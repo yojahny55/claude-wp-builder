@@ -8,6 +8,72 @@ argument-hint: "[project-name]"
 
 Scaffold a new WordPress project from the starter theme, configure i18n, and generate the project CLAUDE.md.
 
+## Step 0: Check for Existing Demo
+
+Before asking any project questions, check if a demo already exists.
+
+### If `$ARGUMENTS` looks like a file path (ends in `.html` or `.htm`):
+
+1. Copy the file to `demo/index.html` (create `demo/` directory if needed).
+2. Proceed to the **Demo-First Path** below — skip the confirmation prompt since the user's intent is clear.
+3. If both `demo/index.html` already exists AND a path argument is given, the path argument takes priority (copies over the existing demo).
+
+### If `$ARGUMENTS` is NOT a file path (or is empty):
+
+1. Check if `demo/index.html` exists in the current working directory.
+2. If found, ask the user:
+   > "I found an existing demo at `demo/index.html`. Would you like to use it as the basis for this project? (Y/n)"
+3. If the user confirms, proceed to the **Demo-First Path**.
+4. If the user declines or no demo exists, proceed to **Step 1: Gather Project Details** (the normal flow).
+
+### Demo-First Path
+
+**Step D1 — Delimiter check:**
+- Read `demo/index.html` and scan for `<!-- ============ SECTION:` delimiters.
+- If NO delimiters are found, inform the user:
+  > "This demo doesn't have section delimiters. Running /wp-polish to prepare it..."
+- Run the `/wp-polish` command on `demo/index.html`, then re-read the polished file.
+- If SOME delimiters exist but sections appear to be missing them, also run `/wp-polish`.
+
+**Step D2 — Extract project info from demo:**
+
+Parse the demo HTML and extract as much as possible:
+
+| Field | How to extract |
+|-------|---------------|
+| Project name | `<title>` tag content (remove suffixes like " — Home", " \| Homepage"). Fall back to `<h1>` content, then folder name. |
+| Slug | Slugify the project name (lowercase, hyphens for spaces, strip special chars). |
+| Industry | Analyze headings and body text for industry keywords. Examples: "patients"/"medical" → healthcare, "cases"/"legal" → law, "menu"/"dishes" → restaurant, "portfolio"/"design" → creative. If uncertain, set to "general". |
+| Primary language | Read the `<html lang="">` attribute. Fall back to content language detection. Default: `en`. |
+| Secondary language | Look for `lang=""` attributes on sub-elements, or content in a second language. Default: `es`. |
+| Sections | List all section names from `<!-- ============ SECTION: Name ============ -->` delimiters (exclude Header and Footer). |
+| Color palette | Read `:root` CSS custom properties for `--color-*` values. If no `:root`, scan for dominant colors in inline styles. |
+| Fonts | Read `font-family` declarations from `:root` or `<style>`. Check for Google Fonts `<link>` tags. |
+
+**Step D3 — Present pre-filled defaults:**
+
+Show all extracted values in a summary and ask the user to confirm or adjust:
+
+```
+=== Extracted from Demo ===
+  Project name:     Kairo Consulting
+  Theme slug:       kairo-consulting
+  Industry:         consulting
+  Primary lang:     en
+  Secondary lang:   es
+  Sections:         Hero, Services, About, Testimonials, Contact
+  Colors:           #1a5632, #c9a84c, #fafafa, #262626
+  Fonts:            Inter, Playfair Display
+
+Confirm these values? (Enter to accept, or type the field name to change it)
+```
+
+The user can override any field. Once confirmed, use these values for the rest of the init process.
+
+**Step D4 — Continue with normal scaffolding:**
+
+Proceed to **Step 2: Locate wp-content/themes/** and continue the normal flow (Steps 2-8) using the confirmed values from Step D3 instead of asking for them in Step 1.
+
 ## Step 1: Gather Project Details
 
 If `$ARGUMENTS` is provided, use it as the project name. Then prompt the user for any missing details:
@@ -110,6 +176,27 @@ Create `.claude/CLAUDE.md` at the **project root** (the directory containing `wp
 8. `/wp-finalize` — Pre-delivery checklist
 ```
 
+**If this is a demo-first project** (demo existed before init), add the following to the generated CLAUDE.md:
+
+After the `## Project Details` section, add:
+
+```markdown
+## Demo
+- **Source:** Existing demo (original preserved at demo/original.html)
+- **Sections:** <comma-separated list of detected sections>
+- **Colors:** <extracted color values>
+- **Fonts:** <extracted font families>
+```
+
+And in the `## Workflow` section, replace:
+```
+1. `/wp-demo` — Create a demo HTML mockup for client approval
+```
+With:
+```
+1. ~~`/wp-demo`~~ — Demo already exists, skip to /wp-header
+```
+
 ## Step 8: Activate Theme (Optional)
 
 Check if WP-CLI is available by running `wp --info` or `which wp`. If available:
@@ -134,4 +221,20 @@ Languages:  <primary> + <secondary>
 CLAUDE.md:  <path-to-claude-md>
 
 Next step: Run /wp-demo to create a demo mockup.
+```
+
+**If this is a demo-first project**, adjust the summary:
+
+```
+=== Project Initialized (from existing demo) ===
+Project:    <Project Name>
+Theme:      <themes-dir>/<slug>/
+Slug:       <slug>
+Prefix:     <prefix>
+Languages:  <primary> + <secondary>
+Sections:   <detected sections>
+CLAUDE.md:  <path-to-claude-md>
+Demo:       demo/index.html (original at demo/original.html)
+
+Next step: Run /wp-header to build the site header.
 ```
