@@ -14,7 +14,7 @@
         "repo": "yojahny55/claude-wp-builder"
       },
       "description": "Claude Code plugin for building custom WordPress sites — demo-first workflow with ACF/SCF fields, bilingual support, and section-by-section theme generation",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "author": {
         "name": "Yojahny"
       },
