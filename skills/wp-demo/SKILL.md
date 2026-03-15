@@ -175,6 +175,7 @@ Each demo is a **single HTML file** containing everything: meta tags, embedded C
             </div>
         </div>
     </header>
+    <!-- ============ END SECTION: Header ============ -->
 
     <main>
         <!-- ============ SECTION: Hero ============ -->
@@ -194,6 +195,7 @@ Each demo is a **single HTML file** containing everything: meta tags, embedded C
                 </div>
             </div>
         </section>
+        <!-- ============ END SECTION: Hero ============ -->
 
         <!-- ============ SECTION: Services ============ -->
         <section class="services section section--alt" id="services">
@@ -205,6 +207,7 @@ Each demo is a **single HTML file** containing everything: meta tags, embedded C
                 </div>
             </div>
         </section>
+        <!-- ============ END SECTION: Services ============ -->
 
         <!-- ... more sections ... -->
 
@@ -214,6 +217,7 @@ Each demo is a **single HTML file** containing everything: meta tags, embedded C
                 <!-- Contact content -->
             </div>
         </section>
+        <!-- ============ END SECTION: Contact ============ -->
     </main>
 
     <!-- ============ SECTION: Footer ============ -->
@@ -252,6 +256,7 @@ Each demo is a **single HTML file** containing everything: meta tags, embedded C
             </div>
         </div>
     </footer>
+    <!-- ============ END SECTION: Footer ============ -->
 
     <script>
         // Minimal JS for demo interactivity (hamburger toggle, scroll effects)
