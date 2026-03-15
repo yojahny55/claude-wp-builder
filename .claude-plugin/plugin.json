@@ -1,0 +1,10 @@
+{
+  "name": "claude-wp-builder",
+  "description": "WordPress site-building methodology: demo HTML → custom theme with ACF/SCF, bilingual support, section-by-section building",
+  "version": "1.0.0",
+  "author": {
+    "name": "Yojahny"
+  },
+  "license": "MIT",
+  "keywords": ["wordpress", "theme", "acf", "scf", "bilingual", "i18n"]
+}
