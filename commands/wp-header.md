@@ -83,7 +83,27 @@ Dispatch the **wp-css** agent with these instructions:
 > /* ============ END HEADER ============ */
 > ```
 
-## Step 6: Update Theme Setup
+## Step 6: Dispatch wp-acf Agent — Add Header Fields to Settings Page
+
+Dispatch the **wp-acf** agent with these instructions:
+
+> Read `fields/settings.php` and ADD any project-specific header fields to the **Header tab** that are needed based on the demo design.
+>
+> The starter theme already includes basic header fields (CTA text/link, phone). Based on the demo, you may need to add:
+> - Header tagline/subtitle text
+> - Header background image or color override
+> - Show/hide toggles for header elements
+> - Additional CTA buttons
+> - Any other header element the client should be able to edit
+>
+> For each new field:
+> 1. Add the primary language field after the existing Header tab fields (before the Footer tab)
+> 2. Add the bilingual `_es` variant in the Spanish Translations tab
+> 3. Follow the existing naming convention: `field_settings_header_<element>`
+>
+> All fields use `'option'` as post ID. Instructions on Spanish fields: "Leave empty to use English version."
+
+## Step 7: Update Theme Setup
 
 Read `inc/theme-setup.php` and ensure `register_nav_menus()` includes per-language menu locations:
 
@@ -103,7 +123,7 @@ Also ensure the nav walker file is included:
 require_once get_template_directory() . '/inc/nav-walker.php';
 ```
 
-## Step 7: Print Summary
+## Step 8: Print Summary
 
 ```
 === Header Built ===
@@ -112,6 +132,7 @@ Files created/updated:
   - inc/nav-walker.php
   - inc/theme-setup.php (menu locations)
   - assets/css/styles.css (header CSS)
+  - fields/settings.php (header ACF fields in Header tab)
 
 Features:
   - Responsive navigation (hamburger on mobile)

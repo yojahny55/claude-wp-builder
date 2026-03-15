@@ -2,6 +2,9 @@
 /**
  * ACF Field Group: Site Settings (Options Page)
  *
+ * Tab structure: General | Header | Footer | Contact | Address | Social | Legal | Designer | Spanish Translations
+ * The /wp-header and /wp-footer commands add project-specific fields to the Header and Footer tabs.
+ *
  * @package __STARTER_NAME__
  */
 
@@ -32,7 +35,67 @@ acf_add_local_field_group(array(
             'type' => 'image',
             'return_format' => 'array',
             'preview_size' => 'medium',
-            'instructions' => 'Upload the site logo. Recommended: SVG or transparent PNG.',
+            'instructions' => 'Upload the site logo. Recommended: SVG or transparent PNG. Used in header and footer.',
+        ),
+        array(
+            'key' => 'field_settings_site_favicon',
+            'label' => 'Favicon',
+            'name' => 'site_favicon',
+            'type' => 'image',
+            'return_format' => 'array',
+            'preview_size' => 'thumbnail',
+            'instructions' => 'Site favicon. Recommended: 32x32 or 512x512 PNG.',
+        ),
+
+        // ── Header Tab ──────────────────────────────────────────
+        // /wp-header adds project-specific fields here based on the demo design.
+        // Common fields: CTA button text/link, phone number display, header style options.
+        array(
+            'key' => 'field_settings_tab_header',
+            'label' => 'Header',
+            'type' => 'tab',
+            'placement' => 'left',
+        ),
+        array(
+            'key' => 'field_settings_header_cta_text',
+            'label' => 'CTA Button Text',
+            'name' => 'header_cta_text',
+            'type' => 'text',
+            'instructions' => 'Text for the header call-to-action button. Leave empty to hide.',
+            'default_value' => 'Contact Us',
+        ),
+        array(
+            'key' => 'field_settings_header_cta_link',
+            'label' => 'CTA Button Link',
+            'name' => 'header_cta_link',
+            'type' => 'url',
+            'instructions' => 'URL for the header CTA button.',
+        ),
+        array(
+            'key' => 'field_settings_header_phone',
+            'label' => 'Header Phone Number',
+            'name' => 'header_phone',
+            'type' => 'text',
+            'instructions' => 'Phone number displayed in the header. Leave empty to hide.',
+        ),
+        // Note: /wp-header may add additional fields here based on the demo design
+
+        // ── Footer Tab ──────────────────────────────────────────
+        // /wp-footer adds project-specific fields here based on the demo design.
+        array(
+            'key' => 'field_settings_tab_footer',
+            'label' => 'Footer',
+            'type' => 'tab',
+            'placement' => 'left',
+        ),
+        array(
+            'key' => 'field_settings_footer_logo',
+            'label' => 'Footer Logo',
+            'name' => 'footer_logo',
+            'type' => 'image',
+            'return_format' => 'array',
+            'preview_size' => 'medium',
+            'instructions' => 'Optional separate logo for the footer. Leave empty to use the site logo.',
         ),
         array(
             'key' => 'field_settings_footer_brand_text',
@@ -50,6 +113,7 @@ acf_add_local_field_group(array(
             'instructions' => 'Copyright line. Use {year} for the current year.',
             'default_value' => '© {year} __STARTER_NAME__. All rights reserved.',
         ),
+        // Note: /wp-footer may add additional fields here based on the demo design
 
         // ── Contact Tab ──────────────────────────────────────────
         array(
@@ -59,18 +123,18 @@ acf_add_local_field_group(array(
             'placement' => 'left',
         ),
         array(
-            'key' => 'field_settings_footer_email',
+            'key' => 'field_settings_contact_email',
             'label' => 'Email Address',
-            'name' => 'footer_email',
+            'name' => 'contact_email',
             'type' => 'text',
-            'instructions' => 'Contact email displayed in the footer.',
+            'instructions' => 'Main contact email. Used in footer and contact sections.',
         ),
         array(
-            'key' => 'field_settings_footer_phone',
+            'key' => 'field_settings_contact_phone',
             'label' => 'Phone Number',
-            'name' => 'footer_phone',
+            'name' => 'contact_phone',
             'type' => 'text',
-            'instructions' => 'Contact phone displayed in the footer.',
+            'instructions' => 'Main contact phone. Used in footer and contact sections.',
         ),
         array(
             'key' => 'field_settings_contact_form_shortcode',
@@ -78,38 +142,6 @@ acf_add_local_field_group(array(
             'name' => 'contact_form_shortcode',
             'type' => 'text',
             'instructions' => 'Shortcode for the contact form (e.g., Contact Form 7).',
-        ),
-
-        // ── Legal Tab ────────────────────────────────────────────
-        array(
-            'key' => 'field_settings_tab_legal',
-            'label' => 'Legal',
-            'type' => 'tab',
-            'placement' => 'left',
-        ),
-        array(
-            'key' => 'field_settings_privacy_policy_page',
-            'label' => 'Privacy Policy Page',
-            'name' => 'privacy_policy_page',
-            'type' => 'page_link',
-            'post_type' => array('page'),
-            'allow_null' => 1,
-        ),
-        array(
-            'key' => 'field_settings_terms_page',
-            'label' => 'Terms of Service Page',
-            'name' => 'terms_page',
-            'type' => 'page_link',
-            'post_type' => array('page'),
-            'allow_null' => 1,
-        ),
-        array(
-            'key' => 'field_settings_legal_disclaimer',
-            'label' => 'Legal Disclaimer',
-            'name' => 'legal_disclaimer',
-            'type' => 'textarea',
-            'rows' => 4,
-            'instructions' => 'Legal disclaimer text shown in the footer or legal pages.',
         ),
 
         // ── Address Tab ──────────────────────────────────────────
@@ -173,6 +205,38 @@ acf_add_local_field_group(array(
             'type' => 'url',
         ),
 
+        // ── Legal Tab ────────────────────────────────────────────
+        array(
+            'key' => 'field_settings_tab_legal',
+            'label' => 'Legal',
+            'type' => 'tab',
+            'placement' => 'left',
+        ),
+        array(
+            'key' => 'field_settings_privacy_policy_page',
+            'label' => 'Privacy Policy Page',
+            'name' => 'privacy_policy_page',
+            'type' => 'page_link',
+            'post_type' => array('page'),
+            'allow_null' => 1,
+        ),
+        array(
+            'key' => 'field_settings_terms_page',
+            'label' => 'Terms of Service Page',
+            'name' => 'terms_page',
+            'type' => 'page_link',
+            'post_type' => array('page'),
+            'allow_null' => 1,
+        ),
+        array(
+            'key' => 'field_settings_legal_disclaimer',
+            'label' => 'Legal Disclaimer',
+            'name' => 'legal_disclaimer',
+            'type' => 'textarea',
+            'rows' => 4,
+            'instructions' => 'Legal disclaimer text shown in the footer or legal pages.',
+        ),
+
         // ── Designer Tab ─────────────────────────────────────────
         array(
             'key' => 'field_settings_tab_designer',
@@ -219,6 +283,40 @@ acf_add_local_field_group(array(
             'preview_size' => 'medium',
             'instructions' => 'Leave empty to use English version.',
         ),
+
+        // Header - Spanish
+        array(
+            'key' => 'field_settings_header_cta_text_es',
+            'label' => 'Header CTA Text (ES)',
+            'name' => 'header_cta_text_es',
+            'type' => 'text',
+            'instructions' => 'Leave empty to use English version.',
+        ),
+        array(
+            'key' => 'field_settings_header_cta_link_es',
+            'label' => 'Header CTA Link (ES)',
+            'name' => 'header_cta_link_es',
+            'type' => 'url',
+            'instructions' => 'Leave empty to use English version.',
+        ),
+        array(
+            'key' => 'field_settings_header_phone_es',
+            'label' => 'Header Phone (ES)',
+            'name' => 'header_phone_es',
+            'type' => 'text',
+            'instructions' => 'Leave empty to use English version.',
+        ),
+
+        // Footer - Spanish
+        array(
+            'key' => 'field_settings_footer_logo_es',
+            'label' => 'Footer Logo (ES)',
+            'name' => 'footer_logo_es',
+            'type' => 'image',
+            'return_format' => 'array',
+            'preview_size' => 'medium',
+            'instructions' => 'Leave empty to use English version.',
+        ),
         array(
             'key' => 'field_settings_footer_brand_text_es',
             'label' => 'Footer Brand Text (ES)',
@@ -237,16 +335,16 @@ acf_add_local_field_group(array(
 
         // Contact - Spanish
         array(
-            'key' => 'field_settings_footer_email_es',
+            'key' => 'field_settings_contact_email_es',
             'label' => 'Email Address (ES)',
-            'name' => 'footer_email_es',
+            'name' => 'contact_email_es',
             'type' => 'text',
             'instructions' => 'Leave empty to use English version.',
         ),
         array(
-            'key' => 'field_settings_footer_phone_es',
+            'key' => 'field_settings_contact_phone_es',
             'label' => 'Phone Number (ES)',
-            'name' => 'footer_phone_es',
+            'name' => 'contact_phone_es',
             'type' => 'text',
             'instructions' => 'Leave empty to use English version.',
         ),
@@ -255,6 +353,23 @@ acf_add_local_field_group(array(
             'label' => 'Contact Form Shortcode (ES)',
             'name' => 'contact_form_shortcode_es',
             'type' => 'text',
+            'instructions' => 'Leave empty to use English version.',
+        ),
+
+        // Address - Spanish
+        array(
+            'key' => 'field_settings_business_address_es',
+            'label' => 'Business Address (ES)',
+            'name' => 'business_address_es',
+            'type' => 'textarea',
+            'rows' => 3,
+            'instructions' => 'Leave empty to use English version.',
+        ),
+        array(
+            'key' => 'field_settings_address_map_link_es',
+            'label' => 'Map Link (ES)',
+            'name' => 'address_map_link_es',
+            'type' => 'url',
             'instructions' => 'Leave empty to use English version.',
         ),
 
@@ -283,60 +398,6 @@ acf_add_local_field_group(array(
             'name' => 'legal_disclaimer_es',
             'type' => 'textarea',
             'rows' => 4,
-            'instructions' => 'Leave empty to use English version.',
-        ),
-
-        // Address - Spanish
-        array(
-            'key' => 'field_settings_business_address_es',
-            'label' => 'Business Address (ES)',
-            'name' => 'business_address_es',
-            'type' => 'textarea',
-            'rows' => 3,
-            'instructions' => 'Leave empty to use English version.',
-        ),
-        array(
-            'key' => 'field_settings_address_map_link_es',
-            'label' => 'Map Link (ES)',
-            'name' => 'address_map_link_es',
-            'type' => 'url',
-            'instructions' => 'Leave empty to use English version.',
-        ),
-
-        // Social - Spanish (unlikely to differ, but included for completeness)
-        array(
-            'key' => 'field_settings_social_instagram_es',
-            'label' => 'Instagram URL (ES)',
-            'name' => 'social_instagram_es',
-            'type' => 'url',
-            'instructions' => 'Leave empty to use English version.',
-        ),
-        array(
-            'key' => 'field_settings_social_facebook_es',
-            'label' => 'Facebook URL (ES)',
-            'name' => 'social_facebook_es',
-            'type' => 'url',
-            'instructions' => 'Leave empty to use English version.',
-        ),
-        array(
-            'key' => 'field_settings_social_tiktok_es',
-            'label' => 'TikTok URL (ES)',
-            'name' => 'social_tiktok_es',
-            'type' => 'url',
-            'instructions' => 'Leave empty to use English version.',
-        ),
-        array(
-            'key' => 'field_settings_social_youtube_es',
-            'label' => 'YouTube URL (ES)',
-            'name' => 'social_youtube_es',
-            'type' => 'url',
-            'instructions' => 'Leave empty to use English version.',
-        ),
-        array(
-            'key' => 'field_settings_social_linkedin_es',
-            'label' => 'LinkedIn URL (ES)',
-            'name' => 'social_linkedin_es',
-            'type' => 'url',
             'instructions' => 'Leave empty to use English version.',
         ),
 

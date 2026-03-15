@@ -68,7 +68,28 @@ Dispatch the **wp-template** agent with these instructions:
 > Follow BEM naming: `.footer__logo`, `.footer__contact`, `.footer__social`, etc.
 > All output must be escaped. Match the demo layout structure.
 
-## Step 5: Dispatch wp-css Agent
+## Step 5: Dispatch wp-acf Agent — Add Footer Fields to Settings Page
+
+Dispatch the **wp-acf** agent with these instructions:
+
+> Read `fields/settings.php` and ADD any project-specific footer fields to the **Footer tab** that are needed based on the demo design.
+>
+> The starter theme already includes basic footer fields (footer logo, brand text, copyright). Based on the demo, you may need to add:
+> - Footer tagline or description text
+> - Footer CTA section (text + button)
+> - Newsletter signup heading/description
+> - Footer column headings
+> - Google Calendar embed code
+> - Any other footer element the client should be able to edit
+>
+> For each new field:
+> 1. Add the primary language field after the existing Footer tab fields (before the Contact tab)
+> 2. Add the bilingual `_es` variant in the Spanish Translations tab
+> 3. Follow the existing naming convention: `field_settings_footer_<element>`
+>
+> All fields use `'option'` as post ID. Instructions on Spanish fields: "Leave empty to use English version."
+
+## Step 6: Dispatch wp-css Agent
 
 Dispatch the **wp-css** agent with these instructions:
 
@@ -91,13 +112,14 @@ Dispatch the **wp-css** agent with these instructions:
 > /* ============ END FOOTER ============ */
 > ```
 
-## Step 6: Print Summary
+## Step 7: Print Summary
 
 ```
 === Footer Built ===
 Files created/updated:
   - footer.php
   - assets/css/styles.css (footer CSS)
+  - fields/settings.php (footer ACF fields in Footer tab)
 
 Settings fields used:
   - footer_logo, footer_description
