@@ -2,7 +2,7 @@
 
 A Claude Code plugin that encodes a complete WordPress site-building methodology into reusable skills, commands, agents, and a starter theme.
 
-**Workflow:** Demo HTML for client approval → Custom WordPress theme built section-by-section with ACF/SCF fields → Bilingual support → Delivery.
+**Workflow:** Demo HTML for client approval (create new or polish existing) → Custom WordPress theme built section-by-section with ACF/SCF fields → Bilingual support → Delivery.
 
 ## Installation
 
@@ -71,6 +71,20 @@ Generates a responsive HTML demo (`demo/index.html`) for client approval. Uses `
 ```
 
 Re-read existing demo and iterate on changes.
+
+### 2b. Or polish an existing demo
+
+```
+/wp-polish path/to/existing-mockup.html
+```
+
+Normalizes any HTML file into a plugin-compatible demo: detects sections, adds section delimiters, normalizes semantic HTML5, adds BEM class naming. Preserves the original at `demo/original.html`.
+
+```
+/wp-polish
+```
+
+Polish the existing `demo/index.html` in place.
 
 ### 3. Build header and footer
 
@@ -143,6 +157,7 @@ Pre-delivery checklist: validates escaping, bilingual coverage, responsive break
 |---------|-------------|
 | `/wp-init` | Scaffold new project from starter theme |
 | `/wp-demo` | Create demo HTML for client approval |
+| `/wp-polish [path]` | Normalize external HTML into plugin-compatible demo |
 | `/wp-header` | Build header with nav, logo, language switcher |
 | `/wp-footer` | Build footer from settings page fields |
 | `/wp-section <name>` | One-shot section: ACF fields + template + CSS |
