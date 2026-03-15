@@ -219,4 +219,9 @@ Placeholder tokens (`__starter__`, `__STARTER__`, `__STARTER_NAME__`) are replac
 
 ## External Dependencies
 
-The `/wp-demo` command works best with `frontend-design` and `ui-ux-pro-max` skills installed. All other commands work independently.
+The `/wp-demo` command works best with these skills installed. All other commands work independently.
+
+| Skill | Repository | Install |
+|-------|-----------|---------|
+| `frontend-design` | [anthropics/claude-code](https://github.com/anthropics/claude-code/tree/main/plugins) | `/plugin install frontend-design@anthropics-claude-code` |
+| `ui-ux-pro-max` | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | `/plugin marketplace add nextlevelbuilder/ui-ux-pro-max-skill` |
