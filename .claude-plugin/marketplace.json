@@ -9,7 +9,10 @@
   "plugins": [
     {
       "name": "claude-wp-builder",
-      "source": "https://github.com/yojahny55/claude-wp-builder",
+      "source": {
+        "source": "github",
+        "repo": "yojahny55/claude-wp-builder"
+      },
       "description": "Claude Code plugin for building custom WordPress sites — demo-first workflow with ACF/SCF fields, bilingual support, and section-by-section theme generation",
       "version": "1.0.0",
       "author": {
