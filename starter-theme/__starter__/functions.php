@@ -42,7 +42,7 @@ function __starter___register_options_page() {
             'page_title'    => '__STARTER_NAME__ Settings',
             'menu_title'    => '__STARTER_NAME__ Settings',
             'menu_slug'     => '__starter__-settings',
-            'capability'    => 'edit_posts',
+            'capability'    => 'manage_options',
             'redirect'      => false,
             'icon_url'      => 'dashicons-admin-generic',
             'position'      => 30,
@@ -55,7 +55,7 @@ add_action('acf/init', '__starter___register_options_page');
  * Admin notice if SCF/ACF is not active
  */
 function __starter___scf_dependency_notice() {
-    if (!function_exists('get_field')) {
+    if (!function_exists('acf_add_local_field_group')) {
         echo '<div class="notice notice-error"><p>';
         echo '<strong>__STARTER_NAME__</strong> requires <a href="https://wordpress.org/plugins/secure-custom-fields/" target="_blank">Secure Custom Fields</a> (or ACF) to be installed and activated.';
         echo '</p></div>';
@@ -159,7 +159,7 @@ function __starter___asset($path) {
  * @return string|array Logo URL or ACF image array
  */
 function __starter___get_logo() {
-    if (!function_exists('get_field')) {
+    if (!function_exists('acf_add_local_field_group')) {
         return __starter___asset('images/logo.svg');
     }
 

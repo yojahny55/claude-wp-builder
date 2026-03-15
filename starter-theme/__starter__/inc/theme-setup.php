@@ -51,7 +51,8 @@ function __starter___setup() {
         'primary-es'   => __('Primary Navigation (ES)', '__starter__'),
         'mobile-en'    => __('Mobile Navigation (EN)', '__starter__'),
         'mobile-es'    => __('Mobile Navigation (ES)', '__starter__'),
-        'footer-links' => __('Footer Links', '__starter__'),
+        'footer-en'    => __('Footer Links (EN)', '__starter__'),
+        'footer-es'    => __('Footer Links (ES)', '__starter__'),
     ));
 }
 add_action('after_setup_theme', '__starter___setup');
