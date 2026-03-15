@@ -1,0 +1,23 @@
+{
+  "name": "claude-wp-builder",
+  "owner": {
+    "name": "Yojahny"
+  },
+  "metadata": {
+    "description": "WordPress site-building methodology: demo HTML, custom themes with ACF/SCF, bilingual support, section-by-section generation"
+  },
+  "plugins": [
+    {
+      "name": "claude-wp-builder",
+      "source": ".",
+      "description": "Claude Code plugin for building custom WordPress sites — demo-first workflow with ACF/SCF fields, bilingual support, and section-by-section theme generation",
+      "version": "1.0.0",
+      "author": {
+        "name": "Yojahny"
+      },
+      "repository": "https://github.com/yojahny55/claude-wp-builder",
+      "license": "MIT",
+      "keywords": ["wordpress", "theme", "acf", "scf", "bilingual", "i18n"]
+    }
+  ]
+}

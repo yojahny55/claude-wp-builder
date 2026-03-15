@@ -6,11 +6,47 @@ A Claude Code plugin that encodes a complete WordPress site-building methodology
 
 ## Installation
 
+### Option 1: Plugin Marketplace (Recommended)
+
+**Step 1 — Add the marketplace:**
+
+```
+/plugin marketplace add yojahny55/claude-wp-builder
+```
+
+**Step 2 — Install the plugin:**
+
+```
+/plugin install claude-wp-builder@claude-wp-builder
+```
+
+Or use the interactive UI: run `/plugin`, go to the **Discover** tab, and select **claude-wp-builder**.
+
+### Option 2: Direct from CLI
+
 ```bash
 claude --plugin-dir /path/to/claude-wp-builder
 ```
 
-Or add to your Claude Code settings for permanent use.
+### Option 3: Project-level auto-install
+
+Add to your project's `.claude/settings.json` so all collaborators get it automatically:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "claude-wp-builder": {
+      "source": {
+        "source": "github",
+        "repo": "yojahny55/claude-wp-builder"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "claude-wp-builder@claude-wp-builder": true
+  }
+}
+```
 
 ## Workflow
 
