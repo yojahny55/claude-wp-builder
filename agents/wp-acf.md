@@ -380,3 +380,50 @@ Multiple conditions in one rule (AND logic — ALL must match):
 10. **Always include `if (!defined('ABSPATH')) { exit; }`** at the top of every file
 11. **Image fields:** specify `return_format` ('array' for template flexibility, 'url' for simple display)
 12. **Provide `instructions`** for fields where the purpose is not obvious from the label
+
+## WP-CLI Integration (when `.wp-create.json` exists)
+
+After generating field definition files, if `.wp-create.json` exists in the project root:
+
+### Read the WP-CLI wrapper
+
+```bash
+# Read wrapper from .wp-create.json
+$WP = <value of wp_cli.wrapper from manifest>
+```
+
+### Validate field registration
+
+ACF fields register automatically via the `acf/init` hook when WordPress loads. WP-CLI triggers a full WordPress bootstrap, so validation works immediately:
+
+```bash
+$WP eval "echo get_field('<field_name>', 'option') !== null ? 'OK' : 'MISSING';"
+```
+
+### Seed field values (if demo content is available)
+
+Use ACF's `update_field()` API (preferred — storage-format-agnostic):
+
+```bash
+# Simple fields
+$WP eval "update_field('hero_title', 'Building Digital Excellence', 'option');"
+
+# Image fields (import first)
+ID=$($WP media import '<url>' --porcelain)
+$WP eval "update_field('hero_image', $ID, 'option');"
+
+# Repeater fields
+$WP eval "update_field('services_cards', array(
+  array('title' => 'Web Design', 'icon' => 43),
+  array('title' => 'SEO', 'icon' => 44),
+), 'option');"
+
+# Bilingual variants
+$WP eval "update_field('hero_title_es', 'Construyendo Excelencia Digital', 'option');"
+```
+
+### Flush cache after seeding
+
+```bash
+$WP cache flush
+```

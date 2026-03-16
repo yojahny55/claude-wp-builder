@@ -111,6 +111,49 @@ Verify required WordPress theme files and configurations:
 
 ---
 
+### Check 7: WP-CLI Runtime Validation (when `.wp-create.json` exists)
+
+If `.wp-create.json` exists in the project, read `wp_cli.wrapper` and run runtime checks:
+
+1. **Pages exist with correct templates:**
+   ```bash
+   $WP post list --post_type=page --format=table
+   ```
+   Verify each page referenced in `front-page.php` `get_template_part()` calls has a corresponding WordPress page.
+
+2. **Menus assigned to locations:**
+   ```bash
+   $WP menu location list --format=table
+   ```
+   Verify all registered locations (primary_en, primary_es, footer_en, footer_es) have menus assigned.
+
+3. **ACF fields return values:**
+   For each section's field file in `fields/`, extract the primary field name and verify:
+   ```bash
+   $WP eval "echo get_field('<section>_title', 'option') ? 'OK' : 'EMPTY';"
+   ```
+
+4. **Permalinks work:**
+   ```bash
+   $WP rewrite flush
+   ```
+
+5. **No PHP errors:**
+   ```bash
+   $WP eval "error_reporting(E_ALL); echo 'Clean';"
+   ```
+   Also check `wp-content/debug.log` for recent errors.
+
+6. **All plugins active:**
+   ```bash
+   $WP plugin list --status=active --format=table
+   ```
+   Compare against `plugins.installed` in manifest.
+
+**PASS** if all runtime checks succeed. **FAIL** with details.
+
+---
+
 ## Step 4: Print Report
 
 ```
@@ -135,8 +178,16 @@ Verify required WordPress theme files and configurations:
 [PASS] Settings page
   Options page registered, fields/settings.php loaded.
 
+[PASS] WP-CLI runtime validation
+  Pages, menus, ACF fields, permalinks, PHP errors, and plugins all verified.
+  (Skipped if .wp-create.json not found)
+
 ---
-Result: 4/6 checks passed — 2 issues found
+Result: 4/7 checks passed — 3 issues found (with .wp-create.json)
+Result: 4/6 checks passed — 2 issues found (without .wp-create.json)
+
+Note: Check 7 (WP-CLI Runtime Validation) only runs when `.wp-create.json` exists.
+If absent, the total is out of 6 instead of 7.
 
 Issues to fix:
 1. Add Spanish field variants in fields/hero.php
@@ -147,5 +198,5 @@ Issues to fix:
 If all checks pass:
 ```
 ---
-Result: Ready to deliver! All 6 checks passed.
+Result: Ready to deliver! All 7 checks passed. (or 6/6 if no .wp-create.json)
 ```

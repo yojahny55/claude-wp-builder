@@ -1,0 +1,9 @@
+{
+  "name": "Starter",
+  "description": "Minimal setup for custom theme development",
+  "plugins": [
+    { "slug": "secure-custom-fields", "required": true },
+    { "slug": "wordpress-seo", "required": false },
+    { "slug": "wp-fastest-cache", "required": false }
+  ]
+}

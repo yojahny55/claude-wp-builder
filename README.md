@@ -2,7 +2,7 @@
 
 A Claude Code plugin that encodes a complete WordPress site-building methodology into reusable skills, commands, agents, and a starter theme.
 
-**Workflow:** Demo HTML for client approval (create new or polish existing) → Custom WordPress theme built section-by-section with ACF/SCF fields → Bilingual support → Delivery.
+**Workflow:** Environment setup → Demo HTML for client approval (create new or polish existing) → Custom WordPress theme built section-by-section with ACF/SCF fields → Bilingual support → Content seeding → Delivery.
 
 ## Installation
 
@@ -50,13 +50,21 @@ Add to your project's `.claude/settings.json` so all collaborators get it automa
 
 ## Workflow
 
+### 0. Set up the local environment (optional)
+
+```
+/wp-create --path=/var/www/html/my-project
+```
+
+Detects available tools (Docker, DDEV, Lando, Nginx, Apache, Caddy, PHP versions), lets you choose your environment, then downloads WordPress, creates the database, configures the web server, installs plugins, and generates a `.wp-create.json` manifest. Supports adopting existing WordPress installs.
+
 ### 1. Scaffold the project
 
 ```
 /wp-init
 ```
 
-Prompts for project name, slug, languages, industry. Copies the starter theme, replaces placeholders, generates `.claude/CLAUDE.md` with project config.
+Prompts for project name, slug, languages, industry. Copies the starter theme, replaces placeholders, generates `.claude/CLAUDE.md` with project config. When `.wp-create.json` exists, skips redundant questions and activates the theme via WP-CLI.
 
 ### 2. Create the demo
 
@@ -149,7 +157,31 @@ Screenshots at 5 viewports (375px, 576px, 768px, 1024px, 1440px) and checks for 
 /wp-finalize
 ```
 
-Pre-delivery checklist: validates escaping, bilingual coverage, responsive breakpoints, menu registration, theme structure, and more.
+Pre-delivery checklist: validates escaping, bilingual coverage, responsive breakpoints, menu registration, theme structure, and more. When `.wp-create.json` exists, adds WP-CLI runtime checks (pages, menus, ACF fields, plugins).
+
+### 8. Seed content from demo
+
+```
+/wp-seed demo/index.html
+```
+
+Parses demo HTML, imports media, populates all ACF fields (primary + bilingual), creates pages, menus, and sets the front page. Zero manual wp-admin entry needed.
+
+### 9. Debug issues
+
+```
+/wp-debug white screen
+```
+
+Runs comprehensive diagnostics via WP-CLI (health, plugins, DB, config, filesystem) and offers targeted fixes. Keyword-aware: adapts checks based on the issue description.
+
+### 10. Clone a remote site
+
+```
+/wp-clone --from=ssh://user@staging.example.com/path --to=/var/www/html/local
+```
+
+Clones a remote/staging WordPress site to local dev. Supports SSH automated mode and manual SQL dump + uploads import.
 
 ## Commands Reference
 
@@ -165,6 +197,10 @@ Pre-delivery checklist: validates escaping, bilingual coverage, responsive break
 | `/wp-settings` | Extend the settings page with new fields |
 | `/wp-responsive-check` | Responsive validation at 5 viewports |
 | `/wp-finalize` | Pre-delivery validation checklist |
+| `/wp-create` | Set up complete WordPress local dev environment |
+| `/wp-seed` | Seed content from demo HTML with bilingual support |
+| `/wp-debug` | Diagnose WordPress issues with WP-CLI |
+| `/wp-clone` | Clone remote/staging site to local dev |
 
 ## Architecture
 
@@ -177,6 +213,8 @@ Pre-delivery checklist: validates escaping, bilingual coverage, responsive break
 | `wp-css-system` | CSS design system: custom properties, BEM naming, scales |
 | `wp-demo` | Demo HTML creation methodology |
 | `wp-responsive` | Mobile-first responsive patterns, fluid typography, touch targets |
+| `wp-cli-patterns` | WP-CLI best practices for all agents (saves tokens vs PHP generation) |
+| `wp-environments` | Environment detection, config generation, PHP version management |
 
 ### Agents (specialized subagents dispatched by commands)
 
@@ -223,6 +261,27 @@ Placeholder tokens (`__starter__`, `__STARTER__`, `__STARTER_NAME__`) are replac
 - Always use `prefix_get_field()`, never raw `get_field()`
 - Fallback pattern: `$value = prefix_get_field('field') ?: 'Default';`
 - All output escaped: `esc_html()`, `esc_url()`, `esc_attr()`
+
+## Local Development
+
+The `/wp-create` command supports multiple environment types:
+
+| Environment | How |
+|-------------|-----|
+| **Docker** (default) | Ships docker-compose template with WordPress, Nginx/Apache, MariaDB, phpMyAdmin, Mailpit |
+| **DDEV** | Generates `.ddev/config.yaml` |
+| **Lando** | Generates `.lando.yml` |
+| **wp-env** | Generates `.wp-env.json` |
+| **Native Nginx** | Generates vhost + SSL cert + hosts entry |
+| **Native Apache** | Generates vhost + SSL cert + hosts entry |
+| **Native Caddy** | Generates Caddyfile (auto-SSL) |
+
+**Plugin profiles** install common plugins in one WP-CLI call:
+- `starter` — SCF, Yoast SEO, WP Fastest Cache
+- `full` — SCF, Yoast SEO, WP Super Cache, Wordfence, CF7, WP Mail SMTP, Redirection, Site Kit
+- Custom profiles from `.wp-profiles/` or `~/.wp-profiles/`
+
+**Project manifest** (`.wp-create.json`) stores all config and is read by all commands/agents for WP-CLI wrapper, language config, and environment type.
 
 ## Tech Stack
 

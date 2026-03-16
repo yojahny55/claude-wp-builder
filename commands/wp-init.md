@@ -8,6 +8,26 @@ argument-hint: "[project-name]"
 
 Scaffold a new WordPress project from the starter theme, configure i18n, and generate the project CLAUDE.md.
 
+## Pre-Step: Check for `.wp-create.json` Manifest
+
+Before anything else, check if `.wp-create.json` exists in the current working directory or parent directories (same search pattern as `wp-content/themes/`).
+
+### If `.wp-create.json` exists:
+
+Read the manifest and extract:
+- `project.name` → use as project name (skip asking in Step 1)
+- `project.slug` → use as theme slug
+- `languages.primary` → use as primary language
+- `languages.additional` → use as secondary language(s)
+- `wp_cli.wrapper` → use for WP-CLI commands instead of bare `wp`
+- `project.domain` → use for site URL references
+
+**Skip Step 1 entirely** — all project details come from the manifest.
+
+### If `.wp-create.json` does NOT exist:
+
+Proceed with the normal flow (Step 0 → Step 1 → ...). No changes to existing behavior.
+
 ## Step 0: Check for Existing Demo
 
 Before asking any project questions, check if a demo already exists.
@@ -176,6 +196,15 @@ Create `.claude/CLAUDE.md` at the **project root** (the directory containing `wp
 8. `/wp-finalize` — Pre-delivery checklist
 ```
 
+**If `.wp-create.json` manifest exists**, also add the following section to the generated CLAUDE.md (after `## Conventions`):
+
+```markdown
+## WP-CLI
+- Wrapper: `<wp_cli.wrapper from manifest>`
+- Always use this wrapper for all wp commands
+- Environment: <environment.type from manifest>
+```
+
 **If this is a demo-first project** (demo existed before init), add the following to the generated CLAUDE.md:
 
 After the `## Project Details` section, add:
@@ -198,6 +227,20 @@ With:
 ```
 
 ## Step 8: Activate Theme (Optional)
+
+### If `.wp-create.json` exists:
+
+Use the WP-CLI wrapper from the manifest (stored as `$WP`):
+
+```bash
+$WP theme activate <slug>
+$WP eval "echo function_exists('acf_add_options_page') ? 'ACF OK' : 'ACF MISSING';"
+$WP rewrite flush
+```
+
+Then update the manifest: set `theme.initialized` to `true`.
+
+### If `.wp-create.json` does NOT exist:
 
 Check if WP-CLI is available by running `wp --info` or `which wp`. If available:
 

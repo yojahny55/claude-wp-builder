@@ -283,3 +283,50 @@ $cards       = prefix_get_repeater('services_cards', array('title', 'description
 8. **Semantic HTML** — use `<section>`, `<article>`, `<nav>`, `<header>`, `<footer>`, `<main>` appropriately
 9. **Accessibility** — include `alt` attributes on images, `aria` labels on interactive elements
 10. **Never use raw `get_field()`** — always use the project's i18n helper functions (`prefix_get_field`, `prefix_get_repeater`, `prefix_e`)
+
+## WP-CLI Integration (when `.wp-create.json` exists)
+
+After generating template files, if `.wp-create.json` exists in the project root:
+
+### Read the WP-CLI wrapper
+
+```bash
+$WP = <value of wp_cli.wrapper from manifest>
+```
+
+### Create the WordPress page
+
+After creating a page template (e.g., `page-services.php`), create the corresponding WordPress page:
+
+```bash
+PAGE_ID=$($WP post create --post_type=page --post_title='Services' --post_status=publish --porcelain)
+```
+
+### Assign the page template
+
+```bash
+$WP post meta update $PAGE_ID _wp_page_template 'page-services.php'
+```
+
+### Set menu order (for navigation ordering)
+
+```bash
+$WP post update $PAGE_ID --menu_order=2
+```
+
+### Verify template assignment
+
+```bash
+$WP eval "echo get_page_template_slug($PAGE_ID);"
+# Expected: page-services.php
+```
+
+### For front-page.php
+
+If creating the front page template, also set the reading settings:
+
+```bash
+HOME_ID=$($WP post create --post_type=page --post_title='Home' --post_status=publish --porcelain)
+$WP option update show_on_front 'page'
+$WP option update page_on_front $HOME_ID
+```
