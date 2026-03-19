@@ -127,6 +127,8 @@ Provide a screenshot for visual reference:
 /wp-section hero /path/to/screenshot.png
 ```
 
+**CF7 Contact Forms:** Sections named `contact`, `contact-us`, `contacto`, or `get-in-touch` automatically integrate Contact Form 7. Use the `--cf7` flag to force integration for other sections. Generates CF7 forms with branded email templates per language, creates forms via WP-CLI with IDs injected into templates, and saves reference files to `cf7/`.
+
 ### 5. Add page templates
 
 ```
@@ -277,8 +279,8 @@ The `/wp-create` command supports multiple environment types:
 | **Native Caddy** | Generates Caddyfile (auto-SSL) |
 
 **Plugin profiles** install common plugins in one WP-CLI call:
-- `starter` — SCF, Yoast SEO, WP Fastest Cache
-- `full` — SCF, Yoast SEO, WP Super Cache, Wordfence, CF7, WP Mail SMTP, Redirection, Site Kit
+- `starter` — SCF, Rank Math SEO, WP Fastest Cache
+- `full` — SCF, Rank Math SEO, WP Super Cache, Wordfence, CF7, WP Mail SMTP, Redirection, Site Kit
 - Custom profiles from `.wp-profiles/` or `~/.wp-profiles/`
 
 **Project manifest** (`.wp-create.json`) stores all config and is read by all commands/agents for WP-CLI wrapper, language config, and environment type.
