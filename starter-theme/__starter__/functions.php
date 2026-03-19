@@ -17,6 +17,9 @@ require get_template_directory() . '/inc/theme-setup.php';
 // Internationalization (i18n) - must load before field definitions
 require get_template_directory() . '/inc/i18n.php';
 
+// Contact Form 7 helpers (placeholder resolution in email templates)
+require get_template_directory() . '/inc/cf7-helpers.php';
+
 // Custom nav walker
 require get_template_directory() . '/inc/nav-walker.php';
 
