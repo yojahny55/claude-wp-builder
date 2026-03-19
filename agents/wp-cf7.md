@@ -204,14 +204,14 @@ Include fully translated message strings for form validation and submission feed
 | Key | Message |
 |---|---|
 | `mail_sent_ok` | Gracias por su mensaje. Ha sido enviado. |
-| `mail_sent_ng` | Hubo un error al enviar su mensaje. Por favor, intente de nuevo mas tarde. |
-| `validation_error` | Uno o mas campos tienen un error. Por favor, revise e intente de nuevo. |
-| `spam` | Hubo un error al enviar su mensaje. Por favor, intente de nuevo mas tarde. |
-| `accept_terms` | Debe aceptar los terminos y condiciones antes de enviar su mensaje. |
+| `mail_sent_ng` | Hubo un error al enviar su mensaje. Por favor, intente de nuevo más tarde. |
+| `validation_error` | Uno o más campos tienen un error. Por favor, revise e intente de nuevo. |
+| `spam` | Hubo un error al enviar su mensaje. Por favor, intente de nuevo más tarde. |
+| `accept_terms` | Debe aceptar los términos y condiciones antes de enviar su mensaje. |
 | `invalid_required` | Este campo es obligatorio. |
-| `invalid_email` | Por favor, ingrese una direccion de correo electronico valida. |
-| `invalid_url` | Por favor, ingrese una URL valida. |
-| `invalid_tel` | Por favor, ingrese un numero de telefono valido. |
+| `invalid_email` | Por favor, ingrese una dirección de correo electrónico válida. |
+| `invalid_url` | Por favor, ingrese una URL válida. |
+| `invalid_tel` | Por favor, ingrese un número de teléfono válido. |
 
 ## WP-CLI Form Creation
 
@@ -251,7 +251,7 @@ FORM_ID=$($WP eval "
     'mail' => array(
         'active'             => true,
         'subject'            => '[your-subject] - New contact from [your-name]',
-        'sender'             => '[your-name] <[your-email]>',
+        'sender'             => get_option('blogname') . ' <' . get_option('admin_email') . '>',
         'recipient'          => get_option('admin_email'),
         'body'               => file_get_contents('$(pwd)/cf7/email-admin-en.html'),
         'additional_headers' => 'Reply-To: [your-email]',
