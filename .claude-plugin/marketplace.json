@@ -1,10 +1,12 @@
 {
   "name": "claude-wp-builder",
   "owner": {
-    "name": "Yojahny"
+    "name": "Yojahny",
+    "email": "contact@yojahny.dev"
   },
   "metadata": {
-    "description": "WordPress site-building methodology: demo HTML, custom themes with ACF/SCF, bilingual support, section-by-section generation"
+    "description": "WordPress site-building methodology: demo HTML, custom themes with ACF/SCF, bilingual support, section-by-section generation",
+    "version": "1.2.0"
   },
   "plugins": [
     {
@@ -13,14 +15,17 @@
         "source": "github",
         "repo": "yojahny55/claude-wp-builder"
       },
-      "description": "Claude Code plugin for building custom WordPress sites — demo-first workflow with ACF/SCF fields, bilingual support, and section-by-section theme generation",
-      "version": "1.1.0",
+      "description": "Claude Code plugin for building custom WordPress sites — demo-first workflow with ACF/SCF fields, bilingual support, CF7 contact forms, and section-by-section theme generation",
+      "version": "1.2.0",
       "author": {
         "name": "Yojahny"
       },
+      "homepage": "https://yojahny.dev",
       "repository": "https://github.com/yojahny55/claude-wp-builder",
       "license": "MIT",
-      "keywords": ["wordpress", "theme", "acf", "scf", "bilingual", "i18n"]
+      "keywords": ["wordpress", "theme", "acf", "scf", "bilingual", "i18n", "contact-form-7", "cf7", "wp-cli"],
+      "category": "web-development",
+      "tags": ["wordpress", "theme-builder", "acf", "bilingual", "cf7", "wp-cli", "demo-to-theme"]
     }
   ]
 }

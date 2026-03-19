@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0] - 2026-03-18
+
+### Added
+- CF7 (Contact Form 7) integration in `/wp-section contact` — auto-generates CF7 forms, branded HTML email templates, and creates forms via WP-CLI
+- New `wp-cf7` agent for CF7 form generation with bilingual support
+- `inc/cf7-helpers.php` in starter theme — runtime `%%placeholder%%` resolution for CF7 email templates
+- Contact section auto-detection for `contact`, `contact-us`, `contacto`, `get-in-touch` section names
+- `--cf7` flag for explicit CF7 integration on any section
+- Two-phase dispatch in `/wp-section` for contact sections (CF7 agent runs in parallel, template waits for form IDs)
+- Branded HTML email templates (admin notification + user confirmation) with table-based layout for email client compatibility
+
+### Changed
+- Plugin metadata: added `homepage`, `repository`, `category`, `tags` fields for better marketplace discoverability
+
 ## [1.1.0] - 2026-03-15
 
 ### Added
