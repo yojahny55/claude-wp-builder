@@ -216,7 +216,7 @@ Wait for all Phase 1 agents to complete. Extract form IDs from wp-cf7 output.
 > Render the CF7 form in the template using language detection:
 > ```php
 > <?php
-> $form_id = prefix_is_spanish() ? <FORM_ID_ES> : <FORM_ID_EN>;
+> $form_id = prefix_is_lang('es') ? <FORM_ID_ES> : <FORM_ID_EN>;
 > echo do_shortcode('[contact-form-7 id="' . $form_id . '" html_class="contact__form"]');
 > ?>
 > ```

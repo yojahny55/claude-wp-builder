@@ -121,6 +121,11 @@ Email templates use two types of variables:
    - `%%copyright%%` — copyright text
    - `%%business_address%%` — business physical address
    - `%%site_url%%` — site URL
+   - `%%social_facebook%%` — Facebook URL
+   - `%%social_instagram%%` — Instagram URL
+   - `%%social_tiktok%%` — TikTok URL
+   - `%%social_linkedin%%` — LinkedIn URL
+   - `%%social_youtube%%` — YouTube URL
 
 ### Templates to generate per language
 
@@ -291,13 +296,22 @@ echo "Created EN form with ID: $FORM_ID"
 
 Repeat for each language (ES, etc.) with translated content and messages.
 
-### Capture form IDs
+### Store and output form IDs
 
-Store form IDs for later reference (e.g., embedding in templates):
+Store the ES form ID in a theme_mod so that `inc/cf7-helpers.php` can detect the language at runtime for email placeholder resolution:
 
 ```bash
-echo "EN Form ID: $FORM_ID_EN"
-echo "ES Form ID: $FORM_ID_ES"
+# Store ES form ID for language detection in cf7-helpers.php
+if [ -n "$FORM_ID_ES" ]; then
+    $WP eval "set_theme_mod('prefix_cf7_form_es', $FORM_ID_ES);"
+fi
+```
+
+Output form IDs for the `/wp-section` command to pass to the template agent:
+
+```bash
+echo "FORM_ID_EN=$FORM_ID_EN"
+echo "FORM_ID_ES=$FORM_ID_ES"
 ```
 
 ## File Output
