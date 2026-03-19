@@ -169,8 +169,8 @@ Present all discovered profiles:
 
 ```
 === Plugin Profiles ===
-  [1] starter — Minimal setup (SCF, Yoast SEO, WP Fastest Cache)
-  [2] full — Production-ready stack (SCF, Yoast, WP Super Cache, Wordfence, CF7, WP Mail SMTP, Redirection, Site Kit)
+  [1] starter — Minimal setup (SCF, Rank Math SEO, WP Fastest Cache)
+  [2] full — Production-ready stack (SCF, Rank Math SEO, WP Super Cache, CF7, WP Mail SMTP, Site Kit), All In One Security
   [3] agency (custom: ~/.wp-profiles/agency.json) — Agency starter pack
   [4] none — No plugins
 ```
@@ -216,7 +216,7 @@ Present all collected values:
   Web server:      Nginx
   PHP version:     8.3
   Database:        wp_my_project (root/root @ db)
-  Plugin profile:  starter (SCF, Yoast SEO, WP Fastest Cache)
+  Plugin profile:  starter (SCF, Rank Math SEO, WP Fastest Cache)
   Languages:       en (primary), es
   Admin:           webmaster / webmaster
 
