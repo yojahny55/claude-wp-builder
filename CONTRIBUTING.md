@@ -79,6 +79,20 @@ claude plugins add ./
 - Use `__starter__` and `__STARTER_NAME__` as placeholders (replaced at runtime by `/wp-init`).
 - Follow WordPress coding standards.
 
+## AI-Assisted Contributions
+
+This is an AI-powered project — using AI tools (Claude, Copilot, ChatGPT, etc.) to write commands, agents, skills, or theme code is welcome and encouraged.
+
+**However, AI-generated content must be reviewed before submitting.** You are responsible for what you commit:
+
+- **Read every line** of generated code. AI can produce plausible but incorrect WordPress patterns (wrong hook priorities, missing escaping, broken template hierarchy).
+- **Test with a real site.** AI-generated commands and agents must be validated against an actual WordPress project — not just reviewed in the editor.
+- **Verify markdown instructions.** AI may generate agent prompts that sound right but produce wrong output when dispatched. Run the command end-to-end.
+- **Check for hallucinated functions.** AI sometimes invents WordPress functions, WP-CLI flags, or ACF methods that don't exist. Verify against official docs.
+- **Don't submit raw AI output.** If you used AI to generate a contribution, refine it — fix the tone, remove redundancy, tighten the instructions. The best contributions combine AI speed with human judgment.
+
+PRs that appear to be unreviewed AI output (generic boilerplate, hallucinated APIs, untested commands) will be asked to revise before merging.
+
 ## Pull Request Guidelines
 
 ### Before Opening a PR
