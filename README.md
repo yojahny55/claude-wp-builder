@@ -169,7 +169,15 @@ Pre-delivery checklist: validates escaping, bilingual coverage, responsive break
 
 Parses demo HTML, imports media, populates all ACF fields (primary + bilingual), creates pages, menus, and sets the front page. Zero manual wp-admin entry needed.
 
-### 9. Debug issues
+### 9. Audit & auto-fix
+
+```
+/wp-audit
+```
+
+Run comprehensive audits and auto-fix issues (security, SEO, accessibility, performance, best practices).
+
+### 10. Debug issues
 
 ```
 /wp-debug white screen
@@ -177,7 +185,7 @@ Parses demo HTML, imports media, populates all ACF fields (primary + bilingual),
 
 Runs comprehensive diagnostics via WP-CLI (health, plugins, DB, config, filesystem) and offers targeted fixes. Keyword-aware: adapts checks based on the issue description.
 
-### 10. Clone a remote site
+### 11. Clone a remote site
 
 ```
 /wp-clone --from=ssh://user@staging.example.com/path --to=/var/www/html/local
@@ -201,6 +209,7 @@ Clones a remote/staging WordPress site to local dev. Supports SSH automated mode
 | `/wp-finalize` | Pre-delivery validation checklist |
 | `/wp-create` | Set up complete WordPress local dev environment |
 | `/wp-seed` | Seed content from demo HTML with bilingual support |
+| `/wp-audit` | Comprehensive audit — security, SEO, accessibility, performance, best practices |
 | `/wp-debug` | Diagnose WordPress issues with WP-CLI |
 | `/wp-clone` | Clone remote/staging site to local dev |
 
@@ -284,6 +293,41 @@ The `/wp-create` command supports multiple environment types:
 - Custom profiles from `.wp-profiles/` or `~/.wp-profiles/`
 
 **Project manifest** (`.wp-create.json`) stores all config and is read by all commands/agents for WP-CLI wrapper, language config, and environment type.
+
+## Audit & Quality
+
+The `/wp-audit` command runs a comprehensive audit across 5 categories and offers to auto-fix issues.
+
+### Categories
+
+| Flag | Category | Plugin Integration |
+|------|----------|--------------------|
+| `--security` | Security hardening, code scanning | All-in-One WP Security |
+| `--seo` | SEO optimization, schema, meta data | Rank Math SEO |
+| `--a11y` | WCAG 2.1 AA accessibility | — |
+| `--performance` | Core Web Vitals, caching, assets | — |
+| `--best-practices` | WordPress coding standards | — |
+
+### Three-Tier Audit
+
+- **Tier 1 (always):** Code analysis via file scanning
+- **Tier 2 (with WP-CLI):** Runtime checks, plugin configuration
+- **Tier 3 (with web-quality-skills):** Lighthouse-style browser audits
+
+### Usage
+
+```bash
+/wp-audit                    # Run all categories
+/wp-audit --security --seo   # Run specific categories
+/wp-audit --report-only      # Report without fixing
+/wp-audit --security-level maximum  # Set AIOS security level
+```
+
+### Optional Dependencies
+
+- [Rank Math SEO](https://wordpress.org/plugins/seo-by-rank-math/) — auto-installed for SEO audits
+- [All-in-One WP Security](https://wordpress.org/plugins/all-in-one-wp-security-and-firewall/) — auto-installed for security audits
+- [web-quality-skills](https://github.com/addyosmani/web-quality-skills) — optional Claude Code plugin for Lighthouse-style audits
 
 ## Tech Stack
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.3.0] - 2026-03-20
+
+### Added
+- `/wp-audit` command with 5 audit categories: security, SEO, accessibility, performance, best practices
+- Security agent with AIOS plugin auto-configuration (3 security levels: basic, recommended, maximum)
+- SEO agent with Rank Math auto-configuration, schema markup, breadcrumbs, llms.txt, robots.txt
+- Accessibility agent with WCAG 2.1 AA + WordPress-specific checks and auto-fixes
+- Performance agent with Core Web Vitals optimization, caching, compression
+- Best practices agent with WordPress coding standards validation
+- Two configuration agents: wp-audit-rankmath and wp-audit-aios for plugin setup
+- Two knowledge skills: wp-audit-standards and wp-audit-seo-standards
+- Three-tier audit system: code-only, WP-CLI runtime, and external skills (web-quality-skills)
+- Dependency management: auto-detect and offer to install required plugins
+- Optional integration with web-quality-skills (Addy Osmani) for Lighthouse-style audits
+
+### Changed
+- Plugin profiles: replaced Yoast SEO with Rank Math SEO, Wordfence with All-in-One WP Security
+
 ## [1.2.0] - 2026-03-18
 
 ### Added
