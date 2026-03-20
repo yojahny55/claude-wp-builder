@@ -388,9 +388,16 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - Pull request guidelines and review process
 - AI-assisted contribution policy
 
-## Star History
+## Support
 
+If this plugin saves you time building WordPress sites, give it a star — it helps others find it.
+
+[![GitHub stars](https://img.shields.io/github/stars/yojahny55/claude-wp-builder?style=social)](https://github.com/yojahny55/claude-wp-builder)
+
+<!-- Uncomment when the repo has 10+ stars for a meaningful chart:
+## Star History
 [![Star History Chart](https://api.star-history.com/svg?repos=yojahny55/claude-wp-builder&type=Date)](https://star-history.com/#yojahny55/claude-wp-builder&Date)
+-->
 
 ## License
 
