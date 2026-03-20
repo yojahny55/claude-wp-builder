@@ -1,8 +1,31 @@
+<div align="center">
+
 # Claude WP Builder
 
-A Claude Code plugin that encodes a complete WordPress site-building methodology into reusable skills, commands, agents, and a starter theme.
+**Demo HTML to production WordPress theme — automated.**
 
-**Workflow:** Environment setup → Demo HTML for client approval (create new or polish existing) → Custom WordPress theme built section-by-section with ACF/SCF fields → Bilingual support → Content seeding → Delivery.
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](CHANGELOG.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-Plugin-blueviolet.svg)](https://docs.anthropic.com/en/docs/claude-code)
+
+A Claude Code plugin that turns approved demo HTML into a complete WordPress theme — section by section, with ACF/SCF fields, bilingual support, SEO, and security — all from the command line.
+
+[Quick Start](#installation) | [Commands](#commands-reference) | [Architecture](#architecture) | [Contributing](CONTRIBUTING.md) | [Backlog](BACKLOG.md)
+
+</div>
+
+---
+
+### How It Works
+
+```
+/wp-create  →  /wp-demo  →  /wp-init  →  /wp-header  →  /wp-section hero  →  /wp-seed  →  /wp-audit  →  /wp-finalize
+     ↓             ↓            ↓              ↓                ↓                 ↓             ↓              ↓
+  WordPress    Demo HTML    Scaffold      header.php     ACF fields +      Populate      Security,       Pre-delivery
+  + database   for client   theme +       + nav CSS +    template +        all fields    SEO, a11y,      validation
+  + server     approval     CLAUDE.md     ACF fields     section CSS       from demo     performance     checklist
+```
 
 ## Installation
 
@@ -289,7 +312,7 @@ The `/wp-create` command supports multiple environment types:
 
 **Plugin profiles** install common plugins in one WP-CLI call:
 - `starter` — SCF, Rank Math SEO, WP Fastest Cache
-- `full` — SCF, Rank Math SEO, WP Super Cache, Wordfence, CF7, WP Mail SMTP, Redirection, Site Kit
+- `full` — SCF, Rank Math SEO, WP Super Cache, All-in-One WP Security, CF7, WP Mail SMTP, Redirection, Site Kit
 - Custom profiles from `.wp-profiles/` or `~/.wp-profiles/`
 
 **Project manifest** (`.wp-create.json`) stores all config and is read by all commands/agents for WP-CLI wrapper, language config, and environment type.
@@ -345,3 +368,44 @@ The `/wp-demo` command works best with these skills installed. All other command
 |-------|-----------|---------|
 | `frontend-design` | [anthropics/claude-code](https://github.com/anthropics/claude-code/tree/main/plugins) | `/plugin install frontend-design@anthropics-claude-code` |
 | `ui-ux-pro-max` | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | `/plugin marketplace add nextlevelbuilder/ui-ux-pro-max-skill` |
+
+## Roadmap
+
+See [BACKLOG.md](BACKLOG.md) for the full product backlog. Key areas of active development:
+
+- Visual regression testing with Playwright (demo vs WordPress comparison)
+- Multi-page demo support and custom post type auto-detection
+- JavaScript specialist agent for sliders, animations, and interactivity
+- Tailwind CSS detection and build pipeline integration
+
+## Contributing
+
+We welcome contributions from everyone. Whether you found a bug while building a real site, want to improve an agent, or have an idea for a new command — we'd love your help.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+- How to report bugs and suggest improvements
+- Development setup and project structure
+- Pull request guidelines and review process
+- AI-assisted contribution policy
+
+## Star History
+
+<a href="https://star-history.com/#yojahny55/claude-wp-builder&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=yojahny55/claude-wp-builder&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=yojahny55/claude-wp-builder&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=yojahny55/claude-wp-builder&type=Date" />
+ </picture>
+</a>
+
+## License
+
+[MIT](LICENSE) - Yojahny
+
+---
+
+<div align="center">
+
+Built with [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+
+</div>
