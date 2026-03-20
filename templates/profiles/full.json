@@ -3,9 +3,9 @@
   "description": "Complete production-ready stack",
   "plugins": [
     { "slug": "secure-custom-fields", "required": true },
-    { "slug": "wordpress-seo", "required": false },
+    { "slug": "seo-by-rank-math", "required": false },
     { "slug": "wp-super-cache", "required": false },
-    { "slug": "wordfence", "required": false },
+    { "slug": "all-in-one-wp-security-and-firewall", "required": false },
     { "slug": "contact-form-7", "required": false },
     { "slug": "wp-mail-smtp", "required": false },
     { "slug": "redirection", "required": false },
