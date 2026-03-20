@@ -1,0 +1,8 @@
+/* Fade-in animation utility */
+.fade-in {
+  @apply transition-opacity duration-300 opacity-0;
+}
+
+.fade-in.active {
+  @apply opacity-100;
+}

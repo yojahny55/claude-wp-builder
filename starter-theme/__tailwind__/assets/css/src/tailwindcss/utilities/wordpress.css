@@ -1,0 +1,12 @@
+/* WordPress block overrides */
+.wp-block-quote {
+  @apply border-l-4 border-primary pl-4 italic;
+}
+
+.wp-block-image {
+  @apply rounded-lg overflow-hidden;
+}
+
+.wp-caption {
+  @apply max-w-full mx-auto;
+}

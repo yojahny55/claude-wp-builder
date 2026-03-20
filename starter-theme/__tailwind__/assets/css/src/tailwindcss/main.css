@@ -1,0 +1,26 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  /* Colors — replaced by wp-init during demo-first injection */
+  --color-primary: #3b82f6;
+  --color-secondary: #6366f1;
+  --color-accent: #f59e0b;
+  --color-dark: #1e293b;
+  --color-light: #f8fafc;
+  --color-gray: #64748b;
+
+  /* Typography — replaced by wp-init during demo-first injection */
+  --font-primary: "Inter", sans-serif;
+  --font-secondary: "Inter", sans-serif;
+}
+
+@import "./base/reset.css";
+@import "./components/buttons.css";
+@import "./components/forms.css";
+@import "./components/navigation.css";
+@import "./layouts/header.css";
+@import "./layouts/footer.css";
+@import "./layouts/sidebar.css";
+@import "./utilities/animations.css";
+@import "./utilities/wordpress.css";

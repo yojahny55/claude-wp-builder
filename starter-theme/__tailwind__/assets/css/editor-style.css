@@ -1,0 +1,16 @@
+/* Block editor styles — static, not processed by Tailwind */
+.wp-block {
+  max-width: 840px;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+[data-align="wide"] {
+  max-width: 1100px;
+}
+
+[data-align="full"] {
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
+}
