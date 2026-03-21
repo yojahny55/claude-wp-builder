@@ -90,9 +90,58 @@ Confirm these values? (Enter to accept, or type the field name to change it)
 
 The user can override any field. Once confirmed, use these values for the rest of the init process.
 
-**Step D4 — Continue with normal scaffolding:**
+**Step D4 — Inject colors/fonts into theme (template-aware):**
 
-Proceed to **Step 2: Locate wp-content/themes/** and continue the normal flow (Steps 2-8) using the confirmed values from Step D3 instead of asking for them in Step 1.
+- If `$TEMPLATE` is `basic`: Replace CSS custom properties in `assets/css/styles.css` `:root` block with extracted colors. (Existing behavior.)
+
+- If `$TEMPLATE` is `tailwind`: Replace values in the `@theme` block in `assets/css/src/tailwindcss/main.css`:
+
+  | Extracted | Target variable |
+  |-----------|----------------|
+  | Primary/brand color | `--color-primary` |
+  | Secondary color | `--color-secondary` |
+  | Accent/CTA color | `--color-accent` |
+  | Dark text/bg color | `--color-dark` |
+  | Light bg color | `--color-light` |
+  | Muted/gray color | `--color-gray` |
+  | Heading font | `--font-primary` |
+  | Body font | `--font-secondary` |
+
+  If fewer than 6 colors are extracted, leave unmatched variables at their defaults.
+
+  Also suggest running `/wp-tailwindify` to convert the demo's CSS classes to Tailwind utilities.
+
+**Step D5 — Continue with normal scaffolding:**
+
+Proceed to **Step 2: Locate wp-content/themes/** and continue the normal flow (Steps 2-9) using the confirmed values from Step D3 instead of asking for them in Step 1.
+
+## Step 0.5: Select Starter Template
+
+Ask the user to choose a starter template:
+
+> **Select a starter template:**
+> 1. **Basic Starter** — Custom CSS design system (CSS variables, BEM), no build tools needed
+> 2. **Tailwind Starter** — Tailwind CSS 4 + WordPress Scripts build pipeline, BrowserSync
+
+Store the selection as `$TEMPLATE`:
+- Option 1 → `basic`
+- Option 2 → `tailwind`
+
+Default: `basic` (if user presses Enter without selecting).
+
+## Step 0.6: Select Custom Fields Plugin
+
+Ask the user to choose a custom fields plugin:
+
+> **Select custom fields plugin:**
+> 1. **SCF** (Secure Custom Fields) — Free, community fork
+> 2. **ACF Pro** — Premium, requires license
+
+Store the selection as `$CF_PLUGIN`:
+- Option 1 → `scf`
+- Option 2 → `acf`
+
+Default: `scf` (if user presses Enter without selecting).
 
 ## Step 1: Gather Project Details
 
@@ -120,11 +169,17 @@ Store the full path to `wp-content/themes/` for later use.
 
 ## Step 3: Copy Starter Theme
 
-Copy the starter theme skeleton to the new theme directory:
+Copy the selected starter theme to the new theme directory:
 
-```
-cp -r ${CLAUDE_PLUGIN_ROOT}/starter-theme/__starter__/ <themes-dir>/<slug>/
-```
+- If `$TEMPLATE` is `basic`:
+  ```
+  cp -r ${CLAUDE_PLUGIN_ROOT}/starter-theme/__starter__/ <themes-dir>/<slug>/
+  ```
+
+- If `$TEMPLATE` is `tailwind`:
+  ```
+  cp -r ${CLAUDE_PLUGIN_ROOT}/starter-theme/__tailwind__/ <themes-dir>/<slug>/
+  ```
 
 Where `<slug>` is the theme slug from Step 1.
 
@@ -135,6 +190,7 @@ Recursively replace placeholders in ALL files within the new theme directory:
 1. `__starter__` → theme slug (e.g., `kairo-consulting`)
 2. `__STARTER__` → theme slug uppercase with underscores (e.g., `KAIRO_CONSULTING`)
 3. `__STARTER_NAME__` → project display name (e.g., `Kairo Consulting`)
+4. `__STARTER_DOMAIN__` → site domain from `.wp-create.json` manifest `project.domain`, or `<slug>.local` if no manifest (Tailwind template only — present in `package.json`)
 
 Use `find` + `sed` or equivalent to do this across all files (`.php`, `.css`, `.js`, `.json`, etc.).
 
@@ -165,6 +221,8 @@ Create `.claude/CLAUDE.md` at the **project root** (the directory containing `wp
 ## Project Details
 - **Theme slug:** <slug>
 - **Function prefix:** <slug_with_underscores>_ (e.g., kairo_consulting_)
+- **Template:** <basic|tailwind>
+- **Custom Fields:** <SCF|ACF Pro>
 - **Primary language:** <primary_lang>
 - **Secondary language(s):** <secondary_langs>
 - **Industry:** <industry>
@@ -179,7 +237,10 @@ Create `.claude/CLAUDE.md` at the **project root** (the directory containing `wp
 - ACF repeater names: `<section>_<plural>` (e.g., `services_cards`)
 - ACF repeater subfields: `<element>` only, no section prefix
 - ACF field keys: `field_<section>_<element>`, group keys: `group_<section>`
-- CSS class naming: BEM — `.block__element--modifier`
+- If `basic`: CSS class naming: BEM — `.block__element--modifier`
+- If `tailwind`: CSS: Tailwind utility classes; component styles use `@apply` in `assets/css/src/tailwindcss/components/`
+- If `tailwind`: Colors/fonts: Defined in `@theme` block in `assets/css/src/tailwindcss/main.css`
+- If `tailwind`: Build: `npm run preview` for development, `npm run build` for production
 - Template parts: `template-parts/section-<name>.php`
 - Use `<prefix>get_field()` for bilingual fields, never raw `get_field()`
 - Use `<prefix>get_repeater()` for bilingual repeaters
@@ -226,21 +287,41 @@ With:
 1. ~~`/wp-demo`~~ — Demo already exists, skip to /wp-header
 ```
 
-## Step 8: Activate Theme (Optional)
+## Step 8: Activate Theme and Install Dependencies
 
-### If `.wp-create.json` exists:
+### Custom Fields Plugin
+
+- If `$CF_PLUGIN` is `scf`:
+  ```bash
+  $WP plugin install secure-custom-fields --activate
+  ```
+  > Note: Verify the correct WordPress.org slug. If it fails, try `developer-starter-templates`.
+
+- If `$CF_PLUGIN` is `acf`:
+  ```bash
+  $WP eval "echo function_exists('acf_add_options_page') ? 'ACF OK' : 'ACF MISSING';"
+  ```
+  If ACF is missing, print: "ACF Pro is not installed. Please install it manually from your ACF account."
+
+### Verification (both):
+```bash
+$WP eval "echo function_exists('acf_add_options_page') ? 'CF OK' : 'CF MISSING';"
+```
+
+### Theme Activation
+
+#### If `.wp-create.json` exists:
 
 Use the WP-CLI wrapper from the manifest (stored as `$WP`):
 
 ```bash
 $WP theme activate <slug>
-$WP eval "echo function_exists('acf_add_options_page') ? 'ACF OK' : 'ACF MISSING';"
 $WP rewrite flush
 ```
 
 Then update the manifest: set `theme.initialized` to `true`.
 
-### If `.wp-create.json` does NOT exist:
+#### If `.wp-create.json` does NOT exist:
 
 Check if WP-CLI is available by running `wp --info` or `which wp`. If available:
 
@@ -250,6 +331,14 @@ wp theme activate <slug> --path=<wordpress-root>
 
 If WP-CLI is not available, skip this step silently.
 
+### Tailwind Build Dependencies
+
+If `$TEMPLATE` is `tailwind`:
+```bash
+cd <theme-dir> && npm install && npm run build
+```
+This generates `assets/css/dist/main.css` and `assets/js/dist/index.js` needed for the theme to function.
+
 ## Step 9: Print Summary
 
 Print a summary:
@@ -258,6 +347,8 @@ Print a summary:
 === Project Initialized ===
 Project:    <Project Name>
 Theme:      <themes-dir>/<slug>/
+Template:   <Basic Starter|Tailwind Starter>
+CF Plugin:  <SCF|ACF Pro>
 Slug:       <slug>
 Prefix:     <prefix>
 Languages:  <primary> + <secondary>
@@ -266,12 +357,19 @@ CLAUDE.md:  <path-to-claude-md>
 Next step: Run /wp-demo to create a demo mockup.
 ```
 
+If `$TEMPLATE` is `tailwind`, add after "Next step":
+```
+Build:      Run `npm run preview` in the theme directory to start development.
+```
+
 **If this is a demo-first project**, adjust the summary:
 
 ```
 === Project Initialized (from existing demo) ===
 Project:    <Project Name>
 Theme:      <themes-dir>/<slug>/
+Template:   <Basic Starter|Tailwind Starter>
+CF Plugin:  <SCF|ACF Pro>
 Slug:       <slug>
 Prefix:     <prefix>
 Languages:  <primary> + <secondary>
