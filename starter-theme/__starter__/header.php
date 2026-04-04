@@ -3,6 +3,10 @@
  * Header Template — Use /wp-header to generate the full header
  * @package __STARTER_NAME__
  */
+
+// Exit if accessed directly.
+defined( 'ABSPATH' ) || exit;
+
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
