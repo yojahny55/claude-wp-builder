@@ -3,6 +3,10 @@
  * Main Index Template (required WordPress fallback)
  * @package __STARTER_NAME__
  */
+
+// Exit if accessed directly.
+defined( 'ABSPATH' ) || exit;
+
 get_header();
 ?>
 <main id="main-content">
