@@ -515,7 +515,10 @@ cmd_native_setup() {
                     dest="/etc/apache2/sites-available/$domain.conf"
                 fi
                 ;;
-            caddy)  print_status "Caddy configs append to Caddyfile — install manually."; dest="";;
+            caddy)
+                print_error "--vhost-src is not supported for caddy (configs append to Caddyfile). Install manually."
+                return 1
+                ;;
         esac
         if [[ -n "$dest" ]]; then
             cmd_vhost_install --src="$vhost_src" --dest="$dest"

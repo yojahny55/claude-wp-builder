@@ -1,0 +1,66 @@
+● === Audit Complete ===                 
+  Fixed: 45/70 issues
+  Remaining: 25 issues require manual attention                                                                      
+   
+  Applied fixes:                                                                                                     
+    SECURITY (14 applied):
+      ✓ wp-config.php: DISALLOW_FILE_EDIT, FORCE_SSL_ADMIN, DISALLOW_UNFILTERED_HTML, CONCATENATE_SCRIPTS            
+      ✓ AIOS: login lockdown, hide WP version, disable file editing                                                  
+      ✓ Removed sensitive root files (readme.html, license.txt, wp-config-sample.php)                                
+      ✗ uploads/.htaccess failed (permission denied — needs sudo)                                                    
+                                                                                                                     
+    SEO (8 applied):                                                                                                 
+      ✓ Rank Math modules enabled (breadcrumbs, 404-monitor, redirections, local-seo, image-seo)                     
+      ✓ Schema: company/TravelAgency configured                                                                      
+      ✓ Breadcrumbs enabled + added to 7 templates                                                                   
+      ✓ robots.txt + llms.txt created                                                                                
+      ✓ Meta descriptions seeded for 4 pages                                                                         
+      ✓ Category base stripped                                                                                       
+                                                                                                                     
+    A11Y (5 applied):
+      ✓ tabindex="-1" on <main> in 8 templates                                                                       
+      ✓ Admin bar skip-link offset CSS                                                                               
+      ✓ .screen-reader-text CSS class added                                                                          
+      ✓ Redundant role="contentinfo" removed                                                                         
+      ✓ aria-hidden on decorative SVG                                                                                
+                  
+    PERFORMANCE (8 applied earlier by agent):                                                                        
+      ✓ Heartbeat throttle, wp_head cleanup, block CSS dequeue
+      ✓ Script defer strategy, preconnect, WebP conversion                                                           
+      ✓ Memory limit 256M, revisions limit 5                                                                         
+                                                                                                                     
+    BEST PRACTICES (10 applied):                                                                                     
+      ✓ ABSPATH guards in 3 templates                                                                                
+      ✓ Raw get_field() → mk_adventure_get_field() in 6 places                                                       
+      ✓ Unescaped output wrapped in esc_attr()                                                                       
+                                                                                                                     
+  Manual issues remaining:                                                                                           
+    1. [SEC-011] uploads/.htaccess — needs sudo (see command above)
+    2. [SEC-020] Default 'wp_' database prefix — change at setup only                                                
+    3. [SEC-022] XML-RPC enabled — disable via AIOS or nginx                                                         
+    4. [SEC-023] REST API user enumeration — enable AIOS option                                                      
+    5. [SEC-025] Author enumeration — enable AIOS option                                                             
+    6. [SEC-030] wp-config.php permissions 644 → 400                                                                 
+    7. [SEO-004] Heading hierarchy in footer/archive templates                                                       
+    8. [SEO-023] 3 pages still missing meta descriptions (ACF-driven content)                                        
+    9. [SEO-030] No default Open Graph image configured                                                              
+    10. [A11Y-026] outline:none !important on PriceRes inputs — CRITICAL                                             
+    11. [A11Y-003] Gold link color contrast ~2.7:1 (needs 4.5:1)                                                     
+    12. [A11Y-005] Body text links distinguished only by color                                                       
+    13. [A11Y-024] Mobile nav focus management + Escape key + focus trap                                             
+    14. [A11Y-006] Font size in px for Swiper arrows                                                                 
+    15. [A11Y-026b] outline:none on 404 search field                                                                 
+    16. [A11Y-028] Language switcher touch targets                                                                   
+    17. [BP-005] Inline <script> in page-legal.php should be enqueued                                                
+    18. [BP-027a-d] Hardcoded strings not wrapped in translation functions                                           
+    19. [BP-023] Anonymous closure in cf7-helpers.php                                                                
+    20. [PERF-001] CSS 110KB over budget — minify or split                                                           
+    21. [PERF-004] No srcset/sizes on ACF images                                                                     
+    22. [PERF-021] Google Fonts remote, no preload                                                                   
+                                                                                                                     
+  Next steps:                                                                                                        
+    - Address A11Y-026 (CRITICAL) — replace outline:none with outline:transparent                                    
+    - Fix A11Y-003 gold link contrast — darken to ~#9a7a1c for text                                                  
+    - Run /wp-finalize for pre-delivery validation                                                                   
+                                                                                                                     
+✻ Brewed for 12m 47s                                       
