@@ -8,6 +8,34 @@ argument-hint: "[project-name]"
 
 Scaffold a new WordPress project from the starter theme, configure i18n, and generate the project CLAUDE.md.
 
+## Step 0.5: Select Starter Template
+
+Ask the user to choose a starter template:
+
+> **Select a starter template:**
+> 1. **Basic Starter** — Custom CSS design system (CSS variables, BEM), no build tools needed
+> 2. **Tailwind Starter** — Tailwind CSS 4 + WordPress Scripts build pipeline, BrowserSync
+
+Store the selection as `$TEMPLATE`:
+- Option 1 → `basic`
+- Option 2 → `tailwind`
+
+Default: `basic` (if user presses Enter without selecting).
+
+## Step 0.6: Select Custom Fields Plugin
+
+Ask the user to choose a custom fields plugin:
+
+> **Select custom fields plugin:**
+> 1. **SCF** (Secure Custom Fields) — Free, community fork
+> 2. **ACF Pro** — Premium, requires license
+
+Store the selection as `$CF_PLUGIN`:
+- Option 1 → `scf`
+- Option 2 → `acf`
+
+Default: `scf` (if user presses Enter without selecting).
+
 ## Pre-Step: Check for `.wp-create.json` Manifest
 
 Before anything else, check if `.wp-create.json` exists in the current working directory or parent directories (same search pattern as `wp-content/themes/`).
@@ -114,34 +142,6 @@ The user can override any field. Once confirmed, use these values for the rest o
 **Step D5 — Continue with normal scaffolding:**
 
 Proceed to **Step 2: Locate wp-content/themes/** and continue the normal flow (Steps 2-9) using the confirmed values from Step D3 instead of asking for them in Step 1.
-
-## Step 0.5: Select Starter Template
-
-Ask the user to choose a starter template:
-
-> **Select a starter template:**
-> 1. **Basic Starter** — Custom CSS design system (CSS variables, BEM), no build tools needed
-> 2. **Tailwind Starter** — Tailwind CSS 4 + WordPress Scripts build pipeline, BrowserSync
-
-Store the selection as `$TEMPLATE`:
-- Option 1 → `basic`
-- Option 2 → `tailwind`
-
-Default: `basic` (if user presses Enter without selecting).
-
-## Step 0.6: Select Custom Fields Plugin
-
-Ask the user to choose a custom fields plugin:
-
-> **Select custom fields plugin:**
-> 1. **SCF** (Secure Custom Fields) — Free, community fork
-> 2. **ACF Pro** — Premium, requires license
-
-Store the selection as `$CF_PLUGIN`:
-- Option 1 → `scf`
-- Option 2 → `acf`
-
-Default: `scf` (if user presses Enter without selecting).
 
 ## Step 1: Gather Project Details
 
