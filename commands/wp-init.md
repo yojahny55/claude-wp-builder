@@ -15,12 +15,27 @@ Ask the user to choose a starter template:
 > **Select a starter template:**
 > 1. **Basic Starter** — Custom CSS design system (CSS variables, BEM), no build tools needed
 > 2. **Tailwind Starter** — Tailwind CSS 4 + WordPress Scripts build pipeline, BrowserSync
+> 3. **Cinematic Starter** — Scroll-driven cinematic reel (persistent video stage, scene scrub on desktop, autoplay-loop on mobile). Requires the [cinematic-scroll-kit](https://github.com/yojahny55/cinematic-scroll-kit) skill.
 
 Store the selection as `$TEMPLATE`:
 - Option 1 → `basic`
 - Option 2 → `tailwind`
+- Option 3 → `cinematic`
 
 Default: `basic` (if user presses Enter without selecting).
+
+### If `$TEMPLATE = cinematic`
+
+This branch follows a different scaffolding shape — the page is one continuous reel, not discrete sections. After Step 0.6, dispatch to `/wp-cinematic-init` for the cinematic-specific flow:
+
+1. Resolve `cinematic-scroll-kit` (globally-installed skill → `./.cinematic-kit/` → vendored fallback in `starter-theme/__cinematic__/assets/cinematic-kit/`).
+2. If none present, offer: `npx skills add yojahny55/cinematic-scroll-kit -g -y` (recommended). Decline → use vendored fallback.
+3. Copy `starter-theme/__cinematic__/` as the theme.
+4. Run the `wp-cinematic` agent against `schemas/scene.json` to generate `fields/scenes.php`, `fields/trailing-sections.php` (if hybrid), `inc/seed-cinematic.php`, and per-scene template fragments.
+5. Skip the per-section `/wp-section` loop. Author scenes via `/wp-cinematic-scene <n>` and append trailing flex sections via `/wp-section <name> --hybrid` if hybrid mode is on.
+6. Seed with `/wp-cinematic-seed` (uses kit sample videos).
+
+Hybrid mode is **on by default** for cinematic — pass `--no-hybrid` to disable trailing sections.
 
 ## Step 0.6: Select Custom Fields Plugin
 

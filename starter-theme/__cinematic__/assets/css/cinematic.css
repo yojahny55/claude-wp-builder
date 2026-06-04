@@ -1,0 +1,472 @@
+/* ============================================================
+   Cinematic Scroll Kit — continuous cinematic reel template
+   Replace the palette below with your brand colours.
+   The example palette is muted slate/sage — works for premium B2B brands.
+   ============================================================ */
+
+:root{
+  --ink:#0d1010;
+  --paper:#eef1ec;
+  --slate:#57676B;
+  --moss:#74847C;
+  --sage:#9DABA8;
+  --mist:#B4C4BE;
+  --bone:#d6dcd5;
+  --gold:#c9a96b;
+
+  --serif:"Fraunces", "Times New Roman", serif;
+  --sans:"Inter", system-ui, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, monospace;
+
+  --gutter:clamp(1.25rem, 4vw, 4rem);
+  --maxw:1480px;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#0a0c0c;color:var(--paper);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+html.lenis,html.lenis body{height:auto}
+.lenis.lenis-smooth{scroll-behavior:auto!important}
+.lenis.lenis-smooth [data-lenis-prevent]{overscroll-behavior:contain}
+
+img,video{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+::selection{background:var(--mist);color:var(--ink)}
+
+/* film grain */
+.grain{position:fixed;inset:0;z-index:200;pointer-events:none;opacity:.07;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='.55'/></svg>");
+  animation:grainShift 1.4s steps(6) infinite;
+}
+@keyframes grainShift{
+  0%{transform:translate(0,0)}20%{transform:translate(-3%,2%)}40%{transform:translate(2%,-3%)}
+  60%{transform:translate(-2%,1%)}80%{transform:translate(3%,3%)}100%{transform:translate(0,0)}
+}
+
+/* subtle global vignette */
+.vignette{position:fixed;inset:0;z-index:85;pointer-events:none;
+  background:radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,.40) 100%)}
+
+/* Story→pricing transition: a black curtain that draws across the stage */
+.curtain{
+  position:fixed;inset:0;z-index:88;pointer-events:none;
+  background:#0a0c0c;
+  opacity:0;
+  will-change:opacity;
+}
+
+/* ----------------------------------------------------------------
+   PERSISTENT STAGE — one fixed reel of 9 videos that crossfade
+---------------------------------------------------------------- */
+.stage{position:fixed;inset:0;z-index:0;overflow:hidden;background:#0a0c0c}
+.stage__v{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  opacity:0;
+  transform:scale(1.16);
+  transform-origin:center 55%;
+  filter:saturate(.95) contrast(1.05);
+  transition:opacity 1.4s cubic-bezier(.55,0,.25,1), filter 1.6s ease;
+  will-change:opacity,transform,filter;
+  background:#0a0c0c;
+}
+.stage__v.active{opacity:1;filter:saturate(1) contrast(1.06)}
+
+/* veils — three flavours faded in by JS based on current scene's data-veil */
+.stage__veil{
+  position:absolute;inset:0;z-index:2;pointer-events:none;
+  opacity:0;
+  transition:opacity 1.4s cubic-bezier(.55,0,.25,1);
+  background:
+    radial-gradient(130% 90% at 0% 55%, rgba(8,10,11,.92), rgba(8,10,11,.30) 55%, rgba(8,10,11,0) 78%),
+    linear-gradient(to top, rgba(8,10,11,.75), rgba(8,10,11,.10) 38%, rgba(8,10,11,.55));
+  mix-blend-mode:multiply;
+}
+.stage__veil--right{
+  background:
+    radial-gradient(130% 90% at 100% 55%, rgba(8,10,11,.94), rgba(8,10,11,.30) 55%, rgba(8,10,11,0) 78%),
+    linear-gradient(to top, rgba(8,10,11,.7), rgba(8,10,11,.05) 38%, rgba(8,10,11,.45));
+}
+.stage__veil--center{
+  background:
+    radial-gradient(45% 35% at 50% 50%, rgba(8,10,11,.72), rgba(8,10,11,.35) 65%, rgba(8,10,11,.55) 100%),
+    radial-gradient(120% 90% at 50% 50%, rgba(8,10,11,.25), rgba(8,10,11,.75));
+}
+.stage[data-veil="left"]   .stage__veil:not(.stage__veil--right):not(.stage__veil--center){opacity:1}
+.stage[data-veil="right"]  .stage__veil--right{opacity:1}
+.stage[data-veil="center"] .stage__veil--center{opacity:1}
+
+/* grade pass for cinematic split-tone */
+.stage::after{
+  content:"";position:absolute;inset:0;z-index:3;pointer-events:none;
+  background:
+    radial-gradient(60% 40% at 50% 30%, rgba(180,196,190,.05), transparent 70%),
+    radial-gradient(80% 60% at 50% 100%, rgba(201,169,107,.04), transparent 70%);
+  mix-blend-mode:screen;
+}
+
+/* ----------------------------------------------------------------
+   Nav
+---------------------------------------------------------------- */
+.nav{
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:2rem;
+  padding:1.1rem var(--gutter);
+  background:linear-gradient(to bottom, rgba(8,10,10,.55), rgba(8,10,10,0));
+  font-family:var(--mono); font-size:.72rem; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--bone);
+}
+.nav__mark{display:inline-flex;align-items:center;gap:.55rem;color:var(--paper)}
+.nav__mark span{display:inline-flex;gap:.25ch;font-family:var(--serif);font-style:normal;font-size:1rem;letter-spacing:.02em;text-transform:none}
+.nav__mark em{font-style:italic;color:var(--sage);font-weight:300}
+.nav__links{display:flex;justify-content:flex-end;gap:1.6rem;align-items:center}
+.nav__links a{position:relative;color:var(--bone);transition:color .3s}
+.nav__links a:hover{color:var(--paper)}
+.nav__links a:not(.nav__cta)::after{content:"";position:absolute;left:0;right:0;bottom:-.4em;height:1px;background:currentColor;transform:scaleX(0);transform-origin:left;transition:transform .4s}
+.nav__links a:not(.nav__cta):hover::after{transform:scaleX(1)}
+.nav__cta{padding:.55rem .95rem;border:1px solid rgba(180,196,190,.35);border-radius:999px;color:var(--paper);transition:background .3s,border-color .3s,color .3s}
+.nav__cta:hover{background:var(--mist);color:var(--ink);border-color:var(--mist)}
+.nav__progress{grid-column:1/-1;height:1px;background:rgba(180,196,190,.15);position:relative;margin-top:.5rem}
+.nav__progress span{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--sage),var(--mist));width:0%}
+@media (max-width:780px){ .nav__links a:not(.nav__cta){display:none} }
+
+/* ----------------------------------------------------------------
+   Scene primitive — pure scroll runway holding copy only
+---------------------------------------------------------------- */
+.scene{position:relative;height:var(--scene-h, 240vh);z-index:2}
+.scene__pin{position:sticky;top:0;height:100vh;display:grid;align-items:center}
+.scene__copy{
+  position:relative;z-index:6;
+  width:100%; max-width:var(--maxw); margin:0 auto;
+  padding:7rem var(--gutter) 5rem;
+  display:flex; flex-direction:column; gap:1.6rem;
+  max-inline-size:min(46rem, 100%);
+}
+.scene--right .scene__copy{margin-left:auto;margin-right:0;align-items:flex-end;text-align:right}
+.scene--right .scene__copy > *{max-width:46rem}
+.scene__copy--center{margin-left:auto;margin-right:auto;align-items:center;text-align:center;max-inline-size:62rem;isolation:isolate}
+/* soft scrim behind centered title cards for legibility over busy videos */
+.scene__copy--center::before{
+  content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(110%,80rem);height:min(120%,28rem);
+  z-index:-1;pointer-events:none;
+  background:radial-gradient(50% 50% at 50% 50%, rgba(8,10,11,.62), rgba(8,10,11,.25) 60%, rgba(8,10,11,0) 78%);
+  filter:blur(4px);
+}
+.scene__copy--center.manifesto::before{height:min(120%,46rem)}
+.scene__copy--center h2,.scene__copy--center .display{text-shadow:0 1px 22px rgba(0,0,0,.55)}
+.scene__copy--hero{padding-top:9rem;padding-bottom:7rem;max-inline-size:min(72rem,100%)}
+/* wide editorial scenes — let the layout breathe across the viewport */
+#s5 .scene__copy,#s7 .scene__copy{max-inline-size:min(104rem,100%)}
+#s5 .title,#s5 .body,#s7 .title{max-width:none}
+#s7 .method article{padding:1.6rem 1.6rem 2rem;min-height:16rem;gap:.75rem}
+#s7 .method article h3{font-size:1.5rem;line-height:1.1}
+#s7 .method article p{font-size:.95rem;line-height:1.55}
+.scene__copy--hero .display{max-width:none;white-space:nowrap}
+@media(max-width:900px){.scene__copy--hero .display{white-space:normal}}
+
+/* HUD label */
+.hud{display:inline-flex;align-items:center;gap:.85rem;font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;text-transform:uppercase;color:var(--mist)}
+.hud__num{color:var(--gold)}
+.hud__line{flex:0 0 3rem;height:1px;background:currentColor;opacity:.5}
+.hud--center{justify-content:center}
+
+/* Typography */
+.display{
+  font-family:var(--serif); font-weight:300;
+  font-size:clamp(2.8rem, 7.2vw, 7.5rem);
+  line-height:.96; letter-spacing:-.02em; margin:0;
+  font-variation-settings:"opsz" 144;
+}
+.display span{display:block}
+.display__em{font-style:italic;color:var(--mist);font-weight:300}
+.display--quiet{font-size:clamp(2rem, 4.2vw, 4rem); line-height:1.1; font-weight:400; max-width:36ch; margin:0 auto}
+.display--quiet em{font-style:italic;color:var(--sage)}
+
+.title{font-family:var(--serif);font-weight:400;font-size:clamp(2.1rem, 5vw, 4.4rem);line-height:1;letter-spacing:-.015em;margin:0}
+.title em{font-style:italic;color:var(--sage)}
+
+.lede{font-family:var(--serif);font-style:italic;font-weight:300;font-size:clamp(1.05rem,1.4vw,1.35rem);line-height:1.5;color:var(--bone);max-width:34ch;margin:0}
+.body{font-size:1rem;line-height:1.65;color:var(--bone);max-width:38ch;margin:0;font-weight:300}
+.body--narrow{max-width:30ch}
+
+.scroll-hint{display:inline-flex;flex-direction:column;align-items:flex-start;gap:.4rem;margin-top:auto;font-family:var(--mono);font-size:.65rem;letter-spacing:.3em;text-transform:uppercase;color:var(--sage);opacity:.75}
+.scroll-hint svg{animation:drop 1.8s ease-in-out infinite}
+@keyframes drop{0%,100%{transform:translateY(0);opacity:.7}50%{transform:translateY(8px);opacity:1}}
+
+.marker{list-style:none;padding:0;margin:.5rem 0 0;display:flex;flex-direction:column;gap:.5rem;font-family:var(--mono);font-size:.78rem;letter-spacing:.04em;color:var(--sage);text-transform:uppercase}
+.scene--right .marker{align-items:flex-end}
+.marker li{position:relative;padding-left:1.2em}
+.scene--right .marker li{padding-left:0;padding-right:1.2em}
+.marker li::before{content:"›";position:absolute;left:0;color:var(--gold)}
+.scene--right .marker li::before{left:auto;right:0}
+
+.diptych{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid rgba(180,196,190,.2);border-bottom:1px solid rgba(180,196,190,.2);margin-top:1.5rem;max-width:34rem;margin-left:auto}
+.diptych > div{padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:.25rem;text-align:left}
+.diptych > div + div{border-left:1px solid rgba(180,196,190,.2)}
+.diptych__k{font-family:var(--serif);font-style:italic;font-size:1.4rem;color:var(--paper)}
+.diptych__v{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:var(--sage)}
+
+.levels{list-style:none;padding:0;margin:1.6rem 0 0;display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid rgba(180,196,190,.18);border-bottom:1px solid rgba(180,196,190,.18)}
+.levels li{display:grid;grid-template-columns:auto 1fr;gap:1.2rem;padding:1.6rem 1.4rem;border-right:1px solid rgba(180,196,190,.15);align-items:start}
+.levels li:last-child{border-right:0}
+@media(max-width:880px){
+  .levels{grid-template-columns:1fr;border-bottom:1px solid rgba(180,196,190,.18)}
+  .levels li{border-right:0;border-bottom:1px solid rgba(180,196,190,.15);padding:1.1rem 0}
+  .levels li:last-child{border-bottom:0}
+}
+.levels__n{font-family:var(--serif);font-style:italic;font-weight:300;color:var(--sage);font-size:1.6rem;line-height:1;align-self:flex-start;padding-top:.15rem}
+.levels h3{margin:0 0 .25rem;font-family:var(--serif);font-weight:400;font-size:1.5rem;letter-spacing:-.01em}
+.levels p{margin:0;font-size:.92rem;color:var(--bone);line-height:1.5;max-width:34ch}
+.levels__mid h3{color:var(--mist)}
+.levels__dark h3{color:var(--paper)}
+.levels__dark{position:relative}
+
+.defs{margin:.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem;text-align:right}
+.defs > div{padding:1rem 0;border-top:1px solid rgba(180,196,190,.18);display:flex;flex-direction:column;gap:.35rem}
+.defs > div:last-child{border-bottom:1px solid rgba(180,196,190,.18)}
+.defs dt{font-family:var(--serif);font-size:1.35rem;font-weight:400}
+.defs dd{margin:0;font-size:.92rem;line-height:1.5;color:var(--bone);max-width:36ch;margin-left:auto}
+
+.method{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid rgba(180,196,190,.2);margin-top:1.4rem}
+.method article{padding:1.4rem 1.2rem 1.6rem;border-right:1px solid rgba(180,196,190,.15);display:flex;flex-direction:column;gap:.55rem;min-height:14rem;position:relative}
+.method article:last-child{border-right:0}
+.method article > span{font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;color:var(--gold)}
+.method article h3{margin:0;font-family:var(--serif);font-weight:400;font-size:1.25rem}
+.method article p{margin:0;color:var(--bone);font-size:.86rem;line-height:1.5}
+.method article::before{content:"";position:absolute;top:-1px;left:0;width:0;height:2px;background:var(--mist);transition:width .9s ease}
+.method article.in::before{width:100%}
+@media(max-width:880px){.method{grid-template-columns:1fr 1fr}.method article{border-bottom:1px solid rgba(180,196,190,.15)}}
+@media(max-width:520px){.method{grid-template-columns:1fr}}
+
+.manifesto{gap:1rem;max-inline-size:64rem}
+.manifesto p{font-family:var(--serif);font-weight:300;font-size:clamp(1.4rem,3.4vw,2.6rem);line-height:1.25;margin:0;color:var(--bone)}
+.manifesto p[data-align="l"]{align-self:flex-start;text-align:left}
+.manifesto p[data-align="r"]{align-self:flex-end;text-align:right}
+.manifesto p em{font-style:italic;color:var(--mist)}
+
+.cta{display:inline-flex;align-items:center;gap:.6rem;padding:1rem 1.6rem;margin-top:1rem;border:1px solid var(--mist);font-family:var(--mono);font-size:.75rem;letter-spacing:.22em;text-transform:uppercase;color:var(--paper);transition:.3s}
+.cta:hover{background:var(--mist);color:var(--ink);letter-spacing:.28em}
+
+/* ----------------------------------------------------------------
+   Pricing / Contact / Footer (light dressed sections)
+---------------------------------------------------------------- */
+.page{position:relative;z-index:10;padding:9rem var(--gutter);max-width:var(--maxw);margin:0 auto;color:var(--paper);background:#0a0c0c}
+.page__hdr{display:grid;grid-template-columns:1fr;gap:1rem;margin-bottom:3.5rem;max-width:48rem}
+.eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:var(--sage)}
+.page h2{font-family:var(--serif);font-weight:400;font-size:clamp(2rem,4.4vw,3.8rem);line-height:1.05;letter-spacing:-.015em;margin:0;max-width:24ch}
+
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(180,196,190,.18);border:1px solid rgba(180,196,190,.18)}
+.plan{background:#0a0c0c;padding:2.4rem 2rem 2.2rem;display:flex;flex-direction:column;gap:1rem;position:relative}
+.plan header{display:flex;flex-direction:column;gap:.6rem;padding-bottom:1rem;border-bottom:1px solid rgba(180,196,190,.15)}
+.plan h3{margin:0;font-family:var(--serif);font-weight:400;font-size:1.7rem}
+.plan__price{font-family:var(--mono);font-size:.8rem;letter-spacing:.12em;color:var(--sage)}
+.plan__price b{color:var(--paper);font-weight:500;font-size:1rem}
+.plan > p{margin:0;color:var(--bone);font-size:.95rem;font-style:italic;font-family:var(--serif)}
+.plan ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.55rem;font-size:.9rem;color:var(--bone);font-weight:300}
+.plan ul li{padding-left:1.1em;position:relative}
+.plan ul li::before{content:"+";position:absolute;left:0;color:var(--sage)}
+.plan__cta{margin-top:auto;align-self:flex-start;font-family:var(--mono);font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:var(--paper);border-bottom:1px solid var(--sage);padding-bottom:.2rem;transition:.3s}
+.plan__cta:hover{color:var(--mist);border-color:var(--mist)}
+.plan--featured{background:linear-gradient(180deg, rgba(157,171,168,.07), rgba(10,12,12,1) 60%)}
+.plan--featured::before{content:"Featured";position:absolute;top:1rem;right:1.2rem;font-family:var(--mono);font-size:.62rem;letter-spacing:.22em;text-transform:uppercase;color:var(--gold)}
+@media(max-width:920px){.plans{grid-template-columns:1fr}}
+
+.extras{margin-top:2.5rem;display:grid;grid-template-columns:1fr 1fr;gap:1.4rem}
+.extras article{padding:1.6rem 1.4rem;border:1px solid rgba(180,196,190,.18);display:flex;flex-direction:column;gap:.4rem}
+.extras h4{margin:0;font-family:var(--serif);font-size:1.25rem;font-weight:400}
+.extras span{font-family:var(--mono);font-size:.72rem;letter-spacing:.18em;color:var(--gold)}
+.extras p{margin:0;color:var(--bone);font-size:.9rem;line-height:1.5}
+@media(max-width:720px){.extras{grid-template-columns:1fr}}
+
+.page--contact{padding-top:6rem;padding-bottom:6rem}
+.contact{display:grid;grid-template-columns:1.1fr 1fr;gap:5rem;align-items:start}
+.contact h2{font-family:var(--serif);font-weight:400;font-size:clamp(2.2rem,4.8vw,4rem);line-height:1.02;margin:.4rem 0 1rem}
+.contact p{color:var(--bone);max-width:32ch;line-height:1.6}
+.form{display:flex;flex-direction:column;gap:1.2rem}
+.form label{display:flex;flex-direction:column;gap:.35rem;font-family:var(--mono);font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;color:var(--sage)}
+.form input,.form textarea{background:transparent;border:0;border-bottom:1px solid rgba(180,196,190,.3);padding:.6rem 0;color:var(--paper);font:inherit;font-family:var(--serif);font-size:1.05rem;transition:border-color .3s}
+.form input:focus,.form textarea:focus{outline:0;border-color:var(--mist)}
+.form button{margin-top:1rem;align-self:flex-start;padding:1rem 1.5rem;border:1px solid var(--mist);font-family:var(--mono);font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;transition:.3s}
+.form button:hover{background:var(--mist);color:var(--ink)}
+.form__ok{font-family:var(--mono);font-size:.72rem;letter-spacing:.18em;color:var(--gold)}
+@media(max-width:820px){.contact{grid-template-columns:1fr;gap:2.5rem}}
+
+.foot{position:relative;z-index:10;padding:2.5rem var(--gutter);display:flex;justify-content:space-between;align-items:center;gap:2rem;border-top:1px solid rgba(180,196,190,.12);font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:var(--sage);background:#0a0c0c}
+.foot p{margin:.3rem 0 0;font-family:var(--serif);font-style:italic;font-size:1rem;color:var(--bone);text-transform:none;letter-spacing:0}
+.foot__meta{display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;text-align:right}
+@media(max-width:600px){.foot{flex-direction:column;align-items:flex-start}.foot__meta{align-items:flex-start;text-align:left}}
+
+/* hide the stage entirely once we pass into pricing/contact */
+body.no-stage .stage{opacity:0;transition:opacity 1.2s ease;pointer-events:none}
+/* hide the scroll progress bar once the cinematic story is done */
+body.no-stage .nav__progress{opacity:0;transition:opacity .6s ease;pointer-events:none}
+
+/* pricing enters as a slow fade up out of the black */
+#pricing > *{opacity:0;transform:translateY(28px);transition:opacity 1.4s cubic-bezier(.2,.7,.2,1),transform 1.5s cubic-bezier(.2,.7,.2,1)}
+#pricing > *:nth-child(2){transition-delay:.18s}
+#pricing > *:nth-child(3){transition-delay:.32s}
+#pricing.in > *{opacity:1;transform:translateY(0)}
+
+/* ----------------------------------------------------------------
+   Cinematic copy reveal — blur-in, slow, staggered
+---------------------------------------------------------------- */
+.scene__copy > *{
+  opacity:0;
+  transform:translateY(22px);
+  filter:blur(8px);
+  transition:opacity 1.3s cubic-bezier(.2,.65,.15,1), transform 1.4s cubic-bezier(.2,.65,.15,1), filter 1.3s ease;
+}
+.scene__copy > *:nth-child(2){transition-delay:.18s}
+.scene__copy > *:nth-child(3){transition-delay:.34s}
+.scene__copy > *:nth-child(4){transition-delay:.5s}
+.scene__copy > *:nth-child(5){transition-delay:.64s}
+.scene.in .scene__copy > *{opacity:1;transform:translateY(0);filter:blur(0)}
+.scene.out .scene__copy > *{opacity:0;transform:translateY(-16px);filter:blur(6px);transition-duration:1s;transition-delay:0s}
+
+/* ================================================================
+   MOBILE — autoplay-loop story, native scroll, single-viewport scenes
+   ================================================================ */
+body.is-mobile{}
+body.is-mobile .scene{height:auto;min-height:100svh}
+body.is-mobile .scene__pin{position:relative;top:auto;height:auto;min-height:100svh;padding:0}
+body.is-mobile .scene__copy{
+  padding:6rem var(--gutter) 3rem;
+  gap:1.6rem;
+  min-height:100svh;
+  justify-content:flex-end;
+  position:relative;
+}
+/* hero: center the title block but push lede + hint to the bottom */
+body.is-mobile .scene__copy--hero{justify-content:flex-end;padding-bottom:5rem}
+body.is-mobile .scene__copy--center{justify-content:center;text-align:center}
+
+/* per-scene readability scrim — dark gradient anchored under the copy block */
+body.is-mobile .scene__copy::before{
+  content:"";position:absolute;inset:auto 0 0 0;height:88%;z-index:-1;
+  pointer-events:none;
+  background:linear-gradient(to top,
+    rgba(8,10,11,.85) 0%,
+    rgba(8,10,11,.72) 35%,
+    rgba(8,10,11,.45) 70%,
+    rgba(8,10,11,0) 100%);
+}
+body.is-mobile .scene__copy--center::before{
+  inset:0;height:100%;
+  background:radial-gradient(70% 50% at 50% 50%, rgba(8,10,11,.78), rgba(8,10,11,.45) 60%, rgba(8,10,11,.15) 100%);
+}
+body.is-mobile .scene__copy > *{position:relative;z-index:1}
+
+/* mobile copy: simpler, faster reveal — no blur (cheap on GPU), shorter duration */
+body.is-mobile .scene__copy > *{
+  filter:none;
+  transform:translateY(14px);
+  transition:opacity .7s ease, transform .8s cubic-bezier(.2,.7,.2,1);
+}
+body.is-mobile .scene__copy > *:nth-child(2){transition-delay:.08s}
+body.is-mobile .scene__copy > *:nth-child(3){transition-delay:.16s}
+body.is-mobile .scene__copy > *:nth-child(4){transition-delay:.24s}
+body.is-mobile .scene__copy > *:nth-child(5){transition-delay:.32s}
+body.is-mobile .scene.in .scene__copy > *{opacity:1;transform:translateY(0)}
+body.is-mobile .scene.out .scene__copy > *{opacity:1;transform:translateY(0);transition-duration:.5s}
+
+/* portrait videos: cover full viewport */
+body.is-mobile .stage__v{transform:none!important;transform-origin:center}
+
+/* mobile veils — single shared scrim that works for all alignments */
+body.is-mobile .stage__veil{
+  background:linear-gradient(to top, rgba(8,10,11,.78) 0%, rgba(8,10,11,.30) 45%, rgba(8,10,11,.60) 100%)!important;
+  opacity:1!important;
+}
+
+/* mobile typography compaction */
+@media(max-width:820px){
+  :root{--gutter:1.5rem}
+  .scene__copy--hero{max-inline-size:100%}
+  .scene__copy--hero .display{
+    white-space:normal;
+    font-size:clamp(3.2rem,13vw,5.5rem);
+    line-height:.95;
+    letter-spacing:-.025em;
+  }
+  .display--quiet{font-size:clamp(2rem,7.5vw,3rem);line-height:1.15}
+  .title{font-size:clamp(2.4rem,10vw,3.8rem);line-height:1.0}
+  .body{font-size:1.02rem;line-height:1.55;max-width:36ch}
+  .lede{font-size:clamp(1.05rem,4vw,1.25rem);line-height:1.5}
+  .hud{font-size:.68rem}
+
+  .scene--right .scene__copy{align-items:flex-start;text-align:left;margin:0}
+  .scene--right .scene__copy > *{max-width:none}
+  .scene--right .marker{align-items:flex-start}
+  .scene--right .marker li{padding-left:1.2em;padding-right:0}
+  .scene--right .marker li::before{left:0;right:auto}
+
+  .defs{text-align:left}
+  .defs dd{margin-left:0}
+  .diptych{margin-left:0;max-width:100%;grid-template-columns:1fr;border-left:0}
+  .diptych > div + div{border-left:0;border-top:1px solid rgba(180,196,190,.2)}
+  /* Manifesto on mobile — vertical statement stack with rhythm */
+  .manifesto{gap:0;width:100%;max-inline-size:100%;padding-block:1rem}
+  .manifesto p{
+    font-size:clamp(1.35rem,5.6vw,1.9rem);
+    line-height:1.2;
+    margin:0;
+    padding:1.4rem 0;
+    border-top:1px solid rgba(180,196,190,.16);
+    width:100%;
+    text-align:left;
+    position:relative;
+    counter-increment:manifesto;
+  }
+  .manifesto p:last-of-type{border-bottom:1px solid rgba(180,196,190,.16)}
+  .manifesto p[data-align="r"]{align-self:stretch;text-align:left;padding-left:1.6rem}
+  .manifesto p[data-align="l"]{align-self:stretch;text-align:left}
+  .manifesto p[data-align="r"]::before{
+    content:counter(manifesto,decimal-leading-zero);
+    position:absolute;left:0;top:1.55rem;
+    font-family:var(--mono);font-size:.65rem;letter-spacing:.22em;color:var(--gold);
+  }
+  .manifesto p[data-align="l"]{padding-left:1.6rem}
+  .manifesto p[data-align="l"]::before{
+    content:counter(manifesto,decimal-leading-zero);
+    position:absolute;left:0;top:1.55rem;
+    font-family:var(--mono);font-size:.65rem;letter-spacing:.22em;color:var(--sage);
+  }
+  .manifesto p em{font-style:italic;color:var(--mist);display:inline-block;border-bottom:1px solid var(--gold);padding-bottom:.1em}
+  .manifesto{counter-reset:manifesto}
+
+  #s5 .scene__copy,#s7 .scene__copy{max-inline-size:100%}
+  .levels{grid-template-columns:1fr}
+  .levels li{border-right:0;border-bottom:1px solid rgba(180,196,190,.15);padding:1rem 0}
+  .method{grid-template-columns:1fr;border-top:0}
+  .method article{border-right:0;border-top:1px solid rgba(180,196,190,.15);min-height:auto;padding:1.2rem 0}
+
+  /* Mobile nav: compact, no wrap, hide branding flourish */
+  .nav{padding:.85rem var(--gutter);gap:.8rem;background:linear-gradient(to bottom, rgba(8,10,10,.7), rgba(8,10,10,0) 120%)}
+  .nav__mark span{font-size:.95rem}
+  .nav__mark em{display:none}
+  .nav__cta{padding:.5rem .8rem;font-size:.62rem;letter-spacing:.16em;white-space:nowrap}
+  .nav__cta::before{content:"Begin"}
+  .nav__cta{font-size:0;line-height:1}
+  .nav__cta::before{font-size:.62rem;letter-spacing:.16em}
+  .nav__progress{display:none}
+  .scroll-hint{display:none}
+
+  /* pricing/contact mobile rhythm */
+  .page{padding:6rem var(--gutter)}
+  .plans{grid-template-columns:1fr}
+  .extras{grid-template-columns:1fr}
+  .page--contact{padding-top:4rem}
+}
+
+/* prefers-reduced-motion — kill expensive animations everywhere */
+@media(prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.15s!important;
+    transition-delay:0s!important;
+  }
+  .scene__copy > *{filter:none!important;transform:none!important;opacity:1!important}
+  .stage__v{transform:none!important;transition:opacity .3s ease!important}
+  .grain{animation:none!important}
+}

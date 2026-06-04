@@ -1,0 +1,15 @@
+/*
+Theme Name: __starter__
+Theme URI: https://github.com/yojahny55/cinematic-scroll-kit
+Author: __starter__
+Description: Cinematic scroll-driven WordPress theme. Persistent video stage, N scenes that scroll-scrub on desktop and autoplay-loop on mobile. Generated from cinematic-scroll-kit.
+Version: __VERSION__
+Text Domain: __TEXTDOMAIN__
+Requires at least: 6.0
+Requires PHP: 8.0
+License: GPL-2.0-or-later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+Tags: cinematic, scroll, video, editorial, bilingual
+*/
+
+/* Theme styles live in assets/css/cinematic.css to keep style.css as a metadata header only (WP convention). */
