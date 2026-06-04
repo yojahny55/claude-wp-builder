@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- **SELinux trap on Fedora/RHEL/CentOS**: when an nginx/apache vhost config was staged in `/tmp` and moved into `/etc/nginx/conf.d/` with `sudo mv`, the file inherited the `user_tmp_t` SELinux label. Confined nginx/apache domains cannot read `user_tmp_t`, so `systemctl reload` failed with `[emerg] open() "..." failed (13: Permission denied)` — even though `ls -la` showed `-rw-r--r--` root:root. The error was confusing because chmod/chown looked correct.
+
+### Added
+- `vhost-install` command in `bin/wp-env-setup.sh`: atomically installs a generated vhost config from a source path to the web server's `conf.d` directory with correct mode (644), owner (root:root), and SELinux context (`restorecon -F`). Safe on systems without SELinux (no-op when `getenforce`/`restorecon` are absent).
+- `native-setup` now accepts `--vhost-src=/tmp/x.conf` and calls `vhost-install` automatically as part of the native setup flow.
+- `commands/wp-create.md`: documented the correct vhost installation pattern and added a Failure Handling row for the SELinux permission-denied error.
+
+### Migration
+- No breaking changes. Existing flows that call `native-setup` without `--vhost-src` still work and print updated guidance pointing at `vhost-install`.
+
+---
+
 ## [1.3.0] - 2026-03-20
 
 ### Added

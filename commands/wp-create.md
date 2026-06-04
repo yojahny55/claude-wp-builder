@@ -298,7 +298,20 @@ Write the generated config to the appropriate location:
 - DDEV: `${PROJECT_PATH}/.ddev/config.yaml`
 - Lando: `${PROJECT_PATH}/.lando.yml`
 - wp-env: `${PROJECT_PATH}/.wp-env.json`
-- Native: write to a temp file, then install via `bin/wp-env-setup.sh native-setup`
+- Native: write the generated config to a temp file (e.g., `/tmp/<domain>.conf`), then install via:
+  ```bash
+  sudo bin/wp-env-setup.sh native-setup \
+       --domain=<domain> \
+       --document-root=<path> \
+       --web-server=nginx \
+       --vhost-src=/tmp/<domain>.conf
+  ```
+  Passing `--vhost-src` triggers `vhost-install` internally, which atomically copies the file with correct mode/owner AND runs `restorecon` to apply the proper SELinux context. **Do NOT use `sudo mv` from `/tmp` to `/etc/nginx/conf.d/` directly** — on Fedora/RHEL/CentOS with SELinux enforcing, the file inherits `user_tmp_t` and nginx will fail to read it with `(13: Permission denied)` on reload.
+
+  If `--vhost-src` is omitted, you can install the file later with:
+  ```bash
+  sudo bin/wp-env-setup.sh vhost-install --src=/tmp/<domain>.conf --dest=/etc/nginx/conf.d/<domain>.conf
+  ```
 
 **Port management (Docker):** Before writing the config, check if default ports (80, 443, 3306, 8080, 8025) are in use:
 
@@ -478,6 +491,7 @@ Each step validates before proceeding. On failure:
 | Docker up (4.8) | Port conflict | Detect which ports are in use with `ss -tlnp`. Offer alternative ports. Update `docker-compose.yml` with new ports. Retry `docker-compose up -d`. Update manifest with actual ports. |
 | Core install (4.9) | DB connection refused | Check if services are running. For Docker: `docker-compose ps`. For native: `systemctl status mariadb`. Suggest fix and offer retry. |
 | Plugin install (4.10) | Plugin not found in WP.org repo | Warn: "Plugin '<slug>' not found — skipping." Continue with remaining plugins. Do not abort. |
+| Web server reload (4.8, native) | `nginx: [emerg] open() "..." failed (13: Permission denied)` after installing a vhost on Fedora/RHEL/CentOS | The vhost file has the wrong SELinux context (`user_tmp_t` instead of `httpd_config_t`). Fix: `sudo restorecon -F /etc/nginx/conf.d/<domain>.conf && sudo systemctl reload nginx`. To avoid this entirely, install vhosts via `bin/wp-env-setup.sh vhost-install` or pass `--vhost-src` to `native-setup` — both run restorecon automatically. |
 
 **Critical vs non-critical:**
 - Steps 4.1-4.9 are **critical** — failure aborts the process.
