@@ -74,7 +74,16 @@ function __starter___get_sub(string $name): string {
 }
 
 /**
- * Print the persistent stage: stacked <video> elements + posters.
+ * Print the persistent stage: stacked <video> + <canvas> + poster layers.
+ *
+ * Two render engines share this markup (see the kit's
+ * skills/07-scroll-scrub-rendering.md):
+ *   - WebCodecs path  → the <canvas class="stage__c"> is driven by
+ *     CinematicScrubber (frame-perfect, smooth reverse). body.webcodecs-scrub
+ *     hides the <video> and shows the <canvas>.
+ *   - Legacy fallback → the <video class="stage__v"> is driven by
+ *     video.currentTime on browsers without WebCodecs.
+ *   - Reduced motion  → the <picture class="stage__poster"> shows a still.
  *
  * @param array<int,array<string,mixed>> $scenes
  */
@@ -84,22 +93,37 @@ function __starter___cinematic_render_stage(array $scenes): void {
     }
     echo '<section class="stage" aria-hidden="true">';
     foreach ($scenes as $i => $s) {
-        $idx = $i + 1;
-        printf(
-            '<picture class="stage__poster" data-scene-index="%d"><img src="%s" alt="" loading="%s"></picture>',
-            $idx,
-            esc_url($s['poster']),
-            $i === 0 ? 'eager' : 'lazy'
-        );
-        if (! empty($s['video_desktop'])) {
+        $desktop = (string) $s['video_desktop'];
+        $mobile  = (string) ($s['video_mobile'] ?: $desktop);
+
+        if ($s['poster']) {
             printf(
-                '<video class="stage__video" data-scene-index="%d" preload="%s" muted playsinline><source src="%s" type="video/mp4"></video>',
-                $idx,
-                $i === 0 ? 'auto' : 'metadata',
-                esc_url($s['video_desktop'])
+                '<picture class="stage__poster" data-idx="%d"><img src="%s" alt="" loading="%s"></picture>',
+                $i,
+                esc_url($s['poster']),
+                $i === 0 ? 'eager' : 'lazy'
+            );
+        }
+        if ($desktop !== '') {
+            // <video> for the legacy currentTime path …
+            printf(
+                '<video class="stage__v" data-idx="%d" data-src="%s" data-src-mobile="%s" preload="%s" muted playsinline tabindex="-1"></video>',
+                $i,
+                esc_url($desktop),
+                esc_url($mobile),
+                $i === 0 ? 'auto' : 'metadata'
+            );
+            // … and a <canvas> sibling for the WebCodecs path.
+            printf(
+                '<canvas class="stage__c" data-idx="%d" data-src="%s"></canvas>',
+                $i,
+                esc_url($desktop)
             );
         }
     }
+    echo '<div class="stage__veil"></div>';
+    echo '<div class="stage__veil stage__veil--right"></div>';
+    echo '<div class="stage__veil stage__veil--center"></div>';
     echo '</section>';
 }
 

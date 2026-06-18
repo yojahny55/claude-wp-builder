@@ -71,6 +71,30 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 }
 .stage__v.active{opacity:1;filter:saturate(1) contrast(1.06)}
 
+/* WebCodecs canvas — mirrors .stage__v. Hidden until body.webcodecs-scrub is
+   set (feature detect passed); then it swaps places with the <video>. */
+.stage__c{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  opacity:0;
+  transform:scale(1.16);
+  transform-origin:center 55%;
+  filter:saturate(.95) contrast(1.05);
+  transition:opacity 1.4s cubic-bezier(.55,0,.25,1), filter 1.6s ease;
+  will-change:opacity,transform,filter;
+  background:#0a0c0c;
+  display:none;
+}
+body.webcodecs-scrub .stage__c{display:block}
+body.webcodecs-scrub .stage__v{display:none}
+.stage__c.active{opacity:1;filter:saturate(1) contrast(1.06)}
+
+/* Reduced motion / poster fallback layer. */
+.stage__poster{position:absolute;inset:0;opacity:0;}
+.stage__poster img{width:100%;height:100%;object-fit:cover;}
+body.reduced-motion .stage__c,
+body.reduced-motion .stage__v{display:none !important}
+body.reduced-motion .stage__poster:first-of-type{opacity:1}
+
 /* veils — three flavours faded in by JS based on current scene's data-veil */
 .stage__veil{
   position:absolute;inset:0;z-index:2;pointer-events:none;

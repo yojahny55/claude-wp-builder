@@ -24,7 +24,7 @@ All paths relative to the theme root (`wp-content/themes/<slug>/`).
 |---|---|
 | `fields/scenes.php` | ACF/SCF field group registering a `cinematic_scenes` repeater whose subfields match `scene.json`. Bilingual fields get an `_es` sibling when `languages` includes `es`. |
 | `fields/trailing-sections.php` | Flex content field for sections appended AFTER the reel. Only when hybrid mode. |
-| `inc/cinematic-loader.php` | Enqueues `cinematic.css` + `cinematic-engine.js`, adds `has-cinematic` body class on cinematic pages, prints `prefers-reduced-motion` guard, declares `cdn.jsdelivr.net` preconnect for GSAP/Lenis. |
+| `inc/cinematic-loader.php` | Enqueues `cinematic.css`, Lenis + GSAP + ScrollTrigger (CDN), `cinematic-scrubber.js`, and `cinematic-engine.js` (depends on all of them), all deferred. Adds `has-cinematic` body class on cinematic pages, prints `prefers-reduced-motion` guard, declares `cdn.jsdelivr.net` preconnect. |
 | `inc/scenes-renderer.php` | Helpers: `{slug}_cinematic_scenes()` returns repeater rows; `{slug}_cinematic_render_stage($rows)` prints the persistent `.stage`; `{slug}_cinematic_render_scene($row, $index)` prints a single scene. |
 | `template-parts/cinematic/stage.php` | Persistent fixed `.stage` with N stacked `<video>` elements (desktop) + `<picture>` posters (reduced-motion fallback). |
 | `template-parts/cinematic/scene.php` | Per-scene HUD + eyebrow + headline + body + cta. Mirrors `align`/`veil` attributes. |
@@ -55,7 +55,7 @@ All paths relative to the theme root (`wp-content/themes/<slug>/`).
 
 ### Engine wiring
 
-- The starter ships a thin `assets/js/cinematic-engine.js` that imports the kit's canonical `templates/main.js` patterns (GSAP + ScrollTrigger scrub on desktop, IntersectionObserver on mobile). DO NOT duplicate the engine logic — copy/import from the installed kit.
+- The starter ships `assets/js/cinematic-engine.js` (dual-path scrub controller) + `assets/js/cinematic-scrubber.js` (the WebCodecs render module, vendored verbatim from the kit's `templates/cinematic-scrubber.js`). The default render path is **WebCodecs → canvas** (frame-perfect, smooth reverse); it falls back to `video.currentTime` on browsers without WebCodecs, and to native autoplay-loop on mobile. DO NOT reintroduce `video.currentTime` as the primary path — see the kit's `skills/07-scroll-scrub-rendering.md`. Keep the scrubber module in sync with the kit; regenerate the engine only against the kit's current `templates/main.js`.
 - Hamburger + motion-toggle handlers run in **both** desktop and mobile mode (the desktop-vs-mobile early-exit must happen AFTER nav handlers — known footgun, documented in feedback memory).
 
 ### i18n
@@ -80,7 +80,7 @@ When hybrid is on:
 ## Things you MUST NOT do
 
 - Do not invent fields not present in `scene.json`. The schema is the contract.
-- Do not write the scroll engine from scratch — always reference the kit's `templates/main.js`.
+- Do not write the scroll engine from scratch — always reference the kit's `templates/main.js` + `templates/cinematic-scrubber.js`. Do not make `video.currentTime` the primary scrub path.
 - Do not enqueue GSAP/Lenis from CDN in production without a `preconnect` (Lighthouse penalty).
 - Do not use `register_activation_hook` for the cinematic CPT or rewrite rules — use `after_switch_theme` (documented prior bug).
 - Do not generate function names with hyphens. Slug `my-site` → PHP prefix `my_site_`.

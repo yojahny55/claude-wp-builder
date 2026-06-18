@@ -63,20 +63,36 @@ add_action('wp_enqueue_scripts', function () {
         return;
     }
 
-    // Engine is loaded deferred. The script itself decides whether to boot
-    // (skips on prefers-reduced-motion and on mobile, where it uses IO instead).
+    // Smooth-scroll + scroll-trigger (desktop scrub). CDN; deferred below.
+    wp_enqueue_script('lenis', 'https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js', [], '1.0.42', true);
+    wp_enqueue_script('gsap', 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js', [], '3.12.5', true);
+    wp_enqueue_script('gsap-scrolltrigger', 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js', ['gsap'], '3.12.5', true);
+
+    // WebCodecs scrubber — loads before the engine, which feature-detects it.
+    // MP4Box.js is lazy-loaded by the module itself on first use.
+    wp_enqueue_script(
+        '__starter__-cinematic-scrubber',
+        __STARTER___THEME_URI . '/assets/js/cinematic-scrubber.js',
+        [],
+        __STARTER___VERSION,
+        true
+    );
+
+    // Engine is loaded deferred. The script itself decides which path to boot
+    // (WebCodecs canvas / video.currentTime / mobile IO / reduced-motion).
     wp_enqueue_script(
         '__starter__-cinematic-engine',
         __STARTER___THEME_URI . '/assets/js/cinematic-engine.js',
-        [],
+        ['lenis', 'gsap', 'gsap-scrolltrigger', '__starter__-cinematic-scrubber'],
         __STARTER___VERSION,
         true
     );
 });
 
-// Defer the engine script (vs. async — we want execution after DOMContentLoaded).
+// Defer the cinematic scripts (vs. async — we want execution after DOMContentLoaded).
 add_filter('script_loader_tag', function ($tag, $handle) {
-    if ($handle === '__starter__-cinematic-engine' && strpos($tag, ' defer') === false) {
+    $deferred = ['lenis', 'gsap', 'gsap-scrolltrigger', '__starter__-cinematic-scrubber', '__starter__-cinematic-engine'];
+    if (in_array($handle, $deferred, true) && strpos($tag, ' defer') === false) {
         return str_replace(' src=', ' defer src=', $tag);
     }
     return $tag;

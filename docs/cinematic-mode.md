@@ -135,7 +135,8 @@ Cinematic page, but with normal pricing + contact blocks after the reel:
 │                                                                       │
 │  <section class="stage" position:fixed>                              │
 │    <picture × N> posters (reduced-motion fallback)                   │
-│    <video × N>   desktop reels (preload=metadata except scene 1)     │
+│    <video × N>   desktop reels (currentTime fallback path)           │
+│    <canvas × N>  WebCodecs render targets (default path)             │
 │  </section>                                                          │
 │                                                                       │
 │  <div class="reel">                                                  │
@@ -157,7 +158,9 @@ Cinematic page, but with normal pricing + contact blocks after the reel:
 
 ### Desktop path
 
-GSAP + ScrollTrigger + Lenis. Each scene block has `data-scrub-duration` (vh). ScrollTrigger pins, scrubs `video.currentTime` over the duration, crossfades to the next scene's video at the boundary.
+GSAP + ScrollTrigger + Lenis. Each scene block has `data-scrub-duration` (vh). The default render engine is **WebCodecs → canvas**: `CinematicScrubber` decodes the exact frame for the current scroll position and paints it to a `<canvas class="stage__c">` (frame-perfect, smooth in both directions). On browsers without WebCodecs (Safari < 16.4, Firefox < 132) it **falls back to `video.currentTime`** on the `<video class="stage__v">`. `body.webcodecs-scrub` decides which element is visible.
+
+Why not `video.currentTime` everywhere: it is not frame-accurate and cannot decode backward — reverse scroll stutters and the video can jump-to-end-and-freeze. See cinematic-scroll-kit `skills/07-scroll-scrub-rendering.md` for the full rationale and decision tree.
 
 ### Mobile path
 
@@ -213,7 +216,8 @@ wp-content/themes/<slug>/
 ├── header.php · footer.php · front-page.php
 ├── assets/
 │   ├── css/cinematic.css           ← vendored from kit
-│   └── js/cinematic-engine.js      ← vendored from kit
+│   ├── js/cinematic-engine.js      ← dual-path scrub controller
+│   └── js/cinematic-scrubber.js    ← WebCodecs module (vendored from kit)
 ├── fields/
 │   ├── scenes.php                  ← AUTO-GENERATED from scene.json
 │   └── trailing-sections.php       ← AUTO-GENERATED (hybrid only)
