@@ -23,9 +23,10 @@ Work through these steps, in order, for the demo folder you are given:
 2. **Parse each page's DOM** → identify:
    - **Header** (detect whether it is shared across pages → build once if so).
    - **Footer** (shared → build once).
-   - **Body sections** — split by explicit `<section>` elements first; else fall back to
-     heuristic segmentation (major headings / block boundaries / background changes).
-     Name each section from its `id`/`class`/heading text.
+   - **Body sections** — if the page already carries the canonical `SECTION:` delimiters
+     (see Fast path below), trust them verbatim; else split by explicit `<section>`
+     elements; else fall back to heuristic segmentation (major headings / block boundaries
+     / background changes). Name each section from its delimiter, `id`/`class`, or heading.
 3. **Resolve CSS** — match external stylesheet rules to each section (by selector) so
    each section carries its own styles for the `wp-css` agent; extract global design
    tokens (colors / fonts / spacing).
@@ -39,6 +40,8 @@ Work through these steps, in order, for the demo folder you are given:
      CSS** — the exact canonical format the existing builders consume (so `/wp-section`,
      `/wp-header`, etc. still work for later fixups). Consolidate every matched external
      CSS rule for a section inline, into that emitted page, so each page is self-contained.
+     If the input page was **already delimited** (Fast path), keep its delimiters and
+     section markup as-is — your job on it is CSS consolidation + manifest, not re-marking.
    - `demo/.yolo-manifest.json` — orchestration source of truth: pages → sections →
      field-guesses → assets → shared-flags → contentTypes + links. Also the checkpoint
      report.
@@ -53,6 +56,26 @@ Use this exact delimiter pair around every section you split out, matching
 ...section markup...
 <!-- ============ END SECTION: <Name> ============ -->
 ```
+
+### Fast path — input already in canonical delimited form
+
+Some demos arrive **already delimited** in the exact format above — e.g. the output of
+figma-html-loop's `/demo-merge`, or a prior normalize run. Before segmenting a page, check
+for the `<!-- ============ SECTION: <Name> ============ -->` markers (and `SECTION: Header`
+/ `SECTION: Footer` around the shared blocks). When a page has them:
+
+- **Trust the delimiters as the section boundaries and names.** Do NOT re-segment the DOM,
+  re-decide where sections start/end, or rewrite the page to move/re-insert delimiters —
+  keep the markup byte-for-byte where you can. This skips the slowest, least-deterministic
+  part of Phase 1 (segmentation + per-file comment insertion).
+- **Still do everything else:** classify each delimited section (kind / CPT / contact /
+  fields), resolve + consolidate its CSS, extract content, and emit the manifest.
+- Because boundaries were **given, not guessed**, do NOT add `review[]` entries for
+  "heuristic segmentation" on these pages — that non-determinism doesn't apply here.
+
+Only fall back to `<section>`-splitting or heuristic segmentation for pages that LACK the
+delimiters. A page is "already delimited" only if the markers are the canonical pair above;
+ignore stray/non-matching comments.
 
 ## Classifier Rubric (CPT vs. static repeater)
 
