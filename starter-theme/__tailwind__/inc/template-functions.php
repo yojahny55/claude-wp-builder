@@ -24,6 +24,23 @@ function __starter___body_classes( $classes ) {
 		$classes[] = 'no-sidebar';
 	}
 
+	// Language class.
+	if ( function_exists( '__starter___get_current_lang' ) ) {
+		$classes[] = 'lang-' . __starter___get_current_lang();
+	}
+
+	// Page template class.
+	if ( is_page_template() ) {
+		$template       = get_page_template_slug();
+		$template_class = str_replace( array( '.php', '/' ), array( '', '-' ), $template );
+		$classes[]      = 'template-' . $template_class;
+	}
+
+	// Front page class.
+	if ( is_front_page() ) {
+		$classes[] = 'home-page';
+	}
+
 	return $classes;
 }
 add_filter( 'body_class', '__starter___body_classes' );

@@ -94,26 +94,5 @@ function __starter___allow_svg_upload($mimes) {
 }
 add_filter('upload_mimes', '__starter___allow_svg_upload');
 
-/**
- * Add custom body classes
- */
-function __starter___body_classes($classes) {
-    // Add language class
-    if (function_exists('__starter___get_current_lang')) {
-        $classes[] = 'lang-' . __starter___get_current_lang();
-    }
-
-    // Add page template class
-    if (is_page_template()) {
-        $template = get_page_template_slug();
-        $template_class = str_replace(array('.php', '/'), array('', '-'), $template);
-        $classes[] = 'template-' . $template_class;
-    }
-
-    if (is_front_page()) {
-        $classes[] = 'home-page';
-    }
-
-    return $classes;
-}
-add_filter('body_class', '__starter___body_classes');
+// Body classes (lang / template / front-page) are added by __starter___body_classes()
+// in inc/template-functions.php — kept in one place to avoid a duplicate-declaration fatal.
