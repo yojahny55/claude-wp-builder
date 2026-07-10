@@ -20,4 +20,13 @@ fi
 grep -Eq '"@tailwindcss/typography":\s*"\^?0\.5\.' "$dir/package.json" \
   || { echo "FAIL: @tailwindcss/typography 0.5.x pin missing"; exit 1; }
 
+# 3. The settings page must gate the Spanish tab on language, not register it unconditionally.
+sf="$dir/fields/settings.php"
+grep -Fq "in_array( 'es', __STARTER___SUPPORTED_LANGS" "$sf" \
+  || { echo "FAIL: settings.php does not language-gate the Spanish Translations tab"; exit 1; }
+# Guard against the bareword regression (unquoted array keys / string) from a quoting bug.
+if grep -Eq 'settings_group\[fields\]|in_array\( es,' "$sf"; then
+  echo "FAIL: settings.php has unquoted bareword array key / string (quoting regression)"; exit 1
+fi
+
 echo PASS

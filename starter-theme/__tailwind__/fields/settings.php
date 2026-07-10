@@ -2,7 +2,9 @@
 /**
  * ACF Field Group: Site Settings (Options Page)
  *
- * Tab structure: General | Header | Footer | Contact | Address | Social | Legal | Designer | Spanish Translations
+ * Tab structure: General | Header | Footer | Contact | Address | Social | Legal | Designer
+ * The Spanish Translations tab and all *_es fields are registered only when 'es' is in
+ * __STARTER___SUPPORTED_LANGS (English-only projects never see them).
  * The /wp-header and /wp-footer commands add project-specific fields to the Header and Footer tabs.
  *
  * @package __STARTER_NAME__
@@ -16,7 +18,7 @@ if (!function_exists('acf_add_local_field_group')) {
     return;
 }
 
-acf_add_local_field_group(array(
+$settings_group = array(
     'key' => 'group_settings',
     'title' => '__STARTER_NAME__ Settings',
     'fields' => array(
@@ -264,7 +266,28 @@ acf_add_local_field_group(array(
             'name' => 'designer_url',
             'type' => 'url',
         ),
+    ),
+    'location' => array(
+        array(
+            array(
+                'param' => 'options_page',
+                'operator' => '==',
+                'value' => '__starter__-settings',
+            ),
+        ),
+    ),
+    'menu_order' => 0,
+    'position' => 'normal',
+    'style' => 'default',
+    'label_placement' => 'top',
+    'instruction_placement' => 'label',
+    'active' => true,
+);
 
+
+// Register the Spanish Translations tab only when Spanish is a supported language.
+if ( in_array( 'es', __STARTER___SUPPORTED_LANGS, true ) ) {
+    $settings_group['fields'] = array_merge( $settings_group['fields'], array(
         // ── Spanish Translations Tab ─────────────────────────────
         array(
             'key' => 'field_settings_tab_spanish',
@@ -423,20 +446,7 @@ acf_add_local_field_group(array(
             'type' => 'url',
             'instructions' => 'Leave empty to use English version.',
         ),
-    ),
-    'location' => array(
-        array(
-            array(
-                'param' => 'options_page',
-                'operator' => '==',
-                'value' => '__starter__-settings',
-            ),
-        ),
-    ),
-    'menu_order' => 0,
-    'position' => 'normal',
-    'style' => 'default',
-    'label_placement' => 'top',
-    'instruction_placement' => 'label',
-    'active' => true,
-));
+    ) );
+}
+
+acf_add_local_field_group( $settings_group );
