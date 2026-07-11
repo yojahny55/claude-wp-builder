@@ -17,6 +17,16 @@ Before generating ANY CSS, read the project's existing `assets/css/styles.css` f
 
 Use ONLY the project's existing design tokens. Never hardcode colors, spacing, or font sizes.
 
+**Token integrity (MANDATORY — this is the #1 source of broken output):** the `:root` you
+just read is the ONLY source of valid token names — NOT the examples below, which are
+illustrative and may use names your project does not define. Before you write any
+`var(--x)`, confirm `--x` is defined in that `:root`. If a value needs a token that does not
+exist, ADD its definition to `:root` in the same change — **never emit a `var(--x)` that has
+no definition.** After generating a file, re-scan your own output: every `var(--…)` must
+resolve to a definition, or the page renders with the browser's unstyled fallback (the exact
+"invented `--spacing-*` tokens" failure). Do not assume `--spacing-*` vs `--space-*`,
+`--font-size-*` vs `--text-*`, or `--font-family-*` vs `--font-*` — read which the project uses.
+
 ## CSS Custom Properties (Design Tokens)
 
 All design values MUST reference custom properties. Never hardcode raw values.
@@ -25,9 +35,9 @@ All design values MUST reference custom properties. Never hardcode raw values.
 /* CORRECT */
 .hero__title {
     color: var(--color-primary);
-    font-size: var(--text-4xl);
+    font-size: var(--font-size-4xl);
     margin-bottom: var(--spacing-md);
-    font-family: var(--font-heading);
+    font-family: var(--font-family-primary);
 }
 
 /* WRONG — never do this */
@@ -40,10 +50,10 @@ All design values MUST reference custom properties. Never hardcode raw values.
 ```
 
 Common token categories to expect:
-- Colors: `--color-primary`, `--color-secondary`, `--color-accent`, `--color-text`, `--color-bg`, etc.
+- Colors: `--color-primary`, `--color-secondary`, `--color-accent`, `--color-text`, `--color-background`, etc.
 - Spacing: `--spacing-xs`, `--spacing-sm`, `--spacing-md`, `--spacing-lg`, `--spacing-xl`, `--spacing-2xl`
-- Typography: `--text-sm`, `--text-base`, `--text-lg`, `--text-xl`, `--text-2xl`, `--text-3xl`, `--text-4xl`
-- Fonts: `--font-body`, `--font-heading`
+- Typography: `--font-size-sm`, `--font-size-base`, `--font-size-lg`, `--font-size-xl`, `--font-size-2xl`, `--font-size-3xl`, `--font-size-4xl`
+- Fonts: `--font-family-secondary`, `--font-family-primary`
 - Borders: `--radius-sm`, `--radius-md`, `--radius-lg`
 - Shadows: `--shadow-sm`, `--shadow-md`, `--shadow-lg`
 
@@ -128,18 +138,18 @@ Every section MUST be wrapped in a clear comment delimiter:
 
 .hero {
     padding: var(--spacing-2xl) 0;
-    background-color: var(--color-bg);
+    background-color: var(--color-background);
 }
 
 .hero__title {
     font-size: clamp(1.75rem, 4vw, 3.5rem);
-    font-family: var(--font-heading);
+    font-family: var(--font-family-primary);
     color: var(--color-primary);
     line-height: 1.2;
 }
 
 .hero__description {
-    font-size: var(--text-lg);
+    font-size: var(--font-size-lg);
     color: var(--color-text);
     max-width: 60ch;
     margin-bottom: var(--spacing-lg);
@@ -355,7 +365,7 @@ Enqueue page-specific styles conditionally in `functions.php`.
 
 .values {
     padding: var(--spacing-2xl) 0;
-    background-color: var(--color-bg-alt);
+    background-color: var(--color-background-alt);
 }
 
 .values__header {
@@ -365,7 +375,7 @@ Enqueue page-specific styles conditionally in `functions.php`.
 
 .values__label {
     display: inline-block;
-    font-size: var(--text-sm);
+    font-size: var(--font-size-sm);
     color: var(--color-accent);
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -375,7 +385,7 @@ Enqueue page-specific styles conditionally in `functions.php`.
 
 .values__title {
     font-size: clamp(1.5rem, 3vw, 2.5rem);
-    font-family: var(--font-heading);
+    font-family: var(--font-family-primary);
     color: var(--color-primary);
 }
 
@@ -405,15 +415,15 @@ Enqueue page-specific styles conditionally in `functions.php`.
 }
 
 .values__card-title {
-    font-size: var(--text-lg);
+    font-size: var(--font-size-lg);
     font-weight: 600;
     color: var(--color-primary);
     margin-bottom: var(--spacing-xs);
 }
 
 .values__card-description {
-    font-size: var(--text-base);
-    color: var(--color-text-muted);
+    font-size: var(--font-size-base);
+    color: var(--color-text-light);
     line-height: 1.6;
 }
 
@@ -448,6 +458,7 @@ Enqueue page-specific styles conditionally in `functions.php`.
 
 1. **No build tools, no frameworks** — vanilla CSS only
 2. **Never hardcode colors, spacing, or font sizes** — use CSS custom properties exclusively
+2b. **Never emit an undefined `var(--x)`** — every custom property you reference must be defined in the project's `:root`; if it isn't, add the definition there in the same change
 3. **BEM naming on every class** — `.block__element--modifier`
 4. **Mobile-first** — base styles for mobile, `min-width` queries for larger screens
 5. **Section delimiters** — every section wrapped in `/* ============ Section: Name ============ */`
