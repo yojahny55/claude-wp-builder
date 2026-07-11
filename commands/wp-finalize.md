@@ -198,6 +198,73 @@ Layer 1 of the 3-layer demo-parity gate (static / theme-file level). Runs agains
 
 ---
 
+### Demo-parity gate — Layer 2 (WP-CLI, when WordPress is reachable)
+
+Layer 2 runs when `.wp-create.json` exists and WordPress is reachable (reuse `$WP` from Check 7). Every check below is **critical**.
+
+1. **`site_logo` + critical options non-empty** — `critical`
+
+   ```bash
+   $WP option get site_logo
+   $WP option get blogname
+   $WP option get blogdescription
+   ```
+   **PASS** if `site_logo` and every other critical site option return a non-empty value. **FAIL** listing which option is empty/unset.
+
+2. **`inner_hero_image` seeded per in-scope page** — `critical`
+
+   For each in-scope page (from the manifest / scope file), find its post ID and check the ACF field:
+   ```bash
+   $WP post list --post_type=page --format=ids
+   $WP eval "echo get_field('inner_hero_image', <post_id>) ? 'OK' : 'EMPTY';"
+   ```
+   **PASS** if every in-scope page has `inner_hero_image` seeded. **FAIL** listing which pages are missing it.
+
+3. **Menus assigned to locations** — `critical`
+
+   ```bash
+   $WP menu location list --format=table
+   ```
+   **PASS** if every registered nav location (e.g. `primary_en`, `primary_es`, `footer_en`, `footer_es`) has a menu assigned. **FAIL** listing unassigned locations.
+
+4. **In-scope pages exist** — `critical`
+
+   ```bash
+   $WP post list --post_type=page --format=table
+   ```
+   **PASS** if every in-scope page from the manifest has a corresponding WordPress page. **FAIL** listing missing pages.
+
+**PASS** if all 4 checks pass. **FAIL** listing every offending check with its details. If WordPress is not reachable (no `.wp-create.json`, or `$WP` calls fail to connect), **SKIP** Layer 2 with a noted reason — this is not a failure, but Layers 1 and 3 still gate.
+
+---
+
+### Demo-parity gate — Layer 3 (measured visual parity, claude-in-chrome)
+
+Layer 3 is the backstop that measures **computed styles**, not just screenshots, so divergence is caught at build time instead of weeks later.
+
+1. **Detect claude-in-chrome availability.** Call the extension's tabs/context tool (e.g. `tabs_context_mcp`). If the claude-in-chrome MCP tools are unavailable, not connected, or the built site / demo URL is unreachable, **SKIP Layer 3 with a noted reason — this is NOT a failure.** Layers 1-2 still gate delivery on their own.
+
+2. **Load demo + built page.** For each in-scope page, navigate to the demo URL and to the corresponding built (local WordPress) URL.
+
+3. **Measure computed styles.** Via `javascript_tool`, run `getComputedStyle()` on matching selectors on both pages (hero, nav, section backgrounds, headings, buttons) and compare the results.
+
+4. **Classify every delta:**
+   - **Hard delta (BLOCK)** — critical:
+     - A `background-image` present in the demo is missing in the build.
+     - `color` / `background-color` resolves to a **different hex** between demo and build.
+     - A fixed `height` / `width` differs by **more than 3% or 8px** (whichever is larger).
+     - `font-family` resolves to a **system fallback stack** instead of the demo's actual font face.
+   - **Soft delta (WARN, non-blocking):**
+     - Sub-pixel geometry differences.
+     - Antialiasing / font-smoothing rendering variance.
+     - Any value within the 3%/8px threshold.
+
+5. **Confirm logo + hero rendering.** Verify the logo renders as an actual image (not a text fallback) and that hero section background images are visible (not blank/broken).
+
+**PASS** if no hard deltas found (soft deltas are reported but do not block). **FAIL** listing every hard delta (selector, property, demo value vs. built value). **SKIP** (not a failure) if claude-in-chrome or either URL is unavailable — state the reason (e.g. "claude-in-chrome not connected", "demo URL unreachable", "built site not running").
+
+---
+
 ## Step 4: Print Report
 
 ```
