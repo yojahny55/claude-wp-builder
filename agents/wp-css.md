@@ -469,3 +469,22 @@ Enqueue page-specific styles conditionally in `functions.php`.
 10. **Follow the demo's visual design exactly** — match colors, spacing, layout from the reference
 11. **Each section gets its own commented block** — keep CSS organized and scannable
 12. **Use logical grouping** — within each section block, order properties: layout, box model, typography, visual, misc
+
+## Transcription Mode (when dispatched by /wp-yolo)
+
+When the dispatch says **"transcribe"** and hands you the demo's exact CSS for this section,
+the demo is the SOURCE OF TRUTH, not inspiration. Your job is to COPY, not re-author.
+
+- Copy the demo's **exact declared values** for `color`, `background`/`background-image`,
+  `width`/`height`/`min-height`/`max-height`, `padding`/`margin`/`gap`, `font-size`,
+  `line-height`, `border`, `border-radius`, `box-shadow`, and flex/grid track sizes.
+- **Capture CSS-declared assets:** `background:url(...)` and `@font-face` `src` — not just
+  `<img>`/`<link>`. Anything in CSS that a markup-only pass would miss, you carry.
+- **Do NOT "improve":** do not add a `min-height:44px` touch target, do not resize inputs or
+  textareas, do not round or clean up values, do not swap a literal for a near-token. Each
+  "reasonable best practice" changes the demo's measured geometry and is a bug here.
+- **Tokenize only on an exact match:** use a token only if its defined value equals the demo's
+  literal byte-for-byte; otherwise keep the literal.
+- **Scope everything under the assigned `block`** given in the dispatch (never a bare generic
+  name). Shared components use the shared class; per-page tweaks are scoped under the block.
+- (Still applies: never emit an undefined `var(--x)`.)
