@@ -290,6 +290,11 @@ Top-level additions:
     { "file": "<path>", "role": "logo" | "nav-graphic" | "hero" | "content",
       "page": "<slug, optional>", "field": "<string, optional>" }
   ],
+```
+
+**Note:** this top-level `assets[]` (role-tagged objects) is distinct from the per-section `assets` field (plain image paths); the role-tagged top-level list is the source of truth for seeding.
+
+```jsonc
   "sharedComponents": [
     { "name": "<string>", "class": "<shared-css-class>",
       "pages": [ "<slug>", "..." ], "sections": [ "<section-name>", "..." ] }
@@ -316,7 +321,9 @@ Top-level additions:
           ], "assets": [] },
         { "name": "services", "kind": "static", "block": "home-services",
           "cssRules": ".services{padding:80px 0;font-family:'Brand Sans',sans-serif;} .services .card{width:320px;}",
-          "backgrounds": [], "fonts": [], "computed": {},
+          "backgrounds": [], "fonts": [
+            { "family": "Brand Sans", "weight": "400", "style": "normal", "src": [ "fonts/brand-sans-regular.woff2" ] }
+          ], "computed": {},
           "confidence": 1.0,
           "rationale": "Same card structure also appears on services.html — see sharedComponents",
           "fields": [ { "name": "services_heading", "type": "text" } ],
