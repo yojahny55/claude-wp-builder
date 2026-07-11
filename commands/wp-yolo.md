@@ -104,12 +104,19 @@ Drive the existing commands/agents in this exact order, reading everything from 
    section walk: walk its `sections[]` in order and run the `/wp-section` procedure per
    section (defaults: `--page index`, `--target front-page.php`, so no flags are needed
    for home):
-   - `kind: "static"` → normal `/wp-section <name>` (three-agent parallel dispatch).
+   - `kind: "static"` → normal `/wp-section <name>` (three-agent parallel dispatch). Pass
+     each dispatched `wp-css`/`wp-template` agent this section's `block` (its assigned
+     unique BEM name — scope every selector under it) and its verbatim `cssRules`, with the
+     instruction **"transcribe"** — this activates wp-css Transcription Mode, which
+     reproduces the demo's exact declared CSS under that block instead of drafting fresh
+     styles. Because every section's `block` is already unique, parallel agents can never
+     collide on a selector.
    - `kind: "cpt-teaser"` → **SKIP** — do NOT dispatch `/wp-section` for these. The CPT's
      teaser `template-parts/section-<cpt>.php` was already built and injected into
      `front-page.php` by that CPT's `/wp-cpt` run in step 2. Note it in the report as
      "teaser for `<cpt>`, built by /wp-cpt".
-   - `kind: "contact"` → `/wp-section <name> --cf7`.
+   - `kind: "contact"` → `/wp-section <name> --cf7`, same `block`/`cssRules`/transcribe
+     dispatch as `static`.
 6. **Inner pages** — for every `pages[role=inner]` entry: if the scope reconciliation
    (Step 2.5) marked this page `delivery: idx` or `delivery: plugin`, skip the normal
    page/section flow entirely and instead run
@@ -117,8 +124,11 @@ Drive the existing commands/agents in this exact order, reading everything from 
    Otherwise, run `/wp-page custom <slug>`, then build its `sections[]` — but each inner
    section must read from its OWN demo page and inject into its OWN page template, so pass
    `--page <slug> --target page-<slug>.php` on every dispatch:
-   - `kind: "static"` → `/wp-section <name> --page <slug> --target page-<slug>.php`.
-   - `kind: "contact"` → `/wp-section <name> --cf7 --page <slug> --target page-<slug>.php`.
+   - `kind: "static"` → `/wp-section <name> --page <slug> --target page-<slug>.php`, passing
+     the section's `block` + `cssRules` and the "transcribe" instruction, exactly as in
+     step 5.
+   - `kind: "contact"` → `/wp-section <name> --cf7 --page <slug> --target page-<slug>.php`,
+     same `block`/`cssRules`/transcribe dispatch.
    - `kind: "cpt-teaser"` on an inner page → same skip rule as step 5 (owned by `/wp-cpt`).
    Under `--careful`, confirm with the user before building each inner page.
 7. **`cpt-archive` pages** — no WP Page is created for these (their archive URL is
@@ -132,6 +142,20 @@ Drive the existing commands/agents in this exact order, reading everything from 
    synthesized from the derived design (shared header/footer, design tokens, section
    styling) so they read as native to the site.
 
+## Step 4.5: Font carry
+
+Before seeding, collect every `section.fonts[]` entry across the manifest (dedupe by
+`family`+`weight`+`style`):
+- Copy each entry's `src` woff2 file(s) from the demo folder into `theme/assets/fonts/`.
+- Re-emit each `@font-face` rule with `src` rewritten to the theme-relative path
+  (`assets/fonts/<file>.woff2`) and enqueue the resulting stylesheet (or add to the
+  theme's existing fonts partial) so every block's `transcribe`d CSS resolves against a
+  self-hosted font, not the demo's original path.
+- Only add a Google Fonts `<link rel="preconnect">` (fonts.googleapis.com /
+  fonts.gstatic.com) when the demo's own `<head>` actually references Google Fonts — never
+  as a substitute for a self-hosted font family found in `section.fonts[]`. Self-hosted
+  stays self-hosted; the two are not interchangeable.
+
 ## Step 5: Phase 3 — Seed & Finish
 
 Run, in order:
@@ -139,6 +163,8 @@ Run, in order:
    `page-<slug>.php` auto-applies), populate ACF fields from extracted text in the
    **primary language only** (flag secondary-language strings as untranslated), sideload
    images into the media library and wire them to fields, and build menus from the nav.
+   Pass the manifest's top-level `assets[]` (role-tagged: `logo` / `nav-graphic` / `hero` /
+   `content`) through so `/wp-seed` seeds each image by its role instead of guessing.
    Set `--exclude-slugs` to the comma-joined slugs of every `pages[role=cpt-archive]` entry
    (e.g. `--exclude-slugs team`) so no stray WP Page is created for an archive slug — its
    URL comes from `has_archive`, and a WP Page would collide with `archive-<cpt>.php`.
