@@ -29,7 +29,7 @@ resolve to a definition, or the page renders with the browser's unstyled fallbac
 
 ## CSS Custom Properties (Design Tokens)
 
-All design values MUST reference custom properties. Never hardcode raw values.
+All design values MUST reference custom properties. Never hardcode raw values. (Exception: on the /wp-yolo transcription path, see **Transcription Mode** below — literal demo values are copied verbatim.)
 
 ```css
 /* CORRECT */
@@ -235,7 +235,7 @@ For background images:
 
 ## Touch Targets
 
-All interactive elements MUST have a minimum touch target of 44px:
+All interactive elements MUST have a minimum touch target of 44px: (Exception: Transcription Mode / the /wp-yolo path does NOT add touch-target min-heights, to preserve the demo's exact geometry.)
 
 ```css
 .nav__link {
@@ -471,6 +471,8 @@ Enqueue page-specific styles conditionally in `functions.php`.
 12. **Use logical grouping** — within each section block, order properties: layout, box model, typography, visual, misc
 
 ## Transcription Mode (when dispatched by /wp-yolo)
+
+**On the transcription (yolo) path, this section OVERRIDES the 'All design values MUST reference custom properties' rule and the Touch Targets 44px rule above** — keep the demo's literal values and exact geometry; do not tokenize non-matching values and do not add touch-target min-heights.
 
 When the dispatch says **"transcribe"** and hands you the demo's exact CSS for this section,
 the demo is the SOURCE OF TRUTH, not inspiration. Your job is to COPY, not re-author.
