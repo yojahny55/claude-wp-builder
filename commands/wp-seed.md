@@ -174,6 +174,21 @@ bash -c "HERO_IMG_ID=\$($WP media import 'https://images.unsplash.com/photo-xxx'
 
 Store all successful attachment IDs mapped to their target ACF field names.
 
+### Seed assets by role
+
+If the manifest (produced by `wp-normalize`) has a top-level `assets[]` array, each entry carries a `role` (`logo|nav-graphic|hero|content`) plus optional `page`/`field`. After importing, route each asset by role — do not fall back to the generic field-mapping table for these:
+
+- **`logo`** → sideload the file, then set the site logo option:
+  ```bash
+  bash -c "LOGO_ID=\$($WP media import '<file>' --title='Site Logo' --porcelain) && $WP eval \"update_field('site_logo', \$LOGO_ID, 'option');\""
+  ```
+- **`hero`** (per page) → sideload, then set that page's `inner_hero_image` field on the page identified by `asset.page`:
+  ```bash
+  bash -c "HERO_ID=\$($WP media import '<file>' --title='<Page> Hero' --porcelain) && $WP eval \"update_field('inner_hero_image', \$HERO_ID, <page_id>);\""
+  ```
+- **`content`** → sideload, then set the ACF field named in `asset.field` using the normal Phase 4 flow (options page or page-specific, per the field mapping table).
+- **`nav-graphic`** → sideload and register as a theme asset only (e.g. an `nav_graphic` field or enqueued static asset). **Never** assign a `nav-graphic` to `site_logo` or any content field — a mis-tagged nav graphic must not become the seeded logo.
+
 ---
 
 ## Phase 4: Seed ACF Fields (Primary Language)

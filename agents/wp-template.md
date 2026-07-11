@@ -225,6 +225,10 @@ wp_nav_menu(array(
 ));
 ```
 
+## Teaser Fidelity (CPT teaser / archive cards)
+
+CPT single-post teasers (used in archive/blog loops, e.g. `.blog__card` above) MUST transcribe the demo's own teaser layout for that content type — matching its markup structure, image treatment, and meta fields (date, category, author, etc.) exactly as shown in the demo HTML. Do not reuse a generic archive card template for a CPT that has its own teaser design in the demo. Only fall back to a generic card (like the `WP_Query` example above) when the demo has no dedicated teaser markup for that post type.
+
 ## Complete Section Template Example
 
 Here is a full example of a properly structured template part:
