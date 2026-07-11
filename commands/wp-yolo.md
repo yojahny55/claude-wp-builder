@@ -177,9 +177,47 @@ Run, in order:
 4. **`/wp-polish`**
 5. **`/wp-responsive-check`**
 
+## Step 5.5: Demo-parity gate — auto-fix|auto fix, re-verify, block
+
+`/wp-finalize` (Step 5, item 3 above) already ran the 3-layer demo-parity gate (Layers 1-3).
+Before this run can report success, walk every **critical** finding from that gate:
+
+1. **Auto-fix mechanical findings** — no judgment required, apply directly:
+   - Token-drifted value with a clear literal source in the demo → replace it with the
+     demo's literal value.
+   - Missing font → copy the woff2 file(s) into `theme/assets/fonts/` and re-emit the
+     `@font-face` rule (same as Step 4.5's font carry).
+   - Missing logo/hero asset → seed it by its manifest `role` (`logo` / `hero`), same as
+     `/wp-seed`'s role-tagged asset pass.
+   - Colliding block (unscoped generic class) → rename/rescope it to its manifest-assigned
+     unique `block` name.
+   - Missing `background:url()` → transcribe it verbatim from the demo's recorded CSS
+     (`section.backgrounds` in the manifest) into the theme CSS.
+2. **Re-verify|re-run** — after applying any auto-fix, re-run the affected gate layer(s) to
+   confirm the finding actually cleared. Do not assume the fix worked; re-run and check.
+3. **Ambiguous findings are reported, not guessed.** Value drift with no clear literal
+   source, or a layout mismatch needing design judgment, is never auto-fixed — add it
+   verbatim to the blocking **Review** list.
+4. **Any critical finding still open after auto-fix + re-verify — including everything
+   ambiguous — blocks delivery.** This applies **even under `--yolo`**: `/wp-yolo` does not report success while any critical remains. The run is marked incomplete and the
+   Review list is printed prominently at the top of Step 6's report, before the rest of
+   the summary.
+
 ## Step 6: Report
 
-Print a summary:
+If any critical demo-parity finding survived Step 5.5's auto-fix + re-verify, do NOT
+print "Build Complete." Print instead, before anything else:
+```
+=== WP YOLO Build INCOMPLETE — demo-parity gate blocked delivery ===
+
+Review (blocking):
+  - <every unresolved critical finding — layer, selector/property/file, demo value vs. built value>
+
+Run /wp-finalize again after resolving the above, then re-run this gate.
+```
+This applies under `--yolo` too — `--yolo` skips the Step 3 checkpoint, not this gate.
+
+Otherwise, print a summary:
 ```
 === WP YOLO Build Complete ===
 Pages built:       <slug list, with section counts>
