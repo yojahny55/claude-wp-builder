@@ -233,6 +233,10 @@ For background images:
 }
 ```
 
+## Nav Styling
+
+Nav markup/styles MUST follow the nav-class contract in the wp-theme-standards skill.
+
 ## Touch Targets
 
 All interactive elements MUST have a minimum touch target of 44px: (Exception: Transcription Mode / the /wp-yolo path does NOT add touch-target min-heights, to preserve the demo's exact geometry.)

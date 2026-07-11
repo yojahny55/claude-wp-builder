@@ -583,6 +583,34 @@ add_action('wp_head', 'prefix_add_meta_description', 1);
 
 ---
 
+## Navigation class contract
+
+The nav walker (generates markup) and the header CSS (styles it) MUST agree on one shared set of class names. Use exactly these — do not invent alternates:
+
+| Class | Purpose |
+|---|---|
+| `.nav` | Root nav container |
+| `.nav__menu` | The `<ul>` menu list |
+| `.nav__item` | Each `<li>` menu item |
+| `.nav__item--has-children` | Modifier on items with a dropdown submenu |
+| `.nav__link` | The anchor for a plain (non-dropdown) menu item |
+| `.nav__submenu` | The nested `<ul>` dropdown menu |
+| `.nav__toggle` | The clickable/focusable element that opens a dropdown (e.g. `PROPERTIES ▾`) |
+
+States: `.is-open` (added to `.nav__item--has-children` when its submenu is expanded) and `aria-expanded` (`"true"`/`"false"` attribute on `.nav__toggle`, kept in sync with `.is-open`).
+
+**Baseline alignment rule (mandatory):** toggle items must sit on the same text baseline as plain links — never let the presence of a dropdown arrow shift a label up/down relative to its siblings. Apply `display:flex; align-items:center` to both `.nav__link` and `.nav__toggle`.
+
+```css
+.nav__link,
+.nav__toggle {
+    display: flex;
+    align-items: center;
+}
+```
+
+---
+
 ## Summary Checklist
 
 - [ ] `style.css` has required WordPress headers

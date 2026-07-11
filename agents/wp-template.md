@@ -193,6 +193,8 @@ For custom query pagination, use `paginate_links()`.
 
 ## Custom Nav Walker
 
+Nav markup/styles MUST follow the nav-class contract in the wp-theme-standards skill.
+
 When generating custom navigation markup, extend `Walker_Nav_Menu`:
 
 ```php
