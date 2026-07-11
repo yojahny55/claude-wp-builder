@@ -1,0 +1,38 @@
+@font-face {
+  font-family: 'Brand Sans';
+  font-weight: 400;
+  font-style: normal;
+  src: url('fonts/brand-sans-regular.woff2') format('woff2');
+}
+
+.site-header { display: flex; align-items: center; gap: 16px; }
+.logo img { height: 32px; }
+.nav-toggle { height: 20px; width: 20px; }
+
+.home-hero {
+  height: 480px;
+  background: url(images/hero-home.jpg) center/cover no-repeat;
+  color: #fff;
+}
+
+.sp-hero {
+  height: 320px;
+  background: url(images/hero-services.jpg) center/cover no-repeat;
+  color: #fff;
+}
+
+.services {
+  padding: 60px 0;
+  font-family: 'Brand Sans', sans-serif;
+}
+.services .note {
+  color: #BFBFBF;
+}
+.services .card {
+  width: 280px;
+}
+
+@media (max-width: 768px) {
+  .home-hero { height: 320px; }
+  .services { padding: 40px 0; }
+}

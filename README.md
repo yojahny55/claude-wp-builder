@@ -182,6 +182,14 @@ Build sections one at a time:
 /wp-yolo /path/to/demo-folder
 ```
 
+`/wp-yolo` **transcribes** the demo rather than re-deriving it — copying its exact colors,
+heights, gaps, CSS backgrounds, and self-hosted fonts verbatim (no "best-practice" edits that
+drift from the design) — and assigns each section a unique CSS block so parallel builds can't
+collide. Before it reports done it runs a **demo-parity gate** (static + WP-CLI + measured
+visual diff via the claude-in-chrome extension), auto-fixes mechanical divergences, and
+**blocks** on anything it can't safely fix — so a broken build fails loudly instead of shipping
+silently.
+
 Each command generates three files in parallel:
 - `fields/<section>.php` — ACF field definitions with bilingual support
 - `template-parts/section-<name>.php` — PHP template consuming those fields
