@@ -213,3 +213,162 @@ List **every** low-confidence decision (any classification you are not fully cer
 any inferred field, any structural guess made from heuristic segmentation rather than
 explicit `<section>` tags) as a plain-language entry in `review[]`. This list is read
 verbatim at the Phase 1 checkpoint.
+
+## Fidelity capture
+
+Beyond classification, the manifest must carry enough raw material that downstream
+`wp-css` agents **transcribe** rather than guess, and that parallel agents can never
+collide on a class name. Do this per section/page, in addition to everything above:
+
+1. **Verbatim CSS.** For every section, collect the exact declared CSS rules that match
+   it (by selector, following the same resolution used in Analysis Procedure step 3) and
+   record them verbatim into `section.cssRules` — a raw CSS string, not a paraphrase.
+   `wp-css` transcribes this string; it must not need to reinvent values.
+2. **Backgrounds.** Scan each section's resolved CSS for `background` / `background-image:
+   url(...)` and record every referenced image path into `section.backgrounds[]`.
+3. **Fonts.** Scan the stylesheet(s) for `@font-face` blocks and record each into
+   `section.fonts[]` as `{ family, weight, style, src: [ "<woff2 path>", ... ] }` (prefer
+   the `woff2` entry in the `src` list; keep multiple sources if declared).
+4. **Computed dimensions.** When a section (or a key element inside it) has a fixed
+   `height` and/or `width` declared in CSS (not `auto`, not percentage-fluid), record it
+   into `section.computed` as `{ height?, width? }`. Omit keys that aren't fixed.
+5. **Unique block names.** Assign `section.block` yourself — you do not wait for
+   downstream agents to request a name. The rule: `<page-slug>-<section-name>`
+   (kebab-case), e.g. `sp-services` for the `services` section on `services.html`. Home
+   (`index`) sections may drop the page prefix and use the bare section name **only if**
+   that bare name is not also used as a block on any other page — if two pages both have
+   a `services`-shaped section, home's becomes `home-services` and the inner page's
+   `sp-services`; there is no bare `.services` in the manifest. This is what makes
+   parallel `wp-css` runs collision-proof: every block is unique before any builder agent
+   starts.
+6. **Asset roles.** Every image referenced anywhere in the demo (header, nav, sections,
+   footer) gets one entry in the top-level `assets[]` array: `{ file, role, page?, field?
+   }`, where `role` is one of:
+   - `logo` — the site identity mark, normally in the header/footer, linked to home.
+   - `nav-graphic` — an image used as a navigation element (e.g. a menu icon, a nav-bar
+     decorative graphic) — **never** classified as `logo` even if it sits beside the logo
+     in the header. Distinguish by function: does it link home and represent the brand
+     (`logo`), or does it toggle/decorate the nav (`nav-graphic`)?
+   - `hero` — an image set via CSS `background:url()` on a hero/banner section (also
+     already captured in that section's `backgrounds[]`; the top-level `assets[]` entry
+     additionally tags its role and originating page/field for the seeding pipeline).
+   - `content` — any other in-content image (card photo, inline `<img>`, etc.).
+7. **Shared components.** When the same card/accordion/list structure (same markup
+   shape + same class naming) recurs on 2+ pages, do not let each page's build treat it
+   as a fresh component. Mark it as a **shared component**: add a `sharedComponents[]`
+   top-level array with `{ name, class, pages: [...], sections: [...] }`, using one
+   shared class for the base structure. Per-page visual differences still get scoped
+   overrides under that page's own `block` (e.g. `.home-services .card` background tweak)
+   rather than a second copy of the component.
+
+### Extended per-section schema
+
+```jsonc
+{
+  "name": "<string>",
+  "kind": "static" | "contact" | "cpt-teaser",
+  "block": "<string>",                 // unique BEM block, assigned here
+  "cssRules": "<string>",              // verbatim declared CSS for this section
+  "backgrounds": [ "<image-url>" ],    // from background:url() in cssRules
+  "fonts": [                            // from @font-face blocks touching this section
+    { "family": "<string>", "weight": "<string|number>", "style": "normal|italic",
+      "src": [ "<woff2-path>" ] }
+  ],
+  "computed": { "height": "<string>", "width": "<string>" }, // fixed dims only, both optional
+  "confidence": 0.0,
+  "rationale": "<string, optional>",
+  "fields": [ /* ACF field guesses */ ],
+  "assets": [ /* image paths referenced by this section */ ]
+}
+```
+
+Top-level additions:
+
+```jsonc
+{
+  "assets": [
+    { "file": "<path>", "role": "logo" | "nav-graphic" | "hero" | "content",
+      "page": "<slug, optional>", "field": "<string, optional>" }
+  ],
+  "sharedComponents": [
+    { "name": "<string>", "class": "<shared-css-class>",
+      "pages": [ "<slug>", "..." ], "sections": [ "<section-name>", "..." ] }
+  ]
+}
+```
+
+### Filled example — two pages, colliding section names resolved, hero background, font, nav-graphic
+
+```jsonc
+{
+  "source": "demo-source/agency-co",
+  "pages": [
+    {
+      "slug": "index", "role": "home", "file": "demo/index.html",
+      "sections": [
+        { "name": "hero", "kind": "static", "block": "home-hero",
+          "cssRules": ".hero{height:640px;background:url(images/hero-bg.jpg) center/cover no-repeat;}",
+          "backgrounds": [ "images/hero-bg.jpg" ],
+          "fonts": [], "computed": { "height": "640px" },
+          "fields": [
+            { "name": "hero_title", "type": "text" },
+            { "name": "hero_subtitle", "type": "textarea" }
+          ], "assets": [] },
+        { "name": "services", "kind": "static", "block": "home-services",
+          "cssRules": ".services{padding:80px 0;font-family:'Brand Sans',sans-serif;} .services .card{width:320px;}",
+          "backgrounds": [], "fonts": [], "computed": {},
+          "confidence": 1.0,
+          "rationale": "Same card structure also appears on services.html — see sharedComponents",
+          "fields": [ { "name": "services_heading", "type": "text" } ],
+          "assets": [] }
+      ]
+    },
+    {
+      "slug": "services", "role": "inner", "file": "demo/services.html",
+      "sections": [
+        { "name": "services", "kind": "static", "block": "sp-services",
+          "cssRules": ".services{padding:60px 0;} .services .card{width:320px;}",
+          "backgrounds": [], "fonts": [], "computed": {},
+          "confidence": 1.0,
+          "rationale": "Same card structure as index.html's services teaser — shared component, page-scoped padding override",
+          "fields": [ { "name": "services_intro", "type": "textarea" } ],
+          "assets": [] }
+      ]
+    }
+  ],
+  "shared": {
+    "header": true, "footer": true,
+    "headerDivergentPages": [], "footerDivergentPages": []
+  },
+  "assets": [
+    { "file": "images/logo.svg", "role": "logo", "page": "index", "field": "site_logo" },
+    { "file": "images/nav-menu-icon.svg", "role": "nav-graphic", "page": "index" },
+    { "file": "images/hero-bg.jpg", "role": "hero", "page": "index", "field": "hero_image" }
+  ],
+  "sharedComponents": [
+    { "name": "services-card", "class": ".services .card",
+      "pages": [ "index", "services" ], "sections": [ "services" ] }
+  ],
+  "contentTypes": [],
+  "review": [
+    "'services' section shape is identical on index and services.html — resolved to distinct blocks home-services / sp-services, shared component .services .card built once with per-page padding override",
+    "images/nav-menu-icon.svg sits next to images/logo.svg in the header but toggles the mobile nav — tagged nav-graphic, not logo"
+  ]
+}
+```
+
+Global font declaration example (site-wide, not tied to one section — record once at
+manifest top level under `"fonts"` if it applies globally, or per-section under
+`section.fonts` if scoped):
+
+```jsonc
+"fonts": [
+  { "family": "Brand Sans", "weight": "400", "style": "normal",
+    "src": [ "fonts/brand-sans-regular.woff2" ] }
+]
+```
+
+List every unresolved shared-component or asset-role ambiguity in `review[]` alongside
+the existing classification entries — the checkpoint reader treats them the same way.</new_string>
+</invoke>
+
