@@ -205,11 +205,11 @@ Layer 2 runs when `.wp-create.json` exists and WordPress is reachable (reuse `$W
 1. **`site_logo` + critical options non-empty** — `critical`
 
    ```bash
-   $WP option get site_logo
+   $WP eval "echo get_field('site_logo','option') ? 'OK' : 'EMPTY';"
    $WP option get blogname
    $WP option get blogdescription
    ```
-   **PASS** if `site_logo` and every other critical site option return a non-empty value. **FAIL** listing which option is empty/unset.
+   The logo is stored as the ACF options field `options_site_logo` (seeded via `update_field('site_logo', $LOGO_ID, 'option')`), NOT the WordPress core `site_logo` option — read it with `get_field('site_logo','option')`, matching the `inner_hero_image` check below. **PASS** if `site_logo` and every other critical site option return a non-empty value. **FAIL** listing which option is empty/unset.
 
 2. **`inner_hero_image` seeded per in-scope page** — `critical`
 

@@ -1,7 +1,7 @@
 ---
 description: One-shot section builder — generates ACF fields + template part + CSS for a section from the demo
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
-argument-hint: "<section-name> [screenshot-path] [--cf7] [--page <slug>] [--target <template>]"
+argument-hint: "<section-name> [screenshot-path] [--cf7] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>]"
 ---
 
 # WP Section — One-Shot Section Builder
@@ -16,15 +16,21 @@ Parse `$ARGUMENTS`:
 - **`--cf7` flag** = force CF7 contact form integration (optional)
 - **`--page <slug>`** = read the section from `demo/<slug>.html` instead of `demo/index.html` (optional, **default `index`** — existing behavior unchanged when omitted)
 - **`--target <template>`** = inject the `get_template_part` call into `<template>` (e.g. `page-about.php`) instead of `front-page.php` (optional, **default `front-page.php`** — existing behavior unchanged when omitted)
+- **`--transcribe` flag** = activate **faithful Transcription Mode** (optional). When set, the dispatched agents reproduce the demo's exact declared CSS/geometry instead of re-authoring fresh design-system styles. When omitted, behavior is unchanged (the current re-authoring / design-system path).
+- **`--block <name>`** = the unique BEM block name to scope every generated selector under (optional; used with `--transcribe` so parallel section builds can never collide on a selector).
+- **`--css <source>`** = the section's verbatim demo CSS to transcribe from (optional; the SOURCE OF TRUTH for `--transcribe`). May be an inline CSS blob or a path to a CSS file.
+
+> **Note:** `/wp-yolo` sets `--transcribe --block <block> --css <cssRules>` on every `/wp-section` dispatch (see `commands/wp-yolo.md` Step 4). When invoked by hand without these flags, `/wp-section` keeps its original design-system authoring behavior.
 
 If no section name is provided, print an error:
 ```
 Error: Section name is required.
-Usage: /wp-section <section-name> [screenshot-path] [--cf7] [--page <slug>] [--target <template>]
+Usage: /wp-section <section-name> [screenshot-path] [--cf7] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>]
 Example: /wp-section hero
          /wp-section services /path/to/screenshot.png
          /wp-section contact --cf7
          /wp-section about-story --page about --target page-about.php
+         /wp-section hero --transcribe --block home-hero --css demo/index.css
 ```
 
 ## Step 2: Read Project Context
@@ -79,6 +85,24 @@ Subfields:      <element> only          (e.g., title, description, icon — NO s
 Field keys:     field_<section>_<element>
 Group keys:     group_<section>
 ```
+
+---
+
+### TRANSCRIPTION MODE OVERLAY (only when `--transcribe` is set)
+
+When `--transcribe` is present (the `/wp-yolo` path), layer these instructions onto every
+agent prompt below. When it is absent, skip this overlay entirely — the agents run their
+normal design-system authoring path unchanged.
+
+- **wp-css:** append to its prompt the literal word **"transcribe"**, the `--css` source
+  (the section's verbatim demo CSS — inline it, or tell the agent to read the given path),
+  and the `--block` name. This activates wp-css **Transcription Mode** (see
+  `agents/wp-css.md`): the demo CSS is the SOURCE OF TRUTH — copy its exact declared values
+  and geometry, do NOT re-author, and scope every selector under `--block`.
+- **wp-template:** instruct it to scope all BEM classes under the `--block` name (use
+  `<block>__<element>` instead of `<section>__<element>`) so the transcribed CSS and the
+  markup share the same unique block and parallel sections never collide.
+- Because each section's `--block` is unique, parallel agents can never clash on a selector.
 
 ---
 

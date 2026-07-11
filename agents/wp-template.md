@@ -201,10 +201,26 @@ When generating custom navigation markup, extend `Walker_Nav_Menu`:
 class Prefix_Nav_Walker extends Walker_Nav_Menu {
     public function start_el(&$output, $item, $depth = 0, $args = null, $id = 0) {
         $classes = implode(' ', $item->classes);
-        $output .= '<li class="nav__item ' . esc_attr($classes) . '">';
+        // Dropdown parents carry the contract's has-children modifier.
+        $has_children = in_array('menu-item-has-children', $item->classes, true);
+        $li_class = 'nav__item' . ($has_children ? ' nav__item--has-children' : '');
+        $output .= '<li class="' . esc_attr(trim($li_class . ' ' . $classes)) . '">';
         $output .= '<a class="nav__link" href="' . esc_url($item->url) . '">';
         $output .= esc_html($item->title);
         $output .= '</a>';
+        // Dropdown items emit a toggle control per the nav-class contract.
+        if ($has_children) {
+            $output .= '<button class="nav__toggle" aria-expanded="false" aria-label="' . esc_attr__('Toggle submenu', 'textdomain') . '"></button>';
+        }
+    }
+
+    // Child <ul> MUST use .nav__submenu to match the contract (default is 'sub-menu').
+    public function start_lvl(&$output, $depth = 0, $args = null) {
+        $output .= '<ul class="nav__submenu">';
+    }
+
+    public function end_lvl(&$output, $depth = 0, $args = null) {
+        $output .= '</ul>';
     }
 
     public function end_el(&$output, $item, $depth = 0, $args = null) {
@@ -220,10 +236,17 @@ wp_nav_menu(array(
     'theme_location' => 'primary',
     'container'      => 'nav',
     'container_class'=> 'nav',
-    'menu_class'     => 'nav__list',
+    'menu_class'     => 'nav__menu',
     'walker'         => new Prefix_Nav_Walker(),
 ));
 ```
+
+The walker output MUST match the nav-class contract exactly: `.nav__menu` on the top-level
+`<ul>`, `.nav__item` (+ `.nav__item--has-children` on dropdown parents) on each `<li>`,
+`.nav__link` on anchors, `.nav__submenu` on the child `<ul>`, and `.nav__toggle` on the
+dropdown control. A `menu_class` or submenu class that diverges from this leaves the header
+CSS targeting selectors the walker never emits (dead selectors — the Layer-1 nav-contract
+gate fails).
 
 ## Teaser Fidelity (CPT teaser / archive cards)
 

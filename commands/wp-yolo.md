@@ -104,19 +104,19 @@ Drive the existing commands/agents in this exact order, reading everything from 
    section walk: walk its `sections[]` in order and run the `/wp-section` procedure per
    section (defaults: `--page index`, `--target front-page.php`, so no flags are needed
    for home):
-   - `kind: "static"` → normal `/wp-section <name>` (three-agent parallel dispatch). Pass
-     each dispatched `wp-css`/`wp-template` agent this section's `block` (its assigned
-     unique BEM name — scope every selector under it) and its verbatim `cssRules`, with the
-     instruction **"transcribe"** — this activates wp-css Transcription Mode, which
-     reproduces the demo's exact declared CSS under that block instead of drafting fresh
-     styles. Because every section's `block` is already unique, parallel agents can never
-     collide on a selector.
+   - `kind: "static"` → `/wp-section <name> --transcribe --block <block> --css <cssRules>`
+     (three-agent parallel dispatch). The `--transcribe` flag activates wp-css Transcription
+     Mode via `/wp-section`'s transcription overlay; `--block` is the section's assigned
+     unique BEM name (every selector is scoped under it); `--css` is its verbatim demo
+     `cssRules` (the source of truth). This reproduces the demo's exact declared CSS under
+     that block instead of drafting fresh styles. Because every section's `block` is already
+     unique, parallel agents can never collide on a selector.
    - `kind: "cpt-teaser"` → **SKIP** — do NOT dispatch `/wp-section` for these. The CPT's
      teaser `template-parts/section-<cpt>.php` was already built and injected into
      `front-page.php` by that CPT's `/wp-cpt` run in step 2. Note it in the report as
      "teaser for `<cpt>`, built by /wp-cpt".
-   - `kind: "contact"` → `/wp-section <name> --cf7`, same `block`/`cssRules`/transcribe
-     dispatch as `static`.
+   - `kind: "contact"` → `/wp-section <name> --cf7 --transcribe --block <block> --css <cssRules>`,
+     same transcribe dispatch as `static`.
 6. **Inner pages** — for every `pages[role=inner]` entry: if the scope reconciliation
    (Step 2.5) marked this page `delivery: idx` or `delivery: plugin`, skip the normal
    page/section flow entirely and instead run
@@ -124,11 +124,11 @@ Drive the existing commands/agents in this exact order, reading everything from 
    Otherwise, run `/wp-page custom <slug>`, then build its `sections[]` — but each inner
    section must read from its OWN demo page and inject into its OWN page template, so pass
    `--page <slug> --target page-<slug>.php` on every dispatch:
-   - `kind: "static"` → `/wp-section <name> --page <slug> --target page-<slug>.php`, passing
-     the section's `block` + `cssRules` and the "transcribe" instruction, exactly as in
-     step 5.
-   - `kind: "contact"` → `/wp-section <name> --cf7 --page <slug> --target page-<slug>.php`,
-     same `block`/`cssRules`/transcribe dispatch.
+   - `kind: "static"` → `/wp-section <name> --page <slug> --target page-<slug>.php --transcribe --block <block> --css <cssRules>`,
+     passing the section's unique `block` + verbatim `cssRules` via the transcribe flags,
+     exactly as in step 5.
+   - `kind: "contact"` → `/wp-section <name> --cf7 --page <slug> --target page-<slug>.php --transcribe --block <block> --css <cssRules>`,
+     same transcribe dispatch.
    - `kind: "cpt-teaser"` on an inner page → same skip rule as step 5 (owned by `/wp-cpt`).
    Under `--careful`, confirm with the user before building each inner page.
 7. **`cpt-archive` pages** — no WP Page is created for these (their archive URL is

@@ -350,7 +350,7 @@ Top-level additions:
   "assets": [
     { "file": "images/logo.svg", "role": "logo", "page": "index", "field": "site_logo" },
     { "file": "images/nav-menu-icon.svg", "role": "nav-graphic", "page": "index" },
-    { "file": "images/hero-bg.jpg", "role": "hero", "page": "index", "field": "hero_image" }
+    { "file": "images/hero-bg.jpg", "role": "hero", "page": "index", "field": "inner_hero_image" }
   ],
   "sharedComponents": [
     { "name": "services-card", "class": ".services .card",
@@ -376,6 +376,4 @@ manifest top level under `"fonts"` if it applies globally, or per-section under
 ```
 
 List every unresolved shared-component or asset-role ambiguity in `review[]` alongside
-the existing classification entries — the checkpoint reader treats them the same way.</new_string>
-</invoke>
-
+the existing classification entries — the checkpoint reader treats them the same way.
