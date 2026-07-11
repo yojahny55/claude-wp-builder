@@ -177,7 +177,7 @@ Run, in order:
 4. **`/wp-polish`**
 5. **`/wp-responsive-check`**
 
-## Step 5.5: Demo-parity gate — auto-fix|auto fix, re-verify, block
+## Step 5.5: Demo-parity gate — auto-fix, re-verify, and block
 
 `/wp-finalize` (Step 5, item 3 above) already ran the 3-layer demo-parity gate (Layers 1-3).
 Before this run can report success, walk every **critical** finding from that gate:
@@ -193,7 +193,7 @@ Before this run can report success, walk every **critical** finding from that ga
      unique `block` name.
    - Missing `background:url()` → transcribe it verbatim from the demo's recorded CSS
      (`section.backgrounds` in the manifest) into the theme CSS.
-2. **Re-verify|re-run** — after applying any auto-fix, re-run the affected gate layer(s) to
+2. **Re-verify** — after applying any auto-fix, re-run the affected gate layer(s) to
    confirm the finding actually cleared. Do not assume the fix worked; re-run and check.
 3. **Ambiguous findings are reported, not guessed.** Value drift with no clear literal
    source, or a layout mismatch needing design judgment, is never auto-fixed — add it
