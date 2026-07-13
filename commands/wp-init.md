@@ -362,6 +362,24 @@ cd <theme-dir> && npm install && npm run build
 ```
 This generates `assets/css/dist/main.css` and `assets/js/dist/index.js` needed for the theme to function.
 
+## Step 9.5: Initialize git repository
+
+The theme directory is the versioned deliverable and `/wp-yolo` requires a git repo
+(for a rollback baseline and worktree-based isolation). Initialize one if absent:
+
+```bash
+cd <theme-dir>
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+  git init -q
+  printf 'node_modules/\n.DS_Store\n*.log\n' > .gitignore
+  # Tailwind build output is regenerable — ignore dist if this is the tailwind template
+  git add -A && git commit -q -m "chore: scaffold <slug> theme from starter"
+}
+```
+
+Idempotent: if `<theme-dir>` is already inside a git work tree (e.g. the whole
+site is versioned), skip init and leave the existing repo untouched.
+
 ## Step 10: Print Summary
 
 Print a summary:

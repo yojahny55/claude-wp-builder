@@ -33,6 +33,21 @@ Error: No .claude/CLAUDE.md found. Run /wp-init first to scaffold the project.
 Extract function prefix, theme slug, languages (primary + secondary), template
 (basic|tailwind), and CF plugin (scf|acf) — needed by every downstream command.
 
+**Git baseline gate.** `/wp-yolo` rewrites the theme wholesale, so it must run against
+a git repo — for a rollback point and for worktree isolation. In the theme directory:
+
+```bash
+cd <theme-dir>
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+  git init -q
+  printf 'node_modules/\n.DS_Store\n*.log\n' > .gitignore
+}
+git add -A && git commit -q -m "chore: baseline before /wp-yolo build" || true
+```
+
+This is unconditional and runs even under `--yolo`: no build starts until a clean
+baseline commit exists, so the whole pass is diffable and revertible.
+
 ## Step 2: Phase 1 — Normalize
 
 Dispatch the **wp-normalize** agent against the demo folder from Step 1. It scans every
