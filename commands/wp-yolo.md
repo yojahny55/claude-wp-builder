@@ -140,7 +140,9 @@ Drive the existing commands/agents in this exact order, reading everything from 
    - `/wp-page search`
    These are never conditional on the demo containing a matching page; they are
    synthesized from the derived design (shared header/footer, design tokens, section
-   styling) so they read as native to the site.
+   styling) so they read as native to the site. When the demo has no 404/search page,
+   they are still built as fully styled theme templates — the `/wp-page` runs overwrite
+   any starter/underscores boilerplate `404.php`/`search.php`, never leaving it in place.
 
 ## Step 4.5: Font carry
 

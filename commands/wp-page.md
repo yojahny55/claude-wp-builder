@@ -159,21 +159,26 @@ Dispatch **wp-css** agent:
 
 Dispatch **wp-template** agent:
 
-> Generate `404.php`:
+> Generate `404.php` — a fully styled theme template, NOT the starter/underscores
+> boilerplate. Overwrite any existing `404.php`. Match the site's visual design:
+> reuse the theme's buttons, typography, and spacing, and apply frontend-design
+> best practices so it reads as a converted theme page (header/footer supply the chrome).
 > - `get_header()`
 > - Centered error message section:
 >   - Large "404" display heading
 >   - Message: `prefix_get_field('404_message', 'option')` with fallback "Page not found"
 >   - Description: `prefix_get_field('404_description', 'option')` with fallback
 >   - Search form using `get_search_form()`
->   - "Back to Home" button linking to `home_url('/')`
+>   - "Back to Home" button linking to `home_url('/')`, styled with the theme's button class
 >   - Optional: recent posts or suggested pages
 > - `get_footer()`
-> - BEM classes: `.error-404__*`
+> - BEM classes: `.error-404__*`, matching the design tokens in the theme CSS
 
 Dispatch **wp-css** agent:
 
-> Add 404 page CSS to `assets/css/styles.css` within delimiters. Include: centered layout, large 404 text, search form styling, responsive design.
+> Add 404 page CSS to `assets/css/styles.css` within delimiters, using the project's
+> design-system custom properties (no new colors). Include: centered layout, large 404
+> text, search form styling, themed button, responsive design.
 
 ---
 
@@ -181,7 +186,9 @@ Dispatch **wp-css** agent:
 
 Dispatch **wp-template** agent:
 
-> Generate `search.php`:
+> Generate `search.php` — a fully styled theme template, NOT the starter/underscores
+> boilerplate. Overwrite any existing `search.php`. Reuse the site's card/list markup and
+> design tokens so results and the no-results state read as converted theme pages.
 > - `get_header()`
 > - Page title: `printf( esc_html__( 'Search results for: %s', '<slug>' ), '<span>' . get_search_query() . '</span>' )`
 > - `if ( have_posts() )` loop reusing the site's card/list markup via
