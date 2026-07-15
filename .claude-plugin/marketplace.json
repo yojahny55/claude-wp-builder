@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "WordPress site-building methodology: demo HTML, custom themes with ACF/SCF, bilingual support, section-by-section generation",
-    "version": "1.6.0"
+    "version": "1.7.0"
   },
   "plugins": [
     {
@@ -16,7 +16,7 @@
         "repo": "yojahny55/claude-wp-builder"
       },
       "description": "Claude Code plugin for building custom WordPress sites — demo-first workflow with ACF/SCF fields, bilingual support, CF7 contact forms, and section-by-section theme generation",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "author": {
         "name": "Yojahny"
       },
