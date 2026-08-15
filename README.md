@@ -1,3 +1,5 @@
+
+
 <div align="center">
 
 # Claude WP Builder
@@ -11,7 +13,7 @@
 
 A Claude Code plugin that turns approved demo HTML into a complete WordPress theme — section by section, with ACF/SCF fields, bilingual support, SEO, and security — all from the command line.
 
-[Quick Start](#installation) | [Commands](#commands-reference) | [Architecture](#architecture) | [Contributing](CONTRIBUTING.md) | [Backlog](BACKLOG.md)
+[Quick Start](#installation) | [Commands](#commands-reference) | [Architecture](#architecture) | [Cinematic Mode](docs/cinematic-mode.md) | [Contributing](CONTRIBUTING.md) | [Backlog](BACKLOG.md)
 
 </div>
 
