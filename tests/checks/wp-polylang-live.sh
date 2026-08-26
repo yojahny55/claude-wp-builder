@@ -73,6 +73,7 @@ ORPHAN_PARENT_ID=""
 ORPHAN_CHILD_ID=""
 FIXTURE_TERM_IDS=""
 FIXTURE_PROBE_MENU_ID=""
+FIXTURE_EMPTY_MENU_ID=""
 SELF_PROBE_ARMED=""
 FIXTURE_MEDIA_ID=""
 FIXTURE_ITEM_IDS=""
@@ -99,7 +100,7 @@ cleanup() {
   # Nothing was created yet -- do not run a site mutation just to delete zero
   # objects. This matters because the trap is armed before the first fixture
   # object exists, on purpose, so the temp dir above is always removed.
-  if [[ -z "$FIXTURE_PARENT_ID$FIXTURE_CHILD_ID$FIXTURE_MEDIA_ID$FIXTURE_ITEM_IDS$FIXTURE_ARCHIVE_PT$FIXTURE_THIRD_LANG$VERIFY_VICTIM$ORPHAN_PARENT_ID$ORPHAN_CHILD_ID$FIXTURE_TERM_IDS$FIXTURE_PROBE_MENU_ID$SELF_PROBE_ARMED" ]]; then
+  if [[ -z "$FIXTURE_PARENT_ID$FIXTURE_CHILD_ID$FIXTURE_MEDIA_ID$FIXTURE_ITEM_IDS$FIXTURE_ARCHIVE_PT$FIXTURE_THIRD_LANG$VERIFY_VICTIM$ORPHAN_PARENT_ID$ORPHAN_CHILD_ID$FIXTURE_TERM_IDS$FIXTURE_PROBE_MENU_ID$FIXTURE_EMPTY_MENU_ID$SELF_PROBE_ARMED" ]]; then
     return $status
   fi
   (cd "$SITE" \
@@ -107,6 +108,7 @@ cleanup() {
        PLL_FIX_ITEMS="$FIXTURE_ITEM_IDS" \
        PLL_FIX_TERMS="$FIXTURE_TERM_IDS" \
        PLL_FIX_PROBE_MENU="$FIXTURE_PROBE_MENU_ID" \
+       PLL_FIX_EMPTY_MENU="$FIXTURE_EMPTY_MENU_ID" \
        PLL_FIX_MENU="$FIXTURE_MENU_ID" \
        PLL_FIX_PT="$FIXTURE_ARCHIVE_PT" \
        PLL_FIX_SRC="$SRC" \
@@ -141,8 +143,18 @@ if ( $probe_menu && wp_get_nav_menu_object( $probe_menu ) ) {
 // leave the site with a bogus location wired to a real menu.
 $pll_opts  = get_option( "polylang" );
 $pll_theme = get_stylesheet();
-if ( isset( $pll_opts["nav_menus"][ $pll_theme ]["pll-selftarget-probe"] ) ) {
-  unset( $pll_opts["nav_menus"][ $pll_theme ]["pll-selftarget-probe"] );
+$empty_menu = (int) getenv( "PLL_FIX_EMPTY_MENU" );
+if ( $empty_menu && wp_get_nav_menu_object( $empty_menu ) ) {
+  wp_delete_nav_menu( $empty_menu );
+}
+$dirty = false;
+foreach ( array( "pll-selftarget-probe", "pll-empty-probe" ) as $probe_loc ) {
+  if ( isset( $pll_opts["nav_menus"][ $pll_theme ][ $probe_loc ] ) ) {
+    unset( $pll_opts["nav_menus"][ $pll_theme ][ $probe_loc ] );
+    $dirty = true;
+  }
+}
+if ( $dirty ) {
   update_option( "polylang", $pll_opts );
 }
 
@@ -1007,6 +1019,70 @@ grep -qF "ids are not portable between sites" <<<"$FOREIGN_OUT" || {
 }
 echo "  import reported: $(grep -F "ids are not portable" <<<"$FOREIGN_OUT" | head -1)"
 rm -f "$FOREIGN_MAN"
+
+echo "── an empty source menu is still exported ──"
+# export used to `continue` on a menu with no items. The importer then never
+# created a target menu for that location, so pll-verify.php failed the site
+# with "menu location has no counterpart menu" -- on every run, permanently,
+# with no way for the pipeline to repair it. An empty menu that exists and is
+# assigned is a valid, verifiable state.
+#
+# Throwaway menu under a location no theme registers, same reasoning as the
+# self-target probe below: this drives a menu path, so nothing it touches may
+# be real.
+EMPTY_MENU_ID="$(cd "$SITE" && wp menu create "PLL empty probe" --porcelain --allow-root)"
+[[ -n "$EMPTY_MENU_ID" ]] || { echo "FAIL: could not create the empty probe menu"; exit 1; }
+FIXTURE_EMPTY_MENU_ID="$EMPTY_MENU_ID"
+(cd "$SITE" && PLL_M="$EMPTY_MENU_ID" PLL_SRC="$SRC" wp eval '
+$o = get_option("polylang"); $t = get_stylesheet();
+$o["nav_menus"][$t]["pll-empty-probe"][getenv("PLL_SRC")] = (int) getenv("PLL_M");
+update_option("polylang", $o);
+' --allow-root >/dev/null)
+
+# The export loop only visits locations the THEME registers, and this site's
+# theme registers exactly one -- the real, in-use menu-principal, which cannot
+# be emptied. So the probe location is registered for the duration of ONE
+# command via WP-CLI's --require, which queues the hook before WP loads and
+# changes no site state at all. Same reasoning as the --skip-plugins isolation
+# used for the no-fields-plugin check: drive the condition without mutating
+# anything that has to be restored.
+EMPTY_REQUIRE="$FIXTURE_TMPDIR/probe-location.php"
+cat > "$EMPTY_REQUIRE" <<'PROBEEOF'
+<?php
+WP_CLI::add_wp_hook( 'after_setup_theme', function () {
+    register_nav_menus( array( 'pll-empty-probe' => 'PLL empty probe' ) );
+}, 99 );
+PROBEEOF
+
+EMPTY_MAN="$FIXTURE_TMPDIR/manifest-empty-menu.json"
+(cd "$SITE" && wp --require="$EMPTY_REQUIRE" eval-file "$SCRIPTS/pll-export.php" "$SRC" "$DST" "$EMPTY_MAN" --allow-root >/dev/null) || { echo "FAIL: export with an empty source menu exited non-zero"; exit 1; }
+EMPTY_LISTED="$(PLL_M="$EMPTY_MAN" PLL_MENU="$EMPTY_MENU_ID" php -r '
+$m = json_decode(file_get_contents(getenv("PLL_M")), true);
+$want = (int) getenv("PLL_MENU");
+foreach ($m["items"] as $it) {
+  if (($it["kind"] ?? "") === "menu" && (int) ($it["menu_id"] ?? 0) === $want) { echo "yes"; return; }
+}
+echo "no";
+')"
+rm -f "$EMPTY_MAN"
+
+# Removed BEFORE the assertion, so a failure cannot leave a probe menu and a
+# bogus location assignment behind on the site.
+(cd "$SITE" && wp menu delete "$EMPTY_MENU_ID" --allow-root >/dev/null 2>&1)
+(cd "$SITE" && wp eval '
+$o = get_option("polylang"); $t = get_stylesheet();
+if (isset($o["nav_menus"][$t]["pll-empty-probe"])) {
+  unset($o["nav_menus"][$t]["pll-empty-probe"]);
+  update_option("polylang", $o);
+}
+' --allow-root >/dev/null)
+FIXTURE_EMPTY_MENU_ID=""
+
+[[ "$EMPTY_LISTED" == "yes" ]] || {
+  echo "FAIL: export skipped a location whose source menu is empty -- the importer will never create its counterpart, and verify fails that site forever"
+  exit 1
+}
+echo "  empty source menu emitted, so its counterpart can be created"
 
 echo "── import refuses a menu manifest that names one menu as both ends ──"
 # The menu branch rebuilds the target from scratch, hard-deleting its items.
@@ -2080,7 +2156,66 @@ if (cd "$SITE" && wp eval 'exit(function_exists("get_field") ? 0 : 1);' --allow-
   echo "  negative controls confirmed unaltered (source and target): $n source + 4 target\n";
   ' "$ACF_SOURCE_STILL" || exit 1
 
-  echo "── a counterpart with no fields set receives the untranslated values ──"
+  echo "── import refuses to drop ACF values when no fields plugin is active ──"
+  # The manifest carries acf values only because a fields plugin was active at
+  # EXPORT time. If one is not active at IMPORT time, those strings used to be
+  # skipped with no output at all -- and the hash recorded anyway, which made
+  # them unreachable on every later run. A failure converted into silence and
+  # then locked in.
+  #
+  # --skip-plugins isolates the condition for ONE command: update_field() is
+  # absent inside that invocation while the site keeps SCF active throughout.
+  # Nothing is deactivated, so there is nothing to restore and no failure path
+  # that can leave the site without its fields plugin -- which is the only
+  # reason this is testable at all.
+  # By this point the site is fully translated, so a fresh export is empty.
+  # Drop the fixture's recorded hash to make it dirty again -- the same trick
+  # the ACF block above uses -- or this test would run against a manifest with
+  # nothing in it and pass without exercising anything.
+  (cd "$SITE" && PLL_T="$ACF_TARGET_ID" wp eval '
+  delete_post_meta((int) getenv("PLL_T"), "_pll_src_hash");
+  ' --allow-root >/dev/null)
+
+  NOACF_MAN="$ACF_TMPDIR/manifest-noacf.json"
+  run "$SCRIPTS/pll-export.php" "$SRC" "$DST" "$NOACF_MAN" >/dev/null || { echo "FAIL: export for the no-plugin check exited non-zero"; exit 1; }
+  NOACF_COUNT="$(PLL_M="$NOACF_MAN" php -r '
+  $m = json_decode(file_get_contents(getenv("PLL_M")), true);
+  $n = 0;
+  foreach ($m["items"] as $it) { if (!empty($it["acf"])) { $n++; } }
+  echo $n;
+  ')"
+  [[ "$NOACF_COUNT" -gt 0 ]] || {
+    echo "FAIL: no manifest item carries acf values, so the no-plugin check would prove nothing"
+    rm -f "$NOACF_MAN"; exit 1
+  }
+
+  if NOACF_OUT="$( (cd "$SITE" && wp --skip-plugins=secure-custom-fields,advanced-custom-fields,advanced-custom-fields-pro eval-file "$SCRIPTS/pll-import.php" "$NOACF_MAN" --allow-root) 2>&1 )"; then
+    echo "$NOACF_OUT"
+    echo "FAIL: import silently dropped ACF values because no fields plugin was active"
+    rm -f "$NOACF_MAN"; exit 1
+  fi
+  grep -qF "no custom-fields plugin is active" <<<"$NOACF_OUT" || {
+    echo "$NOACF_OUT"
+    echo "FAIL: import failed without a fields plugin, but not for that reason -- the check is untested"
+    rm -f "$NOACF_MAN"; exit 1
+  }
+  rm -f "$NOACF_MAN"
+
+  # And SCF must still be active: this test is only safe because it never
+  # deactivated anything.
+  (cd "$SITE" && wp plugin is-active secure-custom-fields --allow-root >/dev/null 2>&1) || {
+    echo "FAIL: the fields plugin is no longer active after the no-plugin check -- it was supposed to isolate, not mutate"
+    exit 1
+  }
+  # Re-import properly so the fixture is left current, exactly as found.
+  NOACF_FIX="$ACF_TMPDIR/manifest-noacf-fix.json"
+  run "$SCRIPTS/pll-export.php" "$SRC" "$DST" "$NOACF_FIX" >/dev/null || { echo "FAIL: re-export after the no-plugin check exited non-zero"; exit 1; }
+  run "$SCRIPTS/pll-import.php" "$NOACF_FIX" >/dev/null || { echo "FAIL: re-import after the no-plugin check exited non-zero"; exit 1; }
+  rm -f "$NOACF_FIX"
+
+  echo "  refused, and the site's fields plugin was never touched"
+
+echo "── a counterpart with no fields set receives the untranslated values ──"
   # pllx_acf_walk() only emits text/textarea/wysiwyg, so images, numbers,
   # booleans and plain urls were never written to a counterpart at all: a
   # freshly created translation came out with its text filled in and

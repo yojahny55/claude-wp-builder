@@ -13,16 +13,21 @@ Scaffold a new WordPress project from the starter theme, configure i18n, and gen
 Ask the user to choose a starter template:
 
 > **Select a starter template:**
-> 1. **Basic Starter** — Custom CSS design system (CSS variables, BEM), no build tools needed
-> 2. **Tailwind Starter** — Tailwind CSS 4 + WordPress Scripts build pipeline, BrowserSync
-> 3. **Cinematic Starter** — Scroll-driven cinematic reel (persistent video stage, scene scrub on desktop, autoplay-loop on mobile). Requires the [cinematic-scroll-kit](https://github.com/yojahny55/cinematic-scroll-kit) skill.
+> 1. **Tailwind Starter** — Tailwind CSS 4 + WordPress Scripts build pipeline, BrowserSync
+> 2. **Cinematic Starter** — Scroll-driven cinematic reel (persistent video stage, scene scrub on desktop, autoplay-loop on mobile). Requires the [cinematic-scroll-kit](https://github.com/yojahny55/cinematic-scroll-kit) skill.
 
 Store the selection as `$TEMPLATE`:
-- Option 1 → `basic`
-- Option 2 → `tailwind`
-- Option 3 → `cinematic`
+- Option 1 → `tailwind`
+- Option 2 → `cinematic`
 
-Default: `basic` (if user presses Enter without selecting).
+Default: `tailwind` (if user presses Enter without selecting).
+
+There is no "Basic Starter" any more. `starter-theme/__starter__/` was removed
+in 3600552 as superseded by the Tailwind template, but this command kept
+offering it as option 1 AND as the Enter-key default — so the most likely path
+through `/wp-init` copied a directory that does not exist. Treat `basic` as an
+alias for `tailwind` if a caller still passes `--template=basic`, rather than
+failing on it.
 
 ### If `$TEMPLATE = cinematic`
 
@@ -157,7 +162,7 @@ The user can override any field. Once confirmed, use these values for the rest o
 
 **Step D4 — Inject colors/fonts into theme (template-aware):**
 
-- If `$TEMPLATE` is `basic`: Replace CSS custom properties in `assets/css/styles.css` `:root` block with extracted colors. (Existing behavior.)
+- If `$TEMPLATE` is `tailwind`: map the extracted colors onto the `@theme` variables in `assets/css/src/style.css`.
 
 - If `$TEMPLATE` is `tailwind`: Replace values in the `@theme` block in `assets/css/src/tailwindcss/main.css`:
 
@@ -208,17 +213,21 @@ Store the full path to `wp-content/themes/` for later use.
 
 Copy the selected starter theme to the new theme directory:
 
-- If `$TEMPLATE` is `basic`:
-  ```
-  cp -r ${CLAUDE_PLUGIN_ROOT}/starter-theme/__starter__/ <themes-dir>/<slug>/
-  ```
-
-- If `$TEMPLATE` is `tailwind`:
+- If `$TEMPLATE` is `tailwind` (or the legacy alias `basic`):
   ```
   cp -r ${CLAUDE_PLUGIN_ROOT}/starter-theme/__tailwind__/ <themes-dir>/<slug>/
   ```
 
+- If `$TEMPLATE` is `cinematic`:
+  ```
+  cp -r ${CLAUDE_PLUGIN_ROOT}/starter-theme/__cinematic__/ <themes-dir>/<slug>/
+  ```
+
 Where `<slug>` is the theme slug from Step 1.
+
+Only the two directories above exist. Copying anything else — `__starter__` in
+particular — silently produces an empty theme directory, because `cp -r` on a
+missing source fails while the rest of the flow carries on.
 
 ## Step 4: Replace All Placeholders
 
@@ -243,8 +252,13 @@ cp ${CLAUDE_PLUGIN_ROOT}/starter-theme/_i18n-variants/__<template>__.php <theme-
 ```
 
 Where `__<template>__` is `__tailwind__` or `__cinematic__`, matching
-`$TEMPLATE`. Then re-run the placeholder replacement from Step 4 over this one
-file, since it was copied in after that step ran.
+`$TEMPLATE` — the only two starters that exist. Then re-run the placeholder
+replacement from Step 4 over this one file, since it was copied in after that
+step ran.
+
+If a new starter is ever added, it needs its own variant in
+`starter-theme/_i18n-variants/` before it can offer Polylang;
+`tests/checks/wp-polylang.sh` fails until it has one, which is the point.
 
 Both files expose the same helper names and signatures, which is what makes
 the swap safe — templates call `<prefix>get_field()` and friends and never
@@ -309,7 +323,7 @@ Create `.claude/CLAUDE.md` at the **project root** (the directory containing `wp
 ## Project Details
 - **Theme slug:** <slug>
 - **Function prefix:** <slug_with_underscores>_ (e.g., kairo_consulting_)
-- **Template:** <basic|tailwind>
+- **Template:** <tailwind|cinematic>
 - **Custom Fields:** <SCF|ACF Pro>
 - **i18n strategy:** <suffix|polylang>
 - **Primary language:** <primary_lang>
@@ -484,7 +498,7 @@ Print a summary:
 === Project Initialized ===
 Project:    <Project Name>
 Theme:      <themes-dir>/<slug>/
-Template:   <Basic Starter|Tailwind Starter>
+Template:   <Tailwind Starter|Cinematic Starter>
 CF Plugin:  <SCF|ACF Pro>
 Slug:       <slug>
 Prefix:     <prefix>
@@ -505,7 +519,7 @@ Build:      Run `npm run preview` in the theme directory to start development.
 === Project Initialized (from existing demo) ===
 Project:    <Project Name>
 Theme:      <themes-dir>/<slug>/
-Template:   <Basic Starter|Tailwind Starter>
+Template:   <Tailwind Starter|Cinematic Starter>
 CF Plugin:  <SCF|ACF Pro>
 Slug:       <slug>
 Prefix:     <prefix>
