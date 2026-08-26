@@ -396,6 +396,10 @@ $res = wp_update_post(wp_slash(array(
                   // parse_str/http_build_query, which silently turned a[]=1
                   // into a%5B0%5D=1 and a valueless flag into flag=.
                   . "<p><a href=\"" . getenv("PLL_HREF") . "?utm_source=news&tags[]=a&tags[]=b&debug\">tracked</a></p>"
+                  // The same requirement for the separator itself. Content
+                  // written in the editor carries &amp;, not a bare &, and a
+                  // pass that only re-points links must not rewrite that.
+                  . "<p><a href=\"" . getenv("PLL_HREF") . "?ref=boletin&amp;src=mail\">escaped query</a></p>"
                   . "<p>" . getenv("PLL_SLASH") . "</p>",
 )), true);
 if (is_wp_error($res)) { fwrite(STDERR, $res->get_error_message()); exit(1); }
@@ -630,7 +634,7 @@ $content = get_post_field("post_content", (int) getenv("PLL_TID"));
 if (!preg_match_all("/href=([\"\x27])([^\"\x27]+)\\1/", $content, $m)) { echo "no-hrefs"; return; }
 
 $bad = array();
-if (count($m[2]) !== 4) { $bad[] = "expected 4 hrefs, found " . count($m[2]) . " -- one was dropped"; }
+if (count($m[2]) !== 5) { $bad[] = "expected 5 hrefs, found " . count($m[2]) . " -- one was dropped"; }
 $seen_query = false;
 foreach ($m[2] as $u) {
   if (strpos($u, "utm_source") === false) { continue; }
@@ -642,6 +646,15 @@ foreach ($m[2] as $u) {
   }
 }
 if (!$seen_query) { $bad[] = "the tracked href lost its query string entirely"; }
+$seen_amp = false;
+foreach ($m[2] as $u) {
+  if (strpos($u, "ref=boletin") === false) { continue; }
+  $seen_amp = true;
+  if (strpos($u, "ref=boletin&amp;src=mail") === false) {
+    $bad[] = "an &amp;-separated query was un-escaped by the rewrite: $u";
+  }
+}
+if (!$seen_amp) { $bad[] = "the escaped-query href lost its query string entirely"; }
 foreach ($m[2] as $url) {
   $id = (int) url_to_postid($url);
   if ($id !== $want) { $bad[] = "\x27$url\x27 resolves to $id, expected $want"; }
@@ -2598,6 +2611,71 @@ echo "── a counterpart with no fields set receives the untranslated values �
     exit 1
   }
   echo "  editor-set post_object preserved, and the skip was reported"
+
+  echo "── a source change still reaches a target that already matched ──"
+  # The ownership record is written only on the branch that CHANGES the field.
+  # A target that already holds the value this pass would derive is therefore
+  # never stamped as ours -- and the moment the source changes, the pass sees
+  # an unrecognised value and refuses it as an editor's, permanently. Nothing
+  # ever re-stamps it, so that field is frozen for good.
+  #
+  # Staged exactly as the block above leaves it: the correct mapping in place,
+  # no ownership meta -- which is also what an editor typing the right target
+  # page by hand produces.
+  FREEZE_SRC_BEFORE="$(cd "$SITE" && PLL_S="$ACF_FIXTURE_ID" wp eval '
+  $v = get_field("pll_post_object", (int) getenv("PLL_S"));
+  echo is_object($v) ? (int) $v->ID : (int) $v;
+  ' --allow-root)"
+  [[ "$FREEZE_SRC_BEFORE" =~ ^[0-9]+$ && "$FREEZE_SRC_BEFORE" != "0" ]] || {
+    echo "FAIL: could not read the source post_object before the freeze check (got '$FREEZE_SRC_BEFORE')"
+    exit 1
+  }
+
+  # Target already correct for the source's CURRENT value, and unowned.
+  (cd "$SITE" && PLL_T="$ACF_TARGET_ID" PLL_R="$REF_EN_ID" wp eval '
+  $t = (int) getenv("PLL_T");
+  update_field("pll_post_object", (int) getenv("PLL_R"), $t);
+  delete_post_meta($t, "_pll_ref_pll_post_object");
+  ' --allow-root >/dev/null)
+
+  # Run one import over that state. It has nothing to change -- and that is the
+  # point: this is the run that must claim the field.
+  FREEZE_MAN="$ACF_TMPDIR/manifest-freeze.json"
+  run "$SCRIPTS/pll-export.php" "$SRC" "$DST" "$FREEZE_MAN" >/dev/null || { echo "FAIL: export for the freeze check exited non-zero"; exit 1; }
+  FREEZE_OUT="$(run "$SCRIPTS/pll-import.php" "$FREEZE_MAN" 2>&1)" || { echo "$FREEZE_OUT"; echo "FAIL: the claiming import for the freeze check exited non-zero"; exit 1; }
+  rm -f "$FREEZE_MAN"
+
+  # Now the source moves. Its new value is the fixture page itself, whose en
+  # counterpart is the fixture target -- a mapping that exists, so the only
+  # thing that can stop the update is the ownership test.
+  (cd "$SITE" && PLL_S="$ACF_FIXTURE_ID" wp eval '
+  update_field("pll_post_object", (int) getenv("PLL_S"), (int) getenv("PLL_S"));
+  ' --allow-root >/dev/null)
+
+  run "$SCRIPTS/pll-export.php" "$SRC" "$DST" "$FREEZE_MAN" >/dev/null || { echo "FAIL: second export for the freeze check exited non-zero"; exit 1; }
+  FREEZE_OUT="$(run "$SCRIPTS/pll-import.php" "$FREEZE_MAN" 2>&1)" || { echo "$FREEZE_OUT"; echo "FAIL: second import for the freeze check exited non-zero"; exit 1; }
+  rm -f "$FREEZE_MAN"
+
+  FREEZE_AFTER="$(cd "$SITE" && PLL_T="$ACF_TARGET_ID" wp eval '
+  $v = get_field("pll_post_object", (int) getenv("PLL_T"));
+  echo is_object($v) ? (int) $v->ID : (int) $v;
+  ' --allow-root)"
+
+  # Restored before the assertions: this block mutates the permanent fixture on
+  # BOTH sides, and a failure here must not leave the source re-pointed.
+  (cd "$SITE" && PLL_T="$ACF_TARGET_ID" PLL_R="$REF_EN_ID" PLL_S="$ACF_FIXTURE_ID" PLL_SB="$FREEZE_SRC_BEFORE" wp eval '
+  $t = (int) getenv("PLL_T");
+  update_field("pll_post_object", (int) getenv("PLL_SB"), (int) getenv("PLL_S"));
+  update_field("pll_post_object", (int) getenv("PLL_R"), $t);
+  delete_post_meta($t, "_pll_ref_pll_post_object");
+  ' --allow-root >/dev/null)
+
+  [[ "$FREEZE_AFTER" == "$ACF_TARGET_ID" ]] || {
+    echo "$FREEZE_OUT"
+    echo "FAIL: a source post_object change never reached a target that already held the right value ($REF_EN_ID -> $FREEZE_AFTER, expected $ACF_TARGET_ID)"
+    exit 1
+  }
+  echo "  a target that already matched is claimed, so later source changes still land"
 
   rm -rf "$ACF_TMPDIR"
 else

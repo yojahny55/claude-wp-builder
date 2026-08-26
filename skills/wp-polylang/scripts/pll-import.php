@@ -155,9 +155,9 @@ $post_counterparts = array();
 // unresolved parent leaves the child dirty for the next run.
 $post_hashes       = array();
 $parents_unresolved = array();
-// Terms get the same treatment: wp_update_term() writes parent unconditionally
-// and defaults it to 0, so a translated tree is flattened on every re-import
-// unless a later pass puts the mapped parent back.
+// Terms get the same treatment, for the insert side of it: wp_insert_term() is
+// given no parent, so a translated tree lands flat until a later pass maps each
+// parent to its counterpart.
 $term_counterparts  = array();
 $term_hashes        = array();
 $term_parents_unresolved = array();
@@ -599,13 +599,21 @@ foreach ( $post_counterparts as $source_id => $target_id ) {
 
 // ── Term parent fixup ─────────────────────────────────────────────────────
 //
-// Core's wp_update_term() defaults 'parent' to 0 and writes it
-// (taxonomy.php:3292 and :3446), so every update of a translated term reset
-// its parent -- destroying a hierarchy an editor set by hand -- and
-// wp_insert_term() was passed no parent either, so a source tree came out as
-// a set of root terms. pllx_term_payload() carries no parent, on purpose:
-// export order is not parent-first here any more than it is for posts, so the
-// mapping can only be done once every counterpart in this run exists.
+// wp_insert_term() is passed no parent, so a source tree came out as a set of
+// root terms. The term payload carries no parent on purpose: export order is
+// not parent-first here any more than it is for posts, so the mapping can only
+// be done once every counterpart in this run exists.
+//
+// wp_update_term() does NOT need to be part of that story: measured on core
+// 6.x, it array_merge()es the existing term over the defaults BEFORE
+// wp_parse_args() fills them, so an update that passes no 'parent' preserves
+// the one already stored. An earlier version of this comment claimed the
+// opposite.
+//
+// Ceiling, shared with the post parent fixup above: the mapped parent is
+// written on every run, so a translated term an editor deliberately re-parented
+// is put back under the source's structure. Translations mirror the source
+// tree; there is no per-term ownership record like the ACF reference pass has.
 $term_parents_fixed = 0;
 foreach ( $term_counterparts as $source_id => $pair ) {
 	list( $target_id, $taxonomy ) = $pair;
@@ -931,10 +939,17 @@ function pllx_repoint_internal_url( $href, $target_lang, $context ) {
 			$parts['query']
 		);
 		// Collapse separators the removal left behind, then trim the edges.
+		// Collapsing to a bare '&' first keeps the trim simple; the original
+		// separator style is put back afterwards, because these hrefs come out
+		// of post_content where '&amp;' is what an editor's HTML actually
+		// carries -- emitting a bare '&' there would rewrite the markup on a
+		// pass that is only supposed to change where the link points.
 		$carry = preg_replace( '/(?:&(?:amp;)?)+/', '&', (string) $carry );
 		$carry = trim( $carry, '&' );
 		if ( '' !== $carry ) {
-			$result .= ( false === strpos( $result, '?' ) ? '?' : '&' ) . $carry;
+			$amp   = false !== stripos( $parts['query'], '&amp;' ) ? '&amp;' : '&';
+			$carry = str_replace( '&', $amp, $carry );
+			$result .= ( false === strpos( $result, '?' ) ? '?' : $amp ) . $carry;
 		}
 	}
 	if ( ! empty( $parts['fragment'] ) ) {
@@ -944,28 +959,6 @@ function pllx_repoint_internal_url( $href, $target_lang, $context ) {
 	return $result;
 }
 
-/**
- * Re-point the reference-holding ACF field types on $target_id from
- * $source_id's own field values, translated into $target_lang.
- *
- * Covers `link` (its `url` key -- `title` travels through the manifest and
- * pllx_acf_write() instead), `page_link` (a permalink string), `post_object`
- * and `relationship` (post ids, given SCF/ACF's `return_format => 'id'`;
- * see pll-acf-fixture.php on the test site and SKILL.md for what was
- * actually measured). Only top-level fields are handled, matching
- * pllx_acf_walk()'s one-level ceiling.
- *
- * Derives each value from the SOURCE post every run, but only WRITES it when
- * the target's field is still empty or still holds what this pass last put
- * there (see pllx_ref_may_write()). An earlier version claimed nothing else
- * could give the target a value, which is untrue -- an editor can set any of
- * these in wp-admin, and re-deriving them unconditionally undid that on every
- * import, with no warning. Idempotent either way: each write is compared
- * against the target's current value first, so a second run with no source
- * change makes zero writes.
- *
- * Returns the number of fields actually rewritten.
- */
 /**
  * Normalise any reference value to one comparable string.
  *
@@ -1134,6 +1127,41 @@ function pllx_meta_keys_with_prefix( $post_id, $prefix ) {
 	return $found;
 }
 
+/**
+ * Record that the value now on the target is this pass's own.
+ *
+ * Called on BOTH branches: after a write, and when the target already held
+ * exactly what this run would have written. Skipping the second case left the
+ * commonest state -- a target that is already correct -- permanently unowned,
+ * so the first real source change was refused as an editor's and the field
+ * froze for good, with nothing left to ever re-stamp it.
+ */
+function pllx_ref_claim( $target_id, $name, $norm ) {
+	update_post_meta( $target_id, PLLX_REF_META . $name, $norm );
+}
+
+/**
+ * Re-point the reference-holding ACF field types on $target_id from
+ * $source_id's own field values, translated into $target_lang.
+ *
+ * Covers `link` (its `url` key -- `title` travels through the manifest and
+ * pllx_acf_write() instead), `page_link` (a permalink string), `post_object`
+ * and `relationship` (post ids, given SCF/ACF's `return_format => 'id'`;
+ * see pll-acf-fixture.php on the test site and SKILL.md for what was
+ * actually measured). Only top-level fields are handled, matching
+ * pllx_acf_walk()'s one-level ceiling.
+ *
+ * Derives each value from the SOURCE post every run, but only WRITES it when
+ * the target's field is still empty or still holds what this pass last put
+ * there (see pllx_ref_may_write()). An earlier version claimed nothing else
+ * could give the target a value, which is untrue -- an editor can set any of
+ * these in wp-admin, and re-deriving them unconditionally undid that on every
+ * import, with no warning. Idempotent either way: each write is compared
+ * against the target's current value first, so a second run with no source
+ * change makes zero writes.
+ *
+ * Returns the number of fields actually rewritten.
+ */
 function pllx_repoint_acf_refs( $source_id, $target_id, $target_lang ) {
 	$source_objects = get_field_objects( $source_id );
 	if ( ! is_array( $source_objects ) ) {
@@ -1170,8 +1198,10 @@ function pllx_repoint_acf_refs( $source_id, $target_id, $target_lang ) {
 					$target_val['target'] = '';
 				}
 				update_field( $name, $target_val, $target_id );
-				update_post_meta( $target_id, PLLX_REF_META . $name, $new_url );
+				pllx_ref_claim( $target_id, $name, $new_url );
 				$count++;
+			} else {
+				pllx_ref_claim( $target_id, $name, $new_url );
 			}
 			continue;
 		}
@@ -1189,8 +1219,10 @@ function pllx_repoint_acf_refs( $source_id, $target_id, $target_lang ) {
 					continue;
 				}
 				update_field( $name, $new_url, $target_id );
-				update_post_meta( $target_id, PLLX_REF_META . $name, $new_url );
+				pllx_ref_claim( $target_id, $name, $new_url );
 				$count++;
+			} else {
+				pllx_ref_claim( $target_id, $name, $new_url );
 			}
 			continue;
 		}
@@ -1213,8 +1245,10 @@ function pllx_repoint_acf_refs( $source_id, $target_id, $target_lang ) {
 					continue;
 				}
 				update_field( $name, $new_id, $target_id );
-				update_post_meta( $target_id, PLLX_REF_META . $name, (string) $new_id );
+				pllx_ref_claim( $target_id, $name, (string) $new_id );
 				$count++;
+			} else {
+				pllx_ref_claim( $target_id, $name, (string) $new_id );
 			}
 			continue;
 		}
@@ -1253,8 +1287,10 @@ function pllx_repoint_acf_refs( $source_id, $target_id, $target_lang ) {
 					continue;
 				}
 				update_field( $name, $new_ids, $target_id );
-				update_post_meta( $target_id, PLLX_REF_META . $name, implode( ',', $new_ids ) );
+				pllx_ref_claim( $target_id, $name, implode( ',', $new_ids ) );
 				$count++;
+			} else {
+				pllx_ref_claim( $target_id, $name, implode( ',', $new_ids ) );
 			}
 			continue;
 		}
