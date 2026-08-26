@@ -390,6 +390,12 @@ $res = wp_update_post(wp_slash(array(
                   // the host comparison used to reject outright.
                   . "<p><a href=\"" . home_url("/?page_id=" . (int) getenv("PLL_CHILD_ID")) . "\">by query</a></p>"
                   . "<p><a href=\"" . preg_replace("#://www\\.#", "://", getenv("PLL_HREF")) . "\">no www</a></p>"
+                  // A query that has NOTHING to do with identifying the post.
+                  // It must survive the rewrite byte for byte: an earlier
+                  // version round-tripped the whole query through
+                  // parse_str/http_build_query, which silently turned a[]=1
+                  // into a%5B0%5D=1 and a valueless flag into flag=.
+                  . "<p><a href=\"" . getenv("PLL_HREF") . "?utm_source=news&tags[]=a&tags[]=b&debug\">tracked</a></p>"
                   . "<p>" . getenv("PLL_SLASH") . "</p>",
 )), true);
 if (is_wp_error($res)) { fwrite(STDERR, $res->get_error_message()); exit(1); }
@@ -624,7 +630,18 @@ $content = get_post_field("post_content", (int) getenv("PLL_TID"));
 if (!preg_match_all("/href=([\"\x27])([^\"\x27]+)\\1/", $content, $m)) { echo "no-hrefs"; return; }
 
 $bad = array();
-if (count($m[2]) !== 3) { $bad[] = "expected 3 hrefs, found " . count($m[2]) . " -- one was dropped"; }
+if (count($m[2]) !== 4) { $bad[] = "expected 4 hrefs, found " . count($m[2]) . " -- one was dropped"; }
+$seen_query = false;
+foreach ($m[2] as $u) {
+  if (strpos($u, "utm_source") === false) { continue; }
+  $seen_query = true;
+  // These three shapes are exactly what a parse_str/http_build_query round
+  // trip destroys: tags[] gains indices, the valueless flag gains an =.
+  if (strpos($u, "utm_source=news&tags[]=a&tags[]=b&debug") === false) {
+    $bad[] = "a non-identifying query was mangled by the rewrite: $u";
+  }
+}
+if (!$seen_query) { $bad[] = "the tracked href lost its query string entirely"; }
 foreach ($m[2] as $url) {
   $id = (int) url_to_postid($url);
   if ($id !== $want) { $bad[] = "\x27$url\x27 resolves to $id, expected $want"; }

@@ -916,9 +916,23 @@ function pllx_repoint_internal_url( $href, $target_lang, $context ) {
 		// WordPress still resolves to the SOURCE post, stably and wrongly, on
 		// every run, and which verify's check 9 then failed the site over
 		// forever.
-		parse_str( $parts['query'], $query_args );
-		unset( $query_args['p'], $query_args['page_id'], $query_args['attachment_id'] );
-		$carry = http_build_query( $query_args );
+		// Removed TEXTUALLY, not via parse_str()/http_build_query(). That round
+		// trip re-encodes everything it touches, and measured it changes query
+		// strings that have nothing to do with the identifier:
+		//   a[]=1&a[]=2   -> a%5B0%5D=1&a%5B1%5D=2   (append becomes indexed)
+		//   flag          -> flag=                    (valueless flag gains =)
+		//   q=hola%20mundo-> q=hola+mundo
+		// Everything not being dropped must survive byte-for-byte, so only the
+		// identifying pairs are cut out. `&amp;` is matched as a separator too,
+		// since these come out of post_content where hrefs are HTML-escaped.
+		$carry = preg_replace(
+			'/(^|&(?:amp;)?)(?:p|page_id|attachment_id)=[^&]*/i',
+			'$1',
+			$parts['query']
+		);
+		// Collapse separators the removal left behind, then trim the edges.
+		$carry = preg_replace( '/(?:&(?:amp;)?)+/', '&', (string) $carry );
+		$carry = trim( $carry, '&' );
 		if ( '' !== $carry ) {
 			$result .= ( false === strpos( $result, '?' ) ? '?' : '&' ) . $carry;
 		}
