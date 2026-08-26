@@ -21,6 +21,18 @@ list( $manifest_path ) = pllx_args( 1, 'pll-import.php <translated.json>' );
 
 pllx_require_polylang();
 
+// KSES strips tags from post_content on save for any user without
+// unfiltered_html. Measured on this test site it is NOT registered under
+// `wp eval-file` (current user is 0 and the filter is absent), but that is an
+// environment fact, not a guarantee: a wrapper that runs this as a real
+// low-privilege user would silently strip markup out of every translated post
+// -- the same shape as the unslashing bug, corruption with no error.
+// Removed explicitly rather than relied upon. This is process-local; each
+// `wp eval-file` is its own process, so nothing is left changed on the site.
+if ( function_exists( 'kses_remove_filters' ) ) {
+	kses_remove_filters();
+}
+
 if ( ! is_readable( $manifest_path ) ) {
 	pllx_fail( "Cannot read manifest '$manifest_path'." );
 }
@@ -1213,6 +1225,14 @@ function pllx_acf_ref_id( $value ) {
  *
  * Polylang keeps string translations in an MO object per language, saved under
  * a post of type `polylang_mo` whose id comes from PLL_MO::get_id().
+ */
+/**
+ * Ceiling, measured rather than guessed: this re-scans
+ * PLL_Admin_Strings::get_strings() and does a full PLL_MO import/export round
+ * trip per string, so it is O(n^2) in the number of registered strings. On the
+ * test site n is 3 and one scan is under a millisecond, which is why it is
+ * left alone. If a theme ever registers hundreds of strings, batch the round
+ * trip: load the PLL_MO once, add every translation, save once.
  */
 function pllx_string_translate( $item_id, $translated, $target ) {
 	if ( ! class_exists( 'PLL_MO' ) ) {
