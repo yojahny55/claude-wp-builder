@@ -1044,6 +1044,7 @@ function pllx_acf_copy_untranslated( $source_id, $target_id ) {
 
 	$translated = array( 'text', 'textarea', 'wysiwyg' );
 	$references = array( 'link', 'page_link', 'post_object', 'relationship' );
+	$containers = array( 'group', 'repeater', 'flexible_content' );
 	$copied     = 0;
 
 	foreach ( $source_objects as $name => $obj ) {
@@ -1063,14 +1064,60 @@ function pllx_acf_copy_untranslated( $source_id, $target_id ) {
 		if ( metadata_exists( 'post', $target_id, $name ) ) {
 			continue;
 		}
-		if ( ! isset( $obj['value'] ) || null === $obj['value'] ) {
-			continue;
+
+		// Raw meta, NOT update_field( $name, $obj['value'] ). get_field_objects()
+		// returns FORMATTED values, and handing a formatted value back to
+		// update_field() is not a round trip: measured on an image field with
+		// return_format 'array', update_field() stores '0' and the image is
+		// gone. ACF's own default for that field type is 'array', so the
+		// formatted path loses media on most real sites -- it only looked
+		// correct here because the fixture happens to use return_format 'id'.
+		//
+		// Copying the stored rows verbatim is also what "copied verbatim"
+		// actually means, and it is format-agnostic: whatever ACF wrote is
+		// what the counterpart gets, including the `_name` => field-key
+		// companion row ACF needs to resolve the field at read time.
+		$keys = array( $name, '_' . $name );
+		if ( in_array( $type, $containers, true ) ) {
+			// Containers store one row per sub-value:
+			// `repeater` => count, `repeater_0_sub` => value, plus each
+			// `_repeater_0_sub` => field key. The prefix carries the trailing
+			// underscore so a sibling field sharing a name stem is not caught.
+			foreach ( pllx_meta_keys_with_prefix( $source_id, $name . '_' ) as $k ) {
+				$keys[] = $k;
+			}
 		}
-		update_field( $name, $obj['value'], $target_id );
-		$copied++;
+
+		$wrote = false;
+		foreach ( array_unique( $keys ) as $key ) {
+			if ( ! metadata_exists( 'post', $source_id, $key ) ) {
+				continue;
+			}
+			$raw = get_post_meta( $source_id, $key, true );
+			update_post_meta( $target_id, $key, wp_slash( $raw ) );
+			$wrote = true;
+		}
+		if ( $wrote ) {
+			$copied++;
+		}
 	}
 
 	return $copied;
+}
+
+/**
+ * Every meta key on a post that starts with $prefix, plus its `_`-prefixed
+ * companion. Used to find a container field's stored sub-rows.
+ */
+function pllx_meta_keys_with_prefix( $post_id, $prefix ) {
+	$found = array();
+	foreach ( array_keys( (array) get_post_meta( $post_id ) ) as $key ) {
+		$bare = ( '_' === substr( $key, 0, 1 ) ) ? substr( $key, 1 ) : $key;
+		if ( 0 === strpos( $bare, $prefix ) ) {
+			$found[] = $key;
+		}
+	}
+	return $found;
 }
 
 function pllx_repoint_acf_refs( $source_id, $target_id, $target_lang ) {

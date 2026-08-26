@@ -2159,13 +2159,21 @@ if (cd "$SITE" && wp eval 'exit(function_exists("get_field") ? 0 : 1);' --allow-
   # never written) instead of proving the importer actively leaves someone
   # else's already-different data alone, and a site where nothing looks stale
   # would export zero items, making every assertion below pass vacuously.
-  (cd "$SITE" && PLL_TID="$ACF_TARGET_ID" PLL_REF_SRC="$REF_SRC_ID" wp eval '
+  (cd "$SITE" && PLL_TID="$ACF_TARGET_ID" PLL_REF_SRC="$REF_SRC_ID" PLL_SRC_FID="$ACF_FIXTURE_ID" wp eval '
   $id      = (int) getenv("PLL_TID");
   $ref_src = (int) getenv("PLL_REF_SRC");
   update_field("pll_number", -1, $id);
   update_field("pll_true_false", 0, $id);
   update_field("pll_url", "https://example.com/target-sentinel", $id);
   update_field("pll_image", 80, $id);
+  // Seeded in ACF STORAGE format on the SOURCE. get_field() hands it back in
+  // DISPLAY format (15/03/2026), so update_field( get_field( x ) ) is not an
+  // identity for this field -- which is exactly what the copy path has to
+  // survive. Measured: a formatted copy stores the display string and the
+  // counterpart date is corrupted.
+  // No apostrophes in this comment on purpose: the whole PHP body sits inside
+  // bash single quotes, which have no escape mechanism at all.
+  update_field("pll_date", "20260315", (int) getenv("PLL_SRC_FID"));
   // Task 9 (ruling T9-E): stage the four reference fields pointing at the
   // SOURCE-language ref target, exactly what a naive verbatim copy (or a
   // prior run, before this pass existed) would leave behind. The assertions
@@ -2431,7 +2439,7 @@ echo "── a counterpart with no fields set receives the untranslated values �
   # delete the fields first so the run has to build them from nothing.
   (cd "$SITE" && PLL_T="$ACF_TARGET_ID" wp eval '
   $id = (int) getenv("PLL_T");
-  foreach (array("pll_number", "pll_true_false", "pll_url", "pll_image") as $f) {
+  foreach (array("pll_number", "pll_true_false", "pll_url", "pll_image", "pll_image_array", "pll_date") as $f) {
     delete_field($f, $id);
   }
   delete_post_meta($id, "_pll_src_hash");
@@ -2439,7 +2447,7 @@ echo "── a counterpart with no fields set receives the untranslated values �
 
   COPY_GONE="$(cd "$SITE" && PLL_T="$ACF_TARGET_ID" wp eval '
   $id = (int) getenv("PLL_T"); $n = 0;
-  foreach (array("pll_number", "pll_true_false", "pll_url", "pll_image") as $f) {
+  foreach (array("pll_number", "pll_true_false", "pll_url", "pll_image", "pll_image_array", "pll_date") as $f) {
     if (metadata_exists("post", $id, $f)) { $n++; }
   }
   echo $n;
@@ -2460,19 +2468,52 @@ echo "── a counterpart with no fields set receives the untranslated values �
     "image"  => get_field("pll_image", $id),
   ));
   ' --allow-root)"
+  # Compared as RAW META, source against target, because that is what "copied
+  # verbatim" has to mean and it is the only format-agnostic comparison. A
+  # field whose return_format is 'array' hands get_field() a 24-key attachment
+  # array; the value that must survive is the stored id underneath it.
+  #
+  # This is the assertion that caught the real bug: the first version of the
+  # copy pass called update_field() with the FORMATTED value, which stores '0'
+  # for an array-return image. It passed anyway, because the only image field
+  # in the fixture used return_format 'id'.
+  COPY_RAW="$(cd "$SITE" && PLL_S="$ACF_FIXTURE_ID" PLL_T="$ACF_TARGET_ID" wp eval '
+  $s = (int) getenv("PLL_S"); $t = (int) getenv("PLL_T");
+  $bad = array();
+  foreach (array("pll_number", "pll_true_false", "pll_url", "pll_image", "pll_image_array", "pll_date") as $f) {
+    $sv = get_post_meta($s, $f, true);
+    $tv = get_post_meta($t, $f, true);
+    if ($sv !== $tv) { $bad[] = "$f: source=" . var_export($sv, true) . " target=" . var_export($tv, true); }
+  }
+  echo $bad ? implode("; ", $bad) : "ok";
+  ' --allow-root)"
   # Restored BEFORE the assertions, not after (ruling T5-M): a restore that
   # only runs on the success path leaves the PERMANENT fixture wrecked the
   # moment the assertion it follows actually fires. Measured the hard way --
   # a mutation run aborted here and left 605 with four empty fields.
-  (cd "$SITE" && PLL_T="$ACF_TARGET_ID" wp eval '
+  (cd "$SITE" && PLL_T="$ACF_TARGET_ID" PLL_S="$ACF_FIXTURE_ID" wp eval '
   $id = (int) getenv("PLL_T");
   update_field("pll_number", -1, $id);
   update_field("pll_true_false", 0, $id);
   update_field("pll_url", "https://example.com/target-sentinel", $id);
   update_field("pll_image", 80, $id);
+  // Every field this block CLEARED has to be restored, not just the four with
+  // sentinels. These two have none, so they go back to what a clean run
+  // leaves: a verbatim copy of the source raw meta. Missing them left the
+  // fixture holding a corrupted date after a mutation run.
+  foreach (array("pll_image_array", "pll_date") as $f) {
+    update_post_meta($id, $f, get_post_meta((int) getenv("PLL_S"), $f, true));
+  }
   ' --allow-root >/dev/null)
 
   # The SOURCE values, not the sentinels: 42 / true / no-traducir / 85.
+  [[ "$COPY_RAW" == "ok" ]] || {
+    echo "$COPY_OUT"
+    echo "FAIL: untranslated values were not copied verbatim ($COPY_RAW)"
+    exit 1
+  }
+
+
   COPY_RESULT="$(PLL_J="$COPY_GOT" php -r '
   $v = json_decode(getenv("PLL_J"), true);
   $bad = array();
