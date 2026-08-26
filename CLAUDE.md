@@ -129,9 +129,20 @@ Version lives in `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`
 README badge — bump all of them together. Add an `[Unreleased]` entry to `CHANGELOG.md`; update
 `README.md` when adding a command.
 
-## Known gap
+## Known ceilings
 
-`/wp-init` offers "Basic Starter" as option 1 (the default) and copies
-`${CLAUDE_PLUGIN_ROOT}/starter-theme/__starter__/`, but that directory was removed in 3600552
-("superseded by tailwind template"). Only `__tailwind__` and `__cinematic__` exist. Anything
-touching the basic starter path must either restore it or reroute the default.
+These are deliberate, documented limits — not bugs to "fix" on sight:
+
+- **Media is not translated.** The Polylang importer copies an image or file id to the counterpart
+  as-is rather than swapping it for that attachment's own translation. Mapping media is a separate
+  decision; `pll-import.php` and the live suite both state the ceiling.
+- **ACF reference re-pointing is one level deep.** `link`, `page_link`, `post_object` and
+  `relationship` are re-pointed only as top-level fields, matching `pllx_acf_walk()`'s own ceiling.
+  The same field nested inside a repeater or flexible-content row keeps pointing at the source.
+- **Parent structure mirrors the source.** Both parent fixup passes rewrite the counterpart's parent
+  on every run, so a post or term an editor deliberately re-parented in the target language is put
+  back. Only the ACF reference pass records ownership; parents do not.
+- **`/wp-init`'s Polylang path has never been run end-to-end against a fresh project.** Its scripts
+  are covered by `tests/checks/wp-polylang-live.sh` against a real site, but the command's own
+  branching is prose, verified only by the grep checks in `tests/checks/wp-polylang.sh` and
+  `wp-init-templates.sh`.
