@@ -74,6 +74,7 @@ ORPHAN_CHILD_ID=""
 FIXTURE_TERM_IDS=""
 FIXTURE_PROBE_MENU_ID=""
 FIXTURE_EMPTY_MENU_ID=""
+FIXTURE_SCRATCH_IDS=""
 SELF_PROBE_ARMED=""
 FIXTURE_MEDIA_ID=""
 FIXTURE_ITEM_IDS=""
@@ -100,7 +101,7 @@ cleanup() {
   # Nothing was created yet -- do not run a site mutation just to delete zero
   # objects. This matters because the trap is armed before the first fixture
   # object exists, on purpose, so the temp dir above is always removed.
-  if [[ -z "$FIXTURE_PARENT_ID$FIXTURE_CHILD_ID$FIXTURE_MEDIA_ID$FIXTURE_ITEM_IDS$FIXTURE_ARCHIVE_PT$FIXTURE_THIRD_LANG$VERIFY_VICTIM$ORPHAN_PARENT_ID$ORPHAN_CHILD_ID$FIXTURE_TERM_IDS$FIXTURE_PROBE_MENU_ID$FIXTURE_EMPTY_MENU_ID$SELF_PROBE_ARMED" ]]; then
+  if [[ -z "$FIXTURE_PARENT_ID$FIXTURE_CHILD_ID$FIXTURE_MEDIA_ID$FIXTURE_ITEM_IDS$FIXTURE_ARCHIVE_PT$FIXTURE_THIRD_LANG$VERIFY_VICTIM$ORPHAN_PARENT_ID$ORPHAN_CHILD_ID$FIXTURE_TERM_IDS$FIXTURE_PROBE_MENU_ID$FIXTURE_EMPTY_MENU_ID$FIXTURE_SCRATCH_IDS$SELF_PROBE_ARMED" ]]; then
     return $status
   fi
   (cd "$SITE" \
@@ -109,6 +110,7 @@ cleanup() {
        PLL_FIX_TERMS="$FIXTURE_TERM_IDS" \
        PLL_FIX_PROBE_MENU="$FIXTURE_PROBE_MENU_ID" \
        PLL_FIX_EMPTY_MENU="$FIXTURE_EMPTY_MENU_ID" \
+       PLL_FIX_SCRATCH="$FIXTURE_SCRATCH_IDS" \
        PLL_FIX_MENU="$FIXTURE_MENU_ID" \
        PLL_FIX_PT="$FIXTURE_ARCHIVE_PT" \
        PLL_FIX_SRC="$SRC" \
@@ -143,6 +145,13 @@ if ( $probe_menu && wp_get_nav_menu_object( $probe_menu ) ) {
 // leave the site with a bogus location wired to a real menu.
 $pll_opts  = get_option( "polylang" );
 $pll_theme = get_stylesheet();
+// Throwaway posts created by the verify-check tests below. Hard-deleted, and
+// registered the moment each is created, so an assertion firing mid-block
+// cannot leave one on the site.
+foreach ( array_filter( array_map( "intval", explode( ",", (string) getenv( "PLL_FIX_SCRATCH" ) ) ) ) as $sid ) {
+  if ( get_post( $sid ) ) { wp_delete_post( $sid, true ); }
+}
+
 $empty_menu = (int) getenv( "PLL_FIX_EMPTY_MENU" );
 if ( $empty_menu && wp_get_nav_menu_object( $empty_menu ) ) {
   wp_delete_nav_menu( $empty_menu );
@@ -1858,6 +1867,200 @@ echo "  verify reported: $(grep -F "(custom URL) points at" <<<"$CUSTOM_BROKEN_O
 
 (cd "$SITE" && wp post delete "$CUSTOM_ITEM_ID" --force --allow-root >/dev/null)
 run "$SCRIPTS/pll-verify.php" "$SRC" "$DST" >/dev/null || { echo "FAIL: verify still failing after the custom menu item was removed"; exit 1; }
+
+# ── verify's remaining failure checks ─────────────────────────────────────────
+# Checks 1, 3 and 9 had tests; 2, 6, 7 and 8 did not, and neither did the two
+# warnings. The suite proved they never fired FALSELY -- it never proved they
+# fire at all, which is the same shape as every vacuous assertion on this
+# branch. Each block below creates the one condition its check exists to catch
+# and requires the verifier to name it, so an unrelated check firing is itself
+# a failure.
+
+scratch_post() { # <title> <lang> -> id, registered for cleanup immediately
+  local id
+  id="$(cd "$SITE" && PLL_T="$1" PLL_L="$2" wp eval '
+  $id = wp_insert_post(array("post_title" => getenv("PLL_T"), "post_type" => "page", "post_status" => "publish"));
+  if ($id && !is_wp_error($id)) { pll_set_post_language((int) $id, getenv("PLL_L")); echo (int) $id; }
+  ' --allow-root)"
+  [[ -n "$id" ]] || return 1
+  FIXTURE_SCRATCH_IDS="${FIXTURE_SCRATCH_IDS:+$FIXTURE_SCRATCH_IDS,}$id"
+  echo "$id"
+}
+
+echo "── verify catches an asymmetric translation group ──"
+# Polylang keeps a group consistent through its own API, so this state only
+# arises from damage -- a raw delete, or an import that died mid-write. Forced
+# by removing the TARGET from its group term, which leaves the SOURCE's group
+# description still naming it: the forward lookup succeeds and the reverse one
+# does not.
+ASYM_TARGET="$(cd "$SITE" && PLL_P="$FIXTURE_PARENT_ID" PLL_DST="$DST" wp eval '
+$t = pll_get_post_translations((int) getenv("PLL_P"));
+echo empty($t[getenv("PLL_DST")]) ? "" : (int) $t[getenv("PLL_DST")];
+' --allow-root)"
+[[ -n "$ASYM_TARGET" ]] || { echo "FAIL: fixture parent has no $DST counterpart to desynchronise"; exit 1; }
+
+(cd "$SITE" && PLL_T="$ASYM_TARGET" wp eval '
+wp_set_object_terms((int) getenv("PLL_T"), array(), "post_translations");
+clean_post_cache((int) getenv("PLL_T"));
+' --allow-root >/dev/null)
+
+ASYM_OUT="$(run "$SCRIPTS/pll-verify.php" "$SRC" "$DST" 2>&1)" && ASYM_RC=0 || ASYM_RC=$?
+
+# Restored before asserting: this is the fixture's own counterpart, but a
+# broken group would poison every later block in this run.
+# BOTH sides are detached before re-linking. pll_save_post_translations()
+# alone is a no-op here: the SOURCE's group description was never damaged, so
+# from Polylang's point of view the group already says the right thing and
+# there is nothing to write. Measured -- re-saving left the asymmetry exactly
+# as it was, and the next verify in this run failed on it.
+(cd "$SITE" && PLL_P="$FIXTURE_PARENT_ID" PLL_T="$ASYM_TARGET" PLL_SRC="$SRC" PLL_DST="$DST" wp eval '
+$p = (int) getenv("PLL_P"); $t = (int) getenv("PLL_T");
+wp_set_object_terms($p, array(), "post_translations");
+wp_set_object_terms($t, array(), "post_translations");
+clean_post_cache($p); clean_post_cache($t);
+pll_save_post_translations(array(getenv("PLL_SRC") => $p, getenv("PLL_DST") => $t));
+clean_post_cache($p); clean_post_cache($t);
+' --allow-root >/dev/null)
+
+[[ "$ASYM_RC" != "0" ]] || { echo "$ASYM_OUT"; echo "FAIL: verify accepted an asymmetric translation group"; exit 1; }
+grep -qF "is not symmetric" <<<"$ASYM_OUT" || {
+  echo "$ASYM_OUT"
+  echo "FAIL: verify rejected the site, but not for the asymmetric group -- check 2 is untested"
+  exit 1
+}
+echo "  verify reported: $(grep -F "is not symmetric" <<<"$ASYM_OUT" | head -1)"
+run "$SCRIPTS/pll-verify.php" "$SRC" "$DST" >/dev/null || { echo "FAIL: verify still failing after the group was re-linked"; exit 1; }
+
+echo "── verify catches two target posts sharing a slug ──"
+# WordPress scopes slug uniqueness to post type AND parent, so two translated
+# posts can legitimately collide after a naive import. wp_insert_post() would
+# uniquify them, so the collision is written straight to the table.
+# Each probe needs its OWN source: check 6 runs inside the loop over source
+# posts and their counterparts, so two loose target-language posts are never
+# examined. Measured -- the first version created only the two targets and
+# verify passed.
+SLUG_SA="$(scratch_post "PLL slug probe source A" "$SRC")" || { echo "FAIL: could not create slug probe source A"; exit 1; }
+SLUG_SB="$(scratch_post "PLL slug probe source B" "$SRC")" || { echo "FAIL: could not create slug probe source B"; exit 1; }
+SLUG_A="$(scratch_post "PLL slug probe A" "$DST")"  || { echo "FAIL: could not create slug probe A"; exit 1; }
+SLUG_B="$(scratch_post "PLL slug probe B" "$DST")"  || { echo "FAIL: could not create slug probe B"; exit 1; }
+(cd "$SITE" && PLL_SA="$SLUG_SA" PLL_SB="$SLUG_SB" PLL_A="$SLUG_A" PLL_B="$SLUG_B" PLL_SRC="$SRC" PLL_DST="$DST" wp eval '
+global $wpdb;
+$src = getenv("PLL_SRC"); $dst = getenv("PLL_DST");
+pll_save_post_translations(array($src => (int) getenv("PLL_SA"), $dst => (int) getenv("PLL_A")));
+pll_save_post_translations(array($src => (int) getenv("PLL_SB"), $dst => (int) getenv("PLL_B")));
+// Written straight to the table: wp_insert_post() and wp_update_post() both
+// uniquify a colliding slug, which is exactly the state this check exists to
+// find after an import that did not go through them.
+foreach (array(getenv("PLL_A"), getenv("PLL_B")) as $id) {
+  $wpdb->update($wpdb->posts, array("post_name" => "pll-slug-probe"), array("ID" => (int) $id));
+  clean_post_cache((int) $id);
+}
+' --allow-root >/dev/null)
+
+SLUG_OUT="$(run "$SCRIPTS/pll-verify.php" "$SRC" "$DST" 2>&1)" && SLUG_RC=0 || SLUG_RC=$?
+(cd "$SITE" && PLL_IDS="$SLUG_A,$SLUG_B,$SLUG_SA,$SLUG_SB" wp eval '
+foreach (array_filter(array_map("intval", explode(",", getenv("PLL_IDS")))) as $id) { wp_delete_post($id, true); }
+' --allow-root >/dev/null)
+FIXTURE_SCRATCH_IDS=""
+
+[[ "$SLUG_RC" != "0" ]] || { echo "$SLUG_OUT"; echo "FAIL: verify accepted two $DST posts sharing a slug"; exit 1; }
+grep -qF "is used by both post" <<<"$SLUG_OUT" || {
+  echo "$SLUG_OUT"
+  echo "FAIL: verify rejected the site, but not for the slug collision -- check 6 is untested"
+  exit 1
+}
+echo "  verify reported: $(grep -F "is used by both post" <<<"$SLUG_OUT" | head -1)"
+
+echo "── verify catches an orphaned counterpart ──"
+# A target post whose group names a source that no longer exists. Reached by
+# deleting the source the way anything without Polylang's hooks would -- raw
+# rows -- which leaves the group intact and pointing at nothing.
+ORPH_SRC="$(scratch_post "PLL orphan probe src" "$SRC")" || { echo "FAIL: could not create the orphan probe source"; exit 1; }
+ORPH_DST="$(scratch_post "PLL orphan probe dst" "$DST")" || { echo "FAIL: could not create the orphan probe target"; exit 1; }
+(cd "$SITE" && PLL_S="$ORPH_SRC" PLL_D="$ORPH_DST" PLL_SRC="$SRC" PLL_DST="$DST" wp eval '
+pll_save_post_translations(array(getenv("PLL_SRC") => (int) getenv("PLL_S"), getenv("PLL_DST") => (int) getenv("PLL_D")));
+global $wpdb;
+$s = (int) getenv("PLL_S");
+$wpdb->delete($wpdb->posts, array("ID" => $s));
+clean_post_cache($s);
+' --allow-root >/dev/null)
+
+ORPH_OUT="$(run "$SCRIPTS/pll-verify.php" "$SRC" "$DST" 2>&1)" && ORPH_RC=0 || ORPH_RC=$?
+(cd "$SITE" && PLL_IDS="$ORPH_SRC,$ORPH_DST" wp eval '
+foreach (array_filter(array_map("intval", explode(",", getenv("PLL_IDS")))) as $id) { if (get_post($id)) { wp_delete_post($id, true); } }
+' --allow-root >/dev/null)
+FIXTURE_SCRATCH_IDS=""
+
+[[ "$ORPH_RC" != "0" ]] || { echo "$ORPH_OUT"; echo "FAIL: verify accepted a $DST post whose source no longer exists"; exit 1; }
+grep -qF "is orphaned" <<<"$ORPH_OUT" || {
+  echo "$ORPH_OUT"
+  echo "FAIL: verify rejected the site, but not for the orphan -- check 7 is untested"
+  exit 1
+}
+echo "  verify reported: $(grep -F "is orphaned" <<<"$ORPH_OUT" | head -1)"
+
+echo "── verify catches a source term with no counterpart ──"
+TERM_PROBE_ID="$(cd "$SITE" && wp term create category "PLL term probe" --porcelain --allow-root)"
+[[ -n "$TERM_PROBE_ID" ]] || { echo "FAIL: could not create the untranslated probe term"; exit 1; }
+(cd "$SITE" && PLL_T="$TERM_PROBE_ID" PLL_SRC="$SRC" wp eval 'pll_set_term_language((int) getenv("PLL_T"), getenv("PLL_SRC"));' --allow-root >/dev/null)
+
+TERMV_OUT="$(run "$SCRIPTS/pll-verify.php" "$SRC" "$DST" 2>&1)" && TERMV_RC=0 || TERMV_RC=$?
+(cd "$SITE" && wp term delete category "$TERM_PROBE_ID" --allow-root >/dev/null 2>&1)
+
+[[ "$TERMV_RC" != "0" ]] || { echo "$TERMV_OUT"; echo "FAIL: verify accepted a $SRC term with no $DST counterpart"; exit 1; }
+grep -qF "has no $DST counterpart" <<<"$TERMV_OUT" || {
+  echo "$TERMV_OUT"
+  echo "FAIL: verify rejected the site, but not for the untranslated term -- check 8 is untested"
+  exit 1
+}
+echo "  verify reported: $(grep -F "PLL term probe" <<<"$TERMV_OUT" | head -1)"
+
+echo "── verify warns about an untranslated title and a stale source ──"
+# Both are WARNINGS, never failures -- a brand name legitimately survives
+# translation, and a stale counterpart is still a working page. So these
+# assert on a run that must still SUCCEED, which is the part that would rot
+# silently if either warning stopped being emitted.
+WARN_TARGET="$ASYM_TARGET"
+WARN_SRC_TITLE="$(cd "$SITE" && wp post get "$FIXTURE_PARENT_ID" --field=post_title --allow-root)"
+WARN_ORIG_TITLE="$(cd "$SITE" && wp post get "$WARN_TARGET" --field=post_title --allow-root)"
+
+(cd "$SITE" && PLL_T="$WARN_TARGET" PLL_TITLE="$WARN_SRC_TITLE" wp eval '
+wp_update_post(wp_slash(array("ID" => (int) getenv("PLL_T"), "post_title" => getenv("PLL_TITLE"))));
+' --allow-root >/dev/null)
+
+WARN_OUT="$(run "$SCRIPTS/pll-verify.php" "$SRC" "$DST" 2>&1)" && WARN_RC=0 || WARN_RC=$?
+
+(cd "$SITE" && PLL_T="$WARN_TARGET" PLL_TITLE="$WARN_ORIG_TITLE" wp eval '
+wp_update_post(wp_slash(array("ID" => (int) getenv("PLL_T"), "post_title" => getenv("PLL_TITLE"))));
+' --allow-root >/dev/null)
+
+[[ "$WARN_RC" == "0" ]] || { echo "$WARN_OUT"; echo "FAIL: an identical title made verify FAIL; it is meant to warn, since a brand name legitimately survives translation"; exit 1; }
+grep -qF "has the same title as its source" <<<"$WARN_OUT" || {
+  echo "$WARN_OUT"
+  echo "FAIL: verify did not warn about a counterpart carrying its source's title -- check 4 is untested"
+  exit 1
+}
+
+# Changing the SOURCE after import is what makes a counterpart stale: the
+# recorded hash no longer matches the source payload.
+STALE_ORIG="$(cd "$SITE" && wp post get "$FIXTURE_PARENT_ID" --field=post_excerpt --allow-root)"
+(cd "$SITE" && PLL_P="$FIXTURE_PARENT_ID" wp eval '
+wp_update_post(wp_slash(array("ID" => (int) getenv("PLL_P"), "post_excerpt" => "changed after translation")));
+' --allow-root >/dev/null)
+
+STALE_OUT="$(run "$SCRIPTS/pll-verify.php" "$SRC" "$DST" 2>&1)" && STALE_RC=0 || STALE_RC=$?
+
+(cd "$SITE" && PLL_P="$FIXTURE_PARENT_ID" PLL_E="$STALE_ORIG" wp eval '
+wp_update_post(wp_slash(array("ID" => (int) getenv("PLL_P"), "post_excerpt" => (string) getenv("PLL_E"))));
+' --allow-root >/dev/null)
+
+[[ "$STALE_RC" == "0" ]] || { echo "$STALE_OUT"; echo "FAIL: a stale counterpart made verify FAIL; it is meant to warn, since the page still works"; exit 1; }
+grep -qF "is stale: source" <<<"$STALE_OUT" || {
+  echo "$STALE_OUT"
+  echo "FAIL: verify did not warn that a counterpart went stale -- check 5 is untested"
+  exit 1
+}
+echo "  both warnings emitted without failing the run"
 
 echo "── remove this run's fixture ──"
 # Deletion, not a re-run of export+import. The teardown used to resync by
