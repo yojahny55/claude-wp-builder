@@ -127,7 +127,67 @@ Lighthouse-style browser audits. Requires the web-quality-skills package for bro
 
 ---
 
-## Auto-Fix Classification
+## Performance — Hard-won Lessons (Tier 3 / Lighthouse)
+
+Interpretation traps and fixes that actually move production bytes. Consult before filing or fixing a `PERF-xxx` finding from a Lighthouse run.
+
+### Read *observed* metrics before chasing a bad *simulated* score
+
+Lighthouse's default (`throttlingMethod: "simulate"`) reports **Lantern-simulated** LCP/FCP/TTI on a modeled slow-4G + 4× CPU. On a **dev server** this is dominated by local TTFB + the throttle model and can read 6–7 s while the page is actually instant. Before treating a high LCP as real, open the full JSON and compare:
+
+- `audits.metrics.details.items[0].largestContentfulPaint` (simulated) **vs** `...observedLargestContentfulPaint` (real paint).
+- If observed is ~200–900 ms and simulated is multi-second, the number is a **simulation/dev-server artifact** — the score barely moves regardless of theme changes, and production (with page cache + real CDN/TTFB) differs. Say so in the finding instead of burning effort chasing it. **Real byte reductions (WebP, right-sizing) still help production** and still shrink the *LCP resource*, so do those — just set score expectations.
+- `image-delivery-insight`, `render-blocking-insight`, `lcp-discovery-insight` etc. are **weight-0** in the Performance score (informative). Only the 5 metric audits (FCP/LCP/TBT/CLS/SI) carry weight. Fixing a weight-0 insight is a production win, not a score win — label it accordingly.
+
+### WebP: `image_editor_output_format` only covers NEW, attachment-pipeline images
+
+`add_filter('image_editor_output_format', ...)` converts uploads to WebP **only on new uploads**, and **only images that flow through WP's attachment functions** (`wp_get_attachment_image`, `the_post_thumbnail`). Themes that print **raw SCF/ACF field URLs** (`echo $field['url']`) or CSS `background-image: url(<field>)` bypass it entirely, so existing hero/about/neighborhood/banner images stay JPEG/PNG.
+
+To serve WebP for **existing + SCF-driven** images without touching every template:
+
+1. Pre-generate `.webp` siblings for existing uploads (one-time): `find uploads -iname '*.jpg' -o -iname '*.png'` → `magick "$f" -quality 82 "${f%.*}.webp"` (hero/LCP images can go lower, ~q68, since they sit behind scrims or are video-replaced).
+2. Add a front-end output-buffer that rewrites finished HTML — covers `src`, `srcset`, and inline `background-image` in one pass:
+
+```php
+add_action( 'template_redirect', function () {
+    if ( is_admin() || is_feed() || is_robots() ) return;
+    $u = wp_get_upload_dir(); $base = $u['baseurl']; $dir = $u['basedir'];
+    ob_start( function ( $html ) use ( $base, $dir ) {
+        $pat = '#' . preg_quote( $base, '#' ) . '/[^"\'\)\s]+?\.(?:jpe?g|png)#i';
+        return preg_replace_callback( $pat, function ( $m ) use ( $base, $dir ) {
+            $webp = preg_replace( '/\.(?:jpe?g|png)$/i', '.webp', $m[0] );
+            return file_exists( $dir . substr( $webp, strlen( $base ) ) ) ? $webp : $m[0];
+        }, $html );
+    } );
+} );
+```
+
+`template_redirect` is front-end-only, and with a page cache (WP Super Cache) the buffer runs once per cache build. WebP is universally supported by target browsers — matching the theme's existing unconditional `image_editor_output_format` policy — so no `Accept`-header branching is needed.
+
+### Right-size — never print `$field['url']` for a fixed slot
+
+Lighthouse "responsive-size" waste = serving a 2200px original in a 400px slot. Raw SCF field URLs (`$image['url']`) always emit the **full original**. Use the attachment ID so the browser gets a `srcset`:
+
+```php
+echo wp_get_attachment_image( (int) $image['id'], 'large', false, array(
+    'class' => 'about__bg', 'alt' => $heading, 'loading' => 'lazy',
+    'sizes' => '(max-width: 899px) 100vw, 136vw', // match the real CSS display width
+) );
+```
+
+Pick `sizes` from the element's actual rendered width (full-bleed → `100vw`; a 136%-wide bg → `136vw`; a 136px logo → `136px`). This composes with the WebP buffer above (the srcset `.jpg` URLs are rewritten to `.webp`).
+
+### Hero LCP pattern (poster-first, video deferred)
+
+Make the LCP element a **small poster image**, not the video: `<img fetchpriority="high" width/height>` + a `<link rel="preload" as="image">` for it in `wp_head`; lazy-load the background `<video>` via JS on **desktop only** (`min-width:1024px`), after the poster paints (`requestIdleCallback`), and **never** on mobile / `navigator.connection.saveData`. Preload the poster's WebP so the preload and the rendered `src` match (else the preload is wasted).
+
+### Render-blocking CSS
+
+Dequeue the near-empty theme `style.css` on the front end (it usually carries only the WP header comment; runtime styles live in the compiled bundle). Async-load below-the-fold plugin CSS (e.g. Contact Form 7) via `style_loader_tag` → `media='print' onload="this.media='all'"`.
+
+### AIOS × Lighthouse gotcha (Tier 2 ↔ Tier 3 interaction)
+
+If the security agent sets AIOS `aiowps_disallow_unauthorized_rest_requests = 1`, it returns **403** on CF7's REST endpoints (`/wp-json/contact-form-7/v1/...`). Lighthouse then **hangs up to 45 s** on those pending requests and logs console errors → Best-Practices drops (often 100 → 96) and metrics inflate. If a CF7 form is present, leave that AIOS setting off (or whitelist the CF7 REST namespace). Symptom in the JSON: `errors-in-console` / pending `Fetch` requests to `contact-form-7` with `statusCode: 403`.
 
 ### Auto-fixable
 

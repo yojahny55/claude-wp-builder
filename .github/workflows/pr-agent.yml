@@ -1,0 +1,45 @@
+# Copy to .github/workflows/pr-agent.yml in each repo you want reviewed.
+# Runs the open-source PR-Agent on a SELF-HOSTED runner so it can reach your
+# LiteLLM endpoint on the NetBird overlay.
+name: PR-Agent
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+  issue_comment:                 # lets you type /review, /improve, /ask in a PR comment
+
+jobs:
+  pr_agent_job:
+    # Don't loop on the bot's own comments.
+    if: ${{ github.event.sender.type != 'Bot' }}
+    runs-on: self-hosted         # <-- the critical line: runs on YOUR rig, not GitHub's cloud
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+    name: PR-Agent review
+    steps:
+      - name: Run PR-Agent
+        uses: the-pr-agent/pr-agent@main   # community-maintained OSS PR-Agent (Qodo donated it)
+        env:
+          # Auto-provided by GitHub; lets the bot read the diff and post comments.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Your LiteLLM virtual key (the ONLY secret). Add it in repo Settings →
+          # Secrets and variables → Actions → New repository secret → name OPENAI_KEY.
+          # Double underscore maps to openai.key in PR-Agent's config (dynaconf),
+          # matching OPENAI__API_BASE below. Single-underscore OPENAI_KEY is NOT
+          # picked up and the tool silently falls back to a 'dummy_key' → LiteLLM 401.
+          OPENAI__KEY: ${{ secrets.OPENAI_KEY }}
+          # Model + endpoint are also read from the committed .pr_agent.toml, but
+          # setting them here too makes the workflow self-contained and overrides
+          # the file if they ever drift. Double-underscore = nested config key.
+          CONFIG__MODEL: "openai/coder"
+          CONFIG__FALLBACK_MODELS: '["openai/coder"]'
+          CONFIG__CUSTOM_MODEL_MAX_TOKENS: "65536"
+          CONFIG__MAX_MODEL_TOKENS: "48000"
+          # LiteLLM directly (NOT via Headroom :8788). Headroom short-circuits pr-agent's
+          # request shape (returns empty 200, never forwards) — and since pr-agent uses the
+          # LOCAL free Qwen, Headroom's token compression saves no cost here anyway.
+          # 172.17.0.1 = Docker bridge gateway ("the host" from the action's container):
+          # not a machine-specific IP, identical on every Docker host, leaks nothing.
+          OPENAI__API_BASE: "http://172.17.0.1:4000/v1"

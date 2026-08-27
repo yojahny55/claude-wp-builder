@@ -10,3 +10,35 @@
 .wp-caption {
   @apply max-w-full mx-auto;
 }
+
+/* Visually-hidden text for screen readers (WP core template-tags rely on this,
+   and it's the correct way to add descriptive text to generic-labelled links —
+   e.g. a "LEARN MORE" button — so Lighthouse's link-text audit sees descriptive
+   innerText. Uses clip (NOT display:none) so the text stays in innerText/the
+   accessibility tree). */
+.screen-reader-text {
+  border: 0;
+  clip: rect(1px, 1px, 1px, 1px);
+  clip-path: inset(50%);
+  height: 1px;
+  width: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  position: absolute !important;
+  word-wrap: normal !important;
+}
+
+.screen-reader-text:focus {
+  background-color: #f1f1f1;
+  clip: auto !important;
+  clip-path: none;
+  color: #21759b;
+  display: block;
+  height: auto;
+  left: 5px;
+  top: 5px;
+  padding: 15px 23px 14px;
+  width: auto;
+  z-index: 100000;
+}

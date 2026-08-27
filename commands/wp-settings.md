@@ -56,11 +56,28 @@ Dispatch the **wp-acf** agent with these instructions:
 > 6. Add helpful instructions/descriptions to fields so the client understands what each one does
 > 7. All fields should have `field_` prefixed keys
 > 8. Ensure the field group location rule keeps pointing to the options page
+> 9. After editing the file, invalidate the group's Local JSON so the change
+>    re-bootstraps (the loader skips PHP for groups that already have JSON):
+>    delete `acf-json/group_settings.json` and, if the site imported it, run
+>    `$WP eval "acf_delete_field_group('group_settings');"`. The next WP load
+>    regenerates `acf-json/group_settings.json` from the edited PHP. This
+>    discards any manual dashboard edits to the settings group — intended for a
+>    code-driven change.
 >
 > **Existing settings.php content:**
 > ```php
 > <paste current file content>
 > ```
+
+## Step 4b: Regenerate Local JSON
+
+After the agent updates `fields/settings.php` and removes the stale JSON, trigger
+a bootstrap pass so the group is rewritten to `acf-json/` and stays dashboard-editable:
+
+```bash
+$WP eval "acf_get_field_groups();" >/dev/null 2>&1
+$WP eval "\$g=acf_get_field_group('group_settings'); echo \$g ? 'settings OK: '.count(acf_get_fields('group_settings')).' fields' : 'MISSING';"
+```
 
 ## Step 5: Print Summary
 

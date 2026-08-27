@@ -126,9 +126,13 @@ endif;
 
 ```php
 $logo = prefix_get_field('site_logo', 'option');
-if ($logo) : ?>
-    <img src="<?php echo esc_url($logo); ?>" alt="<?php echo esc_attr(get_bloginfo('name')); ?>" class="header__logo-img">
-<?php endif; ?>
+// Right-sized + WebP via the helper (see "Image Fields" below); pass an ID-bearing
+// field so a srcset is emitted instead of the full original.
+echo prefix_image($logo, 'medium', array(
+    'class' => 'header__logo-img',
+    'alt'   => get_bloginfo('name'),
+    'sizes' => '160px', // the logo's real display width
+));
 ```
 
 ### Static translated strings
@@ -136,6 +140,49 @@ if ($logo) : ?>
 ```php
 <h2 class="section__title"><?php prefix_e('services_heading'); ?></h2>
 ```
+
+## Image Fields — right-size + WebP (MANDATORY)
+
+**Never emit a raw image-field URL for a fixed-size slot** — `echo $field['url']` always outputs the full-size original (e.g. a 2200px photo in a 400px card), the #1 cause of Lighthouse "responsive-size" / oversized-image waste. Pass the **attachment ID** so WP emits a `srcset`; the starter's `inc/performance.php` output-buffer then rewrites those URLs to `.webp`.
+
+Use the starter helper `prefix_image()` (from `inc/performance.php`) or `wp_get_attachment_image()` directly, and **always set `sizes` to the element's real rendered width**:
+
+```php
+$image = prefix_get_field('about_image');
+// Full-bleed / large content image:
+echo prefix_image($image, 'large', array(
+    'class' => 'about__bg', 'alt' => $heading,
+    'loading' => 'lazy', 'decoding' => 'async',
+    'sizes' => '(max-width: 899px) 100vw, 50vw', // match the CSS display width
+));
+
+// Small fixed slot (logo, icon) — serve a small variant:
+echo prefix_image(prefix_get_field('site_logo', 'option'), 'medium', array(
+    'alt' => get_bloginfo('name'), 'sizes' => '136px',
+));
+```
+
+- Above-the-fold **hero/LCP** image: keep it an `<img>` (not a video) with `fetchpriority="high"` + `width`/`height`, and add a `<link rel="preload" as="image">` for it in `wp_head`. Lazy-load any hero background `<video>` via JS on desktop only, after the poster paints — never on mobile / `navigator.connection.saveData`.
+- `sizes` cheat-sheet: full-bleed → `100vw`; half-width split → `(max-width: 899px) 100vw, 50vw`; fixed logo/icon → its px width (`136px`).
+
+## Descriptive Link Text (SEO — MANDATORY)
+
+Lighthouse's `link-text` SEO audit matches the link's **visible innerText** against a blocklist (`click here`, `here`, `learn more`, `more`, `read more`, `this`, `start`, …). **`aria-label` does NOT satisfy it.** When the demo uses a generic button label (very common: "LEARN MORE", "READ MORE", "VIEW"), append a visually-hidden descriptive suffix **inside** the anchor so innerText becomes descriptive while the button still shows the short label:
+
+```php
+<a class="btn" href="<?php echo esc_url($cta_url); ?>">
+    <?php echo esc_html($cta_label); // e.g. "LEARN MORE" — stays visible ?>
+    <?php if ($context) : ?><span class="screen-reader-text"><?php
+        echo esc_html('about ' . $context); // e.g. the card title
+    ?></span><?php endif; ?>
+</a>
+```
+
+The suffix MUST use `.screen-reader-text` (clip pattern — shipped in `utilities/wordpress.css`), never `display:none` (excluded from innerText → would still fail).
+
+## Meta description — leave it to the SEO plugin
+
+Do **not** emit a hardcoded `<meta name="description">` from the theme `wp_head`. Rank Math / Yoast own it; a theme fallback produces a duplicate-description tag once the plugin is configured.
 
 ## Field Naming Convention
 

@@ -480,7 +480,7 @@ The pattern is: `<location>-<lang>` (e.g., `primary-en`, `primary-es`, `mobile-e
 
 ## ACF Field Creation Rules
 
-When defining fields in `inc/scf-fields.php` for a bilingual site:
+When defining fields in `fields/*.php` for a bilingual site (see wp-theme-standards for the field loader / Local JSON model — `fields/*.php` is a one-time bootstrap seed, `acf-json/*.json` is the dashboard-editable source of truth):
 
 ### Field Organization
 
@@ -631,12 +631,15 @@ In `header.php`, set the document language dynamically.
 
 ## File Structure
 
-The i18n system lives in a single file included early in `functions.php`.
+The i18n system lives in a single file included early in `functions.php`, before the field loader's `acf/init` hook runs.
 
 ```php
-// functions.php — i18n must load before SCF fields
+// functions.php — i18n must load before the fields/*.php bootstrap
 require get_template_directory() . '/inc/i18n.php';
-require get_template_directory() . '/inc/scf-fields.php';
+
+// Field groups loaded via the acf/init bootstrap loader (fields/*.php seeds
+// acf-json/, which becomes the dashboard-editable source of truth) —
+// see wp-theme-standards SKILL.md for the full loader.
 ```
 
 The `inc/i18n.php` file contains:

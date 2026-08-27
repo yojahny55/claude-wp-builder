@@ -22,7 +22,7 @@ All paths relative to the theme root (`wp-content/themes/<slug>/`).
 
 | File | Purpose |
 |---|---|
-| `fields/scenes.php` | ACF/SCF field group registering a `cinematic_scenes` repeater whose subfields match `scene.json`. Bilingual fields get an `_es` sibling when `languages` includes `es`. |
+| `fields/scenes.php` | ACF/SCF field group registering a `cinematic_scenes` repeater whose subfields match `scene.json`. Bilingual fields get an `_es` sibling when `languages` includes `es`. `fields/*.php` is a bootstrap seed: the theme's `acf/init` loader persists each group to `acf-json/` (the editable source of truth). **When you regenerate `scenes.php`, also delete the scenes group's `acf-json/<group_key>.json` (and `acf_delete_field_group('<group_key>')` if imported to the DB) so the new definition re-bootstraps** — otherwise the loader keeps serving the old JSON. |
 | `fields/trailing-sections.php` | Flex content field for sections appended AFTER the reel. Only when hybrid mode. |
 | `inc/cinematic-loader.php` | Enqueues `cinematic.css`, Lenis + GSAP + ScrollTrigger (CDN), `cinematic-scrubber.js`, and `cinematic-engine.js` (depends on all of them), all deferred. Adds `has-cinematic` body class on cinematic pages, prints `prefers-reduced-motion` guard, declares `cdn.jsdelivr.net` preconnect. |
 | `inc/scenes-renderer.php` | Helpers: `{slug}_cinematic_scenes()` returns repeater rows; `{slug}_cinematic_render_stage($rows)` prints the persistent `.stage`; `{slug}_cinematic_render_scene($row, $index)` prints a single scene. |

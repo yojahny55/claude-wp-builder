@@ -56,7 +56,14 @@ theme-name/
 ├── inc/
 │   ├── theme-setup.php         # Theme supports, nav menus, content width
 │   ├── i18n.php                # Internationalization helpers (if bilingual)
-│   └── scf-fields.php          # SCF/ACF custom field definitions
+│   └── performance.php         # WebP delivery + prefix_image() right-size helper
+├── fields/                     # SCF/ACF field definitions — one file per group
+│   ├── hero.php                #   BARE acf_add_local_field_group() calls (seed only)
+│   ├── settings.php
+│   └── ...
+├── acf-json/                   # SCF/ACF Local JSON — the field SOURCE OF TRUTH
+│   ├── group_hero.json         #   auto-written from fields/*.php on first load,
+│   └── ...                     #   dashboard-editable, edits sync back here
 ├── template-parts/
 │   ├── section-hero.php        # Reusable section templates
 │   ├── section-services.php
@@ -69,6 +76,22 @@ theme-name/
 ├── style.css                   # Theme declaration (headers only)
 └── screenshot.png              # Theme preview image
 ```
+
+### SCF/ACF field model — Local JSON is the source of truth
+
+Field groups are **not** left as pure PHP `acf_add_local_field_group()` registrations:
+a PHP-local group has no post (`ID=0`), never appears in **Custom Fields → Field
+Groups**, and can't be edited or extended by the client. Instead the `acf/init`
+loader in `functions.php` treats `fields/*.php` as a **one-time bootstrap** — it
+registers each group once, writes it to `acf-json/<key>.json`, then loads only the
+Local JSON thereafter. ACF/SCF auto-loads `acf-json/`, so groups are visible,
+editable, and two-way synced (dashboard edits — including manually added fields —
+are written back to the JSON files and stay in version control).
+
+To **redefine** an existing group in code, edit its `fields/*.php` and delete the
+matching `acf-json/<key>.json` (plus `acf_delete_field_group('<key>')` if imported
+to the DB) so it re-bootstraps. Never point `save_json`/`load_json` elsewhere —
+ACF already defaults to the theme's `acf-json/`.
 
 ---
 
@@ -360,10 +383,28 @@ function prefix_preload_lcp_image() {
     if (is_front_page()) {
         $hero_image = prefix_get_field('hero_image');
         $hero_image_url = $hero_image ? $hero_image['url'] : prefix_asset('images/hero-image.png');
-        echo '<link rel="preload" as="image" href="' . esc_url($hero_image_url) . '">' . "\n";
+        echo '<link rel="preload" as="image" href="' . esc_url($hero_image_url) . '" fetchpriority="high">' . "\n";
     }
 }
 add_action('wp_head', 'prefix_preload_lcp_image', 2);
+```
+
+The preloaded LCP `<img>` itself must carry `fetchpriority="high"` + `width`/`height`. If the hero is a background video, keep the poster `<img>` as the LCP element and lazy-load the `<video>` via JS on desktop only (never mobile / `navigator.connection.saveData`).
+
+### Image Delivery — WebP + right-sizing (`inc/performance.php`)
+
+Ship `inc/performance.php` (in the starter) in every theme. It handles the image-delivery waste Lighthouse flags, which `image_editor_output_format` alone does **not** cover:
+
+1. `image_editor_output_format` → WebP for new attachment sub-sizes.
+2. `wp_generate_attachment_metadata` → also writes a WebP sibling for the full-size original (so raw-URL / CSS-background usage benefits).
+3. A `template_redirect` output-buffer that rewrites any `uploads/*.jpg|png` with a `.webp` sibling → `.webp` in the finished HTML (covers `src`, `srcset`, and inline `background-image` — including SCF field URLs that bypass WP's attachment pipeline). Runs once per page-cache build.
+4. `prefix_image($field, $size, $attr)` — templates use this instead of `echo $field['url']` so images get a `srcset` sized to the slot. **Always pass `sizes`** matching the real display width (full-bleed `100vw`, split `(max-width: 899px) 100vw, 50vw`, fixed logo `136px`). Serving a 2200px original in a 400px slot is the top oversized-image finding.
+
+For a theme seeded from an existing demo (images already uploaded), batch-generate the `.webp` siblings once so (3) picks them up:
+
+```bash
+find wp-content/uploads -type f \( -iname '*.jpg' -o -iname '*.png' \) \
+  -exec sh -c 'f="$1"; w="${f%.*}.webp"; [ -f "$w" ] || magick "$f" -quality 82 "$w"' _ {} \;
 ```
 
 ### Disable WordPress Emojis

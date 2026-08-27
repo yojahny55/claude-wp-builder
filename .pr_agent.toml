@@ -1,0 +1,54 @@
+# .pr_agent.toml — committed to the ROOT of each repo you want reviewed.
+# Non-secret config only. The API key is NOT here; it lives in GitHub Secrets
+# (Action) or an env var (CLI). See README.md in this kit.
+
+[config]
+# The "openai/" prefix tells PR-Agent's embedded LiteLLM that "coder" is an
+# OpenAI-COMPATIBLE endpoint (your vLLM via LiteLLM), not the real OpenAI cloud.
+# "coder" must match the route name in your ~/litellm/config.yaml.
+model = "openai/coder"
+
+# Don't let it silently fall back to a cloud model (e.g. gpt-4) if a call fails.
+# Pin the fallback to your own route so nothing ever leaves your network.
+fallback_models = ["openai/coder"]
+
+# Your vLLM --max-model-len is 65536 (64k). PR-Agent counts prompt+output
+# against this when it decides how much diff to send / whether to compress.
+# Keep it at or just under your real window.
+custom_model_max_tokens = 65536
+
+# PR-Agent ALSO applies its own diff-budget cap (default ~32000), which prunes
+# large diffs even when the model could take more. Raise it to use your 64k
+# window. 48000 leaves comfortable room for the prompt scaffold + output and
+# keeps single-GPU latency sane; raise toward ~57000 if you want max coverage
+# and can tolerate slower reviews on huge PRs.
+max_model_tokens = 48000
+
+# Optional quality-of-life:
+# publish_output = true          # post results to the PR (default true)
+# verbosity_level = 1            # 0=quiet, 1=normal, 2=debug (turn up if it misbehaves)
+
+[openai]
+# Your LiteLLM proxy. This is a private NetBird address, not a secret, so it's
+# fine to commit. If the Action container can't reach it, see the networking
+# troubleshooting section in README.md.
+api_base = "http://172.17.0.1:4000/v1"
+# api_key is intentionally absent here — provided via OPENAI_KEY secret / env.
+
+[pr_reviewer]
+# Tune what the review focuses on. These are sensible defaults for a local model.
+require_score_review = false
+require_tests_review = true
+require_security_review = true
+num_max_findings = 6            # cap findings so a 35B local model stays focused
+persistent_comment = true       # update one comment instead of spamming new ones
+
+[pr_description]
+publish_labels = false          # set true if you want auto PR labels
+
+[github_action_config]
+# Which tools run automatically when a PR opens. Start with just review;
+# add "describe" / "improve" once you trust the output.
+auto_review = true
+auto_describe = false
+auto_improve = false

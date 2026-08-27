@@ -781,3 +781,34 @@ $WP eval "echo file_exists(ABSPATH . 'robots.txt') ? 'robots.txt exists' : 'robo
 # Verify llms.txt exists
 $WP eval "echo file_exists(ABSPATH . 'llms.txt') ? 'llms.txt exists' : 'llms.txt missing';"
 ```
+
+---
+
+## 13. Lighthouse SEO Audit Gotchas (hard-won)
+
+Non-obvious traps that make a fix *look* applied while the audit keeps failing. Verify against these before reporting an SEO finding fixed.
+
+### `link-text` matches VISIBLE innerText — not `aria-label`
+
+The Lighthouse `link-text` audit (`core/audits/seo/link-text.js`) lowercases/trims the anchor's **`link.text`** (rendered innerText) and checks it against a blocklist: `click here`, `here`, `learn more`, `more`, `read more`, `this`, `start`, … (per-language). **`aria-label`, `title`, and `nodeLabel` are ignored** — adding an `aria-label` fixes the a11y accessible-name but does **not** satisfy this SEO audit.
+
+To keep a design's non-descriptive label (e.g. a "LEARN MORE" button) *and* pass, append a visually-hidden descriptive suffix **inside** the anchor so it becomes part of innerText:
+
+```php
+<a class="btn" href="<?php echo esc_url( $url ); ?>">
+    <?php echo esc_html( $label ); // e.g. "LEARN MORE" — stays visible ?>
+    <?php if ( $context ) : ?><span class="screen-reader-text"><?php
+        echo esc_html( 'about ' . $context ); // e.g. "about Home Search"
+    ?></span><?php endif; ?>
+</a>
+```
+
+Now `link.text` = "LEARN MORE about Home Search" → not a blocklist match → audit passes; the button still visually reads "LEARN MORE".
+
+- **Critical:** the hidden span must use the `.screen-reader-text` **clip** pattern (`position:absolute; clip: rect(...); width:1px`) — NOT `display:none` or `visibility:hidden`, which are excluded from innerText and would fail again. (A `.screen-reader-text` rule is required in the theme CSS; see a11y standards.)
+- The same non-descriptive label often repeats across a reusable button component — fix the component/template part once, then re-check *every* page that uses it (Lighthouse audits per-URL; a homepage pass doesn't clear inner pages).
+- `identical-links-same-purpose` (a11y, weight 0) can also flag two same-text links (e.g. two "VIEW ALL") pointing to different destinations — the same hidden-suffix technique resolves it.
+
+### Meta description: let the SEO plugin own it — don't emit a theme fallback
+
+If Rank Math (or Yoast) is active and configured, do **not** also `echo` a hardcoded `<meta name="description">` from the theme `wp_head`. Two tags = a duplicate-description warning, and the plugin's dynamic/templated value is the one you want. A common failure mode: a theme adds a front-page meta-description fallback "to be safe" while the SEO plugin's setup wizard was incomplete → once the wizard is finished, the tag is duplicated. Remove the theme fallback; verify only one `<meta name="description">` renders (`curl -s <url> | grep -c 'name="description"'` → `1`).

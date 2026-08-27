@@ -105,9 +105,17 @@ Verify required WordPress theme files and configurations:
 
 1. **acf_add_options_page** (or `acf_add_options_sub_page`) is called somewhere in `functions.php` or `inc/` files
 2. **fields/settings.php** exists and is not empty
-3. **Settings file is included** — check that `fields/settings.php` is `require`d or `include`d from `functions.php` or another loaded file
+3. **Settings group resolves at runtime** — the `acf/init` loader bootstraps `fields/*.php` and persists them to `acf-json/`, so don't grep for an individual `require` of settings.php. Instead confirm the group is live:
+   ```bash
+   $WP eval "\$g=acf_get_field_group('group_settings'); echo \$g && count(acf_get_fields('group_settings')) ? 'OK' : 'MISSING';"
+   ```
+4. **Field groups are dashboard-editable (Local JSON)** — verify no field group is stuck PHP-local (`ID=0`, invisible in the admin list):
+   ```bash
+   $WP eval "\$n=0; foreach(acf_get_field_groups() as \$g){ if((\$g['local']??'')==='php') \$n++; } echo \$n===0 ? 'OK: all groups editable' : \"FAIL: \$n php-local groups\";"
+   ```
+   If any are php-local, `acf-json/` is missing or unwritable — confirm the loader ran and the directory is writable.
 
-**PASS** if settings page is properly registered and has fields. **FAIL** with details.
+**PASS** if the settings group resolves, has fields, and no group is php-local. **FAIL** with details.
 
 ---
 
