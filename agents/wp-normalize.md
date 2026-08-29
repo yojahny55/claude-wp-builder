@@ -2,6 +2,7 @@
 name: wp-normalize
 description: Demo-folder analyzer — converts an arbitrary multi-page HTML site into the plugin's canonical delimited demo format plus a build manifest, splitting sections and classifying content types
 tools: Read, Write, Edit, Grep, Glob
+model: opus
 ---
 
 # WordPress Demo Normalizer

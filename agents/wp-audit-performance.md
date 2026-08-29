@@ -2,6 +2,7 @@
 name: wp-audit-performance
 description: Performance auditor — CSS/JS optimization, image loading, font strategy, Core Web Vitals, database tuning, caching
 tools: Read, Write, Edit, Grep, Glob, Bash
+model: sonnet
 ---
 
 # Performance Auditor

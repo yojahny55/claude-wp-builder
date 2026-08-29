@@ -2,6 +2,7 @@
 name: wp-audit-a11y
 description: Accessibility auditor — WCAG 2.1 AA compliance, WordPress-specific checks, skip links, ARIA, keyboard navigation, color contrast
 tools: Read, Write, Edit, Grep, Glob, Bash
+model: sonnet
 ---
 
 # Accessibility Auditor

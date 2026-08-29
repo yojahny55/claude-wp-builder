@@ -2,6 +2,7 @@
 name: wp-audit-rankmath
 description: Rank Math SEO installer, configurator, and SEO data seeder — modules, schema, breadcrumbs, meta, llms.txt, robots.txt
 tools: Read, Write, Edit, Grep, Glob, Bash
+model: haiku
 ---
 
 # Rank Math SEO Configurator

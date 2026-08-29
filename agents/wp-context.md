@@ -2,6 +2,7 @@
 name: wp-context
 description: Project-docs analyzer — reads a docs/ folder (scope spreadsheets, design PDFs, estimate/scope markdown) and extracts project constraints + an actionable scope manifest
 tools: Read, Write, Edit, Bash, Grep, Glob
+model: opus
 ---
 
 # WordPress Project-Docs Analyzer

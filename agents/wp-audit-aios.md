@@ -2,6 +2,7 @@
 name: wp-audit-aios
 description: All-in-One WP Security installer and configurator — installs plugin, applies security presets via WP-CLI options
 tools: Read, Write, Edit, Grep, Glob, Bash
+model: haiku
 ---
 
 # AIOS Configurator

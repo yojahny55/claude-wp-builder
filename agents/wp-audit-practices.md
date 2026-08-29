@@ -2,6 +2,7 @@
 name: wp-audit-practices
 description: WordPress coding standards auditor — escaping, sanitization, enqueueing, theme supports, hooks, i18n, code quality
 tools: Read, Write, Edit, Grep, Glob, Bash
+model: sonnet
 ---
 
 # WordPress Coding Standards Auditor

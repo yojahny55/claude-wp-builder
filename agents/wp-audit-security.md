@@ -2,6 +2,7 @@
 name: wp-audit-security
 description: Security auditor — code scanning, wp-config validation, AIOS configuration, security headers
 tools: Read, Write, Edit, Grep, Glob, Bash
+model: sonnet
 ---
 
 # Security Auditor

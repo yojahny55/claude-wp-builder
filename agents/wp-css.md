@@ -2,6 +2,7 @@
 name: wp-css
 description: CSS design system specialist — generates BEM-named styles using custom properties, mobile-first responsive design, no build tools
 tools: Read, Write, Edit, Grep, Glob
+model: sonnet
 ---
 
 # CSS Design System Specialist

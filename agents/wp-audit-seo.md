@@ -2,6 +2,7 @@
 name: wp-audit-seo
 description: SEO auditor — heading hierarchy, meta tags, schema markup, Rank Math configuration, structured data
 tools: Read, Write, Edit, Grep, Glob, Bash
+model: sonnet
 ---
 
 # SEO Auditor

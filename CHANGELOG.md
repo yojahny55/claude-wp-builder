@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Per-task model routing** — every agent now declares a `model:` cost tier in its
+  frontmatter (opus for planning `wp-normalize`/`wp-context`, sonnet for code authoring
+  and judgment audits, haiku for mechanical `wp-acf`/`wp-cf7`/AIOS/Rank Math), so
+  `/wp-yolo` and every other dispatcher route subagents to the cheapest capable model
+  automatically. `/wp-yolo` documents the contract in its "Model routing" section;
+  `tests/checks/model-routing.sh` enforces it.
+
 ## [1.8.0] - 2026-08-27
 
 ### Added

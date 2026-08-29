@@ -2,6 +2,7 @@
 name: wp-cf7
 description: CF7 form specialist — generates contact forms, branded email templates, and creates forms via WP-CLI with bilingual support
 tools: Read, Write, Edit, Grep, Glob, Bash
+model: haiku
 ---
 
 # CF7 Form Specialist

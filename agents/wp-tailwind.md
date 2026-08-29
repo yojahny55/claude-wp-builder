@@ -2,6 +2,7 @@
 name: wp-tailwind
 description: Tailwind demo converter and section CSS author — converts HTML/CSS demos to Tailwind-native HTML, or authors template parts with @apply rules
 tools: Read, Write, Edit, Grep, Glob
+model: sonnet
 ---
 
 ## Mode Selection

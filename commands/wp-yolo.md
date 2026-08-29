@@ -85,6 +85,24 @@ git add -A && git commit -q -m "chore: baseline before /wp-yolo build" || true
 This is unconditional and runs even under `--yolo`: no build starts until a clean
 baseline commit exists, so the whole pass is diffable and revertible.
 
+## Model routing
+
+Every agent this command reaches — directly or through the commands it drives — declares
+its own `model:` in its frontmatter (`agents/*.md`), so dispatch cost is routed per task
+without any flag on this command:
+
+- **opus** — planning/analysis whose output steers the whole build: `wp-normalize`, `wp-context`.
+- **sonnet** — code authoring and judgment audits: `wp-template`, `wp-css`, `wp-tailwind`,
+  `wp-cinematic`, `wp-audit-a11y|performance|practices|security|seo`.
+- **haiku** — mechanical generation and WP-CLI config: `wp-acf`, `wp-cf7`,
+  `wp-audit-aios`, `wp-audit-rankmath`.
+
+When dispatching an agent with the Agent tool, do **not** pass a `model` parameter — a
+per-invocation override beats frontmatter (resolution order: env var >
+per-invocation param > frontmatter > main model), and passing one silently defeats this
+routing. The orchestration itself (manifest reasoning, checkpoint edits, gate decisions)
+stays on the main conversation model.
+
 ## Step 2: Phase 1 — Normalize
 
 Dispatch the **wp-normalize** agent against the demo folder from Step 1. It scans every

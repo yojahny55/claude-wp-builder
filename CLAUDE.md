@@ -99,7 +99,7 @@ no `match`, no union types.
 **Command** (`commands/<name>.md`) — frontmatter with `description`, `allowed-tools`,
 `argument-hint`. Add `Agent` to `allowed-tools` only if it dispatches subagents.
 
-**Agent** (`agents/<name>.md`) — frontmatter `name`, `description`, `tools` (order:
+**Agent** (`agents/<name>.md`) — frontmatter `name`, `description`, `tools`, `model` (`opus`|`sonnet`|`haiku` — cost tier, see `tests/checks/model-routing.sh`) (order:
 `Read, Write, Edit, Grep, Glob, Bash`). Must open with the "First Action (MANDATORY)" block.
 
 **Skill** (`skills/<name>/SKILL.md`) — frontmatter `name`, `description`, `user-invocable: false`.
