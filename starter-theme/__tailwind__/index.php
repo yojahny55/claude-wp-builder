@@ -10,7 +10,6 @@ global $wp_query;
 get_header();
 ?>
 
-<main id="primary" class="site-main">
 
 <?php
 if ( have_posts() ) :
@@ -45,7 +44,6 @@ else :
 endif;
 ?>
 
-</main><!-- #main -->
 
 <?php
 get_footer();

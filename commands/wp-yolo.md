@@ -19,7 +19,7 @@ Parse `$ARGUMENTS`:
   or if the path is not a directory:
   ```
   Error: A demo folder is required.
-  Usage: /wp-yolo <path-to-demo-folder> [--yolo] [--careful]
+  Usage: /wp-yolo <path-to-demo-folder> [--yolo] [--careful] [--force]
   ```
 - **`--yolo`** = no checkpoint at all (ingest → build → seed → finalize → report, hands-off).
 - **`--careful`** = checkpoint after normalization AND a per-page confirm before each inner
@@ -30,6 +30,23 @@ Read `.claude/CLAUDE.md` at the project root. If it does not exist, refuse:
 ```
 Error: No .claude/CLAUDE.md found. Run /wp-init first to scaffold the project.
 ```
+
+**Then refuse to run twice.** This command has no resume entrypoint: a second
+run restarts at Step 2, re-dispatches `wp-normalize`, overwrites
+`demo/.yolo-manifest.json` and rebuilds the theme over whatever has been hand-
+corrected since. If the theme directory already holds built section template
+parts, or `.claude/CLAUDE.md` records a completed run, stop:
+
+```
+Error: <theme> already contains a built section flow (<n> template parts).
+/wp-yolo rebuilds from the demo and would overwrite work done since the first run.
+Use the per-step commands instead: /wp-section, /wp-page, /wp-seed, /wp-finalize.
+Pass --force only to deliberately discard the current build.
+```
+
+Accept `--force` to override, and on a successful run append a
+`## Workflow — DONE, do not re-run` note to `.claude/CLAUDE.md` recording the
+date and which steps completed.
 Extract function prefix, theme slug, languages (primary + secondary), template
 (basic|tailwind), CF plugin (scf|acf), and **i18n strategy (suffix|polylang)** —
 needed by every downstream command.
@@ -412,6 +429,51 @@ Before seeding, collect every `section.fonts[]` entry across the manifest (dedup
   fonts.gstatic.com) when the demo's own `<head>` actually references Google Fonts — never
   as a substitute for a self-hosted font family found in `section.fonts[]`. Self-hosted
   stays self-hosted; the two are not interchangeable.
+
+## Step 4.6: Behaviour carry — port ALL of the demo's JavaScript
+
+The chrome build ports the header and drawer scripts. **Everything else the demo
+does is still sitting in the demo folder**, and nothing later in this command
+notices: the parity gate measures geometry at rest, so a theme whose carousels,
+lightbox, listboxes, filter drawer and accordions are all dead passes it
+66/66. One project shipped exactly that and only found out from a manual
+browser pass.
+
+Enumerate the demo's scripts before writing anything:
+
+```bash
+ls demo/js/*.js demo/**/*.js 2>/dev/null
+grep -rho 'src="[^"]*\.js"' demo/*.html | sort -u
+```
+
+Then account for **every** one:
+
+- **Shared chrome** (nav, drawer, language pill, sticky rails) → the chrome
+  module the header/footer build already created.
+- **Section behaviour** (carousels, galleries, listboxes, filter panels,
+  accordions, tabs, share menus) → one module per behaviour in
+  `assets/js/src/sections.js`, each binding to nothing when its markup is
+  absent, so any page can load the one bundle.
+- **Duplicated-in-every-page code.** A demo with no shared footer copies the
+  same block into all eleven page scripts. It belongs in the theme once, not
+  eleven times — check the top of each page script before assuming a script is
+  page-specific.
+- **Deliberately NOT ported:** anything the server now owns. Client-side
+  filtering, client-side pagination and client-side facet counts fought a real
+  `WP_Query` for the same state — the facets, sort lists and pager are real
+  links now. Say so in the module's header comment so the omission is not read
+  as an oversight and "restored" later.
+- **User-visible strings** inside the ported JS go through the theme's
+  translation helper and ride on the localized data object. A string frozen
+  into the bundle cannot be translated and cannot be edited by the client.
+- **Guard every lookup.** The demo knows its own markup exists; a WordPress page
+  does not — no menu assigned, an empty repeater, a missing `aria-controls`
+  target. An unguarded dereference throws and takes the rest of the bundle with
+  it.
+
+Verify in a real browser before Step 5, one page per behaviour: click a
+carousel arrow, open a listbox, open the filter drawer, open the gallery. A
+console with zero errors is not evidence — dead code logs nothing.
 
 ## Step 5: Phase 3 — Seed & Finish
 

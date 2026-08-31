@@ -84,6 +84,48 @@ For each configured language, generate a complete CF7 form markup file:
 </div>
 ```
 
+## Making CF7 look like the demo
+
+A CF7 form dropped into an approved design does not match it, and the reasons
+are structural rather than a matter of adding CSS. Take the plugin's
+presentation over completely:
+
+- **Dequeue `contact-form-7`'s stylesheet.** It is **unlayered**, and in
+  Tailwind v4 unlayered CSS beats `@layer components`/`@layer utilities` at any
+  specificity — a success notice will render inside the plugin's red error
+  border no matter what you write. Reproduce what you still need (the notice
+  states, the spinner) in the theme's own component file, in the theme's
+  colours.
+  ```php
+  add_action( 'wp_enqueue_scripts', function () { wp_dequeue_style( 'contact-form-7' ); }, 20 );
+  ```
+- **Neutralise the plugin's wrapper boxes.** CF7 emits its own `<div>`, its
+  `<form>` and a `<span class="wpcf7-form-control-wrap">` around every control.
+  The demo's grid does not expect them, and they push the panel off its approved
+  size. `display: contents` on all three removes them from layout while keeping
+  the plugin's hooks intact.
+- **Turn `wpcf7_autop` off** (`add_filter('wpcf7_autop_or_not','__return_false')`)
+  or every control arrives wrapped in `<p>` with `<br>` between.
+- **The submit control is the demo's own `<button>`, not `[submit]`.** CF7's
+  `[submit]` renders an `<input>`, and an `<input>` is a replaced element: it
+  cannot hold an icon child and `::after` does not apply to it, so a demo's
+  paper-plane or arrow silently vanishes. Use the demo's `<button type="submit">`
+  and hand-place the spinner CF7 would have emitted — over SMTP the send takes
+  seconds and the form looks frozen without one.
+- **Hide the screen-reader response list** with the clip-rect technique. The
+  dequeued stylesheet used to do it; without it every message is announced and
+  printed twice.
+- **A panel with a fixed height from the demo must become content-driven once
+  CF7 has something to say**, or validation messages spill out of the rounded
+  box. Likewise, a submit button positioned absolutely inside that panel lands
+  on top of a field the moment the panel grows — put it back in flow in the
+  states that grow (`invalid`, `unaccepted`, `sent`, `failed`, `aborted`,
+  `spam`).
+
+Verify by measuring the rendered panel against the demo at three widths, and by
+submitting once **invalid** and once **valid** — the two states that change the
+box.
+
 ## Email Template Generation
 
 Design branded HTML email templates for both admin notification and user confirmation emails. Use `frontend-design` skill for visual design decisions.

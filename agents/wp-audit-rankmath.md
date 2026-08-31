@@ -40,6 +40,51 @@ if (defined('RANK_MATH_VERSION')) {
 "
 ```
 
+## Step 1.5: Set the two flags the wizard would have set — MANDATORY
+
+Configuring Rank Math from WP-CLI instead of its setup wizard leaves two options
+unset, and without them everything below this line is written to a database
+nobody reads:
+
+| Option | What breaks without it |
+|---|---|
+| `rank_math_registration_skip` | `Registration::$invalid` stays true and Rank Math loads **no frontend and no sitemap at all** — no canonical, no meta, no JSON-LD, and `/sitemap_index.xml` 404s. This, not a sitemap setting, is the usual cause of that 404. |
+| `rank_math_is_configured` | The wizard-completed flag. Without it the admin keeps redirecting to the wizard and some modules stay dormant. |
+
+```bash
+$WP eval "
+update_option('rank_math_registration_skip', 1);
+update_option('rank_math_is_configured', 1);
+echo 'flags set';
+"
+```
+
+Both are easy to lose: a database reset or a re-import drops them and the SEO
+layer disappears with no error anywhere. Record them in `.claude/CLAUDE.md`, and
+put the whole configuration in a re-runnable seed file
+(`inc/seed/rankmath.php`) rather than leaving it as one-off CLI calls.
+
+### Under Polylang: re-take the post-type snapshot
+
+Rank Math's Polylang integration asks for the accessible post types on
+`pll_init` — which fires during `plugins_loaded`, **before a theme's custom post
+types are registered** — and caches the answer in a static. Every theme CPT is
+then missing from the sitemap index, from the Titles & Meta tabs and from the
+editor metabox, with nothing logged. The static keeps refreshing until
+`wp_loaded`, so one late call on `init` re-takes it. Add to the theme:
+
+```php
+add_action( 'init', function () {
+    if ( class_exists( 'RankMath\\Helper' ) ) {
+        RankMath\Helper::get_accessible_post_types();
+    }
+}, 99 );
+```
+
+Note also that free Polylang serves both languages from the single
+`/sitemap_index.xml`; a per-language `/<lang>/sitemap_index.xml` 404s by design
+and is not a defect to chase.
+
 ## Step 2: Enable Modules
 
 Enable all recommended modules using the pattern from the `wp-audit-seo-standards` skill:

@@ -72,7 +72,15 @@ add_action( 'acf/init', function() {
         if ( ( $g['local'] ?? '' ) !== 'php' ) { continue; }
         if ( file_exists( "$json_dir/{$g['key']}.json" ) ) { continue; }
         $g['fields'] = acf_get_fields( $g );
-        acf_write_json_field_group( acf_prepare_field_group_for_export( $g ) );
+
+        // acf_write_json_field_group() reads $export['ID'] to stamp a modified
+        // time, but acf_prepare_field_group_for_export() strips it. Without the
+        // key put back, a fresh group emits "Undefined array key ID" and stays
+        // PHP-local — invisible in the dashboard.
+        $export       = acf_prepare_field_group_for_export( $g );
+        $export['ID'] = $g['ID'] ?? 0;
+
+        acf_write_json_field_group( $export );
     }
 
     flock( $lock, LOCK_UN );

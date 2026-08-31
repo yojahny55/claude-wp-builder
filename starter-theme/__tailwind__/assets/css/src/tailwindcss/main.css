@@ -1,6 +1,14 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Tailwind v4 auto-discovers sources by walking UP from this stylesheet to the
+   nearest git root. In a WordPress install the theme is buried under
+   wp-content/themes/, so that walk usually stops short of the theme's PHP and
+   every utility in the markup compiles to nothing — silently. Declare the
+   template roots explicitly instead of relying on the walk. */
+@source "../../../../**/*.php";
+@source "../../../js/src/**/*.js";
+
 @theme {
   /* Colors — replaced by wp-init during demo-first injection */
   --color-primary: #3b82f6;

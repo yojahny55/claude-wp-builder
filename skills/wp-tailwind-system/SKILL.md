@@ -167,6 +167,76 @@ answer to each is wrong in a way that still compiles:
   the demo named one property and `ease`, keep both:
   `transition-[background-color] duration-200 ease-[ease]`.
 
+## Arbitrary variants fail silently — four ways
+
+Everything in this section compiles without an error and produces markup that
+looks almost right. Assume none of it works until you have seen the selector in
+the built CSS.
+
+### `_` inside an arbitrary variant is an escaped SPACE
+
+Tailwind reads `_` in `[...]` as a space, so a BEM class written literally turns
+into a descendant combinator that matches nothing:
+
+| Written | Compiles to | Matches |
+|---|---|---|
+| `[&.pager__page--current]:bg-brown` | `.pager page--current` | nothing |
+| `group-[.menu__item--current]/m:font-bold` | `.menu item--current` | nothing |
+| `has-[.select__field:focus]:ring` | `.select field:focus` | nothing |
+
+Escape both underscores: `[&.pager\_\_page--current]:bg-brown`.
+
+This is the single most expensive defect in this plugin's history — one project
+shipped 22 of them, and three were focus indicators that had **never once
+appeared**, an accessibility hole rather than a cosmetic one. Any BEM demo
+converted to Tailwind will produce them by the dozen. Never fix one instance;
+sweep the whole theme for the pattern (see **Verify**).
+
+### Quotes inside an arbitrary variant truncate the class
+
+`has-[[aria-expanded="true"]]:bg-primary` sits inside `class="…"`, so the HTML
+parser — and Tailwind's scanner — see the class end at the first inner `"`. The
+rule is emitted for a class that never existed. An attribute selector takes an
+unquoted identifier: `has-[[aria-expanded=true]]:bg-primary`.
+
+### Unlayered CSS beats `@layer utilities`
+
+In v4 every utility lives in `@layer utilities`, and **unlayered CSS wins over
+any layer** regardless of specificity. A base rule imported outside a layer
+therefore overrides the markup: `a{text-decoration:none}` beats
+`hover:underline`, `.icon-*{width:1em}` beats `size-*`, a body `letter-spacing`
+beats `tracking-*`. Import the theme's own base and component files INTO a
+cascade layer. The same rule explains third-party plugin stylesheets (Contact
+Form 7, Newsletter): they are unlayered, so they beat every theme rule no matter
+how specific — dequeue and reproduce, do not try to out-specify them.
+
+The exception is a document-level at-rule such as `@view-transition`, which is
+not a style rule and has no business in the cascade: import it unlayered.
+
+### Tailwind must be told where the templates are
+
+v4 discovers sources by walking up from the stylesheet to the nearest git root.
+A WordPress theme sits under `wp-content/themes/`, so that walk routinely stops
+short of the theme's PHP and **every utility in the markup compiles to nothing**.
+The starter's `main.css` declares `@source` explicitly. If you move the
+stylesheet, move the `@source` paths with it.
+
+## Fixed dimensions break in the second language
+
+A demo is drawn in one language. `h-[29.25rem]` on a card, `w-[10.9375rem]` on a
+button, `w-[218px]` on a pill: each is exactly right in the source language and
+clips or strands whitespace in the other. In a bilingual theme:
+
+- a box that contains text gets **`min-h-`**, never `h-` — a short card keeps the
+  approved height, a long one grows;
+- a control sized to its label gets **`w-fit`** plus a `min-w-` at the design's
+  width — the source language lands on the frame to the pixel, a longer label
+  pushes past it;
+- a free-text ACF value never gets a fixed box at all.
+
+Check every fixed dimension against the longest string the field can hold before
+the second language exists, not after.
+
 ## `.btn` is already taken
 
 The starter ships `components/buttons.css` with its own `.btn`, and a demo's
@@ -195,6 +265,12 @@ Read `components/buttons.css` before writing any button class.
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/bin/tailwind-native-check.sh" <theme-dir>
+
+# Unescaped BEM underscores inside arbitrary variants — must print nothing.
+grep -rnE '\[[^]"]*[a-z0-9]__[a-z]' --include='*.php' <theme-dir>
+
+# Quotes inside an arbitrary variant — must print nothing.
+grep -rn '\[\[[a-z-]*=\"' --include='*.php' <theme-dir>
 ```
 
 The script ships with the plugin and the working directory is the user's project,
