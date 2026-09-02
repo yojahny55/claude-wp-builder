@@ -105,15 +105,25 @@ done
 # 5. A behavior change needs a CHANGELOG entry. Contracts live in prose, so the
 #    changelog is the only record of what a release actually changed.
 # ---------------------------------------------------------------------------
-if git rev-parse --verify --quiet "$base" >/dev/null 2>&1; then
-  changed=$(git diff --name-only "$base"...HEAD -- commands/ agents/ skills/ starter-theme/ bin/ 2>/dev/null || true)
-  if [ -n "$changed" ]; then
-    if ! git diff --name-only "$base"...HEAD -- CHANGELOG.md | grep -q .; then
-      err "commands/agents/skills/starter-theme/bin changed since $base but CHANGELOG.md did not — add an [Unreleased] entry"
-    fi
-  fi
-else
+# `|| true` on the diff would turn a FAILED diff into "nothing changed" and skip the
+# rule silently — a shallow clone with no merge-base looks identical to a clean tree.
+# Distinguish the three states: no base (skip, say so), diff failed (report), diff
+# succeeded (evaluate).
+if ! git rev-parse --verify --quiet "$base" >/dev/null 2>&1; then
   echo "note: $base does not resolve — skipping the CHANGELOG rule"
+elif ! changed=$(git diff --name-only "$base"...HEAD -- commands/ agents/ skills/ starter-theme/ bin/ 2>/dev/null); then
+  err "could not diff against $base (shallow clone, or no merge base) — the CHANGELOG rule could not be evaluated; re-run with --changelog-base <ref> or fetch more history"
+elif [ -n "$changed" ]; then
+  # Touching the file is not the contract; having an entry is. A whitespace edit to an
+  # old release note satisfied the previous check while the error message asked for an
+  # [Unreleased] entry that was never added.
+  if ! git diff --name-only "$base"...HEAD -- CHANGELOG.md | grep -q .; then
+    err "commands/agents/skills/starter-theme/bin changed since $base but CHANGELOG.md did not — add an [Unreleased] entry"
+  else
+    entries=$(awk '/^## \[Unreleased\]/ { f = 1; next } /^## \[/ { f = 0 } f && /^- / { n++ } END { print n + 0 }' CHANGELOG.md)
+    [ "$entries" -gt 0 ] \
+      || err "CHANGELOG.md changed but its [Unreleased] section has no entries — behavior moved, so describe it there"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -124,42 +134,58 @@ fi
 # nothing fails the pipeline and aborts the script, so a MISSING version would
 # exit silently instead of reporting — the guards below would never run.
 v_plugin=$(grep -oE '"version": "[0-9]+\.[0-9]+\.[0-9]+"' .claude-plugin/plugin.json | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
-mapfile -t v_market < <(grep -oE '"version": "[0-9]+\.[0-9]+\.[0-9]+"' .claude-plugin/marketplace.json | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
 v_badge=$(grep -oE 'version-[0-9]+\.[0-9]+\.[0-9]+-blue' "$README" | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+# `while read` rather than `mapfile`: mapfile is bash 4+, and macOS still ships bash
+# 3.2 as /bin/bash. A gate that aborts on a contributor's machine teaches them to
+# skip it.
+v_market=()
+while IFS= read -r v; do
+  [ -n "$v" ] && v_market+=("$v")
+done < <(grep -oE '"version": "[0-9]+\.[0-9]+\.[0-9]+"' .claude-plugin/marketplace.json | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
 
 [ -n "$v_plugin" ] || err ".claude-plugin/plugin.json has no version"
 [ "${#v_market[@]}" -eq 2 ] || err ".claude-plugin/marketplace.json should state the version twice, found ${#v_market[@]}"
 [ -n "$v_badge" ] || err "$README has no version badge"
-for v in "${v_market[@]}" "$v_badge"; do
-  [ "$v" = "$v_plugin" ] \
-    || err "version mismatch: plugin.json says $v_plugin, another reference says $v — all four must match"
-done
+# Compare only when every reference was found: expanding an empty array under `set -u`
+# aborts on bash 4.2 and older, which would swallow the reports just made above.
+if [ -n "$v_plugin" ] && [ "${#v_market[@]}" -eq 2 ] && [ -n "$v_badge" ]; then
+  for v in "${v_market[@]}" "$v_badge"; do
+    [ "$v" = "$v_plugin" ] \
+      || err "version mismatch: plugin.json says $v_plugin, another reference says $v — all four must match"
+  done
+fi
 
 # ---------------------------------------------------------------------------
 # 7. Frontmatter contracts, per layer. These are what the loader reads; a file
 #    missing them is inert rather than broken, which is why it goes unnoticed.
 # ---------------------------------------------------------------------------
+# `awk NR<=N` rather than `head -N | grep -q`: under `set -o pipefail`, grep -q can exit
+# on its match before head finishes writing, head takes SIGPIPE, and the pipeline reports
+# 141 — a FALSE failure on a file whose frontmatter is correct.
+fm() {  # file, regex, lines-to-scan
+  awk -v re="$2" -v n="${3:-8}" 'NR <= n && $0 ~ re { found = 1 } END { exit !found }' "$1"
+}
 for f in commands/*.md; do
-  head -8 "$f" | grep -q '^description:' || err "$f has no description in its frontmatter"
+  fm "$f" '^description:' || err "$f has no description in its frontmatter"
   # The five cinematic commands follow the kit's own frontmatter shape (`name:` plus
   # an `arguments:` block) rather than the plugin's, so allowed-tools is required
   # only of the standard shape. `argument-hint` is deliberately NOT required: a
   # command that takes no arguments (/wp-finalize) legitimately has none, and there
   # is no way to tell those apart from prose.
-  if ! head -8 "$f" | grep -q '^name:'; then
-    head -8 "$f" | grep -q '^allowed-tools:' || err "$f has no allowed-tools in its frontmatter"
+  if ! fm "$f" '^name:'; then
+    fm "$f" '^allowed-tools:' || err "$f has no allowed-tools in its frontmatter"
   fi
 done
 for f in agents/*.md; do
   for key in name description tools model; do
-    head -12 "$f" | grep -q "^$key:" \
+    fm "$f" "^$key:" 12 \
       || err "$f has no $key in its frontmatter (model is the cost tier — see tests/checks/model-routing.sh)"
   done
 done
 for f in skills/*/SKILL.md; do
   # The contract is the VALUE, not the key: a skill declaring `user-invocable: true`
   # is a skill that acts, which is the one thing the layer rules forbid.
-  head -8 "$f" | grep -q '^user-invocable: false' \
+  fm "$f" '^user-invocable: false' \
     || err "$f does not declare user-invocable: false"
 done
 

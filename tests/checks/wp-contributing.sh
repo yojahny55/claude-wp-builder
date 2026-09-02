@@ -19,11 +19,11 @@ for f in "$s" "$c" "$d"; do [ -f "$f" ] || fail "$f is missing"; done
 # ---------------------------------------------------------------------------
 # 1. Frontmatter — the loader contract each layer's own docs must satisfy.
 # ---------------------------------------------------------------------------
-head -8 "$s" | grep -q '^user-invocable: false' \
+awk 'NR<=8 && /^user-invocable: false/ { f = 1 } END { exit !f }' "$s" \
   || fail "$s does not declare user-invocable: false — a skill that reads as invocable invites the 'skills act' mistake it warns against"
-head -8 "$s" | grep -q '^trigger:' \
+awk 'NR<=8 && /^trigger:/ { f = 1 } END { exit !f }' "$s" \
   || fail "$s has no trigger, so it never auto-loads and a contributor never sees it"
-head -8 "$c" | grep -q '^argument-hint:' || fail "$c has no argument-hint"
+awk 'NR<=8 && /^argument-hint:/ { f = 1 } END { exit !f }' "$c" || fail "$c has no argument-hint"
 
 # ---------------------------------------------------------------------------
 # 2. The layer rule. "Dispatch, never reimplement" is the single most expensive
@@ -58,7 +58,8 @@ grep -Eqi 'options' "$s" || fail "$s omits the options-page crossover, the one p
 grep -Eqi 'do not bump|never bump|no version bump' "$s" \
   || fail "$s does not tell contributors to leave the version alone"
 grep -Fq 'marketplace.json' "$s" || fail "$s does not name every file holding the version"
-grep -Eqi 'four' "$s" || fail "$s does not say how many places state the version"
+grep -Eqi 'four (files|version references|places)|all four' "$s" \
+  || fail "$s does not say how many places state the version"
 grep -Eqi 'do not bump|no version bump' "$c" \
   || fail "$c does not gate the version bump to the release path"
 
@@ -115,6 +116,10 @@ for layer in 'skill $sk' 'agent $a'; do
   grep -Fq "in_table_row \"\$README\" \"${layer##* }\"" "$d" \
     || fail "$d checks ${layer%% *}s with something other than the table-row matcher — the prose loophole is open for that layer"
 done
+grep -Fq 'Unreleased' "$d" \
+  || fail "$d accepts a touched CHANGELOG again — a whitespace edit to an old release note is not an [Unreleased] entry"
+! grep -Eq '^[[:space:]]*mapfile ' "$d" \
+  || fail "$d calls mapfile, which is bash 4+; macOS ships bash 3.2 and the gate would abort there"
 grep -Eq 'awk -F.\|' "$d" \
   || fail "$d no longer matches on the first cell of a table row; a name appearing in some other row's description cell would count as documented"
 grep -Fq '|| true' "$d" \
