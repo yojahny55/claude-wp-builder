@@ -13,7 +13,7 @@
 
 A Claude Code plugin that turns approved demo HTML into a complete WordPress theme — section by section, with ACF/SCF fields, bilingual support, SEO, and security — all from the command line.
 
-[Quick Start](#installation) | [Commands](#commands-reference) | [Architecture](#architecture) | [Cinematic Mode](docs/cinematic-mode.md) | [Contributing](CONTRIBUTING.md) | [Backlog](BACKLOG.md)
+[Quick Start](#installation) | [Workflows](docs/workflows.md) | [Commands](docs/commands.md) | [Architecture](#architecture) | [Cinematic Mode](docs/cinematic-mode.md) | [Contributing](CONTRIBUTING.md) | [Backlog](BACKLOG.md)
 
 </div>
 
@@ -21,13 +21,20 @@ A Claude Code plugin that turns approved demo HTML into a complete WordPress the
 
 ### How It Works
 
+Two setup commands, then one of three build paths, then the same finishing checks:
+
 ```
-/wp-create  →  /wp-demo  →  /wp-init  →  /wp-header  →  /wp-section hero  →  /wp-seed  →  /wp-audit  →  /wp-finalize
-     ↓             ↓            ↓              ↓                ↓                 ↓             ↓              ↓
-  WordPress    Demo HTML    Scaffold      header.php     ACF fields +      Populate      Security,       Pre-delivery
-  + database   for client   theme +       + nav CSS +    template +        all fields    SEO, a11y,      validation
-  + server     approval     CLAUDE.md     ACF fields     section CSS       from demo     performance     checklist
+SETUP    /wp-create (optional)  →  /wp-init  →  /wp-context (optional, auto when docs/ exists)
+                                       │
+BUILD    A. /wp-yolo <demo-folder>     — full multi-page HTML demo → whole theme in one pass
+         B. /wp-demo|/wp-polish → /wp-header → /wp-footer → /wp-section … → /wp-page … → /wp-seed
+         C. /wp-cinematic-init → -demo → -encode → -scene → -seed   (scroll-driven video reel)
+                                       │
+FINISH   /wp-finalize  →  /wp-responsive-check  →  /wp-audit (optional)
 ```
+
+Path A runs every command in path B for you. Full walkthrough of each path, with what is
+required, optional or automatic: **[docs/workflows.md](docs/workflows.md)**.
 
 ## Installation
 
@@ -75,227 +82,96 @@ Add to your project's `.claude/settings.json` so all collaborators get it automa
 
 ## Workflow
 
-### 0. Set up the local environment (optional)
+### Setup (every path)
 
 ```
-/wp-create --path=/var/www/html/my-project
+/wp-create --path=/var/www/html/my-project   # optional: local WordPress + .wp-create.json (needed later by /wp-seed)
+/wp-init                                     # required: asks template (tailwind|cinematic), fields plugin (scf|acf),
+                                             #           i18n strategy (suffix|polylang) — recorded in .claude/CLAUDE.md
+/wp-context                                  # optional: reads docs/ (scope sheets, design PDF) → constraints + scope manifest.
+                                             #           /wp-init runs it automatically when docs/ exists
 ```
 
-Detects available tools (Docker, DDEV, Lando, Nginx, Apache, Caddy, PHP versions), lets you choose your environment, then downloads WordPress, creates the database, configures the web server, installs plugins, and generates a `.wp-create.json` manifest. Supports adopting existing WordPress installs.
-
-### 1. Scaffold the project
+### Path A — full demo folder in one pass
 
 ```
-/wp-init
+/wp-yolo ./demo-folder            # checkpoint after normalization, then hands-off
+/wp-yolo ./demo-folder --yolo     # no checkpoint
+/wp-yolo ./demo-folder --careful  # confirm each inner page
 ```
 
-Prompts for project name, slug, languages, industry. Copies the starter theme, replaces placeholders, generates `.claude/CLAUDE.md` with project config. When `.wp-create.json` exists, skips redundant questions and activates the theme via WP-CLI.
+Normalizes every page, reconciles it against `docs/.scope-manifest.json` (IDX/plugin pages
+become embed shells, out-of-scope pages are skipped), then drives `/wp-settings` → `/wp-cpt`
+→ `/wp-header` → `/wp-footer` → `/wp-section --transcribe` per section → `/wp-seed` →
+`/wp-finalize` → `/wp-polish` → `/wp-responsive-check`, and finishes with a demo-parity
+gate that auto-fixes mechanical drift and blocks on anything it cannot fix. You run nothing
+else.
 
-### 1b. Gather project scope from `docs/`
-
-If the project has a `docs/` folder with client documents, `/wp-init` automatically runs
-`/wp-context` to read them. You can also run it (or re-run it after docs change) manually:
-
-```
-/wp-context            # reads ./docs
-/wp-context path/to/docs
-```
-
-**What to put in `docs/`** — any mix of: scope spreadsheets (`.xlsx` / `.ods`), the design
-package (`.pdf`), estimate/scope notes (`.md`), emails, and link lists (`.txt`). Example:
-a "Pages in scope / Design provided" table, an IDX provider requirement, and hosting/forms/SEO
-constraints.
-
-**What it produces** — two artifacts consumed by the rest of the pipeline:
-
-1. A `## Project Constraints` section written into `.claude/CLAUDE.md` (integrations, forms,
-   SEO, hosting, responsive/migration notes) — every later command reads it as guidance.
-2. `docs/.scope-manifest.json` — a structured page list where each page is tagged
-   `inScope`, `designProvided`, `approved`, and `delivery` = `theme | idx | plugin`.
-
-**How it drives the build** — when you later run `/wp-yolo`, scope governs *what* and *how*,
-the demo fills *content*:
-
-| Scope says | `/wp-yolo` does |
-|------------|-----------------|
-| in-scope, `delivery: theme`, has demo HTML | builds the page normally |
-| in-scope, `delivery: idx` or `plugin` | builds a styled **shell** (`/wp-page embed`) with a marked insertion point for the provider's shortcode (e.g. Showcase IDX) — not a normal template |
-| in-scope but no demo HTML | reports "approved/designed but no HTML — needs demo" |
-| in the demo but not in scope | skips it and notes it |
-
-Re-run `/wp-context` any time the client updates the scope or design docs — it replaces the
-constraints block and overwrites the manifest idempotently.
-
-### 2. Create the demo
+### Path B — step by step
 
 ```
-/wp-demo
+/wp-demo                          # generate demo/index.html from a brief   ┐ one of the two
+/wp-polish path/to/mockup.html    # or normalize an existing mockup          ┘
+/wp-header                        # required
+/wp-footer                        # required
+/wp-section hero                  # required, once per demo section
+/wp-section contact               # contact* names wire Contact Form 7 automatically
+/wp-page blog|legal|404|search|generic|custom <name>|embed <name>   # optional
+/wp-cpt team                      # optional; before any section that lists that type
+/wp-settings "add a newsletter URL"   # optional
+/wp-seed                          # fills pages, media, fields, menus (needs .wp-create.json)
 ```
 
-Generates a responsive HTML demo (`demo/index.html`) for client approval. Uses `frontend-design` and `ui-ux-pro-max` skills for design quality. Sections are clearly separated with comments for easy WordPress conversion.
+### Path C — cinematic
+
+`/wp-cinematic-init` → `/wp-cinematic-demo` → `/wp-cinematic-encode` per video →
+`/wp-cinematic-scene` per scene → `/wp-cinematic-seed`. See [docs/cinematic-mode.md](docs/cinematic-mode.md).
+
+### Finish (every path)
 
 ```
-/wp-demo iterate
+/wp-finalize                              # pre-delivery report (never fixes)
+/wp-responsive-check http://localhost/site   # 5 viewports
+/wp-audit [--security --seo --a11y --performance --best-practices] [--report-only]
+/wp-polylang es en                        # only when i18n strategy is polylang
 ```
 
-Re-read existing demo and iterate on changes.
+### Polishing an existing demo
 
-### 2b. Or polish an existing demo
-
-```
-/wp-polish path/to/existing-mockup.html
-```
-
-Normalizes any HTML file into a plugin-compatible demo: detects sections, adds section delimiters, normalizes semantic HTML5, adds BEM class naming. Preserves an unpolished copy of the source document at `demo/.prepolish/<source-filename>`, and never overwrites a copy already there.
-
-```
-/wp-polish
-```
-
-Polish the existing `demo/index.html` in place.
-
-### 3. Build header and footer
-
-```
-/wp-header
-/wp-footer
-```
-
-Each reads the demo, dispatches specialized agents (`wp-template`, `wp-css`, `wp-acf`) to generate:
-- Template files (`header.php`, `footer.php`)
-- Navigation walker and menu registration
-- CSS styles
-- ACF fields added to the **Header** and **Footer** tabs in the settings page
-
-### 4. Build sections
-
-Build sections one at a time:
-
-```
-/wp-section hero
-/wp-section services
-/wp-section values
-/wp-section contact
-```
-
-**Or, build the entire site from an existing HTML demo in one pass:**
-
-```
-/wp-yolo /path/to/demo-folder
-```
-
-`/wp-yolo` **transcribes** the demo rather than re-deriving it — copying its exact colors,
-heights, gaps, CSS backgrounds, and self-hosted fonts verbatim (no "best-practice" edits that
-drift from the design) — and assigns each section a unique CSS block so parallel builds can't
-collide. Before it reports done it runs a **demo-parity gate** (static + WP-CLI + measured
-visual diff via the claude-in-chrome extension), auto-fixes mechanical divergences, and
-**blocks** on anything it can't safely fix — so a broken build fails loudly instead of shipping
-silently.
-
-Each command generates three files in parallel:
-- `fields/<section>.php` — ACF field definitions with bilingual support
-- `template-parts/section-<name>.php` — PHP template consuming those fields
-- CSS block appended to `styles.css`
-
-Provide a screenshot for visual reference:
-
-```
-/wp-section hero /path/to/screenshot.png
-```
-
-**CF7 Contact Forms:** Sections named `contact`, `contact-us`, `contacto`, or `get-in-touch` automatically integrate Contact Form 7. Use the `--cf7` flag to force integration for other sections. Generates CF7 forms with branded email templates per language, creates forms via WP-CLI with IDs injected into templates, and saves reference files to `cf7/`.
-
-### 5. Add page templates
-
-```
-/wp-page blog       # archive.php, single.php, post card components
-/wp-page legal       # Privacy policy + terms templates with ACF fields
-/wp-page 404         # Custom 404 page
-/wp-page generic     # Basic content page template
-/wp-page custom pricing   # Custom named page template
-```
-
-### 6. Extend settings
-
-```
-/wp-settings Add a Google Calendar embed field and a newsletter signup URL
-```
-
-Adds fields to the settings page with automatic bilingual variants.
-
-### 7. Validate
-
-```
-/wp-responsive-check http://localhost/mysite
-```
-
-Screenshots at 5 viewports (375px, 576px, 768px, 1024px, 1440px) and checks for layout issues.
-
-```
-/wp-finalize
-```
-
-Pre-delivery checklist: validates escaping, bilingual coverage, responsive breakpoints, menu registration, theme structure, and more. When `.wp-create.json` exists, adds WP-CLI runtime checks (pages, menus, ACF fields, plugins).
-
-### 8. Seed content from demo
-
-```
-/wp-seed demo/index.html
-```
-
-Parses demo HTML, imports media, populates all ACF fields (primary + bilingual), creates pages, menus, and sets the front page. Zero manual wp-admin entry needed.
-
-### 9. Audit & auto-fix
-
-```
-/wp-audit
-```
-
-Run comprehensive audits and auto-fix issues (security, SEO, accessibility, performance, best practices).
-
-### 10. Debug issues
-
-```
-/wp-debug white screen
-```
-
-Runs comprehensive diagnostics via WP-CLI (health, plugins, DB, config, filesystem) and offers targeted fixes. Keyword-aware: adapts checks based on the issue description.
-
-### 11. Clone a remote site
-
-```
-/wp-clone --from=ssh://user@staging.example.com/path --to=/var/www/html/local
-```
-
-Clones a remote/staging WordPress site to local dev. Supports SSH automated mode and manual SQL dump + uploads import.
+`/wp-polish` normalizes any HTML into a plugin-compatible demo: detects sections, adds
+section delimiters, semantic HTML5 and BEM classes. It preserves an unpolished copy of the
+source document at `demo/.prepolish/<source-filename>` and never overwrites a copy already there.
 
 ## Commands Reference
 
-| Command | Description |
-|---------|-------------|
-| `/wp-init` | Scaffold new project from starter theme |
-| `/wp-context` | Extract scope manifest from `docs/` folder and update project constraints |
-| `/wp-demo` | Create demo HTML for client approval |
-| `/wp-polish [path]` | Normalize external HTML into plugin-compatible demo |
-| `/wp-header` | Build header with nav, logo, language switcher |
-| `/wp-footer` | Build footer from settings page fields |
-| `/wp-section <name>` | One-shot section: ACF fields + template + CSS |
-| `/wp-page <type>` | Page template generator (blog, legal, 404, generic, custom, search, embed) |
-| `/wp-cpt <name>` | Custom post type builder — generates fields, archive, single, seed helper |
-| `/wp-yolo <demo-folder>` | Convert complete demo folder to WordPress theme in one pass |
-| `/wp-tailwindify [path]` | Convert a demo's CSS classes to Tailwind utilities (run automatically by `/wp-init` and `/wp-yolo` Step 2.6) |
-| `/wp-tailwind-migrate` | Convert an already-built plain-CSS theme to Tailwind-native, in place |
-| `/wp-settings` | Extend the settings page with new fields |
-| `/wp-responsive-check` | Responsive validation at 5 viewports |
-| `/wp-finalize` | Pre-delivery validation checklist |
-| `/wp-create` | Set up complete WordPress local dev environment |
-| `/wp-seed` | Seed content from demo HTML with bilingual support |
-| `/wp-audit` | Comprehensive audit — security, SEO, accessibility, performance, best practices |
-| `/wp-debug` | Diagnose WordPress issues with WP-CLI |
-| `/wp-clone` | Clone remote/staging site to local dev |
-| `/wp-robin` | Fix Robin Image Optimizer — installs, configures, unsticks bulk optimization, generates missing .webp files |
-| `/wp-aos-animator` | Install AOS scroll animations — audits, enqueues, initializes, and seeds animations across all PHP templates |
-| `/wp-polylang` | Translate an existing site into a second language using Polylang |
+Full arguments, inputs and outputs per command: **[docs/commands.md](docs/commands.md)**.
+
+| Command | Path | Required? | Description |
+|---------|------|-----------|-------------|
+| `/wp-create` | all | optional* | Local WordPress environment + `.wp-create.json` |
+| `/wp-init` | all | required | Scaffold theme, record template / fields plugin / i18n choices |
+| `/wp-context [docs]` | all | auto | Scope + constraints from `docs/` |
+| `/wp-yolo <folder>` | A | required | Whole demo folder → theme, seeded and verified |
+| `/wp-demo [brief\|iterate]` | B | one of two | Generate demo HTML |
+| `/wp-polish [path]` | B | one of two | Normalize existing HTML into a demo |
+| `/wp-tailwindify [path]` | A, B | auto | Demo CSS → Tailwind utilities (run by `/wp-init`, `/wp-yolo`) |
+| `/wp-header` / `/wp-footer` | B | required | `header.php` / `footer.php` + settings fields |
+| `/wp-section <name> [--hybrid]` | B, C | required per section | ACF fields + template part + CSS; `--hybrid` = trailing section after a cinematic reel |
+| `/wp-page <type> [name]` | B | optional | blog, legal, 404, search, generic, custom, embed |
+| `/wp-cpt <name>` | B | optional | Custom post type + fields + archive/single + seeder |
+| `/wp-settings <text>` | B | optional | Extend the settings page |
+| `/wp-seed [file]` | B | required for content | Pages, media, fields, menus from the demo |
+| `/wp-finalize` | all | recommended | Pre-delivery checklist |
+| `/wp-responsive-check <url>` | all | recommended | 5-viewport layout check |
+| `/wp-audit [flags]` | all | optional | Security, SEO, a11y, performance, best practices |
+| `/wp-polylang <src> <dst>` | all | polylang only | Translate the site through Polylang |
+| `/wp-tailwind-migrate <theme>` | legacy | optional | Plain-CSS theme → Tailwind in place |
+| `/wp-cinematic-init` `-demo` `-encode` `-scene` `-seed` | C | required | Cinematic scaffold, demo, encoding, scenes, seeding |
+| `/wp-debug [issue]` | utility | — | WP-CLI diagnostics and fixes |
+| `/wp-clone --from --to` | utility | — | Clone a remote site locally |
+
+\* Optional if WordPress is already running: without `.wp-create.json`, `/wp-seed` and `/wp-debug` fall back to a bare `wp` on PATH and the languages in `.claude/CLAUDE.md`.
+`wp-robin` and `wp-aos-animator` are skills, not commands — ask for them in plain language.
 
 ## Architecture
 
@@ -421,9 +297,9 @@ The `/wp-audit` command runs a comprehensive audit across 5 categories and offer
 
 - **WordPress** legacy theme (no blocks, no FSE)
 - **ACF/SCF** for custom fields (programmatic, one file per section)
-- **Vanilla CSS** with custom properties + BEM (no build tools)
-- **Vanilla JS** (no frameworks)
-- **Bilingual** via field suffix pattern (supports N languages, optimized for EN/ES)
+- **Tailwind CSS 4** starter (`@wordpress/scripts` build, BEM blocks for sections) — a plain-CSS `basic` path remains for older themes
+- **Vanilla JS** (no frameworks); the cinematic starter adds the `cinematic-scroll-kit` scroll engine
+- **Bilingual** via field suffixes (default) or Polylang (opt-in at `/wp-init`)
 
 ## External Dependencies
 

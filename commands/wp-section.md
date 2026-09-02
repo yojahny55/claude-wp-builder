@@ -1,7 +1,7 @@
 ---
 description: One-shot section builder — generates ACF fields + template part + CSS for a section from the demo
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
-argument-hint: "<section-name> [screenshot-path] [--cf7] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>]"
+argument-hint: "<section-name> [screenshot-path] [--cf7] [--hybrid] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>]"
 ---
 
 # WP Section — One-Shot Section Builder
@@ -14,6 +14,7 @@ Parse `$ARGUMENTS`:
 - **First word** = section name (required, e.g., `hero`, `services`, `about`, `contact`)
 - **Remaining non-flag word** = screenshot path (optional; a flag token or its value is never treated as the screenshot path)
 - **`--cf7` flag** = force CF7 contact form integration (optional)
+- **`--hybrid` flag** = cinematic projects only (`Template: cinematic`): build the section as a **trailing flex layout** appended to the `trailing_sections` flexible-content field in `fields/trailing-sections.php`, not as a standalone field group, and skip the page-template injection — `front-page.php`'s trailing loop already renders every layout (see the Hybrid overlay below). Error and exit if the project is not cinematic.
 - **`--page <slug>`** = read the section from `demo/<slug>.html` instead of `demo/index.html` (optional, **default `index`** — existing behavior unchanged when omitted)
 - **`--target <template>`** = inject the `get_template_part` call into `<template>` (e.g. `page-about.php`) instead of `front-page.php` (optional, **default `front-page.php`** — existing behavior unchanged when omitted)
 - **`--transcribe` flag** = activate **faithful Transcription Mode** (optional). When set, the dispatched agents reproduce the demo's exact declared CSS/geometry instead of re-authoring fresh design-system styles. When omitted, behavior is unchanged (the current re-authoring / design-system path).
@@ -27,12 +28,13 @@ Parse `$ARGUMENTS`:
 If no section name is provided, print an error:
 ```
 Error: Section name is required.
-Usage: /wp-section <section-name> [screenshot-path] [--cf7] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>]
+Usage: /wp-section <section-name> [screenshot-path] [--cf7] [--hybrid] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>]
 Example: /wp-section hero
          /wp-section services /path/to/screenshot.png
          /wp-section contact --cf7
          /wp-section about-story --page about --target page-about.php
          /wp-section hero --transcribe --block home-hero --css demo/index.css
+         /wp-section pricing --hybrid
 ```
 
 ## Step 2: Read Project Context
@@ -42,6 +44,35 @@ Read `.claude/CLAUDE.md` to extract:
 - **Theme slug**
 - **Languages** (primary + secondary — needed for bilingual field variants)
 - **Theme directory path**
+
+### Hybrid overlay (`--hybrid`)
+
+Read `Template:` from `.claude/CLAUDE.md`. If `--hybrid` is set and the template is not
+`cinematic`, stop:
+```
+Error: --hybrid is only valid on a cinematic project (Template: cinematic). Use /wp-section <name> without it.
+```
+If the template is `cinematic` and `--hybrid` is **absent**, warn once and continue as if it
+were set — a cinematic front page has no `<main>` section list to inject into, so a
+standalone section there would never render.
+
+Under `--hybrid`, four things change and nothing else does:
+
+1. **Fields** — `wp-acf` does not write `fields/<section>.php`. It appends one flexible-content
+   **layout** named `<section>` (label `<Section Name>`) to the `trailing_sections` field in
+   `fields/trailing-sections.php`, carrying the section's sub-fields under the normal
+   `<section>_<element>` / `field_<section>_<element>` naming. If that file does not exist yet
+   (init ran with `--no-hybrid`), create it with the `trailing_sections` flexible-content field
+   attached to the front page, then add the layout.
+2. **Template** — `template-parts/section-<section>.php` is rendered from inside the trailing
+   `have_rows()` loop (see `starter-theme/__cinematic__/front-page.php`), so it reads its values
+   with `get_sub_field('<field>')` — appending `_<lang>` for the secondary language the same way
+   `prefix_get_field()` does — never `prefix_get_field()` / `get_field()`, which would resolve
+   against the page, not the row.
+3. **CSS** — the cinematic starter has no `assets/css/styles.css`; the CSS agent appends the
+   section block to `assets/css/cinematic.css` under `/* ====== Section: <Name> ====== */`.
+4. **Injection** — skip Step 6 entirely. The layout renders because the loop maps every
+   `get_row_layout()` to `template-parts/section-<layout>.php`. Ignore `--target` if given.
 
 ## Step 3: Read Demo Section
 
@@ -413,6 +444,8 @@ mode with Agent 3's prompt from the non-contact block above, naming
 — `wp-css` already ran in Phase 1.
 
 ## Step 6: Add to Page Template
+
+**Skip this step under `--hybrid`** — the trailing loop in `front-page.php` renders the layout.
 
 After all agents complete, check if the resolved target page template (the `--target` value, default `front-page.php`) already includes this section:
 

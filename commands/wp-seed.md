@@ -23,8 +23,13 @@ Extract and store:
 - **Project slug** — `project.slug`
 - **Project path** — `project.path`
 
-If `.wp-create.json` does not exist, abort with:
-> "No `.wp-create.json` found. Run `/wp-create` first to set up the WordPress environment."
+If `.wp-create.json` does not exist, fall back the same way `/wp-debug` does:
+- Check if bare `wp` is available: `bash -c "which wp"`
+- If available, set `$WP` to `wp` (assume the current directory is the WordPress root) and
+  take the languages from the `Languages:` line of `.claude/CLAUDE.md` instead (first =
+  primary, the rest = additional).
+- If `wp` is not available either, abort with:
+  > "No `.wp-create.json` found and no `wp` on PATH. Run `/wp-create` to set up the WordPress environment, or install WP-CLI."
 
 Verify WP-CLI connectivity before proceeding:
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **`/wp-section --hybrid`** now exists. `/wp-init`, `/wp-cinematic-init` and
+  `docs/cinematic-mode.md` had been pointing users at the flag while
+  `commands/wp-section.md` never parsed it. It appends a layout to the `trailing_sections`
+  flex field, renders via `get_sub_field()`, writes CSS to `cinematic.css` and skips page
+  injection; refused on non-cinematic projects. `tests/checks/wp-section-hybrid.sh` guards it.
+- **`/wp-seed` works without `.wp-create.json`** — falls back to bare `wp` and the
+  `Languages:` line of `.claude/CLAUDE.md`, matching `/wp-debug`. `tests/checks/wp-seed-fallback.sh`.
+
+### Changed
+- README "Tech Stack" no longer claims vanilla CSS / no build tools; it names the Tailwind
+  starter, the cinematic starter and the suffix-or-Polylang i18n choice.
+- **Docs restructured around the three build paths.** README now opens with the
+  setup → path A (`/wp-yolo`) / B (step by step) / C (cinematic) → finish shape and a
+  command table that marks each command required / optional / auto. Long-form guides moved
+  to `docs/workflows.md` (per-path how-to, `/wp-init` choices, i18n systems, shared files)
+  and `docs/commands.md` (arguments, inputs, outputs per command). Removed the phantom
+  `/wp-robin` and `/wp-aos-animator` command rows — they are skills, not slash commands.
+
 ## [1.9.0] - 2026-08-29
 
 ### Added
