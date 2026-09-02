@@ -107,6 +107,16 @@ grep -Eq 'for doc in .\$README. .\$DOCS.' "$d" \
   || fail "$d scans only one file for phantom command rows; a phantom row in the reference is as misleading as one in the README"
 grep -Fq 'in_table_row' "$d" \
   || fail "$d matches documentation anywhere in the file again — a prose mention would satisfy it, leaving the command out of every table a reader scans"
+# The prose loophole is only closed if EVERY layer uses the row matcher. Skills and
+# agents were left on a whole-file grep in the first pass, and the README discusses
+# wp-robin and wp-aos-animator in prose outside the skills table — so their rows
+# could be deleted and the gate still passed.
+for layer in 'skill $sk' 'agent $a'; do
+  grep -Fq "in_table_row \"\$README\" \"${layer##* }\"" "$d" \
+    || fail "$d checks ${layer%% *}s with something other than the table-row matcher — the prose loophole is open for that layer"
+done
+grep -Eq 'awk -F.\|' "$d" \
+  || fail "$d no longer matches on the first cell of a table row; a name appearing in some other row's description cell would count as documented"
 grep -Fq '|| true' "$d" \
   || fail "$d extracts versions without '|| true'; under set -euo pipefail a MISSING version aborts the script before it can report"
 grep -Fq 'allowed-tools' "$d" || fail "$d no longer checks command frontmatter beyond description"

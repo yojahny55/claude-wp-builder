@@ -34,13 +34,24 @@ DOCS="docs/commands.md"
 #    grep passes on a sentence like "run /wp-foo after /wp-bar", which leaves the
 #    command absent from every table a reader actually scans.
 # ---------------------------------------------------------------------------
-# A table cell names a command with its flags — `/wp-clone --from --to` — so the
-# name is not followed by a closing backtick. Require instead that the next
-# character is not one a command name could continue with, or /wp-init would be
-# considered documented by a /wp-init-foo row.
+# Documented means "named in the FIRST cell of a table row", for every layer. Two
+# weaker forms were tried and both let real drift through:
+#   - a whole-file grep passes on a prose sentence, so deleting a table row while
+#     leaving a mention elsewhere in the README still passed;
+#   - a whole-line match passes when the name only appears in some other row's
+#     description cell.
+# The first cell is what a reader scans, so that is what is asserted.
+#
+# A cell names a command with its flags — `/wp-clone --from --to` — so the name is
+# not followed by a closing backtick. Require instead that the next character is
+# not one a name could continue with, or /wp-init would count as documented by a
+# /wp-init-foo row, and the wp-css agent by the wp-css-system skill's row.
 NOT_NAME_CHAR='([^a-zA-Z0-9-]|$)'
-in_table_row() {  # file, command name — the name inside a markdown table line
-  grep -Eq "^\|.*\`$2$NOT_NAME_CHAR" "$1"
+in_table_row() {  # file, name — inside the first cell of a markdown table row
+  awk -F'|' -v n="$2" '
+    NF > 2 && $2 ~ ("`" n "([^a-zA-Z0-9-]|$)") { found = 1 }
+    END { exit !found }
+  ' "$1"
 }
 in_section_heading() {
   grep -Eq "^#{2,4} .*\`$2$NOT_NAME_CHAR" "$1"
@@ -70,20 +81,24 @@ for doc in "$README" "$DOCS"; do
 done
 
 # ---------------------------------------------------------------------------
-# 3. Every skill directory appears in the README skills table, and vice versa.
+# 3. Every skill directory is named in the skills table — as a table row, not as
+#    a prose mention. The README discusses wp-robin and wp-aos-animator in prose
+#    outside the table, so a whole-file grep passed even with their rows deleted.
 # ---------------------------------------------------------------------------
 for d in skills/*/; do
-  s=$(basename "$d")
-  [ -f "$d/SKILL.md" ] || { err "skills/$s has no SKILL.md"; continue; }
-  grep -Fq "\`$s\`" "$README" || err "skill $s is not listed in $README's skills table"
+  sk=$(basename "$d")
+  [ -f "$d/SKILL.md" ] || { err "skills/$sk has no SKILL.md"; continue; }
+  in_table_row "$README" "$sk" \
+    || err "skill $sk has no row in $README's skills table (a prose mention does not count)"
 done
 
 # ---------------------------------------------------------------------------
-# 4. Every agent appears in the README agents table.
+# 4. Every agent, same standard.
 # ---------------------------------------------------------------------------
 for f in agents/*.md; do
   a=$(basename "$f" .md)
-  grep -Fq "\`$a\`" "$README" || err "agent $a is not listed in $README's agents table"
+  in_table_row "$README" "$a" \
+    || err "agent $a has no row in $README's agents table (a prose mention does not count)"
 done
 
 # ---------------------------------------------------------------------------
