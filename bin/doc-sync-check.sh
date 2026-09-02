@@ -29,15 +29,28 @@ README="README.md"
 DOCS="docs/commands.md"
 
 # ---------------------------------------------------------------------------
-# 1. Every command file is documented in BOTH tables.
-#    A command nobody can find is the same as a command that does not exist.
+# 1. Every command file is documented in BOTH tables — as a TABLE ROW or (in the
+#    reference) a section heading, never merely as a prose mention. A whole-file
+#    grep passes on a sentence like "run /wp-foo after /wp-bar", which leaves the
+#    command absent from every table a reader actually scans.
 # ---------------------------------------------------------------------------
+# A table cell names a command with its flags — `/wp-clone --from --to` — so the
+# name is not followed by a closing backtick. Require instead that the next
+# character is not one a command name could continue with, or /wp-init would be
+# considered documented by a /wp-init-foo row.
+NOT_NAME_CHAR='([^a-zA-Z0-9-]|$)'
+in_table_row() {  # file, command name — the name inside a markdown table line
+  grep -Eq "^\|.*\`$2$NOT_NAME_CHAR" "$1"
+}
+in_section_heading() {
+  grep -Eq "^#{2,4} .*\`$2$NOT_NAME_CHAR" "$1"
+}
 for f in commands/*.md; do
   name="/$(basename "$f" .md)"
-  grep -Fq "\`$name" "$README" \
-    || err "$name exists in commands/ but no row in $README — add it to the Commands Reference table"
-  grep -Fq "$name" "$DOCS" \
-    || err "$name exists in commands/ but is missing from $DOCS"
+  in_table_row "$README" "$name" \
+    || err "$name exists in commands/ but has no table row in $README (a prose mention does not count)"
+  in_table_row "$DOCS" "$name" || in_section_heading "$DOCS" "$name" \
+    || err "$name exists in commands/ but has no table row or section heading in $DOCS"
 done
 
 # ---------------------------------------------------------------------------
@@ -45,10 +58,15 @@ done
 #    direction. Only `/wp-foo` in a table cell counts: prose may legitimately
 #    mention a command being removed, and a skill name is not a command.
 # ---------------------------------------------------------------------------
-documented=$(grep -oE '^\| `/wp-[a-z0-9-]+' "$README" | sed 's/^| `//' | sort -u)
-for name in $documented; do
-  [ -f "commands/${name#/}.md" ] \
-    || err "$README documents $name as a command, but commands/${name#/}.md does not exist"
+#    Both files are scanned: a phantom row is as misleading in the reference as in
+#    the README. `|| true` because a file with no command rows at all is a
+#    different failure, caught by rule 1 — here it must not abort the run.
+for doc in "$README" "$DOCS"; do
+  documented=$(grep -oE '^\| \[?`/wp-[a-z0-9-]+' "$doc" | grep -oE '/wp-[a-z0-9-]+' | sort -u || true)
+  for name in $documented; do
+    [ -f "commands/${name#/}.md" ] \
+      || err "$doc documents $name as a command, but commands/${name#/}.md does not exist"
+  done
 done
 
 # ---------------------------------------------------------------------------
@@ -87,9 +105,12 @@ fi
 # 6. The version is stated in four places and they must agree. Bumping three of
 #    them ships a plugin whose marketplace entry disagrees with its manifest.
 # ---------------------------------------------------------------------------
-v_plugin=$(grep -oE '"version": "[0-9]+\.[0-9]+\.[0-9]+"' .claude-plugin/plugin.json | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-mapfile -t v_market < <(grep -oE '"version": "[0-9]+\.[0-9]+\.[0-9]+"' .claude-plugin/marketplace.json | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-v_badge=$(grep -oE 'version-[0-9]+\.[0-9]+\.[0-9]+-blue' "$README" | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+# `|| true` on every extraction: under `set -euo pipefail` a grep that matches
+# nothing fails the pipeline and aborts the script, so a MISSING version would
+# exit silently instead of reporting — the guards below would never run.
+v_plugin=$(grep -oE '"version": "[0-9]+\.[0-9]+\.[0-9]+"' .claude-plugin/plugin.json | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+mapfile -t v_market < <(grep -oE '"version": "[0-9]+\.[0-9]+\.[0-9]+"' .claude-plugin/marketplace.json | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+v_badge=$(grep -oE 'version-[0-9]+\.[0-9]+\.[0-9]+-blue' "$README" | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
 
 [ -n "$v_plugin" ] || err ".claude-plugin/plugin.json has no version"
 [ "${#v_market[@]}" -eq 2 ] || err ".claude-plugin/marketplace.json should state the version twice, found ${#v_market[@]}"
@@ -105,13 +126,26 @@ done
 # ---------------------------------------------------------------------------
 for f in commands/*.md; do
   head -8 "$f" | grep -q '^description:' || err "$f has no description in its frontmatter"
+  # The five cinematic commands follow the kit's own frontmatter shape (`name:` plus
+  # an `arguments:` block) rather than the plugin's, so allowed-tools is required
+  # only of the standard shape. `argument-hint` is deliberately NOT required: a
+  # command that takes no arguments (/wp-finalize) legitimately has none, and there
+  # is no way to tell those apart from prose.
+  if ! head -8 "$f" | grep -q '^name:'; then
+    head -8 "$f" | grep -q '^allowed-tools:' || err "$f has no allowed-tools in its frontmatter"
+  fi
 done
 for f in agents/*.md; do
-  head -10 "$f" | grep -q '^name:'  || err "$f has no name in its frontmatter"
-  head -10 "$f" | grep -q '^model:' || err "$f declares no model: cost tier (see tests/checks/model-routing.sh)"
+  for key in name description tools model; do
+    head -12 "$f" | grep -q "^$key:" \
+      || err "$f has no $key in its frontmatter (model is the cost tier — see tests/checks/model-routing.sh)"
+  done
 done
 for f in skills/*/SKILL.md; do
-  head -8 "$f" | grep -q '^user-invocable:' || err "$f does not declare user-invocable"
+  # The contract is the VALUE, not the key: a skill declaring `user-invocable: true`
+  # is a skill that acts, which is the one thing the layer rules forbid.
+  head -8 "$f" | grep -q '^user-invocable: false' \
+    || err "$f does not declare user-invocable: false"
 done
 
 [ "$fail" -eq 0 ] && echo "PASS: docs describe the plugin that exists"

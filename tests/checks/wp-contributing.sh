@@ -99,6 +99,20 @@ grep -Eqi 'does not exist' "$d" || fail "$d lost the phantom-command direction"
 grep -Fq 'CHANGELOG.md' "$d" || fail "$d does not require a CHANGELOG entry for behavior changes"
 grep -Fq 'marketplace.json' "$d" || fail "$d does not verify the version references agree"
 
+# 9a. Rules tightened after review of #35. Each was a way for the gate to pass on
+#     a repo it should have failed, so each is pinned against being loosened back.
+grep -Fq 'user-invocable: false' "$d" \
+  || fail "$d accepts any user-invocable value again — 'true' is precisely the state the layer rules forbid"
+grep -Eq 'for doc in .\$README. .\$DOCS.' "$d" \
+  || fail "$d scans only one file for phantom command rows; a phantom row in the reference is as misleading as one in the README"
+grep -Fq 'in_table_row' "$d" \
+  || fail "$d matches documentation anywhere in the file again — a prose mention would satisfy it, leaving the command out of every table a reader scans"
+grep -Fq '|| true' "$d" \
+  || fail "$d extracts versions without '|| true'; under set -euo pipefail a MISSING version aborts the script before it can report"
+grep -Fq 'allowed-tools' "$d" || fail "$d no longer checks command frontmatter beyond description"
+grep -Eq 'for key in name description tools model' "$d" \
+  || fail "$d no longer checks the full agent frontmatter contract"
+
 # ---------------------------------------------------------------------------
 # 10. Both are documented where a contributor looks.
 # ---------------------------------------------------------------------------

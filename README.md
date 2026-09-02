@@ -166,7 +166,11 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-audit [flags]` | all | optional | Security, SEO, a11y, performance, best practices |
 | `/wp-polylang <src> <dst>` | all | polylang only | Translate the site through Polylang |
 | `/wp-tailwind-migrate <theme>` | legacy | optional | Plain-CSS theme → Tailwind in place |
-| `/wp-cinematic-init` `-demo` `-encode` `-scene` `-seed` | C | required | Cinematic scaffold, demo, encoding, scenes, seeding |
+| `/wp-cinematic-init` | C | required | Cinematic scaffold — kit, theme, ACF scenes |
+| `/wp-cinematic-demo` | C | recommended | Scroll-driven HTML demo for client approval |
+| `/wp-cinematic-encode` | C | per video | ffmpeg — all-keyframe desktop MP4 + 9:16 mobile |
+| `/wp-cinematic-scene` | C | per scene | Author one scene — replaces `/wp-section` on path C |
+| `/wp-cinematic-seed` | C | required | Seed every scene from a manifest, idempotent |
 | `/wp-debug [issue]` | utility | — | WP-CLI diagnostics and fixes |
 | `/wp-clone --from --to` | utility | — | Clone a remote site locally |
 | `/wp-contribute <new\|check\|pr\|release>` | contributors | — | Work on the plugin itself — scaffold a command/agent/skill with its check and doc rows, verify the repo, open the PR |
