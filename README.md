@@ -169,6 +169,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-cinematic-init` `-demo` `-encode` `-scene` `-seed` | C | required | Cinematic scaffold, demo, encoding, scenes, seeding |
 | `/wp-debug [issue]` | utility | — | WP-CLI diagnostics and fixes |
 | `/wp-clone --from --to` | utility | — | Clone a remote site locally |
+| `/wp-contribute <new\|check\|pr\|release>` | contributors | — | Work on the plugin itself — scaffold a command/agent/skill with its check and doc rows, verify the repo, open the PR |
 
 \* Optional if WordPress is already running: without `.wp-create.json`, `/wp-seed` and `/wp-debug` fall back to a bare `wp` on PATH and the languages in `.claude/CLAUDE.md`.
 `wp-robin` and `wp-aos-animator` are skills, not commands — ask for them in plain language.
@@ -189,6 +190,10 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `wp-cli-patterns` | WP-CLI best practices for all agents (saves tokens vs PHP generation) |
 | `wp-aos-animator` | AOS scroll animation installer — audits, enqueues, initializes, and seeds animations across templates |
 | `wp-robin` | Robin Image Optimizer fixer — installs, configures, unsticks bulk optimization, generates .webp files |
+| `wp-environments` | Environment detection and the WP-CLI wrapper every command runs through |
+| `wp-audit-standards` | Audit criteria, severity definitions, report schema and quality thresholds for the `wp-audit-*` agents |
+| `wp-audit-seo-standards` | Rank Math configuration reference, schema JSON-LD templates, meta patterns and SEO seeding commands |
+| `wp-contributing` | Contributing to this plugin — the layer rules, the grep-gate test style, and the PR and release rituals |
 
 ### Agents (specialized subagents dispatched by commands)
 
@@ -198,6 +203,12 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `wp-css` | CSS design system specialist — BEM naming, custom properties, responsive |
 | `wp-tailwind` | Tailwind specialist — demo conversion and section authoring on the `template=tailwind` path, replacing `wp-css` |
 | `wp-acf` | ACF/SCF field architect — programmatic field definitions with bilingual support |
+| `wp-cf7` | Contact Form 7 specialist — forms per language, branded mail templates, and the seeder that carries the form body |
+| `wp-normalize` | Demo-folder analyzer — turns an arbitrary multi-page site into the canonical delimited demo plus a build manifest |
+| `wp-context` | Project-docs analyzer — reads `docs/` and extracts constraints plus an actionable scope manifest |
+| `wp-cinematic` | Cinematic scroll specialist — scene fields, template parts and scroll-engine wiring for the `__cinematic__` starter |
+| `wp-audit-security` · `wp-audit-seo` · `wp-audit-a11y` · `wp-audit-performance` · `wp-audit-practices` | The five `/wp-audit` judgment auditors — code scanning, structured data, WCAG 2.1 AA, Core Web Vitals, WordPress standards |
+| `wp-audit-aios` · `wp-audit-rankmath` | The two mechanical audit installers — All-in-One WP Security and Rank Math, configured via WP-CLI |
 
 ### Starter Theme
 

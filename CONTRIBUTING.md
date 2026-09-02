@@ -54,6 +54,20 @@ claude plugins add ./
 
 ## How to Contribute
 
+**Using Claude Code on this repo?** Two things do most of this for you:
+
+```
+/wp-contribute new command wp-foo   # the file + its check + its README and docs rows
+/wp-contribute check                # the 38 checks, plus the doc-sync gate
+/wp-contribute pr                   # branch, conventional commit, house PR body
+```
+
+`skills/wp-contributing/SKILL.md` auto-loads when you edit this repository and carries the
+conventions that are not written down here — why a command must dispatch builders rather than
+reimplement them, how to write a grep-gate check, the two i18n systems and why mixing them
+fatals a theme, and the release ritual. Read it alongside this file.
+
+
 ### Writing a New Command
 
 - Place the file in `commands/`.

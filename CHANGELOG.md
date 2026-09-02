@@ -1,5 +1,29 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **`wp-contributing` skill and `/wp-contribute`** — the conventions a contributor could
+  previously only learn by breaking them: calls go down the four layers and a command
+  dispatches builders rather than reimplementing them, tests are grep gates over prose
+  (with the house style for writing one), the frontmatter contract per layer, the two i18n
+  systems, and the PR and release rituals including the stacked-PR squash hazard. The skill
+  auto-loads when editing this repository; `/wp-contribute new` scaffolds a layer file
+  together with its check and its doc rows, so a PR cannot arrive missing either.
+- **`bin/doc-sync-check.sh`** — asserts the docs still describe the plugin that exists: every
+  command has a README row and a `docs/commands.md` entry, every documented command exists
+  (the phantom `/wp-robin` and `/wp-aos-animator` rows survived two releases), every agent and
+  skill is listed, frontmatter is present per layer, the four version references agree, and
+  `CHANGELOG.md` moved when behavior did. Run by `/wp-contribute check` and
+  `tests/checks/wp-contributing.sh`.
+
+### Fixed
+- Documentation drift the new gate found on its first run: eleven agents (`wp-cf7`,
+  `wp-normalize`, `wp-context`, `wp-cinematic` and the seven `wp-audit-*`) and three skills
+  (`wp-environments`, `wp-audit-standards`, `wp-audit-seo-standards`) were missing from the
+  README tables, and `wp-aos-animator` and `wp-robin` declared no `user-invocable`, leaving
+  them inert rather than broken.
+
 ## [1.10.0] - 2026-09-02
 
 ### Fixed

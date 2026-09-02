@@ -35,6 +35,7 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-cinematic-seed`](#wp-cinematic-seed) | C | required | scenes manifest | scene rows, sample videos |
 | [`/wp-debug`](#wp-debug) | utility | — | `.wp-create.json` | offered fixes |
 | [`/wp-clone`](#wp-clone) | utility | — | remote site | local install |
+| [`/wp-contribute`](#wp-contribute) | contributors | — | this repository | new layer file + its check + doc rows; PR; release |
 
 \* `/wp-create` is optional if WordPress is already running: `/wp-seed` and `/wp-debug` fall
 back to a bare `wp` on PATH (run from the WordPress root, languages from `.claude/CLAUDE.md`)
@@ -302,6 +303,31 @@ Health, plugins, DB, config, filesystem checks via the WP-CLI wrapper from `.wp-
 /wp-clone --from=ssh://user@host/path --to=/var/www/html/local          # SSH automated
 /wp-clone --sql=/tmp/dump.sql --uploads=/tmp/uploads.zip --to=/var/www/html/local   # manual
 ```
+
+---
+
+## Contributing to the plugin
+
+### `/wp-contribute`
+
+```
+/wp-contribute new <command|agent|skill|check> <name>
+/wp-contribute check
+/wp-contribute pr [--title "..."]
+/wp-contribute release [major|minor|patch]     # maintainers
+```
+
+Operates on **this repository**, not on a WordPress project — it refuses unless the working
+directory is the plugin root. `new` scaffolds a layer file together with the two things a PR
+is always missing without it: a grep gate under `tests/checks/` and the README + docs rows.
+`check` runs the whole suite plus `bin/doc-sync-check.sh`. `pr` refuses on `main`, re-runs
+both gates, then commits (Conventional Commits, no AI attribution), pushes over SSH and opens
+the PR in the house format. `release` is the maintainer path: four version references, the
+changelog rollup, tag, `gh release`, and verification that the published artifact is live.
+
+Reads `skills/wp-contributing/SKILL.md`, which carries the layer rules, the grep-gate test
+style, the frontmatter contract per layer, the two i18n systems, and the stacked-PR merge
+order. See [CONTRIBUTING.md](../CONTRIBUTING.md) for the front-door version.
 
 ---
 

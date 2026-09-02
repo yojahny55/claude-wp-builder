@@ -1,6 +1,7 @@
 ---
 name: wp-robin
 description: Fix Robin Image Optimizer — installs plugin if missing, configures optimal settings, unsticks the bulk optimization loop, generates missing .webp files locally, and syncs the queue database so the plugin recognizes all conversions. Use when the user says Robin Optimizer is stuck, frozen, looping, not finishing, missing webp files, needs setup, or wants to install and configure it properly. Also use for "optimize all images", "configure image optimizer", or when Robin shows "X remaining" but never completes.
+user-invocable: false
 ---
 
 # wp-robin: Install, configure, and fix Robin Image Optimizer

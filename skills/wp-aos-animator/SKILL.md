@@ -1,6 +1,7 @@
 ---
 name: wp-aos-animator
 description: WordPress AOS animation installer — audits, installs, enqueues, initializes, and seeds Animate On Scroll on every visual element across all PHP templates. Use when the user asks to add scroll animations, AOS, fade-in effects, entrance animations, or "make elements appear on scroll" in any WordPress theme.
+user-invocable: false
 ---
 
 # WP AOS Animator
