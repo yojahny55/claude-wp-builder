@@ -175,7 +175,7 @@ and the section's CSS. Flags: `--cf7` force a form, `--page <slug>` read from `d
 
 ```
 /wp-page blog            # archive.php, single.php, post cards
-/wp-page legal           # privacy + terms with ACF fields
+/wp-page legal           # privacy + terms with ACF fields; hides them from site search
 /wp-page 404
 /wp-page search
 /wp-page generic         # plain content page
@@ -207,7 +207,8 @@ Adds fields (with `_es` variants under `suffix`) to the theme settings page.
 
 Creates pages with matching slugs, sideloads media, fills every ACF field, builds menus, sets
 the front page. Uses the WP-CLI wrapper from `.wp-create.json`, or bare `wp` when absent. Does **not** create CPT posts — run the seeder that
-`/wp-cpt` emitted: `$WP eval-file inc/seed/<name>.php`.
+`/wp-cpt` emitted: `$WP eval-file inc/seed/<name>.php`. On a fresh database the CF7 form
+body is restored the same way: `$WP eval-file inc/seed/cf7.php` (emitted by the contact section).
 
 Then [Finish](#finish-all-paths).
 

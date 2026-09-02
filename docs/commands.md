@@ -168,7 +168,7 @@ Footer: `footer.php` from the Footer/Contact/Social/Legal settings tabs.
 |------|---------|--------|
 | `--page <slug>` | `index` | read the section from `demo/<slug>.html` |
 | `--target <template>` | `front-page.php` | where the `get_template_part()` call is injected |
-| `--cf7` | auto for `contact`, `contact-us`, `contacto`, `get-in-touch` | wire Contact Form 7: forms per language, branded mail templates, IDs injected, refs in `cf7/` |
+| `--cf7` | auto for `contact`, `contact-us`, `contacto`, `get-in-touch` | wire Contact Form 7: forms per language, branded mail templates, IDs injected, refs in `cf7/`, plus an idempotent `inc/seed/cf7.php` that restores the form body on a fresh database (`$WP eval-file inc/seed/cf7.php`) |
 | `--hybrid` | off (implied on cinematic) | cinematic only: add a layout to the `trailing_sections` flex field, template reads `get_sub_field()`, CSS to `cinematic.css`, no page injection |
 | `--transcribe` | off | copy the demo's exact declared CSS instead of re-authoring |
 | `--block <bem>` | — | unique BEM block to scope every selector (with `--transcribe`) |
@@ -184,6 +184,8 @@ Emits `fields/<section>.php`, `template-parts/section-<name>.php`, and CSS, in p
 
 `name` is required for `custom` and `embed`. `embed` builds a styled shell with a marked
 insertion point for a provider shortcode (e.g. an IDX plugin); `--provider` names it.
+`legal` also emits `inc/legal-search.php` (required from `functions.php`), which hides
+pages using `page-legal.php` from site search only — they stay published and indexable.
 
 ### `/wp-cpt`
 
