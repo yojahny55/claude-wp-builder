@@ -52,9 +52,12 @@ Read `Template:` from `.claude/CLAUDE.md`. If `--hybrid` is set and the template
 ```
 Error: --hybrid is only valid on a cinematic project (Template: cinematic). Use /wp-section <name> without it.
 ```
-If the template is `cinematic` and `--hybrid` is **absent**, warn once and continue as if it
-were set — a cinematic front page has no `<main>` section list to inject into, so a
-standalone section there would never render.
+If the template is `cinematic`, `--hybrid` is **absent** and no `--target` was given, warn
+once and continue as if it were set — the default target is `front-page.php`, and on the
+cinematic starter that file renders the reel plus the trailing loop, not a `<main>` section
+list, so a standalone section injected there would never render. An explicit `--target`
+(e.g. `--target page-pricing.php`) is a normal inner page on a cinematic site and is built
+the standard way; `--hybrid` is never implied over it.
 
 Under `--hybrid`, four things change and nothing else does:
 
@@ -72,7 +75,8 @@ Under `--hybrid`, four things change and nothing else does:
 3. **CSS** — the cinematic starter has no `assets/css/styles.css`; the CSS agent appends the
    section block to `assets/css/cinematic.css` under `/* ====== Section: <Name> ====== */`.
 4. **Injection** — skip Step 6 entirely. The layout renders because the loop maps every
-   `get_row_layout()` to `template-parts/section-<layout>.php`. Ignore `--target` if given.
+   `get_row_layout()` to `template-parts/section-<layout>.php`. Passing `--hybrid` with an explicit `--target` is a contradiction — error out
+   and ask for one or the other.
 
 ## Step 3: Read Demo Section
 

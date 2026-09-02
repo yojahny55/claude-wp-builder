@@ -14,6 +14,8 @@ grep -Fq 'get_sub_field' "$f" || fail "$f does not tell the template to read row
 grep -Fq 'assets/css/cinematic.css' "$f" || fail "$f does not route hybrid CSS to assets/css/cinematic.css"
 grep -Eq 'Skip (this step|Step 6).*--hybrid|--hybrid.*skip' "$f" || fail "$f does not skip the page-template injection under --hybrid"
 grep -Eqi 'only valid on a cinematic project' "$f" || fail "$f does not refuse --hybrid on non-cinematic projects"
+grep -Eq 'no .--target. was given' "$f" || fail "$f implies --hybrid even when the user passed an explicit --target"
+grep -Eq -- '--hybrid.*--target.*(contradiction|error)' "$f" || fail "$f does not reject --hybrid combined with --target"
 
 # the loop the flag relies on must still exist in the starter
 grep -Fq "have_rows('trailing_sections')" starter-theme/__cinematic__/front-page.php \
