@@ -98,7 +98,12 @@ export function initMotion(gsap, ScrollTrigger) {
     if (kind === 'pan') {
       const rail = el.querySelector('[data-motion-rail]') || el.firstElementChild;
       if (rail) {
-        const travel = () => Math.max(0, rail.scrollWidth - window.innerWidth);
+        // The rail's own container, not the window, is what bounds its visible
+        // width: a rail inside a narrower wrapper overflows that wrapper, not
+        // necessarily the viewport, so window.innerWidth under-reports or
+        // zeroes the travel there.
+        const container = rail.parentElement || el;
+        const travel = () => Math.max(0, rail.scrollWidth - container.clientWidth);
         if (reduced) {
           // The rail IS the navigation here, so zeroing the transform would strand
           // every item past the fold. Hand it back as a native scroll region.
@@ -179,7 +184,10 @@ export function initMotion(gsap, ScrollTrigger) {
           el.appendChild(document.createTextNode(' '));
           return inner;
         });
-        gsap.set(units, { yPercent: reduced ? 0 : 110, opacity: reduced ? 0 : 1 });
+        // Reduced motion keeps the opacity that carries meaning and drops the
+        // position change, per taste.md: visible immediately, not faded in on
+        // a scroll-triggered delay that still counts as motion.
+        gsap.set(units, { yPercent: reduced ? 0 : 110, opacity: reduced ? 1 : 0 });
         ScrollTrigger.create({
           trigger: el,
           start: 'top 85%',

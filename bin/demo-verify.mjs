@@ -14,6 +14,7 @@
 import { existsSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { homedir } from 'node:os';
+import { pathToFileURL } from 'node:url';
 
 const args = process.argv.slice(2);
 if (args.includes('--help') || args.length === 0) {
@@ -28,15 +29,28 @@ const opt = (name, dflt) => {
   const i = args.indexOf(name);
   return i === -1 ? dflt : args[i + 1];
 };
-const positions = Number(opt('--positions', 6));
+// An invalid or missing value must not silently skip the walk: NaN or a
+// value under 2 makes the sample loop's k < positions never run, producing
+// zero frames, zero findings, and a false clean report.
+const rawPositions = Number(opt('--positions', 6));
+const positions = Number.isFinite(rawPositions) && rawPositions >= 2 ? Math.floor(rawPositions) : 6;
 const widths = opt('--widths', '1440x900,390x844')
   .split(',')
   .map((s) => {
     const [w, h] = s.split('x').map(Number);
     return { width: w, height: h };
   });
-const url = /^https?:\/\//.test(target) ? target : 'file://' + resolve(target);
-const outDir = resolve(opt('--out', join(dirname(resolve(target)), '.verify')));
+const targetIsUrl = /^https?:\/\//.test(target);
+// pathToFileURL percent-encodes spaces and non-ASCII, which a manual
+// 'file://' + path concatenation does not; an unencoded path with a space
+// makes page.goto fail outright.
+const url = targetIsUrl ? target : pathToFileURL(resolve(target)).href;
+// resolve() on a URL string treats it as a filesystem path, which is never
+// what the caller means; a URL target with no --out writes into cwd/.verify
+// instead of guessing a directory from the URL text.
+const outDir = resolve(
+  opt('--out', targetIsUrl ? '.verify' : join(dirname(resolve(target)), '.verify'))
+);
 
 function findChrome() {
   if (process.env.WP_DEMO_CHROME && existsSync(process.env.WP_DEMO_CHROME))
@@ -179,15 +193,25 @@ try {
     for (const b of bounds.length ? bounds : [{ id: 'page', top: 0, height: 1 }]) {
       let previous = null;
       let stalls = 0;
+      // Every scrub device shares start: 'top top', end: 'bottom bottom', so the
+      // real scrub range ends at top + height - viewportHeight, not top + height,
+      // whenever a section is taller than the viewport (the normal case for a
+      // pin section with span > 1). Sampling past that point walks into the
+      // flat tail where progress is clamped at 1 and reports it as dead scroll.
+      const scrubRange = Math.max(1, b.height - size.height);
       for (let k = 0; k < positions; k++) {
-        const y = b.top + (b.height * k) / Math.max(1, positions - 1);
+        const y = b.top + (scrubRange * k) / Math.max(1, positions - 1);
         await page.evaluate((to) => window.scrollTo(0, to), y);
         await page.waitForTimeout(180);
         const frame = await page.evaluate(probe);
         await page.screenshot({ path: join(dir, String(shot++).padStart(3, '0') + '.png') });
 
+        // Keyed by element index, not text: two cues sharing a string are real
+        // and distinct DOM elements, and collapsing them by text would mask
+        // one instance never peaking behind another that does.
         frame.cues.forEach((c) => {
-          peak.set(c.text, Math.max(peak.get(c.text) || 0, c.opacity));
+          const prior = peak.get(c.i);
+          peak.set(c.i, { text: c.text, max: Math.max(prior ? prior.max : 0, c.opacity) });
         });
         if (frame.overflow)
           findings.push({ kind: 'overflow', width: size.width, section: b.id, y: Math.round(y) });
@@ -202,7 +226,7 @@ try {
       }
     }
     if (!reduced) {
-      for (const [text, max] of peak) {
+      for (const { text, max } of peak.values()) {
         // Below 0.85 a line is never graded for contrast anywhere, and the reader
         // sees washed-out type at whatever position they stop on.
         if (max < 0.85) findings.push({ kind: 'cue-never-peaks', width: size.width, text, max: Number(max.toFixed(2)) });
@@ -221,7 +245,7 @@ try {
     writeFileSync(join(dir, 'sheet.html'), sheetHtml);
     const sheet = await browser.newPage();
     await sheet.setViewportSize({ width: 1200, height: 800 });
-    await sheet.goto('file://' + join(dir, 'sheet.html'), { waitUntil: 'load' });
+    await sheet.goto(pathToFileURL(join(dir, 'sheet.html')).href, { waitUntil: 'load' });
     await sheet.waitForTimeout(400);
     await sheet.screenshot({ path: join(dir, 'sheet.png'), fullPage: true });
     await sheet.close();
