@@ -199,7 +199,11 @@ try {
 
     let shot = 0;
     const peak = new Map();
-    for (const b of bounds.length ? bounds : [{ id: 'page', top: 0, height: 1 }]) {
+    // The no-sections fallback has to walk the real document, not a 1px stub:
+    // at height 1 every sample landed on scroll 0, so the page was checked for
+    // overflow only at the top and came back clean without ever scrolling.
+    const pageHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+    for (const b of bounds.length ? bounds : [{ id: 'page', top: 0, height: pageHeight }]) {
       let previous = null;
       let stalls = 0;
       // Every scrub device shares start: 'top top', end: 'bottom bottom', so the

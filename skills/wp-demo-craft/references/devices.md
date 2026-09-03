@@ -11,6 +11,7 @@ data-motion-cue="0.1 0.7"     from to [rampIn rampOut] in section progress
 data-motion-rate="-0.6"       parallax plane rate; also tilt/magnet strength
 data-motion-stagger="70"      ms between reveal children
 data-motion-count="0 3,500"   real figures only, written as it should render
+                              (one value counts from zero to that target)
 data-motion-dir="up|down|left|right|iris"   wipe direction
 data-motion-drift="#0A0806"   the page ground this section takes over
 ```

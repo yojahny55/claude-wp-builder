@@ -61,6 +61,11 @@ export function initMotion(gsap, ScrollTrigger) {
   const fine = FINE() && !reduced;
 
   document.querySelectorAll('[data-motion]').forEach((el) => {
+    // One section's failure must not take the page's motion with it. A throw
+    // inside forEach aborts the whole loop, so every later section would stay
+    // uninitialised, and these attributes come from editable ACF fields on a
+    // shipped site. Fail that section loudly, keep the rest running.
+    try {
     const kind = el.getAttribute('data-motion');
     const span = parseFloat(el.getAttribute('data-motion-span')) || 0;
 
@@ -270,13 +275,20 @@ export function initMotion(gsap, ScrollTrigger) {
         });
       }
     }
+    } catch (err) {
+      console.warn('[motion] failed to initialise section, skipping it:', el, err);
+    }
   });
 
   // Counters. Only real figures ever reach this attribute; see devices.md.
   document.querySelectorAll('[data-motion-count]').forEach((el) => {
     const raw = el.getAttribute('data-motion-count').trim().split(/\s+/);
-    const from = Number(String(raw[0]).replace(/,/g, ''));
+    // A one-value attribute counts from zero to that target. Reading raw[0] as
+    // the start in that case made from and to the same number, so the tween ran
+    // target to target and the counter never moved: the raw[1] || raw[0]
+    // fallback below existed for this form but silently did nothing.
     const targetText = raw[1] || raw[0];
+    const from = raw.length > 1 ? Number(String(raw[0]).replace(/,/g, '')) : 0;
     const to = Number(String(targetText).replace(/,/g, ''));
     const ms = parseFloat(el.getAttribute('data-motion-count-ms')) || 1400;
     el.style.fontVariantNumeric = 'tabular-nums';
