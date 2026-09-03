@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # A scroll page has no single state: every scroll position is a different frame and the
 # failures live between the two anyone happened to look at. This check pins the contract
-# that makes the walk trustworthy — including the part a green run cannot cover, which is
+# that makes the walk trustworthy, including the part a green run cannot cover, which is
 # why "read the sheet" is asserted as hard as the machine findings.
 set -euo pipefail
 cd "$(dirname "$0")/../.."

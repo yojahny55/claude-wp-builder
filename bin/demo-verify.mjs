@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * demo-verify.mjs — walk a demo (or a live page) by scrolling it, and report what
+ * demo-verify.mjs: walk a demo (or a live page) by scrolling it, and report what
  * only a moving page can show.
  *
  * A scroll page has no single state. Screenshotting the top and the bottom proves

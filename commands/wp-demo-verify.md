@@ -1,5 +1,5 @@
 ---
-description: Scroll-walk a demo or live page — screenshots per section at every viewport, machine findings, and a contact sheet to read
+description: Scroll-walk a demo or live page: screenshots per section at every viewport, machine findings, and a contact sheet to read
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 argument-hint: "<file-path-or-url> [--positions N]"
 ---
@@ -37,13 +37,13 @@ five viewports. Say which route you used.
 
 ## Step 3: Read the findings
 
-- **dead scroll** — consecutive positions where nothing changed. Shorten the
+- **dead scroll**: consecutive positions where nothing changed. Shorten the
   section's span or add a cue. Authored silence recorded in `demo/BRIEF.md` is not
   dead scroll; say so instead of "fixing" it.
-- **cue never reaches full opacity** — the window is too narrow or the ramps eat
+- **cue never reaches full opacity**: the window is too narrow or the ramps eat
   it. Widen the window or set explicit ramps.
-- **horizontal overflow** — at any width, always a defect.
-- **clipped copy** — text taller than its own hidden-overflow box.
+- **horizontal overflow**: at any width, always a defect.
+- **clipped copy**: text taller than its own hidden-overflow box.
 
 ## Step 4: Read the sheet
 
