@@ -1,5 +1,5 @@
 ---
-description: Scroll-walk a demo or live page: screenshots per section at every viewport, machine findings, and a contact sheet to read
+description: Scroll-walk a demo or live page, screenshots per section at every viewport, machine findings, and a contact sheet to read
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 argument-hint: "<file-path-or-url> [--positions N]"
 ---
