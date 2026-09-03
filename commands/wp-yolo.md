@@ -132,6 +132,15 @@ page, resolves shared header/footer, splits sections, classifies content types
 
 Read `demo/.yolo-manifest.json` back once the agent completes.
 
+**Demo mode.** If `.wp-create.json` already has `demo mode`, read it and move on —
+do not re-derive it. Otherwise decide it here using the same craft-versus-plain
+test as `/wp-demo` Step 2.5 (project docs, `.claude/CLAUDE.md`, `.wp-create.json`;
+`--craft`/`--plain` in `$ARGUMENTS` override), state the one-line reason, and write
+`"demo mode"` into `.wp-create.json`. When the mode is **craft**, read
+`${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/SKILL.md` and apply its grammar,
+feeling curve and fingerprint gate to the whole multi-page build — one fingerprint
+row for the site, not one per page.
+
 ## Step 2.5: Phase 1.5 — Load & reconcile scope
 
 If `docs/.scope-manifest.json` exists, read it and reconcile with the `wp-normalize`

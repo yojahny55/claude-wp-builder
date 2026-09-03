@@ -1,7 +1,7 @@
 ---
 description: Create a demo HTML mockup for client approval — responsive, section-separated, ready for WordPress conversion
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
-argument-hint: "[brief or 'iterate']"
+argument-hint: "[brief] [--craft|--plain] | iterate"
 ---
 
 # WP Demo — HTML Mockup Generator
@@ -22,6 +22,66 @@ Check `$ARGUMENTS`:
   - Client brief / description of what the site should look and feel like
   - Reference screenshots or URLs (optional)
   - List of sections to include (e.g., Hero, About, Services, Team, Testimonials, Contact)
+
+## Step 2.5: Choose the Demo Mode
+
+Craft mode builds against the `wp-demo-craft` skill: a design floor, a page
+grammar, a feeling curve with one peak, scroll motion via `data-motion-*`, and a
+fingerprint gate so two clients never get the same shape. Plain mode is the
+existing single-file demo with no motion contract.
+
+**Decide from the project, not from taste.** Read `.claude/CLAUDE.md` (including
+any Project Constraints section written by `/wp-context`), anything under `docs/`,
+and `.wp-create.json`.
+
+- Choose **craft** when the site is marketing, brand, launch, portfolio, agency or
+  campaign work; when the docs name reference sites; or when they ask for motion,
+  animation or a premium feel.
+- Choose **plain** when the site is an admin tool, an intranet, catalogue- or
+  data-heavy, regulated, or when the docs put accessibility first.
+- `--craft` and `--plain` in `$ARGUMENTS` override the decision. Honour them
+  without arguing.
+
+State the decision and the one-line reason for it. Then write it to
+`.wp-create.json` as `"demo mode": "craft"` or `"demo mode": "plain"`, creating the
+key if absent. Every downstream command reads that line instead of deciding again.
+
+If the mode is **plain**, continue with the existing steps and skip Step 2.6.
+
+## Step 2.6: Craft Mode
+
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/SKILL.md` and its `references/`
+before writing any markup.
+
+1. **Brief.** Self-author `demo/BRIEF.md` from the project docs: brand rules;
+   pain, person and promise; two or three named references and what specifically
+   to take from each; vibe words; aesthetic family; assets already owned. Mark
+   anything you invented as "Self-authored, not interviewed". Ask, in a single
+   pass, only the questions the docs cannot answer. Show the brief once and
+   proceed on a yes.
+2. **Feeling curve.** One line per section: the emotion, then the on-screen cause.
+   Adjacent sections that share a feeling mean one is filler. Name the peak as a
+   sentence a visitor would say to a friend, and complete "it's the site where
+   ___". Write all of it into `demo/BRIEF.md` before listing sections.
+3. **Grammar and signature move.** Pick one grammar from `references/grammars.md`
+   and one bespoke interaction that exists on this site alone.
+4. **Fingerprint gate.** Read `~/.claude/wp-builder/FINGERPRINTS.md` (create it
+   with a header row if absent). The plan must differ from every row on at least
+   4 of the 6 axes. If it fails, change the plan, not the log.
+5. **Score table.** Section, device, why. Check it against the pre-build list in
+   the skill: four or more device families, no family twice in a row, one peak
+   with the largest span and a quieter section before it.
+6. **Build.** Same delimiters, `:root` tokens and BEM as plain mode. Motion comes
+   from `data-motion-*` attributes only. Inline the contents of
+   `${CLAUDE_PLUGIN_ROOT}/starter-theme/__tailwind__/assets/js/src/motion.js` in a
+   `<script>` block, after loading GSAP and ScrollTrigger from
+   `https://cdnjs.cloudflare.com` with pinned versions. The signature move goes in
+   its own `<script id="signature">` block so `/wp-init` can lift it to
+   `assets/js/signature.js`.
+7. **Verify.** Run `/wp-demo-verify demo/index.html`. Fix what it finds, then
+   report the intended curve, the felt curve and the diff.
+8. **Record.** Append the build's row to `~/.claude/wp-builder/FINGERPRINTS.md`
+   and write the same row into `.wp-create.json` under `"fingerprint"`.
 
 ## Step 3: Invoke Skills
 

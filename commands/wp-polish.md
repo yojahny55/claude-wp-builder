@@ -1,12 +1,20 @@
 ---
 description: Normalize any HTML into a plugin-compatible demo with section delimiters and BEM classes
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
-argument-hint: "[path-to-html]"
+argument-hint: "[path-to-html] [--craft]"
 ---
 
 # WP Polish — Demo Normalizer
 
 Normalize any HTML file into a plugin-compatible demo with section delimiters, semantic HTML5, and BEM class naming. Works with external HTML (Figma exports, hand-coded, other tools) or existing demos that need structural cleanup.
+
+### `--craft` — retrofit audit
+
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/SKILL.md` and audit the existing
+demo against the refuse list and the taste floor. Report findings as a list, each
+naming the rule and the offending selector or line. **Do not add motion and do not
+restructure the page**; converting a plain demo to craft is a rebuild, not a
+polish. The existing backup behaviour at `demo/.prepolish/` is unchanged.
 
 ## Step 1: Resolve Input Path
 
