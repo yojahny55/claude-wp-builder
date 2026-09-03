@@ -136,20 +136,29 @@ export function initMotion(gsap, ScrollTrigger) {
     if (kind === 'reveal') {
       const stagger = (parseFloat(el.getAttribute('data-motion-stagger')) || 70) / 1000;
       const kids = el.children.length ? el.children : [el];
-      gsap.set(kids, { opacity: 0, y: reduced ? 0 : rise });
-      ScrollTrigger.create({
-        trigger: el,
-        start: 'top 88%',
-        once: true, // content that re-hides on the way back up is a defect, not an effect
-        onEnter: () =>
-          gsap.to(kids, {
-            opacity: 1,
-            y: 0,
-            duration: 0.62,
-            ease: 'power3.out',
-            stagger: stagger,
-          }),
-      });
+      if (reduced) {
+        // Zeroing the rise alone was not enough: the children still started at
+        // opacity 0 and played a timed, staggered fade on scroll entry, which is
+        // a scroll-triggered animation whatever its property. Cue opacity stays
+        // live under reduced motion because it is scrubbed (it tracks the wheel
+        // directly), but this is a 0.62s one-shot, so it snaps to visible.
+        gsap.set(kids, { opacity: 1, y: 0 });
+      } else {
+        gsap.set(kids, { opacity: 0, y: rise });
+        ScrollTrigger.create({
+          trigger: el,
+          start: 'top 88%',
+          once: true, // content that re-hides on the way back up is a defect, not an effect
+          onEnter: () =>
+            gsap.to(kids, {
+              opacity: 1,
+              y: 0,
+              duration: 0.62,
+              ease: 'power3.out',
+              stagger: stagger,
+            }),
+        });
+      }
     }
 
     if (kind === 'wipe') {

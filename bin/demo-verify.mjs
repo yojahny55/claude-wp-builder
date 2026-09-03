@@ -207,9 +207,15 @@ try {
       // whenever a section is taller than the viewport (the normal case for a
       // pin section with span > 1). Sampling past that point walks into the
       // flat tail where progress is clamped at 1 and reports it as dead scroll.
-      const scrubRange = Math.max(1, b.height - size.height);
+      // A section SHORTER than the viewport has an inverted range (its end sits
+      // above its top), so clamping with max(1, height - viewport) collapsed
+      // every sample onto a single pixel and reported the section as dead
+      // scroll. Derive both ends from geometry and walk between them.
+      const clampedEnd = Math.max(0, b.top + b.height - size.height);
+      const scrubRange = Math.max(1, Math.abs(clampedEnd - b.top));
+      const startY = Math.min(b.top, clampedEnd);
       for (let k = 0; k < positions; k++) {
-        const y = b.top + (scrubRange * k) / Math.max(1, positions - 1);
+        const y = startY + (scrubRange * k) / Math.max(1, positions - 1);
         await page.evaluate((to) => window.scrollTo(0, to), y);
         await page.waitForTimeout(180);
         const frame = await page.evaluate(probe);
