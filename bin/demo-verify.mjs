@@ -17,14 +17,18 @@ import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 
 const args = process.argv.slice(2);
-if (args.includes('--help') || args.length === 0) {
+if (args.includes('--help')) {
   console.log(
-    'usage: demo-verify.mjs <file-or-url> [--out DIR] [--positions N] [--widths 1440x900,390x844]'
+    'usage: demo-verify.mjs [file-or-url] [--out DIR] [--positions N] [--widths 1440x900,390x844]'
   );
-  process.exit(args.length === 0 ? 2 : 0);
+  process.exit(0);
 }
 
-const target = args[0];
+// The command documents demo/index.html as the default target, and exit 2 is
+// reserved for "no usable browser" so a caller can fall back to MCP screenshots.
+// Exiting 2 on a bare invocation made a missing argument look like a missing
+// browser and sent the caller down the wrong branch of that ladder.
+const target = args[0] && !args[0].startsWith('--') ? args[0] : 'demo/index.html';
 const opt = (name, dflt) => {
   const i = args.indexOf(name);
   return i === -1 ? dflt : args[i + 1];

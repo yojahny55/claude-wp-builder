@@ -30,7 +30,11 @@ function parseCue(value) {
     if (p < from) return rampIn === 0 ? (p >= from ? 1 : 0) : 0;
     if (rampIn > 0 && p < from + rampIn) return (p - from) / rampIn;
     if (to === null) return 1;
-    if (p >= to) return 0;
+    // "0 1 0 0" is the documented greet-and-hold form (devices.md): a cue that
+    // ends at 1 with no ramp-out is holding, not fading. Returning 0 here blanked
+    // the closing section's cue on the final frame, which is exactly the
+    // fade-to-an-empty-stage ending feel.md forbids.
+    if (p >= to) return to >= 1 && rampOut === 0 ? 1 : 0;
     if (rampOut > 0 && p > to - rampOut) return Math.max(0, (to - p) / rampOut);
     return 1;
   };
@@ -144,13 +148,21 @@ export function initMotion(gsap, ScrollTrigger) {
 
     if (kind === 'wipe') {
       const dir = el.getAttribute('data-motion-dir') || 'up';
-      const shape = {
+      const shapes = {
         up: (p) => 'inset(' + ((1 - p) * 100).toFixed(2) + '% 0 0 0)',
         down: (p) => 'inset(0 0 ' + ((1 - p) * 100).toFixed(2) + '% 0)',
         left: (p) => 'inset(0 ' + ((1 - p) * 100).toFixed(2) + '% 0 0)',
         right: (p) => 'inset(0 0 0 ' + ((1 - p) * 100).toFixed(2) + '%)',
         iris: (p) => 'circle(' + (p * 75).toFixed(2) + '% at 50% 50%)',
-      }[dir];
+      };
+      // An unrecognised direction falls back rather than leaving shape undefined:
+      // a TypeError thrown from inside the forEach stops every later element
+      // from initialising, so one bad attribute would kill motion page-wide.
+      const shape = shapes[dir] || shapes.up;
+      // Set the closed state up front, the same way the pin branch calls
+      // drive(0): without it the element renders fully revealed until the
+      // first onUpdate fires, so the wipe has nothing left to reveal.
+      el.style.clipPath = shape(reduced ? 1 : 0);
       ScrollTrigger.create({
         trigger: el,
         start: 'top 85%',
