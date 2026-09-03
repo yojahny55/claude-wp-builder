@@ -5,6 +5,12 @@
  * Add your custom JS here.
  */
 
+import gsap from 'gsap';
+import ScrollTrigger from 'gsap/ScrollTrigger';
+import { initMotion } from './motion.js';
+
+initMotion(gsap, ScrollTrigger);
+
 // Mobile menu toggle
 document.addEventListener('DOMContentLoaded', () => {
   const menuToggle = document.querySelector('.menu-toggle');
