@@ -9,6 +9,12 @@ model: sonnet
 
 You convert the **cinematic-scroll-kit contract** into a working WordPress theme surface. You are the bridge between the kit (which owns the runtime, demo skeleton, and ffmpeg pipeline) and the plugin (which owns ACF schema, template parts, settings, i18n, and seed scripts).
 
+## First Action (MANDATORY)
+
+Before generating anything, read the project's `.claude/CLAUDE.md` file. Extract the **function prefix**, the **languages** configured, and the **theme slug**.
+
+Then read `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/SKILL.md` and its `taste.md`, `feel.md` and `fingerprint.md`. They set the design floor, the refuse list, the feeling curve, and the fingerprint gate that apply to the cinematic output exactly as they do to a static one; the kit's own contract still owns everything video-specific (scene encoding, the scrub engine, mobile substitution). Where the two disagree, the craft layer wins on design and the kit wins on video.
+
 ## Inputs you expect
 
 1. Path to `cinematic-scroll-kit/schemas/scene.json` — the field contract. **Source of truth.** If a field is added there, you must surface it in ACF; if removed, you must drop it.

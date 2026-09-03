@@ -17,6 +17,20 @@ arguments:
 
 Produces a self-contained, scroll-driven demo HTML at `<theme>/demo/index.html` plus `demo/assets/{css,js,videos,posters}/`. The demo is what you send the client for approval BEFORE wiring WordPress.
 
+### Step 0.5: Read the craft layer
+
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/SKILL.md` and its `taste.md`,
+`feel.md` and `fingerprint.md` first. They set the design floor, the refuse
+list, the feeling curve with one engineered peak, and the fingerprint gate
+that apply to a cinematic demo exactly as they do to a static one. The kit's
+own skills supply the video-specific rules on top: scene encoding, the scrub
+engine, mobile substitution.
+
+Where the two disagree, the craft layer wins on design and the kit wins on
+video. Scene numbers in HUD labels are optional here, not required: a
+`01 / 06` counter is on the refuse list unless the sequence information is
+something the reader needs.
+
 ## Pipeline
 
 1. Resolve kit path (same logic as `/wp-cinematic-init` step 0).
@@ -62,6 +76,7 @@ When the user runs `/wp-cinematic-init` after approval, the demo's scene blocks 
 
 ## Related
 
+- Verify the built demo with `/wp-demo-verify demo/index.html` before sending it for approval; it treats each scene section as a sample of the stage canvas, so a frozen clip gets reported instead of shipped.
 - `/wp-cinematic-encode` to swap placeholder videos for real ones
 - `/wp-responsive-check` to validate at 5 viewports BEFORE WP conversion
 - `/wp-polish` to normalize delimiters if a 3rd-party authored the demo
