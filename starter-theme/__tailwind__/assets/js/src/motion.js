@@ -73,7 +73,13 @@ export function initMotion(gsap, ScrollTrigger) {
     const rise = reduced ? 0 : 14;
 
     const drive = (p) => {
-      el.style.setProperty('--motion-p', p.toFixed(4));
+      // devices.md documents --motion-p as the seam bespoke CSS drives off via
+      // calc(), and the usual use is a transform. Publishing live progress under
+      // reduced motion would keep animating position through that seam and
+      // defeat the floor, so freeze it at the end state the way every other
+      // device here does (wipe reveals, kinetic shows, count writes its final
+      // value). Cue opacity below still reads the real p, so meaning is kept.
+      el.style.setProperty('--motion-p', reduced ? '1' : p.toFixed(4));
       cued.forEach((c) => {
         const o = Math.max(0, Math.min(1, c.at(p)));
         c.node.style.opacity = String(o);
@@ -240,12 +246,18 @@ export function initMotion(gsap, ScrollTrigger) {
     if (kind === 'drift') {
       const color = el.getAttribute('data-motion-drift');
       if (color) {
+        // Under reduced motion the ground still changes, it just stops being a
+        // 0.8s crossfade: the design intent survives, the animation does not.
+        const apply = () => {
+          if (reduced) document.body.style.backgroundColor = color;
+          else gsap.to(document.body, { backgroundColor: color, duration: 0.8 });
+        };
         ScrollTrigger.create({
           trigger: el,
           start: 'top center',
           end: 'bottom center',
-          onEnter: () => gsap.to(document.body, { backgroundColor: color, duration: 0.8 }),
-          onEnterBack: () => gsap.to(document.body, { backgroundColor: color, duration: 0.8 }),
+          onEnter: apply,
+          onEnterBack: apply,
         });
       }
     }

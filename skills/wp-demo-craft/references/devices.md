@@ -121,7 +121,11 @@ instant. Every act publishes `--motion-p` so anything the kit does not cover
 can be driven from CSS with `calc()`.
 
 Reduced motion keeps the opacity that carries comprehension and drops every
-position change (`prefers-reduced-motion`).
+position change (`prefers-reduced-motion`). Under reduced motion `--motion-p` is
+frozen at `1`, its end state, rather than tracking scroll: the seam is normally
+driven into a `transform`, and a live value there would animate position through
+exactly the rule this floor exists to enforce. Write the `calc()` so that
+`--motion-p: 1` is the settled, fully arrived composition.
 
 ## Video scrub is not in this kit
 

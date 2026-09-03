@@ -182,6 +182,11 @@ try {
       const out = [];
       els.forEach((el) => {
         const r = el.getBoundingClientRect();
+        // A zero-height element (a display:none mobile-only section at desktop
+        // width, most often) collapses the scrub range to 1px, so every sample
+        // lands on the same frame and the walk reports dead scroll for a section
+        // that is not on screen at all. /wp-finalize fails the build on that.
+        if (r.height <= 0) return;
         out.push({
           id: el.id || el.className.toString().split(' ')[0] || 'section',
           top: r.top + window.scrollY,
