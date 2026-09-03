@@ -495,3 +495,8 @@ the demo is the SOURCE OF TRUTH, not inspiration. Your job is to COPY, not re-au
 - **Scope everything under the assigned `block`** given in the dispatch (never a bare generic
   name). Shared components use the shared class; per-page tweaks are scoped under the block.
 - (Still applies: never emit an undefined `var(--x)`.)
+
+Any rule that reads `--motion-p` (or `--motion-mx` / `--motion-my`) is the seam
+between the motion engine and the design. Copy those rules unchanged, including
+their `calc()` expressions. Rewriting one into a static value silently removes the
+effect, and nothing errors.

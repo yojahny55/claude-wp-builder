@@ -474,6 +474,14 @@ Silent no-op on a non-Tailwind theme; skips itself when the user has `npm run pr
 running (the watcher already owns `dist/`). Do this before the summary — a summary that
 lists files no browser can see yet is not a finished section.
 
+## Motion attribute assertion (craft mode only)
+
+When `.wp-create.json` records `"demo mode": "craft"`, after writing the template
+part, compare it against the demo section it came from: every `data-motion*`
+attribute present in the demo must be present in the template part. A missing
+attribute is a **build failure**, not a warning. Report the section, the attribute
+and the demo line, and fix it before continuing.
+
 ## Step 7: Print Summary
 
 The `[basic only]` / `[tailwind only]` markers below are report annotations, not literal

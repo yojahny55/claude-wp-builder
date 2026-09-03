@@ -390,6 +390,16 @@ Layer 3 is the backstop that measures **computed styles**, not just screenshots,
 
 ---
 
+### Craft gate (craft mode only)
+
+When `.wp-create.json` records `"demo mode": "craft"`, run
+`/wp-demo-verify <live-site-url>` against the built theme, not against the demo.
+Dead scroll or horizontal overflow at any width is a **fail**: the approved demo
+moved and the shipped page does not. Report the findings and the contact sheet
+path alongside the rest of the checklist.
+
+---
+
 ## Step 4: Print Report
 
 ```

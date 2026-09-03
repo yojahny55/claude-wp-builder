@@ -134,6 +134,11 @@ For each element in the HTML:
   `/wp-init`, not carried over from the demo.
 - Unused CSS class definitions
 
+Any rule that reads `--motion-p` (or `--motion-mx` / `--motion-my`) is the seam
+between the motion engine and the design. Copy those rules unchanged, including
+their `calc()` expressions. Rewriting one into a static value silently removes the
+effect, and nothing errors.
+
 ### Step 5: Write Output
 
 Write the converted HTML to `<output-path>.tmp`, where `<output-path>` is the output path

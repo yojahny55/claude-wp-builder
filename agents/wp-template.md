@@ -91,6 +91,26 @@ Every variable output MUST be escaped with the appropriate function:
 
 **NEVER echo an unescaped variable.** No exceptions.
 
+### Motion attributes
+
+Every `data-motion-*` attribute on a demo section is copied into the template part
+**verbatim**. They are behaviour, not content: never turn one into an ACF field,
+never make one editable, and never drop one because a section became dynamic.
+
+Attribute values printed from PHP still pass through `esc_attr()`. Static values
+are written as literals:
+
+```php
+<section class="hero" data-motion="pin" data-motion-span="2.4">
+    <h1 class="hero__title" data-motion-cue="0 0.7 0">
+        <?php echo esc_html( prefix_get_field( 'hero_title' ) ); ?>
+    </h1>
+</section>
+```
+
+The signature move lives in `assets/js/signature.js` and reads `--motion-p`. Never
+inline page-specific motion JS into a template part.
+
 ## i18n Helper Functions (CRITICAL)
 
 This project uses custom helper functions for bilingual field retrieval. NEVER use raw `get_field()` directly. Always use the project's i18n wrappers.
