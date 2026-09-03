@@ -158,6 +158,12 @@ export function initMotion(gsap, ScrollTrigger) {
     }
 
     if (kind === 'kinetic') {
+      // ponytail: word-split only, real line-box splitting is out of scope.
+      // The split rebuilds the element from its words (textContent = ''), which
+      // destroys any nested inline markup, so skip elements that have any.
+      if (el.querySelector('*')) {
+        console.warn('[motion] kinetic: element has child markup, skipping split to avoid destroying it:', el);
+      } else {
       // Line boxes are measured, so the split has to wait for the real face.
       const run = () => {
         const words = (el.textContent || '').trim().split(/\s+/);
@@ -190,6 +196,7 @@ export function initMotion(gsap, ScrollTrigger) {
       };
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(run);
       else run();
+      }
     }
 
     if (kind === 'parallax') {

@@ -1,17 +1,25 @@
 # The device kit
 
+Adapted from nateherkai/scroll-craft (MIT).
+
 The attribute contract, exactly as declared:
 
 ```
-data-motion="reveal|pin|pan|wipe|kinetic|parallax|count|drift"
+data-motion="reveal|pin|pan|wipe|kinetic|parallax|drift|tilt|magnet|spotlight"
 data-motion-span="2.4"        pin and pan only, viewport heights
 data-motion-cue="0.1 0.7"     from to [rampIn rampOut] in section progress
-data-motion-rate="-0.6"       parallax plane rate
+data-motion-rate="-0.6"       parallax plane rate; also tilt/magnet strength
 data-motion-stagger="70"      ms between reveal children
 data-motion-count="0 3,500"   real figures only, written as it should render
 data-motion-dir="up|down|left|right|iris"   wipe direction
 data-motion-drift="#0A0806"   the page ground this section takes over
 ```
+
+`data-motion="<name>"` drives reveal, pin, pan, wipe, kinetic, parallax, drift,
+tilt, magnet and spotlight. `count` is the one exception: it is dispatched by
+the presence of `data-motion-count` alone, an element does not also need
+`data-motion="count"` set. The pointer devices (`tilt`, `magnet`, `spotlight`)
+are set with `data-motion="tilt"` etc, same as the scroll-driven devices.
 
 The rail inside a `pan` section is marked `data-motion-rail`; without it the
 engine falls back to the section's first element child.
@@ -30,6 +38,16 @@ Minimum useful span is 1.2, because a pinned section's travel is
 `max(height - viewport, 1)` and at span 1 every cue snaps between two scroll
 notches. Cue windows overlap by roughly 15%.
 
+`data-motion-span` only pins the number into the attribute contract and into
+what `/wp-demo-verify` checks against; the engine reads it for that warning
+but never sets a height and never turns on ScrollTrigger's `pin: true`. The
+author's own CSS has to make the section actually tall and sticky: give the
+section `height: calc(<span> * 100vh);` and give an inner wrapper
+`position: sticky; top: 0; height: 100vh;`. That sticky wrapper is what holds
+the frame in place while ScrollTrigger scrubs `--motion-p` against the
+section's scroll range; a `pin` section without this CSS will not visually
+pin, and `/wp-demo-verify` will report it as dead scroll.
+
 ### `pan`
 
 Travel is `scrollWidth - innerWidth`, so measure the overflow: a rail
@@ -46,9 +64,14 @@ shears ascenders and descenders; put the attribute on a wrapper.
 
 ### `kinetic`
 
-Split by lines almost always, words for a short punch line, characters
-approximately never. Line masks reserve room for descenders. Re-split after
-`document.fonts.ready`. One kinetic heading per section.
+The engine splits by words, not lines, characters approximately never: real
+line-box splitting would need measuring rendered line boxes, which this kit
+does not do. Reserve this device for short punch lines rather than wrapped
+paragraphs, where a word-by-word reveal still reads as one deliberate beat.
+Masks reserve room for descenders. Re-split after `document.fonts.ready`. One
+kinetic heading per section, and it must be plain text: an element with any
+child markup (`<a>`, `<em>`, `<br>`) is skipped rather than split, because the
+split rebuilds the element from its words and would destroy that markup.
 
 ### `parallax`
 

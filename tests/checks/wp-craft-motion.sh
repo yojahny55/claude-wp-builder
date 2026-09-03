@@ -10,8 +10,14 @@ fail() { echo "FAIL: $*"; exit 1; }
 m=starter-theme/__tailwind__/assets/js/src/motion.js
 i=starter-theme/__tailwind__/assets/js/src/index.js
 p=starter-theme/__tailwind__/package.json
+d=commands/wp-demo.md
 
 [ -f "$m" ] || fail "$m is missing"
+
+# --- motion.js uses `export`, so inlining it into a plain <script> is a
+#     SyntaxError that silently disables all motion. The inlining instruction
+#     must say type="module".
+grep -Fq 'type="module"' "$d" || fail "$d does not require type=\"module\" when inlining motion.js"
 
 # --- Every documented attribute is actually read. ---------------------------
 for a in data-motion data-motion-span data-motion-cue data-motion-rate \

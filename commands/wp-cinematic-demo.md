@@ -78,5 +78,4 @@ When the user runs `/wp-cinematic-init` after approval, the demo's scene blocks 
 
 - Verify the built demo with `/wp-demo-verify demo/index.html` before sending it for approval; it treats each scene section as a sample of the stage canvas, so a frozen clip gets reported instead of shipped.
 - `/wp-cinematic-encode` to swap placeholder videos for real ones
-- `/wp-responsive-check` to validate at 5 viewports BEFORE WP conversion
 - `/wp-polish` to normalize delimiters if a 3rd-party authored the demo

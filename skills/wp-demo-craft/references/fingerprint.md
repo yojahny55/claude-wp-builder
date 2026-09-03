@@ -1,5 +1,7 @@
 # The fingerprint gate
 
+Adapted from nateherkai/scroll-craft (MIT).
+
 A page's structure axis, not its palette, is what makes two builds feel
 related. The fingerprint gate stops a new build from silently repeating a
 prior one's shape.

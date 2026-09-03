@@ -1,5 +1,7 @@
 # Verify
 
+Adapted from nateherkai/scroll-craft (MIT).
+
 A scroll page cannot be checked by looking at it once. It has no single
 state: every scroll position is a different frame, and the failures live
 between the two you happened to look at. `/wp-demo-verify` walks it

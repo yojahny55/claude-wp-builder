@@ -270,8 +270,11 @@ to the Tailwind template only (the cinematic template has its own motion engine)
 - **plain**: delete `assets/js/src/motion.js`, remove the GSAP import from
   `assets/js/src/index.js` and the `gsap` dependency from `package.json`, and note in
   the summary that `wp-aos-animator` is the animation route for this project.
-- If `demo mode` is absent (no `/wp-demo` or `/wp-yolo` run yet), leave `motion.js` in
-  place: treat the project as undecided rather than guessing.
+- If `demo mode` is absent (no `/wp-demo` or `/wp-yolo` run yet), treat it as
+  **plain**, the same as an explicit `"demo mode": "plain"`: delete `motion.js`,
+  remove the GSAP import and the `gsap` dependency, and note `wp-aos-animator` as
+  the animation route. This mirrors the `i18n strategy` precedent: when the line
+  is absent, the project ships the default rather than an invented third state.
 
 ## Step 4: Replace All Placeholders
 

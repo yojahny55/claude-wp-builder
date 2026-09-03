@@ -74,7 +74,9 @@ before writing any markup.
 6. **Build.** Same delimiters, `:root` tokens and BEM as plain mode. Motion comes
    from `data-motion-*` attributes only. Inline the contents of
    `${CLAUDE_PLUGIN_ROOT}/starter-theme/__tailwind__/assets/js/src/motion.js` in a
-   `<script>` block, after loading GSAP and ScrollTrigger from
+   `<script type="module">` block (`motion.js` uses `export function initMotion`,
+   so a plain non-module `<script>` throws `SyntaxError: Unexpected token 'export'`
+   and silently disables all motion), after loading GSAP and ScrollTrigger from
    `https://cdnjs.cloudflare.com` with pinned versions. The signature move goes in
    its own `<script id="signature">` block so `/wp-init` can lift it to
    `assets/js/signature.js`.
