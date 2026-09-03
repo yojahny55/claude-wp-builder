@@ -213,7 +213,11 @@ fast.
 
 - `transform` and `opacity` only for anything continuous. `clip-path` is the
   sanctioned third, for wipes. Never animate width, height, margin, padding,
-  top or left, never `transition: all`.
+  top or left, never `transition: all`. Restrict continuous animation to
+  transform and opacity only.
+- `--motion-p` is the one new custom property this plugin introduces: a 0-to-1
+  value published per section by the motion engine. It is the seam anything
+  not covered by the device kit hooks into via `calc()`.
 - **Never `ease-in` on UI.** It delays the moment the eye is already on.
   `ease-out` at 200ms feels faster than `ease-in` at 200ms.
 - Built-in CSS easings are too weak. Use `--transition-ease-out`
