@@ -1,5 +1,31 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **`wp-demo-craft` skill and craft mode for `/wp-demo`, `/wp-yolo` and `/wp-polish`**: a
+  design floor, page grammars, a scroll-motion device kit and an anti-slop refuse list for
+  demos that need to feel premium rather than templated. `/wp-demo` now infers craft or plain
+  mode from the project's docs (`--craft`/`--plain` override it), records the choice as
+  `demo mode` in `.wp-create.json`, self-authors `demo/BRIEF.md` with a per-section feeling
+  curve, and checks the plan against `~/.claude/wp-builder/FINGERPRINTS.md` so two clients
+  never ship the same shape. Motion is a contract, not a library call: sections carry
+  `data-motion-*` attributes and an inlined `motion.js` bundle built on GSAP ScrollTrigger.
+  `/wp-polish --craft` runs the same skill as a retrofit audit against an existing demo
+  instead of a plain normalize pass.
+- **`/wp-demo-verify`**: replaces the single-screenshot check with a scroll walk: per-section
+  screenshots at desktop and mobile widths, a reduced-motion pass, full-page shots at five
+  breakpoints, and machine findings for dead scroll, cues that never reach full opacity,
+  horizontal overflow and clipped copy. `/wp-responsive-check` is now an alias that dispatches
+  to it. A green machine run is explicitly not a pass on its own; the command still requires
+  a human feel check against `demo/BRIEF.md`'s curve.
+- The cinematic path (`/wp-cinematic-demo`, `agents/wp-cinematic.md`) now reads
+  `skills/wp-demo-craft/` first for the same design floor and feeling curve a static craft
+  demo uses, with the kit's own contract still owning everything video-specific.
+  `/wp-demo-verify`'s dead-scroll check samples the stage `<canvas>` so a cinematic reel whose
+  video never actually changes between scenes is caught the same way as a static section with
+  no motion.
+
 ## [1.11.0] - 2026-09-02
 
 ### Added

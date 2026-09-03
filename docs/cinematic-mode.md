@@ -61,7 +61,18 @@ Generate the HTML demo first, send it to the client, and only then commit to Wor
 /wp-cinematic-demo --scenes=9 --brand=./brand-brief.md
 ```
 
-Output lands at `<theme>/demo/` with `<!-- SECTION: scene-N -->` delimiters so `/wp-polish` and `/wp-responsive-check` work on it like any other plugin demo.
+Output lands at `<theme>/demo/` with `<!-- SECTION: scene-N -->` delimiters so `/wp-polish` and `/wp-demo-verify` work on it like any other plugin demo.
+
+`/wp-cinematic-demo` and the `wp-cinematic` agent both read the `wp-demo-craft` skill first,
+for the same design floor, refuse list and feeling curve a static craft demo uses; the kit's
+own contract still owns everything video-specific (scene encoding, the scrub engine, mobile
+substitution), and wins where the two disagree on anything video-related. HUD scene numbers
+are optional, not required: a client-facing demo can drop them.
+
+`/wp-demo-verify` walks a cinematic demo the same way it walks any other; its dead-scroll check
+also samples a pixel from the stage `<canvas>` at every position, so a cinematic reel whose
+video stage never actually paints between scenes is caught the same way a static section with
+no motion is.
 
 ## Step 2 — Real videos
 

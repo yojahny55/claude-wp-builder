@@ -161,6 +161,21 @@ Send the demo to the client here — everything after this transcribes it.
 `/wp-tailwindify` is **auto** (run by `/wp-init` and `/wp-yolo`); run it by hand only to
 convert a demo outside those flows.
 
+### Craft demos
+
+`/wp-demo` chooses **craft** or **plain** mode before it writes anything, from
+`.claude/CLAUDE.md`, `docs/`, and `.wp-create.json` (`--craft`/`--plain` override the
+inference), and records the answer as `demo mode` in `.wp-create.json`. Craft is for a
+marketing, brand, launch or agency-campaign site: it self-authors `demo/BRIEF.md`, reads the
+`wp-demo-craft` skill for its page grammar and device kit, checks the plan against
+`~/.claude/wp-builder/FINGERPRINTS.md` so two clients never get the same shape, and drives
+motion through `data-motion-*` attributes plus an inlined `motion.js` bundle built on GSAP
+ScrollTrigger. Plain is for an admin tool, an intranet, or a data-heavy catalogue site, and
+carries no motion contract. `wp-aos-animator` remains the skill to reach for on a plain
+project that wants simple scroll animations; craft projects ship their own GSAP-based motion
+through the theme bundle instead. Run `/wp-demo-verify` after either mode to walk the demo
+and check what got built, see [`/wp-demo-verify`](commands.md#wp-demo-verify).
+
 ### B2. Header and footer — *required*
 
 ```
@@ -253,7 +268,7 @@ Full pipeline, dependency (`cinematic-scroll-kit`) and encoding details: [cinema
 | Command | Required? | Notes |
 |---------|-----------|-------|
 | `/wp-finalize` | recommended | Reports (never fixes) escaping, bilingual coverage, menus, theme structure; adds WP-CLI runtime checks when `.wp-create.json` exists. `/wp-yolo` runs it for you. |
-| `/wp-responsive-check <url-or-file>` | recommended | Screenshots at 375/576/768/1024/1440 and flags layout issues. Works on the demo file or the live URL. `/wp-yolo` runs it. |
+| `/wp-demo-verify <path-or-url> [--positions N]` | recommended | Scroll-walks the demo or live page, screenshots per section and viewport plus 375/576/768/1024/1440 full-page shots, and prints machine findings. `/wp-yolo` runs it; `/wp-responsive-check` is now an alias for it. |
 | `/wp-audit [--security --seo --a11y --performance --best-practices] [--report-only]` | optional | Audits and auto-fixes; installs Rank Math / AIOS as needed. |
 | `/wp-polylang <src> <dst>` | only under `i18n strategy: polylang` | Translates everything the demo did not cover into the second language. `/wp-seed` hands off to it. |
 | `/wp-tailwind-migrate <theme-path> [--page <slug>]` | only for old plain-CSS themes | Converts an already-built theme to Tailwind in place. Requires a clean git tree. |

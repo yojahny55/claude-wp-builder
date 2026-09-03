@@ -94,6 +94,15 @@ The Polylang path is real code with real failure modes: translations join throug
 local `$args` into `$GLOBALS` — the scripts do not work without that require. PHP 7.4 floor:
 no `match`, no union types.
 
+### Craft vs plain is a recorded decision
+
+`/wp-demo` (and `/wp-yolo`) choose craft or plain mode from the project's docs and write the
+answer as `demo mode` into `.wp-create.json`. Every downstream command branches on that line
+(`/wp-init`, `/wp-section`, `/wp-finalize`), so read it instead of re-deriving it. Craft builds
+read `skills/wp-demo-craft/` and ship GSAP plus `motion.js` in the theme bundle; plain builds
+ship neither and use the `wp-aos-animator` skill instead. When the line is absent, the project
+predates the choice and is `plain`.
+
 ## Authoring conventions
 
 **Command** (`commands/<name>.md`) — frontmatter with `description`, `allowed-tools`,

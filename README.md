@@ -122,6 +122,11 @@ else.
 /wp-seed                          # fills pages, media, fields, menus (needs .wp-create.json)
 ```
 
+`/wp-demo` picks craft or plain mode from the project's docs (`--craft`/`--plain` override it)
+and records the answer as `demo mode` in `.wp-create.json`. Craft mode reads the `wp-demo-craft`
+skill for a marketing/brand/launch site; plain mode is the existing single-file demo with no
+motion contract, for an admin tool, intranet or catalogue.
+
 ### Path C — cinematic
 
 `/wp-cinematic-init` → `/wp-cinematic-demo` → `/wp-cinematic-encode` per video →
@@ -162,7 +167,8 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-settings <text>` | B | optional | Extend the settings page |
 | `/wp-seed [file]` | B | required for content | Pages, media, fields, menus from the demo |
 | `/wp-finalize` | all | recommended | Pre-delivery checklist |
-| `/wp-responsive-check <url>` | all | recommended | 5-viewport layout check |
+| `/wp-demo-verify <path-or-url> [--positions N]` | all | recommended | Scroll-walk demo/live page, screenshots per section and viewport, machine findings plus a contact sheet to read yourself |
+| `/wp-responsive-check <url>` | all | recommended | Alias, dispatches `/wp-demo-verify` (5-viewport layout check is now one part of what it walks) |
 | `/wp-audit [flags]` | all | optional | Security, SEO, a11y, performance, best practices |
 | `/wp-polylang <src> <dst>` | all | polylang only | Translate the site through Polylang |
 | `/wp-tailwind-migrate <theme>` | legacy | optional | Plain-CSS theme → Tailwind in place |
@@ -190,6 +196,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `wp-css-system` | CSS design system: custom properties, BEM naming, scales (`template=basic` only) |
 | `wp-tailwind-system` | Tailwind authoring conventions — the utility-first decision ladder and file layout (`template=tailwind` only) |
 | `wp-demo` | Demo HTML creation methodology |
+| `wp-demo-craft` | Design floor, page grammars, a scroll-motion device kit and an anti-slop refuse list for premium demos |
 | `wp-responsive` | Mobile-first responsive patterns, fluid typography, touch targets |
 | `wp-cli-patterns` | WP-CLI best practices for all agents (saves tokens vs PHP generation) |
 | `wp-aos-animator` | AOS scroll animation installer — audits, enqueues, initializes, and seeds animations across templates |

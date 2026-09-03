@@ -119,22 +119,36 @@ dispatches the commands above.
 ### `/wp-demo`
 
 ```
-/wp-demo [brief]
+/wp-demo [brief] [--craft|--plain]
 /wp-demo iterate
 ```
 
 Writes `demo/index.html` with `<!-- ============ SECTION: name ============ -->` delimiters.
 Uses `frontend-design` and `ui-ux-pro-max` skills when installed. Requires `.claude/CLAUDE.md`.
 
+Before generating, picks **craft** or **plain** mode from `.claude/CLAUDE.md` (including the
+Project Constraints section `/wp-context` writes), anything under `docs/`, and
+`.wp-create.json`; `--craft`/`--plain` override the inference. The choice is written back as
+`demo mode` in `.wp-create.json` so downstream commands do not re-derive it. Craft mode
+self-authors `demo/BRIEF.md` (brand rules, audience pain and promise, two or three named
+references, vibe words, a per-section feeling curve with one named peak), reads the
+`wp-demo-craft` skill for its page grammar and device kit, checks the plan against
+`~/.claude/wp-builder/FINGERPRINTS.md` before building (the plan must differ from every prior
+row on at least 4 of 6 axes) and wires motion through `data-motion-*` attributes plus the
+inlined `motion.js` bundle. Plain mode is the existing single-file demo with no motion
+contract.
+
 ### `/wp-polish`
 
 ```
-/wp-polish [path-to-html]    # default: demo/index.html in place
+/wp-polish [path-to-html] [--craft]    # default: demo/index.html in place
 ```
 
 Detects sections, adds delimiters, normalizes to semantic HTML5, applies BEM classes.
 Preserves an unpolished copy of the source document at `demo/.prepolish/<source-filename>`
-and never overwrites a copy already there.
+and never overwrites a copy already there. `--craft` runs a retrofit audit against the
+`wp-demo-craft` skill instead of a plain normalize pass, and may recommend restructuring the
+page; converting a plain demo to craft is a rebuild, not a polish.
 
 ### `/wp-tailwindify`
 
@@ -230,13 +244,42 @@ No arguments. Reports (does not fix) escaping, `prefix_get_field()` usage, bilin
 coverage, responsive breakpoints, menus, theme structure; adds WP-CLI runtime checks (pages,
 menus, ACF fields, plugins) when `.wp-create.json` exists.
 
+### `/wp-demo-verify`
+
+```
+/wp-demo-verify <file-path-or-url> [--positions N]
+```
+
+Defaults to `demo/index.html`. Pass a URL to check a converted WordPress page instead, the
+only way to prove the demo's motion survived conversion; serve files over HTTP, since a
+`file://` page silently falls back on anything it tries to fetch and proves nothing. Walks
+each section at N positions (default 6) at 1440x900 and 390x844, plus a reduced-motion pass
+at desktop width, then takes full-page screenshots at 375, 576, 768, 1024 and 1440 (this is
+what `/wp-responsive-check` now dispatches to). Output lands in `<dir>/.verify/<width>/`:
+`findings.json` and one `sheet.png` per width.
+
+Four machine findings: dead scroll (consecutive positions where nothing changed, unless
+`demo/BRIEF.md` records it as authored silence), a cue that never reaches full opacity, any
+horizontal overflow, and copy clipped by its own hidden-overflow box.
+
+Three exit codes: `0` no machine findings, `1` findings printed, `2` no usable browser. On
+exit code 2, fall back in order: the Chrome or Playwright MCP screenshot tools if either is
+connected, otherwise ask the user for screenshots at the five viewports.
+
+**A green machine run alone is not a pass.** Open every `sheet.png`, then run the feel check
+from `skills/wp-demo-craft/references/feel.md`: scroll the page cold, write one word per
+section, and only then diff that felt curve against the one recorded in `demo/BRIEF.md`.
+Where they disagree, the page is wrong, not the brief.
+
 ### `/wp-responsive-check`
 
 ```
 /wp-responsive-check <url-or-file-path>
 ```
 
-375 / 576 / 768 / 1024 / 1440 px screenshots plus a layout-issue report.
+Alias, dispatches straight to `/wp-demo-verify $ARGUMENTS`. The 375 / 576 / 768 / 1024 / 1440
+px screenshots this command used to cover are one part of what that walk now does; a single
+static screenshot per breakpoint cannot show scroll motion, which is why the check moved.
 
 ### `/wp-audit`
 
