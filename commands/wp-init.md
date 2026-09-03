@@ -261,7 +261,7 @@ missing source fails while the rest of the flow carries on.
 ## Step 3.5: Wire Motion for the Recorded Demo Mode
 
 Read `demo mode` from `.wp-create.json` (written by `/wp-demo` or `/wp-yolo`). Applies
-to the Tailwind template only — the cinematic template has its own motion engine.
+to the Tailwind template only (the cinematic template has its own motion engine).
 
 - **craft**: keep `motion.js`, the GSAP import in `assets/js/src/index.js`, and the
   `gsap` dependency in `package.json` as copied. If the demo has a
@@ -271,7 +271,7 @@ to the Tailwind template only — the cinematic template has its own motion engi
   `assets/js/src/index.js` and the `gsap` dependency from `package.json`, and note in
   the summary that `wp-aos-animator` is the animation route for this project.
 - If `demo mode` is absent (no `/wp-demo` or `/wp-yolo` run yet), leave `motion.js` in
-  place — treat the project as undecided rather than guessing.
+  place: treat the project as undecided rather than guessing.
 
 ## Step 4: Replace All Placeholders
 

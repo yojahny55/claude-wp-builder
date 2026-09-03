@@ -8,7 +8,7 @@ argument-hint: "[path-to-html] [--craft]"
 
 Normalize any HTML file into a plugin-compatible demo with section delimiters, semantic HTML5, and BEM class naming. Works with external HTML (Figma exports, hand-coded, other tools) or existing demos that need structural cleanup.
 
-### `--craft` — retrofit audit
+### `--craft` (retrofit audit)
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/SKILL.md` and audit the existing
 demo against the refuse list and the taste floor. Report findings as a list, each
