@@ -2,30 +2,32 @@
  * motion.js — the plugin's scroll-motion contract.
  *
  * Reads `data-motion-*` attributes off section markup and drives them with GSAP +
- * ScrollTrigger. Nothing here is page-specific: the demo and the WordPress theme
- * share this one file, so behaviour never drifts between the two.
+ * ScrollTrigger. Nothing here is page-specific: a demo and the WordPress theme it
+ * converts into run the identical file, which is why the attributes survive
+ * conversion while inline per-page JS would not.
  *
- * Two entry points:
- *  - `export function initMotion(gsap, ScrollTrigger)` — theme bundle import.
- *  - `window.WPMotion.init()` — inline demo use, GSAP already global there.
- *
- * Accessibility floor, not opt-in:
- *  - REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches
- *  - FINE    = window.matchMedia('(hover: hover)').matches
+ * Two entry points on purpose. A demo inlines this file and calls
+ * window.WPMotion.init() with GSAP already on window; the theme bundle imports
+ * initMotion and passes the modules in.
  */
 
-/** Parse a `data-motion-cue="from [to [rampIn [rampOut]]]"` into an opacity-at-progress function. */
+const REDUCED = () =>
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const FINE = () =>
+  window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+/** Parse `from [to [rampIn [rampOut]]]` into an opacity function of progress. */
 function parseCue(value) {
   const n = String(value).trim().split(/\s+/).map(Number);
   const from = isFinite(n[0]) ? n[0] : 0;
-  const to = n.length > 1 && isFinite(n[1]) ? n[1] : null; // null = hold to end
+  const to = n.length > 1 && isFinite(n[1]) ? n[1] : null; // null = hold to the end
   const span = (to === null ? 1 : to) - from;
-  // Ramps default to a 30% window each. A cue with no plateau touches full
+  // Ramps default to 30% of the window each. A cue with no plateau touches full
   // opacity for a single instant, which reads as a permanently faded heading.
   const rampIn = n.length > 2 && isFinite(n[2]) ? n[2] : Math.abs(span) * 0.3;
   const rampOut = n.length > 3 && isFinite(n[3]) ? n[3] : Math.abs(span) * 0.3;
   return function opacityAt(p) {
-    if (p < from) return 0;
+    if (p < from) return rampIn === 0 ? (p >= from ? 1 : 0) : 0;
     if (rampIn > 0 && p < from + rampIn) return (p - from) / rampIn;
     if (to === null) return 1;
     if (p >= to) return 0;
@@ -34,7 +36,7 @@ function parseCue(value) {
   };
 }
 
-/** Format a counter target, inferring decimals and grouping from how the template is written. */
+/** Format a counter target, inferring decimals and separators from how it is written. */
 function formatNum(value, template) {
   const decimals = (template.split('.')[1] || '').length;
   const grouped = template.indexOf(',') !== -1 || Math.abs(Number(template.replace(/,/g, ''))) >= 10000;
@@ -45,26 +47,21 @@ function formatNum(value, template) {
   return parts.join('.');
 }
 
-/**
- * Bind every `data-motion-*` device in the document to GSAP/ScrollTrigger.
- * Safe to call more than once; a document-level flag prevents double binding.
- */
 export function initMotion(gsap, ScrollTrigger) {
   if (!gsap || !ScrollTrigger) return;
   if (document.documentElement.dataset.motionReady === '1') return;
   document.documentElement.dataset.motionReady = '1';
   gsap.registerPlugin(ScrollTrigger);
 
-  const REDUCED = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const FINE = () => window.matchMedia('(hover: hover)').matches;
   const reduced = REDUCED();
+  const fine = FINE() && !reduced;
 
   document.querySelectorAll('[data-motion]').forEach((el) => {
     const kind = el.getAttribute('data-motion');
     const span = parseFloat(el.getAttribute('data-motion-span')) || 0;
 
-    // Cued children: reveal-style opacity/translate driven by --motion-p, applied
-    // via ScrollTrigger below for pin/pan/kinetic/wipe/drift host elements.
+    // Cue elements belong to the section's own progress, so they are collected
+    // once and driven from onUpdate rather than each owning a ScrollTrigger.
     const cued = Array.prototype.map.call(
       el.querySelectorAll('[data-motion-cue]'),
       (node) => ({ node: node, at: parseCue(node.getAttribute('data-motion-cue')) })
@@ -82,10 +79,10 @@ export function initMotion(gsap, ScrollTrigger) {
 
     if (kind === 'pin' || kind === 'pan' || kind === 'kinetic' || kind === 'wipe' || kind === 'drift') {
       // A pinned section's travel is max(height - viewport, 1). Below a span of
-      // about 1.2 a handful of pixels crosses every cue instead of running.
+      // about 1.2 that is a handful of pixels and every cue snaps instead of running.
       if (span && span < 1.2 && kind === 'pin') {
-        // ponytail: warn rather than correct — the author picked this span on
-        // purpose, and silently rewriting it hides the finding from /wp-demo-verify.
+        // ponytail: warn rather than correct — the author picked the span on purpose,
+        // and silently rewriting it hides the finding from /wp-demo-verify.
         console.warn('[motion] pin span below 1.2 will snap:', el);
       }
       ScrollTrigger.create({
@@ -103,8 +100,8 @@ export function initMotion(gsap, ScrollTrigger) {
       if (rail) {
         const travel = () => Math.max(0, rail.scrollWidth - window.innerWidth);
         if (reduced) {
-          // The rail IS navigation here, so zeroing its transform would strand
-          // every item past the fold. Hand it back a native scroll region.
+          // The rail IS the navigation here, so zeroing the transform would strand
+          // every item past the fold. Hand it back as a native scroll region.
           rail.style.overflowX = 'auto';
           rail.style.scrollSnapType = 'x proximity';
         } else {
@@ -123,12 +120,12 @@ export function initMotion(gsap, ScrollTrigger) {
 
     if (kind === 'reveal') {
       const stagger = (parseFloat(el.getAttribute('data-motion-stagger')) || 70) / 1000;
-      const kids = el.children.length ? Array.prototype.slice.call(el.children) : [el];
-      gsap.set(kids, { opacity: 0, y: rise });
+      const kids = el.children.length ? el.children : [el];
+      gsap.set(kids, { opacity: 0, y: reduced ? 0 : rise });
       ScrollTrigger.create({
         trigger: el,
         start: 'top 88%',
-        once: true, // content re-hiding on the way back up is a defect, not an effect
+        once: true, // content that re-hides on the way back up is a defect, not an effect
         onEnter: () =>
           gsap.to(kids, {
             opacity: 1,
@@ -161,7 +158,7 @@ export function initMotion(gsap, ScrollTrigger) {
     }
 
     if (kind === 'kinetic') {
-      // Line boxes need to be measured, so wait for real faces before splitting.
+      // Line boxes are measured, so the split has to wait for the real face.
       const run = () => {
         const words = (el.textContent || '').trim().split(/\s+/);
         el.textContent = '';
@@ -176,14 +173,14 @@ export function initMotion(gsap, ScrollTrigger) {
           el.appendChild(document.createTextNode(' '));
           return inner;
         });
-        gsap.set(units, { y: reduced ? 0 : 110, opacity: reduced ? 1 : 0 });
+        gsap.set(units, { yPercent: reduced ? 0 : 110, opacity: reduced ? 0 : 1 });
         ScrollTrigger.create({
           trigger: el,
           start: 'top 85%',
           once: true,
           onEnter: () =>
             gsap.to(units, {
-              y: 0,
+              yPercent: 0,
               opacity: 1,
               duration: 0.7,
               ease: 'power3.out',
@@ -233,6 +230,7 @@ export function initMotion(gsap, ScrollTrigger) {
     const from = Number(String(raw[0]).replace(/,/g, ''));
     const targetText = raw[1] || raw[0];
     const to = Number(String(targetText).replace(/,/g, ''));
+    const ms = parseFloat(el.getAttribute('data-motion-count-ms')) || 1400;
     el.style.fontVariantNumeric = 'tabular-nums';
     if (reduced) {
       el.textContent = formatNum(to, targetText);
@@ -246,7 +244,7 @@ export function initMotion(gsap, ScrollTrigger) {
       onEnter: () =>
         gsap.to(state, {
           v: to,
-          duration: 1.4,
+          duration: ms / 1000,
           ease: 'power3.out',
           onUpdate: () => {
             el.textContent = formatNum(state.v, targetText);
@@ -255,48 +253,47 @@ export function initMotion(gsap, ScrollTrigger) {
     });
   });
 
-  // Pointer-only devices, gated to fine pointers so touch never gets a stuck hover state.
-  if (!reduced && FINE()) {
-    document.querySelectorAll('[data-motion="tilt"]').forEach((el) => {
-      const rate = parseFloat(el.getAttribute('data-motion-rate')) || 6;
-      el.addEventListener('pointermove', (e) => {
-        const r = el.getBoundingClientRect();
-        const px = (e.clientX - r.left) / r.width - 0.5;
-        const py = (e.clientY - r.top) / r.height - 0.5;
-        gsap.to(el, { rotateX: -py * rate, rotateY: px * rate, duration: 0.4, ease: 'power2.out' });
-      });
-      el.addEventListener('pointerleave', () => {
-        gsap.to(el, { rotateX: 0, rotateY: 0, duration: 0.6, ease: 'power2.out' });
-      });
-    });
+  if (!fine) return;
 
-    document.querySelectorAll('[data-motion="magnet"]').forEach((el) => {
-      const k = parseFloat(el.getAttribute('data-motion-rate')) || 0.28;
-      el.addEventListener('pointermove', (e) => {
-        const r = el.getBoundingClientRect();
-        gsap.to(el, {
-          x: (e.clientX - (r.left + r.width / 2)) * k,
-          y: (e.clientY - (r.top + r.height / 2)) * k,
-          duration: 0.4,
-          ease: 'power2.out',
-        });
-      });
-      el.addEventListener('pointerleave', () =>
-        gsap.to(el, { x: 0, y: 0, duration: 0.5, ease: 'power2.out' })
-      );
+  document.querySelectorAll('[data-motion="tilt"]').forEach((el) => {
+    const deg = parseFloat(el.getAttribute('data-motion-rate')) || 6;
+    el.addEventListener('pointermove', (e) => {
+      const r = el.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      gsap.to(el, { rotateY: x * deg, rotateX: -y * deg, duration: 0.4, ease: 'power2.out' });
     });
+    el.addEventListener('pointerleave', () =>
+      gsap.to(el, { rotateY: 0, rotateX: 0, duration: 0.6, ease: 'power2.out' })
+    );
+  });
 
-    document.querySelectorAll('[data-motion="spotlight"]').forEach((el) => {
-      el.addEventListener('pointermove', (e) => {
-        const r = el.getBoundingClientRect();
-        el.style.setProperty('--motion-mx', ((e.clientX - r.left) / r.width).toFixed(4));
-        el.style.setProperty('--motion-my', ((e.clientY - r.top) / r.height).toFixed(4));
+  document.querySelectorAll('[data-motion="magnet"]').forEach((el) => {
+    const k = parseFloat(el.getAttribute('data-motion-rate')) || 0.28;
+    el.addEventListener('pointermove', (e) => {
+      const r = el.getBoundingClientRect();
+      gsap.to(el, {
+        x: (e.clientX - (r.left + r.width / 2)) * k,
+        y: (e.clientY - (r.top + r.height / 2)) * k,
+        duration: 0.4,
+        ease: 'power2.out',
       });
     });
-  }
+    el.addEventListener('pointerleave', () =>
+      gsap.to(el, { x: 0, y: 0, duration: 0.5, ease: 'power2.out' })
+    );
+  });
+
+  document.querySelectorAll('[data-motion="spotlight"]').forEach((el) => {
+    el.addEventListener('pointermove', (e) => {
+      const r = el.getBoundingClientRect();
+      el.style.setProperty('--motion-mx', ((e.clientX - r.left) / r.width).toFixed(4));
+      el.style.setProperty('--motion-my', ((e.clientY - r.top) / r.height).toFixed(4));
+    });
+  });
 }
 
-// Inline-in-a-demo entry: GSAP is already global there.
+// Inline-in-a-demo entry: GSAP is already a global there.
 window.WPMotion = {
   init: () => initMotion(window.gsap, window.ScrollTrigger),
 };
