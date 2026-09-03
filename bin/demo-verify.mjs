@@ -8,7 +8,8 @@
  * half-faded headlines and clipped copy live.
  *
  * Exit codes: 0 clean, 1 findings, 2 no usable browser (distinct on purpose, so
- * the caller can fall back to MCP screenshot tools rather than reporting a failure).
+ * the caller can fall back to MCP screenshot tools rather than reporting a failure),
+ * 3 the walk itself crashed (not a findings report).
  */
 import { existsSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
@@ -80,6 +81,24 @@ if (!executablePath) {
   process.exit(2);
 }
 
+// The five legacy /wp-responsive-check viewports. One full-page shot each, at the
+// top of the page, no scroll-walk: this is layout coverage, not motion coverage.
+const RESPONSIVE_WIDTHS = [375, 576, 768, 1024, 1440];
+
+/** One full-page screenshot per legacy viewport, filenames responsive-<width>.png,
+ *  restoring the convention /wp-tailwind-migrate's visual-golden workflow depends on. */
+async function captureResponsiveShots(browser, url, outDir) {
+  for (const width of RESPONSIVE_WIDTHS) {
+    const height = width <= 480 ? 812 : 900;
+    const context = await browser.newContext({ viewport: { width, height } });
+    const page = await context.newPage();
+    await page.goto(url, { waitUntil: 'load' });
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: join(outDir, 'responsive-' + width + '.png'), fullPage: true });
+    await context.close();
+  }
+}
+
 /** Read one frame's signature plus its static defects. Runs inside the page. */
 const probe = () => {
   const sig = [];
@@ -119,11 +138,15 @@ const probe = () => {
   };
 };
 
-const browser = await chromium.launch({ executablePath, args: ['--autoplay-policy=no-user-gesture-required'] });
+let browser;
+let exitCode = 0;
 const findings = [];
 const sections = [];
 
-for (const size of widths) {
+try {
+  browser = await chromium.launch({ executablePath, args: ['--autoplay-policy=no-user-gesture-required'] });
+
+  for (const size of widths) {
   for (const reduced of size === widths[0] ? [false, true] : [false]) {
     const label = size.width + (reduced ? '-reduced' : '');
     const dir = join(outDir, String(label));
@@ -187,20 +210,18 @@ for (const size of widths) {
     }
 
     // The contact sheet. Reading the frames side by side is the whole point;
-    // a folder of PNGs never gets looked at that way.
+    // a folder of PNGs never gets looked at that way. Written to a real file and
+    // loaded via file://, because Chromium blocks file:// subresources (the <img>
+    // tags below) from a setContent()/about:blank document context.
     const files = Array.from({ length: shot }, (_, n) => String(n).padStart(3, '0') + '.png');
+    const sheetHtml =
+      '<body style="margin:0;background:#111;display:grid;grid-template-columns:repeat(6,1fr);gap:4px">' +
+      files.map((f) => '<img src="' + f + '" style="width:100%;display:block">').join('') +
+      '</body>';
+    writeFileSync(join(dir, 'sheet.html'), sheetHtml);
     const sheet = await browser.newPage();
     await sheet.setViewportSize({ width: 1200, height: 800 });
-    await sheet.setContent(
-      '<body style="margin:0;background:#111;display:grid;grid-template-columns:repeat(6,1fr);gap:4px">' +
-        files
-          .map(
-            (f) =>
-              '<img src="file://' + join(dir, f) + '" style="width:100%;display:block">'
-          )
-          .join('') +
-        '</body>'
-    );
+    await sheet.goto('file://' + join(dir, 'sheet.html'), { waitUntil: 'load' });
     await sheet.waitForTimeout(400);
     await sheet.screenshot({ path: join(dir, 'sheet.png'), fullPage: true });
     await sheet.close();
@@ -208,14 +229,29 @@ for (const size of widths) {
   }
 }
 
-await browser.close();
-mkdirSync(outDir, { recursive: true });
-writeFileSync(join(outDir, 'findings.json'), JSON.stringify({ url, findings }, null, 2));
+  await captureResponsiveShots(browser, url, outDir);
 
-if (findings.length === 0) {
-  console.log('demo-verify: no machine findings. Read the contact sheets before calling this a pass.');
-  process.exit(0);
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(join(outDir, 'findings.json'), JSON.stringify({ url, findings }, null, 2));
+
+  if (findings.length === 0) {
+    console.log('demo-verify: no machine findings. Read the contact sheets before calling this a pass.');
+    exitCode = 0;
+  } else {
+    for (const f of findings) console.log('FINDING ' + f.kind + ' ' + JSON.stringify(f));
+    console.log('demo-verify: ' + findings.length + ' finding(s). Sheets under ' + outDir);
+    exitCode = 1;
+  }
+} catch (err) {
+  console.error('demo-verify: the walk crashed:', err && err.stack ? err.stack : err);
+  exitCode = 3;
+} finally {
+  if (browser) {
+    try {
+      await browser.close();
+    } catch {
+      /* already closed or never fully opened */
+    }
+  }
 }
-for (const f of findings) console.log('FINDING ' + f.kind + ' ' + JSON.stringify(f));
-console.log('demo-verify: ' + findings.length + ' finding(s). Sheets under ' + outDir);
-process.exit(1);
+process.exit(exitCode);

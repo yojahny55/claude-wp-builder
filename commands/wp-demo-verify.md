@@ -29,7 +29,8 @@ desktop width, then full-page shots at 375, 576, 768, 1024 and 1440 (this replac
 `/wp-responsive-check`). Output lands in `<dir>/.verify/<width>/`, with
 `findings.json` and one `sheet.png` per width.
 
-Exit codes: `0` no machine findings, `1` findings printed, `2` no usable browser.
+Exit codes: `0` no machine findings, `1` findings printed, `2` no usable browser,
+`3` the walk itself crashed (not a findings report, something threw mid-walk).
 
 **On exit code 2**, fall back in this order: the Chrome or Playwright MCP
 screenshot tools if either is connected, then ask the user for screenshots at the

@@ -53,6 +53,15 @@ grep -Fq -- '--motion-p' "$s" || fail "$s does not read --motion-p when detectin
 grep -Fq 'process.exit(2)' "$s" || fail "$s does not exit 2 when no browser is available"
 node --check "$s" || fail "$s is not valid JavaScript"
 
+# --- The five legacy viewports must be IMPLEMENTED, not just promised in prose.
+#     A grep-gate that only greps the markdown proves the promise was written,
+#     not that it was kept: this asserts the script itself writes the shots.
+grep -Fq 'responsive-' "$s" || fail "$s does not write responsive-<width>.png files"
+grep -Fq 'fullPage: true' "$s" || fail "$s does not take a full-page screenshot"
+for v in 375 576 768 1024 1440; do
+  grep -Fq "$v" "$s" || fail "$s does not implement the $v viewport (docs promise it, code must too)"
+done
+
 # --- The alias. The old command keeps working or every existing doc breaks. --
 grep -Fq '/wp-demo-verify' "$r" || fail "$r does not dispatch to /wp-demo-verify"
 
