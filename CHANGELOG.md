@@ -1,5 +1,30 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **`/wp-robin` and `/wp-aos-animator` — runner commands for the plugin's only two action
+  skills.** Every skill here is `user-invocable: false`, which is the layer rule and stays
+  that way, so the two skills that actually *do* something had no way in: the README once
+  carried phantom command rows for them, those were removed, and the docs then told users to
+  describe the task in prose — discoverable only by reading docs a user typing a slash never
+  opens. `/wp-robin [wp-root]` resolves and validates a WordPress root, checks the database
+  client and webp converter the skill requires, and runs the skill's bundled `robin-fix.sh`
+  with `WP_ROOT` set. `/wp-aos-animator [<theme>] [templates…] [--report-only]` sequences the
+  skill's audit → install → enqueue → init → animate pipeline and dispatches one subagent per
+  template for the animate phase, with `--report-only` stopping after the audit on the same
+  contract as `/wp-audit`'s flag. Both commands dispatch and never reimplement: the phases,
+  the settings, the skip list and the animation table stay in the skills, which remain the
+  source of truth. New check: `tests/checks/skill-runner-commands.sh`, whose load-bearing
+  assertions are the negative ones — that neither skill has been flipped to
+  `user-invocable: true`, and that neither command carries a copy of the procedure it runs.
+
+### Changed
+- **The docs no longer say these two capabilities have no slash command.** `README.md`,
+  `docs/commands.md` and `docs/workflows.md` each said so, correctly, until now; all three
+  now state that the skills are invoked through their runner commands while remaining
+  non-invocable themselves, so the layer rule reads as intact rather than abandoned.
+
 ## [1.12.1] - 2026-09-04
 
 ### Changed

@@ -232,10 +232,14 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-cinematic-seed` | C | required | Seed every scene from a manifest, idempotent |
 | `/wp-debug [issue]` | utility | — | WP-CLI diagnostics and fixes |
 | `/wp-clone --from --to` | utility | — | Clone a remote site locally |
+| `/wp-robin [wp-root]` | utility | — | Runner for the `wp-robin` skill — install and configure Robin Image Optimizer, unstick the bulk queue, generate missing `.webp` |
+| `/wp-aos-animator [theme] [--report-only]` | utility | — | Runner for the `wp-aos-animator` skill — audit, install, enqueue, initialize and seed AOS scroll animations across the templates |
 | `/wp-contribute <new\|check\|pr\|release>` | contributors | — | Work on the plugin itself — scaffold a command/agent/skill with its check and doc rows, verify the repo, open the PR |
 
 \* Optional if WordPress is already running: without `.wp-create.json`, `/wp-seed` and `/wp-debug` fall back to a bare `wp` on PATH and the languages in `.claude/CLAUDE.md`.
-`wp-robin` and `wp-aos-animator` are skills, not commands — ask for them in plain language.
+The `wp-robin` and `wp-aos-animator` skills are invoked through their runner commands,
+`/wp-robin` and `/wp-aos-animator`. The skills stay `user-invocable: false` and keep owning the
+procedure; the commands only dispatch them.
 
 ## Architecture
 
@@ -252,8 +256,8 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `wp-demo-craft` | Design floor, page grammars, a scroll-motion device kit and an anti-slop refuse list for premium demos |
 | `wp-responsive` | Mobile-first responsive patterns, fluid typography, touch targets |
 | `wp-cli-patterns` | WP-CLI best practices for all agents (saves tokens vs PHP generation) |
-| `wp-aos-animator` | AOS scroll animation installer — audits, enqueues, initializes, and seeds animations across templates |
-| `wp-robin` | Robin Image Optimizer fixer — installs, configures, unsticks bulk optimization, generates .webp files |
+| `wp-aos-animator` | AOS scroll animation installer — audits, enqueues, initializes, and seeds animations across templates. Run through `/wp-aos-animator` |
+| `wp-robin` | Robin Image Optimizer fixer — installs, configures, unsticks bulk optimization, generates .webp files. Run through `/wp-robin` |
 | `wp-environments` | Environment detection and the WP-CLI wrapper every command runs through |
 | `wp-audit-standards` | Audit criteria, severity definitions, report schema and quality thresholds for the `wp-audit-*` agents |
 | `wp-audit-seo-standards` | Rank Math configuration reference, schema JSON-LD templates, meta patterns and SEO seeding commands |
