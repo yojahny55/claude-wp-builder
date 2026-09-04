@@ -1,20 +1,31 @@
 # Workflows
 
 How to get from "nothing" to a working WordPress theme, on each of the three paths the
-plugin supports. Every path shares the same two setup commands and the same three
+plugin supports. Every path shares the same setup, the same demo stage and the same
 finishing commands; only the middle differs.
+
+**The demo is the input to all three paths, not a step inside one of them.** `/wp-init`
+reads it to learn the project, `/wp-yolo` converts it page by page, `/wp-section
+--transcribe` copies its declared values into CSS, and `/wp-seed` turns its files into WP
+Pages. Nothing downstream invents design: it transcribes what the demo already decided, so
+there is no path that begins at WordPress.
 
 ```
 SETUP           /wp-create (optional)  →  /wp-init  →  /wp-context (optional)
                                               │
+DEMO       ┌──────────────────────────────────┴──────────────────────────────┐
+required   │ have a mockup    →  /wp-init path/to/mockup.html (reads it, skips the interview)
+           │ files in demo/   →  /wp-polish demo/index.html
+           │ nothing yet      →  /wp-init, then /wp-demo  |  /wp-cinematic-demo
+           └──────────────────────────────────┬──────────────────────────────┘
+                                              │
 BUILD      ┌──────────────────────────────────┼──────────────────────────────┐
            │ A. Full demo folder              │ B. Step by step              │ C. Cinematic
-           │    /wp-yolo <folder>             │    /wp-demo | /wp-polish     │    /wp-cinematic-*
-           │    (runs everything below)       │    /wp-header /wp-footer     │    see cinematic-mode.md
-           │                                  │    /wp-section … /wp-page …  │
+           │    /wp-yolo <demo folder>        │    /wp-header /wp-footer     │    /wp-cinematic-*
+           │    (runs everything below)       │    /wp-section … /wp-page …  │    see cinematic-mode.md
            │                                  │    /wp-seed                  │
            └──────────────────────────────────┴──────────────────────────────┘
-FINISH          /wp-finalize  →  /wp-responsive-check  →  /wp-audit (optional)
+FINISH          /wp-finalize  →  /wp-demo-verify  →  /wp-audit (optional)
 ```
 
 Legend used below: **required** = the path does not work without it · **optional** =
@@ -99,10 +110,61 @@ client changes scope; it replaces its own block and overwrites the manifest.
 
 ---
 
+## The demo (all paths) — *required*
+
+Every path converts a demo, so this stage always happens. Three ways in, by what you already
+have.
+
+### You already have a mockup
+
+```
+/wp-init path/to/mockup.html
+```
+
+`/wp-init` copies it to `demo/index.html`, runs `/wp-polish` on it when it has no section
+delimiters, and then reads the project name, industry, colours and fonts **out of the demo**
+rather than interviewing you. This is the shortest way in when a client sent HTML, and it is
+why you should not run a bare `/wp-init` first out of habit: with no demo present that flow
+never triggers and you answer by hand what the file already knew. A bare `/wp-init` will also
+offer to adopt an existing `demo/index.html` if it finds one.
+
+### You already have files in `demo/`
+
+```
+/wp-polish demo/index.html
+```
+
+Drop any HTML into `demo/` yourself, then normalize it: section delimiters, semantic HTML5,
+BEM classes. An unpolished copy is kept at `demo/.prepolish/<source-filename>` and never
+overwritten. For a multi-page site put every page in `demo/` and let Path A convert the
+folder in one pass.
+
+### You have nothing yet
+
+```
+/wp-init                 # answer the project questions, writes .claude/CLAUDE.md
+/wp-demo                 # generate demo/index.html from a brief
+/wp-demo iterate         # re-read the existing demo and iterate
+/wp-cinematic-demo       # the video-reel equivalent on path C
+```
+
+`/wp-demo` reads `.claude/CLAUDE.md`, so it runs **after** `/wp-init`. That is the only
+ordering constraint in either direction: bring a mockup and `/wp-init` consumes it, bring
+nothing and `/wp-init` sets up the questions `/wp-demo` answers from.
+
+Send the demo to the client here. Everything after this transcribes it, and
+`/wp-demo-verify demo/index.html` will walk it before the WordPress build rather than only
+after.
+
+---
+
 ## Path A — Full demo folder → site with `/wp-yolo`
 
 **Use when** you have a complete, approved multi-page HTML site (a folder of `*.html` plus
-`css/`, `img/`, fonts) and want the whole theme in one pass.
+`css/`, `img/`, fonts) and want the whole theme in one pass. That folder is the demo from the
+stage above, just with more than one page in it: hand-authored, client-supplied, or polished
+from a mockup. `/wp-yolo` normalizes each page before converting it, so pages without section
+delimiters are fine.
 
 ```
 /wp-yolo ./demo-folder             # one checkpoint after normalization, then hands-off
@@ -145,19 +207,12 @@ incremental; re-running it redoes the whole site.
 **Use when** you are designing the site as you go, only have a one-page mockup, or want to
 review each piece before the next.
 
-### B1. Get a demo — *required, pick one*
+### B1. Get a demo — *required*
 
-```
-/wp-demo                 # generate demo/index.html from a brief (asks for one if omitted)
-/wp-demo iterate         # re-read the existing demo and iterate
-/wp-polish path/to/mockup.html   # normalize a mockup you already have into demo/index.html
-```
+Done in [The demo](#the-demo-all-paths--required) above, which applies to every path. Path B
+picks up from an existing `demo/index.html`.
 
 `/wp-demo` uses the `frontend-design` and `ui-ux-pro-max` skills when installed.
-`/wp-polish` adds section delimiters and BEM classes; it preserves an unpolished copy of the
-source document at `demo/.prepolish/<source-filename>` and never overwrites one already there.
-Send the demo to the client here — everything after this transcribes it.
-
 `/wp-tailwindify` is **auto** (run by `/wp-init` and `/wp-yolo`); run it by hand only to
 convert a demo outside those flows.
 

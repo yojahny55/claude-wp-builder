@@ -82,6 +82,11 @@ Add to your project's `.claude/settings.json` so all collaborators get it automa
 
 ## Workflow
 
+**Every path builds from a demo.** The demo is not a step in one recipe, it is the source
+of truth the WordPress build transcribes: `/wp-init` reads it to learn the project,
+`/wp-yolo` converts it page by page, `/wp-section --transcribe` copies its declared values,
+and `/wp-seed` turns its files into WP Pages. There is no path that starts at WordPress.
+
 ### Setup (every path)
 
 ```
@@ -91,6 +96,36 @@ Add to your project's `.claude/settings.json` so all collaborators get it automa
 /wp-context                                  # optional: reads docs/ (scope sheets, design PDF) → constraints + scope manifest.
                                              #           /wp-init runs it automatically when docs/ exists
 ```
+
+If you already hold a mockup, pass it straight to `/wp-init` (next section) instead of
+running it bare — it will read the project details out of the file rather than asking you.
+
+### Get a demo (every path, before any WordPress work)
+
+Three ways in. Pick the one that matches what you already have.
+
+```
+# 1. You already have a mockup (client HTML, a Figma export, anything)
+/wp-init path/to/mockup.html    # copies it to demo/index.html, polishes it if it has no
+                                # section delimiters, and reads the project name, industry,
+                                # colours and fonts OUT of the demo instead of asking you
+
+# 2. You have files already sitting in demo/
+/wp-polish demo/index.html      # adds section delimiters, semantic HTML5, BEM classes.
+                                # /wp-init also offers to adopt an existing demo/index.html
+
+# 3. You have nothing yet
+/wp-init                        # answer the project questions first, it writes .claude/CLAUDE.md
+/wp-demo                        # then generate demo/index.html from a brief (needs that file)
+/wp-cinematic-demo              # or the video-reel equivalent on the cinematic path
+```
+
+Order matters in one direction only: `/wp-demo` needs `.claude/CLAUDE.md`, so it runs
+*after* `/wp-init`. Going the other way, when you already hold a mockup, hand it to
+`/wp-init` directly and skip the interview.
+
+A multi-page site is the same thing with more files: put every page in `demo/` and Path A
+converts the folder in one pass.
 
 ### Path A — full demo folder in one pass
 
@@ -109,9 +144,9 @@ else.
 
 ### Path B — step by step
 
+Starts from the demo you produced above.
+
 ```
-/wp-demo                          # generate demo/index.html from a brief   ┐ one of the two
-/wp-polish path/to/mockup.html    # or normalize an existing mockup          ┘
 /wp-header                        # required
 /wp-footer                        # required
 /wp-section hero                  # required, once per demo section
@@ -141,11 +176,17 @@ motion contract, for an admin tool, intranet or catalogue.
 /wp-polylang es en                        # only when i18n strategy is polylang
 ```
 
-### Polishing an existing demo
+### More on the demo
 
 `/wp-polish` normalizes any HTML into a plugin-compatible demo: detects sections, adds
 section delimiters, semantic HTML5 and BEM classes. It preserves an unpolished copy of the
 source document at `demo/.prepolish/<source-filename>` and never overwrites a copy already there.
+Run it on anything you drop into `demo/` yourself; `/wp-init` and `/wp-yolo` also run it for
+you when a page arrives without delimiters, since nothing downstream can split a page without them.
+
+`/wp-demo-verify demo/index.html` walks the demo by scrolling it and reports dead scroll,
+overflow, cues that never reach full opacity and clipped copy, then hands back a contact
+sheet to read. Worth running before the WordPress build, not only after.
 
 ## Commands Reference
 
