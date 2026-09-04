@@ -321,10 +321,25 @@ export function initMotion(gsap, ScrollTrigger) {
       const r = el.getBoundingClientRect();
       const x = (e.clientX - r.left) / r.width - 0.5;
       const y = (e.clientY - r.top) / r.height - 0.5;
-      gsap.to(el, { rotateY: x * deg, rotateX: -y * deg, duration: 0.4, ease: 'power2.out' });
+      // transformPerspective is what makes this read as the 3D rotation
+      // devices.md documents. Without a perspective the rotation projects
+      // orthographically and a 6deg tilt just squashes the element sideways.
+      gsap.to(el, {
+        rotateY: x * deg,
+        rotateX: -y * deg,
+        transformPerspective: 800,
+        duration: 0.4,
+        ease: 'power2.out',
+      });
     });
     el.addEventListener('pointerleave', () =>
-      gsap.to(el, { rotateY: 0, rotateX: 0, duration: 0.6, ease: 'power2.out' })
+      gsap.to(el, {
+        rotateY: 0,
+        rotateX: 0,
+        transformPerspective: 800,
+        duration: 0.6,
+        ease: 'power2.out',
+      })
     );
   });
 

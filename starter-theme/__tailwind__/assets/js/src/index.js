@@ -12,7 +12,18 @@ import { initMotion } from './motion.js';
 // Wrapped in a DOM-ready check: a bundle enqueued before the DOM is parsed
 // would find no [data-motion] elements, and motion.js's motionReady guard
 // blocks a later retry once it has run once.
-const startMotion = () => initMotion(gsap, ScrollTrigger);
+// Guarded at the boundary too: the per-section try/catch inside initMotion
+// covers the [data-motion] loop, but the counter and pointer-device loops sit
+// outside it. On the readyState !== 'loading' path this call runs during module
+// evaluation, so an escaping throw would abort the rest of this file and take
+// unrelated theme JavaScript (the mobile menu below) down with it.
+const startMotion = () => {
+  try {
+    initMotion(gsap, ScrollTrigger);
+  } catch (err) {
+    console.warn('[motion] failed to start theme motion:', err);
+  }
+};
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', startMotion);
 } else {

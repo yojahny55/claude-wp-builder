@@ -128,7 +128,14 @@ const probe = () => {
   });
   const cues = [];
   document.querySelectorAll('[data-motion-cue]').forEach((el, i) => {
-    const o = Number(getComputedStyle(el).opacity);
+    // A cue that is not rendered at this width (mobile-only copy behind a
+    // display:none at desktop, most often) never gets driven, so its opacity
+    // sits at its initial value forever and scores a cue-never-peaks finding
+    // for copy the reader was never shown. getClientRects also catches the
+    // case where the cue is fine but an ancestor is hidden.
+    const style = getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden' || el.getClientRects().length === 0) return;
+    const o = Number(style.opacity);
     sig.push(o.toFixed(2));
     cues.push({ i, text: (el.textContent || '').trim().slice(0, 60), opacity: o });
   });
