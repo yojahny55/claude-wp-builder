@@ -282,6 +282,10 @@ export function initMotion(gsap, ScrollTrigger) {
 
   // Counters. Only real figures ever reach this attribute; see devices.md.
   document.querySelectorAll('[data-motion-count]').forEach((el) => {
+    // Isolated like the sections above: this loop runs outside that try/catch,
+    // so one malformed data-motion-count used to abort the pointer devices and
+    // everything after them.
+    try {
     const raw = el.getAttribute('data-motion-count').trim().split(/\s+/);
     // A one-value attribute counts from zero to that target. Reading raw[0] as
     // the start in that case made from and to the same number, so the tween ran
@@ -311,6 +315,9 @@ export function initMotion(gsap, ScrollTrigger) {
           },
         }),
     });
+    } catch (err) {
+      console.warn('[motion] failed to initialise counter, skipping it:', el, err);
+    }
   });
 
   if (!fine) return;
@@ -372,10 +379,18 @@ export function initMotion(gsap, ScrollTrigger) {
 window.WPMotion = {
   init: () => initMotion(window.gsap, window.ScrollTrigger),
 };
+// Guarded like the theme bundle's entry: an escaping error here would surface
+// as an uncaught exception in the demo page rather than a logged warning.
+const safeInlineInit = () => {
+  if (!window.gsap || !window.ScrollTrigger) return;
+  try {
+    window.WPMotion.init();
+  } catch (err) {
+    console.warn('[motion] failed to start inline motion:', err);
+  }
+};
 if (document.readyState !== 'loading') {
-  if (window.gsap && window.ScrollTrigger) window.WPMotion.init();
+  safeInlineInit();
 } else {
-  document.addEventListener('DOMContentLoaded', () => {
-    if (window.gsap && window.ScrollTrigger) window.WPMotion.init();
-  });
+  document.addEventListener('DOMContentLoaded', safeInlineInit);
 }

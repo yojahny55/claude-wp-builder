@@ -262,9 +262,11 @@ Four machine findings: dead scroll (consecutive positions where nothing changed,
 `demo/BRIEF.md` records it as authored silence), a cue that never reaches full opacity, any
 horizontal overflow, and copy clipped by its own hidden-overflow box.
 
-Three exit codes: `0` no machine findings, `1` findings printed, `2` no usable browser. On
-exit code 2, fall back in order: the Chrome or Playwright MCP screenshot tools if either is
-connected, otherwise ask the user for screenshots at the five viewports.
+Four exit codes: `0` no machine findings, `1` findings printed, `2` no usable browser, `3`
+the walk itself crashed (not a findings report). On exit code 2, fall back in order: the
+Chrome or Playwright MCP screenshot tools if either is connected, otherwise ask the user for
+screenshots at the five viewports. On exit code 3, report the crash rather than reading the
+run as clean.
 
 **A green machine run alone is not a pass.** Open every `sheet.png`, then run the feel check
 from `skills/wp-demo-craft/references/feel.md`: scroll the page cold, write one word per

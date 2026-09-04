@@ -28,7 +28,23 @@ if (args.includes('--help')) {
 // reserved for "no usable browser" so a caller can fall back to MCP screenshots.
 // Exiting 2 on a bare invocation made a missing argument look like a missing
 // browser and sent the caller down the wrong branch of that ladder.
-const target = args[0] && !args[0].startsWith('--') ? args[0] : 'demo/index.html';
+//
+// The target is the first argument that is neither a flag nor a flag's value.
+// Testing args[0] alone silently dropped the target in
+// `demo-verify.mjs --positions 6 other.html` and verified the default instead.
+const VALUE_FLAGS = new Set(['--out', '--positions', '--widths']);
+const positional = () => {
+  for (let i = 0; i < args.length; i++) {
+    if (VALUE_FLAGS.has(args[i])) {
+      i++; // skip the value this flag consumes
+      continue;
+    }
+    if (args[i].startsWith('--')) continue;
+    return args[i];
+  }
+  return null;
+};
+const target = positional() || 'demo/index.html';
 const opt = (name, dflt) => {
   const i = args.indexOf(name);
   return i === -1 ? dflt : args[i + 1];
@@ -59,25 +75,47 @@ const outDir = resolve(
 function findChrome() {
   if (process.env.WP_DEMO_CHROME && existsSync(process.env.WP_DEMO_CHROME))
     return process.env.WP_DEMO_CHROME;
-  const candidates = [
-    '/usr/bin/google-chrome',
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  ];
-  for (const c of candidates) if (existsSync(c)) return c;
+  const win = process.platform === 'win32';
+  // Windows was unreachable before: with no candidate paths and no cache root
+  // for it, findChrome returned null and the command exited 2 (no usable
+  // browser) on a machine that had Chrome installed.
+  const candidates = win
+    ? [
+        join(process.env.PROGRAMFILES || 'C:\\Program Files', 'Google\\Chrome\\Application\\chrome.exe'),
+        join(process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Google\\Chrome\\Application\\chrome.exe'),
+        process.env.LOCALAPPDATA
+          ? join(process.env.LOCALAPPDATA, 'Google\\Chrome\\Application\\chrome.exe')
+          : null,
+      ]
+    : [
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
+        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      ];
+  for (const c of candidates) if (c && existsSync(c)) return c;
   // Playwright's own download, when the user has run `npx playwright install`.
   // Walked with readdirSync rather than a glob: fs.globSync landed in Node 22 and
   // importing it outright makes this whole script a SyntaxError on Node 18 and 20.
-  const cache = join(homedir(), '.cache/ms-playwright');
-  if (existsSync(cache)) {
-    for (const entry of readdirSync(cache)) {
-      for (const tail of [
+  // macOS caches under ~/Library/Caches, not ~/.cache, so all roots are tried.
+  const cacheRoots = win
+    ? [join(process.env.LOCALAPPDATA || homedir(), 'ms-playwright')]
+    : [
+        join(homedir(), '.cache/ms-playwright'),
+        join(homedir(), 'Library/Caches/ms-playwright'),
+      ];
+  const tails = win
+    ? ['chrome-win\\chrome.exe']
+    : [
         'chrome-linux64/chrome',
         'chrome-linux/chrome',
         'chrome-mac/Chromium.app/Contents/MacOS/Chromium',
-      ]) {
+      ];
+  for (const cache of cacheRoots) {
+    if (!existsSync(cache)) continue;
+    for (const entry of readdirSync(cache)) {
+      for (const tail of tails) {
         const p = join(cache, entry, tail);
         if (existsSync(p)) return p;
       }
@@ -171,8 +209,12 @@ const sections = [];
 try {
   browser = await chromium.launch({ executablePath, args: ['--autoplay-policy=no-user-gesture-required'] });
 
+  // The docs promise the reduced-motion pass at desktop width. Pinning it to
+  // widths[0] meant a mobile-first --widths list ran it at the phone size and
+  // skipped the desktop check entirely, so pick the widest explicitly.
+  const reducedPassAt = widths.reduce((a, b) => (b.width > a.width ? b : a), widths[0]);
   for (const size of widths) {
-  for (const reduced of size === widths[0] ? [false, true] : [false]) {
+  for (const reduced of size === reducedPassAt ? [false, true] : [false]) {
     const label = size.width + (reduced ? '-reduced' : '');
     const dir = join(outDir, String(label));
     mkdirSync(dir, { recursive: true });
@@ -239,15 +281,20 @@ try {
           const prior = peak.get(c.i);
           peak.set(c.i, { text: c.text, max: Math.max(prior ? prior.max : 0, c.opacity) });
         });
+        // Every finding records which pass produced it: a defect that only
+        // appears under reduced motion needs a different fix from the same
+        // symptom in the normal pass, and without this they were identical
+        // rows in findings.json.
+        const pass = reduced ? 'reduced' : 'normal';
         if (frame.overflow)
-          findings.push({ kind: 'overflow', width: size.width, section: b.id, y: Math.round(y) });
+          findings.push({ kind: 'overflow', pass, width: size.width, section: b.id, y: Math.round(y) });
         frame.clipped.forEach((t) =>
-          findings.push({ kind: 'clipped-copy', width: size.width, section: b.id, text: t })
+          findings.push({ kind: 'clipped-copy', pass, width: size.width, section: b.id, text: t })
         );
         if (previous !== null && frame.signature === previous && frame.signature !== '') stalls++;
         else stalls = 0;
         if (stalls >= 2 && !reduced)
-          findings.push({ kind: 'dead-scroll', width: size.width, section: b.id, y: Math.round(y) });
+          findings.push({ kind: 'dead-scroll', pass, width: size.width, section: b.id, y: Math.round(y) });
         previous = frame.signature;
       }
     }
@@ -255,7 +302,7 @@ try {
       for (const { text, max } of peak.values()) {
         // Below 0.85 a line is never graded for contrast anywhere, and the reader
         // sees washed-out type at whatever position they stop on.
-        if (max < 0.85) findings.push({ kind: 'cue-never-peaks', width: size.width, text, max: Number(max.toFixed(2)) });
+        if (max < 0.85) findings.push({ kind: 'cue-never-peaks', pass: 'normal', width: size.width, text, max: Number(max.toFixed(2)) });
       }
     }
 
