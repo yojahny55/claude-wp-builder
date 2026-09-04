@@ -13,8 +13,8 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-init`](#wp-init) | all | **required** | `.wp-create.json`, `demo/index.html` | theme dir, `.claude/CLAUDE.md` |
 | [`/wp-context`](#wp-context) | all | auto / optional | `docs/**` | `.claude/CLAUDE.md` constraints block, `docs/.scope-manifest.json` |
 | [`/wp-yolo`](#wp-yolo) | A | **required** | demo folder, `.claude/CLAUDE.md`, scope manifest | everything below it |
-| [`/wp-demo`](#wp-demo) | B | required (or polish) | brief | `demo/index.html` |
-| [`/wp-polish`](#wp-polish) | B | required (or demo); auto in init | any HTML | `demo/index.html`, `demo/.prepolish/<file>` |
+| [`/wp-demo`](#wp-demo) | all | demo stage | brief, `.claude/CLAUDE.md` | `demo/index.html` |
+| [`/wp-polish`](#wp-polish) | all | demo stage; auto in init and yolo | any HTML | `demo/index.html`, `demo/.prepolish/<file>` |
 | [`/wp-tailwindify`](#wp-tailwindify) | A, B | auto | `demo/*.html` | Tailwind-native HTML |
 | [`/wp-header`](#wp-header) | B | **required** | demo header | `header.php`, nav walker, Header settings fields, CSS |
 | [`/wp-footer`](#wp-footer) | B | **required** | demo footer | `footer.php`, Footer fields, CSS |
@@ -24,7 +24,8 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-settings`](#wp-settings) | B | optional | `fields/settings.php` | new settings fields |
 | [`/wp-seed`](#wp-seed) | B | required for content | demo HTML, `.wp-create.json` | WP pages, media, ACF values, menus |
 | [`/wp-finalize`](#wp-finalize) | all | recommended | theme, WP-CLI | report only |
-| [`/wp-responsive-check`](#wp-responsive-check) | all | recommended | URL or file | screenshots + report |
+| [`/wp-demo-verify`](#wp-demo-verify) | all | recommended | URL or file | `.verify/` screenshots, contact sheet, findings |
+| [`/wp-responsive-check`](#wp-responsive-check) | all | alias | URL or file | runs `/wp-demo-verify` |
 | [`/wp-audit`](#wp-audit) | all | optional | theme, WP-CLI | fixes, Rank Math / AIOS config |
 | [`/wp-polylang`](#wp-polylang) | all (polylang) | required under `polylang` | WP content | translated posts/terms |
 | [`/wp-tailwind-migrate`](#wp-tailwind-migrate) | legacy | optional | plain-CSS theme | Tailwind theme in place |
@@ -114,7 +115,13 @@ dispatches the commands above.
 
 ---
 
-## Path B
+## The demo (every path)
+
+Every path converts a demo, so one of these runs before any WordPress work. Which one
+depends on what you already have: a mockup goes to `/wp-init path/to/mockup.html` (it reads
+the project out of the file, see [`/wp-init`](#wp-init)); files you dropped into `demo/`
+go through `/wp-polish`; starting from nothing, `/wp-init` then `/wp-demo`. The one ordering
+rule: `/wp-demo` needs `.claude/CLAUDE.md`, so it runs after `/wp-init`.
 
 ### `/wp-demo`
 
@@ -159,6 +166,12 @@ page; converting a plain demo to craft is a rebuild, not a polish.
 Converts CSS-class HTML into Tailwind utilities, keeps delimiters, maps colors to `@theme`
 variables. Default output `<demo-dir>/index-tailwind.html`; `--out` equal to the input
 converts in place (how `/wp-yolo` uses it, after backing up to `demo/.original/`).
+
+---
+
+## Path B
+
+Builds the theme one piece at a time from `demo/index.html`.
 
 ### `/wp-header` · `/wp-footer`
 

@@ -13,7 +13,7 @@ Pick cinematic when **all** of the following are true:
 - Scroll is the primary interaction — there's no traditional fold.
 - Editorial typography, hairline UI, motion-aware accessibility matter to the brand.
 
-Pick **basic** or **tailwind** otherwise — they're more economical for landing pages, marketing sites, blogs, and most B2B work.
+Pick the default **tailwind** template otherwise — it is more economical for landing pages, marketing sites, blogs, and most B2B work.
 
 Hybrid mode (default-on) lets you mix: the reel for the hero/story portion, then normal sections (pricing, contact, FAQ) after. Most real cinematic builds are hybrid.
 
