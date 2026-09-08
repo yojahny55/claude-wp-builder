@@ -339,6 +339,31 @@ Placement follows `/wp-yolo` Step 4.5 — on `Template: tailwind` that is
 `assets/css/src/tailwindcss/base/fonts.css` plus its `@import` in `main.css`, and **no second
 enqueue**: the Tailwind theme enqueues exactly one compiled stylesheet.
 
+**Preload exactly one file.** A self-hosted face is discovered only after the stylesheet
+parses, so the first paint costs an extra round trip. Preload the file that fixes it — the
+**primary family's regular (400) latin subset**, and **never every subset**: the
+`unicode-range` blocks are cheap precisely because the browser skips the ones it will not
+render, and preloading them all downloads Cyrillic and Greek faces to a site that shows
+neither. One family, one weight, one subset; the rest load on demand.
+
+Add it where the deleted Google preconnect used to sit in `functions.php`, guarded on the
+file actually existing so a skipped carry cannot emit a hint pointing at nothing:
+
+```php
+add_action( 'wp_head', function() {
+    $font = get_template_directory() . '/assets/fonts/<primary-regular-latin>.woff2';
+    if ( file_exists( $font ) ) {
+        printf(
+            '<link rel="preload" as="font" type="font/woff2" href="%s" crossorigin>' . "\n",
+            esc_url( get_template_directory_uri() . '/assets/fonts/<primary-regular-latin>.woff2' )
+        );
+    }
+}, 1 );
+```
+
+`crossorigin` is mandatory even same-origin — fonts are fetched in CORS mode, and a preload
+without it downloads the file twice.
+
 **No network, or a font that will not download.** Do not emit a `@font-face` pointing at a
 file the theme does not have — `/wp-yolo` Step 4.5 states why. Leave the family at the head of
 its token so the demo's own fallback stack applies, and report it in the Step 10 summary as

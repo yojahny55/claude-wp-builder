@@ -39,25 +39,35 @@ if grep -rq 'fonts\.googleapis\.com' "$starter"; then
   exit 1
 fi
 
-# 3. The starter names no family it does not ship. Behavioral, not wording: pull the quoted
-#    family names out of the --font-* tokens and require a carried file for each.
-#    A system stack is exempt -- "Segoe UI" and "Helvetica Neue" are quoted but come from
-#    the OS, and /wp-finalize's font-parity check makes the same carve-out. Judge the whole
-#    declaration: if it resolves through system-ui / -apple-system it is a system stack.
-named=$(grep -E '^\s*--font-[a-z]+:' "$main_css" \
-  | grep -vE 'system-ui|-apple-system' \
-  | grep -oE '"[^"]+"' | tr -d '"' | sort -u || true)
-if [[ -n "$named" ]]; then
-  while read -r fam; do
-    [[ -z "$fam" ]] && continue
-    grep -rqi "$fam" "$starter/assets/fonts" 2>/dev/null \
-      || fail "$main_css names the font family '$fam', which the starter neither ships in assets/fonts/ nor loads -- it renders as the next entry in the stack"
-  done <<< "$named"
-fi
-grep -Eq '^\s*--font-primary:.*system-ui' "$main_css" \
-  || fail "$main_css's default --font-primary is not a system stack -- with no demo there is no font to carry, so a system stack is the only value that renders as written"
+# 3. The starter names no family it does not ship. Behavioral, not wording.
+#    Judge the HEAD of each stack, not the presence of a keyword anywhere in it:
+#    `"Inter", system-ui, sans-serif` is not a system stack -- Inter is what renders
+#    wherever it exists, and naming it unloaded is this whole defect. Anything after the
+#    first family is a fallback and never has to be carried, which is the same carve-out
+#    /wp-finalize's font-parity check makes for an intentional system stack.
+while IFS= read -r line; do
+  decl=${line#*:}
+  first=${decl%%,*}
+  first=$(printf '%s' "$first" | tr -d '";' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+  [[ -z "$first" ]] && continue
+  case "$(printf '%s' "$first" | tr '[:upper:]' '[:lower:]')" in
+    ui-sans-serif|ui-serif|ui-monospace|ui-rounded|system-ui|-apple-system|blinkmacsystemfont) continue ;;
+    sans-serif|serif|monospace|cursive|fantasy|inherit|initial|unset|revert) continue ;;
+    var\(*) continue ;;
+  esac
+  grep -rqi -- "$first" "$starter/assets/fonts" 2>/dev/null \
+    || fail "$main_css leads --font-* with the family '$first', which the starter neither ships in assets/fonts/ nor loads -- it silently renders the next entry in the stack"
+done < <(grep -E '^\s*--font-[a-z]+:' "$main_css")
 
-# 4. /wp-yolo agrees. It used to permit a Google Fonts preconnect; two commands giving
+# 4. /wp-init emits a preload, and emits it for ONE file. Preloading every unicode-range
+#    subset defeats the lazy loading that makes carrying them all cheap, so the contract is
+#    the narrow one; a check that only grepped for `preload` would pass on the pessimization.
+grep -Fq 'rel="preload"' "$init" \
+  || fail "$init's font carry emits no preload hint -- a self-hosted face is discovered only after the CSS parses, costing a round trip on first paint"
+grep -Fq 'never every subset' "$init" \
+  || fail "$init no longer scopes the preload to one file -- preloading every unicode-range subset downloads faces the page never renders"
+
+# 5. /wp-yolo agrees. It used to permit a Google Fonts preconnect; two commands giving
 #    different answers about the same demo is how the fallback shipped in the first place.
 grep -Fq 'Never emit a `fonts.googleapis.com` request' "$yolo" \
   || fail "$yolo no longer forbids runtime Google Fonts requests -- it contradicts $init's self-hosting rule"
