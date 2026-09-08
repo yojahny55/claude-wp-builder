@@ -151,6 +151,15 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
 - **Parent structure mirrors the source.** Both parent fixup passes rewrite the counterpart's parent
   on every run, so a post or term an editor deliberately re-parented in the target language is put
   back. Only the ACF reference pass records ownership; parents do not.
+- **The site tagline is written in the primary language only.** `/wp-init` Step 9 sets
+  `blogname` and `blogdescription` from the confirmed tagline; under `i18n strategy: polylang`
+  the secondary language is left to `/wp-polylang`, which exports both as registered strings.
+  Writing them is still the prerequisite — Polylang omits an empty option from its string table.
+- **Fonts are carried once, at scaffold time.** `/wp-init` Step 4.5 self-hosts the demo's
+  families; `/wp-section`, `/wp-header` and `wp-css` do not detect fonts, on purpose — fonts
+  are a site-wide asset and per-section detection would repeat the download N times and race
+  under `/wp-yolo`'s concurrent section builds. The cost is that a demo swapped in *after*
+  `/wp-init` has run brings no new fonts with it: re-run the step, or carry the woff2 by hand.
 - **`/wp-init`'s Polylang path has never been run end-to-end against a fresh project.** Its scripts
   are covered by `tests/checks/wp-polylang-live.sh` against a real site, but the command's own
   branching is prose, verified only by the grep checks in `tests/checks/wp-polylang.sh` and

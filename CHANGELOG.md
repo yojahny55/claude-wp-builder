@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+### Added
+- **`/wp-robin` and `/wp-aos-animator` — runner commands for the plugin's only two action
+  skills.** Every skill here is `user-invocable: false`, which is the layer rule and stays
+  that way, so the two skills that actually *do* something had no way in: the README once
+  carried phantom command rows for them, those were removed, and the docs then told users to
+  describe the task in prose — discoverable only by reading docs a user typing a slash never
+  opens. `/wp-robin [wp-root]` resolves and validates a WordPress root, checks the database
+  client and webp converter the skill requires, and runs the skill's bundled `robin-fix.sh`
+  with `WP_ROOT` set. `/wp-aos-animator [<theme>] [templates…] [--report-only]` sequences the
+  skill's audit → install → enqueue → init → animate pipeline and dispatches one subagent per
+  template for the animate phase, with `--report-only` stopping after the audit on the same
+  contract as `/wp-audit`'s flag. Both commands dispatch and never reimplement: the phases,
+  the settings, the skip list and the animation table stay in the skills, which remain the
+  source of truth. New check: `tests/checks/skill-runner-commands.sh`, whose load-bearing
+  assertions are the negative ones — that neither skill has been flipped to
+  `user-invocable: true`, and that neither command carries a copy of the procedure it runs.
+
+### Changed
+- **The docs no longer say these two capabilities have no slash command.** `README.md`,
+  `docs/commands.md` and `docs/workflows.md` each said so, correctly, until now; all three
+  now state that the skills are invoked through their runner commands while remaining
+  non-invocable themselves, so the layer rule reads as intact rather than abandoned.
+
 ### Fixed
 - **A bare `/wp-yolo <folder>` skipped its own checkpoint.** The command name was being
   read as the `--yolo` flag, Step 1 called the default mode "hands-off", and Step 3 said
@@ -17,6 +40,37 @@
   dispatch instruction each, and a completion rule says a run that reaches the report
   without all three is incomplete, under `--yolo` too. Step 5.5 also pointed at the wrong
   Step 5 item for `/wp-finalize`. Same check guards it.
+- **`/wp-init` never wrote the site's name or tagline, so every scaffolded site shipped
+  "Just another WordPress site."** The command already asked for a one-sentence description
+  and then dropped it on the floor: `blogname` was set only by `/wp-create`'s
+  `core install --title` (so an adopted site kept the previous project's name) and
+  `blogdescription` was set by nothing at all. Both are `critical` in `/wp-finalize`'s
+  Layer 2 gate, which therefore failed on every project by construction. `/wp-init` now
+  extracts a tagline from the demo (`<meta name="description">`, then the hero subtitle),
+  shows it among the demo-first defaults for confirmation, prompts for it when there is no
+  demo, and writes both options next to theme activation. Under `i18n strategy: polylang`
+  this writes the primary language only — but that is the point, because Polylang omits an
+  empty option from its string table entirely, so an unset tagline was not even translatable.
+  New check: `tests/checks/wp-init-site-identity.sh`.
+- **The theme named fonts it never loaded, so every non-`/wp-yolo` build rendered in a
+  fallback stack.** `/wp-init` Step D4 wrote the demo's font *names* into `--font-primary`
+  / `--font-secondary` and nothing ever carried a font file, which is why a converted theme
+  looks "almost right" and nobody can say what changed. Three parts, one cause: the Tailwind
+  starter shipped `--font-primary: "Inter"` with no `@font-face` and no Inter anywhere, so
+  even a demo-less scaffold rendered in the system fallback; `functions.php` preconnected to
+  `fonts.googleapis.com` unconditionally while the theme never made one request to it — a
+  dead hint on every page; and the demo's families were never fetched at all. New `/wp-init`
+  **Step 4.5: Font carry** self-hosts every family the theme names, including Google Fonts
+  (downloading the woff2 with a browser user-agent — the default `curl` UA silently gets the
+  legacy TTF build, and every fetch uses -f so an error page is never written into a .woff2),
+  guarantees `font-display: swap` on every carried block rather than only keeping it where
+  Google emitted it, drops a family that could not be carried from the head of its token
+  instead of leaving the theme naming a font it does not have, preloads the one file that pays for itself (the primary family's regular
+  latin subset — preloading every unicode-range subset would defeat the lazy loading that
+  makes carrying them all cheap), and the starter's default tokens are now a system stack,
+  which is the only value that renders as written when there is no demo. `/wp-yolo` Step 4.5 stops
+  permitting a Google Fonts preconnect so both commands give one answer.
+  New check: `tests/checks/wp-init-font-carry.sh`.
 
 ## [1.12.1] - 2026-09-04
 

@@ -92,7 +92,10 @@ Read the manifest and extract:
 - `wp_cli.wrapper` → use for WP-CLI commands instead of bare `wp`
 - `project.domain` → use for site URL references
 
-**Skip Step 1 entirely** — all project details come from the manifest.
+**Skip Step 1 entirely** — all project details come from the manifest, with one exception: the
+manifest carries no tagline. Take it from the demo when the Demo-First Path runs, and otherwise
+ask Step 1's **Tagline** question on its own. Skipping it leaves Step 9 writing an empty site
+description, which is the state `/wp-finalize` fails on.
 
 ### If `.wp-create.json` does NOT exist:
 
@@ -136,9 +139,10 @@ Parse the demo HTML and extract as much as possible:
 | Industry | Analyze headings and body text for industry keywords. Examples: "patients"/"medical" → healthcare, "cases"/"legal" → law, "menu"/"dishes" → restaurant, "portfolio"/"design" → creative. If uncertain, set to "general". |
 | Primary language | Read the `<html lang="">` attribute. Fall back to content language detection. Default: `en`. |
 | Secondary language | Look for `lang=""` attributes on sub-elements, or content in a second language. Default: `es`. |
+| Tagline | `<meta name="description">` content. Fall back to the hero subtitle (the `<p>` next to the hero `<h1>`), then to a one-line summary of the hero copy. Strip the project name if the meta merely repeats it. This becomes the WordPress site description (`blogdescription`) in Step 9. |
 | Sections | List all section names from `<!-- ============ SECTION: Name ============ -->` delimiters (exclude Header and Footer). |
 | Color palette | Read `:root` CSS custom properties for `--color-*` values. If no `:root`, scan for dominant colors in inline styles. |
-| Fonts | Read `font-family` declarations from `:root` or `<style>`. Check for Google Fonts `<link>` tags. |
+| Fonts | Read `font-family` declarations from `:root` or `<style>`. **Record where each family comes from, not only its name** — the full Google Fonts `<link href>` (it carries the weights) or the `@font-face` `src` path. Step 4.5 carries the files; a name alone leaves it nothing to carry and the theme renders a fallback. |
 
 **Step D3 — Present pre-filled defaults:**
 
@@ -148,6 +152,7 @@ Show all extracted values in a summary and ask the user to confirm or adjust:
 === Extracted from Demo ===
   Project name:     Kairo Consulting
   Theme slug:       kairo-consulting
+  Tagline:          Strategy consulting for growing teams
   Industry:         consulting
   Primary lang:     en
   Secondary lang:   es
@@ -178,6 +183,9 @@ The user can override any field. Once confirmed, use these values for the rest o
   | Muted/gray color | `--color-gray` |
   | Heading font | `--font-primary` |
   | Body font | `--font-secondary` |
+
+  Writing these two names loads nothing. **Step 4.5 carries the font files** — without it the
+  theme names the demo's family and renders the next entry in the stack.
 
   If fewer than 6 colors are extracted, leave unmatched variables at their defaults.
 
@@ -223,7 +231,11 @@ If `$ARGUMENTS` is provided, use it as the project name. Then prompt the user fo
 - **Primary language** (default: `en`)
 - **Secondary language(s)** (default: `es`, comma-separated if multiple)
 - **Client industry** (e.g., "consulting", "restaurant", "healthcare")
-- **Brief description** (one sentence describing the site)
+- **Tagline** (one sentence describing the site) — this is both the `Description:` line in
+  `.claude/CLAUDE.md` and the WordPress site description written in Step 9. Never accept an
+  empty answer here: an unset tagline leaves WordPress showing "Just another WordPress site"
+  in the `<title>`, in feeds and in every SEO preview, and `/wp-finalize`'s Layer 2 gate fails
+  on it. If the user has nothing, propose one from the industry and project name and confirm it.
 
 If `$ARGUMENTS` was the project name, still ask for the remaining fields.
 
@@ -286,6 +298,108 @@ Recursively replace placeholders in ALL files within the new theme directory:
 4. `__STARTER_DOMAIN__` → site domain from `.wp-create.json` manifest `project.domain`, or `<slug>.local` if no manifest (Tailwind template only — present in `package.json`)
 
 Use `find` + `sed` or equivalent to do this across all files (`.php`, `.css`, `.js`, `.json`, etc.).
+
+## Step 4.5: Font carry
+
+Step D4 wrote the demo's font *names* into `--font-primary` / `--font-secondary`. A name is
+not a font: unless the family is actually loaded the browser silently renders the next entry
+in the stack, which is why a converted theme looks "almost right" and nobody can say what
+changed. **The theme self-hosts every family it names.** Run this step whenever a demo exists;
+with no demo, skip it — the starter's tokens are a system stack that needs no loading, and
+naming a family you did not carry is the defect this step exists to remove.
+
+Take the font sources recorded in Step D2 and carry each family into
+`<theme-dir>/assets/fonts/`, by where the demo got it from:
+
+**A demo that self-hosts (`@font-face` with a local `src`).** Copy the woff2 out of the demo
+folder and re-emit the rule with `src` rewritten to `assets/fonts/<file>.woff2`. This is
+`/wp-yolo` Step 4.5's font carry, including its missing-file branch and its per-template
+placement rule — read it there and follow it verbatim rather than inventing a second answer.
+
+**A demo that links Google Fonts** (`<link href="https://fonts.googleapis.com/css2?family=…">`).
+Self-host it; the theme emits no `fonts.googleapis.com` request at runtime. Fetch the
+stylesheet, take the woff2 URLs out of it, and store them next to the self-hosted case:
+
+```bash
+mkdir -p <theme-dir>/assets/fonts
+UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
+curl -fsS -A "$UA" "<the demo's exact css2 URL>" -o /tmp/gf.css
+urls=$(grep -oE 'https://fonts\.gstatic\.com/[^)]+\.woff2' /tmp/gf.css | sort -u)
+[ -n "$urls" ] || { echo "no woff2 URLs in the Google Fonts response — carry failed" >&2; exit 1; }
+printf '%s\n' "$urls" \
+  | xargs -r -n1 sh -c 'curl -fsS -o "<theme-dir>/assets/fonts/$(basename "$1")" "$1"' _
+```
+
+**An empty extraction is a failure, not a quiet no-op.** Without the guard, a response that
+carries no woff2 URLs — the TTF stylesheet from a wrong user agent, an error page, a format
+change at Google — runs the loop zero times and the step reports success with no fonts
+carried, which is the silent fallback this whole step exists to end. The URL is passed to
+`sh -c` as a positional argument rather than interpolated into the command string, so a
+filename with a shell metacharacter cannot alter what runs.
+
+The `-A` is not decoration. Google serves a *different* stylesheet per user agent, and the
+default `curl` UA gets the legacy TTF build — you download fonts that work, in a format two
+generations old, and never notice. Send a modern browser UA and the response is woff2.
+
+Then write `/tmp/gf.css` into the theme's font-face location with each `src: url()` rewritten
+to `assets/fonts/<basename>`, keeping every `@font-face` block the response contains:
+
+- Keep the `unicode-range` descriptors exactly as Google emitted them. They are what makes the
+  many blocks cheap — the browser fetches a subset's file only when the page renders a
+  character in that range — so carrying all of them costs one HTTP request in practice and
+  removes the judgment call about which subsets this site will ever need.
+- **Every carried block ends up with `font-display: swap`.** Google emits it only when the
+  URL asked for `&display=swap`, and a demo whose link omits it hands you blocks with no
+  `font-display` at all — which is FOIT: the browser hides the text for up to three seconds
+  rather than showing it in the fallback. Keep the descriptor where the response has it and
+  add it where it does not. `wp-audit-performance` PERF-020 flags the absence.
+- Carry only the weights and styles the demo's `css2` URL asked for. It already names them;
+  do not widen the request.
+
+Placement follows `/wp-yolo` Step 4.5 — on `Template: tailwind` that is
+`assets/css/src/tailwindcss/base/fonts.css` plus its `@import` in `main.css`, and **no second
+enqueue**: the Tailwind theme enqueues exactly one compiled stylesheet.
+
+**Preload exactly one file.** A self-hosted face is discovered only after the stylesheet
+parses, so the first paint costs an extra round trip. Preload the file that fixes it — the
+**primary family's regular (400) latin subset**, and **never every subset**: the
+`unicode-range` blocks are cheap precisely because the browser skips the ones it will not
+render, and preloading them all downloads Cyrillic and Greek faces to a site that shows
+neither. One family, one weight, one subset; the rest load on demand.
+
+Add it where the deleted Google preconnect used to sit in `functions.php`, guarded on the
+file actually existing so a skipped carry cannot emit a hint pointing at nothing:
+
+```php
+add_action( 'wp_head', function() {
+    $font = get_template_directory() . '/assets/fonts/<primary-regular-latin>.woff2';
+    if ( file_exists( $font ) ) {
+        printf(
+            '<link rel="preload" as="font" type="font/woff2" href="%s" crossorigin>' . "\n",
+            esc_url( get_template_directory_uri() . '/assets/fonts/<primary-regular-latin>.woff2' )
+        );
+    }
+}, 1 );
+```
+
+`crossorigin` is mandatory even same-origin — fonts are fetched in CORS mode, and a preload
+without it downloads the file twice.
+
+**No network, or a font that will not download.** Do not emit a `@font-face` pointing at a
+file the theme does not have — `/wp-yolo` Step 4.5 states why. Then **drop that family from
+the head of its `--font-*` token** and let the rest of the demo's stack stand (the starter's
+system stack, if the demo declared no fallback), and report it in the Step 10 summary as
+`font <family>: not carried — token falls back to <next family>`.
+
+Dropping it changes nothing at render time — a family with no `@font-face` and no local
+install was never going to render, and the browser was already falling through to the next
+entry. What it changes is that the theme stops *naming* a font it does not have, which is the
+whole defect this step removes, and it is the difference between a stack `/wp-finalize`'s
+font-parity check passes (an intentional fallback) and one it fails (a family with no face).
+
+Finally, confirm every `--font-*` token either leads with a family this step carried or is a
+plain fallback stack. Those are the only two states; a token leading with an uncarried family
+is the one `/wp-finalize` fails on.
 
 ## Step 5: Configure i18n
 
@@ -541,6 +655,39 @@ wp theme activate <slug> --path=<wordpress-root>
 ```
 
 If WP-CLI is not available, skip this step silently.
+
+### Site Identity
+
+WordPress core install sets `blogname` from `--title` only when `/wp-create` created the site;
+an adopted or hand-installed site keeps whatever it had, and `blogdescription` is never set by
+anything and defaults to **"Just another WordPress site."** Both are `critical` in
+`/wp-finalize`'s Layer 2 gate, so write them here, from the values confirmed in Step 1 / Step D3:
+
+```bash
+$WP option update blogname "<Project Name>"
+$WP option update blogdescription "<Tagline>"
+```
+
+Without a `.wp-create.json` manifest, use `wp option update … --path=<wordpress-root>` the same
+way Theme Activation does, and skip silently when WP-CLI is unavailable.
+
+Do not skip this because the site already has a name: an adopted site's `blogname` is the
+previous project's, which is exactly the case this step exists for. Verify:
+
+```bash
+$WP option get blogname
+$WP option get blogdescription
+```
+
+Read both back, not just the tagline: an adopted site's `blogname` is the one this step is
+most likely to be changing, and a failed update there is the failure it exists to catch.
+
+If `$I18N = polylang`, this writes the primary language only. Polylang keeps `blogname` and
+`blogdescription` as translatable strings under its `WordPress` context, and **an empty option
+is absent from that string table entirely** — so writing them here is what makes them
+translatable at all. `/wp-polylang` picks them up in its export/translate/import pass; this
+step does not translate them. Say so in the summary rather than leaving the user to discover
+the second language's tagline is empty.
 
 ### Tailwind Build Dependencies
 

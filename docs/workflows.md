@@ -226,7 +226,7 @@ marketing, brand, launch or agency-campaign site: it self-authors `demo/BRIEF.md
 `~/.claude/wp-builder/FINGERPRINTS.md` so two clients never get the same shape, and drives
 motion through `data-motion-*` attributes plus an inlined `motion.js` bundle built on GSAP
 ScrollTrigger. Plain is for an admin tool, an intranet, or a data-heavy catalogue site, and
-carries no motion contract. `wp-aos-animator` remains the skill to reach for on a plain
+carries no motion contract. `/wp-aos-animator` remains the command to reach for on a plain
 project that wants simple scroll animations; craft projects ship their own GSAP-based motion
 through the theme bundle instead. Run `/wp-demo-verify` after either mode to walk the demo
 and check what got built, see [`/wp-demo-verify`](commands.md#wp-demo-verify).
@@ -336,10 +336,12 @@ Full pipeline, dependency (`cinematic-scroll-kit`) and encoding details: [cinema
 |---------|-------------|
 | `/wp-debug [issue]` | Something is broken — white screen, missing fields, plugin conflicts. Keyword-aware WP-CLI diagnostics with offered fixes. |
 | `/wp-clone --from=ssh://user@host/path --to=/local/path` | You need a copy of a staging/production site locally. Also `--sql= --uploads=` for a manual dump. |
+| `/wp-robin [/path/to/wordpress]` | Robin Image Optimizer is stuck, unconfigured, or missing `.webp` files. Runner for the `wp-robin` skill. |
+| `/wp-aos-animator [<theme>] [--report-only]` | A plain project wants scroll animations. Runner for the `wp-aos-animator` skill — audit, install, enqueue, init, animate. |
 
-Two capabilities are **skills, not commands** — ask for them in plain language and Claude
-loads them: `wp-robin` (Robin Image Optimizer fixes) and `wp-aos-animator` (AOS scroll
-animations across templates).
+`wp-robin` and `wp-aos-animator` are the only two skills that act rather than inform. They
+remain `user-invocable: false` like every other skill, and are invoked through the two runner
+commands above.
 
 ---
 

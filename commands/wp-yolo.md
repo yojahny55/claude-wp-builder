@@ -453,10 +453,13 @@ Before seeding, collect every `section.fonts[]` entry across the manifest (dedup
   case-insensitively). If it is genuinely absent, do **not** re-emit a `@font-face`
   whose `src` points at a file the theme does not have: that rule fails silently, and
   under `font-display: swap` the page renders the fallback stack with nothing logged
-  anywhere to say why. Skip that family's `@font-face` rule entirely, keep the family
-  name at the head of its font token so the demo's declared fallback stack still
-  applies, and add `font <family>: <src> not found in the demo folder — supply the woff2
-  or the theme renders the fallback stack` to the Step 6 Review list.
+  anywhere to say why. Skip that family's `@font-face` rule entirely, drop the family
+  name from the head of its font token so the theme stops naming a font it does not
+  have, and add `font <family>: <src> not found in the demo folder — supply the woff2
+  or the token keeps its fallback` to the Step 6 Review list. Keeping the name changes
+  nothing at render time (a family with no face and no local install never rendered
+  anyway) and leaves a token `/wp-finalize`'s font-parity check fails on: it passes a
+  family with a face, or an intentional fallback stack, and nothing in between.
 - Re-emit each `@font-face` rule with `src` rewritten to the theme-relative path
   (`assets/fonts/<file>.woff2`), and **place it by `Template:`**:
   - `basic` → enqueue the resulting stylesheet, or add the rule to the theme's existing
@@ -472,10 +475,13 @@ Before seeding, collect every `section.fonts[]` entry across the manifest (dedup
 
   Either way, every block's `transcribe`d CSS then resolves against a self-hosted font,
   not the demo's original path.
-- Only add a Google Fonts `<link rel="preconnect">` (fonts.googleapis.com /
-  fonts.gstatic.com) when the demo's own `<head>` actually references Google Fonts — never
-  as a substitute for a self-hosted font family found in `section.fonts[]`. Self-hosted
-  stays self-hosted; the two are not interchangeable.
+- **Never emit a `fonts.googleapis.com` request, preconnect included.** The theme self-hosts
+  every family it names — a Google Fonts `<link>` in the demo is carried by downloading its
+  woff2 into `assets/fonts/`, not by copying the link across. `/wp-init` Step 4.5 states that
+  recipe (including the user-agent trap that silently yields TTF instead of woff2) and runs
+  before this command; a preconnect to a host the theme never calls is a dead hint, which is
+  what the starter used to ship. `section.fonts[]` families are self-hosted from the demo
+  folder as above — self-hosted stays self-hosted, and linked fonts become self-hosted too.
 
 ## Step 4.6: Behaviour carry — port ALL of the demo's JavaScript
 

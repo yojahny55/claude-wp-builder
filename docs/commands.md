@@ -36,6 +36,8 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-cinematic-seed`](#wp-cinematic-seed) | C | required | scenes manifest | scene rows, sample videos |
 | [`/wp-debug`](#wp-debug) | utility | — | `.wp-create.json` | offered fixes |
 | [`/wp-clone`](#wp-clone) | utility | — | remote site | local install |
+| [`/wp-robin`](#wp-robin) | utility | — | target WordPress root | Robin settings, queue rows, `.webp` files |
+| [`/wp-aos-animator`](#wp-aos-animator) | utility | — | theme templates | `vendors/aos/`, `functions.php` enqueue, JS init, `data-aos` attributes |
 | [`/wp-contribute`](#wp-contribute) | contributors | — | this repository | new layer file + its check + doc rows; PR; release |
 
 \* `/wp-create` is optional if WordPress is already running: `/wp-seed` and `/wp-debug` fall
@@ -362,6 +364,36 @@ Health, plugins, DB, config, filesystem checks via the WP-CLI wrapper from `.wp-
 /wp-clone --sql=/tmp/dump.sql --uploads=/tmp/uploads.zip --to=/var/www/html/local   # manual
 ```
 
+### `/wp-robin`
+
+```
+/wp-robin                       # auto-detect the WordPress root by walking up from here
+/wp-robin /path/to/wordpress    # target an explicit root
+```
+
+Runner for the `wp-robin` skill. Reads
+[`skills/wp-robin/SKILL.md`](../skills/wp-robin/SKILL.md), checks the database client and webp
+converter it requires, then runs the skill's bundled `scripts/robin-fix.sh` with `WP_ROOT` set
+to the resolved root. Installs and configures Robin Image Optimizer, unsticks items frozen in
+`processing`, registers missing attachments, generates absent `.webp` files locally and syncs
+the queue so the plugin recognizes them. The command dispatches; the skill and its script own
+every step.
+
+### `/wp-aos-animator`
+
+```
+/wp-aos-animator                                        # whole active theme
+/wp-aos-animator <theme-path> template-parts/section-*.php   # scoped to specific templates
+/wp-aos-animator --report-only                          # audit only, writes nothing
+```
+
+Runner for the `wp-aos-animator` skill. Reads
+[`skills/wp-aos-animator/SKILL.md`](../skills/wp-aos-animator/SKILL.md) and sequences its
+audit → install → enqueue → init → animate pipeline, dispatching one subagent per template for
+the animate phase. `--report-only` stops after the audit, the same contract as `/wp-audit`'s
+flag. Intended for **plain** demos: a craft project already carries GSAP motion in its theme
+bundle, so the command asks before adding a second motion system.
+
 ---
 
 ## Contributing to the plugin
@@ -389,8 +421,11 @@ order. See [CONTRIBUTING.md](../CONTRIBUTING.md) for the front-door version.
 
 ---
 
-## Not commands
+## The two action skills
 
-`wp-robin` and `wp-aos-animator` are **skills**: describe the task ("fix Robin's stuck bulk
-optimization", "add AOS animations to the templates") and Claude loads them. There is no
-`/wp-robin` or `/wp-aos-animator` slash command.
+`wp-robin` and `wp-aos-animator` are the plugin's only skills that perform work rather than
+inform. Like every skill here they are `user-invocable: false`, so they are invoked through
+their runner commands — [`/wp-robin`](#wp-robin) and
+[`/wp-aos-animator`](#wp-aos-animator). The commands parse arguments and dispatch; the skills
+keep owning the procedure. Describing the task in plain language still works and loads the
+same skill.
