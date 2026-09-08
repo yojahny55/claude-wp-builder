@@ -10,6 +10,13 @@
   build plan (pages, CPTs, content types, skips, review items) and ends the turn, and
   `AskUserQuestion` is in the command's tool list. `tests/checks/wp-yolo-checkpoint.sh`
   guards it.
+- **`/wp-yolo` stopped after seeding and told the user to run the finish commands
+  himself.** `/wp-finalize`, `/wp-polish` and `/wp-responsive-check` were bare one-word
+  bullets in Step 5, so a long run treated them as optional and reported "site works"
+  with the 3-layer demo-parity gate never executed. They are now marked MANDATORY with a
+  dispatch instruction each, and a completion rule says a run that reaches the report
+  without all three is incomplete, under `--yolo` too. Step 5.5 also pointed at the wrong
+  Step 5 item for `/wp-finalize`. Same check guards it.
 
 ## [1.12.1] - 2026-09-04
 

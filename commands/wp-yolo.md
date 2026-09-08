@@ -548,13 +548,24 @@ Run, in order:
    gate in Step 5.5 — looks at the live site, so without this they would judge an
    unstyled page. No-op on `basic`; skipped when a `tailwindwatch` process already
    owns `dist/`.
-4. **`/wp-finalize`**
-5. **`/wp-polish`**
-6. **`/wp-responsive-check`**
+4. **`/wp-finalize`** — MANDATORY. Run the command exactly as a user would (read
+   `${CLAUDE_PLUGIN_ROOT}/commands/wp-finalize.md` and execute every step in this same
+   run). It runs the 3-layer demo-parity gate (Layers 1-3) that signs off delivery;
+   Step 5.5 consumes its findings. Without it there is no gate result and no delivery.
+5. **`/wp-polish`** — MANDATORY. Same dispatch. Cleans the seeded site and theme
+   (menus, placeholders, leftovers) after seeding, so it runs after item 1, never before.
+6. **`/wp-responsive-check`** — MANDATORY. Same dispatch; it forwards to
+   `/wp-demo-verify` against the built site. Fold every finding it reports into Step 6.
+
+**Completion rule.** Items 4, 5 and 6 are part of the build, not follow-ups for the
+user. A run that reaches Step 6 without having executed all three is **incomplete**:
+never print "site works" or hand the user a list of commands to run next. If one of
+them cannot run (site unreachable, tool missing), say which, why, and mark the run
+incomplete in the Step 6 report. This holds under `--yolo` as well.
 
 ## Step 5.5: Demo-parity gate — auto-fix, re-verify, and block
 
-`/wp-finalize` (Step 5, item 3 above) already ran the 3-layer demo-parity gate (Layers 1-3).
+`/wp-finalize` (Step 5, item 4 above) already ran the 3-layer demo-parity gate (Layers 1-3).
 Before this run can report success, walk every **critical** finding from that gate:
 
 1. **Auto-fix mechanical findings** — no judgment required, apply directly.
