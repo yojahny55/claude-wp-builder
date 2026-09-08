@@ -25,6 +25,22 @@
   now state that the skills are invoked through their runner commands while remaining
   non-invocable themselves, so the layer rule reads as intact rather than abandoned.
 
+### Fixed
+- **The theme named fonts it never loaded, so every non-`/wp-yolo` build rendered in a
+  fallback stack.** `/wp-init` Step D4 wrote the demo's font *names* into `--font-primary`
+  / `--font-secondary` and nothing ever carried a font file, which is why a converted theme
+  looks "almost right" and nobody can say what changed. Three parts, one cause: the Tailwind
+  starter shipped `--font-primary: "Inter"` with no `@font-face` and no Inter anywhere, so
+  even a demo-less scaffold rendered in the system fallback; `functions.php` preconnected to
+  `fonts.googleapis.com` unconditionally while the theme never made one request to it — a
+  dead hint on every page; and the demo's families were never fetched at all. New `/wp-init`
+  **Step 4.5: Font carry** self-hosts every family the theme names, including Google Fonts
+  (downloading the woff2 with a browser user-agent — the default `curl` UA silently gets the
+  legacy TTF build), and the starter's default tokens are now a system stack, which is the
+  only value that renders as written when there is no demo. `/wp-yolo` Step 4.5 stops
+  permitting a Google Fonts preconnect so both commands give one answer.
+  New check: `tests/checks/wp-init-font-carry.sh`.
+
 ## [1.12.1] - 2026-09-04
 
 ### Changed

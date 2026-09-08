@@ -138,7 +138,7 @@ Parse the demo HTML and extract as much as possible:
 | Secondary language | Look for `lang=""` attributes on sub-elements, or content in a second language. Default: `es`. |
 | Sections | List all section names from `<!-- ============ SECTION: Name ============ -->` delimiters (exclude Header and Footer). |
 | Color palette | Read `:root` CSS custom properties for `--color-*` values. If no `:root`, scan for dominant colors in inline styles. |
-| Fonts | Read `font-family` declarations from `:root` or `<style>`. Check for Google Fonts `<link>` tags. |
+| Fonts | Read `font-family` declarations from `:root` or `<style>`. **Record where each family comes from, not only its name** — the full Google Fonts `<link href>` (it carries the weights) or the `@font-face` `src` path. Step 4.5 carries the files; a name alone leaves it nothing to carry and the theme renders a fallback. |
 
 **Step D3 — Present pre-filled defaults:**
 
@@ -178,6 +178,9 @@ The user can override any field. Once confirmed, use these values for the rest o
   | Muted/gray color | `--color-gray` |
   | Heading font | `--font-primary` |
   | Body font | `--font-secondary` |
+
+  Writing these two names loads nothing. **Step 4.5 carries the font files** — without it the
+  theme names the demo's family and renders the next entry in the stack.
 
   If fewer than 6 colors are extracted, leave unmatched variables at their defaults.
 
@@ -286,6 +289,64 @@ Recursively replace placeholders in ALL files within the new theme directory:
 4. `__STARTER_DOMAIN__` → site domain from `.wp-create.json` manifest `project.domain`, or `<slug>.local` if no manifest (Tailwind template only — present in `package.json`)
 
 Use `find` + `sed` or equivalent to do this across all files (`.php`, `.css`, `.js`, `.json`, etc.).
+
+## Step 4.5: Font carry
+
+Step D4 wrote the demo's font *names* into `--font-primary` / `--font-secondary`. A name is
+not a font: unless the family is actually loaded the browser silently renders the next entry
+in the stack, which is why a converted theme looks "almost right" and nobody can say what
+changed. **The theme self-hosts every family it names.** Run this step whenever a demo exists;
+with no demo, skip it — the starter's tokens are a system stack that needs no loading, and
+naming a family you did not carry is the defect this step exists to remove.
+
+Take the font sources recorded in Step D2 and carry each family into
+`<theme-dir>/assets/fonts/`, by where the demo got it from:
+
+**A demo that self-hosts (`@font-face` with a local `src`).** Copy the woff2 out of the demo
+folder and re-emit the rule with `src` rewritten to `assets/fonts/<file>.woff2`. This is
+`/wp-yolo` Step 4.5's font carry, including its missing-file branch and its per-template
+placement rule — read it there and follow it verbatim rather than inventing a second answer.
+
+**A demo that links Google Fonts** (`<link href="https://fonts.googleapis.com/css2?family=…">`).
+Self-host it; the theme emits no `fonts.googleapis.com` request at runtime. Fetch the
+stylesheet, take the woff2 URLs out of it, and store them next to the self-hosted case:
+
+```bash
+mkdir -p <theme-dir>/assets/fonts
+UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
+curl -sS -A "$UA" '<the demo's exact css2 URL>' -o /tmp/gf.css
+grep -oE 'https://fonts\.gstatic\.com/[^)]+\.woff2' /tmp/gf.css | sort -u \
+  | xargs -r -n1 -I{} sh -c 'curl -sS -o "<theme-dir>/assets/fonts/$(basename {})" "{}"'
+```
+
+The `-A` is not decoration. Google serves a *different* stylesheet per user agent, and the
+default `curl` UA gets the legacy TTF build — you download fonts that work, in a format two
+generations old, and never notice. Send a modern browser UA and the response is woff2.
+
+Then write `/tmp/gf.css` into the theme's font-face location with each `src: url()` rewritten
+to `assets/fonts/<basename>`, keeping every `@font-face` block the response contains:
+
+- Keep the `unicode-range` descriptors exactly as Google emitted them. They are what makes the
+  many blocks cheap — the browser fetches a subset's file only when the page renders a
+  character in that range — so carrying all of them costs one HTTP request in practice and
+  removes the judgment call about which subsets this site will ever need.
+- Keep `font-display: swap` (Google emits it when the URL asks for it). `wp-audit-performance`
+  PERF-020 flags its absence.
+- Carry only the weights and styles the demo's `css2` URL asked for. It already names them;
+  do not widen the request.
+
+Placement follows `/wp-yolo` Step 4.5 — on `Template: tailwind` that is
+`assets/css/src/tailwindcss/base/fonts.css` plus its `@import` in `main.css`, and **no second
+enqueue**: the Tailwind theme enqueues exactly one compiled stylesheet.
+
+**No network, or a font that will not download.** Do not emit a `@font-face` pointing at a
+file the theme does not have — `/wp-yolo` Step 4.5 states why. Leave the family at the head of
+its token so the demo's own fallback stack applies, and report it in the Step 10 summary as
+`font <family>: not carried — theme renders the fallback stack`.
+
+Finally, confirm the tokens Step D4 wrote name a family this step actually carried. A
+`--font-primary` naming a family with no `@font-face` in the theme is the exact state
+`/wp-finalize`'s font-parity check fails on.
 
 ## Step 5: Configure i18n
 

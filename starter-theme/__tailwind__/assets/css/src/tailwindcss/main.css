@@ -18,9 +18,11 @@
   --color-light: #f8fafc;
   --color-gray: #64748b;
 
-  /* Typography — replaced by wp-init during demo-first injection */
-  --font-primary: "Inter", sans-serif;
-  --font-secondary: "Inter", sans-serif;
+  /* Typography — replaced by wp-init Step D4, and the family it names is carried
+     into assets/fonts/ by Step 4.5. Until then this is a system stack on purpose:
+     naming a family the theme does not load renders the next entry in the stack. */
+  --font-primary: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-secondary: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 @import "./base/reset.css";

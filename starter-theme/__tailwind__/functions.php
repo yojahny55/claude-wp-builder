@@ -198,14 +198,6 @@ add_action( 'wp_head', function() {
 });
 
 /**
- * Preconnect to Google Fonts for performance.
- */
-add_action( 'wp_head', function() {
-    echo '<link rel="preconnect" href="https://fonts.googleapis.com">' . "\n";
-    echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\n";
-}, 1 );
-
-/**
  * Asset URL helper.
  */
 function __starter___asset( $path ) {

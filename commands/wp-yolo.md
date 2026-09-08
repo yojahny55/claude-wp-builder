@@ -452,10 +452,13 @@ Before seeding, collect every `section.fonts[]` entry across the manifest (dedup
 
   Either way, every block's `transcribe`d CSS then resolves against a self-hosted font,
   not the demo's original path.
-- Only add a Google Fonts `<link rel="preconnect">` (fonts.googleapis.com /
-  fonts.gstatic.com) when the demo's own `<head>` actually references Google Fonts — never
-  as a substitute for a self-hosted font family found in `section.fonts[]`. Self-hosted
-  stays self-hosted; the two are not interchangeable.
+- **Never emit a `fonts.googleapis.com` request, preconnect included.** The theme self-hosts
+  every family it names — a Google Fonts `<link>` in the demo is carried by downloading its
+  woff2 into `assets/fonts/`, not by copying the link across. `/wp-init` Step 4.5 states that
+  recipe (including the user-agent trap that silently yields TTF instead of woff2) and runs
+  before this command; a preconnect to a host the theme never calls is a dead hint, which is
+  what the starter used to ship. `section.fonts[]` families are self-hosted from the demo
+  folder as above — self-hosted stays self-hosted, and linked fonts become self-hosted too.
 
 ## Step 4.6: Behaviour carry — port ALL of the demo's JavaScript
 

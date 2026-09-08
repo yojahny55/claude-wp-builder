@@ -46,8 +46,9 @@ Ensuring the WordPress output matches the demo HTML 1:1 in appearance and conten
 - [ ] **Seed SCF fields with demo content** `NEW`
   Every section build should seed the SCF fields with the actual demo text, links, and images — not just provide fallback values. Use `$WP eval "update_field(...);"` after field generation.
 
-- [ ] **Load fonts from the demo** `NEW`
-  Detect which fonts the demo uses (Google Fonts, self-hosted, system), download or enqueue them, and add proper `@font-face` declarations and preload hints.
+- [x] **Load fonts from the demo** — done in `/wp-init` Step 4.5 (Font carry). Self-hosts
+  every family the theme names, Google Fonts included; the starter's default token is a
+  system stack, so no build names a font it has not carried.
 
 - [x] **Detect and support Tailwind CSS** `DONE`
   Added `__tailwind__` starter theme with Tailwind CSS v4 build pipeline, `/wp-tailwindify` command for CSS-to-Tailwind conversion, and template selection in `/wp-init`. Shipped in v1.4.0.
