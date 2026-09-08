@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- **A bare `/wp-yolo <folder>` skipped its own checkpoint.** The command name was being
+  read as the `--yolo` flag, Step 1 called the default mode "hands-off", and Step 3 said
+  "ask" without a stop, so the model approved the plan for the user and rolled into the
+  build. Step 1 now states the name is not the flag, Step 3 is a hard stop that prints a
+  build plan (pages, CPTs, content types, skips, review items) and ends the turn, and
+  `AskUserQuestion` is in the command's tool list. `tests/checks/wp-yolo-checkpoint.sh`
+  guards it.
+
 ## [1.12.1] - 2026-09-04
 
 ### Changed

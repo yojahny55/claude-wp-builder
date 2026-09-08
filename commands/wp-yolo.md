@@ -1,6 +1,6 @@
 ---
 description: Full-site builder — convert a complete multi-page HTML demo folder into a WordPress theme in one pass
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, AskUserQuestion
 argument-hint: "<demo-folder> [--yolo] [--careful]"
 ---
 
@@ -24,7 +24,12 @@ Parse `$ARGUMENTS`:
 - **`--yolo`** = no checkpoint at all (ingest → build → seed → finalize → report, hands-off).
 - **`--careful`** = checkpoint after normalization AND a per-page confirm before each inner
   page's build in Phase 2.
-- **default** (neither flag) = a single checkpoint after normalization, then hands-off.
+- **default** (neither flag) = a single checkpoint after normalization (Step 3), then
+  hands-off from Step 4 onward.
+
+The command is named `/wp-yolo`; that name is NOT the `--yolo` flag. A bare
+`/wp-yolo <folder>` with no flags runs the Step 3 checkpoint and waits for the
+user. Only the literal `--yolo` token in `$ARGUMENTS` skips it.
 
 Read `.claude/CLAUDE.md` at the project root. If it does not exist, refuse:
 ```
@@ -285,7 +290,22 @@ Under `--careful`, confirm the conversion result with the user before continuing
 
 ## Step 3: Checkpoint (skipped under --yolo)
 
-Unless `--yolo` is set, print the detected map from the manifest:
+Unless the literal `--yolo` flag is set, this step is a **hard stop**. Print the build
+plan below, ask, and END YOUR TURN. Do not answer on the user's behalf, do not assume
+approval, and do not start Step 4 in the same turn. The build resumes only after the
+user replies.
+
+Print the detected map from the manifest as a build plan:
+```
+Build plan for <demo-folder>
+Pages to build:   <slug> (<role>) — <n> sections: <name:kind>, ...
+CPTs to register: <name> (archive: yes/no, <n> seed items) | none
+Content types:    <name>: <field list>
+Shared header/footer: <ok | divergent on <slugs>>
+Skipped:          <out-of-scope pages, missing-HTML pages> | none
+Review:           <review[] items> | none
+```
+Cover, at minimum:
 - Pages (slug, role: home / inner / cpt-archive / blog) and their sections (name, kind,
   confidence where < 1.0)
 - Shared header/footer flags and any divergent pages
@@ -295,7 +315,7 @@ Unless `--yolo` is set, print the detected map from the manifest:
   pages awaiting a demo
 - The full `review[]` list of low-confidence decisions
 
-Ask the user to **approve / edit / abort**:
+Ask the user to **approve / edit / abort** with AskUserQuestion, then stop and wait:
 - Edit = rename/merge/split a section, drop a page, flip a `kind` between `static` and
   `cpt-teaser`, etc. Apply edits directly to `demo/.yolo-manifest.json` before continuing.
 - Abort = stop here, leaving the manifest and `demo/*.html` on disk. On the `tailwind`
