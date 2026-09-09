@@ -56,7 +56,12 @@ grep -Fq 'initMotion' "$i" || fail "$i does not initialise motion"
 
 # --- v2 engine fixes. -------------------------------------------------------
 grep -Fq 'data-motion-peak' "$m" || fail "$m does not read data-motion-peak"
-grep -Fq '> 2' "$m" || fail "$m does not warn on a pin span above 2.0 outside the peak"
+# Anchored to the pin branch's own guard, not a bare '> 2': that fragment is also
+# satisfied by parseCue's unrelated 'n.length > 2', so it stayed green when a copy
+# had its threshold mutated from 2.0 to 5.0. This exact clause is unique to the
+# pin-budget warning and breaks if the threshold or the peak guard moves.
+grep -Fq "span > 2 && !el.hasAttribute('data-motion-peak')" "$m" \
+  || fail "$m does not gate the pin-budget warning on span > 2.0 without data-motion-peak"
 grep -Fq 'line-height:1.1' "$m" || fail "$m kinetic mask does not reserve line-height headroom"
 grep -Fq 'padding-block' "$m" || fail "$m kinetic mask does not pad the block edges"
 grep -Fq 'H1' "$m" || fail "$m does not refuse kinetic on an h1"

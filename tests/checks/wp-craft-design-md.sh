@@ -71,7 +71,12 @@ done <<'ALIASES'
 --font-primary=font-display
 --font-secondary=font-text
 ALIASES
-grep -Fq -- '| `--color-accent` |' "$i" || fail "$i does not state that --color-accent is the one shared name and needs no alias"
+# Anchored to the alias-table row including the no-alias marker: the bare fragment
+# '| `--color-accent` |' is also satisfied by Step D4's pre-existing extraction
+# table (the 'Accent/CTA color' row), which predates the alias table entirely and
+# would leave this green even with the whole alias table deleted.
+grep -Fq -- '| `--color-accent` | *(no alias)*' "$i" \
+  || fail "$i does not state that --color-accent is the one shared name and needs no alias"
 # Bare 'alias' is satisfied by two pre-existing lines about basic/tailwind, so
 # pin the rule that keeps the mapping right instead of the word.
 grep -Eqi 'by role, never by lightness' "$i" || fail "$i does not state that the aliases map by role, not by lightness"

@@ -15,7 +15,12 @@ grep -Fq 'npm i -D playwright-core' "$d" || fail "$d does not try to install pla
 # deleted outright.
 grep -Fq 'probe again' "$d" || fail "$d does not retry the probe after installing playwright-core"
 grep -Fq 'way **stop**' "$d" || fail "$d does not stop on a missing browser"
-grep -Eqi 'only exit 0 continues|any other exit code' "$d" || fail "$d proceeds to build when the probe fails in any way other than exit 2"
+# The second alternative this used to carry, 'any other exit code', is wrapped
+# across a line break in the prose ("...any other exit\n   code...") and a
+# single-line grep can never match it; it worked only because this first
+# alternative already does. Dropped rather than fixed to span the wrap: this
+# phrase alone already states the rule the fail message names.
+grep -Fq 'only exit 0 continues' "$d" || fail "$d proceeds to build when the probe fails in any way other than exit 2"
 grep -Eqi 'never fall(s)? back to plain|not fall back to plain' "$d" || fail "$d may still fall back to plain"
 grep -Fq 'demo/DESIGN.md' "$d" || fail "$d does not write demo/DESIGN.md"
 grep -Fq 'designlang' "$d" || fail "$d does not run designlang on the client's site"
