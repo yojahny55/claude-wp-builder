@@ -1,0 +1,83 @@
+/* ====== Section: FAQ (faq-list) ====== */
+.faq-list, .faq-list *, .faq-list *::before, .faq-list *::after { box-sizing: border-box; }
+.faq-list {
+  padding: var(--space-section) var(--space-gutter);
+  background: var(--color-canvas);
+  border-top: 1px solid var(--color-hairline);
+  display: grid;
+  gap: clamp(2rem, 4vw, 3.5rem);
+}
+.faq-list__head { max-width: 44rem; }
+.faq-list__kicker {
+  font: 500 0.8rem/1.2 var(--font-text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0 0 0.9rem;
+}
+.faq-list__title {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 3.4vw, 3.1rem);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin: 0 0 0.9rem;
+  max-width: 18ch;
+}
+.faq-list__lede {
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--color-ink-soft);
+  text-wrap: pretty;
+  max-width: 58ch;
+  margin: 0;
+}
+.faq-list__list { max-width: 52rem; }
+.faq-list__item { border-top: 1px solid var(--color-hairline); }
+.faq-list__item:last-child { border-bottom: 1px solid var(--color-hairline); }
+.faq-list__q {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.05rem, 1.5vw, 1.3rem);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  color: var(--color-ink);
+  transition: color 160ms ease;
+}
+.faq-list__q::-webkit-details-marker { display: none; }
+.faq-list__q::after {
+  content: "+";
+  flex: 0 0 auto;
+  font-family: var(--font-text);
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--color-accent);
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.faq-list__item[open] > .faq-list__q::after { transform: rotate(45deg); }
+@media (hover: hover) and (pointer: fine) {
+  .faq-list__q:hover { color: var(--color-accent); }
+}
+.faq-list__q:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 4px; border-radius: var(--radius-sm); }
+.faq-list__a { padding: 0 0 1.5rem; }
+.faq-list__a p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--color-ink-soft);
+  text-wrap: pretty;
+  max-width: 62ch;
+}
+@media (min-width: 980px) {
+  .faq-list { grid-template-columns: minmax(16rem, 22rem) 1fr; align-items: start; gap: clamp(2rem, 5vw, 5rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .faq-list__q, .faq-list__q::after { transition: none; }
+}

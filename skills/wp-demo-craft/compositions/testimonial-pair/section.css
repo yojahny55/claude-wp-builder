@@ -1,0 +1,88 @@
+/* ====== Section: Testimonials (testimonial-pair) ====== */
+.testimonial-pair, .testimonial-pair *, .testimonial-pair *::before, .testimonial-pair *::after { box-sizing: border-box; }
+.testimonial-pair {
+  position: relative;
+  isolation: isolate;
+  padding: var(--space-section) var(--space-gutter);
+  background: var(--color-canvas);
+  border-top: 1px solid var(--color-hairline);
+  /* Defaults so the spotlight sits somewhere deliberate before the first
+     pointermove, and stays there on every device that never sends one. */
+  --motion-mx: 0.28;
+  --motion-my: 0.3;
+}
+/* The spotlight device publishes --motion-mx / --motion-my; the light itself is
+   this one gradient, gated to fine pointers because it has nothing to follow
+   otherwise. */
+@media (hover: hover) and (pointer: fine) {
+  .testimonial-pair::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(
+      42rem 42rem at calc(var(--motion-mx) * 100%) calc(var(--motion-my) * 100%),
+      color-mix(in srgb, var(--color-accent) 16%, transparent),
+      transparent 70%);
+  }
+}
+.testimonial-pair__head { max-width: 44rem; margin: 0 0 clamp(2rem, 4vw, 3.25rem); }
+.testimonial-pair__kicker {
+  font: 500 0.8rem/1.2 var(--font-text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0 0 0.9rem;
+}
+.testimonial-pair__title {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 3.4vw, 3.1rem);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin: 0;
+  max-width: 18ch;
+}
+.testimonial-pair__grid {
+  display: grid;
+  gap: clamp(1.25rem, 2.5vw, 2rem);
+}
+.testimonial-pair__quote {
+  margin: 0;
+  padding: clamp(1.5rem, 2.5vw, 2.25rem);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: inset 0 0 0 1px var(--color-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+/* Text face, not display: a pull quote set in a display weight reads as the
+   section shouting, and it is the only body copy on the page a visitor is meant
+   to hear in someone else's voice. */
+.testimonial-pair__text {
+  font-size: clamp(1.15rem, 1.6vw, 1.4rem);
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: -0.005em;
+  text-wrap: pretty;
+  color: var(--color-ink);
+  max-width: 44ch;
+  margin: 0;
+  flex: 1 1 auto;
+}
+.testimonial-pair__who {
+  margin: 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-hairline);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  align-items: baseline;
+}
+.testimonial-pair__name { font-weight: 600; font-size: 0.9375rem; color: var(--color-ink); }
+.testimonial-pair__place { font-size: 0.875rem; color: var(--color-ink-soft); }
+@media (min-width: 840px) {
+  .testimonial-pair__grid { grid-template-columns: 1fr 1fr; }
+}

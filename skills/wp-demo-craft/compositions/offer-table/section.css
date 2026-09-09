@@ -1,0 +1,143 @@
+/* ====== Section: Pricing (offer-table) ====== */
+.offer-table, .offer-table *, .offer-table *::before, .offer-table *::after { box-sizing: border-box; }
+.offer-table {
+  padding: var(--space-section) var(--space-gutter);
+  background: var(--color-canvas);
+  border-top: 1px solid var(--color-hairline);
+}
+.offer-table__head { max-width: 44rem; margin: 0 0 clamp(2rem, 4vw, 3.5rem); }
+.offer-table__kicker {
+  font: 500 0.8rem/1.2 var(--font-text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0 0 0.9rem;
+}
+.offer-table__title {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 3.4vw, 3.1rem);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin: 0 0 0.9rem;
+  max-width: 18ch;
+}
+.offer-table__lede {
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--color-ink-soft);
+  text-wrap: pretty;
+  max-width: 58ch;
+  margin: 0;
+}
+.offer-table__scroll { overflow-x: auto; }
+.offer-table__table {
+  width: 100%;
+  /* Two plans plus a row-label column fit 390px, so the scroll wrapper below is a
+     safety net for long labels rather than the normal phone experience. */
+  min-width: 18rem;
+  border-collapse: collapse;
+  text-align: left;
+}
+.offer-table__caption {
+  caption-side: top;
+  text-align: left;
+  font-size: 0.8125rem;
+  color: var(--color-ink-soft);
+  padding-bottom: 1rem;
+}
+/* The lead column is marked by a rule and a ground, not a badge. */
+.offer-table__col--lead { background: var(--color-surface); }
+.offer-table__plan {
+  vertical-align: bottom;
+  padding: 1rem 0.65rem 1.25rem;
+  border-bottom: 1px solid var(--color-hairline);
+  font-weight: 400;
+}
+.offer-table__plan.offer-table__col--lead { border-top: 1px solid var(--color-accent); }
+.offer-table__plan-name {
+  display: block;
+  font-size: 0.8125rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+  margin-bottom: 0.6rem;
+}
+.offer-table__plan-price {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2.6vw, 2.35rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+}
+.offer-table__plan-note {
+  display: block;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--color-ink-soft);
+  margin-top: 0.5rem;
+  max-width: 22ch;
+}
+.offer-table__corner { padding: 0; border: 0; }
+.offer-table__row-label {
+  font-weight: 500;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: var(--color-ink);
+  padding: 0.85rem 0.65rem 0.85rem 0;
+  border-bottom: 1px solid var(--color-hairline);
+  max-width: 30ch;
+}
+.offer-table__cell {
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: var(--color-ink-soft);
+  padding: 0.85rem 0.65rem;
+  border-bottom: 1px solid var(--color-hairline);
+  vertical-align: top;
+}
+.offer-table__cell--action { padding-top: 1.5rem; border-bottom: 0; }
+.offer-table__cta {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.7rem 1.15rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  text-decoration: none;
+  white-space: nowrap;
+  color: var(--color-ink);
+  box-shadow: inset 0 0 0 1px var(--color-hairline);
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease;
+}
+.offer-table__cta--lead { background: var(--color-accent); color: var(--color-accent-ink); box-shadow: none; }
+@media (hover: hover) and (pointer: fine) {
+  .offer-table__cta:hover { background: var(--color-surface); }
+  .offer-table__cta--lead:hover { background: color-mix(in srgb, var(--color-accent) 86%, var(--color-ink)); }
+}
+.offer-table__cta:active { transform: scale(0.97); }
+.offer-table__cta:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+.offer-table__footnote {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-ink-soft);
+  max-width: 62ch;
+  text-wrap: pretty;
+  margin: 1.5rem 0 0;
+}
+/* Cell padding is the whole phone budget: at 1.25rem a side, six half-gutters push
+   the table past 390px and it scrolls sideways. It grows back where there is room. */
+@media (min-width: 560px) {
+  .offer-table__plan, .offer-table__cell { padding-left: 1.25rem; padding-right: 1.25rem; }
+  .offer-table__row-label { padding-right: 1.25rem; }
+}
+@media (min-width: 700px) {
+  .offer-table__plan, .offer-table__cell { padding-left: 1.5rem; padding-right: 1.5rem; }
+  .offer-table__row-label { padding-right: 1.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .offer-table__cta { transition: none; }
+}

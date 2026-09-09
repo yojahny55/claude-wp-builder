@@ -1,0 +1,71 @@
+/* ====== Section: Hero (hero-type) ====== */
+/* Scoped reset: a composition cannot assume the host page carries one, and without
+   it `min-height: 100dvh` measures the content box and adds the padding on top. */
+.hero-type, .hero-type *, .hero-type *::before, .hero-type *::after { box-sizing: border-box; }
+.hero-type {
+  display: grid;
+  min-height: 100dvh;
+  /* Centred on a phone: bottom-anchoring a 400px block inside an 844px screen
+     leaves half the first paint empty, which is the failure this library exists
+     to stop. The held-breath version starts where there is room for it. */
+  align-content: center;
+  padding: var(--space-section) var(--space-gutter);
+}
+.hero-type__kicker {
+  font: 500 0.8rem/1.2 var(--font-text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0 0 1.25rem;
+  padding-top: 1.25rem;
+  /* The rule is the block's top edge, so it spans the measure rather than the
+     kicker's own two words. */
+  border-top: 1px solid var(--color-hairline);
+  width: min(100%, 34rem);
+}
+.hero-type__title {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 9vw, 8rem);
+  line-height: 0.94;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+  margin: 0 0 1.5rem;
+  max-width: 13ch;
+}
+.hero-type__lede {
+  font-size: clamp(1.05rem, 1.4vw, 1.35rem);
+  line-height: 1.55;
+  color: var(--color-ink-soft);
+  max-width: 52ch;
+  text-wrap: pretty;
+  margin: 0 0 2.25rem;
+}
+.hero-type__actions { margin: 0; }
+.hero-type__cta {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.95rem 1.6rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .hero-type__cta:hover { background: color-mix(in srgb, var(--color-accent) 86%, var(--color-ink)); }
+}
+.hero-type__cta:active { transform: scale(0.97); }
+.hero-type__cta:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+@media (min-width: 720px) {
+  /* Bottom-anchored where there is room: the silence above the type is the
+     composition. Centred, the same words read as a block that failed to fill. */
+  .hero-type { align-content: end; padding: calc(var(--space-section) * 1.4) var(--space-gutter) var(--space-section); }
+}
+@media (min-width: 900px) {
+  .hero-type__title { max-width: 15ch; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-type__cta { transition: none; }
+}

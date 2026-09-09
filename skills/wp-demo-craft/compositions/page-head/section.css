@@ -1,0 +1,34 @@
+/* ====== Section: Page head (page-head) ====== */
+.page-head, .page-head *, .page-head *::before, .page-head *::after { box-sizing: border-box; }
+/* Interior pages never pin, so this is a band and not a screen: tall enough to
+   read as a deliberate opening, short enough that the page's first real section
+   is already on screen underneath it. No min-height, no dvh, no scroll cost. */
+.page-head {
+  padding: calc(var(--space-section) * 1.15) var(--space-gutter) calc(var(--space-section) * 0.7);
+  background: var(--color-canvas);
+  border-bottom: 1px solid var(--color-hairline);
+}
+.page-head__kicker {
+  font: 500 0.8rem/1.2 var(--font-text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0 0 1rem;
+}
+.page-head__title {
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 5vw, 4.25rem);
+  line-height: 1.03;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+  margin: 0 0 1.1rem;
+  max-width: 16ch;
+}
+.page-head__lede {
+  font-size: clamp(1.05rem, 1.3vw, 1.25rem);
+  line-height: 1.58;
+  color: var(--color-ink-soft);
+  text-wrap: pretty;
+  max-width: 56ch;
+  margin: 0;
+}

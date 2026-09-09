@@ -144,6 +144,10 @@ initMotion(window.gsap, window.ScrollTrigger);</script>
     // A missing display face changes line-wrapping, which is exactly the layout
     // judgment a preview exists to support — worth a warning, not a failed render.
     await p.evaluate(() => document.fonts.ready);
+    // initMotion() runs before the webfonts swap in, so ScrollTrigger cached every
+    // start/end against fallback metrics; a swap that reflows a pinned section leaves
+    // those positions stale and the step-scroll below drives the wrong range.
+    await p.evaluate(() => window.ScrollTrigger.refresh());
     const fontOk = await p.evaluate((face) => document.fonts.check('700 16px "' + face + '"'), t.display);
     if (!fontOk) console.error('composition-preview: display font did not load from Google Fonts: ' + t.display);
 

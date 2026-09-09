@@ -1,0 +1,105 @@
+/* ====== Section: Closing (closing-block) ====== */
+.closing-block, .closing-block *, .closing-block *::before, .closing-block *::after { box-sizing: border-box; }
+.closing-block {
+  padding: var(--space-section) var(--space-gutter);
+  background: var(--color-canvas);
+}
+/* The beam. A conic gradient on an over-square pseudo-element rotated by
+   @keyframes on transform only, clipped to the frame, with a second
+   pseudo-element inset 1px painting the ground back over it: what is left
+   visible is a 1px ring with one bright arc travelling round it. */
+.closing-block__frame {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  max-width: 54rem;
+  margin: 0 auto;
+}
+.closing-block__frame::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 200%;
+  aspect-ratio: 1;
+  z-index: -2;
+  transform: translate(-50%, -50%) rotate(0turn);
+  background: conic-gradient(
+    from 0turn,
+    transparent 0 78%,
+    color-mix(in srgb, var(--color-accent) 35%, transparent) 87%,
+    var(--color-accent) 93%,
+    transparent 99%);
+  animation: closing-block-beam 7s linear infinite;
+}
+.closing-block__frame::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: calc(var(--radius-md) - 1px);
+  background: var(--color-surface);
+}
+@keyframes closing-block-beam { to { transform: translate(-50%, -50%) rotate(1turn); } }
+.closing-block__inner {
+  position: relative;
+  padding: clamp(2.5rem, 6vw, 5rem) clamp(1.5rem, 4vw, 4rem);
+  display: grid;
+  justify-items: start;
+}
+.closing-block__kicker {
+  font: 500 0.8rem/1.2 var(--font-text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0 0 1rem;
+}
+.closing-block__title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4.4vw, 3.75rem);
+  line-height: 1.03;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+  margin: 0 0 1rem;
+  max-width: 20ch;
+}
+.closing-block__lede {
+  font-size: clamp(1.05rem, 1.3vw, 1.2rem);
+  line-height: 1.58;
+  color: var(--color-ink-soft);
+  text-wrap: pretty;
+  max-width: 54ch;
+  margin: 0 0 2rem;
+}
+.closing-block__actions { margin: 0 0 1.25rem; }
+.closing-block__cta {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.95rem 1.6rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .closing-block__cta:hover { background: color-mix(in srgb, var(--color-accent) 86%, var(--color-ink)); }
+}
+.closing-block__cta:active { transform: scale(0.97); }
+.closing-block__cta:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 4px; }
+.closing-block__aside {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--color-ink-soft);
+  text-wrap: pretty;
+  max-width: 48ch;
+  margin: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .closing-block__frame::before { animation: none; }
+  .closing-block__cta { transition: none; }
+}

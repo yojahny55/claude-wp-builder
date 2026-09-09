@@ -1,0 +1,79 @@
+/* ====== Section: Hero (hero-bleed) ====== */
+.hero-bleed, .hero-bleed *, .hero-bleed *::before, .hero-bleed *::after { box-sizing: border-box; }
+.hero-bleed {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  align-content: end;
+  min-height: 100dvh;
+  padding: var(--space-section) var(--space-gutter) calc(var(--space-section) * 0.9);
+  background: var(--color-surface);
+}
+/* The bed is over-tall by the parallax travel (rate 0.6 = 60px each way), so the
+   photograph never pulls its own edge into frame. */
+.hero-bleed__bed {
+  position: absolute;
+  inset: -80px 0;
+  width: 100%;
+  height: calc(100% + 160px);
+  object-fit: cover;
+  z-index: -2;
+}
+/* A band, not a full wash: the photograph stays a photograph at the top of the
+   frame and only the copy end is darkened enough to carry text. */
+.hero-bleed__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(to top, var(--color-canvas) 0%, color-mix(in srgb, var(--color-canvas) 82%, transparent) 34%, transparent 66%),
+    linear-gradient(to right, color-mix(in srgb, var(--color-canvas) 62%, transparent) 0%, transparent 58%);
+}
+.hero-bleed__copy { max-width: 46rem; }
+.hero-bleed__kicker {
+  font: 500 0.8rem/1.2 var(--font-text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0 0 1rem;
+}
+.hero-bleed__title {
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 6.4vw, 5.25rem);
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+  color: var(--color-ink);
+  margin: 0 0 1.1rem;
+  max-width: 15ch;
+}
+.hero-bleed__lede {
+  font-size: clamp(1.05rem, 1.3vw, 1.25rem);
+  line-height: 1.55;
+  color: var(--color-ink-soft);
+  max-width: 50ch;
+  text-wrap: pretty;
+  margin: 0 0 2rem;
+}
+.hero-bleed__actions { margin: 0; }
+.hero-bleed__cta {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.95rem 1.6rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .hero-bleed__cta:hover { background: color-mix(in srgb, var(--color-accent) 86%, var(--color-ink)); }
+}
+.hero-bleed__cta:active { transform: scale(0.97); }
+.hero-bleed__cta:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .hero-bleed__cta { transition: none; }
+}

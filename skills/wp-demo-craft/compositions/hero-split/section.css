@@ -1,0 +1,68 @@
+/* ====== Section: Hero (hero-split) ====== */
+/* Scoped, because a composition cannot assume the host page carries a reset:
+   without it `min-height: 100dvh` measures the content box and the padding is
+   added on top, so the hero comes out a third taller than the screen. */
+.hero-split, .hero-split *, .hero-split *::before, .hero-split *::after { box-sizing: border-box; }
+.hero-split {
+  display: grid;
+  gap: var(--space-gutter);
+  padding: calc(var(--space-section) * 0.75) var(--space-gutter) var(--space-section);
+  min-height: 100dvh;
+  align-content: center;
+}
+.hero-split__kicker {
+  font: 500 0.8rem/1.2 var(--font-text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0 0 1rem;
+}
+.hero-split__title {
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 6vw, 5.5rem);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin: 0 0 1.25rem;
+  max-width: 14ch;
+}
+.hero-split__lede {
+  font-size: clamp(1.05rem, 1.4vw, 1.25rem);
+  line-height: 1.55;
+  color: var(--color-ink-soft);
+  max-width: 46ch;
+  text-wrap: pretty;
+  margin: 0 0 2rem;
+}
+.hero-split__actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.hero-split__cta,
+.hero-split__alt {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.85rem 1.4rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease;
+}
+.hero-split__cta { background: var(--color-accent); color: var(--color-accent-ink); }
+.hero-split__alt { color: var(--color-ink); box-shadow: inset 0 0 0 1px var(--color-hairline); }
+@media (hover: hover) and (pointer: fine) {
+  .hero-split__cta:hover { background: color-mix(in srgb, var(--color-accent) 86%, var(--color-ink)); }
+  .hero-split__alt:hover { background: var(--color-surface); }
+}
+.hero-split__cta:active, .hero-split__alt:active { transform: scale(0.97); }
+.hero-split__cta:focus-visible, .hero-split__alt:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+.hero-split__media { margin: 0; overflow: hidden; border-radius: var(--radius-md); }
+.hero-split__media img { width: 100%; height: auto; display: block; object-fit: cover; aspect-ratio: 4 / 5; }
+@media (min-width: 900px) {
+  .hero-split { grid-template-columns: 1.1fr 0.9fr; align-items: center; }
+  .hero-split__media { margin-right: calc(var(--space-gutter) * -1); border-radius: var(--radius-md) 0 0 var(--radius-md); }
+  /* The 4:5 crop is taller than the viewport at desktop widths; without a ceiling the
+     hero grows past 100dvh and the headline leaves the first screen. */
+  .hero-split__media img { max-height: 68vh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-split__cta, .hero-split__alt { transition: none; }
+}
