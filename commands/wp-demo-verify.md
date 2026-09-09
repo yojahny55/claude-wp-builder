@@ -29,25 +29,40 @@ runs it as the craft gate before writing any markup.
 ## Step 2a: Detector
 
 ```bash
-npx impeccable@1 detect <target> --json > <dir>/.verify/impeccable.json
+npx -y impeccable@4 detect <target> --json > <dir>/.verify/impeccable.json
 ```
 
 `impeccable` is an external package this repo does not install, vendor or
 configure — it is fetched from the npm registry at run time via `npx`. Pin the
-major version (`@1`) so a future major release cannot silently change rule
-identifiers or output shape underneath this gate.
+major version (`@4`; `@1` does not exist on the registry) so a future major
+release cannot silently change rule identifiers or output shape underneath
+this gate.
 
-Check the exit status and the output before reading it as findings: if `npx`
-could not resolve or run the package — command not found, no network reaching
-the registry, or the captured output does not parse as JSON — the detector did
-not run at all. Report **"detector could not run"** and fail the round on that
-basis; this is not the same as zero findings, and must never be read as one.
+The exit code says whether the scan ran, not how many findings it made: `0`
+is a clean or advisory-only scan, `1` means a requested target could not be
+scanned at all, `2` means the scan completed and found at least one
+non-advisory finding — findings do not fail the process the way a linter's
+would, so a nonzero exit does not by itself mean "could not run." Only exit
+`1` is that case; treat it, any other exit code, a missing `npx`/no network
+reaching the registry, or stdout that fails to parse as JSON the same way:
+report **"detector could not run"** and fail the round on that basis, never
+read as zero findings. Human-readable text goes to stderr, so the redirect
+above captures only the JSON on stdout, which is what findings are counted
+from — never the exit code.
 
-Once the JSON is confirmed to have parsed, sixty-one deterministic rules, no
-model: any finding with severity `P0` fails the round outright, before a
-screenshot is taken. P1 and P2 findings are listed in the report and fixed when
-the rubric below also flags the section. A target that is a URL is scanned with
+Once the array parses: sixty-one deterministic rules, no model, each finding
+carrying a `category` (`slop` or `quality`) and a `severity` (`warning` or
+`advisory`). A `slop` finding with `severity: "warning"` fails the round
+outright, before a screenshot is taken — that is the AI-tell axis and the
+real gate. An advisory-flagged finding (e.g. em-dash overuse) is listed but
+does not by itself fail the round, matching the detector's own design:
+advisories never block automation. `quality` findings are listed in the
+report and fixed when the rubric below also flags the same section, but do
+not by themselves fail a round. A target that is a URL is scanned with
 Puppeteer by the detector itself; a file or directory is scanned statically.
+Run against the demo that motivated this gate, the detector found twenty
+issues, seven of them `slop`; run against this library's own `hero-split`
+composition, it returns an empty array.
 
 ## Step 2b: Walk it
 

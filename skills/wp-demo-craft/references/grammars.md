@@ -58,9 +58,9 @@ are not offered here; they belong to the cinematic path, built by
 
 **Live surface** (the page behaves like the running product) is not offered
 here either. It depends on a real, operable surface computing real state, and a
-div-built fake dashboard or fake terminal standing in for one is a P0 in
-`impeccable detect`. A concept product that cannot actually run its panels does
-not get this grammar; pick another.
+div-built fake dashboard or fake terminal standing in for one is a `slop`
+finding in `impeccable detect`. A concept product that cannot actually run
+its panels does not get this grammar; pick another.
 
 ## Retired
 

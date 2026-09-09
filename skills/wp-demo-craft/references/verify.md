@@ -11,14 +11,21 @@ three rounds stops and reports rather than shipping quietly, and it
 
 ## Round structure
 
-1. **Deterministic gate.** `npx impeccable detect demo/ --json`, findings written
-   to `demo/.verify/impeccable.json`. Any **P0** fails the round before a
-   screenshot is taken. The detector covers the generic machine-checkable tells
-   — scroll cues, `01 / 06` counters, gradient text, visible em dashes, fake
-   dashboards — and a detector is cheaper than a rule nobody read to the end of.
-   It is an external package this repo neither pins nor configures, so the rules
-   that are this plugin's own stay in `taste.md` and are the author's to hold: a
-   green detector run is not evidence that the taste floor was met.
+1. **Deterministic gate.** `npx -y impeccable@4 detect demo/ --json`, findings
+   written to `demo/.verify/impeccable.json`. Each finding carries a `category`
+   (`slop` or `quality`) and a `severity` (`warning` or `advisory`, the
+   detector's own soft-signal tier). Any non-advisory **`slop`** finding fails
+   the round before a screenshot is taken; `quality` findings and
+   advisory-flagged findings are read at the critique step below instead. Exit
+   code tracks whether the scan ran, not how many findings it made — `1` means
+   a target could not be scanned, which is the real "did not run" case; findings
+   are always counted from the JSON array, never from the exit code. The
+   detector covers the generic machine-checkable tells — scroll cues, `01 / 06`
+   counters, gradient text, visible em dashes, fake dashboards — and a detector
+   is cheaper than a rule nobody read to the end of. It is an external package
+   this repo neither vendors nor configures, so the rules that are this
+   plugin's own stay in `taste.md` and are the author's to hold: a green
+   detector run is not evidence that the taste floor was met.
 2. **Contact sheets.** `node ${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs demo/`
    walks every page at every tested width. Machine findings fail the round.
 3. **Critique.** A separate evaluator pass reads **only the sheets** — never the

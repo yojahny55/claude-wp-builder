@@ -22,8 +22,9 @@ grep -Fq 'three rounds' "$v" || fail "verify.md does not cap the loop at three r
 grep -Fq 'demo/VERIFY.md' "$v" || fail "verify.md does not write the score card to demo/VERIFY.md"
 grep -Eqi 'no fingerprint|does not record a fingerprint' "$v" \
   || fail "verify.md lets a failing build record a fingerprint"
-grep -Fq 'impeccable detect' "$v" || fail "verify.md does not run impeccable detect"
-grep -Fq 'P0' "$v" || fail "verify.md does not fail the round on a P0"
+grep -Eq 'impeccable@[0-9]+ detect' "$v" || fail "verify.md does not run a version-pinned impeccable detect"
+grep -Fq 'slop' "$v" || fail "verify.md does not fail the round on a slop finding"
+if grep -Fq 'P0' "$v"; then fail "verify.md still says P0, a severity impeccable never emits"; fi
 grep -Eqi 'only the (screenshots|sheets)' "$v" \
   || fail "verify.md does not restrict the evaluator to the sheets"
 grep -Fq '4.5:1' "$v" || fail "verify.md does not state the measured contrast floor"

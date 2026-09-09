@@ -63,8 +63,8 @@ plain: an unverified craft page is the one that reaches the client.
 Never ship: content hidden behind a scroll trigger in the first viewport; a page
 over the motion budget in `devices.md`, which owns the pin caps, the total and
 the interior-page rule and is the only place they are written down; a hardcoded
-hex where a token exists; invented statistics; a P0 from `impeccable detect`; a
-build that failed the rubric after three rounds.
+hex where a token exists; invented statistics; a `slop` finding from
+`impeccable detect`; a build that failed the rubric after three rounds.
 
 ## References
 
