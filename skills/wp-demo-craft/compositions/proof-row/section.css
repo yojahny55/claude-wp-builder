@@ -62,6 +62,10 @@
   overflow: hidden;
   padding-top: 1.75rem;
   border-top: 1px solid var(--color-hairline);
+  /* ponytail: `black` here is an alpha channel, not a colour. A mask reads only the
+     alpha of what it is given, so the keyword is the opaque end of the fade and
+     never paints. This is the one place in a composition a colour literal is
+     correct; it is not licence to use one anywhere else. */
   -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
           mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
 }
@@ -82,6 +86,13 @@
   white-space: nowrap;
 }
 @keyframes proof-row-marquee { to { transform: translateX(-50%); } }
+/* WCAG 2.2.2: anything that moves automatically beside static content needs a way
+   to stop it, and `prefers-reduced-motion` is not that mechanism. Hover alone is
+   not keyboard reachable, so `:focus-within` carries the keyboard case. */
+@media (hover: hover) and (pointer: fine) {
+  .proof-row__marquee:hover .proof-row__track,
+  .proof-row__marquee:focus-within .proof-row__track { animation-play-state: paused; }
+}
 @media (min-width: 760px) {
   .proof-row__figures { grid-template-columns: repeat(3, 1fr); }
 }

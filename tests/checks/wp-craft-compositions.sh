@@ -32,6 +32,21 @@ for d in "$c"/*/; do
   grep -Eq '#[0-9a-fA-F]{3,8}\b' "$d/section.css" && fail "$name/section.css has a hex literal; tokens only"
   grep -Fq 'style="' "$d/section.html" && fail "$name/section.html has an inline style attribute; all styling lives in section.css"
   grep -Fq 'transition: all' "$d/section.css" && fail "$name/section.css uses transition: all"
+  grep -Fq '—' "$d/section.html" && fail "$name/section.html has an em dash in visible copy"
+  grep -Fq '<script' "$d/section.html" && fail "$name/section.html has a script tag; motion is data-motion only"
+  grep -Eq '\bease-in\b' "$d/section.css" && fail "$name/section.css uses ease-in; never ease-in on UI"
+  # Every img declares its box, or the page reflows when the photograph lands.
+  while IFS= read -r img; do
+    [[ "$img" == *width=* && "$img" == *height=* ]] \
+      || fail "$name/section.html has an img without both width and height: $img"
+  done < <(tr '<' '\n' < "$d/section.html" | grep '^img ' || true)
+  # Every device is one devices.md actually defines; a typo is a silent no-op.
+  while IFS= read -r kind; do
+    case "$kind" in
+      reveal|pin|pan|wipe|kinetic|parallax|drift|tilt|magnet|spotlight) ;;
+      *) fail "$name/section.html uses data-motion=\"$kind\", which devices.md does not define" ;;
+    esac
+  done < <(grep -o 'data-motion="[a-z]*"' "$d/section.html" | cut -d'"' -f2 | sort -u)
   grep -Fq '{{' "$d/section.html" || fail "$name/section.html has no {{slot}} markers"
   grep -Eqi '^\*\*Port of:\*\*' "$d/README.md" || fail "$name/README.md does not state what it ports (or 'none')"
   grep -Eqi '^\*\*Licence:\*\*' "$d/README.md" || fail "$name/README.md does not state the origin licence"
@@ -41,7 +56,14 @@ for d in "$c"/*/; do
   grep -Eq 'data-motion="kinetic"' "$d/section.html" && [[ "$name" == hero-* || "$name" == page-head ]] \
     && fail "$name uses kinetic on a first-viewport composition; heroes use the greet cue"
 done
-[ "$n" -ge 12 ] || fail "expected at least 12 compositions, found $n"
+[ "$n" -ge 13 ] || fail "expected at least 13 compositions, found $n"
+# The regenerate command the library documents overwrites the previews in place, so
+# the copy that made them has to be committed beside them.
+[ -f "$c/fills.json" ] || fail "$c/fills.json (the preview copy) is missing"
+node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$c/fills.json" \
+  || fail "$c/fills.json is not valid JSON"
+grep -Fq -- '--fill' "$r" || fail "$r has no --fill flag to apply $c/fills.json"
+grep -Fq -- '--fill' "$c/README.md" || fail "$c/README.md documents a regenerate command that ignores fills.json"
 # Interior page head never pins.
 grep -Eq 'data-motion="pin"' "$c/page-head/section.html" && fail "page-head pins; interior pages have no pin"
 

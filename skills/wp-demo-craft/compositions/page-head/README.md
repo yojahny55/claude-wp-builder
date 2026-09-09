@@ -8,8 +8,10 @@ divider is the failure this whole library exists to stop.
 **Port of:** none.
 **Licence:** plugin (MIT).
 **Motion cost:** 0 vh added, and it must stay 0. No pin, no `min-height`, no
-`100dvh`. Devices: reveal on the block, greet-and-hold cue on the title so the
-heading is lit on first paint.
+`100dvh`. Devices: reveal on the block (stagger 70), which lights the kicker,
+title and lede in that order as soon as the section is in view — on an interior
+page, immediately. No `data-motion-cue`: cues are read only for the scrubbed
+devices, so one on a `reveal` section does nothing — see `../README.md`.
 
 **Pick when:** any page that is not the index. Every one of them.
 

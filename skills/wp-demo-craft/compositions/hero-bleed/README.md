@@ -18,8 +18,10 @@ busy image; a band scrim heavy enough to fix a busy image is a grey rectangle.
 **Slots:** kicker, title (max three lines at 390), lede (max 22 words),
 cta_label/cta_href, image_src/image_alt (3:2 or wider, at least 2400px).
 
-**Notes:** the bed is inset `-80px` top and bottom and 160px over-tall, because
-the parallax device translates it 60px each way and a bed sized to the section
-would drag its own edge into frame. `scrim--band` is the shared helper class the
+**Notes:** the bed is inset `-40px` top and bottom and 80px over-tall, because a
+bed sized to the section would drag its own edge into frame. Parallax travel is
+`rate * 100`px *in total* (`devices.md`), so rate 0.6 is 60px end to end, or plus
+and minus 30px from centre; 40px each side covers it with room for rounding.
+`scrim--band` is the shared helper class the
 craft skill names for this treatment; the geometry lives on `.hero-bleed__scrim`
 so the composition works with or without that helper present.

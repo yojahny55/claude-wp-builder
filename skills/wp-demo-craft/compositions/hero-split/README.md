@@ -2,13 +2,15 @@
 
 **Role:** hero. Copy left, one real photograph right, crossing the gutter on
 desktop so the image overlaps the page edge (overlap sells depth better than
-shadow). Headline carries a greet-and-hold cue, so it is visible on first paint
-and never masked.
+shadow). Nothing masks the headline: `reveal` fades the section's direct children
+in on entry, and for a hero that entry is first paint.
 
 **Port of:** none.
 **Licence:** plugin (MIT).
-**Motion cost:** 0 vh added. Devices: reveal on the block, parallax 0.35 on the
-image only. Never body copy on the parallax layer.
+**Motion cost:** 0 vh added. Devices: reveal on the block (stagger 60), parallax
+0.35 on the image only. Never body copy on the parallax layer. No
+`data-motion-cue`: cues are read only for the scrubbed devices, so one on a
+`reveal` section does nothing — see `../README.md`.
 
 **Pick when:** the client owns one strong photograph of people or place. Skip when
 the only imagery is stock or generated.

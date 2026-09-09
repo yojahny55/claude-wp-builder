@@ -4,16 +4,20 @@
  * preview-390.png using the neutral _preview.md tokens and the plugin's own
  * motion engine, scrolled to the section's settled/arrived state.
  *
- * usage: composition-preview.mjs <composition-dir>   exit 0 ok, 2 no browser, 3 crash
+ * usage: composition-preview.mjs [--fill] <composition-dir>
+ *        --fill substitutes compositions/fills.json copy for the {{slot}} markers
+ *        exit 0 ok, 2 no browser, 3 crash
  */
 import { existsSync, readFileSync, writeFileSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
-import { resolve, join, dirname } from 'node:path';
+import { resolve, join, dirname, basename } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
-const dir = resolve(process.argv[2] || '.');
+const argv = process.argv.slice(2);
+const useFill = argv.includes('--fill');
+const dir = resolve(argv.find((a) => !a.startsWith('--')) || '.');
 const html = join(dir, 'section.html');
 const css = join(dir, 'section.css');
 if (!existsSync(html) || !existsSync(css)) {
@@ -45,6 +49,25 @@ function previewTokens() {
     section: p('spacing.section', /\n  section: "([^"]+)"/), gutter: p('spacing.gutter', /\n  gutter: "([^"]+)"/),
     rsm: p('rounded.sm', /\n  sm: ([^\n]+)/), rmd: p('rounded.md', /\n  md: ([^\n]+)/),
   };
+}
+
+/** Substitute the committed `compositions/fills.json` copy for the `{{slot}}` markers.
+ *  A frame full of `{{title}}` teaches nothing about rhythm or measure, and this
+ *  script writes into the composition folder — so the regenerate command the library
+ *  documents has to be able to reproduce the committed PNGs rather than eat them.
+ *  A slot with no fill is reported and left standing, so it shows up in the render. */
+function applyFills(src, compDir) {
+  const file = join(compDir, '..', 'fills.json');
+  if (!existsSync(file)) throw new Error('--fill: ' + file + ' is missing');
+  const all = JSON.parse(readFileSync(file, 'utf8'));
+  const map = Object.assign({}, all._shared, all[basename(compDir)]);
+  return src.replace(/\{\{([A-Za-z0-9_]+)\}\}/g, (m, key) => {
+    if (!(key in map)) {
+      console.error('composition-preview: fills.json has no value for {{' + key + '}}');
+      return m;
+    }
+    return map[key];
+  });
 }
 
 function findChrome() {
@@ -117,7 +140,7 @@ try {
 html{background:var(--color-canvas);color:var(--color-ink);font-family:var(--font-text)}body{margin:0}
 ${readFileSync(css, 'utf8')}
 </style></head><body>
-${readFileSync(html, 'utf8')}
+${useFill ? applyFills(readFileSync(html, 'utf8'), dir) : readFileSync(html, 'utf8')}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js"></script>
 <script type="module">${motion}
@@ -160,22 +183,26 @@ initMotion(window.gsap, window.ScrollTrigger);</script>
       await p.waitForTimeout(250);
     }
 
-    // The arrived frame, not the opening one: a scrub device is tied continuously to
-    // scroll position with no memory of having been visited, so a shot taken back at
-    // scroll 0 shows the unanimated look — the bug this replaces. A section no taller
-    // than the viewport gets its top pinned to the viewport top; a taller (pinned or
-    // panned) section gets its bottom pinned to the viewport bottom, so the frame
-    // shows the arrived state rather than the opening one. Measuring the outer
-    // data-motion element (never the inner sticky frame) keeps top + scrollY equal to
-    // its true document-space position regardless of current scroll.
+    // The arrived frame, not the opening one — but only where those differ. A scrub
+    // device (pin, pan, wipe, kinetic, drift) is tied continuously to scroll position
+    // with no memory of having been visited, so a shot taken back at scroll 0 shows
+    // the unanimated look: those get their bottom pinned to the viewport bottom when
+    // they are taller than it. Everything else fires once and stays arrived at any
+    // scroll position, so end-aligning it buys nothing and costs the section its
+    // opening — a tall reveal section end-aligned shows a clipped heading and the
+    // bottom sliver of an image. Those top-align regardless of height. Measuring the
+    // outer data-motion element (never the inner sticky frame) keeps top + scrollY
+    // equal to its true document-space position regardless of current scroll.
+    const SCRUBBED = ['pin', 'pan', 'wipe', 'kinetic', 'drift'];
     const rect = await p.evaluate(() => {
       const el = document.querySelector('[data-motion], section') || document.body.firstElementChild;
       if (!el) return null;
       const r = el.getBoundingClientRect();
-      return { top: r.top + window.scrollY, height: r.height };
+      return { top: r.top + window.scrollY, height: r.height, kind: el.getAttribute('data-motion') || '' };
     });
     if (rect) {
-      const target = rect.height <= h ? rect.top : rect.top + rect.height - h;
+      const arrives = SCRUBBED.indexOf(rect.kind) !== -1 && rect.height > h;
+      const target = arrives ? rect.top + rect.height - h : rect.top;
       await p.evaluate((y) => window.scrollTo(0, y), Math.min(docMax, Math.max(0, Math.round(target))));
       await p.waitForTimeout(250);
     }

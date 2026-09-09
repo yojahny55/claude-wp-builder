@@ -10,13 +10,15 @@
   padding: var(--space-section) var(--space-gutter) calc(var(--space-section) * 0.9);
   background: var(--color-surface);
 }
-/* The bed is over-tall by the parallax travel (rate 0.6 = 60px each way), so the
-   photograph never pulls its own edge into frame. */
+/* The bed is over-tall by more than the parallax travel, so the photograph never
+   pulls its own edge into frame. Travel is `rate * 100`px total (devices.md), so
+   rate 0.6 is 60px end to end, plus or minus 30px from centre; 40px of bleed each
+   side covers that with room for rounding. */
 .hero-bleed__bed {
   position: absolute;
-  inset: -80px 0;
+  inset: -40px 0;
   width: 100%;
-  height: calc(100% + 160px);
+  height: calc(100% + 80px);
   object-fit: cover;
   z-index: -2;
 }
@@ -27,8 +29,8 @@
   inset: 0;
   z-index: -1;
   background:
-    linear-gradient(to top, var(--color-canvas) 0%, color-mix(in srgb, var(--color-canvas) 82%, transparent) 34%, transparent 66%),
-    linear-gradient(to right, color-mix(in srgb, var(--color-canvas) 62%, transparent) 0%, transparent 58%);
+    linear-gradient(to top, var(--color-canvas) 0%, color-mix(in srgb, var(--color-canvas) 82%, transparent) 42%, transparent 76%),
+    linear-gradient(to right, color-mix(in srgb, var(--color-canvas) 72%, transparent) 0%, color-mix(in srgb, var(--color-canvas) 40%, transparent) 30%, transparent 62%);
 }
 .hero-bleed__copy { max-width: 46rem; }
 .hero-bleed__kicker {

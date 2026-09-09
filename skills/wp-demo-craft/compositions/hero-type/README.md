@@ -5,14 +5,15 @@ anchored to the bottom of the first screen so the empty space above it reads as
 a held breath rather than a section that failed to fill. A hairline over the
 kicker gives the block a top edge; without it the type floats.
 
-**Port of:** Aceternity "text generate", reproduced as the block's own
-greet-and-hold cue rather than a word-by-word split. A per-word reveal on the
-first headline a visitor ever sees costs the landing screen its meaning for the
-length of the stagger, which is the bug the greet form exists to avoid.
+**Port of:** Aceternity "text generate", reproduced as the block's own `reveal`
+rather than a word-by-word split. A per-word reveal on the first headline a
+visitor ever sees costs the landing screen its meaning for the length of the
+stagger; one 620ms fade of the whole block does not.
 **Licence:** Aceternity UI is MIT. No code was copied; the effect is rewritten
 inside the `data-motion` contract.
-**Motion cost:** 0 vh added. Devices: reveal on the block (stagger 70), greet cue
-on the headline. No parallax, nothing to parallax.
+**Motion cost:** 0 vh added. Devices: reveal on the block (stagger 70). No
+parallax, nothing to parallax. No `data-motion-cue`: cues are read only for the
+scrubbed devices, so one on a `reveal` section does nothing — see `../README.md`.
 
 **Pick when:** the brand has a sentence worth the whole screen and no photograph
 worth showing. Skip when the client owns real imagery; an empty hero is a choice,
