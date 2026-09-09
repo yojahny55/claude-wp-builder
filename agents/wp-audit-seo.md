@@ -43,6 +43,9 @@ Scan theme template files using Grep and Glob. No WP-CLI needed.
 | SEO-010 | No breadcrumb template | Grep templates for `breadcrumb\|rank_math_the_breadcrumbs` | INFO | Yes |
 | SEO-011 | Bad link text | Grep for `>click here<\|>read more<\|>learn more<` without screen-reader-text | WARNING | No |
 | SEO-012 | No structured data | Check if any JSON-LD `<script type="application/ld+json">` in templates | INFO | Yes |
+| SEO-039 | Duplicate schema sources | Grep templates for `<script type="application/ld+json"` — if Rank Math is active AND the theme also outputs JSON-LD, both render. More than one schema source on a page is a violation. | WARNING | Yes |
+| SEO-044 | Affiliate links missing `rel="sponsored"` | Grep templates for affiliate `href=` patterns (`amazon.`, `booking.`, `shareasale.`, `cj.com`, `impact.com`, `ref=`, `aff=`, `utm_source=affiliate`) without `rel="sponsored"`. Also flag `target="_blank"` without `rel="noopener"`. | WARNING | Yes |
+| SEO-049 | Dead asset references | Grep templates for `data-src`, `data-src-mobile` and `poster=` attributes, resolve each path against the theme directory and flag any file that does not exist — the browser pays for a 404. | WARNING | Yes |
 
 ### Procedure
 
@@ -74,6 +77,18 @@ These checks require a running WordPress installation. Use `$WP` from `.wp-creat
 | SEO-032 | Archives not noindexed | Check `noindex_tax_post_tag`, `noindex_date_archive`, `noindex_author_archive` in `rank-math-options-titles` | INFO |
 | SEO-033 | Breadcrumbs disabled | Check `breadcrumbs` in `rank-math-options-general` | INFO |
 | SEO-034 | Category base not stripped | Check `strip_category_base` in `rank-math-options-general` | INFO |
+| SEO-035 | Title too long (>60 chars) | `$WP eval "global \$wpdb; \$rows = \$wpdb->get_results(\"SELECT p.ID, p.post_title, (SELECT meta_value FROM \$wpdb->postmeta WHERE post_id=p.ID AND meta_key='rank_math_title') AS rm FROM \$wpdb->posts p WHERE p.post_status='publish' AND p.post_type IN ('post','page')\"); foreach (\$rows as \$r) { \$t = \$r->rm ?: \$r->post_title; if (mb_strlen(\$t) > 60) echo 'LONG TITLE [' . mb_strlen(\$t) . '] #' . \$r->ID . ': ' . mb_substr(\$t, 0, 60) . PHP_EOL; }"` | WARNING |
+| SEO-036 | Description too long (>160 chars) | `$WP eval "global \$wpdb; \$rows = \$wpdb->get_results(\"SELECT post_id, meta_value FROM \$wpdb->postmeta WHERE meta_key='rank_math_description' AND meta_value!=''\"); foreach (\$rows as \$r) { if (mb_strlen(\$r->meta_value) > 160) echo 'LONG DESC [' . mb_strlen(\$r->meta_value) . '] #' . \$r->post_id . PHP_EOL; }"` | WARNING |
+| SEO-037 | Description too short (<70 chars) | Same query as SEO-035/036, flag `mb_strlen(\$r->meta_value) < 70` | INFO |
+| SEO-038 | Canonical not self-referencing | Compare `canonical` from the rendered-head snapshot (see Procedure) with `get_permalink()` for the same post | WARNING |
+| SEO-040 | hreflang target not published | For each `hreflang` href in the snapshot, resolve it with `url_to_postid()` and check `get_post_status()` is `publish` | WARNING |
+| SEO-041 | hreflang not reciprocal | For each snapshot pair A→B, verify B's snapshot carries an `hreflang` back to A | WARNING |
+| SEO-042 | `html lang` mismatch (Polylang) | Compare `html_lang` from the snapshot with `str_replace('_', '-', pll_get_post_language(\$id, 'locale'))` | WARNING |
+| SEO-043 | `og:locale` mismatch (Polylang) | Compare `og_locale` from the snapshot with `pll_get_post_language(\$id, 'locale')` | WARNING |
+| SEO-045 | Polylang language not assigned | `$WP eval "if (!function_exists('pll_get_post_language')) { echo 'SKIP: Polylang not active'; return; } global \$wpdb; \$ids = \$wpdb->get_col(\"SELECT ID FROM \$wpdb->posts WHERE post_status='publish' AND post_type IN ('post','page')\"); \$missing = array(); foreach (\$ids as \$id) { if (!pll_get_post_language(\$id)) \$missing[] = '#' . \$id . ' ' . get_the_title(\$id); } echo count(\$missing) . '/' . count(\$ids) . ' posts have no language: ' . implode(', ', \$missing);"` | WARNING |
+| SEO-046 | Translation group incomplete | `$WP eval "if (!function_exists('pll_get_post_translations')) { echo 'SKIP: Polylang not active'; return; } global \$wpdb; \$ids = \$wpdb->get_col(\"SELECT ID FROM \$wpdb->posts WHERE post_status='publish' AND post_type IN ('post','page')\"); \$missing = array(); foreach (\$ids as \$id) { if (!pll_get_post_language(\$id)) continue; if (count(pll_get_post_translations(\$id)) < 2) \$missing[] = '#' . \$id . ' ' . get_the_title(\$id); } echo count(\$missing) . ' posts have no translation: ' . implode(', ', \$missing);"` | WARNING |
+| SEO-048 | Thin content (<300 words) | `$WP eval "global \$wpdb; \$rows = \$wpdb->get_results(\"SELECT ID, post_title, post_content FROM \$wpdb->posts WHERE post_status='publish' AND post_type IN ('post','page')\"); foreach (\$rows as \$r) { \$w = str_word_count(wp_strip_all_tags(\$r->post_content)); if (\$w < 300) echo 'THIN [' . \$w . ' words] #' . \$r->ID . ': ' . \$r->post_title . PHP_EOL; }"` | WARNING |
+| SEO-050 | Static llms.txt | `$WP eval "echo file_exists(ABSPATH . 'llms.txt') ? 'STATIC FILE — should be a rewrite endpoint' : 'not a static file';"` | INFO |
 
 ### Procedure
 
@@ -81,8 +96,66 @@ These checks require a running WordPress installation. Use `$WP` from `.wp-creat
 2. For module checks, retrieve the active modules array and compare against the recommended list: `seo-analysis`, `sitemap`, `rich-snippet`, `breadcrumbs`, `404-monitor`, `redirections`, `local-seo`, `image-seo`, `instant-indexing`, `link-counter`.
 3. For option checks, read the full option array once and check multiple keys from it.
 
-## Step 3: Tier 3 — Extended Checks
+### Procedure — rendered-head checks (SEO-038, SEO-040 to SEO-043)
 
+SEO-038 and SEO-040 through SEO-043 all compare a value in the rendered `<head>` against
+what WordPress says the post should be. Render every published permalink **once** and reuse
+the snapshot for all five — do not fetch the site five times.
+
+```bash
+$WP eval "
+\$out = array();
+foreach (get_posts(array('post_type' => array('post','page'), 'posts_per_page' => -1, 'post_status' => 'publish')) as \$p) {
+    \$url  = get_permalink(\$p->ID);
+    \$body = wp_remote_retrieve_body(wp_remote_get(\$url));
+    preg_match('#<html[^>]+lang=\"([^\"]+)#i', \$body, \$h);
+    preg_match('#<link[^>]+rel=\"canonical\"[^>]+href=\"([^\"]+)#i', \$body, \$c);
+    preg_match('#<meta[^>]+og:locale\"[^>]+content=\"([^\"]+)#i', \$body, \$o);
+    preg_match_all('#hreflang=\"([^\"]+)\"[^>]+href=\"([^\"]+)#i', \$body, \$a);
+    \$out[] = array(
+        'id'        => \$p->ID,
+        'url'       => \$url,
+        'html_lang' => isset(\$h[1]) ? \$h[1] : '',
+        'canonical' => isset(\$c[1]) ? \$c[1] : '',
+        'og_locale' => isset(\$o[1]) ? \$o[1] : '',
+        'hreflang'  => \$a[1] ? array_combine(\$a[1], \$a[2]) : array(),
+    );
+}
+echo wp_json_encode(\$out);
+"
+```
+
+1. **SEO-038** — `canonical` must equal the post's own `url` (compare with `untrailingslashit()`).
+   A paginated page canonicalising to page 1 is allowed; anything else pointing at a different
+   post is the finding.
+2. **SEO-040** — for every `hreflang` href, `url_to_postid()` then `get_post_status()` must be
+   `publish`. A hreflang to a draft or a 404 is worse than no hreflang.
+3. **SEO-041** — hreflang must be reciprocal: if A's snapshot lists B, B's snapshot must list A.
+4. **SEO-042 / SEO-043** — skip both unless `pll_get_post_language()` exists and
+   `count(pll_languages_list()) > 1`. Expected mapping is Polylang's own:
+   `html_lang` = `str_replace('_', '-', pll_get_post_language($id, 'locale'))`,
+   `og_locale` = `pll_get_post_language($id, 'locale')` verbatim (`es_ES`, `en_US`, `pt_BR`).
+   A mismatch means the theme or another plugin is overriding Polylang's locale filter.
+
+### Procedure — content and link checks
+
+1. **SEO-035 to SEO-037** — count with `mb_strlen()`, never `strlen()`; the meta is UTF-8.
+   Fall back to `post_title` when `rank_math_title` is empty. 60 chars is the safe Latin-script
+   limit — Google truncates by pixel width (~580px), so CJK and Cyrillic titles hit it sooner.
+2. **SEO-039** — only a finding when Rank Math is active. Rank Math is the single schema source;
+   a theme that also emits JSON-LD produces two blocks and Google may trust neither.
+3. **SEO-044** — flag affiliate `href`s without `rel="sponsored"`, and any `target="_blank"`
+   without `rel="noopener"`.
+4. **SEO-045 / SEO-046** — skip unless Polylang is active with more than one language. Not every
+   post needs a translation, but every post needs a language assigned.
+5. **SEO-048** — `wp_strip_all_tags()` then `str_word_count()`. Under 300 words is thin unless
+   the page is deliberately navigational (contact, thank-you, legal stub) — say which it is.
+6. **SEO-049** — resolve each `data-src` / `poster` path against `get_template_directory()` and
+   report the missing file, not just the attribute.
+7. **SEO-050** — a physical `llms.txt` goes stale the moment content changes; it should be a
+   rewrite endpoint generated from Rank Math's schema data.
+
+## Step 3: Tier 3 — Extended Checks
 If web-quality-skills SEO skill is available, reference additional checks:
 
 - **robots.txt validation** — verify directives are correct and sitemap URL is present

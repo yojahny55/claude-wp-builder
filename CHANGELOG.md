@@ -57,6 +57,29 @@
   which is the only value that renders as written when there is no demo. `/wp-yolo` Step 4.5 stops
   permitting a Google Fonts preconnect so both commands give one answer.
   New check: `tests/checks/wp-init-font-carry.sh`.
+- **The audit agents now run the checks they document.** A batch of SEO, performance and
+  Rank Math checks had been appended below the agents' last step with a note to "add these
+  to the tables above" — an instruction to a reader, left undone, so an agent that only
+  runs what Step 1 and Step 2 tabulate ran none of them. Every code is now a row in its
+  own tier table (`wp-audit-seo` SEO-035 to SEO-050, `wp-audit-performance` PERF-047 to
+  PERF-052), the Rank Math steps sit beside the steps they extend rather than after
+  Step 13, and `tests/checks/audit-check-tables.sh` fails if a check code is ever
+  referenced without being tabulated again.
+- **Broken `wp eval` payloads in those checks.** Two were PHP parse errors, several used
+  `$wpdb` and `$p` unescaped inside a double-quoted shell string (the shell ate the
+  variable before PHP saw it), and one shipped a `TODO` as a CRITICAL check that compared
+  nothing. The five checks that need rendered `<head>` values now share one snapshot
+  command instead of fetching the site five times.
+- **`glob('/**/*.php')` skipped the theme root.** PHP's `glob()` has no recursive `**`, so
+  the theme-JSON-LD conflict scan never saw `functions.php` — the single most likely place
+  for a theme to emit schema. Replaced with `RecursiveDirectoryIterator` in all three
+  copies, and the new check refuses the pattern.
+- **PERF-016 and PERF-048 contradicted each other** — one asked for `fetchpriority="high"`
+  on the hero image, the other flagged it. They are two halves of one decision (is the LCP
+  an image or text?) and are now cross-referenced as such.
+- The Rank Math sitemap validation reported that noindex pages "may still be in" a sitemap
+  it had already fetched, and counted drafts site-wide without looking at it at all. Both
+  now match permalinks against the sitemap body.
 
 ## [1.12.1] - 2026-09-04
 

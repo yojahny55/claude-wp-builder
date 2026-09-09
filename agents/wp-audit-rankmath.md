@@ -157,6 +157,32 @@ echo 'Title templates and schema configured.';
 
 **Note:** Adjust `knowledgegraph_type` to `'person'` for personal blogs, or set the appropriate LocalBusiness subtype based on the industry.
 
+## Step 4.5: Category noindex (MUST set BOTH options)
+
+Rank Math ignores `tax_category_robots` unless `tax_category_custom_robots = 'on'`.
+Without the gate, per-category noindex settings are silently discarded.
+
+```bash
+$WP eval "
+\$opts = (array) get_option('rank-math-options-titles', []);
+
+// Enable per-category robots control
+\$opts['tax_category_custom_robots'] = 'on';
+
+// Noindex thin category archives (adjust slugs per site)
+\$thin_categories = []; // slugs of thin/duplicate archives — set per the project's CLAUDE.md
+foreach (\$thin_categories as \$slug) {
+    \$term = get_term_by('slug', \$slug, 'category');
+    if (\$term) {
+        \$opts['tax_category_robots_' . \$term->term_id] = ['noindex'];
+    }
+}
+
+update_option('rank-math-options-titles', \$opts);
+echo 'Category noindex configured (custom_robots gate enabled).';
+"
+```
+
 ## Step 5: Configure Sitemap
 
 ```bash
@@ -171,6 +197,67 @@ $WP eval "
 \$opts['items_per_page']         = 200;
 update_option('rank-math-options-sitemap', \$opts);
 echo 'Sitemap configured.';
+"
+```
+
+## Step 5.5: Sitemap validation (11 known failure modes)
+
+After configuring sitemap, validate it actually works:
+
+```bash
+$WP eval "
+\$home = home_url('/');
+\$sitemap_url = \$home . 'sitemap_index.xml';
+\$response = wp_remote_get(\$sitemap_url);
+\$code = wp_remote_retrieve_response_code(\$response);
+\$body = wp_remote_retrieve_body(\$response);
+\$content_type = wp_remote_retrieve_header(\$response, 'content-type');
+
+echo \"Status: \$code\n\";
+echo \"Content-Type: \$content_type\n\";
+
+// Check 1: Must return 200
+if (\$code !== 200) { echo \"FAIL: Sitemap returns \$code\n\"; }
+
+// Check 2: Must be XML, not HTML
+if (strpos(\$body, '<!DOCTYPE html') !== false || strpos(\$body, '<html') !== false) {
+    echo \"FAIL: Sitemap returns HTML (not XML)\n\";
+}
+
+// Check 3: Must contain <sitemapindex or <urlset
+if (strpos(\$body, '<sitemapindex') === false && strpos(\$body, '<urlset') === false) {
+    echo \"FAIL: Sitemap missing <sitemapindex> or <urlset>\n\";
+}
+
+// Check 4: registration_skip flag
+\$skip = get_option('rank_math_registration_skip', 0);
+\$configured = get_option('rank_math_is_configured', 0);
+if (!\$skip) { echo \"FAIL: rank_math_registration_skip not set — Rank Math loads NO frontend SEO\n\"; }
+if (!\$configured) { echo \"FAIL: rank_math_is_configured not set — wizard flag missing\n\"; }
+
+// Check 5: Noindex pages in sitemap
+global \$wpdb;
+\$noindex_in_sitemap = \$wpdb->get_col(\"
+    SELECT p.ID FROM {\$wpdb->posts} p
+    JOIN {\$wpdb->postmeta} m ON p.ID=m.post_id
+    WHERE p.post_status='publish' AND p.post_type IN ('post','page')
+    AND m.meta_key='rank_math_robots' AND m.meta_value LIKE '%noindex%'
+\");
+foreach (\$noindex_in_sitemap as \$id) {
+    if (strpos(\$body, get_permalink(\$id)) !== false) {
+        echo \"FAIL: noindex post #\$id is listed in the sitemap\n\";
+    }
+}
+
+// Check 6: Draft/private posts in sitemap
+\$drafts = \$wpdb->get_col(\"SELECT ID FROM {\$wpdb->posts} WHERE post_status IN ('draft','private') AND post_type IN ('post','page')\");
+foreach (\$drafts as \$id) {
+    if (strpos(\$body, get_permalink(\$id)) !== false) {
+        echo \"FAIL: unpublished post #\$id is listed in the sitemap\n\";
+    }
+}
+
+echo \"Sitemap validation complete.\n\";
 "
 ```
 
@@ -275,6 +362,96 @@ foreach (\$posts as \$p) {
     \$count++;
 }
 echo \"Seeded SEO meta for \$count posts/pages.\";
+"
+```
+
+## Step 8.5: Schema validation and conflict detection
+
+After seeding meta, check for schema issues:
+
+```bash
+$WP eval "
+// Check 1: Theme JSON-LD + Rank Math = duplicate schema
+\$theme_jsonld = 0;
+\$it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(get_template_directory()));
+foreach (\$it as \$f) {
+    if (\$f->getExtension() !== 'php') continue;
+    if (strpos(file_get_contents(\$f->getPathname()), 'application/ld+json') !== false) {
+        \$theme_jsonld++;
+        echo \"Theme JSON-LD found in: \" . \$f->getFilename() . \"\n\";
+    }
+}
+if (\$theme_jsonld > 0) {
+    echo \"WARN: Theme outputs JSON-LD AND Rank Math is active = duplicate schema\n\";
+    echo \"  FIX: Remove theme JSON-LD, let Rank Math be the single source\n\";
+}
+
+// Check 2: Validate required schema fields
+\$posts = get_posts(['post_type' => ['post','page'], 'posts_per_page' => -1, 'post_status' => 'publish']);
+\$schema_issues = [];
+foreach (\$posts as \$p) {
+    \$schema = get_post_meta(\$p->ID, 'rank_math_schema_BlogPosting', true);
+    if (\$schema && is_array(\$schema)) {
+        // BlogPosting requires: headline, datePublished, author
+        if (empty(\$schema['headline'])) { \$schema_issues[] = '#' . \$p->ID . ' missing headline'; }
+        if (empty(\$schema['datePublished'])) { \$schema_issues[] = '#' . \$p->ID . ' missing datePublished'; }
+        if (empty(\$schema['author'])) { \$schema_issues[] = '#' . \$p->ID . ' missing author'; }
+    }
+}
+if (!empty(\$schema_issues)) {
+    echo \"Schema issues: \" . implode(', ', \$schema_issues) . \"\n\";
+} else {
+    echo \"Schema validation passed.\n\";
+}
+
+// Check 3: LocalBusiness schema for service businesses
+\$kg_type = get_option('rank-math-options-titles', [])['knowledgegraph_type'] ?? '';
+if (\$kg_type === 'localBusiness') {
+    \$schema = get_option('rank_math_schema_LocalBusiness', []);
+    if (empty(\$schema['areaServed'])) {
+        echo \"WARN: LocalBusiness schema missing areaServed\n\";
+    }
+    if (empty(\$schema['hasOfferCatalog'])) {
+        echo \"WARN: LocalBusiness schema missing hasOfferCatalog (service catalog)\n\";
+    }
+}
+
+echo \"Schema checks complete.\n\";
+"
+```
+
+## Step 8.6: Title/description quality validation
+
+After seeding meta, validate quality:
+
+```bash
+$WP eval "
+\$posts = get_posts(['post_type' => ['post','page'], 'posts_per_page' => -1, 'post_status' => 'publish']);
+\$issues = [];
+foreach (\$posts as \$p) {
+    \$title = get_post_meta(\$p->ID, 'rank_math_title', true) ?: \$p->post_title;
+    \$desc = get_post_meta(\$p->ID, 'rank_math_description', true);
+
+    // Title: warn if >60 chars (approximately 580px Google SERP limit)
+    if (mb_strlen(\$title) > 60) {
+        \$issues[] = '#' . \$p->ID . ' title ' . mb_strlen(\$title) . ' chars: ' . mb_substr(\$title, 0, 60) . '...';
+    }
+
+    // Description: warn if >160 chars or <70 chars
+    if (\$desc) {
+        if (mb_strlen(\$desc) > 160) {
+            \$issues[] = '#' . \$p->ID . ' desc ' . mb_strlen(\$desc) . ' chars (too long)';
+        } elseif (mb_strlen(\$desc) < 70) {
+            \$issues[] = '#' . \$p->ID . ' desc ' . mb_strlen(\$desc) . ' chars (too short)';
+        }
+    }
+}
+if (!empty(\$issues)) {
+    echo \"Title/desc quality issues:\n\";
+    foreach (\$issues as \$i) { echo \"  - \$i\n\"; }
+} else {
+    echo \"Title/description quality passed.\n\";
+}
 "
 ```
 
@@ -526,6 +703,53 @@ If an object cache plugin is active:
 
 ```bash
 $WP cache flush
+```
+
+## Step 15: Polylang-specific Rank Math Integration
+
+If Polylang is active, verify:
+
+```bash
+$WP eval "
+if (!function_exists('pll_languages_list')) { echo 'SKIP: Polylang not active'; exit; }
+
+\$langs = pll_languages_list();
+echo 'Languages: ' . implode(', ', \$langs) . PHP_EOL;
+
+// Check 1: Free Polylang = single sitemap (not per-language)
+\$sitemap_url = home_url('/sitemap_index.xml');
+\$response = wp_remote_get(\$sitemap_url);
+\$body = wp_remote_retrieve_body(\$response);
+if (strpos(\$body, '<sitemapindex') !== false) {
+    echo 'OK: Sitemap index present' . PHP_EOL;
+}
+// Per-language /<lang>/sitemap_index.xml 404s by design on free Polylang — not a defect.
+
+// Check 2: Posts without language assigned
+global \$wpdb;
+\$posts = \$wpdb->get_col(\"SELECT ID FROM {\$wpdb->posts} WHERE post_status='publish' AND post_type='post'\");
+\$untranslated = 0;
+foreach (\$posts as \$id) {
+    if (!pll_get_post_language(\$id)) { \$untranslated++; }
+}
+if (\$untranslated > 0) {
+    echo \"WARN: \$untranslated posts have no Polylang language assigned\" . PHP_EOL;
+}
+
+// Check 3: Translation completeness
+\$default = pll_default_language();
+\$missing = 0;
+foreach (\$posts as \$id) {
+    if (pll_get_post_language(\$id) !== \$default) continue;
+    \$tr = pll_get_post_translations(\$id);
+    if (count(\$tr) < 2) { \$missing++; }
+}
+if (\$missing > 0) {
+    echo \"INFO: \$missing default-language posts have no translations\" . PHP_EOL;
+}
+
+echo 'Polylang + Rank Math checks complete.' . PHP_EOL;
+"
 ```
 
 ## Verification

@@ -34,6 +34,8 @@ Before running ANY checks, read the following project files:
 | PERF-003 | @import used | Grep CSS for `@import` (render-blocking) | WARNING | No |
 | PERF-004 | Unused CSS classes | Compare CSS class selectors vs classes in templates | INFO | No |
 | PERF-005 | CSS custom props redefining | Check if `:root` values redefined per section unnecessarily | INFO | No |
+| PERF-047 | Render-blocking third-party CSS | Grep `functions.php` and `inc/` for `wp_enqueue_style` of a known library (`aos`, `swiper`, `animate`, `lightbox`, `slick`) loaded without the `media="print"` + `onload` swap. Synchronous third-party CSS in `<head>` blocks the LCP. | WARNING | Yes |
+| PERF-052 | Library CSS/JS loaded site-wide | For each third-party handle, check the enqueue is wrapped in `is_page_template()` / `is_front_page()` / `is_singular()` or hooked from the template that uses it. A library used by one section but shipped on every page is the finding. | WARNING | Yes |
 
 ### JavaScript Checks
 
@@ -53,6 +55,8 @@ Before running ANY checks, read the following project files:
 | PERF-017 | Images missing dimensions | Grep `<img` for missing `width=` or `height=` | WARNING | No |
 | PERF-018 | No responsive images | Grep for `<img` without `srcset` or `sizes` | INFO | No |
 | PERF-019 | No WebP conversion | Grep functions.php for `image_editor_output_format` filter | INFO | Yes |
+| PERF-049 | Dead/backup files in theme assets | Glob `assets/**` for `*.bak`, `*.bak.*`, `*-bak.*`, `*.original`, `*.backup`, `*.old`, `*.orig`, `*.tmp`. Report the total size; flag above 5MB. | WARNING | Yes |
+| PERF-051 | Dead `data-src` / `poster` references | Grep templates for `data-src=`, `data-src-mobile=` and `poster=`, resolve each path against the theme directory and flag any file that does not exist — the browser pays for a 404. | WARNING | Yes |
 
 ### Font Checks
 
@@ -91,9 +95,49 @@ Before running ANY checks, read the following project files:
 | PERF-044 | Memory limit low | `$WP eval "echo defined('WP_MEMORY_LIMIT') ? WP_MEMORY_LIMIT : ini_get('memory_limit');"` | ≥256M | WARNING |
 | PERF-045 | Excessive cron events | `$WP cron event list --format=count` | ≤50 | INFO |
 | PERF-046 | Page generation time | `$WP eval "echo timer_stop();"` | <1.0s | WARNING |
+| PERF-048 | `fetchpriority` on a non-LCP element | Run PSI/Lighthouse on the homepage and read the `largest-contentful-paint-element` audit | LCP element is an `<img>` whenever any image carries `fetchpriority="high"` | WARNING |
+
+### Procedure — render path checks (PERF-047 to PERF-052)
+
+**PERF-047 — render-blocking third-party CSS.**
+List every `wp_enqueue_style` in `functions.php` and `inc/`. A library is deferred when it is
+enqueued with the `print` media type and switched to `all` on load, with a `<noscript>` fallback:
+
+```php
+wp_enqueue_style( 'aos', get_template_directory_uri() . '/assets/css/aos.css', array(), '3.4.0', 'print' );
+// in the footer:
+// <script>document.querySelectorAll('link[media="print"]').forEach(function(l){l.media='all';});</script>
+// <noscript><link rel="stylesheet" href=".../aos.css"></noscript>
+```
+
+Add `data-no-optimize="1"` to the deferred `<link>`, or a page cache that combines CSS
+(LiteSpeed, WP Rocket) will merge it straight back into a synchronous bundle.
+
+**PERF-048 — `fetchpriority` must point at the real LCP.** This needs lab data; there is no
+code-only version. Read the LCP element from the Lighthouse/PSI report:
+
+- LCP is an `<img>` → `fetchpriority="high"` on that image is correct (this is PERF-016).
+- LCP is text (`<p>`, `<h1>`, `<div>`) → `fetchpriority="high"` on any image is **wrong**: it
+  makes the browser spend bandwidth ahead of the element that actually decides the score, and
+  the run-to-run variance shows up as a swinging performance number. Keep the hero preload,
+  drop the priority hint, and report the actual LCP element in the finding.
+
+PERF-016 and PERF-048 are two halves of one decision — never report them in isolation.
+
+**PERF-049 — dead assets.** Glob the theme's `assets/` recursively, match the backup patterns,
+sum the sizes. Move findings to an archive directory outside the theme rather than deleting:
+the fix is reversible and the deploy stops carrying them.
+
+**PERF-051 — dead references.** Extract the attribute values, resolve relative paths against
+`get_template_directory()`, and `file_exists()` each one. Report the missing file, not just
+the attribute.
+
+**PERF-052 — site-wide libraries.** For each third-party handle, find the template that uses
+it. If exactly one does, either move the enqueue into that template behind a conditional, or
+defer it as in PERF-047. Usual offenders: `aos` (scroll sections), `swiper` (carousels),
+`animate` (single elements), `lightbox` (gallery pages).
 
 ## Step 3: Tier 3 — Performance Budgets & Core Web Vitals
-
 If web-quality-skills performance and core-web-vitals skills are available, reference these targets:
 
 | Metric | Budget |
