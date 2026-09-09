@@ -1,0 +1,72 @@
+# Catalogue index
+
+One row per vendored DESIGN.md. Pick two or three nearest matches by industry
+and tone; read only those files. Never copy a row's tokens verbatim into a client
+DESIGN.md: the catalogue is vocabulary, the client docs are the source.
+
+| domain | industry | tone | display | accent |
+|---|---|---|---|---|
+| airbnb | hospitality | light | "'Airbnb Cereal VF', Circular, -apple-system, system-ui, Roboto, 'Helvetica Neue', sans-serif" | #ff385c |
+| airtable | saas | light | "Haas Groot Disp, Haas, sans-serif" | #181d26 |
+| apple | general | light | "SF Pro Display, system-ui, -apple-system, sans-serif" | #0066cc |
+| binance | finance | unknown | "BinanceNova, -apple-system, BlinkMacSystemFont, sans-serif" | #fcd535 |
+| bmw | automotive | light | "'BMW Type Next Latin', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" | #1c69d4 |
+| bmw-m | automotive | dark | "BMWTypeNextLatin, sans-serif" | #ffffff |
+| bugatti | automotive | dark | "Bugatti Display, sans-serif" | #ffffff |
+| cal | saas | light | "Cal Sans, Inter, sans-serif" | #111111 |
+| claude | saas | light | "Copernicus, Tiempos Headline, serif" | #cc785c |
+| clay | saas | light | "Plain Black, Inter, sans-serif" | #0a0a0a |
+| clickhouse | saas | dark | "Inter, sans-serif" | #faff69 |
+| cohere | saas | light | CohereText | #17171c |
+| coinbase | finance | light | "'Coinbase Display', -apple-system, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" | #0052ff |
+| composio | devtools | dark | "'abcDiatype', ui-sans-serif, system-ui, sans-serif" | #0007cd |
+| cursor | devtools | light | "'CursorGothic', system-ui, 'Helvetica Neue', Helvetica, Arial, sans-serif" | #f54e00 |
+| dell-1996 | general | light | Arial Black | #e91d2a |
+| elevenlabs | devtools | light | "'Waldenburg', 'Times New Roman', serif" | #292524 |
+| expo | devtools | light | "'Inter', -apple-system, system-ui, sans-serif" | #000000 |
+| ferrari | automotive | dark | "'FerrariSans', -apple-system, system-ui, sans-serif" | #da291c |
+| figma | general | light | figmaSans | #000000 |
+| framer | saas | dark | GT Walsheim Framer Medium | #ffffff |
+| hashicorp | devtools | dark | hashicorpSans | #000000 |
+| hp | general | light | Forma DJR Micro | #024ad8 |
+| ibm | general | light | IBM Plex Sans | #0f62fe |
+| intercom | saas | light | Saans | #111111 |
+| linear.app | saas | dark | Linear Display | #5e6ad2 |
+| meta | saas | light | Optimistic VF | #0064e0 |
+| minimax | devtools | light | DM Sans | #0a0a0a |
+| mintlify | devtools | light | Inter | #0a0a0a |
+| miro | saas | light | Roobert PRO | #1c1c1e |
+| mistral.ai | saas | light | PP Editorial Old | #fa520f |
+| mongodb | saas | light | Euclid Circular A | #00ed64 |
+| nike | commerce | light | Nike Futura ND | #111111 |
+| nintendo-2001 | general | unknown | Arial | #e60012 |
+| notion | saas | light | Notion Sans | #5645d4 |
+| nvidia | general | light | NVIDIA-EMEA | #76b900 |
+| ollama | general | light | SF Pro Rounded | #000000 |
+| opencode.ai | general | light | Berkeley Mono | #201d1d |
+| pinterest | general | light | Pin Sans | #e60023 |
+| playstation | general | unknown | PlayStation SST | #0070d1 |
+| posthog | general | light | IBM Plex Sans Variable | #f7a501 |
+| raycast | general | dark | Inter | #ffffff |
+| renault | automotive | light | NouvelR | #ffed00 |
+| replicate | general | light | rb-freigeist-neue | #ea2804 |
+| resend | general | dark | Domaine Display | #fcfdff |
+| revolut | finance | unknown | Aeonik Pro | #494fdf |
+| sentry | devtools | unknown | "Sentri Display, Rubik, system-ui, sans-serif" | #150f23 |
+| shopify | saas | unknown | "NeueHaasGrotesk Display, Helvetica, Arial, sans-serif" | #000000 |
+| slack | saas | light | "Salesforce-Avant-Garde, system-ui, -apple-system, BlinkMacSystemFont, sans-serif" | #4a154b |
+| spacex | general | unknown | "D-DIN-Bold, Arial Narrow, Arial, Verdana, sans-serif" | #000000 |
+| stripe | finance | light | "sohne-var, 'SF Pro Display', system-ui, -apple-system, sans-serif" | #533afd |
+| supabase | saas | light | "Circular, 'Helvetica Neue', Helvetica, Arial, sans-serif" | #3ecf8e |
+| superhuman | saas | light | "'Super Sans VF', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" | #1b1938 |
+| together.ai | devtools | light | The Future, Inter, Helvetica Neue, Arial, sans-serif | #000000 |
+| uber | general | light | UberMove, UberMoveText, system-ui, Helvetica Neue, Arial, sans-serif | #000000 |
+| vercel | devtools | light | Geist, Inter, system-ui, -apple-system, sans-serif | #171717 |
+| vodafone | general | light | Vodafone, Vodafone Rg, Helvetica Neue, Arial, sans-serif | #e60000 |
+| voltagent | devtools | dark | Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif | #00d992 |
+| warp | general | dark | Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif | #f7f5f0 |
+| webflow | saas | light | WF Visual Sans Variable, Inter, system-ui, -apple-system, sans-serif | #080808 |
+| wired | general | light | WiredDisplay, "Times New Roman", Georgia, serif | #000000 |
+| wise | finance | light | Wise Sans, Inter, system-ui, -apple-system, sans-serif | #9fe870 |
+| x.ai | general | dark | universalSans, Inter, system-ui, -apple-system, sans-serif | #ffffff |
+| zapier | devtools | light | Degular Display, Inter, system-ui, -apple-system, sans-serif | #ff4f00 |
