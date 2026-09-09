@@ -20,7 +20,7 @@ is per-user and starts empty; create it with the header row when it is absent.
 
 A new `demo/DESIGN.md` fails the gate when, against any existing row, **all
 three** hold: the same display family, the same text family, and an accent hue
-within 15 degrees on the colour wheel. Two brands sharing a canvas or one of the
+within 15 degrees of each other on the colour wheel. Two brands sharing a canvas or one of the
 two faces is coincidence; sharing the pair and the accent is the same site twice.
 
 Change the type pair or the accent. Do not touch the registry. **If the planned

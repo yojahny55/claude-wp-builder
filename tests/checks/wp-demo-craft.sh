@@ -34,8 +34,9 @@ grep -Fq 'compositions/README.md' "$s" || fail "$s does not send the build to th
 grep -Fq 'DESIGN.md' "$s" || fail "$s does not name demo/DESIGN.md"
 grep -Eqi 'browser' "$s" || fail "$s does not state the browser prerequisite"
 
-# --- The refuse list moved into the detector. taste.md keeps the positive floor.
-grep -Fq '## The refuse list' "$r/taste.md" && fail "taste.md still carries the refuse list; it is detector configuration now"
+# --- The refuse list split: the generic tells went to the detector, the rules
+#     that are this plugin's own stayed in taste.md as part of the positive floor.
+grep -Fq '## The refuse list' "$r/taste.md" && fail "taste.md still carries the refuse list as a separate section"
 grep -Fq 'impeccable' "$r/verify.md" || fail "verify.md does not run the impeccable detector"
 grep -Eqi 'purple|violet' "$r/taste.md" || fail "taste.md does not refuse the AI-purple palette"
 
@@ -45,6 +46,12 @@ grep -Fq '4.5:1' "$r/taste.md" || fail "taste.md does not state the contrast flo
 grep -Fq '300ms' "$r/taste.md" || fail "taste.md does not cap UI transition duration"
 grep -Eqi 'transform and opacity|transform.*opacity only' "$r/taste.md" \
   || fail "taste.md does not restrict continuous animation to transform/opacity"
+# --- The three hero limits the client build broke. They are authoring-time copy
+#     limits, so no render check can catch their loss; they vanished once already
+#     when the refuse list was removed.
+grep -Fq 'at most two lines' "$r/taste.md" || fail "taste.md lost the hero headline two-line limit"
+grep -Fq '20 words' "$r/taste.md" || fail "taste.md lost the hero subtext 20-word limit"
+grep -Fq 'four text elements' "$r/taste.md" || fail "taste.md lost the hero text-element limit"
 
 # --- The emotion axis. -------------------------------------------------------
 grep -Eqi 'one engineered peak' "$r/feel.md" || fail "feel.md does not require one engineered peak"
@@ -84,8 +91,10 @@ grep -Eqi 'prefers-reduced-motion|reduced motion' "$r/devices.md" \
 
 # --- The budget replaces variety. -------------------------------------------
 grep -Fq 'data-motion-peak' "$r/devices.md" || fail "devices.md does not define data-motion-peak"
-grep -Fq '2.0' "$r/devices.md" || fail "devices.md does not cap pin span at 2.0"
-grep -Fq '3.0' "$r/devices.md" || fail "devices.md does not allow the peak up to 3.0"
+# The numbers, not a substring of them: a bare '2.0' passes on a version string
+# while the cap silently becomes 4.0.
+grep -Fq 'span 2.0' "$r/devices.md" || fail "devices.md does not cap pin span at 2.0"
+grep -Fq 'span 3.0' "$r/devices.md" || fail "devices.md does not allow the peak up to span 3.0"
 grep -Eqi 'interior pages? (get|have) no pin|never pin' "$r/devices.md" \
   || fail "devices.md does not forbid pins on interior pages"
 # --- Heroes are reveal, never kinetic. The split masks every word until a scroll
@@ -102,7 +111,7 @@ grep -Fq '4 of the 6' "$r/fingerprint.md" && fail "fingerprint.md still states t
 grep -Fq 'FINGERPRINTS.md' "$r/fingerprint.md" || fail "fingerprint.md does not name the registry file"
 grep -Fq '| client | display | text | accent | canvas | date |' "$r/fingerprint.md" \
   || fail "fingerprint.md does not define the v2 row format"
-grep -Fq '15' "$r/fingerprint.md" || fail "fingerprint.md does not state the 15-degree hue tolerance"
+grep -Fq '15 degrees' "$r/fingerprint.md" || fail "fingerprint.md does not state the 15-degree hue tolerance"
 grep -Fq '.wp-create.json' "$r/fingerprint.md" \
   || fail "fingerprint.md does not record the project's own row in the manifest"
 grep -Eqi 'change the plan, not the log' "$r/fingerprint.md" \

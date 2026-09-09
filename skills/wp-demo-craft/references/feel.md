@@ -150,8 +150,8 @@ The blank has to be something that happened **to the visitor**, phrased from
 their side. If the sentence only makes sense to someone who has read the
 build folder, it fails.
 
-This sentence goes in `demo/BRIEF.md`, and the signature move usually lives
-inside it. If the signature move and the tell-someone sentence point at
+This sentence goes in `demo/BRIEF.md`, and the signature move (defined in
+`devices.md`) usually lives inside it. If the signature move and the tell-someone sentence point at
 different moments, one of them is decoration. Merge them, or cut the one
 that is not the peak.
 

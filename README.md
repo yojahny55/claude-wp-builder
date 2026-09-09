@@ -253,7 +253,7 @@ procedure; the commands only dispatch them.
 | `wp-css-system` | CSS design system: custom properties, BEM naming, scales. Read by the `wp-css` agent, which handles the plain-CSS parts of every section |
 | `wp-tailwind-system` | Tailwind authoring conventions — the utility-first decision ladder and file layout (the default template) |
 | `wp-demo` | Demo HTML creation methodology |
-| `wp-demo-craft` | Design floor, page grammars, a scroll-motion device kit and an anti-slop refuse list for premium demos |
+| `wp-demo-craft` | Design floor, page grammars, a scroll-motion device kit, a composition library and an evaluator rubric for premium demos |
 | `wp-responsive` | Mobile-first responsive patterns, fluid typography, touch targets |
 | `wp-cli-patterns` | WP-CLI best practices for all agents (saves tokens vs PHP generation) |
 | `wp-aos-animator` | AOS scroll animation installer — audits, enqueues, initializes, and seeds animations across templates. Run through `/wp-aos-animator` |

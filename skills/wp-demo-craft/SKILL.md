@@ -37,15 +37,21 @@ plain: an unverified craft page is the one that reaches the client.
 1. **`demo/DESIGN.md`** from the client docs, `designlang` on their site and
    named references, then the nearest catalogue matches for the gaps
    (`references/design-md.md`). The demo's `:root` is generated from it, so this
-   file is written before any markup.
+   file is written before any markup. Check it against the registry before
+   building, not after (`references/fingerprint.md`): a palette that fails the
+   gate is cheap to change now and a rebuild later.
 2. **`demo/BRIEF.md`**: person, pain, promise, vibe words, references, the
    feeling curve, the peak sentence, and any authored silence so verification can
    tell it from dead scroll (`references/feel.md`). Self-author it from the
    project docs, mark anything invented as "Self-authored, not interviewed", and
    ask only what the docs cannot answer.
-3. **Composition plan**: one row per section — section, role, composition, why,
-   motion cost — chosen from the role table in `compositions/README.md`
-   (`references/compositions.md`). Sum the motion cost before building.
+3. **Grammar, then composition plan.** Pick one grammar from
+   `references/grammars.md` — it decides what a section is, what the chrome is
+   for and what the ending does, and compositions are chosen inside it, not
+   instead of it. Then one row per section — section, role, composition, why,
+   motion cost — from the role table in `compositions/README.md`
+   (`references/compositions.md`). Sum the motion cost before building and hold
+   it under the budget in `devices.md`.
 4. **Build** from the compositions, the tokens and the real copy.
 5. **Loop** until the rubric passes or three rounds are spent
    (`references/verify.md`).
@@ -54,10 +60,11 @@ plain: an unverified craft page is the one that reaches the client.
 
 ## Ship blockers
 
-Never ship: content hidden behind a scroll trigger in the first viewport; a pin
-outside the peak above span 2.0, or the peak above 3.0; a pin on an interior
-page; a hardcoded hex where a token exists; invented statistics; a P0 from
-`impeccable detect`; a build that failed the rubric after three rounds.
+Never ship: content hidden behind a scroll trigger in the first viewport; a page
+over the motion budget in `devices.md`, which owns the pin caps, the total and
+the interior-page rule and is the only place they are written down; a hardcoded
+hex where a token exists; invented statistics; a P0 from `impeccable detect`; a
+build that failed the rubric after three rounds.
 
 ## References
 

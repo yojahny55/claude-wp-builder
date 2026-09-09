@@ -13,9 +13,12 @@ three rounds stops and reports rather than shipping quietly, and it
 
 1. **Deterministic gate.** `npx impeccable detect demo/ --json`, findings written
    to `demo/.verify/impeccable.json`. Any **P0** fails the round before a
-   screenshot is taken. This is where the old refuse list lives now: scroll cues,
-   `01 / 06` counters, gradient text, visible em dashes, fake dashboards. A
-   detector is cheaper than a rule nobody read to the end of.
+   screenshot is taken. The detector covers the generic machine-checkable tells
+   — scroll cues, `01 / 06` counters, gradient text, visible em dashes, fake
+   dashboards — and a detector is cheaper than a rule nobody read to the end of.
+   It is an external package this repo neither pins nor configures, so the rules
+   that are this plugin's own stay in `taste.md` and are the author's to hold: a
+   green detector run is not evidence that the taste floor was met.
 2. **Contact sheets.** `node ${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs demo/`
    walks every page at every tested width. Machine findings fail the round.
 3. **Critique.** A separate evaluator pass reads **only the sheets** — never the

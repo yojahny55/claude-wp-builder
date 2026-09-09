@@ -36,9 +36,9 @@ change what a preview says.
 | footer | footer-columns | 0 | none | none |
 | footer | footer-line | 0 | none | none |
 
-Budget rule: the index adds at most four viewport-heights beyond its section
-count; one composition may be promoted to the peak with `data-motion-peak` and a
-pin span up to 3.0. Interior pages never pin.
+The motion-cost column is the input to the budget; the budget itself — the pin
+caps, the per-index total and the interior-page rule — is stated once, in
+`../references/devices.md`, under `### pin`. Sum this column, check it there.
 
 ## Why no composition here carries a `data-motion-cue`
 

@@ -49,8 +49,12 @@ the frame in place while ScrollTrigger scrubs `--motion-p` against the
 section's scroll range; a `pin` section without this CSS will not visually
 pin, and `/wp-demo-verify` will report it as dead scroll.
 
-**Budget.** A pin outside the peak is capped at span 2.0. The one element marked
-`data-motion-peak` may reach 3.0. Interior pages never pin — an about page that
+**Budget.** This paragraph is the only place the budget is written down; `SKILL.md`
+and `compositions/README.md` cite it rather than restate it, so it can be changed
+here without leaving a stale copy behind.
+
+A pin outside the peak is capped at span 2.0. The one element marked
+`data-motion-peak` may reach span 3.0. Interior pages never pin — an about page that
 opens on a title and a divider and then holds them for two screens is not
 restraint, it is an empty page with a long fuse. The index adds at most four
 viewport-heights beyond its section count in total; the role table in

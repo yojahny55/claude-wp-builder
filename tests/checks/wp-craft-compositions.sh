@@ -35,8 +35,9 @@ for d in "$c"/*/; do
   grep -Fq '—' "$d/section.html" && fail "$name/section.html has an em dash in visible copy"
   grep -Fq '<script' "$d/section.html" && fail "$name/section.html has a script tag; motion is data-motion only"
   # ease-in as a complete keyword only. taste.md bans ease-in on UI because it
-  # delays the moment the eye is already on; ease-in-out is a different, legitimate
-  # curve for on-screen movement, and a bare \bease-in\b matches inside it.
+  # delays the moment the eye is already on. The trailing guard is there because
+  # '-' is a word boundary, so a bare \bease-in\b also matches inside the
+  # different keyword ease-in-out and would fail a file that never used ease-in.
   grep -Eq '\bease-in\b($|[^-])' "$d/section.css" && fail "$name/section.css uses ease-in; never ease-in on UI"
   # Every img declares its box, or the page reflows when the photograph lands.
   while IFS= read -r img; do

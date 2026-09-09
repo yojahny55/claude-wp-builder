@@ -68,4 +68,20 @@ not get this grammar; pick another.
 produced pages that read as a device demonstration rather than a site — the
 split stage's divider is a seam the client never asked for, and the cutlist's
 speed leaves nowhere for a peak to sit. A brief that names one explicitly can
-still ask for it, with the reason recorded in `demo/BRIEF.md`.
+still ask for it, with the reason recorded in `demo/BRIEF.md`. Their bans still
+bind when it does:
+
+### Split stage
+
+Two columns held in tension for the whole page, resolved by scroll. The divider
+is the chrome, the close is the collapse of the divider to one edge.
+
+**Forbids:** full-bleed anything before the resolve; centred copy; a symmetric
+close.
+
+### Rhythmic cutlist
+
+Short hard-cut sections at speed. No pinning, no dwell, no crossfades.
+
+**Forbids:** any section over about 1.4 viewport-heights; pinning entirely;
+overlapping cue windows; slow easing.

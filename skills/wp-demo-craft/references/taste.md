@@ -58,6 +58,12 @@ render, not the number.
   six lines. `--font-t-2xl` on the hero inside a phone media query fixes it.
   The portrait crop of the image is covered in devices.md; the portrait crop
   of the type is missed more often.
+- **Hero density, decided while authoring.** Headline at most two lines,
+  subtext at most 20 words, at most four text elements in the hero, and the
+  CTA visible without scrolling. These are copy limits, not layout ones: a
+  hero written past them cannot be rescued by type scale, and discovering it
+  from a render costs a whole verify round. Trust logos, pricing teasers and
+  micro-taglines belong in a section of their own below the fold.
 
 **Font choice.** Inter is a discouraged default: it is the most-used face in
 AI-generated pages and reads as a non-decision. Reach first for Geist,
