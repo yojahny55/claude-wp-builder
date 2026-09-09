@@ -98,4 +98,25 @@ grep -Fq 'page_pattern' "$c" || fail "$c does not fold the domain's page_pattern
 grep -Fq 'domain signal that justified' "$c" || fail "$c's composition plan does not require a domain signal (or brief constraint) per row"
 grep -Fq 'no domain signal' "$c" || fail "$c does not define the no-domain-signal fallback for a row the domain does not touch"
 
+# /wp-yolo's craft branch never runs its own composition-plan procedure — it
+# delegates to skills/wp-demo-craft/SKILL.md's order of work (step 3), so the
+# domain-signal column has to live there too, or the classification stays
+# inert on the path a one-shot builder most likely uses.
+k=skills/wp-demo-craft/SKILL.md
+grep -Fq 'domain signal that justified' "$k" \
+  || fail "$k's composition-plan step does not require a domain signal (or brief constraint) per row"
+grep -Fq 'no domain signal' "$k" \
+  || fail "$k does not define the no-domain-signal fallback for a row the domain does not touch"
+
+# The manifest is the shared source of truth: a domain /wp-demo already recorded
+# must be read, not re-derived, the same rule /wp-yolo already applies four
+# lines above to `demo mode` — and the one commands/wp-demo.md itself promises
+# when it says the recorded domain is what "/wp-yolo reads ... rather than
+# re-deriving it".
+y=commands/wp-yolo.md
+grep -Fq 'already has `"domain"`' "$y" \
+  || fail "$y does not check for an already-recorded domain before classifying"
+grep -Fq 'do not re-classify' "$y" \
+  || fail "$y does not skip re-classification once the domain is already recorded"
+
 echo PASS

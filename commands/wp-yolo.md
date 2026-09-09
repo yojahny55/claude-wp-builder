@@ -147,9 +147,12 @@ the whole multi-page build: the browser gate first, one `demo/DESIGN.md` for the
 site, one composition plan covering every page, one evaluator loop over the
 directory, and one fingerprint row for the site, not one per page.
 
-**Classify the domain, here too, once for the site.** A craft `/wp-yolo` run never
-calls `/wp-demo`, so it must classify the domain itself, in these same terms
-`/wp-demo` Step 2.6 uses on purpose — do not restate them a third way: match the
+**Classify the domain, here too, once for the site.** If `.wp-create.json`
+already has `"domain"` — a prior `/wp-demo` run against this same project
+recorded it — read it and move on; do not re-classify. Otherwise, a craft
+`/wp-yolo` run never calls `/wp-demo`, so it must classify the domain itself, in
+these same terms `/wp-demo` Step 2.6 uses on purpose — do not restate them a
+third way: match the
 client documents' English-language material against the keyword lists in
 `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/domains/domains.csv`. A
 domain is matched when **two distinct keywords** from its list appear in the
