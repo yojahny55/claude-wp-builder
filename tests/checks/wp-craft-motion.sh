@@ -54,4 +54,11 @@ grep -Fq '"gsap"' "$p" || fail "$p does not depend on gsap"
 grep -Fq 'ScrollTrigger' "$i" || fail "$i does not register ScrollTrigger"
 grep -Fq 'initMotion' "$i" || fail "$i does not initialise motion"
 
+# --- v2 engine fixes. -------------------------------------------------------
+grep -Fq 'data-motion-peak' "$m" || fail "$m does not read data-motion-peak"
+grep -Fq '> 2' "$m" || fail "$m does not warn on a pin span above 2.0 outside the peak"
+grep -Fq 'line-height:1.1' "$m" || fail "$m kinetic mask does not reserve line-height headroom"
+grep -Fq 'padding-block' "$m" || fail "$m kinetic mask does not pad the block edges"
+grep -Fq 'H1' "$m" || fail "$m does not refuse kinetic on an h1"
+
 echo PASS

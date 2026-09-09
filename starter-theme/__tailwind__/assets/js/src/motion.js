@@ -100,6 +100,11 @@ export function initMotion(gsap, ScrollTrigger) {
         // and silently rewriting it hides the finding from /wp-demo-verify.
         console.warn('[motion] pin span below 1.2 will snap:', el);
       }
+      // v2 budget: pins outside the one peak are capped at 2.0 so a page does
+      // not become seven screens of nothing (the first craft build did).
+      if (kind === 'pin' && span > 2 && !el.hasAttribute('data-motion-peak')) {
+        console.warn('[motion] pin span above 2.0 without data-motion-peak:', el);
+      }
       ScrollTrigger.create({
         trigger: el,
         start: 'top top',
@@ -195,10 +200,15 @@ export function initMotion(gsap, ScrollTrigger) {
     }
 
     if (kind === 'kinetic') {
-      // ponytail: word-split only, real line-box splitting is out of scope.
-      // The split rebuilds the element from its words (textContent = ''), which
-      // destroys any nested inline markup, so skip elements that have any.
-      if (el.querySelector('*')) {
+      // A hero headline split by words is hidden until ScrollTrigger fires, so
+      // the first viewport paints without its headline. Heroes take the greet
+      // cue instead; refuse the split on any h1.
+      if (el.tagName === 'H1') {
+        console.warn('[motion] kinetic on an h1 is refused; use data-motion-cue="0 1 0 0" on the hero headline:', el);
+      } else if (el.querySelector('*')) {
+        // ponytail: word-split only, real line-box splitting is out of scope.
+        // The split rebuilds the element from its words (textContent = ''), which
+        // destroys any nested inline markup, so skip elements that have any.
         console.warn('[motion] kinetic: element has child markup, skipping split to avoid destroying it:', el);
       } else {
       // Line boxes are measured, so the split has to wait for the real face.
@@ -207,7 +217,7 @@ export function initMotion(gsap, ScrollTrigger) {
         el.textContent = '';
         const units = words.map((w) => {
           const mask = document.createElement('span');
-          mask.style.cssText = 'display:inline-block;overflow:hidden;vertical-align:bottom;padding-bottom:0.12em';
+          mask.style.cssText = 'display:inline-block;overflow:hidden;vertical-align:bottom;line-height:1.1;padding-block:0.06em 0.14em';
           const inner = document.createElement('span');
           inner.style.display = 'inline-block';
           inner.textContent = w;
