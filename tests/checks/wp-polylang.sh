@@ -150,4 +150,22 @@ printf '%s' "$c7" | grep -qF 'bare `primary`, `footer` under `polylang`' \
 printf '%s' "$l2" | grep -qF 'under `polylang`: bare `primary`, `footer`' \
   || { echo "FAIL: wp-finalize Layer 2 still lists only suffix menu locations — under polylang it fails delivery on locations that were never registered"; exit 1; }
 
+# ── /wp-init Step 0.7 must default to polylang, for SEO ────────────────────
+# The suffix model serves both languages from one URL off ?lang=/cookie, so a
+# crawler only ever sees the primary language and there is nowhere to store a
+# translated title. It stays available as a toggle; it is not the default.
+s07=$(awk '/^## Step 0.7:/,/^## Pre-Step:/' commands/wp-init.md)
+[ -n "$s07" ] || { echo "FAIL: no Step 0.7 region in commands/wp-init.md"; exit 1; }
+printf '%s' "$s07" | grep -qF 'Default: `polylang`' \
+  || { echo "FAIL: /wp-init Step 0.7 does not default to polylang — a bilingual site scaffolded on Enter gets the suffix model, whose second language cannot be indexed"; exit 1; }
+printf '%s' "$s07" | grep -qiE 'hreflang|crawler|SEO' \
+  || { echo "FAIL: /wp-init Step 0.7 states no SEO reason for the default — without it the next edit flips it back on 'what existing projects use'"; exit 1; }
+printf '%s' "$s07" | grep -qF 'suffix' \
+  || { echo "FAIL: /wp-init Step 0.7 dropped the suffix option — it is still the right choice when the second language does not need to rank"; exit 1; }
+# Old projects must not be re-read as polylang: the absent-line fallback stays suffix.
+grep -qF 'the project predates the choice and is' CLAUDE.md \
+  || { echo "FAIL: CLAUDE.md dropped the absent-line fallback — existing suffix projects would be rebuilt as polylang"; exit 1; }
+printf '%s' "$s07" | grep -qF '`i18n strategy` line is absent stays `suffix`' \
+  || { echo "FAIL: /wp-init Step 0.7 does not say the new default governs new scaffolds only"; exit 1; }
+
 echo PASS

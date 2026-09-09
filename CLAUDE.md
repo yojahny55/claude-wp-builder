@@ -62,13 +62,23 @@ Key consequences when changing things:
 |---|---|---|
 | Model | one page, ACF field `_<lang>` suffixes (`hero_title_es`) | one post per language, joined by translation groups |
 | Helpers | `prefix_get_field()`, `prefix_t()`, `prefix_e()` resolve the suffix transparently | `pll_*` API via `wp eval-file` scripts |
-| Used by | `/wp-init` when `i18n strategy: suffix` (the default), `/wp-section`, `/wp-seed` | `/wp-init` when `i18n strategy: polylang`, and `/wp-polylang` to retrofit an existing site |
+| Used by | `/wp-init` when `i18n strategy: suffix`, `/wp-section`, `/wp-seed` | `/wp-init` when `i18n strategy: polylang` (**the default**), and `/wp-polylang` to retrofit an existing site |
 
 **Which one a project uses is a recorded decision, not a guess.** `/wp-init`
 asks (Step 0.7) and writes the answer as `i18n strategy` into the project's
 `.claude/CLAUDE.md`. Every downstream command and agent branches on that line —
 `/wp-seed`, `/wp-header`, `wp-acf`, `/wp-yolo` — so read it before assuming the
 suffix model. When the line is absent, the project predates the choice and is
+`suffix`.
+
+**New scaffolds default to `polylang`, and the reason is SEO.** The suffix model
+serves both languages from one URL off `?lang=`/cookie/`Accept-Language`, so a
+crawler only ever sees the primary language; `?lang=es` canonicalizes back to the
+primary URL, there is no hreflang pair because there is only one post, and per-post
+meta leaves Rank Math nowhere to store a translated title or description. `suffix`
+is therefore offered as what it is — a language toggle for a site whose second
+language does not need to be found — not as a way to build a bilingual site that
+has to rank. Existing projects are untouched; the absent-line fallback stays
 `suffix`.
 
 The seam is a single file: `inc/i18n.php`. Templates call `prefix_get_field()`
@@ -160,7 +170,8 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   are a site-wide asset and per-section detection would repeat the download N times and race
   under `/wp-yolo`'s concurrent section builds. The cost is that a demo swapped in *after*
   `/wp-init` has run brings no new fonts with it: re-run the step, or carry the woff2 by hand.
-- **`/wp-init`'s Polylang path has never been run end-to-end against a fresh project.** Its scripts
-  are covered by `tests/checks/wp-polylang-live.sh` against a real site, but the command's own
-  branching is prose, verified only by the grep checks in `tests/checks/wp-polylang.sh` and
-  `wp-init-templates.sh`.
+- **`/wp-init`'s Polylang branching is verified by grep, not by an automated end-to-end run.**
+  The path has been run against a real project and works — that is why it is now the default —
+  but its scripts are covered automatically only by `tests/checks/wp-polylang-live.sh` (which
+  needs `PLL_TEST_SITE`), and the command's own prose branching only by the grep checks in
+  `tests/checks/wp-polylang.sh` and `wp-init-templates.sh`.

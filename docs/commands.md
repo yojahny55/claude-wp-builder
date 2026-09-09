@@ -68,11 +68,11 @@ environment type and languages.
 ```
 /wp-init [project-name]
 /wp-init path/to/mockup.html          # demo-first
-/wp-init --template=tailwind|cinematic --i18n=suffix|polylang   # skip those two questions
+/wp-init --template=tailwind|cinematic --i18n=polylang|suffix   # skip those two questions
 ```
 
 Asks: starter template (`tailwind` default / `cinematic`), custom-fields plugin (`scf`
-default / `acf`), i18n strategy (`suffix` default / `polylang`), then project name, slug,
+default / `acf`), i18n strategy (`polylang` default / `suffix`), then project name, slug,
 languages, industry. With a demo argument (or an existing `demo/index.html` you confirm) it
 infers name/slug/sections from the HTML and runs `/wp-polish` if delimiters are missing.
 Copies the starter, replaces `__starter__` / `__STARTER__` / `__STARTER_NAME__`, writes
@@ -111,7 +111,8 @@ reconcile (`docs/.scope-manifest.json`: `theme` builds normally, `idx`/`plugin` 
 reported) → `/wp-tailwindify` → build (`/wp-settings`, `/wp-cpt` per content type,
 `/wp-header`, `/wp-footer`, `/wp-section --transcribe --block --css` per section,
 `/wp-page embed` for provider pages) → font carry → `/wp-seed --exclude-slugs <cpt-archives>`
-→ CPT seeders → `/wp-finalize` → `/wp-polish` → `/wp-responsive-check` → demo-parity gate
+→ CPT seeders → `/wp-finalize` → `/wp-polish` → `/wp-responsive-check` → `/wp-audit --all`
+→ demo-parity gate
 (auto-fixes mechanical drift, blocks otherwise) → report. Never reimplements a builder; it
 dispatches the commands above.
 

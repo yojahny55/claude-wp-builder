@@ -61,18 +61,31 @@ Default: `scf` (if user presses Enter without selecting).
 Ask the user how the site should handle its languages:
 
 > **Select translation strategy:**
-> 1. **Field suffixes** — one page per site, ACF/SCF fields duplicated as `_es`. No extra plugin.
-> 2. **Polylang** — one page per language, joined by translation groups. Installs the Polylang plugin.
+> 1. **Polylang** — one page per language at its own `/es/` URL, joined by translation
+>    groups. Indexable, with per-language titles, meta and hreflang. Installs the
+>    Polylang plugin. **Required if the second language has to rank in search.**
+> 2. **Field suffixes** — one page per site, ACF/SCF fields duplicated as `_es`, language
+>    picked by `?lang=`/cookie. No extra plugin, and **no SEO value for the second
+>    language.** Choose it only when search traffic in that language does not matter.
 
 Store the selection as `$I18N`:
-- Option 1 → `suffix`
-- Option 2 → `polylang`
+- Option 1 → `polylang`
+- Option 2 → `suffix`
 
-Default: `suffix` (if the user presses Enter without selecting).
+Default: `polylang` (if the user presses Enter without selecting).
 
-The default is deliberate. `suffix` is what every existing project uses, so
-updating the plugin must not silently change how a new project is built, and
-it pulls in no plugin the user did not ask for. Polylang is opt-in.
+The default is deliberate, and it is an SEO decision. Under `suffix` a single URL
+serves both languages off a query param, a cookie and `Accept-Language` — crawlers
+send no cookie, so they only ever see the primary language; `?lang=es` canonicalizes
+back to the primary URL; there is no hreflang pair because there is only one post; and
+titles, meta descriptions and schema are per-post, so Rank Math has nowhere to store a
+translated snippet. None of that is patchable inside the suffix model. Offer `suffix`
+as the toggle it is — a language switch for a site whose second language does not need
+to be found — never as the way to build a bilingual site that has to rank.
+
+Existing projects are untouched: the strategy is read from the project's
+`.claude/CLAUDE.md`, and a project whose `i18n strategy` line is absent stays `suffix`.
+This default governs new scaffolds only.
 
 Skip this question entirely when `$ARGUMENTS` contains `--i18n=suffix` or
 `--i18n=polylang`, so `/wp-yolo` and other non-interactive callers can pass it
@@ -403,7 +416,7 @@ is the one `/wp-finalize` fails on.
 
 ## Step 5: Configure i18n
 
-### If `$I18N = polylang`
+### If `$I18N = polylang` (default)
 
 Overwrite the suffix-based helper with the Polylang one for this template,
 keeping the filename `functions.php` already requires:
@@ -426,7 +439,7 @@ the swap safe — templates call `<prefix>get_field()` and friends and never
 `get_field()` directly, so no template, section, header or footer changes.
 `tests/checks/wp-polylang.sh` enforces that pairing per template.
 
-### If `$I18N = suffix` (default)
+### If `$I18N = suffix`
 
 Nothing to do — the starter already ships the suffix helper.
 
@@ -472,7 +485,7 @@ the helper resolves whichever is current.
 
 Edit `inc/theme-setup.php` in the new theme directory.
 
-### If `$I18N = polylang`
+### If `$I18N = polylang` (default)
 
 Register each menu location ONCE, with no language suffix:
 
@@ -497,7 +510,7 @@ add_action( 'init', function () {
 } );
 ```
 
-### If `$I18N = suffix` (default)
+### If `$I18N = suffix`
 
 - In `register_nav_menus()`, register menu locations for EACH language. Pattern:
   - `'primary_en' => 'Primary Menu (English)'`

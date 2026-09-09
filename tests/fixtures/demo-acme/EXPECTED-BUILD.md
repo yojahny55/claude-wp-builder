@@ -104,6 +104,7 @@ produce when read against this specific manifest.
 3. `/wp-finalize`
 4. `/wp-polish`
 5. `/wp-responsive-check`
+6. `/wp-audit --all --security-level recommended`
 
 ## Assertions checked by this trace
 

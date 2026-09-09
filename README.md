@@ -98,7 +98,7 @@ and `/wp-seed` turns its files into WP Pages. There is no path that starts at Wo
 ```
 /wp-create --path=/var/www/html/my-project   # optional: local WordPress + .wp-create.json (needed later by /wp-seed)
 /wp-init                                     # required: asks template (tailwind, the default | cinematic), fields plugin
-                                             #           (scf, the default | acf), i18n strategy (suffix, the default | polylang).
+                                             #           (scf, the default | acf), i18n strategy (polylang, the default | suffix).
                                              #           Press Enter through all three to take the defaults. Recorded in .claude/CLAUDE.md
 /wp-context                                  # optional: reads docs/ (scope sheets, design PDF) → constraints + scope manifest.
                                              #           /wp-init runs it automatically when docs/ exists
@@ -378,7 +378,7 @@ The `/wp-audit` command runs a comprehensive audit across 5 categories and offer
 - **ACF/SCF** for custom fields (programmatic, one file per section)
 - **Tailwind CSS 4** starter (`@wordpress/scripts` build, BEM blocks for sections) — a plain-CSS `basic` path remains for older themes
 - **Vanilla JS** (no frameworks); the cinematic starter adds the `cinematic-scroll-kit` scroll engine
-- **Bilingual** via field suffixes (default) or Polylang (opt-in at `/wp-init`)
+- **Bilingual** via Polylang (default — real `/es/` URLs, hreflang, per-language meta) or field suffixes (opt-in at `/wp-init`, no SEO value for the second language)
 
 ## External Dependencies
 

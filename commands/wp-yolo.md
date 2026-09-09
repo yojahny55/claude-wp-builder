@@ -562,9 +562,16 @@ Run, in order:
    (menus, placeholders, leftovers) after seeding, so it runs after item 1, never before.
 6. **`/wp-responsive-check`** — MANDATORY. Same dispatch; it forwards to
    `/wp-demo-verify` against the built site. Fold every finding it reports into Step 6.
+7. **`/wp-audit --all --security-level recommended`** — MANDATORY. Same dispatch. This
+   is the only step that measures SEO, Core Web Vitals/performance, accessibility,
+   security and coding standards; nothing earlier does. Its Step 9 fix prompt is
+   pre-answered **yes** in a `/wp-yolo` run — do not stop to ask. Fold every finding it
+   leaves unfixed into Step 6's Review list.
+   If its fixes touched theme CSS, templates or enqueues, re-run `/wp-finalize`'s
+   Layers 2-3 before Step 5.5 signs off — a perf or SEO fix can break demo parity.
 
-**Completion rule.** Items 4, 5 and 6 are part of the build, not follow-ups for the
-user. A run that reaches Step 6 without having executed all three is **incomplete**:
+**Completion rule.** Items 4 through 7 are part of the build, not follow-ups for the
+user. A run that reaches Step 6 without having executed all four is **incomplete**:
 never print "site works" or hand the user a list of commands to run next. If one of
 them cannot run (site unreachable, tool missing), say which, why, and mark the run
 incomplete in the Step 6 report. This holds under `--yolo` as well.

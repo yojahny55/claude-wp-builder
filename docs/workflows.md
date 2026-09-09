@@ -65,7 +65,7 @@ reads them from there:
 |----------|---------|---------|------------------|
 | Starter template | `tailwind` · `cinematic` | `tailwind` | Which `starter-theme/` is copied. `cinematic` hands off to `/wp-cinematic-init` (path C). A legacy `basic` answer is treated as `tailwind`. |
 | Custom-fields plugin | `scf` · `acf` | `scf` | Which plugin `wp-acf` targets and which is installed. |
-| i18n strategy | `suffix` · `polylang` | `suffix` | `suffix` = one page, fields duplicated as `hero_title_es`. `polylang` = one page per language. Changes how `wp-acf`, `/wp-header`, `/wp-seed` and `/wp-yolo` behave. See [Two i18n systems](#two-i18n-systems). |
+| i18n strategy | `polylang` · `suffix` | `polylang` | `polylang` = one page per language at its own `/es/` URL — indexable, hreflang, per-language meta. `suffix` = one page, fields duplicated as `hero_title_es`, language off `?lang=`/cookie — **no SEO value for the second language**, pick it only when that traffic does not matter. Changes how `wp-acf`, `/wp-header`, `/wp-seed` and `/wp-yolo` behave. See [Two i18n systems](#two-i18n-systems). |
 
 Then it asks project name, slug, languages and industry (or infers them from the demo),
 copies the starter theme, replaces `__starter__` placeholders, writes `.claude/CLAUDE.md`,
@@ -88,7 +88,7 @@ Things `/wp-init` does **for you** (auto):
 - runs `/wp-polish` on the demo if it has no `<!-- SECTION: -->` delimiters;
 - runs `/wp-context` if a `docs/` folder exists in the project root.
 
-Non-interactive flags for scripts: `--template=tailwind|cinematic`, `--i18n=suffix|polylang`.
+Non-interactive flags for scripts: `--template=tailwind|cinematic`, `--i18n=polylang|suffix`.
 
 ### 3. `/wp-context` — read the client's documents — *optional; auto when `docs/` exists*
 
@@ -186,7 +186,7 @@ What it does, in order — **you do not run any of these yourself**:
 | — Checkpoint | you edit the manifest if needed (skipped with `--yolo`) | |
 | 2 Build | `/wp-settings` → `/wp-cpt` per content type → `/wp-header` → `/wp-footer` → `/wp-section --transcribe` per section of every page → `/wp-page embed` for IDX/plugin pages | `fields/*.php`, `template-parts/*.php`, `page-<slug>.php`, CSS |
 | 2.5 Fonts | copies self-hosted fonts | `assets/fonts/` |
-| 3 Seed & finish | `/wp-seed` → CPT seeders → `/wp-finalize` → `/wp-polish` → `/wp-responsive-check` | pages, menus, media, ACF values |
+| 3 Seed & finish | `/wp-seed` → CPT seeders → `/wp-finalize` → `/wp-polish` → `/wp-responsive-check` → `/wp-audit --all` | pages, menus, media, ACF values |
 | 3.5 Parity gate | static + WP-CLI + visual diff vs the demo | auto-fixes mechanical drift, **blocks** on anything it can't fix |
 | 4 Report | | what was built, skipped, and what needs review |
 
@@ -349,7 +349,7 @@ commands above.
 
 Chosen once at `/wp-init` Step 0.7, recorded as `i18n strategy` in `.claude/CLAUDE.md`.
 
-| | `suffix` (default) | `polylang` |
+| | `suffix` | `polylang` (default) |
 |---|---|---|
 | Content model | one page; every ACF field duplicated as `field_es` | one page per language, linked by Polylang translation groups |
 | Extra plugin | none | Polylang (installed by `/wp-init`) |

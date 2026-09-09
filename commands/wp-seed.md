@@ -316,7 +316,7 @@ A page silently missing its counterpart is the failure mode to avoid here.
 Menus and internal links are handled by `/wp-polylang`'s import; do not
 hand-build translated menus under this strategy.
 
-### If `i18n strategy` is `suffix` (default)
+### If `i18n strategy` is `suffix` (or the line is absent — see above)
 
 For each additional language in `.wp-create.json` `languages.additional` array, seed translated content. **Secondary language fields append the language code as a suffix** (e.g., `hero_title_es`). This matches the i18n helper convention in `inc/i18n.php`.
 

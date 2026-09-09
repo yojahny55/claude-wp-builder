@@ -22,16 +22,16 @@ grep -Fq "AskUserQuestion" <<<"$s3" || fail "Step 3 does not ask via AskUserQues
 
 
 # Finish phase: a real run stopped after seeding and told the user that
-# /wp-finalize, /wp-polish and /wp-responsive-check "never ran". Those three
+# /wp-finalize, /wp-polish and /wp-responsive-check "never ran". Those were
 # were bare one-word bullets; everything else in the file is prose, so the
 # model treated them as optional.
 s5=$(awk "/^## Step 5: Phase 3/,/^## Step 5\\.5/" "$f")
 [ -n "$s5" ] || fail "no Step 5 region"
-for c in wp-finalize wp-polish wp-responsive-check; do
-  grep -Eq "\\*\\*\`/$c\`\\*\\* — MANDATORY" <<<"$s5" || fail "Step 5 does not mark /$c MANDATORY"
+for c in wp-finalize wp-polish wp-responsive-check wp-audit; do
+  grep -Eq "\\*\\*\`/$c[^\`]*\`\\*\\* — MANDATORY" <<<"$s5" || fail "Step 5 does not mark /$c MANDATORY"
 done
 grep -Fq "Completion rule" <<<"$s5" || fail "Step 5 has no completion rule"
-grep -Fq "incomplete" <<<"$s5" || fail "Step 5 completion rule does not mark a run without items 4-6 incomplete"
+grep -Fq "incomplete" <<<"$s5" || fail "Step 5 completion rule does not mark a run without items 4-7 incomplete"
 grep -Fq "hand the user a list of commands to run next" <<<"$s5" || fail "Step 5 does not forbid deferring finish steps to the user"
 grep -Fq "(Step 5, item 4 above)" "$f" || fail "Step 5.5 points at the wrong Step 5 item for /wp-finalize"
 echo PASS

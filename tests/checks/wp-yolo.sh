@@ -8,5 +8,5 @@ for token in 'wp-normalize' 'yolo-manifest' 'checkpoint' '--yolo' '--careful' 'w
 done
 # every referenced command/agent file must exist
 for name in wp-normalize; do test -f "agents/$name.md" || { echo "FAIL: agents/$name.md"; exit 1; }; done
-for name in wp-cpt wp-settings wp-header wp-footer wp-section wp-page wp-seed wp-finalize wp-polish wp-responsive-check; do test -f "commands/$name.md" || { echo "FAIL: commands/$name.md"; exit 1; }; done
+for name in wp-cpt wp-settings wp-header wp-footer wp-section wp-page wp-seed wp-finalize wp-polish wp-responsive-check wp-audit; do test -f "commands/$name.md" || { echo "FAIL: commands/$name.md"; exit 1; }; done
 echo PASS

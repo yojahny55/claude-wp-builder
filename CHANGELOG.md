@@ -3,6 +3,13 @@
 ## [Unreleased]
 
 ### Added
+- **`/wp-yolo` now runs `/wp-audit --all` as part of its finish phase.** A yolo build
+  shipped without anyone ever measuring SEO, Core Web Vitals, accessibility, security or
+  coding standards — `/wp-finalize`, `/wp-polish` and `/wp-responsive-check` all judge
+  demo parity, nothing judged quality. It is Step 5 item 7, MANDATORY like the other
+  three, its Step 9 fix prompt pre-answered yes, and fixes that touch theme CSS,
+  templates or enqueues re-run `/wp-finalize`'s Layers 2-3 so a perf or SEO fix cannot
+  silently break demo parity. `tests/checks/wp-yolo-checkpoint.sh` guards it.
 - **`/wp-robin` and `/wp-aos-animator` — runner commands for the plugin's only two action
   skills.** Every skill here is `user-invocable: false`, which is the layer rule and stays
   that way, so the two skills that actually *do* something had no way in: the README once
@@ -20,6 +27,17 @@
   `user-invocable: true`, and that neither command carries a copy of the procedure it runs.
 
 ### Changed
+- **`/wp-init` now defaults to Polylang, not field suffixes.** The old default was justified
+  on inertia — "what every existing project uses" — and it costs the second language its
+  entire search presence: one URL serves both languages off `?lang=`/cookie/`Accept-Language`,
+  so a crawler that sends no cookie only ever sees the primary language; `?lang=es`
+  canonicalizes back to the primary URL; there is no hreflang pair because there is only one
+  post; and per-post meta leaves Rank Math nowhere to store a translated title or description.
+  Step 0.7 now lists Polylang first, defaults to it on Enter, states the SEO reason, and
+  offers `suffix` as what it is — a language toggle for a site whose second language does not
+  need to be found. Existing projects are untouched: the strategy is still read from the
+  project's `.claude/CLAUDE.md` and an absent `i18n strategy` line still means `suffix`.
+  `tests/checks/wp-polylang.sh` guards both the new default and that fallback.
 - **The docs no longer say these two capabilities have no slash command.** `README.md`,
   `docs/commands.md` and `docs/workflows.md` each said so, correctly, until now; all three
   now state that the skills are invoked through their runner commands while remaining
