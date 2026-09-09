@@ -16,7 +16,7 @@ Read `.claude/CLAUDE.md` to get the project name, slug, industry, description, a
 
 Check `$ARGUMENTS`:
 
-- **If `$ARGUMENTS` is "iterate"**: Read the existing `demo/index.html` file, then ask the user what changes they want. Apply changes and skip to Step 4 — **unless `.wp-create.json` says `"demo mode": "craft"`**, in which case re-enter Step 2.6: run its gate (step 0) again, then continue from its step 5 (the build) with the existing `demo/DESIGN.md` and `demo/BRIEF.md`, so the changes go through the compositions and the verify loop like any other craft build.
+- **If `$ARGUMENTS` is "iterate"**: Read the existing `demo/index.html` file, then ask the user what changes they want. Apply changes and skip to Step 4 — **unless `.wp-create.json` says `"demo mode": "craft"`**, in which case re-enter Step 2.6: run its gate (step 0) again, then continue from its step 6 (the build) with the existing `demo/DESIGN.md` and `demo/BRIEF.md`, so the changes go through the compositions and the verify loop like any other craft build.
 - **If `$ARGUMENTS` is provided** (not "iterate"): Use it as the client brief.
 - **If `$ARGUMENTS` is empty**: Ask the user for:
   - Client brief / description of what the site should look and feel like
@@ -87,7 +87,22 @@ before writing any markup.
    where ___", authored silence. Mark anything invented "Self-authored, not
    interviewed". Ask, in one pass, only what the docs cannot answer. Show the
    brief once and proceed on a yes.
-4. **Grammar, then composition plan.** Pick one grammar from
+4. **Classify the domain.** Match the client documents against the keyword lists
+   in `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/domains/domains.csv`.
+   A domain is matched when **two distinct keywords** from its list appear in the
+   docs; below that, report `unclassified` and carry on without constraining
+   anything, because a wrong category is worse than none. Record the result in
+   `.wp-create.json` under `"domain"` as `name`, `score`, `matched` and
+   `confidence`, so the decision is auditable and `/wp-yolo` reads it rather than
+   re-deriving it. State the match and its score in one line.
+
+   A matched domain does exactly two things. Its `page_pattern` constrains which
+   section roles the next step may choose, and its `considerations` are folded
+   into the brief as constraints. It **never touches tokens**: colour and type
+   come from `demo/DESIGN.md` and the client's own material, never from a
+   category. A low `confidence` value is reported alongside the match rather than
+   hidden, and a build may ignore a weak match with a one-line reason.
+5. **Grammar, then composition plan.** Pick one grammar from
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/grammars.md` — it
    decides what a section is, what the chrome is for and what the ending does.
    Then open
@@ -100,11 +115,11 @@ before writing any markup.
    the docs name no reference and the Landing Gallery MCP is connected, pull
    four screenshots for the page kind first; when it is not, say so and choose
    from the previews alone.
-5. **Build.** Create `demo/` if absent and write `demo/index.html` plus
+6. **Build.** Create `demo/` if absent and write `demo/index.html` plus
    **one file per page in the agreed page set** (`about.html`, `services.html`,
    `contact.html` — whatever the docs and the curve named). Interior pages are
    built here, not left for later: an index alone is half the failure this mode
-   exists to fix, and step 6 walks the whole directory. Every page carries the
+   exists to fix, and step 7 walks the whole directory. Every page carries the
    header and footer chrome from Step 4 (logo, nav, language switcher, hamburger
    at mobile, footer columns) and Step 4's responsive breakpoints; ignore Step
    4's single-file, no-CDN and `:root` token clauses, which are the plain path.
@@ -124,7 +139,7 @@ before writing any markup.
    `https://cdnjs.cloudflare.com` with pinned versions. Any bespoke effect goes
    in its own `<script id="signature">` block so `/wp-init` can lift it to
    `assets/js/signature.js`.
-6. **Loop.** At most three rounds. Each round runs `/wp-demo-verify demo/` — the
+7. **Loop.** At most three rounds. Each round runs `/wp-demo-verify demo/` — the
    directory, so every page is walked — for the `impeccable detect` gate and the
    contact sheets. That command is the one place the detector and rubric
    contract is written; run it, do not restate it here. **Dispatch its critique
@@ -134,16 +149,16 @@ before writing any markup.
    context that wrote the markup and the brief cannot grade the render — that is
    the self-assessment the rubric exists to remove. Read `demo/VERIFY.md`, fix
    every failed line and repeat. After three rounds with failures, stop, report
-   what still fails, and go to step 8 without recording.
-7. **Record.** Only for a passing build: append the build's row to
+   what still fails, and go to step 9 without recording.
+8. **Record.** Only for a passing build: append the build's row to
    `~/.claude/wp-builder/FINGERPRINTS.md` in the shape `fingerprint.md` defines,
    and write the same fields into `.wp-create.json` under `"fingerprint"`. A
    build that failed after three rounds records no fingerprint, in either place.
-8. **Report.** The intended curve, the felt curve from `demo/VERIFY.md`, the
+9. **Report.** The intended curve, the felt curve from `demo/VERIFY.md`, the
    diff, the detector summary, and what could not be verified.
 
 A craft build is finished here. Steps 3 and 4 are the plain path: take Step 4's
-header, footer and responsive requirements (step 5 above says so) and nothing
+header, footer and responsive requirements (step 6 above says so) and nothing
 else from them — its single-file rule, its ban on external dependencies and its
 `:root` token list all contradict a craft build — then print the Step 5 summary,
 listing every page written, not just `index.html`.

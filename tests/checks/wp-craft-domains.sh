@@ -59,4 +59,16 @@ grep -Eq '#[0-9A-Fa-f]{6}' "$d/domains.csv" \
 grep -Eq '^Commit: [0-9a-f]{7,40}$' "$d/SOURCE.txt" \
   || fail "$d/SOURCE.txt does not name the imported commit"
 
+# /wp-demo Step 2.6 must actually use the table: read it, record the match, gate
+# the threshold, define the fallback, and — the whole point of the table — never
+# let it decide colour or type.
+c=commands/wp-demo.md
+grep -Fq 'references/domains/domains.csv' "$c" || fail "$c does not read the domain table"
+grep -Fq '"domain"' "$c" || fail "$c does not record the domain in the manifest"
+grep -Fq 'two distinct keyword' "$c" || fail "$c does not state the two-keyword threshold"
+grep -Fq 'unclassified' "$c" || fail "$c does not define the unclassified outcome"
+grep -Eqi 'never (touch|decide|choose) (the )?tokens|never touches tokens' "$c" \
+  || fail "$c does not forbid the classifier from touching tokens"
+grep -Fq 'page_pattern' "$c" || fail "$c does not use the page pattern to constrain roles"
+
 echo PASS
