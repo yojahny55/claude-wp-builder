@@ -24,6 +24,19 @@ prov="$tmp/up/src/ui-ux-pro-max/data/data-provenance.json"
 mkdir -p "$d"
 cp "$tmp/up/LICENSE" "$d/LICENSE"
 
+# The clone above is unpinned (always `main`), so a version string in README.md
+# would go stale the moment upstream tags a release. Record what was actually
+# imported instead: the ref, the exact commit, and the date, so provenance is a
+# fact recorded at import time rather than a claim that has to be kept in sync.
+sha=$(git -C "$tmp/up" rev-parse HEAD)
+ref=$(git -C "$tmp/up" symbolic-ref --short HEAD 2>/dev/null || echo HEAD)
+cat > "$d/SOURCE.txt" <<EOF
+Source: https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+Ref: $ref
+Commit: $sha
+Imported: $(date -u +%Y-%m-%d)
+EOF
+
 python3 - "$src" "$prov" > "$d/domains.csv" <<'PY'
 import csv, json, sys, re
 
@@ -38,7 +51,12 @@ except Exception:
     pass
 
 def slug(s):
-    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
+    # Upstream's own entityIds spell "&" out as "-and-" (q-and-a-community-platform),
+    # so a bare punctuation strip turns "&" into a hyphen instead and the lookup
+    # misses — silently falling back to the 0.5 default, indistinguishable from a
+    # genuine weak match. Normalise before stripping.
+    s = re.sub(r"\s*&\s*", " and ", s.lower())
+    return re.sub(r"[^a-z0-9]+", "-", s).strip("-")
 
 out = csv.writer(sys.stdout, lineterminator="\n")
 out.writerow(["domain", "keywords", "page_pattern", "considerations", "confidence"])

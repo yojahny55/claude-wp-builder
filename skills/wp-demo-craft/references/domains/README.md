@@ -1,7 +1,10 @@
 # Domain table
 
-Vendored from `nextlevelbuilder/ui-ux-pro-max-skill` (MIT, v2.13.0). Regenerate
-with `bin/domains-import.sh`, which overwrites `domains.csv` in place.
+Vendored from `nextlevelbuilder/ui-ux-pro-max-skill` (MIT). Regenerate with
+`bin/domains-import.sh`, which overwrites `domains.csv` in place, clones
+`main` unpinned, and records the exact commit it imported in `SOURCE.txt` —
+that file, not a version number here, is the source of truth for what was
+actually vendored.
 
 ## What is here
 

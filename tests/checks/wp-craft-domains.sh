@@ -22,7 +22,7 @@ head -1 "$d/domains.csv" | grep -Fq 'domain,keywords,page_pattern,considerations
   || fail "$d/domains.csv header is not: domain,keywords,page_pattern,considerations,confidence"
 
 n=$(tail -n +2 "$d/domains.csv" | wc -l)
-[ "$n" -ge 150 ] || fail "expected at least 150 domain rows, found $n"
+[ "$n" -ge 185 ] || fail "expected at least 185 domain rows, found $n"
 
 # Every row must carry keywords, or it can never match anything. The keywords
 # field is a quoted CSV field that itself contains commas, so a naive
@@ -34,13 +34,29 @@ bad=[i for i,r in enumerate(csv.DictReader(open('$d/domains.csv')),2) if not (r.
 sys.exit('rows with no keywords: '+str(bad[:5]) if bad else 0)
 " || fail "$d/domains.csv has a row with no keywords, which can never match"
 
-# The refusal, stated and asserted.
-grep -Fq 'colour' "$d/README.md" || fail "$d/README.md does not say the colour table was refused"
-grep -Eqi 'font pairing|typography' "$d/README.md" || fail "$d/README.md does not say the font pairings were refused"
+# The refusal, stated and asserted. The bare words 'colour' and 'typography'
+# each appear more than once in the README (the heading, the recap), so a
+# whole-word grep survives deleting the one sentence that actually carries the
+# reasoning and leaves the check green with the reasoning gone. Anchor on the
+# reasoning clause itself, which appears exactly once.
+grep -Fq '192 product types onto 50 distinct primary colours' "$d/README.md" \
+  || fail "$d/README.md does not carry the colour-table refusal reasoning (the 192-onto-50 ratio)"
+grep -Fq 'pairs Playfair Display with Inter' "$d/README.md" \
+  || fail "$d/README.md does not carry the typography-refusal reasoning (the named Playfair/Inter pairing)"
 grep -Fq 'nextlevelbuilder/ui-ux-pro-max-skill' "$d/README.md" || fail "$d/README.md does not name the source"
 grep -Eq '^(No,)?Primary,|On Primary|Heading Font' "$d/domains.csv" \
   && fail "$d/domains.csv carries colour or typography columns; only shape columns are vendored"
+# The header guard above only catches a literal column reimport. Nothing stops
+# colour or type data folded into considerations prose instead — the same
+# technique the importer already uses for the style recommendation — so guard
+# the whole file against a hex literal, which colour data would need to carry.
+grep -Eq '#[0-9A-Fa-f]{6}' "$d/domains.csv" \
+  && fail "$d/domains.csv carries a hex colour literal; colour must not enter through prose either"
 
 [ -x bin/domains-import.sh ] || fail "bin/domains-import.sh is missing or not executable"
+
+[ -f "$d/SOURCE.txt" ] || fail "$d/SOURCE.txt is missing; the imported commit must be recorded, not just a version claim"
+grep -Eq '^Commit: [0-9a-f]{7,40}$' "$d/SOURCE.txt" \
+  || fail "$d/SOURCE.txt does not name the imported commit"
 
 echo PASS
