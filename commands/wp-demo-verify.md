@@ -26,7 +26,30 @@ builds always pass the directory: interior pages are where a build is emptiest.
 machine render?": exit 0 with the Chrome path, exit 2 with what is missing. `/wp-demo`
 runs it as the craft gate before writing any markup.
 
-## Step 2: Walk it
+## Step 2a: Detector
+
+```bash
+npx impeccable@1 detect <target> --json > <dir>/.verify/impeccable.json
+```
+
+`impeccable` is an external package this repo does not install, vendor or
+configure — it is fetched from the npm registry at run time via `npx`. Pin the
+major version (`@1`) so a future major release cannot silently change rule
+identifiers or output shape underneath this gate.
+
+Check the exit status and the output before reading it as findings: if `npx`
+could not resolve or run the package — command not found, no network reaching
+the registry, or the captured output does not parse as JSON — the detector did
+not run at all. Report **"detector could not run"** and fail the round on that
+basis; this is not the same as zero findings, and must never be read as one.
+
+Once the JSON is confirmed to have parsed, sixty-one deterministic rules, no
+model: any finding with severity `P0` fails the round outright, before a
+screenshot is taken. P1 and P2 findings are listed in the report and fixed when
+the rubric below also flags the section. A target that is a URL is scanned with
+Puppeteer by the detector itself; a file or directory is scanned statically.
+
+## Step 2b: Walk it
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs" <target>
@@ -34,15 +57,17 @@ node "${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs" <target>
 
 Six positions per section at 1440x900 and 390x844, plus a reduced-motion pass at
 desktop width, then full-page shots at 375, 576, 768, 1024 and 1440 (this replaces
-`/wp-responsive-check`). Output lands in `<dir>/.verify/<width>/`, with
-`findings.json` and one `sheet.png` per width.
+`/wp-responsive-check`). A directory target walks every page. Output lands in
+`<dir>/.verify/[<page>/]<width>/`, with `findings.json` and one `sheet.png` per
+width.
 
 Exit codes: `0` no machine findings, `1` findings printed, `2` no usable browser,
 `3` the walk itself crashed (not a findings report, something threw mid-walk).
 
 **On exit code 2**, fall back in this order: the Chrome or Playwright MCP
 screenshot tools if either is connected, then ask the user for screenshots at the
-five viewports. Say which route you used.
+five viewports. Say which route you used. (A craft build never reaches this
+branch: `/wp-demo` probes first and stops on 2.)
 
 ## Step 3: Read the findings
 
@@ -54,19 +79,31 @@ five viewports. Say which route you used.
 - **horizontal overflow**: at any width, always a defect.
 - **clipped copy**: text taller than its own hidden-overflow box.
 
-## Step 4: Read the sheet
+## Step 4: Critique the sheets
 
-Open every `sheet.png`. Then run the feel check from
-`${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/feel.md`: scroll the page
-cold, write one word per section, and only then open `demo/BRIEF.md` and diff the
-two curves. Where they disagree, the page is wrong, not the brief.
+Read only the sheets for this step: not the source, not `demo/BRIEF.md`. Score
+every page pass/fail on each line and write the table to `demo/VERIFY.md`
+(one section per page, one row per line, a one-sentence reason on every fail):
 
-Confirm the peak is the largest visual change and holds the most scroll room, that
-something quiet sits in front of it, and that the last screen can stand still with
-content on it.
+- **First paint complete.** Headline, primary visual and CTA inside the 1440x900
+  fold and the 390x844 fold, none hidden behind a scroll trigger.
+- **One peak.** The largest visual change on the page, a quieter section before
+  it, the most scroll room.
+- **Squint test.** Blurred, the primary, secondary and major groups are still
+  nameable in order.
+- **Measured contrast.** Body 4.5:1, large 3:1, controls and focus 3:1, sampled
+  from the frame.
+- **Mobile headline.** Three lines or fewer at 390; nothing wider than the
+  viewport.
+- **Adjacent feelings.** One word per section, written cold (the feel check); no
+  two adjacent words the same. Only now open `demo/BRIEF.md` and diff the
+  curves.
 
 ## Step 5: Report
 
 State the machine findings, the intended curve, the felt curve, the diff, what you
 changed, and what could not be verified (composited contrast is judged by eye here,
-and headless Chrome cannot prove a real phone). **A green machine run alone is not a pass.**
+and headless Chrome cannot prove a real phone).
+
+**A green machine run alone is not a pass.** A green detector run and a green
+walk with a failing rubric is a failing round.
