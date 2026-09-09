@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # The catalogue is the craft skill's positive vocabulary: real tokens from real
 # sites. It travels with its licence, is indexed so a build can find a nearest
-# match without reading 74 files, and ships one neutral file the composition
-# previews render against so the previews show the compositions, not a brand.
+# match without reading dozens of files, and ships one neutral file the
+# composition previews render against so the previews show the compositions,
+# not a brand. Only 64 of the upstream repo's 74 domains are vendored: the
+# other ten carry no YAML front matter (pure prose, pre-dating the front-matter
+# convention) and so cannot supply the parseable colours/typography this
+# catalogue depends on — that omission is deliberate, not a botched copy.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
