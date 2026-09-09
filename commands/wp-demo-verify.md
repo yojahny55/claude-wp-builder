@@ -18,6 +18,14 @@ run against the converted WordPress page, which is the only way to prove the mot
 survived conversion. Serve files over HTTP when the page fetches anything; a
 `file://` page silently falls back and proves nothing.
 
+A directory (`demo/`) walks every `*.html` in it, one output folder per page
+under `demo/.verify/<page>/`, and `findings.json` carries a `pages[]` array. Craft
+builds always pass the directory: interior pages are where a build is emptiest.
+
+`node "${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs" --probe` answers only "can this
+machine render?": exit 0 with the Chrome path, exit 2 with what is missing. `/wp-demo`
+runs it as the craft gate before writing any markup.
+
 ## Step 2: Walk it
 
 ```bash

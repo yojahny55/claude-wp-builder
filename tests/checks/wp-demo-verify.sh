@@ -65,4 +65,23 @@ done
 # --- The alias. The old command keeps working or every existing doc breaks. --
 grep -Fq '/wp-demo-verify' "$r" || fail "$r does not dispatch to /wp-demo-verify"
 
+# --- The craft gate. A build that cannot render cannot be verified, so the
+#     script must answer "can you render?" without walking anything.
+grep -Fq -- '--probe' "$s" || fail "$s has no --probe mode"
+grep -Fq -- '--probe' "$c" || fail "$c does not document --probe"
+grep -Fq 'PLAYWRIGHT_CORE' "$s" || fail "$s does not honour PLAYWRIGHT_CORE (needed to test the no-browser path)"
+grep -Fq 'process.cwd()' "$s" || fail "$s cannot resolve playwright-core from the project it is run in"
+# Runnable: forcing playwright-core to a bogus path must exit 2, not crash.
+set +e
+PLAYWRIGHT_CORE=/nonexistent/playwright-core node "$s" --probe >/dev/null 2>&1
+code=$?
+set -e
+[ "$code" -eq 2 ] || fail "$s --probe with a bogus PLAYWRIGHT_CORE exited $code, expected 2"
+
+# --- Every page, not only the index. Interior pages were where the last
+#     failed build was emptiest.
+grep -Eqi 'directory|every \*?\.html|each page' "$c" || fail "$c does not walk a directory of pages"
+grep -Fq 'readdirSync' "$s" || fail "$s cannot enumerate a directory target"
+grep -Fq 'pages' "$s" || fail "$s findings.json does not carry per-page results"
+
 echo PASS

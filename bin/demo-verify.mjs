@@ -11,18 +11,20 @@
  * the caller can fall back to MCP screenshot tools rather than reporting a failure),
  * 3 the walk itself crashed (not a findings report).
  */
-import { existsSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs';
-import { resolve, join, dirname } from 'node:path';
+import { existsSync, mkdirSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { resolve, join, dirname, basename } from 'node:path';
 import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 
 const args = process.argv.slice(2);
 if (args.includes('--help')) {
   console.log(
-    'usage: demo-verify.mjs [file-or-url] [--out DIR] [--positions N] [--widths 1440x900,390x844]'
+    'usage: demo-verify.mjs [file-or-dir-or-url] [--out DIR] [--positions N] [--widths 1440x900,390x844]\n' +
+    '       demo-verify.mjs --probe     exit 0 if playwright-core and a Chrome are usable, else 2'
   );
   process.exit(0);
 }
+const PROBE = args.includes('--probe');
 
 // The command documents demo/index.html as the default target, and exit 2 is
 // reserved for "no usable browser" so a caller can fall back to MCP screenshots.
@@ -61,15 +63,17 @@ const widths = opt('--widths', '1440x900,390x844')
     return { width: w, height: h };
   });
 const targetIsUrl = /^https?:\/\//.test(target);
-// pathToFileURL percent-encodes spaces and non-ASCII, which a manual
-// 'file://' + path concatenation does not; an unencoded path with a space
-// makes page.goto fail outright.
-const url = targetIsUrl ? target : pathToFileURL(resolve(target)).href;
+const targetIsDir = !targetIsUrl && existsSync(target) && statSync(target).isDirectory();
+// A directory walks every page in it. Interior pages are where a craft build
+// is emptiest, and verifying only index.html let that ship.
+const pages = targetIsDir
+  ? readdirSync(target).filter((f) => f.endsWith('.html')).sort().map((f) => join(target, f))
+  : [target];
 // resolve() on a URL string treats it as a filesystem path, which is never
 // what the caller means; a URL target with no --out writes into cwd/.verify
 // instead of guessing a directory from the URL text.
 const outDir = resolve(
-  opt('--out', targetIsUrl ? '.verify' : join(dirname(resolve(target)), '.verify'))
+  opt('--out', targetIsUrl ? '.verify' : join(targetIsDir ? resolve(target) : dirname(resolve(target)), '.verify'))
 );
 
 function findChrome() {
@@ -124,17 +128,41 @@ function findChrome() {
   return null;
 }
 
+// PLAYWRIGHT_CORE lets the check suite force the no-browser path; a bogus
+// value must produce exit 2, never a crash, and skips the fallback ladder
+// below entirely so the forced failure stays deterministic.
 let chromium;
 try {
-  ({ chromium } = await import('playwright-core'));
+  if (process.env.PLAYWRIGHT_CORE) {
+    ({ chromium } = await import(pathToFileURL(resolve(process.env.PLAYWRIGHT_CORE, 'index.mjs')).href));
+  } else {
+    try {
+      ({ chromium } = await import('playwright-core'));
+    } catch (bare) {
+      // A bare specifier resolves from this file's own location (bin/),
+      // walking up through the plugin's own node_modules — never the
+      // WordPress project the plugin is invoked from, which is not this
+      // file's ancestor. `npm i -D playwright-core` run in the project root
+      // (what the probe's own failure message, and Task 7's gate, tell the
+      // agent to do) is invisible to that resolution, so fall back to the
+      // cwd's node_modules before giving up.
+      const cwdEntry = join(process.cwd(), 'node_modules', 'playwright-core', 'index.mjs');
+      if (!existsSync(cwdEntry)) throw bare;
+      ({ chromium } = await import(pathToFileURL(cwdEntry).href));
+    }
+  }
 } catch {
-  console.error('demo-verify: playwright-core is not installed (npm i -D playwright-core)');
+  console.error(PROBE ? 'probe: missing playwright-core' : 'demo-verify: playwright-core is not installed (npm i -D playwright-core)');
   process.exit(2);
 }
 const executablePath = findChrome();
 if (!executablePath) {
-  console.error('demo-verify: no Chrome found. Set WP_DEMO_CHROME or run: npx playwright install chrome');
+  console.error(PROBE ? 'probe: missing chrome' : 'demo-verify: no Chrome found. Set WP_DEMO_CHROME or run: npx playwright install chrome');
   process.exit(2);
+}
+if (PROBE) {
+  console.log('probe: ok ' + executablePath);
+  process.exit(0);
 }
 
 // The five legacy /wp-responsive-check viewports. One full-page shot each, at the
@@ -203,11 +231,16 @@ const probe = () => {
 
 let browser;
 let exitCode = 0;
-const findings = [];
-const sections = [];
+const report = { pages: [] };
 
 try {
   browser = await chromium.launch({ executablePath, args: ['--autoplay-policy=no-user-gesture-required'] });
+
+  for (const pageTarget of pages) {
+  const pageUrl = /^https?:\/\//.test(pageTarget) ? pageTarget : pathToFileURL(resolve(pageTarget)).href;
+  const pageOut = pages.length > 1 ? join(outDir, basename(pageTarget, '.html')) : outDir;
+  const findings = [];
+  const sections = [];
 
   // The docs promise the reduced-motion pass at desktop width. Pinning it to
   // widths[0] meant a mobile-first --widths list ran it at the phone size and
@@ -216,14 +249,14 @@ try {
   for (const size of widths) {
   for (const reduced of size === reducedPassAt ? [false, true] : [false]) {
     const label = size.width + (reduced ? '-reduced' : '');
-    const dir = join(outDir, String(label));
+    const dir = join(pageOut, String(label));
     mkdirSync(dir, { recursive: true });
     const context = await browser.newContext({
       viewport: size,
       reducedMotion: reduced ? 'reduce' : 'no-preference',
     });
     const page = await context.newPage();
-    await page.goto(url, { waitUntil: 'load' });
+    await page.goto(pageUrl, { waitUntil: 'load' });
     await page.waitForTimeout(600);
 
     const bounds = await page.evaluate(() => {
@@ -326,17 +359,20 @@ try {
   }
 }
 
-  await captureResponsiveShots(browser, url, outDir);
+  await captureResponsiveShots(browser, pageUrl, pageOut);
+  mkdirSync(pageOut, { recursive: true });
+  report.pages.push({ url: pageUrl, findings });
+  }
 
   mkdirSync(outDir, { recursive: true });
-  writeFileSync(join(outDir, 'findings.json'), JSON.stringify({ url, findings }, null, 2));
-
-  if (findings.length === 0) {
-    console.log('demo-verify: no machine findings. Read the contact sheets before calling this a pass.');
+  writeFileSync(join(outDir, 'findings.json'), JSON.stringify(report, null, 2));
+  const total = report.pages.reduce((n, p) => n + p.findings.length, 0);
+  if (total === 0) {
+    console.log('demo-verify: no machine findings on ' + report.pages.length + ' page(s). Read the contact sheets before calling this a pass.');
     exitCode = 0;
   } else {
-    for (const f of findings) console.log('FINDING ' + f.kind + ' ' + JSON.stringify(f));
-    console.log('demo-verify: ' + findings.length + ' finding(s). Sheets under ' + outDir);
+    for (const p of report.pages) for (const f of p.findings) console.log('FINDING ' + f.kind + ' ' + basename(p.url) + ' ' + JSON.stringify(f));
+    console.log('demo-verify: ' + total + ' finding(s). Sheets under ' + outDir);
     exitCode = 1;
   }
 } catch (err) {
