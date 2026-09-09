@@ -168,9 +168,13 @@ piece as it is built, or when the site is one page.
 ```
 
 `/wp-demo` picks craft or plain mode from the project's docs (`--craft`/`--plain` override it)
-and records the answer as `demo mode` in `.wp-create.json`. Craft mode reads the `wp-demo-craft`
-skill for a marketing/brand/launch site; plain mode is the existing single-file demo with no
-motion contract, for an admin tool, intranet or catalogue.
+and records the answer as `demo mode` in `.wp-create.json`. Craft mode needs a browser
+(`playwright-core` plus Chrome; `demo-verify.mjs --probe` checks both and `/wp-demo` stops on a
+missing one), writes `demo/DESIGN.md` from the client docs, `npx designlang` and a vendored
+catalogue of 64 real-brand DESIGN.md files, builds every section from the plugin's composition
+library, and loops on `npx -y impeccable@4 detect` plus a six-line critique rubric for at most
+three rounds; plain mode is the existing single-file demo with no motion contract, for an admin
+tool, intranet or catalogue. Nothing paid is involved.
 
 ### Path C — cinematic
 
@@ -220,7 +224,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-settings <text>` | B | optional | Extend the settings page |
 | `/wp-seed [file]` | B | required for content | Pages, media, fields, menus from the demo |
 | `/wp-finalize` | all | recommended | Pre-delivery checklist |
-| `/wp-demo-verify <path-or-url> [--positions N]` | all | recommended | Scroll-walk demo/live page, screenshots per section and viewport, machine findings plus a contact sheet to read yourself |
+| `/wp-demo-verify <path-or-url> [--positions N]` | all | recommended | Scroll-walk a demo dir or live page, impeccable detector, screenshots per section and viewport, six-line critique into demo/VERIFY.md |
 | `/wp-responsive-check <url>` | all | recommended | Alias, dispatches `/wp-demo-verify` (5-viewport layout check is now one part of what it walks) |
 | `/wp-audit [flags]` | all | optional | Security, SEO, a11y, performance, best practices |
 | `/wp-polylang <src> <dst>` | all | polylang only | Translate the site through Polylang |
@@ -253,7 +257,7 @@ procedure; the commands only dispatch them.
 | `wp-css-system` | CSS design system: custom properties, BEM naming, scales. Read by the `wp-css` agent, which handles the plain-CSS parts of every section |
 | `wp-tailwind-system` | Tailwind authoring conventions — the utility-first decision ladder and file layout (the default template) |
 | `wp-demo` | Demo HTML creation methodology |
-| `wp-demo-craft` | Design floor, page grammars, a scroll-motion device kit, a composition library and an evaluator rubric for premium demos |
+| `wp-demo-craft` | Reference-first design floor for premium demos: a client DESIGN.md, a composition library, a motion budget and a render-verified loop |
 | `wp-responsive` | Mobile-first responsive patterns, fluid typography, touch targets |
 | `wp-cli-patterns` | WP-CLI best practices for all agents (saves tokens vs PHP generation) |
 | `wp-aos-animator` | AOS scroll animation installer — audits, enqueues, initializes, and seeds animations across templates. Run through `/wp-aos-animator` |
