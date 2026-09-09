@@ -200,9 +200,18 @@ echo 'Sitemap configured.';
 "
 ```
 
-## Step 5.5: Sitemap validation (11 known failure modes)
+## Step 5.5: Sitemap validation
 
-After configuring sitemap, validate it actually works:
+After configuring the sitemap, validate it actually works. This script covers the six
+failure modes that can be checked mechanically; the remaining five in the
+`wp-audit-seo-standards` skill's failure-mode table (redirected URLs, robots.txt-blocked
+URLs, duplicate `<loc>`, stale `lastmod`, wrong canonical) need the redirection and
+canonical data that Step 8.5 and `/wp-audit`'s SEO pass gather — check them there, and do
+not report "sitemap validated" on the strength of this script alone.
+
+**`sitemap_index.xml` lists child sitemaps, not post URLs.** Any check that greps the index
+for a permalink silently never fires. Fetch the index, then fetch every child it names, and
+match against the concatenation.
 
 ```bash
 $WP eval "
@@ -215,6 +224,16 @@ $WP eval "
 
 echo \"Status: \$code\n\";
 echo \"Content-Type: \$content_type\n\";
+
+// Follow the index into every child sitemap — the URLs live there, not here.
+\$all = \$body;
+if (preg_match_all('#<loc>\s*([^<\s]+)\s*</loc>#i', \$body, \$children)) {
+    foreach (array_unique(\$children[1]) as \$child) {
+        if (\$child === \$sitemap_url) { continue; }
+        \$all .= wp_remote_retrieve_body(wp_remote_get(\$child));
+    }
+}
+echo 'Fetched ' . count(array_unique(\$children[1])) . \" child sitemaps.\n\";
 
 // Check 1: Must return 200
 if (\$code !== 200) { echo \"FAIL: Sitemap returns \$code\n\"; }
@@ -244,7 +263,7 @@ global \$wpdb;
     AND m.meta_key='rank_math_robots' AND m.meta_value LIKE '%noindex%'
 \");
 foreach (\$noindex_in_sitemap as \$id) {
-    if (strpos(\$body, get_permalink(\$id)) !== false) {
+    if (strpos(\$all, get_permalink(\$id)) !== false) {
         echo \"FAIL: noindex post #\$id is listed in the sitemap\n\";
     }
 }
@@ -252,7 +271,7 @@ foreach (\$noindex_in_sitemap as \$id) {
 // Check 6: Draft/private posts in sitemap
 \$drafts = \$wpdb->get_col(\"SELECT ID FROM {\$wpdb->posts} WHERE post_status IN ('draft','private') AND post_type IN ('post','page')\");
 foreach (\$drafts as \$id) {
-    if (strpos(\$body, get_permalink(\$id)) !== false) {
+    if (strpos(\$all, get_permalink(\$id)) !== false) {
         echo \"FAIL: unpublished post #\$id is listed in the sitemap\n\";
     }
 }

@@ -102,25 +102,44 @@ SEO-038 and SEO-040 through SEO-043 all compare a value in the rendered `<head>`
 what WordPress says the post should be. Render every published permalink **once** and reuse
 the snapshot for all five — do not fetch the site five times.
 
+Parse the head with `DOMDocument`, not a regex. Attribute order is not fixed (`<link href=…
+rel=canonical>` is as valid as the reverse), attributes may be single-quoted, and a regex
+that assumes otherwise returns an empty string — which reads as "no finding" and passes a
+site that is actually broken.
+
 ```bash
 $WP eval "
 \$out = array();
+\$prev = libxml_use_internal_errors(true);
 foreach (get_posts(array('post_type' => array('post','page'), 'posts_per_page' => -1, 'post_status' => 'publish')) as \$p) {
     \$url  = get_permalink(\$p->ID);
     \$body = wp_remote_retrieve_body(wp_remote_get(\$url));
-    preg_match('#<html[^>]+lang=\"([^\"]+)#i', \$body, \$h);
-    preg_match('#<link[^>]+rel=\"canonical\"[^>]+href=\"([^\"]+)#i', \$body, \$c);
-    preg_match('#<meta[^>]+og:locale\"[^>]+content=\"([^\"]+)#i', \$body, \$o);
-    preg_match_all('#hreflang=\"([^\"]+)\"[^>]+href=\"([^\"]+)#i', \$body, \$a);
+    \$doc  = new DOMDocument();
+    \$doc->loadHTML('<?xml encoding=\"utf-8\" ?>' . \$body);
+    libxml_clear_errors();
+    \$xp = new DOMXPath(\$doc);
+
+    \$canonical = '';
+    foreach (\$xp->query('//link[@rel=\"canonical\"]') as \$n) { \$canonical = \$n->getAttribute('href'); }
+
+    \$og = '';
+    foreach (\$xp->query('//meta[@property=\"og:locale\"]') as \$n) { \$og = \$n->getAttribute('content'); }
+
+    \$hreflang = array();
+    foreach (\$xp->query('//link[@hreflang]') as \$n) { \$hreflang[\$n->getAttribute('hreflang')] = \$n->getAttribute('href'); }
+
+    \$html = \$doc->getElementsByTagName('html')->item(0);
+
     \$out[] = array(
         'id'        => \$p->ID,
         'url'       => \$url,
-        'html_lang' => isset(\$h[1]) ? \$h[1] : '',
-        'canonical' => isset(\$c[1]) ? \$c[1] : '',
-        'og_locale' => isset(\$o[1]) ? \$o[1] : '',
-        'hreflang'  => \$a[1] ? array_combine(\$a[1], \$a[2]) : array(),
+        'html_lang' => \$html ? \$html->getAttribute('lang') : '',
+        'canonical' => \$canonical,
+        'og_locale' => \$og,
+        'hreflang'  => \$hreflang,
     );
 }
+libxml_use_internal_errors(\$prev);
 echo wp_json_encode(\$out);
 "
 ```

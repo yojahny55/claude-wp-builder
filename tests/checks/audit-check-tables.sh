@@ -38,4 +38,18 @@ if grep -rn "glob(get_template_directory() . '/\*\*" agents/ skills/ >/dev/null 
   fail "glob() with '**' is not recursive in PHP — use RecursiveDirectoryIterator"
 fi
 
+# sitemap_index.xml lists child sitemaps, not post URLs. Matching a permalink against
+# the index alone never fires, and the check reports a clean sitemap either way.
+grep -q "child sitemaps" agents/wp-audit-rankmath.md \
+  || fail "wp-audit-rankmath.md: sitemap validation must follow the index into its child sitemaps"
+
+# Head values must be parsed, not pattern-matched: a regex that assumes double quotes or
+# rel-before-href returns '' on valid markup, which reads as "no finding" and passes a
+# broken site.
+grep -q "DOMXPath" agents/wp-audit-seo.md \
+  || fail "wp-audit-seo.md: the rendered-head snapshot must parse the DOM, not regex the markup"
+if grep -q 'preg_match.*rel=.*canonical' agents/wp-audit-seo.md; then
+  fail "wp-audit-seo.md: canonical is being regexed out of the markup again"
+fi
+
 echo PASS
