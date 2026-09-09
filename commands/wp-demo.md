@@ -53,37 +53,73 @@ If the mode is **plain**, continue with the existing steps and skip Step 2.6.
 Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/SKILL.md` and its `references/`
 before writing any markup.
 
-1. **Brief.** Self-author `demo/BRIEF.md` from the project docs: brand rules;
-   pain, person and promise; two or three named references and what specifically
-   to take from each; vibe words; aesthetic family; assets already owned. Mark
-   anything you invented as "Self-authored, not interviewed". Ask, in a single
-   pass, only the questions the docs cannot answer. Show the brief once and
-   proceed on a yes.
-2. **Feeling curve.** One line per section: the emotion, then the on-screen cause.
-   Adjacent sections that share a feeling mean one is filler. Name the peak as a
-   sentence a visitor would say to a friend, and complete "it's the site where
-   ___". Write all of it into `demo/BRIEF.md` before listing sections.
-3. **Grammar and signature move.** Pick one grammar from `references/grammars.md`
-   and one bespoke interaction that exists on this site alone.
-4. **Fingerprint gate.** Read `~/.claude/wp-builder/FINGERPRINTS.md` (create it
-   with a header row if absent). The plan must differ from every row on at least
-   4 of the 6 axes. If it fails, change the plan, not the log.
-5. **Score table.** Section, device, why. Check it against the pre-build list in
-   the skill: four or more device families, no family twice in a row, one peak
-   with the largest span and a quieter section before it.
-6. **Build.** Same delimiters, `:root` tokens and BEM as plain mode. Motion comes
-   from `data-motion-*` attributes only. Inline the contents of
+0. **Gate.** Run `node "${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs" --probe`.
+   On exit 2, run `npm i -D playwright-core` in the project root and probe again
+   (the probe resolves `playwright-core` from `PLAYWRIGHT_CORE`, then the
+   plugin's own `node_modules`, then the project's, which is why installing here
+   works). Still exit 2: print what the probe said is missing (`playwright-core`
+   or Chrome, with `npx playwright install chrome` as the fix) and **stop**. A
+   craft build is never made blind and never falls back to plain; the user reruns
+   once the browser exists.
+1. **DESIGN.md.** Write `demo/DESIGN.md` per `references/design-md.md`: client
+   docs first; then `npx designlang <url>` on the client's current site and on
+   each reference URL the docs name (skip when there is none); then two or three
+   rows from `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/design-md/INDEX.md`
+   by industry and tone for the gaps, cited by domain. If `.wp-create.json` has
+   `firecrawl_url` and a reference is a Refero Styles page, scrape it for its
+   do/don't list. Record `"design_md": "demo/DESIGN.md"` in `.wp-create.json`.
+   `firecrawl_url` is optional and set by hand (a self-hosted instance or the
+   client's own); never ask for a key.
+2. **Fingerprint gate.** Read `~/.claude/wp-builder/FINGERPRINTS.md` (create it
+   with the v2 header row if absent). The DESIGN.md fails when any row shares the
+   display family, the text family, and an accent hue within 15 degrees. Change
+   the type pair or the accent, not the log.
+3. **Brief.** Self-author `demo/BRIEF.md` from the project docs: person, pain,
+   promise, vibe words, two or three named references and what to take from
+   each, assets owned, the feeling curve (one line per section: emotion, then
+   the on-screen cause), the peak as a friend-quotable sentence, "it's the site
+   where ___", authored silence. Mark anything invented "Self-authored, not
+   interviewed". Ask, in one pass, only what the docs cannot answer. Show the
+   brief once and proceed on a yes.
+4. **Grammar, then composition plan.** Pick one grammar from
+   `references/grammars.md` — it decides what a section is, what the chrome is
+   for and what the ending does. Then open
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/compositions/README.md` and look at
+   each candidate's `preview-1440.png` and `preview-390.png`. One row per section
+   of the curve: section, role, composition, why, motion cost. Mark exactly one
+   row as the peak (`data-motion-peak`). Sum the cost and hold it under the
+   budget in `references/devices.md`, which owns the pin caps, the per-index
+   total and the interior-page rule. When the docs name no reference, pull four
+   screenshots from the Landing Gallery MCP for the page kind first.
+5. **Build.** Generate `:root` from `demo/DESIGN.md` onto the plugin token names.
+   Copy each chosen composition's `section.html` and `section.css`, fill the
+   `{{slots}}` with real copy and real assets, keep the delimiters and the BEM
+   block. Same delimiters and `:root` contract as plain mode. Motion comes from
+   `data-motion-*` attributes only. Inline the contents of
    `${CLAUDE_PLUGIN_ROOT}/starter-theme/__tailwind__/assets/js/src/motion.js` in a
    `<script type="module">` block (`motion.js` uses `export function initMotion`,
    so a plain non-module `<script>` throws `SyntaxError: Unexpected token 'export'`
    and silently disables all motion), after loading GSAP and ScrollTrigger from
-   `https://cdnjs.cloudflare.com` with pinned versions. The signature move goes in
-   its own `<script id="signature">` block so `/wp-init` can lift it to
+   `https://cdnjs.cloudflare.com` with pinned versions. Any bespoke effect goes
+   in its own `<script id="signature">` block so `/wp-init` can lift it to
    `assets/js/signature.js`.
-7. **Verify.** Run `/wp-demo-verify demo/index.html`. Fix what it finds, then
-   report the intended curve, the felt curve and the diff.
-8. **Record.** Append the build's row to `~/.claude/wp-builder/FINGERPRINTS.md`
-   and write the same row into `.wp-create.json` under `"fingerprint"`.
+6. **Loop.** At most three rounds. Each round is `/wp-demo-verify demo/` — the
+   directory, so every page is walked — which runs the `impeccable detect` gate
+   and the walk and writes `demo/VERIFY.md`. That command is the one place the
+   detector and rubric contract is written; run it, do not restate it here. Read
+   `demo/VERIFY.md`, fix every failed line and repeat. After three rounds with
+   failures, stop, report what still fails, and go to step 8 without recording.
+7. **Record.** Only for a passing build: append the row
+   `| client | display | text | accent | canvas | date |` to
+   `~/.claude/wp-builder/FINGERPRINTS.md` and write the same fields into
+   `.wp-create.json` under `"fingerprint"`. A build that failed after three
+   rounds records no fingerprint, in either place.
+8. **Report.** The intended curve, the felt curve from `demo/VERIFY.md`, the
+   diff, the detector summary, and what could not be verified.
+
+A craft build is finished here: skip Steps 3 and 4 (they describe the plain
+single-file demo, which forbids the CDN and the motion this build needs) and
+print the Step 5 summary.
 
 ## Step 3: Invoke Skills
 

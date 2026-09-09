@@ -28,6 +28,7 @@ grep -Fq 'wp-demo-craft' "$d" || fail "$d does not read the wp-demo-craft skill"
 
 # --- The gates that make a craft build different from a pretty one. --------
 grep -Eqi 'fingerprint' "$d" || fail "$d does not run the fingerprint gate"
+grep -Fq 'DESIGN.md' "$d" || fail "$d does not split the brief into BRIEF.md and DESIGN.md"
 grep -Eqi 'feeling curve' "$d" || fail "$d does not write the feeling curve"
 grep -Fq '/wp-demo-verify' "$d" || fail "$d does not hand off to /wp-demo-verify"
 
