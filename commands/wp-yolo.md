@@ -165,6 +165,16 @@ rule always wins over the no-demo-HTML rule.
 
 Skip this step entirely when `template == basic`.
 
+Skip it entirely when `demo mode` is **craft**, too, and say so in one line. A craft
+demo is built from `skills/wp-demo-craft/compositions/`, whose CSS is already
+authored against the token vocabulary `/wp-init` writes into the theme, so
+converting it to utilities discards that seam rather than crossing it: `wp-tailwind`
+maps colours to the nearest utility class, which replaces every `var(--color-ink)`
+reference with a hardcoded class. The detection below cannot reach this decision on
+its own — a craft demo carries a `:root` and BEM classes and so is plain-CSS evidence
+by every test in it — which is why the stop is here, before the walk. `/wp-init`
+Step D4 makes the same exception in the same terms; do not restate it a third way.
+
 When `template == tailwind`, the section walk must transcribe from a Tailwind-native
 demo, not a plain-CSS one. Transcribing plain CSS is what produced themes with zero
 utility classes.

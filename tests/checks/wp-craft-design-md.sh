@@ -55,10 +55,39 @@ grep -Fq 'demo/DESIGN.md' CLAUDE.md || fail "CLAUDE.md does not document the DES
 for t in --color-canvas --color-surface --color-ink-soft --color-accent-ink --color-hairline --font-display --font-text; do
   grep -Fq -- "$t" "$i" || fail "$i does not write the craft token $t into the theme"
 done
-for t in --color-primary --color-secondary --color-dark --color-light --color-gray --font-primary --font-secondary; do
-  grep -Fq -- "$t" "$i" || fail "$i does not alias the starter token $t onto the craft vocabulary"
-done
-grep -Fqi 'alias' "$i" || fail "$i does not state that the starter tokens become aliases"
+# Assert the alias ROWS, not the token names. Every starter token name already
+# appears in Step D4's pre-existing extraction table, so grepping for the bare
+# name passes on text that predates the alias table entirely — a green check
+# whose message names a behaviour it cannot detect. The row is what is new.
+while IFS='=' read -r starter craft; do
+  grep -Fq -- "| \`$starter\` | \`var(--$craft)\` |" "$i" \
+    || fail "$i does not alias the starter token $starter onto var(--$craft)"
+done <<'ALIASES'
+--color-primary=color-accent
+--color-secondary=color-ink
+--color-dark=color-ink
+--color-light=color-canvas
+--color-gray=color-ink-soft
+--font-primary=font-display
+--font-secondary=font-text
+ALIASES
+grep -Fq -- '| `--color-accent` |' "$i" || fail "$i does not state that --color-accent is the one shared name and needs no alias"
+# Bare 'alias' is satisfied by two pre-existing lines about basic/tailwind, so
+# pin the rule that keeps the mapping right instead of the word.
+grep -Eqi 'by role, never by lightness' "$i" || fail "$i does not state that the aliases map by role, not by lightness"
 grep -Eqi 'alias table' "$i" || fail "$i does not require the alias table in the theme's copied DESIGN.md"
+
+# Craft demos never go through /wp-tailwindify. They already carry BEM classes
+# and a :root, which is exactly the plain-CSS evidence the converter triggers on,
+# and wp-tailwind maps colours to the nearest utility — which would replace the
+# compositions' custom-property references with hardcoded classes and delete the
+# token indirection the alias table exists to preserve.
+grep -Fq 'wp-tailwindify' "$i" || fail "$i no longer mentions /wp-tailwindify"
+grep -Fq 'When `demo mode` is craft, skip `/wp-tailwindify` entirely' "$i" \
+  || fail "$i does not skip /wp-tailwindify on a craft demo"
+grep -Fq 'Otherwise, **run `/wp-tailwindify`**' "$i" \
+  || fail "$i still runs /wp-tailwindify unconditionally"
+grep -Fq 'Skip it entirely when `demo mode` is **craft**' "$y" \
+  || fail "$y does not skip the Step 2.6 demo conversion on a craft demo"
 
 echo PASS

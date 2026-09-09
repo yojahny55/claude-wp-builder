@@ -211,7 +211,9 @@ The user can override any field. Once confirmed, use these values for the rest o
   siblings. Only `--color-accent` is in both. Write one set and half the theme
   resolves properties nothing defines and renders unstyled, which is a failure with
   no error message. So write the craft vocabulary from `demo/DESIGN.md` front matter
-  (`colors`, `typography`, `rounded`, `spacing`) into the same `@theme` block —
+  (`colors`, `typography`, `rounded`, `spacing`) into the same `@theme` block — which
+  exists only once **Step 3** has copied the starter, so extract and confirm the values
+  here and write them when the file is there, exactly as the rest of Step D4 does —
   Tailwind v4 emits every `@theme` variable into `:root`, and the colour and font
   ones also earn utilities (`bg-canvas`, `text-ink`, `font-display`) — and then
   define the starter's tokens as aliases onto it rather than as second copies of
@@ -242,7 +244,18 @@ The user can override any field. Once confirmed, use these values for the rest o
   `## Token aliases` heading, so `wp-css` and `wp-section` read the mapping instead
   of re-deriving it.
 
-  Then **run `/wp-tailwindify`** on the demo — do not merely suggest it. On the
+  **When `demo mode` is craft, skip `/wp-tailwindify` entirely** and say so in one
+  line: the compositions are already authored against the token vocabulary the theme
+  now defines, so converting them to utilities discards the seam instead of crossing
+  it. This is not the "already Tailwind-native" exemption below — a craft demo carries
+  a `:root` and BEM classes and so reads as plain-CSS evidence on every test in that
+  list — it is a separate, earlier stop. It has to be, because `wp-tailwind` maps
+  colours to the nearest utility class, which would replace every
+  `var(--color-ink)` reference in the composition CSS with a hardcoded class and
+  delete the indirection the alias table above exists to preserve. `/wp-yolo` Step 2.6
+  makes the same exception in the same terms.
+
+  Otherwise, **run `/wp-tailwindify`** on the demo — do not merely suggest it. On the
   tailwind template the build transcribes from the demo, so a plain-CSS demo yields a
   plain-CSS theme. Whether to skip is decided on positive evidence that the demo is
   already Tailwind-native, never on the absence of a `<style>` block: a demo that keeps
