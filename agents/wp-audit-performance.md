@@ -103,15 +103,24 @@ Before running ANY checks, read the following project files:
 List every `wp_enqueue_style` in `functions.php` and `inc/`. A library is deferred when it is
 enqueued with the `print` media type and switched to `all` on load, with a `<noscript>` fallback:
 
+Defer per link, via `onload` on the tag itself. Do **not** sweep the document for
+`link[media="print"]` and flip them all to `all`: a theme's real print stylesheet is a
+`media="print"` link too, and that sweep would load it on screen.
+
 ```php
 wp_enqueue_style( 'aos', get_template_directory_uri() . '/assets/css/aos.css', array(), '3.4.0', 'print' );
-// in the footer:
-// <script>document.querySelectorAll('link[media="print"]').forEach(function(l){l.media='all';});</script>
-// <noscript><link rel="stylesheet" href=".../aos.css"></noscript>
+
+add_filter( 'style_loader_tag', function ( $tag, $handle ) {
+    if ( ! in_array( $handle, array( 'aos' ), true ) ) {
+        return $tag;
+    }
+    $tag = str_replace( "media='print'", "media='print' onload=\"this.media='all';this.onload=null\" data-no-optimize='1'", $tag );
+    return $tag . "<noscript>" . str_replace( "media='print'", "media='all'", $tag ) . "</noscript>";
+}, 10, 2 );
 ```
 
-Add `data-no-optimize="1"` to the deferred `<link>`, or a page cache that combines CSS
-(LiteSpeed, WP Rocket) will merge it straight back into a synchronous bundle.
+`data-no-optimize="1"` keeps a page cache that combines CSS (LiteSpeed, WP Rocket) from
+merging the link straight back into a synchronous bundle.
 
 **PERF-048 — `fetchpriority` must point at the real LCP.** This needs lab data; there is no
 code-only version. Read the LCP element from the Lighthouse/PSI report:

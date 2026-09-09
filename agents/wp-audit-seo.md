@@ -107,11 +107,18 @@ rel=canonical>` is as valid as the reverse), attributes may be single-quoted, an
 that assumes otherwise returns an empty string — which reads as "no finding" and passes a
 site that is actually broken.
 
+This costs one HTTP request per post, issued by the site against itself, so it is capped at
+50 by default — enough to characterise a template set, and short of the point where a large
+site starts timing out under its own audit. Raise `\$limit` when the finding needs to name
+every affected post rather than prove the defect exists, and say in the report how many
+posts were sampled out of how many published.
+
 ```bash
 $WP eval "
+\$limit = 50;
 \$out = array();
 \$prev = libxml_use_internal_errors(true);
-foreach (get_posts(array('post_type' => array('post','page'), 'posts_per_page' => -1, 'post_status' => 'publish')) as \$p) {
+foreach (get_posts(array('post_type' => array('post','page'), 'posts_per_page' => \$limit, 'post_status' => 'publish')) as \$p) {
     \$url  = get_permalink(\$p->ID);
     \$body = wp_remote_retrieve_body(wp_remote_get(\$url));
     \$doc  = new DOMDocument();
@@ -150,6 +157,8 @@ echo wp_json_encode(\$out);
 2. **SEO-040** — for every `hreflang` href, `url_to_postid()` then `get_post_status()` must be
    `publish`. A hreflang to a draft or a 404 is worse than no hreflang.
 3. **SEO-041** — hreflang must be reciprocal: if A's snapshot lists B, B's snapshot must list A.
+   The sample cap can split a pair, so a counterpart that is simply not in the sample is not a
+   finding — fetch that one URL before reporting a broken pair.
 4. **SEO-042 / SEO-043** — skip both unless `pll_get_post_language()` exists and
    `count(pll_languages_list()) > 1`. Expected mapping is Polylang's own:
    `html_lang` = `str_replace('_', '-', pll_get_post_language($id, 'locale'))`,

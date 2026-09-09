@@ -33,9 +33,24 @@ for n in $nums; do
 done
 
 # PHP glob() has no recursive **; a theme-wide scan that uses it silently skips
-# functions.php at the theme root.
-if grep -rn "glob(get_template_directory() . '/\*\*" agents/ skills/ >/dev/null 2>&1; then
+# functions.php at the theme root. Match any quoting or concatenation style.
+if grep -rnE 'glob\(.*\*\*' agents/ skills/ >/dev/null 2>&1; then
   fail "glob() with '**' is not recursive in PHP — use RecursiveDirectoryIterator"
+fi
+
+# A permalink is a prefix of its own paginated children, so a substring test reports
+# /page/ as listed because /page/2/ is. Sitemap membership is an exact <loc> comparison.
+if grep -n 'strpos(\\\$all, get_permalink' agents/wp-audit-rankmath.md >/dev/null 2>&1; then
+  fail "wp-audit-rankmath.md: sitemap membership must compare whole URLs, not substrings"
+fi
+
+# The head snapshot issues one request per post against the site itself; it must stay capped.
+grep -q 'posts_per_page.*\\\$limit' agents/wp-audit-seo.md \
+  || fail "wp-audit-seo.md: the rendered-head snapshot must cap how many posts it fetches"
+
+# A blanket link[media="print"] sweep also unhides the theme's real print stylesheet.
+if grep -n 'querySelectorAll(.link\[media="print"\]' agents/wp-audit-performance.md >/dev/null 2>&1; then
+  fail "wp-audit-performance.md: defer CSS per link, not by sweeping every media=print link"
 fi
 
 # sitemap_index.xml lists child sitemaps, not post URLs. Matching a permalink against

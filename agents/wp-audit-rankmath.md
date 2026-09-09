@@ -226,14 +226,27 @@ echo \"Status: \$code\n\";
 echo \"Content-Type: \$content_type\n\";
 
 // Follow the index into every child sitemap — the URLs live there, not here.
-\$all = \$body;
-if (preg_match_all('#<loc>\s*([^<\s]+)\s*</loc>#i', \$body, \$children)) {
-    foreach (array_unique(\$children[1]) as \$child) {
-        if (\$child === \$sitemap_url) { continue; }
-        \$all .= wp_remote_retrieve_body(wp_remote_get(\$child));
+// Only an index has children: in a flat <urlset> the <loc> entries are the post
+// URLs themselves, and re-fetching each one would hammer the site for nothing.
+\$children = array();
+\$all_bodies = array();
+if (stripos(\$body, '<sitemapindex') !== false) {
+    preg_match_all('#<loc>\s*([^<\s]+)\s*</loc>#i', \$body, \$m);
+    \$children = array_diff(array_unique(\$m[1]), array(\$sitemap_url));
+    foreach (\$children as \$child) {
+        \$all_bodies[] = wp_remote_retrieve_body(wp_remote_get(\$child));
     }
 }
-echo 'Fetched ' . count(array_unique(\$children[1])) . \" child sitemaps.\n\";
+echo 'Fetched ' . count(\$children) . \" child sitemaps.\n\";
+
+// Every <loc> across the index and its children, compared as whole URLs. A
+// substring test would report /page/ as present because /page/2/ is listed.
+\$all_bodies[] = \$body;
+\$listed = array();
+foreach (\$all_bodies as \$b) {
+    preg_match_all('#<loc>\s*([^<\s]+)\s*</loc>#i', \$b, \$m);
+    foreach (\$m[1] as \$loc) { \$listed[untrailingslashit(html_entity_decode(\$loc))] = true; }
+}
 
 // Check 1: Must return 200
 if (\$code !== 200) { echo \"FAIL: Sitemap returns \$code\n\"; }
@@ -263,7 +276,7 @@ global \$wpdb;
     AND m.meta_key='rank_math_robots' AND m.meta_value LIKE '%noindex%'
 \");
 foreach (\$noindex_in_sitemap as \$id) {
-    if (strpos(\$all, get_permalink(\$id)) !== false) {
+    if (isset(\$listed[untrailingslashit(get_permalink(\$id))])) {
         echo \"FAIL: noindex post #\$id is listed in the sitemap\n\";
     }
 }
@@ -271,7 +284,7 @@ foreach (\$noindex_in_sitemap as \$id) {
 // Check 6: Draft/private posts in sitemap
 \$drafts = \$wpdb->get_col(\"SELECT ID FROM {\$wpdb->posts} WHERE post_status IN ('draft','private') AND post_type IN ('post','page')\");
 foreach (\$drafts as \$id) {
-    if (strpos(\$all, get_permalink(\$id)) !== false) {
+    if (isset(\$listed[untrailingslashit(get_permalink(\$id))])) {
         echo \"FAIL: unpublished post #\$id is listed in the sitemap\n\";
     }
 }
