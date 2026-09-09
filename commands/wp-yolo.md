@@ -578,7 +578,7 @@ incomplete in the Step 6 report. This holds under `--yolo` as well.
 
 ## Step 5.5: Demo-parity gate — auto-fix, re-verify, and block
 
-`/wp-finalize` (Step 5, item 4 above) already ran the 3-layer demo-parity gate (Layers 1-3).
+`/wp-finalize` (Step 5, item 4 above) already ran the 3-layer demo-parity gate (Layers 1-3); if `/wp-audit` fixes required a re-run, treat the latest Layers 2-3 findings as the gate result.
 Before this run can report success, walk every **critical** finding from that gate:
 
 1. **Auto-fix mechanical findings** — no judgment required, apply directly.
