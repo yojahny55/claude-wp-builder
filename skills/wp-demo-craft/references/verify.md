@@ -2,51 +2,74 @@
 
 Adapted from nateherkai/scroll-craft (MIT).
 
-A scroll page cannot be checked by looking at it once. It has no single
-state: every scroll position is a different frame, and the failures live
-between the two you happened to look at. `/wp-demo-verify` walks it
-mechanically and produces a contact sheet; this file is what to read out of
-that sheet and how.
+A scroll page has no single state: every scroll position is a different frame,
+and the failures live between the two you happened to look at. So it is verified
+by walking it, and a craft build is verified in a loop — build, measure,
+critique, fix — for at most **three rounds**. A build that still fails after
+three rounds stops and reports rather than shipping quietly, and it
+**does not record a fingerprint**. `/wp-demo-verify` runs this loop.
+
+## Round structure
+
+1. **Deterministic gate.** `npx impeccable detect demo/ --json`, findings written
+   to `demo/.verify/impeccable.json`. Any **P0** fails the round before a
+   screenshot is taken. This is where the old refuse list lives now: scroll cues,
+   `01 / 06` counters, gradient text, visible em dashes, fake dashboards. A
+   detector is cheaper than a rule nobody read to the end of.
+2. **Contact sheets.** `node ${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs demo/`
+   walks every page at every tested width. Machine findings fail the round.
+3. **Critique.** A separate evaluator pass reads **only the sheets** — never the
+   source, never the brief — and scores each page pass or fail on each rubric
+   line into `demo/VERIFY.md`. An evaluator that has read the brief grades the
+   intention; the client only ever sees the render.
+4. **Fix** every failed line, then repeat from 1.
+
+## The rubric
+
+Six lines, each one pass or fail per page. No scores out of ten: a 7/10 is a
+build nobody has to change.
+
+- **First paint complete.** Headline, primary visual and CTA all inside the
+  1440x900 fold and inside the 390x844 fold, none of them hidden behind a scroll
+  trigger. A hero whose type is masked until a trigger fires reads as an empty
+  dark field to a visitor who has not scrolled yet.
+- **One peak.** The largest visual change on the page, with a quieter section
+  before it and the most scroll room. If two sections compete, neither wins; if
+  none does, the page is a list.
+- **Squint test.** Blur a sheet until detail is gone. Primary, secondary and the
+  major groups must still be nameable, in order. If it greys into one even
+  field, the problem is hierarchy and no shadow or motion will fix it.
+- **Measured contrast.** Body 4.5:1, large text 3:1, controls and focus
+  indicators 3:1 — read from the render, not from the token. A headline can clear
+  the floor against one still and fail three hundred pixels later against
+  another.
+- **Mobile headline.** At 390 the headline wraps to three lines or fewer, and no
+  section is wider than the viewport. Left at the desktop type floor, a normal
+  hero headline wraps into six lines on a phone.
+- **Adjacent feelings.** Write one word per section, cold, from the sheet alone.
+  No two adjacent words the same. Only then open `demo/BRIEF.md` and diff the
+  words against the curve; two identical neighbours are one section shown twice.
 
 ## What the machine measures
 
-**Dead scroll**: consecutive positions where nothing changed: no cue opacity
+**Dead scroll**: consecutive positions where nothing changed — no cue opacity
 moved, no `--motion-p` advanced, no rail transform travelled, no clip-path
-progressed. Real dead scroll means the reader is turning the wheel and being
-given nothing. Fix by shortening the section's span or adding a cue.
+progressed. The reader is turning the wheel and being given nothing. Fix by
+shortening the span, not by adding motion to fill it. Authored silence recorded
+in `demo/BRIEF.md` is the exception, and it is only an exception because it was
+written down first.
 
-**Cues that never peak**: an element that never reaches full opacity anywhere
-in its section. Usually a cue window too narrow for the section, or ramps
-that eat the whole window.
+**Cues that never peak**: an element that never reaches full opacity anywhere in
+its section, usually a cue window too narrow for the span.
 
-**Horizontal overflow**: at any tested width, content wider than the
-viewport.
+**Horizontal overflow** at any tested width, and **copy clipped by its
+container**. For cinematic demos, a **frozen stage**: the canvas is on screen,
+the reader is scrolling, the playhead is not moving.
 
-**Copy clipped by its container**: text cut off by a fixed-height wrapper or
-an overflow: hidden ancestor.
-
-**For cinematic demos**, a frozen stage: the video canvas is on screen, the
-reader is scrolling, and the playhead is not moving.
-
-## What the machine does not measure
-
-- **Composited contrast.** Read this from the sheet by eye, frame by frame,
-  because a headline can clear the contrast floor against one still and fail
-  three hundred pixels later against another.
-- **Real-device behaviour.** Headless Chrome cannot prove how the page feels
-  on an actual phone, on an actual network, under an actual thumb.
-
-## The reading protocol
-
-1. Open `sheet.png` per tested width.
-2. Run the feel check from `feel.md` **cold**, before rereading the brief.
-3. Confirm the peak is the largest visual change on the page and holds the
-   most scroll room.
-4. Confirm there is silence in front of the peak, not another loud section.
-5. Confirm the last screen can stand still with content on it, not fade to
-   nothing.
+It cannot measure composited contrast, or how the page feels on a real phone
+under a real thumb.
 
 **A green machine run alone is not a pass.** The machine catches dead scroll,
-missed peaks in opacity, overflow and clipping; it cannot tell you whether the
-page is any good. Reading the contact sheet is not optional and does not
-happen automatically just because `/wp-demo-verify` exited 0.
+missed peaks, overflow and clipping; it cannot tell you whether the page is any
+good. Reading the contact sheets is not optional and does not happen
+automatically because `/wp-demo-verify` exited 0.

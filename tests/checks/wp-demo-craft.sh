@@ -24,17 +24,19 @@ awk 'NR<=8 && /^name: wp-demo-craft/ { f = 1 } END { exit !f }' "$s" \
 grep -Fq 'Adapted from nateherkai/scroll-craft (MIT)' "$s" \
   || fail "$s does not credit scroll-craft"
 
-# --- The variety law. Without it every section becomes the same section. -----
-grep -Eqi 'four device families' "$s" \
-  || fail "$s does not require at least four device families"
-grep -Eqi 'never the same device' "$s" \
-  || fail "$s does not forbid the same device in adjacent sections"
+# --- The two spine rules that survive v2. Variety was the product in v1 and it
+#     produced a split-stage credit-repair site with a seam nobody asked for.
+grep -Eqi 'real content only' "$s" || fail "$s does not require real content only"
+grep -Eqi 'one peak' "$s" || fail "$s does not require one peak"
+grep -Eqi 'four device families' "$s" && fail "$s still requires four device families (removed in v2)"
+grep -Eqi 'never the same device' "$s" && fail "$s still forbids repeating a device (removed in v2)"
+grep -Fq 'compositions/README.md' "$s" || fail "$s does not send the build to the composition role table"
+grep -Fq 'DESIGN.md' "$s" || fail "$s does not name demo/DESIGN.md"
+grep -Eqi 'browser' "$s" || fail "$s does not state the browser prerequisite"
 
-# --- The refuse list. Each entry is a recognisable AI-page tell. -------------
-for t in 'identical' '01 / 06' 'scroll cue' 'gradient text' 'em dash' \
-         'invented statistic' 'cream' 'Inter'; do
-  grep -Fqi "$t" "$r/taste.md" || fail "taste.md refuse list is missing: $t"
-done
+# --- The refuse list moved into the detector. taste.md keeps the positive floor.
+grep -Fq '## The refuse list' "$r/taste.md" && fail "taste.md still carries the refuse list; it is detector configuration now"
+grep -Fq 'impeccable' "$r/verify.md" || fail "verify.md does not run the impeccable detector"
 grep -Eqi 'purple|violet' "$r/taste.md" || fail "taste.md does not refuse the AI-purple palette"
 
 # --- Measured floor, not vibes. A floor with no numbers is a preference. -----
@@ -53,10 +55,10 @@ grep -Eqi 'cold|before looking|do not reread' "$r/feel.md" \
 
 # --- Grammars. The forbids are the point: a grammar that only says what it
 #     likes is a preference, and a preference drifts back to the default shape.
-for gname in 'layered landing' 'chaptered editorial' 'typographic poster' \
-             'gallery' 'split stage' 'rhythmic cutlist'; do
+for gname in 'layered landing' 'chaptered editorial' 'typographic poster' 'gallery'; do
   grep -Fqi "$gname" "$r/grammars.md" || fail "grammars.md is missing the grammar: $gname"
 done
+grep -Fq '## Retired' "$r/grammars.md" || fail "grammars.md does not retire split stage and rhythmic cutlist"
 grep -Eqi 'forbid' "$r/grammars.md" || fail "grammars.md does not state what each grammar forbids"
 grep -Eqi 'cinematic' "$r/grammars.md" \
   || fail "grammars.md does not route the video grammars to the cinematic path"
@@ -80,16 +82,41 @@ grep -Eqi 'plateau' "$r/devices.md" || fail "devices.md does not require a cue p
 grep -Eqi 'prefers-reduced-motion|reduced motion' "$r/devices.md" \
   || fail "devices.md does not state the reduced-motion behaviour"
 
-# --- The fingerprint gate. --------------------------------------------------
-grep -Fq '4 of the 6' "$r/fingerprint.md" || fail "fingerprint.md does not state the 4-of-6 rule"
+# --- The budget replaces variety. -------------------------------------------
+grep -Fq 'data-motion-peak' "$r/devices.md" || fail "devices.md does not define data-motion-peak"
+grep -Fq '2.0' "$r/devices.md" || fail "devices.md does not cap pin span at 2.0"
+grep -Fq '3.0' "$r/devices.md" || fail "devices.md does not allow the peak up to 3.0"
+grep -Eqi 'interior pages? (get|have) no pin|never pin' "$r/devices.md" \
+  || fail "devices.md does not forbid pins on interior pages"
+# --- Heroes are reveal, never kinetic. The split masks every word until a scroll
+#     trigger fires, which is what clipped the client's headline. A cue does not
+#     fix it: drive() reads cues only for pin|pan|kinetic|wipe|drift, so a cue on
+#     a reveal section is inert.
+grep -Eqi 'never on a hero headline' "$r/devices.md" \
+  || fail "devices.md does not ban the kinetic split on hero headlines"
+grep -Eqi 'inert|does nothing|no effect' "$r/devices.md" \
+  || fail "devices.md does not say a cue outside a scrubbed section is inert"
+
+# --- The fingerprint gate, reduced to palette and type. ---------------------
+grep -Fq '4 of the 6' "$r/fingerprint.md" && fail "fingerprint.md still states the 4-of-6 structure rule (removed in v2)"
 grep -Fq 'FINGERPRINTS.md' "$r/fingerprint.md" || fail "fingerprint.md does not name the registry file"
+grep -Fq '| client | display | text | accent | canvas | date |' "$r/fingerprint.md" \
+  || fail "fingerprint.md does not define the v2 row format"
+grep -Fq '15' "$r/fingerprint.md" || fail "fingerprint.md does not state the 15-degree hue tolerance"
 grep -Fq '.wp-create.json' "$r/fingerprint.md" \
   || fail "fingerprint.md does not record the project's own row in the manifest"
 grep -Eqi 'change the plan, not the log' "$r/fingerprint.md" \
   || fail "fingerprint.md does not forbid rewriting a row to fit a new build"
-for axis in 'grammar' 'nav' 'hero' 'sequence' 'close' 'signature move'; do
-  grep -Fqi "$axis" "$r/fingerprint.md" || fail "fingerprint.md is missing the axis: $axis"
-done
+
+# --- New references: the catalogue and the composition library. -------------
+[ -f "$r/design-md.md" ] || fail "$r/design-md.md is missing"
+[ -f "$r/compositions.md" ] || fail "$r/compositions.md is missing"
+grep -Fq 'designlang' "$r/design-md.md" || fail "design-md.md does not name designlang"
+grep -Fq 'INDEX.md' "$r/design-md.md" || fail "design-md.md does not send the build to the catalogue index"
+grep -Eqi 'never (a )?copy|not a copy source|vocabulary' "$r/design-md.md" \
+  || fail "design-md.md does not forbid copying a catalogue entry"
+grep -Fq 'landing.gallery' "$r/compositions.md" || fail "compositions.md does not name the free Landing Gallery MCP"
+grep -Eqi 'one.line reason' "$r/compositions.md" || fail "compositions.md does not require a reason to deviate"
 
 # --- Verification is not optional and not automatic. ------------------------
 grep -Fq '/wp-demo-verify' "$r/verify.md" || fail "verify.md does not name the verify command"

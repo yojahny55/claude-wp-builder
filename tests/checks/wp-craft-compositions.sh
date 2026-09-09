@@ -34,7 +34,10 @@ for d in "$c"/*/; do
   grep -Fq 'transition: all' "$d/section.css" && fail "$name/section.css uses transition: all"
   grep -Fq '—' "$d/section.html" && fail "$name/section.html has an em dash in visible copy"
   grep -Fq '<script' "$d/section.html" && fail "$name/section.html has a script tag; motion is data-motion only"
-  grep -Eq '\bease-in\b' "$d/section.css" && fail "$name/section.css uses ease-in; never ease-in on UI"
+  # ease-in as a complete keyword only. taste.md bans ease-in on UI because it
+  # delays the moment the eye is already on; ease-in-out is a different, legitimate
+  # curve for on-screen movement, and a bare \bease-in\b matches inside it.
+  grep -Eq '\bease-in\b($|[^-])' "$d/section.css" && fail "$name/section.css uses ease-in; never ease-in on UI"
   # Every img declares its box, or the page reflows when the photograph lands.
   while IFS= read -r img; do
     [[ "$img" == *width=* && "$img" == *height=* ]] \
@@ -54,7 +57,7 @@ for d in "$c"/*/; do
   grep -Fq "| $name |" "$c/README.md" || fail "$c/README.md role table has no row for $name"
   # A composition that hides its own copy before scroll fails the first-paint rule.
   grep -Eq 'data-motion="kinetic"' "$d/section.html" && [[ "$name" == hero-* || "$name" == page-head ]] \
-    && fail "$name uses kinetic on a first-viewport composition; heroes use the greet cue"
+    && fail "$name uses kinetic on a first-viewport composition; heroes use reveal"
 done
 [ "$n" -ge 13 ] || fail "expected at least 13 compositions, found $n"
 # The regenerate command the library documents overwrites the previews in place, so

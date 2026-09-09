@@ -1,61 +1,65 @@
 ---
 name: wp-demo-craft
-description: Design floor, page grammars, scroll-motion device kit and anti-slop refuse list for premium demos. Read by /wp-demo in craft mode, /wp-yolo, /wp-cinematic-demo and /wp-demo-verify.
+description: Reference-first design floor for premium demos: a client DESIGN.md, a composition library, a motion budget and a render-verified loop. Read by /wp-demo in craft mode, /wp-yolo, /wp-cinematic-demo and /wp-demo-verify.
 user-invocable: false
 ---
 
 # Demo Craft
 
-Adapted from nateherkai/scroll-craft (MIT), with the video-scrub devices removed
-(those live in the cinematic path) and the token vocabulary changed to this
-plugin's own.
+Adapted from nateherkai/scroll-craft (MIT) for the feeling curve and the device
+kit; rebuilt in v2 around finished design as context rather than a list of things
+to avoid. v1 was a thousand lines of prohibition with no example of a good
+section anywhere in it, and it shipped a 12,000px page whose first screen was an
+empty dark field with the headline clipped mid-word. A build steered only by what
+it must not do has nothing to steer towards.
 
 ## When this applies
 
 Any demo built in craft mode, and every cinematic demo. `/wp-demo` records the
 decision as `demo mode` in `.wp-create.json`; read it, do not re-derive it.
 
-## The four spine rules
+## Prerequisite
 
-1. **Variety is the product.** A page uses at least **four device families**, and
-   **never the same device** in two adjacent sections. Five sections that behave
-   identically are one section shown five times.
-2. **Structure is its own axis.** A different palette is not a different page.
-   Pick a grammar from `references/grammars.md` before writing markup.
-3. **The feeling comes before the sections.** Write the curve in
-   `references/feel.md` first. A section list written first is always a list of
-   things that happen.
-4. **Real content only.** Real copy, real names, real numbers or no numbers.
+Craft mode needs a browser. `/wp-demo` runs
+`node ${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs --probe` before writing markup
+and stops on exit 2. A craft build is never made blind and never falls back to
+plain: an unverified craft page is the one that reaches the client.
 
-## The brief
+## The two spine rules
 
-`demo/BRIEF.md` holds: brand rules; pain, person and promise; two or three named
-references and what specifically to take from each; vibe words; aesthetic family;
-assets already owned; the feeling curve; the peak as a friend-quotable sentence;
-the "it's the site where ___" sentence; and any authored silence, so verification
-can tell it from dead scroll. Self-author it from the project docs, mark anything
-invented as "Self-authored, not interviewed", and ask only the questions the docs
-cannot answer.
+1. **Real content only.** Real copy, real names, real numbers or no numbers. An
+   invented statistic is a liability, not a design element.
+2. **One peak.** Visibly the largest change on the page, with a quieter section
+   before it, and the most scroll room. Two peaks is none.
 
-## Pre-build checks
+## The order of work
 
-- The grammar's bans hold.
-- Four or more device families, and no family twice in a row.
-- No two adjacent sections carry the same feeling.
-- One peak, with visibly the largest span and a quieter section before it.
-- The fingerprint gate passes against every registry row.
+1. **`demo/DESIGN.md`** from the client docs, `designlang` on their site and
+   named references, then the nearest catalogue matches for the gaps
+   (`references/design-md.md`). The demo's `:root` is generated from it, so this
+   file is written before any markup.
+2. **`demo/BRIEF.md`**: person, pain, promise, vibe words, references, the
+   feeling curve, the peak sentence, and any authored silence so verification can
+   tell it from dead scroll (`references/feel.md`). Self-author it from the
+   project docs, mark anything invented as "Self-authored, not interviewed", and
+   ask only what the docs cannot answer.
+3. **Composition plan**: one row per section — section, role, composition, why,
+   motion cost — chosen from the role table in `compositions/README.md`
+   (`references/compositions.md`). Sum the motion cost before building.
+4. **Build** from the compositions, the tokens and the real copy.
+5. **Loop** until the rubric passes or three rounds are spent
+   (`references/verify.md`).
+6. **Record** the fingerprint row, only for a passing build
+   (`references/fingerprint.md`).
 
 ## Ship blockers
 
-Never ship: a scroll cue or mouse icon; `01 / 06` counters; an eyebrow on every
-heading; a visible em dash; centred copy in every section; the same device twice
-in a row; no peak, or three; an ending that fades to nothing or simply becomes a
-footer; a page with no signature move; a plan that clears fewer than four of the
-six fingerprint dimensions; invented statistics; `transition: all`; animating
-width, height, top or left; gradient text or neon glow; text baked into an image.
+Never ship: content hidden behind a scroll trigger in the first viewport; a pin
+outside the peak above span 2.0, or the peak above 3.0; a pin on an interior
+page; a hardcoded hex where a token exists; invented statistics; a P0 from
+`impeccable detect`; a build that failed the rubric after three rounds.
 
 ## References
 
-Read `references/taste.md` before writing markup. Then `feel.md`, `grammars.md`,
-`devices.md`, `fingerprint.md`. `verify.md` describes what `/wp-demo-verify`
-measures.
+Read `references/taste.md` (the floor), then `design-md.md`, `feel.md`,
+`compositions.md`, `grammars.md`, `devices.md`, `fingerprint.md`, `verify.md`.

@@ -49,6 +49,15 @@ the frame in place while ScrollTrigger scrubs `--motion-p` against the
 section's scroll range; a `pin` section without this CSS will not visually
 pin, and `/wp-demo-verify` will report it as dead scroll.
 
+**Budget.** A pin outside the peak is capped at span 2.0. The one element marked
+`data-motion-peak` may reach 3.0. Interior pages never pin — an about page that
+opens on a title and a divider and then holds them for two screens is not
+restraint, it is an empty page with a long fuse. The index adds at most four
+viewport-heights beyond its section count in total; the role table in
+`compositions/README.md` lists each composition's cost, so the sum is arithmetic
+done before the build, not a surprise measured after it. Seven screens of scroll
+carrying one interaction is what a page looks like when nobody added up.
+
 ### `pan`
 
 Travel is `scrollWidth - innerWidth`, so measure the overflow: a rail
@@ -73,6 +82,12 @@ Masks reserve room for descenders. Re-split after `document.fonts.ready`. One
 kinetic heading per section, and it must be plain text: an element with any
 child markup (`<a>`, `<em>`, `<br>`) is skipped rather than split, because the
 split rebuilds the element from its words and would destroy that markup.
+
+**Never on a hero headline.** The split masks every word until a scroll trigger
+fires, so a visitor who never scrolls is shown a headline clipped mid-word. A
+hero is `reveal`, which fades the section's direct children in on entry; at the
+top of a page that is first paint, and it never re-hides on the way back up. A
+cue does not rescue a kinetic hero either, for the reason below.
 
 ### `parallax`
 
@@ -111,9 +126,15 @@ element.
 
 Three rules, each learned by shipping the bug:
 
-1. A hero cue needs the **greet** form, or the landing screen has no
-   headline.
-2. The last section's cue must hold.
+1. **A cue only means something inside a scrubbed section.** `drive()` in
+   `motion.js` is the only thing that reads cue nodes, and it runs only in the
+   `pin|pan|kinetic|wipe|drift` branch — those are the devices with a continuous
+   section progress for a cue to be a function of. On a `reveal` section a
+   `data-motion-cue` is inert: it does nothing, and an attribute that does
+   nothing is worse than none, because it tells the next author a mechanism is
+   in place when it is not. Nothing in the composition library carries one.
+2. The last section's cue must hold. Inside a pinned or panned section, copy
+   that should be present from the first frame takes the **greet** form.
 3. **Only the last** section may hold. A one-value cue on a middle section
    stays lit through the whole un-pin slide.
 
@@ -127,6 +148,23 @@ frozen at `1`, its end state, rather than tracking scroll: the seam is normally
 driven into a `transform`, and a live value there would animate position through
 exactly the rule this floor exists to enforce. Write the `calc()` so that
 `--motion-p: 1` is the settled, fully arrived composition.
+
+## The signature move
+
+A build may invent one bespoke interaction that exists on that site alone, coded
+in `assets/js/signature.js` and driven from `--motion-p`. v2 does not require one
+— the composition library already gives a page its shape, and a required
+signature move is how a page acquires an interaction nobody asked for — but when
+the brief's tell-someone sentence points at an interaction, that interaction is
+the signature move.
+
+It is not a device-kit parameter change. A recoloured spotlight, a different tilt
+angle, a new easing curve on kinetic lines, or more of an existing device (a
+longer rail, a third wipe) do not count. A trace rail the scroll draws through
+the page, a wordmark the pointer pulls apart, an SVG drawing that draws itself,
+one control that regrades the whole page at once — those do. The test: describe
+it to someone who has seen the other builds. If they cannot tell it apart from
+something the kit already does, it is a parameter, not a move.
 
 ## Video scrub is not in this kit
 

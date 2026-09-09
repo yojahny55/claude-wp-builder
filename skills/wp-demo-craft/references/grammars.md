@@ -46,24 +46,9 @@ Museum labels, not marketing copy.
 argument-shaped pinned section. Card copy is read cropped for most of its
 life, so the label schema has to survive being half visible.
 
-## 5. Split stage
-
-Two columns held in tension for the whole page, resolved by scroll. The
-divider is the chrome, the close is the collapse of the divider to one edge.
-
-**Forbids:** full-bleed anything before the resolve; centred copy; a
-symmetric close.
-
-## 6. Rhythmic cutlist
-
-Short hard-cut sections at speed. No pinning, no dwell, no crossfades.
-
-**Forbids:** any section over about 1.4 viewport-heights; pinning entirely;
-overlapping cue windows; slow easing.
-
-When this grammar bans the device the peak wants, move the peak into the
-fixed chrome layer instead of breaking the grammar. The bans are on what the
-sections do, not on what the page can do.
+When a grammar bans the device the peak wants, move the peak into the fixed
+chrome layer instead of breaking the grammar. The bans are on what the sections
+do, not on what the page can do.
 
 ## Routed elsewhere
 
@@ -72,7 +57,15 @@ are not offered here; they belong to the cinematic path, built by
 `/wp-cinematic-demo` and the cinematic-scroll-kit.
 
 **Live surface** (the page behaves like the running product) is not offered
-here either. It depends on a real, operable surface computing real state, and
-`taste.md`'s refuse list already bans a fake dashboard or a fake terminal
-standing in for one. A concept product that cannot actually run its panels
-does not get this grammar; pick another.
+here either. It depends on a real, operable surface computing real state, and a
+div-built fake dashboard or fake terminal standing in for one is a P0 in
+`impeccable detect`. A concept product that cannot actually run its panels does
+not get this grammar; pick another.
+
+## Retired
+
+**Split stage** and **rhythmic cutlist** are no longer offered by default. Both
+produced pages that read as a device demonstration rather than a site — the
+split stage's divider is a seam the client never asked for, and the cutlist's
+speed leaves nowhere for a peak to sit. A brief that names one explicitly can
+still ask for it, with the reason recorded in `demo/BRIEF.md`.
