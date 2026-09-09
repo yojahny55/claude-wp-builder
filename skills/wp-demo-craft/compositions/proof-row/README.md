@@ -14,11 +14,17 @@ each figure, and a CSS marquee.
 anything that moves automatically beside static content, and
 `prefers-reduced-motion` is not that mechanism: it is a standing preference, not
 a control. So the track pauses on `:hover` and on `:focus-within`, the second
-because hover alone is not keyboard reachable. `prefers-reduced-motion` pauses it
-as well, separately. Known ceiling: on a touch screen there is neither hover nor,
-unless a name is a link, anything to focus. If a build makes the names links, the
-focus case starts working there too; if it does not, and the section must satisfy
-2.2.2 on touch, give the marquee a real pause button.
+because hover alone is not keyboard reachable. Only the `:hover` rule sits inside
+`@media (hover: hover) and (pointer: fine)`; the `:focus-within` rule is outside
+it, because a keyboard attached to a coarse-pointer device (a tablet, a TV, a
+touchscreen laptop) fails that query, and gating focus on it would withdraw the
+one keyboard-reachable pause exactly where hover is already gone.
+`prefers-reduced-motion` pauses it as well, separately. Known ceiling: the track
+items this composition ships are plain text, so there is nothing in them to focus
+and `:focus-within` never fires — it is the correct rule waiting for focusable
+content, not a working pause today. If a build makes the names links, it starts
+working at once, on every pointer type; if it does not, and the section must
+satisfy 2.2.2, give the marquee a real pause button.
 
 **Pick when:** the client has figures they can defend. **Skip the whole section when
 they do not.** `data-motion-count` takes real, verified numbers only. A brand

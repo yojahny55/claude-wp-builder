@@ -88,10 +88,13 @@
 @keyframes proof-row-marquee { to { transform: translateX(-50%); } }
 /* WCAG 2.2.2: anything that moves automatically beside static content needs a way
    to stop it, and `prefers-reduced-motion` is not that mechanism. Hover alone is
-   not keyboard reachable, so `:focus-within` carries the keyboard case. */
+   not keyboard reachable, so `:focus-within` carries the keyboard case — and it
+   sits outside the pointer query on purpose: a keyboard attached to a
+   coarse-pointer device fails `(pointer: fine)`, so gating focus on it would
+   withdraw the only keyboard-reachable pause exactly where hover is absent. */
+.proof-row__marquee:focus-within .proof-row__track { animation-play-state: paused; }
 @media (hover: hover) and (pointer: fine) {
-  .proof-row__marquee:hover .proof-row__track,
-  .proof-row__marquee:focus-within .proof-row__track { animation-play-state: paused; }
+  .proof-row__marquee:hover .proof-row__track { animation-play-state: paused; }
 }
 @media (min-width: 760px) {
   .proof-row__figures { grid-template-columns: repeat(3, 1fr); }

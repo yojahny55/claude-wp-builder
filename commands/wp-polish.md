@@ -11,8 +11,10 @@ Normalize any HTML file into a plugin-compatible demo with section delimiters, s
 ### `--craft` (retrofit audit)
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/SKILL.md` and audit the existing
-demo against the taste floor in `taste.md`, plus `npx impeccable detect demo/
---json` for the machine-checkable tells. Report findings as a list, each
+demo against the taste floor in `taste.md`, plus `npx -y impeccable@4 detect demo/
+--json` for the machine-checkable tells (pinned to the major version so a future
+release cannot change rule identifiers or output shape underneath this;
+`skills/wp-demo-craft/references/verify.md` owns the reason). Report findings as a list, each
 naming the rule and the offending selector or line. **Do not add motion and do not
 restructure the page**; converting a plain demo to craft is a rebuild, not a
 polish. The existing backup behaviour at `demo/.prepolish/` is unchanged.

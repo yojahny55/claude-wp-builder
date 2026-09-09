@@ -21,12 +21,17 @@ grep -Eq 'impeccable@4' "$c" || fail "$c does not pin the detector to the real m
 grep -Fq -- '--json' "$c" || fail "$c does not ask the detector for JSON"
 grep -Fq 'impeccable.json' "$c" || fail "$c does not save detector findings under .verify"
 grep -Fq 'slop' "$c" || fail "$c does not gate on the real 'slop' category"
-grep -Fq 'advisory' "$c" || fail "$c does not carve out advisory-flagged findings from the gate"
+# The advisory tier is documented by the tool but was never reproduced against
+# this library, so the command must state it conditionally rather than as
+# observed fact. Anchored to the conditional, not to the bare word: 'advisory'
+# alone stays green if the hedge is deleted and the tier reasserted as certain.
+grep -Fq 'if the tool emits an advisory tier' "$c" \
+  || fail "$c states the advisory tier as observed fact instead of conditionally"
 if grep -Fq 'P0' "$c"; then fail "$c still says P0, a severity impeccable never emits"; fi
 grep -Fq 'demo/VERIFY.md' "$c" || fail "$c does not write the score card"
 grep -Eqi 'external (package|dependency)' "$c" || fail "$c does not say the detector is an external dependency this repo does not vendor"
 grep -Eqi 'could not run|could not be performed' "$c" || fail "$c does not fail loudly, and distinctly from zero findings, when the detector cannot run at all"
-for line in 'First paint complete' 'One peak' 'Squint test' 'Measured contrast' 'Mobile headline' 'Adjacent feelings'; do
+for line in 'First paint complete' 'One peak' 'Squint test' 'Contrast, read from the frame' 'Mobile headline' 'Adjacent feelings'; do
   grep -Fq "$line" "$c" || fail "$c rubric is missing: $line"
 done
 grep -Fq 'feel check' "$c" || fail "$c dropped the feel check that the old Step 4 required"

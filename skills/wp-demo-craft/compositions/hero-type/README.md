@@ -20,4 +20,4 @@ worth showing. Skip when the client owns real imagery; an empty hero is a choice
 not a default.
 
 **Slots:** kicker (three to five words), title (four to seven words; it must not
-pass three lines at 390px), lede (max 24 words), cta_label/cta_href.
+pass three lines at 390px), lede (about 25 words), cta_label/cta_href.

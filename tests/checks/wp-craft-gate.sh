@@ -39,4 +39,21 @@ grep -Eqi 'no fingerprint|not record' "$d" || fail "$d records a fingerprint for
 grep -Fq '"design_md"' "$d" || fail "$d does not record design_md in the manifest"
 grep -Fq 'firecrawl_url' "$d" || fail "$d does not document firecrawl_url"
 grep -Eqi 'four device families|never the same device|signature move' "$d" && fail "$d still carries a removed v1 rule"
+
+# The same gate through the other entry point. /wp-yolo in craft mode never calls
+# /wp-demo, so nothing in /wp-demo.md above reaches a yolo run: without these the
+# multi-page path builds craft blind, which is exactly how the 12,000px page with
+# an empty first screen shipped. The only verification a yolo run otherwise reaches
+# is /wp-responsive-check, whose findings are folded into a review list, not a gate.
+y=commands/wp-yolo.md
+grep -Fq -- 'demo-verify.mjs" --probe' "$y" || fail "$y does not run the probe in craft mode"
+grep -Fq 'only exit 0 continues' "$y" || fail "$y proceeds to build when the craft probe fails"
+grep -Fq 'Either way **stop**' "$y" || fail "$y does not stop the run on a missing browser"
+grep -Eqi 'never fall(s)? back to plain|not fall back to plain' "$y" || fail "$y may still fall back to plain"
+# Anchored to the consequence, not to the bare number: 'three rounds' on its own
+# would stay green if the loop kept counting but never stopped.
+grep -Fq 'after three rounds with failures' "$y" || fail "$y does not cap the craft verify loop at three rounds"
+grep -Fq 'demo/VERIFY.md' "$y" || fail "$y does not read the score card"
+grep -Fq '/wp-demo-verify demo/' "$y" || fail "$y verifies a single page instead of walking demo/"
+
 echo PASS

@@ -28,7 +28,8 @@ engine, mobile substitution.
 
 Where the two disagree, the craft layer wins on design and the kit wins on
 video. Scene numbers in HUD labels are optional here, not required: a
-`01 / 06` counter is a `slop` finding from `npx impeccable detect` unless the
+`01 / 06` counter is a `slop` finding from `npx -y impeccable@4 detect` — pinned
+to the major version for the reason `references/verify.md` gives — unless the
 sequence information is something the reader needs.
 
 ## Pipeline

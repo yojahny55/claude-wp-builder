@@ -49,8 +49,9 @@ grep -Eqi 'transform and opacity|transform.*opacity only' "$r/taste.md" \
 # --- The three hero limits the client build broke. They are authoring-time copy
 #     limits, so no render check can catch their loss; they vanished once already
 #     when the refuse list was removed.
-grep -Fq 'at most two lines' "$r/taste.md" || fail "taste.md lost the hero headline two-line limit"
-grep -Fq '20 words' "$r/taste.md" || fail "taste.md lost the hero subtext 20-word limit"
+grep -Fq 'at most two lines at' "$r/taste.md" || fail "taste.md lost the hero headline two-line limit"
+grep -Fq 'three at 390' "$r/taste.md" || fail "taste.md lost the 390px three-line allowance the rubric grades"
+grep -Fq '25 words' "$r/taste.md" || fail "taste.md lost the hero subtext word limit"
 grep -Fq 'four text elements' "$r/taste.md" || fail "taste.md lost the hero text-element limit"
 
 # --- The emotion axis. -------------------------------------------------------

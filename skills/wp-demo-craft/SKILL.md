@@ -20,9 +20,10 @@ decision as `demo mode` in `.wp-create.json`; read it, do not re-derive it.
 
 ## Prerequisite
 
-Craft mode needs a browser. `/wp-demo` runs
-`node ${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs --probe` before writing markup
-and stops on exit 2. A craft build is never made blind and never falls back to
+Craft mode needs a browser. Whichever command enters it — `/wp-demo` Step 2.6 or
+`/wp-yolo` Step 2 — runs
+`node ${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs --probe` before writing markup,
+and only exit 0 continues. A craft build is never made blind and never falls back to
 plain: an unverified craft page is the one that reaches the client.
 
 ## The two spine rules

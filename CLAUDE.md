@@ -195,10 +195,10 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   but its scripts are covered automatically only by `tests/checks/wp-polylang-live.sh` (which
   needs `PLL_TEST_SITE`), and the command's own prose branching only by the grep checks in
   `tests/checks/wp-polylang.sh` and `wp-init-templates.sh`.
-- **Compositions are ports, not copies, and there are twelve roles.** Effects from
-  Magic UI and Aceternity are rewritten in CSS and GSAP inside the `data-motion`
-  contract; the React libraries are never dependencies. A feeling curve that needs a
-  thirteenth role builds it by hand under the same contract with a reason in
+- **Compositions are ports, not copies: thirteen of them, across ten roles.** Effects
+  from Magic UI and Aceternity are rewritten in CSS and GSAP inside the `data-motion`
+  contract; the React libraries are never dependencies. A feeling curve that needs an
+  eleventh role builds it by hand under the same contract with a reason in
   `demo/BRIEF.md`.
 - **The evaluator reads headless sheets.** Real-device feel is still unproven, and
   Landing Gallery screenshots are inspiration only.

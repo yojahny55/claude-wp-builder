@@ -13,7 +13,7 @@ fail() { echo "FAIL: $*"; exit 1; }
 v=skills/wp-demo-craft/references/verify.md
 [ -f "$v" ] || fail "$v is missing"
 
-for line in 'First paint complete' 'One peak' 'Squint test' 'Measured contrast' \
+for line in 'First paint complete' 'One peak' 'Squint test' 'Contrast, read from the frame' \
             'Mobile headline' 'Adjacent feelings'; do
   grep -Fq "$line" "$v" || fail "verify.md rubric is missing the line: $line"
 done

@@ -15,7 +15,8 @@ writes `transform` on every child, `parallax` writes `transform` on the bed, and
 wide crop with somewhere quiet to put type. Skip when the only candidate is a
 busy image; a band scrim heavy enough to fix a busy image is a grey rectangle.
 
-**Slots:** kicker, title (max three lines at 390), lede (max 22 words),
+**Slots:** kicker, title (max two lines at 1440, three at 390), lede (about 25
+words),
 cta_label/cta_href, image_src/image_alt (3:2 or wider, at least 2400px).
 
 **Notes:** the bed is inset `-40px` top and bottom and 80px over-tall, because a

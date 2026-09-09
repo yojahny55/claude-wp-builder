@@ -66,7 +66,8 @@ before writing any markup.
    the user reruns once the browser exists.
 1. **DESIGN.md.** Write `demo/DESIGN.md` per
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/design-md.md`: client
-   docs first; then `npx designlang <url>` on the client's current site and on
+   docs first; then `npx designlang@12 <url>` (major-version pinned for the reason
+   `references/design-md.md` gives) on the client's current site and on
    each reference URL the docs name (skip when there is none); then two or three
    rows from `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/design-md/INDEX.md`
    by industry and tone for the gaps, cited by domain. If `.wp-create.json` has

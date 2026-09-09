@@ -1,7 +1,7 @@
 ---
-description: Scroll-walk a demo or live page, screenshots per section at every viewport, machine findings, and a contact sheet to read
+description: Verify a demo directory, page or live URL — impeccable detector, scroll-walk screenshots per section and viewport, machine findings, and a six-line critique written to demo/VERIFY.md
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
-argument-hint: "<file-path-or-url> [--positions N]"
+argument-hint: "<demo-dir-or-file-path-or-url> [--positions N]"
 ---
 
 # WP Demo Verify
@@ -51,12 +51,16 @@ above captures only the JSON on stdout, which is what findings are counted
 from — never the exit code.
 
 Once the array parses: sixty-one deterministic rules, no model, each finding
-carrying a `category` (`slop` or `quality`) and a `severity` (`warning` or
-`advisory`). A `slop` finding with `severity: "warning"` fails the round
-outright, before a screenshot is taken — that is the AI-tell axis and the
-real gate. An advisory-flagged finding (e.g. em-dash overuse) is listed but
-does not by itself fail the round, matching the detector's own design:
-advisories never block automation. `quality` findings are listed in the
+carrying a `category` (`slop` or `quality`) and a `severity`. A `slop` finding
+with `severity: "warning"` fails the round outright, before a screenshot is
+taken — that is the AI-tell axis and the real gate. The tool's help also
+describes an `advisory` soft-signal tier, though no finding carrying it has
+been reproduced here (an em-dash-dense file, which that help names as an
+advisory rule, returned zero findings): **if the tool emits an advisory tier,
+a finding flagged with it is listed but does not by itself fail the round**,
+matching the detector's stated design that advisories never block automation.
+The gate does not rest on that, because it keys on `slop` plus `warning`
+directly. `quality` findings are listed in the
 report and fixed when the rubric below also flags the same section, but do
 not by themselves fail a round. A target that is a URL is scanned with
 Puppeteer by the detector itself; a file or directory is scanned statically.
@@ -106,8 +110,8 @@ every page pass/fail on each line and write the table to `demo/VERIFY.md`
   it, the most scroll room.
 - **Squint test.** Blurred, the primary, secondary and major groups are still
   nameable in order.
-- **Measured contrast.** Body 4.5:1, large 3:1, controls and focus 3:1, sampled
-  from the frame.
+- **Contrast, read from the frame.** Body 4.5:1, large 3:1, controls and focus
+  3:1, read from the frame by eye — nothing here samples a composited pixel.
 - **Mobile headline.** Three lines or fewer at 390; nothing wider than the
   viewport.
 - **Adjacent feelings.** One word per section, written cold (the feel check); no

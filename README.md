@@ -170,7 +170,7 @@ piece as it is built, or when the site is one page.
 `/wp-demo` picks craft or plain mode from the project's docs (`--craft`/`--plain` override it)
 and records the answer as `demo mode` in `.wp-create.json`. Craft mode needs a browser
 (`playwright-core` plus Chrome; `demo-verify.mjs --probe` checks both and `/wp-demo` stops on a
-missing one), writes `demo/DESIGN.md` from the client docs, `npx designlang` and a vendored
+missing one), writes `demo/DESIGN.md` from the client docs, `npx designlang@12` and a vendored
 catalogue of 64 real-brand DESIGN.md files, builds every section from the plugin's composition
 library, and loops on `npx -y impeccable@4 detect` plus a six-line critique rubric for at most
 three rounds; plain mode is the existing single-file demo with no motion contract, for an admin

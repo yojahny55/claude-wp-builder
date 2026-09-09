@@ -220,8 +220,9 @@ initMotion(window.gsap, window.ScrollTrigger);</script>
   code = 3;
 } finally {
   if (browser) await browser.close().catch(() => {});
-  // Task 4 loops this over twelve compositions; an unremoved mkdtempSync dir per run
-  // leaks twelve scratch directories per pass, success or failure alike.
+  // A full pass loops this over every composition in the library (thirteen today);
+  // an unremoved mkdtempSync dir per run leaks one scratch directory per
+  // composition per pass, success or failure alike.
   if (work) { try { rmSync(work, { recursive: true, force: true }); } catch { /* best effort */ } }
 }
 process.exit(code);

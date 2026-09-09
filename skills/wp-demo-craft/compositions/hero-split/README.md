@@ -15,7 +15,7 @@ in on entry, and for a hero that entry is first paint.
 **Pick when:** the client owns one strong photograph of people or place. Skip when
 the only imagery is stock or generated.
 
-**Slots:** kicker, title (max two lines at 1440, three at 390), lede (max 20
+**Slots:** kicker, title (max two lines at 1440, three at 390), lede (about 25
 words), cta_label/cta_href, alt_label/alt_href, image_src/image_alt (4:5 crop).
 
 **Notes:** the image gets `max-height: 68vh` above 900px. A 4:5 crop in the right

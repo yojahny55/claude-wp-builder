@@ -58,8 +58,10 @@ render, not the number.
   six lines. `--font-t-2xl` on the hero inside a phone media query fixes it.
   The portrait crop of the image is covered in devices.md; the portrait crop
   of the type is missed more often.
-- **Hero density, decided while authoring.** Headline at most two lines,
-  subtext at most 20 words, at most four text elements in the hero, and the
+- **Hero density, decided while authoring.** Headline at most two lines at
+  1440 and three at 390 — the same limit `verify.md`'s mobile-headline line
+  grades and every hero composition's README states — subtext at most about 25 words,
+  at most four text elements in the hero, and the
   CTA visible without scrolling. These are copy limits, not layout ones: a
   hero written past them cannot be rescued by type scale, and discovering it
   from a render costs a whole verify round. Trust logos, pricing teasers and

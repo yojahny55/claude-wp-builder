@@ -13,10 +13,15 @@ three rounds stops and reports rather than shipping quietly, and it
 
 1. **Deterministic gate.** `npx -y impeccable@4 detect demo/ --json`, findings
    written to `demo/.verify/impeccable.json`. Each finding carries a `category`
-   (`slop` or `quality`) and a `severity` (`warning` or `advisory`, the
-   detector's own soft-signal tier). Any non-advisory **`slop`** finding fails
-   the round before a screenshot is taken; `quality` findings and
-   advisory-flagged findings are read at the critique step below instead. Exit
+   (`slop` or `quality`) and a `severity`; every finding observed here has
+   carried `warning`. A **`slop`** finding at `warning` fails the round before a
+   screenshot is taken; `quality` findings are read at the critique step below
+   instead. The tool's own help describes an `advisory` soft-signal tier, but no
+   finding carrying it has been reproduced against this library, so it is stated
+   conditionally: **if the tool emits an advisory tier, a finding flagged with it
+   does not by itself fail the round** — it is listed and read at the critique
+   step. The gate does not depend on that being true, because it keys on `slop`
+   plus `warning`. Exit
    code tracks whether the scan ran, not how many findings it made — `1` means
    a target could not be scanned, which is the real "did not run" case; findings
    are always counted from the JSON array, never from the exit code. The
@@ -49,8 +54,10 @@ build nobody has to change.
 - **Squint test.** Blur a sheet until detail is gone. Primary, secondary and the
   major groups must still be nameable, in order. If it greys into one even
   field, the problem is hierarchy and no shadow or motion will fix it.
-- **Measured contrast.** Body 4.5:1, large text 3:1, controls and focus
-  indicators 3:1 — read from the render, not from the token. A headline can clear
+- **Contrast, read from the frame.** Body 4.5:1, large text 3:1, controls and
+  focus indicators 3:1 — read from the render, not from the token, and read by
+  eye: nothing in this loop samples a composited pixel, which is why the line is
+  not named for a measurement. A headline can clear
   the floor against one still and fail three hundred pixels later against
   another.
 - **Mobile headline.** At 390 the headline wraps to three lines or fewer, and no

@@ -147,6 +147,26 @@ the whole multi-page build: the browser gate first, one `demo/DESIGN.md` for the
 site, one composition plan covering every page, one evaluator loop over the
 directory, and one fingerprint row for the site, not one per page.
 
+**The browser gate, here, before anything is built.** The gate is not `/wp-demo`'s
+alone — a craft `/wp-yolo` run never calls `/wp-demo`, so it must run the probe
+itself, in these same terms. Run
+`node "${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs" --probe`. On exit 2, run
+`npm i -D playwright-core` in the project root and probe again (say first that this
+writes a `package.json` and a `node_modules/` into the WordPress project root).
+After the retry, **only exit 0 continues** — exit 2 means print what the probe said
+is missing (`playwright-core` or Chrome, with `npx playwright install chrome` as the
+fix), and any other exit code (127 for a missing `node`, or a crash) means print it
+verbatim. Either way **stop** the whole run there: do not normalize on, never fall back to plain,
+and never build a craft demo blind. `--yolo` does not waive this. The
+verify loop that follows is `/wp-demo-verify demo/` over the directory, at most
+**three rounds**, reading the pass/fail table it writes to `demo/VERIFY.md` and
+fixing every failed line before the next round; after three rounds with failures,
+stop and report rather than converting a demo the rubric never passed. That loop is
+the gate this mode exists for, and it blocks — unlike Step 5's
+`/wp-responsive-check`, whose findings are folded into the Step 6 review list. The
+rules are stated here in the same terms `/wp-demo` Step 2.6 uses on purpose, because
+the two entry points must gate identically — do not restate them a third way.
+
 ## Step 2.5: Phase 1.5 — Load & reconcile scope
 
 If `docs/.scope-manifest.json` exists, read it and reconcile with the `wp-normalize`

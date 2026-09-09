@@ -25,7 +25,7 @@
   `category` of `slop` or `quality` — there is no P0 severity — and are always counted by
   parsing the JSON array on stdout, never read from the exit code: exit `0` means the scan
   completed with no primary findings, `1` means a target could not be scanned, `2` means
-  findings are present. A `slop` finding fails the round outright; `quality` findings are
+  findings are present. A `slop` finding at `warning` severity fails the round outright; `quality` findings are
   reported and weighed against the rubric instead. New checks: `wp-craft-gate.sh`,
   `wp-craft-detect.sh`, `wp-craft-compositions.sh`, `wp-craft-design-md.sh`, `wp-craft-rubric.sh`.
 - **Variety is no longer the product.** The old forced-variety rules are gone; a motion budget

@@ -13,7 +13,7 @@ You convert the **cinematic-scroll-kit contract** into a working WordPress theme
 
 Before generating anything, read the project's `.claude/CLAUDE.md` file. Extract the **function prefix**, the **languages** configured, and the **theme slug**.
 
-Then read `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/SKILL.md` and its `taste.md`, `feel.md` and `fingerprint.md`. They set the design floor, the feeling curve, and the fingerprint gate that apply to the cinematic output exactly as they do to a static one; the machine-checkable tells are `npx impeccable detect demo/ --json`, run per `verify.md`; the kit's own contract still owns everything video-specific (scene encoding, the scrub engine, mobile substitution). Where the two disagree, the craft layer wins on design and the kit wins on video.
+Then read `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/SKILL.md` and its `taste.md`, `feel.md` and `fingerprint.md`. They set the design floor, the feeling curve, and the fingerprint gate that apply to the cinematic output exactly as they do to a static one; the machine-checkable tells are `npx -y impeccable@4 detect demo/ --json`, pinned to the major version for the reason `verify.md` gives, and run per `verify.md`; the kit's own contract still owns everything video-specific (scene encoding, the scrub engine, mobile substitution). Where the two disagree, the craft layer wins on design and the kit wins on video.
 
 ## Inputs you expect
 
