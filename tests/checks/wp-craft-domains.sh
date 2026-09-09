@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# The domain table decides which section roles a build may reach for. It is
-# vendored from an MIT catalogue, so the licence travels with it, and it carries
-# ONLY the shape columns: which page pattern a category wants and what it must
-# consider. The colour and typography columns of that catalogue are deliberately
-# absent — it maps 192 product types onto 50 primary colours and pairs Playfair
-# Display with Inter, which would fight the fingerprint gate and the type floor.
-# A future contributor who re-imports the whole thing reintroduces exactly the
-# sameness this plugin exists to refuse, so the refusal is asserted here.
+# The domain table's page_pattern and considerations feed the brief as stated
+# constraints — never a mapping onto this project's own section roles, which the
+# catalogue's free-text patterns have no correspondence to. It is vendored from
+# an MIT catalogue, so the licence travels with it, and it carries ONLY the shape
+# columns: which page pattern a category wants and what it must consider. The
+# colour and typography columns of that catalogue are deliberately absent — it
+# maps 192 product types onto 50 primary colours and pairs Playfair Display with
+# Inter, which would fight the fingerprint gate and the type floor. A future
+# contributor who re-imports the whole thing reintroduces exactly the sameness
+# this plugin exists to refuse, so the refusal is asserted here.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
@@ -59,16 +61,41 @@ grep -Eq '#[0-9A-Fa-f]{6}' "$d/domains.csv" \
 grep -Eq '^Commit: [0-9a-f]{7,40}$' "$d/SOURCE.txt" \
   || fail "$d/SOURCE.txt does not name the imported commit"
 
-# /wp-demo Step 2.6 must actually use the table: read it, record the match, gate
-# the threshold, define the fallback, and — the whole point of the table — never
-# let it decide colour or type.
+# Both craft entry points must actually use the table: read it, record the
+# match, gate the threshold, tie-break it, define the non-English and
+# unclassified fallbacks, and — the whole point of the table — never let it
+# decide colour or type. /wp-yolo never calls /wp-demo (same reason the browser
+# gate above is checked in both files, not just one), so it must run the same
+# classification itself, in the same terms.
+for f in commands/wp-demo.md commands/wp-yolo.md; do
+  grep -Fq 'references/domains/domains.csv' "$f" || fail "$f does not read the domain table"
+  grep -Fq '"domain"' "$f" || fail "$f does not record the domain in the manifest"
+  grep -Fq 'two distinct keyword' "$f" || fail "$f does not state the two-keyword threshold"
+  grep -Fq 'unclassified' "$f" || fail "$f does not define the unclassified outcome"
+  grep -Eqi 'never (touch|decide|choose) (the )?tokens|never touches tokens' "$f" \
+    || fail "$f does not forbid the classifier from touching tokens"
+  grep -Eqi 'highest hit count' "$f" \
+    || fail "$f does not tie-break multiple domains clearing the threshold by hit count"
+  grep -Eqi 'exact tie' "$f" || fail "$f does not say what happens on an exact tie for the top count"
+  grep -Eqi 'english-only' "$f" || fail "$f does not say the keyword lists are English-only"
+  grep -Fq 'with that reason stated' "$f" \
+    || fail "$f falls through to unclassified for non-English docs without stating why"
+  grep -Eqi 'name the domain directly' "$f" \
+    || fail "$f does not let the operator name the domain directly when matching can't"
+done
+
+# page_pattern cannot constrain section roles — the catalogue's 77 free-text
+# patterns (things like "Bento Grid Showcase") have no correspondence to this
+# project's fixed roles, and building that mapping would be mostly arbitrary.
+# The real binding lives in the composition plan (sub-step 5): every row must
+# cite the brief constraint or domain signal that justified it, or say there
+# isn't one — that is what is verified here, not a pattern-to-role mapping.
 c=commands/wp-demo.md
-grep -Fq 'references/domains/domains.csv' "$c" || fail "$c does not read the domain table"
-grep -Fq '"domain"' "$c" || fail "$c does not record the domain in the manifest"
-grep -Fq 'two distinct keyword' "$c" || fail "$c does not state the two-keyword threshold"
-grep -Fq 'unclassified' "$c" || fail "$c does not define the unclassified outcome"
-grep -Eqi 'never (touch|decide|choose) (the )?tokens|never touches tokens' "$c" \
-  || fail "$c does not forbid the classifier from touching tokens"
-grep -Fq 'page_pattern' "$c" || fail "$c does not use the page pattern to constrain roles"
+grep -Fq 'page_pattern' "$c" || fail "$c does not fold the domain's page_pattern into the brief as a constraint"
+# 'no domain signal' contains 'domain signal' as a substring, so anchoring the
+# positive-case assertion on the short form would make it pass off the fallback
+# phrase alone and never fail on its own — anchor on the longer phrase instead.
+grep -Fq 'domain signal that justified' "$c" || fail "$c's composition plan does not require a domain signal (or brief constraint) per row"
+grep -Fq 'no domain signal' "$c" || fail "$c does not define the no-domain-signal fallback for a row the domain does not touch"
 
 echo PASS

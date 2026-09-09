@@ -87,29 +87,41 @@ before writing any markup.
    where ___", authored silence. Mark anything invented "Self-authored, not
    interviewed". Ask, in one pass, only what the docs cannot answer. Show the
    brief once and proceed on a yes.
-4. **Classify the domain.** Match the client documents against the keyword lists
-   in `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/domains/domains.csv`.
+4. **Classify the domain.** Match the client documents' English-language
+   material against the keyword lists in
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/domains/domains.csv`.
    A domain is matched when **two distinct keywords** from its list appear in the
    docs; below that, report `unclassified` and carry on without constraining
-   anything, because a wrong category is worse than none. Record the result in
-   `.wp-create.json` under `"domain"` as `name`, `score`, `matched` and
-   `confidence`, so the decision is auditable and `/wp-yolo` reads it rather than
-   re-deriving it. State the match and its score in one line.
+   anything, because a wrong category is worse than none. When more than one
+   domain clears the threshold, the highest hit count wins; on an exact tie for
+   the top count, report both names and proceed `unclassified` for the same
+   reason. The lists are English-only: a docs set with no English-language
+   material is `unclassified` **with that reason stated**, not silently, and the
+   operator may name the domain directly instead of relying on the match. Record
+   the result in `.wp-create.json` under `"domain"` as `name`, `score`, `matched`
+   and `confidence`, so the decision is auditable and `/wp-yolo` reads it rather
+   than re-deriving it. State the match and its score in one line.
 
-   A matched domain does exactly two things. Its `page_pattern` constrains which
-   section roles the next step may choose, and its `considerations` are folded
-   into the brief as constraints. It **never touches tokens**: colour and type
-   come from `demo/DESIGN.md` and the client's own material, never from a
-   category. A low `confidence` value is reported alongside the match rather than
-   hidden, and a build may ignore a weak match with a one-line reason.
+   A matched domain does exactly two things. Its `page_pattern` and
+   `considerations` both fold into the brief as stated constraints — never as a
+   mapping onto this project's own section roles, which the catalogue's 77
+   free-text patterns have no correspondence to. It **never touches tokens**:
+   colour and type come from `demo/DESIGN.md` and the client's own material,
+   never from a category. A low `confidence` value is reported alongside the
+   match rather than hidden, and a build may ignore a weak match with a one-line
+   reason.
 5. **Grammar, then composition plan.** Pick one grammar from
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/grammars.md` — it
    decides what a section is, what the chrome is for and what the ending does.
    Then open
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/compositions/README.md` and look at
-   each candidate's `preview-1440.png` and `preview-390.png`. One row per section
-   of the curve: section, role, composition, why, motion cost. Mark exactly one
-   row as the peak (`data-motion-peak`). Sum the cost and hold it under the
+   each candidate's `preview-1440.png` and `preview-390.png`. One row per
+   section of the curve: section, role, composition, why, motion cost, and
+   the domain signal that justified it, citing the brief constraint from
+   sub-step 4, or writing "no domain signal" when none applies. This is
+   what makes sub-step 4's classification bind on the plan instead of
+   sitting unread. Mark exactly one row as the peak (`data-motion-peak`).
+   Sum the cost and hold it under the
    budget in `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/devices.md`,
    which owns the pin caps, the per-index total and the interior-page rule. When
    the docs name no reference and the Landing Gallery MCP is connected, pull

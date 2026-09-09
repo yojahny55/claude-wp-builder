@@ -147,6 +147,24 @@ the whole multi-page build: the browser gate first, one `demo/DESIGN.md` for the
 site, one composition plan covering every page, one evaluator loop over the
 directory, and one fingerprint row for the site, not one per page.
 
+**Classify the domain, here too, once for the site.** A craft `/wp-yolo` run never
+calls `/wp-demo`, so it must classify the domain itself, in these same terms
+`/wp-demo` Step 2.6 uses on purpose — do not restate them a third way: match the
+client documents' English-language material against the keyword lists in
+`${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/domains/domains.csv`. A
+domain is matched when **two distinct keywords** from its list appear in the
+docs; below that, report `unclassified` and carry on without constraining
+anything. When more than one domain clears the threshold, the highest hit count
+wins; on an exact tie for the top count, report both names and proceed
+`unclassified` for the same reason. The lists are English-only: a docs set with
+no English-language material is `unclassified` **with that reason stated**, and
+the operator may name the domain directly instead of relying on the match.
+Record the result once, for the site, not once per page, in `.wp-create.json`
+under `"domain"` as `name`, `score`, `matched` and `confidence`. A matched
+domain's `page_pattern` and `considerations` fold into the brief as stated
+constraints; it **never touches tokens**, which come from `demo/DESIGN.md` and
+the client's own material, never from a category.
+
 **The browser gate, here, before anything is built.** The gate is not `/wp-demo`'s
 alone — a craft `/wp-yolo` run never calls `/wp-demo`, so it must run the probe
 itself, in these same terms. Run
