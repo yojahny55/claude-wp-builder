@@ -1,6 +1,6 @@
 ---
 description: Create a demo HTML mockup for client approval — responsive, section-separated, ready for WordPress conversion
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
 argument-hint: "[brief] [--craft|--plain] | iterate"
 ---
 
@@ -16,7 +16,7 @@ Read `.claude/CLAUDE.md` to get the project name, slug, industry, description, a
 
 Check `$ARGUMENTS`:
 
-- **If `$ARGUMENTS` is "iterate"**: Read the existing `demo/index.html` file, then ask the user what changes they want. Apply changes and skip to Step 4.
+- **If `$ARGUMENTS` is "iterate"**: Read the existing `demo/index.html` file, then ask the user what changes they want. Apply changes and skip to Step 4 — **unless `.wp-create.json` says `"demo mode": "craft"`**, in which case re-enter Step 2.6: run its gate (step 0) again, then continue from its step 5 (the build) with the existing `demo/DESIGN.md` and `demo/BRIEF.md`, so the changes go through the compositions and the verify loop like any other craft build.
 - **If `$ARGUMENTS` is provided** (not "iterate"): Use it as the client brief.
 - **If `$ARGUMENTS` is empty**: Ask the user for:
   - Client brief / description of what the site should look and feel like
@@ -57,11 +57,15 @@ before writing any markup.
    On exit 2, run `npm i -D playwright-core` in the project root and probe again
    (the probe resolves `playwright-core` from `PLAYWRIGHT_CORE`, then the
    plugin's own `node_modules`, then the project's, which is why installing here
-   works). Still exit 2: print what the probe said is missing (`playwright-core`
-   or Chrome, with `npx playwright install chrome` as the fix) and **stop**. A
-   craft build is never made blind and never falls back to plain; the user reruns
-   once the browser exists.
-1. **DESIGN.md.** Write `demo/DESIGN.md` per `references/design-md.md`: client
+   works; say first that this writes a `package.json` and a `node_modules/` into
+   the WordPress project root). After the retry, **only exit 0 continues** —
+   exit 2 means print what the probe said is missing (`playwright-core` or
+   Chrome, with `npx playwright install chrome` as the fix), and any other exit
+   code (127 for a missing `node`, or a crash) means print it verbatim. Either
+   way **stop**. A craft build is never made blind and never falls back to plain;
+   the user reruns once the browser exists.
+1. **DESIGN.md.** Write `demo/DESIGN.md` per
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/design-md.md`: client
    docs first; then `npx designlang <url>` on the client's current site and on
    each reference URL the docs name (skip when there is none); then two or three
    rows from `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/design-md/INDEX.md`
@@ -70,10 +74,11 @@ before writing any markup.
    do/don't list. Record `"design_md": "demo/DESIGN.md"` in `.wp-create.json`.
    `firecrawl_url` is optional and set by hand (a self-hosted instance or the
    client's own); never ask for a key.
-2. **Fingerprint gate.** Read `~/.claude/wp-builder/FINGERPRINTS.md` (create it
-   with the v2 header row if absent). The DESIGN.md fails when any row shares the
-   display family, the text family, and an accent hue within 15 degrees. Change
-   the type pair or the accent, not the log.
+2. **Fingerprint gate.** Check `demo/DESIGN.md` against
+   `~/.claude/wp-builder/FINGERPRINTS.md` on the terms in
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/fingerprint.md`, which
+   owns the row shape, the header and the comparison. On a failure change the
+   type pair or the accent, not the log.
 3. **Brief.** Self-author `demo/BRIEF.md` from the project docs: person, pain,
    promise, vibe words, two or three named references and what to take from
    each, assets owned, the feeling curve (one line per section: emotion, then
@@ -82,20 +87,35 @@ before writing any markup.
    interviewed". Ask, in one pass, only what the docs cannot answer. Show the
    brief once and proceed on a yes.
 4. **Grammar, then composition plan.** Pick one grammar from
-   `references/grammars.md` — it decides what a section is, what the chrome is
-   for and what the ending does. Then open
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/grammars.md` — it
+   decides what a section is, what the chrome is for and what the ending does.
+   Then open
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/compositions/README.md` and look at
    each candidate's `preview-1440.png` and `preview-390.png`. One row per section
    of the curve: section, role, composition, why, motion cost. Mark exactly one
    row as the peak (`data-motion-peak`). Sum the cost and hold it under the
-   budget in `references/devices.md`, which owns the pin caps, the per-index
-   total and the interior-page rule. When the docs name no reference, pull four
-   screenshots from the Landing Gallery MCP for the page kind first.
-5. **Build.** Generate `:root` from `demo/DESIGN.md` onto the plugin token names.
+   budget in `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/devices.md`,
+   which owns the pin caps, the per-index total and the interior-page rule. When
+   the docs name no reference and the Landing Gallery MCP is connected, pull
+   four screenshots for the page kind first; when it is not, say so and choose
+   from the previews alone.
+5. **Build.** Create `demo/` if absent and write `demo/index.html` plus
+   **one file per page in the agreed page set** (`about.html`, `services.html`,
+   `contact.html` — whatever the docs and the curve named). Interior pages are
+   built here, not left for later: an index alone is half the failure this mode
+   exists to fix, and step 6 walks the whole directory. Every page carries the
+   header and footer chrome from Step 4 (logo, nav, language switcher, hamburger
+   at mobile, footer columns) and Step 4's responsive breakpoints; ignore Step
+   4's single-file, no-CDN and `:root` token clauses, which are the plain path.
+   Generate `:root` from `demo/DESIGN.md` onto the token names in
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/design-md.md` — the
+   craft tokens (`--color-canvas`, `--color-ink`, `--font-display` and the rest),
+   which are what every composition's CSS already uses, not plain mode's
+   `--color-primary` set. The section delimiters are the ones plain mode uses,
+   unchanged, because `/wp-section` reads them either way.
    Copy each chosen composition's `section.html` and `section.css`, fill the
    `{{slots}}` with real copy and real assets, keep the delimiters and the BEM
-   block. Same delimiters and `:root` contract as plain mode. Motion comes from
-   `data-motion-*` attributes only. Inline the contents of
+   block. Motion comes from `data-motion-*` attributes only. Inline the contents of
    `${CLAUDE_PLUGIN_ROOT}/starter-theme/__tailwind__/assets/js/src/motion.js` in a
    `<script type="module">` block (`motion.js` uses `export function initMotion`,
    so a plain non-module `<script>` throws `SyntaxError: Unexpected token 'export'`
@@ -103,23 +123,29 @@ before writing any markup.
    `https://cdnjs.cloudflare.com` with pinned versions. Any bespoke effect goes
    in its own `<script id="signature">` block so `/wp-init` can lift it to
    `assets/js/signature.js`.
-6. **Loop.** At most three rounds. Each round is `/wp-demo-verify demo/` — the
-   directory, so every page is walked — which runs the `impeccable detect` gate
-   and the walk and writes `demo/VERIFY.md`. That command is the one place the
-   detector and rubric contract is written; run it, do not restate it here. Read
-   `demo/VERIFY.md`, fix every failed line and repeat. After three rounds with
-   failures, stop, report what still fails, and go to step 8 without recording.
-7. **Record.** Only for a passing build: append the row
-   `| client | display | text | accent | canvas | date |` to
-   `~/.claude/wp-builder/FINGERPRINTS.md` and write the same fields into
-   `.wp-create.json` under `"fingerprint"`. A build that failed after three
-   rounds records no fingerprint, in either place.
+6. **Loop.** At most three rounds. Each round runs `/wp-demo-verify demo/` — the
+   directory, so every page is walked — for the `impeccable detect` gate and the
+   contact sheets. That command is the one place the detector and rubric
+   contract is written; run it, do not restate it here. **Dispatch its critique
+   as a subagent**, not inline: hand it only the sheet paths under
+   `demo/.verify/` and the six rubric lines, and ask for a pass or fail per line
+   with one sentence per failure, which is what goes into `demo/VERIFY.md`. The
+   context that wrote the markup and the brief cannot grade the render — that is
+   the self-assessment the rubric exists to remove. Read `demo/VERIFY.md`, fix
+   every failed line and repeat. After three rounds with failures, stop, report
+   what still fails, and go to step 8 without recording.
+7. **Record.** Only for a passing build: append the build's row to
+   `~/.claude/wp-builder/FINGERPRINTS.md` in the shape `fingerprint.md` defines,
+   and write the same fields into `.wp-create.json` under `"fingerprint"`. A
+   build that failed after three rounds records no fingerprint, in either place.
 8. **Report.** The intended curve, the felt curve from `demo/VERIFY.md`, the
    diff, the detector summary, and what could not be verified.
 
-A craft build is finished here: skip Steps 3 and 4 (they describe the plain
-single-file demo, which forbids the CDN and the motion this build needs) and
-print the Step 5 summary.
+A craft build is finished here. Steps 3 and 4 are the plain path: take Step 4's
+header, footer and responsive requirements (step 5 above says so) and nothing
+else from them — its single-file rule, its ban on external dependencies and its
+`:root` token list all contradict a craft build — then print the Step 5 summary,
+listing every page written, not just `index.html`.
 
 ## Step 3: Invoke Skills
 
@@ -186,8 +212,8 @@ These delimiters are critical — they are used by `/wp-section` to extract indi
 
 ```
 === Demo Created ===
-File: demo/index.html
-Sections: <list of sections>
+Files: <every page written — demo/index.html and each interior page>
+Sections: <list of sections, per page>
 
 Open in browser to preview. Share with client for approval.
 Next: Use /wp-header, /wp-footer, /wp-section <name> to convert to WordPress.
