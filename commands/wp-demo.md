@@ -151,6 +151,11 @@ before writing any markup.
    `https://cdnjs.cloudflare.com` with pinned versions. Any bespoke effect goes
    in its own `<script id="signature">` block so `/wp-init` can lift it to
    `assets/js/signature.js`.
+   Inline `${CLAUDE_PLUGIN_ROOT}/starter-theme/__tailwind__/assets/css/src/tailwindcss/utilities/motion.css`
+   into a `<style>` block in the same step. It is the CSS half of the engine and
+   carries the `reveal` device wherever the browser supports scroll-driven
+   animation; without it, a demo in a modern browser reveals nothing, because
+   `motion.js` yields that device to the stylesheet.
 7. **Loop.** At most three rounds. Each round runs `/wp-demo-verify demo/` — the
    directory, so every page is walked — for the `impeccable detect` gate and the
    contact sheets. That command is the one place the detector and rubric

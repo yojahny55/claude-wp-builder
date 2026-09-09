@@ -33,6 +33,25 @@ Opacity from 0 plus a 14px rise over 620ms ease-out, children staggered 30 to
 80ms, trigger 12% inside the viewport, fires once. A fade with no rise reads
 as a loading glitch; a rise past 24px reads as a slide.
 
+**Two paths, one device.** Where the browser supports `animation-timeline: view()`
+this device runs from `utilities/motion.css` and `motion.js` does not wire it;
+elsewhere `motion.js` runs it as before. The feature-query string is identical in
+both places on purpose. Three rules in the stylesheet fail silently if broken:
+`animation-timeline` comes after the `animation` shorthand, no `animation-duration`
+is set, and `animation-fill-mode: both` is required.
+
+**Stagger ceiling on the CSS path.** A per-child delay needs a per-child value and
+composition markup forbids inline styles, so the CSS path carries the offset on
+`nth-child` for the first eight children and shares the last offset beyond that.
+A section relying on more than eight visibly ordered children should stay on a
+scrubbed device.
+
+**Maintaining the engine.** If the `gsap-scrolltrigger` and `gsap-performance`
+skills are installed, read them before changing `motion.js`; they document the
+scrub and refresh semantics this kit depends on. They are not required, and
+nothing in the demo-authoring path should reference them: a demo author writes
+`data-motion` attributes, never GSAP.
+
 ### `pin`
 
 Minimum useful span is 1.2, because a pinned section's travel is

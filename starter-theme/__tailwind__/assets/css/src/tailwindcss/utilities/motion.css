@@ -1,0 +1,47 @@
+/* The CSS half of the motion engine.
+ *
+ * `reveal` is the one device with an exact CSS equivalent, and it is the device
+ * every composition uses. Where the browser supports scroll-driven animation it
+ * runs here and motion.js does not wire it at all, which removes the scroll
+ * listener from the critical path. Every other device stays in motion.js,
+ * because pinning and scrubbing have no CSS equivalent.
+ *
+ * Three rules below fail silently if broken, so none of them is optional:
+ *   - animation-timeline is declared AFTER the animation shorthand, because the
+ *     shorthand resets it back to auto.
+ *   - no animation-duration: a scroll timeline ignores it.
+ *   - animation-fill-mode: both, or the element snaps back to its start state
+ *     when the reader scrolls up.
+ *
+ * `translate` rather than `transform`: the parallax device writes `transform`,
+ * and two devices writing one property on one element is a race.
+ */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    [data-motion="reveal"] > * {
+      animation-name: wp-reveal;
+      animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+      animation-fill-mode: both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+
+    /* Stagger, approximated. A per-child delay needs a per-child value, and
+     * composition markup forbids inline styles, so the offset is carried by
+     * nth-child for the first eight children. Beyond eight they share the last
+     * offset: the ordering stops being readable, which is a real ceiling and is
+     * recorded in devices.md rather than hidden. */
+    [data-motion="reveal"] > *:nth-child(2) { animation-range: entry 4% entry 44% }
+    [data-motion="reveal"] > *:nth-child(3) { animation-range: entry 8% entry 48% }
+    [data-motion="reveal"] > *:nth-child(4) { animation-range: entry 12% entry 52% }
+    [data-motion="reveal"] > *:nth-child(5) { animation-range: entry 16% entry 56% }
+    [data-motion="reveal"] > *:nth-child(6) { animation-range: entry 20% entry 60% }
+    [data-motion="reveal"] > *:nth-child(7) { animation-range: entry 24% entry 64% }
+    [data-motion="reveal"] > *:nth-child(n+8) { animation-range: entry 28% entry 68% }
+  }
+}
+
+@keyframes wp-reveal {
+  from { opacity: 0; translate: 0 14px }
+  to   { opacity: 1; translate: 0 0 }
+}

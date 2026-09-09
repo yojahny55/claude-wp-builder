@@ -60,6 +60,16 @@ export function initMotion(gsap, ScrollTrigger) {
   const reduced = REDUCED();
   const fine = FINE() && !reduced;
 
+  // The CSS half of the engine owns `reveal` wherever scroll-driven animation
+  // exists (utilities/motion.css), so this branch does not wire that device
+  // when the browser supports it — driving one element from two engines is a
+  // race. The condition string is the same one the stylesheet gates on; if
+  // they ever disagree, an element is either driven twice or not at all.
+  const cssReveal =
+    typeof CSS !== 'undefined' &&
+    CSS.supports &&
+    CSS.supports('animation-timeline', 'view()');
+
   document.querySelectorAll('[data-motion]').forEach((el) => {
     // One section's failure must not take the page's motion with it. A throw
     // inside forEach aborts the whole loop, so every later section would stay
@@ -143,7 +153,7 @@ export function initMotion(gsap, ScrollTrigger) {
       }
     }
 
-    if (kind === 'reveal') {
+    if (kind === 'reveal' && !cssReveal) {
       const stagger = (parseFloat(el.getAttribute('data-motion-stagger')) || 70) / 1000;
       const kids = el.children.length ? el.children : [el];
       if (reduced) {

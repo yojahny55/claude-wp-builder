@@ -66,4 +66,37 @@ grep -Fq 'line-height:1.1' "$m" || fail "$m kinetic mask does not reserve line-h
 grep -Fq 'padding-block' "$m" || fail "$m kinetic mask does not pad the block edges"
 grep -Fq 'H1' "$m" || fail "$m does not refuse kinetic on an h1"
 
+# --- The second reveal path. Two engines driving one element is a race, so the
+#     JS guard and the CSS feature query must test the SAME condition.
+mc=starter-theme/__tailwind__/assets/css/src/tailwindcss/utilities/motion.css
+[ -f "$mc" ] || fail "$mc is missing; the CSS reveal path has no home"
+grep -Fq '@supports (animation-timeline: view())' "$mc" \
+  || fail "$mc does not gate the CSS reveal on the feature query"
+# Anchored with the trailing semicolon: the file's own header comment restates
+# "animation-fill-mode: both," (with a comma) in prose, and a bare substring
+# match without the semicolon is satisfied by that sentence even with the real
+# declaration deleted — proved by mutation, not assumed.
+grep -Fq 'animation-fill-mode: both;' "$mc" \
+  || fail "$mc omits animation-fill-mode: both, so reveal snaps back on scroll up"
+grep -Fq 'prefers-reduced-motion' "$mc" || fail "$mc does not honour reduced motion"
+grep -Fq 'translate:' "$mc" || fail "$mc does not use translate, which parallax cannot collide with"
+grep -Fq 'transform:' "$mc" && fail "$mc writes transform, which collides with the parallax device"
+
+grep -Fq "CSS.supports('animation-timeline', 'view()')" "$m" \
+  || fail "$m does not test the same feature query the stylesheet gates on"
+# Not 'skip': that word already appears 4 times in $m for unrelated reasons
+# (the kinetic branch's child-markup skip, the two catch-block "skipping it"
+# warnings), so a bare 'skip' alternative passes whether or not the reveal
+# branch says anything about yielding to CSS — proved by mutation, not assumed.
+grep -Eqi 'does not wire|handled by css' "$m" \
+  || fail "$m does not say it yields reveal to the CSS path"
+
+grep -Fq './utilities/motion.css' starter-theme/__tailwind__/assets/css/src/tailwindcss/main.css \
+  || fail "main.css does not import the motion stylesheet, so the theme ships without it"
+# NOTE: not "$d" — the device loop above (`for d in reveal pin pan ...`) reassigns
+# that variable and leaves it as "spotlight" for the rest of the script, so a
+# reference to "$d" here would silently grep a nonexistent file named spotlight.
+grep -Fq 'motion.css' commands/wp-demo.md \
+  || fail "commands/wp-demo.md does not inline the motion stylesheet into the demo"
+
 echo PASS

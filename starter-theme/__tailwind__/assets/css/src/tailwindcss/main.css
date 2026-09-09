@@ -28,4 +28,5 @@
 @import "./base/reset.css";
 @import "./components/buttons.css";
 @import "./utilities/animations.css";
+@import "./utilities/motion.css";
 @import "./utilities/wordpress.css";
