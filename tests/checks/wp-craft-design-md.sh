@@ -36,4 +36,29 @@ done
 grep -Eq '^  display:' "$p" || fail "$p does not define the display face"
 grep -Eq '^  text:' "$p" || fail "$p does not define the text face"
 
+# The handoff: a DESIGN.md the demo was built from is worth nothing if /wp-init
+# scrapes the demo's :root instead of reading it, or leaves it behind in demo/.
+i=commands/wp-init.md
+y=commands/wp-yolo.md
+grep -Fq 'demo/DESIGN.md' "$i" || fail "$i does not read demo/DESIGN.md"
+grep -Eqi 'before .*:root|first.*:root|instead of .*:root' "$i" || fail "$i does not prefer DESIGN.md over the :root scrape"
+grep -Fq 'DESIGN.md' "$y" || fail "$y does not carry the DESIGN.md contract into the whole-site build"
+grep -Fq 'browser' CLAUDE.md || fail "CLAUDE.md does not state the craft browser prerequisite"
+grep -Fq 'demo/DESIGN.md' CLAUDE.md || fail "CLAUDE.md does not document the DESIGN.md handoff"
+
+# The token seam. The compositions' CSS names a vocabulary the starter's :root
+# has never defined, so a craft demo carried into the theme by name alone would
+# reference undefined properties and render unstyled. /wp-init has to write the
+# craft vocabulary AND alias the starter's own tokens onto it, or one of the two
+# stylesheets goes dead — and the mapping has to be recorded where the next
+# agent can read it rather than guess.
+for t in --color-canvas --color-surface --color-ink-soft --color-accent-ink --color-hairline --font-display --font-text; do
+  grep -Fq -- "$t" "$i" || fail "$i does not write the craft token $t into the theme"
+done
+for t in --color-primary --color-secondary --color-dark --color-light --color-gray --font-primary --font-secondary; do
+  grep -Fq -- "$t" "$i" || fail "$i does not alias the starter token $t onto the craft vocabulary"
+done
+grep -Fqi 'alias' "$i" || fail "$i does not state that the starter tokens become aliases"
+grep -Eqi 'alias table' "$i" || fail "$i does not require the alias table in the theme's copied DESIGN.md"
+
 echo PASS

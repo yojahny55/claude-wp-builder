@@ -113,6 +113,26 @@ read `skills/wp-demo-craft/` and ship GSAP plus `motion.js` in the theme bundle;
 ship neither and use the `wp-aos-animator` skill instead. When the line is absent, the project
 predates the choice and is `plain`.
 
+Craft mode has a hard prerequisite: a browser. `/wp-demo` probes with
+`bin/demo-verify.mjs --probe` and stops on exit 2; it never builds blind and never
+falls back to plain. A craft build writes two files: `demo/BRIEF.md` (the story) and
+`demo/DESIGN.md` (tokens, in the open Stitch DESIGN.md format). `/wp-init` reads
+`demo/DESIGN.md` before scraping `:root`, and copies it into the theme. Sections are
+built from `skills/wp-demo-craft/compositions/` (previews rendered against the
+neutral `references/design-md/_preview.md`), and verified by `npx impeccable detect`
+plus the six-line rubric in `references/verify.md`, at most three rounds.
+
+**The two token vocabularies are joined by aliases, not by a rename.** The
+compositions' CSS speaks `--color-canvas` / `--color-ink` / `--font-display`; the
+starter's speaks `--color-primary` / `--color-dark` / `--font-primary`; only
+`--color-accent` is in both. `/wp-init` Step D4 writes the craft set into the
+Tailwind `@theme` block from `demo/DESIGN.md` and then defines the starter's six
+colour and two font tokens as `var()` aliases onto it, mapped **by role, not by
+lightness** — on a dark craft palette `--color-light` correctly resolves to a
+near-black canvas, because what the starter's CSS depends on is the contrast pair,
+not the name. The table is appended to the theme's copied `DESIGN.md` under
+`## Token aliases` so later agents read the mapping instead of guessing it.
+
 ## Authoring conventions
 
 **Command** (`commands/<name>.md`) — frontmatter with `description`, `allowed-tools`,
@@ -175,3 +195,22 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   but its scripts are covered automatically only by `tests/checks/wp-polylang-live.sh` (which
   needs `PLL_TEST_SITE`), and the command's own prose branching only by the grep checks in
   `tests/checks/wp-polylang.sh` and `wp-init-templates.sh`.
+- **Compositions are ports, not copies, and there are twelve roles.** Effects from
+  Magic UI and Aceternity are rewritten in CSS and GSAP inside the `data-motion`
+  contract; the React libraries are never dependencies. A feeling curve that needs a
+  thirteenth role builds it by hand under the same contract with a reason in
+  `demo/BRIEF.md`.
+- **The evaluator reads headless sheets.** Real-device feel is still unproven, and
+  Landing Gallery screenshots are inspiration only.
+- **`designlang` extracts what a site declares.** A site built on inline styles or
+  canvas yields thin tokens; the catalogue fallback fills the gap and is cited.
+- **A craft demo emits no bilingual `<!-- i18n: … -->` hint comments.** The craft build
+  path takes only the header, footer and responsive requirements from the plain path,
+  so nothing in the markup marks a translatable string. The bilingual pipeline reads
+  the recorded `i18n strategy` instead — which it should anyway; markers in a demo were
+  never the source of truth.
+- **Composition previews need the network to regenerate.** They render against the
+  neutral `references/design-md/_preview.md` and their fill copy lives in
+  `compositions/fills.json`, which points at remote placeholder images. The committed
+  `preview-1440.png` / `preview-390.png` are the artifact; treat them as such rather
+  than assuming a rebuild is always available.

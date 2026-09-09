@@ -142,9 +142,10 @@ do not re-derive it. Otherwise decide it here using the same craft-versus-plain
 test as `/wp-demo` Step 2.5 (project docs, `.claude/CLAUDE.md`, `.wp-create.json`;
 `--craft`/`--plain` in `$ARGUMENTS` override), state the one-line reason, and write
 `"demo mode"` into `.wp-create.json`. When the mode is **craft**, read
-`${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/SKILL.md` and apply its grammar,
-feeling curve and fingerprint gate to the whole multi-page build (one fingerprint
-row for the site, not one per page).
+`${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/SKILL.md` and apply its order of work to
+the whole multi-page build: the browser gate first, one `demo/DESIGN.md` for the
+site, one composition plan covering every page, one evaluator loop over the
+directory, and one fingerprint row for the site, not one per page.
 
 ## Step 2.5: Phase 1.5 — Load & reconcile scope
 

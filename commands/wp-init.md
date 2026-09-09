@@ -154,8 +154,8 @@ Parse the demo HTML and extract as much as possible:
 | Secondary language | Look for `lang=""` attributes on sub-elements, or content in a second language. Default: `es`. |
 | Tagline | `<meta name="description">` content. Fall back to the hero subtitle (the `<p>` next to the hero `<h1>`), then to a one-line summary of the hero copy. Strip the project name if the meta merely repeats it. This becomes the WordPress site description (`blogdescription`) in Step 9. |
 | Sections | List all section names from `<!-- ============ SECTION: Name ============ -->` delimiters (exclude Header and Footer). |
-| Color palette | Read `:root` CSS custom properties for `--color-*` values. If no `:root`, scan for dominant colors in inline styles. |
-| Fonts | Read `font-family` declarations from `:root` or `<style>`. **Record where each family comes from, not only its name** — the full Google Fonts `<link href>` (it carries the weights) or the `@font-face` `src` path. Step 4.5 carries the files; a name alone leaves it nothing to carry and the theme renders a fallback. |
+| Color palette | If `demo/DESIGN.md` exists (written by `/wp-demo` craft mode, path recorded as `design_md` in `.wp-create.json`), read its `colors` front matter first: `canvas`, `surface`, `ink`, `ink-soft`, `accent`, `accent-ink`, `hairline` map onto the theme tokens. Otherwise read `:root` CSS custom properties for `--color-*` values. If no `:root`, scan for dominant colors in inline styles. |
+| Fonts | If `demo/DESIGN.md` exists, read `typography.display.fontFamily` and `typography.text.fontFamily` first. Otherwise read `font-family` declarations from `:root` or `<style>`. **Record where each family comes from, not only its name** — the full Google Fonts `<link href>` (it carries the weights) or the `@font-face` `src` path. Step 4.5 carries the files; a name alone leaves it nothing to carry and the theme renders a fallback. |
 
 **Step D3 — Present pre-filled defaults:**
 
@@ -201,6 +201,46 @@ The user can override any field. Once confirmed, use these values for the rest o
   theme names the demo's family and renders the next entry in the stack.
 
   If fewer than 6 colors are extracted, leave unmatched variables at their defaults.
+
+  **When `demo mode` is craft and `demo/DESIGN.md` exists, write both vocabularies.**
+  A craft demo's sections are copied from `skills/wp-demo-craft/compositions/`, whose
+  CSS names its own tokens — `--color-canvas`, `--color-surface`, `--color-ink`,
+  `--color-ink-soft`, `--color-accent`, `--color-accent-ink`, `--color-hairline`,
+  `--font-display`, `--font-text`, `--space-section`, `--space-gutter`, `--radius-sm`,
+  `--radius-md` — while the starter's own CSS names `--color-primary` and its
+  siblings. Only `--color-accent` is in both. Write one set and half the theme
+  resolves properties nothing defines and renders unstyled, which is a failure with
+  no error message. So write the craft vocabulary from `demo/DESIGN.md` front matter
+  (`colors`, `typography`, `rounded`, `spacing`) into the same `@theme` block —
+  Tailwind v4 emits every `@theme` variable into `:root`, and the colour and font
+  ones also earn utilities (`bg-canvas`, `text-ink`, `font-display`) — and then
+  define the starter's tokens as aliases onto it rather than as second copies of
+  the same hex:
+
+  | Starter token | Aliases to | The starter's role for it |
+  |---------------|-----------|---------------------------|
+  | `--color-primary` | `var(--color-accent)` | brand/signal colour; craft carries exactly one |
+  | `--color-secondary` | `var(--color-ink)` | a second brand colour craft does not have — ink keeps `text-secondary` legible instead of inventing one |
+  | `--color-accent` | *(no alias)* | the one shared name; `demo/DESIGN.md` defines it |
+  | `--color-dark` | `var(--color-ink)` | dark text and dark fills |
+  | `--color-light` | `var(--color-canvas)` | the light page background |
+  | `--color-gray` | `var(--color-ink-soft)` | muted secondary text |
+  | `--font-primary` | `var(--font-display)` | heading face |
+  | `--font-secondary` | `var(--font-text)` | body face |
+
+  **Alias by role, never by lightness.** A craft palette is often dark, so on such a
+  build `--color-light` resolves to a near-black canvas and `--color-dark` to a bone
+  ink. That reads backwards and is still correct: the pair the starter's CSS relies on
+  is *contrast*, dark-on-light, and aliasing by role keeps it — `--color-dark` on
+  `--color-light` stays ink on canvas. Aliasing by lightness would put ink-coloured
+  text on an ink-coloured background on every dark demo.
+
+  `--color-surface` and `--color-hairline` have no starter counterpart, so the mapping
+  is one-way and nothing aliases onto them; only composition CSS reaches them.
+
+  Record the table above in `<theme-dir>/DESIGN.md` (copied by Step 3) under a
+  `## Token aliases` heading, so `wp-css` and `wp-section` read the mapping instead
+  of re-deriving it.
 
   Then **run `/wp-tailwindify`** on the demo — do not merely suggest it. On the
   tailwind template the build transcribes from the demo, so a plain-CSS demo yields a
@@ -282,6 +322,12 @@ Where `<slug>` is the theme slug from Step 1.
 Only the two directories above exist. Copying anything else — `__starter__` in
 particular — silently produces an empty theme directory, because `cp -r` on a
 missing source fails while the rest of the flow carries on.
+
+When `demo/DESIGN.md` exists, copy it to `<theme-dir>/DESIGN.md`. Later agents
+(`wp-css`, `wp-section`) read it for the token vocabulary; it is the same file the
+demo was built from. Append the Step D4 alias table under a `## Token aliases`
+heading at the end — that is the only edit the copy gets, so the front matter the
+demo was generated from stays byte-identical.
 
 ## Step 3.5: Wire Motion for the Recorded Demo Mode
 
