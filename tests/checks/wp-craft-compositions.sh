@@ -14,6 +14,17 @@ grep -Fq '_preview.md' "$r" || fail "$r does not render against _preview.md"
 grep -Fq 'preview-1440.png' "$r" || fail "$r does not write preview-1440.png"
 grep -Fq 'preview-390.png' "$r" || fail "$r does not write preview-390.png"
 grep -Fq 'motion.js' "$r" || fail "$r does not load the plugin's motion engine"
+# The CSS half of reveal lives in utilities/motion.css; motion.js yields that device
+# to it wherever the browser supports scroll-driven animation (ten of the thirteen
+# compositions use data-motion="reveal"), so a preview inlining motion.js without it
+# renders reveal driven by neither engine. Anchored on the quoted path, not the bare
+# substring 'motion.css' — that also appears unquoted in this file's own comment,
+# which would still match after the real readFileSync call was deleted.
+grep -Fq "utilities/motion.css'" "$r" \
+  || fail "$r does not read utilities/motion.css, the CSS half of the reveal device"
+# And it has to land inside the <style> block, not just be read and discarded.
+grep -Fq '${motionCss}' "$r" \
+  || fail "$r reads utilities/motion.css but never inlines it into the page's <style> block"
 grep -Fq 'process.exit(2)' "$r" || fail "$r does not exit 2 with no browser"
 
 c=skills/wp-demo-craft/compositions

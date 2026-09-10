@@ -34,11 +34,18 @@ Opacity from 0 plus a 14px rise over 620ms ease-out, children staggered 30 to
 as a loading glitch; a rise past 24px reads as a slide.
 
 **Two paths, one device.** Where the browser supports `animation-timeline: view()`
-this device runs from `utilities/motion.css` and `motion.js` does not wire it;
-elsewhere `motion.js` runs it as before. The feature-query string is identical in
-both places on purpose. Three rules in the stylesheet fail silently if broken:
-`animation-timeline` comes after the `animation` shorthand, no `animation-duration`
-is set, and `animation-fill-mode: both` is required.
+**and** the user has not asked for reduced motion, this device runs from
+`utilities/motion.css` and `motion.js` does not wire it; everywhere else —
+including a reduced-motion reader on a browser that does support the feature —
+`motion.js` runs it as before, and its own reduced-motion fallback sets the
+arrived state explicitly rather than animating. The feature-query string is
+identical in both places on purpose, and the JS guard tests the same
+reduced-motion term the stylesheet's `@media (prefers-reduced-motion:
+no-preference)` nesting uses, so the two paths cannot both decline the same
+element. Three rules in the stylesheet fail silently if broken: the ruleset
+never uses the `animation` shorthand (only longhands), because the shorthand
+would reset `animation-timeline` back to `auto`; no `animation-duration` is
+set; and `animation-fill-mode: both` is required.
 
 **Stagger ceiling on the CSS path.** A per-child delay needs a per-child value and
 composition markup forbids inline styles, so the CSS path carries the offset on

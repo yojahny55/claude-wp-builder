@@ -7,8 +7,9 @@
  * because pinning and scrubbing have no CSS equivalent.
  *
  * Three rules below fail silently if broken, so none of them is optional:
- *   - animation-timeline is declared AFTER the animation shorthand, because the
- *     shorthand resets it back to auto.
+ *   - longhands only, never the animation shorthand: the shorthand would reset
+ *     animation-timeline back to auto, so an author must not collapse these
+ *     into it later.
  *   - no animation-duration: a scroll timeline ignores it.
  *   - animation-fill-mode: both, or the element snaps back to its start state
  *     when the reader scrolls up.

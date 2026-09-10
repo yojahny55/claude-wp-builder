@@ -84,6 +84,14 @@ grep -Fq 'transform:' "$mc" && fail "$mc writes transform, which collides with t
 
 grep -Fq "CSS.supports('animation-timeline', 'view()')" "$m" \
   || fail "$m does not test the same feature query the stylesheet gates on"
+# cssReveal must also test reduced motion, or a reduced-motion reader on a supporting
+# browser gets neither engine: the CSS @media (prefers-reduced-motion: no-preference)
+# rule does not match them, and this branch would also yield. Anchored to the
+# cssReveal declaration's own next lines, not a bare '!reduced' anywhere in the file —
+# that token also guards the unrelated parallax branch further down and would still
+# pass with cssReveal's own term deleted.
+grep -A4 'const cssReveal =' "$m" | grep -Fq '!reduced' \
+  || fail "$m's cssReveal guard does not test reduced motion, so a reduced-motion reader on a supporting browser gets neither engine"
 # Not 'skip': that word already appears 4 times in $m for unrelated reasons
 # (the kinetic branch's child-markup skip, the two catch-block "skipping it"
 # warnings), so a bare 'skip' alternative passes whether or not the reveal

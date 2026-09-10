@@ -126,6 +126,15 @@ let code = 0;
 try {
   const t = previewTokens();
   const motion = readFileSync(join(root, 'starter-theme/__tailwind__/assets/js/src/motion.js'), 'utf8');
+  // reveal's CSS-only path lives here (utilities/motion.css). motion.js yields that
+  // device to this stylesheet wherever the browser supports scroll-driven animation
+  // (ten of the thirteen compositions use data-motion="reveal"), so a preview that
+  // inlines motion.js without also inlining this file drives nothing on a supporting
+  // browser — mirrors commands/wp-demo.md's real-build instruction to inline both.
+  const motionCss = readFileSync(
+    join(root, 'starter-theme/__tailwind__/assets/css/src/tailwindcss/utilities/motion.css'),
+    'utf8'
+  );
   const fontsHref =
     'https://fonts.googleapis.com/css2?family=' + fontParam(t.display) + ':wght@700' +
     '&family=' + fontParam(t.text) + ':wght@400&display=swap';
@@ -139,6 +148,7 @@ try {
 --space-section:${t.section};--space-gutter:${t.gutter};--radius-sm:${t.rsm};--radius-md:${t.rmd}}
 html{background:var(--color-canvas);color:var(--color-ink);font-family:var(--font-text)}body{margin:0}
 ${readFileSync(css, 'utf8')}
+${motionCss}
 </style></head><body>
 ${useFill ? applyFills(readFileSync(html, 'utf8'), dir) : readFileSync(html, 'utf8')}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
