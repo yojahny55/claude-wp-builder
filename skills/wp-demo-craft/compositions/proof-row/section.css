@@ -57,8 +57,10 @@
   color: var(--color-ink-soft);
   max-width: 34ch;
 }
-/* The marquee. transform only, and it can be read standing still: the names are
-   legible at any frame, the drift is what stops the row reading as a logo wall. */
+/* The name track. transform only, and it can be read standing still: the names
+   are legible at any frame, the drift is what stops the row reading as a logo
+   wall. It advances on the view timeline rather than on a clock, so it moves
+   only while the reader is moving the page. */
 .proof-row__marquee {
   overflow: hidden;
   padding-top: 1.75rem;
@@ -70,6 +72,10 @@
   -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
           mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
 }
+/* No pause affordance here on purpose: WCAG 2.2.2 governs movement that starts
+   automatically. The track advances only as the reader scrolls, so the reader
+   already controls it and there is nothing to pause. Reduced motion is handled
+   by the @media block on the drift rule below, not here. */
 .proof-row__track {
   list-style: none;
   margin: 0;
@@ -77,7 +83,6 @@
   display: flex;
   width: max-content;
   gap: 3.5rem;
-  animation: proof-row-marquee 38s linear infinite;
 }
 .proof-row__name {
   font-size: 0.9375rem;
@@ -86,20 +91,29 @@
   color: var(--color-ink-soft);
   white-space: nowrap;
 }
-@keyframes proof-row-marquee { to { transform: translateX(-50%); } }
-/* WCAG 2.2.2: anything that moves automatically beside static content needs a way
-   to stop it, and `prefers-reduced-motion` is not that mechanism. Hover alone is
-   not keyboard reachable, so `:focus-within` carries the keyboard case — and it
-   sits outside the pointer query on purpose: a keyboard attached to a
-   coarse-pointer device fails `(pointer: fine)`, so gating focus on it would
-   withdraw the only keyboard-reachable pause exactly where hover is absent. */
-.proof-row__marquee:focus-within .proof-row__track { animation-play-state: paused; }
-@media (hover: hover) and (pointer: fine) {
-  .proof-row__marquee:hover .proof-row__track { animation-play-state: paused; }
+/* Longhands only: a shorthand after `animation-timeline` resets it,
+   `animation-duration` is ignored on a scroll timeline, and `both` is what keeps
+   the track where the reader left it instead of snapping back on scroll up.
+   `cover 0% cover 100%` is the section's whole passage through the viewport, so
+   the track drifts for exactly as long as the section is on screen. -38% rather
+   than the loop's -50%: the loop needed the duplicated half to hide its seam, a
+   one-way drift has no seam and should stop short of the end of the track. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .proof-row__track {
+      animation-name: proof-row-drift;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+    }
+  }
 }
+@keyframes proof-row-drift { from { transform: translateX(0); } to { transform: translateX(-38%); } }
 @container (min-width: 760px) {
   .proof-row__figures { grid-template-columns: repeat(3, 1fr); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .proof-row__track { animation-play-state: paused; }
-}
+/* No `prefers-reduced-motion: reduce` block for the track: the drift is applied
+   inside `no-preference` above, so under reduce it is never applied at all.
+   Pausing an animation that was never started is a rule that reads as coverage
+   and does nothing. */

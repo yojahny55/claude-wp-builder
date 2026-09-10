@@ -8,7 +8,16 @@
   `section.css` pair into a complete document before scanning, because `impeccable detect`
   scans zero files and exits 0 against the bare fragments — the reason two compositions'
   infinite loop animations went uncaught. Wired in by `tests/checks/wp-craft-composition-gate.sh`.
-  Currently red on purpose: `closing-block` and `proof-row` both fail on `marquee`.
+
+### Fixed
+- **The two compositions that failed the library's own slop gate are scroll-linked now.**
+  `closing-block` ran a 7s infinite conic sweep and `proof-row` a 38s infinite translate,
+  both reported by `impeccable` as `marquee` at `category=slop`/`severity=warning` — the
+  shape that fails a verification round before a screenshot is taken, so every build using
+  the closing or proof role failed by construction. Both now run on the view timeline: the
+  beam sweeps once on entry, the name track drifts while its section is on screen. No
+  device, no span, no motion-cost change, so the role table stays true. `proof-row` loses
+  its hover/focus pause block, which existed only because the movement was automatic.
 
 ## [1.14.0] - 2026-09-09
 

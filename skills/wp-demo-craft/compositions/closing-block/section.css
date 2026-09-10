@@ -8,7 +8,10 @@
 /* The beam. A conic gradient on an over-square pseudo-element rotated by
    @keyframes on transform only, clipped to the frame, with a second
    pseudo-element inset 1px painting the ground back over it: what is left
-   visible is a 1px ring with one bright arc travelling round it. */
+   visible is a 1px ring with one bright arc travelling round it. The rotation
+   is driven by the view timeline, not by time — it sweeps once as the section
+   enters and then holds. The beam signals arrival; it does not carry content,
+   so it has no reason to run forever. */
 .closing-block__frame {
   position: relative;
   isolation: isolate;
@@ -33,7 +36,14 @@
     color-mix(in srgb, var(--color-accent) 35%, transparent) 87%,
     var(--color-accent) 93%,
     transparent 99%);
-  animation: closing-block-beam 7s linear infinite;
+  /* Longhands only, on purpose: a shorthand after `animation-timeline` resets it,
+     `animation-duration` is ignored on a scroll timeline, and dropping
+     `animation-fill-mode: both` snaps the beam back on the way up. */
+  animation-name: closing-block-beam;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 0% cover 60%;
 }
 .closing-block__frame::after {
   content: "";
@@ -44,6 +54,11 @@
   background: var(--color-surface);
 }
 @keyframes closing-block-beam { to { transform: translate(-50%, -50%) rotate(1turn); } }
+/* Without a view timeline the animation has no duration to run against, so it
+   would settle on a single arbitrary frame. A static beam is the honest fallback. */
+@supports not (animation-timeline: view()) {
+  .closing-block__frame::before { animation: none; }
+}
 .closing-block__inner {
   position: relative;
   padding: clamp(2.5rem, 6vw, 5rem) clamp(1.5rem, 4vw, 4rem);
