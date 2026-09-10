@@ -39,7 +39,13 @@ every composition renders without edits:
 
 `--color-canvas`, `--color-surface`, `--color-ink`, `--color-ink-soft`,
 `--color-accent`, `--color-accent-ink`, `--color-hairline`, `--font-display`,
-`--font-text`, `--space-section`, `--space-gutter`, `--radius-sm`, `--radius-md`.
+`--font-text`, `--space-section`, `--space-gutter`, `--container-max`,
+`--radius-sm`, `--radius-md`.
+
+`--container-max` is the content width, not the section width. Grounds stay
+full-bleed and only the content inside them is constrained; without it every
+composition pads by the gutter alone, so above about 1600px a heading sits hard
+left and an aside hard right with a dead field between them.
 
 A hardcoded hex in a section is a defect: the same value now exists in two
 places, and the one in `:root` is the one `/wp-init` carries into the theme.

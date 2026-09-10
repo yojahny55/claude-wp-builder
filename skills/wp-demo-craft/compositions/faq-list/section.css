@@ -5,7 +5,8 @@
    __inner. The root keeps only what does not move: the band and its padding. */
 .faq-list {
   container-type: inline-size;
-  padding: var(--space-section) var(--space-gutter);
+  padding-block: var(--space-section);
+  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max)) / 2));
   background: var(--color-canvas);
   border-top: 1px solid var(--color-hairline);
 }

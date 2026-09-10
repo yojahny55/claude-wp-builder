@@ -47,6 +47,7 @@ function previewTokens() {
     display: p('display.fontFamily', /\n  display:\n    fontFamily: ([^\n]+)/),
     text: p('text.fontFamily', /\n  text:\n    fontFamily: ([^\n]+)/),
     section: p('spacing.section', /\n  section: "([^"]+)"/), gutter: p('spacing.gutter', /\n  gutter: "([^"]+)"/),
+    container: p('spacing.container', /\n  container: "([^"]+)"/),
     rsm: p('rounded.sm', /\n  sm: ([^\n]+)/), rmd: p('rounded.md', /\n  md: ([^\n]+)/),
   };
 }
@@ -145,7 +146,8 @@ try {
 :root{--color-canvas:${t.canvas};--color-surface:${t.surface};--color-ink:${t.ink};--color-ink-soft:${t.inkSoft};
 --color-accent:${t.accent};--color-accent-ink:${t.accentInk};--color-hairline:${t.hairline};
 --font-display:"${t.display}",system-ui,sans-serif;--font-text:"${t.text}",system-ui,sans-serif;
---space-section:${t.section};--space-gutter:${t.gutter};--radius-sm:${t.rsm};--radius-md:${t.rmd}}
+--space-section:${t.section};--space-gutter:${t.gutter};--container-max:${t.container};
+--radius-sm:${t.rsm};--radius-md:${t.rmd}}
 html{background:var(--color-canvas);color:var(--color-ink);font-family:var(--font-text)}body{margin:0}
 ${readFileSync(css, 'utf8')}
 ${motionCss}

@@ -26,6 +26,13 @@ grep -Fq "utilities/motion.css'" "$r" \
 grep -Fq '${motionCss}' "$r" \
   || fail "$r reads utilities/motion.css but never inlines it into the page's <style> block"
 grep -Fq 'process.exit(2)' "$r" || fail "$r does not exit 2 with no browser"
+# --container-max is used by all thirteen compositions. A var() the :root never
+# defines is invalid at computed-value time, so padding-inline does not fall back
+# to the shorthand beside it — it unsets, and every preview renders edge to edge.
+# Anchored on the declaration inside :root, not the bare token name, which also
+# appears in this file's own comment and in the _preview.md prose.
+grep -Fq -- '--container-max:${t.container}' "$r" \
+  || fail "$r does not write --container-max into the preview :root, so every composition's padding-inline is invalid and collapses to zero"
 
 c=skills/wp-demo-craft/compositions
 [ -f "$c/README.md" ] || fail "$c/README.md (the role table) is missing"
@@ -109,5 +116,24 @@ grep -Fq -- '--fill' "$r" || fail "$r has no --fill flag to apply $c/fills.json"
 grep -Fq -- '--fill' "$c/README.md" || fail "$c/README.md documents a regenerate command that ignores fills.json"
 # Interior page head never pins.
 grep -Eq 'data-motion="pin"' "$c/page-head/section.html" && fail "page-head pins; interior pages have no pin"
+
+# Without a content-width token every composition pads by the gutter alone, so on
+# a wide monitor content spans edge to edge. The token has to exist and the
+# compositions have to use it; either alone is half a fix.
+# In the token LIST, which is what a build generates :root from — matched as a
+# list item (backticked, then a comma or the closing full stop). A bare -F grep
+# for the name passes on the paragraph underneath that only explains the token,
+# so the name could leave the list and the check would stay green.
+grep -Eq -- '`--container-max`[,.]' skills/wp-demo-craft/references/design-md.md \
+  || fail "design-md.md does not list --container-max, so a craft build has no content width to set"
+# Anchored on the declaration, not the bare token name: a composition that dropped
+# the constraint but kept the words in a comment would still satisfy a plain -F
+# grep, and a comment constrains nothing.
+n=0
+for f in skills/wp-demo-craft/compositions/*/section.css; do
+  grep -Eq -- 'padding-inline:[^;]*var\(--container-max\)' "$f" && n=$((n + 1))
+done
+[ "$n" -ge 13 ] \
+  || fail "only $n compositions constrain content width against --container-max, expected 13"
 
 echo PASS

@@ -2,7 +2,8 @@
 .closing-block, .closing-block *, .closing-block *::before, .closing-block *::after { box-sizing: border-box; }
 .closing-block {
   container-type: inline-size;
-  padding: var(--space-section) var(--space-gutter);
+  padding-block: var(--space-section);
+  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max)) / 2));
   background: var(--color-canvas);
 }
 /* The beam. A conic gradient on an over-square pseudo-element rotated by

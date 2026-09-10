@@ -2,7 +2,8 @@
 .feature-zigzag, .feature-zigzag *, .feature-zigzag *::before, .feature-zigzag *::after { box-sizing: border-box; }
 .feature-zigzag {
   container-type: inline-size;
-  padding: var(--space-section) var(--space-gutter);
+  padding-block: var(--space-section);
+  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max)) / 2));
   display: grid;
   gap: clamp(3rem, 6vw, 6rem);
   background: var(--color-canvas);

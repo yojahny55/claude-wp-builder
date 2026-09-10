@@ -87,6 +87,16 @@ before writing any markup.
    where ___", authored silence. Mark anything invented "Self-authored, not
    interviewed". Ask, in one pass, only what the docs cannot answer. Show the
    brief once and proceed on a yes.
+
+   **3.5. Inventory the assets on disk.** List every image, SVG and font under the
+   project's `docs/` with a role — `logo`, `hero`, `portrait`, `product`, `texture`,
+   `font` — and write the list into `demo/BRIEF.md` under `## Assets on disk`. The
+   build uses them; any file left unused is named there with the reason. The header
+   chrome takes its logo from this list.
+
+   A previous build set the wordmark as live text while a 400x400 transparent PNG of
+   the client's real logo sat in `docs/`, and listed "transparent-PNG logo" as owed
+   by the client in the same run. Nothing in the flow had told it the file existed.
 4. **Classify the domain.** If `.wp-create.json` already has `"domain"` — a prior
    `/wp-demo` or `/wp-yolo` run against this same project recorded it — read it and
    move on; **do not re-classify**. The manifest is the shared source of truth, and a
@@ -138,7 +148,8 @@ before writing any markup.
    exists to fix, and step 7 walks the whole directory. Every page carries the
    header and footer chrome from Step 4 (logo, nav, language switcher, hamburger
    at mobile, footer columns) and Step 4's responsive breakpoints; ignore Step
-   4's single-file, no-CDN and `:root` token clauses, which are the plain path.
+   4's single-file, no-CDN, `:root` token and placeholder-content clauses, which
+   are the plain path.
    Generate `:root` from `demo/DESIGN.md` onto the token names in
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/design-md.md` — the
    craft tokens (`--color-canvas`, `--color-ink`, `--font-display` and the rest),

@@ -5,7 +5,8 @@
    is already on screen underneath it. No min-height, no dvh, no scroll cost. */
 .page-head {
   container-type: inline-size;
-  padding: calc(var(--space-section) * 1.15) var(--space-gutter) calc(var(--space-section) * 0.7);
+  padding-block: calc(var(--space-section) * 1.15) calc(var(--space-section) * 0.7);
+  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max)) / 2));
   background: var(--color-canvas);
   border-bottom: 1px solid var(--color-hairline);
 }

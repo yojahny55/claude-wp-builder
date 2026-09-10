@@ -3,6 +3,29 @@
 ## [Unreleased]
 
 ### Added
+- **A content width, an asset inventory, and no inherited placeholders — three client
+  complaints, three contract holes.** Craft is told to ignore plain mode's `:root` clause,
+  which was the only place `--container-max` was ever defined, so every composition padded
+  by the gutter alone and above about 1600px a heading sat hard left and an aside hard
+  right with a dead field between them. `--container-max` joins the craft token set in
+  `references/design-md.md` and the neutral `_preview.md`, and all thirteen compositions
+  now constrain content with
+  `padding-inline: max(var(--space-gutter), calc((100% - var(--container-max)) / 2))` —
+  on the root where the root carries the gutter, on `__inner` for `hero-split` and
+  `hero-type`, and on `__rail` in `100cqw` for `process-rail`, whose `width: max-content`
+  box would otherwise disagree with itself about a percentage padding and leave the
+  horizontal travel short. Second: `docs/` reached a craft build exactly once, in the mode
+  decision, and `design-md.md` read the logo only for its colours — so a 400x400
+  transparent PNG of a client's real logo sat unused while the same run listed it as owed
+  by the client. Step 2.6 gains an asset inventory that writes every image, SVG and font
+  under `docs/` into `demo/BRIEF.md` with a role, and the header chrome takes its logo
+  from that list. Third: craft's exemption list named only Step 4's single-file, no-CDN
+  and `:root` clauses, leaving Step 4's `Logo area (placeholder)` and "placeholder images
+  using CSS background colors" in force — which is how a hero rendering the words
+  "HERO PHOTOGRAPH PENDING" passed "First paint complete", a rubric line that asks only
+  that a primary visual be present. The exemption now covers the placeholder-content
+  clauses too, and `wp-demo-craft/SKILL.md` blocks a placeholder image, a placeholder
+  logo, or the words "pending", "placeholder" or "TBD" in rendered text.
 - **A craft build that fails verification writes `demo/FAILED.md` and cannot pass for a
   finished one.** The loop already treated a rubric FAIL as a failing round, but nothing
   downstream changed what reached the client: `demo/index.html` stayed on disk looking

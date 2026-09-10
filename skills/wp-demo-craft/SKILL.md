@@ -71,6 +71,12 @@ the interior-page rule and is the only place they are written down; a hardcoded
 hex where a token exists; invented statistics; a `slop` finding from
 `impeccable detect`; a build that failed the rubric after three rounds.
 
+- A placeholder image, a placeholder logo, or the words "pending", "placeholder"
+  or "TBD" in rendered text. Spine rule 1 covers copy; this covers everything
+  else the reader sees. A build once rendered "HERO PHOTOGRAPH PENDING" as its
+  hero's primary visual and passed "First paint complete", which asks only that a
+  primary visual be present.
+
 ## References
 
 Read `references/taste.md` (the floor), then `design-md.md`, `feel.md`,

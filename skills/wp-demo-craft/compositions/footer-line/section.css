@@ -5,7 +5,8 @@
    level in, on __inner. */
 .footer-line {
   container-type: inline-size;
-  padding: calc(var(--space-section) * 0.5) var(--space-gutter);
+  padding-block: calc(var(--space-section) * 0.5);
+  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max)) / 2));
   background: var(--color-canvas);
   border-top: 1px solid var(--color-hairline);
 }

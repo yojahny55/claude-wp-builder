@@ -4,7 +4,8 @@
   container-type: inline-size;
   position: relative;
   isolation: isolate;
-  padding: var(--space-section) var(--space-gutter);
+  padding-block: var(--space-section);
+  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max)) / 2));
   background: var(--color-canvas);
   border-top: 1px solid var(--color-hairline);
   /* Defaults so the spotlight sits somewhere deliberate before the first

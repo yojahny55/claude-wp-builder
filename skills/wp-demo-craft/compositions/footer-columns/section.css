@@ -2,7 +2,8 @@
 .footer-columns, .footer-columns *, .footer-columns *::before, .footer-columns *::after { box-sizing: border-box; }
 .footer-columns {
   container-type: inline-size;
-  padding: var(--space-section) var(--space-gutter) calc(var(--space-section) * 0.5);
+  padding-block: var(--space-section) calc(var(--space-section) * 0.5);
+  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max)) / 2));
   background: var(--color-surface);
   border-top: 1px solid var(--color-hairline);
 }

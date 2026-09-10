@@ -34,6 +34,7 @@ spacing:
   base: 4px
   section: "clamp(4rem, 10vw, 9rem)"
   gutter: "clamp(1rem, 4vw, 3rem)"
+  container: "1440px"
 ---
 
 ## Token contract
@@ -42,5 +43,5 @@ Every composition's CSS uses exactly these custom properties and no others for
 colour and type: `--color-canvas`, `--color-surface`, `--color-ink`,
 `--color-ink-soft`, `--color-accent`, `--color-accent-ink`, `--color-hairline`,
 `--font-display`, `--font-text`, `--space-section`, `--space-gutter`,
-`--radius-sm`, `--radius-md`. A client `demo/DESIGN.md` maps its own tokens
-onto these names in the demo's `:root`.
+`--container-max`, `--radius-sm`, `--radius-md`. A client `demo/DESIGN.md` maps its
+own tokens onto these names in the demo's `:root`.

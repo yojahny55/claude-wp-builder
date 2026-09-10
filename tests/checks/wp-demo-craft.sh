@@ -140,4 +140,20 @@ grep -Fq 'oklch' "$r/design-md.md" || fail "design-md.md does not derive token s
 grep -Eqi 'trend roundup|becoming the next default|next default' "$r/taste.md" \
   || fail "taste.md does not warn that today's anti-slop moves become tomorrow's default"
 
+# Three client complaints, one contract each. A real logo on disk was never wired
+# in because docs/ reached a craft build only through the mode decision; and craft
+# inherited Step 4's placeholder-logo and placeholder-image clauses, which is how
+# "HERO PHOTOGRAPH PENDING" shipped as a hero and still passed First paint complete.
+grep -Fq 'Assets on disk' commands/wp-demo.md \
+  || fail "commands/wp-demo.md does not inventory the assets under docs/, so a real logo is never wired in"
+grep -Fq 'placeholder-content clauses' commands/wp-demo.md \
+  || fail "commands/wp-demo.md still inherits Step 4's placeholder logo and placeholder image clauses"
+# And the clause it replaced is gone. Without this, writing the new phrase anywhere
+# in the file satisfies the assertion above while the exemption line still reads
+# "single-file, no-CDN and :root token clauses" and craft still inherits both.
+grep -Fq 'no-CDN and `:root` token clauses' commands/wp-demo.md \
+  && fail "commands/wp-demo.md still carries the old exemption line, so craft inherits the placeholder clauses whatever else the file says"
+grep -Fq -- '- A placeholder image, a placeholder logo' skills/wp-demo-craft/SKILL.md \
+  || fail "SKILL.md does not blocklist placeholder imagery, which spine rule 1 does not cover"
+
 echo PASS

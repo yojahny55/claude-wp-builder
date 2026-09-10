@@ -16,7 +16,8 @@
      leaves half the first paint empty, which is the failure this library exists
      to stop. The held-breath version starts where there is room for it. */
   align-content: center;
-  padding: var(--space-section) var(--space-gutter);
+  padding-block: var(--space-section);
+  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max)) / 2));
 }
 .hero-type__kicker {
   font: 500 0.8rem/1.2 var(--font-text);
@@ -68,7 +69,7 @@
 @container (min-width: 720px) {
   /* Bottom-anchored where there is room: the silence above the type is the
      composition. Centred, the same words read as a block that failed to fill. */
-  .hero-type__inner { align-content: end; padding: calc(var(--space-section) * 1.4) var(--space-gutter) var(--space-section); }
+  .hero-type__inner { align-content: end; padding-block: calc(var(--space-section) * 1.4) var(--space-section); }
 }
 @container (min-width: 900px) {
   .hero-type__title { max-width: 15ch; }

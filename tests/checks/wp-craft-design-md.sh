@@ -35,6 +35,11 @@ for t in canvas surface ink ink-soft accent accent-ink hairline; do
 done
 grep -Eq '^  display:' "$p" || fail "$p does not define the display face"
 grep -Eq '^  text:' "$p" || fail "$p does not define the text face"
+# The content width joined the vocabulary in the same pass that made every
+# composition constrain against it. Asserted as a front-matter key, because that
+# is what composition-preview.mjs reads; the prose token list below it is not.
+grep -Eq '^  container: ' "$p" \
+  || fail "$p does not define the content width, so every composition padding-inline is invalid at computed-value time"
 
 # The handoff: a DESIGN.md the demo was built from is worth nothing if /wp-init
 # scrapes the demo's :root instead of reading it, or leaves it behind in demo/.

@@ -2,7 +2,8 @@
 .proof-row, .proof-row *, .proof-row *::before, .proof-row *::after { box-sizing: border-box; }
 .proof-row {
   container-type: inline-size;
-  padding: var(--space-section) var(--space-gutter);
+  padding-block: var(--space-section);
+  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max)) / 2));
   border-top: 1px solid var(--color-hairline);
   background: var(--color-canvas);
 }
