@@ -37,4 +37,19 @@ done
 grep -Fq 'feel check' "$c" || fail "$c dropped the feel check that the old Step 4 required"
 grep -Fq 'impeccable detect' "$d" || fail "$d does not run the detector inside the craft loop"
 
+# The three kinds must be distinguishable in the walker itself, not just named in
+# prose. `reveal` publishing nothing samplable is why dead-scroll fired on every
+# library-built section; conflating that with real dead scroll is the defect.
+v=bin/demo-verify.mjs
+grep -Fq "kind: 'unobserved'" "$v" \
+  || fail "$v does not emit an unobserved finding, so an unreadable section is still reported as dead"
+grep -Fq "kind: 'no-engine'" "$v" \
+  || fail "$v does not emit a no-engine finding, so a page with no devices still walks clean"
+grep -Fq "data-motion') === 'reveal'" "$v" \
+  || fail "$v does not sample the reveal device, so every reveal-only section reports dead scroll"
+for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
+  grep -Fq 'unobserved' "$f" || fail "$f does not document the unobserved finding"
+  grep -Fq 'no-engine' "$f" || fail "$f does not document the no-engine finding"
+done
+
 echo PASS

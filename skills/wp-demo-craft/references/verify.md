@@ -80,6 +80,15 @@ shortening the span, not by adding motion to fill it. Authored silence recorded
 in `demo/BRIEF.md` is the exception, and it is only an exception because it was
 written down first.
 
+- `unobserved` — the section carries devices but none the harness can sample.
+  Advisory: it never fails a round. `reveal` was reported as `dead-scroll` for
+  every section that used it until v3.1, which is what taught a build to dismiss
+  392 findings in prose. A gate that cannot tell a good page from a broken one
+  gets overruled, and then so does every gate beside it.
+- `no-engine` — the page carries no `data-motion` at all. Fails the round. A
+  motionless page used to walk clean, because an empty frame signature could
+  never accumulate a stall.
+
 **Cues that never peak**: an element that never reaches full opacity anywhere in
 its section, usually a cue window too narrow for the span.
 

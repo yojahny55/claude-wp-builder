@@ -10,6 +10,14 @@
   infinite loop animations went uncaught. Wired in by `tests/checks/wp-craft-composition-gate.sh`.
 
 ### Fixed
+- **`dead-scroll` learns to tell a section that does not move from one the harness cannot
+  read.** `reveal` publishes no `--motion-p` and no composition carries a cue, so every
+  library-built section reported `dead-scroll` forever — 392 findings on a 12-page build
+  whose only clean section was its one hand-built pin. `bin/demo-verify.mjs`'s probe now
+  samples the reveal child the ruleset targets (`[data-motion="reveal"] > *`); a section
+  the harness still cannot read reports `unobserved` and stays advisory, and a page with
+  zero `data-motion` devices reports `no-engine` instead of walking clean on an empty
+  frame signature.
 - **The two compositions that failed the library's own slop gate are scroll-linked now.**
   `closing-block` ran a 7s infinite conic sweep and `proof-row` a 38s infinite translate,
   both reported by `impeccable` as `marquee` at `category=slop`/`severity=warning` — the

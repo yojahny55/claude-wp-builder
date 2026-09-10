@@ -186,11 +186,29 @@ async function captureResponsiveShots(browser, url, outDir) {
 /** Read one frame's signature plus its static defects. Runs inside the page. */
 const probe = () => {
   const sig = [];
+  let devices = 0;
+  let samplable = 0;
   document.querySelectorAll('[data-motion]').forEach((el) => {
-    sig.push(el.style.getPropertyValue('--motion-p') || '');
+    devices += 1;
+    const before = sig.length;
+    const p = el.style.getPropertyValue('--motion-p');
+    if (p) sig.push(p);
     const rail = el.querySelector('[data-motion-rail]');
     if (rail) sig.push(rail.style.transform || '');
     if (el.style.clipPath) sig.push(el.style.clipPath);
+    // `reveal` publishes no progress value under either engine — the CSS path
+    // animates opacity and translate directly, the JS path tweens them. Sample
+    // the child the ruleset actually targets (`[data-motion="reveal"] > *`) so a
+    // working reveal contributes a changing signature instead of nothing.
+    if (el.getAttribute('data-motion') === 'reveal') {
+      const child = el.firstElementChild;
+      if (child) {
+        const cs = getComputedStyle(child);
+        sig.push(Number(cs.opacity).toFixed(2));
+        sig.push(cs.translate || cs.transform || '');
+      }
+    }
+    if (sig.length > before) samplable += 1;
   });
   const cues = [];
   document.querySelectorAll('[data-motion-cue]').forEach((el, i) => {
@@ -222,6 +240,8 @@ const probe = () => {
   });
   return {
     signature: sig.join('|'),
+    devices,
+    samplable,
     cues,
     clipped,
     overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
@@ -324,10 +344,22 @@ try {
         frame.clipped.forEach((t) =>
           findings.push({ kind: 'clipped-copy', pass, width: size.width, section: b.id, text: t })
         );
-        if (previous !== null && frame.signature === previous && frame.signature !== '') stalls++;
+        if (previous !== null && frame.signature === previous) stalls++;
         else stalls = 0;
-        if (stalls >= 2 && !reduced)
-          findings.push({ kind: 'dead-scroll', pass, width: size.width, section: b.id, y: Math.round(y) });
+        if (stalls >= 2 && !reduced) {
+          if (frame.devices === 0) {
+            // A page with no devices cannot stall its way to a finding under the
+            // old guard, so a motionless demo walked clean. It fails loudly now.
+            findings.push({ kind: 'no-engine', pass, width: size.width, section: b.id, y: Math.round(y) });
+          } else if (frame.samplable === 0) {
+            // The harness cannot read these devices, which is not the same claim
+            // as "this section does not move". Advisory, so it never fails a
+            // round on the strength of what the harness could not see.
+            findings.push({ kind: 'unobserved', pass, width: size.width, section: b.id, y: Math.round(y), devices: frame.devices });
+          } else {
+            findings.push({ kind: 'dead-scroll', pass, width: size.width, section: b.id, y: Math.round(y) });
+          }
+        }
         previous = frame.signature;
       }
     }

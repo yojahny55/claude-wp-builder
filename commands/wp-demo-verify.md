@@ -93,6 +93,14 @@ branch: `/wp-demo` probes first and stops on 2.)
 - **dead scroll**: consecutive positions where nothing changed. Shorten the
   section's span or add a cue. Authored silence recorded in `demo/BRIEF.md` is not
   dead scroll; say so instead of "fixing" it.
+- `unobserved` — the section carries devices but none the harness can sample.
+  Advisory: it never fails a round. `reveal` was reported as `dead-scroll` for
+  every section that used it until v3.1, which is what taught a build to dismiss
+  392 findings in prose. A gate that cannot tell a good page from a broken one
+  gets overruled, and then so does every gate beside it.
+- `no-engine` — the page carries no `data-motion` at all. Fails the round. A
+  motionless page used to walk clean, because an empty frame signature could
+  never accumulate a stall.
 - **cue never reaches full opacity**: the window is too narrow or the ramps eat
   it. Widen the window or set explicit ramps.
 - **horizontal overflow**: at any width, always a defect.
