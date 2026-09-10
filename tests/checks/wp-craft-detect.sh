@@ -31,7 +31,7 @@ if grep -Fq 'P0' "$c"; then fail "$c still says P0, a severity impeccable never 
 grep -Fq 'demo/VERIFY.md' "$c" || fail "$c does not write the score card"
 grep -Eqi 'external (package|dependency)' "$c" || fail "$c does not say the detector is an external dependency this repo does not vendor"
 grep -Eqi 'could not run|could not be performed' "$c" || fail "$c does not fail loudly, and distinctly from zero findings, when the detector cannot run at all"
-for line in 'First paint complete' 'One peak' 'Squint test' 'Contrast, read from the frame' 'Mobile headline' 'Adjacent feelings'; do
+for line in 'First paint complete' 'One peak' 'Squint test' 'Contrast, read from the frame' 'Mobile headline' 'Adjacent feelings' 'Name-swap'; do
   grep -Fq "$line" "$c" || fail "$c rubric is missing: $line"
 done
 grep -Fq 'feel check' "$c" || fail "$c dropped the feel check that the old Step 4 required"

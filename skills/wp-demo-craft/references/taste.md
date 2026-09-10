@@ -195,6 +195,15 @@ not one property. Five tools, used together:
 Three elevation steps (`--shadow-e1/2/3`), no more. If everything is
 elevated, nothing is.
 
+**Today's antidote is tomorrow's default.** Grain, film texture, asymmetry and
+tactile brutalism are now in every trend roundup published this year, which means
+the next generation of models is learning them as the safe answer. Reaching for
+grain because it reads as anti-AI is the same move as reaching for a purple
+gradient because it read as modern. What does not commoditise is the reason: a
+texture chosen because this brand makes physical objects is defensible, and the
+same texture chosen because it looks hand-made is decoration. State the reason in
+`demo/BRIEF.md` or leave the surface flat.
+
 ---
 
 ## Cards

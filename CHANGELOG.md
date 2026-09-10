@@ -2,7 +2,57 @@
 
 ## [Unreleased]
 
+### Added
+- **A vendored 192-row domain table constrains the composition plan, never the tokens.**
+  `skills/wp-demo-craft/references/domains/domains.csv` takes only `domain`, `keywords`,
+  `page_pattern`, `considerations` and `confidence` from `nextlevelbuilder/ui-ux-pro-max-skill`
+  (MIT, imported by `bin/domains-import.sh`, with `SOURCE.txt` recording the exact ref and
+  commit it pulled). Its colour and typography tables were refused on sight: the source
+  catalogue maps 192 product types onto 50 distinct primary colours and pairs Playfair Display
+  with Inter, which would hand every client in a category the same palette — exactly what this
+  plugin's fingerprint gate exists to refuse, and a pairing its own type floor already names
+  Inter against as the most-used face in machine-generated pages. New check:
+  `tests/checks/wp-craft-domains.sh`.
+- **`/wp-demo` and `/wp-yolo` classify the client's domain before the composition plan, and
+  the match never touches a token.** Two distinct keyword hits is the bar; the highest count
+  wins; an exact tie reports both names and proceeds `unclassified` rather than guessing; and
+  because the keyword lists are English-only, a docs set with no English-language material is
+  reported `unclassified` with that reason stated instead of silently falling through. A
+  match's `page_pattern` and `considerations` fold into the brief as constraints on which
+  section roles the plan may pick — colour and type still come only from `demo/DESIGN.md` and
+  the client's own material. Recorded once per site in `.wp-create.json` under `"domain"`, and
+  read rather than re-derived on a later run.
+- **`reveal` now has a second, CSS-only engine, and the two never double-drive the same
+  section.** `starter-theme/__tailwind__/assets/css/src/tailwindcss/utilities/motion.css`,
+  pulled in through the theme's existing Tailwind entry (`main.css`), drives every
+  `[data-motion="reveal"]` child under `@supports (animation-timeline: view()) { @media
+  (prefers-reduced-motion: no-preference) { ... } }`. `motion.js` tests the identical
+  feature-query string, `CSS.supports('animation-timeline', 'view()')`, and yields the device
+  to CSS whenever it matches and motion is not reduced, so exactly one engine drives `reveal`
+  in every combination of feature support and reduced-motion preference. New/extended check:
+  `tests/checks/wp-craft-motion.sh`.
+- **A seventh rubric line, `Name-swap`, plus scales derived in `oklch()`.** Replacing the
+  client's name with a competitor's throughout the copy and re-reading it catches a page that
+  describes a category rather than a business — graded from the sheets like the other six
+  lines. `demo/DESIGN.md` now carries a token's `oklch()` triple beside its recorded hex value,
+  because equal numeric steps in oklch are equal perceptual steps while a scale stepped in hex
+  or HSL produces visible bright and dark spots at the same interval; the hex value stays the
+  recorded token so nothing downstream breaks. `taste.md`'s Depth section now warns that grain,
+  film texture and tactile brutalism are in every trend roundup published this year, so
+  reaching for them because they read as anti-AI is today's antidote becoming tomorrow's
+  default unless the reason is stated in `demo/BRIEF.md`.
+
 ### Changed
+- **Every composition sizes its breakpoints to its own container, not the viewport.** Each
+  root declares `container-type: inline-size` and every size-based breakpoint is an
+  `@container` query, so a section dropped into a narrow column lays out for the column
+  instead of the screen. An element never matches a container query against the container it
+  establishes itself, so four compositions needed an `__inner` wrapper to carry the queried
+  layout, with `data-motion` moved onto it so `reveal` still staggers the same children. The
+  fluid ramps do not share the fix: the `vw` in `clamp()` gaps and type scales, 40 occurrences
+  across 12 of the 13 compositions, still key off the viewport, so a section in a narrow column
+  still takes desktop-maximum spacing. `compositions/README.md` and the root `CLAUDE.md` both
+  record that as open work rather than claim it is done.
 - **Craft mode is reference-first and render-verified (`wp-demo-craft` v2).** The first real
   craft build shipped blind — nothing checked whether a browser was even usable before the
   build started, so a 12,000px page with an empty first screen and a headline clipped mid-word

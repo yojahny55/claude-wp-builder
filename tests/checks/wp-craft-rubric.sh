@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # The evaluator rubric is the half of verification a machine cannot do, made
-# checkable: six named lines, pass/fail each, three rounds, and no fingerprint for
+# checkable: seven named lines, pass/fail each, three rounds, and no fingerprint for
 # a failing build. Losing any line silently returns craft mode to shipping blind —
 # the machine reports green on dead scroll and overflow while the page still opens
-# on an empty dark field with a headline clipped mid-word. The six line names are
+# on an empty dark field with a headline clipped mid-word. The seven line names are
 # quoted verbatim by commands/wp-demo-verify.md, so renaming one here breaks that
 # command's score card without any file failing to parse.
 set -euo pipefail
@@ -14,7 +14,7 @@ v=skills/wp-demo-craft/references/verify.md
 [ -f "$v" ] || fail "$v is missing"
 
 for line in 'First paint complete' 'One peak' 'Squint test' 'Contrast, read from the frame' \
-            'Mobile headline' 'Adjacent feelings'; do
+            'Mobile headline' 'Adjacent feelings' 'Name-swap'; do
   grep -Fq "$line" "$v" || fail "verify.md rubric is missing the line: $line"
 done
 

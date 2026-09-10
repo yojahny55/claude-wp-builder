@@ -171,10 +171,12 @@ piece as it is built, or when the site is one page.
 and records the answer as `demo mode` in `.wp-create.json`. Craft mode needs a browser
 (`playwright-core` plus Chrome; `demo-verify.mjs --probe` checks both and `/wp-demo` stops on a
 missing one), writes `demo/DESIGN.md` from the client docs, `npx designlang@12` and a vendored
-catalogue of 64 real-brand DESIGN.md files, builds every section from the plugin's composition
-library, and loops on `npx -y impeccable@4 detect` plus a six-line critique rubric for at most
-three rounds; plain mode is the existing single-file demo with no motion contract, for an admin
-tool, intranet or catalogue. Nothing paid is involved.
+catalogue of 64 real-brand DESIGN.md files, classifies the client's domain against a vendored
+192-row table to constrain which section roles the composition plan may pick (never the tokens),
+builds every section from the plugin's composition library — every composition sized to its own
+container rather than the viewport — and loops on `npx -y impeccable@4 detect` plus a
+seven-line critique rubric for at most three rounds; plain mode is the existing single-file demo
+with no motion contract, for an admin tool, intranet or catalogue. Nothing paid is involved.
 
 ### Path C — cinematic
 
@@ -224,7 +226,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-settings <text>` | B | optional | Extend the settings page |
 | `/wp-seed [file]` | B | required for content | Pages, media, fields, menus from the demo |
 | `/wp-finalize` | all | recommended | Pre-delivery checklist |
-| `/wp-demo-verify <path-or-url> [--positions N]` | all | recommended | Scroll-walk a demo dir or live page, impeccable detector, screenshots per section and viewport, six-line critique into demo/VERIFY.md |
+| `/wp-demo-verify <path-or-url> [--positions N]` | all | recommended | Scroll-walk a demo dir or live page, impeccable detector, screenshots per section and viewport, seven-line critique into demo/VERIFY.md |
 | `/wp-responsive-check <url>` | all | recommended | Alias, dispatches `/wp-demo-verify` (5-viewport layout check is now one part of what it walks) |
 | `/wp-audit [flags]` | all | optional | Security, SEO, a11y, performance, best practices |
 | `/wp-polylang <src> <dst>` | all | polylang only | Translate the site through Polylang |

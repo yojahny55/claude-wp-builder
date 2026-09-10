@@ -44,3 +44,10 @@ every composition renders without edits:
 A hardcoded hex in a section is a defect: the same value now exists in two
 places, and the one in `:root` is the one `/wp-init` carries into the theme.
 `/wp-init` reads this file before it reads the demo's `:root`.
+
+**Derive scales in `oklch()`, record hex beside them.** Equal numeric steps in
+oklch are equal perceptual steps, and holding lightness constant across hues
+holds contrast, which is what makes a derived scale safe to generate rather than
+hand-pick. A scale stepped in hex or HSL produces visible bright and dark spots
+at the same numeric interval. `DESIGN.md` keeps the hex value as the recorded
+token so nothing downstream breaks, and carries the oklch triple beside it.

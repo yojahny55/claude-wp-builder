@@ -54,8 +54,9 @@ plain: an unverified craft page is the one that reaches the client.
    constraint from domain classification, or writing "no domain signal" when
    none applies (this is what makes the classification bind on the plan instead
    of sitting unread) — from the role table in `compositions/README.md`
-   (`references/compositions.md`). Sum the motion cost before building and hold
-   it under the budget in `devices.md`.
+   (`references/compositions.md`). That row format is stated in these same terms
+   `/wp-demo` Step 2.6 uses on purpose — do not restate it a third way. Sum the
+   motion cost before building and hold it under the budget in `devices.md`.
 4. **Build** from the compositions, the tokens and the real copy.
 5. **Loop** until the rubric passes or three rounds are spent
    (`references/verify.md`).

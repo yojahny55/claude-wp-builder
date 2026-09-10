@@ -209,6 +209,14 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   so nothing in the markup marks a translatable string. The bilingual pipeline reads
   the recorded `i18n strategy` instead — which it should anyway; markers in a demo were
   never the source of truth.
+- **A composition's breakpoints size to its own container; its fluid ramps do not.**
+  Every composition's size-based breakpoints are `@container` queries against the
+  block's own `container-type: inline-size`, so a section dropped into a narrow column
+  lays out for the column. The `vw` in `clamp()` gaps and type scales still keys off the
+  viewport, though — 40 occurrences across 12 of the 13 compositions — so a section in a
+  narrow column still takes desktop-maximum spacing. `compositions/README.md` states the
+  gap; converting those ramps to container-relative units is open work, not done in this
+  pass.
 - **Composition previews need the network to regenerate.** They render against the
   neutral `references/design-md/_preview.md` and their fill copy lives in
   `compositions/fills.json`, which points at remote placeholder images. The committed

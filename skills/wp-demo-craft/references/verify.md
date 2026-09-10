@@ -41,7 +41,7 @@ three rounds stops and reports rather than shipping quietly, and it
 
 ## The rubric
 
-Six lines, each one pass or fail per page. No scores out of ten: a 7/10 is a
+Seven lines, each one pass or fail per page. No scores out of ten: a 7/10 is a
 build nobody has to change.
 
 - **First paint complete.** Headline, primary visual and CTA all inside the
@@ -66,6 +66,10 @@ build nobody has to change.
 - **Adjacent feelings.** Write one word per section, cold, from the sheet alone.
   No two adjacent words the same. Only then open `demo/BRIEF.md` and diff the
   words against the curve; two identical neighbours are one section shown twice.
+- **Name-swap.** Replace the client's name with a competitor's throughout the
+  copy and read it again. If it still reads perfectly, the copy describes a
+  category rather than this business, and it will not build trust. Graded from
+  the sheets like the others.
 
 ## What the machine measures
 

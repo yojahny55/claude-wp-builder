@@ -1,5 +1,5 @@
 ---
-description: Verify a demo directory, page or live URL — impeccable detector, scroll-walk screenshots per section and viewport, machine findings, and a six-line critique written to demo/VERIFY.md
+description: Verify a demo directory, page or live URL — impeccable detector, scroll-walk screenshots per section and viewport, machine findings, and a seven-line critique written to demo/VERIFY.md
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 argument-hint: "<demo-dir-or-file-path-or-url> [--positions N]"
 ---
@@ -117,6 +117,10 @@ every page pass/fail on each line and write the table to `demo/VERIFY.md`
 - **Adjacent feelings.** One word per section, written cold (the feel check); no
   two adjacent words the same. Only now open `demo/BRIEF.md` and diff the
   curves.
+- **Name-swap.** Replace the client's name with a competitor's throughout the
+  copy and read it again. If it still reads perfectly, the copy describes a
+  category rather than this business, and it will not build trust. Graded from
+  the sheets like the others.
 
 ## Step 5: Report
 

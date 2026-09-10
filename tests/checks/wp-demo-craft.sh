@@ -135,4 +135,9 @@ grep -Eqi 'contact sheet' "$r/verify.md" || fail "verify.md does not require rea
 grep -Eqi 'not a pass|is not a pass' "$r/verify.md" \
   || fail "verify.md does not state that a green machine run alone is not a pass"
 
+# --- The floor gained a seventh rubric line and two authoring notes. --------
+grep -Fq 'oklch' "$r/design-md.md" || fail "design-md.md does not derive token scales in oklch"
+grep -Eqi 'trend roundup|becoming the next default|next default' "$r/taste.md" \
+  || fail "taste.md does not warn that today's anti-slop moves become tomorrow's default"
+
 echo PASS
