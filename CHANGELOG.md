@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **A composition gate proves the library passes its own slop rule.**
+  `bin/composition-gate.sh` assembles each `skills/wp-demo-craft/compositions/*/section.html` +
+  `section.css` pair into a complete document before scanning, because `impeccable detect`
+  scans zero files and exits 0 against the bare fragments — the reason two compositions'
+  infinite loop animations went uncaught. Wired in by `tests/checks/wp-craft-composition-gate.sh`.
+  Currently red on purpose: `closing-block` and `proof-row` both fail on `marquee`.
+
 ## [1.14.0] - 2026-09-09
 
 ### Added
