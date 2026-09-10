@@ -80,6 +80,11 @@ before writing any markup.
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/fingerprint.md`, which
    owns the row shape, the header and the comparison. On a failure change the
    type pair or the accent, not the log.
+
+   If the registry already holds a row for this client, or the project shows a prior
+   demo in `docs/` or in git history, the plan states how this build's grammar and
+   hero composition differ from it. "It is a fresh build" is not an answer — the
+   previous rebuild was written fresh and converged on the same silhouette anyway.
 3. **Brief.** Self-author `demo/BRIEF.md` from the project docs: person, pain,
    promise, vibe words, two or three named references and what to take from
    each, assets owned, the feeling curve (one line per section: emotion, then

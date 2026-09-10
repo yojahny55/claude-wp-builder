@@ -56,4 +56,14 @@ grep -Fq 'after three rounds with failures' "$y" || fail "$y does not cap the cr
 grep -Fq 'demo/VERIFY.md' "$y" || fail "$y does not read the score card"
 grep -Fq '/wp-demo-verify demo/' "$y" || fail "$y verifies a single page instead of walking demo/"
 
+# The same-client rule: a repeat client cannot be handed back the structure they
+# rejected. Structure stays uncompared across clients (v1's six axes stay retired);
+# this only binds when a row already exists for the same client.
+grep -Fq 'same-client rule' skills/wp-demo-craft/references/fingerprint.md \
+  || fail "fingerprint.md has no same-client rule, so a repeat client can get the prior structure back"
+grep -Fq 'differ in grammar and in the hero composition' skills/wp-demo-craft/references/fingerprint.md \
+  || fail "fingerprint.md does not say what a repeat build must differ in"
+grep -Fq 'is not an answer' commands/wp-demo.md \
+  || fail "commands/wp-demo.md does not require the plan to say how a repeat build differs"
+
 echo PASS

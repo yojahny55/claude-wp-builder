@@ -3,6 +3,19 @@
 ## [Unreleased]
 
 ### Added
+- **A repeat client can no longer be handed back the structure they rejected.** The
+  fingerprint gate compares palette and type across clients and nothing within one, and a
+  build that fails the rubric records no row — so a client who rejected a demo and had it
+  deleted got a rebuild reproducing the rejected build's recorded header silhouette almost
+  exactly, invisible on every axis including palette. `fingerprint.md` gains a same-client
+  rule: when a row already exists for this client, the new build's grammar and hero
+  composition must differ, and the plan must say how — read from the plan and from any
+  prior demo in `docs/` or git history, not from the registry alone, since a deleted
+  predecessor left no row to compare against. Structure stays uncompared across clients
+  and v1's six retired axes stay retired; this is one same-client rule, not a seventh axis.
+  `/wp-demo` Step 2.6's fingerprint gate states the requirement and rules out "it is a
+  fresh build" as an answer, since the previous rebuild was written fresh and converged on
+  the same silhouette anyway.
 - **A content width, an asset inventory, and no inherited placeholders — three client
   complaints, three contract holes.** Craft is told to ignore plain mode's `:root` clause,
   which was the only place `--container-max` was ever defined, so every composition padded

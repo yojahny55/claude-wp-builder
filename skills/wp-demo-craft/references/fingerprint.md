@@ -43,3 +43,20 @@ shipped, and logging it would make the gate refuse a palette no client ever saw.
 Rows written under v1 (six structural axes: grammar, nav, hero, sequence, close,
 signature move) stay in the file untouched. Only the four palette and type
 columns are compared, and a v1 row that does not carry them is skipped.
+
+## The same-client rule
+
+When a row already exists for this `client`, the new build must differ in grammar and in the hero composition,
+and the composition plan must say how. This is two sentences of judgement, not a
+seventh axis: structure is still not compared across clients, and v1's six axes
+stay retired.
+
+The gate is otherwise blind twice over for a repeat client. Structure is not
+compared at all, and a build that failed the rubric records no row — so a
+rejected demo is invisible on every axis including palette. The rule therefore
+reads the plan rather than the registry alone, which is what lets a deleted
+predecessor still constrain its successor.
+
+A client rejected a demo, had it deleted, and received a rebuild whose header
+silhouette reproduced the recorded fingerprint of the rejected one almost
+exactly: "a slim top bar holds the wordmark, EN/ES and Client login".
