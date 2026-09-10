@@ -6,6 +6,8 @@
  *
  * usage: composition-preview.mjs [--fill] <composition-dir>
  *        --fill substitutes compositions/fills.json copy for the {{slot}} markers
+ *        --tokens prints the :root block these previews render against and exits 0,
+ *                 without a browser, so the emitted CSS itself can be asserted on
  *        exit 0 ok, 2 no browser, 3 crash
  */
 import { existsSync, readFileSync, writeFileSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
@@ -18,6 +20,16 @@ const root = resolve(here, '..');
 const argv = process.argv.slice(2);
 const useFill = argv.includes('--fill');
 const dir = resolve(argv.find((a) => !a.startsWith('--')) || '.');
+// --tokens is the one path that needs neither a composition nor a browser: it
+// prints exactly the :root every preview is rendered against, so a check can
+// assert the emitted CSS rather than grep this file for the lines that build it.
+// A source grep is satisfied by a commented-out line, a renamed key, a later
+// reassignment or a duplicate key; the output is satisfied by none of them.
+if (argv.includes('--tokens')) {
+  process.stdout.write(rootBlock(previewTokens()) + '\n');
+  process.exit(0);
+}
+
 const html = join(dir, 'section.html');
 const css = join(dir, 'section.css');
 if (!existsSync(html) || !existsSync(css)) {
@@ -50,6 +62,17 @@ function previewTokens() {
     container: p('spacing.container', /\n  container: "([^"]+)"/),
     rsm: p('rounded.sm', /\n  sm: ([^\n]+)/), rmd: p('rounded.md', /\n  md: ([^\n]+)/),
   };
+}
+
+/** The `:root` every preview renders against, from _preview.md's own values. Kept
+ *  as one function so `--tokens` prints the same string the page embeds — a copy
+ *  that drifts would assert nothing about what is actually rendered. */
+function rootBlock(t) {
+  return `:root{--color-canvas:${t.canvas};--color-surface:${t.surface};--color-ink:${t.ink};--color-ink-soft:${t.inkSoft};
+--color-accent:${t.accent};--color-accent-ink:${t.accentInk};--color-hairline:${t.hairline};
+--font-display:"${t.display}",system-ui,sans-serif;--font-text:"${t.text}",system-ui,sans-serif;
+--space-section:${t.section};--space-gutter:${t.gutter};--container-max:${t.container};
+--radius-sm:${t.rsm};--radius-md:${t.rmd}}`;
 }
 
 /** Substitute the committed `compositions/fills.json` copy for the `{{slot}}` markers.
@@ -143,11 +166,7 @@ try {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="${fontsHref}">
 <style>
-:root{--color-canvas:${t.canvas};--color-surface:${t.surface};--color-ink:${t.ink};--color-ink-soft:${t.inkSoft};
---color-accent:${t.accent};--color-accent-ink:${t.accentInk};--color-hairline:${t.hairline};
---font-display:"${t.display}",system-ui,sans-serif;--font-text:"${t.text}",system-ui,sans-serif;
---space-section:${t.section};--space-gutter:${t.gutter};--container-max:${t.container};
---radius-sm:${t.rsm};--radius-md:${t.rmd}}
+${rootBlock(t)}
 html{background:var(--color-canvas);color:var(--color-ink);font-family:var(--font-text)}body{margin:0}
 ${readFileSync(css, 'utf8')}
 ${motionCss}

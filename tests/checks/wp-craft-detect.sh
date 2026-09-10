@@ -41,18 +41,28 @@ grep -Fq 'impeccable detect' "$d" || fail "$d does not run the detector inside t
 # prose. `reveal` publishing nothing samplable is why dead-scroll fired on every
 # library-built section; conflating that with real dead scroll is the defect.
 v=bin/demo-verify.mjs
-grep -Fq "kind: 'unobserved'" "$v" \
+# Every pin below greps a JS file, and a JS file has comments: writing
+# `<broken code> // <original line>` leaves a plain grep for the original green
+# while the code it names is gone. All ~27 pins on this file fell to that, one of
+# them re-opening the dead-engine regression round 3 of Task 3 closed. So grep a
+# comment-stripped copy instead of the source, and a parked literal stops being a
+# match. Block comments first; then a `//` run that is neither part of a URL
+# (`http://`) nor an escaped slash inside a regex literal (`\/\/`).
+vs="$(mktemp)"
+trap 'rm -f "$vs"' EXIT
+perl -0pe 's{/\*.*?\*/}{}gs' "$v" | perl -pe 's{(?<![:\\/])//.*$}{}' > "$vs"
+grep -Fq "kind: 'unobserved'" "$vs" \
   || fail "$v does not emit an unobserved finding, so an unreadable section is still reported as dead"
-grep -Fq "kind: 'no-engine'" "$v" \
+grep -Fq "kind: 'no-engine'" "$vs" \
   || fail "$v does not emit a no-engine finding, so a page with no devices still walks clean"
 # The other half of the split, and the one that costs more when it is wrong:
 # drive() is required to publish --motion-p for the SCRUB devices, so a stalled
 # section carrying one with nothing samplable is an engine that never ran, not a
 # device the harness cannot read. Routing that to advisory shipped a broken page
 # green — the exact file://-blocked-module failure this branch exists to fix.
-grep -Fq 'frame.samplable === 0 && !b.scrub' "$v" \
+grep -Fq 'frame.samplable === 0 && !b.scrub' "$vs" \
   || fail "$v routes a scrubbed section with nothing samplable to advisory, so a page whose motion engine never ran exits 0"
-grep -Fq "data-motion') === 'reveal'" "$v" \
+grep -Fq "data-motion') === 'reveal'" "$vs" \
   || fail "$v does not sample the reveal device, so every reveal-only section reports dead scroll"
 for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
   grep -Fq 'unobserved' "$f" || fail "$f does not document the unobserved finding"
@@ -65,24 +75,32 @@ done
 # luck and a miss is the false dead-scroll this whole finding exists to avoid.
 # Reveal is judged by two samples instead, and the walk's own dead-scroll push
 # must stay behind the scrubbed branch or the false positive comes straight back.
-grep -Fq "const SCRUB = ['pin', 'pan', 'kinetic', 'wipe', 'drift']" "$v" \
+grep -Fq "const SCRUB = ['pin', 'pan', 'kinetic', 'wipe', 'drift']" "$vs" \
   || fail "$v does not tell a scrubbed section from an entry-driven one, so both take the same sampling window"
 # Anchored on the call site and its consequence, never on the identifier: the
 # whole two-point block was once deleted with the function left defined, and a
 # `grep -Fq revealState` stayed green while dead-scroll-for-reveal ceased to
 # exist. The second sample proves the block is called twice; the -A1 pair proves
 # the comparison still pushes a finding when the two samples match.
-grep -Fq 'const after = await page.evaluate(revealState, b.idx);' "$v" \
+grep -Fq 'const after = await page.evaluate(revealState, b.idx);' "$vs" \
   || fail "$v does not take the second reveal sample, so the two-point check cannot run and a sparse walk reports dead scroll on a section that reveals"
-grep -A1 -F 'if (after === before)' "$v" | grep -Fq "kind: 'dead-scroll'" \
+grep -A1 -F 'if (after === before)' "$vs" | grep -Fq "kind: 'dead-scroll'" \
   || fail "$v does not report dead-scroll when both reveal samples match, so a reveal that never fires walks clean"
 # The predicate itself. Comparing computed opacity/transform let a decorative
 # @keyframes on the reveal's own children counterfeit a live reveal; only a
 # ViewTimeline-driven animation is the device's contract. `none` is what keeps an
 # unwired reveal from returning '' and being skipped by the `before !== ''` guard.
-grep -Fq 'a.timeline instanceof ViewTimeline' "$v" \
+grep -Fq 'a.timeline instanceof ViewTimeline' "$vs" \
   || fail "$v judges reveal by computed style, so ambient motion on the same children spoofs a section with no reveal wired at all"
-grep -Fq "out.push('none')" "$v" \
+# revealState's own device query, both halves. Renaming the attribute value
+# ('revealx') collects zero devices, `out` stays empty, both samples read '' and
+# every section is skipped by the `before !== ''` guard: reveal detection is
+# silent with every assertion above it intact.
+grep -Fq "if (root.matches('[data-motion=\"reveal\"]')) devices.push(root);" "$vs" \
+  || fail "$v does not collect a section that is itself the reveal device, so a reveal on the section root is never sampled"
+grep -Fq "root.querySelectorAll('[data-motion=\"reveal\"]').forEach((el) => devices.push(el));" "$vs" \
+  || fail "$v does not query [data-motion=\"reveal\"] inside the section, so a renamed selector collects no devices and reveal detection silently stops"
+grep -Fq "out.push('none')" "$vs" \
   || fail "$v returns an empty reveal state for a child with no scroll-driven animation, so an unwired reveal is skipped instead of reported"
 # The block's own guard, pinned by polarity AND by what it gates. Inverting one
 # character (`!b.scrub` → `b.scrub`) or wrapping the condition in `false &&`
@@ -90,18 +108,22 @@ grep -Fq "out.push('none')" "$v" \
 # intact — while reveal detection disappears entirely and deadreveal/falsealive
 # drop to exit 0. Anchoring the first sample under the exact condition is what
 # makes either edit fail here by name.
-grep -A3 -F 'if (!b.scrub && !reduced && belowFold >= 0) {' "$v" \
+grep -A3 -F 'if (!b.scrub && !reduced && belowFold >= 0) {' "$vs" \
   | grep -Fq 'const before = await page.evaluate(revealState, b.idx);' \
   || fail "$v does not gate the two-point reveal check on exactly '!b.scrub && !reduced && belowFold >= 0' with the first sample inside it, so inverting or disabling that guard silently switches reveal detection off"
 # The GSAP fallback path. motion.js drives reveal with rAF tweens when the
 # browser has no view(), and those are invisible to getAnimations(), so the
 # predicate must return the unjudged sentinel there rather than read none|none
 # and call a working section dead.
-grep -Fq "CSS.supports('animation-timeline', 'view()')" "$v" \
-  || fail "$v judges reveal on a browser with no view(), where motion.js drives it in GSAP and getAnimations() sees nothing, so a working section is reported dead"
+# Pinned with the `!` and the early return, never on the bare CSS.supports() call:
+# dropping one character inverts the guard, revealState returns the unjudged
+# sentinel on every browser that DOES support view() — which is every browser the
+# harness runs on — and reveal detection ceases entirely with the suite green.
+grep -Fq "if (!CSS.supports('animation-timeline', 'view()')) return '';" "$vs" \
+  || fail "$v judges reveal on a browser with no view(), where motion.js drives it in GSAP and getAnimations() sees nothing, so a working section is reported dead — or the guard's polarity was inverted, which switches reveal detection off on every browser that has view()"
 grep -Fq "animation-timeline', 'view()" skills/wp-demo-craft/references/verify.md \
   || fail "skills/wp-demo-craft/references/verify.md does not record that reveal is unjudged without view() support, so the limit reads as a bug"
-grep -Fq '} else if (b.scrub) {' "$v" \
+grep -Fq '} else if (b.scrub) {' "$vs" \
   || fail "$v pushes dead-scroll from the walk for an entry-driven section, which is the false positive the two-point sample replaces"
 for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
   grep -Fq 'below the fold and fully entered' "$f" \
@@ -114,13 +136,13 @@ done
 # Anchored on the whole literal set, not just 'unobserved': that also catches
 # container-noop landing in the set by mistake, which would silently stop it
 # from blocking the round it exists to fail.
-grep -Fq "const ADVISORY = new Set(['unobserved', 'external-module'])" "$v" \
+grep -Fq "const ADVISORY = new Set(['unobserved', 'external-module'])" "$vs" \
   || fail "$v does not name exactly unobserved and external-module as its advisory kinds, so either a new advisory kind was added without updating this or container-noop landed in the set and stopped blocking"
-grep -Fq 'exitCode = blocking === 0 ? 0 : 1' "$v" \
+grep -Fq 'exitCode = blocking === 0 ? 0 : 1' "$vs" \
   || fail "$v exits on the total finding count, so an advisory-only run still fails the round"
-grep -Fq "' [advisory]'" "$v" \
+grep -Fq "' [advisory]'" "$vs" \
   || fail "$v does not label advisory findings in the printed line, so a reader cannot see why a run with findings exited 0"
-grep -Fq 'nothing blocking, ' "$v" \
+grep -Fq 'nothing blocking, ' "$vs" \
   || fail "$v does not distinguish an advisory-only run from a run with nothing to report"
 for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
   grep -Fq 'advisory-only run exits 0' "$f" \
@@ -132,7 +154,7 @@ for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; d
   grep -Fq 'page-wide judgments, printed per section' "$f" \
     || fail "$f still reads as if unobserved/no-engine were per-section facts; both counters come from a document-wide query"
 done
-grep -Fq 'f.advisory = true' "$v" \
+grep -Fq 'f.advisory = true' "$vs" \
   || fail "$v writes findings.json without the advisory flag, so the label exists only on stdout"
 # The command contradicted itself: an exit-code line that predates the advisory
 # split, three lines from the line that documents it.
@@ -148,19 +170,31 @@ grep -Fq 'parallax' skills/wp-demo-craft/references/verify.md \
 # and says nothing about it: six such blocks shipped in one build and were only
 # found from screenshots. The finding must exist, and it must be blocking (the
 # advisory-set assertion above already pins that).
-grep -Fq "kind: 'container-noop'" "$v" \
+grep -Fq "kind: 'container-noop'" "$vs" \
   || fail "$v does not lint @container rules with no container-type ancestor"
 # The walk must start one level above the queried element: a container query
 # never matches the container the queried element establishes itself, so
 # starting at the element instead of its parent misses that case silently.
-grep -Fq 'let node = el.parentElement;' "$v" \
+# The rule filter itself. Renaming the class it matches ('CSSContainerRuleX') makes
+# the loop `continue` on every rule in every sheet: the lint is permanently silent,
+# every line of it still present, and the run exits 0.
+grep -Fq "if (rule.constructor.name !== 'CSSContainerRule') continue;" "$vs" \
+  || fail "$v does not filter styleSheet rules on exactly CSSContainerRule, so a renamed or altered comparison skips every rule and the container lint is permanently silent"
+# And its polarity one line down. `if (!el) continue;` -> `if (el) continue;`
+# skips every selector that actually resolves, which is all of them, with the
+# same silent result. Anchored under the querySelector that produces `el`, so the
+# guard cannot be satisfied by an identical line somewhere else in the file.
+grep -A1 -F 'try { el = document.querySelector(sel); } catch { continue; }' "$vs" \
+  | grep -Fq 'if (!el) continue;' \
+  || fail "$v does not skip only the selectors that match nothing after querySelector, so inverting that guard skips every selector that does match and the container lint goes silent"
+grep -Fq 'let node = el.parentElement;' "$vs" \
   || fail "$v starts the container-type ancestor walk at the element itself, so an element that establishes its own container is wrongly cleared instead of reported"
 # The lint's polarity, anchored on the guard expression itself. Both lines above
 # survive `if (!found)` -> `if (found)` intact, and that one character inverts
 # the lint completely: every correctly written container query is reported as
 # dead and every actually dead rule is cleared. A selector is reported when the
 # ancestor walk found NO container, never when it found one.
-grep -Fq 'if (!found) out.push(sel);' "$v" \
+grep -Fq 'if (!found) out.push(sel);' "$vs" \
   || fail "$v does not report a container-query selector only when the ancestor walk found no container-type, so the lint's polarity is inverted: correct compositions are flagged and dead rules are cleared"
 
 # Loading a demo as file:// puts an external module script on an opaque
@@ -171,27 +205,27 @@ grep -Fq 'if (!found) out.push(sel);' "$v" \
 # serve(), so a grep for it alone stays green even with the import deleted
 # (a ReferenceError that only surfaces the first time a page is actually
 # walked, never here).
-grep -Fq "import { createServer } from 'node:http';" "$v" \
+grep -Fq "import { createServer } from 'node:http';" "$vs" \
   || fail "$v does not import createServer from node:http, so serving the demo over HTTP throws at runtime the first time a page is walked"
-grep -Fq "kind: 'external-module'" "$v" \
+grep -Fq "kind: 'external-module'" "$vs" \
   || fail "$v does not warn when a built demo still carries an external module script that only works when served"
 # The query that produces it. The push text above stays intact under
 # `[type="module"]` -> `[type="modulex"]`, and the finding then never fires on
 # any page: the fixture reports zero findings and exits 0, which is the silent
 # pass this task exists to close, reopened by one character.
-grep -Fq 'script[type="module"][src]' "$v" \
+grep -Fq 'script[type="module"][src]' "$vs" \
   || fail "$v does not query script[type=\"module\"][src], so no external module script is ever detected and the advisory silently never fires"
 # Both static checks run behind one per-page gate. Inverting it
 # (`if (!staticChecked)` -> `if (staticChecked)`) never runs the block at all,
 # because the flag is only ever set inside it — container-noop and
 # external-module both disappear with every line of theirs still present, and
 # the run exits 0. Anchored on the guard and on the flag being set inside it.
-grep -A1 -F 'if (!staticChecked) {' "$v" | grep -Fq 'staticChecked = true;' \
+grep -A1 -F 'if (!staticChecked) {' "$vs" | grep -Fq 'staticChecked = true;' \
   || fail "$v does not gate the static checks on '!staticChecked' with the flag set inside, so inverting that guard silently skips container-noop and external-module entirely"
 # The demo server decodes the request path. decodeURIComponent throws URIError
 # on a malformed escape, and outside the try that throw is uncaught and kills
 # the walk mid-run; a demo with a stray '%' in an href is enough.
-grep -Fq 'err instanceof URIError ? 400 : 404' "$v" \
+grep -Fq 'err instanceof URIError ? 400 : 404' "$vs" \
   || fail "$v does not answer 400 on a malformed percent-encoding, so a stray '%' in a demo path throws out of the request handler and kills the walk"
 # Anchored on the explanatory phrase from each dedicated bullet, not only the
 # bare kind name: both files also name-drop 'external-module' in passing, in
@@ -218,5 +252,20 @@ grep -Fq '68–90 times per run' skills/wp-demo-craft/references/verify.md \
   || fail "verify.md does not cite the measured 68-90-times-per-run rate that justifies dismissing cramped-padding"
 grep -Fq '131px/129px' skills/wp-demo-craft/references/verify.md \
   || fail "verify.md does not cite the measured padding (56/57px, 131/129px) that proves cramped-padding false-fired"
+# And the floor under the dismissal. Every measurement above is a LARGE padding
+# the detector misread; a collapsed token computes to 0px, where cramped-padding
+# is the one machine signal that would catch it. Without this clause the file
+# teaches builds to dismiss the finding that would have caught its own parked
+# defect.
+grep -Fq 'a measured padding under roughly 16px' skills/wp-demo-craft/references/verify.md \
+  || fail "verify.md dismisses cramped-padding with no lower bound, so a 0px padding from a collapsed token is dismissed alongside the 131px false positives"
+
+# The @container lint's own scope, recorded rather than fixed: a limit nobody
+# wrote down is indistinguishable from a bug, and this branch's whole thesis is
+# that an untrustworthy gate gets dismissed wholesale.
+grep -Fq "each sheet's **top-level** \`cssRules\`" skills/wp-demo-craft/references/verify.md \
+  || fail "verify.md does not record that the @container lint reads only top-level cssRules, so an @container nested in @media/@supports/@layer is silently unlinted"
+grep -Fq 'which is its **first** match only' skills/wp-demo-craft/references/verify.md \
+  || fail "verify.md does not record that the @container lint judges a selector by its first match only"
 
 echo PASS

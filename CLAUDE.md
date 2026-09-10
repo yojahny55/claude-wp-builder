@@ -200,6 +200,15 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   contract; the React libraries are never dependencies. A feeling curve that needs an
   eleventh role builds it by hand under the same contract with a reason in
   `demo/BRIEF.md`.
+- **The `@container` lint under-reports, in two known ways.** `containerAudit()`
+  in `bin/demo-verify.mjs` iterates only each stylesheet's top-level `cssRules`,
+  so an `@container` block nested inside `@media`, `@supports` or `@layer` is
+  never linted — and `proof-row` already nests `@media` inside `@supports`, so
+  generated demos plausibly will nest container queries too. It also judges a
+  selector by `document.querySelector(sel)`, the first match only, so a second
+  instance of the same selector outside any container is never seen. Both
+  directions are under-reporting, never a false positive; widening the lint's
+  scope is open work, recorded in `references/verify.md` rather than done.
 - **The evaluator reads headless sheets.** Real-device feel is still unproven, and
   Landing Gallery screenshots are inspiration only.
 - **`designlang` extracts what a site declares.** A site built on inline styles or

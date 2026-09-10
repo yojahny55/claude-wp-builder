@@ -40,6 +40,18 @@ grep -Fq -- '--container-max:${t.container}' "$r" \
 # this pair (the front-matter value is a length) is in wp-craft-design-md.sh.
 grep -Fq -- "container: p('spacing.container'" "$r" \
   || fail "$r no longer reads the content width out of _preview.md, so it emits --container-max:undefined"
+# And the assertion that outlives all of them: the emitted :root itself. Every
+# grep above reads source text, and source text has four recorded bypasses —
+# comment the line out, rename the key, reassign after the read, add a duplicate
+# key later in the object. `--tokens` prints the exact string the page embeds
+# (one function builds both), needs no browser, and none of the four survives it.
+# Its ceiling: it observes what previewTokens() and rootBlock() produce, not a
+# later mutation of the token object at the render call site — the flag has
+# already exited by then, and seeing that would take the render itself.
+tokens="$(node "$r" --tokens)" \
+  || fail "$r --tokens does not print the preview :root, so the emitted tokens cannot be asserted at all"
+echo "$tokens" | grep -Eq -- '--container-max:[^;}]*[0-9](px|rem|em|ch|vw|vmin|%)' \
+  || fail "$r emits a --container-max that is not a CSS length: $(echo "$tokens" | tr '\n' ' ')"
 
 c=skills/wp-demo-craft/compositions
 [ -f "$c/README.md" ] || fail "$c/README.md (the role table) is missing"

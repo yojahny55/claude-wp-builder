@@ -58,10 +58,68 @@
 - **A composition gate proves the library passes its own slop rule.**
   `bin/composition-gate.sh` assembles each `skills/wp-demo-craft/compositions/*/section.html` +
   `section.css` pair into a complete document before scanning, because `impeccable detect`
-  scans zero files and exits 0 against the bare fragments — the reason two compositions'
-  infinite loop animations went uncaught. Wired in by `tests/checks/wp-craft-composition-gate.sh`.
+  scans zero files and exits 0 against the bare fragments — the reason `proof-row`'s
+  infinite loop animation went uncaught. `tests/checks/wp-craft-composition-gate.sh` runs
+  it against the library, and against two synthetic libraries it must reject: one carrying
+  an infinite marquee (`rc=2`) and one with a 0-byte `section.html` behind a real
+  stylesheet (`rc=1`). A gate only ever watched passing cannot be told from a disabled
+  one — mutating the detector filter or zeroing `MIN_HTML_BYTES` left the old check green.
+  `bin/composition-gate.sh` takes a `COMPS_DIR` override for that, and loses its disk
+  recount, which could never disagree with the counter it was checking.
+
+### Documentation
+- **The `@container` lint's two blind spots are written down.** `containerAudit()` walks
+  only each stylesheet's top-level `cssRules`, so an `@container` nested inside `@media`,
+  `@supports` or `@layer` is never linted — and `proof-row`'s own CSS already nests
+  `@media` inside `@supports` — and it judges a selector by `document.querySelector(sel)`,
+  its first match only. Both under-report; neither fires falsely. Recorded in
+  `references/verify.md` beside the harness's other limits and in `CLAUDE.md`'s ceilings,
+  and deliberately not fixed here: a limit nobody wrote down is indistinguishable from a
+  bug, which is how a gate becomes untrustworthy enough to dismiss wholesale.
+- **`cramped-padding`'s dismissal gains a lower bound.** `verify.md` recorded it as a known
+  false-positive source on evidence of 56/57px and 131/129px — large paddings the detector
+  misread — which as written taught builds to dismiss the one machine signal that catches a
+  collapsed token, whose padding computes to **0px**. A measured padding under roughly 16px
+  is now stated to be a true positive, not a capture artefact.
 
 ### Fixed
+- **`demo/FAILED.md` stops being a one-way latch.** Nothing anywhere deleted the marker,
+  so the branch's headline mechanism shipped without its inverse: a craft `/wp-yolo` run
+  that exhausted its three rounds wrote the marker at Step 2.6 and was then refused by its
+  own Step 0 gate forever, and a build that failed, was fixed and then passed on a later
+  `/wp-demo iterate` still left the marker on disk, with `/wp-init`, `/wp-section` and
+  `/wp-yolo` permanently refusing a demo that had since passed and nothing telling anyone
+  why. The craft verify loop now clears it at its top (`rm -f demo/FAILED.md`) rather than
+  on success, in both entry points, so the marker always describes the **last** loop and
+  never a past one; the three Step 0 gates say what clears it. `references/verify.md`
+  records the rule and `tests/checks/wp-craft-failed-build.sh` pins the literal deletion
+  in every file that runs the loop, so a rewording cannot satisfy the pin while the
+  deletion is gone.
+- **`tests/checks/wp-craft-detect.sh` greps a comment-stripped copy of
+  `bin/demo-verify.mjs`.** It stripped nothing, so all ~27 of its pins on that file fell to
+  comment-parking — write `<broken code> // <original line>` and every grep stays green.
+  Nine were verified to fall that way, one of them re-opening the dead-engine regression a
+  whole fix round had closed (dropping `&& !b.scrub` from `frame.samplable === 0 &&
+  !b.scrub`). The check now strips block comments and line comments once into a temp file
+  and greps that, leaving URLs and escaped slashes in regex literals intact.
+- **Four more text-pins become behaviour-pins.** A comment-stripped grep does not catch a
+  polarity inversion or a renamed constant, so each is pinned on the line that carries it:
+  the `view()` guard including its `!` and early return (dropping one character makes
+  `revealState` return the unjudged sentinel on every browser that *has* `view()` — every
+  browser the harness runs on — and reveal detection ceases with the suite green); the
+  `CSSContainerRule` comparison and the `if (!el) continue;` beneath it (either one
+  renamed or inverted silences the `@container` lint entirely); and `revealState`'s own
+  `[data-motion="reveal"]` queries, both the section-root `matches()` and the descendant
+  `querySelectorAll()` (renaming the attribute value collects zero devices and every
+  section is skipped). All four are the same defect as the `[type="module"]` pin this
+  branch already closed.
+- **`bin/composition-preview.mjs --tokens` prints the preview `:root` and exits 0 without a
+  browser**, and `tests/checks/wp-craft-compositions.sh` asserts that the emitted
+  `--container-max` is a CSS length. Every other assertion about that token reads source
+  text, which has four recorded bypasses — comment the line out, rename the key, reassign
+  after the read, add a duplicate key later in the object — and an output assertion
+  defeats all four at once. One `rootBlock()` builds both the flag's output and the page's
+  own `<style>`, so the two cannot drift.
 - **`dead-scroll` learns to tell a section that does not move from one the harness cannot
   read.** `reveal` publishes no `--motion-p` and no composition carries a cue, so every
   library-built section reported `dead-scroll` forever — 392 findings on a 12-page build
@@ -83,11 +141,18 @@
   `findings.json` like any other, a run whose findings are all advisory exits `0` and says
   `nothing blocking, N advisory finding(s)` instead of looking clean, and any blocking
   finding still exits `1`.
-- **The two compositions that failed the library's own slop gate are scroll-linked now.**
-  `closing-block` ran a 7s infinite conic sweep and `proof-row` a 38s infinite translate,
-  both reported by `impeccable` as `marquee` at `category=slop`/`severity=warning` — the
-  shape that fails a verification round before a screenshot is taken, so every build using
-  the closing or proof role failed by construction. Both now run on the view timeline: the
+- **The composition that failed the library's own slop gate is scroll-linked now, and so
+  is its sibling.** `proof-row` ran a 38s infinite translate, reported by `impeccable` as
+  `marquee` at `category=slop`/`severity=warning` — the shape that fails a verification
+  round before a screenshot is taken — so every build using the proof role failed by
+  construction. `closing-block`'s 7s infinite conic sweep was rewritten in the same pass;
+  re-running the real gate against that original rule reports 0 slop findings and exits 0,
+  so it never failed this gate, and the rewrite stands on the library's own
+  anti-perpetual-motion rules rather than on a gate failure it did not cause. (An earlier
+  revision of this entry, and of the header of
+  `tests/checks/wp-craft-composition-gate.sh`, claimed both had failed. They had not; the
+  claim came from the task brief and propagated unmeasured. Overstating what a gate caught
+  is the failure mode this branch exists to remove.) Both now run on the view timeline: the
   beam sweeps once on entry, the name track drifts while its section is on screen. No
   device, no span, no motion-cost change, so the role table stays true. `proof-row` loses
   its hover/focus pause block, which existed only because the movement was automatic.

@@ -14,12 +14,15 @@
 # `[ -f ... ]` alone is not a scan guard: a truncated section.html/section.css
 # would satisfy it and inflate the count the same as real content, and this gate
 # — and the check wired to it — would go green while scanning nothing.
-# MIN_HTML_BYTES/MIN_CSS_BYTES/MIN_DOC_BYTES and the disk recount below are this
-# script's own defence against that, since the detector offers none.
+# MIN_HTML_BYTES/MIN_CSS_BYTES/MIN_DOC_BYTES are this script's own defence
+# against that, since the detector offers none.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-COMPS="skills/wp-demo-craft/compositions"
+# COMPS_DIR exists so the gate can be pointed at a synthetic library and proved to
+# still fail — a gate only asserted to pass is a gate nobody has watched fail.
+# Real runs never set it.
+COMPS="${COMPS_DIR:-skills/wp-demo-craft/compositions}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -73,14 +76,7 @@ if [ "$count" -eq 0 ]; then
   exit 1
 fi
 
-# Recount on disk rather than trust the loop variable: what matters is what is
-# actually sitting in $WORK the moment the detector is pointed at it.
-scanned="$(find "$WORK" -maxdepth 1 -name '*.html' -type f | wc -l)"
-if [ "$scanned" -eq 0 ] || [ "$scanned" -ne "$count" ]; then
-  echo "composition-gate: assembled $count compositions but $scanned real files are on disk — refusing to scan" >&2
-  exit 1
-fi
-echo "composition-gate: assembled $count compositions ($scanned real files on disk, each >= $MIN_DOC_BYTES bytes)"
+echo "composition-gate: assembled $count compositions (each >= $MIN_DOC_BYTES bytes on disk)"
 
 npx -y impeccable@4 detect "$WORK" --json > "$WORK/findings.json" 2>/dev/null || true
 
