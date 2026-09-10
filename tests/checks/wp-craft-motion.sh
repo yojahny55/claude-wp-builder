@@ -90,7 +90,10 @@ grep -Fq 'animation-timeline: view();' "$mc" \
   || fail "$mc never sets animation-timeline: view(), so the reveal runs on the document timeline and snaps to its end state"
 grep -Fq 'animation-name: wp-reveal;' "$mc" \
   || fail "$mc never sets animation-name: wp-reveal, so the gated ruleset animates nothing"
-grep -Fq '@keyframes wp-reveal' "$mc" \
+# Anchored on the opening brace, not the bare name: '@keyframes wp-revealx' contains
+# '@keyframes wp-reveal' as a substring, so a rename that leaves animation-name pointing
+# at nothing would satisfy a -F match while the device animates nothing at all.
+grep -Eq '@keyframes[[:space:]]+wp-reveal[[:space:]]*\{' "$mc" \
   || fail "$mc does not define @keyframes wp-reveal, the animation the reveal ruleset names"
 grep -Fq 'translate:' "$mc" || fail "$mc does not use translate, which parallax cannot collide with"
 grep -Fq 'transform:' "$mc" && fail "$mc writes transform, which collides with the parallax device"

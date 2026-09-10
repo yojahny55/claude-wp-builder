@@ -43,6 +43,11 @@ grep -Fq 'motion.js' "$i" || fail "$i does not wire motion.js for craft projects
 # the recorded mode, and it was doing half of it.
 grep -Fq 'utilities/motion.css' "$i" \
   || fail "$i does not handle the CSS half of the motion engine, so a plain theme still imports it"
+# Mentioning the file is not the same as removing it. The craft branch names
+# utilities/motion.css too — to KEEP it — so the assertion above passes even if the
+# plain branch's removal is deleted. Anchor on the removal instruction itself.
+grep -Fq 'line from `main.css`' "$i" \
+  || fail "$i does not tell the plain branch to remove the motion.css import from main.css"
 grep -Fq 'wp-aos-animator' "$i" || fail "$i does not keep wp-aos-animator for plain projects"
 
 # --- The retrofit audit. -----------------------------------------------------
