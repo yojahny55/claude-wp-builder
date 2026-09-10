@@ -1,6 +1,7 @@
 /* ====== Section: Features (feature-zigzag) ====== */
 .feature-zigzag, .feature-zigzag *, .feature-zigzag *::before, .feature-zigzag *::after { box-sizing: border-box; }
 .feature-zigzag {
+  container-type: inline-size;
   padding: var(--space-section) var(--space-gutter);
   display: grid;
   gap: clamp(3rem, 6vw, 6rem);
@@ -76,7 +77,7 @@
 }
 .feature-zigzag__link:active { transform: scale(0.98); }
 .feature-zigzag__link:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 4px; border-radius: var(--radius-sm); }
-@media (min-width: 880px) {
+@container (min-width: 880px) {
   .feature-zigzag__item { grid-template-columns: 1fr 1fr; }
   /* The flip is `direction` on the grid, so the source order stays image-then-copy
      and a screen reader reads both rows the same way round. */

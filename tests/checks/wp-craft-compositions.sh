@@ -50,6 +50,16 @@ for d in "$c"/*/; do
   # '-' is a word boundary, so a bare \bease-in\b also matches inside the
   # different keyword ease-in-out and would fail a file that never used ease-in.
   grep -Eq '\bease-in\b($|[^-])' "$d/section.css" && fail "$name/section.css uses ease-in; never ease-in on UI"
+  # A composition is a section dropped into an arbitrary page context, so its
+  # breakpoints key on its own container and never on the screen. Every root
+  # declares the containment context, including the ones with no size query, so
+  # all thirteen behave the same way in a narrow column. @media stays only for
+  # (hover:hover)/(pointer:fine) and (prefers-reduced-motion) — user and device
+  # conditions a container query cannot express.
+  grep -Fq 'container-type: inline-size' "$d/section.css" \
+    || fail "$name/section.css does not declare a containment context, so it sizes to the viewport"
+  grep -Eq '@media \((min|max)-width' "$d/section.css" \
+    && fail "$name/section.css still uses a size-based media query; a section sizes to its container, not the screen"
   # Every img declares its box, or the page reflows when the photograph lands.
   while IFS= read -r img; do
     [[ "$img" == *width=* && "$img" == *height=* ]] \

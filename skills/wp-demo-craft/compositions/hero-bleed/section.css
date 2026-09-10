@@ -1,6 +1,7 @@
 /* ====== Section: Hero (hero-bleed) ====== */
 .hero-bleed, .hero-bleed *, .hero-bleed *::before, .hero-bleed *::after { box-sizing: border-box; }
 .hero-bleed {
+  container-type: inline-size;
   position: relative;
   isolation: isolate;
   overflow: hidden;

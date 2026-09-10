@@ -1,6 +1,7 @@
 /* ====== Section: Pricing (offer-table) ====== */
 .offer-table, .offer-table *, .offer-table *::before, .offer-table *::after { box-sizing: border-box; }
 .offer-table {
+  container-type: inline-size;
   padding: var(--space-section) var(--space-gutter);
   background: var(--color-canvas);
   border-top: 1px solid var(--color-hairline);
@@ -130,11 +131,11 @@
 }
 /* Cell padding is the whole phone budget: at 1.25rem a side, six half-gutters push
    the table past 390px and it scrolls sideways. It grows back where there is room. */
-@media (min-width: 560px) {
+@container (min-width: 560px) {
   .offer-table__plan, .offer-table__cell { padding-left: 1.25rem; padding-right: 1.25rem; }
   .offer-table__row-label { padding-right: 1.25rem; }
 }
-@media (min-width: 700px) {
+@container (min-width: 700px) {
   .offer-table__plan, .offer-table__cell { padding-left: 1.5rem; padding-right: 1.5rem; }
   .offer-table__row-label { padding-right: 1.5rem; }
 }

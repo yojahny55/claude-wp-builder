@@ -4,6 +4,7 @@
    read as a deliberate opening, short enough that the page's first real section
    is already on screen underneath it. No min-height, no dvh, no scroll cost. */
 .page-head {
+  container-type: inline-size;
   padding: calc(var(--space-section) * 1.15) var(--space-gutter) calc(var(--space-section) * 0.7);
   background: var(--color-canvas);
   border-bottom: 1px solid var(--color-hairline);

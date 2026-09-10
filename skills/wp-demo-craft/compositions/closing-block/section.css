@@ -1,6 +1,7 @@
 /* ====== Section: Closing (closing-block) ====== */
 .closing-block, .closing-block *, .closing-block *::before, .closing-block *::after { box-sizing: border-box; }
 .closing-block {
+  container-type: inline-size;
   padding: var(--space-section) var(--space-gutter);
   background: var(--color-canvas);
 }

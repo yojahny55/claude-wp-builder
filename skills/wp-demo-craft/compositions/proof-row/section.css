@@ -1,6 +1,7 @@
 /* ====== Section: Proof (proof-row) ====== */
 .proof-row, .proof-row *, .proof-row *::before, .proof-row *::after { box-sizing: border-box; }
 .proof-row {
+  container-type: inline-size;
   padding: var(--space-section) var(--space-gutter);
   border-top: 1px solid var(--color-hairline);
   background: var(--color-canvas);
@@ -96,7 +97,7 @@
 @media (hover: hover) and (pointer: fine) {
   .proof-row__marquee:hover .proof-row__track { animation-play-state: paused; }
 }
-@media (min-width: 760px) {
+@container (min-width: 760px) {
   .proof-row__figures { grid-template-columns: repeat(3, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) {

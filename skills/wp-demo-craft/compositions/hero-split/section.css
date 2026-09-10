@@ -3,11 +3,18 @@
    without it `min-height: 100dvh` measures the content box and the padding is
    added on top, so the hero comes out a third taller than the screen. */
 .hero-split, .hero-split *, .hero-split *::before, .hero-split *::after { box-sizing: border-box; }
+/* The root is the containment context, and an element never matches a query against
+   its own container — so the split itself lives one level in, on __inner. The root
+   keeps the screen height so the hero still fills its first paint. */
 .hero-split {
+  container-type: inline-size;
+  display: grid;
+  min-height: 100dvh;
+}
+.hero-split__inner {
   display: grid;
   gap: var(--space-gutter);
   padding: calc(var(--space-section) * 0.75) var(--space-gutter) var(--space-section);
-  min-height: 100dvh;
   align-content: center;
 }
 .hero-split__kicker {
@@ -56,8 +63,8 @@
 .hero-split__cta:focus-visible, .hero-split__alt:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
 .hero-split__media { margin: 0; overflow: hidden; border-radius: var(--radius-md); }
 .hero-split__media img { width: 100%; height: auto; display: block; object-fit: cover; aspect-ratio: 4 / 5; }
-@media (min-width: 900px) {
-  .hero-split { grid-template-columns: 1.1fr 0.9fr; align-items: center; }
+@container (min-width: 900px) {
+  .hero-split__inner { grid-template-columns: 1.1fr 0.9fr; align-items: center; }
   .hero-split__media { margin-right: calc(var(--space-gutter) * -1); border-radius: var(--radius-md) 0 0 var(--radius-md); }
   /* The 4:5 crop is taller than the viewport at desktop widths; without a ceiling the
      hero grows past 100dvh and the headline leaves the first screen. */

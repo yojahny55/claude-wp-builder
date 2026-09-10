@@ -1,9 +1,15 @@
 /* ====== Section: FAQ (faq-list) ====== */
 .faq-list, .faq-list *, .faq-list *::before, .faq-list *::after { box-sizing: border-box; }
+/* The root is the containment context, and an element never matches a query against
+   its own container — so the layout that changes with width lives one level in, on
+   __inner. The root keeps only what does not move: the band and its padding. */
 .faq-list {
+  container-type: inline-size;
   padding: var(--space-section) var(--space-gutter);
   background: var(--color-canvas);
   border-top: 1px solid var(--color-hairline);
+}
+.faq-list__inner {
   display: grid;
   gap: clamp(2rem, 4vw, 3.5rem);
 }
@@ -75,8 +81,8 @@
   text-wrap: pretty;
   max-width: 62ch;
 }
-@media (min-width: 980px) {
-  .faq-list { grid-template-columns: minmax(16rem, 22rem) 1fr; align-items: start; gap: clamp(2rem, 5vw, 5rem); }
+@container (min-width: 980px) {
+  .faq-list__inner { grid-template-columns: minmax(16rem, 22rem) 1fr; align-items: start; gap: clamp(2rem, 5vw, 5rem); }
 }
 @media (prefers-reduced-motion: reduce) {
   .faq-list__q, .faq-list__q::after { transition: none; }

@@ -2,8 +2,8 @@
 
 **Role:** hero. Copy left, one real photograph right, crossing the gutter on
 desktop so the image overlaps the page edge (overlap sells depth better than
-shadow). Nothing masks the headline: `reveal` fades the section's direct children
-in on entry, and for a hero that entry is first paint.
+shadow). Nothing masks the headline: `reveal` fades the copy and the figure in on
+entry, and for a hero that entry is first paint.
 
 **Port of:** none.
 **Licence:** plugin (MIT).
@@ -18,7 +18,12 @@ the only imagery is stock or generated.
 **Slots:** kicker, title (max two lines at 1440, three at 390), lede (about 25
 words), cta_label/cta_href, alt_label/alt_href, image_src/image_alt (4:5 crop).
 
-**Notes:** the image gets `max-height: 68vh` above 900px. A 4:5 crop in the right
+**Notes:** the split is a container query on the section's own inline size, not the
+viewport, so the composition still stacks when it is dropped into a narrow column.
+The queried layout sits on `__inner` because an element never matches a query
+against the container it establishes itself.
+
+The image gets `max-height: 68vh` above 900px. A 4:5 crop in the right
 column is taller than the viewport at desktop widths, and without the ceiling the
 section grows past `100dvh` and pushes the headline off the first screen. The
 `object-fit: cover` on the image absorbs the crop.

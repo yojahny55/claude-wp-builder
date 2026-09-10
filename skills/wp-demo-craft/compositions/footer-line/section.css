@@ -1,11 +1,17 @@
 /* ====== Section: Footer (footer-line) ====== */
 .footer-line, .footer-line *, .footer-line *::before, .footer-line *::after { box-sizing: border-box; }
+/* The root is the containment context, and an element never matches a query against
+   its own container — so the row that only forms when there is width for it lives one
+   level in, on __inner. */
 .footer-line {
-  display: grid;
-  gap: 1.25rem;
+  container-type: inline-size;
   padding: calc(var(--space-section) * 0.5) var(--space-gutter);
   background: var(--color-canvas);
   border-top: 1px solid var(--color-hairline);
+}
+.footer-line__inner {
+  display: grid;
+  gap: 1.25rem;
 }
 .footer-line__wordmark {
   font-family: var(--font-display);
@@ -45,8 +51,8 @@
   max-width: 60ch;
   margin: 0;
 }
-@media (min-width: 720px) {
-  .footer-line {
+@container (min-width: 720px) {
+  .footer-line__inner {
     grid-template-columns: auto 1fr auto;
     align-items: center;
     gap: var(--space-gutter);

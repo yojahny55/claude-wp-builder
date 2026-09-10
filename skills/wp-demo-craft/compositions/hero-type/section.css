@@ -2,9 +2,16 @@
 /* Scoped reset: a composition cannot assume the host page carries one, and without
    it `min-height: 100dvh` measures the content box and adds the padding on top. */
 .hero-type, .hero-type *, .hero-type *::before, .hero-type *::after { box-sizing: border-box; }
+/* The root is the containment context, and an element never matches a query against
+   its own container — so the anchoring that changes with width lives one level in,
+   on __inner. The root keeps the screen height. */
 .hero-type {
+  container-type: inline-size;
   display: grid;
   min-height: 100dvh;
+}
+.hero-type__inner {
+  display: grid;
   /* Centred on a phone: bottom-anchoring a 400px block inside an 844px screen
      leaves half the first paint empty, which is the failure this library exists
      to stop. The held-breath version starts where there is room for it. */
@@ -58,12 +65,12 @@
 }
 .hero-type__cta:active { transform: scale(0.97); }
 .hero-type__cta:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
-@media (min-width: 720px) {
+@container (min-width: 720px) {
   /* Bottom-anchored where there is room: the silence above the type is the
      composition. Centred, the same words read as a block that failed to fill. */
-  .hero-type { align-content: end; padding: calc(var(--space-section) * 1.4) var(--space-gutter) var(--space-section); }
+  .hero-type__inner { align-content: end; padding: calc(var(--space-section) * 1.4) var(--space-gutter) var(--space-section); }
 }
-@media (min-width: 900px) {
+@container (min-width: 900px) {
   .hero-type__title { max-width: 15ch; }
 }
 @media (prefers-reduced-motion: reduce) {

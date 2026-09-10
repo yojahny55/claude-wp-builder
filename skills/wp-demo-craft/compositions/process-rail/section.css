@@ -3,6 +3,7 @@
 /* The engine reads data-motion-span for its warning only; the height and the
    sticky frame are the author's job (devices.md). span 2.0 -> 2 * 100vh. */
 .process-rail {
+  container-type: inline-size;
   height: calc(2 * 100vh);
   background: var(--color-canvas);
   border-top: 1px solid var(--color-hairline);

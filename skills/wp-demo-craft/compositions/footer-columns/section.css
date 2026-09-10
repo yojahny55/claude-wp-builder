@@ -1,6 +1,7 @@
 /* ====== Section: Footer (footer-columns) ====== */
 .footer-columns, .footer-columns *, .footer-columns *::before, .footer-columns *::after { box-sizing: border-box; }
 .footer-columns {
+  container-type: inline-size;
   padding: var(--space-section) var(--space-gutter) calc(var(--space-section) * 0.5);
   background: var(--color-surface);
   border-top: 1px solid var(--color-hairline);
@@ -62,7 +63,7 @@
 .footer-columns__copyright { font-size: 0.8125rem; line-height: 1.5; color: var(--color-ink-soft); margin: 0; }
 .footer-columns__legal-links { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; }
 .footer-columns__legal-links .footer-columns__link { font-size: 0.8125rem; color: var(--color-ink-soft); }
-@media (min-width: 720px) {
+@container (min-width: 720px) {
   .footer-columns__top { grid-template-columns: 1.4fr 1fr 1fr 1.2fr; }
 }
 @media (prefers-reduced-motion: reduce) {

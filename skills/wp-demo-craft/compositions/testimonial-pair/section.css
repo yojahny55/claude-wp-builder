@@ -1,6 +1,7 @@
 /* ====== Section: Testimonials (testimonial-pair) ====== */
 .testimonial-pair, .testimonial-pair *, .testimonial-pair *::before, .testimonial-pair *::after { box-sizing: border-box; }
 .testimonial-pair {
+  container-type: inline-size;
   position: relative;
   isolation: isolate;
   padding: var(--space-section) var(--space-gutter);
@@ -83,6 +84,6 @@
 }
 .testimonial-pair__name { font-weight: 600; font-size: 0.9375rem; color: var(--color-ink); }
 .testimonial-pair__place { font-size: 0.875rem; color: var(--color-ink-soft); }
-@media (min-width: 840px) {
+@container (min-width: 840px) {
   .testimonial-pair__grid { grid-template-columns: 1fr 1fr; }
 }
