@@ -11,6 +11,11 @@ quietly, and it **does not record a fingerprint**. `demo/FAILED.md` is the
 on-disk marker `/wp-init`, `/wp-section` and `/wp-yolo` refuse to build on top
 of — a craft build that failed verification is not a deliverable, and the
 marker is what makes that true on disk rather than only in the transcript.
+The loop **deletes the marker at its top** (`rm -f demo/FAILED.md`) rather than
+on success, so it always describes the last loop and never a past one: without
+that, a build that failed, was fixed and then passed would stay refused forever,
+and a `/wp-yolo` run that wrote the marker could never re-enter its own Step 0
+gate. Nothing else removes it.
 `/wp-demo-verify` runs this loop.
 
 ## Round structure
@@ -157,6 +162,15 @@ because `motion.js` drives reveal in GSAP there and a GSAP tween is invisible to
 `getAnimations()` — a working section would otherwise read `none` at both
 samples and be reported dead.
 
+Two more, in the `@container` lint itself, and neither is a bug: it walks only
+each sheet's **top-level** `cssRules`, so an `@container` block nested inside
+`@media`, `@supports` or `@layer` is never linted at all — `proof-row`'s own CSS
+already nests `@media` inside `@supports`, so generated demos plausibly nest
+container queries too; and it judges a selector by `document.querySelector(sel)`,
+which is its **first** match only, so a selector that resolves inside a real
+container somewhere on the page clears even when a second instance of it sits
+outside one. Both make the lint under-report; neither makes it fire falsely.
+
 **Cues that never peak**: an element that never reaches full opacity anywhere in
 its section, usually a cue window too narrow for the span.
 
@@ -171,7 +185,14 @@ under a real thumb.
 68–90 times per run on a build where `.entry__row` measured 56px
 above and 57px below its content and `.chapter` 131px/129px, and
 it fires on untouched compositions in this library. It is a
-`quality` finding and does not fail a round. We do not own the
+`quality` finding and does not fail a round.
+**The dismissal has a floor: a measured padding under roughly 16px
+is a true positive, not a capture artefact.** Every measurement
+that justified the dismissal above is a large padding the detector
+misread. A collapsed token — `padding-inline: var(--container-max)`
+with `--container-max` never defined, say — computes to 0px, and
+0px is exactly what `cramped-padding` exists to catch. Measure
+before dismissing; a dismissal without the measurement is not one. We do not own the
 detector, and pretending its `quality` output is precise is what
 invites blanket dismissal of everything it says.
 

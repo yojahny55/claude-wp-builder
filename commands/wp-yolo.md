@@ -34,7 +34,10 @@ user. Only the literal `--yolo` token in `$ARGUMENTS` skips it.
 **Stop if `demo/FAILED.md` exists.** Print its first ten lines and stop. Building
 a theme from a demo that never passed verification produces a verified-looking
 site on an unverified foundation, and every later audit measures the theme rather
-than the demo it came from.
+than the demo it came from. The marker is cleared only by a craft verify loop
+starting over (`/wp-demo iterate`, or a fresh craft run), which deletes it at its
+top — so it always describes the last loop. Do not delete it by hand to get past
+this gate.
 
 Read `.claude/CLAUDE.md` at the project root. If it does not exist, refuse:
 ```
@@ -188,8 +191,11 @@ verify loop that follows is `/wp-demo-verify demo/` over the directory, at most
 **three rounds**, reading the pass/fail table it writes to `demo/VERIFY.md` and
 fixing every failed line before the next round; after three rounds with failures,
 stop and write `demo/FAILED.md` — in the same shape `/wp-demo` Step 2.6 defines —
-rather than converting a demo the rubric never passed. That loop is
-the gate this mode exists for, and it blocks — unlike Step 5's
+rather than converting a demo the rubric never passed. Open the loop with
+`rm -f demo/FAILED.md`, exactly as `/wp-demo` Step 2.6 defines: the marker
+describes this run and not a past one, and clearing it is the only thing that
+lets a run which wrote the marker get back past this command's own Step 0 gate.
+That loop is the gate this mode exists for, and it blocks — unlike Step 5's
 `/wp-responsive-check`, whose findings are folded into the Step 6 review list. The
 rules are stated here in the same terms `/wp-demo` Step 2.6 uses on purpose, because
 the two entry points must gate identically — do not restate them a third way.

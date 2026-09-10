@@ -176,7 +176,12 @@ before writing any markup.
    carries the `reveal` device wherever the browser supports scroll-driven
    animation; without it, a demo in a modern browser reveals nothing, because
    `motion.js` yields that device to the stylesheet.
-7. **Loop.** At most three rounds. Each round runs `/wp-demo-verify demo/` — the
+7. **Loop.** At most three rounds. **Clear the marker before the first round**:
+   `rm -f demo/FAILED.md`. The marker describes the **last** verify loop, never a
+   past one — a build that failed, was fixed and now passes must not leave a file
+   on disk that `/wp-init`, `/wp-section` and `/wp-yolo` permanently refuse to
+   build on, and a `/wp-yolo` run that wrote it must be able to re-enter its own
+   Step 0 gate. Nothing else deletes it. Each round runs `/wp-demo-verify demo/` — the
    directory, so every page is walked — for the `impeccable detect` gate and the
    contact sheets. That command is the one place the detector and rubric
    contract is written; run it, do not restate it here. **Dispatch its critique

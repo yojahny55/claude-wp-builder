@@ -83,7 +83,10 @@ Under `--hybrid`, four things change and nothing else does:
 **Stop if `demo/FAILED.md` exists.** Print its first ten lines and stop. Building
 a theme from a demo that never passed verification produces a verified-looking
 site on an unverified foundation, and every later audit measures the theme rather
-than the demo it came from.
+than the demo it came from. The marker is cleared only by a craft verify loop
+starting over (`/wp-demo iterate`, or a fresh craft run), which deletes it at its
+top — so it always describes the last loop. Do not delete it by hand to get past
+this gate.
 
 Read the demo page for this section — `demo/<slug>.html` where `<slug>` is the `--page`
 value (**default `index`**, i.e. `demo/index.html` when `--page` is omitted) — and extract
