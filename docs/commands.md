@@ -144,7 +144,9 @@ self-authors `demo/BRIEF.md` (brand rules, audience pain and promise, two or thr
 references, vibe words, a per-section feeling curve with one named peak), reads the
 `wp-demo-craft` skill for its page grammar and device kit, checks the plan against
 `~/.claude/wp-builder/FINGERPRINTS.md` before building (the plan must differ from every prior
-row on at least 4 of 6 axes).
+row on at least 4 of 6 axes), and inventories every image, SVG and font under `docs/` into
+`demo/BRIEF.md` with a role — used, or named with a reason, so a client asset does not sit
+unused while the build reports it as owed.
 
 Craft mode also classifies the client's domain against the vendored 192-row table in
 `skills/wp-demo-craft/references/domains/domains.csv` — two distinct keyword hits to match,
@@ -162,6 +164,15 @@ demo in a modern browser reveals nothing. Sections are built from the compositio
 size-based breakpoints are `@container` queries against each composition's own container rather
 than the viewport — the fluid `vw` ramps in `clamp()` still key off the screen, which is recorded
 open work. Plain mode is the existing single-file demo with no motion contract.
+
+Each round of the craft loop runs `/wp-demo-verify demo/` — served over HTTP, not `file://` —
+for the `impeccable detect` gate and a machine walk. `no-engine` (a page with zero `data-motion`
+devices) and `container-noop` (a dead `@container` rule) join `dead-scroll` as findings that fail
+the round; `unobserved` (a section the walk could not read) and `external-module` (a module
+script that would silently fail to boot if the demo were opened as `file://`) are advisory and do
+not. Three rounds still failing writes `demo/FAILED.md` — every failing rubric line, every
+outstanding finding, the round count reached — and `/wp-init`, `/wp-section` and `/wp-yolo` stop
+on it rather than building a theme from an unverified demo.
 
 ### `/wp-polish`
 
@@ -289,15 +300,27 @@ at desktop width, then takes full-page screenshots at 375, 576, 768, 1024 and 14
 what `/wp-responsive-check` now dispatches to). Output lands in `<dir>/.verify/<width>/`:
 `findings.json` and one `sheet.png` per width.
 
-Four machine findings: dead scroll (consecutive positions where nothing changed, unless
-`demo/BRIEF.md` records it as authored silence), a cue that never reaches full opacity, any
-horizontal overflow, and copy clipped by its own hidden-overflow box.
+Eight machine findings, six blocking and two advisory. Blocking: `dead-scroll` (a
+`pin`/`pan`/`kinetic`/`wipe`/`drift` section where consecutive sampled positions show nothing
+moved — including nothing samplable at all, the `file://`-blocked-engine case — or a
+`reveal`-only section whose child does not move between just-below-the-fold and fully-entered,
+unless `demo/BRIEF.md` records the silence as authored), `no-engine` (a page carrying zero
+`data-motion` devices), `container-noop` (an `@container` rule whose subject has no ancestor
+declaring `container-type`, so the rule never applies), `cue-never-peaks` (a cue that never
+reaches full opacity), `overflow` (horizontal), and `clipped-copy` (copy clipped by its own
+hidden-overflow box). Advisory — printed with `[advisory]`, written to `findings.json` with
+`"advisory": true`, never raise the exit code: `unobserved` (a section the walk genuinely could
+not read — the harness cannot tell that apart from a section that truly does not move) and
+`external-module` (a `<script type="module">` that would silently fail to boot under `file://`
+instead of the HTTP server this walk uses). The craft loop in `/wp-demo` treats the six blocking
+kinds as round failures and writes `demo/FAILED.md` at the three-round cap; `unobserved` and
+`external-module` never do.
 
-Four exit codes: `0` no machine findings, `1` findings printed, `2` no usable browser, `3`
-the walk itself crashed (not a findings report). On exit code 2, fall back in order: the
-Chrome or Playwright MCP screenshot tools if either is connected, otherwise ask the user for
-screenshots at the five viewports. On exit code 3, report the crash rather than reading the
-run as clean.
+Four exit codes: `0` no blocking findings (zero findings, or advisory only), `1` a blocking
+finding was printed, `2` no usable browser, `3` the walk itself crashed (not a findings report).
+On exit code 2, fall back in order: the Chrome or Playwright MCP screenshot tools if either is
+connected, otherwise ask the user for screenshots at the five viewports. On exit code 3, report
+the crash rather than reading the run as clean.
 
 **A green machine run alone is not a pass.** Open every `sheet.png`, then run the feel check
 from `skills/wp-demo-craft/references/feel.md`: scroll the page cold, write one word per

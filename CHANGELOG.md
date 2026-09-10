@@ -139,6 +139,21 @@
   the container lint's polarity (`if (!found)`), the module-script selector
   (`script[type="module"][src]`) and the once-per-page `staticChecked` gate are each
   anchored on the token whose inversion or typo silently switches the check off.
+- **The 392-finding client baseline re-walked at 33.** `bin/demo-verify.mjs demo/` against
+  `next step credit solution/demo/` (12 pages, the build this branch exists to fix) now
+  reports 32 `dead-scroll` and 1 `container-noop`, zero `unobserved` and zero
+  `external-module`. The drop is real and traces mostly to serving over HTTP: with the
+  module script no longer blocked, `motion.js` boots and most sections read as moving
+  outright, with no finding at all, rather than falling back to `unobserved`. None of the
+  32 remaining `dead-scroll` findings moved to `unobserved` on this walk, because
+  `unobserved` requires the probe's page-wide `samplable` count to be zero — a whole-page
+  "the engine produced nothing readable" state that a booted engine essentially never
+  reaches, even on a page carrying a genuine dead section elsewhere. The remaining findings
+  are one real design defect repeated across pages (`closing-block__inner`, dead on 9 of 12)
+  and one page with two additional dead sections (`index.html`'s `how` and `steps__title`).
+  This walk does not exercise the `unobserved` path at all; that it fires correctly when a
+  page's engine is genuinely unreadable is asserted by `tests/checks/wp-craft-detect.sh`,
+  not demonstrated by this baseline.
 
 ## [1.14.0] - 2026-09-09
 

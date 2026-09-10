@@ -173,11 +173,17 @@ and records the answer as `demo mode` in `.wp-create.json`. Craft mode needs a b
 missing one), writes `demo/DESIGN.md` from the client docs, `npx designlang@12` and a vendored
 catalogue of 64 real-brand DESIGN.md files, classifies the client's domain against a vendored
 192-row table to constrain which section roles the composition plan may pick (never the tokens),
-builds every section from the plugin's composition library — every composition's size-based
-breakpoints are `@container` queries against its own container rather than the viewport, though
-its fluid `vw` ramps in `clamp()` still key off the screen — and loops on `npx -y impeccable@4 detect` plus a
-seven-line critique rubric for at most three rounds; plain mode is the existing single-file demo
-with no motion contract, for an admin tool, intranet or catalogue. Nothing paid is involved.
+and inventories every image, SVG and font under `docs/` into `demo/BRIEF.md` with a role, used
+or named with a reason. It builds every section from the plugin's composition library — every
+composition's size-based breakpoints are `@container` queries against its own container rather
+than the viewport, though its fluid `vw` ramps in `clamp()` still key off the screen — and loops
+on `npx -y impeccable@4 detect`, a seven-line critique rubric, and a `demo-verify.mjs` walk
+(served over HTTP, not `file://`; `no-engine` and `container-noop` join `dead-scroll` as
+blocking findings, `unobserved` and `external-module` stay advisory) for at most three rounds. A
+build still failing at the cap writes `demo/FAILED.md` — every failing rubric line, every
+outstanding finding, the round count reached — and `/wp-init`, `/wp-section` and `/wp-yolo`
+refuse to build a theme from it. Plain mode is the existing single-file demo with no motion
+contract, for an admin tool, intranet or catalogue. Nothing paid is involved.
 
 ### Path C — cinematic
 
