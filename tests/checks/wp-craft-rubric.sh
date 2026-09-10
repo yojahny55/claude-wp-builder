@@ -30,4 +30,17 @@ grep -Eqi 'only the (screenshots|sheets)' "$v" \
 grep -Fq '4.5:1' "$v" || fail "verify.md does not state the measured contrast floor"
 grep -Fq 'three lines' "$v" || fail "verify.md does not cap the mobile headline at three lines"
 
+# The count where it is actually acted on. commands/wp-demo.md Step 7 dispatches the
+# critique as a subagent and hands it "the N rubric lines" — that sentence is the only
+# thing on the /wp-demo path telling the evaluator how many lines to grade, and no other
+# check reads that file for the rubric. It said "six" for a release after the seventh
+# line landed, so Name-swap was never graded there. Assert the number, and refuse any
+# other count word rather than only the one that was wrong.
+c=commands/wp-demo.md
+[ -f "$c" ] || fail "$c is missing"
+grep -Fq 'the seven rubric lines' "$c" \
+  || fail "$c does not hand the evaluator all seven rubric lines"
+grep -Eqi 'the (one|two|three|four|five|six|eight|nine|ten) rubric lines' "$c" \
+  && fail "$c states a rubric line count other than seven"
+
 echo PASS

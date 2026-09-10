@@ -87,8 +87,12 @@ before writing any markup.
    where ___", authored silence. Mark anything invented "Self-authored, not
    interviewed". Ask, in one pass, only what the docs cannot answer. Show the
    brief once and proceed on a yes.
-4. **Classify the domain.** Match the client documents' English-language
-   material against the keyword lists in
+4. **Classify the domain.** If `.wp-create.json` already has `"domain"` — a prior
+   `/wp-demo` or `/wp-yolo` run against this same project recorded it — read it and
+   move on; **do not re-classify**. The manifest is the shared source of truth, and a
+   second run that re-derives the domain overwrites an operator's `name the domain
+   directly` override with the match it already rejected. Otherwise, match the client
+   documents' English-language material against the keyword lists in
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/domains/domains.csv`.
    A domain is matched when **two distinct keywords** from its list appear in the
    docs; below that, report `unclassified` and carry on without constraining
@@ -161,7 +165,7 @@ before writing any markup.
    contact sheets. That command is the one place the detector and rubric
    contract is written; run it, do not restate it here. **Dispatch its critique
    as a subagent**, not inline: hand it only the sheet paths under
-   `demo/.verify/` and the six rubric lines, and ask for a pass or fail per line
+   `demo/.verify/` and the seven rubric lines, and ask for a pass or fail per line
    with one sentence per failure, which is what goes into `demo/VERIFY.md`. The
    context that wrote the markup and the brief cannot grade the render — that is
    the self-assessment the rubric exists to remove. Read `demo/VERIFY.md`, fix

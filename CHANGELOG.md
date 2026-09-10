@@ -48,7 +48,9 @@
   `@container` query, so a section dropped into a narrow column lays out for the column
   instead of the screen. An element never matches a container query against the container it
   establishes itself, so four compositions needed an `__inner` wrapper to carry the queried
-  layout, with `data-motion` moved onto it so `reveal` still staggers the same children. The
+  layout. Three of them — `faq-list`, `hero-split` and `hero-type` — moved `data-motion` onto
+  that wrapper so `reveal` still staggers the same children; `footer-line` carries no
+  `data-motion` attribute at all, because it is not a reveal composition. The
   fluid ramps do not share the fix: the `vw` in `clamp()` gaps and type scales, 40 occurrences
   across 12 of the 13 compositions, still key off the viewport, so a section in a narrow column
   still takes desktop-maximum spacing. `compositions/README.md` and the root `CLAUDE.md` both

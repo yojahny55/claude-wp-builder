@@ -18,7 +18,8 @@ done in this pass. Only `(hover: hover) and (pointer: fine)` and
 conditions a container query cannot express. An element never matches a query
 against the container it establishes itself, so where the breakpoint changes
 the block's own layout it is applied to an `__inner` wrapper, which is also
-where `data-motion` moves so `reveal` still staggers the same children.
+where a `data-motion` attribute moves, when the block has one, so `reveal` still
+staggers the same children.
 
 Regenerate a preview:
 

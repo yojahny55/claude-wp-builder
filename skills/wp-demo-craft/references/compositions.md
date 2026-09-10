@@ -11,7 +11,13 @@ picture of a good section anywhere in it.
 Walk the feeling curve from `demo/BRIEF.md`. For each section pick one
 composition by role and write the row into the plan:
 
-    section | role | composition | why | motion cost
+    section | role | composition | why | motion cost | domain signal
+
+The last column is the domain signal that justified the choice, citing the brief
+constraint the domain classification folded in, or "no domain signal" when the
+domain does not touch that row. It is what makes the classification bind on the
+plan instead of sitting unread, and it is the same row format `/wp-demo` Step 2.6
+and `SKILL.md` state — do not restate it a fourth way.
 
 Sum the motion cost before building. The index adds at most four
 viewport-heights beyond its section count; the role table carries each

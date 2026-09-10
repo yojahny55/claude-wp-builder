@@ -37,6 +37,12 @@ grep -Fq 'demo mode' "$y" || fail "$y does not read `demo mode`"
 grep -Fq 'wp-demo-craft' "$y" || fail "$y does not read the craft skill in craft mode"
 grep -Fq 'demo mode' "$i" || fail "$i does not read `demo mode`"
 grep -Fq 'motion.js' "$i" || fail "$i does not wire motion.js for craft projects"
+# Both halves of the engine, or neither. Step 3.5 deleted motion.js on the plain
+# branch and left main.css importing utilities/motion.css, so a plain theme shipped a
+# reveal ruleset it can never trigger — the step's stated job is to wire motion for
+# the recorded mode, and it was doing half of it.
+grep -Fq 'utilities/motion.css' "$i" \
+  || fail "$i does not handle the CSS half of the motion engine, so a plain theme still imports it"
 grep -Fq 'wp-aos-animator' "$i" || fail "$i does not keep wp-aos-animator for plain projects"
 
 # --- The retrofit audit. -----------------------------------------------------

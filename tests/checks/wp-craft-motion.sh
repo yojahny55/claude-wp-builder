@@ -79,6 +79,19 @@ grep -Fq '@supports (animation-timeline: view())' "$mc" \
 grep -Fq 'animation-fill-mode: both;' "$mc" \
   || fail "$mc omits animation-fill-mode: both, so reveal snaps back on scroll up"
 grep -Fq 'prefers-reduced-motion' "$mc" || fail "$mc does not honour reduced motion"
+# The engine itself, not only the guards around it. Every other assertion in this
+# block pins a gate; delete `animation-timeline: view();` or `animation-name:
+# wp-reveal;` and every gate still matches while motion.js keeps yielding, so the
+# reveal lands on its end state instantly with nothing animated. Both were proved
+# by mutation. The timeline assertion keeps its semicolon: the file header restates
+# the property without one ("would reset animation-timeline back to auto"), and the
+# @supports line spells it `animation-timeline: view())`.
+grep -Fq 'animation-timeline: view();' "$mc" \
+  || fail "$mc never sets animation-timeline: view(), so the reveal runs on the document timeline and snaps to its end state"
+grep -Fq 'animation-name: wp-reveal;' "$mc" \
+  || fail "$mc never sets animation-name: wp-reveal, so the gated ruleset animates nothing"
+grep -Fq '@keyframes wp-reveal' "$mc" \
+  || fail "$mc does not define @keyframes wp-reveal, the animation the reveal ruleset names"
 grep -Fq 'translate:' "$mc" || fail "$mc does not use translate, which parallax cannot collide with"
 grep -Fq 'transform:' "$mc" && fail "$mc writes transform, which collides with the parallax device"
 
@@ -92,12 +105,25 @@ grep -Fq "CSS.supports('animation-timeline', 'view()')" "$m" \
 # pass with cssReveal's own term deleted.
 grep -A4 'const cssReveal =' "$m" | grep -Fq '!reduced' \
   || fail "$m's cssReveal guard does not test reduced motion, so a reduced-motion reader on a supporting browser gets neither engine"
-# Not 'skip': that word already appears 4 times in $m for unrelated reasons
-# (the kinetic branch's child-markup skip, the two catch-block "skipping it"
-# warnings), so a bare 'skip' alternative passes whether or not the reveal
-# branch says anything about yielding to CSS — proved by mutation, not assumed.
-grep -Eqi 'does not wire|handled by css' "$m" \
-  || fail "$m does not say it yields reveal to the CSS path"
+# The yield itself, anchored on the branch guard rather than on prose. The earlier
+# form of this assertion grepped for "does not wire|handled by css", which the
+# engine's own explanatory comment satisfies: deleting `&& !cssReveal` from the
+# reveal branch left both engines driving every reveal on a supporting browser and
+# the check still printed PASS. Anchor on the code, so the comment cannot stand in
+# for it.
+grep -Fq "kind === 'reveal' && !cssReveal" "$m" \
+  || fail "$m's reveal branch is not gated on !cssReveal, so both engines drive reveal on a supporting browser"
+
+# The two paths are NOT identical above the fold: the CSS range `entry 0% entry 40%`
+# is already spent for an element in view at load, so fill-mode lands it on the end
+# state while the JS path animates it in. devices.md presented them as one device for
+# a release, which invites a future contributor to "fix" the difference by adding a
+# cover-range rule — the divergence is deliberate and has to stay written down.
+dv=skills/wp-demo-craft/references/devices.md
+grep -Fq 'The two paths differ above the fold' "$dv" \
+  || fail "$dv presents the two reveal paths as identical; the above-the-fold divergence is unrecorded"
+grep -Fq 'entry 0% entry 40%' "$dv" \
+  || fail "$dv does not name the entry range that causes the above-the-fold divergence"
 
 grep -Fq './utilities/motion.css' starter-theme/__tailwind__/assets/css/src/tailwindcss/main.css \
   || fail "main.css does not import the motion stylesheet, so the theme ships without it"

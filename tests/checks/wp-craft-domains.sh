@@ -54,6 +54,25 @@ grep -Eq '^(No,)?Primary,|On Primary|Heading Font' "$d/domains.csv" \
 # the whole file against a hex literal, which colour data would need to carry.
 grep -Eq '#[0-9A-Fa-f]{6}' "$d/domains.csv" \
   && fail "$d/domains.csv carries a hex colour literal; colour must not enter through prose either"
+# A hex literal is only one shape colour data takes, and not the one the upstream
+# catalogue uses: its style-recommendation column is prose ("Primary colour: deep
+# blue"), and bin/domains-import.sh:70-72 already folds that column into
+# `considerations`. So fold one sentence and the hex guard above never fires. Grep a
+# colour-name and font-name vocabulary over the considerations column itself.
+# `inter` needs more than a word boundary: the one live hit in the current CSV is
+# "Inter-page linking" in the Wiki row, so the font pattern excludes a following
+# hyphen. Anything this rejects wrongly belongs in page_pattern or nowhere.
+python3 -c "
+import csv,re,sys
+colours=r'black|white|red|orange|yellow|green|blue|purple|violet|pink|brown|gr[ae]y|teal|cyan|magenta|indigo|amber|navy|gold|silver|beige|cream|crimson|turquoise|lavender|maroon|olive|coral'
+fonts=r'inter(?!-)|playfair|roboto|montserrat|lato|open sans|poppins|raleway|oswald|merriweather|nunito|source sans|helvetica|georgia|garamond|futura|manrope|dm sans|space grotesk|work sans|rubik|karla|lora|mulish|quicksand'
+bad=[]
+for i,r in enumerate(csv.DictReader(open('$d/domains.csv')),2):
+    for kind,pat in (('colour',colours),('font',fonts)):
+        m=re.search(r'\b(?:'+pat+r')\b', r.get('considerations') or '', re.I)
+        if m: bad.append('row %d (%s): %s name %r' % (i, r['domain'], kind, m.group(0)))
+sys.exit('; '.join(bad[:5]) if bad else 0)
+" || fail "$d/domains.csv folds a colour or font name into considerations; only shape data is vendored"
 
 [ -x bin/domains-import.sh ] || fail "bin/domains-import.sh is missing or not executable"
 
@@ -108,15 +127,32 @@ grep -Fq 'domain signal that justified' "$k" \
 grep -Fq 'no domain signal' "$k" \
   || fail "$k does not define the no-domain-signal fallback for a row the domain does not touch"
 
-# The manifest is the shared source of truth: a domain /wp-demo already recorded
-# must be read, not re-derived, the same rule /wp-yolo already applies four
-# lines above to `demo mode` — and the one commands/wp-demo.md itself promises
-# when it says the recorded domain is what "/wp-yolo reads ... rather than
-# re-deriving it".
-y=commands/wp-yolo.md
-grep -Fq 'already has `"domain"`' "$y" \
-  || fail "$y does not check for an already-recorded domain before classifying"
-grep -Fq 'do not re-classify' "$y" \
-  || fail "$y does not skip re-classification once the domain is already recorded"
+# SKILL.md cites references/compositions.md as the source of the role table, so a
+# builder following that pointer writes the plan from the row printed THERE. It
+# carried the pre-classifier five-column row for a release, which is a plan written
+# with the classification unread — the exact failure the rest of this file prevents.
+# The literal row is asserted as well as the prose: the prose alone would survive a
+# revert of the row to five columns.
+r=skills/wp-demo-craft/references/compositions.md
+grep -Fq 'section | role | composition | why | motion cost | domain signal' "$r" \
+  || fail "$r's composition-plan row is not the six-column form ending in domain signal"
+grep -Fq 'domain signal that justified' "$r" \
+  || fail "$r does not require a domain signal (or brief constraint) per row"
+grep -Fq 'no domain signal' "$r" \
+  || fail "$r does not define the no-domain-signal fallback for a row the domain does not touch"
+
+# The manifest is the shared source of truth: a domain already recorded must be read,
+# not re-derived, the same rule /wp-yolo already applies four lines above to
+# `demo mode` — and the one commands/wp-demo.md itself promises when it says the
+# recorded domain is what "/wp-yolo reads ... rather than re-deriving it". The rule
+# has to hold on BOTH entry points or it is not a property of the manifest: with it
+# only in /wp-yolo, a second /wp-demo run silently overwrote an operator's
+# "name the domain directly" override with the match it had already been rejected for.
+for y in commands/wp-yolo.md commands/wp-demo.md; do
+  grep -Fq 'already has `"domain"`' "$y" \
+    || fail "$y does not check for an already-recorded domain before classifying"
+  grep -Fq 'do not re-classify' "$y" \
+    || fail "$y does not skip re-classification once the domain is already recorded"
+done
 
 echo PASS

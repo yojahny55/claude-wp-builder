@@ -144,9 +144,24 @@ self-authors `demo/BRIEF.md` (brand rules, audience pain and promise, two or thr
 references, vibe words, a per-section feeling curve with one named peak), reads the
 `wp-demo-craft` skill for its page grammar and device kit, checks the plan against
 `~/.claude/wp-builder/FINGERPRINTS.md` before building (the plan must differ from every prior
-row on at least 4 of 6 axes) and wires motion through `data-motion-*` attributes plus the
-inlined `motion.js` bundle. Plain mode is the existing single-file demo with no motion
-contract.
+row on at least 4 of 6 axes).
+
+Craft mode also classifies the client's domain against the vendored 192-row table in
+`skills/wp-demo-craft/references/domains/domains.csv` — two distinct keyword hits to match,
+`unclassified` below that — and records the result in `.wp-create.json` under `"domain"`, which
+`/wp-yolo` reads rather than re-deriving. The match folds its `page_pattern` and
+`considerations` into the brief as stated constraints and every composition-plan row cites the
+domain signal that justified it; it never touches tokens.
+
+Motion is wired through `data-motion-*` attributes only, and the engine has two halves, both
+inlined into the demo: `motion.js` in a `<script type="module">` block, and
+`utilities/motion.css` in a `<style>` block. The stylesheet carries the `reveal` device wherever
+the browser supports `animation-timeline: view()` and the reader has not asked for reduced
+motion; `motion.js` yields that device there and runs every other one. Without the stylesheet a
+demo in a modern browser reveals nothing. Sections are built from the composition library, whose
+size-based breakpoints are `@container` queries against each composition's own container rather
+than the viewport — the fluid `vw` ramps in `clamp()` still key off the screen, which is recorded
+open work. Plain mode is the existing single-file demo with no motion contract.
 
 ### `/wp-polish`
 

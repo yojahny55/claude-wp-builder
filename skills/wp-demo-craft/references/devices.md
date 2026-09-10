@@ -47,6 +47,17 @@ never uses the `animation` shorthand (only longhands), because the shorthand
 would reset `animation-timeline` back to `auto`; no `animation-duration` is
 set; and `animation-fill-mode: both` is required.
 
+**The two paths differ above the fold, and the CSS one is the intended behaviour.**
+The CSS range is `entry 0% entry 40%`, so an element already fully inside the
+viewport when the page loads is past its entry range: `animation-fill-mode: both`
+lands it on the end state with no animation. The JS path has no such notion and
+animates it in. A hero therefore fades in on a browser without scroll-driven
+animation and is simply *there* on one that has it. Not a bug to fix — the rubric
+line "First paint complete" grades the first screen as it lands, and a first screen
+that lands finished scores better than one still assembling itself. Do not add a
+`cover`-range rule or a JS above-the-fold check to make them match; make the JS path
+the one that is odd.
+
 **Stagger ceiling on the CSS path.** A per-child delay needs a per-child value and
 composition markup forbids inline styles, so the CSS path carries the offset on
 `nth-child` for the first eight children and shares the last offset beyond that.
