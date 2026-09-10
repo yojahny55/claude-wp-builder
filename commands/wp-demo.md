@@ -169,14 +169,25 @@ before writing any markup.
    with one sentence per failure, which is what goes into `demo/VERIFY.md`. The
    context that wrote the markup and the brief cannot grade the render — that is
    the self-assessment the rubric exists to remove. Read `demo/VERIFY.md`, fix
-   every failed line and repeat. After three rounds with failures, stop, report
-   what still fails, and go to step 9 without recording.
+   every failed line and repeat. After three rounds with failures, stop and write
+   `demo/FAILED.md` before going to step 9 without recording. It names every
+   failing rubric line, every outstanding `slop` finding at `warning` severity,
+   every `dead-scroll`, `no-engine` and `container-noop` finding, and the round
+   count reached. A craft build that failed verification is not a deliverable,
+   and the only thing that made a previous one look like one was that nothing on
+   disk said otherwise.
 8. **Record.** Only for a passing build: append the build's row to
    `~/.claude/wp-builder/FINGERPRINTS.md` in the shape `fingerprint.md` defines,
    and write the same fields into `.wp-create.json` under `"fingerprint"`. A
    build that failed after three rounds records no fingerprint, in either place.
 9. **Report.** The intended curve, the felt curve from `demo/VERIFY.md`, the
-   diff, the detector summary, and what could not be verified.
+   diff, the detector summary, and what could not be verified. When
+   `demo/FAILED.md` exists, the summary opens with the failure and its numbers —
+   the count of failing rubric lines out of seven, and the outstanding finding
+   count — before anything the build did well. A previous build disclosed "I ran
+   2 of 3 rounds… did not re-grade independently" as the third of three caveats
+   under a completion banner, and the client read it as a finished demo.
+   Disclosure that has to be inferred is not disclosure.
 
 A craft build is finished here. Steps 3 and 4 are the plain path: take Step 4's
 header, footer and responsive requirements (step 6 above says so) and nothing

@@ -116,6 +116,11 @@ Proceed with the normal flow (Step 0 → Step 1 → ...). No changes to existing
 
 ## Step 0: Check for Existing Demo
 
+**Stop if `demo/FAILED.md` exists.** Print its first ten lines and stop. Building
+a theme from a demo that never passed verification produces a verified-looking
+site on an unverified foundation, and every later audit measures the theme rather
+than the demo it came from.
+
 Before asking any project questions, check if a demo already exists.
 
 ### If `$ARGUMENTS` looks like a file path (ends in `.html` or `.htm`):

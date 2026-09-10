@@ -31,6 +31,11 @@ The command is named `/wp-yolo`; that name is NOT the `--yolo` flag. A bare
 `/wp-yolo <folder>` with no flags runs the Step 3 checkpoint and waits for the
 user. Only the literal `--yolo` token in `$ARGUMENTS` skips it.
 
+**Stop if `demo/FAILED.md` exists.** Print its first ten lines and stop. Building
+a theme from a demo that never passed verification produces a verified-looking
+site on an unverified foundation, and every later audit measures the theme rather
+than the demo it came from.
+
 Read `.claude/CLAUDE.md` at the project root. If it does not exist, refuse:
 ```
 Error: No .claude/CLAUDE.md found. Run /wp-init first to scaffold the project.

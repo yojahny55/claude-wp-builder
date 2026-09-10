@@ -6,10 +6,20 @@ A scroll page has no single state: every scroll position is a different frame,
 and the failures live between the two you happened to look at. So it is verified
 by walking it, and a craft build is verified in a loop — build, measure,
 critique, fix — for at most **three rounds**. A build that still fails after
-three rounds stops and reports rather than shipping quietly, and it
-**does not record a fingerprint**. `/wp-demo-verify` runs this loop.
+three rounds stops, writes `demo/FAILED.md`, and reports rather than shipping
+quietly, and it **does not record a fingerprint**. `demo/FAILED.md` is the
+on-disk marker `/wp-init`, `/wp-section` and `/wp-yolo` refuse to build on top
+of — a craft build that failed verification is not a deliverable, and the
+marker is what makes that true on disk rather than only in the transcript.
+`/wp-demo-verify` runs this loop.
 
 ## Round structure
+
+Each round is written to `demo/VERIFY.md` under its own `## Round N` heading —
+nothing else on disk separates five walk runs from five rounds. Dismissing a
+machine finding as a capture artefact requires a `## Findings judged to be
+capture artefacts` heading with the measurement that justifies each one; a
+finding argued away without one is a finding still outstanding.
 
 1. **Deterministic gate.** `npx -y impeccable@4 detect demo/ --json`, findings
    written to `demo/.verify/impeccable.json`. Each finding carries a `category`

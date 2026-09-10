@@ -80,6 +80,11 @@ Under `--hybrid`, four things change and nothing else does:
 
 ## Step 3: Read Demo Section
 
+**Stop if `demo/FAILED.md` exists.** Print its first ten lines and stop. Building
+a theme from a demo that never passed verification produces a verified-looking
+site on an unverified foundation, and every later audit measures the theme rather
+than the demo it came from.
+
 Read the demo page for this section — `demo/<slug>.html` where `<slug>` is the `--page`
 value (**default `index`**, i.e. `demo/index.html` when `--page` is omitted) — and extract
 the section matching:

@@ -155,6 +155,17 @@ Read only the sheets for this step: not the source, not `demo/BRIEF.md`. Score
 every page pass/fail on each line and write the table to `demo/VERIFY.md`
 (one section per page, one row per line, a one-sentence reason on every fail):
 
+Each round appends under its own `## Round N` heading. Nothing on disk currently
+separates five walk runs from five rounds, and a build once spent its rounds
+without ever knowing which one it was in.
+
+A machine finding may be argued with, but not silently. Dismissing one requires a
+`## Findings judged to be capture artefacts` heading, one entry per finding, each
+carrying the measurement that justifies it. Arguing with a finding on evidence is
+legitimate and has been right before; what must not be possible is a green-looking
+result whose green came from prose. A reader must be able to count what was fixed
+against what was argued away.
+
 - **First paint complete.** Headline, primary visual and CTA inside the 1440x900
   fold and the 390x844 fold, none hidden behind a scroll trigger.
 - **One peak.** The largest visual change on the page, a quieter section before

@@ -3,6 +3,18 @@
 ## [Unreleased]
 
 ### Added
+- **A craft build that fails verification writes `demo/FAILED.md` and cannot pass for a
+  finished one.** The loop already treated a rubric FAIL as a failing round, but nothing
+  downstream changed what reached the client: `demo/index.html` stayed on disk looking
+  finished, no command read `demo/VERIFY.md` as a gate, and the only recorded penalty was
+  an unwritten fingerprint row the client never sees. `/wp-demo` now writes
+  `demo/FAILED.md` at the three-round cap — naming every failing rubric line, every
+  outstanding `slop` warning, every `dead-scroll`/`no-engine`/`container-noop` finding, and
+  the round count reached — and leads its report with the failure instead of burying it as
+  a caveat. `/wp-init`, `/wp-section` and `/wp-yolo` all stop on `demo/FAILED.md` before
+  building a theme from an unverified demo. `demo/VERIFY.md` now numbers its rounds under
+  `## Round N` headings and requires a `## Findings judged to be capture artefacts` heading,
+  with a measurement per entry, before a machine finding can be dismissed in prose.
 - **A composition gate proves the library passes its own slop rule.**
   `bin/composition-gate.sh` assembles each `skills/wp-demo-craft/compositions/*/section.html` +
   `section.css` pair into a complete document before scanning, because `impeccable detect`
