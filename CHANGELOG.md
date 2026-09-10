@@ -17,7 +17,13 @@
   samples the reveal child the ruleset targets (`[data-motion="reveal"] > *`); a section
   the harness still cannot read reports `unobserved` and stays advisory, and a page with
   zero `data-motion` devices reports `no-engine` instead of walking clean on an empty
-  frame signature.
+  frame signature. Sampling the reveal child was necessary but not sufficient: `reveal`
+  is a one-shot entry transition a few pixels long, driven by the child's own `view()`
+  progress around `scrollY = top - viewport`, so a sparse walk caught it by luck and a
+  miss reported `dead-scroll` on a section that reveals perfectly. A section carrying no
+  `pin`/`pan`/`kinetic`/`wipe`/`drift` is now judged by two samples — below the fold and
+  fully entered — and reports `dead-scroll` only when no reveal child moved between them.
+  Scrubbed sections keep the walk and its stall logic unchanged.
 - **The two compositions that failed the library's own slop gate are scroll-linked now.**
   `closing-block` ran a 7s infinite conic sweep and `proof-row` a 38s infinite translate,
   both reported by `impeccable` as `marquee` at `category=slop`/`severity=warning` — the

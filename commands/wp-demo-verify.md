@@ -101,6 +101,15 @@ branch: `/wp-demo` probes first and stops on 2.)
 - `no-engine` — the page carries no `data-motion` at all. Fails the round. A
   motionless page used to walk clean, because an empty frame signature could
   never accumulate a stall.
+- A section carrying no `pin`/`pan`/`kinetic`/`wipe`/`drift` is not judged by the
+  walk at all. `reveal` is a one-shot entry transition a few pixels long — it
+  runs on the child's own `view()` progress, around `scrollY = top - viewport` —
+  so whether a sparse walk lands inside it is sampling luck, and a miss reported
+  dead scroll on a section that reveals perfectly. Such a section is judged by
+  two samples instead, below the fold and fully entered, and reports
+  `dead-scroll` only when no reveal child moved between them. A section that
+  already sits above the fold on load is not judged: its entry happened before
+  the walk could see it.
 - **cue never reaches full opacity**: the window is too narrow or the ramps eat
   it. Widen the window or set explicit ramps.
 - **horizontal overflow**: at any width, always a defect.

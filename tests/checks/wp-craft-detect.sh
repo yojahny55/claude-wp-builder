@@ -52,4 +52,21 @@ for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; d
   grep -Fq 'no-engine' "$f" || fail "$f does not document the no-engine finding"
 done
 
+# A stall walk asks "did the signature change across N samples", which is the
+# right question for a scrubbed device and the wrong shape for reveal: reveal is
+# a one-shot entry transition a few pixels long, so a sparse walk catches it by
+# luck and a miss is the false dead-scroll this whole finding exists to avoid.
+# Reveal is judged by two samples instead, and the walk's own dead-scroll push
+# must stay behind the scrubbed branch or the false positive comes straight back.
+grep -Fq "const SCRUB = ['pin', 'pan', 'kinetic', 'wipe', 'drift']" "$v" \
+  || fail "$v does not tell a scrubbed section from an entry-driven one, so both take the same sampling window"
+grep -Fq 'revealState' "$v" \
+  || fail "$v does not judge reveal by a two-point sample, so a sparse walk reports dead scroll on a section that reveals"
+grep -Fq '} else if (b.scrub) {' "$v" \
+  || fail "$v pushes dead-scroll from the walk for an entry-driven section, which is the false positive the two-point sample replaces"
+for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
+  grep -Fq 'below the fold and fully entered' "$f" \
+    || fail "$f does not document that a section with no scrubbed device is judged by two samples, not by the walk"
+done
+
 echo PASS

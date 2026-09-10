@@ -249,6 +249,34 @@ const probe = () => {
   };
 };
 
+/**
+ * One section's `reveal` children, as a string. `reveal` is a one-shot entry
+ * transition a few pixels long — measured on a real Chrome it moves between
+ * scrollY top-viewport and about 120px later, whatever the section's height,
+ * because `animation-timeline: view()` is applied to `[data-motion="reveal"] > *`
+ * and driven by that child's own view progress. Asking a stall walk "did the
+ * signature change across N samples" is the right question for a scrubbed
+ * device and the wrong shape for this one: whether a sparse walk lands inside
+ * those pixels is sampling luck, and a miss reports dead scroll on a section
+ * that reveals perfectly. Compare two positions instead — below the fold and
+ * fully entered. Returns '' when the section has no reveal children to read.
+ */
+const revealState = (idx) => {
+  const root = document.querySelectorAll('section, [data-motion]')[idx];
+  if (!root) return '';
+  const devices = [];
+  if (root.matches('[data-motion="reveal"]')) devices.push(root);
+  root.querySelectorAll('[data-motion="reveal"]').forEach((el) => devices.push(el));
+  const out = [];
+  devices.forEach((el) => {
+    Array.from(el.children).forEach((child) => {
+      const cs = getComputedStyle(child);
+      out.push(Number(cs.opacity).toFixed(2), cs.translate || cs.transform || '');
+    });
+  });
+  return out.join('|');
+};
+
 let browser;
 let exitCode = 0;
 const report = { pages: [] };
@@ -280,19 +308,31 @@ try {
     await page.waitForTimeout(600);
 
     const bounds = await page.evaluate(() => {
+      // pin/pan/kinetic/wipe/drift are the only devices drive() publishes
+      // --motion-p for. A section whose subtree carries none of them has
+      // nothing pinning progress open across [top, top+height-viewport], so
+      // it gets a different sampling window below (see the walk loop).
+      const SCRUB = ['pin', 'pan', 'kinetic', 'wipe', 'drift'];
       const els = document.querySelectorAll('section, [data-motion]');
       const out = [];
-      els.forEach((el) => {
+      els.forEach((el, i) => {
         const r = el.getBoundingClientRect();
         // A zero-height element (a display:none mobile-only section at desktop
         // width, most often) collapses the scrub range to 1px, so every sample
         // lands on the same frame and the walk reports dead scroll for a section
         // that is not on screen at all. /wp-finalize fails the build on that.
         if (r.height <= 0) return;
+        const scrub = SCRUB.some(
+          (d) => el.matches('[data-motion="' + d + '"]') || el.querySelector('[data-motion="' + d + '"]')
+        );
         out.push({
           id: el.id || el.className.toString().split(' ')[0] || 'section',
           top: r.top + window.scrollY,
           height: r.height,
+          scrub,
+          // Index into the same query, so the two-point reveal check below can
+          // re-find this exact element without inventing a selector for it.
+          idx: i,
         });
       });
       return out;
@@ -305,21 +345,34 @@ try {
     // at height 1 every sample landed on scroll 0, so the page was checked for
     // overflow only at the top and came back clean without ever scrolling.
     const pageHeight = await page.evaluate(() => document.documentElement.scrollHeight);
-    for (const b of bounds.length ? bounds : [{ id: 'page', top: 0, height: pageHeight }]) {
+    for (const b of bounds.length ? bounds : [{ id: 'page', top: 0, height: pageHeight, scrub: true }]) {
       let previous = null;
       let stalls = 0;
-      // Every scrub device shares start: 'top top', end: 'bottom bottom', so the
-      // real scrub range ends at top + height - viewportHeight, not top + height,
-      // whenever a section is taller than the viewport (the normal case for a
-      // pin section with span > 1). Sampling past that point walks into the
-      // flat tail where progress is clamped at 1 and reports it as dead scroll.
-      // A section SHORTER than the viewport has an inverted range (its end sits
-      // above its top), so clamping with max(1, height - viewport) collapsed
-      // every sample onto a single pixel and reported the section as dead
-      // scroll. Derive both ends from geometry and walk between them.
-      const clampedEnd = Math.max(0, b.top + b.height - size.height);
-      const scrubRange = Math.max(1, Math.abs(clampedEnd - b.top));
-      const startY = Math.min(b.top, clampedEnd);
+      let startY, scrubRange;
+      if (b.scrub) {
+        // Every scrub device shares start: 'top top', end: 'bottom bottom', so the
+        // real scrub range ends at top + height - viewportHeight, not top + height,
+        // whenever a section is taller than the viewport (the normal case for a
+        // pin section with span > 1). Sampling past that point walks into the
+        // flat tail where progress is clamped at 1 and reports it as dead scroll.
+        // A section SHORTER than the viewport has an inverted range (its end sits
+        // above its top), so clamping with max(1, height - viewport) collapsed
+        // every sample onto a single pixel and reported the section as dead
+        // scroll. Derive both ends from geometry and walk between them.
+        const clampedEnd = Math.max(0, b.top + b.height - size.height);
+        scrubRange = Math.max(1, Math.abs(clampedEnd - b.top));
+        startY = Math.min(b.top, clampedEnd);
+      } else {
+        // No pin/pan/kinetic/wipe/drift device in this section's subtree, so
+        // there is nothing holding scrub progress open past entry — the case
+        // above's window starts exactly at "fully entered" (view()'s entry
+        // 100%), which is already past where a reveal-only section's
+        // animation-range (entry 0%-40%, up to 68% staggered) finishes. Walk
+        // the entry itself instead: from first appearance, one viewport above
+        // top, to fully entered at top.
+        startY = Math.max(0, b.top - size.height);
+        scrubRange = Math.max(1, b.top - startY);
+      }
       for (let k = 0; k < positions; k++) {
         const y = startY + (scrubRange * k) / Math.max(1, positions - 1);
         await page.evaluate((to) => window.scrollTo(0, to), y);
@@ -356,11 +409,34 @@ try {
             // as "this section does not move". Advisory, so it never fails a
             // round on the strength of what the harness could not see.
             findings.push({ kind: 'unobserved', pass, width: size.width, section: b.id, y: Math.round(y), devices: frame.devices });
-          } else {
+          } else if (b.scrub) {
+            // Only a scrubbed section is judged by the walk. A section whose
+            // devices are all entry-driven is judged by the two-point check
+            // after this loop, which does not depend on sampling density.
             findings.push({ kind: 'dead-scroll', pass, width: size.width, section: b.id, y: Math.round(y) });
           }
         }
         previous = frame.signature;
+      }
+
+      // The two-point reveal assertion. Below the fold, then fully entered: if
+      // any reveal child moved, the section is alive. Its one blind spot is a
+      // reveal that animates and returns exactly to its start state, which
+      // describes no reveal in the library.
+      // ponytail: a section that starts above the fold cannot be parked below
+      // it, so it is not judged at all — its entry already happened on load.
+      const belowFold = b.top - size.height - 40;
+      if (!b.scrub && !reduced && belowFold >= 0) {
+        await page.evaluate((to) => window.scrollTo(0, to), belowFold);
+        await page.waitForTimeout(180);
+        const before = await page.evaluate(revealState, b.idx);
+        if (before !== '') {
+          await page.evaluate((to) => window.scrollTo(0, to), b.top);
+          await page.waitForTimeout(300);
+          const after = await page.evaluate(revealState, b.idx);
+          if (after === before)
+            findings.push({ kind: 'dead-scroll', pass: 'normal', width: size.width, section: b.id, y: Math.round(b.top) });
+        }
       }
     }
     if (!reduced) {
