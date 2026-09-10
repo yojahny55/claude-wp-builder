@@ -11,8 +11,12 @@
   `demo/FAILED.md` at the three-round cap — naming every failing rubric line, every
   outstanding `slop` warning, every `dead-scroll`/`no-engine`/`container-noop` finding, and
   the round count reached — and leads its report with the failure instead of burying it as
-  a caveat. `/wp-init`, `/wp-section` and `/wp-yolo` all stop on `demo/FAILED.md` before
-  building a theme from an unverified demo. `demo/VERIFY.md` now numbers its rounds under
+  a caveat. `/wp-yolo` carries its own copy of the same craft verify loop (a craft
+  `/wp-yolo` run never calls `/wp-demo`), and its loop now writes the same marker at its
+  own three-round cap, so the full-site build path gates identically to the single-demo
+  one instead of only consuming a marker it never produces. `/wp-init`, `/wp-section` and
+  `/wp-yolo` all stop on `demo/FAILED.md` before building a theme from an unverified demo.
+  `demo/VERIFY.md` now numbers its rounds under
   `## Round N` headings and requires a `## Findings judged to be capture artefacts` heading,
   with a measurement per entry, before a machine finding can be dismissed in prose.
 - **A composition gate proves the library passes its own slop rule.**

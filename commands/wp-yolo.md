@@ -187,7 +187,8 @@ and never build a craft demo blind. `--yolo` does not waive this. The
 verify loop that follows is `/wp-demo-verify demo/` over the directory, at most
 **three rounds**, reading the pass/fail table it writes to `demo/VERIFY.md` and
 fixing every failed line before the next round; after three rounds with failures,
-stop and report rather than converting a demo the rubric never passed. That loop is
+stop and write `demo/FAILED.md` — in the same shape `/wp-demo` Step 2.6 defines —
+rather than converting a demo the rubric never passed. That loop is
 the gate this mode exists for, and it blocks — unlike Step 5's
 `/wp-responsive-check`, whose findings are folded into the Step 6 review list. The
 rules are stated here in the same terms `/wp-demo` Step 2.6 uses on purpose, because

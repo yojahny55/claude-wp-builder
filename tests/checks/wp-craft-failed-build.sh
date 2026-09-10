@@ -20,6 +20,13 @@ for c in commands/wp-init.md commands/wp-section.md commands/wp-yolo.md; do
     || fail "$c does not stop on demo/FAILED.md, so a theme can be built from an unverified demo"
 done
 
+# /wp-yolo carries its own copy of the craft verify loop (a craft /wp-yolo run
+# never calls /wp-demo), so mentioning demo/FAILED.md on the consume side above
+# is not enough — its own loop must produce the marker too, or a full-site
+# build that fails its own three rounds still leaves nothing on disk.
+grep -Fq 'write `demo/FAILED.md`' commands/wp-yolo.md \
+  || fail "commands/wp-yolo.md's own craft loop does not write demo/FAILED.md, so a theme can still be built from a demo that failed /wp-yolo's own verify loop"
+
 v=commands/wp-demo-verify.md
 grep -Fq '## Round N' "$v" \
   || fail "$v does not require a per-round heading, so rounds cannot be counted from disk"
