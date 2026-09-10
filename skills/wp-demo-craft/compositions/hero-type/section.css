@@ -17,7 +17,7 @@
      to stop. The held-breath version starts where there is room for it. */
   align-content: center;
   padding-block: var(--space-section);
-  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max)) / 2));
+  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max, 1280px)) / 2));
 }
 .hero-type__kicker {
   font: 500 0.8rem/1.2 var(--font-text);

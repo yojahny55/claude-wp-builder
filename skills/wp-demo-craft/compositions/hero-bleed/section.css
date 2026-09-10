@@ -9,7 +9,7 @@
   align-content: end;
   min-height: 100dvh;
   padding-block: var(--space-section) calc(var(--space-section) * 0.9);
-  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max)) / 2));
+  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max, 1280px)) / 2));
   background: var(--color-surface);
 }
 /* The bed is over-tall by more than the parallax travel, so the photograph never

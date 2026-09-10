@@ -144,16 +144,30 @@ grep -Eqi 'trend roundup|becoming the next default|next default' "$r/taste.md" \
 # in because docs/ reached a craft build only through the mode decision; and craft
 # inherited Step 4's placeholder-logo and placeholder-image clauses, which is how
 # "HERO PHOTOGRAPH PENDING" shipped as a hero and still passed First paint complete.
-grep -Fq 'Assets on disk' commands/wp-demo.md \
-  || fail "commands/wp-demo.md does not inventory the assets under docs/, so a real logo is never wired in"
-grep -Fq 'placeholder-content clauses' commands/wp-demo.md \
-  || fail "commands/wp-demo.md still inherits Step 4's placeholder logo and placeholder image clauses"
-# And the clause it replaced is gone. Without this, writing the new phrase anywhere
-# in the file satisfies the assertion above while the exemption line still reads
-# "single-file, no-CDN and :root token clauses" and craft still inherits both.
+# The inventory is a numbered sub-step with a named destination. The bare phrase
+# 'Assets on disk' is satisfied by any parenthetical that mentions it in passing,
+# so pin both halves: the step that does the work, and the heading it writes to.
+grep -Fq '**3.5. Inventory the assets on disk.**' commands/wp-demo.md \
+  || fail "commands/wp-demo.md has no numbered step that inventories the assets under docs/, so a real logo is never wired in"
+grep -Fq 'under `## Assets on disk`' commands/wp-demo.md \
+  || fail "commands/wp-demo.md does not write the asset inventory into demo/BRIEF.md under ## Assets on disk"
+# The exemption SENTENCE, not the phrase. Both halves of the old pair were
+# defeated together: the positive half matched 'placeholder-content clauses'
+# anywhere in a 300-line file, and the negative half matched the old exact
+# string — so any rewording that was not a verbatim revert slipped through both.
+# Requiring the clause list and the exemption in one line is what a reword breaks.
+grep -Eq 'single-file.*placeholder-content clauses, which' commands/wp-demo.md \
+  || fail "commands/wp-demo.md's craft exemption does not list the placeholder-content clauses, so craft inherits Step 4's placeholder logo and placeholder image"
 grep -Fq 'no-CDN and `:root` token clauses' commands/wp-demo.md \
   && fail "commands/wp-demo.md still carries the old exemption line, so craft inherits the placeholder clauses whatever else the file says"
+# The ship blocker. Its bullet survives a negation that keeps the opening clause
+# intact — '…"TBD" in rendered text **is acceptable in rounds one and two**' — so
+# the anchor alone is not the contract. Read the bullet out to the blank line and
+# refuse any wording that turns the blocker into a deferral.
 grep -Fq -- '- A placeholder image, a placeholder logo' skills/wp-demo-craft/SKILL.md \
   || fail "SKILL.md does not blocklist placeholder imagery, which spine rule 1 does not cover"
+sed -n '/^- A placeholder image, a placeholder logo/,/^$/p' skills/wp-demo-craft/SKILL.md \
+  | grep -Eqi 'acceptable|is fine|is ok|allowed|tolerated|until round|in rounds? ' \
+  && fail "SKILL.md's placeholder blocker has been softened into something a build may defer; it is a ship blocker in every round"
 
 echo PASS

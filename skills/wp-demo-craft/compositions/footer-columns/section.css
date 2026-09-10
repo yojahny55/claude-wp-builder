@@ -3,7 +3,7 @@
 .footer-columns {
   container-type: inline-size;
   padding-block: var(--space-section) calc(var(--space-section) * 0.5);
-  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max)) / 2));
+  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max, 1280px)) / 2));
   background: var(--color-surface);
   border-top: 1px solid var(--color-hairline);
 }

@@ -28,11 +28,14 @@
   /* The content width is enforced here, on the rail, for the same reason the gutter
      is: travel is `rail.scrollWidth - frame.clientWidth`. In `100cqw`, not `%` —
      the rail is `width: max-content`, and a percentage padding on a max-content box
-     is the one case where the used value and the intrinsic contribution can
-     disagree, which would leave the travel short by two paddings. cqw resolves
-     against `.process-rail`, the containment context, so it is the section width
-     even in a narrow column. */
-  padding-inline: max(var(--space-gutter), calc((100cqw - var(--container-max)) / 2));
+     is the one case where the used value and the intrinsic contribution are
+     permitted to disagree, which would leave the travel short by two paddings.
+     Measured against a `%` variant the two are identical in Chrome at 1920 and
+     2560 (travel 576, insets 240/240), so this is not an observed failure — cqw
+     is simply the safer of two correct choices. It resolves against
+     `.process-rail`, the containment context, so it is the section width even in
+     a narrow column. */
+  padding-inline: max(var(--space-gutter), calc((100cqw - var(--container-max, 1280px)) / 2));
   display: flex;
   align-items: stretch;
   gap: clamp(1.5rem, 3vw, 3rem);

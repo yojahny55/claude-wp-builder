@@ -15,7 +15,7 @@
   display: grid;
   gap: var(--space-gutter);
   padding-block: calc(var(--space-section) * 0.75) var(--space-section);
-  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max)) / 2));
+  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max, 1280px)) / 2));
   align-content: center;
 }
 .hero-split__kicker {

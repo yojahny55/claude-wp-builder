@@ -3,7 +3,7 @@
 .proof-row {
   container-type: inline-size;
   padding-block: var(--space-section);
-  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max)) / 2));
+  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max, 1280px)) / 2));
   border-top: 1px solid var(--color-hairline);
   background: var(--color-canvas);
 }
