@@ -206,4 +206,17 @@ for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; d
     || fail "$f does not explain that external-module is a hazard only when the file is opened directly, not served"
 done
 
+# cramped-padding is a `quality` finding that fired 68-90 times per run on the
+# client build that motivated this branch, dismissed as a false positive — and
+# fires on this library's own untouched compositions too. Anchored on three
+# phrases, not the bare kind name alone: a passing name-drop of 'cramped-padding'
+# elsewhere in the file (e.g. a future finding list) would satisfy a single bare
+# grep while the actual judgement call and its measured evidence stayed missing.
+grep -Fq '`cramped-padding` is a known false-positive source.' skills/wp-demo-craft/references/verify.md \
+  || fail "verify.md does not record cramped-padding as a known false-positive source"
+grep -Fq '68–90 times per run' skills/wp-demo-craft/references/verify.md \
+  || fail "verify.md does not cite the measured 68-90-times-per-run rate that justifies dismissing cramped-padding"
+grep -Fq '131px/129px' skills/wp-demo-craft/references/verify.md \
+  || fail "verify.md does not cite the measured padding (56/57px, 131/129px) that proves cramped-padding false-fired"
+
 echo PASS

@@ -167,6 +167,14 @@ the reader is scrolling, the playhead is not moving.
 It cannot measure composited contrast, or how the page feels on a real phone
 under a real thumb.
 
+`cramped-padding` is a known false-positive source. It fired
+68–90 times per run on a build where `.entry__row` measured 56px
+above and 57px below its content and `.chapter` 131px/129px, and
+it fires on untouched compositions in this library. It is a
+`quality` finding and does not fail a round. We do not own the
+detector, and pretending its `quality` output is precise is what
+invites blanket dismissal of everything it says.
+
 **A green machine run alone is not a pass.** The machine catches dead scroll,
 missed peaks, overflow and clipping; it cannot tell you whether the page is any
 good. Reading the contact sheets is not optional and does not happen
