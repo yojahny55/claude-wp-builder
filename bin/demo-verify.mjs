@@ -269,11 +269,26 @@ const probe = () => {
  * that reveals perfectly. Compare two positions instead — below the fold and
  * fully entered. Returns '' when the section has no reveal children to read.
  *
- * Known limit: only `reveal` is read here. `parallax` is neither scrubbed nor
+ * What is read at each point is the scroll-driven animation itself, not the
+ * computed style it happens to produce. Reading `opacity`/`translate` made the
+ * check spoofable by any ambient motion: a decorative `@keyframes pulse` on the
+ * same children, or a percentage transform re-resolving after a lazy image
+ * loads, moved the computed style and the section passed with no reveal wired
+ * at all. `getAnimations()` filtered to a `ViewTimeline` is the device's own
+ * contract — `[data-motion="reveal"] > *` sets `animation-timeline: view()` —
+ * and an unrelated keyframe runs on the document timeline, so it cannot
+ * counterfeit it. A child with no scroll-driven animation contributes the
+ * literal `none`, so a reveal that was never wired reads the same at both
+ * points and is reported, instead of returning an empty string and being
+ * skipped.
+ *
+ * Known limits: only `reveal` is read here. `parallax` is neither scrubbed nor
  * reveal, publishes no --motion-p, and writes `transform` on the device element
  * itself, so a parallax-only section is not judged at all — deliberately, since
  * sampling every device element's transform would also start judging devices the
  * harness has never been able to read (`counter`) and invent findings on them.
+ * And the comparison is still an OR across the section's reveals: one live child
+ * changes the joined string, so it excuses its dead siblings.
  */
 const revealState = (idx) => {
   const root = document.querySelectorAll('section, [data-motion]')[idx];
@@ -284,8 +299,18 @@ const revealState = (idx) => {
   const out = [];
   devices.forEach((el) => {
     Array.from(el.children).forEach((child) => {
-      const cs = getComputedStyle(child);
-      out.push(Number(cs.opacity).toFixed(2), cs.translate || cs.transform || '');
+      const driven = child.getAnimations().filter(
+        (a) => typeof ViewTimeline !== 'undefined' && a.timeline instanceof ViewTimeline
+      );
+      if (!driven.length) {
+        out.push('none');
+        return;
+      }
+      driven.forEach((a) => {
+        const t = a.effect ? a.effect.getComputedTiming() : null;
+        const p = t && t.progress != null ? Number(t.progress).toFixed(3) : 'null';
+        out.push((a.animationName || 'anim') + ':' + p);
+      });
     });
   });
   return out.join('|');
@@ -418,10 +443,18 @@ try {
             // A page with no devices cannot stall its way to a finding under the
             // old guard, so a motionless demo walked clean. It fails loudly now.
             findings.push({ kind: 'no-engine', pass, width: size.width, section: b.id, y: Math.round(y) });
-          } else if (frame.samplable === 0) {
+          } else if (frame.samplable === 0 && !b.scrub) {
             // The harness cannot read these devices, which is not the same claim
             // as "this section does not move". Advisory, so it never fails a
             // round on the strength of what the harness could not see.
+            //
+            // Only when the section carries no SCRUB device. drive() is
+            // contractually required to publish --motion-p for pin/pan/kinetic/
+            // wipe/drift, so on one of those, nothing samplable does not mean
+            // "unreadable device" — it means the engine never ran, which is the
+            // exact failure this branch exists to catch (file:// blocking the
+            // module script shipped a demo the client rejected). That falls
+            // through to the blocking dead-scroll below.
             findings.push({ kind: 'unobserved', pass, width: size.width, section: b.id, y: Math.round(y), devices: frame.devices });
           } else if (b.scrub) {
             // Only a scrubbed section is judged by the walk. A section whose
@@ -487,6 +520,12 @@ try {
   }
 
   mkdirSync(outDir, { recursive: true });
+  // Tag advisory rows in the artifact, not only on stdout: a consumer reading
+  // findings.json otherwise has to carry its own copy of the kind list to know
+  // why a run with findings exited 0, and that copy goes stale the moment a
+  // kind joins ADVISORY. Blocking rows carry no flag — absence is the default.
+  for (const p of report.pages)
+    for (const f of p.findings) if (ADVISORY.has(f.kind)) f.advisory = true;
   writeFileSync(join(outDir, 'findings.json'), JSON.stringify(report, null, 2));
   const total = report.pages.reduce((n, p) => n + p.findings.length, 0);
   const blocking = report.pages.reduce((n, p) => n + p.findings.filter((f) => !ADVISORY.has(f.kind)).length, 0);

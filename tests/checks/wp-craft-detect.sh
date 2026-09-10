@@ -45,6 +45,13 @@ grep -Fq "kind: 'unobserved'" "$v" \
   || fail "$v does not emit an unobserved finding, so an unreadable section is still reported as dead"
 grep -Fq "kind: 'no-engine'" "$v" \
   || fail "$v does not emit a no-engine finding, so a page with no devices still walks clean"
+# The other half of the split, and the one that costs more when it is wrong:
+# drive() is required to publish --motion-p for the SCRUB devices, so a stalled
+# section carrying one with nothing samplable is an engine that never ran, not a
+# device the harness cannot read. Routing that to advisory shipped a broken page
+# green — the exact file://-blocked-module failure this branch exists to fix.
+grep -Fq 'frame.samplable === 0 && !b.scrub' "$v" \
+  || fail "$v routes a scrubbed section with nothing samplable to advisory, so a page whose motion engine never ran exits 0"
 grep -Fq "data-motion') === 'reveal'" "$v" \
   || fail "$v does not sample the reveal device, so every reveal-only section reports dead scroll"
 for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
@@ -60,8 +67,23 @@ done
 # must stay behind the scrubbed branch or the false positive comes straight back.
 grep -Fq "const SCRUB = ['pin', 'pan', 'kinetic', 'wipe', 'drift']" "$v" \
   || fail "$v does not tell a scrubbed section from an entry-driven one, so both take the same sampling window"
-grep -Fq 'revealState' "$v" \
-  || fail "$v does not judge reveal by a two-point sample, so a sparse walk reports dead scroll on a section that reveals"
+# Anchored on the call site and its consequence, never on the identifier: the
+# whole two-point block was once deleted with the function left defined, and a
+# `grep -Fq revealState` stayed green while dead-scroll-for-reveal ceased to
+# exist. The second sample proves the block is called twice; the -A1 pair proves
+# the comparison still pushes a finding when the two samples match.
+grep -Fq 'const after = await page.evaluate(revealState, b.idx);' "$v" \
+  || fail "$v does not take the second reveal sample, so the two-point check cannot run and a sparse walk reports dead scroll on a section that reveals"
+grep -A1 -F 'if (after === before)' "$v" | grep -Fq "kind: 'dead-scroll'" \
+  || fail "$v does not report dead-scroll when both reveal samples match, so a reveal that never fires walks clean"
+# The predicate itself. Comparing computed opacity/transform let a decorative
+# @keyframes on the reveal's own children counterfeit a live reveal; only a
+# ViewTimeline-driven animation is the device's contract. `none` is what keeps an
+# unwired reveal from returning '' and being skipped by the `before !== ''` guard.
+grep -Fq 'a.timeline instanceof ViewTimeline' "$v" \
+  || fail "$v judges reveal by computed style, so ambient motion on the same children spoofs a section with no reveal wired at all"
+grep -Fq "out.push('none')" "$v" \
+  || fail "$v returns an empty reveal state for a child with no scroll-driven animation, so an unwired reveal is skipped instead of reported"
 grep -Fq '} else if (b.scrub) {' "$v" \
   || fail "$v pushes dead-scroll from the walk for an entry-driven section, which is the false positive the two-point sample replaces"
 for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
@@ -83,7 +105,22 @@ grep -Fq 'nothing blocking, ' "$v" \
 for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
   grep -Fq 'advisory-only run exits 0' "$f" \
     || fail "$f does not document that an advisory-only run exits 0"
+  # The artifact has to be self-describing, or every consumer carries its own
+  # copy of the kind list and that copy goes stale when a kind joins ADVISORY.
+  grep -Fq '"advisory": true' "$f" \
+    || fail "$f does not document the advisory flag on findings.json rows, so a consumer has to match on the kind instead"
+  grep -Fq 'page-wide judgments, printed per section' "$f" \
+    || fail "$f still reads as if unobserved/no-engine were per-section facts; both counters come from a document-wide query"
 done
+grep -Fq 'f.advisory = true' "$v" \
+  || fail "$v writes findings.json without the advisory flag, so the label exists only on stdout"
+# The command contradicted itself: an exit-code line that predates the advisory
+# split, three lines from the line that documents it.
+if grep -Fq '`0` no machine findings, `1` findings printed' commands/wp-demo-verify.md; then
+  fail "commands/wp-demo-verify.md still documents the pre-advisory exit codes, contradicting its own advisory-only-run line"
+fi
+grep -Fq 'Fold every **blocking** finding' commands/wp-yolo.md \
+  || fail "commands/wp-yolo.md folds every finding into the fix list, advisory ones included, so the split it consumes does not reach the one command that acts on it"
 grep -Fq 'parallax' skills/wp-demo-craft/references/verify.md \
   || fail "skills/wp-demo-craft/references/verify.md does not record that parallax is left unjudged, so the limit reads as a bug"
 

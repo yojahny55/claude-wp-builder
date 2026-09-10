@@ -613,7 +613,10 @@ Run, in order:
 5. **`/wp-polish`** — MANDATORY. Same dispatch. Cleans the seeded site and theme
    (menus, placeholders, leftovers) after seeding, so it runs after item 1, never before.
 6. **`/wp-responsive-check`** — MANDATORY. Same dispatch; it forwards to
-   `/wp-demo-verify` against the built site. Fold every finding it reports into Step 6.
+   `/wp-demo-verify` against the built site. Fold every **blocking** finding it reports
+   into Step 6. Findings printed `[advisory]` (rows flagged `"advisory": true` in
+   `findings.json`) are what the harness could not read, not what the page got wrong —
+   list them under Review, do not "fix" them.
 7. **`/wp-audit --all --security-level recommended`** — MANDATORY. Same dispatch. This
    is the only step that measures SEO, Core Web Vitals/performance, accessibility,
    security and coding standards; nothing earlier does. Its Step 9 fix prompt is

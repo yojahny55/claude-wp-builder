@@ -39,6 +39,20 @@
   beam sweeps once on entry, the name track drifts while its section is on screen. No
   device, no span, no motion-cost change, so the role table stays true. `proof-row` loses
   its hover/focus pause block, which existed only because the movement was automatic.
+- **A page whose motion engine never ran fails again, and a spoofed reveal stops passing.**
+  Making the harness stop crying wolf had also stopped it barking at a real intruder: a
+  demo carrying `pin`/`kinetic` markup whose `motion.js` never booted — a `file://`-blocked
+  module script, the failure that shipped a demo the client rejected — reported `unobserved`
+  and exited `0`. `drive()` is contractually required to publish `--motion-p` for
+  `pin`/`pan`/`kinetic`/`wipe`/`drift`, so a stalled section carrying one of those with
+  nothing samplable now reports blocking `dead-scroll`; `unobserved` stays for the section
+  the harness genuinely cannot read. The two-point reveal check now compares the reveal
+  child's scroll-driven animation (`getAnimations()` filtered to a `ViewTimeline`) instead
+  of its computed opacity and transform, which any decorative `@keyframes` on the same
+  children — or a percentage transform re-resolving after a lazy image loads — could move
+  on a section with no reveal wired at all. `findings.json` rows now carry
+  `"advisory": true`, so a consumer reads the field instead of keeping its own copy of the
+  kind list. Scrubbed sections keep today's geometry and stall logic.
 
 ## [1.14.0] - 2026-09-09
 

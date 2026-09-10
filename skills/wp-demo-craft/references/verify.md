@@ -80,38 +80,60 @@ shortening the span, not by adding motion to fill it. Authored silence recorded
 in `demo/BRIEF.md` is the exception, and it is only an exception because it was
 written down first.
 
-- `unobserved` — the section carries devices but none the harness can sample.
-  Advisory: it never fails a round. `reveal` was reported as `dead-scroll` for
-  every section that used it until v3.1, which is what taught a build to dismiss
-  392 findings in prose. A gate that cannot tell a good page from a broken one
-  gets overruled, and then so does every gate beside it.
+- `unobserved` — the page carries devices but none the harness can sample, and
+  the stalled section carries no scrubbed device of its own. Advisory: it never
+  fails a round. `reveal` was reported as `dead-scroll` for every section that
+  used it until v3.1, which is what taught a build to dismiss 392 findings in
+  prose. A gate that cannot tell a good page from a broken one gets overruled,
+  and then so does every gate beside it.
+- A stalled section that *does* carry `pin`/`pan`/`kinetic`/`wipe`/`drift` and
+  still has nothing samplable reports blocking `dead-scroll`, not `unobserved`.
+  `drive()` is contractually required to publish `--motion-p` for those devices,
+  so its absence is not an unreadable device — it is an engine that never ran,
+  which is exactly how a `file://`-blocked module script shipped a demo the
+  client rejected.
 - `no-engine` — the page carries no `data-motion` at all. Fails the round. A
   motionless page used to walk clean, because an empty frame signature could
   never accumulate a stall.
+- **`unobserved` and `no-engine` are page-wide judgments, printed per section.**
+  Both counters come from a document-wide `querySelectorAll` in the probe, so the
+  `section` field on those rows records which section the walk was on when the
+  stall accumulated, not a fact about that section's own markup. Read them as
+  "this page has no readable devices", and expect one row per section.
 - A section carrying no `pin`/`pan`/`kinetic`/`wipe`/`drift` is not judged by the
   walk at all. `reveal` is a one-shot entry transition a few pixels long — it
   runs on the child's own `view()` progress, around `scrollY = top - viewport` —
   so whether a sparse walk lands inside it is sampling luck, and a miss reported
   dead scroll on a section that reveals perfectly. Such a section is judged by
   two samples instead, below the fold and fully entered, and reports
-  `dead-scroll` only when no reveal child moved between them. A section that
-  already sits above the fold on load is not judged: its entry happened before
-  the walk could see it.
+  `dead-scroll` only when no reveal child's **scroll-driven animation** advanced
+  between them. What is compared is `getAnimations()` filtered to a
+  `ViewTimeline`, not the computed opacity or transform: a decorative
+  `@keyframes` on the same children, or a percentage transform re-resolving
+  after a lazy image loads, moved the computed style and let a section with no
+  reveal wired at all pass. A child carrying no scroll-driven animation reads as
+  `none` at both points, so an unwired reveal is reported rather than skipped. A
+  section that already sits above the fold on load is not judged: its entry
+  happened before the walk could see it.
 
 **An advisory-only run exits 0.** `unobserved` is the only advisory kind; every
-other kind blocks and still exits 1. Advisory findings are written to
-`findings.json` and printed like any other, with `[advisory]` on the line, and
-the summary reads `nothing blocking, N advisory finding(s)` so a reader can tell
-the difference between that and a run with nothing to report. A gate that fails
-a round on the strength of what it could not see gets overruled in prose, and
-then so does every gate beside it.
+other kind blocks and still exits 1. Advisory findings are printed like any
+other, with `[advisory]` on the line, and their `findings.json` rows carry
+`"advisory": true` — blocking rows carry no flag, so a consumer reads the field
+instead of keeping its own copy of the kind list. The summary reads
+`nothing blocking, N advisory finding(s)` so a reader can tell the difference
+between that and a run with nothing to report. A gate that fails a round on the
+strength of what it could not see gets overruled in prose, and then so does
+every gate beside it.
 
-Two limits, recorded because a limit nobody writes down is indistinguishable
+Three limits, recorded because a limit nobody writes down is indistinguishable
 from a bug: a section that already sits above the fold on load is never judged
 for dead reveal, since there is no below-the-fold position to sample it from;
-and `parallax` is not judged at all — it is neither scrubbed nor `reveal` and
+`parallax` is not judged at all — it is neither scrubbed nor `reveal` and
 publishes no `--motion-p`, and reading it would mean reading devices the harness
-has never been able to sample (`counter`), which invents findings.
+has never been able to sample (`counter`), which invents findings; and the
+two-point reveal check is an OR across the section's reveals, so one live child
+excuses its dead siblings.
 
 **Cues that never peak**: an element that never reaches full opacity anywhere in
 its section, usually a cue window too narrow for the span.

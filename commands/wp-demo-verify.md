@@ -80,8 +80,9 @@ desktop width, then full-page shots at 375, 576, 768, 1024 and 1440 (this replac
 `<dir>/.verify/[<page>/]<width>/`, with `findings.json` and one `sheet.png` per
 width.
 
-Exit codes: `0` no machine findings, `1` findings printed, `2` no usable browser,
-`3` the walk itself crashed (not a findings report, something threw mid-walk).
+Exit codes: `0` nothing blocking — either no findings at all, or advisory ones
+only; `1` at least one blocking finding printed; `2` no usable browser; `3` the
+walk itself crashed (not a findings report, something threw mid-walk).
 
 **On exit code 2**, fall back in this order: the Chrome or Playwright MCP
 screenshot tools if either is connected, then ask the user for screenshots at the
@@ -93,28 +94,46 @@ branch: `/wp-demo` probes first and stops on 2.)
 - **dead scroll**: consecutive positions where nothing changed. Shorten the
   section's span or add a cue. Authored silence recorded in `demo/BRIEF.md` is not
   dead scroll; say so instead of "fixing" it.
-- `unobserved` — the section carries devices but none the harness can sample.
-  Advisory: it never fails a round. `reveal` was reported as `dead-scroll` for
-  every section that used it until v3.1, which is what taught a build to dismiss
-  392 findings in prose. A gate that cannot tell a good page from a broken one
-  gets overruled, and then so does every gate beside it.
+- `unobserved` — the page carries devices but none the harness can sample, and
+  the stalled section carries no scrubbed device of its own. Advisory: it never
+  fails a round. `reveal` was reported as `dead-scroll` for every section that
+  used it until v3.1, which is what taught a build to dismiss 392 findings in
+  prose. A gate that cannot tell a good page from a broken one gets overruled,
+  and then so does every gate beside it.
+- A stalled section that *does* carry `pin`/`pan`/`kinetic`/`wipe`/`drift` and
+  still has nothing samplable reports blocking `dead-scroll`, not `unobserved`.
+  `drive()` is contractually required to publish `--motion-p` for those devices,
+  so its absence means the engine never ran — the `file://`-blocked module script
+  failure this split exists to keep catching — not that the device is unreadable.
 - `no-engine` — the page carries no `data-motion` at all. Fails the round. A
   motionless page used to walk clean, because an empty frame signature could
   never accumulate a stall.
+- **`unobserved` and `no-engine` are page-wide judgments, printed per section.**
+  Both counters are taken from a document-wide `querySelectorAll`, so the
+  `section` field on those rows says where the walk was when the stall
+  accumulated, not what that section's own markup carries. Expect one row per
+  section and read them as a statement about the page.
 - A section carrying no `pin`/`pan`/`kinetic`/`wipe`/`drift` is not judged by the
   walk at all. `reveal` is a one-shot entry transition a few pixels long — it
   runs on the child's own `view()` progress, around `scrollY = top - viewport` —
   so whether a sparse walk lands inside it is sampling luck, and a miss reported
   dead scroll on a section that reveals perfectly. Such a section is judged by
   two samples instead, below the fold and fully entered, and reports
-  `dead-scroll` only when no reveal child moved between them. A section that
-  already sits above the fold on load is not judged: its entry happened before
-  the walk could see it.
+  `dead-scroll` only when no reveal child's **scroll-driven animation** advanced
+  between them — `getAnimations()` filtered to a `ViewTimeline`, not the computed
+  opacity or transform, which an unrelated `@keyframes` or a re-resolving
+  percentage transform could move on a section with no reveal wired at all. A
+  child with no scroll-driven animation reads as `none` at both points, so an
+  unwired reveal is reported rather than skipped. A section that already sits
+  above the fold on load is not judged: its entry happened before the walk could
+  see it.
 - **An advisory-only run exits 0.** `unobserved` is the only advisory kind; every
   other kind blocks and still exits 1. Advisory findings are printed with
-  `[advisory]` on the line and written to `findings.json` like any other, and the
-  summary reads `nothing blocking, N advisory finding(s)` — read that as "nothing
-  to fix here, and here is what I could not see", not as a clean run.
+  `[advisory]` on the line, and their `findings.json` rows carry
+  `"advisory": true` (blocking rows carry no flag) — read the field rather than
+  matching on the kind. The summary reads `nothing blocking, N advisory
+  finding(s)` — read that as "nothing to fix here, and here is what I could not
+  see", not as a clean run.
 - **cue never reaches full opacity**: the window is too narrow or the ramps eat
   it. Widen the window or set explicit ramps.
 - **horizontal overflow**: at any width, always a defect.
