@@ -15,8 +15,11 @@ half a machine cannot grade.
 
 `$ARGUMENTS` is a file path or a URL. Default to `demo/index.html`. A URL lets this
 run against the converted WordPress page, which is the only way to prove the motion
-survived conversion. Serve files over HTTP when the page fetches anything; a
-`file://` page silently falls back and proves nothing.
+survived conversion. A local file or directory is always served over HTTP on an
+ephemeral `127.0.0.1` port rather than opened as `file://`: an external
+`<script type="module">` is a cross-origin fetch against an opaque `file://`
+origin, Chrome blocks it silently, and the engine never boots — every page then
+reports dead scroll with no trace of why.
 
 A directory (`demo/`) walks every `*.html` in it, one output folder per page
 under `demo/.verify/<page>/`, and `findings.json` carries a `pages[]` array. Craft
@@ -127,13 +130,20 @@ branch: `/wp-demo` probes first and stops on 2.)
   unwired reveal is reported rather than skipped. A section that already sits
   above the fold on load is not judged: its entry happened before the walk could
   see it.
-- **An advisory-only run exits 0.** `unobserved` is the only advisory kind; every
-  other kind blocks and still exits 1. Advisory findings are printed with
-  `[advisory]` on the line, and their `findings.json` rows carry
-  `"advisory": true` (blocking rows carry no flag) — read the field rather than
-  matching on the kind. The summary reads `nothing blocking, N advisory
-  finding(s)` — read that as "nothing to fix here, and here is what I could not
-  see", not as a clean run.
+- **An advisory-only run exits 0.** `unobserved` and `external-module` are the
+  only advisory kinds; every other kind blocks and still exits 1. Advisory
+  findings are printed with `[advisory]` on the line, and their `findings.json`
+  rows carry `"advisory": true` (blocking rows carry no flag) — read the field
+  rather than matching on the kind. The summary reads `nothing blocking, N
+  advisory finding(s)` — read that as "nothing to fix here, and here is what I
+  could not see", not as a clean run.
+- `container-noop` — an `@container` rule whose subject has no ancestor
+  establishing a container. Fails the round: the rule provably never applies. An
+  element never matches a container query against the container it establishes
+  itself, so a block that queries its own root silently loses its breakpoints.
+- `external-module` — the page loads `<script type="module" src=…>`. Advisory.
+  Verification serves over HTTP so it runs, but a client double-clicking the
+  file gets an opaque origin and Chrome blocks it, and the engine never boots.
 - **cue never reaches full opacity**: the window is too narrow or the ramps eat
   it. Widen the window or set explicit ramps.
 - **horizontal overflow**: at any width, always a defect.

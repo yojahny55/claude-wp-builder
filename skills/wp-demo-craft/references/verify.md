@@ -116,15 +116,23 @@ written down first.
   section that already sits above the fold on load is not judged: its entry
   happened before the walk could see it.
 
-**An advisory-only run exits 0.** `unobserved` is the only advisory kind; every
-other kind blocks and still exits 1. Advisory findings are printed like any
-other, with `[advisory]` on the line, and their `findings.json` rows carry
-`"advisory": true` — blocking rows carry no flag, so a consumer reads the field
-instead of keeping its own copy of the kind list. The summary reads
-`nothing blocking, N advisory finding(s)` so a reader can tell the difference
-between that and a run with nothing to report. A gate that fails a round on the
-strength of what it could not see gets overruled in prose, and then so does
-every gate beside it.
+**An advisory-only run exits 0.** `unobserved` and `external-module` are the
+only advisory kinds; every other kind blocks and still exits 1. Advisory
+findings are printed like any other, with `[advisory]` on the line, and their
+`findings.json` rows carry `"advisory": true` — blocking rows carry no flag, so
+a consumer reads the field instead of keeping its own copy of the kind list.
+The summary reads `nothing blocking, N advisory finding(s)` so a reader can
+tell the difference between that and a run with nothing to report. A gate that
+fails a round on the strength of what it could not see gets overruled in
+prose, and then so does every gate beside it.
+
+- `container-noop` — an `@container` rule whose subject has no ancestor
+  establishing a container. Fails the round: the rule provably never applies. An
+  element never matches a container query against the container it establishes
+  itself, so a block that queries its own root silently loses its breakpoints.
+- `external-module` — the page loads `<script type="module" src=…>`. Advisory.
+  Verification serves over HTTP so it runs, but a client double-clicking the
+  file gets an opaque origin and Chrome blocks it, and the engine never boots.
 
 Four limits, recorded because a limit nobody writes down is indistinguishable
 from a bug: a section that already sits above the fold on load is never judged

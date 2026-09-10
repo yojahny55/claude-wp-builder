@@ -11,10 +11,11 @@
  * the caller can fall back to MCP screenshot tools rather than reporting a failure),
  * 3 the walk itself crashed (not a findings report).
  */
-import { existsSync, mkdirSync, writeFileSync, readdirSync, statSync } from 'node:fs';
-import { resolve, join, dirname, basename } from 'node:path';
+import { existsSync, mkdirSync, writeFileSync, readdirSync, statSync, createReadStream } from 'node:fs';
+import { resolve, join, dirname, basename, extname, normalize } from 'node:path';
 import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
+import { createServer } from 'node:http';
 
 // Advisory kinds report what the harness could not see, not what the page got
 // wrong, so they are printed and written to findings.json but never raise the
@@ -22,7 +23,7 @@ import { pathToFileURL } from 'node:url';
 // read gets overruled in prose, and then so does every gate beside it. Every
 // other kind blocks. Listed here, once, so a new kind joins a list instead of
 // re-deriving the rule at the exit.
-const ADVISORY = new Set(['unobserved']);
+const ADVISORY = new Set(['unobserved', 'external-module']);
 
 const args = process.argv.slice(2);
 if (args.includes('--help')) {
@@ -83,6 +84,26 @@ const pages = targetIsDir
 const outDir = resolve(
   opt('--out', targetIsUrl ? '.verify' : join(targetIsDir ? resolve(target) : dirname(resolve(target)), '.verify'))
 );
+
+const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript',
+  '.mjs': 'text/javascript', '.json': 'application/json', '.png': 'image/png',
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml',
+  '.webp': 'image/webp', '.woff2': 'font/woff2', '.avif': 'image/avif' };
+
+/** Serve `root` on an ephemeral port. Verification over file:// silently blocks
+ *  module scripts and relative image loads; neither is a defect in the demo. */
+const serve = (root) => new Promise((resolve) => {
+  const server = createServer((req, res) => {
+    const rel = normalize(decodeURIComponent(req.url.split('?')[0])).replace(/^(\.\.[/\\])+/, '');
+    const file = join(root, rel);
+    try {
+      if (statSync(file).isDirectory()) return res.writeHead(403).end();
+    } catch { return res.writeHead(404).end(); }
+    res.writeHead(200, { 'content-type': MIME[extname(file).toLowerCase()] || 'application/octet-stream' });
+    createReadStream(file).pipe(res);
+  });
+  server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port }));
+});
 
 function findChrome() {
   if (process.env.WP_DEMO_CHROME && existsSync(process.env.WP_DEMO_CHROME))
@@ -322,7 +343,39 @@ const revealState = (idx) => {
   return out.join('|');
 };
 
+/** Report @container rules whose subject can never match a container. */
+const containerAudit = () => {
+  const out = [];
+  const sheets = [...document.styleSheets];
+  for (const sheet of sheets) {
+    let rules;
+    try { rules = [...sheet.cssRules]; } catch { continue; } // cross-origin
+    for (const rule of rules) {
+      if (rule.constructor.name !== 'CSSContainerRule') continue;
+      for (const inner of [...rule.cssRules]) {
+        const sel = inner.selectorText;
+        if (!sel) continue;
+        let el;
+        try { el = document.querySelector(sel); } catch { continue; }
+        if (!el) continue;
+        // An element never matches a container query against the container it
+        // establishes itself, so start the walk at its parent.
+        let node = el.parentElement;
+        let found = false;
+        while (node) {
+          const ct = getComputedStyle(node).containerType;
+          if (ct && ct !== 'normal') { found = true; break; }
+          node = node.parentElement;
+        }
+        if (!found) out.push(sel);
+      }
+    }
+  }
+  return [...new Set(out)];
+};
+
 let browser;
+let http = null;
 let exitCode = 0;
 const report = { pages: [] };
 
@@ -330,10 +383,25 @@ try {
   browser = await chromium.launch({ executablePath, args: ['--autoplay-policy=no-user-gesture-required'] });
 
   for (const pageTarget of pages) {
-  const pageUrl = /^https?:\/\//.test(pageTarget) ? pageTarget : pathToFileURL(resolve(pageTarget)).href;
+  const isRemote = /^https?:\/\//.test(pageTarget);
+  // Loading a local page as file:// puts it on an opaque origin, where Chrome
+  // blocks an external `<script type="module">` outright — the engine never
+  // boots and every section reports dead scroll, silently. Serving removes
+  // the whole class. One server per page, closed before the next is opened;
+  // process.exit() at the very end reclaims whichever one is still open.
+  if (http) { http.server.close(); http = null; }
+  let pageUrl = pageTarget;
+  if (!isRemote) {
+    const abs = resolve(pageTarget);
+    const root = statSync(abs).isDirectory() ? abs : dirname(abs);
+    http = await serve(root);
+    const leaf = statSync(abs).isDirectory() ? 'index.html' : basename(abs);
+    pageUrl = `http://127.0.0.1:${http.port}/${leaf}`;
+  }
   const pageOut = pages.length > 1 ? join(outDir, basename(pageTarget, '.html')) : outDir;
   const findings = [];
   const sections = [];
+  let staticChecked = false;
 
   // The docs promise the reduced-motion pass at desktop width. Pinning it to
   // widths[0] meant a mobile-first --widths list ran it at the phone size and
@@ -351,6 +419,19 @@ try {
     const page = await context.newPage();
     await page.goto(pageUrl, { waitUntil: 'load' });
     await page.waitForTimeout(600);
+
+    // Both static: independent of scroll position, so read once per page
+    // rather than once per width/reduced-motion pass.
+    if (!staticChecked) {
+      staticChecked = true;
+      for (const sel of await page.evaluate(containerAudit)) {
+        findings.push({ kind: 'container-noop', pass: 'normal', width: size.width, selector: sel });
+      }
+      const external = await page.$$eval('script[type="module"][src]', (n) => n.map((s) => s.getAttribute('src')));
+      for (const src of external) {
+        findings.push({ kind: 'external-module', pass: 'normal', width: size.width, src });
+      }
+    }
 
     const bounds = await page.evaluate(() => {
       // pin/pan/kinetic/wipe/drift are the only devices drive() publishes
@@ -558,6 +639,7 @@ try {
   console.error('demo-verify: the walk crashed:', err && err.stack ? err.stack : err);
   exitCode = 3;
 } finally {
+  if (http) http.server.close();
   if (browser) {
     try {
       await browser.close();

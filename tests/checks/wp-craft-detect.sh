@@ -111,8 +111,11 @@ done
 # Advisory has to mean advisory in the exit code, not only in prose: a round that
 # fails on what the harness could not see is the false positive under another
 # name. The split lives in one named set so a new advisory kind joins a list.
-grep -Fq "const ADVISORY = new Set(['unobserved'])" "$v" \
-  || fail "$v does not name its advisory kinds in one place, so the blocking rule is re-derived at the exit"
+# Anchored on the whole literal set, not just 'unobserved': that also catches
+# container-noop landing in the set by mistake, which would silently stop it
+# from blocking the round it exists to fail.
+grep -Fq "const ADVISORY = new Set(['unobserved', 'external-module'])" "$v" \
+  || fail "$v does not name exactly unobserved and external-module as its advisory kinds, so either a new advisory kind was added without updating this or container-noop landed in the set and stopped blocking"
 grep -Fq 'exitCode = blocking === 0 ? 0 : 1' "$v" \
   || fail "$v exits on the total finding count, so an advisory-only run still fails the round"
 grep -Fq "' [advisory]'" "$v" \
@@ -140,5 +143,42 @@ grep -Fq 'Fold every **blocking** finding' commands/wp-yolo.md \
   || fail "commands/wp-yolo.md folds every finding into the fix list, advisory ones included, so the split it consumes does not reach the one command that acts on it"
 grep -Fq 'parallax' skills/wp-demo-craft/references/verify.md \
   || fail "skills/wp-demo-craft/references/verify.md does not record that parallax is left unjudged, so the limit reads as a bug"
+
+# An @container rule whose subject has no container-type ancestor never applies
+# and says nothing about it: six such blocks shipped in one build and were only
+# found from screenshots. The finding must exist, and it must be blocking (the
+# advisory-set assertion above already pins that).
+grep -Fq "kind: 'container-noop'" "$v" \
+  || fail "$v does not lint @container rules with no container-type ancestor"
+# The walk must start one level above the queried element: a container query
+# never matches the container the queried element establishes itself, so
+# starting at the element instead of its parent misses that case silently.
+grep -Fq 'let node = el.parentElement;' "$v" \
+  || fail "$v starts the container-type ancestor walk at the element itself, so an element that establishes its own container is wrongly cleared instead of reported"
+
+# Loading a demo as file:// puts an external module script on an opaque
+# origin; Chrome blocks it, the engine never boots, and every page reports
+# dead scroll with no trace of why. Serving over HTTP is what removes that
+# whole failure class. Anchored on the import statement itself, not just the
+# bare word 'createServer': that word also appears at the call site inside
+# serve(), so a grep for it alone stays green even with the import deleted
+# (a ReferenceError that only surfaces the first time a page is actually
+# walked, never here).
+grep -Fq "import { createServer } from 'node:http';" "$v" \
+  || fail "$v does not import createServer from node:http, so serving the demo over HTTP throws at runtime the first time a page is walked"
+grep -Fq "kind: 'external-module'" "$v" \
+  || fail "$v does not warn when a built demo still carries an external module script that only works when served"
+# Anchored on the explanatory phrase from each dedicated bullet, not only the
+# bare kind name: both files also name-drop 'external-module' in passing, in
+# the sentence that lists the advisory kinds, so a grep for the bare word alone
+# stays green even with the dedicated explanatory bullet deleted outright.
+for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
+  grep -Fq 'container-noop' "$f" || fail "$f does not document the container-noop finding"
+  grep -Fq 'provably never applies' "$f" \
+    || fail "$f does not explain that container-noop fails the round because the rule provably never applies"
+  grep -Fq 'external-module' "$f" || fail "$f does not document the external-module finding"
+  grep -Fq 'double-clicking' "$f" \
+    || fail "$f does not explain that external-module is a hazard only when the file is opened directly, not served"
+done
 
 echo PASS

@@ -63,6 +63,21 @@
   `tests/checks/wp-craft-detect.sh` also pins the two-point block's own guard by polarity
   and by what it gates: inverting `!b.scrub` or wrapping the condition in `false &&` left
   every existing assertion green while reveal detection disappeared entirely.
+- **`bin/demo-verify.mjs` lints dead `@container` rules and serves the walk over HTTP.**
+  An `@container` rule whose subject has no ancestor declaring `container-type` never
+  applies and said nothing about it — this cost a previous effort a whole task and cost a
+  real client build six blocks that never rendered, found only from screenshots. A new
+  `container-noop` finding, blocking, reports the selector; the ancestor walk starts at
+  `parentElement`, never at the element itself, because a container query never matches
+  the container an element establishes on its own. Separately, the walk loaded pages as
+  `file://`, where an external `<script type="module">` is a cross-origin fetch against
+  an opaque origin, so Chrome blocks it silently, the engine never boots, and every page
+  reports dead scroll with no trace of why — the exact failure this branch exists to fix,
+  and it cost an hour to diagnose. Local targets are now served on an ephemeral
+  `127.0.0.1` port instead; the contact sheet stays on `file://`, since it is a locally
+  generated file with inlined images. A new advisory `external-module` finding names any
+  module script that survives into a built demo, since it works served and breaks the
+  moment a client double-clicks the file.
 
 ## [1.14.0] - 2026-09-09
 
