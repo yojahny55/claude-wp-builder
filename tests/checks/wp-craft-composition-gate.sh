@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# The library must pass the gate it asks builds to pass. `proof-row` once shipped
-# an infinite 38s translate that the detector reports as `marquee` at
-# category=slop severity=warning — the shape that fails a round before a
-# screenshot is taken — so every build using the proof role failed by
-# construction. (`closing-block`'s 7s infinite conic sweep was rewritten in the
-# same pass on the library's own anti-perpetual-motion rules; re-running the real
-# gate against the original rule produces 0 slop findings and rc=0, so it never
-# failed this gate. The rewrite stands on its own reasons, not on this one.)
+# The library must pass the gate it asks builds to pass. `closing-block` once ran
+# a 7s infinite conic sweep and `proof-row` a 38s infinite translate; the detector
+# reports both as `marquee` at category=slop severity=warning — the shape that
+# fails a round before a screenshot is taken — so every build using the closing
+# or proof role failed by construction. Both were rewritten in the same pass onto
+# the library's own anti-perpetual-motion rules, scroll-linked through the view
+# timeline instead of running on a loop.
 # This runs the real gate rather than grepping for its wording.
 #
 # And it runs the gate against a synthetic library it must REJECT, because a

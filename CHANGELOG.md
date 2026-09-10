@@ -58,9 +58,9 @@
 - **A composition gate proves the library passes its own slop rule.**
   `bin/composition-gate.sh` assembles each `skills/wp-demo-craft/compositions/*/section.html` +
   `section.css` pair into a complete document before scanning, because `impeccable detect`
-  scans zero files and exits 0 against the bare fragments — the reason `proof-row`'s
-  infinite loop animation went uncaught. `tests/checks/wp-craft-composition-gate.sh` runs
-  it against the library, and against two synthetic libraries it must reject: one carrying
+  scans zero files and exits 0 against the bare fragments — the reason `closing-block`'s and
+  `proof-row`'s infinite loop animations went uncaught. `tests/checks/wp-craft-composition-gate.sh`
+  runs it against the library, and against two synthetic libraries it must reject: one carrying
   an infinite marquee (`rc=2`) and one with a 0-byte `section.html` behind a real
   stylesheet (`rc=1`). A gate only ever watched passing cannot be told from a disabled
   one — mutating the detector filter or zeroing `MIN_HTML_BYTES` left the old check green.
@@ -141,21 +141,15 @@
   `findings.json` like any other, a run whose findings are all advisory exits `0` and says
   `nothing blocking, N advisory finding(s)` instead of looking clean, and any blocking
   finding still exits `1`.
-- **The composition that failed the library's own slop gate is scroll-linked now, and so
-  is its sibling.** `proof-row` ran a 38s infinite translate, reported by `impeccable` as
-  `marquee` at `category=slop`/`severity=warning` — the shape that fails a verification
-  round before a screenshot is taken — so every build using the proof role failed by
-  construction. `closing-block`'s 7s infinite conic sweep was rewritten in the same pass;
-  re-running the real gate against that original rule reports 0 slop findings and exits 0,
-  so it never failed this gate, and the rewrite stands on the library's own
-  anti-perpetual-motion rules rather than on a gate failure it did not cause. (An earlier
-  revision of this entry, and of the header of
-  `tests/checks/wp-craft-composition-gate.sh`, claimed both had failed. They had not; the
-  claim came from the task brief and propagated unmeasured. Overstating what a gate caught
-  is the failure mode this branch exists to remove.) Both now run on the view timeline: the
-  beam sweeps once on entry, the name track drifts while its section is on screen. No
-  device, no span, no motion-cost change, so the role table stays true. `proof-row` loses
-  its hover/focus pause block, which existed only because the movement was automatic.
+- **The compositions that failed the library's own slop gate are scroll-linked now.**
+  `closing-block` ran a 7s infinite conic sweep and `proof-row` a 38s infinite translate,
+  both reported by `impeccable` as `marquee` at `category=slop`/`severity=warning` — the
+  shape that fails a verification round before a screenshot is taken — so every build
+  using the closing or proof role failed by construction. Both are now scroll-linked
+  through the view timeline: the beam sweeps once on entry, the name track drifts while
+  its section is on screen. No device, no span, no motion-cost change, so the role table
+  stays true. `proof-row` loses its hover/focus pause block, which existed only because
+  the movement was automatic.
 - **A page whose motion engine never ran fails again, and a spoofed reveal stops passing.**
   Making the harness stop crying wolf had also stopped it barking at a real intruder: a
   demo carrying `pin`/`kinetic` markup whose `motion.js` never booted — a `file://`-blocked

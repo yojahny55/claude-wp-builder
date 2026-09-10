@@ -44,7 +44,7 @@ grep -Fq -- "container: p('spacing.container'" "$r" \
 # grep above reads source text, and source text has four recorded bypasses —
 # comment the line out, rename the key, reassign after the read, add a duplicate
 # key later in the object. `--tokens` prints the exact string the page embeds
-# (one function builds both), needs no browser, and none of the four survives it.
+# (one function builds both), needs no browser, and none of the first three survives it.
 # Its ceiling: it observes what previewTokens() and rootBlock() produce, not a
 # later mutation of the token object at the render call site — the flag has
 # already exited by then, and seeing that would take the render itself.
