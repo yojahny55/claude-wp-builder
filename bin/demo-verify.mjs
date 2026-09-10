@@ -94,11 +94,16 @@ const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript
  *  module scripts and relative image loads; neither is a defect in the demo. */
 const serve = (root) => new Promise((resolve) => {
   const server = createServer((req, res) => {
-    const rel = normalize(decodeURIComponent(req.url.split('?')[0])).replace(/^(\.\.[/\\])+/, '');
-    const file = join(root, rel);
+    // decodeURIComponent throws URIError on a malformed escape (a bare `%` is
+    // enough), and an uncaught throw here kills the process mid-walk — a
+    // verification that produced no answer, which is the failure this whole
+    // branch exists to stop. Decode inside the guard and answer 400.
+    let file;
     try {
+      const rel = normalize(decodeURIComponent(req.url.split('?')[0])).replace(/^(\.\.[/\\])+/, '');
+      file = join(root, rel);
       if (statSync(file).isDirectory()) return res.writeHead(403).end();
-    } catch { return res.writeHead(404).end(); }
+    } catch (err) { return res.writeHead(err instanceof URIError ? 400 : 404).end(); }
     res.writeHead(200, { 'content-type': MIME[extname(file).toLowerCase()] || 'application/octet-stream' });
     createReadStream(file).pipe(res);
   });

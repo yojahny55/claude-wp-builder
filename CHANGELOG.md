@@ -78,6 +78,15 @@
   generated file with inlined images. A new advisory `external-module` finding names any
   module script that survives into a built demo, since it works served and breaks the
   moment a client double-clicks the file.
+- **A malformed percent-encoding no longer kills the walk.** `demo-verify.mjs`'s demo
+  server decoded the request path outside its `try`, so a request carrying a bare `%` —
+  a stray character in an href or asset path is enough — threw `URIError` out of the
+  request handler and Node killed the process mid-run. The decode is inside the guard
+  now and answers `400`; traversal vectors still `404` and a directory still `403`.
+  Three assertions in `tests/checks/wp-craft-detect.sh` also stopped being text-pins:
+  the container lint's polarity (`if (!found)`), the module-script selector
+  (`script[type="module"][src]`) and the once-per-page `staticChecked` gate are each
+  anchored on the token whose inversion or typo silently switches the check off.
 
 ## [1.14.0] - 2026-09-09
 

@@ -155,6 +155,13 @@ grep -Fq "kind: 'container-noop'" "$v" \
 # starting at the element instead of its parent misses that case silently.
 grep -Fq 'let node = el.parentElement;' "$v" \
   || fail "$v starts the container-type ancestor walk at the element itself, so an element that establishes its own container is wrongly cleared instead of reported"
+# The lint's polarity, anchored on the guard expression itself. Both lines above
+# survive `if (!found)` -> `if (found)` intact, and that one character inverts
+# the lint completely: every correctly written container query is reported as
+# dead and every actually dead rule is cleared. A selector is reported when the
+# ancestor walk found NO container, never when it found one.
+grep -Fq 'if (!found) out.push(sel);' "$v" \
+  || fail "$v does not report a container-query selector only when the ancestor walk found no container-type, so the lint's polarity is inverted: correct compositions are flagged and dead rules are cleared"
 
 # Loading a demo as file:// puts an external module script on an opaque
 # origin; Chrome blocks it, the engine never boots, and every page reports
@@ -168,6 +175,24 @@ grep -Fq "import { createServer } from 'node:http';" "$v" \
   || fail "$v does not import createServer from node:http, so serving the demo over HTTP throws at runtime the first time a page is walked"
 grep -Fq "kind: 'external-module'" "$v" \
   || fail "$v does not warn when a built demo still carries an external module script that only works when served"
+# The query that produces it. The push text above stays intact under
+# `[type="module"]` -> `[type="modulex"]`, and the finding then never fires on
+# any page: the fixture reports zero findings and exits 0, which is the silent
+# pass this task exists to close, reopened by one character.
+grep -Fq 'script[type="module"][src]' "$v" \
+  || fail "$v does not query script[type=\"module\"][src], so no external module script is ever detected and the advisory silently never fires"
+# Both static checks run behind one per-page gate. Inverting it
+# (`if (!staticChecked)` -> `if (staticChecked)`) never runs the block at all,
+# because the flag is only ever set inside it — container-noop and
+# external-module both disappear with every line of theirs still present, and
+# the run exits 0. Anchored on the guard and on the flag being set inside it.
+grep -A1 -F 'if (!staticChecked) {' "$v" | grep -Fq 'staticChecked = true;' \
+  || fail "$v does not gate the static checks on '!staticChecked' with the flag set inside, so inverting that guard silently skips container-noop and external-module entirely"
+# The demo server decodes the request path. decodeURIComponent throws URIError
+# on a malformed escape, and outside the try that throw is uncaught and kills
+# the walk mid-run; a demo with a stray '%' in an href is enough.
+grep -Fq 'err instanceof URIError ? 400 : 404' "$v" \
+  || fail "$v does not answer 400 on a malformed percent-encoding, so a stray '%' in a demo path throws out of the request handler and kills the walk"
 # Anchored on the explanatory phrase from each dedicated bullet, not only the
 # bare kind name: both files also name-drop 'external-module' in passing, in
 # the sentence that lists the advisory kinds, so a grep for the bare word alone
