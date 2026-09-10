@@ -53,6 +53,16 @@
   on a section with no reveal wired at all. `findings.json` rows now carry
   `"advisory": true`, so a consumer reads the field instead of keeping its own copy of the
   kind list. Scrubbed sections keep today's geometry and stall logic.
+- **A reveal on a browser without `view()` is unjudged, not dead.** `revealState` reads
+  `getAnimations()` for a `ViewTimeline`, but `motion.js` drives `reveal` in GSAP whenever
+  `CSS.supports('animation-timeline', 'view()')` is false, and a GSAP tween is rAF-driven
+  and invisible to `getAnimations()` — so on such a browser a working section read
+  `none|none` and was reported `dead-scroll`. It now returns the unjudged sentinel there,
+  the same one the above-the-fold and `parallax` ceilings return, and `verify.md` records
+  it as the fourth limit. Latent on the current harness, where `view()` is supported.
+  `tests/checks/wp-craft-detect.sh` also pins the two-point block's own guard by polarity
+  and by what it gates: inverting `!b.scrub` or wrapping the condition in `false &&` left
+  every existing assertion green while reveal detection disappeared entirely.
 
 ## [1.14.0] - 2026-09-09
 

@@ -126,14 +126,18 @@ between that and a run with nothing to report. A gate that fails a round on the
 strength of what it could not see gets overruled in prose, and then so does
 every gate beside it.
 
-Three limits, recorded because a limit nobody writes down is indistinguishable
+Four limits, recorded because a limit nobody writes down is indistinguishable
 from a bug: a section that already sits above the fold on load is never judged
 for dead reveal, since there is no below-the-fold position to sample it from;
 `parallax` is not judged at all — it is neither scrubbed nor `reveal` and
 publishes no `--motion-p`, and reading it would mean reading devices the harness
-has never been able to sample (`counter`), which invents findings; and the
+has never been able to sample (`counter`), which invents findings; the
 two-point reveal check is an OR across the section's reveals, so one live child
-excuses its dead siblings.
+excuses its dead siblings; and on a browser without
+`CSS.supports('animation-timeline', 'view()')` no reveal is judged at all,
+because `motion.js` drives reveal in GSAP there and a GSAP tween is invisible to
+`getAnimations()` — a working section would otherwise read `none` at both
+samples and be reported dead.
 
 **Cues that never peak**: an element that never reaches full opacity anywhere in
 its section, usually a cue window too narrow for the span.

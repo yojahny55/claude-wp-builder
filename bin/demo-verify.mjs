@@ -291,6 +291,12 @@ const probe = () => {
  * changes the joined string, so it excuses its dead siblings.
  */
 const revealState = (idx) => {
+  // motion.js wires reveal in GSAP whenever `view()` is missing, and a GSAP tween
+  // is rAF-driven, not a Web Animation, so getAnimations() returns nothing and a
+  // working reveal would read `none|none` and be reported dead. On such a browser
+  // the section is unjudged — same sentinel as the above-the-fold and `parallax`
+  // ceilings. Latent on the current harness (Chrome has shipped `view()` since 115).
+  if (!CSS.supports('animation-timeline', 'view()')) return '';
   const root = document.querySelectorAll('section, [data-motion]')[idx];
   if (!root) return '';
   const devices = [];

@@ -84,6 +84,23 @@ grep -Fq 'a.timeline instanceof ViewTimeline' "$v" \
   || fail "$v judges reveal by computed style, so ambient motion on the same children spoofs a section with no reveal wired at all"
 grep -Fq "out.push('none')" "$v" \
   || fail "$v returns an empty reveal state for a child with no scroll-driven animation, so an unwired reveal is skipped instead of reported"
+# The block's own guard, pinned by polarity AND by what it gates. Inverting one
+# character (`!b.scrub` → `b.scrub`) or wrapping the condition in `false &&`
+# leaves both assertions above matching — the two samples are still adjacent and
+# intact — while reveal detection disappears entirely and deadreveal/falsealive
+# drop to exit 0. Anchoring the first sample under the exact condition is what
+# makes either edit fail here by name.
+grep -A3 -F 'if (!b.scrub && !reduced && belowFold >= 0) {' "$v" \
+  | grep -Fq 'const before = await page.evaluate(revealState, b.idx);' \
+  || fail "$v does not gate the two-point reveal check on exactly '!b.scrub && !reduced && belowFold >= 0' with the first sample inside it, so inverting or disabling that guard silently switches reveal detection off"
+# The GSAP fallback path. motion.js drives reveal with rAF tweens when the
+# browser has no view(), and those are invisible to getAnimations(), so the
+# predicate must return the unjudged sentinel there rather than read none|none
+# and call a working section dead.
+grep -Fq "CSS.supports('animation-timeline', 'view()')" "$v" \
+  || fail "$v judges reveal on a browser with no view(), where motion.js drives it in GSAP and getAnimations() sees nothing, so a working section is reported dead"
+grep -Fq "animation-timeline', 'view()" skills/wp-demo-craft/references/verify.md \
+  || fail "skills/wp-demo-craft/references/verify.md does not record that reveal is unjudged without view() support, so the limit reads as a bug"
 grep -Fq '} else if (b.scrub) {' "$v" \
   || fail "$v pushes dead-scroll from the walk for an entry-driven section, which is the false positive the two-point sample replaces"
 for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
