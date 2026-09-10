@@ -7,15 +7,18 @@ client `DESIGN.md` tokens and real copy in, and deviates only with a one-line
 reason in `demo/BRIEF.md`. The previews are rendered with `_preview.md`, so they
 show the composition, not a brand.
 
-Every composition sizes to its own container, never to the screen: the root
-declares `container-type: inline-size` and every size-based breakpoint is an
-`@container` query, so a section dropped into a narrow column lays out for the
-column. Only `(hover: hover) and (pointer: fine)` and `(prefers-reduced-motion)`
-stay on `@media` — they are user and device conditions a container query cannot
-express. An element never matches a query against the container it establishes
-itself, so where the breakpoint changes the block's own layout it is applied to
-an `__inner` wrapper, which is also where `data-motion` moves so `reveal` still
-staggers the same children.
+Every composition's size-based breakpoints size to their own container, never
+to the screen: the root declares `container-type: inline-size` and every
+size-based breakpoint is an `@container` query, so a section dropped into a
+narrow column lays out for the column at those breakpoints. Its fluid ramps —
+the `vw` in `clamp()` gaps and type scales — still key off the viewport, not
+the container; converting them to container-relative units is open work, not
+done in this pass. Only `(hover: hover) and (pointer: fine)` and
+`(prefers-reduced-motion)` stay on `@media` — they are user and device
+conditions a container query cannot express. An element never matches a query
+against the container it establishes itself, so where the breakpoint changes
+the block's own layout it is applied to an `__inner` wrapper, which is also
+where `data-motion` moves so `reveal` still staggers the same children.
 
 Regenerate a preview:
 

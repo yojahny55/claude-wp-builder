@@ -56,10 +56,28 @@ for d in "$c"/*/; do
   # all thirteen behave the same way in a narrow column. @media stays only for
   # (hover:hover)/(pointer:fine) and (prefers-reduced-motion) — user and device
   # conditions a container query cannot express.
-  grep -Fq 'container-type: inline-size' "$d/section.css" \
-    || fail "$name/section.css does not declare a containment context, so it sizes to the viewport"
-  grep -Eq '@media \((min|max)-width' "$d/section.css" \
+  # Anchored to the root block (.$name { ... }), not the bare substring — moving
+  # the declaration onto __inner, the exact mistake this task is about, would
+  # still contain the substring but no longer sit inside the root's own braces.
+  grep -Fq 'container-type: inline-size' <(sed -n "/^\.$name {\$/,/^}\$/p" "$d/section.css") \
+    || fail "$name/section.css does not declare container-type: inline-size on its root selector (.$name), so it sizes to the viewport"
+  # Catches every size-based form, not just the bare "@media (min-width"/"(max-width"
+  # this used to require: "@media screen and (min-width…)", "@media only screen
+  # and …", and range syntax "@media (width >= 900px)" all contain the word
+  # "width" between @media and the block's opening brace, same as the plain form.
+  # Neither protected query — (hover: hover) and (pointer: fine), prefers-reduced-motion —
+  # contains "width", so both keep passing.
+  grep -Eq '@media[^{]*\bwidth\b' "$d/section.css" \
     && fail "$name/section.css still uses a size-based media query; a section sizes to its container, not the screen"
+  # The two checks above prove "no viewport query" but not "the breakpoint
+  # survived" — deleting an @container block outright satisfies both. These nine
+  # compositions carried a size breakpoint before the conversion; each must
+  # still carry at least one.
+  case "$name" in
+    faq-list|feature-zigzag|footer-columns|footer-line|hero-split|hero-type|offer-table|proof-row|testimonial-pair)
+      grep -Fq '@container' "$d/section.css" \
+        || fail "$name/section.css lost its @container breakpoint; the conversion must keep it, not delete it" ;;
+  esac
   # Every img declares its box, or the page reflows when the photograph lands.
   while IFS= read -r img; do
     [[ "$img" == *width=* && "$img" == *height=* ]] \
