@@ -59,11 +59,46 @@ grep -Fq '/wp-demo-verify demo/' "$y" || fail "$y verifies a single page instead
 # The same-client rule: a repeat client cannot be handed back the structure they
 # rejected. Structure stays uncompared across clients (v1's six axes stay retired);
 # this only binds when a row already exists for the same client.
-grep -Fq 'same-client rule' skills/wp-demo-craft/references/fingerprint.md \
+#
+# This is a refusal ("must differ", "is not an answer"), not a heading-presence
+# check, so a bare grep -Fq is not enough: a build under pressure writes exactly
+# the negation that keeps the anchor substring while discharging the obligation
+# ("...unless the client has approved the reuse."). Three defenses, each aimed at
+# a different escape:
+#   1. The heading is anchored to the whole line, not a substring of it — a
+#      negating rewrite of the heading itself ("...does not apply") no longer
+#      equals the line, where a bare substring match would still find it.
+#   2. Both checks are scoped to their own section/sub-step, extracted with awk,
+#      so the anchor cannot be satisfied by parking it in unrelated prose
+#      elsewhere in the file while the real instruction is deleted.
+#   3. Alongside the positive anchor, a negative check fails the section on
+#      excuse vocabulary ("unless", "not required", "may say how, where it is
+#      material", ...) — the shape that let Task 6's ship blocker invert to
+#      "...is acceptable in rounds one and two" while its check stayed green.
+excuse_vocab='unless|except|need not|not required|no longer required|does not apply|is optional|is fine|acceptable|may match|only if|approved the reuse|not necessary|may say how|where it is material|not true|not the case|false that|is wrong that'
+
+fp=skills/wp-demo-craft/references/fingerprint.md
+grep -Eq '^## The same-client rule$' "$fp" \
   || fail "fingerprint.md has no same-client rule, so a repeat client can get the prior structure back"
-grep -Fq 'differ in grammar and in the hero composition' skills/wp-demo-craft/references/fingerprint.md \
+same_client_section=$(awk '/^## The same-client rule$/{f=1;next} /^## /{f=0} f' "$fp")
+[ -n "$same_client_section" ] \
+  || fail "fingerprint.md's same-client rule heading has no body beneath it"
+grep -Fq 'differ in grammar and in the hero composition' <<<"$same_client_section" \
   || fail "fingerprint.md does not say what a repeat build must differ in"
-grep -Fq 'is not an answer' commands/wp-demo.md \
-  || fail "commands/wp-demo.md does not require the plan to say how a repeat build differs"
+grep -Fq 'composition plan must say how' <<<"$same_client_section" \
+  || fail "fingerprint.md does not require the plan to say how a repeat build differs"
+grep -Eiq "$excuse_vocab" <<<"$same_client_section" \
+  && fail "fingerprint.md's same-client rule carries an excuse clause a repeat build could reach for"
+
+d=commands/wp-demo.md
+fp_gate_section=$(awk '/^2\. \*\*Fingerprint gate\.\*\*/{f=1} /^3\. \*\*Brief\.\*\*/{f=0} f' "$d")
+[ -n "$fp_gate_section" ] \
+  || fail "$d has no Step 2.6 sub-step 2 (the fingerprint gate)"
+grep -Fq 'is not an answer' <<<"$fp_gate_section" \
+  || fail "$d does not require the plan to say how a repeat build differs"
+grep -Fq 'the plan states how' <<<"$fp_gate_section" \
+  || fail "$d does not require the plan to say how a repeat build differs"
+grep -Eiq "$excuse_vocab" <<<"$fp_gate_section" \
+  && fail "$d's fingerprint gate carries an excuse clause that lets a repeat build skip saying how it differs"
 
 echo PASS
