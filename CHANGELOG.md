@@ -24,6 +24,13 @@
   `pin`/`pan`/`kinetic`/`wipe`/`drift` is now judged by two samples — below the fold and
   fully entered — and reports `dead-scroll` only when no reveal child moved between them.
   Scrubbed sections keep the walk and its stall logic unchanged.
+- **Advisory findings stop failing the round.** `unobserved` raised `demo-verify.mjs`'s
+  exit code exactly like `dead-scroll`, so a page the harness merely could not read still
+  failed — the false positive moved rather than left. The blocking/advisory split is named
+  once, at the top of the file; advisory lines print with `[advisory]` and land in
+  `findings.json` like any other, a run whose findings are all advisory exits `0` and says
+  `nothing blocking, N advisory finding(s)` instead of looking clean, and any blocking
+  finding still exits `1`.
 - **The two compositions that failed the library's own slop gate are scroll-linked now.**
   `closing-block` ran a 7s infinite conic sweep and `proof-row` a 38s infinite translate,
   both reported by `impeccable` as `marquee` at `category=slop`/`severity=warning` — the

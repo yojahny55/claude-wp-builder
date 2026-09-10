@@ -16,6 +16,14 @@ import { resolve, join, dirname, basename } from 'node:path';
 import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 
+// Advisory kinds report what the harness could not see, not what the page got
+// wrong, so they are printed and written to findings.json but never raise the
+// exit code — a gate that fails a round on the strength of what it could not
+// read gets overruled in prose, and then so does every gate beside it. Every
+// other kind blocks. Listed here, once, so a new kind joins a list instead of
+// re-deriving the rule at the exit.
+const ADVISORY = new Set(['unobserved']);
+
 const args = process.argv.slice(2);
 if (args.includes('--help')) {
   console.log(
@@ -260,6 +268,12 @@ const probe = () => {
  * those pixels is sampling luck, and a miss reports dead scroll on a section
  * that reveals perfectly. Compare two positions instead — below the fold and
  * fully entered. Returns '' when the section has no reveal children to read.
+ *
+ * Known limit: only `reveal` is read here. `parallax` is neither scrubbed nor
+ * reveal, publishes no --motion-p, and writes `transform` on the device element
+ * itself, so a parallax-only section is not judged at all — deliberately, since
+ * sampling every device element's transform would also start judging devices the
+ * harness has never been able to read (`counter`) and invent findings on them.
  */
 const revealState = (idx) => {
   const root = document.querySelectorAll('section, [data-motion]')[idx];
@@ -475,14 +489,26 @@ try {
   mkdirSync(outDir, { recursive: true });
   writeFileSync(join(outDir, 'findings.json'), JSON.stringify(report, null, 2));
   const total = report.pages.reduce((n, p) => n + p.findings.length, 0);
+  const blocking = report.pages.reduce((n, p) => n + p.findings.filter((f) => !ADVISORY.has(f.kind)).length, 0);
+  const advisory = total - blocking;
   if (total === 0) {
     console.log('demo-verify: no machine findings on ' + report.pages.length + ' page(s). Read the contact sheets before calling this a pass.');
-    exitCode = 0;
   } else {
-    for (const p of report.pages) for (const f of p.findings) console.log('FINDING ' + f.kind + ' ' + basename(p.url) + ' ' + JSON.stringify(f));
-    console.log('demo-verify: ' + total + ' finding(s). Sheets under ' + outDir);
-    exitCode = 1;
+    // Advisory lines carry the word on the line itself: a reader scanning the
+    // output has to be able to see why the run exited 0 with findings on screen.
+    for (const p of report.pages)
+      for (const f of p.findings)
+        console.log(
+          'FINDING ' + f.kind + (ADVISORY.has(f.kind) ? ' [advisory]' : '') + ' ' + basename(p.url) + ' ' + JSON.stringify(f)
+        );
+    console.log(
+      blocking === 0
+        ? 'demo-verify: nothing blocking, ' + advisory + ' advisory finding(s). Sheets under ' + outDir
+        : 'demo-verify: ' + blocking + ' blocking finding(s)' +
+            (advisory ? ' and ' + advisory + ' advisory' : '') + '. Sheets under ' + outDir
+    );
   }
+  exitCode = blocking === 0 ? 0 : 1;
 } catch (err) {
   console.error('demo-verify: the walk crashed:', err && err.stack ? err.stack : err);
   exitCode = 3;

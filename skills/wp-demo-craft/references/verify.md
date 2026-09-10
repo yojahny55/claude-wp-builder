@@ -98,6 +98,21 @@ written down first.
   already sits above the fold on load is not judged: its entry happened before
   the walk could see it.
 
+**An advisory-only run exits 0.** `unobserved` is the only advisory kind; every
+other kind blocks and still exits 1. Advisory findings are written to
+`findings.json` and printed like any other, with `[advisory]` on the line, and
+the summary reads `nothing blocking, N advisory finding(s)` so a reader can tell
+the difference between that and a run with nothing to report. A gate that fails
+a round on the strength of what it could not see gets overruled in prose, and
+then so does every gate beside it.
+
+Two limits, recorded because a limit nobody writes down is indistinguishable
+from a bug: a section that already sits above the fold on load is never judged
+for dead reveal, since there is no below-the-fold position to sample it from;
+and `parallax` is not judged at all — it is neither scrubbed nor `reveal` and
+publishes no `--motion-p`, and reading it would mean reading devices the harness
+has never been able to sample (`counter`), which invents findings.
+
 **Cues that never peak**: an element that never reaches full opacity anywhere in
 its section, usually a cue window too narrow for the span.
 

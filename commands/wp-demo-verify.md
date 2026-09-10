@@ -110,6 +110,11 @@ branch: `/wp-demo` probes first and stops on 2.)
   `dead-scroll` only when no reveal child moved between them. A section that
   already sits above the fold on load is not judged: its entry happened before
   the walk could see it.
+- **An advisory-only run exits 0.** `unobserved` is the only advisory kind; every
+  other kind blocks and still exits 1. Advisory findings are printed with
+  `[advisory]` on the line and written to `findings.json` like any other, and the
+  summary reads `nothing blocking, N advisory finding(s)` — read that as "nothing
+  to fix here, and here is what I could not see", not as a clean run.
 - **cue never reaches full opacity**: the window is too narrow or the ramps eat
   it. Widen the window or set explicit ramps.
 - **horizontal overflow**: at any width, always a defect.

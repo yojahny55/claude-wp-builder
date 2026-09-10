@@ -69,4 +69,22 @@ for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; d
     || fail "$f does not document that a section with no scrubbed device is judged by two samples, not by the walk"
 done
 
+# Advisory has to mean advisory in the exit code, not only in prose: a round that
+# fails on what the harness could not see is the false positive under another
+# name. The split lives in one named set so a new advisory kind joins a list.
+grep -Fq "const ADVISORY = new Set(['unobserved'])" "$v" \
+  || fail "$v does not name its advisory kinds in one place, so the blocking rule is re-derived at the exit"
+grep -Fq 'exitCode = blocking === 0 ? 0 : 1' "$v" \
+  || fail "$v exits on the total finding count, so an advisory-only run still fails the round"
+grep -Fq "' [advisory]'" "$v" \
+  || fail "$v does not label advisory findings in the printed line, so a reader cannot see why a run with findings exited 0"
+grep -Fq 'nothing blocking, ' "$v" \
+  || fail "$v does not distinguish an advisory-only run from a run with nothing to report"
+for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
+  grep -Fq 'advisory-only run exits 0' "$f" \
+    || fail "$f does not document that an advisory-only run exits 0"
+done
+grep -Fq 'parallax' skills/wp-demo-craft/references/verify.md \
+  || fail "skills/wp-demo-craft/references/verify.md does not record that parallax is left unjudged, so the limit reads as a bug"
+
 echo PASS
