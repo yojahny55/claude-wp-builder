@@ -146,6 +146,78 @@ before writing any markup.
    the docs name no reference and the Landing Gallery MCP is connected, pull
    four screenshots for the page kind first; when it is not, say so and choose
    from the previews alone.
+
+   **5.5. Image plan.** Craft builds only, and only when the composition plan
+   includes a composition that declares an image slot (`hero-split`,
+   `hero-bleed`, `feature-zigzag`). Skip in one line otherwise.
+
+   Read `"image provider"` from `.wp-create.json`. When the line is absent the
+   project predates this feature: generate nothing, say so in one line, and go
+   to step 6 — the same absent-line convention `demo mode` and `i18n strategy`
+   use. When it is present it is `<vendor>/<model>`, e.g.
+   `google/gemini-3.1-flash-image`.
+
+   Write `demo/.image-plan.json` from this step's own composition table and
+   step 3.5's asset inventory:
+
+   ```json
+   {
+     "provider": "google/gemini-3.1-flash-image",
+     "sections": [{"page": "index", "section": "hero", "composition": "hero-bleed"}],
+     "assets_on_disk": [{"path": "docs/logo.png", "role": "logo"}]
+   }
+   ```
+
+   Then run the planner, which makes no network call and needs no key:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/bin/image-gen.mjs" plan --demo demo/
+   ```
+
+   It fills in `gaps[]` — one per image slot, each with the aspect and size read
+   off that composition's own `<img>` tag — and `unused_assets[]`.
+
+   For each gap set **exactly one of `prompt` or `use`**; the script refuses a
+   plan where a gap has both or neither, before it issues any request. Set `use`
+   to a path from `unused_assets[]` when a real client file belongs in that slot
+   — a real asset always wins and is never generated. Otherwise write a `prompt`
+   from the brief: the person, the pain, the vibe words and the domain, not a
+   generic stock description. The script does not match assets to slots itself,
+   on purpose: the asset roles (`logo/hero/portrait/product/texture`) and the
+   composition roles (`hero/proof/feature/...`) are different vocabularies, and
+   `feature-zigzag` has two slots of identical role, so any automatic mapping
+   would be invented.
+
+   Show the table the planner printed and ask once.
+   **Costs are estimates, not a bill.** A yes on that table is the
+   authorisation for the whole plan; do not ask again per image. On a no,
+   edit the prompts in `demo/.image-plan.json` and re-run `plan` — an edited
+   prompt changes its hash, so it regenerates rather than serving the
+   previous plate.
+
+   On a yes:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/bin/image-gen.mjs" run --demo demo/
+   ```
+
+   **The key comes from the environment and nowhere else.** It is
+   never pasted into chat, never written into `.wp-create.json`, never
+   echoed into a log or into the demo. With plates to generate and no key
+   set, the script exits 3 having written nothing and billed nothing, and
+   names the variable to export (`GEMINI_API_KEY` or `OPENAI_API_KEY`). That
+   is a stop, not a fallback: there is no placeholder path, and step 6's
+   `{{`-blocker still refuses the page.
+
+   Exit 4 means some slots failed while others succeeded. Plates already
+   generated are kept and will not be re-billed on the next run.
+
+   Fill step 6's `{{image_src}}` markers from each gap's `result.file`. Append a
+   `## Generated images` section to `demo/BRIEF.md`, summarised from the
+   `gen-<hash>.json` sidecars on disk, naming the model, the date, the estimated
+   total, and — for Google — that every plate carries an invisible SynthID
+   watermark identifying it as AI-generated. Entries filled from `use` are real
+   client files: list them separately, never as generated.
 6. **Build.** Create `demo/` if absent and write `demo/index.html` plus
    **one file per page in the agreed page set** (`about.html`, `services.html`,
    `contact.html` — whatever the docs and the curve named). Interior pages are

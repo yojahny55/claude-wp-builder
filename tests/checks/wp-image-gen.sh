@@ -217,4 +217,33 @@ perl -0pe 's{^\s*//[^\n]*$}{}gm; s{/\*.*?\*/}{}gs' "$g" > "$gs" \
 n=$(grep -c 'response_format' "$gs" || true)
 [ "$n" = 1 ] || fail "response_format must appear exactly once (the Google body) and never in the OpenAI body; found $n"
 
+# 8. The command contract. Greps a comment-stripped copy so a rule parked in an
+#    HTML comment cannot satisfy the pin - the failure mode that let three
+#    `inherits: true` pins pass in v3.2 while the rule sat commented out.
+d=commands/wp-demo.md
+ds="$tmp/wp-demo-stripped.md"
+perl -0pe 's{<!--.*?-->}{}gs' "$d" > "$ds"
+grep -Fq 'image-gen.mjs" plan --demo demo/' "$ds" \
+  || fail "$d does not run the image planner"
+grep -Fq 'image-gen.mjs" run --demo demo/' "$ds" \
+  || fail "$d does not run the image generator after approval"
+grep -Fq 'exactly one of `prompt` or `use`' "$ds" \
+  || fail "$d does not state the one-field-per-gap rule the script enforces"
+grep -Fq 'Costs are estimates, not a bill' "$ds" \
+  || fail "$d does not carry the estimate disclaimer into the approval prompt"
+grep -Fq '"image provider"' "$ds" \
+  || fail "$d does not record the provider in .wp-create.json"
+grep -Fq 'never pasted into chat' "$ds" \
+  || fail "$d does not state that the key is never pasted into chat"
+# Control: the step is inside wp-demo.md and NOT in wp-yolo.md, which must never
+# generate. A single shared pin would pass with the step in the wrong command.
+# Explicit `if`, not `grep && fail`: a failing command inside an && list has
+# subtle `set -e` semantics, and an assertion must not depend on reading them
+# right. Here the desired outcome is grep FAILING, which makes it acute.
+if grep -Fq 'image-gen.mjs' commands/wp-yolo.md; then
+  fail "commands/wp-yolo.md must never invoke the image generator"
+fi
+grep -Fq 'never generates images' commands/wp-yolo.md \
+  || fail "commands/wp-yolo.md does not state that it never generates images"
+
 echo PASS
