@@ -162,8 +162,10 @@ the browser supports `animation-timeline: view()` and the reader has not asked f
 motion; `motion.js` yields that device there and runs every other one. Without the stylesheet a
 demo in a modern browser reveals nothing. Sections are built from the composition library, whose
 size-based breakpoints are `@container` queries against each composition's own container rather
-than the viewport, and the fluid ramps in `clamp()` read `cqi` against that same container — the
-four that stay `vw` are sized against the screen on purpose and each carries a comment saying so.
+than the viewport, and the fluid ramps in `clamp()` read `cqi` against that same container — of the
+four that stay `vw`, three are sized against the screen on purpose and the fourth cannot be `cqi`
+at all — its rule is the element declaring `container-type`, and an element never matches a
+container query against the container it establishes itself. Each carries a comment saying which.
 Plain mode is the existing single-file demo with no motion contract.
 
 Each round of the craft loop runs `/wp-demo-verify demo/` — served over HTTP, not `file://` —
