@@ -160,10 +160,13 @@ before writing any markup.
    earlier decline and is handled exactly like the no-key branch above:
    generate nothing, say so in one line, go to step 6, and do not ask again.
    Otherwise, **a key is set, gaps exist to fill, and the line is absent** —
-   ask once, offering the provider matching whichever key is present, and
-   recommending `google/gemini-3.1-flash-image` when both are present, because
-   Google offers all three of the library's crops (4:5, 3:2, 4:3) exactly while
-   OpenAI's three fixed sizes make every one of them inexact. Write the
+   ask once, offering the provider matching whichever key is present —
+   `google/gemini-3.1-flash-image` for `GEMINI_API_KEY`, or `gpt-image-2.5-flare`
+   (faster, cheaper) / `gpt-image-2.5-sunburst` (higher quality) for
+   `OPENAI_API_KEY` — and recommending `google/gemini-3.1-flash-image` when both
+   keys are present, because Google offers all three of the library's crops
+   (4:5, 3:2, 4:3) exactly while OpenAI's three fixed sizes make every one of
+   them inexact. Write the
    operator's answer into `.wp-create.json` as `"image provider":
    "<vendor>/<model>"` on a yes, or `"image provider": "none"` on a decline —
    a decline then goes to step 6 exactly like the no-key branch above — so no
@@ -222,15 +225,11 @@ before writing any markup.
    Exit 4 means some slots failed while others succeeded. Plates already
    generated are kept and will not be re-billed on the next run.
 
-   Fill each gap's own `{{<slot>}}` marker from that gap's `result.file` — the
-   slot name is that gap's own `slot` field in `demo/.image-plan.json`, not a
-   fixed string: `feature-zigzag`'s two gaps use `feature_1_image_src` and
-   `feature_2_image_src`, for example. Append a
-   `## Generated images` section to `demo/BRIEF.md`, summarised from the
-   `gen-<hash>.json` sidecars on disk, naming the model, the date, the estimated
-   total, and — for Google — that every plate carries an invisible SynthID
-   watermark identifying it as AI-generated. Entries filled from `use` are real
-   client files: list them separately, never as generated.
+   Append a `## Generated images` section to `demo/BRIEF.md`, summarised from
+   the `gen-<hash>.json` sidecars on disk, naming the model, the date, the
+   estimated total, and — for Google — that every plate carries an invisible
+   SynthID watermark identifying it as AI-generated. Entries filled from `use`
+   are real client files: list them separately, never as generated.
 6. **Build.** Create `demo/` if absent and write `demo/index.html` plus
    **one file per page in the agreed page set** (`about.html`, `services.html`,
    `contact.html` — whatever the docs and the curve named). Interior pages are
@@ -263,7 +262,10 @@ before writing any markup.
    and the `1280px` fallback still covers the absent case, so it needs no
    `@supports` guard.
    Copy each chosen composition's `section.html` and `section.css`, fill the
-   `{{slots}}` with real copy and real assets — **no page may ship with a
+   `{{slots}}` with real copy and real assets — an image slot fills from that
+   gap's own `result.file` in `demo/.image-plan.json`, keyed by that gap's own
+   `slot` field, not a fixed string: `feature-zigzag`'s two gaps use
+   `feature_1_image_src` and `feature_2_image_src`, for example — **no page may ship with a
    `{{` left in it**: several slots fill `alt` and `aria-label` attributes, where
    an unsubstituted marker is read out verbatim by a screen reader and never
    appears on screen for anyone to notice — keep the delimiters and the BEM
