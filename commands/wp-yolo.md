@@ -714,11 +714,11 @@ Run, in order:
    every finding it leaves unfixed into Step 6's Review list.
    If its fixes touched theme CSS, templates or enqueues, re-run `/wp-finalize`'s
    Layers 2-3 before Step 5.5 signs off — a perf or SEO fix can break demo parity.
-8. **`bash "${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh" <site-host>`** — MANDATORY. Run the
-   live is-agentic GEO/agent-readiness scan against the site's host (the same host whose
-   audit item 7 just produced). This is the only step that verifies agent-readiness
-   against the live site rather than the built markup, so it is the only step that can
-   see robots.txt, headers and anything served by a plugin.
+8. **`bash "${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh" <home-host>`** — MANDATORY. Records
+   the finish-phase agent-readiness result for the live site and re-scans once after any
+   fix; item 7's `/wp-audit --geo` runs the same `bin/geo-scan.sh` as part of the audit
+   pass, so this step is the finish-phase result, not a different check. `<home-host>` is
+   `wordpress.url` from `.wp-create.json`, falling back to `$WP option get home`.
    - **exit 0** — a report came back: fold every **failed** check into a fix pass (the
      `wp-agentic-surfaces` loop item 7 uses), then re-run the scan **once** and record
      the before/after score in Step 6. If that fix touched theme CSS, templates or
@@ -793,17 +793,22 @@ Before this run can report success, walk every **critical** finding from that ga
 
 ## Step 6: Report
 
-If any critical demo-parity finding survived Step 5.5's auto-fix + re-verify, do NOT
-print "Build Complete." Print instead, before anything else:
+If any critical demo-parity finding survived Step 5.5's auto-fix + re-verify, or the
+GEO scan in Step 5 item 8 did not succeed (skipped on exit 2, errored on exit 1), or
+any of Step 5 items 4-8 did not run, do NOT print "Build Complete." Print instead,
+before anything else:
 ```
-=== WP YOLO Build INCOMPLETE — demo-parity gate blocked delivery ===
+=== WP YOLO Build INCOMPLETE — deliverable not signed off ===
 
 Review (blocking):
   - <every unresolved critical finding — layer, selector/property/file, demo value vs. built value>
+  - <GEO scan skipped (exit 2) or errored (exit 1): live score unavailable>
+  - <any of Step 5 items 4-8 that did not run, and why>
 
 Run /wp-finalize again after resolving the above, then re-run this gate.
 ```
 This applies under `--yolo` too — `--yolo` skips the Step 3 checkpoint, not this gate.
+A run whose GEO scan did not succeed cannot print "Build Complete".
 
 Otherwise, print a summary:
 ```
@@ -819,8 +824,7 @@ Review:
   - <every review[] entry from the manifest — low-confidence splits, CPT-vs-repeater
     verdicts, ambiguous fields>
   - <untranslated secondary-language strings, if any>
-  - <GEO findings left unfixed — advisory, off-site (no theme file can change it), and
-    any scan skipped because no network or tool was available>
+  - <GEO findings left unfixed — advisory, off-site (no theme file can change it)>
   - <anything skipped — e.g. JS-only interactivity not reproducible in static templates>
   - <out-of-scope pages skipped: "in demo but out of scope — skipped">
   - <approved-but-missing-HTML pages: "approved/designed but no HTML — needs demo">
