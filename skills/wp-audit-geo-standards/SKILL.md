@@ -114,7 +114,7 @@ type implies it.
 | GEO-A19 | `markdown-negotiation`, `markdown-negotiation-vary`, `markdown-url-fallback`, `markdown-frontmatter`, `code-fence-validity`, `markdown-link-alternate` | yes — `Accept: text/markdown` + `Vary` |
 | GEO-A20 | `link-headers-discovery` | yes — RFC 8288 `Link:` |
 | GEO-A21 | `agent-discovery-file`, `agent-skills-index-v2` | yes — `/.well-known/agent-skills/index.json` |
-| GEO-A22 * | `openapi-spec`, `public-api`, `developer-portal`, `api-catalog-rfc9727` | SaaS/API only |
+| GEO-A22 * | `openapi-spec`, `public-api-docs`, `developer-portal`, `api-catalog-rfc9727` | SaaS/API only |
 | GEO-A23 | `agent-crawler-reachability` | yes |
 | GEO-A24 * | `pricing-info`, `pricing-md` | merchant/SaaS |
 
@@ -139,7 +139,7 @@ type implies it.
 |---|---|---|
 | GEO-P01 | `acp-support`, `acp-delegate-payment` | advisory |
 | GEO-P02 | `ucp-support` | advisory |
-| GEO-P03 | `mpp-support`, `mcp-*` payment surfaces | advisory |
+| GEO-P03 | `mpp-support` (the Machine Payments Protocol; MCP payment rides on the MCP surface checks in GEO-U07) | advisory |
 | GEO-P04 | `x402-support` | advisory |
 | GEO-P05 | `ap2-support` | advisory |
 
