@@ -3,6 +3,45 @@
 ## [Unreleased]
 
 ### Fixed
+- **`demo-verify` failed a round on correct CSS whenever a container query was
+  scoped to a breakpoint.** `containerAudit()` decides whether an `@container`
+  rule can ever match by reading `container-type` off the subject's ancestors,
+  and it was sampled once per page at the first width. That was harmless while
+  the audit only saw top-level `@container` rules; once it also collected the
+  ones nested in `@media` — which is exactly where breakpoint-scoped
+  `container-type` lives — liveness became width-dependent. Measured on the new
+  `tests/fixtures/container-audit/index.html`: the single-width audit reported
+  `.bp-max__child`, whose container is declared inside `@media (max-width:
+  700px)` and is live at 390, as dead from its 1440 sample. `container-noop` is
+  blocking, so a demo written the ordinary way failed all three rounds and
+  `/wp-demo` wrote `demo/FAILED.md`, which `/wp-init`, `/wp-section` and
+  `/wp-yolo` then refuse to build on. The audit now runs at every width walked
+  and reports only the selectors dead at all of them; `external-module`, which
+  genuinely is width-independent, stays a once-per-page read. The fixture
+  carries both halves — two breakpoint-scoped pairs that must not be reported
+  and one genuinely dead rule that must be — and `tests/checks/wp-demo-verify.sh`
+  runs the real script over it and requires exactly `.dead__child`, so a fix
+  that reports nothing fails it too.
+- **`process-rail` shipped a dead tab stop and a phantom landmark on every craft
+  build at default motion.** The `tabindex="0" role="region" aria-label="{{title}}"`
+  added with the reduced-motion scroll fix was unconditional, but the scroll
+  region only exists under `prefers-reduced-motion`: at default motion the frame
+  is `overflow-x: hidden` and pinned, so Tab landed on a box that could not be
+  scrolled and every AT landmark list gained a region named after the `<h2>`
+  sitting inside it. The markup carries no a11y attributes now; `motion.js`
+  creates the affordance in the pan device's reduced-motion branch, on whichever
+  box actually scrolls (with the engine running that is the rail, whose own
+  `overflow-x: auto` makes it the scroll container; with the stylesheet alone it
+  is the frame), and names it with `aria-labelledby` pointing at the section's
+  own heading — so no unsubstituted `{{slot}}` and no hand-written, one-language
+  label can reach a screen reader. Measured in both modes on the real
+  composition with `motion.js` running: reduce → Tab lands on the rail,
+  `role=region`, name taken from the heading, ArrowRight moves `scrollLeft`
+  0 → 40; default → no `tabindex`, no `role`, no name, Tab skips the section.
+  `tests/checks/wp-craft-compositions.sh` asserts the markup is clean, that the
+  three lines live inside the pan device's reduced branch (extracted by its own
+  brace range, comments stripped), and that every `{{slot}}` used as an
+  accessible name anywhere in the library has a value in `fills.json`.
 - **`process-rail`'s reduced-motion rail overflowed the whole document instead
   of scrolling inside its own frame.** Under `prefers-reduced-motion` the
   section's own comment calls the rail "a native scroll region", but nothing
@@ -18,14 +57,17 @@
   2496 → 1920, with the frame itself still scrollable at each
   (`scrollWidth` > `clientWidth`). `overflow-y: hidden` is then stated
   explicitly, because CSS corrects a `visible` axis to `auto` when the other
-  axis is not visible — left implicit it computed to `auto`, which would
-  silently clip or add a second scrollbar to anything that later grew
-  vertically out of the frame. And the frame takes `tabindex="0"` with
-  `role="region"`: a scroll container no keyboard can reach is a different
-  bug, not a fix, and before this change the overflowing row at least
-  scrolled with the page. Verified with real key events — without
-  `tabindex`, ArrowRight left `scrollLeft` at 0; with it, `scrollLeft` moved
-  0 → 80 at both 390 and 1920. `tests/checks/wp-craft-compositions.sh` asserts
+  axis is not visible — left implicit it computed to `auto`, which would give
+  anything that later grew vertically out of the frame a second, vertical
+  scrollbar on a horizontal scroller. `hidden` clips that overflow instead,
+  which is the intended behaviour here and the reason the value is stated at
+  all. And the scroll region takes `tabindex="0"` with `role="region"`, added
+  by `motion.js` under reduced motion rather than written into the markup: a
+  scroll container no keyboard can reach is a different bug, not a fix, and
+  before this change the overflowing row at least scrolled with the page.
+  Verified with real key events — without the affordance, ArrowRight left
+  `scrollLeft` at 0; with it, `scrollLeft` moved 0 → 80 at both 390 and 1920.
+  `tests/checks/wp-craft-compositions.sh` asserts
   `overflow-x: auto` on the `__frame` rule specifically inside the
   reduced-motion block, and after the `overflow: visible` shorthand, not
   merely present anywhere in the file.

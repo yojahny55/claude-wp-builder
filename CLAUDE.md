@@ -263,10 +263,13 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   `--tokens` has exited and which no assertion on that output can see — needs the render
   itself to close. And `motion.js`'s GSAP `reveal` branch is never walked, because
   nothing in the suite runs a browser without `animation-timeline`.
-- **`motion.js:147` sets `overflowX` on the rail, not on the frame.** Same bug class as
-  the `process-rail` reduced-motion fix, one layer down and currently inert: the rail is
-  `width: max-content`, so it can never overflow internally and the assignment does
-  nothing. Not fixed in this round; it becomes real the day the rail takes a width.
+- **`motion.js` sets `overflowX` on the rail, not on the frame — and it is not inert.**
+  Under reduced motion the stylesheet resets the rail to `width: auto`, and a scroll
+  container is sized by its box rather than by its content, so the assignment makes the
+  *rail* the scroller and the frame stops overflowing: measured at 1280, rail 2042/1280,
+  frame 1280/1280. The frame's own `overflow-x: auto` is then only the no-JS fallback.
+  Which box scrolls therefore depends on whether the engine ran, which is why the
+  keyboard affordance in the pan device picks the scroller by measurement, not by name.
 - **Verification serves over HTTP; the delivered demo is a `file://` artifact.**
   A defect that only appears when the file is double-clicked can pass a green walk.
   `external-module` findings name the one case known to matter.

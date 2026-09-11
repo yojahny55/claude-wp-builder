@@ -146,6 +146,31 @@ export function initMotion(gsap, ScrollTrigger) {
           // every item past the fold. Hand it back as a native scroll region.
           rail.style.overflowX = 'auto';
           rail.style.scrollSnapType = 'x proximity';
+          // ...and a scroll region no keyboard can reach is a different bug (WCAG
+          // 2.1.1), so the affordance is created HERE and not in the markup. The
+          // region only exists under reduced motion: at default motion the frame is
+          // overflow-x: hidden and pinned, where a static tabindex/role="region"
+          // ships a dead tab stop and a named landmark on every build.
+          // Which box actually scrolls is measured, not assumed: the line above
+          // gives the rail its own scroll container, and a scroll container is
+          // sized by its box and not by its content — so the rail takes the
+          // overflow and its parent frame stops overflowing (measured at 1280:
+          // rail 2042/1280, frame 1280/1280). With the stylesheet alone and no
+          // JS it is the frame that scrolls. Focus has to land on whichever one
+          // it is, or the arrow keys scroll the document instead.
+          const scroller = rail.scrollWidth > rail.clientWidth ? rail : container;
+          if (!scroller.hasAttribute('tabindex')) scroller.tabIndex = 0;
+          // Named by the section's own heading, never by a string in the markup: a
+          // {{slot}} left unsubstituted would otherwise be read out verbatim, and a
+          // hand-written label would ship in one language on a bilingual site. No
+          // heading means no accessible name, and an unnamed region is not a
+          // landmark — so the role is only set when there is something to name it.
+          const heading = el.querySelector('h1, h2, h3');
+          if (heading && !scroller.hasAttribute('aria-label') && !scroller.hasAttribute('aria-labelledby')) {
+            if (!heading.id) heading.id = 'motion-rail-' + Math.random().toString(36).slice(2, 8);
+            scroller.setAttribute('role', 'region');
+            scroller.setAttribute('aria-labelledby', heading.id);
+          }
         } else {
           ScrollTrigger.create({
             trigger: el,

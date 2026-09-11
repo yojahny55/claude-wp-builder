@@ -265,15 +265,50 @@ fi
 printf '%s' "$pr_frame_rule" | grep -qE 'overflow-y:[[:space:]]*hidden' \
   || fail "process-rail__frame does not state overflow-y explicitly inside prefers-reduced-motion, so it computes to auto and can silently clip or scroll anything that grows vertically"
 
-# A scroll container no keyboard can reach is not a fix, it is a different bug.
-# Before overflow-x: auto the row overflowed the DOCUMENT, which at least scrolled
-# with the page; after it, the steps past the fold are reachable by wheel and drag
-# only. Measured with real key events: without tabindex ArrowRight left scrollLeft
-# at 0; with it, scrollLeft moved 0 -> 80 at both 390 and 1920. WCAG 2.1.1.
+# A scroll container no keyboard can reach is not a fix, it is a different bug
+# (WCAG 2.1.1) — but the scroll container only exists under reduced motion. At
+# default motion the frame is overflow-x: hidden and pinned, so a tabindex/role
+# in the MARKUP ships a dead tab stop and a named landmark on every craft build.
+# The affordance therefore belongs to motion.js's reduced branch, which is the
+# only place that knows which mode is live. Measured on the real composition
+# with motion.js running: reduce -> Tab lands on the rail, role=region, name
+# from the section's own <h2>, ArrowRight moves scrollLeft 0 -> 40; default ->
+# no tabindex, no role, no name, Tab skips past the section entirely.
 PR_HTML=skills/wp-demo-craft/compositions/process-rail/section.html
 pr_frame_tag=$(grep -F 'class="process-rail__frame"' "$PR_HTML")
-[ -n "$pr_frame_tag" ] || fail "$PR_HTML has no .process-rail__frame element to make keyboard-reachable"
-printf '%s' "$pr_frame_tag" | grep -Fq 'tabindex="0"' \
-  || fail "$PR_HTML's .process-rail__frame is a scroll container with no tabindex, so a keyboard-only user cannot reach the steps past the fold under reduced motion"
+[ -n "$pr_frame_tag" ] || fail "$PR_HTML has no .process-rail__frame element"
+printf '%s' "$pr_frame_tag" | grep -Eq 'tabindex=|role=|aria-label=' \
+  && fail "$PR_HTML's .process-rail__frame carries a static tabindex/role/aria-label, which at default motion is a dead tab stop and a landmark on a region that cannot be scrolled"
+M=starter-theme/__tailwind__/assets/js/src/motion.js
+# Scoped to the reduced branch of the pan device, by its own brace range: the
+# same three lines sitting in the else branch (or outside the if) would satisfy
+# a whole-file grep while restoring exactly the defect above.
+pan_reduced="$(awk '/if \(kind === .pan.\)/,/^    if \(kind === .reveal./' "$M" | awk '/if \(reduced\) \{/,/^        \} else \{/' | grep -v '^[[:space:]]*//' || true)"
+[ -n "$pan_reduced" ] || fail "$M has no reduced-motion branch in the pan device, so the rail's keyboard affordance cannot be checked"
+printf '%s' "$pan_reduced" | grep -Fq 'const scroller = ' \
+  || fail "$M's pan/reduced branch no longer picks the box that actually scrolls, so the affordance lands on an element the arrow keys do not move"
+printf '%s' "$pan_reduced" | grep -Fq 'tabIndex = 0' \
+  || fail "$M's pan/reduced branch does not make the scroll region focusable, so a keyboard-only user cannot reach the steps past the fold under reduced motion"
+printf '%s' "$pan_reduced" | grep -Fq "setAttribute('role', 'region')" \
+  || fail "$M's pan/reduced branch does not expose the scroll region as a landmark"
+# aria-labelledby onto the section's own heading, never a literal: a label
+# written in the markup ships one language on a bilingual site, and an
+# unsubstituted {{slot}} would be read out verbatim as the region's name.
+printf '%s' "$pan_reduced" | grep -Fq "setAttribute('aria-labelledby', heading.id)" \
+  || fail "$M's pan/reduced branch names the region with something other than the section's own heading"
+
+# Nothing that becomes an accessible name may reach a reader as a raw {{slot}}.
+# applyFills() leaves an unknown key in place (it warns on stderr and returns the
+# match), so a slot with no fill renders literally in the committed previews and
+# reads out as "open brace open brace nav label" in a screen reader.
+fills=skills/wp-demo-craft/compositions/fills.json
+for h in skills/wp-demo-craft/compositions/*/section.html; do
+  comp="$(basename "$(dirname "$h")")"
+  for slot in $(grep -oE '(aria-label|alt|title)="\{\{[A-Za-z0-9_]+\}\}"' "$h" | grep -oE '\{\{[A-Za-z0-9_]+\}\}' | tr -d '{}' | sort -u); do
+    node -e 'const f=require("./"+process.argv[1]);const m=Object.assign({},f._shared,f[process.argv[2]]);process.exit(process.argv[3] in m?0:1)' \
+      "$fills" "$comp" "$slot" \
+      || fail "$h uses {{$slot}} as an accessible name and $fills has no value for it, so the preview and any half-filled build read the raw slot text out to a screen reader"
+  done
+done
 
 echo PASS
