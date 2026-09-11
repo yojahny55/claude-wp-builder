@@ -707,19 +707,31 @@ Run, in order:
    into Step 6. Findings printed `[advisory]` (rows flagged `"advisory": true` in
    `findings.json`) are what the harness could not read, not what the page got wrong —
    list them under Review, do not "fix" them.
-7. **`/wp-audit --all --security-level recommended`** — MANDATORY. Same dispatch. This
-   is the only step that measures SEO, Core Web Vitals/performance, accessibility,
-   security and coding standards; nothing earlier does. Its Step 9 fix prompt is
-   pre-answered **yes** in a `/wp-yolo` run — do not stop to ask. Fold every finding it
-   leaves unfixed into Step 6's Review list.
+7. **`/wp-audit --all --geo --security-level recommended`** — MANDATORY. Same dispatch.
+   This is the only step that measures SEO, Core Web Vitals/performance, accessibility,
+   security, coding standards and GEO/agent-readiness; nothing earlier does. Its Step 9
+   fix prompt is pre-answered **yes** in a `/wp-yolo` run — do not stop to ask. Fold
+   every finding it leaves unfixed into Step 6's Review list.
    If its fixes touched theme CSS, templates or enqueues, re-run `/wp-finalize`'s
    Layers 2-3 before Step 5.5 signs off — a perf or SEO fix can break demo parity.
+8. **`bash "${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh" <site-host>`** — MANDATORY. Run the
+   live is-agentic GEO/agent-readiness scan against the site's host (the same host whose
+   audit item 7 just produced). This is the only step that verifies agent-readiness
+   against the live site rather than the built markup, so it is the only step that can
+   see robots.txt, headers and anything served by a plugin.
+   - **exit 0** — a report came back: fold every **failed** check into a fix pass (the
+     `wp-agentic-surfaces` loop item 7 uses), then re-run the scan **once** and record
+     the before/after score in Step 6. If that fix touched theme CSS, templates or
+     enqueues, re-run `/wp-finalize`'s Layers 2-3 before Step 5.5 signs off.
+   - **exit 2** — the scan skipped (no network or tool): record the skip and mark the
+     run incomplete in Step 6, exactly as the completion rule requires below.
+   - **exit 1** — the scan errored: report the error and mark the run incomplete.
 
-**Completion rule.** Items 4 through 7 are part of the build, not follow-ups for the
-user. A run that reaches Step 6 without having executed all four is **incomplete**:
+**Completion rule.** Items 4 through 8 are part of the build, not follow-ups for the
+user. A run that reaches Step 6 without having executed all five is **incomplete**:
 never print "site works" or hand the user a list of commands to run next. If one of
-them cannot run (site unreachable, tool missing), say which, why, and mark the run
-incomplete in the Step 6 report. This holds under `--yolo` as well.
+them cannot run (site unreachable, tool missing, scan skipped), say which, why, and mark
+the run incomplete in the Step 6 report. This holds under `--yolo` as well.
 
 ## Step 5.5: Demo-parity gate — auto-fix, re-verify, and block
 
@@ -807,6 +819,8 @@ Review:
   - <every review[] entry from the manifest — low-confidence splits, CPT-vs-repeater
     verdicts, ambiguous fields>
   - <untranslated secondary-language strings, if any>
+  - <GEO findings left unfixed — advisory, off-site (no theme file can change it), and
+    any scan skipped because no network or tool was available>
   - <anything skipped — e.g. JS-only interactivity not reproducible in static templates>
   - <out-of-scope pages skipped: "in demo but out of scope — skipped">
   - <approved-but-missing-HTML pages: "approved/designed but no HTML — needs demo">
