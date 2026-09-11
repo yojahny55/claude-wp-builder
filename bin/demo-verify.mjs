@@ -472,6 +472,9 @@ try {
   const findings = [];
   const sections = [];
   let staticChecked = false;
+  // One list of dead selectors per width walked, intersected after the loop.
+  // See the container-noop block below for why a single width cannot decide it.
+  const containerNoop = [];
 
   // The docs promise the reduced-motion pass at desktop width. Pinning it to
   // widths[0] meant a mobile-first --widths list ran it at the phone size and
@@ -490,13 +493,19 @@ try {
     await page.goto(pageUrl, { waitUntil: 'load' });
     await page.waitForTimeout(600);
 
-    // Both static: independent of scroll position, so read once per page
-    // rather than once per width/reduced-motion pass.
+    // Independent of scroll position, NOT of width: `container-type` is routinely
+    // declared inside a `@media` block, and the audit now reads `@container`
+    // rules nested there too — so a rule that is dead at 1440 is live at 390 and
+    // the reverse. Measured: `@media (max-width:700px){.x{container-type:inline-size}
+    // @container(min-width:400px){.x__y{}}}` audits clean at 390 and reports
+    // `.x__y` at 1440. container-noop is blocking, so sampling one width failed a
+    // round on correct CSS. Collect per width, report only what is dead at ALL of
+    // them, below the loop.
+    if (!reduced) containerNoop.push(await page.evaluate(containerAudit));
+    // Width-independent (a <script src> is in the markup at every size), so this
+    // one stays a once-per-page read.
     if (!staticChecked) {
       staticChecked = true;
-      for (const sel of await page.evaluate(containerAudit)) {
-        findings.push({ kind: 'container-noop', pass: 'normal', width: size.width, selector: sel });
-      }
       const external = await page.$$eval('script[type="module"][src]', (n) => n.map((s) => s.getAttribute('src')));
       for (const src of external) {
         findings.push({ kind: 'external-module', pass: 'normal', width: size.width, src });
@@ -678,6 +687,14 @@ try {
     await context.close();
   }
 }
+
+  // A selector is dead only if no element matching it had a container-establishing
+  // ancestor at ANY width walked: the intersection, never the union. The finding's
+  // shape is unchanged; `width` names the first width the audit ran at.
+  if (containerNoop.length) {
+    for (const sel of containerNoop.reduce((a, b) => a.filter((s) => b.includes(s))))
+      findings.push({ kind: 'container-noop', pass: 'normal', width: widths[0].width, selector: sel });
+  }
 
   await captureResponsiveShots(browser, pageUrl, pageOut);
   mkdirSync(pageOut, { recursive: true });

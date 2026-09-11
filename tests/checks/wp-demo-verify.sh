@@ -135,4 +135,29 @@ JS
 grep -Fq 'CONTAINMENT OK' "$work/out" \
   || fail "$s serves outside its root, or no longer serves inside it: $(cat "$work/out")"
 
+# --- container-noop is decided across every width, not at one of them. -------
+# `container-type` is routinely declared inside a `@media` block, and the audit
+# reads `@container` rules nested there too, so liveness is width-dependent:
+# measured on the fixture below, the pre-fix single-width audit reported
+# `.bp-max__child` (whose container is live only under 700px) at its 1440
+# sample. container-noop is blocking, so that failed a round on correct CSS and
+# wrote demo/FAILED.md, which /wp-init, /wp-section and /wp-yolo refuse to build
+# on. The fixture carries BOTH halves and the run must separate them: two
+# breakpoint-scoped pairs (one min-width, one max-width) that must NOT be
+# reported at any width, and one genuinely dead rule that must still be. A fix
+# that reports nothing passes half of this and fails the other half.
+fx=tests/fixtures/container-audit/index.html
+[ -f "$fx" ] || fail "$fx is missing, so the container-noop width battery cannot run"
+grep -Fq 'container-type' "$fx" || fail "$fx declares no container-type, so its breakpoint-scoped half is not there"
+grep -Fq '.dead__child' "$fx" || fail "$fx carries no genuinely dead @container rule, so a fix that reports nothing would pass"
+if node "$s" --probe >/dev/null 2>&1; then
+  node "$s" "$fx" --positions 2 --out "$work/ca" >/dev/null 2>&1 || true
+  [ -f "$work/ca/findings.json" ] || fail "$s produced no findings.json for $fx"
+  noop="$(node -e 'const p=require(process.argv[1]).pages[0].findings.filter(f=>f.kind==="container-noop").map(f=>f.selector).sort();console.log(p.join(" "))' "$work/ca/findings.json")"
+  [ "$noop" = ".dead__child" ] \
+    || fail "$s reported container-noop selectors [$noop] on $fx, expected exactly [.dead__child]: a breakpoint-scoped @container is live at some width and a dead one must still be caught"
+else
+  echo "NOTE: no usable browser (--probe exit != 0); the container-noop width battery did not run"
+fi
+
 echo PASS

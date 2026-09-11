@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>container-audit fixture</title>
+<style>
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; }
+  section { padding: 4rem 1.5rem; min-height: 60vh; }
+
+  /* HALF ONE: a breakpoint-scoped container. The container-type and the
+     @container that reads it live in the SAME @media, which is the ordinary way
+     to write one. Dead at every width where the query does not match and live at
+     every width where it does, so it must never be reported. Both directions are
+     here: a min-width case (live at 1440, dead at 390) and a max-width case
+     (live at 390, dead at 1440). One width alone reports one of the two. */
+  @media (min-width: 900px) {
+    .bp-min { container-type: inline-size; }
+    @container (min-width: 400px) {
+      .bp-min__child { color: #036; }
+    }
+  }
+  @media (max-width: 700px) {
+    .bp-max { container-type: inline-size; }
+    @container (min-width: 300px) {
+      .bp-max__child { color: #063; }
+    }
+  }
+
+  /* HALF TWO: genuinely dead. Nothing on the page ever declares container-type
+     on an ancestor of .dead__child, at any width, so the rule does nothing at
+     every width walked and must still be reported. */
+  @container (min-width: 400px) {
+    .dead__child { color: #900; }
+  }
+</style>
+</head>
+<body>
+  <section class="bp-min" id="bp-min">
+    <h2>Breakpoint-scoped container (min-width)</h2>
+    <p class="bp-min__child">Live above 900px, and its container is too.</p>
+  </section>
+  <section class="bp-max" id="bp-max">
+    <h2>Breakpoint-scoped container (max-width)</h2>
+    <p class="bp-max__child">Live below 700px, and its container is too.</p>
+  </section>
+  <section class="dead" id="dead">
+    <h2>Genuinely dead container query</h2>
+    <p class="dead__child">No ancestor establishes a container at any width.</p>
+  </section>
+</body>
+</html>
