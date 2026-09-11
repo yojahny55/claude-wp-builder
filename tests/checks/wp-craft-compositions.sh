@@ -136,7 +136,7 @@ grep -Fq -- '--fill' "$c/README.md" || fail "$c/README.md documents a regenerate
 # Interior page head never pins.
 grep -Eq 'data-motion="pin"' "$c/page-head/section.html" && fail "page-head pins; interior pages have no pin"
 
-# Every vw ramp left in a composition is a deliberate viewport-relative choice
+# Every viewport-width ramp left in a composition is a deliberate choice
 # (a full-bleed hero's display type) and must say so on its own line or the line
 # directly above, because a per-FILE check lets one justified vw green-light every
 # other vw in that file — process-rail alone carried 7 on 7 separate lines, and a
@@ -147,6 +147,23 @@ grep -Eq 'data-motion="pin"' "$c/page-head/section.html" && fail "page-head pins
 # cqi: a rule that itself declares container-type never matches a container
 # query against the container it establishes, so cqi there resolves against
 # the viewport while reading as if it tracked the block.
+#
+# The pattern covers the whole family, not the one spelling `vw`: `dvw`, `svw`
+# and `lvw` are the same unit with a viewport-sizing variant, `vi` is its
+# logical alias in horizontal writing modes, and `vmin`/`vmax` resolve to the
+# width on one orientation or the other. Pinned to the literal `vw` this loop
+# passed a `6dvw` / `6vmin` ramp dropped into a composition with no comment at
+# all — measured, rc=0 — which is the exact defect it was written to stop, and
+# `dvw` is the spelling a mobile-aware author reaches for first. The trailing
+# class stops `vi` matching inside a longer identifier.
+#
+# Viewport HEIGHT (`vh`, `dvh`, `svh`, `lvh`, `vb`) is deliberately not gated:
+# `container-type: inline-size` gives a block-axis query nothing to resolve
+# against, so there is no container-relative unit to convert those to, and the
+# library's sixteen of them are structural (a pinned frame is one screen tall
+# by definition). Requiring a justification comment on each would be noise, not
+# an assertion.
+VW_FAMILY='[0-9.](d|s|l)?(vw|vi|vmin|vmax)([^a-zA-Z]|$)'
 for cssf in skills/wp-demo-craft/compositions/*/section.css; do
   while IFS=: read -r lineno _; do
     prevno=$((lineno - 1))
@@ -156,9 +173,9 @@ for cssf in skills/wp-demo-craft/compositions/*/section.css; do
     case "$cur$prev" in
       *"viewport on purpose"*) ;;
       *"not cqi"*) ;;
-      *) fail "$cssf:$lineno keeps a vw ramp without recording why it is viewport-relative (marker must be on this line or the line above)" ;;
+      *) fail "$cssf:$lineno keeps a viewport-width ramp (vw/dvw/svw/lvw/vi/vmin/vmax) without recording why it is viewport-relative (marker must be on this line or the line above)" ;;
     esac
-  done < <(grep -n '[0-9.]vw' "$cssf")
+  done < <(grep -nE "$VW_FAMILY" "$cssf")
 done
 
 # An element NEVER matches a container query against the container it establishes
@@ -171,18 +188,25 @@ done
 # assertion the vw-justification loop above cannot make: that loop only sees vw,
 # and this defect has no vw in it. Comments are stripped first, because the one
 # legitimate case documents itself by naming cqi in prose.
+#
+# Every container-query unit, not the one spelling `cqi`: `cqw`, `cqb`, `cqh`,
+# `cqmin` and `cqmax` resolve against the same small-viewport fallback in that
+# rule and reintroduce the identical defect. Pinned to `cqi` this loop passed a
+# `6cqw` ramp inside the rule declaring `container-type` — measured, rc=0 — and
+# `cqw` is already in the library's active vocabulary (process-rail uses
+# `100cqw`), so it is the spelling a copy-paste lands on.
 for cssf in skills/wp-demo-craft/compositions/*/section.css; do
   perl -0pe 's{/\*.*?\*/}{}gs' "$cssf" \
     | awk -v f="$cssf" '
         /\{/ { block=""; inblock=1 }
         inblock { block = block $0 "\n" }
         /\}/ {
-          if (inblock && block ~ /container-type/ && block ~ /[0-9.]cqi/)
+          if (inblock && block ~ /container-type/ && block ~ /[0-9.]cq(i|b|w|h|min|max)([^a-zA-Z]|$)/)
             print "SELFCQI " f
           inblock=0
         }' \
     | while read -r _ badfile; do
-        fail "$badfile puts a cqi ramp in the same rule that declares container-type, so it resolves against the viewport rather than the block it appears to measure"
+        fail "$badfile puts a container-query ramp (cqi/cqb/cqw/cqh/cqmin/cqmax) in the same rule that declares container-type, so it resolves against the viewport rather than the block it appears to measure"
       done
 done
 

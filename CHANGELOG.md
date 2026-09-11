@@ -3,6 +3,19 @@
 ## [Unreleased]
 
 ### Fixed
+- **Both composition unit gates pinned one spelling and let the whole family
+  past.** The `vw` justification loop fed on a literal `[0-9.]vw`, so a `6dvw`
+  or `6vmin` ramp dropped into a composition with no comment passed (rc=0,
+  sha-verified), and `svw`/`lvw`/`vi`/`vmax` are the same shape — all of them
+  the viewport-relative sizing the conversion removed, and `dvw` the spelling a
+  mobile-aware author reaches for first. The self-container loop matched
+  `[0-9.]cqi` only, so a `6cqw` inside the rule declaring `container-type` also
+  passed, reintroducing the identical resolve-against-the-viewport defect with
+  a unit the library already uses elsewhere. Both patterns now cover their
+  families — `(d|s|l)?(vw|vi|vmin|vmax)` and `cq(i|b|w|h|min|max)`, each with a
+  trailing class so a unit cannot match inside a longer identifier. Viewport
+  *height* is deliberately excluded and the check says why: `container-type:
+  inline-size` offers no block-axis container unit to convert to.
 - **`demo-verify` failed a round on correct CSS whenever a container query was
   scoped to a breakpoint.** `containerAudit()` decides whether an `@container`
   rule can ever match by reading `container-type` off the subject's ancestors,
