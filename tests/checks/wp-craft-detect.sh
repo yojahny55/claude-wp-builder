@@ -99,6 +99,23 @@ grep -A1 -F 'if (frame.pageDevices === 0) {' "$vs" | grep -Fq "kind: 'no-engine'
   || fail "$v does not push no-engine directly under the page-wide device test, so the two were decoupled and no-engine no longer means what it says"
 grep -Fq '} else if (frame.devices === 0) {' "$vs" \
   || fail "$v does not silently skip a section that carries no device of its own on a page that does move, so a plain <section> is reported as a defect"
+# The other side of the same boundary: only the [data-motion] walk is scoped.
+# The cue sweep, the canvas sample, the clipped-copy sweep and the overflow read
+# are facts about the document, and the probe now runs once per walked section —
+# so scoping any of them to `root` hides every instance that lives outside a
+# <section> (a clipped <p> in a <footer>, a cue in the header) and, for the three
+# that feed `sig`, quietly changes what every finding kind samples. Measured: a
+# clipped <p> in a <footer> goes from a blocking clipped-copy report to a clean
+# exit-0 walk on a one-word change. Documented in the probe by comment; pinned
+# here, because a comment is not a check.
+grep -Fq "document.querySelectorAll('p, h1, h2, h3, li').forEach" "$vs" \
+  || fail "$v scopes the clipped-copy sweep to the walked section, so clipped copy outside every <section> is never reported and a demo with unreadable text walks clean"
+grep -Fq "document.querySelectorAll('[data-motion-cue]').forEach" "$vs" \
+  || fail "$v scopes the cue sweep to the walked section, so a cue outside every <section> is never graded and cue-never-peaks cannot fire on it"
+grep -Fq "document.querySelectorAll('canvas').forEach" "$vs" \
+  || fail "$v scopes the canvas sample to the walked section, so a cinematic stage painted outside one contributes no signature and its page reports dead scroll"
+grep -Fq 'overflow: document.documentElement.scrollWidth > window.innerWidth + 1,' "$vs" \
+  || fail "$v does not read horizontal overflow from the document element, so overflow caused outside the walked section goes unreported"
 grep -Fq "data-motion') === 'reveal'" "$vs" \
   || fail "$v does not sample the reveal device, so every reveal-only section reports dead scroll"
 for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
