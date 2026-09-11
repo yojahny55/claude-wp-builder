@@ -199,17 +199,28 @@ BLOCK_AXIS='^[[:space:]]*(min-|max-)?(height|block-size)|^[[:space:]]*(inset-blo
 for cssf in skills/wp-demo-craft/compositions/*/section.css; do
   while IFS=: read -r lineno _; do
     cur=$(sed -n "${lineno}p" "$cssf")
-    # A rule written on one line can carry several declarations; judge the one
-    # the unit actually sits in, not the first on the line.
-    decl=$(blank_comments "$cssf" | sed -n "${lineno}p" | tr ';{' '\n\n' | grep -E "$VH_FAMILY" | head -1)
-    printf '%s' "$decl" | grep -qE "$BLOCK_AXIS" && continue
+    # EVERY matching declaration on the line, not the first. A rule written on
+    # one line carries several, and judging only the first lets a block-axis one
+    # shield an inline one behind it: `.x { height: 100vh; width: 50vh }` exempted
+    # the `width` because the `height` came first. Same class as the per-file vs
+    # per-occurrence bug fixed above, reintroduced one scope down.
+    inline_hit=""
+    while IFS= read -r decl; do
+      [ -n "$decl" ] || continue
+      printf '%s' "$decl" | grep -qE "$BLOCK_AXIS" && continue
+      inline_hit="$decl"
+      break
+    done <<EOF_DECLS
+$(blank_comments "$cssf" | sed -n "${lineno}p" | tr ';{}' '\n\n\n' | grep -E "$VH_FAMILY")
+EOF_DECLS
+    [ -n "$inline_hit" ] || continue
     prevno=$((lineno - 1))
     prev=""
     [ "$prevno" -ge 1 ] && prev=$(sed -n "${prevno}p" "$cssf")
     case "$cur$prev" in
       *"viewport on purpose"*) ;;
       *"not cqi"*) ;;
-      *) fail "$cssf:$lineno uses a viewport-height unit (vh/dvh/svh/lvh/vb) on an inline-axis declaration without recording why it is viewport-relative" ;;
+      *) fail "$cssf:$lineno uses a viewport-height unit (vh/dvh/svh/lvh/vb) on an inline-axis declaration ($(printf '%s' "$inline_hit" | tr -s ' ')) without recording why it is viewport-relative" ;;
     esac
   done < <(blank_comments "$cssf" | grep -nE "$VH_FAMILY")
 done
@@ -231,18 +242,27 @@ done
 # `6cqw` ramp inside the rule declaring `container-type` — measured, rc=0 — and
 # `cqw` is already in the library's active vocabulary (process-rail uses
 # `100cqw`), so it is the spelling a copy-paste lands on.
+# Parsed as DECLARATION BLOCKS, not as lines. Line-based brace tracking made the
+# verdict depend on formatting: `@supports (display: grid) { .a { container-type:
+# inline-size; } .b { gap: 1cqi; } }` written on one line was flagged, and the
+# byte-identical CSS written across four lines passed — measured both ways. Two
+# separate rules are not one rule, whatever the whitespace, and a check that
+# blocks valid CSS on formatting is the false-positive class this branch spent
+# its whole final review removing. An innermost block — a `{...}` whose body
+# contains no further brace — is exactly a declaration block, so matching those
+# ignores the at-rule wrapper without needing to understand at-rules.
 for cssf in skills/wp-demo-craft/compositions/*/section.css; do
-  perl -0pe 's{/\*.*?\*/}{}gs' "$cssf" \
-    | awk -v f="$cssf" '
-        /\{/ { block=""; inblock=1 }
-        inblock { block = block $0 "\n" }
-        /\}/ {
-          if (inblock && block ~ /container-type/ && block ~ /[0-9.]cq(i|b|w|h|min|max)([^a-zA-Z]|$)/)
-            print "SELFCQI " f
-          inblock=0
-        }' \
-    | while read -r _ badfile; do
-        fail "$badfile puts a container-query ramp (cqi/cqb/cqw/cqh/cqmin/cqmax) in the same rule that declares container-type, so it resolves against the viewport rather than the block it appears to measure"
+  perl -0ne '
+    s{/\*.*?\*/}{}gs;
+    my $bad = 0;
+    while (/\{([^{}]*)\}/g) {
+      my $body = $1;
+      $bad = 1 if $body =~ /container-type/ && $body =~ /[0-9.]cq(i|b|w|h|min|max)(?![a-zA-Z])/;
+    }
+    print "SELFCQI\n" if $bad;
+  ' "$cssf" \
+    | while read -r _; do
+        fail "$cssf puts a container-query ramp (cqi/cqb/cqw/cqh/cqmin/cqmax) in the same rule that declares container-type, so it resolves against the viewport rather than the block it appears to measure"
       done
 done
 

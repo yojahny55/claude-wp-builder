@@ -3,6 +3,18 @@
 ## [Unreleased]
 
 ### Fixed (residuals from the branch review)
+- **The viewport-height gate judges every declaration on a line, not the first.**
+  A rule written on one line carries several, and judging only the first let a
+  block-axis declaration shield an inline one behind it: `.x { height: 100vh;
+  width: 50vh }` exempted the `width` because the `height` came first. Measured:
+  the same `width: 50vh` alone failed and behind a `height` passed.
+- **The self-container check parses declaration blocks, not lines.** Line-based
+  brace tracking made the verdict depend on formatting — `@supports (display:
+  grid) { .a { container-type: inline-size; } .b { gap: 1cqi; } }` on one line was
+  flagged while the byte-identical CSS across four lines passed. Two separate
+  rules are not one rule whatever the whitespace. It now matches innermost
+  `{...}` blocks, which are exactly declaration blocks, so at-rule wrappers are
+  ignored without having to understand at-rules.
 - **The reduced-motion rail affordance is attached only when a box actually
   overflows.** Below `process-rail`'s own documented three-step minimum neither
   the rail nor the frame scrolls, and attaching `tabindex`/`role="region"`
