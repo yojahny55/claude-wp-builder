@@ -1,22 +1,22 @@
 ---
-description: Comprehensive audit — security, SEO, accessibility, performance, best practices
+description: Comprehensive audit — security, SEO, accessibility, performance, best practices, GEO/AI-agent readiness
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, AskUserQuestion
-argument-hint: "[--security] [--seo] [--a11y] [--performance] [--best-practices] [--all] [--report-only] [--security-level basic|recommended|maximum]"
+argument-hint: "[--security] [--seo] [--a11y] [--performance] [--best-practices] [--geo] [--all] [--report-only] [--security-level basic|recommended|maximum]"
 ---
 
 # WP Audit — Comprehensive Site Audit
 
-Run a comprehensive audit across security, SEO, accessibility, performance, and best practices. Reports issues with severity levels and offers to auto-fix what it can. Dispatches specialized audit agents and optionally configures Rank Math SEO and All-in-One WP Security.
+Run a comprehensive audit across security, SEO, accessibility, performance, best practices, and GEO/AI-agent readiness. Reports issues with severity levels and offers to auto-fix what it can. Dispatches specialized audit agents and optionally configures Rank Math SEO and All-in-One WP Security.
 
 ## Step 1: Parse Arguments
 
 Parse `$ARGUMENTS` for:
-- **Category flags:** `--security`, `--seo`, `--a11y`, `--performance`, `--best-practices`
+- **Category flags:** `--security`, `--seo`, `--a11y`, `--performance`, `--best-practices`, `--geo`
 - **`--all` flag** (default if no category flags provided)
 - **`--report-only` flag** (skip fix phase)
 - **`--security-level basic|recommended|maximum`** (default: `recommended`, ignored if `--report-only`)
 
-If `--all` or no category flags are present: enable all 5 categories (security, seo, a11y, performance, best-practices).
+If `--all` or no category flags are present: enable all 6 categories (security, seo, a11y, performance, best-practices, geo).
 
 ## Step 2: Read Project Context
 
@@ -32,6 +32,8 @@ If `.claude/CLAUDE.md` does not exist, tell the user:
 Error: Project not initialized. Run /wp-init first to set up the project context.
 ```
 And stop execution.
+
+If `--geo` is selected and `.wp-create.json` exists, also note its `wordpress.url` — the live scan in Step 9 needs a reachable host.
 
 ## Step 3: Detect Environment & Tier
 
@@ -97,6 +99,8 @@ Only show plugins relevant to the selected categories (don't prompt for Rank Mat
 
 Use AskUserQuestion for the choice. If A: install all listed via `bash -c "$WP plugin install <slug> --activate"`. If B: ask which ones via AskUserQuestion and install selected. If C: continue without installing.
 
+**`--geo` needs Tier 2.** The GEO auditor's live HTTP checks and the `bin/geo-scan.sh` verifier in Step 9 require `.wp-create.json` (for `$WP` and a reachable site URL). Without Tier 2, `wp-audit-geo` still runs its code-only checks and reports the runtime GEO codes `N/A`, and the live scan is skipped.
+
 ## Step 5: Security Level Selection
 
 If `--security` or `--all` is selected AND `--report-only` is NOT set:
@@ -121,7 +125,7 @@ If `--security` is not selected or `--report-only` is set, skip this step.
 
 For each selected category, dispatch the corresponding agent using the Agent tool. Pass complete context in each agent prompt.
 
-**Dispatch order:** security → seo → a11y → performance → practices
+**Dispatch order:** security → seo → a11y → performance → practices → geo
 
 For each agent, use this prompt template (adapt the category-specific instructions):
 
@@ -144,7 +148,7 @@ Run all checks for your tier level. Output your findings as a structured report 
   Method: <description of fix>
 
 Where SEVERITY is one of: CRITICAL, WARNING, INFO
-Where CODE follows the pattern: SEC-NNN, SEO-NNN, A11Y-NNN, PERF-NNN, BP-NNN
+Where CODE follows the pattern: SEC-NNN, SEO-NNN, A11Y-NNN, PERF-NNN, BP-NNN, GEO-Dnn/Axx/Uxx/Pxx
 ```
 
 Use these `subagent_type` values:
@@ -153,6 +157,7 @@ Use these `subagent_type` values:
 - `wp-audit-a11y` — accessibility checks (skip links, ARIA attributes, alt text, color contrast references, focus styles, semantic HTML, keyboard navigation)
 - `wp-audit-performance` — performance checks (asset enqueuing, image optimization, caching headers, database queries, lazy loading, render-blocking resources)
 - `wp-audit-practices` — best practices checks (ABSPATH guards, escaping, i18n, theme supports, coding standards, enqueue patterns, template hierarchy)
+- `wp-audit-geo` — GEO/AI-agent readiness checks (ORA layers Discovery/Access/Usability/Payments, AI crawler allowlist, `llms.txt` and ARD catalog, rendered-head DOM checks, agent-skills index, is-agentic live scan)
 
 **Error handling:** If an agent fails:
 1. Note which agent failed and the error message
@@ -206,6 +211,14 @@ Categories: <comma-separated selected categories>
   ✗ CRITICAL: ...
   ✗ WARNING: ...
   ℹ INFO: ...
+
+[GEO] <site_type> — N issues (X errors, Y warnings, Z info, K N/A)
+  Layer coverage: <Discovery ✓|✗> <Access ✓|✗> <Usability ✓|✗> <Payments ✓|N/A>
+  ✗ ERROR: <message> (GEO-A13)
+  ✗ WARNING: <message> (GEO-A06)
+  ℹ INFO: <message>
+  ○ N/A: <layer> — <rationale>
+  Live scan: <score|unavailable — skipped: <reason>>
 
 ---
 Total: N issues (X critical, Y warnings, Z info)
@@ -264,6 +277,14 @@ Fix the following issues in the WordPress theme at <theme_path>:
 ```
 Fixes include: ABSPATH checks, adding `esc_html()`/`esc_url()`/`esc_attr()` escaping, theme supports registration, proper enqueue patterns.
 
+**GEO fixes:** Dispatch an agent with `subagent_type: wp-agentic-surfaces` with the full project context and the list of auto-fixable GEO findings. It owns `inc/agentic.php` and every generated agent surface (`llms.txt`, ARD catalog, agent-skills index, markdown negotiation, Link headers, agent-friendly 404, JSON-LD breadth, trust anchors) — do not re-implement the surfaces here. Before dispatching, run the live verifier to capture the before score; run it again after the fixer completes and report the before → after score:
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host>
+```
+
+`<home-host>` is `wordpress.url` from `.wp-create.json` (or `$WP option get home`). Exit codes: `0` = report returned, `2` = skipped (no network or tool), `1` = error. Exit `2` is a clean skip — neither a success nor a failure: report the live score as unavailable and continue. On exit `1`, record the error and continue. Only a returned report yields a score; map its failed ORA check ids back to GEO codes using the `wp-audit-geo-standards` skill. Advisory and off-site findings (GEO-D05 through GEO-D08, GEO-U10, GEO-P01 through GEO-P05) are left unfixed.
+
 After all fix agents complete, count how many issues were successfully fixed.
 
 ## Step 10: Update Manifest
@@ -281,7 +302,7 @@ Add or update the `audit` key in the JSON:
   "audit": {
     "last_run": "<ISO 8601 timestamp>",
     "security_level": "<basic|recommended|maximum>",
-    "categories_run": ["security", "seo", "a11y", "performance", "best-practices"],
+    "categories_run": ["security", "seo", "a11y", "performance", "best-practices", "geo"],
     "issues_found": N,
     "issues_fixed": M,
     "web_quality_skills_available": true
