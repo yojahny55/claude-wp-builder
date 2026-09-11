@@ -3,6 +3,22 @@
 ## [Unreleased]
 
 ### Fixed
+- **`process-rail`'s reduced-motion rail overflowed the whole document instead
+  of scrolling inside its own frame.** Under `prefers-reduced-motion` the
+  section's own comment calls the rail "a native scroll region", but nothing
+  made it one: the frame was `overflow: visible` with no `overflow-x`
+  anywhere, so the row overflowed `documentElement` itself — measured
+  `scrollWidth` 2496 at a 1920 viewport, i.e. a horizontally scrolling page.
+  `.process-rail__frame` now carries `overflow-x: auto` inside that media
+  query, placed after the `overflow: visible` shorthand (which resets both
+  axes and would otherwise win by source order and silently undo the fix).
+  Measured before/after with a headless-Chrome probe at 1920 with
+  `prefers-reduced-motion: reduce` forced: `documentElement.scrollWidth` 2496
+  → 1920, with the frame itself still scrollable (`scrollWidth` 2496 >
+  `clientWidth` 1920). `tests/checks/wp-craft-compositions.sh` asserts
+  `overflow-x: auto` on the `__frame` rule specifically inside the
+  reduced-motion block, and after the `overflow: visible` shorthand, not
+  merely present anywhere in the file.
 - **A composition's fluid ramps ignored the container its breakpoints already
   respected.** `@container` sizing (Task 3) covered layout, but the `vw` inside
   `clamp()` gaps, padding and type scales still keyed off the viewport, so a

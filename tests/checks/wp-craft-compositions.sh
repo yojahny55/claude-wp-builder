@@ -228,4 +228,31 @@ done
 [ "$n" -ge 13 ] \
   || fail "only $n compositions constrain content width against var(--container-max, 1280px) on the rule that carries their inline gutter, expected 13"
 
+# process-rail's own comment calls the reduced-motion rail "a native scroll
+# region", but under prefers-reduced-motion the frame was width: auto,
+# overflow: visible, with no overflow-x anywhere — so the row overflowed the
+# whole DOCUMENT (measured 2496 at a 1920 viewport) instead of scrolling inside
+# the frame. Anchored to the media block AND the __frame rule specifically: a
+# file-wide `grep -F 'overflow-x: auto'` would pass with the declaration
+# sitting anywhere in the file, including outside prefers-reduced-motion (where
+# it does nothing under normal motion) or on __rail/__step (which do not have
+# the frame's constrained width, so overflow-x there clips nothing).
+PR_CSS=skills/wp-demo-craft/compositions/process-rail/section.css
+pr_media=$(sed -n '/^@media (prefers-reduced-motion: reduce) {$/,/^}$/p' "$PR_CSS")
+[ -n "$pr_media" ] || fail "process-rail/section.css has no prefers-reduced-motion media block"
+pr_frame_rule=$(printf '%s\n' "$pr_media" | grep -F '.process-rail__frame {')
+[ -n "$pr_frame_rule" ] || fail "process-rail/section.css has no .process-rail__frame rule inside prefers-reduced-motion"
+printf '%s\n' "$pr_frame_rule" | grep -Eq 'overflow-x:[[:space:]]*auto' \
+  || fail "process-rail__frame has no overflow-x: auto inside prefers-reduced-motion, so the rail overflows the whole document instead of scrolling"
+# overflow: visible is a shorthand for BOTH axes, so it resets overflow-x too.
+# If overflow-x: auto is declared before that shorthand in the same rule, the
+# shorthand wins by source order and silently undoes the fix while the grep
+# above stays green — require the longhand strictly after the shorthand.
+pr_shorthand_at=$(printf '%s' "$pr_frame_rule" | grep -boE 'overflow:[[:space:]]*visible' | head -1 | cut -d: -f1)
+pr_longhand_at=$(printf '%s' "$pr_frame_rule" | grep -boE 'overflow-x:[[:space:]]*auto' | head -1 | cut -d: -f1)
+if [ -n "$pr_shorthand_at" ] && [ -n "$pr_longhand_at" ]; then
+  [ "$pr_longhand_at" -gt "$pr_shorthand_at" ] \
+    || fail "process-rail__frame declares overflow-x: auto before the overflow: visible shorthand, so the shorthand resets it back to visible"
+fi
+
 echo PASS

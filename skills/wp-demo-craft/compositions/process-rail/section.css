@@ -122,7 +122,10 @@
   /* The engine hands the rail back as a native scroll region under reduced motion,
      so the frame must stop clipping it and the section must stop being tall. */
   .process-rail { height: auto; }
-  .process-rail__frame { position: static; height: auto; overflow: visible; padding: var(--space-section) 0; }
+  /* overflow: visible resets overflow-x too (it is a shorthand for both axes),
+     so overflow-x: auto has to come after it in this rule or the shorthand
+     silently wins and the row overflows the document again. */
+  .process-rail__frame { position: static; height: auto; overflow: visible; overflow-x: auto; padding: var(--space-section) 0; }
   .process-rail__rail { width: auto; padding-bottom: 1rem; }
   .process-rail__step { min-height: 0; }
 }
