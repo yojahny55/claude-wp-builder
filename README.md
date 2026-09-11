@@ -215,6 +215,87 @@ you when a page arrives without delimiters, since nothing downstream can split a
 overflow, cues that never reach full opacity and clipped copy, then hands back a contact
 sheet to read. Worth running before the WordPress build, not only after.
 
+### Generated images (optional)
+
+A craft demo needs a photograph for the hero and feature slots. When `docs/` has no
+suitable image, `/wp-demo` can generate one — but only if an API key is present in the
+environment. **With no key set, nothing is asked and nothing is generated**, and the build
+behaves exactly as it always has, so this is opt-in by doing nothing.
+
+Two providers are supported. Set whichever you have:
+
+| provider | variable | what `/wp-demo` offers |
+|---|---|---|
+| Google (nano banana) | `GEMINI_API_KEY` | `gemini-3.1-flash-image` |
+| OpenAI (GPT Image 2.5) | `OPENAI_API_KEY` | `gpt-image-2.5-flare` (fast, cheap) or `gpt-image-2.5-sunburst` (higher quality) |
+
+Those are what the command offers when it asks. Any other model in the same family —
+`gemini-3.1-flash-lite-image`, `gemini-3-pro-image` — also works, but only if you write it
+into `.wp-create.json` yourself as `"image provider": "google/<model>"`; the model string
+is passed through to the API untouched.
+
+Google is recommended, and not only on price: the compositions declare 4:5, 3:2 and 4:3
+crops, which Google supports exactly. OpenAI offers three fixed sizes, so every one of
+those crops is cropped again after you have paid for the pixels.
+
+#### Where to put the key
+
+The key must be in the environment **before Claude Code starts**. Pick one:
+
+**Per project, and the tidiest.** Add an `env` block to `.claude/settings.local.json`
+in your WordPress project — that file is personal and stays out of git (Claude Code adds
+it to your global git excludes; if you created it by hand, add it to `.gitignore`
+yourself):
+
+```json
+{
+  "env": {
+    "GEMINI_API_KEY": "your-key-here"
+  }
+}
+```
+
+**Per shell, for one session.** Export it, then start Claude Code from that same terminal:
+
+```bash
+export GEMINI_API_KEY="your-key-here"
+claude
+```
+
+**Everywhere, always.** Put the same `export` line in `~/.zshrc` or `~/.bashrc`.
+
+Two things that do **not** work, and one that is a mistake:
+
+- **Exporting inside a running Claude Code session does nothing.** Each command runs in a
+  fresh shell, so the variable is gone by the next one. Set it before you start.
+- **`.wp-create.json` is not for the key.** It records *which provider* you chose
+  (`"image provider": "google/gemini-3.1-flash-image"`), never the key itself.
+- **Do not put the key in `.claude/settings.json`** (no `.local`). That file is meant to
+  be committed and shared with the team.
+
+#### What it costs, and what it does
+
+`/wp-demo` shows a table before spending anything — one row per image, with the estimated
+total — and asks once. That approval covers the whole plan; it does not ask per image. A
+typical five-page build is around four images, roughly $0.40. **Those figures are
+estimates**: Google publishes no per-image price, and OpenAI bills per token rather than
+per image.
+
+Re-runs are free. Each image is keyed by a hash of its prompt, aspect and model, so a
+verify round or a second `/wp-demo` reuses what is on disk. Editing a prompt changes the
+hash, so it regenerates rather than quietly serving the old picture.
+
+If a slot should use a real client photograph instead, say so when the table is shown —
+a real file always wins and is never regenerated.
+
+Generated files land in `demo/assets/img/` beside a `.json` sidecar recording the model,
+prompt and date, and are summarised in `demo/BRIEF.md`. Every Google image carries an
+invisible SynthID watermark identifying it as AI-generated — worth knowing before these
+ship to a client's production site.
+
+`/wp-yolo` never generates images. It uses whatever is already in the demo folder, so the
+one command that runs unattended cannot spend money.
+
 ## Commands Reference
 
 Full arguments, inputs and outputs per command: **[docs/commands.md](docs/commands.md)**.

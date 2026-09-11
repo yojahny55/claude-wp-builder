@@ -4,6 +4,15 @@
 
 ### Added
 
+- **README and `docs/commands.md` now document how to supply the image-generation key.**
+  Which variable per provider (`GEMINI_API_KEY` / `OPENAI_API_KEY`), the three places to
+  set it — an `env` block in the gitignored `.claude/settings.local.json`, an `export`
+  before starting Claude Code, or a shell profile — and the two things that look like they
+  should work and do not: exporting inside a running session (each command gets a fresh
+  shell) and putting the key in `.wp-create.json`, which records only which provider was
+  chosen. The prose added in this release told the agent what to do with a key; nothing
+  told a human how to provide one.
+
 - `/wp-demo` Step 5.5 fills a composition's image slots from a client file or a
   generated plate, via the new `bin/image-gen.mjs`. Provider-agnostic across
   `google/gemini-3.1-flash-image` (nano banana) and `gpt-image-2.5-flare` /
