@@ -284,10 +284,12 @@ fi
 # not the `visible` the shorthand appears to declare. Measured: overflow-y read
 # back as `auto` at 390/768/1280/1920 before this was stated explicitly. Nothing
 # overflows the frame vertically today, so it is inert — but a shadow, a badge or
-# a focus ring that later grows past the frame would be silently clipped or given
-# a second scrollbar, and the declaration that caused it would not be in the file.
+# a focus ring that later grew past the frame would get a second, vertical
+# scrollbar on a horizontal scroller, and the declaration that caused it would
+# not be in the file. `hidden` clips that overflow instead, which is the wanted
+# behaviour here and the reason the axis is stated at all.
 printf '%s' "$pr_frame_rule" | grep -qE 'overflow-y:[[:space:]]*hidden' \
-  || fail "process-rail__frame does not state overflow-y explicitly inside prefers-reduced-motion, so it computes to auto and can silently clip or scroll anything that grows vertically"
+  || fail "process-rail__frame does not state overflow-y explicitly inside prefers-reduced-motion, so it computes to auto and puts a second vertical scrollbar on a horizontal scroller as soon as anything grows past the frame"
 
 # A scroll container no keyboard can reach is not a fix, it is a different bug
 # (WCAG 2.1.1) — but the scroll container only exists under reduced motion. At

@@ -126,9 +126,11 @@
      so overflow-x: auto has to come after it in this rule or the shorthand
      silently wins and the row overflows the document again. overflow-y is then
      stated explicitly because CSS corrects a `visible` axis to `auto` when the
-     other axis is not visible: left implicit it computes to `auto`, which would
-     silently clip or scroll anything that later grows vertically out of the
-     frame — a shadow, a badge, a focus ring. */
+     other axis is not visible: left implicit it computes to `auto`, which does
+     not clip — it puts a second, vertical scrollbar on a horizontal scroller the
+     moment anything grows past the frame (a shadow, a badge, a focus ring).
+     `hidden` is the value that clips, and clipping that overflow is what is
+     wanted here: the rail scrolls sideways and nothing else should. */
   .process-rail__frame { position: static; height: auto; overflow: visible; overflow-x: auto; overflow-y: hidden; padding: var(--space-section) 0; }
   .process-rail__rail { width: auto; padding-bottom: 1rem; }
   .process-rail__step { min-height: 0; }
