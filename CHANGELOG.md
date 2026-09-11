@@ -83,6 +83,48 @@
   is now stated to be a true positive, not a capture artefact.
 
 ### Fixed
+- **`container-noop` stops firing on valid CSS.** `containerAudit()` resolved each
+  `@container` rule's selector with `document.querySelector(sel)` — the first match only —
+  and then walked that one element's ancestors, so a selector matching several elements was
+  reported dead whenever the first match sat outside any container and a later one sat
+  inside, even though the rule genuinely applies. `container-noop` blocks, so a verification
+  round failed on correct CSS — the same untrustworthy-gate failure this branch exists to
+  cure, recreated inside the cure. The lint now walks every match and reports the selector
+  only when none of them has a container-establishing ancestor; the ancestor walk still
+  starts at `parentElement`, because an element never matches a container query against the
+  container it establishes itself. Three fixtures pin both directions: `.orphan` (no
+  container anywhere) is still reported, `.good__inner` (parent establishes one) is still
+  not, and the multi-match `.card` is not. The first-match limit recorded in
+  `references/verify.md` and `CLAUDE.md` is retired there rather than left standing as a
+  known ceiling — it was a false positive, not an under-report — and
+  `tests/checks/wp-craft-detect.sh` fails if either file reasserts it.
+- **The verification server enforces path containment.** `serve()` stripped leading `../`
+  from the request path and then called `join(root, rel)`, which is not containment: a path
+  normalising to a Windows drive-absolute `/C:/Windows/...` lands outside the root, and a
+  symlink inside the root pointing outside it was followed and served (measured: a symlink
+  to `/etc/passwd` returned 200 with its contents). A page under test is untrusted markup,
+  and the plugin ships to other people's machines, so "we run Linux" was not an answer. The
+  handler now resolves the path, follows the links with `realpathSync`, and refuses anything
+  that is not the root or under it with 404; a missing file still answers 404 rather than
+  throwing. The whole existing traversal battery still 404s, `/` still 403s, `/index.html`
+  and a nested asset still 200, and `tests/checks/wp-demo-verify.sh` runs that battery
+  against `serve()` lifted verbatim out of the script instead of grepping for it.
+- **A failed bind no longer hangs the walk.** `serve()`'s promise took only `resolve`, so a
+  `server.listen` that failed — port exhaustion, a sandbox refusing the bind — never settled
+  it and the walk stopped with no answer at all. A verification that produces no answer is
+  the failure this branch exists to stop, and a hang is its worst shape because it looks
+  like progress. The promise now rejects on `server.once('error', …)`, and the handler is
+  removed once `listen` succeeds so a later runtime error cannot reject an already-settled
+  promise; the walk's `finally` still closes the server on the throw path.
+- **`bin/composition-gate.sh` returns a verdict on an unexpected detector payload.**
+  Parseable JSON without a `findings` array left `findings` bound to the dict itself and the
+  next loop raised `AttributeError` — an unhandled Python traceback instead of a gate
+  verdict. The payload is normalised to a list first: a list stays as-is, a dict yields
+  `findings` only when that is itself a list, and anything else is a scan that did not
+  happen and exits 1, the same code as "could not scan". Treating an unreadable payload as
+  zero findings would be a vacuous pass. `tests/checks/wp-craft-composition-gate.sh` runs
+  the real gate behind a stub `npx` that emits `{"ok": true}` and asserts rc 1, no
+  traceback, and a message that says why.
 - **`demo/FAILED.md` stops being a one-way latch.** Nothing anywhere deleted the marker,
   so the branch's headline mechanism shipped without its inverse: a craft `/wp-yolo` run
   that exhausted its three rounds wrote the marker at Step 2.6 and was then refused by its

@@ -11,8 +11,8 @@
  * the caller can fall back to MCP screenshot tools rather than reporting a failure),
  * 3 the walk itself crashed (not a findings report).
  */
-import { existsSync, mkdirSync, writeFileSync, readdirSync, statSync, createReadStream } from 'node:fs';
-import { resolve, join, dirname, basename, extname, normalize } from 'node:path';
+import { existsSync, mkdirSync, writeFileSync, readdirSync, statSync, createReadStream, realpathSync } from 'node:fs';
+import { resolve, join, dirname, basename, extname, normalize, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { createServer } from 'node:http';
@@ -92,7 +92,10 @@ const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript
 
 /** Serve `root` on an ephemeral port. Verification over file:// silently blocks
  *  module scripts and relative image loads; neither is a defect in the demo. */
-const serve = (root) => new Promise((resolve) => {
+const serve = (root) => new Promise((ready, fail) => {
+  // realpath once: the containment test below compares real paths, so a root
+  // that is itself reached through a symlink must be in the same terms.
+  const base = realpathSync(root);
   const server = createServer((req, res) => {
     // decodeURIComponent throws URIError on a malformed escape (a bare `%` is
     // enough), and an uncaught throw here kills the process mid-walk — a
@@ -100,14 +103,37 @@ const serve = (root) => new Promise((resolve) => {
     // branch exists to stop. Decode inside the guard and answer 400.
     let file;
     try {
-      const rel = normalize(decodeURIComponent(req.url.split('?')[0])).replace(/^(\.\.[/\\])+/, '');
-      file = join(root, rel);
+      // Leading separators stripped as well as leading ../: a request path is
+      // always rooted at '/', and resolve() treats an absolute second argument
+      // as the whole answer — '/index.html' would resolve to the filesystem
+      // root, not to a file under the demo.
+      const rel = normalize(decodeURIComponent(req.url.split('?')[0]))
+        .replace(/^(\.\.[/\\])+/, '')
+        .replace(/^[/\\]+/, '');
+      // Stripping leading ../ is not containment: a Windows drive-absolute path
+      // (/C:/Windows/...) makes resolve() land outside the root outright, and a
+      // symlink inside the root pointing outside it is followed by the read. So
+      // resolve, follow the links with realpath, and demand the result still be
+      // the root or under it — a page under test could otherwise read arbitrary
+      // local files through this server. realpathSync throws on a missing file,
+      // which the catch already answers 404.
+      file = realpathSync(resolve(base, rel));
+      if (file !== base && !file.startsWith(base + sep)) return res.writeHead(404).end();
       if (statSync(file).isDirectory()) return res.writeHead(403).end();
     } catch (err) { return res.writeHead(err instanceof URIError ? 400 : 404).end(); }
     res.writeHead(200, { 'content-type': MIME[extname(file).toLowerCase()] || 'application/octet-stream' });
     createReadStream(file).pipe(res);
   });
-  server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port }));
+  // Without this the promise never settles when the bind fails (port
+  // exhaustion, a sandbox refusing it) and the walk hangs instead of reporting
+  // a crash — the worst shape of "no answer", because it looks like progress.
+  // Removed once listen succeeds, so a later runtime error cannot reject an
+  // already-settled promise.
+  server.once('error', fail);
+  server.listen(0, '127.0.0.1', () => {
+    server.removeListener('error', fail);
+    ready({ server, port: server.address().port });
+  });
 });
 
 function findChrome() {
@@ -360,17 +386,25 @@ const containerAudit = () => {
       for (const inner of [...rule.cssRules]) {
         const sel = inner.selectorText;
         if (!sel) continue;
-        let el;
-        try { el = document.querySelector(sel); } catch { continue; }
-        if (!el) continue;
-        // An element never matches a container query against the container it
-        // establishes itself, so start the walk at its parent.
-        let node = el.parentElement;
+        // Every match, not the first: a selector matching several elements
+        // applies as soon as ONE of them sits inside a container, and judging
+        // it by document.querySelector(sel) reported that rule as dead when the
+        // first match happened to be the one outside. container-noop is
+        // blocking, so that false positive failed a round on correct CSS.
+        let els;
+        try { els = document.querySelectorAll(sel); } catch { continue; }
+        if (!els.length) continue;
         let found = false;
-        while (node) {
-          const ct = getComputedStyle(node).containerType;
-          if (ct && ct !== 'normal') { found = true; break; }
-          node = node.parentElement;
+        for (const el of els) {
+          // An element never matches a container query against the container it
+          // establishes itself, so start the walk at its parent.
+          let node = el.parentElement;
+          while (node) {
+            const ct = getComputedStyle(node).containerType;
+            if (ct && ct !== 'normal') { found = true; break; }
+            node = node.parentElement;
+          }
+          if (found) break;
         }
         if (!found) out.push(sel);
       }

@@ -84,4 +84,55 @@ grep -Eqi 'directory|every \*?\.html|each page' "$c" || fail "$c does not walk a
 grep -Fq 'readdirSync' "$s" || fail "$s cannot enumerate a directory target"
 grep -Fq 'pages' "$s" || fail "$s findings.json does not carry per-page results"
 
+# --- The demo server's path containment, run rather than grepped. The page
+#     under test is untrusted markup and this server has the whole filesystem
+#     within reach of one join(); a symlink inside the root and a Windows
+#     drive-absolute path both escaped it. The pins in wp-craft-detect.sh say
+#     the lines are present, which is not the same claim as "an escape 404s
+#     and a real file still 200s" — a containment fix that breaks serving is
+#     worse than the hole. serve() is lifted verbatim out of the script, so
+#     this exercises the shipped text and not a re-implementation.
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+mkdir -p "$work/root/assets"
+echo '<!doctype html><p>ok</p>' > "$work/root/index.html"
+echo 'body{}' > "$work/root/assets/a.css"
+echo 'SECRET' > "$work/secret.txt"
+ln -s "$work/secret.txt" "$work/root/escape.txt"
+node - "$s" "$work/root" <<'JS' > "$work/out" 2>&1 || fail "the serve() containment battery crashed: $(cat "$work/out")"
+import { readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const [script, root] = process.argv.slice(2);
+const src = readFileSync(script, 'utf8');
+const start = src.indexOf('const serve = (root)');
+const end = src.indexOf('\n});\n', start) + 5;
+if (start < 0 || end < start + 200) throw new Error('could not lift serve() out of ' + script);
+const mod = join(tmpdir(), 'serve-harness-' + process.pid + '.mjs');
+writeFileSync(mod,
+  "import { statSync, createReadStream, realpathSync } from 'node:fs';\n" +
+  "import { resolve, join, extname, normalize, sep } from 'node:path';\n" +
+  "import { createServer } from 'node:http';\n" +
+  'const MIME = {};\n' + src.slice(start, end) + '\nexport { serve };\n');
+const { serve } = await import('file://' + mod);
+const { server, port } = await serve(root);
+const get = async (p) => (await fetch('http://127.0.0.1:' + port + p)).status;
+const cases = [
+  ['/../etc/passwd', 404], ['/%2e%2e/%2e%2e/etc/passwd', 404], ['/..%2f..%2fetc/passwd', 404],
+  ['/assets/../../etc/passwd', 404], ['/....//....//etc/passwd', 404], ['/index.html%00.png', 404],
+  ['/C:/Windows/win.ini', 404], ['/..%5c..%5cWindows/win.ini', 404],
+  ['/escape.txt', 404], ['/', 403], ['/index.html', 200], ['/assets/a.css', 200],
+  ['/nope.html', 404], ['/%', 400],
+];
+let bad = 0;
+for (const [p, want] of cases) {
+  const got = await get(p);
+  if (got !== want) { console.log('MISMATCH ' + p + ' expected ' + want + ' got ' + got); bad++; }
+}
+server.close();
+console.log(bad === 0 ? 'CONTAINMENT OK' : 'CONTAINMENT FAILED');
+JS
+grep -Fq 'CONTAINMENT OK' "$work/out" \
+  || fail "$s serves outside its root, or no longer serves inside it: $(cat "$work/out")"
+
 echo PASS

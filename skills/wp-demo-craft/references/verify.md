@@ -162,14 +162,22 @@ because `motion.js` drives reveal in GSAP there and a GSAP tween is invisible to
 `getAnimations()` — a working section would otherwise read `none` at both
 samples and be reported dead.
 
-Two more, in the `@container` lint itself, and neither is a bug: it walks only
+One more, in the `@container` lint itself, and it is not a bug: it walks only
 each sheet's **top-level** `cssRules`, so an `@container` block nested inside
 `@media`, `@supports` or `@layer` is never linted at all — `proof-row`'s own CSS
 already nests `@media` inside `@supports`, so generated demos plausibly nest
-container queries too; and it judges a selector by `document.querySelector(sel)`,
-which is its **first** match only, so a selector that resolves inside a real
-container somewhere on the page clears even when a second instance of it sits
-outside one. Both make the lint under-report; neither makes it fire falsely.
+container queries too. That makes the lint under-report; it does not make it
+fire falsely.
+
+It used to judge a selector by `document.querySelector(sel)`, its **first**
+match only, which was a false positive and not an under-report: a selector
+matching several elements applies as soon as one of them sits inside a
+container, and the rule was reported dead whenever the first match happened to
+be the one outside. `container-noop` blocks, so that failed a round on correct
+CSS. The lint now walks **every** match (`querySelectorAll`) and reports the
+selector only when no match has a container-establishing ancestor. The ancestor
+walk still starts at `parentElement`, because an element never matches a
+container query against the container it establishes itself.
 
 **Cues that never peak**: an element that never reaches full opacity anywhere in
 its section, usually a cue window too narrow for the span.

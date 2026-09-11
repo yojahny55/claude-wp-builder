@@ -180,15 +180,33 @@ grep -Fq "kind: 'container-noop'" "$vs" \
 # every line of it still present, and the run exits 0.
 grep -Fq "if (rule.constructor.name !== 'CSSContainerRule') continue;" "$vs" \
   || fail "$v does not filter styleSheet rules on exactly CSSContainerRule, so a renamed or altered comparison skips every rule and the container lint is permanently silent"
-# And its polarity one line down. `if (!el) continue;` -> `if (el) continue;`
-# skips every selector that actually resolves, which is all of them, with the
-# same silent result. Anchored under the querySelector that produces `el`, so the
-# guard cannot be satisfied by an identical line somewhere else in the file.
-grep -A1 -F 'try { el = document.querySelector(sel); } catch { continue; }' "$vs" \
-  | grep -Fq 'if (!el) continue;' \
-  || fail "$v does not skip only the selectors that match nothing after querySelector, so inverting that guard skips every selector that does match and the container lint goes silent"
+# EVERY match, not the first. `querySelectorAll` -> `querySelector` reinstates a
+# blocking false positive on valid CSS: a selector matching several elements
+# applies the moment ONE of them sits inside a container, and judging it by the
+# first match reported the rule as dead whenever that first match was the one
+# outside. A gate that fails a round on correct CSS is the failure this branch
+# exists to cure, recreated inside the cure.
+grep -Fq 'try { els = document.querySelectorAll(sel); } catch { continue; }' "$vs" \
+  || fail "$v judges an @container selector by its first match only, so a rule that genuinely applies to a later match is reported as dead and blocks a round on valid CSS"
+# And its polarity one line down. `if (!els.length) continue;` -> `if (els.length)
+# continue;` skips every selector that actually resolves, which is all of them,
+# and the lint goes permanently silent. Anchored under the query that produces
+# `els`, so the guard cannot be satisfied by an identical line elsewhere.
+grep -A1 -F 'try { els = document.querySelectorAll(sel); } catch { continue; }' "$vs" \
+  | grep -Fq 'if (!els.length) continue;' \
+  || fail "$v does not skip only the selectors that match nothing after querySelectorAll, so inverting that guard skips every selector that does match and the container lint goes silent"
+# The whole match list has to be walked. `for (const el of els)` -> `[els[0]]`
+# restores first-match judgement with querySelectorAll still in place above.
+grep -Fq 'for (const el of els) {' "$vs" \
+  || fail "$v does not walk every element matching the selector, so the lint is back to judging a rule by one match while still calling querySelectorAll"
 grep -Fq 'let node = el.parentElement;' "$vs" \
   || fail "$v starts the container-type ancestor walk at the element itself, so an element that establishes its own container is wrongly cleared instead of reported"
+# One match inside a container clears the rule for all of them. Dropping this
+# break is harmless; inverting the search so a LATER match without a container
+# re-clears `found` is not, and the `if (found) break;` under the ancestor walk
+# is what states the any-match rule in code.
+grep -Fq 'if (found) break;' "$vs" \
+  || fail "$v does not stop at the first match with a container ancestor, so a later match outside one can undo the rule's applicability"
 # The lint's polarity, anchored on the guard expression itself. Both lines above
 # survive `if (!found)` -> `if (found)` intact, and that one character inverts
 # the lint completely: every correctly written container query is reported as
@@ -227,6 +245,32 @@ grep -A1 -F 'if (!staticChecked) {' "$vs" | grep -Fq 'staticChecked = true;' \
 # the walk mid-run; a demo with a stray '%' in an href is enough.
 grep -Fq 'err instanceof URIError ? 400 : 404' "$vs" \
   || fail "$v does not answer 400 on a malformed percent-encoding, so a stray '%' in a demo path throws out of the request handler and kills the walk"
+# Path containment, both halves. Stripping leading ../ is not containment: a
+# Windows drive-absolute path and a symlink inside the root both land outside it
+# and were served, so a page under test could read arbitrary local files through
+# the verification server. realpathSync follows the links before the test; the
+# test itself is what refuses the result. Pinned as a pair, since either line
+# alone is inert: resolving without comparing serves the escape, and comparing
+# without resolving misses the symlink.
+grep -Fq 'file = realpathSync(resolve(base, rel));' "$vs" \
+  || fail "$v does not resolve the request path through realpath, so a symlink inside the demo root pointing outside it is followed and served"
+grep -A1 -F 'file = realpathSync(resolve(base, rel));' "$vs" \
+  | grep -Fq 'if (file !== base && !file.startsWith(base + sep)) return res.writeHead(404).end();' \
+  || fail "$v does not refuse a resolved path outside the demo root with 404, so path containment is not enforced at all and a drive-absolute or symlinked path escapes"
+# The relative-isation the containment depends on. Without the leading-separator
+# strip, resolve(base, '/index.html') returns the filesystem root's index.html:
+# every legitimate request 404s and the walk cannot load a single page.
+grep -Fq ".replace(/^[/\\\\]+/, '')" "$vs" \
+  || fail "$v does not strip the request path's leading separators before resolving, so resolve() treats it as absolute and no page under the demo root is servable"
+# A bind that fails must reject, not hang. Without the error handler the promise
+# never settles — port exhaustion or a sandbox refusing the bind stops the walk
+# with no answer at all, which is the failure shape this branch exists to end,
+# and the one that looks like slow progress instead of a crash.
+grep -Fq "server.once('error', fail);" "$vs" \
+  || fail "$v never rejects the serve() promise, so a failed bind hangs the walk instead of reporting a crash"
+grep -A1 -F "server.listen(0, '127.0.0.1', () => {" "$vs" \
+  | grep -Fq "server.removeListener('error', fail);" \
+  || fail "$v leaves the error handler attached after listen succeeds, so a later runtime error rejects an already-settled promise"
 # Anchored on the explanatory phrase from each dedicated bullet, not only the
 # bare kind name: both files also name-drop 'external-module' in passing, in
 # the sentence that lists the advisory kinds, so a grep for the bare word alone
@@ -265,7 +309,14 @@ grep -Fq 'a measured padding under roughly 16px' skills/wp-demo-craft/references
 # that an untrustworthy gate gets dismissed wholesale.
 grep -Fq "each sheet's **top-level** \`cssRules\`" skills/wp-demo-craft/references/verify.md \
   || fail "verify.md does not record that the @container lint reads only top-level cssRules, so an @container nested in @media/@supports/@layer is silently unlinted"
-grep -Fq 'which is its **first** match only' skills/wp-demo-craft/references/verify.md \
-  || fail "verify.md does not record that the @container lint judges a selector by its first match only"
+# The first-match limit is retired, not recorded: it was a blocking false
+# positive, not an under-report, so the file must say the lint reads every match
+# — a stale "first match only" line teaches a build to dismiss a finding that is
+# now trustworthy, which is how the 392 dismissed findings happened.
+grep -Fq 'walks **every** match (`querySelectorAll`)' skills/wp-demo-craft/references/verify.md \
+  || fail "verify.md does not record that the @container lint reads every match of a selector, not just the first"
+if grep -Fq 'it judges a selector by `document.querySelector(sel)`' skills/wp-demo-craft/references/verify.md; then
+  fail "verify.md still records the retired first-match limit as current behaviour"
+fi
 
 echo PASS
