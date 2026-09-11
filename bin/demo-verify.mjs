@@ -243,12 +243,22 @@ async function captureResponsiveShots(browser, url, outDir) {
   }
 }
 
-/** Read one frame's signature plus its static defects. Runs inside the page. */
-const probe = () => {
+/** Read one section's frame signature plus the page's static defects. Runs inside the page.
+ *  The device walk is scoped to the section, because a document-wide count meant
+ *  `samplable === 0` required every device on the page to be unreadable — so
+ *  `unobserved` could only fire where `no-engine` already did, and a section
+ *  carrying only pointer devices (tilt, magnet, spotlight) was judged by whether
+ *  some other section happened to be readable. Scoping also stops one section's
+ *  motion from perturbing every other section's signature on the same page. */
+const probe = (idx) => {
   const sig = [];
   let devices = 0;
   let samplable = 0;
-  document.querySelectorAll('[data-motion]').forEach((el) => {
+  const root = document.querySelectorAll('section, [data-motion]')[idx] || document.body;
+  const scope = [];
+  if (root.matches && root.matches('[data-motion]')) scope.push(root);
+  root.querySelectorAll('[data-motion]').forEach((el) => scope.push(el));
+  scope.forEach((el) => {
     devices += 1;
     const before = sig.length;
     const p = el.style.getPropertyValue('--motion-p');
@@ -271,6 +281,9 @@ const probe = () => {
     if (sig.length > before) samplable += 1;
   });
   const cues = [];
+  // Page-level from here down, deliberately: the cue sweep, the canvas sample,
+  // `clipped` and `overflow` are facts about the document, not about this
+  // section. Only the [data-motion] walk above is scoped — do not "fix" these.
   document.querySelectorAll('[data-motion-cue]').forEach((el, i) => {
     // A cue that is not rendered at this width (mobile-only copy behind a
     // display:none at desktop, most often) never gets driven, so its opacity
@@ -302,6 +315,11 @@ const probe = () => {
     signature: sig.join('|'),
     devices,
     samplable,
+    // no-engine is the one judgment that stayed page-level: "this demo carries
+    // no motion at all". Scoping its counter turned every ordinary static
+    // section on a moving page into a blocking no-engine, which is the false
+    // positive this whole gate exists to avoid.
+    pageDevices: document.querySelectorAll('[data-motion]').length,
     cues,
     clipped,
     overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
@@ -542,7 +560,7 @@ try {
         const y = startY + (scrubRange * k) / Math.max(1, positions - 1);
         await page.evaluate((to) => window.scrollTo(0, to), y);
         await page.waitForTimeout(180);
-        const frame = await page.evaluate(probe);
+        const frame = await page.evaluate(probe, b.idx);
         await page.screenshot({ path: join(dir, String(shot++).padStart(3, '0') + '.png') });
 
         // Keyed by element index, not text: two cues sharing a string are real
@@ -565,10 +583,18 @@ try {
         if (previous !== null && frame.signature === previous) stalls++;
         else stalls = 0;
         if (stalls >= 2 && !reduced) {
-          if (frame.devices === 0) {
-            // A page with no devices cannot stall its way to a finding under the
-            // old guard, so a motionless demo walked clean. It fails loudly now.
+          // A page with no devices cannot stall its way to a finding under the
+          // old guard, so a motionless demo walked clean. It fails loudly now.
+          // Counted document-wide on purpose: see probe's pageDevices. The push
+          // sits on the line directly under this guard, and its check pins it
+          // there — moving it into the branch below turns "this demo does not
+          // move" into "this section has no device", which blocks a plain
+          // <section> on a moving page.
+          if (frame.pageDevices === 0) {
             findings.push({ kind: 'no-engine', pass, width: size.width, section: b.id, y: Math.round(y) });
+          } else if (frame.devices === 0) {
+            // A plain <section> on a page that does move. Nothing to read and
+            // nothing broken — not even advisory. Silence is the finding.
           } else if (frame.samplable === 0 && !b.scrub) {
             // The harness cannot read these devices, which is not the same claim
             // as "this section does not move". Advisory, so it never fails a

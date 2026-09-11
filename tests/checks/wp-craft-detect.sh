@@ -62,6 +62,43 @@ grep -Fq "kind: 'no-engine'" "$vs" \
 # green — the exact file://-blocked-module failure this branch exists to fix.
 grep -Fq 'frame.samplable === 0 && !b.scrub' "$vs" \
   || fail "$v routes a scrubbed section with nothing samplable to advisory, so a page whose motion engine never ran exits 0"
+# The probe's device walk is scoped to one section, not to the document. A
+# document-wide samplable count meant `samplable === 0` required EVERY device on
+# the page to be unreadable, so `unobserved` could only fire where `no-engine`
+# already did — and a section carrying only pointer devices (tilt, magnet,
+# spotlight, which publish nothing a scroll walk can sample) was judged by
+# whether some OTHER section happened to be readable, and fell to blocking
+# dead-scroll. Three pins, because each alone is inert: the parameter without the
+# argument passes `undefined` and scopes to document.body; both without the
+# scoped query re-reads the whole document anyway.
+grep -Fq 'const probe = (idx) =>' "$vs" \
+  || fail "$v's probe is not scoped to a section index, so samplable is counted document-wide and unobserved can only fire where no-engine already does"
+grep -Fq 'const frame = await page.evaluate(probe, b.idx);' "$vs" \
+  || fail "$v does not pass the section index to probe, so idx is undefined, the scope falls back to document.body and the scoping never takes effect"
+grep -Fq "root.querySelectorAll('[data-motion]').forEach((el) => scope.push(el));" "$vs" \
+  || fail "$v does not build the device scope from the section root, so the walk is document-wide again with the index still threaded through"
+# The root itself. A section that IS the device (<section data-motion="pin">) is
+# the common case, and querySelectorAll never returns the element it was called
+# on: without this line that section counts zero devices of its own and, with
+# the branch below, is silently skipped instead of judged.
+grep -Fq "if (root.matches && root.matches('[data-motion]')) scope.push(root);" "$vs" \
+  || fail "$v does not include the section root in its own device scope, so a section that is itself the device counts no devices and is never judged"
+# no-engine is the one judgment that must NOT be scoped: it means "this demo
+# carries no motion at all". Counting it per section turned every ordinary
+# static <section> on a moving page into a blocking no-engine — the false
+# positive this gate exists to avoid. Pinned on the page-wide counter and on
+# the branch that consumes it.
+grep -Fq "pageDevices: document.querySelectorAll('[data-motion]').length," "$vs" \
+  || fail "$v does not count devices document-wide for no-engine, so a plain <section> on a moving page reports a blocking no-engine"
+grep -Fq 'if (frame.pageDevices === 0) {' "$vs" \
+  || fail "$v judges no-engine on the scoped device count, so every section with no device of its own fails the round"
+# And the silent branch under it. Deleting it, or reordering it above the
+# pageDevices test, sends a device-free section to unobserved (noise) or to
+# no-engine (blocking). Anchored on the branch and its position.
+grep -A1 -F 'if (frame.pageDevices === 0) {' "$vs" | grep -Fq "kind: 'no-engine'" \
+  || fail "$v does not push no-engine directly under the page-wide device test, so the two were decoupled and no-engine no longer means what it says"
+grep -Fq '} else if (frame.devices === 0) {' "$vs" \
+  || fail "$v does not silently skip a section that carries no device of its own on a page that does move, so a plain <section> is reported as a defect"
 grep -Fq "data-motion') === 'reveal'" "$vs" \
   || fail "$v does not sample the reveal device, so every reveal-only section reports dead scroll"
 for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
@@ -151,8 +188,10 @@ for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; d
   # copy of the kind list and that copy goes stale when a kind joins ADVISORY.
   grep -Fq '"advisory": true' "$f" \
     || fail "$f does not document the advisory flag on findings.json rows, so a consumer has to match on the kind instead"
-  grep -Fq 'page-wide judgments, printed per section' "$f" \
-    || fail "$f still reads as if unobserved/no-engine were per-section facts; both counters come from a document-wide query"
+  grep -Fq '`unobserved` is a per-section judgment' "$f" \
+    || fail "$f does not record that unobserved is a fact about the walked section, so a reader takes it for a page-wide statement and dismisses it"
+  grep -Fq '`no-engine` is still the page' "$f" \
+    || fail "$f does not record that no-engine alone stayed document-wide, so a reader expects it per section and reads a plain <section> as a defect"
 done
 grep -Fq 'f.advisory = true' "$vs" \
   || fail "$v writes findings.json without the advisory flag, so the label exists only on stdout"

@@ -111,11 +111,15 @@ branch: `/wp-demo` probes first and stops on 2.)
 - `no-engine` — the page carries no `data-motion` at all. Fails the round. A
   motionless page used to walk clean, because an empty frame signature could
   never accumulate a stall.
-- **`unobserved` and `no-engine` are page-wide judgments, printed per section.**
-  Both counters are taken from a document-wide `querySelectorAll`, so the
-  `section` field on those rows says where the walk was when the stall
-  accumulated, not what that section's own markup carries. Expect one row per
-  section and read them as a statement about the page.
+- **`unobserved` is a per-section judgment; `no-engine` keeps a document-wide count.**
+  The probe walks `[data-motion]` inside the walked section's own subtree, so an
+  `unobserved` row is a fact about that section: it carries devices this harness
+  cannot read. Pointer devices — `tilt`, `magnet`, `spotlight` — publish nothing a
+  scroll walk can sample, so a section carrying only those is unreadable, not dead.
+  `no-engine` is still the page's fact ("this demo carries no `data-motion` at
+  all") and still prints one row per section. A section carrying no device of its
+  own, on a page that does move, is reported as nothing at all — a plain
+  `<section>` is not a defect.
 - A section carrying no `pin`/`pan`/`kinetic`/`wipe`/`drift` is not judged by the
   walk at all. `reveal` is a one-shot entry transition a few pixels long — it
   runs on the child's own `view()` progress, around `scrollY = top - viewport` —
