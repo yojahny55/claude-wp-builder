@@ -242,6 +242,14 @@ grep -Fq '"image provider"' "$ds" \
   || fail "$d does not record the provider in .wp-create.json"
 grep -Fq 'never pasted into chat' "$ds" \
   || fail "$d does not state that the key is never pasted into chat"
+# 9. The write path. Finding 10: an earlier draft only ever READ "image
+#    provider" and nothing ever wrote it, so the feature could never activate.
+#    Pin that the doc now records the operator's answer, and that "none" (a
+#    decline) is a recognised, non-reasked value -- not just a stray string.
+grep -Fq "operator's answer into \`.wp-create.json\`" "$ds" \
+  || fail "$d does not write the chosen provider back into .wp-create.json"
+grep -Fq '"image provider": "none"' "$ds" \
+  || fail "$d does not record and handle a decline as \"image provider\": \"none\""
 # Control: the step is inside wp-demo.md and NOT in wp-yolo.md, which must never
 # generate. A single shared pin would pass with the step in the wrong command.
 # Same comment-strip-and-collapse treatment, so this pin is immune to reflow too.

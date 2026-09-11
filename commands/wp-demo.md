@@ -151,11 +151,23 @@ before writing any markup.
    includes a composition that declares an image slot (`hero-split`,
    `hero-bleed`, `feature-zigzag`). Skip in one line otherwise.
 
-   Read `"image provider"` from `.wp-create.json`. When the line is absent the
-   project predates this feature: generate nothing, say so in one line, and go
-   to step 6 — the same absent-line convention `demo mode` and `i18n strategy`
-   use. When it is present it is `<vendor>/<model>`, e.g.
-   `google/gemini-3.1-flash-image`.
+   Then decide whether to generate, in this order. **Neither `GEMINI_API_KEY`
+   nor `OPENAI_API_KEY` is set in the environment** — generate nothing, say so
+   in one line, and go to step 6. No question is asked, because there is
+   nothing to spend and nothing to decide, so a project that never opts in
+   behaves exactly as it does today. Otherwise, **`.wp-create.json` already has
+   `"image provider"`** — read it and use it; a value of `"none"` records an
+   earlier decline and is handled exactly like the no-key branch above:
+   generate nothing, say so in one line, go to step 6, and do not ask again.
+   Otherwise, **a key is set, gaps exist to fill, and the line is absent** —
+   ask once, offering the provider matching whichever key is present, and
+   recommending `google/gemini-3.1-flash-image` when both are present, because
+   Google offers all three of the library's crops (4:5, 3:2, 4:3) exactly while
+   OpenAI's three fixed sizes make every one of them inexact. Write the
+   operator's answer into `.wp-create.json` as `"image provider":
+   "<vendor>/<model>"` on a yes, or `"image provider": "none"` on a decline —
+   a decline then goes to step 6 exactly like the no-key branch above — so no
+   later run re-asks.
 
    Write `demo/.image-plan.json` from this step's own composition table and
    step 3.5's asset inventory:
@@ -210,7 +222,10 @@ before writing any markup.
    Exit 4 means some slots failed while others succeeded. Plates already
    generated are kept and will not be re-billed on the next run.
 
-   Fill step 6's `{{image_src}}` markers from each gap's `result.file`. Append a
+   Fill each gap's own `{{<slot>}}` marker from that gap's `result.file` — the
+   slot name is that gap's own `slot` field in `demo/.image-plan.json`, not a
+   fixed string: `feature-zigzag`'s two gaps use `feature_1_image_src` and
+   `feature_2_image_src`, for example. Append a
    `## Generated images` section to `demo/BRIEF.md`, summarised from the
    `gen-<hash>.json` sidecars on disk, naming the model, the date, the estimated
    total, and — for Google — that every plate carries an invisible SynthID
