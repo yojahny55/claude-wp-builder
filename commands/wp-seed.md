@@ -112,12 +112,12 @@ If this fails, abort with a message suggesting the user check that the WordPress
 3. **Extract navigation** — parse `<nav>` elements for page names and links. These determine which pages to create and what menu items to build.
 
 4. **Collect all image sources** found in `img[src]` attributes and CSS `background-image: url(...)`
-   declarations. Track which ACF field each image belongs to. A source may be a remote URL, or it
-   may be a demo-relative path — a craft build's generated plates are written to
-   `assets/img/gen-<hash>.jpg` and referenced from the markup that way, not as a URL. When a source
-   is not a URL, resolve it against the demo folder before Phase 3 imports it: `wp media import`
-   accepts a local file path, but it cannot resolve one that is relative to the shell's working
-   directory.
+   declarations. Track which ACF field each image belongs to. A source beginning `http://`,
+   `https://` or `//` is remote; anything else is demo-relative — a craft build's generated plates
+   are written to `assets/img/gen-<hash>.jpg` and referenced from the markup that way, not as a URL.
+   When a source is demo-relative, resolve it against the demo folder before Phase 3 imports it:
+   `wp media import` accepts a local file path, but it cannot resolve one that is relative to the
+   shell's working directory.
 
 Print a summary of parsed content:
 

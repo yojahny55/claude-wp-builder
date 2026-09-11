@@ -318,10 +318,3 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
 - **Prompt quality is judgment, not machinery.** Nothing stops a weak prompt
   from producing a plate that fills its slot while reading as generic.
   `demo/BRIEF.md` is the only defence there is.
-- **`/wp-seed` does not define what counts as "a URL."** A demo-relative
-  `assets/img/gen-<hash>.jpg` — the shape this feature creates — resolves
-  unambiguously against the demo folder. A protocol-relative
-  `//cdn.example/x.jpg` or root-relative `/img/x.jpg` falls into neither
-  branch, so two runs could classify one differently from the other. Left
-  alone because a root-relative `src` was already broken in the demo before
-  this feature existed, so mishandling it here is not a new regression.
