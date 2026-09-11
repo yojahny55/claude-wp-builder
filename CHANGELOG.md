@@ -1,5 +1,33 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `/wp-demo` Step 5.5 fills a composition's image slots from a client file or a
+  generated plate, via the new `bin/image-gen.mjs`. Provider-agnostic across
+  `google/gemini-3.1-flash-image` (nano banana) and `gpt-image-2.5-flare` /
+  `gpt-image-2.5-sunburst`. The provider decision is asked once, when a key is
+  present and plates are needed, and recorded as `"image provider"` in
+  `.wp-create.json` — `"<vendor>/<model>"` on a yes, `"none"` on a decline — so
+  a later run never re-asks. The aspect and size of every request are read off
+  the composition's own `<img>` tag, so a plate arrives at the crop the CSS
+  displays. Plates are content-hashed on prompt, aspect and model, so a re-run
+  or a verify round never re-bills, and an edited prompt always regenerates
+  instead of serving the stale image. The API key is read from
+  `GEMINI_API_KEY` / `OPENAI_API_KEY` in-process only — never a CLI argument,
+  never written to a file, never logged — and a missing key stops the build
+  naming the variable rather than falling back to a placeholder. `/wp-yolo`
+  never generates; it consumes plates already on disk.
+
+### Fixed
+
+- `/wp-seed` could not import a demo-relative image path. Phase 2 collected
+  `img[src]` as "URLs" and Phase 3's example was remote, so a local
+  `assets/img/...` source failed on every import. Sources are now resolved
+  against the demo folder, and a failed import of a generated plate is reported
+  on its own line rather than folded in with a remote URL that 403'd.
+
 ## [1.16.0] - 2026-09-11
 
 ### Fixed

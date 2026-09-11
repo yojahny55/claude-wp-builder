@@ -279,3 +279,49 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   `external-module` findings name the one case known to matter.
 - **The same-client rule reads the plan, which is prose.** It constrains a build
   that argues honestly and does not stop one that does not.
+- **The image generator's HTTP call and response parsing are not covered.** No
+  check can drive a real adapter request without a live key and a real bill,
+  and a mock would only ever assert the mock. What the suite does cover is
+  everything around the call — slot discovery, crop and size resolution, the
+  cache, the ambiguity refusal, and the missing-key stop.
+- **The key-leak guard catches the leaks a careless author writes, not every
+  leak possible.** `say()`/`warn()` route every write through `scrub()`, and
+  the pin greps for `console.log`, `.error`, `.warn`, `.info`, `.debug`,
+  `.trace`, `process.stdout.write` and `process.stderr.write` appearing
+  outside those two functions. An aliased stream (`const w = process.stderr; w.write(...)`),
+  computed member access (`process['stderr'].write(...)`), `fs.writeSync(2,
+  ...)` and `process._rawDebug` all pass that grep untouched — a grep cannot
+  follow aliasing, and pinning a seventh spelling would mostly teach the next
+  reader that the sixth one was the ceiling. The threat model is an honest
+  mistake by a future author, not an attacker with commit access, who could
+  delete the pin anyway.
+- **A thrown error that embeds the key is not a leak, and that is by design.**
+  `scrub()` runs on every value `say()`/`warn()` print, and again on the
+  caught error in `cmdRun`'s own catch block, so `throw new Error('... ' +
+  key)` is redacted before it reaches a stream. Worth stating because it
+  reads like a gap next to the entry above and is not one — the grep pins
+  correctly leave it unflagged.
+- **Image cost figures are estimates and will drift.** Google publishes no
+  per-image price in its own documentation — the figures in `bin/image-gen.mjs`
+  come from third-party trackers — and OpenAI bills tokens rather than images,
+  so its per-image number is an approximation by construction. The plan
+  output says "approximately" and is never presented as a bill.
+- **Aspect fidelity is provider-dependent.** Google fills all three of the
+  library's crops — 4:5, 3:2, 4:3 — exactly. OpenAI offers only three fixed
+  sizes, so every one of those crops lands inexact and is cropped by
+  `object-fit: cover` after the pixels have already been paid for. This is
+  why `google/...` is the recommended default, ahead of price.
+- **A generated plate is detectably AI-generated.** Every Google plate
+  carries an invisible SynthID watermark. `demo/BRIEF.md` records this for
+  the client, not only the build log, because whoever ships these to
+  production is entitled to know.
+- **Prompt quality is judgment, not machinery.** Nothing stops a weak prompt
+  from producing a plate that fills its slot while reading as generic.
+  `demo/BRIEF.md` is the only defence there is.
+- **`/wp-seed` does not define what counts as "a URL."** A demo-relative
+  `assets/img/gen-<hash>.jpg` — the shape this feature creates — resolves
+  unambiguously against the demo folder. A protocol-relative
+  `//cdn.example/x.jpg` or root-relative `/img/x.jpg` falls into neither
+  branch, so two runs could classify one differently from the other. Left
+  alone because a root-relative `src` was already broken in the demo before
+  this feature existed, so mishandling it here is not a new regression.
