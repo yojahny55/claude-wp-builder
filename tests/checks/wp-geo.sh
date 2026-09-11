@@ -43,6 +43,6 @@ grep -q 'wp-audit-geo' "$audit" || fail "$audit must dispatch wp-audit-geo"
 grep -q 'wp-agentic-surfaces' "$audit" || fail "$audit must dispatch wp-agentic-surfaces"
 grep -q -- '--geo' "$yolo" || fail "$yolo missing --geo"
 grep -q 'geo-scan.sh' "$yolo" || fail "$yolo must run the live scan"
-grep -qi 'GEO' "$finalize" || fail "$finalize missing the GEO readiness check"
+grep -q 'GEO & agent-readiness' "$finalize" || fail "$finalize missing the GEO readiness check"
 
 echo PASS
