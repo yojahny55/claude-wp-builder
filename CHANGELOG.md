@@ -1,5 +1,35 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- **`unobserved` could not fire, so a section that only the harness could not read
+  was reported as a section that does not move.** `demo-verify.mjs`'s `probe()`
+  counted `samplable` over a document-wide `querySelectorAll('[data-motion]')`, so
+  `samplable === 0` required *every* device on the page to be unreadable — the kind
+  could only fire where `no-engine` already did, and a single live `reveal` child
+  anywhere closed the door for the whole document. A section carrying only pointer
+  devices (`tilt`, `magnet`, `spotlight` publish nothing a scroll walk can sample)
+  was therefore judged by whether some *other* section happened to be readable, and
+  fell to `dead-scroll`, which blocks: a blocking finding on a working section.
+  `probe()` now takes the section index `bounds` already carries and walks
+  `[data-motion]` inside that subtree only, root included. A section's frame
+  signature is its own as a result, instead of being perturbed by every other
+  section on the page. The cue sweep, the canvas sample, `clipped` and `overflow`
+  stay page-level facts and keep querying `document`.
+- **A plain `<section>` on a moving page is not a dead engine.** `bounds` walks
+  `section, [data-motion]`, so scoping the device count alone would have made
+  `no-engine` — a blocking finding — fire on every ordinary static section, which is
+  the false positive the whole gate exists to avoid. `probe()` returns a separate
+  document-wide `pageDevices` count and `no-engine` keeps testing that, so it still
+  means "this demo carries no motion at all". A section with no device of its own on
+  a page that does move is now reported as nothing at all, not even advisory.
+- **The two verification contracts said both counters were page-wide.** That is now
+  true only of `no-engine`. `skills/wp-demo-craft/references/verify.md` and
+  `commands/wp-demo-verify.md` record `unobserved` as a per-section judgment, name
+  the pointer devices that produce it, and state that a device-free section is not a
+  defect.
+
 ## [1.15.0] - 2026-09-10
 
 ### Added
