@@ -15,7 +15,7 @@
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'node:fs';
 import { resolve, join, dirname, basename } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -142,17 +142,23 @@ function cmdPlan(demo) {
   say('Costs are estimates, not a bill.');
 }
 
-const [, , sub, ...rest] = process.argv;
-const demoIdx = rest.indexOf('--demo');
-const demo = demoIdx >= 0 ? rest[demoIdx + 1] : null;
+// Only dispatch when run as a command, not when imported. The checks import
+// this file to assert the pure resolvers directly: every real composition
+// happens to land on the same size tier, so a CLI-only test cannot tell
+// snapSize from a constant.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const [, , sub, ...rest] = process.argv;
+  const demoIdx = rest.indexOf('--demo');
+  const demo = demoIdx >= 0 ? rest[demoIdx + 1] : null;
 
-try {
-  if (sub === 'plan' && demo) cmdPlan(demo);
-  else {
-    warn('usage: image-gen.mjs plan --demo <dir>');
-    process.exit(2);
+  try {
+    if (sub === 'plan' && demo) cmdPlan(demo);
+    else {
+      warn('usage: image-gen.mjs plan --demo <dir>');
+      process.exit(2);
+    }
+  } catch (e) {
+    warn(e.stack || e.message);
+    process.exit(4);
   }
-} catch (e) {
-  warn(e.stack || e.message);
-  process.exit(4);
 }

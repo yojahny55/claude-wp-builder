@@ -50,7 +50,7 @@ n=$(pj gaps.length)
 
 # 2. The crop is read off the markup, not assumed. hero-split is 1200x1500.
 plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
-node "$g" plan --demo "$tmp" >/dev/null
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero on the hero-split crop assertion"
 a=$(pj gaps.0.aspect)
 [ "$a" = "4:5" ] || fail "hero-split declares 1200x1500 so the aspect must be 4:5; got $a"
 s=$(pj gaps.0.size)
@@ -58,10 +58,22 @@ s=$(pj gaps.0.size)
 
 # 2b. hero-bleed is 2400x1600 and must be capped at 2K rather than escalating to 4K.
 plan_with '[{"page":"index","section":"hero","composition":"hero-bleed"}]'
-node "$g" plan --demo "$tmp" >/dev/null
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero on the hero-bleed cap assertion"
 a=$(pj gaps.0.aspect)
 [ "$a" = "3:2" ] || fail "hero-bleed declares 2400x1600 so the aspect must be 3:2; got $a"
 s=$(pj gaps.0.size)
 [ "$s" = "2K" ] || fail "hero-bleed declares width 2400 but the cap is 2K; got $s"
+
+# 2c. The size tiers are asserted directly, because every composition in the
+#     library happens to land on 2K: a CLI-only test cannot distinguish
+#     snapSize from `return "2K"`. Verified - that mutation passed the whole
+#     suite before this assertion existed.
+tiers=$(node -e '
+  import("./bin/image-gen.mjs").then((m) => {
+    console.log([400, 800, 1200, 2400].map((w) => m.snapSize(w)).join(","));
+  });
+')
+[ "$tiers" = "512px,1K,2K,2K" ] \
+  || fail "snapSize must pick the smallest tier >= width, capped at 2K; got $tiers"
 
 echo PASS
