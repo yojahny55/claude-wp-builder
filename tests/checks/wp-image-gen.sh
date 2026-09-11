@@ -352,5 +352,11 @@ grep -Fq 'resolve it against the demo folder before Phase 3 imports it' "$sms" \
   || fail "$sm does not resolve a demo-relative image source before importing it"
 grep -Fq 'GENERATED PLATE FAILED' "$sms" \
   || fail "$sm does not report a failed local generated plate on its own distinct line"
+# The classification rule — that http://, https://, and // mark remote sources.
+# This prose was reverted to ambiguous wording (5e1c369 → edbd85c) while keeping
+# the "resolve" pin intact, and all 64 checks still passed. A future edit could
+# silently re-introduce the ambiguity without this third pin catching it.
+grep -Fq 'beginning `http://`, `https://` or `//` is remote' "$sms" \
+  || fail "$sm does not classify sources beginning with http://, https://, or // as remote"
 
 echo PASS
