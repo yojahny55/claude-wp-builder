@@ -76,4 +76,82 @@ tiers=$(node -e '
 [ "$tiers" = "512px,1K,2K,2K" ] \
   || fail "snapSize must pick the smallest tier >= width, capped at 2K; got $tiers"
 
+# 3. A gap satisfied by a real client file costs nothing. Asserted by running
+#    with no key at all: a plan made entirely of `use` entries must succeed,
+#    which it could not do if it issued a request.
+printf 'not-a-real-jpeg' > "$tmp/client-photo.jpg"
+plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
+node "$g" plan --demo "$tmp" >/dev/null
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].use = process.argv[2];
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json" "$tmp/client-photo.jpg"
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null ) \
+  || fail "a plan of only 'use' entries must succeed with no key set"
+ls "$tmp/assets/img/client-photo.jpg" >/dev/null 2>&1 \
+  || fail "run did not copy the client file into demo/assets/img/"
+
+# 3b. Control: the same gap with a prompt instead of a use needs a key, and
+#     says so. Without this, assertion 3 would pass on a run that never checked.
+plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
+node "$g" plan --demo "$tmp" >/dev/null
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].prompt = "a joiner easing the nosing on an oak stair tread";
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json"
+set +e
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null 2>"$tmp/err" )
+rc=$?
+set -e
+[ "$rc" = 3 ] || fail "a gap needing generation with no key must exit 3; got $rc"
+grep -Fq 'GEMINI_API_KEY' "$tmp/err" \
+  || fail "the no-key error must name the environment variable to export"
+
+# 4. An ambiguous gap is refused before any request, so an unclear plan cannot
+#    cost money. Both set, then neither set.
+for mutate in 'p.gaps[0].prompt="x"; p.gaps[0].use="y";' 'p.gaps[0].prompt=""; p.gaps[0].use="";'; do
+  plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
+  node "$g" plan --demo "$tmp" >/dev/null
+  node -e '
+    const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+    eval(process.argv[2]);
+    require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+  ' "$tmp/.image-plan.json" "$mutate"
+  set +e
+  ( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null 2>&1 )
+  rc=$?
+  set -e
+  [ "$rc" = 2 ] || fail "an ambiguous gap ($mutate) must exit 2 before any request; got $rc"
+done
+
+# 5. A cached plate is not re-billed. The hash is recomputed here in bash from
+#    the documented formula rather than read back from the script, so this is a
+#    cross-check of the identity and not a tautology.
+prompt='stacked and stickered oak boards seasoning in an open timber shed'
+h=$(printf '%s' "$prompt|3:2|gemini-3.1-flash-image" | sha256sum | cut -c1-12)
+printf 'not-a-real-jpeg' > "$tmp/assets/img/gen-$h.jpg"
+plan_with '[{"page":"index","section":"hero","composition":"hero-bleed"}]'
+node "$g" plan --demo "$tmp" >/dev/null
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].prompt = process.argv[2];
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json" "$prompt"
+node "$g" plan --demo "$tmp" >/dev/null
+[ "$(pj gaps.0.cached)" = "true" ] || fail "a plate whose hash is already on disk must be reported cached"
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null ) \
+  || fail "a fully cached plan must succeed with no key set"
+
+# 5b. Control: changing one character of the prompt changes the hash, so the
+#     cache must miss and the run must then need a key.
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].prompt = process.argv[2] + " at dusk";
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json" "$prompt"
+node "$g" plan --demo "$tmp" >/dev/null
+[ "$(pj gaps.0.cached)" = "false" ] || fail "an edited prompt must miss the cache, not serve the stale plate"
+
 echo PASS

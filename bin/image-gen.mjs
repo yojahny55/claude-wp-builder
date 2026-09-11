@@ -142,6 +142,86 @@ function cmdPlan(demo) {
   say('Costs are estimates, not a bill.');
 }
 
+const ENV_VAR = { google: 'GEMINI_API_KEY', openai: 'OPENAI_API_KEY' };
+
+async function cmdRun(demo) {
+  const plan = readPlan(demo);
+  const [vendor, model] = String(plan.provider).split('/');
+  const imgDir = join(demo, 'assets', 'img');
+  mkdirSync(imgDir, { recursive: true });
+  const gaps = plan.gaps || [];
+
+  // Refuse an ambiguous plan before issuing any request. Failing partway
+  // through has already cost money; failing here has not.
+  for (const g of gaps) {
+    const both = g.prompt && g.use;
+    const neither = !g.prompt && !g.use;
+    if (both || neither) {
+      warn(`${g.page}/${g.section}/${g.slot}: set exactly one of "prompt" or "use" (found ${both ? 'both' : 'neither'})`);
+      process.exit(2);
+    }
+  }
+
+  const needsKey = gaps.some((g) => g.prompt && !isCached(imgDir, g, model));
+  const envVar = ENV_VAR[vendor];
+  const key = process.env[envVar];
+  if (needsKey && !key) {
+    const n = gaps.filter((g) => g.prompt && !isCached(imgDir, g, model)).length;
+    warn(`${n} plate(s) needed, no key for provider ${vendor}.`);
+    warn(`  export ${envVar}=...`);
+    warn('Stopped. Nothing written, nothing billed.');
+    process.exit(3);
+  }
+
+  let failed = 0;
+  for (const g of gaps) {
+    if (g.use) {
+      // A real client file is not generated, and must not be recorded as if it
+      // were: a false line in the provenance table is worse than none.
+      const dest = join(imgDir, basename(g.use));
+      copyFileSync(resolve(g.use), dest);
+      g.result = { file: `assets/img/${basename(g.use)}`, generated: false };
+      say(`  ${g.slot}: used ${g.use}`);
+      continue;
+    }
+    const hash = plateHash(g.prompt, g.aspect, model);
+    const file = `gen-${hash}.jpg`;
+    if (existsSync(join(imgDir, file))) {
+      g.result = { file: `assets/img/${file}`, generated: true, cached: true };
+      say(`  ${g.slot}: cached (${file})`);
+      continue;
+    }
+    try {
+      await generateInto(imgDir, file, { vendor, model, key, g, hash });
+      g.result = { file: `assets/img/${file}`, generated: true, cached: false };
+      say(`  ${g.slot}: generated (${file})`);
+    } catch (e) {
+      // Keep every plate already paid for. Discarding billed work to report a
+      // tidy failure is worse than the failure.
+      failed++;
+      g.result = { error: scrub(e.message) };
+      warn(`  ${g.slot}: FAILED - ${scrub(e.message)}`);
+    }
+  }
+
+  writePlan(demo, plan);
+  if (failed) {
+    warn(`${failed} slot(s) failed. Plates already generated are kept and will not be re-billed.`);
+    process.exit(4);
+  }
+}
+
+function isCached(imgDir, g, model) {
+  return !!g.prompt && existsSync(join(imgDir, `gen-${plateHash(g.prompt, g.aspect, model)}.jpg`));
+}
+
+// Task 3 replaces this body with the real provider adapters. Until then a run
+// that reaches it is a run the checks never exercise, because every check
+// either uses `use`, hits the cache, or stops at the missing-key gate.
+async function generateInto(imgDir, file, { vendor }) {
+  throw new Error(`no adapter for vendor ${vendor}`);
+}
+
 // Only dispatch when run as a command, not when imported. Compare REAL paths:
 // Node resolves symlinks when loading the module, so import.meta.url is the
 // real path while argv[1] keeps the link -- comparing them directly makes a
@@ -154,8 +234,9 @@ if (invokedAs === import.meta.url) {
 
   try {
     if (sub === 'plan' && demo) cmdPlan(demo);
+    else if (sub === 'run' && demo) await cmdRun(demo);
     else {
-      warn('usage: image-gen.mjs plan --demo <dir>');
+      warn('usage: image-gen.mjs (plan|run) --demo <dir>');
       process.exit(2);
     }
   } catch (e) {
