@@ -13,6 +13,7 @@ grep -q "^model: haiku" agents/wp-acf.md       || { echo "FAIL: wp-acf not haiku
 grep -q "^model: haiku" agents/wp-cf7.md       || { echo "FAIL: wp-cf7 not haiku"; exit 1; }
 grep -q "^model: sonnet" agents/wp-template.md || { echo "FAIL: wp-template not sonnet"; exit 1; }
 grep -q "^model: sonnet" agents/wp-audit-geo.md || { echo "FAIL: wp-audit-geo not sonnet"; exit 1; }
+grep -q "^model: sonnet" agents/wp-agentic-surfaces.md || { echo "FAIL: wp-agentic-surfaces not sonnet"; exit 1; }
 grep -Eq "^## Model routing" commands/wp-yolo.md || { echo "FAIL: wp-yolo.md missing Model routing section"; exit 1; }
 grep -q "do \*\*not\*\* pass a \`model\` parameter" commands/wp-yolo.md || { echo "FAIL: wp-yolo.md missing no-override rule"; exit 1; }
 echo PASS
