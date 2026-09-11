@@ -250,6 +250,17 @@ grep -Fq "operator's answer into \`.wp-create.json\`" "$ds" \
   || fail "$d does not write the chosen provider back into .wp-create.json"
 grep -Fq '"image provider": "none"' "$ds" \
   || fail "$d does not record and handle a decline as \"image provider\": \"none\""
+# Finding 12: "none" has a WRITE half (pinned above: record the decline) and a
+# separate READ half (a recorded "none" must generate nothing and never
+# re-ask). They live in two different sentences, so one pin cannot cover both
+# -- this pin targets the read half specifically, spanning from the `"none"`
+# token through the "do not ask again" behaviour in one contiguous phrase, so
+# a mutation that severs the connection between them (e.g. rewording "a value
+# of `"none"`" to something that drops the token, while leaving the generic
+# "handled like the no-key branch" tail untouched) is still caught -- the
+# write-half pin above does not see this sentence at all.
+grep -Fq '`"none"` records an earlier decline and is handled exactly like the no-key branch above: generate nothing, say so in one line, go to step 6, and do not ask again' "$ds" \
+  || fail "$d does not state that a recorded \"none\" generates nothing and is never re-asked"
 # Control: the step is inside wp-demo.md and NOT in wp-yolo.md, which must never
 # generate. A single shared pin would pass with the step in the wrong command.
 # Same comment-strip-and-collapse treatment, so this pin is immune to reflow too.
