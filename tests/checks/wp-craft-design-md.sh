@@ -111,10 +111,24 @@ grep -Fq 'Skip it entirely when `demo mode` is **craft**' "$y" \
 # (--container-maxx) would also satisfy while leaving the real bug unfixed.
 w=commands/wp-demo.md
 r=bin/composition-preview.mjs
-grep -Eq '@property --container-max[[:space:]]*\{' "$w" \
-  || fail "$w does not emit @property for --container-max, so a malformed value still unsets padding-inline"
-grep -Fq 'syntax: "<length>"' "$w" \
+# Grep a CSS-comment-stripped copy of the command: the rule it carries lives in
+# a fenced css block, so a dead `/* @property ... */` instruction satisfies a
+# raw grep while instructing the build to emit nothing.
+ws="$(perl -0pe 's{/\*.*?\*/}{}gs' "$w")"
+echo "$ws" | grep -Eq '@property --container-max[[:space:]]*\{' \
+  || fail "$w does not emit @property for --container-max outside a comment, so a malformed value still unsets padding-inline"
+echo "$ws" | grep -Fq 'syntax: "<length>"' \
   || fail "$w's @property rule does not constrain --container-max to a length"
+# `inherits` is not decoration. A registered property with inherits:false is not
+# inherited by descendants, so :root's WELL-FORMED --container-max stops reaching
+# the sections that read it and every one of them falls back to initial-value.
+# Measured at 1920 with a valid 1440px token: inherits:true -> 240px padding,
+# inherits:false -> 320px. That breaks the working case, not just the malformed
+# one, which is strictly worse than the bug this rule was added to fix.
+echo "$ws" | grep -Fq 'inherits: true' \
+  || fail "$w's @property rule does not set inherits: true, so a well-formed --container-max at :root never reaches the sections that read it"
+grep -Fq 'inherits: true' "$r" \
+  || fail "$r's @property rule does not set inherits: true, so a well-formed --container-max never reaches the preview's sections"
 grep -Eq '@property --container-max[[:space:]]*\{' "$r" \
   || fail "$r does not emit @property, so previews and client demos differ"
 # The source grep above only proves the text exists somewhere in the file. It
