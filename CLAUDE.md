@@ -209,14 +209,17 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   so nothing in the markup marks a translatable string. The bilingual pipeline reads
   the recorded `i18n strategy` instead — which it should anyway; markers in a demo were
   never the source of truth.
-- **A composition's breakpoints size to its own container; its fluid ramps do not.**
-  Every composition's size-based breakpoints are `@container` queries against the
-  block's own `container-type: inline-size`, so a section dropped into a narrow column
-  lays out for the column. The `vw` in `clamp()` gaps and type scales still keys off the
-  viewport, though — 40 occurrences across 12 of the 13 compositions — so a section in a
-  narrow column still takes desktop-maximum spacing. `compositions/README.md` states the
-  gap; converting those ramps to container-relative units is open work, not done in this
-  pass.
+- **A composition's breakpoints and its fluid ramps both size to its own container now,
+  except where the screen is the point.** Every composition's size-based breakpoints are
+  `@container` queries against the block's own `container-type: inline-size`, so a section
+  dropped into a narrow column lays out for the column. The `vw` in `clamp()` gaps and type
+  scales was the one exception — 40 occurrences across 12 of the 13 compositions still keyed
+  off the viewport — and is converted: 37 now read `cqi` and track the container. The
+  remaining 3 stay `vw`, each with a comment: the display headline of each full-bleed hero
+  (`hero-bleed`, `hero-split`, `hero-type`), because that headline is sized against the
+  viewport on purpose and a hero in a narrow column is not a scenario those compositions
+  serve. `compositions/README.md` states the rule; `tests/checks/wp-craft-compositions.sh`
+  asserts every remaining `vw` carries its justification on that line or the line above it.
 - **The two `reveal` paths differ above the fold.** The CSS path's range is
   `entry 0% entry 40%`, so an element already fully in the viewport at load is past
   its entry range and `animation-fill-mode: both` lands it on the end state with no

@@ -44,6 +44,7 @@
 }
 .hero-bleed__title {
   font-family: var(--font-display);
+  /* Sized against the viewport on purpose: a full-bleed hero is not a scenario a narrow column serves. */
   font-size: clamp(2.4rem, 6.4vw, 5.25rem);
   line-height: 1.02;
   letter-spacing: -0.025em;
@@ -53,7 +54,7 @@
   max-width: 15ch;
 }
 .hero-bleed__lede {
-  font-size: clamp(1.05rem, 1.3vw, 1.25rem);
+  font-size: clamp(1.05rem, 1.3cqi, 1.25rem);
   line-height: 1.55;
   color: var(--color-ink-soft);
   max-width: 50ch;

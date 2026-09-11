@@ -29,7 +29,7 @@
       transparent 70%);
   }
 }
-.testimonial-pair__head { max-width: 44rem; margin: 0 0 clamp(2rem, 4vw, 3.25rem); }
+.testimonial-pair__head { max-width: 44rem; margin: 0 0 clamp(2rem, 4cqi, 3.25rem); }
 .testimonial-pair__kicker {
   font: 500 0.8rem/1.2 var(--font-text);
   letter-spacing: 0.08em;
@@ -39,7 +39,7 @@
 }
 .testimonial-pair__title {
   font-family: var(--font-display);
-  font-size: clamp(1.9rem, 3.4vw, 3.1rem);
+  font-size: clamp(1.9rem, 3.4cqi, 3.1rem);
   line-height: 1.06;
   letter-spacing: -0.02em;
   text-wrap: balance;
@@ -48,11 +48,11 @@
 }
 .testimonial-pair__grid {
   display: grid;
-  gap: clamp(1.25rem, 2.5vw, 2rem);
+  gap: clamp(1.25rem, 2.5cqi, 2rem);
 }
 .testimonial-pair__quote {
   margin: 0;
-  padding: clamp(1.5rem, 2.5vw, 2.25rem);
+  padding: clamp(1.5rem, 2.5cqi, 2.25rem);
   border-radius: var(--radius-md);
   background: var(--color-surface);
   box-shadow: inset 0 0 0 1px var(--color-hairline);
@@ -64,7 +64,7 @@
    section shouting, and it is the only body copy on the page a visitor is meant
    to hear in someone else's voice. */
 .testimonial-pair__text {
-  font-size: clamp(1.15rem, 1.6vw, 1.4rem);
+  font-size: clamp(1.15rem, 1.6cqi, 1.4rem);
   font-weight: 400;
   line-height: 1.5;
   letter-spacing: -0.005em;

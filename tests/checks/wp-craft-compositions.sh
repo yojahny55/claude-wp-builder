@@ -136,6 +136,26 @@ grep -Fq -- '--fill' "$c/README.md" || fail "$c/README.md documents a regenerate
 # Interior page head never pins.
 grep -Eq 'data-motion="pin"' "$c/page-head/section.html" && fail "page-head pins; interior pages have no pin"
 
+# Every vw ramp left in a composition is a deliberate viewport-relative choice
+# (a full-bleed hero's display type) and must say so on its own line or the line
+# directly above, because a per-FILE check lets one justified vw green-light every
+# other vw in that file — process-rail alone carried 7 on 7 separate lines, and a
+# per-file grep would let one comment excuse six forgotten conversions. The marker
+# is the literal phrase "viewport on purpose"; reword it on either side (this
+# comment or the CSS) and the check silently stops meaning anything.
+for cssf in skills/wp-demo-craft/compositions/*/section.css; do
+  while IFS=: read -r lineno _; do
+    prevno=$((lineno - 1))
+    prev=""
+    [ "$prevno" -ge 1 ] && prev=$(sed -n "${prevno}p" "$cssf")
+    cur=$(sed -n "${lineno}p" "$cssf")
+    case "$cur$prev" in
+      *"viewport on purpose"*) ;;
+      *) fail "$cssf:$lineno keeps a vw ramp without recording why it is viewport-relative (marker must be on this line or the line above)" ;;
+    esac
+  done < <(grep -n '[0-9.]vw' "$cssf")
+done
+
 # Without a content-width token every composition pads by the gutter alone, so on
 # a wide monitor content spans edge to edge. The token has to exist and the
 # compositions have to use it; either alone is half a fix.

@@ -19,7 +19,7 @@
 }
 .page-head__title {
   font-family: var(--font-display);
-  font-size: clamp(2.2rem, 5vw, 4.25rem);
+  font-size: clamp(2.2rem, 5cqi, 4.25rem);
   line-height: 1.03;
   letter-spacing: -0.025em;
   text-wrap: balance;
@@ -27,7 +27,7 @@
   max-width: 16ch;
 }
 .page-head__lede {
-  font-size: clamp(1.05rem, 1.3vw, 1.25rem);
+  font-size: clamp(1.05rem, 1.3cqi, 1.25rem);
   line-height: 1.58;
   color: var(--color-ink-soft);
   text-wrap: pretty;

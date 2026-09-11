@@ -3,6 +3,19 @@
 ## [Unreleased]
 
 ### Fixed
+- **A composition's fluid ramps ignored the container its breakpoints already
+  respected.** `@container` sizing (Task 3) covered layout, but the `vw` inside
+  `clamp()` gaps, padding and type scales still keyed off the viewport, so a
+  section dropped into a narrow column laid out for the column and then took
+  desktop-maximum spacing anyway — 40 occurrences across 12 of the 13
+  compositions. 37 now read `cqi`, tracking the block's own inline size. The
+  remaining 3 — the display headline of each full-bleed hero (`hero-bleed`,
+  `hero-split`, `hero-type`) — stay `vw`, each with a comment recording that it
+  is sized against the viewport on purpose: a hero in a narrow column is not a
+  scenario those compositions serve. `tests/checks/wp-craft-compositions.sh`
+  asserts every remaining `vw` carries that justification on its own line or the
+  line directly above it, so one justified ramp can no longer green-light every
+  other `vw` left in the same file.
 - **A present but malformed `--container-max` (`wide`, an empty string) unset
   `padding-inline` to `0` at every viewport, phones included.** `var(--container-max,
   1280px)` only ever guarded an *absent* token — `var()` still substitutes a

@@ -12,7 +12,7 @@
 }
 .faq-list__inner {
   display: grid;
-  gap: clamp(2rem, 4vw, 3.5rem);
+  gap: clamp(2rem, 4cqi, 3.5rem);
 }
 .faq-list__head { max-width: 44rem; }
 .faq-list__kicker {
@@ -24,7 +24,7 @@
 }
 .faq-list__title {
   font-family: var(--font-display);
-  font-size: clamp(1.9rem, 3.4vw, 3.1rem);
+  font-size: clamp(1.9rem, 3.4cqi, 3.1rem);
   line-height: 1.06;
   letter-spacing: -0.02em;
   text-wrap: balance;
@@ -51,7 +51,7 @@
   gap: 1.5rem;
   padding: 1.25rem 0;
   font-family: var(--font-display);
-  font-size: clamp(1.05rem, 1.5vw, 1.3rem);
+  font-size: clamp(1.05rem, 1.5cqi, 1.3rem);
   line-height: 1.25;
   letter-spacing: -0.01em;
   text-wrap: balance;
@@ -83,7 +83,7 @@
   max-width: 62ch;
 }
 @container (min-width: 980px) {
-  .faq-list__inner { grid-template-columns: minmax(16rem, 22rem) 1fr; align-items: start; gap: clamp(2rem, 5vw, 5rem); }
+  .faq-list__inner { grid-template-columns: minmax(16rem, 22rem) 1fr; align-items: start; gap: clamp(2rem, 5cqi, 5rem); }
 }
 @media (prefers-reduced-motion: reduce) {
   .faq-list__q, .faq-list__q::after { transition: none; }

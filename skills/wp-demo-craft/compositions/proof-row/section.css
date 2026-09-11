@@ -17,7 +17,7 @@
 }
 .proof-row__title {
   font-family: var(--font-display);
-  font-size: clamp(1.9rem, 3.4vw, 3.1rem);
+  font-size: clamp(1.9rem, 3.4cqi, 3.1rem);
   line-height: 1.06;
   letter-spacing: -0.02em;
   text-wrap: balance;
@@ -40,7 +40,7 @@
 .proof-row__num {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: clamp(2.6rem, 5vw, 4.25rem);
+  font-size: clamp(2.6rem, 5cqi, 4.25rem);
   line-height: 1;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;

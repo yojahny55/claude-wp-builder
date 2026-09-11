@@ -38,15 +38,15 @@
   padding-inline: max(var(--space-gutter), calc((100cqw - var(--container-max, 1280px)) / 2));
   display: flex;
   align-items: stretch;
-  gap: clamp(1.5rem, 3vw, 3rem);
+  gap: clamp(1.5rem, 3cqi, 3rem);
   width: max-content;
   will-change: transform;
 }
 .process-rail__intro {
   flex: 0 0 auto;
-  width: min(26rem, 78vw);
+  width: min(26rem, 78cqi);
   align-self: center;
-  padding-right: clamp(1rem, 2vw, 2rem);
+  padding-right: clamp(1rem, 2cqi, 2rem);
 }
 .process-rail__kicker {
   font: 500 0.8rem/1.2 var(--font-text);
@@ -57,7 +57,7 @@
 }
 .process-rail__title {
   font-family: var(--font-display);
-  font-size: clamp(2rem, 3.6vw, 3.25rem);
+  font-size: clamp(2rem, 3.6cqi, 3.25rem);
   line-height: 1.05;
   letter-spacing: -0.025em;
   text-wrap: balance;
@@ -74,7 +74,7 @@
 }
 .process-rail__step {
   flex: 0 0 auto;
-  width: min(22rem, 74vw);
+  width: min(22rem, 74cqi);
   /* Tall enough to own the pinned frame. A 340px card centred in a 100vh frame
      leaves a quarter of the screen empty above and below it. */
   min-height: min(72vh, 34rem);
@@ -90,7 +90,7 @@
    deliberate blocks with air between them. */
 .process-rail__n {
   font-family: var(--font-display);
-  font-size: clamp(3rem, 5vw, 4.5rem);
+  font-size: clamp(3rem, 5cqi, 4.5rem);
   font-weight: 700;
   line-height: 0.9;
   letter-spacing: -0.02em;
@@ -104,7 +104,7 @@
      auto margin is what keeps them one block instead of three floating rows. */
   margin-top: auto;
   font-family: var(--font-display);
-  font-size: clamp(1.35rem, 1.9vw, 1.75rem);
+  font-size: clamp(1.35rem, 1.9cqi, 1.75rem);
   line-height: 1.14;
   letter-spacing: -0.015em;
   text-wrap: balance;
