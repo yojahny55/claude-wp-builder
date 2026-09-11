@@ -215,11 +215,67 @@ function isCached(imgDir, g, model) {
   return !!g.prompt && existsSync(join(imgDir, `gen-${plateHash(g.prompt, g.aspect, model)}.jpg`));
 }
 
-// Task 3 replaces this body with the real provider adapters. Until then a run
-// that reaches it is a run the checks never exercise, because every check
-// either uses `use`, hits the cache, or stops at the missing-key gate.
-async function generateInto(imgDir, file, { vendor }) {
-  throw new Error(`no adapter for vendor ${vendor}`);
+async function generateInto(imgDir, file, { vendor, model, key, g }) {
+  const bytes = vendor === 'openai'
+    ? await callOpenAI(model, key, g)
+    : await callGoogle(model, key, g);
+  writeFileSync(join(imgDir, file), bytes);
+  writeFileSync(join(imgDir, file.replace(/\.jpg$/, '.json')), JSON.stringify({
+    model, prompt: g.prompt, aspect: g.aspect, size: g.size,
+    date: new Date().toISOString().slice(0, 10),
+    est_cost: g.est_cost,
+    synthid: vendor === 'google',
+  }, null, 2) + '\n');
+}
+
+// One retry, then give up on this slot. A transient 5xx is common enough to be
+// worth one more attempt and rare enough that a second retry mostly buys delay.
+async function once(fn) {
+  try { return await fn(); } catch { return await fn(); }
+}
+
+async function callGoogle(model, key, g) {
+  return once(async () => {
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify({
+        model,
+        input: [{ type: 'text', text: g.prompt }],
+        response_format: {
+          type: 'image', mime_type: 'image/jpeg',
+          aspect_ratio: g.aspect, image_size: g.size,
+        },
+      }),
+    });
+    // Status only. The response body can echo the request, and the request
+    // carries nothing secret, but the headers object does - never format it.
+    if (!r.ok) throw new Error(`google returned HTTP ${r.status}`);
+    const j = await r.json();
+    const b64 = j.output_image?.data
+      ?? j.steps?.flatMap((s) => s.content || []).find((c) => c.type === 'image')?.data;
+    if (!b64) throw new Error('google returned no image (prompt refused, or an unexpected shape)');
+    return Buffer.from(b64, 'base64');
+  });
+}
+
+async function callOpenAI(model, key, g) {
+  return once(async () => {
+    const r = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+      // gpt-image models reject that response-format field outright; they always return base64.
+      body: JSON.stringify({
+        model, prompt: g.prompt, size: g.size,
+        quality: 'medium', output_format: 'jpeg', n: 1,
+      }),
+    });
+    if (!r.ok) throw new Error(`openai returned HTTP ${r.status}`);
+    const j = await r.json();
+    const b64 = j.data?.[0]?.b64_json;
+    if (!b64) throw new Error('openai returned no image (prompt refused, or an unexpected shape)');
+    return Buffer.from(b64, 'base64');
+  });
 }
 
 // Only dispatch when run as a command, not when imported. Compare REAL paths:

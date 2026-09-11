@@ -81,7 +81,7 @@ tiers=$(node -e '
 #    which it could not do if it issued a request.
 printf 'not-a-real-jpeg' > "$tmp/client-photo.jpg"
 plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
-node "$g" plan --demo "$tmp" >/dev/null
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 3 (use entry)"
 node -e '
   const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
   p.gaps[0].use = process.argv[2];
@@ -95,7 +95,7 @@ ls "$tmp/assets/img/client-photo.jpg" >/dev/null 2>&1 \
 # 3b. Control: the same gap with a prompt instead of a use needs a key, and
 #     says so. Without this, assertion 3 would pass on a run that never checked.
 plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
-node "$g" plan --demo "$tmp" >/dev/null
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 3b (prompt control)"
 node -e '
   const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
   p.gaps[0].prompt = "a joiner easing the nosing on an oak stair tread";
@@ -113,7 +113,7 @@ grep -Fq 'GEMINI_API_KEY' "$tmp/err" \
 #    cost money. Both set, then neither set.
 for mutate in 'p.gaps[0].prompt="x"; p.gaps[0].use="y";' 'p.gaps[0].prompt=""; p.gaps[0].use="";'; do
   plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
-  node "$g" plan --demo "$tmp" >/dev/null
+  node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 4 (ambiguous gap, $mutate)"
   node -e '
     const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
     eval(process.argv[2]);
@@ -133,13 +133,13 @@ prompt='stacked and stickered oak boards seasoning in an open timber shed'
 h=$(printf '%s' "$prompt|3:2|gemini-3.1-flash-image" | sha256sum | cut -c1-12)
 printf 'not-a-real-jpeg' > "$tmp/assets/img/gen-$h.jpg"
 plan_with '[{"page":"index","section":"hero","composition":"hero-bleed"}]'
-node "$g" plan --demo "$tmp" >/dev/null
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 5 (cache setup)"
 node -e '
   const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
   p.gaps[0].prompt = process.argv[2];
   require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
 ' "$tmp/.image-plan.json" "$prompt"
-node "$g" plan --demo "$tmp" >/dev/null
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 5 (cache re-plan)"
 [ "$(pj gaps.0.cached)" = "true" ] || fail "a plate whose hash is already on disk must be reported cached"
 ( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null ) \
   || fail "a fully cached plan must succeed with no key set"
@@ -151,7 +151,52 @@ node -e '
   p.gaps[0].prompt = process.argv[2] + " at dusk";
   require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
 ' "$tmp/.image-plan.json" "$prompt"
-node "$g" plan --demo "$tmp" >/dev/null
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 5b (cache-miss control)"
 [ "$(pj gaps.0.cached)" = "false" ] || fail "an edited prompt must miss the cache, not serve the stale plate"
+
+# 6. The key cannot reach the script's own output. Every write funnels through
+#    scrub(); these pins are what keep a future adapter from printing a headers
+#    object in its error path. Quote-anchored so a renamed helper fails them.
+grep -Fq 'function scrub(s) {' "$g" || fail "$g no longer defines scrub()"
+grep -Fq 'const say = (s) => console.log(scrub(s));' "$g" \
+  || fail "$g's stdout writer no longer scrubs"
+grep -Fq 'const warn = (s) => console.error(scrub(s));' "$g" \
+  || fail "$g's stderr writer no longer scrubs"
+grep -Fq 'warn(e.stack || e.message);' "$g" \
+  || fail "$g's top-level catch no longer routes through the scrubbing writer"
+# Control: console.log and console.error appear ONLY inside those two writers.
+# A direct call anywhere else bypasses the scrub entirely.
+# `|| true` is required: grep -c exits 1 on zero matches, and an assignment
+# from a failing command substitution aborts under `set -e` -- which would
+# skip this very assertion instead of failing it.
+n=$(grep -c 'console\.\(log\|error\)' "$g" || true)
+[ "$n" = 2 ] || fail "$g must funnel all output through say()/warn(); found $n console calls, expected 2"
+
+# 6b. Behavioural: with a key set, a refused plan's output contains no trace of it.
+plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 6b (sentinel leak check)"
+set +e
+GEMINI_API_KEY='SENTINEL_kf82hdA91x' node "$g" run --demo "$tmp" >"$tmp/out" 2>"$tmp/err"
+set -e
+grep -Fq 'SENTINEL_kf82hdA91x' "$tmp/out" "$tmp/err" \
+  && fail "the API key appeared in the script's own output"
+
+# 7. Both vendors are wired, and the endpoints are the current ones. The older
+#    Google :generateContent endpoint returns text, not an image, and OpenAI's
+#    gpt-image models reject response_format outright.
+grep -Fq 'https://generativelanguage.googleapis.com/v1beta/interactions' "$g" \
+  || fail "$g does not target the Interactions API"
+grep -Fq "'x-goog-api-key'" "$g" || fail "$g does not send the Google auth header"
+grep -Fq 'https://api.openai.com/v1/images/generations' "$g" \
+  || fail "$g does not target the OpenAI images endpoint"
+grep -Fq 'aspect_ratio' "$g" || fail "$g does not request a Google aspect ratio"
+grep -Fq 'b64_json' "$g" || fail "$g does not read OpenAI's base64 payload"
+# The gpt-image models reject response_format outright, so it must appear in the
+# Google body and NOT in the OpenAI one. Written as an explicit `if` rather than
+# a `grep && grep && fail` chain: a failing command inside an && list has subtle
+# `set -e` semantics, and an assertion must not depend on reading them right.
+if grep -A8 'api.openai.com' "$g" | grep -Fq 'response_format'; then
+  fail "gpt-image models reject response_format; it must not be sent to OpenAI"
+fi
 
 echo PASS
