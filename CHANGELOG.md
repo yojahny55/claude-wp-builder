@@ -12,10 +12,20 @@
   `.process-rail__frame` now carries `overflow-x: auto` inside that media
   query, placed after the `overflow: visible` shorthand (which resets both
   axes and would otherwise win by source order and silently undo the fix).
-  Measured before/after with a headless-Chrome probe at 1920 with
-  `prefers-reduced-motion: reduce` forced: `documentElement.scrollWidth` 2496
-  → 1920, with the frame itself still scrollable (`scrollWidth` 2496 >
-  `clientWidth` 1920). `tests/checks/wp-craft-compositions.sh` asserts
+  Measured before/after with a headless-Chrome probe with
+  `prefers-reduced-motion: reduce` forced, at four viewports:
+  `documentElement.scrollWidth` 1587 → 390, 1981 → 768, 2074 → 1280 and
+  2496 → 1920, with the frame itself still scrollable at each
+  (`scrollWidth` > `clientWidth`). `overflow-y: hidden` is then stated
+  explicitly, because CSS corrects a `visible` axis to `auto` when the other
+  axis is not visible — left implicit it computed to `auto`, which would
+  silently clip or add a second scrollbar to anything that later grew
+  vertically out of the frame. And the frame takes `tabindex="0"` with
+  `role="region"`: a scroll container no keyboard can reach is a different
+  bug, not a fix, and before this change the overflowing row at least
+  scrolled with the page. Verified with real key events — without
+  `tabindex`, ArrowRight left `scrollLeft` at 0; with it, `scrollLeft` moved
+  0 → 80 at both 390 and 1920. `tests/checks/wp-craft-compositions.sh` asserts
   `overflow-x: auto` on the `__frame` rule specifically inside the
   reduced-motion block, and after the `overflow: visible` shorthand, not
   merely present anywhere in the file.

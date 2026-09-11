@@ -255,4 +255,25 @@ if [ -n "$pr_shorthand_at" ] && [ -n "$pr_longhand_at" ]; then
     || fail "process-rail__frame declares overflow-x: auto before the overflow: visible shorthand, so the shorthand resets it back to visible"
 fi
 
+# CSS corrects a `visible` axis to `auto` when the other axis is not visible, so
+# `overflow: visible; overflow-x: auto` leaves overflow-y computing to `auto`,
+# not the `visible` the shorthand appears to declare. Measured: overflow-y read
+# back as `auto` at 390/768/1280/1920 before this was stated explicitly. Nothing
+# overflows the frame vertically today, so it is inert — but a shadow, a badge or
+# a focus ring that later grows past the frame would be silently clipped or given
+# a second scrollbar, and the declaration that caused it would not be in the file.
+printf '%s' "$pr_frame_rule" | grep -qE 'overflow-y:[[:space:]]*hidden' \
+  || fail "process-rail__frame does not state overflow-y explicitly inside prefers-reduced-motion, so it computes to auto and can silently clip or scroll anything that grows vertically"
+
+# A scroll container no keyboard can reach is not a fix, it is a different bug.
+# Before overflow-x: auto the row overflowed the DOCUMENT, which at least scrolled
+# with the page; after it, the steps past the fold are reachable by wheel and drag
+# only. Measured with real key events: without tabindex ArrowRight left scrollLeft
+# at 0; with it, scrollLeft moved 0 -> 80 at both 390 and 1920. WCAG 2.1.1.
+PR_HTML=skills/wp-demo-craft/compositions/process-rail/section.html
+pr_frame_tag=$(grep -F 'class="process-rail__frame"' "$PR_HTML")
+[ -n "$pr_frame_tag" ] || fail "$PR_HTML has no .process-rail__frame element to make keyboard-reachable"
+printf '%s' "$pr_frame_tag" | grep -Fq 'tabindex="0"' \
+  || fail "$PR_HTML's .process-rail__frame is a scroll container with no tabindex, so a keyboard-only user cannot reach the steps past the fold under reduced motion"
+
 echo PASS
