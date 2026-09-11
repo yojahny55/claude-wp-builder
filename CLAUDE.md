@@ -214,11 +214,14 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   `@container` queries against the block's own `container-type: inline-size`, so a section
   dropped into a narrow column lays out for the column. The `vw` in `clamp()` gaps and type
   scales was the one exception — 40 occurrences across 12 of the 13 compositions still keyed
-  off the viewport — and is converted: 37 now read `cqi` and track the container. The
-  remaining 3 stay `vw`, each with a comment: the display headline of each full-bleed hero
-  (`hero-bleed`, `hero-split`, `hero-type`), because that headline is sized against the
-  viewport on purpose and a hero in a narrow column is not a scenario those compositions
-  serve. `compositions/README.md` states the rule; `tests/checks/wp-craft-compositions.sh`
+  off the viewport — and is converted: 36 now read `cqi` and track the container. Four
+  stay `vw`, each with a comment. Three are the display headline of each full-bleed hero
+  (`hero-bleed`, `hero-split`, `hero-type`), sized against the viewport on purpose because
+  a hero in a narrow column is not a scenario those compositions serve. The fourth is
+  `feature-zigzag`'s root `gap`, which *cannot* be `cqi`: that rule is the element
+  declaring `container-type`, and an element never matches a container query against the
+  container it establishes itself, so `cqi` there would resolve against the viewport while
+  reading as if it tracked the block. `compositions/README.md` states the rule; `tests/checks/wp-craft-compositions.sh`
   asserts every remaining `vw` carries its justification on that line or the line above it.
 - **The two `reveal` paths differ above the fold.** The CSS path's range is
   `entry 0% entry 40%`, so an element already fully in the viewport at load is past

@@ -13,11 +13,15 @@ size-based breakpoint is an `@container` query, so a section dropped into a
 narrow column lays out for the column at those breakpoints. Its fluid ramps —
 the gaps, padding and type scales inside `clamp()` — key off the container
 too, in `cqi`, so a section in a narrow column takes the space it actually
-has instead of desktop-maximum spacing. Three occurrences stay `vw`: the
-display headline of each full-bleed hero (`hero-bleed`, `hero-split`,
-`hero-type`), each carrying a comment that it is sized against the viewport
-on purpose — a full-bleed hero fills the screen by definition, and a hero in
-a narrow column is not a scenario this library serves. Only `(hover: hover) and (pointer: fine)` and
+has instead of desktop-maximum spacing. Four occurrences stay `vw`, each
+carrying a comment saying why. Three are the display headline of each
+full-bleed hero (`hero-bleed`, `hero-split`, `hero-type`), sized against the
+viewport on purpose — a full-bleed hero fills the screen by definition, and a
+hero in a narrow column is not a scenario this library serves. The fourth,
+`feature-zigzag`'s root `gap`, cannot be `cqi` at all: that rule is the
+element declaring `container-type`, and an element never matches a container
+query against the container it establishes itself, so `cqi` there resolves
+against the viewport while reading as if it tracked the block. Only `(hover: hover) and (pointer: fine)` and
 `(prefers-reduced-motion)` stay on `@media` — they are user and device
 conditions a container query cannot express. An element never matches a query
 against the container it establishes itself, so where the breakpoint changes

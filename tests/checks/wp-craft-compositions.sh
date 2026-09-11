@@ -141,8 +141,12 @@ grep -Eq 'data-motion="pin"' "$c/page-head/section.html" && fail "page-head pins
 # directly above, because a per-FILE check lets one justified vw green-light every
 # other vw in that file — process-rail alone carried 7 on 7 separate lines, and a
 # per-file grep would let one comment excuse six forgotten conversions. The marker
-# is the literal phrase "viewport on purpose"; reword it on either side (this
-# comment or the CSS) and the check silently stops meaning anything.
+# is one of two literal phrases, "viewport on purpose" or "not cqi"; reword
+# either on one side only (this comment or the CSS) and the check silently
+# stops meaning anything. The second phrase exists because one ramp CANNOT be
+# cqi: a rule that itself declares container-type never matches a container
+# query against the container it establishes, so cqi there resolves against
+# the viewport while reading as if it tracked the block.
 for cssf in skills/wp-demo-craft/compositions/*/section.css; do
   while IFS=: read -r lineno _; do
     prevno=$((lineno - 1))
@@ -151,9 +155,35 @@ for cssf in skills/wp-demo-craft/compositions/*/section.css; do
     cur=$(sed -n "${lineno}p" "$cssf")
     case "$cur$prev" in
       *"viewport on purpose"*) ;;
+      *"not cqi"*) ;;
       *) fail "$cssf:$lineno keeps a vw ramp without recording why it is viewport-relative (marker must be on this line or the line above)" ;;
     esac
   done < <(grep -n '[0-9.]vw' "$cssf")
+done
+
+# An element NEVER matches a container query against the container it establishes
+# itself, and the same is true of `cqi`: in a rule that declares container-type,
+# cqi resolves against the small-viewport fallback, so it tracks the SCREEN while
+# reading as if it tracked the block. Measured in a fixed 480px box, a root
+# `gap: clamp(3rem, 6cqi, 6rem)` computed 96px at a 1920 viewport and 48px at 800
+# — viewport-relative behaviour wearing a container-relative unit, which is worse
+# than the `vw` it replaced because it no longer looks like a bug. This is the
+# assertion the vw-justification loop above cannot make: that loop only sees vw,
+# and this defect has no vw in it. Comments are stripped first, because the one
+# legitimate case documents itself by naming cqi in prose.
+for cssf in skills/wp-demo-craft/compositions/*/section.css; do
+  perl -0pe 's{/\*.*?\*/}{}gs' "$cssf" \
+    | awk -v f="$cssf" '
+        /\{/ { block=""; inblock=1 }
+        inblock { block = block $0 "\n" }
+        /\}/ {
+          if (inblock && block ~ /container-type/ && block ~ /[0-9.]cqi/)
+            print "SELFCQI " f
+          inblock=0
+        }' \
+    | while read -r _ badfile; do
+        fail "$badfile puts a cqi ramp in the same rule that declares container-type, so it resolves against the viewport rather than the block it appears to measure"
+      done
 done
 
 # Without a content-width token every composition pads by the gutter alone, so on
