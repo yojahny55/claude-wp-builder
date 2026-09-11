@@ -374,6 +374,7 @@ procedure; the commands only dispatch them.
 | `wp-cinematic` | Cinematic scroll specialist — scene fields, template parts and scroll-engine wiring for the `__cinematic__` starter |
 | `wp-audit-security` · `wp-audit-seo` · `wp-audit-a11y` · `wp-audit-performance` · `wp-audit-practices` | The five `/wp-audit` judgment auditors — code scanning, structured data, WCAG 2.1 AA, Core Web Vitals, WordPress standards |
 | `wp-audit-aios` · `wp-audit-rankmath` | The two mechanical audit installers — All-in-One WP Security and Rank Math, configured via WP-CLI |
+| `wp-audit-geo` | GEO / AI-agent-readiness auditor — maps the ORA check catalog to GEO codes, parses the rendered DOM and runs the is-agentic scan |
 
 ### Starter Theme
 

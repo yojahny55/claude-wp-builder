@@ -18,6 +18,13 @@ for spec in "agents/wp-audit-seo.md:SEO" "agents/wp-audit-performance.md:PERF"; 
   done
 done
 
+# GEO codes carry a layer letter, so they need their own pattern.
+f=agents/wp-audit-geo.md
+[ -f "$f" ] || fail "$f is missing"
+for code in $(grep -oE "GEO-[DAUP][0-9]{2}" "$f" | sort -u); do
+  grep -qE "^\| ${code} \|" "$f" || fail "$f: ${code} is referenced but never tabulated"
+done
+
 # No client or site names in the plugin's own docs — checks are generic.
 if grep -rniE "mkadventure" agents/ skills/ commands/ >/dev/null 2>&1; then
   fail "a real client site is named in the plugin docs"
