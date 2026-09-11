@@ -26,8 +26,9 @@ pj() { node -e '
 ' "$tmp/.image-plan.json" "$1"; }
 
 plan_with() {
+  local provider="${2:-google/gemini-3.1-flash-image}"
   cat > "$tmp/.image-plan.json" <<JSON
-{"provider": "google/gemini-3.1-flash-image",
+{"provider": "$provider",
  "sections": $1,
  "assets_on_disk": []}
 JSON
@@ -76,6 +77,20 @@ tiers=$(node -e '
 [ "$tiers" = "512px,1K,2K,2K" ] \
   || fail "snapSize must pick the smallest tier >= width, capped at 2K; got $tiers"
 
+# 2d. The OpenAI branch is otherwise never exercised by this suite (every other
+#     assertion plans against the google provider), so a stubbed-out
+#     `snapAspect` openai branch could ship unnoticed. hero-bleed is
+#     2400x1600 (ratio 1.5), which matches OpenAI's 1536x1024 size exactly.
+#     For openai, `size` is defined to equal the resolved aspect string.
+#     Verified - replacing the openai branch with `return '1024x1024';` passed
+#     the whole suite before this assertion existed.
+plan_with '[{"page":"index","section":"hero","composition":"hero-bleed"}]' 'openai/gpt-image-2.5-flare'
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero on the openai aspect/size assertion"
+a=$(pj gaps.0.aspect)
+[ "$a" = "1536x1024" ] || fail "hero-bleed at 2400x1600 (ratio 1.5) must snap to OpenAI's 1536x1024; got $a"
+s=$(pj gaps.0.size)
+[ "$s" = "1536x1024" ] || fail "an openai gap's size must equal its own resolved aspect string; got $s"
+
 # 3. A gap satisfied by a real client file costs nothing. Asserted by running
 #    with no key at all: a plan made entirely of `use` entries must succeed,
 #    which it could not do if it issued a request.
@@ -91,6 +106,13 @@ node -e '
   || fail "a plan of only 'use' entries must succeed with no key set"
 ls "$tmp/assets/img/client-photo.jpg" >/dev/null 2>&1 \
   || fail "run did not copy the client file into demo/assets/img/"
+# A `use` entry must be recorded as NOT generated -- the code's own comment
+# calls a false provenance line "worse than none", and wp-demo.md requires
+# `use` entries to be listed separately from generated plates in BRIEF.md.
+# Verified: flipping `generated: false` to `true` on the `use` branch passed
+# the whole suite before this line existed.
+[ "$(pj gaps.0.result.generated)" = false ] \
+  || fail "a 'use' entry's result.generated must be false, not true"
 
 # 3b. Control: the same gap with a prompt instead of a use needs a key, and
 #     says so. Without this, assertion 3 would pass on a run that never checked.
@@ -166,14 +188,18 @@ grep -Fq 'warn(e.stack || e.message);' "$g" \
   || fail "$g's top-level catch no longer routes through the scrubbing writer"
 # Control: console.log and console.error appear ONLY inside those two writers.
 # A direct call anywhere else bypasses the scrub entirely.
-# `|| true` is required: grep -c exits 1 on zero matches, and an assignment
+# `|| true` is required: grep -o exits 1 on zero matches, and an assignment
 # from a failing command substitution aborts under `set -e` -- which would
 # skip this very assertion instead of failing it.
 # Count EVERY console.* call, not just log|error: console.warn, .info, .debug
 # and .trace all write to stdout/stderr and all bypass scrub(), because they
 # are direct calls rather than say()/warn(). Verified -- console.warn leaking
 # the key in an adapter error path passed the whole suite before this widened.
-n=$(grep -c 'console\.' "$g" || true)
+# `grep -o ... | wc -l` counts OCCURRENCES, not matching lines: `grep -c`
+# counts a line once no matter how many times the pattern appears on it, so
+# appending a second `console.log` call onto the existing `say` line left the
+# line count at 2 and the whole suite green. Verified.
+n=$(grep -o 'console\.' "$g" | wc -l || true)
 [ "$n" = 2 ] || fail "$g must funnel all output through say()/warn(); found $n console calls, expected 2"
 # A leak does not need console.*: process.stderr.write reaches fd 2 just as
 # well, and the count above cannot see it. Verified -- writing the raw key
@@ -183,13 +209,33 @@ if grep -Eq 'process\.(stdout|stderr)\.write' "$g"; then
   fail "$g writes directly to stdout/stderr, bypassing the scrub in say()/warn()"
 fi
 
-# 6b. Behavioural: with a key set, a refused plan's output contains no trace of it.
+# 6b. Behavioural: a run's own success line must not leak the key.
+#     The gap here has a `use`, not a `prompt`, so no network call is needed
+#     and no ambiguity/key gate can intercept before this line runs:
+#     cmdRun's success line is `say("  " + g.slot + ": used " + g.use)`, which
+#     always prints the full `use` path. Making that path's own filename equal
+#     the sentinel, and setting GEMINI_API_KEY to that same sentinel, means the
+#     line always CONTAINS the string scrub() must remove: if scrub is
+#     neutered the sentinel survives verbatim; if scrub works, its blind
+#     substring replacement redacts this innocuous path exactly as it would a
+#     real key. Verified: `scrub(s) { return String(s); }` leaves the whole
+#     suite PASS with the old ambiguous-gap 6b (it never reached a key-bearing
+#     line at all -- exit 2 at the pre-pass), and turns this version RED.
+sentinel='SENTINEL_kf82hdA91x'
+printf 'not-a-real-jpeg' > "$tmp/photo-$sentinel.jpg"
 plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
 node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 6b (sentinel leak check)"
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].use = process.argv[2];
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json" "$tmp/photo-$sentinel.jpg"
 set +e
-GEMINI_API_KEY='SENTINEL_kf82hdA91x' node "$g" run --demo "$tmp" >"$tmp/out" 2>"$tmp/err"
+GEMINI_API_KEY="$sentinel" node "$g" run --demo "$tmp" >"$tmp/out" 2>"$tmp/err"
+rc=$?
 set -e
-grep -Fq 'SENTINEL_kf82hdA91x' "$tmp/out" "$tmp/err" \
+[ "$rc" = 0 ] || fail "a plan of only a 'use' entry with a key set must still succeed; got rc=$rc"
+grep -Fq "$sentinel" "$tmp/out" "$tmp/err" \
   && fail "the API key appeared in the script's own output"
 
 # 7. Both vendors are wired, and the endpoints are the current ones. The older
@@ -242,6 +288,20 @@ grep -Fq '"image provider"' "$ds" \
   || fail "$d does not record the provider in .wp-create.json"
 grep -Fq 'never pasted into chat' "$ds" \
   || fail "$d does not state that the key is never pasted into chat"
+# Finding 4: only the Google model id was ever named where the executing
+# agent reads; the OpenAI ids lived only in CHANGELOG.md, which it does not
+# read, so an OPENAI_API_KEY-only run had to invent a model string and every
+# request failed HTTP 400. Pin both ids where the offer is actually made.
+grep -Fq 'gpt-image-2.5-flare' "$ds" \
+  || fail "$d does not name the gpt-image-2.5-flare model id for an OpenAI key"
+grep -Fq 'gpt-image-2.5-sunburst' "$ds" \
+  || fail "$d does not name the gpt-image-2.5-sunburst model id for an OpenAI key"
+# Finding 3: step 5.5 told the agent to fill {{slot}} markers before the
+# pages holding them exist -- they are written in step 6, which never
+# mentioned .image-plan.json, gaps[] or result.file. Pin that step 6's own
+# slot-filling sentence names the source.
+grep -Fq "an image slot fills from that gap's own \`result.file\` in \`demo/.image-plan.json\`" "$ds" \
+  || fail "$d's step 6 does not source image slots from result.file in demo/.image-plan.json"
 # 9. The write path. Finding 10: an earlier draft only ever READ "image
 #    provider" and nothing ever wrote it, so the feature could never activate.
 #    Pin that the doc now records the operator's answer, and that "none" (a
