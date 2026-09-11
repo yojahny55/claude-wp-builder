@@ -72,7 +72,7 @@ tiers=$(node -e '
   import("./bin/image-gen.mjs").then((m) => {
     console.log([400, 800, 1200, 2400].map((w) => m.snapSize(w)).join(","));
   });
-')
+') || fail "snapSize could not be imported from $g"
 [ "$tiers" = "512px,1K,2K,2K" ] \
   || fail "snapSize must pick the smallest tier >= width, capped at 2K; got $tiers"
 

@@ -13,7 +13,7 @@
  * request, 3 no key (nothing written, nothing billed), 4 one or more slots
  * failed after work began.
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, realpathSync } from 'node:fs';
 import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -142,11 +142,12 @@ function cmdPlan(demo) {
   say('Costs are estimates, not a bill.');
 }
 
-// Only dispatch when run as a command, not when imported. The checks import
-// this file to assert the pure resolvers directly: every real composition
-// happens to land on the same size tier, so a CLI-only test cannot tell
-// snapSize from a constant.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Only dispatch when run as a command, not when imported. Compare REAL paths:
+// Node resolves symlinks when loading the module, so import.meta.url is the
+// real path while argv[1] keeps the link -- comparing them directly makes a
+// symlinked invocation a silent no-op.
+const invokedAs = process.argv[1] ? pathToFileURL(realpathSync(process.argv[1])).href : null;
+if (invokedAs === import.meta.url) {
   const [, , sub, ...rest] = process.argv;
   const demoIdx = rest.indexOf('--demo');
   const demo = demoIdx >= 0 ? rest[demoIdx + 1] : null;
