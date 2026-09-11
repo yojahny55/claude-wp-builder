@@ -2,37 +2,8 @@
 
 ## [Unreleased]
 
-### Fixed (residuals from the branch review)
-- **The viewport-height gate judges every declaration on a line, not the first.**
-  A rule written on one line carries several, and judging only the first let a
-  block-axis declaration shield an inline one behind it: `.x { height: 100vh;
-  width: 50vh }` exempted the `width` because the `height` came first. Measured:
-  the same `width: 50vh` alone failed and behind a `height` passed.
-- **The self-container check parses declaration blocks, not lines.** Line-based
-  brace tracking made the verdict depend on formatting — `@supports (display:
-  grid) { .a { container-type: inline-size; } .b { gap: 1cqi; } }` on one line was
-  flagged while the byte-identical CSS across four lines passed. Two separate
-  rules are not one rule whatever the whitespace. It now matches innermost
-  `{...}` blocks, which are exactly declaration blocks, so at-rule wrappers are
-  ignored without having to understand at-rules.
-- **The reduced-motion rail affordance is attached only when a box actually
-  overflows.** Below `process-rail`'s own documented three-step minimum neither
-  the rail nor the frame scrolls, and attaching `tabindex`/`role="region"`
-  anyway shipped a focusable, named region that scrolls nothing — the same dead
-  tab stop the affordance was written to remove, reached by a different route.
-  Measured: a short rail selects `container` unguarded (which scrolls nothing)
-  and nothing at all guarded.
-- **The viewport-height units are gated by AXIS, not by spelling.** Excluding
-  `vh`/`dvh`/`svh`/`lvh`/`vb` outright is correct for block-axis declarations —
-  a pinned frame is one screen tall by definition and `container-type:
-  inline-size` gives it nothing to convert to — but it also let a height unit be
-  smuggled into an inline ramp, where it is as viewport-relative as `vw` and as
-  convertible. A height unit on a width, gap, font-size or inline padding now
-  has to justify itself like any other. Unit detection runs over a copy with
-  comment bodies blanked and line numbers preserved, so a unit merely *named* in
-  prose is not mistaken for a declaration.
-
 ### Fixed
+
 - **The `@property --container-max` guard stopped at the demo; the delivered
   theme reproduced the bug it closed.** `/wp-section` copies thirteen
   `padding-inline: max(var(--space-gutter), calc((100% - var(--container-max,
@@ -206,7 +177,90 @@
   `skills/wp-demo-craft/references/verify.md` and `CLAUDE.md` no longer record
   the top-level-only scope as a known limit.
 
+- **A full-site build paid three times over for work the flow then discarded.** Measured
+  on a real twelve-page bilingual Tailwind build: roughly 1.9M subagent tokens before a
+  single template part existed, ~90% of it spent reading and rewriting demo HTML. Three
+  causes, all contract holes rather than model error.
+
+  `wp-normalize` captured verbatim `section.cssRules` for every section on **both**
+  template paths, which costs a full read of every stylesheet and a full write of every
+  matched rule. On the `tailwind` path `/wp-yolo` Step 2.6 converts each demo page and
+  then forbids the section walk from reading that field at all — so the capture produced
+  something the flow is contractually required to ignore. It is now skipped on that path
+  and written as `null`, with a `review[]` entry so the null is not read as a failed scan.
+  `backgrounds`, `fonts` and `computed` are still captured on both paths: the font carry
+  and the demo-parity gate read them regardless, and `fonts` cannot be recovered from
+  converted markup at all, because conversion strips the `@font-face` rules it absorbed.
+
+  Step 2.6 converted **every copy** of a repeated card. A demo pads a list with mock
+  repetition — sixteen profile cards cut from four records, eighteen board members from
+  three, twelve branch cards from two — and those pages were the most expensive
+  conversions in the run while collapsing hardest in the theme, where all N become one
+  template part inside a loop. `wp-normalize` now records `section.repetition` as an array with
+  one entry per repeated list (`selector`, `count`, `distinct`, `exemplar`, `variants`;
+  the exemplar is never one of the variants) and Step 2.6 converts the
+  exemplar plus any real variants, applying the exemplar's `class` attributes to its
+  siblings position-for-position and leaving each sibling's own text, `href`, `src`, `alt`
+  and `data-*` untouched. Lists whose children genuinely differ are not collapsed.
+
+  `wp-acf` and `wp-template` each ship a "WP-CLI Integration" section instructing the
+  agent to run `$WP …`, while their frontmatter granted `Read, Write, Edit, Grep, Glob`
+  and no `Bash`. Both reported verification they had no way to perform, and the
+  orchestrator had to re-run it. Both now grant `Bash`; the check also refuses the reverse
+  drift — an agent gaining `Bash` by copy-paste with no shell step in its instructions.
+
+  New check: `tests/checks/wp-yolo-transcription-cost.sh`.
+
+- **The `@apply` promotion ran once per section, so it depended on dispatch order.** The
+  `wp-tailwind-system` ladder promotes a utility group seen "3+ times, or on 2+ distinct
+  pages" — a judgment about the whole theme. On the `tailwind` path `/wp-section` dispatches
+  `wp-tailwind` in author mode after `wp-template` returns, per section, and tells it to grep
+  what earlier sections already wrote. The first section therefore runs with nothing to grep
+  and ships raw utilities; when a later sighting finally crosses the threshold, the template
+  parts already written that carry the same group are never revisited. The group ends up a
+  semantic class in the sections built late and raw utilities in the ones built early, so the
+  `@apply` file exists without covering the repetition it was created for. On top of that it
+  is one serialized agent per section, each re-reading a template part `wp-template` has just
+  written and each appending to the same `main.css`.
+
+  `/wp-section` gains `--defer-promotion` (tailwind only — on `basic` it would ship an
+  unstyled section, since `wp-css` writes the section's only stylesheet). `/wp-yolo` sets it
+  on every section-walk dispatch and runs the promotion once in a new Step 4.4, over every
+  template part the walk produced, counting distinct pages rather than files and touching
+  class names only. Hand-invoked `/wp-section` is unchanged: a section added to a finished
+  theme has the whole theme to grep and nothing to aggregate.
+
+- **The viewport-height gate judges every declaration on a line, not the first.**
+  A rule written on one line carries several, and judging only the first let a
+  block-axis declaration shield an inline one behind it: `.x { height: 100vh;
+  width: 50vh }` exempted the `width` because the `height` came first. Measured:
+  the same `width: 50vh` alone failed and behind a `height` passed.
+- **The self-container check parses declaration blocks, not lines.** Line-based
+  brace tracking made the verdict depend on formatting — `@supports (display:
+  grid) { .a { container-type: inline-size; } .b { gap: 1cqi; } }` on one line was
+  flagged while the byte-identical CSS across four lines passed. Two separate
+  rules are not one rule whatever the whitespace. It now matches innermost
+  `{...}` blocks, which are exactly declaration blocks, so at-rule wrappers are
+  ignored without having to understand at-rules.
+- **The reduced-motion rail affordance is attached only when a box actually
+  overflows.** Below `process-rail`'s own documented three-step minimum neither
+  the rail nor the frame scrolls, and attaching `tabindex`/`role="region"`
+  anyway shipped a focusable, named region that scrolls nothing — the same dead
+  tab stop the affordance was written to remove, reached by a different route.
+  Measured: a short rail selects `container` unguarded (which scrolls nothing)
+  and nothing at all guarded.
+- **The viewport-height units are gated by AXIS, not by spelling.** Excluding
+  `vh`/`dvh`/`svh`/`lvh`/`vb` outright is correct for block-axis declarations —
+  a pinned frame is one screen tall by definition and `container-type:
+  inline-size` gives it nothing to convert to — but it also let a height unit be
+  smuggled into an inline ramp, where it is as viewport-relative as `vw` and as
+  convertible. A height unit on a width, gap, font-size or inline padding now
+  has to justify itself like any other. Unit detection runs over a copy with
+  comment bodies blanked and line numbers preserved, so a unit merely *named* in
+  prose is not mistaken for a declaration.
+
 ### Changed
+
 - **All 26 composition previews re-rendered against the changed CSS.** Nine moved,
   all of them at 1440 and none at 390, and the split is arithmetic rather than luck.
   A container query length resolves against the query container's *content* box, so
@@ -242,6 +296,7 @@
 - README and `docs/commands.md` no longer describe the fluid `vw` ramps as open work,
   and state that `unobserved` is counted per section while `no-engine` stays
   document-wide.
+
 
 ## [1.15.0] - 2026-09-10
 

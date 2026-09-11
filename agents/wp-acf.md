@@ -1,7 +1,7 @@
 ---
 name: wp-acf
 description: ACF/SCF field architect — generates programmatic field definitions with bilingual support, one file per section
-tools: Read, Write, Edit, Grep, Glob
+tools: Read, Write, Edit, Grep, Glob, Bash
 model: haiku
 ---
 

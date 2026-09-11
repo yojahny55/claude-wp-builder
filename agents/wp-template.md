@@ -1,7 +1,7 @@
 ---
 name: wp-template
 description: PHP/WordPress template specialist — generates template parts, page templates, header, footer using WordPress best practices and project i18n helpers
-tools: Read, Write, Edit, Grep, Glob
+tools: Read, Write, Edit, Grep, Glob, Bash
 model: sonnet
 ---
 

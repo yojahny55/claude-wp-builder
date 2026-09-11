@@ -23,7 +23,9 @@ Parse `$ARGUMENTS`:
   - `basic` → the section's **verbatim** demo CSS, and the SOURCE OF TRUTH for the transcription: an inline CSS blob or a path to a CSS file, whose declared values are copied exactly.
   - `tailwind` → the converted demo page itself (HTML, converted in place by `/wp-yolo` Step 2.6). Here it is a geometry reference, **not** a source of verbatim declarations — the overlay's instruction is "reproduce this geometry using Tailwind utilities", never "copy the declared values verbatim".
 
-> **Note:** `/wp-yolo` sets `--transcribe --block <block> --css <css-source>` on every `/wp-section` dispatch (see `commands/wp-yolo.md` Step 4). When invoked by hand without these flags, `/wp-section` keeps its original design-system authoring behavior.
+- **`--defer-promotion` flag** = `tailwind` only. Skip the `wp-tailwind` author-mode dispatch entirely: `wp-template` writes the section with inline utilities and the command returns without an `@apply` promotion. Report the section as built with promotion deferred. Set by `/wp-yolo` on the section walk, where the ladder's "3+ times, or on 2+ distinct pages" test cannot be answered yet because the rest of the theme does not exist; `/wp-yolo` Step 4.4 then runs one promotion pass over every template part the walk produced. Ignored on `basic`, which has no promotion step. Never set it by hand for a one-off section — a section added to a finished theme has the whole theme to grep, and deferring would leave its utilities unpromoted with no later pass to catch them.
+
+> **Note:** `/wp-yolo` sets `--transcribe --block <block> --css <css-source>` on every `/wp-section` dispatch, plus `--defer-promotion` on the `tailwind` path (see `commands/wp-yolo.md` Steps 4 and 4.4). When invoked by hand without these flags, `/wp-section` keeps its original design-system authoring behavior.
 
 If no section name is provided, print an error:
 ```
@@ -171,6 +173,15 @@ Read `Template:` from `.claude/CLAUDE.md`. When `Template:` is `tailwind`, dispa
 | `tailwind` | `wp-tailwind` in **author** mode | Utility classes in the markup; `@apply` rules only where the `wp-tailwind-system` ladder demands them |
 
 Dispatch exactly one of the two. Never both — they write incompatible CSS systems.
+
+**`--defer-promotion` suppresses Agent 3 on the `tailwind` path only.** When the flag is
+set, do not dispatch `wp-tailwind`: `wp-template` has already written the section with
+inline utilities, which is a complete and correct section — the `@apply` promotion is an
+optimisation over the finished theme, and `/wp-yolo` Step 4.4 runs it once over every
+template part after the walk. Report the section as built with promotion deferred so the
+absence is not read as a missed dispatch. The flag never suppresses `wp-css` on `basic`:
+there is no promotion step there and `wp-css` writes the section's only stylesheet, so
+skipping it would ship an unstyled section.
 Agents 1 (`wp-acf`) and 4 (`wp-cf7`) are identical on both paths. Agent 2
 (`wp-template`) runs on both paths too, but its class-naming instruction differs — see
 **File ownership** immediately below, which is the rule the rest of this command follows.
