@@ -15,9 +15,7 @@ if ! command -v npx >/dev/null 2>&1; then
 fi
 
 if ! out=$(npx --yes is-agentic "$host" --json 2>/dev/null); then
-  if npx --yes ax score "$host" --json >/dev/null 2>&1; then
-    out=$(npx --yes ax score "$host" --json)
-  else
+  if ! out=$(npx --yes ax score "$host" --json 2>/dev/null); then
     echo "SKIP: live GEO scan unavailable (no network or service down)"
     exit 2
   fi
