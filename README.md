@@ -197,7 +197,7 @@ contract, for an admin tool, intranet or catalogue. Nothing paid is involved.
 ```
 /wp-finalize                              # pre-delivery report (never fixes)
 /wp-demo-verify http://localhost/site     # scroll-walks the live site, 5 viewports, contact sheet
-/wp-audit [--security --seo --a11y --performance --best-practices] [--report-only]
+/wp-audit [--security --seo --a11y --performance --best-practices --geo] [--report-only]
 /wp-polylang es en                        # only when i18n strategy is polylang
 ```
 
@@ -438,7 +438,7 @@ The `/wp-create` command supports multiple environment types:
 
 ## Audit & Quality
 
-The `/wp-audit` command runs a comprehensive audit across 5 categories and offers to auto-fix issues.
+The `/wp-audit` command runs a comprehensive audit across 6 categories and offers to auto-fix issues.
 
 ### Categories
 
@@ -449,6 +449,14 @@ The `/wp-audit` command runs a comprehensive audit across 5 categories and offer
 | `--a11y` | WCAG 2.1 AA accessibility | — |
 | `--performance` | Core Web Vitals, caching, assets | — |
 | `--best-practices` | WordPress coding standards | — |
+| `--geo` | GEO / AI-agent readiness, ORA-scored | is-agentic live scan |
+
+`--geo` scores how discoverable, accessible and usable a site is to AI agents and generative
+engines, following the four ORA layers (Discovery, Access, Usability, Payments). It detects the
+site type first and gates each check on it, so merchant payments and SaaS API surfaces report
+`N/A` rather than fail. The live score comes from the public is-agentic report `bin/geo-scan.sh`
+fetches; without a reachable public URL the scan skips and the runtime codes report `N/A`.
+`/wp-yolo` runs `/wp-audit --all --geo` and the same scan automatically in its finish phase.
 
 ### Three-Tier Audit
 

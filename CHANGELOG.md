@@ -4,6 +4,31 @@
 
 ### Added
 
+- **`/wp-audit` gains a GEO / AI-agent-readiness category behind `--geo`.** The new
+  `wp-audit-geo` auditor scores a site against the four ORA layers — Discovery, Access,
+  Usability, Payments — and maps the ORA check catalog to GEO codes. Site type is detected,
+  not assumed (content, local business, merchant or SaaS), and every check the detected type
+  does not apply to is reported `N/A` rather than failed. The fixable half is handed to the
+  new `wp-agentic-surfaces` agent, which owns `inc/agentic.php` and emits the generated
+  surfaces — `llms.txt`, the ARD catalog, the agent-skills index, markdown negotiation, Link
+  headers, an agent-friendly 404, JSON-LD breadth — and seeds the trust anchors. The auditor
+  parses the rendered head with `DOMDocument`, never a regex, because attribute order and
+  quoting are not fixed and a regex reads a broken page as clean. The reference — check
+  catalog, applicability matrix, AI crawler allowlist and surface specs — is the new
+  `wp-audit-geo-standards` skill. The live score is fetched by the new `bin/geo-scan.sh`,
+  which calls the public is-agentic report for the site's host (falling back to `ax score`)
+  and prints the JSON the auditor maps back to GEO codes; exit `2` is a clean skip — no
+  network, no `npx`, or no reachable public URL — and the run reports the live score as
+  unavailable instead of failing. `/wp-yolo` runs `/wp-audit --all --geo` and the same scan as
+  mandatory finish-phase steps, and a run whose scan did not succeed cannot print "Build
+  Complete".
+
+  Three ceilings are recorded. Off-site checks — Wikipedia/Wikidata presence, registry
+  listings, agentic share of voice, brand search accuracy — are advisory: no theme file can
+  change a third party's listing, so they are reported with a recommendation and left
+  unfixed. The payments codes (ACP, UCP, MPP, x402, AP2) are merchant-only and advisory,
+  detected but never fixed. The live scan needs a public URL and skips (exit 2) without one.
+
 - **README and `docs/commands.md` now document how to supply the image-generation key.**
   Which variable per provider (`GEMINI_API_KEY` / `OPENAI_API_KEY`), the three places to
   set it — an `env` block in the gitignored `.claude/settings.local.json`, an `export`

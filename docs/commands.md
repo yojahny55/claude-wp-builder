@@ -360,13 +360,23 @@ static screenshot per breakpoint cannot show scroll motion, which is why the che
 ### `/wp-audit`
 
 ```
-/wp-audit [--security] [--seo] [--a11y] [--performance] [--best-practices] [--all]
+/wp-audit [--security] [--seo] [--a11y] [--performance] [--best-practices] [--geo] [--all]
           [--report-only] [--security-level basic|recommended|maximum]
 ```
 
 No category flag = all. Security installs/configures All-in-One WP Security; SEO installs
 Rank Math and seeds meta/schema. `--report-only` skips fixes. Lighthouse-style checks need
 the optional `web-quality-skills` plugin.
+
+`--geo` audits Generative Engine Optimization and AI-agent readiness. It detects the site
+type first — content, local business, merchant or SaaS — and gates each check on that, so a
+shop's payments codes and a SaaS's API codes are reported `N/A` rather than failed. The
+`wp-audit-geo` agent runs the code-only checks, then scores the live site's ORA layers
+against the public is-agentic report and maps the failed checks back to GEO codes. Only a
+returned report yields a score: without a reachable public URL the live scan skips, and the
+runtime codes report `N/A`. Auto-fixable findings go to the `wp-agentic-surfaces` fixer;
+off-site findings and merchant payment protocols are advisory and left alone. `/wp-yolo`
+runs `/wp-audit --all --geo` and the same scan in its finish phase.
 
 ### `/wp-polylang`
 
