@@ -171,6 +171,13 @@ grep -Fq 'warn(e.stack || e.message);' "$g" \
 # skip this very assertion instead of failing it.
 n=$(grep -c 'console\.\(log\|error\)' "$g" || true)
 [ "$n" = 2 ] || fail "$g must funnel all output through say()/warn(); found $n console calls, expected 2"
+# A leak does not need console.*: process.stderr.write reaches fd 2 just as
+# well, and the count above cannot see it. Verified -- writing the raw key
+# with process.stderr.write in callGoogle's error path passed the entire
+# suite before this assertion existed.
+if grep -Eq 'process\.(stdout|stderr)\.write' "$g"; then
+  fail "$g writes directly to stdout/stderr, bypassing the scrub in say()/warn()"
+fi
 
 # 6b. Behavioural: with a key set, a refused plan's output contains no trace of it.
 plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
@@ -191,12 +198,16 @@ grep -Fq 'https://api.openai.com/v1/images/generations' "$g" \
   || fail "$g does not target the OpenAI images endpoint"
 grep -Fq 'aspect_ratio' "$g" || fail "$g does not request a Google aspect ratio"
 grep -Fq 'b64_json' "$g" || fail "$g does not read OpenAI's base64 payload"
-# The gpt-image models reject response_format outright, so it must appear in the
-# Google body and NOT in the OpenAI one. Written as an explicit `if` rather than
-# a `grep && grep && fail` chain: a failing command inside an && list has subtle
-# `set -e` semantics, and an assertion must not depend on reading them right.
-if grep -A8 'api.openai.com' "$g" | grep -Fq 'response_format'; then
-  fail "gpt-image models reject response_format; it must not be sent to OpenAI"
-fi
+# response_format must appear exactly once: in the Google body. The gpt-image
+# models reject the parameter outright, so it must never reach OpenAI.
+# Counted on a comment-stripped copy, because a pin that matches prose forces
+# comments to be worded around it instead of naming the rule. Only full-line
+# // comments are stripped -- a naive // strip would eat the https:// in the
+# endpoint URLs and silently void the endpoint pins above.
+gs="$tmp/image-gen-stripped.mjs"
+perl -0pe 's{^\s*//[^\n]*$}{}gm; s{/\*.*?\*/}{}gs' "$g" > "$gs" \
+  || fail "could not strip comments from $g"
+n=$(grep -c 'response_format' "$gs" || true)
+[ "$n" = 1 ] || fail "response_format must appear exactly once (the Google body) and never in the OpenAI body; found $n"
 
 echo PASS

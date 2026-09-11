@@ -264,7 +264,7 @@ async function callOpenAI(model, key, g) {
     const r = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
-      // gpt-image models reject that response-format field outright; they always return base64.
+      // No response_format: the gpt-image models reject it and always return base64.
       body: JSON.stringify({
         model, prompt: g.prompt, size: g.size,
         quality: 'medium', output_format: 'jpeg', n: 1,
