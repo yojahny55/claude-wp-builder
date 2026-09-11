@@ -177,7 +177,7 @@ and inventories every image, SVG and font under `docs/` into `demo/BRIEF.md` wit
 or named with a reason. It builds every section from the plugin's composition library — every
 composition's size-based breakpoints are `@container` queries against its own container rather
 than the viewport, and its fluid ramps in `clamp()` read `cqi` and track that container too,
-except for four: three hero headlines sized against the screen on purpose, and one
+except for three: two hero headlines sized against the screen on purpose, and one
 root `gap` that cannot be `cqi` because its own rule declares the container — and loops
 on `npx -y impeccable@4 detect`, a seven-line critique rubric, and a `demo-verify.mjs` walk
 (served over HTTP, not `file://`; `no-engine` and `container-noop` join `dead-scroll` as

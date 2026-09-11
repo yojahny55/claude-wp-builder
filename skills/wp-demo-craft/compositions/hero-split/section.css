@@ -27,8 +27,12 @@
 }
 .hero-split__title {
   font-family: var(--font-display);
-  /* Sized against the viewport on purpose: a full-bleed hero is not a scenario a narrow column serves. */
-  font-size: clamp(2.4rem, 6vw, 5.5rem);
+  /* cqi, not vw: the title sits in a 1.1fr/0.9fr split column, so "full-bleed" was
+     never true of it. The nearest container is the section root, which IS the page
+     width at full bleed — measured identical there (86.4px at 1440, 76.8px at 1280,
+     38.4px at 390, same box, same position) — and 38.4px instead of 86.4px in a
+     420px column, which is the whole point. */
+  font-size: clamp(2.4rem, 6cqi, 5.5rem);
   line-height: 1.02;
   letter-spacing: -0.02em;
   text-wrap: balance;

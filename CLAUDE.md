@@ -214,10 +214,14 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   `@container` queries against the block's own `container-type: inline-size`, so a section
   dropped into a narrow column lays out for the column. The `vw` in `clamp()` gaps and type
   scales was the one exception — 40 occurrences across 12 of the 13 compositions still keyed
-  off the viewport — and is converted: 36 now read `cqi` and track the container. Four
-  stay `vw`, each with a comment. Three are the display headline of each full-bleed hero
-  (`hero-bleed`, `hero-split`, `hero-type`), sized against the viewport on purpose because
-  a hero in a narrow column is not a scenario those compositions serve. The fourth is
+  off the viewport — and is converted: 37 now read `cqi` and track the container. Three
+  stay `vw`, each with a comment. Two are the display headline of a full-bleed hero
+  (`hero-bleed`, `hero-type`), sized against the viewport on purpose because
+  a hero in a narrow column is not a scenario those compositions serve. `hero-split`
+  used to be counted a third: its title sits in a `1.1fr 0.9fr` split column, so the
+  borrowed "full-bleed" justification was false for it, and since its nearest container
+  is the section root the conversion is identical at full bleed (86.4px at 1440,
+  measured) and correct in a narrow column (38.4px at 420px) — so it converted. The third is
   `feature-zigzag`'s root `gap`, which *cannot* be `cqi`: that rule is the element
   declaring `container-type`, and an element never matches a container query against the
   container it establishes itself, so `cqi` there would resolve against the viewport while

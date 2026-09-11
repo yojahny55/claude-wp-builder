@@ -89,11 +89,16 @@
   `clamp()` gaps, padding and type scales still keyed off the viewport, so a
   section dropped into a narrow column laid out for the column and then took
   desktop-maximum spacing anyway — 40 occurrences across 12 of the 13
-  compositions. 36 now read `cqi`, tracking the block's own inline size. The
-  remaining 4 stay `vw`, each with a comment recording why. Three are the display
-  headline of each full-bleed hero (`hero-bleed`, `hero-split`, `hero-type`),
+  compositions. 37 now read `cqi`, tracking the block's own inline size. The
+  remaining 3 stay `vw`, each with a comment recording why. Two are the display
+  headline of a full-bleed hero (`hero-bleed`, `hero-type`),
   sized against the viewport on purpose: a hero in a narrow column is not a
-  scenario those compositions serve. The fourth is `feature-zigzag`'s root `gap`,
+  scenario those compositions serve. `hero-split` was counted a third until its
+  justification was checked against the composition it defends: that title sits
+  in a `1.1fr 0.9fr` split column, not the bleed. Its nearest container is the
+  section root, so `6cqi` measured identical at full bleed (86.4px at 1440,
+  76.8px at 1280, 38.4px at 390, same box and position) and 38.4px rather than
+  86.4px in a 420px column — it converted. The third is `feature-zigzag`'s root `gap`,
   which *cannot* be `cqi` — that rule is the element declaring `container-type`,
   and an element never matches a container query against the container it
   establishes itself, so `cqi` there would resolve against the viewport while
