@@ -178,7 +178,10 @@ before writing any markup.
    and the `1280px` fallback still covers the absent case, so it needs no
    `@supports` guard.
    Copy each chosen composition's `section.html` and `section.css`, fill the
-   `{{slots}}` with real copy and real assets, keep the delimiters and the BEM
+   `{{slots}}` with real copy and real assets — **no page may ship with a
+   `{{` left in it**: several slots fill `alt` and `aria-label` attributes, where
+   an unsubstituted marker is read out verbatim by a screen reader and never
+   appears on screen for anyone to notice — keep the delimiters and the BEM
    block. Motion comes from `data-motion-*` attributes only. Inline the contents of
    `${CLAUDE_PLUGIN_ROOT}/starter-theme/__tailwind__/assets/js/src/motion.js` in a
    `<script type="module">` block (`motion.js` uses `export function initMotion`,

@@ -131,6 +131,11 @@ grep -Eq '@property --container-max[[:space:]]*\{[^}]*inherits: true' <<<"$(tr '
 # singular ("in the same <style>"), which a builder can satisfy by emitting it on
 # index.html alone — every interior page then keeps the unguarded token and the
 # original bug. The sentence has to say every page out loud.
+# A slot left unfilled in an alt or aria-label attribute is invisible on screen
+# and read out verbatim by a screen reader, so "fill the slots" has to be stated
+# as a hard condition on the written page, not as a step in a recipe.
+grep -Fq 'no page may ship with a' <<<"$ws" \
+  || fail "$w does not forbid shipping a page with an unsubstituted {{slot}}, which reaches a screen reader through alt and aria-label"
 grep -Fq 'on every page this step writes' <<<"$ws" \
   || fail "$w does not tell the build to emit the @property rule on every page, so an interior page keeps the unguarded --container-max"
 # ...and the theme the client actually receives. /wp-section copies thirteen
