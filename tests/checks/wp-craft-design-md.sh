@@ -115,9 +115,9 @@ r=bin/composition-preview.mjs
 # a fenced css block, so a dead `/* @property ... */` instruction satisfies a
 # raw grep while instructing the build to emit nothing.
 ws="$(perl -0pe 's{/\*.*?\*/}{}gs' "$w")"
-echo "$ws" | grep -Eq '@property --container-max[[:space:]]*\{' \
+grep -Eq '@property --container-max[[:space:]]*\{' <<<"$ws" \
   || fail "$w does not emit @property for --container-max outside a comment, so a malformed value still unsets padding-inline"
-echo "$ws" | grep -Fq 'syntax: "<length>"' \
+grep -Fq 'syntax: "<length>"' <<<"$ws" \
   || fail "$w's @property rule does not constrain --container-max to a length"
 # `inherits` is not decoration. A registered property with inherits:false is not
 # inherited by descendants, so :root's WELL-FORMED --container-max stops reaching
@@ -125,13 +125,13 @@ echo "$ws" | grep -Fq 'syntax: "<length>"' \
 # Measured at 1920 with a valid 1440px token: inherits:true -> 240px padding,
 # inherits:false -> 320px. That breaks the working case, not just the malformed
 # one, which is strictly worse than the bug this rule was added to fix.
-echo "$ws" | tr '\n' ' ' | grep -Eq '@property --container-max[[:space:]]*\{[^}]*inherits: true' \
+grep -Eq '@property --container-max[[:space:]]*\{[^}]*inherits: true' <<<"$(tr '\n' ' ' <<<"$ws")" \
   || fail "$w's @property rule does not set inherits: true, so a well-formed --container-max at :root never reaches the sections that read it"
 # Step 6 writes one file per page, and the instruction beside the rule was
 # singular ("in the same <style>"), which a builder can satisfy by emitting it on
 # index.html alone — every interior page then keeps the unguarded token and the
 # original bug. The sentence has to say every page out loud.
-echo "$ws" | grep -Fq 'on every page this step writes' \
+grep -Fq 'on every page this step writes' <<<"$ws" \
   || fail "$w does not tell the build to emit the @property rule on every page, so an interior page keeps the unguarded --container-max"
 # ...and the theme the client actually receives. /wp-section copies thirteen
 # `calc((100% - var(--container-max, 1280px)) / 2)` gutter rules into it, so a
@@ -142,16 +142,21 @@ echo "$ws" | grep -Fq 'on every page this step writes' \
 # as $w: the rule lives in a fenced css block.
 i4=commands/wp-init.md
 i4s="$(perl -0pe 's{/\*.*?\*/}{}gs' "$i4")"
-echo "$i4s" | grep -Eq '@property --container-max[[:space:]]*\{' \
+grep -Eq '@property --container-max[[:space:]]*\{' <<<"$i4s" \
   || fail "$i4 Step D4 does not emit @property for --container-max, so a malformed token unsets padding-inline in the delivered theme"
-echo "$i4s" | grep -Fq 'syntax: "<length>"' \
+grep -Fq 'syntax: "<length>"' <<<"$i4s" \
   || fail "$i4's @property rule does not constrain --container-max to a length"
-echo "$i4s" | tr '\n' ' ' | grep -Eq '@property --container-max[[:space:]]*\{[^}]*inherits: true' \
+grep -Eq '@property --container-max[[:space:]]*\{[^}]*inherits: true' <<<"$(tr '\n' ' ' <<<"$i4s")" \
   || fail "$i4's @property rule does not set inherits: true, so a well-formed --container-max never reaches the theme's sections"
 # The registration alone is only half: with no --container-max in @theme every
 # section falls back to initial-value and the demo's content width is lost. The
 # token has to be written too, and named in the craft token list Step D4 writes.
-echo "$i4s" | grep -Fq -- '`--space-gutter`, `--container-max`' \
+# And where it goes: `@theme` in Tailwind v4 takes plain variable declarations,
+# so an @property rule written inside it is not a registration — the token stays
+# unregistered and the malformed-value case is back, silently.
+grep -Fq 'at the top level of' <<<"$i4s" \
+  || fail "$i4 does not say the @property rule goes at the top level of main.css; inside @theme it registers nothing"
+grep -Fq -- '`--space-gutter`, `--container-max`' <<<"$i4s" \
   || fail "$i4 Step D4 does not write --container-max into the @theme block, so the theme loses the demo's content width"
 
 tr '\n' ' ' < "$r" | grep -Eq '@property --container-max[[:space:]]*\{[^}]*inherits: true' \
@@ -169,14 +174,14 @@ grep -Eq '@property --container-max[[:space:]]*\{' "$r" \
 # though the whole-file grep above stays green.
 body="$(awk '/^function rootBlock\(t\) \{/,/^}/' "$r")"
 [ -n "$body" ] || fail "$r's rootBlock(t) function is missing or unmatched, so the @property placement cannot be checked"
-echo "$body" | grep -Eq '@property --container-max[[:space:]]*\{' \
+grep -Eq '@property --container-max[[:space:]]*\{' <<<"$body" \
   || fail "$r emits @property outside rootBlock()'s function body, so the embedded preview page (which calls rootBlock(t) directly) does not carry it even though --tokens might"
 # And the runtime proof: --tokens prints exactly what rootBlock() returns, the
 # same string the embedded preview page uses, so its output has to carry the
 # rule too — this is what the file's own comment on --tokens promises.
 tokens="$(node "$r" --tokens)" \
   || fail "$r --tokens does not run, so the @property placement cannot be asserted"
-echo "$tokens" | grep -Eq '@property --container-max[[:space:]]*\{' \
+grep -Eq '@property --container-max[[:space:]]*\{' <<<"$tokens" \
   || fail "$r --tokens output does not carry @property --container-max, so the rule is not inside rootBlock()'s returned string"
 # Permanent zero-occurrence control: this ceiling is fixed, so its old wording
 # must never reappear in CLAUDE.md. Stays green forever unless the ceiling
