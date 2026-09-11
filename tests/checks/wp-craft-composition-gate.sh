@@ -74,4 +74,27 @@ rc=0; COMPS_DIR="$work/thin" bash bin/composition-gate.sh >"$work/thin.out" 2>&1
 grep -Fq 'refused near-empty or truncated content' "$work/thin.out" \
   || fail "the composition gate refused truncated content without saying so"
 
+# 3. A detector payload the gate does not understand — parseable JSON with no
+#    findings list. The old fallback left `findings` bound to the dict and the
+#    filter below it raised AttributeError: an unhandled Python traceback in
+#    place of a verdict. It must be a deliberate "could not scan" (rc 1), not a
+#    traceback and not a vacuous zero-findings pass. A stub `npx` earlier on
+#    PATH is what produces the payload, so the real gate runs unmodified.
+mkdir -p "$work/fakebin"
+cat > "$work/fakebin/npx" <<'SH'
+#!/usr/bin/env bash
+echo '{"ok": true}'
+SH
+chmod +x "$work/fakebin/npx"
+rc=0
+PATH="$work/fakebin:$PATH" COMPS_DIR="$work/slop" bash bin/composition-gate.sh \
+  >"$work/shape.out" 2>&1 || rc=$?
+[ "$rc" -eq 1 ] \
+  || fail "the composition gate returned rc=$rc on a detector payload with no findings list, expected 1 (could not scan): $(cat "$work/shape.out")"
+if grep -Fq 'Traceback' "$work/shape.out"; then
+  fail "the composition gate raised a Python traceback instead of a verdict on a detector payload with no findings list: $(cat "$work/shape.out")"
+fi
+grep -Fq 'carries no findings list' "$work/shape.out" \
+  || fail "the composition gate exited 1 on an uninterpretable detector payload without saying that is why, so it is indistinguishable from any other failure"
+
 echo PASS

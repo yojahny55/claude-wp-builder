@@ -88,7 +88,19 @@ try:
 except Exception as exc:
     print("composition-gate: detector produced no parseable JSON: %s" % exc, file=sys.stderr)
     raise SystemExit(1)
-findings = data if isinstance(data, list) else data.get("findings", data)
+if isinstance(data, list):
+    findings = data
+elif isinstance(data, dict) and isinstance(data.get("findings"), list):
+    findings = data["findings"]
+else:
+    # Parseable JSON in a shape this gate does not understand is a scan that did
+    # not happen, not a clean one: the old fallback left `findings` bound to the
+    # dict and the filter below raised AttributeError, a traceback instead of a
+    # verdict. Exit 1, the same code as "could not scan" — treating an
+    # unreadable payload as zero findings would be a vacuous pass.
+    print("composition-gate: detector JSON carries no findings list (top level: %s) — treating as could not scan"
+          % type(data).__name__, file=sys.stderr)
+    raise SystemExit(1)
 blocking = [f for f in findings
             if f.get("category") == "slop" and f.get("severity") == "warning"]
 by_comp = collections.defaultdict(list)
