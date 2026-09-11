@@ -104,4 +104,43 @@ grep -Fq 'Otherwise, **run `/wp-tailwindify`**' "$i" \
 grep -Fq 'Skip it entirely when `demo mode` is **craft**' "$y" \
   || fail "$y does not skip the Step 2.6 demo conversion on a craft demo"
 
+# A malformed --container-max (`wide`, empty) used to unset padding-inline to 0
+# at every viewport, because var() substitutes a bad value rather than falling
+# back. @property makes it fall back to initial-value instead. Anchored on the
+# opening brace, not the bare token+name pair, which a typo'd property name
+# (--container-maxx) would also satisfy while leaving the real bug unfixed.
+w=commands/wp-demo.md
+r=bin/composition-preview.mjs
+grep -Eq '@property --container-max[[:space:]]*\{' "$w" \
+  || fail "$w does not emit @property for --container-max, so a malformed value still unsets padding-inline"
+grep -Fq 'syntax: "<length>"' "$w" \
+  || fail "$w's @property rule does not constrain --container-max to a length"
+grep -Eq '@property --container-max[[:space:]]*\{' "$r" \
+  || fail "$r does not emit @property, so previews and client demos differ"
+# The source grep above only proves the text exists somewhere in the file. It
+# is equally satisfied by the rule sitting at the --tokens call site (e.g.
+# concatenated onto `process.stdout.write(...)`) as by it living inside
+# rootBlock()'s own returned string — but only the second one reaches the
+# embedded preview page, which calls rootBlock(t) directly and never goes
+# through that call site. Extract the function body by its own brace range
+# and require the rule inside it, so a rule sitting just outside — right
+# above the function, or spliced into the --tokens branch — fails here even
+# though the whole-file grep above stays green.
+body="$(awk '/^function rootBlock\(t\) \{/,/^}/' "$r")"
+[ -n "$body" ] || fail "$r's rootBlock(t) function is missing or unmatched, so the @property placement cannot be checked"
+echo "$body" | grep -Eq '@property --container-max[[:space:]]*\{' \
+  || fail "$r emits @property outside rootBlock()'s function body, so the embedded preview page (which calls rootBlock(t) directly) does not carry it even though --tokens might"
+# And the runtime proof: --tokens prints exactly what rootBlock() returns, the
+# same string the embedded preview page uses, so its output has to carry the
+# rule too — this is what the file's own comment on --tokens promises.
+tokens="$(node "$r" --tokens)" \
+  || fail "$r --tokens does not run, so the @property placement cannot be asserted"
+echo "$tokens" | grep -Eq '@property --container-max[[:space:]]*\{' \
+  || fail "$r --tokens output does not carry @property --container-max, so the rule is not inside rootBlock()'s returned string"
+# Permanent zero-occurrence control: this ceiling is fixed, so its old wording
+# must never reappear in CLAUDE.md. Stays green forever unless the ceiling
+# entry is reverted while the code fix (and the greps above) stay in place.
+grep -Fq 'only guards an absent token, not a malformed one' CLAUDE.md \
+  && fail "CLAUDE.md still records the old container-max ceiling as unfixed"
+
 echo PASS

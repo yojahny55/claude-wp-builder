@@ -229,12 +229,15 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   `compositions/fills.json`, which points at remote placeholder images. The committed
   `preview-1440.png` / `preview-390.png` are the artifact; treat them as such rather
   than assuming a rebuild is always available.
-- **`var(--container-max, 1280px)` only guards an absent token, not a malformed one.**
-  The fallback covers a project whose `:root` never defines the variable. It does not
-  cover a project that defines it badly — `wide`, an empty string: `calc()` treats the
-  whole expression as invalid at computed-value time and `padding-inline` resets to its
-  initial `0`, gutter and all, the same failure the fallback exists to prevent. Measured,
-  not theoretical.
+- **`@property --container-max` needs Chrome/Edge 85+, Safari 16.4+, Firefox 128+.**
+  A malformed value (`wide`, an empty string) used to make `calc()` invalid at
+  computed-value time and unset `padding-inline` to `0` at every viewport, the same
+  failure the `var(--container-max, 1280px)` fallback only ever guarded against for
+  an *absent* token. `commands/wp-demo.md` and `bin/composition-preview.mjs` now emit
+  `@property --container-max { syntax: "<length>"; inherits: true; initial-value:
+  1280px; }` alongside `:root`, so an invalid value falls back to `initial-value`
+  instead. Where `@property` is unsupported, the `1280px` `var()` fallback remains
+  the only guard, and it still covers only the absent case.
 - **`unobserved` is a confession, not a measurement.** A section that genuinely
   does not move and a section the harness cannot read are still not distinguished
   by the harness — only by which finding it emits and what the operator does next.

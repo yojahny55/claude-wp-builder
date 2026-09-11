@@ -3,6 +3,17 @@
 ## [Unreleased]
 
 ### Fixed
+- **A present but malformed `--container-max` (`wide`, an empty string) unset
+  `padding-inline` to `0` at every viewport, phones included.** `var(--container-max,
+  1280px)` only ever guarded an *absent* token — `var()` still substitutes a
+  malformed one, which makes `calc()` invalid at computed-value time. A craft build
+  now emits `@property --container-max { syntax: "<length>"; inherits: true;
+  initial-value: 1280px; }` alongside `:root` in `commands/wp-demo.md`'s generated
+  demo and in `bin/composition-preview.mjs`'s preview harness, so an invalid value
+  falls back to `initial-value` instead of unsetting. Measured before/after with a
+  headless-Chrome probe: `1440px` → 240px (unchanged), `wide` → 320px (was 0px),
+  empty → 320px (was 0px). Where `@property` is unsupported, the `1280px` `var()`
+  fallback remains the only guard, and it still covers only the absent case.
 - **`unobserved` could not fire, so a section that only the harness could not read
   was reported as a section that does not move.** `demo-verify.mjs`'s `probe()`
   counted `samplable` over a document-wide `querySelectorAll('[data-motion]')`, so

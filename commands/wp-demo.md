@@ -161,6 +161,20 @@ before writing any markup.
    which are what every composition's CSS already uses, not plain mode's
    `--color-primary` set. The section delimiters are the ones plain mode uses,
    unchanged, because `/wp-section` reads them either way.
+   Emit this immediately before the `:root` block, in the same `<style>`:
+
+   ```css
+   @property --container-max { syntax: "<length>"; inherits: true; initial-value: 1280px; }
+   ```
+
+   `var(--container-max, 1280px)` guards a token that is *absent*. It does not
+   guard one that is present and malformed — `wide`, an empty string — because
+   `var()` substitutes the bad value and `calc()` is then invalid at
+   computed-value time, which unsets `padding-inline` to `0` at every viewport,
+   phones included. `@property` makes an invalid value fall back to
+   `initial-value` instead. Where `@property` is unsupported the rule is ignored
+   and the `1280px` fallback still covers the absent case, so it needs no
+   `@supports` guard.
    Copy each chosen composition's `section.html` and `section.css`, fill the
    `{{slots}}` with real copy and real assets, keep the delimiters and the BEM
    block. Motion comes from `data-motion-*` attributes only. Inline the contents of

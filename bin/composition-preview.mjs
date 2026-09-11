@@ -66,9 +66,17 @@ function previewTokens() {
 
 /** The `:root` every preview renders against, from _preview.md's own values. Kept
  *  as one function so `--tokens` prints the same string the page embeds — a copy
- *  that drifts would assert nothing about what is actually rendered. */
+ *  that drifts would assert nothing about what is actually rendered. The
+ *  `@property` rule is prepended here, inside the returned string, rather than
+ *  written at the call site, for the same reason: --tokens has to print it too,
+ *  or a check on its output could not tell the rule was ever emitted.
+ *  `var(--container-max, 1280px)` only guards an absent token — a present but
+ *  malformed one (`wide`, empty) makes calc() invalid at computed-value time and
+ *  padding-inline unsets to 0. `@property` makes an invalid value fall back to
+ *  initial-value instead. */
 function rootBlock(t) {
-  return `:root{--color-canvas:${t.canvas};--color-surface:${t.surface};--color-ink:${t.ink};--color-ink-soft:${t.inkSoft};
+  return `@property --container-max { syntax: "<length>"; inherits: true; initial-value: 1280px; }
+:root{--color-canvas:${t.canvas};--color-surface:${t.surface};--color-ink:${t.ink};--color-ink-soft:${t.inkSoft};
 --color-accent:${t.accent};--color-accent-ink:${t.accentInk};--color-hairline:${t.hairline};
 --font-display:"${t.display}",system-ui,sans-serif;--font-text:"${t.text}",system-ui,sans-serif;
 --space-section:${t.section};--space-gutter:${t.gutter};--container-max:${t.container};

@@ -55,6 +55,14 @@ computed-value time: it unsets rather than degrading, and a section with no
 content width would render its body copy flush against a 390px screen edge. The
 fallback is the floor, not the answer — a generated `:root` still writes the token.
 
+The `var()` fallback only ever covered an *absent* token. A present but
+malformed one (`wide`, an empty string) still made `calc()` invalid at
+computed-value time and unset `padding-inline` the same way. The build now
+emits `@property --container-max { syntax: "<length>"; inherits: true;
+initial-value: 1280px; }` alongside `:root`, so an invalid value falls back to
+`initial-value` instead of unsetting — the `var()` fallback remains the only
+guard where `@property` itself is unsupported.
+
 A hardcoded hex in a section is a defect: the same value now exists in two
 places, and the one in `:root` is the one `/wp-init` carries into the theme.
 `/wp-init` reads this file before it reads the demo's `:root`.
