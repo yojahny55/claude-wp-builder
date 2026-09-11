@@ -111,7 +111,13 @@ If this fails, abort with a message suggesting the user check that the WordPress
 
 3. **Extract navigation** — parse `<nav>` elements for page names and links. These determine which pages to create and what menu items to build.
 
-4. **Collect all image URLs** found in `img[src]` attributes and CSS `background-image: url(...)` declarations. Track which ACF field each image belongs to.
+4. **Collect all image sources** found in `img[src]` attributes and CSS `background-image: url(...)`
+   declarations. Track which ACF field each image belongs to. A source may be a remote URL, or it
+   may be a demo-relative path — a craft build's generated plates are written to
+   `assets/img/gen-<hash>.jpg` and referenced from the markup that way, not as a URL. When a source
+   is not a URL, resolve it against the demo folder before Phase 3 imports it: `wp media import`
+   accepts a local file path, but it cannot resolve one that is relative to the shell's working
+   directory.
 
 Print a summary of parsed content:
 
@@ -172,7 +178,12 @@ bash -c "HERO_IMG_ID=\$($WP media import 'https://images.unsplash.com/photo-xxx'
 
 **Failure handling:** If a media import fails for any URL (403, redirect loop, CDN block, timeout), do NOT abort. Instead:
 
-1. Log a warning: `"WARNING: Failed to import <url> for field <field_name>. Skipping."`
+1. Log a warning. For a remote URL: `"WARNING: Failed to import <url> for field <field_name>.
+   Skipping."` For a local file under `assets/img/gen-` — a plate this build generated and paid
+   for — log a distinct line instead, so a spend that produced nothing stays visible in the seed
+   report rather than folding in with a stock photo that merely 403'd:
+   `"GENERATED PLATE FAILED: <path> for field <field_name>. It was generated and billed but did
+   not reach the media library."`
 2. Leave the ACF field empty for that image.
 3. Continue with remaining imports.
 4. Track all failed imports for the final seed report.

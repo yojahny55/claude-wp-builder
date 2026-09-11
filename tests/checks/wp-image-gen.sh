@@ -277,4 +277,20 @@ fi
 grep -Fq 'never generates images' "$ys" \
   || fail "$y does not state that it never generates images"
 
+# 10. /wp-seed must resolve a generated plate's demo-relative path before
+#    importing it, and must report a failed local import on its own line
+#    distinct from the remote-URL warning. Two independent pins, not one
+#    file-wide grep, per the "one pin covering two rules" defect that has
+#    already bitten this branch twice: deleting either rule alone must
+#    redden only its own pin. Same comment-strip-and-collapse treatment as
+#    assertion 8/9, so a pure reflow of the prose cannot fail this either.
+sm=commands/wp-seed.md
+sms="$tmp/wp-seed-stripped.md"
+perl -0pe 's{<!--.*?-->}{}gs; s{\s+}{ }g' "$sm" > "$sms" \
+  || fail "could not build the stripped copy of $sm"
+grep -Fq 'resolve it against the demo folder before Phase 3 imports it' "$sms" \
+  || fail "$sm does not resolve a demo-relative image source before importing it"
+grep -Fq 'GENERATED PLATE FAILED' "$sms" \
+  || fail "$sm does not report a failed local generated plate on its own distinct line"
+
 echo PASS
