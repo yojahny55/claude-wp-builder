@@ -259,6 +259,19 @@ grep -Fq "'CSSLayerBlockRule'" "$vs" \
 # it (rather than the branch that names the types) is caught.
 grep -Fq 'collect([...rule.cssRules]);' "$vs" \
   || fail "$v declares which grouping rules to recurse into but never calls collect() on their nested cssRules, so a nested @container is still never visited"
+# The three names above are pinned individually but the OPERATOR joining them
+# is not. `||` -> `&&` is one character and makes the branch unsatisfiable —
+# constructor.name is a single string and can never equal all three — so
+# recursion dies for every grouping type while all three name pins stay green.
+# Pin the whole clause, operators included.
+grep -Fq "n === 'CSSMediaRule' || n === 'CSSSupportsRule' || n === 'CSSLayerBlockRule'" "$vs" \
+  || fail "$v's grouping-rule branch is no longer the three names joined by ||, so it may be unsatisfiable and recursion dead for every nested @container"
+# The recursive call is pinned above; the per-sheet call that STARTS the walk is
+# a different line. `collect(rules)` -> `collect(containerRules)` walks the empty
+# accumulator instead of the stylesheet, so containerAudit returns nothing at all
+# — top-level rules included, which is worse than the bug this task fixed.
+grep -Fq 'collect(rules);' "$vs" \
+  || fail "$v never starts the rule walk from each sheet's own cssRules, so containerAudit collects nothing and reports no dead @container rule at any depth"
 # EVERY match, not the first. `querySelectorAll` -> `querySelector` reinstates a
 # blocking false positive on valid CSS: a selector matching several elements
 # applies the moment ONE of them sits inside a container, and judging it by the
