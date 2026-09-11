@@ -169,7 +169,11 @@ grep -Fq 'warn(e.stack || e.message);' "$g" \
 # `|| true` is required: grep -c exits 1 on zero matches, and an assignment
 # from a failing command substitution aborts under `set -e` -- which would
 # skip this very assertion instead of failing it.
-n=$(grep -c 'console\.\(log\|error\)' "$g" || true)
+# Count EVERY console.* call, not just log|error: console.warn, .info, .debug
+# and .trace all write to stdout/stderr and all bypass scrub(), because they
+# are direct calls rather than say()/warn(). Verified -- console.warn leaking
+# the key in an adapter error path passed the whole suite before this widened.
+n=$(grep -c 'console\.' "$g" || true)
 [ "$n" = 2 ] || fail "$g must funnel all output through say()/warn(); found $n console calls, expected 2"
 # A leak does not need console.*: process.stderr.write reaches fd 2 just as
 # well, and the count above cannot see it. Verified -- writing the raw key
@@ -201,9 +205,12 @@ grep -Fq 'b64_json' "$g" || fail "$g does not read OpenAI's base64 payload"
 # response_format must appear exactly once: in the Google body. The gpt-image
 # models reject the parameter outright, so it must never reach OpenAI.
 # Counted on a comment-stripped copy, because a pin that matches prose forces
-# comments to be worded around it instead of naming the rule. Only full-line
-# // comments are stripped -- a naive // strip would eat the https:// in the
-# endpoint URLs and silently void the endpoint pins above.
+# comments to be worded around it instead of naming the rule. The first
+# substitution strips only full-line // comments -- a naive // strip would eat
+# the https:// in the endpoint URLs and silently void the endpoint pins above.
+# The second strips /* */ block comments wherever they appear, which would
+# also eat one inside a string literal; nothing in this file has one, and the
+# stripped copy is used for exactly one thing -- counting response_format.
 gs="$tmp/image-gen-stripped.mjs"
 perl -0pe 's{^\s*//[^\n]*$}{}gm; s{/\*.*?\*/}{}gs' "$g" > "$gs" \
   || fail "could not strip comments from $g"
