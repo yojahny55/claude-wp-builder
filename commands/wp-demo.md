@@ -188,12 +188,11 @@ before writing any markup.
    `feature-zigzag` has two slots of identical role, so any automatic mapping
    would be invented.
 
-   Show the table the planner printed and ask once.
-   **Costs are estimates, not a bill.** A yes on that table is the
-   authorisation for the whole plan; do not ask again per image. On a no,
-   edit the prompts in `demo/.image-plan.json` and re-run `plan` — an edited
-   prompt changes its hash, so it regenerates rather than serving the
-   previous plate.
+   Show the table the planner printed and ask once. **Costs are estimates, not a
+   bill.** A yes on that table is the authorisation for the whole plan; do not
+   ask again per image. On a no, edit the prompts in `demo/.image-plan.json` and
+   re-run `plan` — an edited prompt changes its hash, so it regenerates rather
+   than serving the previous plate.
 
    On a yes:
 
@@ -201,13 +200,12 @@ before writing any markup.
    node "${CLAUDE_PLUGIN_ROOT}/bin/image-gen.mjs" run --demo demo/
    ```
 
-   **The key comes from the environment and nowhere else.** It is
-   never pasted into chat, never written into `.wp-create.json`, never
-   echoed into a log or into the demo. With plates to generate and no key
-   set, the script exits 3 having written nothing and billed nothing, and
-   names the variable to export (`GEMINI_API_KEY` or `OPENAI_API_KEY`). That
-   is a stop, not a fallback: there is no placeholder path, and step 6's
-   `{{`-blocker still refuses the page.
+   **The key comes from the environment and nowhere else.** It is never pasted
+   into chat, never written into `.wp-create.json`, never echoed into a log or
+   into the demo. With plates to generate and no key set, the script exits 3
+   having written nothing and billed nothing, and names the variable to export
+   (`GEMINI_API_KEY` or `OPENAI_API_KEY`). That is a stop, not a fallback: there
+   is no placeholder path, and step 6's `{{`-blocker still refuses the page.
 
    Exit 4 means some slots failed while others succeeded. Plates already
    generated are kept and will not be re-billed on the next run.

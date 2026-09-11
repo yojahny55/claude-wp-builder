@@ -222,7 +222,14 @@ n=$(grep -c 'response_format' "$gs" || true)
 #    `inherits: true` pins pass in v3.2 while the rule sat commented out.
 d=commands/wp-demo.md
 ds="$tmp/wp-demo-stripped.md"
-perl -0pe 's{<!--.*?-->}{}gs' "$d" > "$ds"
+# Strip HTML comments so a rule parked in <!-- --> cannot satisfy a pin -- the
+# failure mode that let three `inherits: true` pins pass in v3.2 while the rule
+# sat commented out. Then collapse all whitespace to single spaces, so the pins
+# below test what the document SAYS rather than where its line breaks fall:
+# pinning line-scoped phrases forces prose to be rewrapped around the checks,
+# and a pure reflow would otherwise fail the build claiming a rule is missing.
+perl -0pe 's{<!--.*?-->}{}gs; s{\s+}{ }g' "$d" > "$ds" \
+  || fail "could not build the stripped copy of $d"
 grep -Fq 'image-gen.mjs" plan --demo demo/' "$ds" \
   || fail "$d does not run the image planner"
 grep -Fq 'image-gen.mjs" run --demo demo/' "$ds" \
@@ -237,13 +244,18 @@ grep -Fq 'never pasted into chat' "$ds" \
   || fail "$d does not state that the key is never pasted into chat"
 # Control: the step is inside wp-demo.md and NOT in wp-yolo.md, which must never
 # generate. A single shared pin would pass with the step in the wrong command.
+# Same comment-strip-and-collapse treatment, so this pin is immune to reflow too.
+y=commands/wp-yolo.md
+ys="$tmp/wp-yolo-stripped.md"
+perl -0pe 's{<!--.*?-->}{}gs; s{\s+}{ }g' "$y" > "$ys" \
+  || fail "could not build the stripped copy of $y"
 # Explicit `if`, not `grep && fail`: a failing command inside an && list has
 # subtle `set -e` semantics, and an assertion must not depend on reading them
 # right. Here the desired outcome is grep FAILING, which makes it acute.
-if grep -Fq 'image-gen.mjs' commands/wp-yolo.md; then
-  fail "commands/wp-yolo.md must never invoke the image generator"
+if grep -Fq 'image-gen.mjs' "$ys"; then
+  fail "$y must never invoke the image generator"
 fi
-grep -Fq 'never generates images' commands/wp-yolo.md \
-  || fail "commands/wp-yolo.md does not state that it never generates images"
+grep -Fq 'never generates images' "$ys" \
+  || fail "$y does not state that it never generates images"
 
 echo PASS
