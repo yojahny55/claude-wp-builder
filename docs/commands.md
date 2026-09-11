@@ -162,8 +162,9 @@ the browser supports `animation-timeline: view()` and the reader has not asked f
 motion; `motion.js` yields that device there and runs every other one. Without the stylesheet a
 demo in a modern browser reveals nothing. Sections are built from the composition library, whose
 size-based breakpoints are `@container` queries against each composition's own container rather
-than the viewport — the fluid `vw` ramps in `clamp()` still key off the screen, which is recorded
-open work. Plain mode is the existing single-file demo with no motion contract.
+than the viewport, and the fluid ramps in `clamp()` read `cqi` against that same container — the
+four that stay `vw` are sized against the screen on purpose and each carries a comment saying so.
+Plain mode is the existing single-file demo with no motion contract.
 
 Each round of the craft loop runs `/wp-demo-verify demo/` — served over HTTP, not `file://` —
 for the `impeccable detect` gate and a machine walk. `no-engine` (a page with zero `data-motion`
@@ -305,12 +306,16 @@ Eight machine findings, six blocking and two advisory. Blocking: `dead-scroll` (
 moved — including nothing samplable at all, the `file://`-blocked-engine case — or a
 `reveal`-only section whose child does not move between just-below-the-fold and fully-entered,
 unless `demo/BRIEF.md` records the silence as authored), `no-engine` (a page carrying zero
-`data-motion` devices), `container-noop` (an `@container` rule whose subject has no ancestor
-declaring `container-type`, so the rule never applies), `cue-never-peaks` (a cue that never
+`data-motion` devices — counted document-wide, so a plain `<section>` on a page that does move
+reports nothing at all), `container-noop` (an `@container` rule whose subject has no ancestor
+declaring `container-type`, so the rule never applies — collected at any nesting depth, including
+inside `@media`, `@supports` and `@layer`), `cue-never-peaks` (a cue that never
 reaches full opacity), `overflow` (horizontal), and `clipped-copy` (copy clipped by its own
 hidden-overflow box). Advisory — printed with `[advisory]`, written to `findings.json` with
-`"advisory": true`, never raise the exit code: `unobserved` (a section the walk genuinely could
-not read — the harness cannot tell that apart from a section that truly does not move) and
+`"advisory": true`, never raise the exit code: `unobserved` (a section whose own devices the walk
+could not read — counted inside that section's subtree, so a section carrying only pointer
+devices reports this instead of `dead-scroll`; the harness still cannot tell it apart from a
+section that truly does not move) and
 `external-module` (a `<script type="module">` that would silently fail to boot under `file://`
 instead of the HTTP server this walk uses). The craft loop in `/wp-demo` treats the six blocking
 kinds as round failures and writes `demo/FAILED.md` at the three-round cap; `unobserved` and

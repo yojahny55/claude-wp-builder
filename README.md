@@ -176,7 +176,8 @@ catalogue of 64 real-brand DESIGN.md files, classifies the client's domain again
 and inventories every image, SVG and font under `docs/` into `demo/BRIEF.md` with a role, used
 or named with a reason. It builds every section from the plugin's composition library — every
 composition's size-based breakpoints are `@container` queries against its own container rather
-than the viewport, though its fluid `vw` ramps in `clamp()` still key off the screen — and loops
+than the viewport, and its fluid ramps in `clamp()` read `cqi` and track that container too,
+except for the four that are sized against the screen on purpose — and loops
 on `npx -y impeccable@4 detect`, a seven-line critique rubric, and a `demo-verify.mjs` walk
 (served over HTTP, not `file://`; `no-engine` and `container-noop` join `dead-scroll` as
 blocking findings, `unobserved` and `external-module` stay advisory) for at most three rounds. A

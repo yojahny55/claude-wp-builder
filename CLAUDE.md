@@ -244,9 +244,29 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   1280px; }` alongside `:root`, so an invalid value falls back to `initial-value`
   instead. Where `@property` is unsupported, the `1280px` `var()` fallback remains
   the only guard, and it still covers only the absent case.
-- **`unobserved` is a confession, not a measurement.** A section that genuinely
-  does not move and a section the harness cannot read are still not distinguished
-  by the harness — only by which finding it emits and what the operator does next.
+- **`unobserved` is a confession, not a measurement.** It is now a per-section
+  judgment — `probe()` counts devices inside the section's own subtree, so a section
+  carrying only pointer devices (`tilt`, `magnet`, `spotlight`) reports it instead of
+  falling to a blocking `dead-scroll` — but a section that genuinely does not move and
+  a section the harness cannot read are still not distinguished by the harness, only
+  by which finding it emits and what the operator does next. `no-engine` stays
+  document-wide on purpose: scoping it too would fire on every ordinary static section.
+- **The harness changes were measured on a composition corpus, not on a client
+  build.** The v1.15.0 baseline demo named in the plan no longer exists on disk — that
+  project is now a WordPress install and its demo was consumed into the theme — so the
+  before/after walk was run on a five-page corpus assembled from the thirteen in-repo
+  compositions instead, with the release commit's `demo-verify.mjs` and with HEAD's.
+  That proves the harness changed behaviour as intended; it does not prove what a
+  messy real build now scores, and a composition corpus is cleaner than one.
+- **Two verification paths are still not covered.** Item F's last preview-token bypass
+  — a reassignment at `composition-preview.mjs`'s render call site, which happens after
+  `--tokens` has exited and which no assertion on that output can see — needs the render
+  itself to close. And `motion.js`'s GSAP `reveal` branch is never walked, because
+  nothing in the suite runs a browser without `animation-timeline`.
+- **`motion.js:147` sets `overflowX` on the rail, not on the frame.** Same bug class as
+  the `process-rail` reduced-motion fix, one layer down and currently inert: the rail is
+  `width: max-content`, so it can never overflow internally and the assignment does
+  nothing. Not fixed in this round; it becomes real the day the rail takes a width.
 - **Verification serves over HTTP; the delivered demo is a `file://` artifact.**
   A defect that only appears when the file is double-clicked can pass a green walk.
   `external-module` findings name the one case known to matter.

@@ -34,11 +34,15 @@
   `clamp()` gaps, padding and type scales still keyed off the viewport, so a
   section dropped into a narrow column laid out for the column and then took
   desktop-maximum spacing anyway — 40 occurrences across 12 of the 13
-  compositions. 37 now read `cqi`, tracking the block's own inline size. The
-  remaining 3 — the display headline of each full-bleed hero (`hero-bleed`,
-  `hero-split`, `hero-type`) — stay `vw`, each with a comment recording that it
-  is sized against the viewport on purpose: a hero in a narrow column is not a
-  scenario those compositions serve. `tests/checks/wp-craft-compositions.sh`
+  compositions. 36 now read `cqi`, tracking the block's own inline size. The
+  remaining 4 stay `vw`, each with a comment recording why. Three are the display
+  headline of each full-bleed hero (`hero-bleed`, `hero-split`, `hero-type`),
+  sized against the viewport on purpose: a hero in a narrow column is not a
+  scenario those compositions serve. The fourth is `feature-zigzag`'s root `gap`,
+  which *cannot* be `cqi` — that rule is the element declaring `container-type`,
+  and an element never matches a container query against the container it
+  establishes itself, so `cqi` there would resolve against the viewport while
+  reading as if it tracked the block. `tests/checks/wp-craft-compositions.sh`
   asserts every remaining `vw` carries that justification on its own line or the
   line directly above it, so one justified ramp can no longer green-light every
   other `vw` left in the same file.
@@ -89,6 +93,43 @@
   (`querySelectorAll`) and `parentElement`-rooted ancestor walk unchanged.
   `skills/wp-demo-craft/references/verify.md` and `CLAUDE.md` no longer record
   the top-level-only scope as a known limit.
+
+### Changed
+- **All 26 composition previews re-rendered against the changed CSS.** Nine moved,
+  all of them at 1440 and none at 390, and the split is arithmetic rather than luck.
+  A container query length resolves against the query container's *content* box, so
+  on the nine compositions whose root carries both `container-type: inline-size` and
+  the `padding-inline` content inset, `cqi` at a 1440 viewport is 13.44px against
+  `vw`'s 14.4 — every converted ramp inside an active `clamp()` band lands 4-7%
+  smaller, which is the conversion doing exactly what it says. `hero-split`,
+  `hero-type` and `process-rail` did not move because their inset sits on `__inner`
+  / `__frame` rather than on the container, so `cqi` there equals `vw`; `footer-line`
+  carries no fluid ramp at all. No preview moved at 390: at that width every
+  converted ramp is already pinned to its `clamp()` minimum under both units. No
+  composition changed structurally, which is the signal that no ramp was converted
+  in the wrong place.
+- **The before/after walk was measured on a composition corpus, not on the v1.15.0
+  client demo.** That demo no longer exists on disk — the project is now a WordPress
+  install and the demo was consumed into the theme — so the comparison was made
+  two-sided instead of historical: a five-page corpus assembled from the thirteen
+  in-repo compositions (`composition-gate.sh`'s document shape plus the generated
+  `:root`, `motion.css`, GSAP and `motion.js`) was walked twice, once with
+  `bin/demo-verify.mjs` as of 1.15.0 and once with this revision. Release: **0
+  findings, exit 0**. This revision: **16 `unobserved`, 0 of every other kind, exit
+  0** — advisory, so the exit code is unchanged. Every one of the 16 is a parallax
+  image that is its own bounds entry (`hero-bleed__bed`, and `hero-split`'s unclassed
+  `<img>`): a one-device subtree whose only device publishes no `--motion-p`, which
+  the document-wide count could never see because the reveals elsewhere on the page
+  kept `samplable` non-zero. That is the per-section scoping, on a real page, and
+  nothing else in the corpus moved: no `dead-scroll`, no `no-engine`, no
+  `container-noop` in either walk — the library's nested `@container` rules all match,
+  so the deeper recursion found nothing new to report on clean input. A composition
+  corpus is cleaner than a real client build, so this shows the harness changed
+  behaviour as intended without showing what a messy build now scores; the ceiling is
+  recorded in `CLAUDE.md`.
+- README and `docs/commands.md` no longer describe the fluid `vw` ramps as open work,
+  and state that `unobserved` is counted per section while `no-engine` stays
+  document-wide.
 
 ## [1.15.0] - 2026-09-10
 
