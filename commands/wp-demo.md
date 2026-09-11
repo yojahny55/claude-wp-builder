@@ -161,7 +161,9 @@ before writing any markup.
    which are what every composition's CSS already uses, not plain mode's
    `--color-primary` set. The section delimiters are the ones plain mode uses,
    unchanged, because `/wp-section` reads them either way.
-   Emit this immediately before the `:root` block, in the same `<style>`:
+   Emit this **on every page this step writes** — `index.html` and each interior
+   page alike, since each carries its own `<style>` — immediately before that
+   page's `:root` block and in the same `<style>`:
 
    ```css
    @property --container-max { syntax: "<length>"; inherits: true; initial-value: 1280px; }

@@ -214,8 +214,8 @@ The user can override any field. Once confirmed, use these values for the rest o
   A craft demo's sections are copied from `skills/wp-demo-craft/compositions/`, whose
   CSS names its own tokens — `--color-canvas`, `--color-surface`, `--color-ink`,
   `--color-ink-soft`, `--color-accent`, `--color-accent-ink`, `--color-hairline`,
-  `--font-display`, `--font-text`, `--space-section`, `--space-gutter`, `--radius-sm`,
-  `--radius-md` — while the starter's own CSS names `--color-primary` and its
+  `--font-display`, `--font-text`, `--space-section`, `--space-gutter`, `--container-max`,
+  `--radius-sm`, `--radius-md` — while the starter's own CSS names `--color-primary` and its
   siblings. Only `--color-accent` is in both. Write one set and half the theme
   resolves properties nothing defines and renders unstyled, which is a failure with
   no error message. So write the craft vocabulary from `demo/DESIGN.md` front matter
@@ -237,6 +237,33 @@ The user can override any field. Once confirmed, use these values for the rest o
   | `--color-gray` | `var(--color-ink-soft)` | muted secondary text |
   | `--font-primary` | `var(--font-display)` | heading face |
   | `--font-secondary` | `var(--font-text)` | body face |
+
+  **`--container-max` travels with its `@property` guard, or the theme reproduces a
+  bug the demo no longer has.** Every composition's gutter rule is
+  `padding-inline: max(var(--space-gutter), calc((100% - var(--container-max, 1280px)) / 2))`,
+  and `/wp-section` copies those thirteen rules into the delivered theme verbatim.
+  The `var()` fallback covers a token that is *absent*; it does not cover one that is
+  present and malformed (`wide`, an empty string), because `var()` substitutes the bad
+  value and `calc()` is then invalid at computed-value time — which unsets
+  `padding-inline` to `0` at every viewport, phones included. So write
+  `--container-max` into the `@theme` block from `demo/DESIGN.md`'s `spacing.container`
+  alongside the tokens above, **and emit this at the top level of
+  `assets/css/src/tailwindcss/main.css`** (not inside `@theme`, which takes plain
+  variable declarations only):
+
+  ```css
+  @property --container-max { syntax: "<length>"; inherits: true; initial-value: 1280px; }
+  ```
+
+  `inherits: true` is not decoration: registered with `inherits: false` the
+  well-formed `:root` value stops reaching the sections that read it, which breaks the
+  working case as well as the malformed one. Measured at a 1920 viewport on the exact
+  gutter rule above: `1440px` → 232px with the rule and without it (unchanged), `wide`
+  → 312px with it and **0px** without, empty → 312px with it and **0px** without.
+  `commands/wp-demo.md` Step 6 emits the identical rule into the demo; without this
+  step the theme the client actually receives is the one layer that still has neither
+  guard. Where `@property` is unsupported the rule is ignored and the `1280px` `var()`
+  fallback still covers the absent case, so it needs no `@supports` guard.
 
   **Alias by role, never by lightness.** A craft palette is often dark, so on such a
   build `--color-light` resolves to a near-black canvas and `--color-dark` to a bone

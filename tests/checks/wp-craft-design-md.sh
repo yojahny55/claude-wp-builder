@@ -125,9 +125,36 @@ echo "$ws" | grep -Fq 'syntax: "<length>"' \
 # Measured at 1920 with a valid 1440px token: inherits:true -> 240px padding,
 # inherits:false -> 320px. That breaks the working case, not just the malformed
 # one, which is strictly worse than the bug this rule was added to fix.
-echo "$ws" | grep -Fq 'inherits: true' \
+echo "$ws" | tr '\n' ' ' | grep -Eq '@property --container-max[[:space:]]*\{[^}]*inherits: true' \
   || fail "$w's @property rule does not set inherits: true, so a well-formed --container-max at :root never reaches the sections that read it"
-grep -Fq 'inherits: true' "$r" \
+# Step 6 writes one file per page, and the instruction beside the rule was
+# singular ("in the same <style>"), which a builder can satisfy by emitting it on
+# index.html alone — every interior page then keeps the unguarded token and the
+# original bug. The sentence has to say every page out loud.
+echo "$ws" | grep -Fq 'on every page this step writes' \
+  || fail "$w does not tell the build to emit the @property rule on every page, so an interior page keeps the unguarded --container-max"
+# ...and the theme the client actually receives. /wp-section copies thirteen
+# `calc((100% - var(--container-max, 1280px)) / 2)` gutter rules into it, so a
+# Step D4 that writes the craft tokens without --container-max and without its
+# registration reproduces the same padding-inline: 0 one layer down, in the
+# artifact that ships. Measured at 1920 on that rule: `wide` and empty both give
+# 0px without the rule and 312px with it. Comment-stripped for the same reason
+# as $w: the rule lives in a fenced css block.
+i4=commands/wp-init.md
+i4s="$(perl -0pe 's{/\*.*?\*/}{}gs' "$i4")"
+echo "$i4s" | grep -Eq '@property --container-max[[:space:]]*\{' \
+  || fail "$i4 Step D4 does not emit @property for --container-max, so a malformed token unsets padding-inline in the delivered theme"
+echo "$i4s" | grep -Fq 'syntax: "<length>"' \
+  || fail "$i4's @property rule does not constrain --container-max to a length"
+echo "$i4s" | tr '\n' ' ' | grep -Eq '@property --container-max[[:space:]]*\{[^}]*inherits: true' \
+  || fail "$i4's @property rule does not set inherits: true, so a well-formed --container-max never reaches the theme's sections"
+# The registration alone is only half: with no --container-max in @theme every
+# section falls back to initial-value and the demo's content width is lost. The
+# token has to be written too, and named in the craft token list Step D4 writes.
+echo "$i4s" | grep -Fq -- '`--space-gutter`, `--container-max`' \
+  || fail "$i4 Step D4 does not write --container-max into the @theme block, so the theme loses the demo's content width"
+
+tr '\n' ' ' < "$r" | grep -Eq '@property --container-max[[:space:]]*\{[^}]*inherits: true' \
   || fail "$r's @property rule does not set inherits: true, so a well-formed --container-max never reaches the preview's sections"
 grep -Eq '@property --container-max[[:space:]]*\{' "$r" \
   || fail "$r does not emit @property, so previews and client demos differ"

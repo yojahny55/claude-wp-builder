@@ -3,6 +3,28 @@
 ## [Unreleased]
 
 ### Fixed
+- **The `@property --container-max` guard stopped at the demo; the delivered
+  theme reproduced the bug it closed.** `/wp-section` copies thirteen
+  `padding-inline: max(var(--space-gutter), calc((100% - var(--container-max,
+  1280px)) / 2))` rules into the theme, but `/wp-init` Step D4 wrote neither the
+  token nor its registration into the Tailwind `@theme` block, so a malformed
+  value there unset `padding-inline` to `0` at every viewport in the artifact the
+  client actually receives. Step D4 now writes `--container-max` from
+  `demo/DESIGN.md`'s `spacing.container` and emits the same `@property` rule at
+  the top level of `main.css`. Measured at a 1920 viewport on that exact gutter
+  rule: `1440px` → 232px either way, `wide` → 312px with the rule and 0px
+  without, empty → 312px with and 0px without.
+- **`/wp-demo` Step 6 told the build to emit the `@property` rule "in the same
+  `<style>`", inside a step that writes one file per page.** A builder could
+  satisfy that on `index.html` alone and leave every interior page with the
+  unguarded token. The instruction now says every page this step writes, and the
+  suite pins the wording.
+- **Three records had the `overflow-y` rationale backwards.** The composition
+  comment, the check beside it and the CHANGELOG all said the implicit `auto`
+  would "silently clip". `auto` scrolls — it would add a second, vertical
+  scrollbar to a horizontal scroller; `hidden`, the value actually chosen, is the
+  one that clips, and clipping is what is wanted there. All three now say what
+  each value does.
 - **Both composition unit gates pinned one spelling and let the whole family
   past.** The `vw` justification loop fed on a literal `[0-9.]vw`, so a `6dvw`
   or `6vmin` ramp dropped into a composition with no comment passed (rc=0,
