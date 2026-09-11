@@ -166,12 +166,13 @@ because `motion.js` drives reveal in GSAP there and a GSAP tween is invisible to
 `getAnimations()` — a working section would otherwise read `none` at both
 samples and be reported dead.
 
-One more, in the `@container` lint itself, and it is not a bug: it walks only
-each sheet's **top-level** `cssRules`, so an `@container` block nested inside
-`@media`, `@supports` or `@layer` is never linted at all — `proof-row`'s own CSS
-already nests `@media` inside `@supports`, so generated demos plausibly nest
-container queries too. That makes the lint under-report; it does not make it
-fire falsely.
+It used to walk only each sheet's **top-level** `cssRules`, so an `@container`
+block nested inside `@media`, `@supports` or `@layer` was never linted at all —
+`proof-row`'s own CSS already nests `@media` inside `@supports`, so generated
+demos plausibly nest container queries too. The lint now recurses into
+`CSSMediaRule`, `CSSSupportsRule` and `CSSLayerBlockRule` bodies and collects
+every `@container` rule it finds at any depth, so a nested block is linted the
+same as a top-level one.
 
 It used to judge a selector by `document.querySelector(sel)`, its **first**
 match only, which was a false positive and not an under-report: a selector

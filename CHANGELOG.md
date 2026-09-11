@@ -29,6 +29,16 @@
   `commands/wp-demo-verify.md` record `unobserved` as a per-section judgment, name
   the pointer devices that produce it, and state that a device-free section is not a
   defect.
+- **`containerAudit()` never saw an `@container` rule nested inside `@media`,
+  `@supports` or `@layer`.** The lint walked only each stylesheet's top-level
+  `cssRules`, so a rule nested even one level down was silently unlinted — the
+  exact failure class `container-noop` exists to catch, and `proof-row`'s own CSS
+  already nests `@media` inside `@supports`. The sheet loop now recurses into
+  `CSSMediaRule`, `CSSSupportsRule` and `CSSLayerBlockRule` bodies and collects
+  every `@container` rule found at any depth, keeping the existing all-matches
+  (`querySelectorAll`) and `parentElement`-rooted ancestor walk unchanged.
+  `skills/wp-demo-craft/references/verify.md` and `CLAUDE.md` no longer record
+  the top-level-only scope as a known limit.
 
 ## [1.15.0] - 2026-09-10
 

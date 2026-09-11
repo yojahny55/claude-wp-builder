@@ -396,36 +396,49 @@ const revealState = (idx) => {
 const containerAudit = () => {
   const out = [];
   const sheets = [...document.styleSheets];
+  // @container nested inside @media, @supports or @layer was never linted — a
+  // silent false negative in a lint whose whole job is finding rules that
+  // silently do nothing. proof-row already nests @media inside @supports.
+  const containerRules = [];
+  const collect = (rules) => {
+    for (const rule of rules) {
+      const n = rule.constructor.name;
+      if (n === 'CSSContainerRule') containerRules.push(rule);
+      else if (n === 'CSSMediaRule' || n === 'CSSSupportsRule' || n === 'CSSLayerBlockRule') {
+        try { collect([...rule.cssRules]); } catch { /* not a grouping rule at runtime */ }
+      }
+    }
+  };
   for (const sheet of sheets) {
     let rules;
     try { rules = [...sheet.cssRules]; } catch { continue; } // cross-origin
-    for (const rule of rules) {
-      if (rule.constructor.name !== 'CSSContainerRule') continue;
-      for (const inner of [...rule.cssRules]) {
-        const sel = inner.selectorText;
-        if (!sel) continue;
-        // Every match, not the first: a selector matching several elements
-        // applies as soon as ONE of them sits inside a container, and judging
-        // it by document.querySelector(sel) reported that rule as dead when the
-        // first match happened to be the one outside. container-noop is
-        // blocking, so that false positive failed a round on correct CSS.
-        let els;
-        try { els = document.querySelectorAll(sel); } catch { continue; }
-        if (!els.length) continue;
-        let found = false;
-        for (const el of els) {
-          // An element never matches a container query against the container it
-          // establishes itself, so start the walk at its parent.
-          let node = el.parentElement;
-          while (node) {
-            const ct = getComputedStyle(node).containerType;
-            if (ct && ct !== 'normal') { found = true; break; }
-            node = node.parentElement;
-          }
-          if (found) break;
+    collect(rules);
+  }
+  for (const rule of containerRules) {
+    for (const inner of [...rule.cssRules]) {
+      const sel = inner.selectorText;
+      if (!sel) continue;
+      // Every match, not the first: a selector matching several elements
+      // applies as soon as ONE of them sits inside a container, and judging
+      // it by document.querySelector(sel) reported that rule as dead when the
+      // first match happened to be the one outside. container-noop is
+      // blocking, so that false positive failed a round on correct CSS.
+      let els;
+      try { els = document.querySelectorAll(sel); } catch { continue; }
+      if (!els.length) continue;
+      let found = false;
+      for (const el of els) {
+        // An element never matches a container query against the container it
+        // establishes itself, so start the walk at its parent.
+        let node = el.parentElement;
+        while (node) {
+          const ct = getComputedStyle(node).containerType;
+          if (ct && ct !== 'normal') { found = true; break; }
+          node = node.parentElement;
         }
-        if (!found) out.push(sel);
+        if (found) break;
       }
+      if (!found) out.push(sel);
     }
   }
   return [...new Set(out)];

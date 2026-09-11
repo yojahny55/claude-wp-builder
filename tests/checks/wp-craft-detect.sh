@@ -232,10 +232,33 @@ grep -Fq "kind: 'container-noop'" "$vs" \
 # never matches the container the queried element establishes itself, so
 # starting at the element instead of its parent misses that case silently.
 # The rule filter itself. Renaming the class it matches ('CSSContainerRuleX') makes
-# the loop `continue` on every rule in every sheet: the lint is permanently silent,
-# every line of it still present, and the run exits 0.
-grep -Fq "if (rule.constructor.name !== 'CSSContainerRule') continue;" "$vs" \
+# the recursive collector skip every rule in every sheet: the lint is permanently
+# silent, every line of it still present, and the run exits 0.
+grep -Fq "if (n === 'CSSContainerRule') containerRules.push(rule);" "$vs" \
   || fail "$v does not filter styleSheet rules on exactly CSSContainerRule, so a renamed or altered comparison skips every rule and the container lint is permanently silent"
+# An @container nested inside @media, @supports or @layer was never linted at
+# all — a silent false negative in a lint whose whole job is finding rules
+# that silently do nothing. proof-row's own CSS nests @media inside @supports,
+# so generated demos plausibly nest container queries too. Each grouping type
+# is pinned on its own: deleting just the @media branch (or just @layer) still
+# leaves the other two present and this loop green, so a partial regression
+# needs its own line to be caught. Anchored on the quoted literal, closing
+# quote included ('CSSMediaRule'), not the bare word: a bare 'CSSMediaRule'
+# grep is satisfied by the substring inside a typo like 'CSSMediaRuleX', which
+# breaks the comparison (constructor.name is never that string) while leaving
+# the check green — caught by hand while writing this suite, not by the brief.
+grep -Fq "'CSSMediaRule'" "$vs" \
+  || fail "$v does not recurse into @media, so a nested @container rule is never linted"
+grep -Fq "'CSSSupportsRule'" "$vs" \
+  || fail "$v does not recurse into @supports, so a nested @container rule is never linted"
+grep -Fq "'CSSLayerBlockRule'" "$vs" \
+  || fail "$v does not recurse into @layer, so a nested @container rule is never linted"
+# The three constructor-name pins above stay green even with the recursive
+# call itself commented out: the type names live on the `else if` line, not
+# inside the `try` block that actually descends. Pin the call too, so deleting
+# it (rather than the branch that names the types) is caught.
+grep -Fq 'collect([...rule.cssRules]);' "$vs" \
+  || fail "$v declares which grouping rules to recurse into but never calls collect() on their nested cssRules, so a nested @container is still never visited"
 # EVERY match, not the first. `querySelectorAll` -> `querySelector` reinstates a
 # blocking false positive on valid CSS: a selector matching several elements
 # applies the moment ONE of them sits inside a container, and judging it by the
@@ -360,11 +383,19 @@ grep -Fq '131px/129px' skills/wp-demo-craft/references/verify.md \
 grep -Fq 'a measured padding under roughly 16px' skills/wp-demo-craft/references/verify.md \
   || fail "verify.md dismisses cramped-padding with no lower bound, so a 0px padding from a collapsed token is dismissed alongside the 131px false positives"
 
-# The @container lint's own scope, recorded rather than fixed: a limit nobody
-# wrote down is indistinguishable from a bug, and this branch's whole thesis is
-# that an untrustworthy gate gets dismissed wholesale.
-grep -Fq "each sheet's **top-level** \`cssRules\`" skills/wp-demo-craft/references/verify.md \
-  || fail "verify.md does not record that the @container lint reads only top-level cssRules, so an @container nested in @media/@supports/@layer is silently unlinted"
+# The @container lint's scope limit is retired, not recorded: it now recurses
+# into @media/@supports/@layer, so a stale "top-level only" line would teach a
+# build to keep dismissing a nested @container as unlinted when it is not.
+grep -Fq 'The lint now recurses into' skills/wp-demo-craft/references/verify.md \
+  || fail "verify.md does not record that the @container lint now recurses into @media/@supports/@layer bodies"
+grep -Fq '`CSSMediaRule`, `CSSSupportsRule` and `CSSLayerBlockRule` bodies' skills/wp-demo-craft/references/verify.md \
+  || fail "verify.md does not name all three grouping rule types the @container lint now recurses into"
+if grep -Fq 'it walks only each sheet' skills/wp-demo-craft/references/verify.md; then
+  fail "verify.md still records the retired top-level-only limit as current behaviour"
+fi
+if grep -Fq 'The `@container` lint under-reports in one known way' CLAUDE.md; then
+  fail "CLAUDE.md still lists the retired @container top-level-only limit as a known ceiling"
+fi
 # The first-match limit is retired, not recorded: it was a blocking false
 # positive, not an under-report, so the file must say the lint reads every match
 # — a stale "first match only" line teaches a build to dismiss a finding that is
