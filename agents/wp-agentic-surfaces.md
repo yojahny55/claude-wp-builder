@@ -19,9 +19,9 @@ WP-CLI.
 Before writing any file or running any command, read the project files:
 
 1. **`.claude/CLAUDE.md`** — Extract:
-   - The **function prefix** (e.g., `kairo_`, `acme_`) — substitute it for every `<prefix>` in the templates below
+   - The **function prefix** (recorded with a trailing underscore, e.g., `kairo_`). Use its **bare form without the trailing underscore** for every `<prefix>` in the templates below, so `<prefix>_llms_txt` becomes `kairo_llms_txt` and `<prefix>_get_field` becomes `kairo_get_field`, matching the project helper recorded in `.claude/CLAUDE.md`. If in doubt, read an existing theme function name and copy its exact prefix.
    - The **theme slug** and **theme path** (where `functions.php` and `inc/` live)
-   - The **industry** (a local/business value means the identity graph is `LocalBusiness`, otherwise `Organization`)
+   - The **industry** (a local/business value means set `<prefix>_industry_is_local()` to `true`; otherwise leave it `false`)
    - The **languages** configured
 
 2. **`.wp-create.json`** — Extract:
@@ -54,19 +54,27 @@ that 7.4 lacks.
 
 defined( 'ABSPATH' ) || exit;
 
-// 1. Dynamic llms.txt + modular per-page llms.txt.
+// 1. Dynamic llms.txt + modular per-area llms.txt.
 add_action( 'init', function () {
     add_rewrite_rule( '^llms\.txt$', 'index.php?<prefix>_agent=llms', 'top' );
     add_rewrite_rule( '^agents\.md$', 'index.php?<prefix>_agent=agents', 'top' );
-    add_rewrite_rule( '^pricing\.md$', 'index.php?<prefix>_agent=pricing', 'top' );
     add_rewrite_rule( '^\.well-known/agent-skills/index\.json$', 'index.php?<prefix>_agent=skills', 'top' );
     add_rewrite_rule( '^\.well-known/ard\.json$', 'index.php?<prefix>_agent=ard', 'top' );
     add_rewrite_rule( '^\.well-known/ai-catalog\.json$', 'index.php?<prefix>_agent=ard', 'top' );
-    add_rewrite_rule( '^\.well-known/api-catalog$', 'index.php?<prefix>_agent=api_catalog', 'top' );
+    // Modular per-area index, e.g. /services/llms.txt. Added after the exact routes
+    // so /llms.txt itself is never captured by the slug pattern.
+    add_rewrite_rule( '^([a-z0-9][a-z0-9-]*)/llms\.txt$', 'index.php?<prefix>_agent=area&<prefix>_agent_area=$matches[1]', 'top' );
+    // pricing.md and api-catalog are merchant/SaaS surfaces only. A content site must
+    // not emit these routes at all (GEO-A22 / GEO-A24 stay N/A, not falsely resolved).
+    if ( <prefix>_is_merchant_or_saas() ) {
+        add_rewrite_rule( '^pricing\.md$', 'index.php?<prefix>_agent=pricing', 'top' );
+        add_rewrite_rule( '^\.well-known/api-catalog$', 'index.php?<prefix>_agent=api_catalog', 'top' );
+    }
 } );
 
 add_filter( 'query_vars', function ( $vars ) {
     $vars[] = '<prefix>_agent';
+    $vars[] = '<prefix>_agent_area';
     return $vars;
 } );
 
@@ -74,6 +82,14 @@ add_action( 'template_redirect', function () {
     $which = get_query_var( '<prefix>_agent' );
     if ( ! $which ) {
         return;
+    }
+    if ( 'area' === $which ) {
+        nocache_headers();
+        header( 'Content-Type: text/plain; charset=utf-8' );
+        if ( function_exists( '<prefix>_area_llms_txt' ) ) {
+            echo call_user_func( '<prefix>_area_llms_txt', get_query_var( '<prefix>_agent_area' ) ); // phpcs:ignore WordPress.Security.EscapeOutput
+        }
+        exit;
     }
     $routes = array(
         'llms'        => array( '<prefix>_llms_txt',    'text/plain' ),
@@ -157,30 +173,53 @@ function <prefix>_is_merchant_or_saas() {
         return true;
     }
     foreach ( array_keys( rest_get_server()->get_namespaces() ) as $ns ) {
-        if ( 'oembed' !== $ns && 0 !== strpos( $ns, 'wp/' ) ) {
-            return true;
+        // Core registers wp/v2, wp-site-health/v1, wp-block-editor/v1, wp-abilities/v1,
+        // oembed/1.0 and batch/v1 — all prefix `wp-`, `wp/`, `oembed` or `batch`.
+        // Anything outside that set is a genuine public API. A stock install therefore
+        // returns false here and emits neither pricing.md nor api-catalog.
+        if ( 0 === strpos( $ns, 'wp-' ) || 0 === strpos( $ns, 'wp/' ) ) {
+            continue;
         }
+        if ( 'oembed' === $ns || 0 === strpos( $ns, 'oembed/' ) ) {
+            continue;
+        }
+        if ( 'batch' === $ns || 0 === strpos( $ns, 'batch/' ) ) {
+            continue;
+        }
+        return true;
     }
     return false;
 }
 
+/**
+ * Industry flag — wp-agentic-surfaces sets this to `true` only when
+ * `.claude/CLAUDE.md` records a local/business industry. It defaults to `false` so a
+ * content site never emits LocalBusiness.
+ */
+function <prefix>_industry_is_local() {
+    return false;
+}
+
 function <prefix>_is_local_business() {
-    return '' !== <prefix>_option( 'address' );
+    return <prefix>_industry_is_local() && '' !== trim( (string) <prefix>_option( 'business_address' ) );
 }
 
 function <prefix>_option( $key, $fallback = '' ) {
-    if ( function_exists( 'get_field' ) ) {
+    $value = '';
+    if ( function_exists( '<prefix>_get_field' ) ) {
+        $value = <prefix>_get_field( $key, 'option' );
+    } elseif ( function_exists( 'get_field' ) ) {
         $value = get_field( $key, 'option' );
-        if ( ! empty( $value ) ) {
-            return $value;
-        }
+    }
+    if ( ! empty( $value ) ) {
+        return $value;
     }
     return get_option( '<prefix>_' . $key, $fallback );
 }
 
 function <prefix>_sameas_urls() {
     $urls = array();
-    foreach ( array( 'facebook', 'instagram', 'linkedin', 'twitter', 'youtube', 'github' ) as $network ) {
+    foreach ( array( 'facebook', 'instagram', 'tiktok', 'linkedin', 'youtube' ) as $network ) {
         $url = <prefix>_option( 'social_' . $network );
         if ( $url ) {
             $urls[] = $url;
@@ -207,20 +246,16 @@ function <prefix>_contact_point() {
 }
 
 function <prefix>_postal_address() {
-    $street = <prefix>_option( 'address' );
-    if ( ! $street ) {
+    // The starter exposes one free-text options-page address line
+    // (`business_address`, with an `_es` variant). Do not invent locality keys.
+    $street = trim( (string) <prefix>_option( 'business_address' ) );
+    if ( '' === $street ) {
         return array();
     }
-    $address = array(
-        '@type'           => 'PostalAddress',
-        'streetAddress'   => $street,
-        'addressLocality' => <prefix>_option( 'city' ),
-        'postalCode'      => <prefix>_option( 'postal_code' ),
+    return array(
+        '@type'         => 'PostalAddress',
+        'streetAddress' => $street,
     );
-    if ( <prefix>_option( 'country' ) ) {
-        $address['addressCountry'] = <prefix>_option( 'country' );
-    }
-    return $address;
 }
 
 /**
@@ -267,6 +302,29 @@ function <prefix>_llms_txt() {
     $out .= "\n## Contact\n";
     $out .= '- Website: ' . $home . "\n";
 
+    return $out;
+}
+
+/**
+ * Modular per-area llms.txt — GEO-A16. Served at /<slug>/llms.txt for a published
+ * page; a slug that does not resolve returns a real 404.
+ */
+function <prefix>_area_llms_txt( $area ) {
+    $area = sanitize_title( (string) $area );
+    $page = $area ? get_page_by_path( $area ) : null;
+    if ( ! $page || 'publish' !== $page->post_status ) {
+        status_header( 404 );
+        return "# 404 — Not found\n\nNo machine index exists for '" . $area . "'.\n\n- Site index: " . home_url( '/llms.txt' ) . "\n";
+    }
+    $out  = '# ' . get_bloginfo( 'name' ) . ' — ' . $page->post_title . "\n\n";
+    $out .= '> ' . <prefix>_llms_excerpt( $page ) . "\n\n";
+    $out .= "## In this area\n";
+    $out .= '- [' . $page->post_title . '](' . get_permalink( $page->ID ) . '): ' . <prefix>_llms_excerpt( $page ) . "\n";
+    foreach ( get_pages( array( 'child_of' => $page->ID, 'post_status' => 'publish' ) ) as $child ) {
+        $out .= '- [' . $child->post_title . '](' . get_permalink( $child->ID ) . '): ' . <prefix>_llms_excerpt( $child ) . "\n";
+    }
+    $out .= "\n## Site index\n";
+    $out .= '- Full machine summary: ' . home_url( '/llms.txt' ) . "\n";
     return $out;
 }
 
@@ -419,6 +477,14 @@ function <prefix>_rankmath_owns_schema() {
     return defined( 'RANK_MATH_VERSION' ) || class_exists( 'RankMath' );
 }
 
+/**
+ * JSON-LD encode. The HEX flags escape <, >, &, ' and " so an admin-set blog name or
+ * description containing `</script>` cannot break out of the script element.
+ */
+function <prefix>_jsonld( $data ) {
+    return wp_json_encode( $data, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
+}
+
 add_action( 'wp_head', function () {
     if ( <prefix>_rankmath_owns_schema() ) {
         return;
@@ -452,7 +518,7 @@ add_action( 'wp_head', function () {
     if ( $address ) {
         $graph['address'] = $address;
     }
-    echo '<script type="application/ld+json">' . wp_json_encode( $graph, JSON_UNESCAPED_SLASHES ) . '</script>' . "\n";
+    echo '<script type="application/ld+json">' . <prefix>_jsonld( $graph ) . '</script>' . "\n";
 }, 20 );
 
 /**
@@ -475,7 +541,7 @@ add_action( 'wp_head', function () {
         $position++;
     }
     $items[] = array( '@type' => 'ListItem', 'position' => $position, 'name' => get_the_title( $post ), 'item' => get_permalink( $post ) );
-    echo '<script type="application/ld+json">' . wp_json_encode( array( '@context' => 'https://schema.org', '@type' => 'BreadcrumbList', 'itemListElement' => $items ), JSON_UNESCAPED_SLASHES ) . '</script>' . "\n";
+    echo '<script type="application/ld+json">' . <prefix>_jsonld( array( '@context' => 'https://schema.org', '@type' => 'BreadcrumbList', 'itemListElement' => $items ) ) . '</script>' . "\n";
 }, 21 );
 
 /**
@@ -508,7 +574,7 @@ add_action( 'wp_head', function () {
     if ( ! $entities ) {
         return;
     }
-    echo '<script type="application/ld+json">' . wp_json_encode( array( '@context' => 'https://schema.org', '@type' => 'FAQPage', 'mainEntity' => $entities ), JSON_UNESCAPED_SLASHES ) . '</script>' . "\n";
+    echo '<script type="application/ld+json">' . <prefix>_jsonld( array( '@context' => 'https://schema.org', '@type' => 'FAQPage', 'mainEntity' => $entities ) ) . '</script>' . "\n";
 }, 22 );
 
 /**
@@ -675,7 +741,9 @@ echo 'Content-Signal: ' . ( false !== strpos( wp_remote_retrieve_body( \$res ), 
 ```
 
 A surface is fixed only when its route returns the right status and media type. Report
-each one; a write to the theme file is not proof.
+each one; a write to the theme file is not proof. This is one unauthenticated fetch per
+route: it proves the route works, not that every allowlisted AI user agent can reach it —
+GEO-A23 evidence comes from `wp-audit-geo`'s per-UA probe, not from this check.
 
 ---
 
@@ -701,21 +769,26 @@ reported by `wp-audit-geo` with a recommendation.
 | GEO-A13 | dynamic `/llms.txt` rewrite endpoint |
 | GEO-A14 | `#`/`>`/`##` structure and described links in `<prefix>_llms_txt()` |
 | GEO-A15 | links in `llms.txt` resolve to real permalinks |
-| GEO-A16 | per-area modular `llms.txt` rewrite support |
+| GEO-A16 | per-area modular `llms.txt` — generic `^<slug>/llms\.txt$` rewrite + `<prefix>_area_llms_txt()` |
 | GEO-A17 | "When to use" block in `<prefix>_llms_txt()` |
-| GEO-A18 | markdown negotiation keeps the agent token budget small |
 | GEO-A19 | `Accept: text/markdown` negotiation + `Vary: Accept` |
 | GEO-A20 | RFC 8288 `Link:` headers — the `wp_headers` filter |
 | GEO-A21 | `/.well-known/agent-skills/index.json` v0.2.0 with a `sha256:` digest |
 | GEO-A22 | `/.well-known/api-catalog` linkset — SaaS/API only |
 | GEO-A24 | `/pricing.md` — merchant/SaaS only |
-| GEO-A23 | crawler reachability of the routes above with each allowlisted UA |
 
-Codes the site type excludes are reported `N/A`; the advisory and off-site codes below are
-detected by `wp-audit-geo` and deliberately **not** fixed from the theme:
+One code is only **partly** addressable here, so it is not claimed resolved:
+
+| Code | What this fixer does, and what it cannot prove |
+|------|-------------------------------------------------|
+| GEO-A23 | Emits the robots allowlist and the routes, but per-UA reachability evidence belongs to `wp-audit-geo`, which probes each allowlisted user agent. The Step 5 check is a single unauthenticated fetch per route and does **not** prove A23. |
+
+Codes the site type excludes are reported `N/A`; the advisory, off-site and copy-level
+codes below are detected by `wp-audit-geo` and deliberately **not** fixed from the theme:
 
 | Code | Why it is not fixed here |
 |------|--------------------------|
+| GEO-A18 | Page token budget — a property of the copy, not a surface; `/wp-section` copy craft owns it |
 | GEO-D05 | Brand search accuracy — measured off-site via ORA / DataForSEO |
 | GEO-D06 | Agentic search share of voice — off-site |
 | GEO-D07 | Wikipedia / Wikidata presence — off-site |
