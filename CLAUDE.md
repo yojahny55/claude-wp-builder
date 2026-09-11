@@ -305,7 +305,8 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   per-image price in its own documentation — the figures in `bin/image-gen.mjs`
   come from third-party trackers — and OpenAI bills tokens rather than images,
   so its per-image number is an approximation by construction. The plan
-  output says "approximately" and is never presented as a bill.
+  output prints the total as `~$0.10`, followed by its own line, "Costs are
+  estimates, not a bill." — never a number presented as a bill.
 - **Aspect fidelity is provider-dependent.** Google fills all three of the
   library's crops — 4:5, 3:2, 4:3 — exactly. OpenAI offers only three fixed
   sizes, so every one of those crops lands inexact and is cropped by
