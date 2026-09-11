@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Fixed (residuals from the branch review)
+- **The reduced-motion rail affordance is attached only when a box actually
+  overflows.** Below `process-rail`'s own documented three-step minimum neither
+  the rail nor the frame scrolls, and attaching `tabindex`/`role="region"`
+  anyway shipped a focusable, named region that scrolls nothing — the same dead
+  tab stop the affordance was written to remove, reached by a different route.
+  Measured: a short rail selects `container` unguarded (which scrolls nothing)
+  and nothing at all guarded.
+- **The viewport-height units are gated by AXIS, not by spelling.** Excluding
+  `vh`/`dvh`/`svh`/`lvh`/`vb` outright is correct for block-axis declarations —
+  a pinned frame is one screen tall by definition and `container-type:
+  inline-size` gives it nothing to convert to — but it also let a height unit be
+  smuggled into an inline ramp, where it is as viewport-relative as `vw` and as
+  convertible. A height unit on a width, gap, font-size or inline padding now
+  has to justify itself like any other. Unit detection runs over a copy with
+  comment bodies blanked and line numbers preserved, so a unit merely *named* in
+  prose is not mistaken for a declaration.
+
 ### Fixed
 - **The `@property --container-max` guard stopped at the demo; the delivered
   theme reproduced the bug it closed.** `/wp-section` copies thirteen

@@ -163,6 +163,13 @@ grep -Eq 'data-motion="pin"' "$c/page-head/section.html" && fail "page-head pins
 # library's sixteen of them are structural (a pinned frame is one screen tall
 # by definition). Requiring a justification comment on each would be noise, not
 # an assertion.
+# Unit detection runs over a copy whose comment BODIES are blanked out with the
+# line structure preserved, so a unit named in prose ("min-height: 100dvh" in a
+# note explaining why the reset exists) is not mistaken for a declaration. The
+# marker lookup still reads the real file, because the justification markers
+# live in comments by design.
+blank_comments() { perl -0pe 's{/\*.*?\*/}{ my $c = $&; $c =~ s/[^\n]/ /g; $c }gse' "$1"; }
+
 VW_FAMILY='[0-9.](d|s|l)?(vw|vi|vmin|vmax)([^a-zA-Z]|$)'
 for cssf in skills/wp-demo-craft/compositions/*/section.css; do
   while IFS=: read -r lineno _; do
@@ -175,7 +182,36 @@ for cssf in skills/wp-demo-craft/compositions/*/section.css; do
       *"not cqi"*) ;;
       *) fail "$cssf:$lineno keeps a viewport-width ramp (vw/dvw/svw/lvw/vi/vmin/vmax) without recording why it is viewport-relative (marker must be on this line or the line above)" ;;
     esac
-  done < <(grep -nE "$VW_FAMILY" "$cssf")
+  done < <(blank_comments "$cssf" | grep -nE "$VW_FAMILY")
+done
+
+# The height family is gated too, but by AXIS rather than by spelling. Excluding
+# `vh`/`dvh`/`svh`/`lvh`/`vb` outright is right for the block-axis declarations
+# the note above describes — a pinned frame is one screen tall by definition and
+# `container-type: inline-size` gives it nothing to convert to — but it also let
+# a height unit be smuggled into an INLINE ramp, where it is every bit as
+# viewport-relative as `vw` and just as convertible. So: a height unit on a
+# block-axis property is structural and exempt; the same unit on a width, gap,
+# font-size or inline padding is a viewport ramp and must justify itself like
+# any other.
+VH_FAMILY='[0-9.](d|s|l)?(vh|vb)([^a-zA-Z]|$)'
+BLOCK_AXIS='^[[:space:]]*(min-|max-)?(height|block-size)|^[[:space:]]*(inset-block|padding-block|margin-block|top|bottom|translate|aspect-ratio)'
+for cssf in skills/wp-demo-craft/compositions/*/section.css; do
+  while IFS=: read -r lineno _; do
+    cur=$(sed -n "${lineno}p" "$cssf")
+    # A rule written on one line can carry several declarations; judge the one
+    # the unit actually sits in, not the first on the line.
+    decl=$(blank_comments "$cssf" | sed -n "${lineno}p" | tr ';{' '\n\n' | grep -E "$VH_FAMILY" | head -1)
+    printf '%s' "$decl" | grep -qE "$BLOCK_AXIS" && continue
+    prevno=$((lineno - 1))
+    prev=""
+    [ "$prevno" -ge 1 ] && prev=$(sed -n "${prevno}p" "$cssf")
+    case "$cur$prev" in
+      *"viewport on purpose"*) ;;
+      *"not cqi"*) ;;
+      *) fail "$cssf:$lineno uses a viewport-height unit (vh/dvh/svh/lvh/vb) on an inline-axis declaration without recording why it is viewport-relative" ;;
+    esac
+  done < <(blank_comments "$cssf" | grep -nE "$VH_FAMILY")
 done
 
 # An element NEVER matches a container query against the container it establishes
@@ -313,6 +349,19 @@ pan_reduced="$(awk '/if \(kind === .pan.\)/,/^    if \(kind === .reveal./' "$M" 
 [ -n "$pan_reduced" ] || fail "$M has no reduced-motion branch in the pan device, so the rail's keyboard affordance cannot be checked"
 printf '%s' "$pan_reduced" | grep -Fq 'const scroller = ' \
   || fail "$M's pan/reduced branch no longer picks the box that actually scrolls, so the affordance lands on an element the arrow keys do not move"
+# The affordance is attached only when a box ACTUALLY overflows. Without the
+# null arm, a rail below process-rail's own documented three-step minimum falls
+# through to the container, which does not scroll either — shipping a focusable,
+# named region that scrolls nothing, which is the same dead tab stop this whole
+# block was written to remove. Measured: short rail picks `container` unguarded
+# (scrolls=false) and `null` guarded.
+printf '%s' "$pan_reduced" | grep -Fq ': null;' \
+  || fail "motion.js's reduced-motion pan branch attaches the keyboard affordance without a no-overflow arm, so a rail too short to scroll still ships a focusable named region that scrolls nothing"
+# Anchored on the NAMING branch's own condition, not the bare `if (scroller && `
+# prefix: that prefix also opens the tabindex line, so a grep for it is satisfied
+# by the wrong occurrence and stays green while the naming branch loses its guard.
+printf '%s' "$pan_reduced" | grep -Fq 'if (scroller && heading && ' \
+  || fail "motion.js sets the rail's accessible name without checking that a scroller was found, so a section with no overflow can still be given role=region"
 printf '%s' "$pan_reduced" | grep -Fq 'tabIndex = 0' \
   || fail "$M's pan/reduced branch does not make the scroll region focusable, so a keyboard-only user cannot reach the steps past the fold under reduced motion"
 printf '%s' "$pan_reduced" | grep -Fq "setAttribute('role', 'region')" \

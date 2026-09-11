@@ -158,15 +158,22 @@ export function initMotion(gsap, ScrollTrigger) {
           // rail 2042/1280, frame 1280/1280). With the stylesheet alone and no
           // JS it is the frame that scrolls. Focus has to land on whichever one
           // it is, or the arrow keys scroll the document instead.
-          const scroller = rail.scrollWidth > rail.clientWidth ? rail : container;
-          if (!scroller.hasAttribute('tabindex')) scroller.tabIndex = 0;
+          // ...and only when a box ACTUALLY overflows. Below process-rail's own
+          // documented three-step minimum neither box does, and attaching the
+          // affordance anyway ships a focusable, named region that scrolls
+          // nothing — a dead tab stop by another route, which is the bug this
+          // block exists to avoid rather than a smaller version of it.
+          const scroller = rail.scrollWidth > rail.clientWidth ? rail
+            : container.scrollWidth > container.clientWidth ? container
+            : null;
+          if (scroller && !scroller.hasAttribute('tabindex')) scroller.tabIndex = 0;
           // Named by the section's own heading, never by a string in the markup: a
           // {{slot}} left unsubstituted would otherwise be read out verbatim, and a
           // hand-written label would ship in one language on a bilingual site. No
           // heading means no accessible name, and an unnamed region is not a
           // landmark — so the role is only set when there is something to name it.
           const heading = el.querySelector('h1, h2, h3');
-          if (heading && !scroller.hasAttribute('aria-label') && !scroller.hasAttribute('aria-labelledby')) {
+          if (scroller && heading && !scroller.hasAttribute('aria-label') && !scroller.hasAttribute('aria-labelledby')) {
             if (!heading.id) heading.id = 'motion-rail-' + Math.random().toString(36).slice(2, 8);
             scroller.setAttribute('role', 'region');
             scroller.setAttribute('aria-labelledby', heading.id);
