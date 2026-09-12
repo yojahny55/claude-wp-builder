@@ -183,4 +183,30 @@ grep -Fq 'the vocabulary from `demo/RESEARCH.md`' "$df" \
 grep -Fq "the client's real sentences from \`demo/RESEARCH.md\`" "$df" \
   || fail "$d plain-mode content does not prefer the client's real sentences"
 
+# ---------------------------------------------------------------------------
+# E. /wp-yolo restates the rules because it never calls /wp-demo. The corpus
+#    change in particular exists in two files; editing one and not the other
+#    makes the two entry points classify the same project differently.
+# ---------------------------------------------------------------------------
+y=commands/wp-yolo.md
+yf=$(flat "$y")
+
+grep -Fq '"research": "none"' "$yf" \
+  || fail "$y does not read the \"research\": \"none\" record"
+grep -Fq 'wp-research' "$yf" \
+  || fail "$y never dispatches the wp-research agent"
+
+# Unattended means unattended. A yolo run that stops for a confirmation is a
+# yolo run that does not finish.
+grep -Fq 'asks nothing' "$yf" \
+  || fail "$y does not state that research runs unattended and asks nothing"
+grep -Fq 'unconfirmed' "$yf" \
+  || fail "$y does not record the identity as unconfirmed on an unattended run"
+
+# The corpus change, in BOTH files. This is the pin that catches a one-sided edit.
+grep -Fq 'the client documents and `demo/RESEARCH.md`' "$yf" \
+  || fail "$y does not widen the domain-classification corpus to include research (commands/wp-demo.md does — the two entry points must classify identically)"
+grep -Fq 'which corpus produced each hit' "$yf" \
+  || fail "$y does not record which corpus produced each domain keyword hit"
+
 echo PASS
