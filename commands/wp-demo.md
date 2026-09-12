@@ -105,8 +105,10 @@ before writing any markup.
 1. **DESIGN.md.** Write `demo/DESIGN.md` per
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/design-md.md`: client
    docs first; then `npx designlang@12 <url>` (major-version pinned for the reason
-   `references/design-md.md` gives) on the client's current site and on
-   each reference URL the docs name (skip when there is none); then two or three
+   `references/design-md.md` gives) on the client's current site — the URL the docs
+   name, **or `research.site` from `demo/RESEARCH.md` when `confidence` is
+   `confirmed`** — and on each reference URL the docs name (skip when there is
+   neither); then two or three
    rows from `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/design-md/INDEX.md`
    by industry and tone for the gaps, cited by domain. If `.wp-create.json` has
    `firecrawl_url` and a reference is a Refero Styles page, scrape it for its
@@ -127,9 +129,12 @@ before writing any markup.
    promise, vibe words, two or three named references and what to take from
    each, assets owned, the feeling curve (one line per section: emotion, then
    the on-screen cause), the peak as a friend-quotable sentence, "it's the site
-   where ___", authored silence. Mark anything invented "Self-authored, not
-   interviewed". Ask, in one pass, only what the docs cannot answer. Show the
-   brief once and proceed on a yes.
+   where ___", authored silence. When `demo/RESEARCH.md` exists, each of
+   person, pain and promise either **cites the `demo/RESEARCH.md` line and its
+   source URL, or keeps the marker** — and the marker now means something,
+   because there was an alternative. Mark anything invented "Self-authored,
+   not interviewed". Ask, in one pass, only what the docs cannot answer. Show
+   the brief once and proceed on a yes.
 
    **3.5. Inventory the assets on disk.** List every image, SVG and font under the
    project's `docs/` with a role — `logo`, `hero`, `portrait`, `product`, `texture`,
@@ -144,8 +149,10 @@ before writing any markup.
    `/wp-demo` or `/wp-yolo` run against this same project recorded it — read it and
    move on; **do not re-classify**. The manifest is the shared source of truth, and a
    second run that re-derives the domain overwrites an operator's `name the domain
-   directly` override with the match it already rejected. Otherwise, match the client
-   documents' English-language material against the keyword lists in
+   directly` override with the match it already rejected. Otherwise, match the
+   English-language material in **the client documents and `demo/RESEARCH.md`**
+   (sections `## What they actually say` and `## Competitors`) against the
+   keyword lists in
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/domains/domains.csv`.
    A domain is matched when **two distinct keywords** from its list appear in the
    docs; below that, report `unclassified` and carry on without constraining
@@ -156,7 +163,11 @@ before writing any markup.
    material is `unclassified` **with that reason stated**, not silently, and the
    operator may name the domain directly instead of relying on the match. Record
    the result in `.wp-create.json` under `"domain"` as `name`, `score`, `matched`
-   and `confidence`, so the decision is auditable and `/wp-yolo` reads it rather
+   and `confidence`, recording in `matched` **which corpus produced each hit**
+   — `docs` or `research` — so an operator can tell a category drawn from
+   the client's own material from one drawn from a competitor's marketing
+   copy. The threshold does not move: two distinct keywords are still
+   required., so the decision is auditable and `/wp-yolo` reads it rather
    than re-deriving it. State the match and its score in one line.
 
    A matched domain does exactly two things. Its `page_pattern` and
@@ -173,9 +184,15 @@ before writing any markup.
    Then open
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/compositions/README.md` and look at
    each candidate's `preview-1440.png` and `preview-390.png`. One row per
-   section of the curve: section, role, composition, why, motion cost, and
+   section of the curve: section, role, composition, why, motion cost,
    the domain signal that justified it, citing the brief constraint from
-   sub-step 4, or writing "no domain signal" when none applies. This is
+   sub-step 4, or writing "no domain signal" when none applies; and the
+   research signal — what `demo/RESEARCH.md`'s `## Signals` says this
+   sector does at this point in the page, and whether this row follows it
+   or breaks it — or "no research signal" when none applies. The two are
+   different axes: the domain signal constrains page pattern and
+   considerations, while the research signal is what lets a build
+   deliberately not look like its competitors. This is
    what makes sub-step 4's classification bind on the plan instead of
    sitting unread. Mark exactly one row as the peak (`data-motion-peak`).
    Sum the cost and hold it under the
@@ -234,8 +251,12 @@ before writing any markup.
    plan where a gap has both or neither, before it issues any request. Set `use`
    to a path from `unused_assets[]` when a real client file belongs in that slot
    — a real asset always wins and is never generated. Otherwise write a `prompt`
-   from the brief: the person, the pain, the vibe words and the domain, not a
-   generic stock description. The script does not match assets to slots itself,
+   from the brief: the person, the pain, the vibe words, the domain, and
+   **the vocabulary from `demo/RESEARCH.md`'s `## Signals`** — its "use"
+   terms and none of its "avoid" terms — not a generic stock description.
+   A plate built from sector filler looks like the sector it was meant to
+   stand out from.
+   The script does not match assets to slots itself,
    on purpose: the asset roles (`logo/hero/portrait/product/texture`) and the
    composition roles (`hero/proof/feature/...`) are different vocabularies, and
    `feature-zigzag` has two slots of identical role, so any automatic mapping
@@ -407,7 +428,9 @@ These delimiters are critical — they are used by `/wp-section` to extract indi
 - Appropriate font scaling
 
 ### Content
-- Use realistic placeholder content relevant to the client's industry
+- Use **the client's real sentences from `demo/RESEARCH.md`** (`## What they
+  actually say`) wherever it covers the section; realistic placeholder content
+  relevant to the client's industry only where it does not
 - Include placeholder images using CSS background colors or SVG placeholders (no external image URLs)
 - Include bilingual hints as HTML comments where applicable: `<!-- i18n: hero_title -->`
 

@@ -152,4 +152,35 @@ grep -Fq 'Research still happened; the identity did not' "$df" \
 grep -Fq 'never blocks a build' "$df" \
   || fail "$d does not state that research never blocks a build"
 
+# ---------------------------------------------------------------------------
+# D. The six consumers. Research that nothing is required to cite ships green
+#    and does nothing — that is exactly how "image provider" shipped read but
+#    never written. Each consumer is pinned on its own.
+# ---------------------------------------------------------------------------
+# D1. designlang gets a URL from research when the docs name none.
+grep -Fq 'or `research.site` from `demo/RESEARCH.md` when `confidence` is `confirmed`' "$df" \
+  || fail "$d does not feed research.site to designlang"
+
+# D2. BRIEF.md: cite, or keep the self-authored marker.
+grep -Fq 'cites the `demo/RESEARCH.md` line and its source URL, or keeps the marker' "$df" \
+  || fail "$d does not require person/pain/promise to cite research or keep the marker"
+
+# D3. Domain classification corpus. The wp-yolo half is pinned in section E.
+grep -Fq 'the client documents and `demo/RESEARCH.md`' "$df" \
+  || fail "$d does not widen the domain-classification corpus to include research"
+grep -Fq 'which corpus produced each hit' "$df" \
+  || fail "$d does not record which corpus produced each domain keyword hit"
+
+# D4. The composition table's second signal column.
+grep -Fq 'no research signal' "$df" \
+  || fail "$d composition table has no research-signal column"
+
+# D5. Image prompts draw on the research vocabulary.
+grep -Fq 'the vocabulary from `demo/RESEARCH.md`' "$df" \
+  || fail "$d image prompts do not draw on the research vocabulary"
+
+# D6. Plain-mode copy.
+grep -Fq "the client's real sentences from \`demo/RESEARCH.md\`" "$df" \
+  || fail "$d plain-mode content does not prefer the client's real sentences"
+
 echo PASS
