@@ -6,7 +6,7 @@
 
 **Demo HTML to production WordPress theme — automated.**
 
-[![Version](https://img.shields.io/badge/version-1.16.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.17.0-blue.svg)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-Plugin-blueviolet.svg)](https://docs.anthropic.com/en/docs/claude-code)
@@ -295,6 +295,30 @@ ship to a client's production site.
 
 `/wp-yolo` never generates images. It uses whatever is already in the demo folder, so the
 one command that runs unattended cannot spend money.
+
+### Client research (optional tiers, no key required)
+
+`/wp-demo` researches the client's business before it builds: who they actually
+are, what they actually say, and what their competitors' sites actually do. The
+result is written to `demo/RESEARCH.md`, and six build steps cite it — the brief,
+the design tokens, the industry classification, the composition plan, the image
+prompts and the demo copy.
+
+It works with no configuration at all. Two optional upgrades improve it:
+
+| Tier | Needs | Adds |
+|---|---|---|
+| baseline | nothing | web search and page reading |
+| Firecrawl | a Firecrawl MCP server, or `firecrawl_url` in `.wp-create.json` | reliable extraction from JavaScript-heavy sites |
+| DataForSEO | a DataForSEO MCP server | real local competitor listings by category and location |
+
+**No API key is ever requested, stored or written to disk.** Both upgrades carry
+their own credentials in your MCP configuration; a self-hosted Firecrawl is
+reached by URL alone.
+
+Research never blocks a build. With no network it records that it found nothing,
+and the demo is built exactly as it is today. To refresh it, delete
+`demo/RESEARCH.md` and run `/wp-demo` again.
 
 ## Commands Reference
 

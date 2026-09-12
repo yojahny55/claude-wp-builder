@@ -319,3 +319,25 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
 - **Prompt quality is judgment, not machinery.** Nothing stops a weak prompt
   from producing a plate that fills its slot while reading as generic.
   `demo/BRIEF.md` is the only defence there is.
+- **The network half of client research is covered by no check.** No assertion
+  can drive a real search or fetch without live network, and a mock would only
+  assert the mock. `tests/checks/wp-research.sh` covers everything around the
+  call: the branch order, the `"research": "none"` contract in both directions,
+  the degradation lines, and the six citation rules.
+- **The Firecrawl and DataForSEO rungs are never exercised by the suite.** Both
+  need a connected MCP server. Only the `WebSearch`/`WebFetch` baseline is
+  reachable from a test, so the two upgrade paths are verified by reading, not
+  by running.
+- **`unconfirmed` is a confession, not a measurement.** A business the agent
+  could not confirm and a business with no web presence are not distinguished by
+  the artifact — only by the candidates it lists. What the flag does guarantee is
+  narrower and real: no `research.site` is recorded, so `designlang` is never
+  pointed at a guess.
+- **Research quality is judgment, not machinery.** A weak competitor set yields a
+  weak differentiation line, and nothing catches it. The six citation rules force
+  the artifact to be read; they cannot force it to be good. `demo/RESEARCH.md` is
+  the only defence there is.
+- **Competitor design signal is read from markup, not from rendering.** The agent
+  reads HTML and CSS, never a screenshot, so a site whose identity lives in
+  motion or in canvas yields a thin row — the same ceiling `designlang` already
+  carries.

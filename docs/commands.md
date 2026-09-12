@@ -136,6 +136,13 @@ rule: `/wp-demo` needs `.claude/CLAUDE.md`, so it runs after `/wp-init`.
 Writes `demo/index.html` with `<!-- ============ SECTION: name ============ -->` delimiters.
 Uses `frontend-design` and `ui-ux-pro-max` skills when installed. Requires `.claude/CLAUDE.md`.
 
+Before choosing craft or plain, `/wp-demo` runs the `wp-research` agent, which
+identifies the client's web presence and 3–5 comparable competitors and writes
+`demo/RESEARCH.md`. It asks once to confirm the business it found. Answering
+"wrong business" keeps the research and drops the identity; declining records
+`"research": "none"` in `.wp-create.json` and is never asked again. An existing
+`demo/RESEARCH.md` is reused — delete it to refresh.
+
 Before generating, picks **craft** or **plain** mode from `.claude/CLAUDE.md` (including the
 Project Constraints section `/wp-context` writes), anything under `docs/`, and
 `.wp-create.json`; `--craft`/`--plain` override the inference. The choice is written back as

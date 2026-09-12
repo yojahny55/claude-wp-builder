@@ -29,6 +29,20 @@
   naming the variable rather than falling back to a placeholder. `/wp-yolo`
   never generates; it consumes plates already on disk.
 
+- `/wp-demo` Step 2.4 researches the client's business and competitors before
+  the demo mode is chosen, via the new `wp-research` agent and skill. Writes
+  `demo/RESEARCH.md` and the `"research"` key in `.wp-create.json`.
+- Six build steps now cite `demo/RESEARCH.md`: `designlang`'s target, the
+  brief's person/pain/promise, the domain-classification corpus, the composition
+  table's research-signal column, the image prompts' vocabulary, and plain-mode
+  copy.
+- `/wp-yolo` researches the client unattended, recording the identity as
+  `unconfirmed` rather than asking, and Step 6's report surfaces that
+  unconfirmed identity to the operator — the only channel an unattended run
+  has to a human.
+- Optional Firecrawl (MCP or `firecrawl_url`) and DataForSEO (MCP) tiers improve
+  extraction and local competitor discovery. No API key is ever requested.
+
 ### Fixed
 
 - **A script registered without `in_footer` slipped past PERF-010.** The check grepped
