@@ -81,7 +81,7 @@ does not match the detected site type are reported `N/A`, not failed.
 | GEO-A09 | Org schema completeness | identity graph has `contactPoint` and `address` | INFO | Yes |
 | GEO-A10 | Schema type breadth | FAQPage / Service / Product / AggregateRating / BreadcrumbList where applicable, guarded against duplicates | INFO | Yes |
 | GEO-A11 | Trust anchors | `/about`, `/contact`, `/privacy` published with ≥500 characters each | WARNING | Yes |
-| GEO-A12 | Sitemap + lastmod | sitemap index resolves and carries `<lastmod>` | WARNING | Yes |
+| GEO-A12 | Sitemap + lastmod | sitemap index resolves; child sitemaps carry `<lastmod>` | WARNING | Yes |
 | GEO-A13 | `llms.txt` exists | `/llms.txt` returns `200` from a dynamic endpoint | ERROR | Yes |
 | GEO-A14 | `llms.txt` formatting | `#`/`>`/`##` sections, every link described | WARNING | Yes |
 | GEO-A15 | `llms.txt` links resolve | every link in `/llms.txt` returns `200` | WARNING | Yes |

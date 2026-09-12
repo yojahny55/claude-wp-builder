@@ -257,11 +257,13 @@ run `/wp-audit --geo` to fix a finding, then re-run this check.
 2. **GEO-A06 — metadata completeness.** All four travel together; one missing
    leaves the crawler an incomplete card:
    ```bash
-   curl -s "$SITE/" | grep -o 'rel="canonical"' | wc -l        # must be 1
-   curl -s "$SITE/" | grep -o '<html[^>]*lang=' | wc -l        # must be 1
-   curl -s "$SITE/" | grep -o 'property="og:image"' | wc -l    # must be 1
-   curl -s "$SITE/" | grep -o 'property="og:type"' | wc -l     # must be 1
+   curl -s "$SITE/" | grep -oE "rel=[\"']canonical[\"']" | wc -l        # must be 1
+   curl -s "$SITE/" | grep -oE '<html[^>]*lang=' | wc -l                # must be 1
+   curl -s "$SITE/" | grep -oE "property=[\"']og:image[\"']" | wc -l    # must be 1
+   curl -s "$SITE/" | grep -oE "property=[\"']og:type[\"']" | wc -l     # must be 1
    ```
+   Attribute quoting is not fixed — single-quoted `rel='canonical'` is valid — so the
+   pattern accepts either quote rather than assuming double quotes and false-failing.
    **PASS** if canonical, `lang`, `og:image` and `og:type` are all present.
    **FAIL** listing the missing tags.
 
@@ -270,7 +272,8 @@ run `/wp-audit --geo` to fix a finding, then re-run this check.
    curl -s "$SITE/" > /tmp/geo-home.html
    grep -o 'application/ld+json' /tmp/geo-home.html | wc -l                   # GEO-A07, must be >= 1
    grep -o '"sameAs"' /tmp/geo-home.html | wc -l                              # GEO-A08, must be >= 1
-   grep -oE '"contactPoint"|"address"' /tmp/geo-home.html | wc -l             # GEO-A09, must be >= 2
+   grep -q 'contactPoint' /tmp/geo-home.html                    # GEO-A09, must be present
+   grep -q '"address"' /tmp/geo-home.html                       # GEO-A09, must be present
    grep -oE '"FAQPage"|"Service"|"Product"|"AggregateRating"|"BreadcrumbList"' /tmp/geo-home.html | wc -l   # GEO-A10, must be >= 1
    ```
    **PASS** if an identity JSON-LD block is present, links the entity via
@@ -286,12 +289,20 @@ run `/wp-audit --geo` to fix a finding, then re-run this check.
    (`Disallow: /`). **FAIL** listing the blocked crawler.
 
 5. **GEO-A12 — sitemap `lastmod`.** A sitemap without `lastmod` gives an agent no
-   freshness signal:
+   freshness signal. A sitemap **index** lists child sitemaps, not URLs — the dates live
+   in the children (Rank Math may also date the index itself), so follow the index before
+   judging:
    ```bash
-   curl -s "$SITE/sitemap_index.xml" | grep -o '<lastmod>' | wc -l   # must be >= 1
+   index=$(curl -s "$SITE/sitemap_index.xml")
+   if grep -q '<lastmod>' <<<"$index"; then
+     grep -o '<lastmod>' <<<"$index" | wc -l
+   else
+     grep -oE '<loc>[^<]+</loc>' <<<"$index" | sed -E 's#</?loc>##g' \
+       | while read -r u; do curl -s "$u"; done | grep -o '<lastmod>' | wc -l
+   fi   # must be >= 1
    ```
-   **PASS** if the sitemap emits `lastmod` entries. **FAIL** if the sitemap exists
-   without them (Rank Math: enable `lastmod`).
+   **PASS** if the index or its child sitemaps carry `lastmod`. **FAIL** if the sitemap
+   resolves but nothing is dated (Rank Math: enable `lastmod`).
 
 6. **GEO-A11 — trust anchors.** `/about`, `/contact` and `/privacy` must each
    render ≥500 characters of real content:

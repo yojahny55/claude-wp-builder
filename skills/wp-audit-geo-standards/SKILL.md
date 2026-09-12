@@ -212,13 +212,16 @@ Add the policy signal as a response header (and, where the host supports it, a
 per-`User-agent` block):
 
 ```
-Content-Signal: ai-train=no, search=yes, ai-retrieval=yes
+Content-Signal: ai-train=yes, search=yes, ai-retrieval=yes
 ```
 
-`Content-Signal` lets a site refuse training while still answering search and live
-agent retrieval — which is the posture an SEO-driven WordPress site almost always
-wants. Keep it consistent with the robots allowlist; contradictory signals fail both
-`robots-ai-policy-quality` and `robots-agent-user-policy`.
+`Content-Signal` declares the site's AI usage posture and **must match the robots
+allowlist** — a signal that contradicts the rules fails both `robots-ai-policy-quality` and
+`robots-agent-user-policy`. The allowlist above permits training-capable crawlers (`GPTBot`,
+`ClaudeBot`, `Google-Extended`, `Applebot-Extended`), so the matching signal is
+`ai-train=yes`. A site that wants to refuse training must also `Disallow` those crawlers and
+set `ai-train=no`; `search=yes, ai-retrieval=yes` keeps it discoverable in AI answers either
+way.
 
 ---
 
@@ -411,18 +414,21 @@ discovery endpoints and a numbered obtain-and-send flow — and satisfies `auth-
 
 ## 7. Verification loop
 
-The live verifier is `bin/geo-scan.sh <domain>`: it runs
-`npx --yes is-agentic <domain> --json` under a 60-second timeout, falls back to
-`npx --yes ax score <domain> --json`, and **only prints the JSON report**. It does not
-parse it. The caller — the audit/fix agent — maps the failed ORA check ids back to GEO
-codes using §3, and re-runs the scan after the fixer completes.
+The live verifier is `bin/geo-scan.sh <domain>`: it issues a read-only `GET` to the public
+is-agentic report API (`https://is-agentic.com/api/v1/report?url=…`) under a 60-second
+timeout and **only prints the JSON report**. It never runs npm packages — `/wp-yolo` calls
+it unattended, so downloading and executing a package would be a supply-chain risk. If no
+completed report exists yet, the site owner runs one scan at https://is-agentic.com and the
+script reads it thereafter. The script does not parse the JSON; the caller — the audit/fix
+agent — maps the failed ORA check ids back to GEO codes using §3, and re-runs the scan after
+the fixer completes.
 
 - A fix is reported resolved **only when the ORA check flips**, not when the theme
   file changed.
-- Exit `0` = a report came back; `1` = the tool ran but errored; `2` = skipped cleanly
-  (no `npx`, no network, or no report). A localhost or otherwise non-public URL
-  legitimately yields exit `2`; record the skip and mark the run incomplete rather than
-  silently passing.
+- Exit `0` = a non-empty report came back; `1` = the request failed; `2` = skipped cleanly
+  (no `curl`, no network, no completed report, or a transient `429`/`503`). A localhost or
+  otherwise non-public URL legitimately yields exit `2`; record the skip and mark the run
+  incomplete rather than silently passing.
 - The evaluator reads a point-in-time scan; a green scan is evidence, not a guarantee.
 
 ---

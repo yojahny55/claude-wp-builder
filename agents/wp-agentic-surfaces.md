@@ -168,7 +168,7 @@ add_filter( '404_template', function ( $template ) {
 
 // 4. robots.txt: Content-Signal + sitemap (only when no physical robots.txt serves).
 add_filter( 'robots_txt', function ( $output ) {
-    $output .= "\nContent-Signal: ai-train=no, search=yes, ai-retrieval=yes\n";
+    $output .= "\nContent-Signal: ai-train=yes, search=yes, ai-retrieval=yes\n";
     return $output;
 }, 20 );
 
@@ -177,15 +177,15 @@ add_filter( 'robots_txt', function ( $output ) {
     return $output;
 }, 21 );
 
-// 5. RFC 8288 Link headers.
-add_filter( 'wp_headers', function ( $headers ) {
+// 5. RFC 8288 Link headers. `send_headers` is the front-end response hook — `wp_headers`
+// filters WP_HTTP *request* headers, so a Link built there never reaches a visitor.
+add_action( 'send_headers', function () {
     $links = array(
         '<' . home_url( '/sitemap_index.xml' ) . '>; rel="sitemap"',
         '<' . home_url( '/llms.txt' ) . '>; rel="describedby"; type="text/plain"',
         '<' . home_url( '/.well-known/ard.json' ) . '>; rel="ai-catalog"; type="application/json"',
     );
-    $headers['Link'] = implode( ', ', $links );
-    return $headers;
+    header( 'Link: ' . implode( ', ', $links ) );
 } );
 ```
 
@@ -754,7 +754,7 @@ foreach ( array( 'about' => 'About', 'contact' => 'Contact', 'privacy' => 'Priva
         'post_status'  => 'publish',
         'post_title'   => \$title,
         'post_name'    => \$slug,
-        'post_content' => '<prefix>_trust_anchor_copy( \$slug ),
+        'post_content' => <prefix>_trust_anchor_copy( \$slug ),
     ) );
     echo \"created \$slug (#{\$id})\n\";
 }
@@ -798,15 +798,20 @@ foreach ( \$bots as \$bot ) {
     \$robots .= 'User-agent: ' . \$bot . PHP_EOL . 'Allow: /' . PHP_EOL . PHP_EOL;
 }
 \$robots .= 'User-agent: Bytespider' . PHP_EOL . 'Disallow: /' . PHP_EOL . PHP_EOL;
-\$robots .= 'Content-Signal: ai-train=no, search=yes, ai-retrieval=yes' . PHP_EOL;
+\$robots .= 'Content-Signal: ai-train=yes, search=yes, ai-retrieval=yes' . PHP_EOL;
 \$robots .= 'Sitemap: ' . \$home . 'sitemap_index.xml' . PHP_EOL;
 file_put_contents( ABSPATH . 'robots.txt', \$robots );
 echo 'robots.txt written: ' . ABSPATH . 'robots.txt';
 "
 ```
 
-Keep `CCBot` and `anthropic-ai` consistent with the owner's answer — `CCBot` is context
-(allow only if the public corpus is wanted) and `anthropic-ai` is an alias of `ClaudeBot`.
+The `Content-Signal` must match the allowlist. This list allows training-capable crawlers
+(`GPTBot`, `ClaudeBot`, `Google-Extended`, `Applebot-Extended`), so the signal declares
+`ai-train=yes` — an allow plus `ai-train=no` is the contradiction `robots-ai-policy-quality`
+fails. A site that wants to opt out of training must also `Disallow` those bots and set
+`ai-train=no`. Keep `CCBot` and `anthropic-ai` consistent with the owner's answer — `CCBot`
+is context (allow only if the public corpus is wanted); `anthropic-ai` is training-only,
+unlike `ClaudeBot`.
 
 ---
 
@@ -872,7 +877,7 @@ reported by `wp-audit-geo` with a recommendation.
 | GEO-A16 | per-area modular `llms.txt` — generic `^<slug>/llms\.txt$` rewrite + `<prefix>_area_llms_txt()` |
 | GEO-A17 | "When to use" block in `<prefix>_llms_txt()` |
 | GEO-A19 | `Accept: text/markdown` negotiation + `Vary: Accept` |
-| GEO-A20 | RFC 8288 `Link:` headers — the `wp_headers` filter |
+| GEO-A20 | RFC 8288 `Link:` headers — the `send_headers` action |
 | GEO-A21 | `/.well-known/agent-skills/index.json` v0.2.0 with a `sha256:` digest |
 | GEO-A22 | `/.well-known/api-catalog` linkset — SaaS/API only |
 | GEO-A24 | `/pricing.md` — merchant/SaaS only |

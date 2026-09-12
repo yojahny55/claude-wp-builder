@@ -52,6 +52,21 @@ grep -q 'AGENTIC_SITE_TYPE' "$fixer" || fail "$fixer must bake AGENTIC_SITE_TYPE
 # Live scanner: timeout wrapper is portable (GNU timeout / gtimeout / none).
 grep -q 'gtimeout' bin/geo-scan.sh || fail "bin/geo-scan.sh must fall back to gtimeout"
 
+# Security: the scanner must not download and execute npm packages unattended.
+! grep -q 'npx' bin/geo-scan.sh || fail "bin/geo-scan.sh must not run npx (supply-chain risk)"
+grep -q 'is-agentic.com/api/v1/report' bin/geo-scan.sh || fail "bin/geo-scan.sh must call the public report API"
+
+# Fixer: the RFC 8288 Link header belongs on send_headers — wp_headers filters request headers.
+grep -q 'send_headers' "$fixer" || fail "$fixer must emit the Link header on send_headers"
+grep -qE "add_filter\\( *'wp_headers'" "$fixer" && fail "$fixer must not build the Link header on wp_headers"
+
+# Fixer: Content-Signal must match the training-capable allowlist, not contradict it.
+grep -q 'ai-train=yes' "$fixer" || fail "$fixer must declare ai-train=yes to match its allowlist"
+grep -qE 'Content-Signal: *ai-train=no' "$fixer" && fail "$fixer must not emit ai-train=no while allowing training crawlers"
+
+# Fixer: trust-anchor seeding calls the copy function; quoting it makes wp eval fatal.
+grep -q "'<prefix>_trust_anchor_copy" "$fixer" && fail "$fixer must not quote the trust-anchor copy call"
+
 # Wiring: --geo flag, dispatch names, and the live verifier in the finish phase.
 grep -q -- '--geo' "$audit" || fail "$audit missing --geo"
 grep -q 'wp-audit-geo' "$audit" || fail "$audit must dispatch wp-audit-geo"
