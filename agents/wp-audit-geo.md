@@ -45,7 +45,7 @@ ordinary content site as SaaS and boots every plugin's REST callbacks.
 
 ```bash
 $WP plugin is-installed woocommerce && echo "merchant signal: WooCommerce active"
-$WP option get <prefix>_business_address
+$WP eval "echo get_field('business_address','option');"
 ```
 
 A site with WooCommerce active but products disabled still detects as `merchant`; its

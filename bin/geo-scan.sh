@@ -17,14 +17,24 @@ fi
 err=$(mktemp)
 trap 'rm -f "$err"' EXIT
 
+# GNU `timeout` is absent on stock macOS; `gtimeout` (coreutils) covers that, and with
+# neither present run unwrapped rather than misreport a 127 as a clean skip.
+if command -v timeout >/dev/null 2>&1; then
+  TIMEOUT="timeout 60"
+elif command -v gtimeout >/dev/null 2>&1; then
+  TIMEOUT="gtimeout 60"
+else
+  TIMEOUT=""
+fi
+
 # `is-agentic` and its `ax` alias are the same package. One 60s timeout per attempt so
 # an offline run cannot hang the mandatory finish step.
-if out=$(timeout 60 npx --yes is-agentic "$host" --json 2>"$err"); then
+if out=$($TIMEOUT npx --yes is-agentic "$host" --json 2>"$err"); then
   printf '%s\n' "$out"
   exit 0
 fi
 
-if out=$(timeout 60 npx --yes ax score "$host" --json 2>"$err"); then
+if out=$($TIMEOUT npx --yes ax score "$host" --json 2>"$err"); then
   printf '%s\n' "$out"
   exit 0
 fi

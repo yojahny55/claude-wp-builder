@@ -42,6 +42,16 @@ grep -q 'DOMXPath' "$agent" || fail "$agent must parse the DOM, not regex the ma
 grep -q '^model: sonnet' "$fixer" || fail "$fixer must be sonnet"
 grep -q 'inc/agentic.php' "$fixer" || fail "$fixer must own inc/agentic.php"
 
+# Auditor: local-business probe reads the ACF options-page value, never a raw option key.
+grep -qE "get_field\('business_address','option'\)|options_business_address" "$agent" || fail "$agent must probe business_address via ACF options"
+grep -q '<prefix>_business_address' "$agent" && fail "$agent must not look up <prefix>_business_address as an option"
+
+# Fixer: the detected site type is baked into the theme constant.
+grep -q 'AGENTIC_SITE_TYPE' "$fixer" || fail "$fixer must bake AGENTIC_SITE_TYPE"
+
+# Live scanner: timeout wrapper is portable (GNU timeout / gtimeout / none).
+grep -q 'gtimeout' bin/geo-scan.sh || fail "bin/geo-scan.sh must fall back to gtimeout"
+
 # Wiring: --geo flag, dispatch names, and the live verifier in the finish phase.
 grep -q -- '--geo' "$audit" || fail "$audit missing --geo"
 grep -q 'wp-audit-geo' "$audit" || fail "$audit must dispatch wp-audit-geo"
