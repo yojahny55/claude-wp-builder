@@ -5,6 +5,10 @@ server {
     root {{document_root}};
     index index.php index.html;
 
+    # nginx defaults to 1m, which rejects plugin/theme zips and migration
+    # archives with a 413 before PHP ever sees the request.
+    client_max_body_size {{max_upload_size}};
+
     location / {
         try_files $uri $uri/ /index.php?$args;
     }
