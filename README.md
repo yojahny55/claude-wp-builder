@@ -350,6 +350,7 @@ procedure; the commands only dispatch them.
 | `wp-tailwind-system` | Tailwind authoring conventions — the utility-first decision ladder and file layout (the default template) |
 | `wp-demo` | Demo HTML creation methodology |
 | `wp-demo-craft` | Reference-first design floor for premium demos: a client DESIGN.md, a composition library, a motion budget and a render-verified loop |
+| `wp-research` | Client-business research method — identification, comparable competitors, reading a site for design signal, and the WebSearch/Firecrawl/DataForSEO ladder |
 | `wp-responsive` | Mobile-first responsive patterns, fluid typography, touch targets |
 | `wp-cli-patterns` | WP-CLI best practices for all agents (saves tokens vs PHP generation) |
 | `wp-aos-animator` | AOS scroll animation installer — audits, enqueues, initializes, and seeds animations across templates. Run through `/wp-aos-animator` |

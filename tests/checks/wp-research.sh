@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Client research reaches the network and reads third-party pages, so none of it
+# can be exercised here. What is asserted instead is the contract around the
+# call: that the methodology states the ladder and its degradation, that the
+# agent treats scraped content as data, that the build's six consumers are
+# required to cite the artifact, and that the "none" record is both written and
+# read. Prose is pinned against a comment-stripped, whitespace-collapsed copy so
+# a reflow cannot fail the build and a code comment cannot satisfy a pin.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+fail() { echo "FAIL: $*"; exit 1; }
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+# Collapse a markdown file for prose pins: strip HTML comments, collapse all
+# runs of whitespace to one space. Line wrapping then cannot break a pin.
+flat() {  # file -> stripped copy path on stdout
+  local out="$tmp/$(echo "$1" | tr / _).flat"
+  perl -0pe 's{<!--.*?-->}{}gs; s{\s+}{ }g' "$1" > "$out" \
+    || fail "could not build the stripped copy of $1"
+  echo "$out"
+}
+
+# ---------------------------------------------------------------------------
+# A. The skill states the method, the ladder and the cap.
+# ---------------------------------------------------------------------------
+s=skills/wp-research/SKILL.md
+[ -f "$s" ] || fail "$s is missing"
+grep -q '^user-invocable: false' "$s" || fail "$s must declare user-invocable: false"
+sf=$(flat "$s")
+
+for tier in websearch firecrawl dataforseo; do
+  grep -Fq "$tier" "$sf" || fail "$s does not name the '$tier' tier"
+done
+
+# Each rung must state what it degrades TO. A ladder that names three tiers but
+# never says one falls back to another is a list, not a ladder.
+grep -Fq 'Firecrawl MCP if connected' "$sf" \
+  || fail "$s does not state that Firecrawl is used via MCP when connected"
+grep -Fq 'firecrawl_url' "$sf" \
+  || fail "$s does not state the firecrawl_url HTTP fallback"
+grep -Fq 'fall back to `WebFetch` and say so in one line' "$sf" \
+  || fail "$s does not state the WebFetch fallback and that it is announced"
+
+# The cap is the only thing stopping a run from wandering. Pin the numbers.
+grep -Fq 'at most 5 pages of the client' "$sf" \
+  || fail "$s does not cap the client-site fetches at 5 pages"
+grep -Fq 'at most 5 competitors' "$sf" \
+  || fail "$s does not cap competitors at 5"
+grep -Fq 'at most 2 pages each' "$sf" \
+  || fail "$s does not cap competitor pages at 2 each"
+
+# No key, ever. This is the rule that keeps a self-hosted Firecrawl from
+# becoming a credential prompt.
+grep -Fq 'No key is ever requested' "$sf" \
+  || fail "$s does not state that no key is ever requested"
+
+echo PASS
