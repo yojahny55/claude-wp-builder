@@ -26,7 +26,7 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-finalize`](#wp-finalize) | all | recommended | theme, WP-CLI | report only |
 | [`/wp-demo-verify`](#wp-demo-verify) | all | recommended | URL or file | `.verify/` screenshots, contact sheet, findings |
 | [`/wp-responsive-check`](#wp-responsive-check) | all | alias | URL or file | runs `/wp-demo-verify` |
-| [`/wp-audit`](#wp-audit) | all | optional | theme, WP-CLI | fixes, Rank Math / AIOS config |
+| [`/wp-audit`](#wp-audit) | all | optional | theme, WP-CLI | fixes, Rank Math / AIOS config, `inc/agentic.php` |
 | [`/wp-polylang`](#wp-polylang) | all (polylang) | required under `polylang` | WP content | translated posts/terms |
 | [`/wp-tailwind-migrate`](#wp-tailwind-migrate) | legacy | optional | plain-CSS theme | Tailwind theme in place |
 | [`/wp-cinematic-init`](#wp-cinematic-init) | C | **required** | kit | cinematic theme, `fields/scenes.php`, seeders |
@@ -360,13 +360,23 @@ static screenshot per breakpoint cannot show scroll motion, which is why the che
 ### `/wp-audit`
 
 ```
-/wp-audit [--security] [--seo] [--a11y] [--performance] [--best-practices] [--all]
+/wp-audit [--security] [--seo] [--a11y] [--performance] [--best-practices] [--geo] [--all]
           [--report-only] [--security-level basic|recommended|maximum]
 ```
 
 No category flag = all. Security installs/configures All-in-One WP Security; SEO installs
 Rank Math and seeds meta/schema. `--report-only` skips fixes. Lighthouse-style checks need
 the optional `web-quality-skills` plugin.
+
+`--geo` audits Generative Engine Optimization and AI-agent readiness. It detects the site
+type first — content, local business, merchant or SaaS — and gates each check on that, so a
+shop's payments codes and a SaaS's API codes are reported `N/A` rather than failed. The
+`wp-audit-geo` agent runs the code-only checks, then scores the live site's ORA layers
+against the public is-agentic report and maps the failed checks back to GEO codes. Only a
+returned report yields a score: without a reachable public URL the live scan skips, and the
+runtime codes report `N/A`. Auto-fixable findings go to the `wp-agentic-surfaces` fixer;
+off-site findings and merchant payment protocols are advisory and left alone. `/wp-yolo`
+runs `/wp-audit --all --geo` and the same scan in its finish phase.
 
 ### `/wp-polylang`
 

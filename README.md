@@ -197,7 +197,7 @@ contract, for an admin tool, intranet or catalogue. Nothing paid is involved.
 ```
 /wp-finalize                              # pre-delivery report (never fixes)
 /wp-demo-verify http://localhost/site     # scroll-walks the live site, 7 viewports, contact sheet
-/wp-audit [--security --seo --a11y --performance --best-practices] [--report-only]
+/wp-audit [--security --seo --a11y --performance --best-practices --geo] [--report-only]
 /wp-polylang es en                        # only when i18n strategy is polylang
 ```
 
@@ -318,7 +318,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-finalize` | all | recommended | Pre-delivery checklist |
 | `/wp-demo-verify <path-or-url> [--positions N]` | all | recommended | Scroll-walk a demo dir or live page, impeccable detector, screenshots per section and viewport, seven-line critique into demo/VERIFY.md |
 | `/wp-responsive-check <url>` | all | recommended | Alias, dispatches `/wp-demo-verify` (5-viewport layout check is now one part of what it walks) |
-| `/wp-audit [flags]` | all | optional | Security, SEO, a11y, performance, best practices |
+| `/wp-audit [flags]` | all | optional | Security, SEO, a11y, performance, best practices, GEO |
 | `/wp-polylang <src> <dst>` | all | polylang only | Translate the site through Polylang |
 | `/wp-tailwind-migrate <theme>` | legacy | optional | Plain-CSS theme → Tailwind in place |
 | `/wp-cinematic-init` | C | required | Cinematic scaffold — kit, theme, ACF scenes |
@@ -357,6 +357,7 @@ procedure; the commands only dispatch them.
 | `wp-environments` | Environment detection and the WP-CLI wrapper every command runs through |
 | `wp-audit-standards` | Audit criteria, severity definitions, report schema and quality thresholds for the `wp-audit-*` agents |
 | `wp-audit-seo-standards` | Rank Math configuration reference, schema JSON-LD templates, meta patterns and SEO seeding commands |
+| `wp-audit-geo-standards` | GEO and AI-agent-readiness reference — the ORA/is-agentic check catalog, applicability by site type, AI crawler allowlist, llms.txt/well-known specs, GEO citability rubric and WordPress implementation templates |
 | `wp-contributing` | Contributing to this plugin — the layer rules, the grep-gate test style, and the PR and release rituals |
 
 ### Agents (specialized subagents dispatched by commands)
@@ -373,6 +374,8 @@ procedure; the commands only dispatch them.
 | `wp-cinematic` | Cinematic scroll specialist — scene fields, template parts and scroll-engine wiring for the `__cinematic__` starter |
 | `wp-audit-security` · `wp-audit-seo` · `wp-audit-a11y` · `wp-audit-performance` · `wp-audit-practices` | The five `/wp-audit` judgment auditors — code scanning, structured data, WCAG 2.1 AA, Core Web Vitals, WordPress standards |
 | `wp-audit-aios` · `wp-audit-rankmath` | The two mechanical audit installers — All-in-One WP Security and Rank Math, configured via WP-CLI |
+| `wp-audit-geo` | GEO / AI-agent-readiness auditor — maps the ORA check catalog to GEO codes, parses the rendered DOM and runs the is-agentic scan |
+| `wp-agentic-surfaces` | Agentic-surfaces fixer — emits the theme's `inc/agentic.php` (llms.txt, ARD catalog, agent-skills index, markdown negotiation, Link headers, agent-friendly 404, JSON-LD breadth), seeds trust anchors and writes the robots AI policy |
 
 ### Starter Theme
 
@@ -435,7 +438,7 @@ The `/wp-create` command supports multiple environment types:
 
 ## Audit & Quality
 
-The `/wp-audit` command runs a comprehensive audit across 5 categories and offers to auto-fix issues.
+The `/wp-audit` command runs a comprehensive audit across 6 categories and offers to auto-fix issues.
 
 ### Categories
 
@@ -446,6 +449,14 @@ The `/wp-audit` command runs a comprehensive audit across 5 categories and offer
 | `--a11y` | WCAG 2.1 AA accessibility | — |
 | `--performance` | Core Web Vitals, caching, assets | — |
 | `--best-practices` | WordPress coding standards | — |
+| `--geo` | GEO / AI-agent readiness, ORA-scored | is-agentic live scan |
+
+`--geo` scores how discoverable, accessible and usable a site is to AI agents and generative
+engines, following the four ORA layers (Discovery, Access, Usability, Payments). It detects the
+site type first and gates each check on it, so merchant payments and SaaS API surfaces report
+`N/A` rather than fail. The live score comes from the public is-agentic report `bin/geo-scan.sh`
+fetches; without a reachable public URL the scan skips and the runtime codes report `N/A`.
+`/wp-yolo` runs `/wp-audit --all --geo` and the same scan automatically in its finish phase.
 
 ### Three-Tier Audit
 
