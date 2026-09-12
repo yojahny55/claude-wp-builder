@@ -12,6 +12,11 @@ reusing the plugin's existing build pipeline end to end. Run this AFTER `/wp-cre
 it dispatches the `wp-normalize` agent once, then drives the existing commands/agents in
 dependency order.
 
+`/wp-yolo` **never generates images.** It takes an existing demo folder and
+never calls `/wp-demo`, so plates already in `demo/assets/img/` travel into the
+theme like any other demo asset. Generation is `/wp-demo`'s alone, because it is
+the command with a human present to approve the spend.
+
 ## Step 1: Parse Arguments & Gate
 
 Parse `$ARGUMENTS`:

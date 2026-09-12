@@ -1,0 +1,537 @@
+#!/usr/bin/env bash
+# bin/image-gen.mjs spends money. Every assertion here therefore runs with no
+# key and no network: what is verified is that the script asks for the right
+# thing, never asks twice for the same thing, refuses an ambiguous plan before
+# issuing a request, and cannot put an API key into its own output. The slot
+# list and the crop are read off each composition's own <img> tag, so these
+# assertions pin that the reader still finds them — a regex regression there
+# would silently request square heroes and nothing else would notice.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+fail() { echo "FAIL: $*"; exit 1; }
+
+g=bin/image-gen.mjs
+[ -x "$g" ] || fail "$g is missing or not executable"
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+mkdir -p "$tmp/assets/img"
+
+# Reads one field out of the rewritten plan file, so the assertions below
+# test the artifact the next step actually consumes, not stdout formatting.
+pj() { node -e '
+  const p = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  const v = process.argv[2].split(".").reduce((o, k) => o?.[k], p);
+  console.log(typeof v === "object" ? JSON.stringify(v) : v);
+' "$tmp/.image-plan.json" "$1"; }
+
+plan_with() {
+  local provider="${2:-google/gemini-3.1-flash-image}"
+  cat > "$tmp/.image-plan.json" <<JSON
+{"provider": "$provider",
+ "sections": $1,
+ "assets_on_disk": []}
+JSON
+}
+
+# 1. Slot discovery: the three image-bearing compositions yield exactly four slots.
+plan_with '[{"page":"index","section":"hero","composition":"hero-bleed"},
+             {"page":"index","section":"features","composition":"feature-zigzag"},
+             {"page":"about","section":"hero","composition":"hero-split"}]'
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero on a valid plan file"
+n=$(pj gaps.length)
+[ "$n" = 4 ] || fail "expected 4 image slots across hero-bleed, feature-zigzag and hero-split; got $n"
+
+# 1b. Zero-occurrence control: a composition with no <img> yields no slots.
+#     Without this, a reader that returned a constant 4 would pass the line above.
+plan_with '[{"page":"index","section":"faq","composition":"faq-list"}]'
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero on an image-free composition"
+n=$(pj gaps.length)
+[ "$n" = 0 ] || fail "faq-list declares no <img>, so it must yield 0 slots; got $n"
+
+# 2. The crop is read off the markup, not assumed. hero-split is 1200x1500.
+plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero on the hero-split crop assertion"
+a=$(pj gaps.0.aspect)
+[ "$a" = "4:5" ] || fail "hero-split declares 1200x1500 so the aspect must be 4:5; got $a"
+s=$(pj gaps.0.size)
+[ "$s" = "2K" ] || fail "hero-split declares width 1200, so the smallest size >= 1200 is 2K; got $s"
+
+# 2b. hero-bleed is 2400x1600 and must be capped at 2K rather than escalating to 4K.
+plan_with '[{"page":"index","section":"hero","composition":"hero-bleed"}]'
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero on the hero-bleed cap assertion"
+a=$(pj gaps.0.aspect)
+[ "$a" = "3:2" ] || fail "hero-bleed declares 2400x1600 so the aspect must be 3:2; got $a"
+s=$(pj gaps.0.size)
+[ "$s" = "2K" ] || fail "hero-bleed declares width 2400 but the cap is 2K; got $s"
+
+# 2c. The size tiers are asserted directly, because every composition in the
+#     library happens to land on 2K: a CLI-only test cannot distinguish
+#     snapSize from `return "2K"`. Verified - that mutation passed the whole
+#     suite before this assertion existed.
+tiers=$(node -e '
+  import("./bin/image-gen.mjs").then((m) => {
+    console.log([400, 800, 1200, 2400].map((w) => m.snapSize(w)).join(","));
+  });
+') || fail "snapSize could not be imported from $g"
+[ "$tiers" = "512px,1K,2K,2K" ] \
+  || fail "snapSize must pick the smallest tier >= width, capped at 2K; got $tiers"
+
+# 2d. The OpenAI branch is otherwise never exercised by this suite (every other
+#     assertion plans against the google provider), so a stubbed-out
+#     `snapAspect` openai branch could ship unnoticed. hero-bleed is
+#     2400x1600 (ratio 1.5), which matches OpenAI's 1536x1024 size exactly.
+#     For openai, `size` is defined to equal the resolved aspect string.
+#     Verified - replacing the openai branch with `return '1024x1024';` passed
+#     the whole suite before this assertion existed.
+plan_with '[{"page":"index","section":"hero","composition":"hero-bleed"}]' 'openai/gpt-image-2.5-flare'
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero on the openai aspect/size assertion"
+a=$(pj gaps.0.aspect)
+[ "$a" = "1536x1024" ] || fail "hero-bleed at 2400x1600 (ratio 1.5) must snap to OpenAI's 1536x1024; got $a"
+s=$(pj gaps.0.size)
+[ "$s" = "1536x1024" ] || fail "an openai gap's size must equal its own resolved aspect string; got $s"
+
+# 3. A gap satisfied by a real client file costs nothing. Asserted by running
+#    with no key at all: a plan made entirely of `use` entries must succeed,
+#    which it could not do if it issued a request.
+printf 'not-a-real-jpeg' > "$tmp/client-photo.jpg"
+plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 3 (use entry)"
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].use = process.argv[2];
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json" "$tmp/client-photo.jpg"
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null ) \
+  || fail "a plan of only 'use' entries must succeed with no key set"
+ls "$tmp/assets/img/client-photo.jpg" >/dev/null 2>&1 \
+  || fail "run did not copy the client file into demo/assets/img/"
+# A `use` entry must be recorded as NOT generated -- the code's own comment
+# calls a false provenance line "worse than none", and wp-demo.md requires
+# `use` entries to be listed separately from generated plates in BRIEF.md.
+# Verified: flipping `generated: false` to `true` on the `use` branch passed
+# the whole suite before this line existed.
+[ "$(pj gaps.0.result.generated)" = false ] \
+  || fail "a 'use' entry's result.generated must be false, not true"
+
+# 3b. Control: the same gap with a prompt instead of a use needs a key, and
+#     says so. Without this, assertion 3 would pass on a run that never checked.
+plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 3b (prompt control)"
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].prompt = "a joiner easing the nosing on an oak stair tread";
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json"
+set +e
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null 2>"$tmp/err" )
+rc=$?
+set -e
+[ "$rc" = 3 ] || fail "a gap needing generation with no key must exit 3; got $rc"
+grep -Fq 'GEMINI_API_KEY' "$tmp/err" \
+  || fail "the no-key error must name the environment variable to export"
+
+# F1. A missing "use" file must fail only its own slot, not abort the whole
+#     run: the loop must keep going, writePlan must still run (so a slot that
+#     genuinely succeeded is not lost), and the process must exit 4 -- the
+#     same per-slot-failure code the generate branch already uses.
+printf 'a-real-client-photo' > "$tmp/good.jpg"
+plan_with '[{"page":"index","section":"hero","composition":"hero-bleed"},
+             {"page":"about","section":"hero","composition":"hero-split"}]'
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion F1"
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].use = process.argv[2];
+  p.gaps[1].use = process.argv[3];
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json" "$tmp/good.jpg" "$tmp/MISSING-NEVER.jpg"
+set +e
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >"$tmp/out" 2>"$tmp/err" )
+rc=$?
+set -e
+[ "$rc" = 4 ] || fail "a missing 'use' file must exit 4 (a per-slot failure), not a different code; got $rc"
+ls "$tmp/assets/img/good.jpg" >/dev/null 2>&1 \
+  || fail "slot 1's real file must still be copied even though slot 2's 'use' file is missing"
+[ "$(pj gaps.0.result.file)" = "assets/img/good.jpg" ] \
+  || fail "slot 1's result was lost even though its file WAS copied -- writePlan never ran after the abort"
+grep -q 'ENOENT' <<< "$(pj gaps.1.result.error)" \
+  || fail "slot 2 (the missing file) must record its own ENOENT as a per-slot error, not abort before writePlan"
+
+# F1b. Guard: a "use" path already sitting at its own destination
+# (imgDir/basename(use)) must not be copied onto itself. copyFileSync can
+# open the destination for writing (truncating it) before it finishes
+# reading the source, so copying a file over itself risks zeroing it out.
+# The behavioural half (content survives) is measured here too, but it is
+# NOT mutation-sensitive on this runtime: fs.copyFileSync(x, x) on this
+# Node/Linux combination already happens not to corrupt the file even with
+# the guard removed (verified directly). So the guard's presence is pinned
+# at the source level as well -- that pin is the one a removed guard
+# actually reddens.
+printf 'pre-existing-plate-bytes' > "$tmp/assets/img/samefile.jpg"
+before_sha=$(sha256sum "$tmp/assets/img/samefile.jpg" | cut -d' ' -f1)
+plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion F1b"
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].use = process.argv[2];
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json" "$tmp/assets/img/samefile.jpg"
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null ) \
+  || fail "a 'use' entry already at its own destination must still succeed"
+after_sha=$(sha256sum "$tmp/assets/img/samefile.jpg" | cut -d' ' -f1)
+[ "$before_sha" = "$after_sha" ] || fail "copying a 'use' file onto itself must not truncate it"
+grep -Fq 'resolve(src) !== resolve(dest)' "$g" \
+  || fail "$g dropped the same-file guard around the 'use' copy"
+
+# 4. An ambiguous gap is refused before any request, so an unclear plan cannot
+#    cost money. Both set, then neither set.
+for mutate in 'p.gaps[0].prompt="x"; p.gaps[0].use="y";' 'p.gaps[0].prompt=""; p.gaps[0].use="";'; do
+  plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
+  node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 4 (ambiguous gap, $mutate)"
+  node -e '
+    const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+    eval(process.argv[2]);
+    require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+  ' "$tmp/.image-plan.json" "$mutate"
+  set +e
+  ( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null 2>&1 )
+  rc=$?
+  set -e
+  [ "$rc" = 2 ] || fail "an ambiguous gap ($mutate) must exit 2 before any request; got $rc"
+done
+
+# 5. A cached plate is not re-billed. The hash is recomputed here in bash from
+#    the documented formula (prompt|aspect|model|size) rather than read back
+#    from the script, so this is a cross-check of the identity and not a
+#    tautology. hero-bleed is 2400x1600, which snaps to size "2K" (assertion 2b).
+prompt='stacked and stickered oak boards seasoning in an open timber shed'
+h=$(printf '%s' "$prompt|3:2|gemini-3.1-flash-image|2K" | sha256sum | cut -c1-12)
+printf 'not-a-real-jpeg' > "$tmp/assets/img/gen-$h.jpg"
+plan_with '[{"page":"index","section":"hero","composition":"hero-bleed"}]'
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 5 (cache setup)"
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].prompt = process.argv[2];
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json" "$prompt"
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 5 (cache re-plan)"
+[ "$(pj gaps.0.cached)" = "true" ] || fail "a plate whose hash is already on disk must be reported cached"
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null ) \
+  || fail "a fully cached plan must succeed with no key set"
+
+# 5b. Control: changing one character of the prompt changes the hash, so the
+#     cache must miss and the run must then need a key.
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].prompt = process.argv[2] + " at dusk";
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json" "$prompt"
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 5b (cache-miss control)"
+[ "$(pj gaps.0.cached)" = "false" ] || fail "an edited prompt must miss the cache, not serve the stale plate"
+
+# F3. plateHash must include size: two gaps sharing prompt/aspect/model but
+#     declaring a different resolved width (hence a different size) must not
+#     collide onto the same hash. Asserted directly against the exported
+#     function, mirroring 2c/2d, because no two compositions in the current
+#     library happen to share an aspect while landing on different size tiers.
+h_1k=$(node -e 'import("./bin/image-gen.mjs").then((m) => console.log(m.plateHash("p", "3:2", "gemini-3.1-flash-image", "1K")));')
+h_2k=$(node -e 'import("./bin/image-gen.mjs").then((m) => console.log(m.plateHash("p", "3:2", "gemini-3.1-flash-image", "2K")));')
+[ "$h_1k" != "$h_2k" ] || fail "plateHash must change when only size differs; 1K and 2K collided ($h_1k)"
+
+# F3b. Integration-level control via a hand-rolled plan (bypassing cmdPlan's
+#     own slot derivation, since the library has no same-aspect/different-size
+#     pair to plan against): two gaps share prompt/aspect/model but declare
+#     different sizes, and only the 1K plate exists on disk. If size did not
+#     participate in the hash, the 2K gap would collide with the 1K file, see
+#     itself as cached too, and the whole run would succeed with no key set.
+#     A prompt distinct from assertion 5's is used deliberately -- assertion 5
+#     leaves its own gen-<hash-for-2K>.jpg sitting in the same imgDir, which
+#     would otherwise coincidentally satisfy the 2K gap here too.
+prompt_f3b='a boat-length teak deck plank drying under a covered shed'
+node -e '
+  const p = {
+    provider: "google/gemini-3.1-flash-image",
+    sections: [], assets_on_disk: [],
+    gaps: [
+      { page: "index", section: "hero", slot: "a", composition: "x", aspect: "3:2", size: "1K", prompt: process.argv[1], use: "" },
+      { page: "index", section: "hero", slot: "b", composition: "x", aspect: "3:2", size: "2K", prompt: process.argv[1], use: "" },
+    ],
+  };
+  require("fs").writeFileSync(process.argv[2], JSON.stringify(p, null, 2));
+' "$prompt_f3b" "$tmp/.image-plan.json"
+h1k=$(printf '%s' "$prompt_f3b|3:2|gemini-3.1-flash-image|1K" | sha256sum | cut -c1-12)
+printf 'not-a-real-jpeg' > "$tmp/assets/img/gen-$h1k.jpg"
+set +e
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null 2>"$tmp/err" )
+rc=$?
+set -e
+[ "$rc" = 3 ] \
+  || fail "a 2K gap must not be satisfied by a 1K plate sharing the same prompt/aspect/model; got rc=$rc (expected 3, needs a key)"
+
+# 6. The key cannot reach the script's own output. Every write funnels through
+#    scrub(); these pins are what keep a future adapter from printing a headers
+#    object in its error path. Quote-anchored so a renamed helper fails them.
+grep -Fq 'function scrub(s) {' "$g" || fail "$g no longer defines scrub()"
+grep -Fq 'const say = (s) => console.log(scrub(s));' "$g" \
+  || fail "$g's stdout writer no longer scrubs"
+grep -Fq 'const warn = (s) => console.error(scrub(s));' "$g" \
+  || fail "$g's stderr writer no longer scrubs"
+grep -Fq 'warn(e.stack || e.message);' "$g" \
+  || fail "$g's top-level catch no longer routes through the scrubbing writer"
+# Control: console.log and console.error appear ONLY inside those two writers.
+# A direct call anywhere else bypasses the scrub entirely.
+# `|| true` is required: grep -o exits 1 on zero matches, and an assignment
+# from a failing command substitution aborts under `set -e` -- which would
+# skip this very assertion instead of failing it.
+# Count EVERY console.* call, not just log|error: console.warn, .info, .debug
+# and .trace all write to stdout/stderr and all bypass scrub(), because they
+# are direct calls rather than say()/warn(). Verified -- console.warn leaking
+# the key in an adapter error path passed the whole suite before this widened.
+# `grep -o ... | wc -l` counts OCCURRENCES, not matching lines: `grep -c`
+# counts a line once no matter how many times the pattern appears on it, so
+# appending a second `console.log` call onto the existing `say` line left the
+# line count at 2 and the whole suite green. Verified.
+n=$(grep -o 'console\.' "$g" | wc -l || true)
+[ "$n" = 2 ] || fail "$g must funnel all output through say()/warn(); found $n console calls, expected 2"
+# A leak does not need console.*: process.stderr.write reaches fd 2 just as
+# well, and the count above cannot see it. Verified -- writing the raw key
+# with process.stderr.write in callGoogle's error path passed the entire
+# suite before this assertion existed.
+if grep -Eq 'process\.(stdout|stderr)\.write' "$g"; then
+  fail "$g writes directly to stdout/stderr, bypassing the scrub in say()/warn()"
+fi
+
+# 6b. Behavioural: a run's own success line must not leak the key.
+#     The gap here has a `use`, not a `prompt`, so no network call is needed
+#     and no ambiguity/key gate can intercept before this line runs:
+#     cmdRun's success line is `say("  " + g.slot + ": used " + g.use)`, which
+#     always prints the full `use` path. Making that path's own filename equal
+#     the sentinel, and setting GEMINI_API_KEY to that same sentinel, means the
+#     line always CONTAINS the string scrub() must remove: if scrub is
+#     neutered the sentinel survives verbatim; if scrub works, its blind
+#     substring replacement redacts this innocuous path exactly as it would a
+#     real key. Verified: `scrub(s) { return String(s); }` leaves the whole
+#     suite PASS with the old ambiguous-gap 6b (it never reached a key-bearing
+#     line at all -- exit 2 at the pre-pass), and turns this version RED.
+sentinel='SENTINEL_kf82hdA91x'
+printf 'not-a-real-jpeg' > "$tmp/photo-$sentinel.jpg"
+plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 6b (sentinel leak check)"
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].use = process.argv[2];
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json" "$tmp/photo-$sentinel.jpg"
+set +e
+GEMINI_API_KEY="$sentinel" node "$g" run --demo "$tmp" >"$tmp/out" 2>"$tmp/err"
+rc=$?
+set -e
+[ "$rc" = 0 ] || fail "a plan of only a 'use' entry with a key set must still succeed; got rc=$rc"
+grep -Fq "$sentinel" "$tmp/out" "$tmp/err" \
+  && fail "the API key appeared in the script's own output"
+
+# 7. Both vendors are wired, and the endpoints are the current ones. The older
+#    Google :generateContent endpoint returns text, not an image, and OpenAI's
+#    gpt-image models reject response_format outright.
+grep -Fq 'https://generativelanguage.googleapis.com/v1beta/interactions' "$g" \
+  || fail "$g does not target the Interactions API"
+grep -Fq "'x-goog-api-key'" "$g" || fail "$g does not send the Google auth header"
+grep -Fq 'https://api.openai.com/v1/images/generations' "$g" \
+  || fail "$g does not target the OpenAI images endpoint"
+grep -Fq 'aspect_ratio' "$g" || fail "$g does not request a Google aspect ratio"
+grep -Fq 'b64_json' "$g" || fail "$g does not read OpenAI's base64 payload"
+# response_format must appear exactly once: in the Google body. The gpt-image
+# models reject the parameter outright, so it must never reach OpenAI.
+# Counted on a comment-stripped copy, because a pin that matches prose forces
+# comments to be worded around it instead of naming the rule. The first
+# substitution strips only full-line // comments -- a naive // strip would eat
+# the https:// in the endpoint URLs and silently void the endpoint pins above.
+# The second strips /* */ block comments wherever they appear, which would
+# also eat one inside a string literal; nothing in this file has one, and the
+# stripped copy is used for exactly one thing -- counting response_format.
+gs="$tmp/image-gen-stripped.mjs"
+perl -0pe 's{^\s*//[^\n]*$}{}gm; s{/\*.*?\*/}{}gs' "$g" > "$gs" \
+  || fail "could not strip comments from $g"
+n=$(grep -c 'response_format' "$gs" || true)
+[ "$n" = 1 ] || fail "response_format must appear exactly once (the Google body) and never in the OpenAI body; found $n"
+
+# F2. once() must retry only a failure a retry can actually fix -- a
+#     network-level error (fn rejected before any response came back) or an
+#     HTTP 5xx -- and must never retry a deterministic 4xx or a failure that
+#     surfaces AFTER the response already reported success (that request was
+#     already billed; retrying pays twice for one plate). Verified against
+#     the real, exported callGoogle/callOpenAI with global.fetch
+#     monkeypatched in-process: no real network call is made and no key is
+#     read anywhere on this path.
+out=$(node --input-type=module <<'EOF'
+const m = await import('./bin/image-gen.mjs');
+const g = { prompt: 'p', aspect: '1:1', size: '1K' };
+
+async function calls(fn, respond) {
+  let n = 0;
+  globalThis.fetch = async () => { n++; return respond(); };
+  try { await fn('model-x', 'key-x', g); } catch {}
+  return n;
+}
+
+async function networkCalls(fn) {
+  let n = 0;
+  globalThis.fetch = async () => { n++; throw new Error('ECONNREFUSED'); };
+  try { await fn('model-x', 'key-x', g); } catch {}
+  return n;
+}
+
+const http400 = () => ({ ok: false, status: 400, json: async () => ({}) });
+const http500 = () => ({ ok: false, status: 500, json: async () => ({}) });
+// ok:true (a 200) whose body cannot be turned into an image: the serious F2
+// case, where the request already succeeded (and was billed) before parsing
+// or shape-checking the body failed.
+const parseFail = () => ({ ok: true, status: 200, json: async () => ({ nope: true }) });
+
+for (const [label, fn] of [['google', m.callGoogle], ['openai', m.callOpenAI]]) {
+  console.log(label + '.http400=' + await calls(fn, http400));
+  console.log(label + '.parseFail=' + await calls(fn, parseFail));
+  console.log(label + '.http500=' + await calls(fn, http500));
+  console.log(label + '.network=' + await networkCalls(fn));
+}
+EOF
+) || fail "the F2 retry-policy probe crashed"
+grep -qFx 'google.http400=1' <<< "$out" \
+  || fail "a deterministic HTTP 400 must not be retried (google); probe: $out"
+grep -qFx 'google.parseFail=1' <<< "$out" \
+  || fail "a parse/shape failure after a 200 (already billed) must not be retried (google); probe: $out"
+grep -qFx 'google.http500=2' <<< "$out" \
+  || fail "a transient HTTP 5xx must be retried once (google); probe: $out"
+grep -qFx 'google.network=2' <<< "$out" \
+  || fail "a network-level error must be retried once (google); probe: $out"
+grep -qFx 'openai.http400=1' <<< "$out" \
+  || fail "a deterministic HTTP 400 must not be retried (openai); probe: $out"
+grep -qFx 'openai.parseFail=1' <<< "$out" \
+  || fail "a parse/shape failure after a 200 (already billed) must not be retried (openai); probe: $out"
+grep -qFx 'openai.http500=2' <<< "$out" \
+  || fail "a transient HTTP 5xx must be retried once (openai); probe: $out"
+grep -qFx 'openai.network=2' <<< "$out" \
+  || fail "a network-level error must be retried once (openai); probe: $out"
+
+# F4. An empty (or whitespace/padding-only, which is truthy but decodes to
+#     zero bytes) generated payload must be rejected before it is written --
+#     otherwise a corrupt zero-byte plate is cached forever behind a plate
+#     that was already billed once. Verified against the real, exported
+#     generateInto with global.fetch monkeypatched: no real network call, no
+#     key.
+out=$(IMG_DIR="$tmp/assets/img" node --input-type=module <<'EOF'
+const imgDir = process.env.IMG_DIR;
+const m = await import('./bin/image-gen.mjs');
+const fs = await import('node:fs');
+const g = { prompt: 'p', aspect: '1:1', size: '1K', est_cost: 0.01 };
+globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ output_image: { data: '   ' } }) });
+let threw = false;
+try {
+  await m.generateInto(imgDir, 'gen-empty-test.jpg', { vendor: 'google', model: 'm', key: 'k', g });
+} catch { threw = true; }
+console.log('threw=' + threw);
+console.log('written=' + fs.existsSync(imgDir + '/gen-empty-test.jpg'));
+EOF
+) || fail "the F4 empty-payload probe crashed"
+grep -qFx 'threw=true' <<< "$out" \
+  || fail "generateInto must throw on an empty/whitespace-only image payload; probe: $out"
+grep -qFx 'written=false' <<< "$out" \
+  || fail "an empty image payload must never be written to disk (it would be cached forever); probe: $out"
+
+# 8. The command contract. Greps a comment-stripped copy so a rule parked in an
+#    HTML comment cannot satisfy the pin - the failure mode that let three
+#    `inherits: true` pins pass in v3.2 while the rule sat commented out.
+d=commands/wp-demo.md
+ds="$tmp/wp-demo-stripped.md"
+# Strip HTML comments so a rule parked in <!-- --> cannot satisfy a pin -- the
+# failure mode that let three `inherits: true` pins pass in v3.2 while the rule
+# sat commented out. Then collapse all whitespace to single spaces, so the pins
+# below test what the document SAYS rather than where its line breaks fall:
+# pinning line-scoped phrases forces prose to be rewrapped around the checks,
+# and a pure reflow would otherwise fail the build claiming a rule is missing.
+perl -0pe 's{<!--.*?-->}{}gs; s{\s+}{ }g' "$d" > "$ds" \
+  || fail "could not build the stripped copy of $d"
+grep -Fq 'image-gen.mjs" plan --demo demo/' "$ds" \
+  || fail "$d does not run the image planner"
+grep -Fq 'image-gen.mjs" run --demo demo/' "$ds" \
+  || fail "$d does not run the image generator after approval"
+grep -Fq 'exactly one of `prompt` or `use`' "$ds" \
+  || fail "$d does not state the one-field-per-gap rule the script enforces"
+grep -Fq 'Costs are estimates, not a bill' "$ds" \
+  || fail "$d does not carry the estimate disclaimer into the approval prompt"
+grep -Fq '"image provider"' "$ds" \
+  || fail "$d does not record the provider in .wp-create.json"
+grep -Fq 'never pasted into chat' "$ds" \
+  || fail "$d does not state that the key is never pasted into chat"
+# Finding 4: only the Google model id was ever named where the executing
+# agent reads; the OpenAI ids lived only in CHANGELOG.md, which it does not
+# read, so an OPENAI_API_KEY-only run had to invent a model string and every
+# request failed HTTP 400. Pin both ids where the offer is actually made.
+grep -Fq 'gpt-image-2.5-flare' "$ds" \
+  || fail "$d does not name the gpt-image-2.5-flare model id for an OpenAI key"
+grep -Fq 'gpt-image-2.5-sunburst' "$ds" \
+  || fail "$d does not name the gpt-image-2.5-sunburst model id for an OpenAI key"
+# Finding 3: step 5.5 told the agent to fill {{slot}} markers before the
+# pages holding them exist -- they are written in step 6, which never
+# mentioned .image-plan.json, gaps[] or result.file. Pin that step 6's own
+# slot-filling sentence names the source.
+grep -Fq "an image slot fills from that gap's own \`result.file\` in \`demo/.image-plan.json\`" "$ds" \
+  || fail "$d's step 6 does not source image slots from result.file in demo/.image-plan.json"
+# 9. The write path. Finding 10: an earlier draft only ever READ "image
+#    provider" and nothing ever wrote it, so the feature could never activate.
+#    Pin that the doc now records the operator's answer, and that "none" (a
+#    decline) is a recognised, non-reasked value -- not just a stray string.
+grep -Fq "operator's answer into \`.wp-create.json\`" "$ds" \
+  || fail "$d does not write the chosen provider back into .wp-create.json"
+grep -Fq '"image provider": "none"' "$ds" \
+  || fail "$d does not record and handle a decline as \"image provider\": \"none\""
+# Finding 12: "none" has a WRITE half (pinned above: record the decline) and a
+# separate READ half (a recorded "none" must generate nothing and never
+# re-ask). They live in two different sentences, so one pin cannot cover both
+# -- this pin targets the read half specifically, spanning from the `"none"`
+# token through the "do not ask again" behaviour in one contiguous phrase, so
+# a mutation that severs the connection between them (e.g. rewording "a value
+# of `"none"`" to something that drops the token, while leaving the generic
+# "handled like the no-key branch" tail untouched) is still caught -- the
+# write-half pin above does not see this sentence at all.
+grep -Fq '`"none"` records an earlier decline and is handled exactly like the no-key branch above: generate nothing, say so in one line, go to step 6, and do not ask again' "$ds" \
+  || fail "$d does not state that a recorded \"none\" generates nothing and is never re-asked"
+# Control: the step is inside wp-demo.md and NOT in wp-yolo.md, which must never
+# generate. A single shared pin would pass with the step in the wrong command.
+# Same comment-strip-and-collapse treatment, so this pin is immune to reflow too.
+y=commands/wp-yolo.md
+ys="$tmp/wp-yolo-stripped.md"
+perl -0pe 's{<!--.*?-->}{}gs; s{\s+}{ }g' "$y" > "$ys" \
+  || fail "could not build the stripped copy of $y"
+# Explicit `if`, not `grep && fail`: a failing command inside an && list has
+# subtle `set -e` semantics, and an assertion must not depend on reading them
+# right. Here the desired outcome is grep FAILING, which makes it acute.
+if grep -Fq 'image-gen.mjs' "$ys"; then
+  fail "$y must never invoke the image generator"
+fi
+grep -Fq 'never generates images' "$ys" \
+  || fail "$y does not state that it never generates images"
+
+# 10. /wp-seed must resolve a generated plate's demo-relative path before
+#    importing it, and must report a failed local import on its own line
+#    distinct from the remote-URL warning. Two independent pins, not one
+#    file-wide grep, per the "one pin covering two rules" defect that has
+#    already bitten this branch twice: deleting either rule alone must
+#    redden only its own pin. Same comment-strip-and-collapse treatment as
+#    assertion 8/9, so a pure reflow of the prose cannot fail this either.
+sm=commands/wp-seed.md
+sms="$tmp/wp-seed-stripped.md"
+perl -0pe 's{<!--.*?-->}{}gs; s{\s+}{ }g' "$sm" > "$sms" \
+  || fail "could not build the stripped copy of $sm"
+grep -Fq 'resolve it against the demo folder before Phase 3 imports it' "$sms" \
+  || fail "$sm does not resolve a demo-relative image source before importing it"
+grep -Fq 'GENERATED PLATE FAILED' "$sms" \
+  || fail "$sm does not report a failed local generated plate on its own distinct line"
+# The classification rule — that http://, https://, and // mark remote sources.
+# This prose was reverted to ambiguous wording (5e1c369 → edbd85c) while keeping
+# the "resolve" pin intact, and all 64 checks still passed. A future edit could
+# silently re-introduce the ambiguity without this third pin catching it.
+grep -Fq 'beginning `http://`, `https://` or `//` is remote' "$sms" \
+  || fail "$sm does not classify sources beginning with http://, https://, or // as remote"
+
+echo PASS

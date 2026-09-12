@@ -1,0 +1,359 @@
+#!/usr/bin/env node
+/**
+ * image-gen.mjs: fill a craft demo's image slots, from a client file or from a
+ * generation API, without ever billing twice for the same plate.
+ *
+ * This is code rather than prose in wp-demo.md for one reason: prose telling
+ * Claude to curl an API passes the key through a shell invocation on every
+ * build, where it lands in the transcript, in shell history, and in any hook
+ * that logs commands. Here the key is read from process.env in-process, so no
+ * invocation exists for anything to log.
+ *
+ * Exit codes: 0 clean, 2 the plan is ambiguous and was refused before any
+ * request, 3 no key (nothing written, nothing billed), 4 one or more slots
+ * failed after work began.
+ */
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, realpathSync } from 'node:fs';
+import { resolve, join, dirname, basename, isAbsolute } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createHash } from 'node:crypto';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const COMPOSITIONS = join(ROOT, 'skills/wp-demo-craft/compositions');
+
+// The key must never reach stdout or stderr - not through an error message and
+// not through a stack frame that captured a header object. Every write funnels
+// through scrub(), so a future adapter cannot reintroduce the leak by being
+// careless in its own error path.
+function scrub(s) {
+  let out = String(s);
+  for (const v of [process.env.GEMINI_API_KEY, process.env.OPENAI_API_KEY]) {
+    if (v) out = out.split(v).join('[redacted]');
+  }
+  return out;
+}
+const say = (s) => console.log(scrub(s));
+const warn = (s) => console.error(scrub(s));
+
+// Every <img src="{{slot}}"> in a composition declares its own crop. Reading
+// width/height off the tag is what keeps the requested aspect from drifting
+// away from what the CSS will actually display.
+export function slotsOf(composition) {
+  const file = join(COMPOSITIONS, composition, 'section.html');
+  const html = readFileSync(file, 'utf8');
+  const out = [];
+  for (const tag of html.match(/<img\b[^>]*>/gi) || []) {
+    const slot = /\bsrc="\{\{([A-Za-z0-9_]+)\}\}"/.exec(tag);
+    const w = /\bwidth="(\d+)"/.exec(tag);
+    const h = /\bheight="(\d+)"/.exec(tag);
+    if (slot && w && h) out.push({ slot: slot[1], width: +w[1], height: +h[1] });
+  }
+  return out;
+}
+
+const GOOGLE_RATIOS = ['1:1', '3:2', '2:3', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'];
+const OPENAI_SIZES = [[1024, 1024], [1536, 1024], [1024, 1536]];
+
+export function snapAspect(width, height, vendor) {
+  const want = width / height;
+  if (vendor === 'openai') {
+    const best = OPENAI_SIZES.reduce((a, b) =>
+      Math.abs(b[0] / b[1] - want) < Math.abs(a[0] / a[1] - want) ? b : a);
+    return `${best[0]}x${best[1]}`;
+  }
+  const ratio = (r) => { const [w, h] = r.split(':').map(Number); return w / h; };
+  return GOOGLE_RATIOS.reduce((a, b) =>
+    Math.abs(ratio(b) - want) < Math.abs(ratio(a) - want) ? b : a);
+}
+
+// Smallest offered size at least as wide as the slot declares, capped at 2K: a
+// 4K plate costs half again as much, ships megabytes into the media library,
+// and is invisible behind object-fit: cover.
+const GOOGLE_SIZES = [['512px', 512], ['1K', 1024], ['2K', 2048]];
+export function snapSize(width) {
+  const hit = GOOGLE_SIZES.find(([, px]) => px >= width);
+  return (hit || GOOGLE_SIZES[GOOGLE_SIZES.length - 1])[0];
+}
+
+// Estimates, never a bill. Google publishes no per-image figure in its own
+// documentation and OpenAI bills tokens rather than images, so both columns are
+// approximations that will drift.
+const EST_GOOGLE = { '512px': 0.045, '1K': 0.067, '2K': 0.101 };
+export function estCost(vendor, size) {
+  return vendor === 'openai' ? 0.03 : (EST_GOOGLE[size] ?? 0.101);
+}
+
+export function plateHash(prompt, aspect, model, size) {
+  return createHash('sha256').update(`${prompt}|${aspect}|${model}|${size}`).digest('hex').slice(0, 12);
+}
+
+function planPath(demo) { return join(demo, '.image-plan.json'); }
+function readPlan(demo) { return JSON.parse(readFileSync(planPath(demo), 'utf8')); }
+function writePlan(demo, plan) {
+  writeFileSync(planPath(demo), JSON.stringify(plan, null, 2) + '\n');
+}
+
+function cmdPlan(demo) {
+  const plan = readPlan(demo);
+  const [vendor, model] = String(plan.provider).split('/');
+  const imgDir = join(demo, 'assets', 'img');
+
+  // Carry forward anything already authored, keyed by the slot's identity in
+  // the build, so re-running plan never discards prompts a human wrote.
+  const prior = new Map((plan.gaps || []).map((g) => [`${g.page}|${g.section}|${g.slot}`, g]));
+
+  const gaps = [];
+  for (const row of plan.sections || []) {
+    for (const s of slotsOf(row.composition)) {
+      const aspect = snapAspect(s.width, s.height, vendor);
+      const size = vendor === 'openai' ? aspect : snapSize(s.width);
+      const was = prior.get(`${row.page}|${row.section}|${s.slot}`) || {};
+      const prompt = was.prompt || '';
+      gaps.push({
+        page: row.page,
+        section: row.section,
+        composition: row.composition,
+        slot: s.slot,
+        aspect,
+        size,
+        est_cost: estCost(vendor, size),
+        prompt,
+        use: was.use || '',
+        cached: !!prompt && existsSync(join(imgDir, `gen-${plateHash(prompt, aspect, model, size)}.jpg`)),
+      });
+    }
+  }
+
+  const claimed = new Set(gaps.map((g) => g.use).filter(Boolean));
+  plan.gaps = gaps;
+  plan.unused_assets = (plan.assets_on_disk || []).filter((a) => !claimed.has(a.path));
+  writePlan(demo, plan);
+
+  const billable = gaps.filter((g) => !g.use && !g.cached);
+  const total = billable.reduce((n, g) => n + g.est_cost, 0);
+  say(`Image plan - ${billable.length} plate(s) to generate, ~$${total.toFixed(2)} (${plan.provider})`);
+  for (const g of gaps) {
+    const state = g.use ? `use ${g.use}` : g.cached ? 'cached' : g.prompt ? 'generate' : 'NEEDS PROMPT';
+    say(`  ${g.page}  ${g.section}  ${g.slot}  ${g.aspect}  ${g.size}  ${state}`);
+  }
+  if (plan.unused_assets.length) {
+    say(`  unused docs/ assets: ${plan.unused_assets.map((a) => a.path).join(', ')}`);
+  }
+  say('Costs are estimates, not a bill.');
+}
+
+const ENV_VAR = { google: 'GEMINI_API_KEY', openai: 'OPENAI_API_KEY' };
+
+async function cmdRun(demo) {
+  const plan = readPlan(demo);
+  const [vendor, model] = String(plan.provider).split('/');
+  const imgDir = join(demo, 'assets', 'img');
+  mkdirSync(imgDir, { recursive: true });
+  const gaps = plan.gaps || [];
+
+  // `use` paths come from assets_on_disk[].path and are relative to the
+  // user's WordPress PROJECT (e.g. "docs/logo.png"), not to this plugin's own
+  // ROOT (dirname(image-gen.mjs)/..) -- resolving against ROOT would look for
+  // the client's file inside the plugin install itself. The project root is
+  // the demo folder's own parent: `--demo demo/` is invoked from the project
+  // root, so this does not depend on the caller's current working directory.
+  const projectRoot = dirname(resolve(demo));
+
+  // Refuse an ambiguous plan before issuing any request. Failing partway
+  // through has already cost money; failing here has not.
+  for (const g of gaps) {
+    const both = g.prompt && g.use;
+    const neither = !g.prompt && !g.use;
+    if (both || neither) {
+      warn(`${g.page}/${g.section}/${g.slot}: set exactly one of "prompt" or "use" (found ${both ? 'both' : 'neither'})`);
+      process.exit(2);
+    }
+  }
+
+  const needsKey = gaps.some((g) => g.prompt && !isCached(imgDir, g, model));
+  const envVar = ENV_VAR[vendor];
+  const key = process.env[envVar];
+  if (needsKey && !key) {
+    const n = gaps.filter((g) => g.prompt && !isCached(imgDir, g, model)).length;
+    warn(`${n} plate(s) needed, no key for provider ${vendor}.`);
+    warn(`  export ${envVar}=...`);
+    warn('Stopped. Nothing written, nothing billed.');
+    process.exit(3);
+  }
+
+  let failed = 0;
+  for (const g of gaps) {
+    if (g.use) {
+      // A real client file is not generated, and must not be recorded as if it
+      // were: a false line in the provenance table is worse than none.
+      const src = isAbsolute(g.use) ? g.use : resolve(projectRoot, g.use);
+      const dest = join(imgDir, basename(g.use));
+      try {
+        // Same source and destination would truncate the file mid-copy.
+        if (resolve(src) !== resolve(dest)) copyFileSync(src, dest);
+        g.result = { file: `assets/img/${basename(g.use)}`, generated: false };
+        say(`  ${g.slot}: used ${g.use}`);
+      } catch (e) {
+        // A missing/unreadable "use" file must not abort the whole run: keep
+        // every slot already resolved, exactly like a failed generate below.
+        failed++;
+        g.result = { error: scrub(e.message) };
+        warn(`  ${g.slot}: FAILED - ${scrub(e.message)}`);
+      }
+      continue;
+    }
+    const hash = plateHash(g.prompt, g.aspect, model, g.size);
+    const file = `gen-${hash}.jpg`;
+    if (existsSync(join(imgDir, file))) {
+      g.result = { file: `assets/img/${file}`, generated: true, cached: true };
+      say(`  ${g.slot}: cached (${file})`);
+      continue;
+    }
+    try {
+      await generateInto(imgDir, file, { vendor, model, key, g, hash });
+      g.result = { file: `assets/img/${file}`, generated: true, cached: false };
+      say(`  ${g.slot}: generated (${file})`);
+    } catch (e) {
+      // Keep every plate already paid for. Discarding billed work to report a
+      // tidy failure is worse than the failure.
+      failed++;
+      g.result = { error: scrub(e.message) };
+      warn(`  ${g.slot}: FAILED - ${scrub(e.message)}`);
+    }
+  }
+
+  writePlan(demo, plan);
+  if (failed) {
+    warn(`${failed} slot(s) failed. Plates already generated are kept and will not be re-billed.`);
+    process.exit(4);
+  }
+}
+
+function isCached(imgDir, g, model) {
+  return !!g.prompt && existsSync(join(imgDir, `gen-${plateHash(g.prompt, g.aspect, model, g.size)}.jpg`));
+}
+
+// Exported for direct-import testing: a monkeypatched global.fetch can drive
+// this (and callGoogle/callOpenAI below) through every response shape with no
+// network call and no key, the same way snapSize is tested directly because a
+// CLI-only run cannot distinguish some branches from a stub.
+export async function generateInto(imgDir, file, { vendor, model, key, g }) {
+  const bytes = vendor === 'openai'
+    ? await callOpenAI(model, key, g)
+    : await callGoogle(model, key, g);
+  // A whitespace/padding-only base64 payload is truthy but decodes to zero
+  // bytes, so it survives the `!b64` check inside each vendor call. Writing
+  // it would cache an empty file forever behind a plate that was already
+  // billed once real generation happens on a later, unrelated run.
+  if (!bytes || bytes.length === 0) throw new Error(`${vendor} returned an empty image payload`);
+  writeFileSync(join(imgDir, file), bytes);
+  writeFileSync(join(imgDir, file.replace(/\.jpg$/, '.json')), JSON.stringify({
+    model, prompt: g.prompt, aspect: g.aspect, size: g.size,
+    date: new Date().toISOString().slice(0, 10),
+    est_cost: g.est_cost,
+    synthid: vendor === 'google',
+  }, null, 2) + '\n');
+}
+
+// One retry, then give up on this slot -- but only for a failure a retry can
+// actually fix: a network-level error (fn rejected before any response came
+// back, so nothing was attempted server-side) or a transient HTTP 5xx. A 4xx
+// is deterministic, and a failure that surfaces AFTER the response already
+// reported success means the request was already billed -- retrying either
+// just pays twice for one plate. Reads e.status rather than matching on the
+// error message, so rewording a message can never change retry behaviour.
+export async function once(fn) {
+  try {
+    return await fn();
+  } catch (e) {
+    if (e.status && e.status < 500) throw e;
+    return await fn();
+  }
+}
+
+export async function callGoogle(model, key, g) {
+  return once(async () => {
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify({
+        model,
+        input: [{ type: 'text', text: g.prompt }],
+        response_format: {
+          type: 'image', mime_type: 'image/jpeg',
+          aspect_ratio: g.aspect, image_size: g.size,
+        },
+      }),
+    });
+    // Status only. The response body can echo the request, and the request
+    // carries nothing secret, but the headers object does - never format it.
+    if (!r.ok) {
+      const e = new Error(`google returned HTTP ${r.status}`);
+      e.status = r.status;
+      throw e;
+    }
+    try {
+      const j = await r.json();
+      const b64 = j.output_image?.data
+        ?? j.steps?.flatMap((s) => s.content || []).find((c) => c.type === 'image')?.data;
+      if (!b64) throw new Error('google returned no image (prompt refused, or an unexpected shape)');
+      return Buffer.from(b64, 'base64');
+    } catch (e) {
+      // The HTTP request already succeeded (r.ok): a parse/shape failure past
+      // this point must not look like a transient error to once() above.
+      e.status = e.status ?? r.status;
+      throw e;
+    }
+  });
+}
+
+export async function callOpenAI(model, key, g) {
+  return once(async () => {
+    const r = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+      // No response_format: the gpt-image models reject it and always return base64.
+      body: JSON.stringify({
+        model, prompt: g.prompt, size: g.size,
+        quality: 'medium', output_format: 'jpeg', n: 1,
+      }),
+    });
+    if (!r.ok) {
+      const e = new Error(`openai returned HTTP ${r.status}`);
+      e.status = r.status;
+      throw e;
+    }
+    try {
+      const j = await r.json();
+      const b64 = j.data?.[0]?.b64_json;
+      if (!b64) throw new Error('openai returned no image (prompt refused, or an unexpected shape)');
+      return Buffer.from(b64, 'base64');
+    } catch (e) {
+      e.status = e.status ?? r.status;
+      throw e;
+    }
+  });
+}
+
+// Only dispatch when run as a command, not when imported. Compare REAL paths:
+// Node resolves symlinks when loading the module, so import.meta.url is the
+// real path while argv[1] keeps the link -- comparing them directly makes a
+// symlinked invocation a silent no-op.
+const invokedAs = process.argv[1] ? pathToFileURL(realpathSync(process.argv[1])).href : null;
+if (invokedAs === import.meta.url) {
+  const [, , sub, ...rest] = process.argv;
+  const demoIdx = rest.indexOf('--demo');
+  const demo = demoIdx >= 0 ? rest[demoIdx + 1] : null;
+
+  try {
+    if (sub === 'plan' && demo) cmdPlan(demo);
+    else if (sub === 'run' && demo) await cmdRun(demo);
+    else {
+      warn('usage: image-gen.mjs (plan|run) --demo <dir>');
+      process.exit(2);
+    }
+  } catch (e) {
+    warn(e.stack || e.message);
+    process.exit(4);
+  }
+}

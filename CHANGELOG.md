@@ -2,7 +2,35 @@
 
 ## [Unreleased]
 
+### Added
+
+- **README and `docs/commands.md` now document how to supply the image-generation key.**
+  Which variable per provider (`GEMINI_API_KEY` / `OPENAI_API_KEY`), the three places to
+  set it — an `env` block in the gitignored `.claude/settings.local.json`, an `export`
+  before starting Claude Code, or a shell profile — and the two things that look like they
+  should work and do not: exporting inside a running session (each command gets a fresh
+  shell) and putting the key in `.wp-create.json`, which records only which provider was
+  chosen. The prose added in this release told the agent what to do with a key; nothing
+  told a human how to provide one.
+
+- `/wp-demo` Step 5.5 fills a composition's image slots from a client file or a
+  generated plate, via the new `bin/image-gen.mjs`. Provider-agnostic across
+  `google/gemini-3.1-flash-image` (nano banana) and `gpt-image-2.5-flare` /
+  `gpt-image-2.5-sunburst`. The provider decision is asked once, when a key is
+  present and plates are needed, and recorded as `"image provider"` in
+  `.wp-create.json` — `"<vendor>/<model>"` on a yes, `"none"` on a decline — so
+  a later run never re-asks. The aspect and size of every request are read off
+  the composition's own `<img>` tag, so a plate arrives at the crop the CSS
+  displays. Plates are content-hashed on prompt, aspect and model, so a re-run
+  or a verify round never re-bills, and an edited prompt always regenerates
+  instead of serving the stale image. The API key is read from
+  `GEMINI_API_KEY` / `OPENAI_API_KEY` in-process only — never a CLI argument,
+  never written to a file, never logged — and a missing key stops the build
+  naming the variable rather than falling back to a placeholder. `/wp-yolo`
+  never generates; it consumes plates already on disk.
+
 ### Fixed
+
 - **A script registered without `in_footer` slipped past PERF-010.** The check grepped
   `wp_enqueue_script` only, so a theme that re-registered a core handle — the usual way a
   bundled jQuery replaces the WordPress copy — kept loading it in `<head>` and blocking the
@@ -22,6 +50,11 @@
   change, not where they do damage. `/wp-demo-verify` now also shoots 1152, which sits inside that
   band, and 1280, the first width where `xl:` applies; the responsive skill states that a
   breakpoint is a range to be checked through, not a line to be checked at.
+- `/wp-seed` could not import a demo-relative image path. Phase 2 collected
+  `img[src]` as "URLs" and Phase 3's example was remote, so a local
+  `assets/img/...` source failed on every import. Sources are now resolved
+  against the demo folder, and a failed import of a generated plate is reported
+  on its own line rather than folded in with a remote URL that 403'd.
 
 ## [1.16.0] - 2026-09-11
 

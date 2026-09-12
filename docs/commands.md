@@ -177,6 +177,19 @@ not. Three rounds still failing writes `demo/FAILED.md` — every failing rubric
 outstanding finding, the round count reached — and `/wp-init`, `/wp-section` and `/wp-yolo` stop
 on it rather than building a theme from an unverified demo.
 
+Craft mode can also **generate the images** a composition declares but `docs/` does not
+supply (`hero-split`, `hero-bleed`, `feature-zigzag`). This is opt-in by environment: with
+neither `GEMINI_API_KEY` nor `OPENAI_API_KEY` set, nothing is asked and nothing is
+generated. With a key present and slots uncovered, Step 5.5 asks once which provider to
+use, records the answer in `.wp-create.json` as `"image provider"` (a decline is recorded
+as `"none"` and is not re-asked), shows a cost table, and generates on a yes. The key is
+read from the environment in-process only — never a CLI argument, never written to
+`.wp-create.json`, never logged. A missing key stops the build naming the variable to
+export rather than falling back to a placeholder. See **Generated images** in the README
+for where to set the variable. Plates are content-hashed on prompt, aspect and model, so a
+verify round never re-bills, and an edited prompt regenerates instead of serving a stale
+image. `/wp-yolo` never generates; it consumes plates already on disk.
+
 ### `/wp-polish`
 
 ```
