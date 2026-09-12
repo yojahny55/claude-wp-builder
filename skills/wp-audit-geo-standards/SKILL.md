@@ -404,8 +404,10 @@ characters each, seeded from the demo header/footer copy. They satisfy both
 
 ### 6.10 `llms-full.txt` and `auth.md`
 
-`/llms-full.txt` is the `/llms.txt` route family carrying the full text of every published
-page and post, for agents that ingest the whole site. `/auth.md` (SaaS/API only, spec
+`/llms-full.txt` is the `/llms.txt` route family carrying the body text of published
+pages and posts (capped at the first 200 — an unbounded dump can exhaust memory on a
+content-heavy site; `/llms.txt` remains the complete index), for agents that ingest the
+whole site. `/auth.md` (SaaS/API only, spec
 §7.3) is the credential walkthrough an agent reads before calling the API — scheme,
 discovery endpoints and a numbered obtain-and-send flow — and satisfies `auth-md-exists`,
 `auth-md-structure` and `auth-md-walkthrough-simulation` (GEO-U08).

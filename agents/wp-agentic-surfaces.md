@@ -109,6 +109,10 @@ add_action( 'template_redirect', function () {
         header( 'Content-Type: text/plain; charset=utf-8' );
         if ( function_exists( '<prefix>_area_llms_txt' ) ) {
             echo call_user_func( '<prefix>_area_llms_txt', get_query_var( '<prefix>_agent_area' ) ); // phpcs:ignore WordPress.Security.EscapeOutput
+        } else {
+            // Never answer an empty 200 — a missing builder is a real not-found.
+            status_header( 404 );
+            echo "Not found\n";
         }
         exit;
     }
@@ -331,10 +335,12 @@ function <prefix>_llms_txt() {
  */
 function <prefix>_llms_full_txt() {
     $out  = '# ' . get_bloginfo( 'name' ) . " — full content\n\n";
-    $out .= '> Complete text of every published page and post. Prefer it over truncated summaries.' . "\n\n";
+    $out .= '> Body text of published pages and posts. Prefer it over truncated summaries; /llms.txt is the complete index.' . "\n\n";
+    // Capped: dumping every post in one response exhausts memory on a content-heavy site.
+    // 200 is a defensive ceiling, not a completeness guarantee — /llms.txt stays complete.
     $posts = get_posts( array(
         'post_type'      => array( 'page', 'post' ),
-        'posts_per_page' => -1,
+        'posts_per_page' => 200,
         'post_status'    => 'publish',
         'orderby'        => 'menu_order',
         'order'          => 'ASC',

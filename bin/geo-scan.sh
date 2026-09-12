@@ -12,8 +12,11 @@ set -euo pipefail
 target="${1:-}"
 [ -n "$target" ] || { echo "usage: geo-scan.sh <domain|url>"; exit 1; }
 
-# Bare host.
+# Bare host: strip scheme, userinfo, path, query and fragment so a full URL cannot
+# produce a malformed `url=` value.
 host="${target#http://}"; host="${host#https://}"; host="${host%%/*}"
+host="${host#*@}"; host="${host%%\?*}"; host="${host%%#*}"
+[ -n "$host" ] || { echo "usage: geo-scan.sh <domain|url>"; exit 1; }
 
 if ! command -v curl >/dev/null 2>&1; then
   echo "SKIP: curl not available — cannot run the live GEO scan"

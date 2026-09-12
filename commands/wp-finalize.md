@@ -245,11 +245,14 @@ run `/wp-audit --geo` to fix a finding, then re-run this check.
    execution — this is what an agent that does not run JavaScript sees:
    ```bash
    curl -s "$SITE/" > /tmp/geo-home.html
-   sed -e 's/<[^>]*>/ /g' /tmp/geo-home.html | tr -s ' \n' ' ' | wc -c   # body text, must be >= 500
+   perl -0777 -pe 's/<(script|style)\b[^>]*>.*?<\/\1>//gis' /tmp/geo-home.html \
+     | sed -e 's/<[^>]*>/ /g' | tr -s ' \n' ' ' | wc -c   # visible text, must be >= 500
    grep -o '<h1' /tmp/geo-home.html | wc -l                               # must be exactly 1
    grep -o '<main' /tmp/geo-home.html | wc -l                             # must be >= 1
    grep -oE '<h[1-6]' /tmp/geo-home.html                                  # must be sequential, no skipped level
    ```
+   `<script>` and `<style>` are stripped before counting — otherwise inline JS/CSS
+   inflates the character count and a JS-only page false-passes.
    **PASS** if the raw HTML carries ≥500 characters of content, exactly one
    `<h1>`, at least one `<main>` landmark, and a sequential heading order.
    **FAIL** naming the missing item.
@@ -281,12 +284,19 @@ run `/wp-audit --geo` to fix a finding, then re-run this check.
    FAQPage / Service / Product / AggregateRating / BreadcrumbList. **FAIL**
    listing which identity signal is missing.
 
-4. **GEO-A02 — robots AI policy.** The site must not shut out the answer engines:
+4. **GEO-A02 — robots AI policy.** The site must not shut out the answer engines. Grepping
+   for names is not enough — a bot can be named and still be `Disallow`ed, so track the
+   current `User-agent` and fail on a site-wide `Disallow: /`:
    ```bash
-   curl -s "$SITE/robots.txt" | grep -iE 'GPTBot|OAI-SearchBot|ChatGPT-User|ClaudeBot|PerplexityBot|Google-Extended|Applebot-Extended|Amazonbot|FacebookBot|Bytespider'
+   curl -s "$SITE/robots.txt" | awk '
+     /^User-agent:/ { sub(/^User-agent:[[:space:]]*/, ""); ua = tolower($0); next }
+     ua ~ /^(gptbot|oai-searchbot|chatgpt-user|claudebot|perplexitybot|google-extended|applebot-extended|amazonbot|facebookbot)$/ &&
+     $0 ~ /^Disallow:[[:space:]]*\/[[:space:]]*$/ { print "BLOCKED " toupper(ua); bad = 1 }
+     END { exit bad }
+   '
    ```
-   **PASS** if none of the AI crawlers above is `Disallow`ed site-wide
-   (`Disallow: /`). **FAIL** listing the blocked crawler.
+   **PASS** if the parser exits 0 (no allowlisted crawler has a site-wide `Disallow: /`).
+   **FAIL** printing each blocked crawler.
 
 5. **GEO-A12 — sitemap `lastmod`.** A sitemap without `lastmod` gives an agent no
    freshness signal. A sitemap **index** lists child sitemaps, not URLs — the dates live

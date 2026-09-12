@@ -67,6 +67,17 @@ grep -qE 'Content-Signal: *ai-train=no' "$fixer" && fail "$fixer must not emit a
 # Fixer: trust-anchor seeding calls the copy function; quoting it makes wp eval fatal.
 grep -q "'<prefix>_trust_anchor_copy" "$fixer" && fail "$fixer must not quote the trust-anchor copy call"
 
+# Fixer: llms-full is capped; an unbounded dump can exhaust memory on a large site.
+grep -q "'posts_per_page' => 200" "$fixer" || fail "$fixer must cap llms-full.txt at 200 posts"
+grep -q 'Never answer an empty 200' "$fixer" || fail "$fixer must 404 a missing area llms builder"
+
+# Scanner: a full URL must be reduced to a bare host before building the API query.
+grep -qF 'host="${host#*@}"' bin/geo-scan.sh || fail "bin/geo-scan.sh must strip userinfo/query/fragment from the host"
+
+# Finalize: JS/CSS must not inflate the GEO-A01 count, and GEO-A02 parses robots.
+grep -qF 's/<(script|style)' "$finalize" || fail "$finalize GEO-A01 must strip script/style before counting"
+grep -qF 'BLOCKED ' "$finalize" || fail "$finalize GEO-A02 must detect a site-wide Disallow for a named bot"
+
 # Wiring: --geo flag, dispatch names, and the live verifier in the finish phase.
 grep -q -- '--geo' "$audit" || fail "$audit missing --geo"
 grep -q 'wp-audit-geo' "$audit" || fail "$audit must dispatch wp-audit-geo"
