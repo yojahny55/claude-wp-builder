@@ -341,3 +341,9 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   reads HTML and CSS, never a screenshot, so a site whose identity lives in
   motion or in canvas yields a thin row — the same ceiling `designlang` already
   carries.
+- **`research.at`, `research.tier`, `research.location` and
+  `research.competitors` are recorded, not wired up.** `agents/wp-research.md`
+  writes all four into `.wp-create.json`, for the operator and for future use,
+  but no command reads them today — only `research.site`, `confidence` and the
+  scalar `"research": "none"` are read. Reuse keys off `demo/RESEARCH.md`'s
+  existence, not off `research.at`'s date.

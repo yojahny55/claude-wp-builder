@@ -11,13 +11,14 @@ is a demo with several palettes.
 1. **The client's own material.** Colours stated in the docs, the colours already
    in their logo, a typeface they have licensed or named. Nothing downstream
    overrides this.
-2. **`npx designlang@12 <url>`** on the client's current site, then on each
-   reference URL the docs name. Pinned to the major version — 12 is the current
-   latest on the npm registry, checked rather than assumed — so a future major
-   cannot change the flags or the output shape underneath this step, exactly as
-   `impeccable@4` is pinned in `verify.md`. Take what the site declares. A site built on
-   inline styles yields thin tokens; that is expected, and thin real tokens still
-   beat invented ones.
+2. **`npx designlang@12 <url>`** on the client's current site — the URL the docs
+   name, **or `research.site` from `demo/RESEARCH.md` when `confidence` is
+   `confirmed`** — then on each reference URL the docs name. Pinned to the major
+   version — 12 is the current latest on the npm registry, checked rather than
+   assumed — so a future major cannot change the flags or the output shape
+   underneath this step, exactly as `impeccable@4` is pinned in `verify.md`. Take
+   what the site declares. A site built on inline styles yields thin tokens;
+   that is expected, and thin real tokens still beat invented ones.
 3. **The catalogue.** Open `references/design-md/INDEX.md` — 64 real brands, one
    row each with industry, tone, display face and accent. Pick two or three rows
    by industry and tone, read **only those files**, and fill the remaining gaps

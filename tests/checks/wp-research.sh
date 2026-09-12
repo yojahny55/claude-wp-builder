@@ -30,9 +30,16 @@ s=skills/wp-research/SKILL.md
 grep -q '^user-invocable: false' "$s" || fail "$s must declare user-invocable: false"
 sf=$(flat "$s")
 
-for tier in websearch firecrawl dataforseo; do
-  grep -Fq "$tier" "$sf" || fail "$s does not name the '$tier' tier"
-done
+# Each tier is pinned by its own backticked form on the tier-values line
+# (skills/wp-research/SKILL.md:98-99) rather than the bare word: a bare
+# `grep -Fq firecrawl` cannot fail on its own, because the `firecrawl_url`
+# pin below (line ~41) already contains that substring.
+grep -Fq '`websearch`,' "$sf" \
+  || fail "$s does not name the 'websearch' tier in its three-value list"
+grep -Fq '`firecrawl`,' "$sf" \
+  || fail "$s does not name the 'firecrawl' tier in its three-value list"
+grep -Fq '`dataforseo`.' "$sf" \
+  || fail "$s does not name the 'dataforseo' tier in its three-value list"
 
 # Each rung must state what it degrades TO. A ladder that names three tiers but
 # never says one falls back to another is a list, not a ladder.
@@ -103,6 +110,12 @@ grep -Fq 'no `research.site` is recorded' "$af" \
 grep -Fq '"research": "none"' "$af" \
   || fail "$a never writes \"research\": \"none\""
 
+# The three-answer confirmation table is stated twice on purpose (here, and in
+# commands/wp-demo.md section C). Pin one string against each side so a
+# one-sided edit to either table is caught.
+grep -Fq 'wrong business' "$af" \
+  || fail "$a does not name the 'wrong business' answer in its confirmation table"
+
 # The web address is research.site and is never called a domain: .wp-create.json
 # already uses "domain" for the domains.csv industry category, and an agent that
 # writes the URL there would silently overwrite the classification. A bare
@@ -129,7 +142,7 @@ awk '/^## Step 2.4: Research/ { r = NR } /^## Step 2.5: Choose the Demo Mode/ { 
      END { exit !(r > 0 && m > 0 && r < m) }' "$d" \
   || fail "$d Step 2.4 must appear before Step 2.5, so plain builds get research too"
 
-grep -Fq 'wp-research' "$df" || fail "$d never dispatches the wp-research agent"
+grep -Fq 'dispatch the `wp-research` agent' "$df" || fail "$d never dispatches the wp-research agent"
 
 # The READ half of the "none" contract. The WRITE half is pinned in section B
 # against the agent. One pin covering both lets either be reworded green.
@@ -215,5 +228,24 @@ grep -Fq 'which corpus produced each hit' "$yf" \
 # prevent, restated here for the one channel /wp-yolo actually has.
 grep -Fq 'research identity: confirmed or unconfirmed' "$yf" \
   || fail "$y Step 6 report does not surface the research identity's confirmed/unconfirmed state"
+
+# ---------------------------------------------------------------------------
+# F. The composition row format is stated three times on purpose
+#    (commands/wp-demo.md — pinned as D4 above — skills/wp-demo-craft/SKILL.md,
+#    and its references/compositions.md). All three describe the same seven
+#    columns; pin each file independently, following the section E two-file
+#    idiom, so a one-sided edit to any one of the three is caught.
+# ---------------------------------------------------------------------------
+sk=skills/wp-demo-craft/SKILL.md
+co=skills/wp-demo-craft/references/compositions.md
+[ -f "$sk" ] || fail "$sk is missing"
+[ -f "$co" ] || fail "$co is missing"
+skf=$(flat "$sk")
+cof=$(flat "$co")
+
+grep -Fq 'no research signal' "$skf" \
+  || fail "$sk composition row format has no research-signal column"
+grep -Fq 'no research signal' "$cof" \
+  || fail "$co composition row format has no research-signal column"
 
 echo PASS

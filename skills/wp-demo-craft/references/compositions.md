@@ -11,12 +11,17 @@ picture of a good section anywhere in it.
 Walk the feeling curve from `demo/BRIEF.md`. For each section pick one
 composition by role and write the row into the plan:
 
-    section | role | composition | why | motion cost | domain signal
+    section | role | composition | why | motion cost | domain signal | research signal
 
-The last column is the domain signal that justified the choice, citing the brief
-constraint the domain classification folded in, or "no domain signal" when the
-domain does not touch that row. It is what makes the classification bind on the
-plan instead of sitting unread, and it is the same row format `/wp-demo` Step 2.6
+The domain signal that justified the choice cites the brief constraint the
+domain classification folded in, or "no domain signal" when the domain does not
+touch that row. The research signal is what `demo/RESEARCH.md`'s `## Signals`
+says this sector does at this point in the page, and whether this row follows
+it or breaks it — or "no research signal" when none applies. The two are
+different axes: the domain signal constrains page pattern and considerations,
+while the research signal is what lets a build deliberately not look like its
+competitors. Together they are what makes the classification bind on the plan
+instead of sitting unread, and it is the same row format `/wp-demo` Step 2.6
 and `SKILL.md` state — do not restate it a fourth way.
 
 Sum the motion cost before building. The index adds at most four

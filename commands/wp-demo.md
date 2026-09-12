@@ -160,7 +160,7 @@ before writing any markup.
    anything, because a wrong category is worse than none. When more than one
    domain clears the threshold, the highest hit count wins; on an exact tie for
    the top count, report both names and proceed `unclassified` for the same
-   reason. The lists are English-only: a docs set with no English-language
+   reason. The lists are English-only: a corpus with no English-language
    material is `unclassified` **with that reason stated**, not silently, and the
    operator may name the domain directly instead of relying on the match. Record
    the result in `.wp-create.json` under `"domain"` as `name`, `score`, `matched`

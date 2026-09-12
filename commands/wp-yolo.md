@@ -191,7 +191,7 @@ domain is matched when **two distinct keywords** from its list appear in that
 corpus; below that, report `unclassified` and carry on without constraining
 anything. When more than one domain clears the threshold, the highest hit count
 wins; on an exact tie for the top count, report both names and proceed
-`unclassified` for the same reason. The lists are English-only: a docs set with
+`unclassified` for the same reason. The lists are English-only: a corpus with
 no English-language material is `unclassified` **with that reason stated**, and
 the operator may name the domain directly instead of relying on the match.
 Record the result once, for the site, not once per page, in `.wp-create.json`
