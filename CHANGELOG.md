@@ -31,6 +31,25 @@
 
 ### Fixed
 
+- **A script registered without `in_footer` slipped past PERF-010.** The check grepped
+  `wp_enqueue_script` only, so a theme that re-registered a core handle — the usual way a
+  bundled jQuery replaces the WordPress copy — kept loading it in `<head>` and blocking the
+  first render with no finding raised. The rule now covers `wp_register_script` and the 5th
+  positional argument as well as the array form, and flags a handle only when NEITHER call sets
+  the group — either one can, so checking a single call gives false positives in both directions.
+- **Nothing weighed a theme's own image assets.** PERF-001 caps the CSS bundle and PERF-018
+  looks for `srcset`, but a decorative export sitting in `assets/` was never measured. Design
+  tools export at 2x the CSS slot, which is right for photographs and wasteful for flat art —
+  a gradient panel, a glass card, a solid shape — where the extra pixels are interpolated back
+  away. New **PERF-053** flags any theme image over 100KB, and any over 40KB whose standard
+  deviation is under 0.12, with the downscale-and-compare procedure in Step 2.
+- **The responsive walk sampled 1024 and 1440 and nothing in between.** A layout is free to be
+  wrong across that whole range: `lg:` utilities apply from 1024 with no `xl:` override until
+  1280, so a row that reads correctly at both sampled widths can be broken for 256px nobody
+  looked at. The five legacy widths sample breakpoint EDGES only, and an edge is where the rules
+  change, not where they do damage. `/wp-demo-verify` now also shoots 1152, which sits inside that
+  band, and 1280, the first width where `xl:` applies; the responsive skill states that a
+  breakpoint is a range to be checked through, not a line to be checked at.
 - `/wp-seed` could not import a demo-relative image path. Phase 2 collected
   `img[src]` as "URLs" and Phase 3's example was remote, so a local
   `assets/img/...` source failed on every import. Sources are now resolved

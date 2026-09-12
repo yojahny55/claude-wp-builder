@@ -225,9 +225,15 @@ if (PROBE) {
   process.exit(0);
 }
 
-// The five legacy /wp-responsive-check viewports. One full-page shot each, at the
-// top of the page, no scroll-walk: this is layout coverage, not motion coverage.
-const RESPONSIVE_WIDTHS = [375, 576, 768, 1024, 1440];
+// The five legacy /wp-responsive-check viewports plus 1152 and 1280. One full-page shot each, at
+// the top of the page, no scroll-walk: this is layout coverage, not motion coverage.
+//
+// The legacy five sample breakpoint EDGES only, and an edge is where the rules change, not where
+// they do damage. Between 1024 and 1279 Tailwind's `lg:` utilities apply with no `xl:` override
+// yet, so a row can be correct at 1024, correct again at 1280 once `xl:` takes over, and wrong
+// for the 256px in between — a band no shot covered. 1152 sits inside it. 1280 is kept because
+// it is the first width where `xl:` applies, which is its own thing worth seeing.
+const RESPONSIVE_WIDTHS = [375, 576, 768, 1024, 1152, 1280, 1440];
 
 /** One full-page screenshot per legacy viewport, filenames responsive-<width>.png,
  *  restoring the convention /wp-tailwind-migrate's visual-golden workflow depends on. */
