@@ -191,16 +191,16 @@ grep -Fq "the client's real sentences from \`demo/RESEARCH.md\`" "$df" \
 y=commands/wp-yolo.md
 yf=$(flat "$y")
 
-grep -Fq '"research": "none"' "$yf" \
+grep -Fq 'records `"research": "none"`, skip in one line' "$yf" \
   || fail "$y does not read the \"research\": \"none\" record"
-grep -Fq 'wp-research' "$yf" \
+grep -Fq 'dispatch the `wp-research` agent' "$yf" \
   || fail "$y never dispatches the wp-research agent"
 
 # Unattended means unattended. A yolo run that stops for a confirmation is a
 # yolo run that does not finish.
 grep -Fq 'asks nothing' "$yf" \
   || fail "$y does not state that research runs unattended and asks nothing"
-grep -Fq 'unconfirmed' "$yf" \
+grep -Fq 'records `confidence: "unconfirmed"`' "$yf" \
   || fail "$y does not record the identity as unconfirmed on an unattended run"
 
 # The corpus change, in BOTH files. This is the pin that catches a one-sided edit.
@@ -208,5 +208,12 @@ grep -Fq 'the client documents and `demo/RESEARCH.md`' "$yf" \
   || fail "$y does not widen the domain-classification corpus to include research (commands/wp-demo.md does — the two entry points must classify identically)"
 grep -Fq 'which corpus produced each hit' "$yf" \
   || fail "$y does not record which corpus produced each domain keyword hit"
+
+# An unattended run never asks, so Step 6's report is the only channel an
+# unconfirmed identity can ever reach a human through. Unread research that
+# nothing surfaces is the same defect the six /wp-demo consumers exist to
+# prevent, restated here for the one channel /wp-yolo actually has.
+grep -Fq 'research identity: confirmed or unconfirmed' "$yf" \
+  || fail "$y Step 6 report does not surface the research identity's confirmed/unconfirmed state"
 
 echo PASS

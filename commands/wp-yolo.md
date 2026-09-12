@@ -163,7 +163,10 @@ directory, and one fingerprint row for the site, not one per page.
 **Research the client, here too, once for the site.** If `demo/RESEARCH.md`
 already exists — a prior `/wp-demo` run against this project wrote it — read it
 and move on. If `.wp-create.json` records `"research": "none"`, skip in one line
-and do not retry. Otherwise dispatch the `wp-research` agent, which reads
+and do not retry. Otherwise, a craft `/wp-yolo` run never calls `/wp-demo`, so
+it must research the client itself, in these same terms `/wp-demo` Step 2.4
+uses on purpose — do not restate them a third way:
+dispatch the `wp-research` agent, which reads
 `${CLAUDE_PLUGIN_ROOT}/skills/wp-research/SKILL.md` for the method, the source
 ladder and the fetch cap.
 
@@ -828,6 +831,7 @@ Review:
   - <anything skipped — e.g. JS-only interactivity not reproducible in static templates>
   - <out-of-scope pages skipped: "in demo but out of scope — skipped">
   - <approved-but-missing-HTML pages: "approved/designed but no HTML — needs demo">
+  - <research identity: confirmed or unconfirmed, with the name>
 ```
 
 Note for the user: `--yolo` is best used **after** one checkpointed dry-run of the same
