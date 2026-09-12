@@ -14,7 +14,7 @@
  * failed after work began.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, realpathSync } from 'node:fs';
-import { resolve, join, dirname, basename } from 'node:path';
+import { resolve, join, dirname, basename, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 
@@ -83,8 +83,8 @@ export function estCost(vendor, size) {
   return vendor === 'openai' ? 0.03 : (EST_GOOGLE[size] ?? 0.101);
 }
 
-export function plateHash(prompt, aspect, model) {
-  return createHash('sha256').update(`${prompt}|${aspect}|${model}`).digest('hex').slice(0, 12);
+export function plateHash(prompt, aspect, model, size) {
+  return createHash('sha256').update(`${prompt}|${aspect}|${model}|${size}`).digest('hex').slice(0, 12);
 }
 
 function planPath(demo) { return join(demo, '.image-plan.json'); }
@@ -119,7 +119,7 @@ function cmdPlan(demo) {
         est_cost: estCost(vendor, size),
         prompt,
         use: was.use || '',
-        cached: !!prompt && existsSync(join(imgDir, `gen-${plateHash(prompt, aspect, model)}.jpg`)),
+        cached: !!prompt && existsSync(join(imgDir, `gen-${plateHash(prompt, aspect, model, size)}.jpg`)),
       });
     }
   }
@@ -151,6 +151,14 @@ async function cmdRun(demo) {
   mkdirSync(imgDir, { recursive: true });
   const gaps = plan.gaps || [];
 
+  // `use` paths come from assets_on_disk[].path and are relative to the
+  // user's WordPress PROJECT (e.g. "docs/logo.png"), not to this plugin's own
+  // ROOT (dirname(image-gen.mjs)/..) -- resolving against ROOT would look for
+  // the client's file inside the plugin install itself. The project root is
+  // the demo folder's own parent: `--demo demo/` is invoked from the project
+  // root, so this does not depend on the caller's current working directory.
+  const projectRoot = dirname(resolve(demo));
+
   // Refuse an ambiguous plan before issuing any request. Failing partway
   // through has already cost money; failing here has not.
   for (const g of gaps) {
@@ -178,13 +186,23 @@ async function cmdRun(demo) {
     if (g.use) {
       // A real client file is not generated, and must not be recorded as if it
       // were: a false line in the provenance table is worse than none.
+      const src = isAbsolute(g.use) ? g.use : resolve(projectRoot, g.use);
       const dest = join(imgDir, basename(g.use));
-      copyFileSync(resolve(g.use), dest);
-      g.result = { file: `assets/img/${basename(g.use)}`, generated: false };
-      say(`  ${g.slot}: used ${g.use}`);
+      try {
+        // Same source and destination would truncate the file mid-copy.
+        if (resolve(src) !== resolve(dest)) copyFileSync(src, dest);
+        g.result = { file: `assets/img/${basename(g.use)}`, generated: false };
+        say(`  ${g.slot}: used ${g.use}`);
+      } catch (e) {
+        // A missing/unreadable "use" file must not abort the whole run: keep
+        // every slot already resolved, exactly like a failed generate below.
+        failed++;
+        g.result = { error: scrub(e.message) };
+        warn(`  ${g.slot}: FAILED - ${scrub(e.message)}`);
+      }
       continue;
     }
-    const hash = plateHash(g.prompt, g.aspect, model);
+    const hash = plateHash(g.prompt, g.aspect, model, g.size);
     const file = `gen-${hash}.jpg`;
     if (existsSync(join(imgDir, file))) {
       g.result = { file: `assets/img/${file}`, generated: true, cached: true };
@@ -212,13 +230,22 @@ async function cmdRun(demo) {
 }
 
 function isCached(imgDir, g, model) {
-  return !!g.prompt && existsSync(join(imgDir, `gen-${plateHash(g.prompt, g.aspect, model)}.jpg`));
+  return !!g.prompt && existsSync(join(imgDir, `gen-${plateHash(g.prompt, g.aspect, model, g.size)}.jpg`));
 }
 
-async function generateInto(imgDir, file, { vendor, model, key, g }) {
+// Exported for direct-import testing: a monkeypatched global.fetch can drive
+// this (and callGoogle/callOpenAI below) through every response shape with no
+// network call and no key, the same way snapSize is tested directly because a
+// CLI-only run cannot distinguish some branches from a stub.
+export async function generateInto(imgDir, file, { vendor, model, key, g }) {
   const bytes = vendor === 'openai'
     ? await callOpenAI(model, key, g)
     : await callGoogle(model, key, g);
+  // A whitespace/padding-only base64 payload is truthy but decodes to zero
+  // bytes, so it survives the `!b64` check inside each vendor call. Writing
+  // it would cache an empty file forever behind a plate that was already
+  // billed once real generation happens on a later, unrelated run.
+  if (!bytes || bytes.length === 0) throw new Error(`${vendor} returned an empty image payload`);
   writeFileSync(join(imgDir, file), bytes);
   writeFileSync(join(imgDir, file.replace(/\.jpg$/, '.json')), JSON.stringify({
     model, prompt: g.prompt, aspect: g.aspect, size: g.size,
@@ -228,13 +255,23 @@ async function generateInto(imgDir, file, { vendor, model, key, g }) {
   }, null, 2) + '\n');
 }
 
-// One retry, then give up on this slot. A transient 5xx is common enough to be
-// worth one more attempt and rare enough that a second retry mostly buys delay.
-async function once(fn) {
-  try { return await fn(); } catch { return await fn(); }
+// One retry, then give up on this slot -- but only for a failure a retry can
+// actually fix: a network-level error (fn rejected before any response came
+// back, so nothing was attempted server-side) or a transient HTTP 5xx. A 4xx
+// is deterministic, and a failure that surfaces AFTER the response already
+// reported success means the request was already billed -- retrying either
+// just pays twice for one plate. Reads e.status rather than matching on the
+// error message, so rewording a message can never change retry behaviour.
+export async function once(fn) {
+  try {
+    return await fn();
+  } catch (e) {
+    if (e.status && e.status < 500) throw e;
+    return await fn();
+  }
 }
 
-async function callGoogle(model, key, g) {
+export async function callGoogle(model, key, g) {
   return once(async () => {
     const r = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
       method: 'POST',
@@ -250,16 +287,27 @@ async function callGoogle(model, key, g) {
     });
     // Status only. The response body can echo the request, and the request
     // carries nothing secret, but the headers object does - never format it.
-    if (!r.ok) throw new Error(`google returned HTTP ${r.status}`);
-    const j = await r.json();
-    const b64 = j.output_image?.data
-      ?? j.steps?.flatMap((s) => s.content || []).find((c) => c.type === 'image')?.data;
-    if (!b64) throw new Error('google returned no image (prompt refused, or an unexpected shape)');
-    return Buffer.from(b64, 'base64');
+    if (!r.ok) {
+      const e = new Error(`google returned HTTP ${r.status}`);
+      e.status = r.status;
+      throw e;
+    }
+    try {
+      const j = await r.json();
+      const b64 = j.output_image?.data
+        ?? j.steps?.flatMap((s) => s.content || []).find((c) => c.type === 'image')?.data;
+      if (!b64) throw new Error('google returned no image (prompt refused, or an unexpected shape)');
+      return Buffer.from(b64, 'base64');
+    } catch (e) {
+      // The HTTP request already succeeded (r.ok): a parse/shape failure past
+      // this point must not look like a transient error to once() above.
+      e.status = e.status ?? r.status;
+      throw e;
+    }
   });
 }
 
-async function callOpenAI(model, key, g) {
+export async function callOpenAI(model, key, g) {
   return once(async () => {
     const r = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
@@ -270,11 +318,20 @@ async function callOpenAI(model, key, g) {
         quality: 'medium', output_format: 'jpeg', n: 1,
       }),
     });
-    if (!r.ok) throw new Error(`openai returned HTTP ${r.status}`);
-    const j = await r.json();
-    const b64 = j.data?.[0]?.b64_json;
-    if (!b64) throw new Error('openai returned no image (prompt refused, or an unexpected shape)');
-    return Buffer.from(b64, 'base64');
+    if (!r.ok) {
+      const e = new Error(`openai returned HTTP ${r.status}`);
+      e.status = r.status;
+      throw e;
+    }
+    try {
+      const j = await r.json();
+      const b64 = j.data?.[0]?.b64_json;
+      if (!b64) throw new Error('openai returned no image (prompt refused, or an unexpected shape)');
+      return Buffer.from(b64, 'base64');
+    } catch (e) {
+      e.status = e.status ?? r.status;
+      throw e;
+    }
   });
 }
 

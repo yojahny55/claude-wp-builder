@@ -131,6 +131,58 @@ set -e
 grep -Fq 'GEMINI_API_KEY' "$tmp/err" \
   || fail "the no-key error must name the environment variable to export"
 
+# F1. A missing "use" file must fail only its own slot, not abort the whole
+#     run: the loop must keep going, writePlan must still run (so a slot that
+#     genuinely succeeded is not lost), and the process must exit 4 -- the
+#     same per-slot-failure code the generate branch already uses.
+printf 'a-real-client-photo' > "$tmp/good.jpg"
+plan_with '[{"page":"index","section":"hero","composition":"hero-bleed"},
+             {"page":"about","section":"hero","composition":"hero-split"}]'
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion F1"
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].use = process.argv[2];
+  p.gaps[1].use = process.argv[3];
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json" "$tmp/good.jpg" "$tmp/MISSING-NEVER.jpg"
+set +e
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >"$tmp/out" 2>"$tmp/err" )
+rc=$?
+set -e
+[ "$rc" = 4 ] || fail "a missing 'use' file must exit 4 (a per-slot failure), not a different code; got $rc"
+ls "$tmp/assets/img/good.jpg" >/dev/null 2>&1 \
+  || fail "slot 1's real file must still be copied even though slot 2's 'use' file is missing"
+[ "$(pj gaps.0.result.file)" = "assets/img/good.jpg" ] \
+  || fail "slot 1's result was lost even though its file WAS copied -- writePlan never ran after the abort"
+grep -q 'ENOENT' <<< "$(pj gaps.1.result.error)" \
+  || fail "slot 2 (the missing file) must record its own ENOENT as a per-slot error, not abort before writePlan"
+
+# F1b. Guard: a "use" path already sitting at its own destination
+# (imgDir/basename(use)) must not be copied onto itself. copyFileSync can
+# open the destination for writing (truncating it) before it finishes
+# reading the source, so copying a file over itself risks zeroing it out.
+# The behavioural half (content survives) is measured here too, but it is
+# NOT mutation-sensitive on this runtime: fs.copyFileSync(x, x) on this
+# Node/Linux combination already happens not to corrupt the file even with
+# the guard removed (verified directly). So the guard's presence is pinned
+# at the source level as well -- that pin is the one a removed guard
+# actually reddens.
+printf 'pre-existing-plate-bytes' > "$tmp/assets/img/samefile.jpg"
+before_sha=$(sha256sum "$tmp/assets/img/samefile.jpg" | cut -d' ' -f1)
+plan_with '[{"page":"about","section":"hero","composition":"hero-split"}]'
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion F1b"
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].use = process.argv[2];
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json" "$tmp/assets/img/samefile.jpg"
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null ) \
+  || fail "a 'use' entry already at its own destination must still succeed"
+after_sha=$(sha256sum "$tmp/assets/img/samefile.jpg" | cut -d' ' -f1)
+[ "$before_sha" = "$after_sha" ] || fail "copying a 'use' file onto itself must not truncate it"
+grep -Fq 'resolve(src) !== resolve(dest)' "$g" \
+  || fail "$g dropped the same-file guard around the 'use' copy"
+
 # 4. An ambiguous gap is refused before any request, so an unclear plan cannot
 #    cost money. Both set, then neither set.
 for mutate in 'p.gaps[0].prompt="x"; p.gaps[0].use="y";' 'p.gaps[0].prompt=""; p.gaps[0].use="";'; do
@@ -149,10 +201,11 @@ for mutate in 'p.gaps[0].prompt="x"; p.gaps[0].use="y";' 'p.gaps[0].prompt=""; p
 done
 
 # 5. A cached plate is not re-billed. The hash is recomputed here in bash from
-#    the documented formula rather than read back from the script, so this is a
-#    cross-check of the identity and not a tautology.
+#    the documented formula (prompt|aspect|model|size) rather than read back
+#    from the script, so this is a cross-check of the identity and not a
+#    tautology. hero-bleed is 2400x1600, which snaps to size "2K" (assertion 2b).
 prompt='stacked and stickered oak boards seasoning in an open timber shed'
-h=$(printf '%s' "$prompt|3:2|gemini-3.1-flash-image" | sha256sum | cut -c1-12)
+h=$(printf '%s' "$prompt|3:2|gemini-3.1-flash-image|2K" | sha256sum | cut -c1-12)
 printf 'not-a-real-jpeg' > "$tmp/assets/img/gen-$h.jpg"
 plan_with '[{"page":"index","section":"hero","composition":"hero-bleed"}]'
 node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 5 (cache setup)"
@@ -175,6 +228,45 @@ node -e '
 ' "$tmp/.image-plan.json" "$prompt"
 node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 5b (cache-miss control)"
 [ "$(pj gaps.0.cached)" = "false" ] || fail "an edited prompt must miss the cache, not serve the stale plate"
+
+# F3. plateHash must include size: two gaps sharing prompt/aspect/model but
+#     declaring a different resolved width (hence a different size) must not
+#     collide onto the same hash. Asserted directly against the exported
+#     function, mirroring 2c/2d, because no two compositions in the current
+#     library happen to share an aspect while landing on different size tiers.
+h_1k=$(node -e 'import("./bin/image-gen.mjs").then((m) => console.log(m.plateHash("p", "3:2", "gemini-3.1-flash-image", "1K")));')
+h_2k=$(node -e 'import("./bin/image-gen.mjs").then((m) => console.log(m.plateHash("p", "3:2", "gemini-3.1-flash-image", "2K")));')
+[ "$h_1k" != "$h_2k" ] || fail "plateHash must change when only size differs; 1K and 2K collided ($h_1k)"
+
+# F3b. Integration-level control via a hand-rolled plan (bypassing cmdPlan's
+#     own slot derivation, since the library has no same-aspect/different-size
+#     pair to plan against): two gaps share prompt/aspect/model but declare
+#     different sizes, and only the 1K plate exists on disk. If size did not
+#     participate in the hash, the 2K gap would collide with the 1K file, see
+#     itself as cached too, and the whole run would succeed with no key set.
+#     A prompt distinct from assertion 5's is used deliberately -- assertion 5
+#     leaves its own gen-<hash-for-2K>.jpg sitting in the same imgDir, which
+#     would otherwise coincidentally satisfy the 2K gap here too.
+prompt_f3b='a boat-length teak deck plank drying under a covered shed'
+node -e '
+  const p = {
+    provider: "google/gemini-3.1-flash-image",
+    sections: [], assets_on_disk: [],
+    gaps: [
+      { page: "index", section: "hero", slot: "a", composition: "x", aspect: "3:2", size: "1K", prompt: process.argv[1], use: "" },
+      { page: "index", section: "hero", slot: "b", composition: "x", aspect: "3:2", size: "2K", prompt: process.argv[1], use: "" },
+    ],
+  };
+  require("fs").writeFileSync(process.argv[2], JSON.stringify(p, null, 2));
+' "$prompt_f3b" "$tmp/.image-plan.json"
+h1k=$(printf '%s' "$prompt_f3b|3:2|gemini-3.1-flash-image|1K" | sha256sum | cut -c1-12)
+printf 'not-a-real-jpeg' > "$tmp/assets/img/gen-$h1k.jpg"
+set +e
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null 2>"$tmp/err" )
+rc=$?
+set -e
+[ "$rc" = 3 ] \
+  || fail "a 2K gap must not be satisfied by a 1K plate sharing the same prompt/aspect/model; got rc=$rc (expected 3, needs a key)"
 
 # 6. The key cannot reach the script's own output. Every write funnels through
 #    scrub(); these pins are what keep a future adapter from printing a headers
@@ -262,6 +354,89 @@ perl -0pe 's{^\s*//[^\n]*$}{}gm; s{/\*.*?\*/}{}gs' "$g" > "$gs" \
   || fail "could not strip comments from $g"
 n=$(grep -c 'response_format' "$gs" || true)
 [ "$n" = 1 ] || fail "response_format must appear exactly once (the Google body) and never in the OpenAI body; found $n"
+
+# F2. once() must retry only a failure a retry can actually fix -- a
+#     network-level error (fn rejected before any response came back) or an
+#     HTTP 5xx -- and must never retry a deterministic 4xx or a failure that
+#     surfaces AFTER the response already reported success (that request was
+#     already billed; retrying pays twice for one plate). Verified against
+#     the real, exported callGoogle/callOpenAI with global.fetch
+#     monkeypatched in-process: no real network call is made and no key is
+#     read anywhere on this path.
+out=$(node --input-type=module <<'EOF'
+const m = await import('./bin/image-gen.mjs');
+const g = { prompt: 'p', aspect: '1:1', size: '1K' };
+
+async function calls(fn, respond) {
+  let n = 0;
+  globalThis.fetch = async () => { n++; return respond(); };
+  try { await fn('model-x', 'key-x', g); } catch {}
+  return n;
+}
+
+async function networkCalls(fn) {
+  let n = 0;
+  globalThis.fetch = async () => { n++; throw new Error('ECONNREFUSED'); };
+  try { await fn('model-x', 'key-x', g); } catch {}
+  return n;
+}
+
+const http400 = () => ({ ok: false, status: 400, json: async () => ({}) });
+const http500 = () => ({ ok: false, status: 500, json: async () => ({}) });
+// ok:true (a 200) whose body cannot be turned into an image: the serious F2
+// case, where the request already succeeded (and was billed) before parsing
+// or shape-checking the body failed.
+const parseFail = () => ({ ok: true, status: 200, json: async () => ({ nope: true }) });
+
+for (const [label, fn] of [['google', m.callGoogle], ['openai', m.callOpenAI]]) {
+  console.log(label + '.http400=' + await calls(fn, http400));
+  console.log(label + '.parseFail=' + await calls(fn, parseFail));
+  console.log(label + '.http500=' + await calls(fn, http500));
+  console.log(label + '.network=' + await networkCalls(fn));
+}
+EOF
+) || fail "the F2 retry-policy probe crashed"
+grep -qFx 'google.http400=1' <<< "$out" \
+  || fail "a deterministic HTTP 400 must not be retried (google); probe: $out"
+grep -qFx 'google.parseFail=1' <<< "$out" \
+  || fail "a parse/shape failure after a 200 (already billed) must not be retried (google); probe: $out"
+grep -qFx 'google.http500=2' <<< "$out" \
+  || fail "a transient HTTP 5xx must be retried once (google); probe: $out"
+grep -qFx 'google.network=2' <<< "$out" \
+  || fail "a network-level error must be retried once (google); probe: $out"
+grep -qFx 'openai.http400=1' <<< "$out" \
+  || fail "a deterministic HTTP 400 must not be retried (openai); probe: $out"
+grep -qFx 'openai.parseFail=1' <<< "$out" \
+  || fail "a parse/shape failure after a 200 (already billed) must not be retried (openai); probe: $out"
+grep -qFx 'openai.http500=2' <<< "$out" \
+  || fail "a transient HTTP 5xx must be retried once (openai); probe: $out"
+grep -qFx 'openai.network=2' <<< "$out" \
+  || fail "a network-level error must be retried once (openai); probe: $out"
+
+# F4. An empty (or whitespace/padding-only, which is truthy but decodes to
+#     zero bytes) generated payload must be rejected before it is written --
+#     otherwise a corrupt zero-byte plate is cached forever behind a plate
+#     that was already billed once. Verified against the real, exported
+#     generateInto with global.fetch monkeypatched: no real network call, no
+#     key.
+out=$(IMG_DIR="$tmp/assets/img" node --input-type=module <<'EOF'
+const imgDir = process.env.IMG_DIR;
+const m = await import('./bin/image-gen.mjs');
+const fs = await import('node:fs');
+const g = { prompt: 'p', aspect: '1:1', size: '1K', est_cost: 0.01 };
+globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ output_image: { data: '   ' } }) });
+let threw = false;
+try {
+  await m.generateInto(imgDir, 'gen-empty-test.jpg', { vendor: 'google', model: 'm', key: 'k', g });
+} catch { threw = true; }
+console.log('threw=' + threw);
+console.log('written=' + fs.existsSync(imgDir + '/gen-empty-test.jpg'));
+EOF
+) || fail "the F4 empty-payload probe crashed"
+grep -qFx 'threw=true' <<< "$out" \
+  || fail "generateInto must throw on an empty/whitespace-only image payload; probe: $out"
+grep -qFx 'written=false' <<< "$out" \
+  || fail "an empty image payload must never be written to disk (it would be cached forever); probe: $out"
 
 # 8. The command contract. Greps a comment-stripped copy so a rule parked in an
 #    HTML comment cannot satisfy the pin - the failure mode that let three
