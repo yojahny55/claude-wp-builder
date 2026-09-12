@@ -106,9 +106,9 @@ before writing any markup.
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/design-md.md`: client
    docs first; then `npx designlang@12 <url>` (major-version pinned for the reason
    `references/design-md.md` gives) on the client's current site — the URL the docs
-   name, **or `research.site` from `demo/RESEARCH.md` when `confidence` is
-   `confirmed`** — and on each reference URL the docs name (skip when there is
-   neither); then two or three
+   name, **or `research.site` from `demo/RESEARCH.md` when `confidence` is `confirmed`**
+   — and on each reference URL the docs name (skip when there is neither); then
+   two or three
    rows from `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/design-md/INDEX.md`
    by industry and tone for the gaps, cited by domain. If `.wp-create.json` has
    `firecrawl_url` and a reference is a Refero Styles page, scrape it for its
@@ -130,8 +130,9 @@ before writing any markup.
    each, assets owned, the feeling curve (one line per section: emotion, then
    the on-screen cause), the peak as a friend-quotable sentence, "it's the site
    where ___", authored silence. When `demo/RESEARCH.md` exists, each of
-   person, pain and promise either **cites the `demo/RESEARCH.md` line and its
-   source URL, or keeps the marker** — and the marker now means something,
+   person, pain and promise either
+   **cites the `demo/RESEARCH.md` line and its source URL, or keeps the marker**
+   — and the marker now means something,
    because there was an alternative. Mark anything invented "Self-authored,
    not interviewed". Ask, in one pass, only what the docs cannot answer. Show
    the brief once and proceed on a yes.
@@ -154,8 +155,8 @@ before writing any markup.
    (sections `## What they actually say` and `## Competitors`) against the
    keyword lists in
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/domains/domains.csv`.
-   A domain is matched when **two distinct keywords** from its list appear in the
-   docs; below that, report `unclassified` and carry on without constraining
+   A domain is matched when **two distinct keywords** from its list appear in
+   that corpus; below that, report `unclassified` and carry on without constraining
    anything, because a wrong category is worse than none. When more than one
    domain clears the threshold, the highest hit count wins; on an exact tie for
    the top count, report both names and proceed `unclassified` for the same
@@ -167,7 +168,7 @@ before writing any markup.
    — `docs` or `research` — so an operator can tell a category drawn from
    the client's own material from one drawn from a competitor's marketing
    copy. The threshold does not move: two distinct keywords are still
-   required., so the decision is auditable and `/wp-yolo` reads it rather
+   required, so the decision is auditable and `/wp-yolo` reads it rather
    than re-deriving it. State the match and its score in one line.
 
    A matched domain does exactly two things. Its `page_pattern` and
