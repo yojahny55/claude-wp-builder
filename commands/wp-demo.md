@@ -23,6 +23,44 @@ Check `$ARGUMENTS`:
   - Reference screenshots or URLs (optional)
   - List of sections to include (e.g., Hero, About, Services, Team, Testimonials, Contact)
 
+## Step 2.4: Research
+
+Find out who this client actually is before deciding anything about the build.
+This runs before the mode is chosen, so a plain demo gets the client's real
+words too — invented copy is where a generated demo reads as generated, and a
+plain build has no `demo/DESIGN.md` to lean on.
+
+Take the first branch that applies:
+
+1. **`demo/RESEARCH.md` already exists** — read it, say so in one line, continue.
+   A re-run does not re-research; deleting the file is how you refresh it.
+   `/wp-demo iterate` requires an existing `demo/index.html`, which can only
+   exist because a prior full run already completed Step 4 — and that run
+   necessarily passed through this step first. Research is therefore always
+   already resolved by the time `iterate` runs: it is guaranteed by the
+   bypass, not by landing on a branch, so `iterate` **never re-researches**.
+2. **`.wp-create.json` records `"research": "none"`** — skip in one line, do not ask.
+   The record is permanent: an earlier run already declined or already found
+   nothing reachable.
+3. **Otherwise** — dispatch the `wp-research` agent. It reads
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-research/SKILL.md`, works the source ladder
+   down from whatever is connected, and writes `demo/RESEARCH.md` plus the
+   `"research"` key in `.wp-create.json`.
+
+The agent shows its `## Identity` block once and waits. Three answers, and they
+are not the same thing:
+
+| Answer | Effect |
+|---|---|
+| yes | `confidence: "confirmed"`, `research.site` recorded |
+| wrong business | the site is dropped, `confidence: "unconfirmed"`, that candidate joins the rejected list, and the build continues on the documents alone. Research still happened; the identity did not |
+| no research | `"research": "none"` is written and nothing is researched again |
+
+**Research never blocks a build.** The craft browser gate blocks because
+building blind is wrong; this does not. If there is no network, if every rung of
+the ladder fails, or if the business cannot be found, the run records what
+happened in one line and Step 2.5 continues exactly as it does today.
+
 ## Step 2.5: Choose the Demo Mode
 
 Craft mode builds against the `wp-demo-craft` skill: a design floor, a page
@@ -67,8 +105,10 @@ before writing any markup.
 1. **DESIGN.md.** Write `demo/DESIGN.md` per
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/design-md.md`: client
    docs first; then `npx designlang@12 <url>` (major-version pinned for the reason
-   `references/design-md.md` gives) on the client's current site and on
-   each reference URL the docs name (skip when there is none); then two or three
+   `references/design-md.md` gives) on the client's current site — the URL the docs
+   name, **or `research.site` from `demo/RESEARCH.md` when `confidence` is `confirmed`**
+   — and on each reference URL the docs name (skip when there is neither); then
+   two or three
    rows from `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/design-md/INDEX.md`
    by industry and tone for the gaps, cited by domain. If `.wp-create.json` has
    `firecrawl_url` and a reference is a Refero Styles page, scrape it for its
@@ -89,9 +129,13 @@ before writing any markup.
    promise, vibe words, two or three named references and what to take from
    each, assets owned, the feeling curve (one line per section: emotion, then
    the on-screen cause), the peak as a friend-quotable sentence, "it's the site
-   where ___", authored silence. Mark anything invented "Self-authored, not
-   interviewed". Ask, in one pass, only what the docs cannot answer. Show the
-   brief once and proceed on a yes.
+   where ___", authored silence. When `demo/RESEARCH.md` exists, each of
+   person, pain and promise either
+   **cites the `demo/RESEARCH.md` line and its source URL, or keeps the marker**
+   — and the marker now means something,
+   because there was an alternative. Mark anything invented "Self-authored,
+   not interviewed". Ask, in one pass, only what the docs cannot answer. Show
+   the brief once and proceed on a yes.
 
    **3.5. Inventory the assets on disk.** List every image, SVG and font under the
    project's `docs/` with a role — `logo`, `hero`, `portrait`, `product`, `texture`,
@@ -106,19 +150,25 @@ before writing any markup.
    `/wp-demo` or `/wp-yolo` run against this same project recorded it — read it and
    move on; **do not re-classify**. The manifest is the shared source of truth, and a
    second run that re-derives the domain overwrites an operator's `name the domain
-   directly` override with the match it already rejected. Otherwise, match the client
-   documents' English-language material against the keyword lists in
+   directly` override with the match it already rejected. Otherwise, match the
+   English-language material in **the client documents and `demo/RESEARCH.md`**
+   (sections `## What they actually say` and `## Competitors`) against the
+   keyword lists in
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/domains/domains.csv`.
-   A domain is matched when **two distinct keywords** from its list appear in the
-   docs; below that, report `unclassified` and carry on without constraining
+   A domain is matched when **two distinct keywords** from its list appear in
+   that corpus; below that, report `unclassified` and carry on without constraining
    anything, because a wrong category is worse than none. When more than one
    domain clears the threshold, the highest hit count wins; on an exact tie for
    the top count, report both names and proceed `unclassified` for the same
-   reason. The lists are English-only: a docs set with no English-language
+   reason. The lists are English-only: a corpus with no English-language
    material is `unclassified` **with that reason stated**, not silently, and the
    operator may name the domain directly instead of relying on the match. Record
    the result in `.wp-create.json` under `"domain"` as `name`, `score`, `matched`
-   and `confidence`, so the decision is auditable and `/wp-yolo` reads it rather
+   and `confidence`, recording in `matched` **which corpus produced each hit**
+   — `docs` or `research` — so an operator can tell a category drawn from
+   the client's own material from one drawn from a competitor's marketing
+   copy. The threshold does not move: two distinct keywords are still
+   required, so the decision is auditable and `/wp-yolo` reads it rather
    than re-deriving it. State the match and its score in one line.
 
    A matched domain does exactly two things. Its `page_pattern` and
@@ -135,9 +185,15 @@ before writing any markup.
    Then open
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/compositions/README.md` and look at
    each candidate's `preview-1440.png` and `preview-390.png`. One row per
-   section of the curve: section, role, composition, why, motion cost, and
+   section of the curve: section, role, composition, why, motion cost,
    the domain signal that justified it, citing the brief constraint from
-   sub-step 4, or writing "no domain signal" when none applies. This is
+   sub-step 4, or writing "no domain signal" when none applies; and the
+   research signal — what `demo/RESEARCH.md`'s `## Signals` says this
+   sector does at this point in the page, and whether this row follows it
+   or breaks it — or "no research signal" when none applies. The two are
+   different axes: the domain signal constrains page pattern and
+   considerations, while the research signal is what lets a build
+   deliberately not look like its competitors. This is
    what makes sub-step 4's classification bind on the plan instead of
    sitting unread. Mark exactly one row as the peak (`data-motion-peak`).
    Sum the cost and hold it under the
@@ -196,8 +252,12 @@ before writing any markup.
    plan where a gap has both or neither, before it issues any request. Set `use`
    to a path from `unused_assets[]` when a real client file belongs in that slot
    — a real asset always wins and is never generated. Otherwise write a `prompt`
-   from the brief: the person, the pain, the vibe words and the domain, not a
-   generic stock description. The script does not match assets to slots itself,
+   from the brief: the person, the pain, the vibe words, the domain, and
+   **the vocabulary from `demo/RESEARCH.md`'s `## Signals`** — its "use"
+   terms and none of its "avoid" terms — not a generic stock description.
+   A plate built from sector filler looks like the sector it was meant to
+   stand out from.
+   The script does not match assets to slots itself,
    on purpose: the asset roles (`logo/hero/portrait/product/texture`) and the
    composition roles (`hero/proof/feature/...`) are different vocabularies, and
    `feature-zigzag` has two slots of identical role, so any automatic mapping
@@ -369,7 +429,9 @@ These delimiters are critical — they are used by `/wp-section` to extract indi
 - Appropriate font scaling
 
 ### Content
-- Use realistic placeholder content relevant to the client's industry
+- Use **the client's real sentences from `demo/RESEARCH.md`** (`## What they
+  actually say`) wherever it covers the section; realistic placeholder content
+  relevant to the client's industry only where it does not
 - Include placeholder images using CSS background colors or SVG placeholders (no external image URLs)
 - Include bilingual hints as HTML comments where applicable: `<!-- i18n: hero_title -->`
 

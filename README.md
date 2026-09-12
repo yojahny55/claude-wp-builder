@@ -6,7 +6,7 @@
 
 **Demo HTML to production WordPress theme — automated.**
 
-[![Version](https://img.shields.io/badge/version-1.16.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.17.0-blue.svg)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-Plugin-blueviolet.svg)](https://docs.anthropic.com/en/docs/claude-code)
@@ -296,6 +296,30 @@ ship to a client's production site.
 `/wp-yolo` never generates images. It uses whatever is already in the demo folder, so the
 one command that runs unattended cannot spend money.
 
+### Client research (optional tiers, no key required)
+
+`/wp-demo` researches the client's business before it builds: who they actually
+are, what they actually say, and what their competitors' sites actually do. The
+result is written to `demo/RESEARCH.md`, and six build steps cite it — the brief,
+the design tokens, the industry classification, the composition plan, the image
+prompts and the demo copy.
+
+It works with no configuration at all. Two optional upgrades improve it:
+
+| Tier | Needs | Adds |
+|---|---|---|
+| baseline | nothing | web search and page reading |
+| Firecrawl | a Firecrawl MCP server, or `firecrawl_url` in `.wp-create.json` | reliable extraction from JavaScript-heavy sites |
+| DataForSEO | a DataForSEO MCP server | real local competitor listings by category and location |
+
+**No API key is ever requested, stored or written to disk.** Both upgrades carry
+their own credentials in your MCP configuration; a self-hosted Firecrawl is
+reached by URL alone.
+
+Research never blocks a build. With no network it records that it found nothing,
+and the demo is built exactly as it is today. To refresh it, delete
+`demo/RESEARCH.md` and run `/wp-demo` again.
+
 ## Commands Reference
 
 Full arguments, inputs and outputs per command: **[docs/commands.md](docs/commands.md)**.
@@ -350,6 +374,7 @@ procedure; the commands only dispatch them.
 | `wp-tailwind-system` | Tailwind authoring conventions — the utility-first decision ladder and file layout (the default template) |
 | `wp-demo` | Demo HTML creation methodology |
 | `wp-demo-craft` | Reference-first design floor for premium demos: a client DESIGN.md, a composition library, a motion budget and a render-verified loop |
+| `wp-research` | Client-business research method — identification, comparable competitors, reading a site for design signal, and the WebSearch/Firecrawl/DataForSEO ladder |
 | `wp-responsive` | Mobile-first responsive patterns, fluid typography, touch targets |
 | `wp-cli-patterns` | WP-CLI best practices for all agents (saves tokens vs PHP generation) |
 | `wp-aos-animator` | AOS scroll animation installer — audits, enqueues, initializes, and seeds animations across templates. Run through `/wp-aos-animator` |
@@ -370,6 +395,7 @@ procedure; the commands only dispatch them.
 | `wp-cf7` | Contact Form 7 specialist — forms per language, branded mail templates, and the seeder that carries the form body |
 | `wp-normalize` | Demo-folder analyzer — turns an arbitrary multi-page site into the canonical delimited demo plus a build manifest |
 | `wp-context` | Project-docs analyzer — reads `docs/` and extracts constraints plus an actionable scope manifest |
+| `wp-research` | Client-business researcher — finds the client's web presence and comparable competitors, writes `demo/RESEARCH.md` |
 | `wp-cinematic` | Cinematic scroll specialist — scene fields, template parts and scroll-engine wiring for the `__cinematic__` starter |
 | `wp-audit-security` · `wp-audit-seo` · `wp-audit-a11y` · `wp-audit-performance` · `wp-audit-practices` | The five `/wp-audit` judgment auditors — code scanning, structured data, WCAG 2.1 AA, Core Web Vitals, WordPress standards |
 | `wp-audit-aios` · `wp-audit-rankmath` | The two mechanical audit installers — All-in-One WP Security and Rank Math, configured via WP-CLI |

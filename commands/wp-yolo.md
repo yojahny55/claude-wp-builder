@@ -160,23 +160,44 @@ the whole multi-page build: the browser gate first, one `demo/DESIGN.md` for the
 site, one composition plan covering every page, one evaluator loop over the
 directory, and one fingerprint row for the site, not one per page.
 
+**Research the client, here too, once for the site.** If `demo/RESEARCH.md`
+already exists — a prior `/wp-demo` run against this project wrote it — read it
+and move on. If `.wp-create.json` records `"research": "none"`, skip in one line
+and do not retry. Otherwise, a craft `/wp-yolo` run never calls `/wp-demo`, so
+it must research the client itself, in these same terms `/wp-demo` Step 2.4
+uses on purpose — do not restate them a third way:
+dispatch the `wp-research` agent, which reads
+`${CLAUDE_PLUGIN_ROOT}/skills/wp-research/SKILL.md` for the method, the source
+ladder and the fetch cap.
+
+This run is unattended, so the agent **asks nothing**: it takes the top
+candidate, records `confidence: "unconfirmed"` with the candidates it rejected,
+and Step 6 states that the identity was unconfirmed. An unconfirmed identity
+records no `research.site`, so `designlang` is never pointed at a guess.
+Research never blocks this run: if every rung of the ladder fails, record
+`"research": "none"` and carry on.
+
 **Classify the domain, here too, once for the site.** If `.wp-create.json`
 already has `"domain"` — a prior `/wp-demo` run against this same project
 recorded it — read it and move on; do not re-classify. Otherwise, a craft
 `/wp-yolo` run never calls `/wp-demo`, so it must classify the domain itself, in
 these same terms `/wp-demo` Step 2.6 uses on purpose — do not restate them a
 third way: match the
-client documents' English-language material against the keyword lists in
+English-language material in **the client documents and `demo/RESEARCH.md`**
+(sections `## What they actually say` and `## Competitors`) against the
+keyword lists in
 `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/domains/domains.csv`. A
-domain is matched when **two distinct keywords** from its list appear in the
-docs; below that, report `unclassified` and carry on without constraining
+domain is matched when **two distinct keywords** from its list appear in that
+corpus; below that, report `unclassified` and carry on without constraining
 anything. When more than one domain clears the threshold, the highest hit count
 wins; on an exact tie for the top count, report both names and proceed
-`unclassified` for the same reason. The lists are English-only: a docs set with
+`unclassified` for the same reason. The lists are English-only: a corpus with
 no English-language material is `unclassified` **with that reason stated**, and
 the operator may name the domain directly instead of relying on the match.
 Record the result once, for the site, not once per page, in `.wp-create.json`
-under `"domain"` as `name`, `score`, `matched` and `confidence`. A matched
+under `"domain"` as `name`, `score`, `matched` and `confidence`, recording in
+`matched` **which corpus produced each hit** — `docs` or `research`. The
+threshold does not move: two distinct keywords are still required. A matched
 domain's `page_pattern` and `considerations` fold into the brief as stated
 constraints; it **never touches tokens**, which come from `demo/DESIGN.md` and
 the client's own material, never from a category.
@@ -810,6 +831,7 @@ Review:
   - <anything skipped — e.g. JS-only interactivity not reproducible in static templates>
   - <out-of-scope pages skipped: "in demo but out of scope — skipped">
   - <approved-but-missing-HTML pages: "approved/designed but no HTML — needs demo">
+  - <research identity: confirmed or unconfirmed, with the name>
 ```
 
 Note for the user: `--yolo` is best used **after** one checkpointed dry-run of the same

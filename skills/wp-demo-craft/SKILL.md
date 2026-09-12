@@ -45,15 +45,21 @@ plain: an unverified craft page is the one that reaches the client.
    feeling curve, the peak sentence, and any authored silence so verification can
    tell it from dead scroll (`references/feel.md`). Self-author it from the
    project docs, mark anything invented as "Self-authored, not interviewed", and
-   ask only what the docs cannot answer.
+   ask only what the docs cannot answer. When `demo/RESEARCH.md` exists, each of
+   person, pain and promise either
+   **cites the `demo/RESEARCH.md` line and its source URL, or keeps the marker**
+   — and the marker now means something, because there was an alternative.
 3. **Grammar, then composition plan.** Pick one grammar from
    `references/grammars.md` — it decides what a section is, what the chrome is
    for and what the ending does, and compositions are chosen inside it, not
    instead of it. Then one row per section — section, role, composition, why,
-   motion cost, and the domain signal that justified it, citing the brief
+   motion cost, the domain signal that justified it, citing the brief
    constraint from domain classification, or writing "no domain signal" when
    none applies (this is what makes the classification bind on the plan instead
-   of sitting unread) — from the role table in `compositions/README.md`
+   of sitting unread); and the research signal — what `demo/RESEARCH.md`'s
+   `## Signals` says this sector does at this point in the page, and whether
+   this row follows it or breaks it — or "no research signal" when none
+   applies — from the role table in `compositions/README.md`
    (`references/compositions.md`). That row format is stated in these same terms
    `/wp-demo` Step 2.6 uses on purpose — do not restate it a third way. Sum the
    motion cost before building and hold it under the budget in `devices.md`.

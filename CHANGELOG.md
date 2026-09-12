@@ -29,6 +29,20 @@
   naming the variable rather than falling back to a placeholder. `/wp-yolo`
   never generates; it consumes plates already on disk.
 
+- `/wp-demo` Step 2.4 researches the client's business and competitors before
+  the demo mode is chosen, via the new `wp-research` agent and skill. Writes
+  `demo/RESEARCH.md` and the `"research"` key in `.wp-create.json`.
+- Six build steps now cite `demo/RESEARCH.md`: `designlang`'s target, the
+  brief's person/pain/promise, the domain-classification corpus, the composition
+  table's research-signal column, the image prompts' vocabulary, and plain-mode
+  copy.
+- `/wp-yolo` researches the client unattended, recording the identity as
+  `unconfirmed` rather than asking, and Step 6's report surfaces that
+  unconfirmed identity to the operator — the only channel an unattended run
+  has to a human.
+- Optional Firecrawl (MCP or `firecrawl_url`) and DataForSEO (MCP) tiers improve
+  extraction and local competitor discovery. No API key is ever requested.
+
 ### Fixed
 
 - **A script registered without `in_footer` slipped past PERF-010.** The check grepped
@@ -55,6 +69,31 @@
   `assets/img/...` source failed on every import. Sources are now resolved
   against the demo folder, and a failed import of a generated plate is reported
   on its own line rather than folded in with a remote URL that 403'd.
+- **Three of the six `demo/RESEARCH.md` consumers never reached `/wp-yolo`'s
+  craft path.** `/wp-yolo` builds a craft demo from `skills/wp-demo-craft/SKILL.md`
+  and its `references/`, never through `/wp-demo` — so the `designlang` target,
+  the `demo/BRIEF.md` citation option, and the composition table's
+  research-signal column were wired only into `commands/wp-demo.md` and
+  silently absent on the entry point a one-shot build actually uses.
+  `references/design-md.md`, `SKILL.md` and `references/compositions.md` now
+  state the same three rules, in the same terms `commands/wp-demo.md` uses.
+- **The composition row format disagreed across three files.** `commands/wp-demo.md`
+  named seven columns while `SKILL.md` and `references/compositions.md` still
+  named six, so a build following either reference wrote a plan with no
+  research-signal row. All three now state the same seven columns, and
+  `tests/checks/wp-research.sh` pins the research-signal column in each of the
+  three independently.
+- Two pins in `tests/checks/wp-research.sh` could not fail on their own: the
+  dispatch pin against `commands/wp-demo.md` matched an unrelated skill-path
+  substring, and the `firecrawl` tier pin could not fail independently of the
+  `firecrawl_url` pin beside it. Both now pin exact, unique phrasing, and a
+  new pin catches the three-answer confirmation table drifting between
+  `agents/wp-research.md` and `commands/wp-demo.md`.
+- The English-only fallback sentence in `commands/wp-demo.md` and
+  `commands/wp-yolo.md` still said "a docs set with no English-language
+  material", left over from before the domain-classification corpus widened to
+  include `demo/RESEARCH.md`. Both now say "a corpus", matching the wording
+  used one clause above it.
 
 ## [1.16.0] - 2026-09-11
 
