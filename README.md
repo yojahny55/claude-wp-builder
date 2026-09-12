@@ -371,6 +371,7 @@ procedure; the commands only dispatch them.
 | `wp-cf7` | Contact Form 7 specialist — forms per language, branded mail templates, and the seeder that carries the form body |
 | `wp-normalize` | Demo-folder analyzer — turns an arbitrary multi-page site into the canonical delimited demo plus a build manifest |
 | `wp-context` | Project-docs analyzer — reads `docs/` and extracts constraints plus an actionable scope manifest |
+| `wp-research` | Client-business researcher — finds the client's web presence and comparable competitors, writes `demo/RESEARCH.md` |
 | `wp-cinematic` | Cinematic scroll specialist — scene fields, template parts and scroll-engine wiring for the `__cinematic__` starter |
 | `wp-audit-security` · `wp-audit-seo` · `wp-audit-a11y` · `wp-audit-performance` · `wp-audit-practices` | The five `/wp-audit` judgment auditors — code scanning, structured data, WCAG 2.1 AA, Core Web Vitals, WordPress standards |
 | `wp-audit-aios` · `wp-audit-rankmath` | The two mechanical audit installers — All-in-One WP Security and Rank Math, configured via WP-CLI |

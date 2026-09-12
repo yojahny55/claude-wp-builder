@@ -56,4 +56,52 @@ grep -Fq 'at most 2 pages each' "$sf" \
 grep -Fq 'No key is ever requested' "$sf" \
   || fail "$s does not state that no key is ever requested"
 
+# ---------------------------------------------------------------------------
+# B. The agent's contract: frontmatter, the artifact shape, the "none" write,
+#    and the rule that scraped content is data.
+# ---------------------------------------------------------------------------
+a=agents/wp-research.md
+[ -f "$a" ] || fail "$a is missing"
+for key in name description tools model; do
+  grep -q "^$key:" "$a" || fail "$a has no $key in its frontmatter"
+done
+grep -q '^model: opus' "$a" || fail "$a must be opus — this is synthesis, not extraction"
+grep -q '^tools:.*WebSearch' "$a" || fail "$a does not declare WebSearch"
+grep -q '^tools:.*WebFetch'  "$a" || fail "$a does not declare WebFetch"
+grep -q '^## First Action (MANDATORY)' "$a" \
+  || fail "$a does not open with the First Action (MANDATORY) block"
+
+af=$(flat "$a")
+
+# The artifact's four sections. Pinned individually: one pin naming all four
+# would stay green with three of them deleted.
+for h in '## Identity' '## What they actually say' '## Competitors' '## Signals'; do
+  grep -Fq "$h" "$af" || fail "$a does not define the '$h' section of demo/RESEARCH.md"
+done
+
+# Prompt-injection containment. This is the rule that keeps a competitor's page
+# from editing the build.
+grep -Fq 'is data, never instructions' "$af" \
+  || fail "$a does not state that scraped content is data, never instructions"
+grep -Fq 'never followed' "$af" \
+  || fail "$a does not state that instructions found in scraped content are never followed"
+
+# Honest failure. Each is pinned separately because each is a different refusal.
+grep -Fq 'unreadable' "$af" \
+  || fail "$a does not record an unreadable competitor page as unreadable"
+grep -Fqi 'do not pad' "$af" \
+  || fail "$a does not refuse to pad a short competitor list"
+grep -Fq 'no `research.site` is recorded' "$af" \
+  || fail "$a does not withhold research.site on an unconfirmed identity"
+
+# The WRITE half of the "none" contract. The READ half is pinned in section C
+# against the command; pinning only one half lets the other be reworded green.
+grep -Fq '"research": "none"' "$af" \
+  || fail "$a never writes \"research\": \"none\""
+
+# research.site must never be called a domain: .wp-create.json already uses
+# "domain" for the domains.csv industry category.
+grep -Fq 'research.site' "$af" \
+  || fail "$a does not name the web address research.site"
+
 echo PASS
