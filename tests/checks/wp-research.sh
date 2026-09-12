@@ -115,4 +115,41 @@ grep -Eq '"domain"[[:space:]]*:[[:space:]]*"https?://' "$a" \
 grep -Fq 'It is **never** called `domain`' "$af" \
   || fail "$a does not state that the web address is never called domain"
 
+# ---------------------------------------------------------------------------
+# C. /wp-demo Step 2.4: position, branch order, and the READ half of "none".
+# ---------------------------------------------------------------------------
+d=commands/wp-demo.md
+df=$(flat "$d")
+
+grep -Fq '## Step 2.4: Research' "$df" || fail "$d has no Step 2.4"
+
+# Position: Step 2.4 must sit between Step 2 and Step 2.5, or a plain build
+# reaches Step 4 without it and the copy is invented exactly as before.
+awk '/^## Step 2.4: Research/ { r = NR } /^## Step 2.5: Choose the Demo Mode/ { m = NR }
+     END { exit !(r > 0 && m > 0 && r < m) }' "$d" \
+  || fail "$d Step 2.4 must appear before Step 2.5, so plain builds get research too"
+
+grep -Fq 'wp-research' "$df" || fail "$d never dispatches the wp-research agent"
+
+# The READ half of the "none" contract. The WRITE half is pinned in section B
+# against the agent. One pin covering both lets either be reworded green.
+grep -Fq 'skip in one line, do not ask' "$df" \
+  || fail "$d does not skip on a recorded \"research\": \"none\" without asking"
+
+# Reuse, not re-research. Without this a second run burns the fetch budget again.
+grep -Fq 'already exists' "$df" \
+  || fail "$d does not reuse an existing demo/RESEARCH.md"
+grep -Fq 'never re-researches' "$df" \
+  || fail "$d does not state that iterate never re-researches"
+
+# The three answers are three different outcomes. Pinned separately.
+grep -Fq 'wrong business' "$df" \
+  || fail "$d does not handle the 'wrong business' answer distinctly from a decline"
+grep -Fq 'Research still happened; the identity did not' "$df" \
+  || fail "$d conflates a rejected identity with a declined research run"
+
+# Research must never block a build.
+grep -Fq 'never blocks a build' "$df" \
+  || fail "$d does not state that research never blocks a build"
+
 echo PASS

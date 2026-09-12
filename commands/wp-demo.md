@@ -23,6 +23,41 @@ Check `$ARGUMENTS`:
   - Reference screenshots or URLs (optional)
   - List of sections to include (e.g., Hero, About, Services, Team, Testimonials, Contact)
 
+## Step 2.4: Research
+
+Find out who this client actually is before deciding anything about the build.
+This runs before the mode is chosen, so a plain demo gets the client's real
+words too — invented copy is where a generated demo reads as generated, and a
+plain build has no `demo/DESIGN.md` to lean on.
+
+Take the first branch that applies:
+
+1. **`demo/RESEARCH.md` already exists** — read it, say so in one line, continue.
+   A re-run does not re-research; deleting the file is how you refresh it.
+   `/wp-demo iterate` reaches this branch or the next one and so **never
+   re-researches**.
+2. **`.wp-create.json` records `"research": "none"`** — skip in one line, do not ask.
+   The record is permanent: an earlier run already declined or already found
+   nothing reachable.
+3. **Otherwise** — dispatch the `wp-research` agent. It reads
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-research/SKILL.md`, works the source ladder
+   down from whatever is connected, and writes `demo/RESEARCH.md` plus the
+   `"research"` key in `.wp-create.json`.
+
+The agent shows its `## Identity` block once and waits. Three answers, and they
+are not the same thing:
+
+| Answer | Effect |
+|---|---|
+| yes | `confidence: "confirmed"`, `research.site` recorded |
+| wrong business | the site is dropped, `confidence: "unconfirmed"`, that candidate joins the rejected list, and the build continues on the documents alone. Research still happened; the identity did not |
+| no research | `"research": "none"` is written and nothing is researched again |
+
+**Research never blocks a build.** The craft browser gate blocks because
+building blind is wrong; this does not. If there is no network, if every rung of
+the ladder fails, or if the business cannot be found, the run records what
+happened in one line and Step 2.5 continues exactly as it does today.
+
 ## Step 2.5: Choose the Demo Mode
 
 Craft mode builds against the `wp-demo-craft` skill: a design floor, a page
