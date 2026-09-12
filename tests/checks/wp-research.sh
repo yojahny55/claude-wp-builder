@@ -73,10 +73,14 @@ grep -q '^## First Action (MANDATORY)' "$a" \
 
 af=$(flat "$a")
 
-# The artifact's four sections. Pinned individually: one pin naming all four
-# would stay green with three of them deleted.
+# The artifact's four sections. Pinned against the RAW file with a line-start/end
+# anchor so a heading name that also appears inside a sentence elsewhere (a
+# cross-reference, e.g. "the `## Identity` block") cannot satisfy the pin — only
+# a real heading line matches ^...$. The flattened copy cannot do this: flat()
+# collapses every newline, so ^ has nothing to anchor to there. Pinned
+# individually: one pin naming all four would stay green with three deleted.
 for h in '## Identity' '## What they actually say' '## Competitors' '## Signals'; do
-  grep -Fq "$h" "$af" || fail "$a does not define the '$h' section of demo/RESEARCH.md"
+  grep -q "^$h\$" "$a" || fail "$a does not define the '$h' section of demo/RESEARCH.md"
 done
 
 # Prompt-injection containment. This is the rule that keeps a competitor's page
@@ -99,9 +103,16 @@ grep -Fq 'no `research.site` is recorded' "$af" \
 grep -Fq '"research": "none"' "$af" \
   || fail "$a never writes \"research\": \"none\""
 
-# research.site must never be called a domain: .wp-create.json already uses
-# "domain" for the domains.csv industry category.
-grep -Fq 'research.site' "$af" \
-  || fail "$a does not name the web address research.site"
+# The web address is research.site and is never called a domain: .wp-create.json
+# already uses "domain" for the domains.csv industry category, and an agent that
+# writes the URL there would silently overwrite the classification. A bare
+# `grep -Fq 'research.site'` pin is dead weight here — it cannot fail while the
+# "no `research.site` is recorded" pin above is satisfied, since that string
+# already contains it. Test the actual rule instead: no URL ever lands in
+# "domain", and the prose says why.
+grep -Eq '"domain"[[:space:]]*:[[:space:]]*"https?://' "$a" \
+  && fail "$a writes a URL into \"domain\" — that key holds the domains.csv industry category"
+grep -Fq 'It is **never** called `domain`' "$af" \
+  || fail "$a does not state that the web address is never called domain"
 
 echo PASS
