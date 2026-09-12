@@ -724,7 +724,9 @@ Run, in order:
      the before/after score in Step 6. If that fix touched theme CSS, templates or
      enqueues, re-run `/wp-finalize`'s Layers 2-3 before Step 5.5 signs off.
    - **exit 2** — the scan skipped (no network or tool): record the skip and mark the
-     run incomplete in Step 6, exactly as the completion rule requires below.
+     run incomplete in Step 6, exactly as the completion rule requires below. A localhost
+     or otherwise non-public `wordpress.url` is a normal cause — the scan needs a
+     publicly reachable host — and is still a skip, not a success.
    - **exit 1** — the scan errored: report the error and mark the run incomplete.
 
 **Completion rule.** Items 4 through 8 are part of the build, not follow-ups for the

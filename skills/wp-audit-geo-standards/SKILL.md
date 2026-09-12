@@ -47,16 +47,19 @@ failure, and an `emerging` pass can only lift the grade, never save it.
 
 ## 2. Applicability by site type
 
-Site type is **detected, not assumed**, from the project's `.claude/CLAUDE.md`
-(`industry`), active plugins, registered REST namespaces, page inventory, and
-templates. Every check not implied by the detected type is reported `N/A`.
+Site type is **detected, not assumed**, from **positive signals** — the project's
+`.claude/CLAUDE.md` (`industry`), active plugins, an OpenAPI/public-API signal, the page
+inventory and templates. A registered REST namespace is **not** a signal: Rank Math,
+Yoast, SEOPress and CF7 all register one, so scanning `rest_get_server()` marks an
+ordinary content site as SaaS. Every check not implied by the detected type is reported
+`N/A`.
 
 | Site type | Detection | Layers that apply |
 |---|---|---|
-| content / publisher / service | default | Discovery + Access + GUI-Usability |
-| **local business** | `industry` = local/business + address fields | + LocalBusiness schema, NAP, reviews |
-| **merchant** | WooCommerce active | + Payments, `pricing.md`, Product schema |
-| **SaaS** / public API | custom REST namespace or OpenAPI present | + OpenAPI / api-catalog / MCP / OAuth |
+| content / publisher / service | default when no positive signal matches | Discovery + Access + GUI-Usability |
+| **local business** | `industry` = local/business **and** a non-empty `business_address` | + LocalBusiness schema, NAP, reviews |
+| **merchant** | `class_exists('WooCommerce')` / `$WP plugin is-installed woocommerce` | + Payments, `pricing.md`, Product schema |
+| **SaaS** / public API | an OpenAPI spec or a deliberate public API surface recorded in `.claude/CLAUDE.md` | + OpenAPI / api-catalog / MCP / OAuth |
 
 The auditor runs only the applicable subset and prints the exclusion rationale for
 every `N/A` layer. A WordPress site with WooCommerce active but products disabled
@@ -396,18 +399,30 @@ Ensure `/about`, `/contact`, `/privacy` exist as real published pages with ≥50
 characters each, seeded from the demo header/footer copy. They satisfy both
 `trust-anchors` and give the entity graph something to link to.
 
+### 6.10 `llms-full.txt` and `auth.md`
+
+`/llms-full.txt` is the `/llms.txt` route family carrying the full text of every published
+page and post, for agents that ingest the whole site. `/auth.md` (SaaS/API only, spec
+§7.3) is the credential walkthrough an agent reads before calling the API — scheme,
+discovery endpoints and a numbered obtain-and-send flow — and satisfies `auth-md-exists`,
+`auth-md-structure` and `auth-md-walkthrough-simulation` (GEO-U08).
+
 ---
 
 ## 7. Verification loop
 
 The live verifier is `bin/geo-scan.sh <domain>`: it runs
-`npx --yes is-agentic <domain> --json`, falls back to `npx ax`, parses the JSON, maps
-failed ORA check ids back to GEO codes, and re-scans after the fixer runs.
+`npx --yes is-agentic <domain> --json` under a 60-second timeout, falls back to
+`npx --yes ax score <domain> --json`, and **only prints the JSON report**. It does not
+parse it. The caller — the audit/fix agent — maps the failed ORA check ids back to GEO
+codes using §3, and re-runs the scan after the fixer completes.
 
 - A fix is reported resolved **only when the ORA check flips**, not when the theme
   file changed.
-- No network or no public URL: the scan prints the reason and **skips cleanly**; a run
-  is marked accordingly rather than silently passing.
+- Exit `0` = a report came back; `1` = the tool ran but errored; `2` = skipped cleanly
+  (no `npx`, no network, or no report). A localhost or otherwise non-public URL
+  legitimately yields exit `2`; record the skip and mark the run incomplete rather than
+  silently passing.
 - The evaluator reads a point-in-time scan; a green scan is evidence, not a guarantee.
 
 ---

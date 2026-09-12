@@ -11,10 +11,15 @@ finalize=commands/wp-finalize.md
 
 for f in "$skill" "$agent" "$fixer"; do [ -f "$f" ] || fail "$f is missing"; done
 
-# Skill: ORA layers, weights, tiers and pools.
-for t in Discovery Access Usability Payments '20' '30' '40' '10' required recommended emerging '80'; do
+# Skill: ORA layers as exact table rows. Bare '20'/'30'/'40'/'10' also match the
+# citability weights, so they never proved the layer table; require the row shape.
+for row in '| Discovery | 20 |' '| Access | 30 |' '| Usability | 40 |' '| Payments | 10 |'; do
+  grep -qF "$row" "$skill" || fail "$skill missing layer row '$row'"
+done
+for t in required recommended emerging; do
   grep -q "$t" "$skill" || fail "$skill missing '$t'"
 done
+grep -qF 'share an **80**-point' "$skill" || fail "$skill missing the Essential-pool 80-point line"
 grep -q 'ora.ai/api/checks' "$skill" || fail "$skill missing the ORA catalog endpoint"
 grep -qE 'GEO-[DAUP]' "$skill" || fail "$skill missing GEO layer codes"
 

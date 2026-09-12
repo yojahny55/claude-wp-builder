@@ -21,7 +21,7 @@ Before writing any file or running any command, read the project files:
 1. **`.claude/CLAUDE.md`** — Extract:
    - The **function prefix** (recorded with a trailing underscore, e.g., `kairo_`). Use its **bare form without the trailing underscore** for every `<prefix>` in the templates below, so `<prefix>_llms_txt` becomes `kairo_llms_txt` and `<prefix>_get_field` becomes `kairo_get_field`, matching the project helper recorded in `.claude/CLAUDE.md`. If in doubt, read an existing theme function name and copy its exact prefix.
    - The **theme slug** and **theme path** (where `functions.php` and `inc/` live)
-   - The **industry** (a local/business value means set `<prefix>_industry_is_local()` to `true`; otherwise leave it `false`)
+   - The **industry** (a local/business value is one positive signal for the `local` site type)
    - The **languages** configured
 
 2. **`.wp-create.json`** — Extract:
@@ -29,19 +29,30 @@ Before writing any file or running any command, read the project files:
 
 3. **`skills/wp-audit-geo-standards/SKILL.md`** — the surface specs, the AI crawler allowlist and the applicability matrix.
 
-Detect the **site type** exactly as `wp-audit-geo` did (WooCommerce active → merchant;
-custom REST namespace or OpenAPI → SaaS/API; local/business industry + address fields →
-local business; otherwise content). Only the surfaces that site type implies are emitted;
-the `N/A` surfaces are left out of `inc/agentic.php` rather than shipped empty.
+Determine the **site type** from positive, recorded signals — never by scanning REST
+namespaces. Check in order:
+
+- `class_exists( 'WooCommerce' )` (via `$WP plugin is-installed woocommerce`) → `merchant`
+- the project's `Industry` is a local/business value **and** the settings carry a non-empty
+  `business_address` → `local`
+- the audit or `.claude/CLAUDE.md` records a SaaS / public-API site (an OpenAPI spec or a
+  deliberate public API surface) → `saas`
+- otherwise → `content`
+
+Bake the result into the emitted `inc/agentic.php` as
+`define( '<prefix>_AGENTIC_SITE_TYPE', '<content|local|merchant|saas>' );`. Every
+applicability gate reads that constant, so the site type is decided once, at build time,
+with no per-request sniffing. Only the surfaces that site type implies are emitted; the
+`N/A` surfaces are left out of `inc/agentic.php` rather than shipped empty.
 
 ---
 
 ## Step 1: Emit `inc/agentic.php`
 
 Create `<theme>/inc/agentic.php` with the two code blocks below. **Replace every
-`<prefix>` with the project's real function prefix** from `.claude/CLAUDE.md`. The file
-must survive a PHP 7.4 parser: no `match`, no union types, no arrow-function-only syntax
-that 7.4 lacks.
+`<prefix>` with the project's real function prefix** from `.claude/CLAUDE.md`, and set
+`<prefix>_AGENTIC_SITE_TYPE` to the site type you detected above. The file must survive a
+PHP 7.4 parser: no `match`, no union types, no arrow-function-only syntax that 7.4 lacks.
 
 ### 1a. Routes, response engine, negotiation, 404, robots signal, Link headers
 
@@ -54,21 +65,31 @@ that 7.4 lacks.
 
 defined( 'ABSPATH' ) || exit;
 
-// 1. Dynamic llms.txt + modular per-area llms.txt.
+// Site type, recorded once at build time from the project's positive signals:
+// content | local | merchant | saas. Every surface gate below reads this constant, so
+// nothing is sniffed per request. wp-agentic-surfaces substitutes the detected value.
+define( '<prefix>_AGENTIC_SITE_TYPE', 'content' );
+
+// 1. Dynamic llms.txt, llms-full.txt and modular per-area llms.txt.
 add_action( 'init', function () {
     add_rewrite_rule( '^llms\.txt$', 'index.php?<prefix>_agent=llms', 'top' );
+    add_rewrite_rule( '^llms-full\.txt$', 'index.php?<prefix>_agent=llms_full', 'top' );
     add_rewrite_rule( '^agents\.md$', 'index.php?<prefix>_agent=agents', 'top' );
     add_rewrite_rule( '^\.well-known/agent-skills/index\.json$', 'index.php?<prefix>_agent=skills', 'top' );
     add_rewrite_rule( '^\.well-known/ard\.json$', 'index.php?<prefix>_agent=ard', 'top' );
     add_rewrite_rule( '^\.well-known/ai-catalog\.json$', 'index.php?<prefix>_agent=ard', 'top' );
-    // Modular per-area index, e.g. /services/llms.txt. Added after the exact routes
-    // so /llms.txt itself is never captured by the slug pattern.
+    // Modular per-area index, e.g. /services/llms.txt. The slug pattern requires a
+    // path segment, so it can never capture /llms.txt itself.
     add_rewrite_rule( '^([a-z0-9][a-z0-9-]*)/llms\.txt$', 'index.php?<prefix>_agent=area&<prefix>_agent_area=$matches[1]', 'top' );
-    // pricing.md and api-catalog are merchant/SaaS surfaces only. A content site must
-    // not emit these routes at all (GEO-A22 / GEO-A24 stay N/A, not falsely resolved).
+    // pricing.md is merchant/SaaS (GEO-A24); api-catalog and auth.md are SaaS/API
+    // (GEO-A22, GEO-U08). A content site must not emit these routes at all, so the
+    // excluded codes stay N/A instead of falsely resolved.
     if ( <prefix>_is_merchant_or_saas() ) {
         add_rewrite_rule( '^pricing\.md$', 'index.php?<prefix>_agent=pricing', 'top' );
+    }
+    if ( <prefix>_is_saas() ) {
         add_rewrite_rule( '^\.well-known/api-catalog$', 'index.php?<prefix>_agent=api_catalog', 'top' );
+        add_rewrite_rule( '^auth\.md$', 'index.php?<prefix>_agent=auth', 'top' );
     }
 } );
 
@@ -92,12 +113,14 @@ add_action( 'template_redirect', function () {
         exit;
     }
     $routes = array(
-        'llms'        => array( '<prefix>_llms_txt',    'text/plain' ),
-        'agents'      => array( '<prefix>_agents_md',   'text/markdown' ),
-        'pricing'     => array( '<prefix>_pricing_md',  'text/markdown' ),
-        'skills'      => array( '<prefix>_skills_json', 'application/json' ),
-        'ard'         => array( '<prefix>_ard_json',    'application/json' ),
-        'api_catalog' => array( '<prefix>_api_catalog', 'application/linkset+json' ),
+        'llms'        => array( '<prefix>_llms_txt',     'text/plain' ),
+        'llms_full'   => array( '<prefix>_llms_full_txt', 'text/plain' ),
+        'agents'      => array( '<prefix>_agents_md',    'text/markdown' ),
+        'pricing'     => array( '<prefix>_pricing_md',   'text/markdown' ),
+        'auth'        => array( '<prefix>_auth_md',      'text/markdown' ),
+        'skills'      => array( '<prefix>_skills_json',  'application/json' ),
+        'ard'         => array( '<prefix>_ard_json',     'application/json' ),
+        'api_catalog' => array( '<prefix>_api_catalog',  'application/linkset+json' ),
     );
     if ( ! isset( $routes[ $which ] ) ) {
         return;
@@ -112,22 +135,31 @@ add_action( 'template_redirect', function () {
     exit;
 } );
 
-// 2. Markdown negotiation on normal pages.
-add_action( 'send_headers', function () {
+// 2. Markdown negotiation on normal pages. Negotiated in template_redirect, before the
+//    theme echoes header.php, so the response headers are still mutable and the body can
+//    be a markdown payload. `the_content` fires after the whole document has been echoed,
+//    where both are impossible.
+add_action( 'template_redirect', function () {
     header( 'Vary: Accept', false );
+    if ( ! <prefix>_accepts_markdown() || ! ( is_singular() || is_front_page() ) ) {
+        return;
+    }
+    nocache_headers();
+    header( 'Content-Type: text/markdown; charset=utf-8' );
+    // Capture the rendered page; hand back only its main content as markdown.
+    ob_start( function ( $html ) {
+        return <prefix>_html_to_markdown( <prefix>_extract_main_content( $html ) );
+    } );
 } );
 
-add_filter( 'the_content', function ( $content ) {
-    if ( isset( $_SERVER['HTTP_ACCEPT'] ) && false !== strpos( $_SERVER['HTTP_ACCEPT'], 'text/markdown' ) ) {
-        header( 'Content-Type: text/markdown; charset=utf-8' );
-        return <prefix>_html_to_markdown( $content );
-    }
-    return $content;
-}, 999 );
-
-// 3. Agent-friendly 404: real 404 status + a markdown body pointing at llms.txt.
-add_filter( '404_template', function () {
+// 3. Agent-friendly 404: a real 404 status always; a markdown body only when the request
+//    asks for markdown or is a non-browser agent. A normal browser keeps the theme's
+//    designed 404 template.
+add_filter( '404_template', function ( $template ) {
     status_header( 404 );
+    if ( ! <prefix>_wants_markdown() ) {
+        return $template;
+    }
     nocache_headers();
     header( 'Content-Type: text/markdown; charset=utf-8' );
     echo "# 404 — Not found\n\nThe page you asked for does not exist.\n\n- Site map: " . esc_url( home_url( '/sitemap_index.xml' ) ) . "\n- Machine summary: " . esc_url( home_url( '/llms.txt' ) ) . "\n";
@@ -159,49 +191,37 @@ add_filter( 'wp_headers', function ( $headers ) {
 
 ### 1b. Builder functions, applicability gates and JSON-LD
 
-Append this block to the same `inc/agentic.php`. Every builder is applicability-gated:
-`<prefix>_is_merchant_or_saas()` controls the pricing and API surfaces (GEO-A24, GEO-A22)
-and `<prefix>_is_local_business()` controls the `LocalBusiness` identity. Remove the
-routes and builders that the detected site type excludes rather than shipping stubs.
+Append this block to the same `inc/agentic.php`. The `define()` in block 1a records the
+site type once; every builder reads it back through `<prefix>_is_merchant_or_saas()`
+(pricing, GEO-A24), `<prefix>_is_saas()` (api-catalog, GEO-A22, and auth.md, GEO-U08) and
+`<prefix>_is_local_business()` (the `LocalBusiness` identity). Remove the routes and
+builders that the detected site type excludes rather than shipping stubs.
 
 ```php
 /**
  * Shared gates and helpers.
+ *
+ * The site type is recorded once in `<prefix>_AGENTIC_SITE_TYPE` (see block 1a) from the
+ * positive signals wp-agentic-surfaces detected: an active WooCommerce, a local/business
+ * industry with a settings address, an OpenAPI/public-API signal, or content. Nothing
+ * here touches REST namespaces at runtime — scanning rest_get_server() on `init` would
+ * boot every active plugin's REST callbacks on every front-end request, and a stock
+ * install with an SEO or forms plugin registers namespaces that are not a public API.
  */
-function <prefix>_is_merchant_or_saas() {
-    if ( class_exists( 'WooCommerce' ) ) {
-        return true;
-    }
-    foreach ( array_keys( rest_get_server()->get_namespaces() ) as $ns ) {
-        // Core registers wp/v2, wp-site-health/v1, wp-block-editor/v1, wp-abilities/v1,
-        // oembed/1.0 and batch/v1 — all prefix `wp-`, `wp/`, `oembed` or `batch`.
-        // Anything outside that set is a genuine public API. A stock install therefore
-        // returns false here and emits neither pricing.md nor api-catalog.
-        if ( 0 === strpos( $ns, 'wp-' ) || 0 === strpos( $ns, 'wp/' ) ) {
-            continue;
-        }
-        if ( 'oembed' === $ns || 0 === strpos( $ns, 'oembed/' ) ) {
-            continue;
-        }
-        if ( 'batch' === $ns || 0 === strpos( $ns, 'batch/' ) ) {
-            continue;
-        }
-        return true;
-    }
-    return false;
+function <prefix>_agentic_site_type() {
+    return <prefix>_AGENTIC_SITE_TYPE;
 }
 
-/**
- * Industry flag — wp-agentic-surfaces sets this to `true` only when
- * `.claude/CLAUDE.md` records a local/business industry. It defaults to `false` so a
- * content site never emits LocalBusiness.
- */
-function <prefix>_industry_is_local() {
-    return false;
+function <prefix>_is_merchant_or_saas() {
+    return in_array( <prefix>_agentic_site_type(), array( 'merchant', 'saas' ), true );
+}
+
+function <prefix>_is_saas() {
+    return 'saas' === <prefix>_agentic_site_type();
 }
 
 function <prefix>_is_local_business() {
-    return <prefix>_industry_is_local() && '' !== trim( (string) <prefix>_option( 'business_address' ) );
+    return 'local' === <prefix>_agentic_site_type();
 }
 
 function <prefix>_option( $key, $fallback = '' ) {
@@ -306,6 +326,28 @@ function <prefix>_llms_txt() {
 }
 
 /**
+ * llms-full.txt — the full text of every published page and post, for agents that ingest
+ * the whole site rather than follow links (spec §7.1). Same route family as llms.txt.
+ */
+function <prefix>_llms_full_txt() {
+    $out  = '# ' . get_bloginfo( 'name' ) . " — full content\n\n";
+    $out .= '> Complete text of every published page and post. Prefer it over truncated summaries.' . "\n\n";
+    $posts = get_posts( array(
+        'post_type'      => array( 'page', 'post' ),
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'orderby'        => 'menu_order',
+        'order'          => 'ASC',
+    ) );
+    foreach ( $posts as $p ) {
+        $out .= '## ' . $p->post_title . "\n\n";
+        $out .= 'URL: ' . get_permalink( $p->ID ) . "\n\n";
+        $out .= trim( preg_replace( '/\s+/', ' ', wp_strip_all_tags( $p->post_content ) ) ) . "\n\n";
+    }
+    return $out;
+}
+
+/**
  * Modular per-area llms.txt — GEO-A16. Served at /<slug>/llms.txt for a published
  * page; a slug that does not resolve returns a real 404.
  */
@@ -345,8 +387,31 @@ function <prefix>_agents_md() {
     $out .= "- Send `Accept: text/markdown` to receive a page as markdown.\n\n";
     $out .= "## Rules for agents\n";
     $out .= '- Cite the page URL when quoting.' . "\n";
-    $out .= '- Treat pricing and availability as current only from ' . $home . "pricing.md.\n";
+    if ( <prefix>_is_merchant_or_saas() ) {
+        $out .= '- Treat pricing and availability as current only from ' . $home . "pricing.md.\n";
+    }
     $out .= '- Respect the crawler policy in ' . $home . "robots.txt.\n";
+    return $out;
+}
+
+/**
+ * auth.md — how an agent authenticates to this site's API (GEO-U08, SaaS only).
+ * Replace the scheme and endpoints below with the site's real auth surface; this is the
+ * walkthrough an agent reads before calling the API.
+ */
+function <prefix>_auth_md() {
+    $home = home_url( '/' );
+    $out  = '# Authentication — ' . get_bloginfo( 'name' ) . "\n\n";
+    $out .= "> How an agent obtains and uses a credential for this site's public API.\n\n";
+    $out .= "## Scheme\n";
+    $out .= "- OAuth 2.0 bearer tokens (client credentials).\n\n";
+    $out .= "## Discovery\n";
+    $out .= '- API catalog: ' . $home . ".well-known/api-catalog\n";
+    $out .= '- Protected-resource metadata: ' . $home . ".well-known/oauth-protected-resource\n\n";
+    $out .= "## Walkthrough\n";
+    $out .= "1. Read the protected-resource metadata for the authorization server and scopes.\n";
+    $out .= "2. Request a token from the authorization server's token endpoint.\n";
+    $out .= "3. Send the token on every request as `Authorization: Bearer <token>`.\n";
     return $out;
 }
 
@@ -440,7 +505,7 @@ function <prefix>_ard_json() {
  */
 function <prefix>_api_catalog() {
     $linkset = array();
-    if ( <prefix>_is_merchant_or_saas() ) {
+    if ( <prefix>_is_saas() ) {
         $linkset[] = array(
             'anchor'       => home_url( '/' ),
             'service-desc' => array(
@@ -449,6 +514,38 @@ function <prefix>_api_catalog() {
         );
     }
     return wp_json_encode( array( 'linkset' => $linkset ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+}
+
+/**
+ * True when the request explicitly asks for markdown — GEO-A19.
+ */
+function <prefix>_accepts_markdown() {
+    return isset( $_SERVER['HTTP_ACCEPT'] ) && false !== strpos( $_SERVER['HTTP_ACCEPT'], 'text/markdown' );
+}
+
+/**
+ * True for a markdown request or a non-browser agent, so a 404 can stay useful to agents
+ * without hijacking the designed error page for a human — GEO-A04.
+ */
+function <prefix>_wants_markdown() {
+    if ( <prefix>_accepts_markdown() ) {
+        return true;
+    }
+    $ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : '';
+    return (bool) preg_match( '/bot|crawl|spider|agent|curl|wget|python|httpx|libwww|httpclient/i', $ua );
+}
+
+/**
+ * Pull the main content region out of a rendered HTML document; fall back to the body.
+ */
+function <prefix>_extract_main_content( $html ) {
+    if ( preg_match( '#<main\b[^>]*>(.*?)</main>#is', $html, $match ) ) {
+        return $match[1];
+    }
+    if ( preg_match( '#<body\b[^>]*>(.*?)</body>#is', $html, $match ) ) {
+        return $match[1];
+    }
+    return $html;
 }
 
 /**
@@ -471,10 +568,12 @@ function <prefix>_html_to_markdown( $html ) {
 
 /**
  * Identity JSON-LD — GEO-A07, GEO-A08, GEO-A09.
- * Guarded so it never duplicates Rank Math's block.
+ * Guarded so it never duplicates the SEO plugin's own graph.
  */
-function <prefix>_rankmath_owns_schema() {
-    return defined( 'RANK_MATH_VERSION' ) || class_exists( 'RankMath' );
+function <prefix>_seo_plugin_owns_schema() {
+    return defined( 'RANK_MATH_VERSION' ) || class_exists( 'RankMath' )
+        || defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Options' )
+        || defined( 'SEOPRESS_VERSION' ) || class_exists( 'SEOPress' );
 }
 
 /**
@@ -486,7 +585,7 @@ function <prefix>_jsonld( $data ) {
 }
 
 add_action( 'wp_head', function () {
-    if ( <prefix>_rankmath_owns_schema() ) {
+    if ( <prefix>_seo_plugin_owns_schema() ) {
         return;
     }
     $home = home_url( '/' );
@@ -525,7 +624,7 @@ add_action( 'wp_head', function () {
  * BreadcrumbList breadth — GEO-A10. Guarded against Rank Math.
  */
 add_action( 'wp_head', function () {
-    if ( <prefix>_rankmath_owns_schema() || ! is_singular() ) {
+    if ( <prefix>_seo_plugin_owns_schema() || ! is_singular() ) {
         return;
     }
     $post = get_queried_object();
@@ -548,7 +647,7 @@ add_action( 'wp_head', function () {
  * FAQPage breadth from <details>/<summary> — GEO-A10. Guarded against Rank Math.
  */
 add_action( 'wp_head', function () {
-    if ( <prefix>_rankmath_owns_schema() || ! is_singular() ) {
+    if ( <prefix>_seo_plugin_owns_schema() || ! is_singular() ) {
         return;
     }
     $post = get_queried_object();
@@ -723,6 +822,7 @@ Then fetch each route and confirm status plus `Content-Type`:
 $WP eval "
 \$routes = array(
     'llms.txt'                              => 'text/plain',
+    'llms-full.txt'                         => 'text/plain',
     'agents.md'                             => 'text/markdown',
     '.well-known/ard.json'                  => 'application/json',
     '.well-known/agent-skills/index.json'   => 'application/json',
@@ -761,12 +861,12 @@ reported by `wp-audit-geo` with a recommendation.
 | GEO-D04 | `/agents.md` — `<prefix>_agents_md()` |
 | GEO-A02 | AI user agents allowed through in `robots.txt` — Step 4 |
 | GEO-A04 | real-404 markdown body — the `404_template` filter |
-| GEO-A07 | identity JSON-LD — the guarded `wp_head` identity action |
-| GEO-A08 | `sameAs` in the identity graph |
-| GEO-A09 | `contactPoint` + `address` in the identity graph |
-| GEO-A10 | FAQPage and BreadcrumbList breadth, guarded against Rank Math |
+| GEO-A07 | identity JSON-LD — only when no SEO plugin owns schema; otherwise dependent (below) |
+| GEO-A08 | `sameAs` in the identity graph — only when no SEO plugin owns schema; otherwise dependent (below) |
+| GEO-A09 | `contactPoint` + `address` in the identity graph — only when no SEO plugin owns schema; otherwise dependent (below) |
+| GEO-A10 | FAQPage and BreadcrumbList breadth — only when no SEO plugin owns schema; otherwise dependent (below) |
 | GEO-A11 | `/about`, `/contact`, `/privacy` seeded ≥500 characters — Step 3 |
-| GEO-A13 | dynamic `/llms.txt` rewrite endpoint |
+| GEO-A13 | dynamic `/llms.txt` and `/llms-full.txt` rewrite endpoints |
 | GEO-A14 | `#`/`>`/`##` structure and described links in `<prefix>_llms_txt()` |
 | GEO-A15 | links in `llms.txt` resolve to real permalinks |
 | GEO-A16 | per-area modular `llms.txt` — generic `^<slug>/llms\.txt$` rewrite + `<prefix>_area_llms_txt()` |
@@ -776,6 +876,16 @@ reported by `wp-audit-geo` with a recommendation.
 | GEO-A21 | `/.well-known/agent-skills/index.json` v0.2.0 with a `sha256:` digest |
 | GEO-A22 | `/.well-known/api-catalog` linkset — SaaS/API only |
 | GEO-A24 | `/pricing.md` — merchant/SaaS only |
+| GEO-U08 | `/auth.md` — SaaS/API only; the credential walkthrough an agent reads before calling the API |
+
+Four of the codes above are **conditional on the SEO plugin**. Rank Math (the default
+profile), Yoast and SEOPress each register their own identity graph, and Rank Math does
+**not** emit `contactPoint` or `address`. When one of them is active the theme emits no
+duplicate JSON-LD — which is correct and required — so A07 to A10 cannot flip from this
+agent. Report them as **dependent on the SEO plugin's configuration**, never as resolved
+by this fixer, and name `wp-audit-rankmath` as the path that fills the Organization /
+LocalBusiness `contactPoint`, `address` and social `sameAs`. The fixer's own JSON-LD is
+what a site with no SEO plugin gets.
 
 One code is only **partly** addressable here, so it is not claimed resolved:
 
@@ -810,10 +920,14 @@ codes below are detected by `wp-audit-geo` and deliberately **not** fixed from t
 2. **Reference the `wp-audit-geo-standards` skill** for surface specs, the crawler
    allowlist and the applicability matrix.
 3. **The emitted file must parse on PHP 7.4** — no `match`, no union types.
-4. **Never duplicate Rank Math's JSON-LD** — every schema action returns early when
-   `<prefix>_rankmath_owns_schema()` is true.
-5. **Gate by site type** — do not ship pricing or API surfaces on a site that is neither
-   merchant nor SaaS, and emit `LocalBusiness` only for a local/business identity.
+4. **Never duplicate the SEO plugin's JSON-LD** — every schema action returns early when
+   `<prefix>_seo_plugin_owns_schema()` is true (Rank Math, Yoast or SEOPress). When one is
+   active, report GEO-A07 to GEO-A10 as dependent on its configuration and name
+   `wp-audit-rankmath` as the path to fill Organization/LocalBusiness `contactPoint`,
+   `address` and social `sameAs` — do not claim them resolved here.
+5. **Gate by the recorded site type** — the emitted `<prefix>_AGENTIC_SITE_TYPE` decides
+   pricing (`merchant`/`saas`), api-catalog and auth.md (`saas`) and `LocalBusiness`
+   (`local`). Never sniff REST namespaces at runtime.
 6. **Require the file with an `is_readable` guard** — a missing file must never fatal
    the theme, and `inc/agentic.php` must never be required twice.
 7. **All WordPress interaction via WP-CLI** — never edit the database from PHP outside

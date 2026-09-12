@@ -26,7 +26,7 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-finalize`](#wp-finalize) | all | recommended | theme, WP-CLI | report only |
 | [`/wp-demo-verify`](#wp-demo-verify) | all | recommended | URL or file | `.verify/` screenshots, contact sheet, findings |
 | [`/wp-responsive-check`](#wp-responsive-check) | all | alias | URL or file | runs `/wp-demo-verify` |
-| [`/wp-audit`](#wp-audit) | all | optional | theme, WP-CLI | fixes, Rank Math / AIOS config |
+| [`/wp-audit`](#wp-audit) | all | optional | theme, WP-CLI | fixes, Rank Math / AIOS config, `inc/agentic.php` |
 | [`/wp-polylang`](#wp-polylang) | all (polylang) | required under `polylang` | WP content | translated posts/terms |
 | [`/wp-tailwind-migrate`](#wp-tailwind-migrate) | legacy | optional | plain-CSS theme | Tailwind theme in place |
 | [`/wp-cinematic-init`](#wp-cinematic-init) | C | **required** | kit | cinematic theme, `fields/scenes.php`, seeders |

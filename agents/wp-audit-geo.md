@@ -32,20 +32,27 @@ Before running ANY audit checks, read the following project files:
 Site type is **detected, not assumed**. Print the applicable layer set and mark every
 other layer `N/A` with its rationale.
 
+Detection uses **positive signals only**. Do not scan registered REST namespaces:
+Rank Math, Yoast, SEOPress and CF7 all register one, so a namespace sweep marks an
+ordinary content site as SaaS and boots every plugin's REST callbacks.
+
 | Site type | Detection | Layers that apply |
 |-----------|-----------|-------------------|
 | content / publisher / service | default when nothing below matches | Discovery + Access + Usability |
-| local business | `industry` is local/business and address fields exist | + LocalBusiness schema, NAP, reviews |
+| local business | `industry` is a local/business value **and** a non-empty `business_address` option exists | + LocalBusiness schema, NAP, reviews |
 | merchant | `$WP plugin is-installed woocommerce` returns 0 | + Payments, `pricing.md`, Product schema |
-| SaaS / public API | a custom REST namespace is registered or OpenAPI is present | + OpenAPI / api-catalog / MCP / OAuth |
+| SaaS / public API | an OpenAPI spec or a deliberate public API surface is recorded in `.claude/CLAUDE.md` | + OpenAPI / api-catalog / MCP / OAuth |
 
 ```bash
 $WP plugin is-installed woocommerce && echo "merchant signal: WooCommerce active"
-$WP eval "echo implode(',', array_keys(rest_get_server()->get_namespaces()));"
+$WP option get <prefix>_business_address
 ```
 
 A site with WooCommerce active but products disabled still detects as `merchant`; its
-protocol checks stay advisory. Report the excluded layers, never fail them.
+protocol checks stay advisory. A local/business `industry` with no address is not `local`
+— the address is what the LocalBusiness surface needs. Report the excluded layers, never
+fail them. Record the detected type in the report and pass it to `wp-agentic-surfaces`,
+which bakes it into `<prefix>_AGENTIC_SITE_TYPE`.
 
 ## Step 2: Tier 1 — Code-Only and Static Checks
 

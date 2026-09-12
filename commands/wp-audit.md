@@ -60,6 +60,11 @@ Audit Tier: <Code | Code + Runtime | Code + Runtime + Lighthouse>
   <✓|✗> Tier 3: External quality skills (<web-quality-skills detected|web-quality-skills not found>)
 ```
 
+**`--geo` needs Tier 2.** The GEO auditor's live HTTP checks and the `bin/geo-scan.sh`
+verifier in Step 9 require `.wp-create.json` (for `$WP` and a reachable site URL). Without
+Tier 2, `wp-audit-geo` still runs its code-only checks and reports the runtime GEO codes
+`N/A`, and the live scan is skipped.
+
 ## Step 4: Dependency Check (Tier 2 only)
 
 If Tier 2 is NOT available, skip this step entirely.
@@ -98,8 +103,6 @@ Options:
 Only show plugins relevant to the selected categories (don't prompt for Rank Math if `--security` only, don't prompt for AIOS if `--seo` only).
 
 Use AskUserQuestion for the choice. If A: install all listed via `bash -c "$WP plugin install <slug> --activate"`. If B: ask which ones via AskUserQuestion and install selected. If C: continue without installing.
-
-**`--geo` needs Tier 2.** The GEO auditor's live HTTP checks and the `bin/geo-scan.sh` verifier in Step 9 require `.wp-create.json` (for `$WP` and a reachable site URL). Without Tier 2, `wp-audit-geo` still runs its code-only checks and reports the runtime GEO codes `N/A`, and the live scan is skipped.
 
 ## Step 5: Security Level Selection
 
@@ -218,7 +221,7 @@ Categories: <comma-separated selected categories>
   ✗ WARNING: <message> (GEO-A06)
   ℹ INFO: <message>
   ○ N/A: <layer> — <rationale>
-  Live scan: <score|unavailable — skipped: <reason>>
+  Live scan: <score|unavailable — skipped: <reason>> (produced by Step 9's scan, below)
 
 ---
 Total: N issues (X critical, Y warnings, Z info)
@@ -283,7 +286,9 @@ Fixes include: ABSPATH checks, adding `esc_html()`/`esc_url()`/`esc_attr()` esca
 ${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host>
 ```
 
-`<home-host>` is `wordpress.url` from `.wp-create.json` (or `$WP option get home`). Exit codes: `0` = report returned, `2` = skipped (no network or tool), `1` = error. Exit `2` is a clean skip — neither a success nor a failure: report the live score as unavailable and continue. On exit `1`, record the error and continue. Only a returned report yields a score; map its failed ORA check ids back to GEO codes using the `wp-audit-geo-standards` skill. Advisory and off-site findings (GEO-D05 through GEO-D08, GEO-U10, GEO-P01 through GEO-P05) are left unfixed.
+`<home-host>` is `wordpress.url` from `.wp-create.json` (or `$WP option get home`). Exit codes: `0` = report returned, `1` = tool error, `2` = skipped (no network, no report, or no `npx`). Exit `2` is a clean skip — neither a success nor a failure: report the live score as unavailable and continue. A localhost or otherwise non-public URL legitimately yields exit `2`, because the scan needs a publicly reachable host; record it as a skip and mark the run incomplete. On exit `1`, record the error and continue. Only a returned report yields a score; map its failed ORA check ids back to GEO codes using the `wp-audit-geo-standards` skill. Advisory and off-site findings (GEO-D05 through GEO-D08, GEO-U10, GEO-P01 through GEO-P05) are left unfixed.
+
+The before → after score this step produces is the value the Step 8 report's `Live scan:` line records: the report is printed before this step runs, so at Step 8 show that line as pending and fill it here.
 
 After all fix agents complete, count how many issues were successfully fixed.
 
