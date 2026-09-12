@@ -72,18 +72,21 @@ finding, not a failure.
 
 ## The source ladder
 
-| Tier | Tools | Unlocks |
-|---|---|---|
-| baseline | `WebSearch`, `WebFetch` | identification, competitor discovery, reading any page directly |
-| + Firecrawl | `firecrawl_url` (or the Firecrawl MCP server) | cleaner extraction from JS-heavy or blocked pages |
-| + DataForSEO | `serp_organic_live_advanced`, `on_page_content_parsing`, `business_data_business_listings_search` | ranked SERP discovery, structured on-page parsing, category-and-location business listings |
+| Rung | Discovery | Page reading | Competitors |
+|---|---|---|---|
+| baseline | `WebSearch` | `WebFetch` | SERP + sector search |
+| + Firecrawl | `WebSearch` | Firecrawl MCP if connected, else `firecrawl_url` HTTP, else `WebFetch` | as baseline |
+| + DataForSEO | `serp_organic_live_advanced` | `on_page_content_parsing` | `business_data_business_listings_search` by category **and** location |
+
+`WebSearch` stays the discovery tool even at the Firecrawl rung — Firecrawl
+only changes how a page, once found, gets read.
 
 - The baseline always works: `WebSearch` and `WebFetch` need no
   configuration, no key and no account.
 - Firecrawl has two access paths and one fallback: **Firecrawl MCP if
   connected**; otherwise the `firecrawl_url` HTTP endpoint from
-  `.wp-create.json`; otherwise fall back to `WebFetch` and say so in one
-  line.
+  `.wp-create.json`; otherwise **fall back to `WebFetch` and say so in one
+  line**.
 - DataForSEO is used only when its MCP server is connected:
   `serp_organic_live_advanced` for discovery, `on_page_content_parsing`
   for reading, `business_data_business_listings_search` filtered by
