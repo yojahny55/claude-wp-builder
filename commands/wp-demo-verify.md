@@ -78,7 +78,7 @@ node "${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs" <target>
 ```
 
 Six positions per section at 1440x900 and 390x844, plus a reduced-motion pass at
-desktop width, then full-page shots at 375, 576, 768, 1024 and 1440 (this replaces
+desktop width, then full-page shots at 375, 576, 768, 1024, 1152, 1280 and 1440 (this replaces
 `/wp-responsive-check`). A directory target walks every page. Output lands in
 `<dir>/.verify/[<page>/]<width>/`, with `findings.json` and one `sheet.png` per
 width.

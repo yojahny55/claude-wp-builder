@@ -25,6 +25,13 @@ All styles are written mobile-first. Base styles target the smallest screens, an
 | Large | `1200px` | Large desktops |
 | Extra Large | `1440px` | Ultra-wide screens |
 
+**A breakpoint is a range, not a line.** Whatever you declare at one step stays in force until the
+next step overrides it, so the layout must be checked BETWEEN the steps and not only at them. The
+first desktop step is the usual casualty: a row of cards that reads well at 1440 is handed the same
+row rule at 1024, where the columns are 40% narrower and the copy no longer fits. Before calling a
+component done, resize through the middle of each range — 1100-1200 especially — and give that
+range its own rule when the design's desktop layout does not survive it.
+
 ### CSS Implementation
 
 ```css
