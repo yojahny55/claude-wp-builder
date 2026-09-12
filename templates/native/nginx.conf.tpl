@@ -11,6 +11,10 @@ server {
     root {{document_root}};
     index index.php index.html;
 
+    # nginx defaults to 1m, which rejects plugin/theme zips and migration
+    # archives with a 413 before PHP ever sees the request.
+    client_max_body_size {{max_upload_size}};
+
     ssl_certificate {{ssl_cert}};
     ssl_certificate_key {{ssl_key}};
     ssl_protocols TLSv1.2 TLSv1.3;
