@@ -34,8 +34,11 @@ Take the first branch that applies:
 
 1. **`demo/RESEARCH.md` already exists** — read it, say so in one line, continue.
    A re-run does not re-research; deleting the file is how you refresh it.
-   `/wp-demo iterate` reaches this branch or the next one and so **never
-   re-researches**.
+   `/wp-demo iterate` requires an existing `demo/index.html`, which can only
+   exist because a prior full run already completed Step 4 — and that run
+   necessarily passed through this step first. Research is therefore always
+   already resolved by the time `iterate` runs: it is guaranteed by the
+   bypass, not by landing on a branch, so `iterate` **never re-researches**.
 2. **`.wp-create.json` records `"research": "none"`** — skip in one line, do not ask.
    The record is permanent: an earlier run already declined or already found
    nothing reachable.
