@@ -123,7 +123,9 @@
   listings, agentic share of voice, brand search accuracy — are advisory: no theme file can
   change a third party's listing, so they are reported with a recommendation and left
   unfixed. The payments codes (ACP, UCP, MPP, x402, AP2) are merchant-only and advisory,
-  detected but never fixed. The live scan needs a public URL and skips (exit 2) without one.
+  detected but never fixed. The live scan needs a public URL: a host it cannot reach publicly exits `3`
+  (a configuration problem, fixable with `--host`) and a reachable host with no report yet
+  exits `2`. Neither is a pass.
 
 - **README and `docs/commands.md` now document how to supply the image-generation key.**
   Which variable per provider (`GEMINI_API_KEY` / `OPENAI_API_KEY`), the three places to
