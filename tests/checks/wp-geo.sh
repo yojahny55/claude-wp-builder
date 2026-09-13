@@ -38,6 +38,14 @@ grep -q '^model: sonnet' "$agent" || fail "$agent must be sonnet"
 grep -q 'audit-results/geo.json' "$agent" || fail "$agent must write the GEO report"
 grep -q 'DOMXPath' "$agent" || fail "$agent must parse the DOM, not regex the markup"
 
+# Auditor: schema @id referential integrity. GEO-A07 only counts identity blocks, so a
+# graph whose publisher points at an @id no node declares passes every other schema check
+# while the engine falls back to the bare domain. Pin the rule, not just the code.
+grep -qE '^\| GEO-A25 \|' "$agent" || fail "$agent must tabulate GEO-A25"
+grep -qF 'appear in the declared set' "$agent" || fail "$agent GEO-A25 must resolve references against the declared @id values"
+grep -q 'no ORA check id' "$agent" || fail "$agent must say GEO-A25 is outside the ORA score"
+grep -qF '| GEO-A25 ' "$skill" || fail "$skill must catalog GEO-A25"
+
 # Fixer: model tier and the theme file it owns.
 grep -q '^model: sonnet' "$fixer" || fail "$fixer must be sonnet"
 grep -q 'inc/agentic.php' "$fixer" || fail "$fixer must own inc/agentic.php"

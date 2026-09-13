@@ -4,6 +4,33 @@
 
 ### Added
 
+- **The site-name signal is checked, and written from one source.** Nothing in the plugin
+  read `og:site_name` — the signal that decides whether an engine prints the brand or the
+  bare domain — and `SEO-025` asserted only that `knowledgegraph_type` was *set*, so a site
+  whose `<title>` said one brand and whose Rank Math options said another passed every
+  check. Two codes close it. `SEO-051` requires `og:site_name` on the rendered head;
+  `SEO-052` compares it against the `<title>` brand segment, the schema `WebSite.name`,
+  `get_bloginfo('name')`, `website_name` and `knowledgegraph_name`, and treats a
+  `website_alternate_name` identical to the name as a finding — an alternate that repeats
+  the name tells an engine nothing while occupying the slot a real one would use. Both read
+  the head snapshot the SEO auditor already takes, so they cost no extra request. The
+  configurator side is the root fix: `wp-audit-rankmath` now writes `website_name` as well
+  as `knowledgegraph_name`, both from `get_bloginfo('name')`, and drops an alternate name
+  that merely repeats it. Leaving `website_name` unset was what let the two drift apart.
+
+- **`GEO-A25` resolves schema `@id` references instead of counting blocks.** `GEO-A07`
+  counts identity JSON-LD, so a graph whose `WebSite.publisher` points at an `@id` that no
+  node declares looks complete to it — while a generative engine, unable to resolve the
+  entity, falls back to the bare domain. The new code decodes every JSON-LD block, collects
+  the `@id` values the graph declares and the ones it references at any depth, and reports
+  every dangling reference as an ERROR, naming the referencing node and the ids that do
+  exist. The usual cause is a `rank_math/json_ld` filter that renames a node after Rank Math
+  has already built the references to it.
+
+  `GEO-A25` carries **no ORA check id**: the published catalog has no check that resolves a
+  reference, so the code is reported outside the ORA score and marked plugin-added, keeping
+  the score reproducible against the public catalog.
+
 - **`/wp-audit` gains a GEO / AI-agent-readiness category behind `--geo`.** The new
   `wp-audit-geo` auditor scores a site against the four ORA layers — Discovery, Access,
   Usability, Payments — and maps the ORA check catalog to GEO codes. Site type is detected,

@@ -120,6 +120,12 @@ type implies it.
 | GEO-A22 * | `openapi-spec`, `public-api-docs`, `developer-portal`, `api-catalog-rfc9727` | SaaS/API only |
 | GEO-A23 | `agent-crawler-reachability` | yes |
 | GEO-A24 * | `pricing-info`, `pricing-md` | merchant/SaaS |
+| GEO-A25 † | — no ORA id | yes — every referenced `@id` resolves inside the `@graph` |
+
+† GEO-A25 is **plugin-added**: the ORA catalog has no check that resolves a schema
+reference, so a graph whose `publisher` points at an `@id` no node declares passes
+`json-ld`, `json-ld-entity-linking` and `org-schema-completeness` alike. Report it
+outside the ORA score — the score must stay reproducible against the published catalog.
 
 ### Usability — GEO-U
 

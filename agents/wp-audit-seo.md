@@ -89,6 +89,8 @@ These checks require a running WordPress installation. Use `$WP` from `.wp-creat
 | SEO-046 | Translation group incomplete | `$WP eval "if (!function_exists('pll_get_post_translations')) { echo 'SKIP: Polylang not active'; return; } global \$wpdb; \$ids = \$wpdb->get_col(\"SELECT ID FROM \$wpdb->posts WHERE post_status='publish' AND post_type IN ('post','page')\"); \$missing = array(); foreach (\$ids as \$id) { if (!pll_get_post_language(\$id)) continue; if (count(pll_get_post_translations(\$id)) < 2) \$missing[] = '#' . \$id . ' ' . get_the_title(\$id); } echo count(\$missing) . ' posts have no translation: ' . implode(', ', \$missing);"` | WARNING |
 | SEO-048 | Thin content (<300 words) | `$WP eval "global \$wpdb; \$rows = \$wpdb->get_results(\"SELECT ID, post_title, post_content FROM \$wpdb->posts WHERE post_status='publish' AND post_type IN ('post','page')\"); foreach (\$rows as \$r) { \$w = str_word_count(wp_strip_all_tags(\$r->post_content)); if (\$w < 300) echo 'THIN [' . \$w . ' words] #' . \$r->ID . ': ' . \$r->post_title . PHP_EOL; }"` | WARNING |
 | SEO-050 | Static llms.txt | `$WP eval "echo file_exists(ABSPATH . 'llms.txt') ? 'STATIC FILE — should be a rewrite endpoint' : 'not a static file';"` | INFO |
+| SEO-051 | `og:site_name` missing | Rendered-head snapshot (see Procedure) — `og:site_name` absent or empty on a sampled post | WARNING |
+| SEO-052 | Site-name signals disagree | Compare the snapshot's `og:site_name`, the `<title>` brand segment and the schema `WebSite.name` against `get_bloginfo('name')` and Rank Math's `website_name` / `knowledgegraph_name`; a `website_alternate_name` identical to `website_name` is also a finding | WARNING |
 
 ### Procedure
 
@@ -96,11 +98,11 @@ These checks require a running WordPress installation. Use `$WP` from `.wp-creat
 2. For module checks, retrieve the active modules array and compare against the recommended list: `seo-analysis`, `sitemap`, `rich-snippet`, `breadcrumbs`, `404-monitor`, `redirections`, `local-seo`, `image-seo`, `instant-indexing`, `link-counter`.
 3. For option checks, read the full option array once and check multiple keys from it.
 
-### Procedure — rendered-head checks (SEO-038, SEO-040 to SEO-043)
+### Procedure — rendered-head checks (SEO-038, SEO-040 to SEO-043, SEO-051, SEO-052)
 
-SEO-038 and SEO-040 through SEO-043 all compare a value in the rendered `<head>` against
-what WordPress says the post should be. Render every published permalink **once** and reuse
-the snapshot for all five — do not fetch the site five times.
+SEO-038, SEO-040 through SEO-043, SEO-051 and SEO-052 all compare a value in the rendered
+`<head>` against what WordPress says the post should be. Render every published permalink
+**once** and reuse the snapshot for all of them — do not fetch the site once per code.
 
 Parse the head with `DOMDocument`, not a regex. Attribute order is not fixed (`<link href=…
 rel=canonical>` is as valid as the reverse), attributes may be single-quoted, and a regex
@@ -135,6 +137,15 @@ foreach (get_posts(array('post_type' => array('post','page'), 'posts_per_page' =
     \$hreflang = array();
     foreach (\$xp->query('//link[@hreflang]') as \$n) { \$hreflang[\$n->getAttribute('hreflang')] = \$n->getAttribute('href'); }
 
+    \$site_name = '';
+    foreach (\$xp->query('//meta[@property=\"og:site_name\"]') as \$n) { \$site_name = \$n->getAttribute('content'); }
+
+    \$title = '';
+    foreach (\$xp->query('//title') as \$n) { \$title = trim(\$n->textContent); }
+
+    \$ld = array();
+    foreach (\$xp->query('//script[@type=\"application/ld+json\"]') as \$n) { \$ld[] = trim(\$n->textContent); }
+
     \$html = \$doc->getElementsByTagName('html')->item(0);
 
     \$out[] = array(
@@ -144,6 +155,9 @@ foreach (get_posts(array('post_type' => array('post','page'), 'posts_per_page' =
         'canonical' => \$canonical,
         'og_locale' => \$og,
         'hreflang'  => \$hreflang,
+        'og_site_name' => \$site_name,
+        'title'        => \$title,
+        'json_ld'      => \$ld,
     );
 }
 libxml_use_internal_errors(\$prev);
@@ -164,6 +178,32 @@ echo wp_json_encode(\$out);
    `html_lang` = `str_replace('_', '-', pll_get_post_language($id, 'locale'))`,
    `og_locale` = `pll_get_post_language($id, 'locale')` verbatim (`es_ES`, `en_US`, `pt_BR`).
    A mismatch means the theme or another plugin is overriding Polylang's locale filter.
+5. **SEO-051** — `og:site_name` is the signal that decides whether an engine prints the brand
+   or the bare domain. Absent or empty on any sampled post is the finding. Report which posts.
+6. **SEO-052** — the brand is one entity, so every place it is written must say the same thing.
+   Read the option side once and compare it against the snapshot:
+
+   ```bash
+   $WP eval "
+   \$o = (array) get_option('rank-math-options-titles', array());
+   echo wp_json_encode(array(
+       'blogname'               => get_bloginfo('name'),
+       'separator'              => isset(\$o['title_separator']) ? \$o['title_separator'] : '-',
+       'website_name'           => isset(\$o['website_name']) ? \$o['website_name'] : '',
+       'website_alternate_name' => isset(\$o['website_alternate_name']) ? \$o['website_alternate_name'] : '',
+       'knowledgegraph_name'    => isset(\$o['knowledgegraph_name']) ? \$o['knowledgegraph_name'] : '',
+   ));
+   "
+   ```
+
+   It is a finding when any non-empty option value disagrees with `blogname`; when the
+   `<title>`'s brand segment — the part after the last `title_separator` — disagrees with
+   `og:site_name`; when the schema `WebSite.name` in `json_ld` disagrees with either; or when
+   `website_alternate_name` equals `website_name`, which tells an engine nothing while
+   occupying the slot a real alternate name would use. An ampersand written one way in the
+   title and another in the option (`A&B` vs `AB`) is exactly this finding, not a typo to
+   overlook. Name every value that disagrees and quote what it holds — "the names are
+   inconsistent" is not actionable.
 
 ### Procedure — content and link checks
 

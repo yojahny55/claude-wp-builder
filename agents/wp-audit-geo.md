@@ -94,6 +94,7 @@ does not match the detected site type are reported `N/A`, not failed.
 | GEO-A22 | OpenAPI / developer portal | SaaS/API only — OpenAPI spec, public API docs, api-catalog | INFO | N/A |
 | GEO-A23 | Agent crawler reachability | AI user agents can fetch the key routes without a `403` or a JS-only wall | WARNING | Yes |
 | GEO-A24 | Pricing info | merchant/SaaS only — `/pricing.md` and the HTML `/pricing` page | INFO | N/A |
+| GEO-A25 | Schema `@id` integrity | every `@id` a node references resolves to a node that declares it, inside the same `@graph` | ERROR | Yes |
 | GEO-U01 | Document structure | `main` landmark, single `H1`, sequential headings | WARNING | Yes |
 | GEO-U02 | Native controls | interactive elements are native controls, not click-handled `div`s | INFO | Yes |
 | GEO-U03 | Accessible names | controls have accessible names | INFO | Yes |
@@ -114,8 +115,8 @@ does not match the detected site type are reported `N/A`, not failed.
 
 1. Use `Glob` to find all `.php` files in the theme directory, then `Grep` each pattern.
 2. Record findings with file path, line number and matched content.
-3. For GEO-A01 and GEO-A06 through GEO-A08, do not regex the markup — use the rendered
-   head snapshot in Step 3 and parse it with `DOMDocument` / `DOMXPath`.
+3. For GEO-A01, GEO-A06 through GEO-A08 and GEO-A25, do not regex the markup — use the
+   rendered head snapshot in Step 3 and parse it with `DOMDocument` / `DOMXPath`.
 4. For GEO-A13 through GEO-A16, read the live `/llms.txt` response from Step 3.
 5. Every code the site type excludes is reported with status `N/A` and its rationale.
 
@@ -144,6 +145,7 @@ are published.
 | GEO-A06 | rendered head snapshot | canonical, `html lang`, `og:image`, `og:type` all present | WARNING |
 | GEO-A07 | rendered head snapshot | count of `application/ld+json` identity blocks | WARNING |
 | GEO-A08 | rendered head snapshot | `sameAs` array non-empty | INFO |
+| GEO-A25 | rendered head snapshot | every referenced `@id` resolves inside the same `@graph`; the dangling ones | ERROR |
 | GEO-A11 | `GET /about`, `/contact`, `/privacy` | status; rendered text length ≥500 chars | WARNING |
 | GEO-A12 | `GET /sitemap_index.xml` then each child sitemap | status; `<lastmod>` presence per URL — follow the index, never match a permalink against the index alone | WARNING |
 | GEO-A13 | `GET /llms.txt` | status; `Content-Type`; is it served dynamically | ERROR |
@@ -206,6 +208,24 @@ echo wp_json_encode(\$out);
    JSON-LD scripts. Zero means no entity; more than one means duplicate schema sources.
 3. **GEO-A08** — the identity block's `sameAs` array must be populated (Wikipedia,
    Wikidata, social profiles, registry ids).
+4. **GEO-A25** — decode every JSON-LD block, collect each `@id` a node **declares**, then
+   walk the decoded structure and collect each `@id` a node **references** — `publisher`,
+   `author`, `isPartOf`, `about`, `mainEntity`, `provider`, `parentOrganization`, and any
+   `{"@id": ...}` object at any depth. Every referenced `@id` must appear in the declared set.
+
+   A dangling reference is an ERROR, not a warning: the engine cannot resolve the entity, so
+   it falls back to the bare domain instead of the brand name — while the graph still looks
+   complete to GEO-A07, which only counts blocks. The usual cause is a `rank_math/json_ld`
+   filter that renames a node after Rank Math has already built the references to it, so the
+   reference and the node disagree by one id.
+
+   Report the dangling `@id`, the node and property that reference it, and the ids that do
+   exist in the graph — the fix is almost always renaming one of the two to match the other.
+
+   GEO-A25 has **no ORA check id**: the public catalog at `ora.ai/api/checks` covers
+   `json-ld`, `json-ld-entity-linking`, `org-schema-completeness` and `schema-type-breadth`,
+   and none of them resolve a reference. Report it outside the ORA score so the ORA
+   re-weighting stays reproducible, and say in the report that it is a plugin-added check.
 
 ### Procedure — HTTP probes
 
