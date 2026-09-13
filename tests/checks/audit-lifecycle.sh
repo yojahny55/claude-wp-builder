@@ -59,6 +59,14 @@ grep -qF 'never fold `UNMEASURED` into the passing total' "$audit" \
   || fail "$audit must keep UNMEASURED out of the passing count"
 grep -q 'UNMEASURED' "$geo" || fail "$geo report schema must carry UNMEASURED"
 
+# The vocabulary has to hold in the agents that PRODUCE the statuses, not only in the
+# command that prints them. An agent still writing SKIPPED puts the run back where it was:
+# a check that applies, that nothing ran, counted as though nothing were wrong.
+grep -q 'SKIPPED' "$sec" && fail "$sec still reports SKIPPED — use UNMEASURED"
+grep -q 'note it as skipped' "$prac" && fail "$prac still reports a Tier 2 skip as benign"
+grep -q 'UNMEASURED' "$sec" || fail "$sec must report an unrunnable check UNMEASURED"
+grep -q 'UNMEASURED' "$prac" || fail "$prac must report an unrunnable Tier 2 check UNMEASURED"
+
 # --- a dev host is a configuration problem, not an absent report --------------
 grep -q -- '--host' "$audit" || fail "$audit must accept --host for a project whose manifest holds a dev URL"
 grep -q 'NOT PUBLIC' "$scan" || fail "$scan must detect a non-public host itself"

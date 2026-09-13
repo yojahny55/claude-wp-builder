@@ -135,7 +135,9 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 ### Execution notes
 
 - Run `$WP` commands via Bash tool
-- If a command fails (plugin not installed, option missing), record the check as SKIPPED — not FAIL
+- If a command fails (plugin not installed, option missing), record the check `UNMEASURED` —
+  not FAIL, and not PASS. The check applies and nothing measured it, which is different from
+  a check the site type excludes (`N/A`) and must not be counted with the passes
 - For SEC-029, derive the WordPress root from `$WP eval "echo ABSPATH;"`
 - For SEC-030, use `stat -c '%a' wp-config.php` to get octal permissions
 - For SEC-031, capture stderr — `$WP core verify-checksums 2>&1`
@@ -234,7 +236,10 @@ Output the JSON report matching the schema from `wp-audit-standards` skill. Stru
 }
 ```
 
-Include ALL checks — passed, failed, and skipped — in the findings array. Set `status` to `PASS`, `FAIL`, or `SKIPPED` accordingly.
+Include ALL checks — passed, failed, unmeasured and not-applicable — in the findings array.
+Set `status` to `PASS`, `FAIL`, `UNMEASURED` or `N/A` accordingly. `UNMEASURED` and `N/A` are
+not interchangeable: the first applies here and nothing ran it, the second does not apply to
+this site at all. Never fold either into the passing total.
 
 ## Step 5: Fix Phase
 
@@ -302,4 +307,4 @@ When AIOS-related fixes are needed, dispatch the `wp-audit-aios` agent with the 
 3. **Tier 2 checks require `$WP`** — skip entirely if `.wp-create.json` is missing or has no wrapper
 4. **Tier 3 checks require web-quality-skills** — skip if skill files not found
 5. **Never modify theme logic** — security fixes only touch escaping, config constants, and server configuration
-6. **Report ALL checks** — include PASS, FAIL, and SKIPPED in the output JSON
+6. **Report ALL checks** — include PASS, FAIL, UNMEASURED and N/A in the output JSON

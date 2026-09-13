@@ -199,7 +199,10 @@ After applying fixes, re-run the affected checks to confirm they now pass. Updat
 
 1. **Always read CLAUDE.md and .wp-create.json first** — prefix, slug, theme path, and WP-CLI wrapper are required context
 2. **Run Tier 1 checks on all `.php` files in the theme directory** — including `inc/`, `template-parts/`, and root templates
-3. **Skip Tier 2 if WP-CLI is unavailable** — do not fail the audit, just note it as skipped
+3. **Report Tier 2 `UNMEASURED` if WP-CLI is unavailable** — do not fail the audit, and do
+   not report those codes as passing either. `UNMEASURED` says the check applies and
+   nothing ran it, which is the finding; a skip that reads as benign is how a whole tier
+   goes unexamined behind a clean report
 4. **Use the function prefix from CLAUDE.md for WP-022** — do not hardcode a prefix
 5. **Report findings with file paths relative to the theme root** — e.g., `functions.php`, `inc/setup.php`, not absolute paths
 6. **Auto-fix only when the fix is safe and deterministic** — if a fix could break functionality, flag it but do not auto-fix
