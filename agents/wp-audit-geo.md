@@ -95,6 +95,9 @@ does not match the detected site type are reported `N/A`, not failed.
 | GEO-A23 | Agent crawler reachability | AI user agents can fetch the key routes without a `403` or a JS-only wall | WARNING | Yes |
 | GEO-A24 | Pricing info | merchant/SaaS only — `/pricing.md` and the HTML `/pricing` page | INFO | N/A |
 | GEO-A25 | Schema `@id` integrity | every `@id` a node references resolves to a node that declares it, inside the same `@graph` | ERROR | Yes |
+| GEO-A26 | Root file precedence | a physical file at the web root shadows the theme's rewrite for the same path (`llms.txt`, `robots.txt`, `ads.txt`) | ERROR | Yes |
+| GEO-A27 | Canonical path served | the advertised `/.well-known/*.json` paths return `200` directly, not via a redirect | WARNING | No |
+| GEO-A28 | Surfaces agree | every URL advertised inside `llms.txt`, the ARD catalog and the agent-skills index resolves, and agrees with the sitemap | WARNING | Yes |
 | GEO-U01 | Document structure | `main` landmark, single `H1`, sequential headings | WARNING | Yes |
 | GEO-U02 | Native controls | interactive elements are native controls, not click-handled `div`s | INFO | Yes |
 | GEO-U03 | Accessible names | controls have accessible names | INFO | Yes |
@@ -146,6 +149,9 @@ are published.
 | GEO-A07 | rendered head snapshot | count of `application/ld+json` identity blocks | WARNING |
 | GEO-A08 | rendered head snapshot | `sameAs` array non-empty | INFO |
 | GEO-A25 | rendered head snapshot | every referenced `@id` resolves inside the same `@graph`; the dangling ones | ERROR |
+| GEO-A26 | `GET /llms.txt` + `file_exists(ABSPATH . 'llms.txt')` | which one answers; whether a physical file exists | ERROR |
+| GEO-A27 | `GET /.well-known/ard.json` and `/.well-known/agent-skills/index.json` with `-I` | final status, and any `301`/`302` in between | WARNING |
+| GEO-A28 | every URL inside `llms.txt`, `ard.json` and the agent-skills index | status per URL; membership in the sitemap | WARNING |
 | GEO-A11 | `GET /about`, `/contact`, `/privacy` | status; rendered text length ≥500 chars | WARNING |
 | GEO-A12 | `GET /sitemap_index.xml` then each child sitemap | status; `<lastmod>` presence per URL — follow the index, never match a permalink against the index alone | WARNING |
 | GEO-A13 | `GET /llms.txt` | status; `Content-Type`; is it served dynamically | ERROR |
@@ -242,6 +248,43 @@ echo wp_json_encode(\$out);
    must be a rewrite endpoint. Record which it is.
 5. **GEO-A23** — issue each key route with each allowlisted AI user agent. A `403` or a
    JS-only wall for an agent is the finding.
+6. **GEO-A26** — the web server answers a physical file before PHP ever runs, so a
+   `llms.txt` sitting at the web root **wins over the theme's rewrite permanently**. The
+   theme's endpoint is then dead code: it is correct, it is tested, and nothing it produces
+   is ever served. Nothing that reads the theme can detect this — the two checks disagree
+   only at runtime.
+
+   ```bash
+   $WP eval "echo file_exists(ABSPATH . 'llms.txt') ? 'PHYSICAL FILE PRESENT' : 'no physical file';"
+   curl -sS -o /dev/null -w '%{http_code} %{content_type}\n' https://<host>/llms.txt
+   ```
+
+   A physical file **and** a theme rewrite is the finding, whichever currently answers.
+   Name what generated the file — a `<meta name="generator">` or a header comment usually
+   says which plugin — because removing it without disabling its generator means it returns
+   on the next plugin update. The same applies to `robots.txt` and `ads.txt`.
+
+7. **GEO-A27** — request each advertised well-known path with `-I` and inspect the chain, not
+   just the final status. A CDN that normalises `/.well-known/ard.json` to
+   `/.well-known/ard.json/` answers `301` then `200`: the file is reachable, the canonical
+   path is not, and a client that does not follow redirects — which many agent fetchers do
+   not — gets nothing. A `200` reached through any redirect is the finding; record the
+   intermediate hop so the operator can fix it at the CDN rather than in the theme.
+
+8. **GEO-A28** — existence is not agreement. `GEO-D01`, `GEO-A15` and `GEO-A21` each prove a
+   surface is present and well-formed; none proves the surfaces say the same thing as the
+   site. Collect every URL advertised inside `llms.txt`, the ARD catalog and the agent-skills
+   index, request each, and compare the set against the sitemap:
+
+   - an advertised URL returning `404` is the finding — to an agent the site is claiming
+     authority over a page that does not exist, which is worse than not advertising it
+   - an advertised URL that resolves but is absent from the sitemap is a WARNING: the two
+     surfaces disagree about what the site publishes
+   - a draft or scheduled post advertised as live is the same finding as a `404`; resolve
+     each URL with `url_to_postid()` and check `get_post_status()`
+
+   This fires exactly when content is regenerated and the surfaces are not, which is the
+   normal way it breaks.
 
 ## Step 4: Output Report
 
@@ -276,8 +319,17 @@ Generate a JSON report to `audit-results/geo.json`:
 }
 ```
 
-`status` is one of `PASS`, `FAIL`, `N/A`. Report passing checks and `N/A` exclusions too,
-so the report shows full coverage and the ORA re-weighting is reproducible.
+`status` is one of `PASS`, `FAIL`, `N/A`, `UNMEASURED`. Report passing checks, `N/A`
+exclusions and `UNMEASURED` codes too, so the report shows full coverage and the ORA
+re-weighting is reproducible.
+
+`N/A` and `UNMEASURED` are different findings and must never be merged. `N/A` means the
+detected site type excludes the code — a brochure site has no API to check — and is a
+complete answer. `UNMEASURED` means the code applies and nothing measured it: Tier 2 was
+unavailable, the host was not publicly reachable, a probe timed out. One needs no action and
+the other needs all of it, and a reader counting failures cannot tell them apart once they
+share a label. Count them on separate lines of the summary, and never fold `UNMEASURED` into
+the passing total.
 
 ## Step 5: Fix Phase
 

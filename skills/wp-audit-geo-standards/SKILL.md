@@ -121,11 +121,18 @@ type implies it.
 | GEO-A23 | `agent-crawler-reachability` | yes |
 | GEO-A24 * | `pricing-info`, `pricing-md` | merchant/SaaS |
 | GEO-A25 † | — no ORA id | yes — every referenced `@id` resolves inside the `@graph` |
+| GEO-A26 † | — no ORA id | yes — no physical root file shadowing a theme rewrite |
+| GEO-A27 † | — no ORA id | no — fixed at the CDN, not in the theme |
+| GEO-A28 † | — no ORA id | yes — advertised URLs resolve and agree with the sitemap |
 
-† GEO-A25 is **plugin-added**: the ORA catalog has no check that resolves a schema
+† GEO-A25 through GEO-A28 are **plugin-added**: the ORA catalog has no check that resolves a schema
 reference, so a graph whose `publisher` points at an `@id` no node declares passes
 `json-ld`, `json-ld-entity-linking` and `org-schema-completeness` alike. Report it
 outside the ORA score — the score must stay reproducible against the published catalog.
+The same holds for the three serving-layer and surface-agreement codes: ORA scores what a
+URL returns, so it cannot see that the returning file is a physical one shadowing the
+theme, that the canonical path only answers through a redirect, or that a surface
+advertises pages the site does not publish.
 
 ### Usability — GEO-U
 

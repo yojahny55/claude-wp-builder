@@ -129,6 +129,8 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 | SEC-033 | Plugin updates available | `$WP plugin list --update=available --format=count` | 0 | INFO |
 | SEC-034 | Inactive plugins | `$WP plugin list --status=inactive --format=count` | 0 | INFO |
 | SEC-035 | AIOS not configured | `$WP option get aio_wp_security_configs --format=json` | Exists and configured | INFO |
+| SEC-036 | Development host in database options | `$WP option list --format=json` filtered for the dev host. See Procedure | CRITICAL |
+| SEC-037 | Backup or editor files inside the theme | Glob the theme for `*.bak*`, `*.orig`, `*.save`, `*~`, `*.php.[0-9]*`, `*.sql` | WARNING |
 
 ### Execution notes
 
@@ -137,6 +139,59 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 - For SEC-029, derive the WordPress root from `$WP eval "echo ABSPATH;"`
 - For SEC-030, use `stat -c '%a' wp-config.php` to get octal permissions
 - For SEC-031, capture stderr — `$WP core verify-checksums 2>&1`
+
+### Procedure — SEC-036 and SEC-037 (deploy safety)
+
+Both of these fire on the state of a project that is *about* to be pushed to production. They
+exist because the theme can be entirely correct while the database and the file list carry
+things that must never leave the development machine, and nothing that reads the theme can
+see either one.
+
+**SEC-036 — the development host, stored in the database.** Option values are copied verbatim
+by every sync tool. A dev URL sitting in a plugin's option array is not a cosmetic problem: a
+push writes it into production, where it becomes a logo that 404s, an Organization `url` that
+points at a machine nobody outside the office can reach, or a schema graph that identifies the
+business by a hostname that does not resolve. Search the option table for the dev host rather
+than guessing which keys might hold it:
+
+```bash
+DEV_HOST=$($WP option get home | sed -E 's#https?://##; s#/.*##')
+$WP eval "
+global \$wpdb;
+\$needle = '<dev-host>';
+\$rows = \$wpdb->get_results(\$wpdb->prepare(
+    \"SELECT option_name FROM \$wpdb->options WHERE option_value LIKE %s\",
+    '%' . \$wpdb->esc_like(\$needle) . '%'
+));
+foreach (\$rows as \$r) { echo 'DEV HOST IN: ' . \$r->option_name . PHP_EOL; }
+echo count(\$rows) . ' options carry the development host' . PHP_EOL;
+"
+```
+
+`home` and `siteurl` are expected to hold it and are **not** findings — they are what makes
+the local site work. Every other option is. Report each option name; the SEO plugin's own
+options are the ones that reach production markup, so name those first.
+
+This is CRITICAL rather than WARNING because the damage happens at push time, silently, and is
+discovered from the outside — by a search engine reading a schema graph that names a host it
+cannot resolve.
+
+**SEC-037 — backup and editor files inside the theme.** A sync tool ships the directory it is
+given. A `seo.php.bak-20260913` next to `seo.php` is inside `wp-content/`, so it is inside the
+push, and once on the server it is a publicly fetchable file containing source that may hold
+credentials or logic the live file no longer has.
+
+```bash
+find <theme> -type f \( -name '*.bak*' -o -name '*.orig' -o -name '*.save' -o -name '*~' \
+  -o -name '*.php.[0-9]*' -o -name '*.sql' -o -name '*.zip' \) -print
+```
+
+Report each path. The fix is to delete it or move it outside `wp-content/` — never to add it
+to a deny rule, which protects one server's configuration and travels with nothing.
+
+Run both before any deployment step, and print their findings even when every other check
+passes: a clean audit followed by a push that ships a dev URL is the failure this pair exists
+to prevent.
 
 ## Step 3: Tier 3 — External Checks
 

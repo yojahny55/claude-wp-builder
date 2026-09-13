@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Live GEO/agent-readiness scan via the public is-agentic report API.
-# Exit 0 = report returned, 1 = request failed, 2 = skipped (no curl / no report / no network).
+# Exit 0 = report returned, 1 = request failed, 2 = skipped (no curl / no report / no
+# network), 3 = the host is not publicly reachable, so no scan is possible for it.
+#
+# 3 is separated from 2 on purpose. A dev host is a configuration problem with a fix --
+# pass the public URL -- while 2 is a genuine absence of a report. Collapsing them, as
+# this script used to, makes every project whose manifest still holds a .local URL look
+# like a site nobody has scanned yet, and the audit reports it as a benign skip forever.
 #
 # No package execution. The previous version downloaded and ran an npm CLI, which /wp-yolo
 # runs unattended in its finish phase — a compromised package, alias or registry could
@@ -17,6 +23,26 @@ target="${1:-}"
 host="${target#http://}"; host="${host#https://}"; host="${host%%/*}"
 host="${host#*@}"; host="${host%%\?*}"; host="${host%%#*}"
 [ -n "$host" ] || { echo "usage: geo-scan.sh <domain|url>"; exit 1; }
+
+# A scan of a host the scanner cannot reach is not a scan. Catch it here, with its own exit
+# code, rather than letting it arrive as a 404 that reads as "nobody has scanned this yet".
+case "$host" in
+  localhost|localhost:*|*.localhost|*.local|*.test|*.localhost:*|*.local:*|*.test:*)
+    echo "NOT PUBLIC: $host is a development host — pass the public URL with --host"
+    exit 3 ;;
+  127.*|10.*|192.168.*|[::1]|[::1]:*|0.0.0.0*)
+    echo "NOT PUBLIC: $host is a private address — pass the public URL with --host"
+    exit 3 ;;
+  172.1[6-9].*|172.2[0-9].*|172.3[01].*)
+    echo "NOT PUBLIC: $host is a private address — pass the public URL with --host"
+    exit 3 ;;
+esac
+# A name with no dot is a LAN hostname, not a registrable domain.
+case "$host" in
+  *.*) ;;
+  *) echo "NOT PUBLIC: $host is not a registrable domain — pass the public URL with --host"
+     exit 3 ;;
+esac
 
 if ! command -v curl >/dev/null 2>&1; then
   echo "SKIP: curl not available — cannot run the live GEO scan"

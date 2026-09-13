@@ -63,7 +63,9 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 
 | Code | Check | How to Detect | Severity | Auto-fix |
 |------|-------|---------------|----------|----------|
-| WP-016 | Missing ABSPATH check | Grep each `.php` file for `defined.*ABSPATH\|!defined.*ABSPATH` at top | WARNING | Yes |
+| WP-016 | Missing ABSPATH check | Grep each `.php` file for `defined\( *'ABSPATH' *\)` — the **quoted** form only | WARNING | Yes |
+| WP-046 | Unquoted `ABSPATH` constant | Grep for `defined\( *ABSPATH *\)` without quotes; a PHP 8 fatal, not a style issue | CRITICAL | Yes |
+| WP-047 | Template classes absent from the stylesheet | Every class a template part emits must exist in the theme's CSS. See Procedure | WARNING | No |
 | WP-017 | Include instead of get_template_part | Grep templates for `include\|require` of template files (should use get_template_part) | WARNING | No |
 | WP-018 | Missing wp_body_open | Grep header.php for `wp_body_open()` | WARNING | Yes |
 | WP-019 | Broken template part refs | For each `get_template_part()` call, verify the referenced file exists | CRITICAL | No |
@@ -139,11 +141,57 @@ For each auto-fixable finding, apply the fix:
 - **WP-010/011/012/013/014**: Edit functions.php to add missing `add_theme_support()` calls inside the `after_setup_theme` hook
 - **WP-015**: Edit functions.php to add `global $content_width; if ( ! isset( $content_width ) ) { $content_width = 1200; }`
 - **WP-016**: Edit PHP files to add `if ( ! defined( 'ABSPATH' ) ) { exit; }` as second line
+- **WP-046**: Edit the offending line to quote the constant — `defined( ABSPATH )` → `defined( 'ABSPATH' )`
 - **WP-018**: Edit header.php to add `<?php wp_body_open(); ?>` after `<body>` tag
 - **WP-032**: Edit pure PHP files to remove trailing `?>`
 - **WP-034**: Edit templates to replace `get_field(` with `prefix_get_field(` (using the actual prefix from CLAUDE.md)
 - **WP-041**: `$WP config set FS_METHOD "'direct'" --type=constant`
 - **WP-045**: `chmod 755 wp-content/uploads/ wp-content/plugins/ wp-content/upgrade/`
+
+### Procedure — WP-046 and WP-047
+
+**WP-046 — the unquoted constant.** `defined( ABSPATH )` is not a weaker version of
+`defined( 'ABSPATH' )`; under PHP 8 it is a **fatal**: `Uncaught Error: Undefined constant
+"ABSPATH"`. It stops output partway through the render, so the symptom is a page that shows
+its header and then nothing — no footer, no scripts, no styles that load late — rather than
+an error anyone recognises as one.
+
+Two things hide it, and both must be worked around:
+
+1. The old WP-016 pattern, `defined.*ABSPATH`, matches the broken form as happily as the
+   correct one, so the guard that was supposed to catch it reported a pass. WP-016 now
+   requires the quoted form; WP-046 hunts the unquoted one specifically.
+2. `php -l` passes it. It is a runtime error, not a syntax error, so linting the whole theme
+   proves nothing here.
+
+Confirm with a render probe rather than a lint — request the page and look for truncated
+output:
+
+```bash
+$WP eval "echo defined('ABSPATH') ? 'ok' : 'unreachable';"
+curl -sS https://<host>/ | tail -c 200   # a page that ends mid-markup, with no </html>, is the symptom
+```
+
+**WP-047 — classes that exist only in the template.** A template part that emits
+`class="geo-section"` while the stylesheet defines no such rule renders as unstyled markup:
+collapsed table cells, default headings, no spacing. Every check passes — the PHP is valid,
+the CSS is valid, and nothing compares them.
+
+Collect the class names each template part emits, then require each to appear in the theme's
+CSS:
+
+```bash
+grep -rhoE 'class="[^"]+"' <theme>/template-parts/ \
+  | tr -d '"' | sed 's/class=//' | tr ' ' '\n' | sort -u > /tmp/emitted
+grep -rhoE '\.[a-zA-Z][-_a-zA-Z0-9]*' <theme>/*.css <theme>/assets/css/ 2>/dev/null \
+  | tr -d '.' | sort -u > /tmp/defined
+comm -23 /tmp/emitted /tmp/defined
+```
+
+Ignore classes that come from a framework the theme loads (Tailwind utilities, WordPress core
+classes such as `alignwide` or `screen-reader-text`) — name the framework in the report rather
+than listing its utilities as findings. What is left is a class the theme invented and never
+styled, which is a section that shipped broken.
 
 After applying fixes, re-run the affected checks to confirm they now pass. Update the report with fix status.
 

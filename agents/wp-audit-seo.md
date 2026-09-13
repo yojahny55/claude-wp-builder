@@ -65,7 +65,7 @@ These checks require a running WordPress installation. Use `$WP` from `.wp-creat
 | SEO-020 | Rank Math not installed | `$WP plugin is-installed seo-by-rank-math` | WARNING |
 | SEO-021 | RM modules missing | `$WP eval "echo implode(',', get_option('rank_math_modules', []));"` — compare against recommended list from skill | WARNING |
 | SEO-022 | Wrong permalink structure | `$WP option get permalink_structure` — should be `/%postname%/` | WARNING |
-| SEO-023 | Pages missing meta desc | `$WP eval "global \$wpdb; \$total = \$wpdb->get_var(\"SELECT COUNT(*) FROM \$wpdb->posts WHERE post_type='page' AND post_status='publish'\"); \$with = \$wpdb->get_var(\"SELECT COUNT(*) FROM \$wpdb->posts p JOIN \$wpdb->postmeta m ON p.ID=m.post_id WHERE p.post_type='page' AND p.post_status='publish' AND m.meta_key='rank_math_description' AND m.meta_value!=''\"); echo \"\$with/\$total pages have meta descriptions\";"` | WARNING |
+| SEO-023 | Missing meta description | `$WP eval "global \$wpdb; \$rows = \$wpdb->get_results(\"SELECT p.ID, p.post_type, p.post_title FROM \$wpdb->posts p LEFT JOIN \$wpdb->postmeta m ON p.ID=m.post_id AND m.meta_key='rank_math_description' WHERE p.post_status='publish' AND p.post_type IN ('post','page') AND (m.meta_value IS NULL OR m.meta_value='')\"); foreach (\$rows as \$r) { echo 'NO DESC [' . \$r->post_type . '] #' . \$r->ID . ' ' . get_permalink(\$r->ID) . ' - ' . \$r->post_title . PHP_EOL; } echo count(\$rows) . ' published posts/pages have no meta description' . PHP_EOL;"` | WARNING |
 | SEO-024 | Pages missing focus kw | `$WP eval` count pages without `rank_math_focus_keyword` | INFO |
 | SEO-025 | Schema not configured | Check `rank-math-options-titles` for `knowledgegraph_type` | WARNING |
 | SEO-026 | Sitemap not active | Check if `sitemap` in `rank_math_modules` | WARNING |
@@ -90,6 +90,7 @@ These checks require a running WordPress installation. Use `$WP` from `.wp-creat
 | SEO-048 | Thin content (<300 words) | `$WP eval "global \$wpdb; \$rows = \$wpdb->get_results(\"SELECT ID, post_title, post_content FROM \$wpdb->posts WHERE post_status='publish' AND post_type IN ('post','page')\"); foreach (\$rows as \$r) { \$w = str_word_count(wp_strip_all_tags(\$r->post_content)); if (\$w < 300) echo 'THIN [' . \$w . ' words] #' . \$r->ID . ': ' . \$r->post_title . PHP_EOL; }"` | WARNING |
 | SEO-050 | Static llms.txt | `$WP eval "echo file_exists(ABSPATH . 'llms.txt') ? 'STATIC FILE — should be a rewrite endpoint' : 'not a static file';"` | INFO |
 | SEO-051 | `og:site_name` missing | Rendered-head snapshot (see Procedure) — `og:site_name` absent or empty on a sampled post | WARNING |
+| SEO-053 | Duplicate intent / cannibalization | Two published URLs target the same intent — a term archive and a post that both rank for one query. See Procedure | WARNING |
 | SEO-052 | Site-name signals disagree | Compare the snapshot's `og:site_name`, the `<title>` brand segment and the schema `WebSite.name` against `get_bloginfo('name')` and Rank Math's `website_name` / `knowledgegraph_name`; a `website_alternate_name` identical to `website_name` is also a finding | WARNING |
 
 ### Procedure
@@ -222,6 +223,29 @@ echo wp_json_encode(\$out);
    report the missing file, not just the attribute.
 7. **SEO-050** — a physical `llms.txt` goes stale the moment content changes; it should be a
    rewrite endpoint generated from Rank Math's schema data.
+8. **SEO-023** — **name the URLs, and cover posts as well as pages.** A count
+   (`18/24 pages have meta descriptions`) is not actionable: the reader has to re-derive which
+   six, and the query behind that count excluded `post` entirely, so a money page published as
+   a post was never even examined. When a description is absent Google writes the snippet
+   itself — and on a non-English page it will often write it in English, which costs the click
+   before the visitor ever sees the site. Report each URL, its post type and its title.
+9. **SEO-053** — cannibalization is two of the site's own URLs competing for one intent, and
+   the usual pair is a thin term archive against the real article:
+
+   ```bash
+   $WP eval "
+   foreach (get_terms(array('taxonomy' => 'category', 'hide_empty' => true)) as \$t) {
+       \$hits = get_posts(array('post_type' => array('post','page'), 'post_status' => 'publish',
+                                 's' => \$t->name, 'posts_per_page' => 5, 'fields' => 'ids'));
+       if (\$hits) { echo \$t->slug . ' archive vs: ' . implode(',', \$hits) . PHP_EOL; }
+   }
+   "
+   ```
+
+   Report a pair when a term archive and a post share the intent **and** the archive is the
+   weaker page — thin body copy, no meta description, absent from the sitemap. The fix is a
+   decision, not an edit: noindex the archive, or make it the canonical hub and point the post
+   at it. Recommend one and say why; never silently noindex an archive that earns traffic.
 
 ## Step 3: Tier 3 — Extended Checks
 If web-quality-skills SEO skill is available, reference additional checks:
