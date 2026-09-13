@@ -142,8 +142,20 @@ $WP eval "
 
 // Schema type (adjust based on industry from CLAUDE.md)
 \$opts['knowledgegraph_type']    = 'company';  // or 'company' for Organization
-\$opts['knowledgegraph_name']    = get_bloginfo('name');
 \$opts['knowledgegraph_logo']    = '';  // Will be set if site logo exists
+
+// Site name — one brand, written from one source. website_name feeds the schema
+// WebSite.name and og:site_name; knowledgegraph_name feeds the Organization node.
+// Leaving either unset lets Rank Math and the theme drift apart, and a search or
+// generative engine that cannot agree on the name prints the bare domain instead.
+\$opts['website_name']           = get_bloginfo('name');
+\$opts['knowledgegraph_name']    = get_bloginfo('name');
+
+// An alternate name identical to the name tells an engine nothing and occupies the
+// slot a real alternate would use. Set it only when it genuinely differs.
+if (isset(\$opts['website_alternate_name']) && \$opts['website_alternate_name'] === get_bloginfo('name')) {
+    unset(\$opts['website_alternate_name']);
+}
 
 // Noindex rules for archives
 \$opts['noindex_tax_post_tag']       = 'on';

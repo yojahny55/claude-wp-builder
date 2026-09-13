@@ -18,6 +18,15 @@ for spec in "agents/wp-audit-seo.md:SEO" "agents/wp-audit-performance.md:PERF"; 
   done
 done
 
+# GEO codes carry a layer letter, so they need their own pattern. Both the auditor
+# and the fixer must tabulate every GEO code they mention.
+for f in agents/wp-audit-geo.md agents/wp-agentic-surfaces.md; do
+  [ -f "$f" ] || fail "$f is missing"
+  for code in $(grep -oE "GEO-[DAUP][0-9]{2}" "$f" | sort -u); do
+    grep -qE "^\| ${code} \|" "$f" || fail "$f: ${code} is referenced but never tabulated"
+  done
+done
+
 # No client or site names in the plugin's own docs — checks are generic.
 if grep -rniE "mkadventure" agents/ skills/ commands/ >/dev/null 2>&1; then
   fail "a real client site is named in the plugin docs"
@@ -66,5 +75,15 @@ grep -q "DOMXPath" agents/wp-audit-seo.md \
 if grep -q 'preg_match.*rel=.*canonical' agents/wp-audit-seo.md; then
   fail "wp-audit-seo.md: canonical is being regexed out of the markup again"
 fi
+
+# The site-name signal decides whether an engine prints the brand or the bare domain, and
+# nothing in the plugin checked it. Both halves are pinned: the auditor must read it out of
+# the rendered head, and the Rank Math configurator must write it in the first place.
+grep -q 'og:site_name' agents/wp-audit-seo.md \
+  || fail "wp-audit-seo.md: nothing checks og:site_name"
+grep -q 'website_alternate_name' agents/wp-audit-seo.md \
+  || fail "wp-audit-seo.md: an alternate name identical to the name must be a finding"
+grep -qF "\$opts['website_name']" agents/wp-audit-rankmath.md \
+  || fail "wp-audit-rankmath.md: website_name must be written, not left to drift"
 
 echo PASS

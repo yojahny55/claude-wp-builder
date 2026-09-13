@@ -4,6 +4,129 @@
 
 ### Added
 
+- **`/wp-audit` reconciles the manifest before it trusts it, and reports what has never
+  run.** `.wp-create.json` is called the shared source of truth, and nothing ever checked it
+  against the site: a project could claim Yoast while running Rank Math, nginx while running
+  LiteSpeed, and PHP 8.4 while running 8.5, and every downstream branch took the manifest's
+  word. The new Step 2.5 measures instead — active plugins, PHP version, web server (an
+  `.htaccess` carrying `BEGIN LSCACHE` outvotes the manifest), and Tier 3 availability,
+  re-probed every run rather than read from a capability recorded once months ago. Drift is
+  reported line by line, naming both values.
+
+  `audit.categories_run` was written and never read, so no project could discover that a
+  category which shipped after it was built had never run on it — the audit record kept
+  looking complete while a whole category sat unexecuted. It is now cumulative, read back,
+  and diffed against the categories this version offers; a never-run category is a blocking
+  warning at the top of the report. A record older than 90 days is flagged stale, and
+  `issues_found - issues_fixed` is re-opened rather than quietly forgotten.
+
+  A missing recorded decision is reported as an unknown, with evidence, instead of being
+  defaulted. `i18n strategy` absent means `suffix` — but on a site running Polylang that
+  fallback is wrong, and every command that branches on the line took the wrong branch
+  silently. The manifest now carries `manifest_version`, so a project that predates a key
+  is distinguishable from one where the key is legitimately empty.
+
+- **A development host is no longer indistinguishable from an unscanned site.**
+  `bin/geo-scan.sh` detects a non-public host itself — `localhost`, `.local`, `.test`,
+  RFC 1918 ranges, any name without a dot — and exits `3` with a message naming the fix,
+  where it used to let the request go out and return a `404` that read as "nobody has
+  scanned this yet". Exit `2` now means only that: no report exists, or no network.
+  `/wp-audit --host <public-url>` supplies the public address for a project whose manifest
+  holds the one it develops against, which is every project built before the live scan
+  existed. Neither exit is a pass, and `/wp-yolo` treats both as incomplete.
+
+- **`UNMEASURED` is now a status of its own, separate from `N/A`.** They were one, and
+  merging them hid "this check applies and nothing ever ran it" behind "this does not apply
+  to this site" — a reader counting failures could not tell them apart, and only one of them
+  needs action. `UNMEASURED` is never folded into the passing total.
+
+- **Six checks for defects that were invisible to every tier.** `GEO-A26` catches a physical
+  file at the web root shadowing the theme's rewrite for the same path — the web server
+  answers it before PHP runs, so the theme's endpoint is correct, tested, and never served.
+  `GEO-A27` follows the redirect chain on the advertised `/.well-known/*.json` paths, because
+  a CDN that normalises them to a trailing slash leaves the canonical path answering only
+  through a `301` that many agent fetchers do not follow. `GEO-A28` checks that the URLs
+  advertised inside `llms.txt`, the ARD catalog and the agent-skills index resolve and agree
+  with the sitemap — existence is not agreement, and the three surfaces went stale
+  independently of the content. `SEC-036` searches the options table for the development host
+  (exempting `home` and `siteurl`, which are meant to hold it) because a sync writes those
+  values verbatim into production. `SEC-037` finds backup and editor files inside the theme
+  directory, which ship with any push of `wp-content/`. `SEO-053` reports two of the site's
+  own URLs competing for one intent, the usual pair being a thin term archive against the
+  real article.
+
+- **`WP-046` catches the unquoted `ABSPATH` constant, which `WP-016` could not.** The old
+  detection pattern, `defined.*ABSPATH`, matched `defined( ABSPATH )` as happily as
+  `defined( 'ABSPATH' )` — and the unquoted form is a PHP 8 **fatal** that stops the render
+  partway, so the page shows its header and then nothing. `php -l` passes it, because it is a
+  runtime error rather than a syntax error. `WP-016` now requires the quoted form and
+  `WP-046` hunts the broken one, with a render probe rather than a lint. `WP-047` reports
+  class names a template part emits that no stylesheet defines — a section that ships
+  completely unstyled while every check passes.
+
+### Changed
+
+- **`SEO-023` names the pages and covers posts.** It reported `18/24 pages have meta
+  descriptions` — a count the reader had to re-derive to act on — and its query filtered
+  `post_type='page'`, so a money page published as a post was never examined at all. It now
+  lists every published post and page without a description, with its URL and title. Where a
+  description is missing Google writes the snippet itself, and on a non-Spanish crawl of a
+  Spanish page it will often write it in English.
+
+- **The site-name signal is checked, and written from one source.** Nothing in the plugin
+  read `og:site_name` — the signal that decides whether an engine prints the brand or the
+  bare domain — and `SEO-025` asserted only that `knowledgegraph_type` was *set*, so a site
+  whose `<title>` said one brand and whose Rank Math options said another passed every
+  check. Two codes close it. `SEO-051` requires `og:site_name` on the rendered head;
+  `SEO-052` compares it against the `<title>` brand segment, the schema `WebSite.name`,
+  `get_bloginfo('name')`, `website_name` and `knowledgegraph_name`, and treats a
+  `website_alternate_name` identical to the name as a finding — an alternate that repeats
+  the name tells an engine nothing while occupying the slot a real one would use. Both read
+  the head snapshot the SEO auditor already takes, so they cost no extra request. The
+  configurator side is the root fix: `wp-audit-rankmath` now writes `website_name` as well
+  as `knowledgegraph_name`, both from `get_bloginfo('name')`, and drops an alternate name
+  that merely repeats it. Leaving `website_name` unset was what let the two drift apart.
+
+- **`GEO-A25` resolves schema `@id` references instead of counting blocks.** `GEO-A07`
+  counts identity JSON-LD, so a graph whose `WebSite.publisher` points at an `@id` that no
+  node declares looks complete to it — while a generative engine, unable to resolve the
+  entity, falls back to the bare domain. The new code decodes every JSON-LD block, collects
+  the `@id` values the graph declares and the ones it references at any depth, and reports
+  every dangling reference as an ERROR, naming the referencing node and the ids that do
+  exist. The usual cause is a `rank_math/json_ld` filter that renames a node after Rank Math
+  has already built the references to it.
+
+  `GEO-A25` carries **no ORA check id**: the published catalog has no check that resolves a
+  reference, so the code is reported outside the ORA score and marked plugin-added, keeping
+  the score reproducible against the public catalog.
+
+- **`/wp-audit` gains a GEO / AI-agent-readiness category behind `--geo`.** The new
+  `wp-audit-geo` auditor scores a site against the four ORA layers — Discovery, Access,
+  Usability, Payments — and maps the ORA check catalog to GEO codes. Site type is detected,
+  not assumed (content, local business, merchant or SaaS), and every check the detected type
+  does not apply to is reported `N/A` rather than failed. The fixable half is handed to the
+  new `wp-agentic-surfaces` agent, which owns `inc/agentic.php` and emits the generated
+  surfaces — `llms.txt`, the ARD catalog, the agent-skills index, markdown negotiation, Link
+  headers, an agent-friendly 404, JSON-LD breadth — and seeds the trust anchors. The auditor
+  parses the rendered head with `DOMDocument`, never a regex, because attribute order and
+  quoting are not fixed and a regex reads a broken page as clean. The reference — check
+  catalog, applicability matrix, AI crawler allowlist and surface specs — is the new
+  `wp-audit-geo-standards` skill. The live score is fetched by the new `bin/geo-scan.sh`,
+  which calls the public is-agentic report for the site's host (falling back to `ax score`)
+  and prints the JSON the auditor maps back to GEO codes; exit `2` is a clean skip — no
+  network, no `npx`, or no reachable public URL — and the run reports the live score as
+  unavailable instead of failing. `/wp-yolo` runs `/wp-audit --all --geo` and the same scan as
+  mandatory finish-phase steps, and a run whose scan did not succeed cannot print "Build
+  Complete".
+
+  Three ceilings are recorded. Off-site checks — Wikipedia/Wikidata presence, registry
+  listings, agentic share of voice, brand search accuracy — are advisory: no theme file can
+  change a third party's listing, so they are reported with a recommendation and left
+  unfixed. The payments codes (ACP, UCP, MPP, x402, AP2) are merchant-only and advisory,
+  detected but never fixed. The live scan needs a public URL: a host it cannot reach publicly exits `3`
+  (a configuration problem, fixable with `--host`) and a reachable host with no report yet
+  exits `2`. Neither is a pass.
+
 - **README and `docs/commands.md` now document how to supply the image-generation key.**
   Which variable per provider (`GEMINI_API_KEY` / `OPENAI_API_KEY`), the three places to
   set it — an `env` block in the gitignored `.claude/settings.local.json`, an `export`

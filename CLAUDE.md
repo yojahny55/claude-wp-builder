@@ -316,6 +316,34 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   carries an invisible SynthID watermark. `demo/BRIEF.md` records this for
   the client, not only the build log, because whoever ships these to
   production is entitled to know.
+- **The audit's checks are contract greps, so no test can fail because an audit
+  *missed a defect*.** `tests/checks/*.sh` assert that the wording defining a check is
+  present in the command, agent or skill that owns it — the house style, and the reason
+  documentation and behaviour stay in step. What it cannot do is run an audit against a
+  WordPress site and notice that a real defect went unreported: that would need a fixture
+  site with seeded defects and an expected-findings file, which is a test harness rather
+  than a check. So a coverage gap — a defect class nothing looks for — is invisible to the
+  suite by construction, and is found the way the site-name and schema `@id` gaps were
+  found: by auditing a real site by hand and asking which contract should have caught it.
+  Deliberate; recorded here rather than papered over with a check that would only assert
+  its own mock.
+- **The manifest reconciliation measures, but only what WP-CLI can reach.** `/wp-audit`
+  Step 2.5 re-measures plugins, PHP version, web server and Tier 3 availability on every
+  run instead of trusting the manifest. Without Tier 2 it can measure none of them, and
+  reports the whole block `UNMEASURED` — which is honest, and still means a Tier 1 run on
+  a stale project cannot tell you the manifest is wrong.
+- **The category coverage matrix answers "has this ever run", not "is it still true".**
+  Step 2.5d diffs `categories_run` against the categories this plugin version offers, so a
+  category that shipped after a project was built is surfaced the next time that project is
+  audited. It cannot notice that a category which *did* run has since gained checks the
+  project has never seen — code-level versioning per category would be needed for that, and
+  the honest signal there is the audit-record age, which Step 2.5e already reports.
+- **A dev host is now distinguishable from a missing report, and both still block.**
+  `bin/geo-scan.sh` exits `3` for a host it cannot reach publicly and `2` for a host with no
+  report yet, so the audit can tell a configuration problem from an absence. Neither is a
+  pass, and `--host` is the fix for the first. What neither exit code proves is that the
+  public URL someone passes actually serves the same site as the one WP-CLI is talking to.
+
 - **Prompt quality is judgment, not machinery.** Nothing stops a weak prompt
   from producing a plate that fills its slot while reading as generic.
   `demo/BRIEF.md` is the only defence there is.

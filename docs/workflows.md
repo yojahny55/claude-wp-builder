@@ -324,7 +324,7 @@ Full pipeline, dependency (`cinematic-scroll-kit`) and encoding details: [cinema
 |---------|-----------|-------|
 | `/wp-finalize` | recommended | Reports (never fixes) escaping, bilingual coverage, menus, theme structure; adds WP-CLI runtime checks when `.wp-create.json` exists. `/wp-yolo` runs it for you. |
 | `/wp-demo-verify <path-or-url> [--positions N]` | recommended | Scroll-walks the demo or live page, screenshots per section and viewport plus 375/576/768/1024/1440 full-page shots, and prints machine findings. `/wp-yolo` runs it; `/wp-responsive-check` is now an alias for it. |
-| `/wp-audit [--security --seo --a11y --performance --best-practices] [--report-only]` | optional | Audits and auto-fixes; installs Rank Math / AIOS as needed. |
+| `/wp-audit [--security --seo --a11y --performance --best-practices --geo] [--report-only]` | optional | Audits and auto-fixes; installs Rank Math / AIOS as needed. |
 | `/wp-polylang <src> <dst>` | only under `i18n strategy: polylang` | Translates everything the demo did not cover into the second language. `/wp-seed` hands off to it. |
 | `/wp-tailwind-migrate <theme-path> [--page <slug>]` | only for old plain-CSS themes | Converts an already-built theme to Tailwind in place. Requires a clean git tree. |
 

@@ -1,22 +1,27 @@
 ---
-description: Comprehensive audit — security, SEO, accessibility, performance, best practices
+description: Comprehensive audit — security, SEO, accessibility, performance, best practices, GEO/AI-agent readiness
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, AskUserQuestion
-argument-hint: "[--security] [--seo] [--a11y] [--performance] [--best-practices] [--all] [--report-only] [--security-level basic|recommended|maximum]"
+argument-hint: "[--security] [--seo] [--a11y] [--performance] [--best-practices] [--geo] [--all] [--report-only] [--host <public-url>] [--security-level basic|recommended|maximum]"
 ---
 
 # WP Audit — Comprehensive Site Audit
 
-Run a comprehensive audit across security, SEO, accessibility, performance, and best practices. Reports issues with severity levels and offers to auto-fix what it can. Dispatches specialized audit agents and optionally configures Rank Math SEO and All-in-One WP Security.
+Run a comprehensive audit across security, SEO, accessibility, performance, best practices, and GEO/AI-agent readiness. Reports issues with severity levels and offers to auto-fix what it can. Dispatches specialized audit agents and optionally configures Rank Math SEO and All-in-One WP Security.
 
 ## Step 1: Parse Arguments
 
 Parse `$ARGUMENTS` for:
-- **Category flags:** `--security`, `--seo`, `--a11y`, `--performance`, `--best-practices`
+- **Category flags:** `--security`, `--seo`, `--a11y`, `--performance`, `--best-practices`, `--geo`
 - **`--all` flag** (default if no category flags provided)
 - **`--report-only` flag** (skip fix phase)
 - **`--security-level basic|recommended|maximum`** (default: `recommended`, ignored if `--report-only`)
+- **`--host <public-url>`** — the publicly reachable URL to scan, overriding
+  `wordpress.url` from the manifest. A project whose manifest holds a `.local` or `192.168.*`
+  URL can never be scanned from the manifest alone; this is how such a project supplies one
+  without rewriting the manifest it still develops against. Used by the live scan in Step 9
+  and by nothing else — it does not change which site WP-CLI talks to.
 
-If `--all` or no category flags are present: enable all 5 categories (security, seo, a11y, performance, best-practices).
+If `--all` or no category flags are present: enable all 6 categories (security, seo, a11y, performance, best-practices, geo).
 
 ## Step 2: Read Project Context
 
@@ -33,6 +38,136 @@ Error: Project not initialized. Run /wp-init first to set up the project context
 ```
 And stop execution.
 
+If `--geo` is selected and `.wp-create.json` exists, also note its `wordpress.url` — the live
+scan in Step 9 needs a reachable host. `--host` takes precedence over it when given; a
+project developed locally and served publicly has two URLs, and the manifest holds the one
+WP-CLI needs, not the one the scanner needs.
+
+## Step 2.5: Reconcile the Manifest
+
+`.wp-create.json` is the shared source of truth, so a stale manifest is not a cosmetic
+problem — every later step branches on it. This step measures the project instead of
+trusting what was written the day it was scaffolded. Skip it entirely when
+`.wp-create.json` does not exist; run it before tier detection, because it can turn Tier 3
+back on.
+
+### 2.5a — Schema version
+
+Read `manifest_version`. The current version is `2`.
+
+| Found | Meaning | Action |
+|---|---|---|
+| `2` | current | reconcile as below |
+| absent | the project predates manifest versioning | reconcile, then write `"manifest_version": 2` |
+| `> 2` | written by a newer plugin | **stop** — report the version and do not rewrite keys this version does not understand |
+
+A missing version is not an error; it is the signal that every check below has never run
+on this project.
+
+### 2.5b — Measure, do not trust (Tier 2 only)
+
+```bash
+$WP plugin list --status=active --field=name --format=json
+$WP eval "echo PHP_VERSION;"
+$WP eval "echo isset(\$_SERVER['SERVER_SOFTWARE']) ? \$_SERVER['SERVER_SOFTWARE'] : 'unknown';"
+```
+
+The web server is also visible on disk: an `.htaccess` carrying `# BEGIN LSCACHE` or a
+`litespeed-cache` plugin means LiteSpeed, not nginx, whatever the manifest says. Prefer the
+measured value; `SERVER_SOFTWARE` under WP-CLI is a CLI SAPI value and may be empty.
+
+Compare each measured value against `plugins.installed`, `environment.web_server` and
+`environment.php_version`. Report every drift as a line of its own, naming both values, then
+write the measured value:
+
+```
+=== Manifest Reconciliation ===
+
+  plugins     DRIFT  manifest claims wordpress-seo, wp-super-cache, wordfence
+                     measured seo-by-rank-math, litespeed-cache, all-in-one-wp-security-and-firewall
+  web_server  DRIFT  manifest nginx → measured LiteSpeed (.htaccess carries BEGIN LSCACHE)
+  php_version DRIFT  manifest 8.4 → measured 8.5.10
+  tier 3      RE-PROBED  now available (was false)
+```
+
+Drift is reported, never silently corrected: a manifest that claimed Yoast while the site
+ran Rank Math sent every SEO check at the wrong plugin, and the run that discovers this
+should say so out loud. A wrong `web_server` sends cache-purge and `.htaccess`-versus-nginx
+advice the wrong way; a wrong PHP minor misjudges which constructs are fatal.
+
+**Re-probe Tier 3 here** rather than trusting `audit.web_quality_skills_available` —
+capability recorded once in the past is not capability now. The recorded value is an input
+to the drift report, never to the tier decision.
+
+### 2.5c — Recorded decisions that are missing, not defaulted
+
+Two decisions are recorded per project, and both have a documented fallback for projects
+that predate them: `i18n strategy` (absent ⇒ `suffix`) and `demo mode` (absent ⇒ `plain`).
+
+**A fallback is a guess, and this step reports it as one.** Detect first:
+
+```bash
+$WP plugin is-active polylang && echo "SIGNAL: Polylang active — i18n strategy is polylang, not suffix"
+$WP eval "echo function_exists('pll_languages_list') ? implode(',', pll_languages_list()) : '';"
+```
+
+When a decision line is absent from `.claude/CLAUDE.md` **and** a signal contradicts the
+fallback, report it as an unresolved unknown with the evidence, and use `AskUserQuestion` to
+have the operator record it:
+
+```
+  i18n strategy  UNKNOWN  no line in .claude/CLAUDE.md; the fallback is `suffix`
+                          but Polylang is active with es,en — the fallback is wrong here
+```
+
+Never write the fallback into the manifest as though it were a decision. Record only what
+the operator confirms, then add the line to `.claude/CLAUDE.md` so the next run finds it.
+When no signal contradicts the fallback, note that the fallback is in use and continue —
+a silent default is what made a Polylang site take the suffix branch in every downstream
+command.
+
+### 2.5d — Category coverage matrix
+
+`audit.categories_run` records which categories have ever run on this project. Read it back
+and diff it against the categories this plugin version offers — `security`, `seo`, `a11y`,
+`performance`, `best-practices`, `geo`:
+
+```
+  coverage    NEVER RUN: geo
+              This project was created 2026-03-18 and last audited 2026-03-21.
+              The geo category shipped later, so it has never run here.
+              Run: /wp-audit --geo
+```
+
+**A never-run category is a blocking warning**, printed at the top of the Step 8 report, not
+buried in it. Without this, a project sits indefinitely with a whole category unexecuted
+while its audit record keeps looking complete — the record says what ran, and nothing ever
+asked what did not. This is how a site ships with an entire category unexamined and a clean
+report to show for it.
+
+The diff is against the categories **this version offers**, never against a list stored in
+the project, so a category added to the plugin after the project was built is detected the
+first time the project is audited again.
+
+### 2.5e — Freshness and carry-over
+
+```
+  freshness   STALE  last run 2026-03-21 (176 days ago)
+  carry-over  25 findings were found and never fixed (70 found, 45 fixed)
+```
+
+Warn when `audit.last_run` is more than 90 days old. Report `issues_found - issues_fixed` as
+findings that were carried over, and re-open them in this run rather than starting the count
+from zero — a stale "all clear" is not a clear, and a difference of 25 that no later run
+mentions reads as though it resolved itself.
+
+Write the whole reconciliation block into the Step 8 report as its own section. When every
+line is clean, print one line instead:
+
+```
+  Manifest reconciled — no drift, all categories have run, record is current.
+```
+
 ## Step 3: Detect Environment & Tier
 
 Determine the audit tier:
@@ -41,7 +176,9 @@ Determine the audit tier:
 
 **Tier 2 (if `.wp-create.json` exists):** Read `.wp-create.json` to get `$WP` wrapper. Set `$WP` to the value of `wp_cli.wrapper`. Enables WP-CLI runtime checks.
 
-**Tier 3 (if web-quality-skills installed):** Check these paths in order:
+**Tier 3 (if web-quality-skills installed):** Probe every run — Step 2.5b already
+re-probed it, and `audit.web_quality_skills_available` from a previous run is a drift input,
+never the answer. Check these paths in order:
 1. `~/.claude/skills/performance/SKILL.md`
 2. `.claude/skills/performance/SKILL.md`
 3. Glob for `**/web-quality-skills/skills/performance/SKILL.md`
@@ -57,6 +194,11 @@ Audit Tier: <Code | Code + Runtime | Code + Runtime + Lighthouse>
   <✓|✗> Tier 2: WP-CLI runtime checks (<.wp-create.json found|.wp-create.json not found>)
   <✓|✗> Tier 3: External quality skills (<web-quality-skills detected|web-quality-skills not found>)
 ```
+
+**`--geo` needs Tier 2.** The GEO auditor's live HTTP checks and the `bin/geo-scan.sh`
+verifier in Step 9 require `.wp-create.json` (for `$WP` and a reachable site URL). Without
+Tier 2, `wp-audit-geo` still runs its code-only checks and reports the runtime GEO codes
+`N/A`, and the live scan is skipped.
 
 ## Step 4: Dependency Check (Tier 2 only)
 
@@ -121,12 +263,33 @@ If `--security` is not selected or `--report-only` is set, skip this step.
 
 For each selected category, dispatch the corresponding agent using the Agent tool. Pass complete context in each agent prompt.
 
-**Dispatch order:** security → seo → a11y → performance → practices
+**Dispatch order:** security → seo → a11y → performance → practices → geo
 
 For each agent, use this prompt template (adapt the category-specific instructions):
 
+### What each agent is scoped to
+
+"Audit the theme" was the whole scope, and it is not enough. The theme can be correct while
+the defect lives in a plugin's option array, in postmeta, in what the web server serves before
+PHP runs, or in the markup the two produce together. Those four surfaces are not the theme,
+and until they were named, none of them had an owner — so every audit read the code, passed,
+and said nothing about the layer the defect was actually in.
+
+| Surface | Owner | Examples |
+|---|---|---|
+| theme source | every agent, per category | escaping, enqueues, template structure |
+| plugin configuration and DB options | `wp-audit-seo` (SEO options), `wp-audit-security` (dev-host leakage, SEC-036) | Rank Math option values, site-name options |
+| per-post meta coverage | `wp-audit-seo` | missing descriptions, focus keywords, canonical |
+| rendered output | `wp-audit-seo` (head), `wp-audit-geo` (head, schema graph, DOM) | `og:site_name`, dangling schema `@id` |
+| serving layer | `wp-audit-geo` (GEO-A26, GEO-A27) | a physical root file shadowing a theme rewrite, CDN path rewrites |
+
+An agent whose surface needs Tier 2 and does not have it reports those codes `UNMEASURED`,
+never `PASS`. Say so in the prompt, so the agent does not quietly narrow its scope to the part
+it can reach.
+
 ```
-Audit the WordPress theme at <theme_path>.
+Audit the WordPress theme at <theme_path>, and the surfaces listed for your category in
+"What each agent is scoped to" — the theme is where the code is, not where every defect is.
 
 Project context:
 - Function prefix: <prefix>
@@ -144,7 +307,7 @@ Run all checks for your tier level. Output your findings as a structured report 
   Method: <description of fix>
 
 Where SEVERITY is one of: CRITICAL, WARNING, INFO
-Where CODE follows the pattern: SEC-NNN, SEO-NNN, A11Y-NNN, PERF-NNN, BP-NNN
+Where CODE follows the pattern: SEC-NNN, SEO-NNN, A11Y-NNN, PERF-NNN, BP-NNN, GEO-Dnn/Axx/Uxx/Pxx
 ```
 
 Use these `subagent_type` values:
@@ -153,6 +316,7 @@ Use these `subagent_type` values:
 - `wp-audit-a11y` — accessibility checks (skip links, ARIA attributes, alt text, color contrast references, focus styles, semantic HTML, keyboard navigation)
 - `wp-audit-performance` — performance checks (asset enqueuing, image optimization, caching headers, database queries, lazy loading, render-blocking resources)
 - `wp-audit-practices` — best practices checks (ABSPATH guards, escaping, i18n, theme supports, coding standards, enqueue patterns, template hierarchy)
+- `wp-audit-geo` — GEO/AI-agent readiness checks (ORA layers Discovery/Access/Usability/Payments, AI crawler allowlist, `llms.txt` and ARD catalog, rendered-head DOM checks, agent-skills index, is-agentic live scan)
 
 **Error handling:** If an agent fails:
 1. Note which agent failed and the error message
@@ -177,10 +341,33 @@ Count totals per category and overall.
 
 Print the formatted report:
 
+### Status vocabulary
+
+Every check resolves to one of five statuses, and the last three are not interchangeable:
+
+| Status | Means |
+|---|---|
+| `PASS` | ran, and the site satisfies it |
+| `FAIL` | ran, and the site does not |
+| `N/A` | does not apply to this site type — say why |
+| `UNMEASURED` | applies, but was never measured — say what stopped it |
+| `NEVER RUN` | the whole category has never run on this project (Step 2.5d) |
+
+`N/A` and `UNMEASURED` were one status, and merging them hid the difference between "this
+site has no API to check" and "this check applies and nothing ever ran it". A reader counting
+failures cannot tell those apart, and the second one is the one that needs action. Count them
+separately in every summary line, and never fold `UNMEASURED` into the passing total.
+
+The reconciliation block from Step 2.5 goes **first**, above the per-category counts. A
+never-run category and a stale record change how every number below them should be read, so
+they cannot sit underneath those numbers.
+
 ```
 === WP Audit Report ===
 Tier: <tier description>
 Categories: <comma-separated selected categories>
+
+<the Step 2.5 reconciliation block, or its one-line clean form>
 
 [SECURITY] N issues (X critical, Y warnings, Z info)
   ✗ CRITICAL: <message> (<file>:<line>)
@@ -206,6 +393,14 @@ Categories: <comma-separated selected categories>
   ✗ CRITICAL: ...
   ✗ WARNING: ...
   ℹ INFO: ...
+
+[GEO] <site_type> — N issues (X errors, Y warnings, Z info, K N/A)
+  Layer coverage: <Discovery ✓|✗> <Access ✓|✗> <Usability ✓|✗> <Payments ✓|N/A>
+  ✗ ERROR: <message> (GEO-A13)
+  ✗ WARNING: <message> (GEO-A06)
+  ℹ INFO: <message>
+  ○ N/A: <layer> — <rationale>
+  Live scan: <score|unavailable — skipped: <reason>> (produced by Step 9's scan, below)
 
 ---
 Total: N issues (X critical, Y warnings, Z info)
@@ -264,6 +459,32 @@ Fix the following issues in the WordPress theme at <theme_path>:
 ```
 Fixes include: ABSPATH checks, adding `esc_html()`/`esc_url()`/`esc_attr()` escaping, theme supports registration, proper enqueue patterns.
 
+**GEO fixes:** Dispatch an agent with `subagent_type: wp-agentic-surfaces` with the full project context and the list of auto-fixable GEO findings. It owns `inc/agentic.php` and every generated agent surface (`llms.txt`, ARD catalog, agent-skills index, markdown negotiation, Link headers, agent-friendly 404, JSON-LD breadth, trust anchors) — do not re-implement the surfaces here. Before dispatching, run the live verifier to capture the before score; run it again after the fixer completes and report the before → after score:
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host>
+```
+
+`<home-host>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json` (or
+`$WP option get home`). Exit codes:
+
+| Exit | Meaning | Report as | Actionable |
+|---|---|---|---|
+| `0` | report returned | the score | — |
+| `1` | tool error | `ERROR` | record the error and continue |
+| `2` | no report yet, no network, or a transient `429`/`503` | `UNMEASURED` | scan once at `https://is-agentic.com` |
+| `3` | the host is not publicly reachable | `UNMEASURED — configuration` | re-run with `--host <public-url>` |
+
+**None of these is a pass.** An absent score is not a good score; a category whose evidence
+was never collected must not read like one that was collected and came back clean — which is
+exactly what "skipped" used to look like in the report. Exit `3` in particular is a
+configuration problem with a one-flag fix, and it is the state every project built before the
+live scan existed is in, because its manifest still holds the URL it was developed against.
+Print the reason on the `Live scan:` line and repeat it in the blocking-warnings block at the
+top of the report. Only a returned report yields a score; map its failed ORA check ids back to GEO codes using the `wp-audit-geo-standards` skill. Advisory and off-site findings (GEO-D05 through GEO-D08, GEO-U10, GEO-P01 through GEO-P05) are left unfixed.
+
+The before → after score this step produces is the value the Step 8 report's `Live scan:` line records: the report is printed before this step runs, so at Step 8 show that line as pending and fill it here.
+
 After all fix agents complete, count how many issues were successfully fixed.
 
 ## Step 10: Update Manifest
@@ -281,13 +502,24 @@ Add or update the `audit` key in the JSON:
   "audit": {
     "last_run": "<ISO 8601 timestamp>",
     "security_level": "<basic|recommended|maximum>",
-    "categories_run": ["security", "seo", "a11y", "performance", "best-practices"],
+    "categories_run": ["security", "seo", "a11y", "performance", "best-practices", "geo"],
     "issues_found": N,
     "issues_fixed": M,
+    "carried_over": K,
     "web_quality_skills_available": true
-  }
+  },
+  "manifest_version": 2
 }
 ```
+
+`categories_run` is a **cumulative** record, not a record of this run: union the categories
+this run covered with the ones already there. Overwriting it would erase the very history
+Step 2.5d reads back, and the coverage matrix would report every category as run the moment
+any single category ran.
+
+`carried_over` is `issues_found - issues_fixed` for this run — the number Step 2.5e re-opens
+next time. Write `manifest_version` on every run, including the run that adds it to a project
+that never had one.
 
 Also update the `plugins.installed` array if new plugins were installed during Step 4.
 

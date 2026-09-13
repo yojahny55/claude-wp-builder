@@ -289,9 +289,12 @@ Common placeholders to replace:
 | `{{ssl_key}}` | `/etc/ssl/private/<domain>.key` |
 | `{{php_fpm_sock}}` | `/var/run/php/php<version>-fpm.sock` |
 | `{{web_user}}` | `nginx`, `www-data`, or `apache` (from detection) |
+| `{{max_upload_size}}` | Default `1024M`. Nginx only — see note below |
 | `{{phpmyadmin_port}}` | Default 8080 (check availability) |
 | `{{mailpit_port}}` | Default 8025 (check availability) |
 | `{{container_prefix}}` | Project slug |
+
+**Upload size (`{{max_upload_size}}`):** nginx's `client_max_body_size` defaults to `1m`, which rejects plugin/theme zips and migration archives with a bare `413 Request Entity Too Large` — nginx returns it before PHP runs, so WordPress shows no error of its own and PHP's `upload_max_filesize` is irrelevant. Set it to `1024M` unless the user asks otherwise. Only the nginx templates need this: Apache's `LimitRequestBody` and Caddy's request body limit both default to unlimited.
 
 Write the generated config to the appropriate location:
 - Docker: `${PROJECT_PATH}/docker-compose.yml`
@@ -345,7 +348,15 @@ bash -c "$WP config create --dbname='${DB_NAME}' --dbuser='${DB_USER}' --dbpass=
 
 For Docker environments, run this inside the container after it starts (move after Step 4.8 if needed), or pre-generate `wp-config.php` from a template.
 
-**Validation:** Check that `${PROJECT_PATH}/wp-config.php` exists and contains the correct DB credentials.
+Then set the filesystem method so WordPress writes updates directly instead of prompting for FTP credentials:
+
+```bash
+bash -c "$WP config set FS_METHOD direct --type=constant"
+```
+
+`FS_METHOD direct` is correct for local development, where PHP runs as a user that owns (or has group write on) `wp-content`. Without it, WordPress falls back to asking for FTP credentials on every plugin/theme install. It depends on the permissions set in Step 4.15 — `direct` without write access turns the FTP prompt into a "could not create directory" error instead of fixing anything. Do not carry this constant to shared hosting where PHP runs as a different user than the file owner.
+
+**Validation:** Check that `${PROJECT_PATH}/wp-config.php` exists and contains the correct DB credentials, and that `$WP config get FS_METHOD` returns `direct`.
 
 **On failure:** See Failure Handling table.
 
@@ -468,14 +479,42 @@ bash -c "$WP option update default_comment_status closed"
 For each additional language:
 
 ```bash
-bash -c "$WP language core install es"
+bash -c "$WP language core install es_ES"
 ```
+
+Use full WordPress locale codes, not bare language codes. `es` is not a locale — WP-CLI warns `Language 'es' not available` and reports `Installed 0 of 1 languages (1 skipped)` with a **zero exit code**, so this failure is silent unless the output is read. Map the user's answer to a real locale (`es` -> `es_ES`, `pt` -> `pt_BR`, `fr` -> `fr_FR`) and confirm the choice when the language has several regional variants.
 
 If the primary language is not English:
 
 ```bash
 bash -c "$WP site switch-language ${PRIMARY_LANG}"
 ```
+
+**Validation:** `$WP language core list --status=installed` lists every requested locale.
+
+### Step 4.15: Filesystem Permissions (Native Only)
+
+WordPress must be able to write to `wp-content` as the PHP process user, or media uploads and plugin installs fail. Determine that user:
+
+```bash
+bash -c "grep -hE '^user =' /etc/php-fpm.d/*.conf 2>/dev/null || grep -hE '^(user|User)' /etc/apache2/envvars /etc/httpd/conf/httpd.conf 2>/dev/null"
+```
+
+Grant it write access via an inherited default ACL:
+
+```bash
+bash -c "setfacl -R -m g:${WEB_USER}:rwX -m d:g:${WEB_USER}:rwX '${PROJECT_PATH}/wp-content'"
+```
+
+A plain `chmod -R g+w` is not sufficient: WordPress creates `uploads/<year>/<month>` at runtime under umask 022, so each new month's directory is created mode 755 and uploads break again. The `d:` (default) entry makes every directory created later inherit group write. Capital `X` sets execute on directories only, so uploaded files never become executable.
+
+**Validation:** create a directory under `uploads/` and confirm it is group-writable, then remove it.
+
+**On failure (`setfacl: Operation not permitted`):** the path is owned by another user — ACLs require ownership. If a restore or migration created directories owned by the web user, rename the parent rather than chasing ownership, or re-run with `sudo`.
+
+**Note on the ACL mask:** if a directory already exists with mode 750, its ACL mask clamps `group:<user>:rwx` down to an effective `r-x`. `getfacl` shows this as `#effective:r-x`. The recursive `setfacl` above recalculates the mask, but directories created afterward by a *different* owner may reintroduce it.
+
+Skip this step for Docker, DDEV, Lando, and wp-env — those images handle ownership internally.
 
 ---
 
@@ -493,9 +532,12 @@ Each step validates before proceeding. On failure:
 | Plugin install (4.10) | Plugin not found in WP.org repo | Warn: "Plugin '<slug>' not found — skipping." Continue with remaining plugins. Do not abort. |
 | Web server reload (4.8, native) | `nginx: [emerg] open() "..." failed (13: Permission denied)` after installing a vhost on Fedora/RHEL/CentOS | The vhost file has the wrong SELinux context (`user_tmp_t` instead of `httpd_config_t`). Fix: `sudo restorecon -F /etc/nginx/conf.d/<domain>.conf && sudo systemctl reload nginx`. To avoid this entirely, install vhosts via `bin/wp-env-setup.sh vhost-install` or pass `--vhost-src` to `native-setup` — both run restorecon automatically. |
 
+| Upload via wp-admin (post-setup, nginx) | `413 Request Entity Too Large`, served as a bare nginx error page with no WordPress styling | `client_max_body_size` is missing from the vhost, so it defaults to `1m`. nginx rejects the request before PHP runs, so raising `upload_max_filesize` changes nothing. Add `client_max_body_size 1024M;` to the `server` block, reinstall via `vhost-install`, then `sudo nginx -t && sudo systemctl reload nginx`. To install a local zip without fixing this first, use `$WP plugin install /path/to/plugin.zip`, which bypasses HTTP entirely. |
+| Media upload (post-setup) | "The uploaded file could not be moved to wp-content/uploads/YYYY/MM" | The year/month directory is not writable by the PHP user. Usually the ACL from Step 4.15 was never applied, or was applied non-recursively. Check with `getfacl` for an `#effective:r-x` mask before assuming SELinux is at fault. |
+
 **Critical vs non-critical:**
 - Steps 4.1-4.9 are **critical** — failure aborts the process.
-- Steps 4.10-4.14 are **non-critical** — failure warns but continues.
+- Steps 4.10-4.15 are **non-critical** — failure warns but continues.
 
 **Partial state on failure:** On any critical failure, leave partial state in place for debugging. The `.wp-create.json` manifest is NOT generated until all critical steps succeed. The user can re-run `/wp-create` on the same path to retry — idempotent steps detect existing state and skip (e.g., if WordPress is already downloaded, skip download; if DB already exists, skip create).
 
@@ -569,6 +611,7 @@ Use the extracted values to pre-fill the `.wp-create.json` manifest instead of c
 - Clean defaults — Step 4.12 (skip if content already exists)
 - Set options — Step 4.13
 - Install languages — Step 4.14
+- Filesystem permissions — Step 4.15 (native only)
 
 If the domain changes from the existing config, run search-replace:
 
