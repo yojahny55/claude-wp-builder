@@ -13,6 +13,32 @@ section anywhere in it, and it shipped a 12,000px page whose first screen was an
 empty dark field with the headline clipped mid-word. A build steered only by what
 it must not do has nothing to steer towards.
 
+## The project's brief outranks this skill
+
+Read the project's `.claude/CLAUDE.md` before the rules below, and treat anything
+it records as a client decision as **binding over every default here**. This skill
+is a floor for a build with no instructions. It is not an argument against
+instructions the client actually gave.
+
+That precedence was missing, and the cost of missing it is the reason this section
+is first. A project whose `.claude/CLAUDE.md` carried, in `/wp-context`'s own
+words, *"the client wants an impactful animated website — hero entrance,
+scroll-reveal on section blocks, animated counters, animated step/timeline,
+before/after score chart animation, hover micro-interactions"* shipped with one
+animation and eleven pages of prose. Every item on that list was later reported as
+missing by the person who had asked for it in the first place. Nothing had failed
+to capture the direction; the direction was captured well, and these rules
+overrode it, because nothing said they must not.
+
+So: where the recorded brief asks for motion, graphics, density or a treatment
+this skill discourages, **the brief wins and the discouragement does not apply.**
+Say in `demo/BRIEF.md` which default the brief overrode and why. A rule here that
+contradicts a recorded client decision is not a standard being upheld — it is a
+build ignoring its client.
+
+The two spine rules below are the exception, and they are the only one: honest
+copy and a verified render are not preferences a brief can trade away.
+
 ## When this applies
 
 Any demo built in craft mode, and every cinematic demo. `/wp-demo` records the

@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **A recorded client brief had no authority over the craft defaults, and the defaults
+  won.** `/wp-context` writes the client's own direction into the project's
+  `.claude/CLAUDE.md`; on one project that direction was explicit — *"an impactful
+  animated website: hero entrance, scroll-reveal on section blocks, animated counters,
+  animated step/timeline, before/after score chart animation, hover micro-interactions"* —
+  and every item on it was later reported as missing by the person who asked for it.
+  Nothing failed to capture the direction. `wp-demo-craft` overrode it, because nothing
+  said it must not. The skill now opens by deferring: a recorded client decision binds
+  over every default in it, and where a brief asks for something the floor discourages,
+  the brief wins. Honest copy and a verified render remain the only exceptions.
+
+- **The card rule produced the shape it exists to prevent.** *"A card is a lazy
+  container"* read as a ban, and the alternative it recommends — proximity, a hairline,
+  space — is undifferentiated text, so a faithful build wrote a hairline definition list
+  for every section of every page. Reworded: the failure is *identical* cards, not cards.
+  Likewise `icon`, which appeared in the entire skill exactly once, inside a prohibition,
+  leaving authors to conclude icons are a slop signal while clients ask for animated ones
+  by name. Decorative icons are the tell; an icon that carries meaning is not.
+
+- **`taste.md` gains its first positive instruction.** It was entirely prohibition, which
+  is why builds that obeyed every rule still shipped as walls of prose — nothing ever said
+  reach for a graphic. *When a section states something quantitative, draw it.* A fact
+  published about the sector is not an invented statistic; it is the subject.
+
+### Changed
+
+- **The brief asks what this business has that could be drawn.** The docs said "impactful
+  animated website", which is unfalsifiable, so the old step asked nothing and the
+  adjective survived four rounds of revision unsatisfied. The answerable version is a list
+  of pictures the demo is then obliged to contain. Adds two more: three named sites whose
+  motion to match, and which page a visitor must understand in ten seconds.
+
 ### Changed
 
 - **The demo brief now interviews the operator about form, and gates the build on

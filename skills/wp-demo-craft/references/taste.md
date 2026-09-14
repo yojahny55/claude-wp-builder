@@ -222,8 +222,25 @@ same texture chosen because it looks hand-made is decoration. State the reason i
 
 ## Cards
 
-A card is a lazy container. Before using one, ask what it is doing that
-proximity, a hairline, or space could not.
+A card is a lazy container *when it is standing in for a decision nobody made*.
+Before using one, ask what it is doing that proximity, a hairline, or space could
+not.
+
+**The failure is identical cards, not cards.** Read as a ban on cards, this
+section produces hairline-separated definition lists for every section of every
+page — which is the same undifferentiated shape the ban exists to prevent, wearing
+different CSS. A build that followed it faithfully was reported by its client as
+"so much text and basically the same structure", and every one of those sections
+was a hairline list written because a card felt forbidden. A card carrying a
+figure, a meter and a band name is not the tell; four identical cards carrying an
+icon, a heading and a sentence are.
+
+The same applies to icons. `icon` appears in this skill exactly once — in the
+prohibition below — and an author reading only that comes away believing icons are
+a slop signal. They are not. **Decorative** icons are: an icon that repeats the
+heading next to it, or fills a space where a fact should be. An icon that carries
+meaning, or draws itself on as its section arrives, is craft, and clients ask for
+it by name.
 
 - **Never a grid of identical icon + heading + text cards as page
   structure.** The most recognisable AI-page tell there is.
@@ -270,6 +287,16 @@ fast.
   everywhere.
 - **Check button contrast.** White text on a light button, or a ghost button
   on a photo with no scrim, fails.
+- **When a section states something quantitative, draw it.** A range, a
+  proportion, a sequence, a before and an after, a weighting, a comparison —
+  these are pictures, and writing them as a paragraph is the single biggest
+  source of "too much text" there is. This is the one positive instruction in a
+  file otherwise made of prohibitions, and its absence is why builds that obeyed
+  every rule here still shipped as walls of prose: the floor said what not to do
+  and never once said reach for a graphic.
+  A fact published about the sector — a score range and its bands, a statutory
+  timescale, a standard fee structure — is not an invented statistic. It is the
+  subject. Draw it.
 - Real copy, not lorem. Real names, not "John Doe". Real numbers or no
   numbers.
 - **No invented statistics.** Fake precision (`4.1×`, `92%`, `48k`) is a

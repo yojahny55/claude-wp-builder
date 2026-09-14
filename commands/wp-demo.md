@@ -151,7 +151,10 @@ before writing any markup.
 
    | Field | The question behind it |
    |---|---|
-   | `draw, don't write` | Which facts about this business should be a **picture** rather than a paragraph? A scale, a range, a before and after, a sequence, a comparison. This is the field that decides whether the demo has anything in it besides type. |
+   | `what is quantitative here` | **Ask this one first.** What does this business have that is quantitative and could be drawn? A published scale and its bands, a statutory timescale, a standard fee, a weighting, a set of sources that disagree. For a credit-repair firm the honest answer is five graphics — a 300–850 scale, five bands, five weighted factors, three bureaus, a published average — and a build that never asked wrote all five as paragraphs. The answer is a list of pictures the demo is now obliged to contain. |
+   | `draw, don't write` | Which of those facts should be a **picture** rather than a paragraph, and where? This is the field that decides whether the demo has anything in it besides type. |
+   | `three sites whose motion you want` | Named, with what to take from each. This is what converts "impactful" into something checkable. A brief that records only "impactful animated website" is unfalsifiable, which is how it survives four rounds of revision without ever being satisfied. |
+   | `the ten-second page` | Which page must a visitor understand in ten seconds, and what must they understand? |
    | `text density` | How much reading per section — a sentence, a short paragraph, or a full explanation? |
    | `motion appetite` | How much movement: entrance only, motion throughout, or deliberately still? And is scroll choreography wanted, or is element motion enough? |
    | `microinteraction appetite` | Hover states, animated borders, icons that draw on, details that reward attention — wanted, or noise? |
@@ -169,6 +172,16 @@ before writing any markup.
    `motion appetite` and `microinteraction appetite` decide how far the element
    motion goes. A plan that contradicts a recorded form answer is wrong in the
    same way a plan that contradicts the domain signal is wrong.
+
+   **3a-i. A recorded client decision outranks the craft defaults.** If
+   `.claude/CLAUDE.md` already records what the client asked for — `/wp-context`
+   writes an animation brief there when the documents carry one — read it into the
+   form fields rather than asking again, and carry it into `demo/BRIEF.md` marked as
+   the client's own words. It binds on the build over every default in
+   `wp-demo-craft`; see that skill's first section. A project once carried an explicit
+   brief for animated counters, an animated timeline and a before/after score chart,
+   and shipped with none of them, because nothing said the recorded brief had
+   authority over the taste floor.
 
    **3b. The operator approves the brief before anything is built.** Show the
    whole brief — story and form — and wait. This is a gate, not a courtesy

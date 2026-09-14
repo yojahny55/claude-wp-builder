@@ -66,4 +66,48 @@ grep -qF 'Ask, in one pass, only what the docs cannot answer' "$demo" \
 grep -qF 'built from a guess' "$demo" \
   || fail "$demo must record approval, so a later run can tell a confirmed brief from a guess"
 
+# --- the question that would have changed the build ---------------------------
+# The docs said "impactful animated website", so the old brief step asked nothing --
+# and "impactful" is unfalsifiable, which is how it survived four rounds of revision
+# without ever being satisfied. The answerable version is a list of pictures.
+grep -qF 'what is quantitative here' "$demo" \
+  || fail "$demo must ask what this business has that could be drawn"
+grep -qF 'Ask this one first' "$demo" \
+  || fail "$demo: the quantitative question leads, it does not trail the others"
+grep -qF 'three sites whose motion you want' "$demo" \
+  || fail "$demo must convert an unfalsifiable adjective into named references"
+grep -qF 'the ten-second page' "$demo" \
+  || fail "$demo must ask which page carries the business in ten seconds"
+
+# --- a recorded client decision outranks the defaults -------------------------
+# The root cause of four rounds of the same complaint: /wp-context wrote an explicit
+# animation brief into the project's .claude/CLAUDE.md -- counters, timeline,
+# before/after score chart -- and nothing in the craft rules gave it authority over
+# the taste floor. The floor won, and every item on that brief shipped missing.
+grep -qF 'A recorded client decision outranks the craft defaults' "$demo" \
+  || fail "$demo must carry a recorded client brief into the form fields"
+
+craft=skills/wp-demo-craft/SKILL.md
+grep -qF "The project's brief outranks this skill" "$craft" \
+  || fail "$craft must defer to the project's recorded brief, or the floor overrides the client"
+grep -qF 'the brief wins and the discouragement does not apply' "$craft" \
+  || fail "$craft must say a recorded brief beats its own defaults"
+grep -qF '.claude/CLAUDE.md' "$craft" \
+  || fail "$craft never mentions the file that records what the client asked for"
+
+# --- cards and icons: identical and decorative are the failures ---------------
+# Read as a ban, the card rule produces a hairline definition list per section,
+# which is the same undifferentiated shape it exists to prevent. And `icon` used to
+# appear in the whole skill exactly once, inside a prohibition, while the client was
+# asking for animated icons by name.
+taste=skills/wp-demo-craft/references/taste.md
+grep -qF 'The failure is identical cards, not cards' "$taste" \
+  || fail "$taste reads as a ban on cards, which produces a hairline list per section instead"
+grep -qF 'Decorative' "$taste" \
+  || fail "$taste must distinguish a decorative icon from one that carries meaning"
+
+# The one positive instruction in a file otherwise made of prohibitions.
+grep -qF 'When a section states something quantitative, draw it' "$taste" \
+  || fail "$taste is all prohibition and never says reach for a graphic"
+
 echo PASS
