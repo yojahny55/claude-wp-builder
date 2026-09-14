@@ -136,4 +136,52 @@ grep -Fq './utilities/motion.css' starter-theme/__tailwind__/assets/css/src/tail
 grep -Fq 'motion.css' commands/wp-demo.md \
   || fail "commands/wp-demo.md does not inline the motion stylesheet into the demo"
 
+# --- the counter has to survive a unit --------------------------------------------
+# `data-motion-count="93%"` reached Number() whole and evaluated to NaN. NaN throws
+# nothing, so the try/catch around that loop never fired, the tween ran to NaN and two
+# of three figures on a shipped composition sat dead on the page with no warning in
+# the console -- a defect nobody can see and nothing reports. A percent sign or a
+# currency symbol is how an author writes a figure, so the parse has to carry it.
+#
+# This one RUNS the shipped parser rather than grepping for it: the failure it guards
+# against is behavioural, and an assertion on the source text would pass against a
+# parse that was correct in shape and wrong in result. The module is loaded whole
+# (with `export` stripped and the two helpers re-exported) so the code under test is
+# the code that ships; its top-level browser entry needs the stubs below to evaluate.
+if command -v node >/dev/null 2>&1; then
+  node --input-type=module -e "
+    import fs from 'node:fs';
+    globalThis.window = { matchMedia: () => ({ matches: false }), addEventListener() {} };
+    globalThis.document = {
+      readyState: 'complete', addEventListener() {},
+      documentElement: { dataset: {} }, querySelectorAll: () => [],
+    };
+    const src = fs.readFileSync('$m', 'utf8').replace(/^export /m, '')
+      + '\nexport { parseNum, formatNum };\n';
+    const url = 'data:text/javascript;base64,' + Buffer.from(src).toString('base64');
+    const { parseNum, formatNum } = await import(url);
+    const render = (t) => { const q = parseNum(t); return q.prefix + formatNum(q.n, q.core) + q.suffix; };
+    const eq = (got, want, what) => {
+      if (got !== want) {
+        console.error('  ' + what + ': got ' + JSON.stringify(got) + ', want ' + JSON.stringify(want));
+        process.exitCode = 1;
+      }
+    };
+    eq(parseNum('93%').n, 93, 'a trailing unit must not make the target NaN');
+    eq(render('93%'), '93%', 'the unit must be written back around the number');
+    eq(render('\$1,200'), '\$1,200', 'a leading symbol and grouping must both survive');
+    eq(render('850+'), '850+', 'a trailing + must survive');
+    eq(render('4.8/5'), '4.8/5', 'decimals and a trailing suffix must both survive');
+    eq(parseNum('-12').n, -12, 'a negative target must parse');
+    eq(parseNum('soon'), null, 'a target with no digits must be rejected, not guessed');
+  " 2>&1 || fail "\$m's counter parse does not carry units through (detail above)"
+else
+  echo "SKIP: node unavailable, counter parse not executed"
+fi
+
+# The rejection has to be audible. A silent skip is the same failure wearing a
+# different mask: the figure does not move and nothing says why.
+grep -Fq 'data-motion-count has no number in it' "$m" \
+  || fail "$m drops an unparseable counter target without warning, which is the silent failure this device already shipped once"
+
 echo PASS

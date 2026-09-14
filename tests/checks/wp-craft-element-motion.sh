@@ -212,4 +212,40 @@ grep -qF 'A heading element is a role, not a size' "$taste" \
 grep -qF 'clears at least 1.25' "$taste" \
   || fail "$taste must state the heading-to-body ratio a component heading has to clear"
 
+# --- an entrance must not finish before the reader arrives -------------------------
+# `entry 0% entry 50%` is a working animation that nobody sees: it completes while the
+# element is still grazing the bottom edge of the viewport. Every probe reports it as
+# live -- a ViewTimeline exists, the keyframes ran -- and the reader reports the
+# section as having no animation at all. A measured build had twelve of twelve
+# selectors animating and drew exactly that complaint. `entry 100%` is the moment the
+# element is fully in view, so an entrance ending at or past it is still moving when
+# it is first looked at.
+#
+# Ranges anchored in `cover` are deliberately excluded: cover-phase endpoints are
+# already past the entry phase by construction.
+while IFS= read -r line; do
+  f=${line%%:*}
+  end=$(printf '%s' "$line" | grep -oE 'entry [0-9.]+% entry [0-9.]+%' | grep -oE '[0-9.]+%$' | tr -d '%')
+  [ -n "$end" ] || continue
+  awk -v v="$end" 'BEGIN { exit !(v + 0 < 100) }' \
+    && fail "$f: an entrance range ends at entry ${end}%, inside the entry phase -- it finishes before the element is fully in view and reads as no animation at all"
+done < <(grep -rn 'animation-range: entry [0-9.]*% entry [0-9.]*%' "$C"/*/section.css)
+
+# The amplitude floor, for the same reason: an 18px fade at the bottom edge of a tall
+# viewport is smaller than the reader's own scroll increment.
+while IFS= read -r line; do
+  f=${line%%:*}
+  px=$(printf '%s' "$line" | grep -oE 'var\(--motion-rise, *[0-9.]+px\)' | grep -oE '[0-9.]+' | head -1)
+  [ -n "$px" ] || continue
+  awk -v v="$px" 'BEGIN { exit !(v + 0 < 35) }' \
+    && fail "$f: --motion-rise falls back to ${px}px, below the amplitude floor where a rise stops being visible"
+done < <(grep -rn 'var(--motion-rise,' "$C"/*/section.css)
+
+grep -Fq 'An entrance ends at or past `entry 100%`' "$dev" \
+  || fail "$dev does not state the entrance-range floor, so the ranges above are a convention nothing explains"
+grep -Fq 'Amplitude has a floor too' "$dev" \
+  || fail "$dev does not state the amplitude floor"
+grep -Fq 'Two counts, not one' "$dev" \
+  || fail "$dev does not separate the device count from the animated-element count, which is how a page ends up all fades"
+
 echo PASS

@@ -159,7 +159,7 @@
    `data-motion` device on the same element. Longhands only; no
    `animation-duration`; `animation-fill-mode: both`.
    ------------------------------------------------------------------------- */
-@keyframes score-scale-rise { from { opacity: 0; translate: 0 var(--motion-rise, 22px); } }
+@keyframes score-scale-rise { from { opacity: 0; translate: 0 var(--motion-rise, 44px); } }
 @keyframes score-scale-fade { from { opacity: 0; } }
 @keyframes score-scale-grow { from { opacity: 0; scale: 1 0.55; } }
 /* The marker travels the width of the track. `left` is animated rather than
@@ -172,21 +172,21 @@
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
   animation-fill-mode: both;
   animation-timeline: view();
-  animation-range: entry 0% entry 28%;
+  animation-range: entry 0% entry 100%;
 }
 .score-scale__title {
   animation-name: score-scale-rise;
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
   animation-fill-mode: both;
   animation-timeline: view();
-  animation-range: entry 4% entry 44%;
+  animation-range: entry 4% entry 104%;
 }
 .score-scale__lede {
   animation-name: score-scale-rise;
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
   animation-fill-mode: both;
   animation-timeline: view();
-  animation-range: entry 12% entry 52%;
+  animation-range: entry 12% entry 112%;
 }
 
 /* The bands grow up from the baseline, left to right, so the scale builds itself
@@ -197,11 +197,11 @@
   animation-fill-mode: both;
   animation-timeline: view();
 }
-.score-scale__band--poor { animation-range: entry 14% entry 46%; }
-.score-scale__band--fair { animation-range: entry 19% entry 51%; }
-.score-scale__band--good { animation-range: entry 24% entry 56%; }
-.score-scale__band--very { animation-range: entry 29% entry 61%; }
-.score-scale__band--top  { animation-range: entry 34% entry 66%; }
+.score-scale__band--poor { animation-range: entry 14% entry 114%; }
+.score-scale__band--fair { animation-range: entry 19% entry 119%; }
+.score-scale__band--good { animation-range: entry 24% entry 124%; }
+.score-scale__band--very { animation-range: entry 29% entry 129%; }
+.score-scale__band--top  { animation-range: entry 34% entry 134%; }
 
 /* The marker crosses after the scale exists to be crossed. */
 .score-scale__marker {
@@ -218,11 +218,11 @@
   animation-fill-mode: both;
   animation-timeline: view();
 }
-.score-scale__factor:nth-child(1) { animation-range: entry 44% entry 74%; }
-.score-scale__factor:nth-child(2) { animation-range: entry 48% entry 78%; }
-.score-scale__factor:nth-child(3) { animation-range: entry 52% entry 82%; }
-.score-scale__factor:nth-child(4) { animation-range: entry 56% entry 86%; }
-.score-scale__factor:nth-child(5) { animation-range: entry 60% entry 90%; }
+.score-scale__factor:nth-child(1) { animation-range: entry 44% entry 144%; }
+.score-scale__factor:nth-child(2) { animation-range: entry 48% entry 148%; }
+.score-scale__factor:nth-child(3) { animation-range: entry 52% entry 152%; }
+.score-scale__factor:nth-child(4) { animation-range: entry 56% entry 156%; }
+.score-scale__factor:nth-child(5) { animation-range: entry 60% entry 160%; }
 
 /* No view timeline: the scale is drawn, the marker sits at the top of the range,
    everything is legible. The information does not depend on the motion. */

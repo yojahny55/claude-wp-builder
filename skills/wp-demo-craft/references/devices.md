@@ -50,6 +50,32 @@ only animation was a single one-shot `reveal`. A measured build finished with a
 quarter of its scroll budget unspent while reading as completely static, which is the
 signature of a rule set that constrained the wrong axis.
 
+**An entrance ends at or past `entry 100%`, never inside the entry phase.** This is
+the rule that made three working animations read as none. `entry 0% entry 50%`
+completes while the element is still grazing the bottom edge of the viewport — the
+animation runs, `getAnimations()` reports a live `ViewTimeline`, the harness sees
+motion, and the reader sees a section that was already finished when they arrived.
+A measured build carried twelve of twelve selectors animating correctly and drew the
+report "this section doesn't have any animation, not entrance or scroll one" about a
+section with three of them. Nothing was broken; everything was over half a screen
+early. `entry 100%` is the moment the element is fully in view, so an entrance that
+ends there is still moving when it is first looked at. Keep the start — that is the
+stagger — and let the end run past 100% for later items in a group.
+
+**Amplitude has a floor too.** An 18–26px fade at the bottom edge of a 900px viewport
+is not a subtle entrance, it is an invisible one. The library's `--motion-rise`
+default is 44px for the same reason: below roughly 35px the movement is smaller than
+the reader's own scroll increment and reads as a static element that happened to be
+faint a moment ago.
+
+**Two counts, not one.** The device budget counts `data-motion` attributes; it does
+not count animated elements, and the two numbers are not close. One attribute per
+element is correct and has been read alongside a per-page device figure as "this page
+may contain fifteen animated things" — which is how a page ends up with thirteen of
+its fifteen devices being the same 620ms fade. A page with fifteen devices and a
+hundred and twenty animated elements is a normal page, not an extravagant one. Count
+them separately or the second number silently inherits the first one's ceiling.
+
 **Restraint is about scroll, never about life.** A page can be entirely restrained in
 its scroll choreography — no pins, no scrub, one peak or none — and still fade, rise,
 zoom, stagger and draw its icons throughout. Those are different decisions. A client
@@ -175,7 +201,7 @@ whole collision class rather than warning about it: a `view()` zoom on a paralla
 bed simply works.
 
     /* wrong: races the engine */      transform: translateY(22px);
-    /* right: composes with it */      translate: 0 22px;
+    /* right: composes with it */      translate: 0 44px;
 
 **Restate every `animation-*` longhand when you re-target an element in a later
 rule.** This is the shorthand trap in reverse and it is worse, because nothing looks

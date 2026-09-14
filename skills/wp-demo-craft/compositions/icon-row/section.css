@@ -78,7 +78,7 @@
    anything above the fold flashes to its `from` value.
    ------------------------------------------------------------------------- */
 @keyframes icon-row-draw { from { stroke-dashoffset: 120; } }
-@keyframes icon-row-rise { from { opacity: 0; translate: 0 var(--motion-rise, 18px); } }
+@keyframes icon-row-rise { from { opacity: 0; translate: 0 var(--motion-rise, 40px); } }
 @keyframes icon-row-fade { from { opacity: 0; } }
 
 .icon-row__kicker {
@@ -86,14 +86,14 @@
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
   animation-fill-mode: both;
   animation-timeline: view();
-  animation-range: entry 0% entry 28%;
+  animation-range: entry 0% entry 100%;
 }
 .icon-row__title {
   animation-name: icon-row-rise;
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
   animation-fill-mode: both;
   animation-timeline: view();
-  animation-range: entry 4% entry 44%;
+  animation-range: entry 4% entry 104%;
 }
 
 /* The four cards arrive left to right, and each card's icon draws a beat after
@@ -104,10 +104,10 @@
   animation-fill-mode: both;
   animation-timeline: view();
 }
-.icon-row__item:nth-child(1) { animation-range: entry 12% entry 52%; }
-.icon-row__item:nth-child(2) { animation-range: entry 18% entry 58%; }
-.icon-row__item:nth-child(3) { animation-range: entry 24% entry 64%; }
-.icon-row__item:nth-child(4) { animation-range: entry 30% entry 70%; }
+.icon-row__item:nth-child(1) { animation-range: entry 12% entry 112%; }
+.icon-row__item:nth-child(2) { animation-range: entry 18% entry 118%; }
+.icon-row__item:nth-child(3) { animation-range: entry 24% entry 124%; }
+.icon-row__item:nth-child(4) { animation-range: entry 30% entry 130%; }
 
 .icon-row__stroke {
   stroke-dasharray: 120;
@@ -116,10 +116,10 @@
   animation-fill-mode: both;
   animation-timeline: view();
 }
-.icon-row__item:nth-child(1) .icon-row__stroke { animation-range: entry 18% entry 62%; }
-.icon-row__item:nth-child(2) .icon-row__stroke { animation-range: entry 24% entry 68%; }
-.icon-row__item:nth-child(3) .icon-row__stroke { animation-range: entry 30% entry 74%; }
-.icon-row__item:nth-child(4) .icon-row__stroke { animation-range: entry 36% entry 80%; }
+.icon-row__item:nth-child(1) .icon-row__stroke { animation-range: entry 18% entry 118%; }
+.icon-row__item:nth-child(2) .icon-row__stroke { animation-range: entry 24% entry 124%; }
+.icon-row__item:nth-child(3) .icon-row__stroke { animation-range: entry 30% entry 130%; }
+.icon-row__item:nth-child(4) .icon-row__stroke { animation-range: entry 36% entry 136%; }
 /* Both strokes of a mark draw together. An earlier version trailed the second
    stroke with a flat , which overrode the
    per-card ranges above: card 4 starts at 36%, so its second stroke would have

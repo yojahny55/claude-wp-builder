@@ -46,28 +46,28 @@
    `animation-duration`: it overrides the range. `animation-fill-mode: both`, or
    anything above the fold flashes to its `from` value.
    ------------------------------------------------------------------------- */
-@keyframes page-head-rise { from { opacity: 0; translate: 0 var(--motion-rise, 22px); } }
+@keyframes page-head-rise { from { opacity: 0; translate: 0 var(--motion-rise, 44px); } }
 @keyframes page-head-fade { from { opacity: 0; } }
 .page-head__kicker {
   animation-name: page-head-fade;
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
   animation-fill-mode: both;
   animation-timeline: view();
-  animation-range: entry 0% entry 30%;
+  animation-range: entry 0% entry 100%;
 }
 .page-head__title {
   animation-name: page-head-rise;
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
   animation-fill-mode: both;
   animation-timeline: view();
-  animation-range: entry 5% entry 45%;
+  animation-range: entry 5% entry 105%;
 }
 .page-head__lede {
   animation-name: page-head-rise;
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
   animation-fill-mode: both;
   animation-timeline: view();
-  animation-range: entry 15% entry 55%;
+  animation-range: entry 15% entry 115%;
 }
 /* No view timeline, no range to run against: the honest fallback is the end
    state, already visible, rather than a single arbitrary frame. */

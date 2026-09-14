@@ -155,43 +155,43 @@
    `animation-duration`: it overrides the range. `animation-fill-mode: both`, or
    anything above the fold flashes to its `from` value.
    ------------------------------------------------------------------------- */
-@keyframes offer-table-rise { from { opacity: 0; translate: 0 var(--motion-rise, 22px); } }
+@keyframes offer-table-rise { from { opacity: 0; translate: 0 var(--motion-rise, 44px); } }
 @keyframes offer-table-fade { from { opacity: 0; } }
 .offer-table__kicker {
   animation-name: offer-table-fade;
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
   animation-fill-mode: both;
   animation-timeline: view();
-  animation-range: entry 0% entry 28%;
+  animation-range: entry 0% entry 100%;
 }
 .offer-table__title {
   animation-name: offer-table-rise;
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
   animation-fill-mode: both;
   animation-timeline: view();
-  animation-range: entry 4% entry 44%;
+  animation-range: entry 4% entry 104%;
 }
 .offer-table__lede {
   animation-name: offer-table-rise;
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
   animation-fill-mode: both;
   animation-timeline: view();
-  animation-range: entry 12% entry 52%;
+  animation-range: entry 12% entry 112%;
 }
 .offer-table__footnote {
   animation-name: offer-table-fade;
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
   animation-fill-mode: both;
   animation-timeline: view();
-  animation-range: entry 40% entry 80%;
+  animation-range: entry 40% entry 140%;
 }
 /* Columns arrive left to right so the eye reads the table in the order it is
    meant to be compared, instead of the whole grid appearing at once. */
 .offer-table__plan { animation-name: offer-table-rise; animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1)); animation-fill-mode: both; animation-timeline: view(); }
-.offer-table__plan:nth-child(1) { animation-range: entry 14% entry 54%; }
-.offer-table__plan:nth-child(2) { animation-range: entry 20% entry 60%; }
-.offer-table__plan:nth-child(3) { animation-range: entry 26% entry 66%; }
-.offer-table__plan:nth-child(4) { animation-range: entry 32% entry 72%; }
+.offer-table__plan:nth-child(1) { animation-range: entry 14% entry 114%; }
+.offer-table__plan:nth-child(2) { animation-range: entry 20% entry 120%; }
+.offer-table__plan:nth-child(3) { animation-range: entry 26% entry 126%; }
+.offer-table__plan:nth-child(4) { animation-range: entry 32% entry 132%; }
 /* No view timeline, no range to run against: the honest fallback is the end
    state, already visible, rather than a single arbitrary frame. */
 @supports not (animation-timeline: view()) {

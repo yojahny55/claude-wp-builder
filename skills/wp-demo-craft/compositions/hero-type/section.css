@@ -90,35 +90,35 @@
    `animation-duration`: it overrides the range. `animation-fill-mode: both`, or
    anything above the fold flashes to its `from` value.
    ------------------------------------------------------------------------- */
-@keyframes hero-type-rise { from { opacity: 0; translate: 0 var(--motion-rise, 22px); } }
+@keyframes hero-type-rise { from { opacity: 0; translate: 0 var(--motion-rise, 44px); } }
 @keyframes hero-type-fade { from { opacity: 0; } }
 .hero-type__kicker {
   animation-name: hero-type-fade;
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
   animation-fill-mode: both;
   animation-timeline: view();
-  animation-range: entry 0% entry 25%;
+  animation-range: entry 0% entry 100%;
 }
 .hero-type__title {
   animation-name: hero-type-rise;
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
   animation-fill-mode: both;
   animation-timeline: view();
-  animation-range: entry 0% entry 40%;
+  animation-range: entry 0% entry 100%;
 }
 .hero-type__lede {
   animation-name: hero-type-rise;
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
   animation-fill-mode: both;
   animation-timeline: view();
-  animation-range: entry 12% entry 52%;
+  animation-range: entry 12% entry 112%;
 }
 .hero-type__actions {
   animation-name: hero-type-rise;
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
   animation-fill-mode: both;
   animation-timeline: view();
-  animation-range: entry 20% entry 60%;
+  animation-range: entry 20% entry 120%;
 }
 /* No view timeline, no range to run against: the honest fallback is the end
    state, already visible, rather than a single arbitrary frame. */
