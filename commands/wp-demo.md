@@ -184,8 +184,20 @@ before writing any markup.
    decides what a section is, what the chrome is for and what the ending does.
    Then open
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/compositions/README.md` and look at
-   each candidate's `preview-1440.png` and `preview-390.png`. One row per
-   section of the curve: section, role, composition, why, motion cost,
+   each candidate's `preview-1440.png` and `preview-390.png`.
+
+   **The plan covers every page in the agreed set, not only the index.** Write the
+   index's rows from the curve, then a short block of rows per interior page. This
+   is the step where an interior page stops being an afterthought: a build that
+   plans nine compositions for `index.html` and none for the other eleven writes
+   those eleven from one hand-rolled template, and the result is a page set whose
+   interior is a content management system's default output wearing the index's
+   typeface. The floor per interior page is in
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/compositions.md` — a
+   `page-head` and one body composition, with chrome not counting — and the motion
+   floor is in `references/devices.md`. Do not restate either here.
+
+   One row per section, for each page: section, role, composition, why, motion cost,
    the domain signal that justified it, citing the brief constraint from
    sub-step 4, or writing "no domain signal" when none applies; and the
    research signal — what `demo/RESEARCH.md`'s `## Signals` says this
@@ -198,7 +210,9 @@ before writing any markup.
    sitting unread. Mark exactly one row as the peak (`data-motion-peak`).
    Sum the cost and hold it under the
    budget in `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/devices.md`,
-   which owns the pin caps, the per-index total and the interior-page rule. When
+   which owns the pin caps, the per-index total, and the interior-page floor and
+   ceiling both. Sum per page, not across the set: the index's allowance is the
+   index's, and an interior page does not borrow from it. When
    the docs name no reference and the Landing Gallery MCP is connected, pull
    four screenshots for the page kind first; when it is not, say so and choose
    from the previews alone.
@@ -294,7 +308,11 @@ before writing any markup.
    **one file per page in the agreed page set** (`about.html`, `services.html`,
    `contact.html` — whatever the docs and the curve named). Interior pages are
    built here, not left for later: an index alone is half the failure this mode
-   exists to fix, and step 7 walks the whole directory. Every page carries the
+   exists to fix, and step 7 walks the whole directory. Each interior page is built
+   from its own rows in the sub-step 5 plan. An interior page whose body carries no
+   composition has not been built, only filled — and it will pass every machine gate,
+   because valid markup with correct tokens is exactly what a hand-rolled template
+   produces. Every page carries the
    header and footer chrome from Step 4 (logo, nav, language switcher, hamburger
    at mobile, footer columns) and Step 4's responsive breakpoints; ignore Step
    4's single-file, no-CDN, `:root` token and placeholder-content clauses, which

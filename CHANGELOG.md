@@ -1,5 +1,46 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Interior pages had a ceiling and no floor, so a craft build shipped eleven of them
+  uncomposed.** The rules said "Interior pages never pin", and nothing said what an
+  interior page must *do*. Read alone, the prohibition became permission to do nothing: a
+  real build planned nine compositions for `index.html` and none for the other eleven
+  pages, which were written from one hand-rolled template — eyebrow, headline, rule,
+  definition list. Their only composition blocks were `site-head`, `closing-block` and
+  `footer-columns`: a header, a CTA and a footer.
+
+  Every machine gate passed, because each gate asked a question the build answered
+  correctly. The markup was valid, the tokens were right, the devices were wired. Nothing
+  asked whether an interior page had been composed at all.
+
+  Three changes close it. `references/compositions.md` states that "cheap roles"
+  constrains *which* compositions an interior page uses, never *whether* it uses any, and
+  that chrome does not count toward the floor. `references/devices.md` gains a motion
+  floor beside its never-pin ceiling: at least one scroll-reactive device that is not
+  `reveal`, because `reveal` fires once and the pointer devices need a cursor, so a page
+  holding only those cannot respond to a scroll — 74 reveals and 19 pointer devices across
+  eleven pages measured as motion and moved nothing. `/wp-demo` sub-step 5 now plans every
+  page in the agreed set rather than the index alone, and sums the budget per page.
+
+  Both reference files carry the substance because `/wp-yolo`'s craft path reads them and
+  never opens `commands/wp-demo.md`.
+
+### Added
+
+- **`demo-verify` reports `static-page`.** A page whose entire motion is `reveal` plus
+  pointer devices is a static page that measures as animated, and no existing finding
+  could say so: `no-engine` asks whether motion exists, `dead-scroll` whether a section
+  moves, and both are satisfied by devices that are present and correctly wired. The new
+  finding judges the *mix* — it names the devices the page actually has and fails the round
+  when none of them reacts to scrolling. Blocking, not advisory.
+
+  This is the first gate in the craft path that catches a build rather than a contract.
+  The greps beside it pin the rule's wording, which was accurate before this change and
+  accurate after it; the wording was never what failed.
+
 ## [1.17.0] - 2026-09-13
 
 ### Added

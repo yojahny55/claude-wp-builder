@@ -93,7 +93,18 @@ here without leaving a stale copy behind.
 A pin outside the peak is capped at span 2.0. The one element marked
 `data-motion-peak` may reach span 3.0. Interior pages never pin — an about page that
 opens on a title and a divider and then holds them for two screens is not
-restraint, it is an empty page with a long fuse. The index adds at most four
+restraint, it is an empty page with a long fuse.
+
+**Interior pages have a floor as well as a ceiling, and the floor is the one that
+gets missed.** "Never pin" says what an interior page may not do; on its own it has
+been read as permission to do nothing, which produces eleven pages carrying a
+one-shot `reveal` and three hover devices. Hover is not motion on a touch screen,
+and a `reveal` above the fold does not animate at all on the CSS path — so a page
+whose entire motion budget is `reveal` plus pointer devices is a static page that
+measures as animated. Every interior page therefore carries **at least one
+scroll-reactive device that is not `reveal`**: `drift`, `count`, `parallax` at a low
+rate, `pan`, or `cascade`. All of them cost 0 vh except `pan`, so the budget is
+never the reason a page has none. The index adds at most four
 viewport-heights beyond its section count in total; the role table in
 `compositions/README.md` lists each composition's cost, so the sum is arithmetic
 done before the build, not a surprise measured after it. Seven screens of scroll

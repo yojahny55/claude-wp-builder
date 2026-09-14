@@ -28,7 +28,20 @@ Sum the motion cost before building. The index adds at most four
 viewport-heights beyond its section count; the role table carries each
 composition's cost in vh so the sum is arithmetic, not a measurement taken after
 the page is already 12,000px tall. Promote exactly one composition to the peak
-with `data-motion-peak`. Interior pages take the cheap roles and never pin.
+with `data-motion-peak`. Interior pages take the cheap roles and never pin — **and they are composed, not
+hand-rolled.** "Cheap roles" constrains *which* compositions an interior page uses,
+never *whether* it uses any. Every page in the agreed set carries, at minimum, a
+`page-head` opening its content and one body composition matching its role;
+`site-head`, `footer-columns`/`footer-line` and `closing-block` are chrome and do
+not count toward that floor, because every page has them and they say nothing about
+what the page is.
+
+A page whose body is hand-authored markup while the role table covers its role is
+the finding, not a shortcut. Eleven pages built from one hand-rolled template —
+eyebrow, headline, rule, definition list — are indistinguishable from each other
+with the headlines removed, which is what the squint test measures and what it
+catches. Ten of the thirteen compositions cost 0 vh, so an interior page that
+declines them is not saving budget; it is declining the library.
 
 Deviate from a composition only with a one-line reason in `demo/BRIEF.md`. A role
 the table does not cover is built by hand under the same contract — delimiters,

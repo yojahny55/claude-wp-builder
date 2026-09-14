@@ -399,6 +399,27 @@ const revealState = (idx) => {
 };
 
 /** Report @container rules whose subject can never match a container. */
+/* A page whose entire motion is `reveal` plus pointer devices is a static page that
+ * measures as animated. `reveal` is a one-shot entrance, and on the CSS path an element
+ * already in view at load lands on its end state without animating at all; `tilt`,
+ * `magnet` and `spotlight` need a pointer, so they do nothing on a touch screen. Neither
+ * reacts to scrolling. A build once shipped eleven of twelve pages in exactly this state
+ * — 74 reveals and 19 pointer devices between them, not one scroll-reactive device — and
+ * every gate passed, because each device present was correctly wired. What no gate asked
+ * was whether the mix could move. This one does.
+ *
+ * Returns the device kinds present, so the finding can name what the page actually has
+ * rather than assert an absence. */
+const POINTER_DEVICES = new Set(['tilt', 'magnet', 'spotlight']);
+const motionMix = () => {
+  const kinds = {};
+  document.querySelectorAll('[data-motion]').forEach((el) => {
+    const k = (el.getAttribute('data-motion') || '').trim();
+    if (k) kinds[k] = (kinds[k] || 0) + 1;
+  });
+  return kinds;
+};
+
 const containerAudit = () => {
   const out = [];
   const sheets = [...document.styleSheets];
@@ -481,6 +502,7 @@ try {
   // One list of dead selectors per width walked, intersected after the loop.
   // See the container-noop block below for why a single width cannot decide it.
   const containerNoop = [];
+  let mix = null;
 
   // The docs promise the reduced-motion pass at desktop width. Pinning it to
   // widths[0] meant a mobile-first --widths list ran it at the phone size and
@@ -508,6 +530,7 @@ try {
     // round on correct CSS. Collect per width, report only what is dead at ALL of
     // them, below the loop.
     if (!reduced) containerNoop.push(await page.evaluate(containerAudit));
+    if (!reduced && !mix) mix = await page.evaluate(motionMix);
     // Width-independent (a <script src> is in the markup at every size), so this
     // one stays a once-per-page read.
     if (!staticChecked) {
@@ -697,6 +720,24 @@ try {
   // A selector is dead only if no element matching it had a container-establishing
   // ancestor at ANY width walked: the intersection, never the union. The finding's
   // shape is unchanged; `width` names the first width the audit ran at.
+  // Scroll-reactive means: reacts to the page moving. `reveal` fires once on entry and
+  // the pointer devices need a cursor, so a page holding only those cannot respond to a
+  // scroll at all — which is the complaint a reader makes as "nothing happens here",
+  // while the device count says the page is busy.
+  if (mix) {
+    const kinds = Object.keys(mix);
+    const scrollReactive = kinds.filter((k) => k !== 'reveal' && !POINTER_DEVICES.has(k));
+    if (kinds.length && !scrollReactive.length) {
+      findings.push({
+        kind: 'static-page',
+        pass: 'normal',
+        width: widths[0].width,
+        devices: mix,
+        detail: 'only reveal and pointer devices: nothing on this page reacts to scrolling',
+      });
+    }
+  }
+
   if (containerNoop.length) {
     for (const sel of containerNoop.reduce((a, b) => a.filter((s) => b.includes(s))))
       findings.push({ kind: 'container-noop', pass: 'normal', width: widths[0].width, selector: sel });
