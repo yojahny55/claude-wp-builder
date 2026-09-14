@@ -50,7 +50,9 @@
 .icon-row__name {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(1.0625rem, 1.6cqi, 1.25rem);
+  /* 1.1875rem against the 0.9375rem note is 1.27x, clearing the 1.25x floor in
+     references/taste.md. At 1.0625rem it was 1.13x and read as bold body text. */
+  font-size: clamp(1.1875rem, 1.8cqi, 1.4375rem);
   line-height: 1.25;
 }
 .icon-row__note {

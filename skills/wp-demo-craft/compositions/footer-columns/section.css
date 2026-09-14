@@ -42,6 +42,13 @@
   max-width: 34ch;
   margin: 0;
 }
+/* A <p>, not an <h2>. Three column labels at 0.8rem used to be headings, which put
+   the h2 role at 12.8px on every page of every craft build -- so the measured type
+   ladder was flat site-wide no matter how well-proportioned the real section
+   headings were, and correctly-sized components elsewhere tripped
+   `flat-type-hierarchy` because of a footer. The two nav columns already carry
+   `aria-label`, so nothing was lost by demoting them; see ../../references/taste.md
+   on heading roles. */
 .footer-columns__col-title {
   font: 500 0.8rem/1.2 var(--font-text);
   letter-spacing: 0.08em;

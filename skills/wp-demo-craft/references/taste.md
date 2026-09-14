@@ -52,6 +52,17 @@ render, not the number.
   eyebrow had no way to find the safe side except by trial, because the number was
   written nowhere. It is written here now: stay at or below `0.1em`, and prefer copying
   `page-head`'s kicker rule to inventing one.
+- **A heading element is a role, not a size — never use one as a small label.**
+  An `<h2>` styled at 0.8rem does not read as small print to the type scale; it
+  enters the h2 role and flattens the measured ladder for the **whole page**,
+  including sections that are perfectly proportioned. A real build tripped
+  `flat-type-hierarchy` with `h2 12.8px, body 15.5px, h3 17.3px` — and the 12.8px
+  was three column labels in the footer, on every page. If it needs to look like a
+  label, it is a `<p>`; give the region its name with `aria-label` instead.
+- **A component heading clears at least 1.25× over body at its own size.** A
+  trimmed heading that lands at 1.12× reads as bold body text and measures as a
+  flat scale. Check the ratio at the size it actually renders, not at the token's
+  nominal value.
 - **Tracking tightens as size grows.** A typeface set at 6rem with default
   tracking reads loose and amateur. A ramp handles this: `--font-track-tight`
   on display, `--font-track-normal` on body. This is optical correction, not
@@ -297,6 +308,20 @@ fast.
   A fact published about the sector — a score range and its bands, a statutory
   timescale, a standard fee structure — is not an invented statistic. It is the
   subject. Draw it.
+- **Cut inside the sentence, not at its pivot.** Told to reduce text, the
+  tempting cut is the one that leaves a contrast: *"We are not a law firm. We do
+  not give legal advice — the application of the law to your circumstances. For
+  that, consult an attorney."* becomes *"Not a law firm. No legal advice. For
+  that, see an attorney."* That removes almost no information; what it removes is
+  the sentence, leaving a manufactured aphorism. Three of those in one section is
+  a **cadence**, and `impeccable detect` names it. Drop modifiers, subordinate
+  clauses and hedges; keep the subject and the verb.
+
+  **The bold-lead-in list format invites this specifically.** `<b>Lead.</b> Rest
+  of the sentence.` makes the lead a natural fragment, so one trim pass turns
+  every row into an aphorism at once — the defect arrives as a set, not as a
+  single line. Any composition shaped that way carries the risk with it, and a
+  "less text" pass over one is the moment to vary sentence length deliberately.
 - Real copy, not lorem. Real names, not "John Doe". Real numbers or no
   numbers.
 - **No invented statistics.** Fake precision (`4.1×`, `92%`, `48k`) is a

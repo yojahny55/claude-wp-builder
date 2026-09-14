@@ -164,4 +164,52 @@ for f in preview-1440.png preview-390.png; do
   [ -s "$C/score-scale/$f" ] || fail "score-scale is missing $f"
 done
 
+# --- a heading element is a role, not a size ----------------------------------
+# An <h2> styled at 0.8rem does not read as small print to the type scale: it enters
+# the h2 role and flattens the measured ladder for the WHOLE page. A real build
+# tripped flat-type-hierarchy with `h2 12.8px, body 15.5px, h3 17.3px` -- and the
+# 12.8px was three column labels in footer-columns, present on every page of every
+# craft build, breaking sections that were themselves correctly proportioned.
+#
+# Enforced structurally rather than by prose: no heading in any composition may be
+# sized below 1.1rem at the small end of its clamp. Label-sized headings are the
+# defect; a label that wants to look like a label is a <p> with aria-label on its
+# region.
+for f in "$C"/*/section.html; do
+  comp=$(basename "$(dirname "$f")")
+  for cls in $(grep -oE '<h[1-6] class="[a-z-]+__[a-z0-9-]+"' "$f" \
+                 | grep -oE '[a-z-]+__[a-z0-9-]+' | sort -u); do
+    # The smallest size the heading can render at: the first length in its clamp,
+    # or its plain font-size.
+    min=$(grep -A8 "^\.$cls *{" "$C/$comp/section.css" 2>/dev/null \
+            | grep -oE 'font-size: *clamp\( *[0-9.]+rem|font-size: *[0-9.]+rem' \
+            | head -1 | grep -oE '[0-9.]+rem' | tr -d 'rem')
+    [ -n "$min" ] || continue
+    awk -v v="$min" 'BEGIN { exit !(v + 0 < 1.1) }' \
+      && fail "$comp: .$cls is a heading element rendered at ${min}rem -- a label-sized heading flattens the h2/h3 role for every page it appears on"
+  done
+done
+
+# footer-columns is where this was found. Its column labels must stay demoted.
+grep -qE '<h[1-6][^>]*footer-columns__col-title' "$C/footer-columns/section.html" \
+  && fail "footer-columns: the column labels are headings again, which flattens the type scale site-wide"
+grep -qF 'aria-label' "$C/footer-columns/section.html" \
+  || fail "footer-columns: demoting the labels removed their accessible names"
+
+taste=skills/wp-demo-craft/references/taste.md
+
+# --- cutting text must not manufacture a cadence ------------------------------
+# The tempting cut is the one that leaves a contrast, which removes almost no
+# information and converts a sentence into an aphorism. Three in a section is a
+# cadence and impeccable names it. The bold-lead-in list format produces them as a
+# set rather than one at a time.
+grep -qF 'Cut inside the sentence, not at its pivot' "$taste" \
+  || fail "$taste must say where a trim lands, not just that text should be shorter"
+grep -qF 'bold-lead-in list format invites this' "$taste" \
+  || fail "$taste must name the list shape that produces aphorisms as a set"
+grep -qF 'A heading element is a role, not a size' "$taste" \
+  || fail "$taste must forbid using a heading element as a small label"
+grep -qF 'clears at least 1.25' "$taste" \
+  || fail "$taste must state the heading-to-body ratio a component heading has to clear"
+
 echo PASS

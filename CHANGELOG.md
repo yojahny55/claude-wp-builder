@@ -4,6 +4,22 @@
 
 ### Fixed
 
+- **`footer-columns` flattened the measured type scale on every page.** It used `<h2>`
+  for three column labels at `0.8rem`, and a heading element is a role rather than a
+  size: 12.8px entered the h2 role on every page of every craft build, so correctly
+  proportioned sections elsewhere tripped `flat-type-hierarchy` because of a footer. The
+  labels are `<p>` now, with `aria-label` carrying the accessible names. A structural
+  check refuses any heading sized below `1.1rem`, and it caught one more on the way in:
+  `icon-row__name` at 1.13x over its body text, since raised to 1.27x.
+
+  `taste.md` gains the rules behind it — a heading element is a role not a size, a
+  component heading clears 1.25x over body at the size it renders, and **cut inside the
+  sentence, not at its pivot**: trimming at the pivot removes almost no information while
+  converting a sentence into a manufactured aphorism, and three in a section is a cadence
+  the detector names. The bold-lead-in list format produces them as a set.
+
+### Fixed
+
 - **A recorded client brief had no authority over the craft defaults, and the defaults
   won.** `/wp-context` writes the client's own direction into the project's
   `.claude/CLAUDE.md`; on one project that direction was explicit — *"an impactful
