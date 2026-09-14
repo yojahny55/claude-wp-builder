@@ -191,7 +191,13 @@ it; none of them errors, and all four look correct in the source.
    for `entry 14%` matched nothing at all. The peer build hit the same thing from the
    other direction, by *adding* a `<span>` to a list three rounds after the ladder was
    written, which shifted every `<li>` one place. `:nth-of-type` counts `li` among
-   `li` and cannot be shifted by a sibling of another type.
+   `li` and cannot be shifted by a sibling of another type. The exception is a ladder whose
+   children are *deliberately* of mixed type — a label, a link and a step in one flow
+   — which has no type to count, so `:nth-child` is the only index available and is
+   correct. The stylesheet cannot tell that case from the broken one, so the scan does
+   not guess: the author writes `ladder-scan: allow-nth-child <selector> -- <why>` in a
+   comment, and a marker with no reason after it is refused. The point is to record a
+   judgement someone can check, not to provide a way to silence the scan.
 
 2. **One phase keyword per ladder.** `entry X%` and `cover X%` are not comparable.
    The entry phase spans `min(elementH, viewportH)` of scroll and the cover phase
@@ -213,7 +219,50 @@ it; none of them errors, and all four look correct in the source.
    arriving as a stagger bug instead of as a disagreement between two readouts.
 
 The first three are asserted by `tests/checks/lib/ladder-scan.py`. The fourth is not
-visible in one file. The attribute contract gives a section **one** device; rich
+visible in one file.
+
+### Measuring motion: two readouts, and they answer different questions
+
+Every measurement mistake made while writing these rules — on both sides of the
+review — was the same mistake, made four times: reading the rendered value when the
+question was about the timeline.
+
+| reading | what it is | use it for |
+|---|---|---|
+| `animation.currentTime` | where the timeline is, raw, before the timing function | is this ladder in order? |
+| the computed property | what the reader actually sees, after the ease | does this look arrived? |
+
+`getComputedStyle(el).getPropertyValue('--x')` and `getBoundingClientRect()` both go
+through `animation-timing-function`. Two consequences, both of which produced a wrong
+number that looked plausible:
+
+- **Eased readings are not progress.** Measuring the `entry`-to-`cover` conversion by
+  reading an animated custom property put `entry 100%` at "cover 52.8%" where the
+  true value is 30.8% — the default `ease` distorted both sides. Setting
+  `animation-timing-function: linear` made all eight measurements match the
+  arithmetic exactly. Ordering conclusions survive an ease, because a monotonic
+  function preserves order; percentages do not.
+- **`getBoundingClientRect()` returns the transformed box.** An element mid-`scale`
+  reports its scaled size, so a row of nodes animating `scale: 1 → 1.08` measured 44,
+  43.8, 43.3 and 42.6px and every junction looked several pixels out. Both were
+  artefacts. Use `offsetWidth`/`offsetHeight` for layout, or inject
+  `* { animation: none !important }` before measuring geometry.
+
+### An override can conceal what it overrode
+
+A project override that *flattens* a ladder — giving every rung the same range —
+makes a broken ladder unobservable, because "all correct" and "all identical" look
+the same on a screenshot. Measured on the build using this library: an override
+collapsed two plan columns onto one range, so `offer-table`'s off-by-one could not
+appear there, and the cost of the override was the stagger itself, unnoticed for
+several rounds.
+
+So an override is two hazards, not one. It can silently fail to apply — a patch
+appended *above* the rules it means to replace loses on source order at equal
+specificity, and nothing errors — and it can silently succeed at hiding the defect
+underneath it. The only reliable signal in either direction is the computed value
+read back off the live element, which is also what found the off-by-one: the
+stylesheet says what was written, never what applied. The attribute contract gives a section **one** device; rich
 motion is many elements moving on their own timelines inside one section, and the
 attribute cannot express that while CSS does it trivially.
 

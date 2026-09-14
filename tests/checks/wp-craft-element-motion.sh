@@ -398,4 +398,49 @@ $ladders"
 grep -Fq 'the section stops being a sequence' "$C/process-flow/section.css" \
   || fail "process-flow has lost the note explaining why the guard is on the list and not on the sixth step"
 
+# --- the measurement rules, and the exemption that must be argued -----------------
+# Every wrong number produced while writing the ladder rules -- on both sides of the
+# review -- came from reading the rendered value when the question was about the
+# timeline. `getComputedStyle` and `getBoundingClientRect` both go through the timing
+# function, so an eased reading is not progress and a transformed box is not a layout
+# box. Recording the distinction is the only thing that stops it recurring.
+grep -Fq 'two readouts, and they answer different questions' "$dev" \
+  || fail "$dev does not separate animation.currentTime from the computed property; that conflation produced four wrong measurements"
+grep -Fq 'Eased readings are not progress' "$dev" \
+  || fail "$dev does not warn that a computed property is eased, which put entry 100% at cover 52.8% instead of 30.8%"
+grep -Fq 'returns the transformed box' "$dev" \
+  || fail "$dev does not warn that getBoundingClientRect reports the scaled box mid-animation"
+grep -Fq 'An override can conceal what it overrode' "$dev" \
+  || fail "$dev does not record that a flattening override hides a broken ladder -- 'all correct' and 'all identical' look the same"
+
+# The scan cannot tell a deliberately mixed-type flow from a broken ladder, so the
+# exemption is authored. It must not be a silent bypass: assert the marker carries a
+# reason, by running the scanner over a fixture with and without one.
+tmp=$(mktemp -d)
+mkdir -p "$tmp/mixed"
+cat > "$tmp/mixed/section.css" <<'FIXTURE'
+.cn > * { animation-name: rise; animation-fill-mode: both; animation-timeline: --t; }
+.cn > *:nth-child(1) { animation-range: entry 10% entry 110%; }
+.cn > *:nth-child(2) { animation-range: entry 16% entry 116%; }
+.cn > *:nth-child(n+3) { animation: none; }
+FIXTURE
+scan="$(dirname "$0")/lib/ladder-scan.py"
+# Each assertion names the finding it wants. `-n` alone is not enough and proving that
+# took a mutation: with the :nth-child branch disabled the fixture still emitted its
+# catch-all finding, so a test for "some output" stayed green while the rule it names
+# had been removed.
+nth_finding() { python3 "$scan" "$1" | grep -c 'indexes a stagger by :nth-child'; }
+
+[ "$(nth_finding "$tmp")" -ge 1 ] \
+  || fail "ladder-scan.py does not flag :nth-child at all -- the rule is not enforced"
+
+printf '/* ladder-scan: allow-nth-child .cn > * */\n' >> "$tmp/mixed/section.css"
+[ "$(nth_finding "$tmp")" -ge 1 ] \
+  || fail "ladder-scan.py accepts a bare allow-nth-child marker with no reason, which makes the exemption a silent bypass"
+
+printf '/* ladder-scan: allow-nth-child .cn > * -- label, link and step in one flow */\n' >> "$tmp/mixed/section.css"
+[ -z "$(python3 "$scan" "$tmp")" ] \
+  || fail "ladder-scan.py refuses a reasoned exemption, so a genuinely mixed-type flow has no legal spelling: $(python3 "$scan" "$tmp")"
+rm -rf "$tmp"
+
 echo PASS

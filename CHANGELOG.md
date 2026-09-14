@@ -4,6 +4,30 @@
 
 ### Added
 
+- **An override can conceal what it overrode.** The known hazard was an override that
+  silently fails to apply — appended above the rules it replaces, losing on source
+  order at equal specificity. The other direction is worse: an override that *flattens*
+  a ladder makes a broken ladder unobservable, because "all correct" and "all
+  identical" look the same on a screenshot. Measured on the build using this library,
+  an override collapsed two columns onto one range, hiding `offer-table`'s off-by-one
+  and costing the stagger itself for several rounds without anyone noticing.
+
+- **Measuring motion: two readouts, and they answer different questions.**
+  `animation.currentTime` is raw timeline progress and is the one for "is this ladder
+  in order"; the computed property is post-ease and is the one for "does this look
+  arrived". `getComputedStyle` and `getBoundingClientRect` both go through the timing
+  function — an eased reading put `entry 100%` at cover 52.8% where the truth is 30.8%,
+  and `getBoundingClientRect` returns the *transformed* box, so nodes mid-`scale`
+  measured 44 / 43.8 / 43.3 / 42.6px. Both artefacts, and between them the cause of
+  every wrong number produced while writing these rules.
+
+- **`ladder-scan.py` gains an exemption that has to be argued.** `:nth-of-type` is
+  unavailable to a ladder whose children are deliberately of mixed type, and the
+  stylesheet cannot tell that case from a broken one. The author writes
+  `ladder-scan: allow-nth-child <selector> -- <why>`; a marker with no reason is
+  refused, so the exemption records a judgement rather than silencing the scan.
+
+
 - **`process-flow`, a second answer in the `process` role.** A pipe with a node per
   step and a line the scroll draws along it, stacked on a phone and horizontal once
   the container can hold a column per step. Costs 0 vh where `process-rail` costs a
