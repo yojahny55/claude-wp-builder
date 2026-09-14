@@ -12,6 +12,10 @@ if [ -n "${WP_DESIGN_LIBRARY_URL:-}" ]; then
   curl -s -X POST "$WP_DESIGN_LIBRARY_URL/mcp" -H "authorization: Bearer ${WP_DESIGN_LIBRARY_TOKEN:?}" \
     -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' -d "$body" \
     | grep -q '"name":"search"' || { echo "FAIL: live tools/list"; exit 1; }
+  call_body='{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search","arguments":{"query":"","limit":1}}}'
+  curl -s -X POST "$WP_DESIGN_LIBRARY_URL/mcp" -H "authorization: Bearer ${WP_DESIGN_LIBRARY_TOKEN:?}" \
+    -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' -d "$call_body" \
+    | grep -q '"arms"' || { echo "FAIL: live tools/call search"; exit 1; }
   echo "live: ok"
 else
   echo "live: SKIP (WP_DESIGN_LIBRARY_URL unset)"
