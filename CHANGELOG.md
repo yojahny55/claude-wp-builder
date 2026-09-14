@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **The demo brief now interviews the operator about form, and gates the build on
+  approval.** Every field it captured — person, pain, promise, vibe words, references,
+  the feeling curve, the peak — was about *story*. None was about *form*: what the site
+  looks like, how much it moves, how much of it is reading. A build could satisfy the
+  brief completely and still ship twelve pages of dense paragraphs with one animation.
+
+  The old rule, "ask in one pass only what the docs cannot answer", is right for story
+  and wrong for form: documents describe a business and almost never describe a website,
+  so it resolved to never asking. Six form fields are now always asked, with concrete
+  options — which facts become a picture rather than a paragraph, text density, motion
+  appetite, microinteraction appetite, the one action, and what specifically to take from
+  each reference. They bind on the composition plan, so a row contradicting a recorded
+  answer is a defect rather than a judgment call.
+
+  The brief is shown whole and revised in a loop with no pass limit; the build runs only
+  once the operator approves, and the approval is recorded with its date. `AskUserQuestion`
+  is added to the command's tools — it was instructed to interview and had none.
+
 ### Added
 
 - **`score-scale`: the first composition that draws data rather than describing it.** The

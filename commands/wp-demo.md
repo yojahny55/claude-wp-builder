@@ -1,6 +1,6 @@
 ---
 description: Create a demo HTML mockup for client approval — responsive, section-separated, ready for WordPress conversion
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, AskUserQuestion
 argument-hint: "[brief] [--craft|--plain] | iterate"
 ---
 
@@ -134,8 +134,55 @@ before writing any markup.
    **cites the `demo/RESEARCH.md` line and its source URL, or keeps the marker**
    — and the marker now means something,
    because there was an alternative. Mark anything invented "Self-authored,
-   not interviewed". Ask, in one pass, only what the docs cannot answer. Show
-   the brief once and proceed on a yes.
+   not interviewed".
+
+   **3a. Interview the operator about form.** Everything above is *story* — what
+   the site says. None of it is *form* — what the site looks like, how much it
+   moves, and how much of it is reading. A brief can be right about the person,
+   the pain and the promise and still produce twelve pages of dense paragraphs
+   with one animation, because nothing in it ever asked otherwise.
+
+   **Project documents describe a business. They almost never describe a
+   website.** So unlike the story fields, the form fields are nearly always
+   unanswered by the docs, and asking them is the normal case rather than the
+   exception. Ask all six with `AskUserQuestion`, in as many passes as it takes
+   to get real answers, and write each answer into `demo/BRIEF.md` under
+   `## Form`:
+
+   | Field | The question behind it |
+   |---|---|
+   | `draw, don't write` | Which facts about this business should be a **picture** rather than a paragraph? A scale, a range, a before and after, a sequence, a comparison. This is the field that decides whether the demo has anything in it besides type. |
+   | `text density` | How much reading per section — a sentence, a short paragraph, or a full explanation? |
+   | `motion appetite` | How much movement: entrance only, motion throughout, or deliberately still? And is scroll choreography wanted, or is element motion enough? |
+   | `microinteraction appetite` | Hover states, animated borders, icons that draw on, details that reward attention — wanted, or noise? |
+   | `the one action` | What should a visitor actually do? Everything on the page either serves that or is decoration. |
+   | `reference: what to take` | For each named reference, **what specifically** — its layout, its motion, its density, its restraint? "I like this site" is not usable; "I like how little it makes you read" is. |
+
+   Offer concrete options rather than open questions. An operator who is shown
+   "a sentence / a short paragraph / the full explanation" answers accurately;
+   one asked "how much text do you want?" says "not too much" and means
+   something you cannot build to.
+
+   The answers are constraints on the composition plan in sub-step 5, not
+   decoration on the brief. `draw, don't write` decides which roles the plan
+   reaches for; `text density` decides how much copy each slot carries;
+   `motion appetite` and `microinteraction appetite` decide how far the element
+   motion goes. A plan that contradicts a recorded form answer is wrong in the
+   same way a plan that contradicts the domain signal is wrong.
+
+   **3b. The operator approves the brief before anything is built.** Show the
+   whole brief — story and form — and wait. This is a gate, not a courtesy
+   notice: a build that starts on an unapproved brief spends its whole run on
+   assumptions nobody confirmed, and the cost of that is discovered at the end,
+   in rounds of rework, against a finished demo.
+
+   Changes loop: revise and show it again. There is no pass limit and no
+   "proceed unless told otherwise" — the brief is approved when the operator
+   says so, and only then does sub-step 4 run.
+
+   Record in `demo/BRIEF.md` that the brief was approved, with the date. A demo
+   whose brief was never confirmed is a demo built from a guess, and the next
+   run should be able to tell the difference.
 
    **3.5. Inventory the assets on disk.** List every image, SVG and font under the
    project's `docs/` with a role — `logo`, `hero`, `portrait`, `product`, `texture`,
@@ -185,6 +232,13 @@ before writing any markup.
    Then open
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/compositions/README.md` and look at
    each candidate's `preview-1440.png` and `preview-390.png`.
+
+   **The form answers from sub-step 3a bind here.** `draw, don't write` names the
+   facts that must become a composition rather than a paragraph — reach for a role
+   that draws them, and say in the row which answer it serves. `text density` sets
+   how much copy each slot carries. `motion appetite` and `microinteraction
+   appetite` set how far the element motion goes. A row that contradicts a recorded
+   answer is a defect, not a judgment call: the operator was asked, and answered.
 
    **The plan covers every page in the agreed set, not only the index.** Write the
    index's rows from the curve, then a short block of rows per interior page. This
