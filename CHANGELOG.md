@@ -2,6 +2,44 @@
 
 ## [Unreleased]
 
+### Added
+
+- **The generative half of the ported skill, absent since the port.**
+  `wp-demo-craft` was ported from nateherkai/scroll-craft as *prose* — taste floor,
+  refuse list, feeling curve, device kit — and every one of those is a constraint. The
+  three references that make one build differ from the last never came over. Measured:
+  the source skill is 5,155 lines, this one was 1,752. Now ported and wired into
+  `SKILL.md`, because an unread reference is the same as an absent one:
+  - `references/uniqueness.md` — the template trap, the signature move, the seven
+    aesthetic families, and the burden of proof on the default grammar.
+  - `references/hero-depth.md` — layering is the baseline, not a polish pass. A
+    full-screen photograph with one parallax transform and a text fade is the flat hero
+    it exists to prevent.
+  - `references/worlds.md` — eight art-direction preambles, each pasted verbatim into
+    every image prompt so separately generated plates look like one shoot.
+
+- **A second axis of sameness the source never had to name.** scroll-craft builds one
+  page per project, so its only axis was build against build. A multi-page demo can
+  also repeat *itself*: eleven pages that are the same page with different words, which
+  is what was actually reported. No two pages of one demo may now share their whole
+  composition sequence, and the index's sequence may not be a superset of an interior
+  page's.
+
+- **`aesthetic family` joins the brief.** Premium-minimal is a choice, not the default
+  costume, and a shelf of dark pages with one accent each is what happens when nobody
+  decides.
+
+### Fixed
+
+- **The fingerprint gate compared fonts and not structure.** v2 reduced it to display
+  family, text family and accent hue, reasoning that the composition library chooses
+  structure per role so structure needed no fingerprint. A library with one good answer
+  per role gives every build the same answer — which is exactly what structural
+  fingerprinting catches. Two structurally identical sites passed the gate because
+  their fonts differed. v3 restores the structural axes: seven dimensions, four of
+  which must differ against every row individually, with the palette rule kept as an
+  absolute on top.
+
 ### Fixed
 
 - **`footer-columns` flattened the measured type scale on every page.** It used `<h2>`

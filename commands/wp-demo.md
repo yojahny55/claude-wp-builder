@@ -160,6 +160,7 @@ before writing any markup.
    | `microinteraction appetite` | Hover states, animated borders, icons that draw on, details that reward attention — wanted, or noise? |
    | `the one action` | What should a visitor actually do? Everything on the page either serves that or is decoration. |
    | `surface vocabulary` | **What does a card look like on this site?** Flat, bordered, elevated, glass. One line, site-wide consequences, and the cheapest question on this table to ask late — a build learned in round five that the client had meant "glassmorphism, liquid, like Apple" by name, after every card had already shipped flat. Ask it before the first section is styled. |
+   | `aesthetic family` | Brutalist, maximalist, playful, retro, dense, editorial, or premium-minimal — `references/uniqueness.md` §6 defines each and what earns it. **Premium-minimal is a choice, not the default costume**, and a shelf of dark pages with one accent each is what happens when nobody decides. If the client says "loud" and the demo comes back in charcoal, the interview was decorative. |
    | `name the moving things` | Not appetite on a scale — **a list**. "A credit score going from bad to good" is an answer; "yes, lots of animation" is not. An appetite question returns a volume knob, and a list returns a spec that names components nobody has built yet. |
    | `where the background does work` | Does the ground carry anything — a field, a gradient in motion, a texture, a drawn figure — or is it flat canvas behind everything? Readers distinguish ground from content and have opinions about both ("love the background animation, but the section is ugly"), and with no question about it the ground defaults to flat and every "generic / blank" note is partly about it. |
    | `what may we not claim` | What is this business forbidden to say? In regulated sectors the answer shapes half the copy — a credit-repair firm is bound by CROA, a clinic by its advertising code, a firm by its bar rules. A build surfaced this by reading the statute itself, which is luck, not process. Ask the client; they already know. |
@@ -263,6 +264,19 @@ before writing any markup.
    appetite` set how far the element motion goes. A row that contradicts a recorded
    answer is a defect, not a judgment call: the operator was asked, and answered.
 
+   **Read the plan's composition column DOWN before building.** No two pages may
+   share their whole composition sequence, and the index's sequence may not be a
+   superset of an interior page's — `references/uniqueness.md` §2. Two pages
+   sharing a header and a footer is a site; two pages sharing their middle is a
+   template, and "all the pages are almost the same thing" is what that gets
+   reported as. An about page, a services page and a contact page have three
+   different jobs — a story, a comparison, a transaction — so three identical
+   sequences means the jobs were never read.
+
+   **Landing on the default grammar costs one sentence per grammar rejected**
+   (§3). The default is whichever one a build drifts into when nobody chooses,
+   and four builds in a row looking related is what that drift produces.
+
    **The plan covers every page in the agreed set, not only the index.** Write the
    index's rows from the curve, then a short block of rows per interior page. This
    is the step where an interior page stops being an afterthought: a build that
@@ -293,6 +307,30 @@ before writing any markup.
    the docs name no reference and the Landing Gallery MCP is connected, pull
    four screenshots for the page kind first; when it is not, say so and choose
    from the previews alone.
+
+   **5.4. The signature move and the world.** Both are recorded in
+   `demo/BRIEF.md` before the first section is built, not after.
+
+   The **signature move** is one bespoke interaction that exists on this site
+   alone — `references/uniqueness.md` §4 lists what counts and what does not. A
+   parameter change to a library device is not one; neither is an existing device
+   under a project-specific class name. The test is whether someone who has seen
+   the other builds could tell it apart. **A move described after the build is
+   usually a device with a new name**, which is why it is written down first.
+
+   The **world** is one style preamble chosen from
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/worlds.md`, recorded
+   verbatim under `## World`, and pasted **word for word** at the top of every
+   image prompt this build sends. Reusing it verbatim is what makes separately
+   generated plates look like one shoot; paraphrasing it is what makes them look
+   like eight prompts. Every shot prompt then also names **where the empty space
+   is** — copy sits on these images, so the space is generated, never cropped in
+   afterwards.
+
+   The hero is layered by default:
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/hero-depth.md`. A
+   full-screen photograph with one parallax transform and a text fade is the flat
+   hero that file exists to prevent.
 
    **5.5. Image plan.** Craft builds only, and only when the composition plan
    includes a composition that declares an image slot (`hero-split`,

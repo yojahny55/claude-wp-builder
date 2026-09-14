@@ -75,7 +75,14 @@ plain: an unverified craft page is the one that reaches the client.
    person, pain and promise either
    **cites the `demo/RESEARCH.md` line and its source URL, or keeps the marker**
    — and the marker now means something, because there was an alternative.
-3. **Grammar, then composition plan.** Pick one grammar from
+3. **Grammar, then composition plan.** Landing on the default grammar
+   requires one sentence in `demo/BRIEF.md` per grammar that was rejected
+   (`references/uniqueness.md` §3) — impossible to write honestly when the
+   default is not right, which is the whole mechanism. **No two pages of one
+   demo may share their whole composition sequence**, and the home page's
+   sequence may not be a superset of an interior page's (§2): two pages
+   sharing a header and a footer is a site, two pages sharing their middle is
+   a template. Pick one grammar from
    `references/grammars.md` — it decides what a section is, what the chrome is
    for and what the ending does, and compositions are chosen inside it, not
    instead of it. Then one row per section — section, role, composition, why,
@@ -89,10 +96,16 @@ plain: an unverified craft page is the one that reaches the client.
    (`references/compositions.md`). That row format is stated in these same terms
    `/wp-demo` Step 2.6 uses on purpose — do not restate it a third way. Sum the
    motion cost before building and hold it under the budget in `devices.md`.
-4. **Build** from the compositions, the tokens and the real copy.
+4. **Build** from the compositions, the tokens and the real copy. Before the first section, record the
+   **signature move** in `demo/BRIEF.md` — one bespoke interaction that
+   exists on this site alone, not a parameter change to a library device
+   (`uniqueness.md` §4) — and the **world preamble** chosen from
+   `worlds.md`, pasted verbatim into every image prompt so separately
+   generated plates look like one shoot. The hero is layered by default:
+   `hero-depth.md`.
 5. **Loop** until the rubric passes or three rounds are spent
    (`references/verify.md`).
-6. **Record** the fingerprint row, only for a passing build
+6. **Record** the seven-dimension fingerprint row, only for a passing build
    (`references/fingerprint.md`).
 
 ## Ship blockers
@@ -113,3 +126,13 @@ hex where a token exists; invented statistics; a `slop` finding from
 
 Read `references/taste.md` (the floor), then `design-md.md`, `feel.md`,
 `compositions.md`, `grammars.md`, `devices.md`, `fingerprint.md`, `verify.md`.
+
+Then the three that decide whether this build resembles the last one:
+`uniqueness.md` (the template trap, the signature move, the aesthetic
+families), `hero-depth.md` (layering is the baseline, not a polish pass) and
+`worlds.md` (one style preamble, pasted verbatim into every image prompt).
+
+Those three were absent for several releases while every constraint file was
+present, and the shape of what shipped followed exactly: builds that obeyed
+every rule, resembled each other, and were reported as "all the pages are
+almost the same thing". A skill made only of floors produces the floor.
