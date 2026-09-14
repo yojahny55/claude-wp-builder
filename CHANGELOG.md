@@ -80,6 +80,27 @@
 
 ### Fixed
 
+- **The walk measured the painted box, so it walked moving sections at the wrong
+  offsets.** `bin/demo-verify.mjs` read section bounds with `getBoundingClientRect()`,
+  which returns the box *after* transforms — and every value from that read becomes a
+  scroll position the walk drives to. Measured on a fixture at 1280×800, painted minus
+  layout: a parallax bed **−90px**, an entrance start state **+44px**, a scaled wrapper
+  **−28px top and +56px height**. A motionless section reads correctly, which is why it
+  survived a composition corpus that is cleaner than a real build; the error is largest
+  on exactly the sections the walk exists to judge. The read now neutralises
+  `animation`, `transform`, `translate`, `scale` and `rotate` for its duration and
+  restores the page immediately — all of them, because `animation: none` leaves the
+  engine's inline transform on a parallax bed and `offsetTop` misreads under a
+  transformed ancestor. Verified by running the shipped bounds body against the
+  fixture: all four deltas zero.
+
+- **`references/verify.md` gains the two-readout table, before the rubric.**
+  `animation.currentTime` is raw timeline progress; the computed property and
+  `getBoundingClientRect()` are post-ease and post-transform. It sits next to the act
+  of measuring rather than in a reference section, because the moment it is needed is
+  the moment somebody opens a probe.
+
+
 - **`offer-table`'s stagger was off by one, shipped.** Its plans are `<th>` preceded by
   a `<td>` corner cell, so `:nth-child` counted the corner: plan 1 received the range
   written for plan 2, and the `:nth-child(1)` rule matched nothing at all. With four

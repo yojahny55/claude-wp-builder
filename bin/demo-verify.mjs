@@ -586,6 +586,30 @@ try {
     }
 
     const bounds = await page.evaluate(() => {
+      // Measure the LAYOUT box, not the painted one. `getBoundingClientRect()` returns
+      // the box after transforms, and every value read here becomes a scroll position
+      // the walk then drives to -- so a section that happens to be moving when it is
+      // measured gets walked at the wrong offsets, and the error is largest on exactly
+      // the sections this walk exists to judge. Measured on a fixture at 1280x800,
+      // painted box minus layout box:
+      //
+      //   plain section                             top    0px   height   0px
+      //   parallax bed (engine writes transform)          -90px            0px
+      //   entrance start state (translate 44px)           +44px            0px
+      //   scaled wrapper (scale 1.14)                     -28px          +56px
+      //
+      // Neutralising the box-moving properties for the duration of the read is the
+      // only version that covers all three causes at once: `animation: none` alone
+      // leaves the engine's inline `transform` on a parallax bed, and `offsetTop`
+      // alone misreads under a transformed ancestor, which is a containing block.
+      // Transforms never affect layout, so removing them cannot change what is
+      // measured -- only what was being measured wrongly.
+      const neutraliser = document.createElement('style');
+      neutraliser.textContent =
+        '*,*::before,*::after{animation:none !important;transition:none !important;' +
+        'transform:none !important;translate:none !important;scale:none !important;' +
+        'rotate:none !important}';
+      document.head.appendChild(neutraliser);
       // pin/pan/kinetic/wipe/drift are the only devices drive() publishes
       // --motion-p for. A section whose subtree carries none of them has
       // nothing pinning progress open across [top, top+height-viewport], so
@@ -613,6 +637,9 @@ try {
           idx: i,
         });
       });
+      // Nothing after this read should see the page neutralised: every check below
+      // judges the page as it actually paints.
+      neutraliser.remove();
       return out;
     });
     if (!sections.length) sections.push(...bounds);
