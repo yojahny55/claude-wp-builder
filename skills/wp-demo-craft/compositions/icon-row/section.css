@@ -129,6 +129,26 @@
 
 /* Without a view timeline there is no range to run against, so the honest
    fallback is the finished state: icons drawn, cards in place, nothing hidden. */
+/* --- a child past the last written range ------------------------------------------
+   The stagger above is written out to four children. Add one more and it does not
+   degrade mildly: an element with no `animation-range` falls back to `normal`, and on
+   a view timeline `normal` is `cover 0%` to `cover 100%`. That range bears no
+   relationship to the stagger, so the extra child is out of sequence in whichever
+   direction the explicit ranges happen to sit -- it leads where they are late in the
+   section and lags where they are early.
+
+   Measured here with a fifth item, at 1440: the extra one read opacity 0.00, 0.17,
+   0.58 and 0.81 across four scroll positions while all four others read 1.00 -- still
+   arriving long after the row had settled.
+   The end state of these children is only "present", so the honest fallback is the one
+   the `@supports not` block already gives: no animation, arrived. Where the end state
+   MEANS something -- process-flow's lit node, which reads as a completed step -- a
+   per-child exemption is not enough and the guard goes on the list instead.
+   --------------------------------------------------------------------------------- */
+.icon-row__item:nth-child(n+5),
+.icon-row__item:nth-child(n+5) .icon-row__stroke { animation: none; }
+.icon-row__item:nth-child(n+5) .icon-row__stroke { stroke-dasharray: none; }
+
 @supports not (animation-timeline: view()) {
   .icon-row__kicker,
   .icon-row__title,

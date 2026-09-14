@@ -194,6 +194,27 @@
 .offer-table__plan:nth-child(4) { animation-range: entry 32% entry 132%; }
 /* No view timeline, no range to run against: the honest fallback is the end
    state, already visible, rather than a single arbitrary frame. */
+/* --- a child past the last written range ------------------------------------------
+   The stagger above is written out to four children. Add one more and it does not
+   degrade mildly: an element with no `animation-range` falls back to `normal`, and on
+   a view timeline `normal` is `cover 0%` to `cover 100%`. That range bears no
+   relationship to the stagger, so the extra child is out of sequence in whichever
+   direction the explicit ranges happen to sit -- it leads where they are late in the
+   section and lags where they are early.
+
+   Measured here with a fifth plan, at 1440: opacity 1.00, 1.00, 1.00, 0.97, 0.97 --
+   so unlike the other compositions carrying this shape, the fifth plan is NOT visibly
+   out of step at the positions sampled. The guard is here because the mechanism is
+   the same and the margin is luck: these ranges are early (`entry 14%` to `entry 32%`)
+   and the table has settled by the time it is read. Move the stagger later, as
+   process-flow's is, and the same fallback leads the whole sequence instead.
+   The end state of these children is only "present", so the honest fallback is the one
+   the `@supports not` block already gives: no animation, arrived. Where the end state
+   MEANS something -- process-flow's lit node, which reads as a completed step -- a
+   per-child exemption is not enough and the guard goes on the list instead.
+   --------------------------------------------------------------------------------- */
+.offer-table__plan:nth-child(n+5) { animation: none; }
+
 @supports not (animation-timeline: view()) {
   .offer-table__kicker,
   .offer-table__title,

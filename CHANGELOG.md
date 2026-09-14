@@ -56,6 +56,21 @@
 
 ### Fixed
 
+- **A child past the last written `:nth-child` range runs out of sequence.** An element
+  with no `animation-range` falls back to `normal`, which on a view timeline is
+  `cover 0%` to `cover 100%` — a range unrelated to the stagger, so the extra child
+  leads where the explicit ranges are late and lags where they are early. In
+  `process-flow` at six steps it led: the last node was 54% along while nodes 2–5 sat
+  at 0%, at every scroll position, not only on arrival. Guidance would not have stopped
+  it, because a sixth step lays out perfectly. Above five steps the pipe is now
+  structure without a sequence, guarded on the list rather than on the sixth step —
+  exempting only the untimed elements leaves the last node lit beside dark ones, which
+  is the same inversion held still. Generalising it into a check found the same latent
+  shape in `icon-row`, `offer-table` and `score-scale`; all three are guarded, and
+  `offer-table` records that it is not visibly wrong today only because its stagger is
+  early.
+
+
 
 - **`devices.md` said a duration on a scroll-driven animation hijacks it. Measured,
   it does nothing at all.** The file claimed a duration "overrides the range and the

@@ -300,6 +300,54 @@
 .process-flow__step:nth-child(4) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 66% entry 166%; }
 .process-flow__step:nth-child(5) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 74% entry 174%; }
 
+/* --- past the last written range, the section stops being a sequence -------------
+   The ranges above are written out to five steps. A sixth lays out perfectly --
+   nothing in this composition counts -- so the author who needs one will add it and
+   the layout will encourage them. What they would get is not a mild degradation.
+
+   An element with no `animation-range` falls back to `normal`, and on a view timeline
+   `normal` is `cover 0%` to `cover 100%`: the WIDEST range there is, beginning before
+   every other element in the section, all of which start at `entry 40%` or later. So
+   the last node and the segment feeding it run ahead of the whole sequence. Measured
+   at n=6 and 1440, node progress read back from `scale`, at five scroll positions:
+
+     scroll 25%   59%   0%   0%   0%   0%   54%
+     scroll 45%   99%   0%   0%   0%   0%   79%
+     scroll 60%  100%  53%   0%   0%   0%   89%
+     scroll 75%  100% 100%  89%   0%   0%   95%
+     scroll 90%  100% 100% 100%  99%   0%   98%
+
+   The end of the process is lit while its middle is dark, at every scroll position --
+   the composition's one claim, that the line reaches the node exactly as the node
+   lights, failing in the direction that reads as a bug rather than as a style.
+
+   The guard is on the LIST, not on the sixth step, and that distinction was itself a
+   measurement. Exempting only the untimed elements leaves node 6 drawn in its arrived
+   state beside nodes 3, 4 and 5 still dark -- the same inversion, held still instead
+   of animated, which is not a fix. Above five steps the pipe is therefore structure
+   without a sequence: fully drawn, fully lit, nothing timed. That is exactly what the
+   `@supports not` and reduced-motion branches below already say, for the same reason
+   -- the sequence must not depend on the motion.
+
+   Guidance alone would not do this. A range nobody writes is a range the engine writes
+   for you, and it writes the worst one.
+   -------------------------------------------------------------------------------- */
+.process-flow__steps:has(.process-flow__step:nth-child(6)) :is(
+  .process-flow__node,
+  .process-flow__step-title,
+  .process-flow__step-body
+) { animation: none; }
+
+.process-flow__steps:has(.process-flow__step:nth-child(6)) .process-flow__step::after {
+  animation: none;
+  scale: 1 1;
+}
+.process-flow__steps:has(.process-flow__step:nth-child(6)) .process-flow__node {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent);
+  color: var(--color-accent-ink, var(--color-canvas));
+}
+
 /* No view timeline: the pipe is drawn full, every node is present, the steps are
    legible in order. The sequence does not depend on the motion. */
 @supports not (animation-timeline: view()) {

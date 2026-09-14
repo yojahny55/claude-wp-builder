@@ -54,8 +54,31 @@ per step when stacked, no overflow, and the last step never draws a trailing seg
 its min-content width, so a plain `1fr` lets one long word in a step body push its
 column past its share and overflow the section.
 
-The motion ranges are written out to five steps. A sixth still lays out correctly but
-falls back to the default range, which is why the slot guidance above stops at five.
+**Above five steps the pipe is structure without a sequence.** The motion ranges are
+written out to five. A sixth lays out perfectly — nothing counts — so guidance alone
+would not stop anyone adding it, and what they would get is not a mild degradation: an
+element with no `animation-range` falls back to `normal`, which on a view timeline is
+`cover 0%` to `cover 100%`, the widest range there is and earlier than every explicit
+range in this file. Measured at six steps and 1440, node progress read back from
+`scale`:
+
+```
+scroll 25%   59%   0%   0%   0%   0%   54%
+scroll 45%   99%   0%   0%   0%   0%   79%
+scroll 60%  100%  53%   0%   0%   0%   89%
+scroll 75%  100% 100%  89%   0%   0%   95%
+scroll 90%  100% 100% 100%  99%   0%   98%
+```
+
+The end of the process lit while its middle was dark, at every scroll position — this
+composition's one claim failing in the direction that reads as a bug. So a sixth step
+turns the motion off for the whole list: fully drawn, fully lit, nothing timed, which
+is what the `@supports not` and reduced-motion branches already do.
+
+The guard is on the **list**, not on the sixth step, and that distinction was itself a
+measurement. Exempting only the untimed elements leaves node 6 sitting in its arrived
+state beside nodes 3, 4 and 5 still dark — the same inversion, held still instead of
+animated, which is not a fix.
 
 **Nothing but `__step` children belong in `.process-flow__steps`.** The rail used to
 be a sibling element inside that list and it was a grid item like any other — it took

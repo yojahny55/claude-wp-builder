@@ -365,4 +365,35 @@ done < <(printf '%s\n' "$list" | awk '
 grep -Fq 'carries the measurement that produced it' "$dev" \
   || fail "$dev does not state that a silent-failure rule must carry its measurement, which is the rule that catches a correct rule with a false reason"
 
+# --- indexed ranges need a guard past the last index ------------------------------
+# A composition that staggers with `:nth-child(N)` writes a finite number of ranges.
+# Add one more child than there are ranges and the extra element does not degrade
+# mildly: with no `animation-range` it falls back to `normal`, and on a view timeline
+# `normal` is `cover 0%` to `cover 100%`. That range bears NO relationship to the
+# stagger, so the extra child is out of sequence -- and the direction depends on where
+# the explicit ranges sit, which is why this check does not name one. Measured:
+#
+#   process-flow, 6th step   ranges late  (cover 44-88%)  -> LEADS. At scroll 25% the
+#                            last node was 54% along while nodes 2-5 sat at 0%: the end
+#                            of the process lit while its middle was dark.
+#   icon-row, 5th item       ranges early (entry 12-30%)  -> LAGS. 0.00/0.17/0.58/0.81
+#                            opacity while all four others read 1.00.
+#   score-scale, 6th factor  ranges early                 -> LAGS. 0.12/0.56 vs 1.00.
+#   offer-table, 5th plan    ranges early                 -> in step at the positions
+#                            sampled (0.97 vs 1.00). Guarded anyway: same mechanism,
+#                            and the margin is luck rather than design.
+#
+# So the guard has to be reachable by the extra child. Fail absent, never wrong.
+while IFS= read -r f; do
+  max=$(grep -oE ':nth-child\([0-9]+\)[^{]*\{[^}]*animation-range' "$f" \
+        | grep -oE ':nth-child\([0-9]+\)' | grep -oE '[0-9]+' | sort -n | tail -1)
+  [ -n "$max" ] || continue
+  nxt=$((max + 1))
+  grep -qE ":nth-child\((n\+)?$nxt\)" "$f" \
+    || fail "$f staggers with :nth-child up to $max and nothing reaches a ${nxt}th child. That child inherits \`animation-range: normal\`, which on a view timeline is \`cover 0% cover 100%\` -- a range unrelated to the stagger -- so it animates out of sequence with every element that has an explicit one. Give it the untimed arrived state instead"
+done < <(grep -rlE ':nth-child\([0-9]+\)[^{]*\{[^}]*animation-range' "$C"/*/section.css 2>/dev/null)
+
+grep -Fq 'the section stops being a sequence' "$C/process-flow/section.css" \
+  || fail "process-flow has lost the note explaining why the guard is on the list and not on the sixth step"
+
 echo PASS

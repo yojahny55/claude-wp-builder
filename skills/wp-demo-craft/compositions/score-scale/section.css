@@ -226,6 +226,23 @@
 
 /* No view timeline: the scale is drawn, the marker sits at the top of the range,
    everything is legible. The information does not depend on the motion. */
+/* --- a child past the last written range ------------------------------------------
+   The stagger above is written out to five children. Add one more and it does not
+   degrade mildly: an element with no `animation-range` falls back to `normal`, and on
+   a view timeline `normal` is `cover 0%` to `cover 100%`. That range bears no
+   relationship to the stagger, so the extra child is out of sequence in whichever
+   direction the explicit ranges happen to sit -- it leads where they are late in the
+   section and lags where they are early.
+
+   Measured here with a sixth factor, at 1440: the extra one read opacity 0.12 and
+   0.56 at the two later scroll positions while all five others read 1.00.
+   The end state of these children is only "present", so the honest fallback is the one
+   the `@supports not` block already gives: no animation, arrived. Where the end state
+   MEANS something -- process-flow's lit node, which reads as a completed step -- a
+   per-child exemption is not enough and the guard goes on the list instead.
+   --------------------------------------------------------------------------------- */
+.score-scale__factor:nth-child(n+6) { animation: none; }
+
 @supports not (animation-timeline: view()) {
   .score-scale__kicker,
   .score-scale__title,
