@@ -4,6 +4,19 @@
 
 ### Added
 
+- **`process-flow`, a second answer in the `process` role.** A pipe with a node per
+  step and a line the scroll draws along it, stacked on a phone and horizontal once
+  the container can hold a column per step. Costs 0 vh where `process-rail` costs a
+  viewport-height and pins, so the two are chosen on page budget rather than on taste
+  — the role had one answer, and a library with one good answer per role gives every
+  build the same answer. It is also the composition the coupling rule is shaped
+  around: every animated element runs on one `view-timeline-name` declared on the
+  section, because a segment's progress and the arrival of the node it points at are
+  the same quantity. The rail is drawn per step rather than spanning the list, and
+  nothing in it counts the steps; measured 0.0px at every junction at 1440, 1024, 768
+  and 390, and at three, four, five and six steps.
+
+
 - **The generative half of the ported skill, absent since the port.**
   `wp-demo-craft` was ported from nateherkai/scroll-craft as *prose* — taste floor,
   refuse list, feeling curve, device kit — and every one of those is a constraint. The

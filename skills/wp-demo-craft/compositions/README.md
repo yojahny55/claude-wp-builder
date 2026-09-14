@@ -73,7 +73,7 @@ not writing it.
 | hero | hero-bleed | 0 | parallax, scrim band | none |
 | proof | proof-row | 0 | count, marquee | Magic UI marquee + number ticker (MIT) |
 | feature | feature-zigzag | 0 | reveal | none |
-| process | process-rail | 1.0 | pan | Aceternity sticky scroll reveal (MIT), rewritten as pan |
+| process | process-rail | 1.0 | pan | Aceternity sticky scroll reveal (MIT), rewritten as pan | | process | process-flow | 0 | element motion (segments draw, nodes light) | none |
 | offer | offer-table | 0 | reveal | none |
 | testimonial | testimonial-pair | 0 | reveal, spotlight | Aceternity spotlight (MIT) |
 | faq | faq-list | 0 | reveal | none |
