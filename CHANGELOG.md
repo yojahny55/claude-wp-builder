@@ -29,7 +29,20 @@
   costume, and a shelf of dark pages with one accent each is what happens when nobody
   decides.
 
+### Added
+
+- **Every silent-failure rule now carries the measurement that produced it.** Such a
+  rule is by definition one nobody has cause to test — the advice is followed, nothing
+  breaks, and the stated *reason* is never exercised — so a wrong reason survives until
+  someone reasons forward from it. Measuring the two rules in `devices.md` that had no
+  numbers found a second wrong one immediately: the fill-mode rule said an element
+  outside its range "flashes to its `from` value", and measured on keyframes running
+  `10`→`90` against an `initial-value` of `0`, it renders `0`, not `10`. The fallback is
+  the un-animated value. Checked: each numbered item must be marked as measured and
+  carry a figure that can be re-run.
+
 ### Fixed
+
 
 - **`devices.md` said a duration on a scroll-driven animation hijacks it. Measured,
   it does nothing at all.** The file claimed a duration "overrides the range and the

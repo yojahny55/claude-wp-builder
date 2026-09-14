@@ -182,20 +182,44 @@ Stagger with `animation-range` offsets per child rather than one root `reveal` w
 motion is many elements moving on their own timelines inside one section, and the
 attribute cannot express that while CSS does it trivially.
 
-Three ways this fails silently, all of them worth knowing before you write it:
+Four ways this fails silently, all of them worth knowing before you write it.
+
+**Each one carries the measurement that produced it, and that is a rule about this
+list rather than a courtesy.** A silent-failure rule is by definition one nobody has
+cause to test: the advice is followed, nothing breaks, and the stated reason is never
+exercised. So a wrong reason survives indefinitely and is only found when someone
+reasons *forward* from it to a new case. Two of the four below had reasons that were
+wrong in exactly that way — one said a duration hijacks the animation when it is
+inert, one said the element falls back to its `from` value when it falls back to its
+un-animated value — and both had been read many times without anyone noticing,
+because the advice attached to them was fine. A rule with a number beside it can be
+checked by the next reader in the time it takes to disbelieve it. A rule without one
+is a claim.
+
 
 1. **Longhands only.** The `animation` shorthand resets `animation-timeline` to
    `auto`, which silently reverts the element to a time-based animation that runs
-   once on load and never tracks the scroll.
+   once on load and never tracks the scroll. Measured: two elements given identical
+   longhands, one of them then "tidied" into `animation: sweep 2s` on a later line --
+   the shorter rule a maintainer writes on purpose. At one scroll position the first
+   read `timeline=ViewTimeline, --v=74.2409` and held that value with the page still;
+   the second read `timeline=DocumentTimeline, --v=27.651` and ran on to 87.2776 over
+   the next 1.2s without the page moving at all.
 2. **A duration on a scroll-driven animation is inert.** It does not override the
    range and the element does not play through on its own clock — this file said it
-   did, and measuring says otherwise: two rules identical but for `animation-duration:
+   did, and measured against it does not: two rules identical but for `animation-duration:
    auto` against `2s`, sampled at six scroll positions, produced the same value at
    every one (13.165, 79.0622, 95.4148, 99.9709, 100, 100). The duration is recorded
    in the timing and ignored. Leave it off anyway, because writing one teaches the
    next reader that it does something.
-3. **`animation-fill-mode: both`.** Without it the element snaps back to its start
-   state outside the range, so anything above the fold flashes to its `from` value.
+3. **`animation-fill-mode: both`.** Without it the element renders its *un-animated*
+   value outside the range — not the keyframe's `from` value, which is the easy thing
+   to assume and is wrong. Measured on keyframes running `10` to `90` against a
+   property whose `initial-value` is `0`, both elements sitting past their range and
+   reporting `finished`: with the fill mode, `--v=90`, the end state held; without it,
+   `--v=0`. Not `10`. So the fallback is whatever the element would compute with no
+   animation at all, which for a rise is the offset position and for an opacity fade
+   is invisible.
 4. **A time-based loop near scroll-driven CSS needs `animation-timeline: auto` and
    `animation-range: normal` stated.** A scroll timeline is inherited by anything a
    broader rule hands it to — `motion.css` gives descendants of a `reveal` section

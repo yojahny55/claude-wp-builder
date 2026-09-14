@@ -323,4 +323,46 @@ grep -Fq 'A duration on a scroll-driven animation is inert' "$dev" \
 grep -Fq 'needs `animation-timeline: auto` and' "$dev" \
   || fail "$dev does not state that a clock loop near scroll-driven CSS must declare auto/normal"
 
+# --- every silent-failure rule carries the measurement that produced it -----------
+# A silent-failure rule is by definition one nobody has cause to test: the advice is
+# followed, nothing breaks, and the stated REASON is never exercised. So a wrong
+# reason survives indefinitely, and is found only when someone reasons forward from
+# it. Two of the four in this list were wrong that way -- one said a duration hijacks
+# a scroll-driven animation when it is inert, one said the element falls back to its
+# `from` value when it falls back to its un-animated value -- and both had been read
+# many times, because the advice attached to them was correct.
+#
+# The cheap enforcement is that each numbered item carries a figure someone can
+# disbelieve and re-run. It cannot tell a real measurement from a plausible number,
+# so it is a floor and not a proof; what it does stop is the next rule landing as
+# bare assertion, which is how both of these got in.
+list=$(awk '/^Four ways this fails silently/ { on = 1; next }
+            on && /^\*\*Use `translate`/ { exit }
+            on { print }' "$dev")
+[ -n "$list" ] || fail "$dev: cannot find the silent-failure list -- if it was renamed, re-anchor this check rather than dropping it"
+
+n=0
+while IFS= read -r item; do
+  n=$((n+1))
+  # A bare digit is not enough, and proving that took a mutation: stripping every
+  # measured figure out of rules 1 and 3 left this check GREEN, because both quote
+  # CSS values (`2s`, `10`, `90`) in their prose and a digit test cannot tell a
+  # quoted declaration from an observation. So require the claim to be marked as
+  # measured AND to carry a figure. Still a floor -- it cannot tell a real number
+  # from a plausible one -- but it stops the shape both wrong reasons arrived in.
+  printf '%s' "$item" | grep -qi 'measured' \
+    || fail "$dev: silent-failure rule $n gives a reason that is not marked as measured. A rule nobody has cause to test is never exercised, so a wrong reason survives until someone reasons forward from it -- say what was observed: $(printf '%s' "$item" | cut -c1-70)"
+  printf '%s' "$item" | grep -qE '[0-9]+\.[0-9]+|=[0-9]|`[0-9]+`' \
+    || fail "$dev: silent-failure rule $n says it was measured but carries no figure to re-run: $(printf '%s' "$item" | cut -c1-70)"
+done < <(printf '%s\n' "$list" | awk '
+  /^[0-9]+\. / { if (buf != "") print buf; buf = $0; next }
+  /^   / { buf = buf " " $0; next }
+  { if (buf != "") { print buf; buf = "" } }
+  END { if (buf != "") print buf }')
+
+[ "$n" -ge 4 ] || fail "$dev: expected at least 4 silent-failure rules, parsed $n -- the list parser has drifted from the file's shape and is asserting nothing"
+
+grep -Fq 'carries the measurement that produced it' "$dev" \
+  || fail "$dev does not state that a silent-failure rule must carry its measurement, which is the rule that catches a correct rule with a false reason"
+
 echo PASS
