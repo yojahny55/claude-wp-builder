@@ -188,12 +188,26 @@
 /* Columns arrive left to right so the eye reads the table in the order it is
    meant to be compared, instead of the whole grid appearing at once. */
 .offer-table__plan { animation-name: offer-table-rise; animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1)); animation-fill-mode: both; animation-timeline: view(); }
-.offer-table__plan:nth-child(1) { animation-range: entry 14% entry 114%; }
-.offer-table__plan:nth-child(2) { animation-range: entry 20% entry 120%; }
-.offer-table__plan:nth-child(3) { animation-range: entry 26% entry 126%; }
-.offer-table__plan:nth-child(4) { animation-range: entry 32% entry 132%; }
+.offer-table__plan:nth-of-type(1) { animation-range: entry 14% entry 114%; }
+.offer-table__plan:nth-of-type(2) { animation-range: entry 20% entry 120%; }
+.offer-table__plan:nth-of-type(3) { animation-range: entry 26% entry 126%; }
+.offer-table__plan:nth-of-type(4) { animation-range: entry 32% entry 132%; }
 /* No view timeline, no range to run against: the honest fallback is the end
    state, already visible, rather than a single arbitrary frame. */
+/* --- the ladder indexes by TYPE, not by child position ---------------------------
+   `:nth-child` is a fact about the parent's OTHER children, not about this element's
+   place in its own sequence. These plans are `<th>` preceded by a `<td>` corner cell,
+   so every rung was off by one: measured on the shipped markup, plan 1 received
+   `entry 20%` -- the rule written for plan 2 -- plan 2 received `entry 26%`, and the
+   `:nth-child(1)` rule for `entry 14%` matched nothing at all. With four plans the
+   fourth would have been child 5 and fallen through to the catch-all, silently losing
+   its animation.
+
+   `:nth-of-type` counts `th` among `th` and cannot be shifted by a sibling of another
+   type. The other three ladders in this library are `li` in a list of nothing but
+   `li`, where the two are equivalent today -- they are converted anyway, because
+   "equivalent today" is the state this defect starts from.
+   --------------------------------------------------------------------------------- */
 /* --- a child past the last written range ------------------------------------------
    The stagger above is written out to four children. Add one more and it does not
    degrade mildly: an element with no `animation-range` falls back to `normal`, and on
@@ -213,7 +227,7 @@
    MEANS something -- process-flow's lit node, which reads as a completed step -- a
    per-child exemption is not enough and the guard goes on the list instead.
    --------------------------------------------------------------------------------- */
-.offer-table__plan:nth-child(n+5) { animation: none; }
+.offer-table__plan:nth-of-type(n+5) { animation: none; }
 
 @supports not (animation-timeline: view()) {
   .offer-table__kicker,

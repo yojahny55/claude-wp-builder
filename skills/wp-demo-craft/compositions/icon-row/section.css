@@ -104,10 +104,10 @@
   animation-fill-mode: both;
   animation-timeline: view();
 }
-.icon-row__item:nth-child(1) { animation-range: entry 12% entry 112%; }
-.icon-row__item:nth-child(2) { animation-range: entry 18% entry 118%; }
-.icon-row__item:nth-child(3) { animation-range: entry 24% entry 124%; }
-.icon-row__item:nth-child(4) { animation-range: entry 30% entry 130%; }
+.icon-row__item:nth-of-type(1) { animation-range: entry 12% entry 112%; }
+.icon-row__item:nth-of-type(2) { animation-range: entry 18% entry 118%; }
+.icon-row__item:nth-of-type(3) { animation-range: entry 24% entry 124%; }
+.icon-row__item:nth-of-type(4) { animation-range: entry 30% entry 130%; }
 
 .icon-row__stroke {
   stroke-dasharray: 120;
@@ -116,10 +116,10 @@
   animation-fill-mode: both;
   animation-timeline: view();
 }
-.icon-row__item:nth-child(1) .icon-row__stroke { animation-range: entry 18% entry 118%; }
-.icon-row__item:nth-child(2) .icon-row__stroke { animation-range: entry 24% entry 124%; }
-.icon-row__item:nth-child(3) .icon-row__stroke { animation-range: entry 30% entry 130%; }
-.icon-row__item:nth-child(4) .icon-row__stroke { animation-range: entry 36% entry 136%; }
+.icon-row__item:nth-of-type(1) .icon-row__stroke { animation-range: entry 18% entry 118%; }
+.icon-row__item:nth-of-type(2) .icon-row__stroke { animation-range: entry 24% entry 124%; }
+.icon-row__item:nth-of-type(3) .icon-row__stroke { animation-range: entry 30% entry 130%; }
+.icon-row__item:nth-of-type(4) .icon-row__stroke { animation-range: entry 36% entry 136%; }
 /* Both strokes of a mark draw together. An earlier version trailed the second
    stroke with a flat , which overrode the
    per-card ranges above: card 4 starts at 36%, so its second stroke would have
@@ -145,9 +145,9 @@
    MEANS something -- process-flow's lit node, which reads as a completed step -- a
    per-child exemption is not enough and the guard goes on the list instead.
    --------------------------------------------------------------------------------- */
-.icon-row__item:nth-child(n+5),
-.icon-row__item:nth-child(n+5) .icon-row__stroke { animation: none; }
-.icon-row__item:nth-child(n+5) .icon-row__stroke { stroke-dasharray: none; }
+.icon-row__item:nth-of-type(n+5),
+.icon-row__item:nth-of-type(n+5) .icon-row__stroke { animation: none; }
+.icon-row__item:nth-of-type(n+5) .icon-row__stroke { stroke-dasharray: none; }
 
 @supports not (animation-timeline: view()) {
   .icon-row__kicker,

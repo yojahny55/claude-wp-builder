@@ -66,12 +66,16 @@ done
 # Staggered means DISTINCT ranges. A pin that only proves one column carries a
 # range passes on four identical ones, which is exactly the state it exists to
 # forbid -- four columns animating in unison is not a stagger.
-ot_ranges=$(grep -oE ':nth-child\([0-9]\) *\{ *animation-range: [^;}]+' "$C/offer-table/section.css" \
+# `:nth-of-type`, not `:nth-child` -- these plans are <th> preceded by a <td> corner
+# cell, so :nth-child counted the corner and every rung was off by one. This pin
+# matched the old spelling and went to zero when that was fixed, which is the right
+# way round: it failed loudly on a real change rather than passing on a stale one.
+ot_ranges=$(grep -oE ':nth-of-type\([0-9]\) *\{ *animation-range: [^;}]+' "$C/offer-table/section.css" \
   | sed 's/.*animation-range: //' | sort -u | wc -l)
 [ "$ot_ranges" -ge 3 ] \
   || fail "offer-table: columns must arrive on their own ranges ($ot_ranges distinct, need 3)"
 
-grep -qE 'nth-child\(6n\+[0-9]\)' "$C/faq-list/section.css" \
+grep -qE 'nth-(child|of-type)\(6n\+[0-9]\)' "$C/faq-list/section.css" \
   || fail "faq-list: rows must arrive in sequence"
 
 # --- the icon composition ----------------------------------------------------
@@ -365,33 +369,31 @@ done < <(printf '%s\n' "$list" | awk '
 grep -Fq 'carries the measurement that produced it' "$dev" \
   || fail "$dev does not state that a silent-failure rule must carry its measurement, which is the rule that catches a correct rule with a false reason"
 
-# --- indexed ranges need a guard past the last index ------------------------------
-# A composition that staggers with `:nth-child(N)` writes a finite number of ranges.
-# Add one more child than there are ranges and the extra element does not degrade
-# mildly: with no `animation-range` it falls back to `normal`, and on a view timeline
-# `normal` is `cover 0%` to `cover 100%`. That range bears NO relationship to the
-# stagger, so the extra child is out of sequence -- and the direction depends on where
-# the explicit ranges sit, which is why this check does not name one. Measured:
+# --- stagger ladders put their rungs out of order in three independent ways -------
+# Grouping the rules of one ladder needs real parsing -- a ladder is spread over N
+# rules and which rules belong to it is not a grep -- so the scan lives in
+# tests/checks/lib/ladder-scan.py, which documents each fault and the measurement
+# behind it. The three:
 #
-#   process-flow, 6th step   ranges late  (cover 44-88%)  -> LEADS. At scroll 25% the
-#                            last node was 54% along while nodes 2-5 sat at 0%: the end
-#                            of the process lit while its middle was dark.
-#   icon-row, 5th item       ranges early (entry 12-30%)  -> LAGS. 0.00/0.17/0.58/0.81
-#                            opacity while all four others read 1.00.
-#   score-scale, 6th factor  ranges early                 -> LAGS. 0.12/0.56 vs 1.00.
-#   offer-table, 5th plan    ranges early                 -> in step at the positions
-#                            sampled (0.97 vs 1.00). Guarded anyway: same mechanism,
-#                            and the margin is luck rather than design.
+#   1. `:nth-child` counts the parent's OTHER children. offer-table's plans are <th>
+#      after a <td> corner cell and were off by one in the shipped markup: plan 1
+#      received the rule written for plan 2, and the :nth-child(1) rule matched
+#      nothing at all. `:nth-of-type` cannot be shifted by a sibling of another type.
+#   2. `entry X%` and `cover X%` are not comparable. `entry 100%` sits at
+#      min(h,vh)/(vh+h) of cover -- measured at exactly that across eight
+#      element/viewport pairs, from cover 11.8% to cover 47.1% -- so a ladder that
+#      switches unit is ordered only at the geometry it was written against.
+#   3. A rung past the last written index falls back to `normal` (= cover 0% to
+#      cover 100%), unrelated to the stagger.
 #
-# So the guard has to be reachable by the extra child. Fail absent, never wrong.
-while IFS= read -r f; do
-  max=$(grep -oE ':nth-child\([0-9]+\)[^{]*\{[^}]*animation-range' "$f" \
-        | grep -oE ':nth-child\([0-9]+\)' | grep -oE '[0-9]+' | sort -n | tail -1)
-  [ -n "$max" ] || continue
-  nxt=$((max + 1))
-  grep -qE ":nth-child\((n\+)?$nxt\)" "$f" \
-    || fail "$f staggers with :nth-child up to $max and nothing reaches a ${nxt}th child. That child inherits \`animation-range: normal\`, which on a view timeline is \`cover 0% cover 100%\` -- a range unrelated to the stagger -- so it animates out of sequence with every element that has an explicit one. Give it the untimed arrived state instead"
-done < <(grep -rlE ':nth-child\([0-9]+\)[^{]*\{[^}]*animation-range' "$C"/*/section.css 2>/dev/null)
+# A fourth cause is not visible in one file and is asserted separately: rungs on
+# `view()` each build a timeline from their own box, so a monotonic ladder still
+# fires out of order when the elements differ in height. That is the shared-timeline
+# rule above.
+ladders=$(python3 "$(dirname "$0")/lib/ladder-scan.py" "$C") \
+  || fail "ladder-scan.py failed to run"
+[ -z "$ladders" ] || fail "stagger ladders are out of order:
+$ladders"
 
 grep -Fq 'the section stops being a sequence' "$C/process-flow/section.css" \
   || fail "process-flow has lost the note explaining why the guard is on the list and not on the sixth step"

@@ -218,11 +218,11 @@
   animation-fill-mode: both;
   animation-timeline: view();
 }
-.score-scale__factor:nth-child(1) { animation-range: entry 44% entry 144%; }
-.score-scale__factor:nth-child(2) { animation-range: entry 48% entry 148%; }
-.score-scale__factor:nth-child(3) { animation-range: entry 52% entry 152%; }
-.score-scale__factor:nth-child(4) { animation-range: entry 56% entry 156%; }
-.score-scale__factor:nth-child(5) { animation-range: entry 60% entry 160%; }
+.score-scale__factor:nth-of-type(1) { animation-range: entry 44% entry 144%; }
+.score-scale__factor:nth-of-type(2) { animation-range: entry 48% entry 148%; }
+.score-scale__factor:nth-of-type(3) { animation-range: entry 52% entry 152%; }
+.score-scale__factor:nth-of-type(4) { animation-range: entry 56% entry 156%; }
+.score-scale__factor:nth-of-type(5) { animation-range: entry 60% entry 160%; }
 
 /* No view timeline: the scale is drawn, the marker sits at the top of the range,
    everything is legible. The information does not depend on the motion. */
@@ -241,7 +241,7 @@
    MEANS something -- process-flow's lit node, which reads as a completed step -- a
    per-child exemption is not enough and the guard goes on the list instead.
    --------------------------------------------------------------------------------- */
-.score-scale__factor:nth-child(n+6) { animation: none; }
+.score-scale__factor:nth-of-type(n+6) { animation: none; }
 
 @supports not (animation-timeline: view()) {
   .score-scale__kicker,

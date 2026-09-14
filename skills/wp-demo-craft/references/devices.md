@@ -178,7 +178,42 @@ mechanism `utilities/motion.css` already uses for `reveal`:
 ```
 
 Stagger with `animation-range` offsets per child rather than one root `reveal` with
-`data-motion-stagger`. The attribute contract gives a section **one** device; rich
+`data-motion-stagger`.
+
+**A stagger ladder goes out of order in four independent ways, and fixing one leaves
+the other three.** All four have been measured in this library or the build that uses
+it; none of them errors, and all four look correct in the source.
+
+1. **Index by type, not by child position.** `:nth-child` is a fact about the
+   parent's *other* children. `offer-table`'s plans are `<th>` preceded by a `<td>`
+   corner cell, so every rung was off by one: measured on the shipped markup, plan 1
+   received `entry 20%` — the rule written for plan 2 — and the `:nth-child(1)` rule
+   for `entry 14%` matched nothing at all. The peer build hit the same thing from the
+   other direction, by *adding* a `<span>` to a list three rounds after the ladder was
+   written, which shifted every `<li>` one place. `:nth-of-type` counts `li` among
+   `li` and cannot be shifted by a sibling of another type.
+
+2. **One phase keyword per ladder.** `entry X%` and `cover X%` are not comparable.
+   The entry phase spans `min(elementH, viewportH)` of scroll and the cover phase
+   spans `viewportH + elementH`, so `entry 100%` sits at `min(h,vh) / (vh+h)` of
+   cover — measured at exactly that value across eight element/viewport pairs,
+   anywhere from **cover 11.8%** to **cover 47.1%**. A ladder that switches unit part
+   way up is therefore ordered correctly on the page it was written against and
+   inverts on the next one, by an amount nobody can know while writing it. Because
+   `entry` percentages may exceed 100, a `cover B%` endpoint converts to
+   `entry (100 + B)%` and the ordering becomes arithmetic again.
+
+3. **A rung past the last written index falls back to `normal`**, which on a view
+   timeline is `cover 0%` to `cover 100%` — a range with no relation to the stagger.
+   See "past the last written range" in the compositions.
+
+4. **Rungs on `view()` each build a timeline from their own box.** A row of items
+   with different body lengths gives every rung a different timeline, so a monotonic
+   set of ranges still fires out of order. This is the shared-timeline rule above,
+   arriving as a stagger bug instead of as a disagreement between two readouts.
+
+The first three are asserted by `tests/checks/lib/ladder-scan.py`. The fourth is not
+visible in one file. The attribute contract gives a section **one** device; rich
 motion is many elements moving on their own timelines inside one section, and the
 attribute cannot express that while CSS does it trivially.
 

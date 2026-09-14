@@ -276,16 +276,31 @@
   .process-flow__step::after { animation-name: process-flow-draw-x; }
 }
 
+/* One phase keyword for the whole ladder, and it is arithmetic rather than taste.
+   `entry X%` and `cover X%` are not comparable: the entry phase spans
+   `min(elementH, viewportH)` of scroll while the cover phase spans
+   `viewportH + elementH`, so `entry 100%` lands at `min(h,vh) / (vh+h)` of cover --
+   measured across eight element/viewport pairs, anywhere from cover 11.8% to cover
+   47.1%, matching that expression exactly at every one. A ladder that switches unit
+   part way up therefore orders correctly on the page it was written against and
+   inverts on the next one, by an amount nobody can know at authoring time.
+
+   This rung read `entry 40% cover 44%` when it shipped. It did not invert at any
+   geometry measured -- `entry X%` can never exceed `cover X%`, so a low entry start
+   ahead of a higher cover start is safe -- but it was safe by margin rather than by
+   construction, which is not a property worth keeping. Now `cover 36% cover 44%`,
+   the same moment against the same scale as everything below it.
+   ------------------------------------------------------------------------------- */
 /* Node k lights at the moment segment k-1 finishes drawing to it. */
-.process-flow__step:nth-child(1) .process-flow__node { animation-range: entry 40% cover 44%; }
-.process-flow__step:nth-child(1)::after               { animation-range: cover 44% cover 52%; }
-.process-flow__step:nth-child(2) .process-flow__node { animation-range: cover 52% cover 56%; }
-.process-flow__step:nth-child(2)::after               { animation-range: cover 56% cover 64%; }
-.process-flow__step:nth-child(3) .process-flow__node { animation-range: cover 64% cover 68%; }
-.process-flow__step:nth-child(3)::after               { animation-range: cover 68% cover 76%; }
-.process-flow__step:nth-child(4) .process-flow__node { animation-range: cover 76% cover 80%; }
-.process-flow__step:nth-child(4)::after               { animation-range: cover 80% cover 88%; }
-.process-flow__step:nth-child(5) .process-flow__node { animation-range: cover 88% cover 92%; }
+.process-flow__step:nth-of-type(1) .process-flow__node { animation-range: cover 36% cover 44%; }
+.process-flow__step:nth-of-type(1)::after               { animation-range: cover 44% cover 52%; }
+.process-flow__step:nth-of-type(2) .process-flow__node { animation-range: cover 52% cover 56%; }
+.process-flow__step:nth-of-type(2)::after               { animation-range: cover 56% cover 64%; }
+.process-flow__step:nth-of-type(3) .process-flow__node { animation-range: cover 64% cover 68%; }
+.process-flow__step:nth-of-type(3)::after               { animation-range: cover 68% cover 76%; }
+.process-flow__step:nth-of-type(4) .process-flow__node { animation-range: cover 76% cover 80%; }
+.process-flow__step:nth-of-type(4)::after               { animation-range: cover 80% cover 88%; }
+.process-flow__step:nth-of-type(5) .process-flow__node { animation-range: cover 88% cover 92%; }
 
 .process-flow__step-title,
 .process-flow__step-body {
@@ -294,11 +309,11 @@
   animation-fill-mode: both;
   animation-timeline: --flow-tl;
 }
-.process-flow__step:nth-child(1) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 42% entry 142%; }
-.process-flow__step:nth-child(2) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 50% entry 150%; }
-.process-flow__step:nth-child(3) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 58% entry 158%; }
-.process-flow__step:nth-child(4) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 66% entry 166%; }
-.process-flow__step:nth-child(5) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 74% entry 174%; }
+.process-flow__step:nth-of-type(1) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 42% entry 142%; }
+.process-flow__step:nth-of-type(2) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 50% entry 150%; }
+.process-flow__step:nth-of-type(3) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 58% entry 158%; }
+.process-flow__step:nth-of-type(4) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 66% entry 166%; }
+.process-flow__step:nth-of-type(5) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 74% entry 174%; }
 
 /* --- past the last written range, the section stops being a sequence -------------
    The ranges above are written out to five steps. A sixth lays out perfectly --
@@ -332,17 +347,17 @@
    Guidance alone would not do this. A range nobody writes is a range the engine writes
    for you, and it writes the worst one.
    -------------------------------------------------------------------------------- */
-.process-flow__steps:has(.process-flow__step:nth-child(6)) :is(
+.process-flow__steps:has(.process-flow__step:nth-of-type(6)) :is(
   .process-flow__node,
   .process-flow__step-title,
   .process-flow__step-body
 ) { animation: none; }
 
-.process-flow__steps:has(.process-flow__step:nth-child(6)) .process-flow__step::after {
+.process-flow__steps:has(.process-flow__step:nth-of-type(6)) .process-flow__step::after {
   animation: none;
   scale: 1 1;
 }
-.process-flow__steps:has(.process-flow__step:nth-child(6)) .process-flow__node {
+.process-flow__steps:has(.process-flow__step:nth-of-type(6)) .process-flow__node {
   border-color: var(--color-accent);
   background-color: var(--color-accent);
   color: var(--color-accent-ink, var(--color-canvas));

@@ -56,6 +56,24 @@
 
 ### Fixed
 
+- **`offer-table`'s stagger was off by one, shipped.** Its plans are `<th>` preceded by
+  a `<td>` corner cell, so `:nth-child` counted the corner: plan 1 received the range
+  written for plan 2, and the `:nth-child(1)` rule matched nothing at all. With four
+  plans the fourth would have fallen through to the catch-all and lost its animation
+  entirely. `:nth-child` is a fact about the parent's *other* children; all 39 indexed
+  selectors in the library are now `:nth-of-type`.
+
+- **A ladder that mixes `entry` and `cover` endpoints is ordered only by luck.** The
+  entry phase spans `min(elementH, viewportH)` of scroll and the cover phase spans
+  `viewportH + elementH`, so `entry 100%` sits at `min(h,vh)/(vh+h)` of cover —
+  measured across eight element/viewport pairs at exactly that value, from cover 11.8%
+  to 47.1%. `process-flow` shipped one such rung. It did not invert at any geometry
+  measured, because `entry X%` can never exceed `cover X%`, but it was safe by margin
+  rather than by construction. `tests/checks/lib/ladder-scan.py` now refuses the mix,
+  along with child-indexing and a missing catch-all, and names the fourth cause it
+  cannot see: rungs on `view()` each build a timeline from their own box.
+
+
 - **A child past the last written `:nth-child` range runs out of sequence.** An element
   with no `animation-range` falls back to `normal`, which on a view timeline is
   `cover 0%` to `cover 100%` — a range unrelated to the stagger, so the extra child
