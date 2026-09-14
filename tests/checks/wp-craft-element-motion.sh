@@ -28,11 +28,19 @@ grep -qF 'It meters viewport-heights of added scroll, and nothing else' "$dev" \
 grep -qF 'Restraint is about scroll, never about life' "$dev" \
   || fail "$dev must say a restrained page still moves"
 
-# --- the three silent-failure rules are written where motion is written ------
+# --- the four silent-failure rules are written where motion is written -------
+# The second of these used to pin the claim that a duration on a scroll-driven
+# animation "overrides the range and the element plays through on its own clock".
+# That was wrong, and the pin made it durable. Measured in Chrome with the repo's
+# own playwright-core: two rules identical but for `animation-duration: auto`
+# against `2s`, sampled at six scroll positions, produced the same value at every
+# one -- 13.165, 79.0622, 95.4148, 99.9709, 100, 100. The duration is recorded in
+# the timing and ignored. The advice (leave it off) survives; the reason changed,
+# so the pin has to change with it or the file keeps teaching a false model.
 grep -qF 'Longhands only' "$dev" \
   || fail "$dev: the animation shorthand resets animation-timeline; say so"
-grep -qF 'No `animation-duration`' "$dev" \
-  || fail "$dev: a duration overrides the range; say so"
+grep -qF 'A duration on a scroll-driven animation is inert' "$dev" \
+  || fail "$dev: a duration on a scroll timeline is ignored, not obeyed; say so"
 grep -qF 'animation-fill-mode: both' "$dev" \
   || fail "$dev: without fill-mode both, above-fold elements flash to their from value"
 
@@ -276,5 +284,43 @@ grep -Fq 'share a named timeline' "$dev" \
   || fail "$dev does not state that two elements displaying one value share a named timeline"
 grep -Fq 'Two counters, and which one is a mistake' "$dev" \
   || fail "$dev does not separate the clock-driven counter from the scroll-driven one, so a readout that must track motion gets the tool that cannot"
+
+# --- a loop that never states its timeline is wrong or lucky ----------------------
+# A scroll timeline is INHERITED from any broader rule that hands one out, and
+# motion.css gives descendants of a `reveal` section their own view(). An animation
+# that means to loop on a clock and lands on a scroll timeline does not loop: it
+# reports playState "finished" and sits at its start value forever. Measured on a
+# 2s infinite sweep inside such a subtree -- timeline=ViewTimeline, duration=2000,
+# finished, value pinned at 0, never moved -- against the same rule stating
+# auto/normal, which ran on the DocumentTimeline and swept while the page was still.
+#
+# This is checkable without false positives, which the "two selectors share a range"
+# idea is not: `animation-iteration-count: infinite` plus a finite
+# `animation-duration` plus no explicit `animation-timeline` in the same rule is
+# either wrong or lucky, and lucky only until a section wraps it.
+loose=$(
+  for f in "$C"/*/section.css; do
+    awk -v F="$f" '
+      /\{/ { inrule = 1; buf = "" }
+      inrule { buf = buf $0 " " }
+      /\}/ {
+        if (inrule && buf ~ /animation-iteration-count: *infinite/ &&
+            buf ~ /animation-duration: *[0-9.]+m?s/ && buf !~ /animation-timeline/)
+          print F
+        inrule = 0
+      }' "$f"
+  done
+)
+[ -z "$loose" ] || fail "these declare a clock loop with a duration and no animation-timeline -- if any ancestor rule hands them view() they report finished and never move, so state \`animation-timeline: auto\` and \`animation-range: normal\`:
+$loose"
+
+grep -Fq 'There are two coupling mechanisms' "$dev" \
+  || fail "$dev names only one way to couple two readouts; a clock-driven pair is coupled by identical timing longhands, not by a timeline name"
+grep -Fq 'motionless whenever the reader is' "$dev" \
+  || fail "$dev does not state the cost of scroll-scrubbing a readout, which is the reason one build's gauge was a still picture"
+grep -Fq 'A duration on a scroll-driven animation is inert' "$dev" \
+  || fail "$dev has lost the measured correction about animation-duration on a scroll timeline"
+grep -Fq 'needs `animation-timeline: auto` and' "$dev" \
+  || fail "$dev does not state that a clock loop near scroll-driven CSS must declare auto/normal"
 
 echo PASS

@@ -187,10 +187,26 @@ Three ways this fails silently, all of them worth knowing before you write it:
 1. **Longhands only.** The `animation` shorthand resets `animation-timeline` to
    `auto`, which silently reverts the element to a time-based animation that runs
    once on load and never tracks the scroll.
-2. **No `animation-duration`.** A duration on a scroll-driven animation overrides the
-   range and the element plays through on its own clock.
+2. **A duration on a scroll-driven animation is inert.** It does not override the
+   range and the element does not play through on its own clock — this file said it
+   did, and measuring says otherwise: two rules identical but for `animation-duration:
+   auto` against `2s`, sampled at six scroll positions, produced the same value at
+   every one (13.165, 79.0622, 95.4148, 99.9709, 100, 100). The duration is recorded
+   in the timing and ignored. Leave it off anyway, because writing one teaches the
+   next reader that it does something.
 3. **`animation-fill-mode: both`.** Without it the element snaps back to its start
    state outside the range, so anything above the fold flashes to its `from` value.
+4. **A time-based loop near scroll-driven CSS needs `animation-timeline: auto` and
+   `animation-range: normal` stated.** A scroll timeline is inherited by anything a
+   broader rule hands it to — `motion.css` gives descendants of a `reveal` section
+   their own `view()` — and a looping animation that lands on one does not loop. It
+   reports `playState: "finished"` and sits at its start value forever: measured, an
+   infinite 2s sweep inside such a subtree read `timeline=ViewTimeline, duration=2000,
+   finished, --v=0` and never moved, while the same rule stating `auto`/`normal` ran
+   on the `DocumentTimeline` and swept 54.5 → 6.0 with the page held still. No error,
+   no warning, a still picture. This is the shorthand trap arriving from the opposite
+   direction: there a load animation inherits `view()` and snaps to its end state,
+   here a loop inherits `view()` and never starts.
 
 **Use `translate`, `scale` and `rotate`, never `transform`.** The engine writes
 `transform` for `parallax`, `magnet` and cue rise, and `reveal` writes it on every
@@ -238,6 +254,25 @@ The fix is one timeline on the nearest shared ancestor:
 Both then report the same `currentTime`, and the two readouts agree arithmetically
 rather than by hope. Any composition where a bar and its percentage, a scale and its
 marker, or a meter and its figure describe one quantity has this shape.
+
+**There are two coupling mechanisms, and which one you need depends on what drives
+the value.** The mistake is identical in either case — declaring the same intent on
+two elements and assuming that makes them one animation — and so is the way it
+fails, silently and only on screen.
+
+| the value is driven by | couple with |
+|---|---|
+| the reader's scroll position | one `view-timeline-name` on the nearest common ancestor |
+| a clock | identical timing longhands on both, one keyframe domain |
+
+**Scroll-scrubbing a readout has a cost worth naming before you choose it: it is
+motionless whenever the reader is.** A gauge driven by scroll position is a still
+picture in every screenshot, and on any page somebody is reading rather than
+scrolling. That is right for a value the reader is *navigating* — a scale whose
+marker they move by scrolling — and wrong for a value that should simply be alive,
+which belongs on a clock and loops. One build shipped the scroll version and drew
+"but why doesn't it move" from the operator; the fix was not better coupling but a
+7s alternating document timeline, coupled by mechanism two.
 
 ## The eight devices
 

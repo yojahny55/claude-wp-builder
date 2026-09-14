@@ -31,6 +31,26 @@
 
 ### Fixed
 
+- **`devices.md` said a duration on a scroll-driven animation hijacks it. Measured,
+  it does nothing at all.** The file claimed a duration "overrides the range and the
+  element plays through on its own clock", and a check pinned that wording, which is
+  what made it durable. Two rules identical but for `animation-duration: auto` against
+  `2s`, sampled at six scroll positions in Chrome: same value at every one — 13.165,
+  79.0622, 95.4148, 99.9709, 100, 100. The advice survives, the reason was wrong, and
+  a pin that fixes a false reason in place is worse than no pin.
+
+- **A clock loop written near scroll-driven CSS silently does not run.** A scroll
+  timeline is inherited from any broader rule handing one out, and `motion.css` gives
+  descendants of a `reveal` section their own `view()`. A looping animation that lands
+  on one reports `playState: "finished"` and sits at its start value forever: measured,
+  an infinite 2s sweep read `ViewTimeline, duration=2000, finished, value 0` and never
+  moved, while the same rule stating `animation-timeline: auto` and
+  `animation-range: normal` ran on the `DocumentTimeline` and swept 54.5 → 6.0 with the
+  page held still. Now stated, and checked structurally — a rule with
+  `animation-iteration-count: infinite`, a finite duration and no `animation-timeline`
+  is either wrong or lucky.
+
+
 - **Two elements reading one value on `view()` do not agree.** `view()` builds its
   timeline from each element's own box, so identical `animation-range` declarations
   buy identical *ranges*, not identical *progress* — a box higher in the card is
@@ -44,6 +64,15 @@
   reads out something else moving, which is animated as a custom property and read
   back through `counter()`. No shipped composition has the shape today; four on the
   build list do.
+
+- **There are two ways to couple two readouts, and only one was written down.** A
+  pair driven by scroll position couples with a `view-timeline-name` on the nearest
+  common ancestor; a pair driven by a clock couples with identical timing longhands
+  and one keyframe domain. The mistake is the same in both — declaring the same intent
+  on two elements and assuming that makes them one animation. `devices.md` also now
+  names the cost of the scroll version before you pick it: a scroll-scrubbed readout
+  is motionless whenever the reader is, which is a still picture in every screenshot
+  and on any page somebody is reading rather than scrolling.
 
 
 - **The fingerprint gate compared fonts and not structure.** v2 reduced it to display
