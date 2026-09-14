@@ -133,9 +133,17 @@ grep -Fq 'no domain signal' "$k" \
 # with the classification unread — the exact failure the rest of this file prevents.
 # The literal row is asserted as well as the prose: the prose alone would survive a
 # revert of the row to five columns.
+#
+# Pin the WHOLE row, not a prefix of it. The prefix form asserted six columns while
+# the row had since grown a seventh (`research signal`), so it read as enforcing a
+# column count it could not see -- a substring match cannot notice what follows it,
+# and the failure message named a shape the file no longer had.
 r=skills/wp-demo-craft/references/compositions.md
-grep -Fq 'section | role | composition | why | motion cost | domain signal' "$r" \
-  || fail "$r's composition-plan row is not the six-column form ending in domain signal"
+row='section | role | composition | why | motion cost | domain signal | research signal'
+grep -Fq "$row" "$r" \
+  || fail "$r's composition-plan row is not \`$row\`"
+grep -Fq "$row |" "$r" \
+  && fail "$r's composition-plan row has gained a column the pin does not name -- update \$row here so the count stays asserted"
 grep -Fq 'domain signal that justified' "$r" \
   || fail "$r does not require a domain signal (or brief constraint) per row"
 grep -Fq 'no domain signal' "$r" \
