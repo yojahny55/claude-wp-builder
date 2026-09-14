@@ -20,7 +20,7 @@ words),
 cta_label/cta_href, image_src/image_alt (3:2 or wider, at least 2400px).
 
 **Notes:** copy is centred in the frame by default and anchored to the bottom only
-above `700px` of viewport height. The bottom anchor is the composition's identity, but
+above `900px` of viewport height. The bottom anchor is the composition's identity, but
 applied unconditionally it presses the CTA against the floor of a short frame -- at
 390x844 the button rendered with its label below the fold. A height query, not a width
 one: a short wide window fails identically and a width query would pass it.

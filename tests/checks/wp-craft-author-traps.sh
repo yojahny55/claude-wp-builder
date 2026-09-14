@@ -56,8 +56,8 @@ grep -qF 'clippedSeen' "$verify" \
 # --- hero-bleed clears the fold on a short frame ------------------------------
 grep -qF 'align-content: center' "$hero/section.css" \
   || fail "$hero: the default must centre copy; end presses the CTA against a short fold"
-grep -qF 'min-height: 700px' "$hero/section.css" \
-  || fail "$hero: the bottom anchor must be restored by a HEIGHT query, not unconditionally"
+grep -qF 'min-height: 900px' "$hero/section.css" \
+  || fail "$hero: the bottom anchor returns above 900px measured; 844 is the height that failed"
 grep -qF 'align-content: end' "$hero/section.css" \
   || fail "$hero: the bottom anchor is the composition's identity and must survive"
 

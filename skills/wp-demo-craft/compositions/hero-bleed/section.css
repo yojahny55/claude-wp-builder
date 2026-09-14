@@ -90,10 +90,22 @@
   .hero-bleed__cta { transition: none; }
 }
 
-/* The bottom anchor, restored where there is room for it. 700px is the height at
-   which the copy block clears the bottom padding with the title at its two-line
-   maximum; below it the block is centred instead. Height, not width: a wide short
-   window fails this the same way a phone does, and a width query would pass it. */
-@media (min-height: 700px) {
+/* The bottom anchor, restored where there is room for it.
+   The threshold is 900px and it comes from two measured points, not from a formula:
+   at 1440x900 the bottom-anchored copy clears the fold with the CTA label visible,
+   and at 390x844 the CTA rendered with its top few pixels showing and no label. 900
+   is the lower of the two heights that worked, so it is a floor established by
+   measurement rather than a proof.
+   It was 700px in the first version of this fix, which was wrong in the way that
+   matters: 844 >= 700, so the failing viewport got the bottom anchor restored and
+   the fix did nothing for the case it was written for.
+   Height, not width: the failure is that the copy block plus its bottom padding
+   exceeds the frame, and a short wide window fails identically while a width query
+   would pass it.
+   Ceiling: a threshold cannot see content. A title that wraps to three lines at
+   1000px tall will still crowd the fold, because CSS cannot ask whether the block
+   fits -- only how big the window is. The slot contract caps the title at three
+   lines at 390 for this reason, and that cap is what keeps the two numbers honest. */
+@media (min-height: 900px) {
   .hero-bleed { align-content: end; }
 }
