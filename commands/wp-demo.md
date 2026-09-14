@@ -152,8 +152,9 @@ before writing any markup.
    `faq`, `closing`, `capability`, `explainer`, `page-head`, `footer`), with `filters.feel` set to the
    feel tags drawn from the brief's vibe words and `limit: 3`. For each hit worth using, call
    `get_entry`, read its strip, and record the slug. Write the result into
-   `demo/BRIEF.md` under `## References` as one line per slug: the slug, the
-   role it informed, and one sentence on what was taken from it. Cite only
+   `demo/BRIEF.md` under `## References` as one line per slug, each line starting with the slug,
+   then the role it informed and one sentence on what was taken from it, so library lines are
+   distinguishable from the named references item 3 already lists. Cite only
    entries actually consulted.
 
    If the server is not registered or the call fails, write
