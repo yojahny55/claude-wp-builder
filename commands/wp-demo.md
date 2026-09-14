@@ -159,6 +159,10 @@ before writing any markup.
    | `motion appetite` | How much movement: entrance only, motion throughout, or deliberately still? And is scroll choreography wanted, or is element motion enough? |
    | `microinteraction appetite` | Hover states, animated borders, icons that draw on, details that reward attention — wanted, or noise? |
    | `the one action` | What should a visitor actually do? Everything on the page either serves that or is decoration. |
+   | `surface vocabulary` | **What does a card look like on this site?** Flat, bordered, elevated, glass. One line, site-wide consequences, and the cheapest question on this table to ask late — a build learned in round five that the client had meant "glassmorphism, liquid, like Apple" by name, after every card had already shipped flat. Ask it before the first section is styled. |
+   | `name the moving things` | Not appetite on a scale — **a list**. "A credit score going from bad to good" is an answer; "yes, lots of animation" is not. An appetite question returns a volume knob, and a list returns a spec that names components nobody has built yet. |
+   | `where the background does work` | Does the ground carry anything — a field, a gradient in motion, a texture, a drawn figure — or is it flat canvas behind everything? Readers distinguish ground from content and have opinions about both ("love the background animation, but the section is ugly"), and with no question about it the ground defaults to flat and every "generic / blank" note is partly about it. |
+   | `what may we not claim` | What is this business forbidden to say? In regulated sectors the answer shapes half the copy — a credit-repair firm is bound by CROA, a clinic by its advertising code, a firm by its bar rules. A build surfaced this by reading the statute itself, which is luck, not process. Ask the client; they already know. |
    | `reference: what to take` | For each named reference, **what specifically** — its layout, its motion, its density, its restraint? "I like this site" is not usable; "I like how little it makes you read" is. |
 
    Offer concrete options rather than open questions. An operator who is shown
@@ -170,7 +174,13 @@ before writing any markup.
    decoration on the brief. `draw, don't write` decides which roles the plan
    reaches for; `text density` decides how much copy each slot carries;
    `motion appetite` and `microinteraction appetite` decide how far the element
-   motion goes. A plan that contradicts a recorded form answer is wrong in the
+   motion goes; `surface vocabulary` decides what every card, panel and pane in
+   the build is made of, so it binds before the first section is styled rather
+   than after; `name the moving things` is the field the composition plan has to
+   answer item by item, and a named thing with no composition behind it is a
+   component to build, not a line to drop; `where the background does work`
+   decides whether any section gets a ground at all; `what may we not claim`
+   binds on every line of copy. A plan that contradicts a recorded form answer is wrong in the
    same way a plan that contradicts the domain signal is wrong.
 
    **3a-i. A recorded client decision outranks the craft defaults.** If

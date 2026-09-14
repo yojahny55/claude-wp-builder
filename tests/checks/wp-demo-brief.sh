@@ -34,7 +34,9 @@ grep -qF 'Project documents describe a business. They almost never describe a' "
 # on a real build: no visual vocabulary, walls of text, one animation, no detail,
 # no call to action, and references cited without saying what to take from them.
 for field in "draw, don't write" "text density" "motion appetite" \
-             "microinteraction appetite" "the one action" "reference: what to take"; do
+             "microinteraction appetite" "the one action" "reference: what to take" \
+             "surface vocabulary" "name the moving things" \
+             "where the background does work" "what may we not claim"; do
   grep -qF "$field" "$demo" || fail "$demo: the brief must ask about '$field'"
 done
 
