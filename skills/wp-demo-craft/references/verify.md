@@ -127,7 +127,12 @@ written down first.
 
 - `unobserved` — the page carries devices but none the harness can sample, and
   the stalled section carries no scrubbed device of its own. Advisory: it never
-  fails a round. `reveal` was reported as `dead-scroll` for every section that
+  fails a round. A **jump** in the advisory count is not by itself a
+  regression: a bed is one `unobserved` row at every sampled position, so adding one
+  device to one page raises the count by exactly the per-page sample count. Measured
+  on a build that gained a parallax bed on two pages: 80 advisory to 96, eight rows
+  per page. An advisory rise that is an exact multiple of the sample count is a device
+  being *added*; one that is not is worth reading. `reveal` was reported as `dead-scroll` for every section that
   used it until v3.1, which is what taught a build to dismiss 392 findings in
   prose. A gate that cannot tell a good page from a broken one gets overruled,
   and then so does every gate beside it.
@@ -140,6 +145,20 @@ written down first.
 - `no-engine` — the page carries no `data-motion` at all. Fails the round. A
   motionless page used to walk clean, because an empty frame signature could
   never accumulate a stall.
+- **`static-page` — the page's whole device mix is `reveal` plus pointer devices, so
+  nothing on it reacts to scrolling.** Fails the round. The remedy is almost never to
+  add a device, and reaching for one is how a real defect gets buried: **a page with
+  only `reveal` is usually not a motion decision, it is a page that is missing
+  something.** Ask why this page has less on it than its siblings before deciding what
+  to do about the finding.
+
+  Measured on a real build: two interior pages fired `static-page`, and the cause was
+  that they were the only interior pages with no banner image — the banner bed is what
+  carries `parallax`, so no image meant no scroll device meant nothing reacting. The
+  client had asked several rounds earlier that interior banners use images, and these
+  two were the last pages not honouring it. The finding fired on a *motion* axis and
+  the defect was on a *content* one. Adding a device to satisfy the check would have
+  left the real defect in place and made the page worse.
 - **`unobserved` is a per-section judgment; `no-engine` keeps a document-wide count.**
   The probe walks `[data-motion]` inside the walked section's own subtree, so an
   `unobserved` row is a fact about that section: it carries devices this harness

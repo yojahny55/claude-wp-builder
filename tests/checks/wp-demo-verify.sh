@@ -198,4 +198,23 @@ grep -Fq 'An eased reading is not progress' "$r" \
 grep -Fq 'returns the transformed box' "$r" \
   || fail "$r does not record that getBoundingClientRect reports the transformed box"
 
+# --- what to DO about static-page, which is not what it looks like ----------------
+# The finding fires on a motion axis and the cause is usually on a content one.
+# Measured on a real build: two interior pages fired `static-page` because they were
+# the only interior pages with no banner image, and the banner bed is what carries
+# parallax. The client had asked rounds earlier that interior banners use images and
+# these two were the last not honouring it. Adding a device to clear the finding would
+# have buried that. A remedy that makes the page worse is worse than no remedy, so the
+# prose has to say which way to look.
+grep -Fq 'usually not a motion decision, it is a page that is missing' "$r" \
+  || fail "$r explains static-page but not what to do about it; the remedy is almost never to add a device, and adding one buries the real defect"
+grep -Fq 'static-page' "$r" \
+  || fail "$r does not document the static-page finding at all"
+
+# An advisory count that jumps is not automatically a regression, and the arithmetic
+# says which it is: a bed is one unobserved row per sampled position, so adding one
+# device to one page raises the count by exactly the per-page sample count.
+grep -Fq 'exact multiple of the sample count' "$r" \
+  || fail "$r does not say how to read a jump in the advisory count, so a device being added reads as a device breaking"
+
 echo PASS

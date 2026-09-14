@@ -4,6 +4,23 @@
 
 ### Added
 
+- **`static-page` now says what to do about itself, because the obvious remedy is the
+  wrong one.** Measured on a real build: two interior pages fired it, and the cause was
+  that they were the only interior pages with no banner image — the banner bed carries
+  the `parallax`, so no image meant no scroll device. The client had asked rounds
+  earlier that interior banners use images and these two were the last not honouring
+  it. The finding fires on a *motion* axis and the defect was on a *content* one, so
+  the rule now reads: a page with only `reveal` is usually not a motion decision, it is
+  a page that is missing something. Adding a device to clear the finding would have
+  buried the real defect and made the page worse.
+
+- **How to read a jump in the advisory count.** A bed is one `unobserved` row at every
+  sampled position, so adding one device to one page raises the count by exactly the
+  per-page sample count — measured, 80 to 96 when two pages gained a parallax bed,
+  eight rows each. An advisory rise that is an exact multiple of the sample count is a
+  device being added, not a device breaking.
+
+
 - **An override can conceal what it overrode.** The known hazard was an override that
   silently fails to apply — appended above the rules it replaces, losing on source
   order at equal specificity. The other direction is worse: an override that *flattens*
@@ -93,6 +110,15 @@
   engine's inline transform on a parallax bed and `offsetTop` misreads under a
   transformed ancestor. Verified by running the shipped bounds body against the
   fixture: all four deltas zero.
+
+  **What this does and does not change, measured on a real build rather than a
+  fixture:** it makes a finding's reported `y` and the scrub range the walk drives
+  trustworthy. It does *not* generally change the verdict, because a section that is
+  genuinely moving still reports as moving when sampled from a slightly wrong offset.
+  Run against a build full of moving sections, before and after, the findings were the
+  same. The entry above says the error is largest on the sections the walk exists to
+  judge, which is true and should not be read as "those sections were being judged
+  wrongly" — they were being judged from the wrong coordinates.
 
 - **`references/verify.md` gains the two-readout table, before the rubric.**
   `animation.currentTime` is raw timeline progress; the computed property and
