@@ -21,6 +21,12 @@ intervals are tight and which are the breaks, the page has no rhythm.
   boundary between sections, not inside a heading-and-body pair. Getting this
   backwards is the single most common spacing error, and it makes the page
   read as a list.
+- **The `--space-section` floor is a scroll budget, not a spacing preference.** A
+  `clamp()` whose minimum is `4.5rem` puts 72px above and below every section on a
+  390px screen; at nine sections that is 14.4vh of the page spent on padding alone,
+  over the 8-14vh budget before a single section has said anything. Floor it around
+  `2.75rem` and let the fluid middle do the work. This bullet exists because the
+  suggested token did not follow the rule in the next line.
 - Section padding is fluid (`--space-section`). A phone should not inherit
   desktop air; 8rem of padding on a 375px screen is a scroll tax.
 - Group by proximity before reaching for a container. If you added a border
@@ -38,6 +44,14 @@ render, not the number.
 
 - **Two families maximum.** Display carries voice, text carries prose. A
   third is a costume.
+- **A small-caps eyebrow tracks at `0.08em`, and `0.16em` is over the line.**
+  `impeccable detect` reads wide tracking on a short uppercase string as a slop
+  signature, and the threshold sits between those two values. `page-head`'s own kicker
+  uses `0.08em` and passes every round; a bespoke eyebrow at `0.16em` took one slop
+  finding per page and failed the gate on eleven of them. An author writing their own
+  eyebrow had no way to find the safe side except by trial, because the number was
+  written nowhere. It is written here now: stay at or below `0.1em`, and prefer copying
+  `page-head`'s kicker rule to inventing one.
 - **Tracking tightens as size grows.** A typeface set at 6rem with default
   tracking reads loose and amateur. A ramp handles this: `--font-track-tight`
   on display, `--font-track-normal` on body. This is optical correction, not

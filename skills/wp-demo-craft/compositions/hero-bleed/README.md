@@ -19,7 +19,13 @@ busy image; a band scrim heavy enough to fix a busy image is a grey rectangle.
 words),
 cta_label/cta_href, image_src/image_alt (3:2 or wider, at least 2400px).
 
-**Notes:** the bed is inset `-40px` top and bottom and 80px over-tall, because a
+**Notes:** copy is centred in the frame by default and anchored to the bottom only
+above `700px` of viewport height. The bottom anchor is the composition's identity, but
+applied unconditionally it presses the CTA against the floor of a short frame -- at
+390x844 the button rendered with its label below the fold. A height query, not a width
+one: a short wide window fails identically and a width query would pass it.
+
+The bed is inset `-40px` top and bottom and 80px over-tall, because a
 bed sized to the section would drag its own edge into frame. Parallax travel is
 `rate * 100`px *in total* (`devices.md`), so rate 0.6 is 60px end to end, or plus
 and minus 30px from centre; 40px each side covers it with room for rounding.

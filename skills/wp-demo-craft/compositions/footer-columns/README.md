@@ -14,7 +14,7 @@ above it is the ending.
 **Pick when:** more than six pages, or a business with a physical address, opening
 hours or a phone number worth putting in front of people.
 
-**Slots:** wordmark, blurb, `nav_N_label` and four `nav_N_link_M`/`nav_N_href_M`
+**Slots:** `logo_src`/`logo_alt` (optional), wordmark, blurb, `nav_N_label` and four `nav_N_link_M`/`nav_N_href_M`
 pairs per column, contact_label, address_line, phone/phone_href, email, hours,
 legal_line and two legal links.
 

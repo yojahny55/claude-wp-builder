@@ -114,9 +114,20 @@ carrying one interaction is what a page looks like when nobody added up.
 
 Travel is `scrollWidth - innerWidth`, so measure the overflow: a rail
 narrower than the viewport travels zero and the section becomes a motionless
-pin. Aim for at least half a viewport of overflow; add the heading as the
-first rail item rather than widening cards. Roughly one viewport-height per
+pin. Aim for at least half a viewport of overflow. Roughly one viewport-height per
 item, plus one.
+
+**`pan` needs five items or more.** With three content-sized cards the rail cannot
+overflow a 1440 viewport at all, so the device travels zero and pins a section that
+never moves — pick `reveal` or `cascade` for a short set instead. Widening the cards
+to force overflow makes the cards wrong to fix the device, which is backwards.
+
+**Do not put the heading in the rail.** It was once suggested here as the way to buy
+travel without widening cards, and it buys the travel by panning the section's own
+label off the left edge: the section is then unlabelled for several hundred pixels of
+scroll, which an independent evaluator flagged unprompted on a build that followed this
+advice exactly. A heading is what tells a reader what they are looking at while they
+look at it. Keep it outside the rail and let a short set use a different device.
 
 ### `wipe`
 

@@ -6,7 +6,14 @@
   isolation: isolate;
   overflow: hidden;
   display: grid;
-  align-content: end;
+  /* Bottom-anchored copy is this composition's identity, and it only works when the
+     frame is tall enough to have a bottom worth anchoring to. On a short frame the
+     kicker, up to three lines of title, a ~25-word lede and the CTA are pressed
+     against the floor, and the CTA is the last thing above the edge by construction
+     -- measured at 390x844 as a button with its top few pixels visible and no label,
+     which fails the rubric's own "First paint complete" line with no author error.
+     Centre is the safe default; `end` is restored once there is room for it. */
+  align-content: center;
   min-height: 100dvh;
   padding-block: var(--space-section) calc(var(--space-section) * 0.9);
   padding-inline: max(var(--space-gutter), calc((100% - var(--container-max, 1280px)) / 2));
@@ -81,4 +88,12 @@
 .hero-bleed__cta:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
   .hero-bleed__cta { transition: none; }
+}
+
+/* The bottom anchor, restored where there is room for it. 700px is the height at
+   which the copy block clears the bottom padding with the title at its two-line
+   maximum; below it the block is centred instead. Height, not width: a wide short
+   window fails this the same way a phone does, and a width query would pass it. */
+@media (min-height: 700px) {
+  .hero-bleed { align-content: end; }
 }

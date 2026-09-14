@@ -151,6 +151,8 @@
     "lede": "A selection of flights fitted across Bristol and Somerset since 2018, with the timber, the lead time and the price band for each."
   },
   "footer-columns": {
+    "logo_src": "https://picsum.photos/id/1084/360/96",
+    "logo_alt": "Ravenscroft workshop mark",
     "wordmark": "Ravenscroft",
     "blurb": "Staircases, doors and handrails from one Bristol workshop since 1974.",
     "nav_1_label": "Work",

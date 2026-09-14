@@ -45,6 +45,19 @@ the composition folder, so **run it with `--fill` or it overwrites the committed
 previews with marker-filled ones.** Edit `fills.json`, not `section.html`, to
 change what a preview says.
 
+**Never put `container-type` on `body`, `html`, or any wrapper around the sections.**
+Each composition sets `container-type` on its own root, which is what its `@container`
+queries resolve against — that is the whole design, and it is also why adding one higher
+up looks like the natural next step. It is not. `container-type` freezes
+`animation-timeline: view()` for every subject beneath it: the timeline reports one
+constant progress at every scroll position, so every CSS-path `reveal` lands on its end
+state and never animates. A build that added `container-type: inline-size` to `body` lost
+every reveal on all twelve pages and spent a full round on 58 `dead-scroll` findings
+before finding the one declaration. Measured there: ViewTimeline `currentTime` pinned at
+`11.2849%` with it, tracking `-10.34% → 47.02%` without it. `demo-verify` now names this
+cause on every `dead-scroll` finding when it sees the declaration, but the cheapest fix is
+not writing it.
+
 | role | composition | motion cost (vh added) | devices | port of |
 |---|---|---|---|---|
 | hero | hero-split | 0 | reveal, parallax | none |

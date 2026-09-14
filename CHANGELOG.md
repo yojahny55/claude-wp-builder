@@ -28,6 +28,83 @@
   Both reference files carry the substance because `/wp-yolo`'s craft path reads them and
   never opens `commands/wp-demo.md`.
 
+### Fixed
+
+- **`container-type` on an ancestor freezes every reveal beneath it, and nothing said so.**
+  The composition library is container-query based, so adding `container-type: inline-size`
+  higher up — to `body`, to a page wrapper — reads as the natural next step. It is not: it
+  freezes `animation-timeline: view()`, so the timeline reports one constant progress at
+  every scroll position and every CSS-path `reveal` lands on its end state without
+  animating. A build that did it lost every reveal on all twelve pages and spent a full
+  round on 58 `dead-scroll` findings before locating one declaration. Measured there:
+  ViewTimeline `currentTime` pinned at `11.2849%` with it, tracking `-10.34% → 47.02%`
+  without it. `compositions/README.md` now warns beside the container-query explanation,
+  and `demo-verify` names the cause on every `dead-scroll` finding when it sees the
+  declaration. The finding was always right; it could not say why.
+
+- **Author CSS could lose to composition CSS silently.** Nothing stated where author
+  overrides sit in the cascade, so a build that emitted them above the composition
+  stylesheets had every equal-specificity rule ignored — fixes that looked applied,
+  changed nothing, and were found by screenshot after a wasted round. Composition CSS is
+  now emitted inside `@layer compositions`, and author CSS stays unlayered, which wins
+  regardless of source order. A layer is a guarantee; an ordering rule is an etiquette
+  that fails quietly.
+
+- **The standard accessible honeypot failed `clipped-copy`.** `position: absolute;
+  left: -9999px` and the `1px` sr-only clip both work by making a box far smaller than its
+  text and hiding the overflow, which is exactly the signature the detector looks for. One
+  honeypot field produced 72 blocking findings on a build whose accessibility was correct —
+  a gate that fails correct code teaches authors to delete the correct code. Deliberately
+  hidden copy is now exempt, and `clipped-copy` is deduplicated: one element clipped at
+  every scroll position is one defect, not one per sample.
+
+- **`hero-bleed` pressed its CTA against the bottom of a short fold.** `align-content: end`
+  on a `100dvh` grid pins the copy block to the floor of the frame, so the CTA is the last
+  thing above the edge by construction — at 390×844 the button rendered with its top few
+  pixels visible and no label, failing the rubric's own "First paint complete" line with no
+  author error. Copy is now centred by default and the bottom anchor is restored above
+  `700px` of viewport height. A height query, not a width one: a short wide window fails
+  identically and a width query would pass it.
+
+- **`footer-columns` had no logo slot.** Its only brand slot was `{{wordmark}}`, typed in
+  CSS as display text, so no build could put a client's real mark in the footer without
+  styling an element the composition believes is type. Adds `{{logo_src}}`/`{{logo_alt}}`
+  with their own rule, sized by height so a wide logo and a square one carry the same
+  optical weight, and the wordmark stays as the fallback.
+
+- **`pan` was recommended for sets it cannot move, by a remedy that hid the heading.**
+  With three content-sized cards the rail cannot overflow a 1440 viewport at all, so the
+  device travels zero and pins a motionless section. The fix the reference suggested — add
+  the heading as the first rail item rather than widening cards — buys travel by panning
+  the section's own label off the left edge, leaving it unlabelled for several hundred
+  pixels of scroll; an independent evaluator flagged that unprompted on a build that
+  followed the advice exactly. `pan` now states a five-item floor, and the
+  heading-in-the-rail remedy is retracted.
+
+- **Two thresholds an author could only find by trial are now written down.** The slop
+  detector reads wide tracking on a short uppercase string as a signature, and the line
+  sits between `0.08em` (passes, every round) and `0.16em` (eleven slop findings, one per
+  page, gate failed) — `taste.md` now names it. And `--space-section` floored at `4.5rem`
+  spends 14.4vh of a 390px page on padding across nine sections, over the scroll budget
+  before anything has been said, which contradicts the rule in the line below it.
+
+- **The `{{` ship check failed on the engine it inlines.** `motion.js` carries the literal
+  `{{slot}}` in a source comment, so the obvious whole-file implementation of "no page may
+  ship with a `{{` left in it" fails every time. The check now reads rendered markup.
+
+- **A hand-built section had no path to a generated image.** `image-gen.mjs plan` builds
+  `gaps[]` from `sections[] × slotsOf(composition)`, so a bespoke role — which the craft
+  rules explicitly permit — could not receive a plate. The supported escape hatch, appending
+  gap entries to `.image-plan.json` and calling `run`, is now documented rather than
+  rediscovered.
+
+- **Interior pages fell outside the step that produces composition plans.** `feel.md`
+  defines "the curve" in the singular and every worked example is a home page, so sub-step 5
+  produced an index-shaped plan by construction and interior pages were left with two
+  prohibitions and the word "cheap". They now get their own short curve — three or four
+  states, a smaller peak — which is what "take the cheap roles" was always meant to mean: a
+  lower ceiling on the same structure, never an exemption from having one.
+
 ### Added
 
 - **`demo-verify` reports `static-page`.** A page whose entire motion is `reveal` plus

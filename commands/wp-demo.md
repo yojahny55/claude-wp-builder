@@ -221,6 +221,14 @@ before writing any markup.
    includes a composition that declares an image slot (`hero-split`,
    `hero-bleed`, `feature-zigzag`). Skip in one line otherwise.
 
+   `image-gen.mjs plan` builds `gaps[]` from `sections[] × slotsOf(composition)`, so a
+   **hand-built section has no path to a plate through `plan`**. That is the supported
+   escape hatch, not a dead end: append the gap entries by hand to
+   `demo/.image-plan.json` — same shape, `slot`, `aspect`, `size`, and exactly one of
+   `prompt` or `use` — and call `run`, which reads `plan.gaps` as written. A bespoke
+   section that needs an image is a normal outcome of building a role the table does
+   not cover; it should not have to become a composition to get one.
+
    Then decide whether to generate, in this order. **Neither `GEMINI_API_KEY`
    nor `OPENAI_API_KEY` is set in the environment** — generate nothing, say so
    in one line, and go to step 6. No question is asked, because there is
@@ -339,12 +347,24 @@ before writing any markup.
    `initial-value` instead. Where `@property` is unsupported the rule is ignored
    and the `1280px` fallback still covers the absent case, so it needs no
    `@supports` guard.
+   **Emit every composition's CSS inside `@layer compositions { … }`, and never put
+   your own CSS in a layer.** An unlayered rule beats every layered one regardless of
+   source order or specificity, so this is what makes an author override work. Without
+   it the only thing deciding the winner is which block was written first, which is a
+   convention nobody can see in the output: a build that emitted its overrides above
+   the composition CSS had every equal-specificity rule silently ignored, spent a
+   round fixing things that were already "fixed", and found it only by screenshot.
+   A layer is a guarantee; an ordering rule is an etiquette that fails quietly.
+
    Copy each chosen composition's `section.html` and `section.css`, fill the
    `{{slots}}` with real copy and real assets — an image slot fills from that
    gap's own `result.file` in `demo/.image-plan.json`, keyed by that gap's own
    `slot` field, not a fixed string: `feature-zigzag`'s two gaps use
    `feature_1_image_src` and `feature_2_image_src`, for example — **no page may ship with a
-   `{{` left in it**: several slots fill `alt` and `aria-label` attributes, where
+   `{{` left in it** — check the page's *rendered markup*, not the whole file: the
+   inlined `motion.js` carries the literal `{{slot}}` inside a source comment, so a
+   naive whole-file grep fails on the engine every time and has already cost a build
+   cycle —: several slots fill `alt` and `aria-label` attributes, where
    an unsubstituted marker is read out verbatim by a screen reader and never
    appears on screen for anyone to notice — keep the delimiters and the BEM
    block. Motion comes from `data-motion-*` attributes only. Inline the contents of

@@ -12,6 +12,19 @@
   gap: clamp(2rem, 4cqi, 3rem);
   padding-bottom: clamp(2rem, 4cqi, 3rem);
 }
+/* The client's own mark, when they have one. Sized by height so a wide logo and a
+   square one occupy the same optical weight; `width: auto` keeps the aspect. Drop the
+   <img> and keep the wordmark when there is no logo file -- both are the brand slot,
+   and a demo that ships a broken image in the footer is worse than one that ships
+   type. */
+.footer-columns__logo {
+  display: block;
+  height: clamp(2rem, 3.4cqi, 2.75rem);
+  width: auto;
+  max-width: 100%;
+  margin-block-end: 0.75rem;
+}
+
 .footer-columns__wordmark {
   font-family: var(--font-display);
   font-size: clamp(1.5rem, 2.4cqi, 2.1rem);

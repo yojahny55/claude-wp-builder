@@ -311,9 +311,34 @@ const probe = (idx) => {
       sig.push(d[0] + ',' + d[1] + ',' + d[2]);
     } catch { /* tainted or webgl: not signable, skip */ }
   });
+  // Copy hidden from sighted users on purpose is not clipped copy. The standard
+  // accessible-honeypot and sr-only patterns both work by making a box far smaller
+  // than its text and hiding the overflow -- which is exactly the signature this
+  // detector looks for, so one honeypot field produced 72 blocking findings
+  // (element x section x width x scroll position) on a build whose accessibility
+  // was correct. A gate that fails correct code teaches authors to delete the
+  // correct code.
+  const deliberatelyHidden = (el) => {
+    for (let node = el; node; node = node.parentElement) {
+      if (node.getAttribute && node.getAttribute('aria-hidden') === 'true') return true;
+      const st = getComputedStyle(node);
+      if (st.position === 'absolute' || st.position === 'fixed') {
+        // Parked off-canvas: the -9999px idiom, either axis, either direction.
+        const off = ['left', 'top', 'right', 'bottom']
+          .map((side) => parseFloat(st[side]))
+          .some((v) => Number.isFinite(v) && Math.abs(v) >= 1000);
+        if (off) return true;
+      }
+      // The sr-only clip: a 1px box holding real text.
+      const r = node.getBoundingClientRect();
+      if (r.width <= 2 && r.height <= 2 && (node.textContent || '').trim().length > 2) return true;
+    }
+    return false;
+  };
   const clipped = [];
   document.querySelectorAll('p, h1, h2, h3, li').forEach((el) => {
     if (el.scrollHeight > el.clientHeight + 2 && getComputedStyle(el).overflow === 'hidden') {
+      if (deliberatelyHidden(el)) return;
       clipped.push((el.textContent || '').trim().slice(0, 60));
     }
   });
@@ -502,6 +527,8 @@ try {
   // One list of dead selectors per width walked, intersected after the loop.
   // See the container-noop block below for why a single width cannot decide it.
   const containerNoop = [];
+  const clippedSeen = new Set();
+  let containFreeze = null;
   let mix = null;
 
   // The docs promise the reduced-motion pass at desktop width. Pinning it to
@@ -531,6 +558,23 @@ try {
     // them, below the loop.
     if (!reduced) containerNoop.push(await page.evaluate(containerAudit));
     if (!reduced && !mix) mix = await page.evaluate(motionMix);
+    // `container-type` on an ancestor of the scroll subject freezes
+    // `animation-timeline: view()` -- the timeline reports one constant progress at
+    // every scroll position, so every CSS-path reveal lands dead. The existing
+    // dead-scroll finding catches the symptom; nothing named the cause, and a build
+    // that had added `container-type: inline-size` to `body` (a reasonable thing to
+    // do in a container-query-based library) spent a full round on 58 of them.
+    // Measured on that build: ViewTimeline currentTime pinned at 11.2849% with the
+    // declaration, tracking -10.34% -> 47.02% without it.
+    if (!reduced && containFreeze === null) {
+      containFreeze = await page.evaluate(() => {
+        for (const el of [document.documentElement, document.body]) {
+          const ct = getComputedStyle(el).containerType;
+          if (ct && ct !== 'normal') return el.tagName.toLowerCase() + ' { container-type: ' + ct + ' }';
+        }
+        return '';
+      });
+    }
     // Width-independent (a <script src> is in the markup at every size), so this
     // one stays a once-per-page read.
     if (!staticChecked) {
@@ -628,8 +672,14 @@ try {
         const pass = reduced ? 'reduced' : 'normal';
         if (frame.overflow)
           findings.push({ kind: 'overflow', pass, width: size.width, section: b.id, y: Math.round(y) });
+        // One element clipped at every scroll position is one defect, not one per
+        // sample. Undeduplicated, a single element reported once per section x width x
+        // position, which buried the rest of the report under a repeated line.
         frame.clipped.forEach((t) =>
-          findings.push({ kind: 'clipped-copy', pass, width: size.width, section: b.id, text: t })
+          clippedSeen.has(b.id + '|' + size.width + '|' + t) ? null : (
+            clippedSeen.add(b.id + '|' + size.width + '|' + t),
+            findings.push({ kind: 'clipped-copy', pass, width: size.width, section: b.id, text: t })
+          )
         );
         if (previous !== null && frame.signature === previous) stalls++;
         else stalls = 0;
@@ -724,6 +774,15 @@ try {
   // the pointer devices need a cursor, so a page holding only those cannot respond to a
   // scroll at all — which is the complaint a reader makes as "nothing happens here",
   // while the device count says the page is busy.
+  if (containFreeze) {
+    for (const f of findings) {
+      if (f.kind === 'dead-scroll' && !f.hint) {
+        f.hint = 'a scroll-subject ancestor sets container-type (' + containFreeze +
+          '), which freezes animation-timeline: view() -- remove it before looking anywhere else';
+      }
+    }
+  }
+
   if (mix) {
     const kinds = Object.keys(mix);
     const scrollReactive = kinds.filter((k) => k !== 'reveal' && !POINTER_DEVICES.has(k));
