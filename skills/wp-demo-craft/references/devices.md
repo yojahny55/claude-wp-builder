@@ -212,6 +212,33 @@ timeline. Measured on a real build: `anim=ns-pushin :: timeline=view()`, which t
 a set of drifting banners into banners that zoomed on scroll. One element, one
 animation rule, all longhands together.
 
+**Two elements that display the same value share a named timeline; `view()` is
+only safe when each element's progress is its own business.** `view()` builds a
+timeline from **each element's own box**, so two elements carrying identical
+`animation-range` declarations do not have identical progress — they have the
+progress their own boxes earn, and a box 200px higher in the card is further
+along. Measured on a gauge whose needle and figure read one score, at one scroll
+position: needle `-31.38%`, figure `-13.64%`. The needle had finished its travel
+while the number still read its start value; on screen, an arrow pointing at 850
+beside a figure showing 300, in the same frame.
+
+Nothing reports this. Every probe says both elements have a live `ViewTimeline` on
+the range they asked for, because they do. It is the same species as a counter that
+parses to `NaN`: each part is working and the composite is wrong, so it is caught by
+a reader and not by a harness.
+
+The fix is one timeline on the nearest shared ancestor:
+
+```css
+.gauge__frame  { view-timeline-name: --gauge-tl; view-timeline-axis: block; }
+.gauge__needle,
+.gauge__num    { animation-timeline: --gauge-tl; animation-range: entry 18% cover 52%; }
+```
+
+Both then report the same `currentTime`, and the two readouts agree arithmetically
+rather than by hope. Any composition where a bar and its percentage, a scale and its
+marker, or a meter and its figure describe one quantity has this shape.
+
 ## The eight devices
 
 ### `reveal`
@@ -355,6 +382,24 @@ a parallax layer. Never set a `transform` transition on a parallaxed element.
 Only real, verified numbers; a concept or pre-launch brand has none, so it has
 no counters. Ease-out hard over 1.2 to 1.8 seconds, fires once at half
 visibility, `tabular-nums`, reduced motion writes the final value.
+
+**Two counters, and which one is a mistake depends on what the figure is.**
+`data-motion-count` fires once on arrival and then tweens on a clock, so it is
+right for a figure that simply counts up when the reader gets to it and wrong for
+a figure that is a readout of something else moving — a clock and a scroll
+position are never in sync, so the number and the thing it describes disagree
+through the whole scrub. A figure that must track motion is animated as a
+property and read back:
+
+```css
+@property --score { syntax: "<integer>"; inherits: false; initial-value: 300; }
+.gauge__num        { counter-reset: score var(--score); }
+.gauge__num::after { content: counter(score); }
+```
+
+`counter-reset` goes on the **element**, never on the pseudo that reads the
+counter; the pseudo-scoped version computes and is not worth trusting across
+engines. Animate `--score` on the shared timeline above, not on `view()`.
 
 ### `drift`
 

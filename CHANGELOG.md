@@ -31,6 +31,21 @@
 
 ### Fixed
 
+- **Two elements reading one value on `view()` do not agree.** `view()` builds its
+  timeline from each element's own box, so identical `animation-range` declarations
+  buy identical *ranges*, not identical *progress* — a box higher in the card is
+  further along. Measured on a gauge at one scroll position: needle `-31.38%`,
+  figure `-13.64%`, an arrow pointing at 850 beside a figure showing 300 in the same
+  frame. Nothing reports it, because every probe correctly says both elements have a
+  live `ViewTimeline` on the range they asked for. `references/devices.md` now states
+  the coupling rule — a shared value means a `view-timeline-name` on the nearest
+  common ancestor — and separates the two counters: `data-motion-count` tweens on a
+  clock and is right for a figure that counts up on arrival, wrong for a figure that
+  reads out something else moving, which is animated as a custom property and read
+  back through `counter()`. No shipped composition has the shape today; four on the
+  build list do.
+
+
 - **The fingerprint gate compared fonts and not structure.** v2 reduced it to display
   family, text family and accent hue, reasoning that the composition library chooses
   structure per role so structure needed no fingerprint. A library with one good answer

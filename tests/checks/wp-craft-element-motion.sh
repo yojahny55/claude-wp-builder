@@ -248,4 +248,33 @@ grep -Fq 'Amplitude has a floor too' "$dev" \
 grep -Fq 'Two counts, not one' "$dev" \
   || fail "$dev does not separate the device count from the animated-element count, which is how a page ends up all fades"
 
+# --- two readouts of one value must share one timeline ----------------------------
+# `view()` builds a timeline from EACH ELEMENT'S OWN BOX, so two elements carrying
+# identical `animation-range` declarations do not have identical progress. Measured on
+# a gauge whose needle and figure read one score, at one scroll position: needle
+# `currentTime -31.38%`, figure `-13.64%` -- the needle had finished its travel while
+# the number still read its start value, an arrow at 850 beside a figure showing 300 in
+# the same frame. Nothing reports it: every probe says both have a live ViewTimeline on
+# the range they asked for, because they do. Same species as the NaN counter -- each
+# part works, the composite is wrong, and only a reader catches it.
+#
+# A CSS counter read back from an animated custom property is the readout shape that
+# ALWAYS has a partner moving somewhere else; that is the whole reason to build one.
+# So a composition using that idiom has to name a timeline on the shared ancestor
+# rather than leave each box to earn its own progress.
+while IFS= read -r line; do
+  f=${line%%:*}
+  grep -Fq 'view-timeline-name' "$f" \
+    || fail "$f reads a counter off an animated custom property but names no timeline -- on view() the figure and the thing it reads out get their own progress and disagree on screen"
+done < <(grep -rln 'counter-reset: *[a-z-]* *var(--' "$C"/*/section.css 2>/dev/null | sed 's/$/:/')
+
+# `counter-reset` belongs on the element, not on the pseudo that reads the counter.
+grep -rn '::\(before\|after\)[^{]*{[^}]*counter-reset' "$C"/*/section.css \
+  && fail "a composition sets counter-reset on the pseudo that reads it; it computes and is not trustworthy across engines -- put it on the element"
+
+grep -Fq 'share a named timeline' "$dev" \
+  || fail "$dev does not state that two elements displaying one value share a named timeline"
+grep -Fq 'Two counters, and which one is a mistake' "$dev" \
+  || fail "$dev does not separate the clock-driven counter from the scroll-driven one, so a readout that must track motion gets the tool that cannot"
+
 echo PASS
