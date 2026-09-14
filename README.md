@@ -320,6 +320,18 @@ Research never blocks a build. With no network it records that it found nothing,
 and the demo is built exactly as it is today. To refresh it, delete
 `demo/RESEARCH.md` and run `/wp-demo` again.
 
+### Design library
+
+The craft path queries `wp-design-library` over MCP when it is registered. To
+use a hosted instance instead of the npx stdio default, add to your project's
+`.mcp.json`:
+
+    "wp-design-library": { "type": "http", "url": "https://library.<domain>/mcp",
+      "headers": { "Authorization": "Bearer <token>" } }
+
+Without the server, `/wp-demo` writes `References: library unavailable` in
+`demo/BRIEF.md` and builds from the in-repo compositions.
+
 ## Commands Reference
 
 Full arguments, inputs and outputs per command: **[docs/commands.md](docs/commands.md)**.
