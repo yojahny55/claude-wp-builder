@@ -22,3 +22,9 @@ ships `open`, so the section is never a stack of closed bars with nothing to rea
 semantics anyway. The shared `name="faq-list"` makes the group exclusive natively
 (one answer open at a time) in browsers that support it, and degrades to
 independent disclosures in those that do not.
+
+**Element motion:** self-sufficient. The children arrive on their own `view()`
+ranges in `section.css`, so the root `data-motion="reveal"` is redundant here and
+may be dropped to free `data-motion` for a section-level device (`drift`,
+`parallax`, a pin). See "One attribute, one device" in
+`../../references/devices.md`.

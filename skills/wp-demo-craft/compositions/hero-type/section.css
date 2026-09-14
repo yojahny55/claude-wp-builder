@@ -78,3 +78,53 @@
 @media (prefers-reduced-motion: reduce) {
   .hero-type__cta { transition: none; }
 }
+
+/* ---- Element motion -------------------------------------------------------
+   Per-element scroll-driven CSS, not one root `reveal`. The attribute contract
+   gives a section a single device; rich motion is several elements arriving on
+   their own timelines, which only CSS can express. Costs zero viewport-heights,
+   so none of this touches the motion budget (`references/devices.md`,
+   "Two kinds of motion").
+   Longhands only -- the `animation` shorthand resets `animation-timeline` to
+   `auto` and the element silently reverts to a load-time animation. No
+   `animation-duration`: it overrides the range. `animation-fill-mode: both`, or
+   anything above the fold flashes to its `from` value.
+   ------------------------------------------------------------------------- */
+@keyframes hero-type-rise { from { opacity: 0; transform: translateY(var(--motion-rise, 22px)); } }
+@keyframes hero-type-fade { from { opacity: 0; } }
+.hero-type__kicker {
+  animation-name: hero-type-fade;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 25%;
+}
+.hero-type__title {
+  animation-name: hero-type-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 40%;
+}
+.hero-type__lede {
+  animation-name: hero-type-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 12% entry 52%;
+}
+.hero-type__actions {
+  animation-name: hero-type-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 20% entry 60%;
+}
+/* No view timeline, no range to run against: the honest fallback is the end
+   state, already visible, rather than a single arbitrary frame. */
+@supports not (animation-timeline: view()) {
+  .hero-type__kicker,
+  .hero-type__title,
+  .hero-type__lede,
+  .hero-type__actions { animation: none; }
+}

@@ -22,3 +22,9 @@ words), title, lede (12 to 24 words, what the reader will get from this page).
 because that is what this composition is: roughly 40% of a 900px screen, not a
 hero. The content that follows fills the rest on a real page. Deliberately
 shorter than every hero in the library.
+
+**Element motion:** self-sufficient. The children arrive on their own `view()`
+ranges in `section.css`, so the root `data-motion="reveal"` is redundant here and
+may be dropped to free `data-motion` for a section-level device (`drift`,
+`parallax`, a pin). See "One attribute, one device" in
+`../../references/devices.md`.

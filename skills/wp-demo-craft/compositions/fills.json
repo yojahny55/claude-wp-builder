@@ -195,5 +195,18 @@
     "link_3": "Contact",
     "href_3": "#contact",
     "legal_line": "Ravenscroft Joinery Ltd, Bristol. Registered in England 00841207."
+  },
+  "icon-row": {
+    "section_id": "capabilities",
+    "kicker": "What we do",
+    "title": "Four things we are actually good at",
+    "item_1_name": "Survey and drawings",
+    "item_1_note": "Measured on site, drawn before anything is cut.",
+    "item_2_name": "Fixed-price quotes",
+    "item_2_note": "One number, agreed before the work starts.",
+    "item_3_name": "Workshop build",
+    "item_3_note": "Made in Bristol, not subcontracted out.",
+    "item_4_name": "Ten-year guarantee",
+    "item_4_note": "Structure and finish, in writing."
   }
 }

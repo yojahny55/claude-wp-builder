@@ -143,3 +143,60 @@
 @media (prefers-reduced-motion: reduce) {
   .offer-table__cta { transition: none; }
 }
+
+/* ---- Element motion -------------------------------------------------------
+   Per-element scroll-driven CSS, not one root `reveal`. The attribute contract
+   gives a section a single device; rich motion is several elements arriving on
+   their own timelines, which only CSS can express. Costs zero viewport-heights,
+   so none of this touches the motion budget (`references/devices.md`,
+   "Two kinds of motion").
+   Longhands only -- the `animation` shorthand resets `animation-timeline` to
+   `auto` and the element silently reverts to a load-time animation. No
+   `animation-duration`: it overrides the range. `animation-fill-mode: both`, or
+   anything above the fold flashes to its `from` value.
+   ------------------------------------------------------------------------- */
+@keyframes offer-table-rise { from { opacity: 0; transform: translateY(var(--motion-rise, 22px)); } }
+@keyframes offer-table-fade { from { opacity: 0; } }
+.offer-table__kicker {
+  animation-name: offer-table-fade;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 28%;
+}
+.offer-table__title {
+  animation-name: offer-table-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 4% entry 44%;
+}
+.offer-table__lede {
+  animation-name: offer-table-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 12% entry 52%;
+}
+.offer-table__footnote {
+  animation-name: offer-table-fade;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 40% entry 80%;
+}
+/* Columns arrive left to right so the eye reads the table in the order it is
+   meant to be compared, instead of the whole grid appearing at once. */
+.offer-table__plan { animation-name: offer-table-rise; animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1)); animation-fill-mode: both; animation-timeline: view(); }
+.offer-table__plan:nth-child(1) { animation-range: entry 14% entry 54%; }
+.offer-table__plan:nth-child(2) { animation-range: entry 20% entry 60%; }
+.offer-table__plan:nth-child(3) { animation-range: entry 26% entry 66%; }
+.offer-table__plan:nth-child(4) { animation-range: entry 32% entry 72%; }
+/* No view timeline, no range to run against: the honest fallback is the end
+   state, already visible, rather than a single arbitrary frame. */
+@supports not (animation-timeline: view()) {
+  .offer-table__kicker,
+  .offer-table__title,
+  .offer-table__lede,
+  .offer-table__footnote { animation: none; }
+}

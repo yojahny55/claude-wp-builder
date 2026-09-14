@@ -70,6 +70,7 @@ not writing it.
 | testimonial | testimonial-pair | 0 | reveal, spotlight | Aceternity spotlight (MIT) |
 | faq | faq-list | 0 | reveal | none |
 | closing | closing-block | 0 | reveal, border beam | Magic UI border beam (MIT) |
+| capability | icon-row | 0 | reveal, element motion (icons draw on) | none |
 | page-head | page-head | 0 | reveal | none |
 | footer | footer-columns | 0 | none | none |
 | footer | footer-line | 0 | none | none |

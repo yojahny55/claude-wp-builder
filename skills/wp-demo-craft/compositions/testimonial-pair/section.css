@@ -88,3 +88,42 @@
 @container (min-width: 840px) {
   .testimonial-pair__grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* ---- Element motion -------------------------------------------------------
+   Per-element scroll-driven CSS, not one root `reveal`. The attribute contract
+   gives a section a single device; rich motion is several elements arriving on
+   their own timelines, which only CSS can express. Costs zero viewport-heights,
+   so none of this touches the motion budget (`references/devices.md`,
+   "Two kinds of motion").
+   Longhands only -- the `animation` shorthand resets `animation-timeline` to
+   `auto` and the element silently reverts to a load-time animation. No
+   `animation-duration`: it overrides the range. `animation-fill-mode: both`, or
+   anything above the fold flashes to its `from` value.
+   ------------------------------------------------------------------------- */
+@keyframes testimonial-pair-rise { from { opacity: 0; transform: translateY(var(--motion-rise, 22px)); } }
+@keyframes testimonial-pair-fade { from { opacity: 0; } }
+.testimonial-pair__kicker {
+  animation-name: testimonial-pair-fade;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 28%;
+}
+.testimonial-pair__title {
+  animation-name: testimonial-pair-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 4% entry 44%;
+}
+/* The two quotes arrive a beat apart; simultaneous reads as a layout painting
+   itself in, staggered reads as two people speaking. */
+.testimonial-pair__quote { animation-name: testimonial-pair-rise; animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1)); animation-fill-mode: both; animation-timeline: view(); }
+.testimonial-pair__quote:nth-child(odd)  { animation-range: entry 12% entry 52%; }
+.testimonial-pair__quote:nth-child(even) { animation-range: entry 22% entry 62%; }
+/* No view timeline, no range to run against: the honest fallback is the end
+   state, already visible, rather than a single arbitrary frame. */
+@supports not (animation-timeline: view()) {
+  .testimonial-pair__kicker,
+  .testimonial-pair__title { animation: none; }
+}

@@ -19,3 +19,9 @@ a zigzag of weak images is twice the weakness.
 **Notes:** the mirror is `direction: rtl` on the grid with `direction: ltr` back on
 the children, so the DOM order stays image-then-copy in both rows and the reading
 order does not flip with the visual one. Below 880px both rows stack image-first.
+
+**Element motion:** self-sufficient. The children arrive on their own `view()`
+ranges in `section.css`, so the root `data-motion="reveal"` is redundant here and
+may be dropped to free `data-motion` for a section-level device (`drift`,
+`parallax`, a pin). See "One attribute, one device" in
+`../../references/devices.md`.

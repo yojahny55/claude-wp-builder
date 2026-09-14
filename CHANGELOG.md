@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Compositions carry element motion, and the budget stopped metering it.** A craft build
+  produced pages that read as static while passing every gate, and the cause was neither
+  restraint nor the budget: a measured build finished with a quarter of its scroll allowance
+  unspent, having never dropped a device for it. One word covered two costs. Scroll
+  choreography lengthens the page and is correctly budgeted; fades, rises, zooms, icon draws
+  and staggered entrances lengthen nothing and were rationed by a ceiling that was never
+  about them. Seven compositions now carry per-element `view()` animation staggered by
+  `animation-range` instead of one root `reveal` -- ten of thirteen previously shipped
+  `reveal` as their only device, so composing faithfully produced one one-shot entrance per
+  section.
+
+- **New `icon-row` composition.** Four capability marks whose SVG icons draw themselves on
+  via `stroke-dasharray`/`stroke-dashoffset`, cards arriving left to right. `icon`
+  previously appeared in the craft rules only as a prohibition.
+
+- **Motion reaches the design references.** 67 reference sites, 57 of them describing
+  motion, and the token pipeline extracted none of it, so a demo took its palette from a
+  reference and its motion from nowhere. `--ease-entry` and `--motion-rise` are now mapped
+  and consumed by every composition.
+
 ### Fixed
 
 - **Interior pages had a ceiling and no floor, so a craft build shipped eleven of them

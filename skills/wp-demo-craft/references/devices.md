@@ -25,6 +25,104 @@ are set with `data-motion="tilt"` etc, same as the scroll-driven devices.
 The rail inside a `pan` section is marked `data-motion-rail`; without it the
 engine falls back to the section's first element child.
 
+## Two kinds of motion, and only one of them has a budget
+
+This distinction was missing, and its absence is why builds came out static while
+passing every gate. One word — "motion" — covered two things with completely
+different costs, and the ceiling written for the expensive one was applied to both.
+
+**Scroll choreography costs page length.** `pin`, `pan`, `kinetic`, `wipe` and
+`drift` scrub against a scroll range, which means the page must grow to give them
+room. That growth is what the vh budget below meters, and the budget is correct: a
+page carrying seven screens of scroll and one interaction is the failure it prevents.
+
+**Element animation costs nothing.** A heading rising on its own view range, a list
+staggering in, a bar growing from `scaleX(0)`, an icon drawing itself on with
+`stroke-dashoffset`, a photograph easing in, a hover lift, a zoom on entry — none of
+these lengthen the page by a single pixel. **They are not budgeted, not capped, and
+not rationed.** A section with eight of them is not over budget; it is a section that
+moves.
+
+Read that as permission, because the rules previously read as prohibition. Every
+gate in this skill punishes excess and, until recently, none punished absence — so an
+agent optimising to pass gates minimised motion, correctly, and shipped pages whose
+only animation was a single one-shot `reveal`. A measured build finished with a
+quarter of its scroll budget unspent while reading as completely static, which is the
+signature of a rule set that constrained the wrong axis.
+
+**Restraint is about scroll, never about life.** A page can be entirely restrained in
+its scroll choreography — no pins, no scrub, one peak or none — and still fade, rise,
+zoom, stagger and draw its icons throughout. Those are different decisions. A client
+asking for a site that moves is asking for the second, and answering with a longer
+page is answering a question nobody asked.
+
+### One attribute, one device — and how to get past it
+
+`data-motion` holds a single value. An element carrying `data-motion="reveal"`
+cannot also carry `drift`, and the engine reads one name per element, so there is
+no syntax for two.
+
+That matters more than it sounds, because **every composition used to spend its
+root attribute on `reveal`**. Adding any section-level device to a composed
+section therefore meant *deleting* the composition's own motion first — so the
+library's default foreclosed every alternative, and an author who wanted a
+section to drift or pin had to break the composition to do it. No budget and no
+rule caused that; one attribute did.
+
+The way past it is not a second attribute. It is that **a composition carrying
+element animation in its `section.css` does not need a root `reveal` at all** —
+the children are already arriving on their own ranges, which is better motion
+than one staggered block. Where that is true the root attribute is free, and a
+build can spend it on `drift`, `parallax` or a pin without taking anything away.
+
+So the order is: element motion first, root attribute second. A composition whose
+`section.css` carries `view()` animation may drop `data-motion="reveal"` and its
+`data-motion-stagger` when a build wants a section device there. Check the
+composition's README, which says whether its element motion is self-sufficient.
+
+One consequence worth stating, because it is the cost of the trade: a browser with
+no `animation-timeline: view()` support gets no entrance animation from the CSS
+path, and with the root `reveal` gone there is no GSAP path to fall back to
+either. Content is still visible — every composition's `@supports not` block
+lands on the finished state — it simply arrives without motion. That is the right
+trade for a demo; it is worth knowing before making it for a production theme.
+
+### How element animation is written
+
+Per-element scroll-driven CSS in the composition's own `section.css`, the same
+mechanism `utilities/motion.css` already uses for `reveal`:
+
+```css
+.block__heading {
+  animation-name: rise;
+  animation-timeline: view();
+  animation-range: entry 0% entry 45%;
+  animation-fill-mode: both;
+}
+.block__row:nth-child(2) { animation-range: entry 10% entry 55%; }
+.block__row:nth-child(3) { animation-range: entry 20% entry 65%; }
+```
+
+Stagger with `animation-range` offsets per child rather than one root `reveal` with
+`data-motion-stagger`. The attribute contract gives a section **one** device; rich
+motion is many elements moving on their own timelines inside one section, and the
+attribute cannot express that while CSS does it trivially.
+
+Three ways this fails silently, all of them worth knowing before you write it:
+
+1. **Longhands only.** The `animation` shorthand resets `animation-timeline` to
+   `auto`, which silently reverts the element to a time-based animation that runs
+   once on load and never tracks the scroll.
+2. **No `animation-duration`.** A duration on a scroll-driven animation overrides the
+   range and the element plays through on its own clock.
+3. **`animation-fill-mode: both`.** Without it the element snaps back to its start
+   state outside the range, so anything above the fold flashes to its `from` value.
+
+And one that is not silent but is easy to cause: an element already carrying a
+`transform` from a `data-motion` device cannot also be transformed by a `view()`
+animation — the last declaration wins and one of the two motions vanishes. Animate a
+child, or animate a different property.
+
 ## The eight devices
 
 ### `reveal`
@@ -89,6 +187,11 @@ pin, and `/wp-demo-verify` will report it as dead scroll.
 **Budget.** This paragraph is the only place the budget is written down; `SKILL.md`
 and `compositions/README.md` cite it rather than restate it, so it can be changed
 here without leaving a stale copy behind.
+
+**It meters viewport-heights of added scroll, and nothing else.** It does not cap how
+many things move, how many elements animate, or how alive a page feels — see "Two
+kinds of motion" above. Element animation contributes zero to every number in this
+paragraph. A build that trimmed a fade because of this budget misread it.
 
 A pin outside the peak is capped at span 2.0. The one element marked
 `data-motion-peak` may reach span 3.0. Interior pages never pin — an about page that

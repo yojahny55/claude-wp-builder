@@ -23,3 +23,9 @@ claim), `quote_N_cite` (the URL the quote came from, for the `cite` attribute),
 fallbacks, so the light is somewhere chosen before the first `pointermove` and on
 every device that never sends one. The gradient lives inside
 `(hover: hover) and (pointer: fine)`, per `devices.md`.
+
+**Element motion:** self-sufficient. The children arrive on their own `view()`
+ranges in `section.css`, so the root `data-motion="reveal"` is redundant here and
+may be dropped to free `data-motion` for a section-level device (`drift`,
+`parallax`, a pin). See "One attribute, one device" in
+`../../references/devices.md`.

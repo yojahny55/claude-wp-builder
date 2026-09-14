@@ -25,3 +25,9 @@ client genuinely has three, and accept the scroll. The lead column is marked by 
 its top and a `--color-surface` ground carried by the `<col>` element, with no
 "Most popular" badge anywhere: the rule says which one they mean without
 shouting it.
+
+**Element motion:** self-sufficient. The children arrive on their own `view()`
+ranges in `section.css`, so the root `data-motion="reveal"` is redundant here and
+may be dropped to free `data-motion` for a section-level device (`drift`,
+`parallax`, a pin). See "One attribute, one device" in
+`../../references/devices.md`.
