@@ -79,6 +79,7 @@ not writing it.
 | faq | faq-list | 0 | reveal | none |
 | closing | closing-block | 0 | reveal, border beam | Magic UI border beam (MIT) |
 | capability | icon-row | 0 | reveal, element motion (icons draw on) | none |
+| explainer | score-scale | 0 | element motion (bands grow, marker travels) | none |
 | page-head | page-head | 0 | reveal | none |
 | footer | footer-columns | 0 | none | none |
 | footer | footer-line | 0 | none | none |

@@ -135,4 +135,33 @@ grep -qF 'Driving a plain property off `--motion-p`' "$dev" \
 grep -qF 'modifier class on the container root' "$C/README.md" \
   || fail "$C/README.md must warn that a modifier on the container root cannot match its own query"
 
+# --- the explainer composition ------------------------------------------------
+# The library was nine-of-fourteen text only: every composition a heading and some
+# paragraphs, so every page came out the same shape and "less text" had nothing to
+# become. score-scale is the first composition that draws data instead of describing
+# it, and its numbers are published fact rather than a claim about a client.
+[ -d "$C/score-scale" ] || fail "there is no explainer composition"
+grep -qF '280fr 90fr 70fr 60fr 51fr' "$C/score-scale/section.css" \
+  || fail "score-scale: bands must be drawn at their real point spans, not as equal blocks"
+grep -qF 'score-scale-travel' "$C/score-scale/section.css" \
+  || fail "score-scale: the marker must travel the range"
+
+# taste.md refuses invented statistics, and the distinction this composition rests on
+# is that a published band edge is not one. The marker therefore carries no value: a
+# needle reading "580 to 720" is a claim about results, in the one industry where that
+# claim attracts regulators. The band edges are hardcoded rather than slotted, because
+# a slot invites a build to change them and a changed edge is misinformation.
+grep -qF 'score-scale__marker">' "$C/score-scale/section.html" \
+  && fail "score-scale: the marker must stay empty -- a number on it is a claim"
+grep -qF '300' "$C/score-scale/section.html" \
+  || fail "score-scale: the real band edges belong in the markup, not in slots"
+grep -qF 'scale_caption' "$C/score-scale/section.html" \
+  || fail "score-scale must name its scoring model, or the figure is uncheckable"
+grep -qF '"score-scale"' "$C/fills.json" || fail "score-scale has no preview fills"
+grep -qF '| explainer | score-scale |' "$C/README.md" \
+  || fail "score-scale is not in the role table, so no build will find it"
+for f in preview-1440.png preview-390.png; do
+  [ -s "$C/score-scale/$f" ] || fail "score-scale is missing $f"
+done
+
 echo PASS

@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`score-scale`: the first composition that draws data rather than describing it.** The
+  library was nine-of-fourteen text only — every composition a heading and some paragraphs
+  arranged differently — so every page came out the same shape, and "less text" had nothing
+  to become. This one draws the credit-score range with the five bands at their **real point
+  spans** (Poor is genuinely half of 300–850, which is the fact worth drawing) and the five
+  factor weights at their published values. Bands grow from the baseline left to right, then
+  a marker travels the range. All element-level `view()` animation: zero vh, and the root
+  `data-motion` attribute left free.
+
+  The numbers are hardcoded rather than slotted, and the marker carries **no value**. A
+  published band edge is a fact about FICO scoring; a needle reading "580 → 720" is a claim
+  about a client's results, which `taste.md` refuses — in the one industry where that claim
+  draws regulators. A slot would invite a build to change an edge, and a changed edge is
+  misinformation in a regulated field.
+
 ### Fixed
 
 - **Element keyframes wrote `transform`, which races the engine.** GSAP writes `transform`
