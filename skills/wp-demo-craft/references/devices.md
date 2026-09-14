@@ -56,6 +56,54 @@ zoom, stagger and draw its icons throughout. Those are different decisions. A cl
 asking for a site that moves is asking for the second, and answering with a longer
 page is answering a question nobody asked.
 
+### Motion belongs in the composition, not beside it
+
+An author animating a composition from outside is guessing at its internals, and a
+guessed class name is a **silent no-op**: no match, no error, no animation, and no
+gate that catches it. A real build wrote `.feature-zigzag__label` and
+`.feature-zigzag__figure` against a composition whose elements are `__kicker`,
+`__heading` and `__media`. Nothing failed. The motion simply did not exist, and it
+was found only by enumerating every selector against the rendered DOM and counting
+matches.
+
+That is the argument for element motion living in each composition's own
+`section.css`, which is where it now lives: the file that names the elements is the
+file that animates them, so the names cannot drift apart. A composition that expects
+to be animated from outside owes the author a documented list of its animatable
+hooks — but preferring to carry its own motion is the better answer, and the one the
+library takes.
+
+The same silent-no-op family covers markup, not just CSS: a helper that emits a
+block's class but not the inner wrapper its grid targets renders a single narrow
+column, with no error anywhere. If a composition's layout depends on a wrapper, the
+wrapper is part of the composition, never something the caller is trusted to add.
+
+### Hover states: elevation, never a halo
+
+A hover that adds an accent-tinted glow is a `slop` finding. A build gave its CTAs
+`box-shadow: 0 10px 26px -10px color-mix(in oklab, var(--color-accent) 70%,
+transparent)` and `impeccable detect` returned twelve "Glowing shadow accents" — on a
+build whose own `DESIGN.md` said "no glowing button" in those words.
+
+Spec hover as **depth tinted to the canvas hue** — the shadow tokens — never as a
+coloured halo around the element. The detector is strict here and it is right: an
+accent glow is the single most reliable tell of a generated page.
+
+### Driving a plain property off `--motion-p`
+
+Inside a scrubbed section (`pin`, `pan`, `kinetic`, `wipe`, `drift`) the engine
+publishes section progress as `--motion-p`, and any property can read it directly —
+no timeline, no keyframe, no second device:
+
+```css
+.block__figure { scale: calc(0.94 + (var(--motion-p, 0) * 0.06)); }
+```
+
+It tracks the scrub exactly, and under reduced motion `--motion-p` freezes at 1, so
+the element lands on its settled state for free. Use it for anything that should
+follow the scrub rather than arrive once, in a section that already carries a
+scrubbed device.
+
 ### One attribute, one device — and how to get past it
 
 `data-motion` holds a single value. An element carrying `data-motion="reveal"`
@@ -118,10 +166,25 @@ Three ways this fails silently, all of them worth knowing before you write it:
 3. **`animation-fill-mode: both`.** Without it the element snaps back to its start
    state outside the range, so anything above the fold flashes to its `from` value.
 
-And one that is not silent but is easy to cause: an element already carrying a
-`transform` from a `data-motion` device cannot also be transformed by a `view()`
-animation — the last declaration wins and one of the two motions vanishes. Animate a
-child, or animate a different property.
+**Use `translate`, `scale` and `rotate`, never `transform`.** The engine writes
+`transform` for `parallax`, `magnet` and cue rise, and `reveal` writes it on every
+child — so a keyframe of yours that also writes `transform` does not compose with
+that, it replaces it, and whichever declaration lands last wins. The individual
+properties compose with `transform` instead of overwriting it, which removes the
+whole collision class rather than warning about it: a `view()` zoom on a parallaxed
+bed simply works.
+
+    /* wrong: races the engine */      transform: translateY(22px);
+    /* right: composes with it */      translate: 0 22px;
+
+**Restate every `animation-*` longhand when you re-target an element in a later
+rule.** This is the shorthand trap in reverse and it is worse, because nothing looks
+wrong. A second rule that sets only `animation-name` leaves `animation-timeline`
+exactly as the first rule left it — so an element given `view()` earlier, then
+re-pointed at a load animation, silently runs that load animation on the scroll
+timeline. Measured on a real build: `anim=ns-pushin :: timeline=view()`, which turned
+a set of drifting banners into banners that zoomed on scroll. One element, one
+animation rule, all longhands together.
 
 ## The eight devices
 

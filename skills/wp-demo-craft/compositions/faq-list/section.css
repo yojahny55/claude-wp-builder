@@ -100,7 +100,7 @@
    `animation-duration`: it overrides the range. `animation-fill-mode: both`, or
    anything above the fold flashes to its `from` value.
    ------------------------------------------------------------------------- */
-@keyframes faq-list-rise { from { opacity: 0; transform: translateY(var(--motion-rise, 22px)); } }
+@keyframes faq-list-rise { from { opacity: 0; translate: 0 var(--motion-rise, 22px); } }
 @keyframes faq-list-fade { from { opacity: 0; } }
 .faq-list__kicker {
   animation-name: faq-list-fade;

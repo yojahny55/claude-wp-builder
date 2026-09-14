@@ -45,6 +45,14 @@ the composition folder, so **run it with `--fill` or it overwrites the committed
 previews with marker-filled ones.** Edit `fills.json`, not `section.html`, to
 change what a preview says.
 
+**A modifier class on the container root cannot be matched by that root's own
+`@container` query.** An element never matches a container query against the
+container it establishes itself, so `.band--beside` written on the same element that
+declares `container-type` produces a `container-noop` finding, which blocks. This is
+easy to do by accident, because a modifier naturally lands on the block root. For a
+full-bleed band the honest fix is `@media`; for anything laid out inside the block,
+move the query to a child.
+
 **Never put `container-type` on `body`, `html`, or any wrapper around the sections.**
 Each composition sets `container-type` on its own root, which is what its `@container`
 queries resolve against — that is the whole design, and it is also why adding one higher

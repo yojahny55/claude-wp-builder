@@ -46,7 +46,7 @@
    `animation-duration`: it overrides the range. `animation-fill-mode: both`, or
    anything above the fold flashes to its `from` value.
    ------------------------------------------------------------------------- */
-@keyframes page-head-rise { from { opacity: 0; transform: translateY(var(--motion-rise, 22px)); } }
+@keyframes page-head-rise { from { opacity: 0; translate: 0 var(--motion-rise, 22px); } }
 @keyframes page-head-fade { from { opacity: 0; } }
 .page-head__kicker {
   animation-name: page-head-fade;

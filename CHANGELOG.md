@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Element keyframes wrote `transform`, which races the engine.** GSAP writes `transform`
+  for `parallax`, `magnet` and cue rise, and `reveal` writes it on every child, so the
+  entrance keyframes added in the previous commit would have collided on exactly the
+  compositions carrying a root `reveal` -- last declaration wins, one motion silently gone.
+  All seven use `translate`/`scale` now, which compose instead of replacing. Five further
+  traps reported from a real build are documented beside it: a second rule inherits
+  `animation-timeline` from the first; a guessed class name is a silent no-op; an
+  accent-tinted hover glow is a slop finding; a modifier on the container root cannot match
+  its own `@container` query; and `--motion-p` can drive any property inside a scrubbed
+  section, which was demonstrated nowhere.
+
 ### Added
 
 - **Compositions carry element motion, and the budget stopped metering it.** A craft build

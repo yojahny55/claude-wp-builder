@@ -100,7 +100,7 @@
    `animation-duration`: it overrides the range. `animation-fill-mode: both`, or
    anything above the fold flashes to its `from` value.
    ------------------------------------------------------------------------- */
-@keyframes testimonial-pair-rise { from { opacity: 0; transform: translateY(var(--motion-rise, 22px)); } }
+@keyframes testimonial-pair-rise { from { opacity: 0; translate: 0 var(--motion-rise, 22px); } }
 @keyframes testimonial-pair-fade { from { opacity: 0; } }
 .testimonial-pair__kicker {
   animation-name: testimonial-pair-fade;

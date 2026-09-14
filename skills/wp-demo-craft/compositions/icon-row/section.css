@@ -76,7 +76,7 @@
    anything above the fold flashes to its `from` value.
    ------------------------------------------------------------------------- */
 @keyframes icon-row-draw { from { stroke-dashoffset: 120; } }
-@keyframes icon-row-rise { from { opacity: 0; transform: translateY(var(--motion-rise, 18px)); } }
+@keyframes icon-row-rise { from { opacity: 0; translate: 0 var(--motion-rise, 18px); } }
 @keyframes icon-row-fade { from { opacity: 0; } }
 
 .icon-row__kicker {

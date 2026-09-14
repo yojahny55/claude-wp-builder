@@ -106,7 +106,7 @@
    `animation-duration`: it overrides the range. `animation-fill-mode: both`, or
    anything above the fold flashes to its `from` value.
    ------------------------------------------------------------------------- */
-@keyframes feature-zigzag-rise { from { opacity: 0; transform: translateY(var(--motion-rise, 22px)); } }
+@keyframes feature-zigzag-rise { from { opacity: 0; translate: 0 var(--motion-rise, 22px); } }
 @keyframes feature-zigzag-fade { from { opacity: 0; } }
 .feature-zigzag__kicker {
   animation-name: feature-zigzag-fade;
@@ -145,7 +145,7 @@
 }
 /* The media plate settles a beat after its copy, and scales rather than
    translating so the two motions read as one object arriving, not two. */
-@keyframes feature-zigzag-plate { from { opacity: 0; transform: scale(1.06); } }
+@keyframes feature-zigzag-plate { from { opacity: 0; scale: 1.06; } }
 .feature-zigzag__media {
   animation-name: feature-zigzag-plate;
   animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));

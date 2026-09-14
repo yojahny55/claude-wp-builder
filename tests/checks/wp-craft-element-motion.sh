@@ -94,4 +94,45 @@ for c in page-head feature-zigzag icon-row; do
     || fail "$c hardcodes its easing, so a reference's motion cannot reach it"
 done
 
+# --- transform collision ------------------------------------------------------
+# The engine writes `transform` for parallax, magnet and cue rise, and `reveal`
+# writes it on every child. A keyframe of ours that also writes `transform` replaces
+# that instead of composing with it, and the last declaration wins -- so one of the
+# two motions silently vanishes. `translate`/`scale`/`rotate` compose. This shipped
+# wrong once: every entrance keyframe used `transform: translateY()`, on exactly the
+# compositions that carry a root `reveal`.
+grep -qF 'Use `translate`, `scale` and `rotate`, never `transform`' "$dev" \
+  || fail "$dev must forbid transform in element keyframes"
+for f in "$C"/*/section.css; do
+  if awk '/@keyframes [a-z-]*-(rise|plate|fade)/ { if (/transform:/) exit 1 }' "$f"; then :; else
+    fail "$(basename "$(dirname "$f")"): an entrance keyframe writes transform, which races the engine"
+  fi
+done
+
+# --- a later rule inherits the earlier timeline --------------------------------
+grep -qF 'Restate every `animation-*` longhand' "$dev" \
+  || fail "$dev must warn that a second rule inherits animation-timeline from the first"
+
+# --- motion lives in the composition -------------------------------------------
+grep -qF 'Motion belongs in the composition, not beside it' "$dev" \
+  || fail "$dev must say why element motion lives in section.css"
+grep -qF 'silent no-op' "$dev" \
+  || fail "$dev must say a guessed class name fails silently"
+
+# --- hover is elevation, not a halo --------------------------------------------
+grep -qF 'Hover states: elevation, never a halo' "$dev" \
+  || fail "$dev must spec hover as depth, not an accent glow"
+# And the library must not ship the thing it forbids.
+if grep -l 'box-shadow[^;]*color-mix[^;]*--color-accent' "$C"/*/section.css >/dev/null 2>&1; then
+  fail "a composition ships an accent-tinted glow, which impeccable reads as slop"
+fi
+
+# --- the --motion-p idiom is demonstrated --------------------------------------
+grep -qF 'Driving a plain property off `--motion-p`' "$dev" \
+  || fail "$dev must demonstrate reading --motion-p directly inside a scrubbed section"
+
+# --- a modifier on the container root ------------------------------------------
+grep -qF 'modifier class on the container root' "$C/README.md" \
+  || fail "$C/README.md must warn that a modifier on the container root cannot match its own query"
+
 echo PASS
