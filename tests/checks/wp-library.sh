@@ -4,6 +4,8 @@ cd "$(dirname "$0")/../.."
 grep -q '"wp-design-library"' .mcp.json || { echo "FAIL: mcp registration"; exit 1; }
 grep -q '"@yojahny/wp-design-library@0.1.0"' .mcp.json || { echo "FAIL: pinned mcp package"; exit 1; }
 grep -q 'References: library unavailable' commands/wp-demo.md || { echo "FAIL: degrade line"; exit 1; }
+grep -q 'every call fails before that happens' commands/wp-demo.md || { echo "FAIL: unavailable line is not limited to zero successful references"; exit 1; }
+grep -q 'keep their citations' commands/wp-demo.md || { echo "FAIL: partial library failures discard successful references"; exit 1; }
 grep -q 'search` per role' commands/wp-demo.md || { echo "FAIL: per-role query"; exit 1; }
 grep -q '## References' commands/wp-demo.md || { echo "FAIL: brief section"; exit 1; }
 grep -q 'Design library' README.md || { echo "FAIL: README"; exit 1; }

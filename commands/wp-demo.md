@@ -157,9 +157,13 @@ before writing any markup.
    distinguishable from the named references item 3 already lists. Cite only
    entries actually consulted.
 
-   If the server is not registered or the call fails, write
-   `References: library unavailable` under the same heading and continue with
-   the in-repo compositions. Never stop the build on a library error.
+   Track whether any library entry was successfully consulted. If the server is
+   not registered or every call fails before that happens, write `References: library unavailable`
+   under the same heading and continue with the in-repo
+   compositions. If some roles succeeded before a later call failed, keep their citations
+   and note only the roles the library could not cover; do not replace
+   real references with the blanket unavailable line. Never stop the build on a
+   library error.
 4. **Classify the domain.** If `.wp-create.json` already has `"domain"` — a prior
    `/wp-demo` or `/wp-yolo` run against this same project recorded it — read it and
    move on; **do not re-classify**. The manifest is the shared source of truth, and a
