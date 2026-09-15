@@ -253,9 +253,9 @@ grep -Fq 'no research signal' "$cof" \
 # to baseline while reporting "MCP was not reachable", which reads as a connection fault and
 # is not one. Pin the grant, not the prose that describes the ladder.
 agentf=agents/wp-research.md
-grep -qE '^tools:.*mcp__firecrawl' "$agentf" \
+grep -qE '^tools:.*([[:space:],])mcp__firecrawl([[:space:],]|$)' "$agentf" \
   || fail "$agentf: the Firecrawl MCP rung is documented but the agent is not granted mcp__firecrawl"
-grep -qE '^tools:.*mcp__dataforseo' "$agentf" \
+grep -qE '^tools:.*([[:space:],])mcp__dataforseo([[:space:],]|$)' "$agentf" \
   || fail "$agentf: the DataForSEO rung is MCP-only, and the agent is not granted mcp__dataforseo"
 
 echo PASS
