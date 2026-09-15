@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`bin/tailwindify-parity.mjs` — the conversion is now gated on what it RENDERS.**
+  `/wp-tailwindify` rewrites a plain-CSS demo into utilities and archives the original.
+  Its Step 4 verified structure — delimiters kept, no `<style>` block, no project
+  stylesheet `<link>` — and nothing verified the result against the original. A demo
+  whose reset read `button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}`
+  converted with the whole rule dropped as "preflight covers it". Preflight covers five
+  of those six declarations and not `cursor`: Tailwind v4 leaves buttons on the UA
+  default, which is `default`. Every button on the site lost its pointer.
+
+  Nothing downstream could catch it either. Every later gate compares the theme against
+  the CONVERTED demo, so once a declaration is gone from the reference both sides agree
+  and the site is wrong. Conversion is the last point in the pipeline where the original
+  still exists to compare against, which is why the gate lives there.
+
+  It renders both files and joins leaf elements on tag + text — the two use different
+  class systems, so a selector join is impossible, but they render the same words — then
+  compares fourteen computed properties. Colours are resolved through a canvas in the
+  page, because Tailwind emits `oklab()` for a colour carrying an opacity modifier where
+  plain CSS emits `rgba()` and string-comparing the two buried the real findings under
+  dozens of notation differences. A converted page with no Tailwind runtime renders as
+  bare HTML, where every element differs; that shape is detected and reported as "not
+  compared" rather than as hundreds of lost declarations. Exit 0 clean, 1 deltas, 2 no
+  usable browser, 3 crashed.
+
 ### Fixed
 
 - **The research agent could not reach either MCP rung of its own source ladder.**
@@ -22,6 +48,63 @@
   rungs the wording described. The grant assumes the conventional server ids; a server
   registered under a different id is not matched and degrades to the rung below, which is the
   intended behaviour when a server is genuinely absent.
+
+- **A reset rule is converted declaration by declaration, not as a whole.**
+  `agents/wp-tailwind.md` now requires each declaration in a reset to be either matched
+  to the preflight rule that already sets it or carried across, and names what preflight
+  does not restore: `cursor`, `text-transform`, `letter-spacing`, `white-space`,
+  `word-break`, `:focus-visible` outline, `list-style` position, `scroll-behavior`, and
+  anything in a `font` shorthand past family and size. Survivors go in `@layer base`, not
+  in unlayered CSS that would outrank every utility.
+
+- **Two more conversion traps, both found by the new gate on a real demo.** `text-*`
+  carries a line-height, so a demo declaring `font:600 14px/20px` and overriding only
+  `font-size:16px` renders at 20px and converts to 24px — a translated font-size must be
+  paired with the demo's own `leading-*`. And two overlapping `max-*` variants do not
+  resolve in source order: a rule that is `nowrap` between 430px and 768px converts
+  literally to `max-md:whitespace-nowrap max-[429px]:whitespace-normal`, which is
+  textually faithful and renders `nowrap` at 390px; a band has to be written as a band.
+
+- **A repeated block's per-item variation is data, and a list's order and count come
+  from the demo.** `agents/wp-template.md` bound the element tree to the demo but said
+  nothing about what varies BETWEEN items of a grid, so six practice cards that mixed
+  three SVG icons with three font glyphs at three different sizes — three of them also
+  carrying a second, longer heading for phones — were normalised to one icon type at one
+  size with one heading. The markup looked right and every card was wrong. The same
+  section let `get_terms()` sort by name: with a limit of six over seven terms, the
+  default ordering was not rearranging the cards, it was choosing which term never
+  reached the front page.
+
+
+- **The `tailwind` transcription path had a licence the `basic` path never had, and every
+  section built through it drifted.** `/wp-section`'s overlay called the converted demo "a
+  geometry reference, **not** a source of verbatim declarations" and told the agents to
+  "reproduce this geometry using Tailwind utilities", never to "copy the declared values
+  verbatim". That sentence is true about the notation — the conversion leaves no raw
+  declarations behind, only utility classes — and false about the mandate, and it was read
+  as the second thing: an agent that may reproduce geometry may also substitute a utility
+  it judges equivalent. On `basic` the same overlay says the demo CSS is the SOURCE OF
+  TRUTH and its declared values are copied exactly, so only one of the two paths was ever
+  bound to the demo.
+
+  The converted demo is now the source of truth on both paths, with the tailwind notation
+  spelled out: its utility classes ARE its declared values, carried across character for
+  character, element structure included. `gap-[9px]` is not `gap-2`, `max-[1024px]:` is not
+  `max-lg:`, and two siblings that swap at a breakpoint stay two elements.
+
+- **`agents/wp-tailwind.md` shipped Section Authoring Mode with no fidelity mandate at
+  all.** `agents/wp-css.md` carries one — "the demo is the SOURCE OF TRUTH, not
+  inspiration. Your job is to COPY, not re-author" — and that agent runs only on `basic`,
+  so every project on the `tailwind` template was authored by an agent that was never told
+  to copy. It now carries the same mandate, including that promotion to `@apply` is a move
+  and never a rewrite.
+
+- **`agents/wp-template.md` bound only CPT teasers to the demo's markup.** It owns the
+  element tree for every section on both templates, and nothing outside the teaser rule
+  told it to preserve one, so a wrapper judged redundant or two siblings merged into one
+  passed every gate — the defect renders correctly at the breakpoint being looked at. It
+  now requires the demo's elements, class attributes and breakpoint variants to survive
+  intact, and one ACF field per distinct string rather than one field and a shortened copy.
 
 ## [1.17.0] - 2026-09-13
 

@@ -506,8 +506,10 @@ Drive the existing commands/agents in this exact order, reading everything from 
      - `tailwind` → the converted demo page itself, `demo/index.html` (converted in place
        by Step 2.6). The manifest's `cssRules` was captured by `wp-normalize` in Step 2
        from the plain-CSS original, before Step 2.6 ran, and is stale on this path — do
-       not pass it. Per the overlay, the tailwind instruction is "reproduce this geometry
-       using Tailwind utilities", not "copy the declared values verbatim".
+       not pass it. The converted page is the source of truth on this path exactly as
+       `cssRules` is on `basic` — its utility classes ARE its declared values, and the
+       overlay's mandate is to carry them across character for character, never to
+       substitute a utility judged equivalent.
 
      Because every section's `block` is already unique, parallel agents can never collide
      on a selector.

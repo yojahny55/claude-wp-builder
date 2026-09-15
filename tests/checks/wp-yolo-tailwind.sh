@@ -959,8 +959,8 @@ printf '%s' "$ft" | grep -qF 'If verification fails, discard the temporary file 
 if printf '%s' "$ft" | grep -Eq "moves it over the output path (\*\*)?(before|regardless of|and then|first)"; then
   fail "$t moves the temporary file into place before Step 4's verification — that is the destructive in-place write the temp path exists to prevent"
 fi
-printf '%s' "$ft" | grep -qF 'Only if 2, 3 and 4 all hold, move the temporary file over the output path' \
-  || fail "$t's Step 4 does not make the move conditional on all three verification checks (delimiters, no <style>, no project stylesheet <link>)"
+printf '%s' "$ft" | grep -qF 'Only if 2, 3, 4 and 5 all hold' \
+  || fail "$t's Step 4 does not make the move conditional on structure checks and the rendering gate"
 
 # ---------------------------------------------------------------------------
 # The conversion is licensed to DELETE the demo's project stylesheet <link>, and

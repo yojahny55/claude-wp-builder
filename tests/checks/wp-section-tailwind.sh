@@ -186,8 +186,22 @@ printf '%s' "$basic_css" | grep -qF -- 'SOURCE OF TRUTH' \
   || { echo "FAIL: wp-section's \`basic\` --css bullet does not call the verbatim demo CSS the transcription's SOURCE OF TRUTH"; exit 1; }
 printf '%s' "$flatf" | grep -qF -- '- `tailwind` → the converted demo page itself' \
   || { echo "FAIL: wp-section does not bind --css on \`tailwind\` to the converted demo page itself"; exit 1; }
-printf '%s' "$flatf" | grep -qF 'not** a source of verbatim declarations' \
-  || { echo "FAIL: wp-section does not say the tailwind --css source is a geometry reference rather than a source of verbatim declarations"; exit 1; }
+# The tailwind --css source is the SOURCE OF TRUTH, exactly as the CSS blob is on
+# `basic`. It once read "a geometry reference, not a source of verbatim declarations",
+# and that sentence was read as licence to substitute an equivalent utility, collapse an
+# element or drop a breakpoint variant — every drift it produced was toward LESS than the
+# demo. The absence of raw declarations is a fact about the notation, never a weaker
+# mandate, so assert both halves: the source-of-truth binding, and the explicit refusal
+# of the substitution the old wording allowed.
+printf '%s' "$flatf" | grep -qF 'SOURCE OF TRUTH for the transcription' \
+  || { echo "FAIL: wp-section's \`tailwind\` --css bullet does not call the converted demo the transcription's SOURCE OF TRUTH — the same mandate \`basic\` gets"; exit 1; }
+printf '%s' "$flatf" | grep -qF 'copy its exact utility classes and its exact element structure' \
+  || { echo "FAIL: wp-section does not translate 'copy its exact declared values' into the tailwind notation (exact utility classes + exact element structure)"; exit 1; }
+printf '%s' "$flatf" | grep -qF 'substitute an equivalent utility' \
+  || { echo "FAIL: wp-section does not refuse substituting an equivalent utility on the tailwind path — the licence that let sections drift"; exit 1; }
+if printf '%s' "$flatf" | grep -qF 'not** a source of verbatim declarations'; then
+  echo "FAIL: wp-section has regressed to calling the tailwind --css source a geometry reference rather than the SOURCE OF TRUTH"; exit 1
+fi
 # Inversions, matched file-wide (on the flattened text) so an inverted duplicate
 # added anywhere in the file is caught, not just the first bullet pair.
 if printf '%s' "$flatf" | grep -qF '`basic` → the converted demo page'; then
@@ -306,5 +320,35 @@ while IFS= read -r sent; do
   if printf '%s' "$sent" | grep -qi 'basic'; then continue; fi
   { echo "FAIL: wp-section's summary claims parallel agent dispatch without scoping it to basic — on tailwind wp-tailwind runs AFTER wp-template returns, and an unconditional parallel claim is the first thing a skimming agent obeys"; exit 1; }
 done <<< "$(printf '%s' "$summ" | grep -oE '[^.]*parallel[^.]*' || true)"
+
+
+# wp-template owns the element tree, and it had no fidelity mandate of its own: the
+# teaser rule covered CPT cards and nothing covered ordinary sections. A header CTA
+# whose demo carried two <span>s that swap at a breakpoint shipped as one span plus a
+# guess, and the defect was invisible above md. Assert the rule where the agent that
+# writes the markup will actually read it.
+tflat=$(tr '\n' ' ' < agents/wp-template.md | sed 's/  */ /g')
+if ! printf '%s' "$tflat" | grep -qF 'SOURCE OF TRUTH'; then
+  echo "FAIL: agents/wp-template.md never calls the demo markup the SOURCE OF TRUTH — it authors the element tree for every section on both templates, with only the CPT-teaser rule to bind it"; exit 1
+fi
+if ! printf '%s' "$tflat" | grep -qF 'Every element the demo renders becomes an element here'; then
+  echo "FAIL: agents/wp-template.md does not forbid collapsing the demo's elements — two siblings merged into one renders correctly at the breakpoint being looked at and wrongly at the other"; exit 1
+fi
+if ! printf '%s' "$tflat" | grep -qF 'Two labels in the demo need two fields'; then
+  echo "FAIL: agents/wp-template.md does not require one ACF field per distinct string — one field and a shortened copy is how a demo's two breakpoint labels became one overflowing button"; exit 1
+fi
+
+
+# A repeated block is not one item drawn N times, and a list's order is not the query's
+# default. Both were normalised away on a real build: six cards rendered with one icon
+# type at one size where the demo mixed SVG art with glyphs at three sizes, and a section
+# showing six of seven terms let \`get_terms()\` sort by name — which did not reorder the
+# cards so much as choose which term never reached the front page.
+if ! printf '%s' "$tflat" | grep -qF 'varies BETWEEN items is data'; then
+  echo "FAIL: agents/wp-template.md does not say per-item variation inside a repeated block is data — normalising a grid to one variant looks right and makes every card wrong"; exit 1
+fi
+if ! printf '%s' "$tflat" | grep -qF "ORDER and COUNT"; then
+  echo "FAIL: agents/wp-template.md does not bind a list's order and count to the demo — with a limit, the query's default ordering picks which item is never shown"; exit 1
+fi
 
 echo PASS
