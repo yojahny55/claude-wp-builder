@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-09-15
+
 ### Added
 
 - **`/wp-demo` consults `wp-design-library` when it is registered.** A new
@@ -113,7 +115,6 @@
   costume, and a shelf of dark pages with one accent each is what happens when nobody
   decides.
 
-### Added
 
 - **Every silent-failure rule now carries the measurement that produced it.** Such a
   rule is by definition one nobody has cause to test — the advice is followed, nothing
@@ -124,6 +125,82 @@
   `10`→`90` against an `initial-value` of `0`, it renders `0`, not `10`. The fallback is
   the un-animated value. Checked: each numbered item must be marked as measured and
   carry a figure that can be re-run.
+
+
+- **`score-scale`: the first composition that draws data rather than describing it.** The
+  library was nine-of-fourteen text only — every composition a heading and some paragraphs
+  arranged differently — so every page came out the same shape, and "less text" had nothing
+  to become. This one draws the credit-score range with the five bands at their **real point
+  spans** (Poor is genuinely half of 300–850, which is the fact worth drawing) and the five
+  factor weights at their published values. Bands grow from the baseline left to right, then
+  a marker travels the range. All element-level `view()` animation: zero vh, and the root
+  `data-motion` attribute left free.
+
+  The numbers are hardcoded rather than slotted, and the marker carries **no value**. A
+  published band edge is a fact about FICO scoring; a needle reading "580 → 720" is a claim
+  about a client's results, which `taste.md` refuses — in the one industry where that claim
+  draws regulators. A slot would invite a build to change an edge, and a changed edge is
+  misinformation in a regulated field.
+
+
+- **Compositions carry element motion, and the budget stopped metering it.** A craft build
+  produced pages that read as static while passing every gate, and the cause was neither
+  restraint nor the budget: a measured build finished with a quarter of its scroll allowance
+  unspent, having never dropped a device for it. One word covered two costs. Scroll
+  choreography lengthens the page and is correctly budgeted; fades, rises, zooms, icon draws
+  and staggered entrances lengthen nothing and were rationed by a ceiling that was never
+  about them. Seven compositions now carry per-element `view()` animation staggered by
+  `animation-range` instead of one root `reveal` -- ten of thirteen previously shipped
+  `reveal` as their only device, so composing faithfully produced one one-shot entrance per
+  section.
+
+- **New `icon-row` composition.** Four capability marks whose SVG icons draw themselves on
+  via `stroke-dasharray`/`stroke-dashoffset`, cards arriving left to right. `icon`
+  previously appeared in the craft rules only as a prohibition.
+
+- **Motion reaches the design references.** 67 reference sites, 57 of them describing
+  motion, and the token pipeline extracted none of it, so a demo took its palette from a
+  reference and its motion from nowhere. `--ease-entry` and `--motion-rise` are now mapped
+  and consumed by every composition.
+
+
+- **`demo-verify` reports `static-page`.** A page whose entire motion is `reveal` plus
+  pointer devices is a static page that measures as animated, and no existing finding
+  could say so: `no-engine` asks whether motion exists, `dead-scroll` whether a section
+  moves, and both are satisfied by devices that are present and correctly wired. The new
+  finding judges the *mix* — it names the devices the page actually has and fails the round
+  when none of them reacts to scrolling. Blocking, not advisory.
+
+  This is the first gate in the craft path that catches a build rather than a contract.
+  The greps beside it pin the rule's wording, which was accurate before this change and
+  accurate after it; the wording was never what failed.
+
+### Changed
+
+- **The brief asks what this business has that could be drawn.** The docs said "impactful
+  animated website", which is unfalsifiable, so the old step asked nothing and the
+  adjective survived four rounds of revision unsatisfied. The answerable version is a list
+  of pictures the demo is then obliged to contain. Adds two more: three named sites whose
+  motion to match, and which page a visitor must understand in ten seconds.
+
+
+- **The demo brief now interviews the operator about form, and gates the build on
+  approval.** Every field it captured — person, pain, promise, vibe words, references,
+  the feeling curve, the peak — was about *story*. None was about *form*: what the site
+  looks like, how much it moves, how much of it is reading. A build could satisfy the
+  brief completely and still ship twelve pages of dense paragraphs with one animation.
+
+  The old rule, "ask in one pass only what the docs cannot answer", is right for story
+  and wrong for form: documents describe a business and almost never describe a website,
+  so it resolved to never asking. Six form fields are now always asked, with concrete
+  options — which facts become a picture rather than a paragraph, text density, motion
+  appetite, microinteraction appetite, the one action, and what specifically to take from
+  each reference. They bind on the composition plan, so a row contradicting a recorded
+  answer is a defect rather than a judgment call.
+
+  The brief is shown whole and revised in a loop with no pass limit; the build runs only
+  once the operator approves, and the approval is recorded with its date. `AskUserQuestion`
+  is added to the command's tools — it was instructed to interview and had none.
 
 ### Fixed
 
@@ -244,7 +321,6 @@
   which must differ against every row individually, with the palette rule kept as an
   absolute on top.
 
-### Fixed
 
 - **`footer-columns` flattened the measured type scale on every page.** It used `<h2>`
   for three column labels at `0.8rem`, and a heading element is a role rather than a
@@ -260,7 +336,6 @@
   converting a sentence into a manufactured aphorism, and three in a section is a cadence
   the detector names. The bold-lead-in list format produces them as a set.
 
-### Fixed
 
 - **A recorded client brief had no authority over the craft defaults, and the defaults
   won.** `/wp-context` writes the client's own direction into the project's
@@ -286,52 +361,6 @@
   reach for a graphic. *When a section states something quantitative, draw it.* A fact
   published about the sector is not an invented statistic; it is the subject.
 
-### Changed
-
-- **The brief asks what this business has that could be drawn.** The docs said "impactful
-  animated website", which is unfalsifiable, so the old step asked nothing and the
-  adjective survived four rounds of revision unsatisfied. The answerable version is a list
-  of pictures the demo is then obliged to contain. Adds two more: three named sites whose
-  motion to match, and which page a visitor must understand in ten seconds.
-
-### Changed
-
-- **The demo brief now interviews the operator about form, and gates the build on
-  approval.** Every field it captured — person, pain, promise, vibe words, references,
-  the feeling curve, the peak — was about *story*. None was about *form*: what the site
-  looks like, how much it moves, how much of it is reading. A build could satisfy the
-  brief completely and still ship twelve pages of dense paragraphs with one animation.
-
-  The old rule, "ask in one pass only what the docs cannot answer", is right for story
-  and wrong for form: documents describe a business and almost never describe a website,
-  so it resolved to never asking. Six form fields are now always asked, with concrete
-  options — which facts become a picture rather than a paragraph, text density, motion
-  appetite, microinteraction appetite, the one action, and what specifically to take from
-  each reference. They bind on the composition plan, so a row contradicting a recorded
-  answer is a defect rather than a judgment call.
-
-  The brief is shown whole and revised in a loop with no pass limit; the build runs only
-  once the operator approves, and the approval is recorded with its date. `AskUserQuestion`
-  is added to the command's tools — it was instructed to interview and had none.
-
-### Added
-
-- **`score-scale`: the first composition that draws data rather than describing it.** The
-  library was nine-of-fourteen text only — every composition a heading and some paragraphs
-  arranged differently — so every page came out the same shape, and "less text" had nothing
-  to become. This one draws the credit-score range with the five bands at their **real point
-  spans** (Poor is genuinely half of 300–850, which is the fact worth drawing) and the five
-  factor weights at their published values. Bands grow from the baseline left to right, then
-  a marker travels the range. All element-level `view()` animation: zero vh, and the root
-  `data-motion` attribute left free.
-
-  The numbers are hardcoded rather than slotted, and the marker carries **no value**. A
-  published band edge is a fact about FICO scoring; a needle reading "580 → 720" is a claim
-  about a client's results, which `taste.md` refuses — in the one industry where that claim
-  draws regulators. A slot would invite a build to change an edge, and a changed edge is
-  misinformation in a regulated field.
-
-### Fixed
 
 - **Element keyframes wrote `transform`, which races the engine.** GSAP writes `transform`
   for `parallax`, `magnet` and cue rise, and `reveal` writes it on every child, so the
@@ -344,29 +373,6 @@
   its own `@container` query; and `--motion-p` can drive any property inside a scrubbed
   section, which was demonstrated nowhere.
 
-### Added
-
-- **Compositions carry element motion, and the budget stopped metering it.** A craft build
-  produced pages that read as static while passing every gate, and the cause was neither
-  restraint nor the budget: a measured build finished with a quarter of its scroll allowance
-  unspent, having never dropped a device for it. One word covered two costs. Scroll
-  choreography lengthens the page and is correctly budgeted; fades, rises, zooms, icon draws
-  and staggered entrances lengthen nothing and were rationed by a ceiling that was never
-  about them. Seven compositions now carry per-element `view()` animation staggered by
-  `animation-range` instead of one root `reveal` -- ten of thirteen previously shipped
-  `reveal` as their only device, so composing faithfully produced one one-shot entrance per
-  section.
-
-- **New `icon-row` composition.** Four capability marks whose SVG icons draw themselves on
-  via `stroke-dasharray`/`stroke-dashoffset`, cards arriving left to right. `icon`
-  previously appeared in the craft rules only as a prohibition.
-
-- **Motion reaches the design references.** 67 reference sites, 57 of them describing
-  motion, and the token pipeline extracted none of it, so a demo took its palette from a
-  reference and its motion from nowhere. `--ease-entry` and `--motion-rise` are now mapped
-  and consumed by every composition.
-
-### Fixed
 
 - **Interior pages had a ceiling and no floor, so a craft build shipped eleven of them
   uncomposed.** The rules said "Interior pages never pin", and nothing said what an
@@ -392,7 +398,6 @@
   Both reference files carry the substance because `/wp-yolo`'s craft path reads them and
   never opens `commands/wp-demo.md`.
 
-### Fixed
 
 - **`container-type` on an ancestor freezes every reveal beneath it, and nothing said so.**
   The composition library is container-query based, so adding `container-type: inline-size`
@@ -469,20 +474,6 @@
   states, a smaller peak — which is what "take the cheap roles" was always meant to mean: a
   lower ceiling on the same structure, never an exemption from having one.
 
-### Added
-
-- **`demo-verify` reports `static-page`.** A page whose entire motion is `reveal` plus
-  pointer devices is a static page that measures as animated, and no existing finding
-  could say so: `no-engine` asks whether motion exists, `dead-scroll` whether a section
-  moves, and both are satisfied by devices that are present and correctly wired. The new
-  finding judges the *mix* — it names the devices the page actually has and fails the round
-  when none of them reacts to scrolling. Blocking, not advisory.
-
-  This is the first gate in the craft path that catches a build rather than a contract.
-  The greps beside it pin the rule's wording, which was accurate before this change and
-  accurate after it; the wording was never what failed.
-
-### Fixed
 
 - **The research agent could not reach either MCP rung of its own source ladder.**
   `tools:` in agent frontmatter is an allowlist, not a hint, and `agents/wp-research.md`
@@ -587,7 +578,6 @@
   passed every gate — the defect renders correctly at the breakpoint being looked at. It
   now requires the demo's elements, class attributes and breakpoint variants to survive
   intact, and one ACF field per distinct string rather than one field and a shortened copy.
-
 
 ### Chore
 
