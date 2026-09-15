@@ -14,7 +14,8 @@
      which fails the rubric's own "First paint complete" line with no author error.
      Centre is the safe default; `end` is restored once there is room for it. */
   align-content: center;
-  min-height: 100dvh;
+  /* Match the layout viewport used by the min-height media query below. */
+  min-height: 100vh;
   padding-block: var(--space-section) calc(var(--space-section) * 0.9);
   padding-inline: max(var(--space-gutter), calc((100% - var(--container-max, 1280px)) / 2));
   background: var(--color-surface);

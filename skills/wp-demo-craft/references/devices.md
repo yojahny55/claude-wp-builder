@@ -170,11 +170,11 @@ mechanism `utilities/motion.css` already uses for `reveal`:
 .block__heading {
   animation-name: rise;
   animation-timeline: view();
-  animation-range: entry 0% entry 45%;
+  animation-range: entry 0% entry 100%;
   animation-fill-mode: both;
 }
-.block__row:nth-child(2) { animation-range: entry 10% entry 55%; }
-.block__row:nth-child(3) { animation-range: entry 20% entry 65%; }
+.block__row:nth-child(2) { animation-range: entry 10% entry 110%; }
+.block__row:nth-child(3) { animation-range: entry 20% entry 120%; }
 ```
 
 Stagger with `animation-range` offsets per child rather than one root `reveal` with

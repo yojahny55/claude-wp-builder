@@ -320,26 +320,38 @@ const probe = (idx) => {
   // correct code.
   const deliberatelyHidden = (el) => {
     for (let node = el; node; node = node.parentElement) {
-      if (node.getAttribute && node.getAttribute('aria-hidden') === 'true') return true;
       const st = getComputedStyle(node);
+      if (st.display === 'none' || st.visibility === 'hidden' || st.visibility === 'collapse' || Number(st.opacity) === 0) {
+        return true;
+      }
       if (st.position === 'absolute' || st.position === 'fixed') {
-        // Parked off-canvas: the -9999px idiom, either axis, either direction.
-        const off = ['left', 'top', 'right', 'bottom']
-          .map((side) => parseFloat(st[side]))
-          .some((v) => Number.isFinite(v) && Math.abs(v) >= 1000);
+        // Parked off-canvas: recognise the -9999px family by direction. Large
+        // positive left/top values can be visible on a large page or viewport.
+        const far = Math.max(4096, window.innerWidth * 2, window.innerHeight * 2);
+        const left = parseFloat(st.left);
+        const top = parseFloat(st.top);
+        const right = parseFloat(st.right);
+        const bottom = parseFloat(st.bottom);
+        const off = (Number.isFinite(left) && left <= -far)
+          || (Number.isFinite(top) && top <= -far)
+          || (Number.isFinite(right) && right >= far)
+          || (Number.isFinite(bottom) && bottom >= far);
         if (off) return true;
       }
       // The sr-only clip: a 1px box holding real text.
       const r = node.getBoundingClientRect();
-      if (r.width <= 2 && r.height <= 2 && (node.textContent || '').trim().length > 2) return true;
+      const clipped = st.overflowX === 'hidden' || st.overflowX === 'clip'
+        || st.overflowY === 'hidden' || st.overflowY === 'clip'
+        || (st.clip && st.clip !== 'auto') || (st.clipPath && st.clipPath !== 'none');
+      if (clipped && r.width <= 2 && r.height <= 2 && (node.textContent || '').trim().length > 2) return true;
     }
     return false;
   };
   const clipped = [];
-  document.querySelectorAll('p, h1, h2, h3, li').forEach((el) => {
+  document.querySelectorAll('p, h1, h2, h3, li').forEach((el, i) => {
     if (el.scrollHeight > el.clientHeight + 2 && getComputedStyle(el).overflow === 'hidden') {
       if (deliberatelyHidden(el)) return;
-      clipped.push((el.textContent || '').trim().slice(0, 60));
+      clipped.push({ i, text: (el.textContent || '').trim().slice(0, 60) });
     }
   });
   return {
@@ -435,14 +447,18 @@ const revealState = (idx) => {
  *
  * Returns the device kinds present, so the finding can name what the page actually has
  * rather than assert an absence. */
-const POINTER_DEVICES = new Set(['tilt', 'magnet', 'spotlight']);
+const SCROLL_REACTIVE_DEVICES = new Set(['drift', 'count', 'parallax', 'pan', 'cascade']);
 const motionMix = () => {
-  const kinds = {};
+  const devices = {};
   document.querySelectorAll('[data-motion]').forEach((el) => {
     const k = (el.getAttribute('data-motion') || '').trim();
-    if (k) kinds[k] = (kinds[k] || 0) + 1;
+    if (k) devices[k] = (devices[k] || 0) + 1;
   });
-  return kinds;
+  const cssScroll = [...document.querySelectorAll('*')].some((el) => {
+    const st = getComputedStyle(el);
+    return st.animationName !== 'none' && st.animationTimeline && st.animationTimeline !== 'auto';
+  });
+  return { devices, cssScroll };
 };
 
 const containerAudit = () => {
@@ -568,9 +584,22 @@ try {
     // declaration, tracking -10.34% -> 47.02% without it.
     if (!reduced && containFreeze === null) {
       containFreeze = await page.evaluate(() => {
-        for (const el of [document.documentElement, document.body]) {
-          const ct = getComputedStyle(el).containerType;
-          if (ct && ct !== 'normal') return el.tagName.toLowerCase() + ' { container-type: ' + ct + ' }';
+        const seen = new Set();
+        const compositionRoots = new Set(document.querySelectorAll('section'));
+        const subjects = [...document.querySelectorAll('section, [data-motion]')];
+        if (!subjects.length && document.body) subjects.push(document.body);
+        for (const root of subjects) {
+          for (let node = root.parentElement; node; node = node.parentElement) {
+            if (seen.has(node)) continue;
+            seen.add(node);
+            // Every composition intentionally establishes its own inline-size
+            // container; only wrappers around compositions freeze their timelines.
+            if (compositionRoots.has(node)) continue;
+            const ct = getComputedStyle(node).containerType;
+            if (ct && ct !== 'normal') {
+              return node.tagName.toLowerCase() + ' { container-type: ' + ct + ' }';
+            }
+          }
         }
         return '';
       });
@@ -702,12 +731,12 @@ try {
         // One element clipped at every scroll position is one defect, not one per
         // sample. Undeduplicated, a single element reported once per section x width x
         // position, which buried the rest of the report under a repeated line.
-        frame.clipped.forEach((t) =>
-          clippedSeen.has(b.id + '|' + size.width + '|' + t) ? null : (
-            clippedSeen.add(b.id + '|' + size.width + '|' + t),
-            findings.push({ kind: 'clipped-copy', pass, width: size.width, section: b.id, text: t })
-          )
-        );
+        frame.clipped.forEach((c) => {
+          const key = pass + '|' + b.id + '|' + size.width + '|' + c.i;
+          if (clippedSeen.has(key)) return;
+          clippedSeen.add(key);
+          findings.push({ kind: 'clipped-copy', pass, width: size.width, section: b.id, text: c.text });
+        });
         if (previous !== null && frame.signature === previous) stalls++;
         else stalls = 0;
         if (stalls >= 2 && !reduced) {
@@ -811,14 +840,14 @@ try {
   }
 
   if (mix) {
-    const kinds = Object.keys(mix);
-    const scrollReactive = kinds.filter((k) => k !== 'reveal' && !POINTER_DEVICES.has(k));
-    if (kinds.length && !scrollReactive.length) {
+    const kinds = Object.keys(mix.devices);
+    const scrollReactive = kinds.filter((k) => SCROLL_REACTIVE_DEVICES.has(k));
+    if (kinds.length && !scrollReactive.length && !mix.cssScroll) {
       findings.push({
         kind: 'static-page',
         pass: 'normal',
         width: widths[0].width,
-        devices: mix,
+        devices: mix.devices,
         detail: 'only reveal and pointer devices: nothing on this page reacts to scrolling',
       });
     }

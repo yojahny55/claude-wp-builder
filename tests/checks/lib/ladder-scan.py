@@ -65,9 +65,16 @@ def scan(path):
     groups = collections.defaultdict(list)
     bases_by_key = {}
 
-    for sel, body in re.findall(r"([^{}]+)\{([^}]*animation-range[^}]*)\}", src):
+    # Excluding `@` keeps an at-rule header from being mistaken for a selector;
+    # the same scan still sees the ordinary rules nested inside its braces.
+    for sel, body in re.findall(r"([^{}@]+)\{([^}]*animation-range[^}]*)\}", src):
         m = re.search(r"animation-range:\s*([^;]+)", body)
         if not m:
+            continue
+        rng = m.group(1).strip()
+        # `normal` is the explicit untimed guard for children past a ladder. It
+        # is not another rung and must not raise the expected next index.
+        if rng == "normal":
             continue
         sel = " ".join(sel.split())
         if not re.search(INDEXED, sel):
@@ -85,7 +92,7 @@ def scan(path):
                 "children are genuinely of mixed type say so with a `ladder-scan: "
                 "allow-nth-child %s -- <why>` comment" % (path, sel, base)
             )
-        groups[key].append((int(re.search(INDEXED, sel).group(2)), m.group(1).strip()))
+        groups[key].append((int(re.search(INDEXED, sel).group(2)), rng))
 
     for key, rungs in sorted(groups.items()):
         phases = set()
@@ -106,7 +113,7 @@ def scan(path):
         nxt = top + 1
         # A ladder exempted above indexes by child, so its catch-all does too.
         index = "nth-child" if base in allowed else "nth-of-type"
-        guard = re.escape(base) + r"\s*:" + index + r"\((?:n\+)?" + str(nxt) + r"\)"
+        guard = re.escape(base) + r"\s*:" + index + r"\(\s*(?:n\s*\+\s*)?" + str(nxt) + r"\s*\)"
         if not re.search(guard, src):
             findings.append(
                 "%s: the ladder `%s` runs to %d and nothing reaches a %dth. That one "

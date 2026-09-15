@@ -53,7 +53,7 @@ function parseCue(value) {
  */
 function parseNum(text) {
   const str = String(text);
-  const m = str.match(/-?[\d,]*\.?\d+/);
+  const m = str.match(/-?(?:[\d,]+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?/i);
   if (!m) return null;
   return {
     n: Number(m[0].replace(/,/g, '')),
@@ -65,6 +65,15 @@ function parseNum(text) {
 
 /** Format a counter target, inferring decimals and separators from how it is written. */
 function formatNum(value, template) {
+  const exponent = template.match(/e([+-]?)(\d+)$/i);
+  if (exponent) {
+    const mantissa = template.slice(0, exponent.index);
+    const decimals = (mantissa.split('.')[1] || '').length;
+    let out = value.toExponential(decimals);
+    if (template.includes('E')) out = out.replace('e', 'E');
+    if (exponent[1] !== '+') out = out.replace(/([eE])\+/, '$1');
+    return out;
+  }
   const decimals = (template.split('.')[1] || '').length;
   const grouped = template.indexOf(',') !== -1 || Math.abs(Number(template.replace(/,/g, ''))) >= 10000;
   const fixed = value.toFixed(decimals);

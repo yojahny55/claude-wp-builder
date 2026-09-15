@@ -181,6 +181,8 @@ grep -Fq 'translate:none !important' "$s" \
   || fail "$s neutralises transform but not translate, so an entrance start state still shifts the walk window"
 grep -Fq 'scale:none !important' "$s" \
   || fail "$s neutralises transform but not scale, so a scaled wrapper still reports the wrong height"
+grep -Fq 'rotate:none !important' "$s" \
+  || fail "$s neutralises transform but not rotate, so a rotated wrapper still reports the wrong bounds"
 
 # The page must be left as it paints: every check after the bounds read judges the
 # real thing. A neutraliser that is added and never removed would silently turn the

@@ -215,7 +215,7 @@
     "title": "Half the range is below 580",
     "lede": "The scale runs 300 to 850, and the bands are not equal. Knowing where the lines fall is the first thing that makes a plan possible.",
     "scale_caption": "Bands and factor weights shown are FICO 8. VantageScore 3.0 and 4.0 use the same 300-850 range with different band edges.",
-    "scale_alt": "The FICO credit score range from 300 to 850, divided into five bands drawn at their true widths: poor 300 to 579, fair 580 to 669, good 670 to 739, very good 740 to 799, and exceptional 800 to 850."
+    "scale_alt": "The FICO credit score range from 300 to 850, divided into five bands drawn at their true widths: poor 300 to 579, fair 580 to 669, good 670 to 739, very good 740 to 799, and exceptional 800 to 850; the five factors are payment history 35%, amounts owed 30%, length of history 15%, credit mix 10%, and new credit 10%."
   },
   "process-flow": {
     "section_id": "how-it-works",

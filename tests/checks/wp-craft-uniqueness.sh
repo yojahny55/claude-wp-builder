@@ -84,7 +84,7 @@ grep -Fq 'verbatim' "$R/worlds.md" \
   || fail "$R/worlds.md does not require the preamble to be reused verbatim"
 grep -Fq 'verbatim' "$D" \
   || fail "$D does not carry the world preamble into the image prompts, so choosing a world changes nothing"
-n=$(grep -cE '^### [1-8]\. ' "$R/worlds.md")
+n=$(grep -cE '^### [1-8]\. ' "$R/worlds.md" || true)
 [ "$n" -eq 8 ] || fail "$R/worlds.md carries $n world preambles, not 8"
 grep -Fq 'where the empty space is' "$R/worlds.md" \
   || fail "$R/worlds.md does not require every shot prompt to name the empty space -- copy sits on these images"
@@ -92,7 +92,7 @@ grep -Fq 'banned as a default' "$R/worlds.md" \
   || fail "$R/worlds.md does not ban the clay-diorama look as a default, which is the AI-site house style"
 # Every preamble has to carry its negative list, or the model drifts to rendered.
 for w in 1 2 3 4 5 6 7 8; do
-  blk=$(awk -v k="^### $w\\\\. " 'BEGIN{p=0} $0 ~ k {p=1;next} /^### /{p=0} p' "$R/worlds.md")
+  blk=$(awk -v n="$w" 'BEGIN{p=0} index($0, "### " n ". ") == 1 {p=1;next} /^### /{p=0} p' "$R/worlds.md")
   printf '%s' "$blk" | grep -qiE 'not (3d|rendered|cgi)|no cgi|no render|not rendered|no 3d' \
     || fail "$R/worlds.md preamble $w has no negative list; without it the model drifts toward rendered-looking output"
 done

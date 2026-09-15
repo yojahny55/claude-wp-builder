@@ -140,10 +140,8 @@ grep -Fq 'no domain signal' "$k" \
 # and the failure message named a shape the file no longer had.
 r=skills/wp-demo-craft/references/compositions.md
 row='section | role | composition | why | motion cost | domain signal | research signal'
-grep -Fq "$row" "$r" \
+sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$r" | grep -Fxq "$row" \
   || fail "$r's composition-plan row is not \`$row\`"
-grep -Fq "$row |" "$r" \
-  && fail "$r's composition-plan row has gained a column the pin does not name -- update \$row here so the count stays asserted"
 grep -Fq 'domain signal that justified' "$r" \
   || fail "$r does not require a domain signal (or brief constraint) per row"
 grep -Fq 'no domain signal' "$r" \

@@ -397,7 +397,7 @@
   thing above the edge by construction — at 390×844 the button rendered with its top few
   pixels visible and no label, failing the rubric's own "First paint complete" line with no
   author error. Copy is now centred by default and the bottom anchor is restored above
-  `700px` of viewport height. A height query, not a width one: a short wide window fails
+  `900px` of viewport height. A height query, not a width one: a short wide window fails
   identically and a width query would pass it.
 
 - **`footer-columns` had no logo slot.** Its only brand slot was `{{wordmark}}`, typed in

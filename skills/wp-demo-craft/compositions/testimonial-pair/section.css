@@ -95,10 +95,10 @@
    their own timelines, which only CSS can express. Costs zero viewport-heights,
    so none of this touches the motion budget (`references/devices.md`,
    "Two kinds of motion").
-   Longhands only -- the `animation` shorthand resets `animation-timeline` to
-   `auto` and the element silently reverts to a load-time animation. No
-   `animation-duration`: it overrides the range. `animation-fill-mode: both`, or
-   anything above the fold flashes to its `from` value.
+   Longhands preserve `animation-timeline`; the `animation` shorthand resets it
+   to `auto`. A duration is inert on a scroll timeline, so leave it out rather
+   than implying that it controls the range. `animation-fill-mode: both` holds the
+   intended end state outside the range instead of the element's un-animated value.
    ------------------------------------------------------------------------- */
 @keyframes testimonial-pair-rise { from { opacity: 0; translate: 0 var(--motion-rise, 44px); } }
 @keyframes testimonial-pair-fade { from { opacity: 0; } }
@@ -125,5 +125,11 @@
    state, already visible, rather than a single arbitrary frame. */
 @supports not (animation-timeline: view()) {
   .testimonial-pair__kicker,
-  .testimonial-pair__title { animation: none; }
+  .testimonial-pair__title,
+  .testimonial-pair__quote { animation: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .testimonial-pair__kicker,
+  .testimonial-pair__title,
+  .testimonial-pair__quote { animation: none; }
 }

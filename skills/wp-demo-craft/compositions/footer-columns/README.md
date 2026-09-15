@@ -21,3 +21,5 @@ legal_line and two legal links.
 **Notes:** contact details live in a real `<address>` with `tel:` and `mailto:`
 links, so a phone can dial them. The ground is `--color-surface`, one step off
 the page canvas, which separates the footer without a heavy rule.
+When `logo_src` is empty, the logo image is hidden and the wordmark remains as
+the brand fallback.

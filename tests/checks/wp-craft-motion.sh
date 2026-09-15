@@ -172,6 +172,9 @@ if command -v node >/dev/null 2>&1; then
     eq(render('\$1,200'), '\$1,200', 'a leading symbol and grouping must both survive');
     eq(render('850+'), '850+', 'a trailing + must survive');
     eq(render('4.8/5'), '4.8/5', 'decimals and a trailing suffix must both survive');
+    eq(parseNum('1e3').n, 1000, 'scientific notation must parse as one numeric core');
+    eq(render('1e3'), '1e3', 'scientific notation must retain its written form');
+    eq(render('-2.5E+4'), '-2.5E+4', 'signed uppercase scientific notation must survive');
     eq(parseNum('-12').n, -12, 'a negative target must parse');
     eq(parseNum('soon'), null, 'a target with no digits must be rejected, not guessed');
   " 2>&1 || fail "\$m's counter parse does not carry units through (detail above)"

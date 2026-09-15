@@ -71,7 +71,7 @@ done
 # matched the old spelling and went to zero when that was fixed, which is the right
 # way round: it failed loudly on a real change rather than passing on a stale one.
 ot_ranges=$(grep -oE ':nth-of-type\([0-9]\) *\{ *animation-range: [^;}]+' "$C/offer-table/section.css" \
-  | sed 's/.*animation-range: //' | sort -u | wc -l)
+  | sed 's/.*animation-range: //' | sort -u | wc -l) || true
 [ "$ot_ranges" -ge 3 ] \
   || fail "offer-table: columns must arrive on their own ranges ($ot_ranges distinct, need 3)"
 
@@ -116,7 +116,16 @@ done
 grep -qF 'Use `translate`, `scale` and `rotate`, never `transform`' "$dev" \
   || fail "$dev must forbid transform in element keyframes"
 for f in "$C"/*/section.css; do
-  if awk '/@keyframes [a-z-]*-(rise|plate|fade)/ { if (/transform:/) exit 1 }' "$f"; then :; else
+  if awk '
+    /@keyframes [a-z-]*-(rise|plate|fade)/ { in_block = 1; depth = 0 }
+    in_block {
+      if (/transform[[:space:]]*:/) exit 1
+      line = $0
+      depth += gsub(/{/, "{", line)
+      depth -= gsub(/}/, "}", line)
+      if (depth <= 0) in_block = 0
+    }
+  ' "$f"; then :; else
     fail "$(basename "$(dirname "$f")"): an entrance keyframe writes transform, which races the engine"
   fi
 done
@@ -163,8 +172,8 @@ grep -qF 'score-scale-travel' "$C/score-scale/section.css" \
 # needle reading "580 to 720" is a claim about results, in the one industry where that
 # claim attracts regulators. The band edges are hardcoded rather than slotted, because
 # a slot invites a build to change them and a changed edge is misinformation.
-grep -qF 'score-scale__marker">' "$C/score-scale/section.html" \
-  && fail "score-scale: the marker must stay empty -- a number on it is a claim"
+grep -qE 'score-scale__marker[^>]*>[[:space:]]*</div>' "$C/score-scale/section.html" \
+  || fail "score-scale: the marker must stay empty -- a number on it is a claim"
 grep -qF '300' "$C/score-scale/section.html" \
   || fail "score-scale: the real band edges belong in the markup, not in slots"
 grep -qF 'scale_caption' "$C/score-scale/section.html" \
@@ -193,9 +202,9 @@ for f in "$C"/*/section.html; do
                  | grep -oE '[a-z-]+__[a-z0-9-]+' | sort -u); do
     # The smallest size the heading can render at: the first length in its clamp,
     # or its plain font-size.
-    min=$(grep -A8 "^\.$cls *{" "$C/$comp/section.css" 2>/dev/null \
+    min=$(grep -E -A8 "(^|,)[[:space:]]*\.$cls([^a-zA-Z0-9_-]|$)" "$C/$comp/section.css" 2>/dev/null \
             | grep -oE 'font-size: *clamp\( *[0-9.]+rem|font-size: *[0-9.]+rem' \
-            | head -1 | grep -oE '[0-9.]+rem' | tr -d 'rem')
+            | head -1 | grep -oE '[0-9.]+rem' | tr -d 'rem') || true
     [ -n "$min" ] || continue
     awk -v v="$min" 'BEGIN { exit !(v + 0 < 1.1) }' \
       && fail "$comp: .$cls is a heading element rendered at ${min}rem -- a label-sized heading flattens the h2/h3 role for every page it appears on"

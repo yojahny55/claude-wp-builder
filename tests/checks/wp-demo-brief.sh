@@ -54,8 +54,8 @@ grep -qF '3b. The operator approves the brief before anything is built' "$demo" 
   || fail "$demo must gate the build on an approved brief"
 grep -qF 'This is a gate, not a courtesy' "$demo" \
   || fail "$demo must say the approval blocks the build"
-grep -qF 'no \"proceed unless told otherwise\"' "$demo" \
-  || grep -qF 'proceed unless told otherwise' "$demo" \
+flat_demo=$(tr '\n' ' ' < "$demo")
+grep -qE 'no[[:space:]]+"proceed unless told otherwise"' <<< "$flat_demo" \
   || fail "$demo must refuse the proceed-unless-objected reading"
 grep -qF 'There is no pass limit' "$demo" \
   || fail "$demo: revision must loop until approved, not for a fixed number of rounds"

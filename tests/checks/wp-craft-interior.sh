@@ -51,13 +51,16 @@ grep -qF 'has not been built, only filled' "$demo" \
 # which is the half that was missing when the rule was only prose.
 grep -qF "kind: 'static-page'" "$verify" \
   || fail "$verify must emit a static-page finding"
-grep -qF 'POINTER_DEVICES' "$verify" \
-  || fail "$verify must know which devices need a pointer"
+grep -qF 'SCROLL_REACTIVE_DEVICES' "$verify" \
+  || fail "$verify must use the documented allowlist of devices that react to scrolling"
+grep -qF 'cssScroll' "$verify" \
+  || fail "$verify must count CSS scroll timelines toward the interior-page motion floor"
 grep -qE "scrollReactive" "$verify" \
   || fail "$verify must judge a page on whether any device reacts to scrolling"
 # static-page must be blocking: ADVISORY findings do not fail a round, and a page
 # that cannot move is not an advisory matter.
-grep -qE "ADVISORY = new Set\(\[[^]]*'static-page'" "$verify" \
+advisory=$(sed -n '/const ADVISORY = new Set(/,/);/p' "$verify" | tr '\n' ' ')
+printf '%s' "$advisory" | grep -qF "'static-page'" \
   && fail "$verify: static-page must not be advisory -- it has to fail the round"
 
 echo PASS

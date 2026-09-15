@@ -145,7 +145,7 @@ before writing any markup.
    **Project documents describe a business. They almost never describe a
    website.** So unlike the story fields, the form fields are nearly always
    unanswered by the docs, and asking them is the normal case rather than the
-   exception. Ask all six with `AskUserQuestion`, in as many passes as it takes
+   exception. Ask every field below with `AskUserQuestion`, in as many passes as it takes
    to get real answers, and write each answer into `demo/BRIEF.md` under
    `## Form`:
 

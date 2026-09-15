@@ -95,10 +95,10 @@
    their own timelines, which only CSS can express. Costs zero viewport-heights,
    so none of this touches the motion budget (`references/devices.md`,
    "Two kinds of motion").
-   Longhands only -- the `animation` shorthand resets `animation-timeline` to
-   `auto` and the element silently reverts to a load-time animation. No
-   `animation-duration`: it overrides the range. `animation-fill-mode: both`, or
-   anything above the fold flashes to its `from` value.
+   Longhands preserve `animation-timeline`; the `animation` shorthand resets it
+   to `auto`. A duration is inert on a scroll timeline, so leave it out rather
+   than implying that it controls the range. `animation-fill-mode: both` holds the
+   intended end state outside the range instead of the element's un-animated value.
    ------------------------------------------------------------------------- */
 @keyframes faq-list-rise { from { opacity: 0; translate: 0 var(--motion-rise, 44px); } }
 @keyframes faq-list-fade { from { opacity: 0; } }
@@ -137,5 +137,12 @@
 @supports not (animation-timeline: view()) {
   .faq-list__kicker,
   .faq-list__title,
-  .faq-list__lede { animation: none; }
+  .faq-list__lede,
+  .faq-list__item { animation: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .faq-list__kicker,
+  .faq-list__title,
+  .faq-list__lede,
+  .faq-list__item { animation: none; }
 }

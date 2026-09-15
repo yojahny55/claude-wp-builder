@@ -309,11 +309,11 @@
   animation-fill-mode: both;
   animation-timeline: --flow-tl;
 }
-.process-flow__step:nth-of-type(1) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 42% entry 142%; }
-.process-flow__step:nth-of-type(2) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 50% entry 150%; }
-.process-flow__step:nth-of-type(3) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 58% entry 158%; }
-.process-flow__step:nth-of-type(4) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 66% entry 166%; }
-.process-flow__step:nth-of-type(5) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: entry 74% entry 174%; }
+.process-flow__step:nth-of-type(1) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: cover 36% cover 52%; }
+.process-flow__step:nth-of-type(2) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: cover 52% cover 64%; }
+.process-flow__step:nth-of-type(3) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: cover 64% cover 76%; }
+.process-flow__step:nth-of-type(4) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: cover 76% cover 88%; }
+.process-flow__step:nth-of-type(5) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: cover 88% cover 100%; }
 
 /* --- past the last written range, the section stops being a sequence -------------
    The ranges above are written out to five steps. A sixth lays out perfectly --

@@ -48,8 +48,12 @@ grep -qF 'your own CSS in a layer' "$demo" \
 # --- a deliberately hidden element is not clipped copy ------------------------
 grep -qF 'deliberatelyHidden' "$verify" \
   || fail "$verify must exempt visually-hidden copy from clipped-copy"
-grep -qF 'aria-hidden' "$verify" \
-  || fail "$verify must treat an aria-hidden subtree as deliberately hidden"
+grep -qF "st.visibility === 'hidden'" "$verify" \
+  || fail "$verify must recognize visually hidden subtrees"
+grep -qF "st.overflowX === 'hidden'" "$verify" \
+  || fail "$verify must require an actual clip before exempting a 1px box"
+grep -qF "getAttribute('aria-hidden')" "$verify" \
+  && fail "$verify treats aria-hidden as visual hiding and can suppress visible clipped copy"
 grep -qF 'clippedSeen' "$verify" \
   || fail "$verify must deduplicate clipped-copy: one element is one defect"
 
@@ -66,6 +70,10 @@ grep -qF '{{logo_src}}' "$foot/section.html" \
   || fail "$foot has no logo slot, so no build can put the client's mark in the footer"
 grep -qF 'footer-columns__logo' "$foot/section.css" \
   || fail "$foot: the logo slot needs its own rule, not the wordmark's display type"
+grep -qF 'max-height:' "$foot/section.css" \
+  || fail "$foot: constraining logo width and a fixed height can distort its aspect ratio"
+grep -qF '.footer-columns__logo[src=""]' "$foot/section.css" \
+  || fail "$foot: an empty optional logo source must hide the image and leave the wordmark fallback"
 grep -qF 'logo_src' "$foot/README.md" \
   || fail "$foot/README.md must document the logo slot"
 grep -qF '"logo_alt"' skills/wp-demo-craft/compositions/fills.json \
