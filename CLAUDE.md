@@ -168,6 +168,15 @@ Version lives in `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`
 README badge — bump all of them together. Add an `[Unreleased]` entry to `CHANGELOG.md`; update
 `README.md` when adding a command.
 
+**Cutting a release never renames `## [Unreleased]`.** Insert the new
+`## [x.y.z] - YYYY-MM-DD` heading *below* it and move the entries down, leaving an
+empty `## [Unreleased]` at the top. Renaming it deletes the anchor every open branch
+is editing, so a release turns every open PR into a `CHANGELOG.md` conflict at once.
+`.gitattributes` marks the file `merge=union` so two branches appending under the same
+heading merge instead of conflicting; the cost is that union never reports a conflict,
+so a genuine same-line edit keeps both sides silently — check the top of the file after
+a release.
+
 ## Known ceilings
 
 These are deliberate, documented limits — not bugs to "fix" on sight:
