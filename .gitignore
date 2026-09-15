@@ -24,3 +24,6 @@ package-lock.json
 
 # Serena MCP workspace cache (per-machine index, not shared state)
 .serena/
+
+# Codebase-memory MCP artifacts — local index, never committed.
+.codebase-memory/

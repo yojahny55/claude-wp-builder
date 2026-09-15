@@ -23,6 +23,39 @@
   registered under a different id is not matched and degrades to the rung below, which is the
   intended behaviour when a server is genuinely absent.
 
+- **`/wp-robin` reported every attachment as missing from disk while every file was
+  there.** Step 4 carries the attachment metadata base64-encoded so it cannot drag a tab
+  or a newline into the tab-separated read, but `TO_BASE64()` wraps its own output every
+  76 characters. In batch mode the client escapes those newlines to a literal
+  backslash-n, and `base64_decode()` drops the backslash and keeps the `n` — a valid
+  base64 character — so every row decoded to garbage, `unserialize()` failed, the file
+  name came back empty and the step skipped the attachment as missing. Nothing was
+  queued and the run still ended with a clean "0 remaining", which is exactly the false
+  "nothing left to do" this script exists to undo. The wrap is now stripped server-side
+  with `REPLACE(TO_BASE64(...), CHAR(10), '')`. `DECODE_META` first removes literal
+  backslash-n sequences and then drops non-base64 characters before decoding, so a client
+  that escapes newlines differently cannot reintroduce them.
+
+  The explanation lives in a shell comment above the query rather than inside it: a `--`
+  comment in a `-e` batch query takes the rest of the line with it, which silently
+  emptied the result set a second time.
+
+- **`/wp-robin` re-encoded a library that was already WebP.** Steps 4, 5 and 6 matched
+  attachments against a hardcoded mime list that included `image/webp`, while the
+  `allowed_formats` setting the same script writes one step earlier does not. On a site
+  whose media library is already WebP, every original and every thumbnail was therefore
+  converted again into `<name>.webp.webp` — a second lossy pass over an already-lossy
+  source, which `webp_delivery_mode=picture` then serves in place of the original. The
+  candidate list is now derived from `allowed_formats`, with `image/jpg` riding along
+  with `image/jpeg` for installs that store it, and falls back to the built-in list only
+  when the setting has been emptied by hand, so an emptied setting cannot silently widen
+  the query to every attachment on the site.
+
+### Chore
+
+- `.codebase-memory/` is ignored. It is a per-machine index, like `.serena/` beside it,
+  and showed up as untracked in a clean checkout.
+
 ## [1.17.0] - 2026-09-13
 
 ### Added

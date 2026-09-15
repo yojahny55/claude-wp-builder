@@ -147,6 +147,27 @@ fi
 SETTINGS[allowed_sizes_thumbnail]="$ALL_SIZES"
 info "  Thumbnails: $ALL_SIZES"
 
+# The list of mime types to queue follows wbcr_io_allowed_formats — the setting this
+# script has just written — instead of a second hardcoded copy of it. The copy used to
+# carry image/webp, which the setting does not: on a library that is already WebP the
+# step re-encoded every file into <name>.webp.webp, a second lossy pass over an
+# already-lossy source that webp_delivery_mode=picture then serves in place of the
+# original. image/jpg rides along with image/jpeg because some installs store it.
+ALLOWED_SQL=""
+IFS=',' read -ra ALLOWED_FMTS <<< "${SETTINGS[allowed_formats]}"
+for fmt in "${ALLOWED_FMTS[@]}"; do
+	fmt="${fmt// /}"
+	[[ -z "$fmt" ]] && continue
+	# The value is interpolated into SQL below, so accept only source formats
+	# Robin can convert. This also keeps already-WebP files out of the queue.
+	[[ "$fmt" =~ ^(image/png|image/jpeg|image/jpg|image/gif)$ ]] || continue
+	ALLOWED_SQL+="${ALLOWED_SQL:+,}'${fmt}'"
+	[[ "$fmt" == "image/jpeg" ]] && ALLOWED_SQL+=",'image/jpg'"
+done
+# A setting emptied by hand must not silently widen the query to every attachment.
+[[ -z "$ALLOWED_SQL" ]] && ALLOWED_SQL="'image/png','image/jpeg','image/jpg','image/gif'"
+info "  Formats: ${SETTINGS[allowed_formats]}"
+
 for key in "${!SETTINGS[@]}"; do
 	val="${SETTINGS[$key]}"
 	db_q "INSERT INTO ${TABLE_PREFIX}options (option_name, option_value) VALUES ('wbcr_io_${key}', '${val}') ON DUPLICATE KEY UPDATE option_value='${val}';" || true
@@ -249,7 +270,8 @@ NOW=$(date +%s)
 DECODE_META='while (($l = fgets(STDIN)) !== false) {
 	$l = rtrim($l, "\n"); if ($l === "") continue;
 	$p = explode("\t", $l);
-	$raw = base64_decode($p[2] ?? "");
+	$encoded = str_replace("\\n", "", $p[2] ?? "");
+	$raw = base64_decode(preg_replace("/[^A-Za-z0-9+\/=]/", "", $encoded));
 	$m = @unserialize($raw, ["allowed_classes" => false]);
 	if (!is_array($m)) { $m = json_decode($raw, true); }
 	if (!is_array($m)) { $m = []; }
@@ -284,16 +306,24 @@ flush_batch() {
 # from a process substitution, a query that errors out delivers zero rows and the
 # step reports "0 new attachments" — the same false "nothing left to do" this
 # script exists to undo. `pipefail` makes the mariadb side of the pipe count too.
+# TO_BASE64() wraps its output every 76 characters. In batch mode the client escapes
+# those newlines to a literal backslash-n, and base64_decode() drops the backslash but
+# keeps the 'n', which is a valid base64 character — so every row decodes to garbage,
+# unserialize() fails, $file comes back empty, and the step reports every attachment as
+# "original file missing on disk" while the files are all there. REPLACE() strips the
+# wrap server-side; the preg_replace in DECODE_META covers any client that escapes
+# differently. The note lives out here rather than inside the SQL: a `--` comment in a
+# -e batch query takes the rest of the line with it.
 ATTACH_ROWS=$(mktemp)
 trap 'rm -f "$ATTACH_ROWS"' EXIT
 if ! db_q "
-	SELECT p.ID, p.post_mime_type, COALESCE(MAX(TO_BASE64(pm.meta_value)), '')
+	SELECT p.ID, p.post_mime_type, COALESCE(MAX(REPLACE(TO_BASE64(pm.meta_value), CHAR(10), '')), '')
 	FROM ${POSTS_TABLE} p
 	LEFT JOIN ${TABLE_PREFIX}postmeta pm
 	       ON pm.post_id = p.ID AND pm.meta_key = '_wp_attachment_metadata'
 	WHERE p.post_type = 'attachment'
 	  AND p.post_status = 'inherit'
-	  AND p.post_mime_type IN ('image/png','image/jpeg','image/jpg','image/gif','image/webp')
+	  AND p.post_mime_type IN (${ALLOWED_SQL})
 	  AND p.ID NOT IN (
 	    SELECT object_id FROM ${QUEUE_TABLE}
 	    WHERE item_type='attachment' AND object_id IS NOT NULL
@@ -333,7 +363,6 @@ info "  Registered ${REGISTERED} new attachment(s) — queue total: $(db_q "SELE
 echo ""
 info "━━━ Syncing missing webp entries ━━━"
 
-ALLOWED_SQL="'image/png','image/jpeg','image/jpg','image/gif','image/webp'"
 
 MISSING=$(db_q "
 	SELECT DISTINCT posts.ID
