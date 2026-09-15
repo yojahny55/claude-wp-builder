@@ -329,6 +329,10 @@ use a hosted instance instead of the npx stdio default, add to your project's
     "wp-design-library": { "type": "http", "url": "https://library.<domain>/mcp",
       "headers": { "Authorization": "Bearer <token>" } }
 
+The hosted instance at `https://wp-design-library.yojahny.dev` is a preview with a
+single shared token. If you want to use it, contact me (yojahny55 on GitHub) for
+access.
+
 Without the server, `/wp-demo` writes `References: library unavailable` in
 `demo/BRIEF.md` and builds from the in-repo compositions.
 
