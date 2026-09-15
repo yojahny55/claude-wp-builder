@@ -248,4 +248,14 @@ grep -Fq 'no research signal' "$skf" \
 grep -Fq 'no research signal' "$cof" \
   || fail "$co composition row format has no research-signal column"
 
+# The source ladder's upper two rungs are MCP tools, and `tools:` in agent frontmatter is
+# an ALLOWLIST — built-ins alone make every MCP tool unreachable. The ladder then collapses
+# to baseline while reporting "MCP was not reachable", which reads as a connection fault and
+# is not one. Pin the grant, not the prose that describes the ladder.
+agentf=agents/wp-research.md
+grep -qE '^tools:.*([[:space:],])mcp__firecrawl([[:space:],]|$)' "$agentf" \
+  || fail "$agentf: the Firecrawl MCP rung is documented but the agent is not granted mcp__firecrawl"
+grep -qE '^tools:.*([[:space:],])mcp__dataforseo([[:space:],]|$)' "$agentf" \
+  || fail "$agentf: the DataForSEO rung is MCP-only, and the agent is not granted mcp__dataforseo"
+
 echo PASS
