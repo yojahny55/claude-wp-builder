@@ -1,0 +1,264 @@
+/* ====== Section: Score scale (score-scale) ====== */
+.score-scale, .score-scale *, .score-scale *::before, .score-scale *::after { box-sizing: border-box; }
+.score-scale {
+  container-type: inline-size;
+  padding-block: var(--space-section);
+  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max, 1280px)) / 2));
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.score-scale__head { display: grid; gap: 0.625rem; max-width: 52ch; margin-block-end: clamp(2rem, 5cqi, 3.25rem); }
+.score-scale__kicker {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 0.8125rem;
+  /* At or below 0.1em; see references/taste.md on the tracking threshold. */
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+.score-scale__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 4cqi, 2.75rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.score-scale__lede { margin: 0; font-family: var(--font-text); font-size: clamp(1rem, 1.5cqi, 1.125rem); line-height: 1.6; color: var(--color-ink-soft); }
+
+.score-scale__figure { margin: 0; display: grid; gap: clamp(1.25rem, 3cqi, 2rem); }
+.score-scale__caption {
+  order: 2;
+  font-family: var(--font-text);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+/* The track is the scale itself. Band widths are the real point spans of the
+   FICO range as a proportion of 300-850 (550 points total), so the picture is to
+   scale rather than five equal blocks: Poor is genuinely half the range, which is
+   the fact most people are surprised by and the reason to draw it at all.
+      300-579 = 280pts   580-669 = 90    670-739 = 70
+      740-799 = 60       800-850 = 51 */
+.score-scale__track {
+  order: 1;
+  position: relative;
+  display: grid;
+  grid-template-columns: 280fr 90fr 70fr 60fr 51fr;
+  gap: 3px;
+  padding-block-end: 2.25rem;
+}
+.score-scale__band {
+  display: grid;
+  gap: 0.25rem;
+  align-content: end;
+  padding: clamp(2.5rem, 7cqi, 4.5rem) 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--color-ink) 8%, var(--color-surface));
+  /* Each band lifts its own tint in on scroll; see the motion block below. */
+  transform-origin: bottom;
+}
+.score-scale__band--poor { background: color-mix(in oklab, var(--color-ink) 14%, var(--color-surface)); }
+.score-scale__band--fair { background: color-mix(in oklab, var(--color-ink) 11%, var(--color-surface)); }
+.score-scale__band--good { background: color-mix(in oklab, var(--color-accent) 18%, var(--color-surface)); }
+.score-scale__band--very { background: color-mix(in oklab, var(--color-accent) 32%, var(--color-surface)); }
+.score-scale__band--top  { background: color-mix(in oklab, var(--color-accent) 52%, var(--color-surface)); }
+
+.score-scale__band-name {
+  font-family: var(--font-display);
+  font-size: clamp(0.75rem, 1.3cqi, 0.9375rem);
+  line-height: 1.15;
+}
+.score-scale__band-range {
+  font-family: var(--font-text);
+  font-size: clamp(0.6875rem, 1.1cqi, 0.8125rem);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* At narrow widths the five labels cannot sit side by side: the top band is 9.3% of
+   the range, which is about 33px on a 390 screen, and "Exceptional" overflowed it.
+   The bands keep their real proportions -- that is the information, and stacking them
+   into equal rows would throw it away -- so the names turn instead. Vertical text
+   fits any column width, which is why charts have always done this.
+   The range numbers drop; the band names still name them, and the caption carries
+   the scoring model. */
+@container (max-width: 640px) {
+  .score-scale__track { padding-block-end: 2rem; }
+  .score-scale__band {
+    padding: 0.75rem 0.25rem;
+    align-content: start;
+    justify-items: center;
+  }
+  .score-scale__band-range { display: none; }
+  .score-scale__band-name {
+    writing-mode: vertical-rl;
+    rotate: 180deg;
+    font-size: 0.6875rem;
+    line-height: 1;
+    white-space: nowrap;
+  }
+}
+
+/* The marker rides the track from the bottom of the range to the top. It carries
+   no number, because a number here would be a claim about a particular person's
+   result; the marker says "this is the direction", which is what the section is
+   for. */
+.score-scale__marker {
+  position: absolute;
+  inset-block: 0 1.5rem;
+  inline-size: 3px;
+  border-radius: 2px;
+  background: var(--color-ink);
+  left: 0;
+}
+.score-scale__marker::after {
+  content: "";
+  position: absolute;
+  inset-block-start: -0.375rem;
+  inset-inline-start: 50%;
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  translate: -50% 0;
+  rotate: 45deg;
+  background: var(--color-ink);
+  border-radius: 2px;
+}
+
+.score-scale__factors {
+  order: 3;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: clamp(0.75rem, 2cqi, 1.25rem);
+  grid-template-columns: 1fr 1fr;
+}
+@container (min-width: 720px) {
+  .score-scale__factors { grid-template-columns: repeat(5, 1fr); }
+}
+.score-scale__factor {
+  display: grid;
+  gap: 0.125rem;
+  padding-block-start: 0.75rem;
+  border-block-start: 1px solid var(--color-hairline);
+}
+.score-scale__weight {
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 2.4cqi, 1.75rem);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+}
+.score-scale__factor-name { font-family: var(--font-text); font-size: 0.875rem; line-height: 1.35; color: var(--color-ink-soft); }
+
+/* ---- Element motion -------------------------------------------------------
+   Costs zero viewport-heights (references/devices.md, "Two kinds of motion").
+   `translate` and `scale` rather than `transform`, so nothing here races a
+   `data-motion` device on the same element. Longhands only; no
+   `animation-duration`; `animation-fill-mode: both`.
+   ------------------------------------------------------------------------- */
+@keyframes score-scale-rise { from { opacity: 0; translate: 0 var(--motion-rise, 44px); } }
+@keyframes score-scale-fade { from { opacity: 0; } }
+@keyframes score-scale-grow { from { opacity: 0; scale: 1 0.55; } }
+/* The marker travels the width of the track. `left` is animated rather than
+   `translate` so the end position is the track's own right edge at any width,
+   with no measurement and no script. */
+@keyframes score-scale-travel { from { left: 0; } to { left: calc(100% - 3px); } }
+
+.score-scale__kicker {
+  animation-name: score-scale-fade;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 100%;
+}
+.score-scale__title {
+  animation-name: score-scale-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 4% entry 104%;
+}
+.score-scale__lede {
+  animation-name: score-scale-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 12% entry 112%;
+}
+
+/* The bands grow up from the baseline, left to right, so the scale builds itself
+   in the direction it is read. */
+.score-scale__band {
+  animation-name: score-scale-grow;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+}
+.score-scale__band--poor { animation-range: entry 14% entry 114%; }
+.score-scale__band--fair { animation-range: entry 19% entry 119%; }
+.score-scale__band--good { animation-range: entry 24% entry 124%; }
+.score-scale__band--very { animation-range: entry 29% entry 129%; }
+.score-scale__band--top  { animation-range: entry 34% entry 134%; }
+
+/* The marker crosses after the scale exists to be crossed. */
+.score-scale__marker {
+  animation-name: score-scale-travel;
+  animation-timing-function: cubic-bezier(.45,.05,.25,1);
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 40% cover 55%;
+}
+
+.score-scale__factor {
+  animation-name: score-scale-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+}
+.score-scale__factor:nth-of-type(1) { animation-range: entry 44% entry 144%; }
+.score-scale__factor:nth-of-type(2) { animation-range: entry 48% entry 148%; }
+.score-scale__factor:nth-of-type(3) { animation-range: entry 52% entry 152%; }
+.score-scale__factor:nth-of-type(4) { animation-range: entry 56% entry 156%; }
+.score-scale__factor:nth-of-type(5) { animation-range: entry 60% entry 160%; }
+
+/* No view timeline: the scale is drawn, the marker sits at the top of the range,
+   everything is legible. The information does not depend on the motion. */
+/* --- a child past the last written range ------------------------------------------
+   The stagger above is written out to five children. Add one more and it does not
+   degrade mildly: an element with no `animation-range` falls back to `normal`, and on
+   a view timeline `normal` is `cover 0%` to `cover 100%`. That range bears no
+   relationship to the stagger, so the extra child is out of sequence in whichever
+   direction the explicit ranges happen to sit -- it leads where they are late in the
+   section and lags where they are early.
+
+   Measured here with a sixth factor, at 1440: the extra one read opacity 0.12 and
+   0.56 at the two later scroll positions while all five others read 1.00.
+   The end state of these children is only "present", so the honest fallback is the one
+   the `@supports not` block already gives: no animation, arrived. Where the end state
+   MEANS something -- process-flow's lit node, which reads as a completed step -- a
+   per-child exemption is not enough and the guard goes on the list instead.
+   --------------------------------------------------------------------------------- */
+.score-scale__factor:nth-of-type(n+6) { animation: none; }
+
+@supports not (animation-timeline: view()) {
+  .score-scale__kicker,
+  .score-scale__title,
+  .score-scale__lede,
+  .score-scale__band,
+  .score-scale__marker,
+  .score-scale__factor { animation: none; }
+  .score-scale__marker { left: calc(100% - 3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .score-scale__kicker,
+  .score-scale__title,
+  .score-scale__lede,
+  .score-scale__band,
+  .score-scale__marker,
+  .score-scale__factor { animation: none; }
+  .score-scale__marker { left: calc(100% - 3px); }
+}

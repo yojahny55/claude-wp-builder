@@ -13,6 +13,32 @@ section anywhere in it, and it shipped a 12,000px page whose first screen was an
 empty dark field with the headline clipped mid-word. A build steered only by what
 it must not do has nothing to steer towards.
 
+## The project's brief outranks this skill
+
+Read the project's `.claude/CLAUDE.md` before the rules below, and treat anything
+it records as a client decision as **binding over every default here**. This skill
+is a floor for a build with no instructions. It is not an argument against
+instructions the client actually gave.
+
+That precedence was missing, and the cost of missing it is the reason this section
+is first. A project whose `.claude/CLAUDE.md` carried, in `/wp-context`'s own
+words, *"the client wants an impactful animated website — hero entrance,
+scroll-reveal on section blocks, animated counters, animated step/timeline,
+before/after score chart animation, hover micro-interactions"* shipped with one
+animation and eleven pages of prose. Every item on that list was later reported as
+missing by the person who had asked for it in the first place. Nothing had failed
+to capture the direction; the direction was captured well, and these rules
+overrode it, because nothing said they must not.
+
+So: where the recorded brief asks for motion, graphics, density or a treatment
+this skill discourages, **the brief wins and the discouragement does not apply.**
+Say in `demo/BRIEF.md` which default the brief overrode and why. A rule here that
+contradicts a recorded client decision is not a standard being upheld — it is a
+build ignoring its client.
+
+The two spine rules below are the exception, and they are the only one: honest
+copy and a verified render are not preferences a brief can trade away.
+
 ## When this applies
 
 Any demo built in craft mode, and every cinematic demo. `/wp-demo` records the
@@ -49,7 +75,14 @@ plain: an unverified craft page is the one that reaches the client.
    person, pain and promise either
    **cites the `demo/RESEARCH.md` line and its source URL, or keeps the marker**
    — and the marker now means something, because there was an alternative.
-3. **Grammar, then composition plan.** Pick one grammar from
+3. **Grammar, then composition plan.** Landing on the default grammar
+   requires one sentence in `demo/BRIEF.md` per grammar that was rejected
+   (`references/uniqueness.md` §3) — impossible to write honestly when the
+   default is not right, which is the whole mechanism. **No two pages of one
+   demo may share their whole composition sequence**, and the home page's
+   sequence may not be a superset of an interior page's (§2): two pages
+   sharing a header and a footer is a site, two pages sharing their middle is
+   a template. Pick one grammar from
    `references/grammars.md` — it decides what a section is, what the chrome is
    for and what the ending does, and compositions are chosen inside it, not
    instead of it. Then one row per section — section, role, composition, why,
@@ -63,10 +96,16 @@ plain: an unverified craft page is the one that reaches the client.
    (`references/compositions.md`). That row format is stated in these same terms
    `/wp-demo` Step 2.6 uses on purpose — do not restate it a third way. Sum the
    motion cost before building and hold it under the budget in `devices.md`.
-4. **Build** from the compositions, the tokens and the real copy.
+4. **Build** from the compositions, the tokens and the real copy. Before the first section, record the
+   **signature move** in `demo/BRIEF.md` — one bespoke interaction that
+   exists on this site alone, not a parameter change to a library device
+   (`uniqueness.md` §4) — and the **world preamble** chosen from
+   `worlds.md`, pasted verbatim into every image prompt so separately
+   generated plates look like one shoot. The hero is layered by default:
+   `hero-depth.md`.
 5. **Loop** until the rubric passes or three rounds are spent
    (`references/verify.md`).
-6. **Record** the fingerprint row, only for a passing build
+6. **Record** the seven-dimension fingerprint row, only for a passing build
    (`references/fingerprint.md`).
 
 ## Ship blockers
@@ -87,3 +126,13 @@ hex where a token exists; invented statistics; a `slop` finding from
 
 Read `references/taste.md` (the floor), then `design-md.md`, `feel.md`,
 `compositions.md`, `grammars.md`, `devices.md`, `fingerprint.md`, `verify.md`.
+
+Then the three that decide whether this build resembles the last one:
+`uniqueness.md` (the template trap, the signature move, the aesthetic
+families), `hero-depth.md` (layering is the baseline, not a polish pass) and
+`worlds.md` (one style preamble, pasted verbatim into every image prompt).
+
+Those three were absent for several releases while every constraint file was
+present, and the shape of what shipped followed exactly: builds that obeyed
+every rule, resembled each other, and were reported as "all the pages are
+almost the same thing". A skill made only of floors produces the floor.

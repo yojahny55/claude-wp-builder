@@ -21,3 +21,9 @@ not a default.
 
 **Slots:** kicker (three to five words), title (four to seven words; it must not
 pass three lines at 390px), lede (about 25 words), cta_label/cta_href.
+
+**Element motion:** self-sufficient. The children arrive on their own `view()`
+ranges in `section.css`, so the root `data-motion="reveal"` is redundant here and
+may be dropped to free `data-motion` for a section-level device (`drift`,
+`parallax`, a pin). See "One attribute, one device" in
+`../../references/devices.md`.

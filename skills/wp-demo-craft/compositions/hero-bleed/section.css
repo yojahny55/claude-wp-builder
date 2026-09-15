@@ -6,8 +6,16 @@
   isolation: isolate;
   overflow: hidden;
   display: grid;
-  align-content: end;
-  min-height: 100dvh;
+  /* Bottom-anchored copy is this composition's identity, and it only works when the
+     frame is tall enough to have a bottom worth anchoring to. On a short frame the
+     kicker, up to three lines of title, a ~25-word lede and the CTA are pressed
+     against the floor, and the CTA is the last thing above the edge by construction
+     -- measured at 390x844 as a button with its top few pixels visible and no label,
+     which fails the rubric's own "First paint complete" line with no author error.
+     Centre is the safe default; `end` is restored once there is room for it. */
+  align-content: center;
+  /* Match the layout viewport used by the min-height media query below. */
+  min-height: 100vh;
   padding-block: var(--space-section) calc(var(--space-section) * 0.9);
   padding-inline: max(var(--space-gutter), calc((100% - var(--container-max, 1280px)) / 2));
   background: var(--color-surface);
@@ -81,4 +89,24 @@
 .hero-bleed__cta:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
   .hero-bleed__cta { transition: none; }
+}
+
+/* The bottom anchor, restored where there is room for it.
+   The threshold is 900px and it comes from two measured points, not from a formula:
+   at 1440x900 the bottom-anchored copy clears the fold with the CTA label visible,
+   and at 390x844 the CTA rendered with its top few pixels showing and no label. 900
+   is the lower of the two heights that worked, so it is a floor established by
+   measurement rather than a proof.
+   It was 700px in the first version of this fix, which was wrong in the way that
+   matters: 844 >= 700, so the failing viewport got the bottom anchor restored and
+   the fix did nothing for the case it was written for.
+   Height, not width: the failure is that the copy block plus its bottom padding
+   exceeds the frame, and a short wide window fails identically while a width query
+   would pass it.
+   Ceiling: a threshold cannot see content. A title that wraps to three lines at
+   1000px tall will still crowd the fold, because CSS cannot ask whether the block
+   fits -- only how big the window is. The slot contract caps the title at three
+   lines at 390 for this reason, and that cap is what keeps the two numbers honest. */
+@media (min-height: 900px) {
+  .hero-bleed { align-content: end; }
 }

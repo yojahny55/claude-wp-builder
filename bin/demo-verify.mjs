@@ -311,10 +311,47 @@ const probe = (idx) => {
       sig.push(d[0] + ',' + d[1] + ',' + d[2]);
     } catch { /* tainted or webgl: not signable, skip */ }
   });
+  // Copy hidden from sighted users on purpose is not clipped copy. The standard
+  // accessible-honeypot and sr-only patterns both work by making a box far smaller
+  // than its text and hiding the overflow -- which is exactly the signature this
+  // detector looks for, so one honeypot field produced 72 blocking findings
+  // (element x section x width x scroll position) on a build whose accessibility
+  // was correct. A gate that fails correct code teaches authors to delete the
+  // correct code.
+  const deliberatelyHidden = (el) => {
+    for (let node = el; node; node = node.parentElement) {
+      const st = getComputedStyle(node);
+      if (st.display === 'none' || st.visibility === 'hidden' || st.visibility === 'collapse' || Number(st.opacity) === 0) {
+        return true;
+      }
+      if (st.position === 'absolute' || st.position === 'fixed') {
+        // Parked off-canvas: recognise the -9999px family by direction. Large
+        // positive left/top values can be visible on a large page or viewport.
+        const far = Math.max(4096, window.innerWidth * 2, window.innerHeight * 2);
+        const left = parseFloat(st.left);
+        const top = parseFloat(st.top);
+        const right = parseFloat(st.right);
+        const bottom = parseFloat(st.bottom);
+        const off = (Number.isFinite(left) && left <= -far)
+          || (Number.isFinite(top) && top <= -far)
+          || (Number.isFinite(right) && right >= far)
+          || (Number.isFinite(bottom) && bottom >= far);
+        if (off) return true;
+      }
+      // The sr-only clip: a 1px box holding real text.
+      const r = node.getBoundingClientRect();
+      const clipped = st.overflowX === 'hidden' || st.overflowX === 'clip'
+        || st.overflowY === 'hidden' || st.overflowY === 'clip'
+        || (st.clip && st.clip !== 'auto') || (st.clipPath && st.clipPath !== 'none');
+      if (clipped && r.width <= 2 && r.height <= 2 && (node.textContent || '').trim().length > 2) return true;
+    }
+    return false;
+  };
   const clipped = [];
-  document.querySelectorAll('p, h1, h2, h3, li').forEach((el) => {
+  document.querySelectorAll('p, h1, h2, h3, li').forEach((el, i) => {
     if (el.scrollHeight > el.clientHeight + 2 && getComputedStyle(el).overflow === 'hidden') {
-      clipped.push((el.textContent || '').trim().slice(0, 60));
+      if (deliberatelyHidden(el)) return;
+      clipped.push({ i, text: (el.textContent || '').trim().slice(0, 60) });
     }
   });
   return {
@@ -399,6 +436,31 @@ const revealState = (idx) => {
 };
 
 /** Report @container rules whose subject can never match a container. */
+/* A page whose entire motion is `reveal` plus pointer devices is a static page that
+ * measures as animated. `reveal` is a one-shot entrance, and on the CSS path an element
+ * already in view at load lands on its end state without animating at all; `tilt`,
+ * `magnet` and `spotlight` need a pointer, so they do nothing on a touch screen. Neither
+ * reacts to scrolling. A build once shipped eleven of twelve pages in exactly this state
+ * — 74 reveals and 19 pointer devices between them, not one scroll-reactive device — and
+ * every gate passed, because each device present was correctly wired. What no gate asked
+ * was whether the mix could move. This one does.
+ *
+ * Returns the device kinds present, so the finding can name what the page actually has
+ * rather than assert an absence. */
+const SCROLL_REACTIVE_DEVICES = new Set(['drift', 'count', 'parallax', 'pan', 'cascade']);
+const motionMix = () => {
+  const devices = {};
+  document.querySelectorAll('[data-motion]').forEach((el) => {
+    const k = (el.getAttribute('data-motion') || '').trim();
+    if (k) devices[k] = (devices[k] || 0) + 1;
+  });
+  const cssScroll = [...document.querySelectorAll('*')].some((el) => {
+    const st = getComputedStyle(el);
+    return st.animationName !== 'none' && st.animationTimeline && st.animationTimeline !== 'auto';
+  });
+  return { devices, cssScroll };
+};
+
 const containerAudit = () => {
   const out = [];
   const sheets = [...document.styleSheets];
@@ -481,6 +543,9 @@ try {
   // One list of dead selectors per width walked, intersected after the loop.
   // See the container-noop block below for why a single width cannot decide it.
   const containerNoop = [];
+  const clippedSeen = new Set();
+  let containFreeze = null;
+  let mix = null;
 
   // The docs promise the reduced-motion pass at desktop width. Pinning it to
   // widths[0] meant a mobile-first --widths list ran it at the phone size and
@@ -508,6 +573,37 @@ try {
     // round on correct CSS. Collect per width, report only what is dead at ALL of
     // them, below the loop.
     if (!reduced) containerNoop.push(await page.evaluate(containerAudit));
+    if (!reduced && !mix) mix = await page.evaluate(motionMix);
+    // `container-type` on an ancestor of the scroll subject freezes
+    // `animation-timeline: view()` -- the timeline reports one constant progress at
+    // every scroll position, so every CSS-path reveal lands dead. The existing
+    // dead-scroll finding catches the symptom; nothing named the cause, and a build
+    // that had added `container-type: inline-size` to `body` (a reasonable thing to
+    // do in a container-query-based library) spent a full round on 58 of them.
+    // Measured on that build: ViewTimeline currentTime pinned at 11.2849% with the
+    // declaration, tracking -10.34% -> 47.02% without it.
+    if (!reduced && containFreeze === null) {
+      containFreeze = await page.evaluate(() => {
+        const seen = new Set();
+        const compositionRoots = new Set(document.querySelectorAll('section'));
+        const subjects = [...document.querySelectorAll('section, [data-motion]')];
+        if (!subjects.length && document.body) subjects.push(document.body);
+        for (const root of subjects) {
+          for (let node = root.parentElement; node; node = node.parentElement) {
+            if (seen.has(node)) continue;
+            seen.add(node);
+            // Every composition intentionally establishes its own inline-size
+            // container; only wrappers around compositions freeze their timelines.
+            if (compositionRoots.has(node)) continue;
+            const ct = getComputedStyle(node).containerType;
+            if (ct && ct !== 'normal') {
+              return node.tagName.toLowerCase() + ' { container-type: ' + ct + ' }';
+            }
+          }
+        }
+        return '';
+      });
+    }
     // Width-independent (a <script src> is in the markup at every size), so this
     // one stays a once-per-page read.
     if (!staticChecked) {
@@ -519,6 +615,30 @@ try {
     }
 
     const bounds = await page.evaluate(() => {
+      // Measure the LAYOUT box, not the painted one. `getBoundingClientRect()` returns
+      // the box after transforms, and every value read here becomes a scroll position
+      // the walk then drives to -- so a section that happens to be moving when it is
+      // measured gets walked at the wrong offsets, and the error is largest on exactly
+      // the sections this walk exists to judge. Measured on a fixture at 1280x800,
+      // painted box minus layout box:
+      //
+      //   plain section                             top    0px   height   0px
+      //   parallax bed (engine writes transform)          -90px            0px
+      //   entrance start state (translate 44px)           +44px            0px
+      //   scaled wrapper (scale 1.14)                     -28px          +56px
+      //
+      // Neutralising the box-moving properties for the duration of the read is the
+      // only version that covers all three causes at once: `animation: none` alone
+      // leaves the engine's inline `transform` on a parallax bed, and `offsetTop`
+      // alone misreads under a transformed ancestor, which is a containing block.
+      // Transforms never affect layout, so removing them cannot change what is
+      // measured -- only what was being measured wrongly.
+      const neutraliser = document.createElement('style');
+      neutraliser.textContent =
+        '*,*::before,*::after{animation:none !important;transition:none !important;' +
+        'transform:none !important;translate:none !important;scale:none !important;' +
+        'rotate:none !important}';
+      document.head.appendChild(neutraliser);
       // pin/pan/kinetic/wipe/drift are the only devices drive() publishes
       // --motion-p for. A section whose subtree carries none of them has
       // nothing pinning progress open across [top, top+height-viewport], so
@@ -546,6 +666,9 @@ try {
           idx: i,
         });
       });
+      // Nothing after this read should see the page neutralised: every check below
+      // judges the page as it actually paints.
+      neutraliser.remove();
       return out;
     });
     if (!sections.length) sections.push(...bounds);
@@ -605,9 +728,15 @@ try {
         const pass = reduced ? 'reduced' : 'normal';
         if (frame.overflow)
           findings.push({ kind: 'overflow', pass, width: size.width, section: b.id, y: Math.round(y) });
-        frame.clipped.forEach((t) =>
-          findings.push({ kind: 'clipped-copy', pass, width: size.width, section: b.id, text: t })
-        );
+        // One element clipped at every scroll position is one defect, not one per
+        // sample. Undeduplicated, a single element reported once per section x width x
+        // position, which buried the rest of the report under a repeated line.
+        frame.clipped.forEach((c) => {
+          const key = pass + '|' + b.id + '|' + size.width + '|' + c.i;
+          if (clippedSeen.has(key)) return;
+          clippedSeen.add(key);
+          findings.push({ kind: 'clipped-copy', pass, width: size.width, section: b.id, text: c.text });
+        });
         if (previous !== null && frame.signature === previous) stalls++;
         else stalls = 0;
         if (stalls >= 2 && !reduced) {
@@ -697,6 +826,33 @@ try {
   // A selector is dead only if no element matching it had a container-establishing
   // ancestor at ANY width walked: the intersection, never the union. The finding's
   // shape is unchanged; `width` names the first width the audit ran at.
+  // Scroll-reactive means: reacts to the page moving. `reveal` fires once on entry and
+  // the pointer devices need a cursor, so a page holding only those cannot respond to a
+  // scroll at all — which is the complaint a reader makes as "nothing happens here",
+  // while the device count says the page is busy.
+  if (containFreeze) {
+    for (const f of findings) {
+      if (f.kind === 'dead-scroll' && !f.hint) {
+        f.hint = 'a scroll-subject ancestor sets container-type (' + containFreeze +
+          '), which freezes animation-timeline: view() -- remove it before looking anywhere else';
+      }
+    }
+  }
+
+  if (mix) {
+    const kinds = Object.keys(mix.devices);
+    const scrollReactive = kinds.filter((k) => SCROLL_REACTIVE_DEVICES.has(k));
+    if (kinds.length && !scrollReactive.length && !mix.cssScroll) {
+      findings.push({
+        kind: 'static-page',
+        pass: 'normal',
+        width: widths[0].width,
+        devices: mix.devices,
+        detail: 'only reveal and pointer devices: nothing on this page reacts to scrolling',
+      });
+    }
+  }
+
   if (containerNoop.length) {
     for (const sel of containerNoop.reduce((a, b) => a.filter((s) => b.includes(s))))
       findings.push({ kind: 'container-noop', pass: 'normal', width: widths[0].width, selector: sel });

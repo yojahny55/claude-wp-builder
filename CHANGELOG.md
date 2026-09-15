@@ -10,6 +10,477 @@
   `## References`. Absent server: `References: library unavailable`, build
   continues. `.mcp.json` registers the stdio default; README documents the
   hosted override.
+- **`bin/tailwindify-parity.mjs` — the conversion is now gated on what it RENDERS.**
+  `/wp-tailwindify` rewrites a plain-CSS demo into utilities and archives the original.
+  Its Step 4 verified structure — delimiters kept, no `<style>` block, no project
+  stylesheet `<link>` — and nothing verified the result against the original. A demo
+  whose reset read `button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}`
+  converted with the whole rule dropped as "preflight covers it". Preflight covers five
+  of those six declarations and not `cursor`: Tailwind v4 leaves buttons on the UA
+  default, which is `default`. Every button on the site lost its pointer.
+
+  Nothing downstream could catch it either. Every later gate compares the theme against
+  the CONVERTED demo, so once a declaration is gone from the reference both sides agree
+  and the site is wrong. Conversion is the last point in the pipeline where the original
+  still exists to compare against, which is why the gate lives there.
+
+  It renders both files and joins leaf elements on tag + text — the two use different
+  class systems, so a selector join is impossible, but they render the same words — then
+  compares fourteen computed properties. Colours are resolved through a canvas in the
+  page, because Tailwind emits `oklab()` for a colour carrying an opacity modifier where
+  plain CSS emits `rgba()` and string-comparing the two buried the real findings under
+  dozens of notation differences. A converted page with no Tailwind runtime renders as
+  bare HTML, where every element differs; that shape is detected and reported as "not
+  compared" rather than as hundreds of lost declarations. Exit 0 clean, 1 deltas, 2 no
+  usable browser, 3 crashed.
+
+- **`static-page` now says what to do about itself, because the obvious remedy is the
+  wrong one.** Measured on a real build: two interior pages fired it, and the cause was
+  that they were the only interior pages with no banner image — the banner bed carries
+  the `parallax`, so no image meant no scroll device. The client had asked rounds
+  earlier that interior banners use images and these two were the last not honouring
+  it. The finding fires on a *motion* axis and the defect was on a *content* one, so
+  the rule now reads: a page with only `reveal` is usually not a motion decision, it is
+  a page that is missing something. Adding a device to clear the finding would have
+  buried the real defect and made the page worse.
+
+- **How to read a jump in the advisory count.** A bed is one `unobserved` row at every
+  sampled position, so adding one device to one page raises the count by exactly the
+  per-page sample count — measured, 80 to 96 when two pages gained a parallax bed,
+  eight rows each. An advisory rise that is an exact multiple of the sample count is a
+  device being added, not a device breaking.
+
+
+- **An override can conceal what it overrode.** The known hazard was an override that
+  silently fails to apply — appended above the rules it replaces, losing on source
+  order at equal specificity. The other direction is worse: an override that *flattens*
+  a ladder makes a broken ladder unobservable, because "all correct" and "all
+  identical" look the same on a screenshot. Measured on the build using this library,
+  an override collapsed two columns onto one range, hiding `offer-table`'s off-by-one
+  and costing the stagger itself for several rounds without anyone noticing.
+
+- **Measuring motion: two readouts, and they answer different questions.**
+  `animation.currentTime` is raw timeline progress and is the one for "is this ladder
+  in order"; the computed property is post-ease and is the one for "does this look
+  arrived". `getComputedStyle` and `getBoundingClientRect` both go through the timing
+  function — an eased reading put `entry 100%` at cover 52.8% where the truth is 30.8%,
+  and `getBoundingClientRect` returns the *transformed* box, so nodes mid-`scale`
+  measured 44 / 43.8 / 43.3 / 42.6px. Both artefacts, and between them the cause of
+  every wrong number produced while writing these rules.
+
+- **`ladder-scan.py` gains an exemption that has to be argued.** `:nth-of-type` is
+  unavailable to a ladder whose children are deliberately of mixed type, and the
+  stylesheet cannot tell that case from a broken one. The author writes
+  `ladder-scan: allow-nth-child <selector> -- <why>`; a marker with no reason is
+  refused, so the exemption records a judgement rather than silencing the scan.
+
+
+- **`process-flow`, a second answer in the `process` role.** A pipe with a node per
+  step and a line the scroll draws along it, stacked on a phone and horizontal once
+  the container can hold a column per step. Costs 0 vh where `process-rail` costs a
+  viewport-height and pins, so the two are chosen on page budget rather than on taste
+  — the role had one answer, and a library with one good answer per role gives every
+  build the same answer. It is also the composition the coupling rule is shaped
+  around: every animated element runs on one `view-timeline-name` declared on the
+  section, because a segment's progress and the arrival of the node it points at are
+  the same quantity. The rail is drawn per step rather than spanning the list, and
+  nothing in it counts the steps; measured 0.0px at every junction at 1440, 1024, 768
+  and 390, and at three, four, five and six steps.
+
+
+- **The generative half of the ported skill, absent since the port.**
+  `wp-demo-craft` was ported from nateherkai/scroll-craft as *prose* — taste floor,
+  refuse list, feeling curve, device kit — and every one of those is a constraint. The
+  three references that make one build differ from the last never came over. Measured:
+  the source skill is 5,155 lines, this one was 1,752. Now ported and wired into
+  `SKILL.md`, because an unread reference is the same as an absent one:
+  - `references/uniqueness.md` — the template trap, the signature move, the seven
+    aesthetic families, and the burden of proof on the default grammar.
+  - `references/hero-depth.md` — layering is the baseline, not a polish pass. A
+    full-screen photograph with one parallax transform and a text fade is the flat hero
+    it exists to prevent.
+  - `references/worlds.md` — eight art-direction preambles, each pasted verbatim into
+    every image prompt so separately generated plates look like one shoot.
+
+- **A second axis of sameness the source never had to name.** scroll-craft builds one
+  page per project, so its only axis was build against build. A multi-page demo can
+  also repeat *itself*: eleven pages that are the same page with different words, which
+  is what was actually reported. No two pages of one demo may now share their whole
+  composition sequence, and the index's sequence may not be a superset of an interior
+  page's.
+
+- **`aesthetic family` joins the brief.** Premium-minimal is a choice, not the default
+  costume, and a shelf of dark pages with one accent each is what happens when nobody
+  decides.
+
+### Added
+
+- **Every silent-failure rule now carries the measurement that produced it.** Such a
+  rule is by definition one nobody has cause to test — the advice is followed, nothing
+  breaks, and the stated *reason* is never exercised — so a wrong reason survives until
+  someone reasons forward from it. Measuring the two rules in `devices.md` that had no
+  numbers found a second wrong one immediately: the fill-mode rule said an element
+  outside its range "flashes to its `from` value", and measured on keyframes running
+  `10`→`90` against an `initial-value` of `0`, it renders `0`, not `10`. The fallback is
+  the un-animated value. Checked: each numbered item must be marked as measured and
+  carry a figure that can be re-run.
+
+### Fixed
+
+- **The walk measured the painted box, so it walked moving sections at the wrong
+  offsets.** `bin/demo-verify.mjs` read section bounds with `getBoundingClientRect()`,
+  which returns the box *after* transforms — and every value from that read becomes a
+  scroll position the walk drives to. Measured on a fixture at 1280×800, painted minus
+  layout: a parallax bed **−90px**, an entrance start state **+44px**, a scaled wrapper
+  **−28px top and +56px height**. A motionless section reads correctly, which is why it
+  survived a composition corpus that is cleaner than a real build; the error is largest
+  on exactly the sections the walk exists to judge. The read now neutralises
+  `animation`, `transform`, `translate`, `scale` and `rotate` for its duration and
+  restores the page immediately — all of them, because `animation: none` leaves the
+  engine's inline transform on a parallax bed and `offsetTop` misreads under a
+  transformed ancestor. Verified by running the shipped bounds body against the
+  fixture: all four deltas zero.
+
+  **What this does and does not change, measured on a real build rather than a
+  fixture:** it makes a finding's reported `y` and the scrub range the walk drives
+  trustworthy. It does *not* generally change the verdict, because a section that is
+  genuinely moving still reports as moving when sampled from a slightly wrong offset.
+  Run against a build full of moving sections, before and after, the findings were the
+  same. The entry above says the error is largest on the sections the walk exists to
+  judge, which is true and should not be read as "those sections were being judged
+  wrongly" — they were being judged from the wrong coordinates.
+
+- **`references/verify.md` gains the two-readout table, before the rubric.**
+  `animation.currentTime` is raw timeline progress; the computed property and
+  `getBoundingClientRect()` are post-ease and post-transform. It sits next to the act
+  of measuring rather than in a reference section, because the moment it is needed is
+  the moment somebody opens a probe.
+
+
+- **`offer-table`'s stagger was off by one, shipped.** Its plans are `<th>` preceded by
+  a `<td>` corner cell, so `:nth-child` counted the corner: plan 1 received the range
+  written for plan 2, and the `:nth-child(1)` rule matched nothing at all. With four
+  plans the fourth would have fallen through to the catch-all and lost its animation
+  entirely. `:nth-child` is a fact about the parent's *other* children; all 39 indexed
+  selectors in the library are now `:nth-of-type`.
+
+- **A ladder that mixes `entry` and `cover` endpoints is ordered only by luck.** The
+  entry phase spans `min(elementH, viewportH)` of scroll and the cover phase spans
+  `viewportH + elementH`, so `entry 100%` sits at `min(h,vh)/(vh+h)` of cover —
+  measured across eight element/viewport pairs at exactly that value, from cover 11.8%
+  to 47.1%. `process-flow` shipped one such rung. It did not invert at any geometry
+  measured, because `entry X%` can never exceed `cover X%`, but it was safe by margin
+  rather than by construction. `tests/checks/lib/ladder-scan.py` now refuses the mix,
+  along with child-indexing and a missing catch-all, and names the fourth cause it
+  cannot see: rungs on `view()` each build a timeline from their own box.
+
+
+- **A child past the last written `:nth-child` range runs out of sequence.** An element
+  with no `animation-range` falls back to `normal`, which on a view timeline is
+  `cover 0%` to `cover 100%` — a range unrelated to the stagger, so the extra child
+  leads where the explicit ranges are late and lags where they are early. In
+  `process-flow` at six steps it led: the last node was 54% along while nodes 2–5 sat
+  at 0%, at every scroll position, not only on arrival. Guidance would not have stopped
+  it, because a sixth step lays out perfectly. Above five steps the pipe is now
+  structure without a sequence, guarded on the list rather than on the sixth step —
+  exempting only the untimed elements leaves the last node lit beside dark ones, which
+  is the same inversion held still. Generalising it into a check found the same latent
+  shape in `icon-row`, `offer-table` and `score-scale`; all three are guarded, and
+  `offer-table` records that it is not visibly wrong today only because its stagger is
+  early.
+
+
+
+- **`devices.md` said a duration on a scroll-driven animation hijacks it. Measured,
+  it does nothing at all.** The file claimed a duration "overrides the range and the
+  element plays through on its own clock", and a check pinned that wording, which is
+  what made it durable. Two rules identical but for `animation-duration: auto` against
+  `2s`, sampled at six scroll positions in Chrome: same value at every one — 13.165,
+  79.0622, 95.4148, 99.9709, 100, 100. The advice survives, the reason was wrong, and
+  a pin that fixes a false reason in place is worse than no pin.
+
+- **A clock loop written near scroll-driven CSS silently does not run.** A scroll
+  timeline is inherited from any broader rule handing one out, and `motion.css` gives
+  descendants of a `reveal` section their own `view()`. A looping animation that lands
+  on one reports `playState: "finished"` and sits at its start value forever: measured,
+  an infinite 2s sweep read `ViewTimeline, duration=2000, finished, value 0` and never
+  moved, while the same rule stating `animation-timeline: auto` and
+  `animation-range: normal` ran on the `DocumentTimeline` and swept 54.5 → 6.0 with the
+  page held still. Now stated, and checked structurally — a rule with
+  `animation-iteration-count: infinite`, a finite duration and no `animation-timeline`
+  is either wrong or lucky.
+
+
+- **Two elements reading one value on `view()` do not agree.** `view()` builds its
+  timeline from each element's own box, so identical `animation-range` declarations
+  buy identical *ranges*, not identical *progress* — a box higher in the card is
+  further along. Measured on a gauge at one scroll position: needle `-31.38%`,
+  figure `-13.64%`, an arrow pointing at 850 beside a figure showing 300 in the same
+  frame. Nothing reports it, because every probe correctly says both elements have a
+  live `ViewTimeline` on the range they asked for. `references/devices.md` now states
+  the coupling rule — a shared value means a `view-timeline-name` on the nearest
+  common ancestor — and separates the two counters: `data-motion-count` tweens on a
+  clock and is right for a figure that counts up on arrival, wrong for a figure that
+  reads out something else moving, which is animated as a custom property and read
+  back through `counter()`. No shipped composition has the shape today; four on the
+  build list do.
+
+- **There are two ways to couple two readouts, and only one was written down.** A
+  pair driven by scroll position couples with a `view-timeline-name` on the nearest
+  common ancestor; a pair driven by a clock couples with identical timing longhands
+  and one keyframe domain. The mistake is the same in both — declaring the same intent
+  on two elements and assuming that makes them one animation. `devices.md` also now
+  names the cost of the scroll version before you pick it: a scroll-scrubbed readout
+  is motionless whenever the reader is, which is a still picture in every screenshot
+  and on any page somebody is reading rather than scrolling.
+
+
+- **The fingerprint gate compared fonts and not structure.** v2 reduced it to display
+  family, text family and accent hue, reasoning that the composition library chooses
+  structure per role so structure needed no fingerprint. A library with one good answer
+  per role gives every build the same answer — which is exactly what structural
+  fingerprinting catches. Two structurally identical sites passed the gate because
+  their fonts differed. v3 restores the structural axes: seven dimensions, four of
+  which must differ against every row individually, with the palette rule kept as an
+  absolute on top.
+
+### Fixed
+
+- **`footer-columns` flattened the measured type scale on every page.** It used `<h2>`
+  for three column labels at `0.8rem`, and a heading element is a role rather than a
+  size: 12.8px entered the h2 role on every page of every craft build, so correctly
+  proportioned sections elsewhere tripped `flat-type-hierarchy` because of a footer. The
+  labels are `<p>` now, with `aria-label` carrying the accessible names. A structural
+  check refuses any heading sized below `1.1rem`, and it caught one more on the way in:
+  `icon-row__name` at 1.13x over its body text, since raised to 1.27x.
+
+  `taste.md` gains the rules behind it — a heading element is a role not a size, a
+  component heading clears 1.25x over body at the size it renders, and **cut inside the
+  sentence, not at its pivot**: trimming at the pivot removes almost no information while
+  converting a sentence into a manufactured aphorism, and three in a section is a cadence
+  the detector names. The bold-lead-in list format produces them as a set.
+
+### Fixed
+
+- **A recorded client brief had no authority over the craft defaults, and the defaults
+  won.** `/wp-context` writes the client's own direction into the project's
+  `.claude/CLAUDE.md`; on one project that direction was explicit — *"an impactful
+  animated website: hero entrance, scroll-reveal on section blocks, animated counters,
+  animated step/timeline, before/after score chart animation, hover micro-interactions"* —
+  and every item on it was later reported as missing by the person who asked for it.
+  Nothing failed to capture the direction. `wp-demo-craft` overrode it, because nothing
+  said it must not. The skill now opens by deferring: a recorded client decision binds
+  over every default in it, and where a brief asks for something the floor discourages,
+  the brief wins. Honest copy and a verified render remain the only exceptions.
+
+- **The card rule produced the shape it exists to prevent.** *"A card is a lazy
+  container"* read as a ban, and the alternative it recommends — proximity, a hairline,
+  space — is undifferentiated text, so a faithful build wrote a hairline definition list
+  for every section of every page. Reworded: the failure is *identical* cards, not cards.
+  Likewise `icon`, which appeared in the entire skill exactly once, inside a prohibition,
+  leaving authors to conclude icons are a slop signal while clients ask for animated ones
+  by name. Decorative icons are the tell; an icon that carries meaning is not.
+
+- **`taste.md` gains its first positive instruction.** It was entirely prohibition, which
+  is why builds that obeyed every rule still shipped as walls of prose — nothing ever said
+  reach for a graphic. *When a section states something quantitative, draw it.* A fact
+  published about the sector is not an invented statistic; it is the subject.
+
+### Changed
+
+- **The brief asks what this business has that could be drawn.** The docs said "impactful
+  animated website", which is unfalsifiable, so the old step asked nothing and the
+  adjective survived four rounds of revision unsatisfied. The answerable version is a list
+  of pictures the demo is then obliged to contain. Adds two more: three named sites whose
+  motion to match, and which page a visitor must understand in ten seconds.
+
+### Changed
+
+- **The demo brief now interviews the operator about form, and gates the build on
+  approval.** Every field it captured — person, pain, promise, vibe words, references,
+  the feeling curve, the peak — was about *story*. None was about *form*: what the site
+  looks like, how much it moves, how much of it is reading. A build could satisfy the
+  brief completely and still ship twelve pages of dense paragraphs with one animation.
+
+  The old rule, "ask in one pass only what the docs cannot answer", is right for story
+  and wrong for form: documents describe a business and almost never describe a website,
+  so it resolved to never asking. Six form fields are now always asked, with concrete
+  options — which facts become a picture rather than a paragraph, text density, motion
+  appetite, microinteraction appetite, the one action, and what specifically to take from
+  each reference. They bind on the composition plan, so a row contradicting a recorded
+  answer is a defect rather than a judgment call.
+
+  The brief is shown whole and revised in a loop with no pass limit; the build runs only
+  once the operator approves, and the approval is recorded with its date. `AskUserQuestion`
+  is added to the command's tools — it was instructed to interview and had none.
+
+### Added
+
+- **`score-scale`: the first composition that draws data rather than describing it.** The
+  library was nine-of-fourteen text only — every composition a heading and some paragraphs
+  arranged differently — so every page came out the same shape, and "less text" had nothing
+  to become. This one draws the credit-score range with the five bands at their **real point
+  spans** (Poor is genuinely half of 300–850, which is the fact worth drawing) and the five
+  factor weights at their published values. Bands grow from the baseline left to right, then
+  a marker travels the range. All element-level `view()` animation: zero vh, and the root
+  `data-motion` attribute left free.
+
+  The numbers are hardcoded rather than slotted, and the marker carries **no value**. A
+  published band edge is a fact about FICO scoring; a needle reading "580 → 720" is a claim
+  about a client's results, which `taste.md` refuses — in the one industry where that claim
+  draws regulators. A slot would invite a build to change an edge, and a changed edge is
+  misinformation in a regulated field.
+
+### Fixed
+
+- **Element keyframes wrote `transform`, which races the engine.** GSAP writes `transform`
+  for `parallax`, `magnet` and cue rise, and `reveal` writes it on every child, so the
+  entrance keyframes added in the previous commit would have collided on exactly the
+  compositions carrying a root `reveal` -- last declaration wins, one motion silently gone.
+  All seven use `translate`/`scale` now, which compose instead of replacing. Five further
+  traps reported from a real build are documented beside it: a second rule inherits
+  `animation-timeline` from the first; a guessed class name is a silent no-op; an
+  accent-tinted hover glow is a slop finding; a modifier on the container root cannot match
+  its own `@container` query; and `--motion-p` can drive any property inside a scrubbed
+  section, which was demonstrated nowhere.
+
+### Added
+
+- **Compositions carry element motion, and the budget stopped metering it.** A craft build
+  produced pages that read as static while passing every gate, and the cause was neither
+  restraint nor the budget: a measured build finished with a quarter of its scroll allowance
+  unspent, having never dropped a device for it. One word covered two costs. Scroll
+  choreography lengthens the page and is correctly budgeted; fades, rises, zooms, icon draws
+  and staggered entrances lengthen nothing and were rationed by a ceiling that was never
+  about them. Seven compositions now carry per-element `view()` animation staggered by
+  `animation-range` instead of one root `reveal` -- ten of thirteen previously shipped
+  `reveal` as their only device, so composing faithfully produced one one-shot entrance per
+  section.
+
+- **New `icon-row` composition.** Four capability marks whose SVG icons draw themselves on
+  via `stroke-dasharray`/`stroke-dashoffset`, cards arriving left to right. `icon`
+  previously appeared in the craft rules only as a prohibition.
+
+- **Motion reaches the design references.** 67 reference sites, 57 of them describing
+  motion, and the token pipeline extracted none of it, so a demo took its palette from a
+  reference and its motion from nowhere. `--ease-entry` and `--motion-rise` are now mapped
+  and consumed by every composition.
+
+### Fixed
+
+- **Interior pages had a ceiling and no floor, so a craft build shipped eleven of them
+  uncomposed.** The rules said "Interior pages never pin", and nothing said what an
+  interior page must *do*. Read alone, the prohibition became permission to do nothing: a
+  real build planned nine compositions for `index.html` and none for the other eleven
+  pages, which were written from one hand-rolled template — eyebrow, headline, rule,
+  definition list. Their only composition blocks were `site-head`, `closing-block` and
+  `footer-columns`: a header, a CTA and a footer.
+
+  Every machine gate passed, because each gate asked a question the build answered
+  correctly. The markup was valid, the tokens were right, the devices were wired. Nothing
+  asked whether an interior page had been composed at all.
+
+  Three changes close it. `references/compositions.md` states that "cheap roles"
+  constrains *which* compositions an interior page uses, never *whether* it uses any, and
+  that chrome does not count toward the floor. `references/devices.md` gains a motion
+  floor beside its never-pin ceiling: at least one scroll-reactive device that is not
+  `reveal`, because `reveal` fires once and the pointer devices need a cursor, so a page
+  holding only those cannot respond to a scroll — 74 reveals and 19 pointer devices across
+  eleven pages measured as motion and moved nothing. `/wp-demo` sub-step 5 now plans every
+  page in the agreed set rather than the index alone, and sums the budget per page.
+
+  Both reference files carry the substance because `/wp-yolo`'s craft path reads them and
+  never opens `commands/wp-demo.md`.
+
+### Fixed
+
+- **`container-type` on an ancestor freezes every reveal beneath it, and nothing said so.**
+  The composition library is container-query based, so adding `container-type: inline-size`
+  higher up — to `body`, to a page wrapper — reads as the natural next step. It is not: it
+  freezes `animation-timeline: view()`, so the timeline reports one constant progress at
+  every scroll position and every CSS-path `reveal` lands on its end state without
+  animating. A build that did it lost every reveal on all twelve pages and spent a full
+  round on 58 `dead-scroll` findings before locating one declaration. Measured there:
+  ViewTimeline `currentTime` pinned at `11.2849%` with it, tracking `-10.34% → 47.02%`
+  without it. `compositions/README.md` now warns beside the container-query explanation,
+  and `demo-verify` names the cause on every `dead-scroll` finding when it sees the
+  declaration. The finding was always right; it could not say why.
+
+- **Author CSS could lose to composition CSS silently.** Nothing stated where author
+  overrides sit in the cascade, so a build that emitted them above the composition
+  stylesheets had every equal-specificity rule ignored — fixes that looked applied,
+  changed nothing, and were found by screenshot after a wasted round. Composition CSS is
+  now emitted inside `@layer compositions`, and author CSS stays unlayered, which wins
+  regardless of source order. A layer is a guarantee; an ordering rule is an etiquette
+  that fails quietly.
+
+- **The standard accessible honeypot failed `clipped-copy`.** `position: absolute;
+  left: -9999px` and the `1px` sr-only clip both work by making a box far smaller than its
+  text and hiding the overflow, which is exactly the signature the detector looks for. One
+  honeypot field produced 72 blocking findings on a build whose accessibility was correct —
+  a gate that fails correct code teaches authors to delete the correct code. Deliberately
+  hidden copy is now exempt, and `clipped-copy` is deduplicated: one element clipped at
+  every scroll position is one defect, not one per sample.
+
+- **`hero-bleed` pressed its CTA against the bottom of a short fold.** `align-content: end`
+  on a `100dvh` grid pins the copy block to the floor of the frame, so the CTA is the last
+  thing above the edge by construction — at 390×844 the button rendered with its top few
+  pixels visible and no label, failing the rubric's own "First paint complete" line with no
+  author error. Copy is now centred by default and the bottom anchor is restored above
+  `900px` of viewport height. A height query, not a width one: a short wide window fails
+  identically and a width query would pass it.
+
+- **`footer-columns` had no logo slot.** Its only brand slot was `{{wordmark}}`, typed in
+  CSS as display text, so no build could put a client's real mark in the footer without
+  styling an element the composition believes is type. Adds `{{logo_src}}`/`{{logo_alt}}`
+  with their own rule, sized by height so a wide logo and a square one carry the same
+  optical weight, and the wordmark stays as the fallback.
+
+- **`pan` was recommended for sets it cannot move, by a remedy that hid the heading.**
+  With three content-sized cards the rail cannot overflow a 1440 viewport at all, so the
+  device travels zero and pins a motionless section. The fix the reference suggested — add
+  the heading as the first rail item rather than widening cards — buys travel by panning
+  the section's own label off the left edge, leaving it unlabelled for several hundred
+  pixels of scroll; an independent evaluator flagged that unprompted on a build that
+  followed the advice exactly. `pan` now states a five-item floor, and the
+  heading-in-the-rail remedy is retracted.
+
+- **Two thresholds an author could only find by trial are now written down.** The slop
+  detector reads wide tracking on a short uppercase string as a signature, and the line
+  sits between `0.08em` (passes, every round) and `0.16em` (eleven slop findings, one per
+  page, gate failed) — `taste.md` now names it. And `--space-section` floored at `4.5rem`
+  spends 14.4vh of a 390px page on padding across nine sections, over the scroll budget
+  before anything has been said, which contradicts the rule in the line below it.
+
+- **The `{{` ship check failed on the engine it inlines.** `motion.js` carries the literal
+  `{{slot}}` in a source comment, so the obvious whole-file implementation of "no page may
+  ship with a `{{` left in it" fails every time. The check now reads rendered markup.
+
+- **A hand-built section had no path to a generated image.** `image-gen.mjs plan` builds
+  `gaps[]` from `sections[] × slotsOf(composition)`, so a bespoke role — which the craft
+  rules explicitly permit — could not receive a plate. The supported escape hatch, appending
+  gap entries to `.image-plan.json` and calling `run`, is now documented rather than
+  rediscovered.
+
+- **Interior pages fell outside the step that produces composition plans.** `feel.md`
+  defines "the curve" in the singular and every worked example is a home page, so sub-step 5
+  produced an index-shaped plan by construction and interior pages were left with two
+  prohibitions and the word "cheap". They now get their own short curve — three or four
+  states, a smaller peak — which is what "take the cheap roles" was always meant to mean: a
+  lower ceiling on the same structure, never an exemption from having one.
+
+### Added
+
+- **`demo-verify` reports `static-page`.** A page whose entire motion is `reveal` plus
+  pointer devices is a static page that measures as animated, and no existing finding
+  could say so: `no-engine` asks whether motion exists, `dead-scroll` whether a section
+  moves, and both are satisfied by devices that are present and correctly wired. The new
+  finding judges the *mix* — it names the devices the page actually has and fails the round
+  when none of them reacts to scrolling. Blocking, not advisory.
+
+  This is the first gate in the craft path that catches a build rather than a contract.
+  The greps beside it pin the rule's wording, which was accurate before this change and
+  accurate after it; the wording was never what failed.
 
 ### Fixed
 
@@ -31,6 +502,63 @@
   rungs the wording described. The grant assumes the conventional server ids; a server
   registered under a different id is not matched and degrades to the rung below, which is the
   intended behaviour when a server is genuinely absent.
+
+- **A reset rule is converted declaration by declaration, not as a whole.**
+  `agents/wp-tailwind.md` now requires each declaration in a reset to be either matched
+  to the preflight rule that already sets it or carried across, and names what preflight
+  does not restore: `cursor`, `text-transform`, `letter-spacing`, `white-space`,
+  `word-break`, `:focus-visible` outline, `list-style` position, `scroll-behavior`, and
+  anything in a `font` shorthand past family and size. Survivors go in `@layer base`, not
+  in unlayered CSS that would outrank every utility.
+
+- **Two more conversion traps, both found by the new gate on a real demo.** `text-*`
+  carries a line-height, so a demo declaring `font:600 14px/20px` and overriding only
+  `font-size:16px` renders at 20px and converts to 24px — a translated font-size must be
+  paired with the demo's own `leading-*`. And two overlapping `max-*` variants do not
+  resolve in source order: a rule that is `nowrap` between 430px and 768px converts
+  literally to `max-md:whitespace-nowrap max-[429px]:whitespace-normal`, which is
+  textually faithful and renders `nowrap` at 390px; a band has to be written as a band.
+
+- **A repeated block's per-item variation is data, and a list's order and count come
+  from the demo.** `agents/wp-template.md` bound the element tree to the demo but said
+  nothing about what varies BETWEEN items of a grid, so six practice cards that mixed
+  three SVG icons with three font glyphs at three different sizes — three of them also
+  carrying a second, longer heading for phones — were normalised to one icon type at one
+  size with one heading. The markup looked right and every card was wrong. The same
+  section let `get_terms()` sort by name: with a limit of six over seven terms, the
+  default ordering was not rearranging the cards, it was choosing which term never
+  reached the front page.
+
+
+- **The `tailwind` transcription path had a licence the `basic` path never had, and every
+  section built through it drifted.** `/wp-section`'s overlay called the converted demo "a
+  geometry reference, **not** a source of verbatim declarations" and told the agents to
+  "reproduce this geometry using Tailwind utilities", never to "copy the declared values
+  verbatim". That sentence is true about the notation — the conversion leaves no raw
+  declarations behind, only utility classes — and false about the mandate, and it was read
+  as the second thing: an agent that may reproduce geometry may also substitute a utility
+  it judges equivalent. On `basic` the same overlay says the demo CSS is the SOURCE OF
+  TRUTH and its declared values are copied exactly, so only one of the two paths was ever
+  bound to the demo.
+
+  The converted demo is now the source of truth on both paths, with the tailwind notation
+  spelled out: its utility classes ARE its declared values, carried across character for
+  character, element structure included. `gap-[9px]` is not `gap-2`, `max-[1024px]:` is not
+  `max-lg:`, and two siblings that swap at a breakpoint stay two elements.
+
+- **`agents/wp-tailwind.md` shipped Section Authoring Mode with no fidelity mandate at
+  all.** `agents/wp-css.md` carries one — "the demo is the SOURCE OF TRUTH, not
+  inspiration. Your job is to COPY, not re-author" — and that agent runs only on `basic`,
+  so every project on the `tailwind` template was authored by an agent that was never told
+  to copy. It now carries the same mandate, including that promotion to `@apply` is a move
+  and never a rewrite.
+
+- **`agents/wp-template.md` bound only CPT teasers to the demo's markup.** It owns the
+  element tree for every section on both templates, and nothing outside the teaser rule
+  told it to preserve one, so a wrapper judged redundant or two siblings merged into one
+  passed every gate — the defect renders correctly at the breakpoint being looked at. It
+  now requires the demo's elements, class attributes and breakpoint variants to survive
+  intact, and one ACF field per distinct string rather than one field and a shortened copy.
 
 ## [1.17.0] - 2026-09-13
 

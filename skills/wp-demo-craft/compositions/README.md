@@ -45,6 +45,27 @@ the composition folder, so **run it with `--fill` or it overwrites the committed
 previews with marker-filled ones.** Edit `fills.json`, not `section.html`, to
 change what a preview says.
 
+**A modifier class on the container root cannot be matched by that root's own
+`@container` query.** An element never matches a container query against the
+container it establishes itself, so `.band--beside` written on the same element that
+declares `container-type` produces a `container-noop` finding, which blocks. This is
+easy to do by accident, because a modifier naturally lands on the block root. For a
+full-bleed band the honest fix is `@media`; for anything laid out inside the block,
+move the query to a child.
+
+**Never put `container-type` on `body`, `html`, or any wrapper around the sections.**
+Each composition sets `container-type` on its own root, which is what its `@container`
+queries resolve against — that is the whole design, and it is also why adding one higher
+up looks like the natural next step. It is not. `container-type` freezes
+`animation-timeline: view()` for every subject beneath it: the timeline reports one
+constant progress at every scroll position, so every CSS-path `reveal` lands on its end
+state and never animates. A build that added `container-type: inline-size` to `body` lost
+every reveal on all twelve pages and spent a full round on 58 `dead-scroll` findings
+before finding the one declaration. Measured there: ViewTimeline `currentTime` pinned at
+`11.2849%` with it, tracking `-10.34% → 47.02%` without it. `demo-verify` now names this
+cause on every `dead-scroll` finding when it sees the declaration, but the cheapest fix is
+not writing it.
+
 | role | composition | motion cost (vh added) | devices | port of |
 |---|---|---|---|---|
 | hero | hero-split | 0 | reveal, parallax | none |
@@ -52,11 +73,13 @@ change what a preview says.
 | hero | hero-bleed | 0 | parallax, scrim band | none |
 | proof | proof-row | 0 | count, marquee | Magic UI marquee + number ticker (MIT) |
 | feature | feature-zigzag | 0 | reveal | none |
-| process | process-rail | 1.0 | pan | Aceternity sticky scroll reveal (MIT), rewritten as pan |
+| process | process-rail | 1.0 | pan | Aceternity sticky scroll reveal (MIT), rewritten as pan | | process | process-flow | 0 | element motion (segments draw, nodes light) | none |
 | offer | offer-table | 0 | reveal | none |
 | testimonial | testimonial-pair | 0 | reveal, spotlight | Aceternity spotlight (MIT) |
 | faq | faq-list | 0 | reveal | none |
 | closing | closing-block | 0 | reveal, border beam | Magic UI border beam (MIT) |
+| capability | icon-row | 0 | reveal, element motion (icons draw on) | none |
+| explainer | score-scale | 0 | element motion (bands grow, marker travels) | none |
 | page-head | page-head | 0 | reveal | none |
 | footer | footer-columns | 0 | none | none |
 | footer | footer-line | 0 | none | none |

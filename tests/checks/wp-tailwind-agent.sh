@@ -443,4 +443,41 @@ if ! printf '%s' "$flatf" | grep -Eq 'assets/css/src/tailwindcss/main\.css[^.]{0
   echo "FAIL: the colour-mapping step does not send the agent to <theme>/assets/css/src/tailwindcss/main.css for the @theme values — .claude/CLAUDE.md names that file but holds no colour values, so an agent reading only it falls through to Tailwind's built-in palette"; exit 1
 fi
 
+# Section Authoring Mode shipped with NO fidelity mandate at all. `wp-css` carried one
+# ("the demo is the SOURCE OF TRUTH, not inspiration. Your job is to COPY, not
+# re-author"), and that agent runs only on `basic` — so every tailwind project was built
+# by agents that were never told to copy. The drift was always in the same direction:
+# an "equivalent" utility instead of the declared one, a dropped breakpoint variant.
+# Assert the mandate and the two substitutions that defeated it.
+if ! printf '%s' "$flatf" | grep -qE '### Transcription Mode.*SOURCE OF TRUTH'; then
+  echo "FAIL: agents/wp-tailwind.md does not call the demo the SOURCE OF TRUTH in Transcription Mode — the mandate agents/wp-css.md carries for \`basic\`, absent on the path that builds every tailwind project"; exit 1
+fi
+if ! printf '%s' "$flatf" | grep -qF 'character for character'; then
+  echo "FAIL: agents/wp-tailwind.md does not require utilities carried across character for character — without it, an 'equivalent' utility is a silent geometry change"; exit 1
+fi
+if ! printf '%s' "$flatf" | grep -qF 'breakpoint variant survives'; then
+  echo "FAIL: agents/wp-tailwind.md does not require every breakpoint variant to survive — a variant dropped as 'the default' only shows at that breakpoint, which is where these defects hid"; exit 1
+fi
+
+# Demo Conversion Mode dropped a whole reset rule because most of it was covered by
+# preflight. "Preflight covers it" is a per-DECLARATION judgement and was applied to the
+# rule. Two more couplings bit the same conversion: `text-*` carries a line-height that a
+# declared font-size does not, and two overlapping `max-*` variants do not resolve in
+# source order.
+if ! printf '%s' "$flatf" | grep -qF 'DECLARATION BY DECLARATION'; then
+  echo "FAIL: agents/wp-tailwind.md does not require a reset rule to be converted declaration by declaration — 'preflight covers it' applied to the whole rule is how \`cursor:pointer\` left every button on a site"; exit 1
+fi
+if ! printf '%s' "$flatf" | grep -qF 'cursor'; then
+  echo "FAIL: agents/wp-tailwind.md never names \`cursor\` — it is the declaration preflight does not restore and the one that shipped broken"; exit 1
+fi
+if ! printf '%s' "$flatf" | grep -qF '@layer base'; then
+  echo "FAIL: agents/wp-tailwind.md does not say the carried-over reset goes in @layer base — unlayered CSS outranks every utility, which is a second defect wearing the first one's fix"; exit 1
+fi
+if ! printf '%s' "$flatf" | grep -qF 'sets line-height too'; then
+  echo "FAIL: agents/wp-tailwind.md does not warn that \`text-*\` sets line-height — a demo declaring 14px/20px and overriding only the size renders 24px once converted to text-base"; exit 1
+fi
+if ! printf '%s' "$flatf" | grep -qF 'do not resolve in source order'; then
+  echo "FAIL: agents/wp-tailwind.md does not warn that two overlapping max-* variants do not resolve in source order — the literal, faithful conversion of a banded rule renders the wrong side"; exit 1
+fi
+
 echo PASS

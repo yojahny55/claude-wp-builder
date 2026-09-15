@@ -88,3 +88,61 @@
 @media (prefers-reduced-motion: reduce) {
   .faq-list__q, .faq-list__q::after { transition: none; }
 }
+
+/* ---- Element motion -------------------------------------------------------
+   Per-element scroll-driven CSS, not one root `reveal`. The attribute contract
+   gives a section a single device; rich motion is several elements arriving on
+   their own timelines, which only CSS can express. Costs zero viewport-heights,
+   so none of this touches the motion budget (`references/devices.md`,
+   "Two kinds of motion").
+   Longhands preserve `animation-timeline`; the `animation` shorthand resets it
+   to `auto`. A duration is inert on a scroll timeline, so leave it out rather
+   than implying that it controls the range. `animation-fill-mode: both` holds the
+   intended end state outside the range instead of the element's un-animated value.
+   ------------------------------------------------------------------------- */
+@keyframes faq-list-rise { from { opacity: 0; translate: 0 var(--motion-rise, 44px); } }
+@keyframes faq-list-fade { from { opacity: 0; } }
+.faq-list__kicker {
+  animation-name: faq-list-fade;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 100%;
+}
+.faq-list__title {
+  animation-name: faq-list-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 4% entry 104%;
+}
+.faq-list__lede {
+  animation-name: faq-list-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 12% entry 112%;
+}
+/* Each question rides its own range, so a long list arrives as a sequence the
+   reader can follow rather than a block that appears. Six offsets then repeat:
+   past the sixth the reader has left the top of the list anyway. */
+.faq-list__item { animation-name: faq-list-rise; animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1)); animation-fill-mode: both; animation-timeline: view(); animation-range: entry 10% entry 110%; }
+.faq-list__item:nth-child(6n+2) { animation-range: entry 14% entry 114%; }
+.faq-list__item:nth-child(6n+3) { animation-range: entry 18% entry 118%; }
+.faq-list__item:nth-child(6n+4) { animation-range: entry 22% entry 122%; }
+.faq-list__item:nth-child(6n+5) { animation-range: entry 26% entry 126%; }
+.faq-list__item:nth-child(6n+0) { animation-range: entry 30% entry 130%; }
+/* No view timeline, no range to run against: the honest fallback is the end
+   state, already visible, rather than a single arbitrary frame. */
+@supports not (animation-timeline: view()) {
+  .faq-list__kicker,
+  .faq-list__title,
+  .faq-list__lede,
+  .faq-list__item { animation: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .faq-list__kicker,
+  .faq-list__title,
+  .faq-list__lede,
+  .faq-list__item { animation: none; }
+}

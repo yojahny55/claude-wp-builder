@@ -108,6 +108,39 @@ For each element in the HTML:
    responsive rule on the wrong side of every breakpoint, and the markup still compiles,
    so nothing downstream catches it.
 
+5. **A reset rule converts DECLARATION BY DECLARATION, never as a whole.** Preflight
+   covers most of what a demo's reset does, and "preflight covers it" was applied to the
+   rule instead of to each line in it. A demo reset that read
+
+       button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+
+   was dropped entire. Preflight sets five of those six. It does **not** set `cursor`:
+   Tailwind v4 leaves buttons on the UA default, which is `default`, not `pointer`. Every
+   button on the converted site lost its pointer, and because every later gate compares the
+   theme against the CONVERTED demo, both sides agreed and nothing downstream could see it.
+
+   So: for each declaration in a reset rule, either name the preflight rule that already
+   sets it, or carry it. What preflight does NOT restore, and a demo commonly declares:
+   `cursor`, `text-transform`, `letter-spacing`, `white-space`, `word-break`, `outline` on
+   `:focus-visible`, `list-style` position, `scroll-behavior`, and anything in a `font`
+   shorthand beyond family and size. Carry the survivors as a `@layer base { }` block — NOT
+   as plain unlayered CSS, which outranks every utility and breaks the next thing that tries
+   to override it.
+
+6. **`text-*` sets line-height too, and a declared `font-size` does not.** `text-base` is
+   `font-size:1rem; line-height:1.5rem`. A demo that declares `font:600 14px/20px` and then
+   overrides only `font-size:16px` still renders at 20px; converted as `text-base` it renders
+   at 24px. Whenever you translate a font-size, pair it with the demo's own `leading-*`
+   rather than accepting the utility's default. The same coupling applies to `divide-*`,
+   `space-*` and `border` utilities that ship a default colour or width.
+
+7. **Two overlapping `max-*` variants do not resolve in source order.** A demo that is
+   `nowrap` from 430px to 768px and `normal` below 430 converts literally to
+   `max-md:whitespace-nowrap max-[429px]:whitespace-normal` — textually faithful, and at
+   390px it renders `nowrap`. Express a BAND as a band: `max-md:min-[430px]:whitespace-nowrap`.
+   Whenever two variants of the same property overlap in range, stack them into one
+   non-overlapping variant instead of relying on which one Tailwind happens to sort last.
+
 ### Step 4: Preserve Structure
 
 **MUST preserve:**
@@ -236,6 +269,24 @@ names markup whose styling rules are missing, say so and stop rather than
 inventing the design. Then run the Procedure over the translated markup — the
 ladder still decides what, if anything, earns an `@apply` class, and for most
 sections the answer is nothing.
+
+### Transcription Mode (when the dispatch says "transcribe")
+
+The `wp-css` agent carries this mandate for the `basic` template, and it applies here
+unchanged for `tailwind`. Only the notation differs — the converted demo's utility
+classes ARE its declared values — so the same rule binds: **the demo is the SOURCE OF
+TRUTH, not inspiration. Your job is to COPY, not re-author.**
+
+- Carry every utility across **character for character**. `gap-[9px]` is not `gap-2`,
+  `leading-[19.3636px]` is not `leading-tight`, `max-[1024px]:` is not `max-lg:`. An
+  "equivalent" utility you judged close enough is a measured geometry change, and it is
+  a bug here.
+- Every breakpoint variant survives. A variant dropped because the value looked like the
+  default is the most common form of this defect, and it only shows at that breakpoint.
+- **Do NOT "improve":** do not round a bracket value, do not add a touch-target
+  minimum, do not collapse a utility group you find redundant, do not resize anything.
+- Promotion to `@apply` is a *move*, never a rewrite. The declarations inside the class
+  you create are the same utilities, in the same order, with the same values.
 
 ### Procedure
 

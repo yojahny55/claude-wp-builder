@@ -92,6 +92,22 @@ not by an absolute amount of spectacle.
 
 ---
 
+### Interior pages get their own curve, a short one
+
+Everything above describes **a** curve, singular, and every worked example is a home
+page. Read literally that is correct and it is also how eleven interior pages came to be
+built with no plan at all: the composition plan is written per curve, the curve was
+defined for one page, so the other pages fell outside the step that produces plans.
+
+Each page in the agreed set gets its own curve. An interior page's is shorter — three or
+four states rather than six or seven — and it is a different shape, because the reader
+arrives already knowing what the company does. A home page opens by establishing; a
+services page opens by orienting someone who has already decided to look further.
+
+The peak rule still holds per page, and an interior page's peak is smaller than the
+index's by design. That is what "interior pages take the cheap roles" means: a lower
+ceiling on the same structure, never an exemption from having one.
+
 ## 2. The peak
 
 People remember one peak moment and the ending. The middle compresses into a

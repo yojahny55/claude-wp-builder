@@ -54,6 +54,36 @@ finding argued away without one is a finding still outstanding.
    intention; the client only ever sees the render.
 4. **Fix** every failed line, then repeat from 1.
 
+## Before you read a number off a moving page
+
+The table below belongs here rather than in a reference section because the moment it
+is needed is the moment somebody opens a probe, not the moment they go looking for
+guidance. Every wrong measurement made while building these rules — four of them,
+across two people who both knew the failure mode and were actively watching for it —
+was the same mistake: reading the rendered value when the question was about the
+timeline. The two readouts have the same shape at the call site and nothing
+distinguishes them until you already know which one you want.
+
+| reading | what it is | ask it |
+|---|---|---|
+| `animation.currentTime` | where the timeline is, raw, before the timing function | is this ladder in order? |
+| `getComputedStyle(el)` / `getBoundingClientRect()` | what the reader sees, after the ease and after transforms | does this look arrived? |
+
+Two consequences, each of which produced a plausible wrong number:
+
+- **An eased reading is not progress.** Measuring the `entry`-to-`cover` conversion by
+  reading an animated custom property put `entry 100%` at "cover 52.8%" where the true
+  value is 30.8% — the default `ease` distorted both sides. `animation-timing-function:
+  linear` made all eight measurements match the arithmetic exactly. Ordering survives
+  an ease, because a monotonic function preserves order. Percentages do not.
+- **`getBoundingClientRect()` returns the transformed box.** A row of nodes animating
+  `scale: 1 → 1.08` measured 44, 43.8, 43.3 and 42.6px, and every junction looked
+  pixels out. Both artefacts. For layout, use `offsetWidth`/`offsetHeight`, or
+  neutralise `animation`, `transform`, `translate`, `scale` and `rotate` for the
+  duration of the read — which is what `bin/demo-verify.mjs` now does before taking the
+  section bounds the walk drives to, having been measured walking a parallax bed 90px
+  off its real position.
+
 ## The rubric
 
 Seven lines, each one pass or fail per page. No scores out of ten: a 7/10 is a
@@ -97,7 +127,12 @@ written down first.
 
 - `unobserved` — the page carries devices but none the harness can sample, and
   the stalled section carries no scrubbed device of its own. Advisory: it never
-  fails a round. `reveal` was reported as `dead-scroll` for every section that
+  fails a round. A **jump** in the advisory count is not by itself a
+  regression: a bed is one `unobserved` row at every sampled position, so adding one
+  device to one page raises the count by exactly the per-page sample count. Measured
+  on a build that gained a parallax bed on two pages: 80 advisory to 96, eight rows
+  per page. An advisory rise that is an exact multiple of the sample count is a device
+  being *added*; one that is not is worth reading. `reveal` was reported as `dead-scroll` for every section that
   used it until v3.1, which is what taught a build to dismiss 392 findings in
   prose. A gate that cannot tell a good page from a broken one gets overruled,
   and then so does every gate beside it.
@@ -110,6 +145,20 @@ written down first.
 - `no-engine` — the page carries no `data-motion` at all. Fails the round. A
   motionless page used to walk clean, because an empty frame signature could
   never accumulate a stall.
+- **`static-page` — the page's whole device mix is `reveal` plus pointer devices, so
+  nothing on it reacts to scrolling.** Fails the round. The remedy is almost never to
+  add a device, and reaching for one is how a real defect gets buried: **a page with
+  only `reveal` is usually not a motion decision, it is a page that is missing
+  something.** Ask why this page has less on it than its siblings before deciding what
+  to do about the finding.
+
+  Measured on a real build: two interior pages fired `static-page`, and the cause was
+  that they were the only interior pages with no banner image — the banner bed is what
+  carries `parallax`, so no image meant no scroll device meant nothing reacting. The
+  client had asked several rounds earlier that interior banners use images, and these
+  two were the last pages not honouring it. The finding fired on a *motion* axis and
+  the defect was on a *content* one. Adding a device to satisfy the check would have
+  left the real defect in place and made the page worse.
 - **`unobserved` is a per-section judgment; `no-engine` keeps a document-wide count.**
   The probe walks `[data-motion]` inside the walked section's own subtree, so an
   `unobserved` row is a fact about that section: it carries devices this harness

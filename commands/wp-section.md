@@ -21,7 +21,7 @@ Parse `$ARGUMENTS`:
 - **`--block <name>`** = the unique BEM block name to scope every generated selector under (optional; used with `--transcribe` so parallel section builds can never collide on a selector).
 - **`--css <source>`** = the demo source the section is transcribed from (optional; required with `--transcribe`). What it means depends on the project's `Template:`, per the transcription overlay below:
   - `basic` → the section's **verbatim** demo CSS, and the SOURCE OF TRUTH for the transcription: an inline CSS blob or a path to a CSS file, whose declared values are copied exactly.
-  - `tailwind` → the converted demo page itself (HTML, converted in place by `/wp-yolo` Step 2.6). Here it is a geometry reference, **not** a source of verbatim declarations — the overlay's instruction is "reproduce this geometry using Tailwind utilities", never "copy the declared values verbatim".
+  - `tailwind` → the converted demo page itself (HTML, converted in place by `/wp-yolo` Step 2.6), and the SOURCE OF TRUTH for the transcription exactly as the CSS blob is on `basic`. No raw declarations survive in it to copy — the conversion turned every one into a utility class — so "copy its exact declared values" reads here as **copy its exact utility classes and its exact element structure**. That is not a licence to substitute an equivalent utility, to collapse two elements into one, or to drop a breakpoint variant.
 
 - **`--defer-promotion` flag** = `tailwind` only. Skip the `wp-tailwind` author-mode dispatch entirely: `wp-template` writes the section with inline utilities and the command returns without an `@apply` promotion. Report the section as built with promotion deferred. Set by `/wp-yolo` on the section walk, where the ladder's "3+ times, or on 2+ distinct pages" test cannot be answered yet because the rest of the theme does not exist; `/wp-yolo` Step 4.4 then runs one promotion pass over every template part the walk produced. Ignored on `basic`, which has no promotion step. Never set it by hand for a one-off section — a section added to a finished theme has the whole theme to grep, and deferring would leave its utilities unpromoted with no later pass to catch them.
 
@@ -157,18 +157,25 @@ normal design-system authoring path unchanged.
   and the `--block` name. This activates wp-css **Transcription Mode** (see
   `agents/wp-css.md`): the demo CSS is the SOURCE OF TRUTH — copy its exact declared values
   and geometry, do NOT re-author, and scope every selector under `--block`.
-- **wp-tailwind (tailwind path):** the `--css` source is the *converted* demo, so
-  the instruction is "reproduce this geometry using Tailwind utilities", never
-  "copy the declared values verbatim". Scope any `@apply` class under `--block`,
-  exactly as `wp-css` scopes its BEM selectors. `wp-css` is not dispatched at all
-  on this path.
+- **wp-tailwind (tailwind path):** append the literal word **"transcribe"** here too, and
+  state that the converted demo is the SOURCE OF TRUTH — the same mandate `wp-css` gets,
+  because the job is the same one and only the notation differs. The utility classes on
+  the converted demo ARE its declared values; carry them across character for character,
+  do NOT re-author, and do not swap a utility for one you judge equivalent. Scope any
+  `@apply` class under `--block`, exactly as `wp-css` scopes its BEM selectors. `wp-css`
+  is not dispatched at all on this path.
 - **wp-template (basic path):** instruct it to scope all BEM classes under the `--block`
   name (use `<block>__<element>` instead of `<section>__<element>`) so the transcribed
   CSS and the markup share the same unique block and parallel sections never collide.
 - **wp-template (tailwind path):** there are no BEM classes to scope — the section HTML
   it is handed is already Tailwind-native, and it carries those utilities over
-  unchanged. Pass `--block` anyway, as the name for the section wrapper's own class, so
-  the `@apply` promotion `wp-tailwind` may perform afterwards has a block to hang on.
+  unchanged. "Unchanged" is the whole contract, and it covers the element tree as much as
+  the class attributes: every element the demo renders becomes an element in the template
+  part, every class attribute is copied character for character, and every breakpoint
+  variant (`max-md:`, `lg:`, `max-[1024px]:`) survives. Two sibling `<span>`s that swap at
+  a breakpoint are two `<span>`s here, not one. Pass `--block` anyway, as the name for the
+  section wrapper's own class, so the `@apply` promotion `wp-tailwind` may perform
+  afterwards has a block to hang on.
 - Because each section's `--block` is unique, parallel agents can never clash on a selector.
 
 ---
