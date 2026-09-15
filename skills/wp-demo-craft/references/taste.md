@@ -21,6 +21,12 @@ intervals are tight and which are the breaks, the page has no rhythm.
   boundary between sections, not inside a heading-and-body pair. Getting this
   backwards is the single most common spacing error, and it makes the page
   read as a list.
+- **The `--space-section` floor is a scroll budget, not a spacing preference.** A
+  `clamp()` whose minimum is `4.5rem` puts 72px above and below every section on a
+  390px screen; at nine sections that is 14.4vh of the page spent on padding alone,
+  over the 8-14vh budget before a single section has said anything. Floor it around
+  `2.75rem` and let the fluid middle do the work. This bullet exists because the
+  suggested token did not follow the rule in the next line.
 - Section padding is fluid (`--space-section`). A phone should not inherit
   desktop air; 8rem of padding on a 375px screen is a scroll tax.
 - Group by proximity before reaching for a container. If you added a border
@@ -38,6 +44,25 @@ render, not the number.
 
 - **Two families maximum.** Display carries voice, text carries prose. A
   third is a costume.
+- **A small-caps eyebrow tracks at `0.08em`, and `0.16em` is over the line.**
+  `impeccable detect` reads wide tracking on a short uppercase string as a slop
+  signature, and the threshold sits between those two values. `page-head`'s own kicker
+  uses `0.08em` and passes every round; a bespoke eyebrow at `0.16em` took one slop
+  finding per page and failed the gate on eleven of them. An author writing their own
+  eyebrow had no way to find the safe side except by trial, because the number was
+  written nowhere. It is written here now: stay at or below `0.1em`, and prefer copying
+  `page-head`'s kicker rule to inventing one.
+- **A heading element is a role, not a size — never use one as a small label.**
+  An `<h2>` styled at 0.8rem does not read as small print to the type scale; it
+  enters the h2 role and flattens the measured ladder for the **whole page**,
+  including sections that are perfectly proportioned. A real build tripped
+  `flat-type-hierarchy` with `h2 12.8px, body 15.5px, h3 17.3px` — and the 12.8px
+  was three column labels in the footer, on every page. If it needs to look like a
+  label, it is a `<p>`; give the region its name with `aria-label` instead.
+- **A component heading clears at least 1.25× over body at its own size.** A
+  trimmed heading that lands at 1.12× reads as bold body text and measures as a
+  flat scale. Check the ratio at the size it actually renders, not at the token's
+  nominal value.
 - **Tracking tightens as size grows.** A typeface set at 6rem with default
   tracking reads loose and amateur. A ramp handles this: `--font-track-tight`
   on display, `--font-track-normal` on body. This is optical correction, not
@@ -208,8 +233,25 @@ same texture chosen because it looks hand-made is decoration. State the reason i
 
 ## Cards
 
-A card is a lazy container. Before using one, ask what it is doing that
-proximity, a hairline, or space could not.
+A card is a lazy container *when it is standing in for a decision nobody made*.
+Before using one, ask what it is doing that proximity, a hairline, or space could
+not.
+
+**The failure is identical cards, not cards.** Read as a ban on cards, this
+section produces hairline-separated definition lists for every section of every
+page — which is the same undifferentiated shape the ban exists to prevent, wearing
+different CSS. A build that followed it faithfully was reported by its client as
+"so much text and basically the same structure", and every one of those sections
+was a hairline list written because a card felt forbidden. A card carrying a
+figure, a meter and a band name is not the tell; four identical cards carrying an
+icon, a heading and a sentence are.
+
+The same applies to icons. `icon` appears in this skill exactly once — in the
+prohibition below — and an author reading only that comes away believing icons are
+a slop signal. They are not. **Decorative** icons are: an icon that repeats the
+heading next to it, or fills a space where a fact should be. An icon that carries
+meaning, or draws itself on as its section arrives, is craft, and clients ask for
+it by name.
 
 - **Never a grid of identical icon + heading + text cards as page
   structure.** The most recognisable AI-page tell there is.
@@ -256,6 +298,30 @@ fast.
   everywhere.
 - **Check button contrast.** White text on a light button, or a ghost button
   on a photo with no scrim, fails.
+- **When a section states something quantitative, draw it.** A range, a
+  proportion, a sequence, a before and an after, a weighting, a comparison —
+  these are pictures, and writing them as a paragraph is the single biggest
+  source of "too much text" there is. This is the one positive instruction in a
+  file otherwise made of prohibitions, and its absence is why builds that obeyed
+  every rule here still shipped as walls of prose: the floor said what not to do
+  and never once said reach for a graphic.
+  A fact published about the sector — a score range and its bands, a statutory
+  timescale, a standard fee structure — is not an invented statistic. It is the
+  subject. Draw it.
+- **Cut inside the sentence, not at its pivot.** Told to reduce text, the
+  tempting cut is the one that leaves a contrast: *"We are not a law firm. We do
+  not give legal advice — the application of the law to your circumstances. For
+  that, consult an attorney."* becomes *"Not a law firm. No legal advice. For
+  that, see an attorney."* That removes almost no information; what it removes is
+  the sentence, leaving a manufactured aphorism. Three of those in one section is
+  a **cadence**, and `impeccable detect` names it. Drop modifiers, subordinate
+  clauses and hedges; keep the subject and the verb.
+
+  **The bold-lead-in list format invites this specifically.** `<b>Lead.</b> Rest
+  of the sentence.` makes the lead a natural fragment, so one trim pass turns
+  every row into an aphorism at once — the defect arrives as a set, not as a
+  single line. Any composition shaped that way carries the risk with it, and a
+  "less text" pass over one is the moment to vary sentence length deliberately.
 - Real copy, not lorem. Real names, not "John Doe". Real numbers or no
   numbers.
 - **No invented statistics.** Fake precision (`4.1×`, `92%`, `48k`) is a

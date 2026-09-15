@@ -1,0 +1,386 @@
+/* ====== Section: Process (process-flow) ====== */
+.process-flow, .process-flow *, .process-flow *::before, .process-flow *::after { box-sizing: border-box; }
+
+.process-flow {
+  container-type: inline-size;
+  background: var(--color-canvas);
+  border-top: 1px solid var(--color-hairline);
+  padding-block: var(--space-section);
+  /* The timeline every moving part in this section shares. See the motion block. */
+  view-timeline-name: --flow-tl;
+  view-timeline-axis: block;
+}
+.process-flow__inner {
+  max-width: var(--container-max, 1280px);
+  margin-inline: auto;
+  padding-inline: var(--space-gutter);
+}
+
+.process-flow__kicker {
+  font-family: var(--font-text);
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0 0 0.75rem;
+}
+.process-flow__title {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 1.3rem + 2.2cqi, 3rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+  margin: 0 0 0.9rem;
+  max-width: 20ch;
+}
+.process-flow__lede {
+  font-family: var(--font-text);
+  font-size: clamp(1rem, 0.95rem + 0.35cqi, 1.15rem);
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--color-ink-soft);
+  margin: 0 0 clamp(2.5rem, 1.8rem + 2.5cqi, 4rem);
+  max-width: 58ch;
+}
+
+/* --- the pipe ------------------------------------------------------------------
+   The rail is drawn as one SEGMENT PER STEP, on the step itself, rather than as a
+   single element spanning the list. A single spanning rail has to be inset to the
+   first and last node CENTRES, and there is no count-based expression for that: the
+   nodes are not centred in their cells and the steps are not equal in height, so an
+   inset of `100% / (2 * N)` misses. Measured, that version put the rail start 130px
+   away from the first node centre at 1440 and 44.7px away at 390, and the two ends
+   were out by different amounts (130 against 95.8) because the columns are not equal
+   either. Per-step segments are exact in both orientations and need no count at all:
+   each segment starts at its own node's edge and ends at the next node's edge, both
+   of which are local facts.
+
+   Once the rail is per-step, NOTHING in this composition counts the steps. The
+   horizontal track list is `grid-auto-flow: column` with `grid-auto-columns:
+   minmax(0, 1fr)`, which lays every child in one row of equal columns whatever the
+   number of them is, so a build that adds or drops a step edits the markup and
+   nothing else. An earlier draft carried a `--pipe-count` custom property for the
+   track list; it was the last thing that had to agree with the number of children,
+   and a value that has to agree with something else is a value that eventually does
+   not.
+
+   `minmax(0, 1fr)` rather than `1fr`: a grid item's automatic minimum size is its
+   min-content width, so a plain `1fr` lets one long word in a step body push its
+   column wider than its share and overflow the section.
+   -------------------------------------------------------------------------------- */
+.process-flow__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--pipe-gap, 2.25rem);
+}
+
+.process-flow__step {
+  position: relative;
+  display: grid;
+  gap: 0.35rem;
+}
+
+/* The segment, and the travelled portion of it. The last step draws none: a process
+   ends at its last node, it does not trail off past it. */
+.process-flow__step::before,
+.process-flow__step::after {
+  content: '';
+  position: absolute;
+  /* NOT `z-index: -1`. A negative index paints behind the stacking context's own
+     background, and an entrance animating `translate` or `scale` on any ancestor
+     ESTABLISHES a stacking context -- so a rail on -1 is visible in a static preview
+     and gone the moment the section animates. Everything here stays at or above 0 and
+     the node is given an opaque fill to cover what passes behind it. */
+  z-index: 0;
+  border-radius: 999px;
+}
+.process-flow__step:last-child::before,
+.process-flow__step:last-child::after { content: none; }
+
+.process-flow__step::before { background: var(--color-hairline); }
+.process-flow__step::after  { background: var(--color-accent); }
+
+.process-flow__node {
+  position: relative;
+  z-index: 1;
+  /* No padding. The segment geometry is derived from this element's edges, so its
+     size must not depend on the label inside it -- a node sized by its content would
+     move the rail every time a number got wider. Fixed box, glyph centred by grid.
+     `justify-self` also stops the grid stretching or shrinking it: without it the
+     four nodes measured 44, 43.8, 43.3 and 42.6px across one row, which is a circle
+     that is not a circle. */
+  padding: 0;
+  inline-size: var(--pipe-node, 2.75rem);
+  block-size: var(--pipe-node, 2.75rem);
+  justify-self: start;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--color-hairline);
+  /* Opaque, not a tint: the segment ends behind this and a translucent fill shows the
+     line running through the middle of the number. */
+  background-color: var(--color-surface);
+  color: var(--color-ink-soft);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.process-flow__step-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.3rem, 1.15rem + 0.5cqi, 1.6rem);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-ink);
+  margin: 0;
+}
+.process-flow__step-body {
+  font-family: var(--font-text);
+  font-size: 0.98rem;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--color-ink-soft);
+  margin: 0;
+  max-width: 42ch;
+}
+
+/* --- stacked (the default): the pipe is vertical, down the node column ----------
+   Segment k runs from the bottom of node k to the top of node k+1. Node k+1's top is
+   this step's bottom edge plus the row gap, so the segment's own inset-block-end is
+   exactly `-1 * gap`. No counts, no percentages, exact by construction. */
+.process-flow__step {
+  grid-template-columns: var(--pipe-node, 2.75rem) 1fr;
+  column-gap: 1rem;
+  align-items: start;
+}
+.process-flow__node { grid-row: 1 / span 2; }
+
+.process-flow__step::before,
+.process-flow__step::after {
+  inset-block: var(--pipe-node, 2.75rem) calc(-1 * var(--pipe-gap, 2.25rem));
+  inset-inline-start: calc(var(--pipe-node, 2.75rem) / 2 - 1px);
+  inline-size: 2px;
+}
+.process-flow__step::after { transform-origin: center top; scale: 1 0; }
+
+/* --- side by side, once the container can hold a readable column per step -------
+   Segment k runs from the right edge of node k to the left edge of node k+1, which
+   is this column's right edge plus the column gap. Same construction, one axis over.
+   The node is centred in its column here and the copy with it: a left-aligned node
+   over a centred rail is the version that has to be measured to be believed, and a
+   centred column is the ordinary shape for a horizontal process anyway. */
+@container (min-width: 56rem) {
+  .process-flow__steps {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+  .process-flow__step {
+    grid-template-columns: 1fr;
+    row-gap: 0.6rem;
+    justify-items: center;
+    text-align: center;
+  }
+  .process-flow__node { grid-row: auto; justify-self: center; }
+  .process-flow__step-body { max-width: 34ch; }
+
+  .process-flow__step::before,
+  .process-flow__step::after {
+    inset-block: calc(var(--pipe-node, 2.75rem) / 2 - 1px) auto;
+    block-size: 2px;
+    inset-inline: calc(50% + var(--pipe-node, 2.75rem) / 2)
+                  calc(-1 * var(--pipe-gap, 2.25rem) - 50% + var(--pipe-node, 2.75rem) / 2);
+    inline-size: auto;
+  }
+  .process-flow__step::after { transform-origin: left center; scale: 0 1; }
+}
+
+/* --- motion ---------------------------------------------------------------------
+   Everything here runs on `--flow-tl`, the named timeline on the section, and NOT on
+   `view()`. That is the point of the composition: a segment's progress and the
+   arrival of the node it points at describe one quantity -- how far through the
+   process the reader is -- and `view()` builds a timeline from each element's own
+   box, so a segment and a node below it would report different progress and disagree
+   on screen while every probe called both of them working. Segment k and node k+1
+   share an endpoint, so the line reaches the node exactly as the node lights.
+
+   Longhands only, no `animation-duration` (inert on a scroll timeline), and
+   `animation-fill-mode: both` so an element outside its range renders its end state
+   rather than its un-animated one.
+   -------------------------------------------------------------------------------- */
+@keyframes process-flow-rise { from { opacity: 0; translate: 0 var(--motion-rise, 44px); } }
+@keyframes process-flow-fade { from { opacity: 0; } }
+@keyframes process-flow-draw-y { from { scale: 1 0; } to { scale: 1 1; } }
+@keyframes process-flow-draw-x { from { scale: 0 1; } to { scale: 1 1; } }
+/* The node ARRIVES, it does not appear. A node that fades in leaves its step's title
+   and body standing over nothing until the line reaches it, which reads as a section
+   that failed to load rather than as a process with a position in it. The whole pipe
+   is structure and is legible from the first frame; what the scroll does is move the
+   active point along it. */
+@keyframes process-flow-node {
+  from {
+    border-color: var(--color-hairline);
+    background-color: var(--color-surface);
+    color: var(--color-ink-soft);
+    scale: 1;
+  }
+  to {
+    border-color: var(--color-accent);
+    background-color: var(--color-accent);
+    color: var(--color-accent-ink, var(--color-canvas));
+    scale: 1.08;
+  }
+}
+
+.process-flow__kicker {
+  animation-name: process-flow-fade;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: --flow-tl;
+  animation-range: entry 0% entry 100%;
+}
+.process-flow__title {
+  animation-name: process-flow-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: --flow-tl;
+  animation-range: entry 6% entry 106%;
+}
+.process-flow__lede {
+  animation-name: process-flow-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: --flow-tl;
+  animation-range: entry 14% entry 114%;
+}
+
+.process-flow__step::after {
+  animation-name: process-flow-draw-y;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  animation-timeline: --flow-tl;
+}
+.process-flow__node {
+  animation-name: process-flow-node;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: --flow-tl;
+}
+@container (min-width: 56rem) {
+  .process-flow__step::after { animation-name: process-flow-draw-x; }
+}
+
+/* One phase keyword for the whole ladder, and it is arithmetic rather than taste.
+   `entry X%` and `cover X%` are not comparable: the entry phase spans
+   `min(elementH, viewportH)` of scroll while the cover phase spans
+   `viewportH + elementH`, so `entry 100%` lands at `min(h,vh) / (vh+h)` of cover --
+   measured across eight element/viewport pairs, anywhere from cover 11.8% to cover
+   47.1%, matching that expression exactly at every one. A ladder that switches unit
+   part way up therefore orders correctly on the page it was written against and
+   inverts on the next one, by an amount nobody can know at authoring time.
+
+   This rung read `entry 40% cover 44%` when it shipped. It did not invert at any
+   geometry measured -- `entry X%` can never exceed `cover X%`, so a low entry start
+   ahead of a higher cover start is safe -- but it was safe by margin rather than by
+   construction, which is not a property worth keeping. Now `cover 36% cover 44%`,
+   the same moment against the same scale as everything below it.
+   ------------------------------------------------------------------------------- */
+/* Node k lights at the moment segment k-1 finishes drawing to it. */
+.process-flow__step:nth-of-type(1) .process-flow__node { animation-range: cover 36% cover 44%; }
+.process-flow__step:nth-of-type(1)::after               { animation-range: cover 44% cover 52%; }
+.process-flow__step:nth-of-type(2) .process-flow__node { animation-range: cover 52% cover 56%; }
+.process-flow__step:nth-of-type(2)::after               { animation-range: cover 56% cover 64%; }
+.process-flow__step:nth-of-type(3) .process-flow__node { animation-range: cover 64% cover 68%; }
+.process-flow__step:nth-of-type(3)::after               { animation-range: cover 68% cover 76%; }
+.process-flow__step:nth-of-type(4) .process-flow__node { animation-range: cover 76% cover 80%; }
+.process-flow__step:nth-of-type(4)::after               { animation-range: cover 80% cover 88%; }
+.process-flow__step:nth-of-type(5) .process-flow__node { animation-range: cover 88% cover 92%; }
+
+.process-flow__step-title,
+.process-flow__step-body {
+  animation-name: process-flow-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: --flow-tl;
+}
+.process-flow__step:nth-of-type(1) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: cover 36% cover 52%; }
+.process-flow__step:nth-of-type(2) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: cover 52% cover 64%; }
+.process-flow__step:nth-of-type(3) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: cover 64% cover 76%; }
+.process-flow__step:nth-of-type(4) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: cover 76% cover 88%; }
+.process-flow__step:nth-of-type(5) :is(.process-flow__step-title, .process-flow__step-body) { animation-range: cover 88% cover 100%; }
+
+/* --- past the last written range, the section stops being a sequence -------------
+   The ranges above are written out to five steps. A sixth lays out perfectly --
+   nothing in this composition counts -- so the author who needs one will add it and
+   the layout will encourage them. What they would get is not a mild degradation.
+
+   An element with no `animation-range` falls back to `normal`, and on a view timeline
+   `normal` is `cover 0%` to `cover 100%`: the WIDEST range there is, beginning before
+   every other element in the section, all of which start at `entry 40%` or later. So
+   the last node and the segment feeding it run ahead of the whole sequence. Measured
+   at n=6 and 1440, node progress read back from `scale`, at five scroll positions:
+
+     scroll 25%   59%   0%   0%   0%   0%   54%
+     scroll 45%   99%   0%   0%   0%   0%   79%
+     scroll 60%  100%  53%   0%   0%   0%   89%
+     scroll 75%  100% 100%  89%   0%   0%   95%
+     scroll 90%  100% 100% 100%  99%   0%   98%
+
+   The end of the process is lit while its middle is dark, at every scroll position --
+   the composition's one claim, that the line reaches the node exactly as the node
+   lights, failing in the direction that reads as a bug rather than as a style.
+
+   The guard is on the LIST, not on the sixth step, and that distinction was itself a
+   measurement. Exempting only the untimed elements leaves node 6 drawn in its arrived
+   state beside nodes 3, 4 and 5 still dark -- the same inversion, held still instead
+   of animated, which is not a fix. Above five steps the pipe is therefore structure
+   without a sequence: fully drawn, fully lit, nothing timed. That is exactly what the
+   `@supports not` and reduced-motion branches below already say, for the same reason
+   -- the sequence must not depend on the motion.
+
+   Guidance alone would not do this. A range nobody writes is a range the engine writes
+   for you, and it writes the worst one.
+   -------------------------------------------------------------------------------- */
+.process-flow__steps:has(.process-flow__step:nth-of-type(6)) :is(
+  .process-flow__node,
+  .process-flow__step-title,
+  .process-flow__step-body
+) { animation: none; }
+
+.process-flow__steps:has(.process-flow__step:nth-of-type(6)) .process-flow__step::after {
+  animation: none;
+  scale: 1 1;
+}
+.process-flow__steps:has(.process-flow__step:nth-of-type(6)) .process-flow__node {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent);
+  color: var(--color-accent-ink, var(--color-canvas));
+}
+
+/* No view timeline: the pipe is drawn full, every node is present, the steps are
+   legible in order. The sequence does not depend on the motion. */
+@supports not (animation-timeline: view()) {
+  .process-flow__kicker,
+  .process-flow__title,
+  .process-flow__lede,
+  .process-flow__node,
+  .process-flow__step-title,
+  .process-flow__step-body { animation: none; }
+  .process-flow__step::after { animation: none; scale: 1 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .process-flow__kicker,
+  .process-flow__title,
+  .process-flow__lede,
+  .process-flow__node,
+  .process-flow__step-title,
+  .process-flow__step-body { animation: none; }
+  .process-flow__step::after { animation: none; scale: 1 1; }
+}

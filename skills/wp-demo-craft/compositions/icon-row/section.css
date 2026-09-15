@@ -1,0 +1,168 @@
+/* ====== Section: Capabilities (icon-row) ====== */
+.icon-row, .icon-row *, .icon-row *::before, .icon-row *::after { box-sizing: border-box; }
+.icon-row {
+  container-type: inline-size;
+  padding-block: var(--space-section);
+  padding-inline: max(var(--space-gutter), calc((100% - var(--container-max, 1280px)) / 2));
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.icon-row__head {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 46ch;
+  margin-block-end: clamp(2rem, 5cqi, 3.5rem);
+}
+.icon-row__kicker {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 0.8125rem;
+  /* At or below 0.1em: the slop detector reads wider tracking on a short
+     uppercase string as a signature (references/taste.md). */
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+.icon-row__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 4cqi, 2.75rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.icon-row__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: clamp(1.5rem, 4cqi, 2.75rem);
+  grid-template-columns: 1fr;
+}
+@container (min-width: 720px) {
+  .icon-row__grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+.icon-row__item { display: grid; gap: 0.625rem; align-content: start; }
+.icon-row__mark { display: block; width: clamp(2.25rem, 4cqi, 2.75rem); color: var(--color-accent); }
+.icon-row__mark svg { display: block; width: 100%; height: auto; }
+.icon-row__name {
+  margin: 0;
+  font-family: var(--font-display);
+  /* 1.1875rem against the 0.9375rem note is 1.27x, clearing the 1.25x floor in
+     references/taste.md. At 1.0625rem it was 1.13x and read as bold body text. */
+  font-size: clamp(1.1875rem, 1.8cqi, 1.4375rem);
+  line-height: 1.25;
+}
+.icon-row__note {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--color-muted);
+}
+
+/* ---- Element motion -------------------------------------------------------
+   The icons draw themselves on. `stroke-dasharray` makes each path one dash as
+   long as the path, and `stroke-dashoffset` slides that dash out of view;
+   animating the offset to 0 walks the line back in, which reads as drawing.
+   `pathLength` is not set, so the dash length is in user units and 120 is
+   comfortably longer than any path in these four marks -- a value shorter than
+   the path would leave a visible gap.
+   Costs zero viewport-heights: nothing here lengthens the page, so none of it
+   is metered by the motion budget (`references/devices.md`, "Two kinds of
+   motion").
+   Longhands only -- the `animation` shorthand resets `animation-timeline` to
+   `auto`. No `animation-duration`: it overrides the range. `fill-mode: both`, or
+   anything above the fold flashes to its `from` value.
+   ------------------------------------------------------------------------- */
+@keyframes icon-row-draw { from { stroke-dashoffset: 120; } }
+@keyframes icon-row-rise { from { opacity: 0; translate: 0 var(--motion-rise, 40px); } }
+@keyframes icon-row-fade { from { opacity: 0; } }
+
+.icon-row__kicker {
+  animation-name: icon-row-fade;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 100%;
+}
+.icon-row__title {
+  animation-name: icon-row-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 4% entry 104%;
+}
+
+/* The four cards arrive left to right, and each card's icon draws a beat after
+   the card itself, so the mark reads as being made rather than appearing. */
+.icon-row__item {
+  animation-name: icon-row-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+}
+.icon-row__item:nth-of-type(1) { animation-range: entry 12% entry 112%; }
+.icon-row__item:nth-of-type(2) { animation-range: entry 18% entry 118%; }
+.icon-row__item:nth-of-type(3) { animation-range: entry 24% entry 124%; }
+.icon-row__item:nth-of-type(4) { animation-range: entry 30% entry 130%; }
+
+.icon-row__stroke {
+  stroke-dasharray: 120;
+  animation-name: icon-row-draw;
+  animation-timing-function: cubic-bezier(.65,0,.35,1);
+  animation-fill-mode: both;
+  animation-timeline: view();
+}
+.icon-row__item:nth-of-type(1) .icon-row__stroke { animation-range: entry 18% entry 118%; }
+.icon-row__item:nth-of-type(2) .icon-row__stroke { animation-range: entry 24% entry 124%; }
+.icon-row__item:nth-of-type(3) .icon-row__stroke { animation-range: entry 30% entry 130%; }
+.icon-row__item:nth-of-type(4) .icon-row__stroke { animation-range: entry 36% entry 136%; }
+/* Both strokes of a mark draw together. An earlier version trailed the second
+   stroke with a flat , which overrode the
+   per-card ranges above: card 4 starts at 36%, so its second stroke would have
+   drawn before its first. Per-card offsets for a second stroke are four more
+   rules to buy an effect nobody can see at this size.  is also
+   inert on a scroll timeline, which is what made the mistake easy to miss. */
+
+/* Without a view timeline there is no range to run against, so the honest
+   fallback is the finished state: icons drawn, cards in place, nothing hidden. */
+/* --- a child past the last written range ------------------------------------------
+   The stagger above is written out to four children. Add one more and it does not
+   degrade mildly: an element with no `animation-range` falls back to `normal`, and on
+   a view timeline `normal` is `cover 0%` to `cover 100%`. That range bears no
+   relationship to the stagger, so the extra child is out of sequence in whichever
+   direction the explicit ranges happen to sit -- it leads where they are late in the
+   section and lags where they are early.
+
+   Measured here with a fifth item, at 1440: the extra one read opacity 0.00, 0.17,
+   0.58 and 0.81 across four scroll positions while all four others read 1.00 -- still
+   arriving long after the row had settled.
+   The end state of these children is only "present", so the honest fallback is the one
+   the `@supports not` block already gives: no animation, arrived. Where the end state
+   MEANS something -- process-flow's lit node, which reads as a completed step -- a
+   per-child exemption is not enough and the guard goes on the list instead.
+   --------------------------------------------------------------------------------- */
+.icon-row__item:nth-of-type(n+5),
+.icon-row__item:nth-of-type(n+5) .icon-row__stroke { animation: none; }
+.icon-row__item:nth-of-type(n+5) .icon-row__stroke { stroke-dasharray: none; }
+
+@supports not (animation-timeline: view()) {
+  .icon-row__kicker,
+  .icon-row__title,
+  .icon-row__item,
+  .icon-row__stroke { animation: none; }
+  .icon-row__stroke { stroke-dasharray: none; }
+}
+
+/* Reduced motion keeps the layout and drops the arrival: the marks are already
+   drawn, the cards are already placed. */
+@media (prefers-reduced-motion: reduce) {
+  .icon-row__kicker,
+  .icon-row__title,
+  .icon-row__item,
+  .icon-row__stroke { animation: none; }
+  .icon-row__stroke { stroke-dasharray: none; }
+}

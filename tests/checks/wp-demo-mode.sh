@@ -19,11 +19,23 @@ grep -Fq 'demo mode' "$d" || fail "$d does not record `demo mode` in the manifes
 grep -Fq '.wp-create.json' "$d" || fail "$d does not name the manifest it writes to"
 grep -Fqi 'docs/' "$d" || fail "$d does not read the project docs to choose the mode"
 
-# --- The brief is docs-first and asks only what is missing. -----------------
+# --- The brief: story is docs-first, form is always asked. -------------------
+# This check originally read "docs-first and asks only what is missing", from when
+# the brief captured story alone -- person, pain, promise, vibe. That rule is still
+# right for story: re-asking what the documents already answer wastes the operator's
+# time and teaches them to skim the questions that matter.
+#
+# It is wrong for form. Project documents describe a business; they almost never
+# describe a website, so "only ask what the docs cannot answer" resolved to "never
+# ask about form at all" -- and a brief with no form fields produced pages that were
+# story-correct and unreadable. The split is the contract now, and both halves are
+# pinned here.
 grep -Fq 'demo/BRIEF.md' "$d" || fail "$d does not write demo/BRIEF.md"
-grep -Eqi 'self-author' "$d" || fail "$d does not self-author the brief from the docs"
-grep -Eqi 'only the questions|only ask|cannot answer' "$d" \
-  || fail "$d does not limit the interview to what the docs cannot answer"
+grep -Eqi 'self-author' "$d" || fail "$d does not self-author the story from the docs"
+grep -Fq 'Interview the operator about form' "$d" \
+  || fail "$d does not interview the operator about form, which the docs do not carry"
+grep -Fq 'approves the brief before anything is built' "$d" \
+  || fail "$d does not gate the build on an approved brief"
 grep -Fq 'wp-demo-craft' "$d" || fail "$d does not read the wp-demo-craft skill"
 
 # --- The gates that make a craft build different from a pretty one. --------

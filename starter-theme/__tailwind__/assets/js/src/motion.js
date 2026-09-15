@@ -40,8 +40,40 @@ function parseCue(value) {
   };
 }
 
+/**
+ * Split a counter target into its numeric core and the text around it.
+ *
+ * `data-motion-count="93%"` used to reach Number() whole and evaluate to NaN. NaN
+ * throws nothing, so the try/catch below never fired, the tween ran to NaN, and the
+ * figure sat dead on a shipped page with no warning anywhere -- the worst shape a
+ * defect can take. A percent sign, a currency symbol or a trailing `+` is how an
+ * author naturally writes a figure, so the parse accommodates them and writes them
+ * back around the animated number rather than refusing them. A target with no digits
+ * in it at all is the real error, and is warned about instead of failing silently.
+ */
+function parseNum(text) {
+  const str = String(text);
+  const m = str.match(/-?(?:[\d,]+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?/i);
+  if (!m) return null;
+  return {
+    n: Number(m[0].replace(/,/g, '')),
+    core: m[0],
+    prefix: str.slice(0, m.index),
+    suffix: str.slice(m.index + m[0].length),
+  };
+}
+
 /** Format a counter target, inferring decimals and separators from how it is written. */
 function formatNum(value, template) {
+  const exponent = template.match(/e([+-]?)(\d+)$/i);
+  if (exponent) {
+    const mantissa = template.slice(0, exponent.index);
+    const decimals = (mantissa.split('.')[1] || '').length;
+    let out = value.toExponential(decimals);
+    if (template.includes('E')) out = out.replace('e', 'E');
+    if (exponent[1] !== '+') out = out.replace(/([eE])\+/, '$1');
+    return out;
+  }
   const decimals = (template.split('.')[1] || '').length;
   const grouped = template.indexOf(',') !== -1 || Math.abs(Number(template.replace(/,/g, ''))) >= 10000;
   const fixed = value.toFixed(decimals);
@@ -351,12 +383,20 @@ export function initMotion(gsap, ScrollTrigger) {
     // target to target and the counter never moved: the raw[1] || raw[0]
     // fallback below existed for this form but silently did nothing.
     const targetText = raw[1] || raw[0];
-    const from = raw.length > 1 ? Number(String(raw[0]).replace(/,/g, '')) : 0;
-    const to = Number(String(targetText).replace(/,/g, ''));
+    const target = parseNum(targetText);
+    if (!target) {
+      console.warn('[motion] data-motion-count has no number in it, skipping it:', targetText, el);
+      return;
+    }
+    const start = raw.length > 1 ? parseNum(raw[0]) : null;
+    const from = start ? start.n : 0;
+    const to = target.n;
+    // The unit travels with the number: `93%` counts 0 -> 93 and renders `93%`.
+    const render = (v) => target.prefix + formatNum(v, target.core) + target.suffix;
     const ms = parseFloat(el.getAttribute('data-motion-count-ms')) || 1400;
     el.style.fontVariantNumeric = 'tabular-nums';
     if (reduced) {
-      el.textContent = formatNum(to, targetText);
+      el.textContent = render(to);
       return;
     }
     const state = { v: from };
@@ -370,7 +410,7 @@ export function initMotion(gsap, ScrollTrigger) {
           duration: ms / 1000,
           ease: 'power3.out',
           onUpdate: () => {
-            el.textContent = formatNum(state.v, targetText);
+            el.textContent = render(state.v);
           },
         }),
     });

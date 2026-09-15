@@ -1,0 +1,40 @@
+<!-- ============ SECTION: Process (process-flow) ============ -->
+<section id="{{section_id}}" class="process-flow" data-motion="reveal">
+  <div class="process-flow__inner">
+    <p class="process-flow__kicker">{{kicker}}</p>
+    <h2 class="process-flow__title">{{title}}</h2>
+    <p class="process-flow__lede">{{lede}}</p>
+
+    <!-- Nothing in this composition counts the steps: the rail is drawn per step,
+         from each node's own edge to the next one's, and the horizontal track list
+         is `grid-auto-flow: column`. Add or drop a `__step` and the layout follows.
+
+         Nothing but `__step` children belong in this list, though. The rail used to
+         be a single element sitting alongside them and it was a grid item like any
+         other: it took a column, pushed the fourth step onto a second row and
+         overflowed the section by 153px at 1440. -->
+    <ol class="process-flow__steps">
+      <li class="process-flow__step">
+        <div class="process-flow__node" aria-hidden="true">{{step_1_n}}</div>
+        <h3 class="process-flow__step-title">{{step_1_title}}</h3>
+        <p class="process-flow__step-body">{{step_1_body}}</p>
+      </li>
+      <li class="process-flow__step">
+        <div class="process-flow__node" aria-hidden="true">{{step_2_n}}</div>
+        <h3 class="process-flow__step-title">{{step_2_title}}</h3>
+        <p class="process-flow__step-body">{{step_2_body}}</p>
+      </li>
+      <li class="process-flow__step">
+        <div class="process-flow__node" aria-hidden="true">{{step_3_n}}</div>
+        <h3 class="process-flow__step-title">{{step_3_title}}</h3>
+        <p class="process-flow__step-body">{{step_3_body}}</p>
+      </li>
+      <li class="process-flow__step">
+        <div class="process-flow__node" aria-hidden="true">{{step_4_n}}</div>
+        <h3 class="process-flow__step-title">{{step_4_title}}</h3>
+        <p class="process-flow__step-body">{{step_4_body}}</p>
+      </li>
+    </ol>
+  </div>
+</section>
+<!-- ============ END SECTION: Process ============ -->

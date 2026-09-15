@@ -33,6 +33,37 @@ grotesque over a humanist serif — not so a build can wear another brand's
 clothes. A client `DESIGN.md` whose palette and type pair match a catalogue entry
 is a defect, and the fingerprint gate will catch the second client it happens to.
 
+## Motion mapping
+
+The reference files describe how a site moves, and until now none of that reached
+the build: the token mapping extracted colour, type and spacing, and the motion
+vocabulary in 57 of the 67 catalogue entries was read by nobody. A demo therefore
+took its palette from a reference and its motion from nowhere.
+
+Two tokens carry it, and every composition's element animation consumes them:
+
+| token | what it is | default when the reference is silent |
+|---|---|---|
+| `--ease-entry` | the easing an element arrives on | `cubic-bezier(.22,.61,.36,1)` |
+| `--motion-rise` | how far an element travels as it arrives | `22px` |
+
+Read them off the reference the same way the colour tokens are read. A site whose
+motion is brisk and mechanical wants a shorter rise and a sharper curve; one whose
+motion is soft and long wants the opposite. Two numbers are not the whole of a
+site's motion identity, but they are the two that every entrance in the library
+passes through, so getting them from the reference is the difference between a
+demo that moves like its reference and one that moves like the default.
+
+What the reference cannot give you is **which** elements move and in what order.
+That is the composition's own choreography, written per element in its
+`section.css` (`references/devices.md`, "How element animation is written"), and
+it is a design decision rather than an extracted value.
+
+Where a reference describes a motion the library has no device for — a hover that
+lifts and shadows, a marquee, a cursor-following highlight — build it in the
+composition's own CSS under the same contract. The refuse list constrains taste,
+not technique.
+
 ## Token mapping
 
 The demo's `:root` is generated from this file onto the plugin's token names, so
@@ -41,7 +72,7 @@ every composition renders without edits:
 `--color-canvas`, `--color-surface`, `--color-ink`, `--color-ink-soft`,
 `--color-accent`, `--color-accent-ink`, `--color-hairline`, `--font-display`,
 `--font-text`, `--space-section`, `--space-gutter`, `--container-max`,
-`--radius-sm`, `--radius-md`.
+`--radius-sm`, `--radius-md`, `--ease-entry`, `--motion-rise`.
 
 `--container-max` is the content width, not the section width. Grounds stay
 full-bleed and only the content inside them is constrained; without it every

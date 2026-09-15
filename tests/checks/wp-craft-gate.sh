@@ -38,7 +38,13 @@ grep -Fq 'demo/VERIFY.md' "$d" || fail "$d does not read the score card"
 grep -Eqi 'no fingerprint|not record' "$d" || fail "$d records a fingerprint for a failing build"
 grep -Fq '"design_md"' "$d" || fail "$d does not record design_md in the manifest"
 grep -Fq 'firecrawl_url' "$d" || fail "$d does not document firecrawl_url"
-grep -Eqi 'four device families|never the same device|signature move' "$d" && fail "$d still carries a removed v1 rule"
+# `signature move` used to be on this list. v3 restores it deliberately -- it is the
+# cheapest defence against the template trap, because it is unique by definition --
+# so the command must now CARRY it, while the two genuinely retired v1 rules must not
+# come back with it. See skills/wp-demo-craft/references/uniqueness.md section 4.
+grep -Eqi 'four device families|never the same device' "$d" && fail "$d still carries a removed v1 rule"
+grep -Fq 'signature move' "$d" \
+  || fail "$d does not require a signature move; without it every build is the library's default answer per role"
 
 # The same gate through the other entry point. /wp-yolo in craft mode never calls
 # /wp-demo, so nothing in /wp-demo.md above reaches a yolo run: without these the

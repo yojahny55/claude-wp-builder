@@ -151,6 +151,8 @@
     "lede": "A selection of flights fitted across Bristol and Somerset since 2018, with the timber, the lead time and the price band for each."
   },
   "footer-columns": {
+    "logo_src": "https://picsum.photos/id/1084/360/96",
+    "logo_alt": "Ravenscroft workshop mark",
     "wordmark": "Ravenscroft",
     "blurb": "Staircases, doors and handrails from one Bristol workshop since 1974.",
     "nav_1_label": "Work",
@@ -193,5 +195,44 @@
     "link_3": "Contact",
     "href_3": "#contact",
     "legal_line": "Ravenscroft Joinery Ltd, Bristol. Registered in England 00841207."
+  },
+  "icon-row": {
+    "section_id": "capabilities",
+    "kicker": "What we do",
+    "title": "Four things we are actually good at",
+    "item_1_name": "Survey and drawings",
+    "item_1_note": "Measured on site, drawn before anything is cut.",
+    "item_2_name": "Fixed-price quotes",
+    "item_2_note": "One number, agreed before the work starts.",
+    "item_3_name": "Workshop build",
+    "item_3_note": "Made in Bristol, not subcontracted out.",
+    "item_4_name": "Ten-year guarantee",
+    "item_4_note": "Structure and finish, in writing."
+  },
+  "score-scale": {
+    "section_id": "how-scores-work",
+    "kicker": "How scoring works",
+    "title": "Half the range is below 580",
+    "lede": "The scale runs 300 to 850, and the bands are not equal. Knowing where the lines fall is the first thing that makes a plan possible.",
+    "scale_caption": "Bands and factor weights shown are FICO 8. VantageScore 3.0 and 4.0 use the same 300-850 range with different band edges.",
+    "scale_alt": "The FICO credit score range from 300 to 850, divided into five bands drawn at their true widths: poor 300 to 579, fair 580 to 669, good 670 to 739, very good 740 to 799, and exceptional 800 to 850; the five factors are payment history 35%, amounts owed 30%, length of history 15%, credit mix 10%, and new credit 10%."
+  },
+  "process-flow": {
+    "section_id": "how-it-works",
+    "kicker": "How the switch works",
+    "title": "Four steps, and only one of them is ours",
+    "lede": "Most of a supplier change is waiting for a meter read. Here is where the fortnight goes, so you know which day you have to be in.",
+    "step_1_n": "01",
+    "step_1_title": "Send a bill",
+    "step_1_body": "A photo of any recent statement. We read the tariff and the meter type off it rather than asking you to type either one in.",
+    "step_2_n": "02",
+    "step_2_title": "See the difference",
+    "step_2_body": "Your usage against our standing charge, as a year of totals rather than a unit rate. If it does not save you money we say so here.",
+    "step_3_n": "03",
+    "step_3_title": "We tell them",
+    "step_3_body": "The notice, the final read and the account close are ours to handle. Your old supplier will write to you once; nothing is needed back.",
+    "step_4_n": "04",
+    "step_4_title": "Meter read day",
+    "step_4_body": "One reading on the switch date, taken by you or by us. Supply never stops and no engineer visits the property."
   }
 }

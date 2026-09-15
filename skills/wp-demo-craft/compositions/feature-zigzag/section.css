@@ -94,3 +94,80 @@
 @media (prefers-reduced-motion: reduce) {
   .feature-zigzag__link, .feature-zigzag__link::after { transition: none; }
 }
+
+/* ---- Element motion -------------------------------------------------------
+   Per-element scroll-driven CSS, not one root `reveal`. The attribute contract
+   gives a section a single device; rich motion is several elements arriving on
+   their own timelines, which only CSS can express. Costs zero viewport-heights,
+   so none of this touches the motion budget (`references/devices.md`,
+   "Two kinds of motion").
+   Longhands preserve `animation-timeline`; the `animation` shorthand resets it
+   to `auto`. A duration is inert on a scroll timeline, so leave it out rather
+   than implying that it controls the range. `animation-fill-mode: both` holds the
+   intended end state outside the range instead of the element's un-animated value.
+   ------------------------------------------------------------------------- */
+@keyframes feature-zigzag-rise { from { opacity: 0; translate: 0 var(--motion-rise, 44px); } }
+@keyframes feature-zigzag-fade { from { opacity: 0; } }
+.feature-zigzag__kicker {
+  animation-name: feature-zigzag-fade;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 100%;
+}
+.feature-zigzag__heading {
+  animation-name: feature-zigzag-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 5% entry 105%;
+}
+.feature-zigzag__title {
+  animation-name: feature-zigzag-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 10% entry 110%;
+}
+.feature-zigzag__body {
+  animation-name: feature-zigzag-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 18% entry 118%;
+}
+.feature-zigzag__link {
+  animation-name: feature-zigzag-rise;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 26% entry 126%;
+}
+/* The media plate settles a beat after its copy, and scales rather than
+   translating so the two motions read as one object arriving, not two. */
+@keyframes feature-zigzag-plate { from { opacity: 0; scale: 1.06; } }
+.feature-zigzag__media {
+  animation-name: feature-zigzag-plate;
+  animation-timing-function: var(--ease-entry, cubic-bezier(.22,.61,.36,1));
+  animation-fill-mode: both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 100%;
+}
+/* No view timeline, no range to run against: the honest fallback is the end
+   state, already visible, rather than a single arbitrary frame. */
+@supports not (animation-timeline: view()) {
+  .feature-zigzag__kicker,
+  .feature-zigzag__heading,
+  .feature-zigzag__title,
+  .feature-zigzag__body,
+  .feature-zigzag__link,
+  .feature-zigzag__media { animation: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feature-zigzag__kicker,
+  .feature-zigzag__heading,
+  .feature-zigzag__title,
+  .feature-zigzag__body,
+  .feature-zigzag__link,
+  .feature-zigzag__media { animation: none; }
+}

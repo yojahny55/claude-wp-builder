@@ -160,4 +160,63 @@ else
   echo "NOTE: no usable browser (--probe exit != 0); the container-noop width battery did not run"
 fi
 
+# --- the walk measures the layout box, not the painted one ------------------------
+# `getBoundingClientRect()` returns the box AFTER transforms, and every value the
+# bounds read produces becomes a scroll position the walk then drives to. So a section
+# that happens to be moving when it is measured gets walked at the wrong offsets --
+# and the error is largest on exactly the sections the walk exists to judge. Measured
+# on a fixture at 1280x800, painted box minus layout box:
+#
+#   plain section                            top    0px   height   0px
+#   parallax bed (engine writes transform)         -90px            0px
+#   entrance start state (translate 44px)          +44px            0px
+#   scaled wrapper (scale 1.14)                    -28px          +56px
+#
+# `animation: none` alone does not cover it (the engine's transform on a parallax bed
+# is an inline style, not an animation), and `offsetTop` alone does not either (a
+# transformed ancestor is a containing block). Hence all four box-moving properties.
+grep -Fq 'transform:none !important' "$s" \
+  || fail "$s reads section bounds off the painted box; a section mid-transform is then walked at the wrong scroll offsets"
+grep -Fq 'translate:none !important' "$s" \
+  || fail "$s neutralises transform but not translate, so an entrance start state still shifts the walk window"
+grep -Fq 'scale:none !important' "$s" \
+  || fail "$s neutralises transform but not scale, so a scaled wrapper still reports the wrong height"
+grep -Fq 'rotate:none !important' "$s" \
+  || fail "$s neutralises transform but not rotate, so a rotated wrapper still reports the wrong bounds"
+
+# The page must be left as it paints: every check after the bounds read judges the
+# real thing. A neutraliser that is added and never removed would silently turn the
+# whole walk into a walk of a motionless page -- green, and measuring nothing.
+grep -Fq 'neutraliser.remove()' "$s" \
+  || fail "$s never removes the measurement neutraliser, which would leave every later check looking at a page with no motion at all"
+
+# The two-readout table lives in verify.md, next to the act of measuring, rather than
+# in a reference section: the moment it is needed is the moment somebody opens a probe.
+r=skills/wp-demo-craft/references/verify.md
+grep -Fq 'Before you read a number off a moving page' "$r" \
+  || fail "$r does not warn the reader which surface to measure before it asks them to measure anything"
+grep -Fq 'An eased reading is not progress' "$r" \
+  || fail "$r does not record that a computed property is eased"
+grep -Fq 'returns the transformed box' "$r" \
+  || fail "$r does not record that getBoundingClientRect reports the transformed box"
+
+# --- what to DO about static-page, which is not what it looks like ----------------
+# The finding fires on a motion axis and the cause is usually on a content one.
+# Measured on a real build: two interior pages fired `static-page` because they were
+# the only interior pages with no banner image, and the banner bed is what carries
+# parallax. The client had asked rounds earlier that interior banners use images and
+# these two were the last not honouring it. Adding a device to clear the finding would
+# have buried that. A remedy that makes the page worse is worse than no remedy, so the
+# prose has to say which way to look.
+grep -Fq 'usually not a motion decision, it is a page that is missing' "$r" \
+  || fail "$r explains static-page but not what to do about it; the remedy is almost never to add a device, and adding one buries the real defect"
+grep -Fq 'static-page' "$r" \
+  || fail "$r does not document the static-page finding at all"
+
+# An advisory count that jumps is not automatically a regression, and the arithmetic
+# says which it is: a bed is one unobserved row per sampled position, so adding one
+# device to one page raises the count by exactly the per-page sample count.
+grep -Fq 'exact multiple of the sample count' "$r" \
+  || fail "$r does not say how to read a jump in the advisory count, so a device being added reads as a device breaking"
+
 echo PASS

@@ -107,11 +107,18 @@ grep -Eqi 'never on a hero headline' "$r/devices.md" \
 grep -Eqi 'inert|does nothing|no effect' "$r/devices.md" \
   || fail "devices.md does not say a cue outside a scrubbed section is inert"
 
-# --- The fingerprint gate, reduced to palette and type. ---------------------
-grep -Fq '4 of the 6' "$r/fingerprint.md" && fail "fingerprint.md still states the 4-of-6 structure rule (removed in v2)"
+# --- The fingerprint gate compares structure again (v3). --------------------
+# v2 reduced this to palette and type, reasoning that the composition library picks
+# structure per role so structure needed no fingerprint. A library with one good
+# answer per role gives every build the same answer, which is precisely what
+# structural fingerprinting catches -- two structurally identical sites passed the
+# gate because their fonts differed. The 4-of-7 rule lives in uniqueness.md; this
+# file owns the registry and the row.
+grep -Fq '4 of the 7 dimensions' "$r/fingerprint.md" \
+  || fail "fingerprint.md no longer gates on structure, which is the v2 regression that let identical sites ship"
 grep -Fq 'FINGERPRINTS.md' "$r/fingerprint.md" || fail "fingerprint.md does not name the registry file"
-grep -Fq '| client | display | text | accent | canvas | date |' "$r/fingerprint.md" \
-  || fail "fingerprint.md does not define the v2 row format"
+grep -Fq '| client | grammar | chrome | hero | sequence | close | signature | display | text | accent | canvas | date |' "$r/fingerprint.md" \
+  || fail "fingerprint.md does not define the v3 row format; a row that does not record structure cannot gate on it"
 grep -Fq '15 degrees' "$r/fingerprint.md" || fail "fingerprint.md does not state the 15-degree hue tolerance"
 grep -Fq '.wp-create.json' "$r/fingerprint.md" \
   || fail "fingerprint.md does not record the project's own row in the manifest"

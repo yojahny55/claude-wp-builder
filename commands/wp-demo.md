@@ -1,6 +1,6 @@
 ---
 description: Create a demo HTML mockup for client approval — responsive, section-separated, ready for WordPress conversion
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, AskUserQuestion
 argument-hint: "[brief] [--craft|--plain] | iterate"
 ---
 
@@ -134,8 +134,79 @@ before writing any markup.
    **cites the `demo/RESEARCH.md` line and its source URL, or keeps the marker**
    — and the marker now means something,
    because there was an alternative. Mark anything invented "Self-authored,
-   not interviewed". Ask, in one pass, only what the docs cannot answer. Show
-   the brief once and proceed on a yes.
+   not interviewed".
+
+   **3a. Interview the operator about form.** Everything above is *story* — what
+   the site says. None of it is *form* — what the site looks like, how much it
+   moves, and how much of it is reading. A brief can be right about the person,
+   the pain and the promise and still produce twelve pages of dense paragraphs
+   with one animation, because nothing in it ever asked otherwise.
+
+   **Project documents describe a business. They almost never describe a
+   website.** So unlike the story fields, the form fields are nearly always
+   unanswered by the docs, and asking them is the normal case rather than the
+   exception. Ask every field below with `AskUserQuestion`, in as many passes as it takes
+   to get real answers, and write each answer into `demo/BRIEF.md` under
+   `## Form`:
+
+   | Field | The question behind it |
+   |---|---|
+   | `what is quantitative here` | **Ask this one first.** What does this business have that is quantitative and could be drawn? A published scale and its bands, a statutory timescale, a standard fee, a weighting, a set of sources that disagree. For a credit-repair firm the honest answer is five graphics — a 300–850 scale, five bands, five weighted factors, three bureaus, a published average — and a build that never asked wrote all five as paragraphs. The answer is a list of pictures the demo is now obliged to contain. |
+   | `draw, don't write` | Which of those facts should be a **picture** rather than a paragraph, and where? This is the field that decides whether the demo has anything in it besides type. |
+   | `three sites whose motion you want` | Named, with what to take from each. This is what converts "impactful" into something checkable. A brief that records only "impactful animated website" is unfalsifiable, which is how it survives four rounds of revision without ever being satisfied. |
+   | `the ten-second page` | Which page must a visitor understand in ten seconds, and what must they understand? |
+   | `text density` | How much reading per section — a sentence, a short paragraph, or a full explanation? |
+   | `motion appetite` | How much movement: entrance only, motion throughout, or deliberately still? And is scroll choreography wanted, or is element motion enough? |
+   | `microinteraction appetite` | Hover states, animated borders, icons that draw on, details that reward attention — wanted, or noise? |
+   | `the one action` | What should a visitor actually do? Everything on the page either serves that or is decoration. |
+   | `surface vocabulary` | **What does a card look like on this site?** Flat, bordered, elevated, glass. One line, site-wide consequences, and the cheapest question on this table to ask late — a build learned in round five that the client had meant "glassmorphism, liquid, like Apple" by name, after every card had already shipped flat. Ask it before the first section is styled. |
+   | `aesthetic family` | Brutalist, maximalist, playful, retro, dense, editorial, or premium-minimal — `references/uniqueness.md` §6 defines each and what earns it. **Premium-minimal is a choice, not the default costume**, and a shelf of dark pages with one accent each is what happens when nobody decides. If the client says "loud" and the demo comes back in charcoal, the interview was decorative. |
+   | `name the moving things` | Not appetite on a scale — **a list**. "A credit score going from bad to good" is an answer; "yes, lots of animation" is not. An appetite question returns a volume knob, and a list returns a spec that names components nobody has built yet. |
+   | `where the background does work` | Does the ground carry anything — a field, a gradient in motion, a texture, a drawn figure — or is it flat canvas behind everything? Readers distinguish ground from content and have opinions about both ("love the background animation, but the section is ugly"), and with no question about it the ground defaults to flat and every "generic / blank" note is partly about it. |
+   | `what may we not claim` | What is this business forbidden to say? In regulated sectors the answer shapes half the copy — a credit-repair firm is bound by CROA, a clinic by its advertising code, a firm by its bar rules. A build surfaced this by reading the statute itself, which is luck, not process. Ask the client; they already know. |
+   | `reference: what to take` | For each named reference, **what specifically** — its layout, its motion, its density, its restraint? "I like this site" is not usable; "I like how little it makes you read" is. |
+
+   Offer concrete options rather than open questions. An operator who is shown
+   "a sentence / a short paragraph / the full explanation" answers accurately;
+   one asked "how much text do you want?" says "not too much" and means
+   something you cannot build to.
+
+   The answers are constraints on the composition plan in sub-step 5, not
+   decoration on the brief. `draw, don't write` decides which roles the plan
+   reaches for; `text density` decides how much copy each slot carries;
+   `motion appetite` and `microinteraction appetite` decide how far the element
+   motion goes; `surface vocabulary` decides what every card, panel and pane in
+   the build is made of, so it binds before the first section is styled rather
+   than after; `name the moving things` is the field the composition plan has to
+   answer item by item, and a named thing with no composition behind it is a
+   component to build, not a line to drop; `where the background does work`
+   decides whether any section gets a ground at all; `what may we not claim`
+   binds on every line of copy. A plan that contradicts a recorded form answer is wrong in the
+   same way a plan that contradicts the domain signal is wrong.
+
+   **3a-i. A recorded client decision outranks the craft defaults.** If
+   `.claude/CLAUDE.md` already records what the client asked for — `/wp-context`
+   writes an animation brief there when the documents carry one — read it into the
+   form fields rather than asking again, and carry it into `demo/BRIEF.md` marked as
+   the client's own words. It binds on the build over every default in
+   `wp-demo-craft`; see that skill's first section. A project once carried an explicit
+   brief for animated counters, an animated timeline and a before/after score chart,
+   and shipped with none of them, because nothing said the recorded brief had
+   authority over the taste floor.
+
+   **3b. The operator approves the brief before anything is built.** Show the
+   whole brief — story and form — and wait. This is a gate, not a courtesy
+   notice: a build that starts on an unapproved brief spends its whole run on
+   assumptions nobody confirmed, and the cost of that is discovered at the end,
+   in rounds of rework, against a finished demo.
+
+   Changes loop: revise and show it again. There is no pass limit and no
+   "proceed unless told otherwise" — the brief is approved when the operator
+   says so, and only then does sub-step 4 run.
+
+   Record in `demo/BRIEF.md` that the brief was approved, with the date. A demo
+   whose brief was never confirmed is a demo built from a guess, and the next
+   run should be able to tell the difference.
 
    **3.5. Inventory the assets on disk.** List every image, SVG and font under the
    project's `docs/` with a role — `logo`, `hero`, `portrait`, `product`, `texture`,
@@ -184,8 +255,40 @@ before writing any markup.
    decides what a section is, what the chrome is for and what the ending does.
    Then open
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/compositions/README.md` and look at
-   each candidate's `preview-1440.png` and `preview-390.png`. One row per
-   section of the curve: section, role, composition, why, motion cost,
+   each candidate's `preview-1440.png` and `preview-390.png`.
+
+   **The form answers from sub-step 3a bind here.** `draw, don't write` names the
+   facts that must become a composition rather than a paragraph — reach for a role
+   that draws them, and say in the row which answer it serves. `text density` sets
+   how much copy each slot carries. `motion appetite` and `microinteraction
+   appetite` set how far the element motion goes. A row that contradicts a recorded
+   answer is a defect, not a judgment call: the operator was asked, and answered.
+
+   **Read the plan's composition column DOWN before building.** No two pages may
+   share their whole composition sequence, and the index's sequence may not be a
+   superset of an interior page's — `references/uniqueness.md` §2. Two pages
+   sharing a header and a footer is a site; two pages sharing their middle is a
+   template, and "all the pages are almost the same thing" is what that gets
+   reported as. An about page, a services page and a contact page have three
+   different jobs — a story, a comparison, a transaction — so three identical
+   sequences means the jobs were never read.
+
+   **Landing on the default grammar costs one sentence per grammar rejected**
+   (§3). The default is whichever one a build drifts into when nobody chooses,
+   and four builds in a row looking related is what that drift produces.
+
+   **The plan covers every page in the agreed set, not only the index.** Write the
+   index's rows from the curve, then a short block of rows per interior page. This
+   is the step where an interior page stops being an afterthought: a build that
+   plans nine compositions for `index.html` and none for the other eleven writes
+   those eleven from one hand-rolled template, and the result is a page set whose
+   interior is a content management system's default output wearing the index's
+   typeface. The floor per interior page is in
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/compositions.md` — a
+   `page-head` and one body composition, with chrome not counting — and the motion
+   floor is in `references/devices.md`. Do not restate either here.
+
+   One row per section, for each page: section, role, composition, why, motion cost,
    the domain signal that justified it, citing the brief constraint from
    sub-step 4, or writing "no domain signal" when none applies; and the
    research signal — what `demo/RESEARCH.md`'s `## Signals` says this
@@ -198,14 +301,48 @@ before writing any markup.
    sitting unread. Mark exactly one row as the peak (`data-motion-peak`).
    Sum the cost and hold it under the
    budget in `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/devices.md`,
-   which owns the pin caps, the per-index total and the interior-page rule. When
+   which owns the pin caps, the per-index total, and the interior-page floor and
+   ceiling both. Sum per page, not across the set: the index's allowance is the
+   index's, and an interior page does not borrow from it. When
    the docs name no reference and the Landing Gallery MCP is connected, pull
    four screenshots for the page kind first; when it is not, say so and choose
    from the previews alone.
 
+   **5.4. The signature move and the world.** Both are recorded in
+   `demo/BRIEF.md` before the first section is built, not after.
+
+   The **signature move** is one bespoke interaction that exists on this site
+   alone — `references/uniqueness.md` §4 lists what counts and what does not. A
+   parameter change to a library device is not one; neither is an existing device
+   under a project-specific class name. The test is whether someone who has seen
+   the other builds could tell it apart. **A move described after the build is
+   usually a device with a new name**, which is why it is written down first.
+
+   The **world** is one style preamble chosen from
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/worlds.md`, recorded
+   verbatim under `## World`, and pasted **word for word** at the top of every
+   image prompt this build sends. Reusing it verbatim is what makes separately
+   generated plates look like one shoot; paraphrasing it is what makes them look
+   like eight prompts. Every shot prompt then also names **where the empty space
+   is** — copy sits on these images, so the space is generated, never cropped in
+   afterwards.
+
+   The hero is layered by default:
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/hero-depth.md`. A
+   full-screen photograph with one parallax transform and a text fade is the flat
+   hero that file exists to prevent.
+
    **5.5. Image plan.** Craft builds only, and only when the composition plan
    includes a composition that declares an image slot (`hero-split`,
    `hero-bleed`, `feature-zigzag`). Skip in one line otherwise.
+
+   `image-gen.mjs plan` builds `gaps[]` from `sections[] × slotsOf(composition)`, so a
+   **hand-built section has no path to a plate through `plan`**. That is the supported
+   escape hatch, not a dead end: append the gap entries by hand to
+   `demo/.image-plan.json` — same shape, `slot`, `aspect`, `size`, and exactly one of
+   `prompt` or `use` — and call `run`, which reads `plan.gaps` as written. A bespoke
+   section that needs an image is a normal outcome of building a role the table does
+   not cover; it should not have to become a composition to get one.
 
    Then decide whether to generate, in this order. **Neither `GEMINI_API_KEY`
    nor `OPENAI_API_KEY` is set in the environment** — generate nothing, say so
@@ -294,7 +431,11 @@ before writing any markup.
    **one file per page in the agreed page set** (`about.html`, `services.html`,
    `contact.html` — whatever the docs and the curve named). Interior pages are
    built here, not left for later: an index alone is half the failure this mode
-   exists to fix, and step 7 walks the whole directory. Every page carries the
+   exists to fix, and step 7 walks the whole directory. Each interior page is built
+   from its own rows in the sub-step 5 plan. An interior page whose body carries no
+   composition has not been built, only filled — and it will pass every machine gate,
+   because valid markup with correct tokens is exactly what a hand-rolled template
+   produces. Every page carries the
    header and footer chrome from Step 4 (logo, nav, language switcher, hamburger
    at mobile, footer columns) and Step 4's responsive breakpoints; ignore Step
    4's single-file, no-CDN, `:root` token and placeholder-content clauses, which
@@ -321,12 +462,24 @@ before writing any markup.
    `initial-value` instead. Where `@property` is unsupported the rule is ignored
    and the `1280px` fallback still covers the absent case, so it needs no
    `@supports` guard.
+   **Emit every composition's CSS inside `@layer compositions { … }`, and never put
+   your own CSS in a layer.** An unlayered rule beats every layered one regardless of
+   source order or specificity, so this is what makes an author override work. Without
+   it the only thing deciding the winner is which block was written first, which is a
+   convention nobody can see in the output: a build that emitted its overrides above
+   the composition CSS had every equal-specificity rule silently ignored, spent a
+   round fixing things that were already "fixed", and found it only by screenshot.
+   A layer is a guarantee; an ordering rule is an etiquette that fails quietly.
+
    Copy each chosen composition's `section.html` and `section.css`, fill the
    `{{slots}}` with real copy and real assets — an image slot fills from that
    gap's own `result.file` in `demo/.image-plan.json`, keyed by that gap's own
    `slot` field, not a fixed string: `feature-zigzag`'s two gaps use
    `feature_1_image_src` and `feature_2_image_src`, for example — **no page may ship with a
-   `{{` left in it**: several slots fill `alt` and `aria-label` attributes, where
+   `{{` left in it** — check the page's *rendered markup*, not the whole file: the
+   inlined `motion.js` carries the literal `{{slot}}` inside a source comment, so a
+   naive whole-file grep fails on the engine every time and has already cost a build
+   cycle —: several slots fill `alt` and `aria-label` attributes, where
    an unsubstituted marker is read out verbatim by a screen reader and never
    appears on screen for anyone to notice — keep the delimiters and the BEM
    block. Motion comes from `data-motion-*` attributes only. Inline the contents of
