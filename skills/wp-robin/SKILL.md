@@ -74,3 +74,5 @@ The script reports each step:
 | DB connection fails | Credentials use non-standard wp-config format | Check `define('DB_*'` lines in wp-config |
 | Hash collisions persist | Same file shared by 3+ duplicate posts | Manual cleanup of duplicate attachment posts recommended |
 | Plugin not recognized after install | wp-cron hasn't run activation hooks | Visit WP admin → Plugins → activate manually |
+| "X attachment(s) skipped — original file missing on disk" but the files are there | A client that escapes the newlines `TO_BASE64()` wraps its output with, so the metadata decodes to garbage | Fixed in the script — the wrap is stripped server-side. On an older copy, check that the step 4 query wraps `TO_BASE64()` in `REPLACE(..., '\n', '')` |
+| `<name>.webp.webp` files appear next to the originals | The media library is already WebP, so there is nothing to convert | Nothing to do — the script only queues the mime types in `allowed_formats`, which does not include `image/webp`. On an older copy the list was hardcoded: delete the duplicates and their `item_type='webp'` rows |
