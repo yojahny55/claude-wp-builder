@@ -4,6 +4,12 @@
 
 ### Added
 
+- **`/wp-demo` consults `wp-design-library` when it is registered.** A new
+  MCP server (separate repo) holds a corpus of design references; the craft
+  path queries it per role and cites slugs in `demo/BRIEF.md` under
+  `## References`. Absent server: `References: library unavailable`, build
+  continues. `.mcp.json` registers the stdio default; README documents the
+  hosted override.
 - **`bin/tailwindify-parity.mjs` — the conversion is now gated on what it RENDERS.**
   `/wp-tailwindify` rewrites a plain-CSS demo into utilities and archives the original.
   Its Step 4 verified structure — delimiters kept, no `<style>` block, no project
