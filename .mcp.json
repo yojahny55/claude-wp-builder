@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "wp-design-library": {
+      "command": "npx",
+      "args": ["-y", "@yojahny/wp-design-library@0.1.0", "serve"]
+    }
+  }
+}

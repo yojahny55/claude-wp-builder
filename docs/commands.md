@@ -155,6 +155,8 @@ row on at least 4 of 6 axes), and inventories every image, SVG and font under `d
 `demo/BRIEF.md` with a role — used, or named with a reason, so a client asset does not sit
 unused while the build reports it as owed.
 
+On the craft path it also queries the `wp-design-library` MCP server per role when the server is registered and cites the entries it used under `## References` in `demo/BRIEF.md`; without the server it writes `References: library unavailable` and continues.
+
 Craft mode also classifies the client's domain against the vendored 192-row table in
 `skills/wp-demo-craft/references/domains/domains.csv` — two distinct keyword hits to match,
 `unclassified` below that — and records the result in `.wp-create.json` under `"domain"`, which

@@ -146,6 +146,24 @@ before writing any markup.
    A previous build set the wordmark as live text while a 400x400 transparent PNG of
    the client's real logo sat in `docs/`, and listed "transparent-PNG logo" as owed
    by the client in the same run. Nothing in the flow had told it the file existed.
+
+   **3.6. Library references.** If the `wp-design-library` MCP server is registered, call `search` per role
+   the brief will need (`hero`, `proof`, `feature`, `process`, `offer`, `testimonial`,
+   `faq`, `closing`, `capability`, `explainer`, `page-head`, `footer`), with `filters.feel` set to the
+   feel tags drawn from the brief's vibe words and `limit: 3`. For each hit worth using, call
+   `get_entry`, read its strip, and record the slug. Write the result into
+   `demo/BRIEF.md` under `## References` as one line per slug, each line starting with the slug,
+   then the role it informed and one sentence on what was taken from it, so library lines are
+   distinguishable from the named references item 3 already lists. Cite only
+   entries actually consulted.
+
+   Track whether any library entry was successfully consulted. If the server is
+   not registered or every call fails before that happens, write `References: library unavailable`
+   under the same heading and continue with the in-repo
+   compositions. If some roles succeeded before a later call failed, keep their citations
+   and note only the roles the library could not cover; do not replace
+   real references with the blanket unavailable line. Never stop the build on a
+   library error.
 4. **Classify the domain.** If `.wp-create.json` already has `"domain"` — a prior
    `/wp-demo` or `/wp-yolo` run against this same project recorded it — read it and
    move on; **do not re-classify**. The manifest is the shared source of truth, and a

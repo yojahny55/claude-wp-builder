@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`/wp-demo` consults `wp-design-library` when it is registered.** A new
+  MCP server (separate repo) holds a corpus of design references; the craft
+  path queries it per role and cites slugs in `demo/BRIEF.md` under
+  `## References`. Absent server: `References: library unavailable`, build
+  continues. `.mcp.json` registers the stdio default; README documents the
+  hosted override.
+
 ### Fixed
 
 - **The research agent could not reach either MCP rung of its own source ladder.**

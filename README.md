@@ -320,6 +320,24 @@ Research never blocks a build. With no network it records that it found nothing,
 and the demo is built exactly as it is today. To refresh it, delete
 `demo/RESEARCH.md` and run `/wp-demo` again.
 
+### Design library
+
+The craft path queries `wp-design-library` over MCP when it is registered. The
+default starts the pinned `@yojahny/wp-design-library@0.1.0` package with npx. To
+use a hosted instance instead, add the following server to your project's
+`.mcp.json`, keep that file out of version control, and supply the token through
+your MCP client's secret or environment-variable support when available:
+
+    "wp-design-library": { "type": "http", "url": "https://library.<domain>/mcp",
+      "headers": { "Authorization": "Bearer <token>" } }
+
+The hosted instance at `https://wp-design-library.yojahny.dev` is a preview with a
+single shared token. If you want to use it, contact me (yojahny55 on GitHub) for
+access.
+
+Without the server, `/wp-demo` writes `References: library unavailable` in
+`demo/BRIEF.md` and builds from the in-repo compositions.
+
 ## Commands Reference
 
 Full arguments, inputs and outputs per command: **[docs/commands.md](docs/commands.md)**.
