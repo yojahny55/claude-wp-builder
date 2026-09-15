@@ -452,6 +452,27 @@
   The greps beside it pin the rule's wording, which was accurate before this change and
   accurate after it; the wording was never what failed.
 
+### Fixed
+
+- **The research agent could not reach either MCP rung of its own source ladder.**
+  `tools:` in agent frontmatter is an allowlist, not a hint, and `agents/wp-research.md`
+  listed only built-ins — so `mcp__firecrawl` and `mcp__dataforseo` were unreachable to the
+  subagent no matter how healthy the servers were. The ladder then did what it is designed to
+  do, dropped a rung and reported "Firecrawl MCP was not reachable", which reads as a
+  connection fault and is not one.
+
+  Firecrawl survived on its `firecrawl_url` HTTP fallback, so that rung degraded rather than
+  disappeared. **DataForSEO has no fallback** — it is MCP or nothing — so the top rung was
+  dead in every run since the feature shipped, and a research pass that should have produced
+  real local competitor listings by category and location silently produced none.
+
+  Both servers are now granted with `mcp__<server>` patterns, and
+  `tests/checks/wp-research.sh` pins each grant. The check that existed asserted the ladder's
+  *wording*, which was correct throughout; nothing asserted that the agent could reach the
+  rungs the wording described. The grant assumes the conventional server ids; a server
+  registered under a different id is not matched and degrades to the rung below, which is the
+  intended behaviour when a server is genuinely absent.
+
 ## [1.17.0] - 2026-09-13
 
 ### Added

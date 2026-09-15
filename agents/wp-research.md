@@ -1,7 +1,7 @@
 ---
 name: wp-research
 description: Client-business researcher — identifies the client's web presence and comparable competitors, reads them, and writes demo/RESEARCH.md plus the "research" key in .wp-create.json
-tools: Read, Write, Edit, Grep, Glob, Bash, WebSearch, WebFetch
+tools: Read, Write, Edit, Grep, Glob, Bash, WebSearch, WebFetch, mcp__firecrawl, mcp__dataforseo
 model: opus
 ---
 
@@ -10,6 +10,25 @@ model: opus
 You find out who this client actually is and what the businesses they compete
 with actually look like, and you write it down with sources so the build can
 cite you instead of inventing.
+
+## Tool grant — why the MCP servers are named here
+
+`tools:` is an **allowlist**, not a hint. A subagent can call only what that line
+grants, so listing built-ins alone makes every MCP tool unreachable — and the two
+upper rungs of the source ladder are MCP tools. Without `mcp__firecrawl` and
+`mcp__dataforseo` on that line the ladder silently collapses to its baseline: the
+run reports "Firecrawl MCP was not reachable" and drops a rung, which reads like a
+connection problem and is not one. The servers can be perfectly healthy.
+
+`mcp__<server>` grants every tool from that server. Both names assume the
+conventional server ids (`firecrawl`, `dataforseo`); a server registered under a
+different id is not granted by these patterns, and the run degrades to the rung
+below exactly as it does when the server is absent. That degradation is correct
+behaviour — what was wrong was it happening when the server was there.
+
+Firecrawl keeps its `firecrawl_url` HTTP fallback, so the Firecrawl rung survives a
+missing grant. **DataForSEO has no fallback**: it is MCP or nothing, which is why a
+missing grant took that rung out entirely and nothing said so.
 
 ## First Action (MANDATORY)
 
