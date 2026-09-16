@@ -112,8 +112,26 @@ Verify required WordPress theme files and configurations:
 5. **register_nav_menus** is called in `inc/theme-setup.php` — with per-language
    locations (`primary_<lang>`, `footer_<lang>`) under `suffix`, and with one
    bare location per name (`primary`, `footer`) under `polylang`
+6. **Brand surface — favicon / site icon.** Either a Site Icon is set
+   (`$WP option get site_icon` is non-zero) or the theme itself emits a fallback:
+   grep `functions.php`/`inc/theme-setup.php` for a `wp_head` callback that prints
+   `rel="icon"`, guarded by `has_site_icon()` so it yields once the client sets one
+   in Ajustes → General. A demo that ships its own `<link rel="icon">` on every
+   page (check `demo/` or `demo-*/`) and a theme with neither is the specific
+   thing this catches — a Tailwind/markup conversion can drop a `<link>` tag the
+   HTML→PHP pass never re-emits, and the client is left with no icon at all
+   (`/favicon.ico` then 302s instead of serving anything).
+7. **Brand surface — login screen.** `wp-login.php` is the one page of the site
+   that does not enqueue the theme's own stylesheet, so it stays WordPress's
+   default grey screen with the wordpress.org logo unless something re-skins it —
+   and it is the first screen the client sees every time they sign in. Check for
+   a login-branding seed or plugin config: `inc/seed/*login*.php`, or
+   `login_enqueue_scripts` / `login_headerurl` / `login_headertext` filters in
+   `functions.php`/`inc/`. Absence is a finding, not a blocker — flag it as
+   WARNING rather than FAIL, since some projects genuinely ship with the
+   WordPress default by choice.
 
-**PASS** if all present. **FAIL** listing missing items.
+**PASS** if all present. **FAIL** listing missing items (item 7 reports WARNING, not FAIL, when absent).
 
 ---
 
