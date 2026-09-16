@@ -72,6 +72,17 @@
   alias-table case was also rewritten against a fixture value that differs from
   `getKey`'s own fallback, since the fallback previously matched the fixture by
   coincidence and let a broken alias mapping pass unnoticed.
+- **Fix: a suffixed path under a secret's manifest path — `database.password.length`,
+  `database.password.constructor.name` — still bypassed the refusal above.** The
+  refusal was an exact string match against `manifestPath`, so a key that merely
+  *started with* it fell through to the generic dotted-path reader, which keeps
+  walking past the string onto its own JS properties: `.length` returned the
+  secret's exact character count, `.constructor`/`.constructor.name` its type.
+  Same bypass as before — no warning, exit `0` — for a narrower slice. `getKey`
+  now refuses a key equal to a secret's manifest path *or prefixed by it plus a
+  dot*, and rejects a function the same way it already rejects an object, so a
+  suffixed non-secret path can't return a prototype method either. Covered by
+  three new cases in `tests/checks/wp-config-secrets.sh`.
 
 ## [1.18.0] - 2026-09-15
 

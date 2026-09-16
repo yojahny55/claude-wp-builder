@@ -129,14 +129,23 @@ export function getKey(manifest, key) {
     const fallback = key === 'i18n-strategy' ? 'suffix' : 'plain';
     return { ok: true, value: String(raw ?? fallback) };
   }
-  // A secret's own manifest path (e.g. "database.password") must not be reachable
-  // through the generic dotted-path fallback below -- that would bypass the whole
-  // env -> local -> manifest order resolveSecret exists to enforce, silently, with
-  // no legacy warning. Refuse and name the secret alias to use instead.
-  const secretName = Object.keys(SECRETS).find((n) => SECRETS[n].manifestPath === key);
+  // A secret's own manifest path (e.g. "database.password") -- or anything under
+  // it, such as "database.password.length" or "database.password.constructor.name"
+  // -- must not be reachable through the generic dotted-path fallback below. The
+  // exact-match refusal alone missed this: at() happily keeps walking past the
+  // string onto its own JS properties, so a suffixed path read the secret's
+  // character count or its constructor, still bypassing env -> local -> manifest
+  // with no legacy warning. Refuse the whole subtree and name the alias instead.
+  const secretName = Object.keys(SECRETS).find((n) => {
+    const p = SECRETS[n].manifestPath;
+    return key === p || key.startsWith(`${p}.`);
+  });
   if (secretName) return { ok: false, secret: secretName };
   const value = at(manifest, key);
-  if (value === undefined || value === null || typeof value === 'object') return { ok: false };
+  // A function is never a legitimate config value either -- reject it the same
+  // way an object already is, so a suffixed non-secret path (e.g. a typo'd key
+  // that happens to walk onto a JS prototype method) can't print one.
+  if (value === undefined || value === null || typeof value === 'object' || typeof value === 'function') return { ok: false };
   return { ok: true, value: String(value) };
 }
 

@@ -79,4 +79,30 @@ node -e '
 out=$($cfg get "$tmp/p" db_password 2>/dev/null) || fail "an explicitly empty secret did not resolve"
 [ "$out" = "" ] || fail "an explicitly empty secret returned $out"
 
+# --- A path under a secret's manifest path is refused too, not just the exact
+# path. at() keeps walking past the string onto its own JS properties, so
+# ".length" and ".constructor..." used to read the secret's character count or
+# its constructor -- the same bypass as the exact-path case, narrower and easy
+# to miss. --------------------------------------------------------------------
+set +e
+out=$($cfg get "$tmp/p" database.password.length 2>"$tmp/suffix-err-1"); code=$?
+set -e
+[ "$code" = "1" ] || fail "get database.password.length exited $code, want 1"
+[ -z "$out" ] || fail "get database.password.length printed to stdout: $out"
+grep -q 'db_password' "$tmp/suffix-err-1" || fail "the suffixed-path refusal does not name the secret alias"
+
+set +e
+out=$($cfg get "$tmp/p" wordpress.admin_password.length 2>"$tmp/suffix-err-2"); code=$?
+set -e
+[ "$code" = "1" ] || fail "get wordpress.admin_password.length exited $code, want 1"
+[ -z "$out" ] || fail "get wordpress.admin_password.length printed to stdout: $out"
+grep -q 'admin_password' "$tmp/suffix-err-2" || fail "the suffixed-path refusal does not name the secret alias"
+
+set +e
+out=$($cfg get "$tmp/p" database.password.constructor.name 2>"$tmp/suffix-err-3"); code=$?
+set -e
+[ "$code" = "1" ] || fail "get database.password.constructor.name exited $code, want 1"
+[ -z "$out" ] || fail "get database.password.constructor.name printed to stdout: $out"
+grep -q 'db_password' "$tmp/suffix-err-3" || fail "the deep-suffixed-path refusal does not name the secret alias"
+
 echo PASS
