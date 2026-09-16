@@ -19,7 +19,7 @@ grep -Eq "'type' *=> *'page_link'" <<<"$t" \
   || { echo "FAIL: wp-seed.md's placeholder phase does not detect page_link fields by their ACF type"; exit 1; }
 grep -qi 'placeholder pending review\|generic placeholder' <<<"$t" \
   || { echo "FAIL: wp-seed.md's placeholder phase does not require the seeded page to say it is provisional"; exit 1; }
-grep -q '_<prefix>_seeded' <<<"$t" \
+grep -q '_<prefix>_seed_placeholder' <<<"$t" \
   || { echo "FAIL: wp-seed.md's placeholder phase does not mark the pages it creates, so a re-run cannot tell them from a client's real page"; exit 1; }
 grep -qi 'safe to be rewritten\|left exactly as it is' <<<"$t" \
   || { echo "FAIL: wp-seed.md's placeholder phase does not state the re-run rule that protects a client's edited page"; exit 1; }
