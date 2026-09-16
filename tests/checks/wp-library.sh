@@ -17,6 +17,9 @@ grep -q '`get_reference_jsx` is never called' commands/wp-demo.md || { echo "FAI
 grep -q 'ever reaches `/wp-yolo --transcribe`' commands/wp-demo.md || { echo "FAIL: transcribe exclusion"; exit 1; }
 grep -q 'carries no motion data' commands/wp-demo.md || { echo "FAIL: motion exclusion"; exit 1; }
 grep -q 'contract wins' commands/wp-demo.md || { echo "FAIL: external guidance is not subordinated"; exit 1; }
+grep -q 'A lower tier never overrides a higher one' commands/wp-demo.md || { echo "FAIL: ladder has no binding rule"; exit 1; }
+grep -q 'owns page-level direction only' commands/wp-demo.md || { echo "FAIL: inspo scope fence"; exit 1; }
+grep -q 'Skip this step in craft mode' commands/wp-demo.md || { echo "FAIL: plain-mode step does not skip in craft"; exit 1; }
 grep -q '^## Step 2.7: Page References (plain mode only)' commands/wp-demo.md || { echo "FAIL: plain-mode reference step"; exit 1; }
 [ "$(grep -c 'References: inspo unavailable' commands/wp-demo.md)" -eq 2 ] || { echo "FAIL: inspo degrade line"; exit 1; }
 [ "$(grep -c 'a fourth search costs more than it finds' commands/wp-demo.md)" -eq 2 ] || { echo "FAIL: call budget"; exit 1; }

@@ -398,3 +398,6 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
 - **Inspo's corpus is a runtime dependency on a third party's storage.** Nothing is
   vendored. If it goes away, builds degrade through the `References: inspo
   unavailable` path, which is why that line exists in both modes.
+- **Opt-in means most builds will not have it.** Registration is a deliberate act, so the
+  plain path's reference gap is closed only for operators who take that act. That is the
+  cost of not shipping a third-party network dependency in the default path.

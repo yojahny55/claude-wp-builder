@@ -352,9 +352,10 @@ The major version is pinned for the same reason `designlang@12` is: a reference
 tool that changes its output shape mid-project is worse than one you upgrade
 deliberately.
 
-Three things it is never used for, enforced by `commands/wp-demo.md`: its colour
+Four things it is never used for, enforced by `commands/wp-demo.md`: its colour
 table never becomes theme tokens, its `get_reference_jsx` tool is never called
-because it returns React, and nothing from it reaches `/wp-yolo --transcribe`.
+because it returns React, nothing from it reaches `/wp-yolo --transcribe`, and it
+never chooses a motion device.
 
 It is a third-party network dependency serving captures of other people's production
 sites, credited to their authors with a takedown route. Treat it as reference, never

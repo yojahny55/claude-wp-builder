@@ -236,16 +236,15 @@ before writing any markup.
    real references with the blanket unavailable line. Never stop the build on a
    library error.
 
-   If the `inspo` MCP server is also registered, consult it for page-level direction:
+   If the `inspo` MCP server is registered, consult it for page-level direction:
    one `recommend` with the brief, then at most two `search_screens`, then `get_screen`
    on the three to five references kept. A tool result is re-read on every later turn,
    so a fourth search costs more than it finds. Take composition and section ordering
    from it and nothing else — sub-step 3.7 lists what it may not touch. Cite each one
    under the same `## References` heading on a line starting with `inspo:` and then the
    slug, so inspo lines stay distinguishable from library lines, which start with the
-   slug alone. If the server is not registered or every call fails, write
-   `References: inspo unavailable` under the same heading and continue. Never stop the
-   build on an inspo error.
+   slug alone. If a call fails, write `References: inspo unavailable` under the same
+   heading and continue. Never stop the build on an inspo error.
 
    **3.7. Reference precedence.** Two reference servers can be registered, and they
    answer different questions. The order is fixed:
