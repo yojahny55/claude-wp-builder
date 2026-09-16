@@ -21,8 +21,21 @@ grep -q 'A lower tier never overrides a higher one' commands/wp-demo.md || { ech
 grep -q 'owns page-level direction only' commands/wp-demo.md || { echo "FAIL: inspo scope fence"; exit 1; }
 grep -q 'Skip this step in craft mode' commands/wp-demo.md || { echo "FAIL: plain-mode step does not skip in craft"; exit 1; }
 grep -q '^## Step 2.7: Page References (plain mode only)' commands/wp-demo.md || { echo "FAIL: plain-mode reference step"; exit 1; }
-[ "$(grep -c 'References: inspo unavailable' commands/wp-demo.md)" -eq 2 ] || { echo "FAIL: inspo degrade line"; exit 1; }
-[ "$(grep -c 'a fourth search costs more than it finds' commands/wp-demo.md)" -eq 2 ] || { echo "FAIL: call budget"; exit 1; }
+# Each mode must keep both rules. Extra mentions are harmless, but a summary or
+# two copies in one mode must not hide a missing rule in the other mode.
+step_has_text() {
+  awk -v heading="## Step $1:" -v needle="$2" '
+    /^## Step / { active = index($0, heading) == 1; next }
+    active && index($0, needle) { found = 1 }
+    END { exit !found }
+  ' commands/wp-demo.md
+}
+for step in 2.6 2.7; do
+  step_has_text "$step" 'References: inspo unavailable' \
+    || { echo "FAIL: Step $step missing inspo degrade line"; exit 1; }
+  step_has_text "$step" 'a fourth search costs more than it finds' \
+    || { echo "FAIL: Step $step missing inspo call budget"; exit 1; }
+done
 # Match the literal npx argument, including quotes, so ranges and longer versions fail.
 grep -Fq '"inspo-mcp@0.1.16"' README.md || { echo "FAIL: README does not pin inspo to the measured 0.1.16 release"; exit 1; }
 grep -q 'not\*\* registered by default' README.md || { echo "FAIL: README does not state inspo is opt-in"; exit 1; }

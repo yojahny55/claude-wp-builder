@@ -19,6 +19,11 @@
 
 ### Fixed
 
+- **Check Inspo's fallback and search budget within each demo mode.** The checks
+  previously required exactly two matching lines in the whole command, so an extra
+  mention caused a false failure. Craft and plain are now checked independently;
+  a repeated rule elsewhere cannot hide its removal from either mode.
+
 - **Pin the optional Inspo server to `inspo-mcp@0.1.16`.** The README's `0.1.x`
   range allowed automatic patch upgrades despite its deliberate-upgrade rationale.
   The example now uses the measured release, and the check matches the quoted package
