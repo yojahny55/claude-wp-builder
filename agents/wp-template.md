@@ -91,6 +91,26 @@ get_header();
 
 Template part files go in `template-parts/` and are named `section-{name}.php`.
 
+### Delete a starter scaffold part you just orphaned
+
+`header.php`, `footer.php` and `search.php` ship from the starter theme already calling
+`get_template_part()` on a placeholder part — `template-parts/header/site-branding.php`,
+`template-parts/header/navigation.php`, `template-parts/footer/site-info.php`,
+`template-parts/content-search.php`. When your job is to replace one of those top-level
+files with the project's own markup (dispatched by `/wp-header`, `/wp-footer` or
+`/wp-page search`), you remove that `get_template_part()` call along with everything else
+the placeholder body had — and that leaves the part file on disk with nothing left to load
+it.
+
+An unreferenced PHP file in the theme is not neutral: nobody reviews it again after this
+step, so whatever the starter shipped inside it — a `Theme by <a href="https://example.com">`
+credit line, underscores boilerplate, an anonymous walker — ships to the client's site
+looking like part of the build, one accidental `get_template_part()` away from actually
+rendering. Delete the part file in the same step you remove its last caller. Before
+deleting, `grep -r "get_template_part.*<part-slug>" <theme-dir>` to confirm nothing else in
+the theme still reaches it — a shared part (`content-none.php`, `content-{post_type}.php`)
+is never one of these four, but check rather than assume.
+
 ## Escaping Rules (MANDATORY — never skip)
 
 Every variable output MUST be escaped with the appropriate function:
