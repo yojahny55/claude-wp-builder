@@ -23,7 +23,8 @@ grep -q 'Skip this step in craft mode' commands/wp-demo.md || { echo "FAIL: plai
 grep -q '^## Step 2.7: Page References (plain mode only)' commands/wp-demo.md || { echo "FAIL: plain-mode reference step"; exit 1; }
 [ "$(grep -c 'References: inspo unavailable' commands/wp-demo.md)" -eq 2 ] || { echo "FAIL: inspo degrade line"; exit 1; }
 [ "$(grep -c 'a fourth search costs more than it finds' commands/wp-demo.md)" -eq 2 ] || { echo "FAIL: call budget"; exit 1; }
-grep -q 'inspo-mcp@0.1.x' README.md || { echo "FAIL: README does not pin the inspo major"; exit 1; }
+# Match the literal npx argument, including quotes, so ranges and longer versions fail.
+grep -Fq '"inspo-mcp@0.1.16"' README.md || { echo "FAIL: README does not pin inspo to the measured 0.1.16 release"; exit 1; }
 grep -q 'not\*\* registered by default' README.md || { echo "FAIL: README does not state inspo is opt-in"; exit 1; }
 ! grep -q '"inspo"' .mcp.json || { echo "FAIL: inspo must stay out of the shipped .mcp.json"; exit 1; }
 if [ -n "${WP_DESIGN_LIBRARY_URL:-}" ]; then

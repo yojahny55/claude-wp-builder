@@ -346,11 +346,11 @@ macrostructure, section ordering, fold composition — in both craft and plain m
 It is **not** registered by default. To use it, add this to your project's
 `.mcp.json`:
 
-    "inspo": { "command": "npx", "args": ["-y", "inspo-mcp@0.1.x", "serve"] }
+    "inspo": { "command": "npx", "args": ["-y", "inspo-mcp@0.1.16", "serve"] }
 
-The major version is pinned for the same reason `designlang@12` is: a reference
-tool that changes its output shape mid-project is worse than one you upgrade
-deliberately.
+The exact version is pinned to the release measured in `CLAUDE.md`, so new package
+releases are adopted deliberately. Review their tool output and server instructions
+before updating this pin; the third-party reference corpus remains a runtime dependency.
 
 Four things it is never used for, enforced by `commands/wp-demo.md`: its colour
 table never becomes theme tokens, its `get_reference_jsx` tool is never called

@@ -17,6 +17,13 @@
   is never called because it returns React, nothing reaches `/wp-yolo --transcribe`,
   and it never picks a motion device because it carries no motion data.
 
+### Fixed
+
+- **Pin the optional Inspo server to `inspo-mcp@0.1.16`.** The README's `0.1.x`
+  range allowed automatic patch upgrades despite its deliberate-upgrade rationale.
+  The example now uses the measured release, and the check matches the quoted package
+  argument literally so a range or a longer version cannot satisfy it.
+
 ## [1.18.0] - 2026-09-15
 
 ### Added
