@@ -92,6 +92,16 @@
   `Math.ceil()` dot count could exceed the card count; and there was no rule to reuse a
   sibling template's already-correct accordion/focus-ring pattern instead of re-deriving a new
   one per section.
+- **`agents/wp-cf7.md` — three form-contract gaps, plus a first grep gate for the utility-class
+  rule the agent already stated.** An `[acceptance]` tag with no `acceptance_as_validation:on`
+  leaves the submit button disabled on an unchecked box with no visible error; CF7's own
+  `wpcf7-form-control-wrap` does not stretch the control inside it, so a control needs its own
+  `width: 100%`; CF7's AJAX spinner ships with an unclipped side margin that caused a phone
+  viewport to gain 20px of horizontal scroll; a loading-state `padding-right` override loses to
+  an `@apply px-*` utility's logical `padding-inline` regardless of specificity, so it has to be
+  written as `padding-inline-end`; and the live form is the `_form` post meta, not the
+  `cf7/*.html` reference file — a change has to be pushed through the seeder, and pushed for
+  every language, to reach the site.
 
 ## [1.18.0] - 2026-09-15
 
