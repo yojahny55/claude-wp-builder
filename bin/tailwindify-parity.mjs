@@ -27,7 +27,7 @@
  *
  * exit 0 clean · 1 deltas found · 2 no usable browser · 3 the run itself crashed
  */
-import { existsSync, readdirSync, statSync, createReadStream, realpathSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, createReadStream, readFileSync, realpathSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, join, dirname, extname, normalize, sep, basename } from 'node:path';
 import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -55,10 +55,38 @@ const original = resolve(against);
 for (const p of [converted, original]) {
   if (!existsSync(p)) { console.error('tailwindify-parity: no such path: ' + p); process.exit(3); }
 }
-const widths = opt('--widths', '1440x900,390x844')
+const explicitWidths = opt('--widths', '1440x900,390x844')
   .split(',')
   .map((s) => s.split('x').map(Number))
   .filter((p) => p.length === 2 && p.every(Number.isFinite));
+
+/* An off-by-one at a converted breakpoint (Tailwind's `max-*` is EXCLUSIVE; a
+ * plain-CSS demo's `max-width: Npx` is INCLUSIVE) is invisible everywhere except AT
+ * N itself — 1440 and 390 never land on it. Read every `max-width`/`min-width`
+ * value out of the ORIGINAL's own CSS and sample those exact pixel widths too, on
+ * top of whatever `--widths` asked for. */
+function collectBreakpoints(root) {
+  const found = new Set();
+  const walk = (dir) => {
+    let entries;
+    try { entries = readdirSync(dir); } catch { return; }
+    for (const entry of entries) {
+      const p = join(dir, entry);
+      let st;
+      try { st = statSync(p); } catch { continue; }
+      if (st.isDirectory()) { walk(p); continue; }
+      if (!entry.toLowerCase().endsWith('.css')) continue;
+      let css;
+      try { css = readFileSync(p, 'utf8'); } catch { continue; }
+      for (const m of css.matchAll(/m(?:in|ax)-width\s*:\s*(\d+(?:\.\d+)?)px/gi)) {
+        const n = Math.round(parseFloat(m[1]));
+        if (n > 0 && n <= 3000) found.add(n);
+      }
+    }
+  };
+  walk(root);
+  return [...found].sort((a, b) => a - b);
+}
 
 /* Properties chosen because each one is a declaration a conversion can silently
  * drop while the page still looks built. `cursor` is the one that started this. */
@@ -166,6 +194,21 @@ if (isDir(converted) && isDir(original)) {
 }
 const cRoot = isDir(converted) ? converted : dirname(converted);
 const oRoot = isDir(original) ? original : dirname(original);
+
+const autoBreakpoints = collectBreakpoints(oRoot);
+const widths = [...explicitWidths];
+const haveWidth = new Set(widths.map(([w]) => w));
+for (const bw of autoBreakpoints) {
+  if (haveWidth.has(bw)) continue;
+  haveWidth.add(bw);
+  widths.push([bw, bw >= 700 ? 900 : 844]);
+}
+if (autoBreakpoints.length) {
+  console.log(
+    `tailwindify-parity: also sampling ${autoBreakpoints.length} breakpoint width(s) ` +
+    `found in the original CSS: ${autoBreakpoints.join(', ')}`
+  );
+}
 
 /* ONE server, rooted at the common ancestor of the two trees, and pages
  * addressed by their path relative to it.

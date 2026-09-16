@@ -48,6 +48,16 @@ printf '%s' "$g" | grep -qF 'unrenderable' \
 printf '%s' "$g" | grep -qF 'process.exit(2)' \
   || { echo "FAIL: $gate does not exit 2 when no browser is usable — the caller cannot tell 'could not run' from 'found defects'"; exit 1; }
 
+# 1440 and 390 never land on a converted breakpoint's off-by-one: a demo's
+# `max-width: 768px` and Tailwind's `max-md:` (width < 768) disagree only AT 768.
+# The gate has to read the original's own CSS for its max-width/min-width stops and
+# sample those exact pixel widths too, or the one width where the defect is visible
+# is never sampled.
+printf '%s' "$g" | grep -qF 'collectBreakpoints' \
+  || { echo "FAIL: $gate does not collect breakpoint widths from the original's own CSS — --widths alone never lands on the exact pixel where an inclusive/exclusive max-width conversion goes wrong"; exit 1; }
+printf '%s' "$g" | grep -Eq "m\\(\\?:in\\|ax\\)-width" \
+  || { echo "FAIL: $gate's breakpoint collector does not match both max-width and min-width — a demo mixes both forms"; exit 1; }
+
 # And the command has to actually run it.
 cmd=commands/wp-tailwindify.md
 flat=$(tr '\n' ' ' < "$cmd" | sed 's/  */ /g')
@@ -57,5 +67,7 @@ printf '%s' "$flat" | grep -qF -- '--against' \
   || { echo "FAIL: $cmd invokes the gate without --against, so it compares the converted page with nothing"; exit 1; }
 printf '%s' "$flat" | grep -qiE 'renders?, not only what it contains|what it RENDERS' \
   || { echo "FAIL: $cmd does not say the structural checks are insufficient — items 2-4 all pass on a page that has lost a declaration"; exit 1; }
+printf '%s' "$flat" | grep -qiE 'sampl(e|ing).{0,80}(768|1024|breakpoint)' \
+  || { echo "FAIL: $cmd never explains that the gate also samples breakpoint widths found in the original CSS, not only --widths"; exit 1; }
 
 echo PASS

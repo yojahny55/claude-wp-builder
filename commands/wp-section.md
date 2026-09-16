@@ -395,7 +395,10 @@ writes. See **File ownership** above.
 >    qualified for that file precisely because it spans more than one block, so no
 >    single block's name can carry it.
 > 5. If a target CSS file does not exist, create it with its first rule already in
->    it and add its `@import` to `main.css` in the same step. Never leave an empty file.
+>    it and add its `@import` to `main.css` in the same step, naming its cascade
+>    layer (`layer(components)` for `components/<page-slug>.css`, `layer(utilities)`
+>    for `utilities/site.css`) — a bare `@import` beats every Tailwind utility
+>    regardless of specificity. Never leave an empty file.
 > 6. Colors and fonts come from the `@theme` block as utilities (`bg-primary`,
 >    `font-primary`). No `:root`, no hardcoded hex a token already covers.
 > 7. Responsive via Tailwind prefixes (`md:`, `lg:`). No hand-written `@media`.

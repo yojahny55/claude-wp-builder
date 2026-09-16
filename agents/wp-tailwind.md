@@ -108,6 +108,19 @@ For each element in the HTML:
    responsive rule on the wrong side of every breakpoint, and the markup still compiles,
    so nothing downstream catches it.
 
+   **A demo's `max-width: Npx` is INCLUSIVE of N; Tailwind's `max-*` variants are
+   EXCLUSIVE — they compile to `width < N`.** The `.98` examples above dodge this by
+   already being one hundredth of a pixel short of the next integer; a desktop-first
+   demo that instead writes plain integers — `max-width: 768px`, `max-width: 1024px`,
+   the two most common device stops — does not, and mapping either straight onto
+   Tailwind's stock scale (`md: 768`, `lg: 1024`) is 1px wrong at exactly the width
+   that matters. The fix is N+1, either as the arbitrary form (`max-width: 768px` →
+   `max-[769px]:`) or by redeclaring the named breakpoint in `@theme` —
+   `--breakpoint-md: 769px;` — when the project's own conventions call for named
+   prefixes at that stop. `min-width` needs no adjustment; it is inclusive on both
+   sides already. Re-measure the layout AT 768 and AT 1024 after converting, not only
+   at the far corners of a viewport sweep — the off-by-one is invisible anywhere else.
+
 5. **A reset rule converts DECLARATION BY DECLARATION, never as a whole.** Preflight
    covers most of what a demo's reset does, and "preflight covers it" was applied to the
    rule instead of to each line in it. A demo reset that read
@@ -125,7 +138,19 @@ For each element in the HTML:
    `:focus-visible`, `list-style` position, `scroll-behavior`, and anything in a `font`
    shorthand beyond family and size. Carry the survivors as a `@layer base { }` block — NOT
    as plain unlayered CSS, which outranks every utility and breaks the next thing that tries
-   to override it.
+   to override it. That layering is not optional for `base/reset.css` specifically and
+   optional for every other hand-written CSS file: `components/`, `layouts/` and
+   `utilities/` files carry the same exposure, and the fix is the same — declare the
+   layer on the `@import` (`layer(components)`, `layer(utilities)`; see
+   `skills/wp-tailwind-system/SKILL.md` § File layout) for every file this agent
+   creates or writes into, not only the reset.
+
+   `cursor` widens past a literal `button`, because a demo's clickable surface
+   usually does too: `summary`, `[role="button"]`, `[role="option"]`, `[role="tab"]`,
+   and a form's `input[type="submit"|"button"|"reset"]` — Contact Form 7 and
+   WordPress's own comment form render their submit this way, and a bare
+   `button { cursor: pointer }` never reaches it. Pair it with `button:disabled,
+   [aria-disabled="true"] { cursor: default }` when the demo's own reset does.
 
 6. **`text-*` sets line-height too, and a declared `font-size` does not.** `text-base` is
    `font-size:1rem; line-height:1.5rem`. A demo that declares `font:600 14px/20px` and then
@@ -303,7 +328,12 @@ TRUTH, not inspiration. Your job is to COPY, not re-author.**
    instead. One page → `components/<slug>.css`.
 4. **Create and register together.** If the target file does not exist, create it
    *with its first rule already in it* and add its `@import` line to `main.css` in
-   the same step. Import order: `base` → `components` → `layouts` → `utilities`.
+   the same step. Import order: `base` → `components` → `layouts` → `utilities` —
+   and the import names its cascade layer: `layer(components)` for
+   `components/<slug>.css` and `layouts/<name>.css`, `layer(utilities)` for
+   `utilities/site.css`. An import with no `layer()` sits outside every named
+   layer and beats it regardless of specificity — this is how a promoted
+   `max-md:hidden` modifier has lost to the very class it was written on.
 5. **Name the class for the rung it landed on.** A group that stayed local — rung 3,
    `components/<slug>.css` or `layouts/<name>.css` — is named `<block>__<element>`,
    so parallel section agents never collide on a selector. A group promoted to
