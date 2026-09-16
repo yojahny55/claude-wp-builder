@@ -18,6 +18,24 @@
   every entry `"source": "wordpress.org"`. Exit codes match the existing `validate`
   contract: `0` ok, `1` invalid, `3` file not found. Covered by
   `tests/checks/wp-profiles.sh` and fixtures under `tests/fixtures/profiles/`.
+- **Fix: a user-authored profile with a non-array `requires`/`conflicts` (e.g.
+  `"requires": 5`) no longer crashes `validate-profile` with a raw Node stack trace.**
+  `validateProfile()` now reports it as an ordinary validation problem naming the entry
+  and the key, instead of iterating a non-iterable and throwing. `required` is now
+  type-checked too: a present-but-non-boolean value (e.g. `"required": "false"`) is
+  rejected, and the shipped-profile `required`-count check in `tests/checks/wp-profiles.sh`
+  compares with `=== true` rather than truthiness, closing the same gap on both sides. A
+  plugin `slug` must already be lowercase and trimmed — `validateProfile()` rejects a
+  slug that isn't, naming the canonical form, rather than silently normalising it. Fixture
+  coverage extended to the remaining `validateProfile` branches (`conflicts`, unknown key,
+  bad `source`, a non-object entry, a missing `slug`, a missing `name`, a non-array
+  `plugins`, a non-array `requires`).
+- **Fix: `wp-config.mjs` no longer echoes `JSON.parse`'s own error message when a manifest,
+  local-secrets file or profile fails to parse.** That message can embed up to ~20 raw
+  bytes of the file's own content as a quoted snippet — a real leak path for
+  `.wp-create.local.json`, which holds secrets. `loadManifest`, `loadLocal` and
+  `cmdValidateProfile` now report only the file and, when the parser states one, the
+  position — never the parser's message text.
 - **`bin/wp-config.mjs` and `bin/lib/manifest.mjs` — one validator for `.wp-create.json`,
   the manifest roughly thirty commands, agents and skills read with no writer contract
   until now.** `node bin/wp-config.mjs validate <project-path>` checks the required fields,

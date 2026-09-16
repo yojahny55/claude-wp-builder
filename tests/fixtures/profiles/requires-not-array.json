@@ -1,0 +1,8 @@
+{
+  "name": "Requires not array",
+  "description": "requires is a number instead of an array -- used to throw an uncaught TypeError",
+  "plugins": [
+    { "slug": "secure-custom-fields", "required": true },
+    { "slug": "woocommerce-gateway-stripe", "required": false, "requires": 5 }
+  ]
+}

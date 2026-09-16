@@ -21,6 +21,17 @@ function claudeMdPath(projectPath) {
   return join(resolve(projectPath), '.claude', 'CLAUDE.md');
 }
 
+// JSON.parse's own error message can embed up to ~20 raw bytes of the file's own
+// content as a quoted snippet (`Unexpected token 's', "{"a":supersecre"... is not
+// valid JSON`) -- unsafe to echo verbatim for a file that might hold a secret, which
+// LOCAL_NAME (.wp-create.local.json) always might. Report the file and, when the
+// message states one, the numeric position -- never the parser's own message text.
+function jsonParseErrorLocation(err) {
+  const m = /position (\d+)(?: \(line (\d+) column (\d+)\))?/.exec(err.message ?? '');
+  if (!m) return 'at an unreported position';
+  return m[2] ? `at line ${m[2]}, column ${m[3]}` : `at position ${m[1]}`;
+}
+
 function loadManifest(projectPath) {
   const file = join(resolve(projectPath), MANIFEST_NAME);
   if (!existsSync(file)) {
@@ -30,7 +41,7 @@ function loadManifest(projectPath) {
   try {
     return { file, manifest: JSON.parse(readFileSync(file, 'utf8')) };
   } catch (err) {
-    warn(`${MANIFEST_NAME} is not valid JSON: ${err.message}`);
+    warn(`${MANIFEST_NAME} is not valid JSON ${jsonParseErrorLocation(err)}`);
     process.exit(1);
   }
 }
@@ -116,7 +127,7 @@ function loadLocal(projectPath) {
   try {
     return JSON.parse(readFileSync(file, 'utf8'));
   } catch (err) {
-    warn(`${LOCAL_NAME} is not valid JSON: ${err.message}`);
+    warn(`${LOCAL_NAME} is not valid JSON ${jsonParseErrorLocation(err)}`);
     process.exit(1);
   }
 }
@@ -152,7 +163,7 @@ function cmdValidateProfile(file) {
   try {
     profile = JSON.parse(readFileSync(target, 'utf8'));
   } catch (err) {
-    warn(`${target} is not valid JSON: ${err.message}`);
+    warn(`${target} is not valid JSON ${jsonParseErrorLocation(err)}`);
     process.exit(1);
   }
   const problems = validateProfile(profile);

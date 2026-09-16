@@ -164,20 +164,42 @@ export function validateProfile(profile) {
 
   for (const entry of profile.plugins) {
     if (!entry || typeof entry !== 'object') { problems.push('every plugins entry must be an object'); continue; }
-    if (!entry.slug) { problems.push('every plugins entry needs a slug'); continue; }
+    if (!entry.slug || typeof entry.slug !== 'string') { problems.push('every plugins entry needs a slug'); continue; }
     if (seen.has(entry.slug)) problems.push(`duplicate plugin slug: ${entry.slug}`);
     seen.add(entry.slug);
+    // A profile author who typed a capital or stray whitespace should see it -- silent
+    // normalisation is how "contact-form-7" and "Contact-Form-7" end up as two entries
+    // that resolve to the same (or a colliding) WP-CLI install.
+    const canonical = entry.slug.trim().toLowerCase();
+    if (entry.slug !== canonical) {
+      problems.push(`${entry.slug}: slug must already be lowercase and trimmed (did you mean "${canonical}"?)`);
+    }
     for (const key of Object.keys(entry)) {
       if (!PLUGIN_KEYS.has(key)) problems.push(`unknown key on ${entry.slug}: ${key}`);
+    }
+    if (entry.required !== undefined && typeof entry.required !== 'boolean') {
+      problems.push(`${entry.slug}: required must be a boolean`);
     }
     if (entry.source !== undefined && entry.source !== 'wordpress.org' && entry.source !== 'supplied') {
       problems.push(`${entry.slug}: source must be "wordpress.org" or "supplied"`);
     }
-    for (const need of entry.requires ?? []) {
-      if (!slugs.has(need)) problems.push(`${entry.slug} requires ${need}, which this profile does not list`);
+    // A user-authored profile with "requires": 5 or "requires": {"x":1} is not an array,
+    // and `for...of` on a non-iterable throws an uncaught TypeError -- a raw Node stack
+    // trace naming this module's own path, the opposite of what this function exists to
+    // produce. Refuse it as a validation problem instead of iterating it.
+    if (entry.requires !== undefined && !Array.isArray(entry.requires)) {
+      problems.push(`${entry.slug}: requires must be an array`);
+    } else {
+      for (const need of entry.requires ?? []) {
+        if (!slugs.has(need)) problems.push(`${entry.slug} requires ${need}, which this profile does not list`);
+      }
     }
-    for (const bad of entry.conflicts ?? []) {
-      if (slugs.has(bad)) problems.push(`${entry.slug} conflicts with ${bad}, which this profile also lists`);
+    if (entry.conflicts !== undefined && !Array.isArray(entry.conflicts)) {
+      problems.push(`${entry.slug}: conflicts must be an array`);
+    } else {
+      for (const bad of entry.conflicts ?? []) {
+        if (slugs.has(bad)) problems.push(`${entry.slug} conflicts with ${bad}, which this profile also lists`);
+      }
     }
   }
   return problems;

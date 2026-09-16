@@ -1,0 +1,6 @@
+{
+  "description": "The profile itself has no name",
+  "plugins": [
+    { "slug": "secure-custom-fields", "required": true }
+  ]
+}

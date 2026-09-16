@@ -16,8 +16,10 @@ done
 # --- Every shipped profile marks exactly one plugin required. ---------------
 # secure-custom-fields is the field engine every generated theme calls through
 # prefix_get_field(); a build without it produces templates that fatal on first render.
+# Compared with === true, not truthiness: a string "false" is truthy in JS and would
+# otherwise count as required.
 for p in templates/profiles/*.json; do
-  n=$(node -e 'const j=require("./'"$p"'");console.log(j.plugins.filter(x=>x.required).length)')
+  n=$(node -e 'const j=require("./'"$p"'");console.log(j.plugins.filter(x=>x.required===true).length)')
   [ "$n" -ge 1 ] || fail "$p marks no plugin required, so nothing can block a broken build"
 done
 
@@ -36,5 +38,62 @@ $cfg validate-profile tests/fixtures/profiles/unresolved-requires.json >"$tmp/re
 set -e
 [ "$code" = "1" ] || fail "a profile with an unresolved requires exited $code, want 1"
 grep -q 'woocommerce' "$tmp/req" || fail "the unresolved-requires message does not name the missing plugin"
+
+# --- A conflicts: edge pointing at a plugin the profile also lists is rejected. ---
+set +e
+$cfg validate-profile tests/fixtures/profiles/conflicts.json >"$tmp/conflicts" 2>&1; code=$?
+set -e
+[ "$code" = "1" ] || fail "a profile with conflicting plugins exited $code, want 1"
+grep -q 'w3-total-cache conflicts with wp-super-cache' "$tmp/conflicts" || fail "the conflicts message does not name both slugs"
+
+# --- An unknown key on a plugin entry is rejected and named. ----------------
+set +e
+$cfg validate-profile tests/fixtures/profiles/unknown-key.json >"$tmp/unknown" 2>&1; code=$?
+set -e
+[ "$code" = "1" ] || fail "a profile with an unknown plugin key exited $code, want 1"
+grep -q 'unknown key on contact-form-7: version' "$tmp/unknown" || fail "the unknown-key message does not name the key"
+
+# --- A source outside the wordpress.org/supplied enum is rejected. ----------
+set +e
+$cfg validate-profile tests/fixtures/profiles/bad-source.json >"$tmp/source" 2>&1; code=$?
+set -e
+[ "$code" = "1" ] || fail "a profile with a bad source exited $code, want 1"
+grep -q 'custom-plugin: source must be' "$tmp/source" || fail "the bad-source message does not name the plugin"
+
+# --- A plugins entry that is not an object is rejected. ----------------------
+set +e
+$cfg validate-profile tests/fixtures/profiles/entry-not-object.json >"$tmp/entry" 2>&1; code=$?
+set -e
+[ "$code" = "1" ] || fail "a profile with a non-object plugin entry exited $code, want 1"
+grep -q 'every plugins entry must be an object' "$tmp/entry" || fail "the entry-not-object message is missing"
+
+# --- A plugin entry with no slug is rejected. --------------------------------
+set +e
+$cfg validate-profile tests/fixtures/profiles/missing-slug.json >"$tmp/slug" 2>&1; code=$?
+set -e
+[ "$code" = "1" ] || fail "a profile with a slugless plugin entry exited $code, want 1"
+grep -q 'every plugins entry needs a slug' "$tmp/slug" || fail "the missing-slug message is missing"
+
+# --- A profile with no name is rejected. -------------------------------------
+set +e
+$cfg validate-profile tests/fixtures/profiles/missing-name.json >"$tmp/name" 2>&1; code=$?
+set -e
+[ "$code" = "1" ] || fail "a nameless profile exited $code, want 1"
+grep -q 'name is required' "$tmp/name" || fail "the missing-name message is missing"
+
+# --- A profile whose plugins is not an array is rejected. --------------------
+set +e
+$cfg validate-profile tests/fixtures/profiles/plugins-not-array.json >"$tmp/parr" 2>&1; code=$?
+set -e
+[ "$code" = "1" ] || fail "a profile with non-array plugins exited $code, want 1"
+grep -q 'plugins must be an array' "$tmp/parr" || fail "the plugins-not-array message is missing"
+
+# --- A non-array requires is rejected with a message, not a raw stack trace. -
+set +e
+$cfg validate-profile tests/fixtures/profiles/requires-not-array.json >"$tmp/reqarr" 2>&1; code=$?
+set -e
+[ "$code" = "1" ] || fail "a profile with a non-array requires exited $code, want 1"
+grep -q 'requires must be an array' "$tmp/reqarr" || fail "the requires-not-array message is missing"
+if grep -qi 'TypeError' "$tmp/reqarr"; then fail "a non-array requires produced a raw stack trace instead of a validation message"; fi
 
 echo PASS
