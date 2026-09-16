@@ -25,8 +25,17 @@
   --font-secondary: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-@import "./base/reset.css";
-@import "./components/buttons.css";
-@import "./utilities/animations.css";
-@import "./utilities/motion.css";
-@import "./utilities/wordpress.css";
+/* Every import below names its cascade layer, matching the directory it lives
+   in: base/ -> layer(base), components/ and layouts/ -> layer(components),
+   utilities/ -> layer(utilities). A file imported with no layer() sits OUTSIDE
+   every named layer, and unlayered CSS beats every layer regardless of source
+   order or specificity — a component class's own `display` has outranked a
+   `hidden` utility this way, and a utility file's own class has outranked its
+   OWN `max-md:hidden` modifier for the same reason. Carry the same layer()
+   declaration on every @import a later step adds; see wp-tailwind-system's
+   "File layout" section. */
+@import "./base/reset.css" layer(base);
+@import "./components/buttons.css" layer(components);
+@import "./utilities/animations.css" layer(utilities);
+@import "./utilities/motion.css" layer(utilities);
+@import "./utilities/wordpress.css" layer(utilities);

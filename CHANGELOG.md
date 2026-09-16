@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Tailwind's `max-*` variants are EXCLUSIVE; a plain-CSS demo's `max-width: Npx` is
+  INCLUSIVE.** `max-width: 768px` in a demo matches width 768 itself; Tailwind 4's
+  `max-md:` compiles to `width < 768` and does not — every converted breakpoint was 1px
+  off at exactly the two widths a desktop-first demo declares most, 768 and 1024.
+  `skills/wp-tailwind-system/SKILL.md` and `agents/wp-tailwind.md` now state the N+1
+  rule (`max-width: Npx` → `max-[N+1px]:`, or a `--breakpoint-*` redeclared to `N+1`;
+  `min-width` needs no adjustment) with a worked example at the round numbers that hit
+  this. `bin/tailwindify-parity.mjs` now also reads every `max-width`/`min-width` value
+  out of the ORIGINAL demo's own CSS and samples those exact pixel widths, on top of
+  `--widths` — 1440 and 390 never land on the one width where the off-by-one is visible.
+
+- **A hand-written CSS file imported with no cascade layer beats every Tailwind
+  utility, regardless of specificity or source order — and this shipped in the
+  `__tailwind__` starter itself.** `base/reset.css` duplicated two declarations
+  Preflight already sets (`box-sizing: border-box`, `img { max-width: 100% }`) as
+  plain, unlayered CSS; on a real build the duplicate clamped a button to a fraction of
+  its design size and clipped a slider arrow deliberately overhanging its button. The
+  starter's `main.css` now imports every default file with its matching layer —
+  `layer(base)`, `layer(components)`, `layer(utilities)` — and `base/reset.css` no
+  longer duplicates what Preflight covers. `skills/wp-tailwind-system/SKILL.md`,
+  `agents/wp-tailwind.md` and the five commands that register a new `@import`
+  (`wp-section`, `wp-header`, `wp-footer`, `wp-page`, `wp-cpt`) now require the same
+  `layer()` declaration on every file a later build step adds.
+
+- **Preflight does not set `cursor`, and the starter's own reset never restored it.**
+  Tailwind v4 leaves every button on the UA default (`default`, not `pointer`). The
+  `__tailwind__` starter's `base/reset.css` now restores it, scoped past a literal
+  `<button>` to `summary`, `[role="button"]`, `[role="option"]`, `[role="tab"]` and a
+  form's `input[type="submit"|"button"|"reset"]` — Contact Form 7 and WordPress's own
+  comment form render their submit this way, and `button { cursor: pointer }` alone
+  never reaches it — paired with `:disabled` / `[aria-disabled="true"]` back to
+  `default`.
+
 ## [1.18.0] - 2026-09-15
 
 ### Added

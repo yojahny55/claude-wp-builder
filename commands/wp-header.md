@@ -177,7 +177,10 @@ in a Tailwind theme.
 >    that file precisely because it spans more than one block.
 > 5. If `layouts/header.css` does not exist, create it with its first rule already in
 >    it and add its `@import` to `main.css` in the same step, in `base` → `components`
->    → `layouts` → `utilities` order. Never leave an empty file.
+>    → `layouts` → `utilities` order, naming its cascade layer (`layer(components)` for
+>    `layouts/header.css`, `layer(utilities)` for `utilities/site.css`) — a bare
+>    `@import` beats every Tailwind utility regardless of specificity. Never leave an
+>    empty file.
 > 6. Colors and fonts come from the `@theme` block as utilities (`bg-primary`,
 >    `font-primary`). No `:root`, no hardcoded hex a token already covers.
 > 7. Responsive via Tailwind prefixes (`md:`, `lg:`) — including the hamburger

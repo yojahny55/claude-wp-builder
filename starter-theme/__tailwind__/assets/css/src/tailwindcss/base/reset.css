@@ -1,11 +1,45 @@
-/* WordPress block box-sizing reset */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+/* No `box-sizing: border-box` and no `img { max-width: 100% }` here.
+ *
+ * Tailwind's own Preflight (imported by `@import "tailwindcss"` in main.css)
+ * already sets `box-sizing: border-box` on `*`, `::before` and `::after`, and
+ * `display:block; max-width:100%; height:auto` on every replaced element —
+ * both inside its own `base` layer. A second, hand-written copy of either rule
+ * has shipped here before and cost real damage even though this file IS
+ * layer(base) (see main.css): a project button whose declared box was read as
+ * its OUTER box instead of its content box shrank to a fraction of its design
+ * size, and a slider arrow deliberately overhanging its button via a negative
+ * offset got clamped to the button's own width. Two declarations for one
+ * property, agreeing today, is still a maintenance trap — whichever one a
+ * later edit forgets to update wins silently. Don't duplicate what Preflight
+ * already provides. Extend it below only for what it does NOT cover. */
+
+/* Preflight does not set `cursor`. Tailwind v4 leaves every interactive
+ * control on the UA default, which is `default`, not `pointer` — a demo's own
+ * reset commonly restores this with `button { cursor: pointer }`, and a
+ * conversion that drops the whole rule as "preflight covers it" drops this
+ * declaration along with the ones preflight really does cover.
+ *
+ * The selector list below is wider than a literal `button`, because a demo's
+ * clickable surface usually is too: a `[role="button"]` div standing in for
+ * one, a `<summary>` disclosure triangle, a tab or option in a custom widget,
+ * and a form's `<input type="submit">` — which Contact Form 7 and WordPress's
+ * own comment form both render, and which `button { cursor: pointer }` alone
+ * never reaches. */
+button,
+summary,
+[role="button"],
+[role="option"],
+[role="tab"],
+input[type="submit"],
+input[type="button"],
+input[type="reset"] {
+  cursor: pointer;
 }
 
-img {
-  max-width: 100%;
-  display: block;
+/* A disabled control should not also promise a click — a demo's own reset
+ * commonly pairs the rule above with this one. */
+button:disabled,
+input:disabled,
+[aria-disabled="true"] {
+  cursor: default;
 }
