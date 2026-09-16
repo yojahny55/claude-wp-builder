@@ -70,6 +70,13 @@ defined( 'ABSPATH' ) || exit;
 // nothing is sniffed per request. wp-agentic-surfaces substitutes the detected value.
 define( '<prefix>_AGENTIC_SITE_TYPE', 'content' );
 
+// The site's AI-use policy, in the one wording robots.txt and HTTP can share. It ships
+// as a response header (see the `send_headers` action below); robots.txt only documents
+// it in a comment — `Content-Signal` is an HTTP header per its spec, not a robots.txt
+// directive, and a bare `Content-Signal:` line is the one line in that file no robots.txt
+// grammar recognises, which fails an entire robots.txt validation over one signal.
+define( '<prefix>_CONTENT_SIGNAL', 'Content-Signal: ai-train=yes, search=yes, ai-retrieval=yes' );
+
 // 1. Dynamic llms.txt, llms-full.txt and modular per-area llms.txt.
 add_action( 'init', function () {
     add_rewrite_rule( '^llms\.txt$', 'index.php?<prefix>_agent=llms', 'top' );
@@ -170,9 +177,12 @@ add_filter( '404_template', function ( $template ) {
     exit;
 } );
 
-// 4. robots.txt: Content-Signal + sitemap (only when no physical robots.txt serves).
+// 4. robots.txt: Content-Signal note + sitemap (only when no physical robots.txt serves).
+// `Content-Signal` is an HTTP response header (see the `send_headers` action below), not a
+// robots.txt directive — no robots.txt grammar recognises a bare `Content-Signal:` line, so
+// it is written here only as a comment, which every parser already ignores.
 add_filter( 'robots_txt', function ( $output ) {
-    $output .= "\nContent-Signal: ai-train=yes, search=yes, ai-retrieval=yes\n";
+    $output .= "\n# " . <prefix>_CONTENT_SIGNAL . " (sent as an HTTP header on every response)\n";
     return $output;
 }, 20 );
 
@@ -181,8 +191,9 @@ add_filter( 'robots_txt', function ( $output ) {
     return $output;
 }, 21 );
 
-// 5. RFC 8288 Link headers. `send_headers` is the front-end response hook — `wp_headers`
-// filters WP_HTTP *request* headers, so a Link built there never reaches a visitor.
+// 5. RFC 8288 Link headers, and the Content-Signal header from block 1a. `send_headers`
+// is the front-end response hook — `wp_headers` filters WP_HTTP *request* headers, so a
+// Link (or Content-Signal) built there never reaches a visitor.
 add_action( 'send_headers', function () {
     $links = array(
         '<' . home_url( '/sitemap_index.xml' ) . '>; rel="sitemap"',
@@ -190,6 +201,7 @@ add_action( 'send_headers', function () {
         '<' . home_url( '/.well-known/ard.json' ) . '>; rel="ai-catalog"; type="application/json"',
     );
     header( 'Link: ' . implode( ', ', $links ) );
+    header( <prefix>_CONTENT_SIGNAL );
 } );
 ```
 
@@ -532,12 +544,28 @@ function <prefix>_accepts_markdown() {
 /**
  * True for a markdown request or a non-browser agent, so a 404 can stay useful to agents
  * without hijacking the designed error page for a human — GEO-A04.
+ *
+ * Named search indexers are matched and excluded BEFORE the generic pattern below, and
+ * always get the human HTML. `bot|crawl|spider|agent` matches "Googlebot" on `bot` alone,
+ * so without this exclusion a real audit found a 404 served as markdown to Googlebot: the
+ * page a browser sees and the page a search indexer sees differed on the same URL, which
+ * is the definition of cloaking, whether or not the mismatch was intentional.
  */
 function <prefix>_wants_markdown() {
     if ( <prefix>_accepts_markdown() ) {
         return true;
     }
     $ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : '';
+    if ( '' === $ua ) {
+        return false;
+    }
+    // Search indexers, matched first and always human. Applebot is Apple's own indexer
+    // (Siri, Spotlight, Safari previews); the negative lookahead leaves Applebot-Extended —
+    // a different UA, the AI-training crawler allowlisted in Step 4 — to the generic match.
+    $indexer = '/googlebot|bingbot|msnbot|slurp|duckduckbot|baiduspider|yandex(?:bot|images|video)?|sogou|exabot|ia_archiver|applebot(?!-extended)/i';
+    if ( preg_match( $indexer, $ua ) ) {
+        return false;
+    }
     return (bool) preg_match( '/bot|crawl|spider|agent|curl|wget|python|httpx|libwww|httpclient/i', $ua );
 }
 
@@ -804,20 +832,29 @@ foreach ( \$bots as \$bot ) {
     \$robots .= 'User-agent: ' . \$bot . PHP_EOL . 'Allow: /' . PHP_EOL . PHP_EOL;
 }
 \$robots .= 'User-agent: Bytespider' . PHP_EOL . 'Disallow: /' . PHP_EOL . PHP_EOL;
-\$robots .= 'Content-Signal: ai-train=yes, search=yes, ai-retrieval=yes' . PHP_EOL;
+// Content-Signal is an HTTP response header (see inc/agentic.php's `send_headers`
+// action), not a robots.txt directive — no robots.txt grammar recognises a bare
+// `Content-Signal:` line, so it is written here only as a comment.
+\$robots .= '# Content-Signal: ai-train=yes, search=yes, ai-retrieval=yes (sent as an HTTP header on every response)' . PHP_EOL;
 \$robots .= 'Sitemap: ' . \$home . 'sitemap_index.xml' . PHP_EOL;
 file_put_contents( ABSPATH . 'robots.txt', \$robots );
 echo 'robots.txt written: ' . ABSPATH . 'robots.txt';
 "
 ```
 
-The `Content-Signal` must match the allowlist. This list allows training-capable crawlers
-(`GPTBot`, `ClaudeBot`, `Google-Extended`, `Applebot-Extended`), so the signal declares
-`ai-train=yes` — an allow plus `ai-train=no` is the contradiction `robots-ai-policy-quality`
-fails. A site that wants to opt out of training must also `Disallow` those bots and set
-`ai-train=no`. Keep `CCBot` and `anthropic-ai` consistent with the owner's answer — `CCBot`
-is context (allow only if the public corpus is wanted); `anthropic-ai` is training-only,
-unlike `ClaudeBot`.
+The `Content-Signal` header (block 1a's `send_headers` action) must match the allowlist.
+This list allows training-capable crawlers (`GPTBot`, `ClaudeBot`, `Google-Extended`,
+`Applebot-Extended`), so the signal declares `ai-train=yes` — an allow plus `ai-train=no`
+is the contradiction `robots-ai-policy-quality` fails. A site that wants to opt out of
+training must also `Disallow` those bots and set `ai-train=no`. Keep `CCBot` and
+`anthropic-ai` consistent with the owner's answer — `CCBot` is context (allow only if the
+public corpus is wanted); `anthropic-ai` is training-only, unlike `ClaudeBot`.
+
+**Do not write `Content-Signal:` as a bare line into `robots.txt`.** No robots.txt grammar
+defines that directive, so a validator that lints the file (Lighthouse included) reports
+the whole file invalid over that one line, which costs the SEO score of every page and
+buries any real robots.txt error behind a self-inflicted one. The header carries the
+signal; the file only documents it in a comment.
 
 ---
 
@@ -846,15 +883,22 @@ foreach ( \$routes as \$path => \$want ) {
 }
 \$res  = wp_remote_get( home_url( '/no-such-path-<prefix>-' . time() ) );
 echo 'agent 404: ' . wp_remote_retrieve_response_code( \$res ) . PHP_EOL;
-\$res  = wp_remote_get( home_url( '/robots.txt' ) );
-echo 'Content-Signal: ' . ( false !== strpos( wp_remote_retrieve_body( \$res ), 'Content-Signal' ) ? 'present' : 'MISSING' ) . PHP_EOL;
+// Named search indexers must get the plain themed 404, not the markdown body.
+\$res  = wp_remote_get( home_url( '/no-such-path-<prefix>-' . time() ), array( 'user-agent' => 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' ) );
+\$type = wp_remote_retrieve_header( \$res, 'content-type' );
+echo 'Googlebot 404 content-type: ' . \$type . ( false === strpos( (string) \$type, 'text/markdown' ) ? ' OK (human HTML)' : ' CLOAKING — Googlebot got markdown' ) . PHP_EOL;
+// Content-Signal travels as a header on a real page, not inside robots.txt.
+\$res  = wp_remote_get( home_url( '/' ) );
+echo 'Content-Signal header: ' . ( wp_remote_retrieve_header( \$res, 'content-signal' ) ?: 'MISSING' ) . PHP_EOL;
 "
 ```
 
 A surface is fixed only when its route returns the right status and media type. Report
 each one; a write to the theme file is not proof. This is one unauthenticated fetch per
 route: it proves the route works, not that every allowlisted AI user agent can reach it —
-GEO-A23 evidence comes from `wp-audit-geo`'s per-UA probe, not from this check.
+GEO-A23 evidence comes from `wp-audit-geo`'s per-UA probe, not from this check. The
+Googlebot-UA fetch above is the one check that matters for GEO-A04: it is the same probe
+that caught a 404 served as markdown to a named indexer.
 
 ---
 
@@ -867,7 +911,7 @@ reported by `wp-audit-geo` with a recommendation.
 | Code | Surface in `inc/agentic.php` / steps |
 |------|--------------------------------------|
 | GEO-D01 | `/.well-known/ard.json` + `ai-catalog.json` alias — `<prefix>_ard_json()` |
-| GEO-D02 | robots AI crawler allowlist + `Content-Signal` — Step 4 and the `robots_txt` filter |
+| GEO-D02 | robots AI crawler allowlist — Step 4; `Content-Signal` — the `send_headers` HTTP header in block 1a, not robots.txt |
 | GEO-D03 | trust manifest (`trust` block) inside the ARD catalog |
 | GEO-D04 | `/agents.md` — `<prefix>_agents_md()` |
 | GEO-A02 | AI user agents allowed through in `robots.txt` — Step 4 |
