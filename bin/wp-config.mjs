@@ -10,8 +10,8 @@ import {
 } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import {
-  CURRENT_VERSION, MANIFEST_NAME, detectVersion, validateManifest, migrateManifest,
-  renderContext, spliceContext, contextDrift,
+  CURRENT_VERSION, MANIFEST_NAME, LOCAL_NAME, detectVersion, validateManifest, migrateManifest,
+  renderContext, spliceContext, contextDrift, resolveSecret, getKey, SECRETS,
 } from './lib/manifest.mjs';
 
 const say = (s) => console.log(s);
@@ -110,11 +110,45 @@ function cmdRenderContext(projectPath) {
   say(`ok: wrote the generated block in ${file}`);
 }
 
+function loadLocal(projectPath) {
+  const file = join(resolve(projectPath), LOCAL_NAME);
+  if (!existsSync(file)) return {};
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch (err) {
+    warn(`${LOCAL_NAME} is not valid JSON: ${err.message}`);
+    process.exit(1);
+  }
+}
+
+function cmdGet(projectPath, key) {
+  const { manifest } = loadManifest(projectPath);
+  if (Object.hasOwn(SECRETS, key)) {
+    const hit = resolveSecret(key, { env: process.env, local: loadLocal(projectPath), manifest });
+    if (!hit) {
+      warn(`no value for ${key} in the environment, ${LOCAL_NAME} or the manifest`);
+      process.exit(1);
+    }
+    if (hit.source === 'manifest') {
+      warn(`${key} resolved from the manifest, a legacy location: move it to ${LOCAL_NAME}, which is gitignored`);
+    }
+    say(hit.value);
+    return;
+  }
+  const found = getKey(manifest, key);
+  if (!found.ok) {
+    warn(`unknown key: ${key}`);
+    process.exit(1);
+  }
+  say(found.value);
+}
+
 const [cmd, target] = process.argv.slice(2);
 if (cmd === 'validate' && target) cmdValidate(target);
 else if (cmd === 'migrate' && target) cmdMigrate(target);
 else if (cmd === 'render-context' && target) cmdRenderContext(target);
+else if (cmd === 'get' && target && process.argv[4]) cmdGet(target, process.argv[4]);
 else {
-  warn('usage: wp-config.mjs <validate|migrate|render-context> <project-path>');
+  warn('usage: wp-config.mjs <validate|migrate|render-context|get> <project-path> [key]');
   process.exit(1);
 }

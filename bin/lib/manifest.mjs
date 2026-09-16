@@ -87,6 +87,42 @@ export function migrateManifest(manifest, { claudeMd = '' } = {}) {
   return { manifest: current, notes };
 }
 
+export const SECRETS = {
+  db_password: { env: 'WP_CREATE_DB_PASSWORD', manifestPath: 'database.password' },
+  admin_password: { env: 'WP_CREATE_ADMIN_PASSWORD', manifestPath: 'wordpress.admin_password' },
+};
+
+// environment -> local file -> manifest. The manifest rung is kept so a project that
+// has not migrated still works; the caller warns that it is legacy every time it wins.
+export function resolveSecret(name, { env = {}, local = {}, manifest = {} } = {}) {
+  const spec = SECRETS[name];
+  if (!spec) return null;
+  if (env[spec.env]) return { value: env[spec.env], source: 'env' };
+  const fromLocal = at(local, spec.manifestPath);
+  if (fromLocal) return { value: fromLocal, source: 'local' };
+  const fromManifest = at(manifest, spec.manifestPath);
+  if (fromManifest) return { value: fromManifest, source: 'manifest' };
+  return null;
+}
+
+// Two manifest keys are spelled with a space ("demo mode", "i18n strategy"), which a
+// dotted path cannot address, so lookup goes through an explicit alias table.
+const KEY_ALIASES = {
+  'i18n-strategy': 'i18n strategy',
+  'demo-mode': 'demo mode',
+};
+
+export function getKey(manifest, key) {
+  if (Object.hasOwn(KEY_ALIASES, key)) {
+    const raw = manifest[KEY_ALIASES[key]];
+    const fallback = key === 'i18n-strategy' ? 'suffix' : 'plain';
+    return { ok: true, value: String(raw ?? fallback) };
+  }
+  const value = at(manifest, key);
+  if (value === undefined || value === null || typeof value === 'object') return { ok: false };
+  return { ok: true, value: String(value) };
+}
+
 export const MARK_BEGIN = '<!-- wp-create:begin -->';
 export const MARK_END = '<!-- wp-create:end -->';
 

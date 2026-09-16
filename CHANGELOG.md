@@ -45,6 +45,17 @@
   telling the operator to fix the markers by hand, writing nothing. `contextDrift`
   reports a malformed file as its own finding, distinct from ordinary drift.
   Covered by four new cases in `tests/checks/wp-config-context.sh`.
+- **`node bin/wp-config.mjs get <project-path> <key>` — one way for every consumer to
+  read a manifest value, secrets included.** `/wp-init` writes a project's `.gitignore`
+  as `node_modules/`, `.DS_Store`, `*.log`, so `.wp-create.json` — database password
+  included — was committable into a client's repository by default. `get` resolves the
+  two recognised secrets (`db_password`, `admin_password`) in order **environment →
+  `.wp-create.local.json` → manifest**; the manifest rung still works for a project that
+  has not moved its secret out, but it warns every time it wins that the value came from
+  a legacy, committable location. A fixed alias table (`i18n-strategy`, `demo-mode`, plus
+  the dotted paths `theme.slug`, `project.slug`, `plugins.profile`, `languages.primary`,
+  `wp_cli.wrapper`) addresses the two space-spelled manifest keys a dotted path cannot
+  reach. Covered by `tests/checks/wp-config-secrets.sh`.
 
 ## [1.18.0] - 2026-09-15
 
