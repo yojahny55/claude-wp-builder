@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`agents/wp-acf.md` — the front page's own location rule never matched a hierarchy-rendered
+  front page.** `page_template == front-page.php` only matches when a page's
+  `_wp_page_template` meta is literally set to that filename; a page chosen as the front page
+  through Settings → Reading keeps that meta at `default`, so its field group silently
+  disappeared from the editor while its fields kept rendering on the front end. Switched to
+  `page_type == front_page`, which ACF derives from `is_front_page()` instead. Also: every
+  group now gets a `menu_order` equal to its section's position on the page (groups defaulted
+  to 0 and stacked in load order, not page order) with numbered, single-language titles; and
+  when the demo shows the same content twice at different lengths for different purposes (a
+  card excerpt, a full bio), that is modeled as two fields from the start instead of one field
+  serving both and breaking in both directions.
+
 ## [1.18.0] - 2026-09-15
 
 ### Added

@@ -44,9 +44,9 @@ acf_add_local_field_group(array(
     'location' => array(
         array(
             array(
-                'param' => 'page_template',
+                'param' => 'page_type',
                 'operator' => '==',
-                'value' => 'front-page.php',
+                'value' => 'front_page',
             ),
         ),
     ),
@@ -101,7 +101,9 @@ if (!defined('ABSPATH')) { exit; }
 
 acf_add_local_field_group(array(
     'key' => 'group_hero',
-    'title' => 'Hero Section',
+    // Numbered, primary-language title matching the section's own heading — see
+    // "Editor Box Order" (Rules 16-17) below. This is section 1 on the front page.
+    'title' => '1. Hero',
     'fields' => array(
         // ── Content Tab ──
         array(
@@ -182,12 +184,16 @@ acf_add_local_field_group(array(
     'location' => array(
         array(
             array(
-                'param' => 'page_template',
+                'param' => 'page_type',
                 'operator' => '==',
-                'value' => 'front-page.php',
+                'value' => 'front_page',
             ),
         ),
     ),
+    // The front page's position among the front page's OWN groups: 1 for hero,
+    // 2 for the section drawn right after it, and so on. See "Editor Box Order
+    // (menu_order + titles)" below.
+    'menu_order' => 1,
 ));
 ```
 
@@ -355,19 +361,30 @@ Tab fields have `'name' => ''` (empty string) — they are UI-only, not data fie
 
 | Target | Param | Value |
 |---|---|---|
-| Front page | `page_template` | `front-page.php` |
+| Front page | `page_type` | `front_page` |
 | Specific page template | `page_template` | `page-pricing.php` |
 | All pages | `post_type` | `page` |
 | All posts | `post_type` | `post` |
 | Custom post type | `post_type` | `service` |
 | Options page | `options_page` | `theme-settings` |
 
+**Front page: `page_type == front_page`, never `page_template == front-page.php`.**
+`page_template` matches only when a page's `_wp_page_template` meta is literally set to
+that filename — true when the front page was built with `/wp-page` and assigned the
+template directly. But WordPress's own template hierarchy can also select
+`front-page.php` for whichever page Settings → Reading names as the front page, without
+ever writing that meta: `_wp_page_template` stays `default`, `page_template ==
+front-page.php` never matches, and the field group silently disappears from the editor
+while its fields keep rendering on the front end — the worst kind of broken, because
+nothing looks wrong until someone tries to edit it. `page_type == front_page` matches
+either way, because ACF derives it from `is_front_page()`, not from the template meta.
+
 Multiple location rules (OR logic — show on ANY match):
 
 ```php
 'location' => array(
     array(
-        array('param' => 'page_template', 'operator' => '==', 'value' => 'front-page.php'),
+        array('param' => 'page_type', 'operator' => '==', 'value' => 'front_page'),
     ),
     array(
         array('param' => 'page_template', 'operator' => '==', 'value' => 'page-about.php'),
@@ -391,7 +408,7 @@ Multiple conditions in one rule (AND logic — ALL must match):
 1. **Files contain BARE `acf_add_local_field_group()` calls** — no hooks, no wrapping functions. The auto-loader handles timing. The `fields/*.php` you write are a **one-time bootstrap**: the theme's `acf/init` loader registers them once, persists each group to `acf-json/`, and from then on loads only the Local JSON. This is what makes field groups **editable in the SCF/ACF dashboard** and lets the client add fields manually — pure PHP-local groups (`ID=0`) never appear in the Field Groups list and cannot be edited. Never add a `save_json`/`load_json` filter pointing elsewhere; ACF already defaults to the theme's `acf-json/`.
 2. **One file per section** in the `fields/` directory — `fields/hero.php`, `fields/services.php`, etc.
 3. **Settings fields use `'option'` as post ID** when retrieved via `get_field('field_name', 'option')`
-4. **Location rules:** `page_template` for page-specific fields, `options_page` for settings
+4. **Location rules:** `page_type == front_page` for the front page (never `page_template == front-page.php` — see "Location Rules" above), `page_template` for any OTHER page-specific fields, `options_page` for settings
 5. **Secondary language instructions:** always include `'instructions' => 'Leave empty to use [primary language] version.'`
 6. **Tab organization:** primary content tabs first, then one tab per secondary language at the end
 7. **All field keys MUST be unique** across the entire theme — use section name as namespace prefix
@@ -403,6 +420,9 @@ Multiple conditions in one rule (AND logic — ALL must match):
 13. **Editing a group that already exists** (e.g. adding fields to `fields/settings.php`): after you change the PHP, the loader will keep loading the old Local JSON unless you invalidate it. Delete that group's `acf-json/<group_key>.json` (and, if the site imported it, `$WP eval "acf_delete_field_group('<group_key>');"` to drop the DB post) so the edited PHP re-bootstraps a fresh JSON on the next load. Do this ONLY when redefining the group in code — it discards any manual dashboard edits to that group, which is the intended behavior for a code-driven change.
 14. **Never give an options-page field a `default_value`.** A default is not an empty value, so any per-language layer that falls back "when the bucket is empty" — `acf-options-for-polylang` is the usual one — never falls back at all: the seeded value, and every later edit the client makes, is invisible on the front end while the default renders. Options-page defaults also duplicate a fallback the template almost always already has. Put the fallback in the template (`prefix_get_field('x','option') ?: 'Default'`), never in the field definition.
 15. **An options page is ONE global store.** A value written there shows in *every* language until its per-language twin is filled too — so a field whose Spanish value is seeded prints Spanish on the English page. Seed an options-page field only when the theme has no bilingual string for it; if `get_translations()` already carries the wording, leave the field empty and let both languages fall back. Say so in the field's `instructions`.
+16. **Every group gets a `menu_order` equal to its section's position on the page it belongs to**, numbered per page (the front page's hero is 1, the section right after it is 2, and so on — a different page starts back at 1). Leaving `menu_order` at ACF's default of 0 stacks every group in the order ACF happened to load the files, which is rarely the order the page draws them, and the editor becomes a puzzle instead of a mirror of the page.
+17. **Group titles are numbered and in the project's PRIMARY language, never mixed.** `1. Hero`, `2. Practice Areas`, `3. Our Process` — the same wording and the same order the page uses for that section, so the editor list reads top-to-bottom like the page does. A group that is the single box for one record of a `<cpt>` (its per-post detail fields, not a page section) states what it is without a number: `<CPT> Details`, not `4. <CPT> Details` — it has no siblings on a page to be numbered against.
+18. **When the demo shows the same kind of content twice at different lengths for different purposes — a short line on a card and a full write-up on a detail page — model TWO fields from the start**, e.g. `<section>_excerpt` (the card's own short text) and `<section>_bio` (the long form). A single field trying to serve both breaks in both directions: seeded with the short text, the detail page is empty; seeded with the long text, the card overflows its box. If a record's excerpt is left blank, the template falls back to a trimmed slice of the long field — that is a template concern (`wp_trim_words()` or similar), never a reason to collapse the two fields back into one.
 
 ## Local JSON model (how these files reach the dashboard)
 
