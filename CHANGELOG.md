@@ -29,7 +29,10 @@
   slug that isn't, naming the canonical form, rather than silently normalising it. Fixture
   coverage extended to the remaining `validateProfile` branches (`conflicts`, unknown key,
   bad `source`, a non-object entry, a missing `slug`, a missing `name`, a non-array
-  `plugins`, a non-array `requires`).
+  `plugins`, a non-array `requires`, a non-boolean `required`, a non-canonical `slug`) —
+  the last two were themselves initially unguarded: disabling either check left the full
+  suite green, so each now has its own fixture proven to fail red when that check alone
+  is disabled.
 - **Fix: `wp-config.mjs` no longer echoes `JSON.parse`'s own error message when a manifest,
   local-secrets file or profile fails to parse.** That message can embed up to ~20 raw
   bytes of the file's own content as a quoted snippet — a real leak path for

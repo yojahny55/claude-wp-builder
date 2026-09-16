@@ -96,4 +96,18 @@ set -e
 grep -q 'requires must be an array' "$tmp/reqarr" || fail "the requires-not-array message is missing"
 if grep -qi 'TypeError' "$tmp/reqarr"; then fail "a non-array requires produced a raw stack trace instead of a validation message"; fi
 
+# --- A required that is present but not a boolean is rejected. --------------
+set +e
+$cfg validate-profile tests/fixtures/profiles/required-not-boolean.json >"$tmp/reqbool" 2>&1; code=$?
+set -e
+[ "$code" = "1" ] || fail "a profile with a non-boolean required exited $code, want 1"
+grep -q 'contact-form-7: required must be a boolean' "$tmp/reqbool" || fail "the required-not-boolean message does not name the plugin"
+
+# --- A slug that is not already lowercase and trimmed is rejected. ----------
+set +e
+$cfg validate-profile tests/fixtures/profiles/slug-not-canonical.json >"$tmp/slugcanon" 2>&1; code=$?
+set -e
+[ "$code" = "1" ] || fail "a profile with a non-canonical slug exited $code, want 1"
+grep -q 'Contact-Form-7: slug must already be lowercase and trimmed' "$tmp/slugcanon" || fail "the slug-not-canonical message does not name the slug"
+
 echo PASS
