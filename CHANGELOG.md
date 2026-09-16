@@ -239,6 +239,49 @@
   `apple-touch-icon` at a file iOS does not read as a touch icon. Step 6 now imports the
   site icon (when `site_icon` is empty) with that filter explicitly disabled around the
   sideload, and verifies the stored file is still a PNG.
+- **`/wp-polylang`'s menu import wrote the per-language override and nothing else.**
+  Polylang's own frontend filter only substitutes a location's value inside the core
+  `nav_menu_locations` theme_mod — it never adds one. A location assigned only through
+  the `polylang` option (what `pll-import.php`'s menu branch did, and what `/wp-seed`'s
+  own Polylang phase still does for the primary language) left that theme_mod empty, so
+  `wp_nav_menu()` fell through to its hard-coded fallback for EVERY language — the
+  fallback can look right by coincidence in the default language, which is what hid it.
+  Both scripts now register the location the normal way before writing the override.
+  Separately, the Polylang i18n variant's string helper asked the registry for a
+  hardcoded `'en'` value; a project whose registered source is a different primary
+  language never matched, so `pll__()` silently no-op'd and a client's edits under
+  Languages > Strings were discarded. It now resolves the source through the project's
+  own `DEFAULT_LANG` constant.
+- **A taxonomy term's own custom fields never reached its translation.** `/wp-polylang`
+  carries a post's fields, content and ACF payload across, but a term's fields are a
+  separate storage surface `pll_save_term_translations()` does nothing for — a repeater
+  or a plain field attached to a term came out blank on the counterpart, with no error.
+  The export and import scripts now walk and write a term's ACF/SCF fields the same way
+  they already did for posts, through the `"<taxonomy>_<term_id>"` context string both
+  plugins accept in place of a post id.
+- **A CPT's or taxonomy's rewrite base, registered once in PHP, was never documented as
+  untranslatable.** Free Polylang prefixes and translates a post's or term's slug but
+  never the static path segment ahead of it — there is no per-language value to
+  translate, since the base is a PHP literal, not stored content. `skills/wp-polylang/SKILL.md`
+  now documents the two-halves pattern (extra rewrite rules per translated base, plus a
+  link filter that swaps it) and the rule that decides which base to print: the language
+  already in the URL, never the current reader — getting that backwards breaks the very
+  links Polylang itself builds for the other language (the hreflang pair, the switcher).
+- **`/wp-seed` had nowhere to send an options-page `page_link` field.** A demo never
+  supplies copy for a legal-links column (privacy policy, terms, FAQ), so those fields
+  shipped empty or pointed at whatever draft page WordPress created on install — a 404
+  with nothing in the UI to say so. A new phase creates a clearly-marked placeholder page
+  per language for each one, safe to re-run without overwriting a client's real page.
+  Templates that print one of these fields now have a documented guard: a `page_link`
+  keeps pointing at its page after that page is unpublished, and printing it regardless
+  serves a broken link silently.
+- **Non-trivial seed scripts had no documented home.** A whole content pass written as
+  throwaway files in a session's scratchpad survives only as long as the session does —
+  the records land in the database and stay; the code that reproduces them does not.
+  `skills/wp-cli-patterns/SKILL.md` now says where that logic belongs (`inc/seed/`, data
+  in `inc/seed/data/`), and defines the marker-meta and stable-key convention a re-run
+  needs to update existing records in place instead of duplicating them, without ever
+  overwriting a client's own edit.
 
 ## [1.18.0] - 2026-09-15
 

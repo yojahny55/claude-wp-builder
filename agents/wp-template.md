@@ -203,6 +203,41 @@ echo prefix_image($logo, 'medium', array(
 ));
 ```
 
+### `page_link` options fields — check publish status before linking
+
+A `page_link` field (a legal-links column — privacy policy, terms, FAQ — is
+the common case) keeps pointing at its target page after that page is
+unpublished, put back to draft, or trashed. `page_link` has no notion of post
+status, so printing the raw value once the page stops being public serves a
+404 to a logged-out visitor with nothing anywhere to say so — a settings field
+someone half-configured looks identical to one that broke. The guard belongs
+at the point of use, not at seed time, because a client can unpublish a page
+at any time after seeding:
+
+```php
+/**
+ * Is this URL something a visitor can actually open?
+ *
+ * True for a URL pointing at no post of ours (external — nothing to check) or
+ * at a published one. False for a URL whose post exists but is not public.
+ */
+function prefix_is_public_url($url) {
+    if (is_array($url)) {
+        $url = isset($url['url']) ? $url['url'] : '';
+    }
+    if (!$url || !is_string($url)) {
+        return false;
+    }
+    $post_id = url_to_postid($url);
+    return !$post_id || 'publish' === get_post_status($post_id);
+}
+```
+
+Filter every `page_link`-sourced link through it before printing — an
+`array_filter($links, 'prefix_is_public_url')` over the legal-links array is
+enough — so a page that goes back to draft drops out of the footer instead of
+becoming a dead link.
+
 ### Static translated strings
 
 Every string a visitor can read goes through `prefix_e()` / `prefix_t()`, not only the ones
