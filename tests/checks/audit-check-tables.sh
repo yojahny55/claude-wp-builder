@@ -9,7 +9,7 @@ set -euo pipefail
 fail() { echo "FAIL: $1"; exit 1; }
 
 # A code is "tabulated" when a line starts with `| <CODE> |`.
-for spec in "agents/wp-audit-seo.md:SEO" "agents/wp-audit-performance.md:PERF"; do
+for spec in "agents/wp-audit-seo.md:SEO" "agents/wp-audit-performance.md:PERF" "agents/wp-audit-a11y.md:A11Y"; do
   f=${spec%%:*}
   prefix=${spec##*:}
   [ -f "$f" ] || fail "$f is missing"

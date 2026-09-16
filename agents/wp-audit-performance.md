@@ -97,6 +97,8 @@ Before running ANY checks, read the following project files:
 | PERF-045 | Excessive cron events | `$WP cron event list --format=count` | ≤50 | INFO |
 | PERF-046 | Page generation time | `$WP eval "echo timer_stop();"` | <1.0s | WARNING |
 | PERF-048 | `fetchpriority` on a non-LCP element | Run PSI/Lighthouse on the homepage and read the `largest-contentful-paint-element` audit | LCP element is an `<img>` whenever any image carries `fetchpriority="high"` | WARNING |
+| PERF-054 | `loading="lazy"` on the real LCP element | Per template (not just the homepage), see "Procedure — finding the real LCP element" below | The element a `PerformanceObserver` reports for `largest-contentful-paint` never carries `loading="lazy"` | WARNING |
+| PERF-055 | Font preload weight ≠ LCP text's rendered weight | Read the `font-weight` computed on the LCP element from PERF-054's run; compare against which `assets/fonts/*.woff2` files are preloaded in `wp_head` | The weight the LCP text actually renders in is one of the preloaded files | WARNING |
 
 ### Procedure — render path checks (PERF-047 to PERF-053)
 
@@ -133,6 +135,42 @@ code-only version. Read the LCP element from the Lighthouse/PSI report:
   drop the priority hint, and report the actual LCP element in the finding.
 
 PERF-016 and PERF-048 are two halves of one decision — never report them in isolation.
+
+**PERF-054/PERF-055 — finding the real LCP element, per template.** "The hero image is the
+LCP" is a guess, and guessing it produces the opposite of the intended fix: a card grid
+(a directory archive, a team/news strip) can put its LCP on the first row of CARDS, not on
+the hero — a blanket `loading="lazy"` below the fold then defers exactly the element the page
+is judged on, on the one template where that rule was wrong. Measure instead of assuming, and
+measure every template the theme has, not only the front page:
+
+```js
+// Runs in the page (Playwright `page.evaluate`, or paste into a console).
+// PerformanceObserver on 'largest-contentful-paint' fires once per candidate as the
+// page loads and keeps replacing its report with a later, bigger one — the LAST
+// entry when the load settles is the one Lighthouse/PSI would report too.
+new PerformanceObserver((list) => {
+  const last = list.getEntries().at(-1);
+  window.__lcp = {
+    tag: last.element?.tagName,
+    src: last.element?.currentSrc || last.element?.src || null,
+    loading: last.element?.getAttribute?.('loading'),
+    text: last.element?.textContent?.slice(0, 60),
+    fontWeight: last.element && getComputedStyle(last.element).fontWeight,
+  };
+}).observe({ type: 'largest-contentful-paint', buffered: true });
+```
+
+Run it per template at both the mobile and desktop viewports the audit already screenshots
+at — the LCP element is not guaranteed to be the same element at both: a hero image can beat
+a heading on desktop and lose to it on a phone once the layout stacks. PERF-054 fails when
+`window.__lcp.loading === 'lazy'`. PERF-055 fails when `window.__lcp.tag` is text (not an
+`<img>`) and `window.__lcp.fontWeight` names a weight whose `assets/fonts/<family>-<weight>.woff2`
+is not one of the files `wp_head` preloads — report the actual rendered weight in the finding
+so the fix preloads that file instead of guessing 400.
+
+Report PERF-054/PERF-055 per template, not once for the site: the fix in Step 5 is "eager the
+elements in the real LCP's row, lazy the rest, preload the weight that row renders in" — the
+same shape as the demo's own card grids, never a single sitewide `loading="lazy"` removal.
 
 **PERF-049 — dead assets.** Glob the theme's `assets/` recursively, match the backup patterns,
 sum the sizes. Move findings to an archive directory outside the theme rather than deleting:
@@ -267,13 +305,22 @@ add_action('wp_enqueue_scripts', function() {
     wp_dequeue_style('global-styles');
 }, 100);
 
-// Preload critical fonts
+// Preload the weight(s) the real LCP text actually renders in — never "the
+// first N files glob() happens to return". `array_slice($fonts, 0, 2)` picks
+// whatever alphabetical order the filesystem gives, which preloaded inter-400
+// on a build whose above-the-fold heading was inter-600: the one file the
+// first paint waited on was the one not preloaded. PERF-054/PERF-055 measure
+// the LCP element's computed font-weight per template; name those files here.
 add_action('wp_head', function() {
     $font_dir = get_template_directory_uri() . '/assets/fonts/';
-    $fonts = glob(get_template_directory() . '/assets/fonts/*.woff2');
-    foreach (array_slice($fonts, 0, 2) as $font) {
-        $name = basename($font);
-        echo '<link rel="preload" href="' . esc_url($font_dir . $name) . '" as="font" type="font/woff2" crossorigin>' . "\n";
+    // Replace with the weight(s) PERF-054/PERF-055 measured across every
+    // template's LCP element — usually one or two, never "preload everything".
+    $lcp_weights = array( 400 );
+    foreach ($lcp_weights as $weight) {
+        $file = get_template_directory() . "/assets/fonts/inter-{$weight}.woff2";
+        if (file_exists($file)) {
+            echo '<link rel="preload" href="' . esc_url($font_dir . basename($file)) . '" as="font" type="font/woff2" crossorigin>' . "\n";
+        }
     }
 }, 1);
 
@@ -354,7 +401,21 @@ Edit CSS `@font-face` blocks to add `font-display: swap;` if missing.
 
 ### Image lazy loading fix
 
-Edit templates to add `loading="lazy"` to all `<img` tags below the fold (not in the hero section).
+Do not apply `loading="lazy"` by a blanket "below the hero" rule — PERF-054 exists because
+that rule is wrong on any template whose LCP is a grid card rather than the hero (a directory
+archive, a team/news strip: the first row is above the fold on every viewport the grid
+renders at). Use what PERF-054 measured: eager-load the images in the LCP element's own row
+(with `fetchpriority="high"` on the LCP element itself, never on more than one), `loading="lazy"`
+everything after it. A four-across grid at desktop that drops to two-across on mobile needs
+the wider count eager, e.g.:
+
+```php
+'loading'       => $card_index <= 4 ? 'eager' : 'lazy',
+'fetchpriority' => 1 === $card_index ? 'high' : 'auto',
+```
+
+Everywhere else — a true below-the-fold image with no grid ambiguity — `loading="lazy"` as
+before.
 
 ### Hero fetchpriority fix
 

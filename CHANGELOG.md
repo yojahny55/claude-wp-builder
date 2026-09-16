@@ -2,6 +2,85 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **ACF Local JSON bootstrap lock could never be acquired by the second user.**
+  The starter created the lock with `fopen(..., 'c')` under the process's default
+  umask (0644, owned by whoever ran first). When the web server user and the CLI
+  user differ — the common case — the second one can never open it for an
+  exclusive lock, and the bootstrap returns early, silently, on every later
+  request from that user: a field group's JSON drifts behind its PHP with
+  nothing logged anywhere. `__tailwind__` and `__cinematic__` now widen the lock
+  to 0666 right after creating it.
+- **`/wp-sitemap.xml` 404s on a project with no native `post` content.**
+  `WP::handle_404()` only clears the 404 when the current query matched
+  something, and a sitemap route runs no post query of its own — on a site that
+  publishes `post` it survives by accident (the default "latest posts" query
+  behind it isn't empty); on a site modeled entirely as custom post types that
+  query IS empty, so core marks the sitemap request 404 while
+  `WP_Sitemaps::render_sitemaps()` prints a perfectly valid sitemap on
+  `template_redirect` immediately afterward — a correct XML body under a 404
+  status line, which every crawler reads as absent. The `__tailwind__` starter
+  now exempts the sitemap and sitemap-stylesheet routes via `pre_handle_404`.
+- **A starter scaffold part left on disk after its last caller is removed ships
+  unreviewed.** `/wp-header`, `/wp-footer` and `/wp-page search` fully replace
+  `header.php`/`footer.php`/`search.php` with project markup, which removes the
+  `get_template_part()` call to the starter's placeholder part
+  (`header/site-branding.php`, `header/navigation.php`, `footer/site-info.php`,
+  `content-search.php`) — but nothing then deleted the now-unreferenced file, so
+  a starter placeholder (down to a hardcoded credit link to an external domain)
+  shipped on a real build, one accidental `get_template_part()` away from
+  rendering. `agents/wp-template.md` now instructs deleting an orphaned part in
+  the same step its last caller is removed.
+- **`content-page.php` (the generic/legal page template) shipped as unstyled
+  underscores boilerplate** while every other template in a project is
+  pixel-matched to its demo. It now gets its own small baseline: a
+  comfortable-width column and Tailwind Typography's `prose` utility (already
+  loaded by the starter's `main.css`) carrying headings, lists and links through
+  the project's own `@theme` colors.
+- **`/wp-finalize`'s theme-structure check never looked for a favicon or a
+  branded login screen.** A demo can declare `<link rel="icon">` on every page
+  and have the conversion to PHP drop the tag entirely, leaving the live site
+  with no icon at all; `wp-login.php` is the one page that never enqueues the
+  theme's own stylesheet, so it stays WordPress's stock grey screen — the first
+  thing the client sees every day — unless something re-skins it. Both are now
+  checked (favicon/site icon as a blocking item, login branding as a
+  warning-only item, since some projects ship the default by choice).
+
+### Added
+
+- **Performance and accessibility audits now measure instead of guessing.**
+  `agents/wp-audit-performance.md` gains PERF-054/PERF-055: the real LCP element
+  is found per template with a `PerformanceObserver` on
+  `largest-contentful-paint`, not assumed to always be the hero — a directory or
+  archive grid can put its LCP on a first-row card, and a blanket
+  `loading="lazy"` below the fold then defers exactly the element the page is
+  judged on. PERF-055 checks the preloaded font file actually matches the
+  weight the LCP text renders in, instead of preloading "the first N files"
+  found on disk. `agents/wp-audit-a11y.md` gains A11Y-031 (overlays/drawers need
+  a real focus trap, not just initial focus, and must return focus on close),
+  A11Y-032 (`target="_blank"` links need a screen-reader "opens in a new tab"
+  notice), A11Y-033 (a horizontally-scrollable region needs `tabindex="0"` plus
+  an accessible name), and A11Y-034 (a cross-engine `cursor` sweep must not read
+  WebKit's `auto` — its UA default for an undeclared pointer — as "no pointer"
+  when other engines agree it is one). A11Y-004's non-text-contrast check now
+  requires computing a focus ring's contrast against the background it actually
+  sits on, not a single assumed page ground.
+- **`wp-aos-animator` closes two seams found by scrolling a real build past its
+  first entrance.** `aos.css` rewrites `transition-property`/`-duration`/`-delay`
+  on any element that still carries `data-aos`, for as long as the attribute
+  stays — silently breaking a hover-lift card's or a color-fading button's own
+  transition long after the entrance finished. The skill's init module now
+  strips the AOS attributes once an element's entrance transition ends. AOS also
+  measured trigger points at `DOMContentLoaded`, before web fonts and images
+  reflow the layout, so a block that moves afterward could end up permanently
+  below a stale trigger with `once: true`; the module now calls `AOS.refresh()`
+  again on `load`, and reveals anything already on screen at that point instead
+  of waiting for a scroll that may never come. The skill now also says to
+  animate the above-the-fold LCP candidate with a fast plain `fade` rather than
+  skip it outright — a small, deliberate LCP cost instead of a static-looking
+  first screen.
+
 ## [1.18.0] - 2026-09-15
 
 ### Added
