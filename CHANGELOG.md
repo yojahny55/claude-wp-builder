@@ -33,6 +33,18 @@
   last step. `validate` gains a drift finding: a hand-edited block is reported (exit
   `1`, naming `wp-create:begin`) and never silently overwritten — an operator who
   edited it meant something. Covered by `tests/checks/wp-config-context.sh`.
+- **Fix: a malformed marker pair (an orphan BEGIN with no END, an END before a
+  BEGIN, or more than one of either) is now refused, not guessed at.** The first
+  cut of `spliceContext` treated anything other than a clean single pair as "absent"
+  and appended past it — an orphan BEGIN left the operator's own text stranded
+  after it, and the very next `render-context` (the exact remedy `validate`
+  recommended) paired that orphan with the real END and deleted everything
+  between them; an END appearing before a BEGIN in operator prose took the append
+  branch on every call, growing a new duplicate block each time. `render-context`
+  and `validate` now both refuse and exit `1` naming the malformed state and
+  telling the operator to fix the markers by hand, writing nothing. `contextDrift`
+  reports a malformed file as its own finding, distinct from ordinary drift.
+  Covered by four new cases in `tests/checks/wp-config-context.sh`.
 
 ## [1.18.0] - 2026-09-15
 

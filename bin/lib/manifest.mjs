@@ -110,26 +110,65 @@ export function renderContext(manifest) {
   return lines.join('\n');
 }
 
-// Replaces the block if present, appends it if not. Returns the whole file text.
+// The one place spliceContext and contextDrift agree on where the block is, or
+// whether it can be found at all. Three outcomes, no others: absent (append),
+// present (exactly one BEGIN before exactly one END -- replace), or malformed
+// (refuse). Guessing at anything else is what used to be destructive: a lone BEGIN
+// with no END used to take the append branch, stacking a second block after the
+// orphan instead of refusing, and the very next render-context then paired that
+// orphan BEGIN with the real END and deleted everything an operator had written
+// between them -- including their own prose. Refusing beats guessing.
+//
+// Markers are found by literal indexOf, not by parsing Markdown, so a fenced code
+// block that *documents* this feature by showing both markers as an example is
+// indistinguishable from a file that actually uses them -- it produces two BEGINs
+// and two ENDs, which this correctly refuses rather than corrupting. A fence
+// containing exactly one marker is not caught by this and is a real ceiling: there
+// is no way to tell "an operator wrote one marker for real" from "an operator wrote
+// one marker as an example" without parsing the fence, so it is refused too rather
+// than guessed at either way.
+function markerState(text) {
+  const begins = [];
+  for (let i = text.indexOf(MARK_BEGIN); i !== -1; i = text.indexOf(MARK_BEGIN, i + 1)) begins.push(i);
+  const ends = [];
+  for (let i = text.indexOf(MARK_END); i !== -1; i = text.indexOf(MARK_END, i + 1)) ends.push(i);
+
+  if (begins.length === 0 && ends.length === 0) return { ok: true, present: false };
+  if (begins.length === 1 && ends.length === 1 && begins[0] < ends[0]) {
+    return { ok: true, present: true, start: begins[0], end: ends[0] };
+  }
+  const reason = begins.length === 1 && ends.length === 1
+    ? 'malformed wp-create markers: wp-create:end appears before wp-create:begin'
+    : `malformed wp-create markers: found ${begins.length} wp-create:begin and ${ends.length} wp-create:end marker(s), want exactly one of each or neither`;
+  return { ok: false, reason };
+}
+
+// Replaces the block if present, appends it if absent. Throws on a malformed marker
+// state instead of writing anything -- the caller reports it and exits without
+// touching the file; see markerState above for why guessing is the bug this fixes.
 export function spliceContext(claudeMd, block) {
   const text = claudeMd ?? '';
-  const start = text.indexOf(MARK_BEGIN);
-  const end = text.indexOf(MARK_END);
-  if (start === -1 || end === -1 || end < start) {
+  const state = markerState(text);
+  if (!state.ok) throw new Error(state.reason);
+  if (!state.present) {
     const sep = text.endsWith('\n') || text === '' ? '' : '\n';
     return `${text}${sep}\n${block}\n`;
   }
-  return text.slice(0, start) + block + text.slice(end + MARK_END.length);
+  return text.slice(0, state.start) + block + text.slice(state.end + MARK_END.length);
 }
 
 // Drift is a finding, not a repair: an operator who edited the block meant something,
-// and silently reverting it is how the two files started disagreeing in the first place.
+// and silently reverting it is how the two files started disagreeing in the first
+// place. A malformed marker state is a DIFFERENT finding from ordinary drift -- the
+// block cannot even be located, let alone compared to what the manifest would
+// render -- so it carries its own message rather than being folded into "no longer
+// matches the manifest".
 export function contextDrift(claudeMd, manifest) {
   const text = claudeMd ?? '';
-  if (!text.includes(MARK_BEGIN)) return null;
+  const state = markerState(text);
+  if (!state.ok) return state.reason;
+  if (!state.present) return null;
   const expected = renderContext(manifest);
-  const start = text.indexOf(MARK_BEGIN);
-  const end = text.indexOf(MARK_END);
-  const found = text.slice(start, end + MARK_END.length);
+  const found = text.slice(state.start, state.end + MARK_END.length);
   return found === expected ? null : 'the generated block between wp-create:begin and wp-create:end no longer matches the manifest';
 }
