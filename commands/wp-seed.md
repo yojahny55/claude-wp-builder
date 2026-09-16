@@ -8,6 +8,12 @@ argument-hint: "[demo-file.html] [--exclude-slugs <slug,slug,...>]"
 
 Parse a demo HTML file (or multi-page demo directory), extract content via BEM class conventions, and seed it into WordPress using WP-CLI. Creates pages, imports media, populates ACF fields for all configured languages, and builds navigation menus.
 
+A one-off `wp eval` for a single field is fine inline, as the phases below do
+throughout. Anything meant to be re-run — a bulk import, a script another
+command will need to trigger again later — is a different case: see "Non-Trivial
+Seed Logic Lives in `inc/seed/`, Never in a Scratchpad" in
+`skills/wp-cli-patterns/SKILL.md` before writing it as a throwaway file.
+
 ## Step 0: Read Project Manifest
 
 Read `.wp-create.json` from the project root to obtain the WP-CLI wrapper and language configuration.
@@ -388,6 +394,24 @@ without language suffixes. Assign with:
 bash -c "$WP eval \"\$o = get_option('polylang'); \$o['nav_menus'][get_stylesheet()]['primary']['<lang>'] = <menu_id>; update_option('polylang', \$o);\""
 ```
 
+**That option alone is not enough.** Polylang's frontend filter only
+overrides a location it finds already present in the core
+`nav_menu_locations` theme_mod — it never creates one. Writing only the
+`polylang` option above, with no location ever registered the normal way,
+leaves that theme_mod empty: `wp_nav_menu()` then falls through to its
+hard-coded fallback markup for EVERY language, primary included, and the
+fallback can look correct by coincidence — nothing on the primary-language
+site looks broken, so the defect is invisible until a second language is
+checked. Register the location the normal way for the primary language's
+menu FIRST, so Polylang has something to override:
+
+```bash
+bash -c "$WP menu location assign 'Primary <PRIMARY_LANG>' primary"
+```
+
+Then write the per-language option above for every language, primary
+included.
+
 Add each language's own pages to its own menu; do not add a page to the menu
 of another language. Everything below this line describes the `suffix`
 strategy.
@@ -441,6 +465,49 @@ bash -c "$WP menu location assign 'Footer ES' footer_es"
 ```bash
 bash -c "$WP menu location list --format=table"
 ```
+
+---
+
+## Phase 6.5: Placeholder pages for `page_link` options fields
+
+Grep `fields/settings.php` for `'type' => 'page_link'`. Each one is a settings
+field the header, footer or a menu is going to read and print as a URL — a
+legal-links column is the common case (privacy policy, terms, FAQ), but any
+`page_link` field on the options page qualifies. A demo never supplies these:
+there is no "Privacy Policy" section in a marketing page to seed content from,
+so without this phase the field ships empty, or — worse — pointed at whatever
+draft WordPress happened to create on install, which resolves to a 404 for a
+logged-out visitor with nothing in the UI to say so.
+
+For each such field currently empty, or resolving to a post that is not
+`publish`:
+
+1. Create a page in **publish** status whose body visibly states, in its own
+   language, that the text is a generic placeholder pending review — never
+   silently ship boilerplate as if it were the client's real copy.
+2. Mark it with post meta (e.g. `_<prefix>_seeded`) so a later run can tell it
+   apart from a page the client has since written for real.
+3. Point the field at the new page: `update_field('<field>', get_permalink(<id>), 'option')`.
+4. Under `i18n strategy: polylang`, create and publish one page per
+   configured language, join them with `pll_save_post_translations()`, and
+   set each language's own field (see "One deliberate crossover" in
+   `skills/wp-contributing/SKILL.md` — options-page fields keep their
+   `_<lang>` suffix under Polylang). Under `suffix`, write the `_<lang>`
+   field directly.
+
+**Re-running is safe.** A field whose target page still carries the marker
+meta is free to be rewritten; the marker meta is gone — because the client
+edited the page — the page is left exactly as it is, even if the field
+already pointed somewhere else. This is the same idempotency rule as ACF
+field seeding elsewhere in this command: never overwrite a client's own
+work, only ever a previous run's own placeholder.
+
+Templates that print one of these fields must not merely check for a
+non-empty value: a `page_link` field keeps pointing at its page after that
+page is unpublished or trashed, and WordPress then serves that URL as a 404
+with nothing to say so. Confirm `agents/wp-template.md`'s `page_link` guard
+(the options-page fields section under "i18n Helper Functions") is what the
+generated header/footer actually calls before printing one of these links.
 
 ---
 

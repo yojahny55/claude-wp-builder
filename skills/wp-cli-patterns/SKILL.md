@@ -36,6 +36,42 @@ Use `wp eval` only when no dedicated WP-CLI subcommand exists for the operation 
 
 ---
 
+## Non-Trivial Seed Logic Lives in `inc/seed/`, Never in a Scratchpad
+
+The rule above is about a single throwaway operation. It does not cover
+anything a project needs to **re-run** — content re-seeded after a later pass
+recreates records (a translation import that builds new counterparts, a
+taxonomy retrofit), a bulk import worth re-checking, or any script whose
+inputs are worth keeping. Writing that kind of script into a session's
+scratchpad has the same failure shape every time: the records it created land
+in the database and survive, the code that reproduces them does not, and a
+fresh clone of the repository — or a rollback — has no way to get them back.
+
+- **The script goes in `<theme>/inc/seed/<name>.php`**, any data payload it
+  needs in `<theme>/inc/seed/data/`, however small either looks at the time.
+  Run it with `wp eval-file <path>`.
+- **Every record it writes carries a marker** — post meta or term meta named
+  `_<prefix>_seeded_content` — so a later run, or a later script, can tell
+  which records are this script's own and which are the client's.
+- **A record meant to be found again across runs carries a stable key** —
+  `_<prefix>_seed_key` — instead of being re-identified by its numeric post
+  ID. An ID is only meaningful on the install that generated it; a fresh
+  install, a staging copy or a later environment has no way to match "record
+  14" back to anything. Matching by the marker's key lets a second run update
+  the same record in place instead of duplicating it.
+- **A client's own edit always wins.** Compare before writing: if the target
+  no longer carries the marker (or its content diverges from what the script
+  last wrote), leave it alone. The point of the marker is exactly this
+  comparison — without it, a re-run cannot tell "still ours to update" from
+  "the client changed this on purpose," and silently overwrites the client's
+  work.
+
+This is unrelated to the WP-CLI-vs-PHP-generation rule above: a script that
+belongs in `inc/seed/` should still prefer `update_field()` / WP-CLI functions
+over hand-rolled SQL inside it — the two rules compose, they do not conflict.
+
+---
+
 ## The `$WP` Convention
 
 Throughout all commands, agents, and skills, **`$WP`** is shorthand for the value of `wp_cli.wrapper` from `.wp-create.json`. Agents read this value and substitute it into all WP-CLI commands.
