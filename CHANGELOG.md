@@ -2,6 +2,70 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`wp-agentic-surfaces`: a named search indexer could receive the markdown 404 body —
+  cloaking.** The "is this a non-browser agent" UA sniff (`bot|crawl|spider|agent|…`)
+  matches "Googlebot" on `bot` alone, and a real SEO audit found the theme's designed 404
+  replaced by a markdown response for Google's own crawler: a browser and a named
+  indexer got different content on the same URL. Named search indexers (Googlebot,
+  Bingbot, Slurp, Baiduspider, YandexBot, Applebot, …) are now matched and excluded
+  *before* the generic pattern and always get the human HTML; Applebot-Extended (a
+  distinct UA, the AI-training crawler already allowlisted in Step 4) is unaffected.
+  Step 5's verification now fetches the 404 impersonating Googlebot and fails if the
+  response is `text/markdown`.
+- **`wp-agentic-surfaces`: `Content-Signal` was written as a robots.txt directive; the
+  spec defines it as an HTTP response header.** No robots.txt grammar recognises a bare
+  `Content-Signal:` line, so a linter (Lighthouse included) reports the *whole file*
+  invalid over that one line, costing the SEO score of every page and burying any real
+  robots.txt error behind a self-inflicted one. It now ships on the existing
+  `send_headers` action next to the RFC 8288 `Link` header, and is left in robots.txt
+  only as a comment; the physical-robots.txt writer (Step 4) and its verification
+  (Step 5) match.
+- **`wp-audit-rankmath`: theme JSON-LD sharing an `@id` with Rank Math's own graph must
+  be merged through `rank_math/json_ld`, never echoed as a second `<script>`.** Two
+  blocks sharing an `@id` merge into one entity per the JSON-LD spec, but any validator
+  or audit that counts `@type` occurrences reads two `Organization` nodes — which is how
+  a real portal audit reported it. New Step 4.7 merges the theme's real business data
+  (address, contactPoint, sameAs — none of which Rank Math itself collects) into Rank
+  Math's node by matching `@id`, reading `knowledgegraph_type` to resolve the fragment
+  rather than assuming a value. Step 8.5's duplicate-schema check now recommends the
+  merge path instead of blind removal, which would have lost that data rather than
+  de-duplicated it.
+- **`wp-audit-rankmath`: search results had no noindex step.** `/?s=<term>` and its
+  pretty form both answered `200` as `index, follow` with a canonical — two indexable
+  URLs for the same slice of content. New Step 4.6 sets `noindex, follow` on
+  `is_search()` via `rank_math/frontend/robots` and leaves canonical removal to Rank
+  Math's own noindex behaviour rather than forcing one.
+- **`wp-audit-rankmath`: per-page SEO seeding skipped every taxonomy term.** Step 8
+  looped `get_posts()` only, so a site's term archives were left on the global title
+  template with no description at all — worse than a post, which can at least fall back
+  to excerpting `post_content`; a term has none. Step 8 now also seeds
+  `rank_math_title`/`rank_math_description`/`rank_math_focus_keyword` as term meta over
+  every public taxonomy.
+- **`wp-audit-rankmath`: the og:image default could carry a URL with no attachment ID,
+  and `knowledgegraph_type` silently degrades on an out-of-range value.** Rank Math does
+  not print `og:image` unless `open_graph_image_id` is a real attachment; the old
+  fallback to the theme screenshot always left that at `0` (and the screenshot is the
+  editor preview, not a stable share-card URL). Step 6 now requires a real attachment
+  and warns instead of silently producing no tag. `knowledgegraph_type` accepts only the
+  literal `'person'`/`'company'` — a plausible-looking `'organization'` falls back to
+  `'person'` with no warning, describing a company as a human in its own JSON-LD. Step 4
+  now documents the two legal values and verifies the option landed as one of them.
+- **`wp-audit-rankmath`: a theme's own `<meta name="description">` fallback could
+  duplicate Rank Math's tag.** Gating the fallback only on "is an SEO plugin active" is
+  not enough — Rank Math can be active and still emit nothing on a specific route (an
+  unconfigured template, a page type with no post/term to hold meta). Step 8.5 now
+  checks for a hardcoded theme description tag and for more than one rendered on the
+  home page, and recommends gating the theme's tag on the *current object's own*
+  `rank_math_description`/`rank_math_title` being empty, not on plugin presence alone.
+- **`wp-audit-rankmath`: a sideloaded site icon could be silently turned into WebP.** An
+  unrelated image-optimizer plugin that filters `image_editor_output_format` globally
+  runs on every sideload, including a favicon import, and WordPress then points
+  `apple-touch-icon` at a file iOS does not read as a touch icon. Step 6 now imports the
+  site icon (when `site_icon` is empty) with that filter explicitly disabled around the
+  sideload, and verifies the stored file is still a PNG.
+
 ## [1.18.0] - 2026-09-15
 
 ### Added
