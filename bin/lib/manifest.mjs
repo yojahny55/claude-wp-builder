@@ -86,3 +86,50 @@ export function migrateManifest(manifest, { claudeMd = '' } = {}) {
   }
   return { manifest: current, notes };
 }
+
+export const MARK_BEGIN = '<!-- wp-create:begin -->';
+export const MARK_END = '<!-- wp-create:end -->';
+
+// Rendered from the manifest, so the two files cannot disagree. Every line here is
+// a decision some command branches on; guidance an operator writes lives OUTSIDE
+// the markers and is never touched.
+export function renderContext(manifest) {
+  const lines = [
+    MARK_BEGIN,
+    '<!-- Generated from .wp-create.json by bin/wp-config.mjs. Edits inside these markers are reported, not kept. -->',
+    '',
+    `- **Project:** ${manifest.project?.name ?? ''} (\`${manifest.project?.slug ?? ''}\`)`,
+    `- **Theme slug:** ${manifest.theme?.slug ?? ''}`,
+    `- **i18n strategy:** ${manifest['i18n strategy'] ?? 'suffix'}`,
+    `- **demo mode:** ${manifest['demo mode'] ?? 'plain'}`,
+    `- **Primary language:** ${manifest.languages?.primary ?? ''}`,
+    `- **Plugin profile:** ${manifest.plugins?.profile ?? 'none'}`,
+    '',
+    MARK_END,
+  ];
+  return lines.join('\n');
+}
+
+// Replaces the block if present, appends it if not. Returns the whole file text.
+export function spliceContext(claudeMd, block) {
+  const text = claudeMd ?? '';
+  const start = text.indexOf(MARK_BEGIN);
+  const end = text.indexOf(MARK_END);
+  if (start === -1 || end === -1 || end < start) {
+    const sep = text.endsWith('\n') || text === '' ? '' : '\n';
+    return `${text}${sep}\n${block}\n`;
+  }
+  return text.slice(0, start) + block + text.slice(end + MARK_END.length);
+}
+
+// Drift is a finding, not a repair: an operator who edited the block meant something,
+// and silently reverting it is how the two files started disagreeing in the first place.
+export function contextDrift(claudeMd, manifest) {
+  const text = claudeMd ?? '';
+  if (!text.includes(MARK_BEGIN)) return null;
+  const expected = renderContext(manifest);
+  const start = text.indexOf(MARK_BEGIN);
+  const end = text.indexOf(MARK_END);
+  const found = text.slice(start, end + MARK_END.length);
+  return found === expected ? null : 'the generated block between wp-create:begin and wp-create:end no longer matches the manifest';
+}

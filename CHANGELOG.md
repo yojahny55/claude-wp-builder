@@ -23,6 +23,16 @@
   comparing the whole project directory's file listing before and after, not just the
   manifest's own bytes, so a regression that leaves a stray backup behind is caught too.
   Covered by `tests/checks/wp-config-migrate.sh` and the `legacy-v1`/`future` fixtures.
+- **`node bin/wp-config.mjs render-context <project-path>` renders the project's
+  `.claude/CLAUDE.md` context block from `.wp-create.json` — the manifest, not the
+  prose, is now the source of truth.** `i18n strategy` alone is read out of that prose
+  in 17 places across agents; those readers are unchanged, but the block they read is
+  now generated between `<!-- wp-create:begin -->` / `<!-- wp-create:end -->` markers,
+  so the two files cannot disagree. Text outside the markers is the operator's and is
+  never touched; rendering twice is a no-op. `migrate` calls `render-context` as its
+  last step. `validate` gains a drift finding: a hand-edited block is reported (exit
+  `1`, naming `wp-create:begin`) and never silently overwritten — an operator who
+  edited it meant something. Covered by `tests/checks/wp-config-context.sh`.
 
 ## [1.18.0] - 2026-09-15
 

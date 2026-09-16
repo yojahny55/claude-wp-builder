@@ -6,15 +6,20 @@
  * 2 a migration is available, 3 there is no manifest.
  */
 import {
-  readFileSync, existsSync, writeFileSync, copyFileSync,
+  readFileSync, existsSync, writeFileSync, copyFileSync, mkdirSync,
 } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
 import {
   CURRENT_VERSION, MANIFEST_NAME, detectVersion, validateManifest, migrateManifest,
+  renderContext, spliceContext, contextDrift,
 } from './lib/manifest.mjs';
 
 const say = (s) => console.log(s);
 const warn = (s) => console.error(s);
+
+function claudeMdPath(projectPath) {
+  return join(resolve(projectPath), '.claude', 'CLAUDE.md');
+}
 
 function loadManifest(projectPath) {
   const file = join(resolve(projectPath), MANIFEST_NAME);
@@ -42,6 +47,15 @@ function cmdValidate(projectPath) {
     for (const p of problems) warn(`invalid: ${p}`);
     process.exit(1);
   }
+  const claudeFile = claudeMdPath(projectPath);
+  if (existsSync(claudeFile)) {
+    const drift = contextDrift(readFileSync(claudeFile, 'utf8'), manifest);
+    if (drift) {
+      warn(`invalid: ${drift}`);
+      warn('run wp-config.mjs render-context to regenerate it, or fix the manifest it came from');
+      process.exit(1);
+    }
+  }
   if (version < CURRENT_VERSION) {
     warn(`manifest_version ${version} can migrate to ${CURRENT_VERSION}: run wp-config.mjs migrate`);
     process.exit(2);
@@ -60,7 +74,7 @@ function cmdMigrate(projectPath) {
     say(`ok: already at version ${CURRENT_VERSION}, nothing to migrate`);
     return;
   }
-  const claudeFile = join(resolve(projectPath), '.claude', 'CLAUDE.md');
+  const claudeFile = claudeMdPath(projectPath);
   const claudeMd = existsSync(claudeFile) ? readFileSync(claudeFile, 'utf8') : '';
   const { manifest: next, notes } = migrateManifest(manifest, { claudeMd });
 
@@ -70,12 +84,23 @@ function cmdMigrate(projectPath) {
   writeFileSync(file, `${JSON.stringify(next, null, 2)}\n`);
   for (const n of notes) say(n);
   say(`ok: migrated to version ${CURRENT_VERSION}`);
+  cmdRenderContext(projectPath);
+}
+
+function cmdRenderContext(projectPath) {
+  const { manifest } = loadManifest(projectPath);
+  const file = claudeMdPath(projectPath);
+  const current = existsSync(file) ? readFileSync(file, 'utf8') : '';
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, spliceContext(current, renderContext(manifest)));
+  say(`ok: wrote the generated block in ${file}`);
 }
 
 const [cmd, target] = process.argv.slice(2);
 if (cmd === 'validate' && target) cmdValidate(target);
 else if (cmd === 'migrate' && target) cmdMigrate(target);
+else if (cmd === 'render-context' && target) cmdRenderContext(target);
 else {
-  warn('usage: wp-config.mjs <validate|migrate> <project-path>');
+  warn('usage: wp-config.mjs <validate|migrate|render-context> <project-path>');
   process.exit(1);
 }
