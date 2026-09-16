@@ -338,6 +338,29 @@ access.
 Without the server, `/wp-demo` writes `References: library unavailable` in
 `demo/BRIEF.md` and builds from the in-repo compositions.
 
+### Page references (optional)
+
+[`inspo-mcp`](https://github.com/Nutlope/inspo) is a free, MIT-licensed archive of
+832 production sites served over MCP. `/wp-demo` uses it for page-level direction —
+macrostructure, section ordering, fold composition — in both craft and plain mode.
+It is **not** registered by default. To use it, add this to your project's
+`.mcp.json`:
+
+    "inspo": { "command": "npx", "args": ["-y", "inspo-mcp@0.1.x", "serve"] }
+
+The major version is pinned for the same reason `designlang@12` is: a reference
+tool that changes its output shape mid-project is worse than one you upgrade
+deliberately.
+
+Three things it is never used for, enforced by `commands/wp-demo.md`: its colour
+table never becomes theme tokens, its `get_reference_jsx` tool is never called
+because it returns React, and nothing from it reaches `/wp-yolo --transcribe`.
+
+It is a third-party network dependency serving captures of other people's production
+sites, credited to their authors with a takedown route. Treat it as reference, never
+as material to copy. Its semantic ranking needs a `TOGETHER_API_KEY` we neither
+supply nor ask for; without one its search is lexical only.
+
 ## Commands Reference
 
 Full arguments, inputs and outputs per command: **[docs/commands.md](docs/commands.md)**.

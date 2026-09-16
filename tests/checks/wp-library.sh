@@ -9,6 +9,20 @@ grep -q 'keep their citations' commands/wp-demo.md || { echo "FAIL: partial libr
 grep -q 'search` per role' commands/wp-demo.md || { echo "FAIL: per-role query"; exit 1; }
 grep -q '## References' commands/wp-demo.md || { echo "FAIL: brief section"; exit 1; }
 grep -q 'Design library' README.md || { echo "FAIL: README"; exit 1; }
+# Inspo: page-level direction only, opt-in, and fenced. Each grep names the contract
+# line it protects, so a deleted rule fails here rather than silently widening scope.
+grep -q '3.7. Reference precedence' commands/wp-demo.md || { echo "FAIL: precedence ladder"; exit 1; }
+grep -q 'never enters `DESIGN.md`' commands/wp-demo.md || { echo "FAIL: colour exclusion"; exit 1; }
+grep -q '`get_reference_jsx` is never called' commands/wp-demo.md || { echo "FAIL: jsx exclusion"; exit 1; }
+grep -q 'ever reaches `/wp-yolo --transcribe`' commands/wp-demo.md || { echo "FAIL: transcribe exclusion"; exit 1; }
+grep -q 'carries no motion data' commands/wp-demo.md || { echo "FAIL: motion exclusion"; exit 1; }
+grep -q 'contract wins' commands/wp-demo.md || { echo "FAIL: external guidance is not subordinated"; exit 1; }
+grep -q '^## Step 2.7: Page References (plain mode only)' commands/wp-demo.md || { echo "FAIL: plain-mode reference step"; exit 1; }
+grep -q 'References: inspo unavailable' commands/wp-demo.md || { echo "FAIL: inspo degrade line"; exit 1; }
+grep -q 'a fourth search costs more than it finds' commands/wp-demo.md || { echo "FAIL: call budget"; exit 1; }
+grep -q 'inspo-mcp@0.1.x' README.md || { echo "FAIL: README does not pin the inspo major"; exit 1; }
+grep -q 'not\*\* registered by default' README.md || { echo "FAIL: README does not state inspo is opt-in"; exit 1; }
+! grep -q '"inspo"' .mcp.json || { echo "FAIL: inspo must stay out of the shipped .mcp.json"; exit 1; }
 if [ -n "${WP_DESIGN_LIBRARY_URL:-}" ]; then
   base="${WP_DESIGN_LIBRARY_URL%/}"
   if [[ "$base" == */mcp ]]; then
