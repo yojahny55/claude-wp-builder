@@ -29,11 +29,17 @@ keep=$(node -e 'const m=require("'"$tmp"'/p/.wp-create.json");console.log(m.unkn
 [ -f "$tmp/p/.wp-create.json.v1.bak" ] || fail "migration did not write a versioned backup"
 if [ -f "$tmp/p/.wp-create.json.bak" ]; then fail "migration wrote .wp-create.json.bak and would clobber /wp-create's Overwrite backup"; fi
 
-# --- Migrating twice is a no-op. --------------------------------------------
+# --- Migrating twice is a no-op: the entry is unchanged AND no new file (e.g.
+# a stray backup) appears. A content-only sha256 of .wp-create.json can't see a
+# regression that writes an extra file alongside it, so this also snapshots the
+# whole directory's file listing before and after.
 before=$(sha256sum "$tmp/p/.wp-create.json" | cut -d" " -f1)
+before_files=$(find "$tmp/p" -type f | sort)
 $cfg migrate "$tmp/p" >/dev/null 2>&1 || fail "the second migrate did not exit 0"
 after=$(sha256sum "$tmp/p/.wp-create.json" | cut -d" " -f1)
+after_files=$(find "$tmp/p" -type f | sort)
 [ "$before" = "$after" ] || fail "migrate is not idempotent: the second run rewrote the manifest"
+[ "$before_files" = "$after_files" ] || fail "migrate is not idempotent: the second run left a new file behind (e.g. a stray backup)"
 
 # --- A future version is refused and left completely intact. ----------------
 cp -r tests/fixtures/manifests/future "$tmp/f"
