@@ -15,6 +15,19 @@
   when the demo shows the same content twice at different lengths for different purposes (a
   card excerpt, a full bio), that is modeled as two fields from the start instead of one field
   serving both and breaking in both directions.
+- **`agents/wp-template.md` — six contract gaps a real bilingual build's own defect list
+  turned up.** The ABSPATH guard read as a template-parts rule, so full page/single/archive/
+  taxonomy templates and `inc/` includes shipped without it; archive/directory queries
+  ordering by date had no tiebreaker, so records seeded in the same second reordered on every
+  request; a custom nav walker overriding `start_el()` never re-applied
+  `nav_menu_css_class` / `nav_menu_item_id` / `nav_menu_link_attributes`, dropping any class a
+  filter added; a demo control marked `MOCK:` / `data-mock` had no rule requiring it be
+  re-derived from real data or dropped before being wired up; an optional "see more" control
+  rendered for a demo's `#anchor` placeholder instead of only for a real URL; carousel controls
+  stayed visible-but-dead when the real record count could not overflow the strip, and a
+  `Math.ceil()` dot count could exceed the card count; and there was no rule to reuse a
+  sibling template's already-correct accordion/focus-ring pattern instead of re-deriving a new
+  one per section.
 
 ## [1.18.0] - 2026-09-15
 
