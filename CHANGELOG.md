@@ -4,6 +4,20 @@
 
 ### Added
 
+- **`node bin/wp-config.mjs validate-profile <file>` validates a plugin profile before
+  `/wp-create` installs anything from it.** Profiles load from three places —
+  `templates/profiles/`, the project's `.wp-profiles/*.json`, and `~/.wp-profiles/*.json`
+  — and the last two are user-authored, which is what makes structure validation worth
+  having. `validateProfile()` in `bin/lib/manifest.mjs` rejects a duplicate plugin slug,
+  an unknown key on a plugin entry, a `source` outside `"wordpress.org"`/`"supplied"`,
+  a `requires` edge pointing at a plugin the profile does not list, and a `conflicts`
+  edge pointing at one it does — all named in the message, and all before Step 4.10 has
+  activated a single plugin. Plugin entries gain three optional fields: `requires:
+  string[]`, `conflicts: string[]`, `source: 'wordpress.org' | 'supplied'`; both shipped
+  profiles (`templates/profiles/full.json`, `templates/profiles/starter.json`) now mark
+  every entry `"source": "wordpress.org"`. Exit codes match the existing `validate`
+  contract: `0` ok, `1` invalid, `3` file not found. Covered by
+  `tests/checks/wp-profiles.sh` and fixtures under `tests/fixtures/profiles/`.
 - **`bin/wp-config.mjs` and `bin/lib/manifest.mjs` — one validator for `.wp-create.json`,
   the manifest roughly thirty commands, agents and skills read with no writer contract
   until now.** `node bin/wp-config.mjs validate <project-path>` checks the required fields,

@@ -149,6 +149,40 @@ export function getKey(manifest, key) {
   return { ok: true, value: String(value) };
 }
 
+const PLUGIN_KEYS = new Set(['slug', 'required', 'requires', 'conflicts', 'source', 'tested']);
+
+// A profile that cannot be satisfied should say so before anything is installed, not
+// halfway through Step 4.10 with three plugins already active.
+export function validateProfile(profile) {
+  const problems = [];
+  if (!profile || typeof profile !== 'object') return ['the profile is not a JSON object'];
+  if (!profile.name) problems.push('name is required');
+  if (!Array.isArray(profile.plugins)) return [...problems, 'plugins must be an array'];
+
+  const seen = new Set();
+  const slugs = new Set(profile.plugins.map((p) => p?.slug).filter(Boolean));
+
+  for (const entry of profile.plugins) {
+    if (!entry || typeof entry !== 'object') { problems.push('every plugins entry must be an object'); continue; }
+    if (!entry.slug) { problems.push('every plugins entry needs a slug'); continue; }
+    if (seen.has(entry.slug)) problems.push(`duplicate plugin slug: ${entry.slug}`);
+    seen.add(entry.slug);
+    for (const key of Object.keys(entry)) {
+      if (!PLUGIN_KEYS.has(key)) problems.push(`unknown key on ${entry.slug}: ${key}`);
+    }
+    if (entry.source !== undefined && entry.source !== 'wordpress.org' && entry.source !== 'supplied') {
+      problems.push(`${entry.slug}: source must be "wordpress.org" or "supplied"`);
+    }
+    for (const need of entry.requires ?? []) {
+      if (!slugs.has(need)) problems.push(`${entry.slug} requires ${need}, which this profile does not list`);
+    }
+    for (const bad of entry.conflicts ?? []) {
+      if (slugs.has(bad)) problems.push(`${entry.slug} conflicts with ${bad}, which this profile also lists`);
+    }
+  }
+  return problems;
+}
+
 export const MARK_BEGIN = '<!-- wp-create:begin -->';
 export const MARK_END = '<!-- wp-create:end -->';
 

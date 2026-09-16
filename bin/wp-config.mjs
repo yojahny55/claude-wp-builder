@@ -11,7 +11,7 @@ import {
 import { join, resolve, dirname } from 'node:path';
 import {
   CURRENT_VERSION, MANIFEST_NAME, LOCAL_NAME, detectVersion, validateManifest, migrateManifest,
-  renderContext, spliceContext, contextDrift, resolveSecret, getKey, SECRETS,
+  renderContext, spliceContext, contextDrift, resolveSecret, getKey, SECRETS, validateProfile,
 } from './lib/manifest.mjs';
 
 const say = (s) => console.log(s);
@@ -145,12 +145,31 @@ function cmdGet(projectPath, key) {
   say(found.value);
 }
 
+function cmdValidateProfile(file) {
+  const target = resolve(file);
+  if (!existsSync(target)) { warn(`no profile at ${target}`); process.exit(3); }
+  let profile;
+  try {
+    profile = JSON.parse(readFileSync(target, 'utf8'));
+  } catch (err) {
+    warn(`${target} is not valid JSON: ${err.message}`);
+    process.exit(1);
+  }
+  const problems = validateProfile(profile);
+  if (problems.length) {
+    for (const p of problems) warn(`invalid: ${p}`);
+    process.exit(1);
+  }
+  say(`ok: ${target} is a valid profile`);
+}
+
 const [cmd, target] = process.argv.slice(2);
 if (cmd === 'validate' && target) cmdValidate(target);
 else if (cmd === 'migrate' && target) cmdMigrate(target);
 else if (cmd === 'render-context' && target) cmdRenderContext(target);
 else if (cmd === 'get' && target && process.argv[4]) cmdGet(target, process.argv[4]);
+else if (cmd === 'validate-profile' && target) cmdValidateProfile(target);
 else {
-  warn('usage: wp-config.mjs <validate|migrate|render-context|get> <project-path> [key]');
+  warn('usage: wp-config.mjs <validate|migrate|render-context|get|validate-profile> <project-path> [key]');
   process.exit(1);
 }
