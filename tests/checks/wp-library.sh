@@ -18,8 +18,8 @@ grep -q 'ever reaches `/wp-yolo --transcribe`' commands/wp-demo.md || { echo "FA
 grep -q 'carries no motion data' commands/wp-demo.md || { echo "FAIL: motion exclusion"; exit 1; }
 grep -q 'contract wins' commands/wp-demo.md || { echo "FAIL: external guidance is not subordinated"; exit 1; }
 grep -q '^## Step 2.7: Page References (plain mode only)' commands/wp-demo.md || { echo "FAIL: plain-mode reference step"; exit 1; }
-grep -q 'References: inspo unavailable' commands/wp-demo.md || { echo "FAIL: inspo degrade line"; exit 1; }
-grep -q 'a fourth search costs more than it finds' commands/wp-demo.md || { echo "FAIL: call budget"; exit 1; }
+[ "$(grep -c 'References: inspo unavailable' commands/wp-demo.md)" -eq 2 ] || { echo "FAIL: inspo degrade line"; exit 1; }
+[ "$(grep -c 'a fourth search costs more than it finds' commands/wp-demo.md)" -eq 2 ] || { echo "FAIL: call budget"; exit 1; }
 grep -q 'inspo-mcp@0.1.x' README.md || { echo "FAIL: README does not pin the inspo major"; exit 1; }
 grep -q 'not\*\* registered by default' README.md || { echo "FAIL: README does not state inspo is opt-in"; exit 1; }
 ! grep -q '"inspo"' .mcp.json || { echo "FAIL: inspo must stay out of the shipped .mcp.json"; exit 1; }
