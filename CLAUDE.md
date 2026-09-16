@@ -384,3 +384,17 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   but no command reads them today — only `research.site`, `confidence` and the
   scalar `"research": "none"` are read. Reuse keys off `demo/RESEARCH.md`'s
   existence, not off `research.at`'s date.
+- **An MCP server's instructions reach every session, not just the command that wants
+  them.** Measured: `inspo-mcp@0.1.16` returns 1,478 characters of instructions on
+  `initialize`; `wp-design-library` returns none. Registering a reference server puts
+  its guidance in front of every task in that project, which is why inspo is opt-in
+  rather than shipped. Inspo's own text currently defers to the project, but the
+  precedence line in `commands/wp-demo.md` does not rely on that surviving their next
+  release.
+- **The inspo exclusions are prose, and prose binds an agent that reads it.** The
+  greps in `tests/checks/wp-library.sh` pin the wording; nothing can assert that a
+  build actually declined to read a colour table. Same ceiling the transcription and
+  fidelity mandates already carry.
+- **Inspo's corpus is a runtime dependency on a third party's storage.** Nothing is
+  vendored. If it goes away, builds degrade through the `References: inspo
+  unavailable` path, which is why that line exists in both modes.
