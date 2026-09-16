@@ -521,7 +521,8 @@ For each such field currently empty, or resolving to a post that is not
 1. Create a page in **publish** status whose body visibly states, in its own
    language, that the text is a generic placeholder pending review — never
    silently ship boilerplate as if it were the client's real copy.
-2. Mark it with post meta (e.g. `_<prefix>_seeded`) so a later run can tell it
+2. Mark it with `_<prefix>_seeded_content` (the marker every seeded record carries)
+   plus `_<prefix>_seed_placeholder`, so a later run can tell it
    apart from a page the client has since written for real.
 3. Point the field at the new page: `update_field('<field>', get_permalink(<id>), 'option')`.
 4. Under `i18n strategy: polylang`, create and publish one page per
