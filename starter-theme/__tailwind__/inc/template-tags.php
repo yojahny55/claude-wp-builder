@@ -5,7 +5,9 @@
  * @package __starter__
  */
 
-
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 if ( ! function_exists( '__starter___posted_on' ) ) :
 	/**

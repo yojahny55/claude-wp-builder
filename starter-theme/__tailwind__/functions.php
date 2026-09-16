@@ -5,6 +5,10 @@
  * @package __starter__
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 // Theme constants
 define( '__STARTER___VERSION', '1.0.0' );
 define( '__STARTER___DIR', get_template_directory() );

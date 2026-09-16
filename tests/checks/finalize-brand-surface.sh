@@ -16,6 +16,8 @@ grep -Fq "has_site_icon()" "$f" || fail "$f: favicon check does not account for 
 
 grep -Eiq 'login screen|wp-login\.php' "$f" || fail "$f: no login-screen branding check in the finalize checklist"
 grep -Eiq 'login_enqueue_scripts|login_headerurl|login_headertext' "$f" \
-  || fail "$f: login-screen check gives no concrete hook/seed to look for"
+  || fail "$f: login-screen check names no login hook to look for"
+grep -Eq 'inc/seed/[^ ]*login' "$f" \
+  || fail "$f: login-screen check drops the seed-file alternative (inc/seed/*login*.php)"
 
 echo PASS

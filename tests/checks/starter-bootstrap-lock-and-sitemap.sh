@@ -20,10 +20,22 @@ for f in starter-theme/__tailwind__/functions.php starter-theme/__cinematic__/fu
   grep -Eq "0666" "$f" || fail "$f: bootstrap lock is not widened to 0666"
 done
 
-ts=starter-theme/__tailwind__/inc/theme-setup.php
-[ -f "$ts" ] || fail "$ts is missing"
-grep -Fq "pre_handle_404" "$ts" || fail "$ts: no pre_handle_404 guard for the sitemap route"
-grep -Fq "get( 'sitemap'" "$ts" || grep -Fq "get('sitemap'" "$ts" \
-  || fail "$ts: pre_handle_404 guard does not check the sitemap query var"
+for ts in starter-theme/__tailwind__/inc/theme-setup.php starter-theme/__cinematic__/inc/performance.php; do
+  [ -f "$ts" ] || fail "$ts is missing"
+  grep -Fq "pre_handle_404" "$ts" || fail "$ts: no pre_handle_404 guard for the sitemap route"
+  grep -Fq "get( 'sitemap'" "$ts" || grep -Fq "get('sitemap'" "$ts" \
+    || fail "$ts: pre_handle_404 guard does not check the sitemap query var"
+done
+
+# The ACF export strips 'ID', which acf_write_json_field_group() reads: both loaders
+# must put it back, or a fresh group warns and stays PHP-local.
+for f in starter-theme/__tailwind__/functions.php starter-theme/__cinematic__/functions.php; do
+  grep -Fq "\$export['ID']" "$f" || fail "$f: Local JSON export does not restore the stripped ID key"
+done
+
+# agents/wp-template.md requires the ABSPATH guard in every PHP file a theme ships;
+# the starter those themes are copied from has to meet the same rule.
+unguarded=$(find starter-theme -name '*.php' -exec grep -L "defined( *'ABSPATH' *)" {} + || true)
+[ -z "$unguarded" ] || fail "starter PHP files without the ABSPATH guard: $unguarded"
 
 echo PASS

@@ -57,9 +57,9 @@ done
 # `cursor`, which Preflight does not.
 reset="$dir/assets/css/src/tailwindcss/base/reset.css"
 [ -f "$reset" ] || { echo "FAIL: $reset missing"; exit 1; }
-# Newlines fold to spaces FIRST, or sed's line-by-line BRE cannot strip a comment
-# that spans multiple lines — which every comment in this file does.
-rbody=$(tr '\n' ' ' < "$reset" | sed 's|/\*[^*]*\*\+\([^/*][^*]*\*\+\)*/||g' | tr -d '[:space:]')
+# Strip comments over the whole file (-0777 slurps it, so multi-line comments go too),
+# non-greedy — the first `*/` closes a CSS comment, exactly as a browser reads it.
+rbody=$(perl -0777 -pe 's{/\*.*?\*/}{}gs' "$reset" | tr -d '[:space:]')
 if printf '%s' "$rbody" | grep -Eq '\*,\*::before,\*::after\{box-sizing:border-box;?\}'; then
   echo "FAIL: $reset duplicates Preflight's box-sizing:border-box — Preflight already sets it inside its own base layer, and a hand-written second copy has clamped a button to 62% of its design width"; exit 1
 fi

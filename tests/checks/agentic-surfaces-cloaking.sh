@@ -44,6 +44,9 @@ grep -qE "header\\( *<prefix>_CONTENT_SIGNAL *\\)" "$f" || fail "$f must send Co
 
 # The robots_txt filter and the physical robots.txt writer (Step 4) must not emit a bare
 # Content-Signal directive — only a comment form is legal robots.txt.
+# The pattern is deliberately single-quoted: the agent file holds PHP SOURCE, where the
+# old defect was written as the two characters backslash-n inside a double-quoted string
+# (`$output .= "\nContent-Signal: ..."`). Matching a real newline would never fire.
 ! grep -qF '.= "\nContent-Signal: ai-train' "$f" || fail "$f must not append a bare Content-Signal line to robots.txt"
 ! grep -qE "\\\$robots \\.= 'Content-Signal: [a-z=,; -]+' \\. PHP_EOL;\$" "$f" \
   || fail "$f Step 4 must not write a bare Content-Signal directive into the physical robots.txt file"

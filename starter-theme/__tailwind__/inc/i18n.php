@@ -152,7 +152,11 @@ function __starter___t($key) {
         return $translations[$key][$lang];
     }
 
-    // Fallback to English
+    // Fall back to the primary language (the one the demo was written in), then
+    // to English only when the table has no primary-language entry at all.
+    if (isset($translations[$key][__STARTER___DEFAULT_LANG])) {
+        return $translations[$key][__STARTER___DEFAULT_LANG];
+    }
     if (isset($translations[$key]['en'])) {
         return $translations[$key]['en'];
     }

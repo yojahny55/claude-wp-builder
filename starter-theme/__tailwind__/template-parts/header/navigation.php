@@ -4,6 +4,10 @@
  *
  * @package __starter__
  */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 ?>
 <nav class="main-navigation" role="navigation" aria-label="<?php esc_attr_e('Main menu', '__starter__'); ?>">
     <?php

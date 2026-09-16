@@ -65,6 +65,9 @@ const explicitWidths = opt('--widths', '1440x900,390x844')
  * N itself — 1440 and 390 never land on it. Read every `max-width`/`min-width`
  * value out of the ORIGINAL's own CSS and sample those exact pixel widths too, on
  * top of whatever `--widths` asked for. */
+// Build output and third-party trees carry breakpoints the demo never declared.
+const SKIP_DIRS = new Set(['node_modules', 'vendor', 'dist', 'build', '.git']);
+
 function collectBreakpoints(root) {
   const found = new Set();
   const walk = (dir) => {
@@ -74,7 +77,10 @@ function collectBreakpoints(root) {
       const p = join(dir, entry);
       let st;
       try { st = statSync(p); } catch { continue; }
-      if (st.isDirectory()) { walk(p); continue; }
+      if (st.isDirectory()) {
+        if (!SKIP_DIRS.has(entry)) walk(p);
+        continue;
+      }
       if (!entry.toLowerCase().endsWith('.css')) continue;
       let css;
       try { css = readFileSync(p, 'utf8'); } catch { continue; }
@@ -201,6 +207,8 @@ const haveWidth = new Set(widths.map(([w]) => w));
 for (const bw of autoBreakpoints) {
   if (haveWidth.has(bw)) continue;
   haveWidth.add(bw);
+  // Viewport height only: a desktop-like 900 from 700px up (past the phone/phablet
+  // range), otherwise the same 844 the default phone width uses.
   widths.push([bw, bw >= 700 ? 900 : 844]);
 }
 if (autoBreakpoints.length) {

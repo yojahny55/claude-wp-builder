@@ -192,7 +192,7 @@ lib=skills/wp-polylang/scripts/pll-lib.php
 grep -q "pllx_acf_payload( \$taxonomy . '_' . \$term_id )" "$lib" \
   || { echo "FAIL: pll-lib.php's pllx_term_payload() no longer walks a term's own ACF/SCF fields"; exit 1; }
 exp=skills/wp-polylang/scripts/pll-export.php
-grep -q "'acf'       => \$payload\['acf'\]," "$exp" \
+grep -Eq "'acf'[[:space:]]+=>[[:space:]]*[\$]payload\['acf'\]," "$exp" \
   || { echo "FAIL: pll-export.php builds a term item without its 'acf' payload -- pllx_term_payload() can produce one but nothing puts it on the wire"; exit 1; }
 grep -q 'pllx_acf_copy_untranslated_term' "$imp" \
   || { echo "FAIL: pll-import.php's term branch never copies a term's untranslated ACF values (images, numbers, repeaters) onto the counterpart"; exit 1; }

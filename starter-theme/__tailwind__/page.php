@@ -12,6 +12,10 @@
  * @package __starter__
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 get_header();
 ?>
 
