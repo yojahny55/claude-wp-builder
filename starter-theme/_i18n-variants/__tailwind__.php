@@ -153,7 +153,18 @@ function __starter___t($key) {
     $lang         = __starter___get_current_lang();
     $translations = __starter___get_translations();
 
-    $source = isset($translations[$key]['en']) ? $translations[$key]['en'] : $key;
+    // Look the string up by the value it was REGISTERED under, which is the
+    // PRIMARY language, not a hardcoded 'en'. inc/theme-setup.php registers
+    // each string with pll_register_string( $key, $values[$primary_lang], ... )
+    // (see commands/wp-init.md Step 6), so on a Spanish-primary project the
+    // source value lives under the 'es' key. Asking pll__() for the 'en' value
+    // instead never matches Polylang's registry: pll__() silently returns its
+    // own argument unchanged, the block below falls through, and the table's
+    // hardcoded fallback answers every call -- with no error, and a client's
+    // edits under Languages > Strings permanently ignored.
+    $source = isset($translations[$key][__STARTER___DEFAULT_LANG])
+        ? $translations[$key][__STARTER___DEFAULT_LANG]
+        : $key;
 
     if (function_exists('pll__')) {
         $translated = pll__($source);

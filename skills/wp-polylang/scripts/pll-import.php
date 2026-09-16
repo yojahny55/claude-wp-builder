@@ -357,6 +357,26 @@ foreach ( $manifest['items'] as $item ) {
 		$term_group[ $target ] = $target_id;
 		pll_save_term_translations( $term_group );
 
+		// A term's own custom fields -- a repeater of checklist rows attached
+		// to a taxonomy term is the shape that surfaced this -- are not post
+		// meta and post_translations does nothing for them. Same two-step as
+		// the post branch: copy what was never sent for translation first
+		// (images, numbers, toggles, references), then write the translated
+		// values from the manifest over it.
+		if ( function_exists( 'update_field' ) ) {
+			$acf_copied += pllx_acf_copy_untranslated_term( $source_id, $target_id, $taxonomy );
+		}
+
+		if ( ! empty( $item['acf'] ) && function_exists( 'update_field' ) ) {
+			$term_context = $taxonomy . '_' . $target_id;
+			$source_context = $taxonomy . '_' . $source_id;
+			foreach ( $item['acf'] as $dotted => $value ) {
+				pllx_acf_write( $term_context, $dotted, $value, $source_context );
+			}
+		} elseif ( ! empty( $item['acf'] ) ) {
+			pllx_fail( "item {$item['id']} carries ACF values but no custom-fields plugin is active; activate ACF or SCF and re-run." );
+		}
+
 		$term_counterparts[ $source_id ] = array( $target_id, $taxonomy );
 		$term_hashes[ $source_id ]       = $item['hash'];
 		$written++;
@@ -536,6 +556,29 @@ foreach ( $manifest['items'] as $item ) {
 		$options['nav_menus'][ $theme_slug ][ $location ][ $source ] = (int) $item['menu_id'];
 		$options['nav_menus'][ $theme_slug ][ $location ][ $target ] = $target_menu_id;
 		update_option( 'polylang', $options );
+
+		// The option above is a per-language OVERRIDE, not the whole story.
+		// Polylang's own frontend filter only substitutes the value of a
+		// location it finds ALREADY present in the core 'nav_menu_locations'
+		// theme_mod -- it never adds a location that mod does not have. A
+		// location assigned only through automation that writes straight to
+		// this option (this script; also a seeding step that mirrors it) can
+		// leave that mod with no entry at all, in which case Polylang's filter
+		// has nothing to override, wp_nav_menu() falls through to its
+		// hard-coded fallback markup, and EVERY language renders that
+		// fallback -- including the source language, which can look correct
+		// by coincidence and hide the defect completely. Guarantee the slot
+		// exists, seeded with the source menu when missing, so there is
+		// something there for Polylang to override.
+		$core_locations = get_theme_mod( 'nav_menu_locations', array() );
+		if ( ! is_array( $core_locations ) ) {
+			$core_locations = array();
+		}
+		if ( empty( $core_locations[ $location ] ) ) {
+			$core_locations[ $location ] = (int) $item['menu_id'];
+			set_theme_mod( 'nav_menu_locations', $core_locations );
+			pllx_info( "  location '$location' had no 'nav_menu_locations' theme_mod entry; seeded it with the source menu so Polylang has something to override." );
+		}
 
 		update_term_meta( $target_menu_id, PLLX_HASH_META, $item['hash'] );
 		$written++;
@@ -1119,6 +1162,83 @@ function pllx_acf_copy_untranslated( $source_id, $target_id ) {
 function pllx_meta_keys_with_prefix( $post_id, $prefix ) {
 	$found = array();
 	foreach ( array_keys( (array) get_post_meta( $post_id ) ) as $key ) {
+		$bare = ( '_' === substr( $key, 0, 1 ) ) ? substr( $key, 1 ) : $key;
+		if ( 0 === strpos( $bare, $prefix ) ) {
+			$found[] = $key;
+		}
+	}
+	return $found;
+}
+
+/**
+ * Term-meta counterpart of pllx_acf_copy_untranslated() above -- same
+ * reasoning, same field-type split, different storage. get_field_objects()
+ * takes the same "<taxonomy>_<term_id>" context string used everywhere else
+ * in this file for a term, but the raw values it copies verbatim live in
+ * wp_termmeta, read and written through get_term_meta()/update_term_meta()
+ * instead of the post-meta equivalents.
+ *
+ * Without this, a translated term came out with only its name, slug and
+ * description -- every image, number, toggle and repeater row stayed blank,
+ * because pllx_acf_walk() only ever emitted text-bearing types and nothing
+ * copied the rest onto a term the way it already did onto a post.
+ *
+ * Returns the number of fields copied.
+ */
+function pllx_acf_copy_untranslated_term( $source_id, $target_id, $taxonomy ) {
+	$source_objects = get_field_objects( $taxonomy . '_' . $source_id );
+	if ( ! is_array( $source_objects ) ) {
+		return 0;
+	}
+
+	$translated = array( 'text', 'textarea', 'wysiwyg' );
+	$references = array( 'link', 'page_link', 'post_object', 'relationship' );
+	$containers = array( 'group', 'repeater', 'flexible_content' );
+	$copied     = 0;
+
+	foreach ( $source_objects as $name => $obj ) {
+		$type = isset( $obj['type'] ) ? $obj['type'] : '';
+		if ( in_array( $type, $translated, true ) || in_array( $type, $references, true ) ) {
+			continue;
+		}
+		if ( 'clone' === $type ) {
+			continue;
+		}
+		if ( metadata_exists( 'term', $target_id, $name ) ) {
+			continue;
+		}
+
+		$keys = array( $name, '_' . $name );
+		if ( in_array( $type, $containers, true ) ) {
+			foreach ( pllx_meta_keys_with_prefix_term( $source_id, $name . '_' ) as $k ) {
+				$keys[] = $k;
+			}
+		}
+
+		$wrote = false;
+		foreach ( array_unique( $keys ) as $key ) {
+			if ( ! metadata_exists( 'term', $source_id, $key ) ) {
+				continue;
+			}
+			$raw = get_term_meta( $source_id, $key, true );
+			update_term_meta( $target_id, $key, wp_slash( $raw ) );
+			$wrote = true;
+		}
+		if ( $wrote ) {
+			$copied++;
+		}
+	}
+
+	return $copied;
+}
+
+/**
+ * Every meta key on a term that starts with $prefix, plus its `_`-prefixed
+ * companion. Term-meta counterpart of pllx_meta_keys_with_prefix() above.
+ */
+function pllx_meta_keys_with_prefix_term( $term_id, $prefix ) {
+	$found = array();
+	foreach ( array_keys( (array) get_term_meta( $term_id ) ) as $key ) {
 		$bare = ( '_' === substr( $key, 0, 1 ) ) ? substr( $key, 1 ) : $key;
 		if ( 0 === strpos( $bare, $prefix ) ) {
 			$found[] = $key;
