@@ -92,16 +92,27 @@ export const SECRETS = {
   admin_password: { env: 'WP_CREATE_ADMIN_PASSWORD', manifestPath: 'wordpress.admin_password' },
 };
 
+// A value is "present" if it is neither absent (undefined/null) nor an object -- an
+// empty string or 0 is a real, explicit value (an empty local-dev DB password is a
+// real configuration) and must resolve as itself rather than cascade to the next
+// rung, while an object at a secret's path (a manifest typo, a copy-paste slip) is
+// not a bare string a caller piping `get` into `$(...)` can use, so it is treated
+// the same as absent rather than printed via whatever rendering a template literal
+// gives it.
+function present(v) {
+  return v !== undefined && v !== null && typeof v !== 'object';
+}
+
 // environment -> local file -> manifest. The manifest rung is kept so a project that
 // has not migrated still works; the caller warns that it is legacy every time it wins.
 export function resolveSecret(name, { env = {}, local = {}, manifest = {} } = {}) {
   const spec = SECRETS[name];
   if (!spec) return null;
-  if (env[spec.env]) return { value: env[spec.env], source: 'env' };
+  if (present(env[spec.env])) return { value: env[spec.env], source: 'env' };
   const fromLocal = at(local, spec.manifestPath);
-  if (fromLocal) return { value: fromLocal, source: 'local' };
+  if (present(fromLocal)) return { value: fromLocal, source: 'local' };
   const fromManifest = at(manifest, spec.manifestPath);
-  if (fromManifest) return { value: fromManifest, source: 'manifest' };
+  if (present(fromManifest)) return { value: fromManifest, source: 'manifest' };
   return null;
 }
 
@@ -118,6 +129,12 @@ export function getKey(manifest, key) {
     const fallback = key === 'i18n-strategy' ? 'suffix' : 'plain';
     return { ok: true, value: String(raw ?? fallback) };
   }
+  // A secret's own manifest path (e.g. "database.password") must not be reachable
+  // through the generic dotted-path fallback below -- that would bypass the whole
+  // env -> local -> manifest order resolveSecret exists to enforce, silently, with
+  // no legacy warning. Refuse and name the secret alias to use instead.
+  const secretName = Object.keys(SECRETS).find((n) => SECRETS[n].manifestPath === key);
+  if (secretName) return { ok: false, secret: secretName };
   const value = at(manifest, key);
   if (value === undefined || value === null || typeof value === 'object') return { ok: false };
   return { ok: true, value: String(value) };

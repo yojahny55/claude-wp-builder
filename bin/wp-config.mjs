@@ -137,7 +137,9 @@ function cmdGet(projectPath, key) {
   }
   const found = getKey(manifest, key);
   if (!found.ok) {
-    warn(`unknown key: ${key}`);
+    warn(found.secret
+      ? `${key} is a secret's manifest path: read it with get ${found.secret} instead`
+      : `unknown key: ${key}`);
     process.exit(1);
   }
   say(found.value);

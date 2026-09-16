@@ -56,6 +56,22 @@
   the dotted paths `theme.slug`, `project.slug`, `plugins.profile`, `languages.primary`,
   `wp_cli.wrapper`) addresses the two space-spelled manifest keys a dotted path cannot
   reach. Covered by `tests/checks/wp-config-secrets.sh`.
+- **Fix: `get database.password` and `get wordpress.admin_password` no longer read the
+  secret straight out of the manifest, bypassing the resolution order above.** Those
+  dotted paths equal a secret's own `manifestPath`, so the generic key lookup reached
+  them directly — no environment or `.wp-create.local.json` check, and no legacy
+  warning, even with the corresponding environment variable set. `getKey` now refuses
+  a key that names a secret's manifest path (exit `1`, nothing on stdout, naming the
+  secret alias to use instead — `db_password` / `admin_password`) rather than rerouting
+  it, so there is exactly one way to read a secret. `resolveSecret` also gained the
+  `typeof value === 'object'` guard `getKey` already had (an object at a secret's path
+  is refused, not printed) and switched its three presence checks from truthy to
+  `!== undefined && !== null`, so an explicitly empty secret — a real local-dev
+  configuration — resolves as itself instead of cascading past it to "no value found".
+  Covered by four new cases in `tests/checks/wp-config-secrets.sh`; the existing
+  alias-table case was also rewritten against a fixture value that differs from
+  `getKey`'s own fallback, since the fallback previously matched the fixture by
+  coincidence and let a broken alias mapping pass unnoticed.
 
 ## [1.18.0] - 2026-09-15
 
