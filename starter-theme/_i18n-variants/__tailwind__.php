@@ -162,6 +162,17 @@ function __starter___t($key) {
     // own argument unchanged, the block below falls through, and the table's
     // hardcoded fallback answers every call -- with no error, and a client's
     // edits under Languages > Strings permanently ignored.
+    //
+    // Invariant this whole lookup depends on: __STARTER___DEFAULT_LANG must
+    // equal the PRIMARY / registration language, not just "Polylang's default
+    // language" -- the two are conceptually different (pll_default_language()
+    // is a Polylang setting; "primary" is what inc/theme-setup.php registered
+    // strings under). They agree here only because commands/wp-init.md Step 5
+    // sets the DEFAULT_LANG constant to the primary language every time this
+    // starter is scaffolded. If that ever drifted -- DEFAULT_LANG set to
+    // something other than the language strings were registered under -- this
+    // lookup would silently degrade to the raw $key with no error, reintroducing
+    // the exact bug this function exists to fix.
     $source = isset($translations[$key][__STARTER___DEFAULT_LANG])
         ? $translations[$key][__STARTER___DEFAULT_LANG]
         : $key;

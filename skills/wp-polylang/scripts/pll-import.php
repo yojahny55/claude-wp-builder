@@ -846,12 +846,19 @@ pllx_info( sprintf( 'Copied %d untranslated ACF value(s) to new counterparts.', 
  * and, since Task 8, `flex_field.0.sub` for flexible-content rows -- the two
  * share the same 3-part shape and this function does not distinguish them.
  *
- * $source_id is the SOURCE post (its field-having-been-walked side), used
+ * $post_id and $source_id are both plain ACF post-id contexts -- a numeric
+ * post ID, or any of ACF's string contexts ("options", "user_N", and the
+ * "<taxonomy>_<term_id>" form used for a term, per pllx_acf_copy_untranslated_term()'s
+ * comment above). This function never inspects either value, only hands it
+ * straight to get_field()/update_field(), so whatever context resolves the
+ * target resolves the source the same way.
+ *
+ * $source_id is the SOURCE side (its field-having-been-walked side), used
  * only to backfill a flexible-content row's `acf_fc_layout` on first write --
  * see the comment in the 3-part branch below. Optional and unused by the
- * other branches; omit it where the caller has no source post (there is
+ * other branches; omit it where the caller has no source context (there is
  * currently no such caller, but the parameter defaults to 0 rather than being
- * required so a future caller without a source post does not have to fake one).
+ * required so a future caller without a source context does not have to fake one).
  */
 function pllx_acf_write( $post_id, $dotted, $value, $source_id = 0 ) {
 	$parts = explode( '.', $dotted );

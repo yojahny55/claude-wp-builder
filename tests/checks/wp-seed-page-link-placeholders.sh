@@ -6,8 +6,17 @@
 # to say so. Measured on a real build: the footer's legal column silently
 # dropped two of its three links.
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 
 flat() { tr '\n' ' ' | sed -e 's/  */ /g'; }
+
+# Slice a markdown doc from a heading line down to (not including) the next
+# heading of any level, so a grep against the slice can only match inside the
+# section it names — not any incidental mention of the same words elsewhere
+# in a large doc.
+section() { # file, heading-regex (ERE, matched against the whole heading line)
+  awk -v start="$2" 'on && $0 ~ /^#{1,6} / && $0 !~ start { exit } $0 ~ start { on=1 } on { print }' "$1"
+}
 
 seed=commands/wp-seed.md
 [ -f "$seed" ] || { echo "FAIL: $seed missing"; exit 1; }
@@ -27,14 +36,19 @@ grep -qi 'safe to be rewritten\|left exactly as it is' <<<"$t" \
 # The command must point at where the read-side guard actually lives, and that
 # guard must exist. `page_link` has no notion of post status: printing a URL
 # whose target page went back to draft serves a 404 with nothing to say so.
+# Scoped to the guard's own section, not the whole 700+ line agent doc, so an
+# incidental mention of these two common WP function names elsewhere in the
+# file cannot satisfy the check in place of the actual guard.
 tpl=agents/wp-template.md
 [ -f "$tpl" ] || { echo "FAIL: $tpl missing"; exit 1; }
-tt=$(flat < "$tpl")
+guard=$(section "$tpl" 'page_link. options fields')
+[ -n "$guard" ] || { echo "FAIL: agents/wp-template.md has no page_link options fields guard section"; exit 1; }
+gt=$(flat <<<"$guard")
 grep -q 'page_link.*guard' <<<"$t" \
   || { echo "FAIL: wp-seed.md's placeholder phase never points templates at the page_link publish-status guard"; exit 1; }
-grep -qF "'publish' === get_post_status" <<<"$tt" \
-  || { echo "FAIL: agents/wp-template.md has no publish-status guard for page_link fields"; exit 1; }
-grep -qF 'url_to_postid' <<<"$tt" \
+grep -qF "'publish' === get_post_status" <<<"$gt" \
+  || { echo "FAIL: agents/wp-template.md's page_link section has no publish-status guard for page_link fields"; exit 1; }
+grep -qF 'url_to_postid' <<<"$gt" \
   || { echo "FAIL: agents/wp-template.md's page_link guard does not resolve the URL to a post before checking its status"; exit 1; }
 
 echo PASS

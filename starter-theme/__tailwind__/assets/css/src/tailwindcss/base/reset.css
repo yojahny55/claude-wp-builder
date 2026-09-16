@@ -37,9 +37,26 @@ input[type="reset"] {
 }
 
 /* A disabled control should not also promise a click — a demo's own reset
- * commonly pairs the rule above with this one. */
+ * commonly pairs the rule above with this one. `[aria-disabled="true"]` alone
+ * is too wide: `cursor` inherits, and the attribute is also legal on a
+ * non-interactive container used only to announce state (a disabled tab
+ * panel, a section flagged busy). Every still-interactive descendant — a
+ * link, a nested button — would inherit `cursor: default` from it and lose
+ * its own pointer affordance. Scoped to the same controls the rule above
+ * targets, plus `select`/`textarea` (native `:disabled`) and `a` (no native
+ * disabled state, so `aria-disabled` is how a link expresses it). */
 button:disabled,
 input:disabled,
-[aria-disabled="true"] {
+select:disabled,
+textarea:disabled,
+button[aria-disabled="true"],
+input[aria-disabled="true"],
+select[aria-disabled="true"],
+textarea[aria-disabled="true"],
+a[aria-disabled="true"],
+summary[aria-disabled="true"],
+[role="button"][aria-disabled="true"],
+[role="option"][aria-disabled="true"],
+[role="tab"][aria-disabled="true"] {
   cursor: default;
 }

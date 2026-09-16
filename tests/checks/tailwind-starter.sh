@@ -2,6 +2,9 @@
 # Guards against bugs that shipped in the __tailwind__ starter:
 #   1. a duplicate function declaration (fatal "Cannot redeclare")
 #   2. a nonexistent @tailwindcss/typography pin (0.6.x does not exist; it is a 0.5.x package)
+#   3. the Spanish Translations settings tab registered unconditionally instead of gated on
+#      the project's configured languages, plus the unquoted-bareword regression a quoting
+#      bug in that same gate left behind.
 #   4/5. base/reset.css duplicated what Preflight already sets (box-sizing: border-box,
 #      img { max-width: 100% }) as plain, unlayered CSS. Preflight sets both inside its
 #      OWN `base` layer already; the duplicate outranked every utility regardless, and
@@ -10,6 +13,7 @@
 #      The starter also never restored `cursor: pointer`, which Preflight does NOT set —
 #      Tailwind v4 leaves every button on the UA default (`default`), not `pointer`.
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 dir=starter-theme/__tailwind__
 
 # 1. No PHP function name declared more than once across the theme's inc/ + root PHP.

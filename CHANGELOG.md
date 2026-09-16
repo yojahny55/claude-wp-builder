@@ -9,15 +9,24 @@
   theme. The cinematic starter gets the two loader fixes the tailwind one already had:
   the `pre_handle_404` sitemap guard, and the Local JSON export restoring the `ID` key
   that `acf_prepare_field_group_for_export()` strips. The tailwind `__starter___t()`
-  falls back to the primary language before English.
-  `tests/checks/starter-bootstrap-lock-and-sitemap.sh` pins all three.
+  falls back to the primary language before English. The tailwind starter's
+  `[aria-disabled="true"]` reset rule is now scoped to actual controls (button, input,
+  select, textarea, a, summary, `[role=button|option|tab]`) instead of every element
+  carrying the attribute — `cursor` inherits, so an unscoped rule on a container used
+  only to announce state (a disabled tab panel, a busy section) took the pointer
+  affordance away from still-interactive descendants.
+  `tests/checks/starter-bootstrap-lock-and-sitemap.sh` pins the loader fixes;
+  `tests/checks/tailwind-starter.sh` still pins `cursor: pointer` restored and
+  `input[type="submit"]` covered.
 - **Checks that pinned less than their contract.** `audit-findings-measured.sh` now
   greps the per-finding evidence sentence rather than the word "evidence", and fails
   clearly when no audit agent matches. `finalize-brand-surface.sh` pins both halves of
   the login-branding check, the hook and the seed file. `wp-polylang.sh` no longer
   depends on array alignment. `tailwind-starter.sh` strips CSS comments non-greedily
   with perl. `tailwindify-parity.mjs` skips `node_modules`, `vendor`, `dist`, `build`
-  and `.git` when it collects breakpoints.
+  and `.git` when it collects breakpoints, and now `lstat`s instead of `stat`s so a
+  symlinked directory (the demo trees genuinely carry them) is never recursed into,
+  with a realpath dedupe as a second guard against a loop.
 
 - **Every user-visible literal is a translation key, not only field content.**
   `agents/wp-template.md` forbade raw `get_field()` and showed `prefix_e()` once, which

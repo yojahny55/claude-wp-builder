@@ -27,7 +27,7 @@
  *
  * exit 0 clean · 1 deltas found · 2 no usable browser · 3 the run itself crashed
  */
-import { existsSync, readdirSync, statSync, createReadStream, readFileSync, realpathSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, lstatSync, createReadStream, readFileSync, realpathSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, join, dirname, extname, normalize, sep, basename } from 'node:path';
 import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -70,15 +70,28 @@ const SKIP_DIRS = new Set(['node_modules', 'vendor', 'dist', 'build', '.git']);
 
 function collectBreakpoints(root) {
   const found = new Set();
+  const seenDirs = new Set();
   const walk = (dir) => {
     let entries;
     try { entries = readdirSync(dir); } catch { return; }
     for (const entry of entries) {
       const p = join(dir, entry);
-      let st;
-      try { st = statSync(p); } catch { continue; }
-      if (st.isDirectory()) {
-        if (!SKIP_DIRS.has(entry)) walk(p);
+      // lstat, not stat: a symlinked directory must never be recursed into.
+      // These demo trees genuinely carry symlinks (.original/'s css/js/assets
+      // links) and following one risks looping back into the same tree, or
+      // scanning an external/large tree, before the parity run even starts.
+      let lst;
+      try { lst = lstatSync(p); } catch { continue; }
+      if (lst.isSymbolicLink()) continue;
+      if (lst.isDirectory()) {
+        if (SKIP_DIRS.has(entry)) continue;
+        // Belt and suspenders: dedupe by realpath too, in case two distinct
+        // (non-symlink) paths resolve to the same directory via a bind mount.
+        let real;
+        try { real = realpathSync(p); } catch { continue; }
+        if (seenDirs.has(real)) continue;
+        seenDirs.add(real);
+        walk(p);
         continue;
       }
       if (!entry.toLowerCase().endsWith('.css')) continue;
