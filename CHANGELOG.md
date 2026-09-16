@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Every user-visible literal is a translation key, not only field content.**
+  `agents/wp-template.md` forbade raw `get_field()` and showed `prefix_e()` once, which
+  covered the CONTENT and nothing the template says on its own behalf. A bilingual build
+  therefore shipped with every ACF field translated and its secondary-language directory
+  pages still rendering the filter bar, the composed `alt` text and the empty-state message
+  in the primary language: none of it came from a field, so none of it looked like content.
+  The i18n section now names where those literals hide — controls, placeholders, empty
+  states, button text, `alt`, `aria-label`, `sprintf()` patterns — and Rule 11 states it.
+- **A control the demo drew is not a control the data can answer.** A static demo's filter is
+  coherent by construction: its options and its cards are the same mock values. Transcribed
+  literally onto real posts, that option set becomes a claim about data — a select whose only
+  value matches no record, so choosing it empties the grid. The `/wp-section` transcription
+  overlay now carves controls out of the fidelity mandate (markup and values are copied; an
+  option set is derived from the real terms), and `agents/wp-template.md` Rule 12 requires a
+  control nothing backs to be dropped and NAMED in the summary, rather than shipped dead. The
+  demo's empty-state and "no more results" strings fall under the same carve-out: wording to
+  translate and behaviour to re-derive, not constants to copy.
+- **A finding is the output of a command that ran in this run.** `/wp-audit` §2.5b already
+  said "measure, do not trust" about the environment; the agents' own findings had no such
+  rule, and two shapes reached real reports — a duplicate meta description asserted from
+  reading two code paths on a page that emits one, and "the site has no posts" carried over
+  from a stale input on a site with twenty. New §6.9 requires an evidence line per finding,
+  defines `UNVERIFIED` for what the tier cannot reach, and makes the aggregator drop and
+  report evidence-free findings by agent. All eight `wp-audit-*` agents carry the rule.
+- **Seeding may invent a biography; it may not invent a real person's account.** `/wp-seed`
+  Phase 4.5 covers the fields no demo answers: nothing handle-shaped or externally
+  resolvable is generated (those stay empty and the templates already guard them), generated
+  emails and phones follow one shape site-wide so a wrong one is visible, every invented
+  record carries the seeded marker, and the phase ends with a list of what was invented, by
+  field and count, for the client to replace. Two real defects motivated it: a phone a digit
+  short of every other on the site, and a social URL built from a different person's handle,
+  so a fictional record linked a real stranger.
+
 ## [1.18.0] - 2026-09-15
 
 ### Added

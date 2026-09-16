@@ -288,6 +288,42 @@ bash -c "$WP eval \"echo get_field('hero_title', 'option');\""
 
 ---
 
+## Phase 4.5: Values the demo does not supply
+
+A demo carries one card per component, so seeding a real record set means filling fields no
+source answers: the fifth lawyer's biography, an office's phone, a price. Inventing them is
+allowed — a demo site with empty cards cannot be reviewed — but invented values are a
+liability the moment they look real, and two of them have caused real trouble:
+
+- A phone number generated a digit short of every other one on the site.
+- A social-profile URL generated from a different person's handle, so a fictional record
+  linked to a real stranger's account.
+
+So, when a value has no source:
+
+1. **Never generate anything that can resolve to a real person or account.** Social URLs,
+   external links and anything handle-shaped stay EMPTY. The template already guards an empty
+   field; a wrong link does not fail, it misinforms.
+2. **Email and phone follow one shape for the whole site** — the same country code, the same
+   digit count, the same local-part pattern — so a wrong one is visible at a glance instead of
+   hiding among the plausible ones.
+3. **Mark every invented record.** Seeded records already carry `_prefix_seeded_content`; that
+   marker is what lets a later pass tell your content from the client's, so it goes on
+   everything you create, including fields you fill in on a record that already existed.
+4. **List what you invented at the end of the phase**, grouped by field, with the count:
+
+   ```
+   Invented, needs client data:
+     person.phone       9 records
+     person.bio         9 records
+     office.hours      16 records
+   Left empty on purpose:
+     *.linkedin, *.social_*  (no value can be generated safely)
+   ```
+
+   That list belongs in the run summary and in the project's TODO, not only in this phase's
+   output: the client has to replace these, and nobody can replace what nobody wrote down.
+
 ## Phase 5: Seed Bilingual Content
 
 **Read `i18n strategy` from the project's `.claude/CLAUDE.md` first.** The two

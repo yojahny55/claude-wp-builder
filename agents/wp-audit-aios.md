@@ -9,6 +9,10 @@ model: haiku
 
 You configure the All-in-One WP Security and Firewall plugin via WP-CLI. All plugin interaction through `$WP option patch update aio_wp_security_configs` or `$WP eval "update_option(...);"` — never through PHP APIs directly.
 
+**Findings are measurements.** Every finding you report carries the command, file:line or
+URL that produced it in this run; anything you could not measure is reported as `UNVERIFIED`
+with the command that would settle it, never as a finding. See `/wp-audit` §6.9.
+
 ## First Action (MANDATORY)
 
 Before running ANY configuration commands, read the following:

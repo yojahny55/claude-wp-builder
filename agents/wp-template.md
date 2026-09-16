@@ -172,9 +172,54 @@ echo prefix_image($logo, 'medium', array(
 
 ### Static translated strings
 
+Every string a visitor can read goes through `prefix_e()` / `prefix_t()`, not only the ones
+that arrived in an ACF field. The rule above — never raw `get_field()` — protects the
+CONTENT. This protects everything the template says on its own behalf, and it is the half
+that gets missed, because the demo is written in the primary language and a literal copied
+out of it already looks finished.
+
+The literals that escape hide in the places that do not feel like copy:
+
+| Where | What the demo hands you |
+|---|---|
+| Filter and search controls | the "all" option of every combo, `placeholder`, the submit's own label |
+| Empty and error states | "No results match this search." |
+| Button text no field supplies | "Read more", "Load more", "Download CV" |
+| Labels printed beside a value | "Price", "From", "Opening hours" |
+| `alt` text the template composes | `alt="Portrait of <name>"` |
+| `aria-label` and `title` | `aria-label="Call <name>"` |
+| Anything inside `sprintf()` | `sprintf('Offices in %s', $term->name)` |
+
+Each is a key in `inc/i18n.php`, with `%s` where a value is interpolated:
+
 ```php
 <h2 class="section__title"><?php prefix_e('services_heading'); ?></h2>
+<button type="submit"><?php prefix_e('search_submit'); ?></button>
+<img alt="<?php echo esc_attr( sprintf( prefix_t('portrait_of'), $name ) ); ?>" src="…">
 ```
+
+This is the defect it prevents, and it has been shipped: a Polylang build whose every ACF
+field translated correctly, and whose secondary-language directory pages still rendered the
+filter bar, the card `alt` text and the empty-state message in the primary language —
+because none of it came from a field, so none of it looked like content to anyone.
+
+### A control the demo drew is not a control the data can answer
+
+A static demo's filter is coherent by construction: its options and its cards are the same
+handful of mock values, so every option matches something. Wire that same markup to real
+posts and the option set becomes a claim about data that may not exist — a select whose only
+value is the mock's single label, an "all offices" entry with no taxonomy behind it. Choosing
+one empties the grid.
+
+So, when a transcribed control becomes dynamic:
+
+1. Build its options from the real source — `get_terms()`, the posts' own field values — never
+   from the option elements in the demo.
+2. If nothing real backs it, do not render a dead control. Drop it and **say so in your
+   summary**, naming the control and why, so the omission is a reported decision rather than
+   a silent one.
+3. A control whose options are hard-coded in the template is the same defect as a hard-coded
+   label: it is a literal pretending to be data.
 
 ## Image Fields — right-size + WebP (MANDATORY)
 
@@ -429,6 +474,8 @@ $cards       = prefix_get_repeater('services_cards', array('title', 'description
 8. **Semantic HTML** — use `<section>`, `<article>`, `<nav>`, `<header>`, `<footer>`, `<main>` appropriately
 9. **Accessibility** — include `alt` attributes on images, `aria` labels on interactive elements
 10. **Never use raw `get_field()`** — always use the project's i18n helper functions (`prefix_get_field`, `prefix_get_repeater`, `prefix_e`)
+11. **Never write a user-visible literal** — control labels, placeholders, empty states, button text, `alt`, `aria-label` and every `sprintf()` pattern are keys in `inc/i18n.php`, exactly like field content
+12. **Never render a control the data cannot answer** — build a filter's options from the real terms or field values, and drop the control (out loud, in your summary) when nothing backs it
 
 ## WP-CLI Integration (when `.wp-create.json` exists)
 

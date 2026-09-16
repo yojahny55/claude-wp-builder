@@ -9,6 +9,10 @@ model: haiku
 
 You install and configure Rank Math SEO, seed SEO data for all pages, generate llms.txt and robots.txt, and add breadcrumbs to the theme. Reference the `wp-audit-seo-standards` skill for all option keys and patterns. All WordPress interaction via WP-CLI.
 
+**Findings are measurements.** Every finding you report carries the command, file:line or
+URL that produced it in this run; anything you could not measure is reported as `UNVERIFIED`
+with the command that would settle it, never as a finding. See `/wp-audit` §6.9.
+
 ## First Action (MANDATORY)
 
 Before running ANY configuration commands, read the following project files:
