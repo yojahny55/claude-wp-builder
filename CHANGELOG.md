@@ -118,6 +118,21 @@
   dot*, and rejects a function the same way it already rejects an object, so a
   suffixed non-secret path can't return a prototype method either. Covered by
   three new cases in `tests/checks/wp-config-secrets.sh`.
+- **`/wp-create` now matches the validator Tasks 1-5 built, instead of documenting the
+  behavior the validator replaced.** Step 4.10 no longer treats every plugin failure the
+  same way: it validates the profile first (`wp-config.mjs validate-profile`), installs
+  one plugin at a time, and branches on that plugin's `required` flag — a required
+  plugin that fails to install or activate stops the build and names the blocked
+  workflow, an optional one warns and is recorded in `plugins.degraded`; a successful
+  install is recorded in `plugins.resolved`. A `"source": "supplied"` plugin is never
+  fetched from WP.org, and a required one that has no supplied zip is `license_missing`,
+  which blocks the same as any other required failure. The `.wp-create.json` manifest
+  example is bumped to `manifest_version: 3` and **no longer carries the database
+  password** — DB and admin passwords are generated per project (16 random characters)
+  and written to `.wp-create.local.json` instead, resolved through `wp-config.mjs get`
+  (environment → local file → manifest). `/wp-init` adds `.wp-create.local.json` to the
+  scaffolded theme's `.gitignore`. Covered by the new
+  `tests/checks/wp-create-profile-enforcement.sh`.
 
 ## [1.18.0] - 2026-09-15
 

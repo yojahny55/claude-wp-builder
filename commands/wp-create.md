@@ -154,7 +154,7 @@ Gather all configuration values from the user. For each field, provide a sensibl
 
 - **DB name:** default `wp_<slug_with_underscores>` (e.g., `wp_my_project`)
 - **DB user:** default `root`
-- **DB password:** default `root`
+- **DB password:** generated per project (16 random characters); written to `.wp-create.local.json`, never to the manifest
 - **DB host:** default `localhost` for native, `db` for Docker
 
 ### 3.7 Plugin Profile
@@ -199,7 +199,7 @@ Profile JSON format:
 ### 3.9 Admin Credentials
 
 - **Admin user:** default `webmaster`
-- **Admin password:** default `webmaster`
+- **Admin password:** generated per project (16 random characters); written to `.wp-create.local.json` so it stays recoverable
 - **Admin email:** default `webmaster@local.com`
 
 ### 3.10 Summary & Confirmation
@@ -215,10 +215,10 @@ Present all collected values:
   Environment:     Docker (docker-compose)
   Web server:      Nginx
   PHP version:     8.3
-  Database:        wp_my_project (root/root @ db)
+  Database:        wp_my_project (root/<generated> @ db)
   Plugin profile:  starter (SCF, Rank Math SEO, WP Fastest Cache)
   Languages:       en (primary), es
-  Admin:           webmaster / webmaster
+  Admin:           webmaster / <generated>
 
 Proceed? (Y/n)
 ```
@@ -438,15 +438,47 @@ Where `URL` is `https://${DOMAIN}` (or `http://${DOMAIN}` if no SSL).
 
 If a plugin profile was selected (not "none"):
 
+First validate the profile, because a profile that cannot be satisfied should say so
+before anything is installed:
+
 ```bash
-bash -c "$WP plugin install secure-custom-fields wordpress-seo wp-fastest-cache --activate"
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate-profile '<profile-path>'"
 ```
 
-Use the actual plugin slugs from the selected profile JSON.
+Then install **one plugin at a time**, using the actual slugs from the selected profile
+JSON, and branch on that plugin's `required` flag:
 
-**Validation:** `$WP plugin list --status=active --format=json` includes all expected plugins.
+```bash
+bash -c "$WP plugin install <slug> --activate"
+```
 
-**On failure (plugin not found):** Warn about the missing plugin, skip it, continue with the rest. Do NOT abort the entire process for a missing plugin.
+| Outcome | `required: true` | `required: false` |
+|---|---|---|
+| Installed and activated | record in `plugins.resolved` | record in `plugins.resolved` |
+| Not found, install failed, or activation failed | **stop**: this failure blocks the dependent workflow — report the slug and the reason, and do not continue to steps that need it | warn, continue, record in `plugins.degraded` with the reason |
+
+A plugin whose profile entry says `"source": "supplied"` is never fetched from WP.org.
+Ask for the zip or path. If it is not available, record it as `license_missing`, which
+counts as a failure of its `required` flag — a required licensed plugin blocks the build
+rather than half-installing around it.
+
+Record what was actually resolved, not what was requested:
+
+```json
+"plugins": {
+  "profile": "<PROFILE_NAME>",
+  "installed": ["<plugin-slug-1>"],
+  "resolved": [
+    { "slug": "<plugin-slug-1>", "version": "<X.Y.Z>", "source": "wordpress.org", "active": true }
+  ],
+  "degraded": [
+    { "slug": "<plugin-slug-2>", "reason": "not found in the WP.org repository" }
+  ]
+}
+```
+
+**Validation:** `$WP plugin list --status=active --format=json` includes every required
+plugin from the profile.
 
 ### Step 4.11: Set Permalinks
 
@@ -529,7 +561,7 @@ Each step validates before proceeding. On failure:
 | Config create (4.5) | File write permissions | Abort. Suggest: "Fix path permissions: `sudo chown -R $USER:$USER ${PROJECT_PATH}`" |
 | Docker up (4.8) | Port conflict | Detect which ports are in use with `ss -tlnp`. Offer alternative ports. Update `docker-compose.yml` with new ports. Retry `docker-compose up -d`. Update manifest with actual ports. |
 | Core install (4.9) | DB connection refused | Check if services are running. For Docker: `docker-compose ps`. For native: `systemctl status mariadb`. Suggest fix and offer retry. |
-| Plugin install (4.10) | Plugin not found in WP.org repo | Warn: "Plugin '<slug>' not found — skipping." Continue with remaining plugins. Do not abort. |
+| Plugin install (4.10) | Plugin not found in WP.org repo | Required plugin: stop and report — it blocks the dependent workflow. Optional plugin: warn, skip, record in plugins.degraded, continue. |
 | Web server reload (4.8, native) | `nginx: [emerg] open() "..." failed (13: Permission denied)` after installing a vhost on Fedora/RHEL/CentOS | The vhost file has the wrong SELinux context (`user_tmp_t` instead of `httpd_config_t`). Fix: `sudo restorecon -F /etc/nginx/conf.d/<domain>.conf && sudo systemctl reload nginx`. To avoid this entirely, install vhosts via `bin/wp-env-setup.sh vhost-install` or pass `--vhost-src` to `native-setup` — both run restorecon automatically. |
 
 | Upload via wp-admin (post-setup, nginx) | `413 Request Entity Too Large`, served as a bare nginx error page with no WordPress styling | `client_max_body_size` is missing from the vhost, so it defaults to `1m`. nginx rejects the request before PHP runs, so raising `upload_max_filesize` changes nothing. Add `client_max_body_size 1024M;` to the `server` block, reinstall via `vhost-install`, then `sudo nginx -t && sudo systemctl reload nginx`. To install a local zip without fixing this first, use `$WP plugin install /path/to/plugin.zip`, which bypasses HTTP entirely. |
@@ -537,7 +569,7 @@ Each step validates before proceeding. On failure:
 
 **Critical vs non-critical:**
 - Steps 4.1-4.9 are **critical** — failure aborts the process.
-- Steps 4.10-4.15 are **non-critical** — failure warns but continues.
+- Steps 4.11-4.15 are **non-critical** — failure warns but continues. Step 4.10 is **non-critical per plugin**, not per step: an optional plugin warns, a required one blocks.
 
 **Partial state on failure:** On any critical failure, leave partial state in place for debugging. The `.wp-create.json` manifest is NOT generated until all critical steps succeed. The user can re-run `/wp-create` on the same path to retry — idempotent steps detect existing state and skip (e.g., if WordPress is already downloaded, skip download; if DB already exists, skip create).
 
@@ -681,6 +713,7 @@ Only generate after all critical steps (4.1-4.9) succeed. Write the manifest to 
 
 ```json
 {
+  "manifest_version": 3,
   "project": {
     "name": "<PROJECT_NAME>",
     "slug": "<SLUG>",
@@ -698,7 +731,6 @@ Only generate after all critical steps (4.1-4.9) succeed. Write the manifest to 
   "database": {
     "name": "<DB_NAME>",
     "user": "<DB_USER>",
-    "password": "<DB_PASSWORD>",
     "host": "<DB_HOST>"
   },
   "wordpress": {
@@ -727,8 +759,24 @@ Only generate after all critical steps (4.1-4.9) succeed. Write the manifest to 
   "wp_cli": {
     "wrapper": "<WP_CLI_WRAPPER>",
     "path_flag": "<PATH_FLAG_OR_EMPTY>"
-  }
+  },
+  "demo mode": "<craft|plain>",
+  "i18n strategy": "<suffix|polylang>"
 }
+```
+
+The database password is **not** in the manifest. It goes in `.wp-create.local.json`,
+which `/wp-init` adds to the project's `.gitignore`:
+
+```json
+{ "database": { "password": "<DB_PASSWORD>" }, "wordpress": { "admin_password": "<ADMIN_PASSWORD>" } }
+```
+
+Read either value through the validator, which resolves environment → local file →
+manifest and warns when it had to fall back to the manifest:
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' db_password"
 ```
 
 The `wp_cli.wrapper` value depends on the environment:
@@ -762,7 +810,7 @@ After the manifest is written and validated, prompt the user:
 === WordPress Project Created ===
   Project:      <PROJECT_NAME>
   URL:          <URL>
-  Admin:        <URL>/wp-admin (webmaster / webmaster)
+  Admin:        <URL>/wp-admin (webmaster / <generated>)
   Path:         <PROJECT_PATH>
   Environment:  <ENV_TYPE> (<WEB_SERVER>, PHP <PHP_VERSION>)
   Database:     <DB_NAME>

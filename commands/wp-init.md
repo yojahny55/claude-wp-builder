@@ -821,7 +821,7 @@ The theme directory is the versioned deliverable and `/wp-yolo` requires a git r
 cd <theme-dir>
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
   git init -q
-  printf 'node_modules/\n.DS_Store\n*.log\n' > .gitignore
+  printf 'node_modules/\n.DS_Store\n*.log\n.wp-create.local.json\n' > .gitignore
   # Tailwind build output is regenerable — ignore dist if this is the tailwind template
   git add -A && git commit -q -m "chore: scaffold <slug> theme from starter"
 }
