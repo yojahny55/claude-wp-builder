@@ -323,7 +323,7 @@ and the demo is built exactly as it is today. To refresh it, delete
 ### Design library
 
 The craft path queries `wp-design-library` over MCP when it is registered. The
-default starts the pinned `@yojahny/wp-design-library@0.1.0` package with npx. To
+default starts the pinned `@yojahny/wp-design-library@0.2.0` package with npx. To
 use a hosted instance instead, add the following server to your project's
 `.mcp.json`, keep that file out of version control, and supply the token through
 your MCP client's secret or environment-variable support when available:
