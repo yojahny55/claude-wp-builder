@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`bin/wp-config.mjs` and `bin/lib/manifest.mjs` — one validator for `.wp-create.json`,
+  the manifest roughly thirty commands, agents and skills read with no writer contract
+  until now.** `node bin/wp-config.mjs validate <project-path>` checks the required fields,
+  the `"demo mode"` and `"i18n strategy"` values, and the manifest version, so a malformed
+  or missing manifest fails once, early, instead of thirty different ways deep inside
+  whichever command happens to read it first. Exit codes are fixed and are the contract:
+  `0` ok, `1` invalid/refused, `2` migration available, `3` no manifest. Covered by
+  `tests/checks/wp-config-validate.sh` and fixtures under `tests/fixtures/manifests/`.
+
 ## [1.18.0] - 2026-09-15
 
 ### Added
