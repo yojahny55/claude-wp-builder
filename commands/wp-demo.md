@@ -236,6 +236,17 @@ before writing any markup.
    real references with the blanket unavailable line. Never stop the build on a
    library error.
 
+   If the `inspo` MCP server is also registered, consult it for page-level direction:
+   one `recommend` with the brief, then at most two `search_screens`, then `get_screen`
+   on the three to five references kept. A tool result is re-read on every later turn,
+   so a fourth search costs more than it finds. Take composition and section ordering
+   from it and nothing else — sub-step 3.7 lists what it may not touch. Cite each one
+   under the same `## References` heading on a line starting with `inspo:` and then the
+   slug, so inspo lines stay distinguishable from library lines, which start with the
+   slug alone. If the server is not registered or every call fails, write
+   `References: inspo unavailable` under the same heading and continue. Never stop the
+   build on an inspo error.
+
    **3.7. Reference precedence.** Two reference servers can be registered, and they
    answer different questions. The order is fixed:
 
@@ -581,6 +592,29 @@ header, footer and responsive requirements (step 6 above says so) and nothing
 else from them — its single-file rule, its ban on external dependencies and its
 `:root` token list all contradict a craft build — then print the Step 5 summary,
 listing every page written, not just `index.html`.
+
+## Step 2.7: Page References (plain mode only)
+
+Skip this step in craft mode — craft consults its reference servers at Step 2.6,
+sub-steps 3.6 and 3.7, and the precedence ladder there governs both modes.
+
+If the `inspo` MCP server is registered, consult it for page-level direction before
+generating anything: one `recommend` with the brief from Step 2, then at most two
+`search_screens`, then `get_screen` on the three to five references kept. A tool
+result is re-read on every later turn, so a fourth search costs more than it finds.
+
+Take composition and section ordering only. The exclusions in Step 2.6 sub-step 3.7
+apply here unchanged: the colour table never becomes tokens, `get_reference_jsx` is
+never called, nothing reaches `/wp-yolo --transcribe`, and inspo never chooses a
+motion device.
+
+Plain mode writes no `demo/BRIEF.md`, so the citations go at the top of
+`demo/index.html` as an HTML comment — a `References:` line per reference, each
+starting with `inspo:` and then the slug, then one sentence on what was taken.
+
+If the server is not registered or every call fails, write
+`References: inspo unavailable` in that comment and continue. Never stop the build on
+an inspo error.
 
 ## Step 3: Invoke Skills
 

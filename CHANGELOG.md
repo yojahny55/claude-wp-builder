@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`/wp-demo` consults `inspo` for page-level direction, in both modes.** A free
+  MIT archive of 832 production sites, opt-in and never registered by default. It
+  answers macrostructure, section ordering and fold composition; `wp-design-library`
+  keeps role, section and motion device; the client's own material keeps colour.
+  Plain mode had no reference source at all before this — its library step lives
+  inside the craft-only Step 2.6 — so Step 2.7 gives it one.
+
+  Four exclusions are rules, not judgment calls: its colour table never becomes theme
+  tokens (its role labels are self-declared heuristics, and on `animaapp-com` it calls
+  `#063f77` the accent while its own prose names purple `#5d4fae`), `get_reference_jsx`
+  is never called because it returns React, nothing reaches `/wp-yolo --transcribe`,
+  and it never picks a motion device because it carries no motion data.
+
 ## [1.18.0] - 2026-09-15
 
 ### Added
