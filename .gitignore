@@ -21,6 +21,8 @@ package-lock.json
 # ...except the committed validator fixtures, which are intentionally tracked.
 !tests/fixtures/manifests/valid/.wp-create.json
 !tests/fixtures/manifests/malformed/.wp-create.json
+!tests/fixtures/manifests/legacy-v1/.wp-create.json
+!tests/fixtures/manifests/future/.wp-create.json
 
 # Claude Code local settings
 .claude/settings.local.json

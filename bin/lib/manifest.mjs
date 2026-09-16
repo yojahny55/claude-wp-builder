@@ -51,3 +51,38 @@ export function validateManifest(manifest) {
   }
   return problems;
 }
+
+// The prose line in .claude/CLAUDE.md is the ONLY record of a legacy project's i18n
+// strategy, so migration reads it rather than re-deciding. Where it is absent the
+// documented fallbacks apply unchanged: no line means suffix, no mode means plain.
+export function readProseDecision(claudeMd, label) {
+  const re = new RegExp(`^\\s*-\\s*\\*\\*${label}:\\*\\*\\s*\`?([A-Za-z_-]+)\`?\\s*$`, 'm');
+  const m = re.exec(claudeMd ?? '');
+  return m ? m[1] : null;
+}
+
+// Each step is explicit and additive. Unknown keys are carried through untouched:
+// a key this version does not understand is not a key it may delete.
+const STEPS = {
+  1: (m, ctx) => ({
+    ...m,
+    manifest_version: 2,
+    'i18n strategy': m['i18n strategy'] ?? readProseDecision(ctx.claudeMd, 'i18n strategy') ?? 'suffix',
+    'demo mode': m['demo mode'] ?? 'plain',
+  }),
+  2: (m) => ({ ...m, manifest_version: 3 }),
+};
+
+export function migrateManifest(manifest, { claudeMd = '' } = {}) {
+  let current = { ...manifest };
+  const notes = [];
+  let version = detectVersion(current);
+  while (version < CURRENT_VERSION) {
+    const step = STEPS[version];
+    if (!step) throw new Error(`no migration step from version ${version}`);
+    current = step(current, { claudeMd });
+    notes.push(`migrated ${version} -> ${detectVersion(current)}`);
+    version = detectVersion(current);
+  }
+  return { manifest: current, notes };
+}

@@ -5,10 +5,12 @@
  * Exit codes are fixed and are part of the contract: 0 ok, 1 invalid or refused,
  * 2 a migration is available, 3 there is no manifest.
  */
-import { readFileSync, existsSync } from 'node:fs';
+import {
+  readFileSync, existsSync, writeFileSync, copyFileSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
-  CURRENT_VERSION, MANIFEST_NAME, detectVersion, validateManifest,
+  CURRENT_VERSION, MANIFEST_NAME, detectVersion, validateManifest, migrateManifest,
 } from './lib/manifest.mjs';
 
 const say = (s) => console.log(s);
@@ -47,9 +49,33 @@ function cmdValidate(projectPath) {
   say(`ok: ${MANIFEST_NAME} valid at version ${version}`);
 }
 
+function cmdMigrate(projectPath) {
+  const { file, manifest } = loadManifest(projectPath);
+  const version = detectVersion(manifest);
+  if (version > CURRENT_VERSION) {
+    warn(`manifest_version ${version} is newer than this plugin understands (${CURRENT_VERSION}); leaving it untouched`);
+    process.exit(1);
+  }
+  if (version === CURRENT_VERSION) {
+    say(`ok: already at version ${CURRENT_VERSION}, nothing to migrate`);
+    return;
+  }
+  const claudeFile = join(resolve(projectPath), '.claude', 'CLAUDE.md');
+  const claudeMd = existsSync(claudeFile) ? readFileSync(claudeFile, 'utf8') : '';
+  const { manifest: next, notes } = migrateManifest(manifest, { claudeMd });
+
+  // Versioned on purpose: /wp-create writes .wp-create.json.bak when the user chooses
+  // Overwrite, and reusing that name would destroy their pre-overwrite copy.
+  copyFileSync(file, `${file}.v${version}.bak`);
+  writeFileSync(file, `${JSON.stringify(next, null, 2)}\n`);
+  for (const n of notes) say(n);
+  say(`ok: migrated to version ${CURRENT_VERSION}`);
+}
+
 const [cmd, target] = process.argv.slice(2);
 if (cmd === 'validate' && target) cmdValidate(target);
+else if (cmd === 'migrate' && target) cmdMigrate(target);
 else {
-  warn('usage: wp-config.mjs validate <project-path>');
+  warn('usage: wp-config.mjs <validate|migrate> <project-path>');
   process.exit(1);
 }

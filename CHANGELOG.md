@@ -12,6 +12,15 @@
   whichever command happens to read it first. Exit codes are fixed and are the contract:
   `0` ok, `1` invalid/refused, `2` migration available, `3` no manifest. Covered by
   `tests/checks/wp-config-validate.sh` and fixtures under `tests/fixtures/manifests/`.
+- **`node bin/wp-config.mjs migrate <project-path>` moves a pre-version manifest forward
+  without re-deciding it.** A legacy project's `"i18n strategy"` lives only as a prose
+  line in its `.claude/CLAUDE.md` — the new `migrateManifest()` reads that line instead
+  of falling back to the documented default, and only falls back (`suffix`/`plain`) when
+  the line itself is absent. Unknown keys are preserved, a future `manifest_version` is
+  refused and left untouched, the pre-migration file is backed up as
+  `.wp-create.json.v<n>.bak` (never `.wp-create.json.bak`, which `/wp-create` already
+  owns), and re-running migrate on an up-to-date manifest is a no-op. Covered by
+  `tests/checks/wp-config-migrate.sh` and the `legacy-v1`/`future` fixtures.
 
 ## [1.18.0] - 2026-09-15
 
