@@ -168,4 +168,62 @@ grep -qF 'the project predates the choice and is' CLAUDE.md \
 printf '%s' "$s07" | grep -qF '`i18n strategy` line is absent stays `suffix`' \
   || { echo "FAIL: /wp-init Step 0.7 does not say the new default governs new scaffolds only"; exit 1; }
 
+# ── Menu import must not depend on the 'polylang' option alone ─────────────
+# A location assigned only through that option, with nothing ever registered
+# in the core 'nav_menu_locations' theme_mod, leaves Polylang's own frontend
+# filter with nothing to override -- every language falls through to
+# wp_nav_menu()'s hard-coded fallback. Measured on a real build: the fallback
+# happened to look correct in the default language, which is exactly why this
+# needs a standing check rather than relying on someone noticing by eye.
+imp=skills/wp-polylang/scripts/pll-import.php
+grep -q "get_theme_mod( 'nav_menu_locations'" "$imp" \
+  || { echo "FAIL: pll-import.php's menu branch never reads the core 'nav_menu_locations' theme_mod -- it can leave every language with no working menu"; exit 1; }
+grep -q "set_theme_mod( 'nav_menu_locations'" "$imp" \
+  || { echo "FAIL: pll-import.php's menu branch never backfills 'nav_menu_locations' -- Polylang's filter has nothing to override on a site whose menu was assigned only through the 'polylang' option"; exit 1; }
+
+seed=commands/wp-seed.md
+grep -q "menu location assign" "$seed" \
+  || { echo "FAIL: wp-seed.md's polylang menu phase never registers a location through 'wp menu location assign' -- it only writes the 'polylang' option, the same gap pll-import.php now guards against"; exit 1; }
+
+# ── A taxonomy term's own custom fields must travel through the import ─────
+# pllx_term_payload()'s 'acf' key used to be hardcoded empty: a repeater or a
+# plain field attached to a term never reached its translation, silently.
+lib=skills/wp-polylang/scripts/pll-lib.php
+grep -q "pllx_acf_payload( \$taxonomy . '_' . \$term_id )" "$lib" \
+  || { echo "FAIL: pll-lib.php's pllx_term_payload() no longer walks a term's own ACF/SCF fields"; exit 1; }
+exp=skills/wp-polylang/scripts/pll-export.php
+grep -q "'acf'       => \$payload\['acf'\]," "$exp" \
+  || { echo "FAIL: pll-export.php builds a term item without its 'acf' payload -- pllx_term_payload() can produce one but nothing puts it on the wire"; exit 1; }
+grep -q 'pllx_acf_copy_untranslated_term' "$imp" \
+  || { echo "FAIL: pll-import.php's term branch never copies a term's untranslated ACF values (images, numbers, repeaters) onto the counterpart"; exit 1; }
+grep -qF "pllx_acf_write( \$term_context, \$dotted, \$value, \$source_context )" "$imp" \
+  || { echo "FAIL: pll-import.php's term branch never writes the translated ACF values from the manifest back onto the term counterpart"; exit 1; }
+
+# ── SKILL.md must document the rewrite-base pattern and the term ACF surface ─
+grep -q '^## Rewrite bases are never translated' "$s" \
+  || { echo "FAIL: SKILL.md does not document that Polylang never translates a CPT/taxonomy rewrite base"; exit 1; }
+grep -qF 'chosen by the URL already in hand, never by who is reading' "$s" \
+  || { echo "FAIL: SKILL.md does not state the rewrite-base swap must be decided from the URL, not the current reader"; exit 1; }
+tr '\n' ' ' < "$s" | grep -qi "taxonomy TERM's fields are a separate" \
+  || { echo "FAIL: SKILL.md's ACF section does not call out that a term's own fields are a separate surface from a post's"; exit 1; }
+
+# ── The string helper must resolve its source from the primary language ────
+# A hardcoded 'en' as the lookup key breaks pll__() on every non-English-primary
+# project: the registry is keyed by the value pll_register_string() was given
+# (the PRIMARY language, per commands/wp-init.md Step 6), so asking for 'en'
+# there never matches and a client's edits under Languages > Strings are
+# silently ignored.
+tw=starter-theme/_i18n-variants/__tailwind__.php
+# Scoped to the $source assignment specifically -- a later, unrelated fallback
+# in the same function legitimately defaults to 'en' when a key has no entry
+# at all for the current language, which is a different concern.
+src_line=$(grep -A1 '^\s*\$source = isset(\$translations\[\$key\]' "$tw" | tr '\n' ' ')
+[ -n "$src_line" ] \
+  || { echo "FAIL: __tailwind__.php's Polylang variant has no recognizable \$source assignment in __starter___t() to check"; exit 1; }
+printf '%s' "$src_line" | grep -qF '__STARTER___DEFAULT_LANG' \
+  || { echo "FAIL: __tailwind__.php's Polylang variant does not resolve its string source through the DEFAULT_LANG constant"; exit 1; }
+printf '%s' "$src_line" | grep -qF "['en']" \
+  && { echo "FAIL: __tailwind__.php's Polylang variant still hardcodes 'en' as the registered-string source"; exit 1; }
+true
+
 echo PASS

@@ -167,6 +167,7 @@ foreach ( $taxonomies as $taxonomy ) {
 			'target_id' => $target_id,
 			'hash'      => $hash,
 			'fields'    => $payload['fields'],
+			'acf'       => $payload['acf'],
 		);
 	}
 }
