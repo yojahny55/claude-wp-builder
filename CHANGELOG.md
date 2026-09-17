@@ -351,7 +351,14 @@
   background a template prints, the `wp-robin` skill documents the three delivery modes with
   the page-cache caveat on `url` and the nginx/Apache rule for a background declared in a
   stylesheet, and `wp-audit-performance` gains PERF-056 for an uploads background whose
-  sibling exists but is never served.
+  sibling exists but is never served. The helper percent-encodes the characters `esc_url()`
+  passes through but CSS reads as syntax, so a filename carrying a parenthesis or a
+  semicolon — which reaches disk on any library moved by rsync rather than through
+  `wp_handle_upload()` — cannot close the `url()` token or inject a second declaration; a
+  URL with a parent segment is refused before `file_exists()` runs; and the buffer leaves
+  the helper's own two URLs alone, since rewriting the fallback would hand a browser
+  without `image-set()` a WebP in its place. `tests/checks/webp-css-backgrounds.sh` now
+  runs the code against a fixture library instead of only grepping for the contract.
 
 - **`/wp-demo-verify` no longer reads full-resolution contact sheets into the
   orchestrator's context.** `bin/demo-verify.mjs`'s contact sheet was a single

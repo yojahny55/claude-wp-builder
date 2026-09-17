@@ -41,11 +41,22 @@ grep -Fq "\$relative . '.webp'" "$perf" \
 grep -Fq "preg_replace( '/\\.(?:jpe?g|png)\$/i', '.webp', \$relative )" "$perf" \
   || { echo "FAIL: $perf does not check the replaced-extension sibling name (foto.webp) that WordPress writes"; exit 1; }
 # The buffer must go through the resolver, not re-derive one naming convention of its own.
-grep -Fq '__starter___webp_sibling_url( $m[0] )' "$perf" \
+grep -Fq '__starter___webp_sibling_url( $text )' "$perf" \
   || { echo "FAIL: $perf's output buffer does not use the shared sibling resolver — it would cover only one naming convention"; exit 1; }
 # Local uploads URLs only.
 grep -Fq 'wp_get_upload_dir()' "$perf" \
   || { echo "FAIL: $perf resolves siblings without anchoring on the uploads directory"; exit 1; }
+
+# The buffer must leave a declaration the helper already decided about alone: rewriting
+# the fallback url() would hand a browser without image-set() a WebP it may not decode.
+grep -Fq "') type('" "$perf" \
+  || { echo "FAIL: $perf's buffer does not recognize the helper's image-set() candidates"; exit 1; }
+grep -Fq "');background-image:image-set(" "$perf" \
+  || { echo "FAIL: $perf's buffer does not recognize the helper's plain url() fallback, and would rewrite it"; exit 1; }
+grep -Fq "strpos( \$relative, '..' )" "$perf" \
+  || { echo "FAIL: $perf does not refuse a parent segment before touching the filesystem"; exit 1; }
+grep -Fq 'function __starter___css_url(' "$perf" \
+  || { echo "FAIL: $perf does not percent-encode CSS-syntax characters in the url() token"; exit 1; }
 
 # 2. Agent guidance.
 grep -Fq 'prefix_background_image' "$agent" \
@@ -64,5 +75,15 @@ grep -q 'page cache' "$skill" \
 # 4. The audit check that would have caught it.
 grep -Fq 'PERF-056' "$audit" \
   || { echo "FAIL: $audit has no check for a CSS background whose WebP sibling is never served"; exit 1; }
+
+# 5. Behavior, not wording: the greps above all pass on a helper that probes outside
+# uploads, that leaves a parenthesis loose in the url() token, or whose output buffer
+# overwrites the fallback the helper deliberately emitted. Run the code.
+if command -v php >/dev/null 2>&1; then
+  out=$(php "$(dirname "$0")/lib/webp-backgrounds-behavior.php" 2>&1) || { echo "$out"; exit 1; }
+  [ "$out" = "OK" ] || { echo "FAIL: behavioral test did not report OK:"; echo "$out"; exit 1; }
+else
+  echo "NOTE: php not found — the behavioral half of this check did not run"
+fi
 
 echo "PASS"

@@ -73,7 +73,11 @@ function __starter___webp_sibling_url( $url ) {
 	}
 	$cache[ $url ] = '';
 
-	if ( ! preg_match( '/\.(?:jpe?g|png)$/i', $url ) ) {
+	// A versioned or anchored URL (foto.jpg?ver=3, foto.png#x) names the same file.
+	// The extension test anchors on the end of the string, so the suffix has to go
+	// first or the sibling is never found.
+	$path_only = preg_replace( '/[?#].*$/', '', $url );
+	if ( ! preg_match( '/\.(?:jpe?g|png)$/i', $path_only ) ) {
 		return '';
 	}
 
@@ -81,11 +85,19 @@ function __starter___webp_sibling_url( $url ) {
 	// The stored URL and the request can disagree on the scheme (http vs https),
 	// which would make an otherwise local image look remote.
 	$base_url = set_url_scheme( $uploads['baseurl'] );
-	$compare  = set_url_scheme( $url );
+	$compare  = set_url_scheme( $path_only );
 	if ( 0 !== strpos( $compare, $base_url . '/' ) ) {
 		return '';
 	}
 	$relative = substr( $compare, strlen( $base_url ) );
+
+	// `<baseurl>/../../secret.png` still starts with the base URL, so the prefix test
+	// alone would let file_exists() probe paths outside the uploads directory and
+	// answer whether a file is there. Refuse the whole URL instead of normalizing it:
+	// nothing legitimate in an uploads URL needs a parent segment.
+	if ( false !== strpos( $relative, '..' ) ) {
+		return '';
+	}
 
 	foreach ( array( $relative . '.webp', preg_replace( '/\.(?:jpe?g|png)$/i', '.webp', $relative ) ) as $candidate ) {
 		if ( file_exists( $uploads['basedir'] . $candidate ) ) {
@@ -125,11 +137,26 @@ add_action( 'template_redirect', function () {
 		if ( '' === $html || false === strpos( $html, $base_url ) ) {
 			return $html;
 		}
+		$count   = 0;
 		$pattern = '#' . preg_quote( $base_url, '#' ) . '/[^"\'\)\s]+?\.(?:jpe?g|png)#i';
-		return preg_replace_callback( $pattern, function ( $m ) {
-			$webp = __starter___webp_sibling_url( $m[0] );
-			return '' !== $webp ? $webp : $m[0];
-		}, $html );
+		return preg_replace_callback( $pattern, function ( $m ) use ( $html ) {
+			// __starter___background_image() emits the original URL twice on purpose:
+			// as the plain url() fallback and as the non-WebP candidate inside
+			// image-set(). Swapping either one for the sibling would hand a browser
+			// that cannot parse image-set() a WebP it may not decode — undoing the
+			// fallback this buffer is not the author of. Both are recognized by what
+			// follows them, so a background the theme already decided about is left
+			// exactly as the helper wrote it.
+			// PREG_OFFSET_CAPTURE makes each match array( text, offset ).
+			list( $text, $offset ) = $m[0];
+
+			$after = substr( $html, $offset + strlen( $text ), 32 );
+			if ( 0 === strpos( $after, "') type('" ) || 0 === strpos( $after, "');background-image:image-set(" ) ) {
+				return $text;
+			}
+			$webp = __starter___webp_sibling_url( $text );
+			return '' !== $webp ? $webp : $text;
+		}, $html, -1, $count, PREG_OFFSET_CAPTURE );
 	} );
 } );
 
@@ -166,6 +193,28 @@ function __starter___image( $field, $size = 'large', $attr = array() ) {
 }
 
 /**
+ * Percent-encode a URL for use inside a CSS url() token.
+ *
+ * esc_url() keeps the HTML attribute safe — it strips the quote, angle bracket
+ * and raw space that would break out of style="…" — but its whitelist passes
+ * `(`, `)`, `'` and `;` through, and CSS reads all four as syntax. A file named
+ * `plan (1).png`, which reaches disk on any library moved by rsync rather than
+ * through wp_handle_upload(), would truncate the url() token at its first `)`;
+ * a `;` in the name could close the declaration and start another one. The
+ * server decodes these escapes back to the same file.
+ *
+ * @param string $url URL, already passed through esc_url().
+ * @return string URL safe inside url('…').
+ */
+function __starter___css_url( $url ) {
+	return str_replace(
+		array( '(', ')', "'", '"', ';', ',', '\\' ),
+		array( '%28', '%29', '%27', '%22', '%3B', '%2C', '%5C' ),
+		$url
+	);
+}
+
+/**
  * 4) WebP for a CSS `background-image`, as a value to print inside a style attribute.
  *
  * Robin Image Optimizer's default delivery mode rewrites <img> tags only, so a
@@ -179,13 +228,15 @@ function __starter___image( $field, $size = 'large', $attr = array() ) {
  *
  * The WebP branch is emitted only when the sibling exists on disk.
  *
- * Every URL goes through esc_url(), so the return value is safe to print inside
- * a double-quoted style attribute and must NOT be escaped again:
+ * Every URL goes through esc_url(), which keeps the HTML attribute intact, and
+ * then __starter___css_url(), which percent-encodes the characters esc_url()
+ * passes through but CSS reads as syntax. The return value is therefore safe to
+ * print inside a double-quoted style attribute and must NOT be escaped again:
  *
  *   <div style="<?php echo __starter___background_image( $field['url'] ); ?>">
  *
- * The type() arguments are single-quoted for the same reason — a double quote
- * would end the attribute.
+ * The type() arguments are single-quoted because a double quote would end the
+ * attribute.
  *
  * @param string $url Absolute URL of the background image.
  * @return string CSS declarations, or '' when $url is empty.
@@ -196,15 +247,16 @@ function __starter___background_image( $url ) {
 		return '';
 	}
 
-	$css  = 'background-image:url(' . esc_url( $url ) . ');';
+	$src  = __starter___css_url( esc_url( $url ) );
+	$css  = "background-image:url('" . $src . "');";
 	$webp = __starter___webp_sibling_url( $url );
 	if ( '' === $webp ) {
 		return $css;
 	}
 
-	$type = preg_match( '/\.png$/i', $url ) ? 'image/png' : 'image/jpeg';
+	$type = preg_match( '/\.png(?:[?#]|$)/i', $url ) ? 'image/png' : 'image/jpeg';
 
 	return $css . 'background-image:image-set('
-		. 'url(' . esc_url( $webp ) . ") type('image/webp'), "
-		. 'url(' . esc_url( $url ) . ") type('" . $type . "'));";
+		. "url('" . __starter___css_url( esc_url( $webp ) ) . "') type('image/webp'), "
+		. "url('" . $src . "') type('" . $type . "'));";
 }
