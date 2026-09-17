@@ -358,7 +358,11 @@
   URL with a parent segment is refused before `file_exists()` runs; and the buffer leaves
   the helper's own two URLs alone, since rewriting the fallback would hand a browser
   without `image-set()` a WebP in its place. `tests/checks/webp-css-backgrounds.sh` now
-  runs the code against a fixture library instead of only grepping for the contract.
+  runs the code against a fixture library instead of only grepping for the contract. The
+  buffer's pattern also carries a `(?!\.webp)` look-ahead: its lazy quantifier stops at the
+  first extension, so it used to match the `foto.png` inside an existing `foto.png.webp`
+  URL and rewrite it to `foto.png.webp.webp` — a 404 on any page already printing a
+  sibling URL, which on a Robin-optimized library is every page the helper touches.
 - `wp-robin`: the webp sync step now converts sizes added after the first run. It used to
   pick only attachments with no webp rows at all, so a size registered later and generated
   with `wp media regenerate` was never converted. Each attachment's files on disk are now

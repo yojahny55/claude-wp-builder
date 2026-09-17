@@ -156,7 +156,11 @@ add_action( 'template_redirect', function () {
 			return $html;
 		}
 		$count   = 0;
-		$pattern = '#' . preg_quote( $base_url, '#' ) . '/[^"\'\)\s]+?\.(?:jpe?g|png)#i';
+		// The lazy quantifier stops at the first extension it finds, so without the
+		// look-ahead this matches the `foto.png` inside an existing `foto.png.webp` URL
+		// and rewrites it to `foto.png.webp.webp` — a 404 for any page that already
+		// prints a sibling URL, including the image-set() the helper below emits.
+		$pattern = '#' . preg_quote( $base_url, '#' ) . '/[^"\'\)\s]+?\.(?:jpe?g|png)(?!\.webp)#i';
 		return preg_replace_callback( $pattern, function ( $m ) use ( $html ) {
 			// __starter___background_image() emits the original URL twice on purpose:
 			// as the plain url() fallback and as the non-WebP candidate inside
@@ -272,7 +276,11 @@ function __starter___background_image( $url ) {
 		return $css;
 	}
 
-	$type = preg_match( '/\.png(?:[?#]|$)/i', $url ) ? 'image/png' : 'image/jpeg';
+	// Mirrors the extensions __starter___webp_sibling_url() accepts, so the two cannot
+	// drift into labelling a format it starts resolving as image/jpeg.
+	$type = preg_match( '/\.(jpe?g|png)(?:[?#]|$)/i', $url, $ext ) && 'png' === strtolower( $ext[1] )
+		? 'image/png'
+		: 'image/jpeg';
 
 	return $css . 'background-image:image-set('
 		. "url('" . __starter___css_url( esc_url( $webp ) ) . "') type('image/webp'), "

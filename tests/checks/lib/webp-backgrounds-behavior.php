@@ -155,6 +155,21 @@ $out = ob_get_clean();
 check( '<img> src swapped', (string) (int) ( false !== strpos( $out, 'src="' . $U . 'a.png.webp"' ) ), '1' );
 check( "helper's fallback URL untouched", (string) (int) ( false !== strpos( $out, "url('{$U}a.png');background-image:image-set(" ) ), '1' );
 check( "helper's image-set candidate untouched", (string) (int) ( false !== strpos( $out, "url('{$U}a.png') type('image/png')" ) ), '1' );
+// The WebP candidate is the case the guard prefixes do NOT cover: the lazy pattern
+// matches the `a.png` inside `a.png.webp`, and its sibling resolves, so without the
+// look-ahead in the pattern the buffer turns it into `a.png.webp.webp`.
+check( "helper's WebP candidate not double-suffixed", (string) (int) ( false !== strpos( $out, "url('{$U}a.png.webp') type('image/webp')" ) ), '1' );
+check( 'no .webp.webp anywhere in the output', (string) (int) ( false !== strpos( $out, '.webp.webp' ) ), '0' );
+
+// A sibling URL printed straight into the markup — by a plugin, or by a template that
+// resolved it itself — must survive the buffer too.
+$plain = '<img src="' . $U . 'b.webp"><img src="' . $U . 'a.png.webp">';
+ob_start();
+foreach ( $callbacks as $cb ) { $cb(); }
+echo $plain;
+ob_end_flush();
+$plain_out = ob_get_clean();
+check( 'an already-sibling URL in the markup is left alone', $plain_out, $plain );
 
 if ( $fails ) {
 	echo "FAIL:\n  " . implode( "\n  ", $fails ) . "\n";
