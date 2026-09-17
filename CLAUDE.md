@@ -388,6 +388,14 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   definition of a valid `.wp-create.json`, but a command whose gate line is deleted simply
   stops validating, and only `tests/checks/wp-config-gate.sh` notices. Same ceiling every
   prose contract here carries.
+- **The gate substitutes its own path.** `${PROJECT_PATH}` is prose, not an environment
+  variable the way `${CLAUDE_PLUGIN_ROOT}` beside it in the same `bash -c` is — a Claude
+  that treats both alike runs `validate ''`, gets the usage line and exit `1`, and the
+  table reads that as "stop". The block now says where the path comes from, and
+  `tests/checks/wp-config-gate.sh` diffs all thirteen sites against one canonical copy so
+  the sentence cannot be lost from one of them; nothing can check that the directory a
+  Claude substituted is the right one, and the tool still answers a missing argument and an
+  invalid manifest with the same exit code.
 - **A tested compatibility range is a claim someone has to keep honest.** An absent range
   is reported as untested, which makes the gap visible; nothing keeps a declared range true
   as plugins release.

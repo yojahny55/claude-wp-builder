@@ -192,6 +192,19 @@
   with its `'${PROJECT_PATH}'` argument, and the gate's own migration sentence — neither
   of which any unrelated content in the twelve files happens to contain.
 
+- **Fix: the gate said `${PROJECT_PATH}` without ever saying what it is.** Eleven of the
+  twelve gated commands never defined it — only `/wp-create` does — and it sits inside a
+  `bash -c` beside `${CLAUDE_PLUGIN_ROOT}`, which is a real environment variable, so the
+  gate expanded to `validate ''`, printed the usage line and exited `1`: "stop and report"
+  on every project. The block gains one sentence naming the path and what to do without
+  one, and stays byte-identical at all thirteen insertion sites.
+  `tests/checks/wp-config-gate.sh` now diffs every site against one canonical copy instead
+  of grepping for two of its lines, and finds the gated commands by walking
+  `commands/*.md` rather than from a hardcoded twelve-name list that shipped a thirteenth
+  ungated manifest-reading command green. `/wp-seed`, `/wp-debug`, `/wp-robin` and
+  `/wp-init` now *amend* the exit `3` table row instead of contradicting it three lines
+  later.
+
 ## [1.18.0] - 2026-09-15
 
 ### Added

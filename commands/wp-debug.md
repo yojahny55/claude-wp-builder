@@ -12,6 +12,8 @@ Diagnose WordPress issues by running systematic health checks, identifying probl
 
 **First: validate the project configuration.**
 
+`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report".
+
 ```bash
 bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
 ```
@@ -25,7 +27,7 @@ bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'
 
 On exit 2, run the migration before continuing.
 
-Exit `3` here falls through to the bare-`wp` fallback below rather than stopping outright
+**Amending the exit `3` row above:** Exit `3` here falls through to the bare-`wp` fallback below rather than stopping outright
 — this command also diagnoses a WordPress root that was never run through `/wp-create`.
 
 Read `.wp-create.json` from the project root to extract the WP-CLI wrapper command.
