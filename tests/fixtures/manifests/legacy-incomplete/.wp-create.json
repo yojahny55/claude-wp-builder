@@ -1,0 +1,13 @@
+{
+  "project": {
+    "name": "Legacy Site",
+    "slug": "legacy-site",
+    "domain": "legacy.test",
+    "path": "/tmp/legacy-site",
+    "created": "2026-01-04"
+  },
+  "environment": { "type": "native", "engine": "native", "web_server": "nginx", "php_version": "8.2" },
+  "database": { "name": "legacy", "user": "legacy", "host": "localhost" },
+  "wordpress": { "admin_user": "admin", "admin_email": "a@legacy.test", "url": "https://legacy.test" },
+  "wp_cli": { "wrapper": "wp", "path_flag": "" }
+}

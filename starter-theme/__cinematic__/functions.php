@@ -73,7 +73,16 @@ add_action('acf/init', function () {
 
     // One writer at a time: two concurrent first loads would both write the same
     // files, and a half-written JSON reads back as a corrupt field group.
-    $lock = fopen($json_dir . '/.bootstrap.lock', 'c');
+    //
+    // The lock is opened for writing by whoever bootstraps first — the web server
+    // user on a page load, the CLI user on a wp-cli run. Created with the process's
+    // default umask it comes out 0644, and the OTHER user can then never open it
+    // for writing, so flock() for an exclusive lock fails silently on every later
+    // bootstrap for that user. Widen it once, right after creation.
+    $lock_path = $json_dir . '/.bootstrap.lock';
+    $lock_is_new = !file_exists($lock_path);
+    $lock = fopen($lock_path, 'c');
+    if ($lock && $lock_is_new) { @chmod($lock_path, 0666); }
     if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) { return; }
 
     // Persist any freshly-registered PHP-local group to Local JSON (editable).
@@ -81,7 +90,15 @@ add_action('acf/init', function () {
         if (($g['local'] ?? '') !== 'php') { continue; }
         if (file_exists("$json_dir/{$g['key']}.json")) { continue; }
         $g['fields'] = acf_get_fields($g);
-        acf_write_json_field_group(acf_prepare_field_group_for_export($g));
+
+        // acf_write_json_field_group() reads $export['ID'] to stamp a modified
+        // time, but acf_prepare_field_group_for_export() strips it. Without the
+        // key put back, a fresh group emits "Undefined array key ID" and stays
+        // PHP-local — invisible in the dashboard.
+        $export       = acf_prepare_field_group_for_export($g);
+        $export['ID'] = $g['ID'] ?? 0;
+
+        acf_write_json_field_group($export);
     }
 
     flock($lock, LOCK_UN);

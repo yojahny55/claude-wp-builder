@@ -41,6 +41,23 @@ Example: /wp-section hero
 
 ## Step 2: Read Project Context
 
+**First: validate the project configuration.**
+
+`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report".
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+```
+
+| Exit | Meaning | Do |
+|---|---|---|
+| `0` | valid | continue |
+| `1` | invalid, or the generated context block disagrees with the manifest | stop and report the message verbatim |
+| `2` | an older manifest can migrate | run `wp-config.mjs migrate '${PROJECT_PATH}'`, then continue |
+| `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
+
+On exit 2, run the migration before continuing.
+
 Read `.claude/CLAUDE.md` to extract:
 - **Function prefix** (e.g., `kairo_`)
 - **Theme slug**
@@ -177,6 +194,15 @@ normal design-system authoring path unchanged.
   section wrapper's own class, so the `@apply` promotion `wp-tailwind` may perform
   afterwards has a block to hang on.
 - Because each section's `--block` is unique, parallel agents can never clash on a selector.
+- **Fidelity covers markup and values, never a control's option set.** The demo's filters,
+  selects and combos are coherent only because their options and their cards are the same
+  mock values. Once the section is wired to real posts, those options become a claim about
+  data: transcribing them literally is how a build ships a filter whose single value matches
+  no record, so choosing it empties the grid. Tell `wp-template` to source every option from
+  the real terms or field values, and to drop a control nothing backs — naming it in the
+  summary, so the omission is reported rather than silent. The same carve-out covers the
+  demo's empty-state and "no more results" strings: they are wording to translate and
+  behaviour to re-derive from the real query, not constants to copy.
 
 ---
 
@@ -386,7 +412,10 @@ writes. See **File ownership** above.
 >    qualified for that file precisely because it spans more than one block, so no
 >    single block's name can carry it.
 > 5. If a target CSS file does not exist, create it with its first rule already in
->    it and add its `@import` to `main.css` in the same step. Never leave an empty file.
+>    it and add its `@import` to `main.css` in the same step, naming its cascade
+>    layer (`layer(components)` for `components/<page-slug>.css`, `layer(utilities)`
+>    for `utilities/site.css`) — a bare `@import` beats every Tailwind utility
+>    regardless of specificity. Never leave an empty file.
 > 6. Colors and fonts come from the `@theme` block as utilities (`bg-primary`,
 >    `font-primary`). No `:root`, no hardcoded hex a token already covers.
 > 7. Responsive via Tailwind prefixes (`md:`, `lg:`). No hand-written `@media`.

@@ -83,6 +83,25 @@ paragraph below it — an agent that only reads these bullets must still get it 
   bare selector is dead, read the markup and check the elements, never the stylesheet:
   it is dead only when every element it matches already carries a class that sets the
   same property. A logo `<a>` with no class is the case that has already been missed.
+  **Not an exception**, even though it reads like one: `*, *::before, *::after {
+  box-sizing: border-box }` and `img { max-width: 100%; display: block }` are things
+  Preflight already sets, in its own `base` layer — drop them, never duplicate them.
+- **A demo's `max-width: Npx` is inclusive; Tailwind's `max-*` is exclusive.**
+  `max-width: 768px` in the demo matches width 768 itself; `max-md:` compiles to
+  `width < 768` and does not. The two most common desktop-first stops a demo
+  declares, 768 and 1024, are exactly where this bites. Convert `max-width: Npx` to
+  `max-[N+1px]:`, or redeclare the named breakpoint in `@theme` as `N+1` when the
+  project uses that stop by name (`--breakpoint-md: 769px;`). `min-width` is already
+  inclusive on both sides and needs no adjustment. Read
+  `skills/wp-tailwind-system/SKILL.md` § "`max-width: N` in the demo is INCLUSIVE" —
+  and re-measure the layout AT 768 and AT 1024 after converting, not only at the
+  sweep's far corners.
+- **Every hand-written CSS file this conversion writes into is imported with its
+  cascade layer**, not a bare `@import`: `base/` → `layer(base)`, `components/` and
+  `layouts/` → `layer(components)`, `utilities/` → `layer(utilities)`. An unlayered
+  import beats every Tailwind utility regardless of specificity or source order —
+  the starter's own default imports already carry this; extend the same pattern to
+  any file this conversion adds to `main.css`.
 
 **Never write the output path directly — write a temporary path and move it.** The agent
 writes the converted HTML to a temporary path (`<output-path>.tmp`) and stops. **This
@@ -140,6 +159,13 @@ path:
    clean, 1 deltas, 2 no usable browser (not a failure: say the gate could not run), 3
    crashed. Findings grouped by property, because a dropped reset shows up as the same
    property on many unrelated elements, and that shape is the diagnosis.
+
+   `--widths` is a floor, not the whole sweep: the gate also reads every
+   `max-width`/`min-width` value out of the ORIGINAL's own CSS and adds those exact
+   pixel widths to what it samples. A breakpoint conversion off by one pixel (see the
+   inclusive/exclusive rule above) is invisible at 1440 and 390 — a demo's `max-width:
+   768px` and Tailwind's `max-md:` disagree only AT 768, so the sweep has to land
+   there to see it.
 
    **Run it where the converted page renders.** Conversion strips the demo's stylesheet
    and adds no replacement (see Step 5), so unless the demo carries its own Tailwind

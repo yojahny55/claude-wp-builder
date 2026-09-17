@@ -5,6 +5,10 @@
  * @package __starter__
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 
 
 /**

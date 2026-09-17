@@ -110,3 +110,28 @@ add_filter('upload_mimes', '__starter___allow_svg_upload', 10, 2);
 
 // Body classes (lang / template / front-page) are added by __starter___body_classes()
 // in inc/template-functions.php — kept in one place to avoid a duplicate-declaration fatal.
+
+/**
+ * Stop WordPress 404-ing its own sitemap.
+ *
+ * `WP::handle_404()` clears the 404 only when the query matched something: it
+ * exempts admin, robots and favicon by name, and otherwise wants `$wp_query->posts`
+ * to be non-empty. A sitemap route carries no post query of its own, so on a site
+ * that publishes the built-in `post` type it survives by accident — the default
+ * "latest posts" query behind it returns those posts. A project with no native
+ * `post` content at all (everything modeled as a custom post type) gets an empty
+ * query, core marks the request 404, and `WP_Sitemaps::render_sitemaps()` goes on
+ * to print a perfectly valid sitemap on `template_redirect` immediately afterwards.
+ * The result is a correct XML body served under a 404 status line, which every
+ * crawler reads as "no sitemap" — and robots.txt is advertising that URL.
+ *
+ * `pre_handle_404` is core's own escape hatch for exactly this, so the fix reaches
+ * for it rather than into `WP::handle_404()` or a routing plugin. Also exempts the
+ * per-sitemap stylesheet route for the same reason.
+ */
+add_filter('pre_handle_404', function ($preempt, $query) {
+    if ($preempt) {
+        return $preempt;
+    }
+    return ($query->get('sitemap') || $query->get('sitemap-stylesheet')) ? true : $preempt;
+}, 10, 2);

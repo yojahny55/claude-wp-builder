@@ -1,0 +1,8 @@
+{
+  "name": "Required not boolean",
+  "description": "required is the string \"false\" instead of a real boolean",
+  "plugins": [
+    { "slug": "secure-custom-fields", "required": true },
+    { "slug": "contact-form-7", "required": "false" }
+  ]
+}

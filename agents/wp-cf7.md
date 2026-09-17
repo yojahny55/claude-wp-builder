@@ -47,6 +47,13 @@ Parsing rules:
 - Skip `<input type="file">` elements — CF7 file uploads require server configuration
 - Use the field's `name`, `id`, or `placeholder` attribute to determine a descriptive `your-` name
 - Preserve field order from the demo
+- **Every `[acceptance]` tag needs `acceptance_as_validation:on`.** Without it, CF7 disables
+  the submit button until the box is checked — with no error message and no way to discover
+  why the button won't respond, no other field in the form ever gets to validate, and focus
+  never moves to a first error because the browser never lets the submit happen at all. With
+  the option on, the button stays active and an unchecked box becomes an ordinary validation
+  error, shown next to the checkbox like every other field: `[acceptance* your-acceptance
+  acceptance_as_validation:on] I agree to the privacy policy [/acceptance]`.
 
 ## CF7 Form Generation
 
@@ -128,6 +135,33 @@ stack under its own field.
 once and screenshot it. Resting-state-only review is how error tips, the response
 notice and the consent line all get discovered by the client instead.
 
+### Control width, and the spinner's margins
+
+Two geometry defects recur because CF7 puts its own boxes between your CSS and the control:
+
+- **Set `width: 100%` on the CONTROL itself, not only on `.wpcf7-form-control-wrap`.** CF7's
+  `[text]`/`[email]`/`[tel]` tags render with an intrinsic `size="40"` when no `size` option
+  is given, which is a real HTML width attribute — sizing the wrap to fill a flex/grid column
+  does not stretch the `<input>` inside it, because the input keeps its own intrinsic size.
+  A row built for two equal columns collapses to two `size="40"` boxes with empty space
+  around them. Style both: the wrap for layout, the control for `width: 100%`.
+- **Contain the AJAX spinner's margins inside the form's own box.** CF7 appends the spinner
+  right after the submit button with `margin: 0 24px` from its own (usually dequeued)
+  stylesheet; in a `justify-content: flex-end` row that right margin extends past the
+  button and past the form, with nothing clipping it. Reset that margin in the theme's own
+  component CSS instead of leaving CF7's default — an unclipped spinner margin is exactly
+  what produced 20px of horizontal scroll on a phone viewport, dragging the drawer's close
+  button off-screen with it. Verify with `documentElement.scrollWidth` at your target mobile
+  width before and after: it must equal the viewport width, not exceed it.
+- **The loading-state padding that makes room for the spinner uses `padding-inline-end` in
+  plain CSS, never `pr-*` / `padding-right`.** The button's own horizontal padding comes from
+  an `@apply px-*`, which compiles to the LOGICAL property `padding-inline`. A physical
+  longhand like `padding-right` never beats a logical property on the same element,
+  regardless of selector specificity — so a `.submitting` rule written with `padding-right`
+  is silently overridden by the base `px-*` and the spinner-reserved space never appears.
+  Write the loading-state override as `padding-inline-end` so it competes in the same
+  logical-property family the base rule is already in.
+
 ### Custom submit buttons and validation messages
 
 When the design supplies its own `<button type="submit">` instead of `[submit]`, and
@@ -175,6 +209,19 @@ markup from fighting them.
 
 Measure the rendered panel against the demo at three widths, invalid state
 included — it is the state that changes the box.
+
+## The `cf7/*.html` files are a REFERENCE, not the live form
+
+**The editable form is the `_form` post meta on the CF7 post — a database row, not a file.**
+`cf7/form-{lang}.html` exists so the form definition is readable and versioned, but WordPress
+never reads it: CF7 renders whatever `_form` holds for that post. Editing `cf7/form-es.html`
+and stopping there changes nothing a visitor will ever see; the site keeps serving whatever
+was last written to the database. Every change to a form — a field, a validation option, a
+required marker, a consent line — has to be pushed with the seeder below (or `wp post meta
+update <id> _form ...`) to reach the live form, and when a project has more than one
+language, **push every language's form together in the same pass.** A fix applied to
+`form-en.html`'s post but not `form-es.html`'s is a bilingual bug the moment anyone tests the
+other language.
 
 ## Re-seeding
 
@@ -462,3 +509,6 @@ Do NOT create `-es` variants when the project is monolingual.
 8. **Ship `inc/seed/cf7.php`** — the form is a post row and does not travel with the theme without it.
 9. **Every language gets the same form** — same fields, same required markers (`*` in the placeholder, "(required)" in the visually hidden label), same consent line. A translated form that quietly drops the required markers is a bilingual bug nobody reads in review.
 10. **Screenshot the invalid state before declaring the form done** — submit it empty and look at where CF7 puts its per-field errors and its response notice.
+11. **Every `[acceptance]` tag carries `acceptance_as_validation:on`** — without it the submit button stays disabled on an unchecked box, with no error shown and no way to discover why
+12. **Size the control itself to `width: 100%`, not only its `.wpcf7-form-control-wrap`**; keep the AJAX spinner's margins inside the form's box; write loading-state padding as `padding-inline-end`, never `padding-right` — a physical longhand does not beat the logical `padding-inline` an `@apply px-*` compiles to
+13. **The `_form` post meta is the live form; `cf7/*.html` is only a reference.** Push every change through the seeder (or directly to `_form`), and push every language's form together — a fix landing on one language's post and not the other's is a bilingual bug.

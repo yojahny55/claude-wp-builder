@@ -89,6 +89,22 @@ update_option( 'polylang', $options );
 and the frontend use. It is a naming helper, not a storage API — Polylang reads
 the option path above directly at `src/admin/admin-nav-menu.php:279`.
 
+**That option is an override, not the assignment.** Polylang's own frontend
+filter only substitutes the value of a location it finds ALREADY present in
+the core `nav_menu_locations` theme_mod — it never adds a location that mod
+does not have. Writing straight into the `polylang` option (the snippet
+above, and nothing else) on a location the theme_mod has never heard of
+leaves the filter with nothing to override: `wp_nav_menu()` falls through to
+its hard-coded fallback markup, and this happens for EVERY configured
+language, including the default one. That is what makes it easy to miss — the
+default language's fallback can look identical to what its real menu would
+have rendered, so nothing looks broken until a second language is checked.
+Make sure at least one language's menu is registered the normal way first —
+`wp menu location assign <menu> <location>`, which does write the theme_mod —
+before or alongside writing the per-language override above. `pll-import.php`
+does this defensively on every menu it writes: if `nav_menu_locations` has no
+entry for the location, it seeds one with the source-language menu.
+
 A translated menu whose items still point at source-language objects is the most
 common Polylang misconfiguration, and it is invisible until a visitor clicks and
 lands in the wrong language. Re-point every item with
@@ -203,6 +219,63 @@ Leave such a taxonomy **out** of `pll_get_taxonomies` so both languages share
 one clean term list, and write the reason into `inc/post-types.php` — the next
 person will otherwise "fix" the omission.
 
+**Consequence:** a taxonomy left out of `pll_get_taxonomies` gets none of
+Polylang's own URL handling — no language prefix on its rewrite rules, no
+prefix on `term_link()`. That is correct for the archive itself (both
+languages share the one clean term list this section argues for), but every
+OTHER page that links into it still needs those links to carry the current
+language, or a visitor following one switches language mid-click. Closing
+that without duplicating a single term takes two filters: add the taxonomy's
+rule group to the set Polylang prefixes (`pll_rewrite_rules`), and prefix the
+links the theme prints (`term_link`, via
+`PLL()->links_model->add_language_to_link()`). Neither filter touches the
+BASE segment of the URL — see the next section for that, which is a related
+but separate gap.
+
+## Rewrite bases are never translated, even when the taxonomy or CPT is
+
+Free Polylang prefixes a translated post's or term's URL with the language and
+translates its slug, but it never translates the static **rewrite base** — the
+literal path segment from a CPT's or taxonomy's `rewrite => ['slug' => …]`,
+registered once in PHP for every language. A CPT registered with
+`'rewrite' => ['slug' => 'lawyers']` still answers at `/en/lawyers/`, never at
+an actual English base, because there is no per-language slug to translate:
+the base is not stored on any post or term, it is a literal in
+`register_post_type()`/`register_taxonomy()`. There is no setting that fixes
+this; it has to be built.
+
+The pattern is two halves that must stay in step:
+
+1. **Rules, so the translated URL resolves.** Register one extra rewrite rule
+   per base, on top of the generated set, mapping the translated segment to
+   the same query vars the original rule produces. Leave the source-language
+   rules in place — the old URL keeps answering, and a 301 can retire it later
+   without a dead link in the meantime.
+2. **Links, so the theme prints the translated URL.** The rules alone leave
+   two working addresses for one page; every filter that can produce one of
+   these permalinks (`post_type_link`, `post_type_archive_link`, `term_link`,
+   and Polylang's own `pll_translation_url`) has to swap the base too, or the
+   site keeps linking to the untranslated one.
+
+**The base is chosen by the URL already in hand, never by who is reading.**
+Asking "what language is the current visitor in" gets the link a page prints
+about *itself* right and gets every link built *about its other-language
+twin* wrong — the hreflang pair and the language switcher are constructed
+while the reader is still on the source language, and are links INTO the
+target language. Symmetrically, Polylang builds a page's source-language twin
+by stripping the prefix off the URL already in hand, so a translated-base link
+whose swap depended on "current language" would hand Polylang a base that
+exists in no language at all. Decide from the URL's own prefix instead: a URL
+that already carries the language prefix takes the translated base: a URL
+that does not takes the source one.
+
+This composes with, and is independent of, "Do not translate a taxonomy of
+proper nouns" above: a taxonomy deliberately left untranslated still needs its
+prefix added by hand (that section's two filters), and if its base should read
+differently in the second language too, this section's base-swap runs on top
+of that — one layer adds the prefix, the other swaps what comes after it, and
+neither one replaces the other.
+
 ## Labels registered in PHP are not translatable strings
 
 `prefix_t()` covers the strings the templates print, but WordPress builds some
@@ -238,6 +311,25 @@ dot-notation map (`pllx_acf_walk()`); `pllx_acf_write()` in `pll-import.php`
 writes that map back through `update_field()`/`get_field()`. Both work against
 whatever plugin defines `get_field_objects()`, `get_field()` and
 `update_field()` — that is ACF or SCF, never both (see below).
+
+**This covers a post's own fields. A taxonomy TERM'S fields are a separate
+surface Polylang's own APIs never reach.** `pll_save_term_translations()`
+joins two terms into a translation group the same way
+`pll_save_post_translations()` joins posts, but nothing about that call
+copies or translates a single custom-field value — there is no post-meta
+duplication to lean on the way there almost is for posts, because term data
+never lived in post meta to begin with. A repeater or a plain text field
+attached to a term is invisible to the group-joining call entirely. ACF/SCF
+accept the string `"<taxonomy>_<term_id>"` everywhere a post id is otherwise
+expected (`get_field_objects()`, `get_field()`, `update_field()`), so this
+plugin's import walks and writes a term's fields through the identical
+`pllx_acf_walk()` / `pllx_acf_write()` machinery described below, just with
+that string in place of a post id, and copies its non-text fields with a
+term-meta counterpart of `pllx_acf_copy_untranslated()`. **Ceiling:**
+reference types (`link`, `page_link`, `post_object`, `relationship`) on a
+term are copied to no counterpart at all — the repoint pass below is written
+against `post_content` and post ids throughout and does not have a term
+equivalent yet.
 
 **Translated** (the value is walked, sent through translation, written back):
 

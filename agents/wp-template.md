@@ -53,6 +53,19 @@ if (!defined('ABSPATH')) { exit; }
 
 Replace `__STARTER_NAME__` with the actual theme slug from CLAUDE.md. Replace `Section: Hero` with the actual section or template name.
 
+**"Every PHP file" means every one this theme ships, not only the files that LOOK like
+templates.** A real build shipped 26 files with no guard, and the pattern in every one of
+them was the same: the reviewer's eye goes to `template-parts/section-*.php` because those
+are the files being actively authored, and everything else — full page/archive/single/
+taxonomy templates (`page.php`, `single-{cpt}.php`, `archive-{cpt}.php`,
+`taxonomy-{tax}.php`, `search.php`, `404.php`), the generic `template-parts/content*.php`
+trio, and every file under `inc/` (including one-off `inc/seed/*.php` scripts) — gets
+written as "obviously fine" and skipped. Under a normal Apache + mod_php setup every one of
+those files is directly requestable; WordPress's own loader always defines `ABSPATH` first
+during ordinary routing, so the gap is invisible until something requests the file
+directly. Guard the file the moment you create it, before you write anything else into it —
+do not treat the guard as a thing to add once the file "is a template."
+
 ## Template Parts and Modularity
 
 Use `get_template_part()` to split pages into reusable sections:
@@ -77,6 +90,26 @@ get_header();
 ```
 
 Template part files go in `template-parts/` and are named `section-{name}.php`.
+
+### Delete a starter scaffold part you just orphaned
+
+`header.php`, `footer.php` and `search.php` ship from the starter theme already calling
+`get_template_part()` on a placeholder part — `template-parts/header/site-branding.php`,
+`template-parts/header/navigation.php`, `template-parts/footer/site-info.php`,
+`template-parts/content-search.php`. When your job is to replace one of those top-level
+files with the project's own markup (dispatched by `/wp-header`, `/wp-footer` or
+`/wp-page search`), you remove that `get_template_part()` call along with everything else
+the placeholder body had — and that leaves the part file on disk with nothing left to load
+it.
+
+An unreferenced PHP file in the theme is not neutral: nobody reviews it again after this
+step, so whatever the starter shipped inside it — a `Theme by <a href="https://example.com">`
+credit line, underscores boilerplate, an anonymous walker — ships to the client's site
+looking like part of the build, one accidental `get_template_part()` away from actually
+rendering. Delete the part file in the same step you remove its last caller. Before
+deleting, `grep -r "get_template_part.*<part-slug>" <theme-dir>` to confirm nothing else in
+the theme still reaches it — a shared part (`content-none.php`, `content-{post_type}.php`)
+is never one of these four, but check rather than assume.
 
 ## Escaping Rules (MANDATORY — never skip)
 
@@ -170,11 +203,91 @@ echo prefix_image($logo, 'medium', array(
 ));
 ```
 
+### `page_link` options fields — check publish status before linking
+
+A `page_link` field (a legal-links column — privacy policy, terms, FAQ — is
+the common case) keeps pointing at its target page after that page is
+unpublished, put back to draft, or trashed. `page_link` has no notion of post
+status, so printing the raw value once the page stops being public serves a
+404 to a logged-out visitor with nothing anywhere to say so — a settings field
+someone half-configured looks identical to one that broke. The guard belongs
+at the point of use, not at seed time, because a client can unpublish a page
+at any time after seeding:
+
+```php
+/**
+ * Is this URL something a visitor can actually open?
+ *
+ * True for a URL pointing at no post of ours (external — nothing to check) or
+ * at a published one. False for a URL whose post exists but is not public.
+ */
+function prefix_is_public_url($url) {
+    if (is_array($url)) {
+        $url = isset($url['url']) ? $url['url'] : '';
+    }
+    if (!$url || !is_string($url)) {
+        return false;
+    }
+    $post_id = url_to_postid($url);
+    return !$post_id || 'publish' === get_post_status($post_id);
+}
+```
+
+Filter every `page_link`-sourced link through it before printing — an
+`array_filter($links, 'prefix_is_public_url')` over the legal-links array is
+enough — so a page that goes back to draft drops out of the footer instead of
+becoming a dead link.
+
 ### Static translated strings
+
+Every string a visitor can read goes through `prefix_e()` / `prefix_t()`, not only the ones
+that arrived in an ACF field. The rule above — never raw `get_field()` — protects the
+CONTENT. This protects everything the template says on its own behalf, and it is the half
+that gets missed, because the demo is written in the primary language and a literal copied
+out of it already looks finished.
+
+The literals that escape hide in the places that do not feel like copy:
+
+| Where | What the demo hands you |
+|---|---|
+| Filter and search controls | the "all" option of every combo, `placeholder`, the submit's own label |
+| Empty and error states | "No results match this search." |
+| Button text no field supplies | "Read more", "Load more", "Download CV" |
+| Labels printed beside a value | "Price", "From", "Opening hours" |
+| `alt` text the template composes | `alt="Portrait of <name>"` |
+| `aria-label` and `title` | `aria-label="Call <name>"` |
+| Anything inside `sprintf()` | `sprintf('Offices in %s', $term->name)` |
+
+Each is a key in `inc/i18n.php`, with `%s` where a value is interpolated:
 
 ```php
 <h2 class="section__title"><?php prefix_e('services_heading'); ?></h2>
+<button type="submit"><?php prefix_e('search_submit'); ?></button>
+<img alt="<?php echo esc_attr( sprintf( prefix_t('portrait_of'), $name ) ); ?>" src="…">
 ```
+
+This is the defect it prevents, and it has been shipped: a Polylang build whose every ACF
+field translated correctly, and whose secondary-language directory pages still rendered the
+filter bar, the card `alt` text and the empty-state message in the primary language —
+because none of it came from a field, so none of it looked like content to anyone.
+
+### A control the demo drew is not a control the data can answer
+
+A static demo's filter is coherent by construction: its options and its cards are the same
+handful of mock values, so every option matches something. Wire that same markup to real
+posts and the option set becomes a claim about data that may not exist — a select whose only
+value is the mock's single label, an "all offices" entry with no taxonomy behind it. Choosing
+one empties the grid.
+
+So, when a transcribed control becomes dynamic:
+
+1. Build its options from the real source — `get_terms()`, the posts' own field values — never
+   from the option elements in the demo.
+2. If nothing real backs it, do not render a dead control. Drop it and **say so in your
+   summary**, naming the control and why, so the omission is a reported decision rather than
+   a silent one.
+3. A control whose options are hard-coded in the template is the same defect as a hard-coded
+   label: it is a literal pretending to be data.
 
 ## Image Fields — right-size + WebP (MANDATORY)
 
@@ -256,6 +369,22 @@ endif;
 
 Always call `wp_reset_postdata()` after a custom query loop.
 
+### Archive and directory ordering needs a tiebreaker
+
+`'orderby' => 'date'` alone is not stable when several records share a `post_date` to the
+second — which seeded content routinely does, since a seed script creates a batch of posts
+in the same request. MySQL is free to return same-timestamp rows in a different order on
+every query, so the same archive/directory page silently reshuffles between requests and
+between page loads. Add `ID` as the tiebreaker whenever ordering by date:
+
+```php
+'orderby' => array( 'date' => 'DESC', 'ID' => 'DESC' ),
+```
+
+Only do this for date-based ordering. A query whose `orderby` is already something else —
+`menu_order`, a specific field, the demo's own explicit sequence (see "A list's ORDER and
+COUNT come from the demo" above) — is already deterministic and does not need it.
+
 ## Pagination
 
 Use WordPress built-in pagination functions:
@@ -279,15 +408,32 @@ Nav markup/styles MUST follow the nav-class contract in the wp-theme-standards s
 
 When generating custom navigation markup, extend `Walker_Nav_Menu`:
 
+**A walker that overrides `start_el()` must re-apply the core filters `start_el()` would
+otherwise have run.** `Walker_Nav_Menu::start_el()` is what calls `nav_menu_css_class`,
+`nav_menu_item_id` and `nav_menu_link_attributes` — overriding the method replaces core's
+implementation entirely, so a walker that reads `$item->classes` raw and never calls
+`apply_filters()` itself silently drops every class, ID or link attribute any plugin, or
+the theme's own "current menu item" logic, adds through those filters. This is not
+theoretical: a build shipped exactly this, and the detail page for a record lost the
+"you are here" highlight on its parent nav item the moment its `current-menu-item` class —
+added via `nav_menu_css_class` — stopped surviving the walker.
+
 ```php
 class Prefix_Nav_Walker extends Walker_Nav_Menu {
     public function start_el(&$output, $item, $depth = 0, $args = null, $id = 0) {
-        $classes = implode(' ', $item->classes);
+        // Re-apply the filters core's own start_el() would have run.
+        $classes = (array) apply_filters('nav_menu_css_class', array_filter((array) $item->classes), $item, $args, $depth);
+        $item_id = apply_filters('nav_menu_item_id', 'menu-item-' . $item->ID, $item, $args, $depth);
         // Dropdown parents carry the contract's has-children modifier.
-        $has_children = in_array('menu-item-has-children', $item->classes, true);
+        $has_children = in_array('menu-item-has-children', $classes, true);
         $li_class = 'nav__item' . ($has_children ? ' nav__item--has-children' : '');
-        $output .= '<li class="' . esc_attr(trim($li_class . ' ' . $classes)) . '">';
-        $output .= '<a class="nav__link" href="' . esc_url($item->url) . '">';
+        $output .= '<li' . ($item_id ? ' id="' . esc_attr($item_id) . '"' : '') . ' class="' . esc_attr(trim($li_class . ' ' . implode(' ', $classes))) . '">';
+        $atts = apply_filters('nav_menu_link_attributes', array('class' => 'nav__link', 'href' => $item->url), $item, $args, $depth);
+        $output .= '<a';
+        foreach ($atts as $attr => $value) {
+            $output .= ' ' . esc_attr($attr) . '="' . ($attr === 'href' ? esc_url($value) : esc_attr($value)) . '"';
+        }
+        $output .= '>';
         $output .= esc_html($item->title);
         $output .= '</a>';
         // Dropdown items emit a toggle control per the nav-class contract.
@@ -314,8 +460,10 @@ class Prefix_Nav_Walker extends Walker_Nav_Menu {
 Usage in templates:
 
 ```php
+// The starter registers one location per language (primary-en, primary-es, …);
+// a bare 'primary' is not registered and renders nothing.
 wp_nav_menu(array(
-    'theme_location' => 'primary',
+    'theme_location' => 'primary-' . prefix_get_current_lang(),
     'container'      => 'nav',
     'container_class'=> 'nav',
     'menu_class'     => 'nav__menu',
@@ -365,9 +513,106 @@ ACF calls, the escaping, the i18n helpers, the loops.
   report the demo's item count so the section's count field is seeded to it rather than
   guessed. Count the rendered items; do not eyeball the screenshot.
 
+## Wiring a Demo Control to Real Data
+
+A static demo control (a search box, a filter dropdown, a pager, a "see more" link) is only
+coherent because it was built against the same handful of mock values its cards show. Before
+turning any such control from decoration into something that queries real content:
+
+- **Grep the demo section for `MOCK:` and `data-mock` first.** The demo-authoring tooling
+  writes these on exactly the controls it knows are not backed by real behaviour — a search
+  form with no endpoint, a pager over a fully-rendered list, a filter whose options are not
+  drawn from any real taxonomy. A control carrying either marker is never wired as-is: either
+  re-derive it from the real query (a search that actually searches, a filter whose options
+  come from `get_terms()` on the records this section queries — Rule 12: build options from
+  real data, never from the demo's `<option>` values), or drop the control and say so in
+  your report. Shipping a search box that posts
+  nowhere, a pager that pages nothing, or a client-side filter checked against mock values
+  the real cards don't carry is worse than shipping no control — it reads as broken rather
+  than as absent.
+- **An optional "see more" / CTA URL control renders only when the field holds a real
+  `http(s)://` or site-relative URL.** A demo placeholder like `href="#anchor"` or
+  `href="#noticias"` is not a destination; printing the control anyway ships a dead link.
+  Check the field truthy AND shaped like a URL before rendering the `<a>`, and omit the whole
+  control — not just style it disabled — when it is not:
+
+  ```php
+  $more_url = prefix_get_field('news_more_url');
+  if ($more_url && preg_match('#^(https?://|/)#', $more_url)) : ?>
+      <a class="news__more" href="<?php echo esc_url($more_url); ?>" target="_blank" rel="noopener nofollow">
+          <?php prefix_e('see_more'); ?>
+      </a>
+  <?php endif; ?>
+  ```
+- **Never hardcode an example person, office or address in the template** to stand in for a
+  relation the demo shows but the project has not seeded yet — a practice area's "handled by"
+  lawyer, a service's "offered at" branch. If the relation is real but not yet in the
+  database, that is a seeding gap: report it so it gets seeded (`inc/seed/`), never paper over
+  it with a name and address typed into the PHP. A template that queries the real relation and
+  gets nothing back renders nothing for that slot; it does not invent an answer.
+
 ## Teaser Fidelity (CPT teaser / archive cards)
 
 CPT single-post teasers (used in archive/blog loops, e.g. `.blog__card` above) MUST transcribe the demo's own teaser layout for that content type — matching its markup structure, image treatment, and meta fields (date, category, author, etc.) exactly as shown in the demo HTML. Do not reuse a generic archive card template for a CPT that has its own teaser design in the demo. Only fall back to a generic card (like the `WP_Query` example above) when the demo has no dedicated teaser markup for that post type.
+
+## Carousels (JS you author for a section)
+
+A carousel's controls are correct only relative to how much the strip can actually scroll,
+and that changes with the real content count — which the demo's mock cards never show,
+because a demo always carries enough cards to overflow. Whenever a section script builds a
+scrollable strip with dots and/or arrows:
+
+- **Hide the controls, don't disable-and-leave-them, when the strip cannot move.** Compare
+  `scrollWidth` to `clientWidth` on the scrolling element; when it cannot overflow (the real
+  record count fits the viewport, which routinely happens with seeded content — three news
+  posts, four team members — where the demo showed six or eight), set `hidden` on the arrows,
+  the dots AND their wrapper. `hidden`, not `opacity:0` or a disabled state: a dimmed but
+  present control reads as "temporarily unavailable, try again," and a strip that will never
+  gain more content is never coming back. A "disabled button has no pointer cursor" report is
+  usually this working correctly, not a missing `cursor:pointer` — verify against `hidden`
+  before treating it as a CSS bug.
+- **Dot count is `Math.round(maxScroll / step) + 1`, clamped to the number of cards.**
+  `Math.ceil` turns a sub-pixel width or a scrollbar gutter (a ratio like 2.004 instead of a
+  clean 2) into an extra dot nothing stops on. Whatever the arithmetic produces, a strip
+  cannot have more stops than it has cards — clamp to that count as a hard ceiling.
+- **Dots and arrows live OUTSIDE the element that scrolls**, never as a child of the
+  `overflow-x-auto` box. A control placed inside the scrolling box is itself part of the
+  scrolled content: it renders fine on the first view and slides out of sight as soon as a
+  visitor moves the strip.
+- **A mirrored icon (a prev arrow, typically) uses `transform` consistently across its
+  states.** In Tailwind v4, `-scale-x-100` writes the `scale` CSS property, not `transform` —
+  so a hover/focus rule that still sets `transform: translateX(...)` on the same element
+  REPLACES the mirroring instead of composing with it, and the icon flips back to unmirrored
+  on hover. Either keep every state on `scale`/`translate`/`rotate` (which compose with each
+  other in v4) or write the mirror as part of the same `transform` value the hover state uses
+  — never mix the two systems on one element.
+- **If the starter theme ships a shared carousel module** (a `carousel.js` or equivalent used
+  by more than one section), fix the defect THERE, not by patching around it in the section
+  that found it — every other carousel on the site has the same bug and will surface it later
+  if the fix stays local.
+
+## Component Reuse: Solve It Once
+
+When two sections need the same interactive behaviour — an accordion fold, a search/filter
+bar's focus treatment — and a sibling template part in this theme has already solved it
+correctly, **reuse that solved pattern**, don't re-derive a fresh implementation for the new
+section. Two concrete cases that keep recurring:
+
+- **Accordion chevron.** Rotate it through the trigger BUTTON's `aria-expanded` state with a
+  group/peer variant (`group-aria-expanded:rotate-180` on the icon, `group` on the button),
+  never by positioning the icon absolutely and toggling a class on the icon itself. An icon
+  positioned with a fixed offset (`top-[49px]`) stops tracking the heading the moment line
+  height changes, and a rotation state written onto `aria-[expanded=false]` on the icon does
+  nothing — that attribute lives on the button, not the icon, so the icon can never see it.
+- **Search / filter bar focus ring.** The ring goes on the whole visual control (the pill
+  containing the input plus its icon/divider), not on the bare `<input>`. A focus ring
+  confined to the `<input>` cuts across the divider and ignores the container's border
+  radius — the bar reads as one control to the eye, so focus has to outline all of it, at
+  WCAG 1.4.11's 3:1 contrast (a low-alpha box-shadow copied from a resting-state divider is
+  routinely under 2:1 against the page).
+
+State the pattern once, in the component's own CSS/JS file, and apply it by class/attribute
+— not as bespoke per-instance rules copied and tweaked for each new section that needs it.
 
 ## Complete Section Template Example
 
@@ -420,7 +665,7 @@ $cards       = prefix_get_repeater('services_cards', array('title', 'description
 ## Rules
 
 1. **No inline styles or scripts** — all CSS goes in stylesheet files, all JS in script files
-2. **Every file starts with the ABSPATH check** — `if (!defined('ABSPATH')) { exit; }`
+2. **Every PHP file this theme ships starts with the ABSPATH check** — `if (!defined('ABSPATH')) { exit; }` — full templates and `inc/` includes too, not only `template-parts/`
 3. **Use `get_template_part()` for modularity** — one section per template part
 4. **All output must be escaped** — use the correct escaping function for the context
 5. **Never use `query_posts()`** — always `WP_Query`
@@ -429,6 +674,14 @@ $cards       = prefix_get_repeater('services_cards', array('title', 'description
 8. **Semantic HTML** — use `<section>`, `<article>`, `<nav>`, `<header>`, `<footer>`, `<main>` appropriately
 9. **Accessibility** — include `alt` attributes on images, `aria` labels on interactive elements
 10. **Never use raw `get_field()`** — always use the project's i18n helper functions (`prefix_get_field`, `prefix_get_repeater`, `prefix_e`)
+11. **Never write a user-visible literal** — control labels, placeholders, empty states, button text, `alt`, `aria-label` and every `sprintf()` pattern are keys in `inc/i18n.php`, exactly like field content
+12. **Never render a control the data cannot answer** — build a filter's options from the real terms or field values, and drop the control (out loud, in your summary) when nothing backs it
+13. **Date-ordered archive/directory queries add `ID` as a tiebreaker** — `'orderby' => array('date' => 'DESC', 'ID' => 'DESC')` — seeded records routinely share a `post_date` to the second
+14. **A custom nav walker overriding `start_el()` re-applies `nav_menu_css_class`, `nav_menu_item_id` and `nav_menu_link_attributes`** via `apply_filters()` — overriding the method replaces core's own calls to them
+15. **Grep the demo section for `MOCK:` / `data-mock` before wiring any control to real data** — re-derive it from the real query or drop it and say so; never ship a search that posts nowhere, a pager that pages nothing, or a filter checked against values the real cards don't carry
+16. **An optional CMS "see more" URL control renders only when its field holds a real `http(s)://` or site-relative URL** — never for a demo `#anchor` placeholder — and never hardcode an example person/address/office in the template for a relation that has not been seeded yet
+17. **Carousel controls (dots/arrows) hide via `hidden` — not dim, not disable-in-place — the instant the strip cannot scroll** (`scrollWidth <= clientWidth`); dot count is `Math.round()`, clamped to the card count; dots/arrows sit outside the scrolling element; a mirrored icon's hover/focus state stays on the same transform system (`scale`/`translate`/`rotate`) the mirror itself uses
+18. **Reuse a sibling template's already-solved interactive pattern** (accordion chevron via the trigger button's `aria-expanded` group/peer variant, a focus ring on the whole control box) instead of re-deriving a fresh implementation per section
 
 ## WP-CLI Integration (when `.wp-create.json` exists)
 

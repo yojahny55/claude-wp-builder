@@ -4,6 +4,10 @@
  *
  * @package __starter__
  */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 ?>
 <div class="site-branding">
     <?php if ( has_custom_logo() ) : ?>
