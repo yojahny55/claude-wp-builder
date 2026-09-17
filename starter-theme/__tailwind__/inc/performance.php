@@ -71,6 +71,11 @@ function __starter___webp_sibling_url( $url ) {
 	if ( isset( $cache[ $url ] ) ) {
 		return $cache[ $url ];
 	}
+	// A page holds a few dozen distinct images, but a WP-CLI command walking a whole
+	// media library runs in one process and would otherwise keep every URL it ever saw.
+	if ( count( $cache ) > 1000 ) {
+		$cache = array();
+	}
 	$cache[ $url ] = '';
 
 	// A versioned or anchored URL (foto.jpg?ver=3, foto.png#x) names the same file.

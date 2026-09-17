@@ -23,7 +23,10 @@ function set_url_scheme( $url ) { return preg_replace( '#^https?://#', 'https://
 // Mirrors esc_url()'s whitelist closely enough for what is under test: it strips the
 // quote, the angle bracket and the raw space, and keeps ( ) ' ; — which is the point.
 function esc_url( $url ) {
-	$url = preg_replace( '|[^a-z0-9\-~+_.?#=!&;,/:%@$\|*\'()\[\]\\\\ ]|i', '', $url );
+	// The backslash is deliberately absent from this whitelist, the way it is absent from
+	// WP's: a stub that let it through would keep the percent-encoding assertions passing
+	// after the helper stopped encoding it.
+	$url = preg_replace( '|[^a-z0-9\-~+_.?#=!&;,/:%@$\|*\'()\[\] ]|i', '', $url );
 	$url = str_replace( array( '"', '<', '>' ), '', $url );
 	return str_replace( ' ', '%20', $url );
 }
@@ -115,6 +118,15 @@ check(
 // the WebP branch, which is how an earlier version of this test passed a broken helper.
 check( 'no unencoded parenthesis inside any url() token', (string) (int) ( (bool) preg_match( "/url\('[^']*[()][^']*'\)/", $hostile ) ), '0' );
 check( 'no unencoded semicolon inside any url() token', (string) (int) ( (bool) preg_match( "/url\('[^']*;[^']*'\)/", $hostile ) ), '0' );
+
+// 4b. The encoder's contract, pinned directly: the assertion above compares one rendered
+// declaration, and a replacement list that lost an entry could still render that one the
+// same way.
+check(
+	'every CSS-syntax character is encoded',
+	t_css_url( 'a(b)c\'d"e;f,g\\h' ),
+	'a%28b%29c%27d%22e%3Bf%2Cg%5Ch'
+);
 
 // 5. The fallback declaration comes first and keeps the original format.
 $css = t_background_image( $U . 'a.png' );

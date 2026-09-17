@@ -69,7 +69,7 @@ grep -Fq 'webp_delivery_mode' "$skill" \
   || { echo "FAIL: $skill does not document Robin's delivery modes"; exit 1; }
 grep -Fq 'Vary: Accept' "$skill" \
   || { echo "FAIL: $skill offers the server-side rule without the Vary: Accept caveat"; exit 1; }
-grep -q 'page cache' "$skill" \
+grep -Fq 'page cache' "$skill" \
   || { echo "FAIL: $skill does not state the page-cache caveat on url delivery mode"; exit 1; }
 
 # 4. The audit check that would have caught it.
