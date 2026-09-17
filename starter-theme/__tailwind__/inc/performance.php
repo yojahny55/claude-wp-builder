@@ -90,6 +90,11 @@ function __starter___webp_sibling_url( $url ) {
 		return '';
 	}
 	$relative = substr( $compare, strlen( $base_url ) );
+	// Answer in the scheme the caller asked in. The buffer replaces the exact text it
+	// matched, so returning the normalized https base for an http match would leave a
+	// mixed-scheme URL in the page on any install whose stored base URL disagrees with
+	// the request.
+	$input_base = substr( $path_only, 0, strlen( $path_only ) - strlen( $relative ) );
 
 	// `<baseurl>/../../secret.png` still starts with the base URL, so the prefix test
 	// alone would let file_exists() probe paths outside the uploads directory and
@@ -101,7 +106,7 @@ function __starter___webp_sibling_url( $url ) {
 
 	foreach ( array( $relative . '.webp', preg_replace( '/\.(?:jpe?g|png)$/i', '.webp', $relative ) ) as $candidate ) {
 		if ( file_exists( $uploads['basedir'] . $candidate ) ) {
-			$cache[ $url ] = $base_url . $candidate;
+			$cache[ $url ] = $input_base . $candidate;
 			return $cache[ $url ];
 		}
 	}

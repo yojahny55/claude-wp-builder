@@ -38,7 +38,7 @@ grep -Fq 'function __starter___webp_sibling_url(' "$perf" \
 # library could look entirely unoptimized on the front end.
 grep -Fq "\$relative . '.webp'" "$perf" \
   || { echo "FAIL: $perf does not check the appended sibling name (foto.png.webp) that Robin writes"; exit 1; }
-grep -Fq "preg_replace( '/\\.(?:jpe?g|png)\$/i', '.webp', \$relative )" "$perf" \
+grep -Fq "'.webp', \$relative" "$perf" \
   || { echo "FAIL: $perf does not check the replaced-extension sibling name (foto.webp) that WordPress writes"; exit 1; }
 # The buffer must go through the resolver, not re-derive one naming convention of its own.
 grep -Fq '__starter___webp_sibling_url( $text )' "$perf" \

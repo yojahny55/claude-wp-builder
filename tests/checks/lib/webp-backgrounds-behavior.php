@@ -36,6 +36,15 @@ function is_admin() { return false; }
 function is_feed() { return false; }
 function is_robots() { return false; }
 
+// Registered before any fixture exists, so every exit path — including the early one
+// when no template_redirect callback is found — removes the temporary library.
+register_shutdown_function( function () use ( $base_dir ) {
+	foreach ( glob( "$base_dir/2026/09/*" ) as $f ) { unlink( $f ); }
+	@rmdir( "$base_dir/2026/09" ); @rmdir( "$base_dir/2026" ); @rmdir( $base_dir );
+	$outside = dirname( $base_dir ) . '/starter-webp-outside-' . getmypid();
+	@unlink( "$outside/secret.png.webp" ); @rmdir( $outside );
+} );
+
 $fails = array();
 function check( $label, $got, $want ) {
 	global $fails;
@@ -48,7 +57,13 @@ function check( $label, $got, $want ) {
 $src = file_get_contents( $root . '/starter-theme/__tailwind__/inc/performance.php' );
 $src = str_replace( '__starter___', 't_', $src );
 $src = preg_replace( '/^<\?php/', '', $src, 1 );
-$src = str_replace( "if ( ! defined( 'ABSPATH' ) ) {\n\texit;\n}", '', $src );
+$src = preg_replace( '/^\s*if\s*\(\s*!\s*defined\(\s*.ABSPATH.\s*\)\s*\)\s*\{[^}]*\}/m', '', $src, 1 );
+// Without this, a reformatted guard leaves `exit;` in the eval'd source and the whole
+// test ends silently, which reads exactly like a pass.
+if ( false !== strpos( $src, 'ABSPATH' ) ) {
+	fwrite( STDERR, "FAIL: could not strip the ABSPATH guard from performance.php\n" );
+	exit( 1 );
+}
 eval( $src );
 
 // Fixture library: one attachment per sibling convention, one with no sibling.
@@ -68,6 +83,11 @@ check( 'no sibling', t_webp_sibling_url( $U . 'c.png' ), '' );
 
 // 2. A versioned URL names the same file.
 check( 'versioned URL', t_webp_sibling_url( $U . 'a.png?ver=3' ), $U . 'a.png.webp' );
+
+// 2b. The answer comes back in the scheme it was asked in: the output buffer replaces the
+// exact text it matched, so a normalized https sibling for an http match would leave a
+// mixed-scheme URL in the page.
+check( 'http input, http sibling', t_webp_sibling_url( 'http://example.test/wp-content/uploads/2026/09/a.png' ), 'http://example.test/wp-content/uploads/2026/09/a.png.webp' );
 
 // 3. Remote URLs and parent segments never reach the filesystem.
 check( 'remote URL', t_webp_sibling_url( 'https://cdn.example.com/x.png' ), '' );
@@ -117,12 +137,6 @@ $out = ob_get_clean();
 check( '<img> src swapped', (string) (int) ( false !== strpos( $out, 'src="' . $U . 'a.png.webp"' ) ), '1' );
 check( "helper's fallback URL untouched", (string) (int) ( false !== strpos( $out, "url('{$U}a.png');background-image:image-set(" ) ), '1' );
 check( "helper's image-set candidate untouched", (string) (int) ( false !== strpos( $out, "url('{$U}a.png') type('image/png')" ) ), '1' );
-
-// Clean up.
-foreach ( glob( "$base_dir/2026/09/*" ) as $f ) { unlink( $f ); }
-@rmdir( "$base_dir/2026/09" ); @rmdir( "$base_dir/2026" ); @rmdir( $base_dir );
-$outside = dirname( $base_dir ) . '/starter-webp-outside-' . getmypid();
-@unlink( "$outside/secret.png.webp" ); @rmdir( $outside );
 
 if ( $fails ) {
 	echo "FAIL:\n  " . implode( "\n  ", $fails ) . "\n";
