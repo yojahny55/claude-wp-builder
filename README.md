@@ -323,7 +323,7 @@ and the demo is built exactly as it is today. To refresh it, delete
 ### Design library
 
 The craft path queries `wp-design-library` over MCP when it is registered. The
-default starts the pinned `@yojahny/wp-design-library@0.1.0` package with npx. To
+default starts the pinned `@yojahny/wp-design-library@0.4.0` package with npx. To
 use a hosted instance instead, add the following server to your project's
 `.mcp.json`, keep that file out of version control, and supply the token through
 your MCP client's secret or environment-variable support when available:
@@ -337,6 +337,30 @@ access.
 
 Without the server, `/wp-demo` writes `References: library unavailable` in
 `demo/BRIEF.md` and builds from the in-repo compositions.
+
+### Page references (optional)
+
+[`inspo-mcp`](https://github.com/Nutlope/inspo) is a free, MIT-licensed archive of
+832 production sites served over MCP. `/wp-demo` uses it for page-level direction —
+macrostructure, section ordering, fold composition — in both craft and plain mode.
+It is **not** registered by default. To use it, add this to your project's
+`.mcp.json`:
+
+    "inspo": { "command": "npx", "args": ["-y", "inspo-mcp@0.1.16", "serve"] }
+
+The exact version is pinned to the release measured in `CLAUDE.md`, so new package
+releases are adopted deliberately. Review their tool output and server instructions
+before updating this pin; the third-party reference corpus remains a runtime dependency.
+
+Four things it is never used for, enforced by `commands/wp-demo.md`: its colour
+table never becomes theme tokens, its `get_reference_jsx` tool is never called
+because it returns React, nothing from it reaches `/wp-yolo --transcribe`, and it
+never chooses a motion device.
+
+It is a third-party network dependency serving captures of other people's production
+sites, credited to their authors with a takedown route. Treat it as reference, never
+as material to copy. Its semantic ranking needs a `TOGETHER_API_KEY` we neither
+supply nor ask for; without one its search is lexical only.
 
 ## Commands Reference
 
