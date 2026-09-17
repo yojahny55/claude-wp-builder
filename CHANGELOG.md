@@ -338,6 +338,21 @@
 
 ### Fixed
 
+- **A CSS `background-image` served the original PNG/JPG on an optimized library.** Robin
+  Image Optimizer's default delivery mode, `picture`, rewrites `<img>` tags only, and the
+  `__tailwind__` starter's own HTML rewrite looked for the sibling WordPress writes
+  (`foto.webp`) but not the one Robin and most bulk optimizers write (`foto.png.webp`) — so
+  on a Robin-optimized site it matched nothing and every background kept its original bytes.
+  Both names now resolve through one helper, `prefix_webp_sibling_url()`, which the buffer
+  uses. The starter also gains `prefix_background_image( $url )`: it prints the plain
+  `url()` first and an `image-set()` naming the sibling second, so a browser without
+  `image-set()` keeps the background, and each browser requests the URL it understands,
+  which is safe behind a full-page cache. `agents/wp-template.md` requires it for any
+  background a template prints, the `wp-robin` skill documents the three delivery modes with
+  the page-cache caveat on `url` and the nginx/Apache rule for a background declared in a
+  stylesheet, and `wp-audit-performance` gains PERF-056 for an uploads background whose
+  sibling exists but is never served.
+
 - **`/wp-demo-verify` no longer reads full-resolution contact sheets into the
   orchestrator's context.** `bin/demo-verify.mjs`'s contact sheet was a single
   full-page PNG of the whole walk's frames, and Step 4 told the model to read it

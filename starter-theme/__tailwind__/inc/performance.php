@@ -50,13 +50,67 @@ add_filter( 'wp_generate_attachment_metadata', function ( $metadata, $attachment
 }, 10, 2 );
 
 /**
+ * WebP sibling for an uploads URL, or '' when there is none.
+ *
+ * Two naming conventions are in the wild and both are checked, because a site
+ * can carry either or both. WordPress and (2) above replace the extension
+ * (foto.png -> foto.webp); Robin Image Optimizer and most bulk optimizers
+ * append instead (foto.png -> foto.png.webp). Checking only the first one is
+ * why an optimized library could look entirely unoptimized on the front end.
+ *
+ * Only local uploads URLs resolve — anything else returns '' rather than
+ * guessing a path for a host this site does not serve.
+ *
+ * @param string $url Absolute URL to a jpg/jpeg/png.
+ * @return string WebP URL, or '' if no sibling exists on disk.
+ */
+function __starter___webp_sibling_url( $url ) {
+	static $cache = array();
+
+	$url = (string) $url;
+	if ( isset( $cache[ $url ] ) ) {
+		return $cache[ $url ];
+	}
+	$cache[ $url ] = '';
+
+	if ( ! preg_match( '/\.(?:jpe?g|png)$/i', $url ) ) {
+		return '';
+	}
+
+	$uploads  = wp_get_upload_dir();
+	// The stored URL and the request can disagree on the scheme (http vs https),
+	// which would make an otherwise local image look remote.
+	$base_url = set_url_scheme( $uploads['baseurl'] );
+	$compare  = set_url_scheme( $url );
+	if ( 0 !== strpos( $compare, $base_url . '/' ) ) {
+		return '';
+	}
+	$relative = substr( $compare, strlen( $base_url ) );
+
+	foreach ( array( $relative . '.webp', preg_replace( '/\.(?:jpe?g|png)$/i', '.webp', $relative ) ) as $candidate ) {
+		if ( file_exists( $uploads['basedir'] . $candidate ) ) {
+			$cache[ $url ] = $base_url . $candidate;
+			return $cache[ $url ];
+		}
+	}
+
+	return '';
+}
+
+/**
  * 3) Serve WebP for EXISTING + raw-URL + CSS-background images by rewriting the
- * finished HTML: any wp-content/uploads *.jpg/.png with a `.webp` sibling on
- * disk is swapped to `.webp` — covering <img src>, srcset, and inline
- * background-image in one pass. `template_redirect` is front-end only, and with
- * a page cache the buffer runs once per cache build. WebP is universally
- * supported by target browsers (matching the unconditional policy in (1)), so
- * no Accept-header branching is needed.
+ * finished HTML: any wp-content/uploads *.jpg/.png with a WebP sibling on disk
+ * (either naming convention, see __starter___webp_sibling_url) is swapped —
+ * covering <img src>, srcset, and inline background-image in one pass.
+ * `template_redirect` is front-end only, and with a page cache the buffer runs
+ * once per cache build. WebP is universally supported by target browsers
+ * (matching the unconditional policy in (1)), so no Accept-header branching is
+ * needed.
+ *
+ * A `background-image` declared in a STYLESHEET is not HTML and never reaches
+ * this buffer. Use __starter___background_image() for backgrounds a template
+ * prints, and see the wp-robin skill for the server-side rule that covers a
+ * stylesheet.
  */
 add_action( 'template_redirect', function () {
 	if ( is_admin() || is_feed() || is_robots() ) {
@@ -64,19 +118,17 @@ add_action( 'template_redirect', function () {
 	}
 	$uploads  = wp_get_upload_dir();
 	$base_url = $uploads['baseurl'];
-	$base_dir = $uploads['basedir'];
 
-	ob_start( function ( $html ) use ( $base_url, $base_dir ) {
+	ob_start( function ( $html ) use ( $base_url ) {
 		// strpos on the uploads URL is ~free and skips the regex on any page
 		// with no uploaded images (404s, search, text-only pages).
 		if ( '' === $html || false === strpos( $html, $base_url ) ) {
 			return $html;
 		}
 		$pattern = '#' . preg_quote( $base_url, '#' ) . '/[^"\'\)\s]+?\.(?:jpe?g|png)#i';
-		return preg_replace_callback( $pattern, function ( $m ) use ( $base_url, $base_dir ) {
-			$webp = preg_replace( '/\.(?:jpe?g|png)$/i', '.webp', $m[0] );
-			$path = $base_dir . substr( $webp, strlen( $base_url ) );
-			return file_exists( $path ) ? $webp : $m[0];
+		return preg_replace_callback( $pattern, function ( $m ) {
+			$webp = __starter___webp_sibling_url( $m[0] );
+			return '' !== $webp ? $webp : $m[0];
 		}, $html );
 	} );
 } );
@@ -111,4 +163,48 @@ function __starter___image( $field, $size = 'large', $attr = array() ) {
 		$out .= ' ' . esc_attr( $k ) . '="' . esc_attr( $v ) . '"';
 	}
 	return $out . ' />';
+}
+
+/**
+ * 4) WebP for a CSS `background-image`, as a value to print inside a style attribute.
+ *
+ * Robin Image Optimizer's default delivery mode rewrites <img> tags only, so a
+ * background declared in CSS keeps serving the original JPEG/PNG however well
+ * the library is optimized. This emits two declarations: the plain url() first,
+ * then an image-set() that a browser supporting it uses instead. A browser
+ * without image-set()/type() (Safari 16 and older) keeps the first line, so the
+ * background never disappears. Each browser requests the URL it understands,
+ * which makes this safe behind a full-page cache — unlike Accept-header
+ * negotiation, which would cache one format for every visitor.
+ *
+ * The WebP branch is emitted only when the sibling exists on disk.
+ *
+ * Every URL goes through esc_url(), so the return value is safe to print inside
+ * a double-quoted style attribute and must NOT be escaped again:
+ *
+ *   <div style="<?php echo __starter___background_image( $field['url'] ); ?>">
+ *
+ * The type() arguments are single-quoted for the same reason — a double quote
+ * would end the attribute.
+ *
+ * @param string $url Absolute URL of the background image.
+ * @return string CSS declarations, or '' when $url is empty.
+ */
+function __starter___background_image( $url ) {
+	$url = trim( (string) $url );
+	if ( '' === $url ) {
+		return '';
+	}
+
+	$css  = 'background-image:url(' . esc_url( $url ) . ');';
+	$webp = __starter___webp_sibling_url( $url );
+	if ( '' === $webp ) {
+		return $css;
+	}
+
+	$type = preg_match( '/\.png$/i', $url ) ? 'image/png' : 'image/jpeg';
+
+	return $css . 'background-image:image-set('
+		. 'url(' . esc_url( $webp ) . ") type('image/webp'), "
+		. 'url(' . esc_url( $url ) . ") type('" . $type . "'));";
 }
