@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`/wp-demo` consults `inspo` for page-level direction, in both modes.** A free
+  MIT archive of 832 production sites, opt-in and never registered by default. It
+  answers macrostructure, section ordering and fold composition; `wp-design-library`
+  keeps role, section and motion device; the client's own material keeps colour.
+  Plain mode had no reference source at all before this — its library step lives
+  inside the craft-only Step 2.6 — so Step 2.7 gives it one.
+
+  Four exclusions are rules, not judgment calls: its colour table never becomes theme
+  tokens (its role labels are self-declared heuristics, and on `animaapp-com` it calls
+  `#063f77` the accent while its own prose names purple `#5d4fae`), `get_reference_jsx`
+  is never called because it returns React, nothing reaches `/wp-yolo --transcribe`,
+  and it never picks a motion device because it carries no motion data.
+
+### Fixed
+
+- **Check Inspo's fallback and search budget within each demo mode.** The checks
+  previously required exactly two matching lines in the whole command, so an extra
+  mention caused a false failure. Craft and plain are now checked independently;
+  a repeated rule elsewhere cannot hide its removal from either mode.
+
+- **Pin the optional Inspo server to `inspo-mcp@0.1.16`.** The README's `0.1.x`
+  range allowed automatic patch upgrades despite its deliberate-upgrade rationale.
+  The example now uses the measured release, and the check matches the quoted package
+  argument literally so a range or a longer version cannot satisfy it.
+
 ## [1.18.0] - 2026-09-15
 
 ### Added
