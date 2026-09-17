@@ -42,9 +42,16 @@ input[type="reset"] {
  * non-interactive container used only to announce state (a disabled tab
  * panel, a section flagged busy). Every still-interactive descendant — a
  * link, a nested button — would inherit `cursor: default` from it and lose
- * its own pointer affordance. Scoped to the same controls the rule above
- * targets, plus `select`/`textarea` (native `:disabled`) and `a` (no native
- * disabled state, so `aria-disabled` is how a link expresses it). */
+ * its own pointer affordance. The clickable controls mirror the rule above,
+ * but `input`, `select` and `textarea` are deliberately NOT qualified by type,
+ * so this reaches a disabled text field as well. That is a different claim from
+ * the pointer rule — a text input never had `cursor: pointer` to lose — and it
+ * is intentional: a caret is what promises typing, so a field that cannot be
+ * typed into should not show one. Qualifying `input` to submit/button/reset to
+ * match the rule above would leave a disabled `textarea` and a disabled text
+ * input behaving differently, which is a worse inconsistency than the wider
+ * selector. `a` is here because it has no native disabled state, so
+ * `aria-disabled` is how a link expresses one. */
 button:disabled,
 input:disabled,
 select:disabled,
