@@ -56,8 +56,31 @@ printf '%s' "$g" | grep -qF 'process.exit(2)' \
 # is never sampled.
 printf '%s' "$g" | grep -qF 'collectBreakpoints' \
   || { echo "FAIL: $gate does not collect breakpoint widths from the original's own CSS — --widths alone never lands on the exact pixel where an inclusive/exclusive max-width conversion goes wrong"; exit 1; }
-printf '%s' "$g" | grep -Eq "m\\(\\?:in\\|ax\\)-width" \
+# Fixed-string: this pins the collector's JS regex source, not a pattern to run.
+printf '%s' "$g" | grep -qF 'm(?:in|ax)-width' \
   || { echo "FAIL: $gate's breakpoint collector does not match both max-width and min-width — a demo mixes both forms"; exit 1; }
+
+# Run the collector itself on a fixture: both media-query forms are read, build and
+# vendor trees are skipped, and a symlink that loops back into the tree neither hangs
+# the walk nor counts twice.
+if command -v node >/dev/null 2>&1; then
+  fx=$(mktemp -d)
+  trap 'rm -rf "$fx"' EXIT
+  mkdir -p "$fx/conv" "$fx/orig/css" "$fx/orig/node_modules/pkg" "$fx/orig/dist"
+  printf '<p>x</p>' > "$fx/conv/index.html"
+  printf '<p>x</p>' > "$fx/orig/index.html"
+  printf '@media (max-width: 768px){a{b:c}}\n@media (min-width:1025px){a{b:c}}\n' > "$fx/orig/css/site.css"
+  printf '@media (max-width: 999px){a{b:c}}\n' > "$fx/orig/node_modules/pkg/x.css"
+  printf '@media (max-width: 555px){a{b:c}}\n' > "$fx/orig/dist/x.css"
+  ln -s .. "$fx/orig/css/loop"
+  mkdir -p "$fx/elsewhere"
+  printf '@media (max-width: 333px){a{b:c}}\n' > "$fx/elsewhere/x.css"
+  ln -s ../elsewhere "$fx/orig/linked"
+  got=$(timeout 20 node "$gate" "$fx/conv" --against "$fx/orig" --list-breakpoints) \
+    || { echo "FAIL: $gate --list-breakpoints did not finish on a tree with a symlink loop"; exit 1; }
+  [ "$got" = "[768,1025]" ] \
+    || { echo "FAIL: $gate collected $got from the fixture, expected [768,1025] — both forms read, vendor/dist skipped, symlinked directories not followed"; exit 1; }
+fi
 
 # And the command has to actually run it.
 cmd=commands/wp-tailwindify.md

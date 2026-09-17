@@ -24,6 +24,10 @@
  * usage:
  *   tailwindify-parity.mjs <converted.html|dir> --against <original.html|dir>
  *                          [--widths 1440x900,390x844] [--json OUT]
+ *                          [--list-breakpoints]
+ *
+ * --list-breakpoints prints the widths read from the original's CSS as JSON and
+ * exits 0 without launching a browser.
  *
  * exit 0 clean · 1 deltas found · 2 no usable browser · 3 the run itself crashed
  */
@@ -37,7 +41,8 @@ const args = process.argv.slice(2);
 if (args.includes('--help') || !args.length) {
   console.log(
     'usage: tailwindify-parity.mjs <converted.html|dir> --against <original.html|dir>\n' +
-    '                              [--widths 1440x900,390x844] [--json OUT]'
+    '                              [--widths 1440x900,390x844] [--json OUT]\n' +
+    '                              [--list-breakpoints]'
   );
   process.exit(0);
 }
@@ -67,11 +72,17 @@ const explicitWidths = opt('--widths', '1440x900,390x844')
  * top of whatever `--widths` asked for. */
 // Build output and third-party trees carry breakpoints the demo never declared.
 const SKIP_DIRS = new Set(['node_modules', 'vendor', 'dist', 'build', '.git']);
+// A demo is a handful of folders and stylesheets. The caps keep a mis-pointed
+// --against (a home directory, a whole site root) from stalling the gate before
+// any page renders.
+const MAX_DEPTH = 8;
+const MAX_CSS_BYTES = 2 * 1024 * 1024;
 
 function collectBreakpoints(root) {
   const found = new Set();
   const seenDirs = new Set();
-  const walk = (dir) => {
+  const walk = (dir, depth) => {
+    if (depth > MAX_DEPTH) return;
     let entries;
     try { entries = readdirSync(dir); } catch { return; }
     for (const entry of entries) {
@@ -91,10 +102,10 @@ function collectBreakpoints(root) {
         try { real = realpathSync(p); } catch { continue; }
         if (seenDirs.has(real)) continue;
         seenDirs.add(real);
-        walk(p);
+        walk(p, depth + 1);
         continue;
       }
-      if (!entry.toLowerCase().endsWith('.css')) continue;
+      if (!entry.toLowerCase().endsWith('.css') || lst.size > MAX_CSS_BYTES) continue;
       let css;
       try { css = readFileSync(p, 'utf8'); } catch { continue; }
       for (const m of css.matchAll(/m(?:in|ax)-width\s*:\s*(\d+(?:\.\d+)?)px/gi)) {
@@ -103,8 +114,15 @@ function collectBreakpoints(root) {
       }
     }
   };
-  walk(root);
+  walk(root, 0);
   return [...found].sort((a, b) => a - b);
+}
+
+// Needs no browser, so it answers before one is looked for.
+if (args.includes('--list-breakpoints')) {
+  const listRoot = statSync(original).isDirectory() ? original : dirname(original);
+  console.log(JSON.stringify(collectBreakpoints(listRoot)));
+  process.exit(0);
 }
 
 /* Properties chosen because each one is a declaration a conversion can silently

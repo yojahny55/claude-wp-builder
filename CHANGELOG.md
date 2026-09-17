@@ -31,7 +31,11 @@
   with perl. `tailwindify-parity.mjs` skips `node_modules`, `vendor`, `dist`, `build`
   and `.git` when it collects breakpoints, and now `lstat`s instead of `stat`s so a
   symlinked directory (the demo trees genuinely carry them) is never recursed into,
-  with a realpath dedupe as a second guard against a loop.
+  with a realpath dedupe as a second guard against a loop. The walk stops at depth 8
+  and skips stylesheets over 2 MB, and `--list-breakpoints` prints what it collected
+  without a browser, which `tests/checks/tailwindify-parity.sh` now runs on a fixture
+  (both media-query forms, skipped `node_modules`/`dist`, a looping and an outward
+  symlink).
 
 - **Every user-visible literal is a translation key, not only field content.**
   `agents/wp-template.md` forbade raw `get_field()` and showed `prefix_e()` once, which
