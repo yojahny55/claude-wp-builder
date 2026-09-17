@@ -89,6 +89,19 @@ grep -Fq 'cd ${PROJECT_PATH}' <<<"$step96" \
 grep -Fq '.wp-create.local.json' <<<"$step96" \
   || fail "$i Step 9.6 does not name the local credential file"
 
+# A .gitignore whose last line has no trailing newline is CONCATENATED with the new
+# entry, not extended: `*.log` + `.wp-create.local.json` becomes the single pattern
+# `*.log.wp-create.local.json`, git check-ignore stops matching, and the next
+# `git add -A` commits the database and admin passwords. Measured in a real repo.
+grep -Fq 'tail -c1 .gitignore' <<<"$step96" \
+  || fail "$i Step 9.6 appends without guaranteeing a leading newline, so a .gitignore with no trailing newline is corrupted and the secret is committed"
+
+# Every sibling Validation block in this pipeline states an action for the failing
+# case. This one stated only what success looks like, so a Claude that ran the check
+# and saw no match had nothing telling it not to carry on to Step 10.
+grep -Fq '**On failure:**' <<<"$step96" \
+  || fail "$i Step 9.6's Validation line mandates no action on failure"
+
 # Step 9.5's *theme* .gitignore must not have regressed back to also ignoring it there --
 # that duplication is exactly how the project-root defect survived its first review.
 step95=$(awk '
@@ -98,6 +111,21 @@ step95=$(awk '
 ' "$i")
 if grep -Fq '.wp-create.local.json' <<<"$step95"; then
   fail "$i Step 9.5 writes the local credential file into the theme's own .gitignore again"
+fi
+
+# --- No skill routes an agent back to the manifest for a secret. -------------
+# wp-environments' placeholder->manifest table is a mapping an agent FOLLOWS at
+# /wp-create Step 4.3, not an example: routing {{db_password}} to database.password
+# hands it an empty value on every project written since the split, or a silent
+# legacy read on every project that has not migrated. It must name the validator.
+env=skills/wp-environments/SKILL.md
+if grep -Fq 'database.password' "$env"; then
+  fail "$env still maps a placeholder onto the manifest field the database password was moved out of"
+fi
+grep -Fq "wp-config.mjs get '\${PROJECT_PATH}' db_password" "$env" \
+  || fail "$env does not route {{db_password}} through the validator"
+if grep -Eq '^\| `\{\{db_password\}\}` \| `root` \|' "$env"; then
+  fail "$env still documents the removed fixed default as the db_password example value"
 fi
 
 echo PASS

@@ -205,6 +205,21 @@
   `/wp-init` now *amend* the exit `3` table row instead of contradicting it three lines
   later.
 
+- **Fix: two places still handled a secret as if Task 6 had not happened.**
+  `skills/wp-environments/SKILL.md`'s placeholder table is a mapping an agent follows at
+  `/wp-create` Step 4.3, not an example, and it routed `{{db_password}}` to
+  `database.password` — a field the manifest no longer carries, so the generated
+  `docker-compose.yml` / nginx conf got an empty password, or a silent legacy read on a
+  project that has not migrated. It now names
+  `wp-config.mjs get '${PROJECT_PATH}' db_password`, and the stale `root` example value is
+  gone. Separately, `/wp-init` Step 9.6 appended the `.gitignore` entry without
+  guaranteeing a leading newline: a project-root `.gitignore` ending `*.log` with no
+  trailing newline became `*.log.wp-create.local.json`, `git check-ignore` stopped
+  matching, and the next `git add -A` committed the database and admin passwords
+  (measured in a real repository). The append now normalises the newline first, and the
+  step's `**Validation:**` line gains the `**On failure:**` action every sibling block in
+  `/wp-create` already has.
+
 ## [1.18.0] - 2026-09-15
 
 ### Added

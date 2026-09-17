@@ -865,18 +865,27 @@ delivery pattern — the credentials file needs its own ignore entry there:
 
 ```bash
 cd ${PROJECT_PATH}
-grep -qxF '.wp-create.local.json' .gitignore 2>/dev/null || printf '.wp-create.local.json\n' >> .gitignore
+if ! grep -qxF '.wp-create.local.json' .gitignore 2>/dev/null; then
+  [ -s .gitignore ] && [ -n "$(tail -c1 .gitignore)" ] && printf '\n' >> .gitignore
+  printf '.wp-create.local.json\n' >> .gitignore
+fi
 ```
 
 `printf ... >>` creates `${PROJECT_PATH}/.gitignore` if it does not already
-exist, and the `grep -qxF` guard makes the append idempotent on a re-run. Do
-this unconditionally, whether or not `${PROJECT_PATH}` is a git repository yet
-— the entry costs nothing when it isn't one, and protects the secret the
-moment it becomes one.
+exist, and the `grep -qxF` guard makes the append idempotent on a re-run. The
+`tail -c1` line is what makes the append safe on a pre-existing `.gitignore`
+whose last line has no trailing newline: appending straight onto it produces
+`*.log.wp-create.local.json`, a pattern that ignores neither, and the next
+`git add -A` commits the database and admin passwords. Do this unconditionally,
+whether or not `${PROJECT_PATH}` is a git repository yet — the entry costs
+nothing when it isn't one, and protects the secret the moment it becomes one.
 
 **Validation:** if `${PROJECT_PATH}` is inside a git work tree, `git
 check-ignore -v .wp-create.local.json` (run from `${PROJECT_PATH}`) matches
-the line just added.
+the line just added. **On failure:** stop — do not continue to Step 10. Print
+the last line of `${PROJECT_PATH}/.gitignore` and tell the user that
+`.wp-create.local.json` holds the database and admin passwords, is not
+ignored, and must not be committed until it is.
 
 ## Step 10: Print Summary
 

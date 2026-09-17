@@ -192,7 +192,13 @@ server {
 }
 ```
 
-Replace placeholders with values from the manifest to produce the final nginx config.
+Replace placeholders with values from the manifest to produce the final nginx config —
+except the secrets. The database password is not in `.wp-create.json` any more: it lives in
+the gitignored `.wp-create.local.json`, and the only supported way to read it is
+`wp-config.mjs get '${PROJECT_PATH}' db_password`, which resolves environment → local file →
+manifest and warns when the last rung wins. Reading that field out of the manifest yields an
+empty value on every project `/wp-create` has written since, and a silent legacy read on
+every project it has not.
 
 ### Common Placeholders
 
@@ -203,7 +209,7 @@ Replace placeholders with values from the manifest to produce the final nginx co
 | `{{php_version}}` | `8.3` |
 | `{{db_name}}` | `wp_my_project` |
 | `{{db_user}}` | `root` |
-| `{{db_password}}` | `root` |
+| `{{db_password}}` | generated per project — never a fixed default, and never read from the manifest |
 | `{{db_host}}` | `localhost` or `db` |
 | `{{project_name}}` | `my-project` |
 | `{{ssl_cert}}` | `/etc/ssl/certs/my-project.local.com.crt` |
@@ -220,7 +226,7 @@ Replace placeholders with values from the manifest to produce the final nginx co
 | `{{php_version}}` | `environment.php_version` |
 | `{{db_name}}` | `database.name` |
 | `{{db_user}}` | `database.user` |
-| `{{db_password}}` | `database.password` |
+| `{{db_password}}` | **Not a manifest field.** `bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' db_password"` |
 | `{{db_host}}` | `database.host` |
 | `{{project_name}}` | `project.slug` |
 | `{{ssl_cert}}` | Derived: `/etc/ssl/certs/<domain>.crt` |
