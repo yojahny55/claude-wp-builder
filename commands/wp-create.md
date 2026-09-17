@@ -445,6 +445,15 @@ before anything is installed:
 bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate-profile '<profile-path>'"
 ```
 
+**Validation:** exit code `0`, printing `ok: <path> is a valid profile`.
+
+**On failure:** exit `1` — each problem is printed to stderr, naming the plugin slug and
+the rule it broke (an unmet `requires`, a `conflicts` collision, a bad `source`, a
+non-boolean `required`, a non-canonical `slug`). **Stop: do not install anything from
+this profile.** Report the reasons and let the user fix the profile file or choose a
+different one. (Exit `3` means the profile path does not exist — same stop, different
+reason.)
+
 Then install **one plugin at a time**, using the actual slugs from the selected profile
 JSON, and branch on that plugin's `required` flag:
 
@@ -750,6 +759,12 @@ Only generate after all critical steps (4.1-4.9) succeed. Write the manifest to 
     "installed": [
       "<plugin-slug-1>",
       "<plugin-slug-2>"
+    ],
+    "resolved": [
+      { "slug": "<plugin-slug-1>", "version": "<X.Y.Z>", "source": "wordpress.org", "active": true }
+    ],
+    "degraded": [
+      { "slug": "<plugin-slug-2>", "reason": "not found in the WP.org repository" }
     ]
   },
   "theme": {
@@ -765,12 +780,27 @@ Only generate after all critical steps (4.1-4.9) succeed. Write the manifest to 
 }
 ```
 
-The database password is **not** in the manifest. It goes in `.wp-create.local.json`,
-which `/wp-init` adds to the project's `.gitignore`:
+The database password is **not** in the manifest. Generate `DB_PASSWORD` and
+`ADMIN_PASSWORD` as soon as Step 3 decides them, and **write them to
+`${PROJECT_PATH}/.wp-create.local.json` immediately** — do not defer this to the
+manifest step above, which is gated on all of Steps 4.1-4.9 succeeding. The
+credentials are already in use before that gate closes (Step 4.3's
+`{{db_password}}`, Step 4.9's `--admin_password`), and writing them early means a
+retry after a later critical step fails re-reads the same values already baked
+into the database and `wp-config.php`, instead of generating new ones that no
+longer match:
 
 ```json
 { "database": { "password": "<DB_PASSWORD>" }, "wordpress": { "admin_password": "<ADMIN_PASSWORD>" } }
 ```
+
+`${PROJECT_PATH}/.wp-create.local.json` — the project root, a sibling of
+`.wp-create.json`, not a file inside the theme directory `/wp-init` scaffolds
+later. `/wp-init` (Step 9.6) adds `.wp-create.local.json` to
+`${PROJECT_PATH}/.gitignore` — the project root's own `.gitignore`, creating
+that file if the root has none yet. That is a different repository from the
+theme's own `.gitignore` (`/wp-init` Step 9.5, scoped to `<theme-dir>`), which
+sits below the project root and cannot ignore a path that lives above it.
 
 Read either value through the validator, which resolves environment → local file →
 manifest and warns when it had to fall back to the manifest:

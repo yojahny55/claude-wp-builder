@@ -129,10 +129,32 @@
   which blocks the same as any other required failure. The `.wp-create.json` manifest
   example is bumped to `manifest_version: 3` and **no longer carries the database
   password** — DB and admin passwords are generated per project (16 random characters)
-  and written to `.wp-create.local.json` instead, resolved through `wp-config.mjs get`
-  (environment → local file → manifest). `/wp-init` adds `.wp-create.local.json` to the
-  scaffolded theme's `.gitignore`. Covered by the new
-  `tests/checks/wp-create-profile-enforcement.sh`.
+  and written to `${PROJECT_PATH}/.wp-create.local.json` instead, resolved through
+  `wp-config.mjs get` (environment → local file → manifest). `/wp-init` adds
+  `.wp-create.local.json` to the **project root's** `.gitignore` (Step 9.6). Covered by
+  the new `tests/checks/wp-create-profile-enforcement.sh`.
+- **Fix: the `.gitignore` entry above protected nothing.** It was written to
+  `<theme-dir>/.gitignore` — the theme's own git repo, rooted below
+  `${PROJECT_PATH}` — while `.wp-create.local.json` lives at the project root, a
+  sibling of `.wp-create.json`. A repo cannot ignore a path outside itself
+  (`git check-ignore -v` on it there fails `fatal: ... is outside repository`), so a
+  project root that is itself versioned — a normal delivery pattern — committed the
+  database and admin passwords in cleartext, exactly what this manifest_version 3
+  change exists to prevent. `/wp-init` gains Step 9.6, which writes the ignore line
+  to `${PROJECT_PATH}/.gitignore` (creating it if absent) independently of the
+  theme's own `.gitignore` from Step 9.5, which is left untouched. `/wp-create`'s
+  Step 5 note now says which `.gitignore` and states the write as an imperative
+  ("write them to `${PROJECT_PATH}/.wp-create.local.json` immediately"), not deferred
+  to the manifest step, since the credentials are already in use by Step 4.3/4.9 and
+  an un-persisted value can't survive a retry after a later critical step fails.
+  `Step 4.10`'s `validate-profile` call gained the `**Validation:**`/`**On failure:**`
+  block every sibling step already has, and the Step 5 manifest template now shows
+  `plugins.resolved`/`plugins.degraded` alongside `installed`, matching what Step
+  4.10 actually records. `/wp-audit`'s own `manifest_version` references (Step 2.5a's
+  table, its own `audit` reconciliation example) are bumped to `3`, and the "absent"
+  bucket widens to "absent or `< 3`" — the previous "current is `2`, stop above `2`"
+  table would otherwise treat a project this task's `/wp-create` just created as
+  newer-than-understood and refuse to reconcile it.
 
 ## [1.18.0] - 2026-09-15
 

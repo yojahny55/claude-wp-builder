@@ -11,7 +11,11 @@ c=commands/wp-create.md
 i=commands/wp-init.md
 
 # --- Required and optional are different outcomes, in writing. --------------
-grep -Fq 'required' "$c" || fail "$c never mentions a required plugin"
+# A bare grep for 'required' was already true before any Task 6 edit -- section 3.7's
+# pre-existing profile-JSON example ("required": true) satisfies it on its own, so it
+# protects nothing about Step 4.10 specifically. Assert the actual outcome table instead.
+grep -Fq '| Outcome | `required: true` | `required: false` |' "$c" \
+  || fail "$c does not show the required-vs-optional outcome table"
 grep -Fqi 'blocks the dependent' "$c" || fail "$c does not say a required plugin failure blocks dependent steps"
 grep -Fq 'plugins.degraded' "$c" || fail "$c does not record optional failures in plugins.degraded"
 grep -Fq 'license_missing' "$c" || fail "$c does not name the licensed-plugin outcome"

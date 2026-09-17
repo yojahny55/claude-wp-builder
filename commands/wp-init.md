@@ -821,7 +821,7 @@ The theme directory is the versioned deliverable and `/wp-yolo` requires a git r
 cd <theme-dir>
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
   git init -q
-  printf 'node_modules/\n.DS_Store\n*.log\n.wp-create.local.json\n' > .gitignore
+  printf 'node_modules/\n.DS_Store\n*.log\n' > .gitignore
   # Tailwind build output is regenerable — ignore dist if this is the tailwind template
   git add -A && git commit -q -m "chore: scaffold <slug> theme from starter"
 }
@@ -829,6 +829,32 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
 
 Idempotent: if `<theme-dir>` is already inside a git work tree (e.g. the whole
 site is versioned), skip init and leave the existing repo untouched.
+
+## Step 9.6: Gitignore the local credentials file
+
+`/wp-create` writes database and admin credentials to
+`${PROJECT_PATH}/.wp-create.local.json` — a sibling of `.wp-create.json` at the
+**project root**, not a file inside `<theme-dir>`. This is a different location
+from Step 9.5 above: that step's `.gitignore` belongs to the theme's own git
+repository, rooted at `<theme-dir>` (below `${PROJECT_PATH}`), and a repository
+cannot ignore a path that lives outside it. If the project root is itself a
+versioned repository — the whole site, not just the theme, which is a normal
+delivery pattern — the credentials file needs its own ignore entry there:
+
+```bash
+cd ${PROJECT_PATH}
+grep -qxF '.wp-create.local.json' .gitignore 2>/dev/null || printf '.wp-create.local.json\n' >> .gitignore
+```
+
+`printf ... >>` creates `${PROJECT_PATH}/.gitignore` if it does not already
+exist, and the `grep -qxF` guard makes the append idempotent on a re-run. Do
+this unconditionally, whether or not `${PROJECT_PATH}` is a git repository yet
+— the entry costs nothing when it isn't one, and protects the secret the
+moment it becomes one.
+
+**Validation:** if `${PROJECT_PATH}` is inside a git work tree, `git
+check-ignore -v .wp-create.local.json` (run from `${PROJECT_PATH}`) matches
+the line just added.
 
 ## Step 10: Print Summary
 

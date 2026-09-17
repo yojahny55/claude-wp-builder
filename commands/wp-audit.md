@@ -53,13 +53,13 @@ back on.
 
 ### 2.5a — Schema version
 
-Read `manifest_version`. The current version is `2`.
+Read `manifest_version`. The current version is `3`.
 
 | Found | Meaning | Action |
 |---|---|---|
-| `2` | current | reconcile as below |
-| absent | the project predates manifest versioning | reconcile, then write `"manifest_version": 2` |
-| `> 2` | written by a newer plugin | **stop** — report the version and do not rewrite keys this version does not understand |
+| `3` | current | reconcile as below |
+| absent or `< 3` | the project predates the current manifest version (versioning started at `2`; `/wp-create` writes `3` as of the credential-contract change) | reconcile, then write `"manifest_version": 3` |
+| `> 3` | written by a newer plugin | **stop** — report the version and do not rewrite keys this version does not understand |
 
 A missing version is not an error; it is the signal that every check below has never run
 on this project.
@@ -508,7 +508,7 @@ Add or update the `audit` key in the JSON:
     "carried_over": K,
     "web_quality_skills_available": true
   },
-  "manifest_version": 2
+  "manifest_version": 3
 }
 ```
 
