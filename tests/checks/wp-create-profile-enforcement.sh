@@ -24,6 +24,23 @@ grep -Fq 'plugins.resolved' "$c" || fail "$c does not record resolved plugin ver
 # --- The step is no longer non-critical wholesale. --------------------------
 grep -Fq 'non-critical per plugin' "$c" || fail "$c still treats step 4.10 as non-critical as a whole"
 
+# --- Step 4.10's validate-profile call carries its own Validation/On failure block,
+# the same shape every sibling step already has -- not just the bare command. Scope
+# tightly to the validate-profile block itself: Step 4.10 also has a later, unrelated
+# "**Validation:**" line for the plugin-install loop, and a bare grep over the whole
+# step would still pass with the validate-profile block's own line deleted. -----------
+profile_validation=$(awk '
+  /wp-config\.mjs validate-profile/ { insec = 1 }
+  insec && /^Then install/ { exit }
+  insec { print }
+' "$c")
+grep -Fq 'wp-config.mjs validate-profile' <<<"$profile_validation" \
+  || fail "$c Step 4.10 does not call wp-config.mjs validate-profile"
+grep -Fq '**Validation:**' <<<"$profile_validation" \
+  || fail "$c Step 4.10 does not document a **Validation:** block for validate-profile"
+grep -Fq '**On failure:**' <<<"$profile_validation" \
+  || fail "$c Step 4.10 does not document an **On failure:** block for validate-profile"
+
 # --- The manifest example is at the current version. ------------------------
 grep -Fq '"manifest_version": 3' "$c" || fail "$c's manifest example does not carry manifest_version 3"
 grep -Fq '.wp-create.local.json' "$c" || fail "$c does not name the local credential file"
@@ -43,13 +60,44 @@ if grep -Fq '"password"' <<<"$manifest_example"; then
   fail "$c's manifest example still contains a password field"
 fi
 
+# --- The manifest template itself carries plugins.resolved/plugins.degraded, not just
+# Step 4.10's prose describing them. A grep for the dotted name anywhere in the file
+# already passes off Step 4.10's own text, so assert the JSON keys inside the template. -
+grep -Fq '"resolved":' <<<"$manifest_example" \
+  || fail "$c's Step 5 manifest template does not carry a plugins.resolved key"
+grep -Fq '"degraded":' <<<"$manifest_example" \
+  || fail "$c's Step 5 manifest template does not carry a plugins.degraded key"
+
 # --- Generated credentials, not fixed defaults. -----------------------------
 # A bare grep for 'webmaster' also matches the admin *username* default (still
 # 'webmaster', still correct -- a username is not a secret and was never asked to
 # change). Only the fixed login pair proves the PASSWORD is still hardcoded.
 if grep -Fq 'webmaster / webmaster' "$c"; then fail "$c still documents the fixed webmaster admin password"; fi
 
-# --- The project gitignore covers the local file. ---------------------------
-grep -Fq '.wp-create.local.json' "$i" || fail "$i does not add the local credential file to .gitignore"
+# --- The local credential file is gitignored at the PROJECT ROOT, not the theme
+# directory. A bare grep for the filename passed against the broken version too --
+# that version added it to <theme-dir>/.gitignore in Step 9.5, a repository that
+# cannot ignore a path living above it. Assert the project-root path specifically. --
+step96=$(awk '
+  /^## Step 9\.6: Gitignore the local credentials file/ { insec = 1 }
+  insec && /^## Step 10/ { exit }
+  insec { print }
+' "$i")
+[ -n "$step96" ] || fail "$i has no Step 9.6 gitignoring the local credentials file"
+grep -Fq 'cd ${PROJECT_PATH}' <<<"$step96" \
+  || fail "$i Step 9.6 does not cd into \${PROJECT_PATH} before writing .gitignore"
+grep -Fq '.wp-create.local.json' <<<"$step96" \
+  || fail "$i Step 9.6 does not name the local credential file"
+
+# Step 9.5's *theme* .gitignore must not have regressed back to also ignoring it there --
+# that duplication is exactly how the project-root defect survived its first review.
+step95=$(awk '
+  /^## Step 9\.5: Initialize git repository/ { insec = 1 }
+  insec && /^## Step 9\.6/ { exit }
+  insec { print }
+' "$i")
+if grep -Fq '.wp-create.local.json' <<<"$step95"; then
+  fail "$i Step 9.5 writes the local credential file into the theme's own .gitignore again"
+fi
 
 echo PASS

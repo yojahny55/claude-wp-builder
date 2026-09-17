@@ -4,6 +4,29 @@
 
 ### Added
 
+- **Every command that reads `.wp-create.json` now validates it first.** The twelve
+  consuming commands (`/wp-create`, `/wp-init`, `/wp-yolo`, `/wp-seed`, `/wp-section`,
+  `/wp-demo`, `/wp-audit`, `/wp-finalize`, `/wp-clone`, `/wp-debug`, `/wp-robin`,
+  `/wp-aos-animator`) gain a byte-identical gate block that runs `wp-config.mjs validate`
+  and branches on its exit code (`0` continue, `1` stop and report, `2` migrate then
+  continue, `3` no manifest). `/wp-create` runs its gate after Step 5 writes the manifest,
+  since creating it is that command's own job; `/wp-clone` runs its gate after `/wp-create`
+  has been dispatched as a sub-step, for the same reason. Covered by the new
+  `tests/checks/wp-config-gate.sh`. `README.md` documents `bin/wp-config.mjs`'s
+  subcommands, and `CLAUDE.md` records three ceilings: the gate only binds commands whose
+  gate line survives, a tested plugin-version range is a claim nothing keeps honest, and
+  `.wp-create.local.json` is unencrypted, not just unshared.
+- **Fix: four contracts Task 6 shipped were pinned by no test of their own.**
+  `tests/checks/wp-create-profile-enforcement.sh` now asserts (with a project-root-specific
+  path, not just the filename) that `/wp-init` Step 9.6 gitignores
+  `.wp-create.local.json` at `${PROJECT_PATH}`, not at `<theme-dir>`; that Step 4.10's
+  `validate-profile` call carries its own `**Validation:**`/`**On failure:**` block; and
+  that Step 5's manifest template — not just Step 4.10's prose — carries
+  `plugins.resolved`/`plugins.degraded`. `tests/checks/audit-lifecycle.sh` now asserts
+  `commands/wp-audit.md` states `manifest_version` 3 as current and widens the absent
+  bucket to `absent or < 3`. All four were mutation-proven to fail red when the
+  underlying fix is reverted.
+
 - **`node bin/wp-config.mjs validate-profile <file>` validates a plugin profile before
   `/wp-create` installs anything from it.** Profiles load from three places —
   `templates/profiles/`, the project's `.wp-profiles/*.json`, and `~/.wp-profiles/*.json`

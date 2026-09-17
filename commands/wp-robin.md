@@ -18,6 +18,24 @@ so a user cannot reach it by typing its name. Skills inform; commands act. This 
 
 ## Step 0: Parse Arguments
 
+**First: validate the project configuration.**
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+```
+
+| Exit | Meaning | Do |
+|---|---|---|
+| `0` | valid | continue |
+| `1` | invalid, or the generated context block disagrees with the manifest | stop and report the message verbatim |
+| `2` | an older manifest can migrate | run `wp-config.mjs migrate '${PROJECT_PATH}'`, then continue |
+| `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
+
+On exit 2, run the migration before continuing.
+
+Exit `3` here falls through to the resolution order below rather than stopping outright
+— this command targets any WordPress root, not only one created by `/wp-create`.
+
 `$ARGUMENTS` is optional and holds at most one value:
 
 | Argument | Required | Description |

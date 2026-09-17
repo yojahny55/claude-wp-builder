@@ -384,3 +384,13 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   but no command reads them today — only `research.site`, `confidence` and the
   scalar `"research": "none"` are read. Reuse keys off `demo/RESEARCH.md`'s
   existence, not off `research.at`'s date.
+- **The validator binds the commands that call it.** `bin/wp-config.mjs` is the single
+  definition of a valid `.wp-create.json`, but a command whose gate line is deleted simply
+  stops validating, and only `tests/checks/wp-config-gate.sh` notices. Same ceiling every
+  prose contract here carries.
+- **A tested compatibility range is a claim someone has to keep honest.** An absent range
+  is reported as untested, which makes the gap visible; nothing keeps a declared range true
+  as plugins release.
+- **Generated credentials are only as private as the local file.** Splitting them into
+  `.wp-create.local.json` keeps them out of the committed manifest; it encrypts nothing, and
+  a password already committed needs rotating rather than migrating.

@@ -10,6 +10,24 @@ Parse a demo HTML file (or multi-page demo directory), extract content via BEM c
 
 ## Step 0: Read Project Manifest
 
+**First: validate the project configuration.**
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+```
+
+| Exit | Meaning | Do |
+|---|---|---|
+| `0` | valid | continue |
+| `1` | invalid, or the generated context block disagrees with the manifest | stop and report the message verbatim |
+| `2` | an older manifest can migrate | run `wp-config.mjs migrate '${PROJECT_PATH}'`, then continue |
+| `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
+
+On exit 2, run the migration before continuing.
+
+Exit `3` here falls through to the bare-`wp` fallback below rather than stopping outright
+— this command also seeds a WordPress root that was never run through `/wp-create`.
+
 Read `.wp-create.json` from the project root to obtain the WP-CLI wrapper and language configuration.
 
 ```bash

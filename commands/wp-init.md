@@ -93,6 +93,26 @@ straight through.
 
 ## Pre-Step: Check for `.wp-create.json` Manifest
 
+**First: validate the project configuration.**
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+```
+
+| Exit | Meaning | Do |
+|---|---|---|
+| `0` | valid | continue |
+| `1` | invalid, or the generated context block disagrees with the manifest | stop and report the message verbatim |
+| `2` | an older manifest can migrate | run `wp-config.mjs migrate '${PROJECT_PATH}'`, then continue |
+| `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
+
+On exit 2, run the migration before continuing.
+
+Exit `3` is not a stop here: this command also scaffolds a theme onto a WordPress
+install that was never run through `/wp-create`, and the "If `.wp-create.json` does NOT
+exist" branch below is that legitimate path. Treat exit `3` as "no manifest to read
+config from" and fall through to that branch instead of aborting.
+
 Before anything else, check if `.wp-create.json` exists in the current working directory or parent directories (same search pattern as `wp-content/themes/`).
 
 ### If `.wp-create.json` exists:

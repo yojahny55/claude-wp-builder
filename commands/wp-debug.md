@@ -10,6 +10,24 @@ Diagnose WordPress issues by running systematic health checks, identifying probl
 
 ## Step 0: Read Project Context
 
+**First: validate the project configuration.**
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+```
+
+| Exit | Meaning | Do |
+|---|---|---|
+| `0` | valid | continue |
+| `1` | invalid, or the generated context block disagrees with the manifest | stop and report the message verbatim |
+| `2` | an older manifest can migrate | run `wp-config.mjs migrate '${PROJECT_PATH}'`, then continue |
+| `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
+
+On exit 2, run the migration before continuing.
+
+Exit `3` here falls through to the bare-`wp` fallback below rather than stopping outright
+— this command also diagnoses a WordPress root that was never run through `/wp-create`.
+
 Read `.wp-create.json` from the project root to extract the WP-CLI wrapper command.
 
 ```bash

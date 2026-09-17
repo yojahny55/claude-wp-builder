@@ -823,6 +823,24 @@ The `wp_cli.path_flag` is set to `--path=${PROJECT_PATH}` for native installs an
 
 **Validation:** Read back the file and verify it is valid JSON.
 
+The gate below runs here, after the manifest exists, rather than before Step 1 — this
+command's own job is to create the manifest it would otherwise be validating against.
+
+**First: validate the project configuration.**
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+```
+
+| Exit | Meaning | Do |
+|---|---|---|
+| `0` | valid | continue |
+| `1` | invalid, or the generated context block disagrees with the manifest | stop and report the message verbatim |
+| `2` | an older manifest can migrate | run `wp-config.mjs migrate '${PROJECT_PATH}'`, then continue |
+| `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
+
+On exit 2, run the migration before continuing.
+
 ---
 
 ## Step 6: Chain to `/wp-init`

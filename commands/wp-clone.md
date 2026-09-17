@@ -133,6 +133,24 @@ If WordPress files already exist at the destination (e.g., from a previous clone
 
 ### A10: Import Database
 
+**First: validate the project configuration.**
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+```
+
+| Exit | Meaning | Do |
+|---|---|---|
+| `0` | valid | continue |
+| `1` | invalid, or the generated context block disagrees with the manifest | stop and report the message verbatim |
+| `2` | an older manifest can migrate | run `wp-config.mjs migrate '${PROJECT_PATH}'`, then continue |
+| `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
+
+On exit 2, run the migration before continuing.
+
+This runs after A9, not before Step 0 — the manifest does not exist until `/wp-create`
+has finished creating it.
+
 Read `.wp-create.json` from the local project to get the `$WP` wrapper:
 
 ```bash
@@ -197,6 +215,24 @@ If `--uploads=` was not provided, ask:
 Run the `/wp-create` command to set up a fresh local WordPress environment at the `--to=` path. This creates the full environment from scratch — WordPress download, database, web server, the works.
 
 ### B3: Import Database
+
+**First: validate the project configuration.**
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+```
+
+| Exit | Meaning | Do |
+|---|---|---|
+| `0` | valid | continue |
+| `1` | invalid, or the generated context block disagrees with the manifest | stop and report the message verbatim |
+| `2` | an older manifest can migrate | run `wp-config.mjs migrate '${PROJECT_PATH}'`, then continue |
+| `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
+
+On exit 2, run the migration before continuing.
+
+This runs after B2, not before Step 0 — the manifest does not exist until `/wp-create`
+has finished creating it.
 
 Read `.wp-create.json` for the `$WP` wrapper:
 

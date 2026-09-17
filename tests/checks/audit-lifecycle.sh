@@ -31,6 +31,16 @@ awk '/^## Step 2.5: Reconcile the Manifest/ { r = NR } /^## Step 3: Detect Envir
      END { exit !(r > 0 && t > r) }' "$audit" \
   || fail "$audit: reconciliation must come before tier detection — it can turn Tier 3 back on"
 
+# --- Schema version is the current one, and the absent bucket is widened ------
+# /wp-create writes manifest_version 3 as of the credential-contract change (Task 6). A
+# project this same /wp-create just scaffolded must not be treated as older than the
+# plugin understands, so 2.5a's absent bucket has to cover every version before 3, not
+# just the literal absence.
+grep -Fq 'Read `manifest_version`. The current version is `3`.' "$audit" \
+  || fail "$audit's 2.5a must state manifest_version 3 as the current version"
+grep -Fq '| absent or `< 3` |' "$audit" \
+  || fail "$audit's 2.5a must widen the absent bucket to \`absent or < 3\`, not just absent"
+
 # --- categories_run is read back, not only written ----------------------------
 # The original defect: a single occurrence, a write. Nothing ever asked which categories had
 # never run, so a project could sit forever with a whole category unexecuted.
