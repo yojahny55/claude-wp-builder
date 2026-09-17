@@ -317,6 +317,261 @@
   overwriting a client's own edit.
 ### Added
 
+- **Every command that reads `.wp-create.json` now validates it first.** The twelve
+  consuming commands (`/wp-create`, `/wp-init`, `/wp-yolo`, `/wp-seed`, `/wp-section`,
+  `/wp-demo`, `/wp-audit`, `/wp-finalize`, `/wp-clone`, `/wp-debug`, `/wp-robin`,
+  `/wp-aos-animator`) gain a byte-identical gate block that runs `wp-config.mjs validate`
+  and branches on its exit code (`0` continue, `1` stop and report, `2` migrate then
+  continue, `3` no manifest). `/wp-create` runs its gate after Step 5 writes the manifest,
+  since creating it is that command's own job; `/wp-clone` runs its gate after `/wp-create`
+  has been dispatched as a sub-step, for the same reason. Covered by the new
+  `tests/checks/wp-config-gate.sh`. `README.md` documents `bin/wp-config.mjs`'s
+  subcommands, and `CLAUDE.md` records three ceilings: the gate only binds commands whose
+  gate line survives, a tested plugin-version range is a claim nothing keeps honest, and
+  `.wp-create.local.json` is unencrypted, not just unshared.
+- **Fix: four contracts Task 6 shipped were pinned by no test of their own.**
+  `tests/checks/wp-create-profile-enforcement.sh` now asserts (with a project-root-specific
+  path, not just the filename) that `/wp-init` Step 9.6 gitignores
+  `.wp-create.local.json` at `${PROJECT_PATH}`, not at `<theme-dir>`; that Step 4.10's
+  `validate-profile` call carries its own `**Validation:**`/`**On failure:**` block; and
+  that Step 5's manifest template — not just Step 4.10's prose — carries
+  `plugins.resolved`/`plugins.degraded`. `tests/checks/audit-lifecycle.sh` now asserts
+  `commands/wp-audit.md` states `manifest_version` 3 as current and widens the absent
+  bucket to `absent or < 3`. All four were mutation-proven to fail red when the
+  underlying fix is reverted.
+
+- **`node bin/wp-config.mjs validate-profile <file>` validates a plugin profile before
+  `/wp-create` installs anything from it.** Profiles load from three places —
+  `templates/profiles/`, the project's `.wp-profiles/*.json`, and `~/.wp-profiles/*.json`
+  — and the last two are user-authored, which is what makes structure validation worth
+  having. `validateProfile()` in `bin/lib/manifest.mjs` rejects a duplicate plugin slug,
+  an unknown key on a plugin entry, a `source` outside `"wordpress.org"`/`"supplied"`,
+  a `requires` edge pointing at a plugin the profile does not list, and a `conflicts`
+  edge pointing at one it does — all named in the message, and all before Step 4.10 has
+  activated a single plugin. Plugin entries gain three optional fields: `requires:
+  string[]`, `conflicts: string[]`, `source: 'wordpress.org' | 'supplied'`; both shipped
+  profiles (`templates/profiles/full.json`, `templates/profiles/starter.json`) now mark
+  every entry `"source": "wordpress.org"`. Exit codes match the existing `validate`
+  contract: `0` ok, `1` invalid, `3` file not found. Covered by
+  `tests/checks/wp-profiles.sh` and fixtures under `tests/fixtures/profiles/`.
+- **Fix: a user-authored profile with a non-array `requires`/`conflicts` (e.g.
+  `"requires": 5`) no longer crashes `validate-profile` with a raw Node stack trace.**
+  `validateProfile()` now reports it as an ordinary validation problem naming the entry
+  and the key, instead of iterating a non-iterable and throwing. `required` is now
+  type-checked too: a present-but-non-boolean value (e.g. `"required": "false"`) is
+  rejected, and the shipped-profile `required`-count check in `tests/checks/wp-profiles.sh`
+  compares with `=== true` rather than truthiness, closing the same gap on both sides. A
+  plugin `slug` must already be lowercase and trimmed — `validateProfile()` rejects a
+  slug that isn't, naming the canonical form, rather than silently normalising it. Fixture
+  coverage extended to the remaining `validateProfile` branches (`conflicts`, unknown key,
+  bad `source`, a non-object entry, a missing `slug`, a missing `name`, a non-array
+  `plugins`, a non-array `requires`, a non-boolean `required`, a non-canonical `slug`) —
+  the last two were themselves initially unguarded: disabling either check left the full
+  suite green, so each now has its own fixture proven to fail red when that check alone
+  is disabled.
+- **Fix: `wp-config.mjs` no longer echoes `JSON.parse`'s own error message when a manifest,
+  local-secrets file or profile fails to parse.** That message can embed up to ~20 raw
+  bytes of the file's own content as a quoted snippet — a real leak path for
+  `.wp-create.local.json`, which holds secrets. `loadManifest`, `loadLocal` and
+  `cmdValidateProfile` now report only the file and, when the parser states one, the
+  position — never the parser's message text.
+- **`bin/wp-config.mjs` and `bin/lib/manifest.mjs` — one validator for `.wp-create.json`,
+  the manifest roughly thirty commands, agents and skills read with no writer contract
+  until now.** `node bin/wp-config.mjs validate <project-path>` checks the required fields,
+  the `"demo mode"` and `"i18n strategy"` values, and the manifest version, so a malformed
+  or missing manifest fails once, early, instead of thirty different ways deep inside
+  whichever command happens to read it first. Exit codes are fixed and are the contract:
+  `0` ok, `1` invalid/refused, `2` migration available, `3` no manifest. Covered by
+  `tests/checks/wp-config-validate.sh` and fixtures under `tests/fixtures/manifests/`.
+- **`node bin/wp-config.mjs migrate <project-path>` moves a pre-version manifest forward
+  without re-deciding it.** A legacy project's `"i18n strategy"` lives only as a prose
+  line in its `.claude/CLAUDE.md` — the new `migrateManifest()` reads that line instead
+  of falling back to the documented default, and only falls back (`suffix`/`plain`) when
+  the line itself is absent. Unknown keys are preserved, a future `manifest_version` is
+  refused and left untouched, the pre-migration file is backed up as
+  `.wp-create.json.v<n>.bak` (never `.wp-create.json.bak`, which `/wp-create` already
+  owns), and re-running migrate on an up-to-date manifest is a no-op — asserted by
+  comparing the whole project directory's file listing before and after, not just the
+  manifest's own bytes, so a regression that leaves a stray backup behind is caught too.
+  Covered by `tests/checks/wp-config-migrate.sh` and the `legacy-v1`/`future` fixtures.
+- **`node bin/wp-config.mjs render-context <project-path>` renders the project's
+  `.claude/CLAUDE.md` context block from `.wp-create.json` — the manifest, not the
+  prose, is now the source of truth.** `i18n strategy` alone is read out of that prose
+  in 17 places across agents; those readers are unchanged, but the block they read is
+  now generated between `<!-- wp-create:begin -->` / `<!-- wp-create:end -->` markers,
+  so the two files cannot disagree. Text outside the markers is the operator's and is
+  never touched; rendering twice is a no-op. `migrate` calls `render-context` as its
+  last step. `validate` gains a drift finding: a hand-edited block is reported (exit
+  `1`, naming `wp-create:begin`) and never silently overwritten — an operator who
+  edited it meant something. Covered by `tests/checks/wp-config-context.sh`.
+- **Fix: a malformed marker pair (an orphan BEGIN with no END, an END before a
+  BEGIN, or more than one of either) is now refused, not guessed at.** The first
+  cut of `spliceContext` treated anything other than a clean single pair as "absent"
+  and appended past it — an orphan BEGIN left the operator's own text stranded
+  after it, and the very next `render-context` (the exact remedy `validate`
+  recommended) paired that orphan with the real END and deleted everything
+  between them; an END appearing before a BEGIN in operator prose took the append
+  branch on every call, growing a new duplicate block each time. `render-context`
+  and `validate` now both refuse and exit `1` naming the malformed state and
+  telling the operator to fix the markers by hand, writing nothing. `contextDrift`
+  reports a malformed file as its own finding, distinct from ordinary drift.
+  Covered by four new cases in `tests/checks/wp-config-context.sh`.
+- **`node bin/wp-config.mjs get <project-path> <key>` — one way for every consumer to
+  read a manifest value, secrets included.** `/wp-init` writes a project's `.gitignore`
+  as `node_modules/`, `.DS_Store`, `*.log`, so `.wp-create.json` — database password
+  included — was committable into a client's repository by default. `get` resolves the
+  two recognised secrets (`db_password`, `admin_password`) in order **environment →
+  `.wp-create.local.json` → manifest**; the manifest rung still works for a project that
+  has not moved its secret out, but it warns every time it wins that the value came from
+  a legacy, committable location. A fixed alias table (`i18n-strategy`, `demo-mode`, plus
+  the dotted paths `theme.slug`, `project.slug`, `plugins.profile`, `languages.primary`,
+  `wp_cli.wrapper`) addresses the two space-spelled manifest keys a dotted path cannot
+  reach. Covered by `tests/checks/wp-config-secrets.sh`.
+- **Fix: `get database.password` and `get wordpress.admin_password` no longer read the
+  secret straight out of the manifest, bypassing the resolution order above.** Those
+  dotted paths equal a secret's own `manifestPath`, so the generic key lookup reached
+  them directly — no environment or `.wp-create.local.json` check, and no legacy
+  warning, even with the corresponding environment variable set. `getKey` now refuses
+  a key that names a secret's manifest path (exit `1`, nothing on stdout, naming the
+  secret alias to use instead — `db_password` / `admin_password`) rather than rerouting
+  it, so there is exactly one way to read a secret. `resolveSecret` also gained the
+  `typeof value === 'object'` guard `getKey` already had (an object at a secret's path
+  is refused, not printed) and switched its three presence checks from truthy to
+  `!== undefined && !== null`, so an explicitly empty secret — a real local-dev
+  configuration — resolves as itself instead of cascading past it to "no value found".
+  Covered by four new cases in `tests/checks/wp-config-secrets.sh`; the existing
+  alias-table case was also rewritten against a fixture value that differs from
+  `getKey`'s own fallback, since the fallback previously matched the fixture by
+  coincidence and let a broken alias mapping pass unnoticed.
+- **Fix: a suffixed path under a secret's manifest path — `database.password.length`,
+  `database.password.constructor.name` — still bypassed the refusal above.** The
+  refusal was an exact string match against `manifestPath`, so a key that merely
+  *started with* it fell through to the generic dotted-path reader, which keeps
+  walking past the string onto its own JS properties: `.length` returned the
+  secret's exact character count, `.constructor`/`.constructor.name` its type.
+  Same bypass as before — no warning, exit `0` — for a narrower slice. `getKey`
+  now refuses a key equal to a secret's manifest path *or prefixed by it plus a
+  dot*, and rejects a function the same way it already rejects an object, so a
+  suffixed non-secret path can't return a prototype method either. Covered by
+  three new cases in `tests/checks/wp-config-secrets.sh`.
+- **`/wp-create` now matches the validator Tasks 1-5 built, instead of documenting the
+  behavior the validator replaced.** Step 4.10 no longer treats every plugin failure the
+  same way: it validates the profile first (`wp-config.mjs validate-profile`), installs
+  one plugin at a time, and branches on that plugin's `required` flag — a required
+  plugin that fails to install or activate stops the build and names the blocked
+  workflow, an optional one warns and is recorded in `plugins.degraded`; a successful
+  install is recorded in `plugins.resolved`. A `"source": "supplied"` plugin is never
+  fetched from WP.org, and a required one that has no supplied zip is `license_missing`,
+  which blocks the same as any other required failure. The `.wp-create.json` manifest
+  example is bumped to `manifest_version: 3` and **no longer carries the database
+  password** — DB and admin passwords are generated per project (16 random characters)
+  and written to `${PROJECT_PATH}/.wp-create.local.json` instead, resolved through
+  `wp-config.mjs get` (environment → local file → manifest). `/wp-init` adds
+  `.wp-create.local.json` to the **project root's** `.gitignore` (Step 9.6). Covered by
+  the new `tests/checks/wp-create-profile-enforcement.sh`.
+- **Fix: the `.gitignore` entry above protected nothing.** It was written to
+  `<theme-dir>/.gitignore` — the theme's own git repo, rooted below
+  `${PROJECT_PATH}` — while `.wp-create.local.json` lives at the project root, a
+  sibling of `.wp-create.json`. A repo cannot ignore a path outside itself
+  (`git check-ignore -v` on it there fails `fatal: ... is outside repository`), so a
+  project root that is itself versioned — a normal delivery pattern — committed the
+  database and admin passwords in cleartext, exactly what this manifest_version 3
+  change exists to prevent. `/wp-init` gains Step 9.6, which writes the ignore line
+  to `${PROJECT_PATH}/.gitignore` (creating it if absent) independently of the
+  theme's own `.gitignore` from Step 9.5, which is left untouched. `/wp-create`'s
+  Step 5 note now says which `.gitignore` and states the write as an imperative
+  ("write them to `${PROJECT_PATH}/.wp-create.local.json` immediately"), not deferred
+  to the manifest step, since the credentials are already in use by Step 4.3/4.9 and
+  an un-persisted value can't survive a retry after a later critical step fails.
+  `Step 4.10`'s `validate-profile` call gained the `**Validation:**`/`**On failure:**`
+  block every sibling step already has, and the Step 5 manifest template now shows
+  `plugins.resolved`/`plugins.degraded` alongside `installed`, matching what Step
+  4.10 actually records. `/wp-audit`'s own `manifest_version` references (Step 2.5a's
+  table, its own `audit` reconciliation example) are bumped to `3`, and the "absent"
+  bucket widens to "absent or `< 3`" — the previous "current is `2`, stop above `2`"
+  table would otherwise treat a project this task's `/wp-create` just created as
+  newer-than-understood and refuse to reconcile it.
+
+### Fixed
+
+- **`tests/checks/wp-config-gate.sh`'s validator-call assertion matched a prefix, not the
+  real invocation.** `grep -Fq 'wp-config.mjs validate'` is satisfied by
+  `wp-config.mjs validate-profile`, which `commands/wp-create.md` already calls (Task
+  5/6) — so the one file this whole task exists to protect could lose its actual gate
+  call and the check would still pass. The same shape existed for the migration-exit-code
+  assertion: a bare `grep -Fq 'exit 2'` is satisfied by unrelated `exit 2` documentation
+  already in `commands/wp-yolo.md` and `commands/wp-demo.md` (the `demo-verify.mjs
+  --probe` contract). Both assertions now match the actual gate text — the invocation
+  with its `'${PROJECT_PATH}'` argument, and the gate's own migration sentence — neither
+  of which any unrelated content in the twelve files happens to contain.
+
+- **Fix: the gate said `${PROJECT_PATH}` without ever saying what it is.** Eleven of the
+  twelve gated commands never defined it — only `/wp-create` does — and it sits inside a
+  `bash -c` beside `${CLAUDE_PLUGIN_ROOT}`, which is a real environment variable, so the
+  gate expanded to `validate ''`, printed the usage line and exited `1`: "stop and report"
+  on every project. The block gains one sentence naming the path and what to do without
+  one, and stays byte-identical at all thirteen insertion sites.
+  `tests/checks/wp-config-gate.sh` now diffs every site against one canonical copy instead
+  of grepping for two of its lines, and finds the gated commands by walking
+  `commands/*.md` rather than from a hardcoded twelve-name list that shipped a thirteenth
+  ungated manifest-reading command green. `/wp-seed`, `/wp-debug`, `/wp-robin` and
+  `/wp-init` now *amend* the exit `3` table row instead of contradicting it three lines
+  later.
+
+- **Fix: two places still handled a secret as if Task 6 had not happened.**
+  `skills/wp-environments/SKILL.md`'s placeholder table is a mapping an agent follows at
+  `/wp-create` Step 4.3, not an example, and it routed `{{db_password}}` to
+  `database.password` — a field the manifest no longer carries, so the generated
+  `docker-compose.yml` / nginx conf got an empty password, or a silent legacy read on a
+  project that has not migrated. It now names
+  `wp-config.mjs get '${PROJECT_PATH}' db_password`, and the stale `root` example value is
+  gone. Separately, `/wp-init` Step 9.6 appended the `.gitignore` entry without
+  guaranteeing a leading newline: a project-root `.gitignore` ending `*.log` with no
+  trailing newline became `*.log.wp-create.local.json`, `git check-ignore` stopped
+  matching, and the next `git add -A` committed the database and admin passwords
+  (measured in a real repository). The append now normalises the newline first, and the
+  step's `**Validation:**` line gains the `**On failure:**` action every sibling block in
+  `/wp-create` already has.
+
+- **Fix: the generated block and the manifest's rules were two lists that had to agree,
+  and did not.** `REQUIRED` and `renderContext`'s field list are now derived from one
+  `CONTEXT_FIELDS` table, so a field cannot be rendered into the authoritative block
+  without also being validated: a manifest lacking `theme` or `languages` used to render
+  `- **Theme slug:** ` and `- **Primary language:** ` as blanks with `validate` exiting 0,
+  and reading that block is every agent's first mandatory action. The absent-value
+  defaults (`suffix`, `plain`) come from the same table instead of being spelled a third
+  time inside `getKey`, where a two-entry ternary left "an absent `i18n strategy` means
+  `suffix`" unguarded on the `get` path. `CURRENT_VERSION` is derived from the migration
+  table rather than typed beside it, so bumping it without writing the step can no longer
+  produce an uncaught `Error`.
+- **Fix: migrating a legacy project made `.claude/CLAUDE.md` contradict itself.** `migrate`
+  appended the generated block beside the legacy prose decision line it had just read, and
+  `contextDrift` only compares inside the markers — so the file could state `polylang` on
+  line 4 and `suffix` on line 12 with `validate` exiting 0, reintroducing the exact
+  disagreement this work exists to remove, for exactly the projects migration targets.
+  Migration now comments the superseded lines out, preserving their pre-migration values,
+  so each decision is asserted in exactly one place.
+
+- **Fix: the `wordpress.admin_password` refusal was asserted against a fixture with no such
+  key.** Absence, not the guard, supplied the exit code and the empty stdout, and the grep
+  was satisfied by the message echoing the operator's own key: pointing
+  `SECRETS.admin_password.manifestPath` at a nonexistent field left the whole suite green
+  while `get wordpress.admin_password` would have printed the password. The fixture now
+  holds the key, and both the exact and the suffixed path are asserted against it.
+  `tests/checks/wp-profiles.sh`'s comment said "exactly one plugin required" where the
+  assertion is "at least one"; the comment now states the rule that is enforced.
+
+- **Fix: migration could retire the only record of a decision and leave the project
+  permanently invalid.** A v1 manifest with no `theme` and no `languages` migrated with
+  `ok:` and exit 0, the prose lines carrying those decisions were commented out, the
+  generated block was written with a blank `Theme slug` and `Primary language`, and
+  `validate` then exited 1 on both — the old values recoverable only from inside an HTML
+  comment. `render-context` now validates before it renders and refuses to write a partial
+  block, and retiring the prose moved from `migrate` into `render-context`, downstream of
+  that refusal, so the record survives exactly as long as it is the only record and a
+  refused migration leaves `.claude/CLAUDE.md` byte-identical. Recovery is one
+  `render-context` after the manifest is filled in. `tests/fixtures/manifests/legacy-incomplete/`
+  reproduces the case end to end.
 - **`/wp-demo` consults `inspo` for page-level direction, in both modes.** A free
   MIT archive of 832 production sites, opt-in and never registered by default. It
   answers macrostructure, section ordering and fold composition; `wp-design-library`
@@ -330,8 +585,6 @@
   is never called because it returns React, nothing reaches `/wp-yolo --transcribe`,
   and it never picks a motion device because it carries no motion data.
 
-### Fixed
-
 - **Check Inspo's fallback and search budget within each demo mode.** The checks
   previously required exactly two matching lines in the whole command, so an extra
   mention caused a false failure. Craft and plain are now checked independently;
@@ -341,6 +594,18 @@
   range allowed automatic patch upgrades despite its deliberate-upgrade rationale.
   The example now uses the measured release, and the check matches the quoted package
   argument literally so a range or a longer version cannot satisfy it.
+
+- **`wp-config.mjs get` answered a prototype-chain key with a JS intrinsic.**
+  `at()` walked plain bracket access, so `get toString.length` printed `0` —
+  `Object.prototype.toString`'s arity, not a config value — and exited 0 as though
+  the manifest had said so. `getKey`'s object/function guard does catch
+  `constructor.prototype` (Object.prototype is an object), which is why only the
+  primitive intrinsics leaked, and the secret-subtree refusal covers a secret's own
+  paths but nothing else. `at()` now requires `Object.hasOwn` at every step, so
+  traversal stays on the parsed JSON's own properties and any such key reads as
+  `unknown key` with exit 1. Every path it walks is a plain JSON leaf, so no
+  legitimate lookup changes behaviour. `tests/checks/wp-config-secrets.sh` pins all
+  three shapes.
 
 ## [1.18.0] - 2026-09-15
 

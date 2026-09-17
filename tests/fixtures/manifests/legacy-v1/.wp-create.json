@@ -1,0 +1,17 @@
+{
+  "project": {
+    "name": "Legacy Site",
+    "slug": "legacy-site",
+    "domain": "legacy.test",
+    "path": "/tmp/legacy-site",
+    "created": "2026-01-04"
+  },
+  "environment": { "type": "native", "engine": "native", "web_server": "nginx", "php_version": "8.2" },
+  "database": { "name": "legacy", "user": "legacy", "password": "root", "host": "localhost" },
+  "wordpress": { "admin_user": "admin", "admin_email": "a@legacy.test", "url": "https://legacy.test" },
+  "languages": { "primary": "en", "additional": ["es"], "default": "en" },
+  "plugins": { "profile": "starter", "installed": ["secure-custom-fields"] },
+  "theme": { "slug": "legacy-site", "initialized": true },
+  "wp_cli": { "wrapper": "wp", "path_flag": "" },
+  "unknown_future_key": "keep-me"
+}

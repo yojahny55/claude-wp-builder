@@ -457,6 +457,12 @@ Minimal boilerplate copied by `/wp-init`. Includes:
 
 Placeholder tokens (`__starter__`, `__STARTER__`, `__STARTER_NAME__`) are replaced with the project name/slug during init.
 
+### Scripts (`bin/`)
+
+- `bin/wp-config.mjs` — validates, migrates and reads `.wp-create.json`; every command
+  that reads the manifest calls `validate` first. Subcommands: `validate`, `migrate`,
+  `render-context`, `get`, `validate-profile`.
+
 ## Conventions
 
 ### Field Naming

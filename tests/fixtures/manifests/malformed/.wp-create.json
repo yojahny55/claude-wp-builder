@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "project": {
+    "name": "Fixture Site",
+    "domain": "fixture.test",
+    "path": "/tmp/fixture-site",
+    "created": "2026-09-16"
+  },
+  "environment": {
+    "type": "native",
+    "engine": "native",
+    "web_server": "nginx",
+    "php_version": "8.3",
+    "container_prefix": "fixture-site"
+  },
+  "database": { "name": "fixture", "user": "fixture", "host": "localhost" },
+  "wordpress": {
+    "admin_user": "fixture-admin",
+    "admin_email": "admin@fixture.test",
+    "url": "https://fixture.test",
+    "permalink_structure": "/%postname%/"
+  },
+  "languages": { "primary": "en", "additional": [], "default": "en" },
+  "plugins": { "profile": "starter", "installed": ["secure-custom-fields"] },
+  "theme": { "slug": "fixture-site", "initialized": true },
+  "wp_cli": { "wrapper": "wp", "path_flag": "" },
+  "demo mode": "plain",
+  "i18n strategy": "suffix"
+}

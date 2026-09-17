@@ -1,0 +1,9 @@
+{
+  "name": "Conflicting",
+  "description": "Lists two plugins that conflict with each other",
+  "plugins": [
+    { "slug": "secure-custom-fields", "required": true },
+    { "slug": "wp-super-cache", "required": false },
+    { "slug": "w3-total-cache", "required": false, "conflicts": ["wp-super-cache"] }
+  ]
+}
