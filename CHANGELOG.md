@@ -239,6 +239,15 @@
   Migration now comments the superseded lines out, preserving their pre-migration values,
   so each decision is asserted in exactly one place.
 
+- **Fix: the `wordpress.admin_password` refusal was asserted against a fixture with no such
+  key.** Absence, not the guard, supplied the exit code and the empty stdout, and the grep
+  was satisfied by the message echoing the operator's own key: pointing
+  `SECRETS.admin_password.manifestPath` at a nonexistent field left the whole suite green
+  while `get wordpress.admin_password` would have printed the password. The fixture now
+  holds the key, and both the exact and the suffixed path are asserted against it.
+  `tests/checks/wp-profiles.sh`'s comment said "exactly one plugin required" where the
+  assertion is "at least one"; the comment now states the rule that is enforced.
+
 ## [1.18.0] - 2026-09-15
 
 ### Added

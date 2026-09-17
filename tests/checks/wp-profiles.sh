@@ -13,9 +13,11 @@ for p in templates/profiles/*.json; do
   $cfg validate-profile "$p" >/dev/null 2>&1 || fail "shipped profile $p does not validate"
 done
 
-# --- Every shipped profile marks exactly one plugin required. ---------------
+# --- Every shipped profile marks at least one plugin required. --------------
 # secure-custom-fields is the field engine every generated theme calls through
 # prefix_get_field(); a build without it produces templates that fatal on first render.
+# "At least one", not "exactly one": a future profile may legitimately require a second
+# plugin, and the assertion below is what the rule actually is.
 # Compared with === true, not truthiness: a string "false" is truthy in JS and would
 # otherwise count as required.
 for p in templates/profiles/*.json; do

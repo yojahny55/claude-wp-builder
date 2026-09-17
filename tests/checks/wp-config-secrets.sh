@@ -91,12 +91,34 @@ set -e
 [ -z "$out" ] || fail "get database.password.length printed to stdout: $out"
 grep -q 'db_password' "$tmp/suffix-err-1" || fail "the suffixed-path refusal does not name the secret alias"
 
+# The fixture must actually HOLD an admin password for this one. Asserted against a
+# manifest with no wordpress.admin_password key, absence -- not the guard -- supplied
+# the exit code and the empty stdout, and `grep admin_password` was satisfied by the
+# message echoing the operator's own key: pointing SECRETS.admin_password.manifestPath
+# at a nonexistent field left all 82 checks green while `get wordpress.admin_password`
+# printed the password. With the key present, the guard is the only thing standing
+# between .length and stdout.
+node -e '
+ const f="'"$tmp"'/p/.wp-create.json", fs=require("fs");
+ const m=JSON.parse(fs.readFileSync(f,"utf8")); m.wordpress.admin_password="admin-in-manifest";
+ fs.writeFileSync(f, JSON.stringify(m,null,2));
+'
 set +e
 out=$($cfg get "$tmp/p" wordpress.admin_password.length 2>"$tmp/suffix-err-2"); code=$?
 set -e
 [ "$code" = "1" ] || fail "get wordpress.admin_password.length exited $code, want 1"
 [ -z "$out" ] || fail "get wordpress.admin_password.length printed to stdout: $out"
-grep -q 'admin_password' "$tmp/suffix-err-2" || fail "the suffixed-path refusal does not name the secret alias"
+grep -q 'read it with get admin_password instead' "$tmp/suffix-err-2" \
+  || fail "the suffixed-path refusal does not name the secret alias"
+
+# And the exact path, not only a suffixed one -- the same fixture now proves it.
+set +e
+out=$($cfg get "$tmp/p" wordpress.admin_password 2>"$tmp/admin-path-err"); code=$?
+set -e
+[ "$code" = "1" ] || fail "get wordpress.admin_password exited $code, want 1"
+[ -z "$out" ] || fail "get wordpress.admin_password printed the admin password to stdout: $out"
+grep -q 'read it with get admin_password instead' "$tmp/admin-path-err" \
+  || fail "the admin_password refusal does not name the secret alias to use instead"
 
 set +e
 out=$($cfg get "$tmp/p" database.password.constructor.name 2>"$tmp/suffix-err-3"); code=$?
