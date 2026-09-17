@@ -2,6 +2,319 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **The starters now meet the rules their themes are held to.** Every PHP file in
+  `starter-theme/` opens with the ABSPATH guard that `agents/wp-template.md` requires of a
+  theme. The cinematic starter gets the two loader fixes the tailwind one already had:
+  the `pre_handle_404` sitemap guard, and the Local JSON export restoring the `ID` key
+  that `acf_prepare_field_group_for_export()` strips. The tailwind `__starter___t()`
+  falls back to the primary language before English. The tailwind starter's
+  `[aria-disabled="true"]` reset rule is now scoped to actual controls (button, input,
+  select, textarea, a, summary, `[role=button|option|tab]`) instead of every element
+  carrying the attribute — `cursor` inherits, so an unscoped rule on a container used
+  only to announce state (a disabled tab panel, a busy section) took the pointer
+  affordance away from still-interactive descendants.
+  The starter's `template-parts/header/navigation.php` asked for a `primary` menu
+  location that `inc/theme-setup.php` never registers (only `primary-<lang>`), so the
+  default nav rendered nothing; it now asks for the current language's location, and the
+  same example in `agents/wp-template.md` is fixed. The starter footer no longer prints a
+  placeholder designer credit linking to `example.com`.
+  `tests/checks/starter-bootstrap-lock-and-sitemap.sh` pins the loader fixes;
+  `tests/checks/tailwind-starter.sh` still pins `cursor: pointer` restored and
+  `input[type="submit"]` covered.
+- **Checks that pinned less than their contract.** `audit-findings-measured.sh` now
+  greps the per-finding evidence sentence rather than the word "evidence", and fails
+  clearly when no audit agent matches. `finalize-brand-surface.sh` pins both halves of
+  the login-branding check, the hook and the seed file. `wp-polylang.sh` no longer
+  depends on array alignment. `tailwind-starter.sh` strips CSS comments non-greedily
+  with perl. `tailwindify-parity.mjs` skips `node_modules`, `vendor`, `dist`, `build`
+  and `.git` when it collects breakpoints, and now `lstat`s instead of `stat`s so a
+  symlinked directory (the demo trees genuinely carry them) is never recursed into,
+  with a realpath dedupe as a second guard against a loop. The walk stops at depth 8
+  and skips stylesheets over 2 MB, and `--list-breakpoints` prints what it collected
+  without a browser, which `tests/checks/tailwindify-parity.sh` now runs on a fixture
+  (both media-query forms, skipped `node_modules`/`dist`, a looping and an outward
+  symlink).
+
+- **Every user-visible literal is a translation key, not only field content.**
+  `agents/wp-template.md` forbade raw `get_field()` and showed `prefix_e()` once, which
+  covered the CONTENT and nothing the template says on its own behalf. A bilingual build
+  therefore shipped with every ACF field translated and its secondary-language directory
+  pages still rendering the filter bar, the composed `alt` text and the empty-state message
+  in the primary language: none of it came from a field, so none of it looked like content.
+  The i18n section now names where those literals hide — controls, placeholders, empty
+  states, button text, `alt`, `aria-label`, `sprintf()` patterns — and Rule 11 states it.
+- **A control the demo drew is not a control the data can answer.** A static demo's filter is
+  coherent by construction: its options and its cards are the same mock values. Transcribed
+  literally onto real posts, that option set becomes a claim about data — a select whose only
+  value matches no record, so choosing it empties the grid. The `/wp-section` transcription
+  overlay now carves controls out of the fidelity mandate (markup and values are copied; an
+  option set is derived from the real terms), and `agents/wp-template.md` Rule 12 requires a
+  control nothing backs to be dropped and NAMED in the summary, rather than shipped dead. The
+  demo's empty-state and "no more results" strings fall under the same carve-out: wording to
+  translate and behaviour to re-derive, not constants to copy.
+- **A finding is the output of a command that ran in this run.** `/wp-audit` §2.5b already
+  said "measure, do not trust" about the environment; the agents' own findings had no such
+  rule, and two shapes reached real reports — a duplicate meta description asserted from
+  reading two code paths on a page that emits one, and "the site has no posts" carried over
+  from a stale input on a site with twenty. New §6.9 requires an evidence line per finding,
+  defines `UNVERIFIED` for what the tier cannot reach, and makes the aggregator drop and
+  report evidence-free findings by agent. All eight `wp-audit-*` agents carry the rule.
+- **Seeding may invent a biography; it may not invent a real person's account.** `/wp-seed`
+  Phase 4.5 covers the fields no demo answers: nothing handle-shaped or externally
+  resolvable is generated (those stay empty and the templates already guard them), generated
+  emails and phones follow one shape site-wide so a wrong one is visible, every invented
+  record carries the seeded marker, and the phase ends with a list of what was invented, by
+  field and count, for the client to replace. Two real defects motivated it: a phone a digit
+  short of every other on the site, and a social URL built from a different person's handle,
+  so a fictional record linked a real stranger.
+- **Tailwind's `max-*` variants are EXCLUSIVE; a plain-CSS demo's `max-width: Npx` is
+  INCLUSIVE.** `max-width: 768px` in a demo matches width 768 itself; Tailwind 4's
+  `max-md:` compiles to `width < 768` and does not — every converted breakpoint was 1px
+  off at exactly the two widths a desktop-first demo declares most, 768 and 1024.
+  `skills/wp-tailwind-system/SKILL.md` and `agents/wp-tailwind.md` now state the N+1
+  rule (`max-width: Npx` → `max-[N+1px]:`, or a `--breakpoint-*` redeclared to `N+1`;
+  `min-width` needs no adjustment) with a worked example at the round numbers that hit
+  this. `bin/tailwindify-parity.mjs` now also reads every `max-width`/`min-width` value
+  out of the ORIGINAL demo's own CSS and samples those exact pixel widths, on top of
+  `--widths` — 1440 and 390 never land on the one width where the off-by-one is visible.
+
+- **A hand-written CSS file imported with no cascade layer beats every Tailwind
+  utility, regardless of specificity or source order — and this shipped in the
+  `__tailwind__` starter itself.** `base/reset.css` duplicated two declarations
+  Preflight already sets (`box-sizing: border-box`, `img { max-width: 100% }`) as
+  plain, unlayered CSS; on a real build the duplicate clamped a button to a fraction of
+  its design size and clipped a slider arrow deliberately overhanging its button. The
+  starter's `main.css` now imports every default file with its matching layer —
+  `layer(base)`, `layer(components)`, `layer(utilities)` — and `base/reset.css` no
+  longer duplicates what Preflight covers. `skills/wp-tailwind-system/SKILL.md`,
+  `agents/wp-tailwind.md` and the five commands that register a new `@import`
+  (`wp-section`, `wp-header`, `wp-footer`, `wp-page`, `wp-cpt`) now require the same
+  `layer()` declaration on every file a later build step adds.
+
+- **Preflight does not set `cursor`, and the starter's own reset never restored it.**
+  Tailwind v4 leaves every button on the UA default (`default`, not `pointer`). The
+  `__tailwind__` starter's `base/reset.css` now restores it, scoped past a literal
+  `<button>` to `summary`, `[role="button"]`, `[role="option"]`, `[role="tab"]` and a
+  form's `input[type="submit"|"button"|"reset"]` — Contact Form 7 and WordPress's own
+  comment form render their submit this way, and `button { cursor: pointer }` alone
+  never reaches it — paired with `:disabled` / `[aria-disabled="true"]` back to
+  `default`.
+- **`agents/wp-acf.md` — the front page's own location rule never matched a hierarchy-rendered
+  front page.** `page_template == front-page.php` only matches when a page's
+  `_wp_page_template` meta is literally set to that filename; a page chosen as the front page
+  through Settings → Reading keeps that meta at `default`, so its field group silently
+  disappeared from the editor while its fields kept rendering on the front end. Switched to
+  `page_type == front_page`, which ACF derives from `is_front_page()` instead. Also: every
+  group now gets a `menu_order` equal to its section's position on the page (groups defaulted
+  to 0 and stacked in load order, not page order) with numbered, single-language titles; and
+  when the demo shows the same content twice at different lengths for different purposes (a
+  card excerpt, a full bio), that is modeled as two fields from the start instead of one field
+  serving both and breaking in both directions.
+- **`agents/wp-template.md` — six contract gaps a real bilingual build's own defect list
+  turned up.** The ABSPATH guard read as a template-parts rule, so full page/single/archive/
+  taxonomy templates and `inc/` includes shipped without it; archive/directory queries
+  ordering by date had no tiebreaker, so records seeded in the same second reordered on every
+  request; a custom nav walker overriding `start_el()` never re-applied
+  `nav_menu_css_class` / `nav_menu_item_id` / `nav_menu_link_attributes`, dropping any class a
+  filter added; a demo control marked `MOCK:` / `data-mock` had no rule requiring it be
+  re-derived from real data or dropped before being wired up; an optional "see more" control
+  rendered for a demo's `#anchor` placeholder instead of only for a real URL; carousel controls
+  stayed visible-but-dead when the real record count could not overflow the strip, and a
+  `Math.ceil()` dot count could exceed the card count; and there was no rule to reuse a
+  sibling template's already-correct accordion/focus-ring pattern instead of re-deriving a new
+  one per section.
+- **`agents/wp-cf7.md` — three form-contract gaps, plus a first grep gate for the utility-class
+  rule the agent already stated.** An `[acceptance]` tag with no `acceptance_as_validation:on`
+  leaves the submit button disabled on an unchecked box with no visible error; CF7's own
+  `wpcf7-form-control-wrap` does not stretch the control inside it, so a control needs its own
+  `width: 100%`; CF7's AJAX spinner ships with an unclipped side margin that caused a phone
+  viewport to gain 20px of horizontal scroll; a loading-state `padding-right` override loses to
+  an `@apply px-*` utility's logical `padding-inline` regardless of specificity, so it has to be
+  written as `padding-inline-end`; and the live form is the `_form` post meta, not the
+  `cf7/*.html` reference file — a change has to be pushed through the seeder, and pushed for
+  every language, to reach the site.
+- **ACF Local JSON bootstrap lock could never be acquired by the second user.**
+  The starter created the lock with `fopen(..., 'c')` under the process's default
+  umask (0644, owned by whoever ran first). When the web server user and the CLI
+  user differ — the common case — the second one can never open it for an
+  exclusive lock, and the bootstrap returns early, silently, on every later
+  request from that user: a field group's JSON drifts behind its PHP with
+  nothing logged anywhere. `__tailwind__` and `__cinematic__` now widen the lock
+  to 0666 right after creating it.
+- **`/wp-sitemap.xml` 404s on a project with no native `post` content.**
+  `WP::handle_404()` only clears the 404 when the current query matched
+  something, and a sitemap route runs no post query of its own — on a site that
+  publishes `post` it survives by accident (the default "latest posts" query
+  behind it isn't empty); on a site modeled entirely as custom post types that
+  query IS empty, so core marks the sitemap request 404 while
+  `WP_Sitemaps::render_sitemaps()` prints a perfectly valid sitemap on
+  `template_redirect` immediately afterward — a correct XML body under a 404
+  status line, which every crawler reads as absent. The `__tailwind__` starter
+  now exempts the sitemap and sitemap-stylesheet routes via `pre_handle_404`.
+- **A starter scaffold part left on disk after its last caller is removed ships
+  unreviewed.** `/wp-header`, `/wp-footer` and `/wp-page search` fully replace
+  `header.php`/`footer.php`/`search.php` with project markup, which removes the
+  `get_template_part()` call to the starter's placeholder part
+  (`header/site-branding.php`, `header/navigation.php`, `footer/site-info.php`,
+  `content-search.php`) — but nothing then deleted the now-unreferenced file, so
+  a starter placeholder (down to a hardcoded credit link to an external domain)
+  shipped on a real build, one accidental `get_template_part()` away from
+  rendering. `agents/wp-template.md` now instructs deleting an orphaned part in
+  the same step its last caller is removed.
+- **`content-page.php` (the generic/legal page template) shipped as unstyled
+  underscores boilerplate** while every other template in a project is
+  pixel-matched to its demo. It now gets its own small baseline: a
+  comfortable-width column and Tailwind Typography's `prose` utility (already
+  loaded by the starter's `main.css`) carrying headings, lists and links through
+  the project's own `@theme` colors.
+- **`/wp-finalize`'s theme-structure check never looked for a favicon or a
+  branded login screen.** A demo can declare `<link rel="icon">` on every page
+  and have the conversion to PHP drop the tag entirely, leaving the live site
+  with no icon at all; `wp-login.php` is the one page that never enqueues the
+  theme's own stylesheet, so it stays WordPress's stock grey screen — the first
+  thing the client sees every day — unless something re-skins it. Both are now
+  checked (favicon/site icon as a blocking item, login branding as a
+  warning-only item, since some projects ship the default by choice).
+
+### Added
+
+- **Performance and accessibility audits now measure instead of guessing.**
+  `agents/wp-audit-performance.md` gains PERF-054/PERF-055: the real LCP element
+  is found per template with a `PerformanceObserver` on
+  `largest-contentful-paint`, not assumed to always be the hero — a directory or
+  archive grid can put its LCP on a first-row card, and a blanket
+  `loading="lazy"` below the fold then defers exactly the element the page is
+  judged on. PERF-055 checks the preloaded font file actually matches the
+  weight the LCP text renders in, instead of preloading "the first N files"
+  found on disk. `agents/wp-audit-a11y.md` gains A11Y-031 (overlays/drawers need
+  a real focus trap, not just initial focus, and must return focus on close),
+  A11Y-032 (`target="_blank"` links need a screen-reader "opens in a new tab"
+  notice), A11Y-033 (a horizontally-scrollable region needs `tabindex="0"` plus
+  an accessible name), and A11Y-034 (a cross-engine `cursor` sweep must not read
+  WebKit's `auto` — its UA default for an undeclared pointer — as "no pointer"
+  when other engines agree it is one). A11Y-004's non-text-contrast check now
+  requires computing a focus ring's contrast against the background it actually
+  sits on, not a single assumed page ground.
+- **`wp-aos-animator` closes two seams found by scrolling a real build past its
+  first entrance.** `aos.css` rewrites `transition-property`/`-duration`/`-delay`
+  on any element that still carries `data-aos`, for as long as the attribute
+  stays — silently breaking a hover-lift card's or a color-fading button's own
+  transition long after the entrance finished. The skill's init module now
+  strips the AOS attributes once an element's entrance transition ends. AOS also
+  measured trigger points at `DOMContentLoaded`, before web fonts and images
+  reflow the layout, so a block that moves afterward could end up permanently
+  below a stale trigger with `once: true`; the module now calls `AOS.refresh()`
+  again on `load`, and reveals anything already on screen at that point instead
+  of waiting for a scroll that may never come. The skill now also says to
+  animate the above-the-fold LCP candidate with a fast plain `fade` rather than
+  skip it outright — a small, deliberate LCP cost instead of a static-looking
+  first screen.
+- **`wp-agentic-surfaces`: a named search indexer could receive the markdown 404 body —
+  cloaking.** The "is this a non-browser agent" UA sniff (`bot|crawl|spider|agent|…`)
+  matches "Googlebot" on `bot` alone, and a real SEO audit found the theme's designed 404
+  replaced by a markdown response for Google's own crawler: a browser and a named
+  indexer got different content on the same URL. Named search indexers (Googlebot,
+  Bingbot, Slurp, Baiduspider, YandexBot, Applebot, …) are now matched and excluded
+  *before* the generic pattern and always get the human HTML; Applebot-Extended (a
+  distinct UA, the AI-training crawler already allowlisted in Step 4) is unaffected.
+  Step 5's verification now fetches the 404 impersonating Googlebot and fails if the
+  response is `text/markdown`.
+- **`wp-agentic-surfaces`: `Content-Signal` was written as a robots.txt directive; the
+  spec defines it as an HTTP response header.** No robots.txt grammar recognises a bare
+  `Content-Signal:` line, so a linter (Lighthouse included) reports the *whole file*
+  invalid over that one line, costing the SEO score of every page and burying any real
+  robots.txt error behind a self-inflicted one. It now ships on the existing
+  `send_headers` action next to the RFC 8288 `Link` header, and is left in robots.txt
+  only as a comment; the physical-robots.txt writer (Step 4) and its verification
+  (Step 5) match.
+- **`wp-audit-rankmath`: theme JSON-LD sharing an `@id` with Rank Math's own graph must
+  be merged through `rank_math/json_ld`, never echoed as a second `<script>`.** Two
+  blocks sharing an `@id` merge into one entity per the JSON-LD spec, but any validator
+  or audit that counts `@type` occurrences reads two `Organization` nodes — which is how
+  a real portal audit reported it. New Step 4.7 merges the theme's real business data
+  (address, contactPoint, sameAs — none of which Rank Math itself collects) into Rank
+  Math's node by matching `@id`, reading `knowledgegraph_type` to resolve the fragment
+  rather than assuming a value. Step 8.5's duplicate-schema check now recommends the
+  merge path instead of blind removal, which would have lost that data rather than
+  de-duplicated it.
+- **`wp-audit-rankmath`: search results had no noindex step.** `/?s=<term>` and its
+  pretty form both answered `200` as `index, follow` with a canonical — two indexable
+  URLs for the same slice of content. New Step 4.6 sets `noindex, follow` on
+  `is_search()` via `rank_math/frontend/robots` and leaves canonical removal to Rank
+  Math's own noindex behaviour rather than forcing one.
+- **`wp-audit-rankmath`: per-page SEO seeding skipped every taxonomy term.** Step 8
+  looped `get_posts()` only, so a site's term archives were left on the global title
+  template with no description at all — worse than a post, which can at least fall back
+  to excerpting `post_content`; a term has none. Step 8 now also seeds
+  `rank_math_title`/`rank_math_description`/`rank_math_focus_keyword` as term meta over
+  every public taxonomy.
+- **`wp-audit-rankmath`: the og:image default could carry a URL with no attachment ID,
+  and `knowledgegraph_type` silently degrades on an out-of-range value.** Rank Math does
+  not print `og:image` unless `open_graph_image_id` is a real attachment; the old
+  fallback to the theme screenshot always left that at `0` (and the screenshot is the
+  editor preview, not a stable share-card URL). Step 6 now requires a real attachment
+  and warns instead of silently producing no tag. `knowledgegraph_type` accepts only the
+  literal `'person'`/`'company'` — a plausible-looking `'organization'` falls back to
+  `'person'` with no warning, describing a company as a human in its own JSON-LD. Step 4
+  now documents the two legal values and verifies the option landed as one of them.
+- **`wp-audit-rankmath`: a theme's own `<meta name="description">` fallback could
+  duplicate Rank Math's tag.** Gating the fallback only on "is an SEO plugin active" is
+  not enough — Rank Math can be active and still emit nothing on a specific route (an
+  unconfigured template, a page type with no post/term to hold meta). Step 8.5 now
+  checks for a hardcoded theme description tag and for more than one rendered on the
+  home page, and recommends gating the theme's tag on the *current object's own*
+  `rank_math_description`/`rank_math_title` being empty, not on plugin presence alone.
+- **`wp-audit-rankmath`: a sideloaded site icon could be silently turned into WebP.** An
+  unrelated image-optimizer plugin that filters `image_editor_output_format` globally
+  runs on every sideload, including a favicon import, and WordPress then points
+  `apple-touch-icon` at a file iOS does not read as a touch icon. Step 6 now imports the
+  site icon (when `site_icon` is empty) with that filter explicitly disabled around the
+  sideload, and verifies the stored file is still a PNG.
+- **`/wp-polylang`'s menu import wrote the per-language override and nothing else.**
+  Polylang's own frontend filter only substitutes a location's value inside the core
+  `nav_menu_locations` theme_mod — it never adds one. A location assigned only through
+  the `polylang` option (what `pll-import.php`'s menu branch did, and what `/wp-seed`'s
+  own Polylang phase still does for the primary language) left that theme_mod empty, so
+  `wp_nav_menu()` fell through to its hard-coded fallback for EVERY language — the
+  fallback can look right by coincidence in the default language, which is what hid it.
+  Both scripts now register the location the normal way before writing the override.
+  Separately, the Polylang i18n variant's string helper asked the registry for a
+  hardcoded `'en'` value; a project whose registered source is a different primary
+  language never matched, so `pll__()` silently no-op'd and a client's edits under
+  Languages > Strings were discarded. It now resolves the source through the project's
+  own `DEFAULT_LANG` constant.
+- **A taxonomy term's own custom fields never reached its translation.** `/wp-polylang`
+  carries a post's fields, content and ACF payload across, but a term's fields are a
+  separate storage surface `pll_save_term_translations()` does nothing for — a repeater
+  or a plain field attached to a term came out blank on the counterpart, with no error.
+  The export and import scripts now walk and write a term's ACF/SCF fields the same way
+  they already did for posts, through the `"<taxonomy>_<term_id>"` context string both
+  plugins accept in place of a post id.
+- **A CPT's or taxonomy's rewrite base, registered once in PHP, was never documented as
+  untranslatable.** Free Polylang prefixes and translates a post's or term's slug but
+  never the static path segment ahead of it — there is no per-language value to
+  translate, since the base is a PHP literal, not stored content. `skills/wp-polylang/SKILL.md`
+  now documents the two-halves pattern (extra rewrite rules per translated base, plus a
+  link filter that swaps it) and the rule that decides which base to print: the language
+  already in the URL, never the current reader — getting that backwards breaks the very
+  links Polylang itself builds for the other language (the hreflang pair, the switcher).
+- **`/wp-seed` had nowhere to send an options-page `page_link` field.** A demo never
+  supplies copy for a legal-links column (privacy policy, terms, FAQ), so those fields
+  shipped empty or pointed at whatever draft page WordPress created on install — a 404
+  with nothing in the UI to say so. A new phase creates a clearly-marked placeholder page
+  per language for each one, safe to re-run without overwriting a client's real page.
+  Templates that print one of these fields now have a documented guard: a `page_link`
+  keeps pointing at its page after that page is unpublished, and printing it regardless
+  serves a broken link silently.
+- **Non-trivial seed scripts had no documented home.** A whole content pass written as
+  throwaway files in a session's scratchpad survives only as long as the session does —
+  the records land in the database and stay; the code that reproduces them does not.
+  `skills/wp-cli-patterns/SKILL.md` now says where that logic belongs (`inc/seed/`, data
+  in `inc/seed/data/`), and defines the marker-meta and stable-key convention a re-run
+  needs to update existing records in place instead of duplicating them, without ever
+  overwriting a client's own edit.
 ### Added
 
 - **`/wp-demo` consults `inspo` for page-level direction, in both modes.** A free

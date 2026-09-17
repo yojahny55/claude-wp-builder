@@ -106,7 +106,18 @@ function pllx_post_payload( $post_id ) {
 	);
 }
 
-/** The translatable payload of a term. */
+/**
+ * The translatable payload of a term.
+ *
+ * 'acf' used to be hardcoded empty: nothing walked a term's own custom fields,
+ * so a repeater or a plain text field attached to a taxonomy term never
+ * reached a translation at all -- a term counterpart came out with a name and
+ * nothing else, no error anywhere to say so. ACF/SCF accept the same
+ * "<taxonomy>_<term_id>" context string in place of a post id everywhere a
+ * post id is otherwise expected (get_field_objects(), get_field(),
+ * update_field()), so pllx_acf_payload() -- written for posts -- works here
+ * unchanged; only the id passed to it differs.
+ */
 function pllx_term_payload( $term_id, $taxonomy ) {
 	$t = get_term( $term_id, $taxonomy );
 	if ( ! $t || is_wp_error( $t ) ) {
@@ -118,7 +129,7 @@ function pllx_term_payload( $term_id, $taxonomy ) {
 			'description' => $t->description,
 			'slug'        => $t->slug,
 		),
-		'acf'    => array(),
+		'acf'    => pllx_acf_payload( $taxonomy . '_' . $term_id ),
 	);
 }
 

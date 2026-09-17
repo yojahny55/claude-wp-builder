@@ -5,6 +5,10 @@
  * @package __starter__
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 // Theme constants
 define( '__STARTER___VERSION', '1.0.0' );
 define( '__STARTER___DIR', get_template_directory() );
@@ -62,7 +66,20 @@ add_action( 'acf/init', function() {
 
     // One writer at a time: two concurrent first loads would both write the same
     // files, and a half-written JSON reads back as a corrupt field group.
-    $lock = fopen( $json_dir . '/.bootstrap.lock', 'c' );
+    //
+    // The lock is opened for writing by whoever bootstraps first — the web server
+    // user on a page load, the CLI user on a wp-cli run. Created with the process's
+    // default umask it comes out 0644, and the OTHER user can then never open it
+    // for writing: fopen() itself still succeeds (reads are allowed), but flock()
+    // for an exclusive lock on a file you cannot write silently fails every later
+    // bootstrap for that user, forever, with nothing logged. Widen it once, right
+    // after creation, so either user can acquire it.
+    $lock_path = $json_dir . '/.bootstrap.lock';
+    $lock_is_new = ! file_exists( $lock_path );
+    $lock = fopen( $lock_path, 'c' );
+    if ( $lock && $lock_is_new ) {
+        @chmod( $lock_path, 0666 );
+    }
     if ( ! $lock || ! flock( $lock, LOCK_EX | LOCK_NB ) ) {
         return; // another request is bootstrapping; it finishes the write.
     }

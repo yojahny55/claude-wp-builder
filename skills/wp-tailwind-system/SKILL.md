@@ -57,6 +57,17 @@ replaced.
 
 Import order in `main.css`: `base` → `components` → `layouts` → `utilities`.
 
+Every `@import` also names its cascade layer, matching the directory: `base/` →
+`layer(base)`, `components/` and `layouts/` → `layer(components)`, `utilities/` →
+`layer(utilities)` — `@import "./utilities/site.css" layer(utilities);`. A file
+imported with no `layer()` sits OUTSIDE every layer, and unlayered CSS beats
+every layer regardless of source order or specificity (see "Unlayered CSS beats
+`@layer utilities`" below): a component class's own `display` has outranked a
+`hidden` utility this way, and a promoted utility group has outranked its own
+`max-md:hidden` modifier for the same reason, in the same file. The starter's
+own default imports already carry this; do the same for every file a later
+step adds.
+
 ## Tokens
 
 Colors and fonts live in the `@theme` block of `main.css`, injected by `/wp-init`:
@@ -123,6 +134,43 @@ An arbitrary variant is acceptable only for a one-off width that is genuinely no
 breakpoint of the design (a single `max-[891px]:` where one field wraps). If it appears
 more than twice, it is a breakpoint: name it.
 
+### `max-width: N` in the demo is INCLUSIVE; `max-*` in Tailwind is EXCLUSIVE
+
+A plain-CSS demo's `@media (max-width: Npx)` matches width N itself. Tailwind 4
+compiles every `max-*` variant — named or arbitrary — as `width < N`, which
+EXCLUDES it. Converting one into the other with the same number is a 1px bug at
+exactly N, and N is very often a real device width (768, 1024): the two most
+common desktop-first stops a demo declares.
+
+**The rule: a demo's `max-width: Npx` becomes `max-[N+1px]:`, or a
+`--breakpoint-*` custom property set to `N+1` if the demo uses that stop by
+name more than twice.** `min-width` needs no adjustment — CSS `min-width: N`
+is already inclusive of N, and Tailwind's `min-*:` variants compile the same
+way, so they map straight across.
+
+```css
+/* demo: @media (max-width: 768px) { … } and @media (max-width: 1024px) { … } */
+@theme {
+  --breakpoint-md: 769px;  /* not 768 — Tailwind's own default is exclusive */
+  --breakpoint-lg: 1025px; /* not 1024, same reason */
+}
+```
+
+```html
+<!-- demo: @media (max-width: 768px) { .nav { display: none } } -->
+<!-- wrong: max-md: with the stock breakpoint-md (768) excludes width 768 -->
+<nav class="max-md:hidden">
+<!-- right: breakpoint-md redeclared to 769 above, OR the arbitrary form -->
+<nav class="max-[769px]:hidden">
+```
+
+Never adopt Tailwind's stock breakpoint scale (`sm: 640`, `md: 768`, `lg: 1024`,
+`xl: 1280`) as-is against a demo that declares those same numbers as
+`max-width` — the two disagree by exactly one pixel at the value that matters.
+Re-measure the layout AT 768 and AT 1024 after converting, not only at 1440
+and 390: those two widths are where the off-by-one hides, and a sweep that
+only samples far from every breakpoint never lands on it.
+
 ## `@apply` idiom
 
 ```css
@@ -155,6 +203,20 @@ three-page demo:
 | `<a>` | `text-decoration: underline` | `none` | logo link lost its underline |
 | page | — | — | total height 1130.21px → 1108.78px |
 
+The table above is every case where Preflight CHANGES the UA default. `cursor`
+is the opposite case, and it is the one that has actually shipped broken:
+Preflight does not touch it at all, so `<button>` stays on the UA default,
+which is `default`, not `pointer`. A demo's own reset commonly restores the
+hand with `button { cursor: pointer }`, and that line is not "covered by
+Preflight" in either direction — dropping it as redundant removes the only
+thing setting it. Carry it, scoped past a literal `<button>` to the other
+controls a demo's clickable surface usually includes: `summary`,
+`[role="button"]`, `[role="option"]`, `[role="tab"]`, and a form's
+`input[type="submit"|"button"|"reset"]` (Contact Form 7 and WordPress's own
+comment form render their submit this way, and `button { cursor: pointer }`
+alone never reaches it). Pair it with `:disabled` / `[aria-disabled="true"] {
+cursor: default }` when the demo's reset does.
+
 Two consequences:
 
 1. Where the demo leaned on a UA default, re-add it explicitly as a utility on
@@ -164,6 +226,11 @@ Two consequences:
 2. Fix the element, not the baseline. A reset of your own in `base` that undoes
    Preflight globally gives the theme two competing resets and moves every
    later section.
+3. A reset rule converts **declaration by declaration**, never as a whole.
+   "Preflight covers it" is a judgement about one property, not about the rule
+   it sits in — a six-declaration `button { … }` reset where Preflight covers
+   five is not "covered", and dropping the whole rule drops the sixth
+   (`cursor`, most often) along with it.
 
 ## Bare element selectors
 
@@ -176,8 +243,18 @@ real declarations and none has a class to convert.
   target: the `<body>` tag's own `class` attribute.
 - Exception: keep it as a rule in `base` when it reaches markup the demo does
   not contain (WordPress-generated output, plugin markup), or when it is a
-  global no per-element utility can carry — `*, *::before, *::after {
-  box-sizing: border-box }`, which Preflight already sets.
+  global declaration no per-element utility can carry.
+- **Not an exception: a bare selector Preflight already covers.** `*, *::before,
+  *::after { box-sizing: border-box }` and `img { max-width: 100%; display:
+  block }` read like the "global, no utility can carry it" case above, but
+  Preflight (imported by `@import "tailwindcss"`) already sets both, inside its
+  own `base` layer. A hand-written second copy has shipped in this exact shape
+  and cost real damage: a button's declared box was read as its OUTER box
+  instead of its content box and rendered at a fraction of its design size, and
+  a slider arrow deliberately overhanging its button got clamped to the
+  button's width. Diff a bare selector against Preflight's own coverage
+  (below) before keeping it — a declaration Preflight already sets is dropped
+  entirely, never duplicated, even inside `base`.
 
 **A bare selector is dead only when every element it matches already carries a
 class that sets the same property — check the elements, not the stylesheet.**
@@ -279,6 +356,31 @@ beats `tracking-*`. Import the theme's own base and component files INTO a
 cascade layer. The same rule explains third-party plugin stylesheets (Contact
 Form 7, Newsletter): they are unlayered, so they beat every theme rule no matter
 how specific — dequeue and reproduce, do not try to out-specify them.
+
+This is not only a "reset" concern — every hand-written CSS file in the theme
+has the same exposure, because a plain `@import "./file.css";` with no
+`layer()` leaves the WHOLE file unlayered, not just the rules that look like a
+reset. It has shipped twice in the same shape: a shared button component's own
+`display: inline-flex` outranked a `hidden` utility placed on the same element
+elsewhere, and — the same file, months later — a promoted "reveal on mobile"
+class outranked its OWN `max-md:hidden` modifier written right there in the
+markup, because the utilities file holding it carried no `layer()` either. Two
+rules follow directly:
+
+1. **Diff a carried-over reset against Preflight, declaration by declaration,
+   before deciding what survives.** What Preflight already sets is dropped
+   entirely — not kept, not duplicated, even inside a layer (see "Bare element
+   selectors" above). What survives goes in `base/reset.css`, imported
+   `layer(base)`.
+2. **Every hand-written `components/`, `layouts/` and `utilities/` file is
+   imported with its matching `layer()`** — see "File layout" → "Never create
+   an empty file". This is true of the file on day one and stays true of every
+   rule added to it later; a file that started layered does not need
+   re-checking each time something is appended to it, but a NEW file's
+   `@import` line does.
+
+A file left deliberately unlayered must say why in a comment beside its
+`@import`, the way the exception below already has to.
 
 The exception is a document-level at-rule such as `@view-transition`, which is
 not a style rule and has no business in the cascade: import it unlayered.

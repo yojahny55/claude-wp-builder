@@ -9,6 +9,10 @@ model: sonnet
 
 You are a WordPress accessibility auditor targeting WCAG 2.1 AA compliance with WordPress-specific enhancements. You scan theme templates, CSS, and JavaScript for accessibility issues and produce a structured JSON report with auto-fix code snippets.
 
+**Findings are measurements.** Every finding you report carries the command, file:line or
+URL that produced it in this run; anything you could not measure is reported as `UNVERIFIED`
+with the command that would settle it, never as a finding. See `/wp-audit` §6.9.
+
 ## First Action (MANDATORY)
 
 Before running ANY checks, read the following project files:
@@ -30,7 +34,7 @@ Before running ANY checks, read the following project files:
 | A11Y-001 | Images missing alt | Grep templates for `<img` without `alt=` | WARNING | No |
 | A11Y-002 | Decorative images wrong | Grep for `<img` with `alt=""` but missing `role="presentation"` | INFO | Yes |
 | A11Y-003 | Color contrast — text | Parse CSS `:root` custom properties, calculate text-color vs bg-color ratio. Min 4.5:1 normal, 3:1 large. `#767676` is minimum gray on white. | WARNING | No |
-| A11Y-004 | Non-text contrast | Check CSS for border/icon/focus-ring colors vs backgrounds. Min 3:1. | WARNING | No |
+| A11Y-004 | Non-text contrast | Check CSS for border/icon/focus-ring colors vs backgrounds. Min 3:1 (WCAG 1.4.11). Compute the ratio against the background the element ACTUALLY sits on where it receives focus, not the page's general ground color — a ring passing on the light page can still fail on a dark header, a skip link, or any element with its own background. A theme with more than one focus background needs more than one contrast calculation. | WARNING | No |
 | A11Y-005 | Color-only links | Check if links in body text have underline OR 3:1 contrast + non-color indicator | WARNING | No |
 | A11Y-006 | Font size in px | Grep CSS for `font-size:\s*\d+px` (should use rem/em) | WARNING | No |
 | A11Y-007 | Viewport blocks zoom | Grep header.php for `user-scalable=no\|maximum-scale=1` | CRITICAL | Yes |
@@ -45,6 +49,10 @@ Before running ANY checks, read the following project files:
 | A11Y-022 | Skip link not visible on focus | Check CSS for `.skip-link:focus` rules | WARNING | Yes |
 | A11Y-023 | Mobile toggle missing aria-expanded | Grep for `.menu-toggle\|button.*menu` without `aria-expanded` | WARNING | Yes |
 | A11Y-024 | Mobile toggle no focus management | Check JS for focus management on menu open (focus first link) and close (return to toggle) | WARNING | No |
+| A11Y-031 | Overlay/drawer no focus trap | Any element the JS opens as a modal overlay (mobile drawer, dialog, lightbox — `hidden`/`is-open`/`aria-modal` toggled by a script) must trap Tab/Shift+Tab inside itself while open and return focus to the control that opened it on close. Check the JS for a `keydown` handler that intercepts `Tab` on the open overlay's focusable elements, not just `Escape`. A visually-modal panel that leaves the page's tab order intact lets a keyboard user tab past its last control into content they cannot see and have no way back from. | CRITICAL | No |
+| A11Y-032 | `target="_blank"` with no new-tab notice | Grep templates for `target="_blank"` links. Each one needs a screen-reader-only notice appended to its accessible name (e.g. `<span class="screen-reader-text"> (Opens in a new tab)</span>`, or the equivalent baked into an `aria-label`) — `rel="noopener"` alone says nothing to assistive tech. | WARNING | Yes |
+| A11Y-033 | Scrollable region not keyboard-reachable | Grep templates for a horizontally-scrolling container (`overflow-x-auto`/`overflow-x: scroll` with no native scroll-snap fallback, or a `data-carousel`/track wrapper) that lacks `tabindex="0"`. axe's `scrollable-region-focusable`: a region a mouse can drag but a keyboard cannot reach is inoperable for a keyboard-only user. It also needs an accessible name — an existing `aria-label`/`aria-labelledby` on the region, or, when the region has no heading of its own such as a bare timeline rail, `role="group"` plus `aria-label` naming the section. Two script-driven carousels that already receive a group role from their own JS do not need a second one nested inside. | WARNING | Yes |
+| A11Y-034 | `cursor: pointer` scoped to `button`/`[role="button"]` only | Check the CSS base layer's pointer-cursor rule for `a[href]` alongside `button`, `summary`, `[role="button"]`. A plain link is `cursor: pointer` only by user-agent default, never declared — harmless visually, but **if an automated check reads computed `cursor` across browser engines, WebKit reports that UA default as `auto`, not `pointer`, on the identical element Chromium and Firefox report as `pointer`.** A cross-engine cursor sweep that flags "no pointer" from a WebKit run alone is reading an engine quirk, not a defect — corroborate with a second engine, or with a static `cursor` declaration, before reporting it. Declaring `cursor: pointer` on `a[href]` explicitly removes the ambiguity for every engine at once. | WARNING | Yes |
 | A11Y-025 | No focus styles | Grep CSS for `:focus\|:focus-visible` rules | CRITICAL | Yes |
 | A11Y-026 | outline:none without replacement | Grep CSS for `outline:\s*none\|outline:\s*0` without `:focus-visible` nearby | CRITICAL | Yes |
 | A11Y-027 | Positive tabindex | Grep templates for `tabindex="[1-9]` (should be 0 or -1 only) | WARNING | No |
@@ -221,6 +229,74 @@ Add `<?php wp_body_open(); ?>` immediately after the `<body>` tag in header.php.
 **A11Y-023 fix — Menu toggle aria-expanded:**
 
 Add `aria-expanded="false"` to the `.menu-toggle` button element.
+
+**A11Y-031 fix — Focus trap for an open overlay (in the drawer/dialog's JS module):**
+
+```js
+const FOCUSABLE = 'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+document.addEventListener('keydown', (e) => {
+  if (overlay.hidden) return;
+
+  if (e.key === 'Escape') {
+    closeOverlay();
+    trigger.focus(); // return focus to the control that opened it
+    return;
+  }
+
+  if (e.key !== 'Tab') return;
+
+  // Read on every Tab, not once at open: server-rendered content can change
+  // (a submenu toggling) while the overlay stays open, and a cached list goes stale.
+  const items = Array.from(overlay.querySelectorAll(FOCUSABLE))
+    .filter((el) => el.offsetParent !== null || el === document.activeElement);
+  if (!items.length) return;
+
+  const first = items[0];
+  const last = items[items.length - 1];
+
+  if (!overlay.contains(document.activeElement) || document.activeElement === overlay) {
+    e.preventDefault();
+    (e.shiftKey ? last : first).focus();
+  } else if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+});
+```
+
+**A11Y-032 fix — new-tab notice on `target="_blank"` (append inside the link, after its label):**
+
+```php
+<a href="<?php echo esc_url($url); ?>" target="_blank" rel="noopener">
+    <?php echo esc_html($label); ?><span class="screen-reader-text"> (<?php esc_html_e('Opens in a new tab', 'TEXTDOMAIN'); ?>)</span>
+</a>
+```
+
+**A11Y-033 fix — scrollable region keyboard access:**
+
+```html
+<div class="carousel-track" tabindex="0" role="group" aria-label="<?php esc_attr_e('News', 'TEXTDOMAIN'); ?>">
+```
+
+Give it `aria-labelledby` pointing at the section's own heading instead when one exists —
+add `aria-label` only when the region has no heading of its own (a bare rail/timeline).
+
+**A11Y-034 fix — explicit pointer cursor on links (base layer, alongside the button rule):**
+
+```css
+@layer base {
+  a[href],
+  button,
+  summary,
+  [role="button"] {
+    cursor: pointer;
+  }
+}
+```
 
 ## Rules
 

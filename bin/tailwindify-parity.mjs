@@ -24,10 +24,14 @@
  * usage:
  *   tailwindify-parity.mjs <converted.html|dir> --against <original.html|dir>
  *                          [--widths 1440x900,390x844] [--json OUT]
+ *                          [--list-breakpoints]
+ *
+ * --list-breakpoints prints the widths read from the original's CSS as JSON and
+ * exits 0 without launching a browser.
  *
  * exit 0 clean · 1 deltas found · 2 no usable browser · 3 the run itself crashed
  */
-import { existsSync, readdirSync, statSync, createReadStream, realpathSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, lstatSync, createReadStream, readFileSync, realpathSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, join, dirname, extname, normalize, sep, basename } from 'node:path';
 import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -37,7 +41,8 @@ const args = process.argv.slice(2);
 if (args.includes('--help') || !args.length) {
   console.log(
     'usage: tailwindify-parity.mjs <converted.html|dir> --against <original.html|dir>\n' +
-    '                              [--widths 1440x900,390x844] [--json OUT]'
+    '                              [--widths 1440x900,390x844] [--json OUT]\n' +
+    '                              [--list-breakpoints]'
   );
   process.exit(0);
 }
@@ -55,10 +60,70 @@ const original = resolve(against);
 for (const p of [converted, original]) {
   if (!existsSync(p)) { console.error('tailwindify-parity: no such path: ' + p); process.exit(3); }
 }
-const widths = opt('--widths', '1440x900,390x844')
+const explicitWidths = opt('--widths', '1440x900,390x844')
   .split(',')
   .map((s) => s.split('x').map(Number))
   .filter((p) => p.length === 2 && p.every(Number.isFinite));
+
+/* An off-by-one at a converted breakpoint (Tailwind's `max-*` is EXCLUSIVE; a
+ * plain-CSS demo's `max-width: Npx` is INCLUSIVE) is invisible everywhere except AT
+ * N itself — 1440 and 390 never land on it. Read every `max-width`/`min-width`
+ * value out of the ORIGINAL's own CSS and sample those exact pixel widths too, on
+ * top of whatever `--widths` asked for. */
+// Build output and third-party trees carry breakpoints the demo never declared.
+const SKIP_DIRS = new Set(['node_modules', 'vendor', 'dist', 'build', '.git']);
+// A demo is a handful of folders and stylesheets. The caps keep a mis-pointed
+// --against (a home directory, a whole site root) from stalling the gate before
+// any page renders.
+const MAX_DEPTH = 8;
+const MAX_CSS_BYTES = 2 * 1024 * 1024;
+
+function collectBreakpoints(root) {
+  const found = new Set();
+  const seenDirs = new Set();
+  const walk = (dir, depth) => {
+    if (depth > MAX_DEPTH) return;
+    let entries;
+    try { entries = readdirSync(dir); } catch { return; }
+    for (const entry of entries) {
+      const p = join(dir, entry);
+      // lstat, not stat: a symlinked directory must never be recursed into.
+      // These demo trees genuinely carry symlinks (.original/'s css/js/assets
+      // links) and following one risks looping back into the same tree, or
+      // scanning an external/large tree, before the parity run even starts.
+      let lst;
+      try { lst = lstatSync(p); } catch { continue; }
+      if (lst.isSymbolicLink()) continue;
+      if (lst.isDirectory()) {
+        if (SKIP_DIRS.has(entry)) continue;
+        // Belt and suspenders: dedupe by realpath too, in case two distinct
+        // (non-symlink) paths resolve to the same directory via a bind mount.
+        let real;
+        try { real = realpathSync(p); } catch { continue; }
+        if (seenDirs.has(real)) continue;
+        seenDirs.add(real);
+        walk(p, depth + 1);
+        continue;
+      }
+      if (!entry.toLowerCase().endsWith('.css') || lst.size > MAX_CSS_BYTES) continue;
+      let css;
+      try { css = readFileSync(p, 'utf8'); } catch { continue; }
+      for (const m of css.matchAll(/m(?:in|ax)-width\s*:\s*(\d+(?:\.\d+)?)px/gi)) {
+        const n = Math.round(parseFloat(m[1]));
+        if (n > 0 && n <= 3000) found.add(n);
+      }
+    }
+  };
+  walk(root, 0);
+  return [...found].sort((a, b) => a - b);
+}
+
+// Needs no browser, so it answers before one is looked for.
+if (args.includes('--list-breakpoints')) {
+  const listRoot = statSync(original).isDirectory() ? original : dirname(original);
+  console.log(JSON.stringify(collectBreakpoints(listRoot)));
+  process.exit(0);
+}
 
 /* Properties chosen because each one is a declaration a conversion can silently
  * drop while the page still looks built. `cursor` is the one that started this. */
@@ -166,6 +231,23 @@ if (isDir(converted) && isDir(original)) {
 }
 const cRoot = isDir(converted) ? converted : dirname(converted);
 const oRoot = isDir(original) ? original : dirname(original);
+
+const autoBreakpoints = collectBreakpoints(oRoot);
+const widths = [...explicitWidths];
+const haveWidth = new Set(widths.map(([w]) => w));
+for (const bw of autoBreakpoints) {
+  if (haveWidth.has(bw)) continue;
+  haveWidth.add(bw);
+  // Viewport height only: a desktop-like 900 from 700px up (past the phone/phablet
+  // range), otherwise the same 844 the default phone width uses.
+  widths.push([bw, bw >= 700 ? 900 : 844]);
+}
+if (autoBreakpoints.length) {
+  console.log(
+    `tailwindify-parity: also sampling ${autoBreakpoints.length} breakpoint width(s) ` +
+    `found in the original CSS: ${autoBreakpoints.join(', ')}`
+  );
+}
 
 /* ONE server, rooted at the common ancestor of the two trees, and pages
  * addressed by their path relative to it.
