@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`/wp-demo-verify` no longer reads full-resolution contact sheets into the
+  orchestrator's context.** `bin/demo-verify.mjs`'s contact sheet was a single
+  full-page PNG of the whole walk's frames, and Step 4 told the model to read it
+  directly — an image Read stays in context and is re-billed on every later call
+  until compaction, and a real verify session read 14.6MB of these in one run.
+  The script now also writes `sheet.jpg` next to each `sheet.png` (same grid,
+  downscaled to 1000px wide, quality 70); `sheet.png` stays at full resolution on
+  disk for a human, but the command now points the critique step at the JPEG.
+  Past ~3 sheets — any directory walk of more than a couple of pages —
+  `/wp-demo-verify` now dispatches the critique to a `sonnet` subagent per page
+  (or batch) instead: the subagent reads the sheets and returns only the
+  pass/fail rows, so the images never enter the orchestrating conversation at
+  all. Same guidance carried into `skills/wp-demo-craft/references/verify.md`,
+  which restates the step.
+
 ## [1.18.0] - 2026-09-15
 
 ### Added
