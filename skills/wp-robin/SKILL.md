@@ -13,7 +13,7 @@ user-invocable: false
 3. **Detects all registered thumbnail sizes** from the theme/plugins and adds them to the optimization list
 4. **Fixes stuck items** — webp queue items frozen in `processing` status
 5. **Registers attachments for optimization** if the queue is empty
-6. **Generates missing .webp files** locally using ImageMagick, cwebp, or PHP GD
+6. **Generates missing .webp files** locally using ImageMagick, cwebp, or PHP GD — including sizes added after the first run (a new `add_image_size()` plus `wp media regenerate`), because each attachment's files are compared against its webp rows
 7. **Syncs the database** — inserts correct `wp_rio_process_queue` records with proper sha256 hashes and file sizes
 8. **Handles hash collisions** from duplicate posts sharing the same file (uses `$url|webp|$post_id` fallback)
 
@@ -116,3 +116,5 @@ So a theme that paints hero and section backgrounds through CSS gets no WebP at 
 | Plugin not recognized after install | wp-cron hasn't run activation hooks | Visit WP admin → Plugins → activate manually |
 | "X attachment(s) skipped — original file missing on disk" but the files are there | A client that escapes the newlines `TO_BASE64()` wraps its output with, so the metadata decodes to garbage | Fixed in the script — the wrap is stripped server-side. On an older copy, check that the step 4 query wraps `TO_BASE64()` in `REPLACE(..., '\n', '')` |
 | `<name>.webp.webp` files appear next to the originals | The media library is already WebP, so there is nothing to convert | Nothing to do — the script only queues the mime types in `allowed_formats`, which does not include `image/webp`. On an older copy the list was hardcoded: delete the duplicates and their `item_type='webp'` rows |
+| Hundreds of "conversion failed" lines while the converter works | The uploads directory is not writable by the user running the script (it belongs to the web server user) | Run the script as the web server user (`sudo -u <web-user> ...`) or give this user write access through the group or an ACL. The script now stops with this cause before converting |
+| "Queue table wp_rio_process_queue does not exist" while the plugin is active | Activating through WP-CLI did not create Robin's table | Deactivate and activate the plugin from wp-admin → Plugins, then run the script again |

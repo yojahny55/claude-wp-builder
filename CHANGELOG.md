@@ -359,6 +359,15 @@
   the helper's own two URLs alone, since rewriting the fallback would hand a browser
   without `image-set()` a WebP in its place. `tests/checks/webp-css-backgrounds.sh` now
   runs the code against a fixture library instead of only grepping for the contract.
+- `wp-robin`: the webp sync step now converts sizes added after the first run. It used to
+  pick only attachments with no webp rows at all, so a size registered later and generated
+  with `wp media regenerate` was never converted. Each attachment's files on disk are now
+  compared against its webp rows, entries the attachment already owns are skipped instead of
+  duplicated under the collision hash, and the final "remaining" count uses the same rule.
+- `wp-robin`: the script checks that uploads is writable before converting and stops with the
+  cause, instead of printing one "conversion failed" line per size when the directory belongs
+  to the web server user. The skill's troubleshooting table gains that row and one for a
+  missing `wp_rio_process_queue` table after a WP-CLI activation.
 
 - **`/wp-demo-verify` no longer reads full-resolution contact sheets into the
   orchestrator's context.** `bin/demo-verify.mjs`'s contact sheet was a single
