@@ -363,25 +363,64 @@ info "  Registered ${REGISTERED} new attachment(s) — queue total: $(db_q "SELE
 echo ""
 info "━━━ Syncing missing webp entries ━━━"
 
+# An attachment needs a sync when it has fewer webp rows than distinct files on disk
+# (the original plus every size in _wp_attachment_metadata). Selecting only
+# attachments with no webp rows at all missed every size added later — a new
+# add_image_size() followed by `wp media regenerate` writes files that were never
+# converted, on attachments that already have rows and were therefore never revisited.
+# Files missing on disk are not counted, or such an attachment would be listed forever.
+GAP_META='$u = getenv("UPLOAD_DIR");
+while (($l = fgets(STDIN)) !== false) {
+	$l = rtrim($l, "\n"); if ($l === "") continue;
+	$p = explode("\t", $l);
+	$encoded = str_replace("\\n", "", $p[1] ?? "");
+	$raw = base64_decode(preg_replace("/[^A-Za-z0-9+\/=]/", "", $encoded));
+	$m = @unserialize($raw, ["allowed_classes" => false]);
+	if (!is_array($m)) { $m = json_decode($raw, true); }
+	if (!is_array($m) || !is_string($m["file"] ?? null) || $m["file"] === "") continue;
+	$dir = dirname($m["file"]);
+	$files = [];
+	if (is_file("$u/{$m["file"]}")) { $files[$m["file"]] = 1; }
+	foreach ((is_array($m["sizes"] ?? null) ? $m["sizes"] : []) as $v) {
+		if (is_array($v) && is_string($v["file"] ?? null) && is_file("$u/$dir/{$v["file"]}")) { $files["$dir/{$v["file"]}"] = 1; }
+	}
+	if (count($files) > (int) ($p[2] ?? 0)) echo $p[0], "\n";
+}'
 
-MISSING=$(db_q "
-	SELECT DISTINCT posts.ID
-	FROM ${POSTS_TABLE} AS posts
-	WHERE posts.post_type = 'attachment'
-	  AND posts.post_status = 'inherit'
-	  AND posts.post_mime_type IN (${ALLOWED_SQL})
-	  AND posts.ID IN (
-	    SELECT object_id FROM ${QUEUE_TABLE} rio
-	    WHERE rio.item_type = 'attachment' AND rio.result_status = 'success'
-	    GROUP BY object_id
-	  )
-	  AND posts.ID NOT IN (
-	    SELECT object_id FROM ${QUEUE_TABLE} rio
-	    WHERE rio.item_type = 'webp' AND rio.object_id IS NOT NULL
-	    GROUP BY object_id
-	  )
-	ORDER BY posts.ID;
-")
+list_webp_gaps() {
+	db_q "
+		SELECT p.ID,
+		       COALESCE(MAX(REPLACE(TO_BASE64(pm.meta_value), CHAR(10), '')), ''),
+		       (SELECT COUNT(*) FROM ${QUEUE_TABLE} w WHERE w.item_type = 'webp' AND w.object_id = p.ID)
+		FROM ${POSTS_TABLE} p
+		LEFT JOIN ${TABLE_PREFIX}postmeta pm
+		       ON pm.post_id = p.ID AND pm.meta_key = '_wp_attachment_metadata'
+		WHERE p.post_type = 'attachment'
+		  AND p.post_status = 'inherit'
+		  AND p.post_mime_type IN (${ALLOWED_SQL})
+		  AND p.ID IN (
+		    SELECT object_id FROM ${QUEUE_TABLE}
+		    WHERE item_type = 'attachment' AND result_status = 'success' AND object_id IS NOT NULL
+		  )
+		GROUP BY p.ID
+		ORDER BY p.ID;
+	" | UPLOAD_DIR="$UPLOAD_DIR" php -r "$GAP_META"
+}
+
+# Same rule as step 4: a failed query must not read as "nothing to sync".
+if ! MISSING=$(list_webp_gaps); then
+	err "Could not read the webp sync list from the database — refusing to report the queue as complete."
+	exit 1
+fi
+
+# Converting writes <file>.webp next to every source. When uploads belongs to the web
+# server user, every conversion fails one by one and the run prints hundreds of
+# "conversion failed" lines that read like a broken converter. Stop once, with the cause.
+if [[ -n "$MISSING" && -n "$WEBP_CONVERTER" && ! -w "$UPLOAD_DIR" ]]; then
+	err "${UPLOAD_DIR} is not writable by $(id -un) — no .webp file can be written."
+	err "Run the script as the web server user (sudo -u <web-user> ...) or grant this user write access (group or ACL)."
+	exit 1
+fi
 
 if [[ -z "$MISSING" ]]; then
 	info "  No attachments missing webp entries"
@@ -425,6 +464,10 @@ else
 
 		INSERTED=0
 		TS=$(date +%s)
+		# Hashes this attachment already owns. An attachment is now revisited when only
+		# some of its sizes are synced, so an existing hash can be its own row rather
+		# than a collision with another post — that entry is done, not a duplicate.
+		POST_HASHES=$(db_q "SELECT item_hash FROM ${QUEUE_TABLE} WHERE item_type='webp' AND object_id=${post_id};" || echo '')
 
 		for entry in "${ENTRIES[@]}"; do
 			IFS='|' read -r s_name s_path s_url s_bytes <<< "$entry"
@@ -432,15 +475,24 @@ else
 
 			# Standard hash: sha256("$url|webp")
 			ITEM_HASH=$(echo -n "${s_url}|webp" | sha256sum | awk '{print $1}')
+			SUFFIX_HASH=$(echo -n "${s_url}|webp|${post_id}" | sha256sum | awk '{print $1}')
+			if [[ -n "$POST_HASHES" ]] && echo "$POST_HASHES" | grep -qxF -e "$ITEM_HASH" -e "$SUFFIX_HASH"; then
+				continue
+			fi
 			if echo "$EXISTING_HASHES" | grep -qF "$ITEM_HASH"; then
 				# Collision → add |$post_id suffix
-				ITEM_HASH=$(echo -n "${s_url}|webp|${post_id}" | sha256sum | awk '{print $1}')
+				ITEM_HASH="$SUFFIX_HASH"
 				echo "$EXISTING_HASHES" | grep -qF "$ITEM_HASH" && continue
 			fi
 
 			WEBP_PATH="${s_path}.webp"
 			# Generate webp if missing
 			if [[ ! -f "$WEBP_PATH" && -n "$WEBP_CONVERTER" ]]; then
+				# One line per attachment, not one "conversion failed" per size.
+				if [[ ! -w "$(dirname "$WEBP_PATH")" ]]; then
+					warn "  #${post_id}: $(dirname "$WEBP_PATH") is not writable by $(id -un), skipping"
+					break
+				fi
 				convert_to_webp "$s_path" "$WEBP_PATH" || { warn "    ${s_name}: conversion failed"; continue; }
 			fi
 			WEBP_SIZE=$(stat -c%s "$WEBP_PATH" 2>/dev/null || echo 0)
@@ -474,13 +526,8 @@ info "━━━ Final Status ━━━"
 WP_SUCCESS=$(db_q "SELECT COUNT(*) FROM ${QUEUE_TABLE} WHERE item_type='webp' AND result_status='success';" || echo 0)
 WP_ERR=$(db_q "SELECT COUNT(*) FROM ${QUEUE_TABLE} WHERE item_type='webp' AND result_status='error';" || echo 0)
 WP_PROC=$(db_q "SELECT COUNT(*) FROM ${QUEUE_TABLE} WHERE item_type='webp' AND result_status='processing';" || echo 0)
-REMAIN=$(db_q "
-	SELECT COUNT(DISTINCT p.ID) FROM ${POSTS_TABLE} p
-	WHERE p.post_type='attachment' AND p.post_status='inherit'
-	  AND p.post_mime_type IN (${ALLOWED_SQL})
-	  AND p.ID IN (SELECT object_id FROM ${QUEUE_TABLE} WHERE item_type='attachment' AND result_status='success' GROUP BY object_id)
-	  AND p.ID NOT IN (SELECT object_id FROM ${QUEUE_TABLE} WHERE item_type='webp' GROUP BY object_id);
-" || echo "?")
+REMAIN=$(list_webp_gaps | grep -c . || true)
+
 
 echo "  webp success:    ${WP_SUCCESS}"
 echo "  webp error:      ${WP_ERR}"
