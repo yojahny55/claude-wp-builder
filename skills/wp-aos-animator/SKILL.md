@@ -58,21 +58,92 @@ If AOS JS is already enqueued but CSS is missing, add just the CSS line right be
 
 ### Phase 4: Initialize (if missing)
 
-In the theme's main JS file, add inside `$(document).ready(...)`:
+`AOS.init()` alone leaves two seams that only show up after the entrance has already run
+once, so a quick visual check of the first load will not catch them. Both were found by
+testing a real build past its first scroll, not by reading the AOS docs:
+
+1. **`aos.css` rewrites `transition-property`, `-duration` and `-delay` on every element that
+   still carries `data-aos`, for as long as the attribute stays on it** — not just while the
+   entrance plays. A card that lifts on hover, or a button that fades its background color,
+   loses that transition (and inherits the entrance's timing instead) for the rest of the
+   page's life, because the attribute is still there long after the entrance finished. Strip
+   `data-aos`/`data-aos-delay`/`data-aos-duration` off each element once its own entrance
+   settles, so `aos.css` stops matching it and the element's own classes govern its
+   transitions again. `once: true` makes this safe — AOS never needs the attribute back.
+2. **Measuring trigger points at `DOMContentLoaded` runs before web fonts and images have
+   settled layout.** A block whose position moves once a font swaps in (or an image finishes
+   loading) keeps AOS's stale, pre-reflow trigger point and can end up permanently below it —
+   invisible, forever, because `once: true` will never re-trigger it once the page has
+   scrolled past where AOS thought it was. Initialize on `DOMContentLoaded` (so the entrance
+   can start as soon as possible) but call `AOS.refresh()` again on `load`.
+
+Add a dedicated module (adjust the export style to the theme's existing JS — vanilla ES
+module shown, wrap in `$(document).ready(...)` instead if the theme is jQuery-based) and call
+it from wherever the theme's other init code runs:
 
 ```js
-AOS.init({
-  once: true,
-});
+export default function aos() {
+  if (!window.AOS) {
+    return;
+  }
+
+  // Strip the attributes once an element's own entrance transition ends, so
+  // aos.css stops rewriting its transition-property/-duration/-delay and the
+  // element's own hover/interaction transitions apply again. `once: true`
+  // means AOS never needs the attribute back.
+  document.addEventListener('transitionend', (event) => {
+    const el = event.target;
+    if (event.propertyName === 'opacity' && el.classList?.contains('aos-animate')) {
+      el.removeAttribute('data-aos');
+      el.removeAttribute('data-aos-delay');
+      el.removeAttribute('data-aos-duration');
+    }
+  });
+
+  window.AOS.init({
+    once: true,
+    disable: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  });
+
+  // Two things need the page's full load, not DOMContentLoaded:
+  const settle = () => {
+    // a) AOS measured trigger points before fonts/images finished reflowing
+    //    the layout — measure again now that they have.
+    window.AOS.refresh();
+    // b) AOS only fires once an element is ~120px inside the viewport, so
+    //    whatever peeks above the bottom edge of the FIRST screen sits empty
+    //    until the visitor scrolls. Reveal anything already on screen at once
+    //    instead of waiting for a scroll that may never come. Above-the-fold
+    //    elements still carry data-aos (for the fade itself) but are never
+    //    skipped outright — see Phase 5's LCP guidance for how to keep this
+    //    from delaying the LCP paint.
+    document.querySelectorAll('[data-aos]:not(.aos-animate)').forEach((el) => {
+      if (el.getBoundingClientRect().top < window.innerHeight) {
+        el.classList.add('aos-animate');
+      }
+    });
+  };
+  if (document.readyState === 'complete') {
+    settle();
+  } else {
+    window.addEventListener('load', settle, { once: true });
+  }
+}
 ```
 
-If there's no `$(document).ready`, wrap it:
-```js
-$(document).ready(function () {
-  AOS.init({
-    once: true,
-  });
-});
+Add the reduced-motion escape hatch to the theme's animation CSS — `AOS.init()`'s own
+`disable` option stops new entrances from triggering, but does not undo the starting
+`opacity: 0` / `transform` that `aos.css` already applied to every `[data-aos]` element
+before that check runs:
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  [data-aos] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
 ```
 
 ### Phase 5: Animate templates
@@ -107,6 +178,24 @@ the page, and a transform does two things that outlive the animation:
   `translate`
 - Skip links (`<a class="skip-link">`)
 - Screen reader text
+
+**The above-the-fold LCP candidate (hero `<h1>`, hero image, page-title `<h1>` on an
+archive/404/search) is not one more element to skip — animate it, with a fast plain `fade`
+instead of the slower `fade-up-slow`/`fade-up` used elsewhere:**
+
+```php
+<h1 data-aos="fade" data-aos-duration="400" class="...">…</h1>
+```
+
+Skipping it outright reads worse than a small, deliberate cost: with `once: true` and the
+Phase 4 module's on-load reveal, an above-the-fold element enters as soon as the page loads
+rather than waiting for a scroll that may never come, so the page's first screen looks
+animated instead of static against every section below it. `fade` (opacity only, no
+translate) with a short duration keeps that cost small and avoids `fade-up`'s lingering
+`transform` — see "Never animate an element that also needs a stacking order or a slide"
+above. This is a measured trade-off, not a rule to apply blindly: if a project's own LCP
+budget cannot absorb it, skip the single LCP element and animate everything else around it
+normally.
 
 **Animate these elements (when they lack data-aos):**
 - `<h1>`, `<h2>`, `<h3>` — use `data-aos="fade-up-slow" data-aos-duration="1000"`

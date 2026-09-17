@@ -9,6 +9,10 @@ model: haiku
 
 You install and configure Rank Math SEO, seed SEO data for all pages, generate llms.txt and robots.txt, and add breadcrumbs to the theme. Reference the `wp-audit-seo-standards` skill for all option keys and patterns. All WordPress interaction via WP-CLI.
 
+**Findings are measurements.** Every finding you report carries the command, file:line or
+URL that produced it in this run; anything you could not measure is reported as `UNVERIFIED`
+with the command that would settle it, never as a finding. See `/wp-audit` §6.9.
+
 ## First Action (MANDATORY)
 
 Before running ANY configuration commands, read the following project files:
@@ -140,8 +144,11 @@ $WP eval "
 // Separator
 \$opts['title_separator']        = '-';
 
-// Schema type (adjust based on industry from CLAUDE.md)
-\$opts['knowledgegraph_type']    = 'company';  // or 'company' for Organization
+// Schema type (adjust based on industry from CLAUDE.md). Rank Math accepts ONLY the
+// literal strings 'person' or 'company' here — anything else (including a plausible
+// value like 'organization') is not validated and falls back to 'person' in silence,
+// which describes a company as a human being in its own JSON-LD. Set the real one:
+\$opts['knowledgegraph_type']    = 'company';  // 'person' for an individual/personal site
 \$opts['knowledgegraph_logo']    = '';  // Will be set if site logo exists
 
 // Site name — one brand, written from one source. website_name feeds the schema
@@ -167,7 +174,14 @@ echo 'Title templates and schema configured.';
 "
 ```
 
-**Note:** Adjust `knowledgegraph_type` to `'person'` for personal blogs, or set the appropriate LocalBusiness subtype based on the industry.
+**Note:** Adjust `knowledgegraph_type` to `'person'` for personal blogs, or set the appropriate LocalBusiness subtype based on the industry. Verify the value landed as one of the two Rank Math accepts — anything else silently degrades to `'person'` with no warning anywhere:
+
+```bash
+$WP eval "
+\$type = get_option('rank-math-options-titles', [])['knowledgegraph_type'] ?? '';
+echo in_array(\$type, ['person', 'company'], true) ? \"knowledgegraph_type OK ({\$type})\" : \"FAIL: knowledgegraph_type is '{\$type}', not 'person' or 'company' — Rank Math will silently treat it as 'person'\";
+"
+```
 
 ## Step 4.5: Category noindex (MUST set BOTH options)
 
@@ -193,6 +207,91 @@ foreach (\$thin_categories as \$slug) {
 update_option('rank-math-options-titles', \$opts);
 echo 'Category noindex configured (custom_robots gate enabled).';
 "
+```
+
+## Step 4.6: Search results out of the index
+
+WordPress's own search-results template answers `200` at both `/?s=<term>` and its pretty
+form (`/search/<term>/`), and by default Rank Math serves both `index, follow` with a
+canonical pointing at the pretty URL — two indexable URLs for the same slice of content,
+neither of them worth a ranking. `search_title` (Step 4) only changes the `<title>`; it
+does not change `robots`. Add the noindex from the theme, in every language the site runs:
+
+```php
+// inc/seo.php (or wherever the theme's Rank Math integration lives)
+add_filter( 'rank_math/frontend/robots', function ( $robots ) {
+    if ( is_search() ) {
+        $robots['index']  = 'noindex';
+        $robots['follow'] = 'follow';
+    }
+    return $robots;
+} );
+```
+
+Rank Math removes the canonical tag from any page it renders `noindex` on its own — that is
+its documented behaviour, and this filter must not also force a canonical here, or it puts
+one back on a page that just asked not to be indexed. Verify with a raw fetch, not the
+admin preview:
+
+```bash
+$WP eval "
+\$res = wp_remote_get( home_url( '/?s=test' ) );
+\$body = wp_remote_retrieve_body( \$res );
+echo strpos( \$body, 'noindex' ) !== false ? 'search noindex OK' : 'FAIL: search results page is index, follow';
+echo strpos( \$body, 'rel=\"canonical\"' ) !== false ? ' — FAIL: canonical present on a noindex page' : ' — no canonical OK';
+"
+```
+
+## Step 4.7: Merge theme JSON-LD into Rank Math's graph — never a second `<script>`
+
+Skip this step entirely if the theme emits no JSON-LD of its own (check `wp-agentic-surfaces`'s
+`<prefix>_seo_plugin_owns_schema()` guard — when Rank Math is active that agent's identity
+graph stays silent and defers Organization/LocalBusiness `address`, `contactPoint`, `geo`
+and `sameAs` to this step). A real audit found this: the theme printed its own
+`<script type="application/ld+json">` for those fields, sharing `@id` with Rank Math's own
+Organization node. Two blocks with the same `@id` DO merge into one entity per the JSON-LD
+spec, but any validator or audit that counts `@type` occurrences — including a portal audit
+— reads two `Organization` nodes. The fix is not to print a second `<script>`; it is to
+extend Rank Math's own graph through its `rank_math/json_ld` filter, which runs after Rank
+Math has built its node, so the same `@id` can be found and merged instead of duplicated:
+
+```php
+// inc/seo.php
+add_filter( 'rank_math/json_ld', function ( $data ) {
+    $id = <prefix>_organization_id(); // see below — must read knowledgegraph_type, never assume it
+    $extra = array_filter( array(
+        'address'      => <prefix>_postal_address(),   // build from the site's real ACF/options fields
+        'contactPoint' => <prefix>_contact_point(),
+        'sameAs'       => <prefix>_sameas_urls(),
+    ) );
+    if ( ! $extra ) {
+        return $data;
+    }
+    foreach ( $data as $key => $entity ) {
+        if ( is_array( $entity ) && isset( $entity['@id'] ) && $entity['@id'] === $id ) {
+            // Rank Math's own values win on every key it already fills; this only adds
+            // what it leaves out.
+            $data[ $key ] = array_merge( $extra, $entity );
+            return $data;
+        }
+    }
+    return $data; // no matching node yet (e.g. Rank Math not configured this deep) — do not invent one
+}, 20 );
+
+/**
+ * Rank Math's Organization/LocalBusiness `@id` fragment follows its own
+ * "Person or Company" setting: `#person` for a person, `#organization` for a
+ * company. Read the setting rather than assuming a value — a config value
+ * that is neither 'person' nor 'company' (Step 4's validation check) falls
+ * back to 'person' inside Rank Math, and assuming '#organization' here would
+ * then point this filter at a node Rank Math never created, silently
+ * dropping every property back into a floating, unmerged duplicate.
+ */
+function <prefix>_organization_id() {
+    $base  = home_url( '/' );
+    $type  = get_option( 'rank-math-options-titles', array() )['knowledgegraph_type'] ?? '';
+    return trailingslashit( $base ) . ( 'person' === $type ? '#person' : '#organization' );
+}
 ```
 
 ## Step 5: Configure Sitemap
@@ -305,32 +404,103 @@ echo \"Sitemap validation complete.\n\";
 "
 ```
 
-## Step 6: Configure OG / Social Defaults
+## Step 6: Configure OG / Social Defaults and the site icon
 
-Set a default Open Graph image from the site logo or theme screenshot:
+`open_graph_image` alone does not make Rank Math print the tag: it also reads
+`open_graph_image_id`, and without a real attachment ID behind it the tag is silently
+skipped. `get_theme_mod('custom_logo')` returns nothing until a logo is actually set,
+so a fallback to `$theme->get_screenshot()` looks safe but hands Rank Math a URL with
+`open_graph_image_id` at `0` — no tag prints, and every share of the site renders as a
+bare grey box. The screenshot is also the wrong image on its own terms: it is the editor
+preview, not a share card, and its filename is not a stable URL once the theme updates.
+
+Do not fall back to the theme screenshot. If no logo attachment exists yet, import a real
+1200×630 share card (or generate one from the site's brand colours — see
+`wp-demo-craft` for the asset) so `open_graph_image_id` is always a real attachment:
 
 ```bash
 $WP eval "
 \$opts = (array) get_option('rank-math-options-titles', []);
 
-// Try site logo first, fall back to theme screenshot
 \$logo_id = get_theme_mod('custom_logo');
 if (\$logo_id) {
-    \$logo_url = wp_get_attachment_url(\$logo_id);
+    \$opts['open_graph_image']    = wp_get_attachment_url(\$logo_id);
+    \$opts['open_graph_image_id'] = \$logo_id;
 } else {
-    \$theme = wp_get_theme();
-    \$logo_url = \$theme->get_screenshot();
-}
-
-if (\$logo_url) {
-    \$opts['open_graph_image']    = \$logo_url;
-    \$opts['open_graph_image_id'] = \$logo_id ?: 0;
+    echo 'WARN: no custom_logo attachment — import a real 1200x630 share card before this tag will print, not the theme screenshot.' . PHP_EOL;
 }
 
 \$opts['twitter_card_type'] = 'summary_large_image';
 
 update_option('rank-math-options-titles', \$opts);
-echo 'OG/Social defaults configured. Default image: ' . (\$logo_url ?: 'none');
+echo 'OG/Social defaults configured. open_graph_image_id: ' . (\$opts['open_graph_image_id'] ?? 'NONE — tag will not print');
+"
+```
+
+The knowledge-graph logo is a **different** field (`knowledgegraph_logo` /
+`knowledgegraph_logo_id`) and a different image: Google reads it as the organisation's
+logo, not as a share card, so a 1200×630 image with a tagline across it is the wrong
+asset here. Use the site icon instead — square, on a plain background:
+
+```bash
+$WP eval "
+\$icon_id = (int) get_option('site_icon');
+if (\$icon_id && get_post(\$icon_id)) {
+    \$opts = (array) get_option('rank-math-options-titles', []);
+    \$opts['knowledgegraph_logo']    = wp_get_attachment_url(\$icon_id);
+    \$opts['knowledgegraph_logo_id'] = \$icon_id;
+    update_option('rank-math-options-titles', \$opts);
+    echo 'knowledgegraph_logo set from site_icon #' . \$icon_id;
+} else {
+    echo 'WARN: site_icon is not set — Appearance > Customize > Site Identity, or import one below.';
+}
+"
+```
+
+If `site_icon` is empty, import the theme's square mark and force the output format:
+an image-optimizer plugin that filters `image_editor_output_format` globally (Robin,
+ShortPixel, and others that add WebP support the same way) will silently turn the
+sideloaded favicon into a `.webp`, and WordPress will then point `apple-touch-icon` at a
+format iOS does not read as a touch icon. A favicon is the one image on a site where the
+format is not a performance decision — pin it before the optimizer's filter runs:
+
+```bash
+$WP eval "
+require_once ABSPATH . 'wp-admin/includes/file.php';
+require_once ABSPATH . 'wp-admin/includes/media.php';
+require_once ABSPATH . 'wp-admin/includes/image.php';
+
+\$source = get_template_directory() . '/assets/images/favicon-512.png'; // the theme's square mark, 512x512
+if (!is_readable(\$source)) {
+    WP_CLI::error(\"No square mark found at \$source — export one before this step.\");
+}
+
+// Force PNG regardless of any optimizer's global filter, which runs on this same hook.
+add_filter('image_editor_output_format', '__return_empty_array', 999);
+
+\$tmp = wp_tempnam('favicon-512.png');
+copy(\$source, \$tmp); // a copy: media_handle_sideload MOVES the file it is given
+\$icon_id = media_handle_sideload(array('name' => 'favicon-512.png', 'tmp_name' => \$tmp), 0, 'Site icon');
+
+remove_filter('image_editor_output_format', '__return_empty_array', 999);
+
+if (is_wp_error(\$icon_id)) {
+    @unlink(\$tmp);
+    WP_CLI::error('Could not import the site icon: ' . \$icon_id->get_error_message());
+}
+update_option('site_icon', (int) \$icon_id);
+echo 'site_icon: #' . \$icon_id;
+"
+```
+
+Verify the imported file actually stayed a PNG — the filter guard is the fix, this is
+the proof:
+
+```bash
+$WP eval "
+\$icon_id = (int) get_option('site_icon');
+\$file = get_attached_file(\$icon_id);
+echo \$file && 'png' === strtolower(pathinfo(\$file, PATHINFO_EXTENSION)) ? 'site icon is PNG OK' : 'FAIL: site icon is not a PNG — ' . \$file;
 "
 ```
 
@@ -355,9 +525,24 @@ echo 'IndexNow enabled. API key: ' . \$opts['bing_api_key'];
 "
 ```
 
-## Step 8: Seed Per-Page SEO Meta
+## Step 8: Seed Per-Page SEO Meta — and per-term meta
 
 Loop through all published pages and posts. For each, set `rank_math_title`, `rank_math_description`, `rank_math_focus_keyword`, `rank_math_robots`, and OG title/description. Use the bulk seeding pattern from the `wp-audit-seo-standards` skill:
+
+**This is a floor, not the finished title.** A `rank_math_title` written as the bare
+template string below renders *identically* to leaving the field empty — Rank Math
+falls back to the same `pt_page_title`/`pt_post_title` template from Step 4 either way —
+so it buys no real title and no real keyword. Worse, it PERMANENTLY blocks a later,
+better pass: any future seed script (including a re-run of this one) checks
+`empty($existing_title)` before writing, and a template-only string is not empty. A real
+build hit this at 48 records: a first pass wrote the literal template, and the pass that
+tried to give services proper keyword-led titles could not touch any of them until the
+placeholder values were found and cleared. Replace the two `update_post_meta` calls below
+with real per-record titles and descriptions (built from the record's own fields — a
+service's own summary, a person's own teaser, a branch's own province and hours) before
+delivery; do not ship the literal template as if it were content. The same applies to
+`rank_math_focus_keyword`: a keyword equal to the post's own title, lowercased, cannot
+rank for anything a person would type.
 
 ```bash
 $WP eval "
@@ -409,6 +594,40 @@ echo \"Seeded SEO meta for \$count posts/pages.\";
 "
 ```
 
+**Posts and pages are not the whole site.** Any custom taxonomy the theme registers
+(and the free-edition-visible built-ins) has term archives that rank on their own, and
+Rank Math reads a term's `rank_math_title`/`rank_math_description` from **term meta**,
+not post meta — a loop that only walks `get_posts()` leaves every one of those archives
+on the global `tax_*_title` template from Step 4, with no description at all, which is
+worse for a taxonomy archive than for a post because there is no `post_content` for
+Rank Math to fall back and excerpt from. Seed terms with the matching term-meta calls:
+
+```bash
+$WP eval "
+\$taxonomies = get_object_taxonomies(get_post_types(['public' => true]), 'names');
+\$taxonomies = array_diff(\$taxonomies, ['post_tag', 'post_format']); // adjust per the project's CLAUDE.md
+\$count = 0;
+foreach (\$taxonomies as \$taxonomy) {
+    foreach (get_terms(['taxonomy' => \$taxonomy, 'hide_empty' => false]) as \$term) {
+        if (empty(get_term_meta(\$term->term_id, 'rank_math_title', true))) {
+            update_term_meta(\$term->term_id, 'rank_math_title', '%term% %sep% %sitename%'); // floor only — see the note above
+        }
+        if (empty(get_term_meta(\$term->term_id, 'rank_math_description', true))) {
+            \$desc = trim(preg_replace('/\s+/', ' ', wp_strip_all_tags(\$term->description)));
+            if (mb_strlen(\$desc) > 10) {
+                update_term_meta(\$term->term_id, 'rank_math_description', mb_substr(\$desc, 0, 155));
+            }
+        }
+        if (empty(get_term_meta(\$term->term_id, 'rank_math_focus_keyword', true))) {
+            update_term_meta(\$term->term_id, 'rank_math_focus_keyword', str_replace('-', ' ', strtolower(\$term->slug)));
+        }
+        \$count++;
+    }
+}
+echo \"Seeded SEO meta for \$count terms.\";
+"
+```
+
 ## Step 8.5: Schema validation and conflict detection
 
 After seeding meta, check for schema issues:
@@ -427,8 +646,35 @@ foreach (\$it as \$f) {
 }
 if (\$theme_jsonld > 0) {
     echo \"WARN: Theme outputs JSON-LD AND Rank Math is active = duplicate schema\n\";
-    echo \"  FIX: Remove theme JSON-LD, let Rank Math be the single source\n\";
+    echo \"  FIX: if it shares an @id with Rank Math's own node (Organization/LocalBusiness), merge it\n\";
+    echo \"       through the rank_math/json_ld filter (Step 4.7) instead of removing it outright —\n\";
+    echo \"       Rank Math does not collect address/contactPoint/geo/sameAs itself, so deleting the\n\";
+    echo \"       theme's block loses that data rather than de-duplicating it. Only a genuinely\n\";
+    echo \"       independent node (a different @type, its own @id) should just be removed.\n\";
 }
+
+// Check 1b: Theme's own <meta name=\"description\"> duplicates Rank Math's
+\$meta_desc_theme = [];
+\$it2 = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(get_template_directory()));
+foreach (\$it2 as \$f) {
+    if (\$f->getExtension() !== 'php') continue;
+    if (preg_match('/<meta\s+name=([\"\x27])description\1/i', file_get_contents(\$f->getPathname()))) {
+        \$meta_desc_theme[] = \$f->getFilename();
+    }
+}
+if (\$meta_desc_theme) {
+    echo \"WARN: theme prints its own <meta name=description> in: \" . implode(', ', \$meta_desc_theme) . \"\n\";
+    echo \"  FIX: do not gate this only on 'is an SEO plugin active' — Rank Math can be active and still\n\";
+    echo \"       emit no description on a specific page (an unconfigured template, a route with no\n\";
+    echo \"       post/term to hold meta). Gate the theme's own tag on the CURRENT object already having\n\";
+    echo \"       a non-empty rank_math_description/rank_math_title (get_post_meta / get_term_meta), and\n\";
+    echo \"       only print the fallback when that is empty — otherwise two description tags render on\n\";
+    echo \"       the same page once Rank Math starts covering more routes.\n\";
+}
+\$dup = wp_remote_get(home_url('/'));
+\$dup_body = wp_remote_retrieve_body(\$dup);
+\$dup_count = preg_match_all('/<meta\s+name=[\"\x27]description[\"\x27]/i', \$dup_body);
+echo \$dup_count > 1 ? \"FAIL: home page renders \$dup_count <meta name=description> tags\n\" : \"home page has \$dup_count description tag OK\n\";
 
 // Check 2: Validate required schema fields
 \$posts = get_posts(['post_type' => ['post','page'], 'posts_per_page' => -1, 'post_status' => 'publish']);

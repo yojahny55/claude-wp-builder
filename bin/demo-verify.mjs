@@ -235,6 +235,17 @@ if (PROBE) {
 // it is the first width where `xl:` applies, which is its own thing worth seeing.
 const RESPONSIVE_WIDTHS = [375, 576, 768, 1024, 1152, 1280, 1440];
 
+// sheet.png is a full-resolution grid of the walk's PNG frames -- exactly the file
+// a human wants and exactly the file that makes a bad orchestrator prompt: it is
+// meant to be Read into the model's context (Step 4's "read the sheets"), and an
+// image Read stays in context, re-billed on every later call until compaction. A
+// real verify session read 14.6MB of these across a single directory walk, several
+// sheets over 1MB each. sheet.jpg is the same grid, downscaled and re-encoded, and
+// is what the command now points the model at; sheet.png stays on disk at full size
+// for a human who opens it directly, which costs nothing extra to keep.
+const SHEET_JPEG_WIDTH = 1000;
+const SHEET_JPEG_QUALITY = 70;
+
 /** One full-page screenshot per legacy viewport, filenames responsive-<width>.png,
  *  restoring the convention /wp-tailwind-migrate's visual-golden workflow depends on. */
 async function captureResponsiveShots(browser, url, outDir) {
@@ -818,6 +829,17 @@ try {
     await sheet.goto(pathToFileURL(join(dir, 'sheet.html')).href, { waitUntil: 'load' });
     await sheet.waitForTimeout(400);
     await sheet.screenshot({ path: join(dir, 'sheet.png'), fullPage: true });
+    // The read copy: same grid, narrower viewport, re-encoded as JPEG. Resizing the
+    // already-loaded page reflows the CSS grid in place, so this is one extra
+    // screenshot, not a second render pass or a new dependency.
+    await sheet.setViewportSize({ width: SHEET_JPEG_WIDTH, height: 800 });
+    await sheet.waitForTimeout(150);
+    await sheet.screenshot({
+      path: join(dir, 'sheet.jpg'),
+      fullPage: true,
+      type: 'jpeg',
+      quality: SHEET_JPEG_QUALITY,
+    });
     await sheet.close();
     await context.close();
   }

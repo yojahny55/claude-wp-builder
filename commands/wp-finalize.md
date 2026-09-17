@@ -9,6 +9,23 @@ Run a comprehensive validation checklist on the theme before delivery. This comm
 
 ## Step 1: Read Project Context
 
+**First: validate the project configuration.**
+
+`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report".
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+```
+
+| Exit | Meaning | Do |
+|---|---|---|
+| `0` | valid | continue |
+| `1` | invalid, or the generated context block disagrees with the manifest | stop and report the message verbatim |
+| `2` | an older manifest can migrate | run `wp-config.mjs migrate '${PROJECT_PATH}'`, then continue |
+| `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
+
+On exit 2, run the migration before continuing.
+
 Read `.claude/CLAUDE.md` to extract:
 - **Function prefix** (e.g., `kairo_`)
 - **Theme slug**
@@ -112,8 +129,26 @@ Verify required WordPress theme files and configurations:
 5. **register_nav_menus** is called in `inc/theme-setup.php` — with per-language
    locations (`primary_<lang>`, `footer_<lang>`) under `suffix`, and with one
    bare location per name (`primary`, `footer`) under `polylang`
+6. **Brand surface — favicon / site icon.** Either a Site Icon is set
+   (`$WP option get site_icon` is non-zero) or the theme itself emits a fallback:
+   grep `functions.php`/`inc/theme-setup.php` for a `wp_head` callback that prints
+   `rel="icon"`, guarded by `has_site_icon()` so it yields once the client sets one
+   in Ajustes → General. A demo that ships its own `<link rel="icon">` on every
+   page (check `demo/` or `demo-*/`) and a theme with neither is the specific
+   thing this catches — a Tailwind/markup conversion can drop a `<link>` tag the
+   HTML→PHP pass never re-emits, and the client is left with no icon at all
+   (`/favicon.ico` then 302s instead of serving anything).
+7. **Brand surface — login screen.** `wp-login.php` is the one page of the site
+   that does not enqueue the theme's own stylesheet, so it stays WordPress's
+   default grey screen with the wordpress.org logo unless something re-skins it —
+   and it is the first screen the client sees every time they sign in. Check for
+   a login-branding seed or plugin config: `inc/seed/*login*.php`, or
+   `login_enqueue_scripts` / `login_headerurl` / `login_headertext` filters in
+   `functions.php`/`inc/`. Absence is a finding, not a blocker — flag it as
+   WARNING rather than FAIL, since some projects genuinely ship with the
+   WordPress default by choice.
 
-**PASS** if all present. **FAIL** listing missing items.
+**PASS** if all present. **FAIL** listing missing items (item 7 reports WARNING, not FAIL, when absent).
 
 ---
 

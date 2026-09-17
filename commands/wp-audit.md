@@ -25,6 +25,23 @@ If `--all` or no category flags are present: enable all 6 categories (security, 
 
 ## Step 2: Read Project Context
 
+**First: validate the project configuration.**
+
+`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report".
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+```
+
+| Exit | Meaning | Do |
+|---|---|---|
+| `0` | valid | continue |
+| `1` | invalid, or the generated context block disagrees with the manifest | stop and report the message verbatim |
+| `2` | an older manifest can migrate | run `wp-config.mjs migrate '${PROJECT_PATH}'`, then continue |
+| `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
+
+On exit 2, run the migration before continuing.
+
 Read `.claude/CLAUDE.md` to extract:
 - **Function prefix** (e.g., `kairo_`)
 - **Theme slug**
@@ -53,13 +70,13 @@ back on.
 
 ### 2.5a — Schema version
 
-Read `manifest_version`. The current version is `2`.
+Read `manifest_version`. The current version is `3`.
 
 | Found | Meaning | Action |
 |---|---|---|
-| `2` | current | reconcile as below |
-| absent | the project predates manifest versioning | reconcile, then write `"manifest_version": 2` |
-| `> 2` | written by a newer plugin | **stop** — report the version and do not rewrite keys this version does not understand |
+| `3` | current | reconcile as below |
+| absent or `< 3` | the project predates the current manifest version (versioning started at `2`; `/wp-create` writes `3` as of the credential-contract change) | reconcile, then write `"manifest_version": 3` |
+| `> 3` | written by a newer plugin | **stop** — report the version and do not rewrite keys this version does not understand |
 
 A missing version is not an error; it is the signal that every check below has never run
 on this project.
@@ -324,6 +341,34 @@ Use these `subagent_type` values:
 3. Mark the failed category in the report
 4. Skip the failed category in the fix phase
 
+## Step 6.9: Every finding is a measurement
+
+A finding is the output of a command that ran in THIS run, and it carries what produced it:
+the `$WP` call, the file:line, the URL fetched. Nothing else is a finding.
+
+Two shapes have shipped in real reports, and both read exactly like a real defect:
+
+- **Asserted from reading, not from counting.** An agent that sees two code paths capable of
+  printing a meta description reports a duplicate description — on a page that emits one. The
+  fix is to count the rendered output, not the code paths: `curl -s <url> | grep -c '<meta
+  name="description"'`.
+- **Carried over from a stale input.** An agent that reads a manifest, an earlier report or a
+  cached snapshot and reports what it said — "the site has no posts" against a site with
+  twenty — is quoting history, not measuring the site. §2.5b already says this about the
+  environment; it holds for every finding.
+
+So:
+
+1. Each finding line carries its evidence — the command, the path, or the URL. A finding with
+   no evidence line does not reach the report.
+2. What the tier cannot reach is reported as `UNVERIFIED`, with the command the user can run,
+   and is never counted in the totals or offered as a fix in Step 9.
+3. When a check needs a number, take the number. Counting is one command; guessing costs the
+   client a change that fixes nothing.
+
+The aggregator enforces this: a finding arriving with no evidence is dropped and reported as
+dropped, naming the agent — an agent that guesses should be visible, not silently trusted.
+
 ## Step 7: Aggregate Reports
 
 Collect reports from all agents. For each agent's output, parse the findings into a unified list.
@@ -508,7 +553,7 @@ Add or update the `audit` key in the JSON:
     "carried_over": K,
     "web_quality_skills_available": true
   },
-  "manifest_version": 2
+  "manifest_version": 3
 }
 ```
 

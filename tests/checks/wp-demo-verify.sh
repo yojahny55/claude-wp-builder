@@ -43,6 +43,27 @@ grep -Fq 'sheet.png' "$c" || fail "$c does not produce a contact sheet"
 grep -Eqi 'feel check' "$c" || fail "$c does not require the feel check"
 grep -Eqi 'not a pass' "$c" || fail "$c does not state that a green run alone is not a pass"
 
+# --- Reading a full-resolution contact sheet into the orchestrator's context is
+#     one of the largest token costs in a verify run -- a real session read 14.6MB
+#     of PNGs this way. The script must actually emit a small read copy, and the
+#     command must point the critique step at it instead of the full PNG.
+grep -Fq 'sheet.jpg' "$s" || fail "$s does not write a downscaled sheet.jpg read copy"
+grep -Fq "type: 'jpeg'" "$s" || fail "$s does not encode the read copy as JPEG"
+grep -Fq 'SHEET_JPEG_QUALITY' "$s" || fail "$s does not name a JPEG quality for the read copy"
+grep -Fq 'SHEET_JPEG_WIDTH' "$s" || fail "$s does not cap the read copy's width"
+grep -Fq 'sheet.jpg' "$c" || fail "$c does not tell the model to read sheet.jpg"
+grep -Fq 'never `sheet.png`' "$c" || fail "$c does not steer the critique step away from the full-resolution PNG"
+
+# --- Many sheets Read straight into the orchestrator is the same cost mistake at
+#     a smaller unit size: a twelve-page directory walk produces dozens of them,
+#     and each stays in context, re-billed on every later call until compaction.
+#     Past a small count the critique must be dispatched to a subagent that reads
+#     the images itself and returns only text.
+grep -Eqi 'more than ~3 sheets' "$c" || fail "$c does not say when to stop reading sheets directly and dispatch instead"
+grep -Fq 'sonnet' "$c" || fail "$c does not name which model the dispatched critique subagent uses"
+grep -Eqi 'never the images' "$c" \
+  || fail "$c does not state that dispatching keeps the images out of the orchestrator's context"
+
 # --- Fallbacks, in order, so a machine without Chrome still gets a review. ---
 grep -Eqi 'exit code 2|exits 2' "$c" || fail "$c does not document the no-browser exit code"
 grep -Eqi 'playwright|chrome' "$c" || fail "$c does not name the browser fallback ladder"

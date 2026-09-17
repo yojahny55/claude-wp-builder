@@ -47,11 +47,19 @@ finding argued away without one is a finding still outstanding.
    plugin's own stay in `taste.md` and are the author's to hold: a green
    detector run is not evidence that the taste floor was met.
 2. **Contact sheets.** `node ${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs demo/`
-   walks every page at every tested width. Machine findings fail the round.
-3. **Critique.** A separate evaluator pass reads **only the sheets** — never the
-   source, never the brief — and scores each page pass or fail on each rubric
-   line into `demo/VERIFY.md`. An evaluator that has read the brief grades the
-   intention; the client only ever sees the render.
+   walks every page at every tested width, writing both a full-resolution
+   `sheet.png` and a downscaled `sheet.jpg` (1000px wide, quality 70) per width.
+   Machine findings fail the round.
+3. **Critique.** A separate evaluator pass reads **only the sheets** — the
+   `sheet.jpg` files, never `sheet.png`, never the source, never the brief — and
+   scores each page
+   pass or fail on each rubric line into `demo/VERIFY.md`. An evaluator that has
+   read the brief grades the intention; the client only ever sees the render.
+   Past ~3 sheets, that evaluator pass is a dispatched `sonnet` subagent per page
+   (or batch), so the sheets are Read inside the subagent and only its pass/fail
+   rows come back — the images never enter the orchestrating conversation, which
+   is what keeps a twelve-page directory walk from re-billing dozens of images on
+   every later call until compaction.
 4. **Fix** every failed line, then repeat from 1.
 
 ## Before you read a number off a moving page

@@ -401,3 +401,31 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
 - **Opt-in means most builds will not have it.** Registration is a deliberate act, so the
   plain path's reference gap is closed only for operators who take that act. That is the
   cost of not shipping a third-party network dependency in the default path.
+- **The validator binds the commands that call it.** `bin/wp-config.mjs` is the single
+  definition of a valid `.wp-create.json`, but a command whose gate line is deleted simply
+  stops validating, and only `tests/checks/wp-config-gate.sh` notices. Same ceiling every
+  prose contract here carries.
+- **The gate substitutes its own path.** `${PROJECT_PATH}` is prose, not an environment
+  variable the way `${CLAUDE_PLUGIN_ROOT}` beside it in the same `bash -c` is — a Claude
+  that treats both alike runs `validate ''`, gets the usage line and exit `1`, and the
+  table reads that as "stop". The block now says where the path comes from, and
+  `tests/checks/wp-config-gate.sh` diffs all thirteen sites against one canonical copy so
+  the sentence cannot be lost from one of them; nothing can check that the directory a
+  Claude substituted is the right one, and the tool still answers a missing argument and an
+  invalid manifest with the same exit code.
+- **A tested compatibility range is a claim someone has to keep honest.** An absent range
+  is reported as untested, which makes the gap visible; nothing keeps a declared range true
+  as plugins release.
+- **Writing the generated block is what retires the legacy prose lines.** `render-context`
+  comments them out in the same pass that writes the block, so any caller that takes
+  ownership also retires the old record and a project states each decision exactly once
+  instead of contradicting itself with `validate` exiting 0. It happens only there, and
+  only downstream of `render-context`'s refusal to render an incomplete manifest — a block
+  with a blank where a decision belongs is not worth the record it would retire, which is
+  how migration used to leave a project permanently invalid. `contextDrift` still compares
+  only inside the markers, so a decision line an operator writes outside them afterwards is
+  invisible, and `/wp-init` Step 7 still writes those lines into a fresh project that has no
+  generated block at all.
+- **Generated credentials are only as private as the local file.** Splitting them into
+  `.wp-create.local.json` keeps them out of the committed manifest; it encrypts nothing, and
+  a password already committed needs rotating rather than migrating.

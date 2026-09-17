@@ -4,6 +4,10 @@
  *
  * @package __starter__
  */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 ?>
 <section class="no-results not-found">
 	<header class="page-header">

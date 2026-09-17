@@ -93,6 +93,28 @@ straight through.
 
 ## Pre-Step: Check for `.wp-create.json` Manifest
 
+**First: validate the project configuration.**
+
+`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report".
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+```
+
+| Exit | Meaning | Do |
+|---|---|---|
+| `0` | valid | continue |
+| `1` | invalid, or the generated context block disagrees with the manifest | stop and report the message verbatim |
+| `2` | an older manifest can migrate | run `wp-config.mjs migrate '${PROJECT_PATH}'`, then continue |
+| `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
+
+On exit 2, run the migration before continuing.
+
+**Amending the exit `3` row above:** Exit `3` is not a stop here: this command also scaffolds a theme onto a WordPress
+install that was never run through `/wp-create`, and the "If `.wp-create.json` does NOT
+exist" branch below is that legitimate path. Treat exit `3` as "no manifest to read
+config from" and fall through to that branch instead of aborting.
+
 Before anything else, check if `.wp-create.json` exists in the current working directory or parent directories (same search pattern as `wp-content/themes/`).
 
 ### If `.wp-create.json` exists:
@@ -829,6 +851,41 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
 
 Idempotent: if `<theme-dir>` is already inside a git work tree (e.g. the whole
 site is versioned), skip init and leave the existing repo untouched.
+
+## Step 9.6: Gitignore the local credentials file
+
+`/wp-create` writes database and admin credentials to
+`${PROJECT_PATH}/.wp-create.local.json` — a sibling of `.wp-create.json` at the
+**project root**, not a file inside `<theme-dir>`. This is a different location
+from Step 9.5 above: that step's `.gitignore` belongs to the theme's own git
+repository, rooted at `<theme-dir>` (below `${PROJECT_PATH}`), and a repository
+cannot ignore a path that lives outside it. If the project root is itself a
+versioned repository — the whole site, not just the theme, which is a normal
+delivery pattern — the credentials file needs its own ignore entry there:
+
+```bash
+cd ${PROJECT_PATH}
+if ! grep -qxF '.wp-create.local.json' .gitignore 2>/dev/null; then
+  [ -s .gitignore ] && [ -n "$(tail -c1 .gitignore)" ] && printf '\n' >> .gitignore
+  printf '.wp-create.local.json\n' >> .gitignore
+fi
+```
+
+`printf ... >>` creates `${PROJECT_PATH}/.gitignore` if it does not already
+exist, and the `grep -qxF` guard makes the append idempotent on a re-run. The
+`tail -c1` line is what makes the append safe on a pre-existing `.gitignore`
+whose last line has no trailing newline: appending straight onto it produces
+`*.log.wp-create.local.json`, a pattern that ignores neither, and the next
+`git add -A` commits the database and admin passwords. Do this unconditionally,
+whether or not `${PROJECT_PATH}` is a git repository yet — the entry costs
+nothing when it isn't one, and protects the secret the moment it becomes one.
+
+**Validation:** if `${PROJECT_PATH}` is inside a git work tree, `git
+check-ignore -v .wp-create.local.json` (run from `${PROJECT_PATH}`) matches
+the line just added. **On failure:** stop — do not continue to Step 10. Print
+the last line of `${PROJECT_PATH}/.gitignore` and tell the user that
+`.wp-create.local.json` holds the database and admin passwords, is not
+ignored, and must not be committed until it is.
 
 ## Step 10: Print Summary
 

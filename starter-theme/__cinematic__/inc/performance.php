@@ -33,3 +33,20 @@ add_filter('rest_endpoints', function ($endpoints) {
 
 // XML-RPC off (cinematic sites have no need for it).
 add_filter('xmlrpc_enabled', '__return_false');
+
+/**
+ * Stop WordPress 404-ing its own sitemap.
+ *
+ * `WP::handle_404()` clears the 404 only when the default query matched posts. A
+ * site whose content is all custom post types (this starter ships no blog) gets an
+ * empty query on `/wp-sitemap.xml`, so core sends a 404 status line and then
+ * prints a valid sitemap body anyway — crawlers read that as "no sitemap" while
+ * robots.txt advertises the URL. Same guard as the tailwind starter's
+ * inc/theme-setup.php; keep the two in step.
+ */
+add_filter('pre_handle_404', function ($preempt, $query) {
+    if ($preempt) {
+        return $preempt;
+    }
+    return ($query->get('sitemap') || $query->get('sitemap-stylesheet')) ? true : $preempt;
+}, 10, 2);

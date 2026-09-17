@@ -152,7 +152,16 @@ function __starter___t($key) {
         return $translations[$key][$lang];
     }
 
-    // Fallback to English
+    // Fall back to the primary language (the one the demo was written in), then
+    // to English only when the table has no primary-language entry at all.
+    // While DEFAULT_LANG is still 'en' — the unscaffolded starter's value — the
+    // two branches below test the same key, so the second is unreachable and
+    // reads as dead code. It is not: it goes live as soon as /wp-init Step 5
+    // sets DEFAULT_LANG to a non-English primary, and dropping it would leave
+    // such a project with no English fallback at all.
+    if (isset($translations[$key][__STARTER___DEFAULT_LANG])) {
+        return $translations[$key][__STARTER___DEFAULT_LANG];
+    }
     if (isset($translations[$key]['en'])) {
         return $translations[$key]['en'];
     }
