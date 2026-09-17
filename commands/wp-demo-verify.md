@@ -80,8 +80,9 @@ node "${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs" <target>
 Six positions per section at 1440x900 and 390x844, plus a reduced-motion pass at
 desktop width, then full-page shots at 375, 576, 768, 1024, 1152, 1280 and 1440 (this replaces
 `/wp-responsive-check`). A directory target walks every page. Output lands in
-`<dir>/.verify/[<page>/]<width>/`, with `findings.json` and one `sheet.png` per
-width.
+`<dir>/.verify/[<page>/]<width>/`, with `findings.json` and, per width, both
+`sheet.png` (full resolution, for a human who opens it directly) and `sheet.jpg`
+(downscaled to 1000px wide, quality 70 — the one to Read in Step 4).
 
 Exit codes: `0` nothing blocking — either no findings at all, or advisory ones
 only; `1` at least one blocking finding printed; `2` no usable browser; `3` the
@@ -155,9 +156,22 @@ branch: `/wp-demo` probes first and stops on 2.)
 
 ## Step 4: Critique the sheets
 
-Read only the sheets for this step: not the source, not `demo/BRIEF.md`. Score
-every page pass/fail on each line and write the table to `demo/VERIFY.md`
-(one section per page, one row per line, a one-sentence reason on every fail):
+Read only the `sheet.jpg` files for this step — never `sheet.png` — and never the
+source or `demo/BRIEF.md`. Score every page pass/fail on each line and write the
+table to `demo/VERIFY.md` (one section per page, one row per line, a one-sentence
+reason on every fail):
+
+**More than ~3 sheets: dispatch, don't Read.** A directory target produces one
+`sheet.jpg` per page per width (plus the reduced-motion pass at desktop width), so
+a twelve-page craft build is dozens of sheets even downscaled. Reading them
+straight into this conversation is the same cost mistake at a smaller unit size:
+each image stays in context, re-billed on every later call until compaction. Past
+~3 sheets, dispatch a `sonnet` subagent per page (or batch of pages) with the
+rubric below and the sheet paths; have it Read the sheets itself and return only
+the pass/fail table rows and reasons — never the images, which then never enter
+this conversation at all. Assemble the returned rows into `demo/VERIFY.md` here.
+At 3 sheets or fewer, reading them directly is cheaper than a subagent
+round-trip.
 
 Each round appends under its own `## Round N` heading. Nothing on disk currently
 separates five walk runs from five rounds, and a build once spent its rounds
