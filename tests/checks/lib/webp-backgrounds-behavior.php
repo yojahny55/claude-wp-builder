@@ -63,8 +63,9 @@ $src = preg_replace( '/^<\?php/', '', $src, 1 );
 $removed = 0;
 $src     = preg_replace( '/^\s*if\s*\(\s*!\s*defined\(\s*.ABSPATH.\s*\)\s*\)\s*\{[^}]*\}/m', '', $src, 1, $removed );
 // Without this, a reformatted guard leaves `exit;` in the eval'd source and the whole
-// test ends silently, which reads exactly like a pass.
-if ( 1 !== $removed || false !== strpos( $src, 'ABSPATH' ) ) {
+// test ends silently, which reads exactly like a pass. The assertion looks for the guard
+// itself, not the bare word: a future comment naming ABSPATH must not fail this run.
+if ( 1 !== $removed || preg_match( '/defined\(\s*.ABSPATH./', $src ) ) {
 	fwrite( STDERR, "FAIL: could not strip the ABSPATH guard from performance.php\n" );
 	exit( 1 );
 }
