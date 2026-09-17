@@ -9,7 +9,6 @@
  * These functions are pure: callers do the I/O and pass the parsed values in.
  */
 
-export const CURRENT_VERSION = 3;
 export const MANIFEST_NAME = '.wp-create.json';
 export const LOCAL_NAME = '.wp-create.local.json';
 
@@ -20,13 +19,42 @@ export function detectVersion(manifest) {
   return Number.isInteger(v) ? v : 1;
 }
 
+// Every decision the generated block in .claude/CLAUDE.md asserts, in render order.
+// This table is the single owner of three things that used to be spelled separately
+// and drifted apart: what the block renders, which of those fields validateManifest
+// requires, and what an absent field means. The block is the first thing every agent
+// reads, so a field rendered into it with no value puts a blank where a decision
+// belongs -- which is why REQUIRED below is DERIVED from this list rather than kept
+// beside it. A row with a `fallback` has a documented absent-value meaning and is
+// therefore optional; every other row is required, and cannot be rendered without
+// also being validated.
+const CONTEXT_FIELDS = [
+  {
+    label: 'Project',
+    paths: ['project.name', 'project.slug'],
+    render: (m) => `${at(m, 'project.name') ?? ''} (\`${at(m, 'project.slug') ?? ''}\`)`,
+  },
+  { label: 'Theme slug', paths: ['theme.slug'] },
+  { label: 'i18n strategy', paths: ['i18n strategy'], fallback: 'suffix' },
+  { label: 'demo mode', paths: ['demo mode'], fallback: 'plain' },
+  { label: 'Primary language', paths: ['languages.primary'] },
+  { label: 'Plugin profile', paths: ['plugins.profile'], fallback: 'none' },
+];
+
 // Required fields by dotted path. Anything not listed is optional and preserved.
-const REQUIRED = [
+// The tail is derived, not typed: see CONTEXT_FIELDS above.
+const REQUIRED = [...new Set([
   'project.name', 'project.slug', 'project.path',
   'environment.type', 'environment.engine',
   'wordpress.url',
   'wp_cli.wrapper',
-];
+  ...CONTEXT_FIELDS.filter((f) => f.fallback === undefined).flatMap((f) => f.paths),
+])];
+
+function fallbackFor(path) {
+  const field = CONTEXT_FIELDS.find((f) => f.paths[0] === path);
+  return field?.fallback;
+}
 
 function at(obj, dotted) {
   return dotted.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
@@ -67,11 +95,18 @@ const STEPS = {
   1: (m, ctx) => ({
     ...m,
     manifest_version: 2,
-    'i18n strategy': m['i18n strategy'] ?? readProseDecision(ctx.claudeMd, 'i18n strategy') ?? 'suffix',
-    'demo mode': m['demo mode'] ?? 'plain',
+    'i18n strategy': m['i18n strategy'] ?? readProseDecision(ctx.claudeMd, 'i18n strategy') ?? fallbackFor('i18n strategy'),
+    'demo mode': m['demo mode'] ?? fallbackFor('demo mode'),
   }),
   2: (m) => ({ ...m, manifest_version: 3 }),
 };
+
+// Derived, not typed: CURRENT_VERSION and STEPS are one fact, and bumping the
+// constant without writing the step used to produce an uncaught Error and a raw
+// Node stack trace instead of a refusal in this module's style. A version with no
+// step can no longer be expressed. (A non-contiguous table -- steps 1 and 3, no 2 --
+// still would be, which is what the guard in migrateManifest remains for.)
+export const CURRENT_VERSION = Math.max(...Object.keys(STEPS).map(Number)) + 1;
 
 export function migrateManifest(manifest, { claudeMd = '' } = {}) {
   let current = { ...manifest };
@@ -117,17 +152,21 @@ export function resolveSecret(name, { env = {}, local = {}, manifest = {} } = {}
 }
 
 // Two manifest keys are spelled with a space ("demo mode", "i18n strategy"), which a
-// dotted path cannot address, so lookup goes through an explicit alias table.
-const KEY_ALIASES = {
-  'i18n-strategy': 'i18n strategy',
-  'demo-mode': 'demo mode',
-};
+// dotted path cannot address, so lookup goes through an alias table -- derived from
+// the same CONTEXT_FIELDS rows that define what those keys mean when absent. The
+// alias used to be typed here and the absent-value default typed again inside
+// getKey as a two-entry ternary, which silently handed 'plain' to any third alias
+// and left "absent i18n strategy means suffix" unguarded on the get path.
+const KEY_ALIASES = new Map(
+  CONTEXT_FIELDS
+    .filter((f) => f.paths[0].includes(' '))
+    .map((f) => [f.paths[0].replace(/ /g, '-'), f]),
+);
 
 export function getKey(manifest, key) {
-  if (Object.hasOwn(KEY_ALIASES, key)) {
-    const raw = manifest[KEY_ALIASES[key]];
-    const fallback = key === 'i18n-strategy' ? 'suffix' : 'plain';
-    return { ok: true, value: String(raw ?? fallback) };
+  const aliased = KEY_ALIASES.get(key);
+  if (aliased) {
+    return { ok: true, value: String(manifest[aliased.paths[0]] ?? aliased.fallback) };
   }
   // A secret's own manifest path (e.g. "database.password") -- or anything under
   // it, such as "database.password.length" or "database.password.constructor.name"
@@ -216,12 +255,9 @@ export function renderContext(manifest) {
     MARK_BEGIN,
     '<!-- Generated from .wp-create.json by bin/wp-config.mjs. Edits inside these markers are reported, not kept. -->',
     '',
-    `- **Project:** ${manifest.project?.name ?? ''} (\`${manifest.project?.slug ?? ''}\`)`,
-    `- **Theme slug:** ${manifest.theme?.slug ?? ''}`,
-    `- **i18n strategy:** ${manifest['i18n strategy'] ?? 'suffix'}`,
-    `- **demo mode:** ${manifest['demo mode'] ?? 'plain'}`,
-    `- **Primary language:** ${manifest.languages?.primary ?? ''}`,
-    `- **Plugin profile:** ${manifest.plugins?.profile ?? 'none'}`,
+    ...CONTEXT_FIELDS.map((f) => `- **${f.label}:** ${
+      f.render ? f.render(manifest) : (at(manifest, f.paths[0]) ?? f.fallback ?? '')
+    }`),
     '',
     MARK_END,
   ];
@@ -273,6 +309,33 @@ export function spliceContext(claudeMd, block) {
     return `${text}${sep}\n${block}\n`;
   }
   return text.slice(0, state.start) + block + text.slice(state.end + MARK_END.length);
+}
+
+// Migration hands ownership of the CONTEXT_FIELDS decisions to the generated block.
+// The legacy prose lines that carried them until then sit OUTSIDE the markers, where
+// contextDrift cannot see them, so leaving them alone is how a migrated project ends
+// up stating `polylang` on line 4 and `suffix` on line 12 with `validate` exiting 0 --
+// the exact disagreement this module exists to remove, reintroduced by its own
+// migration. They are commented out rather than deleted: the pre-migration text is the
+// only evidence of what the project used to say, and an operator reading the file is
+// owed both the old value and where the answer moved to. A commented line no longer
+// starts with the list bullet, so a second pass is a no-op.
+//
+// Lines inside the markers are the block's own and are left byte-identical -- they
+// carry the same labels, so a marker-blind pass would comment out the very record it
+// is protecting. A malformed marker state is returned untouched; the caller refuses.
+export function supersedeProseDecisions(claudeMd) {
+  const text = claudeMd ?? '';
+  const rewrite = (chunk) => CONTEXT_FIELDS.reduce((acc, f) => acc.replace(
+    new RegExp(`^([ \\t]*-[ \\t]*\\*\\*${f.label}:\\*\\*.*)$`, 'gm'),
+    (_, line) => `<!-- superseded by the wp-create:begin block below: ${line.trim()} -->`,
+  ), chunk);
+
+  const state = markerState(text);
+  if (!state.ok) return text;
+  if (!state.present) return rewrite(text);
+  const stop = state.end + MARK_END.length;
+  return rewrite(text.slice(0, state.start)) + text.slice(state.start, stop) + rewrite(text.slice(stop));
 }
 
 // Drift is a finding, not a repair: an operator who edited the block meant something,

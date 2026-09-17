@@ -399,6 +399,12 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
 - **A tested compatibility range is a claim someone has to keep honest.** An absent range
   is reported as untested, which makes the gap visible; nothing keeps a declared range true
   as plugins release.
+- **Superseding the legacy decision lines happens once, at migration.** `migrate` comments
+  out the prose lines the generated block takes ownership of, so a migrated project states
+  each decision exactly once instead of contradicting itself with `validate` exiting 0. It
+  runs only there: `contextDrift` still compares only inside the markers, so a decision line
+  an operator writes outside them afterwards is invisible, and `/wp-init` Step 7 still
+  writes those lines into a fresh project that has no generated block at all.
 - **Generated credentials are only as private as the local file.** Splitting them into
   `.wp-create.local.json` keeps them out of the committed manifest; it encrypts nothing, and
   a password already committed needs rotating rather than migrating.

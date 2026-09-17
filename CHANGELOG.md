@@ -220,6 +220,25 @@
   step's `**Validation:**` line gains the `**On failure:**` action every sibling block in
   `/wp-create` already has.
 
+- **Fix: the generated block and the manifest's rules were two lists that had to agree,
+  and did not.** `REQUIRED` and `renderContext`'s field list are now derived from one
+  `CONTEXT_FIELDS` table, so a field cannot be rendered into the authoritative block
+  without also being validated: a manifest lacking `theme` or `languages` used to render
+  `- **Theme slug:** ` and `- **Primary language:** ` as blanks with `validate` exiting 0,
+  and reading that block is every agent's first mandatory action. The absent-value
+  defaults (`suffix`, `plain`) come from the same table instead of being spelled a third
+  time inside `getKey`, where a two-entry ternary left "an absent `i18n strategy` means
+  `suffix`" unguarded on the `get` path. `CURRENT_VERSION` is derived from the migration
+  table rather than typed beside it, so bumping it without writing the step can no longer
+  produce an uncaught `Error`.
+- **Fix: migrating a legacy project made `.claude/CLAUDE.md` contradict itself.** `migrate`
+  appended the generated block beside the legacy prose decision line it had just read, and
+  `contextDrift` only compares inside the markers — so the file could state `polylang` on
+  line 4 and `suffix` on line 12 with `validate` exiting 0, reintroducing the exact
+  disagreement this work exists to remove, for exactly the projects migration targets.
+  Migration now comments the superseded lines out, preserving their pre-migration values,
+  so each decision is asserted in exactly one place.
+
 ## [1.18.0] - 2026-09-15
 
 ### Added

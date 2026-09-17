@@ -12,6 +12,7 @@ import { join, resolve, dirname } from 'node:path';
 import {
   CURRENT_VERSION, MANIFEST_NAME, LOCAL_NAME, detectVersion, validateManifest, migrateManifest,
   renderContext, spliceContext, contextDrift, resolveSecret, getKey, SECRETS, validateProfile,
+  supersedeProseDecisions,
 } from './lib/manifest.mjs';
 
 const say = (s) => console.log(s);
@@ -99,6 +100,19 @@ function cmdMigrate(projectPath) {
   writeFileSync(file, `${JSON.stringify(next, null, 2)}\n`);
   for (const n of notes) say(n);
   say(`ok: migrated to version ${CURRENT_VERSION}`);
+
+  // The prose decision lines migration just read are now the manifest's to state, and
+  // they live outside the markers where contextDrift cannot see them. Retire them
+  // BEFORE the block is written, or the project ends up asserting the old value beside
+  // the new one with validate exiting 0. Skipped when the file does not exist: there
+  // is nothing to supersede, and writing one here would pre-empt render-context.
+  if (existsSync(claudeFile)) {
+    const superseded = supersedeProseDecisions(claudeMd);
+    if (superseded !== claudeMd) {
+      writeFileSync(claudeFile, superseded);
+      say(`ok: superseded the legacy decision lines in ${claudeFile}`);
+    }
+  }
   cmdRenderContext(projectPath);
 }
 
