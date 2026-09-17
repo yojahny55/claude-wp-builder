@@ -338,6 +338,31 @@
 
 ### Fixed
 
+- **A CSS `background-image` served the original PNG/JPG on an optimized library.** Robin
+  Image Optimizer's default delivery mode, `picture`, rewrites `<img>` tags only, and the
+  `__tailwind__` starter's own HTML rewrite looked for the sibling WordPress writes
+  (`foto.webp`) but not the one Robin and most bulk optimizers write (`foto.png.webp`) — so
+  on a Robin-optimized site it matched nothing and every background kept its original bytes.
+  Both names now resolve through one helper, `prefix_webp_sibling_url()`, which the buffer
+  uses. The starter also gains `prefix_background_image( $url )`: it prints the plain
+  `url()` first and an `image-set()` naming the sibling second, so a browser without
+  `image-set()` keeps the background, and each browser requests the URL it understands,
+  which is safe behind a full-page cache. `agents/wp-template.md` requires it for any
+  background a template prints, the `wp-robin` skill documents the three delivery modes with
+  the page-cache caveat on `url` and the nginx/Apache rule for a background declared in a
+  stylesheet, and `wp-audit-performance` gains PERF-056 for an uploads background whose
+  sibling exists but is never served. The helper percent-encodes the characters `esc_url()`
+  passes through but CSS reads as syntax, so a filename carrying a parenthesis or a
+  semicolon — which reaches disk on any library moved by rsync rather than through
+  `wp_handle_upload()` — cannot close the `url()` token or inject a second declaration; a
+  URL with a parent segment is refused before `file_exists()` runs; and the buffer leaves
+  the helper's own two URLs alone, since rewriting the fallback would hand a browser
+  without `image-set()` a WebP in its place. `tests/checks/webp-css-backgrounds.sh` now
+  runs the code against a fixture library instead of only grepping for the contract. The
+  buffer's pattern also carries a `(?!\.webp)` look-ahead: its lazy quantifier stops at the
+  first extension, so it used to match the `foto.png` inside an existing `foto.png.webp`
+  URL and rewrite it to `foto.png.webp.webp` — a 404 on any page already printing a
+  sibling URL, which on a Robin-optimized library is every page the helper touches.
 - `wp-robin`: the webp sync step now converts sizes added after the first run. It used to
   pick only attachments with no webp rows at all, so a size registered later and generated
   with `wp media regenerate` was never converted. Each attachment's files on disk are now

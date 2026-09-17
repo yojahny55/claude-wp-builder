@@ -313,6 +313,24 @@ echo prefix_image(prefix_get_field('site_logo', 'option'), 'medium', array(
 - Above-the-fold **hero/LCP** image: keep it an `<img>` (not a video) with `fetchpriority="high"` + `width`/`height`, and add a `<link rel="preload" as="image">` for it in `wp_head`. Lazy-load any hero background `<video>` via JS on desktop only, after the poster paints — never on mobile / `navigator.connection.saveData`.
 - `sizes` cheat-sheet: full-bleed → `100vw`; half-width split → `(max-width: 899px) 100vw, 50vw`; fixed logo/icon → its px width (`136px`).
 
+### CSS backgrounds (MANDATORY when a section paints an image through CSS)
+
+An image printed as a `background-image` is not an `<img>`, so nothing that rewrites `<img>` tags reaches it — including Robin Image Optimizer in its default `picture` delivery mode, which is what most optimized sites run. A background left alone can serve a megabyte where its WebP sibling is a third of that.
+
+Print the background with the starter helper `prefix_background_image( $url )` (from `inc/performance.php`), never a bare `url()`:
+
+```php
+$image = prefix_get_field('hero_image');
+?>
+<section class="hero" style="<?php echo prefix_background_image( $image['url'] ?? '' ); ?>">
+```
+
+- The helper emits `background-image:url(…)` first and an `image-set()` second, so a browser without `image-set()`/`type()` (Safari 16 and older) keeps the plain URL and the background never disappears.
+- It adds the WebP branch **only when the sibling file exists on disk**, and it resolves local uploads URLs only.
+- Its return value is already escaped — print it raw, do **not** wrap it in `esc_attr()`.
+- Each browser requests the URL it understands, so this is safe behind a full-page cache. Never solve this with `Vary: Accept` from a template.
+- Prefer an `<img>` with `object-fit: cover` where the layout allows one: it gets a `srcset`, which a background never has.
+
 ## Descriptive Link Text (SEO — MANDATORY)
 
 Lighthouse's `link-text` SEO audit matches the link's **visible innerText** against a blocklist (`click here`, `here`, `learn more`, `more`, `read more`, `this`, `start`, …). **`aria-label` does NOT satisfy it.** When the demo uses a generic button label (very common: "LEARN MORE", "READ MORE", "VIEW"), append a visually-hidden descriptive suffix **inside** the anchor so innerText becomes descriptive while the button still shows the short label:
