@@ -99,8 +99,9 @@ function __starter___webp_sibling_url( $url ) {
 	// `<baseurl>/../../secret.png` still starts with the base URL, so the prefix test
 	// alone would let file_exists() probe paths outside the uploads directory and
 	// answer whether a file is there. Refuse the whole URL instead of normalizing it:
-	// nothing legitimate in an uploads URL needs a parent segment.
-	if ( false !== strpos( $relative, '..' ) ) {
+	// nothing legitimate in an uploads URL needs a parent segment. The test is on the
+	// segment, not the substring, so a file honestly named `photo..original.png` passes.
+	if ( preg_match( '#(^|/)\.\.(/|$)#', $relative ) ) {
 		return '';
 	}
 
@@ -123,6 +124,13 @@ function __starter___webp_sibling_url( $url ) {
  * once per cache build. WebP is universally supported by target browsers
  * (matching the unconditional policy in (1)), so no Accept-header branching is
  * needed.
+ *
+ * The pattern stops at a quote, a space and a parenthesis, which is what makes it
+ * safe to run over arbitrary HTML — and is also its ceiling: a file whose name
+ * carries one of those characters (`plan (1).png`, which reaches disk on a library
+ * moved by rsync) is never matched here. Such a background is still served as WebP
+ * when the template prints it through __starter___background_image(), which resolves
+ * the sibling itself; an <img> pointing at one keeps its original bytes.
  *
  * A `background-image` declared in a STYLESHEET is not HTML and never reaches
  * this buffer. Use __starter___background_image() for backgrounds a template

@@ -57,10 +57,11 @@ function check( $label, $got, $want ) {
 $src = file_get_contents( $root . '/starter-theme/__tailwind__/inc/performance.php' );
 $src = str_replace( '__starter___', 't_', $src );
 $src = preg_replace( '/^<\?php/', '', $src, 1 );
-$src = preg_replace( '/^\s*if\s*\(\s*!\s*defined\(\s*.ABSPATH.\s*\)\s*\)\s*\{[^}]*\}/m', '', $src, 1 );
+$removed = 0;
+$src     = preg_replace( '/^\s*if\s*\(\s*!\s*defined\(\s*.ABSPATH.\s*\)\s*\)\s*\{[^}]*\}/m', '', $src, 1, $removed );
 // Without this, a reformatted guard leaves `exit;` in the eval'd source and the whole
 // test ends silently, which reads exactly like a pass.
-if ( false !== strpos( $src, 'ABSPATH' ) ) {
+if ( 1 !== $removed || false !== strpos( $src, 'ABSPATH' ) ) {
 	fwrite( STDERR, "FAIL: could not strip the ABSPATH guard from performance.php\n" );
 	exit( 1 );
 }
@@ -68,7 +69,7 @@ eval( $src );
 
 // Fixture library: one attachment per sibling convention, one with no sibling.
 @mkdir( $base_dir . '/2026/09', 0777, true );
-foreach ( array( 'a.png', 'a.png.webp', 'b.jpg', 'b.webp', 'c.png', 'plan (1).png', 'plan (1).png.webp' ) as $f ) {
+foreach ( array( 'a.png', 'a.png.webp', 'b.jpg', 'b.webp', 'c.png', 'plan (1).png', 'plan (1).png.webp', 'photo..original.png', 'photo..original.png.webp' ) as $f ) {
 	touch( "$base_dir/2026/09/$f" );
 }
 @mkdir( dirname( $base_dir ) . '/starter-webp-outside-' . getmypid(), 0777, true );
@@ -96,6 +97,10 @@ check(
 	t_webp_sibling_url( $base_url . '/../starter-webp-outside-' . getmypid() . '/secret.png' ),
 	''
 );
+
+// 3b. The traversal guard tests the path SEGMENT, so an honest name carrying two dots
+// is not collateral damage.
+check( 'two dots inside a filename still resolve', t_webp_sibling_url( $U . 'photo..original.png' ), $U . 'photo..original.png.webp' );
 
 // 4. A filename CSS would read as syntax cannot close the url() token or the declaration.
 $hostile = t_background_image( $U . 'plan (1).png' );

@@ -53,7 +53,7 @@ grep -Fq "') type('" "$perf" \
   || { echo "FAIL: $perf's buffer does not recognize the helper's image-set() candidates"; exit 1; }
 grep -Fq "');background-image:image-set(" "$perf" \
   || { echo "FAIL: $perf's buffer does not recognize the helper's plain url() fallback, and would rewrite it"; exit 1; }
-grep -Fq "strpos( \$relative, '..' )" "$perf" \
+grep -Fq "'#(^|/)\\.\\.(/|\$)#', \$relative" "$perf" \
   || { echo "FAIL: $perf does not refuse a parent segment before touching the filesystem"; exit 1; }
 grep -Fq 'function __starter___css_url(' "$perf" \
   || { echo "FAIL: $perf does not percent-encode CSS-syntax characters in the url() token"; exit 1; }
@@ -79,11 +79,15 @@ grep -Fq 'PERF-056' "$audit" \
 # 5. Behavior, not wording: the greps above all pass on a helper that probes outside
 # uploads, that leaves a parenthesis loose in the url() token, or whose output buffer
 # overwrites the fallback the helper deliberately emitted. Run the code.
-if command -v php >/dev/null 2>&1; then
-  out=$(php "$(dirname "$0")/lib/webp-backgrounds-behavior.php" 2>&1) || { echo "$out"; exit 1; }
-  [ "$out" = "OK" ] || { echo "FAIL: behavioral test did not report OK:"; echo "$out"; exit 1; }
-else
-  echo "NOTE: php not found — the behavioral half of this check did not run"
+behavior="$(dirname "$0")/lib/webp-backgrounds-behavior.php"
+[ -f "$behavior" ] || { echo "FAIL: $behavior is missing — the behavioral half of this check cannot run"; exit 1; }
+if ! command -v php >/dev/null 2>&1; then
+  # Not PASS: the three defects this file exists to catch are unverified without it,
+  # and a green line would report coverage the run does not have.
+  echo "SKIP: php not found — the greps above passed, the behavioral test did not run"
+  exit 0
 fi
+out=$(php "$behavior" 2>&1) || { echo "FAIL: behavioral test failed:"; echo "${out:-(no output — php exited non-zero with nothing on stdout or stderr)}"; exit 1; }
+[ "$out" = "OK" ] || { echo "FAIL: behavioral test did not report OK:"; echo "${out:-(no output)}"; exit 1; }
 
 echo "PASS"
