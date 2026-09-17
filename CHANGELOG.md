@@ -2,6 +2,331 @@
 
 ## [Unreleased]
 
+### Added
+
+- **A craft build studies an entry's motion clip instead of inferring motion from its strip.**
+  When a consulted `wp-design-library` entry carries `motion.clips`, `/wp-demo` sub-step 3.6 now
+  calls `get_motion` and reads the timestamped frames it returns as images; a strip shows what a
+  section is made of, never how it moves. The tool's own ceiling travels with the instruction —
+  a video URL alone does not provide video understanding — so a clip is cited only when its
+  frames were read.
+- **The motion vocabularies are mapped, including where they do not meet.** Ten library device
+  names map one to one onto the `data-motion` contract; `stagger` and `count` are modifier
+  attributes rather than devices; `marquee`, `stack` and `tabs` have no expression at all and are
+  built by hand with a reason in `demo/BRIEF.md`. `tests/checks/wp-library-motion.sh` pins the
+  mapping against `references/devices.md`, so the claim cannot go stale silently.
+
+- **Performance and accessibility audits now measure instead of guessing.**
+  `agents/wp-audit-performance.md` gains PERF-054/PERF-055: the real LCP element
+  is found per template with a `PerformanceObserver` on
+  `largest-contentful-paint`, not assumed to always be the hero — a directory or
+  archive grid can put its LCP on a first-row card, and a blanket
+  `loading="lazy"` below the fold then defers exactly the element the page is
+  judged on. PERF-055 checks the preloaded font file actually matches the
+  weight the LCP text renders in, instead of preloading "the first N files"
+  found on disk. `agents/wp-audit-a11y.md` gains A11Y-031 (overlays/drawers need
+  a real focus trap, not just initial focus, and must return focus on close),
+  A11Y-032 (`target="_blank"` links need a screen-reader "opens in a new tab"
+  notice), A11Y-033 (a horizontally-scrollable region needs `tabindex="0"` plus
+  an accessible name), and A11Y-034 (a cross-engine `cursor` sweep must not read
+  WebKit's `auto` — its UA default for an undeclared pointer — as "no pointer"
+  when other engines agree it is one). A11Y-004's non-text-contrast check now
+  requires computing a focus ring's contrast against the background it actually
+  sits on, not a single assumed page ground.
+- **`wp-aos-animator` closes two seams found by scrolling a real build past its
+  first entrance.** `aos.css` rewrites `transition-property`/`-duration`/`-delay`
+  on any element that still carries `data-aos`, for as long as the attribute
+  stays — silently breaking a hover-lift card's or a color-fading button's own
+  transition long after the entrance finished. The skill's init module now
+  strips the AOS attributes once an element's entrance transition ends. AOS also
+  measured trigger points at `DOMContentLoaded`, before web fonts and images
+  reflow the layout, so a block that moves afterward could end up permanently
+  below a stale trigger with `once: true`; the module now calls `AOS.refresh()`
+  again on `load`, and reveals anything already on screen at that point instead
+  of waiting for a scroll that may never come. The skill now also says to
+  animate the above-the-fold LCP candidate with a fast plain `fade` rather than
+  skip it outright — a small, deliberate LCP cost instead of a static-looking
+  first screen.
+- **`wp-agentic-surfaces`: a named search indexer could receive the markdown 404 body —
+  cloaking.** The "is this a non-browser agent" UA sniff (`bot|crawl|spider|agent|…`)
+  matches "Googlebot" on `bot` alone, and a real SEO audit found the theme's designed 404
+  replaced by a markdown response for Google's own crawler: a browser and a named
+  indexer got different content on the same URL. Named search indexers (Googlebot,
+  Bingbot, Slurp, Baiduspider, YandexBot, Applebot, …) are now matched and excluded
+  *before* the generic pattern and always get the human HTML; Applebot-Extended (a
+  distinct UA, the AI-training crawler already allowlisted in Step 4) is unaffected.
+  Step 5's verification now fetches the 404 impersonating Googlebot and fails if the
+  response is `text/markdown`.
+- **`wp-agentic-surfaces`: `Content-Signal` was written as a robots.txt directive; the
+  spec defines it as an HTTP response header.** No robots.txt grammar recognises a bare
+  `Content-Signal:` line, so a linter (Lighthouse included) reports the *whole file*
+  invalid over that one line, costing the SEO score of every page and burying any real
+  robots.txt error behind a self-inflicted one. It now ships on the existing
+  `send_headers` action next to the RFC 8288 `Link` header, and is left in robots.txt
+  only as a comment; the physical-robots.txt writer (Step 4) and its verification
+  (Step 5) match.
+- **`wp-audit-rankmath`: theme JSON-LD sharing an `@id` with Rank Math's own graph must
+  be merged through `rank_math/json_ld`, never echoed as a second `<script>`.** Two
+  blocks sharing an `@id` merge into one entity per the JSON-LD spec, but any validator
+  or audit that counts `@type` occurrences reads two `Organization` nodes — which is how
+  a real portal audit reported it. New Step 4.7 merges the theme's real business data
+  (address, contactPoint, sameAs — none of which Rank Math itself collects) into Rank
+  Math's node by matching `@id`, reading `knowledgegraph_type` to resolve the fragment
+  rather than assuming a value. Step 8.5's duplicate-schema check now recommends the
+  merge path instead of blind removal, which would have lost that data rather than
+  de-duplicated it.
+- **`wp-audit-rankmath`: search results had no noindex step.** `/?s=<term>` and its
+  pretty form both answered `200` as `index, follow` with a canonical — two indexable
+  URLs for the same slice of content. New Step 4.6 sets `noindex, follow` on
+  `is_search()` via `rank_math/frontend/robots` and leaves canonical removal to Rank
+  Math's own noindex behaviour rather than forcing one.
+- **`wp-audit-rankmath`: per-page SEO seeding skipped every taxonomy term.** Step 8
+  looped `get_posts()` only, so a site's term archives were left on the global title
+  template with no description at all — worse than a post, which can at least fall back
+  to excerpting `post_content`; a term has none. Step 8 now also seeds
+  `rank_math_title`/`rank_math_description`/`rank_math_focus_keyword` as term meta over
+  every public taxonomy.
+- **`wp-audit-rankmath`: the og:image default could carry a URL with no attachment ID,
+  and `knowledgegraph_type` silently degrades on an out-of-range value.** Rank Math does
+  not print `og:image` unless `open_graph_image_id` is a real attachment; the old
+  fallback to the theme screenshot always left that at `0` (and the screenshot is the
+  editor preview, not a stable share-card URL). Step 6 now requires a real attachment
+  and warns instead of silently producing no tag. `knowledgegraph_type` accepts only the
+  literal `'person'`/`'company'` — a plausible-looking `'organization'` falls back to
+  `'person'` with no warning, describing a company as a human in its own JSON-LD. Step 4
+  now documents the two legal values and verifies the option landed as one of them.
+- **`wp-audit-rankmath`: a theme's own `<meta name="description">` fallback could
+  duplicate Rank Math's tag.** Gating the fallback only on "is an SEO plugin active" is
+  not enough — Rank Math can be active and still emit nothing on a specific route (an
+  unconfigured template, a page type with no post/term to hold meta). Step 8.5 now
+  checks for a hardcoded theme description tag and for more than one rendered on the
+  home page, and recommends gating the theme's tag on the *current object's own*
+  `rank_math_description`/`rank_math_title` being empty, not on plugin presence alone.
+- **`wp-audit-rankmath`: a sideloaded site icon could be silently turned into WebP.** An
+  unrelated image-optimizer plugin that filters `image_editor_output_format` globally
+  runs on every sideload, including a favicon import, and WordPress then points
+  `apple-touch-icon` at a file iOS does not read as a touch icon. Step 6 now imports the
+  site icon (when `site_icon` is empty) with that filter explicitly disabled around the
+  sideload, and verifies the stored file is still a PNG.
+- **`/wp-polylang`'s menu import wrote the per-language override and nothing else.**
+  Polylang's own frontend filter only substitutes a location's value inside the core
+  `nav_menu_locations` theme_mod — it never adds one. A location assigned only through
+  the `polylang` option (what `pll-import.php`'s menu branch did, and what `/wp-seed`'s
+  own Polylang phase still does for the primary language) left that theme_mod empty, so
+  `wp_nav_menu()` fell through to its hard-coded fallback for EVERY language — the
+  fallback can look right by coincidence in the default language, which is what hid it.
+  Both scripts now register the location the normal way before writing the override.
+  Separately, the Polylang i18n variant's string helper asked the registry for a
+  hardcoded `'en'` value; a project whose registered source is a different primary
+  language never matched, so `pll__()` silently no-op'd and a client's edits under
+  Languages > Strings were discarded. It now resolves the source through the project's
+  own `DEFAULT_LANG` constant.
+- **A taxonomy term's own custom fields never reached its translation.** `/wp-polylang`
+  carries a post's fields, content and ACF payload across, but a term's fields are a
+  separate storage surface `pll_save_term_translations()` does nothing for — a repeater
+  or a plain field attached to a term came out blank on the counterpart, with no error.
+  The export and import scripts now walk and write a term's ACF/SCF fields the same way
+  they already did for posts, through the `"<taxonomy>_<term_id>"` context string both
+  plugins accept in place of a post id.
+- **A CPT's or taxonomy's rewrite base, registered once in PHP, was never documented as
+  untranslatable.** Free Polylang prefixes and translates a post's or term's slug but
+  never the static path segment ahead of it — there is no per-language value to
+  translate, since the base is a PHP literal, not stored content. `skills/wp-polylang/SKILL.md`
+  now documents the two-halves pattern (extra rewrite rules per translated base, plus a
+  link filter that swaps it) and the rule that decides which base to print: the language
+  already in the URL, never the current reader — getting that backwards breaks the very
+  links Polylang itself builds for the other language (the hreflang pair, the switcher).
+- **`/wp-seed` had nowhere to send an options-page `page_link` field.** A demo never
+  supplies copy for a legal-links column (privacy policy, terms, FAQ), so those fields
+  shipped empty or pointed at whatever draft page WordPress created on install — a 404
+  with nothing in the UI to say so. A new phase creates a clearly-marked placeholder page
+  per language for each one, safe to re-run without overwriting a client's real page.
+  Templates that print one of these fields now have a documented guard: a `page_link`
+  keeps pointing at its page after that page is unpublished, and printing it regardless
+  serves a broken link silently.
+- **Non-trivial seed scripts had no documented home.** A whole content pass written as
+  throwaway files in a session's scratchpad survives only as long as the session does —
+  the records land in the database and stay; the code that reproduces them does not.
+  `skills/wp-cli-patterns/SKILL.md` now says where that logic belongs (`inc/seed/`, data
+  in `inc/seed/data/`), and defines the marker-meta and stable-key convention a re-run
+  needs to update existing records in place instead of duplicating them, without ever
+  overwriting a client's own edit.
+
+- **Every command that reads `.wp-create.json` now validates it first.** The twelve
+  consuming commands (`/wp-create`, `/wp-init`, `/wp-yolo`, `/wp-seed`, `/wp-section`,
+  `/wp-demo`, `/wp-audit`, `/wp-finalize`, `/wp-clone`, `/wp-debug`, `/wp-robin`,
+  `/wp-aos-animator`) gain a byte-identical gate block that runs `wp-config.mjs validate`
+  and branches on its exit code (`0` continue, `1` stop and report, `2` migrate then
+  continue, `3` no manifest). `/wp-create` runs its gate after Step 5 writes the manifest,
+  since creating it is that command's own job; `/wp-clone` runs its gate after `/wp-create`
+  has been dispatched as a sub-step, for the same reason. Covered by the new
+  `tests/checks/wp-config-gate.sh`. `README.md` documents `bin/wp-config.mjs`'s
+  subcommands, and `CLAUDE.md` records three ceilings: the gate only binds commands whose
+  gate line survives, a tested plugin-version range is a claim nothing keeps honest, and
+  `.wp-create.local.json` is unencrypted, not just unshared.
+- **Fix: four contracts Task 6 shipped were pinned by no test of their own.**
+  `tests/checks/wp-create-profile-enforcement.sh` now asserts (with a project-root-specific
+  path, not just the filename) that `/wp-init` Step 9.6 gitignores
+  `.wp-create.local.json` at `${PROJECT_PATH}`, not at `<theme-dir>`; that Step 4.10's
+  `validate-profile` call carries its own `**Validation:**`/`**On failure:**` block; and
+  that Step 5's manifest template — not just Step 4.10's prose — carries
+  `plugins.resolved`/`plugins.degraded`. `tests/checks/audit-lifecycle.sh` now asserts
+  `commands/wp-audit.md` states `manifest_version` 3 as current and widens the absent
+  bucket to `absent or < 3`. All four were mutation-proven to fail red when the
+  underlying fix is reverted.
+
+- **`node bin/wp-config.mjs validate-profile <file>` validates a plugin profile before
+  `/wp-create` installs anything from it.** Profiles load from three places —
+  `templates/profiles/`, the project's `.wp-profiles/*.json`, and `~/.wp-profiles/*.json`
+  — and the last two are user-authored, which is what makes structure validation worth
+  having. `validateProfile()` in `bin/lib/manifest.mjs` rejects a duplicate plugin slug,
+  an unknown key on a plugin entry, a `source` outside `"wordpress.org"`/`"supplied"`,
+  a `requires` edge pointing at a plugin the profile does not list, and a `conflicts`
+  edge pointing at one it does — all named in the message, and all before Step 4.10 has
+  activated a single plugin. Plugin entries gain three optional fields: `requires:
+  string[]`, `conflicts: string[]`, `source: 'wordpress.org' | 'supplied'`; both shipped
+  profiles (`templates/profiles/full.json`, `templates/profiles/starter.json`) now mark
+  every entry `"source": "wordpress.org"`. Exit codes match the existing `validate`
+  contract: `0` ok, `1` invalid, `3` file not found. Covered by
+  `tests/checks/wp-profiles.sh` and fixtures under `tests/fixtures/profiles/`.
+- **Fix: a user-authored profile with a non-array `requires`/`conflicts` (e.g.
+  `"requires": 5`) no longer crashes `validate-profile` with a raw Node stack trace.**
+  `validateProfile()` now reports it as an ordinary validation problem naming the entry
+  and the key, instead of iterating a non-iterable and throwing. `required` is now
+  type-checked too: a present-but-non-boolean value (e.g. `"required": "false"`) is
+  rejected, and the shipped-profile `required`-count check in `tests/checks/wp-profiles.sh`
+  compares with `=== true` rather than truthiness, closing the same gap on both sides. A
+  plugin `slug` must already be lowercase and trimmed — `validateProfile()` rejects a
+  slug that isn't, naming the canonical form, rather than silently normalising it. Fixture
+  coverage extended to the remaining `validateProfile` branches (`conflicts`, unknown key,
+  bad `source`, a non-object entry, a missing `slug`, a missing `name`, a non-array
+  `plugins`, a non-array `requires`, a non-boolean `required`, a non-canonical `slug`) —
+  the last two were themselves initially unguarded: disabling either check left the full
+  suite green, so each now has its own fixture proven to fail red when that check alone
+  is disabled.
+- **Fix: `wp-config.mjs` no longer echoes `JSON.parse`'s own error message when a manifest,
+  local-secrets file or profile fails to parse.** That message can embed up to ~20 raw
+  bytes of the file's own content as a quoted snippet — a real leak path for
+  `.wp-create.local.json`, which holds secrets. `loadManifest`, `loadLocal` and
+  `cmdValidateProfile` now report only the file and, when the parser states one, the
+  position — never the parser's message text.
+- **`bin/wp-config.mjs` and `bin/lib/manifest.mjs` — one validator for `.wp-create.json`,
+  the manifest roughly thirty commands, agents and skills read with no writer contract
+  until now.** `node bin/wp-config.mjs validate <project-path>` checks the required fields,
+  the `"demo mode"` and `"i18n strategy"` values, and the manifest version, so a malformed
+  or missing manifest fails once, early, instead of thirty different ways deep inside
+  whichever command happens to read it first. Exit codes are fixed and are the contract:
+  `0` ok, `1` invalid/refused, `2` migration available, `3` no manifest. Covered by
+  `tests/checks/wp-config-validate.sh` and fixtures under `tests/fixtures/manifests/`.
+- **`node bin/wp-config.mjs migrate <project-path>` moves a pre-version manifest forward
+  without re-deciding it.** A legacy project's `"i18n strategy"` lives only as a prose
+  line in its `.claude/CLAUDE.md` — the new `migrateManifest()` reads that line instead
+  of falling back to the documented default, and only falls back (`suffix`/`plain`) when
+  the line itself is absent. Unknown keys are preserved, a future `manifest_version` is
+  refused and left untouched, the pre-migration file is backed up as
+  `.wp-create.json.v<n>.bak` (never `.wp-create.json.bak`, which `/wp-create` already
+  owns), and re-running migrate on an up-to-date manifest is a no-op — asserted by
+  comparing the whole project directory's file listing before and after, not just the
+  manifest's own bytes, so a regression that leaves a stray backup behind is caught too.
+  Covered by `tests/checks/wp-config-migrate.sh` and the `legacy-v1`/`future` fixtures.
+- **`node bin/wp-config.mjs render-context <project-path>` renders the project's
+  `.claude/CLAUDE.md` context block from `.wp-create.json` — the manifest, not the
+  prose, is now the source of truth.** `i18n strategy` alone is read out of that prose
+  in 17 places across agents; those readers are unchanged, but the block they read is
+  now generated between `<!-- wp-create:begin -->` / `<!-- wp-create:end -->` markers,
+  so the two files cannot disagree. Text outside the markers is the operator's and is
+  never touched; rendering twice is a no-op. `migrate` calls `render-context` as its
+  last step. `validate` gains a drift finding: a hand-edited block is reported (exit
+  `1`, naming `wp-create:begin`) and never silently overwritten — an operator who
+  edited it meant something. Covered by `tests/checks/wp-config-context.sh`.
+- **Fix: a malformed marker pair (an orphan BEGIN with no END, an END before a
+  BEGIN, or more than one of either) is now refused, not guessed at.** The first
+  cut of `spliceContext` treated anything other than a clean single pair as "absent"
+  and appended past it — an orphan BEGIN left the operator's own text stranded
+  after it, and the very next `render-context` (the exact remedy `validate`
+  recommended) paired that orphan with the real END and deleted everything
+  between them; an END appearing before a BEGIN in operator prose took the append
+  branch on every call, growing a new duplicate block each time. `render-context`
+  and `validate` now both refuse and exit `1` naming the malformed state and
+  telling the operator to fix the markers by hand, writing nothing. `contextDrift`
+  reports a malformed file as its own finding, distinct from ordinary drift.
+  Covered by four new cases in `tests/checks/wp-config-context.sh`.
+- **`node bin/wp-config.mjs get <project-path> <key>` — one way for every consumer to
+  read a manifest value, secrets included.** `/wp-init` writes a project's `.gitignore`
+  as `node_modules/`, `.DS_Store`, `*.log`, so `.wp-create.json` — database password
+  included — was committable into a client's repository by default. `get` resolves the
+  two recognised secrets (`db_password`, `admin_password`) in order **environment →
+  `.wp-create.local.json` → manifest**; the manifest rung still works for a project that
+  has not moved its secret out, but it warns every time it wins that the value came from
+  a legacy, committable location. A fixed alias table (`i18n-strategy`, `demo-mode`, plus
+  the dotted paths `theme.slug`, `project.slug`, `plugins.profile`, `languages.primary`,
+  `wp_cli.wrapper`) addresses the two space-spelled manifest keys a dotted path cannot
+  reach. Covered by `tests/checks/wp-config-secrets.sh`.
+- **Fix: `get database.password` and `get wordpress.admin_password` no longer read the
+  secret straight out of the manifest, bypassing the resolution order above.** Those
+  dotted paths equal a secret's own `manifestPath`, so the generic key lookup reached
+  them directly — no environment or `.wp-create.local.json` check, and no legacy
+  warning, even with the corresponding environment variable set. `getKey` now refuses
+  a key that names a secret's manifest path (exit `1`, nothing on stdout, naming the
+  secret alias to use instead — `db_password` / `admin_password`) rather than rerouting
+  it, so there is exactly one way to read a secret. `resolveSecret` also gained the
+  `typeof value === 'object'` guard `getKey` already had (an object at a secret's path
+  is refused, not printed) and switched its three presence checks from truthy to
+  `!== undefined && !== null`, so an explicitly empty secret — a real local-dev
+  configuration — resolves as itself instead of cascading past it to "no value found".
+  Covered by four new cases in `tests/checks/wp-config-secrets.sh`; the existing
+  alias-table case was also rewritten against a fixture value that differs from
+  `getKey`'s own fallback, since the fallback previously matched the fixture by
+  coincidence and let a broken alias mapping pass unnoticed.
+- **Fix: a suffixed path under a secret's manifest path — `database.password.length`,
+  `database.password.constructor.name` — still bypassed the refusal above.** The
+  refusal was an exact string match against `manifestPath`, so a key that merely
+  *started with* it fell through to the generic dotted-path reader, which keeps
+  walking past the string onto its own JS properties: `.length` returned the
+  secret's exact character count, `.constructor`/`.constructor.name` its type.
+  Same bypass as before — no warning, exit `0` — for a narrower slice. `getKey`
+  now refuses a key equal to a secret's manifest path *or prefixed by it plus a
+  dot*, and rejects a function the same way it already rejects an object, so a
+  suffixed non-secret path can't return a prototype method either. Covered by
+  three new cases in `tests/checks/wp-config-secrets.sh`.
+- **`/wp-create` now matches the validator Tasks 1-5 built, instead of documenting the
+  behavior the validator replaced.** Step 4.10 no longer treats every plugin failure the
+  same way: it validates the profile first (`wp-config.mjs validate-profile`), installs
+  one plugin at a time, and branches on that plugin's `required` flag — a required
+  plugin that fails to install or activate stops the build and names the blocked
+  workflow, an optional one warns and is recorded in `plugins.degraded`; a successful
+  install is recorded in `plugins.resolved`. A `"source": "supplied"` plugin is never
+  fetched from WP.org, and a required one that has no supplied zip is `license_missing`,
+  which blocks the same as any other required failure. The `.wp-create.json` manifest
+  example is bumped to `manifest_version: 3` and **no longer carries the database
+  password** — DB and admin passwords are generated per project (16 random characters)
+  and written to `${PROJECT_PATH}/.wp-create.local.json` instead, resolved through
+  `wp-config.mjs get` (environment → local file → manifest). `/wp-init` adds
+  `.wp-create.local.json` to the **project root's** `.gitignore` (Step 9.6). Covered by
+  the new `tests/checks/wp-create-profile-enforcement.sh`.
+- **Fix: the `.gitignore` entry above protected nothing.** It was written to
+  `<theme-dir>/.gitignore` — the theme's own git repo, rooted below
+  `${PROJECT_PATH}` — while `.wp-create.local.json` lives at the project root, a
+  sibling of `.wp-create.json`. A repo cannot ignore a path outside itself
+  (`git check-ignore -v` on it there fails `fatal: ... is outside repository`), so a
+  project root that is itself versioned — a normal delivery pattern — committed the
+  database and admin passwords in cleartext, exactly what this manifest_version 3
+  change exists to prevent. `/wp-init` gains Step 9.6, which writes the ignore line
+  to `${PROJECT_PATH}/.gitignore` (creating it if absent) independently of the
+  theme's own `.gitignore` from Step 9.5, which is left untouched. `/wp-create`'s
+  Step 5 note now says which `.gitignore` and states the write as an imperative
+  ("write them to `${PROJECT_PATH}/.wp-create.local.json` immediately"), not deferred
+  to the manifest step, since the credentials are already in use by Step 4.3/4.9 and
+  an un-persisted value can't survive a retry after a later critical step fails.
+  `Step 4.10`'s `validate-profile` call gained the `**Validation:**`/`**On failure:**`
+  block every sibling step already has, and the Step 5 manifest template now shows
+  `plugins.resolved`/`plugins.degraded` alongside `installed`, matching what Step
+  4.10 actually records. `/wp-audit`'s own `manifest_version` references (Step 2.5a's
+  table, its own `audit` reconciliation example) are bumped to `3`, and the "absent"
+  bucket widens to "absent or `< 3`" — the previous "current is `2`, stop above `2`"
+  table would otherwise treat a project this task's `/wp-create` just created as
+  newer-than-understood and refuse to reconcile it.
+
 ### Fixed
 
 - **`/wp-demo-verify` no longer reads full-resolution contact sheets into the
@@ -191,322 +516,6 @@
   thing the client sees every day — unless something re-skins it. Both are now
   checked (favicon/site icon as a blocking item, login branding as a
   warning-only item, since some projects ship the default by choice).
-
-### Added
-
-- **Performance and accessibility audits now measure instead of guessing.**
-  `agents/wp-audit-performance.md` gains PERF-054/PERF-055: the real LCP element
-  is found per template with a `PerformanceObserver` on
-  `largest-contentful-paint`, not assumed to always be the hero — a directory or
-  archive grid can put its LCP on a first-row card, and a blanket
-  `loading="lazy"` below the fold then defers exactly the element the page is
-  judged on. PERF-055 checks the preloaded font file actually matches the
-  weight the LCP text renders in, instead of preloading "the first N files"
-  found on disk. `agents/wp-audit-a11y.md` gains A11Y-031 (overlays/drawers need
-  a real focus trap, not just initial focus, and must return focus on close),
-  A11Y-032 (`target="_blank"` links need a screen-reader "opens in a new tab"
-  notice), A11Y-033 (a horizontally-scrollable region needs `tabindex="0"` plus
-  an accessible name), and A11Y-034 (a cross-engine `cursor` sweep must not read
-  WebKit's `auto` — its UA default for an undeclared pointer — as "no pointer"
-  when other engines agree it is one). A11Y-004's non-text-contrast check now
-  requires computing a focus ring's contrast against the background it actually
-  sits on, not a single assumed page ground.
-- **`wp-aos-animator` closes two seams found by scrolling a real build past its
-  first entrance.** `aos.css` rewrites `transition-property`/`-duration`/`-delay`
-  on any element that still carries `data-aos`, for as long as the attribute
-  stays — silently breaking a hover-lift card's or a color-fading button's own
-  transition long after the entrance finished. The skill's init module now
-  strips the AOS attributes once an element's entrance transition ends. AOS also
-  measured trigger points at `DOMContentLoaded`, before web fonts and images
-  reflow the layout, so a block that moves afterward could end up permanently
-  below a stale trigger with `once: true`; the module now calls `AOS.refresh()`
-  again on `load`, and reveals anything already on screen at that point instead
-  of waiting for a scroll that may never come. The skill now also says to
-  animate the above-the-fold LCP candidate with a fast plain `fade` rather than
-  skip it outright — a small, deliberate LCP cost instead of a static-looking
-  first screen.
-- **`wp-agentic-surfaces`: a named search indexer could receive the markdown 404 body —
-  cloaking.** The "is this a non-browser agent" UA sniff (`bot|crawl|spider|agent|…`)
-  matches "Googlebot" on `bot` alone, and a real SEO audit found the theme's designed 404
-  replaced by a markdown response for Google's own crawler: a browser and a named
-  indexer got different content on the same URL. Named search indexers (Googlebot,
-  Bingbot, Slurp, Baiduspider, YandexBot, Applebot, …) are now matched and excluded
-  *before* the generic pattern and always get the human HTML; Applebot-Extended (a
-  distinct UA, the AI-training crawler already allowlisted in Step 4) is unaffected.
-  Step 5's verification now fetches the 404 impersonating Googlebot and fails if the
-  response is `text/markdown`.
-- **`wp-agentic-surfaces`: `Content-Signal` was written as a robots.txt directive; the
-  spec defines it as an HTTP response header.** No robots.txt grammar recognises a bare
-  `Content-Signal:` line, so a linter (Lighthouse included) reports the *whole file*
-  invalid over that one line, costing the SEO score of every page and burying any real
-  robots.txt error behind a self-inflicted one. It now ships on the existing
-  `send_headers` action next to the RFC 8288 `Link` header, and is left in robots.txt
-  only as a comment; the physical-robots.txt writer (Step 4) and its verification
-  (Step 5) match.
-- **`wp-audit-rankmath`: theme JSON-LD sharing an `@id` with Rank Math's own graph must
-  be merged through `rank_math/json_ld`, never echoed as a second `<script>`.** Two
-  blocks sharing an `@id` merge into one entity per the JSON-LD spec, but any validator
-  or audit that counts `@type` occurrences reads two `Organization` nodes — which is how
-  a real portal audit reported it. New Step 4.7 merges the theme's real business data
-  (address, contactPoint, sameAs — none of which Rank Math itself collects) into Rank
-  Math's node by matching `@id`, reading `knowledgegraph_type` to resolve the fragment
-  rather than assuming a value. Step 8.5's duplicate-schema check now recommends the
-  merge path instead of blind removal, which would have lost that data rather than
-  de-duplicated it.
-- **`wp-audit-rankmath`: search results had no noindex step.** `/?s=<term>` and its
-  pretty form both answered `200` as `index, follow` with a canonical — two indexable
-  URLs for the same slice of content. New Step 4.6 sets `noindex, follow` on
-  `is_search()` via `rank_math/frontend/robots` and leaves canonical removal to Rank
-  Math's own noindex behaviour rather than forcing one.
-- **`wp-audit-rankmath`: per-page SEO seeding skipped every taxonomy term.** Step 8
-  looped `get_posts()` only, so a site's term archives were left on the global title
-  template with no description at all — worse than a post, which can at least fall back
-  to excerpting `post_content`; a term has none. Step 8 now also seeds
-  `rank_math_title`/`rank_math_description`/`rank_math_focus_keyword` as term meta over
-  every public taxonomy.
-- **`wp-audit-rankmath`: the og:image default could carry a URL with no attachment ID,
-  and `knowledgegraph_type` silently degrades on an out-of-range value.** Rank Math does
-  not print `og:image` unless `open_graph_image_id` is a real attachment; the old
-  fallback to the theme screenshot always left that at `0` (and the screenshot is the
-  editor preview, not a stable share-card URL). Step 6 now requires a real attachment
-  and warns instead of silently producing no tag. `knowledgegraph_type` accepts only the
-  literal `'person'`/`'company'` — a plausible-looking `'organization'` falls back to
-  `'person'` with no warning, describing a company as a human in its own JSON-LD. Step 4
-  now documents the two legal values and verifies the option landed as one of them.
-- **`wp-audit-rankmath`: a theme's own `<meta name="description">` fallback could
-  duplicate Rank Math's tag.** Gating the fallback only on "is an SEO plugin active" is
-  not enough — Rank Math can be active and still emit nothing on a specific route (an
-  unconfigured template, a page type with no post/term to hold meta). Step 8.5 now
-  checks for a hardcoded theme description tag and for more than one rendered on the
-  home page, and recommends gating the theme's tag on the *current object's own*
-  `rank_math_description`/`rank_math_title` being empty, not on plugin presence alone.
-- **`wp-audit-rankmath`: a sideloaded site icon could be silently turned into WebP.** An
-  unrelated image-optimizer plugin that filters `image_editor_output_format` globally
-  runs on every sideload, including a favicon import, and WordPress then points
-  `apple-touch-icon` at a file iOS does not read as a touch icon. Step 6 now imports the
-  site icon (when `site_icon` is empty) with that filter explicitly disabled around the
-  sideload, and verifies the stored file is still a PNG.
-- **`/wp-polylang`'s menu import wrote the per-language override and nothing else.**
-  Polylang's own frontend filter only substitutes a location's value inside the core
-  `nav_menu_locations` theme_mod — it never adds one. A location assigned only through
-  the `polylang` option (what `pll-import.php`'s menu branch did, and what `/wp-seed`'s
-  own Polylang phase still does for the primary language) left that theme_mod empty, so
-  `wp_nav_menu()` fell through to its hard-coded fallback for EVERY language — the
-  fallback can look right by coincidence in the default language, which is what hid it.
-  Both scripts now register the location the normal way before writing the override.
-  Separately, the Polylang i18n variant's string helper asked the registry for a
-  hardcoded `'en'` value; a project whose registered source is a different primary
-  language never matched, so `pll__()` silently no-op'd and a client's edits under
-  Languages > Strings were discarded. It now resolves the source through the project's
-  own `DEFAULT_LANG` constant.
-- **A taxonomy term's own custom fields never reached its translation.** `/wp-polylang`
-  carries a post's fields, content and ACF payload across, but a term's fields are a
-  separate storage surface `pll_save_term_translations()` does nothing for — a repeater
-  or a plain field attached to a term came out blank on the counterpart, with no error.
-  The export and import scripts now walk and write a term's ACF/SCF fields the same way
-  they already did for posts, through the `"<taxonomy>_<term_id>"` context string both
-  plugins accept in place of a post id.
-- **A CPT's or taxonomy's rewrite base, registered once in PHP, was never documented as
-  untranslatable.** Free Polylang prefixes and translates a post's or term's slug but
-  never the static path segment ahead of it — there is no per-language value to
-  translate, since the base is a PHP literal, not stored content. `skills/wp-polylang/SKILL.md`
-  now documents the two-halves pattern (extra rewrite rules per translated base, plus a
-  link filter that swaps it) and the rule that decides which base to print: the language
-  already in the URL, never the current reader — getting that backwards breaks the very
-  links Polylang itself builds for the other language (the hreflang pair, the switcher).
-- **`/wp-seed` had nowhere to send an options-page `page_link` field.** A demo never
-  supplies copy for a legal-links column (privacy policy, terms, FAQ), so those fields
-  shipped empty or pointed at whatever draft page WordPress created on install — a 404
-  with nothing in the UI to say so. A new phase creates a clearly-marked placeholder page
-  per language for each one, safe to re-run without overwriting a client's real page.
-  Templates that print one of these fields now have a documented guard: a `page_link`
-  keeps pointing at its page after that page is unpublished, and printing it regardless
-  serves a broken link silently.
-- **Non-trivial seed scripts had no documented home.** A whole content pass written as
-  throwaway files in a session's scratchpad survives only as long as the session does —
-  the records land in the database and stay; the code that reproduces them does not.
-  `skills/wp-cli-patterns/SKILL.md` now says where that logic belongs (`inc/seed/`, data
-  in `inc/seed/data/`), and defines the marker-meta and stable-key convention a re-run
-  needs to update existing records in place instead of duplicating them, without ever
-  overwriting a client's own edit.
-### Added
-
-- **Every command that reads `.wp-create.json` now validates it first.** The twelve
-  consuming commands (`/wp-create`, `/wp-init`, `/wp-yolo`, `/wp-seed`, `/wp-section`,
-  `/wp-demo`, `/wp-audit`, `/wp-finalize`, `/wp-clone`, `/wp-debug`, `/wp-robin`,
-  `/wp-aos-animator`) gain a byte-identical gate block that runs `wp-config.mjs validate`
-  and branches on its exit code (`0` continue, `1` stop and report, `2` migrate then
-  continue, `3` no manifest). `/wp-create` runs its gate after Step 5 writes the manifest,
-  since creating it is that command's own job; `/wp-clone` runs its gate after `/wp-create`
-  has been dispatched as a sub-step, for the same reason. Covered by the new
-  `tests/checks/wp-config-gate.sh`. `README.md` documents `bin/wp-config.mjs`'s
-  subcommands, and `CLAUDE.md` records three ceilings: the gate only binds commands whose
-  gate line survives, a tested plugin-version range is a claim nothing keeps honest, and
-  `.wp-create.local.json` is unencrypted, not just unshared.
-- **Fix: four contracts Task 6 shipped were pinned by no test of their own.**
-  `tests/checks/wp-create-profile-enforcement.sh` now asserts (with a project-root-specific
-  path, not just the filename) that `/wp-init` Step 9.6 gitignores
-  `.wp-create.local.json` at `${PROJECT_PATH}`, not at `<theme-dir>`; that Step 4.10's
-  `validate-profile` call carries its own `**Validation:**`/`**On failure:**` block; and
-  that Step 5's manifest template — not just Step 4.10's prose — carries
-  `plugins.resolved`/`plugins.degraded`. `tests/checks/audit-lifecycle.sh` now asserts
-  `commands/wp-audit.md` states `manifest_version` 3 as current and widens the absent
-  bucket to `absent or < 3`. All four were mutation-proven to fail red when the
-  underlying fix is reverted.
-
-- **`node bin/wp-config.mjs validate-profile <file>` validates a plugin profile before
-  `/wp-create` installs anything from it.** Profiles load from three places —
-  `templates/profiles/`, the project's `.wp-profiles/*.json`, and `~/.wp-profiles/*.json`
-  — and the last two are user-authored, which is what makes structure validation worth
-  having. `validateProfile()` in `bin/lib/manifest.mjs` rejects a duplicate plugin slug,
-  an unknown key on a plugin entry, a `source` outside `"wordpress.org"`/`"supplied"`,
-  a `requires` edge pointing at a plugin the profile does not list, and a `conflicts`
-  edge pointing at one it does — all named in the message, and all before Step 4.10 has
-  activated a single plugin. Plugin entries gain three optional fields: `requires:
-  string[]`, `conflicts: string[]`, `source: 'wordpress.org' | 'supplied'`; both shipped
-  profiles (`templates/profiles/full.json`, `templates/profiles/starter.json`) now mark
-  every entry `"source": "wordpress.org"`. Exit codes match the existing `validate`
-  contract: `0` ok, `1` invalid, `3` file not found. Covered by
-  `tests/checks/wp-profiles.sh` and fixtures under `tests/fixtures/profiles/`.
-- **Fix: a user-authored profile with a non-array `requires`/`conflicts` (e.g.
-  `"requires": 5`) no longer crashes `validate-profile` with a raw Node stack trace.**
-  `validateProfile()` now reports it as an ordinary validation problem naming the entry
-  and the key, instead of iterating a non-iterable and throwing. `required` is now
-  type-checked too: a present-but-non-boolean value (e.g. `"required": "false"`) is
-  rejected, and the shipped-profile `required`-count check in `tests/checks/wp-profiles.sh`
-  compares with `=== true` rather than truthiness, closing the same gap on both sides. A
-  plugin `slug` must already be lowercase and trimmed — `validateProfile()` rejects a
-  slug that isn't, naming the canonical form, rather than silently normalising it. Fixture
-  coverage extended to the remaining `validateProfile` branches (`conflicts`, unknown key,
-  bad `source`, a non-object entry, a missing `slug`, a missing `name`, a non-array
-  `plugins`, a non-array `requires`, a non-boolean `required`, a non-canonical `slug`) —
-  the last two were themselves initially unguarded: disabling either check left the full
-  suite green, so each now has its own fixture proven to fail red when that check alone
-  is disabled.
-- **Fix: `wp-config.mjs` no longer echoes `JSON.parse`'s own error message when a manifest,
-  local-secrets file or profile fails to parse.** That message can embed up to ~20 raw
-  bytes of the file's own content as a quoted snippet — a real leak path for
-  `.wp-create.local.json`, which holds secrets. `loadManifest`, `loadLocal` and
-  `cmdValidateProfile` now report only the file and, when the parser states one, the
-  position — never the parser's message text.
-- **`bin/wp-config.mjs` and `bin/lib/manifest.mjs` — one validator for `.wp-create.json`,
-  the manifest roughly thirty commands, agents and skills read with no writer contract
-  until now.** `node bin/wp-config.mjs validate <project-path>` checks the required fields,
-  the `"demo mode"` and `"i18n strategy"` values, and the manifest version, so a malformed
-  or missing manifest fails once, early, instead of thirty different ways deep inside
-  whichever command happens to read it first. Exit codes are fixed and are the contract:
-  `0` ok, `1` invalid/refused, `2` migration available, `3` no manifest. Covered by
-  `tests/checks/wp-config-validate.sh` and fixtures under `tests/fixtures/manifests/`.
-- **`node bin/wp-config.mjs migrate <project-path>` moves a pre-version manifest forward
-  without re-deciding it.** A legacy project's `"i18n strategy"` lives only as a prose
-  line in its `.claude/CLAUDE.md` — the new `migrateManifest()` reads that line instead
-  of falling back to the documented default, and only falls back (`suffix`/`plain`) when
-  the line itself is absent. Unknown keys are preserved, a future `manifest_version` is
-  refused and left untouched, the pre-migration file is backed up as
-  `.wp-create.json.v<n>.bak` (never `.wp-create.json.bak`, which `/wp-create` already
-  owns), and re-running migrate on an up-to-date manifest is a no-op — asserted by
-  comparing the whole project directory's file listing before and after, not just the
-  manifest's own bytes, so a regression that leaves a stray backup behind is caught too.
-  Covered by `tests/checks/wp-config-migrate.sh` and the `legacy-v1`/`future` fixtures.
-- **`node bin/wp-config.mjs render-context <project-path>` renders the project's
-  `.claude/CLAUDE.md` context block from `.wp-create.json` — the manifest, not the
-  prose, is now the source of truth.** `i18n strategy` alone is read out of that prose
-  in 17 places across agents; those readers are unchanged, but the block they read is
-  now generated between `<!-- wp-create:begin -->` / `<!-- wp-create:end -->` markers,
-  so the two files cannot disagree. Text outside the markers is the operator's and is
-  never touched; rendering twice is a no-op. `migrate` calls `render-context` as its
-  last step. `validate` gains a drift finding: a hand-edited block is reported (exit
-  `1`, naming `wp-create:begin`) and never silently overwritten — an operator who
-  edited it meant something. Covered by `tests/checks/wp-config-context.sh`.
-- **Fix: a malformed marker pair (an orphan BEGIN with no END, an END before a
-  BEGIN, or more than one of either) is now refused, not guessed at.** The first
-  cut of `spliceContext` treated anything other than a clean single pair as "absent"
-  and appended past it — an orphan BEGIN left the operator's own text stranded
-  after it, and the very next `render-context` (the exact remedy `validate`
-  recommended) paired that orphan with the real END and deleted everything
-  between them; an END appearing before a BEGIN in operator prose took the append
-  branch on every call, growing a new duplicate block each time. `render-context`
-  and `validate` now both refuse and exit `1` naming the malformed state and
-  telling the operator to fix the markers by hand, writing nothing. `contextDrift`
-  reports a malformed file as its own finding, distinct from ordinary drift.
-  Covered by four new cases in `tests/checks/wp-config-context.sh`.
-- **`node bin/wp-config.mjs get <project-path> <key>` — one way for every consumer to
-  read a manifest value, secrets included.** `/wp-init` writes a project's `.gitignore`
-  as `node_modules/`, `.DS_Store`, `*.log`, so `.wp-create.json` — database password
-  included — was committable into a client's repository by default. `get` resolves the
-  two recognised secrets (`db_password`, `admin_password`) in order **environment →
-  `.wp-create.local.json` → manifest**; the manifest rung still works for a project that
-  has not moved its secret out, but it warns every time it wins that the value came from
-  a legacy, committable location. A fixed alias table (`i18n-strategy`, `demo-mode`, plus
-  the dotted paths `theme.slug`, `project.slug`, `plugins.profile`, `languages.primary`,
-  `wp_cli.wrapper`) addresses the two space-spelled manifest keys a dotted path cannot
-  reach. Covered by `tests/checks/wp-config-secrets.sh`.
-- **Fix: `get database.password` and `get wordpress.admin_password` no longer read the
-  secret straight out of the manifest, bypassing the resolution order above.** Those
-  dotted paths equal a secret's own `manifestPath`, so the generic key lookup reached
-  them directly — no environment or `.wp-create.local.json` check, and no legacy
-  warning, even with the corresponding environment variable set. `getKey` now refuses
-  a key that names a secret's manifest path (exit `1`, nothing on stdout, naming the
-  secret alias to use instead — `db_password` / `admin_password`) rather than rerouting
-  it, so there is exactly one way to read a secret. `resolveSecret` also gained the
-  `typeof value === 'object'` guard `getKey` already had (an object at a secret's path
-  is refused, not printed) and switched its three presence checks from truthy to
-  `!== undefined && !== null`, so an explicitly empty secret — a real local-dev
-  configuration — resolves as itself instead of cascading past it to "no value found".
-  Covered by four new cases in `tests/checks/wp-config-secrets.sh`; the existing
-  alias-table case was also rewritten against a fixture value that differs from
-  `getKey`'s own fallback, since the fallback previously matched the fixture by
-  coincidence and let a broken alias mapping pass unnoticed.
-- **Fix: a suffixed path under a secret's manifest path — `database.password.length`,
-  `database.password.constructor.name` — still bypassed the refusal above.** The
-  refusal was an exact string match against `manifestPath`, so a key that merely
-  *started with* it fell through to the generic dotted-path reader, which keeps
-  walking past the string onto its own JS properties: `.length` returned the
-  secret's exact character count, `.constructor`/`.constructor.name` its type.
-  Same bypass as before — no warning, exit `0` — for a narrower slice. `getKey`
-  now refuses a key equal to a secret's manifest path *or prefixed by it plus a
-  dot*, and rejects a function the same way it already rejects an object, so a
-  suffixed non-secret path can't return a prototype method either. Covered by
-  three new cases in `tests/checks/wp-config-secrets.sh`.
-- **`/wp-create` now matches the validator Tasks 1-5 built, instead of documenting the
-  behavior the validator replaced.** Step 4.10 no longer treats every plugin failure the
-  same way: it validates the profile first (`wp-config.mjs validate-profile`), installs
-  one plugin at a time, and branches on that plugin's `required` flag — a required
-  plugin that fails to install or activate stops the build and names the blocked
-  workflow, an optional one warns and is recorded in `plugins.degraded`; a successful
-  install is recorded in `plugins.resolved`. A `"source": "supplied"` plugin is never
-  fetched from WP.org, and a required one that has no supplied zip is `license_missing`,
-  which blocks the same as any other required failure. The `.wp-create.json` manifest
-  example is bumped to `manifest_version: 3` and **no longer carries the database
-  password** — DB and admin passwords are generated per project (16 random characters)
-  and written to `${PROJECT_PATH}/.wp-create.local.json` instead, resolved through
-  `wp-config.mjs get` (environment → local file → manifest). `/wp-init` adds
-  `.wp-create.local.json` to the **project root's** `.gitignore` (Step 9.6). Covered by
-  the new `tests/checks/wp-create-profile-enforcement.sh`.
-- **Fix: the `.gitignore` entry above protected nothing.** It was written to
-  `<theme-dir>/.gitignore` — the theme's own git repo, rooted below
-  `${PROJECT_PATH}` — while `.wp-create.local.json` lives at the project root, a
-  sibling of `.wp-create.json`. A repo cannot ignore a path outside itself
-  (`git check-ignore -v` on it there fails `fatal: ... is outside repository`), so a
-  project root that is itself versioned — a normal delivery pattern — committed the
-  database and admin passwords in cleartext, exactly what this manifest_version 3
-  change exists to prevent. `/wp-init` gains Step 9.6, which writes the ignore line
-  to `${PROJECT_PATH}/.gitignore` (creating it if absent) independently of the
-  theme's own `.gitignore` from Step 9.5, which is left untouched. `/wp-create`'s
-  Step 5 note now says which `.gitignore` and states the write as an imperative
-  ("write them to `${PROJECT_PATH}/.wp-create.local.json` immediately"), not deferred
-  to the manifest step, since the credentials are already in use by Step 4.3/4.9 and
-  an un-persisted value can't survive a retry after a later critical step fails.
-  `Step 4.10`'s `validate-profile` call gained the `**Validation:**`/`**On failure:**`
-  block every sibling step already has, and the Step 5 manifest template now shows
-  `plugins.resolved`/`plugins.degraded` alongside `installed`, matching what Step
-  4.10 actually records. `/wp-audit`'s own `manifest_version` references (Step 2.5a's
-  table, its own `audit` reconciliation example) are bumped to `3`, and the "absent"
-  bucket widens to "absent or `< 3`" — the previous "current is `2`, stop above `2`"
-  table would otherwise treat a project this task's `/wp-create` just created as
-  newer-than-understood and refuse to reconcile it.
-
-### Fixed
 
 - **`tests/checks/wp-config-gate.sh`'s validator-call assertion matched a prefix, not the
   real invocation.** `grep -Fq 'wp-config.mjs validate'` is satisfied by
