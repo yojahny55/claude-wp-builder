@@ -57,7 +57,13 @@ function fallbackFor(path) {
 }
 
 function at(obj, dotted) {
-  return dotted.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
+  // Own properties only. Plain bracket access walks the prototype chain, so a
+  // suffixed key answered with a JS intrinsic instead of reporting an unknown
+  // key: `get toString.length` printed 0. getKey's object/function guard catches
+  // `constructor.prototype` (Object.prototype is an object) but not a primitive
+  // one, and the secret-subtree refusal only covers a secret's own paths. Every
+  // path this walks is a plain JSON leaf, so nothing legitimate needs the chain.
+  return dotted.split('.').reduce((o, k) => (o == null || !Object.hasOwn(o, k) ? undefined : o[k]), obj);
 }
 
 export function validateManifest(manifest) {

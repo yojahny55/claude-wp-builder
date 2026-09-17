@@ -272,8 +272,6 @@
   is never called because it returns React, nothing reaches `/wp-yolo --transcribe`,
   and it never picks a motion device because it carries no motion data.
 
-### Fixed
-
 - **Check Inspo's fallback and search budget within each demo mode.** The checks
   previously required exactly two matching lines in the whole command, so an extra
   mention caused a false failure. Craft and plain are now checked independently;
@@ -283,6 +281,18 @@
   range allowed automatic patch upgrades despite its deliberate-upgrade rationale.
   The example now uses the measured release, and the check matches the quoted package
   argument literally so a range or a longer version cannot satisfy it.
+
+- **`wp-config.mjs get` answered a prototype-chain key with a JS intrinsic.**
+  `at()` walked plain bracket access, so `get toString.length` printed `0` —
+  `Object.prototype.toString`'s arity, not a config value — and exited 0 as though
+  the manifest had said so. `getKey`'s object/function guard does catch
+  `constructor.prototype` (Object.prototype is an object), which is why only the
+  primitive intrinsics leaked, and the secret-subtree refusal covers a secret's own
+  paths but nothing else. `at()` now requires `Object.hasOwn` at every step, so
+  traversal stays on the parsed JSON's own properties and any such key reads as
+  `unknown key` with exit 1. Every path it walks is a plain JSON leaf, so no
+  legitimate lookup changes behaviour. `tests/checks/wp-config-secrets.sh` pins all
+  three shapes.
 
 ## [1.18.0] - 2026-09-15
 

@@ -48,6 +48,19 @@ $cfg get "$tmp/p" nonsense >/dev/null 2>&1; code=$?
 set -e
 [ "$code" = "1" ] || fail "an unknown key exited $code, want 1"
 
+# A prototype-chain key reads as unknown, not as an answer. `at()` walked plain
+# bracket access, so `toString.length` left the parsed JSON for Object.prototype
+# and printed 0 -- a JS intrinsic, not a config value. getKey's object/function
+# guard does catch `constructor.prototype` (Object.prototype is an object), which
+# is why the primitive intrinsics are the ones asserted here.
+for pk in toString.length constructor.name valueOf.name; do
+  set +e
+  out=$($cfg get "$tmp/p" "$pk" 2>/dev/null); code=$?
+  set -e
+  [ "$code" = "1" ] || fail "get $pk exited $code, want 1 -- a prototype-chain key must read as unknown"
+  [ -z "$out" ] || fail "get $pk printed a JS intrinsic to stdout: $out"
+done
+
 # --- A secret's own manifest path is refused, not rerouted. A dotted path that
 # happens to equal a SECRETS[*].manifestPath must not become a second, silent way
 # to read the value -- it must exit 1, print nothing, and name the alias to use. --
