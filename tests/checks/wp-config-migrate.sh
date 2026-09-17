@@ -74,6 +74,45 @@ after_files=$(find "$tmp/p" -type f | sort)
 [ "$before" = "$after" ] || fail "migrate is not idempotent: the second run rewrote the manifest"
 [ "$before_files" = "$after_files" ] || fail "migrate is not idempotent: the second run left a new file behind (e.g. a stray backup)"
 
+# --- Migration never retires the only record of a decision. -----------------
+# A v1 manifest with no `theme` and no `languages` used to migrate with `ok:` and exit
+# 0: the prose lines carrying those decisions were commented out, the block was written
+# with a BLANK Theme slug and Primary language, and validate then exited 1 on both. The
+# project came out of its own migration permanently invalid, with the old values
+# recoverable only from inside an HTML comment. render-context now refuses an
+# incomplete manifest before it writes anything, and retiring the prose moved into
+# render-context, downstream of that refusal -- so the record survives exactly as long
+# as it is the only record.
+cp -r tests/fixtures/manifests/legacy-incomplete "$tmp/inc"
+inc_md="$tmp/inc/.claude/CLAUDE.md"
+md_before=$(sha256sum "$inc_md" | cut -d" " -f1)
+set +e
+$cfg migrate "$tmp/inc" >"$tmp/inc.out" 2>&1; code=$?
+set -e
+[ "$code" = "1" ] || fail "migrating a manifest that cannot render a complete block exited $code, want 1"
+grep -Fq 'theme.slug is required' "$tmp/inc.out" || fail "the refusal does not name the field that would render blank"
+grep -Fq 'refusing to write a partial block' "$tmp/inc.out" || fail "the refusal does not say a partial block was refused"
+md_after=$(sha256sum "$inc_md" | cut -d" " -f1)
+[ "$md_before" = "$md_after" ] || fail "a refused render still edited .claude/CLAUDE.md, retiring the only record of a decision"
+grep -Fq -e '- **Theme slug:** legacy-site' "$inc_md" \
+  || fail "the prose Theme slug line did not survive a refused migration"
+
+# And the project is recoverable: the operator reads the live prose, fills the manifest
+# in, and one render-context leaves a valid project stating each decision exactly once.
+node -e '
+ const f="'"$tmp"'/inc/.wp-create.json", fs=require("fs");
+ const m=JSON.parse(fs.readFileSync(f,"utf8"));
+ m.theme={slug:"legacy-site"}; m.languages={primary:"en"};
+ fs.writeFileSync(f, JSON.stringify(m,null,2)+"\n");
+'
+$cfg render-context "$tmp/inc" >/dev/null 2>&1 || fail "render-context after filling the manifest in did not exit 0"
+$cfg validate "$tmp/inc" >/dev/null 2>&1 || fail "the recovered project does not validate"
+for label in 'i18n strategy' 'Theme slug' 'Primary language'; do
+  n=$(grep -c "^[[:space:]]*-[[:space:]]*\*\*$label:\*\*" "$inc_md" || true)
+  [ "$n" = "1" ] || fail "after recovery $label is asserted on $n lines, want exactly 1"
+done
+grep -Fq -e '- **Theme slug:** legacy-site' "$inc_md" || fail "the recovered block does not state the theme slug"
+
 # --- A future version is refused and left completely intact. ----------------
 cp -r tests/fixtures/manifests/future "$tmp/f"
 sum_before=$(sha256sum "$tmp/f/.wp-create.json" | cut -d" " -f1)

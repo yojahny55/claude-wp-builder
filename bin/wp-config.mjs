@@ -101,24 +101,30 @@ function cmdMigrate(projectPath) {
   for (const n of notes) say(n);
   say(`ok: migrated to version ${CURRENT_VERSION}`);
 
-  // The prose decision lines migration just read are now the manifest's to state, and
-  // they live outside the markers where contextDrift cannot see them. Retire them
-  // BEFORE the block is written, or the project ends up asserting the old value beside
-  // the new one with validate exiting 0. Skipped when the file does not exist: there
-  // is nothing to supersede, and writing one here would pre-empt render-context.
-  if (existsSync(claudeFile)) {
-    const superseded = supersedeProseDecisions(claudeMd);
-    if (superseded !== claudeMd) {
-      writeFileSync(claudeFile, superseded);
-      say(`ok: superseded the legacy decision lines in ${claudeFile}`);
-    }
-  }
+  // Retiring the legacy prose lines belongs to render-context, not here: writing the
+  // block IS the act that takes ownership of them, and migrate is not the only caller.
+  // Doing it here meant the recovery path (fix the manifest, run render-context) wrote
+  // the block and left the prose live beside it.
   cmdRenderContext(projectPath);
 }
 
 function cmdRenderContext(projectPath) {
   const { manifest } = loadManifest(projectPath);
   const file = claudeMdPath(projectPath);
+  // A manifest that cannot produce a COMPLETE block must not produce a partial one.
+  // The block is the authoritative record every agent reads first, and a field missing
+  // from the manifest renders as an empty string there -- a blank an agent cannot tell
+  // from a decision. validateManifest requires every field the block renders (that is
+  // what CONTEXT_FIELDS is for), but only cmdValidate used to ask it; this path wrote
+  // the blanks anyway, which is how a migration could leave a project at exit 1 for
+  // fields whose only record it had just retired. Same problems, same wording, same
+  // exit code as validate, so the operator sees one message and fixes one thing.
+  const problems = validateManifest(manifest);
+  if (problems.length) {
+    for (const p of problems) warn(`invalid: ${p}`);
+    warn(`refusing to write a partial block to ${file}: fill the fields in above and run render-context again`);
+    process.exit(1);
+  }
   const current = existsSync(file) ? readFileSync(file, 'utf8') : '';
   let spliced;
   try {
@@ -130,9 +136,17 @@ function cmdRenderContext(projectPath) {
     warn(`fix the wp-create:begin/wp-create:end markers in ${file} by hand`);
     process.exit(1);
   }
+  // Writing the block is what takes ownership of the legacy prose decision lines, so
+  // retiring them happens here rather than in migrate: any caller that writes the block
+  // has to retire them, or the file asserts the old value beside the new one with
+  // validate exiting 0. Marker-aware, so the block's own lines -- same labels -- are
+  // untouched, and idempotent, so a second render changes nothing. One write: the
+  // refusals above must leave the file exactly as they found it.
+  const owned = supersedeProseDecisions(spliced);
   mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, spliced);
+  writeFileSync(file, owned);
   say(`ok: wrote the generated block in ${file}`);
+  if (owned !== spliced) say(`ok: superseded the legacy decision lines in ${file}`);
 }
 
 function loadLocal(projectPath) {

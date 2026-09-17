@@ -248,6 +248,18 @@
   `tests/checks/wp-profiles.sh`'s comment said "exactly one plugin required" where the
   assertion is "at least one"; the comment now states the rule that is enforced.
 
+- **Fix: migration could retire the only record of a decision and leave the project
+  permanently invalid.** A v1 manifest with no `theme` and no `languages` migrated with
+  `ok:` and exit 0, the prose lines carrying those decisions were commented out, the
+  generated block was written with a blank `Theme slug` and `Primary language`, and
+  `validate` then exited 1 on both — the old values recoverable only from inside an HTML
+  comment. `render-context` now validates before it renders and refuses to write a partial
+  block, and retiring the prose moved from `migrate` into `render-context`, downstream of
+  that refusal, so the record survives exactly as long as it is the only record and a
+  refused migration leaves `.claude/CLAUDE.md` byte-identical. Recovery is one
+  `render-context` after the manifest is filled in. `tests/fixtures/manifests/legacy-incomplete/`
+  reproduces the case end to end.
+
 ## [1.18.0] - 2026-09-15
 
 ### Added
