@@ -12,7 +12,9 @@
 #   3. the wp-robin skill states that `picture` does not cover CSS, with the page-cache
 #      caveat on `url` mode and the server-side alternative for a stylesheet.
 set -uo pipefail
-cd "$(dirname "$0")/../.."
+# -e is off (several greps are allowed to miss), so the one command whose failure would
+# silently change what every path below resolves against answers for itself.
+cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
 
 perf=starter-theme/__tailwind__/inc/performance.php
 agent=agents/wp-template.md
