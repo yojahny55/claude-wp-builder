@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+
+- The design library is a caret range, `@yojahny/wp-design-library@^1.0.0`, instead of an exact
+  pin. An exact pin had to be edited in `.mcp.json`, the README and a check on every library
+  release, so in practice it went stale rather than getting edited: it sat at 0.4.0 through
+  0.5.1 and 0.6.0, two versions behind the artifact-record contract, which left the pinned
+  server unable to read the corpus it was pointed at. The library is 1.0.0 so a caret works —
+  on 0.x a caret cannot cross a minor, which is what made re-pinning by hand unavoidable.
+
 ### Added
 
 - **A craft build studies an entry's motion clip instead of inferring motion from its strip.**
