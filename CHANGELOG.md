@@ -179,6 +179,19 @@
   table would otherwise treat a project this task's `/wp-create` just created as
   newer-than-understood and refuse to reconcile it.
 
+### Fixed
+
+- **`tests/checks/wp-config-gate.sh`'s validator-call assertion matched a prefix, not the
+  real invocation.** `grep -Fq 'wp-config.mjs validate'` is satisfied by
+  `wp-config.mjs validate-profile`, which `commands/wp-create.md` already calls (Task
+  5/6) — so the one file this whole task exists to protect could lose its actual gate
+  call and the check would still pass. The same shape existed for the migration-exit-code
+  assertion: a bare `grep -Fq 'exit 2'` is satisfied by unrelated `exit 2` documentation
+  already in `commands/wp-yolo.md` and `commands/wp-demo.md` (the `demo-verify.mjs
+  --probe` contract). Both assertions now match the actual gate text — the invocation
+  with its `'${PROJECT_PATH}'` argument, and the gate's own migration sentence — neither
+  of which any unrelated content in the twelve files happens to contain.
+
 ## [1.18.0] - 2026-09-15
 
 ### Added
