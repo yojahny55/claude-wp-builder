@@ -4,6 +4,20 @@
 
 ### Added
 
+- **A craft build studies an entry's motion clip instead of inferring motion from its strip.**
+  When a consulted `wp-design-library` entry carries `motion.clips`, `/wp-demo` sub-step 3.6 now
+  calls `get_motion` and reads the timestamped frames it returns as images; a strip shows what a
+  section is made of, never how it moves. The tool's own ceiling travels with the instruction —
+  a video URL alone does not provide video understanding — so a clip is cited only when its
+  frames were read.
+- **The motion vocabularies are mapped, including where they do not meet.** Ten library device
+  names map one to one onto the `data-motion` contract; `stagger` and `count` are modifier
+  attributes rather than devices; `marquee`, `stack` and `tabs` have no expression at all and are
+  built by hand with a reason in `demo/BRIEF.md`. `tests/checks/wp-library-motion.sh` pins the
+  mapping against `references/devices.md`, so the claim cannot go stale silently.
+
+### Added
+
 - **`/wp-demo` consults `inspo` for page-level direction, in both modes.** A free
   MIT archive of 832 production sites, opt-in and never registered by default. It
   answers macrostructure, section ordering and fold composition; `wp-design-library`

@@ -236,6 +236,31 @@ before writing any markup.
    real references with the blanket unavailable line. Never stop the build on a
    library error.
 
+   **Motion clips.** An entry's strip shows composition, not timing. When a consulted
+   entry's frontmatter carries `motion.clips`, call `get_motion` with that slug and study the
+   timestamped frames it returns as images; choose the section's `data-motion` device from
+   what those frames show, never from the strip. The tool states its own ceiling:
+   a video URL alone does not provide video understanding.
+   So cite a clip only when its frames were read, and never write the URL into
+   `demo/BRIEF.md` in place of reading them.
+
+   The two motion vocabularies are not the same size, and the difference is not all of one
+   kind. `reveal`, `pin`, `pan`, `wipe`, `kinetic`, `parallax`, `drift`, `tilt`, `magnet` and
+   `spotlight` are spelled identically on both sides and map one to one onto the `data-motion`
+   contract in `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/devices.md`. Two more are
+   expressible but are **modifiers, not devices**: an entry that reports `stagger` is asking for
+   `data-motion-stagger` on a `reveal`, and one that reports `count` for `data-motion-count` on
+   the element carrying the figure — reaching for `data-motion="stagger"` instead writes a value
+   the engine does not bind. **`marquee`, `stack` and `tabs` have no expression in the contract
+   at all** — when an entry names one, build it by hand under the same contract and say why in
+   `demo/BRIEF.md`, exactly as an eleventh role is built. Never invent a `data-motion` value:
+   an unknown one is inert rather than loud, so the section simply does not move.
+
+   Record the clip beside the entry that carried it — on that entry's `## References` line,
+   name the clip id and the section whose motion it informed. Most entries carry no clips and
+   `get_motion` refuses cleanly when they do not, so a build that finds none writes nothing
+   extra and continues.
+
    If the `inspo` MCP server is registered, consult it for page-level direction:
    one `recommend` with the brief, then at most two `search_screens`, then `get_screen`
    on the three to five references kept. A tool result is re-read on every later turn,
