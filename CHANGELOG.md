@@ -338,6 +338,16 @@
 
 ### Fixed
 
+- `wp-robin`: the webp sync step now converts sizes added after the first run. It used to
+  pick only attachments with no webp rows at all, so a size registered later and generated
+  with `wp media regenerate` was never converted. Each attachment's files on disk are now
+  compared against its webp rows, entries the attachment already owns are skipped instead of
+  duplicated under the collision hash, and the final "remaining" count uses the same rule.
+- `wp-robin`: the script checks that uploads is writable before converting and stops with the
+  cause, instead of printing one "conversion failed" line per size when the directory belongs
+  to the web server user. The skill's troubleshooting table gains that row and one for a
+  missing `wp_rio_process_queue` table after a WP-CLI activation.
+
 - **`/wp-demo-verify` no longer reads full-resolution contact sheets into the
   orchestrator's context.** `bin/demo-verify.mjs`'s contact sheet was a single
   full-page PNG of the whole walk's frames, and Step 4 told the model to read it
