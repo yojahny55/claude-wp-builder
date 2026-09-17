@@ -2,7 +2,13 @@
 set -eu
 cd "$(dirname "$0")/../.."
 grep -q '"wp-design-library"' .mcp.json || { echo "FAIL: mcp registration"; exit 1; }
-grep -q '"@yojahny/wp-design-library@0.4.0"' .mcp.json || { echo "FAIL: pinned mcp package"; exit 1; }
+# A caret RANGE on the 1.x line, never an exact version. An exact pin had to be edited here, in
+# .mcp.json and in the README on every library release — and because it was edited by hand it went
+# stale instead: it sat at 0.4.0 through 0.5.1 and 0.6.0, two versions behind the artifact-record
+# contract, so the pinned server could no longer read the corpus it was pointed at. The library is
+# 1.0.0 precisely so a caret works; on 0.x a caret cannot cross a minor, which is what made
+# re-pinning by hand unavoidable in the first place.
+grep -qE '"@yojahny/wp-design-library@\^1\.[0-9]+\.[0-9]+"' .mcp.json || { echo "FAIL: the library must be a caret range on 1.x, not an exact pin"; exit 1; }
 grep -q 'References: library unavailable' commands/wp-demo.md || { echo "FAIL: degrade line"; exit 1; }
 grep -q 'every call fails before that happens' commands/wp-demo.md || { echo "FAIL: unavailable line is not limited to zero successful references"; exit 1; }
 grep -q 'keep their citations' commands/wp-demo.md || { echo "FAIL: partial library failures discard successful references"; exit 1; }
