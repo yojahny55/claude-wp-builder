@@ -11,6 +11,7 @@
 #      only clears the 404 when $wp_query->posts is non-empty, and a sitemap route runs
 #      no post query of its own. `pre_handle_404` is core's escape hatch for this.
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $1"; exit 1; }
 
 for f in starter-theme/__tailwind__/functions.php starter-theme/__cinematic__/functions.php; do
@@ -35,7 +36,15 @@ done
 
 # agents/wp-template.md requires the ABSPATH guard in every PHP file a theme ships;
 # the starter those themes are copied from has to meet the same rule.
-unguarded=$(find starter-theme -name '*.php' -exec grep -L "defined( *'ABSPATH' *)" {} + || true)
+unguarded=$(find starter-theme -name '*.php' -exec grep -LE "defined\( *['\"]ABSPATH['\"] *\)" {} + || true)
 [ -z "$unguarded" ] || fail "starter PHP files without the ABSPATH guard: $unguarded"
+
+# The starter registers per-language menu locations only; a bare 'primary'
+# location renders nothing, in the starter's own part or in the agent's example.
+for f in starter-theme/__tailwind__/template-parts/header/navigation.php agents/wp-template.md; do
+  ! grep -Eq "'theme_location' *=> *'primary'" "$f" || fail "$f asks for an unregistered 'primary' menu location"
+done
+! grep -Fq 'https://example.com' starter-theme/__tailwind__/template-parts/footer/site-info.php \
+  || fail "the starter footer still prints a placeholder designer credit"
 
 echo PASS

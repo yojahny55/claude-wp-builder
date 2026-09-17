@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 s=skills/wp-polylang/SKILL.md
 test -f "$s" || { echo "FAIL: $s missing"; exit 1; }
 head -1 "$s" | grep -q '^---$' || { echo "FAIL: no frontmatter"; exit 1; }

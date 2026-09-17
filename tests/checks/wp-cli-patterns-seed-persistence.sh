@@ -6,6 +6,7 @@
 # pass had to be reconstructed by reading the records back out of a live site
 # because the scripts that seeded them were gone.
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 
 flat() { tr '\n' ' ' | sed -e 's/  */ /g'; }
 

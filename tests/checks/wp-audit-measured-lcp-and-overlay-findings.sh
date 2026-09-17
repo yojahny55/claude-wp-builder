@@ -12,6 +12,7 @@
 #   - A cross-engine `cursor` sweep must not read WebKit's `auto` (the UA default
 #     for an undeclared pointer) as "no pointer" when other engines agree it is.
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $1"; exit 1; }
 
 pf=agents/wp-audit-performance.md

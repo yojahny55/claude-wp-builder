@@ -13,6 +13,7 @@
 # the defect was structurally invisible from that point on. Conversion is the last moment
 # the original still exists to compare against.
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 
 gate=bin/tailwindify-parity.mjs
 [ -f "$gate" ] || { echo "FAIL: $gate is missing — the conversion has no rendering gate, and it is the only step where the original is still available to compare against"; exit 1; }

@@ -45,6 +45,8 @@ fi
 # Tailwind utility regardless of specificity or source order.
 main="$dir/assets/css/src/tailwindcss/main.css"
 [ -f "$main" ] || { echo "FAIL: $main missing"; exit 1; }
+# The pattern ends in `"\s*;`, so it only matches an import whose closing quote is
+# followed straight by the semicolon — one with no layer() between them.
 if grep -Eq '@import\s+"\./base/[^"]+"\s*;' "$main"; then
   echo "FAIL: $main imports a base/ file with no layer() — it sits outside every cascade layer and outranks any utility"; exit 1
 fi
@@ -70,7 +72,8 @@ fi
 if printf '%s' "$rbody" | grep -Eq 'img\{max-width:100%'; then
   echo "FAIL: $reset duplicates Preflight's img{max-width:100%} — a hand-written second copy has clamped a deliberately overhanging slider arrow to its button's width"; exit 1
 fi
-grep -Fq 'cursor: pointer' "$reset" \
+# Checked against the comment-stripped body, so a commented-out rule does not count.
+grep -Fq 'cursor:pointer' <<<"$rbody" \
   || { echo "FAIL: $reset does not restore cursor:pointer — Preflight leaves every button on the UA default (default, not pointer)"; exit 1; }
 grep -Fq 'input[type="submit"]' "$reset" \
   || { echo "FAIL: $reset's cursor rule does not cover input[type=submit] — Contact Form 7 and WordPress's own comment form render their submit this way, and button{cursor:pointer} never reaches it"; exit 1; }

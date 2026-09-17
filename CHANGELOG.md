@@ -15,6 +15,11 @@
   carrying the attribute — `cursor` inherits, so an unscoped rule on a container used
   only to announce state (a disabled tab panel, a busy section) took the pointer
   affordance away from still-interactive descendants.
+  The starter's `template-parts/header/navigation.php` asked for a `primary` menu
+  location that `inc/theme-setup.php` never registers (only `primary-<lang>`), so the
+  default nav rendered nothing; it now asks for the current language's location, and the
+  same example in `agents/wp-template.md` is fixed. The starter footer no longer prints a
+  placeholder designer credit linking to `example.com`.
   `tests/checks/starter-bootstrap-lock-and-sitemap.sh` pins the loader fixes;
   `tests/checks/tailwind-starter.sh` still pins `cursor: pointer` restored and
   `input[type="submit"]` covered.

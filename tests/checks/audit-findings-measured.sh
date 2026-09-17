@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # A finding is the output of a command that ran in this run. Anything else is UNVERIFIED.
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 shopt -s nullglob
 
 fail() { echo "FAIL: $1"; exit 1; }

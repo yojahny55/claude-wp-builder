@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 
 # Every audit check code must live in the agent's own check TABLE, not in prose
 # appended after it — an agent only runs what Step 1/Step 2 tabulate. This check

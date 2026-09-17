@@ -6,6 +6,7 @@
 # stays WordPress's stock grey screen — the first thing the client sees every
 # day — unless something re-skins it, and nothing checked that either.
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $1"; exit 1; }
 
 f=commands/wp-finalize.md

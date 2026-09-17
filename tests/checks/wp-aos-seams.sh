@@ -12,6 +12,7 @@
 # elements were skipped outright to protect LCP — the skill must say to animate
 # them too, with a fast plain fade, not leave them out.
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $1"; exit 1; }
 
 f=skills/wp-aos-animator/SKILL.md

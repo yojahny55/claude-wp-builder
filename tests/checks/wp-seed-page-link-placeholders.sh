@@ -43,12 +43,12 @@ tpl=agents/wp-template.md
 [ -f "$tpl" ] || { echo "FAIL: $tpl missing"; exit 1; }
 guard=$(section "$tpl" 'page_link. options fields')
 [ -n "$guard" ] || { echo "FAIL: agents/wp-template.md has no page_link options fields guard section"; exit 1; }
-gt=$(flat <<<"$guard")
+guard_text=$(flat <<<"$guard")
 grep -q 'page_link.*guard' <<<"$t" \
   || { echo "FAIL: wp-seed.md's placeholder phase never points templates at the page_link publish-status guard"; exit 1; }
-grep -qF "'publish' === get_post_status" <<<"$gt" \
+grep -qF "'publish' === get_post_status" <<<"$guard_text" \
   || { echo "FAIL: agents/wp-template.md's page_link section has no publish-status guard for page_link fields"; exit 1; }
-grep -qF 'url_to_postid' <<<"$gt" \
+grep -qF 'url_to_postid' <<<"$guard_text" \
   || { echo "FAIL: agents/wp-template.md's page_link guard does not resolve the URL to a post before checking its status"; exit 1; }
 
 echo PASS
