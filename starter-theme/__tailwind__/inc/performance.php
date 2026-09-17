@@ -50,6 +50,24 @@ add_filter( 'wp_generate_attachment_metadata', function ( $metadata, $attachment
 }, 10, 2 );
 
 /**
+ * Does an uploads URL at this position belong to a declaration the theme already
+ * decided about?
+ *
+ * __starter___background_image() emits the original URL twice on purpose — as the
+ * plain url() fallback and as the non-WebP candidate inside image-set() — and the
+ * output buffer must leave both alone. The two are told apart by what follows them,
+ * so this function is the one place that knows the emitter's format: change the
+ * emitted string and change it here, in the same edit.
+ *
+ * @param string $after The markup immediately following the matched URL.
+ * @return bool
+ */
+function __starter___is_theme_emitted_background( $after ) {
+	return 0 === strpos( $after, "') type('" )
+		|| 0 === strpos( $after, "');background-image:image-set(" );
+}
+
+/**
  * WebP sibling for an uploads URL, or '' when there is none.
  *
  * Two naming conventions are in the wild and both are checked, because a site
@@ -173,7 +191,7 @@ add_action( 'template_redirect', function () {
 			list( $text, $offset ) = $m[0];
 
 			$after = substr( $html, $offset + strlen( $text ), 32 );
-			if ( 0 === strpos( $after, "') type('" ) || 0 === strpos( $after, "');background-image:image-set(" ) ) {
+			if ( __starter___is_theme_emitted_background( $after ) ) {
 				return $text;
 			}
 			$webp = __starter___webp_sibling_url( $text );
@@ -258,7 +276,8 @@ function __starter___css_url( $url ) {
  *   <div style="<?php echo __starter___background_image( $field['url'] ); ?>">
  *
  * The type() arguments are single-quoted because a double quote would end the
- * attribute.
+ * attribute. The exact shape emitted here is what
+ * __starter___is_theme_emitted_background() recognizes, so the two change together.
  *
  * @param string $url Absolute URL of the background image.
  * @return string CSS declarations, or '' when $url is empty.

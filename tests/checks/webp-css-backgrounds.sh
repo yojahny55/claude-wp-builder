@@ -51,6 +51,8 @@ grep -Fq 'wp_get_upload_dir()' "$perf" \
 
 # The buffer must leave a declaration the helper already decided about alone: rewriting
 # the fallback url() would hand a browser without image-set() a WebP it may not decode.
+grep -Fq 'function __starter___is_theme_emitted_background(' "$perf" \
+  || { echo "FAIL: $perf does not keep the emitter's format in one place for the buffer to read"; exit 1; }
 grep -Fq "') type('" "$perf" \
   || { echo "FAIL: $perf's buffer does not recognize the helper's image-set() candidates"; exit 1; }
 grep -Fq "');background-image:image-set(" "$perf" \
