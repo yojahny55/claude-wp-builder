@@ -1,0 +1,152 @@
+# Stage 1 of automated CI: run what already exists on every pull request.
+#
+# Until now the only committed workflow was the OCR review bot, so nothing mechanical
+# stood between a broken contract and main -- CLAUDE.md said so outright ("There is no
+# CI. Run the checks yourself before claiming a change works"), and that sentence was
+# load-bearing on everyone remembering to.
+#
+# Deliberately NOT here: disposable WordPress fixtures, the broken-site corpus with
+# expected audit findings, and browser artifacts for failed scenarios. Those need a
+# provisioned WordPress and a pinned stack, they are stage 2, and bolting a half one
+# onto this would make the green light mean less than it does now.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Contract checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # php and node are both preinstalled on ubuntu-latest, and the checks need both:
+      # roughly a dozen shell out to `node` (the wp-config and craft families) and a
+      # dozen more to `php`. Versions are whatever the image ships on purpose -- these
+      # assert prose contracts, not runtime behaviour, so pinning here would buy
+      # nothing. The syntax job below is where a version is the whole point.
+      - name: Tool versions
+        run: |
+          bash --version | head -1
+          node --version
+          php --version | head -1
+
+      # Every check runs, then the job reports. Exiting on the first red would hand back
+      # one defect per round trip -- a PR that broke three contracts would take three
+      # pushes to discover it broke three contracts.
+      - name: Run every contract check
+        run: |
+          set -uo pipefail
+          pass=0; failed=()
+          for f in tests/checks/*.sh; do
+            if out=$(bash "$f" 2>&1); then
+              pass=$((pass + 1))
+            else
+              failed+=("$f")
+              printf '::group::FAIL %s\n' "$f"
+              printf '%s\n' "$out" | tail -30
+              printf '::endgroup::\n'
+              printf '::error file=%s::%s failed\n' "$f" "$f"
+            fi
+          done
+          printf '\nPASS=%d FAIL=%d\n' "$pass" "${#failed[@]}"
+          if [ "${#failed[@]}" -gt 0 ]; then
+            printf 'failing checks:\n'
+            printf '  %s\n' "${failed[@]}"
+            exit 1
+          fi
+
+  syntax:
+    name: Syntax
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: node --check every ES module
+        run: |
+          set -euo pipefail
+          n=0
+          while IFS= read -r f; do
+            node --check "$f"
+            n=$((n + 1))
+          done < <(find bin -name '*.mjs' -not -path '*/node_modules/*')
+          printf 'ok: %d ES module(s) parse\n' "$n"
+
+      # The runner's default PHP is 8.x, and `php -l` under 8.x happily accepts `match`,
+      # union types and nullsafe calls -- every one of which is a fatal parse error on
+      # 7.4. Linting at the default would therefore be green and wrong, which is worse
+      # than not linting: it reads as proof.
+      #
+      # skills/wp-polylang/scripts/*.php run via `wp eval-file` inside whatever
+      # WordPress the client has, and CLAUDE.md puts them on a 7.4 floor. The starters
+      # get copied into user projects and only __cinematic__ declares a floor of its own
+      # ("Requires PHP: 8.0" in its style.css), so everything else is held to 7.4 too.
+      # Nothing in the tree uses 8.0-only syntax today, so this starts green; the point
+      # is that adding some fails here, making a raised floor a deliberate act instead
+      # of a silent one.
+      - name: Set up PHP 7.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
+
+      - name: php -l at the 7.4 floor
+        run: |
+          set -euo pipefail
+          php --version | head -1
+          n=0
+          while IFS= read -r f; do
+            php -l "$f" >/dev/null
+            n=$((n + 1))
+          done < <(find . -name '*.php' -not -path './node_modules/*' -not -path './starter-theme/__cinematic__/*')
+          printf 'ok: %d file(s) parse on 7.4\n' "$n"
+
+      - name: Set up PHP 8.0
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+
+      - name: php -l the cinematic starter at its declared 8.0 floor
+        run: |
+          set -euo pipefail
+          php --version | head -1
+          n=0
+          while IFS= read -r f; do
+            php -l "$f" >/dev/null
+            n=$((n + 1))
+          done < <(find starter-theme/__cinematic__ -name '*.php')
+          printf 'ok: %d file(s) parse on 8.0\n' "$n"
+
+  doc-sync:
+    name: Docs describe the plugin that exists
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Only on a pull request: the CHANGELOG rule compares the branch against its base,
+    # and a push to main has no base to compare against.
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # bin/doc-sync-check.sh has shipped for months without anything running it --
+      # tests/checks/wp-contributing.sh only asserts that /wp-contribute *mentions* it.
+      # This is the first thing that executes it, and so the first thing that can catch
+      # a command added to the README table but never created, or a PR with no CHANGELOG
+      # entry, without a human remembering to look.
+      - name: Fetch the base ref
+        run: git fetch --no-tags origin "${{ github.base_ref }}"
+
+      - name: Run the doc-sync gate
+        run: bash bin/doc-sync-check.sh --changelog-base "origin/${{ github.base_ref }}"

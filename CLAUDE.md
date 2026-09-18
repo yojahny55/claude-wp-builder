@@ -29,7 +29,24 @@ for f in tests/checks/*.sh; do bash "$f"; done       # all checks
 (`PLL_TEST_SRC`/`PLL_TEST_DST`/`PLL_TEST_THIRD` override the languages; the third language is
 created and deleted by the suite and is guarded by a pre-existence probe).
 
-There is no CI. Run the checks yourself before claiming a change works.
+`.github/workflows/ci.yml` runs all of it on every pull request: the checks above (all of
+them, aggregated — it does not stop at the first red), `node --check` on `bin/*.mjs`,
+`php -l` on every PHP file, and `bin/doc-sync-check.sh`. Run the checks yourself before
+claiming a change works; CI is the net under that, not a replacement for it.
+
+**The PHP lint is version-pinned, and that is the point.** It lints at **7.4** — the floor
+`skills/wp-polylang/scripts/*.php` carry, because they run via `wp eval-file` inside
+whatever WordPress the client has — with `starter-theme/__cinematic__/` held to **8.0**,
+the floor it declares in its own `style.css`. The runner's default PHP is 8.x, and `php -l`
+under 8.x accepts `match`, union types and nullsafe calls, every one of which is a fatal
+parse error on 7.4; linting at the default would be green and wrong, which is worse than
+not linting, because it reads as proof. Nothing in the tree uses 8.0-only syntax today, so
+adding some fails CI and raising a floor stays a deliberate act.
+
+CI does not stand up a WordPress. Nothing here proves a generated site or an audit behaves
+correctly against a real install — disposable fixtures, a broken-site corpus with expected
+findings, and browser artifacts are stage 2. A green CI means the contracts still say what
+they should and the code still parses.
 
 ## Architecture
 
