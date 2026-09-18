@@ -84,6 +84,22 @@ grep -q "is not a directory" "$ORPHAN" \
 grep -qF "['\\\"]" "$ORPHAN" \
   || fail "$ORPHAN: get_field() is only matched with single quotes"
 
+# --- a half-measured gate must say so, not report a clean run ---------------
+# home_url() with no host makes the dev-host half a no-op; "0 items" would then cover
+# one of the two defects this gate exists to catch.
+grep -q "only the '#' check runs" "$MENU" \
+  || fail "$MENU: an empty dev host is skipped silently"
+
+# --- a menu can hold more than one location ---------------------------------
+if grep -n "array_flip( (array) get_nav_menu_locations()" "$MENU" >/dev/null 2>&1; then
+  fail "$MENU: array_flip keeps one location per menu and renames the rest"
+fi
+
+# --- zero is not a post ID --------------------------------------------------
+# get_post_status( 0 ) answers false, so a cleared field would read as a deleted post.
+grep -q "(int) \$candidate > 0" "$ORPHAN" \
+  || fail "$ORPHAN: a zero in a relationship array is reported as a deleted post"
+
 # --- both scripts are read-only deploy gates ---------------------------------
 for f in "$ORPHAN" "$MENU"; do
   if grep -nE '\$wpdb->(query|update|delete|insert|replace)\(|wp_(update|delete|insert)_post\(|update_post_meta\(' "$f" >/dev/null 2>&1; then

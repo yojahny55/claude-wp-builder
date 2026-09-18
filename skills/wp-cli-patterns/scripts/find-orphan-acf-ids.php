@@ -90,7 +90,9 @@ $types    = array();
  */
 $read = array();
 if ( $theme && is_dir( $theme ) ) {
-	$files = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $theme ) );
+	$files = new RecursiveIteratorIterator(
+		new RecursiveDirectoryIterator( $theme, RecursiveDirectoryIterator::SKIP_DOTS )
+	);
 	foreach ( $files as $file ) {
 		if ( 'php' !== strtolower( $file->getExtension() ) ) {
 			continue;
@@ -122,8 +124,12 @@ foreach ( $rows as $row ) {
 	$ids   = array();
 
 	foreach ( (array) $value as $candidate ) {
-		// A relationship array holds IDs; anything else in this meta_key is not one.
-		if ( is_numeric( $candidate ) ) {
+		/*
+		 * A relationship array holds IDs; anything else in this meta_key is not
+		 * one. A zero is not an ID either: get_post_status( 0 ) answers false,
+		 * which would report a cleared field as pointing at a deleted post.
+		 */
+		if ( is_numeric( $candidate ) && (int) $candidate > 0 ) {
 			$ids[] = (int) $candidate;
 		}
 	}

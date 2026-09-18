@@ -28,8 +28,20 @@
  * (see check-dev-host.php).
  */
 
-$dev_host = strtolower( (string) parse_url( home_url(), PHP_URL_HOST ) );
+$dev_host = parse_url( home_url(), PHP_URL_HOST );
+$dev_host = is_string( $dev_host ) ? strtolower( $dev_host ) : '';
 $findings = 0;
+
+/*
+ * A home_url() with no host component — a half-finished migration, a malformed
+ * constant — makes the development-host half of this check a silent no-op. Say so
+ * on STDERR rather than reporting a clean run: the `#` half below still works and
+ * is worth running, but "0 menu items do not navigate" would otherwise cover one
+ * of the two defects this gate exists to catch.
+ */
+if ( '' === $dev_host ) {
+	fwrite( STDERR, "audit-menu-links.php: home_url() has no host — only the '#' check runs\n" );
+}
 
 /*
  * Every menu, not only the ones assigned to a registered location. A menu
@@ -43,7 +55,14 @@ if ( ! $menus ) {
 	exit( 0 );
 }
 
-$locations = array_flip( (array) get_nav_menu_locations() );
+/*
+ * A menu can be assigned to more than one location, so this is a list per menu.
+ * array_flip() would keep only the last one and quietly rename the others.
+ */
+$locations = array();
+foreach ( (array) get_nav_menu_locations() as $location => $menu_id ) {
+	$locations[ (int) $menu_id ][] = $location;
+}
 
 foreach ( $menus as $menu ) {
 	$items = wp_get_nav_menu_items( $menu->term_id );
@@ -60,8 +79,8 @@ foreach ( $menus as $menu ) {
 		}
 	}
 
-	$where = isset( $locations[ $menu->term_id ] )
-		? "location '{$locations[ $menu->term_id ]}'"
+	$where = isset( $locations[ (int) $menu->term_id ] )
+		? "location '" . implode( "', '", $locations[ (int) $menu->term_id ] ) . "'"
 		: 'no location — assigned by widget, or unassigned';
 
 	foreach ( $items as $item ) {
