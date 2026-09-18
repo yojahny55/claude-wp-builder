@@ -31,6 +31,24 @@
 
 ### Added
 
+- **`/wp-seed` resolves every record before it creates one, so a second run stops duplicating
+  the site.** The command already declared `_<prefix>_seeded_content` "the marker every seeded
+  record carries" and stated that re-running is safe — while Phase 2 ran `wp post create`,
+  Phase 3 ran `wp media import` and Phase 6 ran `wp menu create` unconditionally, with no
+  lookup and no marker written. Seeding twice produced a duplicate of every page, attachment
+  and menu, and the client could not tell which "About" the theme reads. Six seed checks
+  existed; none covered a re-run.
+  New Phase 1.5 states the three-way rule the later phases now share: a record carrying our
+  marker is reused and updated **keeping its ID** (menu items, `page_on_front` and `page_link`
+  fields already point at it); a record without the marker belongs to the client and is left
+  exactly as it is, reported as a conflict, with no second record created beside it; anything
+  else is created, with the marker written by the same command that creates it — a create
+  whose marker does not land leaves a record this project can never recognise again.
+  Pages resolve by slug, attachments by the source they were imported from
+  (`_<prefix>_seeded_source`), menus by name — `wp menu create` never refuses a duplicate name,
+  so a second run could fill a menu the theme is not displaying. A plan prints before anything
+  writes, and an unchanged re-run shows `create 0 / update 0` with everything under `skip`,
+  which is how "re-running is safe" becomes observable instead of asserted.
 - **The development-host sweep reads four tables instead of one.** SEC-036 queried
   `wp_options` alone, which is the table that holds the least of this: on an audited site it
   reported 7 occurrences, and the same needle across `postmeta`, `posts` and `termmeta`

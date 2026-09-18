@@ -158,9 +158,80 @@ Languages:      en (primary), es (additional)
 
 ---
 
+## Phase 1.5: Resolve before you create
+
+**Every writing phase below resolves each record before it creates one.** Seeding runs more
+than once — a demo changes, a section is rebuilt, `/wp-yolo` re-runs a step — and a phase
+that creates unconditionally produces a second copy of everything it made last time. Pages,
+attachments and menus are the records that duplicate most visibly, and a client looking at
+two "About" pages cannot tell which one the theme reads.
+
+Seeded records carry `_<prefix>_seeded_content` (the marker named in Phase 4.5). It is what
+separates this run's own previous output from work the client did by hand, and it is the
+only thing that can: a page created by seeding and a page created by a client are otherwise
+identical rows. So every create goes through the same three-way resolution:
+
+| What a lookup finds | Do |
+|---|---|
+| a record **carrying our marker** | reuse it — update it in place, keep its ID |
+| a record **without the marker** | the client owns it. **Leave it exactly as it is**, record a conflict, and use its ID where a reference is needed |
+| **nothing** | create it, and write the marker in the same step |
+
+The second row is the one that must not be softened. An unmarked record is either the
+client's work or something that predates seeding, and both are cases where overwriting
+destroys something nobody can recover from the demo. Reporting the conflict is the whole
+response — never "fix" it by overwriting, and never create a second record beside it, which
+is the duplicate this phase exists to prevent wearing a different hat.
+
+**Write the marker in the same command that creates the record**, not in a later pass. A
+create that succeeds and a marker that does not leaves a record this project can never
+recognise again: the next run finds it unmarked, reads it as client-owned, and seeding can
+never touch it — or, worse, creates a duplicate beside it forever.
+
+### Preview before writing
+
+Resolve everything first, print what will happen, then write:
+
+```
+=== Seed plan ===
+  create    4 pages, 12 attachments, 2 menus
+  update    0 pages, 0 attachments, 0 menus
+  skip      0 (unchanged)
+  conflict  1 page — "About" exists without the seed marker; left untouched
+```
+
+An unchanged re-run prints `create 0 / update 0` and every record under `skip`. That line is
+how "re-running is safe" stops being a claim and becomes something the operator can see. A
+run whose plan is all `create` on a project that has been seeded before is the signal that
+resolution is not working — investigate before letting it write.
+
+Conflicts go in this plan **and** in the Seed Report at the end, with the record named.
+
+---
+
 ## Phase 2: Create Pages
 
 Create a WordPress page for each page found in the navigation (or each HTML file in multi-page demos). **Skip any slug listed in `--exclude-slugs`** — do not create a WP Page for it (its URL is provided by a CPT archive via `has_archive`, and a WP Page would collide with `archive-<slug>.php`).
+
+**Resolve by slug** (Phase 1.5). A page's title is edited freely by clients and its ID is not
+knowable in advance; the slug is what the demo, the menu and the template all agree on:
+
+```bash
+# Existing page with this slug, and whether seeding owns it
+bash -c "$WP post list --post_type=page --name='about' --format=ids"
+bash -c "$WP post meta get <page_id> _<prefix>_seeded_content 2>/dev/null"
+```
+
+Create only what resolution says to create, marking it in the same step:
+
+```bash
+bash -c "ABOUT_ID=\$($WP post create --post_type=page --post_title='About' --post_name='about' --post_status=publish --porcelain) && $WP post meta add \$ABOUT_ID _<prefix>_seeded_content 1 && echo \$ABOUT_ID"
+```
+
+A page found **with** the marker keeps its ID and is updated in place — `wp post update` —
+so every menu item, `page_on_front` option and `page_link` field already pointing at it stays
+pointing at it. Re-creating a page that already exists breaks those references silently:
+the old page keeps the referrers, the new one gets the content.
 
 ```bash
 # Create each page and capture its ID
@@ -197,10 +268,28 @@ Store all page IDs for use in later phases (menu creation, page-specific field s
 
 Import all collected image URLs into the WordPress media library.
 
+**Resolve by source identity** (Phase 1.5). An attachment has no slug worth matching and its
+filename is rewritten on collision — `photo.jpg`, `photo-1.jpg`, `photo-2.jpg` — which is
+exactly what a duplicate import looks like. So record where each attachment came from, in
+the same command that imports it, and look that up before importing:
+
 ```bash
-# Import each image and capture attachment ID
-bash -c "HERO_IMG_ID=\$($WP media import 'https://images.unsplash.com/photo-xxx' --title='Hero Background' --porcelain) && echo \$HERO_IMG_ID"
+# Already imported from this source?
+bash -c "$WP post list --post_type=attachment --meta_key=_<prefix>_seeded_source --meta_value='https://images.unsplash.com/photo-xxx' --format=ids"
+
+# Not found: import, and record both the marker and the source
+bash -c "HERO_IMG_ID=\$($WP media import 'https://images.unsplash.com/photo-xxx' --title='Hero Background' --porcelain) && $WP post meta add \$HERO_IMG_ID _<prefix>_seeded_content 1 && $WP post meta add \$HERO_IMG_ID _<prefix>_seeded_source 'https://images.unsplash.com/photo-xxx' && echo \$HERO_IMG_ID"
 ```
+
+The source value is the URL for a remote image and the repository-relative path for a local
+one (`assets/img/gen-<hash>.jpg`). Those paths already carry a content hash, so a regenerated
+plate is a different source and correctly imports again.
+
+This deduplicates by **where the bytes came from, not by the bytes**. The same image served
+from two different URLs imports twice, and that is a deliberate ceiling: hashing every import
+on every run costs more than the case is worth, and a duplicate attachment is a tidiness
+problem rather than a correctness one — unlike a duplicate page, which splits a site's
+navigation.
 
 **Failure handling:** If a media import fails for any URL (403, redirect loop, CDN block, timeout), do NOT abort. Instead:
 
@@ -476,8 +565,19 @@ Create navigation menus for each configured language. Menu location names use **
 
 ### Create menu structures
 
+**Resolve by name** (Phase 1.5). `wp menu create` never refuses a duplicate name — WordPress
+allows two menus called `Primary EN`, and `wp menu item add-post` then takes a slug that
+resolves to whichever one it finds, so a second run can fill a menu the theme is not
+displaying while the visible one keeps last run's items:
+
 ```bash
-# Create a menu for each language
+# Does a menu with this name already exist?
+bash -c "$WP menu list --fields=term_id,name,slug --format=csv"
+```
+
+Create only the missing ones:
+
+```bash
 bash -c "$WP menu create 'Primary EN'"
 bash -c "$WP menu create 'Primary ES'"
 
@@ -485,6 +585,13 @@ bash -c "$WP menu create 'Primary ES'"
 bash -c "$WP menu create 'Footer EN'"
 bash -c "$WP menu create 'Footer ES'"
 ```
+
+**A menu that already exists is emptied of its seeded items before this run adds its own**,
+rather than added to. Menu items are the one record where update-in-place does not work: a
+demo whose navigation dropped a page leaves that item behind forever, and matching an
+existing item to a demo link is guesswork the moment a title is edited. Delete the items
+this project seeded (`wp menu item delete`), keep any the client added, then add this run's.
+That is the same ownership rule, applied to a record whose identity is its position.
 
 ### Add menu items
 
@@ -607,9 +714,11 @@ Print a summary of everything that was seeded:
 
 ```
 === Seed Complete ===
-Pages created:     Home (ID: 5), About (ID: 6), Services (ID: 7), Contact (ID: 8)
+Pages created:     Home (ID: 5), Services (ID: 7), Contact (ID: 8)
+Pages updated:     (none)
 Front page:        Home (ID: 5)
 Media imported:    12 of 14 succeeded
+  reused:          3 already imported from the same source
   WARNING:         2 images failed (see below)
 ACF fields seeded: 23 fields (primary: en)
 Bilingual fields:  23 fields (es)
@@ -617,6 +726,11 @@ Menus created:     Primary EN, Primary ES, Footer EN, Footer ES
 Menu locations:    primary_en, primary_es, footer_en, footer_es
 Timezone:          America/New_York
 Default content:   Deleted
+
+Left alone — the client owns these:
+  - page "About" (ID: 31) has no seed marker. Nothing was written to it, and no
+    second About page was created. The menu points at ID 31.
+  → If this page should be seeded, delete it and re-run, or add the marker by hand.
 
 Failed media imports:
   - hero_background: https://example.com/image1.jpg (403 Forbidden)

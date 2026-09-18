@@ -198,6 +198,20 @@ a release.
 
 These are deliberate, documented limits — not bugs to "fix" on sight:
 
+- **Seed media deduplicates by source, not by content.** `/wp-seed` records
+  `_<prefix>_seeded_source` — the URL a remote image came from, or the repository-relative
+  path of a local one — and skips an import whose source it has already seen. The same
+  image served from two different URLs therefore imports twice. Hashing every import on
+  every run costs more than that case is worth, and a duplicate attachment is a tidiness
+  problem where a duplicate *page* splits a site's navigation. Generated plates are
+  unaffected: `assets/img/gen-<hash>.jpg` already carries a content hash in its path, so a
+  regenerated plate is a different source and correctly imports again.
+- **Seeded menu items are rebuilt, not reconciled.** Every other record `/wp-seed` owns is
+  updated in place; menu items are deleted and re-added, because a demo whose navigation
+  dropped a page would otherwise leave that item behind forever, and matching an existing
+  item to a demo link is guesswork the moment a title is edited. Items the client added are
+  kept. The cost is that a seeded item's own ID changes on every run, so nothing may hold a
+  reference to one.
 - **Media is not translated.** The Polylang importer copies an image or file id to the counterpart
   as-is rather than swapping it for that attachment's own translation. Mapping media is a separate
   decision; `pll-import.php` and the live suite both state the ceiling.
