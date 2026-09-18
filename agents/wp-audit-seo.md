@@ -96,6 +96,7 @@ These checks require a running WordPress installation. Use `$WP` from `.wp-creat
 | SEO-051 | `og:site_name` missing | Rendered-head snapshot (see Procedure) — `og:site_name` absent or empty on a sampled post | WARNING |
 | SEO-053 | Duplicate intent / cannibalization | Two published URLs target the same intent — a term archive and a post that both rank for one query. See Procedure | WARNING |
 | SEO-052 | Site-name signals disagree | Compare the snapshot's `og:site_name`, the `<title>` brand segment and the schema `WebSite.name` against `get_bloginfo('name')` and Rank Math's `website_name` / `knowledgegraph_name`; a `website_alternate_name` identical to `website_name` is also a finding | WARNING |
+| SEO-054 | Menu items that do not navigate | List every `custom` nav-menu item whose `_menu_item_url` is `#`, empty, or an absolute URL on the development host — excluding items that have children. See Procedure | WARNING |
 
 ### Procedure
 
@@ -251,6 +252,34 @@ echo wp_json_encode(\$out);
    decision, not an edit: noindex the archive, or make it the canonical hub and point the post
    at it. Recommend one and say why; never silently noindex an archive that earns traffic.
 
+10. **SEO-054** — a menu item that goes nowhere is a dead end for a crawler and for a visitor,
+    and it is invisible in the theme: a `custom` item stores its target in
+    `postmeta._menu_item_url`, so nothing in `header.php` or `footer.php` shows it. Menus
+    assigned through a nav-menu **widget** are easy to miss for the same reason — look in
+    `$WP widget list <sidebar>` as well as at the theme's registered locations.
+
+    ```bash
+    $WP eval-file <skills>/wp-cli-patterns/scripts/audit-menu-links.php
+    ```
+
+    Three shapes, and the fix differs:
+
+    | Stored `_menu_item_url` | Fix |
+    |---|---|
+    | `#` or empty, on an item with **no children** | repoint at the page it was meant to open, as a `post_type` item |
+    | an absolute URL on the development host | convert to a `post_type` item so the URL derives from `siteurl` at runtime |
+    | `#` on an item that **has children** | not a finding — see below |
+
+    **Items with children are excluded, and the exclusion is not optional.** A `custom` item
+    with `#` that has children is a submenu header: it is not supposed to navigate, and the
+    theme opens its submenu on hover or tap. Without the exclusion this check fires on almost
+    every menu that has a submenu at all, and the real broken links are lost in the noise.
+
+    Prefer converting to a `post_type` item over editing the URL. A `post_type` item derives
+    its URL from `siteurl` at render time, so it survives a migration to another host; a
+    `custom` item carries whatever host was typed into it, which is how SEC-036 findings get
+    created in the first place.
+
 ## Step 3: Tier 3 — Extended Checks
 If web-quality-skills SEO skill is available, reference additional checks:
 
@@ -317,3 +346,8 @@ For Rank Math configuration issues (SEO-020 through SEO-034), **dispatch the `wp
 4. **Code-level fixes use Edit tool** — template changes are applied directly to files.
 5. **Report all findings** — even passing checks, so the report shows full coverage.
 6. **Dispatch `wp-audit-rankmath` for Rank Math fixes** — do not duplicate its configuration logic.
+7. **Read menus from the database, not from the theme** — a `custom` item's target lives in
+   `postmeta._menu_item_url`, and a menu can be assigned through a widget rather than a
+   registered location. Neither is visible in `header.php` or `footer.php`.
+8. **A `custom` item with children is a submenu header** — excluding it is what keeps SEO-054
+   from firing on every menu that has a submenu.

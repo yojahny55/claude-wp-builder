@@ -829,6 +829,42 @@
   fixes their order — `empty()` on a `WP_Error` is `false` and lets it through — and excludes
   `wp_list_pluck()`, which checks `is_array()` internally and was wrongly flagged on the same
   audited theme.
+- **`WP-048` — IDs that outlive the post they point at.** Deleting a post from wp-admin does
+  not clear its ID out of the relationship and post-object fields that reference it, so a
+  template that iterates the field prints a card with no title, no terms and an empty `href` —
+  a visible defect produced by a record that no longer exists. The rule splits its findings:
+  an orphan in a field some template reads is WARNING, one in a field nothing reads is INFO.
+  That split is the whole point — the audited site had 70 orphans and exactly 1 reached the
+  HTML. An ID that resolves to a draft or trashed post is the same defect and is covered too,
+  because `get_post_status()` answers `draft` rather than `false` and a trashed post still has
+  a permalink.
+- **`SEO-054` — menu items that do not navigate.** A `custom` menu item stores its target in
+  `postmeta._menu_item_url`, so a broken menu link is invisible to anything that reads the
+  theme; the audited site's were in a menu assigned through a widget, which is not even a
+  registered location. The check reports `#`, empty, and development-host URLs, and excludes
+  items that have children — a `custom` item with `#` and children is a submenu header, and
+  without the exclusion the check fires on nearly every menu that has a submenu. The fix is to
+  convert the item to a `post_type` item, whose URL derives from `siteurl` at render time,
+  rather than to edit the URL of an item that will carry the next host too.
+- **Two more scripts in `skills/wp-cli-patterns/scripts/`,** both read-only and both exiting 1
+  on a finding so a deploy can gate on them. `find-orphan-acf-ids.php` resolves each field's
+  ACF type before treating a value as a post ID — a date field holds `20250910` and a number
+  field holds `142`, and skipping that lookup turned 70 real orphans into 248 reported ones.
+  `audit-menu-links.php` walks every menu rather than only the assigned locations.
+- **Match records by slug, never by ID, and the drafts gotcha that goes with it.** A script
+  that runs on one install and then on another cannot match by post ID; IDs are per-install.
+  `skills/wp-cli-patterns` now documents the pattern, including that `get_posts()` with
+  `'name' => $slug` does not return drafts even with `'post_status' => 'any'` — a lookup that
+  works for published pages silently finds nothing the moment the record is a draft, which is
+  the state a content script most often has to fix. `post_name__in` with the statuses written
+  out is the working form.
+- **`/wp-audit` Step 6.10 — every fix is verified against the data that triggered the
+  finding.** §6.9 made a *finding* a measurement and nothing said the same of a *fix*. A page
+  that still returns 200 after an edit proves the site did not break, not that the defect is
+  gone: on the audited site the orphaned ID was in one record's field, and two other pages
+  using the same template rendered correctly throughout. The reproducing case is named when
+  the finding is written, while the measurement is in hand, and a fix whose case cannot be
+  found is `UNVERIFIED` rather than resolved.
 
 ### Fixed
 
