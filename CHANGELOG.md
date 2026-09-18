@@ -336,6 +336,32 @@
   table would otherwise treat a project this task's `/wp-create` just created as
   newer-than-understood and refuse to reconcile it.
 
+- **Four theme-code rules an audit of a real theme found missing or mis-severed.**
+  `WP-030` named only the visible-text case, so the fix for an `_e()` inside `placeholder=`
+  was `esc_html_e()` — which escapes for the document body, not the attribute, and broke four
+  attributes on the audited theme. The check now maps each context to its escaper, covers the
+  `echo __()` form, warns that a regex sweep cannot see the context and so picks the wrong
+  escaper at scale, and states that this is WARNING and not CRITICAL: the vector needs a
+  hostile `.mo` inside `languages/`, and whoever can write there can already write PHP.
+  Reporting it as an exploitable hole inflates the audit.
+- **`WP-049` — a conditional `require` of a file whose functions are called unconditionally.**
+  One `inc/` file loaded under `if ( is_readable( ... ) )` while the rest were required
+  directly. It reads as a precaution and is the opposite of one: the guarded file also held
+  the breadcrumb helper that the always-loaded template-tags file called with no
+  `function_exists()`, so a missing file would have fataled about nineteen templates instead
+  of degrading. CRITICAL. The rule names both correct resolutions — drop the guard, or guard
+  every call site — because half of this is not a fix.
+- **`WP-050` — an argument key `WP_Query` never reads.** `'status' => 'publish'` instead of
+  `'post_status'`. `WP_Query` ignores an unrecognised key without warning, and the default
+  made the results look right, which is why it survives both review and testing; it breaks the
+  day someone previews as a logged-in user. The rule carries the mapping from the plausible
+  wrong key to the real one.
+- **`WP-051` — `get_the_terms()` iterated without a guard.** It returns an array, `false`, or a
+  `WP_Error`, so a bare `foreach` fatals on two of the three. The rule requires both tests and
+  fixes their order — `empty()` on a `WP_Error` is `false` and lets it through — and excludes
+  `wp_list_pluck()`, which checks `is_array()` internally and was wrongly flagged on the same
+  audited theme.
+
 ### Fixed
 
 - **A CSS `background-image` served the original PNG/JPG on an optimized library.** Robin
