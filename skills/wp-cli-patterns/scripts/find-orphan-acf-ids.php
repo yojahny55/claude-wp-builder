@@ -97,10 +97,13 @@ if ( $theme && is_dir( $theme ) ) {
 		if ( 'php' !== strtolower( $file->getExtension() ) ) {
 			continue;
 		}
-		// Both quoting styles. A get_field( $var ) call cannot be resolved statically;
-		// a field read only that way is classified DEAD-DATA, which under-reports.
-		if ( preg_match_all( "/get_field\(\s*['\"]([a-z0-9_]+)['\"]/i", (string) file_get_contents( $file->getPathname() ), $m ) ) {
-			foreach ( $m[1] as $name ) {
+		/*
+		 * Both quoting styles, with a backreference so the closing quote has to be
+		 * the opening one. A get_field( $var ) call cannot be resolved statically;
+		 * a field read only that way is classified DEAD-DATA, which under-reports.
+		 */
+		if ( preg_match_all( "/get_field\(\s*(['\"])([a-z0-9_]+)\\1/i", (string) file_get_contents( $file->getPathname() ), $m ) ) {
+			foreach ( $m[2] as $name ) {
 				$read[ $name ] = true;
 			}
 		}
