@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`/wp-yolo` refuses to normalize a demo it has already converted, instead of silently
+  shipping a degraded theme.** `wp-normalize` derives `cssRules`, `fonts` and `backgrounds`
+  from the declarations and `@font-face` rules in the demo's markup; Step 2.6's Tailwind
+  conversion strips both — the `<style>` blocks and the project stylesheet `<link>` whose
+  rules it absorbed. A second `/wp-yolo` therefore normalized markup that no longer held any
+  of it and wrote an emptied manifest. Nothing failed: Step 2.6 correctly skipped the pages as
+  already-native, and Step 4.5's font carry and `/wp-finalize`'s Layer 1 parity gate then read
+  the gutted manifest and passed over nothing, so the run reported success and the theme
+  shipped with no carried fonts and no background parity.
+  Step 2 now checks for `demo/.original/` — which exists only if a conversion has run — before
+  dispatching normalize, and stops with the restore command. **`--force` does not bypass it:**
+  `--force` discards the built theme and says nothing about the demo, so letting it through
+  would produce the same degraded build with the operator believing they had chosen it. The
+  workaround was already documented, in Step 3's abort branch three steps away from the
+  command that triggers the problem, which is a workaround nobody applies.
+
 ### Changed
 
 - The design library is a caret range, `@yojahny/wp-design-library@^1.0.0`, instead of an exact
