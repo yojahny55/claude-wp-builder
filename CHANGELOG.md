@@ -35,6 +35,24 @@
   read; without the route SEC-032, SEC-033 and SEC-034 are `UNMEASURED`, never a pass. WP-043
   and WP-044 in `agents/wp-audit-practices.md` carry the same gate.
 
+- **CI runs the checks on every pull request** (`.github/workflows/ci.yml`). The only committed
+  workflow was the OCR review bot, so nothing mechanical stood between a broken contract and
+  `main` — CLAUDE.md said as much ("There is no CI"), and that sentence was load-bearing on
+  everyone remembering to run them. Three jobs: all contract checks, **aggregated** so a PR that
+  breaks three of them reports three rather than handing back one per round trip; `node --check`
+  on `bin/*.mjs` plus `php -l` on all 47 PHP files; and `bin/doc-sync-check.sh`, which has
+  shipped for months with nothing ever running it — `tests/checks/wp-contributing.sh` only
+  asserts that `/wp-contribute` *mentions* it, so this is the first thing that can catch a
+  README command that was never created, or a PR with no CHANGELOG entry, without a human
+  remembering to look.
+  The PHP lint is pinned to **7.4**, the floor `skills/wp-polylang/scripts/*.php` carry, with
+  `starter-theme/__cinematic__/` at the **8.0** it declares in its own `style.css`. The runner's
+  default is 8.x, which lints `match`, union types and nullsafe calls clean — all fatal on 7.4 —
+  so the default would have been green and wrong. Nothing uses 8.0-only syntax today; adding
+  some now fails CI, which makes raising a floor deliberate.
+  Disposable WordPress fixtures, the broken-site corpus with expected audit findings and browser
+  artifacts are deliberately not here: they need a provisioned WordPress and a pinned stack, and
+  a half one would make the green light mean less than it does.
 - **A craft build studies an entry's motion clip instead of inferring motion from its strip.**
   When a consulted `wp-design-library` entry carries `motion.clips`, `/wp-demo` sub-step 3.6 now
   calls `get_motion` and reads the timestamped frames it returns as images; a strip shows what a
