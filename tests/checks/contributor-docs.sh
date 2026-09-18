@@ -15,13 +15,27 @@ cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
 DOCS=(CLAUDE.md CONTRIBUTING.md BACKLOG.md)
-# Top-level directories this repo actually ships. A backtick path is only checked
-# when it starts with one of these -- everything else in those docs is a path inside
-# a generated WordPress project, not here.
-OWNED='^(bin|agents|commands|skills|starter-theme|templates|tests|docs)/'
+# The top-level directories this repo ships, read FROM the repo rather than typed here.
+# A hard-coded list is a second copy: add a top-level directory, reference it in these
+# docs, and every path under it is skipped silently -- the check still passes, having
+# validated less than the reader believes. Deriving it cannot go stale.
+OWNED_DIRS=$(git ls-tree -d --name-only HEAD 2>/dev/null | paste -sd'|' -)
+[ -n "$OWNED_DIRS" ] || fail "could not read the repo's top-level directories from git"
+OWNED="^($OWNED_DIRS)/"
 
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 : >"$tmp/paths"
+
+# One extraction, one redirect, and `|| true` scoped to the grep that legitimately finds
+# nothing -- never to the pipeline. Attached to the whole pipeline it also swallows a
+# failed write, and since the only emptiness guard below passes as long as SOME path was
+# extracted, one doc's paths could vanish while the check still reported PASS.
+emit() { # <doc> ; reads candidate paths on stdin
+  local doc=$1 p
+  while IFS= read -r p; do
+    printf '%s\t%s\n' "$doc" "$p"
+  done
+}
 
 for doc in "${DOCS[@]}"; do
   [ -f "$doc" ] || fail "$doc is missing -- this check names it explicitly"
@@ -29,19 +43,23 @@ for doc in "${DOCS[@]}"; do
   # Paths in backticks: `bin/wp-config.mjs`, `starter-theme/__tailwind__/`.
   # A backtick span is often an invocation rather than a bare path
   # (`bin/demo-verify.mjs --probe`), so only its first token is a candidate.
-  grep -oE '`[^`]+`' "$doc" \
+  { grep -oE '`[^`]+`' "$doc" || true; } \
     | tr -d '`' \
     | awk '{print $1}' \
-    | grep -E "$OWNED" \
+    | { grep -E "$OWNED" || true; } \
     | sed 's|/$||' \
-    | while read -r p; do printf '%s\t%s\n' "$doc" "$p"; done >>"$tmp/paths" || true
+    | emit "$doc" >>"$tmp/paths"
 
-  # Relative markdown link targets: [wp-acf](agents/wp-acf.md)
-  grep -oE '\]\([^)]+\)' "$doc" \
+  # Relative markdown link targets: [wp-acf](agents/wp-acf.md).
+  # `[^)]*` and not `+`: an empty target is broken by definition, and skipping it would
+  # be this check declining to look at the most broken link there is.
+  # `/` is excluded with the URL schemes: an absolute path is not a repo path, and
+  # testing one would answer about the machine the check happens to run on.
+  { grep -oE '\]\([^)]*\)' "$doc" || true; } \
     | sed -e 's|^](||' -e 's|)$||' -e 's|#.*$||' \
-    | grep -vE '^(https?:|mailto:|#|$)' \
+    | { grep -vE '^(https?:|mailto:|#|/)' || true; } \
     | sed 's|/$||' \
-    | while read -r p; do printf '%s\t%s\n' "$doc" "$p"; done >>"$tmp/paths" || true
+    | emit "$doc" >>"$tmp/paths"
 done
 
 # A glob or an angle-bracket placeholder describes a shape, not a file. `bin/*.mjs`
@@ -52,7 +70,9 @@ grep -vE $'\t.*[*?<>]' "$tmp/paths" >"$tmp/checkable" || true
 
 missing=0
 while IFS=$'\t' read -r doc p; do
-  [ -e "$p" ] || { echo "  $doc names $p -- which does not exist"; missing=$((missing + 1)); }
+  # $p is quoted in the message because an empty markdown target -- [text]() -- is one of
+  # the things this now looks for, and unquoted it prints as a blank nobody can act on.
+  [ -e "$p" ] || { echo "  $doc names '$p' -- which does not exist"; missing=$((missing + 1)); }
 done <"$tmp/checkable"
 
 [ "$missing" -eq 0 ] || fail "$missing path(s) named in the contributor docs do not exist"
