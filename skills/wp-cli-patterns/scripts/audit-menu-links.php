@@ -1,0 +1,131 @@
+<?php
+/**
+ * Report nav-menu items that do not navigate anywhere useful.
+ *
+ * Usage: wp eval-file audit-menu-links.php
+ *
+ * Read-only. Exits 1 when any item is reported, 0 otherwise.
+ *
+ * WHY THIS EXISTS. A `custom` menu item stores its target in
+ * postmeta._menu_item_url, verbatim. Nothing in header.php or footer.php shows
+ * it, so a broken menu link is invisible to any check that reads the theme. On
+ * an audited site two footer items had url = "#" while the pages they were meant
+ * to open existed and were published, and a third held the absolute URL of the
+ * development host — a link that leaves the live site after a migration. None of
+ * the three was in the theme: the menu was assigned through a nav-menu widget, so
+ * even the registered menu locations did not list it.
+ *
+ * WHY THE CHILD EXCLUSION IS NOT OPTIONAL. A `custom` item with url = "#" that
+ * has children is a submenu header. It is not supposed to navigate; the theme
+ * opens its submenu on hover or tap. Without this exclusion the check fires on
+ * almost every menu that has a submenu at all, and the genuinely broken links are
+ * lost among the false positives.
+ *
+ * Prefer converting a finding to a `post_type` item over editing its URL. A
+ * `post_type` item derives its URL from siteurl at render time, so it survives a
+ * migration to another host; a `custom` item carries whatever host was typed into
+ * it, which is how a development host ends up in the database in the first place
+ * (see check-dev-host.php).
+ */
+
+$dev_host = parse_url( home_url(), PHP_URL_HOST );
+$dev_host = is_string( $dev_host ) ? strtolower( $dev_host ) : '';
+$findings = 0;
+
+/*
+ * A home_url() with no host component — a half-finished migration, a malformed
+ * constant — makes the development-host half of this check a silent no-op. Say so
+ * on STDERR rather than reporting a clean run: the `#` half below still works and
+ * is worth running, but "0 menu items do not navigate" would otherwise cover one
+ * of the two defects this gate exists to catch.
+ */
+if ( '' === $dev_host ) {
+	fwrite( STDERR, "audit-menu-links.php: home_url() has no host — only the '#' check runs\n" );
+}
+
+/*
+ * Every menu, not only the ones assigned to a registered location. A menu
+ * assigned through a widget has no location, and that is exactly the case that
+ * went unnoticed.
+ */
+$menus = wp_get_nav_menus();
+
+if ( ! $menus ) {
+	echo "No nav menus exist.\n";
+	exit( 0 );
+}
+
+/*
+ * A menu can be assigned to more than one location, so this is a list per menu.
+ * array_flip() would keep only the last one and quietly rename the others.
+ */
+$locations = array();
+foreach ( (array) get_nav_menu_locations() as $location => $menu_id ) {
+	$locations[ (int) $menu_id ][] = $location;
+}
+
+foreach ( $menus as $menu ) {
+	$items = wp_get_nav_menu_items( $menu->term_id );
+
+	if ( ! $items ) {
+		continue;
+	}
+
+	// An item is a submenu header when something else declares it as its parent.
+	$has_children = array();
+	foreach ( $items as $item ) {
+		if ( $item->menu_item_parent ) {
+			$has_children[ (int) $item->menu_item_parent ] = true;
+		}
+	}
+
+	$where = isset( $locations[ (int) $menu->term_id ] )
+		? "location '" . implode( "', '", $locations[ (int) $menu->term_id ] ) . "'"
+		: 'no location — assigned by widget, or unassigned';
+
+	foreach ( $items as $item ) {
+		if ( 'custom' !== $item->type ) {
+			continue;
+		}
+
+		if ( isset( $has_children[ (int) $item->ID ] ) ) {
+			continue;
+		}
+
+		$url    = trim( (string) $item->url );
+		$reason = '';
+
+		if ( '' === $url || '#' === $url ) {
+			$reason = 'goes nowhere';
+		} elseif ( '' !== $dev_host && strtolower( (string) parse_url( $url, PHP_URL_HOST ) ) === $dev_host ) {
+			/*
+			 * Compare the host component, not the whole string. A substring test
+			 * also fires on a different host that merely ends in this one
+			 * ('mydev.example.com' against 'dev.example.com') and on any URL that
+			 * carries the host inside a path or a query ('/go?to=dev.example.com').
+			 * This script exits 1 on a finding, so each of those blocks a deploy.
+			 */
+			$reason = 'absolute URL on the development host';
+		}
+
+		if ( '' === $reason ) {
+			continue;
+		}
+
+		printf(
+			"%s — item %d '%s' (%s): %s [url: %s]\n",
+			$menu->name,
+			$item->ID,
+			$item->title,
+			$where,
+			$reason,
+			'' === $url ? '(empty)' : $url
+		);
+
+		$findings++;
+	}
+}
+
+printf( "\n%d menu items do not navigate\n", $findings );
+
+exit( $findings > 0 ? 1 : 0 );
