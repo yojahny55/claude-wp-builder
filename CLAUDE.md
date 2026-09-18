@@ -8,7 +8,18 @@ A **Claude Code plugin**, not an application. Almost everything here is markdown
 Claude at runtime — commands, agents and skills. There is no build step, no package manager, no
 runtime for the plugin itself. The only executable code shipped is:
 
-- `bin/*.sh` — env setup / ffmpeg wrappers, invoked by commands
+- `bin/*.sh` — env setup, ffmpeg wrappers and gate scripts, invoked by commands
+  (`wp-env-setup`, `wp-cinematic-encode`, `composition-gate`, `doc-sync-check`,
+  `geo-scan`, `tailwind-native-check`, `tailwind-rebuild`, `design-md-index`,
+  `domains-import`)
+- `bin/*.mjs` — Node tools a command runs and reads the exit code of. These carry
+  real logic, and several are load-bearing gates rather than helpers:
+  `wp-config.mjs` (the single definition of a valid `.wp-create.json` — see
+  *Config contract* below), `demo-verify.mjs` (the browser walk behind `/wp-demo-verify`
+  and craft mode's probe), `tailwindify-parity.mjs` (computed-style comparison during
+  CSS conversion), `image-gen.mjs` (the image generator and its cost/key handling),
+  `composition-preview.mjs` (renders `skills/wp-demo-craft/compositions/` previews).
+  `bin/lib/` holds what they share.
 - `skills/wp-polylang/scripts/*.php` — run inside a real WordPress via `wp eval-file`
 - `starter-theme/**` — PHP copied into user projects (never executed here)
 

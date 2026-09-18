@@ -89,8 +89,15 @@ fatals a theme, and the release ritual. Read it alongside this file.
 
 ### Modifying the Starter Theme
 
-- Changes go in `starter-theme/__starter__/`.
-- Use `__starter__` and `__STARTER_NAME__` as placeholders (replaced at runtime by `/wp-init`).
+- There are two starters, and a change usually belongs to one of them:
+  `starter-theme/__tailwind__/` (Tailwind v4 build) and
+  `starter-theme/__cinematic__/` (scroll-driven scenes).
+- `__starter__`, `__STARTER__` and `__STARTER_NAME__` are the placeholder *tokens*
+  inside those files, replaced at runtime by `/wp-init`. They are not a directory.
+- The Polylang variants of `inc/i18n.php` live in `starter-theme/_i18n-variants/`,
+  deliberately outside both starters: a starter carrying two definitions of the same
+  function fatals the moment anything globs `inc/*.php`. The two starters have
+  different helper contracts, so each variant mirrors its own.
 - Follow WordPress coding standards.
 
 ## AI-Assisted Contributions
