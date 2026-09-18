@@ -277,6 +277,88 @@ reported 7 occurrences and the full sweep reported 25.
 is counted separately and never rewritten: WordPress treats a `guid` as a historical
 identifier, not a URL, and changing it breaks the key feed readers use.
 
+### `find-orphan-acf-ids.php` — IDs that outlive the post
+
+```bash
+$WP eval-file <skill>/scripts/find-orphan-acf-ids.php <theme-path>
+```
+
+Read-only. Exits 1 when an orphan reaches a template; dead data alone exits 0.
+
+Deleting a post from wp-admin does not clear its ID out of the relationship and post-object
+fields that point at it. A template that iterates such a field prints one card with no title,
+no terms and an empty `href` — a visible defect produced by a record that no longer exists.
+
+Two things the script does that a hand-written sweep usually does not:
+
+- **It resolves the field's type before treating a value as an ID.** A date field holds
+  `20250910` and a number field holds `142`; both are numeric, neither is a post ID, and
+  `get_post_status()` answers `false` for both. Skipping the type lookup turned 70 real
+  orphans into 248 reported ones, every extra a false positive.
+- **It splits by whether a template reads the field.** Pass the theme path and each finding is
+  `REACHES-TEMPLATE` or `DEAD-DATA`. On the audited site 70 orphans existed and exactly 1
+  reached the HTML — a flat list of 70 buries the one that is visible.
+
+A non-`publish` status is the same defect with a different cause and is reported too:
+`get_post_status()` returns `draft` or `trash` rather than `false`, and a trashed post still
+has a permalink the template will print.
+
+### `audit-menu-links.php` — menu items that go nowhere
+
+```bash
+$WP eval-file <skill>/scripts/audit-menu-links.php
+```
+
+Read-only. Exits 1 on any finding.
+
+A `custom` menu item stores its target in `postmeta._menu_item_url`, verbatim, so a broken menu
+link is invisible to anything that reads the theme. It reports `#` and empty URLs, and absolute
+URLs on the development host.
+
+It walks **every** menu, not only the ones assigned to a registered location: a menu assigned
+through a nav-menu widget has no location, and on the audited site that is exactly where the
+broken items were.
+
+**Items with children are excluded, and that exclusion is not optional.** A `custom` item with
+`#` that has children is a submenu header — it is not supposed to navigate. Without the
+exclusion the check fires on almost every menu that has a submenu, and the real findings are
+lost in the noise.
+
+Fix by converting the item to a `post_type` item rather than by editing its URL. A `post_type`
+item derives its URL from `siteurl` at render time and survives a migration; a `custom` item
+carries whatever host was typed into it, which is how `check-dev-host.php` findings are created.
+
+---
+
+## Match Records by Slug, Never by ID
+
+A script that runs on one install and then on another cannot match by post ID. IDs are
+assigned per install; "post 354" on a developer machine is a different record, or no record,
+on staging and on production. The same holds for term IDs, menu item IDs and attachment IDs.
+
+Match on something the content carries with it: a slug, a menu item's title, a page's path, or
+the `_<prefix>_seed_key` marker described above. Resolve it to an ID at the top of the script
+and fail loudly when it does not resolve, rather than writing to whatever ID happens to exist.
+
+**`get_posts()` with `'name' => $slug` does not return drafts, even with
+`'post_status' => 'any'`.** `any` means every status not flagged `exclude_from_search`, and
+`WP_Query` also narrows the query when `name` is set. A lookup that works for published pages
+silently finds nothing the moment the record is a draft — which is the state a content script
+most often has to fix. Use `post_name__in` with the statuses written out:
+
+```php
+$found = get_posts( array(
+	'post_type'      => 'page',
+	'post_name__in'  => array( $slug ),
+	'post_status'    => array( 'publish', 'draft', 'pending', 'private', 'future' ),
+	'posts_per_page' => 1,
+) );
+```
+
+Print what resolved to what before writing anything. A script that reports
+`slug 'about' -> 42` can be checked by the person running it; one that silently writes to 42
+cannot.
+
 ---
 
 ## Common Patterns
