@@ -157,7 +157,49 @@ stays on the main conversation model.
 
 ## Step 2: Phase 1 — Normalize
 
-Dispatch the **wp-normalize** agent against the demo folder from Step 1. It scans every
+**First, refuse to normalize a demo that has already been converted.** `wp-normalize`
+derives `cssRules`, `fonts` and `backgrounds` from the declarations and `@font-face` rules
+in the demo's markup. Step 2.6's Tailwind conversion removes both — it strips the `<style>`
+blocks and the project stylesheet `<link>` whose rules it absorbed — so running normalize
+over an already-converted page derives those three keys from markup that no longer contains
+them, and writes an emptied manifest. **Nothing fails.** Step 2.6 then correctly detects the
+pages as already Tailwind-native and skips them, while Step 4.5's font carry and
+`/wp-finalize`'s Layer 1 parity gate read the gutted manifest and pass over nothing. The
+build completes, reports success, and ships a theme with no carried fonts and no background
+parity.
+
+`demo/.original/` exists only if a conversion has run, so its presence is the signal:
+
+```bash
+bash -c "test -d demo/.original && ls demo/.original/*.html 2>/dev/null | head -1"
+```
+
+If it holds any page, stop:
+
+```
+Error: demo/ has already been converted to Tailwind (demo/.original/ holds <n> pristine pages).
+Normalizing converted markup would empty the manifest's cssRules, fonts and backgrounds —
+silently, and the build would still report success.
+
+Restore the originals first, then run again:
+  cp demo/.original/*.html demo/
+Or run against a pristine copy of the demo folder.
+```
+
+**`--force` does not bypass this.** `--force` means "discard the built theme and rebuild",
+and it is about the theme; it says nothing about the demo, and rebuilding from converted
+markup produces exactly the degraded output above. The two flags answer different questions,
+and the destructive one here is the quiet one. Restoring the originals is the only way past
+this guard, because it is the only thing that makes the build correct.
+
+This is the check Step 2.6 already performs, moved to where it can still act: 2.6's own
+idempotence test ("Tailwind evidence and no plain-CSS evidence") runs *after* Step 2 has
+dispatched normalize, which is why 2.6 can skip correctly and the run is degraded anyway.
+
+On the plain path nothing converts, `demo/.original/` never exists, and this guard never
+fires.
+
+Then dispatch the **wp-normalize** agent against the demo folder from Step 1. It scans every
 page, resolves shared header/footer, splits sections, classifies content types
 (static-repeater vs custom-post-type), and writes:
 - `demo/*.html` — canonical, delimited pages (the same `<!-- SECTION: X -->` format the
@@ -336,9 +378,13 @@ not just `index`. For each page, in this order:
    `/wp-yolo` pass over an already-converted demo detects and skips instead of converting
    twice, because conversion strips the `<style>` blocks *and* the project stylesheet
    `<link>` whose rules it absorbed (`@agents/wp-tailwind`, MUST remove), leaving Tailwind
-   evidence and no plain-CSS evidence behind. It does **not** make a re-run safe: by the
-   time Step 2.6 runs again, Step 2 has already re-dispatched `wp-normalize` and emptied
-   the manifest's `cssRules`, `fonts` and `backgrounds`. See Step 3's abort branch.
+   evidence and no plain-CSS evidence behind. It does **not** by itself make a re-run safe:
+   by the time this step ran again, Step 2 would already have re-dispatched `wp-normalize`
+   and emptied the manifest's `cssRules`, `fonts` and `backgrounds`. **Step 2's guard** is what
+   refuses such a run, applying the same evidence test to the whole demo before normalize is
+   dispatched. The two tests are not redundant: the guard asks "has this demo
+   been converted" and stops the run; this one asks "has *this page* been converted" and
+   skips one page. See Step 3's abort branch.
 2. **Back up, per page.** Otherwise create `demo/.original/` if it does not exist and
    copy `demo/<slug>.html` to `demo/.original/<slug>.html` — but **only if
    `demo/.original/<slug>.html` does not already exist**. If it does, it is already the
@@ -474,6 +520,12 @@ Ask the user to **approve / edit / abort** with AskUserQuestion, then stop and w
   So a fresh `/wp-yolo` after an abort must start from plain-CSS demo pages: restore
   `demo/<slug>.html` from `demo/.original/<slug>.html` for every page first (or re-run
   against a pristine demo folder), then run `/wp-yolo` again from the top.
+
+  **Step 2 now refuses rather than relying on this being remembered.** `demo/.original/`
+  holding any page means a conversion has run, and Step 2 stops with the restore command
+  before dispatching normalize — including under `--force`, which discards the theme and
+  says nothing about the demo. The degradation was silent, and a workaround documented
+  three steps away from the command that triggers it is a workaround nobody applies.
 
   There is no resume entrypoint in this command — not `--yolo`, and not any other flag.
   `--yolo` suppresses this checkpoint and nothing else (Step 1: "no checkpoint at all"):
