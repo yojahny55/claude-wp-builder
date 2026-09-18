@@ -113,9 +113,26 @@ These checks require WP-CLI access via `$WP`. Skip this tier if `.wp-create.json
 | WP-040 | WP_DEBUG true | `$WP config get WP_DEBUG` | false | WARNING |
 | WP-041 | FS_METHOD not set | `$WP config get FS_METHOD 2>/dev/null` | `direct` | INFO |
 | WP-042 | PHP version old | `$WP eval "echo phpversion();"` | >=8.1 | WARNING |
-| WP-043 | WordPress outdated | `$WP core check-update` | No updates | WARNING |
-| WP-044 | Plugin updates | `$WP plugin list --update=available --format=count` | 0 | INFO |
+| WP-043 | WordPress outdated | `$WP core check-update`, **only after the network check below** | No updates | WARNING |
+| WP-044 | Plugin updates | `$WP plugin list --update=available --format=count`, **only after the network check below** | 0 | INFO |
 | WP-045 | Bad file permissions | Check uploads/plugins/upgrade dir permissions | 755 | WARNING |
+
+**WP-043 and WP-044 need a network before they mean anything.** Neither command contacts
+`api.wordpress.org`. Both read the transients `update_core` and `update_plugins`, filled in by
+some earlier background request. With no route to `api.wordpress.org` the refresh fails
+silently, the stale transient answers, and a count of `0` reports "no updates pending" when the
+real answer may be a dozen. Reach the API first, then delete the transients so the counts are
+rebuilt:
+
+```bash
+curl -sS --max-time 10 -o /dev/null https://api.wordpress.org/core/version-check/1.7/ \
+  || echo "no route — WP-043 and WP-044 are UNMEASURED"
+$WP transient delete update_core
+$WP transient delete update_plugins
+```
+
+Without the route both checks are `UNMEASURED`, with the curl command as their evidence line.
+`agents/wp-audit-security.md` carries the same gate as SEC-038.
 
 ## Step 3: Tier 3 — Best Practices Cross-Check
 

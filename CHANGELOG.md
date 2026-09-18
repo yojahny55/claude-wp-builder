@@ -13,6 +13,28 @@
 
 ### Added
 
+- **The development-host sweep reads four tables instead of one.** SEC-036 queried
+  `wp_options` alone, which is the table that holds the least of this: on an audited site it
+  reported 7 occurrences, and the same needle across `postmeta`, `posts` and `termmeta`
+  reported 25. The rows it skipped are the ones that reach the page — a `custom` menu item
+  stores its target verbatim in `postmeta._menu_item_url`, so after a push it is a navigation
+  link that leaves the live site, and an absolute URL pasted into `post_content` is the same
+  defect inside an article body. The sweep now groups its count by table, reports a `guid`
+  match separately because WordPress never resolves a `guid` as a URL, and keeps the
+  `home`/`siteurl` exclusion. `skills/wp-cli-patterns/scripts/check-dev-host.php` runs the
+  same measurement read-only and exits 1 on any hit, so a deploy can gate on it without an
+  agent.
+- **No update count is reported without a network.** `wp core check-update` and
+  `wp plugin list --update=available` never contact `api.wordpress.org`; they read the
+  `update_core` and `update_plugins` transients that some earlier background request filled
+  in. With no route the refresh fails silently, the stale transient answers, and a count of
+  `0` is written into the audit as "no updates pending". On an audited machine the cached
+  answer was one pending plugin update; with a route restored it was twelve, and core was a
+  minor version behind — the report had to be corrected after it was written. New SEC-038
+  reaches the endpoint first and deletes the three update transients before either count is
+  read; without the route SEC-032, SEC-033 and SEC-034 are `UNMEASURED`, never a pass. WP-043
+  and WP-044 in `agents/wp-audit-practices.md` carry the same gate.
+
 - **A craft build studies an entry's motion clip instead of inferring motion from its strip.**
   When a consulted `wp-design-library` entry carries `motion.clips`, `/wp-demo` sub-step 3.6 now
   calls `get_motion` and reads the timestamped frames it returns as images; a strip shows what a

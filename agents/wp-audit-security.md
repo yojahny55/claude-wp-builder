@@ -129,12 +129,13 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 | SEC-029 | PHP files in uploads | `find wp-content/uploads -name "*.php"` | None found | CRITICAL |
 | SEC-030 | Bad file permissions | Check wp-config.php perms | 400 or 440 | WARNING |
 | SEC-031 | Core integrity | `$WP core verify-checksums` | Pass | CRITICAL |
-| SEC-032 | Outdated WordPress | `$WP core check-update` | No updates | WARNING |
-| SEC-033 | Plugin updates available | `$WP plugin list --update=available --format=count` | 0 | INFO |
+| SEC-032 | Outdated WordPress | `$WP core check-update`, **after SEC-038 passes** | No updates | WARNING |
+| SEC-033 | Plugin updates available | `$WP plugin list --update=available --format=count`, **after SEC-038 passes** | 0 | INFO |
 | SEC-034 | Inactive plugins | `$WP plugin list --status=inactive --format=count` | 0 | INFO |
 | SEC-035 | AIOS not configured | `$WP option get aio_wp_security_configs --format=json` | Exists and configured | INFO |
-| SEC-036 | Development host in database options | `$WP option list --format=json` filtered for the dev host. See Procedure | CRITICAL |
+| SEC-036 | Development host in the database | `$WP eval` sweep of `options`, `postmeta`, `posts` and `termmeta` for the dev host. See Procedure | CRITICAL |
 | SEC-037 | Backup or editor files inside the theme | Glob the theme for `*.bak*`, `*.orig`, `*.save`, `*~`, `*.php.[0-9]*`, `*.sql` | WARNING |
+| SEC-038 | Update counts reported without network access | Reach `api.wordpress.org` before reading any update count. See Procedure | WARNING |
 
 ### Execution notes
 
@@ -153,30 +154,61 @@ exist because the theme can be entirely correct while the database and the file 
 things that must never leave the development machine, and nothing that reads the theme can
 see either one.
 
-**SEC-036 — the development host, stored in the database.** Option values are copied verbatim
-by every sync tool. A dev URL sitting in a plugin's option array is not a cosmetic problem: a
-push writes it into production, where it becomes a logo that 404s, an Organization `url` that
-points at a machine nobody outside the office can reach, or a schema graph that identifies the
-business by a hostname that does not resolve. Search the option table for the dev host rather
-than guessing which keys might hold it:
+**SEC-036 — the development host, stored in the database.** Every row of the database is
+copied verbatim by every sync tool. A dev URL sitting in a stored value is not a cosmetic
+problem: a push writes it into production, where it becomes a logo that 404s, an Organization
+`url` that points at a machine nobody outside the office can reach, a menu item that leaves
+the site, or a schema graph that identifies the business by a hostname that does not resolve.
+
+**Search four tables, not one.** `wp_options` is where this check started and it is the table
+that holds the least of it. A first pass that read only `wp_options` on a real site reported
+7 occurrences; the same needle across all four tables reported 25. The three it skipped are
+the ones that reach the page:
+
+| Table | What holds the host there | Why it reaches production |
+|-------|---------------------------|---------------------------|
+| `options` | plugin option arrays, the SEO plugin's social and schema values | rendered into `<head>` on every request |
+| `postmeta` | custom-field URLs, builder payloads, `_menu_item_url` of `custom` menu items | a menu item that points at the dev host is a link off the live site |
+| `posts` | `post_content` and `guid` — an editor pasted an absolute URL | printed inside the article body |
+| `termmeta` | term images and per-term link fields | printed on archive pages |
+
+Derive the needle from `home` rather than hard-coding it, and query every table in one pass:
 
 ```bash
-DEV_HOST=$($WP option get home | sed -E 's#https?://##; s#/.*##')
 $WP eval "
 global \$wpdb;
-\$needle = '<dev-host>';
-\$rows = \$wpdb->get_results(\$wpdb->prepare(
-    \"SELECT option_name FROM \$wpdb->options WHERE option_value LIKE %s\",
-    '%' . \$wpdb->esc_like(\$needle) . '%'
-));
-foreach (\$rows as \$r) { echo 'DEV HOST IN: ' . \$r->option_name . PHP_EOL; }
-echo count(\$rows) . ' options carry the development host' . PHP_EOL;
+\$needle = preg_replace('#^https?://#', '', rtrim(home_url(), '/'));
+\$like   = '%' . \$wpdb->esc_like(\$needle) . '%';
+
+\$queries = array(
+    'options'  => array(\"SELECT option_name AS id, option_name AS label FROM \$wpdb->options WHERE option_value LIKE %s AND option_name NOT IN ('home','siteurl')\"),
+    'postmeta' => array(\"SELECT post_id AS id, meta_key AS label FROM \$wpdb->postmeta WHERE meta_value LIKE %s\"),
+    'posts'    => array(\"SELECT ID AS id, post_type AS label FROM \$wpdb->posts WHERE post_content LIKE %s OR guid LIKE %s\"),
+    'termmeta' => array(\"SELECT term_id AS id, meta_key AS label FROM \$wpdb->termmeta WHERE meta_value LIKE %s\"),
+);
+
+\$total = 0;
+foreach (\$queries as \$table => \$q) {
+    \$args = array_fill(0, substr_count(\$q[0], '%s'), \$like);
+    \$rows = \$wpdb->get_results(\$wpdb->prepare(\$q[0], \$args));
+    echo strtoupper(\$table) . ': ' . count(\$rows) . PHP_EOL;
+    foreach (\$rows as \$r) { echo '  ' . \$r->id . ' — ' . \$r->label . PHP_EOL; }
+    \$total += count(\$rows);
+}
+echo \$total . ' rows carry the development host' . PHP_EOL;
 "
 ```
 
 `home` and `siteurl` are expected to hold it and are **not** findings — they are what makes
-the local site work. Every other option is. Report each option name; the SEO plugin's own
-options are the ones that reach production markup, so name those first.
+the local site work. Every other row is. Report the count per table and then each row, so the
+reader can tell an option array from a menu item from an editor's paste; the SEO plugin's own
+options and `_menu_item_url` are the ones that reach production markup, so name those first.
+
+A `guid` is a historical identifier WordPress does not resolve as a URL, so a `guid`-only hit
+is WARNING rather than CRITICAL. Say which column matched instead of merging the two.
+
+`skills/wp-cli-patterns/scripts/check-dev-host.php` runs exactly this sweep, read-only, and
+exits 1 when it finds anything, so the same measurement can gate a deploy without an agent.
 
 This is CRITICAL rather than WARNING because the damage happens at push time, silently, and is
 discovered from the outside — by a search engine reading a schema graph that names a host it
@@ -198,6 +230,50 @@ to a deny rule, which protects one server's configuration and travels with nothi
 Run both before any deployment step, and print their findings even when every other check
 passes: a clean audit followed by a push that ships a dev URL is the failure this pair exists
 to prevent.
+
+### Procedure — SEC-038 (update counts need a network)
+
+`$WP core check-update` and `$WP plugin list --update=available` do not query `api.wordpress.org`
+themselves. They read the transients `update_core` and `update_plugins`, which a background
+request filled in at some earlier point. When the machine has no route to `api.wordpress.org`
+the refresh fails silently, the stale transient stays, and both commands answer from it. A
+count of `0` then means "the last successful check found nothing", which can be months old —
+and it is reported as "no updates pending", which is the opposite of the truth.
+
+This is not hypothetical. On an audited site the cached count said one plugin needed updating;
+once the machine had a route again the real count was twelve, and core was a full minor version
+behind. The audit had already been written and had to be corrected.
+
+Measure the route before reading either count:
+
+```bash
+if ! curl -sS --max-time 10 -o /dev/null https://api.wordpress.org/core/version-check/1.7/; then
+  echo "SEC-038 FAIL: no route to api.wordpress.org"
+fi
+```
+
+Then force the transients to be rebuilt rather than trusting whatever is cached:
+
+```bash
+$WP transient delete update_core
+$WP transient delete update_plugins
+$WP transient delete update_themes
+$WP core check-update
+$WP plugin list --update=available --format=count
+```
+
+Rules that follow from this:
+
+- When the request fails, SEC-032, SEC-033 and SEC-034's update column are `UNMEASURED`, with
+  the curl command as the evidence line. They are **never** reported as passing, and never as
+  "0 updates pending".
+- When the request succeeds, delete the three transients first. A count read without deleting
+  them is a measurement of the cache, not of the site.
+- Report the age of the data either way: `$WP transient get update_plugins --format=json` carries
+  a `last_checked` timestamp, and a reader who sees it is a week old can judge the count.
+
+The same note applies to WP-043 and WP-044 in `agents/wp-audit-practices.md`, which read the
+same two transients.
 
 ## Step 3: Tier 3 — External Checks
 
@@ -312,3 +388,7 @@ When AIOS-related fixes are needed, dispatch the `wp-audit-aios` agent with the 
 4. **Tier 3 checks require web-quality-skills** — skip if skill files not found
 5. **Never modify theme logic** — security fixes only touch escaping, config constants, and server configuration
 6. **Report ALL checks** — include PASS, FAIL, UNMEASURED and N/A in the output JSON
+7. **Never report an update count without a network** — SEC-038 gates SEC-032, SEC-033 and
+   SEC-034. A count read from a stale transient is `UNMEASURED`, never a pass
+8. **The dev-host sweep reads four tables** — `options` alone misses the rows that reach the
+   page: `postmeta`, `posts` and `termmeta`
