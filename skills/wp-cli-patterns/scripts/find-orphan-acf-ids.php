@@ -101,8 +101,15 @@ if ( $theme && is_dir( $theme ) ) {
 		 * Both quoting styles, with a backreference so the closing quote has to be
 		 * the opening one. A get_field( $var ) call cannot be resolved statically;
 		 * a field read only that way is classified DEAD-DATA, which under-reports.
+		 *
+		 * A prefixed wrapper counts. Themes this plugin builds read fields through
+		 * `<prefix>_get_field()`, and WP-034 in agents/wp-audit-practices.md treats
+		 * that wrapper as the correct call, so a `\b` here would drop the field reads
+		 * of a whole theme and classify every one of them as dead data. The lookbehind
+		 * allows a prefix ending in `_` and still rejects a word that merely ends in
+		 * the name, such as `forget_field(`.
 		 */
-		if ( preg_match_all( "/get_field\(\s*(['\"])([a-z0-9_]+)\\1/i", (string) file_get_contents( $file->getPathname() ), $m ) ) {
+		if ( preg_match_all( "/(?<![a-z0-9])get_field\(\s*(['\"])([a-z0-9_]+)\\1/i", (string) file_get_contents( $file->getPathname() ), $m ) ) {
 			foreach ( $m[2] as $name ) {
 				$read[ $name ] = true;
 			}

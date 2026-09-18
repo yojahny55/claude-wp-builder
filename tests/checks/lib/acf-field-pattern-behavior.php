@@ -41,9 +41,20 @@ if ( ! preg_match( '/preg_match_all\(\s*("(?:[^"\\\\]|\\\\.)*")/', $source, $m )
 $pattern = strtr( substr( $m[1], 1, -1 ), array( '\\"' => '"', '\\\\' => '\\' ) );
 
 $cases = array(
-	'single quotes'          => "get_field( 'hero_items' )",
-	'double quotes'          => 'get_field( "hero_items" )',
-	'no space after paren'   => "get_field('hero_items')",
+	'single quotes'        => "get_field( 'hero_items' )",
+	'double quotes'        => 'get_field( "hero_items" )',
+	'no space after paren' => "get_field('hero_items')",
+	// Themes this plugin builds read fields through a prefixed wrapper, and WP-034
+	// treats that wrapper as the correct call. A \b before the name would drop every
+	// one of those reads and classify the whole theme's fields as dead data.
+	'prefixed wrapper'     => "acme_get_field( 'hero_items' )",
+	'starter wrapper'      => "__starter___get_field( 'hero_items' )",
+);
+
+// A word that merely ends in the function name is not a call to it.
+$must_not_match = array(
+	'forget_field'  => "forget_field( 'hero_items' )",
+	'noget_field'   => "widget_field( 'hero_items' )",
 );
 
 $failed = 0;
@@ -57,6 +68,13 @@ foreach ( $cases as $label => $code ) {
 
 	if ( 'hero_items' !== $hit[2] ) {
 		fwrite( STDERR, "pattern captured '{$hit[2]}' instead of 'hero_items' for {$label}\n" );
+		$failed++;
+	}
+}
+
+foreach ( $must_not_match as $label => $code ) {
+	if ( preg_match( $pattern, $code ) ) {
+		fwrite( STDERR, "pattern matches {$label}, which is not a call to the function\n" );
 		$failed++;
 	}
 }
