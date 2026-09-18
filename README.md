@@ -13,7 +13,7 @@
 
 A Claude Code plugin that turns approved demo HTML into a complete WordPress theme — section by section, with ACF/SCF fields, bilingual support, SEO, and security — all from the command line.
 
-[Quick Start](#installation) | [Workflows](docs/workflows.md) | [Commands](docs/commands.md) | [Architecture](#architecture) | [Cinematic Mode](docs/cinematic-mode.md) | [Contributing](CONTRIBUTING.md) | [Backlog](BACKLOG.md)
+[Quick Start](#installation) | [Workflows](docs/workflows.md) | [Commands](docs/commands.md) | [Architecture](#architecture) | [Cinematic Mode](docs/cinematic-mode.md) | [Contributing](CONTRIBUTING.md) | [Backlog](BACKLOG.md) | [Feature Proposals](docs/improvements-and-new-features.md)
 
 </div>
 

@@ -13,6 +13,10 @@
 
 ### Added
 
+- **Improvement and feature proposals** in `docs/improvements-and-new-features.md`,
+  linked from the README. Separates gaps in existing workflows from new capabilities,
+  with priorities, dependencies, completion checks, and a staged WooCommerce proposal.
+
 - **A craft build studies an entry's motion clip instead of inferring motion from its strip.**
   When a consulted `wp-design-library` entry carries `motion.clips`, `/wp-demo` sub-step 3.6 now
   calls `get_motion` and reads the timestamped frames it returns as images; a strip shows what a
