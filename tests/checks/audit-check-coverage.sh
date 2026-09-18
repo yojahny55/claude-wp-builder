@@ -61,8 +61,11 @@ while IFS=' ' read -r prefix agent; do
   [ -n "$prefix" ] || continue
   grep -Fq "$agent" "$c" || fail "$c does not point $prefix-* at $agent"
   [ -f "$agent" ] || fail "$c points $prefix-* at $agent, which does not exist"
-  n=$(grep -coE "\b${prefix}-[A-Z]?[0-9]+\b" "$agent" || true)
-  [ "${n:-0}" -gt 0 ] || fail "$agent holds no ${prefix}-* check IDs, so the catalog it is named as would be empty"
+  # -q, not -c: the assertion is "the catalog is not empty", and a count invites a reader to
+  # think it means something. (`grep -co` was worse than useless -- -c suppresses -o, so it
+  # counted matching LINES: 2 for a file holding 3 ids on 2 lines.)
+  grep -qE "\b${prefix}-[A-Z]?[0-9]+\b" "$agent" \
+    || fail "$agent holds no ${prefix}-* check IDs, so the catalog it is named as would be empty"
 done <<'PAIRS'
 SEC agents/wp-audit-security.md
 WP agents/wp-audit-practices.md
