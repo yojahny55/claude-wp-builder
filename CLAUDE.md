@@ -372,12 +372,19 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   run instead of trusting the manifest. Without Tier 2 it can measure none of them, and
   reports the whole block `UNMEASURED` — which is honest, and still means a Tier 1 run on
   a stale project cannot tell you the manifest is wrong.
-- **The category coverage matrix answers "has this ever run", not "is it still true".**
-  Step 2.5d diffs `categories_run` against the categories this plugin version offers, so a
-  category that shipped after a project was built is surfaced the next time that project is
-  audited. It cannot notice that a category which *did* run has since gained checks the
-  project has never seen — code-level versioning per category would be needed for that, and
-  the honest signal there is the audit-record age, which Step 2.5e already reports.
+- **Coverage is tracked per check, but findings are still counted, not tracked.** Step 2.5d
+  diffs `categories_run` against the categories this version offers *and* diffs each run
+  category's `audit.checks_run` ids against that category's own agent catalog, so a check
+  added to a category a project already ran is reported by name as never measured there.
+  Catalogs are read from the six agent files rather than from a stored list, because a
+  stored list is a second copy and a stale one would report green coverage for checks
+  nobody ran — the defect the diff exists to prevent. A project with no `checks_run` yet
+  reports its per-check history as unknown rather than reporting all 261 checks as
+  never-measured.
+  What is still only a count is the findings themselves: `issues_found` and `issues_fixed`
+  are integers, so "fixing one issue resolves that issue without clearing others" cannot be
+  shown — a finding has no identity to resolve. That needs a per-finding ledger keyed by
+  check id and resource, which is its own piece of work.
 - **A dev host is now distinguishable from a missing report, and both still block.**
   `bin/geo-scan.sh` exits `3` for a host it cannot reach publicly and `2` for a host with no
   report yet, so the audit can tell a configuration problem from an absence. Neither is a

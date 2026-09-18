@@ -49,6 +49,23 @@
   so a second run could fill a menu the theme is not displaying. A plan prints before anything
   writes, and an unchanged re-run shows `create 0 / update 0` with everything under `skip`,
   which is how "re-running is safe" becomes observable instead of asserted.
+- **An audit reports checks that shipped after the project last ran their category.**
+  `audit.categories_run` answers "has this ever run here", and a category keeps answering yes
+  forever while checks are added to it — so a project could carry a green coverage line for
+  checks nobody had ever run on it. CLAUDE.md listed that as a known ceiling. Step 2.5d now also
+  records `audit.checks_run` (the ids that executed, cumulative, per category) and diffs each
+  run category against that category's own agent catalog, naming what is outstanding:
+  `SEC-036, SEC-038 have never been measured on this project`.
+  The catalogs are read from the six agent files, never from a list stored anywhere else: a
+  stored list is a second copy, and a stale second copy would report green coverage for checks
+  nobody ran — the exact defect the diff exists to prevent, reproduced by the thing preventing
+  it. Passing checks are recorded (a pass that is not recorded is indistinguishable from
+  never-run), `UNMEASURED` checks are not (they did not execute, and recording them would be a
+  false green nothing later re-opens), and a project with no `checks_run` yet reports its
+  per-check history as unknown rather than flagging all 261 checks at once. A partially covered
+  category warns; only a never-run category blocks.
+  `bin/wp-config.mjs validate` refuses a malformed `checks_run` — a bare string where an array
+  belongs would otherwise iterate as characters and report every check as never measured.
 - **The development-host sweep reads four tables instead of one.** SEC-036 queried
   `wp_options` alone, which is the table that holds the least of this: on an audited site it
   reported 7 occurrences, and the same needle across `postmeta`, `posts` and `termmeta`
