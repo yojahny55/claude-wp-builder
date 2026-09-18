@@ -252,6 +252,33 @@ update_field('services_cards', \$rows, 'option');
 
 ---
 
+## Shipped Scripts
+
+`scripts/` holds the checks that are worth re-running rather than retyping. Run each with
+`wp eval-file`.
+
+### `check-dev-host.php` — the development host, in four tables
+
+```bash
+$WP eval-file <skill>/scripts/check-dev-host.php          # needle from home_url()
+$WP eval-file <skill>/scripts/check-dev-host.php old.host # or an explicit host
+```
+
+Read-only. Exits 1 when any row carries the host, so it gates a deploy from a shell script.
+
+Sweep `postmeta`, `posts` and `termmeta`, never `options` alone. `options` holds the least of
+this and is the only table people check. The rows that actually reach the page are elsewhere:
+a `custom` menu item stores its target verbatim in `postmeta._menu_item_url`, so after a push
+it is a navigation link that leaves the live site, and an absolute URL pasted into
+`post_content` is the same defect inside an article body. On one audited site `options` alone
+reported 7 occurrences and the full sweep reported 25.
+
+`home` and `siteurl` are excluded — they are what makes the local install work. A `guid` match
+is counted separately and never rewritten: WordPress treats a `guid` as a historical
+identifier, not a URL, and changing it breaks the key feed readers use.
+
+---
+
 ## Common Patterns
 
 ### Always set an author
