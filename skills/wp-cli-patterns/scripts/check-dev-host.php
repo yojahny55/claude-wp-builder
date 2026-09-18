@@ -21,6 +21,18 @@
  * an article body. `wp_options` is the table that holds the least of this and it
  * was the only one anybody looked at.
  *
+ * THE MATCH IS DELIBERATELY LOOSE. The needle is compared as a substring, not
+ * anchored to a scheme or a host boundary, because the host does not always
+ * appear as a URL: it turns up inside serialized option arrays, inside
+ * post_content prose, and with no scheme in front of it. Anchoring the SQL to
+ * `://<host>` would miss exactly the rows this script exists to find — the first
+ * pass over one site matched 7 rows and the full loose sweep matched 25.
+ *
+ * The trade is intentional. This is a deploy gate: a false positive costs one
+ * look, a false negative ships the development host to production. A needle that
+ * is itself a common substring — `localhost`, or a one-word internal hostname —
+ * will over-report, and the count should be read with that in mind.
+ *
  * `home` and `siteurl` are excluded: they are expected to hold the development
  * host and are what makes the local site work. A `guid` match is reported
  * separately because WordPress treats a `guid` as a historical identifier and
@@ -30,7 +42,14 @@
 
 global $wpdb;
 
-$argv_in = isset( $args ) ? $args : array();
+/*
+ * wp eval-file populates $args as a LOCAL variable in this file's scope, so
+ * `isset( $args )` is the form that works when the file is run directly. A file
+ * that is require()d from another script never sees that local, which is why
+ * skills/wp-polylang/scripts/pll-lib.php mirrors it into $GLOBALS; read both so
+ * this script keeps its argument either way.
+ */
+$argv_in = isset( $args ) ? $args : ( isset( $GLOBALS['args'] ) ? $GLOBALS['args'] : array() );
 $host    = ! empty( $argv_in[0] ) ? $argv_in[0] : home_url();
 $needle  = preg_replace( '#^https?://#', '', rtrim( $host, '/' ) );
 
