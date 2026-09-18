@@ -28,7 +28,7 @@
  * (see check-dev-host.php).
  */
 
-$dev_host = preg_replace( '#^https?://#', '', rtrim( home_url(), '/' ) );
+$dev_host = strtolower( (string) parse_url( home_url(), PHP_URL_HOST ) );
 $findings = 0;
 
 /*
@@ -78,7 +78,14 @@ foreach ( $menus as $menu ) {
 
 		if ( '' === $url || '#' === $url ) {
 			$reason = 'goes nowhere';
-		} elseif ( '' !== $dev_host && false !== strpos( $url, $dev_host ) ) {
+		} elseif ( '' !== $dev_host && strtolower( (string) parse_url( $url, PHP_URL_HOST ) ) === $dev_host ) {
+			/*
+			 * Compare the host component, not the whole string. A substring test
+			 * also fires on a different host that merely ends in this one
+			 * ('mydev.example.com' against 'dev.example.com') and on any URL that
+			 * carries the host inside a path or a query ('/go?to=dev.example.com').
+			 * This script exits 1 on a finding, so each of those blocks a deploy.
+			 */
 			$reason = 'absolute URL on the development host';
 		}
 

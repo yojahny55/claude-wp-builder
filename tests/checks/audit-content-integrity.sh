@@ -55,6 +55,35 @@ grep -q "wp_get_nav_menus" "$MENU" || fail "$MENU: must walk every menu, not onl
 # Editing the URL leaves a custom item carrying a host; converting the type does not.
 grep -q "post_type" "$SEO" || fail "$SEO: SEO-054 does not prefer converting to a post_type item"
 
+# --- a deploy gate must not fire on a host it only resembles -----------------
+# strpos($url, $dev_host) also matches 'mydev.example.com' against 'dev.example.com'
+# and '/go?to=dev.example.com'. Both exit 1, so both block a deploy.
+grep -q "parse_url( \$url, PHP_URL_HOST )" "$MENU" \
+  || fail "$MENU: the dev-host test must compare the host component, not a substring"
+if grep -n 'strpos( \$url, \$dev_host )' "$MENU" >/dev/null 2>&1; then
+  fail "$MENU: the substring host test is back"
+fi
+
+# --- a revision's orphan is a copy of its parent's --------------------------
+# ACF can write field values onto revision posts. The operator cannot fix a revision,
+# and fixing the parent fixes both, so reporting it is duplicate noise.
+grep -q "post_type <> 'revision'" "$ORPHAN" || fail "$ORPHAN: revisions are not excluded"
+# Only revisions. A draft or private page is real content whose fields reach a template
+# on preview, so filtering on post_status would hide live findings.
+if grep -n "p.post_status = 'publish'" "$ORPHAN" >/dev/null 2>&1; then
+  fail "$ORPHAN: filtering parents by post_status hides drafts, which are real findings"
+fi
+
+# --- an unusable theme path must not read as a clean result -----------------
+# With no read-field list every orphan is labelled DEAD-DATA and the script exits 0,
+# which is the most reassuring possible output for a classification that never ran.
+grep -q "is not a directory" "$ORPHAN" \
+  || fail "$ORPHAN: a theme path that does not resolve is silently accepted"
+
+# --- both quoting styles, or a read field is misfiled as dead data ----------
+grep -qF "['\\\"]" "$ORPHAN" \
+  || fail "$ORPHAN: get_field() is only matched with single quotes"
+
 # --- both scripts are read-only deploy gates ---------------------------------
 for f in "$ORPHAN" "$MENU"; do
   if grep -nE '\$wpdb->(query|update|delete|insert|replace)\(|wp_(update|delete|insert)_post\(|update_post_meta\(' "$f" >/dev/null 2>&1; then
@@ -77,7 +106,7 @@ grep -qi "does not return drafts" "$SKILL" \
 
 # --- a fix is measured against the case that produced the finding ------------
 grep -q "Step 6.10" "$CMD" || fail "$CMD: nothing requires a fix to be verified"
-grep -qi "still returns 200\|still return 200" "$CMD" \
+grep -qiE "still returns? 200" "$CMD" \
   || fail "$CMD: 6.10 does not say a 200 response proves nothing"
 grep -qi "reproducing case" "$CMD" || fail "$CMD: 6.10 does not require naming the reproducing case"
 grep -q "UNVERIFIED" "$CMD" || fail "$CMD: an unverifiable fix has no outcome"
