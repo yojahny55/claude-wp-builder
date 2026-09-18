@@ -2,24 +2,6 @@
 
 ## [Unreleased]
 
-### Fixed
-
-- **`/wp-yolo` refuses to normalize a demo it has already converted, instead of silently
-  shipping a degraded theme.** `wp-normalize` derives `cssRules`, `fonts` and `backgrounds`
-  from the declarations and `@font-face` rules in the demo's markup; Step 2.6's Tailwind
-  conversion strips both — the `<style>` blocks and the project stylesheet `<link>` whose
-  rules it absorbed. A second `/wp-yolo` therefore normalized markup that no longer held any
-  of it and wrote an emptied manifest. Nothing failed: Step 2.6 correctly skipped the pages as
-  already-native, and Step 4.5's font carry and `/wp-finalize`'s Layer 1 parity gate then read
-  the gutted manifest and passed over nothing, so the run reported success and the theme
-  shipped with no carried fonts and no background parity.
-  Step 2 now checks for `demo/.original/` — which exists only if a conversion has run — before
-  dispatching normalize, and stops with the restore command. **`--force` does not bypass it:**
-  `--force` discards the built theme and says nothing about the demo, so letting it through
-  would produce the same degraded build with the operator believing they had chosen it. The
-  workaround was already documented, in Step 3's abort branch three steps away from the
-  command that triggers the problem, which is a workaround nobody applies.
-
 ### Changed
 
 - The design library is a caret range, `@yojahny/wp-design-library@^1.0.0`, instead of an exact
@@ -457,6 +439,22 @@
 
 ### Fixed
 
+- **`/wp-yolo` refuses to normalize a demo it has already converted, instead of silently
+  shipping a degraded theme.** `wp-normalize` derives `cssRules`, `fonts` and `backgrounds`
+  from the declarations and `@font-face` rules in the demo's markup; Step 2.6's Tailwind
+  conversion strips both — the `<style>` blocks and the project stylesheet `<link>` whose
+  rules it absorbed. A second `/wp-yolo` therefore normalized markup that no longer held any
+  of it and wrote an emptied manifest. Nothing failed: Step 2.6 correctly skipped the pages as
+  already-native, and Step 4.5's font carry and `/wp-finalize`'s Layer 1 parity gate then read
+  the gutted manifest and passed over nothing, so the run reported success and the theme
+  shipped with no carried fonts and no background parity.
+  Step 2 now checks for `demo/.original/` — which exists only if a conversion has run — before
+  dispatching normalize, and stops with the restore command. **`--force` does not bypass it:**
+  `--force` discards the built theme and says nothing about the demo, so letting it through
+  would produce the same degraded build with the operator believing they had chosen it. The
+  workaround was already documented, in Step 3's abort branch three steps away from the
+  command that triggers the problem, which is a workaround nobody applies.
+
 - **A CSS `background-image` served the original PNG/JPG on an optimized library.** Robin
   Image Optimizer's default delivery mode, `picture`, rewrites `<img>` tags only, and the
   `__tailwind__` starter's own HTML rewrite looked for the sibling WordPress writes
@@ -843,7 +841,6 @@
   eight rows each. An advisory rise that is an exact multiple of the sample count is a
   device being added, not a device breaking.
 
-
 - **An override can conceal what it overrode.** The known hazard was an override that
   silently fails to apply — appended above the rules it replaces, losing on source
   order at equal specificity. The other direction is worse: an override that *flattens*
@@ -867,7 +864,6 @@
   `ladder-scan: allow-nth-child <selector> -- <why>`; a marker with no reason is
   refused, so the exemption records a judgement rather than silencing the scan.
 
-
 - **`process-flow`, a second answer in the `process` role.** A pipe with a node per
   step and a line the scroll draws along it, stacked on a phone and horizontal once
   the container can hold a column per step. Costs 0 vh where `process-rail` costs a
@@ -879,7 +875,6 @@
   the same quantity. The rail is drawn per step rather than spanning the list, and
   nothing in it counts the steps; measured 0.0px at every junction at 1440, 1024, 768
   and 390, and at three, four, five and six steps.
-
 
 - **The generative half of the ported skill, absent since the port.**
   `wp-demo-craft` was ported from nateherkai/scroll-craft as *prose* — taste floor,
@@ -906,7 +901,6 @@
   costume, and a shelf of dark pages with one accent each is what happens when nobody
   decides.
 
-
 - **Every silent-failure rule now carries the measurement that produced it.** Such a
   rule is by definition one nobody has cause to test — the advice is followed, nothing
   breaks, and the stated *reason* is never exercised — so a wrong reason survives until
@@ -916,7 +910,6 @@
   `10`→`90` against an `initial-value` of `0`, it renders `0`, not `10`. The fallback is
   the un-animated value. Checked: each numbered item must be marked as measured and
   carry a figure that can be re-run.
-
 
 - **`score-scale`: the first composition that draws data rather than describing it.** The
   library was nine-of-fourteen text only — every composition a heading and some paragraphs
@@ -932,7 +925,6 @@
   about a client's results, which `taste.md` refuses — in the one industry where that claim
   draws regulators. A slot would invite a build to change an edge, and a changed edge is
   misinformation in a regulated field.
-
 
 - **Compositions carry element motion, and the budget stopped metering it.** A craft build
   produced pages that read as static while passing every gate, and the cause was neither
@@ -954,7 +946,6 @@
   reference and its motion from nowhere. `--ease-entry` and `--motion-rise` are now mapped
   and consumed by every composition.
 
-
 - **`demo-verify` reports `static-page`.** A page whose entire motion is `reveal` plus
   pointer devices is a static page that measures as animated, and no existing finding
   could say so: `no-engine` asks whether motion exists, `dead-scroll` whether a section
@@ -973,7 +964,6 @@
   adjective survived four rounds of revision unsatisfied. The answerable version is a list
   of pictures the demo is then obliged to contain. Adds two more: three named sites whose
   motion to match, and which page a visitor must understand in ten seconds.
-
 
 - **The demo brief now interviews the operator about form, and gates the build on
   approval.** Every field it captured — person, pain, promise, vibe words, references,
@@ -1024,7 +1014,6 @@
   of measuring rather than in a reference section, because the moment it is needed is
   the moment somebody opens a probe.
 
-
 - **`offer-table`'s stagger was off by one, shipped.** Its plans are `<th>` preceded by
   a `<td>` corner cell, so `:nth-child` counted the corner: plan 1 received the range
   written for plan 2, and the `:nth-child(1)` rule matched nothing at all. With four
@@ -1042,7 +1031,6 @@
   along with child-indexing and a missing catch-all, and names the fourth cause it
   cannot see: rungs on `view()` each build a timeline from their own box.
 
-
 - **A child past the last written `:nth-child` range runs out of sequence.** An element
   with no `animation-range` falls back to `normal`, which on a view timeline is
   `cover 0%` to `cover 100%` — a range unrelated to the stagger, so the extra child
@@ -1056,8 +1044,6 @@
   shape in `icon-row`, `offer-table` and `score-scale`; all three are guarded, and
   `offer-table` records that it is not visibly wrong today only because its stagger is
   early.
-
-
 
 - **`devices.md` said a duration on a scroll-driven animation hijacks it. Measured,
   it does nothing at all.** The file claimed a duration "overrides the range and the
@@ -1077,7 +1063,6 @@
   page held still. Now stated, and checked structurally — a rule with
   `animation-iteration-count: infinite`, a finite duration and no `animation-timeline`
   is either wrong or lucky.
-
 
 - **Two elements reading one value on `view()` do not agree.** `view()` builds its
   timeline from each element's own box, so identical `animation-range` declarations
@@ -1102,7 +1087,6 @@
   is motionless whenever the reader is, which is a still picture in every screenshot
   and on any page somebody is reading rather than scrolling.
 
-
 - **The fingerprint gate compared fonts and not structure.** v2 reduced it to display
   family, text family and accent hue, reasoning that the composition library chooses
   structure per role so structure needed no fingerprint. A library with one good answer
@@ -1111,7 +1095,6 @@
   their fonts differed. v3 restores the structural axes: seven dimensions, four of
   which must differ against every row individually, with the palette rule kept as an
   absolute on top.
-
 
 - **`footer-columns` flattened the measured type scale on every page.** It used `<h2>`
   for three column labels at `0.8rem`, and a heading element is a role rather than a
@@ -1126,7 +1109,6 @@
   sentence, not at its pivot**: trimming at the pivot removes almost no information while
   converting a sentence into a manufactured aphorism, and three in a section is a cadence
   the detector names. The bold-lead-in list format produces them as a set.
-
 
 - **A recorded client brief had no authority over the craft defaults, and the defaults
   won.** `/wp-context` writes the client's own direction into the project's
@@ -1152,7 +1134,6 @@
   reach for a graphic. *When a section states something quantitative, draw it.* A fact
   published about the sector is not an invented statistic; it is the subject.
 
-
 - **Element keyframes wrote `transform`, which races the engine.** GSAP writes `transform`
   for `parallax`, `magnet` and cue rise, and `reveal` writes it on every child, so the
   entrance keyframes added in the previous commit would have collided on exactly the
@@ -1163,7 +1144,6 @@
   accent-tinted hover glow is a slop finding; a modifier on the container root cannot match
   its own `@container` query; and `--motion-p` can drive any property inside a scrubbed
   section, which was demonstrated nowhere.
-
 
 - **Interior pages had a ceiling and no floor, so a craft build shipped eleven of them
   uncomposed.** The rules said "Interior pages never pin", and nothing said what an
@@ -1188,7 +1168,6 @@
 
   Both reference files carry the substance because `/wp-yolo`'s craft path reads them and
   never opens `commands/wp-demo.md`.
-
 
 - **`container-type` on an ancestor freezes every reveal beneath it, and nothing said so.**
   The composition library is container-query based, so adding `container-type: inline-size`
@@ -1265,7 +1244,6 @@
   states, a smaller peak — which is what "take the cheap roles" was always meant to mean: a
   lower ceiling on the same structure, never an exemption from having one.
 
-
 - **The research agent could not reach either MCP rung of its own source ladder.**
   `tools:` in agent frontmatter is an allowlist, not a hint, and `agents/wp-research.md`
   listed only built-ins — so `mcp__firecrawl` and `mcp__dataforseo` were unreachable to the
@@ -1338,7 +1316,6 @@
   section let `get_terms()` sort by name: with a limit of six over seven terms, the
   default ordering was not rearranging the cards, it was choosing which term never
   reached the front page.
-
 
 - **The `tailwind` transcription path had a licence the `basic` path never had, and every
   section built through it drifted.** `/wp-section`'s overlay called the converted demo "a
@@ -1889,7 +1866,6 @@
 - README and `docs/commands.md` no longer describe the fluid `vw` ramps as open work,
   and state that `unobserved` is counted per section while `no-engine` stays
   document-wide.
-
 
 ## [1.15.0] - 2026-09-10
 
