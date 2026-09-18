@@ -23,6 +23,12 @@
  * A report of 70 warnings buries the one that is visible, so this script asks the
  * theme which field names it actually reads before it decides a severity.
  *
+ * Revisions are excluded. ACF can write field values onto revision posts, and an
+ * orphan there is a copy of the parent's: the operator cannot fix a revision, and
+ * fixing the parent fixes both. Only revisions are excluded, not every
+ * non-publish parent — a draft or private page is real content whose fields do
+ * reach a template on preview, so dropping those would hide live findings.
+ *
  * A non-publish status is the same defect with a different cause and is reported
  * too. get_post_status() answers 'draft' or 'trash' rather than false, so a check
  * that only tests get_post() for null misses it — and a trashed post still has a
@@ -31,8 +37,18 @@
 
 global $wpdb;
 
-$argv_in = isset( $args ) ? $args : array();
+$argv_in = isset( $args ) ? $args : ( isset( $GLOBALS['args'] ) ? $GLOBALS['args'] : array() );
 $theme   = ! empty( $argv_in[0] ) ? rtrim( $argv_in[0], '/' ) : '';
+
+/*
+ * A path that does not resolve would leave the read-field list empty, and every
+ * orphan would then be labelled DEAD-DATA — the script would print a reassuring
+ * summary and exit 0 while the classification had never run. Refuse instead.
+ */
+if ( '' !== $theme && ! is_dir( $theme ) ) {
+	fwrite( STDERR, "find-orphan-acf-ids.php: '{$theme}' is not a directory\n" );
+	exit( 2 );
+}
 
 if ( ! function_exists( 'acf_get_field' ) ) {
 	fwrite( STDERR, "find-orphan-acf-ids.php: ACF is not active, so field types cannot be resolved\n" );
@@ -57,8 +73,11 @@ $rows = $wpdb->get_results(
 	   JOIN {$wpdb->postmeta} fk
 	     ON fk.post_id = pm.post_id
 	    AND fk.meta_key = CONCAT('_', pm.meta_key)
+	   JOIN {$wpdb->posts} p
+	     ON p.ID = pm.post_id
 	  WHERE fk.meta_value LIKE 'field_%'
-	    AND pm.meta_value <> ''"
+	    AND pm.meta_value <> ''
+	    AND p.post_type <> 'revision'"
 );
 
 // The only field types whose stored value is a post ID.
@@ -76,7 +95,9 @@ if ( $theme && is_dir( $theme ) ) {
 		if ( 'php' !== strtolower( $file->getExtension() ) ) {
 			continue;
 		}
-		if ( preg_match_all( "/get_field\(\s*'([a-z0-9_]+)'/i", (string) file_get_contents( $file->getPathname() ), $m ) ) {
+		// Both quoting styles. A get_field( $var ) call cannot be resolved statically;
+		// a field read only that way is classified DEAD-DATA, which under-reports.
+		if ( preg_match_all( "/get_field\(\s*['\"]([a-z0-9_]+)['\"]/i", (string) file_get_contents( $file->getPathname() ), $m ) ) {
 			foreach ( $m[1] as $name ) {
 				$read[ $name ] = true;
 			}
