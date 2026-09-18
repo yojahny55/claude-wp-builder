@@ -25,9 +25,13 @@ need() { grep -Fq "$1" "$f" || fail "$f $2"; }
 # already run by then.
 need 'refuse to normalize a demo that has already been converted' \
   'Step 2 does not refuse an already-converted demo'
-grep -n 'refuse to normalize a demo that has already been converted' "$f" >/dev/null
-guard_line=$(grep -n 'refuse to normalize a demo that has already been converted' "$f" | head -1 | cut -d: -f1)
-dispatch_line=$(grep -n 'dispatch the \*\*wp-normalize\*\* agent' "$f" | head -1 | cut -d: -f1)
+# `|| true` on both: under `set -euo pipefail` a grep that matches nothing makes the whole
+# pipeline non-zero (pipefail), the assignment fails, and `set -e` kills the script BEFORE
+# either diagnostic below can print -- the operator gets a bare exit 1 and no message.
+# Measured, not reasoned about: without it the script printed nothing and exited 1.
+guard_line=$(grep -n 'refuse to normalize a demo that has already been converted' "$f" | head -1 | cut -d: -f1 || true)
+dispatch_line=$(grep -n 'dispatch the \*\*wp-normalize\*\* agent' "$f" | head -1 | cut -d: -f1 || true)
+[ -n "$guard_line" ] || fail "$f no longer states the Step 2 guard where this check expects it"
 [ -n "$dispatch_line" ] || fail "$f no longer dispatches wp-normalize where this check expects it"
 [ "$guard_line" -lt "$dispatch_line" ] \
   || fail "$f states the guard at line $guard_line, AFTER the normalize dispatch at $dispatch_line -- a guard that runs after the thing it guards is not a guard"
