@@ -35,7 +35,10 @@ for fn in esc_html_e esc_attr_e; do
   grep -q "$fn" "$F" || fail "$F: WP-030 does not name ${fn}"
 done
 grep -q "placeholder" "$F" || fail "$F: WP-030 does not name the attribute context"
-grep -qE "echo +__\\\\\(|echo +__\(" "$F" || fail "$F: WP-030 still ignores the echo __() form"
+# The table row escapes the paren for markdown (`echo __\(`) and the prose does not,
+# so the backslash is optional. Single quotes keep the pattern readable: bash leaves it alone
+# and what is written here is the ERE grep receives.
+grep -qE 'echo +__\\?\(' "$F" || fail "$F: WP-030 still ignores the echo __() form"
 # The severity claim is the part that keeps the audit honest.
 grep -qi "WARNING, not CRITICAL" "$F" \
   || fail "$F: WP-030 does not say an i18n escaping defect is WARNING, not CRITICAL"
