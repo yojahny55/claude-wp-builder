@@ -81,8 +81,18 @@ grep -q "is not a directory" "$ORPHAN" \
   || fail "$ORPHAN: a theme path that does not resolve is silently accepted"
 
 # --- both quoting styles, or a read field is misfiled as dead data ----------
-grep -qF "['\\\"]" "$ORPHAN" \
-  || fail "$ORPHAN: get_field() is only matched with single quotes"
+# Run the pattern instead of grepping for it. Every grep written against this source was
+# wrong in a way that still passed: a fixed string pins the order of the character class,
+# and testing the quote characters against the whole line passes on a pattern that dropped
+# the double quote, because the PHP literal is itself delimited by double quotes.
+behavior="$(dirname "$0")/lib/acf-field-pattern-behavior.php"
+[ -f "$behavior" ] || fail "$behavior is missing"
+if ! command -v php >/dev/null 2>&1; then
+  echo "SKIP: php not found — the greps above passed, the field-pattern test did not run"
+else
+  out=$(php "$behavior" 2>&1) \
+    || fail "the get_field() pattern is wrong: ${out:-(php exited non-zero with no output)}"
+fi
 
 # --- a half-measured gate must say so, not report a clean run ---------------
 # home_url() with no host makes the dev-host half a no-op; "0 items" would then cover
