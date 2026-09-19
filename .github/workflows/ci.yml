@@ -178,12 +178,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # --fail, and no pipe on the verification. Without --fail, curl writes the server's
+      # 404 page to the output path and exits 0, so /usr/local/bin/wp becomes a text file
+      # that happens to be executable -- which is what happened the first time this job
+      # ran, reporting "404:: command not found" three steps later from inside the
+      # provisioner. And `wp --info | head -3` cannot fail the step at all, because the
+      # pipeline's status is head's: the check that was supposed to catch a broken binary
+      # was structurally incapable of it.
+      #
+      # Versioned phars are published as GitHub release assets. The builds repo's phar/
+      # directory carries wp-cli.phar (latest) and nothing version-suffixed, so the
+      # obvious-looking pinned URL there is always a 404.
       - name: Install WP-CLI
         run: |
-          curl -sSLo /usr/local/bin/wp \
-            https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli-2.12.0.phar
+          curl -sSL --fail -o /usr/local/bin/wp \
+            https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar
           chmod +x /usr/local/bin/wp
-          wp --info --allow-root | head -3
+          wp --info --allow-root
 
       # This job reaches the network on purpose, and it is the only one that does: a
       # WordPress fixture cannot exist without downloading a WordPress. Everything it
