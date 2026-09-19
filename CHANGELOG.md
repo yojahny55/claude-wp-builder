@@ -26,32 +26,6 @@
   Step 6.5 now reconciles against the inventory instead of re-reporting the same missing
   plugins as a fresh discovery.
 
-### Fixed
-
-- **`/wp-clone` no longer leaves a production database dump in `/tmp`.** The SSH path
-  exported the whole remote database to a fixed path, `/tmp/wp-clone-dump.sql`, on **both**
-  machines. It deleted the remote copy and never deleted the local one — so after every clone
-  a full production dump (customer records, order rows, password hashes, whatever API keys
-  live in `wp_options`) sat in `/tmp` at a predictable name, with default permissions, until
-  the machine rebooted.
-  The fixed name was two problems at once. A predictable path in a world-writable directory
-  on a **production** server is a name an unprivileged local user can wait for. And two clones
-  running at once against the same machine shared that one filename: the second export
-  overwrote the first, and the first clone then imported the second site's database into its
-  own destination with nothing to say so.
-  Both ends now use `mktemp`, and both create the dump owner-only — `umask 077` on the remote
-  export and `chmod 600` locally, set as the file is created rather than after, since a
-  `chmod` afterwards leaves a window in which the whole database already exists at the default
-  mode. **Both copies are deleted unconditionally**, the remote one whether or not the
-  transfer worked and the local one whether or not the import did: the failing run is the one
-  that leaves a dump behind, because nobody tidies up after a command that did not finish.
-  Path B's dump is left alone — the operator created it and passed it in with `--sql=`, and
-  removing someone's input because the command consumed it is not cleanup — but the summary
-  now names it as a full database export still on disk, since silence there leaves a
-  production database on the machine with nobody having mentioned it.
-
-### Added
-
 - **`/wp-clone` refuses to replace an occupied destination, and backs it up first.** The
   command ran `wp db import` against the destination on both paths with no backup, no
   existence check and no confirmation. A dump carries `DROP TABLE` / `CREATE TABLE`, so the
@@ -91,6 +65,30 @@
   precisely because a payment bug needs reproducing. The report also states plainly that real
   customer records are now on the machine. The summary always shows what was isolated and what
   remains live, never collapsed on success.
+
+### Fixed
+
+- **`/wp-clone` no longer leaves a production database dump in `/tmp`.** The SSH path
+  exported the whole remote database to a fixed path, `/tmp/wp-clone-dump.sql`, on **both**
+  machines. It deleted the remote copy and never deleted the local one — so after every clone
+  a full production dump (customer records, order rows, password hashes, whatever API keys
+  live in `wp_options`) sat in `/tmp` at a predictable name, with default permissions, until
+  the machine rebooted.
+  The fixed name was two problems at once. A predictable path in a world-writable directory
+  on a **production** server is a name an unprivileged local user can wait for. And two clones
+  running at once against the same machine shared that one filename: the second export
+  overwrote the first, and the first clone then imported the second site's database into its
+  own destination with nothing to say so.
+  Both ends now use `mktemp`, and both create the dump owner-only — `umask 077` on the remote
+  export and `chmod 600` locally, set as the file is created rather than after, since a
+  `chmod` afterwards leaves a window in which the whole database already exists at the default
+  mode. **Both copies are deleted unconditionally**, the remote one whether or not the
+  transfer worked and the local one whether or not the import did: the failing run is the one
+  that leaves a dump behind, because nobody tidies up after a command that did not finish.
+  Path B's dump is left alone — the operator created it and passed it in with `--sql=`, and
+  removing someone's input because the command consumed it is not cleanup — but the summary
+  now names it as a full database export still on disk, since silence there leaves a
+  production database on the machine with nobody having mentioned it.
 
 ## [1.19.0] - 2026-09-18
 
