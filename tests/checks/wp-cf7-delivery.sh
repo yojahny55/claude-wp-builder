@@ -60,7 +60,14 @@ PAGE_ID=${PAGE_URL##*page_id=}
 
 # A port the kernel hands out, rather than a fixed one two concurrent runs would fight over.
 PORT=$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')
-wp --path="$DIR" --allow-root server --host=127.0.0.1 --port="$PORT" >/tmp/wp-cf7-server.log 2>&1 &
+
+# The log belongs to this run, like the directory and the port. A fixed path in /tmp is
+# shared, so two concurrent runs interleave into it and the tail printed below -- read only
+# when the site failed to come up -- could show the other run's output, at exactly the
+# moment someone is trying to find out what went wrong. It is read before teardown removes
+# the directory, so scoping it here costs nothing.
+SERVER_LOG="$DIR/wp-cf7-server.log"
+wp --path="$DIR" --allow-root server --host=127.0.0.1 --port="$PORT" >"$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 
 up=""
@@ -71,7 +78,7 @@ for _ in $(seq 1 40); do
   fi
   sleep 1
 done
-[ -n "$up" ] || { tail -5 /tmp/wp-cf7-server.log | sed 's/^/  /'; fail "the fixture site never answered on port $PORT"; }
+[ -n "$up" ] || { tail -5 "$SERVER_LOG" | sed 's/^/  /'; fail "the fixture site never answered on port $PORT"; }
 
 endpoint="http://127.0.0.1:$PORT/?rest_route=/contact-form-7/v1/contact-forms/$FORM_ID/feedback"
 sink="$DIR/wp-content/mail-sink.log"
