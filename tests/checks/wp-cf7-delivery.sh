@@ -97,27 +97,36 @@ post() {
 }
 
 ok=0
-t() { # t <label> <condition-result>
-  if [ "$2" = "1" ]; then echo "  ok   [$1]"; ok=$((ok + 1)); else echo "  FAIL [$1]"; return 1; fi
+# Records a passing assertion and counts it. Every failure path in this file goes through
+# `fail`, which prints a diagnosis and exits; this only ever runs after one of those guards
+# has already let the run continue.
+#
+# It always succeeds on purpose. Returning non-zero would make a bare top-level `t ...`
+# call abort the script under `set -e` before its own line reached the terminal -- the
+# silent exit being the worst possible way to report a failed assertion. No caller passes a
+# computed value today, and this makes it safe if one ever does.
+t() { # t <label>
+  echo "  ok   [$1]"
+  ok=$((ok + 1))
 }
 
 # --- a valid submission is accepted, and the mail actually leaves -----------------------
 before=$(lines)
 valid=$(post "Ana" "ana@example.invalid" "Hola")
 case "$valid" in
-  *'"status":"mail_sent"'*) t "a valid submission is accepted" 1 ;;
+  *'"status":"mail_sent"'*) t "a valid submission is accepted" ;;
   *) echo "  $valid"; fail "a valid submission was not accepted" ;;
 esac
 
 after=$(lines)
 [ "$after" -gt "$before" ] || { echo "  $valid"; fail "the submission was accepted but no mail reached the sink -- a form that renders and delivers nothing"; }
-t "the mail reached the sink" 1
+t "the mail reached the sink"
 
 # The recipient and the interpolated body, not merely that something was sent: a mail with
 # the right shape and the wrong address is the failure this is for.
 last=$(tail -1 "$sink")
 case "$last" in
-  *'"to":"owner@example.invalid"'*) t "addressed to the form's recipient" 1 ;;
+  *'"to":"owner@example.invalid"'*) t "addressed to the form's recipient" ;;
   *) echo "  $last"; fail "the captured mail is not addressed to the form's recipient" ;;
 esac
 # Anchored to the message FIELD, not to the line. Matching 'Ana' anywhere in the captured
@@ -125,18 +134,23 @@ esac
 # template is "Fixture: [your-name]" and supplied the match on its own -- found by
 # mutation. The body is the half a client actually reads, and an assertion satisfied by
 # the subject cannot see it go empty.
-body=$(printf '%s' "$last" | sed -n 's/.*"message":"\(.*\)","at".*/\1/p')
+# Anchored on where the value STARTS, not on what follows it. The previous pattern
+# required "at" to be the next key, which is true only because the sink writes them in that
+# order -- add a field between them and the capture silently yields nothing, and the check
+# then reports "no message body" about a mail that has one. Coupling a check to a
+# neighbouring field's position produces a confident, wrong diagnosis.
+body=$(printf '%s' "$last" | grep -oP '"message":"\K[^"]*' || true)
 [ -n "$body" ] || { echo "  $last"; fail "the captured mail has no message body"; }
 case "$body" in
-  *'Hola'*) t "the submitted message reached the body" 1 ;;
+  *'Hola'*) t "the submitted message reached the body" ;;
   *) echo "  body: $body"; fail "the captured mail body does not carry the submitted message" ;;
 esac
 case "$body" in
-  *'ana@example.invalid'*) t "the submitter's address reached the body" 1 ;;
+  *'ana@example.invalid'*) t "the submitter's address reached the body" ;;
   *) echo "  body: $body"; fail "the captured mail body does not carry the submitter's address" ;;
 esac
 case "$last" in
-  *'"subject":"Fixture: Ana"'*) t "the subject interpolated the submitted name" 1 ;;
+  *'"subject":"Fixture: Ana"'*) t "the subject interpolated the submitted name" ;;
   *) echo "  $last"; fail "the captured mail subject did not interpolate the name" ;;
 esac
 
@@ -144,16 +158,16 @@ esac
 before=$(lines)
 invalid=$(post "Ana" "" "Hola")
 case "$invalid" in
-  *'"status":"validation_failed"'*) t "a submission missing a required field is refused" 1 ;;
+  *'"status":"validation_failed"'*) t "a submission missing a required field is refused" ;;
   *) echo "  $invalid"; fail "a submission with an empty required email was not refused" ;;
 esac
 case "$invalid" in
-  *'"field":"your-email"'*) t "the refusal names the offending field" 1 ;;
+  *'"field":"your-email"'*) t "the refusal names the offending field" ;;
   *) echo "  $invalid"; fail "the refusal does not name your-email" ;;
 esac
 
 after=$(lines)
 [ "$after" -eq "$before" ] || fail "a refused submission still sent mail -- validation that reports an error and delivers anyway is worse than no validation"
-t "a refused submission sends nothing" 1
+t "a refused submission sends nothing"
 
 echo "PASS: CF7 accepts, refuses and delivers correctly in a real WordPress ($ok assertions)"
