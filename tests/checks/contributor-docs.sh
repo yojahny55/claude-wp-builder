@@ -77,4 +77,21 @@ done <"$tmp/checkable"
 
 [ "$missing" -eq 0 ] || fail "$missing path(s) named in the contributor docs do not exist"
 
+
+# --- counts that rot ------------------------------------------------------------------------
+# CONTRIBUTING.md advertised "the 38 checks" while tests/checks/ held 123. Nothing was wrong
+# with the number when it was written, which is the problem: a literal count is a fact that
+# has to be re-verified by hand forever, and this one went un-re-verified for 85 checks. The
+# fix was to name the glob instead. This assertion keeps the next author from typing a fresh
+# number rather than re-deriving one.
+if grep -nE '\b[0-9]+ checks\b' CONTRIBUTING.md; then
+  fail "CONTRIBUTING.md states a literal check count -- there are $(ls tests/checks/*.sh | wc -l) and the number will go stale; name the glob instead"
+fi
+
+# `bin/` has held Node tools since wp-config.mjs became the manifest gate; CONTRIBUTING.md's
+# structure table still called it "Shell utilities", which sends a contributor looking for
+# the validator in the wrong language.
+grep -q '`bin/`.*\*\.mjs\|`bin/`.*Node' CONTRIBUTING.md \
+  || fail "CONTRIBUTING.md's structure table does not mention the Node tools in bin/ -- it is not only shell"
+
 echo "PASS: $(sort -u "$tmp/checkable" | wc -l) repo paths named in ${DOCS[*]} all exist"

@@ -86,13 +86,13 @@ Ensuring the WordPress output matches the demo HTML 1:1 in appearance and conten
 Improving how content is created, organized, and populated.
 
 - [ ] **Auto-trigger `/wp-page blog` for blog sections** `OPEN`
-  When `/wp-section blog` is built, automatically run `/wp-page blog` to generate `archive.php`, `single.php`, and blog-specific templates. The page type exists; the dispatch from `/wp-section` does not.
+  When `/wp-section blog` is built, automatically run `/wp-page blog` to generate `archive.php`, `single.php`, and blog-specific templates. [wp-page](commands/wp-page.md) already builds the blog page type; the dispatch from [wp-section](commands/wp-section.md) does not exist.
 
 - [ ] **Legal pages: create and seed content** `PARTIAL`
   **Gap:** [wp-page](commands/wp-page.md) generates the `legal` template, and [wp-finalize](commands/wp-finalize.md) treats a stub privacy page as a trust gap rather than a pass. Neither creates the Privacy Policy / Terms / Cookie Policy pages nor seeds industry-appropriate content from the project's `CLAUDE.md`.
 
 - [ ] **Blog language field** `OPEN`
-  Add an SCF field to blog posts for selecting the post language; archive templates filter by the active language. Note this only applies under `i18n strategy: suffix` — the Polylang model already carries language per post.
+  Add an SCF field to blog posts for selecting the post language; archive templates filter by the active language. Note this only applies under `i18n strategy: suffix` — the Polylang model already carries language per post. No owner exists: [wp-acf](agents/wp-acf.md) would emit the field and [wp-page](commands/wp-page.md) the archive filter, and neither does today.
 
 - [ ] **Placeholder content for empty elements** `PARTIAL`
   **Gap:** [wp-finalize](commands/wp-finalize.md) refuses `href="#"` in delivered markup and flags a stub privacy page. Nothing seeds obvious placeholder values for social icons or phone numbers when the demo has none, so those elements are simply absent rather than flagged in the report.
@@ -125,7 +125,7 @@ Making the command flow smoother and more guided.
   [motion-devices](tests/checks/motion-devices.sh) now drives both paths. Under default motion it loads the real pinned GSAP from `node_modules` and asserts the rail's transform tracks scroll and that the JS `reveal` branch hides its children and then shows them — reached by forcing `CSS.supports('animation-timeline', …)` to report false, since every browser the suite can run supports it and the CSS engine would otherwise take over.
 
 - [ ] **Broken-site corpus with expected audit findings** `OPEN`
-  A fixture site seeded with known defects and a file of the findings an audit should report. Without it no test can fail because an audit *missed* a defect — the ceiling CLAUDE.md records for the whole audit family.
+  A fixture site seeded with known defects and a file of the findings an audit should report. Without it no test can fail because an audit *missed* a defect — the ceiling CLAUDE.md records for the whole audit family. No owner exists yet; it would build on [provision.sh](tests/fixtures/wp/provision.sh), which already stands up a disposable WordPress for the translation and CF7 suites.
 
 - [ ] **Maintenance mode command** `OPEN`
   New `/wp-maintenance` command to enable/disable maintenance mode — either via a custom template or by installing a maintenance plugin via WP-CLI.
@@ -203,10 +203,10 @@ Server setup, permissions, and WordPress configuration.
 Longer-term features and exploration areas.
 
 - [ ] **Playwright-based visual QA loop** `OPEN`
-  Screenshot each built section, pixel-diff it against the demo, and iterate until the diff is below a threshold. This is the loop; *Visual regression testing* above is the baseline infrastructure it needs first.
+  Screenshot each built section, pixel-diff it against the demo, and iterate until the diff is below a threshold. This is the loop; *Visual regression testing* above is the baseline infrastructure it needs first, and [visual-baselines.sh](tests/checks/visual-baselines.sh) is now half of that. No owner exists for the loop itself.
 
 - [ ] **WordPress.js agent** `OPEN`
-  A dedicated JavaScript specialist for sliders (Swiper, Splide), animations (GSAP, AOS), form validation and interactive components. Same request as *Fix agents being lazy with JavaScript* above — that item records what already ships.
+  A dedicated JavaScript specialist for sliders (Swiper, Splide), animations (GSAP, AOS), form validation and interactive components. No such agent exists; the nearest owner is [wp-yolo](commands/wp-yolo.md) Step 4.6, which ports demo scripts inline. Same request as *Fix agents being lazy with JavaScript* above — that item records what already ships.
 
 - [ ] **Multi-platform support** `OPEN`
   Explore supporting Cursor, Gemini CLI (Codex), and other AI coding tools alongside Claude Code. The plugin architecture (markdown commands/agents/skills) may be adaptable.

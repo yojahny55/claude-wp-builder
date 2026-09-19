@@ -14,6 +14,24 @@ export const LOCAL_NAME = '.wp-create.local.json';
 
 // An absent manifest_version means the project predates versioning. /wp-audit already
 // treats absence that way; this keeps the two readings identical.
+//
+// A PRESENT but malformed one is a different thing entirely, and used to be read as
+// absent: `Number.isInteger("99")` is false, so a manifest declaring version "99" as a
+// string was treated as legacy version 1 and offered for migration. That defeats the
+// future-version guard below with nothing more than a pair of quotes -- the guard exists
+// so a newer plugin's manifest is left untouched rather than downgraded, and a quoted
+// number is exactly what a hand-edit or a JSON writer that stringifies numbers produces.
+// versionProblem() is what callers check; detectVersion() keeps its old meaning for the
+// absent case and is only reached once the version is known to be well-formed.
+export function versionProblem(manifest) {
+  const v = manifest?.manifest_version;
+  if (v === undefined) return null;
+  if (!Number.isInteger(v) || v < 1) {
+    return `manifest_version must be a positive integer, found ${JSON.stringify(v)}`;
+  }
+  return null;
+}
+
 export function detectVersion(manifest) {
   const v = manifest?.manifest_version;
   return Number.isInteger(v) ? v : 1;
@@ -76,7 +94,14 @@ export const AUDIT_CATEGORIES = ['security', 'seo', 'a11y', 'performance', 'best
 // not its membership in any catalog: the catalogs live in the six agent files, they are the
 // thing a project is diffed against, and a second copy here would be one more list to keep
 // true. A typo'd-but-well-shaped id is caught by that diff, reported as never measured.
-const CHECK_ID = /^[A-Z][A-Z0-9]*-[A-Z]?\d+$/;
+//
+// The optional `@<n>` tail is a check REVISION (`SEC-036@2`). An id is an address, not a
+// version: a project holding `SEC-036` stayed "covered" after SEC-036 was rewritten to look
+// for something else, so its coverage read green for a rule it had never been measured
+// against. An id with no tail means revision 1, which is what every id written before this
+// existed means -- so no history is invalidated and nothing has to be re-tagged. Revision 0
+// is refused because "@0" almost always means a counter that started in the wrong place.
+const CHECK_ID = /^[A-Z][A-Z0-9]*-[A-Z]?\d+(@[1-9]\d*)?$/;
 
 export function validateManifest(manifest) {
   const problems = [];
@@ -133,9 +158,33 @@ export function validateManifest(manifest) {
       }
     }
   }
+  const badVersion = versionProblem(manifest);
+  if (badVersion) problems.push(badVersion);
+
+  // Presence AND type. Checking only presence let `wp_cli.wrapper: []` and
+  // `wordpress.url: {}` through: neither is undefined, null or '', so both satisfied the
+  // old test and both are useless to every command that reads them. The wrapper is
+  // interpolated straight into a shell command and the url into a search-replace, so the
+  // failure surfaces later as a mangled command rather than here as a bad manifest --
+  // which is the whole reason this file exists. Every required field is a scalar string;
+  // an array or an object in any of them is a hand-edit or a bad writer, not a value.
   for (const key of REQUIRED) {
     const v = at(manifest, key);
-    if (v === undefined || v === null || v === '') problems.push(`${key} is required and is missing or empty`);
+    if (v === undefined || v === null || v === '') {
+      problems.push(`${key} is required and is missing or empty`);
+    } else if (typeof v !== 'string') {
+      problems.push(`${key} must be a string, found ${Array.isArray(v) ? 'an array' : `a ${typeof v}`}`);
+    }
+  }
+
+  // The optional CONTEXT_FIELDS rows are rendered into the generated block the same way,
+  // so a non-string there puts "[object Object]" where a decision belongs.
+  for (const key of CONTEXT_FIELDS.flatMap((f) => f.paths)) {
+    if (REQUIRED.includes(key)) continue;
+    const v = at(manifest, key);
+    if (v !== undefined && v !== null && typeof v !== 'string') {
+      problems.push(`${key} must be a string, found ${Array.isArray(v) ? 'an array' : `a ${typeof v}`}`);
+    }
   }
   const mode = manifest['demo mode'];
   if (mode !== undefined && mode !== 'craft' && mode !== 'plain') {
@@ -258,6 +307,26 @@ export function getKey(manifest, key) {
 
 const PLUGIN_KEYS = new Set(['slug', 'required', 'requires', 'conflicts', 'source', 'tested']);
 
+// `tested` was an allowed key with no defined meaning and no validation, so `tested: 42`
+// passed and nothing read it -- a compatibility claim that could say anything and bound
+// nobody. It holds the WordPress version, or inclusive version range, the entry is known
+// good against: "6.4", "6.4.2", or "6.0 - 6.6". A range is the shape a profile author
+// reaches for when a plugin's own readme declares one, so refusing it would push people
+// back to the unvalidated free-for-all this replaces.
+const WP_VERSION = /^\d+\.\d+(\.\d+)?$/;
+const TESTED = /^\d+\.\d+(\.\d+)?( - \d+\.\d+(\.\d+)?)?$/;
+
+// Compare two dotted WordPress versions. Missing segments are 0, so "6.4" === "6.4.0".
+function cmpVersion(a, b) {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d < 0 ? -1 : 1;
+  }
+  return 0;
+}
+
 // A profile that cannot be satisfied should say so before anything is installed, not
 // halfway through Step 4.10 with three plugins already active.
 export function validateProfile(profile) {
@@ -290,6 +359,16 @@ export function validateProfile(profile) {
     if (entry.source !== undefined && entry.source !== 'wordpress.org' && entry.source !== 'supplied') {
       problems.push(`${entry.slug}: source must be "wordpress.org" or "supplied"`);
     }
+    if (entry.tested !== undefined) {
+      if (typeof entry.tested !== 'string' || !TESTED.test(entry.tested)) {
+        problems.push(`${entry.slug}: tested must be a WordPress version or range like "6.4", "6.4.2" or "6.0 - 6.6", found ${JSON.stringify(entry.tested)}`);
+      } else if (entry.tested.includes(' - ')) {
+        const [lo, hi] = entry.tested.split(' - ');
+        if (cmpVersion(lo, hi) > 0) {
+          problems.push(`${entry.slug}: tested range "${entry.tested}" runs backwards -- the low bound must come first`);
+        }
+      }
+    }
     // A user-authored profile with "requires": 5 or "requires": {"x":1} is not an array,
     // and `for...of` on a non-iterable throws an uncaught TypeError -- a raw Node stack
     // trace naming this module's own path, the opposite of what this function exists to
@@ -310,6 +389,25 @@ export function validateProfile(profile) {
     }
   }
   return problems;
+}
+
+// What a profile's `tested` claims say about the WordPress actually installed. Returns one
+// line per entry that has something to report, so Step 4.10 can print them; an entry with
+// no `tested` yields "untested", which is deliberately visible rather than silent -- an
+// absent compatibility claim is the common case and the operator should see that it is
+// absent, not read a clean run as a tested one.
+export function testedVerdicts(profile, wpVersion) {
+  if (!WP_VERSION.test(wpVersion ?? '')) return [`cannot compare: ${JSON.stringify(wpVersion)} is not a WordPress version`];
+  const out = [];
+  for (const entry of profile?.plugins ?? []) {
+    if (!entry?.slug) continue;
+    if (entry.tested === undefined) { out.push(`${entry.slug}: untested against any WordPress version`); continue; }
+    if (typeof entry.tested !== 'string' || !TESTED.test(entry.tested)) continue; // validateProfile reports it
+    const [lo, hi] = entry.tested.includes(' - ') ? entry.tested.split(' - ') : [entry.tested, entry.tested];
+    if (cmpVersion(wpVersion, lo) < 0) out.push(`${entry.slug}: WordPress ${wpVersion} is BELOW its tested ${entry.tested}`);
+    else if (cmpVersion(wpVersion, hi) > 0) out.push(`${entry.slug}: WordPress ${wpVersion} is ABOVE its tested ${entry.tested}`);
+  }
+  return out;
 }
 
 export const MARK_BEGIN = '<!-- wp-create:begin -->';

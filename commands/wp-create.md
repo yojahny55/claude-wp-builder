@@ -466,10 +466,26 @@ bash -c "$WP plugin install <slug> --activate"
 | Installed and activated | record in `plugins.resolved` | record in `plugins.resolved` |
 | Not found, install failed, or activation failed | **stop**: this failure blocks the dependent workflow — report the slug and the reason, and do not continue to steps that need it | warn, continue, record in `plugins.degraded` with the reason |
 
-A plugin whose profile entry says `"source": "supplied"` is never fetched from WP.org.
-Ask for the zip or path. If it is not available, record it as `license_missing`, which
-counts as a failure of its `required` flag — a required licensed plugin blocks the build
-rather than half-installing around it.
+A plugin whose profile entry says `"source": "supplied"` is never fetched from WP.org. Ask
+for the zip or path.
+
+**Three different things used to be recorded as `license_missing`, and they need different
+actions from the operator.** A premium plugin whose licence nobody bought, a zip that
+exists but was not handed over, and a zip that was handed over and would not install are
+one word in the report and three different next steps — buy it, go and find it, or debug
+it. Record the reason that actually applies:
+
+| What happened | `reason` | What the operator does next |
+|---|---|---|
+| No zip, and the plugin is licensed | `license_missing` | obtain a licence |
+| The zip exists somewhere but was not supplied to this build | `package_not_supplied` | fetch the file and re-run |
+| A zip was supplied and `wp plugin install` failed | `install_failed` | the message from WP-CLI says why |
+| Installed, but `wp plugin activate` failed | `activation_failed` | usually a PHP or dependency error, which is in the log |
+
+All four count as a failure against the entry's own `required` flag, exactly as before — a
+required plugin that is absent for any of these reasons blocks the build rather than
+half-installing around it. What changes is that the report says which one, so a missing
+file is not reported as a purchase the client has to make.
 
 Record what was actually resolved, not what was requested:
 

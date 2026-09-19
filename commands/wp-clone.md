@@ -354,6 +354,10 @@ until it has passed.
 
 Read `.wp-create.json` from the local project to get the `$WP` wrapper:
 
+**Now run Step 5.4 (Isolate the Clone — before the import).** The mail guard and
+the cron constant are files; they must be in place before anything boots WordPress
+against the source site's database, and the import does not remove them.
+
 ```bash
 bash -c "$WP db import \"\$LOCAL_DUMP\""
 ```
@@ -399,7 +403,7 @@ bash -c "$WP rewrite flush"
 bash -c "bash ${CLAUDE_PLUGIN_ROOT}/bin/wp-env-setup.sh permissions --path=/local/path"
 ```
 
-Skip to **Step 5.5: Isolate the Clone**.
+Skip to **Step 5.5: Isolate the Clone — after the import**.
 
 ---
 
@@ -455,6 +459,10 @@ has finished creating it.
 replaces the destination database. Do not run `wp db import` until it has passed.
 
 Read `.wp-create.json` for the `$WP` wrapper:
+
+**Now run Step 5.4 (Isolate the Clone — before the import).** The mail guard and
+the cron constant are files; they must be in place before anything boots WordPress
+against the source site's database, and the import does not remove them.
 
 ```bash
 bash -c "$WP db import /path/to/dump.sql"
@@ -544,22 +552,34 @@ bash -c "$WP cache flush"
 bash -c "$WP rewrite flush"
 ```
 
-Skip to **Step 5.5: Isolate the Clone**.
+Skip to **Step 5.5: Isolate the Clone — after the import**.
 
 ---
 
-## Step 5.5: Isolate the Clone
+## Step 5.4: Isolate the Clone — before the import
 
-**Both paths arrive here, and nothing may load the site before this step runs.** Step 6
-below loads WordPress and then tells the operator to go visit it — that page load is the
-moment an uncontained clone acts, and by then every send is already out.
+**Both paths arrive here before `wp db import`, and nothing may boot WordPress until it
+has run.**
 
-A clone carries the source site's whole configuration: its mail settings, its payment
-credentials, its webhook URLs, its scheduled jobs. None of that knows it has been copied.
-Everything up to this point has faithfully reproduced a production site on a machine that
-is not production, and reproducing it faithfully is exactly the problem.
+This used to live inside Step 5.5, after the import and after the fix-up commands. That
+ordering was wrong, and the isolation test could not see it because it only asserted that
+5.5 came before Step 6. Between the import and Step 5.5 both paths run `wp search-replace`
+and `wp rewrite flush`; `rewrite flush` fires `init` with the *source site's* plugins
+active, and Path B additionally runs `wp plugin list` and `wp option list` to build its
+dependency inventory. Every one of those loads production code against a production
+database on a machine that is not production — before the mail guard existed. A
+subscription plugin that mails on `init`, or a webhook that fires when a rewrite rule is
+rebuilt, had already acted by the time isolation was applied.
 
-### 5.5.1: Stop outbound mail
+Both measures below are **file** operations — a must-use plugin and a `wp-config.php`
+constant. Neither needs the database, so neither has to wait for the import, and both
+survive it: `wp db import` replaces tables, not files. That is what makes moving them
+earlier possible rather than merely desirable.
+
+What stays in Step 5.5 is the part that genuinely cannot run yet: `blog_public` is a row in
+`wp_options`, so setting it before the import writes a value the import then overwrites.
+
+### 5.4.1: Stop outbound mail
 
 Write `wp-content/mu-plugins/00-clone-isolation.php` in the clone (create `mu-plugins/`
 if absent):
@@ -600,7 +620,7 @@ A **must-use** plugin, because it cannot be deactivated from wp-admin, survives 
 being reactivated, and cannot be undone by an option write. Its filename sorts first and its
 header says what it is, so nobody mistakes it for part of the site.
 
-### 5.5.2: Stop scheduled jobs
+### 5.4.2: Stop scheduled jobs
 
 ```bash
 bash -c "$WP config set DISABLE_WP_CRON true --raw --type=constant"
@@ -611,13 +631,29 @@ subscription renewals, abandoned-cart mail, scheduled publishes — all of them 
 against whatever integrations the database still points at. `/wp-debug` already reports this
 constant, so the state is visible afterwards.
 
-### 5.5.3: Keep it out of search results
+## Step 5.5: Isolate the Clone — after the import
+
+**Both paths arrive here, and nothing may load the site in a browser before this step
+runs.** Step 6 below loads WordPress and then tells the operator to go visit it — that page
+load is the moment an uncontained clone acts in front of a human, and by then every send is
+already out.
+
+Step 5.4 has already stopped mail and cron, before anything booted WordPress. What is left
+here needs the imported database to exist first, and the confirmation that re-checks all of
+it in one place.
+
+A clone carries the source site's whole configuration: its mail settings, its payment
+credentials, its webhook URLs, its scheduled jobs. None of that knows it has been copied.
+Everything up to this point has faithfully reproduced a production site on a machine that
+is not production, and reproducing it faithfully is exactly the problem.
+
+### 5.5.1: Keep it out of search results
 
 ```bash
 bash -c "$WP option update blog_public 0"
 ```
 
-### 5.5.4: Report live integrations — do not silently change them
+### 5.5.2: Report live integrations — do not silently change them
 
 Search the clone for credentials and endpoints that still address production, and **report
 what is found without editing it**:
@@ -648,7 +684,7 @@ Naming it *here* is the point. This report is the one moment an operator is look
 sentence "this database holds real customer records", and a remedy documented anywhere else
 is one they read for the first time after they have already handed the database on.
 
-### 5.5.5: Confirm the isolation took
+### 5.5.3: Confirm the isolation took
 
 ```bash
 bash -c "test -f wp-content/mu-plugins/00-clone-isolation.php && echo 'mail: captured' || echo 'mail: NOT ISOLATED'"

@@ -127,8 +127,11 @@ need '`demo/.yolo-progress.json`, beside the manifest — not in `.wp-create.jso
 # ---------------------------------------------------------------------------
 need 'on **every** run, not only under `--resume`' \
   "Step 4.0 does not require the ledger on every run. One written only when resuming never exists at the moment an interruption creates the need for it"
-need 'Delete it on a successful completion' \
-  "Step 4.0 does not delete the ledger when the build finishes"
+# Was: "Delete it on a successful completion". Deleting protected against a --resume aimed
+# at a finished site, and destroyed the build record in the same act. The stamp keeps both:
+# the refusal below is what the deletion used to buy.
+need 'Stamp `completed` on a successful completion' \
+  "Step 4.0 does not close out the ledger when the build finishes"
 need 'delete it before Step 2 on a `--force`' \
   "Step 4.0 does not delete the ledger on a --force rebuild, where every digest in it is about to describe inputs that no longer exist"
 
@@ -161,5 +164,43 @@ need 'There is no resume inside a unit' \
 # ---------------------------------------------------------------------------
 need '**`--resume` bypasses this gate, and only this gate.**' \
   "Step 1 does not scope what --resume bypasses. A resume that also skipped the FAILED.md stop would build on a demo that never passed verification"
+
+
+# --- ledger v2: output ownership ------------------------------------------------------------
+# v1 recorded that a unit ran and where its artifact was. Resume then skipped the unit when
+# that file existed and was non-empty, which cannot tell OUR output from anyone else's: a
+# hand-edited template part and a half-written one a crashed agent left behind both pass
+# "exists and is non-empty". The digest is what makes the three states distinguishable.
+need '"output": "<sha256 of that file as written>"' \
+  'the ledger no longer records a digest of each artifact -- resume cannot tell its own output from a hand edit'
+need 'sha256sum "$ART"' \
+  'the append command no longer digests the artifact it just wrote'
+need 'Someone edited it after this build wrote it' \
+  'a resume no longer reports an artifact that changed under it'
+need '--skip section:index:hero' \
+  'there is no way to keep an edit a resume found'
+need '--rebuild section:index:hero' \
+  'there is no way to discard an edit a resume found'
+need 'Report every such unit before building any of them' \
+  'edited artifacts are reported one at a time rather than as one decision'
+
+# `version` is the ledger FORMAT; the plugin that wrote it is a separate fact, and the two
+# were the same field. A resume across an upgrade finishes a build with different
+# instructions than it started with.
+need '"plugin_version"' 'the ledger does not record which plugin version wrote it'
+need 'not the ledger format' 'the ledger does not distinguish its format version from the plugin version'
+
+# Deleting the ledger on success destroyed the only record of what the build produced --
+# the record any later update has to start from. `completed` keeps the record AND the
+# protection the deletion provided.
+need '"completed"' 'the ledger has no completed stamp'
+need 'there is nothing to resume' \
+  'a resume against a finished build no longer refuses -- deleting the ledger used to provide that'
+if grep -Fq '**Delete it on a successful completion**' "$f"; then
+  fail "$f still deletes the ledger on success -- the build record does not survive for later updates"
+fi
+# The --force deletion must survive: those digests are about to become lies.
+need 'delete it before Step 2 on a `--force` rebuild' \
+  'a --force rebuild no longer clears a ledger whose digests are about to be regenerated'
 
 echo "PASS: /wp-yolo resume entrypoint, build ledger, drift refusal and verify-before-skip are all pinned"

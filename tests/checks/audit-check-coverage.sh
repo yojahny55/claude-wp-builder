@@ -75,4 +75,24 @@ PERF agents/wp-audit-performance.md
 GEO agents/wp-audit-geo.md
 PAIRS
 
+# --- check revisions ----------------------------------------------------------------------
+# checks_run recorded IDs, and an ID is an address rather than a version: a project holding
+# SEC-036 stayed "covered" after SEC-036 was rewritten to look for something else, so its
+# coverage read green for a rule it had never been measured against. That is this diff's own
+# failure mode, one level down.
+grep -Fq 'A check whose rule changed is a check this project has not run' "$c" \
+  || fail "$c does not treat a revised check as unmeasured coverage"
+grep -Fq 'SEC-036@2' "$c" || fail "$c does not show the revision syntax"
+grep -Fq 'revision 1, which is what every existing entry' "$c" \
+  || fail "$c does not say what a bare ID means -- every checks_run entry written so far is one, and they must stay valid"
+grep -Fq 'reworded finding message is not a bump' "$c" \
+  || fail "$c does not say when to bump a revision, so the revision would mean whatever each author decided"
+grep -Fq 'revision it ran at' "$c" \
+  || fail "$c does not require the revision to be written back into checks_run -- recording the bare ID after running a revised check is what makes the record lie"
+
+# The validator has to accept the suffix, or recording an honest revision makes the manifest
+# invalid and the next command refuses to run.
+grep -Fq '@[1-9]' "$m" \
+  || fail "$m does not accept a revision suffix on a check ID -- writing SEC-036@2 would fail validation"
+
 echo "PASS: check-level coverage is contracted, and all six catalog pointers resolve"
