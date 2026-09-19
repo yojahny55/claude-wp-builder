@@ -208,7 +208,12 @@ jobs:
       # WordPress fixture cannot exist without downloading a WordPress. Everything it
       # installs is pinned in the provisioner, and every assertion runs against the local
       # install -- nothing here asserts against a remote service.
-      - name: ACF nesting inside a real WordPress
+      # Two checks, each provisioning its own fixture. They run in one step because the
+      # runner's default shell is `bash -e` -- confirmed in the job log, `shell:
+      # /usr/bin/bash -e {0}` -- so a failing check aborts the step and the second never
+      # starts. No explicit guard is needed between them, and the note is here because the
+      # absence of one reads like an oversight.
+      - name: WordPress fixture checks
         env:
           WP_FIXTURE: "1"
           WP_FIXTURE_DB_HOST: 127.0.0.1:3307
