@@ -212,6 +212,19 @@ findings that were carried over, and re-open them in this run rather than starti
 from zero — a stale "all clear" is not a clear, and a difference of 25 that no later run
 mentions reads as though it resolved itself.
 
+**When `.wp-audit-findings.json` exists, name them instead of counting them.** The ledger
+(Step 7.5) holds each carried-over finding by check and resource, so the line becomes what
+the operator can act on:
+
+```
+  carry-over  25 findings were found and never fixed
+              oldest: SEC-036 wp_options.siteurl — first seen 2026-03-21, 6 runs ago
+              3 are accepted and are not counted above
+```
+
+Arithmetic is the fallback for a project with no ledger yet, not the preferred answer. A
+count says something is wrong; an identity says what.
+
 Write the whole reconciliation block into the Step 8 report as its own section. When every
 line is clean, print one line instead:
 
@@ -416,6 +429,84 @@ Sort all issues: CRITICAL first, then WARNING, then INFO.
 
 Count totals per category and overall.
 
+## Step 7.5: Reconcile against the finding ledger
+
+`issues_found`, `issues_fixed` and `carried_over` are three integers, and three integers
+cannot answer the question every follow-up audit asks: **is this the same problem as last
+time?** Fix one issue and find a new one and the count is unchanged while the contents
+changed completely — Step 2.5e can report "25 carried over" and never say which 25. A number
+that stays the same for two different reasons is not a measurement anyone can act on.
+
+### A finding's identity is its check and its resource
+
+```
+SEC-036 : wp_options.siteurl
+WP-048  : post:412.related_posts
+SEO-054 : menu_item:88
+A11Y-012: template-parts/hero.php:34
+```
+
+The resource comes from the evidence Step 6.9 already requires — the `$WP` call, the
+`file:line`, the URL. **No new evidence is collected for this**; a finding that could not
+name its resource could not have named its evidence either, and Step 6.9 already drops it.
+
+The resource must be the most stable thing the evidence names. A `file:line` moves when
+someone adds an import above it, so a rule that identifies its finding by line alone reports
+every finding as resolved-and-new after any edit to the file. Prefer the record, the option
+or the element; fall back to `file:line` only where nothing more stable exists, and accept
+that those findings churn.
+
+### Five statuses, and only one of them is a judgement
+
+| Status | Meaning |
+|---|---|
+| `new` | not in the ledger before this run |
+| `still_failing` | in the ledger, failing, and failing again now |
+| `resolved` | in the ledger as failing, and **this run measured the same check and did not find it** |
+| `accepted` | a human decided it stays; the audit stops re-raising it |
+| `unmeasured` | the check did not run this time (wrong tier, no network) — its ledger entry is untouched |
+
+**`resolved` is the one that can lie, so it is the one with a precondition.** A finding is
+only resolved when the check that produced it actually ran and came back clean. A check that
+did not run produces `unmeasured`, never `resolved` — otherwise running an audit without
+Tier 2 would mark every Tier 2 finding fixed, and a report would show a site cleaning itself
+up by being audited with less access than before.
+
+`accepted` is set by a human and by nothing else. An audit never promotes its own finding to
+accepted, and never demotes one: re-raising something a client has explicitly accepted, every
+run, is how a report stops being read.
+
+### Where the ledger lives, and why not in the manifest
+
+`.wp-create.json` is a **configuration** record. Every command parses it on every run to find
+a WP-CLI wrapper and a theme slug, and `bin/wp-config.mjs` validates the whole of it. A
+findings ledger is **audit history**: one command reads it, and it grows without bound — a
+single check found 70 orphan ACF ids on one real site, which is 70 entries from one rule.
+Putting that in the manifest makes `/wp-section` parse an audit's history to learn a theme
+slug.
+
+So the ledger is its own file, beside the manifest:
+
+```
+.wp-audit-findings.json
+```
+
+`audit.findings_ledger` in the manifest records only its path and the run that last wrote it
+— a pointer, fixed in size.
+
+**A missing ledger means "no history", never "nothing ever failed".** It can be deleted,
+gitignored, or simply never written by an older plugin version, and the audit cannot tell
+those apart. Report it as absent and start one; do not report a first run as a project with
+everything resolved.
+
+### What the counts become
+
+`issues_found` and `issues_fixed` stay in the manifest and are now **derived** from the
+ledger rather than authoritative — kept because older reports and Step 2.5e read them, and
+because a number is still the right thing to print in a summary. When the two disagree, the
+ledger wins and the disagreement is worth reporting: it means a run wrote one and not the
+other.
+
 ## Step 8: Present Report
 
 Print the formatted report:
@@ -589,11 +680,49 @@ Add or update the `audit` key in the JSON:
     "issues_found": N,
     "issues_fixed": M,
     "carried_over": K,
+    "findings_ledger": { "path": ".wp-audit-findings.json", "written": "<ISO 8601 timestamp>" },
     "web_quality_skills_available": true
   },
   "manifest_version": 3
 }
 ```
+
+Then write the ledger itself, beside the manifest:
+
+```json
+{
+  "ledger_version": 1,
+  "findings": [
+    {
+      "check": "SEC-036",
+      "resource": "wp_options.siteurl",
+      "status": "still_failing",
+      "severity": "CRITICAL",
+      "first_seen": "2026-03-21T09:14:02Z",
+      "last_seen": "2026-09-19T16:40:11Z",
+      "evidence": "$WP option get siteurl"
+    },
+    {
+      "check": "WP-048",
+      "resource": "post:412.related_posts",
+      "status": "resolved",
+      "severity": "WARNING",
+      "first_seen": "2026-09-01T10:00:00Z",
+      "last_seen": "2026-09-12T11:22:00Z",
+      "evidence": "$WP post meta get 412 related_posts"
+    }
+  ]
+}
+```
+
+`last_seen` on a `resolved` entry is the last run that still **found** it, not the run that
+noticed it was gone — the useful question afterwards is when the problem stopped being
+observed, and a timestamp that moves on every clean run cannot answer it. A `resolved` entry
+is kept, not deleted: deleting it means the next recurrence reports as `new`, and a defect
+that keeps coming back is a different thing from one that has never been seen.
+
+`audit.findings_ledger` is a pointer and stays a pointer. If it ever grows to hold findings,
+every command that reads the manifest pays for an audit's history.
 
 `categories_run` is a **cumulative** record, not a record of this run: union the categories
 this run covered with the ones already there. Overwriting it would erase the very history
