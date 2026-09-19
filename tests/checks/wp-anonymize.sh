@@ -34,7 +34,15 @@ flat=$(tr '\n\t\r' ' ' < "$f" | tr -s ' ')
 # which dies with a usage error instead of reporting a miss.
 need() { printf '%s' "$flat" | grep -Fq -- "$1" || fail "$2"; }
 
-cflat=$(tr '\n\t\r' ' ' < commands/wp-clone.md | tr -s ' ')
+# The cross-reference file needs the same guard $f got, and for a sharper reason: this one
+# is read by a redirect inside a command substitution, so under `set -euo pipefail` a missing
+# or unreadable file aborts the script with a raw "No such file or directory" -- no FAIL:
+# line, and before a single assertion has run. Measured. In CI that lands inside a ::group::
+# among a hundred other checks with nothing in it naming the contract file that went missing.
+c=commands/wp-clone.md
+[ -f "$c" ] || fail "$c is missing -- /wp-anonymize's contract depends on /wp-clone naming it"
+[ -r "$c" ] || fail "$c exists but cannot be read"
+cflat=$(tr '\n\t\r' ' ' < "$c" | tr -s ' ')
 cneed() { printf '%s' "$cflat" | grep -Fq -- "$1" || fail "$2"; }
 
 # ---------------------------------------------------------------------------
