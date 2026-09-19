@@ -66,10 +66,47 @@ function at(obj, dotted) {
   return dotted.split('.').reduce((o, k) => (o == null || !Object.hasOwn(o, k) ? undefined : o[k]), obj);
 }
 
+// The categories /wp-audit offers. Exported because Step 2.5d's coverage diff names the
+// same six in prose, and two lists that must agree and live apart drift -- which is the
+// defect the diff itself exists to catch, so it would be a poor place to reproduce it.
+export const AUDIT_CATEGORIES = ['security', 'seo', 'a11y', 'performance', 'best-practices', 'geo'];
+
+// SEC-036, WP-049, SEO-054, A11Y-012, PERF-054, GEO-A11 -- a letter-and-digit prefix, then
+// an optional letter before the number. This validates the SHAPE of an id and deliberately
+// not its membership in any catalog: the catalogs live in the six agent files, they are the
+// thing a project is diffed against, and a second copy here would be one more list to keep
+// true. A typo'd-but-well-shaped id is caught by that diff, reported as never measured.
+const CHECK_ID = /^[A-Z][A-Z0-9]*-[A-Z]?\d+$/;
+
 export function validateManifest(manifest) {
   const problems = [];
   if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {
     return ['the manifest is not a JSON object'];
+  }
+  const checksRun = at(manifest, 'audit.checks_run');
+  if (checksRun !== undefined) {
+    if (checksRun === null || typeof checksRun !== 'object' || Array.isArray(checksRun)) {
+      problems.push('audit.checks_run must be an object keyed by audit category');
+    } else {
+      for (const [category, ids] of Object.entries(checksRun)) {
+        if (!AUDIT_CATEGORIES.includes(category)) {
+          problems.push(`audit.checks_run has an unknown category: ${category}`);
+        }
+        // A hand-edited "security": "SEC-036" is a string, and `for...of` over a string
+        // iterates characters -- so the coverage diff would silently compare single
+        // letters against check ids and report every check as never measured. Refuse it
+        // here, where the message can say what the shape should be.
+        if (!Array.isArray(ids)) {
+          problems.push(`audit.checks_run.${category} must be an array of check IDs`);
+          continue;
+        }
+        for (const id of ids) {
+          if (typeof id !== 'string' || !CHECK_ID.test(id)) {
+            problems.push(`audit.checks_run.${category} has an invalid check ID: ${JSON.stringify(id)}`);
+          }
+        }
+      }
+    }
   }
   for (const key of REQUIRED) {
     const v = at(manifest, key);

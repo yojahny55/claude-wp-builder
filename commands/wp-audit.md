@@ -166,6 +166,40 @@ The diff is against the categories **this version offers**, never against a list
 the project, so a category added to the plugin after the project was built is detected the
 first time the project is audited again.
 
+**A category that has run is not a category that is current.** `categories_run` answers "has
+this ever run here", and a category keeps answering yes forever while checks are added to it
+that this project has never seen. So for every category that *has* run, diff its catalog
+against `audit.checks_run[<category>]` — the IDs this project has actually executed:
+
+```
+  coverage    security last ran 2026-03-21; 2 checks have shipped since
+              SEC-036, SEC-038 have never been measured on this project.
+              Run: /wp-audit --security
+```
+
+The catalog is the set of check IDs in that category's own agent file — `SEC-*` in
+`agents/wp-audit-security.md`, `WP-*` in `agents/wp-audit-practices.md`, `SEO-*` in
+`agents/wp-audit-seo.md`, `A11Y-*` in `agents/wp-audit-a11y.md`, `PERF-*` in
+`agents/wp-audit-performance.md`, `GEO-*` in `agents/wp-audit-geo.md`. Read the agent, not a
+list kept anywhere else: a stored list is a second copy that goes stale, and a stale copy
+here would report a green coverage line for checks nobody has run — the exact failure this
+diff exists to prevent, reproduced by the thing preventing it.
+
+**This is a warning, not a block.** A never-run category is blocking because nothing in it
+has been examined; a category missing two checks out of forty has been examined, just not
+completely. Both print at the top of the Step 8 report.
+
+**An absent `audit.checks_run` is not "nothing has run".** A project audited before this
+record existed has no per-check history, and reporting all 261 checks as never measured
+would be true but useless. Report it as unknown and say why, once:
+
+```
+  coverage    per-check history begins at the next run
+              This project was last audited before check-level coverage was recorded,
+              so which individual checks ran is unknown. The categories above are
+              still accurate.
+```
+
 ### 2.5e — Freshness and carry-over
 
 ```
@@ -548,6 +582,10 @@ Add or update the `audit` key in the JSON:
     "last_run": "<ISO 8601 timestamp>",
     "security_level": "<basic|recommended|maximum>",
     "categories_run": ["security", "seo", "a11y", "performance", "best-practices", "geo"],
+    "checks_run": {
+      "security": ["SEC-001", "SEC-002", "SEC-036"],
+      "geo": ["GEO-A11"]
+    },
     "issues_found": N,
     "issues_fixed": M,
     "carried_over": K,
@@ -561,6 +599,19 @@ Add or update the `audit` key in the JSON:
 this run covered with the ones already there. Overwriting it would erase the very history
 Step 2.5d reads back, and the coverage matrix would report every category as run the moment
 any single category ran.
+
+`checks_run` is cumulative the same way, and per category: union this run's executed check
+IDs into the array for each category it covered, leaving the other categories untouched.
+Record **every check that executed, including the ones that passed** — a check that ran and
+found nothing is measured, and it is the pass that has to be distinguishable from the
+never-run. A check reported `UNMEASURED` did not execute and is not recorded, so the next
+run with the tier it needed still sees it as outstanding.
+
+Write the IDs exactly as the agent's catalog spells them (`SEC-036`, `GEO-A11`). This is the
+record Step 2.5d diffs against the catalogs, so an id invented here becomes a check that is
+never reported missing and never reported run. `bin/wp-config.mjs validate` refuses a
+`checks_run` whose shape is wrong — a bare string instead of an array, an unknown category,
+an id that is not shaped like one — because the diff consumes it directly.
 
 `carried_over` is `issues_found - issues_fixed` for this run — the number Step 2.5e re-opens
 next time. Write `manifest_version` on every run, including the run that adds it to a project
