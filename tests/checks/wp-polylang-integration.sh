@@ -47,9 +47,15 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 env_out=$(bash "$prov") || fail "could not provision a WordPress fixture"
-eval "$env_out"
-[ -n "${WP_FIXTURE_DIR:-}" ] || fail "the provisioner printed no WP_FIXTURE_DIR"
-DIR="$WP_FIXTURE_DIR"
+
+# Parsed, not eval'd. The provisioner routes every diagnostic to stderr and prints only
+# these two export lines, so `eval` would be correct today -- and would silently execute
+# whatever a later edit accidentally sent to stdout, in a script that runs as root in CI.
+# Reading the one value this check actually needs makes the dependency explicit and costs
+# a line.
+DIR=$(printf '%s\n' "$env_out" | sed -n "s/^export WP_FIXTURE_DIR='\(.*\)'$/\1/p")
+[ -n "$DIR" ] || fail "the provisioner printed no WP_FIXTURE_DIR"
+[ -d "$DIR" ] || fail "the provisioner named $DIR, which is not a directory"
 
 total=0
 for script in $SCRIPTS; do

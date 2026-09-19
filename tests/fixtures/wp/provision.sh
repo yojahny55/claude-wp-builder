@@ -88,6 +88,34 @@ DB_NAME="${WP_FIXTURE_DB_NAME:-wpfix_$(date +%s)_$$}"
 DIR=$(mktemp -d /tmp/wp-fixture-XXXXXX)
 chmod 700 "$DIR"
 
+# Everything below can fail, and the two things worth cleaning up -- the directory and the
+# database -- are both created before the slowest and likeliest failure, the download. A
+# caller cannot tear down what it was never told about: this script prints WP_FIXTURE_DIR
+# only on success, so a failure part way used to leave a directory and a database behind
+# with nothing holding their names. Observed: the run where the pinned WP-CLI URL 404'd
+# stranded both in CI, and a local /tmp accumulated them one failed run at a time.
+#
+# So the failure path is this script's own responsibility. Cleared on success, just before
+# the exports are printed, because from that point the caller owns the fixture and tearing
+# it down here would delete the thing it just asked for.
+PARTIAL_DIR="$DIR"
+PARTIAL_DB="$DB_NAME"
+cleanup_partial() {
+  status=$?
+  [ "$status" -eq 0 ] && [ -z "${PARTIAL_DIR:-}" ] && exit 0
+  if [ -n "${PARTIAL_DB:-}" ]; then
+    mysql -h "${DB_HOST%%:*}" -P "${DB_HOST##*:}" -u "$DB_USER" -p"$DB_PASS" \
+      -e "DROP DATABASE IF EXISTS \`$PARTIAL_DB\`" 2>/dev/null || true
+  fi
+  if [ -n "${PARTIAL_DIR:-}" ]; then
+    case "$PARTIAL_DIR" in
+      /tmp/wp-fixture-*) rm -rf "$PARTIAL_DIR" ;;
+    esac
+  fi
+  exit $status
+}
+trap cleanup_partial EXIT INT TERM
+
 mysql -h "${DB_HOST%%:*}" -P "${DB_HOST##*:}" -u "$DB_USER" -p"$DB_PASS" \
   -e "CREATE DATABASE \`$DB_NAME\`" || die "could not create $DB_NAME"
 
@@ -107,6 +135,10 @@ $WP plugin install polylang --version="$PINNED_POLYLANG" --activate --quiet \
   || die "polylang install failed"
 $WP plugin install secure-custom-fields --version="$PINNED_SCF" --activate --quiet \
   || die "secure-custom-fields install failed"
+
+# Handing ownership to the caller: from here a failure must not delete the fixture.
+PARTIAL_DIR=""
+PARTIAL_DB=""
 
 echo "export WP_FIXTURE_DIR='$DIR'"
 echo "export WP_FIXTURE_CLI='$WP'"
