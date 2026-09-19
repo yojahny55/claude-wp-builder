@@ -447,18 +447,27 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   compositions instead, with the release commit's `demo-verify.mjs` and with HEAD's.
   That proves the harness changed behaviour as intended; it does not prove what a
   messy real build now scores, and a composition corpus is cleaner than one.
-- **One verification path is still not covered, and one now is.** Item F's last
-  preview-token bypass — a reassignment at `composition-preview.mjs`'s render call site,
-  which happens after `--tokens` has exited and which no assertion on that output can see
-  — still needs the render itself to close.
-  `motion.js` is no longer unwalked: `tests/checks/motion-devices.sh` runs it in a real
-  Chrome under `prefers-reduced-motion: reduce` and asserts what the `pan` device does to
-  the DOM, including the behaviour that has no visible output at all — that when neither
-  box overflows it attaches *nothing*, because a focusable named region that scrolls
-  nothing is a dead tab stop. What it drives is the reduced-motion branch with stubbed
-  `gsap`/`ScrollTrigger` objects, which is honest for that branch because it never calls
-  them; the default-motion branch, where ScrollTrigger actually runs, is still walked by
-  nobody.
+- **One verification path is still not covered.** Item F's last preview-token bypass — a
+  reassignment at `composition-preview.mjs`'s render call site, which happens after
+  `--tokens` has exited and which no assertion on that output can see — still needs the
+  render itself to close.
+
+  `motion.js` is no longer among them. `tests/checks/motion-devices.sh` runs it in a real
+  Chrome on both paths. Under `prefers-reduced-motion: reduce` it asserts what the `pan`
+  device does to the DOM, including the behaviour with no visible output at all — that when
+  neither box overflows it attaches *nothing*, because a focusable named region that
+  scrolls nothing is a dead tab stop. Under default motion it loads the **real pinned
+  GSAP** and asserts the engine works rather than merely being wired: the rail's transform
+  moves leftwards as the page scrolls, and the JS `reveal` branch hides its children and
+  then shows them.
+
+  That reveal branch was unreachable on any browser this suite can run, because every one
+  of them supports `animation-timeline` and the CSS engine takes over. The fixture forces
+  `CSS.supports('animation-timeline', …)` to report false before `motion.js` reads it —
+  which is what an older browser reports, and the only way in. Nothing else is faked: gsap
+  and ScrollTrigger are the pinned builds, served from `node_modules` rather than a CDN,
+  because a check that fetches its own engine over the network fails for reasons that have
+  nothing to do with the code under test.
 - **`motion.js` sets `overflowX` on the rail, not on the frame — and it is not inert.**
   Under reduced motion the stylesheet resets the rail to `width: auto`, and a scroll
   container is sized by its box rather than by its content, so the assignment makes the

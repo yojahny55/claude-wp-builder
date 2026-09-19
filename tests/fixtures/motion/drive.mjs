@@ -20,6 +20,13 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..', '..');
 const MOTION = join(repo, 'starter-theme', '__tailwind__', 'assets', 'js', 'src', 'motion.js');
+// The real pinned GSAP, served from node_modules rather than a CDN: a check that reaches
+// the network to fetch its engine fails for reasons that have nothing to do with the code
+// under test.
+const VENDOR = {
+  '/gsap.min.js': join(repo, 'node_modules', 'gsap', 'dist', 'gsap.min.js'),
+  '/ScrollTrigger.min.js': join(repo, 'node_modules', 'gsap', 'dist', 'ScrollTrigger.min.js'),
+};
 
 let failed = 0;
 const t = (label, got, want) => {
@@ -47,8 +54,11 @@ const server = createServer(async (req, res) => {
     return;
   }
   try {
-    const file = path === '/motion.js' ? MOTION : join(here, path === '/' ? 'pan.html' : path);
-    if (!file.startsWith(here) && file !== MOTION) {
+    const file =
+      path === '/motion.js' ? MOTION
+      : VENDOR[path] ? VENDOR[path]
+      : join(here, path === '/' ? 'pan.html' : path);
+    if (!file.startsWith(here) && file !== MOTION && !Object.values(VENDOR).includes(file)) {
       res.writeHead(403).end('no');
       return;
     }
@@ -193,6 +203,84 @@ try {
   afterLeft = await page.evaluate(() => document.querySelector('#a [data-motion-rail]').scrollLeft);
 }
 t('A: the keyboard scrolls the scroller, not the document', afterLeft > beforeLeft, true);
+
+// ---------------------------------------------------------------------------------------
+// Default motion: the branch where ScrollTrigger actually runs.
+//
+// Everything above drives the reduced-motion path with stubbed gsap objects, which is
+// honest there because that path never calls them. This pass uses the real pinned GSAP and
+// no reducedMotion override, so the scrub and the reveal below are the engine doing its
+// job rather than a description of it. CLAUDE.md recorded both as walked by nobody.
+// ---------------------------------------------------------------------------------------
+const motionCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+const page2 = await motionCtx.newPage();
+const errors2 = [];
+page2.on('pageerror', (e) => errors2.push(String(e)));
+page2.on('console', (m) => {
+  if (m.type() === 'error') errors2.push(m.text());
+  if (m.type() === 'warning' && /\[motion\] failed to initialise/.test(m.text())) errors2.push(m.text());
+});
+await page2.goto(`${base}/scroll.html`);
+await page2.waitForFunction('window.__motionReady === true', null, { timeout: 20000 });
+
+t('default motion: no section threw or logged an error', errors2, []);
+t('default motion: the reveal branch is reachable', await page2.evaluate(() => window.__forcedNoTimeline), true);
+
+// --- pan: the rail's transform tracks scroll progress ----------------------------------
+const railX = () =>
+  page2.evaluate(() => {
+    const el = document.querySelector('#pan [data-motion-rail]');
+    const m = /translate3d\((-?[\d.]+)px/.exec(el.style.transform || '');
+    return m ? parseFloat(m[1]) : null;
+  });
+
+await page2.evaluate(() => window.scrollTo(0, 0));
+await page2.waitForTimeout(200);
+const xTop = await railX();
+
+// Scroll into the middle of the pinned section, where progress is neither 0 nor 1.
+await page2.evaluate(() => {
+  const s = document.querySelector('#pan');
+  window.scrollTo(0, s.offsetTop + s.offsetHeight / 2);
+});
+await page2.waitForFunction(
+  () => {
+    const el = document.querySelector('#pan [data-motion-rail]');
+    const m = /translate3d\((-?[\d.]+)px/.exec(el.style.transform || '');
+    return m && parseFloat(m[1]) < -1;
+  },
+  null,
+  { timeout: 5000 }
+).catch(() => {});
+const xMid = await railX();
+
+t('pan: ScrollTrigger wrote a transform at all', xMid !== null, true);
+// Negative and moving: the device translates the rail leftwards as progress grows, so a
+// value that stayed at 0 means the trigger was created and never driven -- wired, not
+// working, which is the distinction this whole check exists to make.
+t('pan: the rail moved leftwards as the page scrolled', xMid !== null && xMid < (xTop === null ? 0 : xTop), true);
+
+// --- reveal: the GSAP branch hides its children, then shows them ------------------------
+const opacities = () =>
+  page2.evaluate(() =>
+    Array.prototype.map.call(document.querySelectorAll('#reveal p'), (n) =>
+      parseFloat(getComputedStyle(n).opacity)
+    )
+  );
+
+await page2.evaluate(() => window.scrollTo(0, 0));
+await page2.waitForTimeout(200);
+const hidden = await opacities();
+t('reveal: children start hidden', hidden.every((o) => o < 0.5), true);
+
+await page2.evaluate(() => document.querySelector('#reveal').scrollIntoView({ block: 'center' }));
+await page2.waitForFunction(
+  () => Array.prototype.every.call(document.querySelectorAll('#reveal p'), (n) => parseFloat(getComputedStyle(n).opacity) > 0.9),
+  null,
+  { timeout: 5000 }
+).catch(() => {});
+const shown = await opacities();
+t('reveal: children are visible after scrolling them into view', shown.every((o) => o > 0.9), true);
 
 await browser.close();
 server.close();
