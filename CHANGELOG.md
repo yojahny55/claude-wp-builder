@@ -2,7 +2,42 @@
 
 ## [Unreleased]
 
+### Added
+
+- A disposable WordPress fixture, and the first checks that run inside one.
+  `tests/fixtures/wp/provision.sh` builds a pinned WordPress with Polylang and SCF against
+  a database from a CI service container or a local docker container, and
+  `tests/checks/wp-polylang-integration.sh` runs the ACF translation path inside it and
+  tears the whole thing down afterwards. It skips unless `WP_FIXTURE=1`; CI opts in.
+
+  CLAUDE.md had said for a long time that nothing here proves behaviour against a real
+  install. This is the first piece of that, and it earned its place immediately — the two
+  defects below were both found by its first runs, and neither was reachable by a contract
+  grep or by a pure-PHP test.
+
 ### Fixed
+
+- `/wp-polylang` could not create a language at all. `pll-setup.php` called
+  `PLL()->model->add_language()`, which is defined only on `PLL_Admin_Model` — a subclass
+  Polylang instantiates only when `is_admin()` is true, and never under `wp eval-file`,
+  which is how the plugin documents running every script in that directory. The guard in
+  front of it checked `class_exists( 'PLL_Settings' )`, true in both contexts, so it never
+  caught the case. The helper now obtains an admin-capable model explicitly and refuses
+  with a readable message if the installed Polylang exposes none.
+- The translation writer skipped every write to a brand-new counterpart. It resolved a
+  field's definition with `get_field_object( $name, $post_id )` against the **target**, and
+  ACF resolves a field name through the hidden `_<name>` reference meta — which a post with
+  no value for that field does not have. So the definition came back `false` on exactly the
+  posts the writer exists to fill, and every write was reported skipped and dropped. It
+  resolves against the source first now, which always has the value, because the payload
+  being written was walked out of it.
+- ACF reference re-pointing stopped at the top level while the text walk recursed, so a
+  nested `link` received a translated title on a URL still pointing at the source language
+  — translated-looking and wrong, which is worse than the untranslated link it replaced.
+  `pllx_repoint_acf_refs()` now walks the same structure the text pass does, through the
+  same `pllx_acf_zip()` traversal and the same layout-by-name rule, and keys its
+  `_pll_ref_` ownership meta by dotted path so two references differing only by row keep
+  separate records of what the importer last wrote.
 
 - Polylang translation payloads stopped at one level of ACF nesting, so a group inside a
   repeater, or anything below it, was never sent for translation — no error, and a

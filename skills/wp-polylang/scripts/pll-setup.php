@@ -30,47 +30,8 @@ $preferred = array(
 	'it' => 'it_IT', 'pt' => 'pt_PT', 'nl' => 'nl_NL', 'ca' => 'ca',
 );
 
-function pllx_add_language( $code, $preferred ) {
-	if ( ! class_exists( 'PLL_Settings' ) || ! is_callable( array( 'PLL_Settings', 'get_predefined_languages' ) ) ) {
-		pllx_fail( "Cannot read Polylang's predefined language list; add '$code' from the admin instead." );
-	}
-
-	$predefined = PLL_Settings::get_predefined_languages();
-	$want       = isset( $preferred[ $code ] ) ? $preferred[ $code ] : null;
-	$chosen     = null;
-
-	foreach ( $predefined as $entry ) {
-		$entry_code   = isset( $entry['code'] ) ? $entry['code'] : '';
-		$entry_locale = isset( $entry['locale'] ) ? $entry['locale'] : '';
-		if ( $want && $entry_locale === $want ) {
-			$chosen = $entry;
-			break;
-		}
-		if ( ! $chosen && $entry_code === $code ) {
-			$chosen = $entry; // fallback: first match by code
-		}
-	}
-
-	if ( ! $chosen ) {
-		pllx_fail( "'$code' is not a language Polylang recognises." );
-	}
-
-	$existing = PLL()->model->get_languages_list();
-	$res      = PLL()->model->add_language( array(
-		'name'       => $chosen['name'],
-		'slug'       => $code,
-		'locale'     => $chosen['locale'],
-		'rtl'        => ! empty( $chosen['dir'] ) && 'rtl' === $chosen['dir'] ? 1 : 0,
-		'term_group' => count( $existing ),
-		'flag'       => isset( $chosen['flag'] ) ? $chosen['flag'] : '',
-	) );
-
-	if ( is_wp_error( $res ) ) {
-		pllx_fail( "Could not create language '$code': " . $res->get_error_message() );
-	}
-
-	pllx_info( "  created language $code ({$chosen['locale']})" );
-}
+// pllx_add_language() and pllx_language_model() live in pll-lib.php, so the fixture in
+// tests/fixtures/wp/ creates its languages through this same code rather than a copy.
 
 $configured = (array) pll_languages_list();
 foreach ( array( $source, $target ) as $code ) {

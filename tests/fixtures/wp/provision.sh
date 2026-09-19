@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# Stand up a disposable WordPress and print its path.
+#
+# Every check in tests/checks/ before this one asserts on prose or on pure PHP. Nothing
+# proved that a generated site, a seeded field or a translation script behaves correctly
+# against a real WordPress -- CLAUDE.md says so in as many words, and the gap is why
+# tests/checks/wp-polylang-live.sh needs an operator to supply PLL_TEST_SITE by hand and
+# skips for everyone else. This script removes the "by hand".
+#
+# It is provisioning, not an assertion. It downloads WordPress and plugins from
+# wordpress.org, which is the one place in this repository that reaches the network on
+# purpose: a WordPress fixture cannot exist without a WordPress. Nothing it installs is
+# asserted against a remote service, every assertion runs against the local install, and
+# the versions are pinned below so a release upstream cannot change a result here.
+#
+# Usage:
+#   eval "$(tests/fixtures/wp/provision.sh)"   # exports WP_FIXTURE_DIR and WP_FIXTURE_CLI
+#   tests/fixtures/wp/provision.sh --teardown "$WP_FIXTURE_DIR"
+#
+# Connection details come from the environment so the same script serves a local docker
+# container and a CI service container without branching:
+#   WP_FIXTURE_DB_HOST (default 127.0.0.1:3307)  WP_FIXTURE_DB_USER (default root)
+#   WP_FIXTURE_DB_PASS (default wp-fixture)      WP_FIXTURE_DB_NAME (default generated)
+set -euo pipefail
+
+PINNED_WP="6.8.2"
+PINNED_POLYLANG="3.6.6"
+PINNED_SCF="6.5.0"
+
+DB_HOST="${WP_FIXTURE_DB_HOST:-127.0.0.1:3307}"
+DB_USER="${WP_FIXTURE_DB_USER:-root}"
+DB_PASS="${WP_FIXTURE_DB_PASS:-wp-fixture}"
+CONTAINER="${WP_FIXTURE_CONTAINER:-wp-fixture-mysql}"
+
+die() { echo "provision: $*" >&2; exit 1; }
+note() { echo "provision: $*" >&2; }
+
+# --------------------------------------------------------------------------------------
+# Teardown. Deliberately unconditional and deliberately first: a fixture left behind holds
+# a database and a few hundred megabytes, and the run that fails is the run that strands
+# one. Same reasoning as /wp-clone deleting both ends of its dump.
+# --------------------------------------------------------------------------------------
+if [ "${1:-}" = "--teardown" ]; then
+  dir="${2:-}"
+  [ -n "$dir" ] || die "--teardown needs the fixture directory"
+  if [ -f "$dir/wp-config.php" ]; then
+    name=$(grep -oP "define\(\s*'DB_NAME',\s*'\K[^']+" "$dir/wp-config.php" 2>/dev/null || true)
+    if [ -n "$name" ]; then
+      mysql -h "${DB_HOST%%:*}" -P "${DB_HOST##*:}" -u "$DB_USER" -p"$DB_PASS" \
+        -e "DROP DATABASE IF EXISTS \`$name\`" 2>/dev/null || note "could not drop $name"
+    fi
+  fi
+  case "$dir" in
+    /tmp/*|/var/tmp/*) rm -rf "$dir" ;;
+    *) die "refusing to rm -rf a fixture outside /tmp: $dir" ;;
+  esac
+  exit 0
+fi
+
+command -v wp >/dev/null 2>&1 || die "wp-cli is not on PATH"
+command -v mysql >/dev/null 2>&1 || die "the mysql client is not on PATH"
+
+# --------------------------------------------------------------------------------------
+# The database. WP_FIXTURE_DB_HOST pointing at something already running (a CI service
+# container) is used as-is; otherwise start a throwaway container. Never the developer's
+# own MySQL: this creates and drops databases, and doing that on a machine whose other
+# databases are somebody's actual work is not a risk a test suite gets to take.
+# --------------------------------------------------------------------------------------
+if ! mysqladmin -h "${DB_HOST%%:*}" -P "${DB_HOST##*:}" -u "$DB_USER" -p"$DB_PASS" ping >/dev/null 2>&1; then
+  command -v docker >/dev/null 2>&1 || die "no database at $DB_HOST and docker is not available to start one"
+  if ! docker ps --format '{{.Names}}' | grep -qx "$CONTAINER"; then
+    note "starting $CONTAINER"
+    docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+    docker run -d --name "$CONTAINER" \
+      -e MYSQL_ROOT_PASSWORD="$DB_PASS" \
+      -p "${DB_HOST##*:}:3306" \
+      mariadb:11 >/dev/null || die "could not start the database container"
+  fi
+  for _ in $(seq 1 60); do
+    mysqladmin -h "${DB_HOST%%:*}" -P "${DB_HOST##*:}" -u "$DB_USER" -p"$DB_PASS" ping >/dev/null 2>&1 && break
+    sleep 2
+  done
+  mysqladmin -h "${DB_HOST%%:*}" -P "${DB_HOST##*:}" -u "$DB_USER" -p"$DB_PASS" ping >/dev/null 2>&1 \
+    || die "the database at $DB_HOST never came up"
+fi
+
+DB_NAME="${WP_FIXTURE_DB_NAME:-wpfix_$(date +%s)_$$}"
+DIR=$(mktemp -d /tmp/wp-fixture-XXXXXX)
+chmod 700 "$DIR"
+
+mysql -h "${DB_HOST%%:*}" -P "${DB_HOST##*:}" -u "$DB_USER" -p"$DB_PASS" \
+  -e "CREATE DATABASE \`$DB_NAME\`" || die "could not create $DB_NAME"
+
+WP="wp --path=$DIR --allow-root"
+
+# --allow-root because CI runs as root and wp-cli refuses otherwise; the fixture is
+# disposable and owns nothing worth protecting from itself.
+$WP core download --version="$PINNED_WP" --quiet || die "core download failed"
+$WP config create --dbname="$DB_NAME" --dbuser="$DB_USER" --dbpass="$DB_PASS" \
+  --dbhost="$DB_HOST" --quiet || die "config create failed"
+$WP core install --url=http://localhost:8080 --title="Fixture" \
+  --admin_user=admin --admin_password=admin --admin_email=fixture@example.invalid \
+  --skip-email --quiet || die "core install failed"
+
+# Pinned, because an upstream release must never change what a check here reports.
+$WP plugin install polylang --version="$PINNED_POLYLANG" --activate --quiet \
+  || die "polylang install failed"
+$WP plugin install secure-custom-fields --version="$PINNED_SCF" --activate --quiet \
+  || die "secure-custom-fields install failed"
+
+echo "export WP_FIXTURE_DIR='$DIR'"
+echo "export WP_FIXTURE_CLI='$WP'"

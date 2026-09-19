@@ -17,6 +17,18 @@
 
 require_once __DIR__ . '/pll-lib.php';
 
+// The ACF reference subsystem -- pllx_acf_ref_id(), pllx_ref_norm(), pllx_ref_may_write(),
+// pllx_ref_claim(), pllx_repoint_internal_url() and pllx_repoint_acf_refs() -- lives in
+// pll-lib.php, beside the path walker and writer it now shares a traversal with.
+//
+// It moved there to be testable. This file runs a whole import at top level and cannot be
+// required, so anything defined here is reachable only by running an import against a real
+// site by hand. tests/fixtures/wp/acf-refs.php exercises the re-pointing pass directly,
+// with real Polylang translation groups, which is the only way to prove that a nested
+// reference resolves to the right counterpart and that an editor's edit to one row is not
+// read as an edit to another.
+
+
 list( $manifest_path ) = pllx_args( 1, 'pll-import.php <translated.json>' );
 
 pllx_require_polylang();
@@ -839,215 +851,19 @@ pllx_info( sprintf( 'Fixed %d parent-child relationship(s).', $parents_fixed ) )
 pllx_info( sprintf( 'Fixed %d term parent relationship(s).', $term_parents_fixed ) );
 pllx_info( sprintf( 'Copied %d untranslated ACF value(s) to new counterparts.', $acf_copied ) );
 
-// pllx_acf_set(), pllx_acf_descend() and pllx_acf_layout_subs() live in
-// pll-lib.php. They resolve a dotted path against a field definition and touch
-// no WordPress function, which is what lets tests/checks/wp-polylang-nesting.sh
-// execute them under bare PHP -- this file cannot be required at all, because
-// it runs a whole import at top level. pllx_acf_write() above is the WordPress
-// half and stays here.
-
-/**
- * Write one translated value back to its dotted path.
- *
- * The path is resolved against the field STRUCTURE, never against the number
- * of dots in it. That distinction is the whole function: with nesting walked
- * to any depth, "a.b.c" is a repeater row's field when `a` is a repeater and a
- * group's group's field when `a` is a group, and the two need opposite
- * handling. The previous version branched on `count($parts)` -- 1 plain, 2
- * group, 3 repeater row -- which was correct only while the walker stopped at
- * one level. Against a group inside a group it would have read "b" as a row
- * index, and `(int) 'b'` is 0, so the translation landed in row 0 of a field
- * that has no rows. It also had no branch at all beyond 3 parts, and no else:
- * a deeper key wrote nothing and reported nothing.
- *
- * $source_id is walked in parallel with the target, and is needed for exactly
- * one thing: a flexible-content row being created for the first time has no
- * `acf_fc_layout` tag, SCF silently drops a row that lacks one, and the source
- * post is the only other place that still knows which layout that row is --
- * pllx_acf_walk() deliberately never emits `acf_fc_layout` as translatable.
- */
-function pllx_acf_write( $post_id, $dotted, $value, $source_id = 0 ) {
-	$parts = explode( '.', $dotted );
-	$top   = array_shift( $parts );
-
-	if ( ! $parts ) {
-		update_field( $top, $value, $post_id );
-		return;
-	}
-
-	$def = function_exists( 'get_field_object' ) ? get_field_object( $top, $post_id ) : null;
-	if ( ! is_array( $def ) || ! isset( $def['type'] ) ) {
-		// No definition to resolve against. Writing anyway would mean
-		// guessing the shape, which is the defect this function exists to
-		// remove; say so instead of writing something arbitrary.
-		pllx_warn( "skipped $dotted: no field definition for '$top' on post $post_id" );
-		return;
-	}
-
-	$node = get_field( $top, $post_id );
-	if ( ! is_array( $node ) ) {
-		$node = array();
-	}
-	$src = $source_id ? get_field( $top, $source_id ) : null;
-
-	if ( pllx_acf_set( $node, $def, $parts, $value, is_array( $src ) ? $src : array(), $dotted ) ) {
-		update_field( $top, $node, $post_id );
-	}
-}
+// pllx_acf_write() and its resolver (pllx_acf_set(), pllx_acf_descend(),
+// pllx_acf_layout_subs()) all live in pll-lib.php. The resolver is pure and is
+// executed by tests/checks/wp-polylang-nesting.sh under bare PHP; pllx_acf_write()
+// itself calls get_field()/update_field() and is executed by
+// tests/checks/wp-polylang-integration.sh inside a real WordPress fixture. Neither
+// could reach them here: this file runs a whole import at top level, so it cannot
+// be required, and a function only reachable by running an import is a function
+// nothing tests.
 
 
-/**
- * Resolve $href to its $target_lang counterpart's permalink if it is a
- * same-host link to a post; otherwise return it unchanged.
- *
- * - External links (a different host) are never this function's business.
- * - A same-host URL that is not a post at all (an archive, a term, the home
- *   page -- pllx_url_to_postid() returns 0) has no per-language object to
- *   re-point at and is left exactly as it is.
- * - A same-host post URL whose target has no $target_lang counterpart yet
- *   is left pointed at the source and reported with pllx_warn(): a link
- *   into the wrong language is bad, but a broken link is worse.
- * - Otherwise the href is rewritten to the counterpart's permalink, with the
- *   original query string and fragment preserved, and written back in the
- *   same root-relative-or-absolute form it arrived in.
- *
- * $context is a short human label ("post 605", "menu item 123") used only in
- * the warning message.
- */
-function pllx_repoint_internal_url( $href, $target_lang, $context ) {
-	$found_id = pllx_url_to_postid( $href );
-	if ( ! $found_id ) {
-		return $href;
-	}
 
-	$target_id = pll_get_post( $found_id, $target_lang );
-	if ( ! $target_id ) {
-		pllx_warn( "$context links to post $found_id, which has no '$target_lang' counterpart; leaving the link pointed at the source" );
-		return $href;
-	}
 
-	if ( (int) $target_id === (int) $found_id ) {
-		return $href; // already pointing at the correct language (or itself).
-	}
 
-	$new_permalink = get_permalink( (int) $target_id );
-	if ( ! $new_permalink ) {
-		return $href;
-	}
-
-	$parts = wp_parse_url( (string) $href );
-	$home  = home_url();
-
-	// Root-relative in, root-relative out: strip the scheme+host this pass
-	// is not supposed to introduce. get_permalink() may itself carry a query
-	// string (?page_id=NN, on a site without pretty permalinks) rather than
-	// a clean path, so this strips a literal prefix instead of reassembling
-	// pieces from wp_parse_url(), which would silently drop that query
-	// string.
-	$result = ( empty( $parts['host'] ) && 0 === strpos( $new_permalink, $home ) )
-		? substr( $new_permalink, strlen( $home ) )
-		: $new_permalink;
-
-	if ( ! empty( $parts['query'] ) ) {
-		// Drop the arguments that IDENTIFIED the source post rather than
-		// carrying them onto the translation. url_to_postid() matches ?p=N
-		// and ?page_id=N first (core rewrite.php:524-530), so re-appending
-		// them produced hrefs like '/?page_id=20&page_id=10' -- which
-		// WordPress still resolves to the SOURCE post, stably and wrongly, on
-		// every run, and which verify's check 9 then failed the site over
-		// forever.
-		// Removed TEXTUALLY, not via parse_str()/http_build_query(). That round
-		// trip re-encodes everything it touches, and measured it changes query
-		// strings that have nothing to do with the identifier:
-		//   a[]=1&a[]=2   -> a%5B0%5D=1&a%5B1%5D=2   (append becomes indexed)
-		//   flag          -> flag=                    (valueless flag gains =)
-		//   q=hola%20mundo-> q=hola+mundo
-		// Everything not being dropped must survive byte-for-byte, so only the
-		// identifying pairs are cut out. `&amp;` is matched as a separator too,
-		// since these come out of post_content where hrefs are HTML-escaped.
-		$carry = preg_replace(
-			'/(^|&(?:amp;)?)(?:p|page_id|attachment_id)=[^&]*/i',
-			'$1',
-			$parts['query']
-		);
-		// Collapse separators the removal left behind, then trim the edges.
-		// Collapsing to a bare '&' first keeps the trim simple; the original
-		// separator style is put back afterwards, because these hrefs come out
-		// of post_content where '&amp;' is what an editor's HTML actually
-		// carries -- emitting a bare '&' there would rewrite the markup on a
-		// pass that is only supposed to change where the link points.
-		$carry = preg_replace( '/(?:&(?:amp;)?)+/', '&', (string) $carry );
-		$carry = trim( $carry, '&' );
-		if ( '' !== $carry ) {
-			$amp   = false !== stripos( $parts['query'], '&amp;' ) ? '&amp;' : '&';
-			$carry = str_replace( '&', $amp, $carry );
-			$result .= ( false === strpos( $result, '?' ) ? '?' : $amp ) . $carry;
-		}
-	}
-	if ( ! empty( $parts['fragment'] ) ) {
-		$result .= '#' . $parts['fragment'];
-	}
-
-	return $result;
-}
-
-/**
- * Normalise any reference value to one comparable string.
- *
- * Reference fields come back in several shapes (a string URL, an int, a
- * WP_Post, an array of either), so comparisons are done on this instead.
- */
-function pllx_ref_norm( $value ) {
-	if ( is_array( $value ) && isset( $value['url'] ) ) {
-		return (string) $value['url'];
-	}
-	if ( is_array( $value ) ) {
-		$ids = array();
-		foreach ( $value as $row ) {
-			$id = pllx_acf_ref_id( $row );
-			if ( $id ) {
-				$ids[] = $id;
-			}
-		}
-		return implode( ',', $ids );
-	}
-	if ( is_string( $value ) ) {
-		return $value;
-	}
-	$id = pllx_acf_ref_id( $value );
-	return $id ? (string) $id : '';
-}
-
-/**
- * May the importer overwrite this reference field?
- *
- * Yes when the field is still empty, or when it holds exactly what the
- * importer itself last wrote there. No when a human has since changed it in
- * wp-admin -- that is a deliberate editorial choice about the translated
- * page, and re-deriving it from the source would silently undo their work on
- * every subsequent import.
- *
- * Comparing against the SOURCE cannot make this distinction: a source whose
- * reference legitimately changed and a target an editor overrode look
- * identical from there. Recording our own writes is what separates them.
- */
-function pllx_ref_may_write( $target_id, $name, $current_norm, $source_norm = null ) {
-	if ( '' === $current_norm ) {
-		return true;
-	}
-	$stored = get_post_meta( $target_id, PLLX_REF_META . $name, true );
-	if ( '' !== $stored && (string) $stored === $current_norm ) {
-		return true;
-	}
-	// Still holding the SOURCE's own unmapped value. That is never a
-	// deliberate editorial choice for a translated page -- it is a stale copy
-	// pointing into the wrong language, which is exactly what pll-verify.php
-	// fails a site over. Counterparts created before this ownership tracking
-	// existed all look like this, and refusing to touch them would freeze
-	// them wrong forever. An editor's real override points somewhere else,
-	// so it is not caught by this branch.
-	return null !== $source_norm && '' !== $source_norm && $current_norm === $source_norm;
-}
 
 /**
  * Copy every ACF value the pipeline does NOT translate from source to target.
@@ -1236,195 +1052,8 @@ function pllx_meta_keys_with_prefix_term( $term_id, $prefix ) {
 	return $found;
 }
 
-/**
- * Record that the value now on the target is this pass's own.
- *
- * Called on BOTH branches: after a write, and when the target already held
- * exactly what this run would have written. Skipping the second case left the
- * commonest state -- a target that is already correct -- permanently unowned,
- * so the first real source change was refused as an editor's and the field
- * froze for good, with nothing left to ever re-stamp it.
- */
-function pllx_ref_claim( $target_id, $name, $norm ) {
-	update_post_meta( $target_id, PLLX_REF_META . $name, $norm );
-}
 
-/**
- * Re-point the reference-holding ACF field types on $target_id from
- * $source_id's own field values, translated into $target_lang.
- *
- * Covers `link` (its `url` key -- `title` travels through the manifest and
- * pllx_acf_write() instead), `page_link` (a permalink string), `post_object`
- * and `relationship` (post ids, given SCF/ACF's `return_format => 'id'`;
- * see pll-acf-fixture.php on the test site and SKILL.md for what was
- * actually measured). Only top-level fields are handled, matching
- * pllx_acf_walk()'s one-level ceiling.
- *
- * Derives each value from the SOURCE post every run, but only WRITES it when
- * the target's field is still empty or still holds what this pass last put
- * there (see pllx_ref_may_write()). An earlier version claimed nothing else
- * could give the target a value, which is untrue -- an editor can set any of
- * these in wp-admin, and re-deriving them unconditionally undid that on every
- * import, with no warning. Idempotent either way: each write is compared
- * against the target's current value first, so a second run with no source
- * change makes zero writes.
- *
- * Returns the number of fields actually rewritten.
- */
-function pllx_repoint_acf_refs( $source_id, $target_id, $target_lang ) {
-	$source_objects = get_field_objects( $source_id );
-	if ( ! is_array( $source_objects ) ) {
-		return 0;
-	}
 
-	$count = 0;
-
-	foreach ( $source_objects as $name => $obj ) {
-		$type = isset( $obj['type'] ) ? $obj['type'] : '';
-		$val  = isset( $obj['value'] ) ? $obj['value'] : null;
-
-		if ( 'link' === $type ) {
-			if ( ! is_array( $val ) || empty( $val['url'] ) ) {
-				continue;
-			}
-			$new_url = pllx_repoint_internal_url( $val['url'], $target_lang, "post $target_id, field '$name'" );
-
-			$target_val = get_field( $name, $target_id );
-			if ( ! is_array( $target_val ) ) {
-				$target_val = array();
-			}
-			$current_url = isset( $target_val['url'] ) ? $target_val['url'] : '';
-			if ( $current_url !== $new_url ) {
-				if ( ! pllx_ref_may_write( $target_id, $name, $current_url, (string) $val['url'] ) ) {
-					pllx_warn( "post $target_id, field '$name': link was changed after the last import; leaving '$current_url' alone" );
-					continue;
-				}
-				$target_val['url'] = $new_url;
-				if ( ! isset( $target_val['title'] ) ) {
-					$target_val['title'] = '';
-				}
-				if ( ! isset( $target_val['target'] ) ) {
-					$target_val['target'] = '';
-				}
-				update_field( $name, $target_val, $target_id );
-				pllx_ref_claim( $target_id, $name, $new_url );
-				$count++;
-			} else {
-				pllx_ref_claim( $target_id, $name, $new_url );
-			}
-			continue;
-		}
-
-		if ( 'page_link' === $type ) {
-			if ( ! is_string( $val ) || '' === $val ) {
-				continue;
-			}
-			$new_url = pllx_repoint_internal_url( $val, $target_lang, "post $target_id, field '$name'" );
-			$current = get_field( $name, $target_id );
-			if ( $current !== $new_url ) {
-				$current_norm = pllx_ref_norm( $current );
-				if ( ! pllx_ref_may_write( $target_id, $name, $current_norm, (string) $val ) ) {
-					pllx_warn( "post $target_id, field '$name': page_link was changed after the last import; leaving '$current_norm' alone" );
-					continue;
-				}
-				update_field( $name, $new_url, $target_id );
-				pllx_ref_claim( $target_id, $name, $new_url );
-				$count++;
-			} else {
-				pllx_ref_claim( $target_id, $name, $new_url );
-			}
-			continue;
-		}
-
-		if ( 'post_object' === $type ) {
-			$source_post_id = pllx_acf_ref_id( $val );
-			if ( ! $source_post_id ) {
-				continue;
-			}
-			$new_id = (int) pll_get_post( $source_post_id, $target_lang );
-			if ( ! $new_id ) {
-				pllx_warn( "post $target_id, field '$name': post_object references post $source_post_id, which has no '$target_lang' counterpart; leaving it pointed at the source" );
-				continue;
-			}
-			$current_id = pllx_acf_ref_id( get_field( $name, $target_id ) );
-			if ( $current_id !== $new_id ) {
-				$current_norm = $current_id ? (string) $current_id : '';
-				if ( ! pllx_ref_may_write( $target_id, $name, $current_norm, (string) $source_post_id ) ) {
-					pllx_warn( "post $target_id, field '$name': post_object was changed after the last import; leaving post $current_id alone" );
-					continue;
-				}
-				update_field( $name, $new_id, $target_id );
-				pllx_ref_claim( $target_id, $name, (string) $new_id );
-				$count++;
-			} else {
-				pllx_ref_claim( $target_id, $name, (string) $new_id );
-			}
-			continue;
-		}
-
-		if ( 'relationship' === $type ) {
-			if ( ! is_array( $val ) || ! $val ) {
-				continue;
-			}
-			$new_ids = array();
-			foreach ( $val as $row ) {
-				$row_id = pllx_acf_ref_id( $row );
-				if ( ! $row_id ) {
-					continue;
-				}
-				$mapped = (int) pll_get_post( $row_id, $target_lang );
-				if ( ! $mapped ) {
-					pllx_warn( "post $target_id, field '$name': relationship references post $row_id, which has no '$target_lang' counterpart; leaving that entry pointed at the source" );
-					$new_ids[] = $row_id; // leave pointed at the source rather than silently drop it.
-					continue;
-				}
-				$new_ids[] = $mapped;
-			}
-
-			$current_ids = array();
-			foreach ( (array) get_field( $name, $target_id ) as $row ) {
-				$id = pllx_acf_ref_id( $row );
-				if ( $id ) {
-					$current_ids[] = $id;
-				}
-			}
-
-			if ( $current_ids !== $new_ids ) {
-				$current_norm = implode( ',', $current_ids );
-				if ( ! pllx_ref_may_write( $target_id, $name, $current_norm, pllx_ref_norm( $val ) ) ) {
-					pllx_warn( "post $target_id, field '$name': relationship was changed after the last import; leaving [$current_norm] alone" );
-					continue;
-				}
-				update_field( $name, $new_ids, $target_id );
-				pllx_ref_claim( $target_id, $name, implode( ',', $new_ids ) );
-				$count++;
-			} else {
-				pllx_ref_claim( $target_id, $name, implode( ',', $new_ids ) );
-			}
-			continue;
-		}
-	}
-
-	return $count;
-}
-
-/**
- * A post_object/relationship field's row can come back as a bare id or, with
- * return_format => 'object', a WP_Post -- normalise either shape to an int
- * id, or 0 for anything else (unset, false, a stray string).
- */
-function pllx_acf_ref_id( $value ) {
-	if ( is_numeric( $value ) ) {
-		return (int) $value;
-	}
-	if ( is_array( $value ) && isset( $value['ID'] ) ) {
-		return (int) $value['ID'];
-	}
-	if ( is_object( $value ) && isset( $value->ID ) ) {
-		return (int) $value->ID;
-	}
-	return 0;
-}
 
 /**
  * Store a string translation in Polylang's own option.

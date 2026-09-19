@@ -5,10 +5,17 @@
 # CI. Run the checks yourself before claiming a change works"), and that sentence was
 # load-bearing on everyone remembering to.
 #
-# Deliberately NOT here: disposable WordPress fixtures, the broken-site corpus with
-# expected audit findings, and browser artifacts for failed scenarios. Those need a
-# provisioned WordPress and a pinned stack, they are stage 2, and bolting a half one
-# onto this would make the green light mean less than it does now.
+# Stage 2 has started: the `integration` job below provisions a real WordPress with a
+# pinned Polylang and SCF and runs the ACF translation path logic inside it. That job
+# earned its place on its first run, by finding a defect the pure checks structurally
+# could not -- ACF resolves a field name through a hidden reference meta, so the field
+# definition is unavailable on a post with no value, which is every brand-new translation
+# counterpart.
+#
+# Still NOT here: the broken-site corpus with expected audit findings, and browser
+# artifacts for failed functional scenarios. Both build on the fixture the integration job
+# now provides; neither is bolted on early, because a half one would make the green light
+# mean less than it does now.
 name: CI
 
 on:
@@ -150,3 +157,45 @@ jobs:
 
       - name: Run the doc-sync gate
         run: bash bin/doc-sync-check.sh --changelog-base "origin/${{ github.base_ref }}"
+
+  integration:
+    name: WordPress integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # A real database, as a service container rather than a container this job starts:
+    # the provisioner takes its connection details from the environment precisely so the
+    # same script serves a developer's docker and this, without branching on which.
+    services:
+      mysql:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: wp-fixture
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install WP-CLI
+        run: |
+          curl -sSLo /usr/local/bin/wp \
+            https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli-2.12.0.phar
+          chmod +x /usr/local/bin/wp
+          wp --info --allow-root | head -3
+
+      # This job reaches the network on purpose, and it is the only one that does: a
+      # WordPress fixture cannot exist without downloading a WordPress. Everything it
+      # installs is pinned in the provisioner, and every assertion runs against the local
+      # install -- nothing here asserts against a remote service.
+      - name: ACF nesting inside a real WordPress
+        env:
+          WP_FIXTURE: "1"
+          WP_FIXTURE_DB_HOST: 127.0.0.1:3307
+          WP_FIXTURE_DB_USER: root
+          WP_FIXTURE_DB_PASS: wp-fixture
+        run: |
+          echo "::group::provision and run"
+          bash tests/checks/wp-polylang-integration.sh
+          echo "::endgroup::"
