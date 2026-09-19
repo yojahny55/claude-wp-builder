@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-09-19
+
 ### Fixed
 
 - **`/wp-seed` no longer deletes a repurposed sample page.** Phase 7 removed WordPress's
