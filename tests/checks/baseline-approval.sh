@@ -54,14 +54,16 @@ while read -r sha; do
   files="$(git show --name-only --format= "$sha" -- "$BASELINES" | tr '\n' ' ')"
   case "$subject" in
     baseline:*)
-      echo "ok   [${sha:0:8}] $subject"
-      # A reason, not just the token. "baseline:" alone says a human typed four
+      # A reason, not just the token. "baseline:" alone says a human typed nine
       # characters; it does not say what they approved.
       reason="${subject#baseline:}"
       reason="$(printf '%s' "$reason" | tr -d '[:space:]')"
       if [ ${#reason} -lt 10 ]; then
         echo "FAIL [${sha:0:8}] 'baseline:' carries no reason -- say what changed and why it is correct"
+        echo "     subject: $subject"
         bad=1
+      else
+        echo "ok   [${sha:0:8}] $subject"
       fi
       ;;
     *)
