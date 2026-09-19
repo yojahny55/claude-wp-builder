@@ -21,13 +21,20 @@ f=commands/wp-anonymize.md
 [ -r "$f" ] || fail "$f exists but cannot be read"
 
 # Prose wraps, and grep -F matches within a line, so a needle spanning a line break misses
-# silently and reports a present contract as absent. Flatten first.
-flat=$(tr '\n' ' ' < "$f" | tr -s ' ')
+# silently and reports a present contract as absent -- the one failure mode that makes a
+# check worse than no check, because it fires on a file that is correct. Flatten first.
+#
+# The class is '\n\t\r', not '\n'. `tr -s ' '` squeezes spaces and leaves a tab standing,
+# so a needle crossing a tab-indented continuation line still misses after flattening, and
+# a CRLF line leaves a stray carriage return mid-needle. Measured: with '\n' alone a needle
+# spanning a tab-indented wrap matches 0 times, with '\n\t\r' it matches 1. No markdown
+# here is tab-indented today, which is exactly why this would be found the hard way.
+flat=$(tr '\n\t\r' ' ' < "$f" | tr -s ' ')
 # `--` terminates options: a needle starting with a dash is otherwise parsed by grep as one,
 # which dies with a usage error instead of reporting a miss.
 need() { printf '%s' "$flat" | grep -Fq -- "$1" || fail "$2"; }
 
-cflat=$(tr '\n' ' ' < commands/wp-clone.md | tr -s ' ')
+cflat=$(tr '\n\t\r' ' ' < commands/wp-clone.md | tr -s ' ')
 cneed() { printf '%s' "$cflat" | grep -Fq -- "$1" || fail "$2"; }
 
 # ---------------------------------------------------------------------------
