@@ -691,10 +691,22 @@ fi
 # demo/.yolo-manifest.json — so that advice IS the unconditional-normalize path
 # the paragraph directly above it calls unsafe, and it destroys its own gating
 # condition in the act of being followed: normalize regenerates the manifest the
-# operator was told to check. There is no resume entrypoint in this command, and
-# the file has to say so rather than invent one.
-printf '%s' "$f3" | grep -qF 'There is no resume entrypoint in this command' \
-  || fail "Step 3's abort branch does not state plainly that /wp-yolo has no resume entrypoint — without that sentence the operator is left to invent one, and the only flag on offer (--yolo) re-runs wp-normalize and regenerates the manifest"
+# operator was told to check. --yolo is not a resume entrypoint, and the file has
+# to say so rather than leave the operator to invent one.
+#
+# `--resume` IS one, as of the build ledger, and that is why this assertion names
+# `--yolo` instead of asserting that no entrypoint exists. The two claims are not
+# interchangeable: an abort branch that says only "there is a --resume flag" leaves
+# --yolo looking like a second way to continue, and an abort branch that says "there
+# is no resume entrypoint" is now simply false and sends an operator to rebuild from
+# scratch work that is sitting on disk. Both sentences have to be present, and the
+# second has to say what --resume does differently -- enters at Step 4, so it never
+# runs the Step 2 that regenerates the manifest -- because "use --resume" without
+# that is the same unexplained instruction --yolo used to be.
+printf '%s' "$f3" | grep -qF 'it is never `--yolo`' \
+  || fail "Step 3's abort branch does not state plainly that a resume is never --yolo — without that sentence the operator is left to read --yolo as a second way to continue, and it re-runs wp-normalize and regenerates the manifest"
+printf '%s' "$f3" | grep -qF 'it enters at Step 4 with the manifest already on disk' \
+  || fail "Step 3's abort branch names --resume without saying why it is safe when --yolo is not: it enters at Step 4, so it never runs the Step 2 that regenerates the manifest. An operator told to use a flag but not told what it skips has been given the same unexplained instruction that made --yolo dangerous"
 printf '%s' "$f3" | grep -qF 'Step 2 still dispatches `wp-normalize` and still overwrites `demo/.yolo-manifest.json`' \
   || fail "Step 3's abort branch does not say what --yolo actually skips: it suppresses this checkpoint and nothing else, while Step 2 still dispatches wp-normalize and still overwrites demo/.yolo-manifest.json"
 
