@@ -3,6 +3,7 @@
   "private": true,
   "description": "Dev-only manifest. The plugin itself is markdown and shell and needs no package manager; these are the browser tools bin/*.mjs already import.",
   "devDependencies": {
-    "playwright-core": "1.63.0"
+    "playwright-core": "1.63.0",
+    "gsap": "3.13.0"
   }
 }

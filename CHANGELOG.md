@@ -4,6 +4,28 @@
 
 ### Added
 
+- The motion engine is now driven on **both** paths in a real browser, not one.
+  `tests/checks/motion-devices.sh` gains a default-motion pass that loads the real pinned
+  GSAP and asserts the engine *works* rather than merely being wired: the `pan` rail's
+  transform moves leftwards as the page scrolls, and the JS `reveal` branch hides its
+  children and then shows them once they scroll into view.
+
+  That reveal branch was unreachable on any browser this suite can run. Every one supports
+  `animation-timeline`, so `cssReveal` is true and the CSS engine takes over — which is
+  exactly why CLAUDE.md recorded it as walked by nobody. The fixture forces
+  `CSS.supports('animation-timeline', …)` to report false before `motion.js` reads it,
+  which is what an older browser reports and the only way in. Nothing else is faked: gsap
+  and ScrollTrigger are the pinned builds, served from `node_modules` rather than a CDN,
+  because a check that fetches its own engine over the network fails for reasons unrelated
+  to the code under test.
+
+  `gsap` is pinned in the root `package.json` beside `playwright-core`. Both are dev
+  tooling and neither is shipped into a user's project.
+
+  Seven deliberate regressions across the two paths were each confirmed to fail the check,
+  including a `pan` device whose ScrollTrigger is created and never drives anything — wired
+  but not working, which is the distinction the whole check exists to make.
+
 - `tests/checks/wp-cf7-delivery.sh` — a contact form is now proved to accept, refuse and
   actually deliver. It creates a real Contact Form 7 form in the WordPress fixture, serves
   the site, and posts to CF7's own REST endpoint: a valid submission must be accepted and

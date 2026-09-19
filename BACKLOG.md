@@ -121,8 +121,8 @@ Making the command flow smoother and more guided.
 - [x] **Verify form delivery end to end** `DELIVERED`
   [wp-cf7-delivery](tests/checks/wp-cf7-delivery.sh) creates a real CF7 form in the WordPress fixture, serves the site, and posts to CF7's own REST endpoint: a valid submission is accepted and its mail captured by a `pre_wp_mail` sink with the right recipient and an interpolated body, and a submission missing a required field is refused and sends nothing.
 
-- [ ] **Walk the default-motion branch** `OPEN`
-  [motion-devices](tests/checks/motion-devices.sh) drives `motion.js` under `prefers-reduced-motion: reduce`, where the `pan` device never calls ScrollTrigger and stubs are honest. The default-motion branch, where ScrollTrigger actually runs, is still walked by nobody.
+- [x] **Walk the default-motion branch** `DELIVERED`
+  [motion-devices](tests/checks/motion-devices.sh) now drives both paths. Under default motion it loads the real pinned GSAP from `node_modules` and asserts the rail's transform tracks scroll and that the JS `reveal` branch hides its children and then shows them — reached by forcing `CSS.supports('animation-timeline', …)` to report false, since every browser the suite can run supports it and the CSS engine would otherwise take over.
 
 - [ ] **Broken-site corpus with expected audit findings** `OPEN`
   A fixture site seeded with known defects and a file of the findings an audit should report. Without it no test can fail because an audit *missed* a defect — the ceiling CLAUDE.md records for the whole audit family.

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>default-motion fixture</title>
+<style>
+  /* Tall enough that the page genuinely scrolls: ScrollTrigger drives off real scroll
+     position, so a fixture that fits in the viewport proves nothing about a scrub. */
+  body { margin: 0; }
+  .spacer { height: 150vh; }
+  .pan { height: 200vh; }
+  .pan .frame { position: sticky; top: 0; width: 400px; overflow-x: hidden; }
+  .pan .rail { display: flex; gap: 20px; will-change: transform; }
+  .pan .item { flex: 0 0 300px; height: 60px; background: #ccc; }
+  .reveal p { margin: 0 0 12px; }
+</style>
+</head>
+<body>
+
+<div class="spacer"></div>
+
+<!-- The pan device under DEFAULT motion, where the reduced-motion branch is not taken and
+     ScrollTrigger drives the rail's transform from scroll progress. -->
+<section id="pan" class="pan" data-motion="pan">
+  <h2>Panning rail</h2>
+  <div class="frame"><div class="rail" data-motion-rail>
+    <div class="item"></div><div class="item"></div><div class="item"></div><div class="item"></div>
+  </div></div>
+</section>
+
+<!-- The GSAP reveal branch. It runs only when the CSS engine is NOT driving reveal, which
+     is why the page forces CSS.supports('animation-timeline', 'view()') to report false
+     below: every browser this suite can run has it, so the branch is otherwise
+     unreachable -- the exact gap CLAUDE.md records. -->
+<section id="reveal" data-motion="reveal">
+  <p>one</p><p>two</p><p>three</p>
+</section>
+
+<div class="spacer"></div>
+
+<script src="./gsap.min.js"></script>
+<script src="./ScrollTrigger.min.js"></script>
+<script type="module">
+  // Forced before motion.js reads it. cssReveal is computed from this exact query, so
+  // reporting false here is what an older browser reports, and is the only way to reach
+  // the GSAP reveal branch on a modern Chrome. Nothing else about the page is faked: the
+  // gsap and ScrollTrigger below are the real pinned builds.
+  const realSupports = CSS.supports.bind(CSS);
+  CSS.supports = (a, b) =>
+    (String(a) === 'animation-timeline' ? false : realSupports(a, b));
+  window.__forcedNoTimeline = CSS.supports('animation-timeline', 'view()') === false;
+
+  const { initMotion } = await import('./motion.js');
+  initMotion(window.gsap, window.ScrollTrigger);
+  window.__motionReady = true;
+</script>
+</body>
+</html>
