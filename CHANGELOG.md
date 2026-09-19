@@ -2,6 +2,44 @@
 
 ## [Unreleased]
 
+### Added
+
+- Approved screenshot baselines, with a review step that is a gate rather than a habit.
+  `tests/checks/visual-baselines.sh` renders the motion fixtures and compares them to
+  committed PNGs, printing how far each one is from its baseline whether it passes or
+  fails — 0.1% of pixels is the limit, and a run that is inside it still says by how much,
+  because a check that prints only PASS gives a reviewer nothing to judge a borderline
+  change with.
+
+  Seven shots: the reduced-motion fallback at two viewports, and the same page at the same
+  two scroll positions with the motion engine running and with it stood down. That pairing
+  is the point — the first version framed both halves at the top of the page, where the
+  sections in question are below the fold, and the two PNGs came out byte-identical. It
+  would have passed with the entire reduced-motion path broken.
+
+  Rendering happens inside a pinned Playwright container rather than the runner's own
+  Chrome. `motion-devices.sh` asserts on the DOM, which survives a browser upgrade; pixels
+  do not, and `ubuntu-latest` ships a Chrome that updates itself. Baselines taken against a
+  moving renderer would fail whenever Chrome changed its antialiasing, so "the baseline
+  moved" would mean "Chrome moved" more often than it meant a regression — and a gate that
+  cries wolf is a gate people mute. `RENDERED-BY.txt` beside the PNGs records which image
+  produced them, and the check refuses to compare against a different one.
+
+- `tests/checks/baseline-approval.sh` — a commit that changes `tests/baselines/` must open
+  its subject with `baseline: <why>`, and the reason has to be more than the token. I06
+  requires that baseline images change only through an explicit review step; this is that
+  step, aimed at one specific reflex — a visual check goes red and the fastest way to green
+  is to regenerate the PNGs and push. Under that reflex a baseline stops being an approved
+  artifact and becomes a record of whatever the code last did, which is worse than having
+  none, because it reads as approval nobody gave. What it cannot enforce is that anyone
+  looked at the images; no check can.
+
+### Changed
+
+- `tests/fixtures/motion/harness.mjs` now holds the static server and the browser
+  resolution ladder that `drive.mjs` and the new `shoot.mjs` both need, instead of a second
+  copy in each.
+
 ## [1.23.0] - 2026-09-19
 
 ### Added

@@ -12,21 +12,7 @@
 // Usage: node tests/fixtures/motion/drive.mjs
 // Exits 0 on success, 1 on a failed assertion, 2 when no browser is available.
 
-import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { join, dirname, extname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const here = dirname(fileURLToPath(import.meta.url));
-const repo = join(here, '..', '..', '..');
-const MOTION = join(repo, 'starter-theme', '__tailwind__', 'assets', 'js', 'src', 'motion.js');
-// The real pinned GSAP, served from node_modules rather than a CDN: a check that reaches
-// the network to fetch its engine fails for reasons that have nothing to do with the code
-// under test.
-const VENDOR = {
-  '/gsap.min.js': join(repo, 'node_modules', 'gsap', 'dist', 'gsap.min.js'),
-  '/ScrollTrigger.min.js': join(repo, 'node_modules', 'gsap', 'dist', 'ScrollTrigger.min.js'),
-};
+import { serveFixtures, launchChrome } from './harness.mjs';
 
 let failed = 0;
 const t = (label, got, want) => {
@@ -39,69 +25,10 @@ const t = (label, got, want) => {
   }
 };
 
-// Served over HTTP rather than opened as file://, because motion.js is an ES module and a
-// module import from a file:// page is blocked by CORS in Chrome. CLAUDE.md already notes
-// that verification serves over HTTP while the delivered demo is a file:// artifact.
-const types = { '.html': 'text/html', '.js': 'text/javascript' };
-const server = createServer(async (req, res) => {
-  const path = (req.url || '/').split('?')[0];
-  // Chrome asks for /favicon.ico on every navigation, and a 404 for it is logged as a
-  // console error -- which the assertion below reads as "a section failed". Answering it
-  // with 204 removes the noise at its source rather than teaching the assertion to ignore
-  // a class of error that would also hide a real missing resource.
-  if (path === '/favicon.ico') {
-    res.writeHead(204).end();
-    return;
-  }
-  try {
-    const file =
-      path === '/motion.js' ? MOTION
-      : VENDOR[path] ? VENDOR[path]
-      : join(here, path === '/' ? 'pan.html' : path);
-    if (!file.startsWith(here) && file !== MOTION && !Object.values(VENDOR).includes(file)) {
-      res.writeHead(403).end('no');
-      return;
-    }
-    const body = await readFile(file);
-    res.writeHead(200, { 'content-type': types[extname(file)] || 'text/plain' }).end(body);
-  } catch {
-    res.writeHead(404).end('not found');
-  }
-});
+const { server, base } = await serveFixtures();
 
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const base = `http://127.0.0.1:${server.address().port}`;
-
-let chromium;
-try {
-  ({ chromium } = await import('playwright-core'));
-} catch {
-  console.log('SKIP: playwright-core is not installed');
-  server.close();
-  process.exit(2);
-}
-
-// The same resolution ladder the other bin/*.mjs tools use: an explicit override first,
-// then a system Chrome. No download is attempted -- a check that installs a browser is a
-// check that fails differently on a cold machine.
-const candidates = [
-  process.env.CHROME_PATH,
-  '/usr/bin/google-chrome',
-  '/usr/bin/chromium',
-  '/usr/bin/chromium-browser',
-].filter(Boolean);
-
-let browser = null;
-for (const executablePath of candidates) {
-  try {
-    browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] });
-    break;
-  } catch {
-    /* try the next one */
-  }
-}
+const browser = await launchChrome();
 if (!browser) {
-  console.log('SKIP: no usable Chrome found (set CHROME_PATH)');
   server.close();
   process.exit(2);
 }
