@@ -86,6 +86,24 @@ inbox, and a submission missing a required field must be refused *and* send noth
 that renders perfectly and delivers nothing costs a client enquiries before anyone notices,
 and no grep over `agents/wp-cf7.md` can see it.
 
+**Screenshots are compared against approved baselines, inside a pinned renderer.**
+`tests/checks/visual-baselines.sh` renders the motion fixtures and diffs them against
+committed PNGs, reporting the percentage of differing pixels on every shot rather than
+only on a failure — the tolerance is 0.1%, and a number nobody can see is a number nobody
+can argue with. It runs inside `mcr.microsoft.com/playwright:v1.63.0-noble`, not the
+runner's Chrome, because pixels do not survive a browser upgrade the way a DOM assertion
+does; `RENDERED-BY.txt` records the image and the check refuses to compare across a
+different one.
+
+Three limits come with it, and all three are the shape of the thing rather than bugs.
+**The pairs are motion-engine pairs, not demo/theme pairs** — I06 asks for a demo compared
+against the theme built from it, and that needs a generated site, which is still the gap
+below. **Only settled states are photographed**, because determinism requires waiting for
+motion to stop: breaking the reveal so it never hides its children changes nothing any
+baseline can see, and `motion-devices.sh` catches that one instead, by name. **The fixtures
+are geometric** — grey boxes on white, carrying no typography or colour — so these
+baselines see layout move and would not see a font change.
+
 Still not covered: a generated site end to end, the broken-site corpus with expected audit
 findings, and browser artifacts for failed functional scenarios. A green CI means the
 contracts still say what they should, the code still parses, and the ACF translation path

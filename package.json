@@ -1,9 +1,11 @@
 {
   "name": "claude-wp-builder-devtools",
   "private": true,
-  "description": "Dev-only manifest. The plugin itself is markdown and shell and needs no package manager; these are the browser tools bin/*.mjs already import.",
+  "description": "Dev-only manifest. The plugin itself is markdown and shell and needs no package manager; these are the browser tools bin/*.mjs and the checks under tests/ already import. Nothing here is shipped into a user's project.",
   "devDependencies": {
     "playwright-core": "1.63.0",
-    "gsap": "3.13.0"
+    "gsap": "3.13.0",
+    "pixelmatch": "7.2.0",
+    "pngjs": "7.0.0"
   }
 }

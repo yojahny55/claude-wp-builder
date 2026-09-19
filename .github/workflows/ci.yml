@@ -62,7 +62,13 @@ jobs:
           # exit 0 and be counted as a pass. A runner that lost Chrome would then still
           # turn this job green, which is exactly the silent-skip failure their own jobs
           # exist to refuse: the guard would be in place and standing next to an open door.
-          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh'
+          # visual-baselines.sh joins them for the same reason and one of its own: it
+          # renders inside a pinned container, and running it here would pull a 3.5 GB
+          # image a second time per CI run. baseline-approval.sh needs the PR's base
+          # branch, which this job does not fetch, so it lives in doc-sync below where the
+          # base is already there -- here it would take its own skip path and pass while
+          # checking nothing.
+          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh'
           for f in tests/checks/*.sh; do
             case " $skip_here " in *" $f "*) continue ;; esac
             if out=$(bash "$f" 2>&1); then
@@ -166,6 +172,14 @@ jobs:
       - name: Run the doc-sync gate
         run: bash bin/doc-sync-check.sh --changelog-base "origin/${{ github.base_ref }}"
 
+      # Same job because it needs the same thing: the base ref, to see which commits the
+      # branch adds. I06 requires that baseline images change only through an explicit
+      # review step, and this is that step -- a commit touching tests/baselines/ must say
+      # "baseline: <why>" in its subject. It cannot run in the checks job, which has no
+      # base to diff against and would pass by skipping.
+      - name: Baseline images changed only through the review step
+        run: bash tests/checks/baseline-approval.sh "origin/${{ github.base_ref }}"
+
   integration:
     name: WordPress integration
     runs-on: ubuntu-latest
@@ -257,3 +271,52 @@ jobs:
           echo "::group::motion devices"
           bash tests/checks/motion-devices.sh
           echo "::endgroup::"
+
+  visual:
+    name: Visual baselines
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # pixelmatch and pngjs do the comparing; playwright-core is what runs inside the
+      # container. All of them are pinned to exact versions in package.json.
+      - name: Install dev dependencies
+        run: npm install --no-audit --no-fund
+
+      # The renderer is pinned and the check pulls it itself, rather than this job using
+      # `container:`. Two reasons: the check has to work the same way on a developer
+      # machine as it does here, and it is the check -- not the workflow -- that knows
+      # which image the committed baselines were rendered by. RENDERED-BY.txt beside the
+      # PNGs is that record, and the check refuses to compare against a different one.
+      #
+      # Deliberately NOT the runner's own Chrome, which is what motion-devices.sh uses.
+      # That check asserts on the DOM, which survives a browser upgrade; this one asserts
+      # on pixels, which do not. ubuntu-latest ships a self-updating Chrome and migrates
+      # to Ubuntu 26 in October, so baselines taken against it would fail every time
+      # Chrome shipped a font or antialiasing change -- "the baseline moved" would mean
+      # "Chrome moved" more often than it meant a regression, and a gate that cries wolf
+      # is a gate people mute.
+      - name: Pull the pinned renderer
+        run: docker pull mcr.microsoft.com/playwright:v1.63.0-noble
+
+      # VISUAL_REQUIRE_BROWSER turns the check's own skip path into a failure: a runner
+      # without docker fails here instead of reporting a green tick for a check that
+      # rendered nothing.
+      - name: Compare rendered motion fixtures to approved baselines
+        env:
+          VISUAL_REQUIRE_BROWSER: "1"
+        run: |
+          echo "::group::visual baselines"
+          bash tests/checks/visual-baselines.sh
+          echo "::endgroup::"
+
+      # The diff images are the whole point of a failed visual run: the percentage tells a
+      # reviewer that something moved, and only the picture tells them what.
+      - name: Upload diffs when it fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baseline-diffs
+          path: tests/baselines/.failed-diffs/
+          if-no-files-found: ignore
