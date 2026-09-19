@@ -54,10 +54,29 @@ parse error on 7.4; linting at the default would be green and wrong, which is wo
 not linting, because it reads as proof. Nothing in the tree uses 8.0-only syntax today, so
 adding some fails CI and raising a floor stays a deliberate act.
 
-CI does not stand up a WordPress. Nothing here proves a generated site or an audit behaves
-correctly against a real install — disposable fixtures, a broken-site corpus with expected
-findings, and browser artifacts are stage 2. A green CI means the contracts still say what
-they should and the code still parses.
+**CI now stands up a WordPress, for one thing.** `tests/fixtures/wp/provision.sh` builds a
+disposable install — pinned WordPress, Polylang and SCF, against a database from a CI
+service container or a throwaway docker container locally — and
+`tests/checks/wp-polylang-integration.sh` runs the ACF translation path inside it, then
+tears the whole thing down. It skips unless `WP_FIXTURE=1`, because provisioning downloads
+WordPress and making that the price of running the suite would mean people stop running it.
+
+That job is the only place here that reaches the network on purpose: a WordPress fixture
+cannot exist without a WordPress. Every version is pinned so an upstream release cannot
+change a result, and nothing it installs is asserted against — every assertion runs against
+the local install.
+
+It pays for itself. Its first two runs found two defects no contract grep and no pure test
+could reach: `get_field_object()` returns false on a post with no value for the field, so
+the translation writer skipped every write to a brand-new counterpart; and
+`PLL()->model->add_language()` is defined only on `PLL_Admin_Model`, which Polylang
+instantiates only when `is_admin()` is true — never under `wp eval-file`, which is how
+every script in `skills/wp-polylang/scripts/` is documented to run.
+
+Still not covered: a generated site end to end, the broken-site corpus with expected audit
+findings, and browser artifacts for failed functional scenarios. A green CI means the
+contracts still say what they should, the code still parses, and the ACF translation path
+still agrees with a real WordPress.
 
 ## Architecture
 
@@ -131,6 +150,15 @@ The Polylang path is real code with real failure modes: translations join throug
 `pll_save_post_translations` / `pll_save_term_translations`. `pll-lib.php` bridges `wp eval-file`'s
 local `$args` into `$GLOBALS` — the scripts do not work without that require. PHP 7.4 floor:
 no `match`, no union types.
+
+`pll-lib.php` is also the one place in this repo where a test runs real shipped logic
+instead of grepping a contract. Its top-level code is all `if (!defined(...))` guards that
+call nothing from WordPress, and the ACF path walker and resolver inside it are pure array
+manipulation, so `tests/checks/wp-polylang-nesting.sh` requires the file under bare PHP and
+asserts on what the walker emits and where the resolver places a value. Keep those two
+functions free of WordPress calls: `pllx_acf_write()` is the wrapper that reaches
+`get_field()`/`update_field()`, and it stays in `pll-import.php`, which cannot be required
+at all because it runs a whole import at top level.
 
 ### Craft vs plain is a recorded decision
 
@@ -302,9 +330,18 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
 - **Media is not translated.** The Polylang importer copies an image or file id to the counterpart
   as-is rather than swapping it for that attachment's own translation. Mapping media is a separate
   decision; `pll-import.php` and the live suite both state the ceiling.
-- **ACF reference re-pointing is one level deep.** `link`, `page_link`, `post_object` and
-  `relationship` are re-pointed only as top-level fields, matching `pllx_acf_walk()`'s own ceiling.
-  The same field nested inside a repeater or flexible-content row keeps pointing at the source.
+- **ACF reference re-pointing recurses, and records ownership per path.** `link`,
+  `page_link`, `post_object` and `relationship` are re-pointed wherever they sit, including
+  inside groups, repeater rows and flexible-content layouts, through the same
+  `pllx_acf_zip()` traversal and the same layout-by-name rule the text walk uses — so a
+  structure one can see is a structure the other can see. `_pll_ref_` ownership meta is
+  keyed by the dotted path, so two references differing only by row keep separate records
+  of what the importer last wrote and an editor's change to one is not read as a change to
+  the other. What is **not** carried is the ceiling that used to sit here: for one release
+  the text walk recursed while this did not, which gave a nested link a translated title on
+  a source-language URL — translated-looking and wrong, worse than the untranslated link it
+  replaced. `tests/fixtures/wp/acf-refs.php` exists to keep that from coming back, and
+  fails if the collector stops recursing or if ownership is keyed by field name again.
 - **Parent structure mirrors the source.** Both parent fixup passes rewrite the counterpart's parent
   on every run, so a post or term an editor deliberately re-parented in the target language is put
   back. Only the ACF reference pass records ownership; parents do not.

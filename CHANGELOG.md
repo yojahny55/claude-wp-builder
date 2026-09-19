@@ -2,6 +2,67 @@
 
 ## [Unreleased]
 
+### Added
+
+- A disposable WordPress fixture, and the first checks that run inside one.
+  `tests/fixtures/wp/provision.sh` builds a pinned WordPress with Polylang and SCF against
+  a database from a CI service container or a local docker container, and
+  `tests/checks/wp-polylang-integration.sh` runs the ACF translation path inside it and
+  tears the whole thing down afterwards. It skips unless `WP_FIXTURE=1`; CI opts in.
+
+  CLAUDE.md had said for a long time that nothing here proves behaviour against a real
+  install. This is the first piece of that, and it earned its place immediately — the two
+  defects below were both found by its first runs, and neither was reachable by a contract
+  grep or by a pure-PHP test.
+
+### Fixed
+
+- `/wp-polylang` could not create a language at all. `pll-setup.php` called
+  `PLL()->model->add_language()`, which is defined only on `PLL_Admin_Model` — a subclass
+  Polylang instantiates only when `is_admin()` is true, and never under `wp eval-file`,
+  which is how the plugin documents running every script in that directory. The guard in
+  front of it checked `class_exists( 'PLL_Settings' )`, true in both contexts, so it never
+  caught the case. The helper now obtains an admin-capable model explicitly and refuses
+  with a readable message if the installed Polylang exposes none.
+- The translation writer skipped every write to a brand-new counterpart. It resolved a
+  field's definition with `get_field_object( $name, $post_id )` against the **target**, and
+  ACF resolves a field name through the hidden `_<name>` reference meta — which a post with
+  no value for that field does not have. So the definition came back `false` on exactly the
+  posts the writer exists to fill, and every write was reported skipped and dropped. It
+  resolves against the source first now, which always has the value, because the payload
+  being written was walked out of it.
+- ACF reference re-pointing stopped at the top level while the text walk recursed, so a
+  nested `link` received a translated title on a URL still pointing at the source language
+  — translated-looking and wrong, which is worse than the untranslated link it replaced.
+  `pllx_repoint_acf_refs()` now walks the same structure the text pass does, through the
+  same `pllx_acf_zip()` traversal and the same layout-by-name rule, and keys its
+  `_pll_ref_` ownership meta by dotted path so two references differing only by row keep
+  separate records of what the importer last wrote.
+
+- Polylang translation payloads stopped at one level of ACF nesting, so a group inside a
+  repeater, or anything below it, was never sent for translation — no error, and a
+  counterpart that read as translated because its top-level fields were. `pllx_acf_walk()`
+  now recurses to any depth, and a flexible-content row's layout is matched by name through
+  the same helper the writer uses, so the two cannot drift on how a row is identified.
+- `pllx_acf_write()` resolved a dotted path by counting its dots — one part a plain field,
+  two a group, three a repeater row. That was correct only while nesting stopped at one
+  level. With nesting walked, `a.b.c` is a repeater row's field when `a` is a repeater and a
+  group's group's field when `a` is a group, and the old reading did `(int) 'b'` → `0` and
+  wrote the translation into row 0 of a field with no rows. It also had no branch beyond
+  three parts and no `else`, so a deeper key wrote nothing and said nothing. Paths are now
+  resolved against the field definition, and a path that does not match the structure is
+  reported and skipped rather than written to a guessed location.
+
+  The path resolver moved to `pll-lib.php` and touches no WordPress function, so
+  `tests/checks/wp-polylang-nesting.sh` executes it: the first check in this suite that
+  runs shipped logic rather than grepping a contract. Seven deliberate regressions —
+  including reverting the recursion and restoring the dot-count reading — were each
+  confirmed to fail it.
+
+  One consequence is recorded rather than fixed: `pllx_repoint_acf_refs()` is still
+  top-level only, so a nested `link` now receives a translated title on a URL that still
+  points at the source language.
+
 ## [1.21.0] - 2026-09-19
 
 ### Added
