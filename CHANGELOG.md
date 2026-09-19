@@ -49,6 +49,27 @@
   orphan ACF ids on a single site. An absent ledger means "no history", never "nothing ever
   failed", so a first run is not reported as a project with everything resolved.
 
+- **`/wp-seed` no longer reverts an editor's work when it re-seeds a record it owns.**
+  Phase 1.5 settled who owns a *record*; nothing settled who owns a *value inside* one, and
+  `update_field()` overwrites unconditionally — so re-seeding a page the seeder legitimately
+  owns silently reverted every edit made to it in wp-admin since the last run. The
+  record-level rule read as though that were already handled.
+  Telling an editor's edit from a source change needs one fact that is not in the database:
+  what this command wrote last time. `_<prefix>_seeded_digest` now records it as a map of
+  field to hash — a digest rather than the value, because detecting *changed* is the whole
+  requirement and storing every seeded string twice answers nothing extra. Options-page
+  fields keep theirs in an option, the same crossover `wp-acf` already makes for `_<lang>`
+  suffixes.
+  Each field is then a three-way compare between what WordPress holds, what the last run
+  wrote, and what the demo supplies: unchanged-and-demo-differs **updates**,
+  unchanged-and-demo-same **skips**, and anything the client has touched is a **conflict**
+  that is left alone and reported. A field with **no** recorded digest is also a conflict —
+  on a project seeded before this existed that is every field, which makes the first re-seed
+  noisy and correct rather than quiet and destructive, since nothing on disk can say whose
+  value it holds. Conflicts are never merged: both values are deliberate and picking either
+  silently discards work somebody did on purpose. `--force-fields` overwrites them, is not
+  implied by `--force` on any other command, and is never the default. The plan reports field
+  outcomes separately from record outcomes, because they are owned separately.
 - **`/wp-clone` refuses to replace an occupied destination, and backs it up first.** The
   command ran `wp db import` against the destination on both paths with no backup, no
   existence check and no confirmation. A dump carries `DROP TABLE` / `CREATE TABLE`, so the

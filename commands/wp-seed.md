@@ -1,7 +1,7 @@
 ---
 description: Seed WordPress content from demo HTML — parses sections, creates pages, imports media, populates ACF fields, builds menus, supports bilingual content
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
-argument-hint: "[demo-file.html] [--exclude-slugs <slug,slug,...>]"
+argument-hint: "[demo-file.html] [--exclude-slugs <slug,slug,...>] [--force-fields]"
 ---
 
 # WP Seed — Content Seeding from Demo HTML
@@ -198,7 +198,14 @@ Resolve everything first, print what will happen, then write:
   update    0 pages, 0 attachments, 0 menus
   skip      0 (unchanged)
   conflict  1 page — "About" exists without the seed marker; left untouched
+  fields    update 3, skip 18, conflict 2
+            conflict: hero_title (page "Home"), contact_phone (options)
 ```
+
+Records and fields are counted separately because they are owned separately: the seeder can
+own a page and not own a heading inside it (Phase 4). A plan that reported only records would
+show `update 1 page` and say nothing about the two client edits inside it that are about to
+be left alone — or, before the field compare existed, silently overwritten.
 
 An unchanged re-run prints `create 0 / update 0` and every record under `skip`. That line is
 how "re-running is safe" stops being a claim and becomes something the operator can see. A
@@ -331,9 +338,81 @@ extractable passages — apply the rubric in `skills/wp-audit-geo-standards/SKIL
 answer-first 1–2 sentence openings, 134-167-word self-contained blocks, question-based
 H2s, a table for 3+ comparisons, and named sources/dates with first-party numbers.
 
+### Before writing a field: whose value is in it?
+
+Phase 1.5 answers who owns a **record**. This answers who owns a **value**, and they are
+different questions with different answers. A page the seeder created is one it may update —
+but a heading inside that page, retyped by the client in wp-admin, is theirs. `update_field()`
+overwrites unconditionally, so re-seeding a record the seeder legitimately owns silently
+reverts every edit made to it since the last run.
+
+Telling an editor's edit from a source change needs one fact that is not in the database:
+**what this command wrote last time.**
+
+Record it as a digest map on the record itself:
+
+```bash
+bash -c "$WP post meta get <post_id> _<prefix>_seeded_digest --format=json 2>/dev/null"
+```
+
+```json
+{ "hero_title": "3f786850e387550fdab836ed7e6dc881de23001b", "hero_cta_text": "89e6c98d92887913cadf06b2adb97f26cd7b5a" }
+```
+
+A digest, not the value: detecting *changed* is the whole requirement, and storing every
+seeded string a second time doubles the content for a question a hash already answers.
+
+Options-page fields are global — one set of values per site, not per record — so their map
+lives in an option rather than post meta, the same crossover `wp-acf` already makes for
+`_<lang>` suffixes.
+
+### The three-way compare
+
+For each field, compare the value now in WordPress, the digest of what was written last run,
+and the value the demo supplies now:
+
+| In WordPress | vs last run | vs demo | Do |
+|---|---|---|---|
+| matches last run | — | demo differs | **update**, and rewrite the digest |
+| matches last run | — | demo identical | **skip** — nothing changed anywhere |
+| **differs** from last run | the client edited it | — | **conflict** — leave the value, report it |
+| no digest recorded | unknown provenance | — | treat as a **conflict**; do not overwrite |
+
+The last row is the one that protects a project seeded before this map existed. A field with
+no recorded digest might hold the client's work or last run's output, and nothing on disk can
+say which — so it is not overwritten. That makes the first re-seed of an older project noisy
+and correct, rather than quiet and destructive. Once a field is written with a digest, it is
+known thereafter.
+
+**A conflict is reported and left, never merged.** There is no safe automatic resolution: the
+demo's value and the client's value are both deliberate, and picking either silently discards
+work somebody did on purpose. Say which field, on which record, and what each side holds.
+
+**Replacing an editor's value is a separate, explicit operation** — `--force-fields`, which
+overwrites conflicts and says so per field. It is not implied by `--force` on any other
+command, and it is never the default: the entire point of the digest is that a routine
+re-seed cannot quietly undo an afternoon in wp-admin.
+
+Report field-level outcomes in the Phase 1.5 preview, where record-level counts already
+appear:
+
+```
+  fields    update 3, skip 18, conflict 2
+            conflict: hero_title (page "Home"), contact_phone (options)
+```
+
+A client edit that happens to produce exactly the demo's value reads as no edit. That is
+harmless — the stored value is what they wanted either way — and it is the only case the
+digest cannot distinguish.
+
 ### Preferred method: ACF's `update_field()` via `wp eval`
 
 This approach is storage-format-agnostic and works regardless of how ACF stores the data internally.
+
+Every `update_field()` below is subject to the three-way compare above, and writes the
+field's digest in the same step that writes the value. A value written without its digest is
+indistinguishable from a client edit on the next run, and will be reported as a conflict
+forever.
 
 **Simple text fields (options page):**
 
@@ -731,6 +810,10 @@ Left alone — the client owns these:
   - page "About" (ID: 31) has no seed marker. Nothing was written to it, and no
     second About page was created. The menu points at ID 31.
   → If this page should be seeded, delete it and re-run, or add the marker by hand.
+  - field hero_title on page "Home" (ID: 5) was edited in wp-admin since the last
+    seed. Left as "Welcome to Acme"; the demo now says "Building Digital Excellence".
+  - field contact_phone (options) was edited since the last seed.
+  → Run with --force-fields to overwrite these with the demo's values.
 
 Failed media imports:
   - hero_background: https://example.com/image1.jpg (403 Forbidden)

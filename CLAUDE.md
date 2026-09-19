@@ -240,6 +240,17 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   real and is the operator's to carry — a clone can still reach a production endpoint through
   any integration that does not use `wp_mail()` or cron, and the database holds live customer
   records from the moment the import finishes. Opt-in anonymisation is not built.
+- **`/wp-seed` owns records and values separately, and the second is the weaker claim.**
+  Phase 1.5's marker says who created a *record*; `_<prefix>_seeded_digest` says what this
+  command last wrote into each *field* of it, so an editor's edit is distinguishable from a
+  source change. A field whose current value no longer matches that digest is the client's,
+  and is left alone and reported; `--force-fields` is the only way past it, and is not
+  implied by `--force` anywhere else. A field with **no** recorded digest is treated as a
+  conflict rather than as ours, which makes the first re-seed of a project created before
+  this existed noisy — correctly, since nothing on disk can say whose value it holds.
+  Two things it cannot do: a client edit that happens to reproduce the demo's value reads as
+  no edit, and the digest records a value, not a history, so it cannot say *when* the edit
+  happened or how many times.
 - **Seed media deduplicates by source, not by content.** `/wp-seed` records
   `_<prefix>_seeded_source` — the URL a remote image came from, or the repository-relative
   path of a local one — and skips an import whose source it has already seen. The same
