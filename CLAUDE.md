@@ -209,6 +209,18 @@ a release.
 
 These are deliberate, documented limits — not bugs to "fix" on sight:
 
+- **A clone carries data, never code.** `/wp-clone` transfers the database and
+  `wp-content/uploads/`; plugin and theme **files** are never transferred. That is
+  deliberate — a dev clone should get its code from the same place the project does, not
+  from a production server's disk — but it means the imported database activates plugins
+  that are not present, so `/wp-clone` inventories them from the source while the SSH
+  session is open and splits them into recoverable (on WordPress.org, with a version-pinned
+  install command), unobtainable (custom, licensed or premium — the clone stays incomplete),
+  and unclassified. The third group exists because the WordPress.org lookup is a network
+  call: guessing it into either of the others sends the operator to install a different
+  plugin that shares a slug, or to ask a client for a file they could have downloaded.
+  Path B has no source to ask and derives a weaker list from the database alone, which it
+  says.
 - **The clone's destination backup is a database export, and nothing else.** `/wp-clone`
   Step 1.5 refuses an occupied destination without `--force` and exports its database to
   `~/.wp-clone-backups/` first — outside the project, because a backup under `wp-content/`

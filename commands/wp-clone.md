@@ -161,6 +161,77 @@ bash -c "ssh user@host 'which wp || command -v wp'"
 
 If WP-CLI is not available on the remote, warn the user and ask them to either install it remotely or switch to Path B (manual export via phpMyAdmin).
 
+### A3.5: Inventory Remote Dependencies
+
+**This clone transfers the database and `wp-content/uploads/`. It does not transfer plugins
+or themes.** The imported database will name the source site's active plugins and its active
+theme, and none of those files will be present unless `/wp-create`'s profile happened to
+install the same ones. WordPress deactivates a plugin whose file is missing and falls back
+off a missing theme, so the first page load is a site with most of its behaviour gone.
+
+**Take the inventory now, while the SSH session is open.** After the clone the source is
+unreachable, and the local database can only report plugin *names* — not their versions, and
+not whether they can be obtained at all. This is the one moment the authoritative answer is
+available:
+
+```bash
+bash -c "ssh user@host 'cd /remote/path && wp plugin list --fields=name,title,status,version --format=csv'"
+bash -c "ssh user@host 'cd /remote/path && wp theme list --fields=name,status,version --format=csv'"
+```
+
+### Split the list by what the operator can do about it
+
+For each plugin and theme the source has **active** and the destination does not have on
+disk, decide which of three groups it belongs to:
+
+```bash
+bash -c "curl -s -o /dev/null -w '%{http_code}' 'https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&request\[slug\]=<slug>'"
+```
+
+| Answer | Group | Report |
+|---|---|---|
+| `200` | on WP.org — **recoverable** | the exact command, pinned to the source's version |
+| `404` | not on WP.org — custom, licensed or premium | the clone is **incomplete** until someone supplies the files |
+| anything else, or no network | **unknown** | say it could not be classified |
+
+**Never guess the third row into one of the first two.** A network failure that silently
+reports a licensed plugin as "available on WP.org" sends the operator to run a command that
+installs a *different* plugin which happens to share a slug, and a failure that reports an
+ordinary plugin as licensed sends them to ask a client for a file they could have downloaded.
+Unknown is a real answer and the only honest one when the check did not complete.
+
+Already present locally — `/wp-create`'s profile installed some of these — is silent. A list
+that repeats what is already there buries the part that needs action.
+
+### Write it down, and say where
+
+```
+=== Dependency inventory ===
+Recoverable — install these (versions from the source):
+  wp plugin install contact-form-7 --version=6.0.1 --activate
+  wp plugin install wordpress-seo --version=23.4 --activate
+
+Not on WordPress.org — this clone is incomplete without them:
+  woocommerce-subscriptions  6.4.1   (active on the source)
+  acf-pro                    6.3.6   (active on the source)
+  → These need the client's own copies. Nothing local can obtain them.
+
+Could not classify (no network):
+  some-plugin-slug           1.2.0
+
+Already installed locally — nothing to do:
+  akismet, woocommerce
+```
+
+Write the same content to `~/.wp-clone-backups/<project-slug>-<timestamp>-dependencies.md`,
+beside the destination backup from Step 1.5, and print the path.
+
+An inventory that exists only in the terminal is one the operator cannot act on tomorrow —
+and this is the list they work through *after* the clone, once the site is up and obviously
+missing things. It goes next to the backup rather than into the project because it is an
+artifact of this clone, not part of the site, and nothing generated here should end up
+committed to the project's repository.
+
 ### A4: Export Remote Database
 
 **The dump is the whole production database** — customer records, order rows, password
@@ -399,6 +470,26 @@ removing or protecting once the clone is verified. Naming it is the right action
 deleting it is not the command's to take, and staying silent leaves a production database
 on the machine with nobody having mentioned it.
 
+### B3.5: Inventory Dependencies (from the database)
+
+Path B has no source to ask, so the inventory is derived from the database that was just
+imported:
+
+```bash
+bash -c "$WP plugin list --fields=name,status,version --format=csv"
+bash -c "$WP theme list --fields=name,status,version --format=csv"
+```
+
+Apply the same three-way split as A3.5 — recoverable, not on WordPress.org, unclassified —
+and write the same file beside the backup.
+
+**Say that this list is weaker, and why.** `wp plugin list` reports what is on disk joined
+with what the options table activates, so a plugin the source had active whose directory
+never existed here appears as a missing file rather than as a named dependency with a known
+version. Path A asks the source directly and gets both. Reporting the two as equivalent
+would tell an operator their inventory is complete when it is the best guess available from
+a database alone.
+
 ### B4: Extract Uploads
 
 If an uploads archive was provided, extract it:
@@ -613,7 +704,15 @@ If the active theme is missing files (not found in `wp-content/themes/`), warn t
 bash -c "$WP plugin list --format=table"
 ```
 
-Note any plugins that are "active" but have missing files — these will cause errors.
+Plugins that are "active" with missing files are expected here, not a surprise: this clone
+never transferred plugin files. **Reconcile this list against the dependency inventory** from
+A3.5 or B3.5 rather than reporting it again as a fresh discovery — the inventory already
+classified each one and, for the recoverable ones, already wrote the command that fixes it.
+A second undifferentiated warning at this point reads as a new problem and sends the operator
+looking for a cause that was explained several steps ago.
+
+Anything missing here that the inventory did **not** list is worth reporting on its own: it
+means the two disagree, and the inventory is what the operator is about to work from.
 
 ### 6.6: HTTP Response Check
 
@@ -638,6 +737,11 @@ Admin users:  <list of admin usernames>
 Replaced:     a WordPress site was already here — "Client Demo", 47 posts
   Backup      ~/.wp-clone-backups/client-demo-20260919T161145Z.sql
               (omit this block entirely when the destination was empty)
+
+Dependencies: 2 recoverable, 2 need the client's own copies, 0 unclassified
+  Inventory   ~/.wp-clone-backups/client-demo-20260919T161145Z-dependencies.md
+  → This clone carries the database and uploads. Plugin and theme FILES were not
+    transferred; the inventory lists what to install and what cannot be obtained.
 
 Database dump:
   Path A        exported, transferred, imported and deleted from both machines
