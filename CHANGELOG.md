@@ -2,31 +2,29 @@
 
 ## [Unreleased]
 
-### Fixed
-
-- **`/wp-clone` no longer leaves a production database dump in `/tmp`.** The SSH path
-  exported the whole remote database to a fixed path, `/tmp/wp-clone-dump.sql`, on **both**
-  machines. It deleted the remote copy and never deleted the local one — so after every clone
-  a full production dump (customer records, order rows, password hashes, whatever API keys
-  live in `wp_options`) sat in `/tmp` at a predictable name, with default permissions, until
-  the machine rebooted.
-  The fixed name was two problems at once. A predictable path in a world-writable directory
-  on a **production** server is a name an unprivileged local user can wait for. And two clones
-  running at once against the same machine shared that one filename: the second export
-  overwrote the first, and the first clone then imported the second site's database into its
-  own destination with nothing to say so.
-  Both ends now use `mktemp`, and both create the dump owner-only — `umask 077` on the remote
-  export and `chmod 600` locally, set as the file is created rather than after, since a
-  `chmod` afterwards leaves a window in which the whole database already exists at the default
-  mode. **Both copies are deleted unconditionally**, the remote one whether or not the
-  transfer worked and the local one whether or not the import did: the failing run is the one
-  that leaves a dump behind, because nobody tidies up after a command that did not finish.
-  Path B's dump is left alone — the operator created it and passed it in with `--sql=`, and
-  removing someone's input because the command consumed it is not cleanup — but the summary
-  now names it as a full database export still on disk, since silence there leaves a
-  production database on the machine with nobody having mentioned it.
-
 ### Added
+
+- **`/wp-clone` inventories the plugins and themes a clone will be missing, while it can
+  still ask the source.** The clone transfers the database and `wp-content/uploads/` and
+  nothing else — plugin and theme *files* are never transferred — so the imported database
+  activates plugins whose directories are not there. WordPress deactivates each one on load
+  and falls back off the missing theme, and Steps 6.4/6.5 then "warned the user": a warning
+  with nothing actionable attached, issued after the site was already broken.
+  New Step A3.5 runs while the SSH session is open, because afterwards the source is
+  unreachable and the local database can report plugin *names* and nothing else. It splits
+  what is missing by what the operator can actually do: **recoverable** (on WordPress.org —
+  emitted as a version-pinned `wp plugin install` command), **unobtainable** (custom,
+  licensed or premium — the clone stays incomplete until someone supplies the files), and
+  **unclassified** (the WordPress.org lookup is a network call and it did not complete).
+  The third group is not collapsed into the other two: a wrong guess either sends the
+  operator to install a different plugin that happens to share a slug, or to ask a client
+  for a file they could have downloaded. Plugins already installed locally are silent.
+  The inventory is written beside the Step 1.5 backup, outside the project, because it is the
+  list the operator works through *after* the clone — once the site is up and visibly missing
+  things, by which time the terminal has scrolled. Path B derives the same report from the
+  imported database and states that it is the weaker of the two rather than presenting parity.
+  Step 6.5 now reconciles against the inventory instead of re-reporting the same missing
+  plugins as a fresh discovery.
 
 - **`/wp-clone` refuses to replace an occupied destination, and backs it up first.** The
   command ran `wp db import` against the destination on both paths with no backup, no
@@ -67,6 +65,30 @@
   precisely because a payment bug needs reproducing. The report also states plainly that real
   customer records are now on the machine. The summary always shows what was isolated and what
   remains live, never collapsed on success.
+
+### Fixed
+
+- **`/wp-clone` no longer leaves a production database dump in `/tmp`.** The SSH path
+  exported the whole remote database to a fixed path, `/tmp/wp-clone-dump.sql`, on **both**
+  machines. It deleted the remote copy and never deleted the local one — so after every clone
+  a full production dump (customer records, order rows, password hashes, whatever API keys
+  live in `wp_options`) sat in `/tmp` at a predictable name, with default permissions, until
+  the machine rebooted.
+  The fixed name was two problems at once. A predictable path in a world-writable directory
+  on a **production** server is a name an unprivileged local user can wait for. And two clones
+  running at once against the same machine shared that one filename: the second export
+  overwrote the first, and the first clone then imported the second site's database into its
+  own destination with nothing to say so.
+  Both ends now use `mktemp`, and both create the dump owner-only — `umask 077` on the remote
+  export and `chmod 600` locally, set as the file is created rather than after, since a
+  `chmod` afterwards leaves a window in which the whole database already exists at the default
+  mode. **Both copies are deleted unconditionally**, the remote one whether or not the
+  transfer worked and the local one whether or not the import did: the failing run is the one
+  that leaves a dump behind, because nobody tidies up after a command that did not finish.
+  Path B's dump is left alone — the operator created it and passed it in with `--sql=`, and
+  removing someone's input because the command consumed it is not cleanup — but the summary
+  now names it as a full database export still on disk, since silence there leaves a
+  production database on the machine with nobody having mentioned it.
 
 ## [1.19.0] - 2026-09-18
 
