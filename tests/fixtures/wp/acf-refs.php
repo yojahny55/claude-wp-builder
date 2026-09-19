@@ -126,6 +126,21 @@ t( 'nested link url re-pointed to the es counterpart',
 t( 'translated title survives the re-point',
 	isset( $after['title'] ) ? $after['title'] : null, 'Leer mas' );
 
+// The whole link array, not just its url. A review of this change read
+// pllx_acf_write() as routing a nested link through pllx_acf_set()'s `link` branch, which
+// writes only ['title'] -- and concluded the re-pointed url was silently dropped. It is
+// not: the reference pass addresses the link FIELD ('...card.more'), so the path ends at
+// that leaf and pllx_acf_descend() assigns the whole array. The `link` branch is only
+// reached when a path continues INTO the link ('...card.more.title'), which is what the
+// text pass does. Asserting all three keys here so the next reader measures it instead of
+// re-deriving it, and so an actual regression to partial writes fails loudly.
+$whole = pllx_acf_get( $tgt, 'rows.0.card.more', $src );
+t( 'the whole link array survives, not just one key',
+	array( isset( $whole['url'] ), isset( $whole['title'] ), isset( $whole['target'] ) ),
+	array( true, true, true ) );
+t( 'and its url is the re-pointed one',
+	isset( $whole['url'] ) ? $whole['url'] : null, get_permalink( $dest_es ) );
+
 $rel = pllx_acf_get( $tgt, 'rows.0.card.rel', $src );
 $rel_id = is_object( $rel ) ? (int) $rel->ID : (int) $rel;
 t( 'nested post_object re-pointed', $rel_id, $dest_es );

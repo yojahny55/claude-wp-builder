@@ -167,7 +167,7 @@ jobs:
     # same script serves a developer's docker and this, without branching on which.
     services:
       mysql:
-        image: mariadb:11
+        image: mariadb:11.4
         env:
           MARIADB_ROOT_PASSWORD: wp-fixture
         ports:

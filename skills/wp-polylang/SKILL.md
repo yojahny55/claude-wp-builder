@@ -307,7 +307,7 @@ emails. That is not content and is out of scope for content translation.
 ## ACF / SCF custom fields
 
 `pllx_acf_payload()` in `pll-lib.php` flattens a post's custom-field values to a
-dot-notation map (`pllx_acf_walk()`); `pllx_acf_write()` in `pll-import.php`
+dot-notation map (`pllx_acf_walk()`); `pllx_acf_write()` in `pll-lib.php`
 writes that map back through `update_field()`/`get_field()`. Both work against
 whatever plugin defines `get_field_objects()`, `get_field()` and
 `update_field()` — that is ACF or SCF, never both (see below).

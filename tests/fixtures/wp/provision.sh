@@ -23,6 +23,10 @@
 #   WP_FIXTURE_DB_PASS (default wp-fixture)      WP_FIXTURE_DB_NAME (default generated)
 set -euo pipefail
 
+# Pinned for the reason the plugin versions below are: an upstream release must never
+# change what a check here reports. The database is pinned to a MINOR line for the same
+# reason -- `mariadb:11` is a mutable tag, and a minor bump can move collation defaults
+# and optimizer behaviour under a suite whose whole purpose is to be reproducible.
 PINNED_WP="6.8.2"
 PINNED_POLYLANG="3.6.6"
 PINNED_SCF="6.5.0"
@@ -74,7 +78,7 @@ if ! mysqladmin -h "${DB_HOST%%:*}" -P "${DB_HOST##*:}" -u "$DB_USER" -p"$DB_PAS
     docker run -d --name "$CONTAINER" \
       -e MYSQL_ROOT_PASSWORD="$DB_PASS" \
       -p "${DB_HOST##*:}:3306" \
-      mariadb:11 >/dev/null || die "could not start the database container"
+      mariadb:11.4 >/dev/null || die "could not start the database container"
   fi
   for _ in $(seq 1 60); do
     mysqladmin -h "${DB_HOST%%:*}" -P "${DB_HOST##*:}" -u "$DB_USER" -p"$DB_PASS" ping >/dev/null 2>&1 && break
