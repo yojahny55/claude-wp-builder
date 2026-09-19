@@ -185,9 +185,36 @@ list kept anywhere else: a stored list is a second copy that goes stale, and a s
 here would report a green coverage line for checks nobody has run — the exact failure this
 diff exists to prevent, reproduced by the thing preventing it.
 
+**A check whose rule changed is a check this project has not run.** An ID is an address,
+not a version: `SEC-036` in `checks_run` said "this project measured the thing SEC-036
+named", and stayed true after SEC-036 was rewritten to look for something else. The
+project's coverage then read green for a rule it had never been measured against — the same
+failure the catalog diff above exists to prevent, one level down.
+
+So a catalog entry may carry a **revision**: `SEC-036@2`. An ID written without one is
+revision 1, which is what every existing entry and every existing `checks_run` value means,
+so nothing has to be re-tagged and no project's history is invalidated by this paragraph.
+Bump the revision when the rule changes what it would report on an unchanged site — a
+reworded finding message is not a bump, a widened pattern is.
+
+Match on ID **and** revision when diffing. A project holding `SEC-036` (revision 1) against
+a catalog offering `SEC-036@2` has not measured the current rule, and is reported as such,
+with the distinction visible so nobody reads it as a check that never ran at all:
+
+```
+  coverage    security last ran 2026-03-21; 1 check has been revised since
+              SEC-036 was measured at revision 1; the catalog is at revision 2.
+              Run: /wp-audit --security
+```
+
+Record what ran, at the revision it ran at: write `SEC-036@2` into `checks_run` when the
+catalog said `SEC-036@2`. Writing the bare ID after running a revised check is what makes
+the record lie, and it is the easy mistake here.
+
 **This is a warning, not a block.** A never-run category is blocking because nothing in it
 has been examined; a category missing two checks out of forty has been examined, just not
-completely. Both print at the top of the Step 8 report.
+completely. A revised check is the mildest of the three — the project measured *something*
+for that rule. All of them print at the top of the Step 8 report.
 
 **An absent `audit.checks_run` is not "nothing has run".** A project audited before this
 record existed has no per-check history, and reporting all 261 checks as never measured
@@ -764,7 +791,7 @@ found nothing is measured, and it is the pass that has to be distinguishable fro
 never-run. A check reported `UNMEASURED` did not execute and is not recorded, so the next
 run with the tier it needed still sees it as outstanding.
 
-Write the IDs exactly as the agent's catalog spells them (`SEC-036`, `GEO-A11`). This is the
+Write the IDs exactly as the agent's catalog spells them, revision included (`SEC-036`, `GEO-A11`, `SEC-036@2`). This is the
 record Step 2.5d diffs against the catalogs, so an id invented here becomes a check that is
 never reported missing and never reported run. `bin/wp-config.mjs validate` refuses a
 `checks_run` whose shape is wrong — a bare string instead of an array, an unknown category,

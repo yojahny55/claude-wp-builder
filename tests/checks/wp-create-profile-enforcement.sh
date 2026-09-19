@@ -19,6 +19,17 @@ grep -Fq '| Outcome | `required: true` | `required: false` |' "$c" \
 grep -Fqi 'blocks the dependent' "$c" || fail "$c does not say a required plugin failure blocks dependent steps"
 grep -Fq 'plugins.degraded' "$c" || fail "$c does not record optional failures in plugins.degraded"
 grep -Fq 'license_missing' "$c" || fail "$c does not name the licensed-plugin outcome"
+
+# license_missing used to be the single reason recorded for every supplied-package failure:
+# a licence nobody bought, a zip nobody handed over, and a zip that was handed over and
+# would not install all reported the same word. The operator reading it was sent to buy a
+# plugin they may already own, or to debug an install that never started.
+for r in package_not_supplied install_failed activation_failed; do
+  grep -Fq "$r" "$c" || fail "$c does not distinguish $r from license_missing -- three causes, three different next steps"
+done
+grep -Fq 'blocks the build' "$c" \
+  || fail "$c no longer says the new reasons still count against the entry's required flag"
+
 grep -Fq 'plugins.resolved' "$c" || fail "$c does not record resolved plugin versions"
 
 # --- The step is no longer non-critical wholesale. --------------------------

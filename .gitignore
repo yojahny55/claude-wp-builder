@@ -1,6 +1,9 @@
 # Internal design docs (specs and plans are working documents, not shipped)
 docs/superpowers/
 
+# Local improvement review report (not shipped)
+/docs/improvements-implementation-status.md
+
 # OS files
 .DS_Store
 Thumbs.db

@@ -298,9 +298,16 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   clone costs more than the case is worth — but it means "a backup was taken" is a narrower
   promise than it sounds, which is why it is written down here.
 - **A clone is isolated at the seams a copy shares with its original, not at every one.**
-  `/wp-clone` Step 5.5 captures mail at `pre_wp_mail` (a must-use plugin, so it survives a
-  plugin being reactivated and cannot be undone by an option write), disables `WP_CRON`, and
-  sets `blog_public` to `0` — before Step 6, which is the first thing that loads the site.
+  `/wp-clone` Step 5.4 captures mail at `pre_wp_mail` (a must-use plugin, so it survives a
+  plugin being reactivated and cannot be undone by an option write) and disables `WP_CRON`
+  — **before `wp db import`**, because both are files and neither needs the database. That
+  ordering is the fix for a real gap: they used to run in Step 5.5, after the import, and
+  between the two both paths ran `wp search-replace` and `wp rewrite flush` while Path B
+  also ran `wp plugin list` and `wp option list`. `rewrite flush` fires `init` with the
+  source site's plugins active, so production code had already executed against a
+  production database before the mail guard existed. The old isolation check could not see
+  it: it asserted only that isolation preceded Step 6. Step 5.5 keeps `blog_public`, which
+  genuinely has to wait — it is a `wp_options` row the import would overwrite.
   What it does **not** do is change live payment credentials, webhook URLs or API keys: it
   reports them. Flipping a gateway to test mode would change the behaviour under test, and a
   store clone often exists because a payment bug needs reproducing. The cost of that choice is
@@ -342,20 +349,37 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   problem where a duplicate *page* splits a site's navigation. Generated plates are
   unaffected: `assets/img/gen-<hash>.jpg` already carries a content hash in its path, so a
   regenerated plate is a different source and correctly imports again.
+- **The three WordPress default records are deleted only while they are still defaults.**
+  `/wp-seed` Phase 7 removes the "Hello world!" post, the sample page and the sample
+  comment — the one place the command deletes a record it does not own, since WordPress
+  ships these and they never carry the `_<prefix>_seeded_content` marker the Phase 1.5
+  rule keys off. It used to do it unconditionally with `--force` and `|| true`, which
+  permanently destroyed a sample page an editor had repurposed into About, on that site's
+  second seed run, and hid that it had. Each delete is now gated on the original slug and
+  on `post_modified` still equalling `post_date`, and a record that fails either test is
+  reported as kept. The ceiling that remains is narrow: an editor who changes a default
+  and changes it back reads as untouched.
 - **Seeded menu items are rebuilt, not reconciled.** Every other record `/wp-seed` owns is
   updated in place; menu items are deleted and re-added, because a demo whose navigation
   dropped a page would otherwise leave that item behind forever, and matching an existing
   item to a demo link is guesswork the moment a title is edited. Items the client added are
   kept. The cost is that a seeded item's own ID changes on every run, so nothing may hold a
   reference to one.
-- **A resumed `/wp-yolo` trusts that a present artifact is a correct artifact.**
-  `--resume` skips a unit when `demo/.yolo-progress.json` records it *and* its file is
-  still on disk and non-empty. A template part that a failed agent left syntactically
-  valid but wrong is indistinguishable from a good one at that granularity, and is
-  skipped. The Step 5.5 parity gate is the net under it, and it measures geometry at
-  rest — not behaviour, and not whether a section says what the demo said. Deliberate:
-  the alternative is re-verifying every completed unit on every resume, which costs
-  what the resume was meant to save.
+- **A resumed `/wp-yolo` trusts that its own output was correct output.** The ledger
+  records a `sha256` of each artifact as it was written, so `--resume` now distinguishes
+  three states where it used to see two: the file matches what this command wrote (skip
+  it), the file differs (someone edited it afterwards — reported as a list, with
+  `--skip`/`--rebuild` per unit, never silently replaced or silently kept), or it is
+  absent (build it). What the digest cannot see is a template part that a failed agent
+  wrote *wrongly but completely*: the ledger digested exactly that file, so it matches
+  itself and is skipped. The Step 5.5 parity gate is the net under that one, and it
+  measures geometry at rest — not behaviour, and not whether a section says what the demo
+  said. Deliberate: the alternative is re-verifying every completed unit on every resume,
+  which costs what the resume was meant to save.
+  Two things the ledger still does not do, both larger than a field: it does not model
+  which manifest key feeds which unit, so there is no dependency-aware selective rebuild
+  (`--accept-drift` permits continuation; it does not scope one), and it records no
+  database mutations, so recovery covers files only.
 - **`settings` is recorded, not verified.** `/wp-settings` writes nine or so WordPress
   options and produces no single file, so its ledger entry carries `artifact: null` and
   is trusted on the ledger alone. A probe asserting one option out of nine would read
@@ -560,6 +584,14 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   nobody ran — the defect the diff exists to prevent. A project with no `checks_run` yet
   reports its per-check history as unknown rather than reporting all 261 checks as
   never-measured.
+  **A check id now carries an optional revision** (`SEC-036@2`), because an id is an
+  address and not a version: a project holding `SEC-036` stayed "covered" after SEC-036 was
+  rewritten to look for something else, which is this same diff's failure mode one level
+  down. A bare id means revision 1 — what every id written before this meant — so no
+  history is invalidated and nothing has to be re-tagged; bump only when the rule changes
+  what it would report on an unchanged site. What this does not do is *detect* a rule
+  change: the bump is an author's deliberate act, and a rewritten check whose author
+  forgot to bump it reads as covered exactly as before.
   Findings now carry identity too: Step 7.5 keys each one by **check id + resource** in
   `.wp-audit-findings.json`, beside the manifest rather than inside it — the manifest is
   configuration every command parses on every run, and a ledger grows without bound (one

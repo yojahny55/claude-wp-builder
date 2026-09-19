@@ -10,9 +10,9 @@ import {
 } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import {
-  CURRENT_VERSION, MANIFEST_NAME, LOCAL_NAME, detectVersion, validateManifest, migrateManifest,
+  CURRENT_VERSION, MANIFEST_NAME, LOCAL_NAME, detectVersion, versionProblem, validateManifest, migrateManifest,
   renderContext, spliceContext, contextDrift, resolveSecret, getKey, SECRETS, validateProfile,
-  supersedeProseDecisions,
+  supersedeProseDecisions, testedVerdicts,
 } from './lib/manifest.mjs';
 
 const say = (s) => console.log(s);
@@ -81,6 +81,14 @@ function cmdValidate(projectPath) {
 
 function cmdMigrate(projectPath) {
   const { file, manifest } = loadManifest(projectPath);
+  // Before detectVersion, because detectVersion reads a malformed version as "absent",
+  // and absent means legacy 1 -- so `"manifest_version": "99"` would migrate a manifest
+  // from a future plugin down to this one's shape. Refuse it as malformed instead.
+  const badVersion = versionProblem(manifest);
+  if (badVersion) {
+    warn(`invalid: ${badVersion}`);
+    process.exit(1);
+  }
   const version = detectVersion(manifest);
   if (version > CURRENT_VERSION) {
     warn(`manifest_version ${version} is newer than this plugin understands (${CURRENT_VERSION}); leaving it untouched`);
@@ -195,6 +203,15 @@ function cmdValidateProfile(file) {
     process.exit(1);
   }
   const problems = validateProfile(profile);
+  // An optional WordPress version turns this from "is the profile well-formed" into "does
+  // it claim to work here". Step 4.10 passes the site's own version, so a plugin whose
+  // tested range does not cover it is reported before it is installed rather than after
+  // something breaks. Reported, not refused: a plugin outside its tested range usually
+  // works, and blocking a build on a readme header would be worse than saying so.
+  const wpVersion = process.argv[4];
+  if (wpVersion) {
+    for (const line of testedVerdicts(profile, wpVersion)) warn(`tested: ${line}`);
+  }
   if (problems.length) {
     for (const p of problems) warn(`invalid: ${p}`);
     process.exit(1);
@@ -209,6 +226,6 @@ else if (cmd === 'render-context' && target) cmdRenderContext(target);
 else if (cmd === 'get' && target && process.argv[4]) cmdGet(target, process.argv[4]);
 else if (cmd === 'validate-profile' && target) cmdValidateProfile(target);
 else {
-  warn('usage: wp-config.mjs <validate|migrate|render-context|get|validate-profile> <project-path> [key]');
+  warn('usage: wp-config.mjs <validate|migrate|render-context|get|validate-profile> <project-path> [key|wp-version]');
   process.exit(1);
 }

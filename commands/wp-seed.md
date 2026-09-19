@@ -765,13 +765,54 @@ bash -c "$WP cache flush"
 
 ### Delete default WordPress content
 
-Remove the default "Hello World" post, sample page, and sample comment if they still exist:
+Remove the default "Hello World" post, sample page, and sample comment — **but only
+while they are still untouched defaults.**
+
+These three are the one place this command deletes a record it does not own. Every other
+record follows the Phase 1.5 rule: no `_<prefix>_seeded_content` marker means the client
+owns it, leave it alone. WordPress ships these three, so they never carry the marker and
+never will — which is why the rule has to be spelled differently for them rather than
+skipped.
+
+Repurposing the sample page is ordinary: it arrives at ID 2 with the slug `sample-page`,
+and an editor turns it into About instead of deleting it and making a new one. An
+unconditional `wp post delete 2 --force` on that site's second seed run destroys it
+permanently — `--force` bypasses the trash, and the `|| true` that used to be here hid
+that anything had happened. So each delete is gated on two signals that a shipped default
+is still one: the original slug, and a `post_modified` still equal to `post_date`. An
+edited slug or an edited body keeps the record.
 
 ```bash
-bash -c "$WP post delete 1 --force 2>/dev/null || true"
-bash -c "$WP post delete 2 --force 2>/dev/null || true"
-bash -c "$WP comment delete 1 --force 2>/dev/null || true"
+bash -c "
+for PAIR in '1:hello-world' '2:sample-page'; do
+  ID=\${PAIR%%:*}; WANT=\${PAIR#*:}
+  SLUG=\$($WP post get \$ID --field=post_name 2>/dev/null) || continue
+  CREATED=\$($WP post get \$ID --field=post_date)
+  TOUCHED=\$($WP post get \$ID --field=post_modified)
+  if [ \"\$SLUG\" = \"\$WANT\" ] && [ \"\$CREATED\" = \"\$TOUCHED\" ]; then
+    $WP post delete \$ID --force && echo \"deleted default post \$ID (\$WANT)\"
+  else
+    echo \"KEPT post \$ID: not an untouched default (slug=\$SLUG) -- the client owns it\"
+  fi
+done
+"
 ```
+
+The sample comment is gated the same way, on the author WordPress ships it with:
+
+```bash
+bash -c "
+AUTHOR=\$($WP comment get 1 --field=comment_author 2>/dev/null) || exit 0
+if [ \"\$AUTHOR\" = 'A WordPress Commenter' ]; then
+  $WP comment delete 1 --force && echo 'deleted default comment 1'
+else
+  echo \"KEPT comment 1: author is '\$AUTHOR', not the WordPress default -- the client owns it\"
+fi
+"
+```
+
+Every `KEPT` line belongs in the Phase 8 report beside the field conflicts: a default that
+survived is a record this command decided not to touch, which is the same kind of fact.
 
 ### Set timezone
 

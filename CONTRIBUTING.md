@@ -50,7 +50,7 @@ claude plugins add ./
 | `skills/` | Knowledge libraries referenced by agents (not user-invocable) |
 | `starter-theme/` | PHP theme template copied per project |
 | `templates/` | Environment configs and plugin profiles |
-| `bin/` | Shell utilities |
+| `bin/` | Shell wrappers (`*.sh`) and the Node tools commands run and gate on (`*.mjs`) |
 
 ## How to Contribute
 
@@ -58,7 +58,7 @@ claude plugins add ./
 
 ```
 /wp-contribute new command wp-foo   # the file + its check + its README and docs rows
-/wp-contribute check                # the 38 checks, plus the doc-sync gate
+/wp-contribute check                # every tests/checks/*.sh, plus the doc-sync gate
 /wp-contribute pr                   # branch, conventional commit, house PR body
 ```
 

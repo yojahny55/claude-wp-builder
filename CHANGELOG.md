@@ -2,6 +2,68 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`/wp-seed` no longer deletes a repurposed sample page.** Phase 7 removed WordPress's
+  default post, sample page and sample comment with `wp post delete <id> --force
+  2>/dev/null || true` — unconditional, permanent, and silent. Turning the sample page into
+  About is ordinary, and that line destroyed it on the site's second seed run. Each delete
+  is now gated on the record still being an untouched default: the original slug, and a
+  `post_modified` still equal to `post_date`. Anything else is reported as kept.
+  `tests/checks/wp-seed-default-cleanup.sh` extracts the shipped block and runs it against
+  a stub `wp` across five scenarios, because a grep could not have seen this.
+- **`/wp-clone` isolates the clone before anything boots WordPress.** The mail-capture
+  mu-plugin and `DISABLE_WP_CRON` ran in Step 5.5, *after* the import — and between the two,
+  both paths ran `wp search-replace` and `wp rewrite flush` while Path B also ran `wp plugin
+  list` and `wp option list`. `rewrite flush` fires `init` with the source site's plugins
+  active, so production code executed against a production database before the mail guard
+  existed. Both measures are files, need no database and survive the import, so they move to
+  a new Step 5.4 ahead of it. `blog_public` stays in 5.5: it is a `wp_options` row the
+  import would overwrite. The old check asserted only that isolation preceded Step 6, which
+  is why it never saw this.
+- **The manifest validator checks types, not only presence.** `wp_cli.wrapper: []` and
+  `wordpress.url: {}` satisfied "required" and reached a shell command and a search-replace
+  respectively. Every required field must now be a string.
+- **A malformed `manifest_version` is refused instead of read as legacy.**
+  `Number.isInteger("99")` is false, so a manifest declaring version `"99"` was treated as
+  *absent*, absent means version 1, and a future plugin's manifest was offered for migration
+  down to this one. A pair of quotes defeated the future-version guard. `versionProblem()`
+  is checked by both `validate` and `migrate`.
+- **CONTRIBUTING.md stopped advertising "the 38 checks"** (there are 127) and stopped
+  describing `bin/` as shell-only. The count is now named as a glob so it cannot go stale
+  again, and `tests/checks/contributor-docs.sh` fails on a literal count.
+
+### Changed
+
+- **CI counts a skipped check as skipped.** The contract job aggregated exit 0 and called
+  the total PASS, so three checks that decline without an optional dependency —
+  `wp-polylang-live.sh`, `craft-kit-sync.sh`, `wp-library.sh` — were counted as measured.
+  The summary now reads `PASS=n SKIP=n FAIL=n` and names the skipped ones. They remain
+  non-fatal; they are simply no longer counted as coverage.
+- **A profile's `tested` key means something.** It was allowed, unvalidated and unread, so
+  `tested: 42` passed. It now holds a WordPress version or inclusive range (`6.4`, `6.4.2`,
+  `6.0 - 6.6`), and `wp-config.mjs validate-profile <file> <wp-version>` reports every entry
+  the installed WordPress falls outside of — reported, not refused, because a plugin outside
+  its tested range usually works.
+- **A supplied package's failure says which failure it was.** `license_missing` covered a
+  licence nobody bought, a zip nobody handed over, and a zip that would not install — three
+  different next steps under one word. `package_not_supplied`, `install_failed` and
+  `activation_failed` join it; all four still count against the entry's `required` flag.
+- **The `/wp-yolo` ledger records what it wrote, and survives the build.** `version: 2` adds
+  a `sha256` of each artifact as written, so a resume distinguishes its own output from a
+  file edited afterwards and reports the edits as one list with `--skip`/`--rebuild` per
+  unit instead of silently replacing them; a `plugin_version` separate from the ledger's
+  format version; and a `completed` stamp that replaces deleting the file on success — the
+  refusal the deletion used to provide is kept, and the build record now survives for later
+  update work. A `--force` rebuild still deletes it.
+- **An audit check ID can carry a revision.** `SEC-036@2`. An ID is an address, not a
+  version: a project holding `SEC-036` stayed "covered" after SEC-036 was rewritten to look
+  for something else. A bare ID means revision 1, so no project's history is invalidated and
+  nothing has to be re-tagged.
+- **Every open, partial and blocked `BACKLOG.md` entry names an owning implementation or
+  says that none exists yet**, enforced by `tests/checks/backlog-ownership.sh`. Five entries
+  did neither, and a reader could not tell an incomplete owner from an absent one.
+
 ### Added
 
 - **`WP-048` — IDs that outlive the post they point at.** Deleting a post from wp-admin does
