@@ -186,7 +186,7 @@ bash -c "$WP rewrite flush"
 bash -c "bash ${CLAUDE_PLUGIN_ROOT}/bin/wp-env-setup.sh permissions --path=/local/path"
 ```
 
-Skip to **Step 6: Post-Clone Verification**.
+Skip to **Step 5.5: Isolate the Clone**.
 
 ---
 
@@ -298,7 +298,114 @@ bash -c "$WP cache flush"
 bash -c "$WP rewrite flush"
 ```
 
-Skip to **Step 6: Post-Clone Verification**.
+Skip to **Step 5.5: Isolate the Clone**.
+
+---
+
+## Step 5.5: Isolate the Clone
+
+**Both paths arrive here, and nothing may load the site before this step runs.** Step 6
+below loads WordPress and then tells the operator to go visit it — that page load is the
+moment an uncontained clone acts, and by then every send is already out.
+
+A clone carries the source site's whole configuration: its mail settings, its payment
+credentials, its webhook URLs, its scheduled jobs. None of that knows it has been copied.
+Everything up to this point has faithfully reproduced a production site on a machine that
+is not production, and reproducing it faithfully is exactly the problem.
+
+### 5.5.1: Stop outbound mail
+
+Write `wp-content/mu-plugins/00-clone-isolation.php` in the clone (create `mu-plugins/`
+if absent):
+
+```php
+<?php
+/**
+ * CLONE ISOLATION — delete this file if this site ever becomes real.
+ *
+ * Written by /wp-clone. This site is a copy of another one and must not act
+ * on its behalf. Mail is captured to wp-content/clone-mail.log instead of sent.
+ */
+defined( 'ABSPATH' ) || exit;
+
+add_filter( 'pre_wp_mail', function ( $null, $atts ) {
+    $to = is_array( $atts['to'] ) ? implode( ', ', $atts['to'] ) : (string) $atts['to'];
+    error_log(
+        sprintf( "[%s] BLOCKED to=%s subject=%s\n", gmdate( 'c' ), $to, (string) $atts['subject'] ),
+        3,
+        WP_CONTENT_DIR . '/clone-mail.log'
+    );
+    return true; // reported to the caller as sent; nothing leaves the machine
+}, 0, 2 );
+```
+
+**`pre_wp_mail` is the right seam, and a mail plugin is not.** Every sender — core password
+resets and new-user notices, WooCommerce order and subscription mail, Contact Form 7 —
+goes through `wp_mail()`, and this filter short-circuits all of them at once. Disabling an
+SMTP plugin instead does not stop sending: core falls back to PHP `mail()`, so the site
+keeps mailing and merely stops logging it where anyone would look.
+
+Returning `true` matters as much as intercepting. `wp_mail()` reports success to its caller,
+so WooCommerce marks the order email sent and does not retry, and no plugin enters a failure
+path that a real send would never have triggered. The clone behaves like the original
+everywhere except at the wire.
+
+A **must-use** plugin, because it cannot be deactivated from wp-admin, survives any plugin
+being reactivated, and cannot be undone by an option write. Its filename sorts first and its
+header says what it is, so nobody mistakes it for part of the site.
+
+### 5.5.2: Stop scheduled jobs
+
+```bash
+bash -c "$WP config set DISABLE_WP_CRON true --raw --type=constant"
+```
+
+WordPress spawns cron on page loads. On a store clone the due queue is the source site's:
+subscription renewals, abandoned-cart mail, scheduled publishes — all of them wanting to run
+against whatever integrations the database still points at. `/wp-debug` already reports this
+constant, so the state is visible afterwards.
+
+### 5.5.3: Keep it out of search results
+
+```bash
+bash -c "$WP option update blog_public 0"
+```
+
+### 5.5.4: Report live integrations — do not silently change them
+
+Search the clone for credentials and endpoints that still address production, and **report
+what is found without editing it**:
+
+```bash
+bash -c "$WP option list --search='*_webhook*' --format=table"
+bash -c "$WP option list --search='*_live_*' --format=table"
+bash -c "$WP plugin list --status=active --field=name | grep -iE 'stripe|paypal|woocommerce|mailchimp|zapier'"
+```
+
+Report each finding as: what it is, where it lives, and what it still points at.
+
+**Reporting is the action here.** Flipping a gateway into test mode would change the
+behaviour under test, and a clone of a store usually exists *because* something about
+payment needs reproducing — a silent switch makes that bug disappear and wastes the session
+that was meant to find it. Silent edits also hide the far more serious fact the operator
+needs to hold: a database on this machine contains live credentials. What to do about that
+is a decision, not a default. Say what is live, and let the operator choose.
+
+The one thing not to leave to a decision is **real customer data**, which is already on the
+disk by the time this step runs. Say so plainly in the report; opt-in anonymisation is a
+separate operation, not something to infer.
+
+### 5.5.5: Confirm the isolation took
+
+```bash
+bash -c "test -f wp-content/mu-plugins/00-clone-isolation.php && echo 'mail: captured' || echo 'mail: NOT ISOLATED'"
+bash -c "$WP eval \"echo defined('DISABLE_WP_CRON') && DISABLE_WP_CRON ? 'cron: disabled' : 'cron: STILL RUNNING';\""
+bash -c "$WP option get blog_public"
+```
+
+**Any line reporting a failure stops the clone here.** Do not continue to Step 6, which loads
+the site. A clone that cannot be isolated is not a clone that should be opened, and the
+honest report is that it is unsafe to visit — not a summary with a warning buried in it.
 
 ---
 
@@ -373,8 +480,24 @@ DB replaced:  <old-domain> → <new-domain>
 Uploads:      <synced | extracted | skipped>
 Admin users:  <list of admin usernames>
 
+Isolation:
+  Mail          captured to wp-content/clone-mail.log (mu-plugins/00-clone-isolation.php)
+  Cron          disabled (DISABLE_WP_CRON)
+  Indexing      discouraged (blog_public = 0)
+
+Still live — reported, not changed:
+  - woocommerce_stripe_settings holds a live secret key (option: woocommerce_stripe_settings)
+  - 2 webhooks still point at <old-domain> (options: *_webhook_url)
+  - This database holds real customer records: 1,284 orders, 903 customer accounts.
+  → These are decisions, not defaults. Nothing above was edited.
+
 Next steps:
   - Visit <local-url> to verify the site
   - Visit <local-url>/wp-admin/ to log in
   - Run /wp-debug if you encounter any issues
+  - Delete wp-content/mu-plugins/00-clone-isolation.php if this site ever becomes real
 ```
+
+The isolation block is **not** optional and **not** collapsed to one line when everything
+succeeded. An operator who cannot see that mail is captured has no reason to believe it is,
+and the one time it silently failed is the run where that line mattered.
