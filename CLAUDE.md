@@ -132,6 +132,15 @@ The Polylang path is real code with real failure modes: translations join throug
 local `$args` into `$GLOBALS` — the scripts do not work without that require. PHP 7.4 floor:
 no `match`, no union types.
 
+`pll-lib.php` is also the one place in this repo where a test runs real shipped logic
+instead of grepping a contract. Its top-level code is all `if (!defined(...))` guards that
+call nothing from WordPress, and the ACF path walker and resolver inside it are pure array
+manipulation, so `tests/checks/wp-polylang-nesting.sh` requires the file under bare PHP and
+asserts on what the walker emits and where the resolver places a value. Keep those two
+functions free of WordPress calls: `pllx_acf_write()` is the wrapper that reaches
+`get_field()`/`update_field()`, and it stays in `pll-import.php`, which cannot be required
+at all because it runs a whole import at top level.
+
 ### Craft vs plain is a recorded decision
 
 `/wp-demo` (and `/wp-yolo`) choose craft or plain mode from the project's docs and write the
@@ -302,9 +311,18 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
 - **Media is not translated.** The Polylang importer copies an image or file id to the counterpart
   as-is rather than swapping it for that attachment's own translation. Mapping media is a separate
   decision; `pll-import.php` and the live suite both state the ceiling.
-- **ACF reference re-pointing is one level deep.** `link`, `page_link`, `post_object` and
-  `relationship` are re-pointed only as top-level fields, matching `pllx_acf_walk()`'s own ceiling.
-  The same field nested inside a repeater or flexible-content row keeps pointing at the source.
+- **ACF reference re-pointing is one level deep, and the text walk no longer is.** `link`,
+  `page_link`, `post_object` and `relationship` are re-pointed only as top-level fields;
+  the same field nested inside a group, repeater or flexible-content row keeps pointing at
+  the source. This used to be justified as matching `pllx_acf_walk()`'s own ceiling. It no
+  longer is: the walker now carries text to any depth, so a **nested `link` gets a
+  translated title on a URL still pointing at the source language.** Before, neither half
+  happened and the link was visibly untranslated; now it reads as translated and goes to
+  the wrong language — the worse failure, and the reason it is written here rather than
+  left to be discovered. Closing it means recursing `pllx_repoint_acf_refs()` and re-keying
+  its `_pll_ref_` ownership meta by dotted path rather than by field name, which is its own
+  unit of work. `pllx_acf_set()` and `pllx_acf_zip()` in `pll-lib.php` are the pieces it
+  would reuse.
 - **Parent structure mirrors the source.** Both parent fixup passes rewrite the counterpart's parent
   on every run, so a post or term an editor deliberately re-parented in the target language is put
   back. Only the ACF reference pass records ownership; parents do not.

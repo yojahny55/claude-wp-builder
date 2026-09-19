@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Polylang translation payloads stopped at one level of ACF nesting, so a group inside a
+  repeater, or anything below it, was never sent for translation — no error, and a
+  counterpart that read as translated because its top-level fields were. `pllx_acf_walk()`
+  now recurses to any depth, and a flexible-content row's layout is matched by name through
+  the same helper the writer uses, so the two cannot drift on how a row is identified.
+- `pllx_acf_write()` resolved a dotted path by counting its dots — one part a plain field,
+  two a group, three a repeater row. That was correct only while nesting stopped at one
+  level. With nesting walked, `a.b.c` is a repeater row's field when `a` is a repeater and a
+  group's group's field when `a` is a group, and the old reading did `(int) 'b'` → `0` and
+  wrote the translation into row 0 of a field with no rows. It also had no branch beyond
+  three parts and no `else`, so a deeper key wrote nothing and said nothing. Paths are now
+  resolved against the field definition, and a path that does not match the structure is
+  reported and skipped rather than written to a guessed location.
+
+  The path resolver moved to `pll-lib.php` and touches no WordPress function, so
+  `tests/checks/wp-polylang-nesting.sh` executes it: the first check in this suite that
+  runs shipped logic rather than grepping a contract. Seven deliberate regressions —
+  including reverting the recursion and restoring the dot-count reading — were each
+  confirmed to fail it.
+
+  One consequence is recorded rather than fixed: `pllx_repoint_acf_refs()` is still
+  top-level only, so a nested `link` now receives a translated title on a URL that still
+  points at the source language.
+
 ## [1.21.0] - 2026-09-19
 
 ### Added

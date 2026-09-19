@@ -839,80 +839,62 @@ pllx_info( sprintf( 'Fixed %d parent-child relationship(s).', $parents_fixed ) )
 pllx_info( sprintf( 'Fixed %d term parent relationship(s).', $term_parents_fixed ) );
 pllx_info( sprintf( 'Copied %d untranslated ACF value(s) to new counterparts.', $acf_copied ) );
 
+// pllx_acf_set(), pllx_acf_descend() and pllx_acf_layout_subs() live in
+// pll-lib.php. They resolve a dotted path against a field definition and touch
+// no WordPress function, which is what lets tests/checks/wp-polylang-nesting.sh
+// execute them under bare PHP -- this file cannot be required at all, because
+// it runs a whole import at top level. pllx_acf_write() above is the WordPress
+// half and stays here.
+
 /**
- * Write one flattened ACF value back.
+ * Write one translated value back to its dotted path.
  *
- * Dot notation mirrors pllx_acf_walk(): `name`, `group.sub`, `repeater.0.sub`,
- * and, since Task 8, `flex_field.0.sub` for flexible-content rows -- the two
- * share the same 3-part shape and this function does not distinguish them.
+ * The path is resolved against the field STRUCTURE, never against the number
+ * of dots in it. That distinction is the whole function: with nesting walked
+ * to any depth, "a.b.c" is a repeater row's field when `a` is a repeater and a
+ * group's group's field when `a` is a group, and the two need opposite
+ * handling. The previous version branched on `count($parts)` -- 1 plain, 2
+ * group, 3 repeater row -- which was correct only while the walker stopped at
+ * one level. Against a group inside a group it would have read "b" as a row
+ * index, and `(int) 'b'` is 0, so the translation landed in row 0 of a field
+ * that has no rows. It also had no branch at all beyond 3 parts, and no else:
+ * a deeper key wrote nothing and reported nothing.
  *
- * $post_id and $source_id are both plain ACF post-id contexts -- a numeric
- * post ID, or any of ACF's string contexts ("options", "user_N", and the
- * "<taxonomy>_<term_id>" form used for a term, per pllx_acf_copy_untranslated_term()'s
- * comment above). This function never inspects either value, only hands it
- * straight to get_field()/update_field(), so whatever context resolves the
- * target resolves the source the same way.
- *
- * $source_id is the SOURCE side (its field-having-been-walked side), used
- * only to backfill a flexible-content row's `acf_fc_layout` on first write --
- * see the comment in the 3-part branch below. Optional and unused by the
- * other branches; omit it where the caller has no source context (there is
- * currently no such caller, but the parameter defaults to 0 rather than being
- * required so a future caller without a source context does not have to fake one).
+ * $source_id is walked in parallel with the target, and is needed for exactly
+ * one thing: a flexible-content row being created for the first time has no
+ * `acf_fc_layout` tag, SCF silently drops a row that lacks one, and the source
+ * post is the only other place that still knows which layout that row is --
+ * pllx_acf_walk() deliberately never emits `acf_fc_layout` as translatable.
  */
 function pllx_acf_write( $post_id, $dotted, $value, $source_id = 0 ) {
 	$parts = explode( '.', $dotted );
+	$top   = array_shift( $parts );
 
-	if ( 1 === count( $parts ) ) {
-		update_field( $parts[0], $value, $post_id );
+	if ( ! $parts ) {
+		update_field( $top, $value, $post_id );
 		return;
 	}
 
-	if ( 2 === count( $parts ) ) {
-		$group = get_field( $parts[0], $post_id );
-		if ( ! is_array( $group ) ) {
-			$group = array();
-		}
-		$group[ $parts[1] ] = $value;
-		update_field( $parts[0], $group, $post_id );
+	$def = function_exists( 'get_field_object' ) ? get_field_object( $top, $post_id ) : null;
+	if ( ! is_array( $def ) || ! isset( $def['type'] ) ) {
+		// No definition to resolve against. Writing anyway would mean
+		// guessing the shape, which is the defect this function exists to
+		// remove; say so instead of writing something arbitrary.
+		pllx_warn( "skipped $dotted: no field definition for '$top' on post $post_id" );
 		return;
 	}
 
-	if ( 3 === count( $parts ) ) {
-		$rows = get_field( $parts[0], $post_id );
-		if ( ! is_array( $rows ) ) {
-			$rows = array();
-		}
-		$i = (int) $parts[1];
-		if ( ! isset( $rows[ $i ] ) || ! is_array( $rows[ $i ] ) ) {
-			$rows[ $i ] = array();
-		}
-		$rows[ $i ][ $parts[2] ] = $value;
+	$node = get_field( $top, $post_id );
+	if ( ! is_array( $node ) ) {
+		$node = array();
+	}
+	$src = $source_id ? get_field( $top, $source_id ) : null;
 
-		// A repeater row is a plain associative array and tolerates being
-		// built up one key at a time by this read-modify-write. A
-		// flexible-content row is not: it also needs its `acf_fc_layout` tag
-		// to say which layout it is, and SCF silently drops a row that lacks
-		// it -- verified empirically (writing a brand-new flexible-content
-		// row through this branch without the tag left the whole field
-		// empty on write). A row the target ALREADY has keeps its own
-		// `acf_fc_layout` untouched by the three lines above, since only
-		// $parts[2] is ever set on it; only a row being created for the
-		// first time (a brand-new translation counterpart) has none, so
-		// backfill it from the corresponding row on the SOURCE post -- the
-		// only other place that still identifies the row's layout, since
-		// pllx_acf_walk() deliberately never emits `acf_fc_layout` as a
-		// translatable key.
-		if ( ! isset( $rows[ $i ]['acf_fc_layout'] ) && $source_id ) {
-			$source_rows = get_field( $parts[0], $source_id );
-			if ( is_array( $source_rows ) && isset( $source_rows[ $i ]['acf_fc_layout'] ) ) {
-				$rows[ $i ]['acf_fc_layout'] = $source_rows[ $i ]['acf_fc_layout'];
-			}
-		}
-
-		update_field( $parts[0], $rows, $post_id );
+	if ( pllx_acf_set( $node, $def, $parts, $value, is_array( $src ) ? $src : array(), $dotted ) ) {
+		update_field( $top, $node, $post_id );
 	}
 }
+
 
 /**
  * Resolve $href to its $target_lang counterpart's permalink if it is a

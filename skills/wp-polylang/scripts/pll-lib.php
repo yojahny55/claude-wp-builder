@@ -143,11 +143,13 @@ function pllx_term_payload( $term_id, $taxonomy ) {
  * comment used to assert that copy happened without any code doing it, so a
  * new counterpart came out with its text filled in and everything else blank.
  *
- * Ceiling: one level of nesting inside groups, repeaters and flexible-content
- * layouts. Deeper structures (a group nested inside a repeater or a
- * flexible-content layout, etc.) are not walked. `clone` fields are
- * deliberately never walked as their own type -- see the comment at the end
- * of pllx_acf_walk() for why. Widen pllx_acf_walk() if a project needs more.
+ * Nesting is walked to any depth: a group inside a repeater, a repeater
+ * inside a flexible-content layout, and so on. It used to stop at one level,
+ * which dropped the deeper text silently -- no error, and a counterpart that
+ * looked translated because its top-level fields were.
+ *
+ * `clone` fields are deliberately never walked as their own type -- see the
+ * comment at the end of pllx_acf_walk() for why.
  */
 function pllx_acf_payload( $post_id ) {
 	if ( ! function_exists( 'get_field_objects' ) ) {
@@ -162,17 +164,29 @@ function pllx_acf_payload( $post_id ) {
 	return $out;
 }
 
-function pllx_acf_walk( $objects, &$out ) {
+/**
+ * Walk a set of ACF field objects, emitting translatable text by dotted path.
+ *
+ * $prefix is the dotted path of the container this call is walking inside,
+ * empty at the top level. Recursion carries it down, so a text field three
+ * containers deep comes out as "sections.0.cta.label" and addresses itself.
+ *
+ * The recursion follows VALUES, not definitions: a container contributes
+ * nothing when its value is absent, so the walk is bounded by the data on the
+ * post and cannot loop even if a field group referenced itself.
+ */
+function pllx_acf_walk( $objects, &$out, $prefix = '' ) {
 	$text = array( 'text', 'textarea', 'wysiwyg' );
 
 	foreach ( $objects as $name => $obj ) {
 		$type = isset( $obj['type'] ) ? $obj['type'] : '';
 		$val  = isset( $obj['value'] ) ? $obj['value'] : null;
 		$subs = isset( $obj['sub_fields'] ) && is_array( $obj['sub_fields'] ) ? $obj['sub_fields'] : array();
+		$key  = '' === $prefix ? (string) $name : $prefix . '.' . $name;
 
 		if ( in_array( $type, $text, true ) ) {
 			if ( is_string( $val ) && '' !== $val ) {
-				$out[ $name ] = $val;
+				$out[ $key ] = $val;
 			}
 			continue;
 		}
@@ -180,25 +194,18 @@ function pllx_acf_walk( $objects, &$out ) {
 		// A `link` field's `title` is translatable text; its `url` is a
 		// reference and is re-pointed by the link-rewrite pass in
 		// pll-import.php instead (pllx_repoint_acf_refs()), never walked
-		// here. `name.title` is written back through the same 2-part
-		// (group-shaped) branch of pllx_acf_write() that already
-		// read-modify-writes a `link` array's `title` key without
-		// disturbing `url`/`target`.
+		// here. At the top level this emits "name.title"; nested, it emits
+		// the container path plus ".title", and pllx_acf_write() resolves
+		// either by structure rather than by counting the dots.
 		if ( 'link' === $type && is_array( $val ) ) {
 			if ( isset( $val['title'] ) && is_string( $val['title'] ) && '' !== $val['title'] ) {
-				$out[ "$name.title" ] = $val['title'];
+				$out[ "$key.title" ] = $val['title'];
 			}
 			continue;
 		}
 
 		if ( 'group' === $type && is_array( $val ) ) {
-			foreach ( $subs as $sub ) {
-				$sname = $sub['name'];
-				if ( in_array( $sub['type'], $text, true )
-					&& isset( $val[ $sname ] ) && is_string( $val[ $sname ] ) && '' !== $val[ $sname ] ) {
-					$out[ "$name.$sname" ] = $val[ $sname ];
-				}
-			}
+			pllx_acf_walk( pllx_acf_zip( $subs, $val ), $out, $key );
 			continue;
 		}
 
@@ -207,46 +214,21 @@ function pllx_acf_walk( $objects, &$out ) {
 				if ( ! is_array( $row ) ) {
 					continue;
 				}
-				foreach ( $subs as $sub ) {
-					$sname = $sub['name'];
-					if ( in_array( $sub['type'], $text, true )
-						&& isset( $row[ $sname ] ) && is_string( $row[ $sname ] ) && '' !== $row[ $sname ] ) {
-						$out[ "$name.$i.$sname" ] = $row[ $sname ];
-					}
-				}
+				pllx_acf_walk( pllx_acf_zip( $subs, $row ), $out, "$key.$i" );
 			}
 			continue;
 		}
 
 		if ( 'flexible_content' === $type && is_array( $val ) ) {
-			$layouts = isset( $obj['layouts'] ) && is_array( $obj['layouts'] ) ? $obj['layouts'] : array();
 			foreach ( $val as $i => $row ) {
 				if ( ! is_array( $row ) || ! isset( $row['acf_fc_layout'] ) ) {
 					continue;
 				}
-				// Match the row's layout name (NOT its key) against the field
-				// object's layouts to find that layout's sub_fields.
-				$layout_subs = array();
-				foreach ( $layouts as $layout ) {
-					if ( isset( $layout['name'] ) && $layout['name'] === $row['acf_fc_layout'] ) {
-						$layout_subs = isset( $layout['sub_fields'] ) && is_array( $layout['sub_fields'] ) ? $layout['sub_fields'] : array();
-						break;
-					}
-				}
-				foreach ( $layout_subs as $sub ) {
-					$sname = $sub['name'];
-					// acf_fc_layout is the machine identifier that names the
-					// row's layout; it is never translatable and must never
-					// be keyed here even if a layout happened to define a
-					// sub_field with that name.
-					if ( 'acf_fc_layout' === $sname ) {
-						continue;
-					}
-					if ( in_array( $sub['type'], $text, true )
-						&& isset( $row[ $sname ] ) && is_string( $row[ $sname ] ) && '' !== $row[ $sname ] ) {
-						$out[ "$name.$i.$sname" ] = $row[ $sname ];
-					}
-				}
+				// Matched by layout NAME, not by key, through the same
+				// helper the writer uses -- two copies of this rule is two
+				// places for a row's layout to be identified differently.
+				$layout_subs = pllx_acf_layout_subs( $obj, $row['acf_fc_layout'] );
+				pllx_acf_walk( pllx_acf_zip( $layout_subs, $row ), $out, "$key.$i" );
 			}
 			continue;
 		}
@@ -263,6 +245,148 @@ function pllx_acf_walk( $objects, &$out ) {
 		// the first with a different translation. Verified on the SCF 6.9.5
 		// fixture: `wp eval` probes for both display modes, see task-8-report.md.
 	}
+}
+
+/**
+ * Pair a container's sub-field definitions with one set of its values.
+ *
+ * get_field_objects() hands back definition-and-value together at the top
+ * level, but a container's sub_fields are definitions only and its value is a
+ * plain associative array. Zipping them produces the same definition+value
+ * shape the walk already understands, which is what lets one function handle
+ * every level instead of one branch per depth.
+ *
+ * `acf_fc_layout` is the machine identifier naming a flexible-content row's
+ * layout. It is never translatable and must never be emitted as a key, even
+ * if a layout happened to define a sub_field with that name -- so it is
+ * dropped here, at the one place every flexible-content row passes through.
+ */
+function pllx_acf_zip( $subs, $values ) {
+	$out = array();
+	foreach ( $subs as $sub ) {
+		if ( ! isset( $sub['name'] ) || 'acf_fc_layout' === $sub['name'] ) {
+			continue;
+		}
+		$sname = $sub['name'];
+		if ( ! array_key_exists( $sname, $values ) ) {
+			continue;
+		}
+		$obj          = $sub;
+		$obj['value'] = $values[ $sname ];
+		$out[ $sname ] = $obj;
+	}
+	return $out;
+}
+
+/**
+ * Set $value at $parts inside $node, using $def to say what each part means.
+ *
+ * Returns true when the value was placed. A false return means the path did
+ * not match the structure, and the caller writes nothing rather than writing
+ * to a guessed location.
+ */
+function pllx_acf_set( &$node, $def, $parts, $value, $src, $dotted ) {
+	$type = isset( $def['type'] ) ? $def['type'] : '';
+	$seg  = array_shift( $parts );
+
+	// A `link` is a leaf whose `title` is the only translatable key. Its
+	// `url`/`target` are references and are left exactly as they are: this
+	// read-modify-write only ever touches the one key.
+	if ( 'link' === $type ) {
+		if ( 'title' !== $seg || $parts ) {
+			pllx_warn( "skipped $dotted: a link field carries no '$seg'" );
+			return false;
+		}
+		$node['title'] = $value;
+		return true;
+	}
+
+	if ( 'group' === $type ) {
+		$subs = isset( $def['sub_fields'] ) && is_array( $def['sub_fields'] ) ? $def['sub_fields'] : array();
+		return pllx_acf_descend( $node, $subs, $seg, $parts, $value, $src, $dotted );
+	}
+
+	if ( 'repeater' === $type || 'flexible_content' === $type ) {
+		// Here, and only here, a path segment is a row index.
+		$i = (int) $seg;
+		if ( ! isset( $node[ $i ] ) || ! is_array( $node[ $i ] ) ) {
+			$node[ $i ] = array();
+		}
+		$src_row = isset( $src[ $i ] ) && is_array( $src[ $i ] ) ? $src[ $i ] : array();
+
+		if ( 'repeater' === $type ) {
+			$subs = isset( $def['sub_fields'] ) && is_array( $def['sub_fields'] ) ? $def['sub_fields'] : array();
+		} else {
+			// A row created for the first time has no layout tag, and SCF
+			// drops a row without one. Carry it across from the source row --
+			// a row the target already has keeps its own, untouched.
+			if ( ! isset( $node[ $i ]['acf_fc_layout'] ) && isset( $src_row['acf_fc_layout'] ) ) {
+				$node[ $i ]['acf_fc_layout'] = $src_row['acf_fc_layout'];
+			}
+			$layout_name = isset( $node[ $i ]['acf_fc_layout'] ) ? $node[ $i ]['acf_fc_layout'] : '';
+			$subs        = pllx_acf_layout_subs( $def, $layout_name );
+			if ( ! $subs ) {
+				pllx_warn( "skipped $dotted: no layout '$layout_name' on this flexible-content field" );
+				return false;
+			}
+		}
+
+		$seg2 = array_shift( $parts );
+		if ( null === $seg2 ) {
+			pllx_warn( "skipped $dotted: path ends on a row rather than on a field" );
+			return false;
+		}
+		return pllx_acf_descend( $node[ $i ], $subs, $seg2, $parts, $value, $src_row, $dotted );
+	}
+
+	pllx_warn( "skipped $dotted: '$type' is not a container this can write into" );
+	return false;
+}
+
+/**
+ * Place $value under $seg inside a container's value, recursing when $parts
+ * still has path left. Shared by the group branch and by both row branches,
+ * which differ only in how they arrive here.
+ */
+function pllx_acf_descend( &$node, $subs, $seg, $parts, $value, $src, $dotted ) {
+	if ( ! $parts ) {
+		$node[ $seg ] = $value;
+		return true;
+	}
+
+	$sub = null;
+	foreach ( $subs as $candidate ) {
+		if ( isset( $candidate['name'] ) && $candidate['name'] === $seg ) {
+			$sub = $candidate;
+			break;
+		}
+	}
+	if ( null === $sub ) {
+		pllx_warn( "skipped $dotted: no sub-field '$seg' in this container" );
+		return false;
+	}
+
+	if ( ! isset( $node[ $seg ] ) || ! is_array( $node[ $seg ] ) ) {
+		$node[ $seg ] = array();
+	}
+	$src_sub = isset( $src[ $seg ] ) && is_array( $src[ $seg ] ) ? $src[ $seg ] : array();
+
+	return pllx_acf_set( $node[ $seg ], $sub, $parts, $value, $src_sub, $dotted );
+}
+
+/**
+ * The sub_fields of one named layout on a flexible-content field definition.
+ * Matched by layout NAME, not by key -- the same rule pllx_acf_walk() follows,
+ * because the row records its layout by name.
+ */
+function pllx_acf_layout_subs( $def, $layout_name ) {
+	$layouts = isset( $def['layouts'] ) && is_array( $def['layouts'] ) ? $def['layouts'] : array();
+	foreach ( $layouts as $layout ) {
+		if ( isset( $layout['name'] ) && $layout['name'] === $layout_name ) {
+			return isset( $layout['sub_fields'] ) && is_array( $layout['sub_fields'] ) ? $layout['sub_fields'] : array();
+		}
+	}
+	return array();
 }
 
 /**
