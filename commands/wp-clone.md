@@ -638,8 +638,15 @@ needs to hold: a database on this machine contains live credentials. What to do 
 is a decision, not a default. Say what is live, and let the operator choose.
 
 The one thing not to leave to a decision is **real customer data**, which is already on the
-disk by the time this step runs. Say so plainly in the report; opt-in anonymisation is a
-separate operation, not something to infer.
+disk by the time this step runs. Say so plainly in the report, and name the remedy:
+`/wp-anonymize` replaces the records in a named catalog and reports every table it did not
+examine. It is a separate operation and stays one — it is irreversible, it is not always
+wanted (a bug in checkout may need the real order that triggered it), and inferring it from
+a clone would make an unasked-for destructive write the default.
+
+Naming it *here* is the point. This report is the one moment an operator is looking at the
+sentence "this database holds real customer records", and a remedy documented anywhere else
+is one they read for the first time after they have already handed the database on.
 
 ### 5.5.5: Confirm the isolation took
 
@@ -757,6 +764,7 @@ Still live — reported, not changed:
   - woocommerce_stripe_settings holds a live secret key (option: woocommerce_stripe_settings)
   - 2 webhooks still point at <old-domain> (options: *_webhook_url)
   - This database holds real customer records: 1,284 orders, 903 customer accounts.
+    → /wp-anonymize replaces them with deterministic fakes and lists what it did not examine.
   → These are decisions, not defaults. Nothing above was edited.
 
 Next steps:

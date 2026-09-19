@@ -36,6 +36,7 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-cinematic-seed`](#wp-cinematic-seed) | C | required | scenes manifest | scene rows, sample videos |
 | [`/wp-debug`](#wp-debug) | utility | — | `.wp-create.json` | offered fixes |
 | [`/wp-clone`](#wp-clone) | utility | — | remote site | local install |
+| [`/wp-anonymize`](#wp-anonymize) | utility | — | cloned database | anonymised database |
 | [`/wp-robin`](#wp-robin) | utility | — | target WordPress root | Robin settings, queue rows, `.webp` files |
 | [`/wp-aos-animator`](#wp-aos-animator) | utility | — | theme templates | `vendors/aos/`, `functions.php` enqueue, JS init, `data-aos` attributes |
 | [`/wp-contribute`](#wp-contribute) | contributors | — | this repository | new layer file + its check + doc rows; PR; release |
@@ -455,6 +456,33 @@ Health, plugins, DB, config, filesystem checks via the WP-CLI wrapper from `.wp-
 /wp-clone --from=ssh://user@host/path --to=/var/www/html/local          # SSH automated
 /wp-clone --sql=/tmp/dump.sql --uploads=/tmp/uploads.zip --to=/var/www/html/local   # manual
 ```
+
+### `/wp-anonymize`
+
+```
+/wp-anonymize --dry-run              # count everything, change nothing
+/wp-anonymize                        # rewrite the catalog
+/wp-anonymize --keep-user=yojahny    # name the account that stays logged-in-able
+```
+
+The opt-in remedy for the live customer records a clone carries. `/wp-clone` isolates mail,
+cron and indexing, but the database it imported holds real people from the moment the import
+finishes.
+
+Refuses to run unless `wp-content/mu-plugins/00-clone-isolation.php` is present — the marker
+`/wp-clone` Step 5.5 writes — and that gate takes no `--force`, the only refusal in the
+plugin that does not. Backs up to `~/.wp-clone-backups/` on every run and stops if the export
+fails, because there is no undo.
+
+Rewrites a named catalog: `wp_users`, `wp_usermeta` billing and shipping keys, comment author
+rows including the IP, and WooCommerce order addresses on both the postmeta and HPOS layouts.
+Replacements are deterministic and land in `example.invalid`, a TLD RFC 2606 reserves so it
+can never resolve. Order totals, dates, statuses and quantities are preserved — they carry no
+identity and they are what the clone exists to debug.
+
+Every table outside the catalog is reported by name and row count under *Not examined*, and
+residue found by the verification pass is reported as a failure rather than beside a success
+summary.
 
 ### `/wp-robin`
 

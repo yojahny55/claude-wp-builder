@@ -239,7 +239,23 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   store clone often exists because a payment bug needs reproducing. The cost of that choice is
   real and is the operator's to carry — a clone can still reach a production endpoint through
   any integration that does not use `wp_mail()` or cron, and the database holds live customer
-  records from the moment the import finishes. Opt-in anonymisation is not built.
+  records from the moment the import finishes. `/wp-anonymize` is the opt-in remedy, and
+  the report names it at the moment the operator is told the records are there.
+- **`/wp-anonymize` replaces a catalog, not a database, and says so in every report.** It
+  rewrites `wp_users`, `wp_usermeta` billing and shipping keys, comment author rows
+  (including the IP, which is personal data on its own) and WooCommerce order addresses on
+  both the postmeta and HPOS layouts. Everything else is listed by name and row count under
+  *Not examined*, because an explicit catalog is only honest if what it excludes is printed:
+  a plugin holding customers in its own table is invisible to the catalog and appears in
+  that list. Three narrower limits follow from the same shape — serialized blobs in
+  `wp_options` and `wp_postmeta` outside the WooCommerce keys are not rewritten;
+  `user_login` is deliberately kept, because it is the join key half the ecosystem
+  recognises an account by and it is far less identifying than an address; and the run
+  cannot undo itself, which is why the backup to `~/.wp-clone-backups/` is unconditional and
+  a failed export stops the command. The gate — the isolation mu-plugin must be present —
+  takes no `--force`, the only refusal in this plugin that does not, because the cost of the
+  check being wrong is an annoyance and the cost of the operator being wrong is a production
+  site with its customers overwritten.
 - **`/wp-seed` owns records and values separately, and the second is the weaker claim.**
   Phase 1.5's marker says who created a *record*; `_<prefix>_seeded_digest` says what this
   command last wrote into each *field* of it, so an editor's edit is distinguishable from a

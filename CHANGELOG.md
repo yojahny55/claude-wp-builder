@@ -4,6 +4,25 @@
 
 ### Added
 
+- `/wp-anonymize` — the opt-in remedy for the customer records a clone carries. `/wp-clone`
+  isolates mail, cron and indexing, but the database it imported holds live customer data
+  from the moment the import finishes, and isolation does nothing about that. The new
+  command replaces a named catalog — `wp_users`, `wp_usermeta` billing/shipping keys,
+  comment authors including the IP, and WooCommerce order addresses on both the postmeta and
+  HPOS layouts — with deterministic fakes in `example.invalid`, a TLD RFC 2606 reserves so
+  it can never resolve even if the clone is moved somewhere with no isolation at all.
+  Deterministic because a clone exists to reproduce a bug: random per-row values would turn
+  one repeat customer into three and take the bug with them. Order totals, dates, statuses
+  and quantities are preserved for the same reason.
+
+  It refuses to run on a site it cannot prove is a clone — the isolation mu-plugin must be
+  present — and that gate takes no `--force`, the only refusal here that does not. It backs
+  up to `~/.wp-clone-backups/` on every run, stops if the export fails, and verifies
+  afterwards: residue is reported as a failure and never alongside a success summary.
+
+  Every table outside the catalog is listed by name and row count under *Not examined*. That
+  block is the feature. A clone that says "these 14 tables were not looked at" can be handed
+  on with an accurate idea of the risk; one that says "anonymised" cannot.
 - `/wp-yolo --resume` — an entrypoint that continues an interrupted build instead of
   discarding it. A full run is thirty to fifty dispatches and the better part of an
   hour, and until now a crash, a closed terminal or one failing step threw all of it
