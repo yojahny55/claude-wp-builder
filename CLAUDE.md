@@ -79,6 +79,13 @@ the translation writer skipped every write to a brand-new counterpart; and
 instantiates only when `is_admin()` is true — never under `wp eval-file`, which is how
 every script in `skills/wp-polylang/scripts/` is documented to run.
 
+The same fixture backs `tests/checks/wp-cf7-delivery.sh`, which posts to Contact Form 7's
+own REST endpoint and asserts what arrived: mail is captured by a `pre_wp_mail` must-use
+plugin, so a valid submission's mail can be read and checked while nothing can reach a real
+inbox, and a submission missing a required field must be refused *and* send nothing. A form
+that renders perfectly and delivers nothing costs a client enquiries before anyone notices,
+and no grep over `agents/wp-cf7.md` can see it.
+
 Still not covered: a generated site end to end, the broken-site corpus with expected audit
 findings, and browser artifacts for failed functional scenarios. A green CI means the
 contracts still say what they should, the code still parses, and the ACF translation path
@@ -229,6 +236,14 @@ Skills inform; they never act.
 Version lives in `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` (twice) and the
 README badge — bump all of them together. Add an `[Unreleased]` entry to `CHANGELOG.md`; update
 `README.md` when adding a command.
+
+**Reconcile `BACKLOG.md` as part of cutting the release**, and update its `**Reconciled** on`
+line. `tests/checks/backlog-freshness.sh` fails when the newest release in the CHANGELOG is
+dated after that line, so this is a gate rather than a good intention. It became one because
+the last hand reconciliation went stale in a single day: three releases shipped a clone
+anonymiser, resumable builds, a findings ledger, ACF nesting and a WordPress fixture, and the
+backlog mentioned none of them. The check cannot tell whether a reconciliation was any good —
+only that one happened, which is the part that kept being skipped.
 
 **Cutting a release never renames `## [Unreleased]`.** Insert the new
 `## [x.y.z] - YYYY-MM-DD` heading *below* it and move the entries down, leaving an

@@ -30,6 +30,7 @@ set -euo pipefail
 PINNED_WP="6.8.2"
 PINNED_POLYLANG="3.6.6"
 PINNED_SCF="6.5.0"
+PINNED_CF7="6.0.6"
 
 DB_HOST="${WP_FIXTURE_DB_HOST:-127.0.0.1:3307}"
 DB_USER="${WP_FIXTURE_DB_USER:-root}"
@@ -139,6 +140,11 @@ $WP plugin install polylang --version="$PINNED_POLYLANG" --activate --quiet \
   || die "polylang install failed"
 $WP plugin install secure-custom-fields --version="$PINNED_SCF" --activate --quiet \
   || die "secure-custom-fields install failed"
+# Installed for every fixture rather than behind a flag. It costs a couple of seconds, and
+# the alternative -- a per-plugin opt-in mechanism -- is more moving parts than the saving
+# is worth while three checks share one provisioner.
+$WP plugin install contact-form-7 --version="$PINNED_CF7" --activate --quiet \
+  || die "contact-form-7 install failed"
 
 # Handing ownership to the caller: from here a failure must not delete the fixture.
 PARTIAL_DIR=""

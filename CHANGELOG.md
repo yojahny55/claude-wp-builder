@@ -2,6 +2,45 @@
 
 ## [Unreleased]
 
+### Added
+
+- `tests/checks/wp-cf7-delivery.sh` — a contact form is now proved to accept, refuse and
+  actually deliver. It creates a real Contact Form 7 form in the WordPress fixture, serves
+  the site, and posts to CF7's own REST endpoint: a valid submission must be accepted and
+  its mail captured with the right recipient and an interpolated body, and a submission
+  missing a required field must be refused **and** send nothing.
+
+  Mail is captured by a `pre_wp_mail` must-use plugin — the same seam `/wp-clone` isolates
+  at, chosen for the same reason: it short-circuits core's own send, so nothing escapes
+  even if a plugin is reactivated. An SMTP plugin would not do, because core falls back to
+  PHP `mail()` and the site keeps sending while merely logging it somewhere nobody looks.
+
+  `agents/wp-cf7.md` contracts the form markup and the branded template, and a grep can
+  confirm those contracts are still written down. It cannot notice that a form renders
+  perfectly and delivers nothing, which is the failure that costs a client real enquiries
+  before anyone sees it. This is the third leg of I06's own completion check.
+- `tests/checks/backlog-freshness.sh` — the backlog now has to be reconciled as part of
+  cutting a release, and CI says so. The last hand reconciliation went stale in a single
+  day: three releases shipped a clone anonymiser, resumable builds, a findings ledger, ACF
+  nesting and a WordPress fixture, and `BACKLOG.md` mentioned none of them while claiming
+  20 delivered items when the number was 26.
+
+  The check compares the newest dated release heading in `CHANGELOG.md` against the
+  `**Reconciled** on` line in `BACKLOG.md` and fails when a release is newer. It cannot
+  tell whether a reconciliation was any good — only that one happened, which is the part
+  that kept being skipped. Reconciling by hand and remembering to do it again is the
+  arrangement that produced the drift.
+
+### Fixed
+
+- `BACKLOG.md` reconciled against `main` at v1.22.0: 30 delivered, 9 partial, 13 open.
+  Continuous integration, disposable WordPress fixtures, `/wp-anonymize` and `/wp-yolo
+  --resume` are recorded as delivered; the visual-regression item's gap is narrowed to
+  baselines and tolerances, now that the browser harness underneath it exists; and three
+  gaps these releases named are open items rather than prose — verifying form delivery end
+  to end, walking the default-motion branch, and a broken-site corpus with expected audit
+  findings.
+
 ## [1.22.0] - 2026-09-19
 
 ### Added

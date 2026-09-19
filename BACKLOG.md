@@ -13,11 +13,19 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 
 **Priority:** Items within each section are ordered by priority (highest first).
 
-**Reconciled** on September 18, 2026 against `main`. Every item below was checked
-against the command, agent or script that would own it — an item claiming to be open
-while the behavior ships reads as a project that does not know what it has built.
+**Reconciled** on September 19, 2026 against `main` at v1.22.0. Every item below was
+checked against the command, agent or script that would own it — an item claiming to be
+open while the behavior ships reads as a project that does not know what it has built.
 Larger reworks of delivered behavior are proposals, not backlog items, and are tracked
 separately by the maintainer.
+
+That date is now checked mechanically. The first reconciliation went stale in a single
+day: three releases shipped a clone anonymiser, resumable builds, a findings ledger, ACF
+nesting and a WordPress fixture, and not one of them appeared here. Reconciling by hand
+and remembering to do it again is the same arrangement that produced the drift, so
+`tests/checks/backlog-freshness.sh` fails when the newest release in `CHANGELOG.md` is
+dated after the line above. It cannot tell whether the reconciliation was any good — only
+that one happened.
 
 ---
 
@@ -48,7 +56,7 @@ Ensuring the WordPress output matches the demo HTML 1:1 in appearance and conten
 
 - [ ] **Visual regression testing with Playwright** `PARTIAL`
   After each section build, take screenshots at key viewports and compare against the demo. Loop fixes until the section matches the demo visually.
-  **Gap:** [demo-verify](bin/demo-verify.mjs) measures layout and motion and captures screenshots; [tailwindify-parity](bin/tailwindify-parity.mjs) compares computed styles during conversion. Neither stores an approved baseline image or diffs pixels against one, so a color or spacing regression passes. Baselines and tolerances are the remaining work.
+  **Gap:** [demo-verify](bin/demo-verify.mjs) measures layout and motion and captures screenshots; [tailwindify-parity](bin/tailwindify-parity.mjs) compares computed styles during conversion. Neither stores an approved baseline image or diffs pixels against one, so a color or spacing regression passes. Baselines and tolerances are still the remaining work — but the harness underneath them now exists: [motion-devices](tests/checks/motion-devices.sh) drives a real Chrome in CI, and the root `package.json` pins the `playwright-core` it needs.
 
 - [x] **Enforce CSS match from demo** `DELIVERED`
   Transcription mode (`--transcribe`, `/wp-yolo`) makes agents copy the demo's exact declared values instead of re-authoring them — [wp-css](agents/wp-css.md), [wp-template](agents/wp-template.md), [wp-section](commands/wp-section.md). The Layer 1 demo-parity gate in [wp-finalize](commands/wp-finalize.md) blocks delivery on a font or background mismatch.
@@ -110,6 +118,15 @@ Making the command flow smoother and more guided.
 - [ ] **Screenshot generation with Playwright** `PARTIAL`
   **Gap:** [wp-finalize](commands/wp-finalize.md) checks that `screenshot.png` exists, and both starters ship one. Nothing regenerates it at 1200x900 from the built homepage, so a delivered theme's preview image is the starter's, not the site's.
 
+- [x] **Verify form delivery end to end** `DELIVERED`
+  [wp-cf7-delivery](tests/checks/wp-cf7-delivery.sh) creates a real CF7 form in the WordPress fixture, serves the site, and posts to CF7's own REST endpoint: a valid submission is accepted and its mail captured by a `pre_wp_mail` sink with the right recipient and an interpolated body, and a submission missing a required field is refused and sends nothing.
+
+- [ ] **Walk the default-motion branch** `OPEN`
+  [motion-devices](tests/checks/motion-devices.sh) drives `motion.js` under `prefers-reduced-motion: reduce`, where the `pan` device never calls ScrollTrigger and stubs are honest. The default-motion branch, where ScrollTrigger actually runs, is still walked by nobody.
+
+- [ ] **Broken-site corpus with expected audit findings** `OPEN`
+  A fixture site seeded with known defects and a file of the findings an audit should report. Without it no test can fail because an audit *missed* a defect — the ceiling CLAUDE.md records for the whole audit family.
+
 - [ ] **Maintenance mode command** `OPEN`
   New `/wp-maintenance` command to enable/disable maintenance mode — either via a custom template or by installing a maintenance plugin via WP-CLI.
 
@@ -166,6 +183,18 @@ Server setup, permissions, and WordPress configuration.
 
 - [x] **Security & audit command** `DELIVERED`
   `/wp-audit` with security, SEO, accessibility, performance, GEO and best-practices categories. Shipped in v1.3.0.
+
+- [x] **Continuous integration** `DELIVERED`
+  [ci.yml](.github/workflows/ci.yml) runs every contract check, `node --check`, a version-pinned `php -l` (7.4, with `__cinematic__` at 8.0) and [doc-sync-check](bin/doc-sync-check.sh) on every pull request. Shipped in v1.19.0.
+
+- [x] **Disposable WordPress fixtures** `DELIVERED`
+  [provision.sh](tests/fixtures/wp/provision.sh) builds a pinned WordPress with Polylang and SCF against a CI service container or a local docker container, and [wp-polylang-integration](tests/checks/wp-polylang-integration.sh) runs the ACF translation path inside it and tears it down. Skips unless `WP_FIXTURE=1`. Shipped in v1.22.0.
+
+- [x] **Anonymise a clone's customer records** `DELIVERED`
+  [wp-anonymize](commands/wp-anonymize.md) replaces a named catalog with deterministic fakes in a reserved TLD, refuses to run on anything it cannot prove is a clone, and reports every table it did not examine. Shipped in v1.21.0.
+
+- [x] **Resumable builds** `DELIVERED`
+  [wp-yolo](commands/wp-yolo.md) `--resume` continues an interrupted build from a ledger at `demo/.yolo-progress.json`, skipping a unit only when the ledger records it and its artifact is still on disk. Shipped in v1.21.0.
 
 ---
 
