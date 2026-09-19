@@ -4,6 +4,22 @@
 
 ### Changed
 
+- **The backlog says what has already been built.** All 40 items were checked against the
+  command, agent or script that would own them: 20 ship and are now marked `DELIVERED` with a
+  link to the owning file, 7 are `PARTIAL` and name the one behavior still missing, and 13 are
+  `OPEN`. Six of the delivered items were still tagged `NEW` — multi-page demos, CPTs from demo
+  structure, media import, field seeding, menu creation and the Tailwind build — which presented
+  a shipped feature set as an unstarted project. The status vocabulary was contradicting itself
+  too: five items read `- [ ] … DONE`, an unchecked box tagged done. The checkbox is now the
+  delivery state and the tag says which kind.
+- **The contributor docs describe the repository that exists.** `CONTRIBUTING.md` told
+  contributors to put starter-theme changes in `starter-theme/__starter__/`, a directory removed
+  several releases ago; there are two starters, `__tailwind__` and `__cinematic__`, and
+  `__starter__` is a placeholder *token* inside their files, not a path. `CLAUDE.md`'s
+  "only executable code shipped" list omitted `bin/*.mjs` entirely, so `wp-config.mjs`,
+  `demo-verify.mjs`, `tailwindify-parity.mjs`, `image-gen.mjs` and `composition-preview.mjs` —
+  several of them load-bearing gates — were invisible in the architecture summary a contributor
+  reads first.
 - The design library is a caret range, `@yojahny/wp-design-library@^1.0.0`, instead of an exact
   pin. An exact pin had to be edited in `.mcp.json`, the README and a check on every library
   release, so in practice it went stale rather than getting edited: it sat at 0.4.0 through
@@ -88,6 +104,14 @@
   Disposable WordPress fixtures, the broken-site corpus with expected audit findings and browser
   artifacts are deliberately not here: they need a provisioned WordPress and a pinned stack, and
   a half one would make the green light mean less than it does.
+- **`tests/checks/contributor-docs.sh`** — every repo path the contributor-facing docs name must
+  exist. A path in prose is just prose: the repo can be reorganised and the sentence describing it
+  stays green forever, which is how `starter-theme/__starter__/` survived its own directory. The
+  check reads backtick paths (restricted to this repo's top-level directories, first token only,
+  so an invocation like `bin/demo-verify.mjs --probe` resolves) and every relative markdown link
+  target in `CLAUDE.md`, `CONTRIBUTING.md` and `BACKLOG.md` — the last because the reconciled
+  backlog's evidence *is* its links, and a rotted one turns a delivered item back into a claim.
+  Globs and `<placeholder>` spans describe a shape and are skipped.
 - **A craft build studies an entry's motion clip instead of inferring motion from its strip.**
   When a consulted `wp-design-library` entry carries `motion.clips`, `/wp-demo` sub-step 3.6 now
   calls `get_motion` and reads the timestamped frames it returns as images; a strip shows what a
