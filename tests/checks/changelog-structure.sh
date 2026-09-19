@@ -16,6 +16,11 @@ fail() { echo "FAIL: $*"; exit 1; }
 
 f=CHANGELOG.md
 [ -f "$f" ] || fail "$f is missing"
+# -f proves it exists, not that it can be read, and every assertion below is a grep. Without
+# this an unreadable file reports whichever assertion happens to run first -- "no Unreleased
+# heading", "lists 0 version blocks" -- each pointing at the file's contents rather than at
+# the fact that nothing could read them.
+[ -r "$f" ] || fail "$f exists but cannot be read"
 
 # The release chore inserts a new version heading BELOW ## [Unreleased] and leaves it empty,
 # because renaming it would delete the anchor every open branch is appending to and turn one
@@ -39,7 +44,14 @@ if [ -n "$problems" ]; then
   fail "a version block repeats a section heading -- merge=union never reports this as a conflict, so it ships unless something looks"
 fi
 
-versions=$(grep -c '^## \[' "$f" || true)
-[ "${versions:-0}" -ge 2 ] || fail "$f lists ${versions:-0} version block(s); the extraction is broken, not the file"
+# `grep -c` exits 1 on zero matches and 2 on a real error, and collapsing both into `|| true`
+# would report an unreadable file as "lists 0 version blocks" -- a diagnostic pointing at the
+# wrong thing. `-f` above proves the file exists, not that it can be read.
+if ! versions=$(grep -c '^## \[' "$f"); then
+  status=$?
+  [ "$status" -eq 1 ] || fail "could not read $f (grep exited $status)"
+  versions=0
+fi
+[ "$versions" -ge 2 ] || fail "$f lists $versions version block(s); the extraction is broken, not the file"
 
 echo "PASS: $versions version blocks, no repeated section headings, Unreleased intact"
