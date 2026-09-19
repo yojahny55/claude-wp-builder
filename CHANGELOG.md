@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-09-19
+
 ### Added
 
 - The first check that drives a browser. `tests/checks/motion-devices.sh` loads `motion.js`
