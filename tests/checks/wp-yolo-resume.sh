@@ -27,7 +27,13 @@ f=commands/wp-yolo.md
 # within a line, so a needle spanning a line break silently misses and the assertion
 # reports the contract as absent when it is present -- the one failure mode that makes a
 # check worse than no check. Flatten the file to a single space-separated line first.
-flat=$(tr '\n' ' ' < "$f" | tr -s ' ')
+#
+# The class is '\n\t\r', not '\n'. `tr -s ' '` squeezes spaces and leaves a tab standing,
+# so a needle crossing a tab-indented continuation line still misses after flattening, and
+# a CRLF line leaves a stray carriage return mid-needle. Measured: with '\n' alone a needle
+# spanning a tab-indented wrap matches 0 times, with '\n\t\r' it matches 1. No markdown
+# here is tab-indented today, which is exactly why this would be found the hard way.
+flat=$(tr '\n\t\r' ' ' < "$f" | tr -s ' ')
 
 # -- guards against the needle itself being wrong ----------------------------
 # `--needle` starts with a dash and grep parses it as an option without the `--`

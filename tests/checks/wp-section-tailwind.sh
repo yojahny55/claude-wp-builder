@@ -8,6 +8,7 @@ f=commands/wp-section.md
 # correct re-wrap can split across two physical lines — including a break AT A
 # HYPHEN, which has false-failed gates on this branch before. `wp- ?tailwind`
 # absorbs the space such a break leaves behind after flattening.
+[ -r "$f" ] || { echo "FAIL: $f is missing or unreadable"; exit 1; }
 flatf=$(tr '\n' ' ' < "$f" | sed 's/  */ /g')
 
 # Backticked, exactly as tests/checks/wp-commands-tailwind.sh does it, so this
@@ -327,6 +328,11 @@ done <<< "$(printf '%s' "$summ" | grep -oE '[^.]*parallel[^.]*' || true)"
 # whose demo carried two <span>s that swap at a breakpoint shipped as one span plus a
 # guess, and the defect was invisible above md. Assert the rule where the agent that
 # writes the markup will actually read it.
+# A redirect inside a command substitution under `set -euo pipefail` aborts the script with a
+# raw "No such file or directory" and no FAIL: line, before this section's assertions run.
+# Measured. Guard it so a missing contract file names itself.
+[ -r agents/wp-template.md ] \
+  || { echo "FAIL: agents/wp-template.md is missing or unreadable"; exit 1; }
 tflat=$(tr '\n' ' ' < agents/wp-template.md | sed 's/  */ /g')
 if ! printf '%s' "$tflat" | grep -qF 'SOURCE OF TRUTH'; then
   echo "FAIL: agents/wp-template.md never calls the demo markup the SOURCE OF TRUTH — it authors the element tree for every section on both templates, with only the CPT-teaser rule to bind it"; exit 1
