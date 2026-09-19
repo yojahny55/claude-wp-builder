@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`/wp-clone` isolates the clone before anything loads it.** Every check the command ran
+  asked "does it work" — WordPress loads, URLs resolve, an admin exists, the theme is present,
+  HTTP answers — and none asked "is it contained". So a clone arrived carrying the source
+  site's mail configuration, live payment credentials, production webhook URLs and a due cron
+  queue, and the summary closed with "Visit `<local-url>` to verify the site": the page load
+  that fires all of it.
+  New Step 5.5, which **both** paths now route through and which runs before Step 6 (the first
+  thing that loads WordPress): mail is captured to `wp-content/clone-mail.log` by a must-use
+  plugin filtering `pre_wp_mail`, `DISABLE_WP_CRON` is set, and `blog_public` goes to `0`. The
+  filter is the seam because every sender — core, WooCommerce, Contact Form 7 — reaches it
+  through `wp_mail()`; disabling an SMTP plugin instead does not stop sending, since core falls
+  back to PHP `mail()`. It returns `true` so callers stay on their success path and the clone
+  behaves like the original everywhere except at the wire. A failed isolation **stops** the
+  clone rather than warning, because continuing means loading the site it failed to contain.
+  Live payment credentials, webhooks and API keys are **reported, not changed**: flipping a
+  gateway to test mode would change the behaviour under test, and a store clone often exists
+  precisely because a payment bug needs reproducing. The report also states plainly that real
+  customer records are now on the machine. The summary always shows what was isolated and what
+  remains live, never collapsed on success.
+
 ## [1.19.0] - 2026-09-18
 
 ### Changed

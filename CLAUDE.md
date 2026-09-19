@@ -209,6 +209,16 @@ a release.
 
 These are deliberate, documented limits — not bugs to "fix" on sight:
 
+- **A clone is isolated at the seams a copy shares with its original, not at every one.**
+  `/wp-clone` Step 5.5 captures mail at `pre_wp_mail` (a must-use plugin, so it survives a
+  plugin being reactivated and cannot be undone by an option write), disables `WP_CRON`, and
+  sets `blog_public` to `0` — before Step 6, which is the first thing that loads the site.
+  What it does **not** do is change live payment credentials, webhook URLs or API keys: it
+  reports them. Flipping a gateway to test mode would change the behaviour under test, and a
+  store clone often exists because a payment bug needs reproducing. The cost of that choice is
+  real and is the operator's to carry — a clone can still reach a production endpoint through
+  any integration that does not use `wp_mail()` or cron, and the database holds live customer
+  records from the moment the import finishes. Opt-in anonymisation is not built.
 - **Seed media deduplicates by source, not by content.** `/wp-seed` records
   `_<prefix>_seeded_source` — the URL a remote image came from, or the repository-relative
   path of a local one — and skips an import whose source it has already seen. The same
