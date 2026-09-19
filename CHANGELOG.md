@@ -4,6 +4,26 @@
 
 ### Added
 
+- **`/wp-clone` refuses to replace an occupied destination, and backs it up first.** The
+  command ran `wp db import` against the destination on both paths with no backup, no
+  existence check and no confirmation. A dump carries `DROP TABLE` / `CREATE TABLE`, so the
+  import does not merge into the destination database — it replaces it; `rsync` overwrites
+  matching paths under `wp-content/uploads/` the same way. The destination is a local
+  development site, which is where unpushed work lives: seeded content, ACF values, test
+  orders. `/wp-seed` carries an entire ownership model so it never overwrites a client's work
+  inside a database, while this replaced the database wholesale with no prompt.
+  New Step 1.5, written once and reached from both imports and the uploads sync, positioned
+  before each of them. An **empty destination proceeds silently** — a gate that fires on every
+  ordinary run is one people learn to click through. An occupied one is **backed up before
+  anything is asked**, to `~/.wp-clone-backups/` (outside the project, because a backup under
+  `wp-content/` is reached by the next clone's `rsync` and by an `rm -rf` of the project), and
+  then named rather than described: site title, content count, what changed most recently and
+  when. "47 posts, last modified two hours ago" is a question an operator can answer;
+  "overwrite?" is one they can only guess at. `--force` proceeds and **still backs up** — it
+  means "I know what is there", not "skip the safety net", and tying the export to the flag
+  would remove it from the runs most likely to need it. The backup path is carried into the
+  final summary, since Step 1.5 has scrolled away by then.
+
 - **`/wp-clone` isolates the clone before anything loads it.** Every check the command ran
   asked "does it work" — WordPress loads, URLs resolve, an admin exists, the theme is present,
   HTTP answers — and none asked "is it contained". So a clone arrived carrying the source

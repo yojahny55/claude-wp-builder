@@ -209,6 +209,15 @@ a release.
 
 These are deliberate, documented limits — not bugs to "fix" on sight:
 
+- **The clone's destination backup is a database export, and nothing else.** `/wp-clone`
+  Step 1.5 refuses an occupied destination without `--force` and exports its database to
+  `~/.wp-clone-backups/` first — outside the project, because a backup under `wp-content/`
+  is reached by the next clone's `rsync` and by an `rm -rf` of the project. What it does not
+  copy is the destination's **uploads**: `rsync` overwrites matching paths, and files it
+  overwrote are not in the `.sql`. Restoring from one of these backups restores the content
+  and the field values, not the media. Deliberate — duplicating an uploads tree on every
+  clone costs more than the case is worth — but it means "a backup was taken" is a narrower
+  promise than it sounds, which is why it is written down here.
 - **A clone is isolated at the seams a copy shares with its original, not at every one.**
   `/wp-clone` Step 5.5 captures mail at `pre_wp_mail` (a must-use plugin, so it survives a
   plugin being reactivated and cannot be undone by an option write), disables `WP_CRON`, and

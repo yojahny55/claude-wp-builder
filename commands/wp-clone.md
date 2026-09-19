@@ -1,7 +1,7 @@
 ---
 description: Clone a remote or staging WordPress site to a local development environment
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion
-argument-hint: "--from=ssh://user@host/path --to=/var/www/html/local"
+argument-hint: "--from=ssh://user@host/path --to=/var/www/html/local [--force]"
 ---
 
 # WP Clone — Remote/Staging Site Cloning
@@ -18,6 +18,7 @@ Parse `$ARGUMENTS` for the following flags:
 | `--to=` | Yes | Local destination path (e.g., `/var/www/html/local-clone`) |
 | `--sql=` | Path B only | Path to a SQL dump file (e.g., `/tmp/dump.sql`) |
 | `--uploads=` | Path B only | Path to uploads zip/tar archive (e.g., `/tmp/uploads.zip`) |
+| `--force` | No | Proceed when the destination already holds a WordPress site. The backup in Step 1.5 is still taken — `--force` means "I know what is there", not "skip the safety net" |
 
 **Parsing rules:**
 
@@ -35,6 +36,91 @@ Parse `$ARGUMENTS` for the following flags:
 | `--from=ssh://...` is provided | **Path A — SSH Automated** |
 | `--sql=` is provided | **Path B — Manual Import** |
 | Neither provided | Ask user (see Step 0) |
+
+---
+
+## Step 1.5: The Destination Gate
+
+**Run this immediately before any `wp db import` or uploads sync, on both paths.** It is
+written once here because both paths perform the same destructive act and a second copy
+would drift; it does not execute here, because the destination is not knowable until the
+path is chosen — under Path A, `/wp-create` may create it during this very run.
+
+A dump carries `DROP TABLE` / `CREATE TABLE`, so `wp db import` does not merge into the
+destination database: it replaces it. `rsync` into `wp-content/uploads/` overwrites
+matching paths. Neither asks first, and neither leaves a copy behind.
+
+The destination is a local development site — which is exactly where unpushed work lives:
+seeded content, ACF values, test orders, a demo built this afternoon. `/wp-seed` has an
+entire ownership model to avoid overwriting a client's work inside a database. Replacing
+that database wholesale was, until this gate, one command with no prompt.
+
+### 1.5.1: Is the destination occupied?
+
+```bash
+bash -c "$WP db tables --format=count 2>/dev/null || echo 0"
+bash -c "find wp-content/uploads -type f 2>/dev/null | wc -l"
+```
+
+**An empty destination proceeds silently.** That is the ordinary case — a fresh
+`/wp-create` environment — and a gate that announces itself on every ordinary run is a gate
+people learn to skip past. It speaks only when there is something to lose.
+
+### 1.5.2: Back up what is about to be replaced
+
+Whenever the destination is occupied, back it up **before** asking anything:
+
+```bash
+bash -c "mkdir -p ~/.wp-clone-backups"
+bash -c "$WP db export ~/.wp-clone-backups/<project-slug>-$(date -u +%Y%m%dT%H%M%SZ).sql"
+```
+
+**The backup goes outside the project directory on purpose.** A backup inside
+`wp-content/` shares the fate of the thing it protects: the next clone's `rsync` reaches it,
+and so does an `rm -rf` of a project someone has given up on. `~/.wp-clone-backups/` is the
+one place that survives both.
+
+Print the full path on its own line. A backup whose location the operator has to reconstruct
+is not one they will find at the moment they need it.
+
+### 1.5.3: Say what is there, then refuse
+
+Do not ask "overwrite?" — nobody can answer that. Say what would be lost:
+
+```bash
+bash -c "$WP option get blogname"
+bash -c "$WP post list --post_type=any --post_status=any --format=count"
+bash -c "$WP post list --post_type=any --post_status=any --orderby=modified --order=desc --format=csv --fields=post_title,post_modified | sed -n 2p"
+```
+
+```
+Error: the destination already holds a WordPress site.
+
+  Site:          Client Demo
+  Content:       47 posts and pages
+  Last modified: "Services" — 2026-09-19 14:02 (2 hours ago)
+  Uploads:       312 files
+
+Importing replaces this database. A backup was written first:
+  ~/.wp-clone-backups/client-demo-20260919T161145Z.sql
+
+Re-run with --force to proceed, or clone into a different path.
+```
+
+"47 posts, last modified two hours ago" is a question an operator can answer. "Overwrite?"
+is one they can only guess at, and a guess at this prompt costs a day of work.
+
+### 1.5.4: `--force` proceeds, and still backs up
+
+`--force` means "I know what is there", never "skip the safety net". The export costs seconds
+and is the only thing that makes the decision reversible; tying it to the flag would remove
+the backup from precisely the runs most likely to need it. Report the backup path under
+`--force` too.
+
+### 1.5.5: Carry the path into the summary
+
+The backup path appears in the Step 6 summary, not only in this step's output — by the time
+the clone finishes, this step has scrolled away.
 
 ---
 
@@ -111,6 +197,10 @@ Ask the user which option they prefer before proceeding.
 
 ### A7: Rsync Uploads
 
+**Run Step 1.5 (The Destination Gate) first if it has not run yet in this clone.** `rsync`
+overwrites matching paths under `wp-content/uploads/`, and an occupied destination has files
+there that this clone did not put there.
+
 ```bash
 bash -c "rsync -avz --progress user@host:/remote/path/wp-content/uploads/ /local/path/wp-content/uploads/"
 ```
@@ -152,6 +242,11 @@ On exit 2, run the migration before continuing.
 
 This runs after A9, not before Step 0 — the manifest does not exist until `/wp-create`
 has finished creating it.
+
+**Now run Step 1.5 (The Destination Gate).** This is the last moment before the import
+replaces the destination database, and the first at which the destination is known — which
+is why the gate executes here rather than where it is written. Do not run `wp db import`
+until it has passed.
 
 Read `.wp-create.json` from the local project to get the `$WP` wrapper:
 
@@ -237,6 +332,9 @@ On exit 2, run the migration before continuing.
 
 This runs after B2, not before Step 0 — the manifest does not exist until `/wp-create`
 has finished creating it.
+
+**Now run Step 1.5 (The Destination Gate).** This is the last moment before the import
+replaces the destination database. Do not run `wp db import` until it has passed.
 
 Read `.wp-create.json` for the `$WP` wrapper:
 
@@ -479,6 +577,10 @@ Admin URL:    <local-url>/wp-admin/
 DB replaced:  <old-domain> → <new-domain>
 Uploads:      <synced | extracted | skipped>
 Admin users:  <list of admin usernames>
+
+Replaced:     a WordPress site was already here — "Client Demo", 47 posts
+  Backup      ~/.wp-clone-backups/client-demo-20260919T161145Z.sql
+              (omit this block entirely when the destination was empty)
 
 Isolation:
   Mail          captured to wp-content/clone-mail.log (mu-plugins/00-clone-isolation.php)
