@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-09-19
+
 ### Added
 
 - `/wp-anonymize` — the opt-in remedy for the customer records a clone carries. `/wp-clone`
