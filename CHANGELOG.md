@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-09-19
+
 ### Added
 
 - Approved screenshot baselines, with a review step that is a gate rather than a habit.
