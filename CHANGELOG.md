@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+### Added
+
+- `tests/checks/backlog-freshness.sh` — the backlog now has to be reconciled as part of
+  cutting a release, and CI says so. The last hand reconciliation went stale in a single
+  day: three releases shipped a clone anonymiser, resumable builds, a findings ledger, ACF
+  nesting and a WordPress fixture, and `BACKLOG.md` mentioned none of them while claiming
+  20 delivered items when the number was 26.
+
+  The check compares the newest dated release heading in `CHANGELOG.md` against the
+  `**Reconciled** on` line in `BACKLOG.md` and fails when a release is newer. It cannot
+  tell whether a reconciliation was any good — only that one happened, which is the part
+  that kept being skipped. Reconciling by hand and remembering to do it again is the
+  arrangement that produced the drift.
+
+### Fixed
+
+- `BACKLOG.md` reconciled against `main` at v1.22.0: 30 delivered, 9 partial, 13 open.
+  Continuous integration, disposable WordPress fixtures, `/wp-anonymize` and `/wp-yolo
+  --resume` are recorded as delivered; the visual-regression item's gap is narrowed to
+  baselines and tolerances, now that the browser harness underneath it exists; and three
+  gaps these releases named are open items rather than prose — verifying form delivery end
+  to end, walking the default-motion branch, and a broken-site corpus with expected audit
+  findings.
+
 ## [1.22.0] - 2026-09-19
 
 ### Added

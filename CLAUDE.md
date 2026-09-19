@@ -230,6 +230,14 @@ Version lives in `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`
 README badge — bump all of them together. Add an `[Unreleased]` entry to `CHANGELOG.md`; update
 `README.md` when adding a command.
 
+**Reconcile `BACKLOG.md` as part of cutting the release**, and update its `**Reconciled** on`
+line. `tests/checks/backlog-freshness.sh` fails when the newest release in the CHANGELOG is
+dated after that line, so this is a gate rather than a good intention. It became one because
+the last hand reconciliation went stale in a single day: three releases shipped a clone
+anonymiser, resumable builds, a findings ledger, ACF nesting and a WordPress fixture, and the
+backlog mentioned none of them. The check cannot tell whether a reconciliation was any good —
+only that one happened, which is the part that kept being skipped.
+
 **Cutting a release never renames `## [Unreleased]`.** Insert the new
 `## [x.y.z] - YYYY-MM-DD` heading *below* it and move the entries down, leaving an
 empty `## [Unreleased]` at the top. Renaming it deletes the anchor every open branch
