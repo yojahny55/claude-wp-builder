@@ -163,21 +163,54 @@ If WP-CLI is not available on the remote, warn the user and ask them to either i
 
 ### A4: Export Remote Database
 
+**The dump is the whole production database** — customer records, order rows, password
+hashes, and whatever API keys and tokens the site keeps in `wp_options`. It exists, briefly,
+as a plain file on two machines. Both copies get a unique name and owner-only permissions,
+and both are deleted.
+
+Pick the remote path first, and keep it for A5:
+
 ```bash
-bash -c "ssh user@host 'cd /remote/path && wp db export /tmp/wp-clone-dump.sql --allow-root 2>/dev/null || wp db export /tmp/wp-clone-dump.sql'"
+bash -c "REMOTE_DUMP=\$(ssh user@host 'mktemp -t wp-clone-XXXXXXXX.sql') && echo \$REMOTE_DUMP"
 ```
+
+`mktemp`, never a fixed name under `/tmp`, for two independent reasons. A predictable
+path in a world-writable directory on a **production** server is a name an unprivileged local
+user can wait for. And two clones running at once against the same machine would otherwise
+share one filename — the second export overwrites the first, and the first clone imports the
+second site's database into its own destination, with nothing to say so.
+
+Export with a restrictive umask so the file is never briefly world-readable:
+
+```bash
+bash -c "ssh user@host \"cd /remote/path && umask 077 && (wp db export '\$REMOTE_DUMP' --allow-root 2>/dev/null || wp db export '\$REMOTE_DUMP')\""
+```
+
+`umask 077` applies to files the command creates, so it has to be set in the same shell as
+the export — `chmod` afterwards leaves a window in which the dump already exists with the
+default mode.
 
 ### A5: Download Database Dump
 
 ```bash
-bash -c "scp user@host:/tmp/wp-clone-dump.sql /tmp/wp-clone-dump.sql"
+bash -c "LOCAL_DUMP=\$(mktemp -t wp-clone-XXXXXXXX.sql) && chmod 600 \"\$LOCAL_DUMP\" && scp user@host:\"\$REMOTE_DUMP\" \"\$LOCAL_DUMP\" && echo \$LOCAL_DUMP"
 ```
 
-Clean up the remote temp file:
+**Delete the remote copy whether or not the transfer worked:**
 
 ```bash
-bash -c "ssh user@host 'rm -f /tmp/wp-clone-dump.sql'"
+bash -c "ssh user@host \"rm -f '\$REMOTE_DUMP'\""
 ```
+
+Run this even when the `scp` above failed, and say so if it cannot be reached. A failed
+clone is exactly the run that leaves a production database sitting on a production server:
+the transfer is the step most likely to break, and a cleanup that only runs on success is
+absent from every case that needed it.
+
+`$LOCAL_DUMP` carries to A10, which imports it, and to A10's cleanup, which deletes it.
+**The local copy is not self-cleaning.** `/tmp` survives until a reboot or a distribution's
+tmpfiles timer, which is days — long enough that the dump outlives every memory of the
+clone that made it.
 
 ### A6: Detect Remote Upload Size
 
@@ -251,8 +284,22 @@ until it has passed.
 Read `.wp-create.json` from the local project to get the `$WP` wrapper:
 
 ```bash
-bash -c "$WP db import /tmp/wp-clone-dump.sql"
+bash -c "$WP db import \"\$LOCAL_DUMP\""
 ```
+
+**Then delete the local dump, and delete it whether the import succeeded or not:**
+
+```bash
+bash -c "rm -f \"\$LOCAL_DUMP\""
+```
+
+A failed import is the case that matters. It is the run the operator retries, investigates,
+or abandons — and the one where a full production database is most likely to be left in
+`/tmp` and forgotten, because nobody tidies up after a command that did not finish. The
+dump has served its only purpose the moment the import returns, either way.
+
+Report the deletion in the final summary. A dump that was written and then removed is
+something the operator should be able to confirm rather than assume.
 
 ### A11: Search-Replace URLs
 
@@ -341,6 +388,16 @@ Read `.wp-create.json` for the `$WP` wrapper:
 ```bash
 bash -c "$WP db import /path/to/dump.sql"
 ```
+
+**Do not delete this file.** Unlike Path A's dump, the operator created it and passed it in
+with `--sql=`; it may be their only copy, and removing someone's input because the command
+happened to consume it is not cleanup.
+
+Say what it is instead, once, in the final summary: the file at `--sql=` is a full database
+export, it is still on disk with whatever permissions it was created with, and it is worth
+removing or protecting once the clone is verified. Naming it is the right action here —
+deleting it is not the command's to take, and staying silent leaves a production database
+on the machine with nobody having mentioned it.
 
 ### B4: Extract Uploads
 
@@ -581,6 +638,11 @@ Admin users:  <list of admin usernames>
 Replaced:     a WordPress site was already here — "Client Demo", 47 posts
   Backup      ~/.wp-clone-backups/client-demo-20260919T161145Z.sql
               (omit this block entirely when the destination was empty)
+
+Database dump:
+  Path A        exported, transferred, imported and deleted from both machines
+  Path B        /tmp/dump.sql is yours and was left in place — it is a full database
+                export; remove or protect it once this clone is verified
 
 Isolation:
   Mail          captured to wp-content/clone-mail.log (mu-plugins/00-clone-isolation.php)
