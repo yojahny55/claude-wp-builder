@@ -25,6 +25,29 @@
   imported database and states that it is the weaker of the two rather than presenting parity.
   Step 6.5 now reconciles against the inventory instead of re-reporting the same missing
   plugins as a fresh discovery.
+- **Audit findings have identities, so successive reports are comparable.** `issues_found`,
+  `issues_fixed` and `carried_over` were three integers, and three integers cannot answer the
+  question every follow-up audit asks: is this the same problem as last time? Fix one issue
+  and find a new one and the count is unchanged while the contents changed completely — Step
+  2.5e could report "25 carried over" and never say which 25.
+  New Step 7.5 keys each finding by **check id + resource** (`SEC-036 : wp_options.siteurl`),
+  taken from the evidence Step 6.9 already requires rather than anything newly collected, and
+  preferring the record, option or element over a `file:line` — a line-number identity reports
+  every finding in a file as resolved-and-new the moment someone adds an import above it.
+  Statuses are `new`, `still_failing`, `resolved`, `accepted` and `unmeasured`.
+  **`resolved` requires a measurement**: a check that did not run yields `unmeasured`, never
+  `resolved`, or a Tier 1 run would mark every Tier 2 finding fixed and the report would show
+  a site cleaning itself up by being audited with less access than before. `accepted` is a
+  human decision in both directions — the audit never promotes its own finding to it and never
+  re-raises one, because re-raising what a client explicitly accepted is how a report stops
+  being read. A resolved entry is kept rather than deleted, so a defect that keeps coming back
+  stays distinguishable from one never seen before.
+  The ledger is its own file, `.wp-audit-findings.json`; `audit.findings_ledger` in the
+  manifest is a **pointer**, and `bin/wp-config.mjs` refuses an inlined one or a path that
+  climbs out of the project. The manifest is configuration that every command parses on every
+  run, while a findings ledger is audit history that grows without bound — one check found 70
+  orphan ACF ids on a single site. An absent ledger means "no history", never "nothing ever
+  failed", so a first run is not reported as a project with everything resolved.
 
 - **`/wp-clone` refuses to replace an occupied destination, and backs it up first.** The
   command ran `wp db import` against the destination on both paths with no backup, no

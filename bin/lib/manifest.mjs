@@ -83,6 +83,31 @@ export function validateManifest(manifest) {
   if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {
     return ['the manifest is not a JSON object'];
   }
+  // A pointer, and it has to stay one. The findings ledger is audit history and grows
+  // without bound -- one check found 70 orphan ids on a real site -- while this manifest is
+  // parsed by every command on every run to find a WP-CLI wrapper and a theme slug. An
+  // array here means the ledger has been inlined, which is the shape this refuses.
+  const ledger = at(manifest, 'audit.findings_ledger');
+  if (ledger !== undefined) {
+    if (ledger === null || typeof ledger !== 'object' || Array.isArray(ledger)) {
+      problems.push('audit.findings_ledger must be an object with a "path" -- it points at the ledger, it does not contain it');
+    } else {
+      if (typeof ledger.path !== 'string' || ledger.path === '') {
+        problems.push('audit.findings_ledger.path must be a non-empty string');
+      } else if (ledger.path.startsWith('/') || ledger.path.includes('..')) {
+        // The path is read and written by the audit. An absolute path or one that climbs
+        // out of the project is not a project artifact, and a manifest copied between
+        // projects would carry it to a machine where it addresses something else.
+        problems.push(`audit.findings_ledger.path must be relative to the project and must not climb out of it, found ${JSON.stringify(ledger.path)}`);
+      }
+      for (const key of Object.keys(ledger)) {
+        if (key !== 'path' && key !== 'written') {
+          problems.push(`audit.findings_ledger has an unknown key: ${key} -- it is a pointer, not the ledger`);
+        }
+      }
+    }
+  }
+
   const checksRun = at(manifest, 'audit.checks_run');
   if (checksRun !== undefined) {
     if (checksRun === null || typeof checksRun !== 'object' || Array.isArray(checksRun)) {

@@ -423,10 +423,18 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   nobody ran — the defect the diff exists to prevent. A project with no `checks_run` yet
   reports its per-check history as unknown rather than reporting all 261 checks as
   never-measured.
-  What is still only a count is the findings themselves: `issues_found` and `issues_fixed`
-  are integers, so "fixing one issue resolves that issue without clearing others" cannot be
-  shown — a finding has no identity to resolve. That needs a per-finding ledger keyed by
-  check id and resource, which is its own piece of work.
+  Findings now carry identity too: Step 7.5 keys each one by **check id + resource** in
+  `.wp-audit-findings.json`, beside the manifest rather than inside it — the manifest is
+  configuration every command parses on every run, and a ledger grows without bound (one
+  check found 70 orphan ids on one site). `audit.findings_ledger` is a pointer, and
+  `bin/wp-config.mjs` refuses an inlined one. `issues_found` / `issues_fixed` survive as
+  derived values because a summary still needs a number.
+  **`resolved` requires a measurement.** A check that did not run yields `unmeasured`, never
+  `resolved` — otherwise a Tier 1 run would mark every Tier 2 finding fixed and the report
+  would show a site cleaning itself up by being audited with less access than before. What
+  the ledger still cannot do is notice a finding whose *resource* is only a `file:line`
+  moving because someone added an import above it: that one reports resolved-and-new. Rules
+  identify by record, option or element wherever one exists, and the ones that cannot churn.
 - **A dev host is now distinguishable from a missing report, and both still block.**
   `bin/geo-scan.sh` exits `3` for a host it cannot reach publicly and `2` for a host with no
   report yet, so the audit can tell a configuration problem from an absence. Neither is a
