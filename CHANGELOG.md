@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-09-18
+
 ### Changed
 
 - **The backlog says what has already been built.** All 40 items were checked against the
