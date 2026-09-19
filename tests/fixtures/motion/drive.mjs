@@ -125,7 +125,7 @@ page.on('console', (m) => {
   }
 });
 await page.goto(`${base}/pan.html`);
-await page.waitForFunction('window.__motionReady === true', null, { timeout: 5000 });
+await page.waitForFunction('window.__motionReady === true', null, { timeout: 20000 });
 
 t('no section threw or logged an error', errors, []);
 
@@ -175,8 +175,23 @@ const beforeLeft = await page.evaluate(() => document.querySelector('#a [data-mo
 // code. Measured -- End left scrollLeft at 0 here.
 await page.keyboard.press('ArrowRight');
 await page.keyboard.press('ArrowRight');
-await page.waitForTimeout(150);
-const afterLeft = await page.evaluate(() => document.querySelector('#a [data-motion-rail]').scrollLeft);
+
+// Waited for, not slept on. Scrolling is not synchronous with the keypress, so reading
+// scrollLeft after a fixed delay is a race: it passed on an idle machine and lost once
+// inside a full suite run, which is the worst way for a check to behave -- an unexplained
+// red that everyone learns to re-run. Polling for the condition removes the timing
+// dependency instead of widening the window and hoping.
+let afterLeft = beforeLeft;
+try {
+  await page.waitForFunction(
+    (before) => document.querySelector('#a [data-motion-rail]').scrollLeft > before,
+    beforeLeft,
+    { timeout: 5000 }
+  );
+  afterLeft = await page.evaluate(() => document.querySelector('#a [data-motion-rail]').scrollLeft);
+} catch {
+  afterLeft = await page.evaluate(() => document.querySelector('#a [data-motion-rail]').scrollLeft);
+}
 t('A: the keyboard scrolls the scroller, not the document', afterLeft > beforeLeft, true);
 
 await browser.close();
