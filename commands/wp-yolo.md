@@ -42,12 +42,18 @@ Parse `$ARGUMENTS`:
   ```
   Error: A demo folder is required.
   Usage: /wp-yolo <path-to-demo-folder> [--yolo] [--careful] [--force]
+         /wp-yolo <path-to-demo-folder> --resume [--accept-drift]
   ```
 - **`--yolo`** = no checkpoint at all (ingest → build → seed → finalize → report, hands-off).
 - **`--careful`** = checkpoint after normalization AND a per-page confirm before each inner
   page's build in Phase 2.
 - **default** (neither flag) = a single checkpoint after normalization (Step 3), then
   hands-off from Step 4 onward.
+- **`--resume`** = continue an interrupted run. Skips Steps 2, 2.5, 2.6 and 3 entirely
+  and enters at Step 4, reading `demo/.yolo-manifest.json` from disk. See
+  *Step 4.0: Resuming an interrupted run*. Requires `demo/.yolo-progress.json`.
+- **`--accept-drift`** = with `--resume` only, continue even though a build input
+  changed since the interrupted run. Never implied by `--force`.
 
 The command is named `/wp-yolo`; that name is NOT the `--yolo` flag. A bare
 `/wp-yolo <folder>` with no flags runs the Step 3 checkpoint and waits for the
@@ -66,11 +72,10 @@ Read `.claude/CLAUDE.md` at the project root. If it does not exist, refuse:
 Error: No .claude/CLAUDE.md found. Run /wp-init first to scaffold the project.
 ```
 
-**Then refuse to run twice.** This command has no resume entrypoint: a second
-run restarts at Step 2, re-dispatches `wp-normalize`, overwrites
-`demo/.yolo-manifest.json` and rebuilds the theme over whatever has been hand-
-corrected since. If the theme directory already holds built section template
-parts, or `.claude/CLAUDE.md` records a completed run, stop:
+**Then refuse to run twice.** A second *build* restarts at Step 2, re-dispatches
+`wp-normalize`, overwrites `demo/.yolo-manifest.json` and rebuilds the theme over
+whatever has been hand-corrected since. If the theme directory already holds built
+section template parts, or `.claude/CLAUDE.md` records a completed run, stop:
 
 ```
 Error: <theme> already contains a built section flow (<n> template parts).
@@ -82,6 +87,13 @@ Pass --force only to deliberately discard the current build.
 Accept `--force` to override, and on a successful run append a
 `## Workflow — DONE, do not re-run` note to `.claude/CLAUDE.md` recording the
 date and which steps completed.
+
+**`--resume` bypasses this gate, and only this gate.** Built template parts are
+exactly the state a resume exists for, so the condition that stops a rebuild is the
+condition a continuation expects. What `--resume` does not bypass is any other
+refusal in this step — `demo/FAILED.md`, a missing `.claude/CLAUDE.md`, an invalid
+manifest, a `cinematic` template — because none of those describe an interrupted
+run. Delete the ledger before a `--force` rebuild (Step 4.0 says where).
 Extract function prefix, theme slug, languages (primary + secondary), template
 (basic|tailwind), CF plugin (scf|acf), and **i18n strategy (suffix|polylang)** —
 needed by every downstream command.
@@ -527,16 +539,175 @@ Ask the user to **approve / edit / abort** with AskUserQuestion, then stop and w
   says nothing about the demo. The degradation was silent, and a workaround documented
   three steps away from the command that triggers it is a workaround nobody applies.
 
-  There is no resume entrypoint in this command — not `--yolo`, and not any other flag.
+  **`--resume` is the only continuation entrypoint, and it is never `--yolo`.**
   `--yolo` suppresses this checkpoint and nothing else (Step 1: "no checkpoint at all"):
   Step 2 still dispatches `wp-normalize` and still overwrites `demo/.yolo-manifest.json`
   before Step 3 is ever reached, so re-running with it *is* the unconditional-normalize
   path described above and it regenerates the very manifest a resume would have to
-  preserve. Restore the originals first: every `/wp-yolo` invocation is a fresh build,
-  never a continuation of an aborted one.
+  preserve.
+
+  `--resume` is the one entrypoint that does not have this problem, because it does not
+  run Step 2 at all — it enters at Step 4 with the manifest already on disk (Step 4.0).
+  That is the whole mechanism rather than an optimisation: the steps it skips are
+  precisely the ones that consume the demo in place. An abort *before* Step 4 has
+  therefore built nothing, so a resume has no work to find and no ledger to read:
+  restore the originals and start fresh, as above.
 
 Under `--yolo`, skip this step and proceed straight to Phase 2 with the manifest as
 emitted by `wp-normalize`.
+
+## Step 4.0: The build ledger, and resuming an interrupted run
+
+Phase 2 and the carries after it are thirty to fifty dispatches and the better part of
+an hour. Every one of them writes a real file, and until this step existed an
+interruption — a crash, a closed terminal, one failing dispatch — threw all of it away,
+because the only way to run this command again was from Step 2, which regenerates the
+manifest the build reads.
+
+### The unit
+
+One dispatch, one unit. Ids are recomputed from the manifest on every run rather than
+stored as a list, so a manifest edit cannot leave the ledger describing units that no
+longer exist:
+
+```
+settings                      cpt:<name>                header       footer
+section:<page-slug>:<block>   page:<slug>               page:blog
+page:404                      page:search               seed-cpt:<name>
+promotion                     fonts                     behaviour
+```
+
+`<page-slug>` is `index` for the home page and the page's own slug for an inner page;
+`<block>` is the unique BEM block Step 4 already assigns each section so parallel agents
+cannot collide on a selector. `section:index:hero` is therefore stable across runs with
+no counter to keep.
+
+**A section is one unit, not three.** `/wp-section` dispatches three agents in parallel;
+two of three finished is not a built section.
+
+**There is no resume inside a unit.** An interrupted unit writes no ledger entry, so the
+next run re-dispatches it and it overwrites its own half-written file. The granularity
+is the recovery — there is no partial state to reconcile and nothing to roll back.
+
+### What the ledger does not cover
+
+Two kinds of step are deliberately absent, and adding them would each cause a defect.
+
+- **Steps that are already idempotent.** `/wp-seed` re-enters correctly by itself: it
+  owns records by marker and fields by digest, and reports a client's edit rather than
+  reverting it. A resume simply runs it. A ledger entry here would be a second source of
+  truth for a question the command already answers, and a stale one skips a seed the
+  demo needs.
+- **Steps that measure.** The Tailwind rebuild, `/wp-finalize`, `/wp-polish`,
+  `/wp-responsive-check` and the Step 5.5 parity gate all read the **live site**.
+  Skipping one because an earlier run performed it would report a gate result for a
+  build that no longer exists — a signed-off deliverable nobody measured. These always
+  run, on a resume exactly as on a fresh build.
+
+Stated once: **the ledger covers work that generates, never work that verifies.**
+
+### The ledger file
+
+`demo/.yolo-progress.json`, beside the manifest — not in `.wp-create.json`, which is
+configuration every command parses on every run, where this is transient build state
+that dies with the demo folder.
+
+```json
+{
+  "version": 1,
+  "started": "2026-09-18T14:02:11Z",
+  "inputs": {
+    "manifest": "<sha256 of demo/.yolo-manifest.json>",
+    "pages": { "index": "<sha256>", "about": "<sha256>" }
+  },
+  "units": [
+    { "id": "section:index:hero",
+      "at": "2026-09-18T14:09:40Z",
+      "artifact": "template-parts/section-hero.php" }
+  ]
+}
+```
+
+Create it at the top of Step 4 on **every** run, not only under `--resume` — a run that
+is never interrupted still writes one, and that is what makes the next one resumable.
+`inputs` is digested once, here, before the first dispatch:
+
+```bash
+sha256sum demo/.yolo-manifest.json demo/index.html demo/<slug>.html
+```
+
+Append one entry the moment a unit returns, with `jq` — never in a batch at the end of a
+phase, which loses exactly the units a crash interrupted:
+
+```bash
+jq --arg id "section:index:hero" --arg at "$(date -u +%FT%TZ)" \
+   --arg art "template-parts/section-hero.php" \
+   '.units += [{id: $id, at: $at, artifact: $art}]' \
+   demo/.yolo-progress.json > demo/.yolo-progress.json.tmp \
+   && mv demo/.yolo-progress.json.tmp demo/.yolo-progress.json
+```
+
+`artifact` is theme-relative, and is `null` for a unit that writes no single file
+(`settings`). Write it through a temp file and `mv`: a crash during the write of a
+ledger is the one crash that must not also destroy the record of everything before it.
+
+**Delete it on a successful completion**, in the same place Step 6 appends the
+`## Workflow — DONE, do not re-run` note, and **delete it before Step 2 on a `--force`
+rebuild**, where the inputs it digested are about to be regenerated and every digest in
+it is about to become a lie. A ledger that outlives its build is a `--resume` aimed at a
+site that needs nothing.
+
+### Entering with `--resume`
+
+`--resume` enters **here**, at Step 4. It has not run Steps 2, 2.5, 2.6 or 3, and must
+not: those are the steps that convert `demo/*.html` in place and rewrite the manifest.
+
+**Refuse when there is no ledger:**
+
+```
+Error: no demo/.yolo-progress.json — there is no interrupted run to resume.
+Run /wp-yolo without --resume to build from the demo.
+```
+
+`--resume` with nothing to resume is a typo, not a request for a fresh build. Silently
+converting one into the other is how a resume flag overwrites a finished site.
+
+**Then check for drift.** Re-digest `demo/.yolo-manifest.json` and every page named in
+`inputs.pages`, and compare against the stored digests. Unchanged → continue. Changed,
+or a recorded page now missing → stop, naming the file, what it feeds, and how far the
+previous run got:
+
+```
+Error: demo/.yolo-manifest.json changed since the interrupted run.
+It feeds every section build. 4 of 11 units completed against the previous version.
+  Rebuild from scratch: restore demo/.original/*.html, then /wp-yolo --force
+  Continue anyway:      /wp-yolo --resume --accept-drift
+```
+
+Without those three facts the message is one an operator cannot act on. Resuming across
+a changed input builds half a theme from one manifest and half from another, and nothing
+downstream fails — the parity gate measures the built site against the demo it can see
+now, so the half built from the old manifest is simply wrong and green.
+
+`--accept-drift` proceeds anyway, and exists because the edit is often deliberate: the
+manifest was fixed to correct whatever broke the run. It is its own flag and is **not**
+implied by `--force`, the same way `--force-fields` is not implied by `--force` in
+`/wp-seed`. A run that accepts drift re-digests `inputs` and says so in the Step 6
+report.
+
+### Verify before skipping
+
+Walk the units in the Step 4 order below. For each:
+
+- **no ledger entry** → dispatch it.
+- **entry, `artifact` non-null, file present and non-empty** → skip it, and count it as
+  resumed in the report.
+- **entry, `artifact` non-null, file missing or empty** → **it is not done.** Dispatch
+  it, and list it in the Step 6 report as rebuilt-because-missing. A ledger can outlive
+  the files it describes — someone deleted a template part, or a theme directory was
+  restored from elsewhere — and trusting it here leaves a hole the build reports as
+  filled.
+- **entry, `artifact` null** → skip on the ledger alone (`settings` only).
 
 ## Step 4: Phase 2 — Build (dependency order)
 
@@ -930,6 +1101,19 @@ Review:
   - <approved-but-missing-HTML pages: "approved/designed but no HTML — needs demo">
   - <research identity: confirmed or unconfirmed, with the name>
 ```
+
+**On a resumed run**, add a Resume block above Review, and delete
+`demo/.yolo-progress.json` once the summary is printed (Step 4.0):
+```
+Resumed:
+  Skipped (already built):     <count> units
+  Rebuilt (artifact missing):  <unit id list — the ledger claimed these, the files were gone>
+  Built this run:              <count> units
+  Drift accepted:              <file list, only when --accept-drift was passed>
+```
+The rebuilt-because-missing list is never folded into the built count. It is the one
+signal that the ledger and the theme directory had diverged, and a reader who cannot
+see it cannot know which parts of the site this run actually looked at.
 
 Note for the user: `--yolo` is best used **after** one checkpointed dry-run of the same
 demo folder, once the manifest has been reviewed and edited at least once.

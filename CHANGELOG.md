@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+### Added
+
+- `/wp-yolo --resume` — an entrypoint that continues an interrupted build instead of
+  discarding it. A full run is thirty to fifty dispatches and the better part of an
+  hour, and until now a crash, a closed terminal or one failing step threw all of it
+  away: the only way to run the command again was from Step 2, which converts
+  `demo/*.html` in place and regenerates the manifest the build reads, so a second run
+  quietly degraded its own output. `--resume` enters at Step 4 and never runs those
+  steps — skipping them is the mechanism, not an optimisation.
+- A build ledger at `demo/.yolo-progress.json`, written on every run (not only resumed
+  ones) and deleted when a build completes. One entry per dispatch, appended the moment
+  the unit returns and written through a temp file, so an interruption loses at most the
+  unit it interrupted. A unit is skipped only when the ledger records it **and** its
+  artifact is still on disk — a ledger that outlived its files reports a hole as filled,
+  so a missing artifact means not-done and is rebuilt and listed as such in the report.
+- Drift detection on resume: the ledger digests the manifest and every demo page it
+  built from, and a changed input refuses rather than continuing, naming the file, what
+  it feeds and how far the previous run got. Building half a theme from one manifest and
+  half from another fails nothing downstream — the parity gate measures the built site
+  against the demo as it stands now — so the stale half would be wrong and green.
+  `--accept-drift` proceeds deliberately and is not implied by `--force`.
+
+  The ledger records work that generates and never work that verifies. `/wp-seed` is
+  re-run rather than recorded, because it already owns its own re-entrancy; the Tailwind
+  rebuild, `/wp-finalize`, `/wp-polish`, `/wp-responsive-check` and the parity gate are
+  re-run because they read the live site, and skipping a measurement would sign off a
+  build nobody measured.
+
 ## [1.20.0] - 2026-09-19
 
 ### Added

@@ -265,6 +265,24 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   item to a demo link is guesswork the moment a title is edited. Items the client added are
   kept. The cost is that a seeded item's own ID changes on every run, so nothing may hold a
   reference to one.
+- **A resumed `/wp-yolo` trusts that a present artifact is a correct artifact.**
+  `--resume` skips a unit when `demo/.yolo-progress.json` records it *and* its file is
+  still on disk and non-empty. A template part that a failed agent left syntactically
+  valid but wrong is indistinguishable from a good one at that granularity, and is
+  skipped. The Step 5.5 parity gate is the net under it, and it measures geometry at
+  rest — not behaviour, and not whether a section says what the demo said. Deliberate:
+  the alternative is re-verifying every completed unit on every resume, which costs
+  what the resume was meant to save.
+- **`settings` is recorded, not verified.** `/wp-settings` writes nine or so WordPress
+  options and produces no single file, so its ledger entry carries `artifact: null` and
+  is trusted on the ledger alone. A probe asserting one option out of nine would read
+  as verification while proving almost nothing, which is worse than the stated gap.
+- **Drift is detected per file, not per section.** The ledger digests the whole
+  manifest, so any edit to it invalidates every section and `--resume` refuses until
+  `--accept-drift` is passed. Sub-document digests would let a resume continue across an
+  unrelated edit, but they would have to model which manifest key feeds which unit, and
+  a wrong model there silently reuses stale input — the exact failure the ledger exists
+  to prevent. Refusing too often is the cheaper error.
 - **Media is not translated.** The Polylang importer copies an image or file id to the counterpart
   as-is rather than swapping it for that attachment's own translation. Mapping media is a separate
   decision; `pll-import.php` and the live suite both state the ceiling.

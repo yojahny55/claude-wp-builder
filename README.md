@@ -143,7 +143,14 @@ the fastest path when a client sends you a complete multi-page HTML site.
 /wp-yolo demo/                    # checkpoint after normalization, then hands-off
 /wp-yolo demo/ --yolo             # no checkpoint
 /wp-yolo demo/ --careful          # confirm each inner page
+/wp-yolo demo/ --resume           # continue an interrupted build
 ```
+
+A full run is thirty to fifty dispatches and the better part of an hour. `--resume`
+picks up where an interrupted one stopped, reading the build ledger at
+`demo/.yolo-progress.json`: it re-dispatches nothing it can prove is already on disk,
+re-runs everything that measures the live site, and refuses if the manifest or a demo
+page changed underneath it.
 
 Normalizes every page, reconciles it against `docs/.scope-manifest.json` (IDX/plugin pages
 become embed shells, out-of-scope pages are skipped), then drives `/wp-settings` → `/wp-cpt`
