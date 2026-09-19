@@ -56,7 +56,15 @@ jobs:
         run: |
           set -uo pipefail
           pass=0; failed=()
+          # Two checks are owned by their own jobs, which give them the WordPress and the
+          # browser they need. Running them here too would execute them a second time per
+          # CI run -- and worse, this job has neither, so each would take its skip path,
+          # exit 0 and be counted as a pass. A runner that lost Chrome would then still
+          # turn this job green, which is exactly the silent-skip failure their own jobs
+          # exist to refuse: the guard would be in place and standing next to an open door.
+          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh'
           for f in tests/checks/*.sh; do
+            case " $skip_here " in *" $f "*) continue ;; esac
             if out=$(bash "$f" 2>&1); then
               pass=$((pass + 1))
             else
@@ -226,27 +234,18 @@ jobs:
       - name: Install playwright-core
         run: npm install --no-audit --no-fund
 
+      # Once, not twice. MOTION_REQUIRE_BROWSER turns the check's own skip path into a
+      # failure, so a runner that loses Chrome fails here instead of going green -- which
+      # a second invocation inspecting the first one's output also achieved, at the cost
+      # of a second browser launch and a second chance to flake.
       - name: motion.js devices in a real browser
         env:
           # The runner's own Chrome. The driver falls back through the usual paths, but
           # naming it here means a runner image change surfaces as "no usable Chrome"
           # from the driver rather than as a mystery skip.
           CHROME_PATH: /usr/bin/google-chrome
+          MOTION_REQUIRE_BROWSER: "1"
         run: |
           echo "::group::motion devices"
           bash tests/checks/motion-devices.sh
           echo "::endgroup::"
-
-      # A skip is a legitimate result for this check on a machine with no browser -- but
-      # not here, where one is installed on purpose. Without this, a runner that loses
-      # Chrome turns a verification job into a green no-op, which is the failure mode this
-      # whole release has been removing.
-      - name: Refuse a silent skip
-        env:
-          CHROME_PATH: /usr/bin/google-chrome
-        run: |
-          out=$(bash tests/checks/motion-devices.sh)
-          case "$out" in
-            *SKIP*) echo "$out"; echo "::error::the browser check skipped on a runner that has a browser"; exit 1 ;;
-            *) echo "$out" ;;
-          esac

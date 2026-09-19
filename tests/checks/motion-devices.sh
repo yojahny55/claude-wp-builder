@@ -41,6 +41,14 @@ set -e
 # suite that reports a missing browser as a broken device teaches everyone to ignore it.
 if [ "$status" -eq 2 ]; then
   echo "$out" | sed 's/^/  /'
+  # A skip is the right answer on a machine with no browser and the wrong answer on one
+  # that is supposed to have one. The caller knows which it is, so the caller says so --
+  # and it lives here rather than in the workflow because a second invocation to check the
+  # first invocation's output costs a whole extra browser launch and gives flakiness two
+  # chances instead of one.
+  if [ -n "${MOTION_REQUIRE_BROWSER:-}" ]; then
+    fail "no browser available, but MOTION_REQUIRE_BROWSER is set -- this environment is supposed to have one"
+  fi
   echo "SKIP: no browser available (install playwright-core and a Chrome, or set CHROME_PATH)"
   exit 0
 fi
