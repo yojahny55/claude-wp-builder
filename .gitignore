@@ -23,8 +23,14 @@ package-lock.json
 # fixture added later in this plan doesn't silently vanish from `git status` again.
 !tests/fixtures/manifests/**/.wp-create.json
 
-# Claude Code local settings
-.claude/settings.local.json
+# Claude Code local settings, and the agent scratch directories beside them.
+# These are per-machine working state: local settings and their backups, the
+# superpowers workspace, and the tokensave index. None of it describes the
+# plugin, and a `git add -A` during a release chore will otherwise sweep the
+# whole lot into the commit.
+.claude/
+.superpowers/
+.tokensave/
 
 # Serena MCP workspace cache (per-machine index, not shared state)
 .serena/

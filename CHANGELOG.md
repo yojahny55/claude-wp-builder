@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-09-19
+
 ### Added
 
 - The motion engine is now driven on **both** paths in a real browser, not one.
