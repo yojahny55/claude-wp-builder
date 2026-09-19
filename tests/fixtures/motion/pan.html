@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>pan device fixture</title>
+<style>
+  /* The frame is the rail's parent and is what bounds its visible width, exactly as a
+     composition's section wrapper does. Its width is fixed so the overflow decision is a
+     property of this fixture rather than of the window the test happens to open. */
+  .frame { width: 400px; overflow-x: hidden; }
+  .rail { display: flex; gap: 20px; }
+  .item { flex: 0 0 300px; height: 60px; background: #ccc; }
+  /* The narrow case: one item, comfortably inside the frame, so NOTHING overflows. */
+  .narrow .item { flex: 0 0 100px; }
+</style>
+</head>
+<body>
+
+<!-- Case A: the rail overflows its frame, and the section has a heading.
+     Expected: the rail becomes the scroller, gains tabindex 0, and is named as a region
+     by that heading. -->
+<section id="a" data-motion="pan">
+  <h2>Overflowing rail</h2>
+  <div class="frame"><div class="rail" data-motion-rail>
+    <div class="item"></div><div class="item"></div><div class="item"></div>
+  </div></div>
+</section>
+
+<!-- Case B: nothing overflows. Expected: NO tabindex and NO role anywhere in the section.
+     A focusable, named region that scrolls nothing is a dead tab stop, which is the bug
+     the measurement in motion.js exists to avoid rather than a smaller version of it. -->
+<section id="b" data-motion="pan">
+  <h2>Nothing overflows</h2>
+  <div class="frame narrow"><div class="rail" data-motion-rail>
+    <div class="item"></div>
+  </div></div>
+</section>
+
+<!-- Case C: the rail overflows but the section has no heading.
+     Expected: tabindex (the region is reachable) but NO role and NO aria-labelledby --
+     an unnamed region is not a landmark, so the role is only set when something can name
+     it. -->
+<section id="c" data-motion="pan">
+  <div class="frame"><div class="rail" data-motion-rail>
+    <div class="item"></div><div class="item"></div><div class="item"></div>
+  </div></div>
+</section>
+
+<script type="module">
+  import { initMotion } from './motion.js';
+
+  // Stubs, and the stub is the honest thing here rather than a shortcut. initMotion()
+  // returns immediately without both arguments, but under reduced motion the pan branch
+  // never calls ScrollTrigger.create() -- it is the DOM logic below that decides which
+  // box scrolls and whether anything is focusable at all. Driving that with real GSAP
+  // would prove the same thing and add a CDN download to every run.
+  const noop = function () {};
+  initMotion({ registerPlugin: noop }, { create: noop });
+  window.__motionReady = true;
+</script>
+</body>
+</html>

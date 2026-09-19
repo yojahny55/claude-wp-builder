@@ -4,6 +4,24 @@
 
 ### Added
 
+- The first check that drives a browser. `tests/checks/motion-devices.sh` loads `motion.js`
+  in a real Chrome under `prefers-reduced-motion: reduce` and asserts what the `pan` device
+  does to the DOM: that it hands the rail back as a scroll region, that the box it makes
+  focusable is the one it *measured* as overflowing rather than the one named in the
+  markup, that the region is named from the section's own heading, and — the one with no
+  visible output at all — that when neither box overflows it attaches nothing, because a
+  focusable named region that scrolls nothing is a dead tab stop by another route.
+
+  CLAUDE.md recorded this branch as walked by nobody. Four deliberate regressions were each
+  confirmed to fail the check, and closing the fourth found a real gap in the check itself:
+  a section that throws is caught by motion.js's own per-section handler and reported with
+  `console.warn`, so a device that died left a DOM merely lacking what it would have added,
+  and every assertion about what is absent passed for the wrong reason. The driver now
+  listens for that.
+
+  A root `package.json` comes with it, pinning the `playwright-core` that
+  `bin/demo-verify.mjs` and `bin/composition-preview.mjs` have always imported and that
+  nothing declared. It is dev tooling, never shipped into a user's project.
 - A disposable WordPress fixture, and the first checks that run inside one.
   `tests/fixtures/wp/provision.sh` builds a pinned WordPress with Polylang and SCF against
   a database from a CI service container or a local docker container, and
