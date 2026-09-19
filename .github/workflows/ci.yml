@@ -210,3 +210,43 @@ jobs:
           echo "::group::provision and run"
           bash tests/checks/wp-polylang-integration.sh
           echo "::endgroup::"
+
+  browser:
+    name: Browser devices
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # playwright-core only -- not `playwright`, and no browser download. The runner
+      # already ships Chrome, and a job that downloads a browser on every run is slower
+      # and fails differently on a cold cache than the thing it is meant to be testing.
+      # No package-lock.json, so no npm ci: the single dependency is pinned to an exact
+      # version in package.json, which is what a lockfile would add here and nothing more.
+      - name: Install playwright-core
+        run: npm install --no-audit --no-fund
+
+      - name: motion.js devices in a real browser
+        env:
+          # The runner's own Chrome. The driver falls back through the usual paths, but
+          # naming it here means a runner image change surfaces as "no usable Chrome"
+          # from the driver rather than as a mystery skip.
+          CHROME_PATH: /usr/bin/google-chrome
+        run: |
+          echo "::group::motion devices"
+          bash tests/checks/motion-devices.sh
+          echo "::endgroup::"
+
+      # A skip is a legitimate result for this check on a machine with no browser -- but
+      # not here, where one is installed on purpose. Without this, a runner that loses
+      # Chrome turns a verification job into a green no-op, which is the failure mode this
+      # whole release has been removing.
+      - name: Refuse a silent skip
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: |
+          out=$(bash tests/checks/motion-devices.sh)
+          case "$out" in
+            *SKIP*) echo "$out"; echo "::error::the browser check skipped on a runner that has a browser"; exit 1 ;;
+            *) echo "$out" ;;
+          esac

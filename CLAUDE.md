@@ -5,7 +5,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this repo is
 
 A **Claude Code plugin**, not an application. Almost everything here is markdown that instructs
-Claude at runtime — commands, agents and skills. There is no build step, no package manager, no
+Claude at runtime — commands, agents and skills. There is no build step and no runtime for the
+plugin itself; the root `package.json` is dev tooling only, pinning the `playwright-core` that
+`bin/demo-verify.mjs`, `bin/composition-preview.mjs` and the browser checks already import. It
+is never shipped to a user's project and nothing in `commands/`, `agents/` or `skills/` requires
+it — those tools each resolve it through a ladder and degrade when it is absent. It is committed
+because the dependency existed either way and pinning it nowhere made "works on my machine" the
+contract. No
 runtime for the plugin itself. The only executable code shipped is:
 
 - `bin/*.sh` — env setup, ffmpeg wrappers and gate scripts, invoked by commands
@@ -426,11 +432,18 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   compositions instead, with the release commit's `demo-verify.mjs` and with HEAD's.
   That proves the harness changed behaviour as intended; it does not prove what a
   messy real build now scores, and a composition corpus is cleaner than one.
-- **Two verification paths are still not covered.** Item F's last preview-token bypass
-  — a reassignment at `composition-preview.mjs`'s render call site, which happens after
-  `--tokens` has exited and which no assertion on that output can see — needs the render
-  itself to close. And `motion.js`'s GSAP `reveal` branch is never walked, because
-  nothing in the suite runs a browser without `animation-timeline`.
+- **One verification path is still not covered, and one now is.** Item F's last
+  preview-token bypass — a reassignment at `composition-preview.mjs`'s render call site,
+  which happens after `--tokens` has exited and which no assertion on that output can see
+  — still needs the render itself to close.
+  `motion.js` is no longer unwalked: `tests/checks/motion-devices.sh` runs it in a real
+  Chrome under `prefers-reduced-motion: reduce` and asserts what the `pan` device does to
+  the DOM, including the behaviour that has no visible output at all — that when neither
+  box overflows it attaches *nothing*, because a focusable named region that scrolls
+  nothing is a dead tab stop. What it drives is the reduced-motion branch with stubbed
+  `gsap`/`ScrollTrigger` objects, which is honest for that branch because it never calls
+  them; the default-motion branch, where ScrollTrigger actually runs, is still walked by
+  nobody.
 - **`motion.js` sets `overflowX` on the rail, not on the frame — and it is not inert.**
   Under reduced motion the stylesheet resets the rail to `width: auto`, and a scroll
   container is sized by its box rather than by its content, so the assignment makes the
