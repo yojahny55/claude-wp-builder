@@ -4,6 +4,21 @@
 
 ### Added
 
+- `tests/checks/wp-cf7-delivery.sh` — a contact form is now proved to accept, refuse and
+  actually deliver. It creates a real Contact Form 7 form in the WordPress fixture, serves
+  the site, and posts to CF7's own REST endpoint: a valid submission must be accepted and
+  its mail captured with the right recipient and an interpolated body, and a submission
+  missing a required field must be refused **and** send nothing.
+
+  Mail is captured by a `pre_wp_mail` must-use plugin — the same seam `/wp-clone` isolates
+  at, chosen for the same reason: it short-circuits core's own send, so nothing escapes
+  even if a plugin is reactivated. An SMTP plugin would not do, because core falls back to
+  PHP `mail()` and the site keeps sending while merely logging it somewhere nobody looks.
+
+  `agents/wp-cf7.md` contracts the form markup and the branded template, and a grep can
+  confirm those contracts are still written down. It cannot notice that a form renders
+  perfectly and delivers nothing, which is the failure that costs a client real enquiries
+  before anyone sees it. This is the third leg of I06's own completion check.
 - `tests/checks/backlog-freshness.sh` — the backlog now has to be reconciled as part of
   cutting a release, and CI says so. The last hand reconciliation went stale in a single
   day: three releases shipped a clone anonymiser, resumable builds, a findings ledger, ACF

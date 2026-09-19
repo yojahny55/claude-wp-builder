@@ -118,8 +118,8 @@ Making the command flow smoother and more guided.
 - [ ] **Screenshot generation with Playwright** `PARTIAL`
   **Gap:** [wp-finalize](commands/wp-finalize.md) checks that `screenshot.png` exists, and both starters ship one. Nothing regenerates it at 1200x900 from the built homepage, so a delivered theme's preview image is the starter's, not the site's.
 
-- [ ] **Verify form delivery end to end** `OPEN`
-  Install CF7 into the WordPress fixture with a local mail sink, then assert a valid submission is accepted, an invalid one is rejected, and the mail actually left the site. [wp-cf7](agents/wp-cf7.md) contracts the form and the branded template; nothing checks that a submission arrives anywhere. Named by I06's own completion check.
+- [x] **Verify form delivery end to end** `DELIVERED`
+  [wp-cf7-delivery](tests/checks/wp-cf7-delivery.sh) creates a real CF7 form in the WordPress fixture, serves the site, and posts to CF7's own REST endpoint: a valid submission is accepted and its mail captured by a `pre_wp_mail` sink with the right recipient and an interpolated body, and a submission missing a required field is refused and sends nothing.
 
 - [ ] **Walk the default-motion branch** `OPEN`
   [motion-devices](tests/checks/motion-devices.sh) drives `motion.js` under `prefers-reduced-motion: reduce`, where the `pan` device never calls ScrollTrigger and stubs are honest. The default-motion branch, where ScrollTrigger actually runs, is still walked by nobody.
