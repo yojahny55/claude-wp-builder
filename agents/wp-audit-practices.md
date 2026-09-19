@@ -73,6 +73,7 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 | WP-017 | Include instead of get_template_part | Grep templates for `include\|require` of template files (should use get_template_part) | WARNING | No |
 | WP-018 | Missing wp_body_open | Grep header.php for `wp_body_open()` | WARNING | Yes |
 | WP-019 | Broken template part refs | For each `get_template_part()` call, verify the referenced file exists | CRITICAL | No |
+| WP-048 | Orphaned IDs in relationship fields | Resolve every post ID stored in an ACF relationship or post-object field; split the ones a template prints from the ones nothing reads. See Procedure | WARNING / INFO | No |
 
 ### Hooks & Functions
 
@@ -171,6 +172,37 @@ For each auto-fixable finding, apply the fix:
 - **WP-034**: Edit templates to replace `get_field(` with `prefix_get_field(` (using the actual prefix from CLAUDE.md)
 - **WP-041**: `$WP config set FS_METHOD "'direct'" --type=constant`
 - **WP-045**: `chmod 755 wp-content/uploads/ wp-content/plugins/ wp-content/upgrade/`
+
+### Procedure — WP-048 (IDs that outlive the post)
+
+Deleting a post from wp-admin does not clear its ID out of the relationship and post-object
+fields that point at it. The ID stays in `postmeta` verbatim. A template that iterates the
+field and prints a card per ID then prints one card with no title, no terms and an empty
+`href` — a visible defect produced by a record that no longer exists.
+
+**Split the findings by whether a template reads the field, or the check is noise.** On one
+audited site the sweep found **70** orphaned IDs and exactly **1** reached the HTML. The other
+69 sat in fields no template touches. Reporting 70 WARNINGs buries the one that matters.
+
+```bash
+# 1. every ID stored in a relationship/post-object field that no longer resolves
+$WP eval-file <skills>/wp-cli-patterns/scripts/find-orphan-acf-ids.php
+
+# 2. which field names a template actually reads
+grep -rhoE "get_field\( *'([a-z0-9_]+)'" <theme> --include='*.php' | sort -u
+```
+
+A field name in both lists is WARNING — the orphan reaches a rendered page, and the report
+names the post whose field holds it so the fix can be verified there. A field name in the first
+list only is INFO: dead data, worth cleaning, not worth a warning.
+
+An ID that resolves to a post in a non-`publish` status is the same defect with a different
+cause and belongs in the WARNING bucket too. `get_post_status()` returns `draft` or `trash`
+rather than `false`, so a check that only tests `get_post()` for `null` misses it, and a
+trashed post still has a permalink the template will happily print.
+
+The fix is to remove the ID from the stored array, never to hide the empty card with CSS: the
+second leaves the data broken and the layout carrying a gap where the card was.
 
 ### Procedure — WP-046 and WP-047
 
