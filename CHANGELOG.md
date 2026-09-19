@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-09-19
+
 ### Added
 
 - **`/wp-clone` inventories the plugins and themes a clone will be missing, while it can
