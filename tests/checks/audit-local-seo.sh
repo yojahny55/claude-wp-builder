@@ -69,11 +69,11 @@ grep -Fq 'suffixes under *both* i18n strategies' "$SKILL" \
 # styles and can override the utility classes already on the page.
 grep -Fq 'never auto-applied' "$AGENT" \
   || fail "$AGENT no longer forbids auto-applying the local fixes that change markup"
-grep -Fq '| SEO-056 |' "$AGENT" && grep -E '^\| SEO-056 \|.*\| No \|$' "$AGENT" >/dev/null \
+grep -Fq '| SEO-056 |' "$AGENT" && grep -E '^\| *SEO-056 *\|.*\| *No *\| *$' "$AGENT" >/dev/null \
   || fail "SEO-056 is not marked auto-fix No — it adds a visible tel: link or map embed"
 
 # Severity: SEO-063 is the only CRITICAL, because it is a manual-action risk.
-grep -E '^\| SEO-063 \|.*\| CRITICAL \|$' "$AGENT" >/dev/null \
+grep -E '^\| *SEO-063 *\|.*\| *CRITICAL *\| *$' "$AGENT" >/dev/null \
   || fail "SEO-063 is no longer CRITICAL — a fabricated aggregateRating risks a manual action"
 
 # The agent must still send the reader to the skill, or the criteria are orphaned.
