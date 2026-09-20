@@ -47,7 +47,10 @@ printf '%s' "$flat" | grep -Fq 'the obvious fix and the wrong one' \
 # must hand to the project rather than keep.
 printf '%s' "$flat" | grep -Fq 'editing a file under' \
   || { echo "FAIL: the PERF-058 fix does not warn that editing a source file has no effect once the twin exists"; exit 1; }
-printf '%s' "$flat" | grep -Fq 'version constant' \
+# The whole instruction, not the words 'version constant', which appear in any prose about
+# a theme constant and would hold with the bump deleted. Matched against $flat: the file is
+# already flattened, so the phrase is found whether or not the paragraph wraps inside it.
+printf '%s' "$flat" | grep -Fq "bump the theme's version constant" \
   || { echo "FAIL: the PERF-058 fix does not require the theme version constant to be bumped, so the rebuilt file is served from cache"; exit 1; }
 printf '%s' "$flat" | grep -Fq ".claude/CLAUDE.md" \
   || { echo "FAIL: the PERF-058 fix does not record the trap in the project's own CLAUDE.md, where the next session will read it"; exit 1; }
