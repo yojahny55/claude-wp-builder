@@ -101,6 +101,11 @@
   to pin or upgrade was a silent no-op against whatever the previous run left behind; the
   requested version is stamped at install time and a mismatch is now reported by name,
   without replacing a tree that may carry local edits or belong to an active plugin.
+  One from the reviewer, narrower than it looks: `check-credentials.php` asked `empty()`
+  of every value it read, and `empty()` reads `'0'` as absent. The bucket and the region
+  could never be that, but the key and the secret are arbitrary strings from whatever
+  server the site talks to, and a credential rejected as missing is debugged in the wrong
+  place. Presence and emptiness are asked separately now.
   Two smaller: the access-key id supplied for the instance-profile fallback stayed in the
   environment for every child process after its secret had been unset, and a value holding
   a line break was accepted by the reader although `--export` writes one `NAME='value'` per

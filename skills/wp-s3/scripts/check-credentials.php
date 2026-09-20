@@ -66,7 +66,15 @@ foreach ( $output as $line ) {
 	$values[ $m[1] ] = str_replace( "'\\''", "'", $m[2] );
 }
 
-if ( empty( $values['S3_UPLOADS_BUCKET'] ) || empty( $values['S3_UPLOADS_REGION'] ) ) {
+// `empty()` everywhere below would read '0' as absent, and the key and the secret are
+// arbitrary strings from whatever server the site talks to — not only AWS, whose own
+// values could never be that. A credential rejected as missing is debugged in the wrong
+// place, so presence and emptiness are asked separately.
+$have = function ( $name ) use ( $values ) {
+	return isset( $values[ $name ] ) && '' !== $values[ $name ];
+};
+
+if ( ! $have( 'S3_UPLOADS_BUCKET' ) || ! $have( 'S3_UPLOADS_REGION' ) ) {
 	fwrite( STDERR, "S3_UPLOADS_BUCKET and S3_UPLOADS_REGION must both be set in $config\n" );
 	exit( 2 );
 }
@@ -89,12 +97,12 @@ $params = array(
 	'region'  => $values['S3_UPLOADS_REGION'],
 );
 
-if ( ! empty( $values['S3_UPLOADS_ENDPOINT'] ) ) {
+if ( $have( 'S3_UPLOADS_ENDPOINT' ) ) {
 	$params['endpoint']                = $values['S3_UPLOADS_ENDPOINT'];
 	$params['use_path_style_endpoint'] = true;
 }
 
-if ( ! empty( $values['S3_UPLOADS_KEY'] ) && ! empty( $values['S3_UPLOADS_SECRET'] ) ) {
+if ( $have( 'S3_UPLOADS_KEY' ) && $have( 'S3_UPLOADS_SECRET' ) ) {
 	$params['credentials'] = array(
 		'key'    => $values['S3_UPLOADS_KEY'],
 		'secret' => $values['S3_UPLOADS_SECRET'],
