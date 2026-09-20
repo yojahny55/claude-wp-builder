@@ -124,6 +124,15 @@ for dir in wc-logs wpcf7_uploads; do
 done
 
 # ---------------------------------------------------------------------------
+# 7c. The revert's closing summary is what tells the operator about Elementor's stored
+#     URLs and WooCommerce's download settings, so it must survive a site that had no
+#     config to park: the reader exits non-zero there, and `pipefail` used to carry that
+#     into an assignment that errexit turned into a silent stop one line short.
+# ---------------------------------------------------------------------------
+grep -Fq 'if [[ -f "$CONFIG.disabled" ]]; then' "$revert" \
+  || fail "$revert reads the parked config without checking that there is one"
+
+# ---------------------------------------------------------------------------
 # 8. The transfer is still judged by comparing both sides, not by the client's
 #    exit code or its summary table.
 # ---------------------------------------------------------------------------

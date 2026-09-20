@@ -131,8 +131,14 @@ if [[ -f "$MU" ]]; then
 fi
 
 # ---------------------------------------------------------------- 6. what this cannot undo
-BUCKET_URL="$(php "$SKILL_DIR/scripts/read-s3-config.php" "$CONFIG.disabled" --names 2>/dev/null \
-    | sed -n 's/^S3_UPLOADS_BUCKET_URL: //p')"
+# Only when there is a config to read: on a site that had none, the reader exits non-zero,
+# `pipefail` carries that into the assignment and errexit ends the script one line before
+# the summary it exists to print.
+BUCKET_URL=""
+if [[ -f "$CONFIG.disabled" ]]; then
+    BUCKET_URL="$(php "$SKILL_DIR/scripts/read-s3-config.php" "$CONFIG.disabled" --names 2>/dev/null \
+        | sed -n 's/^S3_UPLOADS_BUCKET_URL: //p')"
+fi
 # Guarded like every other `wp` call here: without WP-CLI the bare invocation prints
 # "command not found" into the middle of the commands printed below.
 SITE_URL='https://www.example.com'
