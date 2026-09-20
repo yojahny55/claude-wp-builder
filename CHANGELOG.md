@@ -4,6 +4,130 @@
 
 ### Added
 
+- **A site's media can live in S3.** `/wp-s3` installs S3 Uploads with its `vendor/` tree,
+  writes `s3-config.php` at `0640`, hooks it into `wp-config.php` behind a timestamped backup,
+  and installs an mu-plugin that points the plugin at an S3-compatible endpoint and does
+  nothing on AWS. `/wp-s3-media upload|download` then moves `wp-content/uploads` in either
+  direction, reading the connection out of the site's own config so there is no second place
+  to keep in sync. `skills/wp-s3/SKILL.md` owns the procedure and `references/aws.md` the
+  bucket, CloudFront and IAM side; both commands are runners.
+  Four decisions are written down where the next edit will read them, because each looks like
+  a simplification. The setup script does **not** activate the plugin and `S3_UPLOADS_AUTOENABLE`
+  is `false`: activation must not move a file, and rewriting starts at `wp s3-uploads enable`
+  when someone is watching. The secret arrives in the environment and never in `argv`, which
+  `ps` shows to every user on the machine. `--revert` downloads the media *before* removing
+  the configuration — without `s3-config.php` there is no bucket, region or credential left to
+  fetch them with — and renames the config and mu-plugin to `.disabled` rather than deleting
+  them. And `/wp-s3` asks about downloadable products before anything else: with the *Redirect*
+  method the customer gets the file's public URL, kept private the redirect returns `403`, and
+  that has no clean answer with this plugin, so it changes the recommendation rather than the
+  configuration.
+  The transfer is verified by result rather than by report. The client was measured writing
+  **7 of 38 objects and exiting `0`**, and printing its summary table while the backend was
+  down, so `scripts/verify-transfer.py` lists both sides and compares names and sizes — an
+  upload must account for every local file, a download for every object. Neither direction
+  passes `--overwrite` or `--remove`, which is what makes a second run safe and stops a stale
+  local copy from burying a newer one in the bucket; the client exits non-zero for each file
+  it refuses to clobber, so a refusal is counted and reported and any other `<ERROR>` line
+  fails immediately. Trusting the client's own pending-bytes figure instead was tried and is
+  wrong in the direction that matters: every byte-identical file already on disk counts as
+  pending forever, which made a revert abort with the media half restored.
+
+- **The wp-s3 setup proves the credentials with the plugin still off, and an install is
+  finished rather than assumed.** Three defects found by running the scripts against a real
+  S3-compatible server. The credential check was `wp s3-uploads verify`, a subcommand the
+  plugin registers — and setup leaves the plugin deactivated on purpose, so it answered
+  `'s3-uploads' is not a registered wp command` on every first run and exited `1` with the
+  five preceding steps already applied; `scripts/check-credentials.php` now lists the bucket
+  through the SDK the plugin bundles, which is the same question with the plugin off.
+  `composer install` refused the lock file on any PHP without `ext-iconv` — a requirement of
+  a polyfill reached only through Symfony's console, never inside WordPress — so the install
+  adds `--ignore-platform-req=ext-iconv` when `php -m` does not list it. And a failed
+  composer run left the plugin directory behind, which the next run read as "already
+  installed": an installed plugin is now `vendor/autoload.php`, not a directory, and a
+  half-install is completed instead of configuring a site around a plugin that fatals on
+  activation.
+  Two more found the same way, both about how the secret travels. The client was handed
+  its credentials in `MC_HOST_<alias>`, a URL whose key and secret it does **not**
+  percent-decode: measured against a real server, a secret holding `/`, `@`, `+`, `%`, `#`
+  or `?` authenticated verbatim and failed once encoded — so the encoding was wrong for
+  exactly the secrets it existed for, and AWS generates base64 secret keys where `/` and
+  `+` are ordinary. A secret holding `:` could not be expressed in that URL at all. The
+  alias now lives in a `0700` configuration directory the script removes on exit, which
+  carries every character and still keeps the secret out of `argv`, where `ps` would show
+  it. And `s3-config.php` had its credential lines assembled in the shell, so a secret
+  holding a single quote closed the PHP string early and `php -l` condemned a file that
+  already held the credentials; they are quoted where they are written now.
+  Five more came from the reviewer and are worth naming because four of them are about
+  what happens **after** something already went wrong. A failed transfer used to return
+  before the comparison ran, so the one moment an operator most needs a per-file
+  accounting — "how much of it landed?" — was the moment they were denied one; the
+  comparison now runs either way and the run still fails. A revert whose `require` block
+  had been hand-edited printed a warning and carried on to rename `s3-config.php`, leaving
+  a site that requires a file that is no longer there; it now stops with the block to
+  remove and touches nothing. `verify-transfer.py` had no timeout, so an unreachable
+  endpoint hung forever under `set -e` (300s, `WP_S3_LIST_TIMEOUT` to raise it). Both
+  `wp-config.php` rewrites are written to a neighbouring file and renamed, because a
+  process killed mid-write left a truncated `wp-config.php` and a white screen. Every `wp`
+  call in the revert is guarded now, and the plugin is asked whether it is active exactly
+  once: WP-CLI answers a site it cannot read with three lines of its own, and those used to
+  land between step 2 and step 4 of a run whose step 1 had already said the plugin was
+  inactive. A non-zero exit whose every error was a refused overwrite no longer passes in
+  silence either — the run still succeeds, because that is the ordinary repeated transfer,
+  but the exit code is printed, since a client that refused three files and then timed out
+  on the fourth is indistinguishable from here and only the comparison tells them apart.
+  One more the scripts were never going to be asked about: **form attachments no longer
+  leave the disk.** `uploads/wpcf7_uploads/` holds what people attached to a form — CVs,
+  identity documents, invoices — and it was being mirrored into the bucket, where the only
+  thing keeping it unreadable was the bucket policy being written correctly. It joins
+  `wc-logs`, `cache`, `wio_backup` and `wrio` in the exclusions, in both directions. New
+  installs never write there anyway, because `s3-config.php` redirects both WooCommerce's
+  logs and CF7's temporary directory to local paths — but a site migrating in arrives with
+  years of them.
+  Five more from a second pass over the same scripts, and the first is the one that gave a
+  wrong answer with no error anywhere. `read-s3-config.php` matched `define()` textually
+  over the whole file, so a line an operator comments out while rotating a bucket or a key —
+  the new `define()` written under the old one — was read as the site's configuration. PHP
+  keeps the **first** `define()` of a name and ignores every later one, so matching the
+  first occurrence is right for code; a comment is not code. Every caller was handed the
+  stale bucket while the site served from the new one, and the transfer then verified clean
+  against the wrong target. Comments are removed with the PHP tokenizer before anything is
+  matched, because a regular expression cannot tell a comment from `//` inside a URL.
+  The revert told two different failures the same story: Python exits `3` when the `require`
+  block has been hand-edited and `1` on any unhandled exception — a read-only site root is
+  the measured one — and the shell read every non-zero status as the first, sending an
+  operator with a permissions problem to go and delete a block nobody had touched. Setup
+  skipped the install whenever a `vendor/` tree existed, so re-running it with `--version`
+  to pin or upgrade was a silent no-op against whatever the previous run left behind; the
+  requested version is stamped at install time and a mismatch is now reported by name,
+  without replacing a tree that may carry local edits or belong to an active plugin.
+  The reviewer's next round found the one thing none of this had asked: **the plugin's own
+  code arrived unchecked.** It was a tarball over HTTPS from a tag, unpacked straight into
+  `wp-content/plugins/`, and once activated every line of it runs on every request to the
+  site. A tag can be moved upstream, and GitHub regenerates those archives, so their digest
+  is not stable enough to pin. What is stable is the commit id — the hash of the tree
+  itself, which git will not produce from any other content — so the install clones at the
+  pinned commit and refuses anything else, naming both ids. Measured: a deliberately wrong
+  pin stops the run with nothing installed. Where the pin does not apply — git absent, or a
+  `--version` other than the pinned one — the run stops rather than falling back quietly;
+  `--unverified-download` takes the tarball, says so, and prints its sha256 so an operator
+  who accepts it can at least record what they accepted.
+  One from the reviewer, narrower than it looks: `check-credentials.php` asked `empty()`
+  of every value it read, and `empty()` reads `'0'` as absent. The bucket and the region
+  could never be that, but the key and the secret are arbitrary strings from whatever
+  server the site talks to, and a credential rejected as missing is debugged in the wrong
+  place. Presence and emptiness are asked separately now.
+  Two smaller: the access-key id supplied for the instance-profile fallback stayed in the
+  environment for every child process after its secret had been unset, and a value holding
+  a line break was accepted by the reader although `--export` writes one `NAME='value'` per
+  line and every consumer splits on newlines — it is refused with its name now, rather than
+  arriving truncated or missing.
+  Two smaller ones: `verify-transfer.py` called an empty remote listing a verified download,
+  and the client answers an unknown alias with exit `0` and no output, so "no objects" and
+  "could not list" arrived identically — a download that lists nothing now fails. And a
+  revert printed one `<ERROR> … Overwrite not allowed` line per file in the normal case where
+  every file is still on disk; the refusals stay in the log and are reported as a count.
+
 - **A decorative CSS background below the fold is deferred.** `background-image` has no
   `loading` attribute, so every background a template prints is downloaded with the first
   paint however far down the page it sits. On a real build four of them — a footer band, a

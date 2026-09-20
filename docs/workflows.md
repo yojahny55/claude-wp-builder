@@ -338,9 +338,11 @@ Full pipeline, dependency (`cinematic-scroll-kit`) and encoding details: [cinema
 | `/wp-clone --from=ssh://user@host/path --to=/local/path` | You need a copy of a staging/production site locally. Also `--sql= --uploads=` for a manual dump. |
 | `/wp-robin [/path/to/wordpress]` | Robin Image Optimizer is stuck, unconfigured, or missing `.webp` files. Runner for the `wp-robin` skill. |
 | `/wp-aos-animator [<theme>] [--report-only]` | A plain project wants scroll animations. Runner for the `wp-aos-animator` skill — audit, install, enqueue, init, animate. |
+| `/wp-s3 [/path/to/wordpress] [--revert]` | The site's media should live in S3 or any S3-compatible bucket instead of on the server's disk. Runner for the `wp-s3` skill — install, configure, or reverse. |
+| `/wp-s3-media <upload\|download> [/path/to/wordpress]` | Media have to move between the site and its bucket: the first migration, a clone to an environment without S3, or the way back. Runner for the `wp-s3` skill. |
 
-`wp-robin` and `wp-aos-animator` are the only two skills that act rather than inform. They
-remain `user-invocable: false` like every other skill, and are invoked through the two runner
+`wp-robin`, `wp-aos-animator` and `wp-s3` are the skills that act rather than inform. They
+remain `user-invocable: false` like every other skill, and are invoked through the runner
 commands above.
 
 ---

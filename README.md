@@ -404,13 +404,15 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-clone --from --to` | utility | — | Clone a remote site locally |
 | `/wp-anonymize` | utility | — | Replace real people in a clone with deterministic fakes |
 | `/wp-robin [wp-root]` | utility | — | Runner for the `wp-robin` skill — install and configure Robin Image Optimizer, unstick the bulk queue, generate missing `.webp` |
+| `/wp-s3 [wp-root] [--revert]` | utility | — | Runner for the `wp-s3` skill — install and configure S3 Uploads so WordPress writes its media to S3, or take the site back off it |
+| `/wp-s3-media <upload\|download> [wp-root]` | utility | — | Runner for the `wp-s3` skill — move `wp-content/uploads` between the site and its bucket, with a transfer that verifies itself |
 | `/wp-aos-animator [theme] [--report-only]` | utility | — | Runner for the `wp-aos-animator` skill — audit, install, enqueue, initialize and seed AOS scroll animations across the templates |
 | `/wp-contribute <new\|check\|pr\|release>` | contributors | — | Work on the plugin itself — scaffold a command/agent/skill with its check and doc rows, verify the repo, open the PR |
 
 \* Optional if WordPress is already running: without `.wp-create.json`, `/wp-seed` and `/wp-debug` fall back to a bare `wp` on PATH and the languages in `.claude/CLAUDE.md`.
-The `wp-robin` and `wp-aos-animator` skills are invoked through their runner commands,
-`/wp-robin` and `/wp-aos-animator`. The skills stay `user-invocable: false` and keep owning the
-procedure; the commands only dispatch them.
+The `wp-robin`, `wp-aos-animator` and `wp-s3` skills are invoked through their runner
+commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. The skills stay
+`user-invocable: false` and keep owning the procedure; the commands only dispatch them.
 
 ## Architecture
 
@@ -430,6 +432,7 @@ procedure; the commands only dispatch them.
 | `wp-cli-patterns` | WP-CLI best practices for all agents (saves tokens vs PHP generation) |
 | `wp-aos-animator` | AOS scroll animation installer — audits, enqueues, initializes, and seeds animations across templates. Run through `/wp-aos-animator` |
 | `wp-robin` | Robin Image Optimizer fixer — installs, configures, unsticks bulk optimization, generates .webp files. Run through `/wp-robin` |
+| `wp-s3` | WordPress media on S3 — installs and configures S3 Uploads, migrates the library with a transfer that verifies itself, and reverses the whole thing. Run through `/wp-s3` and `/wp-s3-media` |
 | `wp-environments` | Environment detection and the WP-CLI wrapper every command runs through |
 | `wp-audit-standards` | Audit criteria, severity definitions, report schema and quality thresholds for the `wp-audit-*` agents |
 | `wp-audit-seo-standards` | Rank Math configuration reference, schema JSON-LD templates, meta patterns and SEO seeding commands |

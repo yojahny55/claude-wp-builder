@@ -208,6 +208,18 @@ Longer-term features and exploration areas.
 - [ ] **WordPress.js agent** `OPEN`
   A dedicated JavaScript specialist for sliders (Swiper, Splide), animations (GSAP, AOS), form validation and interactive components. No such agent exists; the nearest owner is [wp-yolo](commands/wp-yolo.md) Step 4.6, which ports demo scripts inline. Same request as *Fix agents being lazy with JavaScript* above — that item records what already ships.
 
+- [ ] **WebP conversion on upload** `OPEN`
+  An mu-plugin that converts PNG and JPEG to WebP inside `wp_handle_upload` at priority 5, before WordPress generates the thumbnails, so every size is born WebP. Measured working against `s3://` paths — it copies to a local temp file because `cwebp` cannot read a stream wrapper — and it walks a quality ladder against a PSNR threshold, keeping the original when no candidate beats its size. It replaces an optimizer plugin's delivery for new uploads; [wp-robin](skills/wp-robin/SKILL.md) stays, since sites without S3 still run it. No owner in this repo yet.
+
+- [ ] **WebP migration of an existing library** `OPEN`
+  The other half of the item above, and the larger one: convert a library already on disk, update `wp_postmeta` sizes, replace URLs in content and Elementor data, verify coverage, and delete the originals only after the coverage check passes. A ten-step procedure with backups at each step exists and has been run end to end on a real site, but it lives outside this repo and no owner exists here.
+
+- [ ] **Blocking the REST API in Apache** `OPEN`
+  A `<If>` block matching `HTTP_HOST` plus `REQUEST_URI ^/wp-json` and `rest_route=` in the query string, which is evaluated after `<Directory>` and therefore wins whichever vhost serves the request — the case that defeats a per-vhost rule on a host with duplicated includes. Leaves `admin-ajax.php` alone. Belongs in [wp-environments](skills/wp-environments/SKILL.md) as a reference.
+
+- [ ] **Verify bulk transfers by result, not by exit code** `OPEN`
+  Three separate measurements in one project of a tool reporting success without doing the work: a mirror writing 7 of 38 objects and exiting `0`, the same mirror "succeeding" against a stopped backend, and an interactive `cp` alias silently skipping copies that invalidated an A/B measurement. [skills/wp-s3/scripts/lib-mirror.sh](skills/wp-s3/scripts/lib-mirror.sh) answers it for one tool. The general form — every mass copy, sync or import confirms its result by count or hash — is not written down anywhere, and no check enforces it on new scripts.
+
 - [ ] **Multi-platform support** `OPEN`
   Explore supporting Cursor, Gemini CLI (Codex), and other AI coding tools alongside Claude Code. The plugin architecture (markdown commands/agents/skills) may be adaptable.
 
