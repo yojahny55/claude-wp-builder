@@ -140,6 +140,37 @@ Write the report to `audit/a11y-report.json`.
 
 For each auto-fixable item, apply the fix directly OR include the complete code snippet in the report. Use the theme's text domain (from CLAUDE.md) in all translatable strings.
 
+### A tag swap is a visual change — measure it before and after (MANDATORY)
+
+Half the operable fixes replace one element with another: a `<span>` or `<div>` that carries a
+click handler becomes a `<button>`, a `<div role="list">` becomes a `<ul>`. **None of those is
+markup-only.** The browser applies its own UA styles to the new element, and the theme's reset
+then applies whatever it declares for that tag — and a reset class added to neutralise the UA
+styles sits *later in the stylesheet* than the utilities that were already on the element, so it
+wins on a tie.
+
+The real case: `<span class="icon-search text-white text-[1.625rem]">` became
+`<button class="btn-reset icon-search text-white text-[1.625rem]">`. `.btn-reset` declares
+`color: inherit` and `font: inherit`, both of which beat `text-white` and `text-[1.625rem]` on
+source order. The icon turned black and went from 26px to 18px. Not one colour or size value was
+edited, the diff looked like an accessibility fix, and the person who found the regression was
+the client.
+
+So for every element whose tag or class list changes:
+
+1. **Measure the real element in the browser, before and after**, and compare:
+   `getComputedStyle(el)` → `color`, `backgroundColor`, `fontSize`, `fontFamily`, `borderWidth`,
+   `borderRadius`; `el.getBoundingClientRect()` → `width` and `height`.
+2. **The values must match.** A difference is a regression to fix before the work is reported,
+   not a trade-off to explain. Where the fix genuinely requires a visual change, it stops being
+   an auto-fix and goes to the operator as a proposal.
+3. **Check desktop and mobile**, and **every element that shares the class** — not only the one
+   that was being looked at. A reset class added for one icon reaches every element that already
+   carried it.
+
+A screenshot diff at the page level is not this measurement: a 26px icon becoming an 18px icon
+inside a flex row moves nothing else and can fall under the tolerance. Measure the element.
+
 **A11Y-020 fix — Skip link (add to header.php after `<body>` tag):**
 
 ```html

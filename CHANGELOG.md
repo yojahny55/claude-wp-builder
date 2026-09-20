@@ -59,6 +59,25 @@
 
 ### Fixed
 
+- **An accessibility fix that swaps a tag is measured before and after.** Half the operable
+  fixes replace one element with another — a clickable `<span>` becomes a `<button>` — and none
+  of them is markup-only: the browser applies its own styles to the new element, and a reset
+  class added to neutralise them ties with the utility classes already there, which source order
+  decides in the reset's favour. `<span class="icon-search text-white text-[1.625rem]">` became
+  `<button class="btn-reset icon-search text-white text-[1.625rem]">`, `.btn-reset` declared
+  `color: inherit` and `font: inherit`, and the icon painted black at 18px instead of white at
+  26px. No colour or size value was edited anywhere, the diff read as an accessibility fix, and
+  the client found the regression.
+  Step 8 of `wp-audit-a11y` now requires `getComputedStyle()` and `getBoundingClientRect()` on
+  the real element on both sides of the change, treats a difference as a regression that blocks
+  the fix rather than a trade-off to explain, and extends the check to every element sharing the
+  class and to both viewports. It also says why the screenshot gate cannot stand in for this: a
+  26px icon becoming 18px inside a flex row moves nothing else and falls under the tolerance.
+  `wp-css-system` carries the specificity half — a reset class is (0,1,0) like the utilities, so
+  the tie goes to whichever comes last, and the DevTools rule list shows both declarations
+  applying, which is what makes it invisible. The weightless `:where(.btn-reset)` form and the
+  bare-tag reset are given as the two ways out.
+
 - **The `get_field()` pattern test could not see a pattern written the other way.**
   `tests/checks/lib/acf-field-pattern-behavior.php` extracted only a double-quoted literal
   from `find-orphan-acf-ids.php`. Rewriting that pattern as a single-quoted literal — same
