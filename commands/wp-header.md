@@ -54,7 +54,18 @@ Dispatch the **wp-template** agent with these instructions:
 >     render all configured languages (from `SUPPORTED_LANGS`) with active
 >     state, linking through `prefix_get_lang_url()`; under `polylang`,
 >     render it with `pll_the_languages()` — Step 7 says why (it marks the
->     current language and hides languages with no counterpart)
+>     current language and hides languages with no counterpart).
+>     **Never transcribe the demo's switcher markup.** A demo's switcher is a
+>     mockup — typically two `href="#"` links with `aria-current` hardcoded on
+>     one — and it renders as a working control, which is why copying it across
+>     survives review. Take its *styling* from the demo and its *behaviour* from
+>     the helper above. `demo/.demo-plan.json`'s `inert[]` declares it when the
+>     demo came from `/wp-demo`; a demo from elsewhere declares nothing, so
+>     assume the switcher is inert unless its markup proves otherwise — and
+>     **the proof is the `href`, never the trappings.** A mock switcher carries
+>     `hreflang` on both links and `aria-current="true"` on one, which is
+>     precisely what a working one carries; a measured demo had both. Only where
+>     each link points distinguishes them
 >   - Mobile hamburger toggle button with aria attributes
 >   - Skip-to-content link for accessibility
 >

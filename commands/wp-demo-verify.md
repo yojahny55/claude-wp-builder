@@ -154,6 +154,32 @@ branch: `/wp-demo` probes first and stops on 2.)
 - **horizontal overflow**: at any width, always a defect.
 - **clipped copy**: text taller than its own hidden-overflow box.
 
+## Step 3.5: Undeclared inert controls
+
+A directory target only. Read `inert[]` from `demo/.demo-plan.json` (absent file: skip
+in one line — a demo from elsewhere declares nothing) and find every control the pages
+fake:
+
+```bash
+bash -c "grep -n 'href=\"#\"\|<form\( [^>]*\)\?>' demo/*.html | head -40"
+```
+
+**Grade the declaration, never the control.** A control that appears in `inert[]` is
+silent; one that does not is a finding — `<name> on <page> looks interactive and is
+not wired; declare it in the plan's inert[] or wire it`. A `<form>` with no `action`
+counts; an in-page `href="#"` that a script binds does not, so check for a handler
+before reporting one.
+
+Failing the control itself would fail every honest mockup, and the first time it fired
+on a deliberate one someone would write `href="#!"` to silence it. A rule people route
+around is worse than no rule. Grading the declaration inverts that: the cheap way out
+is to declare it, which is the outcome wanted.
+
+This does not block a round. It is reported with the advisory findings, because an
+undeclared inert control is a gap in what the demo *says*, not a defect in what it
+renders — and the same gap reaches the theme either way, where `/wp-yolo` Step 4.6
+picks the list up.
+
 ## Step 4: Critique the sheets
 
 Read only the `sheet.jpg` files for this step — never `sheet.png` — and never the

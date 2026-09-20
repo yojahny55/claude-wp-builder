@@ -565,6 +565,87 @@
   path used to produce. Non-regular entries are rejected with `isFile()`.
   `FOLLOW_SYMLINKS` stays off, which is what keeps a symlinked directory out of the walk;
   the comment now says so, since the flag's absence is the behaviour rather than an omission.
+### Changed
+
+- **A demo this plugin generated is no longer re-analyzed by `/wp-yolo`.** `/wp-demo`
+  now writes `demo/.demo-plan.json` (Step 4.9, both modes) recording what it decided
+  while authoring the pages — each page's role, each section's name, `kind`, `cpt` and
+  BEM block, and the content types it built teasers and listings for. `wp-normalize`
+  reads it and copies those verbatim, skipping the classifier rubric, the contact
+  detection and the `review[]` entries that went with them. It had been re-deriving
+  the plugin's own decisions from the plugin's own output, with a confidence score
+  attached, which is the one case where a classifier can only lose information.
+  The plan is trusted **per page and only where it matches the markup** — the section
+  names are the join key — so a page added or edited by hand since the demo was
+  generated is classified the old way and says which page and why in `review[]`.
+  Normalize is still dispatched: it remains the only thing that writes
+  `demo/.yolo-manifest.json`, and the plan deliberately carries no field guesses,
+  assets, `cssRules`, `fonts` or `backgrounds`, because those are read off the markup
+  and a second copy would be a second thing to keep true.
+  `tests/checks/wp-demo-plan.sh` pins both halves.
+- **The plan carries craft mode's slot names, with two guards.** A composition's
+  `{{slots}}` are already field-shaped names `/wp-demo` chose, so `sections[].slots[]`
+  records them and `wp-normalize` infers only type and value. Each entry carries a
+  `group` (a run of slots that is really one repeater, not N flat fields) and a
+  `computed` flag (a value the markup derives — an arc's `stroke-dasharray` against a
+  300–850 scale — which must never be offered to an editor as a field). Both come from
+  a build that shipped the wrong answer without them. `fields[]` was 52% of a real
+  13-page manifest.
+- **A demo now declares the controls it fakes.** `.demo-plan.json` grows `inert[]` —
+  `{ selector, reason, needs, pages }` per faked control: the language switcher that is
+  two `href="#"` links, a search box that filters nothing, a client-side pager the
+  server will own. None of that is a defect in a demo; it becomes one the moment a
+  builder reads the demo as a specification, which is what `/wp-yolo` does, and nothing
+  on disk used to say which was which. `/wp-demo-verify` Step 3.5 grades the
+  **declaration** rather than the control — failing `href="#"` itself would fail every
+  honest mockup and get routed around with `href="#!"` — and `/wp-yolo` Step 4.6 and
+  `/wp-header` read the list as a worklist. It must be written while authoring:
+  backfilled from finished markup it degrades into "controls we could not prove were
+  wired". On one 16-page build the switcher was wired only because a normalize agent
+  happened to file it among forty-eight `review[]` entries, and `/wp-header` now
+  refuses to transcribe a demo's switcher markup at all.
+  **A `<form>` with `action="#"` or no `action` counts, and is the worse of the two**
+  — a dead switcher announces itself on the first click, a dead contact form looks
+  like it worked and drops the lead. Writing the list by hand on a real 16-page demo
+  found one: a form with a real consent checkbox, honeypot and language select,
+  submitting to the page it sat on, on two pages whose markup was byte-identical.
+  Grep `action` as well as `href`. And the switcher test keys off the `href` alone:
+  a mock switcher carries `hreflang` on both links and `aria-current` on one, exactly
+  as a working one does.
+- **`review[]` is for decisions, not for restating emptiness.** `wp-normalize` now
+  collapses "why is this null" notes into one build note, and keeps *null by design on
+  this path* apart from *empty because nothing was found* — the second is a finding
+  about the demo. On the build below, "fonts is [] — there is no @font-face anywhere"
+  was filed as reassurance that the scan had not failed, and was in fact reporting the
+  defect fixed below. An explanatory entry that explains away a real gap is worse than
+  no entry.
+- **`wp-normalize` verifies the delimiters it reports.** A parallel run reported five
+  pages as already delimited around the chrome when none of them were, because nothing
+  checked the claim against the bytes. The fast path is now a per-page claim with a
+  per-page proof.
+
+### Fixed
+
+- **Fonts loaded from `fonts.googleapis.com` are now recorded as fonts.**
+  `wp-normalize` read only `@font-face`, so a craft demo — which links its families
+  rather than declaring them — produced `fonts: []` on every section. `/wp-yolo` Step
+  4.5's carry is conditioned on that list, so it carried nothing, and a real build
+  shipped a theme naming `"Inter", system-ui` over a demo rendering Archivo and Source
+  Sans 3, with an empty `assets/fonts/` and no error anywhere. The `css2` query already
+  names the families and weights; they are recorded with `hosted: true`. Step 4.5 also
+  no longer believes an empty list: it greps the demo before concluding a demo has no
+  fonts, and reports the gap when it finds one.
+- **`@theme static` on the craft path.** Tailwind v4 drops a theme variable no utility
+  references, and a craft demo's CSS reaches for `var(--color-canvas)` directly — so a
+  bare `@theme` compiled an entire craft palette to nothing and the build still
+  succeeded. `/wp-init` Step D4 now says which keyword, and why.
+- **`footer-columns` no longer emits `href="tel:tel:+1…"`.** The template hardcoded the
+  scheme onto `{{phone_href}}` while every other `*_href` slot in the library takes a
+  complete href, so a builder filling it correctly produced a doubled scheme on every
+  page of a 16-page demo. The slot now takes the whole href, and `fills.json` carries
+  the `tel:`.
+
+
 ## [1.25.0] - 2026-09-19
 
 ### Fixed

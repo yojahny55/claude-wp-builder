@@ -176,7 +176,7 @@
     "contact_label": "Visit",
     "address_line": "Unit 4, Feeder Road, Bristol BS2 0SB",
     "phone": "0117 900 4412",
-    "phone_href": "+441179004412",
+    "phone_href": "tel:+441179004412",
     "email": "shop@ravenscroft.example",
     "hours": "Weekdays 7am to 5pm, Saturdays until noon",
     "legal_line": "Ravenscroft Joinery Ltd, registered in England 00841207.",
