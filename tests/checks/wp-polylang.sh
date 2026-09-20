@@ -56,17 +56,38 @@ for starter in __tailwind__ __cinematic__; do
     exit 1
   }
 
-  base_fns="$(grep -oP '^function \K[a-z_0-9]+' "$base" | sort)"
-  poly_fns="$(grep -oP '^function \K[a-z_0-9]+' "$poly" | sort)"
+  base_fns="$(grep -oP '^function \K[A-Za-z_0-9]+' "$base" | sort)"
+  poly_fns="$(grep -oP '^function \K[A-Za-z_0-9]+' "$poly" | sort)"
 
   [[ -n "$base_fns" ]] || { echo "FAIL: no functions found in $starter/inc/i18n.php -- this check would be vacuous"; exit 1; }
 
-  if [[ "$base_fns" != "$poly_fns" ]]; then
+  # The template-facing contract is what must match: every helper i18n.php
+  # defines has to exist in the variant under the same name, or swapping the
+  # file breaks the templates that call it.
+  missing="$(comm -23 <(echo "$base_fns") <(echo "$poly_fns") | tr '\n' ' ')"
+  if [[ -n "${missing// /}" ]]; then
     echo "FAIL: $starter's Polylang variant does not expose the same helpers as its i18n.php"
-    echo "  only in i18n.php:          $(comm -23 <(echo "$base_fns") <(echo "$poly_fns") | tr '\n' ' ')"
-    echo "  only in the Polylang variant: $(comm -13 <(echo "$base_fns") <(echo "$poly_fns") | tr '\n' ' ')"
+    echo "  only in i18n.php: $missing"
     exit 1
   fi
+
+  # The variant may carry helpers of its own — the Polylang model needs work the
+  # suffix model does not, and forcing a no-op twin into i18n.php would be a lie
+  # about symmetry. Each extra must say it is not part of the contract, with
+  # PHPDoc's own `@internal`, so "templates may call this" stays a decision
+  # someone wrote down rather than a side effect of adding a function.
+  for fn in $(comm -13 <(echo "$base_fns") <(echo "$poly_fns")); do
+    awk -v fn="$fn" '
+      /^\/\*\*/ { doc = ""; }
+      { doc = doc $0 "\n" }
+      $0 ~ "^function " fn "\\(" { if (doc ~ /@internal/) exit 0; else exit 1 }
+    ' "$poly" || {
+      echo "FAIL: $starter's Polylang variant adds $fn() without marking it @internal"
+      echo "  Either the templates may call it — then i18n.php owes them the same"
+      echo "  helper — or they may not, and its docblock has to say @internal."
+      exit 1
+    }
+  done
 
   # The variant must actually consult Polylang, not just be a copy of the
   # _suffix file under a different name.
