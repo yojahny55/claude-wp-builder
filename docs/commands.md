@@ -38,6 +38,8 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-clone`](#wp-clone) | utility | — | remote site | local install |
 | [`/wp-anonymize`](#wp-anonymize) | utility | — | cloned database | anonymised database |
 | [`/wp-robin`](#wp-robin) | utility | — | target WordPress root | Robin settings, queue rows, `.webp` files |
+| [`/wp-s3`](#wp-s3) | utility | — | bucket, region, media URL, credentials | `s3-config.php`, the `require` in `wp-config.php`, the endpoint mu-plugin |
+| [`/wp-s3-media`](#wp-s3-media) | utility | — | a configured WordPress root | `wp-content/uploads` moved, and verified |
 | [`/wp-aos-animator`](#wp-aos-animator) | utility | — | theme templates | `vendors/aos/`, `functions.php` enqueue, JS init, `data-aos` attributes |
 | [`/wp-contribute`](#wp-contribute) | contributors | — | this repository | new layer file + its check + doc rows; PR; release |
 
@@ -499,6 +501,43 @@ to the resolved root. Installs and configures Robin Image Optimizer, unsticks it
 the queue so the plugin recognizes them. The command dispatches; the skill and its script own
 every step.
 
+### `/wp-s3`
+
+```
+/wp-s3 /path/to/wordpress            # install and configure S3 Uploads
+/wp-s3 /path/to/wordpress --revert   # take the site back off S3
+```
+
+Runner for the `wp-s3` skill. Reads [`skills/wp-s3/SKILL.md`](../skills/wp-s3/SKILL.md),
+asks first whether the site sells downloadable products — the one case the plugin has no
+clean answer for — then collects the bucket, region, media URL, optional endpoint and
+credentials and runs the skill's bundled `scripts/s3-setup.sh`. That script installs
+S3 Uploads with its `vendor/` tree, writes `s3-config.php` at `0640`, hooks it into
+`wp-config.php` behind a backup, and installs the mu-plugin that points the plugin at an
+S3-compatible endpoint. It deliberately does **not** activate the plugin and moves no
+media: `/wp-s3-media` is the next step. The secret is passed in the environment, never as an
+argument. `--revert` runs `scripts/s3-revert.sh`, which brings the media back to disk
+*before* removing the configuration and deletes nothing in the bucket. The command
+dispatches; the skill and its scripts own every step.
+
+### `/wp-s3-media`
+
+```
+/wp-s3-media upload /path/to/wordpress --dry-run   # what would move
+/wp-s3-media upload /path/to/wordpress             # migrate the library to the bucket
+/wp-s3-media download /path/to/wordpress           # bring the bucket to disk
+```
+
+Runner for the `wp-s3` skill. Reads the connection out of the site's own `s3-config.php` and
+runs the skill's bundled `scripts/s3-media.sh`, which mirrors `wp-content/uploads` in either
+direction excluding logs, caches and the image optimizer's originals. Neither direction ever
+passes `--overwrite` or `--remove`, so a file already on the other side is refused and
+reported rather than replaced. The transfer is then verified by result, not by report: the
+client has been measured exiting `0` after writing 7 of 38 objects and printing its summary
+table against a stopped backend, so `scripts/verify-transfer.py` lists both sides and
+compares names and sizes. On a server authenticating with an IAM role there is no key pair
+to sign with, and the script stops and prints the two ways forward rather than guessing.
+
 ### `/wp-aos-animator`
 
 ```
@@ -541,11 +580,12 @@ order. See [CONTRIBUTING.md](../CONTRIBUTING.md) for the front-door version.
 
 ---
 
-## The two action skills
+## The action skills
 
-`wp-robin` and `wp-aos-animator` are the plugin's only skills that perform work rather than
-inform. Like every skill here they are `user-invocable: false`, so they are invoked through
-their runner commands — [`/wp-robin`](#wp-robin) and
-[`/wp-aos-animator`](#wp-aos-animator). The commands parse arguments and dispatch; the skills
-keep owning the procedure. Describing the task in plain language still works and loads the
-same skill.
+`wp-robin`, `wp-aos-animator` and `wp-s3` are the plugin's only skills that perform work
+rather than inform. Like every skill here they are `user-invocable: false`, so they are
+invoked through their runner commands — [`/wp-robin`](#wp-robin),
+[`/wp-aos-animator`](#wp-aos-animator), and [`/wp-s3`](#wp-s3) with
+[`/wp-s3-media`](#wp-s3-media). The commands parse arguments and dispatch; the skills keep
+owning the procedure. Describing the task in plain language still works and loads the same
+skill.

@@ -4,6 +4,35 @@
 
 ### Added
 
+- **A site's media can live in S3.** `/wp-s3` installs S3 Uploads with its `vendor/` tree,
+  writes `s3-config.php` at `0640`, hooks it into `wp-config.php` behind a timestamped backup,
+  and installs an mu-plugin that points the plugin at an S3-compatible endpoint and does
+  nothing on AWS. `/wp-s3-media upload|download` then moves `wp-content/uploads` in either
+  direction, reading the connection out of the site's own config so there is no second place
+  to keep in sync. `skills/wp-s3/SKILL.md` owns the procedure and `references/aws.md` the
+  bucket, CloudFront and IAM side; both commands are runners.
+  Four decisions are written down where the next edit will read them, because each looks like
+  a simplification. The setup script does **not** activate the plugin and `S3_UPLOADS_AUTOENABLE`
+  is `false`: activation must not move a file, and rewriting starts at `wp s3-uploads enable`
+  when someone is watching. The secret arrives in the environment and never in `argv`, which
+  `ps` shows to every user on the machine. `--revert` downloads the media *before* removing
+  the configuration — without `s3-config.php` there is no bucket, region or credential left to
+  fetch them with — and renames the config and mu-plugin to `.disabled` rather than deleting
+  them. And `/wp-s3` asks about downloadable products before anything else: with the *Redirect*
+  method the customer gets the file's public URL, kept private the redirect returns `403`, and
+  that has no clean answer with this plugin, so it changes the recommendation rather than the
+  configuration.
+  The transfer is verified by result rather than by report. The client was measured writing
+  **7 of 38 objects and exiting `0`**, and printing its summary table while the backend was
+  down, so `scripts/verify-transfer.py` lists both sides and compares names and sizes — an
+  upload must account for every local file, a download for every object. Neither direction
+  passes `--overwrite` or `--remove`, which is what makes a second run safe and stops a stale
+  local copy from burying a newer one in the bucket; the client exits non-zero for each file
+  it refuses to clobber, so a refusal is counted and reported and any other `<ERROR>` line
+  fails immediately. Trusting the client's own pending-bytes figure instead was tried and is
+  wrong in the direction that matters: every byte-identical file already on disk counts as
+  pending forever, which made a revert abort with the media half restored.
+
 - **A decorative CSS background below the fold is deferred.** `background-image` has no
   `loading` attribute, so every background a template prints is downloaded with the first
   paint however far down the page it sits. On a real build four of them — a footer band, a
