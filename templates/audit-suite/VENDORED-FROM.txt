@@ -1,0 +1,7 @@
+origin: assets/playwright-template of the web-portal-audit skill
+commit: 25a86b01445ad60fb535b31a5f985b8f7694269b
+date:   2026-09-17
+
+This tree is vendored, not authored here. Changes belong upstream first;
+tests/checks/audit-suite-sync.sh compares the two when the source is present
+and SKIPs when it is not.

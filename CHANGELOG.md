@@ -4,6 +4,47 @@
 
 ### Added
 
+- **The browser half of an audit runs as a suite, not as a hope that the session has a
+  browser.** `/wp-audit --suite` scaffolds `.wp-audit/suite/` from the new
+  `templates/audit-suite/` — a real Playwright project with axe-core, Lighthouse and three
+  engines — runs it against a live URL through `bin/audit-suite.sh`, and converts what it
+  measured into the run file `bin/audit-report.mjs` already renders. Tier 3 was gated on
+  whether whoever ran the audit happened to have a browser automation tool, so the same
+  project measured differently depending on the session and nothing could run unattended.
+  The template is vendored from the `web-portal-audit` skill rather than depended on,
+  because a plugin that only works when a user-scoped skill is installed works for one
+  machine. `VENDORED-FROM.txt` records the source commit and
+  `tests/checks/audit-suite-sync.sh` compares the two when the origin is on the machine and
+  SKIPs when it is not — CI has never seen it, and a vendored tree has to keep working
+  there.
+  Three things are enforced rather than documented. The install is **shared**: browsers and
+  `node_modules` live in one cache keyed by the template's `package.json`, so a version bump
+  installs beside the old copy instead of mutating what other projects are symlinked to, and
+  the second audit on a machine is not as expensive as the first. The Lighthouse pass runs
+  **alone**, because a score measures the machine as much as the page. And `audit.config.js`
+  is written once and then left alone: it holds the selectors somebody inspected the real
+  DOM to find, and a scaffold that overwrote it each run would quietly re-measure a
+  different site.
+  `scripts/to-run.js` is the seam, and it translates rather than re-derives. A criterion
+  becomes `UX-046`, an axe rule `A11Y-AXE-*`, a Lighthouse row `PERF-LH-*` — evidence rows
+  never become criteria, or the total changes every run. Ownership comes from the suite's
+  own four-way classification instead of a second list that would drift within a release,
+  and an unmapped one is an error rather than a guess, because guessing `code` turns a
+  setting into something the commit is assumed to carry. A `pass` is not a finding and a
+  `manual` criterion is neither: it goes to the run's unmeasured list, under its own
+  heading, where nobody can read it as a pass.
+  Where a measured finding and a code finding describe the same check **and** the same
+  resource, the measurement wins and the loser's code is kept as evidence — otherwise one
+  defect is reported twice and every count is inflated. `bin/audit-report.mjs --merge` does
+  it, rather than a sentence telling somebody to: a rule stated in one step and executed in
+  another is a rule nothing applies. A shared check with a different resource stays two
+  findings, because a contrast failure measured on a page and one in a rule no audited page
+  uses are not the same defect — and the second is the one nobody would find again.
+  All three routes now agree on how a finding is identified. The resource convention is
+  written down once (`page:/contact/`, `post:412`, `template-parts/hero.php:34`, `site`),
+  a page-level finding is one row per page rather than one per occurrence, and the Step 6
+  dispatch prompt asks **every** agent for an owner.
+
 - **An audit now produces something you can hand over.** `/wp-audit --report md|html|both`
   writes the run to `.wp-audit/informe-<date>.md` and `informe-<date>.html` through the new
   `bin/audit-report.mjs`. The console report is gone with the scrollback and

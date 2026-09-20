@@ -54,10 +54,16 @@ grep -Fq 'bin/audit-report.mjs' "$c" || fail "$c does not invoke $r"
 need 'refuses a finding with no `ownership`' \
   'does not state that the renderer rejects an unowned finding, so the last column could ship blank'
 
-# A finding's resource is half of its ledger identity, so it has to be written one way.
+# Two sources of findings, one report. The rule and the key it matches on have to live in
+# the step that executes them -- the first version of this stated the rule in Step 6.5 and
+# left Step 7 saying something else, so nothing would ever have applied it.
+need 'A measurement beats an inference' 'does not resolve a measured finding against an inferred one'
+need 'same defect only when the check' \
+  'does not say what makes two findings the same defect, so the merge key is whatever each reader assumes'
 need '| a site-level judgement | `site` |' 'does not give site-level findings a resource'
 need 'one row per page, not one per occurrence' \
-  'does not fix the granularity of a page-level finding, so one bad footer becomes forty findings that are one fix'
+  'does not fix the granularity of a page-level finding, so the agent and the suite count differently and both copies survive'
+grep -Fq -- '--merge' "$c" || fail "$c does not pass the suite run file to the renderer, leaving the merge to be done by hand"
 
 # Every agent has to emit an owner, or the renderer refuses the run it was handed.
 need 'Owner: <code|setting|content|manual>' \
@@ -192,6 +198,33 @@ grep -Fq 'New since the previous run:** 1' "$md2" \
 grep -Fq 'Still failing:** 2' "$md2" || fail "$md2 does not report the carried findings"
 grep -Fq 'SEO-012' "$md2" || fail "$md2 does not name the resolved finding"
 grep -Fq '2026-09-01' "$md2" || fail "$md2 does not name the run it compared against"
+
+# ---------------------------------------------------------------------------
+# 3b. The merge: two sources, one report
+# ---------------------------------------------------------------------------
+cat > "$tmp/agents.json" <<'JSON'
+{"site":"fixture","date":"2026-09-18","findings":[
+  {"check":"A11Y-003","resource":"page:/contact/","severity":"WARNING","ownership":"code","message":"contrast inferred from the stylesheet"},
+  {"check":"A11Y-003","resource":"assets/css/main.css:88","severity":"WARNING","ownership":"code","message":"a rule no audited page uses"},
+  {"check":"WP-048","resource":"post:412","severity":"INFO","ownership":"code","message":"only the agent saw this"}
+]}
+JSON
+cat > "$tmp/measured.json" <<'JSON'
+{"site":"fixture","date":"2026-09-18","findings":[
+  {"check":"A11Y-003","resource":"page:/contact/","severity":"WARNING","ownership":"code","measured":true,"message":"contrast measured at 3.1:1","evidence":"axe"}
+]}
+JSON
+node "$r" --run "$tmp/agents.json" --merge "$tmp/measured.json" --out "$tmp/merged" --format md >/dev/null \
+  || fail "$r failed to merge two run files"
+m="$tmp/merged/informe-2026-09-18.md"
+grep -Fq 'contrast measured at 3.1:1' "$m" || fail "$m dropped the measured finding -- a measurement must beat an inference"
+grep -Fq 'contrast inferred from the stylesheet' "$m" \
+  && fail "$m kept both copies of one defect, which inflates every count"
+# Same check, different resource: two real findings, and the second is the one nobody would
+# find again. Merging on the check alone would silently delete it.
+grep -Fq 'a rule no audited page uses' "$m" \
+  || fail "$m merged two findings that share a check but not a resource -- they are different defects"
+grep -Fq 'only the agent saw this' "$m" || fail "$m dropped a finding only one source reported"
 
 # ---------------------------------------------------------------------------
 # 3c. The values that reach the document without passing through a table cell
