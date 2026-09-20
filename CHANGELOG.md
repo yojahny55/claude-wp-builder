@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **The `get_field()` pattern test could not see a pattern written the other way.**
+  `tests/checks/lib/acf-field-pattern-behavior.php` extracted only a double-quoted literal
+  from `find-orphan-acf-ids.php`. Rewriting that pattern as a single-quoted literal — same
+  pattern, same behaviour, still valid PHP — made the test print `no preg_match_all()
+  pattern literal found` and exit 1, which reads as a broken pattern rather than a test that
+  could not read it. That is the exact failure the test was added to prevent, one level up.
+  The extractor now takes either quoting style, undoes only the escapes that style defines,
+  and is itself checked against six fixtures before it is trusted on the real file.
+- **`find-orphan-acf-ids.php` read every `.php` in the theme tree whole.**
+  `file_get_contents()` holds the entire file in memory, and a generated or vendored file in
+  the same tree can be tens of megabytes. Files above 2 MiB are skipped, and each skip is
+  named on STDERR: a quiet skip would drop that file's field reads from the list, so a field
+  read only there would be classified `DEAD-DATA` — the same under-report an unusable theme
+  path used to produce. Non-regular entries are rejected with `isFile()`.
+  `FOLLOW_SYMLINKS` stays off, which is what keeps a symlinked directory out of the walk;
+  the comment now says so, since the flag's absence is the behaviour rather than an omission.
+
+
 ## [1.25.0] - 2026-09-19
 
 ### Fixed

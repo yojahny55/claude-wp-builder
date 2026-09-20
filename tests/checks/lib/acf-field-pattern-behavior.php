@@ -18,6 +18,61 @@
  * WordPress is not loaded; nothing here runs the script, only its pattern.
  */
 
+/**
+ * Pull the first string literal passed to preg_match_all() out of PHP source, and
+ * return the string PHP would build from it at runtime.
+ *
+ * Both quoting styles, because reading only one is a false negative rather than a
+ * failure: a script that switched its pattern to a single-quoted literal — same
+ * pattern, same behavior — made this test report "no pattern literal found" and exit
+ * 1, which reads as a broken pattern instead of a test that could not see it.
+ *
+ * No eval(). stripcslashes() is not an option either: it would eat `\s` and `\(`,
+ * which belong to the regex. Only the escapes each quoting style actually defines
+ * are undone — `\"` and `\\` inside double quotes, `\'` and `\\` inside single ones.
+ *
+ * Returns null when no literal is found.
+ */
+function acfx_extract_pattern( $source ) {
+	$re = '/preg_match_all\(\s*("(?:[^"\\\\]|\\\\.)*"|\'(?:[^\'\\\\]|\\\\.)*\')/';
+
+	if ( ! preg_match( $re, $source, $m ) ) {
+		return null;
+	}
+
+	$literal = $m[1];
+	$body    = substr( $literal, 1, -1 );
+
+	return ( '"' === $literal[0] )
+		? strtr( $body, array( '\\"' => '"', '\\\\' => '\\' ) )
+		: strtr( $body, array( "\\'" => "'", '\\\\' => '\\' ) );
+}
+
+$failed = 0;
+
+/*
+ * The extractor is tested before it is trusted. Each fixture is the same pattern
+ * written in one quoting style; both must yield the string PHP would build.
+ */
+$extractor_fixtures = array(
+	'double-quoted literal'          => array( 'preg_match_all( "/x/i", $s, $m )', '/x/i' ),
+	'single-quoted literal'          => array( "preg_match_all( '/x/i', \$s, \$m )", '/x/i' ),
+	'escaped quote, double-quoted'   => array( 'preg_match_all( "/a\\"b/i", $s, $m )', '/a"b/i' ),
+	'escaped quote, single-quoted'   => array( "preg_match_all( '/a\\'b/i', \$s, \$m )", "/a'b/i" ),
+	'regex escape survives, double'  => array( 'preg_match_all( "/a\\s(b/i", $s, $m )', '/a\\s(b/i' ),
+	'regex escape survives, single'  => array( "preg_match_all( '/a\\s(b/i', \$s, \$m )", '/a\\s(b/i' ),
+);
+
+foreach ( $extractor_fixtures as $label => $fixture ) {
+	list( $source_fixture, $expected ) = $fixture;
+	$got = acfx_extract_pattern( $source_fixture );
+
+	if ( $got !== $expected ) {
+		fwrite( STDERR, "extractor returned " . var_export( $got, true ) . " for {$label}, expected " . var_export( $expected, true ) . "\n" );
+		$failed++;
+	}
+}
+
 $script = dirname( __DIR__, 3 ) . '/skills/wp-cli-patterns/scripts/find-orphan-acf-ids.php';
 
 if ( ! is_readable( $script ) ) {
@@ -25,20 +80,12 @@ if ( ! is_readable( $script ) ) {
 	exit( 1 );
 }
 
-$source = (string) file_get_contents( $script );
+$pattern = acfx_extract_pattern( (string) file_get_contents( $script ) );
 
-// The first double-quoted literal passed to preg_match_all() is the field-name pattern.
-if ( ! preg_match( '/preg_match_all\(\s*("(?:[^"\\\\]|\\\\.)*")/', $source, $m ) ) {
+if ( null === $pattern ) {
 	fwrite( STDERR, "no preg_match_all() pattern literal found in find-orphan-acf-ids.php\n" );
 	exit( 1 );
 }
-
-/*
- * Turn the PHP source literal into the string PHP would build at runtime, without
- * eval(). Only the two escapes that can appear inside this pattern are unescaped:
- * stripcslashes() would also eat `\s` and `\(`, which are the regex's own.
- */
-$pattern = strtr( substr( $m[1], 1, -1 ), array( '\\"' => '"', '\\\\' => '\\' ) );
 
 $cases = array(
 	'single quotes'        => "get_field( 'hero_items' )",
@@ -56,8 +103,6 @@ $must_not_match = array(
 	'forget_field'  => "forget_field( 'hero_items' )",
 	'noget_field'   => "widget_field( 'hero_items' )",
 );
-
-$failed = 0;
 
 foreach ( $cases as $label => $code ) {
 	if ( ! preg_match( $pattern, $code, $hit ) ) {
