@@ -305,3 +305,74 @@ function __starter___background_image( $url ) {
 		. "url('" . __starter___css_url( esc_url( $webp ) ) . "') type('image/webp'), "
 		. "url('" . $src . "') type('" . $type . "'));";
 }
+
+/**
+ * 5) A decorative CSS background that waits until it is near the viewport.
+ *
+ * `background-image` has no `loading` attribute, so a browser downloads every
+ * one it finds with the first paint — including the section backgrounds that sit
+ * thousands of pixels below the fold. On a real build the footer, the map and
+ * two decorative bands were 120-320KB each and all four were on the critical
+ * path; holding them back took the first paint from 3.7MB to 1.4MB.
+ *
+ * The declaration travels in `data-__starter__-bg` and is painted by
+ * assets/js/src/index.js through an IntersectionObserver. Every declaration is
+ * ALSO printed inside a `<noscript><style>` block keyed by
+ * `data-__starter__-bg-id`, so a visitor without JavaScript sees the same page.
+ *
+ * Never use this for the hero. It is the LCP element: deferring it moves the
+ * largest paint later by exactly the time the observer waits.
+ *
+ * The key is carried in a data attribute rather than in `id`, because these
+ * sections usually have one already (`#colophon`, `#map`) and an HTML parser
+ * drops a second `id` on the same element — which would leave the noscript rule
+ * pointing at nothing while the page still looked correct with JavaScript on.
+ *
+ * @param string $url   Absolute URL of the background image.
+ * @param bool   $idle  True for an element inside the first viewport whose
+ *                      background is not yet visible (a carousel slide behind
+ *                      the first one). An observer fires on those immediately,
+ *                      so they are painted after the load event instead.
+ * @return string Attributes to print inside the opening tag, or '' when $url is empty.
+ */
+function __starter___lazy_background_attr( $url, $idle = false ) {
+	$declaration = __starter___background_image( $url );
+	if ( '' === $declaration ) {
+		return '';
+	}
+
+	if ( ! isset( $GLOBALS['__starter___lazy_backgrounds'] ) ) {
+		$GLOBALS['__starter___lazy_backgrounds'] = array();
+	}
+
+	$key = count( $GLOBALS['__starter___lazy_backgrounds'] ) + 1;
+	$GLOBALS['__starter___lazy_backgrounds'][ $key ] = $declaration;
+
+	$attributes = 'data-__starter__-bg-id="' . esc_attr( (string) $key ) . '"'
+		. ' data-__starter__-bg="' . esc_attr( $declaration ) . '"';
+
+	return $idle ? $attributes . ' data-__starter__-bg-idle="1"' : $attributes;
+}
+
+/**
+ * Prints the held-back backgrounds for a visitor with JavaScript disabled.
+ *
+ * Runs late on `wp_footer` so every template part that called the helper has
+ * already registered its declaration. The CSS is built from values that
+ * __starter___background_image() already passed through esc_url() and
+ * __starter___css_url(), and the keys are integers this function generated, so
+ * there is nothing left to escape here.
+ */
+function __starter___print_lazy_background_noscript() {
+	if ( empty( $GLOBALS['__starter___lazy_backgrounds'] ) ) {
+		return;
+	}
+
+	$css = '';
+	foreach ( $GLOBALS['__starter___lazy_backgrounds'] as $key => $declaration ) {
+		$css .= '[data-__starter__-bg-id="' . (int) $key . '"]{' . $declaration . '}';
+	}
+
+	echo '<noscript><style>' . $css . '</style></noscript>' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from esc_url()ed declarations and integer keys.
+}
+add_action( 'wp_footer', '__starter___print_lazy_background_noscript', 99 );

@@ -43,3 +43,93 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// Decorative CSS backgrounds wait until they are near the viewport.
+//
+// A `background-image` has no `loading` attribute, so without this the browser
+// downloads every decorative section background with the first paint, however
+// far below the fold it sits. The declaration is printed by
+// __starter___lazy_background_attr() into `data-__starter__-bg`, and repeated
+// inside a <noscript><style> block so a visitor without JavaScript sees the same
+// page. The hero is never deferred this way: it is the LCP element.
+const initLazyBackgrounds = () => {
+  const lazyBackgrounds = document.querySelectorAll('[data-__starter__-bg]');
+  if (!lazyBackgrounds.length) {
+    return;
+  }
+
+  // Appended, never assigned: these sections can already carry an inline style
+  // from the template, and `cssText = declaration` would silently drop it. The
+  // getter returns the serialised block, which ends in `;` whenever it is not
+  // empty, so the append is always well formed.
+  // The null test is what makes the call idempotent. Without it a second paint
+  // of the same element — a carousel that moves the node, a future edit that
+  // observes an idle element too — appends the string `null` to the style.
+  const paint = (el) => {
+    const declaration = el.getAttribute('data-__starter__-bg');
+    if (!declaration) {
+      return;
+    }
+    el.style.cssText += declaration;
+    el.removeAttribute('data-__starter__-bg');
+  };
+
+  // Queried again when it fires, not captured above: a carousel or slider moves
+  // these nodes into its own track, so the list taken now can be stale by then.
+  const paintIdle = () => {
+    window.setTimeout(() => {
+      document
+        .querySelectorAll('[data-__starter__-bg][data-__starter__-bg-idle]')
+        .forEach(paint);
+    }, 1200);
+  };
+
+  // The readyState test is load-bearing, not defensive. A bundle that runs after
+  // the load event has already fired — which is the normal case for a deferred
+  // script on a cached page — would never see a `load` listener called, and every
+  // idle background would stay unpainted for the rest of the visit.
+  if (document.readyState === 'complete') {
+    paintIdle();
+  } else {
+    window.addEventListener('load', paintIdle);
+  }
+
+  // The fallback paints what the observer would have observed, and only that.
+  // An idle element is inside the first viewport, so painting it here paints it
+  // during the initial parse — which is the one thing the idle flag exists to
+  // prevent. It stays with paintIdle, which is already scheduled above.
+  if (!('IntersectionObserver' in window)) {
+    lazyBackgrounds.forEach((el) => {
+      if (!el.hasAttribute('data-__starter__-bg-idle')) {
+        paint(el);
+      }
+    });
+    return;
+  }
+
+  // 600px of margin, so the image is requested before the section is on screen
+  // and the visitor does not scroll into an empty band.
+  const observer = new IntersectionObserver(
+    (entries, obs) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          paint(entry.target);
+          obs.unobserve(entry.target);
+        }
+      });
+    },
+    { rootMargin: '600px 0px' }
+  );
+
+  lazyBackgrounds.forEach((el) => {
+    if (!el.hasAttribute('data-__starter__-bg-idle')) {
+      observer.observe(el);
+    }
+  });
+};
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initLazyBackgrounds);
+} else {
+  initLazyBackgrounds();
+}

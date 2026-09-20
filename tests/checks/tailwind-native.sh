@@ -246,6 +246,26 @@ printf '<section class="grid gap-6" style="background-image:url(<?php echo esc_u
   > "$tmp/dynamic_style_attr/template-parts/section-hero.php"
 expect_pass dynamic_style_attr "a dynamic style=\"\" attribute fed by an ACF field is the one sanctioned inline style and must not read as a <style> block"
 
+# The second sanctioned form, and the same justification as the attribute above: the
+# deferred-background helper in inc/performance.php repeats every held-back declaration
+# inside a <noscript><style> block, so a visitor with JavaScript disabled still gets the
+# background. The URLs are runtime values, so no build step can carry them.
+mktheme noscript_bg_style
+mkdir -p "$tmp/noscript_bg_style/inc"
+printf '<?php\necho %s<noscript><style>%s . $css . %s</style></noscript>%s;\n' "'" "'" "'" "'" \
+  > "$tmp/noscript_bg_style/inc/performance.php"
+expect_pass noscript_bg_style "a <noscript><style> block emitted by inc/performance.php is the deferred-background fallback and must not fail rule 5"
+
+# The exception is keyed to <noscript> AND to that file, both halves. A bare <style> block
+# in performance.php is CSS outside the build like any other, and widening the exception to
+# the whole file would let one in through the back door.
+mktheme bare_style_in_perf
+mkdir -p "$tmp/bare_style_in_perf/inc"
+printf '<?php\necho %s<style>.hero{color:red}</style>%s;\n' "'" "'" \
+  > "$tmp/bare_style_in_perf/inc/performance.php"
+expect_fail bare_style_in_perf '<style' \
+  "a bare <style> block in inc/performance.php is not the noscript fallback and must still fail rule 5"
+
 # Every documented invocation of this script must be rooted at ${CLAUDE_PLUGIN_ROOT}.
 # Commands, agents and skills all run with the working directory set to the user's
 # WordPress project, where a bare `bin/…` resolves to nothing and exits 127 — the

@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Added
+
+- **A decorative CSS background below the fold is deferred.** `background-image` has no
+  `loading` attribute, so every background a template prints is downloaded with the first
+  paint however far down the page it sits. On a real build four of them — a footer band, a
+  map panel and two decorative sections, 120–320KB each — were 2.3MB of a 3.7MB first paint.
+  `prefix_lazy_background_attr( $url, $idle = false )` in the `__tailwind__` starter returns
+  the declaration in a data attribute instead of a style value, the bundle paints it through
+  an IntersectionObserver with 600px of forward margin, and
+  `prefix_print_lazy_background_noscript()` repeats every held-back declaration inside a
+  `<noscript><style>` block on `wp_footer`, so a visitor with JavaScript disabled sees the
+  same page. `agents/wp-template.md` forbids it on the hero: that one is the LCP element, and
+  deferring it moves the largest paint later by whatever the observer waits. `PERF-057` finds
+  the defect in a theme this plugin did not build.
+  Two failures are written down where the next edit will read them, because both look like
+  cleanups: the key travels in a data attribute and not in `id`, since these sections usually
+  carry one already and an HTML parser drops the second one — leaving the noscript rule
+  selecting nothing while the page still looks correct with JavaScript on; and the painter
+  tests `document.readyState` before trusting a `load` listener, because a deferred bundle on
+  a cached page runs after that event has fired and the listener alone is never called.
+
 ### Fixed
 
 - **The `get_field()` pattern test could not see a pattern written the other way.**

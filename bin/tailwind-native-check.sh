@@ -6,6 +6,13 @@
 set -euo pipefail
 
 theme="${1:?usage: tailwind-native-check.sh <theme-dir>}"
+# Trailing slashes stripped once, here. Every rule below builds a path as
+# "$theme/…" and rule 5 compares one of those against a `grep -rl` result, which
+# never carries a double slash — so `./my-theme/` made the sanctioned
+# performance.php look like an offender.
+while [ "${theme%/}" != "$theme" ] && [ "${theme%/}" != "" ]; do
+  theme="${theme%/}"
+done
 src="$theme/assets/css/src/tailwindcss"
 main="$src/main.css"
 fail=0
@@ -78,8 +85,35 @@ while IFS= read -r f; do
 done < <(find "$src" -mindepth 1 -name '*.css')
 
 # 5. No inline <style> blocks in templates.
-if grep -rlq '<style' "$theme" --include='*.php' 2>/dev/null; then
-  err "inline <style> block(s) in: $(grep -rl '<style' "$theme" --include='*.php' | tr '\n' ' ')"
+#
+# One exception, and it is the same category as the sanctioned dynamic `style=""`
+# attribute: a `<style>` that sits inside `<noscript>` and is emitted by
+# inc/performance.php. That file's deferred-background helper holds each declaration in a
+# data attribute and repeats all of them in a `<noscript><style>` block, because the
+# fallback has to carry an uploads URL chosen at runtime — a value no build step can know,
+# which is exactly why the dynamic style attribute is allowed too. The exception is keyed
+# to `<noscript>` on the same line AND to that one file, so a `<style>` block anywhere in
+# a template, or a bare one in performance.php, still fails: the rule is about CSS that
+# escapes the Tailwind build, and a rule with a wide exception stops being one.
+style_files=$(grep -rl '<style' "$theme" --include='*.php' 2>/dev/null || true)
+offenders=""
+for f in $style_files; do
+  case "$f" in
+    "$theme"/inc/performance.php)
+      # Every `<style` line in this file must also carry `<noscript>`. Counted as
+      # the lines that do NOT, rather than by comparing two totals: a single line
+      # holding two `<style` occurrences makes `grep -c '<style'` and
+      # `grep -c '<noscript>.*<style'` diverge while every block is still inside a
+      # <noscript>, and that comparison then failed a file that was correct.
+      if [ "$(grep '<style' "$f" | grep -vc '<noscript>' || true)" = "0" ]; then
+        continue
+      fi
+      ;;
+  esac
+  offenders="$offenders$f "
+done
+if [ -n "$offenders" ]; then
+  err "inline <style> block(s) in: $offenders"
 fi
 
 # 6. A compiled theme must actually use utilities in its markup.
