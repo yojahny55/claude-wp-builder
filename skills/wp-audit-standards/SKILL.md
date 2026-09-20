@@ -87,9 +87,13 @@ File scanning via Read, Grep, Glob. No runtime environment required.
 
 Plugin management, option reading, database queries. Requires a working WordPress installation with WP-CLI access.
 
-### Tier 3 — + External skills (when web-quality-skills installed)
+### Tier 3 — + Browser measurement (when a browser automation tool is available)
 
-Lighthouse-style browser audits. Requires the web-quality-skills package for browser-based testing.
+Lighthouse-style browser audits: Core Web Vitals, rendered-page checks, performance traces.
+Requires a browser automation tool — Playwright MCP, Chrome DevTools MCP or Claude in
+Chrome. It adds measurement, never criteria: every threshold Tier 3 measures against is
+recorded in this skill and in the audit agents, and a check a file scan can answer runs at
+Tier 1 whether or not a browser is present.
 
 ---
 

@@ -112,9 +112,11 @@ ran Rank Math sent every SEO check at the wrong plugin, and the run that discove
 should say so out loud. A wrong `web_server` sends cache-purge and `.htaccess`-versus-nginx
 advice the wrong way; a wrong PHP minor misjudges which constructs are fatal.
 
-**Re-probe Tier 3 here** rather than trusting `audit.web_quality_skills_available` —
+**Re-probe Tier 3 here** rather than trusting `audit.browser_measurement_available` —
 capability recorded once in the past is not capability now. The recorded value is an input
-to the drift report, never to the tier decision.
+to the drift report, never to the tier decision. A manifest written before this key existed
+carries the legacy `audit.web_quality_skills_available` instead: read it as the recorded
+value, report it as drift like any other, and write the current key back.
 
 ### 2.5c — Recorded decisions that are missing, not defaulted
 
@@ -267,14 +269,20 @@ Determine the audit tier:
 
 **Tier 2 (if `.wp-create.json` exists):** Read `.wp-create.json` to get `$WP` wrapper. Set `$WP` to the value of `wp_cli.wrapper`. Enables WP-CLI runtime checks.
 
-**Tier 3 (if web-quality-skills installed):** Probe every run — Step 2.5b already
-re-probed it, and `audit.web_quality_skills_available` from a previous run is a drift input,
-never the answer. Check these paths in order:
-1. `~/.claude/skills/performance/SKILL.md`
-2. `.claude/skills/performance/SKILL.md`
-3. Glob for `**/web-quality-skills/skills/performance/SKILL.md`
+**Tier 3 (if a browser automation tool is available):** Probe every run — Step 2.5b
+already re-probed it, and `audit.browser_measurement_available` from a previous run is a
+drift input, never the answer. Tier 3 is what actually loads the page, so it is gated on
+the one thing that can: a browser. Check for any of these tools in the session:
+1. Playwright MCP (`mcp__playwright__browser_navigate`)
+2. Chrome DevTools MCP (`performance_start_trace`)
+3. Claude in Chrome (`mcp__claude-in-chrome__navigate`)
 
-If any path exists, Tier 3 is available.
+If any is available, Tier 3 is available.
+
+The criteria themselves — budgets, Core Web Vitals thresholds, the WCAG 2.2 additions, the
+HTML5 cross-check — live in the audit agents and in `wp-audit-standards`, and every check
+that a file scan can answer runs at Tier 1 regardless. Tier 3 adds measurement, not
+knowledge.
 
 Print tier status:
 ```
@@ -283,7 +291,7 @@ Print tier status:
 Audit Tier: <Code | Code + Runtime | Code + Runtime + Lighthouse>
   ✓ Tier 1: Code analysis (always available)
   <✓|✗> Tier 2: WP-CLI runtime checks (<.wp-create.json found|.wp-create.json not found>)
-  <✓|✗> Tier 3: External quality skills (<web-quality-skills detected|web-quality-skills not found>)
+  <✓|✗> Tier 3: Browser measurement (<browser tool detected|no browser tool available>)
 ```
 
 **`--geo` needs Tier 2.** The GEO auditor's live HTTP checks and the `bin/geo-scan.sh`
@@ -316,9 +324,8 @@ WordPress Plugins:
   ✗ seo-by-rank-math — not installed (needed for --seo)
   ✗ all-in-one-wp-security-and-firewall — not installed (needed for --security)
 
-Claude Code Plugins:
-  <✓|✗> web-quality-skills — <installed|not installed> (enables browser-based audits)
-      Install: npx skills add addyosmani/web-quality-skills
+Browser measurement:
+  <✓|✗> browser automation tool — <available|not available> (enables Core Web Vitals measurement)
 
 Options:
   [A] Install all recommended WordPress plugins
@@ -389,7 +396,7 @@ Project context:
 - Industry: <industry>
 - WP-CLI wrapper: <$WP or "not available">
 - Audit tier: <1|2|3>
-- Web-quality-skills: <available|not available>
+- Browser measurement: <available|not available>
 
 Run all checks for your tier level. Output your findings as a structured report with the following format for each issue:
 
@@ -736,11 +743,16 @@ Add or update the `audit` key in the JSON:
     "issues_fixed": M,
     "carried_over": K,
     "findings_ledger": { "path": ".wp-audit-findings.json", "written": "<ISO 8601 timestamp>" },
-    "web_quality_skills_available": true
+    "browser_measurement_available": true
   },
   "manifest_version": 3
 }
 ```
+
+**Delete `audit.web_quality_skills_available` as you write this block** if the manifest still
+carries it. Step 2.5b reads it once, to migrate a manifest written before the rename; leaving
+it in place afterwards means every later run sees two keys for one capability and no rule
+saying which wins.
 
 Then write the ledger itself, beside the manifest:
 

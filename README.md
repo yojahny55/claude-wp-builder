@@ -548,7 +548,7 @@ fetches; without a reachable public URL the scan skips and the runtime codes rep
 
 - **Tier 1 (always):** Code analysis via file scanning
 - **Tier 2 (with WP-CLI):** Runtime checks, plugin configuration
-- **Tier 3 (with web-quality-skills):** Lighthouse-style browser audits
+- **Tier 3 (with a browser tool):** Lighthouse-style browser audits and Core Web Vitals
 
 ### Usage
 
@@ -563,7 +563,7 @@ fetches; without a reachable public URL the scan skips and the runtime codes rep
 
 - [Rank Math SEO](https://wordpress.org/plugins/seo-by-rank-math/) — auto-installed for SEO audits
 - [All-in-One WP Security](https://wordpress.org/plugins/all-in-one-wp-security-and-firewall/) — auto-installed for security audits
-- [web-quality-skills](https://github.com/addyosmani/web-quality-skills) — optional Claude Code plugin for Lighthouse-style audits
+- A browser automation tool (Playwright MCP, Chrome DevTools MCP or Claude in Chrome) — enables Tier 3 Core Web Vitals measurement
 
 ## Tech Stack
 
