@@ -68,8 +68,14 @@
   remove and touches nothing. `verify-transfer.py` had no timeout, so an unreachable
   endpoint hung forever under `set -e` (300s, `WP_S3_LIST_TIMEOUT` to raise it). Both
   `wp-config.php` rewrites are written to a neighbouring file and renamed, because a
-  process killed mid-write left a truncated `wp-config.php` and a white screen. And the
-  last `wp` call in the revert is guarded like every other one.
+  process killed mid-write left a truncated `wp-config.php` and a white screen. Every `wp`
+  call in the revert is guarded now, and the plugin is asked whether it is active exactly
+  once: WP-CLI answers a site it cannot read with three lines of its own, and those used to
+  land between step 2 and step 4 of a run whose step 1 had already said the plugin was
+  inactive. A non-zero exit whose every error was a refused overwrite no longer passes in
+  silence either — the run still succeeds, because that is the ordinary repeated transfer,
+  but the exit code is printed, since a client that refused three files and then timed out
+  on the fourth is indistinguishable from here and only the comparison tells them apart.
   One more the scripts were never going to be asked about: **form attachments no longer
   leave the disk.** `uploads/wpcf7_uploads/` holds what people attached to a form — CVs,
   identity documents, invoices — and it was being mirrored into the bucket, where the only

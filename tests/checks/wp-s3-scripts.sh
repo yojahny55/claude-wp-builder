@@ -133,6 +133,16 @@ grep -Fq 'if [[ -f "$CONFIG.disabled" ]]; then' "$revert" \
   || fail "$revert reads the parked config without checking that there is one"
 
 # ---------------------------------------------------------------------------
+# 7d. Every `wp` call in the revert is asked once and reused. WP-CLI prints a
+#     three-line "This does not seem to be a WordPress installation" for a site it
+#     cannot read, and it used to land between step 2 and step 4 of a run that had
+#     already reported the plugin inactive in step 1.
+# ---------------------------------------------------------------------------
+grep -Fq 'PLUGIN_ACTIVE' "$revert" \
+  || fail "$revert calls 'wp plugin deactivate' without reusing what step 1 already learned"
+
+
+# ---------------------------------------------------------------------------
 # 8. The transfer is still judged by comparing both sides, not by the client's
 #    exit code or its summary table.
 # ---------------------------------------------------------------------------

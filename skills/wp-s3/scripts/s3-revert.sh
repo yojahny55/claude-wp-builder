@@ -36,17 +36,23 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 [[ -w "$LOCAL" ]] || die "$LOCAL is not writable: the media cannot come back to disk"
 
 # ---------------------------------------------------------------- 1. stop rewriting
+# Asked once and reused by step 3: every `wp` call on a site WP-CLI cannot read prints a
+# multi-line "This does not seem to be a WordPress installation" into the middle of the
+# steps, and an inactive plugin needs neither call.
+PLUGIN_ACTIVE=no
 if command -v wp >/dev/null 2>&1; then
     # The subcommand only exists while the plugin is loaded, so asking for it on an
     # inactive plugin prints "'s3-uploads' is not a registered wp command" — an error
     # message for the one case that needs no work at all.
     if ( cd "$WP_ROOT" && wp plugin is-active S3-Uploads >/dev/null 2>&1 ); then
+        PLUGIN_ACTIVE=yes
         echo "1. wp s3-uploads disable"
         ( cd "$WP_ROOT" && wp s3-uploads disable ) || echo "   (rewriting was already off)"
     else
         echo "1. The plugin is not active: nothing to disable."
     fi
 else
+    PLUGIN_ACTIVE=unknown
     echo "1. WP-CLI not found. Run this yourself before continuing:"
     echo "     cd $WP_ROOT && wp s3-uploads disable && wp plugin deactivate S3-Uploads"
 fi
@@ -66,9 +72,13 @@ else
 fi
 
 # ---------------------------------------------------------------- 3. deactivate
-if command -v wp >/dev/null 2>&1; then
+if [[ "$PLUGIN_ACTIVE" == "yes" ]]; then
     echo "3. wp plugin deactivate S3-Uploads"
-    ( cd "$WP_ROOT" && wp plugin deactivate S3-Uploads ) || echo "   (was not active)"
+    ( cd "$WP_ROOT" && wp plugin deactivate S3-Uploads ) || echo "   (deactivation failed; do it in Plugins)"
+elif [[ "$PLUGIN_ACTIVE" == "unknown" ]]; then
+    echo "3. Deactivate the plugin yourself: it is the command printed in step 1."
+else
+    echo "3. Nothing to deactivate."
 fi
 
 # ---------------------------------------------------------------- 4. unhook the config
