@@ -523,6 +523,53 @@
   path used to produce. Non-regular entries are rejected with `isFile()`.
   `FOLLOW_SYMLINKS` stays off, which is what keeps a symlinked directory out of the walk;
   the comment now says so, since the flag's absence is the behaviour rather than an omission.
+
+### Fixed
+
+- **A translated page now finds its template.** WordPress picks `page-{slug}.php`
+  from the slug and a translated page has its own slug, so `/es/nosotros/` looked for
+  `page-nosotros.php`, missed, and fell through to `page.php` — which renders editor
+  content, and a theme drawing its pages from section parts has none. Correct header,
+  correct footer, nothing between them, HTTP 200. The Polylang `inc/i18n.php` variant
+  now ships a `template_include` filter mapping a translated page to its
+  default-language counterpart's template, so a third language needs no new template
+  files. Recorded there too: sharing one slug across languages is **not** the fix and
+  is worse — WordPress resolves a page request by slug *before* any language filter
+  runs, so `/es/about/` serves the English post, canonical included.
+- **`/es/` and `/es/blog/` no longer render the default language's fields.**
+  `page_on_front` and `page_for_posts` are options holding one ID, so the front page
+  and the posts page are the only two records WordPress does not resolve from the
+  request. The helper hops to the counterpart through `pll_get_post()`. Every inner
+  Spanish page was already correct, which is what made this read as a content problem.
+- **Polylang routing is configured and then verified by request.** `hide_default = 0`
+  (with the cost stated plainly: every default-language URL moves to `/en/…`), because
+  an unprefixed default has nothing to disambiguate `/es/` against and serves English.
+  And `PLL()->model->clean_languages_cache()` after any option or slug change:
+  Polylang caches each language's `home_url` on the language term, so `/` 302s to
+  itself, and **`wp rewrite flush` does not clear it** — which is why it looks like a
+  rewrite problem and does not respond to the rewrite fix.
+- **`/wp-seed` verifies menus from the front end, because WP-CLI conceals this one.**
+  Polylang replaces the core `nav_menu_locations` theme_mod with its own per-language
+  map in a **frontend** filter, which does not run under WP-CLI — so
+  `get_nav_menu_locations()` prints correct IDs on a site serving no navigation at
+  all. A delivery shipped with no nav links on any of 16 pages and a header that read
+  as a deliberate minimal design. Every CLI-based check of this passes on a broken
+  site; only an HTTP request sees it.
+- **`/wp-polylang` records that an imported string outranks the theme's table.**
+  `prefix_t()` asks `pll__()` first, so once a string is in Polylang's store,
+  correcting the PHP changes nothing on the page and the edit looks unsaved. A build
+  lost a round to this over 27 Spanish strings.
+
+### Changed
+
+- **The i18n helper-parity check allows the Polylang variant its own internals.** It
+  still requires every helper `i18n.php` defines, and now permits extras when their
+  docblock says `@internal` — the Polylang model needs work the suffix model does not,
+  and forcing a no-op twin into `i18n.php` would be a lie about symmetry. Both halves
+  are mutation-tested. Its function-name pattern also widened from `[a-z_0-9]` to
+  `[A-Za-z_0-9]`: a name containing a capital letter was truncated to a prefix of
+  itself, which made a renamed helper read as the original.
+
 ## [1.25.0] - 2026-09-19
 
 ### Fixed

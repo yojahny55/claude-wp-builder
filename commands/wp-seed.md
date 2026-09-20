@@ -637,8 +637,33 @@ Then write the per-language option above for every language, primary
 included.
 
 Add each language's own pages to its own menu; do not add a page to the menu
-of another language. Everything below this line describes the `suffix`
-strategy.
+of another language.
+
+**Verify the menus from the front end, and only from the front end.** This is the
+one assertion in this phase that can fail, and the obvious way to make it cannot:
+
+```bash
+for URL in "$($WP option get home)" "$($WP option get home)/es/"; do
+  printf '%s  links: ' "$URL"
+  curl -fsSk "$URL" | grep -c 'class="[^"]*menu-item'
+done
+```
+
+Zero on any language is a failure. Do not continue and do not report the seed as
+done — a header rendering its logo, its language switcher and its CTA with no links
+between them reads as a deliberate minimal design, and that is how it shipped on all
+16 pages of a delivery. `wp_nav_menu()` with `'fallback_cb' => false` renders nothing
+for a location that resolves to menu `0`, which is correct behaviour and leaves no
+trace: HTTP 200, no notice, no log line.
+
+**`$WP eval 'print_r(get_nav_menu_locations());'` will tell you it is fine.** It
+returns the core `nav_menu_locations` theme_mod, and Polylang's filter that *replaces*
+that map with its own per-language one is a **frontend** filter — it does not run
+under WP-CLI. So the CLI prints `primary => 15, mobile => 16, footer => 17`, all
+correct, on a site serving no navigation at all. Every CLI-based check of this will
+pass on a broken site; only an HTTP request sees what a visitor sees.
+
+Everything below this line describes the `suffix` strategy.
 
 Create navigation menus for each configured language. Menu location names use **underscore-separated** format matching `theme-setup.php` `register_nav_menus()`.
 

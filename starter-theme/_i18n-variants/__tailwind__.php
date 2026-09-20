@@ -66,6 +66,49 @@ function __starter___get_current_lang() {
 }
 
 /**
+ * Resolve the record a template should read fields from.
+ *
+ * Everywhere else Polylang answers this for free: a request for /es/nosotros/
+ * queries the Spanish post, and get_field() with no ID reads that post. The
+ * front page and the posts page are the two exceptions, because WordPress does
+ * not resolve them from the request at all -- it reads the page_on_front and
+ * page_for_posts OPTIONS, and an option holds exactly one ID, which is the
+ * default language's. So /es/ renders the Spanish URL, the Spanish menu and the
+ * ENGLISH hero, while every inner Spanish page is correct -- which is what makes
+ * it read as a content problem rather than a routing one.
+ *
+ * Hop to the counterpart when there is one. pll_get_post() returns null for a
+ * post with no translation and false when Polylang is inactive, and both mean
+ * "stay where you are".
+ *
+ * Templates never call this: they call get_field()/get_repeater() as always and
+ * this runs underneath them. It has no counterpart in the suffix i18n.php,
+ * which needs none — that model serves one post per URL.
+ *
+ * @internal
+ * @param mixed $post_id The ID a caller passed, or false for "current".
+ * @return mixed The ID to read from.
+ */
+function __starter___resolve_post_id($post_id) {
+    if ($post_id !== false || !function_exists('pll_get_post')) {
+        return $post_id;
+    }
+
+    $id = 0;
+    if (is_front_page()) {
+        $id = (int) get_option('page_on_front');
+    } elseif (is_home()) {
+        $id = (int) get_option('page_for_posts');
+    }
+    if (!$id) {
+        return $post_id;
+    }
+
+    $translated = pll_get_post($id, __starter___get_current_lang());
+    return $translated ? $translated : $id;
+}
+
+/**
  * Get field value for the current language
  *
  * @param string $field_name Base field name
@@ -73,7 +116,8 @@ function __starter___get_current_lang() {
  * @return mixed Field value
  */
 function __starter___get_field($field_name, $post_id = false) {
-    $lang = __starter___get_current_lang();
+    $lang    = __starter___get_current_lang();
+    $post_id = __starter___resolve_post_id($post_id);
 
     // Only meaningful for the options page -- see the file header.
     if ($lang !== __STARTER___DEFAULT_LANG) {
@@ -96,6 +140,7 @@ function __starter___get_field($field_name, $post_id = false) {
  */
 function __starter___get_repeater($field_name, $translatable_subfields = array(), $post_id = false) {
     $lang     = __starter___get_current_lang();
+    $post_id  = __starter___resolve_post_id($post_id);
     $repeater = get_field($field_name, $post_id);
 
     if (!$repeater || !is_array($repeater)) {
@@ -290,3 +335,41 @@ function __starter___get_lang_url($lang) {
 
     return pll_home_url($lang);
 }
+
+/**
+ * Give a translated page its counterpart's page template.
+ *
+ * WordPress picks page-{slug}.php from the slug, and a translated page has its
+ * own slug by design: /es/nosotros/ looks for page-nosotros.php, does not find
+ * it, and falls through to page.php -- which renders the editor's content. In a
+ * theme that draws its pages from section template parts there is no editor
+ * content, so the page returns 200 with a correct header, a correct footer, and
+ * nothing between them. Nothing errors and the language switcher works, which is
+ * why this reads as missing content rather than as a missing template.
+ *
+ * Sharing one slug across both languages is NOT the fix, and is worse: WordPress
+ * resolves a page request by slug BEFORE any language filter runs, so /es/about/
+ * serves the English post, canonical included. Keep localised slugs; move the
+ * template.
+ *
+ * Mapping to the DEFAULT language's counterpart means a third language needs no
+ * new template files at all.
+ */
+add_filter('template_include', function ($template) {
+    if (!is_page() || !function_exists('pll_get_post') || !function_exists('pll_default_language')) {
+        return $template;
+    }
+
+    // Only act when the hierarchy fell through to the generic page template.
+    if (basename($template) !== 'page.php') {
+        return $template;
+    }
+
+    $source = pll_get_post(get_queried_object_id(), pll_default_language());
+    if (!$source || $source === get_queried_object_id()) {
+        return $template;
+    }
+
+    $candidate = locate_template('page-' . get_post_field('post_name', $source) . '.php');
+    return $candidate ? $candidate : $template;
+});
