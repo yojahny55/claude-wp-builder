@@ -73,8 +73,8 @@
   All three routes now agree on how a finding is identified. The resource convention is
   written down once (`page:/contact/`, `post:412`, `template-parts/hero.php:34`, `site`),
   a page-level finding is one row per page rather than one per occurrence, and the Step 6
-  dispatch prompt asks **every** agent for an owner — the renderer refuses a finding without
-  one, and only the usability agent had been emitting it.
+  dispatch prompt asks **every** agent for an owner, since the renderer refuses a finding
+  that arrives without one.
 
 - **An audit now produces something you can hand over.** `/wp-audit --report md|html|both`
   writes the run to `.wp-audit/informe-<date>.md` and `informe-<date>.html` through the new

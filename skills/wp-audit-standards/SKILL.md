@@ -51,7 +51,7 @@ All audit agents MUST output findings in this format:
 
 ### Field Requirements
 
-- `category` — one of: `security`, `seo`, `a11y`, `performance`, `best-practices`
+- `category` — one of: `security`, `seo`, `a11y`, `performance`, `best-practices`, `geo`, `usability`
 - `tier` — integer 1–3 indicating which audit tier produced the finding
 - `issues` — array of issue objects (may be empty)
 - `severity` — one of: `critical`, `warning`, `info`
@@ -74,6 +74,9 @@ All audit agents MUST output findings in this format:
 | `A11Y-xxx` | Accessibility |
 | `PERF-xxx` | Performance |
 | `WP-xxx` | Best Practices |
+| `GEO-Dnn`, `GEO-Axx`, `GEO-Uxx`, `GEO-Pxx` | GEO / AI-agent readiness, by ORA layer |
+| `UX-xxx` | Usability |
+| `A11Y-AXE-*`, `PERF-LH-*` | Evidence rows from the browser suite — measurements of an existing criterion, never criteria of their own |
 
 ---
 

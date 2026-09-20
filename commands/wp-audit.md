@@ -35,8 +35,11 @@ If `--all` or no category flags are present: enable all 7 categories (security, 
 
 - **`--pages <list|auto|none>`** — which pages the page-level criteria are measured on.
   `auto` derives the list; `none` skips the page walk and reports every page-level check
-  `UNMEASURED`. Default: `auto` when `--usability` or `--suite` is active, `none`
-  otherwise, because the other six categories audit the theme and do not need a page list.
+  `UNMEASURED`. Default: `auto` whenever the **usability category is selected** or `--suite`
+  is given, `none` otherwise, because the other six audit the theme and need no page list.
+  Selected, not typed: `--all` and a bare `/wp-audit` both select usability without naming
+  it, and keying this off the literal flag would make the commonest invocation report the
+  whole category `UNMEASURED` — the quiet failure Step 2.7 exists to prevent.
 
 ## Step 2: Read Project Context
 
@@ -164,7 +167,7 @@ command.
 
 `audit.categories_run` records which categories have ever run on this project. Read it back
 and diff it against the categories this plugin version offers — `security`, `seo`, `a11y`,
-`performance`, `best-practices`, `geo`:
+`performance`, `best-practices`, `geo`, `usability`:
 
 ```
   coverage    NEVER RUN: geo
@@ -565,7 +568,7 @@ agent given no pages audits nothing while reporting cleanly.
 
 ## Step 6.5: Run the browser suite (`--suite` only)
 
-The six agents read code, the database and a rendered `<head>`. None of them loads the page
+The seven agents read code, the database and a rendered `<head>`. None of them loads the page
 the way a visitor does, so the criteria that only exist in a rendered page — contrast as
 measured, line width at each breakpoint, a form's validation, a broken link followed, a
 Lighthouse score — were either unmeasured or asserted from the source. This runs them.
@@ -576,6 +579,9 @@ ${CLAUDE_PLUGIN_ROOT}/bin/audit-suite.sh --url <public-url> --dir .wp-audit/suit
 ```
 
 `<public-url>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json`.
+**Pass `--pages` with the list Step 2.7 fixed.** Without it the suite keeps whatever its
+config already holds, which on a first run is the template's placeholder — so a run that
+looks successful measures pages that are not this site's.
 The first run scaffolds `.wp-audit/suite/` from `templates/audit-suite/` and installs the
 suite's dependencies **once per machine**, into a shared cache keyed by the template's
 `package.json`. Later runs and later projects reuse it.
@@ -849,7 +855,8 @@ Categories: <comma-separated selected categories>
   Pages: <the Step 2.7 scope, or "not measured — no page scope">
   ✗ CRITICAL: <message> (UX-014, /services/)
   ✗ WARNING: <message> (UX-006, desktop: 142 characters)
-  ○ N/A: <code> — <why this site lacks what it evaluates>
+  ○ N/A: K — <the criteria this site genuinely lacks the feature for>
+  ? UNMEASURED: J — <what stopped them: no page scope, no browser, no Tier 2>
 
 [GEO] <site_type> — N issues (X errors, Y warnings, Z info, K N/A)
   Layer coverage: <Discovery ✓|✗> <Access ✓|✗> <Usability ✓|✗> <Payments ✓|N/A>
@@ -1053,6 +1060,21 @@ Fix the following issues in the WordPress theme at <theme_path>:
 <list of auto-fixable best-practices issues with their codes and fix methods>
 ```
 Fixes include: ABSPATH checks, adding `esc_html()`/`esc_url()`/`esc_attr()` escaping, theme supports registration, proper enqueue patterns.
+
+**Usability fixes:** Dispatch the `wp-audit-ux` agent again with fix instructions:
+```
+Fix the following issues in the WordPress theme at <theme_path>:
+<list of auto-fixable usability issues with their codes and fix methods>
+```
+Fixes include: a required-field mark, a missing active state, hover feedback, spacing
+between action elements, a `max-width` in `ch`, an underline on a link that is
+distinguishable only by colour.
+
+**Every one of those changes how the site looks**, and four of them move layout. Pass the
+agent its own Step 4: measure `getComputedStyle()` and `getBoundingClientRect()` before and
+after, at desktop and mobile, on every element carrying the class — and report both sets.
+A value that moved and was not meant to is a regression, not a fix. If the user has not
+agreed to visual changes, this category is reported and not applied.
 
 **GEO fixes:** Dispatch an agent with `subagent_type: wp-agentic-surfaces` with the full project context and the list of auto-fixable GEO findings. It owns `inc/agentic.php` and every generated agent surface (`llms.txt`, ARD catalog, agent-skills index, markdown negotiation, Link headers, agent-friendly 404, JSON-LD breadth, trust anchors) — do not re-implement the surfaces here. Before dispatching, run the live verifier to capture the before score; run it again after the fixer completes and report the before → after score:
 

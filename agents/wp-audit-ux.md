@@ -58,7 +58,7 @@ once across the pages you measured and name the pages they differ between.
 Three criteria are measured rather than read, and reading them instead is the most common
 way this audit goes wrong:
 
-**`UX-014` / `UX-015` — follow the links.** Collect every `href`, then request it and
+**`UX-014` and `UX-015` — follow the links.** Collect every `href`, then request it and
 record the status code. A list of links is not a finding; a `404` with the page it was
 found on is. Use the site's own host:
 
@@ -66,10 +66,15 @@ found on is. Use the site's own host:
 curl -s -o /dev/null -w '%{http_code} %{url_effective}\n' -L --max-time 10 "<url>"
 ```
 
-Report **one finding per page**, not per link: `UX-014 : page:/contact/` whose evidence
-lists every broken link on it with its status code. A row per link turns one bad footer into
-forty findings that are one fix, and `/wp-audit` Step 7 merges on `check` + `resource`, so
-counting differently from the suite leaves both copies in the report.
+**The two are counted differently, and that is not a detail.** `UX-014` is page-level:
+report one finding per page, `UX-014 : page:/contact/`, whose evidence lists every broken
+internal link on it with its status code. `UX-015` is **site-level**: an external target is
+dead for the whole site, not for one page, so it is one finding, `UX-015 : site`, whose
+evidence lists each dead URL and the pages it appears on.
+
+A row per link turns one bad footer into forty findings that are one fix. And `/wp-audit`
+Step 7 merges on `check` + `resource`, so a resource written at the wrong granularity
+matches nothing the suite emits and both copies survive into the report.
 
 When you cannot follow them all, report `UNMEASURED` with the remaining list. Never infer a
 link is fine because the target exists in the template hierarchy — a `href="#"` left in a
