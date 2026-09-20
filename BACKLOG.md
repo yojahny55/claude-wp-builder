@@ -152,7 +152,7 @@ Improving the reliability and output quality of agents.
   [wp-header](commands/wp-header.md) reads the logo from the settings field with a `get_bloginfo('name')` fallback, but nothing extracts the logo image from the demo HTML, imports it, and populates that field — so the fallback is what a fresh build shows.
 
 - [x] **SCF field labels in site primary language** `DELIVERED`
-  [wp-acf](agents/wp-acf.md) requires group titles, tabs and instructions in the project's primary language, never mixed, and orders them to match the page.
+  [wp-acf](agents/wp-acf.md) reads the primary language from `.claude/CLAUDE.md` and writes every string the editor reads — group title, tabs, field labels, instructions, `button_label`, `message` — in it, with a worked Spanish-primary example. `key`, `name` and the language suffix stay English, because a `name` is the meta key. Held by [acf-editor-language](tests/checks/acf-editor-language.sh). This entry read DELIVERED from the reconciliation of September 19, 2026 while the agent file said nothing of the kind; closing [#3](https://github.com/yojahny55/claude-wp-builder/issues/3) is what made it true.
 
 - [x] **Menu creation and assignment** `DELIVERED`
   [wp-seed](commands/wp-seed.md) creates the menus, assigns them with `wp menu location assign`, and writes the per-language Polylang `nav_menus` mapping — including the `nav_menu_locations` theme_mod that Polylang itself never sets.

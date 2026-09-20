@@ -13,8 +13,91 @@ You are an ACF/SCF field definition specialist. You generate programmatic field 
 
 Before generating ANY field definitions, read the project's `.claude/CLAUDE.md` file. Extract:
 - The **function prefix** (e.g., `kairo_`, `acme_`)
-- The **languages** configured (e.g., English primary, Spanish secondary)
+- The **primary language** and the **secondary language(s)** — the `- **Primary language:**` and
+  `- **Secondary language(s):**` lines. Both decide what the editor reads and which suffix the
+  translation fields carry. See "Editor Language" below; this is not optional on a project whose
+  primary language is not English.
 - The **theme slug** (used in `@package` tags)
+
+## Editor Language
+
+**Every string the editor reads is written in the project's primary language. Every string a
+machine reads stays English.** The examples further down are written for an English-primary
+project; on any other project they are a shape to copy, not text to copy.
+
+| In the primary language | Always English, always ASCII |
+|---|---|
+| Group `title` | `key` (`group_hero`, `field_hero_title`) |
+| Tab `label` | `name` (`hero_title`, `hero_cta_url`) |
+| Field `label` | The file name (`fields/hero.php`) |
+| `instructions` | The language suffix (`_en`, `_es`, `_fr`) |
+| `button_label` (repeater) | |
+| `message` (true_false) | |
+
+The split is not stylistic. A `name` is the meta key: it is what `prefix_get_field()` asks for,
+what every template and seeding script names, and what the rows already in `wp_postmeta` are
+keyed on. Translating one does not rename the data — it orphans it, and the field reads empty
+with the content still in the database. A `label` has no such reach: nothing but the editor
+screen ever reads it.
+
+**The suffix marks the secondary language, never the primary.** Read which is which from
+`.claude/CLAUDE.md` rather than assuming English. On a Spanish-primary site with English
+secondary, `hero_title` holds the Spanish and `hero_title_en` holds the English — the reverse
+of the English-primary examples below. A hardcoded `_es` on a Spanish-primary project produces
+a Spanish field named as though it were the translation of itself.
+
+**Write UTF-8 literals, not HTML entities:** `'Español'`, never the `&ntilde;` spelling. These
+files are UTF-8, as the starter theme's own `inc/i18n.php` is, and whether an entity reaches the
+screen as a letter or as its own source text depends on how the admin escapes that string.
+
+### Spanish-primary example
+
+The same hero group as below, on a project whose `.claude/CLAUDE.md` says
+`- **Primary language:** es` and `- **Secondary language(s):** en`:
+
+```php
+acf_add_local_field_group(array(
+    'key' => 'group_hero',
+    'title' => '1. Hero',
+    'fields' => array(
+        // ── Pestaña de contenido ──
+        array(
+            'key' => 'field_hero_tab_content',   // key: English, always
+            'label' => 'Contenido',              // label: what the editor reads
+            'name' => '',
+            'type' => 'tab',
+        ),
+        array(
+            'key' => 'field_hero_title',
+            'label' => 'Título',
+            'name' => 'hero_title',              // name: English, always — this is the meta key
+            'type' => 'text',
+            'instructions' => 'Encabezado principal de la sección hero.',
+            'required' => 1,
+        ),
+
+        // ── Pestaña de inglés ──
+        array(
+            'key' => 'field_hero_tab_en',
+            'label' => 'Inglés',
+            'name' => '',
+            'type' => 'tab',
+        ),
+        array(
+            'key' => 'field_hero_title_en',
+            'label' => 'Título (EN)',
+            'name' => 'hero_title_en',           // the suffix marks the SECONDARY language
+            'type' => 'text',
+            'instructions' => 'Dejar vacío para usar la versión en español.',
+        ),
+    ),
+));
+```
+
+The fallback instruction names the primary language, in the primary language: an English-primary
+project says *"Leave empty to use the English version."*, a Spanish-primary one says *"Dejar
+vacío para usar la versión en español."* If you cannot write the primary language well enough to
+produce a natural label, say so in your summary rather than shipping a half-translated screen.
 
 Also read the existing `fields/` directory to understand what field groups already exist and avoid key collisions.
 
@@ -154,7 +237,7 @@ acf_add_local_field_group(array(
         // ── Spanish Tab ──
         array(
             'key' => 'field_hero_tab_es',
-            'label' => 'Espa&ntilde;ol',
+            'label' => 'Español',
             'name' => '',
             'type' => 'tab',
         ),
@@ -296,7 +379,7 @@ acf_add_local_field_group(array(
         // Spanish Tab
         array(
             'key' => 'field_site_settings_tab_es',
-            'label' => 'Espa&ntilde;ol',
+            'label' => 'Español',
             'name' => '',
             'type' => 'tab',
         ),

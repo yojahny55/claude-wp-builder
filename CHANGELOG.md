@@ -98,6 +98,29 @@
 
 ### Fixed
 
+- **Field labels are written in the site's language, not in English.** The `wp-acf` agent
+  generated every editor-facing string in English whatever the project's primary language was,
+  so a Spanish-primary build opened on "Content", "Title" and "Leave empty to use English
+  version" above Spanish content — and the person filling the page in was not the person who
+  ordered the site in English. The agent now reads `- **Primary language:**` from the project's
+  `.claude/CLAUDE.md` and writes the group title, tabs, labels, instructions, `button_label` and
+  `message` in that language, with a worked Spanish-primary example beside the English one.
+  The other half is the one that would have been lost: `key`, `name`, the file name and the
+  language suffix stay English and ASCII. A `name` is the meta key — what `prefix_get_field()`
+  asks for, what every template and seeding script names, and what the rows in `wp_postmeta` are
+  keyed on — so translating one does not rename data, it orphans it, and the field reads empty
+  with the content still in the database. And the suffix marks the *secondary* language: on a
+  Spanish-primary site `hero_title` holds the Spanish and `hero_title_en` the translation, where
+  a hardcoded `_es` would have named a Spanish field as the translation of itself. The agent's
+  own two `Espa&ntilde;ol` labels became `'Español'` in the same pass, since whether an HTML
+  entity reaches the editor as a letter or as its own source text depends on how the admin
+  escapes that string. `tests/checks/acf-editor-language.sh` holds both halves and reads the
+  Spanish example as a slice rather than against the whole file — every needle in it also
+  appears in the English examples, so a whole-file grep stayed green with the example's field
+  name translated. `skills/wp-bilingual/SKILL.md`, `/wp-header` and `/wp-footer` no longer give
+  the English wording as the rule. `BACKLOG.md` had carried this as `DELIVERED` since the
+  September 19 reconciliation with nothing in the agent behind it.
+
 - **An accessibility fix that swaps a tag is measured before and after.** Half the operable
   fixes replace one element with another — a clickable `<span>` becomes a `<button>` — and none
   of them is markup-only: the browser applies its own styles to the new element, and a reset
