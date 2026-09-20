@@ -10,11 +10,19 @@
 #   3. the fix tells the project that editing a source file changes nothing once the twin
 #      exists. That failure is silent — the page loads, the console is clean, the old
 #      behaviour persists, and reading the source confirms a change that is not live.
+# -e is off on purpose, as in the rest of tests/checks: every assertion below is a grep that
+# is allowed to miss, and under -e the first miss would abort the run with no message instead
+# of printing which contract broke. What -e would have caught is caught explicitly instead:
+# the cd answers for itself, and the file is tested for readability, not only existence.
 set -uo pipefail
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
 
 audit=agents/wp-audit-performance.md
 [ -f "$audit" ] || { echo "FAIL: $audit is missing"; exit 1; }
+# -f says it exists, not that it can be read. Without this an unreadable file flattens to an
+# empty string and reports whichever assertion runs first — "has no PERF-058 row" — which
+# points at the file's contents rather than at the fact that nothing could read them.
+[ -r "$audit" ] || { echo "FAIL: $audit exists but cannot be read"; exit 1; }
 flat=$(tr '\n' ' ' < "$audit" | sed 's/  */ /g')
 
 # 1. The criterion, and the exemption that keeps it off generated themes.
@@ -35,9 +43,11 @@ grep -Fq "add_filter( 'script_loader_src'" "$audit" \
   || { echo "FAIL: the PERF-058 fix does not swap the URL through script_loader_src"; exit 1; }
 grep -Fq 'file_exists( get_template_directory()' "$audit" \
   || { echo "FAIL: the PERF-058 fix swaps the URL with no on-disk test — a checkout where the build never ran would 404 every theme script"; exit 1; }
-# `\*? ?` absorbs the docblock's leading asterisk, which flattening leaves behind when the
-# sentence wraps inside the code fence.
-printf '%s' "$flat" | grep -Eq 'serves the \*? ?original unchanged' \
+# `[*]? ?` absorbs the docblock's leading asterisk, which flattening leaves behind when the
+# sentence wraps inside the code fence. A bracket expression, not `\*`: escaping an ordinary
+# character is undefined in POSIX ERE, so `\*` is a literal asterisk on GNU grep and anyone's
+# guess on BSD — a portability trap that would read as a broken contract, not a broken test.
+printf '%s' "$flat" | grep -Eq 'serves the [*]? ?original unchanged' \
   || { echo "FAIL: the PERF-058 fix does not state that a missing twin falls back to the source"; exit 1; }
 # The obvious wrong fix is named, so it is not re-proposed as an improvement.
 printf '%s' "$flat" | grep -Fq 'the obvious fix and the wrong one' \
