@@ -23,7 +23,11 @@ audit=agents/wp-audit-practices.md
 # -f says it exists, not that it can be read: an unreadable file flattens to an empty string
 # and reports whichever assertion runs first, pointing at the contents rather than the read.
 [ -r "$audit" ] || fail "$audit exists but cannot be read"
-flat=$(tr '\n' ' ' < "$audit" | sed 's/  */ /g')
+# Guarded: -e is off here, so a failed read between the -r test above and this line would
+# leave $flat empty and every assertion below would report a missing phrase instead of a
+# failed read.
+flat=$(tr '\n' ' ' < "$audit" | sed 's/  */ /g') || fail "could not read $audit"
+[ -n "$flat" ] || fail "$audit flattened to nothing — it was readable and is now empty"
 
 # --- WP-051 ---------------------------------------------------------------------------------
 grep -Fq 'WP-051' "$audit" \
