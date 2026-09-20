@@ -413,6 +413,57 @@
   client as broken spacing. 42px per gap against the demo's 0.4rem, closing to 6px
   once the rows were joined. `agents/wp-cf7.md` also now requires shipping the
   bridge stylesheet whenever the demo styles its own form.
+- **`page-head` and `offer-table` shipped a root `reveal` that broke their own
+  children.** Both compositions animate their direct children from `view()` ranges in
+  `section.css` *and* carried `data-motion="reveal"`, which does
+  `gsap.set(kids, {opacity, y})` on exactly those elements. Two writers on the same
+  properties is a race, and it resolves differently in the two places the CSS lives:
+  the demo wins it (`motion.js` inlined, runs before the start keyframe applies) and
+  the theme loses it (`initMotion` at `DOMContentLoaded`, by which point it has). So
+  the section animates in the demo and freezes at the keyframe's start value in the
+  theme — a conversion block stuck at `scale(0.88)` on all 16 pages of a build, and at
+  `opacity: 0` on a hard jump to the page bottom, while `/wp-demo-verify` passed that
+  demo 66/66. Both READMEs already called the attribute redundant; it was worse than
+  redundant. `page-head` is the interior-page floor, so this was on every interior page
+  of every craft build. `references/devices.md` states the rule and
+  `tests/checks/wp-craft-motion-collision.sh` fails on any direct child of a `reveal`
+  root that carries an animation.
+- **Rank Math is now proved to emit, not just configured.** New Step 1.6 reads the
+  front end for JSON-LD, a meta description, OG tags and a `200` on
+  `/sitemap_index.xml`, and refuses to continue on a zero. With
+  `rank_math_registration_skip` false the plugin registers no `wp_head` callbacks at
+  all, so a site with every module on and 47 general, 114 title and 17 sitemap options
+  written emitted nothing — and every admin screen looked healthy.
+- **Pages no longer claim to be `Article`s.** `pt_page_default_rich_snippet` is `off`
+  (WebPage still emits), `pt_post_default_rich_snippet` stays `article`. Rank Math's
+  own default had a pricing table asserting an author and a publish date.
+- **Focus keywords are chosen for intent, never for score.** The score is almost
+  entirely keyword-driven, so maximising it picks whichever word the page already
+  repeats — an automated pass chose `credit`, `crédito` and `contacto` at 14/16 each.
+  Also recorded: with no keyword set every keyword-dependent check fails at once,
+  which is how 32 records sat at 20/100 with nothing visibly wrong.
+- **SCF field-key uniqueness is verified by execution.** Rule 7 said keys must be
+  unique and nothing checked; a duplicate key makes one definition win silently and
+  the other field never appear. A real build had fourteen, and a regex-based audit
+  reported clean on them twice — once because the pattern assumed single spaces around
+  `=>`, once because shell quoting mangled it. `agents/wp-acf.md` now walks the
+  registered groups and reports duplicates by name, and states the general rule: do
+  not audit PHP structure with a regular expression.
+- **The blog archive's fields belong on `page_type == posts_page`.** Located on
+  `post_type == post` the group renders on every single post and on nothing else, so
+  no editor screen ever offers the archive's kicker, title and note — the page prints
+  its fallbacks forever and nothing errors.
+- **`/wp-finalize` checks that every `t()`/`e()` key resolves.** The helper's last
+  fallback returns the key, so an undefined one prints its own name as content: a
+  delivery shipped six, including `contact_map_office` on the contact page.
+- **`/wp-finalize` sweeps rendered output for escaped markup**, and
+  `agents/wp-template.md` requires reading the demo's value before choosing the
+  escaper. `esc_html()` on a field whose demo copy is `Every <b>24</b> hours` printed
+  the tags on the page, in both languages.
+- **`/wp-yolo` passes each section's line range to its template agent.** A craft page
+  is ~4,000 lines of which ~3,360 are inlined CSS ahead of the body, so agents handed
+  a path burned their context finding 7–34 lines of markup: three of four died with
+  "Prompt is too long", one at the words "Now I have everything needed."
 
 - **Field labels are written in the site's language, not in English.** The `wp-acf` agent
   generated every editor-facing string in English whatever the project's primary language was,
@@ -472,61 +523,6 @@
   path used to produce. Non-regular entries are rejected with `isFile()`.
   `FOLLOW_SYMLINKS` stays off, which is what keeps a symlinked directory out of the walk;
   the comment now says so, since the flag's absence is the behaviour rather than an omission.
-
-### Fixed
-
-- **`page-head` and `offer-table` shipped a root `reveal` that broke their own
-  children.** Both compositions animate their direct children from `view()` ranges in
-  `section.css` *and* carried `data-motion="reveal"`, which does
-  `gsap.set(kids, {opacity, y})` on exactly those elements. Two writers on the same
-  properties is a race, and it resolves differently in the two places the CSS lives:
-  the demo wins it (`motion.js` inlined, runs before the start keyframe applies) and
-  the theme loses it (`initMotion` at `DOMContentLoaded`, by which point it has). So
-  the section animates in the demo and freezes at the keyframe's start value in the
-  theme — a conversion block stuck at `scale(0.88)` on all 16 pages of a build, and at
-  `opacity: 0` on a hard jump to the page bottom, while `/wp-demo-verify` passed that
-  demo 66/66. Both READMEs already called the attribute redundant; it was worse than
-  redundant. `page-head` is the interior-page floor, so this was on every interior page
-  of every craft build. `references/devices.md` states the rule and
-  `tests/checks/wp-craft-motion-collision.sh` fails on any direct child of a `reveal`
-  root that carries an animation.
-- **Rank Math is now proved to emit, not just configured.** New Step 1.6 reads the
-  front end for JSON-LD, a meta description, OG tags and a `200` on
-  `/sitemap_index.xml`, and refuses to continue on a zero. With
-  `rank_math_registration_skip` false the plugin registers no `wp_head` callbacks at
-  all, so a site with every module on and 47 general, 114 title and 17 sitemap options
-  written emitted nothing — and every admin screen looked healthy.
-- **Pages no longer claim to be `Article`s.** `pt_page_default_rich_snippet` is `off`
-  (WebPage still emits), `pt_post_default_rich_snippet` stays `article`. Rank Math's
-  own default had a pricing table asserting an author and a publish date.
-- **Focus keywords are chosen for intent, never for score.** The score is almost
-  entirely keyword-driven, so maximising it picks whichever word the page already
-  repeats — an automated pass chose `credit`, `crédito` and `contacto` at 14/16 each.
-  Also recorded: with no keyword set every keyword-dependent check fails at once,
-  which is how 32 records sat at 20/100 with nothing visibly wrong.
-- **SCF field-key uniqueness is verified by execution.** Rule 7 said keys must be
-  unique and nothing checked; a duplicate key makes one definition win silently and
-  the other field never appear. A real build had fourteen, and a regex-based audit
-  reported clean on them twice — once because the pattern assumed single spaces around
-  `=>`, once because shell quoting mangled it. `agents/wp-acf.md` now walks the
-  registered groups and reports duplicates by name, and states the general rule: do
-  not audit PHP structure with a regular expression.
-- **The blog archive's fields belong on `page_type == posts_page`.** Located on
-  `post_type == post` the group renders on every single post and on nothing else, so
-  no editor screen ever offers the archive's kicker, title and note — the page prints
-  its fallbacks forever and nothing errors.
-- **`/wp-finalize` checks that every `t()`/`e()` key resolves.** The helper's last
-  fallback returns the key, so an undefined one prints its own name as content: a
-  delivery shipped six, including `contact_map_office` on the contact page.
-- **`/wp-finalize` sweeps rendered output for escaped markup**, and
-  `agents/wp-template.md` requires reading the demo's value before choosing the
-  escaper. `esc_html()` on a field whose demo copy is `Every <b>24</b> hours` printed
-  the tags on the page, in both languages.
-- **`/wp-yolo` passes each section's line range to its template agent.** A craft page
-  is ~4,000 lines of which ~3,360 are inlined CSS ahead of the body, so agents handed
-  a path burned their context finding 7–34 lines of markup: three of four died with
-  "Prompt is too long", one at the words "Now I have everything needed."
-
 ## [1.25.0] - 2026-09-19
 
 ### Fixed
