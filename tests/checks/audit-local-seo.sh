@@ -62,6 +62,8 @@ grep -Fq '_<lang>' "$AGENT" \
   || fail "$AGENT no longer compares the _<lang> variants under the suffix strategy"
 grep -Fq '_<lang>' "$SKILL" \
   || fail "$SKILL lost the bilingual options-page rule"
+grep -Fq 'suffixes under *both* i18n strategies' "$SKILL" \
+  || fail "$SKILL lost the crossover clause — under polylang the suffixed options fields would go unchecked"
 
 # Rendered markup is never changed without asking: a new element inherits browser default
 # styles and can override the utility classes already on the page.
