@@ -128,6 +128,26 @@
   revert printed one `<ERROR> … Overwrite not allowed` line per file in the normal case where
   every file is still on disk; the refusals stay in the log and are reported as a count.
 
+- **`/wp-audit --seo` now audits a local business as one.** The SEO auditor covered on-page
+  markup and Rank Math configuration; for a site whose ranking surface is a business profile,
+  a map pack and a set of directory listings, that left the whole local dimension unchecked —
+  the only local-aware line in the plugin was a `LocalBusiness` JSON-LD template with nowhere
+  to verify it. `SEO-055` through `SEO-063` add the checks, and the new
+  `wp-audit-local-standards` skill carries the criteria: the applicability gate, the
+  business-type and vertical taxonomies, the NAP normalization rules and the location-page
+  sampling gates.
+  Three things are written down because each one is a way the check goes wrong. The
+  applicability gate runs first and demands two independent signals, since a `tel:` link in a
+  footer is as common on a brochure site as on a dentist's; the business type is resolved
+  before the address checks, because a service-area business has no street address by design
+  and reporting one as missing is a false critical; and NAP values are normalized before
+  comparison, or `+34 900 00 00 00` and `900000000` are reported as a discrepancy and the
+  check gets muted. Under the `suffix` i18n strategy every `_<lang>` variant of the
+  options-page fields is compared too — an address correct in one language and stale in the
+  other is a real defect, not a translation artifact.
+  `SEO-063` is CRITICAL alone among them: an `aggregateRating` no review data backs is
+  structured-data spam and risks a manual action. `SEO-056` and `SEO-061` are reported and
+  never auto-applied, because both change rendered markup.
 - **A decorative CSS background below the fold is deferred.** `background-image` has no
   `loading` attribute, so every background a template prints is downloaded with the first
   paint however far down the page it sits. On a real build four of them — a footer band, a

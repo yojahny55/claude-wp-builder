@@ -30,6 +30,8 @@ Before running ANY audit checks, read the following project files:
 3. **Note whether the site is reachable** — the Step 3 checks read the live site. Without a
    reachable host they are `UNMEASURED`, and every template scan in Steps 1-2 still runs.
 
+4. **If the site is a local business** — read `skills/wp-audit-local-standards/SKILL.md` before running SEO-055 through SEO-063. It carries the applicability gate, the business-type and vertical taxonomies, the NAP normalization rules and the location-page sampling gates those checks depend on. Running the local checks without it produces false criticals: a service-area business has no street address by design, and reporting one as missing is wrong.
+
 ## Step 1: Tier 1 — Code-Only Checks
 
 Scan theme template files using Grep and Glob. No WP-CLI needed.
@@ -51,6 +53,9 @@ Scan theme template files using Grep and Glob. No WP-CLI needed.
 | SEO-039 | Duplicate schema sources | Grep templates for `<script type="application/ld+json"` — if Rank Math is active AND the theme also outputs JSON-LD, both render. More than one schema source on a page is a violation. | WARNING | Yes |
 | SEO-044 | Affiliate links missing `rel="sponsored"` | Grep templates for affiliate `href=` patterns (`amazon.`, `booking.`, `shareasale.`, `cj.com`, `impact.com`, `ref=`, `aff=`, `utm_source=affiliate`) without `rel="sponsored"`. Also flag `target="_blank"` without `rel="noopener"`. | WARNING | Yes |
 | SEO-049 | Dead asset references | Grep templates for `data-src`, `data-src-mobile` and `poster=` attributes, resolve each path against the theme directory and flag any file that does not exist — the browser pays for a 404. | WARNING | Yes |
+| SEO-055 | Local business without `LocalBusiness` schema | Applicability gate passes (see skill) but no `LocalBusiness` node or subtype appears in the theme's JSON-LD and Rank Math's `rich-snippet` module does not emit one | WARNING | Yes |
+| SEO-056 | No click-to-call or map embed | Brick-and-mortar or hybrid only. Grep templates for a `tel:` href and for a map embed; absence of the `tel:` link is WARNING, absence of the map is INFO | WARNING | No |
+| SEO-061 | Location or service page without local intent | For each location or service template, the `<h1>` and the title source carry neither a city nor the service term — a generic heading on a page whose whole purpose is local intent | WARNING | No |
 
 ### Procedure
 
@@ -98,12 +103,40 @@ These checks require a running WordPress installation. Use `$WP` from `.wp-creat
 | SEO-053 | Duplicate intent / cannibalization | Two published URLs target the same intent — a term archive and a post that both rank for one query. See Procedure | WARNING |
 | SEO-052 | Site-name signals disagree | Compare the snapshot's `og:site_name`, the `<title>` brand segment and the schema `WebSite.name` against `get_bloginfo('name')` and Rank Math's `website_name` / `knowledgegraph_name`; a `website_alternate_name` identical to `website_name` is also a finding | WARNING |
 | SEO-054 | Menu items that do not navigate | List every `custom` nav-menu item whose `_menu_item_url` is `#`, empty, or an absolute URL on the development host — excluding items that have children. See Procedure | WARNING |
+| SEO-057 | NAP disagrees across sources | Compare name, address and phone from the rendered JSON-LD, the options page and the footer template, pairwise, after the normalization in the skill. Each disagreeing pair is its own finding. Under the `suffix` i18n strategy compare every `_<lang>` variant too | WARNING |
+| SEO-058 | Wrong or deprecated `LocalBusiness` subtype | The detected vertical requires a subtype the schema does not use, or the schema uses a deprecated one (`Attorney`, bare `MedicalBusiness` for a clinic, `VehicleListing` as a business type). See the skill's vertical table | WARNING |
+| SEO-059 | `geo` missing or imprecise | The `LocalBusiness` node has no `geo`, or `geo.latitude` / `geo.longitude` carry fewer than five decimal places — three decimals place the pin roughly 100 m off | INFO |
+| SEO-060 | No citation references in `sameAs` | The Organization or `LocalBusiness` node has an empty or absent `sameAs` array. Report only what the markup proves; never assert that a missing entry means a missing listing | INFO |
+| SEO-062 | Location pages fail the swap test | Multi-location sites only. Read two location pages and exchange the city names; if both still make sense, the pages carry no location-specific content. Apply the sampling gates from the skill at 30+ and 50+ pages. A store locator whose locations have no crawlable URL of their own is CRITICAL, not WARNING | WARNING |
+| SEO-063 | Fabricated `aggregateRating` | An `aggregateRating` in the schema that no real review data backs, or that carries placeholder values. This is structured-data spam and risks a manual action | CRITICAL |
 
 ### Procedure
 
 1. If SEO-020 fails (Rank Math not installed), skip SEO-021 through SEO-034 and note that Rank Math installation is required.
 2. For module checks, retrieve the active modules array and compare against the recommended list: `seo-analysis`, `sitemap`, `rich-snippet`, `breadcrumbs`, `404-monitor`, `redirections`, `local-seo`, `image-seo`, `instant-indexing`, `link-counter`.
 3. For option checks, read the full option array once and check multiple keys from it.
+
+### Procedure — local business checks (SEO-055 to SEO-063)
+
+1. **Run the applicability gate first.** If the site is not a local business, report every
+   local check as `not_applicable` and exclude them from the score. Do not report an absent
+   address on a SaaS brochure site.
+2. **Determine the business type before anything else.** SEO-056 and SEO-057's address
+   comparison do not apply to a service-area business. When the signals contradict each
+   other, report the type as `undetermined` and run only SEO-055, SEO-058, SEO-060 and
+   SEO-061.
+3. **Read the options once**, not per check:
+   `$WP option get rank_math_titles --format=json` and
+   `$WP option get rank_math_modules --format=json`.
+4. **Take the schema from the rendered head**, reusing the snapshot the rendered-head
+   procedure already captured. Parsing the theme's PHP misses everything Rank Math emits.
+5. **Normalize before comparing** for SEO-057, following the skill. An unnormalized
+   comparison reports `+34 900 00 00 00` and `900000000` as a discrepancy, which mutes the
+   check.
+6. **End the local section of the report with the limitations list** from the skill. The
+   business profile, the reviews, the real local-pack position and third-party citation
+   accuracy are all off-site; a report that omits this implies a completeness the audit
+   does not have.
 
 ### Procedure — rendered-head checks (SEO-038, SEO-040 to SEO-043, SEO-051, SEO-052)
 
@@ -335,6 +368,13 @@ Apply fixes directly using `Edit` for issues marked `auto_fix: true`:
 - **SEO-009** — Remove hardcoded OG meta tags from `header.php`.
 - **SEO-010** — Add breadcrumb template call using `prefix_breadcrumbs()` function from the skill.
 - **SEO-012** — JSON-LD will be handled by Rank Math once configured.
+- **SEO-055** — Enable Rank Math's local SEO module and let it emit the node, rather than adding a second JSON-LD source to the theme. Adding one in the theme while Rank Math is active triggers SEO-039.
+- **SEO-063** — Remove the fabricated `aggregateRating` from the theme's schema. This one is always safe to strip: it renders nothing visible, and leaving it is a manual-action risk.
+
+**Local fixes that change rendered markup are never auto-applied.** SEO-056 adds a visible
+`tel:` link or a map embed, and SEO-061 rewrites a heading. Report them with the proposed
+markup and let the user decide — a new element inherits browser default styles and can
+override the utility classes already on the page.
 
 ### Rank Math Configuration Fixes (Tier 2)
 
