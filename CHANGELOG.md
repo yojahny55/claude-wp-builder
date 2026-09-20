@@ -33,6 +33,26 @@
   wrong in the direction that matters: every byte-identical file already on disk counts as
   pending forever, which made a revert abort with the media half restored.
 
+- **The wp-s3 setup proves the credentials with the plugin still off, and an install is
+  finished rather than assumed.** Three defects found by running the scripts against a real
+  S3-compatible server. The credential check was `wp s3-uploads verify`, a subcommand the
+  plugin registers — and setup leaves the plugin deactivated on purpose, so it answered
+  `'s3-uploads' is not a registered wp command` on every first run and exited `1` with the
+  five preceding steps already applied; `scripts/check-credentials.php` now lists the bucket
+  through the SDK the plugin bundles, which is the same question with the plugin off.
+  `composer install` refused the lock file on any PHP without `ext-iconv` — a requirement of
+  a polyfill reached only through Symfony's console, never inside WordPress — so the install
+  adds `--ignore-platform-req=ext-iconv` when `php -m` does not list it. And a failed
+  composer run left the plugin directory behind, which the next run read as "already
+  installed": an installed plugin is now `vendor/autoload.php`, not a directory, and a
+  half-install is completed instead of configuring a site around a plugin that fatals on
+  activation.
+  Two smaller ones: `verify-transfer.py` called an empty remote listing a verified download,
+  and the client answers an unknown alias with exit `0` and no output, so "no objects" and
+  "could not list" arrived identically — a download that lists nothing now fails. And a
+  revert printed one `<ERROR> … Overwrite not allowed` line per file in the normal case where
+  every file is still on disk; the refusals stay in the log and are reported as a count.
+
 - **A decorative CSS background below the fold is deferred.** `background-image` has no
   `loading` attribute, so every background a template prints is downloaded with the first
   paint however far down the page it sits. On a real build four of them — a footer band, a

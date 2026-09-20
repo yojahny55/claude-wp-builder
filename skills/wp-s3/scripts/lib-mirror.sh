@@ -28,8 +28,14 @@ run_mirror() {
     log="$(mktemp -t wp-s3-mirror-XXXXXX.log)"
     trap 'rm -f "$log"' RETURN
 
+    # Everything goes to the log; the refusals are kept off the screen and counted
+    # instead. Reverting a site is the normal case where every single file is already on
+    # the other side, and one <ERROR> line per file reads like a disaster when it is the
+    # tool doing exactly what it was told.
     set +e
-    "$MCLI" mirror "${options[@]}" "$source" "$target" 2>&1 | tee "$log"
+    "$MCLI" mirror "${options[@]}" "$source" "$target" 2>&1 \
+        | tee "$log" \
+        | grep -v 'Overwrite not allowed'
     status=${PIPESTATUS[0]}
     set -e
 
@@ -54,6 +60,7 @@ run_mirror() {
 
     if [[ "${refused:-0}" -gt 0 ]]; then
         echo "Note: $refused file(s) already existed on the other side and were left untouched."
+        echo "      The comparison below decides whether that is the right result."
     fi
 
     if [[ "$dry" == "yes" ]]; then

@@ -77,10 +77,40 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 echo "== S3 Uploads setup on $WP_ROOT =="
 
 # ---------------------------------------------------------------- 1. the plugin
+
+# Since 3.0.10 the release no longer ships vendor/, and without it the plugin fatals on
+# activation: the AWS SDK is simply not there. A directory is therefore not evidence of
+# an installed plugin; vendor/autoload.php is.
+install_vendor() {
+    command -v composer >/dev/null || die "composer is required: $PLUGIN_DIR has no vendor/ and the release does not ship one"
+
+    # A composer.lock dependency declares ext-iconv, which several distributions leave
+    # out of the PHP they ship. The plugin never calls iconv() at runtime — the polyfill
+    # that requires it is only reached through Symfony's console, which does not run
+    # here — so the platform requirement is ignored rather than installed.
+    local args=( install --no-dev --optimize-autoloader --no-interaction )
+    if ! php -m | grep -qix iconv; then
+        echo "   PHP has no iconv extension: installing with --ignore-platform-req=ext-iconv"
+        args+=( --ignore-platform-req=ext-iconv )
+    fi
+
+    ( cd "$PLUGIN_DIR" && composer "${args[@]}" ) \
+        || die "composer install failed in $PLUGIN_DIR"
+
+    [[ -f "$PLUGIN_DIR/vendor/autoload.php" ]] \
+        || die "composer finished but $PLUGIN_DIR/vendor/autoload.php is still missing"
+}
+
 if [[ "$SKIP_INSTALL" == "yes" ]]; then
     echo "1. Plugin install skipped."
+elif [[ -f "$PLUGIN_DIR/vendor/autoload.php" ]]; then
+    echo "1. $PLUGIN_DIR is already installed with its vendor/ tree; leaving it alone."
 elif [[ -d "$PLUGIN_DIR" ]]; then
-    echo "1. $PLUGIN_DIR already exists; leaving it alone."
+    # Half an install: the download worked and composer did not. Finishing it is safer
+    # than reporting success over a plugin that fatals the moment it is activated.
+    echo "1. $PLUGIN_DIR exists without vendor/: completing the install"
+    install_vendor
+    echo "   Completed at $PLUGIN_DIR (not activated)."
 else
     command -v curl >/dev/null || die "curl is required to download the plugin"
     command -v tar  >/dev/null || die "tar is required to unpack the plugin"
@@ -93,13 +123,7 @@ else
     tar -xzf "$tmp/s3-uploads.tar.gz" -C "$tmp"
     mv "$tmp/S3-Uploads-${PLUGIN_VERSION}" "$PLUGIN_DIR"
 
-    # Since 3.0.10 the release no longer ships vendor/, and without it the plugin
-    # fatals on activation: the AWS SDK is simply not there.
-    if [[ ! -f "$PLUGIN_DIR/vendor/autoload.php" ]]; then
-        command -v composer >/dev/null || die "composer is required: $PLUGIN_DIR has no vendor/ and the release does not ship one"
-        ( cd "$PLUGIN_DIR" && composer install --no-dev --optimize-autoloader --no-interaction ) \
-            || die "composer install failed in $PLUGIN_DIR"
-    fi
+    [[ -f "$PLUGIN_DIR/vendor/autoload.php" ]] || install_vendor
     echo "   Installed at $PLUGIN_DIR (not activated)."
 fi
 
@@ -186,15 +210,22 @@ if [[ -f "$WP_ROOT/.gitignore" ]] && ! grep -qx "s3-config.php" "$WP_ROOT/.gitig
 fi
 
 # ---------------------------------------------------------------- 6. verify
+#
+# Not `wp s3-uploads verify`: that command is registered by the plugin, and the plugin is
+# deliberately still deactivated at this point, so it would fail on every first run with
+# "'s3-uploads' is not a registered wp command". check-credentials.php asks the bucket the
+# same question through the same SDK, with the plugin off.
 echo
-if command -v wp >/dev/null 2>&1; then
-    echo "6. wp s3-uploads verify"
-    ( cd "$WP_ROOT" && wp s3-uploads verify ) || {
-        echo "   verify failed. Check the bucket name, the region and the credentials before going further." >&2
+if [[ -f "$PLUGIN_DIR/vendor/autoload.php" ]]; then
+    echo "6. Checking the credentials against the bucket"
+    php "$SKILL_DIR/scripts/check-credentials.php" "$WP_ROOT" || {
+        echo "   The credentials could not list the bucket. Check the bucket name, the region," >&2
+        echo "   the endpoint and the key pair before going further." >&2
         exit 1
     }
 else
-    echo "6. WP-CLI not found: run 'wp s3-uploads verify' in $WP_ROOT before going further."
+    echo "6. No vendor/ tree to test the credentials with; skipped."
+    echo "   After activating the plugin, run: cd $WP_ROOT && wp s3-uploads verify"
 fi
 
 cat <<TXT

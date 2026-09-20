@@ -14,7 +14,7 @@ SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 WP_ROOT="${1:-}"
-shift 1 2>/dev/null || true
+if [[ $# -ge 1 ]]; then shift 1; fi
 SKIP_DOWNLOAD="no"
 for arg in "$@"; do
     case "$arg" in
@@ -37,8 +37,15 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 
 # ---------------------------------------------------------------- 1. stop rewriting
 if command -v wp >/dev/null 2>&1; then
-    echo "1. wp s3-uploads disable"
-    ( cd "$WP_ROOT" && wp s3-uploads disable ) || echo "   (already disabled, or the plugin is not active)"
+    # The subcommand only exists while the plugin is loaded, so asking for it on an
+    # inactive plugin prints "'s3-uploads' is not a registered wp command" — an error
+    # message for the one case that needs no work at all.
+    if ( cd "$WP_ROOT" && wp plugin is-active S3-Uploads >/dev/null 2>&1 ); then
+        echo "1. wp s3-uploads disable"
+        ( cd "$WP_ROOT" && wp s3-uploads disable ) || echo "   (rewriting was already off)"
+    else
+        echo "1. The plugin is not active: nothing to disable."
+    fi
 else
     echo "1. WP-CLI not found. Run this yourself before continuing:"
     echo "     cd $WP_ROOT && wp s3-uploads disable && wp plugin deactivate S3-Uploads"

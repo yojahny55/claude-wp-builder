@@ -7,8 +7,9 @@ pending forever — and too weak, since it was measured reporting success after 
 of 38 objects. Listing both sides and comparing names and sizes answers the question the
 operator actually has: is every file on the other side.
 
-Exit 0 when every expected file is present at the same size, 1 otherwise, 2 on a listing
-error.
+Exit 0 when every expected file is present at the same size, 1 otherwise, 2 when the
+listing failed or came back empty on a download, which cannot be told apart from a
+listing that silently did not work.
 """
 
 import argparse
@@ -80,6 +81,19 @@ def main():
     local = local_files(args.local, args.exclude)
     remote = remote_files(args.mcli, args.remote, args.exclude)
 
+    # An empty listing is not the same kind of fact on each side. Walking a local
+    # directory that holds nothing is a reliable answer; a remote listing that comes back
+    # empty can also mean the client could not read it, and it says so with exit 0 and no
+    # output — an unknown alias produces exactly that. Calling that a verified download
+    # would sign off on a transfer that moved nothing.
+    if args.direction == "download" and not remote:
+        sys.stderr.write(
+            "ERROR: %s listed no objects at all. Nothing was verified: either the prefix is\n"
+            "       empty or the listing failed silently. Check the alias and the path.\n"
+            % args.remote
+        )
+        return 2
+
     # Only one side is authoritative, and which one depends on the direction: an upload
     # must account for every local file, a download for every object. The other side
     # holding extra files is not a failure — that is how an environment that was not
@@ -97,7 +111,10 @@ def main():
     ]
 
     if not missing and not wrong:
-        print("Verified: %d files present on %s, sizes match." % (len(expected), where))
+        if not expected:
+            print("Nothing to verify: the source side holds no files.")
+        else:
+            print("Verified: %d files present on %s, sizes match." % (len(expected), where))
         return 0
 
     if missing:

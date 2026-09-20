@@ -19,7 +19,10 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 
 DIRECTION="${1:-}"
 WP_ROOT="${2:-}"
-shift 2 2>/dev/null || true
+# Consume only what is there: `shift 2` on a single argument fails and leaves the
+# direction in "$@", where the option loop below reports it as an unknown option
+# instead of printing the usage.
+if [[ $# -ge 2 ]]; then shift 2; else shift $#; fi
 
 DRY=()
 for arg in "$@"; do

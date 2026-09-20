@@ -37,10 +37,10 @@ choosing it:
 |---|---|
 | PHP ≥ 8.1 with `simplexml`, `json`, `pcre`, `curl`, `mbstring` | The AWS SDK the plugin bundles |
 | `allow_url_fopen = On` | The plugin registers `s3://` as a URL-type stream wrapper |
-| `composer` | Releases since 3.0.10 ship without `vendor/` |
+| `composer` | Releases since 3.0.10 ship without `vendor/`. On a PHP with no `iconv` the install adds `--ignore-platform-req=ext-iconv` by itself |
 | `curl`, `tar`, `python3` | The setup script |
 | A client binary named `mcli` or `mc` | Only for `/wp-s3-media` |
-| WP-CLI | Optional, but `wp s3-uploads verify` is the only cheap proof the credentials work |
+| WP-CLI | Optional. The credentials are proved by `scripts/check-credentials.php`, which does not need the plugin to be active |
 
 ## How to use
 
@@ -166,6 +166,19 @@ method the customer receives the file's public URL, and anyone holding that URL 
 it. Kept private under `woocommerce_uploads/`, the redirect returns `403`. Either keep those
 files off S3, or sign CloudFront URLs — custom work. Confirm whether the site sells
 downloadables **before** configuring anything.
+
+**`composer install` refuses the lock file: `ext-iconv` is missing.** Several
+distributions ship a PHP without it. The dependency that declares it — Symfony's mbstring
+polyfill, reached only through their console — never runs inside WordPress, so
+`scripts/s3-setup.sh` adds `--ignore-platform-req=ext-iconv` by itself when `php -m` does
+not list iconv. If a composer run failed before that existed, the plugin directory is
+there without `vendor/`: run the setup again and it completes the install rather than
+treating the directory as an installed plugin.
+
+**`'s3-uploads' is not a registered wp command.`** That subcommand only exists while the
+plugin is active, and setup leaves it deactivated on purpose. It is not what proves the
+credentials — `scripts/check-credentials.php` does, through the SDK the plugin bundles,
+with the plugin off. After activating, `wp s3-uploads verify` works as usual.
 
 **A missing image after the migration, `403` in the network panel.** A path that is not in
 the bucket policy. Add it there; do not make the bucket public.

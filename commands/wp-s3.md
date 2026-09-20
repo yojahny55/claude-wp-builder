@@ -137,7 +137,9 @@ stored URLs and WooCommerce's download settings — are printed there as ready c
 
 Report, in this order:
 
-1. Whether `wp s3-uploads verify` passed. If WP-CLI was missing, give the user the command.
+1. Whether the credential check passed. It runs the AWS SDK against the bucket with the
+   plugin still deactivated, so `wp s3-uploads verify` is not what proves this and must
+   not be offered as the check that was skipped.
 2. That the plugin is installed and **not** active, and that no media have moved.
 3. The next step, verbatim: `/wp-s3-media upload <wp-root>`, dry run first.
 4. The staging checklist from the skill, as a list the user can work through.
