@@ -15,7 +15,7 @@ above it is the ending.
 hours or a phone number worth putting in front of people.
 
 **Slots:** `logo_src`/`logo_alt` (optional), wordmark, blurb, `nav_N_label` and four `nav_N_link_M`/`nav_N_href_M`
-pairs per column, contact_label, address_line, phone/phone_href, email, hours,
+pairs per column, contact_label, address_line, phone/phone_href (a complete href, scheme included — every `*_href` slot in this library is), email, hours,
 legal_line and two legal links.
 
 **Notes:** contact details live in a real `<address>` with `tel:` and `mailto:`

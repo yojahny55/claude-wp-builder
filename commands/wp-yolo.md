@@ -219,6 +219,16 @@ page, resolves shared header/footer, splits sections, classifies content types
 - `demo/.yolo-manifest.json` — the orchestration source of truth (`pages[]`, `shared`,
   `contentTypes[]`, `review[]`)
 
+**A demo this plugin generated is not re-analyzed.** `/wp-demo` writes
+`demo/.demo-plan.json` recording the page roles, section names, kinds, CPTs and block names
+it decided while authoring the pages; `wp-normalize` reads it and copies those verbatim
+instead of re-deriving them, per page, wherever the plan still matches the markup. What the
+agent still does on such a demo is the reading no one can do ahead of time — CSS
+consolidation, field guesses, assets, `cssRules`, `fonts`, `backgrounds` — which is why it is
+still dispatched rather than skipped: the manifest is its output, and nothing else writes
+one. A demo from anywhere else, or one edited by hand since it was generated, is classified
+the old way and says so in `review[]`.
+
 Read `demo/.yolo-manifest.json` back once the agent completes.
 
 **Demo mode.** If `.wp-create.json` already has `demo mode`, read it and move on;
@@ -925,6 +935,23 @@ exists for the walk, where the theme does not exist yet.
 
 Before seeding, collect every `section.fonts[]` entry across the manifest (dedupe by
 `family`+`weight`+`style`):
+
+**An empty collection is checked, not believed.** `fonts: []` on every section means one
+of two things, and they are not the same: a demo that genuinely uses a system stack, or a
+manifest that missed what the demo loads. Grep the demo pages before concluding the first:
+
+```bash
+bash -c "grep -l 'fonts.googleapis.com\|@font-face' demo/*.html | head"
+```
+
+A hit means the manifest is wrong. Carry the families from the markup — the `css2` URL
+names them and their weights — exactly as the recipe below does, and add one Review entry
+naming the gap, because the next command to read that manifest will be misled the same way.
+A build shipped a theme naming `"Inter", system-ui` over a demo rendering Archivo and
+Source Sans 3, with an empty `assets/fonts/`, and nothing in the run said so: every step
+after this one is conditioned on a non-empty list, so an empty one is not a warning, it is
+silence.
+
 - Copy each entry's `src` woff2 file(s) from the demo folder into `theme/assets/fonts/`.
   **When the file is not there.** Demos ship broken font paths as a matter of course —
   the rehearsal demo declares `src: url("assets/fonts/marcellus.woff2")` and carries no
@@ -1003,9 +1030,21 @@ Then account for **every** one:
   target. An unguarded dereference throws and takes the rest of the bundle with
   it.
 
+**A script is not the only thing that can be missing.** `demo/.demo-plan.json`'s
+`inert[]` is the demo's own list of controls it faked — a language switcher that is two
+`href="#"` links, a search box that filters nothing — each with the `needs` line saying
+what wiring it takes here. Read it as a worklist: every entry is either built in this
+step (or by the chrome build, for a `pages: ["*"]` entry) or carried into the Step 6
+Review list by name. It exists because a faked control has no script to enumerate, so
+the walk above cannot see it: on one build the switcher was wired only because a
+normalize agent happened to file it among forty-eight `review[]` entries, which is luck
+and does not scale to the next demo whose fake control sits further down the page.
+
 Verify in a real browser before Step 5, one page per behaviour: click a
-carousel arrow, open a listbox, open the filter drawer, open the gallery. A
-console with zero errors is not evidence — dead code logs nothing.
+carousel arrow, open a listbox, open the filter drawer, open the gallery, and **use
+every `inert[]` entry** — a switcher that still goes nowhere is the one defect in this
+step that renders perfectly. A console with zero errors is not evidence — dead code
+logs nothing.
 
 ## Step 5: Phase 3 — Seed & Finish
 

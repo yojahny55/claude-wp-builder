@@ -260,6 +260,16 @@ The user can override any field. Once confirmed, use these values for the rest o
   | `--font-primary` | `var(--font-display)` | heading face |
   | `--font-secondary` | `var(--font-text)` | body face |
 
+  **The craft block is `@theme static`, not `@theme`.** Tailwind v4 tree-shakes a
+  plain `@theme`: a variable no utility class references is dropped from the compiled
+  CSS. The starter's own tokens survive that because the starter's markup uses
+  `bg-primary` and `text-dark`, but a craft demo's copied CSS reaches for
+  `var(--color-canvas)` **directly** and generates no utility at all — so a bare
+  `@theme` compiles the whole craft palette to nothing, every `var()` in thirteen
+  compositions resolves to its fallback or to nothing, and the build still succeeds.
+  `static` is what keeps an unreferenced variable in the output. Measured on a real
+  build, not inferred.
+
   **`--container-max` travels with its `@property` guard, or the theme reproduces a
   bug the demo no longer has.** Every composition's gutter rule is
   `padding-inline: max(var(--space-gutter), calc((100% - var(--container-max, 1280px)) / 2))`,

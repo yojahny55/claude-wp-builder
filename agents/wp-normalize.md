@@ -78,6 +78,53 @@ Only fall back to `<section>`-splitting or heuristic segmentation for pages that
 delimiters. A page is "already delimited" only if the markers are the canonical pair above;
 ignore stray/non-matching comments.
 
+**Confirm the markers are in the file before you report the fast path on it.** Read them;
+do not conclude they are there because the demo's other pages had them, because a sibling
+agent said so, or because the page looks like one that would. A parallel run reported five
+pages as already delimited around the header and footer when none of them were, and the
+claim survived because nothing ever checked it against the bytes. The cheapest proof is a
+grep for `<!-- ============ SECTION:` in that page, and the claim is per page.
+
+### Faster path — the demo was built by this plugin
+
+`/wp-demo` writes `demo/.demo-plan.json` (its Step 4.9) recording what it *decided* while
+authoring the pages: each page's `role`, and each section's `name`, `kind`, `cpt` and
+`block`, plus the `contentTypes[]` it built teasers and listings for. Read that file first.
+
+Where it applies, **those values are given, not guessed**: copy `role`, `kind`, `cpt` and
+`block` into the manifest verbatim, skip the Classifier Rubric and the contact detection for
+those sections entirely, emit no `confidence`/`rationale` for them, and add no `review[]`
+entry — there is no non-determinism to report. This is the whole point of the file: a demo
+this plugin generated should not have its own decisions re-inferred from its own output by a
+second agent that can only reach them with a confidence score.
+
+You still do everything a fast-path page needs: CSS consolidation, content extraction,
+assets, `cssRules`, `backgrounds`, `fonts`, `computed`, `sharedComponents`. The plan
+carries none of those — they are read off the markup, and this agent is the one place that
+reads it.
+
+**Fields, where a section has `slots[]`, come from the slots.** Take each entry's `name` as
+the field name, infer only its `type` and its `value` from the markup, and honour the two
+flags: entries sharing a `group` other than `"fixed"` become **one repeater** with that name
+and a `variant` subfield rather than N flat fields, and an entry marked `computed: true` is
+**not a field at all** — the value is derived by the markup and offering it to an editor puts
+a rendering internal in an admin box. Sections with no `slots[]` are inferred as before.
+
+**Trust it per page, and only where it matches the markup.** The join key is the section name
+against that page's delimiters. Discard the plan **for a page** and classify it normally —
+rubric, confidence, `review[]` and all — when any of these hold for it:
+
+- the page has no entry in `pages[]` (it was added by hand after the demo was generated)
+- a delimiter on the page has no matching `sections[]` entry, or an entry names a section the
+  page does not contain
+- the page has two delimiters with the same name — the name is the join key, so it cannot
+  address one section, and the page needs classifying and renaming by hand
+- `generator` is not `"wp-demo"`, or the file is absent or unparseable (then no page is trusted)
+
+Add one `review[]` entry naming the page and which of those it was, so the checkpoint reader
+can see that a plan existed and was not used there. A hand-edited page is the case this guard
+exists for: the plan describes what was written, and someone else may have written more since.
+
 ## Classifier Rubric (CPT vs. static repeater)
 
 For every repeating card group found on a page, decide `static-repeater` vs
@@ -238,6 +285,23 @@ any inferred field, any structural guess made from heuristic segmentation rather
 explicit `<section>` tags) as a plain-language entry in `review[]`. This list is read
 verbatim at the Phase 1 checkpoint.
 
+**`review[]` is for decisions an operator can rule on.** A field that came back empty or
+null is not one, and one such note per section group is how a 48-entry list ends up five
+entries of restated emptiness. Collapse those into a single build note — and keep the two
+kinds of empty apart, because they are not the same claim:
+
+- **null by design on this path** — `cssRules` on `Template: tailwind`. Nothing is missing;
+  the contract says not to collect it.
+- **empty because nothing was found** — `fonts: []`, `backgrounds: []`. This is a *finding*
+  about the demo, and it is only reassuring if the scan could have seen what is there.
+
+A build wrote "fonts is [] — there is no @font-face anywhere in the demo" as reassurance
+that the scan had not failed, on a demo loading two families from `fonts.googleapis.com`
+that this agent did not then know how to read. **An explanatory entry that explains away a
+real gap is worse than no entry**: it converts a defect into a reviewed-and-accepted note.
+Before writing one, check the thing you are about to say is absent is absent from the demo,
+not merely from what you looked at.
+
 ## Fidelity capture
 
 Beyond classification, the manifest must carry enough raw material that downstream
@@ -266,9 +330,24 @@ collide on a class name. Do this per section/page, in addition to everything abo
    markup at all, because conversion strips the `@font-face` rules it absorbed.
 2. **Backgrounds.** Scan each section's resolved CSS for `background` / `background-image:
    url(...)` and record every referenced image path into `section.backgrounds[]`.
-3. **Fonts.** Scan the stylesheet(s) for `@font-face` blocks and record each into
+3. **Fonts — `@font-face` blocks *and* hosted-font `<link>`s.** Record each into
    `section.fonts[]` as `{ family, weight, style, src: [ "<woff2 path>", ... ] }` (prefer
    the `woff2` entry in the `src` list; keep multiple sources if declared).
+
+   **A `<link>` to `fonts.googleapis.com` is a font source.** Its `css2` query names the
+   families and the weights outright —
+   `?family=Archivo:wght@400;500;600;700&family=Source+Sans+3:wght@400;600` is two
+   families and six weights — so record one entry per family/weight with the stylesheet
+   URL as `src` and `"hosted": true`. Craft demos are the normal case here: they link the
+   families rather than declaring them, so a scan that only knows `@font-face` returns
+   `fonts: []` on every section of a demo that plainly uses two custom families. That is
+   not a demo without fonts, and it must never be reported as one — `/wp-init` Step 4.5
+   reads this field to self-host, and on an empty one it carries nothing, leaves the
+   theme on `system-ui`, and leaves the starter's `preconnect` to Google in place. A
+   build shipped exactly that: `assets/fonts/` empty but for `.gitkeep`, `--font-primary:
+   "Inter", system-ui` in a theme whose demo rendered Archivo, and no error anywhere.
+
+   Record `fonts: []` only when the demo genuinely declares and links none.
 4. **Computed dimensions.** When a section (or a key element inside it) has a fixed
    `height` and/or `width` declared in CSS (not `auto`, not percentage-fluid), record it
    into `section.computed` as `{ height?, width? }`. Omit keys that aren't fixed.
