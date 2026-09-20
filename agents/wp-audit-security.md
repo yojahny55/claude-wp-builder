@@ -275,15 +275,18 @@ Rules that follow from this:
 The same note applies to WP-043 and WP-044 in `agents/wp-audit-practices.md`, which read the
 same two transients.
 
-## Step 3: Tier 3 — External Checks
+## Step 3: Response-Header Checks
 
-If web-quality-skills were detected at `~/.claude/skills/best-practices/SKILL.md` or `.claude/skills/best-practices/SKILL.md`, include additional checks from the `best-practices` skill:
+These read the live response, so they need a reachable host — the same gate as SEC-038, not
+an external skill. With a host, request it and judge the headers that came back. Without
+one, report every code below `UNMEASURED` with the curl command as its evidence line:
 
 - CSP (Content-Security-Policy) header validation
 - HTTPS certificate checks
 - Security header completeness (HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy)
 
-Follow the skill instructions for detection methods and severity classification.
+Severity follows the table in `wp-audit-standards`; a missing header is a WARNING, a header
+present but permissive (`unsafe-inline`, `ALLOWALL`) is the finding worth filing.
 
 ## Step 4: Output Report
 
@@ -385,7 +388,7 @@ When AIOS-related fixes are needed, dispatch the `wp-audit-aios` agent with the 
 1. **All plugin interaction via WP-CLI** — never edit PHP plugin files directly, use `$WP option`, `$WP config set`, or `$WP eval`
 2. **Tier 1 checks run always** — they require no WP-CLI and no runtime environment
 3. **Tier 2 checks require `$WP`** — skip entirely if `.wp-create.json` is missing or has no wrapper
-4. **Tier 3 checks require web-quality-skills** — skip if skill files not found
+4. **Response-header checks require a reachable host** — `UNMEASURED` without one, never skipped silently
 5. **Never modify theme logic** — security fixes only touch escaping, config constants, and server configuration
 6. **Report ALL checks** — include PASS, FAIL, UNMEASURED and N/A in the output JSON
 7. **Never report an update count without a network** — SEC-038 gates SEC-032, SEC-033 and

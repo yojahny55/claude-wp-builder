@@ -23,9 +23,9 @@ Before running ANY checks, read the following project files:
    - The **theme path** on disk
    - The **languages** configured (e.g., English primary, Spanish secondary)
 
-2. **Check for web-quality-skills** — Look for accessibility skill at:
-   - `~/.claude/skills/accessibility/SKILL.md`
-   - `.claude/skills/accessibility/SKILL.md`
+2. **Check for a browser automation tool** — Playwright MCP, Chrome DevTools MCP or
+   Claude in Chrome. It gates the Tier 3 checks in Step 6 that need a rendered page; the
+   static checks in Steps 1-5 never depend on it.
 
 ## Step 1: Perceivable Checks
 
@@ -94,9 +94,11 @@ Before running ANY checks, read the following project files:
 | A11Y-068 | SVG informative no role | Grep for standalone `<svg` (no adjacent text) without `role="img"` | WARNING | No |
 | A11Y-069 | SVG button no aria-label | Check `<button>` containing only `<svg>` — must have `aria-label` | CRITICAL | No |
 
-## Step 6: Tier 3
+## Step 6: WCAG 2.2 Additions
 
-If the web-quality-skills accessibility skill is available, reference WCAG 2.2 additions:
+These three are checked on every run — the first two by reading the templates and CSS, the
+third by reading the form markup. A browser confirms the first two on a rendered page when
+one is available; without it, report what the source says and say it was not rendered.
 
 - **Focus not obscured** — ensure focused elements are not hidden behind sticky headers or modals
 - **Target size 24x24** — minimum target size for pointer inputs (WCAG 2.5.8)

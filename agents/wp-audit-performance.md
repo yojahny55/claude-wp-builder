@@ -217,8 +217,11 @@ it. If exactly one does, either move the enqueue into that template behind a con
 defer it as in PERF-047. Usual offenders: `aos` (scroll sections), `swiper` (carousels),
 `animate` (single elements), `lightbox` (gallery pages).
 
-## Step 3: Tier 3 — Performance Budgets & Core Web Vitals
-If web-quality-skills performance and core-web-vitals skills are available, reference these targets:
+## Step 3: Performance Budgets & Core Web Vitals
+These budgets are the standard for every run — they are recorded here, not borrowed from an
+external skill. The three weight budgets are answerable from the files alone and are always
+checked. The three Core Web Vitals need a loaded page, so they are measured at Tier 3 and
+reported `UNMEASURED` without a browser, never assumed to pass:
 
 | Metric | Budget |
 |--------|--------|

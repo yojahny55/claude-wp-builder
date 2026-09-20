@@ -140,9 +140,9 @@ $WP transient delete update_plugins
 Without the route both checks are `UNMEASURED`, with the curl command as their evidence line.
 `agents/wp-audit-security.md` carries the same gate as SEC-038.
 
-## Step 3: Tier 3 — Best Practices Cross-Check
+## Step 3: Best Practices Cross-Check
 
-If web-quality-skills best-practices skill is available, also verify:
+Every item below is answerable by reading the templates, so all of them run on every audit:
 
 - Valid HTML5 doctype declaration
 - Charset declaration present and correct

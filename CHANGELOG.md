@@ -220,6 +220,31 @@
   `agents/wp-audit-performance.md` Step 3 points at both, so the warning arrives before the
   finding is filed rather than after.
 
+### Changed
+
+- **Tier 3 is gated on a browser, not on a third-party skill package being installed.** The
+  audit advertised its third tier as unlocked by an external package, and probed for that
+  package's `performance/SKILL.md` on disk to decide. The gate was hollow in both directions.
+  Nothing was ever read from that package at run time — every criterion it supposedly
+  unlocked (the weight budgets, the Core Web Vitals thresholds, the WCAG 2.2 additions, the
+  HTML5 cross-check, the security response headers, the live-site SEO checks) was already
+  written into the audit agents, verbatim, under an `If <package> is available` conditional.
+  So a machine without it skipped checks the plugin could answer from the theme source alone,
+  and reported `Tier 3: not found` for a capability it had all along; a machine with it gained
+  nothing but the flag.
+  Tier 3 now means what it always described: measurement that needs a loaded page. It is
+  gated on a browser automation tool — Playwright MCP, Chrome DevTools MCP or Claude in
+  Chrome — and gates only the three Core Web Vitals, which report `UNMEASURED` without one
+  instead of being assumed to pass. The checks that a file scan can answer moved to Tier 1
+  unconditionally, and the two agents whose "Tier 3" was really *needs the live site*
+  (`wp-audit-security` response headers, `wp-audit-seo` robots/sitemap/structured data) now
+  say so and gate on a reachable host, the same gate SEC-038 already used.
+  The manifest key `audit.web_quality_skills_available` is retired in favour of
+  `audit.browser_measurement_available`; Step 2.5b reads the old key when a manifest predates
+  the rename, reports it as drift like any other measurement, and writes the current one back.
+  `tests/checks/audit-tier3-browser-gate.sh` asserts both directions, because a check that
+  only greps for the new gate is satisfied by deleting the tier.
+
 ### Fixed
 
 - **Field labels are written in the site's language, not in English.** The `wp-acf` agent

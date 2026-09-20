@@ -27,7 +27,8 @@ Before running ANY audit checks, read the following project files:
 2. **`.wp-create.json`** — Extract:
    - The **WP-CLI wrapper** command (`wp_cli.wrapper`) — assign to `$WP`
 
-3. **Check for web-quality-skills** — Look for `skills/web-quality-skills/` or equivalent SEO skill definitions for Tier 3 checks.
+3. **Note whether the site is reachable** — the Step 3 checks read the live site. Without a
+   reachable host they are `UNMEASURED`, and every template scan in Steps 1-2 still runs.
 
 ## Step 1: Tier 1 — Code-Only Checks
 
@@ -280,8 +281,9 @@ echo wp_json_encode(\$out);
     `custom` item carries whatever host was typed into it, which is how SEC-036 findings get
     created in the first place.
 
-## Step 3: Tier 3 — Extended Checks
-If web-quality-skills SEO skill is available, reference additional checks:
+## Step 3: Live-Site Checks
+These four read the served site rather than the theme source, so they need a reachable host.
+Without one, report them `UNMEASURED` with the request that would answer them:
 
 - **robots.txt validation** — verify directives are correct and sitemap URL is present
 - **Sitemap completeness** — ensure all public post types are included

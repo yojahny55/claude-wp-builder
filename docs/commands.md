@@ -378,7 +378,8 @@ static screenshot per breakpoint cannot show scroll motion, which is why the che
 
 No category flag = all. Security installs/configures All-in-One WP Security; SEO installs
 Rank Math and seeds meta/schema. `--report-only` skips fixes. Lighthouse-style checks need
-the optional `web-quality-skills` plugin.
+a browser automation tool; without one they report `UNMEASURED` and every file-scan check
+still runs.
 
 `--geo` audits Generative Engine Optimization and AI-agent readiness. It detects the site
 type first — content, local business, merchant or SaaS — and gates each check on that, so a
