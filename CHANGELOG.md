@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.26.0] - 2026-09-20
+
 ### Added
 
 - **A seventh auditor, for the question the other six do not ask: can a person use this
@@ -639,6 +641,7 @@
   path used to produce. Non-regular entries are rejected with `isFile()`.
   `FOLLOW_SYMLINKS` stays off, which is what keeps a symlinked directory out of the walk;
   the comment now says so, since the flag's absence is the behaviour rather than an omission.
+
 ## [1.25.0] - 2026-09-19
 
 ### Fixed

@@ -13,7 +13,7 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 
 **Priority:** Items within each section are ordered by priority (highest first).
 
-**Reconciled** on September 19, 2026 against `main` at v1.25.0. Every item below was
+**Reconciled** on September 20, 2026 against `main` at v1.26.0. Every item below was
 checked against the command, agent or script that would own it — an item claiming to be
 open while the behavior ships reads as a project that does not know what it has built.
 Larger reworks of delivered behavior are proposals, not backlog items, and are tracked
@@ -177,7 +177,7 @@ Improving the reliability and output quality of agents.
   [wp-acf](agents/wp-acf.md) reads the primary language from `.claude/CLAUDE.md` and writes every string the editor reads — group title, tabs, field labels, instructions, `button_label`, `message` — in it, with a worked Spanish-primary example. `key`, `name` and the language suffix stay English, because a `name` is the meta key. Held by [acf-editor-language](tests/checks/acf-editor-language.sh). This entry read DELIVERED from the reconciliation of September 19, 2026 while the agent file said nothing of the kind; closing [#3](https://github.com/yojahny55/claude-wp-builder/issues/3) is what made it true.
 
 - [x] **Menu creation and assignment** `DELIVERED`
-  [wp-seed](commands/wp-seed.md) creates the menus, assigns them with `wp menu location assign`, and writes the per-language Polylang `nav_menus` mapping — including the `nav_menu_locations` theme_mod that Polylang itself never sets.
+  [wp-seed](commands/wp-seed.md) creates the menus, assigns them with `wp menu location assign`, and writes the per-language Polylang `nav_menus` mapping — including the `nav_menu_locations` theme_mod that Polylang itself never sets. v1.26.0 added the only assertion that can see whether it worked: an HTTP request counting menu items per language. Polylang replaces that theme_mod in a **frontend** filter, so `get_nav_menu_locations()` under WP-CLI prints correct ids for a site serving no navigation at all — which is how a 16-page delivery shipped with no nav links on any page.
 
 - [x] **CF7 dynamic site info** `DELIVERED`
   [wp-cf7](agents/wp-cf7.md) renders `%%site_logo%%`, `%%contact_email%%`, `%%contact_phone%%` and `%%copyright%%` from settings at render time.
