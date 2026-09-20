@@ -51,7 +51,9 @@ printf '%s' "$flats" | grep -Fq 'the LCP number decides' \
   || { echo "FAIL: $skill does not state that LCP decides when FCP and LCP disagree"; exit 1; }
 # The real cause on that site, so the next reader looks at the render delay instead of
 # re-running the rejected fix.
-printf '%s' "$flats" | grep -Fq 'element' \
+# The whole phrase, flattened: 'element' alone matches "the element", "LCP element" and
+# half the prose in the file, so the assertion passed with the finding deleted.
+printf '%s' "$flats" | grep -Fq 'element render delay' \
   || { echo "FAIL: $skill does not name element render delay as what the breakdown actually showed"; exit 1; }
 printf '%s' "$flats" | grep -Fq '276 ms' \
   || { echo "FAIL: $skill does not record the render-delay measurement that located the real cause"; exit 1; }
