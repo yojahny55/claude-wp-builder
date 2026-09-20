@@ -13,6 +13,11 @@
 #
 # The agent also must not auto-apply the two local fixes that change rendered markup,
 # and must keep pointing at the skill that carries all of the above.
+#
+# Every assertion below greps for the exact wording that carries the contract, which is
+# this repo's house style: a failure here means the sentence changed, not that the code
+# broke. Reword one on purpose and update its line in the same commit, so a reviewer sees
+# both halves of the change at once.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
@@ -25,8 +30,8 @@ SKILL="skills/wp-audit-local-standards/SKILL.md"
 
 # The skill is a knowledge library, not an actor. A skill that acts is the one thing the
 # layer rules forbid, and claude-seo's original shipped as user-invocable: true.
-grep -Fq 'user-invocable: false' "$SKILL" \
-  || fail "$SKILL does not declare user-invocable: false"
+awk 'NR<=8 && /^user-invocable: false/ { f = 1 } END { exit !f }' "$SKILL" \
+  || fail "$SKILL does not declare user-invocable: false in its frontmatter"
 
 # Every local code the agent tables must exist, or the report cites codes with no criteria.
 for code in SEO-055 SEO-056 SEO-057 SEO-058 SEO-059 SEO-060 SEO-061 SEO-062 SEO-063; do
