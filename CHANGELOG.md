@@ -377,6 +377,16 @@
 
 ### Fixed
 
+
+- **`bin/demo-verify.mjs` can reach a site with a self-signed certificate.** Every
+  context and page it opened rejected one, so a `/wp-create` local install — which gets
+  HTTPS from its own CA — failed on `ERR_CERT_AUTHORITY_INVALID` at the first
+  navigation. `/wp-finalize`, `/wp-polish`, `/wp-responsive-check` and `/wp-audit` all
+  forward here, so this was not one gate failing: it was the entire finish-phase suite
+  being unavailable on a standard local site, and a real build shipped with none of it
+  run. Verified both ways against a self-signed server — the previous version dies at
+  navigation, this one completes the walk and reports its findings.
+
 - **Field labels are written in the site's language, not in English.** The `wp-acf` agent
   generated every editor-facing string in English whatever the project's primary language was,
   so a Spanish-primary build opened on "Content", "Title" and "Leave empty to use English
@@ -435,8 +445,6 @@
   path used to produce. Non-regular entries are rejected with `isFile()`.
   `FOLLOW_SYMLINKS` stays off, which is what keeps a symlinked directory out of the walk;
   the comment now says so, since the flag's absence is the behaviour rather than an omission.
-
-
 ## [1.25.0] - 2026-09-19
 
 ### Fixed
