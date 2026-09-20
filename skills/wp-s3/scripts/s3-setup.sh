@@ -98,8 +98,11 @@ install_vendor() {
     # out of the PHP they ship. The plugin never calls iconv() at runtime — the polyfill
     # that requires it is only reached through Symfony's console, which does not run
     # here — so the platform requirement is ignored rather than installed.
+    # Asked of PHP directly rather than by piping `php -m` into `grep -q`: grep exits on
+    # its match, php takes SIGPIPE, and `pipefail` then reports 141 for a pipeline that
+    # succeeded — which would add the flag precisely when the extension IS present.
     local args=( install --no-dev --optimize-autoloader --no-interaction )
-    if ! php -m | grep -qix iconv; then
+    if ! php -r 'exit( extension_loaded( "iconv" ) ? 0 : 1 );'; then
         echo "   PHP has no iconv extension: installing with --ignore-platform-req=ext-iconv"
         args+=( --ignore-platform-req=ext-iconv )
     fi
