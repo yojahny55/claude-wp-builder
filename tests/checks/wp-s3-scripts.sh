@@ -112,6 +112,15 @@ for f in "$media" "$lib" "$revert"; do
 done
 
 # ---------------------------------------------------------------------------
+# 7b. The two directories a wrong bucket policy would expose never leave the disk:
+#     WooCommerce's logs and the form attachments people upload.
+# ---------------------------------------------------------------------------
+for dir in wc-logs wpcf7_uploads; do
+  grep -Fq -- "--exclude \"$dir/*\"" "$media" \
+    || fail "$media no longer excludes $dir/ from the transfer"
+done
+
+# ---------------------------------------------------------------------------
 # 8. The transfer is still judged by comparing both sides, not by the client's
 #    exit code or its summary table.
 # ---------------------------------------------------------------------------

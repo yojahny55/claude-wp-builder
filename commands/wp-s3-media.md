@@ -77,6 +77,10 @@ size — and they have different causes. A `Note:` line about files that already
 not one of them: neither direction may replace a file, so that line is the tool doing what
 it was told.
 
+When the transfer itself failed, the comparison still ran and its output is above the
+error: report **both**, because the comparison is what says how much reached the other
+side and therefore what a second run has left to do.
+
 **On a server with an IAM role** the script stops with no key pair to sign with, and prints
 the two ways forward. Read them to the user and let them choose; do not pick one, and never
 write credentials anywhere to get past it.

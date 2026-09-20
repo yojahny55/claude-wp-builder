@@ -110,11 +110,22 @@ Neither direction ever passes `--overwrite` or `--remove`. A file already on the
 is refused and reported, which is what makes a second run safe and what stops a stale local
 copy from burying a newer one in the bucket. The client exits non-zero for those refusals,
 so the exit code cannot separate "declined to clobber" from "could not connect": a refusal
-is counted and reported, any other `<ERROR>` line fails immediately, and the comparison
-decides whether the result is right either way.
+is counted and reported, any other `<ERROR>` line fails the run, and the comparison decides
+whether the result is right either way.
 
-Excluded from both directions: `wc-logs/*`, `cache/*`, `wio_backup/*`, `wrio/*` — logs,
-caches and the image optimizer's untouched originals.
+**The comparison runs even when the transfer failed**, and especially then: a failure is
+the moment the operator most needs to know how much of it landed. It cannot rescue the run
+— a failed transfer stays failed whatever the comparison says — but "47 of 812 objects
+arrived" is what makes the next run safe, and the client's own error says nothing about
+that. The listing has a timeout of 300 seconds (`WP_S3_LIST_TIMEOUT`), because an
+unreachable endpoint otherwise hangs with nothing to read.
+
+Excluded from both directions: `wc-logs/*`, `cache/*`, `wio_backup/*`, `wrio/*`,
+`wpcf7_uploads/*` — logs, caches, the image optimizer's untouched originals, and the form
+attachments. None is ever served from a media URL. The last two are also the directories a
+mistake in the bucket policy would expose, and a site migrating in arrives with years of
+them: keeping them out of the bucket is the guard that does not depend on the policy being
+right.
 
 The client is pointed at a **private configuration directory** (`MC_CONFIG_DIR`, `0700`,
 removed when the script exits) rather than at `MC_HOST_<alias>`. The credentials in that

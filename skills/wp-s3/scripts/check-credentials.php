@@ -38,6 +38,13 @@ if ( ! is_readable( $autoload ) ) {
 
 // The reader prints `NAME='value'` lines quoted for /bin/sh. Parsing them here keeps a
 // single copy of the regular expressions that read the constants.
+if ( ! function_exists( 'exec' ) ) {
+	// Hardened CLI builds disable it. Nothing here can read the constants without running
+	// the reader, so say which function is missing instead of failing on an empty result.
+	fwrite( STDERR, "exec() is disabled in this PHP; cannot read $config.\n" );
+	exit( 2 );
+}
+
 $reader = __DIR__ . '/read-s3-config.php';
 $cmd    = escapeshellcmd( PHP_BINARY ) . ' ' . escapeshellarg( $reader ) . ' ' . escapeshellarg( $config ) . ' --export';
 

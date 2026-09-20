@@ -70,6 +70,14 @@
   `wp-config.php` rewrites are written to a neighbouring file and renamed, because a
   process killed mid-write left a truncated `wp-config.php` and a white screen. And the
   last `wp` call in the revert is guarded like every other one.
+  One more the scripts were never going to be asked about: **form attachments no longer
+  leave the disk.** `uploads/wpcf7_uploads/` holds what people attached to a form — CVs,
+  identity documents, invoices — and it was being mirrored into the bucket, where the only
+  thing keeping it unreadable was the bucket policy being written correctly. It joins
+  `wc-logs`, `cache`, `wio_backup` and `wrio` in the exclusions, in both directions. New
+  installs never write there anyway, because `s3-config.php` redirects both WooCommerce's
+  logs and CF7's temporary directory to local paths — but a site migrating in arrives with
+  years of them.
   Two smaller ones: `verify-transfer.py` called an empty remote listing a verified download,
   and the client answers an unknown alias with exit `0` and no output, so "no objects" and
   "could not list" arrived identically — a download that lists nothing now fails. And a

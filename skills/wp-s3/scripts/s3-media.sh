@@ -137,16 +137,25 @@ export MC_CONFIG_DIR="$MCLI_CONFIG_DIR"
 unset S3_UPLOADS_SECRET S3_MEDIA_SECRET
 
 # S3_UPLOADS_BUCKET may carry a prefix ("bucket/site-prefix"); the client takes that path
-# as written.
-REMOTE="wps3/${S3_UPLOADS_BUCKET}/uploads"
+# as written, so a trailing slash would produce an empty path segment and a key that does
+# not match what the plugin writes.
+REMOTE="wps3/${S3_UPLOADS_BUCKET%/}/uploads"
 
-# Logs, caches and the optimizer's untouched originals. They cost storage, they are never
-# served, and wc-logs is the one directory a misconfigured bucket policy would expose.
+# Logs, caches, the optimizer's untouched originals, and the form attachments.
+#
+# None of them is ever served from a media URL, so nothing on the site breaks by their
+# absence, and two of them are the directories a mistake in the bucket policy would
+# expose: wc-logs holds whatever WooCommerce logged, and wpcf7_uploads holds what people
+# attached to a form — CVs, identity documents, invoices. New installs never write there
+# (s3-config.php redirects both to local paths), but a site migrating in arrives with
+# years of them, and keeping them out of the bucket is the guard that does not depend on
+# a policy being right.
 EXCLUDES=(
     --exclude "wc-logs/*"
     --exclude "cache/*"
     --exclude "wio_backup/*"
     --exclude "wrio/*"
+    --exclude "wpcf7_uploads/*"
 )
 
 if [[ "$DIRECTION" == "upload" ]]; then
