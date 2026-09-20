@@ -21,6 +21,7 @@ AGENT="agents/wp-audit-seo.md"
 SKILL="skills/wp-audit-local-standards/SKILL.md"
 
 [ -f "$SKILL" ] || fail "$SKILL is missing — the local checks have no criteria to read"
+[ -f "$AGENT" ] || fail "$AGENT is missing — the local checks have no agent to read"
 
 # The skill is a knowledge library, not an actor. A skill that acts is the one thing the
 # layer rules forbid, and claude-seo's original shipped as user-invocable: true.
