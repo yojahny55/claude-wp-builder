@@ -547,6 +547,9 @@ try {
   // three times on one build, each time re-run from zero. The page is recorded
   // as crashed, which is blocking, and the walk goes on.
   // Hoisted so the catch below can still name the page and keep its findings.
+  // `let`, not `const`: the local-page branch inside the try reassigns this to
+  // the loopback URL once its server is up, and that server call can throw, so
+  // it cannot be computed before the try.
   let pageUrl = pageTarget;
   const findings = [];
   try {
@@ -903,7 +906,12 @@ try {
   } catch (err) {
     // Keep whatever this page did find before it died: a section list that
     // stops half way is still evidence, and the reason is on the row.
-    const why = err && err.message ? err.message.split('\n')[0] : String(err);
+    // Coerce before splitting: a thrown value whose .message is not a string
+    // would throw again HERE, inside the handler, and that exception reaches the
+    // walk-level catch and aborts the whole directory — the exact failure this
+    // block exists to prevent.
+    const msg = err && typeof err.message === 'string' ? err.message : String(err);
+    const why = msg.split('\n')[0];
     findings.push({ kind: 'page-crashed', pass: 'normal', width: 0, error: why });
     report.pages.push({ url: pageUrl, findings });
     console.error('demo-verify: ' + basename(pageTarget) + ' crashed, continuing: ' + why);

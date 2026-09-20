@@ -3,6 +3,7 @@
 # an inherited one, CF7's own filter inserting line breaks nobody wrote, and one
 # page's timeout destroying a whole directory's results.
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 
 fail() { echo "FAIL: $1"; exit 1; }
 
