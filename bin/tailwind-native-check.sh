@@ -78,8 +78,31 @@ while IFS= read -r f; do
 done < <(find "$src" -mindepth 1 -name '*.css')
 
 # 5. No inline <style> blocks in templates.
-if grep -rlq '<style' "$theme" --include='*.php' 2>/dev/null; then
-  err "inline <style> block(s) in: $(grep -rl '<style' "$theme" --include='*.php' | tr '\n' ' ')"
+#
+# One exception, and it is the same category as the sanctioned dynamic `style=""`
+# attribute: a `<style>` that sits inside `<noscript>` and is emitted by
+# inc/performance.php. That file's deferred-background helper holds each declaration in a
+# data attribute and repeats all of them in a `<noscript><style>` block, because the
+# fallback has to carry an uploads URL chosen at runtime — a value no build step can know,
+# which is exactly why the dynamic style attribute is allowed too. The exception is keyed
+# to `<noscript>` on the same line AND to that one file, so a `<style>` block anywhere in
+# a template, or a bare one in performance.php, still fails: the rule is about CSS that
+# escapes the Tailwind build, and a rule with a wide exception stops being one.
+style_files=$(grep -rl '<style' "$theme" --include='*.php' 2>/dev/null || true)
+offenders=""
+for f in $style_files; do
+  case "$f" in
+    "$theme"/inc/performance.php)
+      # Every `<style` occurrence in this file must be on a `<noscript>` line.
+      if [ "$(grep -c '<style' "$f")" = "$(grep -c '<noscript>.*<style' "$f")" ]; then
+        continue
+      fi
+      ;;
+  esac
+  offenders="$offenders$f "
+done
+if [ -n "$offenders" ]; then
+  err "inline <style> block(s) in: $offenders"
 fi
 
 # 6. A compiled theme must actually use utilities in its markup.

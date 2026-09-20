@@ -435,6 +435,8 @@ Ship `inc/performance.php` (in the starter) in every theme. It handles the image
 2. `wp_generate_attachment_metadata` → also writes a WebP sibling for the full-size original (so raw-URL / CSS-background usage benefits).
 3. A `template_redirect` output-buffer that rewrites any `uploads/*.jpg|png` with a `.webp` sibling → `.webp` in the finished HTML (covers `src`, `srcset`, and inline `background-image` — including SCF field URLs that bypass WP's attachment pipeline). Runs once per page-cache build.
 4. `prefix_image($field, $size, $attr)` — templates use this instead of `echo $field['url']` so images get a `srcset` sized to the slot. **Always pass `sizes`** matching the real display width (full-bleed `100vw`, split `(max-width: 899px) 100vw, 50vw`, fixed logo `136px`). Serving a 2200px original in a 400px slot is the top oversized-image finding.
+5. `prefix_background_image($url)` — the declaration for a CSS background, with the `.webp` sibling in an `image-set()` behind the plain `url()` fallback.
+6. `prefix_lazy_background_attr($url, $idle = false)` — the same declaration, held in a data attribute until an IntersectionObserver paints it, for a **decorative background below the fold**. `background-image` has no `loading` attribute, so those download with the first paint however far down they sit. `prefix_print_lazy_background_noscript()` repeats every held-back declaration inside a `<noscript><style>` block on `wp_footer`. Never defer the hero: it is the LCP element.
 
 For a theme seeded from an existing demo (images already uploaded), batch-generate the `.webp` siblings once so (3) picks them up:
 

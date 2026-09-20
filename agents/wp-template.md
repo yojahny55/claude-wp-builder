@@ -331,6 +331,21 @@ $image = prefix_get_field('hero_image');
 - Each browser requests the URL it understands, so this is safe behind a full-page cache. Never solve this with `Vary: Accept` from a template.
 - Prefer an `<img>` with `object-fit: cover` where the layout allows one: it gets a `srcset`, which a background never has.
 
+#### A decorative background below the fold is deferred (MANDATORY)
+
+`background-image` has no `loading` attribute, so the browser downloads every background it parses with the first paint — a footer band, a map panel or a decorative section sitting thousands of pixels down is on the critical path exactly like the hero. On a real build four such backgrounds were 120–320KB each, and holding them back took the first paint from 3.7MB to 1.4MB with no visible change.
+
+Print those with `prefix_lazy_background_attr( $url )` instead, which returns attributes rather than a style value:
+
+```php
+<section class="cta" <?php echo prefix_lazy_background_attr( $image['url'] ?? '' ); ?>>
+```
+
+- **Never the hero.** It is the LCP element, and deferring it moves the largest paint later by whatever the observer waits. The hero keeps `prefix_background_image()` and its preload.
+- Pass `true` as the second argument for an element that is *inside* the first viewport but not yet visible — a carousel slide behind the first one. An observer fires on those immediately, so they are painted after the load event instead.
+- The helper registers each declaration and `prefix_print_lazy_background_noscript()` repeats all of them inside a `<noscript><style>` block on `wp_footer`, so a visitor with JavaScript disabled sees the same page. Do not remove that hook while the helper is in use.
+- The key travels in a data attribute and **not** in `id`, because these sections usually carry one already and an HTML parser drops a second `id` on the same element — which leaves the noscript rule pointing at nothing while the page still looks correct with JavaScript on.
+
 ## Descriptive Link Text (SEO — MANDATORY)
 
 Lighthouse's `link-text` SEO audit matches the link's **visible innerText** against a blocklist (`click here`, `here`, `learn more`, `more`, `read more`, `this`, `start`, …). **`aria-label` does NOT satisfy it.** When the demo uses a generic button label (very common: "LEARN MORE", "READ MORE", "VIEW"), append a visually-hidden descriptive suffix **inside** the anchor so innerText becomes descriptive while the button still shows the short label:
