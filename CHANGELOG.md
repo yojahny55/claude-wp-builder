@@ -386,6 +386,33 @@
   being unavailable on a standard local site, and a real build shipped with none of it
   run. Verified both ways against a self-signed server — the previous version dies at
   navigation, this one completes the walk and reports its findings.
+- **`prose` reads the theme's colours instead of the plugin's grey.**
+  `@tailwindcss/typography` ships `--tw-prose-body: gray-700` and
+  `--tw-prose-headings: gray-900` and applies them to everything inside `.prose`,
+  which beats an element that merely inherits. On a light palette it passes
+  unnoticed; on a dark one it is grey on near-black — **1.2:1, measured on a
+  delivered site's legal and article pages, found by eye.** The starter now binds
+  the plugin's sixteen variables to its own role tokens, which is correct for the
+  craft aliases too (on a dark craft palette `--color-dark` resolves to the light
+  ink). Per-element `prose-headings:` / `prose-a:` modifiers still win, so nothing
+  already written changes. `compositions/README.md` also reserves the class name:
+  an element called `prose` picks up the plugin's margins, lists and `max-width`
+  whatever its colours do.
+- **One page's failure no longer destroys a directory walk.** A single
+  `page.screenshot` or `page.goto` past its timeout rejected out of
+  `demo-verify.mjs`'s page loop, so a 16-page run lost fifteen completed pages and
+  wrote no `findings.json` at all — three times on one build, each re-run from zero.
+  The page is now recorded as a blocking `page-crashed` finding with the reason, and
+  the walk continues. Verified with a page that hangs forever among two good ones:
+  before, nothing; after, `page-crashed` on the bad one and real findings on both
+  others.
+- **CF7 label rows are written on one line.** CF7 runs its form body through
+  `wpautop`, so the newline an author naturally puts between a label and its tag
+  becomes a `<br>`. Stacked with the control wrap's box and the `<p>`'s UA margin
+  that measured ~100px per field — fourteen times on one form, reported by the
+  client as broken spacing. 42px per gap against the demo's 0.4rem, closing to 6px
+  once the rows were joined. `agents/wp-cf7.md` also now requires shipping the
+  bridge stylesheet whenever the demo styles its own form.
 
 - **Field labels are written in the site's language, not in English.** The `wp-acf` agent
   generated every editor-facing string in English whatever the project's primary language was,
@@ -445,37 +472,6 @@
   path used to produce. Non-regular entries are rejected with `isFile()`.
   `FOLLOW_SYMLINKS` stays off, which is what keeps a symlinked directory out of the walk;
   the comment now says so, since the flag's absence is the behaviour rather than an omission.
-
-### Fixed
-
-- **`prose` reads the theme's colours instead of the plugin's grey.**
-  `@tailwindcss/typography` ships `--tw-prose-body: gray-700` and
-  `--tw-prose-headings: gray-900` and applies them to everything inside `.prose`,
-  which beats an element that merely inherits. On a light palette it passes
-  unnoticed; on a dark one it is grey on near-black — **1.2:1, measured on a
-  delivered site's legal and article pages, found by eye.** The starter now binds
-  the plugin's sixteen variables to its own role tokens, which is correct for the
-  craft aliases too (on a dark craft palette `--color-dark` resolves to the light
-  ink). Per-element `prose-headings:` / `prose-a:` modifiers still win, so nothing
-  already written changes. `compositions/README.md` also reserves the class name:
-  an element called `prose` picks up the plugin's margins, lists and `max-width`
-  whatever its colours do.
-- **One page's failure no longer destroys a directory walk.** A single
-  `page.screenshot` or `page.goto` past its timeout rejected out of
-  `demo-verify.mjs`'s page loop, so a 16-page run lost fifteen completed pages and
-  wrote no `findings.json` at all — three times on one build, each re-run from zero.
-  The page is now recorded as a blocking `page-crashed` finding with the reason, and
-  the walk continues. Verified with a page that hangs forever among two good ones:
-  before, nothing; after, `page-crashed` on the bad one and real findings on both
-  others.
-- **CF7 label rows are written on one line.** CF7 runs its form body through
-  `wpautop`, so the newline an author naturally puts between a label and its tag
-  becomes a `<br>`. Stacked with the control wrap's box and the `<p>`'s UA margin
-  that measured ~100px per field — fourteen times on one form, reported by the
-  client as broken spacing. 42px per gap against the demo's 0.4rem, closing to 6px
-  once the rows were joined. `agents/wp-cf7.md` also now requires shipping the
-  bridge stylesheet whenever the demo styles its own form.
-
 ## [1.25.0] - 2026-09-19
 
 ### Fixed
