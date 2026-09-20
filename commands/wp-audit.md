@@ -1,7 +1,7 @@
 ---
 description: Comprehensive audit — security, SEO, accessibility, performance, best practices, GEO/AI-agent readiness
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, AskUserQuestion
-argument-hint: "[--security] [--seo] [--a11y] [--performance] [--best-practices] [--geo] [--all] [--report-only] [--host <public-url>] [--security-level basic|recommended|maximum]"
+argument-hint: "[--security] [--seo] [--a11y] [--performance] [--best-practices] [--geo] [--all] [--report-only] [--report md|html|both] [--report-lang en|es] [--host <public-url>] [--security-level basic|recommended|maximum]"
 ---
 
 # WP Audit — Comprehensive Site Audit
@@ -15,6 +15,13 @@ Parse `$ARGUMENTS` for:
 - **`--all` flag** (default if no category flags provided)
 - **`--report-only` flag** (skip fix phase)
 - **`--security-level basic|recommended|maximum`** (default: `recommended`, ignored if `--report-only`)
+- **`--report md|html|both`** — also write the run as a dated deliverable under
+  `.wp-audit/`. Absent, the audit prints to the console and writes only the ledger, which
+  is what every run did before this flag existed.
+- **`--report-lang en|es`** (default: `en`) — the language of that deliverable. It is read
+  by a client, not by the person who ran the audit, so it follows the project's primary
+  language rather than the plugin's. Take the default from `languages` in the project's
+  `.claude/CLAUDE.md` when the flag is absent and that line names one.
 - **`--host <public-url>`** — the publicly reachable URL to scan, overriding
   `wordpress.url` from the manifest. A project whose manifest holds a `.local` or `192.168.*`
   URL can never be scanned from the manifest alone; this is how such a project supplies one
@@ -272,7 +279,9 @@ Determine the audit tier:
 **Tier 3 (if a browser automation tool is available):** Probe every run — Step 2.5b
 already re-probed it, and `audit.browser_measurement_available` from a previous run is a
 drift input, never the answer. Tier 3 is what actually loads the page, so it is gated on
-the one thing that can: a browser. Check for any of these tools in the session:
+the one thing that can: a browser.
+
+Check for any of these tools in the session:
 1. Playwright MCP (`mcp__playwright__browser_navigate`)
 2. Chrome DevTools MCP (`performance_start_trace`)
 3. Claude in Chrome (`mcp__claude-in-chrome__navigate`)
@@ -401,10 +410,20 @@ Project context:
 Run all checks for your tier level. Output your findings as a structured report with the following format for each issue:
 
 [<SEVERITY>] <CODE>: <message> (<file>:<line> if applicable)
+  Resource: <the stable thing this is about — see the resource table in Step 7>
   Fix: <auto|manual>
+  Owner: <code|setting|content|manual>
   Method: <description of fix>
 
 Where SEVERITY is one of: CRITICAL, WARNING, INFO
+Where Owner says where the fix LANDS, never whether you can apply it:
+  code     — a file in the theme. Travels with the commit.
+  setting  — a WordPress option, a plugin's configuration, a server rule. Applied with
+             WP-CLI here and NOT carried by the commit, so it is a step to repeat on
+             staging and production.
+  content  — a text somebody has to write or decide.
+  manual   — human judgement or an external tool.
+A fix you apply automatically is still `setting` if it wrote to the database.
 Where CODE follows the pattern: SEC-NNN, SEO-NNN, A11Y-NNN, PERF-NNN, BP-NNN, GEO-Dnn/Axx/Uxx/Pxx
 ```
 
@@ -482,10 +501,27 @@ finding that could not be measured. It is not counted as resolved.
 
 Collect reports from all agents. For each agent's output, parse the findings into a unified list.
 
-**Deduplication:** If the same file:line appears in multiple reports:
+**Deduplication:** If the same `file:line` appears in multiple reports:
 - Keep the finding with the highest severity
 - Remove duplicates from lower-severity reports
-- Ownership rules: Security owns vulnerability checks, Practices owns coding-standards checks
+- Category claims: Security claims vulnerability checks, Practices claims coding-standards
+  checks. ("Claims" is which auditor the check belongs to. It is not the finding's **owner**
+  — that is Step 8.5's `code`/`setting`/`content`/`manual`, and it says who applies the fix.
+  One word for two unrelated ideas is how a `setting` ends up rendered as `code`.)
+
+**The resource convention.** Step 7.5 identifies a finding by `check` + `resource`, so a
+resource written two ways is two findings for one defect:
+
+| What the finding is about | `resource` |
+|---|---|
+| a page | `page:/contact/` — the path, with its trailing slash as the site serves it |
+| a record | `post:412`, `menu_item:88`, `wp_options.siteurl` |
+| a place in the code | `template-parts/hero.php:34` |
+| a site-level judgement | `site` |
+
+**A page-level finding is one row per page, not one per occurrence.** Three broken links on
+`/contact/` are one finding whose evidence lists all three — a row per link turns a page
+with a bad footer into forty findings that are one fix.
 
 Sort all issues: CRITICAL first, then WARNING, then INFO.
 
@@ -649,6 +685,121 @@ If all checks passed in a category:
 [SECURITY] ✓ All checks passed
 ```
 
+## Step 8.5: Write the dated deliverable (if `--report` was given)
+
+The console report above is for whoever ran the audit. It is gone when the scrollback is,
+and `.wp-audit-findings.json` is a working file — nobody hands a client a JSON array of
+check ids. When `--report` is given, this step writes the same run as documents.
+
+### Every finding says who applies it
+
+Before rendering, assign each finding one of four owners. This is not a label for the
+report; it is the answer to "how much of this can you do, and how much is mine?", and it is
+the one question the counts cannot answer.
+
+| Owner | What it is | Where it ends up |
+|---|---|---|
+| `code` | a file in the theme — CSS, `functions.php`, a template | **travels with the commit** |
+| `setting` | a WordPress option, a plugin's configuration, a server rule (HTTPS, redirects, `.htaccess`) | applied with WP-CLI on the local clone, and **does not travel with the commit** |
+| `content` | a text somebody has to write or decide — a title, a description, an `alt` | a person writes it; you may propose the text |
+| `manual` | human judgment or an external tool | never automated |
+
+**`setting` is the one that gets lost, and it is why the four exist rather than two.** A
+`$WP option update` run against a local clone changes that clone's database and nothing
+else. The commit carries no trace of it, the staging panel has no WP-CLI, and the next
+deploy looks identical to the audit that "fixed" it. Every `setting` row is therefore a
+step to repeat wherever the site is deployed, and the report says so in those words.
+
+An owner comes from what the fix touches, never from whether the audit can do it: a fix
+this run applies automatically is still a `setting` if it wrote to the database.
+
+**Every agent reports its own owner** — the dispatch prompt in Step 6 asks for it, so this
+step reads the field rather than classifying ~250 check codes at report time. When a finding
+arrives without one, derive it from what its fix touches, and the category tells you where
+to look first:
+
+| Category | Almost always | The exceptions worth checking |
+|---|---|---|
+| `SEC-*` | `setting` — wp-config constants, `.htaccess`, AIOS options, file permissions | escaping and `$wpdb->prepare` in a template are `code` |
+| `SEO-*` | `setting` — Rank Math options, permalinks, sitemap | hardcoded `<title>`/meta in a template are `code`; a missing description or a title to rewrite is `content` |
+| `A11Y-*` | `code` — templates, CSS, ARIA | `alt` text and link text somebody has to write are `content` |
+| `PERF-*` | `code` — enqueues, image attributes, `inc/performance.php` | object cache, autoload options, revisions, OPcache are `setting` |
+| `WP-*` | `code` — it is the theme's own source by definition | — |
+| `GEO-*` | `code` — `inc/agentic.php` and the surfaces it generates | the robots AI policy and anything written to an option are `setting`; trust-anchor prose is `content` |
+
+The table is a starting point, not the answer. **Ask what the fix writes to**: a file in the
+theme is `code`, a row in the database or a server rule is `setting`, a sentence a person
+must compose is `content`, a judgement is `manual`.
+
+### Render it
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/bin/audit-report.mjs --run <run.json> --out .wp-audit \
+  --format <md|html|both> --lang <en|es>
+```
+
+Write `<run.json>` first, into the session's scratch directory rather than the project —
+it is an argument, not an artifact:
+
+```json
+{
+  "site": "<project name>",
+  "date": "<YYYY-MM-DD>",
+  "tier": "<the same label Step 3 printed>",
+  "categories": ["security", "seo", "a11y"],
+  "findings": [
+    {
+      "check": "SEC-036",
+      "resource": "wp_options.siteurl",
+      "severity": "CRITICAL",
+      "ownership": "setting",
+      "category": "security",
+      "page": null,
+      "message": "Development host in siteurl",
+      "fix": "$WP option update siteurl https://…",
+      "evidence": "$WP option get siteurl"
+    }
+  ],
+  "unmeasured": [
+    { "check": "PERF-LCP", "reason": "no browser tool — Tier 3 never ran" }
+  ]
+}
+```
+
+`check`, `severity`, `ownership` and `message` are required on every finding: the renderer
+**refuses a finding with no `ownership`** and exits `1` naming it, because a plan whose last
+column is blank is the plan this step exists to replace. `page` is the page a page-level finding is about and
+`null` otherwise. An `UNVERIFIED` finding from Step 6.9 is **not** a finding here: it was
+never measured, so it goes in `unmeasured` with the command that would settle it.
+
+| Exit | Meaning |
+|---|---|
+| `0` | documents written — print the paths |
+| `1` | the run file is unusable, or a finding is incomplete — fix the run file and re-run |
+| `2` | the run carried no findings; say so and continue |
+| `3` | crash — report it and continue to Step 9 |
+
+It writes `.wp-audit/informe-<AAAA-MM-DD>.md`, `.html`, and a machine sidecar `.json`.
+The Markdown is for working and versioning; the HTML is a single self-contained file that
+opens with a double click, forwards as an attachment and prints to PDF from the browser.
+Hand over both and say which is which.
+
+**The sidecar is what makes the next report comparable.** The renderer diffs this run
+against the newest earlier sidecar and opens the document with resolved / new / still
+failing, by finding identity rather than by count. It never parses its own Markdown back:
+a report edited by hand would otherwise change what the next comparison claims happened.
+The ledger and the sidecar are different records and both stay — the ledger is the
+project's running history of every finding ever seen, a sidecar is one dated snapshot.
+
+### The report goes out before anything is fixed
+
+Run this step before Step 9, always, including when the user has already said to fix
+everything. The dated report is the baseline the next audit measures against, so a run
+that fixes first has no before to compare with, and the user cannot choose what gets
+touched in their site without seeing the whole of it. Step 9 then works from the plan this
+step wrote: tell the user how many rows are `code`, how many are `setting`, `content` and
+`manual`, and that you can apply the first two and not the last two.
+
 ## Step 9: Offer to Fix (unless --report-only)
 
 If `--report-only` was set, print:
@@ -657,10 +808,19 @@ Report complete. Use /wp-audit (without --report-only) to auto-fix issues.
 ```
 And skip to Step 10.
 
-Otherwise, if auto-fixable issues exist, use AskUserQuestion:
+Otherwise, if auto-fixable issues exist, use AskUserQuestion. Offer the work split by
+owner rather than as one number, so the user can see what is being proposed:
+
 ```
-Want me to fix the M auto-fixable issues? (y/n)
+M auto-fixable issues: C in code (travel with the commit), S in settings
+(database or server — applied here, must be repeated on staging and production).
+K more are content or manual and stay with you.
+
+Apply them? (y/n)
 ```
+
+When Step 8.5 did not run, derive the same split from the findings anyway — the four
+owners are a property of a fix, not of the report.
 
 If the user declines, skip to Step 10.
 
@@ -717,7 +877,10 @@ top of the report. Only a returned report yields a score; map its failed ORA che
 
 The before → after score this step produces is the value the Step 8 report's `Live scan:` line records: the report is printed before this step runs, so at Step 8 show that line as pending and fill it here.
 
-After all fix agents complete, count how many issues were successfully fixed.
+After all fix agents complete, count how many issues were successfully fixed, and count
+them by owner. Print the `setting` fixes again as a list of steps to repeat on staging and
+production: they were applied to a database this deploy will not carry, and a fix nobody
+repeats is indistinguishable from one that was never made.
 
 ## Step 10: Update Manifest
 
@@ -823,8 +986,14 @@ If `.wp-create.json` does not exist, skip this step.
 
 ```
 === Audit Complete ===
-Fixed: M/N auto-fixable issues
+Fixed: M/N auto-fixable issues (C in code, S in settings)
 Remaining: K issues require manual attention
+
+Report: .wp-audit/informe-<AAAA-MM-DD>.md
+        .wp-audit/informe-<AAAA-MM-DD>.html  (single file — open, send, or print to PDF)
+
+Repeat on staging and production (settings do not travel with the commit):
+  1. <the setting fix, as the command that applied it>
 
 Manual issues:
   1. [SEC-002] SQL injection in custom-query.php:45 — use $wpdb->prepare()
@@ -834,6 +1003,7 @@ Manual issues:
 Next steps:
   - Review and test the applied fixes
   - Address the remaining manual issues listed above
+  - Re-run the audit so the next dated report shows the improvement
   - Run /wp-finalize for pre-delivery validation
 ```
 
