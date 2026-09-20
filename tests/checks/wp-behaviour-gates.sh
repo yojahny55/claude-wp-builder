@@ -2,7 +2,16 @@
 # Defects found by a human on a finished 16-page build, every one of which
 # returned HTTP 200 and looked plausible. Each line below pins the contract that
 # would have caught one of them.
+#
+# These assert on prose, deliberately: this repo's contracts ARE prose, and the
+# house style is a grep that fails when the wording defining a rule disappears
+# (CLAUDE.md, "New behavior needs a check"). Where a rule names a code symbol —
+# pt_page_default_rich_snippet, posts_page, sitemap_index.xml — the symbol is
+# what gets pinned, because it survives an edit to the sentence around it. A
+# heading rename does break these, and that is the intended cost: the rename
+# becomes a deliberate act instead of a silent one.
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 cd "$(dirname "$0")/../.."
 
 # These assert on prose, deliberately: this repo's contracts ARE prose, and the
