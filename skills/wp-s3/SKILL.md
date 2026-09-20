@@ -116,6 +116,13 @@ decides whether the result is right either way.
 Excluded from both directions: `wc-logs/*`, `cache/*`, `wio_backup/*`, `wrio/*` — logs,
 caches and the image optimizer's untouched originals.
 
+The client is pointed at a **private configuration directory** (`MC_CONFIG_DIR`, `0700`,
+removed when the script exits) rather than at `MC_HOST_<alias>`. The credentials in that
+URL are not percent-decoded by the client — measured — so a secret holding `/`, `@`, `+`,
+`%`, `#` or `?` works only verbatim, and one holding `:` cannot be expressed in it at all.
+AWS secret keys are base64, so `/` and `+` are ordinary. `mcli alias set` is not used
+either: it takes the secret in `argv`, where `ps` shows it to every user on the machine.
+
 **On a server with an IAM role there is no key pair to hand the client.** `/wp-s3-media`
 stops and offers two ways out: temporary credentials in the environment for that one
 transfer, or `wp s3-uploads upload-directory`, which uses the role but reports no summary,

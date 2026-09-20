@@ -64,6 +64,16 @@ case "$AUTH" in
     *) die "--auth must be 'instance' or 'key'" ;;
 esac
 
+# These three land inside single-quoted PHP literals that the template already carries the
+# quotes for, so a quote or a backslash in one would break the file rather than be stored.
+# None of them can legitimately contain either: bucket names and regions are alphanumeric
+# with dashes, and a URL escapes both.
+for value in "$BUCKET" "$REGION" "$BUCKET_URL" "$ENDPOINT"; do
+    case "$value" in
+        *\'*|*\\*) die "a quote or a backslash in '$value' cannot be written to s3-config.php" ;;
+    esac
+done
+
 # The bucket URL is what every media URL is built from. A trailing slash produces
 # double slashes in every src on the site.
 BUCKET_URL="${BUCKET_URL%/}"
@@ -133,14 +143,6 @@ if [[ -f "$CONFIG" ]]; then
     echo "2. Existing s3-config.php backed up to s3-config.php.bak-$STAMP"
 fi
 
-if [[ "$AUTH" == "instance" ]]; then
-    AUTH_BLOCK="// The server's IAM role supplies the credentials: no secret on disk.
-define( 'S3_UPLOADS_USE_INSTANCE_PROFILE', true );"
-else
-    AUTH_BLOCK="define( 'S3_UPLOADS_KEY',    '${KEY}' );
-define( 'S3_UPLOADS_SECRET', '${S3_UPLOADS_SECRET_VALUE}' );"
-fi
-
 if [[ -n "$ENDPOINT" ]]; then
     ENDPOINT_BLOCK="// S3-compatible server. On AWS this constant is left undefined and the bundled
 // mu-plugin then does nothing.
@@ -151,15 +153,47 @@ else
 fi
 
 # The secret can contain / and &, so it is substituted with an exact string replacement
-# rather than with sed.
+# rather than with sed — and it is quoted for PHP where it is written, not assembled by
+# hand in the shell: a secret holding a single quote or a backslash would otherwise end
+# the PHP string early, and the `php -l` below would condemn a file that already has the
+# credentials in it.
 BUCKET="$BUCKET" REGION="$REGION" BUCKET_URL="$BUCKET_URL" \
-AUTH_BLOCK="$AUTH_BLOCK" ENDPOINT_BLOCK="$ENDPOINT_BLOCK" \
+ENDPOINT_BLOCK="$ENDPOINT_BLOCK" AUTH="$AUTH" KEY="$KEY" \
+SECRET="${S3_UPLOADS_SECRET_VALUE:-}" \
 python3 - "$SKILL_DIR/templates/s3-config.php.tpl" "$CONFIG" <<'PY'
 import os, sys
+
 src, dest = sys.argv[1], sys.argv[2]
+
+
+def php_single_quoted(value):
+    # Inside '...' PHP only honours \' and \\ ; everything else is literal.
+    return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
+if os.environ["AUTH"] == "instance":
+    auth_block = (
+        "// The server's IAM role supplies the credentials: no secret on disk.\n"
+        "define( 'S3_UPLOADS_USE_INSTANCE_PROFILE', true );"
+    )
+else:
+    auth_block = (
+        "define( 'S3_UPLOADS_KEY',    %s );\n"
+        "define( 'S3_UPLOADS_SECRET', %s );"
+        % (php_single_quoted(os.environ["KEY"]), php_single_quoted(os.environ["SECRET"]))
+    )
+
+values = {
+    "BUCKET": os.environ["BUCKET"],
+    "REGION": os.environ["REGION"],
+    "BUCKET_URL": os.environ["BUCKET_URL"],
+    "ENDPOINT_BLOCK": os.environ["ENDPOINT_BLOCK"],
+}
+
 text = open(src).read()
-for key in ("BUCKET", "REGION", "BUCKET_URL", "AUTH_BLOCK", "ENDPOINT_BLOCK"):
-    text = text.replace("{{%s}}" % key, os.environ[key])
+for key, value in values.items():
+    text = text.replace("{{%s}}" % key, value)
+text = text.replace("{{AUTH_BLOCK}}", auth_block)
 open(dest, "w").write(text)
 PY
 

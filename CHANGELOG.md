@@ -47,6 +47,17 @@
   installed": an installed plugin is now `vendor/autoload.php`, not a directory, and a
   half-install is completed instead of configuring a site around a plugin that fatals on
   activation.
+  Two more found the same way, both about how the secret travels. The client was handed
+  its credentials in `MC_HOST_<alias>`, a URL whose key and secret it does **not**
+  percent-decode: measured against a real server, a secret holding `/`, `@`, `+`, `%`, `#`
+  or `?` authenticated verbatim and failed once encoded — so the encoding was wrong for
+  exactly the secrets it existed for, and AWS generates base64 secret keys where `/` and
+  `+` are ordinary. A secret holding `:` could not be expressed in that URL at all. The
+  alias now lives in a `0700` configuration directory the script removes on exit, which
+  carries every character and still keeps the secret out of `argv`, where `ps` would show
+  it. And `s3-config.php` had its credential lines assembled in the shell, so a secret
+  holding a single quote closed the PHP string early and `php -l` condemned a file that
+  already held the credentials; they are quoted where they are written now.
   Two smaller ones: `verify-transfer.py` called an empty remote listing a verified download,
   and the client answers an unknown alias with exit `0` and no output, so "no objects" and
   "could not list" arrived identically — a download that lists nothing now fails. And a

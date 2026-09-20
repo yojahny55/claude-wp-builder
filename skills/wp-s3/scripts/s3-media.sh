@@ -94,20 +94,46 @@ else
     HOST_URL="https://s3.${S3_UPLOADS_REGION}.amazonaws.com"
 fi
 
-# A key or secret can contain /, @ or +, all of which change the meaning of the URL the
-# client parses, so both are percent-encoded.
-ALIAS_URL="$(
-    S3_UPLOADS_KEY="$S3_UPLOADS_KEY" S3_UPLOADS_SECRET="$S3_UPLOADS_SECRET" HOST_URL="$HOST_URL" \
-    python3 - <<'PY'
-import os
-from urllib.parse import quote, urlsplit
-host = urlsplit(os.environ["HOST_URL"])
-user = quote(os.environ["S3_UPLOADS_KEY"], safe="")
-secret = quote(os.environ["S3_UPLOADS_SECRET"], safe="")
-print(f"{host.scheme}://{user}:{secret}@{host.netloc}")
+# The alias goes in a private configuration directory, not in MC_HOST_wps3 and not in
+# `mcli alias set`.
+#
+# MC_HOST_<alias> is a URL, and the client does NOT percent-decode the credentials in it:
+# measured against a real server, a secret holding `/`, `@`, `+`, `%`, `#` or `?` worked
+# verbatim and failed once encoded, while `:` — the character that separates the key from
+# the secret — failed either way. Encoding was therefore wrong for exactly the secrets it
+# was meant to protect, and no spelling of that URL can carry a secret with a colon. AWS
+# generates secret keys from base64, so `/` and `+` are ordinary in one.
+#
+# `mcli alias set` takes the secret in argv, where `ps` shows it to every user on the
+# machine, which is the thing this script avoids everywhere else. A JSON file in a 0700
+# directory does neither: the client reads it through MC_CONFIG_DIR.
+MCLI_CONFIG_DIR="$(mktemp -d -t wp-s3-mc-XXXXXX)"
+chmod 700 "$MCLI_CONFIG_DIR"
+trap 'rm -rf "$MCLI_CONFIG_DIR"' EXIT
+
+S3_UPLOADS_KEY="$S3_UPLOADS_KEY" S3_UPLOADS_SECRET="$S3_UPLOADS_SECRET" HOST_URL="$HOST_URL" \
+CONFIG_DIR="$MCLI_CONFIG_DIR" python3 - <<'PY'
+import json, os, stat
+
+path = os.path.join(os.environ["CONFIG_DIR"], "config.json")
+config = {
+    "version": "10",
+    "aliases": {
+        "wps3": {
+            "url": os.environ["HOST_URL"],
+            "accessKey": os.environ["S3_UPLOADS_KEY"],
+            "secretKey": os.environ["S3_UPLOADS_SECRET"],
+            "api": "s3v4",
+            "path": "auto",
+        }
+    },
+}
+fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, stat.S_IRUSR | stat.S_IWUSR)
+with os.fdopen(fd, "w") as handle:
+    json.dump(config, handle)
 PY
-)"
-export MC_HOST_wps3="$ALIAS_URL"
+
+export MC_CONFIG_DIR="$MCLI_CONFIG_DIR"
 unset S3_UPLOADS_SECRET S3_MEDIA_SECRET
 
 # S3_UPLOADS_BUCKET may carry a prefix ("bucket/site-prefix"); the client takes that path

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Four properties of the wp-s3 scripts that were wrong once, measured against a real
-# S3-compatible server, and are cheap to break again by editing the obvious line:
+# Six properties of the wp-s3 scripts that were wrong once, measured against a real
+# S3-compatible server and a real WordPress, and are cheap to break again by editing the
+# obvious line:
 #
 #   1. The credential check must NOT be `wp s3-uploads verify`. That subcommand is
 #      registered by the plugin, and setup deliberately leaves the plugin deactivated, so
@@ -16,6 +17,10 @@
 #   4. A download must not call an empty remote listing a verified transfer. The client
 #      exits 0 and prints nothing for an alias it does not know, so "no objects" and
 #      "could not list" arrive identically.
+#   5. The alias belongs in a private configuration file. MC_HOST_<alias> is a URL whose
+#      credentials the client does not percent-decode, so encoding them broke every
+#      secret holding a reserved character, and `alias set` would put the secret in argv.
+#   6. Credentials are quoted for PHP where they are written, not assembled in the shell.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
@@ -67,7 +72,31 @@ grep -Fq 'listed no objects at all' "$verify" \
   || fail "$verify no longer refuses an empty remote listing on a download, so a transfer that moved nothing reports success"
 
 # ---------------------------------------------------------------------------
-# 5. Neither direction may ever clobber. This is what makes a repeated run safe,
+# 5. The alias never goes through MC_HOST_<alias>, and the secret never through argv.
+#    Measured against a real server: the client does NOT percent-decode the credentials
+#    in that URL, so encoding them broke every secret holding /, @, +, %, # or ?, and a
+#    secret holding `:` could not be expressed either way. A config file in a 0700
+#    directory carries all of them.
+# ---------------------------------------------------------------------------
+! grep -Eq '^[^#]*MC_HOST_' "$media" \
+  || fail "$media puts the credentials in MC_HOST_<alias>, a URL whose secret the client does not percent-decode"
+! grep -Eq '^[^#]*mcli alias set|^[^#]*\$MCLI" alias set' "$media" \
+  || fail "$media passes the secret to 'alias set', where ps shows it to every user on the machine"
+grep -Fq 'MC_CONFIG_DIR' "$media" \
+  || fail "$media does not point the client at a private configuration directory"
+grep -Fq 'chmod 700' "$media" \
+  || fail "$media does not restrict the configuration directory it writes the secret into"
+
+# ---------------------------------------------------------------------------
+# 6. The credentials are quoted for PHP where they are written. A secret holding a
+#    single quote used to end the string early, and `php -l` then condemned a file that
+#    already had the credentials in it.
+# ---------------------------------------------------------------------------
+grep -Fq 'php_single_quoted' "$setup" \
+  || fail "$setup builds the PHP credential literals without escaping them"
+
+# ---------------------------------------------------------------------------
+# 7. Neither direction may ever clobber. This is what makes a repeated run safe,
 #    and it is one flag away from being untrue.
 # ---------------------------------------------------------------------------
 for f in "$media" "$lib" "$revert"; do
@@ -78,7 +107,7 @@ for f in "$media" "$lib" "$revert"; do
 done
 
 # ---------------------------------------------------------------------------
-# 6. The transfer is still judged by comparing both sides, not by the client's
+# 8. The transfer is still judged by comparing both sides, not by the client's
 #    exit code or its summary table.
 # ---------------------------------------------------------------------------
 grep -Fq 'verify-transfer.py' "$lib" \
