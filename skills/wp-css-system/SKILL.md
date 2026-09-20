@@ -386,6 +386,35 @@ If a page really needs its own reset, give the selector no weight:
 Generally: **a rule that exists to be overridden belongs in `:where()`.** Raising
 each override to outrank it is a race you keep re-running.
 
+### A reset class loses to nothing and wins on source order
+
+The same trap arrives through a class rather than a scope. A `.btn-reset` that neutralises the
+UA styles of a `<button>` — typically `color: inherit; font: inherit; background: none; border: 0`
+— is (0,1,0), exactly like the utility classes already on the element. A tie is decided by source
+order, and a reset class defined after the utilities **wins**.
+
+That is how `<span class="icon-search text-white text-[1.625rem]">` turned into
+`<button class="btn-reset icon-search text-white text-[1.625rem]">` and painted black at 18px
+instead of white at 26px. Nothing about the change looked visual: the diff swapped a tag and
+added a reset class, and no colour or size value was edited anywhere.
+
+Two ways out, in order of preference:
+
+```css
+/* 1. The reset has no weight, so every utility on the element still wins. */
+:where(.btn-reset) { color: inherit; font: inherit; background: none; border: 0; }
+
+/* 2. Or reset the TAG, bare, alongside the other element resets — (0,0,1). */
+button { font: inherit; cursor: pointer; border: none; background: none; }
+```
+
+Option 2 is what the reset above already does, which is why a Tailwind theme rarely needs a
+`btn-reset` class at all: converting a `<span>` to a `<button>` inside this system carries no
+UA styling to neutralise. Reach for the class only where a third-party stylesheet is the thing
+being overridden, and then measure the element's computed `color`, `fontSize` and
+`getBoundingClientRect()` before and after the change — a tie broken by source order is
+invisible in the rule list, where both declarations show as applying.
+
 ---
 
 ## Section Comment Delimiters
