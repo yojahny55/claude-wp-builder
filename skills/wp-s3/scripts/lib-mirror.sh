@@ -13,6 +13,13 @@
 #
 # $MCLI must hold the client's path; require_mcli() below finds it. One side is a local
 # directory and the other is an alias path; the direction is read from which is which.
+#
+# A caller is expected to export MC_CONFIG_DIR — a private directory it removes in its own
+# EXIT trap, which is what s3-media.sh does. The transfer log is written there, so it goes
+# away even if the shell is killed mid-transfer. Without it the log falls back to a 0600
+# file in the system temp directory, removed when this function returns and therefore
+# leaked if the shell dies first; the log lists every object name, which is why the
+# directory is the supported arrangement.
 run_mirror() {
     local source="$1" target="$2"
     shift 2
@@ -54,10 +61,17 @@ run_mirror() {
     refused="$(grep -c 'Overwrite not allowed' "$log" || true)"
     other="$(grep '<ERROR>' "$log" | grep -vc 'Overwrite not allowed' || true)"
 
+    # A non-zero exit with refusals and nothing else is the ordinary repeated run: every
+    # file was already there. It must not fail the run — that is what makes running this
+    # twice safe — but the exit code is still printed, because a client that refused three
+    # files and then timed out on the fourth looks exactly the same from here, and the
+    # comparison below is what tells those two apart.
     local failed=no
     if [[ $status -ne 0 && "${refused:-0}" -eq 0 ]]; then
         echo "ERROR: mcli mirror exited with code $status." >&2
         failed=yes
+    elif [[ $status -ne 0 ]]; then
+        echo "Note: mcli exited with code $status; every error it printed was a refused overwrite."
     fi
 
     if [[ "${other:-0}" -gt 0 ]]; then
