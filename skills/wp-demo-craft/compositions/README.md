@@ -69,18 +69,18 @@ not writing it.
 | role | composition | motion cost (vh added) | devices | port of |
 |---|---|---|---|---|
 | hero | hero-split | 0 | reveal, parallax | none |
-| hero | hero-type | 0 | reveal | Aceternity "text generate" (MIT), rewritten as the block's own reveal |
+| hero | hero-type | 0 | element only | Aceternity "text generate" (MIT), rewritten as the block's own reveal |
 | hero | hero-bleed | 0 | parallax, scrim band | none |
 | proof | proof-row | 0 | count, marquee | Magic UI marquee + number ticker (MIT) |
 | feature | feature-zigzag | 0 | reveal | none |
 | process | process-rail | 1.0 | pan | Aceternity sticky scroll reveal (MIT), rewritten as pan | | process | process-flow | 0 | element motion (segments draw, nodes light) | none |
-| offer | offer-table | 0 | reveal | none |
-| testimonial | testimonial-pair | 0 | reveal, spotlight | Aceternity spotlight (MIT) |
+| offer | offer-table | 0 | element only | none |
+| testimonial | testimonial-pair | 0 | spotlight, element | Aceternity spotlight (MIT) |
 | faq | faq-list | 0 | reveal | none |
 | closing | closing-block | 0 | reveal, border beam | Magic UI border beam (MIT) |
 | capability | icon-row | 0 | reveal, element motion (icons draw on) | none |
 | explainer | score-scale | 0 | element motion (bands grow, marker travels) | none |
-| page-head | page-head | 0 | reveal | none |
+| page-head | page-head | 0 | element only | none |
 | footer | footer-columns | 0 | none | none |
 | footer | footer-line | 0 | none | none |
 

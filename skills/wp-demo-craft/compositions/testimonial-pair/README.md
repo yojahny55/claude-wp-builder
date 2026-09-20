@@ -7,7 +7,7 @@ in one glance and compared; more becomes a slider nobody advances.
 device: the engine publishes `--motion-mx` / `--motion-my` on the section and the
 composition spends them in a single radial gradient.
 **Licence:** Aceternity UI is MIT. No code was copied; the effect is reproduced.
-**Motion cost:** 0 vh added. Devices: `spotlight` on the section, `reveal` on the
+**Motion cost:** 0 vh added. Devices: `spotlight` on the section, nothing on the
 grid. They are on different elements on purpose: an element carries one
 `data-motion` value, and the spotlight has no scroll behaviour to give the quotes.
 
@@ -24,7 +24,10 @@ fallbacks, so the light is somewhere chosen before the first `pointermove` and o
 every device that never sends one. The gradient lives inside
 `(hover: hover) and (pointer: fine)`, per `devices.md`.
 
-**Element motion:** self-sufficient. The children arrive on their own `view()`
+**Element motion:** self-sufficient, and the grid carries **no** `data-motion`.
+A `reveal` there would `gsap.set()` opacity and y onto the quotes, which already
+animate themselves — the collision rule in `../../references/devices.md`.
+The children arrive on their own `view()`
 ranges in `section.css`, so the root `data-motion="reveal"` is redundant here and
 may be dropped to free `data-motion` for a section-level device (`drift`,
 `parallax`, a pin). See "One attribute, one device" in
