@@ -855,6 +855,18 @@ Drive the existing commands/agents in this exact order, reading everything from 
    > routing" table), and `--css` is the Step 2.6-converted demo page rather than the
    > manifest's `cssRules`. When it is `basic` nothing changes.
 
+   > **Pass the section's line range, never the whole page.** Every dispatch above hands
+   > over a page path, and an agent given a path reads the file — a craft page is ~4,000
+   > lines of which perhaps 7 to 34 are the section, because the build inlines about 3,360
+   > lines of CSS ahead of the body. Three of four template agents on one build died with
+   > "Prompt is too long", one at the words *"Now I have everything needed."* — the run
+   > spent its whole context finding the markup and had none left to write with. The
+   > manifest already knows where each section begins and ends, so put the range in the
+   > dispatch (`sed -n '<start>,<end>p' demo/<slug>.html`) and say that is the section. On
+   > the `tailwind` path the agent has no reason to read the `<style>` block at all:
+   > `cssRules` is null there by contract and the classes come from the converted page. A
+   > re-dispatch carrying the range rescued all three of those agents, first time.
+
    Under `--careful`, confirm with the user before building each inner page.
 7. **`cpt-archive` pages** — no WP Page is created for these (their archive URL is
    `has_archive`, already wired by `/wp-cpt` in step 2). Skip page creation; note them in

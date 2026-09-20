@@ -449,7 +449,17 @@ Tab fields have `'name' => ''` (empty string) — they are UI-only, not data fie
 | All pages | `post_type` | `page` |
 | All posts | `post_type` | `post` |
 | Custom post type | `post_type` | `service` |
+| Blog archive (the posts page) | `page_type` | `posts_page` |
 | Options page | `options_page` | `theme-settings` |
+
+**The blog archive's own fields belong on `page_type == posts_page`, not on
+`post_type == post`.** A kicker, a title and an intro note drawn above the post list
+are fields of the *archive*, read on the page Settings → Reading names as the posts
+page — they are not fields of each post. Located on `post_type == post` the group
+renders a box on every single post and on nothing else, so `get_field()` would work
+the moment a value existed and **no editor screen ever offers anywhere to set one**.
+Nothing errors; the archive simply prints its fallbacks forever. Ask which record the
+value is read from, not which records it is about.
 
 **Front page: `page_type == front_page`, never `page_template == front-page.php`.**
 `page_template` matches only when a page's `_wp_page_template` meta is literally set to
@@ -506,6 +516,53 @@ Multiple conditions in one rule (AND logic — ALL must match):
 16. **Every group gets a `menu_order` equal to its section's position on the page it belongs to**, numbered per page (the front page's hero is 1, the section right after it is 2, and so on — a different page starts back at 1). Leaving `menu_order` at ACF's default of 0 stacks every group in the order ACF happened to load the files, which is rarely the order the page draws them, and the editor becomes a puzzle instead of a mirror of the page.
 17. **Group titles are numbered and in the project's PRIMARY language, never mixed.** `1. Hero`, `2. Practice Areas`, `3. Our Process` — the same wording and the same order the page uses for that section, so the editor list reads top-to-bottom like the page does. A group that is the single box for one record of a `<cpt>` (its per-post detail fields, not a page section) states what it is without a number: `<CPT> Details`, not `4. <CPT> Details` — it has no siblings on a page to be numbered against.
 18. **When the demo shows the same kind of content twice at different lengths for different purposes — a short line on a card and a full write-up on a detail page — model TWO fields from the start**, e.g. `<section>_excerpt` (the card's own short text) and `<section>_bio` (the long form). A single field trying to serve both breaks in both directions: seeded with the short text, the detail page is empty; seeded with the long text, the card overflows its box. If a record's excerpt is left blank, the template falls back to a trimmed slice of the long field — that is a template concern (`wp_trim_words()` or similar), never a reason to collapse the two fields back into one.
+
+## Verify key uniqueness by EXECUTION, never by grep — MANDATORY
+
+Rule 7 is the one rule in this file that fails silently. SCF and ACF key a field by
+its `key`, not its name: register two fields with the same key and **one definition
+wins and the other field never appears** — no warning, no duplicate in the dashboard,
+nothing in the log. The client reports a missing box weeks later, or nobody notices.
+
+Before you report the field files as done, execute them and count:
+
+```bash
+$WP eval '
+$seen = [];
+$dups = [];
+add_filter("acf/validate_field_group", function ($g) { return $g; });
+function prefix_walk_keys($fields, &$seen, &$dups, $where) {
+    foreach ($fields as $f) {
+        if (empty($f["key"])) continue;
+        if (isset($seen[$f["key"]])) { $dups[$f["key"]][] = $where . ":" . $f["name"]; }
+        else { $seen[$f["key"]] = $where . ":" . $f["name"]; }
+        if (!empty($f["sub_fields"])) prefix_walk_keys($f["sub_fields"], $seen, $dups, $where);
+        if (!empty($f["layouts"])) foreach ($f["layouts"] as $l) {
+            if (!empty($l["sub_fields"])) prefix_walk_keys($l["sub_fields"], $seen, $dups, $where);
+        }
+    }
+}
+foreach (glob(get_stylesheet_directory() . "/fields/*.php") as $file) { /* loaded by the theme */ }
+foreach (acf_get_local_field_groups() as $g) {
+    prefix_walk_keys(acf_get_local_fields($g["key"]), $seen, $dups, basename($g["key"]));
+}
+echo count($seen) . " unique keys\n";
+foreach ($dups as $k => $w) { echo "DUPLICATE $k: " . implode(", ", $w) . " and " . $seen[$k] . "\n"; }
+'
+```
+
+Any `DUPLICATE` line is a defect to fix before delivery — rename the losing key, keep
+the field name.
+
+**Do not substitute a grep for this.** Two shapes of duplicate both passed a
+regex-based audit on a real build that had fourteen of them: a second file reusing
+the first's `field_<section>_*` keys wholesale (`score-gauge.php` over `gauge.php`),
+and a repeater sub-field given the same key as a top-level field in the same file.
+The grep reported clean, twice — once because the pattern assumed single spaces
+around `=>` where the file used aligned padding, once because shell quoting mangled
+it. A regex sees text; the loader sees a data structure, and the loader is what
+decides which field disappears. This generalises past field keys:
+**do not audit PHP structure with a regular expression.**
 
 ## Local JSON model (how these files reach the dashboard)
 

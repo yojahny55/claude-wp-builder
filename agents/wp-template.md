@@ -125,6 +125,15 @@ Every variable output MUST be escaped with the appropriate function:
 
 **NEVER echo an unescaped variable.** No exceptions.
 
+**Read the demo's value before choosing the escaper.** The table's first row is the
+default, not the answer: if the demo's copy for that field contains inline markup —
+`Every <b>24</b> hours`, a highlighted word, a `<br>` the sentence depends on — then
+that field is rich text and `esc_html()` prints its tags on the page, visibly, in
+every language. It shipped that way on a partners page and the client saw
+`Every &lt;b&gt;24&lt;/b&gt; hours`. The escaper is a decision about the *content*,
+so make it where the content is visible, and take the `wp_kses()` row with an
+allowlist naming only the tags the demo actually used.
+
 **`the_field()` / `the_sub_field()` echo unescaped — never emit them.** They read as
 the natural template call and are the easiest way to ship stored XSS: an editor's
 value reaches every visitor as markup. Use `echo esc_html( prefix_get_field( … ) )`

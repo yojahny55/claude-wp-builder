@@ -69,6 +69,36 @@ layer disappears with no error anywhere. Record them in `.claude/CLAUDE.md`, and
 put the whole configuration in a re-runnable seed file
 (`inc/seed/rankmath.php`) rather than leaving it as one-off CLI calls.
 
+## Step 1.6: Prove it emits — MANDATORY, and not the same thing as Step 1.5
+
+Setting the flags is not evidence the flags worked. Read the front end:
+
+```bash
+HOME=$($WP option get home)
+curl -fsSk "$HOME" -o /tmp/rm-head.html
+grep -c 'application/ld+json' /tmp/rm-head.html
+grep -c '<meta name="description"' /tmp/rm-head.html
+grep -c '<meta property="og:' /tmp/rm-head.html
+curl -o /dev/null -sk -w '%{http_code}\n' "$HOME/sitemap_index.xml"
+```
+
+All four must be non-zero and the sitemap must be `200`. **A zero here outranks
+every option you set**, and the first suspect is Step 1.5: with
+`rank_math_registration_skip` false, `Registration::$invalid` stays true and Rank
+Math registers **no `wp_head` callbacks at all** — so a site with the plugin active,
+every module on and every option written emits nothing, and the plugin's own admin
+screens look healthy throughout. Measured on a real build: 47 general options, 114
+title options, 17 sitemap options, and zero bytes of Rank Math in the front-end
+`<head>`.
+
+If a value is zero, set the Step 1.5 flags again, run `$WP rewrite flush` (the
+sitemap's rules only register once the plugin boots), and re-read. Do not continue
+to Step 2 on a zero — everything below it writes to a database nobody reads, and
+the audit would report success over a site with no SEO layer.
+
+`-k` is deliberate: a local install's certificate is its own, and a certificate
+error here would read as "no schema".
+
 ### Under Polylang: re-take the post-type snapshot
 
 Rank Math's Polylang integration asks for the accessible post types on
@@ -168,6 +198,13 @@ if (isset(\$opts['website_alternate_name']) && \$opts['website_alternate_name'] 
 \$opts['noindex_tax_post_tag']       = 'on';
 \$opts['noindex_date_archive']       = 'on';
 \$opts['noindex_author_archive']     = 'on';
+
+// Default rich snippet per post type. Rank Math ships 'article' for BOTH, so
+// every page — pricing, contact, a legal notice — claims an author and a publish
+// date it does not have. A page is a WebPage; Rank Math still emits that when the
+// rich snippet is off, so 'off' removes the false claim rather than the schema.
+\$opts['pt_page_default_rich_snippet'] = 'off';
+\$opts['pt_post_default_rich_snippet'] = 'article';
 
 update_option('rank-math-options-titles', \$opts);
 echo 'Title templates and schema configured.';
@@ -543,6 +580,21 @@ service's own summary, a person's own teaser, a branch's own province and hours)
 delivery; do not ship the literal template as if it were content. The same applies to
 `rank_math_focus_keyword`: a keyword equal to the post's own title, lowercased, cannot
 rank for anything a person would type.
+
+**Never pick the keyword that maximises the score.** Rank Math's number is almost
+entirely keyword-driven, so the highest-scoring candidate is whichever word already
+appears most often on the page — which is how an automated pass on a credit-repair
+site landed on `credit`, `crédito` and `contacto`, scored 14/16 on each, and chose
+three keywords nobody searches and nothing can rank for. The score measures
+*agreement between the page and its keyword*, not whether the keyword is worth
+having; optimising it directly optimises away the only thing it was proxying for.
+Pick the phrase a customer would type — intent-bearing, two or three words — then
+align the title and description to it and add it once to the marketing lede if it
+is absent. A lower score on a real target beats 100 on a word.
+
+A missing keyword is not a small omission either: with none set, **every
+keyword-dependent check fails at once**, which is how 32 records came to sit at
+20/100 with nothing obviously wrong on any of them.
 
 ```bash
 $WP eval "
