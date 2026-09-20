@@ -19,6 +19,10 @@ skill=skills/wp-audit-standards/SKILL.md
 agent=agents/wp-audit-performance.md
 for f in "$skill" "$agent"; do
   [ -f "$f" ] || { echo "FAIL: $f is missing"; exit 1; }
+  # -f says it exists, not that it can be read. An unreadable file flattens to an empty
+  # string, and the first assertion then reports "does not record 10,170 ms" — a message
+  # about the contents when the fact is that nothing could read them.
+  [ -r "$f" ] || { echo "FAIL: $f exists but cannot be read"; exit 1; }
 done
 flats=$(tr '\n' ' ' < "$skill" | sed 's/  */ /g')
 flata=$(tr '\n' ' ' < "$agent" | sed 's/  */ /g')
