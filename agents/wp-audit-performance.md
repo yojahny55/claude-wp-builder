@@ -229,6 +229,13 @@ If web-quality-skills performance and core-web-vitals skills are available, refe
 | INP (Interaction to Next Paint) | <200ms |
 | CLS (Cumulative Layout Shift) | <0.1 |
 
+**Measure on an idle machine, alone.** The same page under CPU contention read performance 62
+with LCP 10,170 ms, and 94 with LCP 1,580 ms once nothing else was running — no theme change
+between them. Do not run Lighthouse beside a second Lighthouse, the DOM/axe suite or a watch
+build, and re-measure before filing any metric finding. See *A Lighthouse run needs an idle
+machine* in `wp-audit-standards`, and *Inline critical CSS* in the same section before
+proposing that fix: it is measured there, and it made LCP worse.
+
 ## Step 4: Output Report
 
 Output findings as JSON following the `wp-audit-standards` schema. Each finding includes:

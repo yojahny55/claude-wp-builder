@@ -75,6 +75,26 @@
   guards the whole section rather than the shortcode alone, and the two wrong remedies are named:
   hiding it with CSS leaves the data broken and a gap in the layout, and a guard inside a
   container that already has margins is how an empty band ships.
+- **Two performance measurements are recorded where an audit will read them.** Neither can be
+  re-derived from code, and both cost a session once.
+  *A Lighthouse run needs an idle machine.* The same URL, same flags, measured under CPU
+  contention and then on an idle machine, read performance 62 with LCP 10,170 ms and 94 with
+  LCP 1,580 ms — with no theme change between the two. A contended run is indistinguishable
+  from a real regression by inspection, so `wp-audit-standards` now forbids running Lighthouse
+  beside anything else, requires a re-measurement before a metric finding is filed, and
+  requires both halves of a before/after pair to be measured under the same conditions. A
+  search-results spec that looked like it hung completed in 4–7 s once Lighthouse stopped
+  competing with it, and the suite went from 4.3 minutes to 1.0.
+  *Inline critical CSS, measured and rejected.* The standard advice for a render-blocking
+  stylesheet improved FCP from 990 ms to 570 ms and moved LCP the wrong way, 2950 ms to
+  3150 ms, because the inline block precedes the hero image on the same connection; the
+  above-the-fold-only variant carries less than the first viewport needs and took CLS to 0.139.
+  The table is in the skill so the experiment is not repeated blind, with the rule that follows
+  from it — when FCP and LCP disagree, LCP decides — and the real cause the breakdown showed
+  on that site: 276 ms of element render delay, because the carousel rebuilt its first slide
+  and the second paint was the one being measured.
+  `agents/wp-audit-performance.md` Step 3 points at both, so the warning arrives before the
+  finding is filed rather than after.
 
 ### Fixed
 

@@ -139,6 +139,50 @@ Lighthouse's default (`throttlingMethod: "simulate"`) reports **Lantern-simulate
 - If observed is ~200–900 ms and simulated is multi-second, the number is a **simulation/dev-server artifact** — the score barely moves regardless of theme changes, and production (with page cache + real CDN/TTFB) differs. Say so in the finding instead of burning effort chasing it. **Real byte reductions (WebP, right-sizing) still help production** and still shrink the *LCP resource*, so do those — just set score expectations.
 - `image-delivery-insight`, `render-blocking-insight`, `lcp-discovery-insight` etc. are **weight-0** in the Performance score (informative). Only the 5 metric audits (FCP/LCP/TBT/CLS/SI) carry weight. Fixing a weight-0 insight is a production win, not a score win — label it accordingly.
 
+### A Lighthouse run needs an idle machine, and a contended one is not a slow page
+
+A Lighthouse score is a measurement of the machine as much as of the page. The same page, same
+URL and same flags, measured on a busy laptop and then on an idle one, read **performance 62
+with LCP 10,170 ms** and **performance 94 with LCP 1,580 ms**. Nothing in the theme changed
+between the two runs. The first number is the kind that gets a morning spent on a
+non-existent regression, and it is indistinguishable from a real one by inspection.
+
+- **Never run Lighthouse next to anything else** — not a second Lighthouse, not the DOM/axe
+  suite, not a watch build, not a video call. Run it alone, and run the categories serially.
+- **A page that "hangs" under contention is usually not hanging.** An internal search spec
+  that looked stuck, and was left out of the suite for it, completed in 4–7 s once Lighthouse
+  stopped competing with it; the whole suite went from 4.3 minutes to 1.0 minute.
+- **Re-measure before filing a metric regression, on the idle machine, twice.** A single run
+  is not evidence. Where the two runs disagree by more than a few points, say so in the
+  finding rather than reporting the worse one.
+- The same applies to a *before/after* pair for a fix: both halves must be measured under the
+  same conditions, or the fix's number is the machine's number.
+
+### Inline critical CSS: measured on a real site, and rejected
+
+Inlining the critical CSS is the standard advice for a render-blocking stylesheet, and on a
+real build it made the metric it was meant to fix **worse**. Recorded here so the experiment is
+not repeated blind:
+
+| Variant | FCP | LCP | CLS |
+|---|---|---|---|
+| Baseline | 990 ms | 2950 ms | baseline |
+| 43KB critical CSS inlined | **570 ms** | **3150 ms** | improved |
+| 13KB (above-the-fold only) | improved | — | **0.139** |
+| Preloading jQuery + carousel + page JS | **1340 ms** | — | — |
+
+The inline block sits *ahead of the hero image on the same connection*, so the paint that
+counts starts later even though the first paint starts sooner. The trimmed variant is smaller
+than the styles the first viewport actually needs, which is what moved CLS to 0.139. All of it
+was reverted with zero pixels of difference.
+
+**The lesson is not "never inline".** It is that FCP and LCP move in opposite directions here,
+so a change justified by FCP alone is unmeasured, and the LCP number decides. On that site the
+real cause was elsewhere and only the Lighthouse breakdown showed it: 276 ms of *element
+render delay*, because the carousel re-built the first slide inside its own track and the
+second paint was the one being measured. A background the theme already painted without
+JavaScript was not the problem.
+
 ### WebP: `image_editor_output_format` only covers NEW, attachment-pipeline images
 
 `add_filter('image_editor_output_format', ...)` converts uploads to WebP **only on new uploads**, and **only images that flow through WP's attachment functions** (`wp_get_attachment_image`, `the_post_thumbnail`). Themes that print **raw SCF/ACF field URLs** (`echo $field['url']`) or CSS `background-image: url(<field>)` bypass it entirely, so existing hero/about/neighborhood/banner images stay JPEG/PNG.
