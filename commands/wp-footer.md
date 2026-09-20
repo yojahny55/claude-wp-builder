@@ -94,7 +94,9 @@ Dispatch the **wp-acf** agent with these instructions:
 > 2. Add the bilingual `_es` variant in the Spanish Translations tab
 > 3. Follow the existing naming convention: `field_settings_footer_<element>`
 >
-> All fields use `'option'` as post ID. Instructions on Spanish fields: "Leave empty to use English version."
+> All fields use `'option'` as post ID. Instructions on the secondary-language fields name the
+> project's primary language and are written in it — "Leave empty to use the English version." on
+> an English-primary project. See "Editor Language" in `agents/wp-acf.md`.
 
 ### CSS agent routing
 

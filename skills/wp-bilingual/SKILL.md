@@ -42,7 +42,14 @@ For every translatable ACF/SCF field, the **primary language** (typically Englis
 - Secondary language fields have `_<lang>` suffix and are **optional** (fall back to primary if empty)
 - This applies to text, textarea, WYSIWYG, and any content field
 - Non-translatable fields (images, URLs, numbers, booleans) do NOT get duplicated
-- ACF field instructions for secondary fields should say: *"Leave empty to use English version"*
+- ACF field instructions for secondary fields name the PRIMARY language, and are written in it:
+  *"Leave empty to use the English version"* on an English-primary project, *"Dejar vacío para
+  usar la versión en español."* on a Spanish-primary one. Read which language is primary from
+  `.claude/CLAUDE.md`; the tables above use an English-primary project as their example, not as
+  the rule. Every other string the editor reads — group titles, tab and field labels,
+  `button_label`, `message` — follows the same rule. Field `name`s and `key`s do not: they are
+  meta keys, and translating one orphans the rows already stored under the old name. See
+  "Editor Language" in `agents/wp-acf.md`.
 
 ---
 

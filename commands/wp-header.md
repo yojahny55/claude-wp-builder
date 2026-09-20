@@ -243,8 +243,10 @@ Dispatch the **wp-acf** agent with these instructions:
 >    one field, one value per language-post; that is what Polylang is for.
 > 3. Follow the existing naming convention: `field_settings_header_<element>`
 >
-> All fields use `'option'` as post ID. Under `suffix`, instructions on
-> Spanish fields: "Leave empty to use English version."
+> All fields use `'option'` as post ID. Under `suffix`, instructions on the
+> secondary-language fields name the project's primary language and are written in it —
+> "Leave empty to use the English version." on an English-primary project. See "Editor
+> Language" in `agents/wp-acf.md`.
 
 ## Step 7: Update Theme Setup
 
