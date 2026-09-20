@@ -180,6 +180,34 @@ mechanism `utilities/motion.css` already uses for `reveal`:
 Stagger with `animation-range` offsets per child rather than one root `reveal` with
 `data-motion-stagger`.
 
+**Never animate a transform property on a direct child of a section that still carries
+`data-motion="reveal"`.** The device does `gsap.set(kids, { opacity: 0, y: rise })` on
+the section's *direct children* and GSAP takes ownership of the whole transform group on
+each one, writing its own inline values. A composition that also animates `scale`,
+`rotate` or `translate` on that same element has two systems writing the same thing, and
+which one is on screen depends on which ran first.
+
+That order is not the same in the two places this CSS lives. **The demo wins the race and
+the theme loses it**: in a demo `motion.js` is inlined and runs before the animation's
+start keyframe applies, while in the theme `initMotion` runs at `DOMContentLoaded`, by
+which point it does not. So the element animates correctly in the demo, and in the theme
+it is frozen at the keyframe's start value — measured as a conversion block sitting at
+`scale(0.88)` on all 16 pages of a build, and at `opacity: 0` on a hard jump to the page
+bottom. Status 200, nothing logged, and `/wp-demo-verify` passed that demo 66/66, because
+the demo is the side that wins.
+
+Two ways out, and the first is better:
+
+1. **Drop the root `reveal`.** A composition whose `section.css` already animates its
+   children does not need it — that is the order this section just described, and it
+   removes the collision by removing the second writer.
+2. **Animate only `opacity` and `translate`-free properties the device does not touch.**
+   A translate-only entrance under a root `reveal` still collides on `y`; the honest
+   version of this option is opacity alone.
+
+A composition's element motion is free to use any property it likes on a **descendant**
+that is not a direct child. The rule is about the children `reveal` reaches.
+
 **A stagger ladder goes out of order in four independent ways, and fixing one leaves
 the other three.** All four have been measured in this library or the build that uses
 it; none of them errors, and all four look correct in the source.

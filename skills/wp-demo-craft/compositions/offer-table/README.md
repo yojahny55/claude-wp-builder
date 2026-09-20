@@ -6,7 +6,8 @@ is the job, and only a table does it.
 
 **Port of:** none.
 **Licence:** plugin (MIT).
-**Motion cost:** 0 vh added. Devices: reveal on the block, stagger 80.
+**Motion cost:** 0 vh added. Devices: none on the block — the head, the plans
+and the footnote each arrive on their own `view()` range in `section.css`.
 
 **Pick when:** the client sells named tiers with the same features priced
 differently. Skip when there is one price, or when the price is "it depends";
@@ -26,8 +27,14 @@ its top and a `--color-surface` ground carried by the `<col>` element, with no
 "Most popular" badge anywhere: the rule says which one they mean without
 shouting it.
 
-**Element motion:** self-sufficient. The children arrive on their own `view()`
-ranges in `section.css`, so the root `data-motion="reveal"` is redundant here and
-may be dropped to free `data-motion` for a section-level device (`drift`,
-`parallax`, a pin). See "One attribute, one device" in
+**Element motion:** self-sufficient, and the root carries **no** `data-motion`.
+The children arrive on their own `view()` ranges in `section.css`, so a root
+`reveal` would not add motion — it would take it away. `reveal` does
+`gsap.set(kids, {opacity, y})` on exactly these elements, which is a second
+writer on the properties the CSS is already animating, and the two resolve
+differently in a demo and in a theme: the demo wins that race and the theme
+loses it, freezing each child at its keyframe's start value. This composition
+shipped with that attribute and the defect reached a client's every interior
+page. `data-motion` here is free for a section-level device (`drift`,
+`parallax`, a pin) — see "One attribute, one device" and the collision rule in
 `../../references/devices.md`.
