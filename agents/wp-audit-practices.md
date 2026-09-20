@@ -88,6 +88,8 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 | WP-026 | Unbounded queries | Grep for `posts_per_page.*-1\|numberposts.*-1` | WARNING | No |
 | WP-049 | Conditional require of an always-used file | Grep `functions.php` for `is_readable\|file_exists` guarding a `require\|include` of `inc/` | CRITICAL | No |
 | WP-050 | Invalid WP_Query argument key | Grep query argument arrays for `'status'\s*=>\|'type'\s*=>\|'category'\s*=>\|'numberposts'\s*=>.*WP_Query` | WARNING | No |
+| WP-051 | The action name sent to `admin-ajax.php` is not a registered action | Collect what the theme registers — `add_action( 'wp_ajax_<name>'` and `wp_ajax_nopriv_<name>` — and what it sends: the `'action' =>` values in every `wp_localize_script()` array, plus literal `action:` / `action=` strings in `assets/js/**`. Report every sent name with no registered counterpart. See Procedure | CRITICAL | Yes — send the registered name |
+| WP-052 | A section is printed for a record that no longer exists | For every field value passed into a shortcode (`[poll id="N"]`, `[contact-form-7 id="N"]`, `[gallery ids="…"]`) or into a plugin lookup, verify the target row still exists before the section renders — these IDs live in the plugin's own tables, so `get_post()` does not see them and WP-048's sweep does not reach them. Report each template that prints the section unconditionally. See Procedure | WARNING | Yes — guard the section, do not hide it with CSS |
 
 ### i18n
 
@@ -203,6 +205,82 @@ trashed post still has a permalink the template will happily print.
 
 The fix is to remove the ID from the stored array, never to hide the empty card with CSS: the
 second leaves the data broken and the layout carrying a gap where the card was.
+
+### Procedure — WP-051 (the name the browser sends is not the name WordPress hears)
+
+`admin-ajax.php` dispatches on the `action` parameter, and the hook is `wp_ajax_<action>`. A
+theme that localizes the **callback's** name instead of the action's sends something WordPress
+has no hook for, and the endpoint answers `400` with `0`. Nothing else breaks: the page renders,
+the console shows one failed request, and the feature is simply dead. On one audited theme every
+filter UI it had — four of them, across a document library, a gallery, a news list and a
+taxonomy archive — had been dead this way, because the localized names carried the theme prefix
+that the `add_action()` calls did not.
+
+The mismatch is invisible to a grep that looks at one side only, so collect both:
+
+```bash
+# Registered
+grep -rhoE "add_action\( *'wp_ajax(_nopriv)?_([a-z0-9_]+)'" <theme> --include='*.php' \
+  | sed -E "s/.*wp_ajax(_nopriv)?_//; s/'$//" | sort -u
+
+# Sent — the localized params, then anything hardcoded in the theme's own JS
+grep -rhoE "'action' *=> *'([a-z0-9_]+)'" <theme> --include='*.php' | sed -E "s/.*=> *'//; s/'$//" | sort -u
+grep -rhoE "action: *'([a-z0-9_]+)'" <theme>/assets/js --include='*.js' | sed -E "s/.*'//; s/'$//" | sort -u
+```
+
+Every sent name absent from the registered list is the finding. **Confirm it against the real
+endpoint before reporting, because this one is cheap to measure and a guess here is
+embarrassing** — a registered action answers `200`, an unregistered one answers `400`:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST "$SITE/wp-admin/admin-ajax.php" -d "action=<name>"
+```
+
+Report it CRITICAL: a filter or a pagination that answers 400 is broken functionality, not a
+practice. Fix by sending the registered name — never by renaming the hook to match the message,
+which changes a public contract any other script may already be using.
+
+Two neighbouring defects belong in the same finding when the sweep sees them, because the fix
+is in the same file and a second audit round to reach them is waste: a handler registered with
+`wp_ajax_` only, when the UI is on the public front end and needs `wp_ajax_nopriv_` as well
+(logged-out visitors get `0`), and a `check_ajax_referer()` that no localized nonce feeds.
+
+### Procedure — WP-052 (a section printed for a record that no longer exists)
+
+WP-048 resolves IDs that point at **posts**. This is its sibling for IDs that point anywhere
+else: a poll, a form, a slider or any plugin record whose rows live in the plugin's own table.
+`get_post()` returns nothing useful for those, so the orphan sweep cannot see them and the field
+keeps a number that resolves to nothing.
+
+What the visitor gets depends on the plugin and none of it is acceptable: a bare
+`[poll id="12"]` printed as literal text, an empty band where a section's heading and padding
+still render, or a fatal inside the plugin's shortcode handler.
+
+```bash
+# The field values that feed a shortcode
+grep -rnE "do_shortcode\(|\[(poll|contact-form-7|gallery)[^]]*\]" <theme> --include='*.php'
+
+# Does the target still exist? Ask the plugin's own table, not the posts table.
+PREFIX=$($WP db prefix)
+$WP db query "SELECT pollq_id FROM ${PREFIX}pollsq WHERE pollq_id = <id>;"   # WP-Polls
+$WP post list --post_type=wpcf7_contact_form --field=ID                      # Contact Form 7 does use posts
+```
+
+The fix is a guard in the template, so the whole section — heading, padding and background
+included — is skipped when the record is gone:
+
+```php
+$poll_id = (int) prefix_get_field( 'poll_id', 'option' );
+if ( $poll_id && prefix_poll_exists( $poll_id ) ) :
+	// section markup
+endif;
+```
+
+Never hide the empty section with CSS, and never leave the shortcode printing into a container
+that already has margins: the first leaves the defect in the data with the layout carrying a
+gap, and the second is how an empty band ships. The existence helper belongs in the theme, next
+to whatever reads the field, because the template is the only place that knows the section is
+optional.
 
 ### Procedure — WP-046 and WP-047
 

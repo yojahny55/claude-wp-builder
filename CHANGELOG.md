@@ -56,6 +56,25 @@
   with nothing to point at. The fix also says where the text sample has to come from — ACF/SCF
   field values and term names are not in `post_content` — and that the original family must be
   kept, because a subset cannot be widened back into one.
+- **`WP-051` catches an action name the browser sends that WordPress has no hook for.**
+  `admin-ajax.php` dispatches on `action` and the hook is `wp_ajax_<action>`, so a theme that
+  localizes the *callback's* name sends something nothing is listening for: the endpoint answers
+  `400` with `0`, the page renders, the console shows one failed request and the feature is dead.
+  On one audited theme all four filter UIs — a document library, a gallery, a news list and a
+  taxonomy archive — had been dead this way, because the localized names carried the theme prefix
+  the `add_action()` calls did not. The procedure collects both sides (a grep over one of them can
+  never see a mismatch), confirms each name against the real endpoint with one `curl` before
+  reporting, files it CRITICAL, and rejects the tempting fix of renaming the hook to match the
+  message — that changes a public contract any other script may already use. A front-end handler
+  registered without `wp_ajax_nopriv_`, and a `check_ajax_referer()` no localized nonce feeds,
+  fold into the same finding.
+- **`WP-052` catches a section printed for a record that no longer exists.** `WP-048` resolves IDs
+  that point at posts; these point into a plugin's own table — a poll, a form, a slider — where
+  `get_post()` sees nothing and the orphan sweep cannot reach them. The page then prints a bare
+  `[poll id="12"]` as text, or an empty band whose heading and padding still render. The fix
+  guards the whole section rather than the shortcode alone, and the two wrong remedies are named:
+  hiding it with CSS leaves the data broken and a gap in the layout, and a guard inside a
+  container that already has margins is how an empty band ships.
 
 ### Fixed
 
