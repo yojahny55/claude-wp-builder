@@ -38,6 +38,24 @@
   site serves. The page loads, the console stays clean, the old behaviour persists, and reading
   the source confirms a change that is not live — so the build runs in the same pass as the
   edit, and the theme version constant is bumped so the rebuilt file is not served from cache.
+- **`PERF-059` reports a self-hosted family that carries scripts the site never writes.**
+  `PERF-023` flagged a woff2 over 100KB and said nothing about why it was that size. A family
+  downloaded as one file per weight carries every script its designer shipped, so a site
+  written in one Latin language pays for Cyrillic, Greek and Vietnamese on every first paint
+  and renders none of it: eight faces were 442KB on a real build, 263KB after subsetting, and
+  141KB off the home page. The criterion reads each file's `cmap` rather than guessing from
+  the name, sums the weight the first paint actually requests, and exempts a face carried with
+  Google's own `unicode-range` blocks — which is what `/wp-init` Step 4.5 produces, so the
+  finding cannot fire on a theme this plugin scaffolded.
+  The fix subsets with `pyftsubset`, keeps `--layout-features='*'` (a subset without kerning
+  and ligatures renders visibly worse at the same glyph coverage — a regression wearing the
+  shape of a saving), and **verifies coverage against the site's own text before replacing a
+  file**, treating a missing glyph as a refusal rather than a warning. That check is the
+  reason this is safe to auto-fix: a missing glyph does not error, the browser silently falls
+  back for that one character, and the result is a font that is "slightly off" on one page
+  with nothing to point at. The fix also says where the text sample has to come from — ACF/SCF
+  field values and term names are not in `post_content` — and that the original family must be
+  kept, because a subset cannot be widened back into one.
 
 ### Fixed
 

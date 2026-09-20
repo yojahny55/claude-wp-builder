@@ -74,6 +74,7 @@ Before running ANY checks, read the following project files:
 | PERF-021 | No font preload | Grep for `<link rel="preload".*as="font"` in head | WARNING | Yes |
 | PERF-022 | Remote Google Fonts | Grep for `fonts.googleapis.com` in enqueue or templates | INFO | No |
 | PERF-023 | Large font files | Check woff2 file sizes in `assets/fonts/` >100KB each | INFO | No |
+| PERF-059 | Self-hosted font carries scripts the site never writes | For each woff2 in `assets/fonts/`, read its `cmap` and report the Unicode blocks it covers: `python3 -c "from fontTools.ttLib import TTFont; import sys; print(len(TTFont(sys.argv[1]).getBestCmap()))" <file>` — a family carrying Cyrillic, Greek, Vietnamese or Devanagari on a site written in one Latin language is the finding, and a face whose `@font-face` block has no `unicode-range` descriptor is serving all of it on every page. Report the summed weight of the font set actually requested by the first paint, not the directory total; a single face is rarely worth subsetting and eight of them was 442KB on a real build. Do NOT report a face carried with Google's own `unicode-range` blocks (see `/wp-init` Step 4.5) — the browser already fetches only the subsets it renders | WARNING | Yes — see *Font subsetting fix*, and only with the coverage check in it |
 
 ### WordPress Optimization
 
@@ -405,6 +406,56 @@ $WP config set AUTOSAVE_INTERVAL 120 --raw --type=constant
 ### Font display fix
 
 Edit CSS `@font-face` blocks to add `font-display: swap;` if missing.
+
+### Font subsetting fix
+
+A family downloaded as one file per weight carries every script its designer shipped. A site
+written in one Latin language pays for Cyrillic, Greek and Vietnamese on every first paint and
+renders none of it. On a real build eight faces were 442KB on disk and 263KB after subsetting,
+which was 141KB off the home page.
+
+Subset with `pyftsubset` (`pip install fonttools brotli` — brotli is what writes woff2):
+
+```bash
+# Latin + Latin-1 supplement + the punctuation and symbols a Western European site uses.
+RANGES='U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD'
+pyftsubset Family-Regular.woff2 \
+  --flavor=woff2 --unicodes="$RANGES" --layout-features='*' \
+  --output-file=Family-Regular.subset.woff2
+```
+
+`--layout-features='*'` keeps kerning and ligatures; dropping them is how a subset starts
+rendering visibly worse than the original at the same glyph coverage.
+
+**Verify coverage before replacing the file, and verify it against the site's real text, not
+against the range list.** A missing glyph does not error — the browser silently falls back to
+the next family in the stack for that one character, so a single absent `ñ`, `€` or `—` reads
+as a font that is "slightly off" on one page and nobody can say why:
+
+```bash
+# Every character the site actually renders, from the database and the templates.
+wp post list --post_type=any --post_status=publish --field=ID \
+  | xargs -n1 -I{} wp post get {} --field=post_content > /tmp/site-text.txt
+wp post list --post_type=any --post_status=publish --field=post_title >> /tmp/site-text.txt
+cat wp-content/themes/<slug>/**/*.php >> /tmp/site-text.txt   # hardcoded UI strings
+
+python3 - <<'PY'
+from fontTools.ttLib import TTFont
+cmap = set(TTFont('Family-Regular.subset.woff2').getBestCmap())
+text = set(open('/tmp/site-text.txt', encoding='utf-8', errors='replace').read())
+missing = {c for c in text if ord(c) not in cmap and c.isprintable() and not c.isspace()}
+print('MISSING:', sorted(missing) if missing else 'none')
+PY
+```
+
+A non-empty `MISSING` list is a refusal, not a warning: widen the ranges and subset again.
+Field values in ACF/SCF and term names live outside `post_content`, so a site whose copy sits
+in fields needs those in the sample too — `wp postmeta list` per post, or an `$wpdb` dump of
+`wp_postmeta` and `wp_terms`.
+
+Keep the originals in the repository (or in the project's `docs/`), because a subset cannot be
+widened back into a full family — the discarded glyphs are gone, and a second language added
+to the site later has no source to subset from.
 
 ### Image lazy loading fix
 
