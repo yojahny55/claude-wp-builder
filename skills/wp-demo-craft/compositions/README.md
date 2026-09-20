@@ -107,3 +107,19 @@ The greet and hold cue forms in `devices.md` still matter — they are how a
 *pinned* or *panned* section's copy is timed against its own scroll range — and
 `devices.md` rule 3, that only the last section may hold, still binds anything
 that uses them. No composition in this library does.
+
+## `prose` is a reserved class name
+
+Never name a composition element `prose`, and never add a bare `prose` class to
+one. The Tailwind starter loads `@tailwindcss/typography`, whose `.prose` applies
+`--tw-prose-body` and `--tw-prose-headings` to everything inside it — so a
+long-form block that borrows the name inherits the plugin's colours instead of the
+composition's, and on a dark palette that is grey on near-black. It was found by
+eye on a delivered site at 1.2:1, not by any gate: the markup is right, the
+contrast token is right, and a third party's default is what lands.
+
+The starter binds those variables to the theme's role tokens, so `prose` used
+deliberately — on `the_content()`, which is what it is for — is legible on any
+palette. That fix does not make the name safe to borrow: a composition element
+called `prose` also picks up the plugin's margins, list styling and `max-width`.
+Use the composition's own BEM name.

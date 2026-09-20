@@ -25,6 +25,41 @@
   --font-secondary: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
+/* `prose` reads the theme's own colours, or it hardcodes grey onto whatever
+   palette this project has.
+
+   @tailwindcss/typography ships `--tw-prose-body: gray-700` and
+   `--tw-prose-headings: gray-900` and applies them to everything inside
+   `.prose`. On a light palette that is close enough to pass unnoticed; on a
+   dark one it is grey-on-near-black — a measured 1.2:1, found by eye on a
+   delivered site's legal and article pages, because the plugin's colour beats
+   an element that only inherits.
+
+   Binding them to the role tokens fixes it for every palette at once, including
+   the craft aliases /wp-init writes (on a dark craft palette `--color-dark`
+   resolves to the light ink and `--color-light` to the near-black canvas, which
+   is exactly what these need). Per-element `prose-headings:` / `prose-a:`
+   modifiers in a template still win over these, so nothing already written
+   changes. */
+.prose {
+  --tw-prose-body: var(--color-dark);
+  --tw-prose-headings: var(--color-dark);
+  --tw-prose-lead: var(--color-gray);
+  --tw-prose-links: var(--color-accent);
+  --tw-prose-bold: var(--color-dark);
+  --tw-prose-counters: var(--color-gray);
+  --tw-prose-bullets: var(--color-gray);
+  --tw-prose-hr: var(--color-gray);
+  --tw-prose-quotes: var(--color-dark);
+  --tw-prose-quote-borders: var(--color-accent);
+  --tw-prose-captions: var(--color-gray);
+  --tw-prose-code: var(--color-dark);
+  --tw-prose-pre-code: var(--color-light);
+  --tw-prose-pre-bg: var(--color-dark);
+  --tw-prose-th-borders: var(--color-gray);
+  --tw-prose-td-borders: var(--color-gray);
+}
+
 /* Every import below names its cascade layer, matching the directory it lives
    in: base/ -> layer(base), components/ and layouts/ -> layer(components),
    utilities/ -> layer(utilities). A file imported with no layer() sits OUTSIDE
