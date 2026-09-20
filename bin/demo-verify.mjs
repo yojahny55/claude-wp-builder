@@ -25,6 +25,15 @@ import { createServer } from 'node:http';
 // re-deriving the rule at the exit.
 const ADVISORY = new Set(['unobserved', 'external-module']);
 
+// Every context and page this tool opens accepts a self-signed certificate.
+// `/wp-create` gives a local site HTTPS with its own CA, so without this the
+// walk dies on ERR_CERT_AUTHORITY_INVALID before the first screenshot — and
+// /wp-finalize, /wp-polish, /wp-responsive-check and /wp-audit all forward
+// here, so one rejected certificate took out the whole finish-phase gate suite
+// on a standard local install. Nothing here authenticates or posts; it
+// screenshots and reads the DOM.
+const TLS = { ignoreHTTPSErrors: true };
+
 const args = process.argv.slice(2);
 if (args.includes('--help')) {
   console.log(
@@ -251,7 +260,7 @@ const SHEET_JPEG_QUALITY = 70;
 async function captureResponsiveShots(browser, url, outDir) {
   for (const width of RESPONSIVE_WIDTHS) {
     const height = width <= 480 ? 812 : 900;
-    const context = await browser.newContext({ viewport: { width, height } });
+    const context = await browser.newContext({ viewport: { width, height }, ...TLS });
     const page = await context.newPage();
     await page.goto(url, { waitUntil: 'load' });
     await page.waitForTimeout(400);
@@ -570,6 +579,7 @@ try {
     const context = await browser.newContext({
       viewport: size,
       reducedMotion: reduced ? 'reduce' : 'no-preference',
+      ...TLS,
     });
     const page = await context.newPage();
     await page.goto(pageUrl, { waitUntil: 'load' });
@@ -824,7 +834,7 @@ try {
       files.map((f) => '<img src="' + f + '" style="width:100%;display:block">').join('') +
       '</body>';
     writeFileSync(join(dir, 'sheet.html'), sheetHtml);
-    const sheet = await browser.newPage();
+    const sheet = await browser.newPage({ ...TLS });
     await sheet.setViewportSize({ width: 1200, height: 800 });
     await sheet.goto(pathToFileURL(join(dir, 'sheet.html')).href, { waitUntil: 'load' });
     await sheet.waitForTimeout(400);
