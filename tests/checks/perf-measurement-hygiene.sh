@@ -34,7 +34,7 @@ flata=$(tr '\n' ' ' < "$agent" | sed 's/  */ /g')
 has() { case "$2" in *"$1"*) return 0 ;; *) return 1 ;; esac; }
 
 # 1. Contention. The numbers are the evidence; a rule with no number is advice.
-grep -Fq 'A Lighthouse run needs an idle machine' "$skill" \
+has 'A Lighthouse run needs an idle machine' "$flats" \
   || { echo "FAIL: $skill has no section requiring an idle machine for a Lighthouse run"; exit 1; }
 has '10,170 ms' "$flats" \
   || { echo "FAIL: $skill does not record the contended measurement, so the rule reads as caution rather than evidence"; exit 1; }
@@ -51,9 +51,11 @@ has 'both halves must be measured under the' "$flats" \
 
 # 2. The rejected experiment. Every number in the table is load-bearing: the point is that
 # FCP improved WHILE LCP got worse, and one number alone does not carry that.
-grep -Fq 'Inline critical CSS' "$skill" \
+has 'Inline critical CSS' "$flats" \
   || { echo "FAIL: $skill does not record the inline-critical-CSS result"; exit 1; }
-for n in '990 ms' '570 ms' '2950 ms' '3150 ms' '0.139'; do
+# Every row of the table, including the fourth: a row nothing pins can be edited or
+# deleted with this check still green, and the header says every number is load-bearing.
+for n in '990 ms' '570 ms' '1340 ms' '2950 ms' '3150 ms' '0.139'; do
   has "$n" "$flats" \
     || { echo "FAIL: $skill is missing the measurement $n from the inline-critical-CSS table — the result is that FCP improved while LCP got worse, which no single number shows"; exit 1; }
 done
