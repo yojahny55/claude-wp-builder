@@ -94,6 +94,18 @@ else
     || fail "the get_field() pattern is wrong: ${out:-(php exited non-zero with no output)}"
 fi
 
+# --- a file too large to hold in memory is skipped, and said out loud --------
+# file_get_contents() reads the whole file. A generated or vendored file in the theme
+# tree can be tens of megabytes, and this pass would hold all of it to collect field
+# names. Skipping quietly would drop that file's field reads and misfile them as dead
+# data, so the skip has to reach the operator.
+grep -q "max_bytes" "$ORPHAN" \
+  || fail "$ORPHAN: no size cap before file_get_contents()"
+grep -q "skipped " "$ORPHAN" \
+  || fail "$ORPHAN: a file skipped for size is not reported"
+grep -q "isFile()" "$ORPHAN" \
+  || fail "$ORPHAN: non-regular entries are read as files"
+
 # --- a half-measured gate must say so, not report a clean run ---------------
 # home_url() with no host makes the dev-host half a no-op; "0 items" would then cover
 # one of the two defects this gate exists to catch.

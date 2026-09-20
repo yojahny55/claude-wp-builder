@@ -90,11 +90,40 @@ $types    = array();
  */
 $read = array();
 if ( $theme && is_dir( $theme ) ) {
+	/*
+	 * FOLLOW_SYMLINKS is deliberately absent, so a symlinked directory inside the
+	 * theme is not walked. A symlinked *file* is still read, with or without the
+	 * flag, and that is correct: a .php symlink inside a theme is a file the theme
+	 * loads, and this pass only collects field names out of it.
+	 */
 	$files = new RecursiveIteratorIterator(
 		new RecursiveDirectoryIterator( $theme, RecursiveDirectoryIterator::SKIP_DOTS )
 	);
+
+	/*
+	 * file_get_contents() reads the whole file into memory. A template is a few
+	 * kilobytes; a generated or vendored file in the same tree can be tens of
+	 * megabytes, and this pass would hold all of it to scan for field names.
+	 * Two megabytes is far above any hand-written template.
+	 *
+	 * A skipped file is named on STDERR rather than passed over quietly. Silence
+	 * would drop its field reads from the list, and a field read only there would
+	 * then be classified DEAD-DATA — the same under-report an unusable theme path
+	 * used to produce.
+	 */
+	$max_bytes = 2 * 1024 * 1024;
+
 	foreach ( $files as $file ) {
-		if ( 'php' !== strtolower( $file->getExtension() ) ) {
+		if ( ! $file->isFile() || 'php' !== strtolower( $file->getExtension() ) ) {
+			continue;
+		}
+
+		if ( $file->getSize() > $max_bytes ) {
+			fwrite(
+				STDERR,
+				'find-orphan-acf-ids.php: skipped ' . $file->getPathname()
+					. ' (' . $file->getSize() . " bytes) — its field reads are not in the list\n"
+			);
 			continue;
 		}
 		/*
