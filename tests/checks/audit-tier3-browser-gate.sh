@@ -33,16 +33,16 @@ done
 #    `- Web-quality-skills: <available|not available>`. A capital W and a space defeated it.
 #    Case and separator are therefore both matched, and the retired manifest key is matched
 #    in its own right because it does not contain the package name at all.
-offenders=$(grep -rlniE 'web[- ]quality[- ]skills|web_quality_skills' --include='*.md' --include='*.sh' . \
-  | grep -vE '^\./(CHANGELOG\.md|tests/checks/audit-tier3-browser-gate\.sh)$' || true)
-exempt_lines=$(grep -rniE 'web[- ]quality[- ]skills|web_quality_skills' --include='*.md' --include='*.sh' . \
+#    The scan reports LINES, not file names: the two exempted strings are single lines inside
+#    a file that legitimately names the retired key, so a file-level list would either hide a
+#    real offender sitting beside them or fail on the migration path itself.
+stale=$(grep -rniE 'web[- ]quality[- ]skills|web_quality_skills' --include='*.md' --include='*.sh' . \
   | grep -vE '^\./(CHANGELOG\.md|tests/checks/audit-tier3-browser-gate\.sh):' \
   | grep -vF 'the legacy `audit.web_quality_skills_available`' \
   | grep -vF 'Delete `audit.web_quality_skills_available` as you write this block' || true)
-[ -z "$exempt_lines" ] \
+[ -z "$stale" ] \
   || fail "these still reference the retired package outside the migration path:
-$exempt_lines"
-: "$offenders"
+$stale"
 
 grep -Fq 'the legacy `audit.web_quality_skills_available`' "$audit" \
   || fail "$audit dropped the migration path for a manifest that predates the key rename"
@@ -91,9 +91,11 @@ grep -Fq 'It adds measurement, never criteria' "$standards" \
 # 4. The budgets stay unconditional, and the three metrics a file scan cannot answer stay
 #    honest about it. This is the actual regression the change exists to prevent.
 flatp=$(tr '\n' ' ' < "$perf" | sed 's/  */ /g')
-case "$flatp" in
-  *'If web-quality-skills'*) fail "$perf still makes its budgets conditional on the package" ;;
-esac
+# Case- and separator-insensitive like the offender scan above: a negative assertion that
+# only matches one spelling is the same defect this check was rewritten to close.
+if printf '%s' "$flatp" | grep -qiE 'if web[- ]quality[- ]skills'; then
+  fail "$perf still makes its budgets conditional on the package"
+fi
 case "$flatp" in
   *'reported `UNMEASURED` without a browser, never assumed to pass'*) ;;
   *) fail "$perf must report the Core Web Vitals UNMEASURED without a browser, not pass them" ;;
