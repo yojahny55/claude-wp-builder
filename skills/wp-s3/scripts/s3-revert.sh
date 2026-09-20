@@ -76,9 +76,10 @@ if grep -q "s3-config.php" "$WP_ROOT/wp-config.php"; then
     cp -p "$WP_ROOT/wp-config.php" "$WP_ROOT/wp-config.php.bak-$STAMP"
     set +e
     python3 - "$WP_ROOT/wp-config.php" <<'PY'
-import sys, re
+import os, re, sys
 path = sys.argv[1]
-text = open(path).read()
+with open(path) as handle:
+    text = handle.read()
 pattern = re.compile(
     r"if \(\s*file_exists\(\s*__DIR__ \. '/s3-config\.php'\s*\)\s*\) \{\s*"
     r"require __DIR__ \. '/s3-config\.php';\s*\}\s*\n*",
@@ -88,14 +89,31 @@ new, count = pattern.subn("", text)
 if count == 0:
     sys.stderr.write("WARNING: the require block was edited by hand; remove it yourself.\n")
     sys.exit(3)
-open(path, "w").write(new)
+# Written to a neighbouring file and renamed: a process killed halfway through a
+# plain write leaves wp-config.php truncated, which is a white screen until
+# someone restores the backup by hand.
+tmp = path + ".wp-s3-tmp"
+with open(tmp, "w") as handle:
+    handle.write(new)
+    handle.flush()
+    os.fsync(handle.fileno())
+os.replace(tmp, path)
 PY
     status=$?
     set -e
-    if [[ $status -eq 0 ]]; then
-        php -l "$WP_ROOT/wp-config.php" >/dev/null || die "wp-config.php no longer parses; restore wp-config.php.bak-$STAMP"
-        echo "4. Removed the require from wp-config.php (backup: wp-config.php.bak-$STAMP)"
+    if [[ $status -ne 0 ]]; then
+        # Stopping here leaves the site working: wp-config.php still requires a
+        # config that is still in place. Carrying on would rename that config out
+        # from under a require nobody could remove automatically, which is a fatal
+        # on the next request whenever the hand-edited block dropped the
+        # file_exists() guard.
+        die "the require block in wp-config.php was edited by hand and could not be removed.
+       Nothing has been renamed and the site still works. Remove this block yourself:
+           if ( file_exists( __DIR__ . '/s3-config.php' ) ) { require __DIR__ . '/s3-config.php'; }
+       then run this script again (backup: wp-config.php.bak-$STAMP)."
     fi
+    php -l "$WP_ROOT/wp-config.php" >/dev/null || die "wp-config.php no longer parses; restore wp-config.php.bak-$STAMP"
+    echo "4. Removed the require from wp-config.php (backup: wp-config.php.bak-$STAMP)"
 else
     echo "4. wp-config.php does not require s3-config.php."
 fi
@@ -115,7 +133,12 @@ fi
 # ---------------------------------------------------------------- 6. what this cannot undo
 BUCKET_URL="$(php "$SKILL_DIR/scripts/read-s3-config.php" "$CONFIG.disabled" --names 2>/dev/null \
     | sed -n 's/^S3_UPLOADS_BUCKET_URL: //p')"
-SITE_URL="$(cd "$WP_ROOT" && wp option get siteurl 2>/dev/null || echo 'https://www.example.com')"
+# Guarded like every other `wp` call here: without WP-CLI the bare invocation prints
+# "command not found" into the middle of the commands printed below.
+SITE_URL='https://www.example.com'
+if command -v wp >/dev/null 2>&1; then
+    SITE_URL="$(cd "$WP_ROOT" && wp option get siteurl 2>/dev/null || echo 'https://www.example.com')"
+fi
 
 cat <<TXT
 

@@ -24,8 +24,15 @@ run_mirror() {
         [[ "$opt" == "--dry-run" ]] && dry=yes
     done
 
+    # The log lands in the caller's private configuration directory when there is one, so
+    # it is removed by that script's EXIT trap even if the shell dies mid-transfer — a
+    # RETURN trap alone leaks the file, and the log carries every object name.
     local log status
-    log="$(mktemp -t wp-s3-mirror-XXXXXX.log)"
+    if [[ -n "${MC_CONFIG_DIR:-}" && -d "${MC_CONFIG_DIR:-}" ]]; then
+        log="$(mktemp "$MC_CONFIG_DIR/mirror-XXXXXX.log")"
+    else
+        log="$(mktemp -t wp-s3-mirror-XXXXXX.log)"
+    fi
     trap 'rm -f "$log"' RETURN
 
     # Everything goes to the log; the refusals are kept off the screen and counted
@@ -47,15 +54,16 @@ run_mirror() {
     refused="$(grep -c 'Overwrite not allowed' "$log" || true)"
     other="$(grep '<ERROR>' "$log" | grep -vc 'Overwrite not allowed' || true)"
 
+    local failed=no
     if [[ $status -ne 0 && "${refused:-0}" -eq 0 ]]; then
         echo "ERROR: mcli mirror exited with code $status." >&2
-        return "$status"
+        failed=yes
     fi
 
     if [[ "${other:-0}" -gt 0 ]]; then
         echo "ERROR: mcli reported an error during the transfer." >&2
         grep '<ERROR>' "$log" | grep -v 'Overwrite not allowed' | head -5 >&2
-        return 1
+        failed=yes
     fi
 
     if [[ "${refused:-0}" -gt 0 ]]; then
@@ -64,6 +72,7 @@ run_mirror() {
     fi
 
     if [[ "$dry" == "yes" ]]; then
+        [[ "$failed" == "no" ]] || return 1
         return 0
     fi
 
@@ -83,12 +92,25 @@ run_mirror() {
         fi
     done
 
+    # The comparison runs even after a failed transfer, and especially then: a failure is
+    # exactly when the operator needs to know how much of it landed. It cannot rescue the
+    # run — a failed transfer stays failed whatever the comparison says — but "47 of 812
+    # objects arrived" is what makes the next run safe, and the client's own error says
+    # nothing about that.
+    local verified=0
     python3 "$(dirname "${BASH_SOURCE[0]}")/verify-transfer.py" \
         --direction "$direction" \
         --local "$local_path" \
         --remote "$remote_path" \
         --mcli "$MCLI" \
-        "${excludes[@]}"
+        "${excludes[@]}" || verified=$?
+
+    if [[ "$failed" == "yes" ]]; then
+        echo "The transfer itself failed; the comparison above says what reached the other side." >&2
+        return 1
+    fi
+
+    return "$verified"
 }
 
 # require_mcli <install-dir>

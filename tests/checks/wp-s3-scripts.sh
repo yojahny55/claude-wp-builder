@@ -99,11 +99,16 @@ grep -Fq 'php_single_quoted' "$setup" \
 # 7. Neither direction may ever clobber. This is what makes a repeated run safe,
 #    and it is one flag away from being untrue.
 # ---------------------------------------------------------------------------
+# The flag is matched as a standalone argument token on a line with its comment stripped,
+# not by "the line does not start with #": a continuation line, a quoted string or a
+# command whose first token is the flag would all slip past that heuristic, and this guard
+# is the one that keeps a repeated run safe.
+code_only() { sed 's/#.*$//' "$1"; }
 for f in "$media" "$lib" "$revert"; do
-  ! grep -Eq '^[^#]*--overwrite' "$f" \
-    || fail "$f passes --overwrite to the client"
-  ! grep -Eq '^[^#]*--remove' "$f" \
-    || fail "$f passes --remove to the client"
+  for flag in --overwrite --remove; do
+    ! code_only "$f" | grep -Eq "(^|[[:space:]\"'\(\$])${flag}([[:space:]\"'\)]|$)" \
+      || fail "$f passes $flag to the client"
+  done
 done
 
 # ---------------------------------------------------------------------------

@@ -58,6 +58,18 @@
   it. And `s3-config.php` had its credential lines assembled in the shell, so a secret
   holding a single quote closed the PHP string early and `php -l` condemned a file that
   already held the credentials; they are quoted where they are written now.
+  Five more came from the reviewer and are worth naming because four of them are about
+  what happens **after** something already went wrong. A failed transfer used to return
+  before the comparison ran, so the one moment an operator most needs a per-file
+  accounting — "how much of it landed?" — was the moment they were denied one; the
+  comparison now runs either way and the run still fails. A revert whose `require` block
+  had been hand-edited printed a warning and carried on to rename `s3-config.php`, leaving
+  a site that requires a file that is no longer there; it now stops with the block to
+  remove and touches nothing. `verify-transfer.py` had no timeout, so an unreachable
+  endpoint hung forever under `set -e` (300s, `WP_S3_LIST_TIMEOUT` to raise it). Both
+  `wp-config.php` rewrites are written to a neighbouring file and renamed, because a
+  process killed mid-write left a truncated `wp-config.php` and a white screen. And the
+  last `wp` call in the revert is guarded like every other one.
   Two smaller ones: `verify-transfer.py` called an empty remote listing a verified download,
   and the client answers an unknown alias with exit `0` and no output, so "no objects" and
   "could not list" arrived identically — a download that lists nothing now fails. And a

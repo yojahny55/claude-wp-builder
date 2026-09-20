@@ -39,11 +39,26 @@ def local_files(root, patterns):
     return found
 
 
+# A listing that never answers is the failure mode with no error message: a blackholed
+# route or an unresponsive backend leaves the caller blocked under `set -e` with nothing
+# to read. Overridable because a first listing of a very large bucket is legitimately
+# slow.
+LIST_TIMEOUT = int(os.environ.get("WP_S3_LIST_TIMEOUT", "300"))
+
+
 def remote_files(mcli, remote, patterns):
-    proc = subprocess.run(
-        [mcli, "ls", "--recursive", "--json", remote],
-        capture_output=True, text=True,
-    )
+    try:
+        proc = subprocess.run(
+            [mcli, "ls", "--recursive", "--json", remote],
+            capture_output=True, text=True, timeout=LIST_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        sys.stderr.write(
+            "ERROR: listing %s did not answer within %d seconds. Nothing was verified.\n"
+            "       Raise WP_S3_LIST_TIMEOUT if the bucket is genuinely that large.\n"
+            % (remote, LIST_TIMEOUT)
+        )
+        sys.exit(2)
     if proc.returncode != 0:
         sys.stderr.write("ERROR: could not list %s\n%s\n" % (remote, proc.stderr.strip()))
         sys.exit(2)

@@ -194,7 +194,16 @@ text = open(src).read()
 for key, value in values.items():
     text = text.replace("{{%s}}" % key, value)
 text = text.replace("{{AUTH_BLOCK}}", auth_block)
-open(dest, "w").write(text)
+
+# Written and renamed, never truncated in place: this file holds the credentials, and a
+# half-written one is a site that fatals on every request.
+tmp = dest + ".wp-s3-tmp"
+fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, "w") as handle:
+    handle.write(text)
+    handle.flush()
+    os.fsync(handle.fileno())
+os.replace(tmp, dest)
 PY
 
 chmod 640 "$CONFIG"
@@ -207,9 +216,10 @@ if grep -q "s3-config.php" "$WP_ROOT/wp-config.php"; then
 else
     cp -p "$WP_ROOT/wp-config.php" "$WP_ROOT/wp-config.php.bak-$STAMP"
     python3 - "$WP_ROOT/wp-config.php" <<'PY'
-import sys, re
+import os, re, sys
 path = sys.argv[1]
-text = open(path).read()
+with open(path) as handle:
+    text = handle.read()
 block = (
     "if ( file_exists( __DIR__ . '/s3-config.php' ) ) {\n"
     "\trequire __DIR__ . '/s3-config.php';\n"
@@ -224,7 +234,12 @@ if not m:
     sys.stderr.write("ERROR: no require_once ABSPATH . 'wp-settings.php' line in wp-config.php\n")
     sys.exit(1)
 text = text[:m.start()] + block + text[m.start():]
-open(path, "w").write(text)
+tmp = path + ".wp-s3-tmp"
+with open(tmp, "w") as handle:
+    handle.write(text)
+    handle.flush()
+    os.fsync(handle.fileno())
+os.replace(tmp, path)
 PY
     php -l "$WP_ROOT/wp-config.php" >/dev/null || die "wp-config.php no longer parses; restore wp-config.php.bak-$STAMP"
     echo "3. Added the require to wp-config.php (backup: wp-config.php.bak-$STAMP)"
