@@ -4,6 +4,7 @@
 # nothing at all — so every check here is about asserting from a REQUEST rather
 # than from the database, which is the thing they all have in common.
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 
 fail() { echo "FAIL: $1"; exit 1; }
 
