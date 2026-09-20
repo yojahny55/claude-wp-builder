@@ -396,7 +396,7 @@ Project context:
 - Industry: <industry>
 - WP-CLI wrapper: <$WP or "not available">
 - Audit tier: <1|2|3>
-- Web-quality-skills: <available|not available>
+- Browser measurement: <available|not available>
 
 Run all checks for your tier level. Output your findings as a structured report with the following format for each issue:
 
@@ -748,6 +748,11 @@ Add or update the `audit` key in the JSON:
   "manifest_version": 3
 }
 ```
+
+**Delete `audit.web_quality_skills_available` as you write this block** if the manifest still
+carries it. Step 2.5b reads it once, to migrate a manifest written before the rename; leaving
+it in place afterwards means every later run sees two keys for one capability and no rule
+saying which wins.
 
 Then write the ledger itself, beside the manifest:
 

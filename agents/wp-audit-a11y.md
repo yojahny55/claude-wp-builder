@@ -23,9 +23,9 @@ Before running ANY checks, read the following project files:
    - The **theme path** on disk
    - The **languages** configured (e.g., English primary, Spanish secondary)
 
-2. **Check for a browser automation tool** — Playwright MCP, Chrome DevTools MCP or
-   Claude in Chrome. It gates the Tier 3 checks in Step 6 that need a rendered page; the
-   static checks in Steps 1-5 never depend on it.
+2. **Browser measurement** — read the `Browser measurement` line of this prompt. The
+   dispatcher probes the session for a browser tool; this agent's `tools:` list cannot see
+   one, so never probe for it here. It gates only the checks that need a rendered page.
 
 ## Step 1: Perceivable Checks
 
@@ -98,7 +98,7 @@ Before running ANY checks, read the following project files:
 
 These three are checked on every run — the first two by reading the templates and CSS, the
 third by reading the form markup. A browser confirms the first two on a rendered page when
-one is available; without it, report what the source says and say it was not rendered.
+one is available; without it, file the source-code finding and mark the check `UNMEASURED`.
 
 - **Focus not obscured** — ensure focused elements are not hidden behind sticky headers or modals
 - **Target size 24x24** — minimum target size for pointer inputs (WCAG 2.5.8)

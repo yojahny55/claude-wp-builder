@@ -26,9 +26,9 @@ Before running ANY coding standards checks, read the following project files:
 2. **`.wp-create.json`** — Extract (if file exists):
    - The **WP-CLI wrapper** command (`wp_cli.wrapper`) as `$WP`
 
-3. **Web-quality skills** — Check for additional checks at:
-   - `~/.claude/skills/best-practices/SKILL.md`
-   - `.claude/skills/best-practices/SKILL.md`
+3. **Browser measurement** — read the `Browser measurement` line of this prompt. The
+   dispatcher probes the session for a browser tool; this agent's `tools:` list cannot see
+   one, so never probe for it here. It gates only the checks that need a rendered page.
 
 ## Step 1: Tier 1 — Code-Only Checks
 

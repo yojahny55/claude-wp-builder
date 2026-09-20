@@ -25,7 +25,9 @@ Before running ANY checks, read the following project files:
 2. **`.wp-create.json`** — Extract:
    - The **WP-CLI wrapper** command (`wp_cli.wrapper`) as `$WP`
 
-3. **Web-quality-skills** — Check `~/.claude/skills/performance/SKILL.md` for performance budgets and Core Web Vitals targets.
+3. **Browser measurement** — read the `Browser measurement` line of this prompt. The
+   dispatcher probes the session for a browser tool; this agent's `tools:` list cannot see
+   one, so never probe for it here. It gates only the checks that need a rendered page.
 
 ## Step 1: Tier 1 — Code-Only Checks
 

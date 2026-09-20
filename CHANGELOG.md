@@ -242,8 +242,19 @@
   The manifest key `audit.web_quality_skills_available` is retired in favour of
   `audit.browser_measurement_available`; Step 2.5b reads the old key when a manifest predates
   the rename, reports it as drift like any other measurement, and writes the current one back.
+  Availability is probed once, by the command, and passed down the dispatch prompt as
+  `Browser measurement`. No audit agent probes for itself: their `tools:` lists carry
+  `Read, Write, Edit, Grep, Glob, Bash` and no MCP tool, so an agent told to look for a
+  browser would have been told to do something it cannot do.
   `tests/checks/audit-tier3-browser-gate.sh` asserts both directions, because a check that
-  only greps for the new gate is satisfied by deleting the tier.
+  only greps for the new gate is satisfied by deleting the tier. Its first version proved the
+  point at its own expense: written as a case-sensitive `grep -rln 'web-quality-skills'`, it
+  passed while four references were still live — three agents opened with `**Web-quality
+  skills**` and the dispatch prompt still carried `- Web-quality-skills: <available|not
+  available>`. A capital letter and a space defeated it. It now matches either separator in
+  either case, pins the three MCP tool identifiers that *are* the detection, and pins the
+  dispatch line, and each of those assertions was confirmed by breaking the contract and
+  watching the check fail.
 
 ### Fixed
 

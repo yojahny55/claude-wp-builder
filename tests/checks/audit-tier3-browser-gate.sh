@@ -26,20 +26,62 @@ done
 #    history and is exempt, as is this check, which has to name the thing it forbids;
 #    wp-audit.md names the retired manifest key once, to read a manifest written before the
 #    rename, which is a migration path and not a gate.
-offenders=$(grep -rln 'web-quality-skills' --include='*.md' --include='*.sh' . \
+#
+#    The first version of this scan was `grep -rln 'web-quality-skills'` and it passed while
+#    four stale references were live: three agents opened with `**Web-quality skills**` and
+#    `**Web-quality-skills**`, and the subagent prompt template carried
+#    `- Web-quality-skills: <available|not available>`. A capital W and a space defeated it.
+#    Case and separator are therefore both matched, and the retired manifest key is matched
+#    in its own right because it does not contain the package name at all.
+offenders=$(grep -rlniE 'web[- ]quality[- ]skills|web_quality_skills' --include='*.md' --include='*.sh' . \
   | grep -vE '^\./(CHANGELOG\.md|tests/checks/audit-tier3-browser-gate\.sh)$' || true)
-[ -z "$offenders" ] || fail "these still reference the retired package as a gate: $offenders"
+exempt_lines=$(grep -rniE 'web[- ]quality[- ]skills|web_quality_skills' --include='*.md' --include='*.sh' . \
+  | grep -vE '^\./(CHANGELOG\.md|tests/checks/audit-tier3-browser-gate\.sh):' \
+  | grep -vF 'the legacy `audit.web_quality_skills_available`' \
+  | grep -vF 'Delete `audit.web_quality_skills_available` as you write this block' || true)
+[ -z "$exempt_lines" ] \
+  || fail "these still reference the retired package outside the migration path:
+$exempt_lines"
+: "$offenders"
 
 grep -Fq 'the legacy `audit.web_quality_skills_available`' "$audit" \
   || fail "$audit dropped the migration path for a manifest that predates the key rename"
 
 # 2. The replacement gate is a browser, and it is re-probed rather than trusted.
-grep -Fq '**Tier 3 (if a browser automation tool is available):**' "$audit" \
-  || fail "$audit does not gate Tier 3 on a browser automation tool"
+# Flattened, so an assertion survives a reflow and does not depend on a heading staying
+# word-for-word. What it cannot survive is the detection mechanism being deleted, which is
+# the point: the three tool identifiers ARE the gate, and a check that only greps the label
+# around them passes on an empty tier.
+flata=$(tr '\n' ' ' < "$audit" | sed 's/  */ /g')
+for id in 'mcp__playwright__browser_navigate' 'performance_start_trace' 'mcp__claude-in-chrome__navigate'; do
+  case "$flata" in
+    *"$id"*) ;;
+    *) fail "$audit does not probe for $id — Tier 3 has a label but no detection" ;;
+  esac
+done
+case "$flata" in
+  *'browser automation tool is available'*) ;;
+  *) fail "$audit does not gate Tier 3 on a browser automation tool" ;;
+esac
 grep -Fq 'audit.browser_measurement_available' "$audit" \
   || fail "$audit does not record the browser capability under the current manifest key"
-grep -Fq 'Tier 3: Browser measurement' "$audit" \
-  || fail "$audit's tier line still advertises the retired package"
+case "$flata" in
+  *'Tier 3: Browser measurement'*) ;;
+  *) fail "$audit's tier line still advertises the retired package" ;;
+esac
+
+# The agents cannot probe for a browser: their `tools:` lists carry no MCP tool. The value
+# has to arrive in the dispatch prompt, or every agent gates on a line nothing fills.
+case "$flata" in
+  *'- Browser measurement: <available|not available>'*) ;;
+  *) fail "$audit's subagent prompt does not pass browser availability down to the agents" ;;
+esac
+
+# Migrating a manifest means removing the old key, not accumulating both.
+case "$flata" in
+  *'Delete `audit.web_quality_skills_available` as you write this block'*) ;;
+  *) fail "$audit migrates the retired manifest key but never deletes it" ;;
+esac
 
 # 3. The tier adds measurement, not criteria. Said in the skill that the agents read, because
 #    an agent that believes Tier 3 owns the thresholds skips them when no browser is present.
