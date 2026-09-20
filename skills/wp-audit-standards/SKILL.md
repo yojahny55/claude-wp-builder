@@ -26,7 +26,7 @@ All audit agents MUST output findings in this format:
 
 ```json
 {
-  "category": "security|seo|a11y|performance|best-practices",
+  "category": "security|seo|a11y|performance|best-practices|geo|usability",
   "tier": 1,
   "issues": [
     {

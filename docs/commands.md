@@ -372,8 +372,9 @@ static screenshot per breakpoint cannot show scroll motion, which is why the che
 ### `/wp-audit`
 
 ```
-/wp-audit [--security] [--seo] [--a11y] [--performance] [--best-practices] [--geo] [--all]
-          [--report-only] [--report md|html|both] [--report-lang en|es] [--suite]
+/wp-audit [--security] [--seo] [--a11y] [--performance] [--best-practices] [--geo]
+          [--usability] [--all] [--report-only] [--report md|html|both] [--report-lang en|es]
+          [--suite] [--pages <list|auto|none>]
           [--host <public-url>] [--security-level basic|recommended|maximum]
 ```
 
@@ -390,6 +391,27 @@ against, and a run that fixes first has no before to compare with. A machine sid
 beside them, and the next report opens with resolved / new / still failing against it — by
 finding identity, not by count, so fixing one issue and finding another no longer reads as
 no change.
+
+`--usability` audits whether a person can use the site — the categories the other six
+auditors do not own: forms and data entry, navigation and task flow, links followed rather
+than inferred, hover and active states, rendered line length per breakpoint, and whether
+the logo and the type scale hold still between templates. `wp-audit-ux` owns it and
+`skills/wp-audit-ux-standards/SKILL.md` holds the `UX-NNN` catalog. Contrast, focus and
+target size are not here: they are `wp-audit-a11y`, and two codes for one defect inflate
+every count.
+
+It is the one auditor whose scope is a list of URLs rather than the theme directory, so
+`--pages` fixes that list. `auto` derives it from the manifest, the primary menu, the
+sitemap or the home page's links, in that order, and always adds the 404 and any page with
+a form — a third of the catalog lives on those two and no ranking finds them. The list is
+capped at eight pages, one per template, and the cap is printed. **A page-level criterion
+with no page list reports `UNMEASURED`, never `PASS`**, because an audit that measured
+nothing and printed no failures reads exactly like a clean site.
+
+With a page list the report scores: criteria passed over criteria that applied, per page
+and overall. `N/A` and `UNMEASURED` are both excluded from the denominator and reported
+beside it — the first because a site is not worse for lacking a feature it never had, the
+second because it is work outstanding and folding it into either side hides it.
 
 `--suite` runs the browser half of the audit as a generated Playwright project instead of
 depending on a browser tool being present in the session — axe-core for accessibility,

@@ -1,17 +1,17 @@
 ---
-description: Comprehensive audit — security, SEO, accessibility, performance, best practices, GEO/AI-agent readiness
+description: Comprehensive audit — security, SEO, accessibility, performance, best practices, GEO/AI-agent readiness, usability
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, AskUserQuestion
-argument-hint: "[--security] [--seo] [--a11y] [--performance] [--best-practices] [--geo] [--all] [--report-only] [--report md|html|both] [--report-lang en|es] [--suite] [--host <public-url>] [--security-level basic|recommended|maximum]"
+argument-hint: "[--security] [--seo] [--a11y] [--performance] [--best-practices] [--geo] [--usability] [--all] [--report-only] [--report md|html|both] [--report-lang en|es] [--suite] [--pages <list|auto|none>] [--host <public-url>] [--security-level basic|recommended|maximum]"
 ---
 
 # WP Audit — Comprehensive Site Audit
 
-Run a comprehensive audit across security, SEO, accessibility, performance, best practices, and GEO/AI-agent readiness. Reports issues with severity levels and offers to auto-fix what it can. Dispatches specialized audit agents and optionally configures Rank Math SEO and All-in-One WP Security.
+Run a comprehensive audit across security, SEO, accessibility, performance, best practices, GEO/AI-agent readiness and usability. Reports issues with severity levels and offers to auto-fix what it can. Dispatches specialized audit agents and optionally configures Rank Math SEO and All-in-One WP Security.
 
 ## Step 1: Parse Arguments
 
 Parse `$ARGUMENTS` for:
-- **Category flags:** `--security`, `--seo`, `--a11y`, `--performance`, `--best-practices`, `--geo`
+- **Category flags:** `--security`, `--seo`, `--a11y`, `--performance`, `--best-practices`, `--geo`, `--usability`
 - **`--all` flag** (default if no category flags provided)
 - **`--report-only` flag** (skip fix phase)
 - **`--security-level basic|recommended|maximum`** (default: `recommended`, ignored if `--report-only`)
@@ -31,7 +31,12 @@ Parse `$ARGUMENTS` for:
   without rewriting the manifest it still develops against. Used by the live scan in Step 9
   and by nothing else — it does not change which site WP-CLI talks to.
 
-If `--all` or no category flags are present: enable all 6 categories (security, seo, a11y, performance, best-practices, geo).
+If `--all` or no category flags are present: enable all 7 categories (security, seo, a11y, performance, best-practices, geo, usability).
+
+- **`--pages <list|auto|none>`** — which pages the page-level criteria are measured on.
+  `auto` derives the list; `none` skips the page walk and reports every page-level check
+  `UNMEASURED`. Default: `auto` when `--usability` or `--suite` is active, `none`
+  otherwise, because the other six categories audit the theme and do not need a page list.
 
 ## Step 2: Read Project Context
 
@@ -192,7 +197,8 @@ against `audit.checks_run[<category>]` — the IDs this project has actually exe
 The catalog is the set of check IDs in that category's own agent file — `SEC-*` in
 `agents/wp-audit-security.md`, `WP-*` in `agents/wp-audit-practices.md`, `SEO-*` in
 `agents/wp-audit-seo.md`, `A11Y-*` in `agents/wp-audit-a11y.md`, `PERF-*` in
-`agents/wp-audit-performance.md`, `GEO-*` in `agents/wp-audit-geo.md`. Read the agent, not a
+`agents/wp-audit-performance.md`, `GEO-*` in `agents/wp-audit-geo.md`, `UX-*` in
+`agents/wp-audit-ux.md`. Read the agent, not a
 list kept anywhere else: a stored list is a second copy that goes stale, and a stale copy
 here would report a green coverage line for checks nobody has run — the exact failure this
 diff exists to prevent, reproduced by the thing preventing it.
@@ -270,6 +276,96 @@ line is clean, print one line instead:
 ```
   Manifest reconciled — no drift, all categories have run, record is current.
 ```
+
+## Step 2.7: Fix the page scope
+
+The audit reads the theme. A client reads a site, page by page, and several criteria exist
+only by comparing pages: a logo that moves between templates, a type scale that changes, a
+menu item that is marked active on one page and not another. None of those is visible from
+a single template, and none of them has a `file:line`.
+
+So before any page-level check runs, fix the list of pages. Skip this step entirely when
+the scope is `none`.
+
+**`auto` derives the list, in this order, and stops at the first that yields pages:**
+
+1. `.wp-create.json` `pages`, if the project records one.
+2. The primary menu — `$WP menu item list <menu> --format=json` at Tier 2.
+3. `sitemap.xml` (or `sitemap_index.xml`) from the site URL.
+4. The internal links on the home page.
+
+Then **always** add, if they exist: the 404, and any page carrying a form. They are where a
+third of the usability catalog lives and no derivation finds them by ranking.
+
+- **The 404** is a URL that cannot resolve — `<site>/<a path nothing serves>`. Do not look
+  for it; construct it.
+- **The form page**, at Tier 2, from the site itself rather than by fetching every candidate:
+
+  ```bash
+  bash -c "$WP post list --post_type=page --fields=ID,post_name,post_title --format=csv \
+    --s='[contact-form-7' --meta_key=_wp_page_template"
+  ```
+
+  Repeat for the form plugin actually installed (`[gravityform`, `[wpforms`, `<form`). With
+  no Tier 2, fetch the pages already in the list and keep the first whose HTML contains a
+  `<form>` that is not the search form; when none does, say the form page could not be found
+  rather than reporting category A as passing.
+
+**Cap the list at eight pages and say you capped it.** A representative set — home, a
+listing, a detail, the page with the main form, the 404 — measures the templates; auditing
+forty pages measures the same five templates eight times each and makes the report unusable
+for the person who has to act on it. When the site has more, take one page per template and
+name the templates covered.
+
+**Grouping by template** is `_wp_page_template` at Tier 2:
+
+```bash
+bash -c "$WP post list --post_type=page --fields=ID,post_title --format=csv \
+  --meta_key=_wp_page_template --meta_value=<template.php>"
+```
+
+Without Tier 2 there is no template metadata, so group by URL shape instead — one page per
+path depth and per post type prefix — and say in the report that the grouping was inferred
+from URLs. An inferred grouping that is announced is usable; one that is presented as
+template coverage is not.
+
+Print the scope before measuring:
+
+```
+=== Page Scope ===
+Source: <manifest|menu|sitemap|home links>
+Pages (N):
+  /                      home
+  /services/             listing
+  /services/<one>/       detail
+  /contact/              form
+  /<404 probe>           404
+<Capped from M pages — one per template.>
+```
+
+**A page-level criterion with no page list is `UNMEASURED`, never `PASS`.** This is the same
+rule the tiers already follow, and it is worth restating here because the failure is quiet:
+an audit that measured nothing page-level and printed no failures reads exactly like a site
+with no page-level problems.
+
+### Page-level and site-level are different answers
+
+A criterion answered per page is reported on **every page it fails on** — the fix is per
+template and a single row would hide which page is wrong. A criterion that can only be
+answered by comparing pages is evaluated **once**, and when it fails it names the pages it
+differs between. `skills/wp-audit-ux-standards/SKILL.md` holds the split; the same shape
+applies to any other category that grows page-level checks.
+
+### What a score means once pages exist
+
+With a page list, the report scores: criteria passed over criteria that **applied**, per
+page, per category and overall.
+
+**`N/A` is excluded from the denominator and reported beside it, never inside it.** A site
+is not worse for lacking a feature it was never meant to have, and 30/40 on what applied is
+a measurement where 30/56 against a list including sixteen that never applied is a number
+that punishes a site for its own shape. `UNMEASURED` is excluded too, and for the opposite
+reason: it is work outstanding, and folding it into either side of the fraction hides it.
 
 ## Step 3: Detect Environment & Tier
 
@@ -390,7 +486,7 @@ If `--security` is not selected or `--report-only` is set, skip this step.
 
 For each selected category, dispatch the corresponding agent using the Agent tool. Pass complete context in each agent prompt.
 
-**Dispatch order:** security → seo → a11y → performance → practices → geo
+**Dispatch order:** security → seo → a11y → performance → practices → geo → usability
 
 For each agent, use this prompt template (adapt the category-specific instructions):
 
@@ -409,6 +505,7 @@ and said nothing about the layer the defect was actually in.
 | per-post meta coverage | `wp-audit-seo` | missing descriptions, focus keywords, canonical |
 | rendered output | `wp-audit-seo` (head), `wp-audit-geo` (head, schema graph, DOM) | `og:site_name`, dangling schema `@id` |
 | serving layer | `wp-audit-geo` (GEO-A26, GEO-A27) | a physical root file shadowing a theme rewrite, CDN path rewrites |
+| the page a person sees | `wp-audit-ux` | a required mark that is not there, a link that 404s, 142 characters to a line, a logo that moves between templates |
 
 An agent whose surface needs Tier 2 and does not have it reports those codes `UNMEASURED`,
 never `PASS`. Say so in the prompt, so the agent does not quietly narrow its scope to the part
@@ -454,6 +551,11 @@ Use these `subagent_type` values:
 - `wp-audit-performance` — performance checks (asset enqueuing, image optimization, caching headers, database queries, lazy loading, render-blocking resources)
 - `wp-audit-practices` — best practices checks (ABSPATH guards, escaping, i18n, theme supports, coding standards, enqueue patterns, template hierarchy)
 - `wp-audit-geo` — GEO/AI-agent readiness checks (ORA layers Discovery/Access/Usability/Payments, AI crawler allowlist, `llms.txt` and ARD catalog, rendered-head DOM checks, agent-skills index, is-agentic live scan)
+- `wp-audit-ux` — usability checks (forms and data entry, navigation and task flow, links followed rather than inferred, hover and active states, rendered line length per breakpoint, logo and typography consistency across pages)
+
+**`wp-audit-ux` is dispatched with the page list from Step 2.7, and its prompt says so.**
+It is the only auditor whose scope is a set of URLs rather than the theme directory, and an
+agent given no pages audits nothing while reporting cleanly.
 
 **Error handling:** If an agent fails:
 1. Note which agent failed and the error message
@@ -474,8 +576,6 @@ ${CLAUDE_PLUGIN_ROOT}/bin/audit-suite.sh --url <public-url> --dir .wp-audit/suit
 ```
 
 `<public-url>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json`.
-`--pages` is the list to measure; without it the suite keeps whatever its config already
-holds, which on a first run is the template's placeholder — so pass it.
 The first run scaffolds `.wp-audit/suite/` from `templates/audit-suite/` and installs the
 suite's dependencies **once per machine**, into a shared cache keyed by the template's
 `package.json`. Later runs and later projects reuse it.
@@ -602,8 +702,9 @@ so a resource written two ways never matches and the duplicate survives:
 | a site-level judgement | `site` |
 
 **A page-level finding is one row per page, not one per occurrence.** Three broken links on
-`/contact/` are one finding whose evidence lists all three. One row per link matches nothing
-the suite emits, and turns a page with a bad footer into forty findings that are one fix.
+`/contact/` are one `UX-014 : page:/contact/` whose evidence lists all three. One row per
+link would match nothing the suite emits, and would turn a page with a bad footer into
+forty findings that are one fix.
 
 Sort all issues: CRITICAL first, then WARNING, then INFO.
 
@@ -744,6 +845,12 @@ Categories: <comma-separated selected categories>
   ✗ WARNING: ...
   ℹ INFO: ...
 
+[USABILITY] N issues (X critical, Y warnings, Z info) — M/A criteria passed of those that applied
+  Pages: <the Step 2.7 scope, or "not measured — no page scope">
+  ✗ CRITICAL: <message> (UX-014, /services/)
+  ✗ WARNING: <message> (UX-006, desktop: 142 characters)
+  ○ N/A: <code> — <why this site lacks what it evaluates>
+
 [GEO] <site_type> — N issues (X errors, Y warnings, Z info, K N/A)
   Layer coverage: <Discovery ✓|✗> <Access ✓|✗> <Usability ✓|✗> <Payments ✓|N/A>
   ✗ ERROR: <message> (GEO-A13)
@@ -808,6 +915,7 @@ to look first:
 | `PERF-*` | `code` — enqueues, image attributes, `inc/performance.php` | object cache, autoload options, revisions, OPcache are `setting` |
 | `WP-*` | `code` — it is the theme's own source by definition | — |
 | `GEO-*` | `code` — `inc/agentic.php` and the surfaces it generates | the robots AI policy and anything written to an option are `setting`; trust-anchor prose is `content` |
+| `UX-*` | read it from `skills/wp-audit-ux-standards/SKILL.md`, which gives an owner per criterion | — |
 
 The table is a starting point, not the answer. **Ask what the fix writes to**: a file in the
 theme is `code`, a row in the database or a server rule is `setting`, a sentence a person
@@ -828,7 +936,7 @@ it is an argument, not an artifact:
   "site": "<project name>",
   "date": "<YYYY-MM-DD>",
   "tier": "<the same label Step 3 printed>",
-  "categories": ["security", "seo", "a11y"],
+  "categories": ["security", "seo", "usability"],
   "findings": [
     {
       "check": "SEC-036",
@@ -992,10 +1100,11 @@ Add or update the `audit` key in the JSON:
   "audit": {
     "last_run": "<ISO 8601 timestamp>",
     "security_level": "<basic|recommended|maximum>",
-    "categories_run": ["security", "seo", "a11y", "performance", "best-practices", "geo"],
+    "categories_run": ["security", "seo", "a11y", "performance", "best-practices", "geo", "usability"],
     "checks_run": {
       "security": ["SEC-001", "SEC-002", "SEC-036"],
-      "geo": ["GEO-A11"]
+      "geo": ["GEO-A11"],
+      "usability": ["UX-014", "UX-006"]
     },
     "issues_found": N,
     "issues_fixed": M,
