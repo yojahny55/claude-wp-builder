@@ -39,10 +39,10 @@ s3_skill=skills/wp-s3/SKILL.md
 # Every runner command, and every skill reached only through one. wp-s3 has two commands
 # over one skill: configuring a site and moving its media are separate jobs with separate
 # failure modes, and the second is run again long after the first.
-runner_cmds="$robin_cmd $aos_cmd $s3_cmd $s3_media_cmd"
-action_skills="$robin_skill $aos_skill $s3_skill"
+runner_cmds=( "$robin_cmd" "$aos_cmd" "$s3_cmd" "$s3_media_cmd" )
+action_skills=( "$robin_skill" "$aos_skill" "$s3_skill" )
 
-for f in $runner_cmds $action_skills; do
+for f in "${runner_cmds[@]}" "${action_skills[@]}"; do
   [ -f "$f" ] || fail "$f is missing"
 done
 
@@ -58,7 +58,7 @@ fm() {  # file, regex — frontmatter only
     END { exit !(found && closed) }
   ' "$1"
 }
-for f in $runner_cmds; do
+for f in "${runner_cmds[@]}"; do
   for key in '^description:' '^allowed-tools:' '^argument-hint:'; do
     fm "$f" "$key" || fail "$f has no ${key#^} in its frontmatter"
   done
@@ -68,7 +68,7 @@ done
 # 2. The skills stay non-invocable. Flipping this is the workaround these two
 #    commands exist to make unnecessary.
 # ---------------------------------------------------------------------------
-for f in $action_skills; do
+for f in "${action_skills[@]}"; do
   fm "$f" '^user-invocable: false' \
     || fail "$f no longer declares user-invocable: false in its frontmatter — a runner command is the supported way in, not an invocable skill"
   ! fm "$f" '^user-invocable: true' \
@@ -79,7 +79,7 @@ done
 # 3. Each command says what it is — a runner whose skill still owns the method —
 #    in the repo's own words for it.
 # ---------------------------------------------------------------------------
-for f in $runner_cmds; do
+for f in "${runner_cmds[@]}"; do
   has "$f" 'runner' || fail "$f never says it is a runner for the skill of the same name"
   has "$f" 'Dispatch, never reimplement' \
     || fail "$f does not state the layer rule it depends on ('dispatch, never reimplement')"

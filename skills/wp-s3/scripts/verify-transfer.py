@@ -21,7 +21,10 @@ import sys
 
 
 def excluded(path, patterns):
-    return any(fnmatch.fnmatch(path, p) for p in patterns)
+    # fnmatchcase, not fnmatch: on this platform fnmatch lowercases both sides, and the
+    # client matches its own --exclude patterns case-sensitively. Disagreeing with it
+    # means comparing a file the transfer was told to skip and reporting it as missing.
+    return any(fnmatch.fnmatchcase(path, p) for p in patterns)
 
 
 def local_files(root, patterns):

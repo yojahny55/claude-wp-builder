@@ -68,11 +68,17 @@ if [[ -z "$S3_UPLOADS_KEY" || -z "$S3_UPLOADS_SECRET" ]]; then
         S3_UPLOADS_KEY="$S3_MEDIA_KEY"
         S3_UPLOADS_SECRET="$S3_MEDIA_SECRET"
     else
+        if [[ -n "$S3_UPLOADS_USE_INSTANCE_PROFILE" ]]; then
+            WHY="This site authenticates with the server's IAM role, which signs the plugin's requests
+but cannot be handed to a separate client."
+        else
+            WHY="This site has neither a key pair nor S3_UPLOADS_USE_INSTANCE_PROFILE, so there is
+nothing here to sign a request with. Check $CONFIG first."
+        fi
         cat >&2 <<TXT
 ERROR: $CONFIG has no key pair.
 
-This site authenticates with the server's IAM role, which signs the plugin's requests
-but cannot be handed to a separate client. Two ways forward:
+$WHY Two ways forward:
 
   1. Temporary credentials for this transfer only, never written to disk:
        read -rs S3_MEDIA_SECRET && export S3_MEDIA_SECRET
@@ -134,7 +140,10 @@ with os.fdopen(fd, "w") as handle:
 PY
 
 export MC_CONFIG_DIR="$MCLI_CONFIG_DIR"
-unset S3_UPLOADS_SECRET S3_MEDIA_SECRET
+# Both halves of the credential leave the environment now that they are in the file the
+# client reads: the key id is the less sensitive half, not a harmless one, and every child
+# process below inherits whatever is still set here.
+unset S3_UPLOADS_KEY S3_UPLOADS_SECRET S3_MEDIA_SECRET
 
 # S3_UPLOADS_BUCKET may carry a prefix ("bucket/site-prefix"); the client takes that path
 # as written, so a trailing slash would produce an empty path segment and a key that does

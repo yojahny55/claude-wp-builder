@@ -103,7 +103,10 @@ grep -Fq 'php_single_quoted' "$setup" \
 # not by "the line does not start with #": a continuation line, a quoted string or a
 # command whose first token is the flag would all slip past that heuristic, and this guard
 # is the one that keeps a repeated run safe.
-code_only() { sed 's/#.*$//' "$1"; }
+# Only a `#` that starts a line or follows whitespace opens a comment here; one inside a
+# URL or a colour literal does not, and stripping from it would delete the rest of a line
+# that may carry the very flag this guard looks for.
+code_only() { sed 's/\(^\|[[:space:]]\)#.*$/\1/' "$1"; }
 for f in "$media" "$lib" "$revert"; do
   for flag in --overwrite --remove; do
     ! code_only "$f" | grep -Eq "(^|[[:space:]\"'\(\$])${flag}([[:space:]\"'\)]|$)" \
