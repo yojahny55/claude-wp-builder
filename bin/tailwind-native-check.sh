@@ -6,6 +6,13 @@
 set -euo pipefail
 
 theme="${1:?usage: tailwind-native-check.sh <theme-dir>}"
+# Trailing slashes stripped once, here. Every rule below builds a path as
+# "$theme/…" and rule 5 compares one of those against a `grep -rl` result, which
+# never carries a double slash — so `./my-theme/` made the sanctioned
+# performance.php look like an offender.
+while [ "${theme%/}" != "$theme" ] && [ "${theme%/}" != "" ]; do
+  theme="${theme%/}"
+done
 src="$theme/assets/css/src/tailwindcss"
 main="$src/main.css"
 fail=0
@@ -93,8 +100,12 @@ offenders=""
 for f in $style_files; do
   case "$f" in
     "$theme"/inc/performance.php)
-      # Every `<style` occurrence in this file must be on a `<noscript>` line.
-      if [ "$(grep -c '<style' "$f")" = "$(grep -c '<noscript>.*<style' "$f")" ]; then
+      # Every `<style` line in this file must also carry `<noscript>`. Counted as
+      # the lines that do NOT, rather than by comparing two totals: a single line
+      # holding two `<style` occurrences makes `grep -c '<style'` and
+      # `grep -c '<noscript>.*<style'` diverge while every block is still inside a
+      # <noscript>, and that comparison then failed a file that was correct.
+      if [ "$(grep '<style' "$f" | grep -vc '<noscript>' || true)" = "0" ]; then
         continue
       fi
       ;;

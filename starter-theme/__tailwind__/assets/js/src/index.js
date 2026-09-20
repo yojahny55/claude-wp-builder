@@ -58,8 +58,19 @@ const initLazyBackgrounds = () => {
     return;
   }
 
+  // Appended, never assigned: these sections can already carry an inline style
+  // from the template, and `cssText = declaration` would silently drop it. The
+  // getter returns the serialised block, which ends in `;` whenever it is not
+  // empty, so the append is always well formed.
+  // The null test is what makes the call idempotent. Without it a second paint
+  // of the same element — a carousel that moves the node, a future edit that
+  // observes an idle element too — appends the string `null` to the style.
   const paint = (el) => {
-    el.style.cssText += el.getAttribute('data-__starter__-bg');
+    const declaration = el.getAttribute('data-__starter__-bg');
+    if (!declaration) {
+      return;
+    }
+    el.style.cssText += declaration;
     el.removeAttribute('data-__starter__-bg');
   };
 
@@ -83,8 +94,16 @@ const initLazyBackgrounds = () => {
     window.addEventListener('load', paintIdle);
   }
 
+  // The fallback paints what the observer would have observed, and only that.
+  // An idle element is inside the first viewport, so painting it here paints it
+  // during the initial parse — which is the one thing the idle flag exists to
+  // prevent. It stays with paintIdle, which is already scheduled above.
   if (!('IntersectionObserver' in window)) {
-    lazyBackgrounds.forEach(paint);
+    lazyBackgrounds.forEach((el) => {
+      if (!el.hasAttribute('data-__starter__-bg-idle')) {
+        paint(el);
+      }
+    });
     return;
   }
 

@@ -64,6 +64,22 @@ grep -Fq "document.readyState === 'complete'" "$js" \
 # otherwise show every deferred section with no background at all.
 grep -Fq "!('IntersectionObserver' in window)" "$js" \
   || { echo "FAIL: $js has no fallback for a browser without IntersectionObserver"; exit 1; }
+# …and it must paint only what the observer would have observed. An idle element sits
+# inside the first viewport, so a bare lazyBackgrounds.forEach(paint) here paints it
+# during the initial parse and the idle flag means nothing on the very browsers this
+# path exists for.
+flatjs=$(tr '\n' ' ' < "$js" | sed 's/  */ /g')
+printf '%s' "$flatjs" | grep -Fq "in window)) { lazyBackgrounds.forEach(paint); }" \
+  && { echo "FAIL: $js paints idle backgrounds eagerly in the no-IntersectionObserver fallback"; exit 1; }
+printf '%s' "$flatjs" | grep -Fq "hasAttribute('data-__starter__-bg-idle')" \
+  || { echo "FAIL: $js does not keep idle backgrounds deferred in the no-IntersectionObserver fallback"; exit 1; }
+# paint() must read the attribute into a variable and bail when it is gone. Appending
+# `null` to cssText is what a second paint of the same node does otherwise.
+printf '%s' "$flatjs" | grep -Eq "const declaration = el.getAttribute\('data-__starter__-bg'\); if \(!declaration\)" \
+  || { echo "FAIL: $js paint() is not idempotent — a second call appends the string null to the element style"; exit 1; }
+# Appended, not assigned: these sections can carry an inline style already.
+printf '%s' "$flatjs" | grep -Fq 'el.style.cssText += declaration;' \
+  || { echo "FAIL: $js assigns cssText instead of appending, dropping any inline style the template set"; exit 1; }
 
 # 3. The agent contract. Flattened first: a correct re-wrap can split any of these phrases
 # across two physical lines, including at a hyphen.
