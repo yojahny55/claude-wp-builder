@@ -46,6 +46,7 @@ Before running ANY checks, read the following project files:
 | Code | Check | How to Detect | Severity | Auto-fix |
 |------|-------|---------------|----------|----------|
 | PERF-010 | Scripts not deferred | Grep `wp_enqueue_script` AND `wp_register_script` for the handle. Flag it when NEITHER call sets `in_footer => true` (array form or 5th positional `true`) nor `strategy => 'defer'` — either call can set the group, so check both before reporting | WARNING | Yes |
+| PERF-058 | Theme JavaScript served unminified | List the theme's own script files (`assets/js/**.js`, excluding `vendors/`, `node_modules/` and any file already ending `.min.js`) and read the first 2KB of each. Flag the theme when a file carries block comments, indentation or a line over 200 characters *and* no minified twin is served for it — check both shapes: a `<name>.min.js` next to it, and a `assets/js/min/<name>.js`. Report the summed byte size of the unminified set, since a single 3KB file is noise and a whole theme's worth is not (55.4KB → 23.3KB on a real build). A bundled theme (`assets/js/dist/`, `@wordpress/scripts`, webpack, vite) minifies in its build and is NOT a finding | WARNING | Yes — see *Unminified theme JavaScript fix* |
 | PERF-011 | Hardcoded script tags | Grep templates for `<script src=` | WARNING | No |
 | PERF-012 | jQuery when vanilla suffices | Grep JS files for `jQuery\|\$\(` when vanilla would work | INFO | No |
 | PERF-013 | Render-blocking in head | Grep header.php for `<script` without `defer\|async` | WARNING | Yes |
@@ -422,6 +423,62 @@ the wider count eager, e.g.:
 
 Everywhere else — a true below-the-fold image with no grid ambiguity — `loading="lazy"` as
 before.
+
+### Unminified theme JavaScript fix
+
+A hand-written theme (the common case in an audit: no bundler, files enqueued one by one)
+ships `assets/js/*.js` exactly as they were written. Rewriting every `wp_enqueue_script()`
+call to point at a `.min.js` is the obvious fix and the wrong one: it is a change in as many
+places as there are handles, it breaks the moment someone adds a handle and forgets, and it
+leaves the theme unusable until the build has been run at least once.
+
+Build the minified copies into a sibling directory and swap the URL in one filter, so no
+`wp_enqueue_script()` call has to know the build exists:
+
+```php
+/**
+ * Serve the minified twin of a theme script when one has been built.
+ *
+ * The filter swaps the URL only when the twin exists on disk, so a checkout where
+ * the build has not been run — or one file that failed to minify — serves the
+ * original unchanged instead of 404ing.
+ */
+add_filter( 'script_loader_src', 'prefix_use_minified_scripts', 10, 2 );
+function prefix_use_minified_scripts( $src, $handle ) {
+	if ( is_admin() || false === strpos( $src, '/assets/js/' ) ) {
+		return $src;
+	}
+
+	$theme_uri = get_template_directory_uri();
+	if ( 0 !== strpos( $src, $theme_uri . '/assets/js/' ) ) {
+		return $src;
+	}
+
+	$file = basename( wp_parse_url( $src, PHP_URL_PATH ) );
+	if ( ! file_exists( get_template_directory() . '/assets/js/min/' . $file ) ) {
+		return $src;
+	}
+
+	return str_replace( '/assets/js/' . $file, '/assets/js/min/' . $file, $src );
+}
+```
+
+The build is one script and one dev dependency (`terser`), writing every
+`assets/js/*.js` into `assets/js/min/` and printing the before/after bytes per file so the
+saving is a number rather than a claim. Commit both the sources and the output: the filter
+reads the disk, not a manifest.
+
+**State this in the project's `.claude/CLAUDE.md` as part of the fix, because it is a trap
+that wastes a whole debugging session:** once the twin exists, editing a file under
+`assets/js/` changes nothing that the site serves. The page still loads, the console stays
+clean, the old behaviour persists, and reading the source confirms a change that is not
+live — so the next edit has to run the build in the same pass, and bump the theme's version
+constant so the new file is not served from the browser cache either.
+
+Two things this fix does not cover, and both belong in the report rather than in a silent
+decision: a file under `vendors/` is third-party and usually minified already, so it is left
+alone; and `assets/js/min/` must be excluded from the theme bundle's own exclude list only if
+that list names `min` — check `bundle`/`zip` scripts before assuming the twins ship.
 
 ### Hero fetchpriority fix
 
