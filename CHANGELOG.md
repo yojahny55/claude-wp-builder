@@ -22,6 +22,22 @@
   selecting nothing while the page still looks correct with JavaScript on; and the painter
   tests `document.readyState` before trusting a `load` listener, because a deferred bundle on
   a cached page runs after that event has fired and the listener alone is never called.
+- **`PERF-058` reports a theme that serves its own JavaScript unminified, and the fix is one
+  filter.** A hand-written theme — the common case in an audit, with no bundler and one
+  `wp_enqueue_script()` per file — ships `assets/js/*.js` as written; on a real build that was
+  55.4KB where the minified set is 23.3KB. The criterion sums the unminified bytes rather than
+  flagging a single small file, checks both twin shapes (`<name>.min.js` and
+  `assets/js/min/<name>.js`) so a theme that already has the fix is not reported, and exempts a
+  bundled theme, whose build minifies already.
+  The fix swaps the URL in a `script_loader_src` filter that tests the twin exists on disk
+  first, so no `wp_enqueue_script()` call has to know the build exists and a checkout where the
+  build has never run serves the sources instead of 404ing every script. The rejected
+  alternative — rewriting every enqueue call to a `.min.js` path — is named in the fix, with
+  the reason. And the trap goes into the project's own `.claude/CLAUDE.md`, because it is
+  silent: once the twin exists, editing a source file under `assets/js/` changes nothing the
+  site serves. The page loads, the console stays clean, the old behaviour persists, and reading
+  the source confirms a change that is not live — so the build runs in the same pass as the
+  edit, and the theme version constant is bumped so the rebuilt file is not served from cache.
 
 ### Fixed
 
