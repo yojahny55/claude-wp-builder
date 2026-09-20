@@ -104,7 +104,7 @@ Use `AskUserQuestion` for everything except the secret:
 the user to export it into the environment themselves, in their own terminal:
 
 ```
-! read -rs S3_UPLOADS_SECRET_VALUE && export S3_UPLOADS_SECRET_VALUE
+! read -rsp 'S3_UPLOADS_SECRET_VALUE: ' S3_UPLOADS_SECRET_VALUE && echo && export S3_UPLOADS_SECRET_VALUE
 ```
 
 Then run the script in that same shell. If the secret is not in the environment and the

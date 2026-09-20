@@ -8,7 +8,8 @@ user-invocable: false
 
 ## What this skill does
 
-1. **Installs** S3 Uploads (Human Made) with its `vendor/` tree, and leaves it deactivated
+1. **Installs** S3 Uploads (Human Made) with its `vendor/` tree, verified against a pinned
+   commit, and leaves it deactivated
 2. **Writes** `s3-config.php` at the site root and hooks it into `wp-config.php`
 3. **Installs** an mu-plugin that points the plugin at an S3-compatible endpoint, and does
    nothing on AWS
@@ -38,7 +39,8 @@ choosing it:
 | PHP ≥ 8.1 with `simplexml`, `json`, `pcre`, `curl`, `mbstring` | The AWS SDK the plugin bundles |
 | `allow_url_fopen = On` | The plugin registers `s3://` as a URL-type stream wrapper |
 | `composer` | Releases since 3.0.10 ship without `vendor/`. On a PHP with no `iconv` the install adds `--ignore-platform-req=ext-iconv` by itself |
-| `curl`, `tar`, `python3` | The setup script |
+| `git` | The plugin is cloned at a pinned commit and refused if the tag no longer points there. Without git the install stops: `--unverified-download` takes the tarball instead, which carries nothing that can be checked |
+| `curl`, `tar`, `python3` | The setup script; `curl` and `tar` only on the `--unverified-download` path |
 | A client binary named `mcli` or `mc` | Only for `/wp-s3-media` |
 | WP-CLI | Optional. The credentials are proved by `scripts/check-credentials.php`, which does not need the plugin to be active |
 

@@ -13,12 +13,20 @@
 #       --bucket-url https://media.example.com \
 #       [--endpoint https://s3.example.com] \
 #       [--auth instance|key] [--key <access-key-id>] \
-#       [--version 3.0.13] [--skip-plugin-install]
+#       [--version 3.0.13] [--unverified-download] [--skip-plugin-install]
 
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PLUGIN_VERSION="3.0.13"
+# The commit the default tag points at, verified at install time. A git tag can be moved
+# and a tarball is served by whatever answers the request; a commit id is the hash of the
+# tree itself, so git rejects any content that does not produce it. Pinned per version:
+# --version with any other value has no pin and is refused unless --unverified-download
+# says so out loud.
+PLUGIN_PINNED_VERSION="3.0.13"
+PLUGIN_COMMIT="c09bd3057747b181eeb9c22e380da9d904ba260a"
+ALLOW_UNVERIFIED="no"
 
 WP_ROOT=""
 BUCKET=""
@@ -41,6 +49,7 @@ while [[ $# -gt 0 ]]; do
         --auth)       AUTH="${2:-}"; shift 2 ;;
         --key)        KEY="${2:-}"; shift 2 ;;
         --version)    PLUGIN_VERSION="${2:-}"; shift 2 ;;
+        --unverified-download) ALLOW_UNVERIFIED="yes"; shift ;;
         --skip-plugin-install) SKIP_INSTALL="yes"; shift ;;
         *) die "unknown option: $1" ;;
     esac
@@ -163,16 +172,64 @@ elif [[ -d "$PLUGIN_DIR" ]]; then
     install_vendor
     echo "   Completed at $PLUGIN_DIR (not activated)."
 else
-    command -v curl >/dev/null || die "curl is required to download the plugin"
-    command -v tar  >/dev/null || die "tar is required to unpack the plugin"
+    # This installs PHP that will run on every request to the site, so what arrives is
+    # checked against something the network cannot choose. `git clone` of a pinned commit
+    # is that check: git hashes every object it receives and refuses a tree that does not
+    # produce the id asked for, so a moved tag, a rewritten archive or a man-in-the-middle
+    # all fail here rather than on the site. The tarball path has no such anchor — GitHub
+    # regenerates those archives, so their digest is not stable enough to pin — and is
+    # therefore the fallback, refused by default.
     echo "1. Downloading S3-Uploads $PLUGIN_VERSION"
     tmp="$(mktemp -d -t wp-s3-XXXXXX)"
     trap 'rm -rf "$tmp"' EXIT
-    curl -fsSL -o "$tmp/s3-uploads.tar.gz" \
-        "https://github.com/humanmade/S3-Uploads/archive/refs/tags/${PLUGIN_VERSION}.tar.gz" \
-        || die "could not download S3-Uploads $PLUGIN_VERSION"
-    tar -xzf "$tmp/s3-uploads.tar.gz" -C "$tmp"
-    mv "$tmp/S3-Uploads-${PLUGIN_VERSION}" "$PLUGIN_DIR"
+
+    WANT_COMMIT=""
+    if [[ "$PLUGIN_VERSION" == "$PLUGIN_PINNED_VERSION" ]]; then
+        WANT_COMMIT="$PLUGIN_COMMIT"
+    fi
+
+    if [[ -n "$WANT_COMMIT" ]] && command -v git >/dev/null 2>&1; then
+        # A shallow clone of a tag lands on a detached HEAD, and git prints eight lines
+        # of advice about it to stderr even under --quiet. Here that is noise between the
+        # numbered steps, not something the operator can act on.
+        git -c advice.detachedHead=false clone --quiet --depth 1 --branch "$PLUGIN_VERSION" \
+            https://github.com/humanmade/S3-Uploads.git "$tmp/S3-Uploads" \
+            || die "could not clone S3-Uploads $PLUGIN_VERSION"
+        got="$( cd "$tmp/S3-Uploads" && git rev-parse HEAD )"
+        if [[ "$got" != "$WANT_COMMIT" ]]; then
+            die "S3-Uploads $PLUGIN_VERSION is not the commit this script pins.
+       expected $WANT_COMMIT
+       received $got
+       Nothing has been installed. The tag may have been moved upstream; check it
+       before going further."
+        fi
+        echo "   Verified commit $WANT_COMMIT"
+        rm -rf "$tmp/S3-Uploads/.git"
+        mv "$tmp/S3-Uploads" "$PLUGIN_DIR"
+    else
+        if [[ "$ALLOW_UNVERIFIED" != "yes" ]]; then
+            if [[ -z "$WANT_COMMIT" ]]; then
+                WHY="This script pins a commit for $PLUGIN_PINNED_VERSION only, and you asked for $PLUGIN_VERSION."
+            else
+                WHY="git is not installed, and the tarball carries nothing that can be checked."
+            fi
+            die "refusing to install unverified plugin code.
+       $WHY
+       This code runs on every request to the site once the plugin is activated.
+       Install git, or pass --unverified-download to accept the tarball as it arrives."
+        fi
+        command -v curl >/dev/null || die "curl is required to download the plugin"
+        command -v tar  >/dev/null || die "tar is required to unpack the plugin"
+        echo "   WARNING: downloading without verification (--unverified-download)."
+        curl -fsSL -o "$tmp/s3-uploads.tar.gz" \
+            "https://github.com/humanmade/S3-Uploads/archive/refs/tags/${PLUGIN_VERSION}.tar.gz" \
+            || die "could not download S3-Uploads $PLUGIN_VERSION"
+        if command -v sha256sum >/dev/null 2>&1; then
+            echo "   sha256 of what arrived: $(sha256sum "$tmp/s3-uploads.tar.gz" | cut -d" " -f1)"
+        fi
+        tar -xzf "$tmp/s3-uploads.tar.gz" -C "$tmp"
+        mv "$tmp/S3-Uploads-${PLUGIN_VERSION}" "$PLUGIN_DIR"
+    fi
 
     [[ -f "$PLUGIN_DIR/vendor/autoload.php" ]] || install_vendor
     echo "   Installed at $PLUGIN_DIR (not activated)."

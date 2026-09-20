@@ -101,6 +101,17 @@
   to pin or upgrade was a silent no-op against whatever the previous run left behind; the
   requested version is stamped at install time and a mismatch is now reported by name,
   without replacing a tree that may carry local edits or belong to an active plugin.
+  The reviewer's next round found the one thing none of this had asked: **the plugin's own
+  code arrived unchecked.** It was a tarball over HTTPS from a tag, unpacked straight into
+  `wp-content/plugins/`, and once activated every line of it runs on every request to the
+  site. A tag can be moved upstream, and GitHub regenerates those archives, so their digest
+  is not stable enough to pin. What is stable is the commit id — the hash of the tree
+  itself, which git will not produce from any other content — so the install clones at the
+  pinned commit and refuses anything else, naming both ids. Measured: a deliberately wrong
+  pin stops the run with nothing installed. Where the pin does not apply — git absent, or a
+  `--version` other than the pinned one — the run stops rather than falling back quietly;
+  `--unverified-download` takes the tarball, says so, and prints its sha256 so an operator
+  who accepts it can at least record what they accepted.
   One from the reviewer, narrower than it looks: `check-credentials.php` asked `empty()`
   of every value it read, and `empty()` reads `'0'` as absent. The bucket and the region
   could never be that, but the key and the secret are arbitrary strings from whatever

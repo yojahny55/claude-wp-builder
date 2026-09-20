@@ -81,7 +81,7 @@ ERROR: $CONFIG has no key pair.
 $WHY Two ways forward:
 
   1. Temporary credentials for this transfer only, never written to disk:
-       read -rs S3_MEDIA_SECRET && export S3_MEDIA_SECRET
+       read -rsp 'S3_MEDIA_SECRET: ' S3_MEDIA_SECRET && echo && export S3_MEDIA_SECRET
        S3_MEDIA_KEY=<access-key-id> bash $0 $DIRECTION $WP_ROOT
 
   2. WP-CLI, which uses the role, for the upload direction only:

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Six properties of the wp-s3 scripts that were wrong once, measured against a real
-# S3-compatible server and a real WordPress, and are cheap to break again by editing the
-# obvious line:
+# Fifteen properties of the wp-s3 scripts, every one of them wrong once, measured against
+# a real S3-compatible server and a real WordPress, and cheap to break again by editing
+# the obvious line. Each numbered section below asserts the property of the same number.
 #
 #   1. The credential check must NOT be `wp s3-uploads verify`. That subcommand is
 #      registered by the plugin, and setup deliberately leaves the plugin deactivated, so
@@ -21,6 +21,15 @@
 #      credentials the client does not percent-decode, so encoding them broke every
 #      secret holding a reserved character, and `alias set` would put the secret in argv.
 #   6. Credentials are quoted for PHP where they are written, not assembled in the shell.
+#   7. Neither direction may ever clobber: no --overwrite, no --remove.
+#   8. WooCommerce's logs and the form attachments never leave the disk.
+#   9. The revert's closing summary survives a site that had no config to park.
+#  10. Every `wp` call in the revert is asked once and reused.
+#  11. A commented-out define() is not configuration.
+#  12. "The require block was hand-edited" is not the same failure as "the rewrite failed".
+#  13. A vendor/ tree is not the version that was asked for.
+#  14. A transfer is judged by comparing both sides, not by the client's exit code.
+#  15. Plugin code is verified against a pinned commit before it is installed.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
@@ -118,7 +127,7 @@ for f in "$media" "$lib" "$revert"; do
 done
 
 # ---------------------------------------------------------------------------
-# 7b. The two directories a wrong bucket policy would expose never leave the disk:
+# 8. The two directories a wrong bucket policy would expose never leave the disk:
 #     WooCommerce's logs and the form attachments people upload.
 # ---------------------------------------------------------------------------
 for dir in wc-logs wpcf7_uploads; do
@@ -127,7 +136,7 @@ for dir in wc-logs wpcf7_uploads; do
 done
 
 # ---------------------------------------------------------------------------
-# 7c. The revert's closing summary is what tells the operator about Elementor's stored
+# 9. The revert's closing summary is what tells the operator about Elementor's stored
 #     URLs and WooCommerce's download settings, so it must survive a site that had no
 #     config to park: the reader exits non-zero there, and `pipefail` used to carry that
 #     into an assignment that errexit turned into a silent stop one line short.
@@ -136,7 +145,7 @@ grep -Fq 'if [[ -f "$CONFIG.disabled" ]]; then' "$revert" \
   || fail "$revert reads the parked config without checking that there is one"
 
 # ---------------------------------------------------------------------------
-# 7d. Every `wp` call in the revert is asked once and reused. WP-CLI prints a
+# 10. Every `wp` call in the revert is asked once and reused. WP-CLI prints a
 #     three-line "This does not seem to be a WordPress installation" for a site it
 #     cannot read, and it used to land between step 2 and step 4 of a run that had
 #     already reported the plugin inactive in step 1.
@@ -146,7 +155,7 @@ grep -Fq 'PLUGIN_ACTIVE' "$revert" \
 
 
 # ---------------------------------------------------------------------------
-# 9. A commented-out define() is not configuration. PHP keeps the FIRST define() of a
+# 11. A commented-out define() is not configuration. PHP keeps the FIRST define() of a
 #    name, so matching the first occurrence is right for code — but the reader matched
 #    it textually, and the line an operator leaves above the new one while rotating a
 #    bucket or a key is a comment. It handed every caller the stale value while the site
@@ -162,7 +171,7 @@ printf '%s\n' '<?php' "// define( 'S3_UPLOADS_BUCKET', 'stale' );" \
   || fail "$reader reads a commented-out define() as the site's configuration"
 
 # ---------------------------------------------------------------------------
-# 10. The revert must tell "the block was hand-edited" apart from "the rewrite failed".
+# 12. The revert must tell "the block was hand-edited" apart from "the rewrite failed".
 #     Python exits 3 for the first and 1 for any unhandled exception — a read-only
 #     $WP_ROOT is the measured one — and both used to print the same message, sending
 #     that operator to delete a block nobody had touched.
@@ -171,17 +180,29 @@ grep -Fq 'status -eq 3' "$revert" \
   || fail "$revert treats every non-zero exit from the rewrite as a hand-edited require block"
 
 # ---------------------------------------------------------------------------
-# 11. A vendor/ tree is not the version that was asked for. Re-running with --version to
+# 13. A vendor/ tree is not the version that was asked for. Re-running with --version to
 #     pin or upgrade was a silent no-op against whatever a previous run left behind.
 # ---------------------------------------------------------------------------
 grep -Fq 'installed_version' "$setup" \
   || fail "$setup skips the install without comparing what is there against --version"
 
 # ---------------------------------------------------------------------------
-# 8. The transfer is still judged by comparing both sides, not by the client's
-#    exit code or its summary table.
+# 14. The transfer is still judged by comparing both sides, not by the client's
+#     exit code or its summary table.
 # ---------------------------------------------------------------------------
 grep -Fq 'verify-transfer.py' "$lib" \
   || fail "$lib no longer compares both sides after a transfer"
+
+# ---------------------------------------------------------------------------
+# 15. Plugin code is verified before it is installed. This tree runs on every request
+#     to the site once the plugin is activated, and a tag can be moved upstream. The
+#     clone is checked against a pinned commit — the hash of the tree itself, which
+#     git refuses to produce from anything else — and the tarball path, which carries
+#     no such anchor, is refused unless the operator asks for it by name.
+# ---------------------------------------------------------------------------
+grep -Fq 'PLUGIN_COMMIT' "$setup" \
+  || fail "$setup installs the plugin without checking what arrived against a pinned commit"
+grep -Fq -- '--unverified-download' "$setup" \
+  || fail "$setup has no named way to accept an unverifiable download, so it either refuses always or checks nothing"
 
 echo PASS
