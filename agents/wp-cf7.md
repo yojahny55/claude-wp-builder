@@ -135,6 +135,35 @@ stack under its own field.
 once and screenshot it. Resting-state-only review is how error tips, the response
 notice and the consent line all get discovered by the client instead.
 
+### Write each label and its tag on ONE line
+
+CF7 runs its form body through `wpautop`, so **every newline inside a paragraph
+becomes a `<br>`** — including the one an author naturally puts between a label and
+its field:
+
+```
+<label>Your name
+    [text* your-name]</label>
+```
+
+That renders a line break between them, and with the wrap's box and the `<p>`'s own
+UA margin stacked on top, the gap measures around 100px per field. On a fourteen-field
+form that is fourteen of them, and the form reads as broken spacing rather than as a
+markup artefact — a client reported it before anyone looked. Measured 42px per gap
+against the demo's 0.4rem, closing to 6px once the rows were on one line.
+
+Write them joined:
+
+```
+<label>Your name [text* your-name]</label>
+```
+
+Two more from the same cause: zero the `<p>` margin in the bridge stylesheet, and use
+`display: contents` on `.wpcf7-form-control-wrap` where the design needs the control to
+be a grid or flex item — with the exception above for side-by-side rows. **Ship that
+bridge stylesheet whenever the demo styles its own form**, because the demo's CSS
+targets the demo's markup and CF7's markup is not the same shape.
+
 ### Control width, and the spinner's margins
 
 Two geometry defects recur because CF7 puts its own boxes between your CSS and the control:

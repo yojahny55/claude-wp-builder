@@ -541,6 +541,18 @@ try {
   browser = await chromium.launch({ executablePath, args: ['--autoplay-policy=no-user-gesture-required'] });
 
   for (const pageTarget of pages) {
+  // One page's failure costs that page, never the walk. A single screenshot
+  // exceeding its timeout used to reject out of the whole loop, so a 16-page
+  // directory lost fifteen completed pages and wrote no findings.json at all —
+  // three times on one build, each time re-run from zero. The page is recorded
+  // as crashed, which is blocking, and the walk goes on.
+  // Hoisted so the catch below can still name the page and keep its findings.
+  // `let`, not `const`: the local-page branch inside the try reassigns this to
+  // the loopback URL once its server is up, and that server call can throw, so
+  // it cannot be computed before the try.
+  let pageUrl = pageTarget;
+  const findings = [];
+  try {
   const isRemote = /^https?:\/\//.test(pageTarget);
   // Loading a local page as file:// puts it on an opaque origin, where Chrome
   // blocks an external `<script type="module">` outright — the engine never
@@ -548,7 +560,6 @@ try {
   // the whole class. One server per page, closed before the next is opened;
   // process.exit() at the very end reclaims whichever one is still open.
   if (http) { http.server.close(); http = null; }
-  let pageUrl = pageTarget;
   if (!isRemote) {
     const abs = resolve(pageTarget);
     const root = statSync(abs).isDirectory() ? abs : dirname(abs);
@@ -557,7 +568,6 @@ try {
     pageUrl = `http://127.0.0.1:${http.port}/${leaf}`;
   }
   const pageOut = pages.length > 1 ? join(outDir, basename(pageTarget, '.html')) : outDir;
-  const findings = [];
   const sections = [];
   let staticChecked = false;
   // One list of dead selectors per width walked, intersected after the loop.
@@ -893,6 +903,20 @@ try {
   await captureResponsiveShots(browser, pageUrl, pageOut);
   mkdirSync(pageOut, { recursive: true });
   report.pages.push({ url: pageUrl, findings });
+  } catch (err) {
+    // Keep whatever this page did find before it died: a section list that
+    // stops half way is still evidence, and the reason is on the row.
+    // Coerce before splitting: a thrown value whose .message is not a string
+    // would throw again HERE, inside the handler, and that exception reaches the
+    // walk-level catch and aborts the whole directory — the exact failure this
+    // block exists to prevent.
+    const msg = err && typeof err.message === 'string' ? err.message : String(err);
+    const why = msg.split('\n')[0];
+    findings.push({ kind: 'page-crashed', pass: 'normal', width: 0, error: why });
+    report.pages.push({ url: pageUrl, findings });
+    console.error('demo-verify: ' + basename(pageTarget) + ' crashed, continuing: ' + why);
+    exitCode = Math.max(exitCode, 1);
+  }
   }
 
   mkdirSync(outDir, { recursive: true });
