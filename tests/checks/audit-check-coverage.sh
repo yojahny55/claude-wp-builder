@@ -44,7 +44,7 @@ grep -Fq 'absent `audit.checks_run` is not "nothing has run"' "$c" \
 grep -Fq 'This is a warning, not a block' "$c" \
   || fail "$c does not distinguish a partially-covered category from a never-run one"
 
-# Both lists name the same six categories, and they live in different files: the module
+# Both lists name the same categories, and they live in different files: the module
 # validates them, the command's prose enumerates them. Drift between two lists that must
 # agree is the defect this whole feature is about.
 cats=$(node --input-type=module -e \
@@ -73,6 +73,7 @@ SEO agents/wp-audit-seo.md
 A11Y agents/wp-audit-a11y.md
 PERF agents/wp-audit-performance.md
 GEO agents/wp-audit-geo.md
+UX agents/wp-audit-ux.md
 PAIRS
 
 # --- check revisions ----------------------------------------------------------------------
@@ -95,4 +96,4 @@ grep -Fq 'revision it ran at' "$c" \
 grep -Fq '@[1-9]' "$m" \
   || fail "$m does not accept a revision suffix on a check ID -- writing SEC-036@2 would fail validation"
 
-echo "PASS: check-level coverage is contracted, and all six catalog pointers resolve"
+echo "PASS: check-level coverage is contracted, and every catalog pointer resolves"

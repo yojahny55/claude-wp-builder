@@ -436,6 +436,7 @@ commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. 
 | `wp-environments` | Environment detection and the WP-CLI wrapper every command runs through |
 | `wp-audit-standards` | Audit criteria, severity definitions, report schema and quality thresholds for the `wp-audit-*` agents |
 | `wp-audit-seo-standards` | Rank Math configuration reference, schema JSON-LD templates, meta patterns and SEO seeding commands |
+| `wp-audit-ux-standards` | Usability criteria — the UX-NNN catalog, the page-level vs site-level split, the applicability rules that keep a score honest and the owner each fix belongs to |
 | `wp-audit-geo-standards` | GEO and AI-agent-readiness reference — the ORA/is-agentic check catalog, applicability by site type, AI crawler allowlist, llms.txt/well-known specs, GEO citability rubric and WordPress implementation templates |
 | `wp-audit-local-standards` | Local SEO audit reference — business-type and vertical detection, NAP consistency sources, LocalBusiness subtype selection, location-page quality gates and citation tiers, with the WordPress option and meta keys each check reads |
 | `wp-contributing` | Contributing to this plugin — the layer rules, the grep-gate test style, and the PR and release rituals |
@@ -456,6 +457,7 @@ commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. 
 | `wp-audit-security` · `wp-audit-seo` · `wp-audit-a11y` · `wp-audit-performance` · `wp-audit-practices` | The five `/wp-audit` judgment auditors — code scanning, structured data, WCAG 2.1 AA, Core Web Vitals, WordPress standards |
 | `wp-audit-aios` · `wp-audit-rankmath` | The two mechanical audit installers — All-in-One WP Security and Rank Math, configured via WP-CLI |
 | `wp-audit-geo` | GEO / AI-agent-readiness auditor — maps the ORA check catalog to GEO codes, parses the rendered DOM and runs the is-agentic scan |
+| `wp-audit-ux` | Usability auditor — forms, navigation, links followed rather than inferred, hover and active states, rendered line length per breakpoint, logo and typography consistency across pages |
 | `wp-agentic-surfaces` | Agentic-surfaces fixer — emits the theme's `inc/agentic.php` (llms.txt, ARD catalog, agent-skills index, markdown negotiation, Link headers, agent-friendly 404, JSON-LD breadth), seeds trust anchors and writes the robots AI policy |
 
 ### Starter Theme
@@ -525,7 +527,7 @@ The `/wp-create` command supports multiple environment types:
 
 ## Audit & Quality
 
-The `/wp-audit` command runs a comprehensive audit across 6 categories and offers to auto-fix issues.
+The `/wp-audit` command runs a comprehensive audit across 7 categories and offers to auto-fix issues.
 
 ### Categories
 
@@ -537,6 +539,7 @@ The `/wp-audit` command runs a comprehensive audit across 6 categories and offer
 | `--performance` | Core Web Vitals, caching, assets | — |
 | `--best-practices` | WordPress coding standards | — |
 | `--geo` | GEO / AI-agent readiness, ORA-scored | is-agentic live scan |
+| `--usability` | Forms, navigation, links, feedback, legibility, identity | — |
 
 `--geo` scores how discoverable, accessible and usable a site is to AI agents and generative
 engines, following the four ORA layers (Discovery, Access, Usability, Payments). It detects the
@@ -550,6 +553,9 @@ fetches; without a reachable public URL the scan skips and the runtime codes rep
 - **Tier 1 (always):** Code analysis via file scanning
 - **Tier 2 (with WP-CLI):** Runtime checks, plugin configuration
 - **Tier 3 (with a browser tool, or `--suite`):** Lighthouse-style browser audits and Core Web Vitals
+
+Most of `--usability` is page-level, so `--pages` fixes which URLs are measured; without a
+page list those criteria report `UNMEASURED` rather than passing.
 
 ### The deliverable
 
@@ -572,6 +578,7 @@ external tool. `--report-lang en|es` picks the language the client reads it in.
 /wp-audit --report-only      # Report without fixing
 /wp-audit --report both --report-lang es   # Also write the dated client report
 /wp-audit --suite --host https://example.com  # Measure in a real browser, unattended
+/wp-audit --usability --pages auto         # Audit the pages a person actually uses
 /wp-audit --security-level maximum  # Set AIOS security level
 ```
 

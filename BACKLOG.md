@@ -148,8 +148,30 @@ Making the command flow smoother and more guided.
 
 Improving the reliability and output quality of agents.
 
-- [ ] **Logo from demo path** `OPEN`
-  [wp-header](commands/wp-header.md) reads the logo from the settings field with a `get_bloginfo('name')` fallback, but nothing extracts the logo image from the demo HTML, imports it, and populates that field — so the fallback is what a fresh build shows.
+- [x] **Run the browser audit as a suite instead of asking the session for a browser** `DELIVERED`
+  [`/wp-audit --suite`](commands/wp-audit.md) scaffolds and runs
+  [templates/audit-suite](templates/audit-suite/) through
+  [bin/audit-suite.sh](bin/audit-suite.sh) — axe-core, Lighthouse desktop and mobile, three
+  engines — and [scripts/to-run.js](templates/audit-suite/scripts/to-run.js) converts its
+  results into the run file [bin/audit-report.mjs](bin/audit-report.mjs) renders. The
+  template is vendored with its provenance and compared by
+  [audit-suite-sync](tests/checks/audit-suite-sync.sh); the install is shared per machine;
+  the overlap with the agents' own findings is resolved by measurement beating inference.
+
+- [x] **Usability criteria: the categories no auditor owns** `DELIVERED`
+  [wp-audit-ux](agents/wp-audit-ux.md) audits forms and data entry, navigation and task
+  flow, links followed rather than inferred, interactive feedback, legibility and visual
+  identity, against the `UX-NNN` catalog in
+  [wp-audit-ux-standards](skills/wp-audit-ux-standards/SKILL.md). Contrast, focus and target
+  size stay with [wp-audit-a11y](agents/wp-audit-a11y.md). Held by
+  [audit-usability-scope](tests/checks/audit-usability-scope.sh).
+
+- [x] **Audit a list of pages, not only the theme** `DELIVERED`
+  [`/wp-audit --pages`](commands/wp-audit.md) Step 2.7 derives the scope from the manifest,
+  the menu, the sitemap or the home page, adds the 404 and the form page, caps at eight and
+  says it capped. A page-level criterion with no page list reports `UNMEASURED` rather than
+  passing, and `N/A` and `UNMEASURED` are both excluded from the denominator so the score
+  reflects what the site was meant to do.
 
 - [x] **SCF field labels in site primary language** `DELIVERED`
   [wp-acf](agents/wp-acf.md) reads the primary language from `.claude/CLAUDE.md` and writes every string the editor reads — group title, tabs, field labels, instructions, `button_label`, `message` — in it, with a worked Spanish-primary example. `key`, `name` and the language suffix stay English, because a `name` is the meta key. Held by [acf-editor-language](tests/checks/acf-editor-language.sh). This entry read DELIVERED from the reconciliation of September 19, 2026 while the agent file said nothing of the kind; closing [#3](https://github.com/yojahny55/claude-wp-builder/issues/3) is what made it true.

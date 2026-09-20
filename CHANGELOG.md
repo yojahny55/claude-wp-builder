@@ -4,6 +4,36 @@
 
 ### Added
 
+- **A seventh auditor, for the question the other six do not ask: can a person use this
+  site?** `/wp-audit --usability` dispatches the new `wp-audit-ux` agent against the
+  `UX-NNN` catalog in `skills/wp-audit-ux-standards/SKILL.md` — forms and data entry,
+  navigation and task flow, links **followed** rather than inferred, hover and active
+  states, rendered line length per breakpoint, and whether the logo and the type scale hold
+  still between templates. A form that marks no field as required is valid HTML, escapes
+  correctly, loads fast and passes WCAG; six auditors had nothing to say about it.
+  Contrast, focus order and target size are deliberately absent from the catalog: they are
+  `wp-audit-a11y`, and where a defect is genuinely both, the accessibility code is the one
+  reported. Two codes for one defect inflate every count and make the ledger's identity
+  useless.
+  **It is the first auditor whose scope is a list of URLs**, so Step 2.7 fixes one.
+  `--pages auto` derives it from the manifest, the primary menu, the sitemap or the home
+  page's links — in that order, stopping at the first that yields pages — and always adds
+  the 404 and any page carrying a form, because a third of the catalog lives on those two
+  and no ranking finds them. The list is capped at eight, one page per template, and the cap
+  is printed: auditing forty pages measures five templates eight times each and produces a
+  report nobody acts on.
+  Two rules keep the result honest, and both failures are quiet. **A page-level criterion
+  with no page list is `UNMEASURED`, never `PASS`** — an audit that measured nothing and
+  printed no failures reads exactly like a clean site. And **`N/A` and `UNMEASURED` are both
+  excluded from the denominator**, the first because a site is not worse for lacking a
+  feature it was never meant to have, the second because it is outstanding work and folding
+  it into either side of the fraction hides it. Applicability is decided *before* scoring,
+  so an awkward criterion cannot become `N/A` for having been hard to measure.
+  Almost every fix in this catalog changes how the site looks, and four of them move
+  layout, so the agent measures `getComputedStyle()` and `getBoundingClientRect()` before
+  and after, at both widths and on every element carrying the class — not only the one it
+  was looking at.
+
 - **The browser half of an audit runs as a suite, not as a hope that the session has a
   browser.** `/wp-audit --suite` scaffolds `.wp-audit/suite/` from the new
   `templates/audit-suite/` — a real Playwright project with axe-core, Lighthouse and three
@@ -43,7 +73,8 @@
   All three routes now agree on how a finding is identified. The resource convention is
   written down once (`page:/contact/`, `post:412`, `template-parts/hero.php:34`, `site`),
   a page-level finding is one row per page rather than one per occurrence, and the Step 6
-  dispatch prompt asks **every** agent for an owner.
+  dispatch prompt asks **every** agent for an owner, since the renderer refuses a finding
+  that arrives without one.
 
 - **An audit now produces something you can hand over.** `/wp-audit --report md|html|both`
   writes the run to `.wp-audit/informe-<date>.md` and `informe-<date>.html` through the new
