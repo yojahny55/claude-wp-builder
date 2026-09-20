@@ -4,6 +4,33 @@
 
 ### Added
 
+- **An audit now produces something you can hand over.** `/wp-audit --report md|html|both`
+  writes the run to `.wp-audit/informe-<date>.md` and `informe-<date>.html` through the new
+  `bin/audit-report.mjs`. The console report is gone with the scrollback and
+  `.wp-audit-findings.json` is a working file of check ids, so every audit was run twice:
+  once to find the problems and once by whoever wanted to read them. The HTML is a single
+  file with no external stylesheet, script or font, because a deliverable is opened offline,
+  attached to mail and printed to PDF, and a page that fetches anything renders correctly
+  only on the machine that made it.
+  **Every finding now names who applies it**, and the four owners exist because of the one
+  that gets lost. `code` is a theme file and travels with the commit; `setting` is a
+  WordPress option, a plugin's configuration or a server rule, applied here with WP-CLI and
+  left behind by the commit — the staging panel has no WP-CLI, so it is a step to repeat
+  rather than a fix that shipped; `content` needs a person to write a text; `manual` needs
+  judgment or an external tool. Ownership follows what the fix touches, never whether the
+  audit could automate it, or `setting` collapses into `code` the moment a fix is
+  auto-applied. The renderer refuses a finding without one and exits `1` naming it: a plan
+  whose last column is blank looks exactly like a populated one until somebody reads it.
+  The report is written **before** the fix phase, always. The dated report is the baseline
+  the next audit is measured against, so a run that fixes first has no before to compare
+  with, and the user cannot choose what gets touched in their site without seeing the whole
+  of it. A machine sidecar is written beside the documents and the next report diffs against
+  it by finding identity — resolved, new, still failing — so fixing one issue and finding
+  another stops reading as no change. The sidecar is not the ledger: the ledger is the
+  project's running history of every finding ever seen, a sidecar is one dated snapshot, and
+  the renderer never parses its own Markdown back, because a report edited by hand would
+  otherwise rewrite what the next comparison claims happened.
+
 - **A site's media can live in S3.** `/wp-s3` installs S3 Uploads with its `vendor/` tree,
   writes `s3-config.php` at `0640`, hooks it into `wp-config.php` behind a timestamped backup,
   and installs an mu-plugin that points the plugin at an S3-compatible endpoint and does

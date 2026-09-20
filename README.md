@@ -551,12 +551,26 @@ fetches; without a reachable public URL the scan skips and the runtime codes rep
 - **Tier 2 (with WP-CLI):** Runtime checks, plugin configuration
 - **Tier 3 (with a browser tool):** Lighthouse-style browser audits and Core Web Vitals
 
+### The deliverable
+
+`--report md|html|both` writes the run to `.wp-audit/informe-<date>.md` and
+`informe-<date>.html` — one self-contained file that opens with a double click, forwards as
+an attachment and prints to PDF. It is written before the fix phase, so the dated report is
+the baseline the next audit is measured against. Each later report opens with resolved /
+new / still failing, compared by finding identity rather than by count.
+
+Every row of its plan names who applies it: `code` travels with the commit, `setting` is a
+database or server change that does **not** and has to be repeated on staging and
+production, `content` needs a person to write a text, `manual` needs judgment or an
+external tool. `--report-lang en|es` picks the language the client reads it in.
+
 ### Usage
 
 ```bash
 /wp-audit                    # Run all categories
 /wp-audit --security --seo   # Run specific categories
 /wp-audit --report-only      # Report without fixing
+/wp-audit --report both --report-lang es   # Also write the dated client report
 /wp-audit --security-level maximum  # Set AIOS security level
 ```
 

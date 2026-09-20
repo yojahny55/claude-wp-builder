@@ -373,13 +373,31 @@ static screenshot per breakpoint cannot show scroll motion, which is why the che
 
 ```
 /wp-audit [--security] [--seo] [--a11y] [--performance] [--best-practices] [--geo] [--all]
-          [--report-only] [--host <public-url>] [--security-level basic|recommended|maximum]
+          [--report-only] [--report md|html|both] [--report-lang en|es]
+          [--host <public-url>] [--security-level basic|recommended|maximum]
 ```
 
 No category flag = all. Security installs/configures All-in-One WP Security; SEO installs
 Rank Math and seeds meta/schema. `--report-only` skips fixes. Lighthouse-style checks need
 a browser automation tool; without one they report `UNMEASURED` and every file-scan check
 still runs.
+
+`--report` writes the run as a dated deliverable under `.wp-audit/` — `informe-<date>.md`
+to work with and version, and `informe-<date>.html`, a single self-contained file that
+opens with a double click, forwards as an attachment and prints to PDF. It is written
+before the fix phase, always: the dated report is the baseline the next audit is measured
+against, and a run that fixes first has no before to compare with. A machine sidecar goes
+beside them, and the next report opens with resolved / new / still failing against it — by
+finding identity, not by count, so fixing one issue and finding another no longer reads as
+no change.
+
+Its plan gives every row an owner, which is the column that answers how much of the work
+is yours: `code` is a theme file and **travels with the commit**; `setting` is a WordPress
+option, a plugin's configuration or a server rule, applied here with WP-CLI and **left
+behind by the commit**, so it is a step to repeat on staging and production where there is
+no WP-CLI; `content` needs a person to write a text; `manual` needs judgment or an external
+tool. `--report-lang` picks the language of the document, since a client reads it and not
+the person who ran the audit.
 
 `--geo` audits Generative Engine Optimization and AI-agent readiness. It detects the site
 type first — content, local business, merchant or SaaS — and gates each check on that, so a
