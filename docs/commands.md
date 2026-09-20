@@ -406,7 +406,7 @@ somebody inspected the real DOM to find, and a scaffold that overwrote it every 
 re-measure a different site without saying so.
 
 Where a measured finding and a code finding describe the same **check and the same
-resource**, the measurement wins and the loser's code is recorded in its evidence —
+resource**, the measurement wins and the superseded source is noted in its evidence —
 otherwise one defect is reported twice and every count is inflated. This is not done by
 hand: `bin/audit-report.mjs --merge` folds the suite's run file into the agents' and prints
 how many collided. A shared check with a *different* resource is two real findings — a

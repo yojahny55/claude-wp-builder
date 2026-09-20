@@ -80,6 +80,16 @@ for f in audit.config.js .env.example; do
   fi
 done
 
+# A denylist that passes because it is empty is worth nothing, so prove the rule bites.
+probe=$(mktemp -d)
+cp "$suite/audit.config.js" "$probe/audit.config.js"
+sed -i "s|https://example.com|https://a-real-client.example-not-reserved.ca|" "$probe/audit.config.js"
+leak_probe=$(grep -hoE 'https?://[A-Za-z0-9.-]+' "$probe/audit.config.js" \
+  | sed -E 's#^https?://##; s#^www\.##' \
+  | grep -vE '(^|\.)(example\.(com|net|org)|example|test|invalid|localhost)$' | sort -u || true)
+rm -rf "$probe"
+[ -n "$leak_probe" ] || fail "the host check does not flag a non-reserved domain, so it would pass on a real client host"
+
 # ---------------------------------------------------------------------------
 # 2. Every JavaScript file parses
 # ---------------------------------------------------------------------------
@@ -136,6 +146,40 @@ if (byId["UX-046"].ownership !== "content") fail("UX-046 (title text) is not own
 if (byId["UX-032"].ownership !== "manual") fail("UX-032 (typography judgement) is not owned as manual");
 if (byId["UX-051"].severity !== "CRITICAL") fail("an indexability failure is not CRITICAL");
 ' "$run" || fail "the bridge mistranslated the classification the suite already made"
+
+# ---------------------------------------------------------------------------
+# 3b. The page list is rewritten without destroying the file
+# ---------------------------------------------------------------------------
+# The template's own default `pages:` array is not flat -- its contact entry nests
+# `form: { fields: [ ... ] }`. A non-greedy regex stops at that inner `]` and leaves the
+# outer array's tail behind as orphaned tokens, so the config no longer parses and nothing
+# notices until a Playwright run fails with a syntax error deep in a generated file. This
+# is the documented, recommended invocation, against the shipped template.
+cfg="$tmp/audit.config.js"
+cp "$suite/audit.config.js" "$cfg"
+# Run the runner's own config-rewriting step against the shipped template, by extracting
+# the heredoc it feeds to node. Calling bin/audit-suite.sh directly would npm install.
+cat > "$tmp/rewrite.js" <<'JS'
+const fs = require('fs');
+const src = fs.readFileSync(process.env.RUNNER, 'utf8');
+const marker = "<<'NODE'";
+const start = src.indexOf("const fs = require('fs');", src.indexOf(marker));
+const body = src.slice(start, src.indexOf('\nNODE\n', start));
+process.argv[2] = process.env.CFG;
+eval(body);
+JS
+RUNNER="$runner" CFG="$cfg" BASE_URL="https://example.com" PAGES="/,/a/,/b/" \
+  node "$tmp/rewrite.js" || fail "$runner could not rewrite the template config"
+
+node --check "$cfg" >/dev/null 2>&1 \
+  || fail "rewriting pages: left $suite/audit.config.js unparseable -- the nested form array truncated the replacement"
+node -e '
+const c = require(process.argv[1]);
+const paths = c.pages.map(p => p.path).join(" ");
+if (paths !== "/ /a/ /b/") { console.error("pages are " + paths); process.exit(1); }
+if (c.baseURL !== "https://example.com") { console.error("baseURL is " + c.baseURL); process.exit(1); }
+if (!c.notFoundPath) { console.error("the tail of the file was eaten: notFoundPath is gone"); process.exit(1); }
+' "$cfg" || fail "the rewritten config does not hold what it was given"
 
 # ---------------------------------------------------------------------------
 # 4. The runner refuses and skips in the right places

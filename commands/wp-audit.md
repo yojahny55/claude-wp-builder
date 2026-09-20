@@ -502,8 +502,8 @@ owns it, with one rule:
 
 - **A measurement beats an inference.** Where both describe the same resource, keep the
   suite's finding and drop the agent's — the agent reasoned about the code, the suite
-  loaded the page. Record the agent's code in the kept finding's evidence so the ledger
-  still shows the check ran.
+  loaded the page. The kept finding's evidence notes that it superseded another source, and
+  the sidecar keeps that evidence.
 - Where they describe *different* resources, they are different findings. A contrast
   failure the suite measured on `/contact` and one the agent found in a stylesheet rule
   that no audited page uses are both real, and the second is the one nobody would find
@@ -862,7 +862,8 @@ ${CLAUDE_PLUGIN_ROOT}/bin/audit-report.mjs --run <agents.json> \
 ```
 
 The renderer applies Step 7's second rule — same `check` **and** same `resource` keeps the
-measured one and records the other's code in its evidence — and prints how many collided.
+measured one, notes the superseded source in its evidence — which the dated sidecar keeps —
+and prints how many collided.
 Rendering the two separately instead would split one audit across two documents and two
 baselines.
 

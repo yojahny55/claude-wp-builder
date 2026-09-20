@@ -27,8 +27,8 @@
 // -- the agents, and the browser suite -- and rendering them separately would split one
 // audit across two documents and two baselines. Where both describe the same check and the
 // same resource, the MEASURED one wins: the suite loaded the page, the agent reasoned about
-// the code. The loser's check id is kept in the winner's evidence, so the ledger still shows
-// it ran.
+// the code. The losing finding is noted in the winner's evidence and that evidence is kept
+// in the dated sidecar, so a later reader can see that two sources reported it.
 //
 // Exit codes (house convention):
 //   0  documents written
@@ -246,6 +246,19 @@ function identity(finding) {
 // stylesheet rule no audited page uses are two real findings, and the second is the one
 // nobody would find again.
 function mergeRuns(base, extras) {
+  // Swapped arguments, or a stale suite run left over from a previous audit, produced a
+  // report labelled with whatever --run pointed at and no sign the inputs disagreed.
+  for (const extra of extras) {
+    for (const field of ['site', 'date']) {
+      if (extra[field] && base[field] && extra[field] !== base[field]) {
+        console.error(
+          `audit-report: warning: merging a run whose ${field} is ${JSON.stringify(extra[field])} `
+          + `into one whose ${field} is ${JSON.stringify(base[field])} -- the report keeps the latter`,
+        );
+      }
+    }
+  }
+
   const byIdentity = new Map(base.findings.map((finding) => [identity(finding), finding]));
   const merged = [...base.findings];
   const unmeasured = [...(Array.isArray(base.unmeasured) ? base.unmeasured : [])];
@@ -254,6 +267,7 @@ function mergeRuns(base, extras) {
 
   for (const extra of extras) {
     for (const finding of extra.findings) {
+      if (!finding.source && extra.source) finding.source = extra.source;
       const key = identity(finding);
       const existing = byIdentity.get(key);
       if (!existing) {
@@ -265,7 +279,13 @@ function mergeRuns(base, extras) {
       // findings do not carry it, which is the whole distinction.
       const winner = finding.measured && !existing.measured ? finding : existing;
       const loser = winner === finding ? existing : finding;
-      winner.evidence = [winner.evidence, `superseded ${loser.check}`].filter(Boolean).join(' — ');
+      // Name the source, not the check: a collision means both carried the SAME check and
+      // the same resource, so repeating the check id says nothing the row does not show.
+      // Repeated merges must not repeat the note either.
+      const note = `superseded ${loser.measured ? 'a measured' : 'an inferred'} finding from ${loser.source || 'another run'}`;
+      if (!String(winner.evidence || '').includes(note)) {
+        winner.evidence = [winner.evidence, note].filter(Boolean).join(' — ');
+      }
       if (winner !== existing) {
         merged[merged.indexOf(existing)] = winner;
         byIdentity.set(key, winner);
@@ -725,6 +745,7 @@ function main() {
           category: finding.category || null,
           page: finding.page || null,
           message: finding.message,
+          evidence: finding.evidence || null,
         })),
       },
       null,
