@@ -373,7 +373,7 @@ static screenshot per breakpoint cannot show scroll motion, which is why the che
 
 ```
 /wp-audit [--security] [--seo] [--a11y] [--performance] [--best-practices] [--geo] [--all]
-          [--report-only] [--report md|html|both] [--report-lang en|es]
+          [--report-only] [--report md|html|both] [--report-lang en|es] [--suite]
           [--host <public-url>] [--security-level basic|recommended|maximum]
 ```
 
@@ -390,6 +390,28 @@ against, and a run that fixes first has no before to compare with. A machine sid
 beside them, and the next report opens with resolved / new / still failing against it — by
 finding identity, not by count, so fixing one issue and finding another no longer reads as
 no change.
+
+`--suite` runs the browser half of the audit as a generated Playwright project instead of
+depending on a browser tool being present in the session — axe-core for accessibility,
+Lighthouse for the desktop and mobile scores and Core Web Vitals, and the criteria that
+only exist in a rendered page: contrast as measured, line width per breakpoint, a form's
+validation, a link followed rather than inferred. It scaffolds `.wp-audit/suite/` from
+`templates/audit-suite/` and installs the dependencies once per machine into a shared
+cache, so the second audit on a machine is not as expensive as the first. Without Node or
+npm it skips cleanly and Tier 3 reports `UNMEASURED`, which is what an absent browser tool
+already did.
+
+Its `audit.config.js` is written once and then left alone: it carries the selectors
+somebody inspected the real DOM to find, and a scaffold that overwrote it every run would
+re-measure a different site without saying so.
+
+Where a measured finding and a code finding describe the same **check and the same
+resource**, the measurement wins and the superseded source is noted in its evidence —
+otherwise one defect is reported twice and every count is inflated. This is not done by
+hand: `bin/audit-report.mjs --merge` folds the suite's run file into the agents' and prints
+how many collided. A shared check with a *different* resource is two real findings — a
+contrast failure measured on `/contact/` and one in a stylesheet rule no audited page uses
+are not the same defect, and the second is the one nobody would find again.
 
 Its plan gives every row an owner, which is the column that answers how much of the work
 is yours: `code` is a theme file and **travels with the commit**; `setting` is a WordPress

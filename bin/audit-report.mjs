@@ -20,8 +20,15 @@
 //      its own Markdown back.
 //
 // Usage:
-//   bin/audit-report.mjs --run <run.json> [--out <dir>] [--format md|html|both]
-//                        [--lang en|es] [--date YYYY-MM-DD]
+//   bin/audit-report.mjs --run <run.json> [--merge <other.json>...] [--out <dir>]
+//                        [--format md|html|both] [--lang en|es] [--date YYYY-MM-DD]
+//
+// --merge folds another run file into this one. One audit produces two sources of findings
+// -- the agents, and the browser suite -- and rendering them separately would split one
+// audit across two documents and two baselines. Where both describe the same check and the
+// same resource, the MEASURED one wins: the suite loaded the page, the agent reasoned about
+// the code. The losing finding is noted in the winner's evidence and that evidence is kept
+// in the dated sidecar, so a later reader can see that two sources reported it.
 //
 // Exit codes (house convention):
 //   0  documents written
@@ -118,11 +125,17 @@ function die(code, message) {
 }
 
 function parseArgs(argv) {
-  const opts = { out: '.wp-audit', format: 'both', lang: 'en', run: null, date: null };
+  const opts = { out: '.wp-audit', format: 'both', lang: 'en', run: null, date: null, merge: [] };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     const value = argv[i + 1];
     switch (flag) {
+      case '--merge': {
+        if (value === undefined || value.startsWith('--')) die(1, `${flag} needs a value`);
+        opts.merge.push(value);
+        i += 1;
+        break;
+      }
       case '--run':
       case '--out':
       case '--format':
@@ -226,6 +239,68 @@ function validateUnmeasured(entries) {
 
 function identity(finding) {
   return finding.resource ? `${finding.check}:${finding.resource}` : finding.check;
+}
+
+// A measurement beats an inference. Both describe the same defect only when they agree on
+// the check AND the resource; a contrast failure measured on /contact and one found in a
+// stylesheet rule no audited page uses are two real findings, and the second is the one
+// nobody would find again.
+function mergeRuns(base, extras) {
+  // Swapped arguments, or a stale suite run left over from a previous audit, produced a
+  // report labelled with whatever --run pointed at and no sign the inputs disagreed.
+  for (const extra of extras) {
+    for (const field of ['site', 'date']) {
+      if (extra[field] && base[field] && extra[field] !== base[field]) {
+        console.error(
+          `audit-report: warning: merging a run whose ${field} is ${JSON.stringify(extra[field])} `
+          + `into one whose ${field} is ${JSON.stringify(base[field])} -- the report keeps the latter`,
+        );
+      }
+    }
+  }
+
+  const byIdentity = new Map(base.findings.map((finding) => [identity(finding), finding]));
+  const merged = [...base.findings];
+  const unmeasured = [...(Array.isArray(base.unmeasured) ? base.unmeasured : [])];
+  const seenUnmeasured = new Set(unmeasured.map((entry) => entry.check));
+  let superseded = 0;
+
+  for (const extra of extras) {
+    for (const finding of extra.findings) {
+      if (!finding.source && extra.source) finding.source = extra.source;
+      const key = identity(finding);
+      const existing = byIdentity.get(key);
+      if (!existing) {
+        byIdentity.set(key, finding);
+        merged.push(finding);
+        continue;
+      }
+      // `measured` is set by whatever produced the run file. The suite sets it; an agent's
+      // findings do not carry it, which is the whole distinction.
+      const winner = finding.measured && !existing.measured ? finding : existing;
+      const loser = winner === finding ? existing : finding;
+      // Name the source, not the check: a collision means both carried the SAME check and
+      // the same resource, so repeating the check id says nothing the row does not show.
+      // Repeated merges must not repeat the note either.
+      const note = `superseded ${loser.measured ? 'a measured' : 'an inferred'} finding from ${loser.source || 'another run'}`;
+      if (!String(winner.evidence || '').includes(note)) {
+        winner.evidence = [winner.evidence, note].filter(Boolean).join(' — ');
+      }
+      if (winner !== existing) {
+        merged[merged.indexOf(existing)] = winner;
+        byIdentity.set(key, winner);
+      }
+      superseded += 1;
+    }
+    for (const entry of Array.isArray(extra.unmeasured) ? extra.unmeasured : []) {
+      if (seenUnmeasured.has(entry.check)) continue;
+      seenUnmeasured.add(entry.check);
+      unmeasured.push(entry);
+    }
+  }
+
+  if (superseded) console.log(`audit-report: ${superseded} finding(s) reported by two sources, kept once`);
+  return { ...base, findings: merged, unmeasured };
 }
 
 // The previous run is the newest sidecar in the output directory that is not this run's
@@ -596,7 +671,9 @@ ${unmeasuredBlock}
 
 function main() {
   const opts = parseArgs(process.argv.slice(2));
-  const run = loadRun(opts.run);
+  const run = opts.merge.length
+    ? mergeRuns(loadRun(opts.run), opts.merge.map(loadRun))
+    : loadRun(opts.run);
   const findings = run.findings;
 
   if (findings.length === 0 && !(run.unmeasured || []).length) {
@@ -668,6 +745,7 @@ function main() {
           category: finding.category || null,
           page: finding.page || null,
           message: finding.message,
+          evidence: finding.evidence || null,
         })),
       },
       null,

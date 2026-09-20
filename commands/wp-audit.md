@@ -1,7 +1,7 @@
 ---
 description: Comprehensive audit — security, SEO, accessibility, performance, best practices, GEO/AI-agent readiness
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, AskUserQuestion
-argument-hint: "[--security] [--seo] [--a11y] [--performance] [--best-practices] [--geo] [--all] [--report-only] [--report md|html|both] [--report-lang en|es] [--host <public-url>] [--security-level basic|recommended|maximum]"
+argument-hint: "[--security] [--seo] [--a11y] [--performance] [--best-practices] [--geo] [--all] [--report-only] [--report md|html|both] [--report-lang en|es] [--suite] [--host <public-url>] [--security-level basic|recommended|maximum]"
 ---
 
 # WP Audit — Comprehensive Site Audit
@@ -15,6 +15,9 @@ Parse `$ARGUMENTS` for:
 - **`--all` flag** (default if no category flags provided)
 - **`--report-only` flag** (skip fix phase)
 - **`--security-level basic|recommended|maximum`** (default: `recommended`, ignored if `--report-only`)
+- **`--suite`** — run the browser audit as a generated Playwright project instead of
+  depending on a browser tool being present in this session. Needs a reachable URL, the
+  same one `--host` supplies.
 - **`--report md|html|both`** — also write the run as a dated deliverable under
   `.wp-audit/`. Absent, the audit prints to the console and writes only the ledger, which
   is what every run did before this flag existed.
@@ -276,17 +279,30 @@ Determine the audit tier:
 
 **Tier 2 (if `.wp-create.json` exists):** Read `.wp-create.json` to get `$WP` wrapper. Set `$WP` to the value of `wp_cli.wrapper`. Enables WP-CLI runtime checks.
 
-**Tier 3 (if a browser automation tool is available):** Probe every run — Step 2.5b
+**Tier 3 (if a browser automation tool is available, or `--suite` brings its own):** Probe every run — Step 2.5b
 already re-probed it, and `audit.browser_measurement_available` from a previous run is a
 drift input, never the answer. Tier 3 is what actually loads the page, so it is gated on
 the one thing that can: a browser.
 
-Check for any of these tools in the session:
-1. Playwright MCP (`mcp__playwright__browser_navigate`)
-2. Chrome DevTools MCP (`performance_start_trace`)
-3. Claude in Chrome (`mcp__claude-in-chrome__navigate`)
+**Tier 3 is available two ways, and they are not equivalent.**
 
-If any is available, Tier 3 is available.
+1. *A browser tool in this session* — Playwright MCP (`mcp__playwright__browser_navigate`),
+   Chrome DevTools MCP (`performance_start_trace`) or Claude in Chrome
+   (`mcp__claude-in-chrome__navigate`). Whatever is here measures; nothing here means no
+   measurement.
+2. *The suite* (`--suite`) — a generated Playwright project that brings its own browser.
+
+The first depends on who is running the audit, which is why the same project used to
+measure differently depending on the session. The second does not, and it is the one that
+can run unattended. Probe it with:
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/bin/audit-suite.sh --probe
+```
+
+Exit `0` means it can run, `2` means this machine has no Node or npm and Tier 3 stays
+unmeasured — which is a skip, not a failure, and is reported as `UNMEASURED` exactly like
+an absent browser tool.
 
 The criteria themselves — budgets, Core Web Vitals thresholds, the WCAG 2.2 additions, the
 HTML5 cross-check — live in the audit agents and in `wp-audit-standards`, and every check
@@ -297,10 +313,10 @@ Print tier status:
 ```
 === Audit Tier Detection ===
 
-Audit Tier: <Code | Code + Runtime | Code + Runtime + Lighthouse>
+Audit Tier: <Code | Code + Runtime | Code + Runtime + Lighthouse | Code + Runtime + Suite>
   ✓ Tier 1: Code analysis (always available)
   <✓|✗> Tier 2: WP-CLI runtime checks (<.wp-create.json found|.wp-create.json not found>)
-  <✓|✗> Tier 3: Browser measurement (<browser tool detected|no browser tool available>)
+  <✓|✗> Tier 3: Browser measurement (<browser tool detected|suite available|no browser tool available>)
 ```
 
 **`--geo` needs Tier 2.** The GEO auditor's live HTTP checks and the `bin/geo-scan.sh`
@@ -335,6 +351,10 @@ WordPress Plugins:
 
 Browser measurement:
   <✓|✗> browser automation tool — <available|not available> (enables Core Web Vitals measurement)
+  <✓|✗> suite (--suite) — <available|node/npm not available> (brings its own browser)
+
+Either one is Tier 3. Print both: with `--suite` on a machine that has no MCP browser, a
+line that says only "not available" contradicts the tier this run is actually at.
 
 Options:
   [A] Install all recommended WordPress plugins
@@ -441,6 +461,54 @@ Use these `subagent_type` values:
 3. Mark the failed category in the report
 4. Skip the failed category in the fix phase
 
+## Step 6.5: Run the browser suite (`--suite` only)
+
+The six agents read code, the database and a rendered `<head>`. None of them loads the page
+the way a visitor does, so the criteria that only exist in a rendered page — contrast as
+measured, line width at each breakpoint, a form's validation, a broken link followed, a
+Lighthouse score — were either unmeasured or asserted from the source. This runs them.
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/bin/audit-suite.sh --url <public-url> --dir .wp-audit/suite \
+  --site "<project name>" [--pages "/,/services/,/contact/"]
+```
+
+`<public-url>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json`.
+`--pages` is the list to measure; without it the suite keeps whatever its config already
+holds, which on a first run is the template's placeholder — so pass it.
+The first run scaffolds `.wp-audit/suite/` from `templates/audit-suite/` and installs the
+suite's dependencies **once per machine**, into a shared cache keyed by the template's
+`package.json`. Later runs and later projects reuse it.
+
+| Exit | Meaning | What to report |
+|---|---|---|
+| `0` | the suite ran; `.wp-audit/suite/results/run.json` holds its findings | fold them in |
+| `1` | it could not run, or produced nothing to convert | report the error; Tier 3 findings stay `UNMEASURED` |
+| `2` | no Node, no npm, or the browser would not install | Tier 3 `UNMEASURED` — a skip, not a failure |
+| `3` | crash | report it and continue |
+
+**`audit.config.js` is written once and then left alone.** It carries the selectors
+somebody inspected the real DOM to find, and a scaffold that overwrote it every run would
+re-measure a different site each time without saying so. When a run reports selectors that
+match nothing, edit that file — do not delete it.
+
+### The suite's findings and the agents' findings can be the same defect
+
+The suite measures accessibility with axe and reads the same `<head>` `wp-audit-seo` reads,
+so a contrast failure or a missing description can arrive twice, once as `A11Y-AXE-*` or
+`UX-*` and once as `A11Y-*` or `SEO-*`. Reporting **the same defect twice under two codes**
+inflates every count and makes the ledger's identity useless, so Step 7's deduplication
+owns it, with one rule:
+
+- **A measurement beats an inference.** Where both describe the same resource, keep the
+  suite's finding and drop the agent's — the agent reasoned about the code, the suite
+  loaded the page. The kept finding's evidence notes that it superseded another source, and
+  the sidecar keeps that evidence.
+- Where they describe *different* resources, they are different findings. A contrast
+  failure the suite measured on `/contact` and one the agent found in a stylesheet rule
+  that no audited page uses are both real, and the second is the one nobody would find
+  again.
+
 ## Step 6.9: Every finding is a measurement
 
 A finding is the output of a command that ran in THIS run, and it carries what produced it:
@@ -501,7 +569,9 @@ finding that could not be measured. It is not counted as resolved.
 
 Collect reports from all agents. For each agent's output, parse the findings into a unified list.
 
-**Deduplication:** If the same `file:line` appears in multiple reports:
+**Deduplication** runs on two different keys, because two different things collide here.
+
+*Two agents reporting the same place.* If the same `file:line` appears in multiple reports:
 - Keep the finding with the highest severity
 - Remove duplicates from lower-severity reports
 - Category claims: Security claims vulnerability checks, Practices claims coding-standards
@@ -509,8 +579,20 @@ Collect reports from all agents. For each agent's output, parse the findings int
   — that is Step 8.5's `code`/`setting`/`content`/`manual`, and it says who applies the fix.
   One word for two unrelated ideas is how a `setting` ends up rendered as `code`.)
 
-**The resource convention.** Step 7.5 identifies a finding by `check` + `resource`, so a
-resource written two ways is two findings for one defect:
+*The suite and an agent reporting the same defect.* With `--suite`, a contrast failure or a
+missing description arrives twice: once measured on a page, once inferred from the source.
+**A measurement beats an inference.** They are the same defect only when the check **and**
+the resource match — a contrast failure measured on `/contact` and one found in a stylesheet
+rule no audited page uses are two real findings, and the second is the one nobody would find
+again.
+
+This one is not applied by hand. `bin/audit-report.mjs --merge` does it in Step 8.5, keeping
+the measured finding and recording the loser's code in its evidence so the ledger still
+shows the check ran. Do not also dedupe them here: doing it twice drops the second copy
+without recording that it existed.
+
+**The resource convention both sides must share.** The merge matches on `check` + `resource`,
+so a resource written two ways never matches and the duplicate survives:
 
 | What the finding is about | `resource` |
 |---|---|
@@ -520,8 +602,8 @@ resource written two ways is two findings for one defect:
 | a site-level judgement | `site` |
 
 **A page-level finding is one row per page, not one per occurrence.** Three broken links on
-`/contact/` are one finding whose evidence lists all three — a row per link turns a page
-with a bad footer into forty findings that are one fix.
+`/contact/` are one finding whose evidence lists all three. One row per link matches nothing
+the suite emits, and turns a page with a bad footer into forty findings that are one fix.
 
 Sort all issues: CRITICAL first, then WARNING, then INFO.
 
@@ -761,7 +843,7 @@ it is an argument, not an artifact:
     }
   ],
   "unmeasured": [
-    { "check": "PERF-LCP", "reason": "no browser tool — Tier 3 never ran" }
+    { "check": "PERF-LCP", "reason": "no browser tool and no suite — Tier 3 never ran" }
   ]
 }
 ```
@@ -771,6 +853,19 @@ it is an argument, not an artifact:
 column is blank is the plan this step exists to replace. `page` is the page a page-level finding is about and
 `null` otherwise. An `UNVERIFIED` finding from Step 6.9 is **not** a finding here: it was
 never measured, so it goes in `unmeasured` with the command that would settle it.
+
+**With `--suite`, do not hand-merge.** Step 6.5 wrote a run file of its own; pass it:
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/bin/audit-report.mjs --run <agents.json> \
+  --merge .wp-audit/suite/results/run.json --out .wp-audit --format both --lang <en|es>
+```
+
+The renderer applies Step 7's second rule — same `check` **and** same `resource` keeps the
+measured one, notes the superseded source in its evidence — which the dated sidecar keeps —
+and prints how many collided.
+Rendering the two separately instead would split one audit across two documents and two
+baselines.
 
 | Exit | Meaning |
 |---|---|

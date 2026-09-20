@@ -1,0 +1,21 @@
+{
+  "name": "wp-audit-suite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser audit suite scaffolded by /wp-audit --suite",
+  "scripts": {
+    "test": "playwright test tests/audit.spec.js",
+    "test:a11y": "playwright test tests/audit.spec.js --project=chromium",
+    "test:seo": "playwright test tests/seo-tech.spec.js --project=chromium",
+    "test:perf": "playwright test tests/performance.spec.js --project=chromium --workers=1 --retries=0",
+    "test:report": "playwright show-report results/html",
+    "audit:build": "node scripts/build-report.js"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "@playwright/test": "^1.48.0",
+    "dotenv": "^16.4.5",
+    "lighthouse": "^12.2.0",
+    "playwright-lighthouse": "^4.0.0"
+  }
+}

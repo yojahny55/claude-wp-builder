@@ -549,7 +549,7 @@ fetches; without a reachable public URL the scan skips and the runtime codes rep
 
 - **Tier 1 (always):** Code analysis via file scanning
 - **Tier 2 (with WP-CLI):** Runtime checks, plugin configuration
-- **Tier 3 (with a browser tool):** Lighthouse-style browser audits and Core Web Vitals
+- **Tier 3 (with a browser tool, or `--suite`):** Lighthouse-style browser audits and Core Web Vitals
 
 ### The deliverable
 
@@ -571,6 +571,7 @@ external tool. `--report-lang en|es` picks the language the client reads it in.
 /wp-audit --security --seo   # Run specific categories
 /wp-audit --report-only      # Report without fixing
 /wp-audit --report both --report-lang es   # Also write the dated client report
+/wp-audit --suite --host https://example.com  # Measure in a real browser, unattended
 /wp-audit --security-level maximum  # Set AIOS security level
 ```
 
