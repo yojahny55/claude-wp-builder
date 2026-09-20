@@ -74,7 +74,7 @@ need 'a sidecar is one dated snapshot' 'does not distinguish the snapshot from t
 # 2. The renderer, exercised
 # ---------------------------------------------------------------------------
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+trap 'rm -rf "$tmp"' EXIT INT TERM
 
 # A pipe in the evidence and in the fix: the value most likely to carry one is a shell
 # pipeline, and a Markdown cell ends at the next pipe.
@@ -124,6 +124,9 @@ grep -Fq '| Setting |' "$md" || fail "$md does not end the setting row with its 
 grep -Fq 'wp option get siteurl \| grep local' "$md" \
   || fail "$md did not escape a pipe inside a table cell -- the row silently shifts a column"
 
+# These assertions quote the renderer's STRINGS templates verbatim on purpose: the wording
+# is what the client reads, so a reword in bin/audit-report.mjs that looks cosmetic breaks
+# them, and that is the point.
 # The split is stated as a count, which is the sentence that answers "how much is mine?".
 grep -Fq '1 in code, 1 in settings, 1 content, 0 manual' "$md" \
   || fail "$md does not print the four-way count of the plan"
@@ -191,6 +194,49 @@ grep -Fq 'SEO-012' "$md2" || fail "$md2 does not name the resolved finding"
 grep -Fq '2026-09-01' "$md2" || fail "$md2 does not name the run it compared against"
 
 # ---------------------------------------------------------------------------
+# 3c. The values that reach the document without passing through a table cell
+# ---------------------------------------------------------------------------
+# The plan table escapes every cell. The comparison bullets did not, and a message is
+# author-supplied text: a newline breaks out of the list item, and a backtick closes the
+# code span the identity is wrapped in.
+cat > "$tmp/before.json" <<'JSON'
+{"site":"fixture","date":"2026-09-20","findings":[
+  {"check":"UX-001","resource":"page:/a/","severity":"WARNING","ownership":"code","message":"first line\nsecond line pretending to be a bullet"},
+  {"check":"UX-002","resource":"weird`resource","severity":"INFO","ownership":"code","message":"a backtick in the resource"}
+]}
+JSON
+cat > "$tmp/after.json" <<'JSON'
+{"site":"fixture","date":"2026-09-21","findings":[
+  {"check":"UX-003","resource":"page:/a/","severity":"INFO","ownership":"code","message":"something else"}
+]}
+JSON
+node "$r" --run "$tmp/before.json" --out "$tmp/esc" --format md >/dev/null || fail "$r failed on a message carrying a newline"
+node "$r" --run "$tmp/after.json" --out "$tmp/esc" --format md >/dev/null || fail "$r failed on the comparison run"
+esc="$tmp/esc/informe-2026-09-21.md"
+if grep -qx 'second line pretending to be a bullet' "$esc"; then
+  fail "$esc lets a newline in a message break out of its list item"
+fi
+if grep -Fq '`UX-002:weird`resource`' "$esc"; then
+  fail "$esc lets a backtick close the code span around a finding identity"
+fi
+
+# A run that measured nothing is not a run that found nothing. Without the distinction the
+# next report calls every finding new, against a baseline that never looked.
+cat > "$tmp/nothing.json" <<'JSON'
+{"site":"fixture","date":"2026-09-22","findings":[],"unmeasured":[{"check":"UX-006","reason":"no browser"}]}
+JSON
+cat > "$tmp/something.json" <<'JSON'
+{"site":"fixture","date":"2026-09-23","findings":[
+  {"check":"UX-006","resource":"page:/","severity":"WARNING","ownership":"code","message":"142 characters on desktop"}
+]}
+JSON
+node "$r" --run "$tmp/nothing.json" --out "$tmp/base" --format md >/dev/null \
+  || fail "$r refused a run that only carried unmeasured checks"
+node "$r" --run "$tmp/something.json" --out "$tmp/base" --format md >/dev/null || fail "$r failed on the follow-up run"
+grep -Fq 'unmeasured' "$tmp/base/informe-2026-09-23.md" \
+  || fail "the report does not say the previous run measured nothing -- its findings all read as newly broken"
+
+# ---------------------------------------------------------------------------
 # 4. The refusals
 # ---------------------------------------------------------------------------
 cat > "$tmp/unowned.json" <<'JSON'
@@ -236,6 +282,24 @@ node "$r" --run "$tmp/nocheck.json" --out "$tmp/out6" --format md >/dev/null 2>&
 code=$?
 set -e
 [ "$code" -eq 1 ] || fail "an unmeasured entry with no check id exited $code instead of 1 -- it would print \"undefined\" to the client"
+
+# The run file is an argument, and its date becomes three file names under --out. --date
+# was validated and this was not, so `x/../../evil` escaped the output directory: path.join
+# only cancels a `..` that lands on its own segment, and one slash supplies exactly that.
+cat > "$tmp/traversal.json" <<'JSON'
+{"site":"fixture","date":"x/../../evil","findings":[
+  {"check":"UX-001","severity":"WARNING","ownership":"code","message":"fine"}
+]}
+JSON
+mkdir -p "$tmp/sandbox/out"
+set +e
+node "$r" --run "$tmp/traversal.json" --out "$tmp/sandbox/out" --format md >/dev/null 2>&1
+code=$?
+set -e
+[ "$code" -eq 1 ] || fail "a run file whose date contains a path separator exited $code instead of 1"
+if [ -n "$(find "$tmp/sandbox" -name 'evil*' 2>/dev/null)" ]; then
+  fail "$r wrote outside its --out directory"
+fi
 
 cat > "$tmp/empty.json" <<'JSON'
 {"site":"fixture","date":"2026-09-17","findings":[]}

@@ -38,7 +38,6 @@ const SEVERITY_ORDER = { CRITICAL: 0, WARNING: 1, INFO: 2 };
 const STRINGS = {
   en: {
     title: 'Web audit',
-    site: 'Site',
     date: 'Date',
     tier: 'Tier',
     categories: 'Categories',
@@ -47,6 +46,8 @@ const STRINGS = {
     noPrevious:
       'No previous audit found. This report is the baseline every later run is measured against.',
     previousRun: 'Previous run',
+    previousUnmeasured:
+      ' — that run left %unmeasured% check(s) unmeasured, so what is "new" below may be what it never looked at',
     scoreLine: 'Findings: %total% (%critical% critical, %warning% warnings, %info% info)',
     improved: 'Resolved since the previous run',
     regressed: 'New since the previous run',
@@ -74,7 +75,6 @@ const STRINGS = {
   },
   es: {
     title: 'Auditoría web',
-    site: 'Sitio',
     date: 'Fecha',
     tier: 'Nivel',
     categories: 'Categorías',
@@ -83,6 +83,8 @@ const STRINGS = {
     noPrevious:
       'No hay auditoría anterior. Este informe es la línea base contra la que se mide cada ejecución posterior.',
     previousRun: 'Ejecución anterior',
+    previousUnmeasured:
+      ' — esa ejecución dejó %unmeasured% criterio(s) sin medir, así que lo que aquí figura como nuevo puede ser lo que entonces no se miró',
     scoreLine: 'Hallazgos: %total% (%critical% críticos, %warning% advertencias, %info% informativos)',
     improved: 'Resueltos desde la ejecución anterior',
     regressed: 'Nuevos desde la ejecución anterior',
@@ -166,6 +168,13 @@ function loadRun(path) {
   if (!Array.isArray(run.findings)) {
     die(1, `${path} has no "findings" array`);
   }
+  // The date becomes three file names under --out. `--date` was validated and this was not,
+  // so a run file carrying `x/../../evil` wrote outside the output directory entirely --
+  // `path.join` only cancels a `..` that lands on its own segment, and one slash is enough
+  // to give it that. The run file is an argument like any other: it is not trusted.
+  if (run.date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(String(run.date))) {
+    die(1, `${path} has an invalid "date": ${JSON.stringify(run.date)} -- expected YYYY-MM-DD`);
+  }
   return run;
 }
 
@@ -233,9 +242,13 @@ function findPrevious(outDir, selfPath) {
   const path = sidecars[sidecars.length - 1];
   try {
     const previous = JSON.parse(readFileSync(path, 'utf8'));
-    if (!Array.isArray(previous.findings)) return null;
+    if (!Array.isArray(previous.findings)) {
+      console.error(`audit-report: ${path} holds no findings array -- treating this run as a baseline`);
+      return null;
+    }
     return { path, ...previous };
-  } catch {
+  } catch (error) {
+    console.error(`audit-report: ${path} could not be read (${error.message}) -- treating this run as a baseline`);
     return null;
   }
 }
@@ -275,7 +288,12 @@ function groupBy(findings, key) {
 
 function sortForPlan(findings) {
   return [...findings].sort((a, b) => {
-    const bySeverity = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
+    // `counts()` already buckets an unrecognised severity; this has to survive one too.
+    // `undefined - undefined` is NaN, NaN !== 0, and a comparator returning NaN leaves the
+    // sort undefined -- on a list built from a PREVIOUS run's sidecar, which never passed
+    // validation because it was written by whatever version existed then.
+    const rank = (finding) => SEVERITY_ORDER[finding.severity] ?? Number.POSITIVE_INFINITY;
+    const bySeverity = rank(a) - rank(b);
     if (bySeverity !== 0) return bySeverity;
     return identity(a).localeCompare(identity(b));
   });
@@ -288,6 +306,9 @@ function sortForPlan(findings) {
 function mdCell(value) {
   return String(value ?? '')
     .replaceAll('|', '\\|')
+    // Every call site wraps its output in a code span, so a backtick in the value closes
+    // that span early and the rest of the cell renders as prose with a stray backtick.
+    .replaceAll('`', "'")
     .replace(/\s*\n\s*/g, ' ')
     .trim();
 }
@@ -317,6 +338,9 @@ function compare(findings, previous) {
   const before = new Set(previous.findings.map(identity));
   return {
     date: previous.date,
+    // A previous run that measured nothing is not one that found nothing, and the
+    // difference decides how to read every "new since" below it.
+    unmeasured: Array.isArray(previous.unmeasured) ? previous.unmeasured.length : 0,
     counts: counts(previous.findings),
     resolved: previous.findings.filter((finding) => !now.has(identity(finding))),
     added: findings.filter((finding) => !before.has(identity(finding))),
@@ -349,11 +373,14 @@ function renderMarkdown(model) {
     push(t.noPrevious);
   } else {
     const c = model.comparison;
-    push(`**${t.previousRun}:** ${c.date} — ${scoreSentence(t, c.counts)}`);
+    push(`**${t.previousRun}:** ${c.date} — ${scoreSentence(t, c.counts)}`
+      + (c.unmeasured ? fill(t.previousUnmeasured, { unmeasured: c.unmeasured }) : ''));
     push();
     for (const [label, list] of [[t.improved, c.resolved], [t.regressed, c.added], [t.carried, c.carried]]) {
       push(`- **${label}:** ${list.length}`);
-      for (const finding of sortForPlan(list)) push(`  - \`${identity(finding)}\` — ${finding.message}`);
+      for (const finding of sortForPlan(list)) {
+        push(`  - \`${mdCell(identity(finding))}\` — ${mdCell(finding.message)}`);
+      }
     }
   }
   push();
@@ -472,7 +499,8 @@ ${body}
         .map((finding) => `<li><code>${escapeHtml(identity(finding))}</code> — ${escapeHtml(finding.message)}</li>`)
         .join('')}</ul></li>`;
     return `<p><strong>${escapeHtml(t.previousRun)}:</strong> ${escapeHtml(c.date)} — ${escapeHtml(
-      scoreSentence(t, c.counts),
+      scoreSentence(t, c.counts)
+      + (c.unmeasured ? fill(t.previousUnmeasured, { unmeasured: c.unmeasured }) : ''),
     )}</p>
 <ul>${list(t.improved, c.resolved)}${list(t.regressed, c.added)}${list(t.carried, c.carried)}</ul>`;
   };
@@ -631,6 +659,7 @@ function main() {
         site: model.site,
         tier: model.tier,
         categories: model.categories,
+        unmeasured: model.unmeasured.map((entry) => ({ check: entry.check, reason: entry.reason || null })),
         findings: findings.map((finding) => ({
           check: finding.check,
           resource: finding.resource || null,
