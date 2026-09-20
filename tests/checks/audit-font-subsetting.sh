@@ -16,7 +16,9 @@ set -uo pipefail
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
 
 audit=agents/wp-audit-performance.md
-[ -f "$audit" ] || { echo "FAIL: $audit is missing"; exit 1; }
+# -s, not -f: an empty file fails every assertion below on its own, and eleven
+# near-identical "does not mention" lines hide the one fact that explains them.
+[ -s "$audit" ] || { echo "FAIL: $audit is missing or empty"; exit 1; }
 flat=$(tr '\n' ' ' < "$audit" | sed 's/  */ /g')
 
 # 1. The criterion and its exemption.
