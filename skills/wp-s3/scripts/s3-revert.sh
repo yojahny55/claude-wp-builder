@@ -111,7 +111,16 @@ os.replace(tmp, path)
 PY
     status=$?
     set -e
-    if [[ $status -ne 0 ]]; then
+    if [[ $status -ne 0 && $status -ne 3 ]]; then
+        # Not the hand-edited case: the rewrite itself failed. A read-only $WP_ROOT is the
+        # one measured here — the temporary file cannot be created, python raises
+        # PermissionError and exits 1 — and telling that operator to go and delete a block
+        # nobody touched sends them to fix the wrong thing.
+        die "could not rewrite wp-config.php (python exited $status; its error is above).
+       Nothing has been renamed and the site still works. Fix that and run again
+       (backup: wp-config.php.bak-$STAMP)."
+    fi
+    if [[ $status -eq 3 ]]; then
         # Stopping here leaves the site working: wp-config.php still requires a
         # config that is still in place. Carrying on would rename that config out
         # from under a require nobody could remove automatically, which is a fatal

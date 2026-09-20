@@ -143,7 +143,7 @@ export MC_CONFIG_DIR="$MCLI_CONFIG_DIR"
 # Both halves of the credential leave the environment now that they are in the file the
 # client reads: the key id is the less sensitive half, not a harmless one, and every child
 # process below inherits whatever is still set here.
-unset S3_UPLOADS_KEY S3_UPLOADS_SECRET S3_MEDIA_SECRET
+unset S3_UPLOADS_KEY S3_UPLOADS_SECRET S3_MEDIA_KEY S3_MEDIA_SECRET
 
 # S3_UPLOADS_BUCKET may carry a prefix ("bucket/site-prefix"); the client takes that path
 # as written, so a trailing slash would produce an empty path segment and a key that does

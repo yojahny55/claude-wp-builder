@@ -112,12 +112,50 @@ install_vendor() {
 
     [[ -f "$PLUGIN_DIR/vendor/autoload.php" ]] \
         || die "composer finished but $PLUGIN_DIR/vendor/autoload.php is still missing"
+
+    # What was asked for, recorded where the next run can read it. The plugin's own
+    # `Version:` header is the fallback and not the record: it is written by hand upstream
+    # and has lagged the tag before, so a header that disagrees with the tag would report
+    # a mismatch on a correct install.
+    printf '%s\n' "$PLUGIN_VERSION" > "$PLUGIN_DIR/.wp-s3-version"
+}
+
+# installed_version — what the tree at $PLUGIN_DIR actually holds, or the empty string.
+installed_version() {
+    if [[ -f "$PLUGIN_DIR/.wp-s3-version" ]]; then
+        head -n 1 "$PLUGIN_DIR/.wp-s3-version"
+        return 0
+    fi
+    # Installed before the stamp existed, or by hand. A missing main file is an answer
+    # here, not a failure: sed exits 2 for it, `pipefail` carries that out of the
+    # function, and errexit would end the run inside a command substitution — with no
+    # message at all, because everything this function prints is being captured.
+    [[ -f "$PLUGIN_DIR/s3-uploads.php" ]] || return 0
+    sed -n 's/^[[:space:]]*\*\?[[:space:]]*Version:[[:space:]]*//p' \
+        "$PLUGIN_DIR/s3-uploads.php" | head -n 1
+    return 0
 }
 
 if [[ "$SKIP_INSTALL" == "yes" ]]; then
     echo "1. Plugin install skipped."
 elif [[ -f "$PLUGIN_DIR/vendor/autoload.php" ]]; then
-    echo "1. $PLUGIN_DIR is already installed with its vendor/ tree; leaving it alone."
+    # "A vendor/ tree is here" is not "the version you asked for is here". Re-running with
+    # --version to pin or upgrade used to be a silent no-op against whatever the previous
+    # run left behind, and the operator had no line to read that said so.
+    HAVE="$(installed_version)"
+    if [[ -n "$HAVE" && "$HAVE" != "$PLUGIN_VERSION" ]]; then
+        echo "1. $PLUGIN_DIR already holds S3-Uploads $HAVE, not the $PLUGIN_VERSION you asked for."
+        echo "   Nothing is replaced automatically: the tree may carry local edits, and the"
+        echo "   plugin may be active on this site. To install $PLUGIN_VERSION, remove it first:"
+        echo "     rm -rf '$PLUGIN_DIR'"
+        echo "   then run this script again with --version $PLUGIN_VERSION."
+
+    elif [[ -z "$HAVE" ]]; then
+        echo "1. $PLUGIN_DIR is already installed with its vendor/ tree; leaving it alone."
+        echo "   Its version could not be read, so it is not compared with $PLUGIN_VERSION."
+    else
+        echo "1. $PLUGIN_DIR already holds S3-Uploads $PLUGIN_VERSION; leaving it alone."
+    fi
 elif [[ -d "$PLUGIN_DIR" ]]; then
     # Half an install: the download worked and composer did not. Finishing it is safer
     # than reporting success over a plugin that fatals the moment it is activated.

@@ -84,6 +84,28 @@
   installs never write there anyway, because `s3-config.php` redirects both WooCommerce's
   logs and CF7's temporary directory to local paths — but a site migrating in arrives with
   years of them.
+  Five more from a second pass over the same scripts, and the first is the one that gave a
+  wrong answer with no error anywhere. `read-s3-config.php` matched `define()` textually
+  over the whole file, so a line an operator comments out while rotating a bucket or a key —
+  the new `define()` written under the old one — was read as the site's configuration. PHP
+  keeps the **first** `define()` of a name and ignores every later one, so matching the
+  first occurrence is right for code; a comment is not code. Every caller was handed the
+  stale bucket while the site served from the new one, and the transfer then verified clean
+  against the wrong target. Comments are removed with the PHP tokenizer before anything is
+  matched, because a regular expression cannot tell a comment from `//` inside a URL.
+  The revert told two different failures the same story: Python exits `3` when the `require`
+  block has been hand-edited and `1` on any unhandled exception — a read-only site root is
+  the measured one — and the shell read every non-zero status as the first, sending an
+  operator with a permissions problem to go and delete a block nobody had touched. Setup
+  skipped the install whenever a `vendor/` tree existed, so re-running it with `--version`
+  to pin or upgrade was a silent no-op against whatever the previous run left behind; the
+  requested version is stamped at install time and a mismatch is now reported by name,
+  without replacing a tree that may carry local edits or belong to an active plugin.
+  Two smaller: the access-key id supplied for the instance-profile fallback stayed in the
+  environment for every child process after its secret had been unset, and a value holding
+  a line break was accepted by the reader although `--export` writes one `NAME='value'` per
+  line and every consumer splits on newlines — it is refused with its name now, rather than
+  arriving truncated or missing.
   Two smaller ones: `verify-transfer.py` called an empty remote listing a verified download,
   and the client answers an unknown alias with exit `0` and no output, so "no objects" and
   "could not list" arrived identically — a download that lists nothing now fails. And a

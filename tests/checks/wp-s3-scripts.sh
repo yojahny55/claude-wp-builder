@@ -32,6 +32,9 @@ lib=skills/wp-s3/scripts/lib-mirror.sh
 verify=skills/wp-s3/scripts/verify-transfer.py
 creds=skills/wp-s3/scripts/check-credentials.php
 
+tmp_config="$(mktemp -t wp-s3-check-XXXXXX.php)"
+trap 'rm -f "$tmp_config"' EXIT
+
 for f in "$setup" "$media" "$revert" "$lib" "$verify" "$creds"; do
   [ -f "$f" ] || fail "$f is missing"
 done
@@ -141,6 +144,38 @@ grep -Fq 'if [[ -f "$CONFIG.disabled" ]]; then' "$revert" \
 grep -Fq 'PLUGIN_ACTIVE' "$revert" \
   || fail "$revert calls 'wp plugin deactivate' without reusing what step 1 already learned"
 
+
+# ---------------------------------------------------------------------------
+# 9. A commented-out define() is not configuration. PHP keeps the FIRST define() of a
+#    name, so matching the first occurrence is right for code — but the reader matched
+#    it textually, and the line an operator leaves above the new one while rotating a
+#    bucket or a key is a comment. It handed every caller the stale value while the site
+#    served from the new one, and the transfer then verified clean against the wrong
+#    bucket: a wrong answer with no error anywhere.
+# ---------------------------------------------------------------------------
+reader=skills/wp-s3/scripts/read-s3-config.php
+grep -Fq 'token_get_all' "$reader" \
+  || fail "$reader matches define() over the raw file again: a commented-out line reads as configuration"
+printf '%s\n' '<?php' "// define( 'S3_UPLOADS_BUCKET', 'stale' );" \
+  "define( 'S3_UPLOADS_BUCKET', 'live' );" > "$tmp_config"
+[ "$(php "$reader" "$tmp_config" --names)" = "S3_UPLOADS_BUCKET: live" ] \
+  || fail "$reader reads a commented-out define() as the site's configuration"
+
+# ---------------------------------------------------------------------------
+# 10. The revert must tell "the block was hand-edited" apart from "the rewrite failed".
+#     Python exits 3 for the first and 1 for any unhandled exception — a read-only
+#     $WP_ROOT is the measured one — and both used to print the same message, sending
+#     that operator to delete a block nobody had touched.
+# ---------------------------------------------------------------------------
+grep -Fq 'status -eq 3' "$revert" \
+  || fail "$revert treats every non-zero exit from the rewrite as a hand-edited require block"
+
+# ---------------------------------------------------------------------------
+# 11. A vendor/ tree is not the version that was asked for. Re-running with --version to
+#     pin or upgrade was a silent no-op against whatever a previous run left behind.
+# ---------------------------------------------------------------------------
+grep -Fq 'installed_version' "$setup" \
+  || fail "$setup skips the install without comparing what is there against --version"
 
 # ---------------------------------------------------------------------------
 # 8. The transfer is still judged by comparing both sides, not by the client's

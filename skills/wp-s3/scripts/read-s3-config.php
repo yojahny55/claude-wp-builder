@@ -43,6 +43,40 @@ if ( false === $source ) {
 	exit( 1 );
 }
 
+// Comments are removed before anything is matched. PHP keeps the FIRST define() of a
+// name and ignores every later one, so matching the first occurrence is right for code —
+// but a commented-out line is not code, and it is exactly what an operator leaves behind
+// when rotating a bucket or a key by writing the new define() under the old one:
+//
+//     // define( 'S3_UPLOADS_BUCKET', 'old-bucket' );
+//     define( 'S3_UPLOADS_BUCKET', 'new-bucket' );
+//
+// Read textually, that file hands every caller `old-bucket` while the site itself serves
+// from `new-bucket`. The transfer then verifies clean against the wrong bucket, which is a
+// wrong answer with no error anywhere. The tokenizer decides what is a comment, because a
+// regular expression cannot: `//` inside a URL literal opens no comment.
+if ( function_exists( 'token_get_all' ) ) {
+	$stripped = '';
+	foreach ( token_get_all( $source ) as $token ) {
+		if ( is_array( $token ) ) {
+			if ( T_COMMENT === $token[0] || T_DOC_COMMENT === $token[0] ) {
+				// Replaced by its own newlines so reported line numbers stay honest.
+				$stripped .= str_repeat( "\n", substr_count( $token[1], "\n" ) );
+				continue;
+			}
+			$stripped .= $token[1];
+			continue;
+		}
+		$stripped .= $token;
+	}
+	$source = $stripped;
+} else {
+	// ext-tokenizer is compiled in by default; a build without it cannot tell a commented
+	// define() from a live one, and guessing is how the wrong bucket gets used.
+	fwrite( STDERR, "This PHP has no tokenizer extension; cannot tell a commented-out define() from a live one.\n" );
+	exit( 2 );
+}
+
 $found = array();
 
 foreach ( $wanted as $name ) {
@@ -65,6 +99,15 @@ foreach ( $wanted as $name ) {
 	} else {
 		// An expression rather than a literal: report it instead of guessing.
 		fwrite( STDERR, "$name is not a literal; cannot read it safely.\n" );
+		exit( 2 );
+	}
+
+	// A newline inside a value cannot survive being read back: --export writes one
+	// NAME='value' per line, and every consumer splits that output on newlines. Refusing
+	// it here is the difference between a clear stop and a credential that silently
+	// arrives truncated or missing.
+	if ( false !== strpos( $value, "\n" ) || false !== strpos( $value, "\r" ) ) {
+		fwrite( STDERR, "$name contains a line break; that cannot be read back safely.\n" );
 		exit( 2 );
 	}
 
