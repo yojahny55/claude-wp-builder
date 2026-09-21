@@ -15,7 +15,7 @@ import {
   supersedeProseDecisions, testedVerdicts,
 } from './lib/manifest.mjs';
 import {
-  detectWrapper, runProbe, detectStack, buildManifest, isWordPressRoot,
+  detectWrapper, runProbe, buildManifest, isWordPressRoot,
 } from './lib/adopt.mjs';
 
 const say = (s) => console.log(s);
@@ -259,6 +259,7 @@ function cmdAdopt(projectPath, flags) {
     warn('multisite installs are not supported: the code scope and the stack are per site, and this plugin audits one');
     process.exit(1);
   }
+  // `--editable=` (empty value) is an empty list; a bare `--editable` or no flag keeps the proposal.
   const list = (v) => (typeof v === 'string' ? v.split(',').map((x) => x.trim()).filter(Boolean) : undefined);
   const overrides = {
     wrapper,
@@ -266,11 +267,11 @@ function cmdAdopt(projectPath, flags) {
     prefix: typeof flags.prefix === 'string' ? flags.prefix : undefined,
     industry: typeof flags.industry === 'string' ? flags.industry : undefined,
     editable: list(flags.editable),
-    read_only: flags['read-only'] === '' ? [] : list(flags['read-only']),
+    read_only: list(flags['read-only']),
   };
-  if (flags.editable === '') overrides.editable = [];
-  const { manifest, reasons, prefixSource } = buildManifest(root, probe, { ...detected, wrapper }, overrides);
-  const { conflicts } = detectStack(probe);
+  const {
+    manifest, reasons, prefixSource, conflicts,
+  } = buildManifest(root, probe, { ...detected, wrapper }, overrides);
   const problems = validateManifest(manifest);
 
   if (flags['dry-run']) {

@@ -65,6 +65,11 @@ j 'j.manifest.code_scope' | grep -Fq 'hello' && fail "an inactive plugin entered
 [ "$(j "j.manifest['i18n strategy']")" = '"none"' ] || fail "monolingual adopted site should record i18n strategy none"
 [ "$(j 'j.manifest.languages.primary')" = '"es"' ] || fail "primary language not taken from the locale"
 [ "$(j 'j.problems')" = '[]' ] || fail "the proposal does not validate: $(j 'j.problems')"
+# An empty value is an empty list for both flags; a bare flag keeps the proposal.
+ro=$($cfg adopt "$tmp/site" --dry-run --read-only= | node -e "console.log(JSON.stringify(JSON.parse(require('fs').readFileSync(0,'utf8')).manifest.code_scope.read_only))")
+[ "$ro" = '[]' ] || fail "--read-only= did not give an empty list: $ro"
+ed=$($cfg adopt "$tmp/site" --dry-run --editable | node -e "console.log(JSON.parse(require('fs').readFileSync(0,'utf8')).manifest.code_scope.editable.length)")
+[ "$ed" = 2 ] || fail "a bare --editable dropped the proposal"
 grep -vx 'eval' "$tmp/wp.log" && fail "adopt ran a WP-CLI command other than eval"
 
 # --- Real run: operator moved nothing; writes both files, validates ------------

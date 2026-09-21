@@ -210,7 +210,7 @@ export function proposeScope(probe) {
 }
 
 export function buildManifest(root, probe, detected, overrides = {}) {
-  const { stack } = detectStack(probe);
+  const { stack, conflicts } = detectStack(probe);
   const scope = proposeScope(probe);
   const prefix = inferPrefix(root, probe.theme_path, probe.stylesheet);
   // Polylang slugs may be `en-us` or `pt-br`; the manifest holds two-letter codes. Every
@@ -251,7 +251,7 @@ export function buildManifest(root, probe, detected, overrides = {}) {
     stack,
     'i18n strategy': stack.multilingual === 'polylang' ? 'polylang' : 'none',
   };
-  return { manifest, reasons: scope.reasons, prefixSource: prefix.source };
+  return { manifest, reasons: scope.reasons, prefixSource: prefix.source, conflicts };
 }
 
 // wp-load.php marks the root; wp-config.php may sit one directory above it, as WordPress allows.

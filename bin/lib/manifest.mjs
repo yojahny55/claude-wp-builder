@@ -57,20 +57,20 @@ const CONTEXT_FIELDS = [
   { label: 'demo mode', paths: ['demo mode'], fallback: 'plain' },
   { label: 'Primary language', paths: ['languages.primary'] },
   { label: 'Plugin profile', paths: ['plugins.profile'], fallback: 'none' },
-  // Rendered only for a site registered by `wp-config.mjs adopt` -- one this plugin did not
+  // `scope: 'adopted'` rows are rendered only for a site registered by `wp-config.mjs adopt` -- one this plugin did not
   // build, whose theme it did not scaffold and whose plugins it did not choose. A created
   // project's block is byte-identical to what it was before these rows existed, so no
   // existing project reads as drifted. Every agent reads the block first; these rows are
   // how it learns which code it may change and which plugin owns SEO or security here.
-  { label: 'Origin', paths: ['origin'], fallback: 'created', when: isAdopted },
-  { label: 'Function prefix', paths: ['project.prefix'], when: isAdopted },
-  { label: 'Industry', paths: ['project.industry'], fallback: 'unknown', when: isAdopted },
-  { label: 'Editable code', paths: ['code_scope.editable'], when: isAdopted, list: true },
-  { label: 'Read-only code', paths: ['code_scope.read_only'], when: isAdopted, list: true },
+  { label: 'Origin', paths: ['origin'], fallback: 'created', scope: 'adopted' },
+  { label: 'Function prefix', paths: ['project.prefix'], scope: 'adopted' },
+  { label: 'Industry', paths: ['project.industry'], fallback: 'unknown', scope: 'adopted' },
+  { label: 'Editable code', paths: ['code_scope.editable'], scope: 'adopted', list: true },
+  { label: 'Read-only code', paths: ['code_scope.read_only'], scope: 'adopted', list: true },
   {
     label: 'Stack',
     paths: ['stack'],
-    when: isAdopted,
+    scope: 'adopted',
     object: true,
     render: (m) => STACK_KEYS.map((k) => `${k}=${at(m, `stack.${k}`) ?? 'none'}`).join(', '),
   },
@@ -82,10 +82,12 @@ export function isAdopted(manifest) {
   return manifest?.origin === 'adopted';
 }
 
-// The rows that apply to THIS manifest. A row with `when` exists only for the projects it
+// The rows that apply to THIS manifest. A row with a `scope` exists only for the projects it
 // names; everywhere else it is neither rendered, validated nor allowed to supersede prose.
+// A row names its scope as data, not as a function reference: identity comparison against
+// a predicate broke silently the moment someone inlined an equivalent arrow function.
 function contextFieldsFor(manifest) {
-  return CONTEXT_FIELDS.filter((f) => !f.when || (manifest !== undefined && f.when(manifest)));
+  return CONTEXT_FIELDS.filter((f) => !f.scope || (f.scope === 'adopted' && isAdopted(manifest)));
 }
 
 // The concerns a site's own plugins can already own. /wp-audit used to assume Rank Math and
@@ -100,12 +102,12 @@ const REQUIRED = [...new Set([
   'environment.type', 'environment.engine',
   'wordpress.url',
   'wp_cli.wrapper',
-  ...CONTEXT_FIELDS.filter((f) => f.fallback === undefined && !f.when).flatMap((f) => f.paths),
+  ...CONTEXT_FIELDS.filter((f) => f.fallback === undefined && !f.scope).flatMap((f) => f.paths),
 ])];
 
 // Required only when the manifest is an adopted one. Same derivation, other half of the table.
 const REQUIRED_ADOPTED = CONTEXT_FIELDS
-  .filter((f) => f.fallback === undefined && f.when === isAdopted && !f.list && !f.object)
+  .filter((f) => f.fallback === undefined && f.scope === 'adopted' && !f.list && !f.object)
   .flatMap((f) => f.paths);
 
 function fallbackFor(path) {
