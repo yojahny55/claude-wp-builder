@@ -648,10 +648,20 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   rather than shipped. Inspo's own text currently defers to the project, but the
   precedence line in `commands/wp-demo.md` does not rely on that surviving their next
   release.
-- **The inspo exclusions are prose, and prose binds an agent that reads it.** The
-  greps in `tests/checks/wp-library.sh` pin the wording; nothing can assert that a
-  build actually declined to read a colour table. Same ceiling the transcription and
-  fidelity mandates already carry.
+- **The inspo exclusions are prose, and prose binds an agent that reads it — but a
+  produced build can now be checked against its own transport log.** The greps in
+  `tests/checks/wp-library.sh` pin the wording. `tests/checks/wp-demo-references.sh`
+  goes one step further, on demand: pointed at a `demo/` built with
+  `tests/fixtures/mcp-spy.sh` wrapping each reference server (`MCP_SPY_LOG` set), it
+  reads the build's citations and the JSON-RPC requests that actually went over the
+  wire, and fails when a citation names a server no call reached, or when the build
+  called `get_reference_jsx`, `find_by_color` or `get_design_system` — the three
+  Step 2.6 sub-step 3.7 forbids. `recommend` exists on both servers and is
+  reported, asserted on by neither. It `SKIP`s without `DEMO_DIR`, so the suite
+  stays network-free; it is evidence an operator gathers, not a gate CI runs. What
+  remains prose-only is everything a call cannot show — whether the build *used*
+  what it fetched, which is the same ceiling the transcription and fidelity mandates
+  carry.
 - **Inspo's corpus is a runtime dependency on a third party's storage.** Nothing is
   vendored. If it goes away, builds degrade through the `References: inspo
   unavailable` path, which is why that line exists in both modes.
