@@ -13,7 +13,7 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 
 **Priority:** Items within each section are ordered by priority (highest first).
 
-**Reconciled** on September 20, 2026 against `main` at v1.26.0. Every item below was
+**Reconciled** on September 21, 2026 against `main` at v1.27.0. Every item below was
 checked against the command, agent or script that would own it — an item claiming to be
 open while the behavior ships reads as a project that does not know what it has built.
 Larger reworks of delivered behavior are proposals, not backlog items, and are tracked
@@ -53,6 +53,10 @@ Issues discovered during testing that need to be resolved.
 ## Demo Fidelity
 
 Ensuring the WordPress output matches the demo HTML 1:1 in appearance and content.
+
+- [ ] **A craft build commits to one aesthetic family, and the commitment is measured** `PARTIAL`
+  Every "generic" note on a craft demo describes a page that chose no family — charcoal, one accent, air. v1.27.0 made the choice binding: [families.md](skills/wp-demo-craft/references/families.md) gives each of the seven families its type, palette, surfaces, motion, sequence and an **Avoid** list; [wp-demo](commands/wp-demo.md) 5.4 records the choice under `## Family` in `BRIEF.md` before the first section and hands the Avoid list to the verify critique; [SKILL.md](skills/wp-demo-craft/SKILL.md) lists a hit among the ship blockers.
+  **Gap:** the Avoid list is judged by the evaluator from contact sheets, not measured, and the gate has not yet run on a real client build. The first is a family lint under `bin/` that reports `backdrop-filter` (glass), radius over 12px on a bordered box (rounded SaaS card) and more than one saturated accent, never blocks, and lets the evaluator decide; the second is running `/wp-demo` on the project whose demo prompted this and reading `demo/VERIFY.md`.
 
 - [ ] **Visual regression testing with Playwright** `PARTIAL`
   After each section build, take screenshots at key viewports and compare against the demo. Loop fixes until the section matches the demo visually.
