@@ -29,6 +29,13 @@ On exit 2, run the migration before continuing.
 
 **Amending the exit `3` row above:** Exit `3` here falls through to the bare-`wp` fallback below rather than stopping outright
 — this command also diagnoses a WordPress root that was never run through `/wp-create`.
+First, offer adoption with `AskUserQuestion`: `[A] Adopt it — read-only detection, writes .wp-create.json and .claude/CLAUDE.md only` /
+`[B] Diagnose without registering`. On A, run `/srv/http/claude-wp-builder/commands/wp-adopt.md` Steps 2 to 5,
+run the validator again (it must exit `0`) and continue with the adopted manifest's wrapper: that is the
+right choice for a Docker, DDEV or Lando site, where bare `wp` reaches the wrong PHP or none at all. On B,
+or when adoption fails — a WordPress that does not boot is the usual reason someone runs this command,
+and the probe needs it booted — take the bare-`wp` fallback below. Never make a broken site's diagnosis
+wait on its registration.
 
 Read `.wp-create.json` from the project root to extract the WP-CLI wrapper command.
 

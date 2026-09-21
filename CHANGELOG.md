@@ -2,6 +2,38 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`/wp-adopt`: audit, debug and clone sites this plugin did not build.** Before this,
+  `/wp-audit`, `/wp-debug` and `/wp-clone` required a manifest that only `/wp-create`
+  writes, and stopped with "not created by /wp-create" on any site without one. A client
+  site on a commercial theme could not be audited at all. The alternative was `/wp-create`'s
+  Adopt Mode, which reconfigures the vhost, SSL and options of a site that already worked.
+  - `bin/wp-config.mjs adopt` runs one read-only WP-CLI probe and writes a manifest with
+    `"origin": "adopted"`. The manifest records:
+    - `code_scope.editable`: the child theme, the site's own plugins and mu-plugins;
+    - `code_scope.read_only`: the parent theme and plugins an updater maintains;
+    - `stack`: the SEO, security, fields, multilingual, builder and cache plugins;
+    - the function prefix, inferred from the child theme. `<parent>_child_` wins over the
+      vendor's `<parent>_`.
+  - The operator confirms the scope and prefix before anything is written.
+  - The three commands offer adoption when their gate exits `3`.
+  - A created project's generated block, validation and prose supersession are unchanged.
+
+### Changed
+
+- **`/wp-audit` on an adopted site audits vendor code but never edits it, and respects the
+  site's stack.**
+  - Findings under `code_scope.read_only` are always `Fix: manual`. After each fix agent
+    returns, the fix phase checks that nothing under a read-only path changed. An update
+    overwrites vendor files, so a fix written there is lost at the next update.
+  - Step 4 no longer offers Rank Math beside Yoast or AIOS beside Wordfence.
+    `wp-audit-rankmath` and `wp-audit-aios` stop before installing anything when the stack
+    names another plugin. Before, the audit offered a second SEO plugin or a second
+    firewall as a fix.
+  - An adopted site's i18n strategy is measured (`polylang` or `none`) and never falls back
+    to `suffix`.
+
 ## [1.27.0] - 2026-09-21
 
 ### Changed

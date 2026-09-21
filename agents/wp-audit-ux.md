@@ -36,6 +36,30 @@ Before running ANY checks, read the following:
    are in scope and whether a rendered page is available. Your `tools:` list carries no MCP
    browser, so never probe for one here — read what you were given.
 
+## Adopted sites (`origin: adopted`)
+
+Read `origin` from `.wp-create.json`. When it is absent or `created`, skip this section.
+
+When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
+
+- **Scope is `code_scope`, not one theme.** Run the code checks over every path in
+  `code_scope.editable` **and** `code_scope.read_only`. Report file paths relative to the
+  WordPress root, because two themes and several plugins cannot all be "relative to the
+  theme root".
+- **Read-only code is reported, never fixed.** A finding under a `code_scope.read_only` path
+  is always `Fix: manual`, `Owner: manual`. Its `Method` works around the vendor file: an
+  override in the child theme, a filter from the site's own plugin, or a report to the
+  vendor. It never edits the file, because an update overwrites it. In fix mode, never write
+  under a read-only path.
+- **The prefix is `project.prefix`**, and it applies to editable code only. Vendor code
+  carries the vendor's prefix, and that is not a finding.
+- **The stack is the site's own.** `stack.*` names the plugin that owns each concern.
+  `none` means none was detected. Never recommend installing a second plugin for a concern
+  the stack already owns.
+- **Page-builder markup lives in the database.** When `stack.builder` is not `none`, a
+  defect in markup the builder stores per page is `Owner: content` (fixed in the builder's
+  editor), not `code`.
+
 ## Step 1: Decide what applies, before measuring anything
 
 Walk the site's shape first and write down which criteria are N/A and why: no form, no

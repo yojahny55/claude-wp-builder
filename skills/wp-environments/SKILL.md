@@ -308,6 +308,12 @@ These tools manage PHP internally:
 
 ## 7. Adopt Mode Detection
 
+Two different things share the word "adopt". `/wp-create`'s Adopt Mode, described here,
+**reconfigures** an existing install into a `/wp-create` environment: vhost, SSL, hosts
+entry, options. `/wp-adopt` (`bin/wp-config.mjs adopt`) only **registers** a site: it runs a
+read-only probe and writes the manifest with `"origin": "adopted"`. Use it for a site that is
+already served and only needs auditing, debugging or cloning into.
+
 When targeting an existing WordPress installation, check for `wp-config.php` at the project path to enter "adopt" mode:
 
 ```bash

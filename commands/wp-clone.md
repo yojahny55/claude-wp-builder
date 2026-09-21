@@ -325,6 +325,21 @@ Run the `/wp-create` command to set up the local WordPress environment at the `-
 
 If WordPress files already exist at the destination (e.g., from a previous clone attempt), use adopt mode.
 
+**When the destination is already a working local site** — its vhost, database and WP-CLI
+already serve it, but it has no `.wp-create.json` — ask with `AskUserQuestion` before running
+`/wp-create`:
+
+```
+The destination already runs WordPress and was not created by /wp-create.
+  [A] Register it with /wp-adopt and import into it — nothing about its environment changes (recommended)
+  [B] Run /wp-create in Adopt Mode — reconfigures vhost, SSL, hosts entry and options for it
+```
+
+On A, run `/srv/http/claude-wp-builder/commands/wp-adopt.md` Steps 2 to 5 against the
+destination instead of `/wp-create`, then continue with A10. The Destination Gate (Step 1.5)
+still runs at A10 and still backs up the database it is about to replace. Adoption registers
+the destination; it does not make it disposable.
+
 ### A10: Import Database
 
 **First: validate the project configuration.**
@@ -343,6 +358,12 @@ bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'
 | `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
 
 On exit 2, run the migration before continuing.
+
+**Amending the exit `3` row above:** Exit `3` here means the step before this one neither
+created nor adopted the destination. Run `/srv/http/claude-wp-builder/commands/wp-adopt.md`
+Steps 2 to 5 against it if it runs WordPress, then run the validator again. If it does not
+run WordPress, or adoption fails, stop and say so, as the row says. Never import a database
+into a destination this command has no manifest for.
 
 This runs after A9, not before Step 0 — the manifest does not exist until `/wp-create`
 has finished creating it.
@@ -433,6 +454,10 @@ If `--uploads=` was not provided, ask:
 
 Run the `/wp-create` command to set up a fresh local WordPress environment at the `--to=` path. This creates the full environment from scratch — WordPress download, database, web server, the works.
 
+If the `--to=` path already runs WordPress with no `.wp-create.json`, offer the same choice
+as A9 before creating anything: register it with `/wp-adopt` and import into it, or run
+`/wp-create`.
+
 ### B3: Import Database
 
 **First: validate the project configuration.**
@@ -451,6 +476,12 @@ bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'
 | `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
 
 On exit 2, run the migration before continuing.
+
+**Amending the exit `3` row above:** Exit `3` here means the step before this one neither
+created nor adopted the destination. Run `/srv/http/claude-wp-builder/commands/wp-adopt.md`
+Steps 2 to 5 against it if it runs WordPress, then run the validator again. If it does not
+run WordPress, or adoption fails, stop and say so, as the row says. Never import a database
+into a destination this command has no manifest for.
 
 This runs after B2, not before Step 0 — the manifest does not exist until `/wp-create`
 has finished creating it.

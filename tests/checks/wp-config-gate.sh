@@ -65,11 +65,11 @@ done
 [ "$found" -ge 13 ] || fail "only $found gate blocks found, want at least 13"
 
 # --- Where exit 3 is not a stop, the table row is AMENDED, not contradicted. -
-# The row three lines above says "stop and say so"; these four commands legitimately
+# The row three lines above says "stop and say so"; these commands legitimately
 # fall through. The block stays byte-identical everywhere, so the amendment has to
 # live outside it -- and it has to announce itself, or a Claude acts on the row it
 # just read and stops on a legitimate path.
-for c in wp-seed wp-debug wp-robin wp-init; do
+for c in wp-seed wp-debug wp-robin wp-init wp-audit wp-clone wp-adopt; do
   grep -Fq 'Amending the exit `3` row above:' "commands/$c.md" \
     || fail "commands/$c.md contradicts the exit 3 table row instead of amending it"
 done

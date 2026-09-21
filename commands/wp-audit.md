@@ -60,12 +60,33 @@ bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'
 
 On exit 2, run the migration before continuing.
 
+**Amending the exit `3` row above:** Exit `3` is not a stop here until the operator declines
+adoption. A site this plugin did not build has no manifest, and auditing it is a legitimate
+use, not a misconfiguration. Ask with `AskUserQuestion`:
+
+```
+No .wp-create.json: this site was not created by /wp-create.
+  [A] Adopt it now — read-only detection, writes .wp-create.json and .claude/CLAUDE.md only (recommended)
+  [B] Stop
+```
+
+On A, run `/srv/http/claude-wp-builder/commands/wp-adopt.md` Steps 2 to 5 against
+`${PROJECT_PATH}`. Then run the validator again: it must exit `0`, and the audit continues
+from here with the adopted manifest. On B, stop and say so, as the row says. A site that is
+only files, with no running WordPress for WP-CLI to probe, cannot be adopted. In that case
+say so and stop.
+
 Read `.claude/CLAUDE.md` to extract:
 - **Function prefix** (e.g., `kairo_`)
 - **Theme slug**
 - **Languages** (primary + secondary)
 - **Theme directory path**
 - **Industry** (used for schema type: Organization vs LocalBusiness)
+
+On an adopted site (`"origin": "adopted"` in `.wp-create.json`), all of these come from the
+generated block that adoption wrote. **Function prefix** and **Industry** are rows of that
+block. The theme directory path is `code_scope`, not one directory. See
+**Step 2.2** below.
 
 If `.claude/CLAUDE.md` does not exist, tell the user:
 ```
@@ -77,6 +98,48 @@ If `--geo` is selected and `.wp-create.json` exists, also note its `wordpress.ur
 scan in Step 9 needs a reachable host. `--host` takes precedence over it when given; a
 project developed locally and served publicly has two URLs, and the manifest holds the one
 WP-CLI needs, not the one the scanner needs.
+
+## Step 2.2: Adopted sites (`origin: adopted`)
+
+Read `origin`. When it is absent or `created`, skip this step: nothing below applies, and
+every later step behaves exactly as it did before adoption existed.
+
+When it is `adopted`, the site was registered by `/wp-adopt`. This plugin built none of it,
+so three assumptions made everywhere else are false here:
+
+1. **The code is not one theme directory.** `code_scope.editable` lists the site's own code:
+   the child theme, the site's own plugins, mu-plugins. `code_scope.read_only` lists vendor
+   code: a commercial parent theme and third-party plugins. **Both lists are audited.**
+   - Findings in editable code follow the normal rules.
+   - Findings in read-only code are always reported with `Fix: manual` and `Owner: manual`.
+     Their `Method` names the way around the vendor file, never an edit to it: an override
+     in the child theme, a filter from the site's own plugin, or a report to the vendor.
+
+   An update overwrites every file under a read-only path. A fix written there is lost at
+   the next update and hides the defect until then.
+2. **The plugin stack was not chosen by this plugin.** `stack.seo`, `stack.security`,
+   `stack.fields`, `stack.multilingual`, `stack.builder` and `stack.cache` name what the site
+   already runs. `none` means nothing was detected.
+   - Never offer to install a second plugin for a concern the site's stack already owns.
+     Rank Math beside Yoast, or AIOS beside Wordfence, is a new defect, not a fix.
+   - Checks that read one plugin's options are `N/A (stack: <name>)` when that plugin is
+     not the one in the stack. This covers Rank Math option checks on a Yoast site and AIOS
+     configuration checks on a Wordfence site.
+   - Checks that read the rendered output apply whatever plugin produced it: the head, the
+     schema graph, response headers, the DOM.
+3. **The i18n strategy was detected, not decided.** `polylang` when Polylang is active,
+   otherwise `none`. `none` means the site is monolingual, or `stack.multilingual` names a
+   plugin this one does not build for. `none` never falls back to `suffix`: an adopted site
+   has no ACF `_<lang>` fields to check.
+
+Print it before the tier detection, so the scope of the run is visible up front:
+
+```
+=== Adopted site ===
+  Editable code   <path>, <path>, …
+  Read-only code  <path>, <path>, …   (audited, reported, never edited)
+  Stack           seo=<…> security=<…> fields=<…> multilingual=<…> builder=<…> cache=<…>
+```
 
 ## Step 2.5: Reconcile the Manifest
 
@@ -162,6 +225,11 @@ the operator confirms, then add the line to `.claude/CLAUDE.md` so the next run 
 When no signal contradicts the fallback, note that the fallback is in use and continue —
 a silent default is what made a Polylang site take the suffix branch in every downstream
 command.
+
+**On an adopted site, skip this question.** The manifest records the i18n strategy as a
+measurement (Step 2.2), not a fallback. Compare it with the signals above anyway: Polylang
+active with `none` recorded, or inactive with `polylang` recorded, is drift. Report it as a
+drift line under 2.5b and write the measured value.
 
 ### 2.5d — Category coverage matrix
 
@@ -463,11 +531,24 @@ Options:
 
 Only show plugins relevant to the selected categories (don't prompt for Rank Math if `--security` only, don't prompt for AIOS if `--seo` only).
 
+**On an adopted site, the stack decides what is offered** (Step 2.2):
+
+- `stack.seo` names a plugin other than `rankmath`: do not list `seo-by-rank-math`. Print
+  `✓ SEO owned by <stack.seo> — Rank Math not offered` instead.
+- `stack.security` names a plugin other than `aios`: do not list
+  `all-in-one-wp-security-and-firewall`. Print the same kind of line.
+- `stack.fields` is `none`: do not list `secure-custom-fields`. A site with no field plugin
+  has no field groups to audit. With `acf`, ACF is the field plugin, so SCF is not offered.
+- A concern at `none` may still be offered its plugin (Rank Math, AIOS). Adding a plugin to
+  a client site is the operator's decision, so option `[C] Skip` is listed first and marked
+  recommended.
+
 Use AskUserQuestion for the choice. If A: install all listed via `bash -c "$WP plugin install <slug> --activate"`. If B: ask which ones via AskUserQuestion and install selected. If C: continue without installing.
 
 ## Step 5: Security Level Selection
 
-If `--security` or `--all` is selected AND `--report-only` is NOT set:
+If `--security` or `--all` is selected AND `--report-only` is NOT set — and, on an adopted
+site, `stack.security` is `aios`, or is `none` and AIOS was installed in Step 4:
 
 If `--security-level` was provided in arguments, use that value and skip the prompt.
 
@@ -526,6 +607,16 @@ Project context:
 - WP-CLI wrapper: <$WP or "not available">
 - Audit tier: <1|2|3>
 - Browser measurement: <available|not available>
+- Origin: <created|adopted>
+- Editable code: <code_scope.editable, or the theme path when created>
+- Read-only code: <code_scope.read_only, or "none" when created>
+- Stack: <seo=… security=… fields=… multilingual=… builder=… cache=…, or "plugin defaults" when created>
+
+On an adopted site, audit every path in both code lists instead of <theme_path>. A finding
+under a read-only path is always `Fix: manual`, `Owner: manual`, with a Method that works
+around the vendor file (an override in editable code, a filter, a report upstream) and never
+edits it. A check that reads one plugin's options is `N/A (stack: <name>)` when the stack
+names a different plugin for that concern.
 
 Run all checks for your tier level. Output your findings as a structured report with the following format for each issue:
 
@@ -1034,7 +1125,26 @@ owners are a property of a fix, not of the report.
 
 If the user declines, skip to Step 10.
 
-If the user confirms, dispatch fix operations by category:
+If the user confirms, dispatch fix operations by category.
+
+**On an adopted site** (Step 2.2), every `<theme_path>` below means the editable code only.
+Pass `code_scope.editable` and forbid writes under `code_scope.read_only`. After each fix
+agent returns, check that nothing under a read-only path changed:
+`git status --porcelain -- <read_only paths>` when the root is a git repository, otherwise
+modification times compared with a snapshot taken before dispatch. A write there is a
+failed fix: revert it and report it. Additionally:
+
+- **Security fixes:** dispatch `wp-audit-aios` only when `stack.security` is `aios`. With
+  another security plugin, its configuration findings stay `manual`. The wp-config
+  constants and server rules below still apply, because they belong to no plugin.
+- **SEO fixes:** dispatch `wp-audit-rankmath` only when `stack.seo` is `rankmath`. With
+  another SEO plugin, its option findings are `manual`, and the method names that plugin's
+  setting.
+- **GEO fixes:** `wp-agentic-surfaces` writes `inc/agentic.php` into the active theme.
+  Dispatch it only when the active theme's directory is in `code_scope.editable`. Otherwise
+  the GEO findings stay `manual`.
+
+The categories:
 
 **Security fixes:** Dispatch an agent with `subagent_type: wp-audit-aios` with the security level context and the list of security issues to fix. Also apply direct fixes where applicable (wp-config constants via `$WP config set`, .htaccess hardening edits).
 

@@ -45,7 +45,9 @@ hand only to re-run or override.
 Detects Docker / DDEV / Lando / wp-env / native Nginx-Apache-Caddy, downloads WordPress,
 creates the database and vhost, installs a plugin profile, and writes `.wp-create.json`.
 
-Skip it if you already have a WordPress install (it can adopt an existing one, too). Without
+Skip it if you already have a WordPress install (it can adopt an existing one, too). To only
+audit, debug or clone into a site you did not build, without letting `/wp-create` reconfigure
+it, run `/wp-adopt` instead: it registers the site read-only. Without
 `.wp-create.json`, `/wp-seed` and `/wp-debug` fall back to a bare `wp` on PATH run from the
 WordPress root, taking languages from `.claude/CLAUDE.md`; Docker/DDEV/Lando wrappers only
 work through the manifest.

@@ -14,6 +14,9 @@ import {
   renderContext, spliceContext, contextDrift, resolveSecret, getKey, SECRETS, validateProfile,
   supersedeProseDecisions, testedVerdicts,
 } from './lib/manifest.mjs';
+import {
+  detectWrapper, runProbe, detectStack, buildManifest, isWordPressRoot,
+} from './lib/adopt.mjs';
 
 const say = (s) => console.log(s);
 const warn = (s) => console.error(s);
@@ -150,7 +153,7 @@ function cmdRenderContext(projectPath) {
   // validate exiting 0. Marker-aware, so the block's own lines -- same labels -- are
   // untouched, and idempotent, so a second render changes nothing. One write: the
   // refusals above must leave the file exactly as they found it.
-  const owned = supersedeProseDecisions(spliced);
+  const owned = supersedeProseDecisions(spliced, manifest);
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, owned);
   say(`ok: wrote the generated block in ${file}`);
@@ -219,13 +222,80 @@ function cmdValidateProfile(file) {
   say(`ok: ${target} is a valid profile`);
 }
 
+// Register a site this plugin did not build. Reads the site, never changes it: the only
+// files written are the manifest and the generated block in .claude/CLAUDE.md, and only
+// without --dry-run. /wp-adopt runs --dry-run first, has the operator confirm the proposal,
+// then runs it again with the confirmed values as flags.
+function parseFlags(argv) {
+  const flags = {};
+  for (const a of argv) {
+    const m = /^--([a-z-]+)(?:=(.*))?$/.exec(a);
+    if (m) flags[m[1]] = m[2] ?? true;
+  }
+  return flags;
+}
+
+function cmdAdopt(projectPath, flags) {
+  const root = resolve(projectPath);
+  const file = join(root, MANIFEST_NAME);
+  if (existsSync(file)) {
+    warn(`${MANIFEST_NAME} already exists at ${root}: this site is already registered -- run validate instead`);
+    process.exit(1);
+  }
+  if (!isWordPressRoot(root)) {
+    warn(`no WordPress install at ${root} (wp-load.php and wp-config.php): pass the WordPress root`);
+    process.exit(1);
+  }
+  const detected = detectWrapper(root);
+  const wrapper = typeof flags.wrapper === 'string' ? flags.wrapper : detected.wrapper;
+  const probed = runProbe(wrapper);
+  if (!probed.ok) {
+    warn(`probe failed: ${probed.reason}`);
+    warn('pass --wrapper="<the command that runs WP-CLI for this site>" if it is not the one above');
+    process.exit(1);
+  }
+  const { probe } = probed;
+  if (probe.multisite) {
+    warn('multisite installs are not supported: the code scope and the stack are per site, and this plugin audits one');
+    process.exit(1);
+  }
+  const list = (v) => (typeof v === 'string' ? v.split(',').map((x) => x.trim()).filter(Boolean) : undefined);
+  const overrides = {
+    wrapper,
+    name: typeof flags.name === 'string' ? flags.name : undefined,
+    prefix: typeof flags.prefix === 'string' ? flags.prefix : undefined,
+    industry: typeof flags.industry === 'string' ? flags.industry : undefined,
+    editable: list(flags.editable),
+    read_only: flags['read-only'] === '' ? [] : list(flags['read-only']),
+  };
+  if (flags.editable === '') overrides.editable = [];
+  const { manifest, reasons, prefixSource } = buildManifest(root, probe, { ...detected, wrapper }, overrides);
+  const { conflicts } = detectStack(probe);
+  const problems = validateManifest(manifest);
+
+  if (flags['dry-run']) {
+    say(JSON.stringify({ manifest, reasons, prefix_source: prefixSource, conflicts, problems }, null, 2));
+    return;
+  }
+  if (problems.length) {
+    for (const p of problems) warn(`invalid: ${p}`);
+    warn('nothing written: fix the values above with flags and run adopt again');
+    process.exit(1);
+  }
+  writeFileSync(file, `${JSON.stringify(manifest, null, 2)}\n`);
+  say(`ok: wrote ${file} (origin: adopted)`);
+  for (const c of conflicts) say(`note: ${c}`);
+  cmdRenderContext(root);
+}
+
 const [cmd, target] = process.argv.slice(2);
 if (cmd === 'validate' && target) cmdValidate(target);
 else if (cmd === 'migrate' && target) cmdMigrate(target);
 else if (cmd === 'render-context' && target) cmdRenderContext(target);
 else if (cmd === 'get' && target && process.argv[4]) cmdGet(target, process.argv[4]);
 else if (cmd === 'validate-profile' && target) cmdValidateProfile(target);
+else if (cmd === 'adopt' && target) cmdAdopt(target, parseFlags(process.argv.slice(4)));
 else {
-  warn('usage: wp-config.mjs <validate|migrate|render-context|get|validate-profile> <project-path> [key|wp-version]');
+  warn('usage: wp-config.mjs <validate|migrate|render-context|get|validate-profile|adopt> <project-path> [key|wp-version|adopt flags]');
   process.exit(1);
 }

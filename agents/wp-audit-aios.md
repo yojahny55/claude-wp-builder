@@ -27,6 +27,16 @@ Before running ANY configuration commands, read the following:
 
 If no level is specified, default to `recommended`.
 
+## Adopted sites: check the stack before installing anything
+
+When `.wp-create.json` has `"origin": "adopted"`, read `stack.security` first:
+
+- **`aios`**: continue. AIOS is the site's own security plugin.
+- **`none`**: continue only if the dispatching command says the operator agreed to install
+  AIOS on this site. Otherwise stop and report that nothing was installed.
+- **anything else**: stop. Install nothing and configure nothing. Report `N/A (stack:
+  <name>)`. A second security plugin beside the site's own is a new defect, not a fix.
+
 ## Step 1: Install AIOS
 
 Install and activate the All-in-One WP Security and Firewall plugin:
