@@ -48,8 +48,9 @@ export const STACK_SIGNATURES = {
   ],
 };
 
-// Themes that ARE page builders; a site on them has no builder plugin to detect.
-const BUILDER_THEMES = { divi: 'divi', bricks: 'bricks', avada: 'avada', 'x': 'x-pro', pro: 'x-pro' };
+// Themes that ARE page builders; a site on them has no builder plugin to detect. Keys are
+// template slugs: Themeco ships X as `x` and its successor Pro as `pro`, both one builder.
+const BUILDER_THEMES = { divi: 'divi', bricks: 'bricks', avada: 'avada', x: 'x-pro', pro: 'x-pro' };
 
 // One probe, everything in it. Each extra `wp` call is a WordPress boot, and on a Docker
 // wrapper a container exec -- and a probe split across calls can read two different states.
@@ -131,10 +132,16 @@ export function inferPrefix(root, themePath, fallbackSlug) {
   const files = [];
   const walk = (d, depth) => {
     if (depth > 3 || !existsSync(d)) return;
-    for (const e of readdirSync(d)) {
+    // A live site's files can vanish or be unreadable mid-walk (a deploy, a cache purge,
+    // another owner's permissions). The prefix is a proposal, so a skipped file costs a
+    // vote, while an exception would abort an adoption whose probe already succeeded.
+    let entries;
+    try { entries = readdirSync(d); } catch { return; }
+    for (const e of entries) {
       if (e === 'node_modules' || e === 'vendor' || e.startsWith('.')) continue;
       const f = join(d, e);
-      const st = statSync(f);
+      let st;
+      try { st = statSync(f); } catch { continue; }
       if (st.isDirectory()) walk(f, depth + 1);
       else if (e.endsWith('.php')) files.push(f);
     }
@@ -145,7 +152,9 @@ export function inferPrefix(root, themePath, fallbackSlug) {
   // functions into the vendor's namespace. The longer candidate wins when it covers at
   // least 80% of what the shorter one does.
   for (const f of files) {
-    for (const m of readFileSync(f, 'utf8').matchAll(/^\s*function\s+([a-z][a-z0-9]*_)([a-z0-9]+_)?[a-z0-9_]*\s*\(/gim)) {
+    let src;
+    try { src = readFileSync(f, 'utf8'); } catch { continue; }
+    for (const m of src.matchAll(/^\s*function\s+([a-z][a-z0-9]*_)([a-z0-9]+_)?[a-z0-9_]*\s*\(/gim)) {
       const one = m[1].toLowerCase();
       counts.set(one, (counts.get(one) ?? 0) + 1);
       if (m[2]) {

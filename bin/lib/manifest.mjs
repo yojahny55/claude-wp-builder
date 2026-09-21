@@ -615,10 +615,15 @@ export function spliceContext(claudeMd, block) {
 //
 // Only the rows that apply to `manifest` supersede prose: a created project's hand-written
 // `Function prefix` line is its only record of the prefix, and the block never renders one.
+// Labels are prose and may one day carry `(` or `.`; a label is matched literally.
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function supersedeProseDecisions(claudeMd, manifest) {
   const text = claudeMd ?? '';
   const rewrite = (chunk) => contextFieldsFor(manifest).reduce((acc, f) => acc.replace(
-    new RegExp(`^([ \\t]*-[ \\t]*\\*\\*${f.label}:\\*\\*.*)$`, 'gm'),
+    new RegExp(`^([ \\t]*-[ \\t]*\\*\\*${escapeRegExp(f.label)}:\\*\\*.*)$`, 'gm'),
     (_, line) => `<!-- superseded by the wp-create:begin block below: ${line.trim()} -->`,
   ), chunk);
 
