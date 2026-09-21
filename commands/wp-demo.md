@@ -407,8 +407,19 @@ before writing any markup.
    four screenshots for the page kind first; when it is not, say so and choose
    from the previews alone.
 
-   **5.4. The signature move and the world.** Both are recorded in
-   `demo/BRIEF.md` before the first section is built, not after.
+   **5.4. The family, the signature move and the world.** All three are
+   recorded in `demo/BRIEF.md` before the first section is built, not after.
+
+   The **family** is the interview's `aesthetic family` answer, made binding:
+   one of the seven in
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/families.md`,
+   recorded under `## Family` with that family's **Avoid list copied verbatim**
+   beneath it. From here on the composition plan, `demo/DESIGN.md` and every
+   section obey the family's Type, Palette, Surfaces and Motion lines, and step
+   7's verify reads every page against the Avoid list before the rubric — a hit
+   is a ship blocker, not a graded line. Premium-minimal is recorded only with
+   the client's own word for it beside the heading; it is the family the skill
+   drifts to when nobody chose, and the drift is what "generic" means.
 
    The **signature move** is one bespoke interaction that exists on this site
    alone — `references/uniqueness.md` §4 lists what counts and what does not. A
@@ -625,8 +636,11 @@ before writing any markup.
    contact sheets. That command is the one place the detector and rubric
    contract is written; run it, do not restate it here. **Dispatch its critique
    as a subagent**, not inline: hand it only the sheet paths under
-   `demo/.verify/` and the seven rubric lines, and ask for a pass or fail per line
-   with one sentence per failure, which is what goes into `demo/VERIFY.md`. The
+   `demo/.verify/`, the seven rubric lines, and the family's Avoid list from
+   `demo/BRIEF.md ## Family`; ask for a pass or fail per rubric line with one
+   sentence per failure, and separately for every Avoid item it can see on any
+   sheet, named with the page — which is what goes into `demo/VERIFY.md`. An
+   Avoid hit is a ship blocker (`SKILL.md`), fixed like a failed line. The
    context that wrote the markup and the brief cannot grade the render — that is
    the self-assessment the rubric exists to remove. Read `demo/VERIFY.md`, fix
    every failed line and repeat. After three rounds with failures, stop and write
