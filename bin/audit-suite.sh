@@ -197,11 +197,14 @@ mkdir -p "$cache" "$PLAYWRIGHT_BROWSERS_PATH"
 # toolchain -- names that directory and skips the managed install. It is used as given: the
 # operator owns its versions, so it is checked below for whether it loads, not for semver.
 if [ -n "${WP_AUDIT_SUITE_NODE_MODULES:-}" ]; then
-  modules="$WP_AUDIT_SUITE_NODE_MODULES"
-  if [ ! -d "$modules" ]; then
-    echo "audit-suite: WP_AUDIT_SUITE_NODE_MODULES=$modules is not a directory" >&2
+  if [ ! -d "$WP_AUDIT_SUITE_NODE_MODULES" ]; then
+    echo "audit-suite: WP_AUDIT_SUITE_NODE_MODULES=$WP_AUDIT_SUITE_NODE_MODULES is not a directory" >&2
     exit 1
   fi
+  # Absolute and physical. The link below resolves a relative target against $dir, not
+  # against the directory the check above ran in, so a relative value would pass the check
+  # and leave a dangling link.
+  modules="$(cd "$WP_AUDIT_SUITE_NODE_MODULES" && pwd -P)"
   echo "audit-suite: using the packages in $modules (WP_AUDIT_SUITE_NODE_MODULES)"
 else
   # The cache is keyed by the template's package.json. A dependency bump therefore installs
@@ -258,8 +261,16 @@ else
   fi
 fi
 
-rm -rf "$dir/node_modules"
-ln -s "$modules" "$dir/node_modules"
+# An override that already is this suite's node_modules -- packages installed there by hand --
+# is used in place. Replacing it with a link would first delete the operator's packages and
+# then point the link at itself.
+if [ -d "$dir/node_modules" ] && [ ! -L "$dir/node_modules" ] \
+  && [ "$(cd "$dir/node_modules" && pwd -P)" = "$modules" ]; then
+  :
+else
+  rm -rf "$dir/node_modules"
+  ln -s "$modules" "$dir/node_modules"
+fi
 
 # Load the CLI before asking it to do anything. A package tree that exists but cannot resolve
 # its own imports fails every later step with the same MODULE_NOT_FOUND, and each of those

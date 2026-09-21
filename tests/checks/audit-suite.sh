@@ -209,6 +209,10 @@ if grep -Eq 'modules="\$cache/node_modules-' "$runner"; then
 fi
 grep -Fq 'WP_AUDIT_SUITE_NODE_MODULES' "$runner" \
   || fail "$runner cannot reuse packages the machine already has installed"
+grep -Fq 'modules="$(cd "$WP_AUDIT_SUITE_NODE_MODULES" && pwd -P)"' "$runner" \
+  || fail "$runner links a relative WP_AUDIT_SUITE_NODE_MODULES as given; it resolves against the suite dir and dangles"
+grep -Fq '[ ! -L "$dir/node_modules" ]' "$runner" \
+  || fail "$runner deletes the suite's own node_modules when the override points at it"
 grep -Fq 'npx --no-install playwright --version' "$runner" \
   || fail "$runner never checks that the Playwright CLI loads before using it, so a broken tree is reported as a missing browser"
 if grep -Fq 'playwright install chromium >/dev/null' "$runner"; then
