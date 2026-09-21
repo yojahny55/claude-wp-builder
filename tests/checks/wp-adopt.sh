@@ -100,6 +100,19 @@ import('$PWD/bin/lib/manifest.mjs').then((m) => {
   if (m.supersedeProseDecisions(md, man) !== md) { console.error('a created project lost its prose prefix line'); process.exit(1); }
 });" || fail "adopted rows changed created-project behaviour"
 
+# --- Probe semantics the fake `wp` cannot exercise ---------------------------------
+# core fills `checked` with every installed theme and plugin before any updater answers, so
+# reading it made a bespoke theme on any site that ever ran its update cron read-only.
+node -e "
+import('$PWD/bin/lib/adopt.mjs').then(({ PROBE_PHP, buildManifest }) => {
+  if (/'checked'/.test(PROBE_PHP)) { console.error('the probe reads update_*->checked'); process.exit(1); }
+  const base = JSON.parse(require('fs').readFileSync('$tmp/probe.json', 'utf8'));
+  const { manifest: m } = buildManifest('$tmp/site', { ...base, pll_default: 'en-us', pll_languages: ['en-us', 'pt-br', 'es'] },
+    { wrapper: 'wp', engine: 'native', type: 'native' });
+  const got = JSON.stringify([m.languages.primary, m.languages.additional]);
+  if (got !== JSON.stringify(['en', ['pt', 'es']])) { console.error('languages wrong: ' + got); process.exit(1); }
+});" || fail "probe semantics"
+
 # --- The prose honours it --------------------------------------------------------
 grep -Fq 'Step 2.2: Adopted sites' commands/wp-audit.md || fail "wp-audit has no adopted-site step"
 grep -Fq 'forbid writes under `code_scope.read_only`' commands/wp-audit.md || fail "wp-audit fix phase does not guard read-only code"
@@ -107,7 +120,11 @@ grep -Fq 'dispatch `wp-audit-rankmath` only when `stack.seo` is `rankmath`' comm
   || fail "wp-audit would dispatch Rank Math onto another SEO plugin"
 grep -Fq 'do not list `seo-by-rank-math`' commands/wp-audit.md || fail "wp-audit Step 4 still offers Rank Math beside another SEO plugin"
 for c in wp-audit wp-debug wp-clone; do
-  grep -Fq 'commands/wp-adopt.md' "commands/$c.md" || fail "$c does not offer adoption"
+  grep -Fq '${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt.md' "commands/$c.md" || fail "$c does not offer adoption"
+  # A literal install path resolves only on the machine it was typed on.
+  # Strip the correct references, then any path left ending in /commands/wp-adopt.md is literal.
+  sed 's#${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt\.md##g' "commands/$c.md" | grep -Eq '/commands/wp-adopt\.md' \
+    && fail "$c points at wp-adopt.md through a literal path"
 done
 for a in security seo a11y performance practices geo ux; do
   grep -Fq 'Read-only code is reported, never fixed.' "agents/wp-audit-$a.md" || fail "wp-audit-$a ignores the read-only scope"

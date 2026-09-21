@@ -56,13 +56,16 @@ const BUILDER_THEMES = { divi: 'divi', bricks: 'bricks', avada: 'avada', x: 'x-p
 // wrapper a container exec -- and a probe split across calls can read two different states.
 // Paths are made relative to ABSPATH inside PHP because only PHP knows where the container
 // mounted things; the host path and the container path of the same file differ.
+// `checked` is never read, for plugins or themes: wp_update_plugins() and wp_update_themes()
+// fill it with EVERY installed item's version before asking anyone, so an item listed there
+// is merely installed. Only `response` and `no_update` mean an updater answered for it.
 export const PROBE_PHP = `
 $rel = function ($p) { $a = wp_normalize_path(ABSPATH); $p = wp_normalize_path($p); return strpos($p, $a) === 0 ? ltrim(substr($p, strlen($a)), '/') : null; };
 if (!function_exists('get_plugins')) { require_once ABSPATH . 'wp-admin/includes/plugin.php'; }
 $up = get_site_transient('update_plugins'); $known = array();
 foreach (array('response', 'no_update') as $k) { if (is_object($up) && isset($up->$k) && is_array($up->$k)) { $known = array_merge($known, array_keys($up->$k)); } }
 $ut = get_site_transient('update_themes'); $tknown = array();
-foreach (array('response', 'no_update', 'checked') as $k) { if (is_object($ut) && isset($ut->$k) && is_array($ut->$k)) { $tknown = array_merge($tknown, array_keys($ut->$k)); } }
+foreach (array('response', 'no_update') as $k) { if (is_object($ut) && isset($ut->$k) && is_array($ut->$k)) { $tknown = array_merge($tknown, array_keys($ut->$k)); } }
 $plugins = array(); $active = (array) get_option('active_plugins', array());
 foreach (get_plugins() as $file => $h) {
   $dir = dirname($file);
@@ -210,8 +213,12 @@ export function buildManifest(root, probe, detected, overrides = {}) {
   const { stack } = detectStack(probe);
   const scope = proposeScope(probe);
   const prefix = inferPrefix(root, probe.theme_path, probe.stylesheet);
-  const primary = (probe.pll_default ?? probe.locale ?? 'en').slice(0, 2).toLowerCase();
-  const additional = (probe.pll_languages ?? []).filter((l) => l !== primary);
+  // Polylang slugs may be `en-us` or `pt-br`; the manifest holds two-letter codes. Every
+  // slug is normalised the same way BEFORE comparing, or the default language (`en-us`)
+  // survives the filter against its own truncation (`en`) and is listed as additional.
+  const lang = (l) => String(l).slice(0, 2).toLowerCase();
+  const primary = lang(probe.pll_default ?? probe.locale ?? 'en');
+  const additional = [...new Set((probe.pll_languages ?? []).map(lang))].filter((l) => l !== primary);
   const slug = basename(root).toLowerCase().replace(/[^a-z0-9-]+/g, '-');
   let domain = '';
   try { domain = new URL(probe.home).host; } catch { /* reported by validate as a bad url */ }

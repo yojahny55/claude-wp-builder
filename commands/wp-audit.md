@@ -70,7 +70,7 @@ No .wp-create.json: this site was not created by /wp-create.
   [B] Stop
 ```
 
-On A, run `/srv/http/claude-wp-builder/commands/wp-adopt.md` Steps 2 to 5 against
+On A, run `${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt.md` Steps 2 to 5 against
 `${PROJECT_PATH}`. Then run the validator again: it must exit `0`, and the audit continues
 from here with the adopted manifest. On B, stop and say so, as the row says. A site that is
 only files, with no running WordPress for WP-CLI to probe, cannot be adopted. In that case

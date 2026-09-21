@@ -335,7 +335,7 @@ The destination already runs WordPress and was not created by /wp-create.
   [B] Run /wp-create in Adopt Mode — reconfigures vhost, SSL, hosts entry and options for it
 ```
 
-On A, run `/srv/http/claude-wp-builder/commands/wp-adopt.md` Steps 2 to 5 against the
+On A, run `${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt.md` Steps 2 to 5 against the
 destination instead of `/wp-create`, then continue with A10. The Destination Gate (Step 1.5)
 still runs at A10 and still backs up the database it is about to replace. Adoption registers
 the destination; it does not make it disposable.
@@ -360,7 +360,7 @@ bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'
 On exit 2, run the migration before continuing.
 
 **Amending the exit `3` row above:** Exit `3` here means the step before this one neither
-created nor adopted the destination. Run `/srv/http/claude-wp-builder/commands/wp-adopt.md`
+created nor adopted the destination. Run `${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt.md`
 Steps 2 to 5 against it if it runs WordPress, then run the validator again. If it does not
 run WordPress, or adoption fails, stop and say so, as the row says. Never import a database
 into a destination this command has no manifest for.
@@ -478,7 +478,7 @@ bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'
 On exit 2, run the migration before continuing.
 
 **Amending the exit `3` row above:** Exit `3` here means the step before this one neither
-created nor adopted the destination. Run `/srv/http/claude-wp-builder/commands/wp-adopt.md`
+created nor adopted the destination. Run `${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt.md`
 Steps 2 to 5 against it if it runs WordPress, then run the validator again. If it does not
 run WordPress, or adoption fails, stop and say so, as the row says. Never import a database
 into a destination this command has no manifest for.

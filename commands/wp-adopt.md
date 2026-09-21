@@ -145,7 +145,7 @@ operator's decision, and a shared repository may not want another tool's config 
 
 | Key | Read by | Effect |
 |---|---|---|
-| `origin: "adopted"` | every gated command | the site is registered, but no theme was scaffolded. Builders (`/wp-section`, `/wp-seed`, …) do not apply |
+| `origin: "adopted"` | `/wp-audit`, `/wp-debug`, `/wp-clone` | the site is registered, but no theme was scaffolded. The builders (`/wp-init`, `/wp-section`, `/wp-seed`, …) do **not** check `origin` and assume a starter theme. They are not supported on an adopted site, and nothing stops them yet |
 | `code_scope.editable` | `/wp-audit` agents and fix phase | the only paths a fix may edit |
 | `code_scope.read_only` | `/wp-audit` agents | audited and reported with `Fix: manual`, `Owner: manual`. Never edited |
 | `stack.*` | `/wp-audit` Steps 4, 5, 6 and 9 | no offer to install Rank Math or AIOS when another plugin owns SEO or security |
