@@ -109,4 +109,33 @@ done
 grep -Fq 'image-prompt.md' "$R/worlds.md" \
   || fail "$R/worlds.md does not point at image-prompt.md, so a reader of worlds alone still pastes the preamble by hand"
 
+# --- families: the enforceable half of §6 ---------------------------------------------
+# §6 names seven families by what they read as and who earns them. A build that
+# chose "brutalist" and shipped one glass card chose two families, and nothing
+# could say so until each family carried a list of what it forbids. The shape is
+# MengTo/Skills' style-lane skills (MIT): type, palette, surfaces, motion,
+# sequence, and an Avoid list -- the last is what verify reads.
+F="$R/families.md"
+[ -f "$F" ] || fail "$F is missing -- §6 names seven families and nothing says what each one forbids"
+for fam in Brutalist Maximalist Playful Retro Dense Editorial Premium-minimal; do
+  blk=$(awk -v n="### $fam" 'BEGIN{p=0} index($0, n) == 1 {p=1;next} /^### /{p=0} p' "$F")
+  [ -n "$blk" ] || fail "$F has no ### $fam section"
+  for part in '**Type**' '**Palette**' '**Surfaces**' '**Motion**' '**Sequence**' '**Avoid**'; do
+    printf '%s' "$blk" | grep -Fq "$part" || fail "$F: $fam lacks $part"
+  done
+  n=$(printf '%s' "$blk" | awk '/\*\*Avoid\*\*/{p=1;next} p && /^ *- /{c++} END{print c+0}')
+  [ "$n" -ge 3 ] || fail "$F: $fam's Avoid list has $n items; fewer than three is a mood, not a list"
+done
+grep -Fq 'families.md' "$R/uniqueness.md" || fail "$R/uniqueness.md §6 does not point at families.md"
+grep -Fq 'families.md' "$S" || fail "$S never names families.md, so nothing reads it"
+grep -Fq 'floor' "$F" || fail "$F does not restate that the taste floor holds in every family"
+# The answer has to land where the build and verify both read it.
+grep -Fq '## Family' "$D" || fail "$D never records the family in BRIEF.md, so the interview answer binds nothing"
+grep -Fq 'families.md' "$D" || fail "$D does not point the build at families.md"
+grep -Fq 'Avoid list' "$D" || fail "$D does not carry the family Avoid list into BRIEF.md, where verify can read it"
+grep -Fq 'Avoid list' "$S" || fail "$S ship blockers do not name the family Avoid list"
+# Recorded and never handed to the evaluator is recorded and never read.
+grep -Fq "the family's Avoid list from" "$D" \
+  || fail "$D dispatches the critique without the Avoid list, so the family binds the build and nothing checks it"
+
 echo PASS

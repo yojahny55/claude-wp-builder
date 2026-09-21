@@ -179,6 +179,11 @@ nobody decides otherwise.
 | Editorial | Paper, folios, measure, restraint | Long-form substance |
 | Premium-minimal | Quiet, dark, one accent, air | Luxury, and only when asked for |
 
+This table says what each family reads as; `families.md` says what each one
+**does** — type, palette, surfaces, motion, sequence — and what it forbids. The
+chosen family is recorded in `demo/BRIEF.md` under `## Family` with its Avoid
+list, and an Avoid hit on any page is a ship blocker.
+
 Go where the brief points. **If the client says "loud" and the demo comes back in
 charcoal with one accent, the interview was decorative.** The `surface
 vocabulary` and `name the moving things` fields exist to make this answerable;
