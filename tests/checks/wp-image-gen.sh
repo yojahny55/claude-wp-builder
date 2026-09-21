@@ -201,11 +201,16 @@ for mutate in 'p.gaps[0].prompt="x"; p.gaps[0].use="y";' 'p.gaps[0].prompt=""; p
 done
 
 # 5. A cached plate is not re-billed. The hash is recomputed here in bash from
-#    the documented formula (prompt|aspect|model|size) rather than read back
-#    from the script, so this is a cross-check of the identity and not a
-#    tautology. hero-bleed is 2400x1600, which snaps to size "2K" (assertion 2b).
+#    the documented formula (prompt_sent|aspect|model|size) rather than read
+#    back from the plan the script wrote, so this is a cross-check of the
+#    identity and not a tautology. The identity is the COMPOSED prompt
+#    (assertion 11) - composePrompt is called for the text, and sha256sum here
+#    is what pins the formula. hero-bleed is 2400x1600, which snaps to size
+#    "2K" (assertion 2b). No DESIGN.md/BRIEF.md in this fixture, so world and
+#    palette are absent from the composition.
 prompt='stacked and stickered oak boards seasoning in an open timber shed'
-h=$(printf '%s' "$prompt|3:2|gemini-3.1-flash-image|2K" | sha256sum | cut -c1-12)
+sent=$(SUBJECT="$prompt" node -e 'import("./bin/image-gen.mjs").then((m)=>process.stdout.write(m.composePrompt(process.env.SUBJECT,{world:null,design:null,aspect:"3:2"})))')
+h=$(printf '%s' "$sent|3:2|gemini-3.1-flash-image|2K" | sha256sum | cut -c1-12)
 printf 'not-a-real-jpeg' > "$tmp/assets/img/gen-$h.jpg"
 plan_with '[{"page":"index","section":"hero","composition":"hero-bleed"}]'
 node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging assertion 5 (cache setup)"
@@ -533,5 +538,123 @@ grep -Fq 'GENERATED PLATE FAILED' "$sms" \
 # silently re-introduce the ambiguity without this third pin catching it.
 grep -Fq 'beginning `http://`, `https://` or `//` is remote' "$sms" \
   || fail "$sm does not classify sources beginning with http://, https://, or // as remote"
+
+# 11. The prompt that is sent is composed: world from BRIEF.md, palette from
+#     DESIGN.md, a fixed negative block, around the subject the build wrote. An
+#     agent cannot forget any of it, and a palette edit changes the hash.
+cat > "$tmp/DESIGN.md" <<'MD'
+---
+colors:
+  canvas: "#f4efe6"
+  surface: "#ffffff"
+  ink: "#1a1a1a"
+  ink-soft: "#6b665e"
+  accent: "#c2410c"
+  accent-ink: "#ffffff"
+  hairline: "#e5ddd0"
+---
+MD
+cat > "$tmp/BRIEF.md" <<'MD'
+# Brief
+## World
+> Editorial still-life photography on a seamless bone-white cyclorama. NOT 3D render.
+## Assets on disk
+MD
+plan_with '[{"page":"index","section":"hero","composition":"hero-bleed"}]'
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero with DESIGN.md and BRIEF.md present"
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].prompt = "a joiner easing the nosing of an oak stair tread, empty space on the right third";
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json"
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero re-planning with a prompt set"
+sent=$(pj gaps.0.prompt_sent)
+case "$sent" in *"bone-white cyclorama"*) ;; *) fail "prompt_sent lacks the world from BRIEF.md ## World: $sent";; esac
+case "$sent" in *"#c2410c"*) ;; *) fail "prompt_sent lacks the accent hex from DESIGN.md";; esac
+case "$sent" in *"one accent"*) ;; *) fail "prompt_sent does not say one accent only";; esac
+case "$sent" in *"no text"*) ;; *) fail "prompt_sent lacks the fixed NEGATIVE block";; esac
+case "$sent" in *"oak stair tread"*) ;; *) fail "prompt_sent lost the subject the build wrote";; esac
+case "$sent" in "Editorial"*) ;; *) fail "the world must come first in prompt_sent";; esac
+# The composed prompt is what is hashed, so a palette edit regenerates.
+h1=$(node -e 'import("./bin/image-gen.mjs").then((m)=>console.log(m.plateHash(m.composePrompt("s",{world:"w",design:{canvas:"#000",ink:"#fff",accent:"#111"},aspect:"3:2"}),"3:2","x","1K")))')
+h2=$(node -e 'import("./bin/image-gen.mjs").then((m)=>console.log(m.plateHash(m.composePrompt("s",{world:"w",design:{canvas:"#000",ink:"#fff",accent:"#222"},aspect:"3:2"}),"3:2","x","1K")))')
+[ -n "$h1" ] && [ "$h1" != "$h2" ] || fail "changing the accent must change the plate hash"
+# Missing files degrade, never fatal: every earlier fixture here had neither.
+rm "$tmp/DESIGN.md" "$tmp/BRIEF.md"
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan must still succeed with no DESIGN.md/BRIEF.md"
+sent=$(pj gaps.0.prompt_sent)
+case "$sent" in *"no text"*) ;; *) fail "NEGATIVE block must be present even with no DESIGN.md";; esac
+# And the command tells the build which half is its to write.
+grep -Fq 'image-prompt.md' commands/wp-demo.md \
+  || fail "commands/wp-demo.md 5.5 does not point at references/image-prompt.md"
+grep -Fq 'prompt_sent' commands/wp-demo.md \
+  || fail "commands/wp-demo.md does not tell the build what a yes authorises (prompt_sent)"
+grep -Fq 'no longer matches the' commands/wp-demo.md \
+  || fail "commands/wp-demo.md does not document the exit-2 refusal when DESIGN.md/BRIEF.md change after approval"
+
+# 11b. The DESIGN.md reader is lenient about what it cannot control. A file
+#      written by hand with 4-space indent, single quotes, an unquoted hex or
+#      CRLF endings is still the palette; refusing it would silently drop the
+#      COLOUR line from every plate AND change every hash, which is exactly the
+#      quiet failure a strict regex produces. Only the key and a value matter.
+printf -- "---\r\ncolors:\r\n    canvas: '#111111'\r\n    ink: #eeeeee\r\n    accent: \"#c2410c\"\r\n---\r\n" > "$tmp/DESIGN.md"
+d=$(T="$tmp" node -e 'import("./bin/image-gen.mjs").then((m)=>console.log(JSON.stringify(m.readDesign(process.env.T))))')
+[ "$d" = '{"canvas":"#111111","ink":"#eeeeee","accent":"#c2410c"}' ] \
+  || fail "readDesign must accept 4-space indent, single/unquoted values and CRLF; got $d"
+# And a genuinely absent colour is still null, not a partial palette.
+printf -- "---\ncolors:\n  canvas: \"#111\"\n---\n" > "$tmp/DESIGN.md"
+d=$(T="$tmp" node -e 'import("./bin/image-gen.mjs").then((m)=>console.log(JSON.stringify(m.readDesign(process.env.T))))')
+[ "$d" = "null" ] || fail "readDesign with ink and accent missing must return null, not a partial palette; got $d"
+rm "$tmp/DESIGN.md"
+
+# 11c. A yes on the plan authorises the prompt_sent the plan showed. If DESIGN.md
+#      or BRIEF.md changes between plan and run, the recomposed text is one nobody
+#      approved, and run must refuse before any request rather than bill on it.
+cat > "$tmp/DESIGN.md" <<'MD'
+---
+colors:
+  canvas: "#f4efe6"
+  ink: "#1a1a1a"
+  accent: "#c2410c"
+---
+MD
+plan_with '[{"page":"index","section":"hero","composition":"hero-bleed"}]'
+node "$g" plan --demo "$tmp" >/dev/null
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].prompt = "a stair tread, empty space right";
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json"
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging 11c"
+sed -i 's/#c2410c/#0e7490/' "$tmp/DESIGN.md"
+set +e
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null 2>"$tmp/err" )
+rc=$?
+set -e
+[ "$rc" = 2 ] || fail "run after a DESIGN.md edit must refuse with exit 2 (the approved prompt_sent no longer matches); got $rc"
+grep -Fq 'plan' "$tmp/err" || fail "the refusal must tell the operator to re-run plan"
+grep -Fq 'index/hero/image' "$tmp/err" || fail "the refusal must name the slot whose prompt changed"
+# Control: re-running plan re-shows the new text, and run then proceeds to the
+# key check (exit 3 here, with no key) instead of refusing.
+node "$g" plan --demo "$tmp" >/dev/null
+set +e
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null 2>"$tmp/err" )
+rc=$?
+set -e
+[ "$rc" = 3 ] || fail "after re-planning, run must get past the approval check to the key check (exit 3); got $rc"
+# A gap hand-added without plan (the documented bespoke-section path) has no
+# recorded prompt_sent; that is composed on the spot and said, not refused.
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  delete p.gaps[0].prompt_sent;
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json"
+set +e
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null 2>"$tmp/err" )
+rc=$?
+set -e
+[ "$rc" = 3 ] || fail "a gap with no recorded prompt_sent is composed on the spot, not refused; got $rc"
+grep -Fq 'not shown by plan' "$tmp/err" || fail "composing an unplanned prompt_sent must be said on stderr"
+rm "$tmp/DESIGN.md"
 
 echo PASS

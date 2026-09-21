@@ -419,12 +419,14 @@ before writing any markup.
 
    The **world** is one style preamble chosen from
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/worlds.md`, recorded
-   verbatim under `## World`, and pasted **word for word** at the top of every
-   image prompt this build sends. Reusing it verbatim is what makes separately
-   generated plates look like one shoot; paraphrasing it is what makes them look
-   like eight prompts. Every shot prompt then also names **where the empty space
-   is** — copy sits on these images, so the space is generated, never cropped in
-   afterwards.
+   verbatim under `## World`. It is written **there and nowhere else**:
+   `image-gen.mjs` reads that block and prepends it word for word to every
+   image prompt this build sends, so it is never pasted by hand into a prompt.
+   Reusing it verbatim is what makes separately generated plates look like one
+   shoot; paraphrasing it is what makes them look like eight prompts, which is
+   why the reuse is done by code. Every shot's `SUBJECT` then also names **where
+   the empty space is** — copy sits on these images, so the space is generated,
+   never cropped in afterwards.
 
    The hero is layered by default:
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/hero-depth.md`. A
@@ -493,6 +495,19 @@ before writing any markup.
    terms and none of its "avoid" terms — not a generic stock description.
    A plate built from sector filler looks like the sector it was meant to
    stand out from.
+
+   **The `prompt` is the `SUBJECT` line only**, per
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/image-prompt.md`.
+   The script composes the rest around it from files this step has already
+   written — the `## World` block from `demo/BRIEF.md`, a `FORMAT` line from
+   the gap's aspect, a `COLOUR` line from `demo/DESIGN.md`'s canvas, ink and
+   accent, and a fixed `NEGATIVE` line (no text, no logos, no UI) — and writes
+   the result onto each gap as `prompt_sent`. Do not repeat the world, the
+   palette or the lens in the `prompt`; name the shot and where its empty space
+   is. `prompt_sent` is what the plan shows, what a yes authorises, what is
+   hashed for the cache, and what the `gen-<hash>.json` sidecar records (and so
+   what `## Generated images` in `demo/BRIEF.md` summarises) — so a
+   later edit to `DESIGN.md`'s accent regenerates every plate, correctly.
    The script does not match assets to slots itself,
    on purpose: the asset roles (`logo/hero/portrait/product/texture`) and the
    composition roles (`hero/proof/feature/...`) are different vocabularies, and
@@ -517,6 +532,12 @@ before writing any markup.
    having written nothing and billed nothing, and names the variable to export
    (`GEMINI_API_KEY` or `OPENAI_API_KEY`). That is a stop, not a fallback: there
    is no placeholder path, and step 6's `{{`-blocker still refuses the page.
+
+   Exit 2 before any request means the plan was refused: a gap with both or
+   neither of `prompt`/`use`, **or a `prompt_sent` that no longer matches the
+   one the plan showed** — `demo/DESIGN.md` or `demo/BRIEF.md ## World` was
+   edited after the yes, so the text that would be billed is one nobody
+   approved. Re-run `plan`, show the new table, ask again.
 
    Exit 4 means some slots failed while others succeeded. Plates already
    generated are kept and will not be re-billed on the next run.

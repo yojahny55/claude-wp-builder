@@ -97,4 +97,16 @@ for w in 1 2 3 4 5 6 7 8; do
     || fail "$R/worlds.md preamble $w has no negative list; without it the model drifts toward rendered-looking output"
 done
 
+# --- image prompt skeleton --------------------------------------------------------
+# The skeleton every plate prompt follows, and which half the script composes.
+# Adapted from MengTo/Skills design-first-ui-prompting (MIT): one accent only,
+# and generate without text -- copy is set in HTML, so a plate carrying letters
+# is a plate carrying misspelled letters.
+[ -f "$R/image-prompt.md" ] || fail "$R/image-prompt.md is missing"
+for t in 'SUBJECT' 'FORMAT' 'COLOUR' 'NEGATIVE' 'one accent' 'no text' 'image-gen.mjs' 'where the empty space is'; do
+  grep -Fq "$t" "$R/image-prompt.md" || fail "$R/image-prompt.md lacks: $t"
+done
+grep -Fq 'image-prompt.md' "$R/worlds.md" \
+  || fail "$R/worlds.md does not point at image-prompt.md, so a reader of worlds alone still pastes the preamble by hand"
+
 echo PASS

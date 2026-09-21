@@ -9,9 +9,10 @@
  * that logs commands. Here the key is read from process.env in-process, so no
  * invocation exists for anything to log.
  *
- * Exit codes: 0 clean, 2 the plan is ambiguous and was refused before any
- * request, 3 no key (nothing written, nothing billed), 4 one or more slots
- * failed after work began.
+ * Exit codes: 0 clean, 2 the plan was refused before any request (a gap with
+ * both or neither of prompt/use, or a composed prompt that no longer matches
+ * the one plan showed and the operator approved), 3 no key (nothing written,
+ * nothing billed), 4 one or more slots failed after work began.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, realpathSync } from 'node:fs';
 import { resolve, join, dirname, basename, isAbsolute } from 'node:path';
@@ -87,6 +88,61 @@ export function plateHash(prompt, aspect, model, size) {
   return createHash('sha256').update(`${prompt}|${aspect}|${model}|${size}`).digest('hex').slice(0, 12);
 }
 
+// What is sent is composed here, not pasted by the build. The world preamble
+// (BRIEF.md ## World) and the palette (DESIGN.md) are the same for every plate
+// of a build, and a prompt that omits either produces a good photograph that
+// belongs on some other page. Composing them in code is what makes "verbatim"
+// true by construction, and hashing the composed text is what makes a palette
+// edit regenerate rather than serve the old plate. Skeleton documented in
+// skills/wp-demo-craft/references/image-prompt.md.
+export const NEGATIVE = 'NEGATIVE: no text, no letters, no words, no numerals, no logos, no watermark, no UI, no screens showing type. Never stock-photo styling.';
+
+// Regex over the front matter, no YAML dependency - same approach as
+// composition-preview.mjs previewTokens(), but lenient where that one is
+// strict: indent width, quote style and line endings are not the build's
+// contract, and a reader that refused a hand-edited file would drop the COLOUR
+// line from every plate and change every hash without anything saying so.
+// Null when the file or any of the three colours is absent; the caller says so
+// once and composes without it.
+export function readDesign(demo) {
+  const f = join(demo, 'DESIGN.md');
+  if (!existsSync(f)) return null;
+  const fm = readFileSync(f, 'utf8').replace(/\r\n?/g, '\n').split('---')[1] || '';
+  const pick = (k) => (new RegExp(`^\\s+${k}:\\s*["']?([^"'\\n]+?)["']?\\s*$`, 'm').exec(fm) || [])[1];
+  const d = { canvas: pick('canvas'), ink: pick('ink'), accent: pick('accent') };
+  return d.canvas && d.ink && d.accent ? d : null;
+}
+
+// The whole `## World` section, blockquote markers stripped, as one paragraph.
+export function readWorld(demo) {
+  const f = join(demo, 'BRIEF.md');
+  if (!existsSync(f)) return null;
+  const m = /^## World[^\n]*\n([\s\S]*?)(?=\n## |\s*$)/m.exec(readFileSync(f, 'utf8'));
+  if (!m) return null;
+  const text = m[1].split('\n').map((l) => l.replace(/^>\s?/, '').trim()).filter(Boolean).join(' ');
+  return text || null;
+}
+
+export function composePrompt(subject, { world, design, aspect }) {
+  const lines = [];
+  // A plan written before this existed already carries the world in its
+  // prompt; do not send it twice.
+  if (world && !subject.includes(world)) lines.push(world);
+  lines.push(`SUBJECT: ${subject}`);
+  lines.push(`FORMAT: ${aspect} background plate; page copy is set over it, so the named empty space stays clear and quiet.`);
+  if (design) lines.push(`COLOUR: canvas ${design.canvas}, ink ${design.ink}, one accent ${design.accent} only - grade toward these; no other saturated colour.`);
+  lines.push(NEGATIVE);
+  return lines.join('\n');
+}
+
+function readBuild(demo) {
+  const world = readWorld(demo);
+  const design = readDesign(demo);
+  if (!world) warn('BRIEF.md has no ## World - plates will not share a preamble');
+  if (!design) warn('DESIGN.md not read - plates will not be graded to the palette');
+  return { world, design };
+}
+
 function planPath(demo) { return join(demo, '.image-plan.json'); }
 function readPlan(demo) { return JSON.parse(readFileSync(planPath(demo), 'utf8')); }
 function writePlan(demo, plan) {
@@ -97,6 +153,7 @@ function cmdPlan(demo) {
   const plan = readPlan(demo);
   const [vendor, model] = String(plan.provider).split('/');
   const imgDir = join(demo, 'assets', 'img');
+  const build = readBuild(demo);
 
   // Carry forward anything already authored, keyed by the slot's identity in
   // the build, so re-running plan never discards prompts a human wrote.
@@ -109,6 +166,7 @@ function cmdPlan(demo) {
       const size = vendor === 'openai' ? aspect : snapSize(s.width);
       const was = prior.get(`${row.page}|${row.section}|${s.slot}`) || {};
       const prompt = was.prompt || '';
+      const prompt_sent = prompt ? composePrompt(prompt, { ...build, aspect }) : '';
       gaps.push({
         page: row.page,
         section: row.section,
@@ -118,8 +176,9 @@ function cmdPlan(demo) {
         size,
         est_cost: estCost(vendor, size),
         prompt,
+        prompt_sent,
         use: was.use || '',
-        cached: !!prompt && existsSync(join(imgDir, `gen-${plateHash(prompt, aspect, model, size)}.jpg`)),
+        cached: !!prompt && existsSync(join(imgDir, `gen-${plateHash(prompt_sent, aspect, model, size)}.jpg`)),
       });
     }
   }
@@ -150,6 +209,25 @@ async function cmdRun(demo) {
   const imgDir = join(demo, 'assets', 'img');
   mkdirSync(imgDir, { recursive: true });
   const gaps = plan.gaps || [];
+  // The composed prompt is what is hashed and sent; `prompt` stays the
+  // build's own subject so a re-run of plan carries it forward unchanged.
+  // A yes on the plan's table authorised the prompt_sent the plan showed. If
+  // BRIEF.md or DESIGN.md changed since, the recomposed text is one nobody
+  // approved, and billing on it is the thing the approval step exists to
+  // prevent - refuse before any request, like the ambiguity check below. A gap
+  // with no recorded prompt_sent is the documented bespoke-section path (added
+  // by hand, never planned); that is composed here and said, not refused.
+  const build = readBuild(demo);
+  for (const g of gaps) {
+    if (!g.prompt) continue;
+    const now = composePrompt(g.prompt, { ...build, aspect: g.aspect });
+    if (g.prompt_sent && g.prompt_sent !== now) {
+      warn(`${g.page}/${g.section}/${g.slot}: BRIEF.md or DESIGN.md changed since plan, so the composed prompt is not the one approved. Re-run plan and approve the new table.`);
+      process.exit(2);
+    }
+    if (!g.prompt_sent) warn(`${g.page}/${g.section}/${g.slot}: prompt_sent not shown by plan; composed now from the current BRIEF.md and DESIGN.md`);
+    g.prompt_sent = now;
+  }
 
   // `use` paths come from assets_on_disk[].path and are relative to the
   // user's WordPress PROJECT (e.g. "docs/logo.png"), not to this plugin's own
@@ -202,7 +280,7 @@ async function cmdRun(demo) {
       }
       continue;
     }
-    const hash = plateHash(g.prompt, g.aspect, model, g.size);
+    const hash = plateHash(g.prompt_sent, g.aspect, model, g.size);
     const file = `gen-${hash}.jpg`;
     if (existsSync(join(imgDir, file))) {
       g.result = { file: `assets/img/${file}`, generated: true, cached: true };
@@ -230,7 +308,7 @@ async function cmdRun(demo) {
 }
 
 function isCached(imgDir, g, model) {
-  return !!g.prompt && existsSync(join(imgDir, `gen-${plateHash(g.prompt, g.aspect, model, g.size)}.jpg`));
+  return !!g.prompt && existsSync(join(imgDir, `gen-${plateHash(g.prompt_sent, g.aspect, model, g.size)}.jpg`));
 }
 
 // Exported for direct-import testing: a monkeypatched global.fetch can drive
@@ -248,7 +326,7 @@ export async function generateInto(imgDir, file, { vendor, model, key, g }) {
   if (!bytes || bytes.length === 0) throw new Error(`${vendor} returned an empty image payload`);
   writeFileSync(join(imgDir, file), bytes);
   writeFileSync(join(imgDir, file.replace(/\.jpg$/, '.json')), JSON.stringify({
-    model, prompt: g.prompt, aspect: g.aspect, size: g.size,
+    model, prompt: g.prompt, prompt_sent: g.prompt_sent, aspect: g.aspect, size: g.size,
     date: new Date().toISOString().slice(0, 10),
     est_cost: g.est_cost,
     synthid: vendor === 'google',
@@ -278,7 +356,7 @@ export async function callGoogle(model, key, g) {
       headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify({
         model,
-        input: [{ type: 'text', text: g.prompt }],
+        input: [{ type: 'text', text: g.prompt_sent ?? g.prompt }],
         response_format: {
           type: 'image', mime_type: 'image/jpeg',
           aspect_ratio: g.aspect, image_size: g.size,
@@ -314,7 +392,7 @@ export async function callOpenAI(model, key, g) {
       headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
       // No response_format: the gpt-image models reject it and always return base64.
       body: JSON.stringify({
-        model, prompt: g.prompt, size: g.size,
+        model, prompt: g.prompt_sent ?? g.prompt, size: g.size,
         quality: 'medium', output_format: 'jpeg', n: 1,
       }),
     });

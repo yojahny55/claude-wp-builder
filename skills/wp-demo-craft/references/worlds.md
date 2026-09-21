@@ -3,13 +3,16 @@
 Ported from [nateherkai/scroll-craft](https://github.com/nateherkai/scroll-craft)
 `references/worlds.md` (MIT). The art direction the whole demo lives inside.
 
-Pick one, write it as a **style preamble**, and paste that preamble **verbatim**
-at the top of every image prompt the build sends to `bin/image-gen.mjs`. Reusing
-it word for word is what makes eight separately generated assets look like one
-shoot. Paraphrasing it is what makes them look like eight prompts.
+Pick one, write it as a **style preamble**, and record it in `demo/BRIEF.md`
+under `## World`. `bin/image-gen.mjs` reads that block and prepends it
+**verbatim** to every image prompt the build sends — the build writes the
+preamble once, there, and never into a prompt. Reusing it word for word is what
+makes eight separately generated assets look like one shoot; paraphrasing it is
+what makes them look like eight prompts, which is why the pasting is done by
+code. The rest of the prompt's shape is in `references/image-prompt.md`.
 
-Record the chosen world and its preamble in `demo/BRIEF.md` under `## World`, so
-a later run generating one replacement plate uses the same words.
+A later run generating one replacement plate reads the same block and so uses
+the same words.
 
 ## The default is photographic
 
