@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **A generated plate is graded to the demo's own palette, and the build no longer
+  pastes the world.** An image prompt used to carry the world preamble (if the build
+  remembered to paste it), the subject, and the sector's "use" terms — and nothing
+  from `demo/DESIGN.md`. A low-key cinematic preamble on a warm-paper editorial demo
+  produced a good photograph that belonged on some other page. `bin/image-gen.mjs`
+  now composes what is sent: the `## World` block from `demo/BRIEF.md`, the build's
+  `SUBJECT`, a `FORMAT` line from the gap's aspect, a `COLOUR` line from `DESIGN.md`'s
+  canvas, ink and one accent, and a fixed `NEGATIVE` line (no text, no logos, no UI —
+  copy is set in HTML, and a plate carrying letters carries misspelled ones). The
+  composed text is what is hashed, so editing the accent regenerates every plate, and
+  is recorded on each gap as `prompt_sent` and in the sidecar. The build writes the
+  `SUBJECT` and nothing else; the skeleton is in
+  `skills/wp-demo-craft/references/image-prompt.md`, adapted from MengTo/Skills'
+  `design-first-ui-prompting` (MIT). A missing `DESIGN.md` or `## World` is said
+  once and composed without, never refused.
+
 ## [1.26.0] - 2026-09-20
 
 ### Added
