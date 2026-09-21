@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.27.0] - 2026-09-21
+
 ### Changed
 
 - **A generated plate is graded to the demo's own palette, and the build no longer

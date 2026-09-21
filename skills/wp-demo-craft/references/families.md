@@ -228,4 +228,4 @@ rubric. Nothing measures it: a glass card is `backdrop-filter`, a rounded SaaS
 card is a radius over 12px on a bordered box, and both are detectable — but a
 detector that fires on a brutalist page's one deliberate exception is a detector
 the build learns to argue with. If Avoid hits keep shipping, the upgrade path is
-a `bin/family-lint.mjs` that reports, never blocks, and the evaluator decides.
+a family lint under `bin/` that reports, never blocks, and lets the evaluator decide.
