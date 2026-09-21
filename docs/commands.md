@@ -34,6 +34,7 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-cinematic-encode`](#wp-cinematic-encode) | C | required per video | source MP4 | `assets/videos/*`, ACF row |
 | [`/wp-cinematic-scene`](#wp-cinematic-scene) | C | required per scene | — | scene repeater row, optional template override |
 | [`/wp-cinematic-seed`](#wp-cinematic-seed) | C | required | scenes manifest | scene rows, sample videos |
+| [`/wp-adopt`](#wp-adopt) | utility | — | a running WordPress root | `.wp-create.json` (`origin: adopted`), `.claude/CLAUDE.md` block |
 | [`/wp-debug`](#wp-debug) | utility | — | `.wp-create.json` | offered fixes |
 | [`/wp-clone`](#wp-clone) | utility | — | remote site | local install |
 | [`/wp-anonymize`](#wp-anonymize) | utility | — | cloned database | anonymised database |
@@ -505,6 +506,35 @@ Details, kit install and encoding rationale: [cinematic-mode.md](cinematic-mode.
 ---
 
 ## Utilities
+
+### `/wp-adopt`
+
+```
+/wp-adopt [wordpress-root] [--wrapper="docker exec <container> wp --allow-root"]
+```
+
+Registers a site that was not built with `/wp-create`, for example a client site on a
+commercial theme or an inherited install. It runs one read-only WP-CLI probe, proposes the
+values below, and has the operator confirm them:
+
+- the wrapper;
+- the code scope: which code is the site's own and editable, and which is vendor code and
+  read-only;
+- the plugin stack: SEO, security, fields, multilingual, builder, cache;
+- the function prefix.
+
+Then it writes `.wp-create.json` with `"origin": "adopted"` and the generated block in
+`.claude/CLAUDE.md`. Nothing on the site changes.
+
+`/wp-audit`, `/wp-debug` and `/wp-clone` offer adoption themselves when they find no manifest.
+On an adopted site:
+
+- `/wp-audit` audits the editable code and the read-only code, but never fixes read-only
+  code.
+- It does not offer Rank Math or AIOS when the site already runs another SEO or security
+  plugin.
+
+This command is not `/wp-create`'s Adopt Mode, which reconfigures the environment.
 
 ### `/wp-debug`
 

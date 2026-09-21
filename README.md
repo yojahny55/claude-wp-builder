@@ -400,6 +400,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-cinematic-encode` | C | per video | ffmpeg — all-keyframe desktop MP4 + 9:16 mobile |
 | `/wp-cinematic-scene` | C | per scene | Author one scene — replaces `/wp-section` on path C |
 | `/wp-cinematic-seed` | C | required | Seed every scene from a manifest, idempotent |
+| `/wp-adopt [wp-root]` | utility | — | Register a site not built with `/wp-create` — read-only, so `/wp-audit`, `/wp-debug` and `/wp-clone` run on it |
 | `/wp-debug [issue]` | utility | — | WP-CLI diagnostics and fixes |
 | `/wp-clone --from --to` | utility | — | Clone a remote site locally |
 | `/wp-anonymize` | utility | — | Replace real people in a clone with deterministic fakes |
@@ -409,7 +410,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-aos-animator [theme] [--report-only]` | utility | — | Runner for the `wp-aos-animator` skill — audit, install, enqueue, initialize and seed AOS scroll animations across the templates |
 | `/wp-contribute <new\|check\|pr\|release>` | contributors | — | Work on the plugin itself — scaffold a command/agent/skill with its check and doc rows, verify the repo, open the PR |
 
-\* Optional if WordPress is already running: without `.wp-create.json`, `/wp-seed` and `/wp-debug` fall back to a bare `wp` on PATH and the languages in `.claude/CLAUDE.md`.
+\* Optional if WordPress is already running: without `.wp-create.json`, `/wp-seed` and `/wp-debug` fall back to a bare `wp` on PATH and the languages in `.claude/CLAUDE.md`. To audit, debug or clone into a site this plugin did not build, `/wp-adopt` registers it without changing it.
 The `wp-robin`, `wp-aos-animator` and `wp-s3` skills are invoked through their runner
 commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. The skills stay
 `user-invocable: false` and keep owning the procedure; the commands only dispatch them.

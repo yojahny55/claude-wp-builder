@@ -57,7 +57,43 @@ const CONTEXT_FIELDS = [
   { label: 'demo mode', paths: ['demo mode'], fallback: 'plain' },
   { label: 'Primary language', paths: ['languages.primary'] },
   { label: 'Plugin profile', paths: ['plugins.profile'], fallback: 'none' },
+  // `scope: 'adopted'` rows are rendered only for a site registered by `wp-config.mjs adopt` -- one this plugin did not
+  // build, whose theme it did not scaffold and whose plugins it did not choose. A created
+  // project's block is byte-identical to what it was before these rows existed, so no
+  // existing project reads as drifted. Every agent reads the block first; these rows are
+  // how it learns which code it may change and which plugin owns SEO or security here.
+  { label: 'Origin', paths: ['origin'], fallback: 'created', scope: 'adopted' },
+  { label: 'Function prefix', paths: ['project.prefix'], scope: 'adopted' },
+  { label: 'Industry', paths: ['project.industry'], fallback: 'unknown', scope: 'adopted' },
+  { label: 'Editable code', paths: ['code_scope.editable'], scope: 'adopted', list: true },
+  { label: 'Read-only code', paths: ['code_scope.read_only'], scope: 'adopted', list: true },
+  {
+    label: 'Stack',
+    paths: ['stack'],
+    scope: 'adopted',
+    object: true,
+    render: (m) => STACK_KEYS.map((k) => `${k}=${at(m, `stack.${k}`) ?? 'none'}`).join(', '),
+  },
 ];
+
+// `origin` absent means created: every manifest written before adoption existed came from
+// /wp-create, and reading absence any other way would re-scope every existing project.
+export function isAdopted(manifest) {
+  return manifest?.origin === 'adopted';
+}
+
+// The rows that apply to THIS manifest. A row with a `scope` exists only for the projects it
+// names; everywhere else it is neither rendered, validated nor allowed to supersede prose.
+// A row names its scope as data, not as a function reference: identity comparison against
+// a predicate broke silently the moment someone inlined an equivalent arrow function.
+function contextFieldsFor(manifest) {
+  return CONTEXT_FIELDS.filter((f) => !f.scope || (f.scope === 'adopted' && isAdopted(manifest)));
+}
+
+// The concerns a site's own plugins can already own. /wp-audit used to assume Rank Math and
+// AIOS and offered to install them; on a site that runs Yoast and Wordfence that is a
+// second SEO plugin and a second firewall, not a fix. `none` means nothing was detected.
+export const STACK_KEYS = ['seo', 'security', 'fields', 'multilingual', 'builder', 'cache'];
 
 // Required fields by dotted path. Anything not listed is optional and preserved.
 // The tail is derived, not typed: see CONTEXT_FIELDS above.
@@ -66,8 +102,13 @@ const REQUIRED = [...new Set([
   'environment.type', 'environment.engine',
   'wordpress.url',
   'wp_cli.wrapper',
-  ...CONTEXT_FIELDS.filter((f) => f.fallback === undefined).flatMap((f) => f.paths),
+  ...CONTEXT_FIELDS.filter((f) => f.fallback === undefined && !f.scope).flatMap((f) => f.paths),
 ])];
+
+// Required only when the manifest is an adopted one. Same derivation, other half of the table.
+const REQUIRED_ADOPTED = CONTEXT_FIELDS
+  .filter((f) => f.fallback === undefined && f.scope === 'adopted' && !f.list && !f.object)
+  .flatMap((f) => f.paths);
 
 function fallbackFor(path) {
   const field = CONTEXT_FIELDS.find((f) => f.paths[0] === path);
@@ -183,7 +224,7 @@ export function validateManifest(manifest) {
 
   // The optional CONTEXT_FIELDS rows are rendered into the generated block the same way,
   // so a non-string there puts "[object Object]" where a decision belongs.
-  for (const key of CONTEXT_FIELDS.flatMap((f) => f.paths)) {
+  for (const key of contextFieldsFor(manifest).filter((f) => !f.list && !f.object).flatMap((f) => f.paths)) {
     if (REQUIRED.includes(key)) continue;
     const v = at(manifest, key);
     if (v !== undefined && v !== null && typeof v !== 'string') {
@@ -195,8 +236,82 @@ export function validateManifest(manifest) {
     problems.push(`"demo mode" must be "craft" or "plain", found ${JSON.stringify(mode)}`);
   }
   const i18n = manifest['i18n strategy'];
-  if (i18n !== undefined && i18n !== 'suffix' && i18n !== 'polylang') {
-    problems.push(`"i18n strategy" must be "suffix" or "polylang", found ${JSON.stringify(i18n)}`);
+  // `none` is an adopted site's answer only: it has no ACF suffix fields and no Polylang
+  // groups -- it is monolingual, or a plugin this one does not build for (WPML, TranslatePress)
+  // owns translation, which `stack.multilingual` records. A created project always chose one
+  // of the two strategies this plugin builds, so `none` there is a hand-edit.
+  const i18nAllowed = isAdopted(manifest) ? ['suffix', 'polylang', 'none'] : ['suffix', 'polylang'];
+  if (i18n !== undefined && !i18nAllowed.includes(i18n)) {
+    problems.push(`"i18n strategy" must be ${i18nAllowed.map((v) => `"${v}"`).join(' or ')}, found ${JSON.stringify(i18n)}`);
+  }
+  const origin = manifest.origin;
+  if (origin !== undefined && origin !== 'created' && origin !== 'adopted') {
+    problems.push(`origin must be "created" or "adopted", found ${JSON.stringify(origin)}`);
+  }
+  if (isAdopted(manifest)) problems.push(...validateAdopted(manifest));
+  return problems;
+}
+
+// An adopted manifest carries the one thing a created project never needs: which code is
+// the site's own. The fix phase of /wp-audit edits files, and on a site built on a commercial
+// theme the active theme's parent is vendor code an update will overwrite -- so the list of
+// what may be edited is a required, validated field, never a default.
+function validateAdopted(manifest) {
+  const problems = [];
+  for (const key of REQUIRED_ADOPTED) {
+    const v = at(manifest, key);
+    if (v === undefined || v === null || v === '') {
+      problems.push(`${key} is required on an adopted site and is missing or empty`);
+    } else if (typeof v !== 'string') {
+      problems.push(`${key} must be a string, found ${Array.isArray(v) ? 'an array' : `a ${typeof v}`}`);
+    }
+  }
+  const industry = at(manifest, 'project.industry');
+  if (industry !== undefined && typeof industry !== 'string') {
+    problems.push('project.industry must be a string');
+  }
+  const scope = at(manifest, 'code_scope');
+  if (scope === undefined || scope === null || typeof scope !== 'object' || Array.isArray(scope)) {
+    problems.push('code_scope is required on an adopted site: an object with "editable" and "read_only" path arrays');
+  } else {
+    const seen = new Map();
+    for (const list of ['editable', 'read_only']) {
+      const paths = scope[list];
+      if (!Array.isArray(paths)) {
+        problems.push(`code_scope.${list} must be an array of paths relative to the WordPress root`);
+        continue;
+      }
+      for (const p of paths) {
+        if (typeof p !== 'string' || p === '') {
+          problems.push(`code_scope.${list} has a non-string or empty entry: ${JSON.stringify(p)}`);
+        } else if (p.startsWith('/') || p.split('/').includes('..')) {
+          // Same rule as the ledger path: a manifest copied between machines must not carry
+          // an address that means something else there, and the fix phase writes to these.
+          problems.push(`code_scope.${list} must hold paths relative to the WordPress root that do not climb out of it, found ${JSON.stringify(p)}`);
+        } else if (seen.has(p)) {
+          problems.push(`code_scope lists ${JSON.stringify(p)} in both ${seen.get(p)} and ${list}`);
+        } else {
+          seen.set(p, list);
+        }
+      }
+    }
+    if (Array.isArray(scope.editable) && scope.editable.length === 0) {
+      problems.push('code_scope.editable is empty: an adopted site with no code of its own has nothing to audit or fix -- list at least the active theme or a plugin');
+    }
+    for (const key of Object.keys(scope)) {
+      if (key !== 'editable' && key !== 'read_only') problems.push(`code_scope has an unknown key: ${key}`);
+    }
+  }
+  const stack = at(manifest, 'stack');
+  if (stack !== undefined) {
+    if (stack === null || typeof stack !== 'object' || Array.isArray(stack)) {
+      problems.push('stack must be an object keyed by concern');
+    } else {
+      for (const [k, v] of Object.entries(stack)) {
+        if (!STACK_KEYS.includes(k)) problems.push(`stack has an unknown key: ${k}`);
+        else if (typeof v !== 'string' || v === '') problems.push(`stack.${k} must be a non-empty string ("none" when nothing owns it)`);
+      }
+    }
   }
   return problems;
 }
@@ -420,14 +535,19 @@ export const MARK_END = '<!-- wp-create:end -->';
 // Rendered from the manifest, so the two files cannot disagree. Every line here is
 // a decision some command branches on; guidance an operator writes lives OUTSIDE
 // the markers and is never touched.
+function renderField(f, manifest) {
+  if (f.render) return f.render(manifest);
+  const v = at(manifest, f.paths[0]);
+  if (f.list) return Array.isArray(v) && v.length ? v.map((p) => `\`${p}\``).join(', ') : '(none)';
+  return v ?? f.fallback ?? '';
+}
+
 export function renderContext(manifest) {
   const lines = [
     MARK_BEGIN,
     '<!-- Generated from .wp-create.json by bin/wp-config.mjs. Edits inside these markers are reported, not kept. -->',
     '',
-    ...CONTEXT_FIELDS.map((f) => `- **${f.label}:** ${
-      f.render ? f.render(manifest) : (at(manifest, f.paths[0]) ?? f.fallback ?? '')
-    }`),
+    ...contextFieldsFor(manifest).map((f) => `- **${f.label}:** ${renderField(f, manifest)}`),
     '',
     MARK_END,
   ];
@@ -481,6 +601,11 @@ export function spliceContext(claudeMd, block) {
   return text.slice(0, state.start) + block + text.slice(state.end + MARK_END.length);
 }
 
+// Labels are prose and may one day carry `(` or `.`; a label is matched literally.
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Migration hands ownership of the CONTEXT_FIELDS decisions to the generated block.
 // The legacy prose lines that carried them until then sit OUTSIDE the markers, where
 // contextDrift cannot see them, so leaving them alone is how a migrated project ends
@@ -494,10 +619,13 @@ export function spliceContext(claudeMd, block) {
 // Lines inside the markers are the block's own and are left byte-identical -- they
 // carry the same labels, so a marker-blind pass would comment out the very record it
 // is protecting. A malformed marker state is returned untouched; the caller refuses.
-export function supersedeProseDecisions(claudeMd) {
+//
+// Only the rows that apply to `manifest` supersede prose: a created project's hand-written
+// `Function prefix` line is its only record of the prefix, and the block never renders one.
+export function supersedeProseDecisions(claudeMd, manifest) {
   const text = claudeMd ?? '';
-  const rewrite = (chunk) => CONTEXT_FIELDS.reduce((acc, f) => acc.replace(
-    new RegExp(`^([ \\t]*-[ \\t]*\\*\\*${f.label}:\\*\\*.*)$`, 'gm'),
+  const rewrite = (chunk) => contextFieldsFor(manifest).reduce((acc, f) => acc.replace(
+    new RegExp(`^([ \\t]*-[ \\t]*\\*\\*${escapeRegExp(f.label)}:\\*\\*.*)$`, 'gm'),
     (_, line) => `<!-- superseded by the wp-create:begin block below: ${line.trim()} -->`,
   ), chunk);
 

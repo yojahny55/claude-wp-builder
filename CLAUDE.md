@@ -676,10 +676,18 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   variable the way `${CLAUDE_PLUGIN_ROOT}` beside it in the same `bash -c` is — a Claude
   that treats both alike runs `validate ''`, gets the usage line and exit `1`, and the
   table reads that as "stop". The block now says where the path comes from, and
-  `tests/checks/wp-config-gate.sh` diffs all thirteen sites against one canonical copy so
+  `tests/checks/wp-config-gate.sh` diffs every site against one canonical copy so
   the sentence cannot be lost from one of them; nothing can check that the directory a
   Claude substituted is the right one, and the tool still answers a missing argument and an
   invalid manifest with the same exit code.
+- **An adopted site's code scope is a heuristic that the operator confirms.**
+  `wp-config.mjs adopt` treats code that no updater knows as the site's own. The update
+  transients are the only offline signal. They misclassify a vendor add-on bundled with a
+  theme, and a site that has never checked for updates has empty transients, so every
+  plugin reads as the site's own. `/wp-adopt` makes the operator confirm every path for
+  that reason. The read-only guard in `/wp-audit`'s fix phase is prose plus a
+  `git status` check after each fix. A root that is not a git repository falls back to
+  modification times, which is weaker.
 - **A tested compatibility range is a claim someone has to keep honest.** An absent range
   is reported as untested, which makes the gap visible; nothing keeps a declared range true
   as plugins release.

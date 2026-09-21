@@ -26,6 +26,16 @@ Before running ANY configuration commands, read the following project files:
 2. **`.wp-create.json`** — Extract:
    - The **WP-CLI wrapper** command (`wp_cli.wrapper`) — assign to `$WP`
 
+## Adopted sites: check the stack before installing anything
+
+When `.wp-create.json` has `"origin": "adopted"`, read `stack.seo` first:
+
+- **`rankmath`**: continue. Rank Math is the site's own SEO plugin.
+- **`none`**: continue only if the dispatching command says the operator agreed to install
+  Rank Math on this site. Otherwise stop and report that nothing was installed.
+- **anything else**: stop. Install nothing and configure nothing. Report `N/A (stack:
+  <name>)`. A second SEO plugin beside the site's own is a new defect, not a fix.
+
 ## Step 1: Install Rank Math
 
 ```bash
