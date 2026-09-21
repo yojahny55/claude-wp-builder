@@ -599,6 +599,11 @@ export function spliceContext(claudeMd, block) {
   return text.slice(0, state.start) + block + text.slice(state.end + MARK_END.length);
 }
 
+// Labels are prose and may one day carry `(` or `.`; a label is matched literally.
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Migration hands ownership of the CONTEXT_FIELDS decisions to the generated block.
 // The legacy prose lines that carried them until then sit OUTSIDE the markers, where
 // contextDrift cannot see them, so leaving them alone is how a migrated project ends
@@ -615,11 +620,6 @@ export function spliceContext(claudeMd, block) {
 //
 // Only the rows that apply to `manifest` supersede prose: a created project's hand-written
 // `Function prefix` line is its only record of the prefix, and the block never renders one.
-// Labels are prose and may one day carry `(` or `.`; a label is matched literally.
-function escapeRegExp(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 export function supersedeProseDecisions(claudeMd, manifest) {
   const text = claudeMd ?? '';
   const rewrite = (chunk) => contextFieldsFor(manifest).reduce((acc, f) => acc.replace(
