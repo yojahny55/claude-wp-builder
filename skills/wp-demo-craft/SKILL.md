@@ -121,6 +121,11 @@ hex where a token exists; invented statistics; a `slop` finding from
   else the reader sees. A build once rendered "HERO PHOTOGRAPH PENDING" as its
   hero's primary visual and passed "First paint complete", which asks only that a
   primary visual be present.
+- Anything on the chosen family's **Avoid list**, read from `demo/BRIEF.md
+  ## Family` (`references/families.md`). Verify reads every page against that
+  list before the rubric; a hit is a fail, not a grade, because a brutalist page
+  with one glass card is a page that chose two families, and a page that chose
+  two chose none.
 
 ## References
 
@@ -129,8 +134,10 @@ Read `references/taste.md` (the floor), then `design-md.md`, `feel.md`,
 
 Then the three that decide whether this build resembles the last one:
 `uniqueness.md` (the template trap, the signature move, the aesthetic
-families), `hero-depth.md` (layering is the baseline, not a polish pass) and
-`worlds.md` (one style preamble, pasted verbatim into every image prompt).
+families) with `families.md` (what each family does and forbids),
+`hero-depth.md` (layering is the baseline, not a polish pass) and `worlds.md`
+(one style preamble, prepended verbatim to every image prompt by
+`image-gen.mjs`).
 
 Those three were absent for several releases while every constraint file was
 present, and the shape of what shipped followed exactly: builds that obeyed
