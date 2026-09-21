@@ -19,6 +19,22 @@
   `skills/wp-demo-craft/references/image-prompt.md`, adapted from MengTo/Skills'
   `design-first-ui-prompting` (MIT). A missing `DESIGN.md` or `## World` is said
   once and composed without, never refused.
+### Added
+
+- **A craft build commits to one aesthetic family, and an Avoid hit is a ship
+  blocker.** `uniqueness.md` §6 named seven families by what they read as and who
+  earns them, and the interview asked which; nothing downstream could tell whether
+  the answer was honoured, and a build that said "brutalist" and shipped a glass
+  card had chosen two families — which is to say none, the shape every "generic"
+  note describes. `skills/wp-demo-craft/references/families.md` now carries the
+  enforceable half for each of the seven: type, palette, surfaces, motion,
+  sequence and an **Avoid** list, adapted from the style-lane skills in
+  MengTo/Skills (MIT). `/wp-demo` records the family under `## Family` in
+  `demo/BRIEF.md` with its Avoid list verbatim before the first section, hands
+  that list to the verify critique beside the seven rubric lines, and `SKILL.md`
+  lists a hit among the ship blockers. The rubric stays seven lines: an Avoid hit
+  is a fail, not a grade. Premium-minimal is recorded only with the client's own
+  word for it — it is the family the skill drifts to when nobody chose.
 
 ## [1.26.0] - 2026-09-20
 
