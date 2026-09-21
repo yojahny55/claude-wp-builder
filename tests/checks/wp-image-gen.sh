@@ -589,5 +589,72 @@ grep -Fq 'image-prompt.md' commands/wp-demo.md \
   || fail "commands/wp-demo.md 5.5 does not point at references/image-prompt.md"
 grep -Fq 'prompt_sent' commands/wp-demo.md \
   || fail "commands/wp-demo.md does not tell the build what a yes authorises (prompt_sent)"
+grep -Fq 'no longer matches the' commands/wp-demo.md \
+  || fail "commands/wp-demo.md does not document the exit-2 refusal when DESIGN.md/BRIEF.md change after approval"
+
+# 11b. The DESIGN.md reader is lenient about what it cannot control. A file
+#      written by hand with 4-space indent, single quotes, an unquoted hex or
+#      CRLF endings is still the palette; refusing it would silently drop the
+#      COLOUR line from every plate AND change every hash, which is exactly the
+#      quiet failure a strict regex produces. Only the key and a value matter.
+printf -- "---\r\ncolors:\r\n    canvas: '#111111'\r\n    ink: #eeeeee\r\n    accent: \"#c2410c\"\r\n---\r\n" > "$tmp/DESIGN.md"
+d=$(T="$tmp" node -e 'import("./bin/image-gen.mjs").then((m)=>console.log(JSON.stringify(m.readDesign(process.env.T))))')
+[ "$d" = '{"canvas":"#111111","ink":"#eeeeee","accent":"#c2410c"}' ] \
+  || fail "readDesign must accept 4-space indent, single/unquoted values and CRLF; got $d"
+# And a genuinely absent colour is still null, not a partial palette.
+printf -- "---\ncolors:\n  canvas: \"#111\"\n---\n" > "$tmp/DESIGN.md"
+d=$(T="$tmp" node -e 'import("./bin/image-gen.mjs").then((m)=>console.log(JSON.stringify(m.readDesign(process.env.T))))')
+[ "$d" = "null" ] || fail "readDesign with ink and accent missing must return null, not a partial palette; got $d"
+rm "$tmp/DESIGN.md"
+
+# 11c. A yes on the plan authorises the prompt_sent the plan showed. If DESIGN.md
+#      or BRIEF.md changes between plan and run, the recomposed text is one nobody
+#      approved, and run must refuse before any request rather than bill on it.
+cat > "$tmp/DESIGN.md" <<'MD'
+---
+colors:
+  canvas: "#f4efe6"
+  ink: "#1a1a1a"
+  accent: "#c2410c"
+---
+MD
+plan_with '[{"page":"index","section":"hero","composition":"hero-bleed"}]'
+node "$g" plan --demo "$tmp" >/dev/null
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  p.gaps[0].prompt = "a stair tread, empty space right";
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json"
+node "$g" plan --demo "$tmp" >/dev/null || fail "plan exited non-zero staging 11c"
+sed -i 's/#c2410c/#0e7490/' "$tmp/DESIGN.md"
+set +e
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null 2>"$tmp/err" )
+rc=$?
+set -e
+[ "$rc" = 2 ] || fail "run after a DESIGN.md edit must refuse with exit 2 (the approved prompt_sent no longer matches); got $rc"
+grep -Fq 'plan' "$tmp/err" || fail "the refusal must tell the operator to re-run plan"
+grep -Fq 'index/hero/image' "$tmp/err" || fail "the refusal must name the slot whose prompt changed"
+# Control: re-running plan re-shows the new text, and run then proceeds to the
+# key check (exit 3 here, with no key) instead of refusing.
+node "$g" plan --demo "$tmp" >/dev/null
+set +e
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null 2>"$tmp/err" )
+rc=$?
+set -e
+[ "$rc" = 3 ] || fail "after re-planning, run must get past the approval check to the key check (exit 3); got $rc"
+# A gap hand-added without plan (the documented bespoke-section path) has no
+# recorded prompt_sent; that is composed on the spot and said, not refused.
+node -e '
+  const f = process.argv[1], p = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  delete p.gaps[0].prompt_sent;
+  require("fs").writeFileSync(f, JSON.stringify(p, null, 2));
+' "$tmp/.image-plan.json"
+set +e
+( unset GEMINI_API_KEY OPENAI_API_KEY; node "$g" run --demo "$tmp" >/dev/null 2>"$tmp/err" )
+rc=$?
+set -e
+[ "$rc" = 3 ] || fail "a gap with no recorded prompt_sent is composed on the spot, not refused; got $rc"
+grep -Fq 'not shown by plan' "$tmp/err" || fail "composing an unplanned prompt_sent must be said on stderr"
+rm "$tmp/DESIGN.md"
 
 echo PASS

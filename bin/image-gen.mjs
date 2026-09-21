@@ -9,9 +9,10 @@
  * that logs commands. Here the key is read from process.env in-process, so no
  * invocation exists for anything to log.
  *
- * Exit codes: 0 clean, 2 the plan is ambiguous and was refused before any
- * request, 3 no key (nothing written, nothing billed), 4 one or more slots
- * failed after work began.
+ * Exit codes: 0 clean, 2 the plan was refused before any request (a gap with
+ * both or neither of prompt/use, or a composed prompt that no longer matches
+ * the one plan showed and the operator approved), 3 no key (nothing written,
+ * nothing billed), 4 one or more slots failed after work began.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, realpathSync } from 'node:fs';
 import { resolve, join, dirname, basename, isAbsolute } from 'node:path';
@@ -97,13 +98,17 @@ export function plateHash(prompt, aspect, model, size) {
 export const NEGATIVE = 'NEGATIVE: no text, no letters, no words, no numerals, no logos, no watermark, no UI, no screens showing type. Never stock-photo styling.';
 
 // Regex over the front matter, no YAML dependency - same approach as
-// composition-preview.mjs previewTokens(). Null when the file or any of the
-// three colours is absent; the caller says so once and composes without it.
+// composition-preview.mjs previewTokens(), but lenient where that one is
+// strict: indent width, quote style and line endings are not the build's
+// contract, and a reader that refused a hand-edited file would drop the COLOUR
+// line from every plate and change every hash without anything saying so.
+// Null when the file or any of the three colours is absent; the caller says so
+// once and composes without it.
 export function readDesign(demo) {
   const f = join(demo, 'DESIGN.md');
   if (!existsSync(f)) return null;
-  const fm = readFileSync(f, 'utf8').split('---')[1] || '';
-  const pick = (k) => (new RegExp(`\\n  ${k}: "([^"]+)"`).exec(fm) || [])[1];
+  const fm = readFileSync(f, 'utf8').replace(/\r\n?/g, '\n').split('---')[1] || '';
+  const pick = (k) => (new RegExp(`^\\s+${k}:\\s*["']?([^"'\\n]+?)["']?\\s*$`, 'm').exec(fm) || [])[1];
   const d = { canvas: pick('canvas'), ink: pick('ink'), accent: pick('accent') };
   return d.canvas && d.ink && d.accent ? d : null;
 }
@@ -206,8 +211,23 @@ async function cmdRun(demo) {
   const gaps = plan.gaps || [];
   // The composed prompt is what is hashed and sent; `prompt` stays the
   // build's own subject so a re-run of plan carries it forward unchanged.
+  // A yes on the plan's table authorised the prompt_sent the plan showed. If
+  // BRIEF.md or DESIGN.md changed since, the recomposed text is one nobody
+  // approved, and billing on it is the thing the approval step exists to
+  // prevent - refuse before any request, like the ambiguity check below. A gap
+  // with no recorded prompt_sent is the documented bespoke-section path (added
+  // by hand, never planned); that is composed here and said, not refused.
   const build = readBuild(demo);
-  for (const g of gaps) if (g.prompt) g.prompt_sent = composePrompt(g.prompt, { ...build, aspect: g.aspect });
+  for (const g of gaps) {
+    if (!g.prompt) continue;
+    const now = composePrompt(g.prompt, { ...build, aspect: g.aspect });
+    if (g.prompt_sent && g.prompt_sent !== now) {
+      warn(`${g.page}/${g.section}/${g.slot}: BRIEF.md or DESIGN.md changed since plan, so the composed prompt is not the one approved. Re-run plan and approve the new table.`);
+      process.exit(2);
+    }
+    if (!g.prompt_sent) warn(`${g.page}/${g.section}/${g.slot}: prompt_sent not shown by plan; composed now from the current BRIEF.md and DESIGN.md`);
+    g.prompt_sent = now;
+  }
 
   // `use` paths come from assets_on_disk[].path and are relative to the
   // user's WordPress PROJECT (e.g. "docs/logo.png"), not to this plugin's own

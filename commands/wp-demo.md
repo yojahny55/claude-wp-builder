@@ -533,6 +533,12 @@ before writing any markup.
    (`GEMINI_API_KEY` or `OPENAI_API_KEY`). That is a stop, not a fallback: there
    is no placeholder path, and step 6's `{{`-blocker still refuses the page.
 
+   Exit 2 before any request means the plan was refused: a gap with both or
+   neither of `prompt`/`use`, **or a `prompt_sent` that no longer matches the
+   one the plan showed** — `demo/DESIGN.md` or `demo/BRIEF.md ## World` was
+   edited after the yes, so the text that would be billed is one nobody
+   approved. Re-run `plan`, show the new table, ask again.
+
    Exit 4 means some slots failed while others succeeded. Plates already
    generated are kept and will not be re-billed on the next run.
 
