@@ -65,12 +65,20 @@ fi
 if [[ -n "${MCP_SPY_LOG:-}" ]]; then
   [[ -s "$MCP_SPY_LOG" ]] || fail "MCP_SPY_LOG '$MCP_SPY_LOG' is empty — the server was never started through the spy, so nothing about calls is proven"
   # No match is the normal case for most tool names, and under `set -o pipefail`
-  # grep's exit 1 would take the whole check down instead of counting zero.
-  calls() { grep -o "\"name\"[[:space:]]*:[[:space:]]*\"$1\"" "$MCP_SPY_LOG" | wc -l || true; }
-  # Only tools unique to one server can attribute a call. Measured against
-  # wp-design-library@1.x and inspo-mcp@0.1.16, `recommend` is defined by BOTH,
+  # grep's exit 1 would take the whole check down instead of counting zero. The
+  # guard has to sit on grep itself: `... | wc -l || true` only guards wc, and
+  # the pipeline's status is still grep's. It survived before only because every
+  # caller consumed the result inside $(( )), which set -e does not inspect.
+  calls() { { grep -o "\"name\"[[:space:]]*:[[:space:]]*\"$1\"" "$MCP_SPY_LOG" || true; } | wc -l; }
+  # Only tools unique to one server can attribute a call. The two inventories
+  # are the live `tools/list` of wp-design-library@1.1.0 (add, add_batch,
+  # get_entry, get_motion, get_vocab, recommend, refresh, save_entry, search,
+  # set_fields, similar) and inspo-mcp@0.1.16 (search_screens, get_screen,
+  # find_similar, get_site_pages, recommend, get_reference_jsx, find_by_color,
+  # get_design_system, ...), probed 2026-09-21. `recommend` is defined by BOTH,
   # so counting it toward either lets an inspo-only build read as having reached
-  # the library. It is reported and asserted on by neither.
+  # the library. It is reported and asserted on by neither. A renamed tool on
+  # either server makes its count read 0 here, never a false positive.
   LIB_CALLS=$(( $(calls search) + $(calls get_entry) + $(calls similar) + $(calls get_motion) ))
   INSPO_CALLS=$(( $(calls search_screens) + $(calls get_screen) + $(calls find_similar) + $(calls get_site_pages) ))
   AMBIG=$(calls recommend)
