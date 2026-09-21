@@ -13,6 +13,12 @@
 # the second audit on a machine cost as much as the first, which is how a gate stops being
 # run.
 #
+# Environment:
+#   WP_AUDIT_SUITE_NODE_MODULES  use this package directory (e.g. `npm root -g`) instead of
+#                                the managed install; it must hold the template's packages
+#   PLAYWRIGHT_BROWSERS_PATH     browser cache; defaults to the suite's own under the cache dir
+#   WP_AUDIT_SUITE_CACHE         the cache dir itself
+#
 # Usage:
 #   bin/audit-suite.sh --url <base-url> [--dir <suite-dir>] [--pages <p1,p2,...>]
 #                      [--only a11y|seo|perf|all] [--site <name>] [--probe]
@@ -187,57 +193,100 @@ cache="${WP_AUDIT_SUITE_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/claude-wp-builder
 export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-${cache}/browsers}"
 mkdir -p "$cache" "$PLAYWRIGHT_BROWSERS_PATH"
 
-# The cache is keyed by the template's package.json. A dependency bump therefore installs
-# into a new directory instead of mutating the one older projects are still symlinked to.
-key="$(cksum < "$template/package.json" | awk '{print $1}')"
-modules="$cache/node_modules-$key"
+# A machine that already has the suite's packages -- a global `npm install -g`, a shared
+# toolchain -- names that directory and skips the managed install. It is used as given: the
+# operator owns its versions, so it is checked below for whether it loads, not for semver.
+if [ -n "${WP_AUDIT_SUITE_NODE_MODULES:-}" ]; then
+  if [ ! -d "$WP_AUDIT_SUITE_NODE_MODULES" ]; then
+    echo "audit-suite: WP_AUDIT_SUITE_NODE_MODULES=$WP_AUDIT_SUITE_NODE_MODULES is not a directory" >&2
+    exit 1
+  fi
+  # Absolute and physical. The link below resolves a relative target against $dir, not
+  # against the directory the check above ran in, so a relative value would pass the check
+  # and leave a dangling link.
+  modules="$(cd "$WP_AUDIT_SUITE_NODE_MODULES" && pwd -P)"
+  echo "audit-suite: using the packages in $modules (WP_AUDIT_SUITE_NODE_MODULES)"
+else
+  # The cache is keyed by the template's package.json. A dependency bump therefore installs
+  # into a new directory instead of mutating the one older projects are still symlinked to.
+  key="$(cksum < "$template/package.json" | awk '{print $1}')"
 
-if [ ! -d "$modules" ]; then
-  # `mkdir` is the atomic part. Two runs racing a bare `[ ! -d ]` both install, and the
-  # second `mv` finds a directory and nests inside it -- producing node_modules/node_modules,
-  # no error and no non-zero exit, because `mv` did exactly what it was asked.
-  lock="$modules.lock"
-  if mkdir "$lock" 2>/dev/null; then
-    staging=""
-    # Both, and on INT/TERM as well as EXIT. Trapping only the lock left an install-XXXXXX
-    # directory orphaned in the shared cache on every abort between mktemp and mv -- and
-    # under `set -e` an unguarded `cp` or a Ctrl-C is exactly such an abort.
-    trap 'rm -rf "$lock" ${staging:+"$staging"}' EXIT INT TERM
-    echo "audit-suite: installing the suite's dependencies once into $modules"
-    staging="$(mktemp -d "$cache/install-XXXXXX")"
-    cp "$template/package.json" "$staging/package.json"
-    if ! (cd "$staging" && npm install --no-audit --no-fund --silent); then
-      echo "audit-suite: npm install failed -- the browser suite cannot run here"
-      exit 2
-    fi
-    # Move, do not copy: a half-written cache that a later run treats as complete is worse
-    # than no cache, and a rename within one filesystem is the only atomic option here.
-    mv "$staging/node_modules" "$modules" || exit 1
-    rm -rf "$staging" "$lock"
-    staging=""
-    trap - EXIT INT TERM
-  else
-    echo "audit-suite: another run is installing the same dependencies -- waiting"
-    waited=0
-    while [ -d "$lock" ] && [ ! -d "$modules" ]; do
-      sleep 2
-      waited=$((waited + 2))
-      # A lock left behind by a killed process must not block every later run forever. Ten
-      # minutes is longer than the install and shorter than a working day.
-      if [ "$waited" -ge 600 ]; then
-        echo "audit-suite: gave up waiting for $lock -- remove it if no install is running" >&2
-        exit 1
+  # The leaf must be named exactly node_modules. Node resolves a package's own imports from
+  # its real path, walking up through directories literally called node_modules, so the
+  # symlink from the project does not help once the package is loaded. A leaf named
+  # node_modules-<key> is never searched: @playwright/test could not find playwright, and
+  # every run died with MODULE_NOT_FOUND while reporting a browser that would not install.
+  modules="$cache/$key/node_modules"
+
+  if [ ! -d "$modules" ]; then
+    # `mkdir` is the atomic part. Two runs racing a bare `[ ! -d ]` both install, and the
+    # second `mv` finds a directory and nests inside it -- producing node_modules/node_modules,
+    # no error and no non-zero exit, because `mv` did exactly what it was asked.
+    lock="$cache/$key.lock"
+    if mkdir "$lock" 2>/dev/null; then
+      staging=""
+      # Both, and on INT/TERM as well as EXIT. Trapping only the lock left an install-XXXXXX
+      # directory orphaned in the shared cache on every abort between mktemp and mv -- and
+      # under `set -e` an unguarded `cp` or a Ctrl-C is exactly such an abort.
+      trap 'rm -rf "$lock" ${staging:+"$staging"}' EXIT INT TERM
+      echo "audit-suite: installing the suite's dependencies once into $modules"
+      staging="$(mktemp -d "$cache/install-XXXXXX")"
+      cp "$template/package.json" "$staging/package.json"
+      if ! (cd "$staging" && npm install --no-audit --no-fund --silent); then
+        echo "audit-suite: npm install failed -- the browser suite cannot run here"
+        exit 2
       fi
-    done
-    [ -d "$modules" ] || { echo "audit-suite: the other run did not produce $modules" >&2; exit 1; }
+      # Move, do not copy: a half-written cache that a later run treats as complete is worse
+      # than no cache, and a rename within one filesystem is the only atomic option here.
+      mkdir -p "$cache/$key"
+      mv "$staging/node_modules" "$modules" || exit 1
+      rm -rf "$staging" "$lock"
+      staging=""
+      trap - EXIT INT TERM
+    else
+      echo "audit-suite: another run is installing the same dependencies -- waiting"
+      waited=0
+      while [ -d "$lock" ] && [ ! -d "$modules" ]; do
+        sleep 2
+        waited=$((waited + 2))
+        # A lock left behind by a killed process must not block every later run forever. Ten
+        # minutes is longer than the install and shorter than a working day.
+        if [ "$waited" -ge 600 ]; then
+          echo "audit-suite: gave up waiting for $lock -- remove it if no install is running" >&2
+          exit 1
+        fi
+      done
+      [ -d "$modules" ] || { echo "audit-suite: the other run did not produce $modules" >&2; exit 1; }
+    fi
   fi
 fi
 
-rm -rf "$dir/node_modules"
-ln -s "$modules" "$dir/node_modules"
+# An override that already is this suite's node_modules -- packages installed there by hand --
+# is used in place. Replacing it with a link would first delete the operator's packages and
+# then point the link at itself.
+if [ -d "$dir/node_modules" ] && [ ! -L "$dir/node_modules" ] \
+  && [ "$(cd "$dir/node_modules" && pwd -P)" = "$modules" ]; then
+  :
+else
+  rm -rf "$dir/node_modules"
+  ln -s "$modules" "$dir/node_modules"
+fi
 
-if ! (cd "$dir" && npx --no-install playwright install chromium >/dev/null 2>&1); then
+# Load the CLI before asking it to do anything. A package tree that exists but cannot resolve
+# its own imports fails every later step with the same MODULE_NOT_FOUND, and each of those
+# steps would name its own symptom instead of the cause. Exit 1, not 2: this is a broken
+# install on a machine that has Node, not a machine without one.
+if ! out="$(cd "$dir" && npx --no-install playwright --version 2>&1)"; then
+  echo "audit-suite: the Playwright CLI in $modules does not load:" >&2
+  printf '%s\n' "$out" | grep -m3 -E 'Error|Cannot find' >&2 || printf '%s\n' "$out" | tail -3 >&2
+  exit 1
+fi
+
+# The install's own output is kept for the failure message. Discarding it is how a module
+# that would not resolve was reported as a browser that would not download.
+if ! out="$(cd "$dir" && npx --no-install playwright install chromium 2>&1)"; then
   echo "audit-suite: playwright could not install its browser -- reporting Tier 3 unmeasured"
+  printf '%s\n' "$out" | tail -5 >&2
   exit 2
 fi
 

@@ -2,7 +2,24 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`--suite` could never run from its managed install.** The shared dependency cache was
+  named `node_modules-<key>`. Node resolves a package's own imports from its real path,
+  searching only directories literally named `node_modules`, so `@playwright/test` could not
+  find `playwright` and every run failed with `MODULE_NOT_FOUND`. The script sent that
+  output to `/dev/null` and reported "playwright could not install its browser", so Tier 3
+  read as an unavailable browser.
+  - The cache leaf is now `<cache>/<key>/node_modules`. An old `node_modules-<key>`
+    directory is no longer used and can be deleted.
+  - The runner loads the Playwright CLI before using it and prints the real error.
+  - The browser install's output is kept and its tail is printed on failure.
+
 ### Added
+
+- **`WP_AUDIT_SUITE_NODE_MODULES`**: point `--suite` at packages the machine already has,
+  such as a global install (`npm root -g`), instead of the managed install.
+  `PLAYWRIGHT_BROWSERS_PATH` is already respected when set.
 
 - **`/wp-adopt`: audit, debug and clone sites this plugin did not build.** Before this,
   `/wp-audit`, `/wp-debug` and `/wp-clone` required a manifest that only `/wp-create`

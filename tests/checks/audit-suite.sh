@@ -200,8 +200,24 @@ set -e
 grep -Fq 'exit 2' "$runner" || fail "$runner never skips cleanly -- a missing browser would read as a failure"
 grep -Fq 'PLAYWRIGHT_BROWSERS_PATH' "$runner" \
   || fail "$runner does not share the browser cache, so every project pays the full install"
-grep -Fq 'node_modules-$key' "$runner" \
-  || fail "$runner does not key the dependency cache to the template, so a version bump would mutate the shared cache in place"
+grep -Fq 'modules="$cache/$key/node_modules"' "$runner" \
+  || fail "$runner does not key the dependency cache to the template in a leaf named node_modules -- a version bump would mutate the shared cache, or Node could not resolve the packages from their real path"
+# Node resolves a package's imports from its real path, through directories literally named
+# node_modules. A cache leaf named anything else loads the CLI and then fails to find its deps.
+if grep -Eq 'modules="\$cache/node_modules-' "$runner"; then
+  fail "$runner names the cache leaf node_modules-<key>; Node never searches it and every run dies with MODULE_NOT_FOUND"
+fi
+grep -Fq 'WP_AUDIT_SUITE_NODE_MODULES' "$runner" \
+  || fail "$runner cannot reuse packages the machine already has installed"
+grep -Fq 'modules="$(cd "$WP_AUDIT_SUITE_NODE_MODULES" && pwd -P)"' "$runner" \
+  || fail "$runner links a relative WP_AUDIT_SUITE_NODE_MODULES as given; it resolves against the suite dir and dangles"
+grep -Fq '[ ! -L "$dir/node_modules" ]' "$runner" \
+  || fail "$runner deletes the suite's own node_modules when the override points at it"
+grep -Fq 'npx --no-install playwright --version' "$runner" \
+  || fail "$runner never checks that the Playwright CLI loads before using it, so a broken tree is reported as a missing browser"
+if grep -Fq 'playwright install chromium >/dev/null' "$runner"; then
+  fail "$runner discards the browser install's output, hiding the real error behind 'could not install its browser'"
+fi
 grep -Fq 'audit.config.js' "$runner" || fail "$runner never seeds the per-project configuration"
 
 # The selectors somebody inspected a real DOM to find are work; a scaffold that overwrites

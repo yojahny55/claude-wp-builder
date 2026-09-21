@@ -424,6 +424,13 @@ cache, so the second audit on a machine is not as expensive as the first. Withou
 npm it skips cleanly and Tier 3 reports `UNMEASURED`, which is what an absent browser tool
 already did.
 
+A machine that already has the suite's packages installed, globally or in a shared
+toolchain, can point the suite at them with `WP_AUDIT_SUITE_NODE_MODULES=<dir>` (for a
+global install, the output of `npm root -g`) and skip the managed install. Set
+`PLAYWRIGHT_BROWSERS_PATH` beside it to reuse the browsers that installation already
+downloaded. The directory is used as given, and the run stops with exit `1` if its
+Playwright CLI does not load.
+
 Its `audit.config.js` is written once and then left alone: it carries the selectors
 somebody inspected the real DOM to find, and a scaffold that overwrote it every run would
 re-measure a different site without saying so.
