@@ -24,7 +24,9 @@ runtime for the plugin itself. The only executable code shipped is:
   *Config contract* below), `demo-verify.mjs` (the browser walk behind `/wp-demo-verify`
   and craft mode's probe), `tailwindify-parity.mjs` (computed-style comparison during
   CSS conversion), `image-gen.mjs` (the image generator and its cost/key handling),
-  `composition-preview.mjs` (renders `skills/wp-demo-craft/compositions/` previews).
+  `composition-preview.mjs` (renders `skills/wp-demo-craft/compositions/` previews),
+  `theme-template-check.mjs` (the ABSPATH, compiled-class and widget-script gate behind
+  `/wp-finalize` Check 4 and the practices audit).
   `bin/lib/` holds what they share.
 - `skills/wp-polylang/scripts/*.php` — run inside a real WordPress via `wp eval-file`
 - `starter-theme/**` — PHP copied into user projects (never executed here)

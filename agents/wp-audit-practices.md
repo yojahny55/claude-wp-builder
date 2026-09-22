@@ -92,9 +92,11 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 
 | Code | Check | How to Detect | Severity | Auto-fix |
 |------|-------|---------------|----------|----------|
-| WP-016 | Missing ABSPATH check | Grep each `.php` file for `defined\( *'ABSPATH' *\)` — the **quoted** form only | WARNING | Yes |
+| WP-016 | Missing ABSPATH check | Run `node ${CLAUDE_PLUGIN_ROOT}/bin/theme-template-check.mjs <theme> --rule abspath`: every `.php` file, `inc/seed/` and `fields/` included, must carry `defined( 'ABSPATH' )` — the **quoted** form only. The script is the gate; a grep sample is what let sixteen unguarded seed files through | WARNING | Yes |
 | WP-046 | Unquoted `ABSPATH` constant | Grep for `defined\( *ABSPATH *\)` without quotes; a PHP 8 fatal, not a style issue | CRITICAL | Yes |
 | WP-047 | Template classes absent from the stylesheet | Every class a template part emits must exist in the theme's CSS. See Procedure | WARNING | No |
+| WP-053 | Tailwind class that never compiled | On a compiled Tailwind theme run `node ${CLAUDE_PLUGIN_ROOT}/bin/theme-template-check.mjs <theme> --rule classes`. It fails on an HTML entity inside a class token (`group-aria-[expanded=&quot;false&quot;]:rotate-90` emitted nothing on a real build) and on a utility-shaped token with no selector in `assets/css/dist/*.css`. `CANNOT VERIFY` lines are runtime-built classes: report them as INFO, never as findings | WARNING | No |
+| WP-054 | Tabs, accordion or directory-filter markup without its script | `node ${CLAUDE_PLUGIN_ROOT}/bin/theme-template-check.mjs <theme> --rule widgets`: `role="tab"`, `data-accordion-trigger` or `data-directory` in a template requires `./tabs.js`, `./accordion.js` or `./directory-filter.js` imported by `assets/js/src/index.js` | WARNING | Yes |
 | WP-017 | Include instead of get_template_part | Grep templates for `include\|require` of template files (should use get_template_part) | WARNING | No |
 | WP-018 | Missing wp_body_open | Grep header.php for `wp_body_open()` | WARNING | Yes |
 | WP-019 | Broken template part refs | For each `get_template_part()` call, verify the referenced file exists | CRITICAL | No |

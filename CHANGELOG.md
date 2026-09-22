@@ -40,6 +40,21 @@
   such as a global install (`npm root -g`), instead of the managed install.
   `PLAYWRIGHT_BROWSERS_PATH` is already respected when set.
 
+- **`bin/theme-template-check.mjs`: template contracts that no build step enforced.**
+  `/wp-finalize` Check 4 and the practices audit (WP-016, WP-053, WP-054) run it. It
+  checks three things:
+  - **abspath**: every theme PHP file carries the quoted `defined( 'ABSPATH' )` guard, and
+    the unquoted PHP 8 fatal form fails. The agents already required the guard, and
+    sixteen `inc/seed/*.php` files shipped without it anyway.
+  - **classes**: on a compiled Tailwind theme, an HTML entity inside a class token fails,
+    and so does a utility-shaped token (a variant, an arbitrary value, a utility prefix)
+    with no selector in `assets/css/dist/*.css`. A template's
+    `group-aria-[expanded=&quot;false&quot;]:rotate-90` compiled to nothing and the icon
+    never rotated. BEM classes, `js-*` hooks and plain words are ignored. Classes built at
+    runtime are listed as `CANNOT VERIFY` and do not fail the check.
+  - **widgets**: `role="tab"`, accordion-trigger or `data-directory` markup requires its
+    module (`tabs.js`, `accordion.js`, `directory-filter.js`) in `assets/js/src/index.js`.
+
 - **`/wp-adopt`: audit, debug and clone sites this plugin did not build.** Before this,
   `/wp-audit`, `/wp-debug` and `/wp-clone` required a manifest that only `/wp-create`
   writes, and stopped with "not created by /wp-create" on any site without one. A client
