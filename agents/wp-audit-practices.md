@@ -136,6 +136,7 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 | WP-033 | Loose comparisons | Grep for `[^!=]==[^=]` (should use ===) in PHP files | INFO | No |
 | WP-034 | Raw get_field | Grep for `\bget_field\(` excluding `prefix_get_field` in templates (bypasses bilingual) | WARNING | Yes |
 | WP-051 | Unguarded get_the_terms result | Grep for `foreach\s*\(\s*get_the_terms\(` or a `foreach` over a variable assigned from `get_the_terms()` with no `is_wp_error`/`empty` between them | WARNING | No |
+| WP-055 | Contour that renders differently across engines | `node ${CLAUDE_PLUGIN_ROOT}/bin/css-contour-lint.mjs <theme>`: a 1px `border` + `border-radius` on a transparent/white control (Firefox on Windows notches the corners; use `box-shadow: inset 0 0 0 1px`), `drop-shadow` on a bordered rounded ring, a `type="search"` whose native clear button is not hidden. Verification never renders Firefox on Windows, so this static read is the only check. Visual change: report, never auto-fix | WARNING | No |
 
 ## Step 2: Tier 2 — WP-CLI Runtime Checks
 

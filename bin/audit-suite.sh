@@ -16,7 +16,10 @@
 # Environment:
 #   WP_AUDIT_SUITE_NODE_MODULES  use this package directory (e.g. `npm root -g`) instead of
 #                                the managed install; it must hold the template's packages
-#   PLAYWRIGHT_BROWSERS_PATH     browser cache; defaults to the suite's own under the cache dir
+#   PLAYWRIGHT_BROWSERS_PATH     an extra Playwright browser cache to search for executables
+#   WP_BROWSER_CHROMIUM / _FIREFOX / _WEBKIT
+#                                use this executable (bin/lib/browsers.mjs); nothing is
+#                                ever downloaded, a missing browser is a skip
 #   WP_AUDIT_SUITE_CACHE         the cache dir itself
 #
 # Usage:
@@ -26,7 +29,7 @@
 # Exit codes (house convention):
 #   0  the suite ran and results/run.json was written
 #   1  a real failure -- the suite could not run, or the conversion refused its own output
-#   2  clean skip -- node or the browsers are unavailable, or --probe found nothing to run
+#   2  clean skip -- node or an existing Chromium is unavailable, or --probe found nothing to run
 #   3  crash
 set -euo pipefail
 
@@ -70,8 +73,35 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 [ -d "$template" ] || { echo "audit-suite: $template is missing" >&2; exit 1; }
 
+# Browsers are resolved, never installed: `playwright install` downloads a build pinned to
+# one Playwright revision, and on a machine whose policy forbids it the audit died on the
+# install instead of measuring. bin/lib/browsers.mjs finds an executable that already exists
+# (Playwright's caches, then the system Chromium). Chromium carries every pass; Firefox and
+# WebKit only add the cross-browser pass, so their absence is a notice, not a skip. Each
+# lookup logs the executable and revision it chose on stderr, left visible on purpose: a
+# build of another revision than the driving Playwright pins is the first suspect when a
+# launch fails.
+# browsers.mjs exits 2 when it finds nothing; any other failure is the lookup itself
+# crashing (an old Node, a broken checkout) and must not read as "no browser".
+find_browser() {
+  local out rc=0
+  out="$(node "$here/bin/lib/browsers.mjs" "$1")" || rc=$?
+  case "$rc" in
+    0) printf '%s' "$out" ;;
+    2) ;;
+    *) echo "audit-suite: bin/lib/browsers.mjs failed (exit $rc) looking up $1; its error is above" >&2; exit 1 ;;
+  esac
+}
+chromium_exe="$(find_browser chromium)" || exit 1
+firefox_exe="$(find_browser firefox)" || exit 1
+webkit_exe="$(find_browser webkit)" || exit 1
+if [ -z "$chromium_exe" ]; then
+  echo "audit-suite: no existing Chromium found (Playwright cache or system chromium; set WP_BROWSER_CHROMIUM) -- reporting Tier 3 unmeasured. Nothing is downloaded."
+  exit 2
+fi
+
 if [ "$probe" -eq 1 ]; then
-  echo "audit-suite: node $(node --version), npm $(npm --version), template present"
+  echo "audit-suite: node $(node --version), npm $(npm --version), template present, chromium $chromium_exe${firefox_exe:+, firefox $firefox_exe}${webkit_exe:+, webkit $webkit_exe}"
   exit 0
 fi
 
@@ -282,13 +312,31 @@ if ! out="$(cd "$dir" && npx --no-install playwright --version 2>&1)"; then
   exit 1
 fi
 
-# The install's own output is kept for the failure message. Discarding it is how a module
-# that would not resolve was reported as a browser that would not download.
-if ! out="$(cd "$dir" && npx --no-install playwright install chromium 2>&1)"; then
-  echo "audit-suite: playwright could not install its browser -- reporting Tier 3 unmeasured"
-  printf '%s\n' "$out" | tail -5 >&2
+# Every launch in the suite -- the runner's projects, Lighthouse's own Chromium, the form
+# login -- gets the resolved executable through a preload, because the vendored files pass
+# none and are compared against their upstream (bin/lib/pw-executables.cjs says how).
+[ -f "$here/bin/lib/pw-executables.cjs" ] \
+  || { echo "audit-suite: $here/bin/lib/pw-executables.cjs is missing; the plugin checkout is incomplete" >&2; exit 1; }
+# Resolved again, now that the suite's own playwright-core exists: the first pass runs
+# before the install, so pinnedRevisions() had no manifest to read and could only take the
+# newest cached build. With PLAYWRIGHT_CORE set, the revision this suite pins wins, and a
+# cache that lacks it says MISMATCH instead of failing later at launch.
+export PLAYWRIGHT_CORE="$modules/playwright-core"
+chromium_exe="$(find_browser chromium)" || exit 1
+firefox_exe="$(find_browser firefox)" || exit 1
+webkit_exe="$(find_browser webkit)" || exit 1
+if [ -z "$chromium_exe" ]; then
+  echo "audit-suite: no existing Chromium found (Playwright cache or system chromium; set WP_BROWSER_CHROMIUM) -- reporting Tier 3 unmeasured. Nothing is downloaded."
   exit 2
 fi
+export WP_AUDIT_CHROMIUM="$chromium_exe" WP_AUDIT_FIREFOX="$firefox_exe" WP_AUDIT_WEBKIT="$webkit_exe"
+case "${NODE_OPTIONS:-}" in
+  *pw-executables.cjs*) ;;
+  # Quoted: node splits NODE_OPTIONS on whitespace, and a plugin installed under a path
+  # with a space would otherwise kill every node process in the suite at startup.
+  *) export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--require \"$here/bin/lib/pw-executables.cjs\"" ;;
+esac
+echo "audit-suite: chromium $chromium_exe"
 
 # ---------------------------------------------------------------------------
 # Run
@@ -302,12 +350,30 @@ run_pass() {
   (cd "$dir" && npm run --silent "$2") || status=1
 }
 
+# The DOM/axe pass again in the other engines the config declares. Their results land beside
+# Chromium's (<page>.<browser>.json) and the collector keeps each criterion's worst state, so
+# a layout or control that only breaks in Firefox or WebKit becomes a finding. An engine with
+# no existing executable is skipped with a notice, never installed.
+cross_browser() {
+  for engine in firefox webkit; do
+    exe_var="${engine}_exe"
+    if [ -z "${!exe_var}" ]; then
+      echo "audit-suite: no existing $engine build found -- $engine pass skipped (nothing is downloaded)"
+      continue
+    fi
+    echo "audit-suite: accessibility and usability pass in $engine"
+    (cd "$dir" && npx --no-install playwright test tests/audit.spec.js --project="$engine") \
+      || { echo "audit-suite: the $engine pass ran and exited non-zero (a failure, not a skip)"; status=1; }
+  done
+}
+
 case "$only" in
-  a11y) run_pass "accessibility and usability pass" test:a11y ;;
+  a11y) run_pass "accessibility and usability pass" test:a11y; cross_browser ;;
   seo)  run_pass "technical SEO pass" test:seo ;;
   perf) run_pass "Lighthouse pass (alone -- a contended machine is not a slow page)" test:perf ;;
   all)
     run_pass "accessibility and usability pass" test:a11y
+    cross_browser
     run_pass "technical SEO pass" test:seo
     run_pass "Lighthouse pass (alone -- a contended machine is not a slow page)" test:perf
     ;;

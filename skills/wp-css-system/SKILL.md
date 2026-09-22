@@ -668,6 +668,46 @@ When building the demo HTML first and then converting to WordPress:
 
 ---
 
+## Contours That Render the Same in Every Engine
+
+Verification runs Chromium, plus Firefox on Linux when a build exists. Firefox on Windows
+draws a 1px `border` with a `border-radius` with visible notches where each corner curve
+meets the straight edge, and Linux Firefox does not reproduce it. `bin/css-contour-lint.mjs`
+is the guard (`/wp-finalize` runs it over the theme and the demo):
+
+- **A 1px contour on a transparent or white/near-white background is drawn with
+  `box-shadow: inset 0 0 0 1px <color>`**, never `border`: outline buttons, focused and
+  error fields, ringed icon links. The inset shadow occupies no layout space, so replace the
+  border with `border: 0` plus the shadow and keep the padding the border used to add:
+
+  ```css
+  .btn--outline {
+      border: 0;
+      border-radius: var(--radius-full);
+      background: transparent;
+      box-shadow: inset 0 0 0 1px var(--color-primary);
+      padding: calc(var(--spacing-sm) + 1px) calc(var(--spacing-lg) + 1px);
+  }
+  ```
+
+  A border on a solid fill, a card or a divider is fine.
+- **Never `filter: drop-shadow()` on a bordered rounded ring.** The filter follows the
+  anti-aliased edge and picks up the same artifacts. Stack ring and shadow in one
+  `box-shadow`: `box-shadow: 0 0 0 1px var(--color-accent), 0 2px 4px rgb(0 0 0 / .2);`.
+
+### Search Inputs: One Clear Control, and It Is Yours
+
+Chromium and Safari draw a native clear "×" inside `type="search"`; Firefox draws none. A
+design that shows a clear affordance therefore needs a real `<button type="button">` that
+empties the field and fires `input`, and the native one must be hidden, or Chromium shows
+two:
+
+```css
+input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+```
+
+A design with no clear affordance still hides the native one, for the same parity reason.
+
 ## Summary Checklist
 
 - [ ] All design tokens defined as `:root` custom properties

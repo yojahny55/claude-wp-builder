@@ -39,7 +39,7 @@ Issues discovered during testing that need to be resolved.
 
 - [ ] **Fix desktop breakpoint rules in responsive CSS** `PARTIAL`
   Agents sometimes generate incorrect desktop overrides. Example: `.mobile-nav-footer` should be `display: none` on desktop, `.mobile-nav-links` should use `display: contents` for inline flow. Mobile media query must override both.
-  **Gap:** [wp-demo-verify](commands/wp-demo-verify.md) screenshots 7 viewports and catches the result, but nothing in [wp-css](agents/wp-css.md) states the rule, so the defect is detected rather than prevented.
+  **Gap:** [wp-demo-verify](commands/wp-demo-verify.md) screenshots 9 viewports and catches the result, but nothing in [wp-css](agents/wp-css.md) states the rule, so the defect is detected rather than prevented.
 
 - [ ] **Fix agents being lazy with JavaScript** `PARTIAL`
   Consider adding a dedicated `wp-js` agent that handles JavaScript conversion, enqueueing, and event binding specifically.

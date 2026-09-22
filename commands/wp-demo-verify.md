@@ -78,8 +78,24 @@ node "${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs" <target>
 ```
 
 Six positions per section at 1440x900 and 390x844, plus a reduced-motion pass at
-desktop width, then full-page shots at 375, 576, 768, 1024, 1152, 1280 and 1440 (this replaces
-`/wp-responsive-check`). A directory target walks every page. Output lands in
+desktop width, then full-page shots at 375, 576, 620, 768, 1024, 1100, 1152, 1280 and 1440
+(this replaces `/wp-responsive-check`).
+
+**Firefox pass.** When a Playwright Firefox build already exists on the machine (Playwright's
+browser cache, or `WP_BROWSER_FIREFOX`), the same nine full-page shots are taken in Firefox
+under `.verify/[<page>/]firefox/`, and at each walk width every layout element's box is
+compared between Chromium and Firefox. A box that differs by more than 2px (position within
+its parent, width or height) is an `engine-delta` finding, advisory, the 15 largest per
+width. Nothing is ever downloaded: without a Firefox build the run prints a notice and stays
+Chromium-only; `--no-firefox` skips it on purpose. Firefox on Linux does not reproduce every
+Windows rendering defect (a 1px rounded border draws corner artifacts only on Windows), so
+the static CSS lint in `/wp-finalize` stays the guard for those. The browser executable and
+its revision are logged at startup (`browsers: firefox <path> (revision N, ...)`); the
+revision pinned by the loaded playwright-core's `browsers.json` is preferred over a newer
+cached one, and a mismatch is named in that line. `tests/checks/demo-verify-engines.sh` only
+exercises this pass when it finds a playwright-core: run it with
+`PLAYWRIGHT_CORE="$(npm root -g)/@playwright/test/node_modules/playwright-core"` to test the
+cross-engine path for real. A directory target walks every page. Output lands in
 `<dir>/.verify/[<page>/]<width>/`, with `findings.json` and, per width, both
 `sheet.png` (full resolution, for a human who opens it directly) and `sheet.jpg`
 (downscaled to 1000px wide, quality 70 — the one to Read in Step 4).

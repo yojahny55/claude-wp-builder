@@ -172,6 +172,38 @@
   - An adopted site's i18n strategy is measured (`polylang` or `none`) and never falls back
     to `suffix`.
 
+- **Browser verification was Chromium-only and installed its own browser.** `bin/audit-suite.sh`
+  ran `playwright install chromium`, which downloads a revision-pinned build and died where
+  that is forbidden. Its config declared `firefox` and `webkit` projects that no pass ever
+  ran, and `bin/demo-verify.mjs` shot seven widths in one engine.
+  - `bin/lib/browsers.mjs` resolves an existing executable (Playwright's caches, the
+    revision the loaded playwright-core's `browsers.json` pins first, then the newest, then
+    the system Chromium; `WP_BROWSER_*` overrides) and logs the executable and revision it
+    chose, naming a mismatch with the pin. Nothing downloads a
+    browser any more, and the "run `npx playwright install`" hints are gone.
+  - The suite hands the executables to its vendored files through a `--require` preload
+    (`bin/lib/pw-executables.cjs`), so they stay byte-identical to upstream. The
+    accessibility pass also runs in Firefox and WebKit when they exist, and prints a skip
+    notice when they do not.
+  - `demo-verify` adds 620 and 1100 to its widths (nine viewports). When a Firefox build
+    exists it shoots every viewport in Firefox too and reports each layout box that differs
+    from Chromium by more than 2px as an advisory `engine-delta`. `--no-firefox` skips that
+    pass.
+
+  **`bin/css-contour-lint.mjs`: contours that differ across engines.** Firefox on Windows
+  notches the corners of a 1px `border` with a `border-radius`, and Linux Firefox does not
+  reproduce it, so no screenshot here can catch it. The lint flags that pattern on a
+  transparent or white control (use `box-shadow: inset 0 0 0 1px`), `drop-shadow` on a
+  bordered rounded ring, and a `type="search"` whose native clear button is not hidden
+  (Chromium draws it, Firefox never does). CSS is walked by brace depth, so nested rules
+  (`&:hover { }`) and rules inside `@media`/`@supports`/`@layer` are each read for their own
+  declarations; hsl()/hsla() and space-separated rgb() backgrounds are read as colours; and a
+  search field counts as covered only by a hiding rule whose selector reaches it (a global
+  `input[type="search"]` rule covers every field, a class-scoped one only fields with that
+  class). `/wp-finalize` Check 3 and the practices audit
+  (WP-055) run it, and `wp-css-system` and `wp-tailwind-system` state the rules, including
+  one custom clear control per search field.
+
 ## [1.27.0] - 2026-09-21
 
 ### Changed

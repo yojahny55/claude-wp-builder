@@ -22,7 +22,8 @@ runtime for the plugin itself. The only executable code shipped is:
   real logic, and several are load-bearing gates rather than helpers:
   `wp-config.mjs` (the single definition of a valid `.wp-create.json` — see
   *Config contract* below), `demo-verify.mjs` (the browser walk behind `/wp-demo-verify`
-  and craft mode's probe), `tailwindify-parity.mjs` (computed-style comparison during
+  and craft mode's probe, Chromium plus an existing Firefox; `css-contour-lint.mjs` is its
+  static cross-engine companion), `tailwindify-parity.mjs` (computed-style comparison during
   CSS conversion), `image-gen.mjs` (the image generator and its cost/key handling),
   `composition-preview.mjs` (renders `skills/wp-demo-craft/compositions/` previews),
   `theme-template-check.mjs` (the ABSPATH, compiled-class and widget-script gate behind
@@ -41,6 +42,17 @@ Each check is a standalone bash script that prints `PASS` or exits non-zero. No 
 ```bash
 bash tests/checks/wp-yolo-gate.sh                    # one check
 for f in tests/checks/*.sh; do bash "$f"; done       # all checks
+```
+
+The browser checks (`demo-verify-engines.sh` and the others that drive a browser) need a
+`playwright-core` and an existing Playwright Chromium/Firefox build. Without them they still
+print `PASS`, but the skip line says the browser path was NOT exercised. To run them for real
+without installing anything, point `PLAYWRIGHT_CORE` at a playwright-core already on the
+machine, for example the one inside a global `@playwright/test`:
+
+```bash
+PLAYWRIGHT_CORE="$(npm root -g)/@playwright/test/node_modules/playwright-core" \
+  bash tests/checks/demo-verify-engines.sh
 ```
 
 `tests/checks/wp-polylang-live.sh` is the only test that touches a real site; it exits 0 with
