@@ -442,7 +442,8 @@ FORM_ID=$($WP eval "
 \$domain = strtolower((string) wp_parse_url(home_url(), PHP_URL_HOST));
 \$domain = preg_replace('/^www\\./', '', \$domain);
 \$admin  = get_option('admin_email');
-\$from   = (substr(strrchr(\$admin, '@'), 1) === \$domain) ? \$admin : 'wordpress@' . \$domain;
+// CF7's own test: case-insensitive, and a parent domain counts (admin@example.com on shop.example.com).
+\$from   = wpcf7_is_email_in_domain(\$admin, \$domain) ? \$admin : 'wordpress@' . \$domain;
 \$sender = get_option('blogname') . ' <' . \$from . '>';
 
 // Set form title
@@ -504,29 +505,35 @@ the message: SPF, DKIM and DMARC all fail for a domain the site does not control
 - **`mail.sender` and `mail_2.sender` are on the site's domain.** The snippet above
   computes it. Never a free-mail domain (`gmail.com`, `googlemail.com`, `yahoo.*`,
   `hotmail.*`, `outlook.*`, `live.com`, `icloud.com`, `aol.com`, `proton.me`,
-  `protonmail.com`, `gmx.*`, `yandex.*`): if the computed sender or `admin_email` lands on
-  one, stop and report it as a **warning** with the value, and ask for an address on the
-  domain. Where the reply should go to the visitor, that is `Reply-To: [your-email]` in
+  `protonmail.com`, `gmx.*`, `yandex.*`): the snippet never picks one (it falls back to
+  `wordpress@<domain>`), so the check is on the input: when `admin_email` itself is on a
+  free-mail domain, report it as a **warning** with the value, and ask for an address on
+  the domain, since `wordpress@<domain>` needs a mailbox or SMTP account to exist. Where the reply should go to the visitor, that is `Reply-To: [your-email]` in
   `additional_headers`, never the sender.
 - **`[your-email]` is a recipient only in `mail_2`**, only from a required `[email*
   your-email]` field, and only on a form with spam protection (a honeypot, Turnstile,
   reCAPTCHA or Akismet). Without it the autoresponder sends whatever a bot types to any
   address it names. `mail.recipient` is the site's inbox (the settings page's contact
   email, else `admin_email`).
-- **Run CF7's own configuration validator after every save** and surface each message:
+- **Run CF7's own configuration validator after every save**, once per form created
+  (every language), and surface each message:
 
   ```bash
-  $WP eval "
-  \$v = new WPCF7_ConfigValidator( wpcf7_contact_form( $FORM_ID ) );
-  \$v->validate(); \$v->save();
-  foreach ( \$v->collect_error_messages( array( 'decodes_html_entities' => true ) ) as \$section => \$errs ) {
-      foreach ( \$errs as \$e ) { echo 'WARNING ' . \$section . ': ' . \$e['message'] . PHP_EOL; }
-  }"
+  for id in $FORM_ID ${FORM_ID_ES:-}; do
+    $WP eval "
+    \$v = new WPCF7_ConfigValidator( wpcf7_contact_form( $id ) );
+    \$v->validate(); \$v->save();
+    foreach ( \$v->collect_error_messages( array( 'decodes_html_entities' => true ) ) as \$section => \$errs ) {
+        foreach ( \$errs as \$e ) { echo 'WARNING form $id ' . \$section . ': ' . \$e['message'] . PHP_EOL; }
+    }"
+  done
   ```
 
   It reports `email_not_in_site_domain` for a foreign sender and
   `unsafe_email_without_protection` for an unprotected `[your-email]` recipient, among
-  others. On a localhost domain CF7 skips the domain check, so re-run it on staging.
+  others. CF7 skips the domain check only on the literal hosts `localhost` and
+  `127.0.0.1`; on a `.local` or `.test` dev domain it runs, but against that dev domain.
+  Re-run it on staging, where the domain is the real one.
 - **SMTP is per environment.** Delivery goes through the SMTP plugin the project uses,
   configured on each environment (host, port, user, from address on the site's domain).
   Credentials live in that environment's `wp-config.php` constants or the plugin's own
