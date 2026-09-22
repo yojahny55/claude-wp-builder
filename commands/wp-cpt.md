@@ -207,6 +207,8 @@ manual run) can create the posts deterministically. For each post: create it
 (`wp_insert_post` with `post_type => '<name>'`), set its ACF fields, and sideload the card
 image (`media_sideload_image`) into the media library and set it as the thumbnail.
 Make it idempotent where practical (skip if a post with the same title already exists).
+It opens with the `defined( 'ABSPATH' ) || exit;` guard like every theme PHP file. `wp eval-file`
+defines `ABSPATH`, so the guard costs the seeder nothing, and `/wp-finalize` fails a seed without it.
 Primary language only; flag secondary.
 
 ## Step 6.5: Rebuild Tailwind CSS

@@ -184,7 +184,29 @@ Verify required WordPress theme files and configurations:
    WARNING rather than FAIL, since some projects genuinely ship with the
    WordPress default by choice.
 
-**PASS** if all present. **FAIL** listing missing items (item 7 reports WARNING, not FAIL, when absent).
+8. **Template contracts no build step enforces.** Run:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/bin/theme-template-check.mjs" <theme-dir>
+   ```
+   It fails on:
+   - any theme PHP file without the quoted `defined( 'ABSPATH' )` guard, `inc/seed/*.php`
+     and `fields/*.php` included. The agents require it, and sixteen seed files shipped
+     without it anyway;
+   - on a compiled Tailwind theme, an HTML entity inside a class token, or a utility-shaped
+     class with no selector in `assets/css/dist/*.css`. Such a class compiled to nothing,
+     silently: a typo, an unsupported variant, `&quot;` inside an arbitrary variant, or a
+     build that was never re-run;
+   - `role="tab"`, `data-accordion-trigger` or `data-directory` markup without
+     `./tabs.js`, `./accordion.js` or `./directory-filter.js` imported by
+     `assets/js/src/index.js`.
+
+   `CANNOT VERIFY` lines name classes built at runtime. They do not fail the check. Read
+   each one and confirm its possible values appear in the templates or a `@source inline()`.
+   Re-run `npm run build` before treating a missing-selector finding as a typo.
+
+**PASS** if all present. **FAIL** listing missing items (item 7 reports WARNING, not FAIL, when absent;
+item 8 reports WARNING, not FAIL, as the practices audit does for WP-016, WP-053 and WP-054, except an
+unquoted `defined( ABSPATH )`, which is a PHP 8 fatal and FAILs).
 
 ---
 
