@@ -53,9 +53,12 @@ doc_list=$(printf '%s\n' "$fixcss" | where_list)
 starter_list=$(where_list < "$r")
 [ -n "$starter_list" ] && [ "$doc_list" = "$starter_list" ] \
   || fail "$a's ring selector ($doc_list) differs from $r's ($starter_list)"
-outline_decl() { grep -oE 'outline: *[^;]+;' | head -1; }
-[ "$(printf '%s\n' "$fixcss" | outline_decl)" = "$(outline_decl < "$r")" ] \
-  || fail "$a's ring outline differs from $r's"
+# Spacing around ':' and inside the value does not count; the failure prints both sides.
+outline_decl() { grep -oE 'outline[[:space:]]*:[^;]+;' | head -1 | sed -E 's/[[:space:]]*:[[:space:]]*/: /; s/[[:space:]]+/ /g'; }
+doc_outline=$(printf '%s\n' "$fixcss" | outline_decl)
+starter_outline=$(outline_decl < "$r")
+[ -n "$starter_outline" ] && [ "$doc_outline" = "$starter_outline" ] \
+  || fail "$a's ring outline ($doc_outline) differs from $r's ($starter_outline)"
 grep -Fq 'focus-visible:outline-none' starter-theme/__tailwind__/assets/css/src/tailwindcss/components/buttons.css \
   || fail ".btn draws a ring without clearing the outline, so the base ring stacks on it"
 
