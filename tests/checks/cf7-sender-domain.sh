@@ -9,10 +9,14 @@ cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
 a=agents/wp-cf7.md
-if grep -Fq "'sender'             => get_option('blogname') . ' <' . get_option('admin_email') . '>'" "$a"; then
+# Whitespace-tolerant: no 'sender' line reads admin_email, and every one uses \$sender.
+if grep -Eq "'sender'[[:space:]]*=>.*get_option[[:space:]]*\([[:space:]]*'admin_email'" "$a"; then
   fail "$a still puts admin_email in the sender unchecked"
 fi
-[ "$(grep -Fc "'sender'             => \\\$sender," "$a")" -eq 2 ] || fail "$a: mail and mail_2 do not both use the computed site-domain sender"
+senders=$(grep -Ec "'sender'[[:space:]]*=>" "$a" || true)
+computed=$(grep -Ec "'sender'[[:space:]]*=>[[:space:]]*\\\\?\\\$sender[[:space:]]*," "$a" || true)
+[ "$computed" -ge 2 ] && [ "$computed" = "$senders" ] \
+  || fail "$a: $computed of $senders 'sender' lines use the computed site-domain sender (mail and mail_2 need it)"
 grep -Fq "'wordpress@' . \\\$domain" "$a" || fail "$a does not fall back to wordpress@<site domain>"
 grep -Fq 'gmail.com' "$a" || fail "$a does not warn on free-mail sender domains"
 grep -Fq 'new WPCF7_ConfigValidator(' "$a" || fail "$a does not run CF7's configuration validator"
