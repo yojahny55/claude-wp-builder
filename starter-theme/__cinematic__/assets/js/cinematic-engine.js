@@ -26,6 +26,23 @@
   const canvases = Array.from(document.querySelectorAll('.stage__c'));
   const scenes   = Array.from(document.querySelectorAll('.scene'));
 
+  // cinematic.css sets --nav-h to the bar's height with the default wordmark, which a
+  // logo, a longer menu or a restyle changes. Keep it equal to the rendered .nav so
+  // scroll-padding-top lands in-page anchors below the bar; the CSS values stay as the
+  // no-JS fallback.
+  const nav = document.querySelector('.nav');
+  if (nav) {
+    const setNavH = () => {
+      document.documentElement.style.setProperty('--nav-h', `${Math.ceil(nav.getBoundingClientRect().height)}px`);
+    };
+    setNavH();
+    if ('ResizeObserver' in window) {
+      new ResizeObserver(setNavH).observe(nav);
+    } else {
+      window.addEventListener('resize', setNavH, { passive: true });
+    }
+  }
+
   if (!scenes.length) return;
 
   const isMobile = mqMobile.matches;

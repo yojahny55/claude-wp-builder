@@ -47,7 +47,7 @@ const norm = (s) =>
   (s || '')
     .toString()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim();
 

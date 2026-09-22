@@ -24,6 +24,11 @@ grep -Fq 'id="masthead"' starter-theme/__tailwind__/header.php || fail "the star
 cin=starter-theme/__cinematic__/assets/css/cinematic.css
 grep -Fq 'scroll-padding-top:calc(var(--nav-h) + 20px)' "$cin" || fail "$cin does not pad anchors under the fixed nav"
 [ "$(grep -c -- '--nav-h:' "$cin")" -ge 2 ] || fail "$cin has no separate mobile --nav-h"
+# The CSS values are a fallback: a logo or a longer menu changes the bar's height, so the
+# engine measures the rendered .nav and keeps --nav-h in step.
+eng=starter-theme/__cinematic__/assets/js/cinematic-engine.js
+grep -Fq "setProperty('--nav-h'" "$eng" || fail "$eng does not keep --nav-h equal to the rendered nav"
+grep -Fq 'new ResizeObserver(setNavH)' "$eng" || fail "$eng does not re-measure the nav when it resizes"
 
 grep -Fq 'scroll-padding-top' commands/wp-header.md || fail "/wp-header does not carry the anchor offset contract"
 

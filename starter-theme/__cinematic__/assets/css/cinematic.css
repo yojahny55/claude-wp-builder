@@ -26,9 +26,9 @@
 html,body{margin:0;padding:0;background:#0a0c0c;color:var(--paper);font-family:var(--sans);-webkit-font-smoothing:antialiased}
 html.lenis,html.lenis body{height:auto}
 /* In-page anchors land below the fixed .nav, not under it: its height plus 20px.
-   --nav-h is the bar's rendered height with the default wordmark: 88px on desktop,
-   80px in the mobile block below. Re-measure both with getBoundingClientRect()
-   after restyling the nav or swapping in a logo. */
+   cinematic-engine.js keeps --nav-h equal to the rendered bar (logo, menu length,
+   breakpoint); these values, 88px on desktop and 80px in the mobile block below,
+   are only the fallback until it runs. */
 html{--nav-h:5.5rem;scroll-padding-top:calc(var(--nav-h) + 20px)}
 .lenis.lenis-smooth{scroll-behavior:auto!important}
 .lenis.lenis-smooth [data-lenis-prevent]{overscroll-behavior:contain}

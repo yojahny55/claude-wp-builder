@@ -11,7 +11,8 @@ if (!defined('ABSPATH')) { exit; }
 /**
  * Render the options-page contact form, or return '' when it cannot render.
  *
- * `contact_form_shortcode` (and its language twin) is typed by a person, and the form it
+ * `contact_form_shortcode` (read through __starter___get_field(), which returns the
+ * current language's `_<lang>` twin when it is filled) is typed by a person, and the form it
  * names can be deleted or re-imported under a new id. CF7 then prints its own
  * `[contact-form-7 404 "Not Found"]` notice inside the page, which is what a real build
  * shipped. This resolves the form the way CF7's shortcode does (hash, then post id, then
