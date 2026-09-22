@@ -3,3 +3,6 @@
 .field input:focus { border: 1px solid #346699; border-radius: 8px; }
 .avatar-ring { border: 1px solid #c59755; border-radius: 50%; filter: drop-shadow(0 2px 4px rgba(0,0,0,.2)); }
 .social a { @apply border rounded-full bg-white; }
+.btn--ghost { border: 1px solid #072049; border-radius: 8px; background: transparent; &:hover { color: #346699; } }
+.btn--light { border: 1px solid #072049; border-radius: 8px; background: hsl(0 0% 100%); }
+.filter__search::-webkit-search-cancel-button { display: none; }

@@ -11,15 +11,23 @@
  * Search order per engine:
  *   1. the override variable (WP_BROWSER_CHROMIUM / _FIREFOX / _WEBKIT);
  *   2. Playwright's browser caches: $PLAYWRIGHT_BROWSERS_PATH, ~/.cache/ms-playwright,
- *      ~/Library/Caches/ms-playwright, %LOCALAPPDATA%\ms-playwright, newest revision first;
+ *      ~/Library/Caches/ms-playwright, %LOCALAPPDATA%\ms-playwright. The revision pinned by
+ *      the playwright-core that will drive it (its browsers.json) comes first, then the
+ *      newest: a Playwright driving a build of another revision can fail to launch or
+ *      misbehave. playwright-core is looked up as the runners load it: $PLAYWRIGHT_CORE
+ *      alone when set, else from this plugin's bin/, else from the working directory;
  *   3. Chromium only: the system Chrome/Chromium. A system Firefox or Safari cannot be
  *      driven by Playwright (it needs its own patched builds), so they are not candidates.
  *
- * CLI: `node bin/lib/browsers.mjs <chromium|firefox|webkit>` prints the path and exits 0,
- * or prints nothing and exits 2.
+ * Every resolution logs one line to stderr naming the engine, the executable, its revision
+ * and the revision playwright-core pins, so a mismatch shows in the run's output.
+ *
+ * CLI: `node bin/lib/browsers.mjs <chromium|firefox|webkit>` prints the path on stdout and
+ * exits 0, or prints nothing on stdout and exits 2.
  */
-import { existsSync, readdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
@@ -60,25 +68,71 @@ export function cacheRoots() {
 
 const revision = (entry) => Number((entry.match(/-(\d+)$/) || [])[1] || 0);
 
+/** { dir, revisions: { engine: number } } of the playwright-core that will run, or null. */
+export function pinnedRevisions() {
+  let dir = null;
+  if (process.env.PLAYWRIGHT_CORE) dir = resolve(process.env.PLAYWRIGHT_CORE);
+  else
+    for (const from of [fileURLToPath(import.meta.url), join(process.cwd(), 'noop.js')]) {
+      try {
+        dir = dirname(createRequire(from).resolve('playwright-core/package.json'));
+        break;
+      } catch {}
+    }
+  if (!dir) return null;
+  try {
+    const manifest = JSON.parse(readFileSync(join(dir, 'browsers.json'), 'utf8'));
+    const revisions = {};
+    for (const b of manifest.browsers || []) if (b.name && b.revision) revisions[b.name] = Number(b.revision);
+    return { dir, revisions };
+  } catch {
+    return null;
+  }
+}
+
+const log = (msg) => process.stderr.write(`browsers: ${msg}\n`);
+
 /** Absolute path of an existing executable for `engine`, or null. Never downloads. */
 export function findBrowser(engine) {
+  const pins = pinnedRevisions();
+  const pinned = pins?.revisions[engine] || 0;
+  const wants = pins ? (pinned ? `playwright-core at ${pins.dir} pins ${pinned}` : `playwright-core at ${pins.dir} pins none`) : 'no playwright-core manifest read';
   const override = process.env['WP_BROWSER_' + engine.toUpperCase()];
-  if (override) return existsSync(override) ? override : null;
+  if (override) {
+    const ok = existsSync(override);
+    log(`${engine} ${ok ? override : 'none'} (WP_BROWSER_${engine.toUpperCase()}${ok ? '' : ' does not exist'}; ${wants})`);
+    return ok ? override : null;
+  }
   // `chromium-1243`, never `chromium_headless_shell-1243`: the shell has no headed mode
   // and a different directory layout.
   const prefix = engine + '-';
+  const found = [];
   for (const root of cacheRoots()) {
     if (!existsSync(root)) continue;
-    const entries = readdirSync(root)
-      .filter((e) => e.startsWith(prefix) && /-\d+$/.test(e))
-      .sort((a, b) => revision(b) - revision(a));
-    for (const entry of entries)
+    for (const entry of readdirSync(root).filter((e) => e.startsWith(prefix) && /-\d+$/.test(e)))
       for (const tail of TAILS[engine] || []) {
         const p = join(root, entry, tail);
-        if (existsSync(p)) return p;
+        if (existsSync(p)) {
+          found.push({ p, rev: revision(entry) });
+          break;
+        }
       }
   }
-  if (engine === 'chromium') for (const p of SYSTEM_CHROMIUM) if (existsSync(p)) return p;
+  // Root order is kept among equal revisions: the sort is stable.
+  found.sort((a, b) => (b.rev === pinned) - (a.rev === pinned) || b.rev - a.rev);
+  if (found.length) {
+    const { p, rev } = found[0];
+    const why = rev === pinned ? 'the pinned revision' : pinned ? `MISMATCH, ${pinned} is not cached, newest used` : 'newest cached';
+    log(`${engine} ${p} (revision ${rev}, ${why}; ${wants})`);
+    return p;
+  }
+  if (engine === 'chromium')
+    for (const p of SYSTEM_CHROMIUM)
+      if (existsSync(p)) {
+        log(`${engine} ${p} (system build, no cached revision; ${wants})`);
+        return p;
+      }
+  log(`${engine} none (${wants}; nothing is downloaded)`);
   return null;
 }
 

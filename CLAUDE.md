@@ -44,6 +44,17 @@ bash tests/checks/wp-yolo-gate.sh                    # one check
 for f in tests/checks/*.sh; do bash "$f"; done       # all checks
 ```
 
+The browser checks (`demo-verify-engines.sh` and the others that drive a browser) need a
+`playwright-core` and an existing Playwright Chromium/Firefox build. Without them they still
+print `PASS`, but the skip line says the browser path was NOT exercised. To run them for real
+without installing anything, point `PLAYWRIGHT_CORE` at a playwright-core already on the
+machine, for example the one inside a global `@playwright/test`:
+
+```bash
+PLAYWRIGHT_CORE="$(npm root -g)/@playwright/test/node_modules/playwright-core" \
+  bash tests/checks/demo-verify-engines.sh
+```
+
 `tests/checks/wp-polylang-live.sh` is the only test that touches a real site; it exits 0 with
 `SKIP` unless `PLL_TEST_SITE` points at a WordPress root with Polylang active
 (`PLL_TEST_SRC`/`PLL_TEST_DST`/`PLL_TEST_THIRD` override the languages; the third language is

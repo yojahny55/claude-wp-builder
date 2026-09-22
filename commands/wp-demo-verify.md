@@ -89,7 +89,13 @@ its parent, width or height) is an `engine-delta` finding, advisory, the 15 larg
 width. Nothing is ever downloaded: without a Firefox build the run prints a notice and stays
 Chromium-only; `--no-firefox` skips it on purpose. Firefox on Linux does not reproduce every
 Windows rendering defect (a 1px rounded border draws corner artifacts only on Windows), so
-the static CSS lint in `/wp-finalize` stays the guard for those. A directory target walks every page. Output lands in
+the static CSS lint in `/wp-finalize` stays the guard for those. The browser executable and
+its revision are logged at startup (`browsers: firefox <path> (revision N, ...)`); the
+revision pinned by the loaded playwright-core's `browsers.json` is preferred over a newer
+cached one, and a mismatch is named in that line. `tests/checks/demo-verify-engines.sh` only
+exercises this pass when it finds a playwright-core: run it with
+`PLAYWRIGHT_CORE="$(npm root -g)/@playwright/test/node_modules/playwright-core"` to test the
+cross-engine path for real. A directory target walks every page. Output lands in
 `<dir>/.verify/[<page>/]<width>/`, with `findings.json` and, per width, both
 `sheet.png` (full resolution, for a human who opens it directly) and `sheet.jpg`
 (downscaled to 1000px wide, quality 70 — the one to Read in Step 4).

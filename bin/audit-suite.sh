@@ -77,10 +77,13 @@ fi
 # one Playwright revision, and on a machine whose policy forbids it the audit died on the
 # install instead of measuring. bin/lib/browsers.mjs finds an executable that already exists
 # (Playwright's caches, then the system Chromium). Chromium carries every pass; Firefox and
-# WebKit only add the cross-browser pass, so their absence is a notice, not a skip.
-chromium_exe="$(node "$here/bin/lib/browsers.mjs" chromium 2>/dev/null || true)"
-firefox_exe="$(node "$here/bin/lib/browsers.mjs" firefox 2>/dev/null || true)"
-webkit_exe="$(node "$here/bin/lib/browsers.mjs" webkit 2>/dev/null || true)"
+# WebKit only add the cross-browser pass, so their absence is a notice, not a skip. Each
+# lookup logs the executable and revision it chose on stderr, left visible on purpose: a
+# build of another revision than the driving Playwright pins is the first suspect when a
+# launch fails.
+chromium_exe="$(node "$here/bin/lib/browsers.mjs" chromium || true)"
+firefox_exe="$(node "$here/bin/lib/browsers.mjs" firefox || true)"
+webkit_exe="$(node "$here/bin/lib/browsers.mjs" webkit || true)"
 if [ -z "$chromium_exe" ]; then
   echo "audit-suite: no existing Chromium found (Playwright cache or system chromium; set WP_BROWSER_CHROMIUM) -- reporting Tier 3 unmeasured. Nothing is downloaded."
   exit 2

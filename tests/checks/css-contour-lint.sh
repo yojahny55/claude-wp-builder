@@ -16,10 +16,15 @@ fx=tests/fixtures/css-contour-lint
 set +e; out=$(node "$lint" "$fx/bad"); code=$?; set -e
 [ "$code" -eq 1 ] || fail "$lint exited $code on $fx/bad, expected 1"
 for want in 'style.css:2 [thin-border]' 'style.css:3 [thin-border]' 'style.css:4 [drop-shadow-ring]' \
-    'style.css:5 [thin-border]' 'search.php:3 [thin-border]' 'search.php:2 [search-clear]'; do
+    'style.css:5 [thin-border]' 'search.php:3 [thin-border]' 'search.php:2 [search-clear]' \
+    'style.css:6 [thin-border]' 'style.css:7 [thin-border]' 'filter.php:3 [search-clear]'; do
   grep -Fq "$want" <<<"$out" || fail "$lint missed $want"
 done
-[ "$(grep -c '^FAIL: .*\[' <<<"$out")" -eq 6 ] || fail "$lint reported something beyond the six seeded defects:
+# style.css:6 has a nested `&:hover { }` block: a regex over innermost braces never read the
+# rule that owns it. style.css:7 is white written as hsl(). style.css:8 hides the native
+# clear button for `.filter__search` only, so filter.php:2 and the Tailwind-variant field on
+# filter.php:4 are covered while filter.php:3 and search.php:2 are not.
+[ "$(grep -c '^FAIL: .*\[' <<<"$out")" -eq 9 ] || fail "$lint reported something beyond the nine seeded defects:
 $out"
 
 set +e; out=$(node "$lint" "$fx/good"); code=$?; set -e

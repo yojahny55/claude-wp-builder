@@ -5,3 +5,5 @@
 .btn { @apply border border-transparent rounded-md; }
 .avatar-ring { border-radius: 50%; box-shadow: 0 0 0 1px #c59755, 0 2px 4px rgba(0,0,0,.2); }
 input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.btn--ghost { border: 0; border-radius: 8px; background: transparent; box-shadow: inset 0 0 0 1px #072049; &:hover { box-shadow: inset 0 0 0 1px #346699; } }
+.btn--dark { border: 1px solid #072049; border-radius: 8px; background: hsl(216 82% 16%); }

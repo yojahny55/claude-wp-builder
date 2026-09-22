@@ -28,7 +28,9 @@ grep -Fq 'Firefox pass' commands/wp-demo-verify.md || fail "commands/wp-demo-ver
 # Runtime, when this machine can: the Firefox shots land beside Chromium's.
 command -v node >/dev/null || { echo "PASS (static only: no node)"; exit 0; }
 if ! probe=$(node "$s" --probe 2>&1) || ! grep -q '(firefox ' <<<"$probe"; then
-  echo "PASS (static only: no playwright-core, Chromium or Firefox build here -- $probe)"
+  echo "PASS (static only -- the cross-engine run was NOT exercised: no usable playwright-core, Chromium or Firefox build here -- $(tr '\n' ' ' <<<"$probe"))"
+  echo "  To run it for real, point PLAYWRIGHT_CORE at an installed playwright-core, e.g."
+  echo "  PLAYWRIGHT_CORE=\"\$(npm root -g)/@playwright/test/node_modules/playwright-core\" bash $0"
   exit 0
 fi
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT

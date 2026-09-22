@@ -176,8 +176,10 @@
   ran `playwright install chromium`, which downloads a revision-pinned build and died where
   that is forbidden. Its config declared `firefox` and `webkit` projects that no pass ever
   ran, and `bin/demo-verify.mjs` shot seven widths in one engine.
-  - `bin/lib/browsers.mjs` resolves an existing executable (Playwright's caches, newest
-    revision first, then the system Chromium; `WP_BROWSER_*` overrides). Nothing downloads a
+  - `bin/lib/browsers.mjs` resolves an existing executable (Playwright's caches, the
+    revision the loaded playwright-core's `browsers.json` pins first, then the newest, then
+    the system Chromium; `WP_BROWSER_*` overrides) and logs the executable and revision it
+    chose, naming a mismatch with the pin. Nothing downloads a
     browser any more, and the "run `npx playwright install`" hints are gone.
   - The suite hands the executables to its vendored files through a `--require` preload
     (`bin/lib/pw-executables.cjs`), so they stay byte-identical to upstream. The
@@ -193,7 +195,12 @@
   reproduce it, so no screenshot here can catch it. The lint flags that pattern on a
   transparent or white control (use `box-shadow: inset 0 0 0 1px`), `drop-shadow` on a
   bordered rounded ring, and a `type="search"` whose native clear button is not hidden
-  (Chromium draws it, Firefox never does). `/wp-finalize` Check 3 and the practices audit
+  (Chromium draws it, Firefox never does). CSS is walked by brace depth, so nested rules
+  (`&:hover { }`) and rules inside `@media`/`@supports`/`@layer` are each read for their own
+  declarations; hsl()/hsla() and space-separated rgb() backgrounds are read as colours; and a
+  search field counts as covered only by a hiding rule whose selector reaches it (a global
+  `input[type="search"]` rule covers every field, a class-scoped one only fields with that
+  class). `/wp-finalize` Check 3 and the practices audit
   (WP-055) run it, and `wp-css-system` and `wp-tailwind-system` state the rules, including
   one custom clear control per search field.
 
