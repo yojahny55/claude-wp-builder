@@ -36,6 +36,23 @@
 
 ### Added
 
+- **Security baseline in both starters: `inc/security.php`.** The tailwind starter had
+  none, and its `template-functions.php` printed a pingback `<link>`. A full audit of a
+  delivered build found XML-RPC and pingbacks on, `/wp/v2/users` and `?author=N` listing
+  logins, the file editors open and no security headers. `DISALLOW_FILE_EDIT` lives in
+  `wp-config.php`, which is never deployed with the repository, so the theme now does the
+  work:
+  - XML-RPC off with the method list emptied (pingbacks included), and no RSD link or
+    `X-Pingback` header;
+  - REST user routes hidden from visitors who cannot `edit_posts`. The gate is not
+    `list_users`, because the block editor's author selector needs these routes and an
+    Editor has no `list_users`;
+  - `?author=N` and author archives answer 404 unless a build opts in with the `<prefix>_author_archives` filter; the byline links to the archive only then;
+  - theme and plugin editors blocked through `map_meta_cap`;
+  - `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` and a conservative
+    `Permissions-Policy` sent on `send_headers`, and `X-Powered-By` removed.
+  The cinematic starter's partial copy moved out of `inc/performance.php` into the same file.
+
 - **`WP_AUDIT_SUITE_NODE_MODULES`**: point `--suite` at packages the machine already has,
   such as a global install (`npm root -g`), instead of the managed install.
   `PLAYWRIGHT_BROWSERS_PATH` is already respected when set.

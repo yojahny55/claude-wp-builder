@@ -43,10 +43,16 @@ if ( ! function_exists( '__starter___posted_by' ) ) :
 	 * Prints HTML with meta information for the current author.
 	 */
 	function __starter___posted_by() {
+		// Author archives 404 unless the build opts in (inc/security.php), so the
+		// name only becomes a link when its target exists.
+		$name = esc_html( get_the_author() );
+		if ( __starter___author_archives_enabled() ) {
+			$name = '<a class="url fn n" href="' . esc_url( get_author_posts_url( get_the_author_meta( 'ID' ) ) ) . '">' . $name . '</a>';
+		}
 		$byline = sprintf(
 			/* translators: %s: post author. */
 			esc_html_x( 'by %s', 'post author', '__starter__' ),
-			'<span class="author vcard"><a class="url fn n" href="' . esc_url( get_author_posts_url( get_the_author_meta( 'ID' ) ) ) . '">' . esc_html( get_the_author() ) . '</a></span>'
+			'<span class="author vcard">' . $name . '</span>'
 		);
 
 		echo '<span class="byline"> ' . $byline . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped

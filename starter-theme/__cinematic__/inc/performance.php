@@ -12,7 +12,6 @@ remove_action('wp_head', 'print_emoji_detection_script', 7);
 remove_action('wp_print_styles', 'print_emoji_styles');
 remove_action('wp_head', 'wp_generator');
 remove_action('wp_head', 'wlwmanifest_link');
-remove_action('wp_head', 'rsd_link');
 
 // Slow heartbeat to reduce admin-ajax churn.
 add_filter('heartbeat_settings', function ($settings) {
@@ -20,19 +19,7 @@ add_filter('heartbeat_settings', function ($settings) {
     return $settings;
 });
 
-// Block REST user enumeration.
-add_filter('rest_endpoints', function ($endpoints) {
-    if (isset($endpoints['/wp/v2/users'])) {
-        unset($endpoints['/wp/v2/users']);
-    }
-    if (isset($endpoints['/wp/v2/users/(?P<id>[\d]+)'])) {
-        unset($endpoints['/wp/v2/users/(?P<id>[\d]+)']);
-    }
-    return $endpoints;
-});
-
-// XML-RPC off (cinematic sites have no need for it).
-add_filter('xmlrpc_enabled', '__return_false');
+// RSD link, XML-RPC and REST user routes: see inc/security.php.
 
 /**
  * Stop WordPress 404-ing its own sitemap.

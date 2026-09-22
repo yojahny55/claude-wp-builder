@@ -49,15 +49,7 @@ function __starter___body_classes( $classes ) {
 }
 add_filter( 'body_class', '__starter___body_classes' );
 
-/**
- * Add a pingback url auto-discovery header for single posts, pages, or attachments.
- */
-function __starter___pingback_header() {
-	if ( is_singular() && pings_open() ) {
-		printf( '<link rel="pingback" href="%s">', esc_url( get_bloginfo( 'pingback_url' ) ) );
-	}
-}
-add_action( 'wp_head', '__starter___pingback_header' );
+// No pingback <link>: inc/security.php turns XML-RPC off, pingbacks included.
 
 
 
