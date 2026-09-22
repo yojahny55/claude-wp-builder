@@ -516,6 +516,14 @@ Wait for all Phase 1 agents to complete. Extract form IDs from wp-cf7 output.
 > ```php
 > <?php echo do_shortcode('[contact-form-7 id="<FORM_ID_EN>" html_class="contact__form"]'); ?>
 > ```
+>
+> When the project keeps the form in the settings page (`contact_form_shortcode` and its
+> language twin) instead of fixed IDs, render it with the starter's
+> `prefix_contact_form()` and wrap the whole section in its result:
+> `$form = prefix_contact_form(); if ( '' !== $form ) { … echo $form; … }`. It returns
+> `''` when the referenced form (numeric id, hash or title) no longer exists or CF7 is
+> inactive, so a deleted or re-imported form drops the section instead of printing CF7's
+> "Not Found" notice on the page. Never `do_shortcode()` the option directly.
 
 **Phase 3 (`tailwind` only):** once Agent 2 has returned, dispatch `wp-tailwind` in author
 mode with Agent 3's prompt from the non-contact block above, naming

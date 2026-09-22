@@ -88,6 +88,13 @@
   fixed nav's measured height (88px desktop, 80px mobile) + 20px. `/wp-header` keeps the
   `masthead` id and states the contract.
 
+  **A deleted contact form printed CF7's "Not Found" notice on the page.** The section ran
+  the settings-page shortcode through a bare `do_shortcode()`, and the form it named had
+  been re-imported under a new id. The tailwind starter's `inc/cf7-helpers.php` gains
+  `prefix_contact_form()`: it resolves the form the way CF7 does (hash, post id, title)
+  and returns `''` when none exists or CF7 is inactive, and `/wp-section` wraps the
+  contact section in its result.
+
 ### Changed
 
 - **`/wp-audit` on an adopted site audits vendor code but never edits it, and respects the
