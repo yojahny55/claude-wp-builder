@@ -37,20 +37,32 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-const args = process.argv.slice(2);
-const theme = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--rule');
-if (!theme || !existsSync(theme) || !statSync(theme).isDirectory()) {
-  console.error('usage: theme-template-check.mjs <theme-dir> [--rule abspath|classes|widgets]...');
+const USAGE = 'usage: theme-template-check.mjs <theme-dir> [--rule abspath|classes|widgets]...';
+const usage = (why) => {
+  console.error(`${why}\n${USAGE}`);
   process.exit(2);
-}
+};
 const ALL = ['abspath', 'classes', 'widgets'];
-const picked = args.flatMap((a, i) => (args[i - 1] === '--rule' ? [a] : []));
-for (const r of picked) {
-  if (!ALL.includes(r)) {
-    console.error(`unknown rule: ${r}`);
-    process.exit(2);
+const args = process.argv.slice(2);
+const picked = [];
+let theme;
+for (let i = 0; i < args.length; i++) {
+  const a = args[i];
+  if (a === '--rule') {
+    const r = args[++i];
+    if (r === undefined) usage('--rule needs a value');
+    if (!ALL.includes(r)) usage(`unknown rule: ${r}`);
+    picked.push(r);
+  } else if (a.startsWith('--')) {
+    usage(`unknown option: ${a}`);
+  } else if (theme !== undefined) {
+    usage(`more than one theme dir: ${theme}, ${a}`);
+  } else {
+    theme = a;
   }
 }
+if (theme === undefined) usage('missing theme dir');
+if (!existsSync(theme) || !statSync(theme).isDirectory()) usage(`not a directory: ${theme}`);
 const rules = picked.length ? picked : ALL;
 
 const SKIP_DIRS = new Set(['node_modules', 'vendor', '.git', '.codebase-memory']);
@@ -250,6 +262,11 @@ function utilityShaped(token, tokens) {
   for (const [p, values] of Object.entries(CLOSED)) {
     if (t.startsWith(p + '-') && values.split(' ').includes(t.slice(p.length + 1))) return true;
   }
+  // PFX is sorted longest first, so the first prefix that matches is the most specific
+  // one and decides. A value that is none of the shapes below (`bg-brandx`, a typo of
+  // the `--color-brand` token) reads exactly like a component class (`text-block`,
+  // `bg-hero`), so it is not utility-shaped: telling the two apart would flag every
+  // component class that starts with a utility prefix.
   for (const p of PFX) {
     if (!t.startsWith(p + '-')) continue;
     const v = t.slice(p.length + 1);
@@ -266,17 +283,16 @@ function utilityShaped(token, tokens) {
 function classValues(src) {
   const out = [];
   const islands = [];
-  const html = src.replace(/<\?(?:php|=)?[\s\S]*?(?:\?>|$)/g, (block) => {
-    islands.push(block);
+  // The replacer's offset is where the island starts in src, so no island is ever
+  // located again by searching for its text (which may repeat elsewhere in the file).
+  const html = src.replace(/<\?(?:php|=)?[\s\S]*?(?:\?>|$)/g, (block, start) => {
+    islands.push({ block, start });
     return DYN + '\n'.repeat((block.match(/\n/g) || []).length);
   });
   for (const m of html.matchAll(/(?<![\w-])class\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
     out.push({ value: m[1] ?? m[2], line: lineAt(html, m.index) });
   }
-  let offset = 0;
-  for (const block of islands) {
-    const start = src.indexOf(block, offset);
-    offset = start + block.length;
+  for (const { block, start } of islands) {
     const patterns = [/(?<![\w-])class\s*=\s*\\?"([^"\\]*)/g, /['"]class['"]\s*=>\s*'([^']*)'/g];
     for (const re of patterns) {
       for (const m of block.matchAll(re)) {
