@@ -28,7 +28,9 @@ done
 $out"
 
 set +e; out=$(node "$lint" "$fx/good"); code=$?; set -e
-[ "$code" -eq 0 ] || fail "$lint flagged the corrected fixture (a card, a solid button, a transparent border, an inset shadow):
+# good/search.php ends with the rule that hides the native clear button and a
+# querySelectorAll over the same attribute text: a selector is not a field.
+[ "$code" -eq 0 ] || fail "$lint flagged the corrected fixture (a card, a solid button, a transparent border, an inset shadow, the cancel-button rule itself):
 $out"
 
 set +e; node "$lint" /nonexistent >/dev/null 2>&1; code=$?; set -e

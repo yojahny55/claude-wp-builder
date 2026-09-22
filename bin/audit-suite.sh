@@ -317,10 +317,24 @@ fi
 # none and are compared against their upstream (bin/lib/pw-executables.cjs says how).
 [ -f "$here/bin/lib/pw-executables.cjs" ] \
   || { echo "audit-suite: $here/bin/lib/pw-executables.cjs is missing; the plugin checkout is incomplete" >&2; exit 1; }
+# Resolved again, now that the suite's own playwright-core exists: the first pass runs
+# before the install, so pinnedRevisions() had no manifest to read and could only take the
+# newest cached build. With PLAYWRIGHT_CORE set, the revision this suite pins wins, and a
+# cache that lacks it says MISMATCH instead of failing later at launch.
+export PLAYWRIGHT_CORE="$modules/playwright-core"
+chromium_exe="$(find_browser chromium)" || exit 1
+firefox_exe="$(find_browser firefox)" || exit 1
+webkit_exe="$(find_browser webkit)" || exit 1
+if [ -z "$chromium_exe" ]; then
+  echo "audit-suite: no existing Chromium found (Playwright cache or system chromium; set WP_BROWSER_CHROMIUM) -- reporting Tier 3 unmeasured. Nothing is downloaded."
+  exit 2
+fi
 export WP_AUDIT_CHROMIUM="$chromium_exe" WP_AUDIT_FIREFOX="$firefox_exe" WP_AUDIT_WEBKIT="$webkit_exe"
 case "${NODE_OPTIONS:-}" in
   *pw-executables.cjs*) ;;
-  *) export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--require $here/bin/lib/pw-executables.cjs" ;;
+  # Quoted: node splits NODE_OPTIONS on whitespace, and a plugin installed under a path
+  # with a space would otherwise kill every node process in the suite at startup.
+  *) export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--require \"$here/bin/lib/pw-executables.cjs\"" ;;
 esac
 echo "audit-suite: chromium $chromium_exe"
 

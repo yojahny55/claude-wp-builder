@@ -342,7 +342,11 @@ if (rules.includes('search-clear')) {
       const open = file.text.lastIndexOf('<', m.index);
       const tagRe = /<[a-zA-Z](?:<\?[\s\S]*?\?>|[^>])*>/y;
       tagRe.lastIndex = open;
-      const tag = (open >= 0 && tagRe.exec(file.text)?.[0]) || file.text.slice(m.index, m.index + 200);
+      const tag = open >= 0 ? tagRe.exec(file.text)?.[0] : null;
+      // Only inside an <input> tag. The same attribute text in a stylesheet selector
+      // (`input[type="search"]::-webkit-search-cancel-button`) or in a querySelectorAll
+      // is not a field, and is usually the very fix this rule asks for.
+      if (!tag || !/^<input\b/i.test(tag) || m.index >= open + tag.length) continue;
       if (fieldCovered(tag)) continue;
       const custom = CLEAR.test(file.text);
       report(

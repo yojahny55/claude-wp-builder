@@ -59,11 +59,15 @@ grep -Fq 'chromium_exe="$(find_browser chromium)"' "$runner" || fail "$runner do
 # Only browsers.mjs's exit 2 means "none found"; a crash of the lookup stops the run.
 grep -Eq '^[[:space:]]*2\)[[:space:]]*;;' "$runner" && grep -Fq 'failed (exit $rc) looking up' "$runner" \
   || fail "$runner reads a crash of browsers.mjs as a missing browser"
-grep -Fq -- '--require $here/bin/lib/pw-executables.cjs' "$runner" || fail "$runner does not hand the executables to the vendored suite"
+grep -Fq -- '--require \"$here/bin/lib/pw-executables.cjs\"' "$runner" || fail "$runner does not hand the executables to the vendored suite"
 grep -Fq -- '--project="$engine"' "$runner" || fail "$runner never runs the firefox/webkit projects"
 grep -Fq 'pass skipped (nothing is downloaded)' "$runner" || fail "$runner does not skip a missing engine with a notice"
 grep -Eq 'browsers.mjs" (chromium|firefox|webkit) 2>/dev/null' "$runner" && fail "$runner hides the browser choice log"
 grep -Fq "opts.executablePath = exe[name]" bin/lib/pw-executables.cjs || fail "pw-executables.cjs does not default executablePath"
+# The suite's own playwright-core pins the revision, so the runner resolves again once it
+# exists, and the preload path is quoted for a plugin path with a space in it.
+grep -Fq 'export PLAYWRIGHT_CORE="$modules/playwright-core"' "$runner" \
+  || fail "$runner never re-resolves the browsers against the suite's playwright-core"
 # The runner exports and the preload reads the same three names.
 for e in CHROMIUM FIREFOX WEBKIT; do
   grep -Eq "^export .*\bWP_AUDIT_$e=" "$runner" || fail "$runner does not export WP_AUDIT_$e"
