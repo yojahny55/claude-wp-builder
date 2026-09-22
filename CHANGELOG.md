@@ -151,6 +151,15 @@
 
 ### Changed
 
+- **`wp-cf7` put `admin_email` in the sender unchecked.** Both `mail.sender` and
+  `mail_2.sender` were `blogname <admin_email>`. On a free-mail or foreign domain that fails
+  SPF, DKIM and DMARC, and a real build's forms carried CF7's own "sender not in the site
+  domain" and "unsafe email without protection" warnings. The agent now computes a sender on
+  the site's domain (CF7's own rule), warns on free-mail domains, allows `[your-email]` as a
+  recipient only in a protected `mail_2`, runs `WPCF7_ConfigValidator` after every save and
+  reports its messages, and adds an SMTP note: configured per environment, credentials never
+  in the repository, tested with `wp_mail()` plus the plugin's email log.
+
 - **`/wp-audit` on an adopted site audits vendor code but never edits it, and respects the
   site's stack.**
   - Findings under `code_scope.read_only` are always `Fix: manual`. After each fix agent
