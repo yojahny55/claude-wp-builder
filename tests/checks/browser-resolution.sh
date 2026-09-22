@@ -54,7 +54,11 @@ grep -Fq 'revision 2359, MISMATCH, 2400 is not cached' <<<"$log" || fail "$lib d
   || fail "$lib ignores the WP_BROWSER_FIREFOX override"
 
 # The runner resolves, preloads and runs the other engines.
-grep -Fq 'node "$here/bin/lib/browsers.mjs" chromium' "$runner" || fail "$runner does not resolve an existing Chromium"
+grep -Fq 'node "$here/bin/lib/browsers.mjs" "$1"' "$runner" || fail "$runner does not resolve browsers through bin/lib/browsers.mjs"
+grep -Fq 'chromium_exe="$(find_browser chromium)"' "$runner" || fail "$runner does not resolve an existing Chromium"
+# Only browsers.mjs's exit 2 means "none found"; a crash of the lookup stops the run.
+grep -Eq '^[[:space:]]*2\)[[:space:]]*;;' "$runner" && grep -Fq 'failed (exit $rc) looking up' "$runner" \
+  || fail "$runner reads a crash of browsers.mjs as a missing browser"
 grep -Fq -- '--require $here/bin/lib/pw-executables.cjs' "$runner" || fail "$runner does not hand the executables to the vendored suite"
 grep -Fq -- '--project="$engine"' "$runner" || fail "$runner never runs the firefox/webkit projects"
 grep -Fq 'pass skipped (nothing is downloaded)' "$runner" || fail "$runner does not skip a missing engine with a notice"

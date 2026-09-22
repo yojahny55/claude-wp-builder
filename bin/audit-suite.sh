@@ -81,9 +81,20 @@ fi
 # lookup logs the executable and revision it chose on stderr, left visible on purpose: a
 # build of another revision than the driving Playwright pins is the first suspect when a
 # launch fails.
-chromium_exe="$(node "$here/bin/lib/browsers.mjs" chromium || true)"
-firefox_exe="$(node "$here/bin/lib/browsers.mjs" firefox || true)"
-webkit_exe="$(node "$here/bin/lib/browsers.mjs" webkit || true)"
+# browsers.mjs exits 2 when it finds nothing; any other failure is the lookup itself
+# crashing (an old Node, a broken checkout) and must not read as "no browser".
+find_browser() {
+  local out rc=0
+  out="$(node "$here/bin/lib/browsers.mjs" "$1")" || rc=$?
+  case "$rc" in
+    0) printf '%s' "$out" ;;
+    2) ;;
+    *) echo "audit-suite: bin/lib/browsers.mjs failed (exit $rc) looking up $1; its error is above" >&2; exit 1 ;;
+  esac
+}
+chromium_exe="$(find_browser chromium)" || exit 1
+firefox_exe="$(find_browser firefox)" || exit 1
+webkit_exe="$(find_browser webkit)" || exit 1
 if [ -z "$chromium_exe" ]; then
   echo "audit-suite: no existing Chromium found (Playwright cache or system chromium; set WP_BROWSER_CHROMIUM) -- reporting Tier 3 unmeasured. Nothing is downloaded."
   exit 2
@@ -307,7 +318,10 @@ fi
 [ -f "$here/bin/lib/pw-executables.cjs" ] \
   || { echo "audit-suite: $here/bin/lib/pw-executables.cjs is missing; the plugin checkout is incomplete" >&2; exit 1; }
 export WP_AUDIT_CHROMIUM="$chromium_exe" WP_AUDIT_FIREFOX="$firefox_exe" WP_AUDIT_WEBKIT="$webkit_exe"
-export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--require $here/bin/lib/pw-executables.cjs"
+case "${NODE_OPTIONS:-}" in
+  *pw-executables.cjs*) ;;
+  *) export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--require $here/bin/lib/pw-executables.cjs" ;;
+esac
 echo "audit-suite: chromium $chromium_exe"
 
 # ---------------------------------------------------------------------------
@@ -334,7 +348,8 @@ cross_browser() {
       continue
     fi
     echo "audit-suite: accessibility and usability pass in $engine"
-    (cd "$dir" && npx --no-install playwright test tests/audit.spec.js --project="$engine") || status=1
+    (cd "$dir" && npx --no-install playwright test tests/audit.spec.js --project="$engine") \
+      || { echo "audit-suite: the $engine pass ran and exited non-zero (a failure, not a skip)"; status=1; }
   done
 }
 

@@ -141,7 +141,7 @@ try {
 }
 const executablePath = findChrome();
 if (!executablePath) {
-  console.error('composition-preview: no existing Chrome or Chromium found. Set WP_DEMO_CHROME to one; nothing is downloaded.');
+  console.error('composition-preview: no existing Chrome or Chromium found. Set WP_DEMO_CHROME to an existing Chrome or Chromium binary; nothing is downloaded.');
   process.exit(2);
 }
 
