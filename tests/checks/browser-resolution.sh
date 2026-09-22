@@ -60,5 +60,10 @@ grep -Fq -- '--project="$engine"' "$runner" || fail "$runner never runs the fire
 grep -Fq 'pass skipped (nothing is downloaded)' "$runner" || fail "$runner does not skip a missing engine with a notice"
 grep -Eq 'browsers.mjs" (chromium|firefox|webkit) 2>/dev/null' "$runner" && fail "$runner hides the browser choice log"
 grep -Fq "opts.executablePath = exe[name]" bin/lib/pw-executables.cjs || fail "pw-executables.cjs does not default executablePath"
+# The runner exports and the preload reads the same three names.
+for e in CHROMIUM FIREFOX WEBKIT; do
+  grep -Eq "^export .*\bWP_AUDIT_$e=" "$runner" || fail "$runner does not export WP_AUDIT_$e"
+  grep -Fq "process.env.WP_AUDIT_$e" bin/lib/pw-executables.cjs || fail "pw-executables.cjs does not read WP_AUDIT_$e"
+done
 
 echo PASS

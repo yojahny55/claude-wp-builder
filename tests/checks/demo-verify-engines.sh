@@ -34,10 +34,12 @@ if ! probe=$(node "$s" --probe 2>&1) || ! grep -q '(firefox ' <<<"$probe"; then
   exit 0
 fi
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
-node "$s" tests/fixtures/engine-delta/index.html --positions 2 --widths 1440x900 --out "$work" >/dev/null 2>&1 || true
+# A non-zero exit is tolerated (the fixture has findings); a missing shot quotes stderr.
+node "$s" tests/fixtures/engine-delta/index.html --positions 2 --widths 1440x900 --out "$work" >/dev/null 2>"$work/stderr" || true
+why() { head -3 "$work/stderr" | tr '\n' ' '; }
 for w in 620 1100; do
-  [ -f "$work/responsive-$w.png" ] || fail "$s wrote no Chromium responsive-$w.png"
-  [ -f "$work/firefox/responsive-$w.png" ] || fail "$s wrote no Firefox responsive-$w.png"
+  [ -f "$work/responsive-$w.png" ] || fail "$s wrote no Chromium responsive-$w.png (stderr: $(why))"
+  [ -f "$work/firefox/responsive-$w.png" ] || fail "$s wrote no Firefox responsive-$w.png (stderr: $(why))"
 done
 node -e 'const r=require(process.argv[1]); if(!r.firefox) process.exit(1)' "$work/findings.json" \
   || fail "$s ran without Firefox although the probe found one"

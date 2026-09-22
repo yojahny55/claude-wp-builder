@@ -1008,11 +1008,17 @@ try {
   }
 
   await captureResponsiveShots(browser, pageUrl, pageOut);
+  // Firefox is the second engine, never a requirement: a crash mid-pass keeps the
+  // Chromium findings and says so, like a Firefox that never launched.
   if (ffBrowser) {
-    await captureResponsiveShots(ffBrowser, pageUrl, join(pageOut, 'firefox'));
-    for (const size of widths) findings.push(...(await engineDeltas(browser, ffBrowser, pageUrl, size)));
+    try {
+      await captureResponsiveShots(ffBrowser, pageUrl, join(pageOut, 'firefox'));
+      for (const size of widths) findings.push(...(await engineDeltas(browser, ffBrowser, pageUrl, size)));
+    } catch (err) {
+      const why = err && typeof err.message === 'string' ? err.message.split('\n')[0] : String(err);
+      console.error('demo-verify: Firefox pass failed on ' + pageUrl + ' (' + why + ') -- Chromium findings kept');
+    }
   }
-  mkdirSync(pageOut, { recursive: true });
   report.pages.push({ url: pageUrl, findings });
   } catch (err) {
     // Keep whatever this page did find before it died: a section list that

@@ -118,6 +118,7 @@ function isLightOrClear(value) {
       const [sat, l] = [parseFloat(parts[1]) / 100, parseFloat(parts[2]) / 100];
       const k = (n) => (n + h / 30) % 12;
       const c = sat * Math.min(l, 1 - l);
+      // CSS Color 4 hslToRgb: R, G and B are f(0), f(8) and f(4) on the 12-sector hue wheel.
       rgb = [0, 8, 4].map((n) => 255 * (l - c * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))));
     }
     return rgb.every((x) => x >= 240 - 0.5);

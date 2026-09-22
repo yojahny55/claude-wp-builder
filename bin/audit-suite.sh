@@ -304,6 +304,8 @@ fi
 # Every launch in the suite -- the runner's projects, Lighthouse's own Chromium, the form
 # login -- gets the resolved executable through a preload, because the vendored files pass
 # none and are compared against their upstream (bin/lib/pw-executables.cjs says how).
+[ -f "$here/bin/lib/pw-executables.cjs" ] \
+  || { echo "audit-suite: $here/bin/lib/pw-executables.cjs is missing; the plugin checkout is incomplete" >&2; exit 1; }
 export WP_AUDIT_CHROMIUM="$chromium_exe" WP_AUDIT_FIREFOX="$firefox_exe" WP_AUDIT_WEBKIT="$webkit_exe"
 export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--require $here/bin/lib/pw-executables.cjs"
 echo "audit-suite: chromium $chromium_exe"

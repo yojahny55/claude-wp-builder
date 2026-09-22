@@ -25,7 +25,7 @@
  * CLI: `node bin/lib/browsers.mjs <chromium|firefox|webkit>` prints the path on stdout and
  * exits 0, or prints nothing on stdout and exits 2.
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, accessSync, constants } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
@@ -92,6 +92,17 @@ export function pinnedRevisions() {
 
 const log = (msg) => process.stderr.write(`browsers: ${msg}\n`);
 
+// A file that exists but lacks the execute bit (a tarball that dropped permissions) fails
+// at launch with a bare EACCES; skip it here so the next candidate is tried.
+const isExecutable = (p) => {
+  try {
+    accessSync(p, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /** Absolute path of an existing executable for `engine`, or null. Never downloads. */
 export function findBrowser(engine) {
   const pins = pinnedRevisions();
@@ -99,8 +110,8 @@ export function findBrowser(engine) {
   const wants = pins ? (pinned ? `playwright-core at ${pins.dir} pins ${pinned}` : `playwright-core at ${pins.dir} pins none`) : 'no playwright-core manifest read';
   const override = process.env['WP_BROWSER_' + engine.toUpperCase()];
   if (override) {
-    const ok = existsSync(override);
-    log(`${engine} ${ok ? override : 'none'} (WP_BROWSER_${engine.toUpperCase()}${ok ? '' : ' does not exist'}; ${wants})`);
+    const ok = isExecutable(override);
+    log(`${engine} ${ok ? override : 'none'} (WP_BROWSER_${engine.toUpperCase()}${ok ? '' : ' is not an executable file'}; ${wants})`);
     return ok ? override : null;
   }
   // `chromium-1243`, never `chromium_headless_shell-1243`: the shell has no headed mode
@@ -112,7 +123,7 @@ export function findBrowser(engine) {
     for (const entry of readdirSync(root).filter((e) => e.startsWith(prefix) && /-\d+$/.test(e)))
       for (const tail of TAILS[engine] || []) {
         const p = join(root, entry, tail);
-        if (existsSync(p)) {
+        if (isExecutable(p)) {
           found.push({ p, rev: revision(entry) });
           break;
         }
@@ -128,7 +139,7 @@ export function findBrowser(engine) {
   }
   if (engine === 'chromium')
     for (const p of SYSTEM_CHROMIUM)
-      if (existsSync(p)) {
+      if (isExecutable(p)) {
         log(`${engine} ${p} (system build, no cached revision; ${wants})`);
         return p;
       }
