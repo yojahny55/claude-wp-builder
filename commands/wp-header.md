@@ -70,7 +70,8 @@ Dispatch the **wp-template** agent with these instructions:
 >   - Skip-to-content link for accessibility
 >   - The `<header>` keeps `id="masthead"`. When the demo header is sticky or fixed, in-page
 >     anchors must land below it: the tailwind starter's `index.js` writes the header's live
->     height into `--header-offset` and `base/reset.css` sets
+>     `top` + height into `--header-offset` (so an `.admin-bar #masthead { top: 32px }` rule
+>     counts the admin bar) and `base/reset.css` sets
 >     `html { scroll-padding-top: calc(var(--header-offset, 0px) + 1.25rem) }`, so both
 >     depend on that id. On a non-starter theme, write the same `scroll-padding-top` from the
 >     measured desktop and mobile header heights. Verify at both widths by opening a

@@ -49,8 +49,10 @@ if (document.readyState === 'loading') {
 
 // Anchor offset under a sticky header. base/reset.css pads html's scroll-padding-top by
 // --header-offset; this keeps that variable equal to the header's real height, which
-// differs between the desktop bar and the mobile one. A header that is not sticky or
-// fixed scrolls away with the page and sets 0.
+// differs between the desktop bar and the mobile one. The offset is where the header ends
+// once pinned: its own `top` plus its height, so a header pushed below the admin bar
+// (`.admin-bar #masthead { top: 32px }`) counts the bar too. A header that is not sticky
+// or fixed scrolls away with the page and sets 0.
 const initHeaderOffset = () => {
   const header = document.getElementById('masthead');
   if (!header) {
@@ -58,9 +60,10 @@ const initHeaderOffset = () => {
   }
   const root = document.documentElement;
   const update = () => {
-    const pos = getComputedStyle(header).position;
-    const pinned = pos === 'sticky' || pos === 'fixed';
-    root.style.setProperty('--header-offset', pinned ? `${Math.ceil(header.getBoundingClientRect().height)}px` : '0px');
+    const style = getComputedStyle(header);
+    const pinned = style.position === 'sticky' || style.position === 'fixed';
+    const top = parseFloat(style.top) || 0;
+    root.style.setProperty('--header-offset', pinned ? `${Math.ceil(top + header.getBoundingClientRect().height)}px` : '0px');
   };
   update();
   if ('ResizeObserver' in window) {
