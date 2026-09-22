@@ -112,18 +112,20 @@ fresh; rm -rf "$tmp/t/assets/css/dist"; expect_pass "no dist"
 grep -Fq 'SKIP classes' "$tmp/out" || fail "a theme without dist/ does not report the class rule as skipped"
 
 # Bad arguments are a usage error (exit 2) that says what is wrong, never a silent run.
+# usage_err <expected message> <args...>
 usage_err() {
-  local rc=0
+  local why=$1 rc=0
+  shift
   node "$bin" "$@" > "$tmp/out" 2>&1 || rc=$?
   [ "$rc" = 2 ] || { cat "$tmp/out"; fail "exit $rc, not 2, for: $*"; }
-  grep -Fq -- "$USAGE_WHY" "$tmp/out" || { cat "$tmp/out"; fail "usage error did not say: $USAGE_WHY"; }
+  grep -Fq -- "$why" "$tmp/out" || { cat "$tmp/out"; fail "usage error did not say: $why"; }
 }
-USAGE_WHY='--rule needs a value' usage_err "$fx" --rule
-USAGE_WHY='unknown rule: bogus' usage_err "$fx" --rule bogus
-USAGE_WHY='unknown option: --rules' usage_err --rules abspath "$fx"
-USAGE_WHY='missing theme dir' usage_err --rule abspath
-USAGE_WHY='not a directory' usage_err "$tmp/nope"
-USAGE_WHY='more than one theme dir' usage_err "$fx" "$fx"
+usage_err '--rule needs a value' "$fx" --rule
+usage_err 'unknown rule: bogus' "$fx" --rule bogus
+usage_err 'unknown option: --rules' --rules abspath "$fx"
+usage_err 'missing theme dir' --rule abspath
+usage_err 'not a directory' "$tmp/nope"
+usage_err 'more than one theme dir' "$fx" "$fx"
 node "$bin" --rule abspath "$fx" > "$tmp/out" 2>&1 || { cat "$tmp/out"; fail "--rule before the theme dir is not accepted"; }
 
 # Both starters must pass their own gate.
@@ -132,7 +134,9 @@ for st in starter-theme/__tailwind__ starter-theme/__cinematic__; do
 done
 
 # Wired where a delivery and an audit actually run it.
-grep -Fq 'bin/theme-template-check.mjs' commands/wp-finalize.md || fail "/wp-finalize does not run theme-template-check"
-grep -Fq 'bin/theme-template-check.mjs' agents/wp-audit-practices.md || fail "wp-audit-practices does not run theme-template-check"
+# The invocation, not a prose mention of the path.
+run_gate='node "?\$\{CLAUDE_PLUGIN_ROOT\}/bin/theme-template-check\.mjs"? '
+grep -Eq "$run_gate" commands/wp-finalize.md || fail "/wp-finalize does not run theme-template-check"
+grep -Eq "$run_gate" agents/wp-audit-practices.md || fail "wp-audit-practices does not run theme-template-check"
 
 echo PASS
