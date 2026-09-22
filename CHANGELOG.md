@@ -13,6 +13,15 @@
     modules and blocks on a missing table.
   - `/wp-audit` reports a module without its table as PERF-060 (CRITICAL).
 
+  **CPT-archive breadcrumbs stayed in the primary language under Polylang.** Rank Math
+  builds that crumb from the `register_post_type()` label, which no
+  `post_type_archive_title` filter reaches, so `/en/<cpt-plural>/` showed the Spanish
+  plural. `wp-audit-rankmath` Step 15b adds a `rank_math/frontend/breadcrumb/items` filter
+  that reads the same `plural_<post_type>` string. The `wp-polylang` skill's
+  `post_type_archive_title` example also fell back with `?:` on `prefix_t()`. That function
+  returns the key itself when a string is missing, never `''`, so a missing string printed
+  the key. It now compares against the key.
+
 - **`--suite` could never run from its managed install.** The shared dependency cache was
   named `node_modules-<key>`. Node resolves a package's own imports from its real path,
   searching only directories literally named `node_modules`, so `@playwright/test` could not

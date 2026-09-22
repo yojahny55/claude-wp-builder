@@ -1137,6 +1137,45 @@ echo 'Polylang + Rank Math checks complete.' . PHP_EOL;
 "
 ```
 
+### 15b. Translate the CPT-archive breadcrumb
+
+Rank Math builds the archive crumb of a custom post type from the label passed to
+`register_post_type()`, a plain literal in the primary language. Under Polylang,
+`/en/<cpt-plural>/` and every single under it then show the primary-language plural in the
+breadcrumb. `post_type_archive_title` filters do not reach it. Add this to the theme's
+`inc/rankmath.php` (or wherever Step 4.7's `rank_math/json_ld` filter lives), with the real
+prefix:
+
+```php
+/**
+ * Route each CPT-archive crumb through the theme's string table, the same
+ * `plural_<post_type>` key the post_type_archive_title filter reads.
+ */
+add_filter( 'rank_math/frontend/breadcrumb/items', function ( $crumbs ) {
+    $types = get_post_types( array( '_builtin' => false, 'has_archive' => true ), 'names' );
+    foreach ( $crumbs as $i => $crumb ) {
+        foreach ( $types as $type ) {
+            $link = get_post_type_archive_link( $type );
+            $is_archive_crumb = ! empty( $crumb[1] ) && $link
+                && untrailingslashit( $crumb[1] ) === untrailingslashit( $link );
+            // On the archive itself the last crumb may carry no link.
+            $is_current = empty( $crumb[1] ) && is_post_type_archive( $type ) && $i === array_key_last( $crumbs );
+            if ( $is_archive_crumb || $is_current ) {
+                $key   = 'plural_' . $type;
+                $label = prefix_t( $key );
+                $crumbs[ $i ][0] = $label !== $key ? $label : post_type_archive_title( '', false );
+            }
+        }
+    }
+    return $crumbs;
+} );
+```
+
+Register a `plural_<post_type>` string for every CPT with an archive, in every language.
+Then verify on the secondary language: fetch `/<lang>/<cpt-plural>/` and one single, and
+read the breadcrumb text. The crumb must match the page's `<h1>`/`<title>` language, not the
+primary one.
+
 ## Verification
 
 After all steps, output a summary and print key URLs:
