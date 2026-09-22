@@ -1,0 +1,5 @@
+/* Each rule below is one defect the lint must name. */
+.btn--outline { border: 1px solid #072049; border-radius: 999px; background: transparent; }
+.field input:focus { border: 1px solid #346699; border-radius: 8px; }
+.avatar-ring { border: 1px solid #c59755; border-radius: 50%; filter: drop-shadow(0 2px 4px rgba(0,0,0,.2)); }
+.social a { @apply border rounded-full bg-white; }

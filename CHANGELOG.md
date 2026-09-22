@@ -188,6 +188,15 @@
     from Chromium by more than 2px as an advisory `engine-delta`. `--no-firefox` skips that
     pass.
 
+  **`bin/css-contour-lint.mjs`: contours that differ across engines.** Firefox on Windows
+  notches the corners of a 1px `border` with a `border-radius`, and Linux Firefox does not
+  reproduce it, so no screenshot here can catch it. The lint flags that pattern on a
+  transparent or white control (use `box-shadow: inset 0 0 0 1px`), `drop-shadow` on a
+  bordered rounded ring, and a `type="search"` whose native clear button is not hidden
+  (Chromium draws it, Firefox never does). `/wp-finalize` Check 3 and the practices audit
+  (WP-055) run it, and `wp-css-system` and `wp-tailwind-system` state the rules, including
+  one custom clear control per search field.
+
 ## [1.27.0] - 2026-09-21
 
 ### Changed

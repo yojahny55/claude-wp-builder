@@ -152,6 +152,21 @@ Branch on the project's `Template:` (read it from `.claude/CLAUDE.md`):
 
 **PASS** if breakpoints are covered on the template's own terms. **FAIL** with missing breakpoints or sections without responsive rules.
 
+**Cross-engine contours (both templates).** Verification renders Chromium and, when a build
+exists, Linux Firefox; neither shows the notched corners Firefox on Windows draws on a thin
+rounded border. Run the static guard over the theme and, when present, the demo:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/css-contour-lint.mjs" <theme-dir> [<demo-dir>]
+```
+
+It fails on a 1px `border` + `border-radius` on a transparent or white control (outline
+button, focused or error field, ringed icon link: draw it with
+`box-shadow: inset 0 0 0 1px <color>`), on `drop-shadow` over a bordered rounded ring, and on
+a `type="search"` whose native clear button is not hidden (Chromium shows it, Firefox never
+does; with a custom clear control Chromium shows two). Each finding is a visual change to
+the site: report it with its file and line and ask before changing it.
+
 ---
 
 ### Check 4: Theme Structure
