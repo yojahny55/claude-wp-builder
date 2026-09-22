@@ -240,7 +240,7 @@ Nav markup/styles MUST follow the nav-class contract in the wp-theme-standards s
 
 ## Touch Targets
 
-All interactive elements MUST have a minimum touch target of 44px: (Exception: Transcription Mode / the /wp-yolo path does NOT add touch-target min-heights, to preserve the demo's exact geometry.)
+All interactive elements MUST render at least 24x24 (WCAG 2.2 AA 2.5.8, the audit's failing threshold) and SHOULD reach 44px where the design has room: (Exception: Transcription Mode / the /wp-yolo path does NOT add touch-target min-heights, to preserve the demo's exact geometry. A target there that measures under 24x24 gets padding plus an equal negative margin instead, which enlarges the hit area and moves nothing.)
 
 ```css
 .nav__link {
@@ -499,7 +499,7 @@ Enqueue page-specific styles conditionally in `functions.php`.
 5. **Section delimiters** — every section wrapped in `/* ============ Section: Name ============ */`
 6. **No horizontal scroll at any viewport** — test with `overflow-x: hidden` awareness, use `max-width: 100%` on media
 7. **Fluid typography for headings** — use `clamp()`
-8. **Minimum 44px touch targets** — all buttons, links, interactive elements
+8. **Minimum 24x24 touch targets (44px where the design has room)** — all buttons, links, interactive elements; below 24 without room, padding plus an equal negative margin
 9. **Respect `prefers-reduced-motion`** — disable animations/transitions for users who prefer it
 10. **Follow the demo's visual design exactly** — match colors, spacing, layout from the reference
 11. **Each section gets its own commented block** — keep CSS organized and scannable
@@ -518,7 +518,8 @@ the demo is the SOURCE OF TRUTH, not inspiration. Your job is to COPY, not re-au
   `line-height`, `border`, `border-radius`, `box-shadow`, and flex/grid track sizes.
 - **Capture CSS-declared assets:** `background:url(...)` and `@font-face` `src` — not just
   `<img>`/`<link>`. Anything in CSS that a markup-only pass would miss, you carry.
-- **Do NOT "improve":** do not add a `min-height:44px` touch target, do not resize inputs or
+- **Do NOT "improve":** do not add a `min-height:44px` touch target (a target under 24x24 gets
+  padding plus an equal negative margin, which moves nothing), do not resize inputs or
   textareas, do not round or clean up values, do not swap a literal for a near-token. Each
   "reasonable best practice" changes the demo's measured geometry and is a bug here.
 - **Tokenize only on an exact match:** use a token only if its defined value equals the demo's

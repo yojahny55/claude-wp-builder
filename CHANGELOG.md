@@ -44,6 +44,14 @@
   The tailwind starter gains that default ring in `base/reset.css`, where `.btn`'s
   `focus:outline-none` overrides it.
 
+  **The target-size check failed the wrong threshold.** A11Y-028 read CSS for 44x44, which
+  is WCAG 2.5.5 (AAA), while the AA criterion 2.5.8 is 24x24. Nav items, footer social icons
+  and a breadcrumb home link measured under 24 on a real build and were never reported as
+  AA failures. The a11y audit, `wp-audit-standards` and UX-009 now fail below 24x24,
+  measured with `getBoundingClientRect()` at desktop and mobile, and treat 44x44 as advice.
+  `/wp-header`, `/wp-footer`, the Rank Math breadcrumb CSS, `wp-css` and `wp-responsive`
+  reach 24x24 with padding plus an equal negative margin, so the text does not move.
+
 ### Added
 
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had

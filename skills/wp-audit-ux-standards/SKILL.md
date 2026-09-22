@@ -101,7 +101,7 @@ the same way or the duplicate survives.
 |---|---|---|---|---|---|
 | UX-005 | Clickable things react to hover | `:hover` rules and `cursor` | every clickable element gives visible feedback | INFO | code |
 | UX-008 | The current menu item is marked | `active`/`aria-current="page"` and the style behind it | the selected item is clearly different | WARNING | code |
-| UX-009 | Action elements have room between them | margins, padding and the rendered target (~44×44px) | adjacent controls do not induce a wrong tap | WARNING | code |
+| UX-009 | Action elements have room between them | margins, padding and the rendered target (below 24×24 fails per WCAG 2.5.8; 44×44 is AAA advice) | adjacent controls do not induce a wrong tap | WARNING | code |
 | UX-026 | Button text names the action | read the button labels | "Save changes", not "OK" where OK is ambiguous | INFO | content |
 | UX-030 | Icons match what they mean | compare each icon with its function | a magnifier searches, a cart buys | INFO | manual |
 | UX-031 | Selected icons differ from unselected | the icon's active state | the selected state is unmistakable | INFO | manual |

@@ -71,6 +71,9 @@ Dispatch the **wp-template** agent with these instructions:
 >
 > ### inc/nav-walker.php
 > - Custom Walker_Nav_Menu extension named `Prefix_Nav_Walker` (using actual prefix)
+> - Every menu item's `<a>` renders at least 24x24 at desktop and mobile (WCAG 2.2 AA
+>   2.5.8). When the demo's line is shorter, add padding plus an equal negative margin
+>   (`py-0.5 -my-0.5` for a 20px line) so the hit area grows and the text does not move
 > - Support for dropdown/submenu items if the demo has them
 > - Proper escaping on all output
 >

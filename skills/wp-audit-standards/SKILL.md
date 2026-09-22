@@ -119,7 +119,7 @@ Tier 1 whether or not a browser is present.
 | Normal text contrast | 4.5:1 |
 | Large text contrast (>=18px or >=14px bold) | 3:1 |
 | UI component contrast | 3:1 |
-| Touch target size | 44x44 CSS pixels |
+| Touch target size | 24x24 CSS pixels fails (WCAG 2.2 AA 2.5.8), measured at desktop and mobile; 44x44 is AAA advice (INFO) |
 | Minimum gray on white passing 4.5:1 | `#767676` |
 
 ---

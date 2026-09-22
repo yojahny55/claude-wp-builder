@@ -80,7 +80,7 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 | A11Y-025 | No focus styles | Grep CSS for `:focus\|:focus-visible` rules | CRITICAL | Yes |
 | A11Y-026 | outline:none without replacement | Grep CSS for `outline:\s*none\|outline:\s*0` without `:focus-visible` nearby | CRITICAL | Yes |
 | A11Y-027 | Positive tabindex | Grep templates for `tabindex="[1-9]` (should be 0 or -1 only) | WARNING | No |
-| A11Y-028 | Small touch targets | Check CSS for interactive elements (buttons, links) min 44x44px | WARNING | No |
+| A11Y-028 | Target smaller than 24x24 | Measure, do not read CSS: in a browser at desktop (1440) **and** mobile (390), `getBoundingClientRect()` on every `a[href]`, `button`, `[role=button]`, form control and icon link outside running text — nav items, footer social icons, the breadcrumb home link, carousel dots, close buttons. Below **24x24 CSS px fails** (WCAG 2.2 AA 2.5.8) unless a 24px circle centred on it overlaps no other target (the spacing exception) or it is a link inside a sentence. 44x44 is 2.5.5 (AAA): report it as INFO advice, never as a finding. Fix with padding plus an equal negative margin (`p-1 -m-1` on a 16px icon, `py-0.5 -my-0.5` on a 20px text line) so the text does not move, and re-measure the text's own position before and after | WARNING | No |
 | A11Y-029 | Bad link text | Grep for `>click here<\|>read more<\|>learn more<` without `.screen-reader-text` | WARNING | No |
 | A11Y-030 | Language switcher not keyboard accessible | Check language switcher has keyboard event handlers | INFO | No |
 
@@ -125,7 +125,8 @@ third by reading the form markup. A browser confirms the first two on a rendered
 one is available; without it, file the source-code finding and mark the check `UNMEASURED`.
 
 - **Focus not obscured** — ensure focused elements are not hidden behind sticky headers or modals
-- **Target size 24x24** — minimum target size for pointer inputs (WCAG 2.5.8)
+- **Target size 24x24** — minimum target size for pointer inputs (WCAG 2.5.8). This is the
+  failing threshold (A11Y-028), measured at desktop and mobile; 44x44 is AAA advice only
 - **Accessible authentication** — no cognitive function tests for login/forms
 
 ## Step 7: Output Report
