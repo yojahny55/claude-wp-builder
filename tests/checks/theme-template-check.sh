@@ -67,6 +67,30 @@ expect_fail "accordion without accordion.js" 'does not import ./accordion.js'
 fresh; printf '?>\n<div data-directory><ul><li data-filter-item>A</li></ul></div>\n' >> "$tmp/t/index.php"
 expect_fail "directory filter without directory-filter.js" 'does not import ./directory-filter.js'
 
+# Comments are not code: a docblock naming the unquoted form, a commented-out class or
+# tab, in PHP (`//`, `#`, `/* */`) or HTML (`<!-- -->`), fails nothing.
+fresh; sed -i 's/ \* Fixture seed\./ * Fixture seed. Never write defined( ABSPATH ) unquoted./' "$tmp/t/inc/seed/items.php"
+expect_pass "unquoted ABSPATH inside a docblock"
+fresh; cat "$fx/comments.php.txt" >> "$tmp/t/index.php"
+expect_pass "classes and a tab inside PHP and HTML comments"
+# ...while markup in a PHP string, even next to a URL or a trailing comment, is still read.
+fresh; printf "\$u = 'https://example.test/#a'; echo '<div class=\"mt-[31px]\">'; // note\n" >> "$tmp/t/index.php"
+expect_fail "class in a PHP string beside a URL and a comment" '"mt-[31px]"'
+fresh; printf "?>\n<!-- note --><button role=\"tab\">A</button>\n" >> "$tmp/t/index.php"
+expect_fail "tab markup after an HTML comment" 'does not import ./tabs.js'
+
+# Only selectors define classes: `.mt-7` inside a declaration value does not.
+fresh; sed -i 's/class="flex mt-4/class="flex mt-7/' "$tmp/t/index.php"
+echo '.x{content:".mt-7";opacity:0.5}' >> "$tmp/t/assets/css/dist/main.css"
+expect_fail "a class named only in a declaration" '"mt-7"'
+
+# Families outside the spacing/colour prefixes are checked; their component look-alikes are not.
+fresh; sed -i 's/class="flex mt-4/class="flex pointer-events-non select-none table-cell select-wrapper table-responsive/' "$tmp/t/index.php"
+expect_fail "pointer-events typo" '"pointer-events-non"'
+grep -Fq '"select-none"' "$tmp/out" || { cat "$tmp/out"; fail "select-none missing from dist is not reported"; }
+grep -Fq '"table-cell"' "$tmp/out" || { cat "$tmp/out"; fail "table-cell missing from dist is not reported"; }
+if grep -Eq '"(select-wrapper|table-responsive)"' "$tmp/out"; then cat "$tmp/out"; fail "a component class was read as a utility"; fi
+
 # No compiled CSS: the class rule skips instead of failing a theme that is not built.
 fresh; rm -rf "$tmp/t/assets/css/dist"; expect_pass "no dist"
 grep -Fq 'SKIP classes' "$tmp/out" || fail "a theme without dist/ does not report the class rule as skipped"

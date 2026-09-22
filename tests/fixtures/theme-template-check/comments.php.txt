@@ -1,0 +1,14 @@
+// echo '<div class="mt-[999px]">'; see https://example.test/#x
+# echo '<button role="tab">A</button>';
+/*
+ * <div class="hover:mt-[998px]">, <button role="tab">
+ */
+$note = <<<TXT
+it's a note, not a class
+TXT;
+?>
+<!-- <div class="mt-[997px]"><button role="tab">B</button> -->
+<!--
+<div class="mt-[996px]" data-accordion-trigger></div>
+-->
+<?php

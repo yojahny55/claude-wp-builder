@@ -204,7 +204,9 @@ Verify required WordPress theme files and configurations:
    each one and confirm its possible values appear in the templates or a `@source inline()`.
    Re-run `npm run build` before treating a missing-selector finding as a typo.
 
-**PASS** if all present. **FAIL** listing missing items (item 7 reports WARNING, not FAIL, when absent).
+**PASS** if all present. **FAIL** listing missing items (item 7 reports WARNING, not FAIL, when absent;
+item 8 reports WARNING, not FAIL, as the practices audit does for WP-016, WP-053 and WP-054, except an
+unquoted `defined( ABSPATH )`, which is a PHP 8 fatal and FAILs).
 
 ---
 
