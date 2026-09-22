@@ -80,7 +80,7 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 | A11Y-025 | No focus styles | Grep CSS for `:focus\|:focus-visible` rules | CRITICAL | Yes |
 | A11Y-026 | outline:none without replacement | Grep CSS for `outline:\s*none\|outline:\s*0` without `:focus-visible` nearby | CRITICAL | Yes |
 | A11Y-027 | Positive tabindex | Grep templates for `tabindex="[1-9]` (should be 0 or -1 only) | WARNING | No |
-| A11Y-028 | Small touch targets | Check CSS for interactive elements (buttons, links) min 44x44px | WARNING | No |
+| A11Y-028 | Target smaller than 24x24 | Measure, do not read CSS: in a browser at desktop (1440) **and** mobile (390), `getBoundingClientRect()` on every `a[href]`, `button`, `[role=button]`, form control and icon link outside running text — nav items, footer social icons, the breadcrumb home link, carousel dots, close buttons. Below **24x24 CSS px fails** (WCAG 2.2 AA 2.5.8) unless a 24px circle centred on it overlaps no other target (the spacing exception) or it is a link inside a sentence. 44x44 is 2.5.5 (AAA): report it as INFO advice, never as a finding. Fix with padding plus an equal negative margin so the text does not move: on a `tailwind` project `p-1 -m-1` on a 16px icon, `py-0.5 -my-0.5` on a 20px text line; on a `basic` project the BEM rule, e.g. `.footer__social-link { padding: 4px; margin: -4px; }`, `.nav__link { padding-block: 2px; margin-block: -2px; }`, and re-measure the text's own position before and after | WARNING | No |
 | A11Y-029 | Bad link text | Grep for `>click here<\|>read more<\|>learn more<` without `.screen-reader-text` | WARNING | No |
 | A11Y-030 | Language switcher not keyboard accessible | Check language switcher has keyboard event handlers | INFO | No |
 
@@ -125,7 +125,8 @@ third by reading the form markup. A browser confirms the first two on a rendered
 one is available; without it, file the source-code finding and mark the check `UNMEASURED`.
 
 - **Focus not obscured** — ensure focused elements are not hidden behind sticky headers or modals
-- **Target size 24x24** — minimum target size for pointer inputs (WCAG 2.5.8)
+- **Target size 24x24** — minimum target size for pointer inputs (WCAG 2.5.8). This is the
+  failing threshold (A11Y-028), measured at desktop and mobile; 44x44 is AAA advice only
 - **Accessible authentication** — no cognitive function tests for login/forms
 
 ## Step 7: Output Report
@@ -245,14 +246,48 @@ inside a flex row moves nothing else and can fall under the tolerance. Measure t
 }
 ```
 
-**A11Y-025/026 fix — Focus visible CSS:**
+**A11Y-025/026 fix — one focus indicator per element, never a second one on top.**
 
-```css
-:focus-visible {
-    outline: 2px solid var(--color-link, #0073aa);
-    outline-offset: 2px;
-}
-```
+A bare global `:focus-visible { outline: … }` shipped from this section once. On a build
+whose form fields already had a design focus state (a border colour change), every field
+then showed two indicators, the design border and the new ring. Nothing in the audit saw it,
+because both indicators passed. The fix has four steps:
+
+1. **Inventory before writing.** Grep the theme CSS and templates for the components that
+   already style their own focus: `:focus`, `:focus-visible`, `:focus-within`,
+   `focus:`/`focus-visible:` utilities, `.wpcf7-form-control:focus`, `.btn:focus`. Each one
+   is excluded from any global rule.
+2. **A global ring only where nothing else exists**, at zero specificity so any component
+   rule wins, and never on the components from step 1. This is the rule the `tailwind`
+   starter ships in `base/reset.css`; write the same one on a `basic` build:
+
+   ```css
+   :where(a[href], button, summary, input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+     outline: 2px solid currentColor;
+     outline-offset: 2px;
+   }
+   ```
+
+   `currentColor` is the element's text colour, which on a muted icon link or a grey
+   caption link can sit under 3:1 against what surrounds it. Measure the ring on every
+   component it reaches: `getComputedStyle(el).outlineColor` against the background
+   adjacent to the outline (the parent's, since `outline-offset` draws it outside the
+   element). Under 3:1 (A11Y-004) is a finding, and the fix is an explicit
+   `outline-color` for that component on `:focus-visible`, not a change to the global rule.
+
+   When a component from step 1 sits inside that list (a form field with a design
+   border), give it `outline: none` on the same state *only if* its own indicator passes
+   the step 3 contrast check. Otherwise the ring replaces its indicator, see step 3.
+3. **A design focus colour that fails 3:1 (A11Y-004) is replaced, not stacked.** Change
+   that component's own focus colour, or remove its indicator and let the ring be the one.
+   Two indicators that each half-pass do not add up to one that passes.
+4. **Measure before and after**, on every component the rule reaches, focused through the
+   keyboard (`Tab`, not `.focus()` from a mouse-driven script, or `:focus-visible` does not
+   match). Read `getComputedStyle(el)` → `outlineStyle`, `outlineWidth`, `outlineColor`,
+   `boxShadow`, `borderColor`, `borderWidth`. The element must show one indicator: the
+   design's own, or the new ring. A design border change plus a new outline on the same
+   element is a regression, and the fix is not done until it is gone. Check every
+   component, at desktop and mobile widths.
 
 **A11Y-060 fix — Nav aria-label pattern:**
 

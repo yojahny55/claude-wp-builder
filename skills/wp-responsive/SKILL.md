@@ -479,7 +479,38 @@ Add `loading="lazy"` to all images below the fold. Do NOT add it to the hero/LCP
 
 ## Touch-Friendly Targets
 
-All interactive elements (links, buttons, form inputs) MUST have a minimum tap area of **44x44 pixels** on touch devices.
+Every interactive element outside running text (links, buttons, form inputs, icon links)
+MUST render at least **24x24 CSS pixels** at every viewport — WCAG 2.2 AA 2.5.8, and the
+threshold the accessibility audit fails on. **44x44** (2.5.5, AAA) is the comfortable size
+to design new controls at; it is advice, not a failing threshold.
+
+When a designed element is smaller than 24px (a 16px social icon, a 20px nav line, a
+breadcrumb home glyph), enlarge the hit area **without moving anything**: padding plus an
+equal negative margin, so the layout box and the text position stay where the design put
+them.
+
+```css
+/* 16px icon: 4px padding each side = 24x24, -4px margin keeps its place */
+.footer__social-link {
+    display: inline-flex;
+    padding: 4px;
+    margin: -4px;
+}
+
+/* 20px line of nav text: 2px top and bottom */
+.nav__link {
+    display: inline-block;
+    padding-block: 2px;
+    margin-block: -2px;
+}
+```
+
+On a `tailwind` project the same pair is `inline-flex p-1 -m-1` and `inline-block py-0.5 -my-0.5`
+on the element.
+
+Measure it at desktop and mobile with `getBoundingClientRect()` (24x24 or more), and
+compare the text's own `getBoundingClientRect().top/left` before and after the change: it
+must not move.
 
 ### Buttons
 
@@ -524,7 +555,7 @@ select {
 
 ### Icon Buttons
 
-For small icon buttons (close, hamburger, social links), ensure the clickable area is at least 44px even if the visible icon is smaller.
+For small icon buttons (close, hamburger, social links), the clickable area is at least 24px (44px where the design has room) even if the visible icon is smaller. Inside a row whose spacing is fixed by the design, use the padding plus negative margin pattern above instead of a fixed box.
 
 ```css
 .icon-button {
@@ -769,7 +800,7 @@ Before marking any page or section as complete, verify responsiveness at these v
 
 | Width | Device Class | Check |
 |---|---|---|
-| 375px | Mobile (iPhone SE) | Layout stacks, text readable, touch targets 44px+ |
+| 375px | Mobile (iPhone SE) | Layout stacks, text readable, touch targets 24px+ |
 | 576px | Large phone | Grid may shift to 2 columns |
 | 768px | Tablet | 2-column layouts, larger padding |
 | 1024px | Desktop | Full navigation visible, 3+ column grids |
@@ -782,7 +813,7 @@ Before marking any page or section as complete, verify responsiveness at these v
 - [ ] Images scale properly (no stretching, no overflow)
 - [ ] Navigation switches between hamburger and horizontal
 - [ ] Grid layouts adjust column count appropriately
-- [ ] Touch targets are at least 44x44px on mobile
+- [ ] Touch targets are at least 24x24px at desktop and mobile (44x44 where the design has room)
 - [ ] Section spacing scales (tighter on mobile, looser on desktop)
 - [ ] Footer stacks properly on mobile
 - [ ] `prefers-reduced-motion` disables animations
@@ -800,7 +831,7 @@ Before marking any page or section as complete, verify responsiveness at these v
 - [ ] `clamp()` used for headings and display text
 - [ ] Responsive images with `srcset`, `sizes`, and `loading="lazy"`
 - [ ] WordPress `wp_get_attachment_image()` used in templates
-- [ ] All touch targets minimum 44x44px
+- [ ] All touch targets minimum 24x24px (WCAG 2.5.8), none moved to get there
 - [ ] Every section has styles for all breakpoints
 - [ ] No horizontal scroll at any width (tested at 320px+)
 - [ ] `prefers-reduced-motion` media query included

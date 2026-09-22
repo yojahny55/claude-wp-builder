@@ -79,3 +79,21 @@ summary[aria-disabled="true"],
 [role="tab"][aria-disabled="true"] {
   cursor: default;
 }
+
+/* One focus indicator per element. This is the default ring for controls that
+ * have no focus style of their own, and it is written so it can never be the
+ * second one. Two mechanisms, not one: this file is layer(base), so a rule in
+ * the components or utilities layer (`.btn`, `focus-visible:outline-none`)
+ * wins by LAYER ORDER whatever its specificity; and `:where()` keeps the rule
+ * at zero specificity, so any other base-layer rule with a selector beats it
+ * too. Unlayered CSS wins over every layer. A component that draws its
+ * own indicator (a ring like `.btn`, a design border colour on a form field)
+ * must also clear the outline on that state (`focus-visible:outline-none`),
+ * or the field shows the design border and this ring together. That stacked
+ * pair shipped on a real build's form fields. Verify with getComputedStyle on
+ * a keyboard-focused element: one of outline, box-shadow or border changes,
+ * never two. */
+:where(a[href], button, summary, input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}

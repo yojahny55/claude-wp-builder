@@ -34,6 +34,28 @@
   - The runner loads the Playwright CLI before using it and prints the real error.
   - The browser install's output is kept and its tail is printed on failure.
 
+- **The accessibility fix drew a second focus indicator.** A11Y-025/026 shipped a bare
+  global `:focus-visible { outline }`. On form fields that already had a design focus
+  border, the rule added a second indicator on every field. The fix now takes four steps:
+  1. Find the components that already style their own focus.
+  2. Add a zero-specificity `:where()` ring only where nothing else exists.
+  3. Replace a design focus colour that fails 3:1 instead of stacking a ring on it.
+  4. Check with `getComputedStyle` before and after that each element shows one indicator.
+  The tailwind starter gains that default ring in `base/reset.css`. It sits in the base
+  layer at zero specificity, so `.btn`'s `focus-visible:outline-none` (utilities layer)
+  wins by layer order. `.btn`'s ring moves from `focus:` to `focus-visible:`, the state
+  where the outline is cleared: measured in Chromium at 1440 and 390, rest and keyboard
+  focus are unchanged (same box-shadow, colour, size, radius, 76x38 / 62x38), and a mouse
+  click no longer draws the ring.
+
+  **The target-size check failed the wrong threshold.** A11Y-028 read CSS for 44x44, which
+  is WCAG 2.5.5 (AAA), while the AA criterion 2.5.8 is 24x24. Nav items, footer social icons
+  and a breadcrumb home link measured under 24 on a real build and were never reported as
+  AA failures. The a11y audit, `wp-audit-standards` and UX-009 now fail below 24x24,
+  measured with `getBoundingClientRect()` at desktop and mobile, and treat 44x44 as advice.
+  `/wp-header`, `/wp-footer`, the Rank Math breadcrumb CSS, `wp-css` and `wp-responsive`
+  reach 24x24 with padding plus an equal negative margin, so the text does not move.
+
 ### Added
 
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had

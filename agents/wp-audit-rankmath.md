@@ -1044,6 +1044,11 @@ Append breadcrumb styles to `assets/css/styles.css` using the CSS from the skill
 .breadcrumbs a {
     color: #3b82f6;
     text-decoration: none;
+    /* 24x24 target (WCAG 2.2 AA 2.5.8), a home icon included, without moving the text:
+       the padding and the equal negative margin cancel out in the layout. */
+    display: inline-block;
+    padding: 4px;
+    margin: -4px;
 }
 .breadcrumbs a:hover {
     text-decoration: underline;
