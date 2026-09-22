@@ -10,8 +10,9 @@ cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
 a=agents/wp-audit-a11y.md
-fix=$(awk '/^\*\*A11Y-025\/026 fix/{on=1} on&&/^\*\*A11Y-060 fix/{exit} on' "$a")
-[ -n "$fix" ] || fix=$(cat "$a")
+# The section ends at the next **A11Y-NNN header, whichever it is; an empty section fails.
+fix=$(awk '/^\*\*A11Y-025\/026 fix/{on=1; print; next} on&&/^\*\*A11Y-[0-9]/{exit} on' "$a")
+[ -n "$fix" ] || fail "$a has no **A11Y-025/026 fix section"
 
 # The old bare global rule is gone.
 printf '%s\n' "$fix" | grep -qE '^:focus-visible \{' \
@@ -25,7 +26,7 @@ printf '%s\n' "$fix" | grep -Fq ':where(' || fail "$a's global ring is not zero-
 r=starter-theme/__tailwind__/assets/css/src/tailwindcss/base/reset.css
 grep -Fq ':where(a[href], button' "$r" || fail "$r's default focus ring is not wrapped in :where()"
 grep -Eq '^:focus-visible|^\*:focus-visible' "$r" && fail "$r carries a specificity-bearing global focus rule"
-grep -Fq 'focus:outline-none' starter-theme/__tailwind__/assets/css/src/tailwindcss/components/buttons.css \
+grep -Fq 'focus-visible:outline-none' starter-theme/__tailwind__/assets/css/src/tailwindcss/components/buttons.css \
   || fail ".btn draws a ring without clearing the outline, so the base ring stacks on it"
 
 echo PASS

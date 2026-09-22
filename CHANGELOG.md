@@ -41,8 +41,9 @@
   2. Add a zero-specificity `:where()` ring only where nothing else exists.
   3. Replace a design focus colour that fails 3:1 instead of stacking a ring on it.
   4. Check with `getComputedStyle` before and after that each element shows one indicator.
-  The tailwind starter gains that default ring in `base/reset.css`, where `.btn`'s
-  `focus:outline-none` overrides it.
+  The tailwind starter gains that default ring in `base/reset.css`. It sits in the base
+  layer at zero specificity, so `.btn`'s `focus-visible:outline-none` (utilities layer)
+  wins by layer order.
 
   **The target-size check failed the wrong threshold.** A11Y-028 read CSS for 44x44, which
   is WCAG 2.5.5 (AAA), while the AA criterion 2.5.8 is 24x24. Nav items, footer social icons
