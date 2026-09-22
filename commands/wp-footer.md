@@ -54,8 +54,9 @@ Dispatch the **wp-template** agent with these instructions:
 >   - Address: `prefix_get_field('contact_address', 'option')`
 > - **Social links** (repeater): `prefix_get_repeater('social_links', array('platform', 'url', 'icon'), 'option')`
 >   Each icon link renders at least 24x24 at desktop and mobile (WCAG 2.2 AA 2.5.8). A
->   16px glyph gets `p-1 -m-1` (padding plus the equal negative margin), so the row keeps the
->   demo's spacing and nothing moves
+>   16px glyph gets padding plus the equal negative margin, so the row keeps the demo's
+>   spacing and nothing moves: `tailwind` → `p-1 -m-1` on the `<a>`; `basic` →
+>   `.footer__social-link { padding: 4px; margin: -4px; }`
 > - **Legal links**: `prefix_get_field('legal_privacy_url', 'option')`, `prefix_get_field('legal_terms_url', 'option')`
 > - **Copyright**: `prefix_get_field('footer_copyright', 'option')` with fallback to `© {year} {blogname}`
 > - **Designer credit**: `prefix_get_field('footer_credit', 'option')` (optional)

@@ -489,12 +489,24 @@ breadcrumb home glyph), enlarge the hit area **without moving anything**: paddin
 equal negative margin, so the layout box and the text position stay where the design put
 them.
 
-```html
-<!-- 16px icon: 4px padding each side = 24x24, -4px margin keeps its place -->
-<a class="inline-flex p-1 -m-1" href="…" aria-label="…"><span class="icon-facebook text-base"></span></a>
-<!-- 20px line of nav text: 2px top and bottom -->
-<a class="inline-block py-0.5 -my-0.5" href="…">About</a>
+```css
+/* 16px icon: 4px padding each side = 24x24, -4px margin keeps its place */
+.footer__social-link {
+    display: inline-flex;
+    padding: 4px;
+    margin: -4px;
+}
+
+/* 20px line of nav text: 2px top and bottom */
+.nav__link {
+    display: inline-block;
+    padding-block: 2px;
+    margin-block: -2px;
+}
 ```
+
+On a `tailwind` project the same pair is `inline-flex p-1 -m-1` and `inline-block py-0.5 -my-0.5`
+on the element.
 
 Measure it at desktop and mobile with `getBoundingClientRect()` (24x24 or more), and
 compare the text's own `getBoundingClientRect().top/left` before and after the change: it
