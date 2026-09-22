@@ -245,14 +245,40 @@ inside a flex row moves nothing else and can fall under the tolerance. Measure t
 }
 ```
 
-**A11Y-025/026 fix — Focus visible CSS:**
+**A11Y-025/026 fix — one focus indicator per element, never a second one on top.**
 
-```css
-:focus-visible {
-    outline: 2px solid var(--color-link, #0073aa);
-    outline-offset: 2px;
-}
-```
+A bare global `:focus-visible { outline: … }` shipped from this section once. On a build
+whose form fields already had a design focus state (a border colour change), every field
+then showed two indicators, the design border and the new ring. Nothing in the audit saw it,
+because both indicators passed. The fix has four steps:
+
+1. **Inventory before writing.** Grep the theme CSS and templates for the components that
+   already style their own focus: `:focus`, `:focus-visible`, `:focus-within`,
+   `focus:`/`focus-visible:` utilities, `.wpcf7-form-control:focus`, `.btn:focus`. Each one
+   is excluded from any global rule.
+2. **A global ring only where nothing else exists**, at zero specificity so any component
+   rule wins, and never on the components from step 1:
+
+   ```css
+   :where(a, button, summary, [tabindex]:not([tabindex="-1"]), input, select, textarea):focus-visible {
+       outline: 2px solid var(--color-focus, currentColor);
+       outline-offset: 2px;
+   }
+   ```
+
+   When a component from step 1 sits inside that list (a form field with a design
+   border), give it `outline: none` on the same state *only if* its own indicator passes
+   the step 3 contrast check. Otherwise the ring replaces its indicator, see step 3.
+3. **A design focus colour that fails 3:1 (A11Y-004) is replaced, not stacked.** Change
+   that component's own focus colour, or remove its indicator and let the ring be the one.
+   Two indicators that each half-pass do not add up to one that passes.
+4. **Measure before and after**, on every component the rule reaches, focused through the
+   keyboard (`Tab`, not `.focus()` from a mouse-driven script, or `:focus-visible` does not
+   match). Read `getComputedStyle(el)` → `outlineStyle`, `outlineWidth`, `outlineColor`,
+   `boxShadow`, `borderColor`, `borderWidth`. The element must show one indicator: the
+   design's own, or the new ring. A design border change plus a new outline on the same
+   element is a regression, and the fix is not done until it is gone. Check every
+   component, at desktop and mobile widths.
 
 **A11Y-060 fix — Nav aria-label pattern:**
 

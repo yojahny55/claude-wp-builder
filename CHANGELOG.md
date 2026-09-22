@@ -34,6 +34,16 @@
   - The runner loads the Playwright CLI before using it and prints the real error.
   - The browser install's output is kept and its tail is printed on failure.
 
+- **The accessibility fix drew a second focus indicator.** A11Y-025/026 shipped a bare
+  global `:focus-visible { outline }`. On form fields that already had a design focus
+  border, the rule added a second indicator on every field. The fix now takes four steps:
+  1. Find the components that already style their own focus.
+  2. Add a zero-specificity `:where()` ring only where nothing else exists.
+  3. Replace a design focus colour that fails 3:1 instead of stacking a ring on it.
+  4. Check with `getComputedStyle` before and after that each element shows one indicator.
+  The tailwind starter gains that default ring in `base/reset.css`, where `.btn`'s
+  `focus:outline-none` overrides it.
+
 ### Added
 
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had
