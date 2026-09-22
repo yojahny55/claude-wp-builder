@@ -61,5 +61,8 @@ starter_outline=$(outline_decl < "$r")
   || fail "$a's ring outline ($doc_outline) differs from $r's ($starter_outline)"
 grep -Fq 'focus-visible:outline-none' starter-theme/__tailwind__/assets/css/src/tailwindcss/components/buttons.css \
   || fail ".btn draws a ring without clearing the outline, so the base ring stacks on it"
+grep -Eq 'focus-visible:ring-[0-9]' starter-theme/__tailwind__/assets/css/src/tailwindcss/components/buttons.css \
+  && ! grep -Eq '(^|[[:space:]])focus:ring-' starter-theme/__tailwind__/assets/css/src/tailwindcss/components/buttons.css \
+  || fail ".btn's ring is not on :focus-visible, the state its outline clear and the base ring use"
 
 echo PASS

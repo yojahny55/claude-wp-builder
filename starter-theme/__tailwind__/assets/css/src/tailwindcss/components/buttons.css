@@ -1,8 +1,9 @@
 /* Button component — extend with Tailwind @apply as needed.
- * The ring IS the focus indicator, so the outline is cleared on the state
- * where base/reset.css's default ring fires (`:focus-visible`), and only
- * there: that ring must never draw a second one here, and if the ring is ever
- * removed from `.btn` the default ring comes back instead of no indicator. */
+ * The ring IS the focus indicator. It and the outline clear share the state
+ * where base/reset.css's default ring fires (`:focus-visible`): the default
+ * ring never draws a second one here, a mouse click draws none, and if the
+ * ring is ever removed from `.btn` the default ring comes back instead of no
+ * indicator. */
 .btn {
-  @apply inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium focus-visible:outline-none focus:ring-2 focus:ring-offset-2;
+  @apply inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
 }

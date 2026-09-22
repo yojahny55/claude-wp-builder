@@ -43,7 +43,10 @@
   4. Check with `getComputedStyle` before and after that each element shows one indicator.
   The tailwind starter gains that default ring in `base/reset.css`. It sits in the base
   layer at zero specificity, so `.btn`'s `focus-visible:outline-none` (utilities layer)
-  wins by layer order.
+  wins by layer order. `.btn`'s ring moves from `focus:` to `focus-visible:`, the state
+  where the outline is cleared: measured in Chromium at 1440 and 390, rest and keyboard
+  focus are unchanged (same box-shadow, colour, size, radius, 76x38 / 62x38), and a mouse
+  click no longer draws the ring.
 
   **The target-size check failed the wrong threshold.** A11Y-028 read CSS for 44x44, which
   is WCAG 2.5.5 (AAA), while the AA criterion 2.5.8 is 24x24. Nav items, footer social icons
