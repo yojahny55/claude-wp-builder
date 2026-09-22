@@ -25,6 +25,11 @@
 *,*::before,*::after{box-sizing:border-box}
 html,body{margin:0;padding:0;background:#0a0c0c;color:var(--paper);font-family:var(--sans);-webkit-font-smoothing:antialiased}
 html.lenis,html.lenis body{height:auto}
+/* In-page anchors land below the fixed .nav, not under it: its height plus 20px.
+   --nav-h is the bar's rendered height with the default wordmark: 88px on desktop,
+   80px in the mobile block below. Re-measure both with getBoundingClientRect()
+   after restyling the nav or swapping in a logo. */
+html{--nav-h:5.5rem;scroll-padding-top:calc(var(--nav-h) + 20px)}
 .lenis.lenis-smooth{scroll-behavior:auto!important}
 .lenis.lenis-smooth [data-lenis-prevent]{overscroll-behavior:contain}
 
@@ -465,6 +470,7 @@ body.is-mobile .stage__veil{
   .method article{border-right:0;border-top:1px solid rgba(180,196,190,.15);min-height:auto;padding:1.2rem 0}
 
   /* Mobile nav: compact, no wrap, hide branding flourish */
+  html{--nav-h:5rem}
   .nav{padding:.85rem var(--gutter);gap:.8rem;background:linear-gradient(to bottom, rgba(8,10,10,.7), rgba(8,10,10,0) 120%)}
   .nav__mark span{font-size:.95rem}
   .nav__mark em{display:none}

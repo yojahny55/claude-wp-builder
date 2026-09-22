@@ -80,6 +80,14 @@
   a public CPT or taxonomy query var. The string table gains six `directory_*`
   strings: the count and its singular, clear, empty, the search label and the empty option.
 
+  **In-page anchors landed under the sticky header.** Nothing set `scroll-padding-top`, so
+  every `#section` link on a build scrolled its heading behind the bar. The tailwind
+  starter's `base/reset.css` now pads `html` by `--header-offset` + 1.25rem, and `index.js`
+  keeps that variable equal to `#masthead`'s live height while it is sticky or fixed, so
+  the desktop and mobile bars each get their own offset. The cinematic starter pads by its
+  fixed nav's measured height (88px desktop, 80px mobile) + 20px. `/wp-header` keeps the
+  `masthead` id and states the contract.
+
 ### Changed
 
 - **`/wp-audit` on an adopted site audits vendor code but never edits it, and respects the

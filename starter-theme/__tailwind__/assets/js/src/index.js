@@ -47,6 +47,33 @@ if (document.readyState === 'loading') {
   startWidgets();
 }
 
+// Anchor offset under a sticky header. base/reset.css pads html's scroll-padding-top by
+// --header-offset; this keeps that variable equal to the header's real height, which
+// differs between the desktop bar and the mobile one. A header that is not sticky or
+// fixed scrolls away with the page and sets 0.
+const initHeaderOffset = () => {
+  const header = document.getElementById('masthead');
+  if (!header) {
+    return;
+  }
+  const root = document.documentElement;
+  const update = () => {
+    const pos = getComputedStyle(header).position;
+    const pinned = pos === 'sticky' || pos === 'fixed';
+    root.style.setProperty('--header-offset', pinned ? `${Math.ceil(header.getBoundingClientRect().height)}px` : '0px');
+  };
+  update();
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(update).observe(header);
+  }
+  window.addEventListener('resize', update, { passive: true });
+};
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initHeaderOffset);
+} else {
+  initHeaderOffset();
+}
+
 // Mobile menu toggle
 document.addEventListener('DOMContentLoaded', () => {
   const menuToggle = document.querySelector('.menu-toggle');

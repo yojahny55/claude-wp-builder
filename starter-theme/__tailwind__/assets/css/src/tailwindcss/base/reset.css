@@ -13,6 +13,18 @@
  * later edit forgets to update wins silently. Don't duplicate what Preflight
  * already provides. Extend it below only for what it does NOT cover. */
 
+/* An in-page anchor (`#contact`, a skip link, a table of contents) must land below
+ * a sticky or fixed header, not under it. On a real build every "#section" link
+ * scrolled its heading behind the bar. `--header-offset` is the header's live height,
+ * written by assets/js/src/index.js from `#masthead` only while that element is
+ * `sticky` or `fixed`, and re-measured on resize, so the desktop bar and the shorter
+ * mobile one each get their own value. 1.25rem (20px) keeps the heading off the
+ * header's edge. Without JavaScript, or with a header that scrolls away, the offset is
+ * just that 1.25rem. */
+html {
+  scroll-padding-top: calc(var(--header-offset, 0px) + 1.25rem);
+}
+
 /* Preflight does not set `cursor`. Tailwind v4 leaves every interactive
  * control on the UA default, which is `default`, not `pointer` — a demo's own
  * reset commonly restores this with `button { cursor: pointer }`, and a
