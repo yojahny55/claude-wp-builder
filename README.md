@@ -203,7 +203,7 @@ contract, for an admin tool, intranet or catalogue. Nothing paid is involved.
 
 ```
 /wp-finalize                              # pre-delivery report (never fixes)
-/wp-demo-verify http://localhost/site     # scroll-walks the live site, 7 viewports, contact sheet
+/wp-demo-verify http://localhost/site     # scroll-walks the live site, 9 viewports + Firefox, contact sheet
 /wp-audit [--security --seo --a11y --performance --best-practices --geo] [--report-only]
 /wp-polylang es en                        # only when i18n strategy is polylang
 ```

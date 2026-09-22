@@ -16,6 +16,7 @@ import { resolve, join, dirname, basename, extname, normalize, sep } from 'node:
 import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { createServer } from 'node:http';
+import { findBrowser } from './lib/browsers.mjs';
 
 // Advisory kinds report what the harness could not see, not what the page got
 // wrong, so they are printed and written to findings.json but never raise the
@@ -23,7 +24,7 @@ import { createServer } from 'node:http';
 // read gets overruled in prose, and then so does every gate beside it. Every
 // other kind blocks. Listed here, once, so a new kind joins a list instead of
 // re-deriving the rule at the exit.
-const ADVISORY = new Set(['unobserved', 'external-module']);
+const ADVISORY = new Set(['unobserved', 'external-module', 'engine-delta']);
 
 // Every context and page this tool opens accepts a self-signed certificate.
 // `/wp-create` gives a local site HTTPS with its own CA, so without this the
@@ -37,7 +38,7 @@ const TLS = { ignoreHTTPSErrors: true };
 const args = process.argv.slice(2);
 if (args.includes('--help')) {
   console.log(
-    'usage: demo-verify.mjs [file-or-dir-or-url] [--out DIR] [--positions N] [--widths 1440x900,390x844]\n' +
+    'usage: demo-verify.mjs [file-or-dir-or-url] [--out DIR] [--positions N] [--widths 1440x900,390x844] [--no-firefox]\n' +
     '       demo-verify.mjs --probe     exit 0 if playwright-core and a Chrome are usable, else 2'
   );
   process.exit(0);
@@ -168,7 +169,7 @@ function findChrome() {
         '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
       ];
   for (const c of candidates) if (c && existsSync(c)) return c;
-  // Playwright's own download, when the user has run `npx playwright install`.
+  // Playwright's own browser cache, when one already exists on the machine.
   // Walked with readdirSync rather than a glob: fs.globSync landed in Node 22 and
   // importing it outright makes this whole script a SyntaxError on Node 18 and 20.
   // macOS caches under ~/Library/Caches, not ~/.cache, so all roots are tried.
@@ -201,12 +202,13 @@ function findChrome() {
 // value must produce exit 2, never a crash, and skips the fallback ladder
 // below entirely so the forced failure stays deterministic.
 let chromium;
+let firefox;
 try {
   if (process.env.PLAYWRIGHT_CORE) {
-    ({ chromium } = await import(pathToFileURL(resolve(process.env.PLAYWRIGHT_CORE, 'index.mjs')).href));
+    ({ chromium, firefox } = await import(pathToFileURL(resolve(process.env.PLAYWRIGHT_CORE, 'index.mjs')).href));
   } else {
     try {
-      ({ chromium } = await import('playwright-core'));
+      ({ chromium, firefox } = await import('playwright-core'));
     } catch (bare) {
       // A bare specifier resolves from this file's own location (bin/),
       // walking up through the plugin's own node_modules — never the
@@ -217,7 +219,7 @@ try {
       // cwd's node_modules before giving up.
       const cwdEntry = join(process.cwd(), 'node_modules', 'playwright-core', 'index.mjs');
       if (!existsSync(cwdEntry)) throw bare;
-      ({ chromium } = await import(pathToFileURL(cwdEntry).href));
+      ({ chromium, firefox } = await import(pathToFileURL(cwdEntry).href));
     }
   }
 } catch {
@@ -226,23 +228,35 @@ try {
 }
 const executablePath = findChrome();
 if (!executablePath) {
-  console.error(PROBE ? 'probe: missing chrome' : 'demo-verify: no Chrome found. Set WP_DEMO_CHROME or run: npx playwright install chrome');
+  console.error(PROBE ? 'probe: missing chrome' : 'demo-verify: no existing Chrome or Chromium found. Set WP_DEMO_CHROME to one; nothing is downloaded.');
   process.exit(2);
 }
+// Firefox is the second engine, never a requirement: a Playwright Firefox build that
+// already exists is used, and a machine without one gets a notice and a Chromium-only run.
+// A system Firefox cannot be driven (Playwright needs its own patched build), and nothing
+// here downloads one.
+const firefoxPath = args.includes('--no-firefox') || !firefox ? null : findBrowser('firefox');
 if (PROBE) {
-  console.log('probe: ok ' + executablePath);
+  console.log('probe: ok ' + executablePath + (firefoxPath ? ' (firefox ' + firefoxPath + ')' : ' (no firefox)'));
   process.exit(0);
 }
 
-// The five legacy /wp-responsive-check viewports plus 1152 and 1280. One full-page shot each, at
-// the top of the page, no scroll-walk: this is layout coverage, not motion coverage.
+// The five legacy /wp-responsive-check viewports plus 620, 1100, 1152 and 1280. One full-page
+// shot each, at the top of the page, no scroll-walk: this is layout coverage, not motion
+// coverage.
 //
 // The legacy five sample breakpoint EDGES only, and an edge is where the rules change, not where
 // they do damage. Between 1024 and 1279 Tailwind's `lg:` utilities apply with no `xl:` override
 // yet, so a row can be correct at 1024, correct again at 1280 once `xl:` takes over, and wrong
 // for the 256px in between — a band no shot covered. 1152 sits inside it. 1280 is kept because
 // it is the first width where `xl:` applies, which is its own thing worth seeing.
-const RESPONSIVE_WIDTHS = [375, 576, 768, 1024, 1152, 1280, 1440];
+//
+// 620 and 1100 sample two more bands the edges skip. 620 sits between 576 and 768, where a
+// grid that is one column on the phone and two at `md:` is still one stretched column.
+// 1100 sits just under the
+// 1140-1200px containers most demos use, where the wrapper has stopped centring and its
+// content meets the gutters.
+const RESPONSIVE_WIDTHS = [375, 576, 620, 768, 1024, 1100, 1152, 1280, 1440];
 
 // sheet.png is a full-resolution grid of the walk's PNG frames -- exactly the file
 // a human wants and exactly the file that makes a bad orchestrator prompt: it is
@@ -258,6 +272,7 @@ const SHEET_JPEG_QUALITY = 70;
 /** One full-page screenshot per legacy viewport, filenames responsive-<width>.png,
  *  restoring the convention /wp-tailwind-migrate's visual-golden workflow depends on. */
 async function captureResponsiveShots(browser, url, outDir) {
+  mkdirSync(outDir, { recursive: true });
   for (const width of RESPONSIVE_WIDTHS) {
     const height = width <= 480 ? 812 : 900;
     const context = await browser.newContext({ viewport: { width, height }, ...TLS });
@@ -267,6 +282,86 @@ async function captureResponsiveShots(browser, url, outDir) {
     await page.screenshot({ path: join(outDir, 'responsive-' + width + '.png'), fullPage: true });
     await context.close();
   }
+}
+
+// Chromium vs Firefox, element by element. Verification used to be Chromium-only, and a
+// difference between engines surfaced only when the client opened the site in another
+// browser. Motion is neutralised as in the section walk (same reasons: a transform is not
+// layout), the page is read after its fonts load, and each box is keyed by its DOM path so
+// the two engines' lists line up. `y` is taken relative to the parent: one taller heading
+// would otherwise shift every box below it and report the page a hundred times over.
+const ENGINE_DELTA_PX = 2;
+const ENGINE_DELTA_REPORT = 15;
+const ENGINE_BOX_SELECTOR =
+  'header, nav, main, footer, section, article, aside, h1, h2, h3, h4, p, ul, ol, li, a, button, ' +
+  'input, select, textarea, label, img, svg, picture, video, iframe, form, table';
+
+async function engineBoxes(browser, url, size) {
+  const context = await browser.newContext({ viewport: size, reducedMotion: 'reduce', ...TLS });
+  try {
+    const page = await context.newPage();
+    await page.goto(url, { waitUntil: 'load' });
+    await page.evaluate(() => document.fonts && document.fonts.ready);
+    await page.waitForTimeout(300);
+    return await page.evaluate((sel) => {
+      const style = document.createElement('style');
+      style.textContent =
+        '*,*::before,*::after{animation:none !important;transition:none !important;' +
+        'transform:none !important;translate:none !important;scale:none !important;' +
+        'rotate:none !important}';
+      document.head.appendChild(style);
+      const pathOf = (el) => {
+        const parts = [];
+        for (let n = el; n && n !== document.body; n = n.parentElement) {
+          let i = 1;
+          for (let s = n.previousElementSibling; s; s = s.previousElementSibling) if (s.tagName === n.tagName) i++;
+          parts.unshift(n.tagName.toLowerCase() + ':nth-of-type(' + i + ')');
+        }
+        return parts.join(' > ');
+      };
+      const out = {};
+      for (const el of document.querySelectorAll(sel)) {
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) continue;
+        // A broken image renders its alt text, and each engine draws that differently:
+        // a missing file is its own finding, not an engine difference.
+        if (el.tagName === 'IMG' && el.complete && !el.naturalWidth) continue;
+        const pr = el.parentElement ? el.parentElement.getBoundingClientRect() : { top: 0 };
+        const cls = typeof el.className === 'string' ? el.className.trim().split(/\s+/)[0] : '';
+        out[pathOf(el)] = {
+          label: el.tagName.toLowerCase() + (cls ? '.' + cls : ''),
+          x: Math.round(r.left * 10) / 10, y: Math.round((r.top - pr.top) * 10) / 10,
+          w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10,
+        };
+      }
+      return out;
+    }, ENGINE_BOX_SELECTOR);
+  } finally {
+    await context.close();
+  }
+}
+
+async function engineDeltas(chromeBrowser, ffBrowser, url, size) {
+  const [a, b] = [await engineBoxes(chromeBrowser, url, size), await engineBoxes(ffBrowser, url, size)];
+  const rows = [];
+  for (const [key, c] of Object.entries(a)) {
+    const f = b[key];
+    if (!f) continue;
+    const d = Math.max(Math.abs(c.x - f.x), Math.abs(c.y - f.y), Math.abs(c.w - f.w), Math.abs(c.h - f.h));
+    if (d > ENGINE_DELTA_PX) rows.push({ d, key, c, f });
+  }
+  rows.sort((p, q) => q.d - p.d);
+  return rows.slice(0, ENGINE_DELTA_REPORT).map((r) => ({
+    kind: 'engine-delta',
+    pass: 'firefox',
+    width: size.width,
+    element: r.c.label,
+    path: r.key,
+    chromium: { x: r.c.x, y: r.c.y, w: r.c.w, h: r.c.h },
+    firefox: { x: r.f.x, y: r.f.y, w: r.f.w, h: r.f.h },
+    delta: Math.round(r.d * 10) / 10,
+    ...(rows.length > ENGINE_DELTA_REPORT ? { of: rows.length } : {}),
+  }));
 }
 
 /** Read one section's frame signature plus the page's static defects. Runs inside the page.
@@ -533,12 +628,24 @@ const containerAudit = () => {
 };
 
 let browser;
+let ffBrowser = null;
 let http = null;
 let exitCode = 0;
 const report = { pages: [] };
 
 try {
   browser = await chromium.launch({ executablePath, args: ['--autoplay-policy=no-user-gesture-required'] });
+  if (firefoxPath) {
+    try {
+      ffBrowser = await firefox.launch({ executablePath: firefoxPath });
+    } catch (err) {
+      const why = err && typeof err.message === 'string' ? err.message.split('\n')[0] : String(err);
+      console.error('demo-verify: Firefox at ' + firefoxPath + ' did not launch (' + why + ') -- Chromium only this run');
+    }
+  } else if (!args.includes('--no-firefox')) {
+    console.error('demo-verify: no Playwright Firefox build found (set WP_BROWSER_FIREFOX) -- Chromium only this run; nothing is downloaded');
+  }
+  report.firefox = ffBrowser ? firefoxPath : null;
 
   for (const pageTarget of pages) {
   // One page's failure costs that page, never the walk. A single screenshot
@@ -901,6 +1008,10 @@ try {
   }
 
   await captureResponsiveShots(browser, pageUrl, pageOut);
+  if (ffBrowser) {
+    await captureResponsiveShots(ffBrowser, pageUrl, join(pageOut, 'firefox'));
+    for (const size of widths) findings.push(...(await engineDeltas(browser, ffBrowser, pageUrl, size)));
+  }
   mkdirSync(pageOut, { recursive: true });
   report.pages.push({ url: pageUrl, findings });
   } catch (err) {
@@ -953,6 +1064,13 @@ try {
   exitCode = 3;
 } finally {
   if (http) http.server.close();
+  if (ffBrowser) {
+    try {
+      await ffBrowser.close();
+    } catch {
+      /* already closed */
+    }
+  }
   if (browser) {
     try {
       await browser.close();

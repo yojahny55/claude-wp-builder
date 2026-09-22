@@ -209,7 +209,7 @@ try {
 }
 const executablePath = findChrome();
 if (!executablePath) {
-  console.error('tailwindify-parity: no Chrome found. Set WP_DEMO_CHROME or run: npx playwright install chrome');
+  console.error('tailwindify-parity: no existing Chrome or Chromium found. Set WP_DEMO_CHROME to one; nothing is downloaded.');
   process.exit(2);
 }
 

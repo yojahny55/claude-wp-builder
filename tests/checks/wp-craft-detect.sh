@@ -190,8 +190,10 @@ done
 # Anchored on the whole literal set, not just 'unobserved': that also catches
 # container-noop landing in the set by mistake, which would silently stop it
 # from blocking the round it exists to fail.
-grep -Fq "const ADVISORY = new Set(['unobserved', 'external-module'])" "$vs" \
-  || fail "$v does not name exactly unobserved and external-module as its advisory kinds, so either a new advisory kind was added without updating this or container-noop landed in the set and stopped blocking"
+# engine-delta joined it with the Firefox pass: a box that differs between engines is
+# evidence to read, and font rasterisation alone moves text by a pixel or two.
+grep -Fq "const ADVISORY = new Set(['unobserved', 'external-module', 'engine-delta'])" "$vs" \
+  || fail "$v does not name exactly unobserved, external-module and engine-delta as its advisory kinds, so either a new advisory kind was added without updating this or container-noop landed in the set and stopped blocking"
 grep -Fq 'exitCode = blocking === 0 ? 0 : 1' "$vs" \
   || fail "$v exits on the total finding count, so an advisory-only run still fails the round"
 grep -Fq "' [advisory]'" "$vs" \

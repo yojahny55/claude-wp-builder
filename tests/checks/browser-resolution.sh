@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Browsers are resolved, never installed. bin/audit-suite.sh ran `playwright install
+# chromium`, which downloads a revision-pinned build; on a machine whose policy forbids
+# that, the audit died on the install. Its config declared firefox and webkit projects that
+# no pass ever ran. bin/lib/browsers.mjs now finds an existing executable, the suite passes
+# it through a preload, and the other engines run when they exist and are skipped with a
+# notice when they do not.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+fail() { echo "FAIL: $*"; exit 1; }
+command -v node >/dev/null || { echo "SKIP: node not installed"; exit 0; }
+
+lib=bin/lib/browsers.mjs
+runner=bin/audit-suite.sh
+
+# No runner or doc tells anyone to install a browser.
+for f in "$runner" bin/demo-verify.mjs bin/composition-preview.mjs bin/tailwindify-parity.mjs \
+    commands/wp-audit.md commands/wp-demo-verify.md commands/wp-demo.md commands/wp-yolo.md; do
+  [ -f "$f" ] || continue
+  if grep -v '^\s*#' "$f" | grep -Eq 'playwright install( |$|")|npx playwright install'; then
+    fail "$f still installs a browser (or tells the user to)"
+  fi
+done
+
+# Behaviour: a fake cache with two revisions, and one with nothing in it.
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+mk() { mkdir -p "$(dirname "$1")"; printf '#!/bin/sh\n' > "$1"; chmod +x "$1"; }
+mk "$tmp/cache/firefox-1500/firefox/firefox"
+mk "$tmp/cache/firefox-1543/firefox/firefox"
+mk "$tmp/cache/chromium_headless_shell-1243/chrome-linux/headless_shell"
+mk "$tmp/cache/webkit-2359/pw_run.sh"
+run() { env -u WP_BROWSER_CHROMIUM -u WP_BROWSER_FIREFOX -u WP_BROWSER_WEBKIT \
+  HOME="$tmp/home" PLAYWRIGHT_BROWSERS_PATH="$1" node "$lib" "$2"; }
+[ "$(run "$tmp/cache" firefox)" = "$tmp/cache/firefox-1543/firefox/firefox" ] \
+  || fail "$lib does not pick the newest cached Firefox revision"
+[ "$(run "$tmp/cache" webkit)" = "$tmp/cache/webkit-2359/pw_run.sh" ] || fail "$lib does not find a cached WebKit"
+mkdir -p "$tmp/empty"
+set +e; out=$(run "$tmp/empty" firefox); code=$?; set -e
+[ "$code" -eq 2 ] && [ -z "$out" ] || fail "$lib with no Firefox exited $code ('$out') instead of 2 with no output"
+[ "$(WP_BROWSER_FIREFOX="$tmp/cache/firefox-1500/firefox/firefox" node "$lib" firefox)" = "$tmp/cache/firefox-1500/firefox/firefox" ] \
+  || fail "$lib ignores the WP_BROWSER_FIREFOX override"
+
+# The runner resolves, preloads and runs the other engines.
+grep -Fq 'node "$here/bin/lib/browsers.mjs" chromium' "$runner" || fail "$runner does not resolve an existing Chromium"
+grep -Fq -- '--require $here/bin/lib/pw-executables.cjs' "$runner" || fail "$runner does not hand the executables to the vendored suite"
+grep -Fq -- '--project="$engine"' "$runner" || fail "$runner never runs the firefox/webkit projects"
+grep -Fq 'pass skipped (nothing is downloaded)' "$runner" || fail "$runner does not skip a missing engine with a notice"
+grep -Fq "opts.executablePath = exe[name]" bin/lib/pw-executables.cjs || fail "pw-executables.cjs does not default executablePath"
+
+echo PASS

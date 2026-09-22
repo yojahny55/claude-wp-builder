@@ -172,6 +172,22 @@
   - An adopted site's i18n strategy is measured (`polylang` or `none`) and never falls back
     to `suffix`.
 
+- **Browser verification was Chromium-only and installed its own browser.** `bin/audit-suite.sh`
+  ran `playwright install chromium`, which downloads a revision-pinned build and died where
+  that is forbidden. Its config declared `firefox` and `webkit` projects that no pass ever
+  ran, and `bin/demo-verify.mjs` shot seven widths in one engine.
+  - `bin/lib/browsers.mjs` resolves an existing executable (Playwright's caches, newest
+    revision first, then the system Chromium; `WP_BROWSER_*` overrides). Nothing downloads a
+    browser any more, and the "run `npx playwright install`" hints are gone.
+  - The suite hands the executables to its vendored files through a `--require` preload
+    (`bin/lib/pw-executables.cjs`), so they stay byte-identical to upstream. The
+    accessibility pass also runs in Firefox and WebKit when they exist, and prints a skip
+    notice when they do not.
+  - `demo-verify` adds 620 and 1100 to its widths (nine viewports). When a Firefox build
+    exists it shoots every viewport in Firefox too and reports each layout box that differs
+    from Chromium by more than 2px as an advisory `engine-delta`. `--no-firefox` skips that
+    pass.
+
 ## [1.27.0] - 2026-09-21
 
 ### Changed
