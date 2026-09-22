@@ -16,14 +16,16 @@ for st in __tailwind__ __cinematic__; do
   # The require itself, not any mention of the path (a comment would satisfy a bare grep).
   grep -Eq "^[[:space:]]*require_once[[:space:]]+[A-Z_]+[[:space:]]*\.[[:space:]]*'/inc/security\.php'[[:space:]]*;" "$d/functions.php" \
     || fail "$d/functions.php never require_once's inc/security.php"
+  # Compare against the file with the padding inside parentheses removed, so the needles
+  # hold whatever coding style a starter uses (the tailwind one spaces its parentheses,
+  # the cinematic one does not) and survive a reformat.
+  src=$(sed -E 's/\([[:space:]]+/(/g; s/[[:space:]]+\)/)/g' "$f")
   for needle in "'xmlrpc_enabled', '__return_false'" "'xmlrpc_methods'" "'rsd_link'" "X-Pingback" \
       "'rest_endpoints'" "/wp/v2/users" "is_author()" "\$_GET['author']" "set_404()" \
       "'map_meta_cap'" "'edit_themes'" "'edit_plugins'" "'edit_files'" "'do_not_allow'" \
       "'send_headers'" "X-Content-Type-Options: nosniff" "X-Frame-Options: SAMEORIGIN" \
       "Referrer-Policy: strict-origin-when-cross-origin" "Permissions-Policy:" "header_remove('X-Powered-By')"; do
-    # Both coding styles: the tailwind starter spaces its parentheses, the cinematic one does not.
-    alt=${needle//(\'/( \'}; alt=${alt//\')/\' )}
-    grep -Fq -- "$needle" "$f" || grep -Fq -- "$alt" "$f" || fail "$f lacks: $needle"
+    grep -Fq -- "$needle" <<<"$src" || fail "$f lacks: $needle"
   done
   grep -q "defined *( *'ABSPATH' *)" "$f" || fail "$f has no ABSPATH guard"
 done
