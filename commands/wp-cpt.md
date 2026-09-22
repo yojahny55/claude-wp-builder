@@ -160,6 +160,17 @@ Dispatch **wp-template** agent:
 > Generate `archive-<name>.php`:
 > - `get_header()`, archive intro/title, grid loop over the main query rendering each item as a card
 >   (reuse `template-parts/<name>/card.php`), `the_posts_pagination()`, `get_footer()`
+> - When the demo draws a filter bar (text search, a select per taxonomy or relation), build it
+>   on the starter's `assets/js/src/directory-filter.js` contract, the same for every directory:
+>   a `[data-directory]` root, `[data-filter-text]`, one `[data-filter="<key>"]` per select with
+>   options from the real terms/records, the results line `[data-filter-count]` with
+>   `data-count-template="<?php echo esc_attr( prefix_t( 'directory_count' ) ); ?>"` (and
+>   `data-count-template-one`), the `[data-filter-clear]` button, `[data-filter-empty]`, and
+>   `data-filter-item` + `data-<key>` slugs on each card wrapper. Every label goes through
+>   `prefix_t()`; the starter's string table already carries `directory_count`,
+>   `directory_count_one`, `directory_clear`, `directory_empty`, `directory_search` (the text field's label) and `directory_all` (the empty select option). A filter mirrored in the URL uses `data-filter-param`, and that parameter
+>   name must not be a public query var: a CPT or taxonomy slug makes WordPress query that
+>   object instead of rendering this archive
 > Generate `single-<name>.php`:
 > - `get_header()`, item detail rendered from the CPT ACF fields via `prefix_get_field()`,
 >   `get_footer()`, BEM classes `.<name>-single__*`

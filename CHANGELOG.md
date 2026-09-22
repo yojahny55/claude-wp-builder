@@ -88,6 +88,45 @@
   - The three commands offer adoption when their gate exits `3`.
   - A created project's generated block, validation and prose supersession are unchanged.
 
+- **Card footers floated at different heights.** A demo card carried `mt-auto` on its link,
+  and the generated template dropped it. `wp-template`, `wp-tailwind` and the
+  `wp-tailwind-system` skill now say how a card pins its footer: the card is
+  `flex flex-col`, with `h-full` in a grid, and the price or CTA block is `mt-auto`. Every
+  layout utility from the demo section is carried into the template, never re-derived.
+
+  **Tabs, accordion and directory-filter modules in the tailwind starter.** The starter had
+  none. A build's hand-made `tabs.js` only moved the underline marker, with no
+  `aria-selected`, no panel switch and no keyboard. Two of its three directories had no
+  results count and no "clear filters", because each filter bar was written for its own
+  template. The three modules are imported by `index.js`:
+  - `tabs.js`: `role=tablist/tab/tabpanel`, `aria-selected` plus `is-active`, the other
+    panels hidden, arrow/Home/End keys, and a marker as wide as the active tab's label;
+  - `accordion.js`: groups scoped per container, `data-accordion="single|multiple"`. FAQ
+    lists open one item at a time; standalone fold blocks are independent and open by
+    default;
+  - `directory-filter.js`: text and select filters over a rendered list, a results line
+    from `data-count-template` that is hidden while unfiltered, and a clear control that
+    resets every control and reloads without the URL's filter parameters.
+  `/wp-cpt`, `/wp-section`, `wp-template` and `wp-tailwind-system` now point every tab set,
+  FAQ and directory at the modules. They also record that a filter's GET name must never be
+  a public CPT or taxonomy query var. The string table gains six `directory_*`
+  strings: the count and its singular, clear, empty, the search label and the empty option.
+
+  **In-page anchors landed under the sticky header.** Nothing set `scroll-padding-top`, so
+  every `#section` link on a build scrolled its heading behind the bar. The tailwind
+  starter's `base/reset.css` now pads `html` by `--header-offset` + 1.25rem, and `index.js`
+  keeps that variable equal to `#masthead`'s live height while it is sticky or fixed, so
+  the desktop and mobile bars each get their own offset. The cinematic starter pads by its
+  fixed nav's measured height (88px desktop, 80px mobile) + 20px. `/wp-header` keeps the
+  `masthead` id and states the contract.
+
+  **A deleted contact form printed CF7's "Not Found" notice on the page.** The section ran
+  the settings-page shortcode through a bare `do_shortcode()`, and the form it named had
+  been re-imported under a new id. The tailwind starter's `inc/cf7-helpers.php` gains
+  `prefix_contact_form()`: it resolves the form the way CF7 does (hash, post id, title)
+  and returns `''` when none exists or CF7 is inactive, and `/wp-section` wraps the
+  contact section in its result.
+
 ### Changed
 
 - **`/wp-audit` on an adopted site audits vendor code but never edits it, and respects the

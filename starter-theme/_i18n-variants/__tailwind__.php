@@ -295,6 +295,14 @@ function __starter___get_translations() {
         'footer_privacy'  => array('en' => 'Privacy Policy',       'es' => 'Política de Privacidad'),
         'footer_terms'    => array('en' => 'Terms of Service',     'es' => 'Términos de Servicio'),
 
+        // Directory filter (assets/js/src/directory-filter.js)
+        'directory_count'     => array('en' => '{count} results', 'es' => '{count} resultados'),
+        'directory_count_one' => array('en' => '1 result',        'es' => '1 resultado'),
+        'directory_clear'     => array('en' => 'Clear filters',   'es' => 'Limpiar filtros'),
+        'directory_empty'     => array('en' => 'No results match these filters.', 'es' => 'Ningún resultado coincide con estos filtros.'),
+        'directory_search'    => array('en' => 'Search',          'es' => 'Buscar'),
+        'directory_all'       => array('en' => 'All',             'es' => 'Todos'),
+
         // Language switcher
         'lang_en'         => array('en' => 'English', 'es' => 'Inglés'),
         'lang_es'         => array('en' => 'Spanish', 'es' => 'Español'),

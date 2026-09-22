@@ -409,6 +409,60 @@ clips or strands whitespace in the other. In a bilingual theme:
 Check every fixed dimension against the longest string the field can hold before
 the second language exists, not after.
 
+## Cards pin their footer with `mt-auto`, and the template keeps it
+
+A card in a row of cards has a footer (price, CTA, "read more") that sits on one line
+across the row, whatever the length of each card's text. That is a flex chain, and every
+link of it is a class the template must carry:
+
+```html
+<ul class="grid md:grid-cols-3 gap-6">
+  <li class="h-full">                                  <!-- grid cell stretches -->
+    <article class="flex flex-col h-full ...">         <!-- the card is a column -->
+      <h3>...</h3><p>...</p>
+      <div class="mt-auto pt-6 flex items-center justify-between">  <!-- footer pinned -->
+        <span>price</span><a href="...">CTA</a>
+      </div>
+    </article>
+  </li>
+</ul>
+```
+
+Drop any one class and the footers float at different heights. It does not show in a
+single card, or in a demo whose mock texts are all the same length. A build kept `mt-auto`
+on the demo's card link and the generated template dropped it. **Carry every layout
+utility from the demo section into the template (`flex`, `flex-col`, `h-full`, `mt-auto`,
+`grow`, `self-*`, `order-*`); never re-derive the layout.** A wrapper the template adds
+(the loop's `<li>`, a `get_template_part()` boundary) must not break the chain: it gets
+`h-full` or `flex` too.
+
+## Tabs, accordions and directory filters come from the starter's modules
+
+The `__tailwind__` starter ships three behaviour modules in `assets/js/src/`, imported by
+`index.js`. A section that shows one of these widgets writes the markup contract in the
+module's header comment and **no script of its own**. Hand-made copies drifted: a build's
+tabs only moved the underline and never switched a panel, and two of its three directories
+had no results count and no "clear filters".
+
+| Widget | Markup hook | Module | Contract in short |
+|---|---|---|---|
+| Tabs | `[data-tabs]` > `role="tablist"` > `role="tab"` + `role="tabpanel"` | `tabs.js` | `aria-selected` + `is-active` on the selected tab, other panels `hidden`, arrows/Home/End, `[data-tabs-marker]` as wide as the active tab's `[data-tab-label]` |
+| Accordion | `[data-accordion="single\|multiple"]` > `[data-accordion-trigger][aria-controls]` | `accordion.js` | FAQ list = `single` (the default); a trigger outside any group is a standalone fold that rests open and toggles on its own; state on `aria-expanded`, panel `hidden`, item `is-open` |
+| Directory filter | `[data-directory]` with `[data-filter-text]`, `[data-filter="<key>"]`, `[data-filter-count]`, `[data-filter-clear]`, `[data-filter-item]` | `directory-filter.js` | count line from `data-count-template` (`{count}`), hidden while unfiltered; clear resets every control and reloads without the URL's filter parameters |
+
+Style state from the attributes the modules set, never from `:focus`: the active tab is
+`aria-selected:text-accent` (or `.is-active`), and the chevron rotates from the trigger with
+`group` on the button and `group-aria-expanded:rotate-180` on the icon. Every visible string
+(tab labels, the count templates, "clear filters", the empty message) goes through the
+theme's i18n helper in the template: the modules contain no literals.
+
+**A filter's GET parameter is never a public query var.** A CPT or taxonomy slug is one:
+`?<slug>=x` makes WordPress query that object and answer with its archive or a 404 before
+the template runs. Name the parameter something no registered type or taxonomy uses.
+
+`bin/theme-template-check.mjs --rule widgets` fails a theme whose templates carry the hook
+without the module imported.
+
 ## `absolute` is for superposition, not for layout
 
 A mockup's `x`/`y` is where an element fell in one frame at one width — not the

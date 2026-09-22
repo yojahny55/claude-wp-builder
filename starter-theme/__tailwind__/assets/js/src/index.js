@@ -8,6 +8,9 @@
 import gsap from 'gsap';
 import ScrollTrigger from 'gsap/ScrollTrigger';
 import { initMotion } from './motion.js';
+import { initTabs } from './tabs.js';
+import { initAccordions } from './accordion.js';
+import { initDirectoryFilters } from './directory-filter.js';
 
 // Wrapped in a DOM-ready check: a bundle enqueued before the DOM is parsed
 // would find no [data-motion] elements, and motion.js's motionReady guard
@@ -28,6 +31,50 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', startMotion);
 } else {
   startMotion();
+}
+
+// Tabs, accordions and directory filters. Each module is a no-op on a page without
+// its markup, and bin/theme-template-check.mjs fails a theme whose templates carry
+// role="tab", data-accordion-trigger or data-directory while its import is missing.
+const startWidgets = () => {
+  initTabs();
+  initAccordions();
+  initDirectoryFilters();
+};
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', startWidgets);
+} else {
+  startWidgets();
+}
+
+// Anchor offset under a sticky header. base/reset.css pads html's scroll-padding-top by
+// --header-offset; this keeps that variable equal to the header's real height, which
+// differs between the desktop bar and the mobile one. The offset is where the header ends
+// once pinned: its own `top` plus its height, so a header pushed below the admin bar
+// (`.admin-bar #masthead { top: 32px }`) counts the bar too. A header that is not sticky
+// or fixed scrolls away with the page and sets 0.
+const initHeaderOffset = () => {
+  const header = document.getElementById('masthead');
+  if (!header) {
+    return;
+  }
+  const root = document.documentElement;
+  const update = () => {
+    const style = getComputedStyle(header);
+    const pinned = style.position === 'sticky' || style.position === 'fixed';
+    const top = parseFloat(style.top) || 0;
+    root.style.setProperty('--header-offset', pinned ? `${Math.ceil(top + header.getBoundingClientRect().height)}px` : '0px');
+  };
+  update();
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(update).observe(header);
+  }
+  window.addEventListener('resize', update, { passive: true });
+};
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initHeaderOffset);
+} else {
+  initHeaderOffset();
 }
 
 // Mobile menu toggle

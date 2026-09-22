@@ -308,6 +308,10 @@ TRUTH, not inspiration. Your job is to COPY, not re-author.**
   a bug here.
 - Every breakpoint variant survives. A variant dropped because the value looked like the
   default is the most common form of this defect, and it only shows at that breakpoint.
+- Layout utilities survive too, and they are the ones a card loses first: `flex flex-col`
+  (+ `h-full` in a grid) on the card and `mt-auto` on its price/CTA block pin the footer
+  to the bottom. A template that shipped without `mt-auto` left every card's footer at a
+  different height. See wp-tailwind-system, "Cards pin their footer".
 - **Do NOT "improve":** do not round a bracket value, do not add a touch-target
   minimum, do not collapse a utility group you find redundant, do not resize anything.
 - Promotion to `@apply` is a *move*, never a rewrite. The declarations inside the class

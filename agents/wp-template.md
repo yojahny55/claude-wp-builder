@@ -535,6 +535,16 @@ ACF calls, the escaping, the i18n helpers, the loops.
   value — an "equivalent" utility is a measured geometry change. On `basic`, apply the
   `--block` BEM scoping rename required by `/wp-section` instead of copying the original
   BEM names verbatim.
+- **Layout utilities are carried, never re-derived.** Every layout class on the demo
+  section's elements comes across: `flex`, `flex-col`, `grid`, `h-full`, `mt-auto`,
+  `items-*`, `self-*`, `grow`, `order-*`. Those are the easiest to drop, because nothing
+  looks wrong in a single card. A card whose footer (price, CTA link) must sit on the same
+  line as its neighbours' is `flex flex-col` (plus `h-full` when it is a grid cell), and
+  the footer block carries `mt-auto`. A build kept `mt-auto` on the demo's card link and
+  the generated template dropped it, so price and link floated at a different height in
+  every card with a shorter text. When a template wraps the demo's element in a PHP loop
+  or a new wrapper, the flex chain must survive the wrapper: the grid cell, the card and
+  the footer each keep their class.
 - **Two labels in the demo need two fields.** When an element's text differs between
   breakpoints or states, the section gets one ACF field per distinct string, not one
   field and a shortened copy. Say so in your report so `wp-acf` defines both.
@@ -640,6 +650,17 @@ bar's focus treatment — and a sibling template part in this theme has already 
 correctly, **reuse that solved pattern**, don't re-derive a fresh implementation for the new
 section. Two concrete cases that keep recurring:
 
+- **Tabs, accordions and directory filters have one implementation: the starter's
+  modules.** Write the markup contract from the header of `assets/js/src/tabs.js`,
+  `accordion.js` or `directory-filter.js` and no script of your own. A hand-made tabs
+  script on a build moved the underline and never switched a panel. FAQ lists are
+  `data-accordion="single"`; fold blocks on a detail page are standalone triggers, open by
+  default, each toggling on its own. Every directory's filter bar (every CPT archive, every
+  Page listing terms) is a `[data-directory]` with the results count
+  (`data-count-template` through `prefix_t()`) and the "clear filters" button, never a
+  bar that has one and not the other. A GET parameter a filter mirrors must not be a
+  public query var (a CPT or taxonomy slug), or WordPress answers the request as a query
+  for that object.
 - **Accordion chevron.** Rotate it through the trigger BUTTON's `aria-expanded` state with a
   group/peer variant (`group-aria-expanded:rotate-180` on the icon, `group` on the button),
   never by positioning the icon absolutely and toggling a class on the icon itself. An icon

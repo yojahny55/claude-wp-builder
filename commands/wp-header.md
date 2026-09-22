@@ -68,6 +68,14 @@ Dispatch the **wp-template** agent with these instructions:
 >     each link points distinguishes them
 >   - Mobile hamburger toggle button with aria attributes
 >   - Skip-to-content link for accessibility
+>   - The `<header>` keeps `id="masthead"`. When the demo header is sticky or fixed, in-page
+>     anchors must land below it: the tailwind starter's `index.js` writes the header's live
+>     `top` + height into `--header-offset` (so an `.admin-bar #masthead { top: 32px }` rule
+>     counts the admin bar) and `base/reset.css` sets
+>     `html { scroll-padding-top: calc(var(--header-offset, 0px) + 1.25rem) }`, so both
+>     depend on that id. On a non-starter theme, write the same `scroll-padding-top` from the
+>     measured desktop and mobile header heights. Verify at both widths by opening a
+>     `#section` link: the section heading sits fully below the header
 >
 > ### inc/nav-walker.php
 > - Custom Walker_Nav_Menu extension named `Prefix_Nav_Walker` (using actual prefix)
