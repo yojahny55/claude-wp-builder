@@ -289,6 +289,15 @@ field naming convention.
   writes race on one file. See **File ownership** above for why that race is not
   survivable.
 
+**Tabs, accordions and filter bars are markup, not new scripts.** When the demo section
+shows tabs, an accordion/FAQ or a directory filter bar, tell Agent 2 to write the markup
+contract of the starter module that owns it (`assets/js/src/tabs.js`, `accordion.js`,
+`directory-filter.js`, see wp-tailwind-system "Tabs, accordions and directory filters")
+and to author no section script for it. A FAQ list is `data-accordion="single"`; a detail
+page's fold blocks are standalone triggers that rest open. On a theme that predates these
+modules, copy them from `${CLAUDE_PLUGIN_ROOT}/starter-theme/__tailwind__/assets/js/src/`
+and import them in `index.js` first.
+
 #### Agent 1: wp-acf
 
 > Generate `fields/<section-name>.php` in the theme directory.

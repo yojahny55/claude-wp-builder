@@ -8,6 +8,9 @@
 import gsap from 'gsap';
 import ScrollTrigger from 'gsap/ScrollTrigger';
 import { initMotion } from './motion.js';
+import { initTabs } from './tabs.js';
+import { initAccordions } from './accordion.js';
+import { initDirectoryFilters } from './directory-filter.js';
 
 // Wrapped in a DOM-ready check: a bundle enqueued before the DOM is parsed
 // would find no [data-motion] elements, and motion.js's motionReady guard
@@ -28,6 +31,20 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', startMotion);
 } else {
   startMotion();
+}
+
+// Tabs, accordions and directory filters. Each module is a no-op on a page without
+// its markup, and bin/theme-template-check.mjs fails a theme whose templates carry
+// role="tab", data-accordion-trigger or data-directory while its import is missing.
+const startWidgets = () => {
+  initTabs();
+  initAccordions();
+  initDirectoryFilters();
+};
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', startWidgets);
+} else {
+  startWidgets();
 }
 
 // Mobile menu toggle

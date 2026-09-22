@@ -62,6 +62,24 @@
   `flex flex-col`, with `h-full` in a grid, and the price or CTA block is `mt-auto`. Every
   layout utility from the demo section is carried into the template, never re-derived.
 
+  **Tabs, accordion and directory-filter modules in the tailwind starter.** The starter had
+  none. A build's hand-made `tabs.js` only moved the underline marker, with no
+  `aria-selected`, no panel switch and no keyboard. Two of its three directories had no
+  results count and no "clear filters", because each filter bar was written for its own
+  template. The three modules are imported by `index.js`:
+  - `tabs.js`: `role=tablist/tab/tabpanel`, `aria-selected` plus `is-active`, the other
+    panels hidden, arrow/Home/End keys, and a marker as wide as the active tab's label;
+  - `accordion.js`: groups scoped per container, `data-accordion="single|multiple"`. FAQ
+    lists open one item at a time; standalone fold blocks are independent and open by
+    default;
+  - `directory-filter.js`: text and select filters over a rendered list, a results line
+    from `data-count-template` that is hidden while unfiltered, and a clear control that
+    resets every control and reloads without the URL's filter parameters.
+  `/wp-cpt`, `/wp-section`, `wp-template` and `wp-tailwind-system` now point every tab set,
+  FAQ and directory at the modules. They also record that a filter's GET name must never be
+  a public CPT or taxonomy query var. The string table gains six `directory_*`
+  strings: the count and its singular, clear, empty, the search label and the empty option.
+
 ### Changed
 
 - **`/wp-audit` on an adopted site audits vendor code but never edits it, and respects the

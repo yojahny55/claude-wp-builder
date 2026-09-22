@@ -231,6 +231,32 @@ function __starter___get_translations() {
             'es' => 'Volver al Inicio',
         ),
 
+        // Directory filter (assets/js/src/directory-filter.js)
+        'directory_count' => array(
+            'en' => '{count} results',
+            'es' => '{count} resultados',
+        ),
+        'directory_count_one' => array(
+            'en' => '1 result',
+            'es' => '1 resultado',
+        ),
+        'directory_clear' => array(
+            'en' => 'Clear filters',
+            'es' => 'Limpiar filtros',
+        ),
+        'directory_empty' => array(
+            'en' => 'No results match these filters.',
+            'es' => 'Ningún resultado coincide con estos filtros.',
+        ),
+        'directory_search' => array(
+            'en' => 'Search',
+            'es' => 'Buscar',
+        ),
+        'directory_all' => array(
+            'en' => 'All',
+            'es' => 'Todos',
+        ),
+
         // Footer
         'footer_rights' => array(
             'en' => 'All rights reserved.',

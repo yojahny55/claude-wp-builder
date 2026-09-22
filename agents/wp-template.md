@@ -650,6 +650,17 @@ bar's focus treatment — and a sibling template part in this theme has already 
 correctly, **reuse that solved pattern**, don't re-derive a fresh implementation for the new
 section. Two concrete cases that keep recurring:
 
+- **Tabs, accordions and directory filters have one implementation: the starter's
+  modules.** Write the markup contract from the header of `assets/js/src/tabs.js`,
+  `accordion.js` or `directory-filter.js` and no script of your own. A hand-made tabs
+  script on a build moved the underline and never switched a panel. FAQ lists are
+  `data-accordion="single"`; fold blocks on a detail page are standalone triggers, open by
+  default, each toggling on its own. Every directory's filter bar (every CPT archive, every
+  Page listing terms) is a `[data-directory]` with the results count
+  (`data-count-template` through `prefix_t()`) and the "clear filters" button, never a
+  bar that has one and not the other. A GET parameter a filter mirrors must not be a
+  public query var (a CPT or taxonomy slug), or WordPress answers the request as a query
+  for that object.
 - **Accordion chevron.** Rotate it through the trigger BUTTON's `aria-expanded` state with a
   group/peer variant (`group-aria-expanded:rotate-180` on the icon, `group` on the button),
   never by positioning the icon absolutely and toggling a class on the icon itself. An icon
