@@ -144,6 +144,39 @@ echo 'Enabled modules: ' . implode(', ', \$modules);
 "
 ```
 
+### Step 2.1: Create the module tables — MANDATORY
+
+Writing `rank_math_modules` switches `404-monitor` and `redirections` on without running
+the activation routine that creates their tables. Both modules then query a table that does
+not exist on every request: two failed queries per page, and a measured TTFB of 1.7–5.8 s
+that dropped to 0.5–0.7 s once the tables existed. Nothing on the page shows it; only the
+debug log and the timing do.
+
+```bash
+$WP eval 'RankMath\Installer::create_tables(get_option("rank_math_modules"));'
+```
+
+Then prove they exist — this is the step that fails, not the one above:
+
+```bash
+$WP eval '
+global $wpdb;
+$mods = (array) get_option("rank_math_modules", []);
+$need = [];
+if (in_array("404-monitor", $mods, true)) { $need[] = $wpdb->prefix . "rank_math_404_logs"; }
+if (in_array("redirections", $mods, true)) { $need[] = $wpdb->prefix . "rank_math_redirections"; }
+foreach ($need as $t) {
+    $ok = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $t)) === $t;
+    echo ($ok ? "OK: " : "MISSING: ") . $t . PHP_EOL;
+    if (!$ok) { exit(1); }
+}
+'
+```
+
+A `MISSING` line is a blocker: do not continue to Step 3 with a module whose table is absent.
+Disable the module instead if the table cannot be created. `/wp-audit`'s performance pass
+re-checks this as PERF-060.
+
 ## Step 3: Configure General Settings
 
 ```bash
@@ -1103,6 +1136,47 @@ if (\$missing > 0) {
 echo 'Polylang + Rank Math checks complete.' . PHP_EOL;
 "
 ```
+
+### 15b. Translate the CPT-archive breadcrumb
+
+Rank Math builds the archive crumb of a custom post type from the label passed to
+`register_post_type()`, a plain literal in the primary language. Under Polylang,
+`/en/<cpt-plural>/` and every single under it then show the primary-language plural in the
+breadcrumb. `post_type_archive_title` filters do not reach it. Add this to the theme's
+`inc/rankmath.php` (or wherever Step 4.7's `rank_math/json_ld` filter lives), with the real
+prefix:
+
+```php
+/**
+ * Route each CPT-archive crumb through the theme's string table, the same
+ * `plural_<post_type>` key the post_type_archive_title filter reads.
+ */
+add_filter( 'rank_math/frontend/breadcrumb/items', function ( $crumbs ) {
+    $types = get_post_types( array( '_builtin' => false, 'has_archive' => true ), 'names' );
+    foreach ( $crumbs as $i => $crumb ) {
+        foreach ( $types as $type ) {
+            $link = get_post_type_archive_link( $type );
+            $is_archive_crumb = ! empty( $crumb[1] ) && $link
+                && untrailingslashit( $crumb[1] ) === untrailingslashit( $link );
+            // On the archive itself the last crumb may carry no link.
+            $is_current = empty( $crumb[1] ) && is_post_type_archive( $type ) && $i === array_key_last( $crumbs );
+            if ( $is_archive_crumb || $is_current ) {
+                $key   = 'plural_' . $type;
+                $label = prefix_t( $key );
+                // Fallback: the type's own label. post_type_archive_title() is null
+                // on a single, and every single under the CPT carries this crumb too.
+                $crumbs[ $i ][0] = $label !== $key ? $label : get_post_type_object( $type )->labels->name;
+            }
+        }
+    }
+    return $crumbs;
+} );
+```
+
+Register a `plural_<post_type>` string for every CPT with an archive, in every language.
+Then verify on the secondary language: fetch `/<lang>/<cpt-plural>/` and one single, and
+read the breadcrumb text. The crumb must match the page's `<h1>`/`<title>` language, not the
+primary one.
 
 ## Verification
 

@@ -57,7 +57,13 @@ foreach (\$enable as \$mod) { if (!in_array(\$mod, \$modules)) { \$modules[] = \
 update_option('rank_math_modules', \$modules);
 echo 'Enabled modules: ' . implode(', ', \$modules);
 "
+$WP eval 'RankMath\Installer::create_tables(get_option("rank_math_modules"));'
 ```
+
+The second call is not optional. Writing the option skips the activation that creates the
+`{prefix}rank_math_404_logs` and `{prefix}rank_math_redirections` tables, and the two modules
+then run a failing query on every request (TTFB several seconds on a real build).
+`wp-audit-rankmath` Step 2.1 verifies both tables; `/wp-audit` reports a missing one as PERF-060.
 
 ---
 

@@ -286,13 +286,21 @@ Spanish plural over an English page. Filter it against a registered string:
 
 ```php
 add_filter( 'post_type_archive_title', function ( $title, $post_type ) {
-    $key = 'plural_' . $post_type;
-    return prefix_t( $key ) ?: $title;
+    $key   = 'plural_' . $post_type;
+    $label = prefix_t( $key );
+    // prefix_t() returns the key itself when it has no entry, never ''.
+    return $label !== $key ? $label : $title;
 }, 10, 2 );
 ```
 
 Audit `wp_title`/`document_title_parts`, `the_archive_title`, and any admin
 label a client will see, the same way.
+
+**Rank Math breadcrumbs need the same routing.** Their CPT-archive crumb is built from the
+post type's registered label, not from `post_type_archive_title()`, so `/en/<cpt-plural>/`
+and every single under it still show the primary-language plural after the filter above.
+The `rank_math/frontend/breadcrumb/items` filter in `wp-audit-rankmath` Step 15 routes that
+crumb through the same `plural_<post_type>` key.
 
 ## What free Polylang covers
 
