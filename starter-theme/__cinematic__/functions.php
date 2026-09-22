@@ -36,6 +36,7 @@ require_once __STARTER___THEME_DIR . '/inc/i18n.php';
 require_once __STARTER___THEME_DIR . '/inc/cinematic-loader.php';
 require_once __STARTER___THEME_DIR . '/inc/scenes-renderer.php';
 require_once __STARTER___THEME_DIR . '/inc/performance.php';
+require_once __STARTER___THEME_DIR . '/inc/security.php';
 
 // Field groups use ACF/SCF Local JSON (acf-json/) as the single source of truth
 // so they stay editable in the dashboard AND versioned in code. fields/*.php are

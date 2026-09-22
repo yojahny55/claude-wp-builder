@@ -22,6 +22,7 @@ require_once __STARTER___DIR . '/inc/nav-walker.php';
 require_once __STARTER___DIR . '/inc/template-tags.php';
 require_once __STARTER___DIR . '/inc/template-functions.php';
 require_once __STARTER___DIR . '/inc/performance.php';
+require_once __STARTER___DIR . '/inc/security.php';
 
 /**
  * Field groups use ACF/SCF Local JSON (acf-json/) as the single source of truth

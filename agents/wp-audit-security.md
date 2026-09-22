@@ -363,6 +363,14 @@ When dispatched in fix mode, iterate over findings where `auto_fixable: true` an
 $WP config set DISALLOW_FILE_EDIT true --raw --type=constant
 ```
 
+`wp-config.php` is not in the repository, so this constant is lost on every environment
+deployed by cloning it. The starters' `inc/security.php` blocks the editors in the theme
+through `map_meta_cap` (`edit_themes`, `edit_plugins`, `edit_files` → `do_not_allow`). When
+that file is loaded, SEC-006 is a PASS with the file as its evidence. The same file owns
+SEC-022, SEC-023, SEC-025 and the Step 3 headers. On a theme that predates it, copy the
+starter's `inc/security.php` and require it from `functions.php` instead of patching each
+item separately.
+
 **SEC-007 — FORCE_SSL_ADMIN:**
 ```bash
 $WP config set FORCE_SSL_ADMIN true --raw --type=constant

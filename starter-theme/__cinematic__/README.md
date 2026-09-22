@@ -37,6 +37,7 @@ To preserve hand edits across regeneration, wrap them in:
 - `assets/css/cinematic.css` (base stage + scene styles — copy of kit's canonical `templates/style.css`)
 - `assets/js/cinematic-engine.js` (copy of kit's `templates/main.js`)
 - `header.php`, `footer.php` (standard parts)
+- `inc/performance.php`, `inc/security.php` (head cleanup and the security baseline — XML-RPC, user enumeration, file editors, response headers)
 
 These are kept in sync with the kit via `/wp-cinematic-init --update-kit`, which copies fresh from the installed kit and shows a diff before overwriting.
 
