@@ -13,7 +13,9 @@ for st in __tailwind__ __cinematic__; do
   d=starter-theme/$st
   f=$d/inc/security.php
   [ -f "$f" ] || fail "$f is missing"
-  grep -q "inc/security.php" "$d/functions.php" || fail "$d/functions.php never loads inc/security.php"
+  # The require itself, not any mention of the path (a comment would satisfy a bare grep).
+  grep -Eq "^[[:space:]]*require_once[[:space:]]+[A-Z_]+[[:space:]]*\.[[:space:]]*'/inc/security\.php'[[:space:]]*;" "$d/functions.php" \
+    || fail "$d/functions.php never require_once's inc/security.php"
   for needle in "'xmlrpc_enabled', '__return_false'" "'xmlrpc_methods'" "'rsd_link'" "X-Pingback" \
       "'rest_endpoints'" "/wp/v2/users" "is_author()" "\$_GET['author']" "set_404()" \
       "'map_meta_cap'" "'edit_themes'" "'edit_plugins'" "'edit_files'" "'do_not_allow'" \
