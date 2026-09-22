@@ -535,6 +535,16 @@ ACF calls, the escaping, the i18n helpers, the loops.
   value — an "equivalent" utility is a measured geometry change. On `basic`, apply the
   `--block` BEM scoping rename required by `/wp-section` instead of copying the original
   BEM names verbatim.
+- **Layout utilities are carried, never re-derived.** Every layout class on the demo
+  section's elements comes across: `flex`, `flex-col`, `grid`, `h-full`, `mt-auto`,
+  `items-*`, `self-*`, `grow`, `order-*`. Those are the easiest to drop, because nothing
+  looks wrong in a single card. A card whose footer (price, CTA link) must sit on the same
+  line as its neighbours' is `flex flex-col` (plus `h-full` when it is a grid cell), and
+  the footer block carries `mt-auto`. A build kept `mt-auto` on the demo's card link and
+  the generated template dropped it, so price and link floated at a different height in
+  every card with a shorter text. When a template wraps the demo's element in a PHP loop
+  or a new wrapper, the flex chain must survive the wrapper: the grid cell, the card and
+  the footer each keep their class.
 - **Two labels in the demo need two fields.** When an element's text differs between
   breakpoints or states, the section gets one ACF field per distinct string, not one
   field and a shortened copy. Say so in your report so `wp-acf` defines both.

@@ -409,6 +409,33 @@ clips or strands whitespace in the other. In a bilingual theme:
 Check every fixed dimension against the longest string the field can hold before
 the second language exists, not after.
 
+## Cards pin their footer with `mt-auto`, and the template keeps it
+
+A card in a row of cards has a footer (price, CTA, "read more") that sits on one line
+across the row, whatever the length of each card's text. That is a flex chain, and every
+link of it is a class the template must carry:
+
+```html
+<ul class="grid md:grid-cols-3 gap-6">
+  <li class="h-full">                                  <!-- grid cell stretches -->
+    <article class="flex flex-col h-full ...">         <!-- the card is a column -->
+      <h3>...</h3><p>...</p>
+      <div class="mt-auto pt-6 flex items-center justify-between">  <!-- footer pinned -->
+        <span>price</span><a href="...">CTA</a>
+      </div>
+    </article>
+  </li>
+</ul>
+```
+
+Drop any one class and the footers float at different heights. It does not show in a
+single card, or in a demo whose mock texts are all the same length. A build kept `mt-auto`
+on the demo's card link and the generated template dropped it. **Carry every layout
+utility from the demo section into the template (`flex`, `flex-col`, `h-full`, `mt-auto`,
+`grow`, `self-*`, `order-*`); never re-derive the layout.** A wrapper the template adds
+(the loop's `<li>`, a `get_template_part()` boundary) must not break the chain: it gets
+`h-full` or `flex` too.
+
 ## `absolute` is for superposition, not for layout
 
 A mockup's `x`/`y` is where an element fell in one frame at one width — not the

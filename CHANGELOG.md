@@ -56,6 +56,12 @@
   - The three commands offer adoption when their gate exits `3`.
   - A created project's generated block, validation and prose supersession are unchanged.
 
+- **Card footers floated at different heights.** A demo card carried `mt-auto` on its link,
+  and the generated template dropped it. `wp-template`, `wp-tailwind` and the
+  `wp-tailwind-system` skill now say how a card pins its footer: the card is
+  `flex flex-col`, with `h-full` in a grid, and the price or CTA block is `mt-auto`. Every
+  layout utility from the demo section is carried into the template, never re-derived.
+
 ### Changed
 
 - **`/wp-audit` on an adopted site audits vendor code but never edits it, and respects the
