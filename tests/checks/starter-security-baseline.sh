@@ -28,6 +28,18 @@ for st in __tailwind__ __cinematic__; do
   grep -q "defined *( *'ABSPATH' *)" "$f" || fail "$f has no ABSPATH guard"
 done
 
+# Author archives are off by default but can be opted into, and the tailwind byline
+# only links to an author archive when it exists (a 404 link on every post card otherwise).
+for st in __tailwind__ __cinematic__; do
+  grep -Fq "'__starter___author_archives'" starter-theme/$st/inc/security.php \
+    || fail "$st/inc/security.php has no __starter___author_archives opt-in"
+done
+tt=starter-theme/__tailwind__/inc/template-tags.php
+if grep -q "get_author_posts_url" "$tt"; then
+  grep -q "__starter___author_archives_enabled()" "$tt" \
+    || fail "$tt links the byline to an author archive the baseline 404s"
+fi
+
 # The pingback <link> is gone, and no second copy of the baseline lingers in performance.php.
 grep -q "pingback_url" starter-theme/__tailwind__/inc/template-functions.php \
   && fail "the tailwind starter still prints a pingback <link>"

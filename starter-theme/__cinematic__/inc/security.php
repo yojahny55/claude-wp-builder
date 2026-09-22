@@ -36,10 +36,13 @@ add_filter('rest_endpoints', function ($endpoints) {
     return $endpoints;
 });
 
-// `?author=N` and author archives 404 instead of redirecting to /author/<login>/.
+// `?author=N` and author archives 404 instead of redirecting to /author/<login>/,
+// unless a build with a real blog opts in:
+// add_filter('__starter___author_archives', '__return_true');
 // Priority 1: redirect_canonical (priority 10) is what performs that redirect.
 add_action('template_redirect', function () {
-    if (is_admin() || (!is_author() && !isset($_GET['author']))) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+    if (is_admin() || apply_filters('__starter___author_archives', false)
+        || (!is_author() && !isset($_GET['author']))) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         return;
     }
     global $wp_query;

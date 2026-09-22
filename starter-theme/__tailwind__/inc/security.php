@@ -49,12 +49,23 @@ add_filter( 'rest_endpoints', function ( $endpoints ) {
 } );
 
 /**
- * `?author=N` and author archives answer 404 instead of redirecting to
- * /author/<login>/, which hands out the login name. Runs before
- * redirect_canonical (priority 10), which is what performs that redirect.
+ * Whether the site publishes author archives. Off by default: most builds have
+ * no blog, and /author/<nicename>/ (plus the ?author=N redirect to it) hands out
+ * the login name. A build with a real blog opts in with
+ * add_filter( '__starter___author_archives', '__return_true' );
+ * __starter___posted_by() links the byline only when this is true.
+ */
+function __starter___author_archives_enabled() {
+	return (bool) apply_filters( '__starter___author_archives', false );
+}
+
+/**
+ * With author archives off, `?author=N` and /author/<nicename>/ answer 404
+ * instead of redirecting to /author/<login>/. Runs before redirect_canonical
+ * (priority 10), which is what performs that redirect.
  */
 function __starter___block_author_enumeration() {
-	if ( is_admin() || ( ! is_author() && ! isset( $_GET['author'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	if ( is_admin() || __starter___author_archives_enabled() || ( ! is_author() && ! isset( $_GET['author'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		return;
 	}
 	global $wp_query;

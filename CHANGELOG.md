@@ -28,7 +28,7 @@
   - REST user routes hidden from visitors who cannot `edit_posts`. The gate is not
     `list_users`, because the block editor's author selector needs these routes and an
     Editor has no `list_users`;
-  - `?author=N` and author archives answer 404;
+  - `?author=N` and author archives answer 404 unless a build opts in with the `<prefix>_author_archives` filter; the byline links to the archive only then;
   - theme and plugin editors blocked through `map_meta_cap`;
   - `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` and a conservative
     `Permissions-Policy` sent on `send_headers`, and `X-Powered-By` removed.
