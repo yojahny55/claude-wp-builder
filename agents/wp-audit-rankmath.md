@@ -1163,7 +1163,9 @@ add_filter( 'rank_math/frontend/breadcrumb/items', function ( $crumbs ) {
             if ( $is_archive_crumb || $is_current ) {
                 $key   = 'plural_' . $type;
                 $label = prefix_t( $key );
-                $crumbs[ $i ][0] = $label !== $key ? $label : post_type_archive_title( '', false );
+                // Fallback: the type's own label. post_type_archive_title() is null
+                // on a single, and every single under the CPT carries this crumb too.
+                $crumbs[ $i ][0] = $label !== $key ? $label : get_post_type_object( $type )->labels->name;
             }
         }
     }
