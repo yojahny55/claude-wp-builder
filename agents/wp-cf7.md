@@ -436,6 +436,15 @@ Use the `WPCF7_ContactForm::get_template()` API to create forms. **NEVER use raw
 FORM_ID=$($WP eval "
 \$form = WPCF7_ContactForm::get_template();
 
+// Sender on the site's own domain, the rule CF7's own template follows: admin_email only
+// when it already is on that domain, otherwise wordpress@<domain>. Computed on the
+// environment the seeder runs on, so staging and production each get their own domain.
+\$domain = strtolower((string) wp_parse_url(home_url(), PHP_URL_HOST));
+\$domain = preg_replace('/^www\\./', '', \$domain);
+\$admin  = get_option('admin_email');
+\$from   = (substr(strrchr(\$admin, '@'), 1) === \$domain) ? \$admin : 'wordpress@' . \$domain;
+\$sender = get_option('blogname') . ' <' . \$from . '>';
+
 // Set form title
 \$form->set_title('Contact Form - EN');
 
@@ -445,7 +454,7 @@ FORM_ID=$($WP eval "
     'mail' => array(
         'active'             => true,
         'subject'            => '[your-subject] - New contact from [your-name]',
-        'sender'             => get_option('blogname') . ' <' . get_option('admin_email') . '>',
+        'sender'             => \$sender,
         'recipient'          => get_option('admin_email'),
         'body'               => file_get_contents('$(pwd)/cf7/email-admin-en.html'),
         'additional_headers' => 'Reply-To: [your-email]',
@@ -455,7 +464,7 @@ FORM_ID=$($WP eval "
     'mail_2' => array(
         'active'             => true,
         'subject'            => 'Thank you for contacting us',
-        'sender'             => get_option('blogname') . ' <' . get_option('admin_email') . '>',
+        'sender'             => \$sender,
         'recipient'          => '[your-email]',
         'body'               => file_get_contents('$(pwd)/cf7/email-user-en.html'),
         'additional_headers' => '',
@@ -484,6 +493,47 @@ echo "Created EN form with ID: $FORM_ID"
 ```
 
 Repeat for each language (ES, etc.) with translated content and messages.
+
+### Sender, recipients and delivery
+
+A form that renders and validates can still deliver nothing. This agent used to write
+`admin_email` into `mail.sender` unchecked. When that address is a free-mail inbox, or on
+any domain the site's mail server is not authorised for, receiving servers reject or junk
+the message: SPF, DKIM and DMARC all fail for a domain the site does not control.
+
+- **`mail.sender` and `mail_2.sender` are on the site's domain.** The snippet above
+  computes it. Never a free-mail domain (`gmail.com`, `googlemail.com`, `yahoo.*`,
+  `hotmail.*`, `outlook.*`, `live.com`, `icloud.com`, `aol.com`, `proton.me`,
+  `protonmail.com`, `gmx.*`, `yandex.*`): if the computed sender or `admin_email` lands on
+  one, stop and report it as a **warning** with the value, and ask for an address on the
+  domain. Where the reply should go to the visitor, that is `Reply-To: [your-email]` in
+  `additional_headers`, never the sender.
+- **`[your-email]` is a recipient only in `mail_2`**, only from a required `[email*
+  your-email]` field, and only on a form with spam protection (a honeypot, Turnstile,
+  reCAPTCHA or Akismet). Without it the autoresponder sends whatever a bot types to any
+  address it names. `mail.recipient` is the site's inbox (the settings page's contact
+  email, else `admin_email`).
+- **Run CF7's own configuration validator after every save** and surface each message:
+
+  ```bash
+  $WP eval "
+  \$v = new WPCF7_ConfigValidator( wpcf7_contact_form( $FORM_ID ) );
+  \$v->validate(); \$v->save();
+  foreach ( \$v->collect_error_messages( array( 'decodes_html_entities' => true ) ) as \$section => \$errs ) {
+      foreach ( \$errs as \$e ) { echo 'WARNING ' . \$section . ': ' . \$e['message'] . PHP_EOL; }
+  }"
+  ```
+
+  It reports `email_not_in_site_domain` for a foreign sender and
+  `unsafe_email_without_protection` for an unprotected `[your-email]` recipient, among
+  others. On a localhost domain CF7 skips the domain check, so re-run it on staging.
+- **SMTP is per environment.** Delivery goes through the SMTP plugin the project uses,
+  configured on each environment (host, port, user, from address on the site's domain).
+  Credentials live in that environment's `wp-config.php` constants or the plugin's own
+  settings, never in the repository and never in a seeder. Test with
+  `$WP eval 'var_dump( wp_mail( get_option("admin_email"), "SMTP test", "ok" ) );'` and
+  then read the SMTP plugin's email log: `true` from `wp_mail()` only means the message was
+  handed over, the log says whether the server accepted it.
 
 ### Store and output form IDs
 
@@ -541,3 +591,4 @@ Do NOT create `-es` variants when the project is monolingual.
 11. **Every `[acceptance]` tag carries `acceptance_as_validation:on`** — without it the submit button stays disabled on an unchecked box, with no error shown and no way to discover why
 12. **Size the control itself to `width: 100%`, not only its `.wpcf7-form-control-wrap`**; keep the AJAX spinner's margins inside the form's box; write loading-state padding as `padding-inline-end`, never `padding-right` — a physical longhand does not beat the logical `padding-inline` an `@apply px-*` compiles to
 13. **The `_form` post meta is the live form; `cf7/*.html` is only a reference.** Push every change through the seeder (or directly to `_form`), and push every language's form together — a fix landing on one language's post and not the other's is a bilingual bug.
+14. **`mail.sender` and `mail_2.sender` are on the site's domain, never `admin_email` unchecked and never a free-mail domain**; `[your-email]` is a recipient only in `mail_2` on a protected form; CF7's `WPCF7_ConfigValidator` runs after every save and its messages are reported
