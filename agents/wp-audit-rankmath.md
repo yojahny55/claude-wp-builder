@@ -144,6 +144,39 @@ echo 'Enabled modules: ' . implode(', ', \$modules);
 "
 ```
 
+### Step 2.1: Create the module tables — MANDATORY
+
+Writing `rank_math_modules` switches `404-monitor` and `redirections` on without running
+the activation routine that creates their tables. Both modules then query a table that does
+not exist on every request: two failed queries per page, and a measured TTFB of 1.7–5.8 s
+that dropped to 0.5–0.7 s once the tables existed. Nothing on the page shows it; only the
+debug log and the timing do.
+
+```bash
+$WP eval 'RankMath\Installer::create_tables(get_option("rank_math_modules"));'
+```
+
+Then prove they exist — this is the step that fails, not the one above:
+
+```bash
+$WP eval '
+global $wpdb;
+$mods = (array) get_option("rank_math_modules", []);
+$need = [];
+if (in_array("404-monitor", $mods, true)) { $need[] = $wpdb->prefix . "rank_math_404_logs"; }
+if (in_array("redirections", $mods, true)) { $need[] = $wpdb->prefix . "rank_math_redirections"; }
+foreach ($need as $t) {
+    $ok = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $t)) === $t;
+    echo ($ok ? "OK: " : "MISSING: ") . $t . PHP_EOL;
+    if (!$ok) { exit(1); }
+}
+'
+```
+
+A `MISSING` line is a blocker: do not continue to Step 3 with a module whose table is absent.
+Disable the module instead if the table cannot be created. `/wp-audit`'s performance pass
+re-checks this as PERF-060.
+
 ## Step 3: Configure General Settings
 
 ```bash

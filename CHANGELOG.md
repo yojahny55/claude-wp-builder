@@ -4,6 +4,15 @@
 
 ### Fixed
 
+- **Rank Math modules enabled from WP-CLI ran without their tables.** Writing
+  `rank_math_modules` skips the activation that creates `rank_math_404_logs` and
+  `rank_math_redirections`, so `404-monitor` and `redirections` ran two failing queries on
+  every request. A real build measured TTFB at 1.7-5.8 s, and 0.5-0.7 s once the tables
+  existed.
+  - `wp-audit-rankmath` Step 2.1 runs `RankMath\Installer::create_tables()` after enabling
+    modules and blocks on a missing table.
+  - `/wp-audit` reports a module without its table as PERF-060 (CRITICAL).
+
 - **`--suite` could never run from its managed install.** The shared dependency cache was
   named `node_modules-<key>`. Node resolves a package's own imports from its real path,
   searching only directories literally named `node_modules`, so `@playwright/test` could not
