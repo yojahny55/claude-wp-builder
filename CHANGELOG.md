@@ -99,7 +99,8 @@
   the output parses line by line. The `redirect` method is CRITICAL by configuration when that
   file exists locally, or when the clone holds no paid files at all (no `woocommerce_uploads`,
   or only the `index.html` and `.htaccess` WooCommerce recreates there) and the stored path is
-  the best evidence; it is `UNMEASURED` when paid files are there but the stored one is not. Otherwise it fires a control request at a public upload on the production host (never
+  the best evidence; it is `UNMEASURED` when paid files are there but the stored one is not.
+  Otherwise it fires a control request at a public upload on the production host (never
   an attachment under `woocommerce_uploads`, which would be a paid file) first and, only if that
   returns a non-HTML `200`/`206`, probes the paid file header-only with a 15-second timeout.
   When HEAD gets `405`/`501`, both requests fall back to a one-byte ranged GET capped by
@@ -136,15 +137,6 @@
   for and confirmed, defaulting to `wordpress.url_origin` — and never the clone, whose
   local server answers an `.htaccess` a production nginx ignores and would return a false
   PASS.
-  `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
-  production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
-
-  When the manifest shows a clone (`source: restore`, a `restore.url_origin`, or a non-public
-  `wordpress.url`), those conditions are `N/A (local clone)`, suppressed and out of the
-  denominator, bounded by one test: would this also be true on production? Live checks
-  (response headers, paid-file reachability) now target the production URL — asked for and
-  confirmed, defaulting to `restore.url_origin` — and never the clone, whose local server
-  answers an `.htaccess` a production nginx ignores and would return a false PASS.
   `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
   production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
 
