@@ -114,28 +114,43 @@
   ever checked.** Those three only counted outdated or inactive plugins — a plugin could
   carry a disclosed vulnerability, or sit unmaintained for years, and nothing said so unless
   an update happened to be pending. SEC-041 (known-vulnerable plugins/themes) reads the
-  WPScan v3 API with a token from `WPSCAN_API_TOKEN`; SEC-042 (abandoned plugins) reads the
-  wp.org plugin info API. Both sit behind SEC-038's network gate: no route, no token, or a
-  refused token is `UNMEASURED`, never `PASS`, and neither hardcodes a CVE or abandonment
-  list. Only public wp.org slugs are sent to the vulnerability feed — nothing in
-  `code_scope.editable`, and no other site-own or vendor slug, ever leaves the machine for a
-  third party. SEC-043 (a function declared at the top level in two places — a fatal
-  `Cannot redeclare`) is a Tier 1 code scan over every installed plugin, active and
-  inactive, plus mu-plugins, drop-ins and the active theme and its parent; it is CRITICAL
-  when an inactive plugin or two unconditionally loaded files collide, WARNING otherwise. On
-  a local clone, the plugins Step 2.3 suppressed are kept in all three checks and counted as
-  loaded: Step 2.3 suppresses the "deactivated" finding, not the plugin, and those are the
-  plugins active on production. Also fixes a `/wp-adopt` misclassification: a commercial
-  plugin with no updater of its own (a paid multi-currency plugin, a paid slider) was
-  proposed as the site's own editable code purely because it had no update transient.
-  `/wp-adopt` now checks the plugin header against its wp.org listing (a same-slug listing
-  by another author does not count) and shows vendor-looking plugins in a second,
-  pre-selected "proposed read-only" list the operator can reverse; when wp.org cannot be
-  reached it keeps the transient signal and says the plugin was not verified.
-  `wp-audit-security` prints a non-scored reminder as a safety net when one is still found in
-  `code_scope.editable`. `tests/checks/audit-plugin-inventory.sh` pins the new codes, the
-  reused network gate, the inventory rule, the feed boundary and the `/wp-adopt` proposal,
-  and fails on a `SEC-NNN` defined by two table rows.
+  WPScan v3 API, with the token from `WPSCAN_API_TOKEN` piped to curl on stdin so it never
+  reaches the process list; it reads the quota first and queries loaded plugins before
+  inactive ones. SEC-042 (abandoned plugins) reads the wp.org plugin info API and also fails
+  a plugin wp.org has closed, naming the date and reason. Both sit behind SEC-038's network
+  gate: no route, no token or a refused token is `UNMEASURED`, never `PASS`, and neither
+  hardcodes a CVE or abandonment list. A new **Plugin inventory** section defines the rules
+  all three checks share: the header read through `get_plugins()` (`wp plugin get` has no
+  `plugin_uri` field), wp.org lookups with `curl -g` (the `[slug]` brackets otherwise glob
+  and curl exits 3), the not-found / closed / failed / listing states, and what makes a
+  listing match the installed plugin (author with tags stripped and case folded, or the
+  same home host, or a `w.org/plugins/<slug>` transient id), with a theme route through the
+  themes API and `update_themes`. Only public slugs are sent to a third-party vulnerability
+  feed; `code_scope.editable` slugs go to wp.org only, from the vendor re-check. SEC-043
+  (a global function declared by two sources) is a Tier 1 scan over every installed plugin,
+  active and inactive, plus mu-plugins, drop-ins and the active theme and its parent, run by
+  a new tokenizer script, `skills/wp-cli-patterns/scripts/find-redeclared-functions.php`,
+  instead of a grep. The tokenizer skips methods, closures, `function_exists` guards,
+  early-return guards and drop-in templates shipped inside plugins, and qualifies names by
+  namespace. On a site with ~15,600 PHP files it runs in under 2 seconds, where the grep
+  matched ~160,000 lines. Severity follows WordPress's sandboxed activation: CRITICAL when
+  two loaded sources collide, WARNING when one side is inactive (it cannot be activated),
+  INFO when both are. On a local clone the agent reads three dispatch lines (`Local clone`,
+  `Clone-suppressed plugins`, `Parked drop-ins`), keeps the clone-suppressed plugins in
+  all three checks and counts them as loaded — Step 2.3 suppresses the "deactivated"
+  finding, not the plugin, and those are the plugins active on production. Without those
+  lines it treats the project as not a clone rather than guessing. Also fixes a `/wp-adopt`
+  misclassification: a commercial plugin with no updater of its own (a paid multi-currency
+  plugin, a paid slider) was proposed as the site's own editable code purely because it had
+  no update transient. `/wp-adopt` now checks the header against the wp.org listing (a
+  same-slug listing by another author does not count; a closed plugin stays editable) and
+  shows vendor-looking plugins in a second, pre-selected "proposed read-only" list the
+  operator can reverse; when wp.org cannot be reached it keeps the transient signal and
+  says the plugin was not verified. `wp-audit-security` runs its own route probe and prints
+  a non-scored reminder when a vendor-looking plugin is still in `code_scope.editable`.
+  `tests/checks/audit-plugin-inventory.sh` checks each rule inside the section that owns
+  it, fails on a `SEC-NNN` defined by two table rows, and runs the tokenizer against a
+  fixture.
 
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had
   none, and its `template-functions.php` printed a pingback `<link>`. A full audit of a
