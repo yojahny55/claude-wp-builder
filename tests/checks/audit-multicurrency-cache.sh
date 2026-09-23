@@ -137,10 +137,11 @@ grep -Eq 'cf-cache-status`.*is `HIT`' "$perf" \
 # --- Direction 5: the fix is a setting, never a code workaround ---
 grep -Fq 'Multi-currency cache-key fix' "$perf" \
   || fail "$perf has no fix section for PERF-065/PERF-067"
-# Bounded on ANY heading (#, ## or ###), not only another ### — otherwise, when the fix
-# section is the last ### under its ## parent (as it is today, right before "## Rules"), the
-# extract runs off the end of the file and swallows every unrelated section after it, which
-# would still happen to contain the needles below and mask a real regression.
+# The section ends at the next heading of the same or a higher level (#, ## or ###), which is
+# where a Markdown section ends: a later ### sibling or the "## Rules" parent after it both
+# close it, and #### subsections inside it stay part of it. Bounding only on "## " would let
+# the extract swallow any ### sibling added after it, whose text could then satisfy the
+# needles below and mask a regression in this section.
 fix=$(awk '/^### Multi-currency cache-key fix/{f=1; next} f && /^#{1,3} /{exit} f{print}' "$perf")
 [ -n "$fix" ] || fail "$perf's Multi-currency cache-key fix section is empty"
 ! grep -Fq '## Rules' <<< "$fix" \
@@ -156,10 +157,10 @@ grep -Fq 'no WP-CLI command reaches this' <<< "$fix" \
 #     same agent files, so this asserts uniqueness of every table row instead of banning
 #     specific numbers (a ban would fail as soon as a sibling PR merges). ---
 for f in "$perf" "$seo"; do
-  # `grep -oE ... | uniq -d` legitimately exits non-zero (no output) in the common case of no
-  # duplicates. Under `set -e` + pipefail, a bare `dups=$(pipeline)` assignment aborts the
-  # whole script the moment that happens — `|| true` on the pipeline keeps the pipeline's own
-  # exit status from ever reaching the assignment, so only real script errors stop the test.
+  # The grep exits 1 on a file with no code rows. A plain assignment takes the exit status of
+  # its command substitution, so under `set -e` + pipefail `dups=$(pipeline)` would stop the
+  # script there (checked: `set -euo pipefail; x=$(false | cat)` exits 1). `|| true` keeps an
+  # empty match from ending the test; an empty $dups then correctly means no duplicates.
   dups=$(grep -oE '^\| *(PERF|SEO)-[0-9]{3} *\|' "$f" | tr -d '| ' | sort | uniq -d || true)
   [ -z "$dups" ] || fail "$f defines these codes more than once: $dups"
 done
