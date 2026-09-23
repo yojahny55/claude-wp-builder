@@ -25,7 +25,7 @@ grep -Fq 'escapes' "$c" || fail "$c does not explain the escapes field or its fi
 grep -Fq 'position: relative; min-height' "$fx/contained.html" \
   || fail "$fx/contained.html no longer differs from index.html by the positioned card"
 
-if node "$s" --probe >/dev/null 2>&1; then
+if probe=$(node "$s" --probe 2>&1); then
   work="$(mktemp -d)"
   trap 'rm -rf "$work"' EXIT
   node "$s" "$fx" --positions 2 --widths 1280x800 --no-firefox --out "$work/ov" >/dev/null 2>&1 || true
@@ -44,7 +44,7 @@ if node "$s" --probe >/dev/null 2>&1; then
   ' "$work/ov/findings.json")"
   [ "$verdict" = "OK" ] || fail "$s on $fx: $verdict"
 else
-  echo "NOTE: no usable browser (--probe exit != 0); the overflow culprit battery did not run"
+  echo "NOTE: no usable browser; the overflow culprit battery did not run -- $(tr '\n' ' ' <<<"$probe")"
 fi
 
 echo PASS
