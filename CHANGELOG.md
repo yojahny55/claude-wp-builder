@@ -101,7 +101,6 @@
   `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
   production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
 
-
 - **`wp-audit-security` now checks for payment-gateway credentials stored at rest
   (SEC-040).** SEC-005 only greps theme PHP for hardcoded secrets, but a WooCommerce payment
   gateway keeps its live API key, secret and token in the database instead — a serialized
@@ -121,7 +120,7 @@
   `wp_options` is true of production too and is reported regardless. The fix is manual —
   rotate the key at the processor if the database was ever shared, and scrub the value before
   handing around a cloned copy. `tests/checks/audit-gateway-credentials.sh` pins the check,
-  the credential-key list, and the clone-suppression distinction.
+  the database enumeration, the secret-key pattern, and the clone-suppression distinction.
 
 - **`/wp-audit` reads the site type and whether it is a local clone before any category
   runs (Step 2.3).** Two blind spots made the audit report on the wrong site. First, checks

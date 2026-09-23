@@ -7,9 +7,10 @@
 # `secret_key` and `token`. Nothing that scans source code sees that row, and it is exactly
 # the row a database dump, a staging snapshot, or a cloned copy carries verbatim. This test
 # pins two directions: the check enumerates every settings row from the database (active or
-# deactivated plugin) and reports a non-empty secret-shaped value at CRITICAL, AND it does not fold into the local-clone suppression list —
-# a gateway deactivated on a clone is a clone artifact, but a credential still sitting in
-# wp_options is true on production too and must still be reported.
+# deactivated plugin) and reports a non-empty secret-shaped value at CRITICAL, AND it does
+# not fold into the local-clone suppression list — a gateway deactivated on a clone is a
+# clone artifact, but a credential still sitting in wp_options is true on production too and
+# must still be reported.
 
 set -uo pipefail
 cd "$(dirname "$0")/../.."
@@ -49,22 +50,44 @@ if printf '%s\n' "$PROC" | grep -Fq '$gateway->enabled'; then
   fail "SEC-040 reads enabled from the loaded gateway object, which misses deactivated plugins"
 fi
 
-# --- It matches secret-shaped key names by pattern, not an exact list ---
-for word in secret password token signature 'api_?key'; do
-  has "$word" || fail "SEC-040's secret pattern does not cover '$word'"
+# --- It matches secret-shaped key names by an end-anchored pattern, not an exact list ---
+# The gates read the pattern line itself, so a word dropped from the regex cannot be covered
+# by the same word appearing in the prose.
+SECRET_RE=$(printf '%s\n' "$PROC" | grep -F '$secret     = "' | sort -u)
+[ -n "$SECRET_RE" ] || fail "SEC-040 has no \$secret pattern line"
+[ "$(printf '%s\n' "$SECRET_RE" | wc -l)" -eq 1 ] \
+  || fail "SEC-040's detection and scrub snippets use different \$secret patterns"
+[ "$(printf '%s\n' "$PROC" | grep -cF '$secret     = "')" -eq 2 ] \
+  || fail "SEC-040 must define \$secret in both the detection and the scrub snippet"
+for word in 'secret' 'secret_?key' 'password' 'token' 'signature' 'api_?key' 'consumer_?key'; do
+  printf '%s\n' "$SECRET_RE" | grep -Fq "|$word|" \
+    || printf '%s\n' "$SECRET_RE" | grep -Fq "($word|" \
+    || printf '%s\n' "$SECRET_RE" | grep -Fq "|$word)" \
+    || fail "SEC-040's \$secret pattern does not cover '$word'"
 done
-has 'foreach ( $settings as $key => $value )' \
-  || fail "SEC-040 does not test every stored key against the pattern"
-has 'publishable_key' || fail "SEC-040 does not classify publishable_key"
+printf '%s\n' "$SECRET_RE" | grep -Fq '$/i";' \
+  || fail "SEC-040's \$secret pattern is not anchored to the end of the key"
+IDENT_RE=$(printf '%s\n' "$PROC" | grep -F '$identifier = "' | sort -u)
+[ "$(printf '%s\n' "$IDENT_RE" | wc -l)" -eq 1 ] && [ -n "$IDENT_RE" ] \
+  || fail "SEC-040's detection and scrub snippets use different \$identifier patterns"
+printf '%s\n' "$IDENT_RE" | grep -Fq 'publishable_?key' \
+  || fail "SEC-040 does not classify publishable_key as an identifier"
 hasi 'public by design' || fail "SEC-040 does not say a publishable key is not a secret"
+has '$flags      = array( "yes", "no"' || fail "SEC-040 does not skip on/off switch values"
+has 'tokenization' || fail "SEC-040 does not explain why the pattern is anchored (tokenization flag)"
+has '$walk( $name, $enabled, $value, $key_path );' || fail "SEC-040 does not walk nested arrays"
+has 'woocommerce-ppcp-' || fail "SEC-040 does not cover gateways that store secrets outside *_settings rows"
 
 # --- Never print the credential value itself, including in the scrub fix ---
 has 'never print the value itself' \
   || fail "SEC-040 does not say to withhold the credential value from the report"
 has 'never by dumping the option' || fail "SEC-040's scrub step does not forbid dumping the option"
-if printf '%s\n' "$PROC" | grep -Eq 'option get[^`]*--format=json`?\)'; then
-  fail "SEC-040's scrub step still dumps the option as JSON"
+CODE=$(printf '%s\n' "$PROC" | awk '/^```/{f=!f;next} f')
+if printf '%s\n' "$CODE" | grep -Eq 'option (get|list)|option_value|var_export|print_r|var_dump'; then
+  fail "a SEC-040 code block dumps option values"
 fi
+has 'option not found or not an array, nothing changed' \
+  || fail "SEC-040's scrub does not say when it changed nothing"
 
 # --- Commerce gating: N/A when there is no WooCommerce, out of the denominator ---
 has 'site.commerce' || fail "SEC-040 does not read site.commerce"

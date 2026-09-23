@@ -307,8 +307,10 @@ same two transients.
 ### Procedure — SEC-040 (payment-gateway credentials stored at rest)
 
 SEC-005 greps theme PHP for hardcoded secrets, but a payment gateway does not keep its live
-API key in a file at all — WooCommerce stores each gateway's settings, credentials included,
-as a serialized array in the `wp_options` row `woocommerce_<gateway_id>_settings`. Nothing that
+API key in a file at all — most gateways keep their settings, credentials included, as a
+serialized array in the `wp_options` row `woocommerce_<gateway_id>_settings` (a few use their
+own option names instead; WooCommerce PayPal Payments, for one, keeps its secrets in
+`woocommerce-ppcp-*` rows). Nothing that
 scans source code can see that row, and it is exactly the row a database dump, a staging
 snapshot or a cloned copy carries verbatim. A key sitting there is a live secret the same way a
 key in a `.env` file is: whoever gets a copy of the database gets the gateway's production
@@ -326,41 +328,62 @@ misses real secrets:
 ```bash
 $WP eval '
 global $wpdb;
-$like  = $wpdb->esc_like( "woocommerce_" ) . "%" . $wpdb->esc_like( "_settings" );
 $names = $wpdb->get_col( $wpdb->prepare(
-    "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s", $like
+    "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+    $wpdb->esc_like( "woocommerce_" ) . "%" . $wpdb->esc_like( "_settings" ),
+    $wpdb->esc_like( "woocommerce-ppcp-" ) . "%"
 ) );
 if ( class_exists( "WC_Payment_Gateways" ) ) {
     foreach ( WC_Payment_Gateways::instance()->payment_gateways() as $gateway ) {
         $names[] = "woocommerce_" . $gateway->id . "_settings";
     }
 }
-$secret     = "/(secret|password|passwd|private|token|signature|api_?key|consumer_?(key|secret))/i";
-$identifier = "/(publishable_key|merchant_id|client_id|app_id|_id$|user(name)?$)/i";
+$secret     = "/(secret|secret_?key|password|passwd|private_?key|token|signature|api_?key|consumer_?key)(_?(live|test|sandbox|production|prod))?$/i";
+$identifier = "/(publishable_?key|merchant_?id|client_?id|app_?id|_id|user|username)(_?(live|test|sandbox|production|prod))?$/i";
+$flags      = array( "yes", "no", "on", "off", "true", "false", "0", "1" );
+$walk = function ( $name, $enabled, array $data, $path ) use ( &$walk, $secret, $identifier, $flags ) {
+    foreach ( $data as $key => $value ) {
+        $key_path = "" === $path ? (string) $key : $path . "." . $key;
+        if ( is_array( $value ) ) {
+            $walk( $name, $enabled, $value, $key_path );
+            continue;
+        }
+        if ( ! is_scalar( $value ) || "" === (string) $value
+            || in_array( strtolower( (string) $value ), $flags, true ) ) {
+            continue;
+        }
+        if ( preg_match( $identifier, (string) $key ) ) {
+            $level = "INFO";
+        } elseif ( preg_match( $secret, (string) $key ) ) {
+            $level = "CRITICAL";
+        } else {
+            continue;
+        }
+        printf( "%s %s: enabled=%s key=%s len=%d\n", $level, $name, $enabled, $key_path, strlen( (string) $value ) );
+    }
+};
 foreach ( array_unique( $names ) as $name ) {
     $settings = get_option( $name );
     if ( ! is_array( $settings ) ) {
         continue;
     }
-    $enabled = isset( $settings["enabled"] ) ? $settings["enabled"] : "-";
-    foreach ( $settings as $key => $value ) {
-        if ( ! is_scalar( $value ) || "" === (string) $value ) {
-            continue;
-        }
-        if ( preg_match( $identifier, $key ) ) {
-            $level = "INFO";
-        } elseif ( preg_match( $secret, $key ) ) {
-            $level = "CRITICAL";
-        } else {
-            continue;
-        }
-        printf( "%s %s: enabled=%s key=%s len=%d\n", $level, $name, $enabled, $key, strlen( (string) $value ) );
-    }
+    $walk( $name, isset( $settings["enabled"] ) ? $settings["enabled"] : "-", $settings, "" );
 }
 '
 ```
 
-The pattern also sweeps non-gateway `woocommerce_*_settings` rows (email settings and the
+How the key test reads:
+
+- The name must **end** in a secret word (`secret`, `secret_key`, `password`, `token`,
+  `signature`, `api_key`, …), optionally followed by an environment suffix (`_live`, `_test`,
+  `_sandbox`, `_production`). An unanchored match would flag settings flags such as
+  `tokenization`, `password_protected` or `signature_method`.
+- Values that are only a switch (`yes`, `no`, `on`, `off`, `0`, `1`…) are skipped, whatever
+  the key is called.
+- Identifiers are tested first, so `secret_key_id` or `client_id_live` is INFO, not CRITICAL.
+- Nested arrays are walked, and a nested key is reported with its dotted path.
+
+The enumeration also sweeps non-gateway `woocommerce_*_settings` rows (email settings and the
 like); a secret-shaped key there is just as much a secret at rest, so it is reported the same
 way.
 
@@ -401,18 +424,40 @@ prints every secret into the terminal and the session transcript:
 ```bash
 $WP eval '
 $name = "woocommerce_<gateway_id>_settings";
-$o    = get_option( $name );
-if ( is_array( $o ) ) {
-    foreach ( $o as $k => $v ) {
-        if ( preg_match( "/(secret|password|passwd|private|token|signature|api_?key|consumer_?(key|secret))/i", $k ) ) {
-            $o[ $k ] = "";
+$secret     = "/(secret|secret_?key|password|passwd|private_?key|token|signature|api_?key|consumer_?key)(_?(live|test|sandbox|production|prod))?$/i";
+$identifier = "/(publishable_?key|merchant_?id|client_?id|app_?id|_id|user|username)(_?(live|test|sandbox|production|prod))?$/i";
+$flags      = array( "yes", "no", "on", "off", "true", "false", "0", "1" );
+$count = 0;
+$scrub = function ( array $data ) use ( &$scrub, &$count, $secret, $identifier, $flags ) {
+    foreach ( $data as $key => $value ) {
+        if ( is_array( $value ) ) {
+            $data[ $key ] = $scrub( $value );
+            continue;
+        }
+        if ( ! is_scalar( $value ) || "" === (string) $value
+            || in_array( strtolower( (string) $value ), $flags, true )
+            || preg_match( $identifier, (string) $key ) ) {
+            continue;
+        }
+        if ( preg_match( $secret, (string) $key ) ) {
+            $data[ $key ] = "";
+            $count++;
         }
     }
-    update_option( $name, $o );
+    return $data;
+};
+$o = get_option( $name );
+if ( is_array( $o ) ) {
+    update_option( $name, $scrub( $o ) );
+    printf( "%s: %d secret value(s) blanked\n", $name, $count );
+} else {
+    printf( "%s: option not found or not an array, nothing changed\n", $name );
 }
-echo "scrubbed";
 '
 ```
+
+The scrub uses the same three patterns as the detection snippet, in the same order, so it blanks
+exactly the keys reported CRITICAL and leaves identifiers and switches alone.
 
 ## Step 3: Response-Header Checks
 
