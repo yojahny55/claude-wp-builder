@@ -347,7 +347,7 @@ percent-encoded per segment, so a file name with spaces or accents reaches `curl
 # One line per snippet, each starting with its label, so the output parses line by line.
 $WP eval 'echo "METHOD ",get_option("woocommerce_file_download_method") ?: "force","\n";'
 # Where uploads are served from (multisite: uploads/sites/N; custom UPLOADS or upload_path).
-$WP eval 'echo "UPLOADS-PATH ",rtrim(wp_parse_url(wp_upload_dir()["baseurl"],PHP_URL_PATH) ?: "","/") ?: "/","\n";'
+$WP eval 'echo "UPLOADS-PATH ",rtrim((string) wp_parse_url(wp_upload_dir()["baseurl"],PHP_URL_PATH),"/"),"\n";'
 # Probe file: FOUND|NO-LOCAL-UPLOADS|MISSING-LOCALLY <path relative to woocommerce_uploads/>,
 # or a marker when there is no path to probe.
 $WP eval 'global $wpdb; $seg="/woocommerce_uploads/";
@@ -385,7 +385,9 @@ Never `PASS` without a probe file and a control file.
 **Build both URLs from `UPLOADS-PATH`, never from a hardcoded `/wp-content/uploads`.** It is
 `/wp-content/uploads` on a default single site, `/wp-content/uploads/sites/<N>` on a multisite
 subsite (run the snippets with `--url=<subsite>`), and whatever a custom `UPLOADS` constant or
-`upload_path` option sets otherwise; the probe and control paths are relative to it. Only
+`upload_path` option sets otherwise; the probe and control paths are relative to it. It has
+no trailing slash and is empty when uploads sit at the web root, so `<uploads-path>/<path>`
+always joins with exactly one slash. Only
 the path is kept: when the uploads base URL sits on another host (media offloaded to a CDN or
 bucket), the control on the production host fails and the check is `UNMEASURED`, never a
 verdict read off a host that is not the site.
@@ -429,6 +431,10 @@ Read the verdict off that first response:
 | `404` from the site's own server, same conditions, and the probe file was `FOUND` | protected → PASS |
 | `404` on a `NO-LOCAL-UPLOADS` or `MISSING-LOCALLY` probe file | the file may simply be gone → `UNMEASURED` |
 | `403` carrying a challenge header: `cf-mitigated: challenge`, a `cf-chl-*` / `__cf_chl` cookie, `x-sucuri-block`, or any header naming a WAF or bot check | **a 403 from a WAF is not protection** — the challenge would clear for a browser and the file may still be open → `UNMEASURED` |
+
+On a site behind Cloudflare or Sucuri every response carries the proxy's headers, the site's
+own `403` included: `server: cloudflare`, `cf-ray` or `x-sucuri-id` on their own do not make it
+a WAF answer; only a challenge or block header does.
 | `3xx` (login redirect or otherwise), `405` after the ranged fallback, `401`, `429`, `5xx`, or `200` with `text/html` (a soft 404 or a challenge page) | `UNMEASURED`, with the status line and headers as evidence |
 | curl error (exit other than `0`/`63`) or empty response | `UNMEASURED`, quoting the curl exit code |
 

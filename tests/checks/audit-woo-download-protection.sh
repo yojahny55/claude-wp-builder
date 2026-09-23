@@ -54,14 +54,16 @@ has()  { grep -Fq -- "$1" <<<"$flat"; }
 line() { grep -Fxq -- "$1" <<<"$proc"; }
 
 # The snippet block prints one labelled line each, so its output parses line by line.
-line "\$WP eval 'echo \"METHOD \",get_option(\"woocommerce_file_download_method\") ?: \"force\",\"\\n\";'" \
+has 'echo "METHOD ",get_option("woocommerce_file_download_method") ?: "force","\n";' \
   || fail "SEC-039 does not print the download method on its own labelled line"
-line "\$WP eval 'echo \"UPLOADS-PATH \",rtrim(wp_parse_url(wp_upload_dir()[\"baseurl\"],PHP_URL_PATH) ?: \"\",\"/\") ?: \"/\",\"\\n\";'" \
+has 'echo "UPLOADS-PATH ",rtrim((string) wp_parse_url(wp_upload_dir()["baseurl"],PHP_URL_PATH),"/"),"\n";' \
   || fail "SEC-039 does not print the uploads URL path"
 has '**Build both URLs from `UPLOADS-PATH`, never from a hardcoded `/wp-content/uploads`.**' \
   || fail "SEC-039 hardcodes /wp-content/uploads (multisite and custom UPLOADS never measured)"
 has '`/wp-content/uploads/sites/<N>` on a multisite subsite (run the snippets with `--url=<subsite>`)' \
   || fail "SEC-039 lost the multisite uploads path"
+has 'It has no trailing slash and is empty when uploads sit at the web root, so `<uploads-path>/<path>` always joins with exactly one slash.' \
+  || fail "SEC-039 does not say how UPLOADS-PATH joins (double slash at the web root)"
 has 'when the uploads base URL sits on another host (media offloaded to a CDN or bucket), the control on the production host fails and the check is `UNMEASURED`' \
   || fail "SEC-039 does not say what happens when uploads are offloaded to another host"
 
@@ -81,7 +83,7 @@ has 'With `NO-DOWNLOADS` or `EXTERNAL-ONLY` it is `N/A`, exactly as for the othe
 # The nginx-vs-Apache reason is the crux; if it goes, the check looks like a config lookup.
 has 'nginx does not' || fail "SEC-039 lost the reason the .htaccess is inert on nginx"
 # The fix must name the server layer, not propose editing the (inert) .htaccess.
-has 'a `location` block that denies direct access' \
+has 'on nginx, a `location` block that denies direct access to `woocommerce_uploads`' \
   || fail "SEC-039 fix does not name an nginx location block"
 has 'purge that path from any edge cache' || fail "SEC-039 fix lost the edge-cache purge"
 
@@ -146,6 +148,38 @@ has 'Exit `63` from either fallback means the server ignored the range and annou
 has 'Any other non-zero exit, or no status line at all, is `UNMEASURED`, quoting the curl exit code' \
   || fail "SEC-039 does not report a curl error as UNMEASURED"
 
+# Every line of every code block in the procedure, verbatim. The fragment gates above say
+# why each piece matters; this pin catches the rest (a deleted early return, a dropped
+# rawurldecode, an edited comment that no longer matches the code).
+while IFS= read -r l; do
+  line "$l" || fail "SEC-039 code line missing or changed: $l"
+done <<'EOF_SNIPPETS'
+# One line per snippet, each starting with its label, so the output parses line by line.
+$WP eval 'echo "METHOD ",get_option("woocommerce_file_download_method") ?: "force","\n";'
+# Where uploads are served from (multisite: uploads/sites/N; custom UPLOADS or upload_path).
+$WP eval 'echo "UPLOADS-PATH ",rtrim((string) wp_parse_url(wp_upload_dir()["baseurl"],PHP_URL_PATH),"/"),"\n";'
+# Probe file: FOUND|NO-LOCAL-UPLOADS|MISSING-LOCALLY <path relative to woocommerce_uploads/>,
+# or a marker when there is no path to probe.
+$WP eval 'global $wpdb; $seg="/woocommerce_uploads/";
+$rows=$wpdb->get_col("SELECT pm.meta_value FROM {$wpdb->postmeta} pm JOIN {$wpdb->posts} p ON p.ID=pm.post_id LEFT JOIN {$wpdb->posts} par ON par.ID=p.post_parent WHERE pm.meta_key=\"_downloadable_files\" AND pm.meta_value<>\"\" AND p.post_status=\"publish\" AND (p.post_type=\"product\" OR (p.post_type=\"product_variation\" AND par.post_status=\"publish\")) ORDER BY p.post_date DESC");
+if(!$rows){echo "NO-DOWNLOADS\n";return;}
+$dir=wp_upload_dir()["basedir"].$seg; $local=is_dir($dir); $first=null;
+foreach($rows as $r){foreach((array)maybe_unserialize($r) as $f){$u=is_array($f)?($f["file"]??""):"";$i=strpos($u,$seg);if($i===false){continue;}
+$p=rawurldecode(preg_replace("/[?#].*$/","",substr($u,$i+strlen($seg))));
+$enc=implode("/",array_map("rawurlencode",explode("/",$p)));
+if($local&&file_exists($dir.$p)){echo "FOUND $enc\n";return;} $first=$first??$enc;}}
+if($first===null){echo "EXTERNAL-ONLY\n";return;} echo $local?"MISSING-LOCALLY":"NO-LOCAL-UPLOADS"," $first\n";'
+# Control file: a public upload outside woocommerce_uploads, relative to the uploads path.
+$WP eval '$a=get_posts(["post_type"=>"attachment","post_mime_type"=>"image","post_status"=>"inherit","numberposts"=>1,"fields"=>"ids","meta_query"=>[["key"=>"_wp_attached_file","value"=>"woocommerce_uploads/","compare"=>"NOT LIKE"]]]); echo $a?"CONTROL ".implode("/",array_map("rawurlencode",explode("/",get_post_meta($a[0],"_wp_attached_file",true)))):"NO-CONTROL","\n";'
+curl -sI --max-time 15 -A "Mozilla/5.0" "https://<production-host><uploads-path>/<control-path>"
+# HEAD not allowed (405/501)? The same capped one-byte ranged GET:
+curl -s -o /dev/null -D - -r 0-0 --max-filesize 1024 --max-time 15 -A "Mozilla/5.0" "https://<production-host><uploads-path>/<control-path>"
+curl -sI --max-time 15 -A "Mozilla/5.0" "https://<production-host><uploads-path>/woocommerce_uploads/<path>"
+# HEAD not allowed (405/501)? Fall back to a one-byte ranged GET, body discarded and capped
+# in case the server ignores the range:
+curl -s -o /dev/null -D - -r 0-0 --max-filesize 1024 --max-time 15 -A "Mozilla/5.0" "https://<production-host><uploads-path>/woocommerce_uploads/<path>"
+EOF_SNIPPETS
+
 # Verdict table: every row, verbatim.
 line '| `200` or `206` with any `content-type` other than `text/html` | the file is served without a purchase → **CRITICAL** |' \
   || fail "SEC-039 CRITICAL rule does not cover any non-HTML 200/206"
@@ -157,6 +191,8 @@ line '| `404` on a `NO-LOCAL-UPLOADS` or `MISSING-LOCALLY` probe file | the file
   || fail "SEC-039 reads a 404 on a file not confirmed locally as protected"
 line '| `403` carrying a challenge header: `cf-mitigated: challenge`, a `cf-chl-*` / `__cf_chl` cookie, `x-sucuri-block`, or any header naming a WAF or bot check | **a 403 from a WAF is not protection** — the challenge would clear for a browser and the file may still be open → `UNMEASURED` |' \
   || fail "SEC-039 reads a WAF or bot-challenge 403 (Cloudflare, Sucuri) as protected"
+has '`server: cloudflare`, `cf-ray` or `x-sucuri-id` on their own do not make it a WAF answer; only a challenge or block header does.' \
+  || fail "SEC-039 may read any 403 on a proxied site as a WAF answer"
 line '| `3xx` (login redirect or otherwise), `405` after the ranged fallback, `401`, `429`, `5xx`, or `200` with `text/html` (a soft 404 or a challenge page) | `UNMEASURED`, with the status line and headers as evidence |' \
   || fail "SEC-039 lost the UNMEASURED row for redirects, 405, 5xx and HTML 200"
 line '| curl error (exit other than `0`/`63`) or empty response | `UNMEASURED`, quoting the curl exit code |' \
