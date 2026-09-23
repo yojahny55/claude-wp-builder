@@ -195,8 +195,8 @@ greater than zero, `x-cache: HIT`, a `via:`/`server:` naming Varnish, or a prese
 `x-proxy-cache`/`x-fastcgi-cache` header — since most CDNs and reverse-proxy caches use one of
 these instead of `cf-cache-status`. Follow the exact production-host contract
 `wp-audit-security.md` Step 3 uses for its own response-header checks: ask for the production
-URL when the manifest does not resolve one, default to `restore.url_origin`, and never fire this
-at the local clone — a clone has no CDN in front of it (Step 2.3 suppresses that absence as a
+URL when the manifest does not resolve one, default to `wordpress.url_origin`, and never fire
+this at the local clone — a clone has no CDN in front of it (Step 2.3 suppresses that absence as a
 clone artifact, not a finding), so probing it here would read as "no cache detected" and hide a
 defect that is live in production. Without a confirmed production URL, PERF-065, PERF-066 and
 PERF-067 are all `UNMEASURED` ("needs the public URL"), never `PASS` — a cache with no
