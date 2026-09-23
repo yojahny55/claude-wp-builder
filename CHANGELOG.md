@@ -4,6 +4,17 @@
 
 ### Fixed
 
+- **A horizontal-overflow finding did not say what overflowed.** `bin/demo-verify.mjs`
+  reported `overflow: true` and nothing else, once per sampled position. On a real
+  build the box stretching the page was a 1px `screen-reader-text` span inside a
+  carousel card. It is `position: absolute`, and its containing block sat outside
+  the carousel's `overflow-x: auto` strip, so the strip never clipped it. It widened
+  the document at every width and showed in no screenshot. The row now lists the
+  `culprits`: boxes past the right edge that no ancestor clips. It follows the
+  containing-block rule for absolute boxes, and `escapes` names the clipping box an
+  absolute culprit got past. The same culprits at every position count as one row
+  per width. `tests/checks/demo-verify-overflow-culprits.sh` runs the walk on an
+  escaping strip and on the same strip with positioned cards.
 - **Rank Math modules enabled from WP-CLI ran without their tables.** Writing
   `rank_math_modules` skips the activation that creates `rank_math_404_logs` and
   `rank_math_redirections`, so `404-monitor` and `redirections` ran two failing queries on
