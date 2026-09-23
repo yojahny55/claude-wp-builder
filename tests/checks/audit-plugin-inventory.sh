@@ -70,8 +70,8 @@ inv="$(section "$sec" '## Plugin inventory — shared by' '## Step 1: Tier 1')"
 recheck="$(section "$sec" '- **Vendor-plugin re-check.**' '## Plugin inventory')"
 proc="$(section "$sec" '### Procedure — SEC-041 and SEC-042' '## Step 3')"
 s43="$(section "$sec" '**SEC-043 — Duplicate/redeclared function' '## Step 2: Tier 2')"
-rules="$(section "$sec" '9. **SEC-041 and SEC-042 share' '12. **The WPScan token')"
-rules="$rules $(section "$sec" '12. **The WPScan token' 'never in a finding')"
+rules="$(section "$sec" '10. **SEC-041 and SEC-042 share' '13. **The WPScan token')"
+rules="$rules $(section "$sec" '13. **The WPScan token' 'never in a finding')"
 adoptsec="$(section "$adopt" 'Re-verify the first case before offering the list' '2. **Function prefix.**')"
 for v in tier1 tier2 inv recheck proc s43 rules adoptsec; do
   [ -n "$(echo "${!v}" | tr -d ' ')" ] || fail "section '$v' is missing — a heading the gates anchor on was renamed"
@@ -118,8 +118,8 @@ has "$inv" '**plus every slug on the `Clone-suppressed plugins` line**' \
 has "$proc" 'excluding anything Step 2.3' && fail "$sec still excludes clone-suppressed plugins from SEC-041/042"
 has "$s43" 'is not scanned here either' && fail "$sec still drops clone-suppressed plugins from SEC-043"
 has "$rules" 'Step 2.3 suppresses a finding, never an inventory entry' \
-  || fail "$sec rule 10 does not keep suppressed plugins in the inventory"
-has "$rules" 'respect the Step 2.3 clone suppression' && fail "$sec rule 10 still skips clone-suppressed plugins"
+  || fail "$sec rule 11 does not keep suppressed plugins in the inventory"
+has "$rules" 'respect the Step 2.3 clone suppression' && fail "$sec rule 11 still skips clone-suppressed plugins"
 
 # --- Runnable snippets: headers via get_plugins(), -g and a status on every info-API curl ---
 grep -Fq -- '--field=plugin_uri' "$sec" "$adopt" && fail "a snippet still uses the nonexistent --field=plugin_uri"
@@ -174,7 +174,7 @@ has "$inv" '**`code_scope.editable` slugs go to wp.org only, and only from the v
 has "$inv" 'never sent to a third-party vulnerability feed' || fail "$sec may send editable slugs to the feed"
 has "$inv" '**Only public slugs are sent to the vulnerability feed.**' || fail "$sec does not restrict the feed to public slugs"
 has "$rules" 'editable slugs go to wp.org only, from the vendor re-check; only public slugs reach WPScan' \
-  || fail "$sec rule 11 disagrees with the editable-slug rule"
+  || fail "$sec rule 12 disagrees with the editable-slug rule"
 has "$rules" 'The WPScan token never leaves stdin' || fail "$sec has no rule keeping the token off the command line"
 grep -Fq 'It is still skipped for' "$sec" && fail "$sec still carries the old contradictory editable-slug wording"
 has "$inv" 'proved public there (this plugin'"'"'s listing, or closed): a public slug like any other' \
