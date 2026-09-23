@@ -108,10 +108,13 @@
   array in the `wp_options` row `woocommerce_<gateway_id>_settings` — so nothing that scans
   source code could ever see it. That row is exactly what a database dump, staging snapshot
   or cloned copy carries verbatim, which makes a configured gateway's credentials a real leak
-  risk on any shared copy of the site. SEC-040 enumerates enabled gateways through
-  `WC_Payment_Gateways`, reads each one's settings, and reports CRITICAL when a
-  credential-shaped key (`api_key`, `secret_key`, `token`, `publishable_key`, …) is
-  non-empty, without ever printing the value itself. It is `N/A` when `site.commerce` is
+  risk on any shared copy of the site. SEC-040 enumerates every `woocommerce_*_settings` row
+  straight from the options table — so a gateway whose plugin is deactivated, as on a clone,
+  is still covered — matches each stored key name against a secret pattern (`secret`,
+  `password`, `token`, `signature`, `api_key`, …), and reports CRITICAL when one is
+  non-empty, without ever printing the value itself. Identifiers such as `publishable_key`
+  and `merchant_id` are listed as INFO. The manual scrub step edits the row in place instead
+  of dumping it. It is `N/A` when `site.commerce` is
   `none` (`/wp-audit` Step 2.3), like every other commerce-only check, and it is deliberately
   **not** folded into that same step's local-clone suppression list: a gateway deactivated on
   a clone is a clone artifact and stays suppressed, but the credential still sitting in

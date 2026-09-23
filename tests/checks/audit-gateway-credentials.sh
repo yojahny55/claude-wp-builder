@@ -6,8 +6,8 @@
 # `woocommerce_<gateway_id>_settings`, a serialized array with keys like `api_key`,
 # `secret_key` and `token`. Nothing that scans source code sees that row, and it is exactly
 # the row a database dump, a staging snapshot, or a cloned copy carries verbatim. This test
-# pins two directions: the check enumerates enabled gateways and reports a non-empty
-# credential value at CRITICAL, AND it does not fold into the local-clone suppression list —
+# pins two directions: the check enumerates every settings row from the database (active or
+# deactivated plugin) and reports a non-empty secret-shaped value at CRITICAL, AND it does not fold into the local-clone suppression list —
 # a gateway deactivated on a clone is a clone artifact, but a credential still sitting in
 # wp_options is true on production too and must still be reported.
 
@@ -27,47 +27,65 @@ grep -Eq '^\| SEC-040 \|' "$SEC" || fail "$SEC: SEC-040 is not tabulated"
 grep -E '^\| SEC-040 \|' "$SEC" | grep -Fq 'CRITICAL' \
   || fail "$SEC: SEC-040's table row is not CRITICAL"
 
+# Every other gate reads only the SEC-040 procedure, so a word elsewhere in the agent file
+# cannot keep it green.
+PROC=$(awk '/^### Procedure — SEC-040/{f=1;print;next} /^##/{f=0} f' "$SEC")
+[ -n "$PROC" ] || fail "$SEC: no '### Procedure — SEC-040' section"
+has() { printf '%s\n' "$PROC" | grep -Fq -- "$1"; }
+hasi() { printf '%s\n' "$PROC" | grep -Fiq -- "$1"; }
+
 # --- It reads the options table, not theme source ---
-grep -Fq 'woocommerce_' "$SEC" || fail "$SEC: SEC-040 does not name the woocommerce_<gateway>_settings option"
-grep -Fq 'get_option' "$SEC" || fail "$SEC: SEC-040 does not read the option with get_option"
+has 'woocommerce_<gateway_id>_settings' || fail "SEC-040 does not name the woocommerce_<gateway_id>_settings option"
+has 'get_option(' || fail "SEC-040 does not read the option with get_option"
 
-# --- It enumerates enabled gateways, not a fixed list of plugin slugs ---
-grep -Fq 'WC_Payment_Gateways' "$SEC" \
-  || fail "$SEC: SEC-040 does not enumerate gateways via WC_Payment_Gateways"
-grep -Fq 'enabled' "$SEC" || fail "$SEC: SEC-040 does not check whether the gateway is enabled"
+# --- It enumerates the settings rows from the database, so deactivated gateways are covered ---
+has 'SELECT option_name FROM {$wpdb->options}' \
+  || fail "SEC-040 does not enumerate woocommerce_*_settings rows from the options table"
+has 'esc_like( "_settings" )' || fail "SEC-040 does not match the _settings suffix"
+has 'only returns gateways whose plugin is active' \
+  || fail "SEC-040 does not say why payment_gateways() alone misses deactivated gateways"
+has '$settings["enabled"]' || fail "SEC-040 does not read enabled from the stored settings"
+if printf '%s\n' "$PROC" | grep -Fq '$gateway->enabled'; then
+  fail "SEC-040 reads enabled from the loaded gateway object, which misses deactivated plugins"
+fi
 
-# --- It checks credential-shaped keys ---
-for key in api_key secret_key token publishable_key; do
-  grep -Fq "$key" "$SEC" || fail "$SEC: SEC-040 does not check the credential-shaped key '$key'"
+# --- It matches secret-shaped key names by pattern, not an exact list ---
+for word in secret password token signature 'api_?key'; do
+  has "$word" || fail "SEC-040's secret pattern does not cover '$word'"
 done
+has 'foreach ( $settings as $key => $value )' \
+  || fail "SEC-040 does not test every stored key against the pattern"
+has 'publishable_key' || fail "SEC-040 does not classify publishable_key"
+hasi 'public by design' || fail "SEC-040 does not say a publishable key is not a secret"
 
-# --- Never print the credential value itself ---
-grep -Fq 'never print the value itself' "$SEC" \
-  || fail "$SEC: SEC-040 does not say to withhold the credential value from the report"
+# --- Never print the credential value itself, including in the scrub fix ---
+has 'never print the value itself' \
+  || fail "SEC-040 does not say to withhold the credential value from the report"
+has 'never by dumping the option' || fail "SEC-040's scrub step does not forbid dumping the option"
+if printf '%s\n' "$PROC" | grep -Eq 'option get[^`]*--format=json`?\)'; then
+  fail "SEC-040's scrub step still dumps the option as JSON"
+fi
 
 # --- Commerce gating: N/A when there is no WooCommerce, out of the denominator ---
-grep -Fq 'site.commerce' "$SEC" || fail "$SEC: SEC-040 does not read site.commerce"
-grep -Fq 'no WooCommerce' "$SEC" || fail "$SEC: SEC-040 does not give the N/A reason"
+has 'site.commerce' || fail "SEC-040 does not read site.commerce"
+has 'no WooCommerce' || fail "SEC-040 does not give the N/A reason"
 
 # --- The clone-suppression distinction is explicit, both directions ---
-grep -Fq 'local-clone suppression' "$SEC" \
-  || fail "$SEC: SEC-040 does not reference the local-clone suppression list"
-grep -Fq 'deactivating the gateway on the' "$SEC" \
-  || fail "$SEC: SEC-040 does not say deactivation does not clear the stored credential"
-grep -Fq 'reported by SEC-040' "$SEC" \
-  || fail "$SEC: SEC-040 does not say the credential is still reported despite deactivation"
+has 'local-clone suppression' || fail "SEC-040 does not reference the local-clone suppression list"
+has 'deactivating the gateway on the' \
+  || fail "SEC-040 does not say deactivation does not clear the stored credential"
+has 'reported by SEC-040' \
+  || fail "SEC-040 does not say the credential is still reported despite deactivation"
 
 # --- Fix is manual, never automatic ---
-grep -Fq 'Fix is manual, never automatic' "$SEC" \
-  || fail "$SEC: SEC-040 does not say the fix is manual"
-grep -Fiq 'rotate the key' "$SEC" || fail "$SEC: SEC-040 does not tell the reader to rotate the key"
-grep -Fiq 'scrub' "$SEC" || fail "$SEC: SEC-040 does not tell the reader to scrub a shared/cloned copy"
+has 'Fix is manual, never automatic' || fail "SEC-040 does not say the fix is manual"
+hasi 'rotate the key' || fail "SEC-040 does not tell the reader to rotate the key"
+hasi 'scrub' || fail "SEC-040 does not tell the reader to scrub a shared/cloned copy"
 
-# --- The base contract this stacks on: /wp-audit Step 2.3 already names the gateway-credential
-#     check as one of the commerce-only checks gated by site.commerce. ---
-if [ -f "$AUDIT" ]; then
-  grep -Fq 'gateway-credential check' "$AUDIT" \
-    || fail "$AUDIT: does not name the gateway-credential check among the commerce-only checks"
-fi
+# --- The base contract this stacks on: /wp-audit Step 2.3 names the gateway-credential check
+#     as one of the commerce-only checks gated by site.commerce. ---
+[ -f "$AUDIT" ] || fail "$AUDIT is missing"
+grep -Fq 'gateway-credential check' "$AUDIT" \
+  || fail "$AUDIT: does not name the gateway-credential check among the commerce-only checks"
 
 echo PASS

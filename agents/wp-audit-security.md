@@ -161,7 +161,7 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 | SEC-036 | Development host in the database | `$WP eval` sweep of `options`, `postmeta`, `posts` and `termmeta` for the dev host. See Procedure | CRITICAL |
 | SEC-037 | Backup or editor files inside the theme | Glob the theme for `*.bak*`, `*.orig`, `*.save`, `*~`, `*.php.[0-9]*`, `*.sql` | WARNING |
 | SEC-038 | Update counts reported without network access | Reach `api.wordpress.org` before reading any update count. See Procedure | WARNING |
-| SEC-040 | Gateway credentials stored at rest | Read each `woocommerce_<gateway>_settings` option for enabled gateways, check credential-shaped keys. See Procedure | No enabled gateway holds a non-empty live credential value | CRITICAL |
+| SEC-040 | Gateway credentials stored at rest | Read every `woocommerce_<gateway>_settings` row in the options table (active or not), match secret-shaped key names. See Procedure | No gateway settings row holds a non-empty secret value | CRITICAL |
 
 `N/A ("no WooCommerce")`, out of the denominator, when `site.commerce` is `none` (`/wp-audit`
 Step 2.3) — this check has nothing to read without WooCommerce installed and active.
@@ -314,52 +314,70 @@ snapshot or a cloned copy carries verbatim. A key sitting there is a live secret
 key in a `.env` file is: whoever gets a copy of the database gets the gateway's production
 credentials.
 
-**Enumerate enabled gateways and read their settings, not a fixed list of plugin slugs** — a
-gateway added later would silently escape a hardcoded check:
+**Enumerate the settings rows from the database, not from WooCommerce's gateway registry, and
+match key names by pattern, not against a fixed list.** `WC_Payment_Gateways::instance()->payment_gateways()`
+only returns gateways whose plugin is active and whose class is loaded — on a clone, where the
+gateway plugins are deactivated, it returns the core offline methods only and every stored key
+escapes the check. The `woocommerce_<gateway_id>_settings` rows are still there, so read those.
+Likewise each gateway names its secrets its own way (`secret_key`, `app_secret`,
+`live_secret_key`, `api_password`, `api_signature`, `webhook_secret`…), so an exact-name list
+misses real secrets:
 
 ```bash
 $WP eval '
-if ( ! class_exists( "WC_Payment_Gateways" ) ) {
-    echo "no WooCommerce";
-    return;
+global $wpdb;
+$like  = $wpdb->esc_like( "woocommerce_" ) . "%" . $wpdb->esc_like( "_settings" );
+$names = $wpdb->get_col( $wpdb->prepare(
+    "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s", $like
+) );
+if ( class_exists( "WC_Payment_Gateways" ) ) {
+    foreach ( WC_Payment_Gateways::instance()->payment_gateways() as $gateway ) {
+        $names[] = "woocommerce_" . $gateway->id . "_settings";
+    }
 }
-$credential_keys = array(
-    "api_key", "secret_key", "secret", "private_key", "publishable_key",
-    "client_secret", "token", "access_token", "merchant_id", "consumer_key",
-    "consumer_secret",
-);
-foreach ( WC_Payment_Gateways::instance()->payment_gateways() as $gateway ) {
-    $settings = get_option( "woocommerce_" . $gateway->id . "_settings", array() );
+$secret     = "/(secret|password|passwd|private|token|signature|api_?key|consumer_?(key|secret))/i";
+$identifier = "/(publishable_key|merchant_id|client_id|app_id|_id$|user(name)?$)/i";
+foreach ( array_unique( $names ) as $name ) {
+    $settings = get_option( $name );
     if ( ! is_array( $settings ) ) {
         continue;
     }
-    foreach ( $credential_keys as $key ) {
-        if ( ! empty( $settings[ $key ] ) ) {
-            printf(
-                "%s: enabled=%s key=%s len=%d\n",
-                $gateway->id,
-                $gateway->enabled,
-                $key,
-                strlen( (string) $settings[ $key ] )
-            );
+    $enabled = isset( $settings["enabled"] ) ? $settings["enabled"] : "-";
+    foreach ( $settings as $key => $value ) {
+        if ( ! is_scalar( $value ) || "" === (string) $value ) {
+            continue;
         }
+        if ( preg_match( $identifier, $key ) ) {
+            $level = "INFO";
+        } elseif ( preg_match( $secret, $key ) ) {
+            $level = "CRITICAL";
+        } else {
+            continue;
+        }
+        printf( "%s %s: enabled=%s key=%s len=%d\n", $level, $name, $enabled, $key, strlen( (string) $value ) );
     }
 }
 '
 ```
 
-- **Pass:** for every gateway whose `enabled` is `yes`, none of the credential-shaped keys hold
-  a non-empty value — either the gateway is not configured yet, or it is a sandbox/test mode
-  with no live key.
-- **Fail:** an enabled gateway has a non-empty value under `api_key`, `secret_key`, `token`, or
-  any of the other credential-shaped keys. Report the gateway id and which key(s) matched, but
-  never print the value itself — the length is enough to prove it is non-empty.
-- Message: `Enabled payment gateway "<gateway_id>" stores a live credential ("<key>") in
-  wp_options — a database copy carries the working key`
+The pattern also sweeps non-gateway `woocommerce_*_settings` rows (email settings and the
+like); a secret-shaped key there is just as much a secret at rest, so it is reported the same
+way.
+
+- **Pass:** no settings row holds a non-empty value under a secret-shaped key — whatever the
+  gateway's `enabled` flag and whether its plugin is active. Rows with only identifiers
+  (`publishable_key`, `merchant_id`, `*_id`, `user`) pass; those are listed as INFO, since a
+  publishable key is public by design and an id is not a credential on its own.
+- **Fail:** any settings row has a non-empty value under a secret-shaped key (`secret_key`,
+  `api_key`, `token`, `app_secret`, `api_password`…). Report the option name, its `enabled`
+  value and which key(s) matched, but never print the value itself — the length is enough to
+  prove it is non-empty.
+- Message: `Payment gateway settings "<option_name>" (enabled=<yes|no>) store a live credential
+  ("<key>") in wp_options — a database copy carries the working key`
 
 **This is `N/A`, not a finding, on a non-commerce site.** Read `site.commerce` from `/wp-audit`
-Step 2.3 rather than re-detecting WooCommerce here; when it is `none` this check is `N/A ("no
-WooCommerce")`, out of the denominator, same as every other commerce-only check.
+Step 2.3 rather than re-detecting WooCommerce here; when it is `none` this check is
+`N/A ("no WooCommerce")`, out of the denominator, same as every other commerce-only check.
 
 **Do not confuse this with the local-clone suppression in `/wp-audit` Step 2.3.** That step
 lists "known-local plugins deactivated (payment gateways, …)" as a clone artifact to suppress
@@ -368,16 +386,33 @@ is not a finding. SEC-040 is a different fact about the same gateway: the creden
 still sitting in `wp_options` is true of production too — deactivating the gateway on the
 clone does not clear it — and it is exactly what makes a shared or cloned database a leak
 risk. So a deactivated-but-still-configured gateway is reported by SEC-040 (a live key at
-rest) even while its deactivation is not reported by Step 2.3 (a clone artifact). Only a
-gateway with `enabled !== "yes"` **and** an empty settings array is fully silent here.
+rest) even while its deactivation is not reported by Step 2.3 (a clone artifact). Neither the
+`enabled` flag nor the plugin being inactive silences it: only a row with no secret-shaped key
+holding a value is silent here.
 
 **Fix is manual, never automatic.** There is no safe automatic fix — the theme does not own
 `wp_options`, and clearing the key would break the live gateway on production. The remediation
 is procedural: rotate the key at the payment processor if this database was ever shared, backed
 up off the original server, or handed to a third party; and on a clone or shared copy meant to
-be handed around, scrub the value from `wp_options` (`$WP option get
-woocommerce_<gateway_id>_settings --format=json`, redact the credential keys, `$WP option
-update … --format=json`) before the copy leaves the machine that has production access.
+be handed around, scrub the value from `wp_options` before the copy leaves the machine that has
+production access. Scrub in place, never by dumping the option — `wp option get … --format=json`
+prints every secret into the terminal and the session transcript:
+
+```bash
+$WP eval '
+$name = "woocommerce_<gateway_id>_settings";
+$o    = get_option( $name );
+if ( is_array( $o ) ) {
+    foreach ( $o as $k => $v ) {
+        if ( preg_match( "/(secret|password|passwd|private|token|signature|api_?key|consumer_?(key|secret))/i", $k ) ) {
+            $o[ $k ] = "";
+        }
+    }
+    update_option( $name, $o );
+}
+echo "scrubbed";
+'
+```
 
 ## Step 3: Response-Header Checks
 
