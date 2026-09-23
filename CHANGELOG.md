@@ -69,6 +69,16 @@
   `/wp-header`, `/wp-footer`, the Rank Math breadcrumb CSS, `wp-css` and `wp-responsive`
   reach 24x24 with padding plus an equal negative margin, so the text does not move.
 
+- **A carousel's absolute boxes escaped the strip and scrolled the page sideways.** The
+  Carousels rules in `agents/wp-template.md` asked for controls outside the scrolling
+  element, but not for positioned cards. The A11Y-032 fix in `agents/wp-audit-a11y.md` adds
+  a `screen-reader-text` span, which is `position: absolute`, to every new-tab link,
+  including a card's "see more". On a real build the containing block of that span was a
+  container above the `overflow-x: auto` strip, so the strip never clipped it. Every
+  off-screen card widened the document, at every width from phone to 1920. Cards inside a
+  scrolling strip are now `relative`, the A11Y-032 fix says so, and both give the
+  `scrollWidth <= clientWidth` check. `tests/checks/carousel-positioned-cards.sh`.
+
 ### Added
 
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had

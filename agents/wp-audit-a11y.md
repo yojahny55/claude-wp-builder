@@ -368,6 +368,12 @@ document.addEventListener('keydown', (e) => {
 </a>
 ```
 
+`.screen-reader-text` is `position: absolute`. When the link sits inside a horizontally
+scrolling strip (a carousel card), the card needs `position: relative`. Without it the span
+is laid out against a container above the strip, `overflow-x: auto` does not clip it, and
+the off-screen cards stretch the page sideways. After applying this fix, check
+`document.documentElement.scrollWidth <= clientWidth` at a desktop and a phone width.
+
 **A11Y-033 fix — scrollable region keyboard access:**
 
 ```html
