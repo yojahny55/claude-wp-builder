@@ -141,6 +141,83 @@ Print it before the tier detection, so the scope of the run is visible up front:
   Stack           seo=<…> security=<…> fields=<…> multilingual=<…> builder=<…> cache=<…>
 ```
 
+## Step 2.3: Site type and local clone
+
+Two facts decide how many later checks should even run, and both are read once, here, before
+any category dispatches.
+
+### Site type — is this a store?
+
+A store fails in ways an informational site cannot, and an informational site must never be
+scored against checks it could not satisfy. Detect commerce once and record it:
+
+```bash
+$WP plugin is-active woocommerce && echo "site type: commerce (WooCommerce)" \
+  || echo "site type: non-commerce"
+```
+
+Set `site.commerce` to `woocommerce` or `none`. Every commerce-only check — the SEO checks
+in `skills/wp-audit-seo-standards` marked commerce, the download-protection check, the
+gateway-credential check, the multi-currency check — is **`N/A` when `site.commerce` is
+`none`**, said with the reason "no WooCommerce", and excluded from the denominator. This is
+how the commerce depth is added without regressing a generic site: a blog audited after this
+change scores exactly as it did before, because every new check reads `N/A` on it.
+
+`is-active`, not `is-installed`: a store with WooCommerce deactivated is not currently a
+store, and its commerce surfaces are not live to audit.
+
+### Local clone — audit production's posture, not the copy's
+
+When `.wp-create.json` carries `source: restore`, or a `restore.url_origin`, or its
+`wordpress.url` is a non-public host (`*.local`, `localhost`, `127.`, `10.`, `192.168.`,
+`172.16.`–`172.31.`), the project is a **local clone of a site that lives somewhere else**.
+Set `local_clone = true` and read `production_url` from `restore.url_origin` when present.
+
+A clone is deliberately altered to run in isolation, and those alterations are not defects of
+the site being audited — they are the cost of having a local copy at all. Reporting them
+audits the clone instead of the site. When `local_clone` is true, the following are
+**`N/A (local clone)`**, out of the denominator, and are *not* printed as findings — the
+reader wants production's posture, not a list of what localization changed:
+
+| Condition normally a finding | Why it is a clone artifact here |
+|---|---|
+| Dev host stored in the database (SEC-036) | the clone's own URL is *supposed* to be the local host |
+| Known-local plugins deactivated (payment gateways, a CDN/page-cache plugin, an object-cache/Redis plugin, a mail plugin, a security/scanner plugin) | turned off so the copy does not reach live payment, cache or mail endpoints |
+| `DISABLE_WP_CRON` true, `WP_CACHE` false | set so an isolated copy does not fire scheduled or cached work |
+| `object-cache.php` / `advanced-cache.php` absent or left as `*.bak` | the backing service (Redis, a CDN cache) does not exist locally |
+| A must-use plugin that neutralizes mail or external calls (e.g. a local `wp_mail()` override) | added by the clone to keep the copy from contacting the outside world |
+| `WP_DEBUG` / `WP_DEBUG_LOG` on (SEC-008/009) | a development copy logs; production is what those checks are about |
+| An attachment whose file is missing on disk **when the file archive predates the database** | the media was uploaded after the file backup was taken; it exists in production |
+
+Do not widen this list to excuse a real defect: a plugin deactivated on the clone that has no
+local reason to be off is still a finding, and media missing with no archive/database date gap
+is still a finding (see the media-integrity check). The test is "would this be true on
+production too?" — if yes, report it; if it exists only because this is a copy, suppress it.
+
+### Live checks need a public URL, and you ask for it
+
+Some checks can only be answered against the running production site: response headers, and
+whether a paid file is reachable without a purchase. The **local clone must never be probed
+for these** — a local Apache reads `.htaccess` and would pass a rule a production nginx
+ignores, turning a real exposure into a false PASS.
+
+So when a live check needs a URL and `local_clone` is true:
+
+1. Use `--host` when it was given.
+2. Otherwise, **ask the user for the production URL**, proposing `production_url`
+   (`restore.url_origin`) as the default when the manifest has one. Do not fire an external
+   request at a host the user has not confirmed this run.
+3. If no production URL is available, the live check is `UNMEASURED` with "needs the public
+   URL", never `PASS`.
+
+Print the two facts before tier detection, next to the adopted-site block when there is one:
+
+```
+=== Site ===
+  Type          <commerce (WooCommerce) | non-commerce>
+  Local clone   <yes — production: https://… | no>
+```
+
 ## Step 2.5: Reconcile the Manifest
 
 `.wp-create.json` is the shared source of truth, so a stale manifest is not a cosmetic
@@ -897,8 +974,8 @@ Every check resolves to one of five statuses, and the last three are not interch
 |---|---|
 | `PASS` | ran, and the site satisfies it |
 | `FAIL` | ran, and the site does not |
-| `N/A` | does not apply to this site type — say why |
-| `UNMEASURED` | applies, but was never measured — say what stopped it |
+| `N/A` | does not apply to this site type — say why (e.g. "no WooCommerce", or "local clone", see Step 2.3) |
+| `UNMEASURED` | applies, but was never measured — say what stopped it (e.g. "needs the public URL") |
 | `NEVER RUN` | the whole category has never run on this project (Step 2.5d) |
 
 `N/A` and `UNMEASURED` were one status, and merging them hid the difference between "this
