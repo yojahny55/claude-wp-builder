@@ -151,6 +151,14 @@
 
 ### Changed
 
+- **Versioning the seeders is now the project's decision.** The `wp-cli-patterns` skill
+  argued for committing `inc/seed/` without saying it could be otherwise, so a session
+  kept re-opening it on a project that had chosen to move its database by hand. The skill
+  now keeps versioning as the default, names gitignoring `inc/seed/` as the alternative and
+  what it trades away (the scripts that reproduce the content live on one machine), and
+  asks for the decision to be written once in the project's `CLAUDE.md`. Seeders still
+  belong in `inc/seed/`, never a scratchpad. `tests/checks/wp-cli-patterns-seed-persistence.sh`.
+
 - **`wp-cf7` put `admin_email` in the sender unchecked.** Both `mail.sender` and
   `mail_2.sender` were `blogname <admin_email>`. On a free-mail or foreign domain that fails
   SPF, DKIM and DMARC, and a real build's forms carried CF7's own "sender not in the site
