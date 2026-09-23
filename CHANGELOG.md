@@ -107,20 +107,30 @@
   array in the `wp_options` row `woocommerce_<gateway_id>_settings` — so nothing that scans
   source code could ever see it. That row is exactly what a database dump, staging snapshot
   or cloned copy carries verbatim, which makes a configured gateway's credentials a real leak
-  risk on any shared copy of the site. SEC-040 enumerates every `woocommerce_*_settings` row
-  straight from the options table — so a gateway whose plugin is deactivated, as on a clone,
-  is still covered — matches each stored key name against a secret pattern (`secret`,
-  `password`, `token`, `signature`, any name ending in `key`, …), and reports CRITICAL when one is
-  non-empty, without ever printing the value itself. Identifiers such as `publishable_key`
-  and `merchant_id` are listed as INFO. The manual scrub step edits the row in place instead
-  of dumping it. It is `N/A` when `site.commerce` is
+  risk on any shared copy of the site. SEC-040 enumerates every `woocommerce_*_settings` and
+  `woocommerce-ppcp-*` row straight from the options table — so a gateway whose plugin is
+  deactivated, as on a clone, is still covered — plus the options a few gateways keep a
+  credential in on their own (Mollie, Square, Amazon Pay, and the Jetpack connection tokens
+  WooPayments authenticates with), and reports CRITICAL for every non-empty credential
+  without ever printing the value itself. Key names are classified by segment rather than by
+  a fixed pattern: environment, version and region suffixes are dropped (`secret_key_v3`,
+  `shared_secret_eu`), descriptors such as `signature_method` are ignored, identifiers and
+  public-by-design keys (`merchant_id_eu`, `publishable_key`, `client_key`, `site_key`,
+  `merchant_key`) are INFO, and a name holding a secret word (`secret`, `*key`, `token`,
+  `password`, `passphrase`, `hmac`, signing material) is CRITICAL. The Pass criterion states
+  that coverage is limited to those rows. The manual scrub step runs the same classifier —
+  the block is byte-identical in both snippets — and edits the option in place, array or
+  single value, instead of dumping it. It is `N/A` when `site.commerce` is
   `none` (`/wp-audit` Step 2.3), like every other commerce-only check, and it is deliberately
   **not** folded into that same step's local-clone suppression list: a gateway deactivated on
   a clone is a clone artifact and stays suppressed, but the credential still sitting in
   `wp_options` is true of production too and is reported regardless. The fix is manual —
   rotate the key at the processor if the database was ever shared, and scrub the value before
-  handing around a cloned copy. `tests/checks/audit-gateway-credentials.sh` pins the check,
-  the database enumeration, the secret-key pattern, and the clone-suppression distinction.
+  handing around a cloned copy. `tests/checks/audit-gateway-credentials.sh` extracts both
+  snippets and runs them with `php` against a stubbed options table
+  (`tests/checks/lib/sec040-gateway-credentials-behavior.php`): the exact CRITICAL and INFO
+  sets, no secret in the output, and a scrub that blanks exactly the CRITICAL keys and saves
+  only when it changed something. It fails rather than skips without `php`.
 
 - **`/wp-audit` reads the site type and whether it is a local clone before any category
   runs (Step 2.3).** Two blind spots made the audit report on the wrong site. First, checks

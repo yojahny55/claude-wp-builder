@@ -12,7 +12,7 @@
 # clone artifact, but a credential still sitting in wp_options is true on production too and
 # must still be reported.
 
-set -uo pipefail
+set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 fail() { echo "FAIL: $1"; exit 1; }
@@ -24,76 +24,78 @@ AUDIT=commands/wp-audit.md
 [ -r "$SEC" ] || fail "$SEC exists but cannot be read"
 
 # --- SEC-040 is tabulated and CRITICAL ---
-grep -Eq '^\| SEC-040 \|' "$SEC" || fail "$SEC: SEC-040 is not tabulated"
-grep -E '^\| SEC-040 \|' "$SEC" | grep -Fq 'CRITICAL' \
-  || fail "$SEC: SEC-040's table row is not CRITICAL"
+ROW=$(grep -E '^\| SEC-040 \|' "$SEC") || fail "$SEC: SEC-040 is not tabulated"
+grep -Fq 'CRITICAL' <<<"$ROW" || fail "$SEC: SEC-040's table row is not CRITICAL"
 
 # Every other gate reads only the SEC-040 procedure, so a word elsewhere in the agent file
 # cannot keep it green.
 PROC=$(awk '/^### Procedure — SEC-040/{f=1;print;next} /^##/{f=0} f' "$SEC")
 [ -n "$PROC" ] || fail "$SEC: no '### Procedure — SEC-040' section"
-has() { printf '%s\n' "$PROC" | grep -Fq -- "$1"; }
-hasi() { printf '%s\n' "$PROC" | grep -Fiq -- "$1"; }
+# Here-strings, not `printf | grep -q`: under pipefail an early grep exit makes printf die of
+# SIGPIPE on a long section, and the gate fails on text that is there. Every command that may
+# fail is the left side of `||` or an `if` condition, so `set -e` never aborts on its own.
+has() { grep -Fq -- "$1" <<<"$PROC"; }
+hasi() { grep -Fiq -- "$1" <<<"$PROC"; }
 
-# --- It reads the options table, not theme source ---
+# --- It enumerates rows from the database, so deactivated gateways are covered (the behavior
+#     test below runs the enumeration; this pins the reason it must not use the registry) ---
 has 'woocommerce_<gateway_id>_settings' || fail "SEC-040 does not name the woocommerce_<gateway_id>_settings option"
-has 'get_option(' || fail "SEC-040 does not read the option with get_option"
-
-# --- It enumerates the settings rows from the database, so deactivated gateways are covered ---
-has 'SELECT option_name FROM {$wpdb->options}' \
-  || fail "SEC-040 does not enumerate woocommerce_*_settings rows from the options table"
-has 'esc_like( "_settings" )' || fail "SEC-040 does not match the _settings suffix"
 has 'only returns gateways whose plugin is active' \
   || fail "SEC-040 does not say why payment_gateways() alone misses deactivated gateways"
-has '$settings["enabled"]' || fail "SEC-040 does not read enabled from the stored settings"
-if printf '%s\n' "$PROC" | grep -Fq '$gateway->enabled'; then
+if grep -Fq '$gateway->enabled' <<<"$PROC"; then
   fail "SEC-040 reads enabled from the loaded gateway object, which misses deactivated plugins"
 fi
 
-# --- It matches secret-shaped key names by an end-anchored pattern, not an exact list ---
-# The gates read the pattern line itself, so a word dropped from the regex cannot be covered
-# by the same word appearing in the prose.
-SECRET_RE=$(printf '%s\n' "$PROC" | grep -F '$secret     = "' | sort -u)
-[ -n "$SECRET_RE" ] || fail "SEC-040 has no \$secret pattern line"
-[ "$(printf '%s\n' "$SECRET_RE" | wc -l)" -eq 1 ] \
-  || fail "SEC-040's detection and scrub snippets use different \$secret patterns"
-[ "$(printf '%s\n' "$PROC" | grep -cF '$secret     = "')" -eq 2 ] \
-  || fail "SEC-040 must define \$secret in both the detection and the scrub snippet"
-for word in 'secret[a-z0-9]*' 'key' 'password' 'pass_?phrase' 'token' 'signature' 'seed' 'salt' 'hash'; do
-  printf '%s\n' "$SECRET_RE" | grep -Fq "|$word|" \
-    || printf '%s\n' "$SECRET_RE" | grep -Fq "($word|" \
-    || printf '%s\n' "$SECRET_RE" | grep -Fq "|$word)" \
-    || fail "SEC-040's \$secret pattern does not cover '$word'"
+# --- Behavior: run both snippets against a stubbed options table ---
+# Four rounds of text gates each passed a pattern that missed a real key name, and a gate on
+# the text cannot see a snippet that prints the value, walks nothing, or never saves. So the
+# two `$WP eval '...'` blocks are extracted from the procedure and executed with php against a
+# fixture (tests/checks/lib/sec040-gateway-credentials-behavior.php): the detection must
+# report exactly the expected CRITICAL and INFO keys without printing any secret, and the
+# scrub must blank exactly those keys, keep everything else, and save only when it changed
+# something. php is on the CI runner; without it this check fails rather than skips, because
+# the gates below no longer pin the classifier on their own.
+command -v php >/dev/null 2>&1 || fail "php not found — SEC-040's behavior test cannot run"
+tmp=$(mktemp -d) || fail "mktemp failed"
+trap 'rm -rf "$tmp"' EXIT
+awk -v dir="$tmp" '
+  $0 == "$WP eval '"'"'" { n++; f = 1; next }
+  f && $0 == "'"'"'"     { f = 0; next }
+  f                      { print > (dir "/snippet" n ".php") }
+  END                    { print n + 0 > (dir "/count") }' <<<"$PROC"
+[ "$(cat "$tmp/count")" -eq 2 ] \
+  || fail "SEC-040 must hold exactly two \$WP eval blocks (detection, scrub); found $(cat "$tmp/count")"
+for n in 1 2; do
+  { printf '<?php\n'; cat "$tmp/snippet$n.php"; } > "$tmp/lint$n.php"
+  lint=$(php -l "$tmp/lint$n.php" 2>&1) || fail "SEC-040 snippet $n does not parse: $lint"
 done
-printf '%s\n' "$SECRET_RE" | grep -Fq '$/i";' \
-  || fail "SEC-040's \$secret pattern is not anchored to the end of the key"
-IDENT_RE=$(printf '%s\n' "$PROC" | grep -F '$identifier = "' | sort -u)
-[ "$(printf '%s\n' "$IDENT_RE" | wc -l)" -eq 1 ] && [ -n "$IDENT_RE" ] \
-  || fail "SEC-040's detection and scrub snippets use different \$identifier patterns"
-[ "$(printf '%s\n' "$PROC" | grep -cF '$identifier = "')" -eq 2 ] \
-  || fail "SEC-040 must define \$identifier in both the detection and the scrub snippet"
-for word in 'publishable_?key' 'public_?key'; do
-  printf '%s\n' "$IDENT_RE" | grep -Fq "$word" \
-    || fail "SEC-040 does not classify '$word' as an identifier"
+# The classifier block must be byte-identical in both snippets, or the scrub could blank a
+# different set of keys than the detection reports.
+for n in 1 2; do
+  awk '/^\/\/ --- SEC-040 classifier:/{f=1} f{print} /^\/\/ --- end SEC-040 classifier ---$/{f=0}' \
+    "$tmp/snippet$n.php" > "$tmp/classifier$n"
+  grep -q '^\$classify = function' "$tmp/classifier$n" \
+    || fail "SEC-040 snippet $n has no \$classify block between the classifier markers"
 done
-has '|| preg_match( $identifier, (string) $key ) ) {' \
-  || fail "SEC-040's scrub does not skip identifiers before blanking"
+cmp -s "$tmp/classifier1" "$tmp/classifier2" \
+  || fail "SEC-040's detection and scrub snippets carry different \$classify blocks"
+behavior=tests/checks/lib/sec040-gateway-credentials-behavior.php
+[ -f "$behavior" ] || fail "$behavior is missing"
+out=$(php "$behavior" "$tmp/snippet1.php" "$tmp/snippet2.php" 2>&1) \
+  || fail "SEC-040 snippets misbehave:
+${out:-(php exited non-zero with no output)}"
+
 hasi 'public by design' || fail "SEC-040 does not say a publishable key is not a secret"
-has '$flags      = array( "yes", "no"' || fail "SEC-040 does not skip on/off switch values"
-has 'tokenization' || fail "SEC-040 does not explain why the pattern is anchored (tokenization flag)"
-has '$walk( $name, $enabled, $value, $key_path );' || fail "SEC-040 does not walk nested arrays"
-has '$wpdb->esc_like( "woocommerce-ppcp-" ) . "%"' || fail "SEC-040 does not cover gateways that store secrets outside *_settings rows"
+has 'Coverage is limited to' || fail "SEC-040's Pass criterion does not bound its coverage"
 
 # --- Never print the credential value itself, including in the scrub fix ---
 has 'never print the value itself' \
   || fail "SEC-040 does not say to withhold the credential value from the report"
 has 'never by dumping the option' || fail "SEC-040's scrub step does not forbid dumping the option"
-CODE=$(printf '%s\n' "$PROC" | awk '/^```/{f=!f;next} f')
-if printf '%s\n' "$CODE" | grep -Eq 'option (get|list)|option_value|var_export|print_r|var_dump'; then
+CODE=$(awk '/^```/{f=!f;next} f' <<<"$PROC")
+if grep -Eq 'option (get|list)|option_value|var_export|print_r|var_dump' <<<"$CODE"; then
   fail "a SEC-040 code block dumps option values"
 fi
-has 'option not found or not an array, nothing changed' \
-  || fail "SEC-040's scrub does not say when it changed nothing"
 
 # --- Commerce gating: N/A when there is no WooCommerce, out of the denominator ---
 has 'site.commerce' || fail "SEC-040 does not read site.commerce"
