@@ -330,7 +330,7 @@ It also has a download method, `woocommerce_file_download_method`, with three va
 **So configuration alone cannot answer this — a live request must.** And it must go to
 **production**, never the local clone: a local Apache honours the `.htaccess` and returns a
 false PASS for a site that is wide open behind nginx. Follow Step 2.3's rule for a live check
-— use `--host`, otherwise ask for the production URL (default `restore.url_origin`) and fire
+— use `--host`, otherwise ask for the production URL (default `wordpress.url_origin`) and fire
 nothing until it is confirmed; with no public URL the check is `UNMEASURED`, not `PASS`.
 
 **Pick the probe file from the stored downloads, not from the product API.** The first
