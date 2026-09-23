@@ -350,20 +350,28 @@ php <skill>/scripts/find-redeclared-functions.php \
   loaded:mu-plugin/<file>=wp-content/mu-plugins/<file> loaded:drop-in/<file>=wp-content/<file>
 ```
 
-Read-only, no WordPress bootstrap, PHP 7.4+. Exits 1 on any collision. Each line is
+Read-only, no WordPress bootstrap, PHP 7.4+. Exits 0 when nothing collides, 1 on any
+collision, and 2 when a source path does not exist (`missing source: <label>` on stderr) —
+treat 2 as not measured, never as a pass. An unreadable file or directory is printed as
+`skipped: <path>` and is partial coverage. Each line is
 `CRITICAL` (two loaded sources), `WARNING` (one loaded, the other inactive: it cannot be
 activated) or `INFO` (only inactive plugins).
 
 It tokenizes instead of grepping. A `function <name>(` grep over one real `wp-content` matched
 about 160,000 lines; the tokenizer found about 4,000 global declarations in ~15,600 files, in
 under 2 seconds. It knows which braces belong to a class, a function or an
-`if ( ! function_exists() )` guard, qualifies names by namespace, and treats a top-level
-`if ( function_exists() ) return;` as guarding the rest of the file.
+`if` / `elseif` guard that negates `function_exists`, `class_exists`, `interface_exists`,
+`trait_exists`, `enum_exists` or `defined` (braced, `:`/`endif;` or braceless), qualifies
+names by namespace, ignores `use function` imports, recognises `enum` bodies on runtimes
+older than 8.1, and treats a top-level `if ( function_exists() ) return;` (or any of those
+tests) as guarding the rest of the file.
 
 Skipped: `vendor/`, `node_modules/`, `tests/`, `examples/`, and — inside a plugin or theme
-directory — files named like a drop-in (`object-cache.php`, `advanced-cache.php`, …). Those
-are templates a cache plugin copies into `wp-content/`; on the audited site they produced 56
-of 57 collisions, each plugin against its own installed drop-in.
+directory — `object-cache.php` and `advanced-cache.php`. Those are the drop-in templates a
+cache plugin copies into `wp-content/`; on the audited site they produced 56 of 57
+collisions, each plugin against its own installed drop-in. Other drop-in names (`db.php`,
+…) are scanned: a plugin's own `includes/db.php` is ordinary code. A drop-in passed as a
+single file, parked `*.bak` included, is always scanned.
 
 ---
 

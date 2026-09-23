@@ -123,16 +123,24 @@
   all three checks share: the header read through `get_plugins()` (`wp plugin get` has no
   `plugin_uri` field), wp.org lookups with `curl -g` (the `[slug]` brackets otherwise glob
   and curl exits 3), the not-found / closed / failed / listing states, and what makes a
-  listing match the installed plugin (author with tags stripped and case folded, or the
+  listing the installed plugin's own (author with tags stripped and case folded, or the
   same home host, or a `w.org/plugins/<slug>` transient id), with a theme route through the
-  themes API and `update_themes`. Only public slugs are sent to a third-party vulnerability
-  feed; `code_scope.editable` slugs go to wp.org only, from the vendor re-check. SEC-043
+  themes API and `update_themes`. A transient entry counts only when its `package` or `url`
+  points at wordpress.org, since premium updaters inject entries there too. Only public slugs
+  are sent to a third-party vulnerability feed; `code_scope.editable` slugs go to wp.org
+  only, from the vendor re-check, and join SEC-041/042 only when that re-check proved them
+  public (listed, or closed). SEC-043
   (a global function declared by two sources) is a Tier 1 scan over every installed plugin,
   active and inactive, plus mu-plugins, drop-ins and the active theme and its parent, run by
   a new tokenizer script, `skills/wp-cli-patterns/scripts/find-redeclared-functions.php`,
-  instead of a grep. The tokenizer skips methods, closures, `function_exists` guards,
-  early-return guards and drop-in templates shipped inside plugins, and qualifies names by
-  namespace. On a site with ~15,600 PHP files it runs in under 2 seconds, where the grep
+  instead of a grep. The tokenizer skips methods, closures, nested functions, `use
+  function` imports, guards on `function_exists` / `class_exists` / `defined` (and the
+  other existence tests) in `if` and `elseif`, early-return guards, enum bodies on runtimes
+  older than 8.1, and the `object-cache.php` / `advanced-cache.php` templates cache plugins
+  ship; it qualifies names by namespace. A source path that does not exist exits 2, which
+  the agent reports as `UNMEASURED`, and an unreadable directory is listed as partial
+  coverage instead of crashing. Must-use plugins are scanned as WordPress loads them: the
+  top-level `*.php` files and the subdirectories their loaders require. On a site with ~15,600 PHP files it runs in under 2 seconds, where the grep
   matched ~160,000 lines. Severity follows WordPress's sandboxed activation: CRITICAL when
   two loaded sources collide, WARNING when one side is inactive (it cannot be activated),
   INFO when both are. On a local clone the agent reads three dispatch lines (`Local clone`,
@@ -147,10 +155,11 @@
   shows vendor-looking plugins in a second, pre-selected "proposed read-only" list the
   operator can reverse; when wp.org cannot be reached it keeps the transient signal and
   says the plugin was not verified. `wp-audit-security` runs its own route probe and prints
-  a non-scored reminder when a vendor-looking plugin is still in `code_scope.editable`.
+  a non-scored reminder when a plugin still in `code_scope.editable` is a public wp.org
+  plugin or looks vendor-supplied.
   `tests/checks/audit-plugin-inventory.sh` checks each rule inside the section that owns
-  it, fails on a `SEC-NNN` defined by two table rows, and runs the tokenizer against a
-  fixture.
+  it, fails on a `SEC-NNN` defined by two table rows, and runs the tokenizer against two
+  fixtures that cover every case above.
 
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had
   none, and its `template-functions.php` printed a pingback `<link>`. A full audit of a

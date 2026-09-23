@@ -166,6 +166,15 @@ has "$rules" 'editable slugs go to wp.org only, from the vendor re-check; only p
   || fail "$sec rule 11 disagrees with the editable-slug rule"
 has "$rules" 'The WPScan token never leaves stdin' || fail "$sec has no rule keeping the token off the command line"
 grep -Fq 'It is still skipped for' "$sec" && fail "$sec still carries the old contradictory editable-slug wording"
+has "$inv" 'proved public there (this plugin'"'"'s listing, or closed): a public slug like any other' \
+  || fail "$sec: a closed or listed editable plugin is not checked by SEC-041/042"
+has "$inv" 'SEC-041 and SEC-042 do not look them up at all' && fail "$sec still drops every editable plugin from SEC-041/042"
+has "$inv" 'the entry'"'"'s `package` host must be `downloads.wordpress.org` or its `url` host `wordpress.org`' \
+  || fail "$sec trusts a transient entry a premium updater may have injected"
+has "$inv" 'It is **this plugin'"'"'s listing** when the transient entry above proves it' \
+  || fail "$sec does not accept a listing the transient ties to the plugin"
+has "$proc" 'Pass: this plugin'"'"'s listing (tied by the transient or by author/home)' \
+  || fail "$sec SEC-042 has no verdict for a transient-proved listing"
 
 # --- Vendor re-check runs its own route probe first ---
 has "$recheck" 'Run the SEC-038 route probe yourself, first' || fail "$sec: the vendor re-check does not run the route probe"
@@ -175,10 +184,16 @@ p_lookup="$(pos "$recheck" 'look its slug up on wp.org')"
 has "$recheck" 'not verified: no route to api.wordpress.org' || fail "$sec: the re-check assumes a result offline"
 has "$recheck" 'not a scored finding' || fail "$sec: the vendor reminder is not unscored"
 has "$recheck" 'A **closed** listing gets no reminder' || fail "$sec: the re-check treats a closed plugin as vendor"
+has "$recheck" 'reason `public wp.org plugin`' || fail "$sec: the re-check does not remind for a public wp.org plugin"
+has "$recheck" 'A plugin proved public here (its own listing, or closed) is a public slug for SEC-041 and SEC-042' \
+  || fail "$sec: the re-check's public answers do not reach SEC-041/042"
 has "$recheck" 'Vendor-plugin re-check ===' || fail "$sec lost the re-check print block"
 
 # --- SEC-043: scope, script, severity ---
-for needle in 'active and inactive' 'wp-content/mu-plugins/**' '`Parked drop-ins` line' \
+for needle in 'active and inactive' 'wp-content/mu-plugins/*.php' '`Parked drop-ins` line' \
+              '`*.php.disabled` or `*.bak` left in that folder is not loaded and is not scanned' \
+              '[ -e "$p" ] || p="$p.php"' 'is `UNMEASURED` with the script'"'"'s stderr as the evidence line' \
+              '`skipped: <path>` line on stderr' \
               'the active theme and its parent' 'find-redeclared-functions.php' 'Do not grep for it' \
               '**CRITICAL** — two or more **loaded** sources' \
               '**WARNING** — exactly one loaded source declares it; the inactive plugin cannot be activated' \
@@ -189,6 +204,11 @@ done
 has "$s43" '**CRITICAL** when one side is an inactive plugin' && fail "$sec SEC-043 still makes an inactive side CRITICAL"
 has "$s43" 'Pattern: top-level `function' && fail "$sec SEC-043 still describes a grep pattern"
 has "$s43" 'within the 3 lines above' && fail "$sec SEC-043 still uses the 3-line guard heuristic"
+# Both plugin loops (loaded and inactive) must fall back to <slug>.php, or a single-file
+# plugin is a missing source.
+[ "$(grep -cF '[ -e "$p" ] || p="$p.php"' "$sec")" = 2 ] \
+  || fail "$sec: a plugin loop in the SEC-043 snippet lacks the single-file <slug>.php fallback"
+has "$s43" 'for f in wp-content/mu-plugins/*; do' && fail "$sec SEC-043 still scans every entry in mu-plugins as loaded"
 grep -Fq '### `find-redeclared-functions.php`' "$skill" || fail "$skill does not document find-redeclared-functions.php"
 
 # --- /wp-adopt: runnable lookup, branches, propose-then-confirm order ---
@@ -200,6 +220,11 @@ for needle in 'Never move a plugin in silence' 'Anything deselected goes back to
               'Read the body before the status' 'strip HTML tags' 'without a leading `www.`'; do
   has "$adoptsec" "$needle" || fail "$adopt re-verification lacks: $needle"
 done
+# The closed branch promises a SEC-042 finding; the agent must be able to deliver it.
+has "$adoptsec" '`/wp-audit` reports the closure under SEC-042' \
+  || fail "$adopt no longer tells the operator where a closed editable plugin is reported"
+has "$adoptsec" '`/wp-audit` reports the closure under SEC-042' && ! has "$inv" 'a closed one fails SEC-042' \
+  && fail "$adopt promises a SEC-042 finding the agent does not produce for an editable plugin"
 has "$adoptsec" 'move it to read-only before presenting the list' && fail "$adopt still moves before presenting"
 p_verify="$(pos "$adoptsec" 'Re-verify the first case before offering the list')"
 p_present="$(pos "$adoptsec" 'Present two multi-selects')"
@@ -279,5 +304,78 @@ for n in acme_method_only acme_guarded_one acme_guarded_two acme_alt acme_early;
 done
 out="$(php "$script" inactive:e="$fx/a/a.php" inactive:f="$fx/b/b.php" 2>/dev/null || true)"
 row acme_loaded_pair | grep -q '^INFO' || fail "$script: only-inactive collisions are not INFO"
+
+# Second fixture: imports, braceless and nested functions, every guard form, enums, where
+# drop-in templates are skipped, a parked drop-in, a missing source and an unreadable one.
+# Source y declares every name once, so any name x also reports shows up as a collision.
+mkdir -p "$fx/x/includes" "$fx/y"
+# Imports sit in the global namespace: in a namespaced file a wrongly recorded import would
+# be qualified (acme\lib\x) and could never collide with y, hiding the defect.
+cat > "$fx/x/g.php" <<'PHP'
+<?php
+use function Other\imported_fn;
+use function Other\{grouped_a, grouped_b};
+use Other\{function mixed_fn, const MIXED_C};
+use function imported_global;
+if ( ! function_exists( 'brace_less' ) ) function brace_less() { return 1; }
+function after_braceless() {}
+function outer_fn() { function nested_fn() {} return 1; }
+if ( ! class_exists( 'Foo' ) ) { function cls_guarded() {} }
+if ( ! defined( 'X_LOADED' ) ) { function def_guarded() {} }
+if ( is_admin() ) { $a = 1; } elseif ( ! function_exists( 'elif_guarded' ) ) { function elif_guarded() {} }
+if ( is_admin() ) : $a = 1; elseif ( ! function_exists( 'alt_elif' ) ) : function alt_elif() {} else : function alt_else() {} endif;
+enum Suit: string { case A = 'a'; public function enum_method() {} }
+function after_enum() {}
+PHP
+echo '<?php function includes_db() {}' > "$fx/x/includes/db.php"
+echo '<?php function tpl_skip() {}' > "$fx/x/includes/advanced-cache.php"
+names='imported_fn grouped_a grouped_b mixed_fn imported_global brace_less after_braceless nested_fn outer_fn
+cls_guarded def_guarded elif_guarded alt_elif alt_else enum_method after_enum includes_db tpl_skip parked_one'
+{ echo '<?php'; for n in $names; do echo "function $n() {}"; done; } > "$fx/y/y.php"
+echo '<?php function parked_one() {}' > "$fx/parked.php.bak"
+set +e
+out="$(php "$script" loaded:x="$fx/x" loaded:y="$fx/y" loaded:parked="$fx/parked.php.bak" 2>/dev/null)"
+rc=$?
+set -e
+[ "$rc" = 1 ] || fail "$script: second fixture exited $rc, expected 1"
+for n in imported_fn grouped_a grouped_b mixed_fn imported_global; do
+  [ -z "$(row "$n")" ] || fail "$script counted the import 'use function $n' as a declaration"
+done
+[ -z "$(row brace_less)" ] || fail "$script missed a braceless function_exists guard"
+row after_braceless | grep -q '^CRITICAL' || fail "$script kept a braceless guard open past its statement"
+[ -z "$(row nested_fn)" ] || fail "$script counted a function declared inside a function body"
+row outer_fn | grep -q '^CRITICAL' || fail "$script lost the enclosing named function"
+for n in cls_guarded def_guarded elif_guarded alt_elif; do
+  [ -z "$(row "$n")" ] || fail "$script missed the guard around $n (class_exists / defined / elseif)"
+done
+row alt_else | grep -q '^CRITICAL' || fail "$script treated the else branch of a guard chain as guarded"
+[ -z "$(row enum_method)" ] || fail "$script counted an enum method as a global function"
+row after_enum | grep -q '^CRITICAL' || fail "$script lost track of the enum body"
+row includes_db | grep -q '^CRITICAL' || fail "$script skipped a plugin's own includes/db.php"
+[ -z "$(row tpl_skip)" ] || fail "$script scanned an advanced-cache.php template inside a plugin"
+row parked_one | grep -q $'	parked parked.php.bak:1' || fail "$script did not scan a parked *.php.bak drop-in"
+
+set +e
+err="$(php "$script" loaded:y="$fx/y" loaded:gone="$fx/does-not-exist" 2>&1 >/dev/null)"
+rc=$?
+set -e
+[ "$rc" = 2 ] || fail "$script: a missing source exited $rc, not 2 — it would read as a pass"
+has "$err" 'missing source: gone' || fail "$script does not name the missing source"
+set +e
+err="$(php "$script" loaded:single="$fx/y/y.php" 2>&1 >/dev/null)"
+rc=$?
+set -e
+[ "$rc" = 0 ] || fail "$script: a single-file source exited $rc"
+if [ "$(id -u)" != 0 ]; then    # root reads a mode-000 directory anyway
+  mkdir -p "$fx/y/locked"
+  chmod 000 "$fx/y/locked"
+  set +e
+  err="$(php "$script" loaded:y="$fx/y" 2>&1 >/dev/null)"
+  rc=$?
+  set -e
+  chmod 755 "$fx/y/locked"
+  [ "$rc" = 0 ] || fail "$script: an unreadable directory exited $rc instead of being skipped"
+  has "$err" "skipped: $fx/y/locked" || fail "$script does not report an unreadable directory"
+fi
 
 echo PASS

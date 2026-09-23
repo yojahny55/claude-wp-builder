@@ -12,8 +12,18 @@
  *   <path>    a directory (its .php files, recursively) or a single file, scanned
  *             whatever its extension — a drop-in parked as `object-cache.php.bak`
  *
- * Runs on PHP 7.4+. Plain PHP, no WordPress bootstrap: it reads files only, so it runs without a
- * database and without WP-CLI. Read-only. Exits 1 when it reports anything.
+ * Runs on PHP 7.4+. Plain PHP, no WordPress bootstrap: it reads files only, so it
+ * runs without a database and without WP-CLI. Read-only.
+ *
+ * Exit status:
+ *   0  every source was found and nothing collides
+ *   1  at least one collision (printed on stdout)
+ *   2  bad usage, or a source path does not exist (`missing source: <label>` on
+ *      stderr). Collisions among the sources that were found are still printed,
+ *      but the run is incomplete and must not be read as a pass.
+ * A directory or file that exists but cannot be read is reported on stderr as
+ * `skipped: <path>` and does not change the exit status; the caller lists those
+ * lines as partial coverage.
  *
  * Output, one line per colliding name, tab-separated:
  *   <SEVERITY>  <name>()  <label> <file>:<line>  <label> <file>:<line> ...
@@ -33,24 +43,26 @@
  * a single `if ( ! function_exists() ) {` block wrapping several functions. The
  * tokenizer knows which braces belong to a class, a function or a guard.
  *
- * What counts as a declaration: a named `function` whose enclosing blocks are
- * neither a class/trait/interface/enum nor another function. The key is the
- * lowercased, namespace-qualified name, since PHP function names are
- * case-insensitive and functions in different namespaces do not collide.
+ * What counts as a declaration: `function <name> (` whose enclosing blocks are
+ * neither a class/trait/interface/enum nor another function. `use function x;`
+ * is an import, not a declaration. The key is the lowercased,
+ * namespace-qualified name, since PHP function names are case-insensitive and
+ * functions in different namespaces do not collide.
  *
- * What is excluded as guarded (it can never redeclare):
- *   - a declaration inside `if ( ! function_exists( ... ) )` — braced,
- *     alternative `:` / `endif;` syntax, or a single braceless statement;
- *   - everything after a top-level `if ( function_exists( ... ) ) return;` or
- *     `if ( class_exists( ... ) ) return;` early exit.
+ * What is excluded as guarded (it can never redeclare, or only runs once):
+ *   - a declaration inside `if` / `elseif` whose condition negates
+ *     function_exists, class_exists, interface_exists, trait_exists,
+ *     enum_exists or defined — braced, alternative `:` / `endif;` syntax, or a
+ *     single braceless statement;
+ *   - everything after a top-level `if ( <one of those> ) return;` early exit.
  *
  * Paths containing a vendor/, node_modules/, tests/ or examples/ directory are
  * skipped: bundled libraries and fixtures that plugin code does not load as its
- * own globals. Inside a directory, a file named like a drop-in (object-cache.php,
- * advanced-cache.php, db.php, ...) is skipped too: it is the template a cache
- * plugin copies into wp-content/, and on one audited site those templates alone
- * produced 56 of 57 collisions — each plugin against its own installed drop-in.
- * A drop-in passed as a single file is always scanned.
+ * own globals. Inside a directory, `object-cache.php` and `advanced-cache.php`
+ * are skipped too: a cache plugin ships its drop-in as a template it copies into
+ * wp-content/, never loads it itself, and on one audited site those two
+ * templates produced 56 of 57 collisions — each plugin against its own
+ * installed drop-in. A drop-in passed as a single file is always scanned.
  */
 
 if ( PHP_SAPI !== 'cli' ) {
@@ -58,13 +70,17 @@ if ( PHP_SAPI !== 'cli' ) {
 }
 
 // PHP 8 tokenizes `Foo\Bar` and `\foo` as one name token; 7.4 emits T_STRING and
-// T_NS_SEPARATOR pieces, which the loops below already accept.
+// T_NS_SEPARATOR pieces, which the loops below also accept.
 if ( ! defined( 'T_NAME_QUALIFIED' ) ) {
 	define( 'T_NAME_QUALIFIED', -10001 );
 }
 if ( ! defined( 'T_NAME_FULLY_QUALIFIED' ) ) {
 	define( 'T_NAME_FULLY_QUALIFIED', -10002 );
 }
+
+const RF_SKIP_DIRS       = array( 'vendor', 'node_modules', 'tests', 'examples' );
+const RF_DROPIN_TEMPLATE = array( 'advanced-cache.php', 'object-cache.php' );
+const RF_GUARD_TESTS     = array( 'function_exists', 'class_exists', 'interface_exists', 'trait_exists', 'enum_exists', 'defined' );
 
 $started = microtime( true );
 $sources = array();
@@ -80,45 +96,37 @@ if ( ! $sources ) {
 	exit( 2 );
 }
 
-const SKIP_DIRS = array( 'vendor', 'node_modules', 'tests', 'examples' );
-
-// WordPress loads a drop-in only from wp-content/. A file with one of these names inside a
-// plugin or theme directory is the template the plugin copies there, not code it loads —
-// scanning it reports the plugin colliding with its own installed drop-in.
-const DROPIN_TEMPLATES = array(
-	'advanced-cache.php', 'object-cache.php', 'db.php', 'db-error.php', 'maintenance.php',
-	'php-error.php', 'fatal-error-handler.php', 'sunrise.php',
-);
-
-function rf_php_files( $path ) {
-	if ( is_file( $path ) ) {
-		return array( $path );    // named explicitly: scan it whatever its extension (a parked `*.php.bak` drop-in)
+/** Collect the .php files under $dir into $out; an unreadable directory goes to stderr. */
+function rf_walk( $dir, array &$out, array &$seen ) {
+	$real = realpath( $dir );
+	if ( $real === false || isset( $seen[ $real ] ) ) {
+		return;    // a symlink loop, or a directory already walked
 	}
-	if ( ! is_dir( $path ) ) {
-		return array();
+	$seen[ $real ] = true;
+	$entries       = @scandir( $dir );
+	if ( $entries === false ) {
+		fwrite( STDERR, "skipped: $dir (cannot be read)\n" );
+		return;
 	}
-	$out = array();
-	$it  = new RecursiveIteratorIterator(
-		new RecursiveCallbackFilterIterator(
-			new RecursiveDirectoryIterator( $path, FilesystemIterator::SKIP_DOTS ),
-			function ( $file ) {
-				return ! ( $file->isDir() && in_array( strtolower( $file->getFilename() ), SKIP_DIRS, true ) );
+	foreach ( $entries as $name ) {
+		if ( $name === '.' || $name === '..' ) {
+			continue;
+		}
+		$path = $dir . '/' . $name;
+		if ( is_dir( $path ) ) {
+			if ( ! in_array( strtolower( $name ), RF_SKIP_DIRS, true ) ) {
+				rf_walk( $path, $out, $seen );
 			}
-		)
-	);
-	foreach ( $it as $file ) {
-		if ( $file->isFile() && strtolower( $file->getExtension() ) === 'php'
-			&& ! in_array( strtolower( $file->getFilename() ), DROPIN_TEMPLATES, true ) ) {
-			$out[] = $file->getPathname();
+		} elseif ( strtolower( pathinfo( $name, PATHINFO_EXTENSION ) ) === 'php'
+			&& ! in_array( strtolower( $name ), RF_DROPIN_TEMPLATE, true ) ) {
+			$out[] = $path;
 		}
 	}
-	return $out;
 }
 
 /** Index of the next token that is not whitespace or a comment, or null. */
 function rf_next( $t, $i ) {
-	$n = count( $t );
-	for ( $i++; $i < $n; $i++ ) {
+	for ( $n = count( $t ), $i++; $i < $n; $i++ ) {
 		if ( is_array( $t[ $i ] ) && in_array( $t[ $i ][0], array( T_WHITESPACE, T_COMMENT, T_DOC_COMMENT ), true ) ) {
 			continue;
 		}
@@ -127,10 +135,20 @@ function rf_next( $t, $i ) {
 	return null;
 }
 
-/** Index of the token closing the parenthesis opened at $i. */
+/** Index of the previous token that is not whitespace or a comment, or null. */
+function rf_prev( $t, $i ) {
+	for ( $i--; $i >= 0; $i-- ) {
+		if ( is_array( $t[ $i ] ) && in_array( $t[ $i ][0], array( T_WHITESPACE, T_COMMENT, T_DOC_COMMENT ), true ) ) {
+			continue;
+		}
+		return $i;
+	}
+	return null;
+}
+
+/** Index of the token closing the parenthesis opened at $i, or null. */
 function rf_close_paren( $t, $i ) {
-	$depth = 0;
-	for ( $n = count( $t ); $i < $n; $i++ ) {
+	for ( $depth = 0, $n = count( $t ); $i < $n; $i++ ) {
 		if ( $t[ $i ] === '(' ) {
 			$depth++;
 		} elseif ( $t[ $i ] === ')' && --$depth === 0 ) {
@@ -141,43 +159,38 @@ function rf_close_paren( $t, $i ) {
 }
 
 /**
- * Classify an if-condition between two indices: 'negated' for
- * `! function_exists(...)`, 'positive' for a bare function_exists/class_exists
- * test, or null.
+ * Classify an if-condition between two indices by its first existence test:
+ * 'negated' for `! function_exists(...)` and the like, 'positive' for a bare
+ * test, or null when the condition tests nothing of the kind.
  */
 function rf_condition( $t, $from, $to ) {
-	for ( $i = $from; $i < $to; $i++ ) {
-		if ( is_array( $t[ $i ] ) && in_array( $t[ $i ][0], array( T_STRING, T_NAME_FULLY_QUALIFIED ), true ) ) {
-			$name = strtolower( ltrim( $t[ $i ][1], '\\' ) );
-			if ( $name !== 'function_exists' && $name !== 'class_exists' ) {
-				continue;
-			}
-			for ( $j = $i - 1; $j > $from; $j-- ) {
-				if ( is_array( $t[ $j ] ) && in_array( $t[ $j ][0], array( T_WHITESPACE, T_NS_SEPARATOR ), true ) ) {
-					continue;
-				}
-				break;
-			}
-			if ( $t[ $j ] === '!' ) {
-				return $name === 'function_exists' ? 'negated' : null;
-			}
-			return 'positive';
+	for ( $i = $from + 1; $i < $to; $i++ ) {
+		if ( ! is_array( $t[ $i ] ) || ! in_array( $t[ $i ][0], array( T_STRING, T_NAME_FULLY_QUALIFIED ), true ) ) {
+			continue;
 		}
+		if ( ! in_array( strtolower( ltrim( $t[ $i ][1], '\\' ) ), RF_GUARD_TESTS, true ) ) {
+			continue;
+		}
+		$p = rf_prev( $t, $i );
+		if ( $p !== null && is_array( $t[ $p ] ) && $t[ $p ][0] === T_NS_SEPARATOR ) {
+			$p = rf_prev( $t, $p );    // 7.4: `\function_exists` is two tokens
+		}
+		return ( $p !== null && $t[ $p ] === '!' ) ? 'negated' : 'positive';
 	}
 	return null;
 }
 
 /** @return array<int, array{0:string,1:int}> [qualified name, line] of unguarded declarations */
 function rf_declarations( $code ) {
-	$t        = @token_get_all( $code );
-	$n        = count( $t );
-	$stack    = array();      // block kinds: class | function | guard | namespace | other
-	$pending  = null;         // kind the next `{` opens
-	$ns       = '';
-	$alt      = array();      // open alternative-syntax `if (...) :` blocks: guard | other
-	$guard_1  = false;        // braceless guarded single statement
-	$file_ok  = false;        // early-return guard seen: rest of file is guarded
-	$found    = array();
+	$t       = @token_get_all( $code );
+	$n       = count( $t );
+	$stack   = array();    // brace blocks: class | function | guard | namespace | other
+	$pending = null;       // the kind the next `{` opens
+	$ns      = '';
+	$alt     = array();    // open alternative-syntax `if (...) :` chains: guard | other
+	$guard_1 = false;      // inside a braceless guarded statement
+	$file_ok = false;      // a top-level early-return guard: the rest of the file is guarded
+	$found   = array();
 
 	for ( $i = 0; $i < $n; $i++ ) {
 		$tok = $t[ $i ];
@@ -199,26 +212,36 @@ function rf_declarations( $code ) {
 			}
 			continue;
 		}
-		if ( in_array( $id, array( T_CLASS, T_INTERFACE, T_TRAIT ), true ) || ( defined( 'T_ENUM' ) && $id === T_ENUM ) ) {
-			$p = $i - 1;
-			while ( $p >= 0 && is_array( $t[ $p ] ) && $t[ $p ][0] === T_WHITESPACE ) {
-				$p--;
+
+		// class / interface / trait / enum open a class body. Before PHP 8.1 `enum` is a
+		// T_STRING, recognised by its shape: `enum Name {`, `enum Name: type {`, `enum Name implements`.
+		$is_type = in_array( $id, array( T_CLASS, T_INTERFACE, T_TRAIT ), true ) || ( defined( 'T_ENUM' ) && $id === T_ENUM );
+		if ( ! $is_type && $id === T_STRING && strtolower( $tok[1] ) === 'enum' ) {
+			$j       = rf_next( $t, $i );
+			$k       = ( $j !== null && is_array( $t[ $j ] ) && $t[ $j ][0] === T_STRING ) ? rf_next( $t, $j ) : null;
+			$is_type = $k !== null && ( $t[ $k ] === '{' || $t[ $k ] === ':' || ( is_array( $t[ $k ] ) && $t[ $k ][0] === T_IMPLEMENTS ) );
+		}
+		if ( $is_type ) {
+			$p = rf_prev( $t, $i );
+			if ( $p === null || ! is_array( $t[ $p ] ) || $t[ $p ][0] !== T_DOUBLE_COLON ) {
+				$pending = 'class';    // not `Foo::class`
 			}
-			if ( $p >= 0 && is_array( $t[ $p ] ) && $t[ $p ][0] === T_DOUBLE_COLON ) {
-				continue;    // Foo::class
-			}
-			$pending = 'class';
 			continue;
 		}
-		if ( $id === T_IF ) {
+
+		if ( $id === T_IF || $id === T_ELSEIF ) {
 			$open  = rf_next( $t, $i );
-			$close = $open !== null && $t[ $open ] === '(' ? rf_close_paren( $t, $open ) : null;
+			$close = ( $open !== null && $t[ $open ] === '(' ) ? rf_close_paren( $t, $open ) : null;
 			if ( $close === null ) {
 				continue;
 			}
 			$kind  = rf_condition( $t, $open, $close );
 			$after = rf_next( $t, $close );
 			if ( $after !== null && $t[ $after ] === ':' ) {
+				// An alternative-syntax elseif continues the chain its if opened; one endif closes both.
+				if ( $id === T_ELSEIF && $alt ) {
+					array_pop( $alt );
+				}
 				$alt[] = $kind === 'negated' ? 'guard' : 'other';
 				$i     = $after;
 				continue;
@@ -233,7 +256,7 @@ function rf_declarations( $code ) {
 				}
 				continue;
 			}
-			if ( $kind === 'positive' && $after !== null && ! array_diff( $stack, array( 'namespace' ) ) ) {
+			if ( $kind === 'positive' && $id === T_IF && $after !== null && ! array_diff( $stack, array( 'namespace' ) ) ) {
 				$ret = $t[ $after ] === '{' ? rf_next( $t, $after ) : $after;
 				if ( $ret !== null && is_array( $t[ $ret ] ) && $t[ $ret ][0] === T_RETURN ) {
 					$file_ok = true;
@@ -241,18 +264,41 @@ function rf_declarations( $code ) {
 			}
 			continue;
 		}
+		if ( $id === T_ELSE ) {
+			$after = rf_next( $t, $i );
+			if ( $after !== null && $t[ $after ] === ':' && $alt ) {
+				array_pop( $alt );    // the else branch of a guard chain is not guarded
+				$alt[] = 'other';
+				$i     = $after;
+			}
+			continue;
+		}
 		if ( $id === T_ENDIF && $alt ) {
 			array_pop( $alt );
 			continue;
 		}
+
 		if ( $id === T_FUNCTION ) {
 			$j = rf_next( $t, $i );
 			if ( $j !== null && $t[ $j ] === '&' ) {
 				$j = rf_next( $t, $j );
 			}
-			$named = $j !== null && is_array( $t[ $j ] ) && $t[ $j ][0] === T_STRING;
-			$inside = in_array( 'class', $stack, true ) || in_array( 'function', $stack, true ) || $pending === 'class';
-			if ( $named && ! $inside && ! $file_ok && ! $guard_1 && ! in_array( 'guard', $alt, true ) && ! in_array( 'guard', $stack, true ) ) {
+			if ( $j !== null && $t[ $j ] === '(' ) {
+				if ( $pending !== 'class' ) {
+					$pending = 'function';    // a closure: its body is a function body
+				}
+				continue;
+			}
+			$paren = $j !== null ? rf_next( $t, $j ) : null;
+			if ( $j === null || ! is_array( $t[ $j ] ) || $t[ $j ][0] !== T_STRING || $paren === null || $t[ $paren ] !== '(' ) {
+				// Not `function name (`. This is also what excludes every import form —
+				// `use function x;`, `use function A\{b, c};`, `use A\{function b, const C};` —
+				// since valid PHP never puts `(` after an imported name.
+				continue;
+			}
+			$inside  = in_array( 'class', $stack, true ) || in_array( 'function', $stack, true ) || $pending === 'class';
+			$guarded = $file_ok || $guard_1 || in_array( 'guard', $alt, true ) || in_array( 'guard', $stack, true );
+			if ( ! $inside && ! $guarded ) {
 				$found[] = array( strtolower( ( $ns !== '' ? $ns . '\\' : '' ) . $t[ $j ][1] ), $t[ $j ][2] );
 			}
 			$guard_1 = false;
@@ -261,6 +307,7 @@ function rf_declarations( $code ) {
 			}
 			continue;
 		}
+
 		if ( $id === '{' || $id === T_CURLY_OPEN || $id === T_DOLLAR_OPEN_CURLY_BRACES ) {
 			$stack[] = ( $id === '{' && $pending ) ? $pending : 'other';
 			if ( $id === '{' ) {
@@ -269,20 +316,18 @@ function rf_declarations( $code ) {
 			continue;
 		}
 		if ( $id === '}' ) {
-			$kind = array_pop( $stack );
-			if ( $kind === 'namespace' ) {
+			if ( array_pop( $stack ) === 'namespace' ) {
 				$ns = '';
-			}
-			if ( ! $stack ) {
-				$guard_1 = false;
 			}
 			continue;
 		}
 		if ( $id === ';' ) {
 			if ( $pending === 'function' ) {
-				$pending = null;    // abstract or interface method: no body
+				$pending = null;    // an abstract or interface method: no body
 			}
-			$guard_1 = false;
+			if ( ! in_array( 'function', $stack, true ) ) {
+				$guard_1 = false;    // the braceless guarded statement ended
+			}
 		}
 	}
 	return $found;
@@ -291,10 +336,23 @@ function rf_declarations( $code ) {
 $by_name = array();
 $files   = 0;
 $decls   = 0;
+$missing = array();
 foreach ( $sources as $s => $src ) {
-	foreach ( rf_php_files( $src['path'] ) as $file ) {
+	$list = array();
+	if ( is_file( $src['path'] ) ) {
+		$list[] = $src['path'];    // named explicitly: scanned whatever its extension
+	} elseif ( is_dir( $src['path'] ) ) {
+		$seen = array();
+		rf_walk( $src['path'], $list, $seen );
+	} else {
+		$missing[] = $src['label'];
+		fwrite( STDERR, "missing source: {$src['label']} ({$src['path']})\n" );
+		continue;
+	}
+	foreach ( $list as $file ) {
 		$code = @file_get_contents( $file );
 		if ( $code === false ) {
+			fwrite( STDERR, "skipped: $file (cannot be read)\n" );
 			continue;
 		}
 		$files++;
@@ -329,8 +387,11 @@ foreach ( $by_name as $name => $where ) {
 fwrite(
 	STDERR,
 	sprintf(
-		"files=%d declarations=%d critical=%d warning=%d info=%d seconds=%.2f\n",
-		$files, $decls, $counts['CRITICAL'], $counts['WARNING'], $counts['INFO'], microtime( true ) - $started
+		"files=%d declarations=%d critical=%d warning=%d info=%d missing=%d seconds=%.2f\n",
+		$files, $decls, $counts['CRITICAL'], $counts['WARNING'], $counts['INFO'], count( $missing ), microtime( true ) - $started
 	)
 );
+if ( $missing ) {
+	exit( 2 );
+}
 exit( array_sum( $counts ) > 0 ? 1 : 0 );
