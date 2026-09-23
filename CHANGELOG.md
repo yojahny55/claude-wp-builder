@@ -81,35 +81,6 @@
 
 ### Added
 
-- **`/wp-audit` reads the site type and whether it is a local clone before any category
-  runs (Step 2.3).** Two blind spots made the audit report on the wrong site. First, checks
-  written for a store had no gate: adding any WooCommerce-specific check would fire on a
-  generic blog and score it for a cart it never had. The audit now records `site.commerce`
-  from `wp plugin is-active woocommerce`, and every commerce check reads `N/A` (out of the
-  denominator) on a non-commerce site, so commerce depth can be added without moving a
-  generic site's score. Second, a project restored to run locally is deliberately altered —
-  dev host in the database, deactivated payment/cache/mail plugins, `DISABLE_WP_CRON`, absent
-  object-cache drop-ins, debug logging, media newer than the file backup — and the audit used
-  to report those alterations as defects of the site, when they are the price of the copy.
-  When the manifest shows a clone (`project.source: "restore"`, a `wordpress.url_origin`,
-  or a non-public `wordpress.url`), those conditions are `N/A (local clone)`, suppressed and
-  out of the denominator, bounded by one test: would this also be true on production? Live
-  checks (response headers, paid-file reachability) now target the production URL — asked
-  for and confirmed, defaulting to `wordpress.url_origin` — and never the clone, whose
-  local server answers an `.htaccess` a production nginx ignores and would return a false
-  PASS.
-  `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
-  production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
-
-  When the manifest shows a clone (`source: restore`, a `restore.url_origin`, or a non-public
-  `wordpress.url`), those conditions are `N/A (local clone)`, suppressed and out of the
-  denominator, bounded by one test: would this also be true on production? Live checks
-  (response headers, paid-file reachability) now target the production URL — asked for and
-  confirmed, defaulting to `restore.url_origin` — and never the clone, whose local server
-  answers an `.htaccess` a production nginx ignores and would return a false PASS.
-  `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
-  production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
-
 - **`wp-audit-security` gains SEC-041/042/043, deeper than the plugin counts SEC-032/033/034
   ever checked.** Those three only counted outdated or inactive plugins — a plugin could
   carry a disclosed vulnerability, or sit unmaintained for years, and nothing said so unless
@@ -160,6 +131,26 @@
   `tests/checks/audit-plugin-inventory.sh` checks each rule inside the section that owns
   it, fails on a `SEC-NNN` defined by two table rows, and runs the tokenizer against two
   fixtures that cover every case above.
+
+- **`/wp-audit` reads the site type and whether it is a local clone before any category
+  runs (Step 2.3).** Two blind spots made the audit report on the wrong site. First, checks
+  written for a store had no gate: adding any WooCommerce-specific check would fire on a
+  generic blog and score it for a cart it never had. The audit now records `site.commerce`
+  from `wp plugin is-active woocommerce`, and every commerce check reads `N/A` (out of the
+  denominator) on a non-commerce site, so commerce depth can be added without moving a
+  generic site's score. Second, a project restored to run locally is deliberately altered —
+  dev host in the database, deactivated payment/cache/mail plugins, `DISABLE_WP_CRON`, absent
+  object-cache drop-ins, debug logging, media newer than the file backup — and the audit used
+  to report those alterations as defects of the site, when they are the price of the copy.
+  When the manifest shows a clone (`project.source: "restore"`, a `wordpress.url_origin`,
+  or a non-public `wordpress.url`), those conditions are `N/A (local clone)`, suppressed and
+  out of the denominator, bounded by one test: would this also be true on production? Live
+  checks (response headers, paid-file reachability) now target the production URL — asked
+  for and confirmed, defaulting to `wordpress.url_origin` — and never the clone, whose
+  local server answers an `.htaccess` a production nginx ignores and would return a false
+  PASS.
+  `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
+  production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
 
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had
   none, and its `template-functions.php` printed a pingback `<link>`. A full audit of a
