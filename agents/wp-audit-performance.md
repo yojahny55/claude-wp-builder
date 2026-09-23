@@ -120,17 +120,17 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 | Code | Check | Command | Pass Criteria | Severity |
 |------|-------|---------|---------------|----------|
 | PERF-035 | Too many plugins | `$WP plugin list --status=active --format=count` | ≤20 | WARNING |
-| PERF-036 | Autoloaded options large | `$WP db query "SELECT SUM(LENGTH(option_value)) FROM wp_options WHERE autoload='yes';"` | ≤800KB | WARNING |
-| PERF-037 | Top autoloaded options | `$WP db query "SELECT option_name, LENGTH(option_value) AS size FROM wp_options WHERE autoload='yes' ORDER BY size DESC LIMIT 10;"` | Info only | INFO |
+| PERF-036 | Autoloaded options large | `$WP db query "SELECT SUM(LENGTH(option_value)) FROM wp_options WHERE autoload IN ('yes','on','auto-on','auto');"` | ≤800KB | WARNING |
+| PERF-037 | Top autoloaded options | `$WP db query "SELECT option_name, LENGTH(option_value) AS size FROM wp_options WHERE autoload IN ('yes','on','auto-on','auto') ORDER BY size DESC LIMIT 10;"` | Info only | INFO |
 | PERF-038 | No object cache | `$WP cache type` | Not "WP Object Cache" (default) | INFO |
 | PERF-039 | Expired transients | `$WP db query "SELECT COUNT(*) FROM wp_options WHERE option_name LIKE '_transient_timeout_%' AND option_value < UNIX_TIMESTAMP();"` | 0 | INFO |
 | PERF-040 | PHP version old | `$WP eval "echo phpversion();"` | ≥8.1 | WARNING |
 | PERF-041 | OPcache off | `$WP eval "echo function_exists('opcache_get_status') && opcache_get_status() ? 'ON' : 'OFF';"` | ON | WARNING |
 | PERF-042 | Database bloated | `$WP db size --tables --format=json` | Info only | INFO |
-| PERF-061 | Action Scheduler backlog not pruned | `$WP db query "SELECT COUNT(*) FROM wp_actionscheduler_actions WHERE status IN ('complete','failed','canceled');"` | ≤10,000 completed/failed/canceled rows | WARNING |
-| PERF-062 | `woocommerce_sessions` oversized | `$WP db query "SELECT COUNT(*) FROM wp_woocommerce_sessions WHERE session_expiry < UNIX_TIMESTAMP();"` | ≤1,000 expired rows | WARNING |
-| PERF-063 | Expired-transient backlog exceeds prune budget | `$WP db query "SELECT COUNT(*) AS rows_, SUM(LENGTH(o.option_value)) AS bytes FROM wp_options t JOIN wp_options o ON o.option_name = REPLACE(t.option_name,'_transient_timeout_','_transient_') WHERE t.option_name LIKE '_transient_timeout_%' AND t.option_value < UNIX_TIMESTAMP();"` | ≤5,000 rows AND ≤5MB | INFO |
-| PERF-064 | Orphaned `postmeta` | `$WP db query "SELECT COUNT(*) FROM wp_postmeta pm LEFT JOIN wp_posts p ON p.ID = pm.post_id WHERE p.ID IS NULL;"` | ≤500 orphaned rows | INFO |
+| PERF-061 | Action Scheduler backlog not pruned | `$WP db query "SELECT COUNT(*) FROM $($WP db prefix)actionscheduler_actions WHERE status IN ('complete','failed','canceled');"` | ≤10,000 completed/failed/canceled rows | WARNING |
+| PERF-062 | `woocommerce_sessions` oversized | `$WP db query "SELECT COUNT(*) FROM $($WP db prefix)woocommerce_sessions WHERE session_expiry < UNIX_TIMESTAMP();"` | ≤1,000 expired rows | WARNING |
+| PERF-063 | Expired-transient backlog exceeds prune budget | `$WP db query "SELECT COUNT(*) AS rows_, SUM(LENGTH(o.option_value)) AS bytes FROM $($WP db prefix)options t JOIN $($WP db prefix)options o ON o.option_name = REPLACE(t.option_name,'_transient_timeout_','_transient_') WHERE t.option_name LIKE '\_transient\_timeout\_%' AND t.option_value < UNIX_TIMESTAMP();"` | ≤5,000 rows AND ≤5MB | INFO |
+| PERF-064 | Orphaned `postmeta` | `$WP db query "SELECT COUNT(*) FROM $($WP db prefix)postmeta pm LEFT JOIN $($WP db prefix)posts p ON p.ID = pm.post_id WHERE p.ID IS NULL;"` | ≤500 orphaned rows | INFO |
 | PERF-043 | Too many revisions | `$WP post list --post_type='revision' --format=count` | ≤100 | INFO |
 | PERF-044 | Memory limit low | `$WP eval "echo defined('WP_MEMORY_LIMIT') ? WP_MEMORY_LIMIT : ini_get('memory_limit');"` | ≥256M | WARNING |
 | PERF-045 | Excessive cron events | `$WP cron event list --format=count` | ≤50 | INFO |
@@ -259,10 +259,13 @@ old transient nobody ever reads again, and a dead `postmeta` row are just as rea
 as on a local copy, so they report `PASS`/`FAIL`/`INFO` normally — never suppressed the way
 Step 2.3's local-clone table suppresses `DISABLE_WP_CRON` or a deactivated payment gateway.
 
-Every command below is written with the literal `wp_` prefix as the generic example a doc
-uses — read the site's real prefix from `$table_prefix` in `wp-config.php` (or `$wpdb->prefix`)
-before running it, the same way `.wp-create.json`/`.claude/CLAUDE.md` already record a non-`wp_`
-prefix when the site has one.
+Every SQL command below resolves the site's real table prefix at run time with
+`$($WP db prefix)` rather than assuming `wp_` — the same non-`wp_` prefix
+`.wp-create.json`/`.claude/CLAUDE.md` already record when the site has one. Do not hand-edit
+these commands to hardcode `wp_<table>`: on a site whose prefix isn't `wp_`, that table simply
+doesn't exist and the query errors out instead of reporting the finding. Prose below still
+refers to each table by its generic `wp_<table>` name — that is shorthand for "the table this
+check reports on", not a literal identifier to run.
 
 **PERF-061 — Action Scheduler backlog not pruned.** WooCommerce, and several other plugins that
 queue background work, ship the Action Scheduler library. Its own cleaner purges `complete`,
@@ -293,7 +296,11 @@ nothing reads anymore never gets cleared on its own. PERF-063 does not duplicate
 escalates the same underlying data once it has piled up enough to matter for the `wp_options`
 table's physical size (`mysqldump`/migration weight, `ANALYZE TABLE` cost) rather than merely
 existing. Report the row count and byte sum together — a handful of large serialized values can
-cross the byte budget well before the row count does. Fix: `$WP transient delete --expired`.
+cross the byte budget well before the row count does. The `LIKE` pattern escapes its leading
+underscores (`\_transient\_timeout\_%`) rather than leaving them bare: MySQL treats an
+unescaped `_` as a single-character wildcard, which blocks the range scan on the `option_name`
+index and forces a full table scan of `wp_options` on every run — escaped, the same query reads
+the index instead. Fix: `$WP transient delete --expired`.
 
 **PERF-064 — orphaned `postmeta`.** A `wp_postmeta` row whose `post_id` no longer resolves to a
 row in `wp_posts` is left behind when a plugin (or a direct `$wpdb` delete) removes a post
@@ -311,7 +318,12 @@ hundreds of thousands, so it does not hold a long table lock on a live site.
 autoloaded-options size against an ≤800KB threshold at `WARNING`, and PERF-037 already lists the
 heaviest ten. Autoloaded options are the one bloat pattern in this group that loads on *every*
 request (`wp_load_alloptions()`), which is why that pair was already a real threshold rather than
-`INFO only` — there is nothing missing to add a new code for.
+`INFO only` — there is nothing missing to add a new code for. Both queries filter
+`autoload IN ('yes','on','auto-on','auto')`, not `autoload='yes'` alone: WP 6.6 added the
+per-option autoloading heuristic (`wp_autoload_values_to_autoload()`), so a 6.6+ install can
+write `on`, `off`, `auto-on`, `auto-off` or `auto` and never write `yes` at all — a query that
+only matches `'yes'` silently under-reports, or on a site with no `'yes'` rows at all, reports
+nothing.
 
 ## Step 3: Performance Budgets & Core Web Vitals
 These budgets are the standard for every run — they are recorded here, not borrowed from an

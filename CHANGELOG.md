@@ -100,7 +100,16 @@
   at `WARNING` (autoload is the one bloat pattern here that loads on every request), and
   PERF-039 already flags any expired transient at `INFO` — PERF-063 escalates the same data by
   volume instead of restating its existence. `tests/checks/audit-db-bloat.sh` pins the four
-  new codes, their thresholds and fix commands, and that autoload was not duplicated.
+  new codes, their thresholds and fix commands, and that autoload was not duplicated. All four
+  queries build their table name from `$($WP db prefix)` instead of a hardcoded `wp_` — on a
+  site whose real prefix differs, `FROM wp_<table>` simply errors instead of reporting the
+  finding. The expired-transient query also escapes the leading underscores in its `LIKE
+  '\_transient\_timeout\_%'` pattern: left unescaped, MySQL reads a leading `_` as a
+  single-character wildcard and falls back to a full scan of `wp_options` on every run instead
+  of a range scan on its `option_name` index. PERF-036/037's autoload queries now filter
+  `autoload IN ('yes','on','auto-on','auto')` rather than `autoload='yes'` alone, since WP 6.6's
+  per-option autoloading heuristic can write `on`/`off`/`auto-on`/`auto-off`/`auto` and never
+  write `yes` at all — the old filter could silently report nothing on a 6.6+ site.
 
 - **`/wp-audit` reads the site type and whether it is a local clone before any category
   runs (Step 2.3).** Two blind spots made the audit report on the wrong site. First, checks

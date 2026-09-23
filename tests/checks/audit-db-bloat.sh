@@ -40,10 +40,21 @@ done
 
 row() { grep -F "$1" "$agent" | grep -F '|'; }
 
-# PERF-061 — Action Scheduler backlog: table names, a real row-count threshold, not "Info only".
+# None of the four executable cells may hardcode the wp_ prefix: on a site whose real prefix
+# isn't wp_, that table doesn't exist and the query errors instead of reporting the finding.
+# The dynamic-prefix build ($($WP db prefix)<table>) is required in each cell instead.
+for code in PERF-061 PERF-062 PERF-063 PERF-064; do
+  r=$(row "$code")
+  printf '%s' "$r" | grep -Eq 'FROM wp_[a-z]' \
+    && fail "$code hardcodes the wp_ prefix in its SQL instead of reading the site's real one"
+  printf '%s' "$r" | grep -Fq '$($WP db prefix)' \
+    || fail "$code does not build its table name from \$($WP db prefix)"
+done
+
+# PERF-061 — Action Scheduler backlog: table name, a real row-count threshold, not "Info only".
 r=$(row 'PERF-061')
 printf '%s' "$r" | grep -Fq 'actionscheduler_actions' \
-  || fail "PERF-061 does not name wp_actionscheduler_actions"
+  || fail "PERF-061 does not name the actionscheduler_actions table"
 printf '%s' "$r" | grep -Fq '10,000' \
   || fail "PERF-061 has no concrete row-count threshold"
 printf '%s' "$r" | grep -Fq 'WARNING' \
@@ -54,25 +65,43 @@ printf '%s' "$r" | grep -Fiq 'info only' \
 # PERF-062 — woocommerce_sessions: table name, expiry column, threshold.
 r=$(row 'PERF-062')
 printf '%s' "$r" | grep -Fq 'woocommerce_sessions' \
-  || fail "PERF-062 does not name wp_woocommerce_sessions"
+  || fail "PERF-062 does not name the woocommerce_sessions table"
 printf '%s' "$r" | grep -Fq 'session_expiry' \
   || fail "PERF-062 does not check session_expiry"
 printf '%s' "$r" | grep -Fq '1,000' \
   || fail "PERF-062 has no concrete threshold"
 
-# PERF-063 — expired-transient backlog: threshold on rows AND bytes, not just "any".
+# PERF-063 — expired-transient backlog: threshold on rows AND bytes, not just "any", and the
+# LIKE pattern escapes its leading underscores so the option_name index can still be used
+# (an unescaped leading `_` is a single-char wildcard MySQL can't range-scan on, which forces
+# a full table scan of wp_options on every run).
 r=$(row 'PERF-063')
 printf '%s' "$r" | grep -Fq '_transient_timeout_' \
   || fail "PERF-063 does not query the transient timeout markers"
 printf '%s' "$r" | grep -Fq '5,000' || fail "PERF-063 has no row threshold"
 printf '%s' "$r" | grep -Fq '5MB' || fail "PERF-063 has no byte threshold"
+printf '%s' "$r" | grep -Fq '\_transient\_timeout\_%' \
+  || fail "PERF-063's LIKE pattern does not escape its leading underscores — it forces a full table scan of options"
 
 # PERF-064 — orphaned postmeta: LEFT JOIN against posts, IS NULL, threshold.
 r=$(row 'PERF-064')
-printf '%s' "$r" | grep -Fq 'wp_postmeta' || fail "PERF-064 does not query wp_postmeta"
+printf '%s' "$r" | grep -Fq 'postmeta' || fail "PERF-064 does not query the postmeta table"
 printf '%s' "$r" | grep -Fq 'LEFT JOIN' || fail "PERF-064 does not LEFT JOIN against posts"
 printf '%s' "$r" | grep -Fq 'IS NULL' || fail "PERF-064 does not filter on a missing owner"
 printf '%s' "$r" | grep -Fq '500' || fail "PERF-064 has no concrete row threshold"
+
+# --- The prefix-awareness note itself is present, not just the fixed cells ---
+grep -Fq '$($WP db prefix)' "$agent" \
+  || fail "$agent never explains how the real table prefix is resolved"
+grep -Fq "Do not hand-edit" "$agent" \
+  || fail "$agent has no warning against hardcoding wp_<table> when running these by hand"
+
+# --- PERF-036/037 must count the autoload values WP 6.6+ actually writes, not just 'yes' ---
+grep -Fq "autoload IN ('yes','on','auto-on','auto')" "$agent" \
+  || fail "$agent's autoloaded-options queries (PERF-036/037) still filter only autoload='yes' — WP 6.6+ also writes on/auto-on/auto"
+autoload_yes_only=$(grep -F "autoload='yes'" "$agent" | grep -v "autoload IN (" || true)
+[ -z "$autoload_yes_only" ] \
+  || fail "$agent still has a bare autoload='yes' filter that misses WP 6.6+ autoload values"
 
 # --- The procedure section: fix commands named, per item ---
 proc=$(awk '/^### Procedure — database bloat checks/{f=1} f{print} f && /^## Step 3/{exit}' "$agent")
