@@ -110,18 +110,19 @@
   risk on any shared copy of the site. SEC-040 enumerates every `woocommerce_*_settings` and
   `woocommerce-ppcp-*` row straight from the options table — so a gateway whose plugin is
   deactivated, as on a clone, is still covered — plus the options a few gateways keep a
-  credential in on their own (Mollie, Square, Amazon Pay, and the Jetpack connection tokens
-  WooPayments authenticates with), and reports CRITICAL for every non-empty credential
-  without ever printing the value itself. Key names are classified by segment rather than by
+  credential in on their own (Mollie, Square, Amazon Pay, Mercado Pago, the PayPal Payments
+  registration token, and the Jetpack connection tokens WooPayments authenticates with), and
+  reports CRITICAL for every non-empty credential without ever printing the value itself. Key names are classified by segment rather than by
   a fixed pattern: environment, version and region suffixes are dropped (`secret_key_v3`,
-  `shared_secret_eu`), descriptors such as `signature_method` are ignored, identifiers and
-  public-by-design keys (`merchant_id_eu`, `publishable_key`, `client_key`, `site_key`,
-  `merchant_key`) are INFO, and a name holding a secret word (`secret`, `*key`, `token`,
+  `shared_secret_eu`), a descriptor as the last segment (`signature_method`, `token_lock`)
+  silences the key, identifiers and public-by-design keys (`merchant_id_eu`,
+  `publishable_key`, `client_key`, `site_key`) are INFO — `merchant_key` is not, since Paytm's
+  is a secret — and a name holding a secret word (`secret`, `*key`, `token`,
   `password`, `passphrase`, `hmac`, signing material) is CRITICAL. The Pass criterion states
   that coverage is limited to those rows. The manual scrub step runs the same classifier —
   the block is byte-identical in both snippets — and edits the option in place, array or
-  single value, instead of dumping it. It is `N/A` when `site.commerce` is
-  `none` (`/wp-audit` Step 2.3), like every other commerce-only check, and it is deliberately
+  single value, instead of dumping it, and says so when `update_option()` fails. It is
+  `N/A` when `site.commerce` is `none` (`/wp-audit` Step 2.3), like every other commerce-only check, and it is deliberately
   **not** folded into that same step's local-clone suppression list: a gateway deactivated on
   a clone is a clone artifact and stays suppressed, but the credential still sitting in
   `wp_options` is true of production too and is reported regardless. The fix is manual —

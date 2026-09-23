@@ -67,14 +67,21 @@ function sec040_like( $subject, $pattern ) {
 	return 1 === preg_match( '/^' . $re . '$/s', $subject );
 }
 
+// WordPress unserializes the stored value, so every get_option() hands back a fresh copy; an
+// edit to what it returned never touches what is stored. The stub does the same.
 function get_option( $name, $default = false ) {
-	return array_key_exists( $name, $GLOBALS['sec040_options'] ) ? $GLOBALS['sec040_options'][ $name ] : $default;
+	return array_key_exists( $name, $GLOBALS['sec040_options'] )
+		? unserialize( serialize( $GLOBALS['sec040_options'][ $name ] ) )
+		: $default;
 }
 
-// Like WordPress, update_option() compares against the stored value and saves nothing when they
-// match — so a scrub that edits the object get_option() handed back, instead of a copy, saves
-// nothing, here as on a real site.
+// Like WordPress, update_option() returns false and saves nothing when the new value matches the
+// stored one. $GLOBALS['sec040_update_fails'] makes it return false without saving, as a failed
+// database write does.
 function update_option( $name, $value ) {
+	if ( ! empty( $GLOBALS['sec040_update_fails'] ) ) {
+		return false;
+	}
 	if ( array_key_exists( $name, $GLOBALS['sec040_options'] )
 		&& serialize( $GLOBALS['sec040_options'][ $name ] ) === serialize( $value ) ) {
 		return false;
@@ -124,7 +131,7 @@ $fixture = array(
 		'client_key'            => 'client-public',
 		'publishable_key'       => 'pk_public',
 		'test_publishable_key'  => 'pk_test_public',
-		'merchant_key'          => 'merchant-public',
+		'merchant_key'          => 'SENTINEL-32',
 		'key_id'                => 'rzp_key_id',
 		'api_username'          => 'api-user',
 		'receiver_email'        => 'shop@example.com',
@@ -157,9 +164,11 @@ $fixture = array(
 	'wc_square_access_tokens'                       => array( 'production' => 'SENTINEL-21' ),
 	'_mp_access_token_prod'                         => 'SENTINEL-30',
 	'_mp_public_key_prod'                           => 'APP_USR-public',
+	'ppcp_agentic_registration_token'               => 'SENTINEL-31',
 	'jetpack_private_options'                       => array(
 		'blog_token'  => 'SENTINEL-22',
 		'user_tokens' => array( 1 => 'SENTINEL-23' ),
+		'token_lock'  => '1767225600|||https://shop.example',
 	),
 	'woocommerce_camel_settings'                    => array(
 		'clientSecretLive' => 'SENTINEL-24',
@@ -212,6 +221,8 @@ $expected_critical = array(
 	'woocommerce_object_settings api_key',
 	'woocommerce_demo_settings clave256',
 	'_mp_access_token_prod -',
+	'woocommerce_demo_settings merchant_key',
+	'ppcp_agentic_registration_token -',
 );
 // Objects other than stdClass are not walked: detection names them, the scrub leaves them.
 $expected_unread = array(
@@ -223,7 +234,6 @@ $expected_info = array(
 	'woocommerce_demo_settings client_key',
 	'woocommerce_demo_settings publishable_key',
 	'woocommerce_demo_settings test_publishable_key',
-	'woocommerce_demo_settings merchant_key',
 	'woocommerce_demo_settings key_id',
 	'woocommerce_demo_settings api_username',
 	'woocommerce_demo_settings receiver_email',
@@ -377,6 +387,17 @@ foreach ( $fixture as $option => $original ) {
 			sec040_fail( "scrub of $option changed $other" );
 		}
 	}
+}
+
+// A failed save is said out loud, never reported as blanked.
+$GLOBALS['sec040_options']      = sec040_copy( $fixture );
+$GLOBALS['sec040_updates']      = array();
+$GLOBALS['sec040_update_fails'] = true;
+$out = sec040_run( str_replace( $placeholder, '$name = "woocommerce_demo_settings";', $scrub ) );
+$GLOBALS['sec040_update_fails'] = false;
+sec040_sentinels( $out, 'failed scrub' );
+if ( "woocommerce_demo_settings: update_option failed, nothing saved\n" !== $out ) {
+	sec040_fail( 'scrub whose update_option() fails printed ' . var_export( $out, true ) . ', expected the failure line' );
 }
 
 $GLOBALS['sec040_options'] = sec040_copy( $fixture );

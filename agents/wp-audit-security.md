@@ -336,7 +336,8 @@ Three sets of rows are read:
   (`mollie-payments-for-woocommerce_live_api_key`, `…_test_api_key`), Square
   (`wc_square_access_tokens`, `wc_square_refresh_tokens`, `wc_square_settings`), Amazon Pay
   (`woocommerce_amazon_payments_advanced_private_key`), Mercado Pago (`_mp_access_token_prod`,
-  `_mp_public_key_prod`, `…_test`) and the Jetpack connection tokens
+  `_mp_public_key_prod`, `…_test`), the JWT WooCommerce PayPal Payments keeps in
+  `ppcp_agentic_registration_token`, and the Jetpack connection tokens
   WooPayments authenticates with (`jetpack_private_options`). For these the option name minus
   the prefix is part of the name being classified, so `live_api_key` and
   `access_tokens.production` are judged like a settings key.
@@ -345,7 +346,7 @@ Three sets of rows are read:
 $WP eval '
 global $wpdb;
 // --- SEC-040 classifier: keep this block byte-identical in both snippets ---
-$prefixes = array( "mollie-payments-for-woocommerce_", "wc_square_", "woocommerce_amazon_payments_advanced_", "_mp_", "jetpack_private_options" );
+$prefixes = array( "mollie-payments-for-woocommerce_", "wc_square_", "woocommerce_amazon_payments_advanced_", "_mp_", "ppcp_agentic_", "jetpack_private_options" );
 $classify = function ( $name, $path, $value ) use ( $prefixes ) {
     if ( ! is_scalar( $value ) || "" === trim( (string) $value )
         || in_array( strtolower( trim( (string) $value ) ), array( "yes", "no", "on", "off", "true", "false", "0", "1" ), true ) ) {
@@ -366,11 +367,11 @@ $classify = function ( $name, $path, $value ) use ( $prefixes ) {
     }
     $last = $parts ? (string) end( $parts ) : "";
     $prev = count( $parts ) > 1 ? $parts[ count( $parts ) - 2 ] : "";
-    if ( "" === $last || preg_match( "/^(method|type|mode|algorithm|algo|enabled|enable|length|format|version|url|uri|endpoint|name|label|title|description|status|date|time|expiry|expires|expiration|page|field|placeholder|text|message|path|file|prefix|count|size|limit|required|protected|header)$/", $last ) ) {
+    if ( "" === $last || preg_match( "/^(method|type|mode|algorithm|algo|enabled|enable|length|format|version|url|uri|endpoint|name|label|title|description|status|date|time|expiry|expires|expiration|page|field|placeholder|text|message|path|file|prefix|count|size|limit|required|protected|header|lock)$/", $last ) ) {
         return "";
     }
     if ( preg_match( "/^(id|user|username|login|email|account)$/", $last )
-        || preg_match( "/^(publishable|public|client|site|merchant)key$/", $prev . $last ) ) {
+        || preg_match( "/^(publishable|public|client|site)key$/", $prev . $last ) ) {
         return "INFO";
     }
     if ( preg_match( "/^(signature|pass|pw|pwd|pin|seed|salt|hash|private|[a-z0-9]*sha(256|512))$/", $last ) ) {
@@ -441,13 +442,17 @@ name after the prefix, then the path):
    qualifier, so `merchant_id_eu` still ends in `id`.
 4. If the last segment **describes** a credential rather than holding one — `method`, `type`,
    `mode`, `algorithm`, `enabled`, `length`, `format`, `version`, `url`, `endpoint`, `name`,
-   `title`, `status`, `date`, `expiry`, `page`, `path`, `file`, `protected`… — nothing is
-   reported. So `signature_method=HMAC-SHA256`, `token_type` and `api_key_status` are silent.
+   `title`, `status`, `date`, `expiry`, `page`, `path`, `file`, `protected`, `lock`… — nothing
+   is reported, even when an earlier segment is a secret word. So
+   `signature_method=HMAC-SHA256`, `token_type`, `api_key_status` and Jetpack's `token_lock`
+   (an expiry and a site URL) are silent.
 5. If the last segment is an **identifier** (`id`, `user`, `username`, `login`, `email`,
    `account`), or the name ends in a key that is public by design (`publishable_key`,
-   `public_key`, `client_key`, `site_key`, `merchant_key`), it is **INFO**. So `merchant_id_eu`,
-   `site_key_v3`, `recaptcha_site_key`, `client_key` (Authorize.Net, Adyen), `merchant_key`
-   (PayFast posts it in the checkout form) and `key_id` are INFO, not CRITICAL.
+   `public_key`, `client_key`, `site_key`), it is **INFO**. So `merchant_id_eu`, `site_key_v3`,
+   `recaptcha_site_key`, `client_key` (Authorize.Net, Adyen) and `key_id` are INFO, not
+   CRITICAL. `merchant_key` is deliberately **not** on that list: PayFast posts it in the
+   checkout form, but Paytm's `merchant_key` is its secret signing key, so it is CRITICAL and a
+   PayFast row costs one manual look.
 6. It is **CRITICAL** if the last segment is signing material (`signature`, `pass`, `pw`,
    `pwd`, `pin`, `seed`, `salt`, `hash`, `private`, `…sha256`), or if **any** segment is a
    secret word: `secret` and its run-ons (`secretsha256`, `clientsecret`), anything ending in
@@ -508,7 +513,7 @@ option that holds a single value alike:
 $WP eval '
 $name = "woocommerce_<gateway_id>_settings";
 // --- SEC-040 classifier: keep this block byte-identical in both snippets ---
-$prefixes = array( "mollie-payments-for-woocommerce_", "wc_square_", "woocommerce_amazon_payments_advanced_", "_mp_", "jetpack_private_options" );
+$prefixes = array( "mollie-payments-for-woocommerce_", "wc_square_", "woocommerce_amazon_payments_advanced_", "_mp_", "ppcp_agentic_", "jetpack_private_options" );
 $classify = function ( $name, $path, $value ) use ( $prefixes ) {
     if ( ! is_scalar( $value ) || "" === trim( (string) $value )
         || in_array( strtolower( trim( (string) $value ) ), array( "yes", "no", "on", "off", "true", "false", "0", "1" ), true ) ) {
@@ -529,11 +534,11 @@ $classify = function ( $name, $path, $value ) use ( $prefixes ) {
     }
     $last = $parts ? (string) end( $parts ) : "";
     $prev = count( $parts ) > 1 ? $parts[ count( $parts ) - 2 ] : "";
-    if ( "" === $last || preg_match( "/^(method|type|mode|algorithm|algo|enabled|enable|length|format|version|url|uri|endpoint|name|label|title|description|status|date|time|expiry|expires|expiration|page|field|placeholder|text|message|path|file|prefix|count|size|limit|required|protected|header)$/", $last ) ) {
+    if ( "" === $last || preg_match( "/^(method|type|mode|algorithm|algo|enabled|enable|length|format|version|url|uri|endpoint|name|label|title|description|status|date|time|expiry|expires|expiration|page|field|placeholder|text|message|path|file|prefix|count|size|limit|required|protected|header|lock)$/", $last ) ) {
         return "";
     }
     if ( preg_match( "/^(id|user|username|login|email|account)$/", $last )
-        || preg_match( "/^(publishable|public|client|site|merchant)key$/", $prev . $last ) ) {
+        || preg_match( "/^(publishable|public|client|site)key$/", $prev . $last ) ) {
         return "INFO";
     }
     if ( preg_match( "/^(signature|pass|pw|pwd|pin|seed|salt|hash|private|[a-z0-9]*sha(256|512))$/", $last ) ) {
@@ -572,10 +577,11 @@ if ( null === $o ) {
     printf( "%s: option not found, nothing changed\n", $name );
 } else {
     $clean = $scrub( $o, "" );
-    if ( $count > 0 ) {
-        update_option( $name, $clean );
+    if ( $count > 0 && ! update_option( $name, $clean ) ) {
+        printf( "%s: update_option failed, nothing saved\n", $name );
+    } else {
+        printf( "%s: %d secret value(s) blanked\n", $name, $count );
     }
-    printf( "%s: %d secret value(s) blanked\n", $name, $count );
 }
 '
 ```
