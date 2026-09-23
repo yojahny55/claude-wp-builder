@@ -97,9 +97,9 @@
   clone's host is never probed (`N/A` with the reason when there are no downloads or every
   download lives outside it, whatever the method). Each snippet prints one labelled line, so
   the output parses line by line. The `redirect` method is CRITICAL by configuration when that
-  file exists locally, or when the clone has no `woocommerce_uploads` at all and the stored
-  path is the best evidence; it is `UNMEASURED` when the directory is there but the stored file
-  is not. Otherwise it fires a control request at a public upload on the production host (never
+  file exists locally, or when the clone holds no paid files at all (no `woocommerce_uploads`,
+  or only the `index.html` and `.htaccess` WooCommerce recreates there) and the stored path is
+  the best evidence; it is `UNMEASURED` when paid files are there but the stored one is not. Otherwise it fires a control request at a public upload on the production host (never
   an attachment under `woocommerce_uploads`, which would be a paid file) first and, only if that
   returns a non-HTML `200`/`206`, probes the paid file header-only with a 15-second timeout.
   When HEAD gets `405`/`501`, both requests fall back to a one-byte ranged GET capped by

@@ -105,6 +105,10 @@ has 'which must never be probed' || fail "SEC-039 does not forbid probing the st
 has '$seg="/woocommerce_uploads/"' \
   || fail "SEC-039 does not cut the stored URL at /woocommerce_uploads/"
 has 'file_exists($dir.$p)' || fail "SEC-039 does not prefer a probe file that exists locally"
+has '$local=is_dir($dir)&&count(array_diff(scandir($dir),[".","..","index.html",".htaccess"]))>0;' \
+  || fail "SEC-039 reads WooCommerce's recreated stub directory as restored paid files"
+has 'the clone has no `woocommerce_uploads` directory, or only the `index.html` and `.htaccess` WooCommerce recreates there on its own' \
+  || fail "SEC-039 lost the stub-directory case of NO-LOCAL-UPLOADS"
 has 'echo $local?"MISSING-LOCALLY":"NO-LOCAL-UPLOADS"," $first\n";' \
   || fail "SEC-039 snippet does not tell a missing file from uploads that were never restored"
 has 'array_map("rawurlencode",explode("/",$p))' \
@@ -148,12 +152,11 @@ has 'Exit `63` from either fallback means the server ignored the range and annou
 has 'Any other non-zero exit, or no status line at all, is `UNMEASURED`, quoting the curl exit code' \
   || fail "SEC-039 does not report a curl error as UNMEASURED"
 
-# Every line of every code block in the procedure, verbatim. The fragment gates above say
-# why each piece matters; this pin catches the rest (a deleted early return, a dropped
-# rawurldecode, an edited comment that no longer matches the code).
-while IFS= read -r l; do
-  line "$l" || fail "SEC-039 code line missing or changed: $l"
-done <<'EOF_SNIPPETS'
+# Every code block in the procedure, compared whole: a changed, removed OR added line fails
+# (an added `curl -sL -o paid.bin …` would otherwise slip past per-line presence checks). The
+# fragment gates above say why each piece matters; this catches everything else.
+code=$(awk '/^```bash$/{on=1; next} on && /^```$/{on=0; next} on' <<<"$proc")
+expected_code=$(cat <<'EOF_SNIPPETS'
 # One line per snippet, each starting with its label, so the output parses line by line.
 $WP eval 'echo "METHOD ",get_option("woocommerce_file_download_method") ?: "force","\n";'
 # Where uploads are served from (multisite: uploads/sites/N; custom UPLOADS or upload_path).
@@ -163,7 +166,7 @@ $WP eval 'echo "UPLOADS-PATH ",rtrim((string) wp_parse_url(wp_upload_dir()["base
 $WP eval 'global $wpdb; $seg="/woocommerce_uploads/";
 $rows=$wpdb->get_col("SELECT pm.meta_value FROM {$wpdb->postmeta} pm JOIN {$wpdb->posts} p ON p.ID=pm.post_id LEFT JOIN {$wpdb->posts} par ON par.ID=p.post_parent WHERE pm.meta_key=\"_downloadable_files\" AND pm.meta_value<>\"\" AND p.post_status=\"publish\" AND (p.post_type=\"product\" OR (p.post_type=\"product_variation\" AND par.post_status=\"publish\")) ORDER BY p.post_date DESC");
 if(!$rows){echo "NO-DOWNLOADS\n";return;}
-$dir=wp_upload_dir()["basedir"].$seg; $local=is_dir($dir); $first=null;
+$dir=wp_upload_dir()["basedir"].$seg; $local=is_dir($dir)&&count(array_diff(scandir($dir),[".","..","index.html",".htaccess"]))>0; $first=null;
 foreach($rows as $r){foreach((array)maybe_unserialize($r) as $f){$u=is_array($f)?($f["file"]??""):"";$i=strpos($u,$seg);if($i===false){continue;}
 $p=rawurldecode(preg_replace("/[?#].*$/","",substr($u,$i+strlen($seg))));
 $enc=implode("/",array_map("rawurlencode",explode("/",$p)));
@@ -179,24 +182,56 @@ curl -sI --max-time 15 -A "Mozilla/5.0" "https://<production-host><uploads-path>
 # in case the server ignores the range:
 curl -s -o /dev/null -D - -r 0-0 --max-filesize 1024 --max-time 15 -A "Mozilla/5.0" "https://<production-host><uploads-path>/woocommerce_uploads/<path>"
 EOF_SNIPPETS
+)
+if [ "$code" != "$expected_code" ]; then
+  diff <(printf '%s\n' "$expected_code") <(printf '%s\n' "$code") | head -20 || true
+  fail "SEC-039 code blocks differ from the pinned copy (a line changed, removed or added)"
+fi
 
-# Verdict table: every row, verbatim.
-line '| `200` or `206` with any `content-type` other than `text/html` | the file is served without a purchase → **CRITICAL** |' \
-  || fail "SEC-039 CRITICAL rule does not cover any non-HTML 200/206"
-line "| \`403\` from the site's own server — no challenge headers (below) and the control returned \`200\`/\`206\` | protected → PASS |" \
-  || fail "SEC-039 403 PASS is not limited to the site's own 403 after a good control"
-line "| \`404\` from the site's own server, same conditions, and the probe file was \`FOUND\` | protected → PASS |" \
-  || fail "SEC-039 404 PASS does not require a probe file known to exist"
-line '| `404` on a `NO-LOCAL-UPLOADS` or `MISSING-LOCALLY` probe file | the file may simply be gone → `UNMEASURED` |' \
-  || fail "SEC-039 reads a 404 on a file not confirmed locally as protected"
-line '| `403` carrying a challenge header: `cf-mitigated: challenge`, a `cf-chl-*` / `__cf_chl` cookie, `x-sucuri-block`, or any header naming a WAF or bot check | **a 403 from a WAF is not protection** — the challenge would clear for a browser and the file may still be open → `UNMEASURED` |' \
-  || fail "SEC-039 reads a WAF or bot-challenge 403 (Cloudflare, Sucuri) as protected"
+# Every curl the procedure names, in code or prose: header-only or capped, never following
+# redirects, never writing a body anywhere but /dev/null.
+curls=$(grep -oE 'curl +-[^`]*' <<<"$proc" || true)
+[ "$(printf '%s\n' "$curls" | grep -c .)" -ge 4 ] || fail "SEC-039 lost its curl commands"
+while IFS= read -r c; do
+  case "$c" in
+    *" -sI "*|*" --max-filesize "*) ;;
+    *) fail "SEC-039 curl can download a body (neither -sI nor --max-filesize): $c" ;;
+  esac
+  if grep -Eq -- '(^| )(-[A-Za-z]*L[A-Za-z]*|--location(-trusted)?)( |$)' <<<"$c"; then
+    fail "SEC-039 curl follows redirects: $c"
+  fi
+  rest=${c// -o \/dev\/null/}
+  if grep -Eq -- '(^| )(-[A-Za-z]*[oO][A-Za-z]*|--output|--remote-name(-all)?|--output-dir)( |$)' <<<"$rest"; then
+    fail "SEC-039 curl writes output somewhere other than /dev/null: $c"
+  fi
+done <<<"$curls"
+
+# Verdict table compared whole: header, delimiter and exactly these seven consecutive rows. A
+# paragraph between rows ends the table in GFM; an extra row (a second PASS) must fail too.
+table=$(awk '/^\| Response \| Verdict \|$/{on=1} on && !/^\|/{exit} on' <<<"$proc")
+expected_table=$(cat <<'EOF_TABLE'
+| Response | Verdict |
+|---|---|
+| `200` or `206` with any `content-type` other than `text/html` | the file is served without a purchase → **CRITICAL** |
+| `403` from the site's own server — no challenge headers (below) and the control returned `200`/`206` | protected → PASS |
+| `404` from the site's own server, same conditions, and the probe file was `FOUND` | protected → PASS |
+| `404` on a `NO-LOCAL-UPLOADS` or `MISSING-LOCALLY` probe file | the file may simply be gone → `UNMEASURED` |
+| `403` carrying a challenge header: `cf-mitigated: challenge`, a `cf-chl-*` / `__cf_chl` cookie, `x-sucuri-block`, or any header naming a WAF or bot check | **a 403 from a WAF is not protection** — the challenge would clear for a browser and the file may still be open → `UNMEASURED` |
+| `3xx` (login redirect or otherwise), `405` after the ranged fallback, `401`, `429`, `5xx`, or `200` with `text/html` (a soft 404 or a challenge page) | `UNMEASURED`, with the status line and headers as evidence |
+| curl error (exit other than `0`/`63`) or empty response | `UNMEASURED`, quoting the curl exit code |
+EOF_TABLE
+)
+if [ "$table" != "$expected_table" ]; then
+  diff <(printf '%s\n' "$expected_table") <(printf '%s\n' "$table") | head -20 || true
+  fail "SEC-039 verdict table is not the 7 pinned rows, consecutive after the delimiter"
+fi
+# GFM keeps a non-blank line straight after the last row inside the table: require a blank.
+after_table=$(awk '/^\| Response \| Verdict \|$/{on=1} on && !/^\|/{print; exit}' <<<"$proc")
+[ -z "$after_table" ] || fail "SEC-039 verdict table is not closed by a blank line: $after_table"
+[ "$(grep -c '^|' <<<"$proc" || true)" -eq 9 ] \
+  || fail "SEC-039 has table rows outside the verdict table (split table or stray row)"
 has '`server: cloudflare`, `cf-ray` or `x-sucuri-id` on their own do not make it a WAF answer; only a challenge or block header does.' \
   || fail "SEC-039 may read any 403 on a proxied site as a WAF answer"
-line '| `3xx` (login redirect or otherwise), `405` after the ranged fallback, `401`, `429`, `5xx`, or `200` with `text/html` (a soft 404 or a challenge page) | `UNMEASURED`, with the status line and headers as evidence |' \
-  || fail "SEC-039 lost the UNMEASURED row for redirects, 405, 5xx and HTML 200"
-line '| curl error (exit other than `0`/`63`) or empty response | `UNMEASURED`, quoting the curl exit code |' \
-  || fail "SEC-039 lost the UNMEASURED row for a curl error"
 has 'Only the table'"'"'s first three rows produce a verdict; everything else is `UNMEASURED`, never `PASS`' \
   || fail "SEC-039 lets unclassified responses fall through to PASS"
 
