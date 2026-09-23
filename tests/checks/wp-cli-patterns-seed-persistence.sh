@@ -27,6 +27,11 @@ grep -qi "client's own edit always wins" <<<"$t" \
 grep -qi 'scratchpad' <<<"$t" \
   || { echo "FAIL: wp-cli-patterns never names the scratchpad as the thing to avoid"; exit 1; }
 
+grep -qi "whether those scripts are committed is the project's call" <<<"$t" \
+  || { echo "FAIL: wp-cli-patterns does not say that versioning the seeders is the project's decision, versioned by default"; exit 1; }
+grep -qF 'gitignore `inc/seed/`' <<<"$t" \
+  || { echo "FAIL: wp-cli-patterns does not name gitignoring inc/seed/ as the alternative, nor what it trades away"; exit 1; }
+
 # The command that actually runs seeding must point here, without landing
 # inside the Phase 4/4.5/5 region another change already owns.
 seed=commands/wp-seed.md

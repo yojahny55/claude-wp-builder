@@ -66,6 +66,19 @@ fresh clone of the repository — or a rollback — has no way to get them back.
   "the client changed this on purpose," and silently overwrites the client's
   work.
 
+**Whether those scripts are committed is the project's call.** Versioning them
+is the default, and it is what the paragraph above is arguing for: a clone, a
+fresh environment or a rollback then carries the code that reproduces the
+content, not just the content. A project that moves its database by hand
+between environments may decide the opposite and gitignore `inc/seed/` — the
+content travels in the dump, and nothing in the theme loads a seeder at
+runtime, so no deploy misses them. What that trades away is exactly the
+reproducibility above: the records survive only as long as somebody still has
+a dump, and the script that made them lives on one machine. Either way the
+scripts still belong in `inc/seed/` rather than a scratchpad. Decide it once,
+write the decision in the project's `CLAUDE.md`, and honour it there instead of
+re-opening it file by file.
+
 This is unrelated to the WP-CLI-vs-PHP-generation rule above: a script that
 belongs in `inc/seed/` should still prefer `update_field()` / WP-CLI functions
 over hand-rolled SQL inside it — the two rules compose, they do not conflict.
