@@ -101,6 +101,34 @@
   `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
   production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
 
+  When the manifest shows a clone (`source: restore`, a `restore.url_origin`, or a non-public
+  `wordpress.url`), those conditions are `N/A (local clone)`, suppressed and out of the
+  denominator, bounded by one test: would this also be true on production? Live checks
+  (response headers, paid-file reachability) now target the production URL — asked for and
+  confirmed, defaulting to `restore.url_origin` — and never the clone, whose local server
+  answers an `.htaccess` a production nginx ignores and would return a false PASS.
+  `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
+  production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
+
+- **`wp-audit-security` gains SEC-041/042/043, deeper than the plugin counts SEC-032/033/034
+  ever checked.** Those three only counted outdated or inactive plugins — a plugin could
+  carry a disclosed vulnerability, or sit unmaintained for years, and nothing said so unless
+  an update happened to be pending. SEC-041 (known-vulnerable plugins/themes) and SEC-042
+  (abandoned plugins) close that gap by reading a live vulnerability feed and the wp.org API,
+  gated exactly like SEC-038 — an unreachable network makes both `UNMEASURED`, never `PASS`,
+  and neither hardcodes a CVE or abandonment list. SEC-043 (duplicate/redeclared function
+  names across the site's own plugins) is a Tier 1 code scan with no network dependency,
+  catching a fatal `Cannot redeclare` risk before both plugins are ever active together. All
+  three respect the Step 2.3 local-clone suppression, so a plugin already excluded there is
+  not re-reported under a new code. Also fixes a `/wp-adopt` misclassification: a commercial
+  plugin with no updater of its own (a paid multi-currency plugin, a paid slider) was
+  proposed as the site's own editable code purely because it had no update transient.
+  `/wp-adopt`'s code-scope confirmation now re-checks the plugin's header and wp.org listing
+  and moves a vendor-without-updater plugin to `read_only` before confirming, and
+  `wp-audit-security` prints a non-scored reminder as a safety net when one is still found in
+  `code_scope.editable`. `tests/checks/audit-plugin-inventory.sh` pins the new codes, the
+  reused network gate and the `/wp-adopt` re-verification note.
+
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had
   none, and its `template-functions.php` printed a pingback `<link>`. A full audit of a
   delivered build found XML-RPC and pingbacks on, `/wp/v2/users` and `?author=N` listing

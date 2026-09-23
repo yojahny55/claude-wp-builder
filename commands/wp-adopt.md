@@ -95,6 +95,17 @@ Ask with `AskUserQuestion`, one question each:
    - A site that has never checked for updates has empty transients, so every plugin looks
      like the site's own code.
 
+   **Re-verify the first case before offering the list.** For each plugin the transient
+   signal proposed as editable, read its header — `$WP plugin get <slug> --field=author` and
+   `--field=plugin_uri` — and check whether its slug resolves on the wp.org plugin directory.
+   A paid multi-currency plugin or a paid slider bundled with a commercial theme is vendor
+   code with no updater, not site code, even though the transient signal cannot tell the two
+   apart: a header naming a vendor with no matching wp.org listing means move it to
+   read-only before presenting the list, so the operator is deselecting exceptions rather
+   than un-checking the common case. `/wp-audit` prints a reminder later if such a plugin is
+   still sitting in `code_scope.editable`, but that is a safety net for a site adopted before
+   this check existed — it is not a substitute for getting the split right here.
+
    Offer the editable list as a multi-select, pre-selected. Anything the operator deselects
    moves to read-only. **The parent of a child theme is always read-only.** An update
    overwrites it, so do not offer to move it.

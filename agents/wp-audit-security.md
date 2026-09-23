@@ -53,6 +53,24 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
   defect in markup the builder stores per page is `Owner: content` (fixed in the builder's
   editor), not `code`.
 - **Security plugin.** AIOS configuration checks run only when `stack.security` is `aios`. With another security plugin they are `N/A (stack: <name>)`. With `none` they report AIOS as absent, as before. wp-config constants, file permissions, headers and code checks apply whatever the stack is.
+- **Vendor-plugin re-check.** `code_scope.editable` was decided once, at adoption time, from
+  which plugins had no update transient — the only signal `/wp-adopt` could read then. A
+  commercial plugin bundled with a theme (a paid multi-currency plugin, a paid slider) often
+  has no updater of its own, so that signal proposed it as the site's own code even though
+  nobody at the site wrote it. Before Step 1 runs, re-check every plugin path still in
+  `code_scope.editable`: read its header with `$WP plugin get <slug> --field=author` and
+  `--field=plugin_uri`, and check whether its slug resolves on the wp.org plugin directory
+  (the same lookup SEC-042 makes). When the header names a vendor and the slug has no wp.org
+  listing, print a reminder — this is not a scored finding, so it never moves the
+  denominator — and do not move the plugin yourself:
+  ```
+  === Vendor-plugin re-check ===
+    wp-content/plugins/<slug>   looks vendor-supplied (Author: <name>, no wp.org listing) —
+    confirm code_scope with /wp-adopt; a fix proposed here would be lost on the vendor's
+    next update
+  ```
+  Only the operator's confirmation in `/wp-adopt` changes the manifest; this print is a
+  safety net for a site adopted before the check existed, or where the operator missed it.
 
 ## Step 1: Tier 1 — Code-Only Checks
 
@@ -74,6 +92,7 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 | SEC-012 | Sensitive files accessible | Check `.htaccess` for blocking of `readme.html`, `license.txt` | INFO | Yes |
 | SEC-013 | DISALLOW_UNFILTERED_HTML missing | Read `wp-config.php`, check if constant defined | INFO | Yes |
 | SEC-014 | Missing CONCATENATE_SCRIPTS false | Read `wp-config.php`, check if constant defined and set to `false` | INFO | Yes |
+| SEC-043 | Duplicate/redeclared function across site plugins | Grep every active plugin (plus, on an adopted site, every `code_scope.editable`/`code_scope.read_only` plugin path) for top-level `function <name>(` declarations; a name declared in two or more plugins is a fatal redeclare risk | CRITICAL | No |
 
 ### Detection details
 
@@ -136,6 +155,29 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 - Fail: No blocking rules found
 - Message: `Sensitive WordPress files (readme.html, license.txt) are publicly accessible`
 
+**SEC-043 — Duplicate/redeclared function across site plugins:**
+- This is Tier 1 — a code scan, no network and no vulnerability feed needed. Two plugins that
+  each declare `function acme_get_field()` at the top level fatal the instant both are active;
+  nothing short of reading both plugins' code together catches it before that happens.
+- Scope: `$WP plugin list --status=active --format=json` for the plugin slugs, then every
+  `.php` file under each one's directory. On an adopted site also scan every plugin path
+  named in `code_scope.editable` and `code_scope.read_only` — a redeclare fatals regardless
+  of which list owns the file.
+- A plugin Step 2.3 already suppressed as a local-clone artifact (a payment gateway or
+  cache plugin turned off only because this is a local copy) is inactive, so it is not
+  scanned here either — it is not currently loaded, so it cannot currently collide. Do not
+  re-report it under this code; that reintroduces exactly what Step 2.3 exists to suppress.
+- Pattern: top-level `function\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(`, excluding any declaration
+  inside a `class`, `trait` or `interface` body (a method redeclare is a different,
+  PHP-caught error) and excluding anything inside a `namespace` block (namespaced functions
+  of the same name do not collide).
+- A declaration guarded by `if ( ! function_exists( 'name' ) )` within the 3 lines above it
+  is a defensive polyfill, not a live collision — it never actually redeclares — so exclude
+  guarded matches from the count.
+- Pass: every unguarded, unnamespaced, top-level function name appears in exactly one plugin.
+- Fail: the same name is declared by two or more plugins.
+- Message: `<function_name>() is declared by both <plugin A slug> and <plugin B slug> — activating both fatals`
+
 ## Step 2: Tier 2 — WP-CLI Runtime Checks
 
 Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
@@ -161,6 +203,8 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 | SEC-036 | Development host in the database | `$WP eval` sweep of `options`, `postmeta`, `posts` and `termmeta` for the dev host. See Procedure | CRITICAL |
 | SEC-037 | Backup or editor files inside the theme | Glob the theme for `*.bak*`, `*.orig`, `*.save`, `*~`, `*.php.[0-9]*`, `*.sql` | WARNING |
 | SEC-038 | Update counts reported without network access | Reach `api.wordpress.org` before reading any update count. See Procedure | WARNING |
+| SEC-041 | Known-vulnerable plugins/themes | Match active plugin/theme slugs and versions against a vulnerability feed (Patchstack, WPScan, or the wp.org security advisories), **after the SEC-038 network gate passes**. See Procedure | 0 vulnerable matches | CRITICAL |
+| SEC-042 | Abandoned plugins | wp.org API `last_updated` older than ~2 years, or `tested` far behind the installed core version, **after the SEC-038 network gate passes**. See Procedure | Not abandoned | WARNING |
 
 ### Execution notes
 
@@ -300,6 +344,52 @@ Rules that follow from this:
 The same note applies to WP-043 and WP-044 in `agents/wp-audit-practices.md`, which read the
 same two transients.
 
+### Procedure — SEC-041 and SEC-042 (vulnerability and abandonment need a live feed)
+
+Both need to know something about the *outside world* that no file in the theme or plugin can
+tell you: whether a version has a disclosed vulnerability, and whether the plugin is still
+maintained. Neither question has a fixed answer to bake into this file.
+
+**Do not hardcode a CVE list, a vulnerable-version list, or an abandonment cutoff list.** A
+list written into this document today is wrong tomorrow — a plugin patched last month is
+still flagged, and a plugin that ships a vulnerability next month is silently trusted. Both
+checks read a live source at audit time instead.
+
+**Same gate as SEC-038, reused exactly, not reimplemented.** Run the SEC-038 `curl` probe
+against `api.wordpress.org` first. When it fails, SEC-041 and SEC-042 are `UNMEASURED` with
+that curl command as the evidence line — **never `PASS`**, for the identical reason SEC-038
+gives: a check that cannot reach the network is not "no vulnerabilities found", it is "not
+checked". Do not add a second, separate network probe for the vulnerability feed; if
+`api.wordpress.org` is unreachable, assume any additional feed (Patchstack, WPScan) is too and
+skip straight to `UNMEASURED`.
+
+**SEC-041 — known-vulnerable plugins/themes.** Enumerate `$WP plugin list --format=json` and
+`$WP theme list --format=json` for active slugs and installed versions, excluding anything
+Step 2.3 already reclassified `N/A (local clone)` — a plugin turned off only because this is
+a local copy is not live on this site and reporting it a second time under a different code
+re-introduces what Step 2.3 exists to suppress. For each remaining slug, query whichever
+vulnerability source is reachable (Patchstack's free API, WPScan's free API, or the wp.org
+plugin API's advisory data where it publishes one) for that slug and version range.
+- Fail: the feed lists a disclosed vulnerability matching the installed version.
+- Pass: the feed has an entry for the slug and lists nothing matching the installed version.
+- A vendor/premium plugin or theme with no wp.org slug and no match in the vulnerability feed
+  (a paid plugin no public database tracks at all) is `UNMEASURED` per-item, "no public
+  vulnerability database entry" — it is not folded into a site-wide pass, and it is not a
+  FAIL either: there is nothing public to measure it against.
+
+**SEC-042 — abandoned plugins.** For each active plugin slug (again excluding anything Step
+2.3 suppressed as a local-clone artifact), call the wp.org plugin info API
+(`https://api.wordpress.org/plugins/info/1.0/<slug>.json`) and read `last_updated` and
+`tested`.
+- Fail: `last_updated` is older than roughly 2 years (730 days), or `tested` (the WordPress
+  version the plugin claims compatibility with) is more than two major core versions behind
+  the version this site runs.
+- Pass: neither condition holds.
+- **Vendor/premium plugins with no wp.org listing are `UNMEASURED` ("no public metadata"),
+  never `FAIL`.** There is no public `last_updated` to read for a plugin wp.org never
+  indexed, and treating "unknown" as "abandoned" would flag every commercial plugin on the
+  site regardless of how well it is actually maintained.
+
 ## Step 3: Response-Header Checks
 
 These read the live response, so they need a reachable host — the same gate as SEC-038, not
@@ -428,3 +518,9 @@ When AIOS-related fixes are needed, dispatch the `wp-audit-aios` agent with the 
    SEC-034. A count read from a stale transient is `UNMEASURED`, never a pass
 8. **The dev-host sweep reads four tables** — `options` alone misses the rows that reach the
    page: `postmeta`, `posts` and `termmeta`
+9. **SEC-041 and SEC-042 share SEC-038's network gate and never a hardcoded list** — an
+   unreachable `api.wordpress.org` makes both `UNMEASURED`, and a vendor plugin absent from
+   every public feed is `UNMEASURED` per item too, never `FAIL`
+10. **SEC-041, SEC-042 and SEC-043 respect the Step 2.3 clone suppression** — a plugin already
+    reclassified `N/A (local clone)` there is not re-reported as vulnerable, abandoned or a
+    redeclare risk under a new code
