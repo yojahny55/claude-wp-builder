@@ -631,6 +631,15 @@ scrollable strip with dots and/or arrows:
   `overflow-x-auto` box. A control placed inside the scrolling box is itself part of the
   scrolled content: it renders fine on the first view and slides out of sight as soon as a
   visitor moves the strip.
+- **Every card inside the scrolling element is `relative`** (the strip's direct children,
+  e.g. `<li class="relative ...">`). `overflow-x: auto` clips only the descendants whose
+  containing block is the strip or something inside it. A `position: absolute` box in a card
+  with no positioned ancestor below the strip (a `screen-reader-text` new-tab notice, a
+  badge, a stretched link) is laid out against a container *above* the strip. The strip
+  never clips it, and each off-screen card's copy stretches the whole document sideways at
+  every width. A 1px screen-reader span shows in no screenshot, so check the document
+  itself at a desktop and a phone width:
+  `document.documentElement.scrollWidth <= document.documentElement.clientWidth`.
 - **A mirrored icon (a prev arrow, typically) uses `transform` consistently across its
   states.** In Tailwind v4, `-scale-x-100` writes the `scale` CSS property, not `transform` —
   so a hover/focus rule that still sets `transform: translateX(...)` on the same element
