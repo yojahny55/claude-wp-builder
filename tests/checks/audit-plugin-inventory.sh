@@ -40,7 +40,8 @@ cd "$(dirname "$0")/../.." || fail "cannot cd to the repository root"
 # matches at the start of a line outside a ``` fence, so a `## Step 3` quoted in a code
 # block or in prose cannot cut the section short.
 section() {
-  awk -v a="$2" -v b="$3" '
+  # ENVIRON, not -v: awk -v expands backslash escapes in the markers.
+  A="$2" B="$3" awk 'BEGIN { a = ENVIRON["A"]; b = ENVIRON["B"] }
     function hit(m) {
       if (substr(m, 1, 1) == "#") return !fence && index($0, m) == 1
       return index($0, m) > 0
@@ -298,11 +299,9 @@ function acme_early() {}
 PHP
 echo '<?php function acme_early() {}' > "$fx/object-cache.php.bak"
 
-set +e
+rc=0
 out="$(php "$script" loaded:a="$fx/a" loaded:b="$fx/b" inactive:c="$fx/c" inactive:d="$fx/d" \
-  inactive:e="$fx/a/a.php" loaded:g="$fx/g" loaded:h="$fx/h" loaded:parked="$fx/object-cache.php.bak" 2>/dev/null)"
-rc=$?
-set -e
+  inactive:e="$fx/a/a.php" loaded:g="$fx/g" loaded:h="$fx/h" loaded:parked="$fx/object-cache.php.bak" 2>/dev/null)" || rc=$?
 [ "$rc" = 1 ] || fail "$script must exit 1 on a finding (got $rc)"
 # ENVIRON, not -v: awk -v expands backslash escapes, and a namespaced name holds a `\t`.
 row() { printf '%s\n' "$out" | N="$1()" awk -F'\t' '$2 == ENVIRON["N"]'; }
@@ -348,10 +347,8 @@ names='imported_fn grouped_a grouped_b mixed_fn imported_global brace_less after
 cls_guarded def_guarded elif_guarded alt_elif alt_else enum_method after_enum includes_db tpl_skip parked_one'
 { echo '<?php'; for n in $names; do echo "function $n() {}"; done; } > "$fx/y/y.php"
 echo '<?php function parked_one() {}' > "$fx/parked.php.bak"
-set +e
-out="$(php "$script" loaded:x="$fx/x" loaded:y="$fx/y" loaded:parked="$fx/parked.php.bak" 2>/dev/null)"
-rc=$?
-set -e
+rc=0
+out="$(php "$script" loaded:x="$fx/x" loaded:y="$fx/y" loaded:parked="$fx/parked.php.bak" 2>/dev/null)" || rc=$?
 [ "$rc" = 1 ] || fail "$script: second fixture exited $rc, expected 1"
 for n in imported_fn grouped_a grouped_b mixed_fn imported_global; do
   [ -z "$(row "$n")" ] || fail "$script counted the import 'use function $n' as a declaration"
@@ -370,24 +367,18 @@ row includes_db | grep -q '^CRITICAL' || fail "$script skipped a plugin's own in
 [ -z "$(row tpl_skip)" ] || fail "$script scanned an advanced-cache.php template inside a plugin"
 row parked_one | grep -q $'	parked parked.php.bak:1' || fail "$script did not scan a parked *.php.bak drop-in"
 
-set +e
-err="$(php "$script" loaded:y="$fx/y" loaded:gone="$fx/does-not-exist" 2>&1 >/dev/null)"
-rc=$?
-set -e
+rc=0
+err="$(php "$script" loaded:y="$fx/y" loaded:gone="$fx/does-not-exist" 2>&1 >/dev/null)" || rc=$?
 [ "$rc" = 2 ] || fail "$script: a missing source exited $rc, not 2 — it would read as a pass"
 has "$err" 'missing source: gone' || fail "$script does not name the missing source"
-set +e
-err="$(php "$script" loaded:single="$fx/y/y.php" 2>&1 >/dev/null)"
-rc=$?
-set -e
+rc=0
+err="$(php "$script" loaded:single="$fx/y/y.php" 2>&1 >/dev/null)" || rc=$?
 [ "$rc" = 0 ] || fail "$script: a single-file source exited $rc"
 if [ "$(id -u)" != 0 ]; then    # root reads a mode-000 directory anyway
   mkdir -p "$fx/y/locked"
   chmod 000 "$fx/y/locked"
-  set +e
-  err="$(php "$script" loaded:y="$fx/y" 2>&1 >/dev/null)"
-  rc=$?
-  set -e
+  rc=0
+  err="$(php "$script" loaded:y="$fx/y" 2>&1 >/dev/null)" || rc=$?
   chmod 755 "$fx/y/locked"
   [ "$rc" = 0 ] || fail "$script: an unreadable directory exited $rc instead of being skipped"
   has "$err" "skipped: $fx/y/locked" || fail "$script does not report an unreadable directory"
