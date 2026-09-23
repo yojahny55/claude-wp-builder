@@ -40,6 +40,17 @@
  * audits the copy, not the site. A gap that predates the archive has no
  * such excuse: the file should already have been backed up, on a clone or
  * not.
+ *
+ * WHY BATCHED. Attachments are walked BATCH_SIZE IDs at a time instead of
+ * pulling every ID with get_col() and then calling get_post_meta() and
+ * get_post_field() per attachment. That per-ID pattern is 2N extra queries
+ * on top of the ID list — tens of thousands of round trips on a site with
+ * tens of thousands of attachments, for a report that is read-only. Each
+ * batch instead pulls ID + post_date in one query and primes the meta
+ * cache for that batch's IDs with update_meta_cache(), so get_post_meta()
+ * and wp_get_attachment_metadata() inside the loop read cache, not the
+ * database. A runtime-cache flush between batches keeps memory bounded on
+ * libraries too large to hold every attachment's meta at once.
  */
 
 global $wpdb;
@@ -57,77 +68,125 @@ if ( '' !== $archive_arg && false === $archive_ts ) {
 $upload_dir = wp_get_upload_dir();
 $basedir    = $upload_dir['basedir'];
 
-$attachment_ids = $wpdb->get_col(
-	"SELECT ID FROM {$wpdb->posts} WHERE post_type = 'attachment'"
-);
-
 $buckets = array(
 	'BEFORE-ARCHIVE' => array(),
 	'AFTER-ARCHIVE'  => array(),
 	'UNDATED'        => array(),
 );
 
-foreach ( $attachment_ids as $id ) {
-	$id            = (int) $id;
-	$attached_file = get_post_meta( $id, '_wp_attached_file', true );
+const BATCH_SIZE = 1000;
 
-	// No _wp_attached_file at all: an attachment for an external/remote URL
-	// (e.g. sideloaded from a CDN reference). Nothing on this server's disk
-	// to check, and reporting it missing would be a false positive.
-	if ( '' === $attached_file ) {
-		continue;
+$last_id          = 0;
+$attachment_count = 0;
+
+while ( true ) {
+	$rows = $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT ID, post_date FROM {$wpdb->posts}
+			  WHERE post_type = 'attachment' AND ID > %d
+			  ORDER BY ID LIMIT %d",
+			$last_id,
+			BATCH_SIZE
+		)
+	);
+
+	// get_results() returns [] both for "no more rows" and for a failed query
+	// (flush() clears last_result to [] before the query runs and only fills
+	// it back in on success) — last_error is what tells the two apart. Left
+	// unchecked, a typo'd table or column would read back as "0 attachments",
+	// not as the query failure it is.
+	if ( '' !== $wpdb->last_error ) {
+		fwrite( STDERR, "find-missing-media-files.php: attachment query failed — {$wpdb->last_error}\n" );
+		exit( 2 );
 	}
 
-	$rel_dir   = dirname( $attached_file ); // '.' when the file sits at basedir root.
-	$post_date = get_post_field( 'post_date', $id );
-
-	// label => path relative to $basedir.
-	$targets = array( 'file' => $attached_file );
-
-	$meta = wp_get_attachment_metadata( $id );
-	if ( is_array( $meta ) ) {
-		if ( ! empty( $meta['sizes'] ) && is_array( $meta['sizes'] ) ) {
-			foreach ( $meta['sizes'] as $size_name => $size_info ) {
-				if ( ! empty( $size_info['file'] ) ) {
-					$targets[ 'size:' . $size_name ] = ( '.' === $rel_dir )
-						? $size_info['file']
-						: $rel_dir . '/' . $size_info['file'];
-				}
-			}
-		}
-		if ( ! empty( $meta['original_image'] ) ) {
-			$targets['original_image'] = ( '.' === $rel_dir )
-				? $meta['original_image']
-				: $rel_dir . '/' . $meta['original_image'];
-		}
+	if ( empty( $rows ) ) {
+		break;
 	}
 
-	foreach ( $targets as $label => $relative_path ) {
-		if ( file_exists( path_join( $basedir, $relative_path ) ) ) {
+	$batch_ids = wp_list_pluck( $rows, 'ID' );
+	update_meta_cache( 'post', $batch_ids );
+
+	if ( '' !== $wpdb->last_error ) {
+		fwrite( STDERR, "find-missing-media-files.php: meta cache query failed — {$wpdb->last_error}\n" );
+		exit( 2 );
+	}
+
+	foreach ( $rows as $row ) {
+		$id            = (int) $row->ID;
+		$attached_file = get_post_meta( $id, '_wp_attached_file', true );
+
+		// No _wp_attached_file at all: an attachment for an external/remote URL
+		// (e.g. sideloaded from a CDN reference). Nothing on this server's disk
+		// to check, and reporting it missing would be a false positive.
+		if ( '' === $attached_file ) {
 			continue;
 		}
 
-		if ( 'file' === $label ) {
-			$code = 'WP-060';
-		} elseif ( 0 === strpos( $label, 'size:' ) ) {
-			$code = 'WP-061';
-		} else {
-			$code = 'WP-062';
+		$rel_dir   = dirname( $attached_file ); // '.' when the file sits at basedir root.
+		$post_date = $row->post_date;
+
+		// label => path relative to $basedir.
+		$targets = array( 'file' => $attached_file );
+
+		$meta = wp_get_attachment_metadata( $id );
+		if ( is_array( $meta ) ) {
+			if ( ! empty( $meta['sizes'] ) && is_array( $meta['sizes'] ) ) {
+				foreach ( $meta['sizes'] as $size_name => $size_info ) {
+					if ( ! empty( $size_info['file'] ) ) {
+						$targets[ 'size:' . $size_name ] = ( '.' === $rel_dir )
+							? $size_info['file']
+							: $rel_dir . '/' . $size_info['file'];
+					}
+				}
+			}
+			if ( ! empty( $meta['original_image'] ) ) {
+				$targets['original_image'] = ( '.' === $rel_dir )
+					? $meta['original_image']
+					: $rel_dir . '/' . $meta['original_image'];
+			}
 		}
 
-		if ( false === $archive_ts ) {
-			$bucket = 'UNDATED';
-		} else {
-			$bucket = ( strtotime( $post_date ) > $archive_ts ) ? 'AFTER-ARCHIVE' : 'BEFORE-ARCHIVE';
-		}
+		foreach ( $targets as $label => $relative_path ) {
+			if ( file_exists( path_join( $basedir, $relative_path ) ) ) {
+				continue;
+			}
 
-		$buckets[ $bucket ][] = array(
-			'code'  => $code,
-			'id'    => $id,
-			'label' => $label,
-			'path'  => $relative_path,
-			'date'  => $post_date,
-		);
+			if ( 'file' === $label ) {
+				$code = 'WP-060';
+			} elseif ( 0 === strpos( $label, 'size:' ) ) {
+				$code = 'WP-061';
+			} else {
+				$code = 'WP-062';
+			}
+
+			if ( false === $archive_ts ) {
+				$bucket = 'UNDATED';
+			} else {
+				$bucket = ( strtotime( $post_date ) > $archive_ts ) ? 'AFTER-ARCHIVE' : 'BEFORE-ARCHIVE';
+			}
+
+			$buckets[ $bucket ][] = array(
+				'code'  => $code,
+				'id'    => $id,
+				'label' => $label,
+				'path'  => $relative_path,
+				'date'  => $post_date,
+			);
+		}
+	}
+
+	$attachment_count += count( $rows );
+	$last_id            = (int) end( $batch_ids );
+
+	if ( count( $rows ) < BATCH_SIZE ) {
+		break;
+	}
+
+	// Drop this batch's primed meta (and anything else cached this request)
+	// before pulling the next one, so memory stays bounded on large libraries.
+	if ( function_exists( 'wp_cache_flush_runtime' ) ) {
+		wp_cache_flush_runtime();
 	}
 }
 
@@ -157,7 +216,7 @@ foreach ( $buckets as $bucket_name => $items ) {
 printf(
 	"\n%d attachment file(s) missing on disk out of %d attachment(s) checked\n",
 	$total,
-	count( $attachment_ids )
+	$attachment_count
 );
 
 exit( ( count( $buckets['BEFORE-ARCHIVE'] ) > 0 || count( $buckets['UNDATED'] ) > 0 ) ? 1 : 0 );

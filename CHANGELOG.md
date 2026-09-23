@@ -121,8 +121,11 @@
   attachment postdates the file archive is `N/A (local clone)` — the media exists in
   production, it just postdates this copy's archive — while a miss that predates the archive
   is still reported, and an unknown archive date reports `UNMEASURED` ("verify against
-  production") rather than guessing either way. `tests/checks/audit-media-integrity.sh` pins
-  the codes and both directions of the suppression rule.
+  production") rather than guessing either way. The script walks attachments in batches,
+  priming the meta cache per batch instead of querying per attachment, and treats a failed
+  query as a failure (STDERR, exit 2) rather than folding it into "0 attachments checked".
+  `tests/checks/audit-media-integrity.sh` pins the codes and both directions of the
+  suppression rule.
 
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had
   none, and its `template-functions.php` printed a pingback `<link>`. A full audit of a

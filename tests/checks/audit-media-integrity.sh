@@ -76,8 +76,26 @@ grep -Fq 'N/A (local clone)' "$practices" \
   || fail "$practices does not suppress AFTER-ARCHIVE misses as N/A (local clone)"
 grep -Fq 'UNMEASURED' "$practices" \
   || fail "$practices does not fall back to UNMEASURED when the archive date is unknown"
-grep -Eq 'BEFORE-ARCHIVE.*(no such excuse|WARNING)' "$practices" \
+
+# The "no such excuse" reasoning is its own paragraph, wrapped across several
+# lines, so a line-scoped grep on the whole file would never see BEFORE-ARCHIVE
+# and the reasoning together — it would instead pass by coincidence, off the
+# WP-060/061/062 table row or the Procedure section's summary line, which both
+# happen to hold "BEFORE-ARCHIVE" and "WARNING" on one line regardless of
+# whether this specific paragraph still makes the case. Extract just that
+# paragraph and flatten it before matching, so the assertion tracks the prose
+# it names, not any other line in the file. The range end is the heading of
+# the *next* bullet, not any wording from inside this one — an end anchor
+# built out of the very phrase under test would stop bounding the section the
+# moment that phrase changed, silently falling back to "match anywhere in the
+# file" and reintroducing the bug this extraction exists to avoid.
+clone_known_date_section=$(sed -n '/\*\*Local clone, archive date known\*\*/,/\*\*Local clone, archive date unknown\*\*/p' "$practices" \
+  | tr '\n' ' ' | sed 's/  */ /g')
+[ -n "$clone_known_date_section" ] \
+  || fail "$practices lost the 'Local clone, archive date known' paragraph"
+printf '%s' "$clone_known_date_section" | grep -Eq 'BEFORE-ARCHIVE.*(no such excuse|WARNING)' \
   || fail "$practices does not still report a pre-archive miss as WARNING — the clone must not become a blanket excuse"
+
 grep -Fq 'run the script with no archive-date argument' "$practices" \
   || fail "$practices does not report every miss WARNING on a site that is not a local clone"
 
