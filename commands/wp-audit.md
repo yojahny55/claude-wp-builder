@@ -177,10 +177,18 @@ store, and its commerce surfaces are not live to audit.
 
 ### Local clone — audit production's posture, not the copy's
 
-When `.wp-create.json` carries `source: restore`, or a `restore.url_origin`, or its
-`wordpress.url` is a non-public host (`*.local`, `localhost`, `127.`, `10.`, `192.168.`,
-`172.16.`–`172.31.`), the project is a **local clone of a site that lives somewhere else**.
-Set `local_clone = true` and read `production_url` from `restore.url_origin` when present.
+When `.wp-create.json` carries `project.source: "restore"` (the field lives under
+`project`, not at the manifest's root — `restore` itself holds only
+`files_archive`, `db_archive` and `url_rewritten`, none of which name production), or a
+`wordpress.url_origin` (the pre-restore URL, written beside `wordpress.url`), or its
+`wordpress.url` is a non-public host, the project is a **local clone of a site that lives
+somewhere else**. "Non-public host" is not this check's own list to keep in sync by hand:
+it is exactly what `bin/geo-scan.sh` already refuses to scan — `localhost`, `*.localhost`,
+`*.local`, `*.local.com` (this plugin's own default domain shape: `/wp-create` Step 3.3
+offers `<slug>.local.com`, and `/wp-clone`'s placeholder follows the same shape), `*.test`,
+any of those with a port, the private ranges `127.`, `10.`, `192.168.`,
+`172.16.`–`172.31.`, `[::1]`, and a dotless hostname. Set `local_clone = true` and read
+`production_url` from `wordpress.url_origin` when present.
 
 A clone is deliberately altered to run in isolation, and those alterations are not defects of
 the site being audited — they are the cost of having a local copy at all. Reporting them
@@ -232,8 +240,8 @@ So when a live check needs a URL and `local_clone` is true:
 
 1. Use `--host` when it was given.
 2. Otherwise, **ask the user for the production URL**, proposing `production_url`
-   (`restore.url_origin`) as the default when the manifest has one. Do not fire an external
-   request at a host the user has not confirmed this run.
+   (`wordpress.url_origin`) as the default when the manifest has one. Do not fire an
+   external request at a host the user has not confirmed this run.
 3. If no production URL is available, the live check is `UNMEASURED` with "needs the public
    URL", never `PASS`.
 

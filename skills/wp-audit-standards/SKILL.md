@@ -97,8 +97,9 @@ generic site's score unchanged, because every commerce check reads `N/A` on it.
 
 ### A local clone is audited for production's posture
 
-A project restored from a backup to run locally (`.wp-create.json` `source: restore`, a
-`restore.url_origin`, or a non-public `wordpress.url`) has been deliberately altered to work
+A project restored from a backup to run locally (`.wp-create.json` `project.source:
+"restore"`, a `wordpress.url_origin`, or a non-public `wordpress.url` — see `/wp-audit`
+Step 2.3 for the exact field paths and the host list) has been deliberately altered to work
 in isolation. Those alterations — a dev host in the database, deactivated payment/cache/mail
 plugins, `DISABLE_WP_CRON`, absent object-cache drop-ins, debug logging on, media uploaded
 after the file backup was taken — are the price of the copy, not defects of the site. On a
@@ -113,8 +114,8 @@ Response headers and paid-file reachability can only be judged against the runni
 production site. A local server answers them differently — it reads `.htaccess` a production
 nginx ignores — so a live check run against the clone is a false result, not a lenient one.
 These checks use `--host`, or ask the user for the production URL (defaulting to
-`restore.url_origin`) and fire no external request until it is confirmed; with no public URL
-they are `UNMEASURED`, never `PASS`.
+`wordpress.url_origin`) and fire no external request until it is confirmed; with no public
+URL they are `UNMEASURED`, never `PASS`.
 
 ---
 

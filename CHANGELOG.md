@@ -91,12 +91,13 @@
   dev host in the database, deactivated payment/cache/mail plugins, `DISABLE_WP_CRON`, absent
   object-cache drop-ins, debug logging, media newer than the file backup — and the audit used
   to report those alterations as defects of the site, when they are the price of the copy.
-  When the manifest shows a clone (`source: restore`, a `restore.url_origin`, or a non-public
-  `wordpress.url`), those conditions are `N/A (local clone)`, suppressed and out of the
-  denominator, bounded by one test: would this also be true on production? Live checks
-  (response headers, paid-file reachability) now target the production URL — asked for and
-  confirmed, defaulting to `restore.url_origin` — and never the clone, whose local server
-  answers an `.htaccess` a production nginx ignores and would return a false PASS.
+  When the manifest shows a clone (`project.source: "restore"`, a `wordpress.url_origin`,
+  or a non-public `wordpress.url`), those conditions are `N/A (local clone)`, suppressed and
+  out of the denominator, bounded by one test: would this also be true on production? Live
+  checks (response headers, paid-file reachability) now target the production URL — asked
+  for and confirmed, defaulting to `wordpress.url_origin` — and never the clone, whose
+  local server answers an `.htaccess` a production nginx ignores and would return a false
+  PASS.
   `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
   production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
 

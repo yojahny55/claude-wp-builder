@@ -66,12 +66,23 @@ done
 grep -Fq 'commerce-only check' <<<"$step23_flat" \
   || fail "$audit Step 2.3 does not state the general commerce-gating contract for checks not yet added"
 
-# --- Local-clone detection from the manifest ---
-for token in 'source: restore' 'restore.url_origin' 'local_clone'; do
+# --- Local-clone detection from the manifest: the real field paths, verified against the
+#     restore flow's own manifest write, not invented ones. `project.source` is nested
+#     under `project`; the pre-restore URL is `wordpress.url_origin`, beside
+#     `wordpress.url`; `restore` itself holds only files_archive/db_archive/url_rewritten
+#     and never an origin URL. ---
+for token in 'project.source: "restore"' 'wordpress.url_origin' 'local_clone'; do
   grep -Fq "$token" <<<"$step23" || fail "$audit Step 2.3 lost clone-detection token: $token"
 done
 grep -Fq 'N/A (local clone)' <<<"$step23" \
   || fail "$audit Step 2.3 does not reclassify clone artifacts as N/A (local clone)"
+# Negative gate: the nonexistent path must not come back anywhere it was fixed.
+for f in "$audit" "$std" CHANGELOG.md; do
+  grep -Fq 'restore.url_origin' "$f" \
+    && fail "$f still references restore.url_origin, which does not exist in the manifest the restore flow writes -- the field is wordpress.url_origin"
+  grep -Eq '`?source: *restore`?' "$f" \
+    && fail "$f still treats source as a root-level manifest field -- the restore flow nests it under project.source"
+done
 # The catalog must name the artifacts, or a later edit quietly narrows it to nothing.
 # SEC-036 alone is anchored to its catalog row: the bare code also appears elsewhere in
 # the file (coverage-matrix examples), so a bare `grep -Fq 'SEC-036'` on the whole file
@@ -84,6 +95,22 @@ done
 # Both directions: the suppression must not become a blanket excuse for real defects.
 grep -Fq 'would this be true on' <<<"$step23" \
   || fail "$audit Step 2.3 lost the 'would this be true on production?' test that bounds suppression"
+
+# --- Non-public host detection defers to bin/geo-scan.sh as the one list, and that list
+#     actually recognizes this plugin's own default local domain (<slug>.local.com from
+#     /wp-create, local-clone.local.com from /wp-clone) -- missing from the original
+#     hand-written list, which never widened past *.local. ---
+grep -Fq 'bin/geo-scan.sh' <<<"$step23" \
+  || fail "$audit Step 2.3 does not name bin/geo-scan.sh as the source of truth for a non-public host"
+grep -Fq '*.local.com' <<<"$step23" \
+  || fail "$audit Step 2.3 does not recognize *.local.com (this plugin's own default local domain) as a non-public host"
+grep -Fq '*.local.com' bin/geo-scan.sh \
+  || fail "bin/geo-scan.sh does not recognize *.local.com, though Step 2.3 claims it defers to this script for the exact list"
+# Functional, not just textual: the pattern in the case statement actually matches and
+# actually exits 3 (not publicly reachable), the same as any other dev host.
+out=$(bash bin/geo-scan.sh "some-project.local.com" 2>&1) && status=0 || status=$?
+[ "$status" -eq 3 ] || fail "bin/geo-scan.sh does not exit 3 for a *.local.com host (got $status)"
+grep -q 'NOT PUBLIC' <<<"$out" || fail "bin/geo-scan.sh does not report a *.local.com host as NOT PUBLIC"
 
 # --- Live checks: production host, asked and confirmed, never the clone ---
 grep -Fq 'must never be probed' <<<"$step23" \
