@@ -5,19 +5,35 @@
  *
  * Usage: wp eval-file find-missing-media-files.php [archive-date] [sample-size]
  *
- *   archive-date  Optional ISO 8601 date (e.g. 2026-09-23), the date the file
- *                 archive was taken when this project is a restored copy of a
- *                 site that lives elsewhere (`/wp-audit` Step 2.3 — read it
- *                 before wiring this up; this script does not detect clones
- *                 itself). Every miss whose attachment post_date is AFTER
- *                 this date is bucketed AFTER-ARCHIVE: the media was
- *                 uploaded after the backup was taken, so it exists on
- *                 production and this copy's archive was never going to
- *                 have it. Everything at or before the date is
+ *   archive-date  Optional ISO 8601 date (`Y-m-d`, e.g. 2026-09-23) or full
+ *                 timestamp (`Y-m-d H:i:s`, e.g. 2026-09-23 14:30:00) — the
+ *                 moment the file archive was taken when this project is a
+ *                 restored copy of a site that lives elsewhere (`/wp-audit`
+ *                 Step 2.3 — read it before wiring this up; this script does
+ *                 not detect clones itself). Every miss whose attachment
+ *                 post_date is AFTER this cutoff is bucketed AFTER-ARCHIVE:
+ *                 the media was uploaded after the backup was taken, so it
+ *                 exists on production and this copy's archive was never
+ *                 going to have it. Everything at or before the cutoff is
  *                 BEFORE-ARCHIVE — the file should already have been in the
- *                 archive, clone or not. Omit the argument to bucket every
- *                 miss UNDATED, because without a date there is no way to
- *                 tell a real loss from an ordinary post-archive upload.
+ *                 archive, clone or not.
+ *
+ *                 A bare date with no time of day (including one that
+ *                 happens to parse to exactly midnight) is ambiguous for its
+ *                 own calendar day: an upload made that same day compares as
+ *                 "after archive" regardless of what time the archive was
+ *                 actually taken, which would silently suppress a real
+ *                 pre-archive loss as N/A (local clone). To stay on the safe
+ *                 side, a date-only cutoff is pushed to the END of that day
+ *                 (23:59:59), so nothing uploaded on the archive date itself
+ *                 can be waved through as AFTER-ARCHIVE — it is reported
+ *                 BEFORE-ARCHIVE instead. Pass a full `Y-m-d H:i:s` timestamp
+ *                 to narrow the window to the exact time the archive was
+ *                 taken and stop folding that whole day into BEFORE-ARCHIVE.
+ *
+ *                 Omit the argument entirely to bucket every miss UNDATED,
+ *                 because without any date there is no way to tell a real
+ *                 loss from an ordinary post-archive upload.
  *   sample-size   How many misses to print per bucket (default 20). Every
  *                 miss is still counted; only the printed list is capped.
  *
@@ -53,16 +69,57 @@
  * libraries too large to hold every attachment's meta at once.
  */
 
+/**
+ * Compute the effective archive-date cutoff from the raw CLI argument.
+ *
+ * Returns false when no date was given. Also returns false — indistinguishable
+ * from "no date given" — when $archive_arg is set but strtotime() cannot parse
+ * it; the caller checks $archive_arg itself to tell the two apart. Otherwise
+ * returns an int Unix timestamp: the cutoff BEFORE-ARCHIVE/AFTER-ARCHIVE
+ * buckets a miss against.
+ *
+ * A cutoff that lands on exact midnight — what a bare "Y-m-d" date parses to,
+ * and also what an explicit "...00:00:00" timestamp parses to — is ambiguous
+ * for its own calendar day: an upload later that same day would otherwise
+ * compare as "after archive" no matter what time the archive was actually
+ * taken, silently suppressing a real pre-archive loss as N/A (local clone).
+ * The cutoff is pushed to the end of that day instead, so the whole archive
+ * day reads BEFORE-ARCHIVE rather than being guessed at. Pass a full
+ * "Y-m-d H:i:s" timestamp other than midnight to narrow the window to the
+ * exact moment the archive was taken.
+ */
+function mmf_compute_archive_cutoff( $archive_arg ) {
+	$archive_ts = '' !== $archive_arg ? strtotime( $archive_arg ) : false;
+
+	if ( false !== $archive_ts && '00:00:00' === date( 'H:i:s', $archive_ts ) ) {
+		$archive_ts = strtotime( date( 'Y-m-d', $archive_ts ) . ' 23:59:59' );
+	}
+
+	return $archive_ts;
+}
+
+/**
+ * Bucket a dated miss against the archive cutoff. Only called once $archive_ts
+ * is known not to be false — the UNDATED bucket is decided by the caller.
+ */
+function mmf_bucket_for( $post_date, $archive_ts ) {
+	return ( strtotime( $post_date ) > $archive_ts ) ? 'AFTER-ARCHIVE' : 'BEFORE-ARCHIVE';
+}
+
 global $wpdb;
 
 $argv_in     = isset( $args ) ? $args : ( isset( $GLOBALS['args'] ) ? $GLOBALS['args'] : array() );
 $archive_arg = isset( $argv_in[0] ) && '' !== trim( (string) $argv_in[0] ) ? trim( (string) $argv_in[0] ) : '';
 $sample_size = isset( $argv_in[1] ) && is_numeric( $argv_in[1] ) ? (int) $argv_in[1] : 20;
 
-$archive_ts = '' !== $archive_arg ? strtotime( $archive_arg ) : false;
+$archive_ts = mmf_compute_archive_cutoff( $archive_arg );
 if ( '' !== $archive_arg && false === $archive_ts ) {
 	fwrite( STDERR, "find-missing-media-files.php: '{$archive_arg}' is not a parseable date\n" );
 	exit( 2 );
+}
+
+if ( false !== $archive_ts ) {
+	printf( "Archive cutoff: %s (BEFORE-ARCHIVE at or before, AFTER-ARCHIVE strictly after)\n", date( 'Y-m-d H:i:s', $archive_ts ) );
 }
 
 $upload_dir = wp_get_upload_dir();
@@ -160,11 +217,7 @@ while ( true ) {
 				$code = 'WP-062';
 			}
 
-			if ( false === $archive_ts ) {
-				$bucket = 'UNDATED';
-			} else {
-				$bucket = ( strtotime( $post_date ) > $archive_ts ) ? 'AFTER-ARCHIVE' : 'BEFORE-ARCHIVE';
-			}
+			$bucket = ( false === $archive_ts ) ? 'UNDATED' : mmf_bucket_for( $post_date, $archive_ts );
 
 			$buckets[ $bucket ][] = array(
 				'code'  => $code,

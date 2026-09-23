@@ -172,6 +172,15 @@ detect clones itself; that stays entirely in `/wp-audit` Step 2.3, which this ch
   clone)`, out of the denominator. A miss bucketed `BEFORE-ARCHIVE` predates the archive and has
   no such excuse — Step 2.3's own bound applies ("would this also be true on production?") —
   report it WARNING like any other site.
+  - **Know the exact archive time, not just the day, when you have it.** A bare `Y-m-d` date
+    (or any timestamp that lands on exact midnight) is ambiguous for its own calendar day: an
+    attachment uploaded later that same day would otherwise compare as "after archive" no
+    matter what time of day the archive was actually taken, which would suppress a real
+    pre-archive loss as `N/A (local clone)`. The script folds that whole day into
+    `BEFORE-ARCHIVE` instead — it prints the effective cutoff it used ("Archive cutoff: …") so
+    the report shows which reading applied. Pass a full `Y-m-d H:i:s` timestamp whenever the
+    restore log or backup metadata gives one; it narrows the window to the exact moment and
+    stops folding the whole archive day into `BEFORE-ARCHIVE`.
 - **Local clone, archive date unknown** — every miss comes back `UNDATED`. Do not report these
   `FAIL`/WARNING: there is no way to tell a genuine loss from an ordinary post-archive upload
   without the date. Report `UNMEASURED`, "verify against production".
@@ -532,14 +541,21 @@ table above; do not re-derive `local_clone` here, read it from Step 2.3):
 # Not a local clone, or a clone with no known archive date for its file backup:
 $WP eval-file <skills>/wp-cli-patterns/scripts/find-missing-media-files.php
 
-# Local clone, archive date known — pass it so AFTER-ARCHIVE misses can be suppressed:
+# Local clone, archive date known — pass it so AFTER-ARCHIVE misses can be suppressed. A bare
+# date folds its whole day into BEFORE-ARCHIVE (see above); pass a full timestamp instead
+# whenever the restore log gives one, to narrow that window:
 $WP eval-file <skills>/wp-cli-patterns/scripts/find-missing-media-files.php 2026-08-31
+$WP eval-file <skills>/wp-cli-patterns/scripts/find-missing-media-files.php "2026-08-31 22:14:00"
 ```
 
-The output is grouped by bucket, each line naming the code, the attachment ID, which file was
-missing (`file`, `size:<name>`, or `original_image`) and the attachment's `post_date`:
+With a date argument, the first line names the effective cutoff, so the report shows which
+reading applied. The rest of the output is grouped by bucket, each line naming the code, the
+attachment ID, which file was missing (`file`, `size:<name>`, or `original_image`) and the
+attachment's `post_date`:
 
 ```
+Archive cutoff: 2026-08-31 23:59:59 (BEFORE-ARCHIVE at or before, AFTER-ARCHIVE strictly after)
+
 BEFORE-ARCHIVE: 2 missing
   WP-060 attachment 118 [file] 2024/03/cover.jpg (post_date 2024-03-02 10:11:04)
   WP-061 attachment 204 [size:medium] 2024/06/photo-300x200.jpg (post_date 2024-06-14 09:00:12)

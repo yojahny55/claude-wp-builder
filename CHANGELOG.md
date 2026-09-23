@@ -121,11 +121,20 @@
   attachment postdates the file archive is `N/A (local clone)` — the media exists in
   production, it just postdates this copy's archive — while a miss that predates the archive
   is still reported, and an unknown archive date reports `UNMEASURED` ("verify against
-  production") rather than guessing either way. The script walks attachments in batches,
-  priming the meta cache per batch instead of querying per attachment, and treats a failed
-  query as a failure (STDERR, exit 2) rather than folding it into "0 attachments checked".
-  `tests/checks/audit-media-integrity.sh` pins the codes and both directions of the
-  suppression rule.
+  production") rather than guessing either way. A bare `Y-m-d` archive date (or any cutoff
+  that lands on exact midnight) is ambiguous for its own day — an upload later that same day
+  used to compare as "after archive" and get suppressed as `N/A (local clone)` no matter what
+  time the archive was actually taken, hiding a real pre-archive loss. The cutoff is now
+  pushed to the end of that day, so a same-day miss is reported `BEFORE-ARCHIVE` instead of
+  waved through; passing a full `Y-m-d H:i:s` timestamp narrows the window to the exact time
+  and the script prints the effective cutoff it used. The script walks attachments in
+  batches, priming the meta cache per batch instead of querying per attachment, and treats a
+  failed query as a failure (STDERR, exit 2) rather than folding it into "0 attachments
+  checked". `tests/checks/audit-media-integrity.sh` pins the codes, both directions of the
+  suppression rule, the batching and error-handling call sites, and — because no grep can
+  tell a correct same-day comparison from an inverted one, since every bucket name it could
+  match is spelled correctly either way — runs the script's own cutoff/bucket functions
+  against real PHP (`tests/checks/lib/media-integrity-date-cutoff-behavior.php`).
 
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had
   none, and its `template-functions.php` printed a pingback `<link>`. A full audit of a
