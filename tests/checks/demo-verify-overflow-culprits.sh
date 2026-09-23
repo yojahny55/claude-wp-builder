@@ -33,6 +33,8 @@ if probe=$(node "$s" --probe 2>&1); then
   verdict="$(node -e '
     const r = require(process.argv[1]);
     const page = (n) => r.pages.find((p) => p.url.endsWith("/" + n));
+    const missing = ["index.html", "contained.html"].filter((n) => !page(n));
+    if (missing.length) { console.log("no findings for " + missing.join(", ")); process.exit(); }
     const ov = (n) => page(n).findings.filter((f) => f.kind === "overflow");
     const bad = ov("index.html");
     if (!bad.length) { console.log("escaping strip not reported"); process.exit(); }
