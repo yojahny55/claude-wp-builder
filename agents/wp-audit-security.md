@@ -161,6 +161,7 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 | SEC-036 | Development host in the database | `$WP eval` sweep of `options`, `postmeta`, `posts` and `termmeta` for the dev host. See Procedure | CRITICAL |
 | SEC-037 | Backup or editor files inside the theme | Glob the theme for `*.bak*`, `*.orig`, `*.save`, `*~`, `*.php.[0-9]*`, `*.sql` | WARNING |
 | SEC-038 | Update counts reported without network access | Reach `api.wordpress.org` before reading any update count. See Procedure | WARNING |
+| SEC-039 | Paid downloads reachable without a purchase | WooCommerce only. Read `woocommerce_file_download_method`, then fetch a real `woocommerce_uploads` file over HTTP and read the status. See Procedure | CRITICAL |
 
 ### Execution notes
 
@@ -299,6 +300,51 @@ Rules that follow from this:
 
 The same note applies to WP-043 and WP-044 in `agents/wp-audit-practices.md`, which read the
 same two transients.
+
+### Procedure — SEC-039 (paid downloads reachable without a purchase)
+
+WooCommerce only. When `site.commerce` is `none` (see `/wp-audit` Step 2.3), this check is
+`N/A (no WooCommerce)` and is not counted. When a store is present, it is one of the most
+damaging findings the audit can make: the paid files a customer pays to download are sitting
+in the web root, and anyone with the URL takes them for free.
+
+**Why the built-in protection can be inert.** WooCommerce stores paid files under
+`wp-content/uploads/woocommerce_uploads/` and ships an `.htaccess` there with `deny from all`.
+It also has a download method, `woocommerce_file_download_method`, with three values:
+
+- `redirect` — the file is served straight from its public URL with no gate at all. This is
+  an exposure **by configuration**, independent of the web server: report it CRITICAL on
+  sight, no HTTP probe needed.
+- `force` / `xsendfile` — downloads are meant to stream through PHP with a capability check,
+  and the directory `.htaccess` is the only thing stopping a direct hit. **Apache reads that
+  `.htaccess`; nginx does not.** On an nginx host the `deny from all` is dead text and every
+  file under `woocommerce_uploads` is fetchable by URL, while the store looks correctly
+  configured from the admin.
+
+**So configuration alone cannot answer this — a live request must.** And it must go to
+**production**, never the local clone: a local Apache honours the `.htaccess` and returns a
+false PASS for a site that is wide open behind nginx. Follow Step 2.3's rule for a live check
+— use `--host`, otherwise ask for the production URL (default `restore.url_origin`) and fire
+nothing until it is confirmed; with no public URL the check is `UNMEASURED`, not `PASS`.
+
+```bash
+$WP eval 'echo get_option("woocommerce_file_download_method") ?: "force";'
+# Find one real paid file to probe, from the newest downloadable product:
+$WP eval '$p=wc_get_products(["downloadable"=>true,"limit"=>1,"orderby"=>"date","order"=>"DESC"]); if($p){foreach($p[0]->get_downloads() as $d){echo $d->get_file(),"\n";break;}}'
+```
+
+Probe with the **path only**, over the confirmed production host, and read the status — never
+save the body, which would copy the paid file:
+
+```bash
+curl -sI -A "Mozilla/5.0" "https://<production-host>/wp-content/uploads/woocommerce_uploads/<path>"
+```
+
+`HTTP 200` with `content-type: application/pdf` (or `epub+zip`, `application/zip`) = the file
+is served without a purchase → **CRITICAL**. `HTTP 403` = protected → PASS. The fix names the
+server: on nginx, a `location` block that denies direct access to `woocommerce_uploads` (an
+`.htaccess` never runs there); and purge that path from any edge cache (a CDN may already hold
+a public copy). One `200` proves the hole; do not enumerate or download more files.
 
 ## Step 3: Response-Header Checks
 

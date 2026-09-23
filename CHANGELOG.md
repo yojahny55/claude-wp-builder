@@ -81,6 +81,21 @@
 
 ### Added
 
+- **`/wp-audit` detects paid WooCommerce downloads reachable without a purchase (SEC-039).**
+  A store's paid files live under `wp-content/uploads/woocommerce_uploads/`, guarded only by
+  an `.htaccess` `deny from all`. Apache honours it; nginx ignores it — so with the
+  `force`/`xsendfile` download method the store looks correctly configured from the admin
+  while every paid file is fetchable by URL on an nginx host, and the `redirect` method
+  serves them from a public URL with no gate at all. Nothing in the audit saw this, because
+  reading the code and the option value both say "protected"; only a live request settles it.
+  The check reads `woocommerce_file_download_method`, then probes one real paid file over the
+  production host (header-only, never downloading the body) and reports a `200`/`application-pdf`
+  response as CRITICAL. It is commerce-gated (`N/A` without WooCommerce) and, per Step 2.3,
+  probes production only — never the local clone, whose Apache would return a false PASS for a
+  site wide open behind nginx. Fix names the server layer (an nginx `location` block, since the
+  `.htaccess` never runs there) and an edge-cache purge. `tests/checks/audit-woo-download-protection.sh`
+  pins the gate, the nginx reason and the production-host rule.
+
 - **`/wp-audit` reads the site type and whether it is a local clone before any category
   runs (Step 2.3).** Two blind spots made the audit report on the wrong site. First, checks
   written for a store had no gate: adding any WooCommerce-specific check would fire on a
@@ -100,6 +115,16 @@
   PASS.
   `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
   production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
+
+  When the manifest shows a clone (`source: restore`, a `restore.url_origin`, or a non-public
+  `wordpress.url`), those conditions are `N/A (local clone)`, suppressed and out of the
+  denominator, bounded by one test: would this also be true on production? Live checks
+  (response headers, paid-file reachability) now target the production URL — asked for and
+  confirmed, defaulting to `restore.url_origin` — and never the clone, whose local server
+  answers an `.htaccess` a production nginx ignores and would return a false PASS.
+  `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
+  production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
+
 
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had
   none, and its `template-functions.php` printed a pingback `<link>`. A full audit of a
