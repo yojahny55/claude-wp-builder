@@ -313,8 +313,10 @@ in the web root, and anyone with the URL takes them for free.
 It also has a download method, `woocommerce_file_download_method`, with three values:
 
 - `redirect` — the file is served straight from its public URL with no gate at all. This is
-  an exposure **by configuration**, independent of the web server: report it CRITICAL on
-  sight, no HTTP probe needed.
+  an exposure **by configuration**, independent of the web server — but only when a paid file
+  actually lives in `woocommerce_uploads`. Run the probe-file snippet below first: **the
+  redirect method with a probe path is CRITICAL** (`FOUND` or `UNVERIFIED`, no HTTP probe
+  needed); with `NO-DOWNLOADS` or `EXTERNAL-ONLY` it is `N/A`, exactly as for the other methods.
 - `force` / `xsendfile` — downloads are meant to stream through PHP with a capability check,
   and the directory `.htaccess` is the only thing stopping a direct hit. **Apache reads that
   `.htaccess`; nginx does not.** On an nginx host the `deny from all` is dead text and every
@@ -330,59 +332,83 @@ nothing until it is confirmed; with no public URL the check is `UNMEASURED`, not
 **Pick the probe file from the stored downloads, not from the product API.** The first
 downloadable product may serve from an external URL, and downloads attached to a variation
 never show up in `wc_get_products(["downloadable"=>true])`. Read `_downloadable_files` on
-products **and** variations, take the first URL that sits under `/woocommerce_uploads/`, and
-print only what follows that segment — the stored URL carries whatever host was saved (the
-clone's, after a search-replace), which must never be probed:
+published products **and** on published variations of published products — a trashed or draft
+product can point at a file that was deleted long ago. Take the URLs that sit under
+`/woocommerce_uploads/`, keep only what follows that segment (the stored URL carries whatever
+host was saved — the clone's, after a search-replace — which must never be probed), and prefer
+the first one whose file exists in the local copy of the uploads. The path is printed
+percent-encoded per segment, so a file name with spaces or accents reaches `curl` intact:
 
 ```bash
 $WP eval 'echo get_option("woocommerce_file_download_method") ?: "force";'
-# Probe file: path relative to woocommerce_uploads/, or a marker when there is none.
+# Probe file: FOUND|UNVERIFIED <path relative to woocommerce_uploads/>, or a marker.
 $WP eval 'global $wpdb; $seg="/woocommerce_uploads/";
-$rows=$wpdb->get_col("SELECT pm.meta_value FROM {$wpdb->postmeta} pm JOIN {$wpdb->posts} p ON p.ID=pm.post_id WHERE pm.meta_key=\"_downloadable_files\" AND p.post_type IN (\"product\",\"product_variation\") AND pm.meta_value<>\"\" ORDER BY p.post_date DESC");
+$rows=$wpdb->get_col("SELECT pm.meta_value FROM {$wpdb->postmeta} pm JOIN {$wpdb->posts} p ON p.ID=pm.post_id LEFT JOIN {$wpdb->posts} par ON par.ID=p.post_parent WHERE pm.meta_key=\"_downloadable_files\" AND pm.meta_value<>\"\" AND p.post_status=\"publish\" AND (p.post_type=\"product\" OR (p.post_type=\"product_variation\" AND par.post_status=\"publish\")) ORDER BY p.post_date DESC");
 if(!$rows){echo "NO-DOWNLOADS\n";return;}
-foreach($rows as $r){foreach((array)maybe_unserialize($r) as $f){$u=is_array($f)?($f["file"]??""):"";$i=strpos($u,$seg);if($i!==false){echo substr($u,$i+strlen($seg)),"\n";return;}}}
-echo "EXTERNAL-ONLY\n";'
+$dir=wp_upload_dir()["basedir"].$seg; $local=is_dir($dir); $first=null;
+foreach($rows as $r){foreach((array)maybe_unserialize($r) as $f){$u=is_array($f)?($f["file"]??""):"";$i=strpos($u,$seg);if($i===false){continue;}
+$p=rawurldecode(preg_replace("/[?#].*$/","",substr($u,$i+strlen($seg))));
+$enc=implode("/",array_map("rawurlencode",explode("/",$p)));
+if($local&&file_exists($dir.$p)){echo "FOUND $enc\n";return;} $first=$first??$enc;}}
+echo $first!==null?"UNVERIFIED $first\n":"EXTERNAL-ONLY\n";'
 # Control file: a public upload outside woocommerce_uploads, relative to wp-content/uploads/.
-$WP eval '$a=get_posts(["post_type"=>"attachment","post_mime_type"=>"image","post_status"=>"inherit","numberposts"=>1,"fields"=>"ids"]); echo $a?get_post_meta($a[0],"_wp_attached_file",true):"NO-CONTROL","\n";'
+$WP eval '$a=get_posts(["post_type"=>"attachment","post_mime_type"=>"image","post_status"=>"inherit","numberposts"=>1,"fields"=>"ids"]); echo $a?implode("/",array_map("rawurlencode",explode("/",get_post_meta($a[0],"_wp_attached_file",true)))):"NO-CONTROL","\n";'
 ```
 
-- `NO-DOWNLOADS` — no product or variation stores a download: `N/A (no downloadable products)`.
+- `FOUND <path>` — the file exists in the local uploads, so it is known to exist on the site:
+  a `404` from the server is evidence of protection.
+- `UNVERIFIED <path>` — the local copy has no such file (uploads not restored, or the stored
+  file is gone): a `404` may just mean the file does not exist, so it is `UNMEASURED`.
+- `NO-DOWNLOADS` — no published product or variation stores a download:
+  `N/A (no downloadable products)`, whatever the download method.
 - `EXTERNAL-ONLY` — every download points outside `woocommerce_uploads` (a CDN, S3, another
-  host): `N/A (downloads served from outside woocommerce_uploads)`, with the reason in the
-  evidence line. This check does not judge those hosts.
-- `NO-CONTROL` — no public upload to calibrate against: `UNMEASURED`.
+  host): `N/A (downloads served from outside woocommerce_uploads)`, whatever the download
+  method, with the reason in the evidence line. This check does not judge those hosts.
+- `NO-CONTROL` — no public upload to calibrate against: `UNMEASURED`. It matters only to
+  the HTTP probe; the `redirect` method's verdict needs no control.
 
 Never `PASS` without a probe file and a control file.
 
 **Control request first.** Request the public control file over the confirmed production
-host. It must come back `200` with a non-HTML `content-type` (an `image/*`). Anything else —
-a challenge page, a `403` from the edge, a redirect — means the host is not answering this
-client the way it answers a visitor, and any verdict on the paid file would be read off the
-WAF, not the server: the check is `UNMEASURED`, with the control status line as evidence.
+host. It must come back `200` with a non-HTML `content-type` (an `image/*`). Requests read the
+first response only — redirects are not followed (no `-L`). If the control answers `3xx` with
+a `Location` on the same site under its canonical host (`www` or not, `https`), repeat the
+control against that host and use it for the probe too. Anything else — a challenge page, a
+`403` from the edge, a redirect elsewhere — means the host is not answering this client the way
+it answers a visitor, and any verdict on the paid file would be read off the WAF, not the
+server: the check is `UNMEASURED`, with the control status line as evidence.
 
 ```bash
-curl -sI -A "Mozilla/5.0" "https://<production-host>/wp-content/uploads/<control-path>"
+curl -sI --max-time 15 -A "Mozilla/5.0" "https://<production-host>/wp-content/uploads/<control-path>"
 ```
 
 **Then probe the paid file** with the **path only**, over the same host, and read the status
 — never save the body, which would copy the paid file:
 
 ```bash
-curl -sI -A "Mozilla/5.0" "https://<production-host>/wp-content/uploads/woocommerce_uploads/<path>"
-# HEAD not allowed (405/501)? Fall back to a one-byte ranged GET, body discarded:
-curl -s -o /dev/null -D - -r 0-0 -A "Mozilla/5.0" "https://<production-host>/wp-content/uploads/woocommerce_uploads/<path>"
+curl -sI --max-time 15 -A "Mozilla/5.0" "https://<production-host>/wp-content/uploads/woocommerce_uploads/<path>"
+# HEAD not allowed (405/501)? Fall back to a one-byte ranged GET, body discarded and capped
+# in case the server ignores the range:
+curl -s -o /dev/null -D - -r 0-0 --max-filesize 1024 --max-time 15 -A "Mozilla/5.0" "https://<production-host>/wp-content/uploads/woocommerce_uploads/<path>"
 ```
 
-Read the verdict off the final response:
+Exit `63` from the fallback means the server ignored the range and announced a larger file;
+curl stopped before the body and the status line is still in its output — read it. Any other
+non-zero exit, or no status line at all, is `UNMEASURED`, quoting the curl exit code.
+
+Read the verdict off that first response:
 
 | Response | Verdict |
 |---|---|
 | `200` or `206` with any `content-type` other than `text/html` | the file is served without a purchase → **CRITICAL** |
-| `403` or `404` from the site's own server — no challenge headers (below) and the control returned `200` | protected → PASS |
+| `403` from the site's own server — no challenge headers (below) and the control returned `200` | protected → PASS |
+| `404` from the site's own server, same conditions, and the probe file was `FOUND` | protected → PASS |
+| `404` on an `UNVERIFIED` probe file | the file may simply be gone → `UNMEASURED` |
 | `403` carrying a challenge header: `cf-mitigated: challenge`, a `cf-chl-*` / `__cf_chl` cookie, `x-sucuri-block`, or any header naming a WAF or bot check | **a 403 from a WAF is not protection** — the challenge would clear for a browser and the file may still be open → `UNMEASURED` |
 | `3xx` (login redirect or otherwise), `405` after the ranged fallback, `401`, `429`, `5xx`, or `200` with `text/html` (a soft 404 or a challenge page) | `UNMEASURED`, with the status line and headers as evidence |
+| curl error (exit other than `0`/`63`) or empty response | `UNMEASURED`, quoting the curl exit code |
 
-Only the table's first two rows produce a verdict; everything else is `UNMEASURED`, never
+Only the table's first three rows produce a verdict; everything else is `UNMEASURED`, never
 `PASS`. The fix names the server: on nginx, a `location` block that denies direct access to
 `woocommerce_uploads` (an `.htaccess` never runs there); and purge that path from any edge
 cache (a CDN may already hold a public copy). One `200` proves the hole; do not enumerate or
