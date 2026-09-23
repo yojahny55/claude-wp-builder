@@ -118,14 +118,19 @@
   everyone else — wrong prices, and the cached `Product`/`Offer` schema is wrong alongside
   them, since both come from the same response. `wp-audit-performance` adds PERF-065 (the
   plugin/cache combination, WARNING/CRITICAL depending on whether the currency is
-  cookie-selected), PERF-066 (a live check that detects the edge/CDN layer from
-  `server`/`cf-cache-status` response headers), and PERF-067 (a live check that confirms the
-  bleed by requesting two currencies against the same URL and reading the cache status back).
-  `wp-audit-seo` adds SEO-069 for the cached schema's stale price/currency. All four gate on
-  `site.commerce` and on a multi-currency plugin being active, and the two live checks follow
-  `/wp-audit` Step 2.3's production-host contract — never the local clone.
-  `tests/checks/audit-multicurrency-cache.sh` pins the gate, the severity split and the fix
-  (a cache-key/cookie-exclusion setting, never a code change).
+  cookie-selected, gated on a confirmed slug list rather than a bare `currency` substring),
+  PERF-066 (a live check that detects the edge/CDN layer from `cf-cache-status` and generic
+  CDN/proxy response headers, requiring a confirmed HIT rather than the header's mere
+  presence), and PERF-067 (a live check that confirms the bleed by requesting two currencies
+  against the same URL and reading the cache status back). `wp-audit-seo` adds SEO-069, its
+  own live two-currency request pair against the same product URL — the two agents run
+  independently with no mechanism to share a live result, so SEO-069 issues its own requests
+  rather than reusing PERF-067's — for the cached schema's stale price/currency. All four codes
+  gate on `site.commerce` and on a multi-currency plugin being active, and every live check
+  (PERF-066, PERF-067, SEO-069) follows `/wp-audit` Step 2.3's production-host contract — never
+  the local clone. `tests/checks/audit-multicurrency-cache.sh` pins the gate (on all three
+  performance codes, not just PERF-065), the severity split and the fix (a
+  cache-key/cookie-exclusion setting, never a code change).
 
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had
   none, and its `template-functions.php` printed a pingback `<link>`. A full audit of a

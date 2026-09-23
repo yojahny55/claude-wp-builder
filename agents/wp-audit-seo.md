@@ -134,7 +134,7 @@ These checks require a running WordPress installation. Use `$WP` from `.wp-creat
 | SEO-060 | No citation references in `sameAs` | The Organization or `LocalBusiness` node has an empty or absent `sameAs` array. Report only what the markup proves; never assert that a missing entry means a missing listing | INFO |
 | SEO-062 | Location pages fail the swap test | Multi-location sites only. Read two location pages and exchange the city names; if both still make sense, the pages carry no location-specific content. Apply the sampling gates from the skill at 30+ and 50+ pages. A store locator whose locations have no crawlable URL of their own is CRITICAL, not WARNING | WARNING |
 | SEO-063 | Fabricated `aggregateRating` | An `aggregateRating` in the schema that no real review data backs, or that carries placeholder values. This is structured-data spam and risks a manual action | CRITICAL |
-| SEO-069 | Cached `Product`/`Offer` schema price does not match the visitor's selected currency | Commerce + multi-currency only — same gate as `wp-audit-performance.md` PERF-065 (`N/A` "no WooCommerce" / "no multi-currency plugin"). Take the rendered-head/body snapshot for a product page (see the rendered-head Procedure) and read the `Product`/`Offer` node's `price` and `priceCurrency`. Repeat the request selecting the store's other currency and compare: the same cached HTML that serves a stale visible price (PERF-067) serves this JSON-LD alongside it, since both come from one cached response | WARNING; CRITICAL when the second request's cache-status header (from PERF-067's own two-currency read, `cf-cache-status` or the equivalent header PERF-066 detected) is `HIT` and the schema still names the first request's currency |
+| SEO-069 | Cached `Product`/`Offer` schema price does not match the visitor's selected currency | Commerce + multi-currency only — same gate as `wp-audit-performance.md` PERF-065 (`N/A` "no WooCommerce" / "no multi-currency plugin"). LIVE, and its own request pair — not a reuse of PERF-067's, since the two agents run independently with no mechanism to share a live result. Against the confirmed production host, request the same product URL twice, selecting a different one of the store's currencies each time exactly as PERF-067 does, and parse the `Product`/`Offer` node's `price` and `priceCurrency` out of each response's JSON-LD | WARNING; CRITICAL when the second request's cache-status header (`cf-cache-status`, or the equivalent header PERF-066 would detect) is `HIT` and the schema still names the first request's currency. Same `N/A`/`UNMEASURED` gates as PERF-065 |
 
 ### Procedure
 
@@ -272,16 +272,21 @@ echo wp_json_encode(\$out);
    inconsistent" is not actionable.
 7. **SEO-069** — gate first: `N/A` ("no WooCommerce") when `site.commerce` is `none`, `N/A`
    ("no multi-currency plugin") when no such plugin is active, same as
-   `wp-audit-performance.md` PERF-065. The `json_ld` field the snapshot already captured for a
-   product permalink carries the `Product`/`Offer` node; read its `price` and `priceCurrency`
-   from there instead of re-fetching. Then repeat that one request selecting the store's other
-   currency (cookie, session or `?currency=`, whichever the active plugin uses) and compare —
-   the fix for the underlying cache-key problem is PERF-065/PERF-067's, this code exists only
-   because the same cached response carries the schema too, and a reader who fixes the visible
+   `wp-audit-performance.md` PERF-065. This is its own LIVE request pair against the confirmed
+   production host, not a reuse of the rendered-head/`json_ld` snapshot above: that snapshot is
+   a bulk *local* self-fetch of up to 50 permalinks over `$WP eval`, run against whatever host
+   WP-CLI points at — the clone, per Step 2.3 — so it cannot stand in for a production,
+   cache-sensitive read, and this plugin has no mechanism for one subagent to hand a live
+   result to another. Request the same product URL twice, selecting a different one of the
+   store's currencies each time (cookie, session or `?currency=`, whichever the active plugin
+   uses) — two production requests of its own, in addition to PERF-066's and PERF-067's, not a
+   reuse of them — and read the `Product`/`Offer` node's `price` and `priceCurrency` straight
+   out of each response's JSON-LD. Compare the two: the fix for the underlying cache-key
+   problem is PERF-065/PERF-067's, this code exists only because the same cached response that
+   serves a stale visible price also carries the schema, and a reader who fixes the visible
    price without knowing the structured data is equally stale ships a page that still lies to
-   a crawler after it stopped lying to a person. Needs the production host and PERF-067's
-   cache-status reading (`cf-cache-status`, or the equivalent header PERF-066 detected);
-   `UNMEASURED` ("needs the public URL") without one.
+   a crawler after it stopped lying to a person. Needs the production host; `UNMEASURED`
+   ("needs the public URL") without one.
 
 ### Procedure — content and link checks
 
