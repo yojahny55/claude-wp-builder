@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euo pipefail
 
 # SEC-039 — paid WooCommerce downloads reachable without a purchase.
 #
@@ -47,11 +47,23 @@ proc=$(awk '/^### Procedure — SEC-039/{on=1; print; next} on && /^##/{exit} on
 
 # Prose wraps at 96 columns; flatten it so a phrase split across a line break still matches.
 flat=$(printf '%s\n' "$proc" | tr '\n' ' ' | tr -s ' ')
-has()  { printf '%s\n' "$flat" | grep -Fq -- "$1"; }
+# Here-strings, not pipes: under pipefail an early-exiting `grep -q` can SIGPIPE the writer and
+# turn a match into status 141.
+has()  { grep -Fq -- "$1" <<<"$flat"; }
 # Exact code lines are matched unflattened, as whole lines.
-line() { printf '%s\n' "$proc" | grep -Fxq -- "$1"; }
+line() { grep -Fxq -- "$1" <<<"$proc"; }
 
-has 'woocommerce_file_download_method' || fail "SEC-039 does not read the download method"
+# The snippet block prints one labelled line each, so its output parses line by line.
+line "\$WP eval 'echo \"METHOD \",get_option(\"woocommerce_file_download_method\") ?: \"force\",\"\\n\";'" \
+  || fail "SEC-039 does not print the download method on its own labelled line"
+line "\$WP eval 'echo \"UPLOADS-PATH \",rtrim(wp_parse_url(wp_upload_dir()[\"baseurl\"],PHP_URL_PATH) ?: \"\",\"/\") ?: \"/\",\"\\n\";'" \
+  || fail "SEC-039 does not print the uploads URL path"
+has '**Build both URLs from `UPLOADS-PATH`, never from a hardcoded `/wp-content/uploads`.**' \
+  || fail "SEC-039 hardcodes /wp-content/uploads (multisite and custom UPLOADS never measured)"
+has '`/wp-content/uploads/sites/<N>` on a multisite subsite (run the snippets with `--url=<subsite>`)' \
+  || fail "SEC-039 lost the multisite uploads path"
+has 'when the uploads base URL sits on another host (media offloaded to a CDN or bucket), the control on the production host fails and the check is `UNMEASURED`' \
+  || fail "SEC-039 does not say what happens when uploads are offloaded to another host"
 
 # Commerce gating (relies on Step 2.3's site.commerce, does not re-detect).
 has 'N/A (no WooCommerce)' || fail "SEC-039 is not gated N/A on a non-commerce site"
@@ -71,6 +83,7 @@ has 'nginx does not' || fail "SEC-039 lost the reason the .htaccess is inert on 
 # The fix must name the server layer, not propose editing the (inert) .htaccess.
 has 'a `location` block that denies direct access' \
   || fail "SEC-039 fix does not name an nginx location block"
+has 'purge that path from any edge cache' || fail "SEC-039 fix lost the edge-cache purge"
 
 # Live probe targets production, never the clone (false PASS on local Apache).
 has 'returns a false PASS' || fail "SEC-039 does not warn that a local probe is a false PASS"
@@ -86,6 +99,7 @@ has '_downloadable_files' || fail "SEC-039 does not read _downloadable_files"
 has 'p.post_type=\"product_variation\"' || fail "SEC-039 misses downloads attached to variations"
 has 'AND p.post_status=\"publish\"' || fail "SEC-039 probes trashed or draft products"
 has 'par.post_status=\"publish\"' || fail "SEC-039 probes variations of unpublished products"
+has 'which must never be probed' || fail "SEC-039 does not forbid probing the stored (clone) host"
 has '$seg="/woocommerce_uploads/"' \
   || fail "SEC-039 does not cut the stored URL at /woocommerce_uploads/"
 has 'file_exists($dir.$p)' || fail "SEC-039 does not prefer a probe file that exists locally"
@@ -112,33 +126,41 @@ has 'a challenge page, a `403` from the edge, a redirect elsewhere' \
   || fail "SEC-039 lost the list of failed-control answers"
 has 'the check is `UNMEASURED`, with the control status line as evidence' \
   || fail "SEC-039 does not report a failed control as UNMEASURED"
-line 'curl -sI --max-time 15 -A "Mozilla/5.0" "https://<production-host>/wp-content/uploads/<control-path>"' \
+line 'curl -sI --max-time 15 -A "Mozilla/5.0" "https://<production-host><uploads-path>/<control-path>"' \
   || fail "SEC-039 control request is not a timed HEAD on a public upload"
-has 'It must come back `200` with a non-HTML `content-type`' \
-  || fail "SEC-039 lost the control's 200 / non-HTML criterion"
+line 'curl -s -o /dev/null -D - -r 0-0 --max-filesize 1024 --max-time 15 -A "Mozilla/5.0" "https://<production-host><uploads-path>/<control-path>"' \
+  || fail "SEC-039 control has no capped ranged-GET fallback for a host that refuses HEAD"
+has 'It must come back `200` or `206` with a non-HTML `content-type` (an `image/*`); a host that refuses HEAD (`405`/`501`) gets the same one-byte ranged GET as the paid file' \
+  || fail "SEC-039 lost the control's 200/206 non-HTML criterion or its HEAD fallback"
+has '?"CONTROL ".implode(' || fail "SEC-039 control snippet does not label its output line"
 has 'redirects are not followed (no `-L`)' \
   || fail "SEC-039 does not say which response the verdict is read from"
 
 # The paid-file probe itself, header-only and timed, plus the capped ranged fallback.
-line 'curl -sI --max-time 15 -A "Mozilla/5.0" "https://<production-host>/wp-content/uploads/woocommerce_uploads/<path>"' \
+line 'curl -sI --max-time 15 -A "Mozilla/5.0" "https://<production-host><uploads-path>/woocommerce_uploads/<path>"' \
   || fail "SEC-039 lost the header-only probe of the paid file"
-line 'curl -s -o /dev/null -D - -r 0-0 --max-filesize 1024 --max-time 15 -A "Mozilla/5.0" "https://<production-host>/wp-content/uploads/woocommerce_uploads/<path>"' \
+line 'curl -s -o /dev/null -D - -r 0-0 --max-filesize 1024 --max-time 15 -A "Mozilla/5.0" "https://<production-host><uploads-path>/woocommerce_uploads/<path>"' \
   || fail "SEC-039 ranged fallback is missing or uncapped (could download the paid file)"
+has 'Exit `63` from either fallback means the server ignored the range and announced a larger file; curl stopped before the body and the status line is still in its output — read it.' \
+  || fail "SEC-039 does not explain reading the status after a capped fallback (exit 63)"
 has 'Any other non-zero exit, or no status line at all, is `UNMEASURED`, quoting the curl exit code' \
   || fail "SEC-039 does not report a curl error as UNMEASURED"
 
-# Verdict table.
-has '| `200` or `206` with any `content-type` other than `text/html` | the file is served without a purchase → **CRITICAL** |' \
+# Verdict table: every row, verbatim.
+line '| `200` or `206` with any `content-type` other than `text/html` | the file is served without a purchase → **CRITICAL** |' \
   || fail "SEC-039 CRITICAL rule does not cover any non-HTML 200/206"
-has "| \`403\` from the site's own server — no challenge headers (below) and the control returned \`200\` | protected → PASS |" \
+line "| \`403\` from the site's own server — no challenge headers (below) and the control returned \`200\`/\`206\` | protected → PASS |" \
   || fail "SEC-039 403 PASS is not limited to the site's own 403 after a good control"
-has "| \`404\` from the site's own server, same conditions, and the probe file was \`FOUND\` | protected → PASS |" \
+line "| \`404\` from the site's own server, same conditions, and the probe file was \`FOUND\` | protected → PASS |" \
   || fail "SEC-039 404 PASS does not require a probe file known to exist"
-has '| `404` on a `NO-LOCAL-UPLOADS` or `MISSING-LOCALLY` probe file | the file may simply be gone → `UNMEASURED` |' \
+line '| `404` on a `NO-LOCAL-UPLOADS` or `MISSING-LOCALLY` probe file | the file may simply be gone → `UNMEASURED` |' \
   || fail "SEC-039 reads a 404 on a file not confirmed locally as protected"
-has 'cf-mitigated: challenge' || fail "SEC-039 does not recognise a Cloudflare challenge"
-has 'a 403 from a WAF is not protection' || fail "SEC-039 reads a WAF 403 as protected"
-has '`200` with `text/html` (a soft 404' || fail "SEC-039 does not treat an HTML 200 as UNMEASURED"
+line '| `403` carrying a challenge header: `cf-mitigated: challenge`, a `cf-chl-*` / `__cf_chl` cookie, `x-sucuri-block`, or any header naming a WAF or bot check | **a 403 from a WAF is not protection** — the challenge would clear for a browser and the file may still be open → `UNMEASURED` |' \
+  || fail "SEC-039 reads a WAF or bot-challenge 403 (Cloudflare, Sucuri) as protected"
+line '| `3xx` (login redirect or otherwise), `405` after the ranged fallback, `401`, `429`, `5xx`, or `200` with `text/html` (a soft 404 or a challenge page) | `UNMEASURED`, with the status line and headers as evidence |' \
+  || fail "SEC-039 lost the UNMEASURED row for redirects, 405, 5xx and HTML 200"
+line '| curl error (exit other than `0`/`63`) or empty response | `UNMEASURED`, quoting the curl exit code |' \
+  || fail "SEC-039 lost the UNMEASURED row for a curl error"
 has 'Only the table'"'"'s first three rows produce a verdict; everything else is `UNMEASURED`, never `PASS`' \
   || fail "SEC-039 lets unclassified responses fall through to PASS"
 

@@ -308,8 +308,9 @@ WooCommerce only. When `site.commerce` is `none` (see `/wp-audit` Step 2.3), thi
 damaging findings the audit can make: the paid files a customer pays to download are sitting
 in the web root, and anyone with the URL takes them for free.
 
-**Why the built-in protection can be inert.** WooCommerce stores paid files under
-`wp-content/uploads/woocommerce_uploads/` and ships an `.htaccess` there with `deny from all`.
+**Why the built-in protection can be inert.** WooCommerce stores paid files in
+`woocommerce_uploads/` inside the uploads directory (`wp-content/uploads/` by default) and
+ships an `.htaccess` there with `deny from all`.
 It also has a download method, `woocommerce_file_download_method`, with three values:
 
 - `redirect` — the file is served straight from its public URL with no gate at all. This is
@@ -343,7 +344,10 @@ the first one whose file exists in the local copy of the uploads. The path is pr
 percent-encoded per segment, so a file name with spaces or accents reaches `curl` intact:
 
 ```bash
-$WP eval 'echo get_option("woocommerce_file_download_method") ?: "force";'
+# One line per snippet, each starting with its label, so the output parses line by line.
+$WP eval 'echo "METHOD ",get_option("woocommerce_file_download_method") ?: "force","\n";'
+# Where uploads are served from (multisite: uploads/sites/N; custom UPLOADS or upload_path).
+$WP eval 'echo "UPLOADS-PATH ",rtrim(wp_parse_url(wp_upload_dir()["baseurl"],PHP_URL_PATH) ?: "","/") ?: "/","\n";'
 # Probe file: FOUND|NO-LOCAL-UPLOADS|MISSING-LOCALLY <path relative to woocommerce_uploads/>,
 # or a marker when there is no path to probe.
 $WP eval 'global $wpdb; $seg="/woocommerce_uploads/";
@@ -355,8 +359,8 @@ $p=rawurldecode(preg_replace("/[?#].*$/","",substr($u,$i+strlen($seg))));
 $enc=implode("/",array_map("rawurlencode",explode("/",$p)));
 if($local&&file_exists($dir.$p)){echo "FOUND $enc\n";return;} $first=$first??$enc;}}
 if($first===null){echo "EXTERNAL-ONLY\n";return;} echo $local?"MISSING-LOCALLY":"NO-LOCAL-UPLOADS"," $first\n";'
-# Control file: a public upload outside woocommerce_uploads, relative to wp-content/uploads/.
-$WP eval '$a=get_posts(["post_type"=>"attachment","post_mime_type"=>"image","post_status"=>"inherit","numberposts"=>1,"fields"=>"ids","meta_query"=>[["key"=>"_wp_attached_file","value"=>"woocommerce_uploads/","compare"=>"NOT LIKE"]]]); echo $a?implode("/",array_map("rawurlencode",explode("/",get_post_meta($a[0],"_wp_attached_file",true)))):"NO-CONTROL","\n";'
+# Control file: a public upload outside woocommerce_uploads, relative to the uploads path.
+$WP eval '$a=get_posts(["post_type"=>"attachment","post_mime_type"=>"image","post_status"=>"inherit","numberposts"=>1,"fields"=>"ids","meta_query"=>[["key"=>"_wp_attached_file","value"=>"woocommerce_uploads/","compare"=>"NOT LIKE"]]]); echo $a?"CONTROL ".implode("/",array_map("rawurlencode",explode("/",get_post_meta($a[0],"_wp_attached_file",true)))):"NO-CONTROL","\n";'
 ```
 
 - `FOUND <path>` — the file exists in the local uploads, so it is known to exist on the site:
@@ -378,30 +382,41 @@ $WP eval '$a=get_posts(["post_type"=>"attachment","post_mime_type"=>"image","pos
 
 Never `PASS` without a probe file and a control file.
 
+**Build both URLs from `UPLOADS-PATH`, never from a hardcoded `/wp-content/uploads`.** It is
+`/wp-content/uploads` on a default single site, `/wp-content/uploads/sites/<N>` on a multisite
+subsite (run the snippets with `--url=<subsite>`), and whatever a custom `UPLOADS` constant or
+`upload_path` option sets otherwise; the probe and control paths are relative to it. Only
+the path is kept: when the uploads base URL sits on another host (media offloaded to a CDN or
+bucket), the control on the production host fails and the check is `UNMEASURED`, never a
+verdict read off a host that is not the site.
+
 **Control request first.** Request the public control file over the confirmed production
-host. It must come back `200` with a non-HTML `content-type` (an `image/*`). Requests read the
-first response only — redirects are not followed (no `-L`). If the control answers `3xx` with
-a `Location` on the same site under its canonical host (`www` or not, `https`), repeat the
-control against that host and use it for the probe too. Anything else — a challenge page, a
-`403` from the edge, a redirect elsewhere — means the host is not answering this client the way
-it answers a visitor, and any verdict on the paid file would be read off the WAF, not the
-server: the check is `UNMEASURED`, with the control status line as evidence.
+host. It must come back `200` or `206` with a non-HTML `content-type` (an `image/*`); a host
+that refuses HEAD (`405`/`501`) gets the same one-byte ranged GET as the paid file. Requests
+read the first response only — redirects are not followed (no `-L`). If the control answers
+`3xx` with a `Location` on the same site under its canonical host (`www` or not, `https`),
+repeat the control against that host and use it for the probe too. Anything else — a
+challenge page, a `403` from the edge, a redirect elsewhere — means the host is not answering
+this client the way it answers a visitor, and any verdict on the paid file would be read off
+the WAF, not the server: the check is `UNMEASURED`, with the control status line as evidence.
 
 ```bash
-curl -sI --max-time 15 -A "Mozilla/5.0" "https://<production-host>/wp-content/uploads/<control-path>"
+curl -sI --max-time 15 -A "Mozilla/5.0" "https://<production-host><uploads-path>/<control-path>"
+# HEAD not allowed (405/501)? The same capped one-byte ranged GET:
+curl -s -o /dev/null -D - -r 0-0 --max-filesize 1024 --max-time 15 -A "Mozilla/5.0" "https://<production-host><uploads-path>/<control-path>"
 ```
 
 **Then probe the paid file** with the **path only**, over the same host, and read the status
 — never save the body, which would copy the paid file:
 
 ```bash
-curl -sI --max-time 15 -A "Mozilla/5.0" "https://<production-host>/wp-content/uploads/woocommerce_uploads/<path>"
+curl -sI --max-time 15 -A "Mozilla/5.0" "https://<production-host><uploads-path>/woocommerce_uploads/<path>"
 # HEAD not allowed (405/501)? Fall back to a one-byte ranged GET, body discarded and capped
 # in case the server ignores the range:
-curl -s -o /dev/null -D - -r 0-0 --max-filesize 1024 --max-time 15 -A "Mozilla/5.0" "https://<production-host>/wp-content/uploads/woocommerce_uploads/<path>"
+curl -s -o /dev/null -D - -r 0-0 --max-filesize 1024 --max-time 15 -A "Mozilla/5.0" "https://<production-host><uploads-path>/woocommerce_uploads/<path>"
 ```
 
-Exit `63` from the fallback means the server ignored the range and announced a larger file;
+Exit `63` from either fallback means the server ignored the range and announced a larger file;
 curl stopped before the body and the status line is still in its output — read it. Any other
 non-zero exit, or no status line at all, is `UNMEASURED`, quoting the curl exit code.
 
@@ -410,7 +425,7 @@ Read the verdict off that first response:
 | Response | Verdict |
 |---|---|
 | `200` or `206` with any `content-type` other than `text/html` | the file is served without a purchase → **CRITICAL** |
-| `403` from the site's own server — no challenge headers (below) and the control returned `200` | protected → PASS |
+| `403` from the site's own server — no challenge headers (below) and the control returned `200`/`206` | protected → PASS |
 | `404` from the site's own server, same conditions, and the probe file was `FOUND` | protected → PASS |
 | `404` on a `NO-LOCAL-UPLOADS` or `MISSING-LOCALLY` probe file | the file may simply be gone → `UNMEASURED` |
 | `403` carrying a challenge header: `cf-mitigated: challenge`, a `cf-chl-*` / `__cf_chl` cookie, `x-sucuri-block`, or any header naming a WAF or bot check | **a 403 from a WAF is not protection** — the challenge would clear for a browser and the file may still be open → `UNMEASURED` |
