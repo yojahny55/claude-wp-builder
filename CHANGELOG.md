@@ -101,6 +101,32 @@
   `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
   production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
 
+  When the manifest shows a clone (`source: restore`, a `restore.url_origin`, or a non-public
+  `wordpress.url`), those conditions are `N/A (local clone)`, suppressed and out of the
+  denominator, bounded by one test: would this also be true on production? Live checks
+  (response headers, paid-file reachability) now target the production URL — asked for and
+  confirmed, defaulting to `restore.url_origin` — and never the clone, whose local server
+  answers an `.htaccess` a production nginx ignores and would return a false PASS.
+  `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
+  production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
+
+- **A multi-currency plugin and a full-page/edge cache computed prices at two different
+  granularities, and nothing checked whether they agreed.** A multi-currency plugin (CURCY/
+  `woocommerce-multi-currency` is one shape of this) picks the price per request, usually from
+  a cookie; a page or edge cache picks what to serve per cache key. When the key does not
+  include the currency signal, the first visitor's currency gets cached and served to
+  everyone else — wrong prices, and the cached `Product`/`Offer` schema is wrong alongside
+  them, since both come from the same response. `wp-audit-performance` adds PERF-061 (the
+  plugin/cache combination, WARNING/CRITICAL depending on whether the currency is
+  cookie-selected), PERF-062 (a live check that detects the edge/CDN layer from
+  `server`/`cf-cache-status` response headers), and PERF-063 (a live check that confirms the
+  bleed by requesting two currencies against the same URL and reading the cache status back).
+  `wp-audit-seo` adds SEO-064 for the cached schema's stale price/currency. All four gate on
+  `site.commerce` and on a multi-currency plugin being active, and the two live checks follow
+  `/wp-audit` Step 2.3's production-host contract — never the local clone.
+  `tests/checks/audit-multicurrency-cache.sh` pins the gate, the severity split and the fix
+  (a cache-key/cookie-exclusion setting, never a code change).
+
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had
   none, and its `template-functions.php` printed a pingback `<link>`. A full audit of a
   delivered build found XML-RPC and pingbacks on, `/wp/v2/users` and `?author=N` listing
