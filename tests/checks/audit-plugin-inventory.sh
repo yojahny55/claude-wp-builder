@@ -36,9 +36,19 @@ cd "$(dirname "$0")/../.." || fail "cannot cd to the repository root"
 
 # section <file> <start-literal> <end-literal>: the lines from the first line containing
 # start up to (not including) the next line containing end, joined into one line so prose
-# wrapped across lines still matches.
+# wrapped across lines still matches. A marker that starts with `#` is a heading: it only
+# matches at the start of a line outside a ``` fence, so a `## Step 3` quoted in a code
+# block or in prose cannot cut the section short.
 section() {
-  awk -v a="$2" -v b="$3" 'f && index($0, b) { exit } index($0, a) { f = 1 } f' "$1" \
+  awk -v a="$2" -v b="$3" '
+    function hit(m) {
+      if (substr(m, 1, 1) == "#") return !fence && index($0, m) == 1
+      return index($0, m) > 0
+    }
+    /^[ \t]*```/ { fence = !fence }
+    f && hit(b)   { exit }
+    hit(a)        { f = 1 }
+    f' "$1" \
     | tr '\n' ' ' | tr -s ' '
 }
 has() { printf '%s\n' "$1" | grep -Fq -- "$2"; }
@@ -204,10 +214,15 @@ done
 has "$s43" '**CRITICAL** when one side is an inactive plugin' && fail "$sec SEC-043 still makes an inactive side CRITICAL"
 has "$s43" 'Pattern: top-level `function' && fail "$sec SEC-043 still describes a grep pattern"
 has "$s43" 'within the 3 lines above' && fail "$sec SEC-043 still uses the 3-line guard heuristic"
-# Both plugin loops (loaded and inactive) must fall back to <slug>.php, or a single-file
-# plugin is a missing source.
-[ "$(grep -cF '[ -e "$p" ] || p="$p.php"' "$sec")" = 2 ] \
-  || fail "$sec: a plugin loop in the SEC-043 snippet lacks the single-file <slug>.php fallback"
+# Every plugin loop in the snippet (at least loaded and inactive) must fall back to
+# <slug>.php, or a single-file plugin is a missing source. The expected count comes from the
+# loops present, so a new loop only has to carry the fallback too.
+loops="$(grep -cF 'p=wp-content/plugins/$slug' "$sec")"
+fallbacks="$(grep -cF 'p=wp-content/plugins/$slug; [ -e "$p" ] || p="$p.php"' "$sec")"
+[ "$loops" -ge 2 ] \
+  || fail "$sec: the SEC-043 snippet must hold both plugin loops (loaded and inactive); found $loops"
+[ "$fallbacks" = "$loops" ] \
+  || fail "$sec: $((loops - fallbacks)) of $loops plugin loops in the SEC-043 snippet lack the single-file <slug>.php fallback"
 has "$s43" 'for f in wp-content/mu-plugins/*; do' && fail "$sec SEC-043 still scans every entry in mu-plugins as loaded"
 grep -Fq '### `find-redeclared-functions.php`' "$skill" || fail "$skill does not document find-redeclared-functions.php"
 
@@ -237,7 +252,7 @@ if ! command -v php >/dev/null 2>&1; then
   echo "SKIP: php not found — the greps above passed, the script behavior test did not run"
   exit 0
 fi
-php -l "$script" >/dev/null 2>&1 || fail "$script does not parse"
+lint_err="$(php -l "$script" 2>&1)" || fail "$script does not parse: $lint_err"
 fx="$(mktemp -d)"
 trap 'rm -rf "$fx"' EXIT
 mkdir -p "$fx/a" "$fx/b" "$fx/c" "$fx/d" "$fx/g" "$fx/h/vendor" "$fx/h/includes"
