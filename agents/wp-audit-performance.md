@@ -120,16 +120,16 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 | Code | Check | Command | Pass Criteria | Severity |
 |------|-------|---------|---------------|----------|
 | PERF-035 | Too many plugins | `$WP plugin list --status=active --format=count` | ≤20 | WARNING |
-| PERF-036 | Autoloaded options large | `$WP db query "SELECT SUM(LENGTH(option_value)) FROM wp_options WHERE autoload IN ('yes','on','auto-on','auto');"` | ≤800KB | WARNING |
-| PERF-037 | Top autoloaded options | `$WP db query "SELECT option_name, LENGTH(option_value) AS size FROM wp_options WHERE autoload IN ('yes','on','auto-on','auto') ORDER BY size DESC LIMIT 10;"` | Info only | INFO |
+| PERF-036 | Autoloaded options large | `$WP db query "SELECT SUM(LENGTH(option_value)) FROM $($WP db prefix)options WHERE autoload IN ('yes','on','auto-on','auto');"` | ≤800KB | WARNING |
+| PERF-037 | Top autoloaded options | `$WP db query "SELECT option_name, LENGTH(option_value) AS size FROM $($WP db prefix)options WHERE autoload IN ('yes','on','auto-on','auto') ORDER BY size DESC LIMIT 10;"` | Info only | INFO |
 | PERF-038 | No object cache | `$WP cache type` | Not "WP Object Cache" (default) | INFO |
-| PERF-039 | Expired transients | `$WP db query "SELECT COUNT(*) FROM wp_options WHERE option_name LIKE '_transient_timeout_%' AND option_value < UNIX_TIMESTAMP();"` | 0 | INFO |
+| PERF-039 | Expired transients | `$WP db query "SELECT COUNT(*) FROM $($WP db prefix)options WHERE option_name LIKE '\_transient\_timeout\_%' AND option_value < UNIX_TIMESTAMP();"` | 0 | INFO |
 | PERF-040 | PHP version old | `$WP eval "echo phpversion();"` | ≥8.1 | WARNING |
 | PERF-041 | OPcache off | `$WP eval "echo function_exists('opcache_get_status') && opcache_get_status() ? 'ON' : 'OFF';"` | ON | WARNING |
 | PERF-042 | Database bloated | `$WP db size --tables --format=json` | Info only | INFO |
 | PERF-061 | Action Scheduler backlog not pruned | `$WP db query "SELECT COUNT(*) FROM $($WP db prefix)actionscheduler_actions WHERE status IN ('complete','failed','canceled');"` | ≤10,000 completed/failed/canceled rows | WARNING |
 | PERF-062 | `woocommerce_sessions` oversized | `$WP db query "SELECT COUNT(*) FROM $($WP db prefix)woocommerce_sessions WHERE session_expiry < UNIX_TIMESTAMP();"` | ≤1,000 expired rows | WARNING |
-| PERF-063 | Expired-transient backlog exceeds prune budget | `$WP db query "SELECT COUNT(*) AS rows_, SUM(LENGTH(o.option_value)) AS bytes FROM $($WP db prefix)options t JOIN $($WP db prefix)options o ON o.option_name = REPLACE(t.option_name,'_transient_timeout_','_transient_') WHERE t.option_name LIKE '\_transient\_timeout\_%' AND t.option_value < UNIX_TIMESTAMP();"` | ≤5,000 rows AND ≤5MB | INFO |
+| PERF-063 | Expired-transient backlog exceeds prune budget | `$WP db query "SELECT COUNT(*) AS rows_, COALESCE(SUM(LENGTH(o.option_value)),0) AS bytes FROM $($WP db prefix)options t LEFT JOIN $($WP db prefix)options o ON o.option_name = CONCAT('_transient_', SUBSTRING(t.option_name, LENGTH('_transient_timeout_') + 1)) WHERE t.option_name LIKE '\_transient\_timeout\_%' AND t.option_value < UNIX_TIMESTAMP();"` | ≤5,000 rows AND ≤5MB | INFO |
 | PERF-064 | Orphaned `postmeta` | `$WP db query "SELECT COUNT(*) FROM $($WP db prefix)postmeta pm LEFT JOIN $($WP db prefix)posts p ON p.ID = pm.post_id WHERE p.ID IS NULL;"` | ≤500 orphaned rows | INFO |
 | PERF-043 | Too many revisions | `$WP post list --post_type='revision' --format=count` | ≤100 | INFO |
 | PERF-044 | Memory limit low | `$WP eval "echo defined('WP_MEMORY_LIMIT') ? WP_MEMORY_LIMIT : ini_get('memory_limit');"` | ≥256M | WARNING |
@@ -300,7 +300,18 @@ cross the byte budget well before the row count does. The `LIKE` pattern escapes
 underscores (`\_transient\_timeout\_%`) rather than leaving them bare: MySQL treats an
 unescaped `_` as a single-character wildcard, which blocks the range scan on the `option_name`
 index and forces a full table scan of `wp_options` on every run — escaped, the same query reads
-the index instead. Fix: `$WP transient delete --expired`.
+the index instead. The join to the value row is a `LEFT JOIN`, not an inner one, and its
+byte sum is wrapped in `COALESCE(…, 0)`: an inner join would silently drop a timeout marker
+whose `_transient_<key>` value row was already deleted out from under it — undercounting
+against PERF-039's own plain `COUNT(*)` of the same expired markers, which has no such join to
+lose rows through. The join condition itself is written as
+`CONCAT('_transient_', SUBSTRING(t.option_name, LENGTH('_transient_timeout_') + 1))`, never
+`REPLACE(...)`: WP-CLI's `db query` scans the query text for `UPDATE`/`DELETE`/`INSERT`/
+`REPLACE`/`LOAD DATA` (case-insensitively, as a whole word) and treats a match as a
+row-modifying statement, printing only `Rows affected: -1` instead of the result set — a
+`REPLACE()` string function trips the same detection as the `REPLACE INTO` statement it exists
+to catch. None of PERF-061/062/064's cells may pick up one of those words either, for the same
+reason. Fix: `$WP transient delete --expired`.
 
 **PERF-064 — orphaned `postmeta`.** A `wp_postmeta` row whose `post_id` no longer resolves to a
 row in `wp_posts` is left behind when a plugin (or a direct `$wpdb` delete) removes a post
@@ -308,11 +319,18 @@ without calling `wp_delete_post()`, which is what actually cascades the meta del
 `postmeta` rows with no owning post — a different defect from WP-048 in `wp-audit-practices`,
 which is about a *live* post's ACF/relationship field still pointing at another post's ID after
 that post was deleted; here the post owning the meta itself is gone. Report the count.
-**Never auto-fix this finding.** The cleanup is a bulk `DELETE … LEFT JOIN … WHERE p.ID IS
-NULL`, which is irreversible the moment it runs, so require an export first:
-`$WP db export` before `$WP eval 'global $wpdb; $wpdb->query("DELETE pm FROM {$wpdb->prefix}postmeta pm LEFT JOIN {$wpdb->prefix}posts p ON p.ID = pm.post_id WHERE p.ID IS NULL");'`,
-and prefer a batched delete (`LIMIT` in a loop) over one statement on a backlog in the
-hundreds of thousands, so it does not hold a long table lock on a live site.
+**Never auto-fix this finding.** The cleanup is a bulk delete, which is irreversible the
+moment it runs, so require an export first: `$WP db export`. On a small backlog, the single
+statement from the row above works: `$WP eval 'global $wpdb; $wpdb->query("DELETE pm FROM {$wpdb->prefix}postmeta pm LEFT JOIN {$wpdb->prefix}posts p ON p.ID = pm.post_id WHERE p.ID IS NULL");'`.
+A `DELETE … LEFT JOIN …` cannot take a `LIMIT` — MySQL rejects `LIMIT` on a multi-table
+delete — so on a backlog in the hundreds of thousands, batch it instead with a subquery that
+can be limited, materialized in a derived table (`x`) so MySQL will not refuse "you can't
+specify target table for update in FROM clause": run this repeatedly, in a loop, until it
+reports 0 rows affected, so no single statement holds a long table lock on a live site:
+
+```
+$WP db query "DELETE FROM $($WP db prefix)postmeta WHERE meta_id IN (SELECT meta_id FROM (SELECT pm.meta_id FROM $($WP db prefix)postmeta pm LEFT JOIN $($WP db prefix)posts p ON p.ID = pm.post_id WHERE p.ID IS NULL LIMIT 5000) x);"
+```
 
 **Autoload budget — already covered, not duplicated here.** PERF-036 already reports the summed
 autoloaded-options size against an ≤800KB threshold at `WARNING`, and PERF-037 already lists the

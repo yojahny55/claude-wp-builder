@@ -109,7 +109,27 @@
   of a range scan on its `option_name` index. PERF-036/037's autoload queries now filter
   `autoload IN ('yes','on','auto-on','auto')` rather than `autoload='yes'` alone, since WP 6.6's
   per-option autoloading heuristic can write `on`/`off`/`auto-on`/`auto-off`/`auto` and never
-  write `yes` at all — the old filter could silently report nothing on a 6.6+ site.
+  write `yes` at all — the old filter could silently report nothing on a 6.6+ site. PERF-039's
+  own expired-transient `LIKE` had the same unescaped-underscore full-scan bug as PERF-063, and
+  PERF-036/037/039 all still hardcoded `wp_options` even after the other four checks moved off
+  it — all three now build their table name the same way and escape the same underscores.
+  PERF-063's join originally used `REPLACE()` to build the paired option's name; WP-CLI's `db
+  query` scans the query text for `UPDATE`/`DELETE`/`INSERT`/`REPLACE`/`LOAD DATA` and treats a
+  match as row-modifying, so that cell printed only `Rows affected: -1` through the real
+  command, never the row/byte numbers the check needs — confirmed by literally running it.
+  Rewritten with `CONCAT`/`SUBSTRING` instead, and every one of the four cells is now checked
+  for those five words. The join was also an inner join, which drops an expired timeout marker
+  whose value row is already gone — undercounting against PERF-039's own plain `COUNT(*)` of
+  the same markers, which has no join to lose rows through; it is now a `LEFT JOIN` with
+  `COALESCE(..., 0)` on the byte sum. PERF-064 named a batched delete as the fix for a backlog
+  too large for one statement but gave no runnable command, and a `DELETE ... JOIN` cannot
+  take `LIMIT` at all; it now gives the subquery form (a `LIMIT`-able `SELECT`, materialized in
+  a derived table so MySQL doesn't reject it as updating its own source table) to run in a loop
+  until it deletes 0 rows. `tests/checks/audit-db-bloat.sh` now runs under `set -euo pipefail`
+  per house convention, checks PERF-036/037/039 the same way as the four new codes, and swapped
+  its fixed "no PERF-065+" ceiling — which a sibling PR adding its own new codes to this same
+  file would have failed on main for no defect of its own — for a uniqueness gate: no PERF-NNN
+  code may appear on more than one table row, however many exist.
 
 - **`/wp-audit` reads the site type and whether it is a local clone before any category
   runs (Step 2.3).** Two blind spots made the audit report on the wrong site. First, checks
