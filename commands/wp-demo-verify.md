@@ -167,7 +167,13 @@ branch: `/wp-demo` probes first and stops on 2.)
   file gets an opaque origin and Chrome blocks it, and the engine never boots.
 - **cue never reaches full opacity**: the window is too narrow or the ramps eat
   it. Widen the window or set explicit ramps.
-- **horizontal overflow**: at any width, always a defect.
+- **horizontal overflow**: at any width, always a defect. The row lists up to five
+  `culprits`, the boxes past the right edge that no ancestor clips, widest first.
+  Fix those, not the rows under them. A culprit with `escapes` is a
+  `position: absolute` box that got past that clipping box, because its containing
+  block sits outside it. A screen-reader span inside a carousel card is the usual
+  case: it is 1px and shows in no screenshot. Give an ancestor inside the named box
+  `position: relative`, usually the card.
 - **clipped copy**: text taller than its own hidden-overflow box.
 
 ## Step 3.5: Undeclared inert controls

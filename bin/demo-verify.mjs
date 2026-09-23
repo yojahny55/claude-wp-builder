@@ -469,6 +469,59 @@ const probe = (idx) => {
       clipped.push({ i, text: (el.textContent || '').trim().slice(0, 60) });
     }
   });
+  // Which boxes stick out, not only that one does. A bare `overflow: true` sent
+  // the reader hunting, and the box that stretched a real page was a 1px
+  // screen-reader span inside a carousel card: invisible in every screenshot. It
+  // was `position: absolute`, its containing block sat OUTSIDE the carousel's
+  // `overflow-x: auto` strip, and overflow only clips descendants whose
+  // containing block is the clipping box or inside it -- so every off-screen
+  // card's span widened the document. The walk below follows that rule: an
+  // ancestor that clips counts only once the chain has reached the containing
+  // block of every absolute box on the way up. `escapes` names the clipping box
+  // the culprit got past, which is where the fix goes.
+  const culprits = [];
+  if (document.documentElement.scrollWidth > window.innerWidth + 1) {
+    const edge = document.documentElement.clientWidth + 1;
+    const describe = (el) => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '')
+      + (typeof el.className === 'string' && el.className.trim()
+        ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : '');
+    const containing = (s) => s.position !== 'static' || s.transform !== 'none'
+      || s.filter !== 'none' || /paint|layout|strict|content/.test(s.contain);
+    const found = new Set();
+    for (const el of document.body.querySelectorAll('*')) {
+      const r = el.getBoundingClientRect();
+      if (!r.width || r.right <= edge) continue;
+      const st = getComputedStyle(el);
+      // A fixed box is laid out against the viewport and never widens the document.
+      if (st.position === 'fixed') continue;
+      let waiting = st.position === 'absolute';
+      let clipped = false;
+      let bypassed = null;
+      for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+        const s = getComputedStyle(a);
+        if (waiting && containing(s)) waiting = false;
+        if (s.overflowX !== 'visible') {
+          if (!waiting) { clipped = true; break; }
+          if (!bypassed) bypassed = a;
+        }
+        if (s.position === 'absolute') waiting = true;
+      }
+      if (clipped) continue;
+      found.add(el);
+      // An in-flow child of a culprit only follows its parent out; the parent is
+      // the one to report. An absolute child is its own case.
+      let p = el.parentElement;
+      while (p && !found.has(p)) p = p.parentElement;
+      if (p && st.position !== 'absolute') continue;
+      culprits.push({
+        selector: describe(el),
+        right: Math.round(r.right),
+        position: st.position,
+        ...(bypassed ? { escapes: describe(bypassed) } : {}),
+      });
+    }
+    culprits.sort((x, y) => y.right - x.right);
+  }
   return {
     signature: sig.join('|'),
     devices,
@@ -481,6 +534,7 @@ const probe = (idx) => {
     cues,
     clipped,
     overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+    culprits: culprits.slice(0, 5),
     scrollHeight: document.documentElement.scrollHeight,
   };
 };
@@ -681,6 +735,7 @@ try {
   // See the container-noop block below for why a single width cannot decide it.
   const containerNoop = [];
   const clippedSeen = new Set();
+  const overflowSeen = new Set();
   let containFreeze = null;
   let mix = null;
 
@@ -864,8 +919,21 @@ try {
         // symptom in the normal pass, and without this they were identical
         // rows in findings.json.
         const pass = reduced ? 'reduced' : 'normal';
-        if (frame.overflow)
-          findings.push({ kind: 'overflow', pass, width: size.width, section: b.id, y: Math.round(y) });
+        // Deduplicated like clipped copy, but without the section in the key: the
+        // culprit walk covers the whole document, not section b, so the same boxes
+        // come back at every position of every section. One row per width and
+        // culprit set; `section` records where it was first seen, not where the
+        // culprit lives.
+        if (frame.overflow) {
+          const key = pass + '|' + size.width + '|' + frame.culprits.map((c) => c.selector).join(',');
+          if (!overflowSeen.has(key)) {
+            overflowSeen.add(key);
+            const row = { kind: 'overflow', pass, width: size.width, section: b.id, y: Math.round(y), culprits: frame.culprits };
+            if (frame.culprits.some((c) => c.escapes))
+              row.hint = 'a position:absolute box escapes the overflow of the box named in `escapes`: its containing block sits outside it -- give an ancestor inside that box position:relative';
+            findings.push(row);
+          }
+        }
         // One element clipped at every scroll position is one defect, not one per
         // sample. Undeduplicated, a single element reported once per section x width x
         // position, which buried the rest of the report under a repeated line.
