@@ -88,10 +88,37 @@ printf '%s' "$agent_flat" | grep -Fq 'never a WP-CLI stock query against the loc
   || fail "SEO-066 does not reject comparing availability against a possibly-stale local DB value"
 printf '%s' "$skill_flat" | grep -Fq 'outofstock' \
   || fail "SEO-066 does not name the rendered stock class it compares the schema claim against"
+# The stock-class grep must be scoped to the MAIN product's own wrapper. Related products and
+# up-sells go through the same wc_get_product_class() and carry their own stock class, so an
+# unscoped grep can match a decoy product instead of the one the fetch is actually about.
+printf '%s' "$skill_flat" | grep -Fq 'related products and up-sells' \
+  || fail "SEO-066 does not warn that related products/up-sells carry their own stock class"
+printf '%s' "$skill_flat" | grep -Fq 'id=\"product-$pid\"' \
+  || fail "SEO-066's stock-class grep is not scoped to the main product's own wrapper id"
+# The class alternation must be the real WooCommerce class names. (in|out)ofstock concatenates
+# to "inofstock"/"outofstock" — it can never match the actual "instock" class, so the InStock
+# side of the mismatch this check exists to catch was undetectable.
+printf '%s' "$skill_flat" | grep -Fq '(in|out)ofstock' \
+  && fail "SEO-066 still uses the (in|out)ofstock alternation, which can never match WooCommerce's real 'instock' class"
+printf '%s' "$skill_flat" | grep -Fq 'instock|outofstock|onbackorder' \
+  || fail "SEO-066 does not match the real WooCommerce stock class names"
 
 # --- SEO-067: sitemap vs noindex contradiction ---------------------------------------------
 printf '%s' "$agent_flat" | grep -Fq 'contradictory signals for the same page' \
   || fail "SEO-067 does not call a sitemap-listed, noindexed URL a contradictory signal"
+# A body-text `grep -qi noindex` over the whole page false-positives on the word inside a
+# comment/script and misses a page noindexed only via the X-Robots-Tag header. Both signals
+# must be read, and the meta check must be anchored to the actual robots tag.
+printf '%s' "$skill_flat" | grep -Fq 'X-Robots-Tag' \
+  || fail "SEO-067 does not check the X-Robots-Tag response header"
+printf '%s' "$skill_flat" | grep -Fq 'Anchor to the actual robots meta tag' \
+  || fail "SEO-067's meta check is not anchored to the robots meta tag"
+printf '%s' "$skill_flat" | grep -Fq 'tolerate attribute order and' \
+  || fail "SEO-067's meta check does not tolerate attribute order (content before name)"
+# Large catalogs split the product sitemap into numbered files and redirect the bare name to
+# the first one; a fetch without -L or without reading the index silently checks nothing.
+printf '%s' "$skill_flat" | grep -Fq 'sitemap_index.xml' \
+  || fail "SEO-067 does not read the sitemap index to find the numbered product-sitemap files"
 
 # --- SEO-068: migration reminder — warning-level, no fetch ---------------------------------
 printf '%s' "$agent_flat" | grep -Fq 'Not a live fetch' \

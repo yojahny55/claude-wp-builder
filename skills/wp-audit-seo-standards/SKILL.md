@@ -1011,9 +1011,16 @@ curl -s "https://<production-host>/product-category/<slug>/page/2/" | grep -o '<
 ### 18.3 `Offer.availability` disagreeing with real stock (SEO-066)
 
 ```bash
-curl -s "https://<production-host>/product/<slug>/" > /tmp/product.html
+curl -s "https://<production-host>/product/<slug>/" | tr '\n' ' ' > /tmp/product.html
 grep -o '"@type":"Product".*"availability":"[^"]*"' /tmp/product.html
-grep -oE 'class="[^"]*\b(in|out)ofstock\b[^"]*"' /tmp/product.html
+# Scope to the MAIN product's own wrapper, not the whole page: related products and up-sells
+# (rendered after the summary via `woocommerce_after_single_product_summary`) go through the
+# same wc_get_product_class() and carry their own in/out-of-stock class, so an unscoped grep
+# picks up whichever product in those sections happens to match first. The main wrapper's id
+# is `product-<post ID>`, and the post ID is on <body class="... postid-<ID> ...">.
+pid=$(grep -oE 'postid-[0-9]+' /tmp/product.html | head -1 | grep -oE '[0-9]+')
+grep -oE "<div[^>]*id=\"product-$pid\"[^>]*>" /tmp/product.html | head -1 \
+  | grep -oE '\b(instock|outofstock|onbackorder)\b'
 ```
 
 `https://schema.org/InStock` next to an `outofstock` class from the same fetch is the finding.
@@ -1030,13 +1037,38 @@ regenerated and still lists it — indexed in the sitemap, excluded by the tag, 
 signals for the same URL.
 
 ```bash
-$WP eval "echo home_url('/product-sitemap.xml');"
-curl -s "https://<production-host>/product-sitemap.xml" \
-  | grep -oE '<loc>[^<]+</loc>' | sed 's/<[^>]*>//g' > /tmp/sitemap-urls.txt
+# Rank Math splits a large post-type sitemap into numbered files (product-sitemap1.xml,
+# product-sitemap2.xml, ...) once the catalog passes its "items per sitemap" setting, and
+# 301/302s the unnumbered name to the first one. `curl -s` without `-L` on the bare
+# `product-sitemap.xml` gets an empty redirect body, so the loop below silently checks
+# nothing. Read every product-sitemap entry from the index instead of guessing the filename.
+curl -sL "https://<production-host>/sitemap_index.xml" \
+  | grep -oE '<loc>[^<]*product-sitemap[^<]*</loc>' | sed 's/<[^>]*>//g' > /tmp/product-sitemaps.txt
+: > /tmp/sitemap-urls.txt
+while read -r sm; do
+  curl -sL "$sm" | grep -oE '<loc>[^<]+</loc>' | sed 's/<[^>]*>//g' >> /tmp/sitemap-urls.txt
+done < /tmp/product-sitemaps.txt
 while read -r u; do
-  curl -s "$u" | grep -qi 'noindex' && echo "SITEMAP+NOINDEX: $u"
+  # A body-text `grep -qi noindex` over the whole page false-positives on the word inside a
+  # comment, inline JS or a consent-banner string, and false-negatives a page noindexed only
+  # via the `X-Robots-Tag` response header (no meta tag at all). Read headers and body in the
+  # same fetch, then check both signals.
+  headers=$(curl -s -D - -o /tmp/sitemap-url-body.html "$u")
+  if printf '%s' "$headers" | grep -qiE '^X-Robots-Tag:.*noindex'; then
+    echo "SITEMAP+NOINDEX (X-Robots-Tag): $u"
+    continue
+  fi
+  # Anchor to the actual robots meta tag, not the bare word, and tolerate attribute order and
+  # quote style: `<meta name="robots" content="noindex,...">` and
+  # `<meta content='noindex,...' name='robots'>` must both match.
+  tag=$(grep -oiE '<meta[^>]+>' /tmp/sitemap-url-body.html | grep -i 'name=["'"'"']robots["'"'"']')
+  printf '%s' "$tag" | grep -qi 'noindex' && echo "SITEMAP+NOINDEX (meta): $u"
 done < /tmp/sitemap-urls.txt
 ```
+
+When a sitemap URL resolves to a local post, skip the second fetch and read `rank_math_robots`
+postmeta instead — the same shortcut §15 already uses for the sitemap-vs-exclusion-logic
+comparison.
 
 Reuse the sitemap failure-mode table in §15 (#4, "Noindex pages in sitemap") for the same
 comparison against Rank Math's own exclusion logic — §15 asks whether Rank Math is configured
