@@ -973,7 +973,7 @@ contradict itself about. They complement SEO-038 (canonical self-reference) and 
 All four checks that read a live page target the production host, never the local clone —
 same rule as the rendered-head snapshot: per `/wp-audit` Step 2.3, when the project is a local
 clone (`local_clone = true`), use `--host` if given, otherwise ask the user for
-`production_url` (defaulting to `restore.url_origin`) and fire no request until it is
+`production_url` (defaulting to `wordpress.url_origin`) and fire no request until it is
 confirmed. With no public URL, report `UNMEASURED`, never `PASS` — a local Apache honors a
 `.htaccess` rule a production Nginx ignores, which would turn a real defect into a false pass.
 
@@ -1177,7 +1177,7 @@ Two losses a URL or platform migration causes, and that nothing recovers afterwa
   404, not a redirect, and none of the old authority carries over.
 
 This is a reminder to raise, not a code scan or a live fetch: fire it once when a migration
-signal is present (`.wp-create.json` `source: restore` or a `migration` note, or the operator
-naming a recent platform/URL-structure change) and name the two losses above. It is never
+signal is present (`.wp-create.json` `project.source: restore` or a `migration` note, or the
+operator naming a recent platform/URL-structure change) and name the two losses above. It is never
 auto-fixed — the redirect map and the review migration are decisions for the team doing the
 move, not something an audit can generate from the running site.
