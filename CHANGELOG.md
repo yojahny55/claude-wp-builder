@@ -81,6 +81,27 @@
 
 ### Added
 
+- **`wp-audit-performance` gives database bloat a threshold instead of reporting it as
+  `INFO only` (PERF-061 to PERF-064).** PERF-042 already prints every table's size, but named
+  no pass/fail line, so a table that had grown to gigabytes read exactly like a healthy one.
+  Four new checks cover the patterns that actually slow a WordPress/WooCommerce site: an
+  Action Scheduler backlog Action Scheduler's own 30-day cleaner should have purged
+  (`wp_actionscheduler_actions`/`_logs`, `WARNING` above 10,000 completed/failed/canceled
+  rows, fixed with `wp action-scheduler clean`); a `woocommerce_sessions` table whose expired
+  rows never got cleared because the twice-daily cleanup cron stopped firing (`WARNING` above
+  1,000 expired rows, fixed by forcing `do_action('woocommerce_cleanup_sessions')`); and, at
+  `INFO`, an expired-transient backlog large enough to matter for the options table's physical
+  size (fixed with `wp transient delete --expired`) and orphaned `postmeta` rows whose owning
+  post no longer exists (never auto-fixed — the cleanup is an irreversible bulk `DELETE`, so
+  the check requires a `wp db export` first). None of these are clone artifacts — they are
+  real on production too, so they report normally rather than being folded into Step 2.3's
+  local-clone suppression. Two patterns already had a real threshold and were left alone
+  rather than duplicated: PERF-036/037 already sum autoloaded options against an 800KB budget
+  at `WARNING` (autoload is the one bloat pattern here that loads on every request), and
+  PERF-039 already flags any expired transient at `INFO` — PERF-063 escalates the same data by
+  volume instead of restating its existence. `tests/checks/audit-db-bloat.sh` pins the four
+  new codes, their thresholds and fix commands, and that autoload was not duplicated.
+
 - **`/wp-audit` reads the site type and whether it is a local clone before any category
   runs (Step 2.3).** Two blind spots made the audit report on the wrong site. First, checks
   written for a store had no gate: adding any WooCommerce-specific check would fire on a
@@ -98,6 +119,12 @@
   for and confirmed, defaulting to `wordpress.url_origin` — and never the clone, whose
   local server answers an `.htaccess` a production nginx ignores and would return a false
   PASS.
+  When the manifest shows a clone (`source: restore`, a `restore.url_origin`, or a non-public
+  `wordpress.url`), those conditions are `N/A (local clone)`, suppressed and out of the
+  denominator, bounded by one test: would this also be true on production? Live checks
+  (response headers, paid-file reachability) now target the production URL — asked for and
+  confirmed, defaulting to `restore.url_origin` — and never the clone, whose local server
+  answers an `.htaccess` a production nginx ignores and would return a false PASS.
   `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
   production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
 

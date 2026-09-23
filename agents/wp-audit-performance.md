@@ -127,6 +127,10 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 | PERF-040 | PHP version old | `$WP eval "echo phpversion();"` | ≥8.1 | WARNING |
 | PERF-041 | OPcache off | `$WP eval "echo function_exists('opcache_get_status') && opcache_get_status() ? 'ON' : 'OFF';"` | ON | WARNING |
 | PERF-042 | Database bloated | `$WP db size --tables --format=json` | Info only | INFO |
+| PERF-061 | Action Scheduler backlog not pruned | `$WP db query "SELECT COUNT(*) FROM wp_actionscheduler_actions WHERE status IN ('complete','failed','canceled');"` | ≤10,000 completed/failed/canceled rows | WARNING |
+| PERF-062 | `woocommerce_sessions` oversized | `$WP db query "SELECT COUNT(*) FROM wp_woocommerce_sessions WHERE session_expiry < UNIX_TIMESTAMP();"` | ≤1,000 expired rows | WARNING |
+| PERF-063 | Expired-transient backlog exceeds prune budget | `$WP db query "SELECT COUNT(*) AS rows_, SUM(LENGTH(o.option_value)) AS bytes FROM wp_options t JOIN wp_options o ON o.option_name = REPLACE(t.option_name,'_transient_timeout_','_transient_') WHERE t.option_name LIKE '_transient_timeout_%' AND t.option_value < UNIX_TIMESTAMP();"` | ≤5,000 rows AND ≤5MB | INFO |
+| PERF-064 | Orphaned `postmeta` | `$WP db query "SELECT COUNT(*) FROM wp_postmeta pm LEFT JOIN wp_posts p ON p.ID = pm.post_id WHERE p.ID IS NULL;"` | ≤500 orphaned rows | INFO |
 | PERF-043 | Too many revisions | `$WP post list --post_type='revision' --format=count` | ≤100 | INFO |
 | PERF-044 | Memory limit low | `$WP eval "echo defined('WP_MEMORY_LIMIT') ? WP_MEMORY_LIMIT : ini_get('memory_limit');"` | ≥256M | WARNING |
 | PERF-045 | Excessive cron events | `$WP cron event list --format=count` | ≤50 | INFO |
@@ -244,6 +248,70 @@ exists for.
 it. If exactly one does, either move the enqueue into that template behind a conditional, or
 defer it as in PERF-047. Usual offenders: `aos` (scroll sections), `swiper` (carousels),
 `animate` (single elements), `lightbox` (gallery pages).
+
+### Procedure — database bloat checks (PERF-061 to PERF-064)
+
+PERF-042 already reports every table's size, but as `INFO only` — it names no threshold, so a
+table that has quietly grown to gigabytes reads exactly like one that hasn't. These four checks
+give the patterns that actually cost request time or backup size a number to fail against.
+None of them are clone artifacts: an Action Scheduler backlog, an oversized session table, an
+old transient nobody ever reads again, and a dead `postmeta` row are just as real on production
+as on a local copy, so they report `PASS`/`FAIL`/`INFO` normally — never suppressed the way
+Step 2.3's local-clone table suppresses `DISABLE_WP_CRON` or a deactivated payment gateway.
+
+Every command below is written with the literal `wp_` prefix as the generic example a doc
+uses — read the site's real prefix from `$table_prefix` in `wp-config.php` (or `$wpdb->prefix`)
+before running it, the same way `.wp-create.json`/`.claude/CLAUDE.md` already record a non-`wp_`
+prefix when the site has one.
+
+**PERF-061 — Action Scheduler backlog not pruned.** WooCommerce, and several other plugins that
+queue background work, ship the Action Scheduler library. Its own cleaner purges `complete`,
+`failed` and `canceled` actions older than 30 days — but only while the cleanup event itself
+keeps firing. A cron that stopped running, or a queue runner overwhelmed by its own backlog,
+lets both `wp_actionscheduler_actions` and `wp_actionscheduler_logs` grow unbounded; every later
+queue-claim query (`WHERE status = 'pending' ORDER BY scheduled_date ASC LIMIT …`) then scans a
+bigger table on every request that touches the queue. Report `N/A` only when
+`wp_actionscheduler_actions` does not exist — not when WooCommerce is inactive, since other
+plugins load the same library. Fix: `$WP action-scheduler clean` (repeat, or pass
+`--batch-size=<n>` for a backlog too large to clear in one pass) prunes both tables; it is safe
+to run live, since it only ever removes actions already in a terminal state.
+
+**PERF-062 — `woocommerce_sessions` oversized.** `WC_Session_Handler` writes one row per visitor
+(logged in or not) and expires it after 48 hours by default; the twice-daily
+`woocommerce_cleanup_sessions` cron event is what actually deletes expired rows; a broken or
+disabled cron leaves them piling up, and every guest-cart request pays for a lookup against the
+larger table. Report `N/A` only when `wp_woocommerce_sessions` does not exist (WooCommerce never
+installed) — a site with WooCommerce present but no purchase traffic still has the table and
+still accumulates crawler/bot sessions that must count. Fix:
+`$WP eval "do_action('woocommerce_cleanup_sessions');"` runs the same cleanup the cron would,
+immediately, instead of waiting for the next scheduled run.
+
+**PERF-063 — expired-transient backlog exceeds prune budget.** PERF-039 already flags *any*
+expired transient as `INFO` — that check exists because `get_transient()` only deletes a
+transient's rows lazily, on the next read, so one left over from a plugin's old cache key that
+nothing reads anymore never gets cleared on its own. PERF-063 does not duplicate that check; it
+escalates the same underlying data once it has piled up enough to matter for the `wp_options`
+table's physical size (`mysqldump`/migration weight, `ANALYZE TABLE` cost) rather than merely
+existing. Report the row count and byte sum together — a handful of large serialized values can
+cross the byte budget well before the row count does. Fix: `$WP transient delete --expired`.
+
+**PERF-064 — orphaned `postmeta`.** A `wp_postmeta` row whose `post_id` no longer resolves to a
+row in `wp_posts` is left behind when a plugin (or a direct `$wpdb` delete) removes a post
+without calling `wp_delete_post()`, which is what actually cascades the meta delete. This is
+`postmeta` rows with no owning post — a different defect from WP-048 in `wp-audit-practices`,
+which is about a *live* post's ACF/relationship field still pointing at another post's ID after
+that post was deleted; here the post owning the meta itself is gone. Report the count.
+**Never auto-fix this finding.** The cleanup is a bulk `DELETE … LEFT JOIN … WHERE p.ID IS
+NULL`, which is irreversible the moment it runs, so require an export first:
+`$WP db export` before `$WP eval 'global $wpdb; $wpdb->query("DELETE pm FROM {$wpdb->prefix}postmeta pm LEFT JOIN {$wpdb->prefix}posts p ON p.ID = pm.post_id WHERE p.ID IS NULL");'`,
+and prefer a batched delete (`LIMIT` in a loop) over one statement on a backlog in the
+hundreds of thousands, so it does not hold a long table lock on a live site.
+
+**Autoload budget — already covered, not duplicated here.** PERF-036 already reports the summed
+autoloaded-options size against an ≤800KB threshold at `WARNING`, and PERF-037 already lists the
+heaviest ten. Autoloaded options are the one bloat pattern in this group that loads on *every*
+request (`wp_load_alloptions()`), which is why that pair was already a real threshold rather than
+`INFO only` — there is nothing missing to add a new code for.
 
 ## Step 3: Performance Budgets & Core Web Vitals
 These budgets are the standard for every run — they are recorded here, not borrowed from an
