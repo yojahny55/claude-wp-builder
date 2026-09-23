@@ -58,13 +58,20 @@ fi
 command -v php >/dev/null 2>&1 || fail "php not found — SEC-040's behavior test cannot run"
 tmp=$(mktemp -d) || fail "mktemp failed"
 trap 'rm -rf "$tmp"' EXIT
+# Delimiters are matched with trailing whitespace ignored, so a stray space after `$WP eval '`
+# or the closing `'` still extracts; an empty snippet then fails here, not as a php -l error.
 awk -v dir="$tmp" '
-  $0 == "$WP eval '"'"'" { n++; f = 1; next }
-  f && $0 == "'"'"'"     { f = 0; next }
-  f                      { print > (dir "/snippet" n ".php") }
-  END                    { print n + 0 > (dir "/count") }' <<<"$PROC"
+  { line = $0; sub(/[ \t\r]+$/, "", line) }
+  line == "$WP eval '"'"'" { n++; f = 1; next }
+  f && line == "'"'"'"     { f = 0; next }
+  f                        { print > (dir "/snippet" n ".php") }
+  END                      { print n + 0 > (dir "/count") }' <<<"$PROC"
 [ "$(cat "$tmp/count")" -eq 2 ] \
   || fail "SEC-040 must hold exactly two \$WP eval blocks (detection, scrub); found $(cat "$tmp/count")"
+for n in 1 2; do
+  [ -s "$tmp/snippet$n.php" ] \
+    || fail "SEC-040 snippet $n extracted empty — check the \$WP eval ' / ' delimiters in the Procedure"
+done
 for n in 1 2; do
   { printf '<?php\n'; cat "$tmp/snippet$n.php"; } > "$tmp/lint$n.php"
   lint=$(php -l "$tmp/lint$n.php" 2>&1) || fail "SEC-040 snippet $n does not parse: $lint"
