@@ -97,7 +97,10 @@ And stop execution.
 If `--geo` is selected and `.wp-create.json` exists, also note its `wordpress.url` — the live
 scan in Step 9 needs a reachable host. `--host` takes precedence over it when given; a
 project developed locally and served publicly has two URLs, and the manifest holds the one
-WP-CLI needs, not the one the scanner needs.
+WP-CLI needs, not the one the scanner needs. This note is not itself the URL-selection rule:
+Step 9's dispatch is the single site that picks the scan's host, and it applies Step 2.3's
+local-clone override there — `wordpress.url` is never used as a fallback when `local_clone`
+is true.
 
 ## Step 2.2: Adopted sites (`origin: adopted`)
 
@@ -162,8 +165,8 @@ check — present or still to be added — must follow: **read `site.commerce`, 
 denominator. A check whose object is the store (a cart, a checkout, a priced-per-currency
 listing, a protected paid file) is commerce-only by definition, whichever category dispatches
 it. For example, the gateway-credential check, the download-protection check, and the
-multi-currency check are commerce-only, as are the SEO checks in
-`skills/wp-audit-seo-standards` marked commerce — each reads `site.commerce` and is `N/A` on
+multi-currency check are commerce-only, as are the SEO checks that a commerce-specific
+section of `skills/wp-audit-seo-standards` adds — each reads `site.commerce` and is `N/A` on
 a non-commerce site rather than being skipped or, worse, scoring a blog for a cart it never
 had. This is how commerce depth is added without regressing a generic site: a blog audited
 after a new commerce check ships scores exactly as it did before, because that check reads
@@ -199,6 +202,24 @@ Do not widen this list to excuse a real defect: a plugin deactivated on the clon
 local reason to be off is still a finding, and media missing with no archive/database date gap
 is still a finding (see the media-integrity check). The test is "would this be true on
 production too?" — if yes, report it; if it exists only because this is a copy, suppress it.
+
+**Record what was actually suppressed, not just that the rule applied.** While walking the
+"known-local plugins deactivated" and the `*.bak` drop-in rows above, keep the two lists that
+came out of them:
+
+- `clone_suppressed_plugins` — the slugs of the plugins that row found inactive (payment
+  gateways, a CDN/page-cache plugin, an object-cache/Redis plugin, a mail plugin, a
+  security/scanner plugin). Empty, never absent, when the clone deactivated none of them.
+- `clone_parked_dropins` — the drop-in files found parked as `*.bak` (e.g.
+  `object-cache.php.bak`, `advanced-cache.php.bak`). Empty, never absent, when none were
+  parked.
+
+These two lists are what Step 6 passes to the security agent so it knows which plugins and
+drop-ins Step 2.3 already looked at, without re-deriving the clone rule itself. The
+suppression they record reaches exactly one finding per item — "this plugin is deactivated",
+"this drop-in is missing" — and nothing else: a plugin in `clone_suppressed_plugins` with a
+known vulnerability, an outdated version, or a hardcoded credential is still a finding: the
+clone rule silences "it is off", never "it is off *and* it is broken."
 
 ### Live checks need a public URL, and you ask for it
 
@@ -694,6 +715,15 @@ Project context:
 - Editable code: <code_scope.editable, or the theme path when created>
 - Read-only code: <code_scope.read_only, or "none" when created>
 - Stack: <seo=… security=… fields=… multilingual=… builder=… cache=…, or "plugin defaults" when created>
+- Site type (commerce): <site.commerce value — woocommerce|none>
+- Local clone: <yes|no>
+- Clone-suppressed plugins: <clone_suppressed_plugins slugs, comma-separated, or "none">
+- Parked drop-ins: <clone_parked_dropins files, comma-separated, or "none">
+
+Step 2.3's clone suppression covers only the "deactivated"/"parked" finding for the items
+above — nothing else about them is suppressed. A plugin listed under Clone-suppressed
+plugins with a known vulnerability, an outdated version, or a hardcoded credential is still
+a finding; only "this plugin is off because it is a clone" is already accounted for.
 
 On an adopted site, audit every path in both code lists instead of <theme_path>. A finding
 under a read-only path is always `Fix: manual`, `Owner: manual`, with a Method that works

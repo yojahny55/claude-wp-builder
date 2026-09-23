@@ -106,6 +106,49 @@ grep -Fq "the suite must not probe the clone's own host" <<<"$audit_flat" \
 grep -Fq "the live scan must not probe the clone's own host" <<<"$audit_flat" \
   || fail "$audit's GEO live-scan dispatch (geo-scan.sh) does not gate its URL fallback on local_clone"
 
+# --- Step 2's forward-reference to the GEO live scan defers to Step 2.3, rather than
+#     repeating its own wordpress.url fallback (a third live-URL site, same class as 6.5
+#     and geo-scan above). Scoped to Step 2 itself so this does not match Step 2.3's own
+#     text about the same idea. ---
+step2=$(sed -n '/^## Step 2: Read Project Context/,/^## Step 2\.2:/p' "$audit")
+[ -n "$step2" ] || fail "$audit: could not extract the Step 2 section (heading renamed?)"
+step2_flat=$(printf '%s\n' "$step2" | tr '\n' ' ' | sed 's/  */ /g')
+grep -Fq "Step 2.3's local-clone override" <<<"$step2_flat" \
+  || fail "$audit Step 2's geo/wordpress.url note does not defer to Step 2.3's local-clone override"
+
+# --- Step 2.3 no longer implies the commerce checks it names already exist as written ---
+grep -Fq 'marked commerce' "$audit" \
+  && fail "$audit still claims the SEO checks are 'marked commerce' in skills/wp-audit-seo-standards, which has no such marking"
+grep -Fq 'commerce-specific section' <<<"$step23_flat" \
+  || fail "$audit Step 2.3 does not reword the SEO-commerce example as a section still to be added"
+
+# --- What Step 2.3 suppresses on a clone is recorded, not just applied: the security
+#     agent (and the plugin-inventory work stacked on this PR) needs the exact items,
+#     not only that "some plugins were deactivated". ---
+for token in 'clone_suppressed_plugins' 'clone_parked_dropins'; do
+  grep -Fq "$token" <<<"$step23" \
+    || fail "$audit Step 2.3 does not record $token from the clone-artifact walk"
+done
+grep -Fq 'Empty, never absent, when the clone deactivated none of them' <<<"$step23" \
+  || fail "$audit Step 2.3 does not say clone_suppressed_plugins is an empty list, not absent, when nothing was deactivated"
+grep -Fq 'Empty, never absent, when none were' <<<"$step23_flat" \
+  || fail "$audit Step 2.3 does not say clone_parked_dropins is an empty list, not absent, when nothing was parked"
+# Both directions again: suppression is narrow, not a blanket excuse for the same plugin
+# elsewhere. Anchored on the flattened section since the sentence wraps.
+grep -Fq 'clone rule silences "it is off", never "it is off' <<<"$step23_flat" \
+  || fail "$audit Step 2.3 does not say the clone suppression covers only the deactivated/parked finding, not other findings on the same item"
+
+# --- The Step 6 dispatch template passes all four fields to every audit agent ---
+dispatch=$(sed -n '/^Project context:/,/^Run all checks for your tier level\./p' "$audit")
+[ -n "$dispatch" ] || fail "$audit: could not extract the Step 6 dispatch template (markers renamed?)"
+for line in 'Site type (commerce):' 'Local clone:' 'Clone-suppressed plugins:' 'Parked drop-ins:'; do
+  grep -Fq "$line" <<<"$dispatch" \
+    || fail "$audit Step 6 dispatch template lost the '$line' line"
+done
+dispatch_flat=$(printf '%s\n' "$dispatch" | tr '\n' ' ' | sed 's/  */ /g')
+grep -Fq 'covers only the "deactivated"/"parked" finding' <<<"$dispatch_flat" \
+  || fail "$audit Step 6 dispatch template does not restate that clone suppression is narrow, not blanket, for the fields it just passed"
+
 # --- The methodology is mirrored in the standards skill ---
 grep -Fq 'Site type and local clones' "$std" \
   || fail "$std lost the site-type / local-clone methodology section"

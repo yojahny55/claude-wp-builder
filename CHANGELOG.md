@@ -100,7 +100,6 @@
   `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
   production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
 
-
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had
   none, and its `template-functions.php` printed a pingback `<link>`. A full audit of a
   delivered build found XML-RPC and pingbacks on, `/wp/v2/users` and `?author=N` listing
