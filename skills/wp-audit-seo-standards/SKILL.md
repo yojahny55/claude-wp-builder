@@ -985,15 +985,24 @@ the clean category URL. A filtered URL canonicalizing to itself tells Google eve
 combination is a distinct page worth crawling and indexing — the opposite of the intent.
 
 ```bash
-# Compare the clean category's canonical against a filtered variant's.
-curl -s "https://<production-host>/product-category/<slug>/" | grep -o '<link rel="canonical"[^>]*>'
-curl -s "https://<production-host>/product-category/<slug>/?orderby=price" | grep -o '<link rel="canonical"[^>]*>'
+# -L (bounded) follows a redirect instead of returning an empty body for it; a redirect is not
+# the same fact as a canonical tag, so it must not be silently mistaken for either a match or
+# a miss.
+curl -sL --max-redirs 3 --max-time 15 "https://<production-host>/product-category/<slug>/" \
+  | grep -o '<link rel="canonical"[^>]*>'
+curl -sL --max-redirs 3 --max-time 15 "https://<production-host>/product-category/<slug>/?orderby=price" \
+  | grep -o '<link rel="canonical"[^>]*>'
 ```
 
 Both must print the same clean URL. If the filtered fetch prints its own `?orderby=price` URL,
 that is the defect. A `noindex` on the filtered variant is an acceptable alternative to a
 canonical redirect — but the store needs **one** strategy applied consistently, not a
 canonical on some filters and a bare noindex on others.
+
+No output from either fetch — a redirect loop, a timeout, or a page with no canonical tag at
+all — is `UNMEASURED`, never a match and never a pass. An absent canonical is a different
+finding from a self-referencing one, and both require the fetch to have actually returned a
+page to say anything at all.
 
 ### 18.2 Paginated category pages canonicalizing to page 1 (SEO-065)
 
@@ -1004,14 +1013,19 @@ page 2+ do not exist, and they drop out of the index entirely. Self-canonicalizi
 the required, not merely tolerated, behavior for a WooCommerce category archive.
 
 ```bash
-curl -s "https://<production-host>/product-category/<slug>/page/2/" | grep -o '<link rel="canonical"[^>]*>'
+curl -sL --max-redirs 3 --max-time 15 "https://<production-host>/product-category/<slug>/page/2/" \
+  | grep -o '<link rel="canonical"[^>]*>'
 # Must contain .../page/2/ — a bare category URL here is the SEO-065 defect.
 ```
+
+No output — the same UNMEASURED rule as 18.1 — is not the same finding as a bare category URL:
+a page that returned nothing said nothing about its canonical, defect or otherwise.
 
 ### 18.3 `Offer.availability` disagreeing with real stock (SEO-066)
 
 ```bash
-curl -s "https://<production-host>/product/<slug>/" | tr '\n' ' ' > /tmp/product.html
+curl -sL --max-redirs 3 --max-time 15 "https://<production-host>/product/<slug>/" \
+  | tr '\n' ' ' > /tmp/product.html
 grep -o '"@type":"Product".*"availability":"[^"]*"' /tmp/product.html
 # Scope to the MAIN product's own wrapper, not the whole page: related products and up-sells
 # (rendered after the summary via `woocommerce_after_single_product_summary`) go through the
@@ -1022,6 +1036,11 @@ pid=$(grep -oE 'postid-[0-9]+' /tmp/product.html | head -1 | grep -oE '[0-9]+')
 grep -oE "<div[^>]*id=\"product-$pid\"[^>]*>" /tmp/product.html | head -1 \
   | grep -oE '\b(instock|outofstock|onbackorder)\b'
 ```
+
+No output from either grep — an empty body, a schema block that never rendered, or a wrapper
+markup this pattern does not recognize — is `UNMEASURED`, never read as "no mismatch found."
+A missing signal and a confirmed non-mismatch are different findings; only the second one is
+a pass.
 
 `https://schema.org/InStock` next to an `outofstock` class from the same fetch is the finding.
 Compare against the page's own rendered signal, not a WP-CLI stock query against the local
@@ -1034,26 +1053,99 @@ marked "Out of stock" is exactly that shape of mismatch.
 
 A product can be discontinued and noindexed while the XML sitemap generator has not yet
 regenerated and still lists it — indexed in the sitemap, excluded by the tag, two opposite
-signals for the same URL.
+signals for the same URL. Covers both products (`product-sitemap*.xml`) and product
+categories (`product_cat-sitemap.xml`, off by default in Rank Math's sitemap settings —
+`tax_product_cat_sitemap`; only present when the store turned it on).
+
+**Primary method: compare locally via WP-CLI, the same way §15 #4 already does for this exact
+failure mode.** Fetching every sitemap FILE is cheap — a handful of requests even for a large
+catalog, since each file holds hundreds of URLs — but fetching every individual product or
+category PAGE to read its own robots signal does not scale: a catalog with a few thousand
+products means a few thousand live requests for one check. Read the noindex signal from the
+database instead of the rendered page for every URL that resolves locally.
 
 ```bash
-# Rank Math splits a large post-type sitemap into numbered files (product-sitemap1.xml,
-# product-sitemap2.xml, ...) once the catalog passes its "items per sitemap" setting, and
-# 301/302s the unnumbered name to the first one. `curl -s` without `-L` on the bare
-# `product-sitemap.xml` gets an empty redirect body, so the loop below silently checks
-# nothing. Read every product-sitemap entry from the index instead of guessing the filename.
-curl -sL "https://<production-host>/sitemap_index.xml" \
-  | grep -oE '<loc>[^<]*product-sitemap[^<]*</loc>' | sed 's/<[^>]*>//g' > /tmp/product-sitemaps.txt
+# Read every product- and product_cat-sitemap entry from the index; -L (bounded) follows the
+# 301/302 Rank Math puts on the bare, unnumbered filename once a catalog is large enough to
+# split into product-sitemap1.xml, product-sitemap2.xml, ... — a fetch without -L, or one that
+# guesses a single filename instead of reading the index, silently checks nothing.
+# Cap at 50 sitemap FILES (not URLs): a pathologically large catalog could still produce
+# hundreds of sitemap files, and this loop must stay bounded regardless of catalog size.
+curl -sL --max-redirs 3 --max-time 15 "https://<production-host>/sitemap_index.xml" \
+  | grep -oE '<loc>[^<]*(product|product_cat)-sitemap[^<]*</loc>' | sed 's/<[^>]*>//g' \
+  | head -n 50 > /tmp/product-sitemaps.txt
 : > /tmp/sitemap-urls.txt
 while read -r sm; do
-  curl -sL "$sm" | grep -oE '<loc>[^<]+</loc>' | sed 's/<[^>]*>//g' >> /tmp/sitemap-urls.txt
+  curl -sL --max-redirs 3 --max-time 15 "$sm" \
+    | grep -oE '<loc>[^<]+</loc>' | sed 's/<[^>]*>//g' >> /tmp/sitemap-urls.txt
 done < /tmp/product-sitemaps.txt
-while read -r u; do
+```
+
+```bash
+$WP eval "
+\$urls = file('/tmp/sitemap-urls.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+\$tax_meta   = get_option('wpseo_taxonomy_meta', []); // Yoast fallback for term-level robots.
+\$unresolved = fopen('/tmp/sitemap-urls-unresolved.txt', 'w');
+foreach (\$urls as \$url) {
+    \$noindex  = false;
+    \$resolved = false;
+    \$post_id  = url_to_postid(\$url);
+    if (\$post_id) {
+        \$resolved = true;
+        \$rm = get_post_meta(\$post_id, 'rank_math_robots', true);
+        \$noindex = is_array(\$rm) && in_array('noindex', \$rm, true);
+        if (!\$noindex) {
+            // Yoast stores this as real post meta; confirmed against the Rank Math Yoast
+            // importer, which reads the same key when migrating a site off Yoast.
+            \$noindex = '1' === get_post_meta(\$post_id, '_yoast_wpseo_meta-robots-noindex', true);
+        }
+    } else {
+        \$path  = trim((string) wp_parse_url(\$url, PHP_URL_PATH), '/');
+        \$parts = explode('/', \$path);
+        \$slug  = end(\$parts);
+        \$term  = get_term_by('slug', \$slug, 'product_cat');
+        if (\$term) {
+            \$resolved = true;
+            \$rm = get_term_meta(\$term->term_id, 'rank_math_robots', true);
+            \$noindex = is_array(\$rm) && in_array('noindex', \$rm, true);
+            if (!\$noindex) {
+                // Yoast never wrote real term meta for this — it lives in the
+                // wpseo_taxonomy_meta option, keyed by taxonomy then term ID. Confirmed
+                // against the same Rank Math Yoast importer (its termmeta() step).
+                \$field = \$tax_meta['product_cat'][\$term->term_id]['wpseo_noindex'] ?? '';
+                \$noindex = 'noindex' === \$field;
+            }
+        }
+    }
+    if (!\$resolved) {
+        fwrite(\$unresolved, \$url . \"\n\");
+        continue;
+    }
+    if (\$noindex) {
+        echo \"SITEMAP+NOINDEX (DB): \$url\n\";
+    }
+}
+fclose(\$unresolved);
+"
+```
+
+A URL that resolves to neither a post nor a `product_cat` term (rare for these two sitemaps,
+but possible after a slug change) has nothing to compare and is simply skipped here, not
+counted as a pass — note it and fall back to the bounded HTTP method below only for that
+handful of unresolved URLs, never for the whole list.
+
+**Fallback, and only for URLs the WP-CLI pass could not resolve:** the same signals as before
+— `X-Robots-Tag` header, then the anchored `<meta name="robots">` tag — over an explicitly
+capped sample (`head -n 50` of the unresolved list, not the full sitemap), because reading the
+live page is exactly the per-URL cost the primary method exists to avoid.
+
+```bash
+head -n 50 /tmp/sitemap-urls-unresolved.txt | while read -r u; do
   # A body-text `grep -qi noindex` over the whole page false-positives on the word inside a
   # comment, inline JS or a consent-banner string, and false-negatives a page noindexed only
   # via the `X-Robots-Tag` response header (no meta tag at all). Read headers and body in the
   # same fetch, then check both signals.
-  headers=$(curl -s -D - -o /tmp/sitemap-url-body.html "$u")
+  headers=$(curl -sL --max-redirs 3 --max-time 15 -D - -o /tmp/sitemap-url-body.html "$u")
   if printf '%s' "$headers" | grep -qiE '^X-Robots-Tag:.*noindex'; then
     echo "SITEMAP+NOINDEX (X-Robots-Tag): $u"
     continue
@@ -1063,12 +1155,11 @@ while read -r u; do
   # `<meta content='noindex,...' name='robots'>` must both match.
   tag=$(grep -oiE '<meta[^>]+>' /tmp/sitemap-url-body.html | grep -i 'name=["'"'"']robots["'"'"']')
   printf '%s' "$tag" | grep -qi 'noindex' && echo "SITEMAP+NOINDEX (meta): $u"
-done < /tmp/sitemap-urls.txt
+done
 ```
 
-When a sitemap URL resolves to a local post, skip the second fetch and read `rank_math_robots`
-postmeta instead — the same shortcut §15 already uses for the sitemap-vs-exclusion-logic
-comparison.
+No output from a fetch that timed out, redirect-looped past the cap, or came back empty is
+`UNMEASURED` for that URL, never a silent pass — the same rule as 18.1-18.3.
 
 Reuse the sitemap failure-mode table in §15 (#4, "Noindex pages in sitemap") for the same
 comparison against Rank Math's own exclusion logic — §15 asks whether Rank Math is configured

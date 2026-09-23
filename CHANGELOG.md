@@ -122,16 +122,22 @@
   indexed at all, so self-referencing pagination is required here, not merely tolerated.
   SEO-066 catches a `Product` schema's `Offer.availability` still claiming `InStock` on a page
   the storefront itself renders as out of stock — the same manual-action risk tier as the
-  existing SEO-063 fabricated-rating check. SEO-067 catches a URL the XML sitemap still lists
-  after it picked up a `noindex`, a contradictory signal to Google. SEO-068 is a warning-level
-  reminder, not a live check: when the project shows a migration signal, it names the two
-  losses a URL/platform migration causes and nothing recovers afterward — product reviews and
-  their `AggregateRating` if IDs are not migrated with them, and old URLs' ranking authority if
-  they are not 301-mapped one-to-one instead of blanket-redirected to the home page. All five
-  are `N/A ("no WooCommerce")` on a non-commerce site, and the four that fetch a live page
-  target the confirmed production host, never the local clone, per Step 2.3.
-  `tests/checks/audit-ecommerce-seo.sh` pins the five codes and the site-type gate; the
-  methodology is recorded in `skills/wp-audit-seo-standards` §18.
+  existing SEO-063 fabricated-rating check. SEO-067 catches a product OR product-category URL
+  the XML sitemap still lists after it picked up a `noindex` — a contradictory signal to
+  Google — by comparing the sitemap against `rank_math_robots`/Yoast robots meta via WP-CLI,
+  not a live fetch of every listed URL: a catalog-sized sitemap would otherwise mean a
+  catalog-sized number of production requests. Only the URLs that database comparison cannot
+  resolve fall back to a live fetch, capped at 50. SEO-068 is a warning-level reminder, not a
+  live check: when the project shows a migration signal, it names the two losses a
+  URL/platform migration causes and nothing recovers afterward — product reviews and their
+  `AggregateRating` if IDs are not migrated with them, and old URLs' ranking authority if they
+  are not 301-mapped one-to-one instead of blanket-redirected to the home page. All five are
+  `N/A ("no WooCommerce")` on a non-commerce site; SEO-064/065/066 and SEO-067's sitemap-file
+  and fallback fetches target the confirmed production host, never the local clone, per
+  Step 2.3, each following redirects with a bounded `-L`, and an empty fetch is `UNMEASURED`
+  rather than a silent pass.
+  `tests/checks/audit-ecommerce-seo.sh` pins the five codes, the site-type gate, and the
+  sitemap-file cap; the methodology is recorded in `skills/wp-audit-seo-standards` §18.
 
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had
   none, and its `template-functions.php` printed a pingback `<link>`. A full audit of a

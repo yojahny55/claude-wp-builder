@@ -16,7 +16,7 @@
 # Grepping the exact wording is this repo's house style: a failure here means the sentence
 # changed, not that the code broke. Reword one on purpose and update its line in the same
 # commit, so a reviewer sees both halves of the change at once.
-set -uo pipefail
+set -euo pipefail
 
 fail() { echo "FAIL: $1"; exit 1; }
 
@@ -65,6 +65,11 @@ printf '%s' "$skill_flat" | grep -Fq 'canonicalizing to itself tells Google ever
   || fail "SEO-064 does not say a self-canonicalizing filtered URL is the defect"
 printf '%s' "$skill_flat" | grep -Fq 'canonical back at the clean category URL' \
   || fail "SEO-064 does not require the filtered URL's canonical to point at the clean category URL"
+# A redirect must be followed (bounded), and an empty fetch is UNMEASURED, never a match/pass.
+printf '%s' "$skill_flat" | grep -Fq -- '--max-redirs 3 --max-time 15' \
+  || fail "the §18 fetches do not bound -L with --max-redirs/--max-time"
+printf '%s' "$skill_flat" | grep -Fq 'is `UNMEASURED`, never a match and never a pass' \
+  || fail "SEO-064/18.1 does not say an empty canonical fetch is UNMEASURED rather than a match"
 
 # --- SEO-065: category pagination — the inverted assumption, both directions --------------
 # The wrong form: canonical to page 1 must be named as the defect for category pagination,
@@ -80,6 +85,8 @@ printf '%s' "$agent_flat" | grep -Fq 'A paginated page canonicalising to page 1 
 # ...and SEO-065 must say plainly that the allowance does not carry over to a category archive.
 printf '%s' "$skill_flat" | grep -Fq 'unlike a paginated single post' \
   || fail "SEO-065 does not say the SEO-038 pagination allowance does not extend to a category archive"
+printf '%s' "$skill_flat" | grep -Fq 'is not the same finding as a bare category URL' \
+  || fail "SEO-065/18.2 does not say an empty canonical fetch is UNMEASURED rather than the page-1 defect"
 
 # --- SEO-066: Offer.availability vs real stock — CRITICAL, and never a stale local query ---
 grep -E '^\| *SEO-066 *\|.*\| *CRITICAL *\| *$' "$AGENT" >/dev/null \
@@ -102,23 +109,58 @@ printf '%s' "$skill_flat" | grep -Fq '(in|out)ofstock' \
   && fail "SEO-066 still uses the (in|out)ofstock alternation, which can never match WooCommerce's real 'instock' class"
 printf '%s' "$skill_flat" | grep -Fq 'instock|outofstock|onbackorder' \
   || fail "SEO-066 does not match the real WooCommerce stock class names"
+printf '%s' "$skill_flat" | grep -Fq 'never read as "no mismatch found."' \
+  || fail "SEO-066/18.3 does not say a missing schema/stock signal is UNMEASURED, not a pass"
 
 # --- SEO-067: sitemap vs noindex contradiction ---------------------------------------------
 printf '%s' "$agent_flat" | grep -Fq 'contradictory signals for the same page' \
   || fail "SEO-067 does not call a sitemap-listed, noindexed URL a contradictory signal"
+# Large catalogs split the product sitemap into numbered files and redirect the bare name to
+# the first one; a fetch without -L or without reading the index silently checks nothing.
+printf '%s' "$skill_flat" | grep -Fq 'sitemap_index.xml' \
+  || fail "SEO-067 does not read the sitemap index to find the numbered product-sitemap files"
+# The primary method must be a local WP-CLI comparison, not a live fetch of every sitemap URL
+# — a catalog-sized sitemap otherwise means a catalog-sized number of production requests.
+printf '%s' "$agent_flat" | grep -Fq 'Primary method is a WP-CLI database comparison' \
+  || fail "SEO-067 does not name the WP-CLI database comparison as its primary method"
+printf '%s' "$skill_flat" | grep -Fq 'Primary method: compare locally via WP-CLI' \
+  || fail "SEO-067's skill methodology does not lead with the WP-CLI comparison"
+printf '%s' "$agent_flat" | grep -Fq 'does not scale' \
+  || fail "SEO-067 does not say why a live fetch per sitemap URL does not scale"
+# Category coverage: product_cat, not just products, and Yoast's real storage shape for both
+# levels (post meta for a post; the wpseo_taxonomy_meta OPTION, not term meta, for a term).
+printf '%s' "$agent_flat" | grep -Fq 'product-category URLs' \
+  || fail "SEO-067's table row narrowed back to products only"
+printf '%s' "$skill_flat" | grep -Fq 'product_cat-sitemap.xml' \
+  || fail "SEO-067 does not read the product_cat taxonomy sitemap"
+printf '%s' "$skill_flat" | grep -Fq '_yoast_wpseo_meta-robots-noindex' \
+  || fail "SEO-067 dropped the Yoast post-level noindex fallback"
+printf '%s' "$skill_flat" | grep -Fq 'wpseo_taxonomy_meta' \
+  || fail "SEO-067's Yoast term-level fallback reads term meta instead of the wpseo_taxonomy_meta option Yoast actually uses"
+# The WP-CLI pass must actually PRODUCE the unresolved-URL file the fallback reads — a
+# fallback pointed at a file nothing writes silently checks zero URLs.
+printf '%s' "$skill_flat" | grep -Fq "fopen('/tmp/sitemap-urls-unresolved.txt', 'w')" \
+  || fail "SEO-067's WP-CLI pass does not open the unresolved-URL file its own fallback reads"
+printf '%s' "$skill_flat" | grep -Fq 'fwrite(\$unresolved' \
+  || fail "SEO-067's WP-CLI pass opens the unresolved-URL file but never writes an unresolved URL to it"
+# Any HTTP that remains (sitemap files themselves, and the fallback for URLs the DB comparison
+# could not resolve) must be explicitly capped, not open-ended.
+printf '%s' "$skill_flat" | grep -Fq 'head -n 50 > /tmp/product-sitemaps.txt' \
+  || fail "SEO-067 does not cap the sitemap-FILE list itself at 50, independent of the fallback cap"
+printf '%s' "$skill_flat" | grep -Fq 'head -n 50 /tmp/sitemap-urls-unresolved.txt' \
+  || fail "SEO-067's fallback does not cap the unresolved-URL list at 50, independent of the sitemap-file cap"
+printf '%s' "$agent_flat" | grep -Fq 'capped at 50' \
+  || fail "SEO-067's procedure does not state the 50-item cap on sitemap files and the fallback"
 # A body-text `grep -qi noindex` over the whole page false-positives on the word inside a
 # comment/script and misses a page noindexed only via the X-Robots-Tag header. Both signals
-# must be read, and the meta check must be anchored to the actual robots tag.
+# must be read, and the meta check must be anchored to the actual robots tag. This survives
+# only in the fallback path now, but the anchoring must still hold there.
 printf '%s' "$skill_flat" | grep -Fq 'X-Robots-Tag' \
   || fail "SEO-067 does not check the X-Robots-Tag response header"
 printf '%s' "$skill_flat" | grep -Fq 'Anchor to the actual robots meta tag' \
   || fail "SEO-067's meta check is not anchored to the robots meta tag"
 printf '%s' "$skill_flat" | grep -Fq 'tolerate attribute order and' \
   || fail "SEO-067's meta check does not tolerate attribute order (content before name)"
-# Large catalogs split the product sitemap into numbered files and redirect the bare name to
-# the first one; a fetch without -L or without reading the index silently checks nothing.
-printf '%s' "$skill_flat" | grep -Fq 'sitemap_index.xml' \
-  || fail "SEO-067 does not read the sitemap index to find the numbered product-sitemap files"
 
 # --- SEO-068: migration reminder — warning-level, no fetch ---------------------------------
 printf '%s' "$agent_flat" | grep -Fq 'Not a live fetch' \
