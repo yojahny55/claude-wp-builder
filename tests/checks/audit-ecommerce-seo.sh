@@ -34,6 +34,15 @@ agent_flat=$(tr '\n' ' ' < "$AGENT" | sed 's/  */ /g') || fail "could not read $
 [ -n "$agent_flat" ] || fail "$AGENT flattened to nothing — it was readable and is now empty"
 skill_flat=$(tr '\n' ' ' < "$SKILL" | sed 's/  */ /g') || fail "could not read $SKILL"
 [ -n "$skill_flat" ] || fail "$SKILL flattened to nothing — it was readable and is now empty"
+# The commerce assertions read only what belongs to SEO-064..068: their table rows plus their
+# own procedure. A phrase that also appears elsewhere in the agent (UNMEASURED, site.commerce)
+# must not satisfy a gate that the commerce text itself has dropped.
+commerce_flat=$( { grep -E '^\| *SEO-06[4-8] *\|' "$AGENT"
+                   awk '/^### Procedure — commerce checks \(SEO-064 to SEO-068\)/ { f = 1; print; next }
+                        f && /^##/ { exit }
+                        f' "$AGENT"; } | tr '\n' ' ' | sed 's/  */ /g')
+printf '%s' "$commerce_flat" | grep -Fq '### Procedure — commerce checks (SEO-064 to SEO-068)' \
+  || fail "$AGENT has no '### Procedure — commerce checks (SEO-064 to SEO-068)' section for the gates to read"
 
 # --- all five codes exist, in the agent's check table -------------------------------------
 for code in SEO-064 SEO-065 SEO-066 SEO-067 SEO-068; do
@@ -45,19 +54,19 @@ grep -Fq '## 18. E-commerce SEO nuances' "$SKILL" \
   || fail "$SKILL has no e-commerce SEO section for SEO-064..SEO-068 to reference"
 
 # --- gate: site.commerce, not a re-detection ------------------------------------------------
-printf '%s' "$agent_flat" | grep -Fq 'N/A ("no WooCommerce")' \
+printf '%s' "$commerce_flat" | grep -Fq 'N/A ("no WooCommerce")' \
   || fail "the commerce checks do not report N/A (\"no WooCommerce\") on a non-commerce site"
-printf '%s' "$agent_flat" | grep -Fq 'site.commerce' \
+printf '%s' "$commerce_flat" | grep -Fq 'site.commerce' \
   || fail "the commerce checks do not read site.commerce from /wp-audit Step 2.3"
-printf '%s' "$agent_flat" | grep -Fq 'Never re-detect WooCommerce' \
+printf '%s' "$commerce_flat" | grep -Fq 'Never re-detect WooCommerce' \
   || fail "the commerce checks re-detect WooCommerce instead of trusting Step 2.3's site.commerce"
 
 # --- production host, never the clone, for the four checks that fetch a page --------------
 printf '%s' "$skill_flat" | grep -Fq 'target the production host, never the local clone' \
   || fail "the skill does not send the live commerce checks at the production host"
-printf '%s' "$agent_flat" | grep -Fq 'Production host, never the clone' \
+printf '%s' "$commerce_flat" | grep -Fq 'Production host, never the clone' \
   || fail "the agent does not repeat the production-host rule for the commerce checks"
-printf '%s' "$agent_flat" | grep -Fq 'UNMEASURED' \
+printf '%s' "$commerce_flat" | grep -Fq 'With no public URL, the check is `UNMEASURED`, never `PASS`' \
   || fail "the commerce checks do not fall back to UNMEASURED without a public URL"
 
 # --- SEO-064: faceted/filtered URL must NOT self-canonicalize ------------------------------
@@ -74,9 +83,9 @@ printf '%s' "$skill_flat" | grep -Fq 'is `UNMEASURED`, never a match and never a
 # --- SEO-065: category pagination — the inverted assumption, both directions --------------
 # The wrong form: canonical to page 1 must be named as the defect for category pagination,
 # not silently allowed the way SEO-038 allows it for a single post.
-printf '%s' "$agent_flat" | grep -Fq 'canonical back to page 1 is the defect' \
+printf '%s' "$commerce_flat" | grep -Fq 'canonical back to page 1 is the defect' \
   || fail "SEO-065 does not name canonical-to-page-1 as the defect for category pagination"
-printf '%s' "$agent_flat" | grep -Fq 'Self-referencing is correct and required' \
+printf '%s' "$commerce_flat" | grep -Fq 'Self-referencing is correct and required' \
   || fail "SEO-065 does not require self-referencing canonical on category page 2+"
 # SEO-038's own allowance must still be intact — this PR narrows SEO-065, it does not touch
 # SEO-038's rule for a paginated single post.
@@ -91,7 +100,7 @@ printf '%s' "$skill_flat" | grep -Fq 'is not the same finding as a bare category
 # --- SEO-066: Offer.availability vs real stock — CRITICAL, and never a stale local query ---
 grep -E '^\| *SEO-066 *\|.*\| *CRITICAL *\| *$' "$AGENT" >/dev/null \
   || fail "SEO-066 is not CRITICAL — a stale InStock claim is a manual-action risk, same tier as SEO-063"
-printf '%s' "$agent_flat" | grep -Fq 'never a WP-CLI stock query against the local database' \
+printf '%s' "$commerce_flat" | grep -Fq 'never a WP-CLI stock query against the local database' \
   || fail "SEO-066 does not reject comparing availability against a possibly-stale local DB value"
 printf '%s' "$skill_flat" | grep -Fq 'outofstock' \
   || fail "SEO-066 does not name the rendered stock class it compares the schema claim against"
@@ -113,7 +122,7 @@ printf '%s' "$skill_flat" | grep -Fq 'never read as "no mismatch found."' \
   || fail "SEO-066/18.3 does not say a missing schema/stock signal is UNMEASURED, not a pass"
 
 # --- SEO-067: sitemap vs noindex contradiction ---------------------------------------------
-printf '%s' "$agent_flat" | grep -Fq 'contradictory signals for the same page' \
+printf '%s' "$commerce_flat" | grep -Fq 'contradictory signals for the same page' \
   || fail "SEO-067 does not call a sitemap-listed, noindexed URL a contradictory signal"
 # Large catalogs split the product sitemap into numbered files and redirect the bare name to
 # the first one; a fetch without -L or without reading the index silently checks nothing.
@@ -121,15 +130,15 @@ printf '%s' "$skill_flat" | grep -Fq 'sitemap_index.xml' \
   || fail "SEO-067 does not read the sitemap index to find the numbered product-sitemap files"
 # The primary method must be a local WP-CLI comparison, not a live fetch of every sitemap URL
 # — a catalog-sized sitemap otherwise means a catalog-sized number of production requests.
-printf '%s' "$agent_flat" | grep -Fq 'Primary method is a WP-CLI database comparison' \
+printf '%s' "$commerce_flat" | grep -Fq 'Primary method is a WP-CLI database comparison' \
   || fail "SEO-067 does not name the WP-CLI database comparison as its primary method"
 printf '%s' "$skill_flat" | grep -Fq 'Primary method: compare locally via WP-CLI' \
   || fail "SEO-067's skill methodology does not lead with the WP-CLI comparison"
-printf '%s' "$agent_flat" | grep -Fq 'does not scale' \
+printf '%s' "$commerce_flat" | grep -Fq 'does not scale' \
   || fail "SEO-067 does not say why a live fetch per sitemap URL does not scale"
 # Category coverage: product_cat, not just products, and Yoast's real storage shape for both
 # levels (post meta for a post; the wpseo_taxonomy_meta OPTION, not term meta, for a term).
-printf '%s' "$agent_flat" | grep -Fq 'product-category URLs' \
+printf '%s' "$commerce_flat" | grep -Fq 'product-category URLs' \
   || fail "SEO-067's table row narrowed back to products only"
 printf '%s' "$skill_flat" | grep -Fq 'product_cat-sitemap.xml' \
   || fail "SEO-067 does not read the product_cat taxonomy sitemap"
@@ -149,7 +158,7 @@ printf '%s' "$skill_flat" | grep -Fq 'head -n 50 > /tmp/product-sitemaps.txt' \
   || fail "SEO-067 does not cap the sitemap-FILE list itself at 50, independent of the fallback cap"
 printf '%s' "$skill_flat" | grep -Fq 'head -n 50 /tmp/sitemap-urls-unresolved.txt' \
   || fail "SEO-067's fallback does not cap the unresolved-URL list at 50, independent of the sitemap-file cap"
-printf '%s' "$agent_flat" | grep -Fq 'capped at 50' \
+printf '%s' "$commerce_flat" | grep -Fq 'capped at 50' \
   || fail "SEO-067's procedure does not state the 50-item cap on sitemap files and the fallback"
 # A body-text `grep -qi noindex` over the whole page false-positives on the word inside a
 # comment/script and misses a page noindexed only via the X-Robots-Tag header. Both signals
@@ -163,7 +172,7 @@ printf '%s' "$skill_flat" | grep -Fq 'tolerate attribute order and' \
   || fail "SEO-067's meta check does not tolerate attribute order (content before name)"
 
 # --- SEO-068: migration reminder — warning-level, no fetch ---------------------------------
-printf '%s' "$agent_flat" | grep -Fq 'Not a live fetch' \
+printf '%s' "$commerce_flat" | grep -Fq 'Not a live fetch' \
   || fail "SEO-068 is not marked as a non-fetching, reminder-only check"
 printf '%s' "$skill_flat" | grep -Fq 'AggregateRating' \
   || fail "SEO-068 does not name the lost AggregateRating as one of the two migration risks"
