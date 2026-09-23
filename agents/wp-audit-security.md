@@ -161,6 +161,10 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 | SEC-036 | Development host in the database | `$WP eval` sweep of `options`, `postmeta`, `posts` and `termmeta` for the dev host. See Procedure | CRITICAL |
 | SEC-037 | Backup or editor files inside the theme | Glob the theme for `*.bak*`, `*.orig`, `*.save`, `*~`, `*.php.[0-9]*`, `*.sql` | WARNING |
 | SEC-038 | Update counts reported without network access | Reach `api.wordpress.org` before reading any update count. See Procedure | WARNING |
+| SEC-040 | Gateway credentials stored at rest | Read each `woocommerce_<gateway>_settings` option for enabled gateways, check credential-shaped keys. See Procedure | No enabled gateway holds a non-empty live credential value | CRITICAL |
+
+`N/A ("no WooCommerce")`, out of the denominator, when `site.commerce` is `none` (`/wp-audit`
+Step 2.3) — this check has nothing to read without WooCommerce installed and active.
 
 ### Execution notes
 
@@ -300,6 +304,81 @@ Rules that follow from this:
 The same note applies to WP-043 and WP-044 in `agents/wp-audit-practices.md`, which read the
 same two transients.
 
+### Procedure — SEC-040 (payment-gateway credentials stored at rest)
+
+SEC-005 greps theme PHP for hardcoded secrets, but a payment gateway does not keep its live
+API key in a file at all — WooCommerce stores each gateway's settings, credentials included,
+as a serialized array in the `wp_options` row `woocommerce_<gateway_id>_settings`. Nothing that
+scans source code can see that row, and it is exactly the row a database dump, a staging
+snapshot or a cloned copy carries verbatim. A key sitting there is a live secret the same way a
+key in a `.env` file is: whoever gets a copy of the database gets the gateway's production
+credentials.
+
+**Enumerate enabled gateways and read their settings, not a fixed list of plugin slugs** — a
+gateway added later would silently escape a hardcoded check:
+
+```bash
+$WP eval '
+if ( ! class_exists( "WC_Payment_Gateways" ) ) {
+    echo "no WooCommerce";
+    return;
+}
+$credential_keys = array(
+    "api_key", "secret_key", "secret", "private_key", "publishable_key",
+    "client_secret", "token", "access_token", "merchant_id", "consumer_key",
+    "consumer_secret",
+);
+foreach ( WC_Payment_Gateways::instance()->payment_gateways() as $gateway ) {
+    $settings = get_option( "woocommerce_" . $gateway->id . "_settings", array() );
+    if ( ! is_array( $settings ) ) {
+        continue;
+    }
+    foreach ( $credential_keys as $key ) {
+        if ( ! empty( $settings[ $key ] ) ) {
+            printf(
+                "%s: enabled=%s key=%s len=%d\n",
+                $gateway->id,
+                $gateway->enabled,
+                $key,
+                strlen( (string) $settings[ $key ] )
+            );
+        }
+    }
+}
+'
+```
+
+- **Pass:** for every gateway whose `enabled` is `yes`, none of the credential-shaped keys hold
+  a non-empty value — either the gateway is not configured yet, or it is a sandbox/test mode
+  with no live key.
+- **Fail:** an enabled gateway has a non-empty value under `api_key`, `secret_key`, `token`, or
+  any of the other credential-shaped keys. Report the gateway id and which key(s) matched, but
+  never print the value itself — the length is enough to prove it is non-empty.
+- Message: `Enabled payment gateway "<gateway_id>" stores a live credential ("<key>") in
+  wp_options — a database copy carries the working key`
+
+**This is `N/A`, not a finding, on a non-commerce site.** Read `site.commerce` from `/wp-audit`
+Step 2.3 rather than re-detecting WooCommerce here; when it is `none` this check is `N/A ("no
+WooCommerce")`, out of the denominator, same as every other commerce-only check.
+
+**Do not confuse this with the local-clone suppression in `/wp-audit` Step 2.3.** That step
+lists "known-local plugins deactivated (payment gateways, …)" as a clone artifact to suppress
+— a gateway turned off so the local copy cannot reach a live payment endpoint is expected and
+is not a finding. SEC-040 is a different fact about the same gateway: the credential value
+still sitting in `wp_options` is true of production too — deactivating the gateway on the
+clone does not clear it — and it is exactly what makes a shared or cloned database a leak
+risk. So a deactivated-but-still-configured gateway is reported by SEC-040 (a live key at
+rest) even while its deactivation is not reported by Step 2.3 (a clone artifact). Only a
+gateway with `enabled !== "yes"` **and** an empty settings array is fully silent here.
+
+**Fix is manual, never automatic.** There is no safe automatic fix — the theme does not own
+`wp_options`, and clearing the key would break the live gateway on production. The remediation
+is procedural: rotate the key at the payment processor if this database was ever shared, backed
+up off the original server, or handed to a third party; and on a clone or shared copy meant to
+be handed around, scrub the value from `wp_options` (`$WP option get
+woocommerce_<gateway_id>_settings --format=json`, redact the credential keys, `$WP option
+update … --format=json`) before the copy leaves the machine that has production access.
+
 ## Step 3: Response-Header Checks
 
 These read the live response, so they need a reachable host — the same gate as SEC-038, not
@@ -428,3 +507,6 @@ When AIOS-related fixes are needed, dispatch the `wp-audit-aios` agent with the 
    SEC-034. A count read from a stale transient is `UNMEASURED`, never a pass
 8. **The dev-host sweep reads four tables** — `options` alone misses the rows that reach the
    page: `postmeta`, `posts` and `termmeta`
+9. **Gateway credential exposure is a database fact, not a clone artifact** — SEC-040 reports a
+   live key in `wp_options` even when the gateway itself is deactivated on a clone; only the
+   gateway's deactivation is suppressed by `/wp-audit` Step 2.3, never the stored credential

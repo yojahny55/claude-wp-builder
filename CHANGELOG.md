@@ -80,6 +80,44 @@
   `scrollWidth <= clientWidth` check. `tests/checks/carousel-positioned-cards.sh`.
 
 ### Added
+### Added
+
+- **`/wp-audit` reads the site type and whether it is a local clone before any category
+  runs (Step 2.3).** Two blind spots made the audit report on the wrong site. First, checks
+  written for a store had no gate: adding any WooCommerce-specific check would fire on a
+  generic blog and score it for a cart it never had. The audit now records `site.commerce`
+  from `wp plugin is-active woocommerce`, and every commerce check reads `N/A` (out of the
+  denominator) on a non-commerce site, so commerce depth can be added without moving a
+  generic site's score. Second, a project restored to run locally is deliberately altered —
+  dev host in the database, deactivated payment/cache/mail plugins, `DISABLE_WP_CRON`, absent
+  object-cache drop-ins, debug logging, media newer than the file backup — and the audit used
+  to report those alterations as defects of the site, when they are the price of the copy.
+  When the manifest shows a clone (`source: restore`, a `restore.url_origin`, or a non-public
+  `wordpress.url`), those conditions are `N/A (local clone)`, suppressed and out of the
+  denominator, bounded by one test: would this also be true on production? Live checks
+  (response headers, paid-file reachability) now target the production URL — asked for and
+  confirmed, defaulting to `restore.url_origin` — and never the clone, whose local server
+  answers an `.htaccess` a production nginx ignores and would return a false PASS.
+  `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
+  production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
+
+- **`wp-audit-security` now checks for payment-gateway credentials stored at rest
+  (SEC-040).** SEC-005 only greps theme PHP for hardcoded secrets, but a WooCommerce payment
+  gateway keeps its live API key, secret and token in the database instead — a serialized
+  array in the `wp_options` row `woocommerce_<gateway_id>_settings` — so nothing that scans
+  source code could ever see it. That row is exactly what a database dump, staging snapshot
+  or cloned copy carries verbatim, which makes a configured gateway's credentials a real leak
+  risk on any shared copy of the site. SEC-040 enumerates enabled gateways through
+  `WC_Payment_Gateways`, reads each one's settings, and reports CRITICAL when a
+  credential-shaped key (`api_key`, `secret_key`, `token`, `publishable_key`, …) is
+  non-empty, without ever printing the value itself. It is `N/A` when `site.commerce` is
+  `none` (`/wp-audit` Step 2.3), like every other commerce-only check, and it is deliberately
+  **not** folded into that same step's local-clone suppression list: a gateway deactivated on
+  a clone is a clone artifact and stays suppressed, but the credential still sitting in
+  `wp_options` is true of production too and is reported regardless. The fix is manual —
+  rotate the key at the processor if the database was ever shared, and scrub the value before
+  handing around a cloned copy. `tests/checks/audit-gateway-credentials.sh` pins the check,
+  the credential-key list, and the clone-suppression distinction.
 
 - **`/wp-audit` reads the site type and whether it is a local clone before any category
   runs (Step 2.3).** Two blind spots made the audit report on the wrong site. First, checks
@@ -191,6 +229,83 @@
   `prefix_contact_form()`: it resolves the form the way CF7 does (hash, post id, title)
   and returns `''` when none exists or CF7 is inactive, and `/wp-section` wraps the
   contact section in its result.
+
+### Fixed
+
+- **A horizontal-overflow finding did not say what overflowed.** `bin/demo-verify.mjs`
+  reported `overflow: true` and nothing else, once per sampled position. On a real
+  build the box stretching the page was a 1px `screen-reader-text` span inside a
+  carousel card. It is `position: absolute`, and its containing block sat outside
+  the carousel's `overflow-x: auto` strip, so the strip never clipped it. It widened
+  the document at every width and showed in no screenshot. The row now lists the
+  `culprits`: boxes past the right edge that no ancestor clips. It follows the
+  containing-block rule for absolute boxes, and `escapes` names the clipping box an
+  absolute culprit got past. The walk covers the whole document, so the same culprits
+  at every position of every section count as one row per width; `section` is where
+  they were first seen. `tests/checks/demo-verify-overflow-culprits.sh` runs the walk
+  on an escaping strip and on the same strip with positioned cards.
+
+- **Rank Math modules enabled from WP-CLI ran without their tables.** Writing
+  `rank_math_modules` skips the activation that creates `rank_math_404_logs` and
+  `rank_math_redirections`, so `404-monitor` and `redirections` ran two failing queries on
+  every request. A real build measured TTFB at 1.7-5.8 s, and 0.5-0.7 s once the tables
+  existed.
+  - `wp-audit-rankmath` Step 2.1 runs `RankMath\Installer::create_tables()` after enabling
+    modules and blocks on a missing table.
+  - `/wp-audit` reports a module without its table as PERF-060 (CRITICAL).
+
+- **CPT-archive breadcrumbs stayed in the primary language under Polylang.** Rank Math
+  builds that crumb from the `register_post_type()` label, which no
+  `post_type_archive_title` filter reaches, so `/en/<cpt-plural>/` showed the Spanish
+  plural. `wp-audit-rankmath` Step 15b adds a `rank_math/frontend/breadcrumb/items` filter
+  that reads the same `plural_<post_type>` string, and falls back to the type's own label
+  (on a single, `post_type_archive_title()` is null). The `wp-polylang` skill's
+  `post_type_archive_title` example also fell back with `?:` on `prefix_t()`. That function
+  returns the key itself when a string is missing, never `''`, so a missing string printed
+  the key. It now compares against the key.
+
+- **`--suite` could never run from its managed install.** The shared dependency cache was
+  named `node_modules-<key>`. Node resolves a package's own imports from its real path,
+  searching only directories literally named `node_modules`, so `@playwright/test` could not
+  find `playwright` and every run failed with `MODULE_NOT_FOUND`. The script sent that
+  output to `/dev/null` and reported "playwright could not install its browser", so Tier 3
+  read as an unavailable browser.
+  - The cache leaf is now `<cache>/<key>/node_modules`. An old `node_modules-<key>`
+    directory is no longer used and can be deleted.
+  - The runner loads the Playwright CLI before using it and prints the real error.
+  - The browser install's output is kept and its tail is printed on failure.
+
+- **The accessibility fix drew a second focus indicator.** A11Y-025/026 shipped a bare
+  global `:focus-visible { outline }`. On form fields that already had a design focus
+  border, the rule added a second indicator on every field. The fix now takes four steps:
+  1. Find the components that already style their own focus.
+  2. Add a zero-specificity `:where()` ring only where nothing else exists.
+  3. Replace a design focus colour that fails 3:1 instead of stacking a ring on it.
+  4. Check with `getComputedStyle` before and after that each element shows one indicator.
+  The tailwind starter gains that default ring in `base/reset.css`. It sits in the base
+  layer at zero specificity, so `.btn`'s `focus-visible:outline-none` (utilities layer)
+  wins by layer order. `.btn`'s ring moves from `focus:` to `focus-visible:`, the state
+  where the outline is cleared: measured in Chromium at 1440 and 390, rest and keyboard
+  focus are unchanged (same box-shadow, colour, size, radius, 76x38 / 62x38), and a mouse
+  click no longer draws the ring.
+
+  **The target-size check failed the wrong threshold.** A11Y-028 read CSS for 44x44, which
+  is WCAG 2.5.5 (AAA), while the AA criterion 2.5.8 is 24x24. Nav items, footer social icons
+  and a breadcrumb home link measured under 24 on a real build and were never reported as
+  AA failures. The a11y audit, `wp-audit-standards` and UX-009 now fail below 24x24,
+  measured with `getBoundingClientRect()` at desktop and mobile, and treat 44x44 as advice.
+  `/wp-header`, `/wp-footer`, the Rank Math breadcrumb CSS, `wp-css` and `wp-responsive`
+  reach 24x24 with padding plus an equal negative margin, so the text does not move.
+
+- **A carousel's absolute boxes escaped the strip and scrolled the page sideways.** The
+  Carousels rules in `agents/wp-template.md` asked for controls outside the scrolling
+  element, but not for positioned cards. The A11Y-032 fix in `agents/wp-audit-a11y.md` adds
+  a `screen-reader-text` span, which is `position: absolute`, to every new-tab link,
+  including a card's "see more". On a real build the containing block of that span was a
+  container above the `overflow-x: auto` strip, so the strip never clipped it. Every
+  off-screen card widened the document, at every width from phone to 1920. Cards inside a
+  scrolling strip are now `relative`, the A11Y-032 fix says so, and both give the
+  `scrollWidth <= clientWidth` check. `tests/checks/carousel-positioned-cards.sh`.
 
 ### Changed
 
@@ -632,7 +747,6 @@
 
 ### Changed
 
-
 - **The i18n helper-parity check allows the Polylang variant its own internals.** It
   still requires every helper `i18n.php` defines, and now permits extras when their
   docblock says `@internal` — the Polylang model needs work the suffix model does not,
@@ -732,7 +846,6 @@
   watching the check fail.
 
 ### Fixed
-
 
 - **`bin/demo-verify.mjs` can reach a site with a self-signed certificate.** Every
   context and page it opened rejected one, so a `/wp-create` local install — which gets
