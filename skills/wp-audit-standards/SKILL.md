@@ -80,6 +80,45 @@ All audit agents MUST output findings in this format:
 
 ---
 
+## Site type and local clones
+
+Two properties of the project change which checks apply. `/wp-audit` Step 2.3 reads them
+once and every agent honours the result; this is the methodology behind that step.
+
+### Gate by site type, do not delete
+
+A store (WooCommerce active) has surfaces a generic site does not: a cart, a checkout, an
+account area, priced-per-currency markup, protected paid files. Checks written for those
+surfaces are **`N/A` on a non-commerce site**, reported with the reason and excluded from
+the denominator — never silently dropped, and never counted as failures. The inverse also
+holds: a commerce check must not fire on a site with no WooCommerce, or the score punishes a
+site for lacking a feature it never claimed. Adding commerce depth therefore leaves a
+generic site's score unchanged, because every commerce check reads `N/A` on it.
+
+### A local clone is audited for production's posture
+
+A project restored from a backup to run locally (`.wp-create.json` `project.source:
+"restore"`, a `wordpress.url_origin`, or a non-public `wordpress.url` — see `/wp-audit`
+Step 2.3 for the exact field paths and the host list) has been deliberately altered to work
+in isolation. Those alterations — a dev host in the database, deactivated payment/cache/mail
+plugins, `DISABLE_WP_CRON`, absent object-cache drop-ins, debug logging on, media uploaded
+after the file backup was taken — are the price of the copy, not defects of the site. On a
+clone they are **`N/A (local clone)`**, out of the denominator, and not printed as findings.
+The catalog and the exact rule live in `/wp-audit` Step 2.3. The one test that keeps this
+honest: *would this also be true on production?* If yes, it is a finding; if it exists only
+because this is a copy, suppress it.
+
+### Live checks target production, and the URL is confirmed
+
+Response headers and paid-file reachability can only be judged against the running
+production site. A local server answers them differently — it reads `.htaccess` a production
+nginx ignores — so a live check run against the clone is a false result, not a lenient one.
+These checks use `--host`, or ask the user for the production URL (defaulting to
+`wordpress.url_origin`) and fire no external request until it is confirmed; with no public
+URL they are `UNMEASURED`, never `PASS`.
+
+---
+
 ## Audit Tiers
 
 ### Tier 1 — Code-only (always available)

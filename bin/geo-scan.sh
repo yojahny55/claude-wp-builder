@@ -30,6 +30,13 @@ case "$host" in
   localhost|localhost:*|*.localhost|*.local|*.test|*.localhost:*|*.local:*|*.test:*)
     echo "NOT PUBLIC: $host is a development host — pass the public URL with --host"
     exit 3 ;;
+  *.local.com|*.local.com:*)
+    # This plugin's own default local domain shape: /wp-create offers <slug>.local.com
+    # (commands/wp-create.md Step 3.3) and /wp-clone's placeholder domain follows the
+    # same shape -- every project this plugin scaffolds locally can live under this
+    # suffix, and it is not covered by the generic *.local pattern above.
+    echo "NOT PUBLIC: $host is a development host — pass the public URL with --host"
+    exit 3 ;;
   127.*|10.*|192.168.*|[::1]|[::1]:*|0.0.0.0*)
     echo "NOT PUBLIC: $host is a private address — pass the public URL with --host"
     exit 3 ;;

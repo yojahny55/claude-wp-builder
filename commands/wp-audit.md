@@ -97,7 +97,10 @@ And stop execution.
 If `--geo` is selected and `.wp-create.json` exists, also note its `wordpress.url` — the live
 scan in Step 9 needs a reachable host. `--host` takes precedence over it when given; a
 project developed locally and served publicly has two URLs, and the manifest holds the one
-WP-CLI needs, not the one the scanner needs.
+WP-CLI needs, not the one the scanner needs. This note is not itself the URL-selection rule:
+Step 9's dispatch is the single site that picks the scan's host, and it applies Step 2.3's
+local-clone override there — `wordpress.url` is never used as a fallback when `local_clone`
+is true.
 
 ## Step 2.2: Adopted sites (`origin: adopted`)
 
@@ -139,6 +142,115 @@ Print it before the tier detection, so the scope of the run is visible up front:
   Editable code   <path>, <path>, …
   Read-only code  <path>, <path>, …   (audited, reported, never edited)
   Stack           seo=<…> security=<…> fields=<…> multilingual=<…> builder=<…> cache=<…>
+```
+
+## Step 2.3: Site type and local clone
+
+Two facts decide how many later checks should even run, and both are read once, here, before
+any category dispatches.
+
+### Site type — is this a store?
+
+A store fails in ways an informational site cannot, and an informational site must never be
+scored against checks it could not satisfy. Detect commerce once and record it:
+
+```bash
+$WP plugin is-active woocommerce && echo "site type: commerce (WooCommerce)" \
+  || echo "site type: non-commerce"
+```
+
+Set `site.commerce` to `woocommerce` or `none`. This is the contract every commerce-only
+check — present or still to be added — must follow: **read `site.commerce`, and report
+`N/A` when it is `none`**, said with the reason "no WooCommerce", and excluded from the
+denominator. A check whose object is the store (a cart, a checkout, a priced-per-currency
+listing, a protected paid file) is commerce-only by definition, whichever category dispatches
+it. For example, the gateway-credential check, the download-protection check, and the
+multi-currency check are commerce-only, as are the SEO checks that a commerce-specific
+section of `skills/wp-audit-seo-standards` adds — each reads `site.commerce` and is `N/A` on
+a non-commerce site rather than being skipped or, worse, scoring a blog for a cart it never
+had. This is how commerce depth is added without regressing a generic site: a blog audited
+after a new commerce check ships scores exactly as it did before, because that check reads
+`N/A` on it.
+
+`is-active`, not `is-installed`: a store with WooCommerce deactivated is not currently a
+store, and its commerce surfaces are not live to audit.
+
+### Local clone — audit production's posture, not the copy's
+
+When `.wp-create.json` carries `project.source: "restore"` (the field lives under
+`project`, not at the manifest's root — `restore` itself holds only
+`files_archive`, `db_archive` and `url_rewritten`, none of which name production), or a
+`wordpress.url_origin` (the pre-restore URL, written beside `wordpress.url`), or its
+`wordpress.url` is a non-public host, the project is a **local clone of a site that lives
+somewhere else**. "Non-public host" is not this check's own list to keep in sync by hand:
+it is exactly what `bin/geo-scan.sh` already refuses to scan — `localhost`, `*.localhost`,
+`*.local`, `*.local.com` (this plugin's own default domain shape: `/wp-create` Step 3.3
+offers `<slug>.local.com`, and `/wp-clone`'s placeholder follows the same shape), `*.test`,
+any of those with a port, the private ranges `127.`, `10.`, `192.168.`,
+`172.16.`–`172.31.`, `[::1]`, and a dotless hostname. Set `local_clone = true` and read
+`production_url` from `wordpress.url_origin` when present.
+
+A clone is deliberately altered to run in isolation, and those alterations are not defects of
+the site being audited — they are the cost of having a local copy at all. Reporting them
+audits the clone instead of the site. When `local_clone` is true, the following are
+**`N/A (local clone)`**, out of the denominator, and are *not* printed as findings — the
+reader wants production's posture, not a list of what localization changed:
+
+| Condition normally a finding | Why it is a clone artifact here |
+|---|---|
+| Dev host stored in the database (SEC-036) | the clone's own URL is *supposed* to be the local host |
+| Known-local plugins deactivated (payment gateways, a CDN/page-cache plugin, an object-cache/Redis plugin, a mail plugin, a security/scanner plugin) | turned off so the copy does not reach live payment, cache or mail endpoints |
+| `DISABLE_WP_CRON` true, `WP_CACHE` false | set so an isolated copy does not fire scheduled or cached work |
+| `object-cache.php` / `advanced-cache.php` absent or left as `*.bak` | the backing service (Redis, a CDN cache) does not exist locally |
+| A must-use plugin that neutralizes mail or external calls (e.g. a local `wp_mail()` override) | added by the clone to keep the copy from contacting the outside world |
+| `WP_DEBUG` / `WP_DEBUG_LOG` on (SEC-008/009) | a development copy logs; production is what those checks are about |
+| An attachment whose file is missing on disk **when the file archive predates the database** | the media was uploaded after the file backup was taken; it exists in production |
+
+Do not widen this list to excuse a real defect: a plugin deactivated on the clone that has no
+local reason to be off is still a finding, and media missing with no archive/database date gap
+is still a finding (see the media-integrity check). The test is "would this be true on
+production too?" — if yes, report it; if it exists only because this is a copy, suppress it.
+
+**Record what was actually suppressed, not just that the rule applied.** While walking the
+"known-local plugins deactivated" and the `*.bak` drop-in rows above, keep the two lists that
+came out of them:
+
+- `clone_suppressed_plugins` — the slugs of the plugins that row found inactive (payment
+  gateways, a CDN/page-cache plugin, an object-cache/Redis plugin, a mail plugin, a
+  security/scanner plugin). Empty, never absent, when the clone deactivated none of them.
+- `clone_parked_dropins` — the drop-in files found parked as `*.bak` (e.g.
+  `object-cache.php.bak`, `advanced-cache.php.bak`). Empty, never absent, when none were
+  parked.
+
+These two lists are what Step 6 passes to the security agent so it knows which plugins and
+drop-ins Step 2.3 already looked at, without re-deriving the clone rule itself. The
+suppression they record reaches exactly one finding per item — "this plugin is deactivated",
+"this drop-in is missing" — and nothing else: a plugin in `clone_suppressed_plugins` with a
+known vulnerability, an outdated version, or a hardcoded credential is still a finding: the
+clone rule silences "it is off", never "it is off *and* it is broken."
+
+### Live checks need a public URL, and you ask for it
+
+Some checks can only be answered against the running production site: response headers, and
+whether a paid file is reachable without a purchase. The **local clone must never be probed
+for these** — a local Apache reads `.htaccess` and would pass a rule a production nginx
+ignores, turning a real exposure into a false PASS.
+
+So when a live check needs a URL and `local_clone` is true:
+
+1. Use `--host` when it was given.
+2. Otherwise, **ask the user for the production URL**, proposing `production_url`
+   (`wordpress.url_origin`) as the default when the manifest has one. Do not fire an
+   external request at a host the user has not confirmed this run.
+3. If no production URL is available, the live check is `UNMEASURED` with "needs the public
+   URL", never `PASS`.
+
+Print the two facts before tier detection, next to the adopted-site block when there is one:
+
+```
+=== Site ===
+  Type          <commerce (WooCommerce) | non-commerce>
+  Local clone   <yes — production: https://… | no>
 ```
 
 ## Step 2.5: Reconcile the Manifest
@@ -611,6 +723,15 @@ Project context:
 - Editable code: <code_scope.editable, or the theme path when created>
 - Read-only code: <code_scope.read_only, or "none" when created>
 - Stack: <seo=… security=… fields=… multilingual=… builder=… cache=…, or "plugin defaults" when created>
+- Site type (commerce): <site.commerce value — woocommerce|none>
+- Local clone: <yes|no>
+- Clone-suppressed plugins: <clone_suppressed_plugins slugs, comma-separated, or "none">
+- Parked drop-ins: <clone_parked_dropins files, comma-separated, or "none">
+
+Step 2.3's clone suppression covers only the "deactivated"/"parked" finding for the items
+above — nothing else about them is suppressed. A plugin listed under Clone-suppressed
+plugins with a known vulnerability, an outdated version, or a hardcoded credential is still
+a finding; only "this plugin is off because it is a clone" is already accounted for.
 
 On an adopted site, audit every path in both code lists instead of <theme_path>. A finding
 under a read-only path is always `Fix: manual`, `Owner: manual`, with a Method that works
@@ -669,7 +790,11 @@ ${CLAUDE_PLUGIN_ROOT}/bin/audit-suite.sh --url <public-url> --dir .wp-audit/suit
   --site "<project name>" [--pages "/,/services/,/contact/"]
 ```
 
-`<public-url>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json`.
+`<public-url>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json` —
+**unless `local_clone` is true (Step 2.3): the suite must not probe the clone's own host**,
+so Step 2.3's live-check rule applies instead of that fallback — the confirmed production
+URL (asked for, defaulting to `production_url`), or Tier 3 stays `UNMEASURED — needs the
+public URL` and this run is skipped.
 **Pass `--pages` with the list Step 2.7 fixed.** Without it the suite keeps whatever its
 config already holds, which on a first run is the template's placeholder — so a run that
 looks successful measures pages that are not this site's.
@@ -897,8 +1022,8 @@ Every check resolves to one of five statuses, and the last three are not interch
 |---|---|
 | `PASS` | ran, and the site satisfies it |
 | `FAIL` | ran, and the site does not |
-| `N/A` | does not apply to this site type — say why |
-| `UNMEASURED` | applies, but was never measured — say what stopped it |
+| `N/A` | does not apply to this site type — say why (e.g. "no WooCommerce", or "local clone", see Step 2.3) |
+| `UNMEASURED` | applies, but was never measured — say what stopped it (e.g. "needs the public URL") |
 | `NEVER RUN` | the whole category has never run on this project (Step 2.5d) |
 
 `N/A` and `UNMEASURED` were one status, and merging them hid the difference between "this
@@ -1193,7 +1318,9 @@ ${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host>
 ```
 
 `<home-host>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json` (or
-`$WP option get home`). Exit codes:
+`$WP option get home`) — **unless `local_clone` is true (Step 2.3): the live scan must not probe
+the clone's own host**, so Step 2.3's live-check rule applies instead of that fallback — the
+confirmed production URL, or `UNMEASURED — needs the public URL` with no scan run. Exit codes:
 
 | Exit | Meaning | Report as | Actionable |
 |---|---|---|---|
