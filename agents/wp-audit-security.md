@@ -338,8 +338,8 @@ if ( class_exists( "WC_Payment_Gateways" ) ) {
         $names[] = "woocommerce_" . $gateway->id . "_settings";
     }
 }
-$secret     = "/(secret|secret_?key|password|passwd|private_?key|token|signature|api_?key|consumer_?key)(_?(live|test|sandbox|production|prod))?$/i";
-$identifier = "/(publishable_?key|merchant_?id|client_?id|app_?id|_id|user|username)(_?(live|test|sandbox|production|prod))?$/i";
+$secret     = "/(secret[a-z0-9]*|key|password|passwd|pass_?phrase|token|signature|seed|salt|hash)(_?(live|test|sandbox|production|prod))?$/i";
+$identifier = "/(publishable_?key|public_?key|merchant_?id|client_?id|app_?id|_id|user|username)(_?(live|test|sandbox|production|prod))?$/i";
 $flags      = array( "yes", "no", "on", "off", "true", "false", "0", "1" );
 $walk = function ( $name, $enabled, array $data, $path ) use ( &$walk, $secret, $identifier, $flags ) {
     foreach ( $data as $key => $value ) {
@@ -374,13 +374,16 @@ foreach ( array_unique( $names ) as $name ) {
 
 How the key test reads:
 
-- The name must **end** in a secret word (`secret`, `secret_key`, `password`, `token`,
-  `signature`, `api_key`, …), optionally followed by an environment suffix (`_live`, `_test`,
-  `_sandbox`, `_production`). An unanchored match would flag settings flags such as
+- The name must **end** in a secret word, optionally followed by an environment suffix
+  (`_live`, `_test`, `_sandbox`, `_production`). Any name ending in `key` counts (`api_key`,
+  `secret_key`, `api_transaction_key`, `merchant_key`, `hmac_key`, `signature_key`…), as do
+  `secret` and its run-ons (`app_secret`, `secretsha256`), `password`, `pass_phrase`, `token`,
+  `signature`, and the signing material some gateways store as `seed`, `salt` or `hash`. An unanchored match would flag settings flags such as
   `tokenization`, `password_protected` or `signature_method`.
 - Values that are only a switch (`yes`, `no`, `on`, `off`, `0`, `1`…) are skipped, whatever
   the key is called.
-- Identifiers are tested first, so `secret_key_id` or `client_id_live` is INFO, not CRITICAL.
+- Identifiers are tested first, so `publishable_key`, `public_key`, `secret_key_id` or
+  `client_id_live` is INFO, not CRITICAL.
 - Nested arrays are walked, and a nested key is reported with its dotted path.
 
 The enumeration also sweeps non-gateway `woocommerce_*_settings` rows (email settings and the
@@ -424,8 +427,8 @@ prints every secret into the terminal and the session transcript:
 ```bash
 $WP eval '
 $name = "woocommerce_<gateway_id>_settings";
-$secret     = "/(secret|secret_?key|password|passwd|private_?key|token|signature|api_?key|consumer_?key)(_?(live|test|sandbox|production|prod))?$/i";
-$identifier = "/(publishable_?key|merchant_?id|client_?id|app_?id|_id|user|username)(_?(live|test|sandbox|production|prod))?$/i";
+$secret     = "/(secret[a-z0-9]*|key|password|passwd|pass_?phrase|token|signature|seed|salt|hash)(_?(live|test|sandbox|production|prod))?$/i";
+$identifier = "/(publishable_?key|public_?key|merchant_?id|client_?id|app_?id|_id|user|username)(_?(live|test|sandbox|production|prod))?$/i";
 $flags      = array( "yes", "no", "on", "off", "true", "false", "0", "1" );
 $count = 0;
 $scrub = function ( array $data ) use ( &$scrub, &$count, $secret, $identifier, $flags ) {

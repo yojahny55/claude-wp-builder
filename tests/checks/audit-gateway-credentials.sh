@@ -59,7 +59,7 @@ SECRET_RE=$(printf '%s\n' "$PROC" | grep -F '$secret     = "' | sort -u)
   || fail "SEC-040's detection and scrub snippets use different \$secret patterns"
 [ "$(printf '%s\n' "$PROC" | grep -cF '$secret     = "')" -eq 2 ] \
   || fail "SEC-040 must define \$secret in both the detection and the scrub snippet"
-for word in 'secret' 'secret_?key' 'password' 'token' 'signature' 'api_?key' 'consumer_?key'; do
+for word in 'secret[a-z0-9]*' 'key' 'password' 'pass_?phrase' 'token' 'signature' 'seed' 'salt' 'hash'; do
   printf '%s\n' "$SECRET_RE" | grep -Fq "|$word|" \
     || printf '%s\n' "$SECRET_RE" | grep -Fq "($word|" \
     || printf '%s\n' "$SECRET_RE" | grep -Fq "|$word)" \
@@ -70,13 +70,19 @@ printf '%s\n' "$SECRET_RE" | grep -Fq '$/i";' \
 IDENT_RE=$(printf '%s\n' "$PROC" | grep -F '$identifier = "' | sort -u)
 [ "$(printf '%s\n' "$IDENT_RE" | wc -l)" -eq 1 ] && [ -n "$IDENT_RE" ] \
   || fail "SEC-040's detection and scrub snippets use different \$identifier patterns"
-printf '%s\n' "$IDENT_RE" | grep -Fq 'publishable_?key' \
-  || fail "SEC-040 does not classify publishable_key as an identifier"
+[ "$(printf '%s\n' "$PROC" | grep -cF '$identifier = "')" -eq 2 ] \
+  || fail "SEC-040 must define \$identifier in both the detection and the scrub snippet"
+for word in 'publishable_?key' 'public_?key'; do
+  printf '%s\n' "$IDENT_RE" | grep -Fq "$word" \
+    || fail "SEC-040 does not classify '$word' as an identifier"
+done
+has '|| preg_match( $identifier, (string) $key ) ) {' \
+  || fail "SEC-040's scrub does not skip identifiers before blanking"
 hasi 'public by design' || fail "SEC-040 does not say a publishable key is not a secret"
 has '$flags      = array( "yes", "no"' || fail "SEC-040 does not skip on/off switch values"
 has 'tokenization' || fail "SEC-040 does not explain why the pattern is anchored (tokenization flag)"
 has '$walk( $name, $enabled, $value, $key_path );' || fail "SEC-040 does not walk nested arrays"
-has 'woocommerce-ppcp-' || fail "SEC-040 does not cover gateways that store secrets outside *_settings rows"
+has '$wpdb->esc_like( "woocommerce-ppcp-" ) . "%"' || fail "SEC-040 does not cover gateways that store secrets outside *_settings rows"
 
 # --- Never print the credential value itself, including in the scrub fix ---
 has 'never print the value itself' \

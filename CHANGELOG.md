@@ -110,7 +110,7 @@
   risk on any shared copy of the site. SEC-040 enumerates every `woocommerce_*_settings` row
   straight from the options table — so a gateway whose plugin is deactivated, as on a clone,
   is still covered — matches each stored key name against a secret pattern (`secret`,
-  `password`, `token`, `signature`, `api_key`, …), and reports CRITICAL when one is
+  `password`, `token`, `signature`, any name ending in `key`, …), and reports CRITICAL when one is
   non-empty, without ever printing the value itself. Identifiers such as `publishable_key`
   and `merchant_id` are listed as INFO. The manual scrub step edits the row in place instead
   of dumping it. It is `N/A` when `site.commerce` is
