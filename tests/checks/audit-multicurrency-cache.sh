@@ -127,14 +127,17 @@ grep -Fq 'SEO-069 is never auto-applied' "$seo" \
 grep -Fq 'there is no theme code to' "$seo" \
   || fail "$seo does not explain why SEO-069 has no code fix of its own"
 
-# --- Direction 6: no collision with the codes sibling PRs already own (PERF-061/062/063 and
-#     SEO-064 belong to other open PRs; this PR's codes are PERF-065/066/067 and SEO-069) ---
-for f in "$perf" "$seo" "$changelog"; do
-  grep -Eq 'PERF-06[123]\b' "$f" \
-    && fail "$f still uses a PERF-06[123] code — those belong to a sibling PR, renumber to PERF-065/066/067"
-  grep -Eq 'SEO-064\b' "$f" \
-    && fail "$f still uses SEO-064 — that code belongs to a sibling PR, renumber to SEO-069"
+# --- Direction 6: no code is defined twice. Sibling PRs add their own PERF-/SEO- rows to the
+#     same agent files, so this asserts uniqueness of every table row instead of banning
+#     specific numbers (a ban would fail as soon as a sibling PR merges). ---
+for f in "$perf" "$seo"; do
+  dups=$(grep -oE '^\| *(PERF|SEO)-[0-9]{3} *\|' "$f" | tr -d '| ' | sort | uniq -d)
+  [ -z "$dups" ] || fail "$f defines these codes more than once: $dups"
 done
+for code in PERF-065 PERF-066 PERF-067; do
+  grep -Eq "^\| *$code *\|" "$perf" || fail "$perf: $code has no table row"
+done
+grep -Eq '^\| *SEO-069 *\|' "$seo" || fail "$seo: SEO-069 has no table row"
 
 # --- CHANGELOG: an Unreleased entry exists and names the new codes ---
 unreleased=$(awk '/^## \[Unreleased\]/{f=1; next} f && /^## \[/{exit} f{print}' "$changelog")
