@@ -25,11 +25,12 @@
  * stops at the first standalone "}" would truncate it.
  */
 function mmfx_extract_function( $source, $name ) {
-	$needle = 'function ' . $name;
-	$start  = strpos( $source, $needle );
-	if ( false === $start ) {
+	// Anchored at a line-start `function` token, so a docblock or comment that
+	// names the function in prose cannot be sliced out instead of its definition.
+	if ( ! preg_match( '/^function ' . preg_quote( $name, '/' ) . '\b/m', $source, $m, PREG_OFFSET_CAPTURE ) ) {
 		return null;
 	}
+	$start = $m[0][1];
 
 	$brace_start = strpos( $source, '{', $start );
 	if ( false === $brace_start ) {
@@ -139,6 +140,8 @@ $bucket_cases = array(
 	'prior-day upload, bare date arg'           => array( '2026-09-23', '2026-09-22 23:59:59', 'BEFORE-ARCHIVE' ),
 	'upload before an exact timestamp cutoff'   => array( '2026-09-23 14:30:00', '2026-09-23 08:00:00', 'BEFORE-ARCHIVE' ),
 	'upload after an exact timestamp cutoff'    => array( '2026-09-23 14:30:00', '2026-09-23 18:00:00', 'AFTER-ARCHIVE' ),
+	'empty post_date is not BEFORE-ARCHIVE'     => array( '2026-09-23', '', 'UNDATED' ),
+	'unparseable post_date is not BEFORE-ARCHIVE' => array( '2026-09-23', 'not a date', 'UNDATED' ),
 );
 
 foreach ( $bucket_cases as $label => $case ) {

@@ -100,10 +100,17 @@ function mmf_compute_archive_cutoff( $archive_arg ) {
 
 /**
  * Bucket a dated miss against the archive cutoff. Only called once $archive_ts
- * is known not to be false — the UNDATED bucket is decided by the caller.
+ * is known not to be false — the caller decides UNDATED when there is no
+ * cutoff. A post_date strtotime() cannot parse (empty, zeroed or corrupt) is
+ * UNDATED too: comparing false against the cutoff would read it as 0 and file
+ * the miss as BEFORE-ARCHIVE on no evidence.
  */
 function mmf_bucket_for( $post_date, $archive_ts ) {
-	return ( strtotime( $post_date ) > $archive_ts ) ? 'AFTER-ARCHIVE' : 'BEFORE-ARCHIVE';
+	$post_ts = strtotime( (string) $post_date );
+	if ( false === $post_ts || $post_ts <= 0 ) {
+		return 'UNDATED';
+	}
+	return ( $post_ts > $archive_ts ) ? 'AFTER-ARCHIVE' : 'BEFORE-ARCHIVE';
 }
 
 global $wpdb;
@@ -238,6 +245,10 @@ while ( true ) {
 
 	// Drop this batch's primed meta (and anything else cached this request)
 	// before pulling the next one, so memory stays bounded on large libraries.
+	// wp_cache_flush_runtime() is core since WordPress 6.0 (wp-includes/cache.php,
+	// with a cache-compat.php shim for object-cache drop-ins); the guard only
+	// skips the flush on older cores, and never calls the full wp_cache_flush(),
+	// which would also empty a persistent object cache shared with the live site.
 	if ( function_exists( 'wp_cache_flush_runtime' ) ) {
 		wp_cache_flush_runtime();
 	}

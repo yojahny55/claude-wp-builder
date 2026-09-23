@@ -104,7 +104,7 @@ grep -Fq 'find-missing-media-files.php: attachment query failed' "$script" \
   || fail "$script does not report a failed attachment query to STDERR"
 grep -Fq 'find-missing-media-files.php: meta cache query failed' "$script" \
   || fail "$script does not report a failed meta-cache query to STDERR"
-exit_2_count=$(grep -Fc 'exit( 2 )' "$script")
+exit_2_count=$(grep -Ec 'exit[[:space:]]*\([[:space:]]*2[[:space:]]*\)' "$script")
 [ "$exit_2_count" -ge 3 ] \
   || fail "$script has fewer than 3 exit( 2 ) sites — expected one each for a bad date argument, a failed attachment query, and a failed meta-cache query"
 
@@ -175,8 +175,9 @@ grep -Fq 'media-integrity check' "$audit" \
 if ! command -v php >/dev/null 2>&1; then
   echo "SKIP: php not found — the greps above passed, the date-cutoff behavior test did not run"
 else
-  behavior_out=$(php "$behavior" 2>&1) \
-    || fail "the archive-date cutoff/bucket behavior is wrong: ${behavior_out:-(php exited non-zero with no output)}"
+  if ! behavior_out=$(php "$behavior" 2>&1); then
+    fail "the archive-date cutoff/bucket behavior is wrong: ${behavior_out:-(php exited non-zero with no output)}"
+  fi
 fi
 
 echo PASS
