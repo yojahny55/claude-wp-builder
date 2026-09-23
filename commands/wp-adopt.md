@@ -97,18 +97,40 @@ Ask with `AskUserQuestion`, one question each:
 
    **Re-verify the first case before offering the list.** For each plugin the transient
    signal proposed as editable, read its header — `$WP plugin get <slug> --field=author` and
-   `--field=plugin_uri` — and check whether its slug resolves on the wp.org plugin directory.
-   A paid multi-currency plugin or a paid slider bundled with a commercial theme is vendor
-   code with no updater, not site code, even though the transient signal cannot tell the two
-   apart: a header naming a vendor with no matching wp.org listing means move it to
-   read-only before presenting the list, so the operator is deselecting exceptions rather
-   than un-checking the common case. `/wp-audit` prints a reminder later if such a plugin is
-   still sitting in `code_scope.editable`, but that is a safety net for a site adopted before
-   this check existed — it is not a substitute for getting the split right here.
+   `--field=plugin_uri` — and look its slug up on the wp.org plugin directory:
+   ```bash
+   curl -sS --max-time 15 \
+     "https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&request[slug]=<slug>"
+   ```
+   This lookup goes to wp.org only — which already receives every installed plugin's header
+   on WordPress's own update checks — and never to a third-party vulnerability feed. Read
+   the answer three ways:
+   - **Matching listing** — the entry's `author`/`homepage` agree with the header's
+     `author`/`plugin_uri`: a public plugin, not site code. Propose it as vendor code.
+   - **No listing** (an `error` key), **or a listing that disagrees** with the header — a
+     premium plugin can share its slug with an unrelated wp.org plugin, so a slug match
+     alone proves nothing: when the header names an author, propose it as vendor code (a
+     paid multi-currency plugin or a paid slider bundled with a commercial theme). An agency
+     that built the site's own plugin also fills in `Author`, so this is a proposal, never a
+     decision.
+   - **Lookup failed** (no route to `api.wordpress.org`, timeout, non-2xx): keep the
+     transient signal — the plugin stays in the editable list — and mark it
+     `not verified (wp.org unreachable)` in the proposal. An author header alone is not
+     enough to move anything.
 
-   Offer the editable list as a multi-select, pre-selected. Anything the operator deselects
-   moves to read-only. **The parent of a child theme is always read-only.** An update
-   overwrites it, so do not offer to move it.
+   **Never move a plugin in silence.** Present two multi-selects, both pre-selected, so the
+   operator sees and can reverse every proposal:
+   - *Editable code* — what is still proposed as the site's own. Anything deselected moves to
+     read-only.
+   - *Looks vendor-supplied — proposed read-only* — each re-verified plugin with its reason
+     (`Author: <name>, no matching wp.org listing`). Anything deselected goes back to
+     editable.
+   `/wp-audit` prints a reminder later if a vendor-looking plugin is still sitting in
+   `code_scope.editable`, but that is a safety net for a site adopted before this check
+   existed — it is not a substitute for getting the split right here.
+
+   **The parent of a child theme is always read-only.** An update overwrites it, so do not
+   offer to move it.
 2. **Function prefix.** Offer the inferred one first, marked recommended. The operator can
    type another. `<parent>_child_` beats `<parent>_`, because the parent's prefix belongs
    to the vendor.

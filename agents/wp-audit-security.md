@@ -60,9 +60,13 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
   nobody at the site wrote it. Before Step 1 runs, re-check every plugin path still in
   `code_scope.editable`: read its header with `$WP plugin get <slug> --field=author` and
   `--field=plugin_uri`, and check whether its slug resolves on the wp.org plugin directory
-  (the same lookup SEC-042 makes). When the header names a vendor and the slug has no wp.org
-  listing, print a reminder — this is not a scored finding, so it never moves the
-  denominator — and do not move the plugin yourself:
+  (the same wp.org lookup SEC-042 makes, and only after the SEC-038 route probe passes).
+  A wp.org entry counts as this plugin's listing only when its `author`/`homepage` agree
+  with the header's `author`/`plugin_uri`; a premium plugin that happens to share a slug
+  with an unrelated wp.org plugin has no listing. When the header names a vendor and the
+  slug has no matching listing, print a reminder — this is not a scored finding, so it never
+  moves the denominator — and do not move the plugin yourself. When the route probe fails,
+  print `not verified: no route to api.wordpress.org` instead and assume nothing:
   ```
   === Vendor-plugin re-check ===
     wp-content/plugins/<slug>   looks vendor-supplied (Author: <name>, no wp.org listing) —
@@ -92,7 +96,7 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 | SEC-012 | Sensitive files accessible | Check `.htaccess` for blocking of `readme.html`, `license.txt` | INFO | Yes |
 | SEC-013 | DISALLOW_UNFILTERED_HTML missing | Read `wp-config.php`, check if constant defined | INFO | Yes |
 | SEC-014 | Missing CONCATENATE_SCRIPTS false | Read `wp-config.php`, check if constant defined and set to `false` | INFO | Yes |
-| SEC-043 | Duplicate/redeclared function across site plugins | Grep every active plugin (plus, on an adopted site, every `code_scope.editable`/`code_scope.read_only` plugin path) for top-level `function <name>(` declarations; a name declared in two or more plugins is a fatal redeclare risk | CRITICAL | No |
+| SEC-043 | Duplicate/redeclared function across site code | Grep every installed plugin (active and inactive), `wp-content/mu-plugins/**`, the drop-ins and the active theme and its parent for top-level `function <name>(` declarations; a name declared in two or more of them is a fatal redeclare risk. See Detection details | CRITICAL / WARNING | No |
 
 ### Detection details
 
@@ -155,28 +159,50 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 - Fail: No blocking rules found
 - Message: `Sensitive WordPress files (readme.html, license.txt) are publicly accessible`
 
-**SEC-043 — Duplicate/redeclared function across site plugins:**
-- This is Tier 1 — a code scan, no network and no vulnerability feed needed. Two plugins that
-  each declare `function acme_get_field()` at the top level fatal the instant both are active;
-  nothing short of reading both plugins' code together catches it before that happens.
-- Scope: `$WP plugin list --status=active --format=json` for the plugin slugs, then every
-  `.php` file under each one's directory. On an adopted site also scan every plugin path
-  named in `code_scope.editable` and `code_scope.read_only` — a redeclare fatals regardless
-  of which list owns the file.
-- A plugin Step 2.3 already suppressed as a local-clone artifact (a payment gateway or
-  cache plugin turned off only because this is a local copy) is inactive, so it is not
-  scanned here either — it is not currently loaded, so it cannot currently collide. Do not
-  re-report it under this code; that reintroduces exactly what Step 2.3 exists to suppress.
+**SEC-043 — Duplicate/redeclared function across site code:**
+- This is Tier 1 — a code scan, no network and no vulnerability feed needed. Two files that
+  each declare `function acme_get_field()` at the top level fatal the instant both load;
+  nothing short of reading all the site's code together catches it before that happens.
+- Scope — everything that can put a function into the global namespace, not only what is
+  active right now:
+  - every installed plugin directory under `wp-content/plugins/`, **active and inactive**
+    (and `active-network` on a multisite). An inactive plugin is the real risk: the
+    collision fires the moment someone activates it, and two plugins already active
+    together have already proven they coexist;
+  - every `.php` file under `wp-content/mu-plugins/**`;
+  - the drop-ins in `wp-content/` (`object-cache.php`, `advanced-cache.php`, `db.php`,
+    `sunrise.php`, `maintenance.php`, and the `*-error.php` drop-ins). When `local_clone`
+    is true, include a drop-in Step 2.3 found parked as `*.bak` — it runs on production;
+  - the active theme and its parent, from `functions.php` down through everything it
+    includes.
+  On an adopted site this is a superset of `code_scope.editable` and `code_scope.read_only`;
+  a redeclare fatals regardless of which list owns the file.
+- Exclude third-party trees that are never loaded as plugin code: any path under
+  `vendor/`, `node_modules/`, `tests/` or `examples/`.
+- Plugin status comes from `$WP plugin list --format=json` (all statuses). Without WP-CLI,
+  enumerate the plugin directories by Glob; the status is then unknown and every collision
+  is reported as WARNING.
+- **Step 2.3 does not remove a plugin from this scan.** Step 2.3 only suppresses the finding
+  "this plugin is deactivated" when the deactivation is a local-clone artifact. The plugin
+  itself stays in the inventory, and when `local_clone` is true it counts as **loaded**
+  here, because it is active on production — a payment gateway turned off locally still
+  collides with whatever it collides with on the live site.
 - Pattern: top-level `function\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(`, excluding any declaration
   inside a `class`, `trait` or `interface` body (a method redeclare is a different,
-  PHP-caught error) and excluding anything inside a `namespace` block (namespaced functions
-  of the same name do not collide).
+  PHP-caught error) and excluding anything in a namespaced file (`namespace X;` or a
+  `namespace X { }` block) — namespaced functions of the same name do not collide.
 - A declaration guarded by `if ( ! function_exists( 'name' ) )` within the 3 lines above it
   is a defensive polyfill, not a live collision — it never actually redeclares — so exclude
   guarded matches from the count.
-- Pass: every unguarded, unnamespaced, top-level function name appears in exactly one plugin.
-- Fail: the same name is declared by two or more plugins.
-- Message: `<function_name>() is declared by both <plugin A slug> and <plugin B slug> — activating both fatals`
+- Pass: every unguarded, unnamespaced, top-level function name appears in exactly one
+  plugin, mu-plugin, drop-in or theme.
+- Fail, by severity:
+  - **CRITICAL** when one side is an inactive plugin (activating it fatals the site) or both
+    sides load unconditionally — a mu-plugin, a drop-in, a theme's `functions.php`, or the
+    main file of a loaded plugin (active, or clone-suppressed and active on production).
+  - **WARNING** otherwise — for example a declaration in a file that is only `require`d
+    conditionally, where the audit cannot prove both sides ever load in one request.
+- Message: `<function_name>() is declared by both <source A> and <source B> — loading both fatals`
 
 ## Step 2: Tier 2 — WP-CLI Runtime Checks
 
@@ -203,8 +229,8 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 | SEC-036 | Development host in the database | `$WP eval` sweep of `options`, `postmeta`, `posts` and `termmeta` for the dev host. See Procedure | CRITICAL |
 | SEC-037 | Backup or editor files inside the theme | Glob the theme for `*.bak*`, `*.orig`, `*.save`, `*~`, `*.php.[0-9]*`, `*.sql` | WARNING |
 | SEC-038 | Update counts reported without network access | Reach `api.wordpress.org` before reading any update count. See Procedure | WARNING |
-| SEC-041 | Known-vulnerable plugins/themes | Match active plugin/theme slugs and versions against a vulnerability feed (Patchstack, WPScan, or the wp.org security advisories), **after the SEC-038 network gate passes**. See Procedure | 0 vulnerable matches | CRITICAL |
-| SEC-042 | Abandoned plugins | wp.org API `last_updated` older than ~2 years, or `tested` far behind the installed core version, **after the SEC-038 network gate passes**. See Procedure | Not abandoned | WARNING |
+| SEC-041 | Known-vulnerable plugins/themes | Match installed plugin/theme slugs and versions against the WPScan vulnerability API (`WPSCAN_API_TOKEN`), **after the SEC-038 network gate passes**; only wp.org-listed slugs are sent. See Procedure | 0 vulnerable matches | CRITICAL (loaded) / WARNING (inactive) |
+| SEC-042 | Abandoned plugins | wp.org API `last_updated` older than ~2 years, or `tested` far behind the installed core version, for every loaded plugin (active, plus clone-suppressed on a local clone), **after the SEC-038 network gate passes**. See Procedure | Not abandoned | WARNING |
 
 ### Execution notes
 
@@ -360,27 +386,86 @@ against `api.wordpress.org` first. When it fails, SEC-041 and SEC-042 are `UNMEA
 that curl command as the evidence line — **never `PASS`**, for the identical reason SEC-038
 gives: a check that cannot reach the network is not "no vulnerabilities found", it is "not
 checked". Do not add a second, separate network probe for the vulnerability feed; if
-`api.wordpress.org` is unreachable, assume any additional feed (Patchstack, WPScan) is too and
-skip straight to `UNMEASURED`.
+`api.wordpress.org` is unreachable, assume the vulnerability feed is too and skip straight to
+`UNMEASURED`.
 
-**SEC-041 — known-vulnerable plugins/themes.** Enumerate `$WP plugin list --format=json` and
-`$WP theme list --format=json` for active slugs and installed versions, excluding anything
-Step 2.3 already reclassified `N/A (local clone)` — a plugin turned off only because this is
-a local copy is not live on this site and reporting it a second time under a different code
-re-introduces what Step 2.3 exists to suppress. For each remaining slug, query whichever
-vulnerability source is reachable (Patchstack's free API, WPScan's free API, or the wp.org
-plugin API's advisory data where it publishes one) for that slug and version range.
-- Fail: the feed lists a disclosed vulnerability matching the installed version.
-- Pass: the feed has an entry for the slug and lists nothing matching the installed version.
-- A vendor/premium plugin or theme with no wp.org slug and no match in the vulnerability feed
-  (a paid plugin no public database tracks at all) is `UNMEASURED` per-item, "no public
-  vulnerability database entry" — it is not folded into a site-wide pass, and it is not a
+**The inventory both checks read.** Step 2.3 suppresses one *finding* — "this plugin is
+deactivated" — when the deactivation is a local-clone artifact. It does **not** take the
+plugin out of the inventory. On a local clone the plugins it suppressed (payment gateways,
+cache, mail, security plugins) are exactly the ones that are active on production, so
+leaving them out would audit the clone's reduced plugin set instead of the live site's.
+Build the set once:
+
+- **Loaded** = `$WP plugin list --status=active --format=json` (plus `active-network` on a
+  multisite), **and, when `local_clone` is true, every plugin Step 2.3 reclassified
+  `N/A (local clone)`** — treat those as active, because on production they are.
+- **Inactive** = every other installed plugin (`$WP plugin list --status=inactive`).
+- Themes: the active theme, its parent, and every other installed theme as inactive.
+
+**Which slugs may leave the machine.** A slug is sent to the vulnerability feed only when it
+is a public wp.org slug: the wp.org plugin info API (below) returns a listing whose
+`author`/`homepage` agree with the plugin header's `author`/`plugin_uri`, or the refreshed
+`update_plugins` transient lists it with an `id` of `w.org/plugins/<slug>`. **No slug in
+`code_scope.editable` is ever sent to a third-party vulnerability feed**, and neither is any
+other slug that is not a public wp.org slug — a site's own plugin or a paid vendor plugin
+can carry the client's or the agency's name in its slug. Those are decided locally, with no
+request:
+- a path in `code_scope.editable` (the site's own code) is `N/A (site's own code)` for
+  SEC-041 and SEC-042 — no public feed or listing can know it; the Tier 1 code checks cover it;
+- any other unlisted plugin or theme (vendor/premium) is `UNMEASURED` per item.
+
+(The wp.org lookup itself is not a new disclosure: WordPress core already sends every
+installed plugin's header to `api.wordpress.org` on each update check, which SEC-038 forces.
+It is still skipped for `code_scope.editable` paths, which need no lookup.)
+
+**SEC-041 — known-vulnerable plugins/themes.** Scan the loaded **and** the inactive plugins
+and themes, with their installed versions. An inactive plugin still has its files on disk,
+and many vulnerable entry points (an AJAX or upload handler reached by direct request, a
+bundled library) do not care whether it is activated.
+
+The source is the **WPScan WordPress vulnerability API**, v3:
+
+```bash
+# Token from the environment only — never written to the manifest, the report or the evidence line.
+[ -n "${WPSCAN_API_TOKEN:-}" ] || echo "SEC-041 UNMEASURED: no vulnerability feed credentials"
+curl -sS --max-time 15 -w '\nHTTP %{http_code}\n' \
+  -H "Authorization: Token token=${WPSCAN_API_TOKEN}" \
+  "https://wpscan.com/api/v3/plugins/<slug>"     # themes: /api/v3/themes/<slug>
+```
+
+- No `WPSCAN_API_TOKEN`, or the API answers `401`/`403`: SEC-041 is `UNMEASURED` ("no
+  vulnerability feed credentials") for the whole site — **never `PASS`**. The operator gets
+  a free token at wpscan.com and exports it before the audit.
+- Any other non-2xx answer (`429` rate limit, `5xx`, timeout): that item and every item not
+  yet queried are `UNMEASURED` ("vulnerability feed error: <status>"). Stop querying on
+  `429`; the free tier has a small daily quota.
+- `404` for a slug that is a public wp.org slug: the feed has no entry for it — `PASS` for
+  that item, for this feed.
+- `200`: read `<slug>.vulnerabilities[]`. A vulnerability matches when the installed version
+  is lower than its `fixed_in` (and not lower than `introduced_in` when present); a
+  `fixed_in` of `null` means unpatched and matches every version.
+- Fail: at least one match. **CRITICAL** for a loaded plugin/theme (active, or
+  clone-suppressed and active on production); **WARNING** for an inactive one. Name the
+  vulnerability title and the `fixed_in` version in the finding.
+- Pass: the feed has an entry for the slug, or has none for a public wp.org slug, and
+  nothing matches the installed version.
+- A vendor/premium plugin or theme with no public wp.org slug (a paid plugin no public
+  database tracks at all) is `UNMEASURED` per-item, "no public vulnerability database
+  entry", with no request made — it is not folded into a site-wide pass, and it is not a
   FAIL either: there is nothing public to measure it against.
 
-**SEC-042 — abandoned plugins.** For each active plugin slug (again excluding anything Step
-2.3 suppressed as a local-clone artifact), call the wp.org plugin info API
-(`https://api.wordpress.org/plugins/info/1.0/<slug>.json`) and read `last_updated` and
-`tested`.
+**SEC-042 — abandoned plugins.** For each **loaded** plugin (active, plus the ones Step 2.3
+suppressed on a local clone) that is not in `code_scope.editable`, call the wp.org plugin
+info API and read `last_updated`, `tested`, `author` and `homepage`:
+
+```bash
+curl -sS --max-time 15 \
+  "https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&request[slug]=<slug>"
+```
+
+An answer carrying an `error` key (`"Plugin not found."`) means no listing. A listing whose
+`author`/`homepage` disagree with the installed plugin's header `author`/`plugin_uri` belongs
+to a different plugin that happens to share the slug, and counts as no listing too.
 - Fail: `last_updated` is older than roughly 2 years (730 days), or `tested` (the WordPress
   version the plugin claims compatibility with) is more than two major core versions behind
   the version this site runs.
@@ -521,6 +606,9 @@ When AIOS-related fixes are needed, dispatch the `wp-audit-aios` agent with the 
 9. **SEC-041 and SEC-042 share SEC-038's network gate and never a hardcoded list** — an
    unreachable `api.wordpress.org` makes both `UNMEASURED`, and a vendor plugin absent from
    every public feed is `UNMEASURED` per item too, never `FAIL`
-10. **SEC-041, SEC-042 and SEC-043 respect the Step 2.3 clone suppression** — a plugin already
-    reclassified `N/A (local clone)` there is not re-reported as vulnerable, abandoned or a
-    redeclare risk under a new code
+10. **Step 2.3 suppresses a finding, never an inventory entry** — on a local clone, a plugin
+    reclassified `N/A (local clone)` there is still scanned by SEC-041, SEC-042 and SEC-043,
+    and counts as loaded, because it is active on production. Only the "deactivated"
+    finding itself stays suppressed
+11. **No slug in `code_scope.editable` is sent to a third-party vulnerability feed** — only
+    public wp.org slugs reach WPScan; the site's own and vendor plugins are decided locally
