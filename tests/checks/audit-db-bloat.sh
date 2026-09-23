@@ -215,11 +215,11 @@ grep -Fq 'INFO only' "$changelog" \
 grep -Fq 'not duplicated' "$changelog" \
   || fail "$changelog does not explain the autoload/transient duplication check"
 
-# The version must not have been bumped for an in-agent addition.
-if grep -Eq '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' "$changelog"; then
-  if head -20 "$changelog" | grep -Eq '^## \[[0-9]+\.[0-9]+\.[0-9]+\]'; then
-    fail "$changelog was bumped to a version header — new codes in an existing agent do not bump the version"
-  fi
-fi
+# The version must not have been bumped for an in-agent addition: a bump turns the top
+# release heading from [Unreleased] into a version number. Read that first heading itself,
+# not a fixed window of lines, which grows with every entry added under [Unreleased].
+top="$(grep -m1 '^## ' "$changelog")"
+[ "$top" = '## [Unreleased]' ] \
+  || fail "$changelog's top heading is '$top', not '## [Unreleased]' — new codes in an existing agent do not bump the version"
 
 echo PASS
