@@ -919,8 +919,11 @@ try {
         // symptom in the normal pass, and without this they were identical
         // rows in findings.json.
         const pass = reduced ? 'reduced' : 'normal';
-        // Deduplicated like clipped copy: the same boxes sticking out at every
-        // sampled position are one defect per width, not one row per position.
+        // Deduplicated like clipped copy, but without the section in the key: the
+        // culprit walk covers the whole document, not section b, so the same boxes
+        // come back at every position of every section. One row per width and
+        // culprit set; `section` records where it was first seen, not where the
+        // culprit lives.
         if (frame.overflow) {
           const key = pass + '|' + size.width + '|' + frame.culprits.map((c) => c.selector).join(',');
           if (!overflowSeen.has(key)) {

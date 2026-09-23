@@ -12,9 +12,11 @@
   the document at every width and showed in no screenshot. The row now lists the
   `culprits`: boxes past the right edge that no ancestor clips. It follows the
   containing-block rule for absolute boxes, and `escapes` names the clipping box an
-  absolute culprit got past. The same culprits at every position count as one row
-  per width. `tests/checks/demo-verify-overflow-culprits.sh` runs the walk on an
-  escaping strip and on the same strip with positioned cards.
+  absolute culprit got past. The walk covers the whole document, so the same culprits
+  at every position of every section count as one row per width; `section` is where
+  they were first seen. `tests/checks/demo-verify-overflow-culprits.sh` runs the walk
+  on an escaping strip and on the same strip with positioned cards.
+
 - **Rank Math modules enabled from WP-CLI ran without their tables.** Writing
   `rank_math_modules` skips the activation that creates `rank_math_404_logs` and
   `rank_math_redirections`, so `404-monitor` and `redirections` ran two failing queries on
