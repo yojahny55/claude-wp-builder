@@ -93,22 +93,24 @@
   — the first URL under `/woocommerce_uploads/` whose file exists in the local uploads,
   printed percent-encoded and relative to that directory so the clone's host is never probed
   (`N/A` with the reason when there are no downloads or every download lives outside it,
-  whatever the method). The `redirect` method is CRITICAL by configuration only when such a
-  file exists. Otherwise it fires a control request at a public upload on the production host
-  first and, only if that returns a non-HTML `200`, probes the paid file header-only with a
+  whatever the method). The `redirect` method is CRITICAL by configuration when that file
+  exists locally, or when the clone has no `woocommerce_uploads` at all and the stored path is
+  the best evidence; it is `UNMEASURED` when the directory is there but the stored file is not.
+  Otherwise it fires a control request at a public upload on the production host (never an
+  attachment under `woocommerce_uploads`, which would be a paid file) first and, only if that returns a non-HTML `200`, probes the paid file header-only with a
   15-second timeout (a one-byte ranged GET capped by `--max-filesize` when HEAD gets `405`, so
   the paid body is never downloaded even if the range is ignored). Redirects are not followed.
   A `200`/`206` with any non-HTML type is CRITICAL; the site's own `403` is PASS, and its own
   `404` is PASS only for a file known to exist; a WAF or bot-challenge `403`
-  (`cf-mitigated: challenge`), a `404` on an unverified file, a curl error and every other
+  (`cf-mitigated: challenge`), a `404` on a file not confirmed locally, a failed control, a curl error and every other
   answer — redirects, `5xx`, an HTML soft 404 — is `UNMEASURED`, never PASS. It is
   commerce-gated (`N/A` without WooCommerce) and, per Step 2.3, probes production only — never
   the local clone, whose Apache would return a false PASS for a site wide open behind nginx.
   Fix names the server layer (an nginx `location` block, since the `.htaccess` never runs
   there) and an edge-cache purge. `tests/checks/audit-woo-download-protection.sh` runs its
   gates on the SEC-039 procedure section alone and pins the CRITICAL severity, the gate, the
-  nginx reason, the production-host rule, the probe-file query, the control request, both
-  curl lines, the verdict table and the `UNMEASURED` fallthrough.
+  nginx reason, the production-host rule, the probe-file query and its markers, the control
+  request and its failure and canonical-host rules, both curl lines, the verdict table and the `UNMEASURED` fallthrough.
 
 - **`/wp-audit` reads the site type and whether it is a local clone before any category
   runs (Step 2.3).** Two blind spots made the audit report on the wrong site. First, checks
@@ -138,7 +140,6 @@
   answers an `.htaccess` a production nginx ignores and would return a false PASS.
   `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
   production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
-
 
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had
   none, and its `template-functions.php` printed a pingback `<link>`. A full audit of a

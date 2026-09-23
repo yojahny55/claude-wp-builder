@@ -313,10 +313,13 @@ in the web root, and anyone with the URL takes them for free.
 It also has a download method, `woocommerce_file_download_method`, with three values:
 
 - `redirect` — the file is served straight from its public URL with no gate at all. This is
-  an exposure **by configuration**, independent of the web server — but only when a paid file
-  actually lives in `woocommerce_uploads`. Run the probe-file snippet below first: **the
-  redirect method with a probe path is CRITICAL** (`FOUND` or `UNVERIFIED`, no HTTP probe
-  needed); with `NO-DOWNLOADS` or `EXTERNAL-ONLY` it is `N/A`, exactly as for the other methods.
+  an exposure **by configuration**, independent of the web server — but only when the store
+  keeps its paid files in `woocommerce_uploads`. Run the probe-file snippet below first; no
+  HTTP probe is needed. **The redirect method is CRITICAL on `FOUND`**, and on
+  `NO-LOCAL-UPLOADS`, where the paid files were never restored and the stored path is the best
+  evidence there is. On `MISSING-LOCALLY` (the files are here, the stored one is not) it is
+  `UNMEASURED`. With `NO-DOWNLOADS` or `EXTERNAL-ONLY` it is `N/A`, exactly as for the other
+  methods.
 - `force` / `xsendfile` — downloads are meant to stream through PHP with a capability check,
   and the directory `.htaccess` is the only thing stopping a direct hit. **Apache reads that
   `.htaccess`; nginx does not.** On an nginx host the `deny from all` is dead text and every
@@ -341,7 +344,8 @@ percent-encoded per segment, so a file name with spaces or accents reaches `curl
 
 ```bash
 $WP eval 'echo get_option("woocommerce_file_download_method") ?: "force";'
-# Probe file: FOUND|UNVERIFIED <path relative to woocommerce_uploads/>, or a marker.
+# Probe file: FOUND|NO-LOCAL-UPLOADS|MISSING-LOCALLY <path relative to woocommerce_uploads/>,
+# or a marker when there is no path to probe.
 $WP eval 'global $wpdb; $seg="/woocommerce_uploads/";
 $rows=$wpdb->get_col("SELECT pm.meta_value FROM {$wpdb->postmeta} pm JOIN {$wpdb->posts} p ON p.ID=pm.post_id LEFT JOIN {$wpdb->posts} par ON par.ID=p.post_parent WHERE pm.meta_key=\"_downloadable_files\" AND pm.meta_value<>\"\" AND p.post_status=\"publish\" AND (p.post_type=\"product\" OR (p.post_type=\"product_variation\" AND par.post_status=\"publish\")) ORDER BY p.post_date DESC");
 if(!$rows){echo "NO-DOWNLOADS\n";return;}
@@ -350,22 +354,27 @@ foreach($rows as $r){foreach((array)maybe_unserialize($r) as $f){$u=is_array($f)
 $p=rawurldecode(preg_replace("/[?#].*$/","",substr($u,$i+strlen($seg))));
 $enc=implode("/",array_map("rawurlencode",explode("/",$p)));
 if($local&&file_exists($dir.$p)){echo "FOUND $enc\n";return;} $first=$first??$enc;}}
-echo $first!==null?"UNVERIFIED $first\n":"EXTERNAL-ONLY\n";'
+if($first===null){echo "EXTERNAL-ONLY\n";return;} echo $local?"MISSING-LOCALLY":"NO-LOCAL-UPLOADS"," $first\n";'
 # Control file: a public upload outside woocommerce_uploads, relative to wp-content/uploads/.
-$WP eval '$a=get_posts(["post_type"=>"attachment","post_mime_type"=>"image","post_status"=>"inherit","numberposts"=>1,"fields"=>"ids"]); echo $a?implode("/",array_map("rawurlencode",explode("/",get_post_meta($a[0],"_wp_attached_file",true)))):"NO-CONTROL","\n";'
+$WP eval '$a=get_posts(["post_type"=>"attachment","post_mime_type"=>"image","post_status"=>"inherit","numberposts"=>1,"fields"=>"ids","meta_query"=>[["key"=>"_wp_attached_file","value"=>"woocommerce_uploads/","compare"=>"NOT LIKE"]]]); echo $a?implode("/",array_map("rawurlencode",explode("/",get_post_meta($a[0],"_wp_attached_file",true)))):"NO-CONTROL","\n";'
 ```
 
 - `FOUND <path>` — the file exists in the local uploads, so it is known to exist on the site:
   a `404` from the server is evidence of protection.
-- `UNVERIFIED <path>` — the local copy has no such file (uploads not restored, or the stored
-  file is gone): a `404` may just mean the file does not exist, so it is `UNMEASURED`.
+- `NO-LOCAL-UPLOADS <path>` — the clone has no `woocommerce_uploads` directory at all (the
+  paid files were not restored): the path is real store data, but whether the file still exists
+  on the site is unknown, so a `404` is `UNMEASURED`.
+- `MISSING-LOCALLY <path>` — the directory is here but none of the stored files are: they may
+  be gone from the site too, so a `404` is `UNMEASURED`.
 - `NO-DOWNLOADS` — no published product or variation stores a download:
   `N/A (no downloadable products)`, whatever the download method.
 - `EXTERNAL-ONLY` — every download points outside `woocommerce_uploads` (a CDN, S3, another
   host): `N/A (downloads served from outside woocommerce_uploads)`, whatever the download
   method, with the reason in the evidence line. This check does not judge those hosts.
-- `NO-CONTROL` — no public upload to calibrate against: `UNMEASURED`. It matters only to
-  the HTTP probe; the `redirect` method's verdict needs no control.
+- `NO-CONTROL` — no public upload to calibrate against: `UNMEASURED`. Images added through a
+  product's downloadable-file field are attachments too, stored under `woocommerce_uploads/`;
+  the control query excludes them, so the control is never a paid file. `NO-CONTROL` matters
+  only to the HTTP probe; the `redirect` method's verdict needs no control.
 
 Never `PASS` without a probe file and a control file.
 
@@ -403,7 +412,7 @@ Read the verdict off that first response:
 | `200` or `206` with any `content-type` other than `text/html` | the file is served without a purchase → **CRITICAL** |
 | `403` from the site's own server — no challenge headers (below) and the control returned `200` | protected → PASS |
 | `404` from the site's own server, same conditions, and the probe file was `FOUND` | protected → PASS |
-| `404` on an `UNVERIFIED` probe file | the file may simply be gone → `UNMEASURED` |
+| `404` on a `NO-LOCAL-UPLOADS` or `MISSING-LOCALLY` probe file | the file may simply be gone → `UNMEASURED` |
 | `403` carrying a challenge header: `cf-mitigated: challenge`, a `cf-chl-*` / `__cf_chl` cookie, `x-sucuri-block`, or any header naming a WAF or bot check | **a 403 from a WAF is not protection** — the challenge would clear for a browser and the file may still be open → `UNMEASURED` |
 | `3xx` (login redirect or otherwise), `405` after the ranged fallback, `401`, `429`, `5xx`, or `200` with `text/html` (a soft 404 or a challenge page) | `UNMEASURED`, with the status line and headers as evidence |
 | curl error (exit other than `0`/`63`) or empty response | `UNMEASURED`, quoting the curl exit code |

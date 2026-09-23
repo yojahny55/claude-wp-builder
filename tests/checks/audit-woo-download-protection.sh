@@ -56,10 +56,14 @@ has 'woocommerce_file_download_method' || fail "SEC-039 does not read the downlo
 # Commerce gating (relies on Step 2.3's site.commerce, does not re-detect).
 has 'N/A (no WooCommerce)' || fail "SEC-039 is not gated N/A on a non-commerce site"
 
-# redirect is CRITICAL by configuration, but only when a paid file lives in woocommerce_uploads.
-has 'the redirect method with a probe path is CRITICAL' \
+# redirect is CRITICAL by configuration, but only when the store keeps paid files in
+# woocommerce_uploads: FOUND, or NO-LOCAL-UPLOADS (paid files not restored); UNMEASURED when the
+# directory is here and the stored file is not.
+has '**The redirect method is CRITICAL on `FOUND`**, and on `NO-LOCAL-UPLOADS`' \
   || fail "SEC-039 lost the redirect-method CRITICAL rule"
-has 'with `NO-DOWNLOADS` or `EXTERNAL-ONLY` it is `N/A`, exactly as for the other methods' \
+has 'On `MISSING-LOCALLY` (the files are here, the stored one is not) it is `UNMEASURED`' \
+  || fail "SEC-039 flags redirect CRITICAL on a stored file that no longer exists"
+has 'With `NO-DOWNLOADS` or `EXTERNAL-ONLY` it is `N/A`, exactly as for the other methods' \
   || fail "SEC-039 flags redirect CRITICAL even with no woocommerce_uploads download"
 
 # The nginx-vs-Apache reason is the crux; if it goes, the check looks like a config lookup.
@@ -85,6 +89,8 @@ has 'par.post_status=\"publish\"' || fail "SEC-039 probes variations of unpublis
 has '$seg="/woocommerce_uploads/"' \
   || fail "SEC-039 does not cut the stored URL at /woocommerce_uploads/"
 has 'file_exists($dir.$p)' || fail "SEC-039 does not prefer a probe file that exists locally"
+has 'echo $local?"MISSING-LOCALLY":"NO-LOCAL-UPLOADS"," $first\n";' \
+  || fail "SEC-039 snippet does not tell a missing file from uploads that were never restored"
 has 'array_map("rawurlencode",explode("/",$p))' \
   || fail "SEC-039 does not percent-encode the probe path"
 has '`NO-DOWNLOADS` — no published product or variation stores a download: `N/A (no downloadable products)`' \
@@ -98,6 +104,14 @@ has 'Never `PASS` without a probe file and a control file' \
 
 # Control request calibrates the host before the paid file is judged.
 has '**Control request first.**' || fail "SEC-039 lost the control request"
+has '"meta_query"=>[["key"=>"_wp_attached_file","value"=>"woocommerce_uploads/","compare"=>"NOT LIKE"]]' \
+  || fail "SEC-039 control file can be a paid file under woocommerce_uploads"
+has 'repeat the control against that host and use it for the probe too' \
+  || fail "SEC-039 lost the canonical-host repeat of the control request"
+has 'a challenge page, a `403` from the edge, a redirect elsewhere' \
+  || fail "SEC-039 lost the list of failed-control answers"
+has 'the check is `UNMEASURED`, with the control status line as evidence' \
+  || fail "SEC-039 does not report a failed control as UNMEASURED"
 line 'curl -sI --max-time 15 -A "Mozilla/5.0" "https://<production-host>/wp-content/uploads/<control-path>"' \
   || fail "SEC-039 control request is not a timed HEAD on a public upload"
 has 'It must come back `200` with a non-HTML `content-type`' \
@@ -120,8 +134,8 @@ has "| \`403\` from the site's own server — no challenge headers (below) and t
   || fail "SEC-039 403 PASS is not limited to the site's own 403 after a good control"
 has "| \`404\` from the site's own server, same conditions, and the probe file was \`FOUND\` | protected → PASS |" \
   || fail "SEC-039 404 PASS does not require a probe file known to exist"
-has '| `404` on an `UNVERIFIED` probe file | the file may simply be gone → `UNMEASURED` |' \
-  || fail "SEC-039 reads a 404 on an unverified file as protected"
+has '| `404` on a `NO-LOCAL-UPLOADS` or `MISSING-LOCALLY` probe file | the file may simply be gone → `UNMEASURED` |' \
+  || fail "SEC-039 reads a 404 on a file not confirmed locally as protected"
 has 'cf-mitigated: challenge' || fail "SEC-039 does not recognise a Cloudflare challenge"
 has 'a 403 from a WAF is not protection' || fail "SEC-039 reads a WAF 403 as protected"
 has '`200` with `text/html` (a soft 404' || fail "SEC-039 does not treat an HTML 200 as UNMEASURED"
