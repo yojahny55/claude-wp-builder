@@ -156,12 +156,18 @@ $WP plugin is-active woocommerce && echo "site type: commerce (WooCommerce)" \
   || echo "site type: non-commerce"
 ```
 
-Set `site.commerce` to `woocommerce` or `none`. Every commerce-only check — the SEO checks
-in `skills/wp-audit-seo-standards` marked commerce, the download-protection check, the
-gateway-credential check, the multi-currency check — is **`N/A` when `site.commerce` is
-`none`**, said with the reason "no WooCommerce", and excluded from the denominator. This is
-how the commerce depth is added without regressing a generic site: a blog audited after this
-change scores exactly as it did before, because every new check reads `N/A` on it.
+Set `site.commerce` to `woocommerce` or `none`. This is the contract every commerce-only
+check — present or still to be added — must follow: **read `site.commerce`, and report
+`N/A` when it is `none`**, said with the reason "no WooCommerce", and excluded from the
+denominator. A check whose object is the store (a cart, a checkout, a priced-per-currency
+listing, a protected paid file) is commerce-only by definition, whichever category dispatches
+it. For example, the gateway-credential check, the download-protection check, and the
+multi-currency check are commerce-only, as are the SEO checks in
+`skills/wp-audit-seo-standards` marked commerce — each reads `site.commerce` and is `N/A` on
+a non-commerce site rather than being skipped or, worse, scoring a blog for a cart it never
+had. This is how commerce depth is added without regressing a generic site: a blog audited
+after a new commerce check ships scores exactly as it did before, because that check reads
+`N/A` on it.
 
 `is-active`, not `is-installed`: a store with WooCommerce deactivated is not currently a
 store, and its commerce surfaces are not live to audit.
@@ -746,7 +752,11 @@ ${CLAUDE_PLUGIN_ROOT}/bin/audit-suite.sh --url <public-url> --dir .wp-audit/suit
   --site "<project name>" [--pages "/,/services/,/contact/"]
 ```
 
-`<public-url>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json`.
+`<public-url>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json` —
+**unless `local_clone` is true (Step 2.3): the suite must not probe the clone's own host**,
+so Step 2.3's live-check rule applies instead of that fallback — the confirmed production
+URL (asked for, defaulting to `production_url`), or Tier 3 stays `UNMEASURED — needs the
+public URL` and this run is skipped.
 **Pass `--pages` with the list Step 2.7 fixed.** Without it the suite keeps whatever its
 config already holds, which on a first run is the template's placeholder — so a run that
 looks successful measures pages that are not this site's.
@@ -1270,7 +1280,9 @@ ${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host>
 ```
 
 `<home-host>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json` (or
-`$WP option get home`). Exit codes:
+`$WP option get home`) — **unless `local_clone` is true (Step 2.3): the live scan must not probe
+the clone's own host**, so Step 2.3's live-check rule applies instead of that fallback — the
+confirmed production URL, or `UNMEASURED — needs the public URL` with no scan run. Exit codes:
 
 | Exit | Meaning | Report as | Actionable |
 |---|---|---|---|
