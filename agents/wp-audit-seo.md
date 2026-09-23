@@ -134,7 +134,7 @@ These checks require a running WordPress installation. Use `$WP` from `.wp-creat
 | SEO-060 | No citation references in `sameAs` | The Organization or `LocalBusiness` node has an empty or absent `sameAs` array. Report only what the markup proves; never assert that a missing entry means a missing listing | INFO |
 | SEO-062 | Location pages fail the swap test | Multi-location sites only. Read two location pages and exchange the city names; if both still make sense, the pages carry no location-specific content. Apply the sampling gates from the skill at 30+ and 50+ pages. A store locator whose locations have no crawlable URL of their own is CRITICAL, not WARNING | WARNING |
 | SEO-063 | Fabricated `aggregateRating` | An `aggregateRating` in the schema that no real review data backs, or that carries placeholder values. This is structured-data spam and risks a manual action | CRITICAL |
-| SEO-064 | Cached `Product`/`Offer` schema price does not match the visitor's selected currency | Commerce + multi-currency only — same gate as `wp-audit-performance.md` PERF-061 (`N/A` "no WooCommerce" / "no multi-currency plugin"). Take the rendered-head/body snapshot for a product page (see the rendered-head Procedure) and read the `Product`/`Offer` node's `price` and `priceCurrency`. Repeat the request selecting the store's other currency and compare: the same cached HTML that serves a stale visible price (PERF-063) serves this JSON-LD alongside it, since both come from one cached response | WARNING; CRITICAL when the second request's `cf-cache-status` (from PERF-062) is `HIT` and the schema still names the first request's currency |
+| SEO-069 | Cached `Product`/`Offer` schema price does not match the visitor's selected currency | Commerce + multi-currency only — same gate as `wp-audit-performance.md` PERF-065 (`N/A` "no WooCommerce" / "no multi-currency plugin"). Take the rendered-head/body snapshot for a product page (see the rendered-head Procedure) and read the `Product`/`Offer` node's `price` and `priceCurrency`. Repeat the request selecting the store's other currency and compare: the same cached HTML that serves a stale visible price (PERF-067) serves this JSON-LD alongside it, since both come from one cached response | WARNING; CRITICAL when the second request's cache-status header (from PERF-067's own two-currency read, `cf-cache-status` or the equivalent header PERF-066 detected) is `HIT` and the schema still names the first request's currency |
 
 ### Procedure
 
@@ -270,17 +270,18 @@ echo wp_json_encode(\$out);
    title and another in the option (`A&B` vs `AB`) is exactly this finding, not a typo to
    overlook. Name every value that disagrees and quote what it holds — "the names are
    inconsistent" is not actionable.
-7. **SEO-064** — gate first: `N/A` ("no WooCommerce") when `site.commerce` is `none`, `N/A`
+7. **SEO-069** — gate first: `N/A` ("no WooCommerce") when `site.commerce` is `none`, `N/A`
    ("no multi-currency plugin") when no such plugin is active, same as
-   `wp-audit-performance.md` PERF-061. The `json_ld` field the snapshot already captured for a
+   `wp-audit-performance.md` PERF-065. The `json_ld` field the snapshot already captured for a
    product permalink carries the `Product`/`Offer` node; read its `price` and `priceCurrency`
    from there instead of re-fetching. Then repeat that one request selecting the store's other
    currency (cookie, session or `?currency=`, whichever the active plugin uses) and compare —
-   the fix for the underlying cache-key problem is PERF-061/PERF-063's, this code exists only
+   the fix for the underlying cache-key problem is PERF-065/PERF-067's, this code exists only
    because the same cached response carries the schema too, and a reader who fixes the visible
    price without knowing the structured data is equally stale ships a page that still lies to
-   a crawler after it stopped lying to a person. Needs the production host and PERF-062's
-   `cf-cache-status` reading; `UNMEASURED` ("needs the public URL") without one.
+   a crawler after it stopped lying to a person. Needs the production host and PERF-067's
+   cache-status reading (`cf-cache-status`, or the equivalent header PERF-066 detected);
+   `UNMEASURED` ("needs the public URL") without one.
 
 ### Procedure — content and link checks
 
@@ -413,10 +414,10 @@ Apply fixes directly using `Edit` for issues marked `auto_fix: true`:
 markup and let the user decide — a new element inherits browser default styles and can
 override the utility classes already on the page.
 
-**SEO-064 is never auto-applied either, and for a different reason: there is no theme code to
+**SEO-069 is never auto-applied either, and for a different reason: there is no theme code to
 edit.** The schema is generated correctly from whatever price WooCommerce/Rank Math read at
 render time; the defect is the cached response carrying yesterday's currency, which is
-PERF-061/PERF-063's fix (`Fix: manual`, `Owner: setting` — the cache plugin's cookie exclusion
+PERF-065/PERF-067's fix (`Fix: manual`, `Owner: setting` — the cache plugin's cookie exclusion
 or the CDN's cache-key rule). Point the report at that fix rather than proposing a second one.
 
 ### Rank Math Configuration Fixes (Tier 2)

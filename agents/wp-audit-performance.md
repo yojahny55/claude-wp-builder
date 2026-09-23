@@ -135,11 +135,11 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 | PERF-048 | `fetchpriority` on a non-LCP element | Run PSI/Lighthouse on the homepage and read the `largest-contentful-paint-element` audit | LCP element is an `<img>` whenever any image carries `fetchpriority="high"` | WARNING |
 | PERF-054 | `loading="lazy"` on the real LCP element | Per template (not just the homepage), see "Procedure — finding the real LCP element" below | The element a `PerformanceObserver` reports for `largest-contentful-paint` never carries `loading="lazy"` | WARNING |
 | PERF-055 | Font preload weight ≠ LCP text's rendered weight | Read the `font-weight` computed on the LCP element from PERF-054's run; compare against which `assets/fonts/*.woff2` files are preloaded in `wp_head` | The weight the LCP text actually renders in is one of the preloaded files | WARNING |
-| PERF-061 | Multi-currency plugin active behind a page/edge cache with no currency-aware cache key | `$WP plugin list --status=active --format=json` — flag when a WooCommerce multi-currency plugin (e.g. CURCY, slug `woocommerce-multi-currency`, or any other active plugin whose slug/name matches `currency`) is active together with a known full-page cache plugin (`wp-rocket`, `w3-total-cache`, `wp-super-cache`, `litespeed-cache`, `wp-fastest-cache`, `sg-cachepress`, `breeze`, `cache-enabler`) — or PERF-062 confirms an edge CDN cache in front of the origin. See *Procedure — multi-currency and full-page cache* for how the plugin's currency-selection mechanism decides the severity | No full-page/edge cache detected, or the detected cache plugin's cookie-exclusion setting names the currency cookie; `N/A` ("no WooCommerce") when `site.commerce` is `none`; `N/A` ("no multi-currency plugin") when none is active | WARNING/CRITICAL |
-| PERF-062 | Cache/CDN edge layer fronting the origin | LIVE. `curl -sSI <production_url>` against the confirmed production host (`/wp-audit` Step 2.3 — never the local clone, whose own server answers a rule production's edge never sees). Read `server:` and `cf-cache-status:`; `server: cloudflare` with a `cf-cache-status` header present means Cloudflare caches whole pages at the edge, a layer WP-CLI cannot see at all | Detection only, feeds PERF-061 and PERF-063; `UNMEASURED` ("needs the public URL") without a confirmed production URL | INFO |
-| PERF-063 | Confirmed cross-visitor currency bleed on a cached page | LIVE. Against the confirmed production host, request the same shop/product URL twice, selecting a different one of the store's currencies each time by whatever mechanism the active plugin uses (cookie, session or a `?currency=` parameter), and read the rendered price and `cf-cache-status` from each response | The second request's price/currency matches the currency it selected; FAIL when `cf-cache-status` is `HIT` on the second request and the price still matches the FIRST request's currency. Same `N/A`/`UNMEASURED` gates as PERF-061/PERF-062 | WARNING/CRITICAL |
+| PERF-065 | Multi-currency plugin active behind a page/edge cache with no currency-aware cache key | `$WP plugin list --status=active --format=json` — flag when a WooCommerce multi-currency plugin (e.g. CURCY, slug `woocommerce-multi-currency`, or any other active plugin whose slug/name matches `currency`) is active together with a known full-page cache plugin (`wp-rocket`, `w3-total-cache`, `wp-super-cache`, `litespeed-cache`, `wp-fastest-cache`, `sg-cachepress`, `breeze`, `cache-enabler`) — or PERF-066 confirms an edge CDN cache in front of the origin. See *Procedure — multi-currency and full-page cache* for how the plugin's currency-selection mechanism decides the severity | No full-page/edge cache detected — confirmed against the production host, not merely the absence of a known caching plugin locally — or the detected cache plugin's cookie-exclusion setting names the currency cookie; `N/A` ("no WooCommerce") when `site.commerce` is `none`; `N/A` ("no multi-currency plugin") when none is active; `UNMEASURED` ("needs the public URL") without a confirmed production URL, never `PASS` | WARNING/CRITICAL |
+| PERF-066 | Cache/CDN edge layer fronting the origin | LIVE. `curl -sSI <production_url>` against the confirmed production host (`/wp-audit` Step 2.3 — never the local clone, whose own server answers a rule production's edge never sees), then repeat the identical request once more against the same URL. Read `server:`, `cf-cache-status:`, `age:`, `x-cache:`, `via:`, `x-varnish:`, `x-proxy-cache:` and `x-fastcgi-cache:` from both responses. `cf-cache-status: HIT` on the second request confirms Cloudflare is caching the full page at the edge — `DYNAMIC` or `BYPASS` do not, even though Cloudflare sets the header either way, so its mere presence is not detection. When there is no `cf-cache-status` header, treat any of `age:` > 0, `x-cache: HIT`, a `via:` or `server:` naming Varnish, or a present `x-proxy-cache`/`x-fastcgi-cache` header as evidence of a full-page cache or CDN/proxy layer, a layer WP-CLI cannot see at all | Detection only, feeds PERF-065 and PERF-067; `UNMEASURED` ("needs the public URL") without a confirmed production URL | INFO |
+| PERF-067 | Confirmed cross-visitor currency bleed on a cached page | LIVE. Against the confirmed production host, request the same shop/product URL twice, selecting a different one of the store's currencies each time by whatever mechanism the active plugin uses (cookie, session or a `?currency=` parameter), and read the rendered price and the cache-status header PERF-066 detected (`cf-cache-status`, or its `x-cache`/equivalent counterpart on a non-Cloudflare layer) from each response | The second request's price/currency matches the currency it selected; FAIL when `cf-cache-status` is `HIT` on the second request (or the equivalent HIT value for the header PERF-066 detected) and the price still matches the FIRST request's currency. Same `N/A`/`UNMEASURED` gates as PERF-065/PERF-066 | WARNING/CRITICAL |
 
-### Procedure — multi-currency and full-page cache (PERF-061 to PERF-063)
+### Procedure — multi-currency and full-page cache (PERF-065 to PERF-067)
 
 A multi-currency plugin (CURCY/`woocommerce-multi-currency` is one shape of this; any plugin
 that computes a per-currency price at request time from `_regular_price_wmcp`-style per-currency
@@ -154,7 +154,7 @@ WooCommerce") when `site.commerce` is `none`, out of the denominator; `N/A` ("no
 plugin") when `site.commerce` is `woocommerce` but no multi-currency plugin is active. Neither
 gate is optional — reporting this on a single-currency store scores it for a cart it never had.
 
-**Severity split for PERF-061.** A cookie- or session-selected currency is invisible to almost
+**Severity split for PERF-065.** A cookie- or session-selected currency is invisible to almost
 every cache layer by design (a URL-keyed cache never sees the cookie at all), so that
 combination is the CRITICAL case: the collision is not a possibility, it is the plugin's normal
 mode of operation meeting a cache that cannot see it. A currency chosen by a `?currency=` query
@@ -162,24 +162,34 @@ parameter is comparatively safer — a cache that varies its key on the full URL
 default) naturally separates the two — so that shape is WARNING, and the finding should say
 which mechanism was found and why the split.
 
-**PERF-062 is a detection code, not a pass/fail** — it exists so PERF-061 and PERF-063 have a
-name for the layer they are reasoning about (Cloudflare page cache, a caching plugin, or "none
-detected"), and so the report can say *which* edge is doing this rather than "a cache,
-somewhere." Follow the exact production-host contract `wp-audit-security.md` Step 3 uses for
-its own response-header checks: ask for the production URL when the manifest does not resolve
-one, default to `restore.url_origin`, and never fire this at the local clone — a clone has no
-CDN in front of it (Step 2.3 suppresses that absence as a clone artifact, not a finding), so
-probing it here would read as "no cache detected" and hide a defect that is live in production.
-Without a confirmed production URL, PERF-061, PERF-062 and PERF-063 are all `UNMEASURED`
-("needs the public URL"), never `PASS` — a cache with no currency-aware key does not become
-safe because nobody could reach it to check.
+**PERF-066 is a detection code, not a pass/fail** — it exists so PERF-065 and PERF-067 have a
+name for the layer they are reasoning about (Cloudflare or another CDN/proxy cache, a caching
+plugin, or "none detected"), and so the report can say *which* edge is doing this rather than
+"a cache, somewhere." Detection needs a second request to the same URL and a header that reads
+as a confirmed hit, not merely present: `cf-cache-status` is set on every Cloudflare response
+regardless of whether that response was cached, so `DYNAMIC`/`BYPASS` on the second request mean
+Cloudflare is in front of the origin but is *not* caching the page, and PERF-065/PERF-067 must
+not treat that as a caching layer. Off Cloudflare, fall back to the generic heuristics — `age:`
+greater than zero, `x-cache: HIT`, a `via:`/`server:` naming Varnish, or a present
+`x-proxy-cache`/`x-fastcgi-cache` header — since most CDNs and reverse-proxy caches use one of
+these instead of `cf-cache-status`. Follow the exact production-host contract
+`wp-audit-security.md` Step 3 uses for its own response-header checks: ask for the production
+URL when the manifest does not resolve one, default to `restore.url_origin`, and never fire this
+at the local clone — a clone has no CDN in front of it (Step 2.3 suppresses that absence as a
+clone artifact, not a finding), so probing it here would read as "no cache detected" and hide a
+defect that is live in production. Without a confirmed production URL, PERF-065, PERF-066 and
+PERF-067 are all `UNMEASURED` ("needs the public URL"), never `PASS` — a cache with no
+currency-aware key does not become safe because nobody could reach it to check, and PERF-065's
+own "no cache detected" PASS depends on this same production reading: a clean local plugin list
+is not proof there is no edge cache in front of production.
 
-**PERF-063 is the proof, not the guess.** PERF-061 reasons from configuration; PERF-063 reasons
+**PERF-067 is the proof, not the guess.** PERF-065 reasons from configuration; PERF-067 reasons
 from what the cache actually served. Selecting each of the store's currencies in turn against
-the same URL and reading `cf-cache-status` back tells you whether the second request got its
-own price (the cache varied correctly, or bypassed) or the first visitor's (the cache did not
-— `HIT` plus the wrong price is the confirmed defect). Report the two prices, the two currency
-codes, and the `cf-cache-status` value for each request as the evidence line.
+the same URL and reading back the header PERF-066 detected — `cf-cache-status` on Cloudflare, or
+the equivalent generic header otherwise — tells you whether the second request got its own price
+(the cache varied correctly, or bypassed) or the first visitor's (the cache did not — a
+confirmed HIT plus the wrong price is the confirmed defect). Report the two prices, the two
+currency codes, and the cache-status header value for each request as the evidence line.
 
 ### Procedure — render path checks (PERF-047 to PERF-053)
 
@@ -620,7 +630,7 @@ Edit the hero template to add `fetchpriority="high"` to the main hero image.
 
 ### Multi-currency cache-key fix
 
-PERF-061/PERF-063 are never auto-applied — the fix is a setting on a plugin or an edge
+PERF-065/PERF-067 are never auto-applied — the fix is a setting on a plugin or an edge
 service this agent does not own, the same rule the "Cache plugin" note in *Adopted sites*
 already states for every other caching finding. Report `Fix: manual`, `Owner: setting`, and
 name the concrete control:
@@ -630,7 +640,7 @@ name the concrete control:
   cache" list (WP Rocket: *Cache Settings → Never Cache Cookies*; LiteSpeed Cache: the vary
   group for that cookie). This makes the cache treat each currency as its own cache entry
   instead of one shared entry.
-- **An edge CDN** (Cloudflare) — no WP-CLI command reaches this: it is a Cache Rule at the
+- **An edge CDN** (Cloudflare, or another CDN/proxy cache PERF-066 detected) — no WP-CLI command reaches this: it is a Cache Rule at the
   edge, configured to bypass or vary the cache key on the currency cookie/query parameter.
   Point the report at the dashboard control, never at a `.htaccess` or `performance.php`
   workaround that the edge never sees in the first place.

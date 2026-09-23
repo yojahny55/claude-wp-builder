@@ -7,11 +7,11 @@
 #
 # Three defects this contract prevents, each one a false-clean audit on a store that has this
 # plugin combination:
-#   1. The risk check (PERF-061) fires on any store, whether or not it runs WooCommerce or a
+#   1. The risk check (PERF-065) fires on any store, whether or not it runs WooCommerce or a
 #      multi-currency plugin, scoring a site for a cart or a plugin it never had. It must gate
 #      on site.commerce and on a multi-currency plugin being active, same as every other
 #      commerce check /wp-audit Step 2.3 already requires.
-#   2. The live checks (PERF-062, PERF-063) get fired at the local clone, whose own server has
+#   2. The live checks (PERF-066, PERF-067) get fired at the local clone, whose own server has
 #      no CDN in front of it — a false PASS/"no cache" reading exactly like probing the clone
 #      for response headers or paid-file reachability. They must target a confirmed production
 #      host and read UNMEASURED without one.
@@ -44,77 +44,104 @@ flat_seo=$(tr '\n' ' ' < "$seo" | sed 's/  */ /g')
 
 # --- Codes exist and are tabulated (audit-check-tables.sh's own rule, pinned here too so this
 #     one test file tells the whole story on its own) ---
-for code in PERF-061 PERF-062 PERF-063; do
+for code in PERF-065 PERF-066 PERF-067; do
   grep -qE "^\| ${code} \|" "$perf" || fail "$perf has no tabulated row for $code"
 done
-grep -qE '^\| SEO-064 \|' "$seo" || fail "$seo has no tabulated row for SEO-064"
+grep -qE '^\| SEO-069 \|' "$seo" || fail "$seo has no tabulated row for SEO-069"
 
 # --- Direction 1: the commerce/multi-currency gate is present, both reasons ---
 grep -Fq '"no WooCommerce"' "$perf" \
-  || fail "$perf: PERF-061 does not give the N/A (no WooCommerce) reason"
+  || fail "$perf: PERF-065 does not give the N/A (no WooCommerce) reason"
 grep -Fq '"no multi-currency plugin"' "$perf" \
-  || fail "$perf: PERF-061 does not give the N/A (no multi-currency plugin) reason"
+  || fail "$perf: PERF-065 does not give the N/A (no multi-currency plugin) reason"
 grep -Fq '"no WooCommerce"' "$seo" \
-  || fail "$seo: SEO-064 does not give the N/A (no WooCommerce) reason"
+  || fail "$seo: SEO-069 does not give the N/A (no WooCommerce) reason"
 grep -Fq '"no multi-currency plugin"' "$seo" \
-  || fail "$seo: SEO-064 does not give the N/A (no multi-currency plugin) reason"
+  || fail "$seo: SEO-069 does not give the N/A (no multi-currency plugin) reason"
 # Both directions on the gate: it must also be stated that these are commerce-only, not a
 # blanket "always N/A" that would silently disable the check everywhere.
 grep -Fq 'site.commerce' "$perf" \
-  || fail "$perf does not read site.commerce, so PERF-061 cannot be commerce-gated at all"
+  || fail "$perf does not read site.commerce, so PERF-065 cannot be commerce-gated at all"
 
 # --- Direction 2: severity is NOT one flat value — cookie/session selection escalates ---
 grep -Fq 'cookie- or session-selected currency is invisible' "$perf" \
-  || fail "$perf: PERF-061 does not escalate to CRITICAL for cookie/session currency selection"
+  || fail "$perf: PERF-065 does not escalate to CRITICAL for cookie/session currency selection"
 printf '%s' "$flat_perf" | grep -Fq 'that combination is the CRITICAL case' \
   || fail "$perf does not name the cookie/session case as CRITICAL, not merely WARNING"
 grep -Fq 'WARNING/CRITICAL' "$perf" \
-  || fail "$perf does not carry the WARNING/CRITICAL split for PERF-061/PERF-063"
+  || fail "$perf does not carry the WARNING/CRITICAL split for PERF-065/PERF-067"
 
 # --- Direction 3: the live checks use the production-host contract, never the clone ---
 grep -Fq 'cf-cache-status' "$perf" \
-  || fail "$perf: PERF-062 does not read the cf-cache-status header"
+  || fail "$perf: PERF-066 does not read the cf-cache-status header"
 grep -Fq 'server:' "$perf" \
-  || fail "$perf: PERF-062 does not read the server response header"
+  || fail "$perf: PERF-066 does not read the server response header"
 grep -Fq 'never the local clone' "$perf" \
-  || fail "$perf does not forbid probing the local clone for PERF-062/PERF-063"
+  || fail "$perf does not forbid probing the local clone for PERF-066/PERF-067"
 grep -Fq 'Step 2.3' "$perf" \
   || fail "$perf does not point the live checks at /wp-audit Step 2.3's production-host contract"
-grep -Fq '`UNMEASURED`' "$perf" \
-  || fail "$perf does not fall back to UNMEASURED without a confirmed production URL"
 
-# --- Direction 4: PERF-063 requires a live CONFIRMATION, not just the config-level guess ---
+# --- Direction 3b: PERF-066 requires a confirmed HIT, not the header's mere presence, and
+#     recognizes CDNs/proxies other than Cloudflare ---
+grep -Fq 'not merely present' "$perf" \
+  || fail "$perf: PERF-066 does not reject cf-cache-status's mere presence as detection"
+printf '%s' "$flat_perf" | grep -Fq 'DYNAMIC`/`BYPASS` on the second request mean' \
+  || fail "$perf does not explain that DYNAMIC/BYPASS mean Cloudflare is present but not caching"
+grep -Fq 'x-varnish' "$perf" \
+  || fail "$perf: PERF-066 has no generic non-Cloudflare CDN/proxy heuristic (x-varnish)"
+grep -Fq 'x-cache: HIT' "$perf" \
+  || fail "$perf: PERF-066 has no generic x-cache heuristic"
+grep -Fq '`age:`' "$perf" \
+  || fail "$perf: PERF-066 has no generic age: heuristic"
+# The bare token `UNMEASURED` already existed in the base file for an unrelated Core Web
+# Vitals check, so a plain `grep -Fq '`UNMEASURED`'` would pass even with every UNMEASURED
+# fallback below deleted. Anchor on the specific sentences instead.
+printf '%s' "$flat_perf" | grep -Fq 'PERF-065, PERF-066 and PERF-067 are all `UNMEASURED`' \
+  || fail "$perf's procedure does not fall back all three multi-currency-cache checks to UNMEASURED without a confirmed production URL"
+grep -Fq '`UNMEASURED` ("needs the public URL") without a confirmed production URL, never `PASS`' "$perf" \
+  || fail "$perf: PERF-065's own row does not condition PASS on a confirmed production URL (it must read UNMEASURED, never PASS, without one)"
+
+# --- Direction 4: PERF-067 requires a live CONFIRMATION, not just the config-level guess ---
 grep -Eq 'cf-cache-status`.*is `HIT`' "$perf" \
-  || fail "$perf: PERF-063 does not name the HIT + stale-price combination as the confirmed defect"
+  || fail "$perf: PERF-067 does not name the HIT + stale-price combination as the confirmed defect"
 
 # --- Direction 5: the fix is a setting, never a code workaround ---
 grep -Fq 'Multi-currency cache-key fix' "$perf" \
-  || fail "$perf has no fix section for PERF-061/PERF-063"
+  || fail "$perf has no fix section for PERF-065/PERF-067"
 fix=$(awk '/^### Multi-currency cache-key fix/{f=1; next} f && /^### /{exit} f{print}' "$perf")
 [ -n "$fix" ] || fail "$perf's Multi-currency cache-key fix section is empty"
 printf '%s' "$fix" | grep -Fq 'Owner: setting' \
-  || fail "the PERF-061/PERF-063 fix does not state Owner: setting"
+  || fail "the PERF-065/PERF-067 fix does not state Owner: setting"
 printf '%s' "$fix" | grep -Fq 'Never propose disabling the page cache' \
-  || fail "the PERF-061/PERF-063 fix does not reject disabling the cache site-wide as a shortcut"
+  || fail "the PERF-065/PERF-067 fix does not reject disabling the cache site-wide as a shortcut"
 printf '%s' "$fix" | grep -Fq 'no WP-CLI command reaches this' \
-  || fail "the PERF-061/PERF-063 fix does not say a Cloudflare edge rule is out of WP-CLI's reach"
+  || fail "the PERF-065/PERF-067 fix does not say a Cloudflare edge rule is out of WP-CLI's reach"
 
-# --- SEO-064: reuses the existing rendered-head/json_ld snapshot, is not a second fetch, and
+# --- SEO-069: reuses the existing rendered-head/json_ld snapshot, is not a second fetch, and
 #     is not auto-fixed as if it were a theme code defect ---
 grep -Fq 'json_ld' "$seo" \
-  || fail "$seo has lost the json_ld snapshot field SEO-064 depends on"
-grep -Fq 'SEO-064' "$seo" || fail "$seo never mentions SEO-064 outside its table row"
-grep -Fq 'SEO-064 is never auto-applied' "$seo" \
-  || fail "$seo does not exclude SEO-064 from the auto-fix pass"
+  || fail "$seo has lost the json_ld snapshot field SEO-069 depends on"
+grep -Fq 'SEO-069' "$seo" || fail "$seo never mentions SEO-069 outside its table row"
+grep -Fq 'SEO-069 is never auto-applied' "$seo" \
+  || fail "$seo does not exclude SEO-069 from the auto-fix pass"
 grep -Fq 'there is no theme code to' "$seo" \
-  || fail "$seo does not explain why SEO-064 has no code fix of its own"
+  || fail "$seo does not explain why SEO-069 has no code fix of its own"
+
+# --- Direction 6: no collision with the codes sibling PRs already own (PERF-061/062/063 and
+#     SEO-064 belong to other open PRs; this PR's codes are PERF-065/066/067 and SEO-069) ---
+for f in "$perf" "$seo" "$changelog"; do
+  grep -Eq 'PERF-06[123]\b' "$f" \
+    && fail "$f still uses a PERF-06[123] code — those belong to a sibling PR, renumber to PERF-065/066/067"
+  grep -Eq 'SEO-064\b' "$f" \
+    && fail "$f still uses SEO-064 — that code belongs to a sibling PR, renumber to SEO-069"
+done
 
 # --- CHANGELOG: an Unreleased entry exists and names the new codes ---
 unreleased=$(awk '/^## \[Unreleased\]/{f=1; next} f && /^## \[/{exit} f{print}' "$changelog")
 [ -n "$unreleased" ] || fail "$changelog has no content under [Unreleased]"
-printf '%s' "$unreleased" | grep -Fq 'PERF-061' \
-  || fail "$changelog's [Unreleased] section does not mention PERF-061"
-printf '%s' "$unreleased" | grep -Fq 'SEO-064' \
-  || fail "$changelog's [Unreleased] section does not mention SEO-064"
+printf '%s' "$unreleased" | grep -Fq 'PERF-065' \
+  || fail "$changelog's [Unreleased] section does not mention PERF-065"
+printf '%s' "$unreleased" | grep -Fq 'SEO-069' \
+  || fail "$changelog's [Unreleased] section does not mention SEO-069"
 
 echo PASS

@@ -116,12 +116,12 @@
   a cookie; a page or edge cache picks what to serve per cache key. When the key does not
   include the currency signal, the first visitor's currency gets cached and served to
   everyone else — wrong prices, and the cached `Product`/`Offer` schema is wrong alongside
-  them, since both come from the same response. `wp-audit-performance` adds PERF-061 (the
+  them, since both come from the same response. `wp-audit-performance` adds PERF-065 (the
   plugin/cache combination, WARNING/CRITICAL depending on whether the currency is
-  cookie-selected), PERF-062 (a live check that detects the edge/CDN layer from
-  `server`/`cf-cache-status` response headers), and PERF-063 (a live check that confirms the
+  cookie-selected), PERF-066 (a live check that detects the edge/CDN layer from
+  `server`/`cf-cache-status` response headers), and PERF-067 (a live check that confirms the
   bleed by requesting two currencies against the same URL and reading the cache status back).
-  `wp-audit-seo` adds SEO-064 for the cached schema's stale price/currency. All four gate on
+  `wp-audit-seo` adds SEO-069 for the cached schema's stale price/currency. All four gate on
   `site.commerce` and on a multi-currency plugin being active, and the two live checks follow
   `/wp-audit` Step 2.3's production-host contract — never the local clone.
   `tests/checks/audit-multicurrency-cache.sh` pins the gate, the severity split and the fix
