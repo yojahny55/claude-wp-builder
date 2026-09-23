@@ -101,6 +101,38 @@
   `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
   production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
 
+  When the manifest shows a clone (`source: restore`, a `restore.url_origin`, or a non-public
+  `wordpress.url`), those conditions are `N/A (local clone)`, suppressed and out of the
+  denominator, bounded by one test: would this also be true on production? Live checks
+  (response headers, paid-file reachability) now target the production URL — asked for and
+  confirmed, defaulting to `restore.url_origin` — and never the clone, whose local server
+  answers an `.htaccess` a production nginx ignores and would return a false PASS.
+  `tests/checks/audit-site-type-and-clone.sh` pins the gate, the suppression catalog and the
+  production-host rule; the methodology is recorded in `skills/wp-audit-standards`.
+
+- **`wp-audit-seo` gained five WooCommerce-specific checks (SEO-064 to SEO-068), gated by the
+  `site.commerce` flag from Step 2.3.** Before this, the SEO auditor's canonical and schema
+  checks were written for an informational site and missed the failure modes that only exist
+  because a site is a store. Faceted navigation (`?orderby=`, `?filter_*`, `?min_price=`)
+  multiplies one category page into near-infinite URL variants, and a filtered variant
+  canonicalizing to itself (SEO-064) tells Google to crawl and index all of them. The opposite
+  mistake sat right next to it: a paginated category page canonicalizing back to page 1
+  (SEO-065) was easy to assume correct by analogy with a paginated single post, but for a
+  WooCommerce category archive it is the classic error — the products on page 2+ never get
+  indexed at all, so self-referencing pagination is required here, not merely tolerated.
+  SEO-066 catches a `Product` schema's `Offer.availability` still claiming `InStock` on a page
+  the storefront itself renders as out of stock — the same manual-action risk tier as the
+  existing SEO-063 fabricated-rating check. SEO-067 catches a URL the XML sitemap still lists
+  after it picked up a `noindex`, a contradictory signal to Google. SEO-068 is a warning-level
+  reminder, not a live check: when the project shows a migration signal, it names the two
+  losses a URL/platform migration causes and nothing recovers afterward — product reviews and
+  their `AggregateRating` if IDs are not migrated with them, and old URLs' ranking authority if
+  they are not 301-mapped one-to-one instead of blanket-redirected to the home page. All five
+  are `N/A ("no WooCommerce")` on a non-commerce site, and the four that fetch a live page
+  target the confirmed production host, never the local clone, per Step 2.3.
+  `tests/checks/audit-ecommerce-seo.sh` pins the five codes and the site-type gate; the
+  methodology is recorded in `skills/wp-audit-seo-standards` §18.
+
 - **Security baseline in both starters: `inc/security.php`.** The tailwind starter had
   none, and its `template-functions.php` printed a pingback `<link>`. A full audit of a
   delivered build found XML-RPC and pingbacks on, `/wp/v2/users` and `?author=N` listing

@@ -957,3 +957,104 @@ foreach (\$posts as \$p) {
 }
 "
 ```
+
+---
+
+## 18. E-commerce SEO nuances (WooCommerce)
+
+Read this section only when `/wp-audit` Step 2.3 sets `site.commerce` to `woocommerce`; every
+check below is `N/A ("no WooCommerce")` and out of the denominator otherwise — never
+re-detect commerce here, Step 2.3 already did it. These are failure modes that only exist
+because the site is a store rather than a blog: faceted navigation multiplies category URLs,
+paginated archives can hide inventory instead of content, and stock is a fact the page can
+contradict itself about. They complement SEO-038 (canonical self-reference) and SEO-039
+(duplicate schema source), which already cover the generic cases.
+
+All four checks that read a live page target the production host, never the local clone —
+same rule as the rendered-head snapshot: per `/wp-audit` Step 2.3, when the project is a local
+clone (`local_clone = true`), use `--host` if given, otherwise ask the user for
+`production_url` (defaulting to `restore.url_origin`) and fire no request until it is
+confirmed. With no public URL, report `UNMEASURED`, never `PASS` — a local Apache honors a
+`.htaccess` rule a production Nginx ignores, which would turn a real defect into a false pass.
+
+### 18.1 Faceted/filtered URLs canonicalizing to themselves (SEO-064)
+
+Attribute and sort filters (`?filter_color=red`, `?orderby=price`, `?min_price=`) generate
+near-infinite variants of one category page. Each variant should declare a canonical back at
+the clean category URL. A filtered URL canonicalizing to itself tells Google every filter
+combination is a distinct page worth crawling and indexing — the opposite of the intent.
+
+```bash
+# Compare the clean category's canonical against a filtered variant's.
+curl -s "https://<production-host>/product-category/<slug>/" | grep -o '<link rel="canonical"[^>]*>'
+curl -s "https://<production-host>/product-category/<slug>/?orderby=price" | grep -o '<link rel="canonical"[^>]*>'
+```
+
+Both must print the same clean URL. If the filtered fetch prints its own `?orderby=price` URL,
+that is the defect. A `noindex` on the filtered variant is an acceptable alternative to a
+canonical redirect — but the store needs **one** strategy applied consistently, not a
+canonical on some filters and a bare noindex on others.
+
+### 18.2 Paginated category pages canonicalizing to page 1 (SEO-065)
+
+The opposite mistake from 18.1. Category pagination (`/product-category/<slug>/page/2/`) must
+be **self-referencing** — canonical to page 1 is the classic error and, unlike a paginated
+single post, is never the correct default here: it tells Google the products listed only on
+page 2+ do not exist, and they drop out of the index entirely. Self-canonicalizing page 2+ is
+the required, not merely tolerated, behavior for a WooCommerce category archive.
+
+```bash
+curl -s "https://<production-host>/product-category/<slug>/page/2/" | grep -o '<link rel="canonical"[^>]*>'
+# Must contain .../page/2/ — a bare category URL here is the SEO-065 defect.
+```
+
+### 18.3 `Offer.availability` disagreeing with real stock (SEO-066)
+
+```bash
+curl -s "https://<production-host>/product/<slug>/" > /tmp/product.html
+grep -o '"@type":"Product".*"availability":"[^"]*"' /tmp/product.html
+grep -oE 'class="[^"]*\b(in|out)ofstock\b[^"]*"' /tmp/product.html
+```
+
+`https://schema.org/InStock` next to an `outofstock` class from the same fetch is the finding.
+Compare against the page's own rendered signal, not a WP-CLI stock query against the local
+database — a live availability claim compared with a possibly-stale clone value would flag
+stock that already changed in production. This is not cosmetic: Google has taken manual action
+against Product-schema spam before, and a stale `InStock` claim on a page the visitor sees
+marked "Out of stock" is exactly that shape of mismatch.
+
+### 18.4 Sitemap listing a noindexed URL (SEO-067)
+
+A product can be discontinued and noindexed while the XML sitemap generator has not yet
+regenerated and still lists it — indexed in the sitemap, excluded by the tag, two opposite
+signals for the same URL.
+
+```bash
+$WP eval "echo home_url('/product-sitemap.xml');"
+curl -s "https://<production-host>/product-sitemap.xml" \
+  | grep -oE '<loc>[^<]+</loc>' | sed 's/<[^>]*>//g' > /tmp/sitemap-urls.txt
+while read -r u; do
+  curl -s "$u" | grep -qi 'noindex' && echo "SITEMAP+NOINDEX: $u"
+done < /tmp/sitemap-urls.txt
+```
+
+Reuse the sitemap failure-mode table in §15 (#4, "Noindex pages in sitemap") for the same
+comparison against Rank Math's own exclusion logic — §15 asks whether Rank Math is configured
+to exclude noindex URLs at generation time; this check confirms it actually did, against the
+sitemap as currently served.
+
+### 18.5 Post-migration reminder: reviews and the 301 map (SEO-068)
+
+Two losses a URL or platform migration causes, and that nothing recovers afterward:
+
+- **Reviews and `AggregateRating`** disappear from the schema if review rows are not migrated
+  under the same product IDs — the SERP stars go with them.
+- **Old indexed URLs** lose their ranking authority unless mapped one-to-one (301) to their new
+  equivalent. A blanket redirect of everything to the home page is treated by Google as a soft
+  404, not a redirect, and none of the old authority carries over.
+
+This is a reminder to raise, not a code scan or a live fetch: fire it once when a migration
+signal is present (`.wp-create.json` `source: restore` or a `migration` note, or the operator
+naming a recent platform/URL-structure change) and name the two losses above. It is never
+auto-fixed — the redirect map and the review migration are decisions for the team doing the
+move, not something an audit can generate from the running site.
