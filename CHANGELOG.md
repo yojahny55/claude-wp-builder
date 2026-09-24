@@ -4,6 +4,13 @@
 
 ### Added
 
+- **`store-kit`, a plugin this repository ships into stores.** Catalog mode (prices shown,
+  nothing purchasable — the Store API refuses add-to-cart, Cart and Checkout redirect to the
+  shop) and Stripe keys supplied from `STORE_KIT_STRIPE_*` constants in `wp-config.php`: merged
+  in when the gateway reads its settings and stripped when it saves them, so no database dump
+  or clone carries a working key. `bin/store-kit-sync.sh` installs it and never downgrades.
+  `Update URI: false` and a provable Author/URI keep a same-named plugin from ever being
+  mistaken for it.
 - **A `store` block in `.wp-create.json`.** Records what a WooCommerce store sells and how —
   tier (`catalog`, `store`, `full`), address, currency, units, checkout type, enquiry channels,
   Stripe in test mode, shipping zones, tax rates — and `bin/wp-config.mjs validate` refuses a

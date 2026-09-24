@@ -478,6 +478,8 @@ Placeholder tokens (`__starter__`, `__STARTER__`, `__STARTER_NAME__`) are replac
 - `bin/wp-config.mjs` — validates, migrates and reads `.wp-create.json`; every command
   that reads the manifest calls `validate` first. Subcommands: `validate`, `migrate`,
   `render-context`, `get`, `validate-profile`.
+- `bin/store-kit-sync.sh <plugins-dir>` — copies the bundled `plugins/store-kit` into a site
+  when it has none or an older one; never downgrades.
 
 ## Conventions
 

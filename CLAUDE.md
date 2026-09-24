@@ -17,7 +17,7 @@ runtime for the plugin itself. The only executable code shipped is:
 - `bin/*.sh` — env setup, ffmpeg wrappers and gate scripts, invoked by commands
   (`wp-env-setup`, `wp-cinematic-encode`, `composition-gate`, `doc-sync-check`,
   `geo-scan`, `tailwind-native-check`, `tailwind-rebuild`, `design-md-index`,
-  `domains-import`)
+  `domains-import`, `store-kit-sync`)
 - `bin/*.mjs` — Node tools a command runs and reads the exit code of. These carry
   real logic, and several are load-bearing gates rather than helpers:
   `wp-config.mjs` (the single definition of a valid `.wp-create.json` — see
@@ -30,6 +30,10 @@ runtime for the plugin itself. The only executable code shipped is:
   `/wp-finalize` Check 4 and the practices audit).
   `bin/lib/` holds what they share.
 - `skills/wp-polylang/scripts/*.php` — run inside a real WordPress via `wp eval-file`
+- `plugins/store-kit/` — a WordPress plugin copied into stores by `/wp-create` and
+  `/wp-woo-setup` through `bin/store-kit-sync.sh`: catalog mode, and Stripe keys read from
+  `wp-config.php` instead of the database. Held to the PHP 7.4 floor, and exercised against a
+  real WooCommerce in the fixture.
 - `starter-theme/**` — PHP copied into user projects (never executed here)
 
 Editing a "feature" therefore usually means editing prose contracts, and the tests assert on
