@@ -168,6 +168,17 @@ fi
 grep -Fq '<!DOCTYPE html>' "$html" || fail "$html is not a complete document"
 grep -Fq '@media print' "$html" || fail "$html has no print rules, so printing to PDF is what it looks like"
 
+# The reader's colour scheme is honoured with no input, and the switch and the severity
+# filter work without a script -- a mail client strips scripts, and the rule above forbids
+# them anyway. Each needle is the mechanism, not a class name that could survive without it.
+grep -Fq 'prefers-color-scheme:dark' "$html" || fail "$html ignores a reader's dark colour scheme"
+grep -Fq ':root:has(#theme:checked)' "$html" || fail "$html has no script-free theme switch"
+grep -Fq 'tr[data-sev="INFO"]' "$html" || fail "$html has no script-free severity filter"
+grep -Fq 'data-sev="CRITICAL"' "$html" || fail "$html does not tag finding rows by severity, so the filter hides nothing"
+# Printing ignores both: a PDF made while a filter was on must still carry every finding.
+grep -Fq 'tr[data-sev]{display:table-row!important}' "$html" \
+  || fail "$html lets an active filter drop rows from the printed report"
+
 # ---------------------------------------------------------------------------
 # 3. The comparison, on a second run
 # ---------------------------------------------------------------------------

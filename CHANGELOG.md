@@ -81,6 +81,23 @@
 
 ### Changed
 
+- **The HTML deliverable read like a raw table dump.** `bin/audit-report.mjs` rendered one
+  long unstyled page: plain counts, a flat plan table and no way to narrow 100+ findings to
+  the ones that matter. The HTML now follows the layout of a mature audit report:
+  - a header with key figures (findings, critical, warnings, info, not measured) and a sticky
+    table of contents;
+  - sections as cards, with counts coloured by what they count and a zero shown as good news;
+  - severity chips and owner tags (code, setting, content, manual);
+  - findings grouped by category in collapsible panels, with resource and evidence under each
+    problem;
+  - a legend that explains what each owner means for who applies the fix.
+
+  It also follows the reader's system colour scheme and has a dark/light switch. The switch
+  and the "critical only / critical and warnings" filter are pure CSS (a hidden input and
+  `:has()`), so the file still carries no script and fetches nothing. Printing forces the
+  light palette and every row back on, so a PDF made while a filter was active still carries
+  every finding. The Markdown output is unchanged.
+
 - **`/wp-audit` asks for report-only as its first question when `--report-only` is absent.**
   Before, a run without the flag only reached the fix/no-fix decision at Step 9, after Step 4
   had already offered to install Rank Math, AIOS or SCF and Step 5 to pick an AIOS security

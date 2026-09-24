@@ -531,139 +531,339 @@ function escapeHtml(value) {
 // One file, no external stylesheet, no script, no font. It is opened by double-click,
 // forwarded as an attachment and printed to PDF from the browser — every one of which
 // breaks the moment the page fetches something.
+//
+// The two things a reader clicks — the theme switch and the severity filter — are
+// therefore CSS, not script: a hidden input and `:has()`. A mail client that strips
+// scripts, or a print dialog, leaves both working or harmlessly inert, and the page
+// still honours the reader's system colour scheme with no input at all.
+const HTML_UI = {
+  en: {
+    kicker: 'WordPress audit report',
+    findings: 'findings',
+    critical: 'critical',
+    warnings: 'warnings',
+    info: 'info',
+    unmeasured: 'not measured',
+    detail: 'Findings by category',
+    show: 'Show:',
+    all: 'All',
+    onlyCritical: 'Critical only',
+    criticalAndWarnings: 'Critical and warnings',
+    dark: 'Dark mode',
+    light: 'Light mode',
+    total: 'Total',
+    evidence: 'Evidence',
+    resource: 'Resource',
+    who: 'Who',
+    legend: 'Legend',
+    legendSeverity: 'Severity',
+    legendOwner: 'Who applies the fix',
+    ownerHelp: {
+      code: 'a file in the theme or the site\'s own plugins; fixed once, travels with the commit.',
+      setting: 'a WordPress option, a plugin\'s configuration, a server or CDN rule — does not travel with the commit.',
+      content: 'a text somebody has to write or decide: descriptions, alternative text, links.',
+      manual: 'human judgement, an external provider, or vendor code that is worked around rather than edited.',
+    },
+    categoryNames: {
+      security: 'Security', seo: 'SEO', a11y: 'Accessibility', performance: 'Performance',
+      'best-practices': 'Best practices', geo: 'GEO / AI agents', usability: 'Usability',
+    },
+  },
+  es: {
+    kicker: 'Informe de auditoría WordPress',
+    findings: 'hallazgos',
+    critical: 'críticos',
+    warnings: 'advertencias',
+    info: 'informativos',
+    unmeasured: 'sin medir',
+    detail: 'Hallazgos por categoría',
+    show: 'Ver:',
+    all: 'Todos',
+    onlyCritical: 'Solo críticos',
+    criticalAndWarnings: 'Críticos y advertencias',
+    dark: 'Modo oscuro',
+    light: 'Modo claro',
+    total: 'Total',
+    evidence: 'Evidencia',
+    resource: 'Recurso',
+    who: 'Quién',
+    legend: 'Leyenda',
+    legendSeverity: 'Severidad',
+    legendOwner: 'Quién aplica la corrección',
+    ownerHelp: {
+      code: 'archivo del tema o de un plugin propio; se corrige una vez y viaja con el commit.',
+      setting: 'opción de WordPress, configuración de un plugin, regla del servidor o del CDN; no viaja con el commit.',
+      content: 'hay que escribir o decidir un texto: descripciones, textos alternativos, enlaces.',
+      manual: 'juicio humano, proveedor externo o código de terceros que se sortea en lugar de editarse.',
+    },
+    categoryNames: {
+      security: 'Seguridad', seo: 'SEO', a11y: 'Accesibilidad', performance: 'Rendimiento',
+      'best-practices': 'Buenas prácticas', geo: 'GEO / agentes IA', usability: 'Usabilidad',
+    },
+  },
+};
+
+// Light values first; the dark block redefines the same tokens, so no rule below names a
+// colour directly. A rule that did would stay light in dark mode, which is how a dark
+// theme ends up with one white table in the middle of it.
+const HTML_TOKENS_LIGHT = `--ink:#1b1f24;--muted:#5b6672;--rule:#e3e7ec;--canvas:#f6f7f9;--paper:#fff;
+  --ok:#1a7f4b;--ok-bg:#e6f4ec;--ok-rule:#c6e6d5;--bad:#c0362c;--bad-bg:#fbeae8;--bad-rule:#f2cfcb;
+  --mid:#9a6a00;--mid-bg:#fdf3e0;--mid-rule:#f0dcb4;--info:#2b5fa8;--info-bg:#e9f0fb;--info-rule:#cfe0f6;
+  --na:#7a828c;--na-bg:#eef0f3;--na-rule:#dfe3e8;--bar:rgba(255,255,255,.96);--hover:#fafbfc;color-scheme:light;`;
+const HTML_TOKENS_DARK = `--ink:#e6e9ee;--muted:#9aa4b0;--rule:#2c333c;--canvas:#0f1318;--paper:#171c22;
+  --ok:#4cc38a;--ok-bg:#11291d;--ok-rule:#1d4a33;--bad:#ff7b72;--bad-bg:#3a1714;--bad-rule:#5c2520;
+  --mid:#e3b341;--mid-bg:#352a0c;--mid-rule:#5a4513;--info:#79b8ff;--info-bg:#132a45;--info-rule:#24476e;
+  --na:#8b949e;--na-bg:#232a32;--na-rule:#333b45;--bar:rgba(23,28,34,.94);--hover:#1c232b;color-scheme:dark;`;
+
+const HTML_CSS = `
+:root{${HTML_TOKENS_LIGHT}}
+@media (prefers-color-scheme:dark){:root{${HTML_TOKENS_DARK}}}
+/* The switch inverts whatever the system chose, so it works from either starting point. */
+:root:has(#theme:checked){${HTML_TOKENS_DARK}}
+@media (prefers-color-scheme:dark){:root:has(#theme:checked){${HTML_TOKENS_LIGHT}}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--canvas);color:var(--ink);
+  font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-text-size-adjust:100%}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+h1{font-size:30px;margin:.1em 0 .2em;letter-spacing:-.01em}
+h2{font-size:22px;margin:0 0 16px;padding-bottom:8px;border-bottom:2px solid var(--rule)}
+p{margin:0 0 12px}
+code{background:var(--na-bg);padding:1px 5px;border-radius:4px;font-size:.9em}
+.top{background:var(--paper);border-bottom:1px solid var(--rule);padding:34px 0 26px}
+.kicker{margin:0;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.1em}
+.meta{margin:2px 0;color:var(--muted);font-size:13.5px}
+.kpis{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}
+.kpi{background:var(--canvas);border:1px solid var(--rule);border-radius:10px;padding:12px 16px;min-width:120px}
+.kpi b{display:block;font-size:26px;line-height:1.1}
+.kpi span{color:var(--muted);font-size:12.5px}
+.kpi.big{background:var(--info-bg);border-color:var(--info-rule)}
+.kpi.big b{font-size:34px;color:var(--info)}
+b.ok{color:var(--ok)} b.bad{color:var(--bad)} b.mid{color:var(--mid)} b.info{color:var(--info)}
+.toc{position:sticky;top:0;z-index:5;background:var(--bar);border-bottom:1px solid var(--rule);
+  backdrop-filter:saturate(1.6) blur(6px)}
+.toc .wrap{display:flex;align-items:center;gap:4px;overflow-x:auto;padding-top:6px;padding-bottom:6px}
+.toc a{white-space:nowrap;padding:6px 10px;border-radius:7px;text-decoration:none;color:var(--muted);font-size:13px}
+.toc a:hover{background:var(--na-bg);color:var(--ink)}
+.theme{margin-left:auto;white-space:nowrap;cursor:pointer;font-size:13px;background:var(--paper);color:var(--ink);
+  border:1px solid var(--rule);border-radius:7px;padding:5px 11px}
+.theme .to-light{display:none}
+:root:has(#theme:checked) .theme .to-dark{display:none}
+:root:has(#theme:checked) .theme .to-light{display:inline}
+@media (prefers-color-scheme:dark){
+  .theme .to-dark{display:none} .theme .to-light{display:inline}
+  :root:has(#theme:checked) .theme .to-dark{display:inline}
+  :root:has(#theme:checked) .theme .to-light{display:none}
+}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+main{padding:28px 24px 60px}
+section{background:var(--paper);border:1px solid var(--rule);border-radius:12px;padding:24px;margin:0 0 22px}
+section,details.group{scroll-margin-top:64px}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 0 12px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--rule)}
+thead th{background:var(--canvas);color:var(--muted);font-size:12px;text-transform:uppercase;
+  letter-spacing:.04em;white-space:nowrap}
+tbody tr:hover{background:var(--hover)}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+td.nowrap{white-space:nowrap}
+.ev{color:var(--muted);word-break:break-word}
+span.ev{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;margin-top:2px;font-size:12.5px}
+.muted{color:var(--na)}
+tr.sum td{background:var(--canvas);font-weight:600;border-top:2px solid var(--rule)}
+.chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;white-space:nowrap;border:1px solid transparent}
+.sev-critical{background:var(--bad-bg);color:var(--bad);border-color:var(--bad-rule);font-weight:600}
+.sev-warning{background:var(--mid-bg);color:var(--mid);border-color:var(--mid-rule)}
+.sev-info{background:var(--na-bg);color:var(--na);border-color:var(--na-rule)}
+.sev-other,.chip.unmeasured{background:var(--info-bg);color:var(--info);border-color:var(--info-rule)}
+.score{display:inline-block;min-width:34px;text-align:center;padding:2px 7px;border-radius:6px;
+  font-weight:600;font-variant-numeric:tabular-nums}
+.score.ok{background:var(--ok-bg);color:var(--ok)} .score.bad{background:var(--bad-bg);color:var(--bad)}
+.score.mid{background:var(--mid-bg);color:var(--mid)} .score.na{background:var(--na-bg);color:var(--na)}
+.tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:12px;border:1px solid var(--rule);white-space:nowrap}
+.own-code{background:var(--info-bg);color:var(--info);border-color:var(--info-rule)}
+.own-setting{background:var(--mid-bg);color:var(--mid);border-color:var(--mid-rule)}
+.own-content{background:var(--ok-bg);color:var(--ok);border-color:var(--ok-rule)}
+.own-manual{background:var(--na-bg);color:var(--na);border-color:var(--na-rule)}
+.note{color:var(--muted);font-size:13px;border-left:3px solid var(--rule);padding-left:12px;margin-top:14px}
+.changes{margin:0;padding-left:18px} .changes li{margin-bottom:8px} .changes ul{color:var(--muted);font-size:13px}
+.legend{margin:0;padding-left:18px;font-size:13.5px} .legend li{margin-bottom:8px}
+.filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 16px;font-size:13px;color:var(--muted)}
+.filters label{cursor:pointer;background:var(--paper);border:1px solid var(--rule);border-radius:7px;padding:5px 11px;color:var(--ink)}
+.filters input:checked+label{background:var(--info);border-color:var(--info);color:var(--paper)}
+.filters input:focus-visible+label{outline:2px solid var(--info);outline-offset:2px}
+:root:has(#filter-critical:checked) tr[data-sev="WARNING"],
+:root:has(#filter-critical:checked) tr[data-sev="INFO"],
+:root:has(#filter-problems:checked) tr[data-sev="INFO"]{display:none}
+details.group{border:1px solid var(--rule);border-radius:10px;margin-bottom:12px;background:var(--paper)}
+details.group>summary{cursor:pointer;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;list-style:none}
+details.group>summary::-webkit-details-marker{display:none}
+details.group>summary::before{content:"▸";color:var(--muted);font-size:12px}
+details.group[open]>summary::before{content:"▾"}
+details.group[open]>summary{border-bottom:1px solid var(--rule);background:var(--canvas);border-radius:10px 10px 0 0}
+details.group>.scroll{margin:0 16px 16px}
+.pill{background:var(--na-bg);color:var(--muted);border-radius:999px;padding:2px 9px;font-size:12px}
+.pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.mid{background:var(--mid-bg);color:var(--mid)}
+footer{color:var(--muted);font-size:12.5px;padding-bottom:36px}
+@media (max-width:720px){
+  .wrap{padding:0 14px} main{padding:18px 14px 40px} section{padding:16px}
+  h1{font-size:24px} .kpi.big b{font-size:28px}
+}
+@media print{
+  :root,:root:has(#theme:checked){${HTML_TOKENS_LIGHT}}
+  body{background:#fff} .toc,.filters,.theme{display:none}
+  tr[data-sev]{display:table-row!important}
+  section{border:none;padding:0;margin-bottom:18px}
+  details.group{border:none} details.group>.scroll{margin:0}
+  h2{break-after:avoid} tr{break-inside:avoid}
+  span.ev{display:block;overflow:visible;-webkit-line-clamp:none}
+}`;
+
 function renderHtml(model) {
   const t = model.t;
-  const row = (cells, tag = 'td') =>
-    `<tr>${cells.map((cell) => `<${tag}>${cell}</${tag}>`).join('')}</tr>`;
+  const ui = HTML_UI[model.lang] || HTML_UI.en;
+  const esc = escapeHtml;
+  const sevChip = (severity) =>
+    `<span class="chip sev-${severity in SEVERITY_ORDER ? severity.toLowerCase() : 'other'}">${esc(
+      t.severity[severity] || severity,
+    )}</span>`;
+  const ownTag = (owner) => `<span class="tag own-${owner}">${esc(t.ownership[owner] || owner)}</span>`;
+  // A zero is good news and is coloured as such; a count is coloured by what it counts.
+  const score = (value, tone) => `<span class="score ${value ? tone : 'ok'}">${value}</span>`;
+  const categoryName = (name) => ui.categoryNames[name] || name;
+  const slug = (value) => String(value).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const c = model.counts;
 
-  const planRows = model.plan
-    .map((finding) =>
-      row([
-        `<span class="sev sev--${finding.severity.toLowerCase()}">${escapeHtml(t.severity[finding.severity])}</span>`,
-        `<code>${escapeHtml(identity(finding))}</code>`,
-        escapeHtml(finding.page || '—'),
-        escapeHtml(finding.message),
-        escapeHtml(finding.fix || '—'),
-        `<span class="own own--${finding.ownership}">${escapeHtml(t.ownership[finding.ownership])}</span>`,
-      ]),
-    )
-    .join('\n');
-
-  const groupTable = (heading, groups, label) => {
-    if (!groups.size) return '';
-    const body = [...groups]
-      .map(([name, list]) => {
-        const c = counts(list);
-        return row([escapeHtml(name), c.CRITICAL, c.WARNING, c.INFO]);
-      })
-      .join('\n');
-    return `<h2>${escapeHtml(heading)}</h2>
-<table><thead>${row(
-      [label, t.severity.CRITICAL, t.severity.WARNING, t.severity.INFO].map(escapeHtml),
-      'th',
-    )}</thead><tbody>
-${body}
-</tbody></table>`;
+  const countRow = (label, list) => {
+    const n = counts(list);
+    return `<tr><td>${label}</td><td>${score(n.CRITICAL, 'bad')}</td><td>${score(n.WARNING, 'mid')}</td><td>${score(
+      n.INFO,
+      'na',
+    )}</td><td class="num">${n.total}</td></tr>`;
   };
+  const groupTable = (heading, id, groups, label, name) => {
+    if (!groups.size) return '';
+    const rows = [...groups].map(([key, list]) => countRow(name(key), list)).join('');
+    return `<section id="${id}"><h2>${esc(heading)}</h2><div class="scroll"><table>
+<thead><tr><th>${esc(label)}</th><th>${esc(t.severity.CRITICAL)}</th><th>${esc(t.severity.WARNING)}</th><th>${esc(
+      t.severity.INFO,
+    )}</th><th>${esc(ui.total)}</th></tr></thead>
+<tbody>${rows}<tr class="sum"><td>${esc(ui.total)}</td><td>${score(c.CRITICAL, 'bad')}</td><td>${score(
+      c.WARNING,
+      'mid',
+    )}</td><td>${score(c.INFO, 'na')}</td><td class="num">${c.total}</td></tr></tbody></table></div></section>`;
+  };
+
+  const findingRow = (finding) => `<tr data-sev="${esc(finding.severity)}">
+<td class="nowrap">${sevChip(finding.severity)}</td>
+<td class="num">${esc(finding.check)}</td>
+<td>${finding.page ? `<code>${esc(finding.page)}</code>` : '<span class="muted">—</span>'}</td>
+<td><b>${esc(finding.message)}</b>${finding.resource ? `<br><span class="muted">${esc(ui.resource)}: ${esc(finding.resource)}</span>` : ''}${
+    finding.evidence ? `<span class="ev" title="${esc(finding.evidence)}">${esc(ui.evidence)}: ${esc(finding.evidence)}</span>` : ''
+  }</td>
+<td class="ev">${finding.fix ? esc(finding.fix) : '<span class="muted">—</span>'}</td>
+<td class="nowrap">${ownTag(finding.ownership)}</td></tr>`;
+  const findingTable = (list) => `<div class="scroll"><table>
+<thead><tr>${[t.priority, t.code, t.page, t.problem, t.todo, t.applied].map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead>
+<tbody>${list.map(findingRow).join('\n')}</tbody></table></div>`;
 
   const comparisonBlock = () => {
-    if (!model.comparison) return `<p>${escapeHtml(t.noPrevious)}</p>`;
-    const c = model.comparison;
-    const list = (label, items) =>
-      `<li><strong>${escapeHtml(label)}:</strong> ${items.length}<ul>${sortForPlan(items)
-        .map((finding) => `<li><code>${escapeHtml(identity(finding))}</code> — ${escapeHtml(finding.message)}</li>`)
+    if (!model.comparison) return `<p class="note">${esc(t.noPrevious)}</p>`;
+    const cmp = model.comparison;
+    const list = (label, items, tone) =>
+      `<li><b class="${tone}">${esc(label)}:</b> ${items.length}<ul>${sortForPlan(items)
+        .map((finding) => `<li><code>${esc(identity(finding))}</code> — ${esc(finding.message)}</li>`)
         .join('')}</ul></li>`;
-    return `<p><strong>${escapeHtml(t.previousRun)}:</strong> ${escapeHtml(c.date)} — ${escapeHtml(
-      scoreSentence(t, c.counts)
-      + (c.unmeasured ? fill(t.previousUnmeasured, { unmeasured: c.unmeasured }) : ''),
+    return `<p><b>${esc(t.previousRun)}:</b> ${esc(cmp.date)} — ${esc(
+      scoreSentence(t, cmp.counts) + (cmp.unmeasured ? fill(t.previousUnmeasured, { unmeasured: cmp.unmeasured }) : ''),
     )}</p>
-<ul>${list(t.improved, c.resolved)}${list(t.regressed, c.added)}${list(t.carried, c.carried)}</ul>`;
+<ul class="changes">${list(t.improved, cmp.resolved, 'ok')}${list(t.regressed, cmp.added, 'bad')}${list(t.carried, cmp.carried, 'mid')}</ul>`;
   };
 
+  // The detail groups by category when the run carries one, and falls back to a single
+  // group so a run without categories still lists every finding.
+  const byCategory = model.byCategory.size ? model.byCategory : new Map([[null, model.plan]]);
+  const groups = [...byCategory]
+    .map(([name, list], i) => {
+      const n = counts(list);
+      return `<details class="group" id="cat-${slug(name || 'all')}"${i === 0 ? ' open' : ''}>
+<summary><b>${esc(name ? categoryName(name) : t.plan)}</b> <span class="pill">${n.total} ${esc(ui.findings)}</span>${
+        n.CRITICAL ? ` <span class="pill bad">${n.CRITICAL} ${esc(ui.critical)}</span>` : ''
+      }${n.WARNING ? ` <span class="pill mid">${n.WARNING} ${esc(ui.warnings)}</span>` : ''}</summary>
+${findingTable(sortForPlan(list))}</details>`;
+    })
+    .join('\n');
+
   const unmeasuredBlock = model.unmeasured.length
-    ? `<p>${escapeHtml(t.unmeasuredNote)}</p><ul>${model.unmeasured
-        .map((entry) => `<li><code>${escapeHtml(entry.check)}</code> — ${escapeHtml(entry.reason || entry.message || '')}</li>`)
-        .join('')}</ul>`
-    : `<p>${escapeHtml(t.none)}</p>`;
+    ? `<p>${esc(t.unmeasuredNote)}</p><div class="scroll"><table><thead><tr><th>${esc(t.code)}</th><th></th><th>${esc(
+        t.problem,
+      )}</th></tr></thead><tbody>${model.unmeasured
+        .map(
+          (entry) =>
+            `<tr><td class="num">${esc(entry.check)}</td><td><span class="chip unmeasured">${esc(t.unmeasured)}</span></td><td class="ev">${esc(
+              entry.reason || entry.message || '',
+            )}</td></tr>`,
+        )
+        .join('')}</tbody></table></div>`
+    : `<p>${esc(t.none)}</p>`;
+
+  const toc = [
+    ['summary', t.summary],
+    ['comparison', t.comparison],
+    model.byCategory.size ? ['by-category', t.byCategory] : null,
+    model.byPage.size ? ['by-page', t.byPage] : null,
+    ['plan', t.plan],
+    ['unmeasured', t.unmeasured],
+    ['legend', ui.legend],
+  ].filter(Boolean);
 
   return `<!DOCTYPE html>
 <html lang="${model.lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(`${t.title} — ${model.site} — ${model.date}`)}</title>
-<style>
-  :root {
-    --ink: #16191d;
-    --muted: #5b6470;
-    --rule: #dfe3e8;
-    --canvas: #ffffff;
-    --critical: #b3261e;
-    --warning: #8a5a00;
-    --info: #3c4650;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0 auto;
-    padding: 2.5rem 1rem 4rem;
-    max-width: 62rem;
-    background: var(--canvas);
-    color: var(--ink);
-    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  }
-  h1 { font-size: 1.9rem; margin: 0 0 .5rem; }
-  h2 { font-size: 1.25rem; margin: 2.5rem 0 .75rem; padding-bottom: .3rem; border-bottom: 1px solid var(--rule); }
-  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .875em; }
-  dl.meta { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1rem; margin: 0 0 1.5rem; }
-  dl.meta dt { color: var(--muted); }
-  dl.meta dd { margin: 0; }
-  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .9375rem; }
-  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
-  th { font-size: .8125rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
-  .sev { font-weight: 600; }
-  .sev--critical { color: var(--critical); }
-  .sev--warning { color: var(--warning); }
-  .sev--info { color: var(--info); }
-  .own { white-space: nowrap; }
-  blockquote { margin: 1rem 0; padding: .75rem 1rem; border-left: 3px solid var(--rule); color: var(--muted); }
-  ul ul { color: var(--muted); }
-  @media print {
-    body { padding: 0; max-width: none; font-size: 11pt; }
-    h2 { break-after: avoid; }
-    tr { break-inside: avoid; }
-  }
-</style>
+<meta name="robots" content="noindex">
+<title>${esc(`${t.title} — ${model.site} — ${model.date}`)}</title>
+<style>${HTML_CSS}</style>
 </head>
 <body>
-<h1>${escapeHtml(`${t.title} — ${model.site}`)}</h1>
-<dl class="meta">
-  <dt>${escapeHtml(t.date)}</dt><dd>${escapeHtml(model.date)}</dd>
-  ${model.tier ? `<dt>${escapeHtml(t.tier)}</dt><dd>${escapeHtml(model.tier)}</dd>` : ''}
-  ${model.categories.length ? `<dt>${escapeHtml(t.categories)}</dt><dd>${escapeHtml(model.categories.join(', '))}</dd>` : ''}
-</dl>
-
-<h2>${escapeHtml(t.summary)}</h2>
-<p>${escapeHtml(scoreSentence(t, model.counts))}</p>
-<p>${escapeHtml(fill(t.ownershipCounts, model.ownership))}</p>
-
-<h2>${escapeHtml(t.comparison)}</h2>
-${comparisonBlock()}
-
-${groupTable(t.byCategory, model.byCategory, t.category)}
-${groupTable(t.byPage, model.byPage, t.page)}
-
-<h2>${escapeHtml(t.plan)}</h2>
-<table><thead>${row(
-    [t.priority, t.code, t.page, t.problem, t.todo, t.applied].map(escapeHtml),
-    'th',
-  )}</thead><tbody>
-${planRows}
-</tbody></table>
-<p>${escapeHtml(fill(t.ownershipCounts, model.ownership))}</p>
-<blockquote>${escapeHtml(t.settingWarning.replaceAll('**', ''))}</blockquote>
-
-<h2>${escapeHtml(t.unmeasured)}</h2>
-${unmeasuredBlock}
+<input type="checkbox" id="theme" class="sr">
+<header class="top"><div class="wrap">
+<p class="kicker">${esc(ui.kicker)}</p>
+<h1>${esc(model.site)}</h1>
+<p class="meta">${esc([model.date, model.tier].filter(Boolean).join(' · '))}</p>
+${model.categories.length ? `<p class="meta">${esc(t.categories)}: ${esc(model.categories.map(categoryName).join(', '))}</p>` : ''}
+<div class="kpis">
+<div class="kpi big"><b>${c.total}</b><span>${esc(ui.findings)}</span></div>
+<div class="kpi"><b class="bad">${c.CRITICAL}</b><span>${esc(ui.critical)}</span></div>
+<div class="kpi"><b class="mid">${c.WARNING}</b><span>${esc(ui.warnings)}</span></div>
+<div class="kpi"><b>${c.INFO}</b><span>${esc(ui.info)}</span></div>
+<div class="kpi"><b class="info">${model.unmeasured.length}</b><span>${esc(ui.unmeasured)}</span></div>
+</div></div></header>
+<nav class="toc"><div class="wrap">${toc.map(([id, label]) => `<a href="#${id}">${esc(label)}</a>`).join('')}
+<label class="theme" for="theme"><span class="to-dark">🌙 ${esc(ui.dark)}</span><span class="to-light">☀️ ${esc(ui.light)}</span></label></div></nav>
+<main class="wrap">
+<section id="summary"><h2>${esc(t.summary)}</h2>
+<p>${esc(scoreSentence(t, c))}</p>
+<p>${esc(fill(t.ownershipCounts, model.ownership))}</p></section>
+<section id="comparison"><h2>${esc(t.comparison)}</h2>${comparisonBlock()}</section>
+${groupTable(t.byCategory, 'by-category', model.byCategory, t.category, (name) => `<a href="#cat-${slug(name)}">${esc(categoryName(name))}</a>`)}
+${groupTable(t.byPage, 'by-page', model.byPage, t.page, (name) => `<code>${esc(name)}</code>`)}
+<section id="plan"><h2>${esc(t.plan)}</h2>
+<div class="filters" role="radiogroup" aria-label="${esc(ui.show)}"><span>${esc(ui.show)}</span>
+<input type="radio" name="filter" id="filter-all" class="sr" checked><label for="filter-all">${esc(ui.all)}</label>
+<input type="radio" name="filter" id="filter-critical" class="sr"><label for="filter-critical">${esc(ui.onlyCritical)}</label>
+<input type="radio" name="filter" id="filter-problems" class="sr"><label for="filter-problems">${esc(ui.criticalAndWarnings)}</label></div>
+${groups}
+<p>${esc(fill(t.ownershipCounts, model.ownership))}</p>
+<p class="note">${esc(t.settingWarning.replaceAll('**', '').replaceAll('`', ''))}</p></section>
+<section id="unmeasured"><h2>${esc(t.unmeasured)}</h2>${unmeasuredBlock}</section>
+<section id="legend"><h2>${esc(ui.legend)}</h2><ul class="legend">
+<li><b>${esc(ui.legendSeverity)}:</b> ${['CRITICAL', 'WARNING', 'INFO'].map(sevChip).join(' ')}</li>
+<li><b>${esc(ui.legendOwner)}:</b><ul>${OWNERSHIP.map((owner) => `<li>${ownTag(owner)} ${esc(ui.ownerHelp[owner])}</li>`).join('')}</ul></li>
+</ul></section>
+</main>
+<footer class="wrap"><p>${esc(`${t.title} · ${model.site} · ${model.date}`)}</p></footer>
 </body>
 </html>
 `;
