@@ -23,8 +23,9 @@ AUDIT=commands/wp-audit.md
 [ -f "$SEC" ] || fail "$SEC is missing"
 [ -r "$SEC" ] || fail "$SEC exists but cannot be read"
 
-# --- SEC-040 is tabulated and CRITICAL ---
-ROW=$(grep -E '^\| SEC-040 \|' "$SEC") || fail "$SEC: SEC-040 is not tabulated"
+# --- SEC-040 is tabulated at revision 2 and CRITICAL ---
+ROW=$(grep -E '^\| SEC-040@2 \|' "$SEC") || fail "$SEC: SEC-040 is not tabulated at revision 2 (SEC-040@2)"
+if grep -Eq '^\| SEC-040 \|' "$SEC"; then fail "$SEC still tabulates SEC-040 at revision 1"; fi
 grep -Fq 'CRITICAL' <<<"$ROW" || fail "$SEC: SEC-040's table row is not CRITICAL"
 
 # Every other gate reads only the SEC-040 procedure, so a word elsewhere in the agent file
@@ -100,9 +101,13 @@ has 'never print the value itself' \
   || fail "SEC-040 does not say to withhold the credential value from the report"
 has 'never by dumping the option' || fail "SEC-040's scrub step does not forbid dumping the option"
 CODE=$(awk '/^```/{f=!f;next} f' <<<"$PROC")
-if grep -Eq 'option (get|list)|option_value|var_export|print_r|var_dump' <<<"$CODE"; then
+if grep -Eq 'option (get|list)|var_export|print_r|var_dump' <<<"$CODE"; then
   fail "a SEC-040 code block dumps option values"
 fi
+# option_value is read on purpose since revision 2 -- only through the one prepared raw read.
+bad=$(grep -n 'option_value' <<<"$CODE" | grep -Fv 'SELECT option_value FROM {$wpdb->options} WHERE option_name = %s' || true)
+[ -z "$bad" ] || fail "a SEC-040 code block touches option_value outside the prepared raw read: $bad"
+has 'Read the stored row, not the option' || fail "SEC-040 does not say why it reads the raw row"
 
 # --- Commerce gating: N/A when there is no WooCommerce, out of the denominator ---
 has 'site.commerce' || fail "SEC-040 does not read site.commerce"

@@ -107,6 +107,10 @@
 
 ### Changed
 
+- **SEC-040 reads the stored row (`SEC-040@2`).** It used `get_option()`, which runs read-time
+  filters, so a key supplied from `wp-config.php` (as `store-kit` does) would be reported as a
+  key at rest. Both the detection and the scrub read `option_value` directly now. Projects that
+  ran revision 1 see SEC-040 listed as revised in the audit's coverage line.
 - **`/wp-audit` asks for report-only as its first question when `--report-only` is absent.**
   Before, a run without the flag only reached the fix/no-fix decision at Step 9, after Step 4
   had already offered to install Rank Math, AIOS or SCF and Step 5 to pick an AIOS security

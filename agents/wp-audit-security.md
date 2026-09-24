@@ -370,7 +370,7 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 | SEC-037 | Backup or editor files inside the theme | Glob the theme for `*.bak*`, `*.orig`, `*.save`, `*~`, `*.php.[0-9]*`, `*.sql` | WARNING |
 | SEC-038 | Update counts reported without network access | Reach `api.wordpress.org` before reading any update count. See Procedure | WARNING |
 | SEC-039 | Paid downloads reachable without a purchase | WooCommerce only. Read `woocommerce_file_download_method`, then fetch a real `woocommerce_uploads` file over HTTP and read the status. See Procedure | CRITICAL |
-| SEC-040 | Gateway credentials stored at rest | Read every `woocommerce_*_settings` and `woocommerce-ppcp-*` row plus the listed gateway credential options (active or not), classify key names by segment. See Procedure | No row read holds a non-empty value classified CRITICAL | CRITICAL |
+| SEC-040@2 | Gateway credentials stored at rest | Read the stored row (not `get_option()`) of every `woocommerce_*_settings` and `woocommerce-ppcp-*` row plus the listed gateway credential options (active or not), classify key names by segment. See Procedure | No row read holds a non-empty value classified CRITICAL | CRITICAL |
 | SEC-041 | Known-vulnerable plugins/themes | Match installed plugin/theme slugs and versions against the WPScan vulnerability API (`WPSCAN_API_TOKEN`), **after the SEC-038 network gate passes**; only public slugs are sent. See Procedure | 0 vulnerable matches | CRITICAL (loaded) / WARNING (inactive) |
 | SEC-042 | Abandoned plugins | wp.org API `last_updated` older than ~2 years, or `tested` far behind the installed core version, for every loaded plugin (active, plus clone-suppressed on a local clone), **after the SEC-038 network gate passes**. See Procedure | Not abandoned | WARNING |
 
@@ -680,6 +680,14 @@ Likewise each gateway names its secrets its own way (`secret_key`, `app_secret`,
 `secret_key_v3`…), so an exact-name list, or a pattern anchored to a fixed set of suffixes,
 misses real secrets.
 
+**Read the stored row, not the option.** `get_option()` runs every `option_{$name}` filter, so a
+plugin that supplies a key when the option is read — `store-kit` merges the `STORE_KIT_STRIPE_*`
+constants from `wp-config.php` into `woocommerce_stripe_settings` this way — would be reported as
+a key at rest while the database holds none. Both snippets read `option_value` directly and
+unserialize it. This is revision 2 (`SEC-040@2`): on a site with such a filter, revision 1
+reported a CRITICAL that revision 2 does not, which is a change in what the check reports on an
+unchanged site.
+
 Three sets of rows are read:
 
 - every `woocommerce_*_settings` row, gateway or not (email settings and the like are swept
@@ -772,7 +780,11 @@ $walk = function ( $name, $enabled, $data, $path ) use ( &$walk, $classify ) {
     }
 };
 foreach ( array_unique( $names ) as $name ) {
-    $settings = get_option( $name );
+    // The stored row, not get_option(): a plugin that supplies a key when the option is read
+    // (store-kit merges wp-config.php constants into woocommerce_stripe_settings) has not put
+    // it at rest, and get_option() would report it as if it had.
+    $raw      = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $name ) );
+    $settings = null === $raw ? false : maybe_unserialize( $raw );
     $enabled  = is_array( $settings ) && isset( $settings["enabled"] ) && is_scalar( $settings["enabled"] ) ? $settings["enabled"] : "-";
     $walk( $name, $enabled, $settings, "" );
 }
@@ -865,6 +877,7 @@ option that holds a single value alike:
 
 ```bash
 $WP eval '
+global $wpdb;
 $name = "woocommerce_<gateway_id>_settings";
 // --- SEC-040 classifier: keep this block byte-identical in both snippets ---
 $prefixes = array( "mollie-payments-for-woocommerce_", "wc_square_", "woocommerce_amazon_payments_advanced_", "_mp_", "ppcp_agentic_", "jetpack_private_options" );
@@ -926,7 +939,8 @@ $scrub = function ( $data, $path ) use ( &$scrub, &$count, $classify, $name ) {
     }
     return $data;
 };
-$o = get_option( $name, null );
+$raw = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $name ) );
+$o   = null === $raw ? null : maybe_unserialize( $raw );
 if ( null === $o ) {
     printf( "%s: option not found, nothing changed\n", $name );
 } else {
