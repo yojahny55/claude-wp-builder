@@ -7,13 +7,33 @@
  * needs WordPress belongs in woo-setup.php. PHP 7.4 floor.
  */
 
-/** Arrays in a stable order: maps sorted by key, lists left as they are. Objects become maps. */
+/**
+ * A scalar as WordPress would store and read it back: `true` -> "1", `false` -> "" (both
+ * options are stored as strings), a number -> its canonical string, via json_encode so a
+ * float keeps full precision (0.1+0.2 stays distinct from 0.3). `null` is untouched --
+ * absent stays distinct from "". Strings are untouched.
+ */
+function wooset_scalar( $value ) {
+	if ( is_bool( $value ) ) {
+		return $value ? '1' : '';
+	}
+	if ( is_int( $value ) || is_float( $value ) ) {
+		return json_encode( $value );
+	}
+	return $value;
+}
+
+/**
+ * Arrays in a stable order: maps sorted by key, lists left as they are. Objects become maps.
+ * Scalar leaves are normalised through wooset_scalar, recursively, so a value read from
+ * WordPress and the same value handed in as a native PHP type compare equal.
+ */
 function wooset_sort( $value ) {
 	if ( is_object( $value ) ) {
 		$value = get_object_vars( $value );
 	}
 	if ( ! is_array( $value ) ) {
-		return $value;
+		return wooset_scalar( $value );
 	}
 	foreach ( $value as $k => $v ) {
 		$value[ $k ] = wooset_sort( $v );
@@ -43,6 +63,9 @@ function wooset_hash( $value ) {
  * An absent value is nobody's choice, so it is always set -- which is also how a setting added
  * in a later version reaches a store setup has already run on. A recorded hash is the proof
  * this script wrote the current value; without one, only a fresh store is the script's.
+ *
+ * Callers must pass null for an absent value (`get_option( $name, null )`), never
+ * get_option()'s own default of `false` -- that reads as a real, present value here.
  */
 function wooset_decide( $current, $desired, $recorded, $fresh, $force ) {
 	if ( wooset_same( $current, $desired ) ) {
@@ -112,7 +135,7 @@ function wooset_locations_canon( $locations ) {
 	return $out;
 }
 
-/** A ;-separated postcode or city list as a sorted, upper-cased set -- how WooCommerce stores them. */
+/** A ;-separated postcode or city list as a sorted, deduplicated, upper-cased set -- how WooCommerce stores them. */
 function wooset_tax_list( $value ) {
 	$parts = array();
 	foreach ( explode( ';', strtoupper( (string) $value ) ) as $part ) {
@@ -121,6 +144,7 @@ function wooset_tax_list( $value ) {
 			$parts[] = $part;
 		}
 	}
+	$parts = array_values( array_unique( $parts ) );
 	sort( $parts, SORT_STRING );
 	return implode( ';', $parts );
 }

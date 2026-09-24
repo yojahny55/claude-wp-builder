@@ -10,7 +10,8 @@ lib=skills/wp-woocommerce/scripts/woo-lib.php
 command -v php >/dev/null 2>&1 || fail "php is not on PATH; this check executes the library"
 php -l "$lib" >/dev/null 2>&1 || fail "$lib does not parse"
 
-out=$(LIB="$PWD/$lib" php -d error_reporting=E_ALL -d display_errors=1 <<'PHP' 2>&1) || { printf '%s\n' "$out"; fail "woo-lib.php decisions are wrong"; }
+out=$(
+LIB="$PWD/$lib" php -d error_reporting=E_ALL -d display_errors=1 <<'PHP' 2>&1
 <?php
 ob_start();
 require getenv( 'LIB' );
@@ -31,6 +32,12 @@ check( 'store with orders, no record', wooset_decide( 'no', 'yes', null, false, 
 check( 'our own earlier value', wooset_decide( '10.00', '11.00', wooset_hash( '10.00' ), false, false ), 'set' );
 check( 'edited after we wrote it, even on a fresh store', wooset_decide( '12.00', '11.00', wooset_hash( '10.00' ), true, false ), 'client' );
 check( 'force takes it back', wooset_decide( '12.00', '11.00', wooset_hash( '10.00' ), false, true ), 'set' );
+check( 'a stored string equals the int WordPress would read it back as', wooset_same( '100', 100 ), true );
+check( 'a stored "1" equals true', wooset_same( true, '1' ), true );
+check( 'a stored "" equals false', wooset_same( false, '' ), true );
+check( 'absent is not the same as an empty string', wooset_same( null, '' ), false );
+check( 'floats keep their precision', wooset_same( 0.1 + 0.2, 0.3 ), false );
+check( 'a string already equal to the desired int is ok', wooset_decide( '100', 100, null, false, false ), 'ok' );
 check( 'map key order does not matter', wooset_same( array( 'b' => 1, 'a' => 2 ), array( 'a' => 2, 'b' => 1 ) ), true );
 check( 'list order does', wooset_same( array( 'setup', 'extended' ), array( 'extended', 'setup' ) ), false );
 check( 'objects compare like maps', wooset_same( (object) array( 'skipped' => true ), array( 'skipped' => true ) ), true );
@@ -57,6 +64,7 @@ check( 'one rate written two ways is one key', wooset_tax_key( $a ), wooset_tax_
 check( 'rate to four places', $a['rate'], '6.0000' );
 $p = wooset_tax_row( array( 'country' => 'US', 'name' => 'x', 'rate' => '1', 'postcode' => '33602; 33601' ) );
 check( 'postcodes compare as a set', $p['postcode'], '33601;33602' );
+check( 'a repeated postcode is one entry', wooset_tax_list( '33602;33602' ), '33602' );
 check( 'another name is another rate', wooset_tax_key( wooset_tax_row( array( 'country' => 'US', 'state' => 'FL', 'rate' => '6', 'name' => 'County' ) ) ) === wooset_tax_key( $a ), false );
 $z = wooset_tax_row( array( 'country' => 'US', 'name' => 'x', 'rate' => '1', 'shipping' => '0' ) );
 check( "the database's '0' is false", $z['shipping'], false );
@@ -77,5 +85,6 @@ check( 'summary', wooset_summary( array( 'set' => 2, 'ok' => 30, 'client' => 1, 
 check( 'plan', wooset_summary( array( 'set' => 2, 'ok' => 30, 'client' => 1, 'degraded' => 1 ), true ), "plan: 2 to set, 30 already right, 1 client's, 1 degraded" );
 exit( $fail );
 PHP
+) || { printf '%s\n' "$out"; fail "woo-lib.php decisions are wrong"; }
 [ -z "$out" ] || { printf '%s\n' "$out"; fail "woo-lib.php printed output"; }
 echo PASS
