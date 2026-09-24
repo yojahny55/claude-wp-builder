@@ -19,38 +19,68 @@
  */
 
 /**
- * Extract a named top-level function's full source (the `function ...` line
- * through its matching closing brace) by counting braces, not by a fixed
- * line count — the function's own body has a nested `if`, so a regex that
- * stops at the first standalone "}" would truncate it.
+ * Extract a named top-level function's full source (the `function` keyword
+ * through its matching closing brace) with PHP's own tokenizer, not a regex or
+ * a character-level brace count: a brace inside a string, a comment or a
+ * heredoc is part of that token, never a `{` / `}` token, so it cannot move
+ * the end of the slice. Only a `function <name>` at brace depth 0 matches, so
+ * a docblock naming the function or a same-named method is never picked up.
  */
 function mmfx_extract_function( $source, $name ) {
-	// Anchored at a line-start `function` token, so a docblock or comment that
-	// names the function in prose cannot be sliced out instead of its definition.
-	if ( ! preg_match( '/^function ' . preg_quote( $name, '/' ) . '\b/m', $source, $m, PREG_OFFSET_CAPTURE ) ) {
-		return null;
-	}
-	$start = $m[0][1];
+	$tokens = token_get_all( $source );
+	$n      = count( $tokens );
+	$depth  = 0;
+	$start  = null;
+	$out    = '';
 
-	$brace_start = strpos( $source, '{', $start );
-	if ( false === $brace_start ) {
-		return null;
-	}
+	for ( $i = 0; $i < $n; $i++ ) {
+		$tok  = $tokens[ $i ];
+		$id   = is_array( $tok ) ? $tok[0] : $tok;
+		$text = is_array( $tok ) ? $tok[1] : $tok;
 
-	$depth = 0;
-	$len   = strlen( $source );
+		if ( null === $start && 0 === $depth && T_FUNCTION === $id ) {
+			$k = $i + 1;
+			while ( $k < $n && is_array( $tokens[ $k ] ) && T_WHITESPACE === $tokens[ $k ][0] ) {
+				$k++;
+			}
+			if ( $k < $n && is_array( $tokens[ $k ] ) && T_STRING === $tokens[ $k ][0] && $tokens[ $k ][1] === $name ) {
+				$start = $i;
+			}
+		}
+		if ( null !== $start ) {
+			$out .= $text;
+		}
 
-	for ( $i = $brace_start; $i < $len; $i++ ) {
-		if ( '{' === $source[ $i ] ) {
+		if ( '{' === $id || T_CURLY_OPEN === $id || T_DOLLAR_OPEN_CURLY_BRACES === $id ) {
 			++$depth;
-		} elseif ( '}' === $source[ $i ] ) {
+		} elseif ( '}' === $id ) {
 			--$depth;
-			if ( 0 === $depth ) {
-				return substr( $source, $start, $i - $start + 1 );
+			if ( null !== $start && 0 === $depth ) {
+				return $out;
 			}
 		}
 	}
 
+	return null;
+}
+
+/**
+ * Fail loudly at extraction time, not later in the assertions: the slice must
+ * start with this function's own signature, end on its closing brace and
+ * parse as PHP on its own. Returns an error message, or null when it is sound.
+ */
+function mmfx_check_extracted( $code, $name ) {
+	if ( ! preg_match( '/^function\s+' . preg_quote( $name, '/' ) . '\s*\(/', $code ) ) {
+		return "{$name}(): extracted slice does not start with its own signature";
+	}
+	if ( '}' !== substr( rtrim( $code ), -1 ) ) {
+		return "{$name}(): extracted slice does not end on a closing brace";
+	}
+	try {
+		token_get_all( "<?php\n" . $code, TOKEN_PARSE );
+	} catch ( ParseError $e ) {
+		return "{$name}(): extracted slice does not parse — " . $e->getMessage();
+	}
 	return null;
 }
 
@@ -61,10 +91,10 @@ $failed = 0;
  * behavioral checks — a brace-counting bug here would silently validate
  * nothing.
  */
-$extractor_fixture = "function foo( \$x ) {\n\tif ( \$x ) {\n\t\treturn 1;\n\t}\n\treturn 0;\n}\n";
-$extracted          = mmfx_extract_function( "// noise\n" . $extractor_fixture . "\n// trailing noise", 'foo' );
+$extractor_fixture = "function foo( \$x ) {\n\tif ( \$x ) {\n\t\treturn '} {';\n\t}\n\t// a stray } in a comment\n\treturn \"{\$x}\";\n}\n";
+$extracted          = mmfx_extract_function( "<?php\n/* function foo() { */\n" . $extractor_fixture . "\nfunction bar() {}\n", 'foo' );
 if ( trim( (string) $extracted ) !== trim( $extractor_fixture ) ) {
-	fwrite( STDERR, "extractor mishandled a nested brace:\n" . var_export( $extracted, true ) . "\n" );
+	fwrite( STDERR, "extractor mishandled a nested brace, or one inside a string or comment:\n" . var_export( $extracted, true ) . "\n" );
 	$failed++;
 }
 
@@ -89,8 +119,22 @@ if ( null === $bucket_fn ) {
 	exit( 1 );
 }
 
-// phpcs:ignore -- eval() runs the real script's own two functions, not a reimplementation.
-eval( $cutoff_fn . "\n" . $bucket_fn );
+foreach ( array( 'mmf_compute_archive_cutoff' => $cutoff_fn, 'mmf_bucket_for' => $bucket_fn ) as $name => $code ) {
+	$problem = mmfx_check_extracted( $code, $name );
+	if ( null !== $problem ) {
+		fwrite( STDERR, $problem . "\n" );
+		exit( 1 );
+	}
+}
+
+// The real script's own two functions, loaded from a temporary file rather than eval().
+$tmp = tempnam( sys_get_temp_dir(), 'mmfx_' );
+if ( false === $tmp || false === file_put_contents( $tmp, "<?php\n" . $cutoff_fn . "\n\n" . $bucket_fn . "\n" ) ) {
+	fwrite( STDERR, "cannot write the extracted functions to a temporary file\n" );
+	exit( 1 );
+}
+require $tmp;
+unlink( $tmp );
 
 if ( ! function_exists( 'mmf_compute_archive_cutoff' ) || ! function_exists( 'mmf_bucket_for' ) ) {
 	fwrite( STDERR, "extracted function bodies did not define the expected functions\n" );
