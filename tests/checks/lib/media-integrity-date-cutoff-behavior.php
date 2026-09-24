@@ -87,6 +87,15 @@ function mmfx_check_extracted( $code, $name ) {
 $failed = 0;
 
 /*
+ * The script's frame is UTC: WordPress sets it at bootstrap, and this test does
+ * not load WordPress. Without it the epoch and zeroed post_date cases flip to
+ * BEFORE-ARCHIVE on a host whose default timezone is west of UTC, where
+ * strtotime( '1970-01-01 00:00:00' ) is positive. The Y-m-d cases round-trip
+ * through strtotime() and date() in one frame, so they do not depend on it.
+ */
+date_default_timezone_set( 'UTC' );
+
+/*
  * The extractor is tested before it is trusted, same as this repo's other
  * behavioral checks — a brace-counting bug here would silently validate
  * nothing.
@@ -154,6 +163,17 @@ foreach ( array( 'mmf_compute_archive_cutoff' => $cutoff_fn, 'mmf_bucket_for' =>
 
 // The real script's own two functions, loaded from a temporary file rather than eval().
 $tmp = tempnam( sys_get_temp_dir(), 'mmfx_' );
+if ( false !== $tmp ) {
+	// Registered before anything can fail, so every exit path — a failed write, a
+	// fatal in the required file, a later exit( 1 ) — removes the temporary file.
+	register_shutdown_function(
+		function () use ( $tmp ) {
+			if ( file_exists( $tmp ) ) {
+				unlink( $tmp );
+			}
+		}
+	);
+}
 if ( false === $tmp || false === file_put_contents( $tmp, "<?php\n" . $cutoff_fn . "\n\n" . $bucket_fn . "\n" ) ) {
 	fwrite( STDERR, "cannot write the extracted functions to a temporary file\n" );
 	exit( 1 );

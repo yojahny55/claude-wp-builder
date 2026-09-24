@@ -38,8 +38,9 @@ practices=agents/wp-audit-practices.md
 audit=commands/wp-audit.md
 script=skills/wp-cli-patterns/scripts/find-missing-media-files.php
 behavior=tests/checks/lib/media-integrity-date-cutoff-behavior.php
+skill=skills/wp-cli-patterns/SKILL.md
 
-for f in "$practices" "$audit" "$script" "$behavior"; do
+for f in "$practices" "$audit" "$script" "$behavior" "$skill"; do
   [ -s "$f" ] || fail "$f is missing or empty"
 done
 
@@ -56,13 +57,17 @@ done
 tier2=$(awk '/^## Step 2: Tier 2/{f=1; next} f && /^## /{exit} f' "$practices")
 [ -n "$tier2" ] || fail "$practices lost its '## Step 2: Tier 2' section"
 for code in WP-060 WP-061 WP-062; do
-  sev=$(printf '%s\n' "$tier2" | awk -F'|' -v code="$code" '/^\|/ { c = $2; gsub(/^[ \t]+|[ \t]+$/, "", c)
-          if (c == code) { s = $(NF - 1); gsub(/^[ \t]+|[ \t]+$/, "", s); print s; exit } }')
+  # A here-string, not a pipe: awk exits on the first match, and a pipe writer still
+  # flushing a large section would die of SIGPIPE, which pipefail turns into an abort.
+  sev=$(awk -F'|' -v code="$code" '/^\|/ { c = $2; gsub(/^[ \t]+|[ \t]+$/, "", c)
+          if (c == code) { s = $(NF - 1); gsub(/^[ \t]+|[ \t]+$/, "", s); print s; exit } }' <<< "$tier2")
   [ -n "$sev" ] || fail "$practices has no $code row in the Tier 2 table"
   [ "$sev" = WARNING ] || fail "$practices: $code is $sev in the Tier 2 table, expected WARNING"
 done
 grep -Fq 'find-missing-media-files.php' "$practices" \
   || fail "$practices does not point at the WP-CLI script that resolves attachment files"
+grep -Fq '### `find-missing-media-files.php`' "$skill" \
+  || fail "$skill's Shipped Scripts index does not document find-missing-media-files.php"
 
 # --- Detection covers the main file, its registered sub-sizes, and original_image ---
 grep -Fq '_wp_attached_file' "$practices" \
@@ -75,6 +80,8 @@ grep -Fq "wp_get_upload_dir()['basedir']" "$practices" \
 # --- Counting + sampling is required (never dump the whole list); severity is pinned above ---
 grep -Fq 'prints a sample, never the whole list' <<< "$flat" \
   || fail "$practices does not require sampling, not dumping, the missing set"
+grep -Fq 'array_slice( $items, 0, $sample_size )' "$script" \
+  || fail "$script prints the whole missing set instead of a sample-size-capped sample"
 
 # --- The script itself: enumerates attachments, buckets by archive date, never guesses one ---
 grep -Fq "wp_get_upload_dir" "$script" || fail "$script does not resolve paths via wp_get_upload_dir()"
@@ -82,7 +89,7 @@ grep -Fq "'sizes'" "$script" || fail "$script does not walk registered image sub
 grep -Fq "original_image" "$script" || fail "$script does not check original_image"
 # Sub-sizes and original_image are bare filenames; without the attachment's own YYYY/MM
 # directory every one of them reads as missing (a wall of false WP-061/WP-062 misses).
-grep -Fq '$rel_dir   = dirname( $attached_file )' "$script" \
+grep -Eq '\$rel_dir[[:space:]]+=[[:space:]]+dirname\([[:space:]]*\$attached_file[[:space:]]*\)' "$script" \
   || fail "$script does not take the attachment's own subdirectory from _wp_attached_file"
 grep -Fq "\$rel_dir . '/' . \$size_info['file']" "$script" \
   || fail "$script does not resolve sub-sizes against the attachment's own subdirectory"
@@ -98,8 +105,10 @@ done
 # still pass with the call itself deleted and only the comment left behind.
 grep -Fq "update_meta_cache( 'post'," "$script" \
   || fail "$script does not prime the meta cache per batch with update_meta_cache( 'post', ... )"
-grep -Fq 'const BATCH_SIZE' "$script" \
-  || fail "$script does not declare a bounded BATCH_SIZE"
+# A positive value: BATCH_SIZE = 0 would make the first query LIMIT 0, and the script would
+# report "0 attachments checked" with exit 0 — defect #4 again.
+grep -Eq 'const BATCH_SIZE = [1-9][0-9]*;' "$script" \
+  || fail "$script does not declare a positive, bounded BATCH_SIZE"
 # The old pattern this replaced: every ID with get_col(), then a per-attachment
 # get_post_field( 'post_date', $id ) lookup. Its return would silently reappear as a
 # regression that no positive check above would catch, since BATCH_SIZE/update_meta_cache
@@ -226,13 +235,14 @@ grep -Fq 'see WP-060/061/062 in `agents/wp-audit-practices.md`' "$audit" \
 # Required, not skipped: without php this check would shrink to doc greps and still PASS.
 command -v php >/dev/null 2>&1 \
   || fail "php not found — the date-cutoff behavior test cannot run, and no grep above can replace it"
-grep -Fq 'find-missing-media-files.php' "$behavior" \
+grep -Fq "'/skills/wp-cli-patterns/scripts/find-missing-media-files.php'" "$behavior" \
   || fail "$behavior no longer loads the production script — it would validate its own copy of the functions"
-if ! behavior_out=$(php "$behavior" 2>&1); then
+# TZ=UTC: the script runs under WordPress, which sets UTC; the fixture pins it too.
+if ! behavior_out=$(TZ=UTC php "$behavior" 2>&1); then
   fail "the archive-date cutoff/bucket behavior is wrong: ${behavior_out:-(php exited non-zero with no output)}"
 fi
 # A run that asserted nothing must not pass: the fixture prints its case count on success.
-[[ "$behavior_out" =~ ^OK\ [0-9]+\ cases$ ]] \
+[[ "$behavior_out" =~ ^OK\ [1-9][0-9]*\ cases$ ]] \
   || fail "$behavior did not report its cases as run: ${behavior_out:-(no output)}"
 
 echo PASS

@@ -89,7 +89,7 @@
  * returns an int Unix timestamp: the cutoff BEFORE-ARCHIVE/AFTER-ARCHIVE
  * buckets a miss against.
  *
- * A date with no time of day — "2026-09-23", "23 September 2026" — parses to
+ * A bare `Y-m-d` date with no time of day — "2026-09-23" — parses to
  * midnight, which is ambiguous for its own calendar day: an upload later that
  * same day would otherwise compare as "after archive" no matter what time the
  * archive was actually taken, silently suppressing a real pre-archive loss as
