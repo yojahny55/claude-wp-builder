@@ -139,6 +139,7 @@ These checks require a running WordPress installation. Use `$WP` from `.wp-creat
 | SEO-066 | `Offer.availability` disagrees with real stock | WooCommerce only. Fetch a production product page, parse its `Product` JSON-LD `offers.availability`, and compare against the same page's own rendered stock signal (WooCommerce's `outofstock`/`instock` class on the product wrapper). `InStock` on a product the page itself renders as out of stock is the defect — Google treats this class of Product-schema mismatch as a manual-action risk, same tier as SEO-063 | CRITICAL |
 | SEO-067 | Sitemap lists a `noindex` URL | WooCommerce only. Cross-reference product AND product-category URLs in the XML sitemap (skill §15/§18.4) against each URL's `noindex` signal. Primary method is a WP-CLI database comparison (`rank_math_robots`/Yoast postmeta and term meta), not a live fetch per URL — a catalog-sized sitemap means a catalog-sized number of requests, which does not scale. Only the handful of URLs the database comparison cannot resolve fall back to a capped (50 URL) live fetch. A URL present in the sitemap that also carries `noindex` sends Google two contradictory signals for the same page | WARNING |
 | SEO-068 | Post-migration 301 map and lost reviews | WooCommerce only. Not a live fetch — a reminder fired once when the project shows a migration signal (`.wp-create.json` `project.source: restore`/`migration`, or the operator naming a recent platform or URL change). Names two losses: reviews and their `AggregateRating` vanish unless migrated under the same product IDs, and old indexed URLs lose ranking authority without a one-to-one 301 map (a blanket redirect to the home page reads as a soft 404) | WARNING |
+| SEO-069 | Cached `Product`/`Offer` schema price does not match the visitor's selected currency | Commerce + multi-currency only — same gate as `wp-audit-performance.md` PERF-065 (`N/A` "no WooCommerce" / "no multi-currency plugin"). LIVE, and its own request pair — not a reuse of PERF-067's, since the two agents run independently with no mechanism to share a live result. Against the confirmed production host, request the same product URL twice, selecting a different one of the store's currencies each time exactly as PERF-067 does, and parse the `Product`/`Offer` node's `price` and `priceCurrency` out of each response's JSON-LD | WARNING; CRITICAL when the second request's cache-status header (`cf-cache-status`, or the equivalent header PERF-066 would detect) is `HIT` and the schema still names the first request's currency. Same `N/A`/`UNMEASURED` gates as PERF-065 |
 
 ### Procedure
 
@@ -274,6 +275,23 @@ echo wp_json_encode(\$out);
    title and another in the option (`A&B` vs `AB`) is exactly this finding, not a typo to
    overlook. Name every value that disagrees and quote what it holds — "the names are
    inconsistent" is not actionable.
+7. **SEO-069** — gate first: `N/A` ("no WooCommerce") when `site.commerce` is `none`, `N/A`
+   ("no multi-currency plugin") when no such plugin is active, same as
+   `wp-audit-performance.md` PERF-065. This is its own LIVE request pair against the confirmed
+   production host, not a reuse of the rendered-head/`json_ld` snapshot above: that snapshot is
+   a bulk *local* self-fetch of up to 50 permalinks over `$WP eval`, run against whatever host
+   WP-CLI points at — the clone, per Step 2.3 — so it cannot stand in for a production,
+   cache-sensitive read, and this plugin has no mechanism for one subagent to hand a live
+   result to another. Request the same product URL twice, selecting a different one of the
+   store's currencies each time (cookie, session or `?currency=`, whichever the active plugin
+   uses) — two production requests of its own, in addition to PERF-066's and PERF-067's, not a
+   reuse of them — and read the `Product`/`Offer` node's `price` and `priceCurrency` straight
+   out of each response's JSON-LD. Compare the two: the fix for the underlying cache-key
+   problem is PERF-065/PERF-067's, this code exists only because the same cached response that
+   serves a stale visible price also carries the schema, and a reader who fixes the visible
+   price without knowing the structured data is equally stale ships a page that still lies to
+   a crawler after it stopped lying to a person. Needs the production host; `UNMEASURED`
+   ("needs the public URL") without one.
 
 ### Procedure — content and link checks
 
@@ -446,6 +464,12 @@ Apply fixes directly using `Edit` for issues marked `auto_fix: true`:
 `tel:` link or a map embed, and SEO-061 rewrites a heading. Report them with the proposed
 markup and let the user decide — a new element inherits browser default styles and can
 override the utility classes already on the page.
+
+**SEO-069 is never auto-applied either, and for a different reason: there is no theme code to
+edit.** The schema is generated correctly from whatever price WooCommerce/Rank Math read at
+render time; the defect is the cached response carrying yesterday's currency, which is
+PERF-065/PERF-067's fix (`Fix: manual`, `Owner: setting` — the cache plugin's cookie exclusion
+or the CDN's cache-key rule). Point the report at that fix rather than proposing a second one.
 
 ### Rank Math Configuration Fixes (Tier 2)
 
