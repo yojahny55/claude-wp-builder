@@ -46,7 +46,18 @@ section() {
       if (substr(m, 1, 1) == "#") return !fence && index($0, m) == 1
       return index($0, m) > 0
     }
-    /^[ \t]*```/ { fence = !fence }
+    # CommonMark fences: an opening run of 3+ backticks or tildes is closed only by a run
+    # of the same character at least as long with nothing after it, so a shorter or
+    # different fence line inside the block cannot flip the state.
+    { opened = 0 }
+    !fence && match($0, /^[ \t]*(```+|~~~+)/) {
+      run = substr($0, RSTART, RLENGTH); sub(/^[ \t]+/, "", run)
+      fence = 1; opened = 1; fch = substr(run, 1, 1); flen = length(run)
+    }
+    fence && !opened {
+      line = $0; sub(/^[ \t]+/, "", line); sub(/[ \t]+$/, "", line)
+      if (line ~ /^(```+|~~~+)$/ && substr(line, 1, 1) == fch && length(line) >= flen) fence = 0
+    }
     f && hit(b)   { exit }
     hit(a)        { f = 1 }
     f' "$1" \
@@ -374,9 +385,15 @@ has "$err" 'missing source: gone' || fail "$script does not name the missing sou
 rc=0
 err="$(php "$script" loaded:single="$fx/y/y.php" 2>&1 >/dev/null)" || rc=$?
 [ "$rc" = 0 ] || fail "$script: a single-file source exited $rc"
-if [ "$(id -u)" != 0 ]; then    # root reads a mode-000 directory anyway
-  mkdir -p "$fx/y/locked"
-  chmod 000 "$fx/y/locked"
+# An unreadable directory must be skipped and reported. The precondition is probed rather
+# than assumed: root, and filesystems that ignore POSIX modes, still read a mode-000
+# directory, and there the test says it did not run instead of failing on the environment.
+mkdir -p "$fx/y/locked"
+chmod 000 "$fx/y/locked"
+if ls "$fx/y/locked" >/dev/null 2>&1; then
+  chmod 755 "$fx/y/locked"
+  echo "SKIP (unreadable-directory case only): a mode-000 directory is still readable here"
+else
   rc=0
   err="$(php "$script" loaded:y="$fx/y" 2>&1 >/dev/null)" || rc=$?
   chmod 755 "$fx/y/locked"

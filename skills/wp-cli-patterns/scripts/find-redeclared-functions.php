@@ -21,9 +21,9 @@
  *   2  bad usage, or a source path does not exist (`missing source: <label>` on
  *      stderr). Collisions among the sources that were found are still printed,
  *      but the run is incomplete and must not be read as a pass.
- * A directory or file that exists but cannot be read is reported on stderr as
- * `skipped: <path>` and does not change the exit status; the caller lists those
- * lines as partial coverage.
+ * A directory or file that exists but cannot be read, or a file the tokenizer
+ * cannot process, is reported on stderr as `skipped: <path> (<reason>)` and does
+ * not change the exit status; the caller lists those lines as partial coverage.
  *
  * Output, one line per colliding name, tab-separated:
  *   <SEVERITY>  <name>()  <label> <file>:<line>  <label> <file>:<line> ...
@@ -85,8 +85,13 @@ const RF_GUARD_TESTS     = array( 'function_exists', 'class_exists', 'interface_
 $started = microtime( true );
 $sources = array();
 foreach ( array_slice( $argv, 1 ) as $arg ) {
-	if ( ! preg_match( '/^(loaded|inactive):([^=]+)=(.+)$/', $arg, $m ) ) {
+	if ( ! preg_match( '/^(loaded|inactive):([^=]*)=(.+)$/', $arg, $m ) ) {
 		fwrite( STDERR, "bad argument: $arg (expected <loaded|inactive>:<label>=<path>)\n" );
+		exit( 2 );
+	}
+	if ( '' === trim( $m[2] ) ) {
+		// The label names the source in every finding; an empty one would print as a blank column.
+		fwrite( STDERR, "bad argument: $arg (empty label — use e.g. loaded:plugin/<slug>=<path>)\n" );
 		exit( 2 );
 	}
 	$sources[] = array( 'status' => $m[1], 'label' => $m[2], 'path' => rtrim( $m[3], '/' ) );
@@ -180,9 +185,15 @@ function rf_condition( $t, $from, $to ) {
 	return null;
 }
 
-/** @return array<int, array{0:string,1:int}> [qualified name, line] of unguarded declarations */
+/**
+ * @return array<int, array{0:string,1:int}>|null [qualified name, line] of unguarded
+ *         declarations, or null when the source could not be tokenized at all.
+ */
 function rf_declarations( $code ) {
-	$t       = @token_get_all( $code );
+	$t = @token_get_all( $code );
+	if ( ! is_array( $t ) ) {
+		return null;    // never folded into "declares nothing": the caller reports it
+	}
 	$n       = count( $t );
 	$stack   = array();    // brace blocks: class | function | guard | namespace | other
 	$pending = null;       // the kind the next `{` opens
@@ -355,9 +366,14 @@ foreach ( $sources as $s => $src ) {
 			fwrite( STDERR, "skipped: $file (cannot be read)\n" );
 			continue;
 		}
+		$decls_in_file = rf_declarations( $code );
+		if ( null === $decls_in_file ) {
+			fwrite( STDERR, "skipped: $file (cannot be tokenized)\n" );
+			continue;
+		}
 		$files++;
 		$rel = ltrim( substr( $file, strlen( $src['path'] ) ), '/' );
-		foreach ( rf_declarations( $code ) as list( $name, $line ) ) {
+		foreach ( $decls_in_file as list( $name, $line ) ) {
 			$decls++;
 			// First declaration per source: two in one source are that source's own business.
 			if ( ! isset( $by_name[ $name ][ $s ] ) ) {
