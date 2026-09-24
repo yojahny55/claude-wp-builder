@@ -268,7 +268,8 @@ update_field('services_cards', \$rows, 'option');
 ## Shipped Scripts
 
 `scripts/` holds the checks that are worth re-running rather than retyping. Run each with
-`wp eval-file`.
+`wp eval-file`, except `find-redeclared-functions.php`, which reads files only and runs with
+plain `php`.
 
 ### `check-dev-host.php` — the development host, in four tables
 
@@ -340,6 +341,40 @@ lost in the noise.
 Fix by converting the item to a `post_type` item rather than by editing its URL. A `post_type`
 item derives its URL from `siteurl` at render time and survives a migration; a `custom` item
 carries whatever host was typed into it, which is how `check-dev-host.php` findings are created.
+
+### `find-redeclared-functions.php` — one global function, two sources (SEC-043)
+
+```bash
+php <skill>/scripts/find-redeclared-functions.php \
+  loaded:plugin/<a>=wp-content/plugins/<a> inactive:plugin/<b>=wp-content/plugins/<b> \
+  loaded:mu-plugin/<file>=wp-content/mu-plugins/<file> loaded:drop-in/<file>=wp-content/<file>
+```
+
+Read-only, no WordPress bootstrap, PHP 7.4+. Exits 0 when nothing collides, 1 on any
+collision, and 2 when a source path does not exist (`missing source: <label>` on stderr) —
+treat 2 as not measured, never as a pass. An unreadable file or directory is printed as
+`skipped: <path>` and is partial coverage. Each line is
+`CRITICAL` (two loaded sources), `WARNING` (one loaded, the other inactive: it cannot be
+activated) or `INFO` (only inactive plugins).
+
+It tokenizes instead of grepping. A `function <name>(` grep over one real `wp-content` matched
+about 160,000 lines; the tokenizer found about 4,000 global declarations in ~15,600 files, in
+under 2 seconds. It knows which braces belong to a class, a function or an
+`if` / `elseif` guard that negates `function_exists`, `class_exists`, `interface_exists`,
+`trait_exists`, `enum_exists` or `defined` (braced, `:`/`endif;` or braceless), qualifies
+names by namespace, ignores `use function` imports, recognises `enum` bodies on runtimes
+older than 8.1, and treats a top-level `if ( function_exists() ) return;` (or any of those
+tests) as guarding the rest of the file. The whole condition is read, not its first test: a
+negated test guards from any operand of an `&&` chain, but not next to an `||`, where the
+body also runs when the other operand holds; an early return guards only when the test sits
+in an `||` chain (or alone).
+
+Skipped: `vendor/`, `node_modules/`, `tests/`, `examples/`, and — inside a plugin or theme
+directory — `object-cache.php` and `advanced-cache.php`. Those are the drop-in templates a
+cache plugin copies into `wp-content/`; on the audited site they produced 56 of 57
+collisions, each plugin against its own installed drop-in. Other drop-in names (`db.php`,
+…) are scanned: a plugin's own `includes/db.php` is ordinary code. A drop-in passed as a
+single file, parked `*.bak` included, is always scanned.
 
 ---
 
