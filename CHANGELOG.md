@@ -130,6 +130,37 @@
   its fixed "no PERF-065+" ceiling — which a sibling PR adding its own new codes to this same
   file would have failed on main for no defect of its own — for a uniqueness gate: no PERF-NNN
   code may appear on more than one table row, however many exist.
+- **`wp-audit-security` now checks for payment-gateway credentials stored at rest
+  (SEC-040).** SEC-005 only greps theme PHP for hardcoded secrets, but a WooCommerce payment
+  gateway keeps its live API key, secret and token in the database instead — a serialized
+  array in the `wp_options` row `woocommerce_<gateway_id>_settings` — so nothing that scans
+  source code could ever see it. That row is exactly what a database dump, staging snapshot
+  or cloned copy carries verbatim, which makes a configured gateway's credentials a real leak
+  risk on any shared copy of the site. SEC-040 enumerates every `woocommerce_*_settings` and
+  `woocommerce-ppcp-*` row straight from the options table — so a gateway whose plugin is
+  deactivated, as on a clone, is still covered — plus the options a few gateways keep a
+  credential in on their own (Mollie, Square, Amazon Pay, Mercado Pago, the PayPal Payments
+  registration token, and the Jetpack connection tokens WooPayments authenticates with), and
+  reports CRITICAL for every non-empty credential without ever printing the value itself. Key names are classified by segment rather than by
+  a fixed pattern: environment, version and region suffixes are dropped (`secret_key_v3`,
+  `shared_secret_eu`), a descriptor as the last segment (`signature_method`, `token_lock`)
+  silences the key, identifiers and public-by-design keys (`merchant_id_eu`,
+  `publishable_key`, `client_key`, `site_key`) are INFO — `merchant_key` is not, since Paytm's
+  is a secret — and a name holding a secret word (`secret`, `*key`, `token`,
+  `password`, `passphrase`, `hmac`, signing material) is CRITICAL. The Pass criterion states
+  that coverage is limited to those rows. The manual scrub step runs the same classifier —
+  the block is byte-identical in both snippets — and edits the option in place, array or
+  single value, instead of dumping it, and says so when `update_option()` fails. It is
+  `N/A` when `site.commerce` is `none` (`/wp-audit` Step 2.3), like every other commerce-only check, and it is deliberately
+  **not** folded into that same step's local-clone suppression list: a gateway deactivated on
+  a clone is a clone artifact and stays suppressed, but the credential still sitting in
+  `wp_options` is true of production too and is reported regardless. The fix is manual —
+  rotate the key at the processor if the database was ever shared, and scrub the value before
+  handing around a cloned copy. `tests/checks/audit-gateway-credentials.sh` extracts both
+  snippets and runs them with `php` against a stubbed options table
+  (`tests/checks/lib/sec040-gateway-credentials-behavior.php`): the exact CRITICAL and INFO
+  sets, no secret in the output, and a scrub that blanks exactly the CRITICAL keys and saves
+  only when it changed something. It fails rather than skips without `php`.
 - **`/wp-audit` detects paid WooCommerce downloads reachable without a purchase (SEC-039).**
   A store's paid files live under `wp-content/uploads/woocommerce_uploads/`, guarded only by
   an `.htaccess` `deny from all`. Apache honours it; nginx ignores it — so with the
