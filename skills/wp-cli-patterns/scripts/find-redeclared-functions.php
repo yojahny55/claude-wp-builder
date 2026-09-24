@@ -221,7 +221,9 @@ function rf_test_kind( $t, $s, $e ) {
  *   - null otherwise. An `||` next to a negated test is not a guard — in
  *     `! class_exists( 'Foo' ) || ! function_exists( 'fn' )` the body also
  *     runs whenever Foo is missing — and a mix of `&&` with `||`, `xor`, a
- *     ternary or `??` at the top level is never read as one either.
+ *     ternary or `??` at the top level is never read as one either. An
+ *     operand holding anything besides the bare test call, such as
+ *     `! function_exists( 'x' ) == $force`, is not a test at all.
  */
 function rf_condition( $t, $from, $to ) {
 	$parts = array();
@@ -249,6 +251,11 @@ function rf_condition( $t, $from, $to ) {
 		} elseif ( $id === T_LOGICAL_XOR || $id === '?' || $id === T_COALESCE ) {
 			return null;
 		} else {
+			// Every other operator (==, ===, <, +, ., instanceof ...) binds tighter
+			// than && and ||, so it stays inside one operand, and rf_test_kind()
+			// accepts an operand only when it is exactly `[!] <test>( ... )`:
+			// `! function_exists( 'x' ) == $force` is one operand that is not a
+			// test, never a negated guard.
 			continue;
 		}
 		$parts[] = array( $start, $i - 1 );
