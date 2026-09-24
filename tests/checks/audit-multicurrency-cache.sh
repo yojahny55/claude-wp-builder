@@ -58,7 +58,6 @@ done
 # Carriage returns dropped and every whitespace run squeezed to one space, so a CRLF checkout
 # or a tab in the prose cannot break a cross-line literal match.
 flat_perf=$(tr -d '\r' < "$perf" | tr -s '[:space:]' ' ')
-flat_seo=$(tr -d '\r' < "$seo" | tr -s '[:space:]' ' ')
 
 # --- Codes exist and are tabulated (audit-check-tables.sh's own rule, pinned here too so this
 #     one test file tells the whole story on its own) ---
@@ -104,12 +103,16 @@ grep -Fq 'PERF-066 included, even though it is a detection-only INFO code' <<< "
   || fail "$perf's procedure does not explicitly extend the gate to PERF-066"
 
 # --- Direction 2: severity is NOT one flat value — cookie/session selection escalates ---
-grep -Fq 'cookie- or session-selected currency is invisible' "$perf" \
+grep -Fq 'cookie- or session-selected currency is invisible' <<< "$flat_perf" \
   || fail "$perf: PERF-065 does not escalate to CRITICAL for cookie/session currency selection"
 grep -Fq 'that combination is the CRITICAL case' <<< "$flat_perf" \
   || fail "$perf does not name the cookie/session case as CRITICAL, not merely WARNING"
-grep -Fq 'WARNING/CRITICAL' "$perf" \
-  || fail "$perf does not carry the WARNING/CRITICAL split for PERF-065/PERF-067"
+grep -Fq 'WARNING/CRITICAL' <<< "$perf065_row" \
+  || fail "PERF-065's own row does not carry the WARNING/CRITICAL split"
+grep -Fq 'WARNING/CRITICAL' <<< "$perf067_row" \
+  || fail "PERF-067's own row does not carry the WARNING/CRITICAL split"
+grep -Fq 'confirmed production host' <<< "$perf067_row" \
+  || fail "PERF-067's own row does not target the confirmed production host"
 
 # --- Direction 3: the live checks use the production-host contract, never the clone ---
 grep -Fq 'cf-cache-status' "$perf" \
@@ -123,7 +126,7 @@ grep -Fq 'Step 2.3' <<< "$perf066_row" \
 
 # --- Direction 3b: PERF-066 requires a confirmed HIT, not the header's mere presence, and
 #     recognizes CDNs/proxies other than Cloudflare ---
-grep -Fq 'not merely present' "$perf" \
+grep -Fq 'not merely present' <<< "$flat_perf" \
   || fail "$perf: PERF-066 does not reject cf-cache-status's mere presence as detection"
 grep -Fq 'DYNAMIC`/`BYPASS` on the second request mean' <<< "$flat_perf" \
   || fail "$perf does not explain that DYNAMIC/BYPASS mean Cloudflare is present but not caching"
@@ -156,17 +159,19 @@ grep -Fq 'Multi-currency cache-key fix' "$perf" \
 fix=$(awk '/^### Multi-currency cache-key fix/{f=1; next} f && /^## Rules/{found=1; exit} f{print} END{exit(found ? 0 : 1)}' "$perf") \
   || fail "$perf's Multi-currency cache-key fix section is not terminated by ## Rules"
 [ -n "$fix" ] || fail "$perf's Multi-currency cache-key fix section is empty"
-inner=$(grep -E '^#{1,6} ' <<< "$fix" || true)
+# Lines inside a fenced code block are not headings: a shell comment in a snippet starts with
+# "# " too, and must not read as the section having gained a subheading.
+inner=$(awk '/^(```|~~~)/ { fence = !fence; next } !fence && /^#+ /' <<< "$fix")
+fix_flat=$(tr -s '[:space:]' ' ' <<< "$fix")
 [ -z "$inner" ] \
   || fail "the Multi-currency cache-key fix is no longer followed directly by ## Rules (found: $inner) — move this gate's end marker to the heading that now closes the section"
-grep -Fq 'Owner: setting' <<< "$fix" \
+grep -Fq 'Owner: setting' <<< "$fix_flat" \
   || fail "the PERF-065/PERF-067 fix does not state Owner: setting"
-grep -Fq 'Never propose disabling the page cache' <<< "$fix" \
+grep -Fq 'Never propose disabling the page cache' <<< "$fix_flat" \
   || fail "the PERF-065/PERF-067 fix does not reject disabling the cache site-wide as a shortcut"
-grep -Fq 'no WP-CLI command reaches this' <<< "$fix" \
+grep -Fq 'no WP-CLI command reaches this' <<< "$fix_flat" \
   || fail "the PERF-065/PERF-067 fix does not say a Cloudflare edge rule is out of WP-CLI's reach"
 # The discarded shape is named as wrong too: a code workaround the edge never sees, and autofix.
-fix_flat=$(tr -s '[:space:]' ' ' <<< "$fix")
 grep -Fq 'workaround that the edge never sees' <<< "$fix_flat" \
   || fail "the PERF-065/PERF-067 fix does not name a .htaccess/performance.php code workaround as wrong"
 grep -Fq 'PERF-065/PERF-067 are never auto-applied' <<< "$fix_flat" \
@@ -196,6 +201,10 @@ for slug in 'woocommerce-multi-currency' 'woocommerce-currency-switcher' \
             'woocommerce-payments'; do
   grep -Fq "$slug" "$perf" || fail "$perf's confirmed multi-currency slug list is missing $slug"
 done
+# Two of those slugs (WCML, WooCommerce Payments) ship with multi-currency off, so the list alone
+# is not the gate: without this caveat PERF-065 fires on every WooPayments store with a cache.
+grep -Fq "check each plugin's own settings before crediting it" <<< "$flat_perf" \
+  || fail "$perf does not require confirming WCML/WooPayments' own multi-currency setting before crediting them"
 grep -Fq 'UNCONFIRMED' "$perf" \
   || fail "$perf does not report a bare currency-substring match as UNCONFIRMED"
 grep -Fq 'never flagged as the multi-currency plugin outright' <<< "$flat_perf" \
@@ -208,13 +217,16 @@ grep -Fq 'confirmed multi-currency plugin slugs' <<< "$perf065_row" \
 # --- SEO-069: makes its own live production request pair — it has no mechanism to reuse
 #     PERF-067's result (separate agents), and the rendered-head/json_ld snapshot is a local
 #     self-fetch that cannot stand in for a production, cache-sensitive read ---
-grep -Fq 'json_ld' "$seo" \
+grep -Eq "'json_ld'[[:space:]]*=>" "$seo" \
   || fail "$seo has lost the json_ld snapshot field (still used by the other rendered-head checks)"
 seo_prose=$(grep -v '^|' "$seo" || true)
+# Prose only, flattened: SEO-069's table row repeats some of these phrases and must not
+# satisfy a gate the procedure itself has dropped.
+flat_seo_prose=$(tr -d '\r' <<< "$seo_prose" | tr -s '[:space:]' ' ')
 grep -Fq 'SEO-069' <<< "$seo_prose" || fail "$seo never mentions SEO-069 outside its table row"
-grep -Fq 'SEO-069 is never auto-applied' "$seo" \
+grep -Fq 'SEO-069 is never auto-applied' <<< "$flat_seo_prose" \
   || fail "$seo does not exclude SEO-069 from the auto-fix pass"
-grep -Fq 'there is no theme code to' "$seo" \
+grep -Fq 'there is no theme code to' <<< "$flat_seo_prose" \
   || fail "$seo does not explain why SEO-069 has no code fix of its own"
 # The contract lives in SEO-069's own table row — the agent runs what its table tabulates — so
 # these two are matched against that row alone, not anywhere in the file (the procedure prose
@@ -227,17 +239,17 @@ grep -Fq 'confirmed production host' <<< "$seo069_row" \
   || fail "$seo: SEO-069's own table row does not target the confirmed production host"
 grep -Fq 'UNMEASURED' <<< "$seo069_row" \
   || fail "$seo: SEO-069's own table row does not fall back to UNMEASURED without a confirmed production URL"
-grep -Fq 'no mechanism' <<< "$flat_seo" \
+grep -Fq 'no mechanism' <<< "$flat_seo_prose" \
   || fail "$seo does not explain that the two agents have no mechanism to share a live result"
-grep -Fq 'that snapshot is' <<< "$flat_seo" \
+grep -Fq 'that snapshot is' <<< "$flat_seo_prose" \
   || fail "$seo's procedure does not explain why the rendered-head/json_ld snapshot cannot stand in for SEO-069's production read"
 
 # --- CHANGELOG: an Unreleased entry exists and names the new codes ---
 unreleased=$(awk '/^## \[Unreleased\]/{f=1; next} f && /^## \[/{exit} f{print}' "$changelog")
 [ -n "$unreleased" ] || fail "$changelog has no content under [Unreleased]"
-grep -Fq 'PERF-065' <<< "$unreleased" \
-  || fail "$changelog's [Unreleased] section does not mention PERF-065"
-grep -Fq 'SEO-069' <<< "$unreleased" \
-  || fail "$changelog's [Unreleased] section does not mention SEO-069"
+for code in PERF-065 PERF-066 PERF-067 SEO-069; do
+  grep -Fq "$code" <<< "$unreleased" \
+    || fail "$changelog's [Unreleased] section does not mention $code"
+done
 
 echo PASS
