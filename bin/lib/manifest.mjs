@@ -611,6 +611,9 @@ export function validateProfile(profile) {
   const problems = [];
   if (!profile || typeof profile !== 'object') return ['the profile is not a JSON object'];
   if (!profile.name) problems.push('name is required');
+  if (profile.store !== undefined && !STORE_TIERS.includes(profile.store)) {
+    problems.push(`store must be "catalog", "store" or "full", found ${JSON.stringify(profile.store)}`);
+  }
   if (!Array.isArray(profile.plugins)) return [...problems, 'plugins must be an array'];
 
   const seen = new Set();
@@ -634,8 +637,8 @@ export function validateProfile(profile) {
     if (entry.required !== undefined && typeof entry.required !== 'boolean') {
       problems.push(`${entry.slug}: required must be a boolean`);
     }
-    if (entry.source !== undefined && entry.source !== 'wordpress.org' && entry.source !== 'supplied') {
-      problems.push(`${entry.slug}: source must be "wordpress.org" or "supplied"`);
+    if (entry.source !== undefined && !['wordpress.org', 'supplied', 'bundled'].includes(entry.source)) {
+      problems.push(`${entry.slug}: source must be "wordpress.org", "supplied" or "bundled"`);
     }
     if (entry.tested !== undefined) {
       if (typeof entry.tested !== 'string' || !TESTED.test(entry.tested)) {

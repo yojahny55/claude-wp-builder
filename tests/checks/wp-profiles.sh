@@ -112,4 +112,55 @@ set -e
 [ "$code" = "1" ] || fail "a profile with a non-canonical slug exited $code, want 1"
 grep -q 'Contact-Form-7: slug must already be lowercase and trimmed' "$tmp/slugcanon" || fail "the slug-not-canonical message does not name the slug"
 
+# --- A store profile's tier is one of three. --------------------------------------
+set +e
+$cfg validate-profile tests/fixtures/profiles/bad-store.json >"$tmp/store" 2>&1; code=$?
+set -e
+[ "$code" = "1" ] || fail "a profile with an unknown store tier exited $code, want 1"
+grep -q 'store must be "catalog", "store" or "full"' "$tmp/store" || fail "the store-tier message does not name the three tiers"
+
+# --- A bundled plugin must actually ship in this repository. ------------------------
+set +e
+$cfg validate-profile tests/fixtures/profiles/bundled-missing.json >"$tmp/bundled" 2>&1; code=$?
+set -e
+[ "$code" = "1" ] || fail "a profile naming a bundled plugin this repo does not ship exited $code, want 1"
+grep -q 'plugins/no-such-kit/no-such-kit.php' "$tmp/bundled" || fail "the bundled message does not name the missing file"
+
+# --- The three store profiles. -------------------------------------------------------
+for t in catalog store full; do
+  p=templates/profiles/woo-$t.json
+  [ -f "$p" ] || fail "$p is missing"
+  node -e '
+    const j = require("./" + process.argv[1]), t = process.argv[2];
+    const by = Object.fromEntries(j.plugins.map((x) => [x.slug, x]));
+    const need = (c, m) => { if (!c) { console.log(m); process.exit(1); } };
+    need(j.store === t, `store is ${JSON.stringify(j.store)}, want "${t}"`);
+    need(by.woocommerce && by.woocommerce.required === true, "woocommerce is not required");
+    need(by["store-kit"] && by["store-kit"].required === true && by["store-kit"].source === "bundled", "store-kit is not a required bundled plugin");
+    need((by["store-kit"].requires || []).includes("woocommerce"), "store-kit does not require woocommerce");
+    const order = j.plugins.map((x) => x.slug);
+    need(order.indexOf("woocommerce") < order.indexOf("store-kit"),
+      "woocommerce must install before store-kit: WordPress refuses to activate a plugin whose Requires Plugins is inactive");
+  ' "$p" "$t" || fail "$p is not a store profile"
+done
+
+# --- Every store-profile plugin has a reason; no shipped profile holds an avoided one. ---
+ref=skills/wp-woocommerce/references/plugins.md
+[ -r "$ref" ] || fail "$ref is missing"
+picks=$(awk '/^## Picks/{f=1;next} /^## /{f=0} f && /^\| `/' "$ref" | sed -E 's/^\| `([^`]+)`.*/\1/')
+avoid=$(awk '/^## Avoid/{f=1;next} /^## /{f=0} f && /^\| `/' "$ref" | sed -E 's/^\| `([^`]+)`.*/\1/')
+[ -n "$picks" ] || fail "$ref has no Picks table"
+[ -n "$avoid" ] || fail "$ref has no Avoid table"
+slugs() { node -e 'require("./" + process.argv[1]).plugins.forEach((x) => console.log(x.slug))' "$1"; }
+for p in templates/profiles/woo-*.json; do
+  for s in $(slugs "$p"); do
+    grep -qx -- "$s" <<<"$picks" || fail "$p installs $s, which has no reason row under ## Picks in $ref"
+  done
+done
+for p in templates/profiles/*.json; do
+  for s in $(slugs "$p"); do
+    if grep -qx -- "$s" <<<"$avoid"; then fail "$p installs $s, which $ref lists under ## Avoid"; fi
+  done
+done
+
 echo PASS

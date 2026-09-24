@@ -62,7 +62,8 @@ when `.wp-create.json` is absent. Container wrappers need the manifest.
 Detects Docker, DDEV, Lando, wp-env, native Nginx/Apache/Caddy and PHP versions; lets you
 choose; downloads WordPress, creates DB, web-server config, SSL, hosts entry; installs a
 plugin profile (`starter` = SCF + Rank Math + WP Fastest Cache, `full` adds AIOS, CF7,
-WP Mail SMTP, Redirection, Site Kit; custom profiles in `.wp-profiles/` or `~/.wp-profiles/`).
+WP Mail SMTP, Redirection, Site Kit; `woo-catalog`, `woo-store` and `woo-full` are the three
+store tiers; custom profiles in `.wp-profiles/` or `~/.wp-profiles/`).
 Can adopt an existing install. Writes `.wp-create.json` holding the WP-CLI wrapper
 (`wp --path=…`, `docker exec … wp`, `ddev wp`, `lando wp`, `npx wp-env run cli wp`),
 environment type and languages.

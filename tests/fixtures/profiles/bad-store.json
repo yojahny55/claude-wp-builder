@@ -1,0 +1,1 @@
+{ "name": "Bad store", "store": "mall", "plugins": [ { "slug": "woocommerce", "required": true } ] }

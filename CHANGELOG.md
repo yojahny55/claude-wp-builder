@@ -97,6 +97,13 @@
   tell a correct same-day comparison from an inverted one, since every bucket name it could
   match is spelled correctly either way — runs the script's own cutoff/bucket functions
   against real PHP (`tests/checks/lib/media-integrity-date-cutoff-behavior.php`).
+- **Three store profiles and the `wp-woocommerce` skill.** `woo-catalog` (products and prices,
+  nothing purchasable), `woo-store` (cart, block checkout, Stripe in test mode, Turnstile, SMTP)
+  and `woo-full` (plus abandoned cart, email marketing, reviews, search, filters, swatches,
+  wishlist and feeds). Every plugin has a written reason, and fifteen popular ones are listed as
+  avoided with the record behind each — `tests/checks/wp-profiles.sh` refuses a profile that
+  breaks either rule. Profiles gain a `store` tier key and a `bundled` source for plugins this
+  repository ships; `validate-profile` refuses a bundled slug with no plugin behind it.
 
 ### Changed
 
