@@ -32,8 +32,7 @@ SKILL="skills/wp-audit-seo-standards/SKILL.md"
 
 agent_flat=$(tr '\n' ' ' < "$AGENT" | sed 's/  */ /g') || fail "could not read $AGENT"
 [ -n "$agent_flat" ] || fail "$AGENT flattened to nothing — it was readable and is now empty"
-skill_flat=$(tr '\n' ' ' < "$SKILL" | sed 's/  */ /g') || fail "could not read $SKILL"
-[ -n "$skill_flat" ] || fail "$SKILL flattened to nothing — it was readable and is now empty"
+[ -s "$SKILL" ] || fail "$SKILL is readable but empty"
 # The commerce assertions read only what belongs to SEO-064..068: their table rows plus their
 # own procedure. A phrase that also appears elsewhere in the agent (UNMEASURED, site.commerce)
 # must not satisfy a gate that the commerce text itself has dropped.
@@ -54,6 +53,9 @@ grep -Fq 'Read `skills/wp-audit-seo-standards/SKILL.md` §18 before running thes
 # --- all five codes exist, in the agent's check table -------------------------------------
 for code in SEO-064 SEO-065 SEO-066 SEO-067 SEO-068; do
   grep -Fq "| $code |" "$AGENT" || fail "$AGENT has no table row for $code"
+  # The row is what an agent reads when it scans the table, so each carries its own gate.
+  grep -Eq "^\| *$code *\|[^|]*\| *WooCommerce only" "$AGENT" \
+    || fail "$AGENT's $code row lost its WooCommerce-only gate"
 done
 
 # The skill carries the methodology section these codes point back to. Skill-side gates read
@@ -62,16 +64,25 @@ done
 grep -Fq '## 18. E-commerce SEO nuances' "$SKILL" \
   || fail "$SKILL has no e-commerce SEO section for SEO-064..SEO-068 to reference"
 ecom=$(awk '/^## 18\. E-commerce SEO nuances/ { f = 1; print; next } f && /^## / { exit } f' "$SKILL")
+[ -n "$ecom" ] || fail "$SKILL §18 extracted to nothing — the heading is present but not as a top-level '## 18.' section"
 ecom_flat=$(tr -s '[:space:]' ' ' <<< "$ecom")
 
 # Every curl in §18 is bounded on its own — a single bounded call elsewhere in the section must
-# not cover a new unbounded one. Backslash-continued lines are joined first.
-curls=$(sed -e ':a' -e '/\\$/N; s/\\\n//; ta' <<< "$ecom" | grep -E '(^|[^[:alnum:]_])curl ' || true)
-[ -n "$curls" ] || fail "$SKILL §18 has no curl fetch left for the live commerce checks"
+# not cover a new unbounded one. Backslash-continued lines are joined first, and each command
+# is cut from `curl -` to the next backtick or `|`, so a second curl sharing a line is its own
+# entry and prose that merely says "curl" is not a command at all.
+curls=$(sed -e ':a' -e '/\\$/N; s/\\\n//; ta' <<< "$ecom" | grep -oE 'curl +-[^`|]*' || true)
+[ "$(grep -c . <<< "$curls")" -ge 5 ] || fail "$SKILL §18 lost its bounded curl fetches (fewer than 5 left)"
 while IFS= read -r c; do
   case "$c" in
     *--max-redirs*--max-time*|*--max-time*--max-redirs*) ;;
     *) fail "$SKILL §18 has a curl without both --max-redirs and --max-time: $c" ;;
+  esac
+  # --max-redirs does nothing unless curl follows redirects; without -L every fetch reads the
+  # empty 301 body and all four live checks turn UNMEASURED for good.
+  case "$c" in
+    *" -L "*|*" -sL "*|*" -Ls "*|*--location*) ;;
+    *) fail "$SKILL §18 has a curl that does not follow redirects (-L), so --max-redirs is inert: $c" ;;
   esac
 done <<< "$curls"
 
@@ -136,7 +147,10 @@ grep -Fq 'id=\"product-$pid\"' <<< "$ecom_flat" \
 # The class alternation must be the real WooCommerce class names. (in|out)ofstock concatenates
 # to "inofstock"/"outofstock" — it can never match the actual "instock" class, so the InStock
 # side of the mismatch this check exists to catch was undetectable.
-if grep -Fq '(in|out)ofstock' <<< "$skill_flat"; then
+# Only command text is scanned — lines inside §18's fenced blocks that are not # comments — so
+# the doc may still name the old alternation to warn against it.
+ecom_code=$(awk '/^```/ { fence = !fence; next } fence && !/^[[:space:]]*#/' <<< "$ecom")
+if grep -Fq '(in|out)ofstock' <<< "$ecom_code"; then
   fail "SEO-066 still uses the (in|out)ofstock alternation, which can never match WooCommerce's real 'instock' class"
 fi
 grep -Fq 'instock|outofstock|onbackorder' <<< "$ecom_flat" \
@@ -169,6 +183,11 @@ grep -Fq '_yoast_wpseo_meta-robots-noindex' <<< "$ecom_flat" \
   || fail "SEO-067 dropped the Yoast post-level noindex fallback"
 grep -Fq 'wpseo_taxonomy_meta' <<< "$ecom_flat" \
   || fail "SEO-067's Yoast term-level fallback reads term meta instead of the wpseo_taxonomy_meta option Yoast actually uses"
+# The option name alone is satisfied by a mention; pin the lookup that reads the term's flag.
+grep -Fq "tax_meta['product_cat'][" <<< "$ecom_code" \
+  || fail "SEO-067 names wpseo_taxonomy_meta but no longer looks up the product_cat term inside it"
+grep -Fq "['wpseo_noindex']" <<< "$ecom_code" \
+  || fail "SEO-067's term-level lookup does not read Yoast's wpseo_noindex flag"
 # The WP-CLI pass must actually PRODUCE the unresolved-URL file the fallback reads — a
 # fallback pointed at a file nothing writes silently checks zero URLs.
 grep -Fq "fopen('/tmp/sitemap-urls-unresolved.txt', 'w')" <<< "$ecom_flat" \
@@ -193,6 +212,12 @@ grep -Fq 'Anchor to the actual robots meta tag' <<< "$ecom_flat" \
   || fail "SEO-067's meta check is not anchored to the robots meta tag"
 grep -Fq 'tolerate attribute order and' <<< "$ecom_flat" \
   || fail "SEO-067's meta check does not tolerate attribute order (content before name)"
+# The prose above can survive a code change; pin the operative patterns in the commands too.
+grep -Fq "grep -qiE '^X-Robots-Tag:.*noindex'" <<< "$ecom_code" \
+  || fail "SEO-067 no longer tests the X-Robots-Tag header for noindex"
+meta_needle=$'grep -oiE \'<meta[^>]+>\' /tmp/sitemap-url-body.html | grep -i \'name=["'
+grep -Fq "$meta_needle" <<< "$ecom_code" \
+  || fail "SEO-067's meta check is no longer anchored to the robots <meta> tag"
 
 # --- SEO-068: migration reminder — warning-level, no fetch ---------------------------------
 grep -Fq 'Not a live fetch' <<< "$commerce_flat" \
