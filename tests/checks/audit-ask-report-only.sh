@@ -21,6 +21,16 @@ grep -Fq 'set `--report-only` for the rest of the run' <<<"$step1" \
 grep -Fq 'When the flag was passed, do not ask.' <<<"$step1" \
   || fail "Step 1 asks even when --report-only was typed"
 
+# Order, independent of headings: the question must come before the adoption prompt and the
+# plugin-install prompt, so a whole-file fallback above cannot hide it moving back to Step 9.
+line_of() { grep -nF -- "$1" "$audit" | head -1 | cut -d: -f1; }
+q=$(line_of '[A] Report only')
+adopt=$(line_of '[A] Adopt it now')
+install=$(line_of '[A] Install all recommended WordPress plugins')
+[ -n "$adopt" ] && [ -n "$install" ] || fail "adoption or plugin-install prompt not found in $audit"
+[ "$q" -lt "$adopt" ] || fail "report-only question comes after the adoption prompt"
+[ "$q" -lt "$install" ] || fail "report-only question comes after the plugin-install prompt"
+
 step4=$(awk '/^## Step 4:/{on=1} /^## Step 5:/{on=0} on' "$audit")
 [ -n "$step4" ] || step4=$(cat "$audit")
 grep -Fq 'With `--report-only`, this step installs nothing.' <<<"$step4" \
