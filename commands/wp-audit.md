@@ -41,6 +41,25 @@ If `--all` or no category flags are present: enable all 7 categories (security, 
   it, and keying this off the literal flag would make the commonest invocation report the
   whole category `UNMEASURED` — the quiet failure Step 2.7 exists to prevent.
 
+### Ask for report-only up front when the flag is absent
+
+If `--report-only` was NOT passed, ask before any other question of the run (before the
+adoption prompt in Step 2, the plugin prompt in Step 4 and the security level in Step 5).
+Use `AskUserQuestion`:
+
+```
+What should this audit do?
+  [A] Report only — audit and write the report; nothing on the site is installed or changed
+  [B] Report, then offer fixes — the report comes first, then Step 9 asks before applying anything
+```
+
+On A, set `--report-only` for the rest of the run, exactly as if it had been typed. On B,
+continue without it. When the flag was passed, do not ask.
+
+Before this question existed, a run without the flag only learned that the operator wanted a
+read-only audit at Step 9, after Steps 4 and 5 had already offered to install and configure
+plugins on the site. The answer belongs at the start, where it decides those prompts too.
+
 ## Step 2: Read Project Context
 
 **First: validate the project configuration.**
@@ -607,6 +626,10 @@ Tier 2, `wp-audit-geo` still runs its code-only checks and reports the runtime G
 ## Step 4: Dependency Check (Tier 2 only)
 
 If Tier 2 is NOT available, skip this step entirely.
+
+**With `--report-only`, this step installs nothing.** Print the dependency report below
+without the Options block, then continue with option C (run with what is available). A
+report-only run promises to leave the site unchanged, and installing a plugin changes it.
 
 If Tier 2 is available, check what plugins are installed:
 

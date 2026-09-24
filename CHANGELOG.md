@@ -79,6 +79,16 @@
   match is spelled correctly either way — runs the script's own cutoff/bucket functions
   against real PHP (`tests/checks/lib/media-integrity-date-cutoff-behavior.php`).
 
+### Changed
+
+- **`/wp-audit` asks for report-only as its first question when `--report-only` is absent.**
+  Before, a run without the flag only reached the fix/no-fix decision at Step 9, after Step 4
+  had already offered to install Rank Math, AIOS or SCF and Step 5 to pick an AIOS security
+  level, so an operator who only wanted a report was asked to change the site first. Answering
+  "report only" now sets `--report-only` for the whole run, and Step 4 no longer offers plugin
+  installs on a report-only run: it prints the dependency report and continues with what is
+  available. `tests/checks/audit-ask-report-only.sh` pins both.
+
 ## [1.28.0] - 2026-09-23
 
 ### Fixed
