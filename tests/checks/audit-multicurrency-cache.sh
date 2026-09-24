@@ -34,7 +34,9 @@
 # it with code, a bare substring match, an impossible cross-agent reuse) named as wrong.
 set -euo pipefail
 
-fail() { echo "FAIL: $1"; exit 1; }
+# stderr, not stdout: fail() also runs inside $(row ...), where stdout is the captured row
+# text and a FAIL line there would read as a found row instead of a visible failure.
+fail() { echo "FAIL: $1" >&2; exit 1; }
 
 cd "$(dirname "$0")/../.." || fail "cannot cd to the repository root"
 
@@ -53,8 +55,10 @@ done
 # as it finds a match, and if the writer is still flushing output when that happens it gets
 # SIGPIPE — pipefail then reports that as the pipeline's exit status even though the match was
 # found, turning a passing check into a spurious failure. A herestring has no pipe to break.
-flat_perf=$(tr '\n' ' ' < "$perf" | sed 's/  */ /g')
-flat_seo=$(tr '\n' ' ' < "$seo" | sed 's/  */ /g')
+# Carriage returns dropped and every whitespace run squeezed to one space, so a CRLF checkout
+# or a tab in the prose cannot break a cross-line literal match.
+flat_perf=$(tr -d '\r' < "$perf" | tr -s '[:space:]' ' ')
+flat_seo=$(tr -d '\r' < "$seo" | tr -s '[:space:]' ' ')
 
 # --- Codes exist and are tabulated (audit-check-tables.sh's own rule, pinned here too so this
 #     one test file tells the whole story on its own) ---
@@ -82,10 +86,10 @@ seo069_row=$(row "$seo" SEO-069)
 # fourth time — but it must still point somewhere, not drop the gate silently.
 for pair in "PERF-065:$perf065_row" "PERF-066:$perf066_row" "SEO-069:$seo069_row"; do
   code=${pair%%:*}
-  row=${pair#*:}
-  grep -Fq '"no WooCommerce"' <<< "$row" \
+  rowtext=${pair#*:}
+  grep -Fq '"no WooCommerce"' <<< "$rowtext" \
     || fail "$code's own row does not give the N/A (no WooCommerce) reason"
-  grep -Fq '"no multi-currency plugin"' <<< "$row" \
+  grep -Fq '"no multi-currency plugin"' <<< "$rowtext" \
     || fail "$code's own row does not give the N/A (no multi-currency plugin) reason"
 done
 grep -Fq 'Same `N/A`/`UNMEASURED` gates as PERF-065/PERF-066' <<< "$perf067_row" \
@@ -114,8 +118,8 @@ grep -Fq 'server:' "$perf" \
   || fail "$perf: PERF-066 does not read the server response header"
 grep -Fq 'never the local clone' "$perf" \
   || fail "$perf does not forbid probing the local clone for PERF-066/PERF-067"
-grep -Fq 'Step 2.3' "$perf" \
-  || fail "$perf does not point the live checks at /wp-audit Step 2.3's production-host contract"
+grep -Fq 'Step 2.3' <<< "$perf066_row" \
+  || fail "PERF-066's own row does not point the live check at /wp-audit Step 2.3's production-host contract"
 
 # --- Direction 3b: PERF-066 requires a confirmed HIT, not the header's mere presence, and
 #     recognizes CDNs/proxies other than Cloudflare ---
@@ -147,7 +151,10 @@ grep -Fq 'Multi-currency cache-key fix' "$perf" \
 # The fix section runs from its own heading to the "## Rules" heading that follows it today.
 # Both ends are named, so a failure says which one moved: a heading of any level that shows up
 # inside the extract means the section's shape changed and this end marker needs a look.
-fix=$(awk '/^### Multi-currency cache-key fix/{f=1; next} f && /^## Rules/{exit} f{print}' "$perf")
+# awk records that it reached ## Rules: without it, a removed or renamed end heading would let
+# the extract run to EOF.
+fix=$(awk '/^### Multi-currency cache-key fix/{f=1; next} f && /^## Rules/{found=1; exit} f{print} END{exit(found ? 0 : 1)}' "$perf") \
+  || fail "$perf's Multi-currency cache-key fix section is not terminated by ## Rules"
 [ -n "$fix" ] || fail "$perf's Multi-currency cache-key fix section is empty"
 inner=$(grep -E '^#{1,6} ' <<< "$fix" || true)
 [ -z "$inner" ] \
@@ -158,6 +165,12 @@ grep -Fq 'Never propose disabling the page cache' <<< "$fix" \
   || fail "the PERF-065/PERF-067 fix does not reject disabling the cache site-wide as a shortcut"
 grep -Fq 'no WP-CLI command reaches this' <<< "$fix" \
   || fail "the PERF-065/PERF-067 fix does not say a Cloudflare edge rule is out of WP-CLI's reach"
+# The discarded shape is named as wrong too: a code workaround the edge never sees, and autofix.
+fix_flat=$(tr -s '[:space:]' ' ' <<< "$fix")
+grep -Fq 'workaround that the edge never sees' <<< "$fix_flat" \
+  || fail "the PERF-065/PERF-067 fix does not name a .htaccess/performance.php code workaround as wrong"
+grep -Fq 'PERF-065/PERF-067 are never auto-applied' <<< "$fix_flat" \
+  || fail "the PERF-065/PERF-067 fix does not exclude these codes from the auto-fix pass"
 
 # --- Direction 6: each code this change owns is defined exactly once. A sibling PR that picks
 #     the same number would add a second row for it, and that collision is what this catches.
@@ -189,7 +202,7 @@ grep -Fq 'never flagged as the multi-currency plugin outright' <<< "$flat_perf" 
   || fail "$perf does not say a substring match alone must not be flagged outright"
 grep -Fq 'price by country or geography' <<< "$flat_perf" \
   || fail "$perf does not document the price-by-country detection gap"
-grep -Fq 'confirmed multi-currency plugin slugs' "$perf" \
+grep -Fq 'confirmed multi-currency plugin slugs' <<< "$perf065_row" \
   || fail "$perf's PERF-065 row does not point at the confirmed slug list"
 
 # --- SEO-069: makes its own live production request pair — it has no mechanism to reuse
@@ -197,7 +210,8 @@ grep -Fq 'confirmed multi-currency plugin slugs' "$perf" \
 #     self-fetch that cannot stand in for a production, cache-sensitive read ---
 grep -Fq 'json_ld' "$seo" \
   || fail "$seo has lost the json_ld snapshot field (still used by the other rendered-head checks)"
-grep -Fq 'SEO-069' "$seo" || fail "$seo never mentions SEO-069 outside its table row"
+seo_prose=$(grep -v '^|' "$seo" || true)
+grep -Fq 'SEO-069' <<< "$seo_prose" || fail "$seo never mentions SEO-069 outside its table row"
 grep -Fq 'SEO-069 is never auto-applied' "$seo" \
   || fail "$seo does not exclude SEO-069 from the auto-fix pass"
 grep -Fq 'there is no theme code to' "$seo" \
@@ -209,6 +223,10 @@ grep -Fq 'own request pair' <<< "$seo069_row" \
   || fail "$seo: SEO-069's own table row does not say it makes its own request pair"
 grep -Fq 'not a reuse' <<< "$seo069_row" \
   || fail "$seo: SEO-069's own table row does not say it is not a reuse of PERF-067's result"
+grep -Fq 'confirmed production host' <<< "$seo069_row" \
+  || fail "$seo: SEO-069's own table row does not target the confirmed production host"
+grep -Fq 'UNMEASURED' <<< "$seo069_row" \
+  || fail "$seo: SEO-069's own table row does not fall back to UNMEASURED without a confirmed production URL"
 grep -Fq 'no mechanism' <<< "$flat_seo" \
   || fail "$seo does not explain that the two agents have no mechanism to share a live result"
 grep -Fq 'that snapshot is' <<< "$flat_seo" \
