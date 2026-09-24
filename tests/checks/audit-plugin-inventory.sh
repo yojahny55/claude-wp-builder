@@ -136,9 +136,13 @@ has "$rules" 'respect the Step 2.3 clone suppression' && fail "$sec rule 11 stil
 grep -Fq -- '--field=plugin_uri' "$sec" "$adopt" && fail "a snippet still uses the nonexistent --field=plugin_uri"
 for f in "$sec" "$adopt"; do
   grep -Fq '$h["PluginURI"]' "$f" || fail "$f does not read Plugin URI from get_plugins()"
+  # Judge each info-API call as one shell command: backslash-continued lines are joined first,
+  # so the flags are found however the command is wrapped, not only on the line above the URL.
+  cmds="$(awk '{ if (sub(/\\[ \t]*$/, "")) { buf = buf $0 " "; next } print buf $0; buf = "" }' "$f" \
+          | grep 'info/1.2/?action=' || true)"
   n_info="$(grep -c 'info/1.2/?action=' "$f" || true)"
-  n_g="$(grep -B1 'info/1.2/?action=' "$f" | grep -c 'curl -gsS' || true)"
-  n_w="$(grep -B1 'info/1.2/?action=' "$f" | grep 'curl -gsS' | grep -cF '%{http_code}' || true)"
+  n_g="$(printf '%s\n' "$cmds" | grep -c 'curl -gsS' || true)"
+  n_w="$(printf '%s\n' "$cmds" | grep 'curl -gsS' | grep -cF '%{http_code}' || true)"
   [ "$n_info" -gt 0 ] && [ "$n_info" = "$n_g" ] \
     || fail "$f: an info-API curl lacks -g ($n_g of $n_info) — the [slug] brackets glob and curl exits 3"
   [ "$n_info" = "$n_w" ] || fail "$f: an info-API curl does not print the HTTP status ($n_w of $n_info)"
