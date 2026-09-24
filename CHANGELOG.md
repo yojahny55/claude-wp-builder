@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-09-23
+
 ### Fixed
 
 - **A horizontal-overflow finding did not say what overflowed.** `bin/demo-verify.mjs`
