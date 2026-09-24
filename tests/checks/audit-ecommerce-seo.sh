@@ -72,7 +72,9 @@ printf '%s' "$commerce_flat" | grep -Fq 'With no public URL, the check is `UNMEA
 # --- SEO-064: faceted/filtered URL must NOT self-canonicalize ------------------------------
 printf '%s' "$skill_flat" | grep -Fq 'canonicalizing to itself tells Google every filter' \
   || fail "SEO-064 does not say a self-canonicalizing filtered URL is the defect"
-printf '%s' "$skill_flat" | grep -Fq 'canonical back at the clean category URL' \
+# The skill wraps this sentence across two lines; $skill_flat has newlines folded to spaces,
+# so the whole clause is matched as one string.
+printf '%s' "$skill_flat" | grep -Fq 'Each variant should declare a canonical back at the clean category URL' \
   || fail "SEO-064 does not require the filtered URL's canonical to point at the clean category URL"
 # A redirect must be followed (bounded), and an empty fetch is UNMEASURED, never a match/pass.
 printf '%s' "$skill_flat" | grep -Fq -- '--max-redirs 3 --max-time 15' \
