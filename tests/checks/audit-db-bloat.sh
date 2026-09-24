@@ -57,7 +57,7 @@ declare -A want_severity=(
 # added later must not silently shift which cell is compared. A row whose table has no
 # Severity header column reports that instead of a wrong value.
 for code in "${!want_severity[@]}"; do
-  sev=$(CODE="$code" awk -F'|' '
+  sev=$(awk -F'|' -v code="$code" '
     /^\|/ {
       first = $2; gsub(/^[ \t]+|[ \t]+$/, "", first)
       if (first == "Code") {
@@ -65,7 +65,7 @@ for code in "${!want_severity[@]}"; do
         for (i = 2; i < NF; i++) { h = $i; gsub(/^[ \t]+|[ \t]+$/, "", h); if (h == "Severity") sev_col = i }
         next
       }
-      if (first == ENVIRON["CODE"]) {
+      if (first == code) {
         if (!sev_col) { print "(no Severity column in its table)"; exit }
         s = $sev_col; gsub(/^[ \t]+|[ \t]+$/, "", s); print s; exit
       }
@@ -90,7 +90,7 @@ grep -Eq '^\| PERF-[0-9]+ \|' "$agent" \
 # pipeline, so there is no grep exit status or SIGPIPE to mask; a missing row is empty output
 # and exit 0, and the `[ -n "$r" ]` guard at each call site reports it.
 row() {
-  CODE="$1" awk -F'|' '/^\|/ { cell = $2; gsub(/^[ \t]+|[ \t]+$/, "", cell); if (cell == ENVIRON["CODE"]) print }' "$agent"
+  awk -F'|' -v code="$1" '/^\|/ { cell = $2; gsub(/^[ \t]+|[ \t]+$/, "", cell); if (cell == code) print }' "$agent"
 }
 
 # None of the four executable cells may hardcode the wp_ prefix: on a site whose real prefix
@@ -173,24 +173,32 @@ r=$(row 'PERF-064')
 printf '%s' "$r" | grep -Fq 'postmeta' || fail "PERF-064 does not query the postmeta table"
 printf '%s' "$r" | grep -Fq 'LEFT JOIN' || fail "PERF-064 does not LEFT JOIN against posts"
 printf '%s' "$r" | grep -Fq 'IS NULL' || fail "PERF-064 does not filter on a missing owner"
-printf '%s' "$r" | grep -Fq '≤500 orphaned rows' || fail "PERF-064's threshold is not ≤500 orphaned rows"
+# The threshold is the number and its unit next to an upper-bound word, not one exact spelling.
+printf '%s' "$r" | grep -Eiq '(≤|<=|at most|no more than|up to) ?500 orphaned' \
+  || fail "PERF-064's threshold is not an upper bound of 500 orphaned rows"
 
 # --- The prefix-awareness note itself is present, not just the fixed cells ---
 grep -Fq '$($WP db prefix)' "$agent" \
   || fail "$agent never explains how the real table prefix is resolved"
-grep -Fq "Do not hand-edit" "$agent" \
+grep -Eiq "(do not|don't|never) (hand-edit|hardcode|hard-code)" "$agent" \
   || fail "$agent has no warning against hardcoding wp_<table> when running these by hand"
 
 # --- PERF-036/037 must count the autoload values WP 6.6+ actually writes, not just 'yes' ---
 grep -Fq "autoload IN ('yes','on','auto-on','auto')" "$agent" \
   || fail "$agent's autoloaded-options queries (PERF-036/037) still filter only autoload='yes' — WP 6.6+ also writes on/auto-on/auto"
-autoload_yes_only=$(grep -F "autoload='yes'" "$agent" | grep -v "autoload IN (" || true)
+# Drop only the prose that names the old filter to reject it, then look for the filter itself
+# in any spacing. Excluding whole lines that also hold the IN list would hide a bare filter
+# sharing a line with it.
+autoload_yes_only=$(sed "s/not \`autoload='yes'\` alone//g" "$agent" \
+  | grep -E "autoload[[:space:]]*=[[:space:]]*'yes'" || true)
 [ -z "$autoload_yes_only" ] \
   || fail "$agent still has a bare autoload='yes' filter that misses WP 6.6+ autoload values"
 
 # --- The procedure section: fix commands named, per item ---
 proc=$(awk '/^### Procedure — database bloat checks/{f=1} f{print} f && /^## Step 3/{exit}' "$agent" || true)
 [ -n "$proc" ] || fail "$agent has no 'Procedure — database bloat checks' section"
+# Prose assertions match the flattened section, so a reflowed line cannot split a phrase.
+proc_flat=$(printf '%s' "$proc" | tr '\n' ' ' | sed 's/  */ /g')
 
 grep -Eq '\$WP action-scheduler clean' "$agent" \
   || fail "$agent does not give '\$WP action-scheduler clean' as the PERF-061 fix"
@@ -207,7 +215,7 @@ printf '%s' "$proc" | grep -Fiq 'never auto-fix' \
 # the batch has to go through a LIMIT-able subquery, materialized in a derived table (the
 # classic "can't specify target table for update in FROM clause" workaround), built with the
 # dynamic prefix like every other cell, and repeated until it deletes 0 rows.
-printf '%s' "$proc" | grep -Fq 'cannot take a `LIMIT`' \
+printf '%s' "$proc_flat" | grep -Eiq "(cannot|can't|does not|doesn't) (take|accept|support) (a )?\`?LIMIT" \
   || fail "$agent does not explain that DELETE ... JOIN cannot take LIMIT, which is why PERF-064 needs a subquery batch form"
 printf '%s' "$proc" | grep -Fq 'WHERE meta_id IN (SELECT meta_id FROM (SELECT' \
   || fail "$agent gives no runnable batched-delete command for PERF-064 (subquery form with a derived table)"
@@ -215,7 +223,7 @@ printf '%s' "$proc" | grep -Fq 'LIMIT 5000' \
   || fail "$agent's PERF-064 batch command has no LIMIT, so it is not actually batched"
 printf '%s' "$proc" | grep -Fq '$($WP db prefix)postmeta' \
   || fail "$agent's PERF-064 batch command hardcodes the table name instead of resolving the real prefix"
-printf '%s' "$proc" | grep -Fiq 'run this repeatedly, in a loop' \
+printf '%s' "$proc_flat" | grep -Eiq '(repeatedly|in a loop|loop it|until it)' \
   || fail "$agent does not say to run the PERF-064 batch repeatedly"
 printf '%s' "$proc" | grep -Fq '0 rows affected' \
   || fail "$agent does not say to stop the PERF-064 batch loop at 0 rows affected"
@@ -223,7 +231,7 @@ printf '%s' "$proc" | grep -Fq '0 rows affected' \
 # --- Not clone artifacts: must report normally, never folded into Step 2.3 suppression ---
 printf '%s' "$proc" | grep -Fq 'real on production' \
   || fail "$agent does not say these bloat patterns are real on production, not clone artifacts"
-printf '%s' "$proc" | grep -Fiq 'never suppressed' \
+printf '%s' "$proc_flat" | grep -Eiq '(never|not|must not be|is not) suppressed' \
   || fail "$agent does not forbid suppressing these under the local-clone rule"
 
 # N/A is bounded to "table genuinely absent", never a blanket commerce gate.
