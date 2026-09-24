@@ -119,6 +119,31 @@ if ( null === $bucket_fn ) {
 	exit( 1 );
 }
 
+/*
+ * Passing cases prove nothing if the script stopped calling these functions and
+ * inlined its own comparison. With both definitions cut out, each name must still
+ * be called as code — a T_STRING followed by `(` — not only named in a comment.
+ */
+$rest   = str_replace( array( $cutoff_fn, $bucket_fn ), '', $source );
+$called = array();
+$rt     = token_get_all( $rest );
+foreach ( $rt as $k => $tok ) {
+	if ( ! is_array( $tok ) || T_STRING !== $tok[0] ) {
+		continue;
+	}
+	for ( $m = $k + 1; isset( $rt[ $m ] ) && is_array( $rt[ $m ] ) && T_WHITESPACE === $rt[ $m ][0]; $m++ ) {
+	}
+	if ( isset( $rt[ $m ] ) && '(' === $rt[ $m ] ) {
+		$called[ $tok[1] ] = true;
+	}
+}
+foreach ( array( 'mmf_compute_archive_cutoff', 'mmf_bucket_for' ) as $name ) {
+	if ( empty( $called[ $name ] ) ) {
+		fwrite( STDERR, "find-missing-media-files.php never calls {$name}() — the tested logic is dead code\n" );
+		exit( 1 );
+	}
+}
+
 foreach ( array( 'mmf_compute_archive_cutoff' => $cutoff_fn, 'mmf_bucket_for' => $bucket_fn ) as $name => $code ) {
 	$problem = mmfx_check_extracted( $code, $name );
 	if ( null !== $problem ) {
@@ -155,6 +180,8 @@ $cutoff_cases = array(
 	'relative date is rejected'            => array( 'yesterday', false ),
 	'impossible calendar date is rejected' => array( '2026-02-30', false ),
 	'out-of-range hour is rejected'        => array( '2026-09-23 24:00:00', false ),
+	'out-of-range minute is rejected'      => array( '2026-09-23 14:75:00', false ),
+	'out-of-range second is rejected'      => array( '2026-09-23 14:30:75', false ),
 	'unparseable date'                     => array( 'not-a-date', false ),
 );
 
@@ -192,6 +219,8 @@ $bucket_cases = array(
 	'upload after an exact timestamp cutoff'    => array( '2026-09-23 14:30:00', '2026-09-23 18:00:00', 'AFTER-ARCHIVE' ),
 	'empty post_date is not BEFORE-ARCHIVE'     => array( '2026-09-23', '', 'UNDATED' ),
 	'unparseable post_date is not BEFORE-ARCHIVE' => array( '2026-09-23', 'not a date', 'UNDATED' ),
+	'zeroed post_date is not BEFORE-ARCHIVE'    => array( '2026-09-23', '0000-00-00 00:00:00', 'UNDATED' ),
+	'epoch post_date is not BEFORE-ARCHIVE'     => array( '2026-09-23', '1970-01-01 00:00:00', 'UNDATED' ),
 );
 
 foreach ( $bucket_cases as $label => $case ) {
@@ -215,4 +244,9 @@ foreach ( $bucket_cases as $label => $case ) {
 	}
 }
 
-exit( $failed > 0 ? 1 : 0 );
+if ( $failed > 0 ) {
+	exit( 1 );
+}
+// The shell check requires this line, so a run that asserted nothing cannot pass.
+printf( "OK %d cases\n", count( $cutoff_cases ) + count( $bucket_cases ) );
+exit( 0 );

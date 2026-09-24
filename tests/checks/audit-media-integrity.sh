@@ -80,6 +80,14 @@ grep -Fq 'prints a sample, never the whole list' <<< "$flat" \
 grep -Fq "wp_get_upload_dir" "$script" || fail "$script does not resolve paths via wp_get_upload_dir()"
 grep -Fq "'sizes'" "$script" || fail "$script does not walk registered image sub-sizes"
 grep -Fq "original_image" "$script" || fail "$script does not check original_image"
+# Sub-sizes and original_image are bare filenames; without the attachment's own YYYY/MM
+# directory every one of them reads as missing (a wall of false WP-061/WP-062 misses).
+grep -Fq '$rel_dir   = dirname( $attached_file )' "$script" \
+  || fail "$script does not take the attachment's own subdirectory from _wp_attached_file"
+grep -Fq "\$rel_dir . '/' . \$size_info['file']" "$script" \
+  || fail "$script does not resolve sub-sizes against the attachment's own subdirectory"
+grep -Fq "\$rel_dir . '/' . \$meta['original_image']" "$script" \
+  || fail "$script does not resolve original_image against the attachment's own subdirectory"
 for bucket in BEFORE-ARCHIVE AFTER-ARCHIVE UNDATED; do
   grep -Fq "$bucket" "$script" || fail "$script lost the $bucket bucket"
 done
@@ -112,14 +120,19 @@ grep -Fq 'find-missing-media-files.php: attachment query failed' "$script" \
   || fail "$script does not report a failed attachment query to STDERR"
 grep -Fq 'find-missing-media-files.php: meta cache query failed' "$script" \
   || fail "$script does not report a failed meta-cache query to STDERR"
-# The other "cannot measure" modes are pinned the same way, one literal message each, so
-# dropping any one guard fails here even if an unrelated exit( 2 ) is added elsewhere.
-grep -Fq 'is not a Y-m-d or Y-m-d H:i:s date' "$script" \
-  || fail "$script does not reject an archive-date argument it cannot read"
-grep -Fq 'is not a non-negative integer' "$script" \
-  || fail "$script does not reject a negative or non-numeric sample-size"
-grep -Fq 'find-missing-media-files.php: uploads directory unavailable' "$script" \
-  || fail "$script does not stop when wp_get_upload_dir() has no usable basedir"
+# The other "cannot measure" modes are pinned the same way, one literal message each, and
+# every pinned message must be followed by an exit( 2 ) before the next statement block: a
+# message with no exit after it is defect #4 back again — the script would fall through and
+# print "0 attachments checked" with exit 0.
+for msg in 'attachment query failed' 'meta cache query failed' 'uploads directory unavailable' \
+           'is not a Y-m-d or Y-m-d H:i:s date' 'is not a non-negative integer'; do
+  grep -Fq "$msg" "$script" || fail "$script no longer reports '$msg' to STDERR"
+  awk -v msg="$msg" 'index($0, msg) { want = 1; n = 0; next }
+      want && /exit[[:space:]]*\([[:space:]]*2[[:space:]]*\)/ { ok = 1; exit }
+      want && ++n > 2 { exit }
+      END { exit(ok ? 0 : 1) }' "$script" \
+    || fail "$script reports '$msg' but no exit( 2 ) follows it — the failure would read as '0 attachments checked'"
+done
 
 # --- Local-clone suppression rule: references Step 2.3, does not re-implement clone detection ---
 grep -Fq 'Step 2.3' "$practices" \
@@ -130,10 +143,20 @@ grep -Fq 'local_clone' "$practices" \
   || fail "$practices does not read the local_clone flag from Step 2.3"
 
 # --- Both directions of the suppression: N/A only after the archive date, WARNING/UNMEASURED otherwise ---
-grep -Fq 'N/A (local clone)' "$practices" \
+[[ "$flat" == *'buckets `AFTER-ARCHIVE` is exactly that case'* \
+   && "$flat" == *'report it `N/A (local clone)`, out of the denominator'* ]] \
   || fail "$practices does not suppress AFTER-ARCHIVE misses as N/A (local clone)"
-grep -Fq 'UNMEASURED' "$practices" \
-  || fail "$practices does not fall back to UNMEASURED when the archive date is unknown"
+# UNMEASURED appears for other checks too (the WP-043/044 network gate, the Rules), so it is
+# matched inside the "archive date unknown" bullet only, ended by the report's fix note.
+grep -Fq 'Fix note for the report' "$practices" \
+  || fail "$practices lost the 'Fix note for the report' line that ends the archive-date-unknown bullet"
+clone_unknown_date_section=$(sed -n '/\*\*Local clone, archive date unknown\*\*/,/^Fix note for the report/p' "$practices" \
+  | tr '\n' ' ' | sed 's/  */ /g')
+[[ "$clone_unknown_date_section" == *'Fix note for the report'* ]] \
+  || fail "$practices: the 'archive date unknown' extraction never reached its end anchor"
+[[ "$clone_unknown_date_section" == *'every miss comes back `UNDATED`'* \
+   && "$clone_unknown_date_section" == *'Report `UNMEASURED`'* ]] \
+  || fail "$practices does not fall back to UNMEASURED for UNDATED misses when the archive date is unknown"
 
 # The "no such excuse" reasoning is its own paragraph, wrapped across several
 # lines, so a line-scoped grep on the whole file would never see BEFORE-ARCHIVE
@@ -157,6 +180,10 @@ clone_known_date_section=$(sed -n '/\*\*Local clone, archive date known\*\*/,/\*
   | tr '\n' ' ' | sed 's/  */ /g')
 [ -n "$clone_known_date_section" ] \
   || fail "$practices lost the 'Local clone, archive date known' paragraph"
+# sed only stops at an end anchor that follows the start one; reordered bullets would run the
+# range to EOF, so the end anchor must be inside what was extracted.
+[[ "$clone_known_date_section" == *'**Local clone, archive date unknown**'* ]] \
+  || fail "$practices: the 'archive date known' extraction ran to EOF without reaching its end anchor"
 # Piping into `grep -q` under `pipefail` risks a false FAIL: grep can exit as soon as it
 # finds a match, and if the writer on the other end of the pipe is still flushing output
 # when that happens it can be killed by SIGPIPE, which pipefail then reports as the
@@ -171,7 +198,7 @@ clone_known_date_pattern='no such excuse .* report it WARNING like any other sit
 [[ "$clone_known_date_section" =~ $clone_known_date_pattern ]] \
   || fail "$practices does not still report a pre-archive miss as WARNING"
 
-grep -Fq 'run the script with no archive-date argument' "$practices" \
+[[ "$flat" == *'run the script with no archive-date argument and report every miss WARNING'* ]] \
   || fail "$practices does not report every miss WARNING on a site that is not a local clone"
 
 # --- Same-day archive-date ambiguity is documented (round-2 fix) ---
@@ -199,8 +226,13 @@ grep -Fq 'see WP-060/061/062 in `agents/wp-audit-practices.md`' "$audit" \
 # Required, not skipped: without php this check would shrink to doc greps and still PASS.
 command -v php >/dev/null 2>&1 \
   || fail "php not found — the date-cutoff behavior test cannot run, and no grep above can replace it"
+grep -Fq 'find-missing-media-files.php' "$behavior" \
+  || fail "$behavior no longer loads the production script — it would validate its own copy of the functions"
 if ! behavior_out=$(php "$behavior" 2>&1); then
   fail "the archive-date cutoff/bucket behavior is wrong: ${behavior_out:-(php exited non-zero with no output)}"
 fi
+# A run that asserted nothing must not pass: the fixture prints its case count on success.
+[[ "$behavior_out" =~ ^OK\ [0-9]+\ cases$ ]] \
+  || fail "$behavior did not report its cases as run: ${behavior_out:-(no output)}"
 
 echo PASS
