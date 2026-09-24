@@ -134,6 +134,11 @@ These checks require a running WordPress installation. Use `$WP` from `.wp-creat
 | SEO-060 | No citation references in `sameAs` | The Organization or `LocalBusiness` node has an empty or absent `sameAs` array. Report only what the markup proves; never assert that a missing entry means a missing listing | INFO |
 | SEO-062 | Location pages fail the swap test | Multi-location sites only. Read two location pages and exchange the city names; if both still make sense, the pages carry no location-specific content. Apply the sampling gates from the skill at 30+ and 50+ pages. A store locator whose locations have no crawlable URL of their own is CRITICAL, not WARNING | WARNING |
 | SEO-063 | Fabricated `aggregateRating` | An `aggregateRating` in the schema that no real review data backs, or that carries placeholder values. This is structured-data spam and risks a manual action | CRITICAL |
+| SEO-064 | Faceted/filtered URL self-canonicalizes | WooCommerce only — `N/A ("no WooCommerce")` when `site.commerce` is `none` (Step 2.3). Fetch a category URL against the confirmed production host with a filter/sort query string appended (`?filter_*`, `?orderby=`, `?min_price=`) and compare its canonical with the clean category URL's own. Canonicalizing to itself instead of the clean URL is the defect; a consistent `noindex` on the filtered variant is an acceptable alternative — but the store needs one strategy, not both applied inconsistently | WARNING |
+| SEO-065 | Category pagination canonicalizes to page 1 | WooCommerce only. Fetch a paginated category URL (page 2+) against production and read its canonical. Self-referencing is correct and required here — canonical back to page 1 is the defect: Google never discovers the products listed only on page 2+ | WARNING |
+| SEO-066 | `Offer.availability` disagrees with real stock | WooCommerce only. Fetch a production product page, parse its `Product` JSON-LD `offers.availability`, and compare against the same page's own rendered stock signal (WooCommerce's `outofstock`/`instock` class on the product wrapper). `InStock` on a product the page itself renders as out of stock is the defect — Google treats this class of Product-schema mismatch as a manual-action risk, same tier as SEO-063 | CRITICAL |
+| SEO-067 | Sitemap lists a `noindex` URL | WooCommerce only. Cross-reference product AND product-category URLs in the XML sitemap (skill §15/§18.4) against each URL's `noindex` signal. Primary method is a WP-CLI database comparison (`rank_math_robots`/Yoast postmeta and term meta), not a live fetch per URL — a catalog-sized sitemap means a catalog-sized number of requests, which does not scale. Only the handful of URLs the database comparison cannot resolve fall back to a capped (50 URL) live fetch. A URL present in the sitemap that also carries `noindex` sends Google two contradictory signals for the same page | WARNING |
+| SEO-068 | Post-migration 301 map and lost reviews | WooCommerce only. Not a live fetch — a reminder fired once when the project shows a migration signal (`.wp-create.json` `project.source: restore`/`migration`, or the operator naming a recent platform or URL change). Names two losses: reviews and their `AggregateRating` vanish unless migrated under the same product IDs, and old indexed URLs lose ranking authority without a one-to-one 301 map (a blanket redirect to the home page reads as a soft 404) | WARNING |
 
 ### Procedure
 
@@ -338,6 +343,47 @@ echo wp_json_encode(\$out);
     its URL from `siteurl` at render time, so it survives a migration to another host; a
     `custom` item carries whatever host was typed into it, which is how SEC-036 findings get
     created in the first place.
+
+### Procedure — commerce checks (SEO-064 to SEO-068)
+
+Read `skills/wp-audit-seo-standards/SKILL.md` §18 before running these; it carries the curl
+snippets and the rationale for each. Do not run this section at all when the site is not a
+store — see step 1 below.
+
+1. **Applicability gate first.** Read `site.commerce` from `/wp-audit` Step 2.3. `none` means
+   report all five as `N/A ("no WooCommerce")` and exclude them from the denominator. Never
+   re-detect WooCommerce with your own plugin check — Step 2.3 already did it once for the
+   whole audit.
+2. **Production host, never the clone**, for every check that fetches a page (SEO-064,
+   SEO-065, SEO-066) and for the sitemap-file fetches and any capped fallback sample in
+   SEO-067. Per Step 2.3: when `local_clone` is true, use `--host` if given, otherwise ask the
+   user for the production URL (default `wordpress.url_origin`) and fire no request until it is
+   confirmed. With no public URL, the check is `UNMEASURED`, never `PASS` — a local Apache
+   honors a `.htaccess` canonical rule a production Nginx would ignore, which would turn a real
+   defect into a false pass. Every fetch in §18 follows redirects with a bounded `-L` (`
+   --max-redirs 3 --max-time 15`); no output from a fetch (empty body, timeout, redirect past
+   the cap) is `UNMEASURED` for that check, never read as a match or a pass.
+3. **Sample one category and one product**, the same way the rendered-head snapshot samples
+   posts — fetch each page once and reuse the parsed DOM for every check that reads it, rather
+   than re-fetching per code.
+4. **SEO-064** — build the filtered URL from a real filter/sort link your fetch of the category
+   page already contains (a genuine `orderby=price` or `filter_` href), not a guessed
+   parameter.
+5. **SEO-065** — needs a category with 2+ pages of products; if none exists in the catalog,
+   report `UNMEASURED` ("no paginated category in this catalog"), not `N/A` — the check applies
+   to the store, the sample just doesn't exist yet.
+6. **SEO-066** — the "real stock" side is the page's own rendered class, never a WP-CLI stock
+   query against the local database: the clone's DB can be stale relative to production, and
+   comparing a live claim against a stale value manufactures a false finding either way.
+7. **SEO-067** — fetch only the sitemap FILES (index plus each `product-` and
+   `product_cat-sitemap*.xml` entry, capped at 50 files), never every URL they list. Compare
+   each listed URL's noindex signal via WP-CLI (`rank_math_robots`/Yoast postmeta for a post,
+   term meta/`wpseo_taxonomy_meta` for a `product_cat` term) — this is the primary method, not
+   a fallback, because a live fetch per URL turns a catalog-sized sitemap into a catalog-sized
+   number of production requests. Only the URLs that resolve to neither a post nor a term fall
+   back to a live fetch, capped at 50 of them.
+8. **SEO-068** never fetches anything. Fire it once, from the migration signals already read in
+   `/wp-audit` Step 2.3 / `.wp-create.json`, not once per URL.
 
 ## Step 3: Live-Site Checks
 These four read the served site rather than the theme source, so they need a reachable host.

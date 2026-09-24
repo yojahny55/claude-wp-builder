@@ -4,6 +4,34 @@
 
 ### Added
 
+- **`wp-audit-seo` gained five WooCommerce-specific checks (SEO-064 to SEO-068), gated by the
+  `site.commerce` flag from Step 2.3.** Before this, the SEO auditor's canonical and schema
+  checks were written for an informational site and missed the failure modes that only exist
+  because a site is a store. Faceted navigation (`?orderby=`, `?filter_*`, `?min_price=`)
+  multiplies one category page into near-infinite URL variants, and a filtered variant
+  canonicalizing to itself (SEO-064) tells Google to crawl and index all of them. The opposite
+  mistake sat right next to it: a paginated category page canonicalizing back to page 1
+  (SEO-065) was easy to assume correct by analogy with a paginated single post, but for a
+  WooCommerce category archive it is the classic error — the products on page 2+ never get
+  indexed at all, so self-referencing pagination is required here, not merely tolerated.
+  SEO-066 catches a `Product` schema's `Offer.availability` still claiming `InStock` on a page
+  the storefront itself renders as out of stock — the same manual-action risk tier as the
+  existing SEO-063 fabricated-rating check. SEO-067 catches a product OR product-category URL
+  the XML sitemap still lists after it picked up a `noindex` — a contradictory signal to
+  Google — by comparing the sitemap against `rank_math_robots`/Yoast robots meta via WP-CLI,
+  not a live fetch of every listed URL: a catalog-sized sitemap would otherwise mean a
+  catalog-sized number of production requests. Only the URLs that database comparison cannot
+  resolve fall back to a live fetch, capped at 50. SEO-068 is a warning-level reminder, not a
+  live check: when the project shows a migration signal, it names the two losses a
+  URL/platform migration causes and nothing recovers afterward — product reviews and their
+  `AggregateRating` if IDs are not migrated with them, and old URLs' ranking authority if they
+  are not 301-mapped one-to-one instead of blanket-redirected to the home page. All five are
+  `N/A ("no WooCommerce")` on a non-commerce site; SEO-064/065/066 and SEO-067's sitemap-file
+  and fallback fetches target the confirmed production host, never the local clone, per
+  Step 2.3, each following redirects with a bounded `-L`, and an empty fetch is `UNMEASURED`
+  rather than a silent pass.
+  `tests/checks/audit-ecommerce-seo.sh` pins the five codes, the site-type gate, and the
+  sitemap-file cap; the methodology is recorded in `skills/wp-audit-seo-standards` §18.
 - **`/wp-audit` did not notice a media file was missing.** An attachment post survives the
   deletion of its own file — by hand, by a partial migration, or by a restore that skipped
   part of the uploads directory — and nothing in core flags it, so the site keeps serving a
