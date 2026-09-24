@@ -104,7 +104,8 @@ $cutoff_cases = array(
 	'no date given'                       => array( '', false ),
 	'bare ISO date'                        => array( '2026-09-23', '2026-09-23 23:59:59' ),
 	'full timestamp, non-midnight'         => array( '2026-09-23 14:30:00', '2026-09-23 14:30:00' ),
-	'explicit literal midnight (same as bare date)' => array( '2026-09-23 00:00:00', '2026-09-23 23:59:59' ),
+	'explicit midnight is a real time'     => array( '2026-09-23 00:00:00', '2026-09-23 00:00:00' ),
+	'written-out date, no time'            => array( '23 September 2026', '2026-09-23 23:59:59' ),
 	'unparseable date'                     => array( 'not-a-date', false ),
 );
 

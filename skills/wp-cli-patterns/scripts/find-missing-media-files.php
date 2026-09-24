@@ -26,8 +26,7 @@
  *                 applied to either; a cutoff taken from the server clock
  *                 of a host in another timezone is off by that difference.
  *
- *                 A bare date with no time of day (including one that
- *                 happens to parse to exactly midnight) is ambiguous for its
+ *                 A bare date with no time of day is ambiguous for its
  *                 own calendar day: an upload made that same day compares as
  *                 "after archive" regardless of what time the archive was
  *                 actually taken, which would silently suppress a real
@@ -37,7 +36,8 @@
  *                 can be waved through as AFTER-ARCHIVE — it is reported
  *                 BEFORE-ARCHIVE instead. Pass a full `Y-m-d H:i:s` timestamp
  *                 to narrow the window to the exact time the archive was
- *                 taken and stop folding that whole day into BEFORE-ARCHIVE.
+ *                 taken and stop folding that whole day into BEFORE-ARCHIVE;
+ *                 an explicit time is used as given, 00:00:00 included.
  *
  *                 Omit the argument entirely to bucket every miss UNDATED,
  *                 because without any date there is no way to tell a real
@@ -88,20 +88,28 @@
  * returns an int Unix timestamp: the cutoff BEFORE-ARCHIVE/AFTER-ARCHIVE
  * buckets a miss against.
  *
- * A cutoff that lands on exact midnight — what a bare "Y-m-d" date parses to,
- * and also what an explicit "...00:00:00" timestamp parses to — is ambiguous
- * for its own calendar day: an upload later that same day would otherwise
- * compare as "after archive" no matter what time the archive was actually
- * taken, silently suppressing a real pre-archive loss as N/A (local clone).
- * The cutoff is pushed to the end of that day instead, so the whole archive
- * day reads BEFORE-ARCHIVE rather than being guessed at. Pass a full
- * "Y-m-d H:i:s" timestamp other than midnight to narrow the window to the
- * exact moment the archive was taken.
+ * A date with no time of day — "2026-09-23", "23 September 2026" — parses to
+ * midnight, which is ambiguous for its own calendar day: an upload later that
+ * same day would otherwise compare as "after archive" no matter what time the
+ * archive was actually taken, silently suppressing a real pre-archive loss as
+ * N/A (local clone). Such a cutoff is pushed to the end of that day instead,
+ * so the whole archive day reads BEFORE-ARCHIVE rather than being guessed at.
+ * Whether a time was given is read from the argument itself with date_parse(),
+ * not from the parsed timestamp, so an explicit "...00:00:00" is a real time
+ * and is used exactly as given, like any other full "Y-m-d H:i:s" timestamp.
  */
 function mmf_compute_archive_cutoff( $archive_arg ) {
-	$archive_ts = '' !== $archive_arg ? strtotime( $archive_arg ) : false;
+	if ( '' === $archive_arg ) {
+		return false;
+	}
 
-	if ( false !== $archive_ts && '00:00:00' === date( 'H:i:s', $archive_ts ) ) {
+	$archive_ts = strtotime( $archive_arg );
+	if ( false === $archive_ts ) {
+		return false;
+	}
+
+	$parts = date_parse( $archive_arg );
+	if ( false === $parts['hour'] ) {
 		$archive_ts = strtotime( date( 'Y-m-d', $archive_ts ) . ' 23:59:59' );
 	}
 
@@ -261,14 +269,17 @@ while ( true ) {
 		break;
 	}
 
-	// Drop this batch's primed meta (and anything else cached this request)
-	// before pulling the next one, so memory stays bounded on large libraries.
-	// wp_cache_flush_runtime() is core since WordPress 6.0 (wp-includes/cache.php,
-	// with a cache-compat.php shim for object-cache drop-ins); the guard only
-	// skips the flush on older cores, and never calls the full wp_cache_flush(),
-	// which would also empty a persistent object cache shared with the live site.
-	if ( function_exists( 'wp_cache_flush_runtime' ) ) {
-		wp_cache_flush_runtime();
+	// Drop this batch's primed post meta before pulling the next one, so memory
+	// stays bounded on large libraries. update_meta_cache() stores it one key per
+	// post ID in the 'post_meta' group, so exactly those keys are deleted; nothing
+	// else is flushed, which matters when a persistent object cache is shared with
+	// the live site.
+	if ( function_exists( 'wp_cache_delete_multiple' ) ) {
+		wp_cache_delete_multiple( $batch_ids, 'post_meta' );
+	} else {
+		foreach ( $batch_ids as $batch_id ) {
+			wp_cache_delete( $batch_id, 'post_meta' );
+		}
 	}
 }
 

@@ -172,8 +172,8 @@ detect clones itself; that stays entirely in `/wp-audit` Step 2.3, which this ch
   clone)`, out of the denominator. A miss bucketed `BEFORE-ARCHIVE` predates the archive and has
   no such excuse — Step 2.3's own bound applies ("would this also be true on production?") —
   report it WARNING like any other site.
-  - **Know the exact archive time, not just the day, when you have it.** A bare `Y-m-d` date
-    (or any timestamp that lands on exact midnight) is ambiguous for its own calendar day: an
+  - **Know the exact archive time, not just the day, when you have it.** A date with no time
+    of day (a bare `Y-m-d`, which parses to midnight) is ambiguous for its own calendar day: an
     attachment uploaded later that same day would otherwise compare as "after archive" no
     matter what time of day the archive was actually taken, which would suppress a real
     pre-archive loss as `N/A (local clone)`. The script folds that whole day into

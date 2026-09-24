@@ -92,8 +92,8 @@
   attachment postdates the file archive is `N/A (local clone)` — the media exists in
   production, it just postdates this copy's archive — while a miss that predates the archive
   is still reported, and an unknown archive date reports `UNMEASURED` ("verify against
-  production") rather than guessing either way. A bare `Y-m-d` archive date (or any cutoff
-  that lands on exact midnight) is ambiguous for its own day — an upload later that same day
+  production") rather than guessing either way. A bare `Y-m-d` archive date (any date given
+  without a time of day) is ambiguous for its own day — an upload later that same day
   used to compare as "after archive" and get suppressed as `N/A (local clone)` no matter what
   time the archive was actually taken, hiding a real pre-archive loss. The cutoff is now
   pushed to the end of that day, so a same-day miss is reported `BEFORE-ARCHIVE` instead of
