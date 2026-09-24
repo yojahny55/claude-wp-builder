@@ -98,6 +98,12 @@ grep -Fq "\$rel_dir . '/' . \$meta['original_image']" "$script" \
 for bucket in BEFORE-ARCHIVE AFTER-ARCHIVE UNDATED; do
   grep -Fq "$bucket" "$script" || fail "$script lost the $bucket bucket"
 done
+# The report line names the code, so the script — not only the docs — must emit all three,
+# each for its own kind of file.
+code_map=$(awk "/if \\( 'file' === \\\$label \\) \\{/ { f = 1 } f { print; if (++n == 7) exit }" "$script" | tr -s '[:space:]' ' ')
+code_map_want="if ( 'file' === \$label ) { \$code = 'WP-060'; } elseif ( 0 === strpos( \$label, 'size:' ) ) { \$code = 'WP-061'; } else { \$code = 'WP-062'; }"
+[[ "$code_map" == *"$code_map_want"* ]] \
+  || fail "$script no longer maps file / size:* / original_image to WP-060 / WP-061 / WP-062"
 
 # --- Batched attachment walk, not a per-ID query pattern (round-1 fix) ---
 # The literal call, not just the name: WHY-BATCHED prose above mentions
@@ -111,6 +117,23 @@ grep -Fq 'AND ID > %d' "$script" \
   || fail "$script's batch query lost its ID > %d keyset predicate"
 grep -Eq '\$last_id[[:space:]]*=[[:space:]]*\(int\)[[:space:]]*end\([[:space:]]*\$batch_ids[[:space:]]*\)' "$script" \
   || fail "$script does not advance the keyset cursor past the batch it just read — the walk would never terminate"
+# ORDER BY ID is what makes end( $batch_ids ) the highest ID of the batch: without it the cursor
+# can move backwards (re-read, double-count) or jump forwards (skip attachments silently).
+grep -Fq 'ORDER BY ID LIMIT %d' "$script" \
+  || fail "$script's batch query lost ORDER BY ID — the keyset walk can skip or re-read attachments"
+# And the walk stops: on an empty batch end() returns false, the cursor resets to 0, and the
+# loop would re-read the first batch forever.
+grep -Fq 'if ( empty( $rows ) ) {' "$script" \
+  || fail "$script lost its empty-batch break — the walk would never terminate"
+grep -Fq 'if ( count( $rows ) < BATCH_SIZE ) {' "$script" \
+  || fail "$script lost its short-batch break"
+# get_post() inside wp_get_attachment_metadata() reads the post cache, which the batch query
+# does not fill: without priming it, every attachment costs its own query again.
+grep -Fq '_prime_post_caches( $batch_ids, false, false );' "$script" \
+  || fail "$script does not prime the post cache per batch — wp_get_attachment_metadata() would query per attachment"
+# Only attachments actually compared against disk count as checked; the rest are reported.
+grep -Fq 'attachment(s) skipped, not checked' "$script" \
+  || fail "$script counts skipped attachments (remote URL, no local path) as checked"
 # Only a sample of each bucket is held in memory; the totals come from separate counters.
 grep -Fq '$bucket_counts[ $bucket ]++;' "$script" \
   || fail "$script does not count every miss separately from the sample it keeps"
@@ -151,9 +174,11 @@ grep -Fq "exit( ( \$bucket_counts['BEFORE-ARCHIVE'] > 0 || \$bucket_counts['UNDA
 for msg in 'attachment query failed' 'meta cache query failed' 'uploads directory unavailable' \
            'is not a Y-m-d or Y-m-d H:i:s date' 'is not a non-negative integer'; do
   grep -Fq "$msg" "$script" || fail "$script no longer reports '$msg' to STDERR"
-  awk -v msg="$msg" 'index($0, msg) { want = 1; n = 0; next }
+  # No `next`: the message's own line is tested too, so a one-line `fwrite(...); exit( 2 );`
+  # passes, and n counts that line so the window is the message line plus the two after it.
+  awk -v msg="$msg" 'index($0, msg) { want = 1; n = 0 }
       want && /exit[[:space:]]*\([[:space:]]*2[[:space:]]*\)/ { ok = 1; exit }
-      want && ++n > 2 { exit }
+      want && ++n > 3 { exit }
       END { exit(ok ? 0 : 1) }' "$script" \
     || fail "$script reports '$msg' but no exit( 2 ) follows it — the failure would read as '0 attachments checked'"
 done

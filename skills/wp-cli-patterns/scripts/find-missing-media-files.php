@@ -189,6 +189,7 @@ const BATCH_SIZE = 1000;
 
 $last_id          = 0;
 $attachment_count = 0;
+$skipped_count    = 0;
 
 while ( true ) {
 	$rows = $wpdb->get_results(
@@ -223,10 +224,23 @@ while ( true ) {
 		exit( 2 );
 	}
 
+	// wp_get_attachment_metadata() below calls get_post(), which reads the post
+	// object cache; the batch query above bypasses it, so without this every
+	// attachment would cost its own SELECT * — the per-ID pattern batching exists
+	// to remove. Priming keeps the wp_get_attachment_metadata filter in play for
+	// offload plugins that rewrite the metadata.
+	if ( function_exists( '_prime_post_caches' ) ) {
+		_prime_post_caches( $batch_ids, false, false );
+	}
+
 	foreach ( $rows as $row ) {
 		$id            = (int) $row->ID;
 		$attached_file = get_post_meta( $id, '_wp_attached_file', true );
 
+		// An absolute path is fine as it is: path_join() returns an absolute
+		// $path untouched instead of prefixing $basedir, and dirname() of it is
+		// the right directory for the sub-sizes too.
+		//
 		// Only a plain filesystem path can be checked on this server's disk. No
 		// _wp_attached_file at all, a remote URL stored there by an offsite-media
 		// or import plugin (`https://cdn.example.com/...`), or a corrupt non-string
@@ -235,8 +249,10 @@ while ( true ) {
 		// that would abort the whole run.
 		if ( ! is_string( $attached_file ) || '' === $attached_file
 			|| preg_match( '#^[a-z][a-z0-9+.\-]*://#i', $attached_file ) ) {
+			$skipped_count++;
 			continue;
 		}
+		$attachment_count++;
 
 		$rel_dir   = dirname( $attached_file ); // '.' when the file sits at basedir root.
 		$post_date = $row->post_date;
@@ -290,7 +306,6 @@ while ( true ) {
 		}
 	}
 
-	$attachment_count += count( $rows );
 	$last_id            = (int) end( $batch_ids );
 
 	if ( count( $rows ) < BATCH_SIZE ) {
@@ -344,5 +359,13 @@ printf(
 	$total,
 	$attachment_count
 );
+// A skipped attachment was never compared against disk. Saying so keeps a library
+// that is entirely offloaded from reading as a clean pass over every attachment.
+if ( $skipped_count > 0 ) {
+	printf(
+		"%d attachment(s) skipped, not checked: no local file path (remote URL, empty or corrupt _wp_attached_file)\n",
+		$skipped_count
+	);
+}
 
 exit( ( $bucket_counts['BEFORE-ARCHIVE'] > 0 || $bucket_counts['UNDATED'] > 0 ) ? 1 : 0 );
