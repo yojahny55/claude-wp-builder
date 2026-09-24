@@ -6,11 +6,16 @@
 
 - **`store-kit`, a plugin this repository ships into stores.** Catalog mode (prices shown,
   nothing purchasable — the Store API refuses add-to-cart, Cart and Checkout redirect to the
-  shop) and Stripe keys supplied from `STORE_KIT_STRIPE_*` constants in `wp-config.php`: merged
-  in when the gateway reads its settings and stripped when it saves them, so no database dump
-  or clone carries a working key. `bin/store-kit-sync.sh` installs it and never downgrades.
-  `Update URI: false` and a provable Author/URI keep a same-named plugin from ever being
-  mistaken for it.
+  shop) and Stripe API keys supplied from `STORE_KIT_STRIPE_*` constants in `wp-config.php`:
+  merged in when the gateway reads its settings and stripped when it saves them, so no database
+  dump or clone carries a working API key — including the copy Stripe's own webhook setup nests
+  a second time inside the settings row. A webhook-secret constant only ever seeds an empty row:
+  Stripe periodically rotates its own webhook secret and saves the new one, and that value is
+  left to win and reach the database, with an admin notice naming the now-stale constant. A
+  constant whose prefix does not match its field's mode (test vs live) is never used at all, and
+  is reported by name — the guard against a live key ending up in a test-mode constant.
+  `bin/store-kit-sync.sh` installs the plugin and never downgrades. `Update URI: false` and a
+  provable Author/URI keep a same-named plugin from ever being mistaken for it.
 - **A `store` block in `.wp-create.json`.** Records what a WooCommerce store sells and how —
   tier (`catalog`, `store`, `full`), address, currency, units, checkout type, enquiry channels,
   Stripe in test mode, shipping zones, tax rates — and `bin/wp-config.mjs validate` refuses a

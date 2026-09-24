@@ -74,8 +74,61 @@ want( is_array( $absent ) && 'sk_test_const' === $absent['test_secret_key'], 'an
 $out = store_kit_stripe_strip( array( 'enabled' => 'yes', 'test_secret_key' => 'sk_test_const', 'test_publishable_key' => 'pk_typed' ) );
 want( ! isset( $out['test_secret_key'] ), 'the constant-backed key would reach the database' );
 want( 'pk_typed' === $out['test_publishable_key'], 'a field with no constant was stripped' );
+
+// Critical 1: the raw secret nested inside test_webhook_data by Stripe's own
+// configure_webhooks() must be stripped and restored exactly like the flat field.
+$saved_hook = store_kit_stripe_strip( array(
+	'enabled'           => 'yes',
+	'test_webhook_data' => array( 'id' => 'we_1', 'url' => 'https://example.com/wc-api/wc_stripe', 'secret' => 'sk_test_const' ),
+) );
+want( ! isset( $saved_hook['test_webhook_data']['secret'] ), 'a nested webhook secret matching the constant was not stripped' );
+want( 'we_1' === $saved_hook['test_webhook_data']['id'], 'stripping the nested secret removed the rest of the webhook data' );
+$read_hook = store_kit_stripe_inject( array(
+	'enabled'           => 'yes',
+	'test_webhook_data' => array( 'id' => 'we_1', 'url' => 'https://example.com/wc-api/wc_stripe' ),
+) );
+want( isset( $read_hook['test_webhook_data']['secret'] ) && 'sk_test_const' === $read_hook['test_webhook_data']['secret'], 'inject did not restore the nested webhook secret' );
+$other_hook = array(
+	'enabled'           => 'yes',
+	'test_webhook_data' => array( 'id' => 'we_2', 'url' => 'https://example.com/wc-api/wc_stripe', 'secret' => 'sk_test_other' ),
+);
+want( 'sk_test_other' === store_kit_stripe_strip( $other_hook )['test_webhook_data']['secret'], 'a nested webhook secret that differs from the constant was stripped' );
+want( 'sk_test_other' === store_kit_stripe_inject( $other_hook )['test_webhook_data']['secret'], 'inject overwrote a nested webhook secret that differs from the constant' );
+
+// Important 2: a webhook-secret constant seeds an empty row but never overrides a value Stripe
+// itself already wrote there (a rotation), and strip only discards an unrotated copy.
+define( 'STORE_KIT_STRIPE_TEST_WEBHOOK_SECRET', 'whsec_const' );
+$seeded = store_kit_stripe_inject( array( 'enabled' => 'yes' ) );
+want( isset( $seeded['test_webhook_secret'] ) && 'whsec_const' === $seeded['test_webhook_secret'], 'an empty row did not get the webhook secret constant' );
+$rotated = array( 'enabled' => 'yes', 'test_webhook_secret' => 'whsec_rotated' );
+want( 'whsec_rotated' === store_kit_stripe_inject( $rotated )['test_webhook_secret'], 'a rotated webhook secret in the row was overridden by the constant on read' );
+want( 'whsec_rotated' === store_kit_stripe_strip( $rotated )['test_webhook_secret'], 'a rotated webhook secret was stripped even though it differs from the constant' );
+$unrotated = array( 'enabled' => 'yes', 'test_webhook_secret' => 'whsec_const' );
+want( ! isset( store_kit_stripe_strip( $unrotated )['test_webhook_secret'] ), 'a webhook secret equal to the constant was not stripped' );
+
 exit( $ok ? 0 : 1 );
 PHP
+
+KIT="$PWD/$kit" php <<'PHP2' || fail "store-kit's prefix-mismatch guard misbehaves"
+<?php
+define( 'ABSPATH', '/tmp/' );
+function add_filter() {}
+function add_action() {}
+require getenv( 'KIT' ) . '/includes/credentials.php';
+$ok = true;
+function want( $cond, $msg ) { global $ok; if ( ! $cond ) { echo "  $msg\n"; $ok = false; } }
+// Important 3: a live-mode key placed in a test-mode constant must never be used -- it would
+// charge real cards while the admin screen still says test mode.
+define( 'STORE_KIT_STRIPE_TEST_SECRET_KEY', 'sk_live_should_not_charge_real_cards' );
+want( array() === store_kit_stripe_supplied(), 'a mismatched-prefix constant was supplied anyway' );
+$injected = store_kit_stripe_inject( array( 'enabled' => 'yes' ) );
+want( ! isset( $injected['test_secret_key'] ), 'a mismatched-prefix constant was injected' );
+$row = array( 'test_secret_key' => 'sk_live_should_not_charge_real_cards' );
+want( isset( store_kit_stripe_strip( $row )['test_secret_key'] ), 'strip discarded a row value for a mismatched constant, hiding it from SEC-040' );
+$mismatches = store_kit_stripe_mismatches();
+want( isset( $mismatches['test_secret_key'] ) && 'STORE_KIT_STRIPE_TEST_SECRET_KEY' === $mismatches['test_secret_key'], 'the mismatch was not reported by field and constant name' );
+exit( $ok ? 0 : 1 );
+PHP2
 
 p=$(mktemp -d); trap 'rm -rf "$p"' EXIT
 out=$(bash "$sync" "$p") || fail "the first sync failed: $out"
