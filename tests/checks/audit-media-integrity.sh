@@ -104,9 +104,14 @@ grep -Fq 'find-missing-media-files.php: attachment query failed' "$script" \
   || fail "$script does not report a failed attachment query to STDERR"
 grep -Fq 'find-missing-media-files.php: meta cache query failed' "$script" \
   || fail "$script does not report a failed meta-cache query to STDERR"
-exit_2_count=$(grep -Ec 'exit[[:space:]]*\([[:space:]]*2[[:space:]]*\)' "$script")
-[ "$exit_2_count" -ge 3 ] \
-  || fail "$script has fewer than 3 exit( 2 ) sites — expected one each for a bad date argument, a failed attachment query, and a failed meta-cache query"
+# The other "cannot measure" modes are pinned the same way, one literal message each, so
+# dropping any one guard fails here even if an unrelated exit( 2 ) is added elsewhere.
+grep -Fq 'is not a Y-m-d or Y-m-d H:i:s date' "$script" \
+  || fail "$script does not reject an archive-date argument it cannot read"
+grep -Fq 'is not a non-negative integer' "$script" \
+  || fail "$script does not reject a negative or non-numeric sample-size"
+grep -Fq 'find-missing-media-files.php: uploads directory unavailable' "$script" \
+  || fail "$script does not stop when wp_get_upload_dir() has no usable basedir"
 
 # --- Local-clone suppression rule: references Step 2.3, does not re-implement clone detection ---
 grep -Fq 'Step 2.3' "$practices" \
@@ -134,6 +139,12 @@ grep -Fq 'UNMEASURED' "$practices" \
 # built out of the very phrase under test would stop bounding the section the
 # moment that phrase changed, silently falling back to "match anywhere in the
 # file" and reintroducing the bug this extraction exists to avoid.
+# Both range anchors are asserted on their own first: with the end anchor gone, sed would
+# print from the start anchor to EOF and the match below could land far outside the bullet.
+grep -Fq '**Local clone, archive date known**' "$practices" \
+  || fail "$practices lost the 'Local clone, archive date known' bullet the section extraction starts at"
+grep -Fq '**Local clone, archive date unknown**' "$practices" \
+  || fail "$practices lost the 'Local clone, archive date unknown' bullet the section extraction ends at"
 clone_known_date_section=$(sed -n '/\*\*Local clone, archive date known\*\*/,/\*\*Local clone, archive date unknown\*\*/p' "$practices" \
   | tr '\n' ' ' | sed 's/  */ /g')
 [ -n "$clone_known_date_section" ] \
@@ -165,8 +176,8 @@ grep -Fq 'mmf_bucket_for' "$script" \
 # --- commands/wp-audit.md already carries the matching row in its Step 2.3 catalog ---
 grep -Fq 'predates the database' "$audit" \
   || fail "$audit Step 2.3 lost the media-archive-date row this check depends on"
-grep -Fq 'media-integrity check' "$audit" \
-  || fail "$audit Step 2.3 does not point at the media-integrity check for this row"
+grep -Fq 'see WP-060/061/062 in `agents/wp-audit-practices.md`' "$audit" \
+  || fail "$audit Step 2.3 does not point at WP-060/061/062 in the practices agent for this row"
 
 # --- Behavioral check: the real cutoff/bucket functions, not a grep of their names ---
 # A same-day upload against a bare-date archive argument must not land in AFTER-ARCHIVE

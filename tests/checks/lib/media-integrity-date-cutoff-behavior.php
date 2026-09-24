@@ -105,7 +105,12 @@ $cutoff_cases = array(
 	'bare ISO date'                        => array( '2026-09-23', '2026-09-23 23:59:59' ),
 	'full timestamp, non-midnight'         => array( '2026-09-23 14:30:00', '2026-09-23 14:30:00' ),
 	'explicit midnight is a real time'     => array( '2026-09-23 00:00:00', '2026-09-23 00:00:00' ),
-	'written-out date, no time'            => array( '23 September 2026', '2026-09-23 23:59:59' ),
+	'ISO 8601 T separator keeps its time'  => array( '2026-09-23T14:30:00', '2026-09-23 14:30:00' ),
+	'time without seconds'                 => array( '2026-09-23 14:30', '2026-09-23 14:30:00' ),
+	'written-out date is rejected'         => array( '23 September 2026', false ),
+	'relative date is rejected'            => array( 'yesterday', false ),
+	'impossible calendar date is rejected' => array( '2026-02-30', false ),
+	'out-of-range hour is rejected'        => array( '2026-09-23 24:00:00', false ),
 	'unparseable date'                     => array( 'not-a-date', false ),
 );
 

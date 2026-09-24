@@ -42,13 +42,14 @@
  *                 Omit the argument entirely to bucket every miss UNDATED,
  *                 because without any date there is no way to tell a real
  *                 loss from an ordinary post-archive upload.
- *   sample-size   How many misses to print per bucket (default 20). Every
- *                 miss is still counted; only the printed list is capped.
+ *   sample-size   How many misses to print per bucket (default 20), as a
+ *                 non-negative integer; anything else exits 2. Every miss is
+ *                 still counted; only the printed list is capped.
  *
  * Read-only. Exits 1 when any BEFORE-ARCHIVE or UNDATED miss exists, 0 when
  * every miss is AFTER-ARCHIVE or there are none — a clone's dated gaps alone
  * should not fail anything on their own. Exits 2 when it cannot measure: an
- * unparseable archive date, a failed query, or an uploads directory that
+ * archive date or sample size it does not accept, a failed query, or an uploads directory that
  * wp_get_upload_dir() cannot resolve — never a list of false misses.
  *
  * WHY THIS EXISTS. `_wp_attached_file` and `_wp_attachment_metadata` are
@@ -94,26 +95,36 @@
  * archive was actually taken, silently suppressing a real pre-archive loss as
  * N/A (local clone). Such a cutoff is pushed to the end of that day instead,
  * so the whole archive day reads BEFORE-ARCHIVE rather than being guessed at.
- * Whether a time was given is read from the argument itself with date_parse(),
- * not from the parsed timestamp, so an explicit "...00:00:00" is a real time
- * and is used exactly as given, like any other full "Y-m-d H:i:s" timestamp.
+ * Only the two documented shapes are accepted — `Y-m-d`, or `Y-m-d H:i:s`
+ * with a space or `T` between date and time (seconds optional). Anything
+ * else (a written-out date, "yesterday", a timezone suffix) returns false
+ * and the caller exits 2, because each extra format is another place where
+ * "was a time given?" could be read wrong. Whether a time was given is read
+ * from the argument's shape, not from the parsed timestamp, so an explicit
+ * "...00:00:00" is a real time and is used exactly as given.
  */
 function mmf_compute_archive_cutoff( $archive_arg ) {
 	if ( '' === $archive_arg ) {
 		return false;
 	}
 
-	$archive_ts = strtotime( $archive_arg );
-	if ( false === $archive_ts ) {
+	if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/', $archive_arg, $m ) ) {
+		return false;
+	}
+	if ( ! checkdate( (int) $m[2], (int) $m[3], (int) $m[1] ) ) {
 		return false;
 	}
 
-	$parts = date_parse( $archive_arg );
-	if ( false === $parts['hour'] ) {
-		$archive_ts = strtotime( date( 'Y-m-d', $archive_ts ) . ' 23:59:59' );
+	$has_time = isset( $m[4] ) && '' !== $m[4];
+	if ( $has_time && ( (int) $m[4] > 23 || (int) $m[5] > 59 || ( isset( $m[6] ) && (int) $m[6] > 59 ) ) ) {
+		return false;
 	}
 
-	return $archive_ts;
+	$time = $has_time
+		? sprintf( '%s:%s:%s', $m[4], $m[5], isset( $m[6] ) && '' !== $m[6] ? $m[6] : '00' )
+		: '23:59:59';
+
+	return strtotime( "{$m[1]}-{$m[2]}-{$m[3]} {$time}" );
 }
 
 /**
@@ -135,11 +146,16 @@ global $wpdb;
 
 $argv_in     = isset( $args ) ? $args : ( isset( $GLOBALS['args'] ) ? $GLOBALS['args'] : array() );
 $archive_arg = isset( $argv_in[0] ) && '' !== trim( (string) $argv_in[0] ) ? trim( (string) $argv_in[0] ) : '';
-$sample_size = isset( $argv_in[1] ) && is_numeric( $argv_in[1] ) ? (int) $argv_in[1] : 20;
+$sample_arg  = isset( $argv_in[1] ) ? trim( (string) $argv_in[1] ) : '';
+if ( '' !== $sample_arg && ! ctype_digit( $sample_arg ) ) {
+	fwrite( STDERR, "find-missing-media-files.php: sample-size '{$sample_arg}' is not a non-negative integer\n" );
+	exit( 2 );
+}
+$sample_size = '' !== $sample_arg ? (int) $sample_arg : 20;
 
 $archive_ts = mmf_compute_archive_cutoff( $archive_arg );
 if ( '' !== $archive_arg && false === $archive_ts ) {
-	fwrite( STDERR, "find-missing-media-files.php: '{$archive_arg}' is not a parseable date\n" );
+	fwrite( STDERR, "find-missing-media-files.php: '{$archive_arg}' is not a Y-m-d or Y-m-d H:i:s date\n" );
 	exit( 2 );
 }
 
