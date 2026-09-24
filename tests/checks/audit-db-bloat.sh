@@ -59,9 +59,15 @@ done
 # Every PERF-NNN table row is unique. A fixed 061-064-only ceiling (rejecting PERF-065+)
 # would go red the moment any other PR adds a new code to this same file — this checks the
 # actual defect (two rows claiming one code) without capping how many codes may ever exist.
-row() { grep -F "$1" "$agent" | grep -F '|' || true; }
 dupe_codes=$(grep -oE '^\| PERF-[0-9]+ \|' "$agent" | tr -d '| ' | sort | uniq -d || true)
 [ -z "$dupe_codes" ] || fail "$agent defines the same PERF-NNN code on more than one row: $dupe_codes"
+
+# row <code>: the agent's table row whose first cell is exactly <code>. One awk pass, no
+# pipeline, so there is no grep exit status or SIGPIPE to mask; a missing row is empty output
+# and exit 0, and the `[ -n "$r" ]` guard at each call site reports it.
+row() {
+  CODE="$1" awk -F'|' '/^\|/ { cell = $2; gsub(/^[ \t]+|[ \t]+$/, "", cell); if (cell == ENVIRON["CODE"]) print }' "$agent"
+}
 
 # None of the four executable cells may hardcode the wp_ prefix: on a site whose real prefix
 # isn't wp_, that table doesn't exist and the query errors instead of reporting the finding.
