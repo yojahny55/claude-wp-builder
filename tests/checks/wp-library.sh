@@ -12,7 +12,9 @@ grep -qE '"@yojahny/wp-design-library@\^1\.[0-9]+\.[0-9]+"' .mcp.json || { echo 
 grep -q 'References: library unavailable' commands/wp-demo.md || { echo "FAIL: degrade line"; exit 1; }
 grep -q 'every call fails before that happens' commands/wp-demo.md || { echo "FAIL: unavailable line is not limited to zero successful references"; exit 1; }
 grep -q 'keep their citations' commands/wp-demo.md || { echo "FAIL: partial library failures discard successful references"; exit 1; }
-grep -q 'search` per role' commands/wp-demo.md || { echo "FAIL: per-role query"; exit 1; }
+grep -q 'search` per selected role' commands/wp-demo.md || { echo "FAIL: per-role query"; exit 1; }
+grep -q '`get_vocab` and choose the roles' commands/wp-demo.md || { echo "FAIL: library roles must come from its vocabulary"; exit 1; }
+grep -q '`shop` for a product listing or collection' commands/wp-demo.md || { echo "FAIL: store roles are not mapped to page types"; exit 1; }
 grep -q '## References' commands/wp-demo.md || { echo "FAIL: brief section"; exit 1; }
 grep -q 'Design library' README.md || { echo "FAIL: README"; exit 1; }
 # Inspo: page-level direction only, opt-in, and fenced. Each grep names the contract
