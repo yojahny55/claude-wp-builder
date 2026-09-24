@@ -1,12 +1,12 @@
 <?php
 /**
- * Behavioral test for find-missing-media-files.php's archive-date cutoff and
- * bucket decision.
+ * Behavioral test for find-missing-media-files.php's archive-date cutoff,
+ * bucket decision and local-path screen.
  *
  * The rest of the suite greps for contract wording. This one extracts the
- * actual mmf_compute_archive_cutoff() and mmf_bucket_for() function bodies
- * from the real script and runs them, because the bug this test exists to
- * pin was invisible to any grep: a bare "Y-m-d" archive date parses to
+ * actual mmf_compute_archive_cutoff(), mmf_bucket_for() and
+ * mmf_is_local_rel_path() function bodies from the real script and runs
+ * them, because the bug this test exists to pin was invisible to any grep: a bare "Y-m-d" archive date parses to
  * midnight, so an attachment uploaded later the SAME calendar day compared
  * as "after archive" no matter what time the archive was actually taken,
  * silently suppressing a real pre-archive loss as N/A (local clone). Every
@@ -15,7 +15,7 @@
  * a same-day timestamp was wrong.
  *
  * WordPress is not loaded; nothing here runs the script's WP-CLI body, only
- * the two pure-PHP functions it delegates the cutoff/bucket decision to.
+ * the pure-PHP functions it delegates the cutoff, bucket and path decisions to.
  */
 
 /**
@@ -116,16 +116,14 @@ if ( ! is_readable( $script ) ) {
 
 $source = (string) file_get_contents( $script );
 
-$cutoff_fn = mmfx_extract_function( $source, 'mmf_compute_archive_cutoff' );
-$bucket_fn = mmfx_extract_function( $source, 'mmf_bucket_for' );
-
-if ( null === $cutoff_fn ) {
-	fwrite( STDERR, "mmf_compute_archive_cutoff() not found in find-missing-media-files.php\n" );
-	exit( 1 );
-}
-if ( null === $bucket_fn ) {
-	fwrite( STDERR, "mmf_bucket_for() not found in find-missing-media-files.php\n" );
-	exit( 1 );
+$tested = array( 'mmf_compute_archive_cutoff', 'mmf_bucket_for', 'mmf_is_local_rel_path' );
+$fns    = array();
+foreach ( $tested as $name ) {
+	$fns[ $name ] = mmfx_extract_function( $source, $name );
+	if ( null === $fns[ $name ] ) {
+		fwrite( STDERR, "{$name}() not found in find-missing-media-files.php\n" );
+		exit( 1 );
+	}
 }
 
 /*
@@ -133,7 +131,7 @@ if ( null === $bucket_fn ) {
  * inlined its own comparison. With both definitions cut out, each name must still
  * be called as code — a T_STRING followed by `(` — not only named in a comment.
  */
-$rest   = str_replace( array( $cutoff_fn, $bucket_fn ), '', $source );
+$rest   = str_replace( array_values( $fns ), '', $source );
 $called = array();
 $rt     = token_get_all( $rest );
 foreach ( $rt as $k => $tok ) {
@@ -146,14 +144,14 @@ foreach ( $rt as $k => $tok ) {
 		$called[ $tok[1] ] = true;
 	}
 }
-foreach ( array( 'mmf_compute_archive_cutoff', 'mmf_bucket_for' ) as $name ) {
+foreach ( $tested as $name ) {
 	if ( empty( $called[ $name ] ) ) {
 		fwrite( STDERR, "find-missing-media-files.php never calls {$name}() — the tested logic is dead code\n" );
 		exit( 1 );
 	}
 }
 
-foreach ( array( 'mmf_compute_archive_cutoff' => $cutoff_fn, 'mmf_bucket_for' => $bucket_fn ) as $name => $code ) {
+foreach ( $fns as $name => $code ) {
 	$problem = mmfx_check_extracted( $code, $name );
 	if ( null !== $problem ) {
 		fwrite( STDERR, $problem . "\n" );
@@ -161,7 +159,7 @@ foreach ( array( 'mmf_compute_archive_cutoff' => $cutoff_fn, 'mmf_bucket_for' =>
 	}
 }
 
-// The real script's own two functions, loaded from a temporary file rather than eval().
+// The real script's own functions, loaded from a temporary file rather than eval().
 $tmp = tempnam( sys_get_temp_dir(), 'mmfx_' );
 if ( false !== $tmp ) {
 	// Registered before anything can fail, so every exit path — a failed write, a
@@ -174,16 +172,18 @@ if ( false !== $tmp ) {
 		}
 	);
 }
-if ( false === $tmp || false === file_put_contents( $tmp, "<?php\n" . $cutoff_fn . "\n\n" . $bucket_fn . "\n" ) ) {
+if ( false === $tmp || false === file_put_contents( $tmp, "<?php\n" . implode( "\n\n", $fns ) . "\n" ) ) {
 	fwrite( STDERR, "cannot write the extracted functions to a temporary file\n" );
 	exit( 1 );
 }
 require $tmp;
 unlink( $tmp );
 
-if ( ! function_exists( 'mmf_compute_archive_cutoff' ) || ! function_exists( 'mmf_bucket_for' ) ) {
-	fwrite( STDERR, "extracted function bodies did not define the expected functions\n" );
-	exit( 1 );
+foreach ( $tested as $name ) {
+	if ( ! function_exists( $name ) ) {
+		fwrite( STDERR, "extracted function bodies did not define {$name}()\n" );
+		exit( 1 );
+	}
 }
 
 /*
@@ -264,9 +264,33 @@ foreach ( $bucket_cases as $label => $case ) {
 	}
 }
 
+/*
+ * Path cases: label => [stored value, expected]. A value this rejects is skipped
+ * and counted, never joined to the uploads directory and reported as missing.
+ */
+$path_cases = array(
+	'plain relative path is local'       => array( '2026/09/cover.jpg', true ),
+	'bare filename is local'             => array( 'cover-300x300.jpg', true ),
+	'https URL is not local'             => array( 'https://cdn.example.com/cover.jpg', false ),
+	's3 URL is not local'                => array( 's3://bucket/cover.jpg', false ),
+	'protocol-relative URL is not local' => array( '//cdn.example.com/cover.jpg', false ),
+	'empty string is not local'          => array( '', false ),
+	'array value is not local'           => array( array( 'cover.jpg' ), false ),
+	'null value is not local'            => array( null, false ),
+);
+
+foreach ( $path_cases as $label => $case ) {
+	list( $value, $expected ) = $case;
+	$got = mmf_is_local_rel_path( $value );
+	if ( $got !== $expected ) {
+		fwrite( STDERR, "mmf_is_local_rel_path() [{$label}]: expected " . var_export( $expected, true ) . ', got ' . var_export( $got, true ) . "\n" );
+		$failed++;
+	}
+}
+
 if ( $failed > 0 ) {
 	exit( 1 );
 }
 // The shell check requires this line, so a run that asserted nothing cannot pass.
-printf( "OK %d cases\n", count( $cutoff_cases ) + count( $bucket_cases ) );
+printf( "OK %d cases\n", count( $cutoff_cases ) + count( $bucket_cases ) + count( $path_cases ) );
 exit( 0 );

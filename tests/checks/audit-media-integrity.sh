@@ -59,8 +59,11 @@ tier2=$(awk '/^## Step 2: Tier 2/{f=1; next} f && /^## /{exit} f' "$practices")
 for code in WP-060 WP-061 WP-062; do
   # A here-string, not a pipe: awk exits on the first match, and a pipe writer still
   # flushing a large section would die of SIGPIPE, which pipefail turns into an abort.
+  # The severity is the last non-empty cell, so a dropped trailing pipe or an escaped
+  # `\|` inside an earlier cell cannot shift which cell is read.
   sev=$(awk -F'|' -v code="$code" '/^\|/ { c = $2; gsub(/^[ \t]+|[ \t]+$/, "", c)
-          if (c == code) { s = $(NF - 1); gsub(/^[ \t]+|[ \t]+$/, "", s); print s; exit } }' <<< "$tier2")
+          if (c == code) { for (i = NF; i > 2; i--) { s = $i; gsub(/^[ \t]+|[ \t]+$/, "", s)
+                             if (s != "") { print s; exit } } } }' <<< "$tier2")
   [ -n "$sev" ] || fail "$practices has no $code row in the Tier 2 table"
   [ "$sev" = WARNING ] || fail "$practices: $code is $sev in the Tier 2 table, expected WARNING"
 done
@@ -134,6 +137,21 @@ grep -Fq '_prime_post_caches( $batch_ids, false, false );' "$script" \
 # Only attachments actually compared against disk count as checked; the rest are reported.
 grep -Fq 'attachment(s) skipped, not checked' "$script" \
   || fail "$script counts skipped attachments (remote URL, no local path) as checked"
+# The same screen covers the metadata-derived paths: a remote or corrupt sub-size or
+# original_image entry joined to the uploads directory would be a false WP-061/WP-062 miss.
+for screened in 'mmf_is_local_rel_path( $attached_file )' \
+                "mmf_is_local_rel_path( \$size_info['file'] ?? null )" \
+                "mmf_is_local_rel_path( \$meta['original_image'] )"; do
+  grep -Fq "$screened" "$script" || fail "$script does not screen '$screened' before checking it on disk"
+done
+grep -Fq 'entr(ies) skipped, not checked' "$script" \
+  || fail "$script drops unusable sub-size/original_image entries without reporting them"
+# An uploads tree the WP-CLI user cannot read makes every file_exists() false: exit 2, not misses.
+grep -Fq '! is_readable( $basedir )' "$script" \
+  || fail "$script does not stop when the uploads directory exists but cannot be read"
+# The fallback cleanup must also drop what _prime_post_caches() wrote, or memory grows per batch.
+grep -Fq "array( 'posts', 'post_meta' ) as \$cache_group" "$script" \
+  || fail "$script's fallback cache cleanup no longer deletes both the primed 'posts' and 'post_meta' keys"
 # Only a sample of each bucket is held in memory; the totals come from separate counters.
 grep -Fq '$bucket_counts[ $bucket ]++;' "$script" \
   || fail "$script does not count every miss separately from the sample it keeps"
@@ -173,12 +191,17 @@ grep -Fq "exit( ( \$bucket_counts['BEFORE-ARCHIVE'] > 0 || \$bucket_counts['UNDA
   || fail "$script no longer exits 1 on BEFORE-ARCHIVE/UNDATED misses"
 for msg in 'attachment query failed' 'meta cache query failed' 'uploads directory unavailable' \
            'is not a Y-m-d or Y-m-d H:i:s date' 'is not a non-negative integer'; do
-  grep -Fq "$msg" "$script" || fail "$script no longer reports '$msg' to STDERR"
-  # No `next`: the message's own line is tested too, so a one-line `fwrite(...); exit( 2 );`
-  # passes, and n counts that line so the window is the message line plus the two after it.
-  awk -v msg="$msg" 'index($0, msg) { want = 1; n = 0 }
+  # The message must sit on the STDERR write's own line: printed to STDOUT, or only
+  # named in a comment, it would not reach a caller that reads STDERR for the reason.
+  awk -v msg="$msg" 'index($0, msg) && index($0, "fwrite( STDERR") { found = 1 }
+      END { exit(found ? 0 : 1) }' "$script" \
+    || fail "$script no longer reports '$msg' to STDERR"
+  # The exit( 2 ) must belong to that same write: the window is the STDERR line itself
+  # (a one-line `fwrite(...); exit( 2 );` passes) plus the two lines after it, so an
+  # exit from a neighbouring branch cannot satisfy it.
+  awk -v msg="$msg" 'index($0, msg) && index($0, "fwrite( STDERR") { want = 1; n = 0 }
       want && /exit[[:space:]]*\([[:space:]]*2[[:space:]]*\)/ { ok = 1; exit }
-      want && ++n > 3 { exit }
+      want && ++n > 2 { exit }
       END { exit(ok ? 0 : 1) }' "$script" \
     || fail "$script reports '$msg' but no exit( 2 ) follows it — the failure would read as '0 attachments checked'"
 done
@@ -259,7 +282,11 @@ grep -Fqi 'midnight' "$practices" \
   || fail "$practices does not explain why a bare date is ambiguous (midnight cutoff)"
 grep -Fq 'Archive cutoff:' "$script" \
   || fail "$script no longer prints the effective cutoff — $practices names that line as the report's evidence of which reading applied"
-grep -Fq 'Y-m-d H:i:s' "$script" \
+# Scoped to the leading docblock: the body also contains the string (the exit-2 message,
+# the Archive cutoff date() format), so a whole-file grep would pass with no usage doc.
+usage_doc=$(sed -n '2,/^ \*\/$/p' "$script")
+[ -n "$usage_doc" ] || fail "$script lost its leading usage docblock"
+grep -Fq 'Y-m-d H:i:s' <<< "$usage_doc" \
   || fail "$script's own usage doc does not mention the Y-m-d H:i:s timestamp form"
 grep -Fq 'mmf_compute_archive_cutoff' "$script" \
   || fail "$script does not isolate the archive-cutoff computation into its own function"
@@ -287,15 +314,20 @@ grep -Fq "'/skills/wp-cli-patterns/scripts/find-missing-media-files.php'" "$beha
   || fail "$behavior no longer loads the production script — it would validate its own copy of the functions"
 # TZ=UTC: the script runs under WordPress, which sets UTC; the fixture pins it too.
 if ! behavior_out=$(TZ=UTC php "$behavior" 2>&1); then
-  fail "the archive-date cutoff/bucket behavior is wrong: ${behavior_out:-(php exited non-zero with no output)}"
+  fail "the cutoff/bucket/path behavior is wrong: ${behavior_out:-(php exited non-zero with no output)}"
 fi
 # A run that asserted nothing must not pass: the fixture prints its case count on success.
 [[ "$behavior_out" =~ ^OK\ [1-9][0-9]*\ cases$ ]] \
   || fail "$behavior did not report its cases as run: ${behavior_out:-(no output)}"
 # The same-day cases are the defect this check exists to pin; dropping them must fail by name,
 # not just shrink the case count.
+# Label and expected bucket sit on one line, so both are pinned together: flipping the
+# expectation to AFTER-ARCHIVE would keep the fixture self-consistent and still print OK.
 for same_day in 'same-day upload, morning, bare date arg' 'same-day upload, last second, bare date arg'; do
   grep -Fq "'$same_day'" "$behavior" || fail "$behavior lost the '$same_day' case"
+  awk -v label="'$same_day'" -v want="'BEFORE-ARCHIVE'" \
+      'index($0, label) && index($0, want) { found = 1 } END { exit(found ? 0 : 1) }' "$behavior" \
+    || fail "$behavior no longer expects BEFORE-ARCHIVE for '$same_day' — the suppressed same-day miss is back"
 done
 
 echo PASS

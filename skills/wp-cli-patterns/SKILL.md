@@ -386,13 +386,15 @@ $WP eval-file <skill>/scripts/find-missing-media-files.php [archive-date] [sampl
 
 Read-only. Exits 1 when any `BEFORE-ARCHIVE` or `UNDATED` miss exists, 0 when every miss is
 `AFTER-ARCHIVE` or there are none, and 2 when it cannot measure: an archive date or sample size
-it does not accept, a failed query, or an uploads directory `wp_get_upload_dir()` cannot resolve.
+it does not accept, a failed query, or an uploads directory it cannot resolve or read.
 
 An attachment post survives the deletion of its own file, so nothing in core notices a broken
 `<img>` or a 404 download. The script walks every attachment in batches and resolves its main
 file, each registered image sub-size and the pre-scale `original_image` against the uploads
 directory, joining the bare sub-size filenames to the attachment's own `YYYY/MM` folder. It
-counts every miss and prints a sample per bucket (20 by default), never the whole list.
+counts every miss and prints a sample per bucket (20 by default), never the whole list. A
+stored value that is not a local path (a remote or CDN URL, an empty or corrupt entry) is
+never checked against disk: it is counted and reported as skipped, not as missing.
 
 `archive-date` is `Y-m-d` or `Y-m-d H:i:s`, in the site's timezone, and is only for a local
 clone whose file archive predates its database (`/wp-audit` Step 2.3). A miss whose attachment

@@ -129,6 +129,21 @@ function mmf_compute_archive_cutoff( $archive_arg ) {
 }
 
 /**
+ * Whether a stored file value is a local path this script can check on disk:
+ * a non-empty string that is not a URL (`scheme://…`) or a protocol-relative
+ * `//host/…` reference. Offload and CDN plugins rewrite _wp_attached_file and
+ * metadata entries to such URLs; joined to the uploads directory they would
+ * read as false misses. A corrupt non-string value (an array, an object) would
+ * print as "Array", or make path_join() throw a TypeError under PHP 8 and end
+ * the run outside the documented 0/1/2 exit codes.
+ */
+function mmf_is_local_rel_path( $value ) {
+	return is_string( $value ) && '' !== $value
+		&& 0 !== strpos( $value, '//' )
+		&& ! preg_match( '#^[a-z][a-z0-9+.\-]*://#i', $value );
+}
+
+/**
  * Bucket a dated miss against the archive cutoff. Only called once $archive_ts
  * is known not to be false — the caller decides UNDATED when there is no
  * cutoff. A post_date strtotime() cannot parse (empty, zeroed or corrupt) is
@@ -169,8 +184,10 @@ $basedir    = $upload_dir['basedir'];
 // basedir comes back false (with 'error' set) when the uploads directory cannot
 // be resolved or created. Every path joined to it would then be missing, and the
 // report would be a wall of false misses instead of one clear failure.
-if ( empty( $basedir ) || ! is_dir( $basedir ) ) {
-	$reason = ! empty( $upload_dir['error'] ) ? $upload_dir['error'] : 'not a directory: ' . var_export( $basedir, true );
+// An existing but unreadable directory (WP-CLI run as a user the uploads tree is
+// closed to) fails the same way: every file_exists() under it returns false.
+if ( empty( $basedir ) || ! is_dir( $basedir ) || ! is_readable( $basedir ) ) {
+	$reason = ! empty( $upload_dir['error'] ) ? $upload_dir['error'] : 'not a readable directory: ' . var_export( $basedir, true );
 	fwrite( STDERR, 'find-missing-media-files.php: uploads directory unavailable — ' . $reason . "\n" );
 	exit( 2 );
 }
@@ -190,6 +207,7 @@ const BATCH_SIZE = 1000;
 $last_id          = 0;
 $attachment_count = 0;
 $skipped_count    = 0;
+$skipped_meta     = 0;
 
 while ( true ) {
 	$rows = $wpdb->get_results(
@@ -247,8 +265,7 @@ while ( true ) {
 		// value is skipped: joined to basedir, a URL would read as a false miss for
 		// the file and every sub-size, and dirname() on an array is a TypeError
 		// that would abort the whole run.
-		if ( ! is_string( $attached_file ) || '' === $attached_file
-			|| preg_match( '#^[a-z][a-z0-9+.\-]*://#i', $attached_file ) ) {
+		if ( ! mmf_is_local_rel_path( $attached_file ) ) {
 			$skipped_count++;
 			continue;
 		}
@@ -264,17 +281,23 @@ while ( true ) {
 		if ( is_array( $meta ) ) {
 			if ( ! empty( $meta['sizes'] ) && is_array( $meta['sizes'] ) ) {
 				foreach ( $meta['sizes'] as $size_name => $size_info ) {
-					if ( ! empty( $size_info['file'] ) ) {
-						$targets[ 'size:' . $size_name ] = ( '.' === $rel_dir )
-							? $size_info['file']
-							: $rel_dir . '/' . $size_info['file'];
+					if ( ! is_array( $size_info ) || ! mmf_is_local_rel_path( $size_info['file'] ?? null ) ) {
+						$skipped_meta++;
+						continue;
 					}
+					$targets[ 'size:' . $size_name ] = ( '.' === $rel_dir )
+						? $size_info['file']
+						: $rel_dir . '/' . $size_info['file'];
 				}
 			}
-			if ( ! empty( $meta['original_image'] ) ) {
-				$targets['original_image'] = ( '.' === $rel_dir )
-					? $meta['original_image']
-					: $rel_dir . '/' . $meta['original_image'];
+			if ( isset( $meta['original_image'] ) && '' !== $meta['original_image'] ) {
+				if ( mmf_is_local_rel_path( $meta['original_image'] ) ) {
+					$targets['original_image'] = ( '.' === $rel_dir )
+						? $meta['original_image']
+						: $rel_dir . '/' . $meta['original_image'];
+				} else {
+					$skipped_meta++;
+				}
 			}
 		}
 
@@ -312,20 +335,23 @@ while ( true ) {
 		break;
 	}
 
-	// Drop this batch's primed post meta before pulling the next one, so memory
-	// stays bounded on large libraries. A runtime flush (WP 6.1+, when the cache
-	// supports it) clears only this process's copies and never touches a
+	// Drop this batch's primed posts and post meta before pulling the next one, so
+	// memory stays bounded on large libraries. A runtime flush (WP 6.1+, when the
+	// cache supports it) clears only this process's copies and never touches a
 	// persistent backend shared with the live site. Without it, the batch's own
-	// 'post_meta' keys are deleted instead — the only keys update_meta_cache()
-	// wrote — which on a persistent cache also evicts them from the backend.
+	// keys are deleted instead — 'posts' from _prime_post_caches() and 'post_meta'
+	// from update_meta_cache(), the only keys this loop wrote — which on a
+	// persistent cache also evicts them from the backend.
 	$flushed = function_exists( 'wp_cache_supports' ) && wp_cache_supports( 'flush_runtime' )
 		&& function_exists( 'wp_cache_flush_runtime' ) && wp_cache_flush_runtime();
 	if ( ! $flushed ) {
-		if ( function_exists( 'wp_cache_delete_multiple' ) ) {
-			wp_cache_delete_multiple( $batch_ids, 'post_meta' );
-		} else {
-			foreach ( $batch_ids as $batch_id ) {
-				wp_cache_delete( $batch_id, 'post_meta' );
+		foreach ( array( 'posts', 'post_meta' ) as $cache_group ) {
+			if ( function_exists( 'wp_cache_delete_multiple' ) ) {
+				wp_cache_delete_multiple( $batch_ids, $cache_group );
+			} else {
+				foreach ( $batch_ids as $batch_id ) {
+					wp_cache_delete( $batch_id, $cache_group );
+				}
 			}
 		}
 	}
@@ -365,6 +391,12 @@ if ( $skipped_count > 0 ) {
 	printf(
 		"%d attachment(s) skipped, not checked: no local file path (remote URL, empty or corrupt _wp_attached_file)\n",
 		$skipped_count
+	);
+}
+if ( $skipped_meta > 0 ) {
+	printf(
+		"%d sub-size/original_image entr(ies) skipped, not checked: remote URL or corrupt attachment metadata\n",
+		$skipped_meta
 	);
 }
 
