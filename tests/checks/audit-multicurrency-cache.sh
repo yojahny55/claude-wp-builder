@@ -60,8 +60,10 @@ flat_seo=$(tr '\n' ' ' < "$seo" | sed 's/  */ /g')
 #     one test file tells the whole story on its own) ---
 # row <file> <code>: the table rows whose first cell is exactly <code>. One awk pass: no regex
 # escaping of the pipe, and a missing row is empty output with exit 0, never a set -e abort.
+# A file awk cannot open is a different failure, and says so instead of aborting silently.
 row() {
-  CODE="$2" awk -F'|' '/^\|/ { c = $2; gsub(/^[ \t]+|[ \t]+$/, "", c); if (c == ENVIRON["CODE"]) print }' "$1"
+  awk -F'|' -v code="$2" '/^\|/ { c = $2; gsub(/^[ \t]+|[ \t]+$/, "", c); if (c == code) print }' "$1" \
+    || fail "row(): cannot read $1 while looking up $2"
 }
 for code in PERF-065 PERF-066 PERF-067; do
   [ -n "$(row "$perf" "$code")" ] || fail "$perf has no tabulated row for $code"
@@ -157,24 +159,19 @@ grep -Fq 'Never propose disabling the page cache' <<< "$fix" \
 grep -Fq 'no WP-CLI command reaches this' <<< "$fix" \
   || fail "the PERF-065/PERF-067 fix does not say a Cloudflare edge rule is out of WP-CLI's reach"
 
-# --- Direction 6: no code is defined twice. Sibling PRs add their own PERF-/SEO- rows to the
-#     same agent files, so instead of banning specific numbers (a ban would fail as soon as a
-#     sibling PR merges), every code the file mentions with its own prefix must have exactly one
-#     defining row: a line whose first cell is that code. A mention in any other column or in
-#     prose is a reference, not a definition. ---
-for spec in "$perf:PERF" "$seo:SEO"; do
+# --- Direction 6: each code this change owns is defined exactly once. A sibling PR that picks
+#     the same number would add a second row for it, and that collision is what this catches.
+#     Codes other changes own are left to their own tests and to audit-check-tables.sh, so a
+#     cross-reference to a code whose row lands in another PR never blocks this one. ---
+for spec in "$perf:PERF-065" "$perf:PERF-066" "$perf:PERF-067" "$seo:SEO-069"; do
   f=${spec%%:*}
-  prefix=${spec##*:}
-  readarray -t codes < <(grep -oE "${prefix}-[0-9]{3}" "$f" | sort -u || true)
-  [ "${#codes[@]}" -gt 0 ] || fail "$f mentions no ${prefix}- code at all"
-  for code in "${codes[@]}"; do
-    n=$(row "$f" "$code" | awk 'END { print NR }')
-    if [ "$n" = 0 ]; then
-      fail "$f: $code is mentioned but no table row's first cell is exactly '$code' — either the code is never defined, or its row no longer has the '| $code |' shape row() reads"
-    elif [ "$n" != 1 ]; then
-      fail "$f: $code is defined on $n table rows, expected exactly 1"
-    fi
-  done
+  code=${spec##*:}
+  n=$(row "$f" "$code" | awk 'END { print NR }')
+  if [ "$n" = 0 ]; then
+    fail "$f: no table row's first cell is exactly '$code' — the row is gone, or it no longer has the '| $code |' shape row() reads"
+  elif [ "$n" != 1 ]; then
+    fail "$f: $code is defined on $n table rows, expected exactly 1"
+  fi
 done
 
 # --- Direction 7: multi-currency detection uses a confirmed slug list, not a bare `currency`
