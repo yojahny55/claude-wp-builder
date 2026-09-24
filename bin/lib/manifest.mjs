@@ -57,6 +57,9 @@ const CONTEXT_FIELDS = [
   { label: 'demo mode', paths: ['demo mode'], fallback: 'plain' },
   { label: 'Primary language', paths: ['languages.primary'] },
   { label: 'Plugin profile', paths: ['plugins.profile'], fallback: 'none' },
+  // `scope: 'store'` renders only for a manifest with a store block, so every project that is
+  // not a store keeps a byte-identical block and never reads as drifted.
+  { label: 'Store tier', paths: ['store.tier'], scope: 'store' },
   // `scope: 'adopted'` rows are rendered only for a site registered by `wp-config.mjs adopt` -- one this plugin did not
   // build, whose theme it did not scaffold and whose plugins it did not choose. A created
   // project's block is byte-identical to what it was before these rows existed, so no
@@ -87,7 +90,9 @@ export function isAdopted(manifest) {
 // A row names its scope as data, not as a function reference: identity comparison against
 // a predicate broke silently the moment someone inlined an equivalent arrow function.
 function contextFieldsFor(manifest) {
-  return CONTEXT_FIELDS.filter((f) => !f.scope || (f.scope === 'adopted' && isAdopted(manifest)));
+  return CONTEXT_FIELDS.filter((f) => !f.scope
+    || (f.scope === 'adopted' && isAdopted(manifest))
+    || (f.scope === 'store' && manifest?.store !== undefined));
 }
 
 // The concerns a site's own plugins can already own. /wp-audit used to assume Rank Math and
@@ -249,6 +254,7 @@ export function validateManifest(manifest) {
     problems.push(`origin must be "created" or "adopted", found ${JSON.stringify(origin)}`);
   }
   if (isAdopted(manifest)) problems.push(...validateAdopted(manifest));
+  if (manifest.store !== undefined) problems.push(...validateStore(manifest.store));
   return problems;
 }
 
@@ -316,6 +322,156 @@ function validateAdopted(manifest) {
   return problems;
 }
 
+// The store block: what /wp-woo-setup brings a WooCommerce store in line with. Strict, because
+// it is new: there is no legacy block to tolerate, and an unknown key is a typo the operator
+// would otherwise believe configured something.
+export const STORE_TIERS = ['catalog', 'store', 'full'];
+const WEIGHT_UNITS = ['kg', 'g', 'lbs', 'oz'];
+const DIMENSION_UNITS = ['m', 'cm', 'mm', 'in', 'yd'];
+const ENQUIRY = ['form', 'where-to-buy', 'whatsapp'];
+const METHOD_KEYS = { flat_rate: ['type', 'cost'], free_shipping: ['type', 'min_amount'], local_pickup: ['type', 'cost'] };
+const TAX_CLASSES = ['standard', 'reduced-rate', 'zero-rate'];
+const STORE_COUNTRY = /^[A-Z]{2}(:[A-Z0-9-]{1,10})?$/;
+const STORE_LOCATION = /^([A-Z]{2}(:[A-Z0-9-]{1,10})?|postcode:[A-Za-z0-9 *.-]{1,20}|continent:[A-Z]{2})$/;
+const MONEY = /^\d+(\.\d{1,2})?$/;
+const TAX_RATE = /^\d{1,3}(\.\d{1,4})?$/;
+
+const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const filled = (v) => typeof v === 'string' && v.trim() !== '';
+function unknownKeys(obj, allowed, path, problems) {
+  for (const k of Object.keys(obj)) if (!allowed.includes(k)) problems.push(`${path}.${k} is not a known key`);
+}
+
+export function validateStore(store) {
+  if (!isObj(store)) return ['store must be an object'];
+  const p = [];
+  // Secrets first, with the message that says where they belong: an unknown-key refusal
+  // alone would leave the operator deleting the key and never setting it anywhere.
+  const secretPaths = Object.entries(SECRETS).filter(([, s]) => s.manifestPath.startsWith('store.'));
+  for (const [, s] of secretPaths) {
+    if (at({ store }, s.manifestPath) !== undefined) {
+      p.push(`${s.manifestPath} is a secret: put it in ${LOCAL_NAME} or ${s.env}, never in the manifest`);
+    }
+  }
+  unknownKeys(store, ['tier', 'address', 'currency', 'units', 'checkout', 'checkout_reason', 'enquiry', 'payments', 'shipping', 'tax'], 'store', p);
+  const { tier } = store;
+  if (!STORE_TIERS.includes(tier)) p.push(`store.tier must be ${STORE_TIERS.map((t) => `"${t}"`).join(', ')}, found ${JSON.stringify(tier)}`);
+  const sells = tier === 'store' || tier === 'full';
+
+  if (!isObj(store.address)) p.push('store.address is required: street, city, postcode and country');
+  else {
+    unknownKeys(store.address, ['street', 'city', 'postcode', 'country'], 'store.address', p);
+    for (const k of ['street', 'city', 'postcode']) if (!filled(store.address[k])) p.push(`store.address.${k} must be a non-empty string`);
+    if (typeof store.address.country !== 'string' || !STORE_COUNTRY.test(store.address.country)) {
+      p.push(`store.address.country must look like "US" or "US:FL", found ${JSON.stringify(store.address.country)}`);
+    }
+  }
+  if (typeof store.currency !== 'string' || !/^[A-Z]{3}$/.test(store.currency)) {
+    p.push(`store.currency must be a three-letter ISO code like "USD", found ${JSON.stringify(store.currency)}`);
+  }
+  if (!isObj(store.units)) p.push('store.units is required: weight and dimension');
+  else {
+    unknownKeys(store.units, ['weight', 'dimension'], 'store.units', p);
+    if (!WEIGHT_UNITS.includes(store.units.weight)) p.push(`store.units.weight must be one of ${WEIGHT_UNITS.join(', ')}`);
+    if (!DIMENSION_UNITS.includes(store.units.dimension)) p.push(`store.units.dimension must be one of ${DIMENSION_UNITS.join(', ')}`);
+  }
+
+  if (store.enquiry !== undefined) {
+    if (!Array.isArray(store.enquiry)) p.push('store.enquiry must be an array');
+    else {
+      for (const e of store.enquiry) if (!ENQUIRY.includes(e)) p.push(`store.enquiry has an unknown channel ${JSON.stringify(e)}: use ${ENQUIRY.join(', ')}`);
+      if (new Set(store.enquiry).size !== store.enquiry.length) p.push('store.enquiry lists a channel twice');
+    }
+  }
+
+  if (tier === 'catalog') {
+    if (!(Array.isArray(store.enquiry) && store.enquiry.length)) p.push('store.enquiry needs at least one channel on a catalog: form, where-to-buy or whatsapp');
+    for (const k of ['checkout', 'checkout_reason', 'payments', 'shipping', 'tax']) {
+      if (store[k] !== undefined) p.push(`store.${k} is forbidden on a catalog: nothing is purchasable`);
+    }
+    return p;
+  }
+  if (!sells) return p;
+
+  if (store.checkout !== undefined && store.checkout !== 'block' && store.checkout !== 'shortcode') {
+    p.push(`store.checkout must be "block" or "shortcode", found ${JSON.stringify(store.checkout)}`);
+  }
+  if (store.checkout === 'shortcode' && !filled(store.checkout_reason)) {
+    p.push("store.checkout \"shortcode\" needs a checkout_reason: block checkout is WooCommerce's default and where new features land");
+  }
+  if (store.checkout_reason !== undefined && store.checkout !== 'shortcode') p.push('store.checkout_reason only belongs beside checkout "shortcode"');
+
+  if (!isObj(store.payments)) p.push('store.payments is required on a store: gateway and mode');
+  else {
+    const secretKeys = secretPaths.map(([, s]) => s.manifestPath.split('.').pop());
+    unknownKeys(store.payments, ['gateway', 'mode', ...secretKeys], 'store.payments', p);
+    if (store.payments.gateway !== 'stripe') p.push(`store.payments.gateway must be "stripe", found ${JSON.stringify(store.payments.gateway)}`);
+    if (store.payments.mode !== 'test') p.push('store.payments.mode must be "test": going live is a launch step, not a setup value');
+  }
+  if (store.shipping !== undefined) validateShipping(store.shipping, p);
+  if (store.tax !== undefined) validateTax(store.tax, p);
+  return p;
+}
+
+function validateShipping(shipping, p) {
+  if (!Array.isArray(shipping)) { p.push('store.shipping must be an array of zones'); return; }
+  const names = new Set();
+  shipping.forEach((z, i) => {
+    const zp = `store.shipping[${i}]`;
+    if (!isObj(z)) { p.push(`${zp} must be an object`); return; }
+    unknownKeys(z, ['zone', 'locations', 'methods'], zp, p);
+    if (!filled(z.zone)) p.push(`${zp}.zone must be a non-empty name`);
+    else if (names.has(z.zone)) p.push(`${zp}.zone "${z.zone}" is used twice: zones are matched by name`);
+    else names.add(z.zone);
+    if (!Array.isArray(z.locations) || !z.locations.length) p.push(`${zp}.locations must list at least one location`);
+    else {
+      for (const l of z.locations) {
+        if (typeof l !== 'string' || !STORE_LOCATION.test(l)) p.push(`${zp}.locations has ${JSON.stringify(l)}: use "US", "US:FL", "postcode:33602" or "continent:NA"`);
+      }
+    }
+    if (!Array.isArray(z.methods) || !z.methods.length) { p.push(`${zp}.methods must list at least one method`); return; }
+    const types = new Set();
+    z.methods.forEach((m, j) => {
+      const mp = `${zp}.methods[${j}]`;
+      if (!isObj(m) || !Object.hasOwn(METHOD_KEYS, m.type)) { p.push(`${mp}.type must be ${Object.keys(METHOD_KEYS).join(', ')}`); return; }
+      if (types.has(m.type)) p.push(`${mp}.type ${m.type} appears twice in one zone: methods are matched by type`);
+      types.add(m.type);
+      unknownKeys(m, METHOD_KEYS[m.type], mp, p);
+      const money = (k, required) => {
+        if (m[k] === undefined) { if (required) p.push(`${mp}.${k} is required`); return; }
+        if (typeof m[k] !== 'string' || !MONEY.test(m[k])) p.push(`${mp}.${k} must be a decimal string like "10.00", found ${JSON.stringify(m[k])}`);
+      };
+      if (m.type === 'flat_rate') money('cost', true);
+      if (m.type === 'local_pickup') money('cost', false);
+      if (m.type === 'free_shipping') money('min_amount', false);
+    });
+  });
+}
+
+function validateTax(tax, p) {
+  if (!isObj(tax)) { p.push('store.tax must be an object'); return; }
+  unknownKeys(tax, ['enabled', 'prices_include_tax', 'rates'], 'store.tax', p);
+  for (const k of ['enabled', 'prices_include_tax']) if (typeof tax[k] !== 'boolean') p.push(`store.tax.${k} must be true or false`);
+  if (tax.rates === undefined) return;
+  if (!Array.isArray(tax.rates)) { p.push('store.tax.rates must be an array'); return; }
+  const keys = new Set();
+  tax.rates.forEach((r, i) => {
+    const rp = `store.tax.rates[${i}]`;
+    if (!isObj(r)) { p.push(`${rp} must be an object`); return; }
+    unknownKeys(r, ['country', 'state', 'postcode', 'city', 'rate', 'name', 'shipping', 'class'], rp, p);
+    if (typeof r.country !== 'string' || !/^[A-Z]{2}$/.test(r.country)) p.push(`${rp}.country must be a two-letter code like "US"`);
+    if (r.state !== undefined && !(typeof r.state === 'string' && /^[A-Z0-9-]{1,10}$/.test(r.state))) p.push(`${rp}.state must look like "FL"`);
+    for (const k of ['postcode', 'city']) if (r[k] !== undefined && !filled(r[k])) p.push(`${rp}.${k} must be a non-empty string when present`);
+    if (typeof r.rate !== 'string' || !TAX_RATE.test(r.rate)) p.push(`${rp}.rate must be a decimal string with at most 4 places, like "6.0000"`);
+    if (!filled(r.name)) p.push(`${rp}.name must be a non-empty string`);
+    if (typeof r.shipping !== 'boolean') p.push(`${rp}.shipping must be true or false`);
+    if (r.class !== undefined && !TAX_CLASSES.includes(r.class)) p.push(`${rp}.class must be ${TAX_CLASSES.join(', ')}`);
+    const key = [r.country, r.state ?? '', r.postcode ?? '', r.city ?? '', r.name, r.class ?? 'standard'].join('|');
+    if (keys.has(key)) p.push(`${rp} duplicates another rate's country, state, postcode, city, name and class`);
+    keys.add(key);
+  });
+}
+
 // The prose line in .claude/CLAUDE.md is the ONLY record of a legacy project's i18n
 // strategy, so migration reads it rather than re-deciding. Where it is absent the
 // documented fallbacks apply unchanged: no line means suffix, no mode means plain.
@@ -361,6 +517,9 @@ export function migrateManifest(manifest, { claudeMd = '' } = {}) {
 export const SECRETS = {
   db_password: { env: 'WP_CREATE_DB_PASSWORD', manifestPath: 'database.password' },
   admin_password: { env: 'WP_CREATE_ADMIN_PASSWORD', manifestPath: 'wordpress.admin_password' },
+  stripe_test_secret_key: { env: 'WP_CREATE_STRIPE_TEST_SECRET_KEY', manifestPath: 'store.payments.test_secret_key' },
+  stripe_test_publishable_key: { env: 'WP_CREATE_STRIPE_TEST_PUBLISHABLE_KEY', manifestPath: 'store.payments.test_publishable_key' },
+  stripe_test_webhook_secret: { env: 'WP_CREATE_STRIPE_TEST_WEBHOOK_SECRET', manifestPath: 'store.payments.test_webhook_secret' },
 };
 
 // A value is "present" if it is neither absent (undefined/null) nor an object -- an

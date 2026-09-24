@@ -4,6 +4,13 @@
 
 ### Added
 
+- **A `store` block in `.wp-create.json`.** Records what a WooCommerce store sells and how —
+  tier (`catalog`, `store`, `full`), address, currency, units, checkout type, enquiry channels,
+  Stripe in test mode, shipping zones, tax rates — and `bin/wp-config.mjs validate` refuses a
+  bad one by name. Stripe keys are secrets like the database password: `.wp-create.local.json`
+  or `WP_CREATE_STRIPE_TEST_*`, never the manifest. The generated CLAUDE.md block gains a
+  `Store tier` line only for a project that has the block, so every other project's block is
+  unchanged.
 - **A multi-currency plugin and a full-page/edge cache computed prices at two different
   granularities, and nothing checked whether they agreed.** A multi-currency plugin (CURCY/
   `woocommerce-multi-currency` is one shape of this) picks the price per request, usually from
