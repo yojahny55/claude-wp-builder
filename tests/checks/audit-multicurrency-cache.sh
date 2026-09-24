@@ -169,7 +169,11 @@ for spec in "$perf:PERF" "$seo:SEO"; do
   [ "${#codes[@]}" -gt 0 ] || fail "$f mentions no ${prefix}- code at all"
   for code in "${codes[@]}"; do
     n=$(row "$f" "$code" | awk 'END { print NR }')
-    [ "$n" = 1 ] || fail "$f: $code has $n defining table rows, expected exactly 1"
+    if [ "$n" = 0 ]; then
+      fail "$f: $code is mentioned but no table row's first cell is exactly '$code' — either the code is never defined, or its row no longer has the '| $code |' shape row() reads"
+    elif [ "$n" != 1 ]; then
+      fail "$f: $code is defined on $n table rows, expected exactly 1"
+    fi
   done
 done
 
@@ -201,10 +205,13 @@ grep -Fq 'SEO-069 is never auto-applied' "$seo" \
   || fail "$seo does not exclude SEO-069 from the auto-fix pass"
 grep -Fq 'there is no theme code to' "$seo" \
   || fail "$seo does not explain why SEO-069 has no code fix of its own"
-grep -Fq 'own request pair' "$seo" \
-  || fail "$seo: SEO-069's table row does not say it makes its own request pair"
-grep -Fq 'not a reuse' "$seo" \
-  || fail "$seo does not say SEO-069 is not a reuse of PERF-067's result"
+# The contract lives in SEO-069's own table row — the agent runs what its table tabulates — so
+# these two are matched against that row alone, not anywhere in the file (the procedure prose
+# repeats "not a reuse", which would keep a file-wide grep green after the row lost it).
+grep -Fq 'own request pair' <<< "$seo069_row" \
+  || fail "$seo: SEO-069's own table row does not say it makes its own request pair"
+grep -Fq 'not a reuse' <<< "$seo069_row" \
+  || fail "$seo: SEO-069's own table row does not say it is not a reuse of PERF-067's result"
 grep -Fq 'no mechanism' <<< "$flat_seo" \
   || fail "$seo does not explain that the two agents have no mechanism to share a live result"
 grep -Fq 'that snapshot is' <<< "$flat_seo" \
