@@ -52,10 +52,24 @@ declare -A want_severity=(
   [PERF-063]=INFO
   [PERF-064]=INFO
 )
-# Severity is the row's last cell; each code's must be exactly the one it was assigned.
+# Severity is read from the column its own table's header names "Severity", not from a fixed
+# position: the Tier 1 tables end in Auto-fix, the Tier 2 table in Severity, and a column
+# added later must not silently shift which cell is compared. A row whose table has no
+# Severity header column reports that instead of a wrong value.
 for code in "${!want_severity[@]}"; do
-  sev=$(CODE="$code" awk -F'|' '/^\|/ { c = $2; gsub(/^[ \t]+|[ \t]+$/, "", c)
-          if (c == ENVIRON["CODE"]) { s = $(NF - 1); gsub(/^[ \t]+|[ \t]+$/, "", s); print s; exit } }' "$agent")
+  sev=$(CODE="$code" awk -F'|' '
+    /^\|/ {
+      first = $2; gsub(/^[ \t]+|[ \t]+$/, "", first)
+      if (first == "Code") {
+        sev_col = 0
+        for (i = 2; i < NF; i++) { h = $i; gsub(/^[ \t]+|[ \t]+$/, "", h); if (h == "Severity") sev_col = i }
+        next
+      }
+      if (first == ENVIRON["CODE"]) {
+        if (!sev_col) { print "(no Severity column in its table)"; exit }
+        s = $sev_col; gsub(/^[ \t]+|[ \t]+$/, "", s); print s; exit
+      }
+    }' "$agent")
   [ -n "$sev" ] || fail "$agent has no $code row"
   [ "$sev" = "${want_severity[$code]}" ] \
     || fail "$code is $sev, expected ${want_severity[$code]}"
@@ -66,6 +80,11 @@ done
 # actual defect (two rows claiming one code) without capping how many codes may ever exist.
 dupe_codes=$(grep -oE '^\| PERF-[0-9]+ \|' "$agent" | tr -d '| ' | sort | uniq -d || true)
 [ -z "$dupe_codes" ] || fail "$agent defines the same PERF-NNN code on more than one row: $dupe_codes"
+
+# Every lookup below matches the code in the first cell of a `| PERF-NNN |` row. If that row
+# shape itself changes, say so once here instead of letting each lookup report "no row".
+grep -Eq '^\| PERF-[0-9]+ \|' "$agent" \
+  || fail "$agent has no '| PERF-NNN |' table rows at all — the table format changed, not just one code"
 
 # row <code>: the agent's table row whose first cell is exactly <code>. One awk pass, no
 # pipeline, so there is no grep exit status or SIGPIPE to mask; a missing row is empty output
@@ -82,12 +101,14 @@ row() {
 for code in PERF-061 PERF-062 PERF-063 PERF-064; do
   r=$(row "$code")
   [ -n "$r" ] || fail "$agent has no $code table row"
-  printf '%s' "$r" | grep -Eq 'FROM wp_[a-z]' \
-    && fail "$code hardcodes the wp_ prefix in its SQL instead of reading the site's real one"
+  if printf '%s' "$r" | grep -Eq 'FROM wp_[A-Za-z0-9_]'; then
+    fail "$code hardcodes the wp_ prefix in its SQL instead of reading the site's real one"
+  fi
   printf '%s' "$r" | grep -Fq '$($WP db prefix)' \
-    || fail "$code does not build its table name from \$($WP db prefix)"
-  printf '%s' "$r" | grep -Eiq '\b(UPDATE|DELETE|INSERT|REPLACE|LOAD DATA)\b' \
-    && fail "$code's check cell contains a word WP-CLI's db query treats as row-modifying (UPDATE/DELETE/INSERT/REPLACE/LOAD DATA) — it would print only 'Rows affected: -1', never the number the Pass criterion needs"
+    || fail "$code does not build its table name from "'$($WP db prefix)'
+  if printf '%s' "$r" | grep -Eiq '\b(UPDATE|DELETE|INSERT|REPLACE|LOAD DATA)\b'; then
+    fail "$code's check cell contains a word WP-CLI's db query treats as row-modifying (UPDATE/DELETE/INSERT/REPLACE/LOAD DATA) — it would print only 'Rows affected: -1', never the number the Pass criterion needs"
+  fi
 done
 
 # PERF-036/037/039 pre-date this PR, but this PR edits them anyway (autoload values; and,
@@ -96,10 +117,11 @@ done
 for code in PERF-036 PERF-037 PERF-039; do
   r=$(row "$code")
   [ -n "$r" ] || fail "$agent has no $code table row"
-  printf '%s' "$r" | grep -Eq 'FROM wp_[a-z]' \
-    && fail "$code hardcodes the wp_ prefix in its SQL instead of reading the site's real one"
+  if printf '%s' "$r" | grep -Eq 'FROM wp_[A-Za-z0-9_]'; then
+    fail "$code hardcodes the wp_ prefix in its SQL instead of reading the site's real one"
+  fi
   printf '%s' "$r" | grep -Fq '$($WP db prefix)' \
-    || fail "$code does not build its table name from \$($WP db prefix)"
+    || fail "$code does not build its table name from "'$($WP db prefix)'
 done
 printf '%s' "$(row 'PERF-039')" | grep -Fq '\_transient\_timeout\_%' \
   || fail "PERF-039's LIKE pattern does not escape its leading underscores — same full-scan bug as PERF-063 had"
@@ -112,8 +134,9 @@ printf '%s' "$r" | grep -Fq '10,000' \
   || fail "PERF-061 has no concrete row-count threshold"
 printf '%s' "$r" | grep -Fq 'WARNING' \
   || fail "PERF-061 is not WARNING"
-printf '%s' "$r" | grep -Fiq 'info only' \
-  && fail "PERF-061 is still an INFO-only row like PERF-042 — it must carry a threshold"
+if printf '%s' "$r" | grep -Fiq 'info only'; then
+  fail "PERF-061 is still an INFO-only row like PERF-042 — it must carry a threshold"
+fi
 
 # PERF-062 — woocommerce_sessions: table name, expiry column, threshold.
 r=$(row 'PERF-062')
