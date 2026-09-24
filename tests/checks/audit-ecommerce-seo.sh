@@ -102,7 +102,7 @@ grep -E '^\| *SEO-066 *\|.*\| *CRITICAL *\| *$' "$AGENT" >/dev/null \
   || fail "SEO-066 is not CRITICAL — a stale InStock claim is a manual-action risk, same tier as SEO-063"
 printf '%s' "$commerce_flat" | grep -Fq 'never a WP-CLI stock query against the local database' \
   || fail "SEO-066 does not reject comparing availability against a possibly-stale local DB value"
-printf '%s' "$skill_flat" | grep -Fq 'outofstock' \
+printf '%s' "$skill_flat" | grep -Fq 'next to an `outofstock` class from the same fetch is the finding' \
   || fail "SEO-066 does not name the rendered stock class it compares the schema claim against"
 # The stock-class grep must be scoped to the MAIN product's own wrapper. Related products and
 # up-sells go through the same wc_get_product_class() and carry their own stock class, so an
@@ -114,8 +114,9 @@ printf '%s' "$skill_flat" | grep -Fq 'id=\"product-$pid\"' \
 # The class alternation must be the real WooCommerce class names. (in|out)ofstock concatenates
 # to "inofstock"/"outofstock" — it can never match the actual "instock" class, so the InStock
 # side of the mismatch this check exists to catch was undetectable.
-printf '%s' "$skill_flat" | grep -Fq '(in|out)ofstock' \
-  && fail "SEO-066 still uses the (in|out)ofstock alternation, which can never match WooCommerce's real 'instock' class"
+if printf '%s' "$skill_flat" | grep -Fq '(in|out)ofstock'; then
+  fail "SEO-066 still uses the (in|out)ofstock alternation, which can never match WooCommerce's real 'instock' class"
+fi
 printf '%s' "$skill_flat" | grep -Fq 'instock|outofstock|onbackorder' \
   || fail "SEO-066 does not match the real WooCommerce stock class names"
 printf '%s' "$skill_flat" | grep -Fq 'never read as "no mismatch found."' \
@@ -174,7 +175,7 @@ printf '%s' "$skill_flat" | grep -Fq 'tolerate attribute order and' \
 # --- SEO-068: migration reminder — warning-level, no fetch ---------------------------------
 printf '%s' "$commerce_flat" | grep -Fq 'Not a live fetch' \
   || fail "SEO-068 is not marked as a non-fetching, reminder-only check"
-printf '%s' "$skill_flat" | grep -Fq 'AggregateRating' \
+printf '%s' "$skill_flat" | grep -Fq 'Reviews and `AggregateRating`** disappear from the schema' \
   || fail "SEO-068 does not name the lost AggregateRating as one of the two migration risks"
 printf '%s' "$skill_flat" | grep -Fq 'soft 404' \
   || fail "SEO-068 does not warn that a blanket redirect to the home page reads as a soft 404"
