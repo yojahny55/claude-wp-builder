@@ -137,15 +137,14 @@ grep -Eq 'cf-cache-status`.*is `HIT`' "$perf" \
 # --- Direction 5: the fix is a setting, never a code workaround ---
 grep -Fq 'Multi-currency cache-key fix' "$perf" \
   || fail "$perf has no fix section for PERF-065/PERF-067"
-# The section ends at the next heading of the same or a higher level (#, ## or ###), which is
-# where a Markdown section ends: a later ### sibling or the "## Rules" parent after it both
-# close it, and #### subsections inside it stay part of it. Bounding only on "## " would let
-# the extract swallow any ### sibling added after it, whose text could then satisfy the
-# needles below and mask a regression in this section.
-fix=$(awk '/^### Multi-currency cache-key fix/{f=1; next} f && /^#{1,3} /{exit} f{print}' "$perf")
+# The fix section runs from its own heading to the "## Rules" heading that follows it today.
+# Both ends are named, so a failure says which one moved: a heading of any level that shows up
+# inside the extract means the section's shape changed and this end marker needs a look.
+fix=$(awk '/^### Multi-currency cache-key fix/{f=1; next} f && /^## Rules/{exit} f{print}' "$perf")
 [ -n "$fix" ] || fail "$perf's Multi-currency cache-key fix section is empty"
-! grep -Fq '## Rules' <<< "$fix" \
-  || fail "the Multi-currency cache-key fix extract ran past its section into ## Rules — awk boundary regressed"
+inner=$(grep -E '^#{1,6} ' <<< "$fix" || true)
+[ -z "$inner" ] \
+  || fail "the Multi-currency cache-key fix is no longer followed directly by ## Rules (found: $inner) — move this gate's end marker to the heading that now closes the section"
 grep -Fq 'Owner: setting' <<< "$fix" \
   || fail "the PERF-065/PERF-067 fix does not state Owner: setting"
 grep -Fq 'Never propose disabling the page cache' <<< "$fix" \
@@ -154,15 +153,19 @@ grep -Fq 'no WP-CLI command reaches this' <<< "$fix" \
   || fail "the PERF-065/PERF-067 fix does not say a Cloudflare edge rule is out of WP-CLI's reach"
 
 # --- Direction 6: no code is defined twice. Sibling PRs add their own PERF-/SEO- rows to the
-#     same agent files, so this asserts uniqueness of every table row instead of banning
-#     specific numbers (a ban would fail as soon as a sibling PR merges). ---
-for f in "$perf" "$seo"; do
-  # The grep exits 1 on a file with no code rows. A plain assignment takes the exit status of
-  # its command substitution, so under `set -e` + pipefail `dups=$(pipeline)` would stop the
-  # script there (checked: `set -euo pipefail; x=$(false | cat)` exits 1). `|| true` keeps an
-  # empty match from ending the test; an empty $dups then correctly means no duplicates.
-  dups=$(grep -oE '^\| *(PERF|SEO)-[0-9]{3} *\|' "$f" | tr -d '| ' | sort | uniq -d || true)
-  [ -z "$dups" ] || fail "$f defines these codes more than once: $dups"
+#     same agent files, so instead of banning specific numbers (a ban would fail as soon as a
+#     sibling PR merges), every code the file mentions with its own prefix must have exactly one
+#     defining row: a line whose first cell is that code. A mention in any other column or in
+#     prose is a reference, not a definition. ---
+for spec in "$perf:PERF" "$seo:SEO"; do
+  f=${spec%%:*}
+  prefix=${spec##*:}
+  codes=$(grep -oE "${prefix}-[0-9]{3}" "$f" | sort -u || true)
+  [ -n "$codes" ] || fail "$f mentions no ${prefix}- code at all"
+  for code in $codes; do
+    n=$(CODE="$code" awk -F'|' '/^\|/ { c = $2; gsub(/^[ \t]+|[ \t]+$/, "", c); if (c == ENVIRON["CODE"]) k++ } END { print k + 0 }' "$f")
+    [ "$n" = 1 ] || fail "$f: $code has $n defining table rows, expected exactly 1"
+  done
 done
 for code in PERF-065 PERF-066 PERF-067; do
   grep -Eq "^\| *$code *\|" "$perf" || fail "$perf: $code has no table row"
