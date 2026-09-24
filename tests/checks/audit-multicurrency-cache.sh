@@ -57,7 +57,11 @@ done
 # found, turning a passing check into a spurious failure. A herestring has no pipe to break.
 # Carriage returns dropped and every whitespace run squeezed to one space, so a CRLF checkout
 # or a tab in the prose cannot break a cross-line literal match.
-flat_perf=$(tr -d '\r' < "$perf" | tr -s '[:space:]' ' ')
+# Prose only: the PERF-065..067 rows restate much of the procedure in near-duplicate wording,
+# so a row must not keep a procedure gate green after the paragraph itself is gone. Rows are
+# checked on their own through row(). Indented table rows (a table nested in a list) are rows
+# too, hence the leading whitespace in the anchor.
+flat_perf=$(grep -Ev '^[[:space:]]*\|' "$perf" | tr -d '\r' | tr -s '[:space:]' ' ')
 
 # --- Codes exist and are tabulated (audit-check-tables.sh's own rule, pinned here too so this
 #     one test file tells the whole story on its own) ---
@@ -160,11 +164,12 @@ fix=$(awk '/^### Multi-currency cache-key fix/{f=1; next} f && /^## Rules/{found
   || fail "$perf's Multi-currency cache-key fix section is not terminated by ## Rules"
 [ -n "$fix" ] || fail "$perf's Multi-currency cache-key fix section is empty"
 # Lines inside a fenced code block are not headings: a shell comment in a snippet starts with
-# "# " too, and must not read as the section having gained a subheading.
-inner=$(awk '/^(```|~~~)/ { fence = !fence; next } !fence && /^#+ /' <<< "$fix")
+# "# " too. Fences may be indented (a snippet nested in a list). A #### subheading inside the
+# section is fine; a heading at level 1-3 means a sibling section now starts inside the extract.
+inner=$(awk '/^[[:space:]]*(```|~~~)/ { fence = !fence; next } !fence && /^(#|##|###) /' <<< "$fix")
 fix_flat=$(tr -s '[:space:]' ' ' <<< "$fix")
 [ -z "$inner" ] \
-  || fail "the Multi-currency cache-key fix is no longer followed directly by ## Rules (found: $inner) — move this gate's end marker to the heading that now closes the section"
+  || fail "a level 1-3 heading now sits between the Multi-currency cache-key fix and ## Rules (found: $inner) — a sibling section was added there: end this extract at that heading instead"
 grep -Fq 'Owner: setting' <<< "$fix_flat" \
   || fail "the PERF-065/PERF-067 fix does not state Owner: setting"
 grep -Fq 'Never propose disabling the page cache' <<< "$fix_flat" \
@@ -219,7 +224,7 @@ grep -Fq 'confirmed multi-currency plugin slugs' <<< "$perf065_row" \
 #     self-fetch that cannot stand in for a production, cache-sensitive read ---
 grep -Eq "'json_ld'[[:space:]]*=>" "$seo" \
   || fail "$seo has lost the json_ld snapshot field (still used by the other rendered-head checks)"
-seo_prose=$(grep -v '^|' "$seo" || true)
+seo_prose=$(grep -Ev '^[[:space:]]*\|' "$seo" || true)
 # Prose only, flattened: SEO-069's table row repeats some of these phrases and must not
 # satisfy a gate the procedure itself has dropped.
 flat_seo_prose=$(tr -d '\r' <<< "$seo_prose" | tr -s '[:space:]' ' ')
