@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`/autofix` fixes what OpenCodeReview found.** A maintainer comments `/autofix` on a pull
+  request and `.github/workflows/autofix.yml` hands the open, unresolved OCR threads to OpenCode
+  (Alibaba token plan, `qwen3.8-max`). It pushes one commit only if the contract checks gain no
+  new failure against a baseline taken before the edit, and if the edited PHP and ES modules
+  still pass `php -l` at their floors and `node --check`. It refuses to push when no checks ran,
+  so an empty comparison cannot pass. Each thread gets a fixed/skipped reply with a reason, and
+  fixed threads are resolved. It runs only for commenters with write, maintain or admin, and only
+  on branches in this repository: the agent gets a shell over the PR's code. Edits under
+  `.github/`, `tests/checks/` and `tests/baselines/` are reverted unless a finding names that
+  file. A push made with `GITHUB_TOKEN` starts no pull-request run, so the workflow dispatches CI
+  on the branch itself; `ci.yml` gains `workflow_dispatch` for that.
+
+### Changed
+
+- **OpenCodeReview now reviews on `qwen3.8-max` via the Alibaba token plan, with thinking off.**
+  The plan enables thinking by default. A probe measured 26.5 s and 918 tokens (787 of them
+  reasoning) with it on, and 5.7 s and 214 tokens with it off. The first reviews on it ran over
+  30 minutes, against about 9 on the local model. `llm_extra_body` now sends
+  `{"enable_thinking":false}`.
+
 ## [1.28.0] - 2026-09-23
 
 ### Fixed

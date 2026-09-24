@@ -1,17 +1,17 @@
 # OpenCodeReview PR review — adapted from upstream
 # examples/github_actions/ocr-review.yml (fetched 2026-09-16) for this fleet:
 #   * runs-on: self-hosted (AI rig runner) — ubuntu-latest cannot reach LiteLLM
-#   * llm_url secret points at LiteLLM :4000 (composite action runs on the rig
+#   * llm_url secret: Alibaba token plan (qwen3.8-max) since 2026-09-24; was LiteLLM :4000 (composite action runs on the rig
 #     HOST, not in a container, so 192.168.0.20 works — not 172.17.0.1)
-#   * llm_extra_body '{}' — upstream default sends Anthropic-shaped
-#     {"thinking":{"type":"disabled"}}; vLLM may reject the unknown field and
-#     the LiteLLM `coder` route already sets enable_thinking:false server-side
+#   * llm_extra_body '{"enable_thinking":false}' — upstream default sends Anthropic-shaped
+#     {"thinking":{"type":"disabled"}}, an unknown field on an OpenAI-compatible endpoint;
+#     Qwen's own switch is enable_thinking (see the input below for the measurements)
 #   * review_concurrency 2 + llm_timeout 600 — single-GPU local 27B, not cloud
 #
-# Secrets/vars (already set): OCR_LLM_URL, OCR_LLM_AUTH_TOKEN (ocr-wp-builder
-# key), vars OCR_LLM_MODEL=coder, OCR_LLM_USE_ANTHROPIC=false
+# Secrets/vars (already set): OCR_LLM_URL, OCR_LLM_AUTH_TOKEN (Alibaba token-plan
+# key), vars OCR_LLM_MODEL=qwen3.8-max, OCR_LLM_USE_ANTHROPIC=false
 #
-# Runs SIDE BY SIDE with pr-agent.yml during the trial — both review each PR.
+# The sole review bot since 2026-09-16 (PR-Agent was retired after the trial).
 name: OpenCodeReview PR Review
 
 concurrency:
@@ -97,7 +97,11 @@ jobs:
           llm_auth_token: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
           llm_model: ${{ vars.OCR_LLM_MODEL }}
           llm_use_anthropic: ${{ vars.OCR_LLM_USE_ANTHROPIC }}
-          llm_extra_body: '{}'
+          # Thinking off. The Alibaba token plan enables it by default for qwen3.8-max (the old
+          # LiteLLM `coder` route disabled it server-side, so '{}' used to be enough): a probe
+          # measured 26.5s / 918 tokens (787 reasoning) with it on vs 5.7s / 214 tokens off,
+          # and the first reviews on it ran 30+ min against ~9 on the local model.
+          llm_extra_body: '{"enable_thinking":false}'
           llm_timeout: '600'
           review_concurrency: '2'
           stream_progress: 'true'

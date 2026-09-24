@@ -22,6 +22,11 @@ on:
   pull_request:
   push:
     branches: [main]
+  # /autofix pushes with GITHUB_TOKEN, and a push made with that token starts no
+  # pull_request run -- so the fix commit would get no CI at all. autofix.yml dispatches
+  # this workflow on the branch instead. doc-sync is skipped on a dispatch (it needs a
+  # pull_request base); every other job runs.
+  workflow_dispatch:
 
 permissions:
   contents: read
