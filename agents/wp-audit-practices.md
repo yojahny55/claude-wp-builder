@@ -543,7 +543,8 @@ $WP eval-file <skills>/wp-cli-patterns/scripts/find-missing-media-files.php
 
 # Local clone, archive date known — pass it so AFTER-ARCHIVE misses can be suppressed. A bare
 # date folds its whole day into BEFORE-ARCHIVE (see above); pass a full timestamp instead
-# whenever the restore log gives one, to narrow that window:
+# whenever the restore log gives one, to narrow that window. Give it in the site's timezone,
+# the wall-clock time post_date holds, and convert a restore log stamped in another timezone:
 $WP eval-file <skills>/wp-cli-patterns/scripts/find-missing-media-files.php 2026-08-31
 $WP eval-file <skills>/wp-cli-patterns/scripts/find-missing-media-files.php "2026-08-31 22:14:00"
 ```

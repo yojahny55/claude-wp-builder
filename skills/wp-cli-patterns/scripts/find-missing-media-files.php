@@ -18,6 +18,14 @@
  *                 BEFORE-ARCHIVE — the file should already have been in the
  *                 archive, clone or not.
  *
+ *                 Give the cutoff in the SITE's timezone, the same wall-clock
+ *                 time post_date holds (what wp-admin shows), not the
+ *                 server's. Both sides are parsed by strtotime() in the same
+ *                 PHP default timezone — UTC, which WordPress sets at
+ *                 bootstrap — so they share one frame and no offset is
+ *                 applied to either; a cutoff taken from the server clock
+ *                 of a host in another timezone is off by that difference.
+ *
  *                 A bare date with no time of day (including one that
  *                 happens to parse to exactly midnight) is ambiguous for its
  *                 own calendar day: an upload made that same day compares as
@@ -39,7 +47,9 @@
  *
  * Read-only. Exits 1 when any BEFORE-ARCHIVE or UNDATED miss exists, 0 when
  * every miss is AFTER-ARCHIVE or there are none — a clone's dated gaps alone
- * should not fail anything on their own.
+ * should not fail anything on their own. Exits 2 when it cannot measure: an
+ * unparseable archive date, a failed query, or an uploads directory that
+ * wp_get_upload_dir() cannot resolve — never a list of false misses.
  *
  * WHY THIS EXISTS. `_wp_attached_file` and `_wp_attachment_metadata` are
  * database rows; they outlive the file they point at whenever an upload is
@@ -131,6 +141,14 @@ if ( false !== $archive_ts ) {
 
 $upload_dir = wp_get_upload_dir();
 $basedir    = $upload_dir['basedir'];
+// basedir comes back false (with 'error' set) when the uploads directory cannot
+// be resolved or created. Every path joined to it would then be missing, and the
+// report would be a wall of false misses instead of one clear failure.
+if ( empty( $basedir ) || ! is_dir( $basedir ) ) {
+	$reason = ! empty( $upload_dir['error'] ) ? $upload_dir['error'] : 'not a directory: ' . var_export( $basedir, true );
+	fwrite( STDERR, 'find-missing-media-files.php: uploads directory unavailable — ' . $reason . "\n" );
+	exit( 2 );
+}
 
 $buckets = array(
 	'BEFORE-ARCHIVE' => array(),
