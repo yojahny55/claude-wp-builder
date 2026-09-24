@@ -77,7 +77,8 @@
  * cache for that batch's IDs with update_meta_cache(), so get_post_meta()
  * and wp_get_attachment_metadata() inside the loop read cache, not the
  * database. A runtime-cache flush between batches keeps memory bounded on
- * libraries too large to hold every attachment's meta at once.
+ * libraries too large to hold every attachment's meta at once, and only a
+ * sample of each bucket is kept in memory, next to its exact count.
  */
 
 /**
@@ -179,6 +180,10 @@ $buckets = array(
 	'AFTER-ARCHIVE'  => array(),
 	'UNDATED'        => array(),
 );
+// Exact totals per bucket. $buckets keeps only the first $sample_size misses of
+// each, so a restore that lost most of a large library does not hold hundreds
+// of thousands of records in memory just to print twenty of them.
+$bucket_counts = array_fill_keys( array_keys( $buckets ), 0 );
 
 const BATCH_SIZE = 1000;
 
@@ -222,10 +227,14 @@ while ( true ) {
 		$id            = (int) $row->ID;
 		$attached_file = get_post_meta( $id, '_wp_attached_file', true );
 
-		// No _wp_attached_file at all: an attachment for an external/remote URL
-		// (e.g. sideloaded from a CDN reference). Nothing on this server's disk
-		// to check, and reporting it missing would be a false positive.
-		if ( '' === $attached_file ) {
+		// Only a plain filesystem path can be checked on this server's disk. No
+		// _wp_attached_file at all, a remote URL stored there by an offsite-media
+		// or import plugin (`https://cdn.example.com/...`), or a corrupt non-string
+		// value is skipped: joined to basedir, a URL would read as a false miss for
+		// the file and every sub-size, and dirname() on an array is a TypeError
+		// that would abort the whole run.
+		if ( ! is_string( $attached_file ) || '' === $attached_file
+			|| preg_match( '#^[a-z][a-z0-9+.\-]*://#i', $attached_file ) ) {
 			continue;
 		}
 
@@ -268,13 +277,16 @@ while ( true ) {
 
 			$bucket = ( false === $archive_ts ) ? 'UNDATED' : mmf_bucket_for( $post_date, $archive_ts );
 
-			$buckets[ $bucket ][] = array(
-				'code'  => $code,
-				'id'    => $id,
-				'label' => $label,
-				'path'  => $relative_path,
-				'date'  => $post_date,
-			);
+			$bucket_counts[ $bucket ]++;
+			if ( count( $buckets[ $bucket ] ) < $sample_size ) {
+				$buckets[ $bucket ][] = array(
+					'code'  => $code,
+					'id'    => $id,
+					'label' => $label,
+					'path'  => $relative_path,
+					'date'  => $post_date,
+				);
+			}
 		}
 	}
 
@@ -286,22 +298,27 @@ while ( true ) {
 	}
 
 	// Drop this batch's primed post meta before pulling the next one, so memory
-	// stays bounded on large libraries. update_meta_cache() stores it one key per
-	// post ID in the 'post_meta' group, so exactly those keys are deleted; nothing
-	// else is flushed, which matters when a persistent object cache is shared with
-	// the live site.
-	if ( function_exists( 'wp_cache_delete_multiple' ) ) {
-		wp_cache_delete_multiple( $batch_ids, 'post_meta' );
-	} else {
-		foreach ( $batch_ids as $batch_id ) {
-			wp_cache_delete( $batch_id, 'post_meta' );
+	// stays bounded on large libraries. A runtime flush (WP 6.1+, when the cache
+	// supports it) clears only this process's copies and never touches a
+	// persistent backend shared with the live site. Without it, the batch's own
+	// 'post_meta' keys are deleted instead — the only keys update_meta_cache()
+	// wrote — which on a persistent cache also evicts them from the backend.
+	$flushed = function_exists( 'wp_cache_supports' ) && wp_cache_supports( 'flush_runtime' )
+		&& function_exists( 'wp_cache_flush_runtime' ) && wp_cache_flush_runtime();
+	if ( ! $flushed ) {
+		if ( function_exists( 'wp_cache_delete_multiple' ) ) {
+			wp_cache_delete_multiple( $batch_ids, 'post_meta' );
+		} else {
+			foreach ( $batch_ids as $batch_id ) {
+				wp_cache_delete( $batch_id, 'post_meta' );
+			}
 		}
 	}
 }
 
 $total = 0;
 foreach ( $buckets as $bucket_name => $items ) {
-	$count  = count( $items );
+	$count  = $bucket_counts[ $bucket_name ];
 	$total += $count;
 
 	printf( "\n%s: %d missing\n", $bucket_name, $count );
@@ -328,4 +345,4 @@ printf(
 	$attachment_count
 );
 
-exit( ( count( $buckets['BEFORE-ARCHIVE'] ) > 0 || count( $buckets['UNDATED'] ) > 0 ) ? 1 : 0 );
+exit( ( $bucket_counts['BEFORE-ARCHIVE'] > 0 || $bucket_counts['UNDATED'] > 0 ) ? 1 : 0 );

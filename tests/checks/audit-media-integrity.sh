@@ -105,9 +105,20 @@ done
 # still pass with the call itself deleted and only the comment left behind.
 grep -Fq "update_meta_cache( 'post'," "$script" \
   || fail "$script does not prime the meta cache per batch with update_meta_cache( 'post', ... )"
+# The walk must advance: the keyset predicate and the cursor moved past each batch. Without
+# either, every iteration re-reads the same rows and the audit hangs instead of reporting.
+grep -Fq 'AND ID > %d' "$script" \
+  || fail "$script's batch query lost its ID > %d keyset predicate"
+grep -Eq '\$last_id[[:space:]]*=[[:space:]]*\(int\)[[:space:]]*end\([[:space:]]*\$batch_ids[[:space:]]*\)' "$script" \
+  || fail "$script does not advance the keyset cursor past the batch it just read — the walk would never terminate"
+# Only a sample of each bucket is held in memory; the totals come from separate counters.
+grep -Fq '$bucket_counts[ $bucket ]++;' "$script" \
+  || fail "$script does not count every miss separately from the sample it keeps"
+grep -Fq 'if ( count( $buckets[ $bucket ] ) < $sample_size ) {' "$script" \
+  || fail "$script keeps every miss record in memory instead of at most sample-size per bucket"
 # A positive value: BATCH_SIZE = 0 would make the first query LIMIT 0, and the script would
 # report "0 attachments checked" with exit 0 — defect #4 again.
-grep -Eq 'const BATCH_SIZE = [1-9][0-9]*;' "$script" \
+grep -Eq 'const BATCH_SIZE = [1-9][0-9]{0,4};' "$script" \
   || fail "$script does not declare a positive, bounded BATCH_SIZE"
 # The old pattern this replaced: every ID with get_col(), then a per-attachment
 # get_post_field( 'post_date', $id ) lookup. Its return would silently reappear as a
@@ -133,6 +144,10 @@ grep -Fq 'find-missing-media-files.php: meta cache query failed' "$script" \
 # every pinned message must be followed by an exit( 2 ) before the next statement block: a
 # message with no exit after it is defect #4 back again — the script would fall through and
 # print "0 attachments checked" with exit 0.
+# The success/failure exit code is the contract a caller keys off: a script that always exits
+# 0 would report a site with real BEFORE-ARCHIVE or UNDATED losses as clean.
+grep -Fq "exit( ( \$bucket_counts['BEFORE-ARCHIVE'] > 0 || \$bucket_counts['UNDATED'] > 0 ) ? 1 : 0 );" "$script" \
+  || fail "$script no longer exits 1 on BEFORE-ARCHIVE/UNDATED misses"
 for msg in 'attachment query failed' 'meta cache query failed' 'uploads directory unavailable' \
            'is not a Y-m-d or Y-m-d H:i:s date' 'is not a non-negative integer'; do
   grep -Fq "$msg" "$script" || fail "$script no longer reports '$msg' to STDERR"
@@ -157,8 +172,10 @@ grep -Fq 'local_clone' "$practices" \
   || fail "$practices does not suppress AFTER-ARCHIVE misses as N/A (local clone)"
 # UNMEASURED appears for other checks too (the WP-043/044 network gate, the Rules), so it is
 # matched inside the "archive date unknown" bullet only, ended by the report's fix note.
-grep -Fq 'Fix note for the report' "$practices" \
-  || fail "$practices lost the 'Fix note for the report' line that ends the archive-date-unknown bullet"
+# Column 0, the shape the sed end anchor needs: an indented or bulleted line would not end the
+# range, which would then run to EOF with the phrase still inside it.
+grep -Eq '^Fix note for the report' "$practices" \
+  || fail "$practices lost the column-0 'Fix note for the report' line the 'archive date unknown' extraction ends at"
 clone_unknown_date_section=$(sed -n '/\*\*Local clone, archive date unknown\*\*/,/^Fix note for the report/p' "$practices" \
   | tr '\n' ' ' | sed 's/  */ /g')
 [[ "$clone_unknown_date_section" == *'Fix note for the report'* ]] \
@@ -215,15 +232,21 @@ grep -Fq 'Y-m-d H:i:s' "$practices" \
   || fail "$practices does not document passing a full Y-m-d H:i:s timestamp for a precise cutoff"
 grep -Fqi 'midnight' "$practices" \
   || fail "$practices does not explain why a bare date is ambiguous (midnight cutoff)"
+grep -Fq 'Archive cutoff:' "$script" \
+  || fail "$script no longer prints the effective cutoff — $practices names that line as the report's evidence of which reading applied"
 grep -Fq 'Y-m-d H:i:s' "$script" \
   || fail "$script's own usage doc does not mention the Y-m-d H:i:s timestamp form"
 grep -Fq 'mmf_compute_archive_cutoff' "$script" \
   || fail "$script does not isolate the archive-cutoff computation into its own function"
 grep -Fq 'mmf_bucket_for' "$script" \
   || fail "$script does not isolate the bucket decision into its own function"
+# The caller buckets only when a cutoff exists: mmf_bucket_for( $post_date, false ) compares
+# against 0, so every dated miss would read AFTER-ARCHIVE and the clone a blanket excuse.
+grep -Fq "( false === \$archive_ts ) ? 'UNDATED' : mmf_bucket_for(" "$script" \
+  || fail "$script buckets misses even when no archive cutoff exists — every dated miss would read AFTER-ARCHIVE"
 
 # --- commands/wp-audit.md already carries the matching row in its Step 2.3 catalog ---
-grep -Fq 'predates the database' "$audit" \
+awk '/^\|/ && /predates the database/ { found = 1 } END { exit(found ? 0 : 1) }' "$audit" \
   || fail "$audit Step 2.3 lost the media-archive-date row this check depends on"
 grep -Fq 'see WP-060/061/062 in `agents/wp-audit-practices.md`' "$audit" \
   || fail "$audit Step 2.3 does not point at WP-060/061/062 in the practices agent for this row"
@@ -244,5 +267,10 @@ fi
 # A run that asserted nothing must not pass: the fixture prints its case count on success.
 [[ "$behavior_out" =~ ^OK\ [1-9][0-9]*\ cases$ ]] \
   || fail "$behavior did not report its cases as run: ${behavior_out:-(no output)}"
+# The same-day cases are the defect this check exists to pin; dropping them must fail by name,
+# not just shrink the case count.
+for same_day in 'same-day upload, morning, bare date arg' 'same-day upload, last second, bare date arg'; do
+  grep -Fq "'$same_day'" "$behavior" || fail "$behavior lost the '$same_day' case"
+done
 
 echo PASS
