@@ -37,7 +37,7 @@ skill_flat=$(tr '\n' ' ' < "$SKILL" | sed 's/  */ /g') || fail "could not read $
 # The commerce assertions read only what belongs to SEO-064..068: their table rows plus their
 # own procedure. A phrase that also appears elsewhere in the agent (UNMEASURED, site.commerce)
 # must not satisfy a gate that the commerce text itself has dropped.
-commerce_flat=$( { grep -E '^\| *SEO-06[4-8] *\|' "$AGENT"
+commerce_flat=$( { grep -E '^\| *SEO-06[4-8] *\|' "$AGENT" || true   # no rows: the per-code gate below names them
                    awk '/^### Procedure — commerce checks \(SEO-064 to SEO-068\)/ { f = 1; print; next }
                         f && /^##/ { exit }
                         f' "$AGENT"; } | tr '\n' ' ' | sed 's/  */ /g')
