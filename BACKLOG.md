@@ -13,7 +13,7 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 
 **Priority:** Items within each section are ordered by priority (highest first).
 
-**Reconciled** on September 21, 2026 against `main` at v1.27.0. Every item below was
+**Reconciled** on September 23, 2026 against `main` at v1.28.0. Every item below was
 checked against the command, agent or script that would own it — an item claiming to be
 open while the behavior ships reads as a project that does not know what it has built.
 Larger reworks of delivered behavior are proposals, not backlog items, and are tracked
@@ -53,6 +53,12 @@ Issues discovered during testing that need to be resolved.
 ## Demo Fidelity
 
 Ensuring the WordPress output matches the demo HTML 1:1 in appearance and content.
+
+- [x] **Security baseline and template contracts in both starters** `DELIVERED`
+  Both starters ship `inc/security.php`, and [theme-template-check.mjs](bin/theme-template-check.mjs)
+  gates ABSPATH guards, compiled classes and widget scripts behind [`/wp-finalize`](commands/wp-finalize.md)
+  Check 4 and the practices audit. Check: [baseline](tests/checks/starter-security-baseline.sh).
+  Shipped in v1.28.0.
 
 - [ ] **A craft build commits to one aesthetic family, and the commitment is measured** `PARTIAL`
   Every "generic" note on a craft demo describes a page that chose no family — charcoal, one accent, air. v1.27.0 made the choice binding: [families.md](skills/wp-demo-craft/references/families.md) gives each of the seven families its type, palette, surfaces, motion, sequence and an **Avoid** list; [wp-demo](commands/wp-demo.md) 5.4 records the choice under `## Family` in `BRIEF.md` before the first section and hands the Avoid list to the verify critique; [SKILL.md](skills/wp-demo-craft/SKILL.md) lists a hit among the ship blockers.
@@ -151,6 +157,31 @@ Making the command flow smoother and more guided.
 ## Agent Quality
 
 Improving the reliability and output quality of agents.
+
+- [x] **Audit and fix sites this plugin did not build** `DELIVERED`
+  [`/wp-adopt`](commands/wp-adopt.md) writes a manifest for an existing install through
+  [`wp-config.mjs adopt`](bin/wp-config.mjs), splitting code into the site's own and vendor
+  by the update transients and making the operator confirm every path. [`/wp-audit`](commands/wp-audit.md)
+  then audits vendor code but never edits it, and reads the site type and whether it is a
+  local clone before any category runs, so a staging copy is not scored as a live site.
+  Check: [wp-adopt](tests/checks/wp-adopt.sh). Shipped in v1.28.0.
+
+- [x] **Security audit reaches what the plugin counts could not** `DELIVERED`
+  [wp-audit-security](agents/wp-audit-security.md): SEC-039 paid WooCommerce downloads
+  reachable without a purchase; SEC-040 payment-gateway credentials stored at rest, keys
+  classified by segment and `merchant_key` rated CRITICAL; SEC-041/042/043 plugin inventory
+  deeper than the counts. [wp-audit-performance](agents/wp-audit-performance.md): PERF-036..064
+  give database bloat a threshold instead of a report. Every snippet is run by its check, not
+  grepped — [gateway](tests/checks/audit-gateway-credentials.sh),
+  [inventory](tests/checks/audit-plugin-inventory.sh), [download](tests/checks/audit-woo-download-protection.sh),
+  [bloat](tests/checks/audit-db-bloat.sh). Shipped in v1.28.0.
+
+- [x] **Verification runs in Firefox as well as Chromium** `DELIVERED`
+  [demo-verify.mjs](bin/demo-verify.mjs) drives an existing Playwright Firefox beside Chromium
+  instead of installing its own browser, and [css-contour-lint.mjs](bin/css-contour-lint.mjs)
+  is the static cross-engine companion for the rules one engine renders and the other does
+  not. Checks: [engines](tests/checks/demo-verify-engines.sh), [contour](tests/checks/css-contour-lint.sh).
+  Shipped in v1.28.0.
 
 - [x] **Run the browser audit as a suite instead of asking the session for a browser** `DELIVERED`
   [`/wp-audit --suite`](commands/wp-audit.md) scaffolds and runs
