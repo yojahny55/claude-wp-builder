@@ -61,7 +61,10 @@ done
 # so a row must not keep a procedure gate green after the paragraph itself is gone. Rows are
 # checked on their own through row(). Indented table rows (a table nested in a list) are rows
 # too, hence the leading whitespace in the anchor.
-flat_perf=$(grep -Ev '^[[:space:]]*\|' "$perf" | tr -d '\r' | tr -s '[:space:]' ' ')
+# `|| true`: grep -v exits 1 when it selects nothing, which set -e would turn into a silent abort;
+# an empty result fails below with a named message instead.
+flat_perf=$({ grep -Ev '^[[:space:]]*\|' "$perf" || true; } | tr -d '\r' | tr -s '[:space:]' ' ')
+[ -n "${flat_perf// /}" ] || fail "$perf has no prose outside its tables"
 
 # --- Codes exist and are tabulated (audit-check-tables.sh's own rule, pinned here too so this
 #     one test file tells the whole story on its own) ---
@@ -119,12 +122,16 @@ grep -Fq 'confirmed production host' <<< "$perf067_row" \
   || fail "PERF-067's own row does not target the confirmed production host"
 
 # --- Direction 3: the live checks use the production-host contract, never the clone ---
-grep -Fq 'cf-cache-status' "$perf" \
-  || fail "$perf: PERF-066 does not read the cf-cache-status header"
-grep -Fq 'server:' "$perf" \
-  || fail "$perf: PERF-066 does not read the server response header"
+# Prose, not the whole file: PERF-066's row carries every one of these tokens too, so a
+# file-wide grep stays green after the procedure paragraph is gone.
+grep -Fq 'cf-cache-status' <<< "$flat_perf" \
+  || fail "$perf: PERF-066's procedure does not read the cf-cache-status header"
+grep -Fq 'server:' <<< "$flat_perf" \
+  || fail "$perf: PERF-066's procedure does not read the server response header"
 grep -Fq 'never the local clone' "$perf" \
   || fail "$perf does not forbid probing the local clone for PERF-066/PERF-067"
+grep -Fq 'never fire this at the local clone' <<< "$flat_perf" \
+  || fail "$perf's procedure does not forbid probing the local clone for PERF-066/PERF-067 (only the table row still says it)"
 grep -Fq 'Step 2.3' <<< "$perf066_row" \
   || fail "PERF-066's own row does not point the live check at /wp-audit Step 2.3's production-host contract"
 
@@ -134,12 +141,13 @@ grep -Fq 'not merely present' <<< "$flat_perf" \
   || fail "$perf: PERF-066 does not reject cf-cache-status's mere presence as detection"
 grep -Fq 'DYNAMIC`/`BYPASS` on the second request mean' <<< "$flat_perf" \
   || fail "$perf does not explain that DYNAMIC/BYPASS mean Cloudflare is present but not caching"
-grep -Fq 'x-varnish' "$perf" \
-  || fail "$perf: PERF-066 has no generic non-Cloudflare CDN/proxy heuristic (x-varnish)"
-grep -Fq 'x-cache: HIT' "$perf" \
-  || fail "$perf: PERF-066 has no generic x-cache heuristic"
-grep -Fq '`age:`' "$perf" \
-  || fail "$perf: PERF-066 has no generic age: heuristic"
+# x-varnish is named only in PERF-066's own row, so it is pinned there on purpose.
+grep -Fq 'x-varnish' <<< "$perf066_row" \
+  || fail "$perf: PERF-066's own row has no generic non-Cloudflare CDN/proxy heuristic (x-varnish)"
+grep -Fq 'x-cache: HIT' <<< "$flat_perf" \
+  || fail "$perf: PERF-066's procedure has no generic x-cache heuristic"
+grep -Fq '`age:`' <<< "$flat_perf" \
+  || fail "$perf: PERF-066's procedure has no generic age: heuristic"
 # The bare token `UNMEASURED` already existed in the base file for an unrelated Core Web
 # Vitals check, so a plain `grep -Fq '`UNMEASURED`'` would pass even with every UNMEASURED
 # fallback below deleted. Anchor on the specific sentences instead.
@@ -149,8 +157,10 @@ grep -Fq '`UNMEASURED` ("needs the public URL") without a confirmed production U
   || fail "$perf: PERF-065's own row does not condition PASS on a confirmed production URL (it must read UNMEASURED, never PASS, without one)"
 
 # --- Direction 4: PERF-067 requires a live CONFIRMATION, not just the config-level guess ---
-grep -Eq 'cf-cache-status`.*is `HIT`' "$perf" \
-  || fail "$perf: PERF-067 does not name the HIT + stale-price combination as the confirmed defect"
+grep -Eq 'cf-cache-status`.*is `HIT`' <<< "$perf067_row" \
+  || fail "$perf: PERF-067's own row does not fail on a cf-cache-status HIT"
+grep -Fq 'confirmed HIT plus the wrong price is the confirmed defect' <<< "$flat_perf" \
+  || fail "$perf: PERF-067's procedure does not name the HIT + stale-price combination as the confirmed defect"
 
 # --- Direction 5: the fix is a setting, never a code workaround ---
 grep -Fq 'Multi-currency cache-key fix' "$perf" \
@@ -229,6 +239,9 @@ seo_prose=$(grep -Ev '^[[:space:]]*\|' "$seo" || true)
 # satisfy a gate the procedure itself has dropped.
 flat_seo_prose=$(tr -d '\r' <<< "$seo_prose" | tr -s '[:space:]' ' ')
 grep -Fq 'SEO-069' <<< "$seo_prose" || fail "$seo never mentions SEO-069 outside its table row"
+# The procedure's own gate is what stops two production requests on a non-commerce site.
+grep -Fq 'gate first: `N/A` ("no WooCommerce") when `site.commerce` is `none`' <<< "$flat_seo_prose" \
+  || fail "$seo's SEO-069 procedure does not gate on site.commerce before its own live requests"
 grep -Fq 'SEO-069 is never auto-applied' <<< "$flat_seo_prose" \
   || fail "$seo does not exclude SEO-069 from the auto-fix pass"
 grep -Fq 'there is no theme code to' <<< "$flat_seo_prose" \
