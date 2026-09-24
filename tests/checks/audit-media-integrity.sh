@@ -51,8 +51,16 @@ for code in WP-060 WP-061 WP-062; do
   grep -Fq "$code" "$practices" || fail "$practices lost $code"
 done
 
-# --- The check is Tier 2 / WP-CLI, not a code-only Tier 1 grep ---
-grep -Fq 'Tier 2' "$practices" || fail "$practices does not place WP-060/061/062 in Tier 2"
+# --- The check is Tier 2 / WP-CLI, not a code-only Tier 1 grep: each row sits between the
+#     Tier 2 heading and the next `## ` heading, and its last cell is WARNING ---
+tier2=$(awk '/^## Step 2: Tier 2/{f=1; next} f && /^## /{exit} f' "$practices")
+[ -n "$tier2" ] || fail "$practices lost its '## Step 2: Tier 2' section"
+for code in WP-060 WP-061 WP-062; do
+  sev=$(printf '%s\n' "$tier2" | awk -F'|' -v code="$code" '/^\|/ { c = $2; gsub(/^[ \t]+|[ \t]+$/, "", c)
+          if (c == code) { s = $(NF - 1); gsub(/^[ \t]+|[ \t]+$/, "", s); print s; exit } }')
+  [ -n "$sev" ] || fail "$practices has no $code row in the Tier 2 table"
+  [ "$sev" = WARNING ] || fail "$practices: $code is $sev in the Tier 2 table, expected WARNING"
+done
 grep -Fq 'find-missing-media-files.php' "$practices" \
   || fail "$practices does not point at the WP-CLI script that resolves attachment files"
 
@@ -64,9 +72,9 @@ grep -Fq '_wp_attachment_metadata' "$practices" \
 grep -Fq "wp_get_upload_dir()['basedir']" "$practices" \
   || fail "$practices does not resolve files against wp_get_upload_dir()['basedir']"
 
-# --- Severity is WARNING, and counting + sampling is required (never dump the whole list) ---
-grep -Fq '| WARNING |' "$practices" || fail "$practices table has no WARNING severity row for these codes"
-grep -Fq 'sample' "$practices" || fail "$practices does not require sampling, not dumping, the missing set"
+# --- Counting + sampling is required (never dump the whole list); severity is pinned above ---
+grep -Fq 'prints a sample, never the whole list' <<< "$flat" \
+  || fail "$practices does not require sampling, not dumping, the missing set"
 
 # --- The script itself: enumerates attachments, buckets by archive date, never guesses one ---
 grep -Fq "wp_get_upload_dir" "$script" || fail "$script does not resolve paths via wp_get_upload_dir()"
@@ -154,9 +162,14 @@ clone_known_date_section=$(sed -n '/\*\*Local clone, archive date known\*\*/,/\*
 # when that happens it can be killed by SIGPIPE, which pipefail then reports as the
 # pipeline's exit status even though the match was found. Bash's own =~ operator tests the
 # string in-process, with no pipe and nothing to race.
-clone_known_date_pattern='BEFORE-ARCHIVE.*(no such excuse|WARNING)'
+# Two separate anchors: the reasoning (a pre-archive miss has no clone excuse) and the
+# severity that follows from it, so losing either one fails on its own.
+clone_known_date_pattern='bucketed `BEFORE-ARCHIVE` predates the archive and has no such excuse'
 [[ "$clone_known_date_section" =~ $clone_known_date_pattern ]] \
-  || fail "$practices does not still report a pre-archive miss as WARNING — the clone must not become a blanket excuse"
+  || fail "$practices no longer says a BEFORE-ARCHIVE miss has no clone excuse — the clone must not become a blanket excuse"
+clone_known_date_pattern='no such excuse .* report it WARNING like any other site'
+[[ "$clone_known_date_section" =~ $clone_known_date_pattern ]] \
+  || fail "$practices does not still report a pre-archive miss as WARNING"
 
 grep -Fq 'run the script with no archive-date argument' "$practices" \
   || fail "$practices does not report every miss WARNING on a site that is not a local clone"
@@ -183,12 +196,11 @@ grep -Fq 'see WP-060/061/062 in `agents/wp-audit-practices.md`' "$audit" \
 # A same-day upload against a bare-date archive argument must not land in AFTER-ARCHIVE
 # (the suppressed bucket) — no grep above can tell a correct comparison from an inverted
 # or off-by-one one, since every string it could match is present either way.
-if ! command -v php >/dev/null 2>&1; then
-  echo "SKIP: php not found — the greps above passed, the date-cutoff behavior test did not run"
-else
-  if ! behavior_out=$(php "$behavior" 2>&1); then
-    fail "the archive-date cutoff/bucket behavior is wrong: ${behavior_out:-(php exited non-zero with no output)}"
-  fi
+# Required, not skipped: without php this check would shrink to doc greps and still PASS.
+command -v php >/dev/null 2>&1 \
+  || fail "php not found — the date-cutoff behavior test cannot run, and no grep above can replace it"
+if ! behavior_out=$(php "$behavior" 2>&1); then
+  fail "the archive-date cutoff/bucket behavior is wrong: ${behavior_out:-(php exited non-zero with no output)}"
 fi
 
 echo PASS
