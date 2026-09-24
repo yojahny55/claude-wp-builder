@@ -208,8 +208,9 @@ reader wants production's posture, not a list of what localization changed:
 
 Do not widen this list to excuse a real defect: a plugin deactivated on the clone that has no
 local reason to be off is still a finding, and media missing with no archive/database date gap
-is still a finding (see the media-integrity check). The test is "would this be true on
-production too?" — if yes, report it; if it exists only because this is a copy, suppress it.
+is still a finding (see WP-060/061/062 in `agents/wp-audit-practices.md`). The test is
+"would this be true on production too?" — if yes, report it; if it exists only because this is
+a copy, suppress it.
 
 **Record what was actually suppressed, not just that the rule applied.** While walking the
 "known-local plugins deactivated" and the `*.bak` drop-in rows above, keep the two lists that

@@ -32,6 +32,31 @@
   rather than a silent pass.
   `tests/checks/audit-ecommerce-seo.sh` pins the five codes, the site-type gate, and the
   sitemap-file cap; the methodology is recorded in `skills/wp-audit-seo-standards` §18.
+- **`/wp-audit` did not notice a media file was missing.** An attachment post survives the
+  deletion of its own file — by hand, by a partial migration, or by a restore that skipped
+  part of the uploads directory — and nothing in core flags it, so the site keeps serving a
+  broken `<img>` or a 404 download with no warning. `agents/wp-audit-practices.md` adds
+  WP-060/061/062 (Tier 2): `skills/wp-cli-patterns/scripts/find-missing-media-files.php`
+  enumerates every attachment and resolves its main file, registered image sub-sizes and
+  `original_image` against `wp_get_upload_dir()['basedir']`, then counts and samples the
+  misses rather than printing them all. On a local clone (`/wp-audit` Step 2.3) a miss whose
+  attachment postdates the file archive is `N/A (local clone)` — the media exists in
+  production, it just postdates this copy's archive — while a miss that predates the archive
+  is still reported, and an unknown archive date reports `UNMEASURED` ("verify against
+  production") rather than guessing either way. A bare `Y-m-d` archive date (any date given
+  without a time of day) is ambiguous for its own day — an upload later that same day
+  used to compare as "after archive" and get suppressed as `N/A (local clone)` no matter what
+  time the archive was actually taken, hiding a real pre-archive loss. The cutoff is now
+  pushed to the end of that day, so a same-day miss is reported `BEFORE-ARCHIVE` instead of
+  waved through; passing a full `Y-m-d H:i:s` timestamp narrows the window to the exact time
+  and the script prints the effective cutoff it used. The script walks attachments in
+  batches, priming the meta cache per batch instead of querying per attachment, and treats a
+  failed query as a failure (STDERR, exit 2) rather than folding it into "0 attachments
+  checked". `tests/checks/audit-media-integrity.sh` pins the codes, both directions of the
+  suppression rule, the batching and error-handling call sites, and — because no grep can
+  tell a correct same-day comparison from an inverted one, since every bucket name it could
+  match is spelled correctly either way — runs the script's own cutoff/bucket functions
+  against real PHP (`tests/checks/lib/media-integrity-date-cutoff-behavior.php`).
 
 ## [1.28.0] - 2026-09-23
 

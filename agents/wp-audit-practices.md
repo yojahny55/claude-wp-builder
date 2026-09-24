@@ -150,6 +150,45 @@ These checks require WP-CLI access via `$WP`. Skip this tier if `.wp-create.json
 | WP-043 | WordPress outdated | `$WP core check-update`, **only after the network check below** | No updates | WARNING |
 | WP-044 | Plugin updates | `$WP plugin list --update=available --format=count`, **only after the network check below** | 0 | INFO |
 | WP-045 | Bad file permissions | Check uploads/plugins/upgrade dir permissions | 755 | WARNING |
+| WP-060 | Attachment's main file (`_wp_attached_file`) missing from the uploads directory | `$WP eval-file <skills>/wp-cli-patterns/scripts/find-missing-media-files.php` | 0 BEFORE-ARCHIVE/UNDATED misses | WARNING |
+| WP-061 | A registered image sub-size is missing (main file present) | same script, `size:*` labels | 0 BEFORE-ARCHIVE/UNDATED misses | WARNING |
+| WP-062 | The pre-scale `original_image` backup (from `_wp_attachment_metadata`) is missing | same script, `original_image` label | 0 BEFORE-ARCHIVE/UNDATED misses | WARNING |
+
+**WP-060/061/062 need Step 2.3's `local_clone` flag and archive date before a miss means what
+it looks like.** Enumerate every attachment, resolve its main file and its registered image
+sub-sizes and `original_image` against `wp_get_upload_dir()['basedir']`, and count the misses —
+`skills/wp-cli-patterns/scripts/find-missing-media-files.php` does exactly that and prints a
+sample, never the whole list, on a site with thousands of attachments. This script does not
+detect clones itself; that stays entirely in `/wp-audit` Step 2.3, which this check only reads:
+
+- **Not a local clone** (`local_clone` is false) — run the script with no archive-date argument
+  and report every miss WARNING: broken images or downloads on the live site, with no clone to
+  explain any of them.
+- **Local clone, archive date known** — Step 2.3 already lists "an attachment whose file is
+  missing on disk when the file archive predates the database" as a clone artifact. Pass that
+  date as the script's first argument. A miss it buckets `AFTER-ARCHIVE` is exactly that case:
+  the attachment's `post_date` is after the file archive was taken, so the media exists in
+  production and this copy's archive was never going to have it — report it `N/A (local
+  clone)`, out of the denominator. A miss bucketed `BEFORE-ARCHIVE` predates the archive and has
+  no such excuse — Step 2.3's own bound applies ("would this also be true on production?") —
+  report it WARNING like any other site.
+  - **Know the exact archive time, not just the day, when you have it.** A date with no time
+    of day (a bare `Y-m-d`, which parses to midnight) is ambiguous for its own calendar day: an
+    attachment uploaded later that same day would otherwise compare as "after archive" no
+    matter what time of day the archive was actually taken, which would suppress a real
+    pre-archive loss as `N/A (local clone)`. The script folds that whole day into
+    `BEFORE-ARCHIVE` instead — it prints the effective cutoff it used ("Archive cutoff: …") so
+    the report shows which reading applied. Pass a full `Y-m-d H:i:s` timestamp whenever the
+    restore log or backup metadata gives one; it narrows the window to the exact moment and
+    stops folding the whole archive day into `BEFORE-ARCHIVE`.
+- **Local clone, archive date unknown** — every miss comes back `UNDATED`. Do not report these
+  `FAIL`/WARNING: there is no way to tell a genuine loss from an ordinary post-archive upload
+  without the date. Report `UNMEASURED`, "verify against production".
+
+Fix note for the report: regenerate missing thumbnails from the still-present main file
+(`$WP media regenerate <ID> --only-missing`), re-upload the file when the main upload itself is
+gone, or remove the orphaned attachment (`$WP post delete <ID> --force`) when the source is
+unrecoverable and nothing should keep pointing at it.
 
 **WP-043 and WP-044 need a network before they mean anything.** Neither command contacts
 `api.wordpress.org`. Both read the transients `update_core` and `update_plugins`, filled in by
@@ -202,6 +241,8 @@ For each auto-fixable finding, apply the fix:
 - **WP-034**: Edit templates to replace `get_field(` with `prefix_get_field(` (using the actual prefix from CLAUDE.md)
 - **WP-041**: `$WP config set FS_METHOD "'direct'" --type=constant`
 - **WP-045**: `chmod 755 wp-content/uploads/ wp-content/plugins/ wp-content/upgrade/`
+- **WP-061**: `$WP media regenerate <ID> --only-missing` — only when the same attachment has no
+  WP-060 finding; there is no main file to regenerate the sub-size from otherwise
 
 ### Procedure — WP-048 (IDs that outlive the post)
 
@@ -490,6 +531,46 @@ attention on code that is correct — and one audited theme had exactly that pat
 
 WARNING rather than CRITICAL: it fatals only for a post with no terms in that taxonomy, which
 is a real state but not every request.
+
+### Procedure — WP-060/061/062 (media integrity)
+
+Run the script, passing the archive date only on a local clone that has one (see the Tier 2
+table above; do not re-derive `local_clone` here, read it from Step 2.3):
+
+```bash
+# Not a local clone, or a clone with no known archive date for its file backup:
+$WP eval-file <skills>/wp-cli-patterns/scripts/find-missing-media-files.php
+
+# Local clone, archive date known — pass it so AFTER-ARCHIVE misses can be suppressed. A bare
+# date folds its whole day into BEFORE-ARCHIVE (see above); pass a full timestamp instead
+# whenever the restore log gives one, to narrow that window. Give it in the site's timezone,
+# the wall-clock time post_date holds, and convert a restore log stamped in another timezone:
+$WP eval-file <skills>/wp-cli-patterns/scripts/find-missing-media-files.php 2026-08-31
+$WP eval-file <skills>/wp-cli-patterns/scripts/find-missing-media-files.php "2026-08-31 22:14:00"
+```
+
+With a date argument, the first line names the effective cutoff, so the report shows which
+reading applied. The rest of the output is grouped by bucket, each line naming the code, the
+attachment ID, which file was missing (`file`, `size:<name>`, or `original_image`) and the
+attachment's `post_date`:
+
+```
+Archive cutoff: 2026-08-31 23:59:59 (BEFORE-ARCHIVE at or before, AFTER-ARCHIVE strictly after)
+
+BEFORE-ARCHIVE: 2 missing
+  WP-060 attachment 118 [file] 2024/03/cover.jpg (post_date 2024-03-02 10:11:04)
+  WP-061 attachment 204 [size:medium] 2024/06/photo-300x200.jpg (post_date 2024-06-14 09:00:12)
+
+AFTER-ARCHIVE: 5 missing
+  ...
+
+3 attachment file(s) missing on disk out of 812 attachment(s) checked
+```
+
+Report `BEFORE-ARCHIVE` and, on a non-clone, every miss as WARNING; report `AFTER-ARCHIVE` as
+`N/A (local clone)`; report `UNDATED` as `UNMEASURED` ("verify against production"). Name the
+attachment ID and the specific missing path in the finding, not just a count, so the fix can be
+verified against the same ID afterward.
 
 ## Rules
 
