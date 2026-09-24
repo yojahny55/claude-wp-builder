@@ -95,9 +95,56 @@ Ask with `AskUserQuestion`, one question each:
    - A site that has never checked for updates has empty transients, so every plugin looks
      like the site's own code.
 
-   Offer the editable list as a multi-select, pre-selected. Anything the operator deselects
-   moves to read-only. **The parent of a child theme is always read-only.** An update
-   overwrites it, so do not offer to move it.
+   **Re-verify the first case before offering the list.** For each plugin the transient
+   signal proposed as editable, read its `Author` and `Plugin URI` headers — `$WP plugin
+   get` has no field for `Plugin URI`, so read what WordPress parses:
+   ```bash
+   $WP eval 'require_once ABSPATH . "wp-admin/includes/plugin.php";
+     foreach ( get_plugins() as $file => $h ) { echo $file, "\t", $h["Author"], "\t", $h["PluginURI"], "\n"; }'
+   ```
+   Then look its slug up on the wp.org plugin directory (`-g`: the `[slug]` brackets are
+   literal; without it curl reads them as a glob and exits 3):
+   ```bash
+   curl -gsS --max-time 15 -w '\nHTTP %{http_code}\n' \
+     "https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&request[slug]=<slug>"
+   ```
+   This lookup goes to wp.org only — which already receives every installed plugin's header
+   on WordPress's own update checks — and never to a third-party vulnerability feed. Read
+   the body before the status, since wp.org answers "not found" with an `error` body:
+   - **Matching listing** — a listing whose author or home agrees with the header. *Author*:
+     strip HTML tags from the API's `author`, decode entities, trim and case-fold, and
+     compare with the header's `Author` treated the same way. *Home*: the host of the API's
+     `homepage` equals the host of the header's `Plugin URI`, both lowercased and without a
+     leading `www.`. Either one is enough; an empty value on either side never agrees. A public plugin, not site code: propose it as
+     vendor code, since its next update overwrites any edit.
+   - **No listing** — `error` is `Plugin not found.`, **or a listing where neither author nor
+     home agrees** — a premium plugin can share its slug with an unrelated wp.org plugin, so
+     a slug match alone proves nothing. When the header names an author, propose it as
+     vendor code (a paid multi-currency plugin or a paid slider bundled with a commercial
+     theme). An agency that built the site's own plugin also fills in `Author`, so this is
+     a proposal, never a decision.
+   - **Closed** — `error` is `closed`, with `closed_date` and `reason`. It was a wp.org
+     plugin and gets no more updates from there, so nothing will overwrite an edit: do not
+     propose it as vendor code. Keep it in the editable list, marked `closed on wp.org
+     <closed_date> (<reason>)`; `/wp-audit` reports the closure under SEC-042.
+   - **Lookup failed** — any other `error`, a body that is not a JSON object, any other
+     non-2xx status, a timeout or no route to `api.wordpress.org`: keep the transient signal — the plugin stays in the
+     editable list — and mark it `not verified (wp.org unreachable)` in the proposal. An
+     author header alone is not enough to move anything.
+
+   **Never move a plugin in silence.** Present two multi-selects, both pre-selected, so the
+   operator sees and can reverse every proposal:
+   - *Editable code* — what is still proposed as the site's own. Anything deselected moves to
+     read-only.
+   - *Looks vendor-supplied — proposed read-only* — each re-verified plugin with its reason
+     (`public wp.org plugin` or `Author: <name>, no matching wp.org listing`). Anything
+     deselected goes back to editable.
+   `/wp-audit` prints a reminder later if a vendor-looking plugin is still sitting in
+   `code_scope.editable`, but that is a safety net for a site adopted before this check
+   existed — it is not a substitute for getting the split right here.
+
+   **The parent of a child theme is always read-only.** An update overwrites it, so do not
+   offer to move it.
 2. **Function prefix.** Offer the inferred one first, marked recommended. The operator can
    type another. `<parent>_child_` beats `<parent>_`, because the parent's prefix belongs
    to the vendor.
