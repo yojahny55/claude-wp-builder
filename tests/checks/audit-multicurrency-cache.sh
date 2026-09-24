@@ -58,17 +58,22 @@ flat_seo=$(tr '\n' ' ' < "$seo" | sed 's/  */ /g')
 
 # --- Codes exist and are tabulated (audit-check-tables.sh's own rule, pinned here too so this
 #     one test file tells the whole story on its own) ---
+# row <file> <code>: the table rows whose first cell is exactly <code>. One awk pass: no regex
+# escaping of the pipe, and a missing row is empty output with exit 0, never a set -e abort.
+row() {
+  CODE="$2" awk -F'|' '/^\|/ { c = $2; gsub(/^[ \t]+|[ \t]+$/, "", c); if (c == ENVIRON["CODE"]) print }' "$1"
+}
 for code in PERF-065 PERF-066 PERF-067; do
-  grep -qE "^\| ${code} \|" "$perf" || fail "$perf has no tabulated row for $code"
+  [ -n "$(row "$perf" "$code")" ] || fail "$perf has no tabulated row for $code"
 done
-grep -qE '^\| SEO-069 \|' "$seo" || fail "$seo has no tabulated row for SEO-069"
+[ -n "$(row "$seo" SEO-069)" ] || fail "$seo has no tabulated row for SEO-069"
 
 # --- Direction 1: the commerce/multi-currency gate is present, both reasons, on ALL THREE
 #     performance codes individually — not just somewhere in the file ---
-perf065_row=$(grep -E '^\| PERF-065 \|' "$perf")
-perf066_row=$(grep -E '^\| PERF-066 \|' "$perf")
-perf067_row=$(grep -E '^\| PERF-067 \|' "$perf")
-seo069_row=$(grep -E '^\| SEO-069 \|' "$seo")
+perf065_row=$(row "$perf" PERF-065)
+perf066_row=$(row "$perf" PERF-066)
+perf067_row=$(row "$perf" PERF-067)
+seo069_row=$(row "$seo" SEO-069)
 
 # PERF-065, PERF-066 and SEO-069 spell the N/A reasons out; PERF-067 is allowed to point at
 # them instead ("Same N/A/UNMEASURED gates as ...") rather than repeat the same two strings a
@@ -160,17 +165,13 @@ grep -Fq 'no WP-CLI command reaches this' <<< "$fix" \
 for spec in "$perf:PERF" "$seo:SEO"; do
   f=${spec%%:*}
   prefix=${spec##*:}
-  codes=$(grep -oE "${prefix}-[0-9]{3}" "$f" | sort -u || true)
-  [ -n "$codes" ] || fail "$f mentions no ${prefix}- code at all"
-  for code in $codes; do
-    n=$(CODE="$code" awk -F'|' '/^\|/ { c = $2; gsub(/^[ \t]+|[ \t]+$/, "", c); if (c == ENVIRON["CODE"]) k++ } END { print k + 0 }' "$f")
+  readarray -t codes < <(grep -oE "${prefix}-[0-9]{3}" "$f" | sort -u || true)
+  [ "${#codes[@]}" -gt 0 ] || fail "$f mentions no ${prefix}- code at all"
+  for code in "${codes[@]}"; do
+    n=$(row "$f" "$code" | awk 'END { print NR }')
     [ "$n" = 1 ] || fail "$f: $code has $n defining table rows, expected exactly 1"
   done
 done
-for code in PERF-065 PERF-066 PERF-067; do
-  grep -Eq "^\| *$code *\|" "$perf" || fail "$perf: $code has no table row"
-done
-grep -Eq '^\| *SEO-069 *\|' "$seo" || fail "$seo: SEO-069 has no table row"
 
 # --- Direction 7: multi-currency detection uses a confirmed slug list, not a bare `currency`
 #     substring — the substring both false-positives (a decorative rate-display widget) and
