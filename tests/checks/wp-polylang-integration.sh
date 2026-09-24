@@ -57,6 +57,13 @@ DIR=$(printf '%s\n' "$env_out" | sed -n "s/^export WP_FIXTURE_DIR='\(.*\)'$/\1/p
 [ -n "$DIR" ] || fail "the provisioner printed no WP_FIXTURE_DIR"
 [ -d "$DIR" ] || fail "the provisioner named $DIR, which is not a directory"
 
+# Offline after provisioning: a check must never pass or fail because a real service answered.
+# tests/fixtures/wp/net-guard.php refuses every host but loopback and logs each one.
+reach=$(wp --path="$DIR" --allow-root eval 'echo is_wp_error( wp_remote_get( "https://wordpress.org/" ) ) ? "refused" : "reached";' 2>/dev/null || true)
+[ "$reach" = "refused" ] || fail "the fixture reached the network after provisioning (got '$reach') -- tests/fixtures/wp/net-guard.php is not installed"
+grep -q 'wordpress.org' "$DIR/wp-content/net-guard.log" 2>/dev/null \
+  || fail "the refused request was not logged to wp-content/net-guard.log"
+
 total=0
 for script in $SCRIPTS; do
   name=$(basename "$script")
