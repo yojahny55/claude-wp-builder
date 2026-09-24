@@ -81,6 +81,55 @@
 
 ### Added
 
+- **`wp-audit-performance` gives database bloat a threshold instead of reporting it as
+  `INFO only` (PERF-061 to PERF-064).** PERF-042 already prints every table's size, but named
+  no pass/fail line, so a table that had grown to gigabytes read exactly like a healthy one.
+  Four new checks cover the patterns that actually slow a WordPress/WooCommerce site: an
+  Action Scheduler backlog Action Scheduler's own 30-day cleaner should have purged
+  (`wp_actionscheduler_actions`/`_logs`, `WARNING` above 10,000 completed/failed/canceled
+  rows, fixed with `wp action-scheduler clean`); a `woocommerce_sessions` table whose expired
+  rows never got cleared because the twice-daily cleanup cron stopped firing (`WARNING` above
+  1,000 expired rows, fixed by forcing `do_action('woocommerce_cleanup_sessions')`); and, at
+  `INFO`, an expired-transient backlog large enough to matter for the options table's physical
+  size (fixed with `wp transient delete --expired`) and orphaned `postmeta` rows whose owning
+  post no longer exists (never auto-fixed — the cleanup is an irreversible bulk `DELETE`, so
+  the check requires a `wp db export` first). None of these are clone artifacts — they are
+  real on production too, so they report normally rather than being folded into Step 2.3's
+  local-clone suppression. Two patterns already had a real threshold and were left alone
+  rather than duplicated: PERF-036/037 already sum autoloaded options against an 800KB budget
+  at `WARNING` (autoload is the one bloat pattern here that loads on every request), and
+  PERF-039 already flags any expired transient at `INFO` — PERF-063 escalates the same data by
+  volume instead of restating its existence. `tests/checks/audit-db-bloat.sh` pins the four
+  new codes, their thresholds and fix commands, and that autoload was not duplicated. All four
+  queries build their table name from `$($WP db prefix)` instead of a hardcoded `wp_` — on a
+  site whose real prefix differs, `FROM wp_<table>` simply errors instead of reporting the
+  finding. The expired-transient query also escapes the leading underscores in its `LIKE
+  '\_transient\_timeout\_%'` pattern: left unescaped, MySQL reads a leading `_` as a
+  single-character wildcard and falls back to a full scan of `wp_options` on every run instead
+  of a range scan on its `option_name` index. PERF-036/037's autoload queries now filter
+  `autoload IN ('yes','on','auto-on','auto')` rather than `autoload='yes'` alone, since WP 6.6's
+  per-option autoloading heuristic can write `on`/`off`/`auto-on`/`auto-off`/`auto` and never
+  write `yes` at all — the old filter could silently report nothing on a 6.6+ site. PERF-039's
+  own expired-transient `LIKE` had the same unescaped-underscore full-scan bug as PERF-063, and
+  PERF-036/037/039 all still hardcoded `wp_options` even after the other four checks moved off
+  it — all three now build their table name the same way and escape the same underscores.
+  PERF-063's join originally used `REPLACE()` to build the paired option's name; WP-CLI's `db
+  query` scans the query text for `UPDATE`/`DELETE`/`INSERT`/`REPLACE`/`LOAD DATA` and treats a
+  match as row-modifying, so that cell printed only `Rows affected: -1` through the real
+  command, never the row/byte numbers the check needs — confirmed by literally running it.
+  Rewritten with `CONCAT`/`SUBSTRING` instead, and every one of the four cells is now checked
+  for those five words. The join was also an inner join, which drops an expired timeout marker
+  whose value row is already gone — undercounting against PERF-039's own plain `COUNT(*)` of
+  the same markers, which has no join to lose rows through; it is now a `LEFT JOIN` with
+  `COALESCE(..., 0)` on the byte sum. PERF-064 named a batched delete as the fix for a backlog
+  too large for one statement but gave no runnable command, and a `DELETE ... JOIN` cannot
+  take `LIMIT` at all; it now gives the subquery form (a `LIMIT`-able `SELECT`, materialized in
+  a derived table so MySQL doesn't reject it as updating its own source table) to run in a loop
+  until it deletes 0 rows. `tests/checks/audit-db-bloat.sh` now runs under `set -euo pipefail`
+  per house convention, checks PERF-036/037/039 the same way as the four new codes, and swapped
+  its fixed "no PERF-065+" ceiling — which a sibling PR adding its own new codes to this same
+  file would have failed on main for no defect of its own — for a uniqueness gate: no PERF-NNN
+  code may appear on more than one table row, however many exist.
 - **`wp-audit-security` gains SEC-041/042/043, deeper than the plugin counts SEC-032/033/034
   ever checked.** Those three only counted outdated or inactive plugins — a plugin could
   carry a disclosed vulnerability, or sit unmaintained for years, and nothing said so unless
