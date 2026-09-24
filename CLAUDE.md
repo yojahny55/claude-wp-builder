@@ -29,7 +29,8 @@ runtime for the plugin itself. The only executable code shipped is:
   `theme-template-check.mjs` (the ABSPATH, compiled-class and widget-script gate behind
   `/wp-finalize` Check 4 and the practices audit).
   `bin/lib/` holds what they share.
-- `skills/wp-polylang/scripts/*.php` — run inside a real WordPress via `wp eval-file`
+- `skills/wp-polylang/scripts/*.php` and `skills/wp-woocommerce/scripts/*.php` — run inside a
+  real WordPress via `wp eval-file`
 - `plugins/store-kit/` — a WordPress plugin copied into stores by `/wp-create` and
   `/wp-woo-setup` through `bin/store-kit-sync.sh`: catalog mode, and Stripe keys read from
   `wp-config.php` instead of the database. Held to the PHP 7.4 floor, and exercised against a
