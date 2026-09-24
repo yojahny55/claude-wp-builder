@@ -73,17 +73,22 @@ ecom_flat=$(tr -s '[:space:]' ' ' <<< "$ecom")
 # entry and prose that merely says "curl" is not a command at all.
 curls=$(sed -e ':a' -e '/\\$/N; s/\\\n//; ta' <<< "$ecom" | grep -oE 'curl +-[^`|]*' || true)
 [ "$(grep -c . <<< "$curls")" -ge 5 ] || fail "$SKILL §18 lost its bounded curl fetches (fewer than 5 left)"
+# Parity: every `curl` word in §18 must be one the extractor recognized. A fetch written URL-first
+# (no leading dash flag) would otherwise escape the bound checks below entirely.
+curl_words=$(grep -oE '(^|[^[:alnum:]_-])curl([^[:alnum:]_-]|$)' <<< "$ecom" | grep -c . || true)
+[ "$curl_words" -eq "$(grep -c . <<< "$curls")" ] \
+  || fail "$SKILL §18 mentions curl $curl_words times but only $(grep -c . <<< "$curls") are recognized commands — a fetch is escaping the bounded-curl guard"
 while IFS= read -r c; do
-  case "$c" in
-    *--max-redirs*--max-time*|*--max-time*--max-redirs*) ;;
-    *) fail "$SKILL §18 has a curl without both --max-redirs and --max-time: $c" ;;
-  esac
+  # Present is not enough: --max-time 0 means no timeout, and --max-redirs 0 never follows.
+  grep -qE -- '--max-redirs[ =][1-9][0-9]*' <<< "$c" \
+    || fail "$SKILL §18 has a curl without a positive --max-redirs: $c"
+  grep -qE -- '--max-time[ =][1-9][0-9]*' <<< "$c" \
+    || fail "$SKILL §18 has a curl without a positive --max-time: $c"
   # --max-redirs does nothing unless curl follows redirects; without -L every fetch reads the
   # empty 301 body and all four live checks turn UNMEASURED for good.
-  case "$c" in
-    *" -L "*|*" -sL "*|*" -Ls "*|*--location*) ;;
-    *) fail "$SKILL §18 has a curl that does not follow redirects (-L), so --max-redirs is inert: $c" ;;
-  esac
+  # L anywhere in a short-option bundle (-L, -sL, -Ls, -fsSL) or the long form.
+  grep -qE -- '(^|[[:space:]])-[^[:space:]-]*L|--location' <<< "$c" \
+    || fail "$SKILL §18 has a curl that does not follow redirects (-L), so --max-redirs is inert: $c"
 done <<< "$curls"
 
 # --- gate: site.commerce, not a re-detection ------------------------------------------------
@@ -149,7 +154,14 @@ grep -Fq 'id=\"product-$pid\"' <<< "$ecom_flat" \
 # side of the mismatch this check exists to catch was undetectable.
 # Only command text is scanned — lines inside §18's fenced blocks that are not # comments — so
 # the doc may still name the old alternation to warn against it.
-ecom_code=$(awk '/^```/ { fence = !fence; next } fence && !/^[[:space:]]*#/' <<< "$ecom")
+ecom_code=$(awk '/^[[:space:]]*```/ { fence = !fence; next } fence && !/^[[:space:]]*#/' <<< "$ecom")
+[ -n "$ecom_code" ] || fail "$SKILL §18 extracted no code lines — fence detection broke"
+# SEO-064 compares the clean category URL with a filtered one, and SEO-065 fetches page 2; each
+# needs its own fetch, which the curl count alone would not notice losing.
+grep -Fq '/product-category/<slug>/?orderby=price' <<< "$ecom_code" \
+  || fail "SEO-064 lost its filtered-URL fetch (?orderby=price) — there is nothing to compare the clean URL against"
+grep -Fq '/product-category/<slug>/page/2/' <<< "$ecom_code" \
+  || fail "SEO-065 lost its page-2 fetch"
 if grep -Fq '(in|out)ofstock' <<< "$ecom_code"; then
   fail "SEO-066 still uses the (in|out)ofstock alternation, which can never match WooCommerce's real 'instock' class"
 fi
