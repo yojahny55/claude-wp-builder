@@ -6,23 +6,20 @@
 
 - **`/autofix` fixes what OpenCodeReview found.** A maintainer comments `/autofix` on a pull
   request and `.github/workflows/autofix.yml` hands the open, unresolved OCR threads to OpenCode
-  (Alibaba token plan, `qwen3.8-max`). It pushes one commit only if the contract checks gain no
-  new failure against a baseline taken before the edit, and if the edited PHP and ES modules
-  still pass `php -l` at their floors and `node --check`. It refuses to push when no checks ran,
-  so an empty comparison cannot pass. Each thread gets a fixed/skipped reply with a reason, and
-  fixed threads are resolved. It runs only for commenters with write, maintain or admin, and only
-  on branches in this repository: the agent gets a shell over the PR's code. Edits under
-  `.github/`, `tests/checks/` and `tests/baselines/` are reverted unless a finding names that
-  file. A push made with `GITHUB_TOKEN` starts no pull-request run, so the workflow dispatches CI
-  on the branch itself; `ci.yml` gains `workflow_dispatch` for that.
+  (Alibaba token plan, `qwen3.8-max`, thinking off). It runs as six jobs split by what each one
+  holds: the agent runs with a read-only token and produces only a patch; a filter job with no
+  repository code drops edits to `.github/`, `tests/checks/` and `tests/baselines/` unless a
+  finding names that file, plus unrequested deletions and stray new files; a verify job with no
+  secrets runs the contract checks before and after the patch, then `php -l` at the PHP floors
+  and `node --check`; only then does a publish job, which runs no repository code, push the
+  exact patch the filter hashed. The skip list is read from the default branch, so a PR cannot
+  switch off the checks judging it, and an empty comparison fails closed. Only commenters with
+  write, maintain or admin, and only branches in this repository. Each thread gets a
+  fixed/skipped reply and fixed threads are resolved. A push made with `GITHUB_TOKEN` starts no
+  pull-request run, so the workflow dispatches CI on the branch with the PR's base: `ci.yml`
+  gains `workflow_dispatch` with a `base_ref` input, doc-sync runs on such a dispatch, and the
+  concurrency group now includes the event so a dispatch never cancels a push run.
 
-### Changed
-
-- **OpenCodeReview now reviews on `qwen3.8-max` via the Alibaba token plan, with thinking off.**
-  The plan enables thinking by default. A probe measured 26.5 s and 918 tokens (787 of them
-  reasoning) with it on, and 5.7 s and 214 tokens with it off. The first reviews on it ran over
-  30 minutes, against about 9 on the local model. `llm_extra_body` now sends
-  `{"enable_thinking":false}`.
 - **A multi-currency plugin and a full-page/edge cache computed prices at two different
   granularities, and nothing checked whether they agreed.** A multi-currency plugin (CURCY/
   `woocommerce-multi-currency` is one shape of this) picks the price per request, usually from
@@ -44,6 +41,7 @@
   the local clone. `tests/checks/audit-multicurrency-cache.sh` pins the gate (on all three
   performance codes, not just PERF-065), the severity split and the fix (a
   cache-key/cookie-exclusion setting, never a code change).
+
 - **`wp-audit-seo` gained five WooCommerce-specific checks (SEO-064 to SEO-068), gated by the
   `site.commerce` flag from Step 2.3.** Before this, the SEO auditor's canonical and schema
   checks were written for an informational site and missed the failure modes that only exist
@@ -72,6 +70,7 @@
   rather than a silent pass.
   `tests/checks/audit-ecommerce-seo.sh` pins the five codes, the site-type gate, and the
   sitemap-file cap; the methodology is recorded in `skills/wp-audit-seo-standards` §18.
+
 - **`/wp-audit` did not notice a media file was missing.** An attachment post survives the
   deletion of its own file — by hand, by a partial migration, or by a restore that skipped
   part of the uploads directory — and nothing in core flags it, so the site keeps serving a
@@ -99,6 +98,13 @@
   against real PHP (`tests/checks/lib/media-integrity-date-cutoff-behavior.php`).
 
 ### Changed
+
+- **OpenCodeReview now reviews on `qwen3.8-max` via the Alibaba token plan, with thinking off.**
+  The plan enables thinking by default. A probe measured 26.5 s and 918 tokens (787 of them
+  reasoning) with it on, and 5.7 s and 214 tokens with it off; the first reviews on it ran over
+  30 minutes, against about 9 on the local model. `llm_extra_body` now comes from
+  `vars.OCR_LLM_EXTRA_BODY`, defaulting to `{"enable_thinking":false}`, because the field is
+  specific to Qwen3: repointing the model means setting that variable in the same change.
 
 - **`/wp-audit` asks for report-only as its first question when `--report-only` is absent.**
   Before, a run without the flag only reached the fix/no-fix decision at Step 9, after Step 4

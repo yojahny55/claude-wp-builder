@@ -24,15 +24,22 @@ on:
     branches: [main]
   # /autofix pushes with GITHUB_TOKEN, and a push made with that token starts no
   # pull_request run -- so the fix commit would get no CI at all. autofix.yml dispatches
-  # this workflow on the branch instead. doc-sync is skipped on a dispatch (it needs a
-  # pull_request base); every other job runs.
+  # this workflow on the branch with the PR's base, so doc-sync (CHANGELOG + baseline
+  # approval) judges the fix too. A dispatch without base_ref skips doc-sync.
   workflow_dispatch:
+    inputs:
+      base_ref:
+        description: Base branch to compare against for doc-sync (the PR's base)
+        required: false
+        default: ''
 
 permissions:
   contents: read
 
+# Event-aware: a dispatch must never share a group with (and cancel) the push run on the
+# same ref, e.g. main's own CI for a commit.
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event.pull_request.number || format('{0}-{1}', github.event_name, github.ref) }}
   cancel-in-progress: true
 
 jobs:
@@ -174,9 +181,11 @@ jobs:
     name: Docs describe the plugin that exists
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Only on a pull request: the CHANGELOG rule compares the branch against its base,
-    # and a push to main has no base to compare against.
-    if: github.event_name == 'pull_request'
+    # Only with a base to compare against: a pull request, or an /autofix dispatch that
+    # passed the PR's base. A push to main has none.
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.base_ref != '')
+    env:
+      BASE_REF: ${{ github.base_ref || inputs.base_ref }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -188,10 +197,10 @@ jobs:
       # a command added to the README table but never created, or a PR with no CHANGELOG
       # entry, without a human remembering to look.
       - name: Fetch the base ref
-        run: git fetch --no-tags origin "${{ github.base_ref }}"
+        run: git fetch --no-tags origin "$BASE_REF"
 
       - name: Run the doc-sync gate
-        run: bash bin/doc-sync-check.sh --changelog-base "origin/${{ github.base_ref }}"
+        run: bash bin/doc-sync-check.sh --changelog-base "origin/$BASE_REF"
 
       # Same job because it needs the same thing: the base ref, to see which commits the
       # branch adds. I06 requires that baseline images change only through an explicit
@@ -199,7 +208,7 @@ jobs:
       # "baseline: <why>" in its subject. It cannot run in the checks job, which has no
       # base to diff against and would pass by skipping.
       - name: Baseline images changed only through the review step
-        run: bash tests/checks/baseline-approval.sh "origin/${{ github.base_ref }}"
+        run: bash tests/checks/baseline-approval.sh "origin/$BASE_REF"
 
   integration:
     name: WordPress integration

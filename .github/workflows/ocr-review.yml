@@ -1,15 +1,19 @@
 # OpenCodeReview PR review — adapted from upstream
 # examples/github_actions/ocr-review.yml (fetched 2026-09-16) for this fleet:
-#   * runs-on: self-hosted (AI rig runner) — ubuntu-latest cannot reach LiteLLM
-#   * llm_url secret: Alibaba token plan (qwen3.8-max) since 2026-09-24; was LiteLLM :4000 (composite action runs on the rig
-#     HOST, not in a container, so 192.168.0.20 works — not 172.17.0.1)
-#   * llm_extra_body '{"enable_thinking":false}' — upstream default sends Anthropic-shaped
-#     {"thinking":{"type":"disabled"}}, an unknown field on an OpenAI-compatible endpoint;
-#     Qwen's own switch is enable_thinking (see the input below for the measurements)
-#   * review_concurrency 2 + llm_timeout 600 — single-GPU local 27B, not cloud
+#   * runs-on: self-hosted (AI rig runner). Needed while the endpoint was LiteLLM on the rig's
+#     LAN; since 2026-09-24 the endpoint is the public Alibaba token plan (qwen3.8-max), so
+#     ubuntu-latest would also work. Kept on the rig for now, a single runner: reviews queue.
+#   * llm_extra_body from vars.OCR_LLM_EXTRA_BODY, default '{"enable_thinking":false}'. That is
+#     Qwen3's switch, and the token plan turns thinking on by default (a probe measured 26.5 s
+#     / 918 tokens on vs 5.7 s / 214 off). It is coupled to the model: repoint OCR_LLM_MODEL to
+#     a non-Qwen3 model or a vLLM route and set OCR_LLM_EXTRA_BODY ('{}') in the same change,
+#     or the endpoint may reject the field. Upstream's default, Anthropic-shaped
+#     {"thinking":{"type":"disabled"}}, is not used on an OpenAI-compatible endpoint.
+#   * review_concurrency 2 + llm_timeout 600 were sized for the single-GPU local 27B. The cloud
+#     endpoint could take more; not retuned yet.
 #
 # Secrets/vars (already set): OCR_LLM_URL, OCR_LLM_AUTH_TOKEN (Alibaba token-plan
-# key), vars OCR_LLM_MODEL=qwen3.8-max, OCR_LLM_USE_ANTHROPIC=false
+# key), vars OCR_LLM_MODEL=qwen3.8-max, OCR_LLM_USE_ANTHROPIC=false, optional OCR_LLM_EXTRA_BODY
 #
 # The sole review bot since 2026-09-16 (PR-Agent was retired after the trial).
 name: OpenCodeReview PR Review
@@ -97,11 +101,8 @@ jobs:
           llm_auth_token: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
           llm_model: ${{ vars.OCR_LLM_MODEL }}
           llm_use_anthropic: ${{ vars.OCR_LLM_USE_ANTHROPIC }}
-          # Thinking off. The Alibaba token plan enables it by default for qwen3.8-max (the old
-          # LiteLLM `coder` route disabled it server-side, so '{}' used to be enough): a probe
-          # measured 26.5s / 918 tokens (787 reasoning) with it on vs 5.7s / 214 tokens off,
-          # and the first reviews on it ran 30+ min against ~9 on the local model.
-          llm_extra_body: '{"enable_thinking":false}'
+          # Thinking off by default; see the header for the measurements and the model coupling.
+          llm_extra_body: ${{ vars.OCR_LLM_EXTRA_BODY || '{"enable_thinking":false}' }}
           llm_timeout: '600'
           review_concurrency: '2'
           stream_progress: 'true'
