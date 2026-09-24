@@ -364,7 +364,10 @@ under 2 seconds. It knows which braces belong to a class, a function or an
 `trait_exists`, `enum_exists` or `defined` (braced, `:`/`endif;` or braceless), qualifies
 names by namespace, ignores `use function` imports, recognises `enum` bodies on runtimes
 older than 8.1, and treats a top-level `if ( function_exists() ) return;` (or any of those
-tests) as guarding the rest of the file.
+tests) as guarding the rest of the file. The whole condition is read, not its first test: a
+negated test guards from any operand of an `&&` chain, but not next to an `||`, where the
+body also runs when the other operand holds; an early return guards only when the test sits
+in an `||` chain (or alone).
 
 Skipped: `vendor/`, `node_modules/`, `tests/`, `examples/`, and — inside a plugin or theme
 directory — `object-cache.php` and `advanced-cache.php`. Those are the drop-in templates a

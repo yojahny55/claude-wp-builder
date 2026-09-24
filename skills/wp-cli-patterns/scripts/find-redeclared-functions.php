@@ -53,8 +53,11 @@
  *   - a declaration inside `if` / `elseif` whose condition negates
  *     function_exists, class_exists, interface_exists, trait_exists,
  *     enum_exists or defined — braced, alternative `:` / `endif;` syntax, or a
- *     single braceless statement;
- *   - everything after a top-level `if ( <one of those> ) return;` early exit.
+ *     single braceless statement. The negated test may be any operand of an
+ *     `&&` chain; next to an `||` it guards nothing, since the body then also
+ *     runs when the other operand holds;
+ *   - everything after a top-level `if ( <one of those> ) return;` early exit,
+ *     where the test may be any operand of an `||` chain.
  *
  * Paths containing a vendor/, node_modules/, tests/ or examples/ directory are
  * skipped: bundled libraries and fixtures that plugin code does not load as its
@@ -164,23 +167,106 @@ function rf_close_paren( $t, $i ) {
 }
 
 /**
- * Classify an if-condition between two indices by its first existence test:
- * 'negated' for `! function_exists(...)` and the like, 'positive' for a bare
- * test, or null when the condition tests nothing of the kind.
+ * Classify one operand of a condition, tokens $s..$e inclusive: 'negated' for
+ * `! function_exists(...)` and the like, 'positive' for a bare test, or null
+ * when the operand is anything else. Wrapping parentheses are peeled and an
+ * even number of `!` cancels out.
+ */
+function rf_test_kind( $t, $s, $e ) {
+	if ( is_array( $t[ $s ] ) && in_array( $t[ $s ][0], array( T_WHITESPACE, T_COMMENT, T_DOC_COMMENT ), true ) ) {
+		$s = rf_next( $t, $s );
+	}
+	if ( is_array( $t[ $e ] ) && in_array( $t[ $e ][0], array( T_WHITESPACE, T_COMMENT, T_DOC_COMMENT ), true ) ) {
+		$e = rf_prev( $t, $e );
+	}
+	$negated = false;
+	while ( $s !== null && $e !== null && $s < $e ) {
+		if ( $t[ $s ] === '!' ) {
+			$negated = ! $negated;
+			$s       = rf_next( $t, $s );
+		} elseif ( $t[ $s ] === '(' && rf_close_paren( $t, $s ) === $e ) {
+			$s = rf_next( $t, $s );
+			$e = rf_prev( $t, $e );
+		} else {
+			break;
+		}
+	}
+	if ( $s === null || $e === null || $s >= $e ) {
+		return null;
+	}
+	if ( is_array( $t[ $s ] ) && $t[ $s ][0] === T_NS_SEPARATOR ) {
+		$s = rf_next( $t, $s );    // 7.4: `\function_exists` is two tokens
+	}
+	if ( ! is_array( $t[ $s ] ) || ! in_array( $t[ $s ][0], array( T_STRING, T_NAME_FULLY_QUALIFIED ), true )
+		|| ! in_array( strtolower( ltrim( $t[ $s ][1], '\\' ) ), RF_GUARD_TESTS, true ) ) {
+		return null;
+	}
+	$open = rf_next( $t, $s );
+	if ( $open === null || $t[ $open ] !== '(' || rf_close_paren( $t, $open ) !== $e ) {
+		return null;
+	}
+	return $negated ? 'negated' : 'positive';
+}
+
+/**
+ * Classify the if-condition between two parenthesis indices by what it
+ * guarantees, reading every top-level operand and the operators joining them:
+ *   - 'negated' when the body can only run while the name is undeclared: the
+ *     operands are joined by `&&` / `and` alone (or there is just one) and at
+ *     least one is `! <test>(...)` — `defined( 'X' ) && ! function_exists()`
+ *     is a guard, whichever operand comes first;
+ *   - 'positive' when the body runs whenever the name exists (the shape an
+ *     early `return` needs): operands joined by `||` / `or` alone, at least
+ *     one a bare `<test>(...)`;
+ *   - null otherwise. An `||` next to a negated test is not a guard — in
+ *     `! class_exists( 'Foo' ) || ! function_exists( 'fn' )` the body also
+ *     runs whenever Foo is missing — and a mix of `&&` with `||`, `xor`, a
+ *     ternary or `??` at the top level is never read as one either.
  */
 function rf_condition( $t, $from, $to ) {
+	$parts = array();
+	$ops   = array();
+	$depth = 0;
+	$start = $from + 1;
 	for ( $i = $from + 1; $i < $to; $i++ ) {
-		if ( ! is_array( $t[ $i ] ) || ! in_array( $t[ $i ][0], array( T_STRING, T_NAME_FULLY_QUALIFIED ), true ) ) {
+		$tok = $t[ $i ];
+		$id  = is_array( $tok ) ? $tok[0] : $tok;
+		if ( $id === '(' || $id === '[' || $id === '{' || $id === T_CURLY_OPEN || $id === T_DOLLAR_OPEN_CURLY_BRACES ) {
+			$depth++;
 			continue;
 		}
-		if ( ! in_array( strtolower( ltrim( $t[ $i ][1], '\\' ) ), RF_GUARD_TESTS, true ) ) {
+		if ( $id === ')' || $id === ']' || $id === '}' ) {
+			$depth--;
 			continue;
 		}
-		$p = rf_prev( $t, $i );
-		if ( $p !== null && is_array( $t[ $p ] ) && $t[ $p ][0] === T_NS_SEPARATOR ) {
-			$p = rf_prev( $t, $p );    // 7.4: `\function_exists` is two tokens
+		if ( $depth > 0 ) {
+			continue;
 		}
-		return ( $p !== null && $t[ $p ] === '!' ) ? 'negated' : 'positive';
+		if ( $id === T_BOOLEAN_AND || $id === T_LOGICAL_AND ) {
+			$ops['and'] = true;
+		} elseif ( $id === T_BOOLEAN_OR || $id === T_LOGICAL_OR ) {
+			$ops['or'] = true;
+		} elseif ( $id === T_LOGICAL_XOR || $id === '?' || $id === T_COALESCE ) {
+			return null;
+		} else {
+			continue;
+		}
+		$parts[] = array( $start, $i - 1 );
+		$start   = $i + 1;
+	}
+	$parts[] = array( $start, $to - 1 );
+	if ( count( $ops ) > 1 ) {
+		return null;
+	}
+	$want = isset( $ops['or'] ) ? 'positive' : ( isset( $ops['and'] ) ? 'negated' : null );
+	foreach ( $parts as $part ) {
+		if ( $part[0] > $part[1] ) {
+			continue;
+		}
+		$kind = rf_test_kind( $t, $part[0], $part[1] );
+		if ( $kind !== null && ( $want === null || $kind === $want ) ) {
+			return $kind;
+		}
 	}
 	return null;
 }

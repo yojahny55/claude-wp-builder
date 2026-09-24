@@ -353,13 +353,21 @@ if ( ! class_exists( 'Foo' ) ) { function cls_guarded() {} }
 if ( ! defined( 'X_LOADED' ) ) { function def_guarded() {} }
 if ( is_admin() ) { $a = 1; } elseif ( ! function_exists( 'elif_guarded' ) ) { function elif_guarded() {} }
 if ( is_admin() ) : $a = 1; elseif ( ! function_exists( 'alt_elif' ) ) : function alt_elif() {} else : function alt_else() {} endif;
+if ( defined( 'X_ON' ) && ! function_exists( 'and_second' ) ) { function and_second() {} }
+if ( ( ! function_exists( 'paren_guard' ) ) ) { function paren_guard() {} }
+if ( ! class_exists( 'Foo' ) || ! function_exists( 'or_negated' ) ) { function or_negated() {} }
+if ( ! function_exists( 'mixed_ops' ) && is_admin() || is_feed() ) { function mixed_ops() {} }
 enum Suit: string { case A = 'a'; public function enum_method() {} }
 function after_enum() {}
 PHP
 echo '<?php function includes_db() {}' > "$fx/x/includes/db.php"
+# An early return guards the rest of the file only when the test alone can trigger it.
+printf '%s\n' '<?php' "if ( defined( 'B_ON' ) || function_exists( 'early_or' ) ) { return; }" 'function early_or() {}' > "$fx/x/early-or.php"
+printf '%s\n' '<?php' "if ( defined( 'A_ON' ) && function_exists( 'early_and' ) ) { return; }" 'function early_and() {}' > "$fx/x/early-and.php"
 echo '<?php function tpl_skip() {}' > "$fx/x/includes/advanced-cache.php"
 names='imported_fn grouped_a grouped_b mixed_fn imported_global brace_less after_braceless nested_fn outer_fn
-cls_guarded def_guarded elif_guarded alt_elif alt_else enum_method after_enum includes_db tpl_skip parked_one'
+cls_guarded def_guarded elif_guarded alt_elif alt_else enum_method after_enum includes_db tpl_skip parked_one
+and_second paren_guard or_negated mixed_ops early_or early_and'
 { echo '<?php'; for n in $names; do echo "function $n() {}"; done; } > "$fx/y/y.php"
 echo '<?php function parked_one() {}' > "$fx/parked.php.bak"
 rc=0
@@ -376,6 +384,14 @@ for n in cls_guarded def_guarded elif_guarded alt_elif; do
   [ -z "$(row "$n")" ] || fail "$script missed the guard around $n (class_exists / defined / elseif)"
 done
 row alt_else | grep -q '^CRITICAL' || fail "$script treated the else branch of a guard chain as guarded"
+# The whole condition decides, not whichever existence test comes first: a negated test is
+# a guard anywhere in an && chain, and no guard at all next to an ||.
+for n in and_second paren_guard early_or; do
+  [ -z "$(row "$n")" ] || fail "$script missed the guard around $n (a later && operand / wrapping parentheses / an || early return)"
+done
+for n in or_negated mixed_ops early_and; do
+  row "$n" | grep -q '^CRITICAL' || fail "$script treated $n as guarded, but its condition lets the body run while the function exists"
+done
 [ -z "$(row enum_method)" ] || fail "$script counted an enum method as a global function"
 row after_enum | grep -q '^CRITICAL' || fail "$script lost track of the enum body"
 row includes_db | grep -q '^CRITICAL' || fail "$script skipped a plugin's own includes/db.php"

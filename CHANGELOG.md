@@ -106,7 +106,8 @@
   a new tokenizer script, `skills/wp-cli-patterns/scripts/find-redeclared-functions.php`,
   instead of a grep. The tokenizer skips methods, closures, nested functions, `use
   function` imports, guards on `function_exists` / `class_exists` / `defined` (and the
-  other existence tests) in `if` and `elseif`, early-return guards, enum bodies on runtimes
+  other existence tests) in `if` and `elseif` — read across the whole `&&` / `||`
+  condition, not just its first test — early-return guards, enum bodies on runtimes
   older than 8.1, and the `object-cache.php` / `advanced-cache.php` templates cache plugins
   ship; it qualifies names by namespace. A source path that does not exist exits 2, which
   the agent reports as `UNMEASURED`, and an unreadable directory is listed as partial
