@@ -52,8 +52,13 @@ declare -A want_severity=(
   [PERF-063]=INFO
   [PERF-064]=INFO
 )
+# Severity is the row's last cell; each code's must be exactly the one it was assigned.
 for code in "${!want_severity[@]}"; do
-  grep -Fq "$code" "$agent" || fail "$agent has no $code row"
+  sev=$(CODE="$code" awk -F'|' '/^\|/ { c = $2; gsub(/^[ \t]+|[ \t]+$/, "", c)
+          if (c == ENVIRON["CODE"]) { s = $(NF - 1); gsub(/^[ \t]+|[ \t]+$/, "", s); print s; exit } }' "$agent")
+  [ -n "$sev" ] || fail "$agent has no $code row"
+  [ "$sev" = "${want_severity[$code]}" ] \
+    || fail "$code is $sev, expected ${want_severity[$code]}"
 done
 
 # Every PERF-NNN table row is unique. A fixed 061-064-only ceiling (rejecting PERF-065+)
@@ -145,7 +150,7 @@ r=$(row 'PERF-064')
 printf '%s' "$r" | grep -Fq 'postmeta' || fail "PERF-064 does not query the postmeta table"
 printf '%s' "$r" | grep -Fq 'LEFT JOIN' || fail "PERF-064 does not LEFT JOIN against posts"
 printf '%s' "$r" | grep -Fq 'IS NULL' || fail "PERF-064 does not filter on a missing owner"
-printf '%s' "$r" | grep -Fq '500' || fail "PERF-064 has no concrete row threshold"
+printf '%s' "$r" | grep -Fq '≤500 orphaned rows' || fail "PERF-064's threshold is not ≤500 orphaned rows"
 
 # --- The prefix-awareness note itself is present, not just the fixed cells ---
 grep -Fq '$($WP db prefix)' "$agent" \
