@@ -379,6 +379,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-create` | all | optional* | Local WordPress environment + `.wp-create.json` |
 | `/wp-init` | all | required | Scaffold theme, record template / fields plugin / i18n choices |
 | `/wp-context [docs]` | all | auto | Scope + constraints from `docs/` |
+| `/wp-woo-setup [project-path] [--force]` | all | store profiles | Record the store — tier, address, currency, shipping, tax, Stripe in test mode — and bring WooCommerce in line with it; shows a dry run, re-runnable |
 | `/wp-yolo <folder>` | A | required | Whole demo folder → theme, seeded and verified |
 | `/wp-demo [brief\|iterate]` | all | demo stage | Generate `demo/index.html` from a brief (after `/wp-init`) |
 | `/wp-polish [path]` | all | demo stage | Normalize any HTML you already have into a demo |
@@ -434,6 +435,7 @@ commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. 
 | `wp-aos-animator` | AOS scroll animation installer — audits, enqueues, initializes, and seeds animations across templates. Run through `/wp-aos-animator` |
 | `wp-robin` | Robin Image Optimizer fixer — installs, configures, unsticks bulk optimization, generates .webp files. Run through `/wp-robin` |
 | `wp-s3` | WordPress media on S3 — installs and configures S3 Uploads, migrates the library with a transfer that verifies itself, and reverses the whole thing. Run through `/wp-s3` and `/wp-s3-media` |
+| `wp-woocommerce` | WooCommerce store practice — the three store tiers and the plugins each installs (and the ones deliberately avoided, with reasons), the setup facts a WP-CLI install gets wrong, and the setup script `/wp-woo-setup` runs |
 | `wp-environments` | Environment detection and the WP-CLI wrapper every command runs through |
 | `wp-audit-standards` | Audit criteria, severity definitions, report schema and quality thresholds for the `wp-audit-*` agents |
 | `wp-audit-seo-standards` | Rank Math configuration reference, schema JSON-LD templates, meta patterns and SEO seeding commands |
@@ -478,6 +480,8 @@ Placeholder tokens (`__starter__`, `__STARTER__`, `__STARTER_NAME__`) are replac
 - `bin/wp-config.mjs` — validates, migrates and reads `.wp-create.json`; every command
   that reads the manifest calls `validate` first. Subcommands: `validate`, `migrate`,
   `render-context`, `get`, `validate-profile`.
+- `bin/store-kit-sync.sh <plugins-dir>` — copies the bundled `plugins/store-kit` into a site
+  when it has none or an older one; never downgrades.
 
 ## Conventions
 
@@ -522,6 +526,7 @@ The `/wp-create` command supports multiple environment types:
 **Plugin profiles** install common plugins in one WP-CLI call:
 - `starter` — SCF, Rank Math SEO, WP Fastest Cache
 - `full` — SCF, Rank Math SEO, WP Super Cache, All-in-One WP Security, CF7, WP Mail SMTP, Redirection, Site Kit
+- `woo-catalog`, `woo-store`, `woo-full` — the three store tiers: WooCommerce and the bundled `store-kit`, plus each tier's plugins; `/wp-create` then runs `/wp-woo-setup` (see `skills/wp-woocommerce/references/plugins.md` for every pick and every plugin avoided)
 - Custom profiles from `.wp-profiles/` or `~/.wp-profiles/`
 
 **Project manifest** (`.wp-create.json`) stores all config and is read by all commands/agents for WP-CLI wrapper, language config, and environment type.

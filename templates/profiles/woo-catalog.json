@@ -1,0 +1,14 @@
+{
+  "name": "WooCommerce catalog",
+  "description": "Products and prices, nothing purchasable: enquiry form, where-to-buy link or WhatsApp",
+  "store": "catalog",
+  "plugins": [
+    { "slug": "secure-custom-fields", "required": true, "source": "wordpress.org", "tested": "7.1.2" },
+    { "slug": "woocommerce", "required": true, "source": "wordpress.org", "tested": "7.1.2" },
+    { "slug": "store-kit", "required": true, "source": "bundled", "requires": ["woocommerce"], "tested": "7.1.2" },
+    { "slug": "seo-by-rank-math", "required": false, "source": "wordpress.org" },
+    { "slug": "wp-super-cache", "required": false, "source": "wordpress.org" },
+    { "slug": "contact-form-7", "required": false, "source": "wordpress.org", "tested": "7.1.2" },
+    { "slug": "wp-mail-smtp", "required": false, "source": "wordpress.org", "conflicts": ["fluent-smtp"] }
+  ]
+}

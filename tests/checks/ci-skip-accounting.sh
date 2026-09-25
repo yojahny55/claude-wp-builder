@@ -37,7 +37,7 @@ awk '
 ' "$CI" || fail "$CI increments pass on the SKIP branch, or no longer has an else branch"
 
 # --- the job-owned exclusions, which this check now sits beside ------------------------------
-for owned in motion-devices wp-polylang-integration wp-cf7-delivery visual-baselines baseline-approval; do
+for owned in motion-devices wp-polylang-integration wp-cf7-delivery wp-woo-setup-integration visual-baselines baseline-approval; do
   grep -Fq "tests/checks/$owned.sh" "$CI" \
     || fail "$CI no longer excludes tests/checks/$owned.sh from the contract glob -- it would skip there and pass"
 done

@@ -1,0 +1,1 @@
+{ "name": "Bundled but absent", "plugins": [ { "slug": "no-such-kit", "required": true, "source": "bundled" } ] }

@@ -4,6 +4,26 @@
 
 ### Added
 
+- **`store-kit`, a plugin this repository ships into stores.** Catalog mode (prices shown,
+  nothing purchasable — the Store API refuses add-to-cart, Cart and Checkout redirect to the
+  shop) and Stripe API keys supplied from `STORE_KIT_STRIPE_*` constants in `wp-config.php`:
+  merged in when the gateway reads its settings and stripped when it saves them, so no database
+  dump or clone carries a working API key — including the copy Stripe's own webhook setup nests
+  a second time inside the settings row. A webhook-secret constant only ever seeds an empty row:
+  Stripe rotates its own webhook secret when Stripe reconfigures webhooks (connect, re-key, the
+  settings button, or after a plugin update) and saves the new one, and that value is left to
+  win and reach the database, with an admin notice naming the now-stale constant. A
+  constant whose prefix does not match its field's mode (test vs live) is never used at all, and
+  is reported by name — the guard against a live key ending up in a test-mode constant.
+  `bin/store-kit-sync.sh` installs the plugin and never downgrades. `Update URI: false` and a
+  provable Author/URI keep a same-named plugin from ever being mistaken for it.
+- **A `store` block in `.wp-create.json`.** Records what a WooCommerce store sells and how —
+  tier (`catalog`, `store`, `full`), address, currency, units, checkout type, enquiry channels,
+  Stripe in test mode, shipping zones, tax rates — and `bin/wp-config.mjs validate` refuses a
+  bad one by name. Stripe keys are secrets like the database password: `.wp-create.local.json`
+  or `WP_CREATE_STRIPE_TEST_*`, never the manifest. The generated CLAUDE.md block gains a
+  `Store tier` line only for a project that has the block, so every other project's block is
+  unchanged.
 - **A multi-currency plugin and a full-page/edge cache computed prices at two different
   granularities, and nothing checked whether they agreed.** A multi-currency plugin (CURCY/
   `woocommerce-multi-currency` is one shape of this) picks the price per request, usually from
@@ -78,9 +98,41 @@
   tell a correct same-day comparison from an inverted one, since every bucket name it could
   match is spelled correctly either way — runs the script's own cutoff/bucket functions
   against real PHP (`tests/checks/lib/media-integrity-date-cutoff-behavior.php`).
+- **Three store profiles and the `wp-woocommerce` skill.** `woo-catalog` (products and prices,
+  nothing purchasable), `woo-store` (cart, block checkout, Stripe in test mode, Turnstile, SMTP)
+  and `woo-full` (plus abandoned cart, email marketing, reviews, search, filters, swatches,
+  wishlist and feeds). Every plugin has a written reason, and fifteen popular ones are listed as
+  avoided with the record behind each — `tests/checks/wp-profiles.sh` refuses a profile that
+  breaks either rule. Profiles gain a `store` tier key and a `bundled` source for plugins this
+  repository ships; `validate-profile` refuses a bundled slug with no plugin behind it.
+- **Store setup, proven against a real WooCommerce.** `skills/wp-woocommerce/scripts/woo-setup.php`
+  brings a store in line with its `store` block: HPOS before any order, store pages assigned
+  and given Polylang's default language, shipping and tax matched without duplicates, Stripe
+  keys written to `wp-config.php`, the checkout rate limit and Turnstile on, catalog mode for a
+  catalog. It records a hash of every value it writes and leaves the rest alone as the client's.
+  `force` takes those back, except launch state — coming soon, Stripe's switches, cash on
+  delivery — which it never changes on a store that has orders; a secret it leaves alone is
+  reported by fingerprint, never by value. It never deletes: a zone, method or rate it recorded
+  that the block no longer names is reported `degraded` and counted, an assigned page left
+  unpublished is the client's, and a block missing a key it reads is refused before any write.
+  `tests/checks/wp-woo-setup-integration.sh` proves it in the fixture (WooCommerce 11.1.2):
+  second runs change nothing, and the store takes a real Store API order — processing, in the
+  HPOS table, with the right total and both emails.
+- **`/wp-woo-setup`.** Asks the store questions once, records the answers as the `store` block,
+  shows a dry run, then runs the setup script. Stripe keys never enter the conversation: the
+  operator puts them in `.wp-create.local.json` or the environment, and the script reads them.
+  Recording the block regenerates an existing generated CLAUDE.md block, which gains a `Store
+  tier` row. It needs native WP-CLI, and stops before syncing on Docker, DDEV, Lando or wp-env.
+- **`/wp-create` sets up stores.** It marks every dev site `WP_ENVIRONMENT_TYPE=local`, installs
+  `bundled` plugins from this repository, and after writing the manifest runs `/wp-woo-setup`
+  when a store profile was chosen.
 
 ### Changed
 
+- **SEC-040 reads the stored row (`SEC-040@2`).** It used `get_option()`, which runs read-time
+  filters, so a key supplied from `wp-config.php` (as `store-kit` does) would be reported as a
+  key at rest. Both the detection and the scrub read `option_value` directly now. Projects that
+  ran revision 1 see SEC-040 listed as revised in the audit's coverage line.
 - **`/wp-audit` asks for report-only as its first question when `--report-only` is absent.**
   Before, a run without the flag only reached the fix/no-fix decision at Step 9, after Step 4
   had already offered to install Rank Math, AIOS or SCF and Step 5 to pick an AIOS security

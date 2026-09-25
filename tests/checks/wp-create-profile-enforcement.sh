@@ -139,4 +139,22 @@ if grep -Eq '^\| `\{\{db_password\}\}` \| `root` \|' "$env"; then
   fail "$env still documents the removed fixed default as the db_password example value"
 fi
 
+# --- Stores. ------------------------------------------------------------------------------
+grep -Fq 'config set WP_ENVIRONMENT_TYPE local --type=constant' "$c" \
+  || fail "$c does not mark a dev site local: WordPress reads an unset WP_ENVIRONMENT_TYPE as production"
+grep -Fq '"source": "bundled"' "$c" || fail "$c does not say how a bundled plugin is installed"
+grep -Fq 'bin/store-kit-sync.sh' "$c" || fail "$c does not install store-kit through bin/store-kit-sync.sh"
+s55=$(grep -n '^## Step 5.5: Store setup' "$c" | cut -d: -f1 || true)
+s5=$(grep -n '^## Step 5: Generate' "$c" | cut -d: -f1 || true)
+s6=$(grep -n '^## Step 6: Chain' "$c" | cut -d: -f1 || true)
+[ -n "$s55" ] && [ -n "$s5" ] && [ -n "$s6" ] && [ "$s5" -lt "$s55" ] && [ "$s55" -lt "$s6" ] \
+  || fail "$c must run store setup after the manifest exists (Step 5) and before chaining to /wp-init"
+sed -n "${s55},${s6}p" "$c" | grep -Fq '/wp-woo-setup' || fail "$c Step 5.5 does not run /wp-woo-setup"
+# store-kit and the setup script are host paths: both store steps refuse every container engine up front.
+s410=$(grep -n '^### Step 4.10' "$c" | cut -d: -f1 || true); s411=$(grep -n '^### Step 4.11' "$c" | cut -d: -f1 || true)
+for range in "${s410},${s411}" "${s55},${s6}"; do
+  sed -n "${range}p" "$c" | grep -Fq 'store profiles need native WP-CLI' \
+    || fail "$c lines $range do not stop a store profile on a container engine before syncing store-kit"
+done
+
 echo PASS

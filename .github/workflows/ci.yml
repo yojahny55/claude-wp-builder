@@ -68,7 +68,7 @@ jobs:
           # branch, which this job does not fetch, so it lives in doc-sync below where the
           # base is already there -- here it would take its own skip path and pass while
           # checking nothing.
-          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh'
+          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh tests/checks/wp-woo-setup-integration.sh'
           for f in tests/checks/*.sh; do
             case " $skip_here " in *" $f "*) continue ;; esac
             if out=$(bash "$f" 2>&1); then
@@ -199,7 +199,7 @@ jobs:
   integration:
     name: WordPress integration
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     # A real database, as a service container rather than a container this job starts:
     # the provisioner takes its connection details from the environment precisely so the
     # same script serves a developer's docker and this, without branching on which.
@@ -238,10 +238,10 @@ jobs:
       # WordPress fixture cannot exist without downloading a WordPress. Everything it
       # installs is pinned in the provisioner, and every assertion runs against the local
       # install -- nothing here asserts against a remote service.
-      # Two checks, each provisioning its own fixture. They run in one step because the
+      # Three checks, each provisioning its own fixture. They run in one step because the
       # runner's default shell is `bash -e` -- confirmed in the job log, `shell:
-      # /usr/bin/bash -e {0}` -- so a failing check aborts the step and the second never
-      # starts. No explicit guard is needed between them, and the note is here because the
+      # /usr/bin/bash -e {0}` -- so a failing check aborts the step and the rest never
+      # start. No explicit guard is needed between them, and the note is here because the
       # absence of one reads like an oversight.
       - name: WordPress fixture checks
         env:
@@ -255,6 +255,9 @@ jobs:
           echo "::endgroup::"
           echo "::group::contact form delivery"
           bash tests/checks/wp-cf7-delivery.sh
+          echo "::endgroup::"
+          echo "::group::store setup and a real order"
+          bash tests/checks/wp-woo-setup-integration.sh
           echo "::endgroup::"
 
   browser:
