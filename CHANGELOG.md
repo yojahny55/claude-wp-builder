@@ -104,6 +104,14 @@
   avoided with the record behind each — `tests/checks/wp-profiles.sh` refuses a profile that
   breaks either rule. Profiles gain a `store` tier key and a `bundled` source for plugins this
   repository ships; `validate-profile` refuses a bundled slug with no plugin behind it.
+- **Store setup, proven against a real WooCommerce.** `skills/wp-woocommerce/scripts/woo-setup.php`
+  brings a store in line with its `store` block: HPOS before any order, store pages assigned
+  and given Polylang's default language, shipping and tax matched without duplicates, Stripe
+  keys written to `wp-config.php`, the checkout rate limit and Turnstile on, catalog mode for a
+  catalog. It records a hash of every value it writes and leaves the rest alone as the client's.
+  `tests/checks/wp-woo-setup-integration.sh` proves it in the fixture (WooCommerce 11.1.2):
+  second runs change nothing, and the store takes a real Store API order — processing, in the
+  HPOS table, with the right total and both emails.
 
 ### Changed
 
