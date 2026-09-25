@@ -8,17 +8,25 @@
   request and `.github/workflows/autofix.yml` hands the open, unresolved OCR threads to OpenCode
   (Alibaba token plan, `qwen3.8-max`, thinking off). It runs as six jobs split by what each one
   holds: the agent runs with a read-only token and produces only a patch; a filter job with no
-  repository code drops edits to `.github/`, `tests/checks/` and `tests/baselines/` unless a
+  repository code drops every edit to `tests/checks/` and `tests/baselines/` (the checks that
+  judge the patch, and baselines that need a `baseline:` commit), edits to `.github/` unless a
   finding names that file, plus unrequested deletions and stray new files; a verify job with no
   secrets runs the contract checks before and after the patch, then `php -l` at the PHP floors
   and `node --check`; only then does a publish job, which runs no repository code, push the
   exact patch the filter hashed. The skip list is read from the default branch, so a PR cannot
   switch off the checks judging it, and an empty comparison fails closed. Only commenters with
-  write, maintain or admin, and only branches in this repository. Each thread gets a
-  fixed/skipped reply and fixed threads are resolved. A push made with `GITHUB_TOKEN` starts no
-  pull-request run, so the workflow dispatches CI on the branch with the PR's base: `ci.yml`
-  gains `workflow_dispatch` with a `base_ref` input, doc-sync runs on such a dispatch, and the
-  concurrency group now includes the event so a dispatch never cancels a push run.
+  write, maintain or admin, and only branches in this repository; a failed permission lookup
+  fails the run instead of posting a false refusal. Each thread gets a fixed/skipped reply, and
+  a thread is resolved only when the agent reported it fixed *and* the pushed patch changed its
+  file. The summary comment says when the agent exited non-zero, quotes the last 30 lines of
+  each new check failure, warns past 100 review threads, and is posted even when the gate
+  itself fails. A push made with `GITHUB_TOKEN` starts no pull-request run, so the workflow
+  dispatches CI on the branch with the PR's base: `ci.yml` gains `workflow_dispatch` with a
+  required `base_ref` input that must look like a branch name and be behind HEAD, doc-sync runs
+  on every dispatch, and the concurrency group now includes the event so a dispatch never
+  cancels a push run. `ocr-review.yml` pins `alibaba/open-code-review` to a commit SHA and
+  fails fast when `OCR_LLM_EXTRA_BODY` is not JSON or carries `enable_thinking` for a model that
+  is not Qwen3.
 
 - **A multi-currency plugin and a full-page/edge cache computed prices at two different
   granularities, and nothing checked whether they agreed.** A multi-currency plugin (CURCY/

@@ -25,13 +25,14 @@ on:
   # /autofix pushes with GITHUB_TOKEN, and a push made with that token starts no
   # pull_request run -- so the fix commit would get no CI at all. autofix.yml dispatches
   # this workflow on the branch with the PR's base, so doc-sync (CHANGELOG + baseline
-  # approval) judges the fix too. A dispatch without base_ref skips doc-sync.
+  # approval) judges the fix too. base_ref is required: autofix.yml is the only caller that
+  # dispatches this workflow, and a dispatch without it used to drop doc-sync silently while
+  # the other jobs reported green.
   workflow_dispatch:
     inputs:
       base_ref:
         description: Base branch to compare against for doc-sync (the PR's base)
-        required: false
-        default: ''
+        required: true
 
 permissions:
   contents: read
@@ -181,9 +182,9 @@ jobs:
     name: Docs describe the plugin that exists
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Only with a base to compare against: a pull request, or an /autofix dispatch that
-    # passed the PR's base. A push to main has none.
-    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.base_ref != '')
+    # Only with a base to compare against: a pull request, or a dispatch (base_ref is a
+    # required input, and the fetch step refuses a blank one). A push to main has none.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     env:
       BASE_REF: ${{ github.base_ref || inputs.base_ref }}
     steps:
@@ -196,8 +197,21 @@ jobs:
       # This is the first thing that executes it, and so the first thing that can catch
       # a command added to the README table but never created, or a PR with no CHANGELOG
       # entry, without a human remembering to look.
+      #
+      # On a dispatch, base_ref is caller-supplied. Only a branch-name shape reaches git, and
+      # `--` stops it being read as an option (`--depth=1` would succeed and destroy the
+      # merge-base both gates below use). A base that HEAD is not ahead of (base_ref naming
+      # the dispatched branch itself) leaves nothing to compare, and both gates would pass
+      # vacuously -- refuse that too.
       - name: Fetch the base ref
-        run: git fetch --no-tags origin "$BASE_REF"
+        run: |
+          set -euo pipefail
+          if ! [[ "$BASE_REF" =~ ^[A-Za-z0-9._/-]+$ ]] || [[ "$BASE_REF" == -* ]]; then
+            echo "::error::base_ref is not a branch name (allowed: A-Z a-z 0-9 . _ / -, not starting with -)"; exit 1
+          fi
+          git fetch --no-tags origin -- "$BASE_REF"
+          ahead=$(git rev-list --count "origin/$BASE_REF..HEAD")
+          [ "$ahead" -gt 0 ] || { echo "::error::HEAD is not ahead of origin/$BASE_REF — nothing to compare"; exit 1; }
 
       - name: Run the doc-sync gate
         run: bash bin/doc-sync-check.sh --changelog-base "origin/$BASE_REF"

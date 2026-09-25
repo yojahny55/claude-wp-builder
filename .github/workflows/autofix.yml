@@ -12,14 +12,18 @@
 #   fix      the agent: a shell over the PR's code + the LLM key, and a READ-ONLY token.
 #            Its only product is a patch file and a report; it cannot push or comment.
 #   filter   runs no PR code. Applies the patch to a clean checkout and drops what the agent
-#            may not change: .github/, tests/checks/, tests/baselines/ (unless a finding names
-#            that exact file), deletions nobody asked for, and new files outside the
-#            findings' directories. Hashes the result.
+#            may not change: tests/checks/ and tests/baselines/ always (the checks verify
+#            runs to judge the patch, and the baselines they compare against -- a finding
+#            naming one is a human's fix, and finding text is untrusted PR content), .github/
+#            unless a finding names that exact file, deletions nobody asked for, and new files
+#            outside the findings' directories. Hashes the result.
 #   verify   no secrets, read-only token. Contract checks on the PR as it is (baseline), then
 #            with the filtered patch, then php -l / node --check on what changed.
 #   publish  holds the write token and runs NO repository code: applies the exact patch
 #            filter hashed, commits, pushes, dispatches CI.
-#   report   runs whenever the gate passed: one summary comment, a reply per thread.
+#   report   runs whenever the gate ran (a gate that failed after the 👀 still gets a
+#            comment): one summary comment, a reply per thread. A thread is resolved only
+#            when the pushed patch changed its file -- the agent's "fixed" alone leaves it open.
 #
 # Why it is shaped this way:
 #   * Maintainers only. The repo is public and a push lands on someone's branch, so the
@@ -86,6 +90,9 @@ jobs:
       base_ref: ${{ steps.pr.outputs.base_ref }}
       count: ${{ steps.findings.outputs.count }}
       skip: ${{ steps.skip.outputs.skip }}
+      # Set before a refusal exits: the refusal is already a comment, so report must not
+      # add a second "gate failed" one.
+      refused: ${{ steps.pr.outputs.refused }}
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
@@ -98,16 +105,27 @@ jobs:
         id: pr
         run: |
           set -euo pipefail
-          perm=$(gh api "repos/$REPO/collaborators/$ACTOR/permission" --jq .permission 2>/dev/null || echo none)
+          # A failed lookup is not a permission. Collapsing it into `none` posted a false
+          # "@user has none" for every 403/404/rate limit. The endpoint needs only Metadata
+          # read, which every GITHUB_TOKEN carries (docs: "Permissions required for GitHub
+          # Apps" lists it under Repository permissions for "Metadata").
+          if ! perm=$(gh api "repos/$REPO/collaborators/$ACTOR/permission" --jq .permission 2>"$RUNNER_TEMP/perm.err"); then
+            cat "$RUNNER_TEMP/perm.err" >&2
+            echo "::error::permission lookup failed: $(tr '\n' ' ' < "$RUNNER_TEMP/perm.err" | head -c 300) -- no refusal posted, the check itself did not run"
+            exit 1
+          fi
+          [ -n "$perm" ] || { echo "::error::permission lookup returned no .permission field"; exit 1; }
           case "$perm" in
             admin|maintain|write) ;;
-            *) gh api "repos/$REPO/issues/$PR/comments" -f body="/autofix is limited to repo maintainers (@$ACTOR has \`$perm\`)." >/dev/null
+            *) echo "refused=true" >> "$GITHUB_OUTPUT"
+               gh api "repos/$REPO/issues/$PR/comments" -f body="/autofix is limited to repo maintainers (@$ACTOR has \`$perm\`)." >/dev/null
                echo "refused: $ACTOR has $perm"; exit 1 ;;
           esac
           pr=$(gh api "repos/$REPO/pulls/$PR")
           head_repo=$(jq -r '.head.repo.full_name // ""' <<<"$pr")
           state=$(jq -r .state <<<"$pr")
           if [ "$head_repo" != "$REPO" ] || [ "$state" != open ]; then
+            echo "refused=true" >> "$GITHUB_OUTPUT"
             gh api "repos/$REPO/issues/$PR/comments" -f body="/autofix only runs on open PRs from branches in this repository (head: \`${head_repo:-deleted}\`, state: \`$state\`)." >/dev/null
             echo "refused: head=$head_repo state=$state"; exit 1
           fi
@@ -137,12 +155,18 @@ jobs:
           owner=${REPO%/*}; name=${REPO#*/}
           gh api graphql -F owner="$owner" -F name="$name" -F n="$PR" -f query='
             query($owner:String!,$name:String!,$n:Int!){ repository(owner:$owner,name:$name){ pullRequest(number:$n){
-              reviewThreads(first:100){ nodes{ id isResolved isOutdated path line
+              reviewThreads(first:100){ pageInfo{ hasNextPage } nodes{ id isResolved isOutdated path line
                 comments(first:1){ nodes{ databaseId body } } } } } } }' > "$RUNNER_TEMP/threads.json"
           python3 - "$RUNNER_TEMP" <<'PY'
           import json, re, sys, pathlib
           tmp = pathlib.Path(sys.argv[1])
-          nodes = json.loads((tmp/"threads.json").read_text())["data"]["repository"]["pullRequest"]["reviewThreads"]["nodes"]
+          threads = json.loads((tmp/"threads.json").read_text())["data"]["repository"]["pullRequest"]["reviewThreads"]
+          nodes = threads["nodes"]
+          # ponytail: one page of 100 threads, not a cursor loop. Past that the rest is
+          # unread, and the run says so here and in the summary comment rather than silently.
+          if threads["pageInfo"]["hasNextPage"]:
+              print("::warning::this PR has more than 100 review threads; findings beyond the first 100 were not read")
+              (tmp/"findings"/"truncated.txt").write_text("more than 100 review threads; only the first 100 were read\n")
           out = []
           for t in nodes:
               c = (t["comments"]["nodes"] or [None])[0]
@@ -209,11 +233,15 @@ jobs:
           python3 - "$cfg" <<'PY'
           import json, os, sys
           model = os.environ["AUTOFIX_LLM_MODEL"]
+          base = os.environ["AUTOFIX_LLM_BASE_URL"]
+          # An unset repository variable expands to "", not to a missing env var.
+          if not (model and base and os.environ.get("AUTOFIX_LLM_API_KEY")):
+              sys.exit("::error::AUTOFIX_LLM_MODEL / AUTOFIX_LLM_BASE_URL / AUTOFIX_LLM_API_KEY must all be set")
           json.dump({
             "$schema": "https://opencode.ai/config.json",
             "provider": {"autofix": {
               "npm": "@ai-sdk/openai-compatible", "name": "autofix",
-              "options": {"baseURL": os.environ["AUTOFIX_LLM_BASE_URL"], "apiKey": "{env:AUTOFIX_LLM_API_KEY}"},
+              "options": {"baseURL": base, "apiKey": "{env:AUTOFIX_LLM_API_KEY}"},
               "models": {model: {"name": model, "limit": {"context": 131072, "output": 16384},
                                  # The token plan runs qwen3.8-max with thinking ON by default:
                                  # ~4x the tokens and ~5x the latency per call. Off by choice.
@@ -229,7 +257,7 @@ jobs:
           Rules:
           - Fix each finding with the smallest correct change. Follow CLAUDE.md in this repo.
           - Do not change anything the findings do not ask for. No refactors, no reformatting.
-          - Do NOT edit anything under .github/, tests/checks/ or tests/baselines/ unless a finding points at that exact file. Such edits are discarded.
+          - Do NOT edit anything under tests/checks/ or tests/baselines/, even when a finding points there: skip that finding. Do NOT edit .github/ unless a finding points at that exact file. Such edits are discarded.
           - If a finding is wrong, already fixed, or unsafe to change without a human decision, skip it.
           - PHP must still parse on PHP 7.4 (8.0 under starter-theme/__cinematic__). Check edited PHP with php -l.
           - Do not commit, push or create branches.
@@ -240,7 +268,15 @@ jobs:
           prompt="$prompt
 
           $(cat "$RUNNER_TEMP/findings/findings.md")"
-          timeout 1500 opencode run --auto --pure "$prompt" 2>&1 | tail -n 200 || echo "opencode exited $?"
+          # The exit code is kept, not swallowed: a crash, the timeout (124) or a rejected model
+          # must not read as "the agent chose to change nothing". report quotes it.
+          mkdir -p "$RUNNER_TEMP/agent-output"
+          set +e
+          timeout 1500 opencode run --auto --pure "$prompt" 2>&1 | tail -n 200
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "$rc" > "$RUNNER_TEMP/agent-output/exit.txt"
+          [ "$rc" = 0 ] || echo "::warning::opencode exited $rc"
 
       # Anchored to the PR head commit, not the index: whatever the agent staged or even
       # committed is still in this diff, so nothing it did is silently dropped or smuggled.
@@ -299,8 +335,13 @@ jobs:
             [ -n "$f" ] || continue
             named=false; grep -qxF -- "$f" <<<"$allowed" && named=true
             why=""
-            case "$f" in .github/*|tests/checks/*|tests/baselines/*)
-              [ "$named" = true ] || why="protected path" ;;
+            # tests/checks/ is what verify runs to judge this patch, and finding text is
+            # untrusted: naming a check must not make it editable. tests/baselines/ needs a
+            # `baseline: <why>` commit subject this job never writes, so the dispatched CI
+            # would go red. Both are a human's fix, named or not.
+            case "$f" in
+              tests/checks/*|tests/baselines/*) why="protected path (never agent-editable, even when a finding names it)" ;;
+              .github/*) [ "$named" = true ] || why="protected path" ;;
             esac
             if [ -z "$why" ] && [ "$st" = D ] && [ "$named" = false ]; then why="deletion no finding asked for"; fi
             if [ -z "$why" ] && [ "$st" = A ] && [ "$named" = false ] && ! grep -qxF -- "$(dirname -- "$f")" <<<"$allowed_dirs"; then
@@ -347,13 +388,15 @@ jobs:
           # Usage: run-checks.sh <label>. Prints each failing contract check, one per line, and
           # records how many checks ran in $RUNNER_TEMP/ran-<label>. Mirrors ci.yml's contract
           # loop, with the default branch's skip list ($SKIP).
+          # Each check's output is kept in $RUNNER_TEMP/out-<label>/, so a rejected fix can
+          # say why (Verdict quotes the tail of each new failure, as ci.yml does).
           set -uo pipefail
-          label=$1; ran=0
+          label=$1; ran=0; logs="$RUNNER_TEMP/out-$label"; mkdir -p "$logs"
           for f in tests/checks/*.sh; do
             [ -f "$f" ] || continue
             case " $SKIP " in *" $f "*) continue ;; esac
             ran=$((ran + 1))
-            timeout 300 bash "$f" >/dev/null 2>&1 || printf '%s\n' "$f"
+            timeout 300 bash "$f" > "$logs/$(basename "$f").log" 2>&1 || printf '%s\n' "$f"
           done
           echo "$ran" > "$RUNNER_TEMP/ran-$label"
           SH
@@ -405,7 +448,9 @@ jobs:
         id: verdict
         run: |
           set -uo pipefail
-          out="$RUNNER_TEMP/verify"; mkdir -p "$out"; : > "$out/new-failures.txt"
+          out="$RUNNER_TEMP/verify"; mkdir -p "$out"; : > "$out/new-failures.txt"; : > "$out/new-failures-output.txt"
+          # report resolves a thread only when its file is in here.
+          cp "$RUNNER_TEMP/changed.txt" "$out/changed.txt" 2>/dev/null || : > "$out/changed.txt"
           before=$(cat "$RUNNER_TEMP/ran-before" 2>/dev/null || echo 0)
           after=$(cat "$RUNNER_TEMP/ran-after" 2>/dev/null || echo 0)
           echo "contract checks run: before=$before after=$after"
@@ -415,6 +460,12 @@ jobs:
           fi
           comm -13 <(sort -u "$RUNNER_TEMP/fail-before.txt") <(sort -u "$RUNNER_TEMP/fail-after.txt") >> "$out/new-failures.txt" || true
           cat "$RUNNER_TEMP/lint.txt" >> "$out/new-failures.txt" 2>/dev/null || true
+          # The same 30 lines ci.yml keeps per failure.
+          while IFS= read -r f; do
+            log="$RUNNER_TEMP/out-after/$(basename -- "$f").log"
+            [ -f "$log" ] || continue
+            { printf '=== %s (last 30 lines)\n' "$f"; tail -30 "$log"; echo; } >> "$out/new-failures-output.txt"
+          done < <(grep '^tests/checks/' "$out/new-failures.txt" || true)
           if [ -s "$out/new-failures.txt" ]; then
             echo "ok=false" >> "$GITHUB_OUTPUT"; echo "new failures:"; cat "$out/new-failures.txt"
           else
@@ -489,7 +540,13 @@ jobs:
 
   report:
     needs: [gate, fix, filter, verify, publish]
-    if: always() && needs.gate.result == 'success' && needs.gate.outputs.count != '0'
+    # Also on a gate that failed after the 👀 (skip list missing, GraphQL error, upload
+    # failure), which would otherwise leave the eyes as the only signal. Not on a refusal:
+    # that already is a comment. Not on zero findings: the gate already said so.
+    if: |
+      always() && needs.gate.result != 'skipped'
+      && needs.gate.outputs.refused != 'true'
+      && (needs.gate.result != 'success' || needs.gate.outputs.count != '0')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -498,6 +555,7 @@ jobs:
       issues: write
     steps:
       - uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: findings
           path: ${{ runner.temp }}/findings
@@ -522,6 +580,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.issue.number }}
+          GATE: ${{ needs.gate.result }}
           FIX: ${{ needs.fix.result }}
           FILTER: ${{ needs.filter.result }}
           CHANGED: ${{ needs.filter.outputs.changed }}
@@ -551,18 +610,30 @@ jobs:
               if isinstance(r, dict) and "id" in r:
                   report.setdefault(str(r["id"]).strip(), r)
           new = read("verify/new-failures.txt").strip()
+          # ponytail: capped so a flood of failures cannot push the comment past GitHub's
+          # 65536-character body limit; the full text is in the verify artifact.
+          new_out = read("verify/new-failures-output.txt").strip()[:20000]
+          changed = set(read("verify/changed.txt").splitlines())
+          agent_rc = read("agent-output/exit.txt").strip()
+          truncated = read("findings/truncated.txt").strip()
           dropped = [l.split("\t") for l in read("filtered/dropped.txt").splitlines() if l.strip()]
           sha = e("SHA") or ""
-          if e("PUSHED") == "true":
+          if e("GATE") != "success":
+              head = f"❌ the gate did not finish (`{e('GATE')}`) — nothing was run. See the run log linked above."
+          elif e("PUSHED") == "true":
               head = f"✅ pushed `{sha[:7]}` — CI dispatched on the branch."
           elif e("FIX") != "success":
               head = f"❌ the agent step did not finish (`{e('FIX')}`) — nothing pushed. See the run log."
           elif e("FILTER") != "success":
               head = "❌ could not apply the agent's edit — nothing pushed. See the run log."
+          elif e("CHANGED") == "false" and agent_rc not in ("", "0"):
+              head = f"❌ the agent exited {agent_rc} (124 is the 25-minute timeout) — nothing pushed. See the run log."
           elif e("CHANGED") == "false":
               head = "⚪ nothing to push: the agent made no change, or only edits that were dropped (below)."
           elif e("OK") == "false":
               head = "❌ **not pushed** — the fix introduced new failures:\n```\n" + new + "\n```"
+              if new_out:
+                  head += "\n<details><summary>Output of the new failures</summary>\n\n````\n" + new_out + "\n````\n</details>"
           elif e("VERIFY") != "success":
               head = f"❌ verification did not finish (`{e('VERIFY')}`) — nothing pushed."
           elif e("WHY") == "moved":
@@ -574,7 +645,11 @@ jobs:
               st = r.get("status") if r.get("status") in ("fixed", "skipped") else "unreported"
               why = " ".join(str(r.get("reason", "no report from the agent")).split())[:300]
               return st, why
+          if agent_rc not in ("", "0") and "the agent exited" not in head:
+              head += f"\n\nThe agent exited {agent_rc} (124 is the timeout), so its work may be partial."
           lines = ["<!-- ocr-autofix -->", f"🔧 **/autofix** ({e('RUN_URL')})", "", head, ""]
+          if truncated:
+              lines += [f"⚠️ {truncated} — findings past them were not sent to the agent.", ""]
           for f in findings:
               st, why = status(f)
               icon = {"fixed": "✅", "skipped": "⏭️"}.get(st, "❔")
@@ -583,18 +658,27 @@ jobs:
               lines += ["", "Dropped from the agent's edit:"] + [f"- `{d[0]}` — {d[-1]}" for d in dropped]
           lines += ["", "OCR does not re-review an autofix push by itself. Comment `/open-code-review` to review the fix."]
           (tmp / "summary.md").write_text("\n".join(lines))
+          # Non-fatal per call: one rejected reply must not suppress the rest.
           def gh(*a):
-              subprocess.run(["gh", "api", *a], stdout=subprocess.DEVNULL)
+              r = subprocess.run(["gh", "api", *a], stdout=subprocess.DEVNULL)
+              if r.returncode != 0:
+                  print(f"::warning::gh api {' '.join(a[:2])} exited {r.returncode}")
           repo, pr = e("REPO"), e("PR")
           gh(f"repos/{repo}/issues/{pr}/comments", "-F", f"body=@{tmp / 'summary.md'}")
           if e("PUSHED") != "true":
               sys.exit(0)
-          # Reply on each thread; resolve the fixed ones so the next /autofix skips them.
+          # Reply on each thread. Resolve only on evidence: the agent said fixed AND the pushed
+          # patch changed that file. A resolved thread is hidden from reviewers and from every
+          # later /autofix, so the agent's word alone must not close it.
           for f in findings:
               st, why = status(f)
+              if st == "fixed" and f["path"] not in changed:
+                  gh(f"repos/{repo}/pulls/{pr}/comments/{f['comment']}/replies",
+                     "-f", f"body=🔧 /autofix: reported **fixed**, but {sha[:7]} does not change `{f['path']}` — left open for a human. {why}")
+                  continue
               gh(f"repos/{repo}/pulls/{pr}/comments/{f['comment']}/replies",
                  "-f", f"body=🔧 /autofix: **{st}** in {sha[:7]} — {why}")
-              if st == "fixed":
+              if st == "fixed" and f["path"] in changed:
                   gh("graphql", "-f", "query=mutation($t:ID!){resolveReviewThread(input:{threadId:$t}){thread{isResolved}}}",
                      "-F", f"t={f['thread']}")
           PY
