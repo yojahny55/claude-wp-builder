@@ -85,6 +85,10 @@ That job is the only place here that reaches the network on purpose: a WordPress
 cannot exist without a WordPress. Every version is pinned so an upstream release cannot
 change a result, and nothing it installs is asserted against — every assertion runs against
 the local install.
+And only while provisioning: once the downloads are done, `tests/fixtures/wp/net-guard.php`
+is installed as a must-use plugin that refuses every host but loopback and logs each attempt
+to `wp-content/net-guard.log`, so no fixture check can pass or fail because a real service
+answered.
 
 It pays for itself. Its first two runs found two defects no contract grep and no pure test
 could reach: `get_field_object()` returns false on a post with no value for the field, so

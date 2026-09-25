@@ -88,6 +88,12 @@
   "report only" now sets `--report-only` for the whole run, and Step 4 no longer offers plugin
   installs on a report-only run: it prints the dependency report and continues with what is
   available. `tests/checks/audit-ask-report-only.sh` pins both.
+- **The WordPress fixture runs WordPress 7.1 and is offline once provisioned.** Pins move to
+  WordPress 7.1.2, Polylang 3.8.9, SCF 6.9.5 and CF7 6.1.7 — WooCommerce 11.1 needs WordPress
+  7.0 — and the Polylang and CF7 checks pass unchanged on them. `tests/fixtures/wp/net-guard.php`
+  is installed after the downloads and refuses every outbound host, logging each to
+  `wp-content/net-guard.log`, so no fixture check can pass or fail because a real service
+  answered. The CF7 check's mail sink moved to `tests/fixtures/wp/mail-sink.php` for reuse.
 
 ## [1.28.0] - 2026-09-23
 
