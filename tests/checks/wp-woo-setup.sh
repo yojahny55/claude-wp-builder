@@ -15,7 +15,7 @@ cmd=commands/wp-woo-setup.md
 script=skills/wp-woocommerce/scripts/woo-setup.php
 for f in "$cmd" "$script"; do [ -r "$f" ] || fail "$f is missing or unreadable"; done
 
-line_of() { grep -n -- "$1" "$2" | head -1 | cut -d: -f1; }
+line_of() { grep -n -- "$1" "$2" | head -1 | cut -d: -f1 || true; }
 dry=$(line_of '^## Step 5: Dry run first' "$cmd"); apply=$(line_of '^## Step 6: Apply' "$cmd")
 [ -n "$dry" ] && [ -n "$apply" ] && [ "$dry" -lt "$apply" ] || fail "$cmd must show the dry run (Step 5) before applying (Step 6)"
 sync=$(line_of 'store-kit-sync.sh' "$cmd")
@@ -25,6 +25,8 @@ if grep -E 'eval-file.*--(dry-run|force)' "$cmd" >/dev/null; then fail "$cmd pas
 if grep -Fq "get '\${PROJECT_PATH}' stripe_" "$cmd"; then fail "$cmd reads a Stripe key into the transcript"; fi
 grep -Fq '| `0` | the store matches the block' "$cmd" || fail "$cmd lost its exit 0 row"
 grep -Fq '| `1` | refused' "$cmd" || fail "$cmd lost its exit 1 row"
+grep -Fq 'launch state' "$cmd" || fail "$cmd does not carry the launch-state exception to force"
+grep -Fq 'WP_CREATE_STRIPE_TEST_WEBHOOK_SECRET' "$cmd" || fail "$cmd never mentions the Stripe webhook secret"
 
 h=$(grep -nE '^\s*wooset_step_hpos\(' "$script" | cut -d: -f1)
 pg=$(grep -nE '^\s*wooset_step_pages\(' "$script" | cut -d: -f1)

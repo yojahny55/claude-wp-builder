@@ -115,6 +115,12 @@ The script reads them itself, writes them to `wp-config.php` as `STORE_KIT_STRIP
 constants, and never prints them. Without keys the store is still set up, and payments stay off
 with a `degraded` line that says where the keys go.
 
+A webhook secret is optional, in the same two places — `store.payments.test_webhook_secret` in
+`.wp-create.local.json`, or `WP_CREATE_STRIPE_TEST_WEBHOOK_SECRET` — starting `whsec_`. Without
+it, Stripe's webhooks (async payment confirmations, refunds, disputes) are not verified. Stripe
+may rotate it later; setup leaves a rotated value to reach the database, and store-kit shows a
+notice naming the now-stale constant.
+
 ## Step 5: Dry run first
 
 ```bash
@@ -132,7 +138,10 @@ bash -c "$WP eval-file '${CLAUDE_PLUGIN_ROOT}/skills/wp-woocommerce/scripts/woo-
 ```
 
 Append ` force` only when the operator passed `--force`. It takes back values the client
-changed and applies to a store that already has orders, which otherwise runs report-only.
+changed and applies to a store that already has orders, which otherwise runs report-only. The
+one exception: on a store that has orders, launch state — coming soon, Stripe's
+`enabled`/`testmode`, cash on delivery — is never changed by `force`; change it in WooCommerce
+instead.
 
 ## Step 7: Report
 
@@ -145,7 +154,7 @@ changed and applies to a store that already has orders, which otherwise runs rep
 |---|---|
 | `set` / `would-set` | changed, or would be in a dry or report-only run |
 | `ok` | already what the block says |
-| `client` | differs, and setup did not write it: left alone; `--force` takes it back |
+| `client` | differs, and setup did not write it: left alone; `force` takes it back — except launch state on a store with orders, which `force` never changes; change it in WooCommerce |
 | `degraded` | could not be done here; the line says why and what to do |
 | `note` | information only |
 
