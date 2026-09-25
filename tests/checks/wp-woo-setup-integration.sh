@@ -353,6 +353,14 @@ for id in woocommerce_coming_soon woocommerce_stripe_settings.testmode; do
   grep -q "^client $id: .*launch state on a store with orders: change it in WooCommerce, force does not" <<<"$out" \
     || fail "force on a store with orders did not report $id as launch state: $(grep "$id" <<<"$out")"
 done
+# An absent row is launch state too: WooCommerce reads it as a live shop, so writing one on an
+# older adopted store would take it offline.
+q 'delete_option( "woocommerce_coming_soon" );'
+out=$(run_setup force) || fail "the forced run with no coming-soon row failed: $out"
+[ "$(q 'global $wpdb; echo $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name = \"woocommerce_coming_soon\"" );')" = "0" ] \
+  || fail "setup wrote a coming-soon row on a store with orders: $(grep woocommerce_coming_soon <<<"$out")"
+grep -q '^client woocommerce_coming_soon: kept absent, .*launch state on a store with orders: change it in WooCommerce, force does not' <<<"$out" \
+  || fail "an absent coming-soon row was not reported as launch state: $(grep woocommerce_coming_soon <<<"$out")"
 q 'update_option( "woocommerce_coming_soon", "no" ); $s = get_option( "woocommerce_stripe_settings" ); $s["testmode"] = "yes"; update_option( "woocommerce_stripe_settings", $s );'
 [ "$(q 'echo count( (array) get_option( "store_kit_setup_state", array() ) );')" -gt 0 ] || fail "force did not record ownership"
 

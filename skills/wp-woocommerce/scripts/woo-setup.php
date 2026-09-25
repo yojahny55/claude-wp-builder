@@ -46,14 +46,18 @@ function wooset_report( $status, $id, $detail = '' ) {
 /**
  * One owned value: read it, decide whose it is, write it if it is ours, record what we wrote.
  * $kind: 'secret' -- a credential, shown only as a fingerprint in any note; 'launch' -- decides
- * whether a store takes real money, and is never forced on a store that has orders.
+ * whether a store takes real money, and is never written on a store that has orders.
  */
 function wooset_converge( $id, $desired, $get, $set, $note = '', $kind = '' ) {
 	$c        = &$GLOBALS['wooset_ctx'];
 	$current  = call_user_func( $get );
 	$recorded = isset( $c['state'][ $id ] ) ? $c['state'][ $id ] : null;
 	$held     = 'launch' === $kind && $c['orders'];
-	$decision = wooset_decide( $current, $desired, $recorded, $c['fresh'], $c['force'] && ! $held );
+	// On a store with orders launch state is never written, absent or not, forced or not:
+	// WooCommerce reads an absent coming-soon row as a live shop, so writing one takes it offline.
+	$decision = $held
+		? ( wooset_same( $current, $desired ) ? 'ok' : 'client' )
+		: wooset_decide( $current, $desired, $recorded, $c['fresh'], $c['force'] );
 	if ( 'set' === $decision && $c['write'] ) {
 		call_user_func( $set, $desired );
 	}
@@ -62,7 +66,7 @@ function wooset_converge( $id, $desired, $get, $set, $note = '', $kind = '' ) {
 	}
 	if ( 'client' === $decision ) {
 		$show = 'secret' === $kind ? 'wooset_fingerprint' : 'wooset_show';
-		$note = 'kept ' . $show( $current ) . ', the block says ' . $show( $desired )
+		$note = 'kept ' . ( $held && null === $current ? 'absent' : $show( $current ) ) . ', the block says ' . $show( $desired )
 			. ( $held ? ' (launch state on a store with orders: change it in WooCommerce, force does not)' : ' (force takes it back)' );
 	}
 	wooset_report( $decision, $id, $note );
