@@ -10,8 +10,8 @@
  * SEC-040 reads the raw row, so it reports what is actually stored.
  *
  * Three things are left in the database on purpose, and SEC-040 is what surfaces each one:
- * - a rotated webhook secret. Stripe periodically recreates its webhook endpoint and saves the
- *   new secret; a *_webhook_secret constant only ever seeds an empty row, it never overrides a
+ * - a rotated webhook secret. Stripe rotates it when Stripe reconfigures webhooks (connect,
+ *   re-key, the settings button, or after a plugin update) and saves the new secret; a *_webhook_secret constant only ever seeds an empty row, it never overrides a
  *   value Stripe itself already wrote there, so a rotation reaches the database and an admin
  *   notice says so and names the now-stale constant.
  * - a key whose prefix does not match its field's mode (test vs live). store_kit_stripe_supplied()
@@ -183,11 +183,20 @@ function store_kit_stripe_notice() {
 	}
 
 	$supplied = store_kit_stripe_supplied();
-	if ( $supplied ) {
+	$api_keys = array_diff( array_keys( $supplied ), store_kit_stripe_seed_only_fields() );
+	$webhooks = array_intersect( array_keys( $supplied ), store_kit_stripe_seed_only_fields() );
+	if ( $api_keys ) {
 		echo '<div class="notice notice-info"><p>' . sprintf(
 			/* translators: %s: comma-separated list of settings field names supplied by wp-config.php */
-			esc_html__( 'These Stripe fields are set in wp-config.php by Store Kit and are not saved from this screen: %s.', 'store-kit' ),
-			esc_html( implode( ', ', array_keys( $supplied ) ) )
+			esc_html__( 'These Stripe API keys are set in wp-config.php by Store Kit and are not saved from this screen: %s.', 'store-kit' ),
+			esc_html( implode( ', ', $api_keys ) )
+		) . '</p></div>';
+	}
+	if ( $webhooks ) {
+		echo '<div class="notice notice-info"><p>' . sprintf(
+			/* translators: %s: comma-separated list of webhook secret field names */
+			esc_html__( 'Webhook secrets are seeded from wp-config.php when the field is empty: %s. To re-seed after updating the constant, clear the field on this screen.', 'store-kit' ),
+			esc_html( implode( ', ', $webhooks ) )
 		) . '</p></div>';
 	}
 

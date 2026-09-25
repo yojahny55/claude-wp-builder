@@ -59,7 +59,8 @@ Measured on WooCommerce 11.1.2 unless marked (source).
   are `STORE_KIT_STRIPE_*` constants in `wp-config.php`; `store-kit` supplies them when the
   gateway reads its settings and strips them when it saves, so a database dump or clone carries
   none of those, and SEC-040 (which reads the raw row) agrees. A webhook-secret constant only
-  ever seeds an *empty* field, because Stripe periodically rotates that secret on its own — a
+  ever seeds an *empty* field, because Stripe rotates that secret on its own when Stripe
+  reconfigures webhooks (connect, re-key, the settings button, or after a plugin update) — a
   rotated value is left to reach the database, with an admin notice naming the now-stale
   constant. Configure Stripe with API keys, not "Connect with Stripe", which saves keys to the
   database.

@@ -54,6 +54,26 @@ fi
 grep -Fq "find . -name '*.php' -not -path './node_modules/*'" .github/workflows/ci.yml \
   || fail "CI's PHP 7.4 lint no longer walks the whole tree, so plugins/ may not be linted"
 
+# A webhook secret is seeded, not supplied: the Stripe screen must not tell the admin it is not
+# saved there, and must say how to re-seed it from an updated constant.
+notice=$(KIT="$PWD/$kit" php <<'PHP3'
+<?php
+define( 'ABSPATH', '/tmp/' );
+function add_filter() {}
+function add_action() {}
+function esc_html__( $s ) { return $s; }
+function esc_html( $s ) { return $s; }
+function get_option() { return array(); }
+require getenv( 'KIT' ) . '/includes/credentials.php';
+define( 'STORE_KIT_STRIPE_TEST_WEBHOOK_SECRET', 'whsec_const' );
+$_GET['section'] = 'stripe';
+store_kit_stripe_notice();
+PHP3
+) || fail "store-kit's Stripe screen notice does not run"
+if grep -Fq 'not saved from this screen' <<<"$notice"; then fail "the Stripe screen says a seeded webhook secret is not saved there: $notice"; fi
+grep -Fq 'To re-seed after updating the constant, clear the field on this screen' <<<"$notice" \
+  || fail "the Stripe screen does not say how to re-seed a webhook secret from wp-config.php: $notice"
+
 KIT="$PWD/$kit" php <<'PHP' || fail "store-kit's credential filters misbehave"
 <?php
 define( 'ABSPATH', '/tmp/' );
