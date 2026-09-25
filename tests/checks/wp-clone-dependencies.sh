@@ -78,6 +78,8 @@ need 'Dependencies:' 'the clone summary does not carry the dependency counts'
 # --- A plugin this repository ships is neither WordPress.org's nor the client's to supply. ---
 need 'Bundled plugins first' 'does not check for a bundled plugin before asking WordPress.org'
 need 'reinstall with `/wp-woo-setup`' 'does not tell the operator how a bundled plugin comes back'
+# A slug alone is not ours: a same-slug plugin on the source would read as store-kit.
+need 'header prints exactly the `title` the source reported' 'classifies a plugin as bundled by its slug alone, not by a matching Plugin Name header'
 b=$(grep -n 'Bundled plugins first' "$f" | head -1 | cut -d: -f1)
 o=$(grep -n 'api.wordpress.org/plugins/info' "$f" | head -1 | cut -d: -f1)
 [ -n "$b" ] && [ -n "$o" ] && [ "$b" -lt "$o" ] \

@@ -183,11 +183,16 @@ bash -c "ssh user@host 'cd /remote/path && wp theme list --fields=name,status,ve
 
 **Bundled plugins first.** A plugin claude-wp-builder ships — `store-kit` — is not on
 WordPress.org and is not the client's to supply: it comes back from this repository. Check the
-plugin root before asking WordPress.org:
+plugin root before asking WordPress.org, and read the bundled file's header:
 
 ```bash
-bash -c "test -f '${CLAUDE_PLUGIN_ROOT}/plugins/<slug>/<slug>.php' && echo bundled"
+bash -c "sed -n 's/^ \* Plugin Name: *//p' '${CLAUDE_PLUGIN_ROOT}/plugins/<slug>/<slug>.php' 2>/dev/null"
 ```
+
+The plugin is `bundled` only when `plugins/<slug>/<slug>.php` exists **and** its `Plugin Name:`
+header prints exactly the `title` the source reported for that slug in the inventory above. A
+missing file prints nothing; a different name is a same-slug plugin that is not ours, and goes
+through the WordPress.org split below like any other.
 
 A `bundled` answer is reported as "shipped by claude-wp-builder — reinstall with `/wp-woo-setup`",
 which copies and activates it. Only the rest go through the WordPress.org split below.
