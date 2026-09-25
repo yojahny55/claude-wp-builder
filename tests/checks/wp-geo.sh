@@ -94,4 +94,13 @@ grep -q -- '--geo' "$yolo" || fail "$yolo missing --geo"
 grep -q 'geo-scan.sh' "$yolo" || fail "$yolo must run the live scan"
 grep -q 'GEO & agent-readiness' "$finalize" || fail "$finalize missing the GEO readiness check"
 
+# --- One answer to "is this a store": WooCommerce active, the same test /wp-audit Step 2.3 records.
+if grep -rn 'is-installed woocommerce' agents skills commands >/dev/null 2>&1; then
+  fail "a GEO file still detects a merchant with is-installed: $(grep -rln 'is-installed woocommerce' agents skills commands | tr '\n' ' ')"
+fi
+for f in agents/wp-audit-geo.md agents/wp-agentic-surfaces.md skills/wp-audit-geo-standards/SKILL.md; do
+  grep -Fq 'is-active woocommerce' "$f" || fail "$f does not detect a merchant with is-active"
+done
+grep -Fq 'site.commerce' agents/wp-audit-geo.md || fail "agents/wp-audit-geo.md does not read site.commerce from Step 2.3"
+
 echo PASS

@@ -194,6 +194,22 @@ after a new commerce check ships scores exactly as it did before, because that c
 `is-active`, not `is-installed`: a store with WooCommerce deactivated is not currently a
 store, and its commerce surfaces are not live to audit.
 
+### Store tier — what the store sells
+
+A store set up by `/wp-woo-setup` records what it sells in `.wp-create.json`, and a catalog
+sells nothing: its products carry prices, and no cart or checkout is live. Read the tier once:
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' store.tier 2>/dev/null || echo unknown"
+```
+
+Set `site.store_tier` to `catalog`, `store` or `full`, or `unknown` when there is no `store`
+block (a store set up by hand, or before `/wp-woo-setup` existed). A check whose object is the
+cart, the checkout or a payment is **`N/A ("catalog: nothing purchasable")`** when
+`site.store_tier` is `catalog` — the rule `site.commerce` applies, one level down, for the same
+reason: a catalog must not be scored for a checkout it deliberately does not have. `unknown` is
+not `catalog`: it audits as a store.
+
 ### Local clone — audit production's posture, not the copy's
 
 When `.wp-create.json` carries `project.source: "restore"` (the field lives under
@@ -270,6 +286,7 @@ Print the two facts before tier detection, next to the adopted-site block when t
 ```
 === Site ===
   Type          <commerce (WooCommerce) | non-commerce>
+  Store tier    <catalog | store | full | unknown>
   Local clone   <yes — production: https://… | no>
 ```
 
@@ -748,6 +765,7 @@ Project context:
 - Read-only code: <code_scope.read_only, or "none" when created>
 - Stack: <seo=… security=… fields=… multilingual=… builder=… cache=…, or "plugin defaults" when created>
 - Site type (commerce): <site.commerce value — woocommerce|none>
+- Store tier: <site.store_tier — catalog|store|full|unknown>
 - Local clone: <yes|no>
 - Clone-suppressed plugins: <clone_suppressed_plugins slugs, comma-separated, or "none">
 - Parked drop-ins: <clone_parked_dropins files, comma-separated, or "none">

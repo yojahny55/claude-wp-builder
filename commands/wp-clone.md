@@ -181,6 +181,17 @@ bash -c "ssh user@host 'cd /remote/path && wp theme list --fields=name,status,ve
 
 ### Split the list by what the operator can do about it
 
+**Bundled plugins first.** A plugin claude-wp-builder ships — `store-kit` — is not on
+WordPress.org and is not the client's to supply: it comes back from this repository. Check the
+plugin root before asking WordPress.org:
+
+```bash
+bash -c "test -f '${CLAUDE_PLUGIN_ROOT}/plugins/<slug>/<slug>.php' && echo bundled"
+```
+
+A `bundled` answer is reported as "shipped by claude-wp-builder — reinstall with `/wp-woo-setup`",
+which copies and activates it. Only the rest go through the WordPress.org split below.
+
 For each plugin and theme the source has **active** and the destination does not have on
 disk, decide which of three groups it belongs to:
 
@@ -210,6 +221,9 @@ that repeats what is already there buries the part that needs action.
 Recoverable — install these (versions from the source):
   wp plugin install contact-form-7 --version=6.0.1 --activate
   wp plugin install wordpress-seo --version=23.4 --activate
+
+Bundled with claude-wp-builder — reinstall with /wp-woo-setup:
+  store-kit                  1.0.0
 
 Not on WordPress.org — this clone is incomplete without them:
   woocommerce-subscriptions  6.4.1   (active on the source)
