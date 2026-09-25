@@ -109,6 +109,9 @@
   and given Polylang's default language, shipping and tax matched without duplicates, Stripe
   keys written to `wp-config.php`, the checkout rate limit and Turnstile on, catalog mode for a
   catalog. It records a hash of every value it writes and leaves the rest alone as the client's.
+  `force` takes those back, except launch state — coming soon, Stripe's switches, cash on
+  delivery — which it never changes on a store that has orders; a secret it leaves alone is
+  reported by fingerprint, never by value.
   `tests/checks/wp-woo-setup-integration.sh` proves it in the fixture (WooCommerce 11.1.2):
   second runs change nothing, and the store takes a real Store API order — processing, in the
   HPOS table, with the right total and both emails.

@@ -87,7 +87,7 @@ PY
 # Every value setup writes, the rows it creates, and wp-config.php: two equal snapshots mean
 # nothing setup owns was touched.
 snapshot() {
-  q 'global $wpdb; $o = array(); foreach ( array( "woocommerce_onboarding_profile", "woocommerce_task_list_hidden_lists", "woocommerce_allow_tracking", "woocommerce_show_marketplace_suggestions", "woocommerce_admin_created_default_shipping_zones", "woocommerce_custom_orders_table_enabled", "woocommerce_custom_orders_table_data_sync_enabled", "woocommerce_store_address", "woocommerce_store_city", "woocommerce_store_postcode", "woocommerce_default_country", "woocommerce_currency", "woocommerce_weight_unit", "woocommerce_dimension_unit", "woocommerce_manage_stock", "woocommerce_enable_reviews", "woocommerce_file_download_method", "woocommerce_enable_guest_checkout", "woocommerce_enable_delayed_account_creation", "woocommerce_enable_coupons", "woocommerce_calc_taxes", "woocommerce_prices_include_tax", "woocommerce_stripe_settings", "woocommerce_cod_settings", "woocommerce_feature_rate_limit_checkout_enabled", "woocommerce_coming_soon", "woocommerce_store_pages_only", "woocommerce_terms_page_id", "store_kit_catalog_mode", "store_kit_setup_state", "cfturnstile_key", "cfturnstile_secret", "cfturnstile_woo_checkout", "cfturnstile_tested" ) as $n ) { $o[ $n ] = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $n ) ); } foreach ( array( "woocommerce_shipping_zones", "woocommerce_shipping_zone_methods", "woocommerce_tax_rates" ) as $t ) { $o[ $t ] = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}$t" ); } $o["config"] = md5_file( ABSPATH . "wp-config.php" ); echo hash( "sha256", serialize( $o ) );'
+  q 'global $wpdb; $o = array(); foreach ( array( "woocommerce_onboarding_profile", "woocommerce_task_list_hidden_lists", "woocommerce_allow_tracking", "woocommerce_show_marketplace_suggestions", "woocommerce_admin_created_default_shipping_zones", "woocommerce_custom_orders_table_enabled", "woocommerce_custom_orders_table_data_sync_enabled", "woocommerce_store_address", "woocommerce_store_city", "woocommerce_store_postcode", "woocommerce_default_country", "woocommerce_currency", "woocommerce_weight_unit", "woocommerce_dimension_unit", "woocommerce_manage_stock", "woocommerce_enable_reviews", "woocommerce_file_download_method", "woocommerce_enable_guest_checkout", "woocommerce_enable_delayed_account_creation", "woocommerce_enable_coupons", "woocommerce_calc_taxes", "woocommerce_prices_include_tax", "woocommerce_stripe_settings", "woocommerce_cod_settings", "woocommerce_feature_rate_limit_checkout_enabled", "woocommerce_coming_soon", "woocommerce_store_pages_only", "woocommerce_terms_page_id", "store_kit_catalog_mode", "store_kit_setup_state", "cfturnstile_key", "cfturnstile_secret", "cfturnstile_woo_checkout", "cfturnstile_tested" ) as $n ) { $o[ $n ] = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $n ) ); } foreach ( array( "woocommerce_shipping_zones", "woocommerce_shipping_zone_methods", "woocommerce_tax_rates" ) as $t ) { $o[ $t ] = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}$t" ); } foreach ( array( "shop", "cart", "checkout", "myaccount", "terms" ) as $p ) { $o["lang:$p"] = function_exists( "pll_get_post_language" ) ? pll_get_post_language( (int) get_option( "woocommerce_{$p}_page_id" ) ) : null; } $o["config"] = md5_file( ABSPATH . "wp-config.php" ); echo hash( "sha256", serialize( $o ) );'
 }
 rows() { q 'global $wpdb; foreach ( array( "woocommerce_shipping_zones", "woocommerce_shipping_zone_methods", "woocommerce_tax_rates" ) as $t ) { echo $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}$t" ), " "; }'; }
 # The stored row, read with no plugin loaded: Stripe 11.0.0 saves its own settings once when its
@@ -120,9 +120,11 @@ if grep -q 'sk_live_fixture' <<<"$out"; then fail "the refusal printed the key";
 
 # store-kit ignores a constant whose prefix does not match its field, silently -- so setup must
 # refuse to write one rather than report keys configured that Stripe will never read.
-write_keys "fixture$(date +%s)" "$PK"
+BAD="fixture$(date +%s%N)"
+write_keys "$BAD" "$PK"
 set +e; out=$(run_setup); code=$?; set -e
 [ "$code" = "1" ] || fail "a malformed test key exited $code, want 1: $out"
+if grep -Fq "$BAD" <<<"$out"; then fail "the malformed-key refusal printed the key"; fi
 grep -q '^refused: test_secret_key does not look like a Stripe test key' <<<"$out" || fail "the refusal does not name the malformed field: $out"
 [ "$(snapshot)" = "$before" ] || fail "a refused run (malformed key) changed the store"
 
@@ -130,6 +132,7 @@ grep -q '^refused: test_secret_key does not look like a Stripe test key' <<<"$ou
 write_keys "$SK" "$PK"
 node bin/wp-config.mjs validate "$PROJ" >/dev/null || fail "this check's own store block does not validate"
 out=$(run_setup dry-run) || fail "the dry run failed: $out"
+if grep -Fq "$SK" <<<"$out"; then fail "the dry run printed the Stripe secret key"; fi
 grep -q '^plan: ' <<<"$out" || fail "the dry run printed no plan summary: $out"
 grep -q '^would-set ' <<<"$out" || fail "the dry run printed no would-set line"
 [ "$(snapshot)" = "$before" ] || fail "a dry run changed the store"
@@ -180,9 +183,23 @@ cost() { q "echo get_option( '$flat' )['cost'];"; }
 q "\$s = get_option( '$flat' ); \$s['cost'] = '12.00'; update_option( '$flat', \$s );"
 out=$(run_setup) || fail "the run after a client edit failed: $out"
 grep -q '^client .*zone:United States:flat_rate' <<<"$out" || fail "the client's shipping cost was not reported as the client's: $out"
-[ "$(cost)" = "12.00" ] || fail "setup overwrote the client's shipping cost"
+[ "$(cost)" = "12.00" ] || fail "setup overwrote the client's shipping cost (cost reads '$(cost)'): $out"
 out=$(run_setup force) || fail "the forced run failed: $out"
+if grep -Fq "$SK" <<<"$out"; then fail "the forced run printed the Stripe secret key"; fi
 [ "$(cost)" = "10.00" ] || fail "force did not take the shipping cost back"
+# A client's Turnstile secret (a local clone of a live site holds the production one) reads as
+# the client's and is reported by fingerprint only.
+TS="0x4AAAfixture$(date +%s%N)"
+q "update_option( 'cfturnstile_secret', '$TS' );"
+ts_print=$(printf '%s' "$TS" | sha256sum | cut -c1-12)
+for mode in dry-run ""; do
+  out=$(run_setup $mode) || fail "the run with a client's Turnstile secret failed ($mode)"
+  if grep -Fq "$TS" <<<"$out"; then fail "the client note printed the Turnstile secret (${mode:-real run})"; fi
+  grep -q "^client cfturnstile_secret: kept sha256:$ts_print," <<<"$out" \
+    || fail "the client's Turnstile secret is not reported by its fingerprint (${mode:-real run}): $(grep cfturnstile_secret <<<"$out")"
+done
+[ "$(q 'echo get_option( "cfturnstile_secret" );')" = "$TS" ] || fail "setup overwrote the client's Turnstile secret"
+q 'update_option( "cfturnstile_secret", "1x0000000000000000000000000000000AA" );'
 # Review Focus 2: the operator changes the block; setup wrote the old value, so it updates its own.
 set_block 's["shipping"][0]["methods"][0]["cost"] = "11.00"'
 out=$(run_setup) || fail "the run after a block change failed: $out"
@@ -207,11 +224,37 @@ run_setup >/dev/null || fail "the run after a language change failed"
 q "pll_set_post_language( $cart, 'en' );"
 
 # Review Focus 1: no keys anywhere -- say where they go.
+cod_line='^(set|ok|client|would-set) woocommerce_cod_settings\.enabled'
+cp "$DIR/wp-config.php" "$PROJ/wp-config.php.bak"
 mv "$PROJ/.wp-create.local.json" "$PROJ/keys.json"
 out=$(run_setup) || fail "the run without keys failed: $out"
+grep -q '^ok stripe:keys: in wp-config.php' <<<"$out" || fail "keys already in wp-config.php were not reported ok: $(grep stripe <<<"$out")"
+$WP config delete STORE_KIT_STRIPE_TEST_SECRET_KEY --quiet
+$WP config delete STORE_KIT_STRIPE_TEST_PUBLISHABLE_KEY --quiet
+out=$(run_setup) || fail "the run without keys or constants failed: $out"
 grep -q '^degraded stripe: .*WP_CREATE_STRIPE_TEST_SECRET_KEY.*\.wp-create\.local\.json' <<<"$out" \
   || fail "missing keys are not reported with where they belong: $out"
 mv "$PROJ/keys.json" "$PROJ/.wp-create.local.json"
+# Review Focus 6: keys to write and a wp-config.php that cannot take them. Only Stripe's steps
+# are skipped: cash on delivery is still converged.
+chmod 444 "$DIR/wp-config.php"
+if [ -w "$DIR/wp-config.php" ]; then
+  echo "  note: running as root, so chmod cannot make wp-config.php unwritable; the failed-write case below takes the same path"
+else
+  out=$(run_setup) || fail "the run with an unwritable wp-config.php failed: $out"
+  grep -q '^degraded stripe:keys: wp-config.php is not writable' <<<"$out" || fail "an unwritable wp-config.php was not reported: $(grep stripe <<<"$out")"
+  grep -Eq "$cod_line" <<<"$out" || fail "cash on delivery was skipped when wp-config.php was not writable: $out"
+fi
+chmod 644 "$DIR/wp-config.php"
+# No placement anchor, so WPConfigTransformer throws when it adds a constant.
+sed -i "/That's all, stop editing/d" "$DIR/wp-config.php"
+out=$(run_setup) || fail "the run with a wp-config.php that cannot be written failed: $out"
+if grep -Fq "$SK" <<<"$out"; then fail "a failed wp-config.php write printed the Stripe secret key"; fi
+grep -q '^degraded stripe:keys: wp-config.php could not be written (Exception)' <<<"$out" \
+  || fail "a failed wp-config.php write was not reported by exception class: $(grep stripe <<<"$out")"
+grep -Eq "$cod_line" <<<"$out" || fail "cash on delivery was skipped when wp-config.php could not be written: $out"
+cp "$PROJ/wp-config.php.bak" "$DIR/wp-config.php"
+run_setup >/dev/null || fail "the run after restoring wp-config.php failed"
 
 # --- A real order through the Store API --------------------------------------------------------
 PRODUCT=$($WP eval-file tests/fixtures/wp/woo-product.php 2>/dev/null | sed -n 's/^PRODUCT_ID=//p')
@@ -294,11 +337,23 @@ q 'update_option( "woocommerce_stripe_settings", get_option( "woocommerce_stripe
 
 # --- Review Focus 4: a store with orders and no setup record is report-only ------------------
 q 'delete_option( "store_kit_setup_state" );'
+# The merchant's launch state differs from what the block implies for a local store.
+q 'update_option( "woocommerce_coming_soon", "yes" ); $s = get_option( "woocommerce_stripe_settings" ); $s["testmode"] = "no"; update_option( "woocommerce_stripe_settings", $s );'
+testmode() { q 'echo get_option( "woocommerce_stripe_settings" )["testmode"];'; }
 before=$(snapshot)
 out=$(run_setup) || fail "the report-only run failed: $out"
 grep -q '^report-only' <<<"$out" || fail "a store with orders and no setup record was not run report-only: $out"
+grep -q '^report-only: .*force never changes launch state' <<<"$out" || fail "the report-only line does not say force leaves launch state alone: $out"
 [ "$(snapshot)" = "$before" ] || fail "a report-only run wrote to the store"
-run_setup force >/dev/null || fail "the forced run after report-only failed"
+out=$(run_setup force) || fail "the forced run after report-only failed: $out"
+if grep -Fq "$SK" <<<"$out"; then fail "the forced run after report-only printed the Stripe secret key"; fi
+[ "$(q 'echo get_option( "woocommerce_coming_soon" );')" = "yes" ] || fail "force changed coming soon on a store with orders"
+[ "$(testmode)" = "no" ] || fail "force changed Stripe test mode on a store with orders"
+for id in woocommerce_coming_soon woocommerce_stripe_settings.testmode; do
+  grep -q "^client $id: .*launch state on a store with orders: change it in WooCommerce, force does not" <<<"$out" \
+    || fail "force on a store with orders did not report $id as launch state: $(grep "$id" <<<"$out")"
+done
+q 'update_option( "woocommerce_coming_soon", "no" ); $s = get_option( "woocommerce_stripe_settings" ); $s["testmode"] = "yes"; update_option( "woocommerce_stripe_settings", $s );'
 [ "$(q 'echo count( (array) get_option( "store_kit_setup_state", array() ) );')" -gt 0 ] || fail "force did not record ownership"
 
 # --- A catalog ----------------------------------------------------------------------------------

@@ -43,12 +43,17 @@ function wooset_report( $status, $id, $detail = '' ) {
 	WP_CLI::line( $status . ' ' . $id . ( '' === $detail ? '' : ': ' . $detail ) );
 }
 
-/** One owned value: read it, decide whose it is, write it if it is ours, record what we wrote. */
-function wooset_converge( $id, $desired, $get, $set, $note = '' ) {
+/**
+ * One owned value: read it, decide whose it is, write it if it is ours, record what we wrote.
+ * $kind: 'secret' -- a credential, shown only as a fingerprint in any note; 'launch' -- decides
+ * whether a store takes real money, and is never forced on a store that has orders.
+ */
+function wooset_converge( $id, $desired, $get, $set, $note = '', $kind = '' ) {
 	$c        = &$GLOBALS['wooset_ctx'];
 	$current  = call_user_func( $get );
 	$recorded = isset( $c['state'][ $id ] ) ? $c['state'][ $id ] : null;
-	$decision = wooset_decide( $current, $desired, $recorded, $c['fresh'], $c['force'] );
+	$held     = 'launch' === $kind && $c['orders'];
+	$decision = wooset_decide( $current, $desired, $recorded, $c['fresh'], $c['force'] && ! $held );
 	if ( 'set' === $decision && $c['write'] ) {
 		call_user_func( $set, $desired );
 	}
@@ -56,13 +61,15 @@ function wooset_converge( $id, $desired, $get, $set, $note = '' ) {
 		$c['state'][ $id ] = wooset_hash( $desired );
 	}
 	if ( 'client' === $decision ) {
-		$note = 'kept ' . wooset_show( $current ) . ', the block says ' . wooset_show( $desired ) . ' (force takes it back)';
+		$show = 'secret' === $kind ? 'wooset_fingerprint' : 'wooset_show';
+		$note = 'kept ' . $show( $current ) . ', the block says ' . $show( $desired )
+			. ( $held ? ' (launch state on a store with orders: change it in WooCommerce, force does not)' : ' (force takes it back)' );
 	}
 	wooset_report( $decision, $id, $note );
 	return $decision;
 }
 
-function wooset_option( $option, $value, $note = '' ) {
+function wooset_option( $option, $value, $note = '', $kind = '' ) {
 	return wooset_converge(
 		$option,
 		$value,
@@ -72,11 +79,12 @@ function wooset_option( $option, $value, $note = '' ) {
 		function ( $v ) use ( $option ) {
 			update_option( $option, $v );
 		},
-		$note
+		$note,
+		$kind
 	);
 }
 
-function wooset_suboption( $option, $key, $value, $note = '' ) {
+function wooset_suboption( $option, $key, $value, $note = '', $kind = '' ) {
 	return wooset_converge(
 		$option . '.' . $key,
 		$value,
@@ -90,7 +98,8 @@ function wooset_suboption( $option, $key, $value, $note = '' ) {
 			$o[ $key ] = $v;
 			update_option( $option, $o );
 		},
-		$note
+		$note,
+		$kind
 	);
 }
 
@@ -468,52 +477,72 @@ function wooset_step_tax( $store ) {
 }
 
 function wooset_step_payments( $keys, $root ) {
-	$c = $GLOBALS['wooset_ctx'];
-	if ( '' !== $keys['test_secret_key'] && '' !== $keys['test_publishable_key'] ) {
-		$map     = array(
-			'test_secret_key'      => 'STORE_KIT_STRIPE_TEST_SECRET_KEY',
-			'test_publishable_key' => 'STORE_KIT_STRIPE_TEST_PUBLISHABLE_KEY',
-			'test_webhook_secret'  => 'STORE_KIT_STRIPE_TEST_WEBHOOK_SECRET',
-		);
-		$changed = array();
-		foreach ( $map as $field => $constant ) {
-			if ( '' !== $keys[ $field ] && ! ( defined( $constant ) && constant( $constant ) === $keys[ $field ] ) ) {
-				$changed[ $field ] = $constant;
-			}
-		}
-		if ( ! $changed ) {
-			wooset_report( 'ok', 'stripe:keys', 'in wp-config.php, not the database (SEC-040)' );
-		} else {
-			$config = wooset_config_path();
-			if ( ! $config || ! class_exists( 'WPConfigTransformer' ) ) {
-				wooset_report( 'degraded', 'stripe:keys', 'wp-config.php is not writable here: the keys were not written' );
-				return;
-			}
-			if ( $c['write'] ) {
-				$t = new WPConfigTransformer( $config );
-				foreach ( $changed as $field => $constant ) {
-					$t->update( 'constant', $constant, $keys[ $field ], array( 'raw' => false, 'normalize' => true ) );
-					// This process read wp-config.php before the write. Defining the constant here
-					// is what lets store-kit's save filter strip the field in the re-save below.
-					if ( ! defined( $constant ) ) {
-						define( $constant, $keys[ $field ] );
-					}
-				}
-			}
-			wooset_report( 'set', 'stripe:keys', implode( ', ', array_keys( $changed ) ) . ' written to wp-config.php, values not shown (SEC-040: no key at rest)' );
-		}
+	// Only Stripe's own sub-steps depend on the keys; cash on delivery is converged either way.
+	if ( wooset_stripe_keys( $keys, $root ) ) {
 		wooset_stripe_resave();
-		wooset_suboption( 'woocommerce_stripe_settings', 'enabled', 'yes' );
-		wooset_suboption( 'woocommerce_stripe_settings', 'testmode', 'yes' );
-	} else {
-		wooset_report( 'degraded', 'stripe', 'no test keys in WP_CREATE_STRIPE_TEST_SECRET_KEY and _PUBLISHABLE_KEY, or in ' . $root . '/.wp-create.local.json (store.payments.test_secret_key, test_publishable_key): payments stay off until they are there' );
+		wooset_suboption( 'woocommerce_stripe_settings', 'enabled', 'yes', '', 'launch' );
+		wooset_suboption( 'woocommerce_stripe_settings', 'testmode', 'yes', '', 'launch' );
 	}
+	$local = $GLOBALS['wooset_ctx']['local'];
 	wooset_suboption(
 		'woocommerce_cod_settings',
 		'enabled',
-		$c['local'] ? 'yes' : 'no',
-		$c['local'] ? 'local only: pays the automated test order' : 'off outside a local environment'
+		$local ? 'yes' : 'no',
+		$local ? 'local only: pays the automated test order' : 'off outside a local environment',
+		'launch'
 	);
+}
+
+/** Puts the test keys in wp-config.php. True when Stripe can read them from there. */
+function wooset_stripe_keys( $keys, $root ) {
+	$map = array(
+		'test_secret_key'      => 'STORE_KIT_STRIPE_TEST_SECRET_KEY',
+		'test_publishable_key' => 'STORE_KIT_STRIPE_TEST_PUBLISHABLE_KEY',
+		'test_webhook_secret'  => 'STORE_KIT_STRIPE_TEST_WEBHOOK_SECRET',
+	);
+	if ( '' === $keys['test_secret_key'] || '' === $keys['test_publishable_key'] ) {
+		$supplied = store_kit_stripe_supplied();
+		if ( isset( $supplied['test_secret_key'], $supplied['test_publishable_key'] ) ) {
+			wooset_report( 'ok', 'stripe:keys', 'in wp-config.php' );
+			return true;
+		}
+		wooset_report( 'degraded', 'stripe', 'no test keys in WP_CREATE_STRIPE_TEST_SECRET_KEY and _PUBLISHABLE_KEY, or in ' . $root . '/.wp-create.local.json (store.payments.test_secret_key, test_publishable_key): payments stay off until they are there' );
+		return false;
+	}
+	$changed = array();
+	foreach ( $map as $field => $constant ) {
+		if ( '' !== $keys[ $field ] && ! ( defined( $constant ) && constant( $constant ) === $keys[ $field ] ) ) {
+			$changed[ $field ] = $constant;
+		}
+	}
+	if ( ! $changed ) {
+		wooset_report( 'ok', 'stripe:keys', 'in wp-config.php, not the database (SEC-040)' );
+		return true;
+	}
+	$config = wooset_config_path();
+	if ( ! $config || ! class_exists( 'WPConfigTransformer' ) ) {
+		wooset_report( 'degraded', 'stripe:keys', 'wp-config.php is not writable here: the keys were not written' );
+		return false;
+	}
+	if ( $GLOBALS['wooset_ctx']['write'] ) {
+		try {
+			$t = new WPConfigTransformer( $config );
+			foreach ( $changed as $field => $constant ) {
+				$t->update( 'constant', $constant, $keys[ $field ], array( 'raw' => false, 'normalize' => true ) );
+				// This process read wp-config.php before the write. Defining the constant here
+				// is what lets store-kit's save filter strip the field in the re-save below.
+				if ( ! defined( $constant ) ) {
+					define( $constant, $keys[ $field ] );
+				}
+			}
+		} catch ( Exception $e ) {
+			// The class only: a transformer message can quote the line it choked on.
+			wooset_report( 'degraded', 'stripe:keys', 'wp-config.php could not be written (' . get_class( $e ) . ')' );
+			return false;
+		}
+	}
+	wooset_report( 'set', 'stripe:keys', implode( ', ', array_keys( $changed ) ) . ' written to wp-config.php, values not shown (SEC-040: no key at rest)' );
+	return true;
 }
 
 /**
@@ -548,14 +577,14 @@ function wooset_step_protection() {
 		return;
 	}
 	wooset_option( 'cfturnstile_key', '1x00000000000000000000AA', 'Cloudflare test site key: always passes' );
-	wooset_option( 'cfturnstile_secret', '1x0000000000000000000000000000000AA', 'Cloudflare test secret: always passes' );
+	wooset_option( 'cfturnstile_secret', '1x0000000000000000000000000000000AA', 'Cloudflare test secret: always passes', 'secret' );
 	wooset_option( 'cfturnstile_woo_checkout', '1' );
 	wooset_option( 'cfturnstile_tested', 'yes', 'the plugin loads its WooCommerce checks only once tested is yes' );
 }
 
 function wooset_step_visibility() {
 	$local = $GLOBALS['wooset_ctx']['local'];
-	wooset_option( 'woocommerce_coming_soon', $local ? 'no' : 'yes', $local ? 'visible on a local site' : 'coming soon until launch' );
+	wooset_option( 'woocommerce_coming_soon', $local ? 'no' : 'yes', $local ? 'visible on a local site' : 'coming soon until launch', 'launch' );
 	wooset_option( 'woocommerce_store_pages_only', 'no' );
 }
 
@@ -618,21 +647,23 @@ if ( $wooset_malformed ) {
 
 $wooset_state = get_option( 'store_kit_setup_state', array() );
 $wooset_state = is_array( $wooset_state ) ? $wooset_state : array();
-$wooset_fresh = wooset_is_fresh( wooset_has_orders(), isset( $wooset_manifest['origin'] ) ? (string) $wooset_manifest['origin'] : 'created' );
+$wooset_orders = wooset_has_orders();
+$wooset_fresh  = wooset_is_fresh( $wooset_orders, isset( $wooset_manifest['origin'] ) ? (string) $wooset_manifest['origin'] : 'created' );
 // A store with orders (or an adopted one) that setup has never recorded is a real merchant's:
 // report what would change and write nothing until the operator passes force.
 $wooset_report_only = ! $wooset_fresh && ! $wooset_state && ! $wooset_force;
 
 $GLOBALS['wooset_ctx'] = array(
-	'write' => ! $wooset_dry && ! $wooset_report_only,
-	'fresh' => $wooset_fresh,
-	'force' => $wooset_force,
-	'local' => 'local' === wp_get_environment_type(),
-	'state' => $wooset_state,
-	'n'     => array( 'set' => 0, 'ok' => 0, 'client' => 0, 'degraded' => 0 ),
+	'write'  => ! $wooset_dry && ! $wooset_report_only,
+	'fresh'  => $wooset_fresh,
+	'orders' => $wooset_orders,
+	'force'  => $wooset_force,
+	'local'  => 'local' === wp_get_environment_type(),
+	'state'  => $wooset_state,
+	'n'      => array( 'set' => 0, 'ok' => 0, 'client' => 0, 'degraded' => 0 ),
 );
 if ( $wooset_report_only && ! $wooset_dry ) {
-	WP_CLI::line( 'report-only: this store has orders or was adopted, and setup has never run here -- re-run with force to apply' );
+	WP_CLI::line( 'report-only: this store has orders or was adopted, and setup has never run here -- re-run with force to apply; force never changes launch state (coming soon, Stripe enabled and test mode, cash on delivery) on a store with orders' );
 }
 
 $wooset_sells = 'catalog' !== $wooset_store['tier'];

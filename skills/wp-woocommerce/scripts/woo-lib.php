@@ -205,6 +205,14 @@ function wooset_show( $value ) {
 	return strlen( $s ) > 60 ? substr( $s, 0, 57 ) . '...' : $s;
 }
 
+/** A secret for one report line: enough to tell two values apart, never the value. */
+function wooset_fingerprint( $value ) {
+	if ( null === $value ) {
+		return 'absent';
+	}
+	return 'sha256:' . substr( hash( 'sha256', is_scalar( $value ) ? (string) $value : wooset_canon( $value ) ), 0, 12 );
+}
+
 function wooset_summary( array $n, $plan ) {
 	return sprintf(
 		"%s: %d %s, %d already right, %d client's, %d degraded",
