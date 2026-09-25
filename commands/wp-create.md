@@ -489,7 +489,18 @@ for the zip or path.
 A plugin whose entry says `"source": "bundled"` ships inside claude-wp-builder. Copy it in and
 activate it; never fetch it from WordPress.org, where the same slug could belong to someone
 else. Its entry lists `woocommerce` first, because WordPress refuses to activate a plugin whose
-`Requires Plugins` is inactive:
+`Requires Plugins` is inactive.
+
+A store profile needs an environment whose WP-CLI sees the project directory — native, DDEV or
+Lando. The copy lands in the host's `wp-content/plugins`, and `/wp-woo-setup` later runs host
+paths; Docker (our templates) mounts only the theme, and wp-env loads no plugin from the project.
+On `docker-compose` or `wp-env` (the environment chosen in Step 1; the manifest records it as
+`environment.engine`), stop here, before syncing, rather than failing at `plugin activate`, and
+say so in one line:
+
+> store profiles need native, DDEV or Lando: on `<engine>` WP-CLI cannot see the project directory
+
+Otherwise:
 
 ```bash
 bash -c "bash '${CLAUDE_PLUGIN_ROOT}/bin/store-kit-sync.sh' '${PROJECT_PATH}/wp-content/plugins' && $WP plugin activate store-kit"
@@ -897,6 +908,18 @@ no tax and no payments — WooCommerce's own new-store defaults wait for a wp-ad
 WP-CLI build never makes. `/wp-woo-setup` asks the store questions (the tier defaults to the
 profile's `"store"` value), records the `store` block in the manifest just written, shows a dry
 run and applies it.
+
+Store profiles need native, DDEV or Lando. Read `environment.engine` from the manifest just
+written:
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' environment.engine"
+```
+
+On `docker-compose` or `wp-env`, do not run `/wp-woo-setup`, which would copy store-kit where
+the container cannot see it; stop with one line:
+
+> store profiles need native, DDEV or Lando: on `<engine>` WP-CLI cannot see the project directory
 
 A profile without `"store"` skips this step.
 

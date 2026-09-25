@@ -42,6 +42,20 @@ bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' wp_c
 
 ## Step 2: WooCommerce and store-kit
 
+A store needs an environment whose WP-CLI sees the project directory — native, DDEV or Lando.
+store-kit is copied into the host's `wp-content/plugins`, and `woo-setup.php` and
+`.wp-create.json` are host paths; Docker (our templates) mounts only the theme, and wp-env loads
+no plugin from the project. Read the recorded environment first:
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' environment.engine"
+```
+
+`docker-compose` or `wp-env`: stop here, before syncing anything, rather than failing later at
+`plugin activate`, and say so in one line:
+
+> store profiles need native, DDEV or Lando: on `<engine>` WP-CLI cannot see the project directory
+
 ```bash
 bash -c "$WP plugin is-active woocommerce"
 ```
@@ -100,6 +114,20 @@ block that does not validate:
 ```bash
 bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
 ```
+
+A store block adds a `Store tier` row to the generated block in `.claude/CLAUDE.md`, so on a
+project that already has that block, `validate` now exits `1` saying the generated block no
+longer matches the manifest. Then, and only when `.claude/CLAUDE.md` already contains the
+`wp-create:begin` block, regenerate it — same `${PROJECT_PATH}` substitution as the gate — and
+validate again:
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs render-context '${PROJECT_PATH}'"
+```
+
+A project with no generated block is left alone: no `.claude/CLAUDE.md` is created before
+`/wp-init`. Any other exit-`1` message is a problem in the block — fix it, never regenerate
+around it.
 
 The WhatsApp number and its message are not in this block: they live in the theme's settings
 page, where the client can change them.

@@ -150,5 +150,11 @@ s6=$(grep -n '^## Step 6: Chain' "$c" | cut -d: -f1 || true)
 [ -n "$s55" ] && [ -n "$s5" ] && [ -n "$s6" ] && [ "$s5" -lt "$s55" ] && [ "$s55" -lt "$s6" ] \
   || fail "$c must run store setup after the manifest exists (Step 5) and before chaining to /wp-init"
 sed -n "${s55},${s6}p" "$c" | grep -Fq '/wp-woo-setup' || fail "$c Step 5.5 does not run /wp-woo-setup"
+# store-kit and the setup script are host paths: both store steps refuse Docker and wp-env up front.
+s410=$(grep -n '^### Step 4.10' "$c" | cut -d: -f1 || true); s411=$(grep -n '^### Step 4.11' "$c" | cut -d: -f1 || true)
+for range in "${s410},${s411}" "${s55},${s6}"; do
+  sed -n "${range}p" "$c" | grep -Fq 'store profiles need native, DDEV or Lando' \
+    || fail "$c lines $range do not stop a store profile on Docker or wp-env before syncing store-kit"
+done
 
 echo PASS

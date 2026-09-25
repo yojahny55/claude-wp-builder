@@ -27,6 +27,16 @@ grep -Fq '| `0` | the store matches the block' "$cmd" || fail "$cmd lost its exi
 grep -Fq '| `1` | refused' "$cmd" || fail "$cmd lost its exit 1 row"
 grep -Fq 'launch state' "$cmd" || fail "$cmd does not carry the launch-state exception to force"
 grep -Fq 'WP_CREATE_STRIPE_TEST_WEBHOOK_SECRET' "$cmd" || fail "$cmd never mentions the Stripe webhook secret"
+# Recording a store block adds the Store tier row to a generated CLAUDE.md block, and validate
+# then exits 1 on drift: Step 3 must regenerate an existing block, or the command fails its gate.
+step3=$(awk '/^## Step 3:/{f=1} /^## Step 4:/{f=0} f' "$cmd")
+grep -Fq "wp-config.mjs render-context '\${PROJECT_PATH}'" <<<"$step3" \
+  || fail "$cmd Step 3 does not regenerate the generated CLAUDE.md block after recording the store block"
+# store-kit, woo-setup.php and .wp-create.json are host paths: Docker and wp-env cannot see them,
+# so the command reads the environment and stops before the sync, not at plugin activate.
+engine=$(line_of "get '\${PROJECT_PATH}' environment.engine" "$cmd")
+[ -n "$engine" ] && [ "$engine" -lt "$sync" ] && grep -Fq 'native, DDEV or Lando' "$cmd" \
+  || fail "$cmd must read environment.engine and stop on Docker or wp-env before syncing store-kit"
 
 h=$(grep -nE '^\s*wooset_step_hpos\(' "$script" | cut -d: -f1)
 pg=$(grep -nE '^\s*wooset_step_pages\(' "$script" | cut -d: -f1)
