@@ -170,7 +170,7 @@ decision=$(awk '/^### A store is a recorded decision/,/^## /' CLAUDE.md)
 grep -Fq 'launch state' <<<"$decision" || fail "CLAUDE.md's store decision omits the launch-state exception to force"
 for c in 'Gateway keys from constants cover Stripe only' 'The general Store API limiter is off on purpose' \
          "Connect with Stripe" 'Setup reports what the block stopped naming, and never deletes it' \
-         'Store profiles need native, DDEV or Lando'; do
+         'Store profiles need native WP-CLI'; do
   grep -Fq "$c" CLAUDE.md || fail "CLAUDE.md does not record the ceiling: $c"
 done
 grep -Fq '**WooCommerce stores (N01)**' BACKLOG.md || fail "BACKLOG.md has no N01 row"
