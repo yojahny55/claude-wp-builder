@@ -122,7 +122,7 @@
   shows a dry run, then runs the setup script. Stripe keys never enter the conversation: the
   operator puts them in `.wp-create.local.json` or the environment, and the script reads them.
   Recording the block regenerates an existing generated CLAUDE.md block, which gains a `Store
-  tier` row. It needs native, DDEV or Lando, and stops before syncing on Docker or wp-env.
+  tier` row. It needs native WP-CLI, and stops before syncing on Docker, DDEV, Lando or wp-env.
 - **`/wp-create` sets up stores.** It marks every dev site `WP_ENVIRONMENT_TYPE=local`, installs
   `bundled` plugins from this repository, and after writing the manifest runs `/wp-woo-setup`
   when a store profile was chosen.
