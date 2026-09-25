@@ -755,6 +755,18 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   limit; `tests/checks/store-kit.sh` fails if anything enables the general one.
 - **Setup ownership is by value hash.** A client edit that happens to restore setup's own value
   reads as setup's, and the hash records a value, not a history.
+- **Setup reports what the block stopped naming, and never deletes it.** A zone, shipping method
+  or tax rate setup recorded that is no longer in the `store` block but still exists in
+  WooCommerce is a `degraded` line, counted in the summary — a stale rate or method keeps
+  charging, so a run must not read as a clean match. Removing it is the operator's act in
+  WooCommerce. Zones and rates are matched by name, so a renamed zone is a new zone plus a stale
+  one.
+- **Store profiles need native, DDEV or Lando.** `bin/store-kit-sync.sh` copies into the host's
+  `wp-content/plugins`, and `woo-setup.php` and `.wp-create.json` are host paths; the Docker
+  template mounts only the theme and wp-env loads no plugin from the project. `/wp-create` and
+  `/wp-woo-setup` read `environment.engine` and stop before syncing on `docker-compose` or
+  `wp-env` rather than fail at `plugin activate`. Supporting them means mounting the plugin and
+  the project into the container, which neither template does today.
 - **The fixture proves checkout through the Store API with cash on delivery.** A real card
   payment and Stripe's own flow are never exercised — no network, no bill — and Turnstile's
   verification is a stub at the HTTP boundary (`tests/fixtures/wp/net-guard.php`).

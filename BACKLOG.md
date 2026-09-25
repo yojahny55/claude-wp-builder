@@ -235,6 +235,12 @@ Server setup, permissions, and WordPress configuration.
   product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang bridge,
   subscriptions, bookings.
 
+- [ ] **One unexplained integration failure in store setup** `OPEN`
+  [The integration check](tests/checks/wp-woo-setup-integration.sh) failed once at "setup
+  overwrote the client's shipping cost", during a mutation run that cannot reach that
+  assertion; it was not reproduced in 4+ full runs or 12 targeted loops. The assertion now
+  prints the cost it read and setup's output, so a recurrence explains itself. Watch it in CI.
+
 - [ ] **Docker environments get no nginx config** `OPEN`
   [`docker-compose.yml.tpl`](templates/docker/docker-compose.yml.tpl) mounts `./docker/nginx.conf`,
   and no template or command writes that file — no owner exists yet. Until one does, a Docker
