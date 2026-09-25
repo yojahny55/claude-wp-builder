@@ -251,9 +251,12 @@ mode — validated by `bin/wp-config.mjs` like every other manifest field, with 
 as secrets beside the database password. `/wp-woo-setup` writes the block and runs
 `skills/wp-woocommerce/scripts/woo-setup.php`, which brings WooCommerce in line with it. The
 script records a hash of every value it writes in `store_kit_setup_state`, so a value that no
-longer matches is the client's and is left alone unless `force` is passed. Behaviour that must
-survive a theme switch — catalog mode, and Stripe keys supplied from `wp-config.php` instead of
-the database — lives in `plugins/store-kit/`, copied into the site by `bin/store-kit-sync.sh`.
+longer matches is the client's and is left alone unless `force` is passed — except launch state
+(coming soon, Stripe enabled and test mode, cash on delivery), which `force` never writes on a
+store that already has orders, even when the row is absent. Behaviour that must survive a theme
+switch lives in `plugins/store-kit/`, copied into the site by `bin/store-kit-sync.sh`: catalog
+mode, and Stripe API keys supplied from `wp-config.php` — its webhook-secret constant only seeds
+an empty field, so a secret Stripe rotates is saved to the database, and SEC-040 reports it.
 `/wp-audit` reads `store.tier`, so a catalog is never scored for a checkout it does not have.
 
 ## Authoring conventions

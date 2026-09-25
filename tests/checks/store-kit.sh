@@ -166,6 +166,8 @@ set +e; bash "$sync" "$p/missing" >/dev/null 2>&1; code=$?; set -e
 
 # The decision and its limits are recorded where every other one is.
 grep -Fq '### A store is a recorded decision' CLAUDE.md || fail "CLAUDE.md does not record the store decision"
+decision=$(awk '/^### A store is a recorded decision/,/^## /' CLAUDE.md)
+grep -Fq 'launch state' <<<"$decision" || fail "CLAUDE.md's store decision omits the launch-state exception to force"
 for c in 'Gateway keys from constants cover Stripe only' 'The general Store API limiter is off on purpose' \
          "Connect with Stripe"; do
   grep -Fq "$c" CLAUDE.md || fail "CLAUDE.md does not record the ceiling: $c"
