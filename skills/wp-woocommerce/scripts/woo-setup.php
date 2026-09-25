@@ -5,13 +5,16 @@
  * Usage: wp eval-file woo-setup.php <project-path> [dry-run] [force]
  *   The flags are bare words: `wp eval-file` refuses a --flag it does not know.
  *   dry-run  print what would change, write nothing
- *   force    also take back values this script did not write (a client's edit, an adopted store)
+ *   force    also take back values this script did not write (a client's edit, an adopted store),
+ *            except launch state on a store with orders, which force never changes
  *
  * Every line is `<status> <setting>[: detail]`:
  *   set / would-set  changed (or would be, in a dry or report-only run)
  *   ok               already what the block says
- *   client           differs, and this script did not write it: left alone (force takes it back)
- *   degraded         could not be done here; the line says why and what to do
+ *   client           differs, and this script did not write it: left alone (force takes it back,
+ *                    except launch state on a store with orders)
+ *   degraded         could not be done here, or a row setup created that the block no longer
+ *                    names (setup never deletes); the line says why and what to do
  *   note             information, counted nowhere
  * and the last line is the summary: `setup: 12 set, 31 already right, 1 client's, 1 degraded`.
  *
@@ -113,6 +116,12 @@ function wooset_has_orders() {
 
 function wooset_page_ok( $id ) {
 	return $id && 'publish' === get_post_status( (int) $id );
+}
+
+/** The status of an assigned page that exists unpublished and is not in the trash (the client's draft), or ''. */
+function wooset_page_held( $id ) {
+	$status = $id ? get_post_status( (int) $id ) : false;
+	return $status && ! in_array( $status, array( 'publish', 'trash' ), true ) ? $status : '';
 }
 
 /** A page's content for a checkout type, or null when WooCommerce's block markup cannot be read. */
@@ -231,11 +240,25 @@ function wooset_step_pages( $store ) {
 		WC_Install::create_pages();
 	}
 	foreach ( array( 'shop', 'cart', 'checkout', 'myaccount' ) as $page ) {
-		$made = in_array( $page, $missing, true );
-		wooset_report( $made ? 'set' : 'ok', "page:$page", $made ? 'created and assigned' : '' );
+		$id = get_option( "woocommerce_{$page}_page_id" );
+		if ( ! in_array( $page, $missing, true ) ) {
+			wooset_report( 'ok', "page:$page" );
+		} elseif ( $c['write'] && wooset_page_ok( $id ) ) {
+			wooset_report( 'set', "page:$page", 'created and assigned' );
+		} elseif ( wooset_page_held( $id ) ) {
+			// WooCommerce keeps an assigned page it finds unpublished rather than make another.
+			wooset_report( 'client', "page:$page", 'kept as ' . wooset_page_held( $id ) . ': publish it in WooCommerce' );
+		} elseif ( ! $c['write'] ) {
+			wooset_report( 'set', "page:$page", 'created and assigned' );
+		} else {
+			wooset_report( 'degraded', "page:$page", 'WooCommerce did not create it: WooCommerce > Status > Tools > Create default WooCommerce pages' );
+		}
 	}
-	if ( wooset_page_ok( get_option( 'woocommerce_terms_page_id' ) ) ) {
+	$terms = get_option( 'woocommerce_terms_page_id' );
+	if ( wooset_page_ok( $terms ) ) {
 		wooset_report( 'ok', 'page:terms' );
+	} elseif ( wooset_page_held( $terms ) ) {
+		wooset_report( 'client', 'page:terms', 'kept as ' . wooset_page_held( $terms ) . ': the client publishes the terms before launch' );
 	} else {
 		if ( $c['write'] ) {
 			$id = wp_insert_post( array( 'post_type' => 'page', 'post_status' => 'publish', 'post_title' => 'Terms and conditions', 'post_name' => 'terms' ) );
@@ -480,6 +503,57 @@ function wooset_step_tax( $store ) {
 	}
 }
 
+/**
+ * Zones, methods and rates setup recorded that the block no longer names but WooCommerce still
+ * has. Setup never deletes -- a stale rate or method would otherwise keep charging while the run
+ * read as a match -- so each is reported degraded, and a renamed zone or rate is a new one plus
+ * a stale one.
+ */
+function wooset_step_stale( $store ) {
+	$named = array();
+	foreach ( empty( $store['shipping'] ) ? array() : $store['shipping'] as $z ) {
+		$named[ "zone:{$z['zone']}:locations" ] = true;
+		foreach ( $z['methods'] as $m ) {
+			$named[ "zone:{$z['zone']}:{$m['type']}" ] = true;
+		}
+	}
+	foreach ( empty( $store['tax']['rates'] ) ? array() : $store['tax']['rates'] as $r ) {
+		$named[ 'tax:' . wooset_tax_key( wooset_tax_row( $r ) ) ] = true;
+	}
+	$rates = null;
+	$gone  = array(); // zones already reported, so their methods are not reported again
+	foreach ( array_keys( $GLOBALS['wooset_ctx']['state'] ) as $id ) {
+		$id = (string) $id;
+		if ( isset( $named[ $id ] ) ) {
+			continue;
+		}
+		$exists = false;
+		if ( 0 === strpos( $id, 'zone:' ) ) {
+			$cut  = strrpos( $id, ':' );
+			$name = substr( $id, 5, $cut - 5 );
+			$zone = wooset_find_zone( $name );
+			if ( ! $zone || isset( $gone[ $name ] ) ) {
+				continue;
+			}
+			if ( ! isset( $named[ "zone:$name:locations" ] ) ) {
+				$gone[ $name ] = true;
+				$id            = "zone:$name";
+				$exists        = true;
+			} else {
+				$exists = (bool) wooset_find_method( $zone, substr( $id, $cut + 1 ) );
+			}
+		} elseif ( 0 === strpos( $id, 'tax:' ) ) {
+			$rates = null === $rates ? wooset_existing_rates() : $rates;
+			foreach ( $rates as $e ) {
+				$exists = $exists || 'tax:' . wooset_tax_key( $e ) === $id;
+			}
+		}
+		if ( $exists ) {
+			wooset_report( 'degraded', $id, 'setup created this and it is no longer in the block — remove it in WooCommerce' );
+		}
+	}
+}
+
 function wooset_step_payments( $keys, $root ) {
 	// Only Stripe's own sub-steps depend on the keys; cash on delivery is converged either way.
 	if ( wooset_stripe_keys( $keys, $root ) ) {
@@ -626,6 +700,21 @@ if ( null === $wooset_store ) {
 if ( ! isset( $wooset_store['tier'] ) || ! in_array( $wooset_store['tier'], array( 'catalog', 'store', 'full' ), true ) ) {
 	wooset_refuse( 'store.tier must be catalog, store or full -- run wp-config.mjs validate' );
 }
+// The keys this script reads, checked here too: a block edited after validate would otherwise
+// write an empty address or currency before anything noticed. Every tier sets its identity.
+$wooset_required = array( 'address.street', 'address.city', 'address.postcode', 'address.country', 'currency', 'units.weight', 'units.dimension' );
+if ( 'catalog' !== $wooset_store['tier'] ) {
+	array_push( $wooset_required, 'payments.gateway', 'payments.mode' );
+}
+foreach ( $wooset_required as $wooset_path ) {
+	$wooset_value = $wooset_store;
+	foreach ( explode( '.', $wooset_path ) as $wooset_key ) {
+		$wooset_value = is_array( $wooset_value ) && isset( $wooset_value[ $wooset_key ] ) ? $wooset_value[ $wooset_key ] : null;
+	}
+	if ( ! is_string( $wooset_value ) || '' === trim( $wooset_value ) ) {
+		wooset_refuse( 'store block incomplete: store.' . $wooset_path . ' -- run wp-config.mjs validate' );
+	}
+}
 if ( ! class_exists( 'WooCommerce' ) ) {
 	wooset_refuse( 'WooCommerce is not active' );
 }
@@ -680,6 +769,7 @@ wooset_step_rules( $wooset_store );
 if ( $wooset_sells ) {
 	wooset_step_shipping( $wooset_store );
 	wooset_step_tax( $wooset_store );
+	wooset_step_stale( $wooset_store );
 	wooset_step_payments( $wooset_keys, $wooset_root );
 	wooset_step_protection();
 }

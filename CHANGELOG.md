@@ -10,8 +10,9 @@
   merged in when the gateway reads its settings and stripped when it saves them, so no database
   dump or clone carries a working API key — including the copy Stripe's own webhook setup nests
   a second time inside the settings row. A webhook-secret constant only ever seeds an empty row:
-  Stripe periodically rotates its own webhook secret and saves the new one, and that value is
-  left to win and reach the database, with an admin notice naming the now-stale constant. A
+  Stripe rotates its own webhook secret when Stripe reconfigures webhooks (connect, re-key, the
+  settings button, or after a plugin update) and saves the new one, and that value is left to
+  win and reach the database, with an admin notice naming the now-stale constant. A
   constant whose prefix does not match its field's mode (test vs live) is never used at all, and
   is reported by name — the guard against a live key ending up in a test-mode constant.
   `bin/store-kit-sync.sh` installs the plugin and never downgrades. `Update URI: false` and a
@@ -111,13 +112,17 @@
   catalog. It records a hash of every value it writes and leaves the rest alone as the client's.
   `force` takes those back, except launch state — coming soon, Stripe's switches, cash on
   delivery — which it never changes on a store that has orders; a secret it leaves alone is
-  reported by fingerprint, never by value.
+  reported by fingerprint, never by value. It never deletes: a zone, method or rate it recorded
+  that the block no longer names is reported `degraded` and counted, an assigned page left
+  unpublished is the client's, and a block missing a key it reads is refused before any write.
   `tests/checks/wp-woo-setup-integration.sh` proves it in the fixture (WooCommerce 11.1.2):
   second runs change nothing, and the store takes a real Store API order — processing, in the
   HPOS table, with the right total and both emails.
 - **`/wp-woo-setup`.** Asks the store questions once, records the answers as the `store` block,
   shows a dry run, then runs the setup script. Stripe keys never enter the conversation: the
   operator puts them in `.wp-create.local.json` or the environment, and the script reads them.
+  Recording the block regenerates an existing generated CLAUDE.md block, which gains a `Store
+  tier` row. It needs native, DDEV or Lando, and stops before syncing on Docker or wp-env.
 - **`/wp-create` sets up stores.** It marks every dev site `WP_ENVIRONMENT_TYPE=local`, installs
   `bundled` plugins from this repository, and after writing the manifest runs `/wp-woo-setup`
   when a store profile was chosen.

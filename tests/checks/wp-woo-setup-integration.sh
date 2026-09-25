@@ -110,6 +110,14 @@ set +e; out=$(run_setup); code=$?; set -e
 grep -q '^refused: store.tier' <<<"$out" || fail "the refusal does not name store.tier: $out"
 [ "$(snapshot)" = "$before" ] || fail "a refused run (bad tier) changed the store"
 
+# A block edited after validate ran: the script checks the keys it reads before any write.
+write_manifest "$STORE"
+set_block 'del s["address"]["city"]'
+set +e; out=$(run_setup); code=$?; set -e
+[ "$code" = "1" ] || fail "a store block with no address.city exited $code, want 1: $out"
+grep -q '^refused: store block incomplete: store.address.city' <<<"$out" || fail "the refusal does not name the missing key: $out"
+[ "$(snapshot)" = "$before" ] || fail "a refused run (incomplete block) changed the store"
+
 write_manifest "$STORE"
 write_keys "sk_live_fixture$(date +%s)" "$PK"
 set +e; out=$(run_setup); code=$?; set -e
@@ -222,6 +230,39 @@ q "pll_set_post_language( $cart, 'es' );"
 run_setup >/dev/null || fail "the run after a language change failed"
 [ "$(q "echo pll_get_post_language( $cart );")" = "es" ] || fail "setup moved a page the client had put in another language"
 q "pll_set_post_language( $cart, 'en' );"
+
+# A rate and a method setup created, since taken out of the block, would keep charging: they are
+# reported degraded and counted, and nothing is deleted.
+counts=$(rows)
+set_block 's["shipping"][0]["methods"].pop(); s["tax"]["rates"] = []'
+out=$(run_setup) || fail "the run after removing a rate and a method from the block failed: $out"
+stale=': setup created this and it is no longer in the block — remove it in WooCommerce'
+grep -Fxq "degraded zone:United States:free_shipping$stale" <<<"$out" \
+  || fail "a free-shipping method removed from the block was not reported: $(grep -E '^degraded ' <<<"$out")"
+grep -Fxq "degraded tax:US|FL|||FL Sales Tax|standard$stale" <<<"$out" \
+  || fail "a tax rate removed from the block was not reported: $(grep -E '^degraded ' <<<"$out")"
+[ "$(rows)" = "$counts" ] || fail "setup deleted a row the block no longer names ($counts -> $(rows))"
+deg=$(grep -c '^degraded ' <<<"$out" || true)
+grep -Eq "^setup: .*, $deg degraded\$" <<<"$out" \
+  || fail "the summary does not count the $deg degraded lines: $(grep '^setup: ' <<<"$out")"
+set_block 's["shipping"][0]["methods"].append({"type": "free_shipping", "min_amount": "100"}); s["tax"]["rates"] = [{"country": "US", "state": "FL", "rate": "6.0000", "name": "FL Sales Tax", "shipping": True}]'
+out=$(run_setup) || fail "the run after restoring the rate and the method failed: $out"
+if grep -Fq "$stale" <<<"$out"; then fail "a rate or method back in the block is still reported stale: $out"; fi
+grep -q '^setup: 0 set' <<<"$out" || fail "restoring the block changed something: $(grep -E '^(set|client) ' <<<"$out" | head -5)"
+
+# An assigned page the client left unpublished is the client's: WooCommerce keeps it, setup must
+# neither replace it nor report it set on every run.
+terms=$(q 'echo (int) get_option( "woocommerce_terms_page_id" );')
+q "wp_update_post( array( 'ID' => $terms, 'post_status' => 'draft' ) ); wp_update_post( array( 'ID' => $cart, 'post_status' => 'draft' ) );"
+out=$(run_setup) || fail "the run with draft store pages failed: $out"
+[ "$(q 'echo (int) get_option( "woocommerce_terms_page_id" );')" = "$terms" ] || fail "setup replaced the client's draft terms page: $out"
+[ "$(q 'echo (int) get_option( "woocommerce_cart_page_id" );')" = "$cart" ] || fail "setup replaced the client's draft cart page: $out"
+[ "$(q "echo get_post_status( $terms ), get_post_status( $cart );")" = "draftdraft" ] || fail "setup published the client's draft pages"
+grep -q '^client page:terms: kept as draft' <<<"$out" || fail "a draft terms page was not reported as the client's: $(grep page:terms <<<"$out")"
+grep -q '^client page:cart: kept as draft' <<<"$out" || fail "a draft cart page was not reported as the client's: $(grep 'page:cart' <<<"$out")"
+out=$(run_setup) || fail "the second run with draft store pages failed: $out"
+grep -q '^setup: 0 set' <<<"$out" || fail "draft store pages keep a re-run from reaching 0 set: $(grep -E '^(set|client) ' <<<"$out" | head -5)"
+q "wp_update_post( array( 'ID' => $terms, 'post_status' => 'publish' ) ); wp_update_post( array( 'ID' => $cart, 'post_status' => 'publish' ) );"
 
 # Review Focus 1: no keys anywhere -- say where they go.
 cod_line='^(set|ok|client|would-set) woocommerce_cod_settings\.enabled'

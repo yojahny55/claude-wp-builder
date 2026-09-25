@@ -99,7 +99,7 @@ Idempotent — re-run after the client changes scope.
 
 ```
 /wp-woo-setup [project-path]           # ask, record the store block, dry run, apply
-/wp-woo-setup [project-path] --force   # also take back values the client changed
+/wp-woo-setup [project-path] --force   # also take back values the client changed, except launch state on a store with orders
 ```
 
 Records what the store sells and how in the `store` block of `.wp-create.json` — tier
