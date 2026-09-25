@@ -34,18 +34,27 @@ grep -Fq 'ahead=$(git rev-list --count "origin/$BASE_REF..HEAD")' "$CI" \
 # A mutable action ref on pull_request_target runs any upstream push with the LLM key.
 grep -Eq '^[[:space:]]+uses: alibaba/open-code-review@[0-9a-f]{40}([[:space:]]|$)' "$OCR" \
   || fail "$OCR: alibaba/open-code-review is not pinned to a full commit SHA"
+# ...and no second use of it rides a branch or tag beside the pinned one.
+unpinned=$(grep -E 'uses:[[:space:]]*alibaba/open-code-review@' "$OCR" \
+  | grep -Ev 'uses:[[:space:]]*alibaba/open-code-review@[0-9a-f]{40}([[:space:]]|$)')
+[ -z "$unpinned" ] || fail "$OCR: a use of alibaba/open-code-review is not a 40-hex SHA: $unpinned"
 
 # A gate that fails after the eyes reaction must still leave a comment.
 grep -Fq "always() && needs.gate.result != 'skipped'" "$AF" \
   || fail "$AF: report no longer runs when the gate fails"
 
-# A thread is resolved on evidence: the pushed patch changed its file.
-grep -Fq 'changed = set(read("verify/changed.txt").splitlines())' "$AF" \
-  || fail "$AF: report no longer reads verify's changed.txt"
+# A thread is resolved on evidence: the pushed patch changed its file. The evidence is
+# filter's patch (no PR code ran there), not anything verify (agent-edited code) wrote.
+grep -Fq 'for l in read("filtered/filtered.patch").splitlines():' "$AF" \
+  || fail "$AF: report no longer derives the changed files from filter's patch"
+grep -Fq 'verify/changed.txt' "$AF" \
+  && fail "$AF: report reads changed files from verify, a VM that ran agent-edited code"
 grep -Fq 'if st == "fixed" and f["path"] in changed:' "$AF" \
-  || fail "$AF: a thread is resolved on the agent's word alone, without its file in changed.txt"
-grep -Fq 'cp "$RUNNER_TEMP/changed.txt" "$out/changed.txt"' "$AF" \
-  || fail "$AF: verify no longer uploads changed.txt, so report cannot tell what was changed"
+  || fail "$AF: a thread is resolved on the agent's word alone, without its file in the patch"
+
+# Agent-influenced check output quoted into a comment cannot close the fence or ping anyone.
+grep -Fq 'new_out = defang(' "$AF" && grep -Fq 'return s.replace("@", "@​")' "$AF" \
+  || fail "$AF: quoted check output is no longer defanged (backtick runs, @mentions)"
 
 if [ "$fails" -gt 0 ]; then
   printf 'FAILED %d\n' "$fails"

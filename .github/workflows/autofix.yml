@@ -189,7 +189,12 @@ jobs:
           n=$(jq length "$RUNNER_TEMP/findings/findings.json")
           echo "count=$n" >> "$GITHUB_OUTPUT"
           if [ "$n" = 0 ]; then
-            gh api "repos/$REPO/issues/$PR/comments" -f body="🔧 **/autofix**: no open OpenCodeReview findings on this PR — nothing to fix." >/dev/null
+            # Same truncation line as report's summary: "none" may only mean "none in the first 100".
+            note=""
+            if [ -f "$RUNNER_TEMP/findings/truncated.txt" ]; then
+              note=$(printf '\n\n⚠️ %s — findings past them were not sent to the agent.' "$(tr -d '\n' < "$RUNNER_TEMP/findings/truncated.txt")")
+            fi
+            gh api "repos/$REPO/issues/$PR/comments" -f body="🔧 **/autofix**: no open OpenCodeReview findings on this PR — nothing to fix.$note" >/dev/null
           fi
 
       - uses: actions/upload-artifact@v4
@@ -449,8 +454,6 @@ jobs:
         run: |
           set -uo pipefail
           out="$RUNNER_TEMP/verify"; mkdir -p "$out"; : > "$out/new-failures.txt"; : > "$out/new-failures-output.txt"
-          # report resolves a thread only when its file is in here.
-          cp "$RUNNER_TEMP/changed.txt" "$out/changed.txt" 2>/dev/null || : > "$out/changed.txt"
           before=$(cat "$RUNNER_TEMP/ran-before" 2>/dev/null || echo 0)
           after=$(cat "$RUNNER_TEMP/ran-after" 2>/dev/null || echo 0)
           echo "contract checks run: before=$before after=$after"
@@ -593,7 +596,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           python3 - "$RUNNER_TEMP" <<'PY'
-          import json, os, pathlib, subprocess, sys
+          import json, os, pathlib, re, subprocess, sys
           tmp = pathlib.Path(sys.argv[1]); e = os.environ.get
           def read(p, default=""):
               p = tmp / p
@@ -609,11 +612,28 @@ jobs:
           for r in raw if isinstance(raw, list) else []:
               if isinstance(r, dict) and "id" in r:
                   report.setdefault(str(r["id"]).strip(), r)
-          new = read("verify/new-failures.txt").strip()
+          # Check output and file names are agent-influenced: break 3+ backtick runs so they
+          # cannot close the fence, and @mentions so they cannot ping anyone.
+          def defang(s):
+              s = re.sub(r"`{3,}", lambda m: "​".join(m.group()), s)
+              return s.replace("@", "@​")
+          new = defang(read("verify/new-failures.txt").strip())
           # ponytail: capped so a flood of failures cannot push the comment past GitHub's
           # 65536-character body limit; the full text is in the verify artifact.
-          new_out = read("verify/new-failures-output.txt").strip()[:20000]
-          changed = set(read("verify/changed.txt").splitlines())
+          new_out = defang(read("verify/new-failures-output.txt").strip()[:20000])
+          # Files the pushed patch touches, read from filter's patch (a job that runs no PR
+          # code), not from verify (which ran agent-edited code). Only `diff --git` headers:
+          # an added line "++ b/x" shows up as "+++ b/x" in a hunk, so `+++` lines can be
+          # forged by content, while a hunk line always starts with " ", "+", "-" or "\" and
+          # base85 has no space. --no-renames makes a == b; deletions and binaries count too.
+          # ponytail: a git-quoted path (non-ASCII, control chars) is not decoded, so its
+          # thread stays open -- the conservative side.
+          changed = set()
+          for l in read("filtered/filtered.patch").splitlines():
+              if l.startswith("diff --git a/"):
+                  s = l[len("diff --git a/"):]; n = (len(s) - 3) // 2
+                  if s[n:n + 3] == " b/" and s[:n] == s[n + 3:]:
+                      changed.add(s[:n])
           agent_rc = read("agent-output/exit.txt").strip()
           truncated = read("findings/truncated.txt").strip()
           dropped = [l.split("\t") for l in read("filtered/dropped.txt").splitlines() if l.strip()]
