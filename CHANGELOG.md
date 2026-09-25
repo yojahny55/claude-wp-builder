@@ -115,6 +115,9 @@
   `tests/checks/wp-woo-setup-integration.sh` proves it in the fixture (WooCommerce 11.1.2):
   second runs change nothing, and the store takes a real Store API order — processing, in the
   HPOS table, with the right total and both emails.
+- **`/wp-woo-setup`.** Asks the store questions once, records the answers as the `store` block,
+  shows a dry run, then runs the setup script. Stripe keys never enter the conversation: the
+  operator puts them in `.wp-create.local.json` or the environment, and the script reads them.
 
 ### Changed
 

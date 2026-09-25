@@ -81,6 +81,9 @@ check( 'other', wooset_page_mode( '<p>hello</p>', 'cart' ), 'other' );
 // Output.
 check( 'absent shows as absent', wooset_show( null ), '(absent)' );
 check( 'long values are cut', strlen( wooset_show( str_repeat( 'x', 200 ) ) ), 60 );
+check( 'a fingerprint, not the value', wooset_fingerprint( 'abc' ), 'sha256:ba7816bf8f01' );
+check( 'absent has no fingerprint', wooset_fingerprint( null ), 'absent' );
+check( 'the fingerprint never contains the input', strpos( wooset_fingerprint( 'abc' ), 'abc' ), false );
 check( 'summary', wooset_summary( array( 'set' => 2, 'ok' => 30, 'client' => 1, 'degraded' => 1 ), false ), "setup: 2 set, 30 already right, 1 client's, 1 degraded" );
 check( 'plan', wooset_summary( array( 'set' => 2, 'ok' => 30, 'client' => 1, 'degraded' => 1 ), true ), "plan: 2 to set, 30 already right, 1 client's, 1 degraded" );
 exit( $fail );

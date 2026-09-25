@@ -82,4 +82,6 @@ Measured on WooCommerce 11.1.2 unless marked (source).
 with the block. `scripts/woo-lib.php` holds its decisions with no WordPress calls, so
 `tests/checks/woo-lib.sh` runs them under bare PHP. Setup records a hash of every value it
 writes in `store_kit_setup_state`; a value that no longer matches that hash is the client's and
-is left alone unless `force` is passed. PHP 7.4 floor.
+is left alone unless `force` is passed. The one exception is launch state — "coming soon",
+Stripe's `enabled`/`testmode`, cash on delivery — which a store with orders never has written
+for it, absent or not, force or not: change it in WooCommerce instead. PHP 7.4 floor.

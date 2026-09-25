@@ -379,6 +379,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-create` | all | optional* | Local WordPress environment + `.wp-create.json` |
 | `/wp-init` | all | required | Scaffold theme, record template / fields plugin / i18n choices |
 | `/wp-context [docs]` | all | auto | Scope + constraints from `docs/` |
+| `/wp-woo-setup [project-path] [--force]` | all | store profiles | Record the store — tier, address, currency, shipping, tax, Stripe in test mode — and bring WooCommerce in line with it; shows a dry run, re-runnable |
 | `/wp-yolo <folder>` | A | required | Whole demo folder → theme, seeded and verified |
 | `/wp-demo [brief\|iterate]` | all | demo stage | Generate `demo/index.html` from a brief (after `/wp-init`) |
 | `/wp-polish [path]` | all | demo stage | Normalize any HTML you already have into a demo |
