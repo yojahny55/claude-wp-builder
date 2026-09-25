@@ -42,19 +42,20 @@ bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' wp_c
 
 ## Step 2: WooCommerce and store-kit
 
-A store needs an environment whose WP-CLI sees the project directory — native, DDEV or Lando.
-store-kit is copied into the host's `wp-content/plugins`, and `woo-setup.php` and
-`.wp-create.json` are host paths; Docker (our templates) mounts only the theme, and wp-env loads
-no plugin from the project. Read the recorded environment first:
+A store needs native WP-CLI, running on the host. store-kit is copied into the host's
+`wp-content/plugins`, and `woo-setup.php` and `.wp-create.json` are host paths: Docker (our
+templates) mounts only the theme, wp-env loads no plugin from the project, and DDEV and Lando run
+WP-CLI in a container that mounts neither this plugin's scripts nor the host project path. Read
+the recorded environment first:
 
 ```bash
 bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' environment.engine"
 ```
 
-`docker-compose` or `wp-env`: stop here, before syncing anything, rather than failing later at
+Anything but `native`: stop here, before syncing anything, rather than failing later at
 `plugin activate`, and say so in one line:
 
-> store profiles need native, DDEV or Lando: on `<engine>` WP-CLI cannot see the project directory
+> store profiles need native WP-CLI: on `<engine>` WP-CLI cannot see the plugin's scripts or the project directory
 
 ```bash
 bash -c "$WP plugin is-active woocommerce"
