@@ -69,16 +69,17 @@ ordinary content site as SaaS and boots every plugin's REST callbacks.
 |-----------|-----------|-------------------|
 | content / publisher / service | default when nothing below matches | Discovery + Access + Usability |
 | local business | `industry` is a local/business value **and** a non-empty `business_address` option exists | + LocalBusiness schema, NAP, reviews |
-| merchant | `$WP plugin is-installed woocommerce` returns 0 | + Payments, `pricing.md`, Product schema |
+| merchant | `site.commerce` is `woocommerce` (WooCommerce **active**, from `/wp-audit` Step 2.3); run standalone, `$WP plugin is-active woocommerce` returns 0 | + Payments, `pricing.md`, Product schema |
 | SaaS / public API | an OpenAPI spec or a deliberate public API surface is recorded in `.claude/CLAUDE.md` | + OpenAPI / api-catalog / MCP / OAuth |
 
 ```bash
-$WP plugin is-installed woocommerce && echo "merchant signal: WooCommerce active"
+$WP plugin is-active woocommerce && echo "merchant signal: WooCommerce active"
 $WP eval "echo get_field('business_address','option');"
 ```
 
 A site with WooCommerce active but products disabled still detects as `merchant`; its
-protocol checks stay advisory. A local/business `industry` with no address is not `local`
+protocol checks stay advisory. Installed but inactive is not a merchant: `/wp-audit` Step 2.3
+tests is-active, and the two must agree. A local/business `industry` with no address is not `local`
 — the address is what the LocalBusiness surface needs. Report the excluded layers, never
 fail them. Record the detected type in the report and pass it to `wp-agentic-surfaces`,
 which bakes it into `<prefix>_AGENTIC_SITE_TYPE`.

@@ -184,4 +184,10 @@ grep -Fq 'N/A (local clone)' "$std" \
 grep -Eiq 'would this also be true on production' "$std" \
   || fail "$std lost the production-posture test"
 
+# --- The store tier: a catalog is not scored for a checkout it deliberately does not have. ---
+for needle in 'store.tier' 'site.store_tier' 'catalog: nothing purchasable' '`unknown` is not `catalog`'; do
+  grep -Fq -- "$needle" <<<"$step23_flat" || fail "$audit Step 2.3 does not carry '$needle'"
+done
+grep -Fq 'catalog: nothing purchasable' "$std" || fail "$std does not state the catalog N/A rule"
+
 echo PASS

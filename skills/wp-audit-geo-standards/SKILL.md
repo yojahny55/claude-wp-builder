@@ -58,7 +58,7 @@ ordinary content site as SaaS. Every check not implied by the detected type is r
 |---|---|---|
 | content / publisher / service | default when no positive signal matches | Discovery + Access + GUI-Usability |
 | **local business** | `industry` = local/business **and** a non-empty `business_address` | + LocalBusiness schema, NAP, reviews |
-| **merchant** | `class_exists('WooCommerce')` / `$WP plugin is-installed woocommerce` | + Payments, `pricing.md`, Product schema |
+| **merchant** | `class_exists('WooCommerce')` / `$WP plugin is-active woocommerce` | + Payments, `pricing.md`, Product schema |
 | **SaaS** / public API | an OpenAPI spec or a deliberate public API surface recorded in `.claude/CLAUDE.md` | + OpenAPI / api-catalog / MCP / OAuth |
 
 The auditor runs only the applicable subset and prints the exclusion rationale for

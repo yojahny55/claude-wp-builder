@@ -239,4 +239,13 @@ has 'Only the table'"'"'s first three rows produce a verdict; everything else is
 has 'do not enumerate or download more files' \
   || fail "SEC-039 lost the 'one 200 is enough, do not download' bound"
 
+# --- The fix SEC-039 names ships in the templates this plugin writes. `^~` matters: without it
+#     the static-file regex location would serve a paid .png before the deny rule is reached.
+for t in templates/native/nginx.conf.tpl templates/native/nginx-no-ssl.conf.tpl; do
+  grep -Fq 'location ^~ /wp-content/uploads/woocommerce_uploads/ { deny all; }' "$t" \
+    || fail "$t does not deny woocommerce_uploads ahead of its regex locations"
+done
+grep -Fq 'path /wp-content/uploads/woocommerce_uploads/*' templates/native/Caddyfile.tpl \
+  || fail "templates/native/Caddyfile.tpl does not refuse woocommerce_uploads"
+
 echo PASS

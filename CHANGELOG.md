@@ -146,6 +146,12 @@
   is installed after the downloads and refuses every outbound host, logging each to
   `wp-content/net-guard.log`, so no fixture check can pass or fail because a real service
   answered. The CF7 check's mail sink moved to `tests/fixtures/wp/mail-sink.php` for reuse.
+- **The audit knows what a store sells, and agrees on what a store is.** `/wp-audit` Step 2.3
+  reads `store.tier`: a catalog is `N/A ("catalog: nothing purchasable")` for cart, checkout and
+  payment checks. The GEO auditor and the agentic-surfaces fixer detect a merchant by WooCommerce
+  being **active**, as Step 2.3 does, instead of merely installed. `/wp-clone` reports `store-kit`
+  as bundled — reinstall with `/wp-woo-setup` — instead of unobtainable. The native nginx and
+  Caddy templates deny `woocommerce_uploads`, the fix SEC-039 names, on every site they write.
 
 ## [1.28.0] - 2026-09-23
 
