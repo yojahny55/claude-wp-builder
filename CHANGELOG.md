@@ -118,6 +118,9 @@
 - **`/wp-woo-setup`.** Asks the store questions once, records the answers as the `store` block,
   shows a dry run, then runs the setup script. Stripe keys never enter the conversation: the
   operator puts them in `.wp-create.local.json` or the environment, and the script reads them.
+- **`/wp-create` sets up stores.** It marks every dev site `WP_ENVIRONMENT_TYPE=local`, installs
+  `bundled` plugins from this repository, and after writing the manifest runs `/wp-woo-setup`
+  when a store profile was chosen.
 
 ### Changed
 
