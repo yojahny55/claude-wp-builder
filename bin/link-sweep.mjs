@@ -27,6 +27,12 @@
  *     skills/wp-cli-patterns/scripts/resolve-link-targets.php), else the first path
  *     segment. Hundreds of term archives cost 20 renders rather than hundreds; --full
  *     lifts it;
+ *   - --per-page <n> caps the requests charged to each page a link was found on, so a
+ *     mega-menu of every archive on the site does not become the whole sweep. Pages are
+ *     compared as resolved URLs, so `/shop/` and `<site>/shop/` share one quota. Links found
+ *     on one page are charged first; a link carried by several pages (site-wide chrome) is
+ *     charged once, to the page with the most quota left, so chrome cannot drain the first
+ *     page that lists it. Links with no page column share one quota, `(no page)`;
  *   - a wall-clock budget (--budget, default 120 s): what is not done by then is
  *     UNMEASURED with the reason, and the tool still exits with a report.
  *
@@ -37,7 +43,7 @@
  * usage:
  *   link-sweep.mjs --site <origin> [--urls <file>] [--clone-origin <host>]
  *                  [--follow-clone-origin] [--concurrency <1-4>] [--per-group <n>] [--full]
- *                  [--max <n>] [--timeout <s>] [--budget <s>] [--insecure]
+ *                  [--per-page <n>] [--max <n>] [--timeout <s>] [--budget <s>] [--insecure]
  *
  * Output: JSON on stdout, `{ summary, results }`. Each result carries `url`, `class`,
  * `status` (HTTP code or null), `final` (after redirects), `verdict`
@@ -48,7 +54,7 @@
 import { readFileSync } from 'node:fs';
 
 const USAGE = 'usage: link-sweep.mjs --site <origin> [--urls <file>] [--clone-origin <host>] ' +
-  '[--follow-clone-origin] [--concurrency <1-4>] [--per-group <n>] [--full] [--max <n>] ' +
+  '[--follow-clone-origin] [--concurrency <1-4>] [--per-group <n>] [--full] [--per-page <n>] [--max <n>] ' +
   '[--timeout <s>] [--budget <s>] [--insecure]';
 const MAX_CONCURRENCY = 4;
 const UA = 'claude-wp-builder-link-sweep';
@@ -60,7 +66,7 @@ function usage(msg) {
 }
 
 function parseArgs(argv) {
-  const o = { concurrency: MAX_CONCURRENCY, perGroup: 20, max: 0, timeout: 10, budget: 120,
+  const o = { concurrency: MAX_CONCURRENCY, perGroup: 20, perPage: 0, max: 0, timeout: 10, budget: 120,
     full: false, followClone: false, insecure: false };
   const num = (v, flag) => {
     const n = Number(v);
@@ -78,6 +84,7 @@ function parseArgs(argv) {
       case '--concurrency': o.concurrency = num(next(), a); break;
       case '--per-group': o.perGroup = num(next(), a); break;
       case '--full': o.full = true; break;
+      case '--per-page': o.perPage = num(next(), a); break;
       case '--max': o.max = num(next(), a); break;
       case '--timeout': o.timeout = num(next(), a); break;
       case '--budget': o.budget = num(next(), a); break;
@@ -109,6 +116,13 @@ function readLines(o) {
     const [href, page, group] = l.split('\t');
     return { href: href.trim(), page: page ? page.trim() : null, group: group ? group.trim() : null };
   });
+}
+
+const NO_PAGE = '(no page)';
+
+// One spelling per page, so a quota cannot be multiplied by writing the page differently.
+function pageKey(o, page) {
+  try { const u = new URL(page, o.siteUrl); u.hash = ''; return u.href; } catch { return page; }
 }
 
 function classify(o, href, page) {
@@ -194,13 +208,18 @@ async function main() {
   for (const { href, page, group } of readLines(o)) {
     const c = classify(o, href, page);
     const r = byKey.get(c.key) || { url: c.url, class: c.class, pages: [], bad: c.bad, group: group || null };
-    if (page && !r.pages.includes(page)) r.pages.push(page);
+    const p = page ? pageKey(o, page) : null;
+    if (p && !r.pages.includes(p)) r.pages.push(p);
     byKey.set(c.key, r);
   }
   const all = [...byKey.values()];
   const queue = [];
   const perGroup = new Map();
-  for (const r of all) {
+  const perPage = new Map();
+  // Single-page links first, so shared chrome is charged after every page's own links.
+  const isShared = (r) => Number(r.pages.length > 1);
+  const order = [...all].sort((x, y) => isShared(x) - isShared(y));
+  for (const r of order) {
     if (r.class === 'fragment') { Object.assign(r, { verdict: 'fragment', status: null, reason: 'resolves to the page it is on' }); continue; }
     if (r.class === 'skipped') { Object.assign(r, { verdict: 'skipped', status: null, reason: r.bad ? 'unparseable href' : 'not an http(s) link' }); continue; }
     if (r.class === 'clone-origin' && !o.followClone) {
@@ -208,21 +227,38 @@ async function main() {
         reason: 'clone-origin host not confirmed this run (--follow-clone-origin)' });
       continue;
     }
+    // Quotas are checked here and charged only once the link is queued, so a link refused by
+    // a later limit does not use up a slot another link could have been measured with.
+    let groupKey = null;
     if (r.class === 'internal' && !o.full && o.perGroup > 0) {
       const seg = new URL(r.url).pathname.split('/').filter(Boolean)[0];
-      const key = r.group || (seg ? `/${seg}/` : '/');
-      const n = (perGroup.get(key) || 0) + 1;
-      perGroup.set(key, n);
-      if (n > o.perGroup) {
+      groupKey = r.group || (seg ? `/${seg}/` : '/');
+      if ((perGroup.get(groupKey) || 0) >= o.perGroup) {
         Object.assign(r, { verdict: 'unmeasured', status: null,
-          reason: `sampled: over ${o.perGroup} links in ${key} (--full to sweep all)` });
+          reason: `sampled: over ${o.perGroup} links in ${groupKey} (--full to sweep all)` });
         continue;
       }
+    }
+    let chargePage = null;
+    if (o.perPage > 0) {
+      const carriers = r.pages.length ? r.pages : [NO_PAGE];
+      const page = carriers
+        .filter((p) => (perPage.get(p) || 0) < o.perPage)
+        .sort((x, y) => (perPage.get(x) || 0) - (perPage.get(y) || 0))[0];
+      if (!page) {
+        const named = carriers.slice(0, 3).join(', ') + (carriers.length > 3 ? ` +${carriers.length - 3} more` : '');
+        Object.assign(r, { verdict: 'unmeasured', status: null,
+          reason: `over --per-page ${o.perPage} on every page carrying it: ${named}` });
+        continue;
+      }
+      chargePage = page;
     }
     if (o.max > 0 && queue.length >= o.max) {
       Object.assign(r, { verdict: 'unmeasured', status: null, reason: `over --max ${o.max}` });
       continue;
     }
+    if (groupKey) perGroup.set(groupKey, (perGroup.get(groupKey) || 0) + 1);
+    if (chargePage) perPage.set(chargePage, (perPage.get(chargePage) || 0) + 1);
     queue.push(r);
   }
 
