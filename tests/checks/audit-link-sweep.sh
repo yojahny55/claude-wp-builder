@@ -111,6 +111,16 @@ const req=d.results.filter(r=>r.verdict==='ok').length, cap=d.results.filter(r=>
 if(req!==2||cap!==1){console.log(req,cap);process.exit(1)}" <<<"$outn" \
   || fail "--per-page did not cap links that carry no page column"
 
+# A link refused by --per-page does not use up a --per-group slot: group g has 3 links, the
+# first on a page whose quota is already spent, and all of the other two are still measured.
+{ printf '%s\t%s\n' /load/z1/ "$site/full/"; printf '%s\t%s\ttax:g\n' /load/z2/ "$site/full/" \
+    /load/z3/ "$site/c/" /load/z4/ "$site/d/"; } >"$tmp/pg"
+outpg=$(node "$tool" --site "$site" --urls "$tmp/pg" --per-page 1 --per-group 2 --budget 30)
+node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));
+const ok=d.results.filter(r=>r.verdict==='ok').map(r=>r.url.replace(/.*\/load\//,'')).sort().join();
+if(ok!=='z1/,z3/,z4/'){console.log(ok);process.exit(1)}" <<<"$outpg" \
+  || fail "a link refused by --per-page consumed a --per-group slot"
+
 # Budget: a zero budget measures nothing and says why, instead of hanging.
 out0=$(printf '/ok/\n' | node "$tool" --site "$site" --budget 0)
 grep -q 'budget exhausted' <<<"$out0" || fail "--budget 0 did not report budget exhaustion"

@@ -227,17 +227,19 @@ async function main() {
         reason: 'clone-origin host not confirmed this run (--follow-clone-origin)' });
       continue;
     }
+    // Quotas are checked here and charged only once the link is queued, so a link refused by
+    // a later limit does not use up a slot another link could have been measured with.
+    let groupKey = null;
     if (r.class === 'internal' && !o.full && o.perGroup > 0) {
       const seg = new URL(r.url).pathname.split('/').filter(Boolean)[0];
-      const key = r.group || (seg ? `/${seg}/` : '/');
-      const n = (perGroup.get(key) || 0) + 1;
-      perGroup.set(key, n);
-      if (n > o.perGroup) {
+      groupKey = r.group || (seg ? `/${seg}/` : '/');
+      if ((perGroup.get(groupKey) || 0) >= o.perGroup) {
         Object.assign(r, { verdict: 'unmeasured', status: null,
-          reason: `sampled: over ${o.perGroup} links in ${key} (--full to sweep all)` });
+          reason: `sampled: over ${o.perGroup} links in ${groupKey} (--full to sweep all)` });
         continue;
       }
     }
+    let chargePage = null;
     if (o.perPage > 0) {
       const carriers = r.pages.length ? r.pages : [NO_PAGE];
       const page = carriers
@@ -249,12 +251,14 @@ async function main() {
           reason: `over --per-page ${o.perPage} on every page carrying it: ${named}` });
         continue;
       }
-      perPage.set(page, (perPage.get(page) || 0) + 1);
+      chargePage = page;
     }
     if (o.max > 0 && queue.length >= o.max) {
       Object.assign(r, { verdict: 'unmeasured', status: null, reason: `over --max ${o.max}` });
       continue;
     }
+    if (groupKey) perGroup.set(groupKey, (perGroup.get(groupKey) || 0) + 1);
+    if (chargePage) perPage.set(chargePage, (perPage.get(chargePage) || 0) + 1);
     queue.push(r);
   }
 
