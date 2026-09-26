@@ -92,6 +92,16 @@ const ok=d.results.filter(r=>r.verdict==='ok').length;
 if(ok!==6){console.log(ok);process.exit(1)}" <<<"$outg" \
   || fail "--per-group 3 over two groups did not request 3 of each"
 
+# --per-page: a link on two pages is charged once, and what is over every page's quota is
+# unmeasured. Page A carries 3 links, page B carries 3 (one shared); cap 2 per page.
+{ printf '%s\t%s\n' /load/p1/ "$site/a/" /load/p2/ "$site/a/" /load/p3/ "$site/a/" \
+    /load/p3/ "$site/b/" /load/p4/ "$site/b/" /load/p5/ "$site/b/"; } >"$tmp/pp"
+outp=$(node "$tool" --site "$site" --urls "$tmp/pp" --per-page 2 --budget 30)
+node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));
+const req=d.results.filter(r=>r.verdict==='ok').length, cap=d.results.filter(r=>/per-page/.test(r.reason||'')).length;
+if(req!==4||cap!==1){console.log(req,cap);process.exit(1)}" <<<"$outp" \
+  || fail "--per-page 2 over two pages did not request 4 and cap 1"
+
 # Budget: a zero budget measures nothing and says why, instead of hanging.
 out0=$(printf '/ok/\n' | node "$tool" --site "$site" --budget 0)
 grep -q 'budget exhausted' <<<"$out0" || fail "--budget 0 did not report budget exhaustion"

@@ -27,6 +27,9 @@
  *     skills/wp-cli-patterns/scripts/resolve-link-targets.php), else the first path
  *     segment. Hundreds of term archives cost 20 renders rather than hundreds; --full
  *     lifts it;
+ *   - --per-page <n> caps the requests charged to each page a link was found on (a link
+ *     carried by several pages is charged once, to the first page with quota left), so a
+ *     mega-menu of every archive on the site does not become the whole sweep;
  *   - a wall-clock budget (--budget, default 120 s): what is not done by then is
  *     UNMEASURED with the reason, and the tool still exits with a report.
  *
@@ -37,7 +40,7 @@
  * usage:
  *   link-sweep.mjs --site <origin> [--urls <file>] [--clone-origin <host>]
  *                  [--follow-clone-origin] [--concurrency <1-4>] [--per-group <n>] [--full]
- *                  [--max <n>] [--timeout <s>] [--budget <s>] [--insecure]
+ *                  [--per-page <n>] [--max <n>] [--timeout <s>] [--budget <s>] [--insecure]
  *
  * Output: JSON on stdout, `{ summary, results }`. Each result carries `url`, `class`,
  * `status` (HTTP code or null), `final` (after redirects), `verdict`
@@ -48,7 +51,7 @@
 import { readFileSync } from 'node:fs';
 
 const USAGE = 'usage: link-sweep.mjs --site <origin> [--urls <file>] [--clone-origin <host>] ' +
-  '[--follow-clone-origin] [--concurrency <1-4>] [--per-group <n>] [--full] [--max <n>] ' +
+  '[--follow-clone-origin] [--concurrency <1-4>] [--per-group <n>] [--full] [--per-page <n>] [--max <n>] ' +
   '[--timeout <s>] [--budget <s>] [--insecure]';
 const MAX_CONCURRENCY = 4;
 const UA = 'claude-wp-builder-link-sweep';
@@ -60,7 +63,7 @@ function usage(msg) {
 }
 
 function parseArgs(argv) {
-  const o = { concurrency: MAX_CONCURRENCY, perGroup: 20, max: 0, timeout: 10, budget: 120,
+  const o = { concurrency: MAX_CONCURRENCY, perGroup: 20, perPage: 0, max: 0, timeout: 10, budget: 120,
     full: false, followClone: false, insecure: false };
   const num = (v, flag) => {
     const n = Number(v);
@@ -78,6 +81,7 @@ function parseArgs(argv) {
       case '--concurrency': o.concurrency = num(next(), a); break;
       case '--per-group': o.perGroup = num(next(), a); break;
       case '--full': o.full = true; break;
+      case '--per-page': o.perPage = num(next(), a); break;
       case '--max': o.max = num(next(), a); break;
       case '--timeout': o.timeout = num(next(), a); break;
       case '--budget': o.budget = num(next(), a); break;
@@ -194,6 +198,7 @@ async function main() {
   const all = [...byKey.values()];
   const queue = [];
   const perGroup = new Map();
+  const perPage = new Map();
   for (const r of all) {
     if (r.class === 'fragment') { Object.assign(r, { verdict: 'fragment', status: null, reason: 'resolves to the page it is on' }); continue; }
     if (r.class === 'skipped') { Object.assign(r, { verdict: 'skipped', status: null, reason: r.bad ? 'unparseable href' : 'not an http(s) link' }); continue; }
@@ -212,6 +217,15 @@ async function main() {
           reason: `sampled: over ${o.perGroup} links in ${key} (--full to sweep all)` });
         continue;
       }
+    }
+    if (o.perPage > 0 && r.pages.length) {
+      const page = r.pages.find((p) => (perPage.get(p) || 0) < o.perPage);
+      if (!page) {
+        Object.assign(r, { verdict: 'unmeasured', status: null,
+          reason: `over --per-page ${o.perPage} on every page carrying it` });
+        continue;
+      }
+      perPage.set(page, (perPage.get(page) || 0) + 1);
     }
     if (o.max > 0 && queue.length >= o.max) {
       Object.assign(r, { verdict: 'unmeasured', status: null, reason: `over --max ${o.max}` });

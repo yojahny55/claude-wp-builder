@@ -99,6 +99,17 @@
 
 ### Changed
 
+- **`wp-audit-ux` runs on a budget.** On an 8-page store audit it ran 25 minutes while the
+  other six agents finished in 8–14: one new script and browser launch per question, a
+  sweep of 1801 links pulled from a mega-menu, and a serial retry loop against production
+  links behind a CDN bot challenge. The agent now has a *Budget and stop rule* read before
+  Step 1 — at most 3 browser launches, 2 attempts per criterion before `UNMEASURED` with the
+  selectors tried, 15 minutes of wall clock, and no command that outlives one Bash call — plus
+  one harness that opens each page once per viewport and runs every probe in that session.
+  `UX-014` is scoped: links classified, internal targets resolved through WP-CLI first,
+  deduplicated, at most 50 HTTP requests per page, the clone-origin host never requested
+  from a clone, and a CDN challenge `UNMEASURED` rather than broken. `bin/link-sweep.mjs`
+  gains `--per-page` for the cap. `tests/checks/audit-ux-budget.sh` pins the contract.
 - **`/wp-audit` asks for report-only as its first question when `--report-only` is absent.**
   Before, a run without the flag only reached the fix/no-fix decision at Step 9, after Step 4
   had already offered to install Rank Math, AIOS or SCF and Step 5 to pick an AIOS security
