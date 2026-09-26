@@ -31,9 +31,8 @@
 // in the dated sidecar, so a later reader can see that two sources reported it.
 //
 // Exit codes (house convention):
-//   0  documents written
+//   0  documents written — including for a run with no findings, which is a clean report
 //   1  invalid input — the run file is missing, unparseable, or a finding is incomplete
-//   2  clean skip — the run carries no findings to report
 //   3  crash
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
@@ -52,6 +51,7 @@ const STRINGS = {
     comparison: 'Compared with the previous audit',
     noPrevious:
       'No previous audit found. This report is the baseline every later run is measured against.',
+    noFindings: 'No issues found in the categories audited.',
     previousRun: 'Previous run',
     previousUnmeasured:
       ' — that run left %unmeasured% check(s) unmeasured, so what is "new" below may be what it never looked at',
@@ -89,6 +89,7 @@ const STRINGS = {
     comparison: 'Comparativa con la auditoría anterior',
     noPrevious:
       'No hay auditoría anterior. Este informe es la línea base contra la que se mide cada ejecución posterior.',
+    noFindings: 'No se encontraron incidencias en las categorías auditadas.',
     previousRun: 'Ejecución anterior',
     previousUnmeasured:
       ' — esa ejecución dejó %unmeasured% criterio(s) sin medir, así que lo que aquí figura como nuevo puede ser lo que entonces no se miró',
@@ -486,8 +487,9 @@ function renderMarkdown(model) {
 
   push(`## ${t.plan}`);
   push();
-  push(`| ${t.priority} | ${t.code} | ${t.page} | ${t.problem} | ${t.todo} | ${t.applied} |`);
-  push('|---|---|---|---|---|---|');
+  if (model.plan.length === 0) push(t.noFindings);
+  else push(`| ${t.priority} | ${t.code} | ${t.page} | ${t.problem} | ${t.todo} | ${t.applied} |`);
+  if (model.plan.length) push('|---|---|---|---|---|---|');
   for (const finding of model.plan) {
     push(`| ${[
       t.severity[finding.severity],
@@ -676,10 +678,9 @@ function main() {
     : loadRun(opts.run);
   const findings = run.findings;
 
-  if (findings.length === 0 && !(run.unmeasured || []).length) {
-    console.log('audit-report: the run carries no findings — nothing to write');
-    process.exit(2);
-  }
+  // A run with no findings is still rendered. A clean audit is a result the client is owed,
+  // and its sidecar is the baseline the next audit diffs against: skipping it left the first
+  // report-only run on a clean site with nothing to compare later runs to.
 
   const problems = [
     ...validate(findings),

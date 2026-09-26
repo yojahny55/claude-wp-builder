@@ -88,8 +88,11 @@
   diff against. Step 1 now defaults `--report` to `both` on a report-only run (an explicit
   `--report md|html|both` still wins), Step 8.5 runs for it, answer A says a document will be
   written, and the Step 11 summaries print the paths Step 8.5 actually wrote — one for
-  `--report md|html`, and `Report: none written` for a clean run, where the renderer writes
-  nothing. `tests/checks/audit-ask-report-only.sh` pins all of it, and the doc lines.
+  `--report md|html`. `bin/audit-report.mjs` now renders a run with no findings instead of
+  exiting 2 and writing nothing: the report says no issues were found, and its sidecar is the
+  baseline the next audit diffs against (a later run's findings are then new, and an earlier
+  run's are resolved). `tests/checks/audit-ask-report-only.sh` and
+  `tests/checks/audit-deliverable-report.sh` pin it, and the doc lines.
 
 - **`/wp-audit` asks for report-only as its first question when `--report-only` is absent.**
   Before, a run without the flag only reached the fix/no-fix decision at Step 9, after Step 4

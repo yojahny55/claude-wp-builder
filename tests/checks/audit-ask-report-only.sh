@@ -59,11 +59,11 @@ grep -Fq '.wp-audit/informe-<AAAA-MM-DD>.html' <<<"$ro" \
 grep -Fq 'Review the report written above' <<<"$ro" \
   || fail "Step 11 report-only summary no longer points at the written deliverable"
 # The paths are what Step 8.5 wrote, not a fixed pair: --report md writes one file, and a
-# run with no findings writes none (audit-report.mjs exits 2).
+# failed render writes none.
 grep -Fq '**The `Report:` lines name only what Step 8.5 actually wrote**' <<<"$step11" \
   || fail "Step 11 prints a fixed pair of paths whatever was written"
-grep -Fq 'Report: none written — the run found no issues' <<<"$step11" \
-  || fail "Step 11 has no summary for a clean run that wrote nothing"
+grep -Fq 'Report: not written — <the reason>' <<<"$step11" \
+  || fail "Step 11 has no summary for a render that wrote nothing"
 
 # What the operator reads before running the command must say the same thing.
 tr '\n' ' ' < docs/commands.md | grep -Fq 'report-only run always writes the dated deliverable (`--report` defaults to `both`)' \

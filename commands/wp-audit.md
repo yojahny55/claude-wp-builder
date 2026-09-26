@@ -1233,9 +1233,8 @@ baselines.
 
 | Exit | Meaning |
 |---|---|
-| `0` | documents written — print the paths |
+| `0` | documents written — print the paths. A run with no findings is written too: the report says nothing was found, and its sidecar is the baseline the next audit diffs against |
 | `1` | the run file is unusable, or a finding is incomplete — fix the run file and re-run |
-| `2` | the run carried no findings; say so and continue |
 | `3` | crash — report it and continue to Step 9 |
 
 It writes `.wp-audit/informe-<AAAA-MM-DD>.md`, `.html`, and a machine sidecar `.json`.
@@ -1521,8 +1520,8 @@ Next steps:
 ```
 
 **The `Report:` lines name only what Step 8.5 actually wrote**, in both summaries above.
-`--report md` or `--report html` prints one line, not two. When the renderer exited `2`
-(the run carries no findings, so nothing is written), print
-`Report: none written — the run found no issues` instead of paths, and drop the line that
-tells the operator to review it. A summary that points at a file which does not exist is
-worse than no summary.
+`--report md` or `--report html` prints one line, not two. A run with no findings is still
+written — the report says nothing was found — so its paths are printed like any other.
+When the renderer failed (exit `1` or `3`), print `Report: not written — <the reason>`
+instead of paths, and drop the line that tells the operator to review it. A summary that
+points at a file which does not exist is worse than no summary.

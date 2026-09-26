@@ -337,12 +337,25 @@ fi
 cat > "$tmp/empty.json" <<'JSON'
 {"site":"fixture","date":"2026-09-17","findings":[]}
 JSON
+# A clean run is a report, not a skip: it used to exit 2 and write nothing, so the first
+# report-only audit of a clean site left no sidecar for the next run to diff against.
+mkdir -p "$tmp/out3"
+cp "$side" "$tmp/out3/informe-2026-09-10.json"
 set +e
-node "$r" --run "$tmp/empty.json" --out "$tmp/out3" --format md >/dev/null 2>&1
+node "$r" --run "$tmp/empty.json" --out "$tmp/out3" --format both >/dev/null 2>&1
 code=$?
 set -e
-[ "$code" -eq 2 ] \
-  || fail "a run with no findings exited $code -- a clean skip is 2, and 0 would claim a report exists"
+[ "$code" -eq 0 ] || fail "a run with no findings exited $code -- a clean run must still be rendered"
+for ext in md html json; do
+  [ -f "$tmp/out3/informe-2026-09-17.$ext" ] || fail "a clean run wrote no informe-2026-09-17.$ext"
+done
+grep -Fq 'No issues found in the categories audited.' "$tmp/out3/informe-2026-09-17.md" \
+  || fail "a clean report does not say that nothing was found"
+node -e 'const d=require(process.argv[1]); if(!Array.isArray(d.findings)||d.findings.length) process.exit(1)' \
+  "$tmp/out3/informe-2026-09-17.json" || fail "a clean run's sidecar is not an empty findings baseline"
+# Against the earlier run with findings, every one of them now reads as resolved.
+grep -Eq 'Resolved[^0-9]*[1-9]|Improved[^0-9]*[1-9]' "$tmp/out3/informe-2026-09-17.md" \
+  || fail "a clean run after a run with findings does not report them resolved"
 
 set +e
 node "$r" --run "$tmp/does-not-exist.json" --out "$tmp/out4" >/dev/null 2>&1
