@@ -236,9 +236,12 @@ before writing any markup.
    the client's real logo sat in `docs/`, and listed "transparent-PNG logo" as owed
    by the client in the same run. Nothing in the flow had told it the file existed.
 
-   **3.6. Library references.** If the `wp-design-library` MCP server is registered, call `search` per role
-   the brief will need (`hero`, `proof`, `feature`, `process`, `offer`, `testimonial`,
-   `faq`, `closing`, `capability`, `explainer`, `page-head`, `footer`), with `filters.feel` set to the
+   **3.6. Library references.** If the `wp-design-library` MCP server is registered, call
+   `get_vocab` and choose the roles each page in the brief actually needs. Include store
+   roles when the page calls for them: `shop` for a product listing or collection,
+   `product` for a single-product page, and `cart`, `checkout`, `account`, or
+   `confirmation` for those respective surfaces. A marketing homepage with product cards
+   alone is not a shop page. Call `search` per selected role, with `filters.feel` set to the
    feel tags drawn from the brief's vibe words and `limit: 3`. For each hit worth using, call
    `get_entry`, read its strip, and record the slug. Write the result into
    `demo/BRIEF.md` under `## References` as one line per slug, each line starting with the slug,
