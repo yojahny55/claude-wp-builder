@@ -1,17 +1,34 @@
 # OpenCodeReview PR review — adapted from upstream
 # examples/github_actions/ocr-review.yml (fetched 2026-09-16) for this fleet:
-#   * runs-on: self-hosted (AI rig runner) — ubuntu-latest cannot reach LiteLLM
-#   * llm_url secret points at LiteLLM :4000 (composite action runs on the rig
-#     HOST, not in a container, so 192.168.0.20 works — not 172.17.0.1)
-#   * llm_extra_body '{}' — upstream default sends Anthropic-shaped
-#     {"thinking":{"type":"disabled"}}; vLLM may reject the unknown field and
-#     the LiteLLM `coder` route already sets enable_thinking:false server-side
-#   * review_concurrency 2 + llm_timeout 600 — single-GPU local 27B, not cloud
+#   * runs-on: self-hosted (AI rig runner), on purpose (decided 2026-09-25). Since 2026-09-24
+#     the endpoint is the public Alibaba token plan (qwen3.8-max), but that is temporary: the
+#     model returns to the local LAN endpoint, which only the rig reaches. A self-hosted runner
+#     on pull_request_target is safe here only because no PR code runs on it: the job never
+#     checks out the PR head (the action reads the diff through the API) and the action is
+#     pinned to a SHA. Do not add a step that checks out or runs PR code while this runs on
+#     pull_request_target on the rig. A single runner, so reviews queue.
+#   * llm_extra_body from vars.OCR_LLM_EXTRA_BODY, default '{"enable_thinking":false}'. That is
+#     Qwen3's switch, and the token plan turns thinking on by default (a probe measured 26.5 s
+#     / 918 tokens on vs 5.7 s / 214 off). It is coupled to the model, and the "Model and
+#     extra body agree" step enforces that: it fails the run before the review when the
+#     effective body is not a JSON object, or carries enable_thinking while OCR_LLM_MODEL does
+#     not contain "qwen3", and warns (without failing) when a Qwen3 model runs without
+#     enable_thinking: false -- thinking then stays on, at the cost measured above. Repointing the model to a non-Qwen3 one therefore means setting
+#     OCR_LLM_EXTRA_BODY to '{}', which is how to say "send no extra body". Clearing the
+#     variable does NOT say that: an empty variable is indistinguishable from an unset one in
+#     an expression, so the default applies (and the guard then names both variables).
+#     Upstream's default, Anthropic-shaped {"thinking":{"type":"disabled"}}, is not used on an
+#     OpenAI-compatible endpoint.
+#   * The action is pinned to a commit SHA, not @main: this runs on pull_request_target with
+#     the paid LLM key and pull-requests: write, so an upstream push must not run here until
+#     someone bumps the pin deliberately.
+#   * review_concurrency 2 + llm_timeout 600 were sized for the single-GPU local 27B. The cloud
+#     endpoint could take more; not retuned yet.
 #
-# Secrets/vars (already set): OCR_LLM_URL, OCR_LLM_AUTH_TOKEN (ocr-wp-builder
-# key), vars OCR_LLM_MODEL=coder, OCR_LLM_USE_ANTHROPIC=false
+# Secrets/vars (already set): OCR_LLM_URL, OCR_LLM_AUTH_TOKEN (Alibaba token-plan
+# key), vars OCR_LLM_MODEL=qwen3.8-max, OCR_LLM_USE_ANTHROPIC=false, optional OCR_LLM_EXTRA_BODY
 #
-# Runs SIDE BY SIDE with pr-agent.yml during the trial — both review each PR.
+# The sole review bot since 2026-09-16 (PR-Agent was retired after the trial).
 name: OpenCodeReview PR Review
 
 concurrency:
@@ -90,14 +107,50 @@ jobs:
             core.setOutput('base_ref', pullRequest.base.ref);
             core.setOutput('head_sha', pullRequest.head.sha);
 
+      # The default body lives here only; the review reads the checked value from this step.
+      - name: Model and extra body agree
+        id: extra-body
+        uses: actions/github-script@v7
+        env:
+          MODEL: ${{ vars.OCR_LLM_MODEL }}
+          # Thinking off by default; see the header for the measurements and the model coupling.
+          EXTRA_BODY: ${{ vars.OCR_LLM_EXTRA_BODY || '{"enable_thinking":false}' }}
+        with:
+          script: |
+            const model = process.env.MODEL || '';
+            const raw = process.env.EXTRA_BODY;
+            let body;
+            try {
+              body = JSON.parse(raw);
+            } catch (err) {
+              core.setFailed(`OCR_LLM_EXTRA_BODY is not valid JSON (${err.message}); use '{}' to send no extra body.`);
+              return;
+            }
+            // null, a number, an array or a double-encoded string all parse, and would reach
+            // the paid review as an opaque action error.
+            if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+              core.setFailed(`OCR_LLM_EXTRA_BODY must be a JSON object (got ${JSON.stringify(body)}); use '{}' to send no extra body.`);
+              return;
+            }
+            const qwen3 = /qwen3/i.test(model);
+            if ('enable_thinking' in body && !qwen3) {
+              core.setFailed(`the effective OCR_LLM_EXTRA_BODY carries enable_thinking (Qwen3's switch) but OCR_LLM_MODEL is '${model}', not a Qwen3 model: set OCR_LLM_EXTRA_BODY to '{}' or repoint OCR_LLM_MODEL.`);
+              return;
+            }
+            // Not fatal: thinking on may be a deliberate override. It must not be a silent one.
+            if (qwen3 && body.enable_thinking !== false) {
+              core.warning(`OCR_LLM_MODEL '${model}' is Qwen3 but the effective OCR_LLM_EXTRA_BODY does not set enable_thinking: false, so thinking stays on (~4x tokens, ~5x latency per call).`);
+            }
+            core.setOutput('body', raw);
+
       - name: Run OpenCodeReview
-        uses: alibaba/open-code-review@main
+        uses: alibaba/open-code-review@486022daaf14f7142275eddb9b3cacc3cc5dadfa # main as of 2026-09-25
         with:
           llm_url: ${{ secrets.OCR_LLM_URL }}
           llm_auth_token: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
           llm_model: ${{ vars.OCR_LLM_MODEL }}
           llm_use_anthropic: ${{ vars.OCR_LLM_USE_ANTHROPIC }}
-          llm_extra_body: '{}'
+          llm_extra_body: ${{ steps.extra-body.outputs.body }}
           llm_timeout: '600'
           review_concurrency: '2'
           stream_progress: 'true'
