@@ -295,12 +295,15 @@ async function main() {
   const executablePath = findBrowser('chromium');
   if (!executablePath) usage('no existing Chromium found (set WP_BROWSER_CHROMIUM); nothing is downloaded', 2);
 
+  // A launch is charged once a browser exists: one that never started measured nothing.
+  let browser;
+  try { browser = await chromium.launch({ executablePath }); }
+  catch (e) { usage(`Chromium failed to launch: ${errMsg(e)}`); }
   state.launches += 1;
   writeState(o, state);
   const report = { site: o.site, launch: state.launches, maxLaunches: MAX_LAUNCHES,
     minutesUsed: Math.round(elapsed / 6000) / 10, pages: [], probes: {} };
   const linkRows = [];
-  const browser = await chromium.launch({ executablePath });
   try {
     for (const vp of o.viewports) {
       const context = await browser.newContext({ viewport: VIEWPORTS[vp] });

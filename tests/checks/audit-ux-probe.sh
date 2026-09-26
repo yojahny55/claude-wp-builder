@@ -111,5 +111,9 @@ for bad in '--page-timeout abc' '--probe-timeout 0' '--viewports ,'; do
   [ "$code" = 2 ] || fail "$bad exited $code, expected 2"
 done
 [ ! -e "$tmp/o4/ux-probe-state.json" ] || fail "a usage error consumed a launch"
+# A browser that fails to start is not a spent launch.
+set +e; WP_BROWSER_CHROMIUM=/bin/false node "$tool" --site "$site" --pages / --out "$tmp/o5/r.json" 2>"$tmp/err"; code=$?; set -e
+[ "$code" = 2 ] && grep -q 'failed to launch' "$tmp/err" || fail "a failed Chromium launch exited $code, expected 2"
+[ ! -e "$tmp/o5/ux-probe-state.json" ] || fail "a failed Chromium launch consumed a launch"
 
 echo PASS
