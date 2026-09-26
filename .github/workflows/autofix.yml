@@ -329,7 +329,7 @@ jobs:
         id: filter
         run: |
           set -euo pipefail
-          out="$RUNNER_TEMP/filtered"; mkdir -p "$out"; : > "$out/dropped.txt"
+          out="$RUNNER_TEMP/filtered"; mkdir -p "$out"; : > "$out/dropped.txt"; : > "$out/unrequested.txt"
           if [ -s "$RUNNER_TEMP/agent-output/raw.patch" ]; then
             git apply --index --binary --whitespace=nowarn "$RUNNER_TEMP/agent-output/raw.patch"
           fi
@@ -349,15 +349,22 @@ jobs:
               .github/*) [ "$named" = true ] || why="protected path" ;;
             esac
             if [ -z "$why" ] && [ "$st" = D ] && [ "$named" = false ]; then why="deletion no finding asked for"; fi
+            # A typechange (file -> symlink, say) is as unrequested as a deletion.
+            if [ -z "$why" ] && [ "$st" = T ] && [ "$named" = false ]; then why="typechange no finding asked for"; fi
             if [ -z "$why" ] && [ "$st" = A ] && [ "$named" = false ] && ! grep -qxF -- "$(dirname -- "$f")" <<<"$allowed_dirs"; then
               why="new file outside the findings' directories"
             fi
+            # Kept, but shown: a real fix may touch a helper no finding names, so an unnamed
+            # modification (or a new file beside a finding) is not dropped -- it is listed in
+            # the summary for the maintainer to check before merging.
+            if [ -z "$why" ] && [ "$named" = false ]; then printf '%s\t%s\n' "$f" "$st" >> "$out/unrequested.txt"; fi
             [ -n "$why" ] || continue
             if [ "$st" = A ]; then git rm -q -f -- "$f"; else git reset -q HEAD -- "$f"; git checkout -q HEAD -- "$f"; fi
             printf '%s\t%s\n' "$f" "$why" >> "$out/dropped.txt"
           done < "$RUNNER_TEMP/changes.txt"
           git diff --cached --binary --no-renames HEAD > "$out/filtered.patch"
           echo "--- dropped:"; cat "$out/dropped.txt"
+          echo "--- kept, no finding names the file:"; cat "$out/unrequested.txt"
           echo "--- kept:"; git diff --cached --stat --no-renames HEAD | tail -20
           if [ -s "$out/filtered.patch" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; else echo "changed=false" >> "$GITHUB_OUTPUT"; fi
           echo "patch_sha=$(sha256sum "$out/filtered.patch" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
@@ -636,7 +643,9 @@ jobs:
                       changed.add(s[:n])
           agent_rc = read("agent-output/exit.txt").strip()
           truncated = read("findings/truncated.txt").strip()
+          # Paths below come from the agent's patch: defanged like any agent text.
           dropped = [l.split("\t") for l in read("filtered/dropped.txt").splitlines() if l.strip()]
+          unrequested = [l.split("\t") for l in read("filtered/unrequested.txt").splitlines() if l.strip()]
           sha = e("SHA") or ""
           if e("GATE") != "success":
               head = f"❌ the gate did not finish (`{e('GATE')}`) — nothing was run. See the run log linked above."
@@ -663,7 +672,8 @@ jobs:
           def status(f):
               r = report.get(str(f["id"]), {})
               st = r.get("status") if r.get("status") in ("fixed", "skipped") else "unreported"
-              why = " ".join(str(r.get("reason", "no report from the agent")).split())[:300]
+              # The agent's reason is untrusted text (finding content can steer it).
+              why = defang(" ".join(str(r.get("reason", "no report from the agent")).split())[:300])
               return st, why
           if agent_rc not in ("", "0") and "the agent exited" not in head:
               head += f"\n\nThe agent exited {agent_rc} (124 is the timeout), so its work may be partial."
@@ -675,7 +685,10 @@ jobs:
               icon = {"fixed": "✅", "skipped": "⏭️"}.get(st, "❔")
               lines.append(f"- {icon} **{st}** `{f['path']}:{f['line']}` ({f['severity']}) — {why}")
           if dropped:
-              lines += ["", "Dropped from the agent's edit:"] + [f"- `{d[0]}` — {d[-1]}" for d in dropped]
+              lines += ["", "Dropped from the agent's edit:"] + [f"- `{defang(d[0])}` — {d[-1]}" for d in dropped]
+          if unrequested:
+              lines += ["", "Changed without a finding naming the file — check before merging:"] + \
+                       [f"- `{defang(u[0])}` ({'added' if u[-1] == 'A' else 'modified'})" for u in unrequested]
           lines += ["", "OCR does not re-review an autofix push by itself. Comment `/open-code-review` to review the fix."]
           (tmp / "summary.md").write_text("\n".join(lines))
           # Non-fatal per call: one rejected reply must not suppress the rest.

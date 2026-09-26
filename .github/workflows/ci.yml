@@ -210,6 +210,10 @@ jobs:
             echo "::error::base_ref is not a branch name (allowed: A-Z a-z 0-9 . _ / -, not starting with -)"; exit 1
           fi
           git fetch --no-tags origin -- "$BASE_REF"
+          # A tag or full ref passes the shape test and the fetch, but updates no tracking ref,
+          # so rev-list below would die with a bare "unknown revision". Name the rule instead.
+          git show-ref --verify --quiet "refs/remotes/origin/$BASE_REF" \
+            || { echo "::error::origin/$BASE_REF does not exist — base_ref must be a branch name, not a tag or full ref"; exit 1; }
           ahead=$(git rev-list --count "origin/$BASE_REF..HEAD")
           [ "$ahead" -gt 0 ] || { echo "::error::HEAD is not ahead of origin/$BASE_REF — nothing to compare"; exit 1; }
 

@@ -10,7 +10,8 @@
   holds: the agent runs with a read-only token and produces only a patch; a filter job with no
   repository code drops every edit to `tests/checks/` and `tests/baselines/` (the checks that
   judge the patch, and baselines that need a `baseline:` commit), edits to `.github/` unless a
-  finding names that file, plus unrequested deletions and stray new files; a verify job with no
+  finding names that file, plus unrequested deletions, typechanges and stray new files, and
+  lists every kept change to a file no finding names in the summary; a verify job with no
   secrets runs the contract checks before and after the patch, then `php -l` at the PHP floors
   and `node --check`; only then does a publish job, which runs no repository code, push the
   exact patch the filter hashed. The skip list is read from the default branch, so a PR cannot
@@ -25,8 +26,8 @@
   required `base_ref` input that must look like a branch name and be behind HEAD, doc-sync runs
   on every dispatch, and the concurrency group now includes the event so a dispatch never
   cancels a push run. `ocr-review.yml` pins `alibaba/open-code-review` to a commit SHA and
-  fails fast when `OCR_LLM_EXTRA_BODY` is not JSON or carries `enable_thinking` for a model that
-  is not Qwen3.
+  fails fast when `OCR_LLM_EXTRA_BODY` is not a JSON object or carries `enable_thinking` for a
+  model that is not Qwen3, and warns when a Qwen3 model runs with thinking left on.
 
 - **A multi-currency plugin and a full-page/edge cache computed prices at two different
   granularities, and nothing checked whether they agreed.** A multi-currency plugin (CURCY/
