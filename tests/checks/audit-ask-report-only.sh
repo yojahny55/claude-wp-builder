@@ -44,14 +44,18 @@ grep -Fq 'and `--report` is absent, set `--report both`' <<<"$step1" \
   || fail "Step 1 lost the --report both default for report-only"
 grep -Fq '[A] Report only — audit and write the report (.md + .html)' <<<"$step1" \
   || fail "answer A no longer says a document will be written"
-grep -Fq '## Step 8.5: Write the dated deliverable (if `--report` was given, or the run is report-only)' "$audit" \
+grep -Fq 'or the run is report-only (Step 1 defaults `--report`' "$audit" \
   || fail "Step 8.5 does not run on a report-only run"
-step11=$(awk '/^## Step 11:/{on=1} on' "$audit")
+step11=$(awk '/^## Step 11:/{on=1;print;next} on&&/^## /{on=0} on' "$audit")
+[ -n "$step11" ] || fail "no Step 11 in $audit"
 ro=$(awk '/^If `--report-only` was used:/{on=1} on' <<<"$step11")
+[ -n "$ro" ] || fail "Step 11 no longer has a report-only summary block"
 grep -Fq 'Report: .wp-audit/informe-<AAAA-MM-DD>.md' <<<"$ro" \
-  || fail "Step 11 report-only summary does not print the document paths"
-grep -Fq 'Review the report above' <<<"$ro" \
-  && fail "Step 11 report-only summary still points at the console"
+  || fail "Step 11 report-only summary does not print the .md path"
+grep -Fq '.wp-audit/informe-<AAAA-MM-DD>.html' <<<"$ro" \
+  || fail "Step 11 report-only summary does not print the .html path"
+grep -Fq 'Review the report written above' <<<"$ro" \
+  || fail "Step 11 report-only summary no longer points at the written deliverable"
 
 grep -Fq 'the first question of the run asks whether you want the report only' docs/commands.md \
   || fail "docs/commands.md does not describe the report-only question"
