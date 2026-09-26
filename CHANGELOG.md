@@ -81,6 +81,12 @@
 
 ### Changed
 
+- **`/wp-demo` picks design-library roles from the library's own vocabulary.** Step 2.6's
+  sub-step 3.6 used to search a fixed list of twelve roles, so the store roles the library
+  gained (`shop`, `product`, `cart`, `checkout`, `account`, `confirmation`) were never asked
+  for. It now calls `get_vocab`, chooses the roles each page in the brief actually needs, and
+  maps the store roles to their pages — a marketing homepage with product cards is not a
+  `shop` page. `tests/checks/wp-library.sh` pins the vocabulary call and the store mapping.
 - **`/wp-audit` asks for report-only as its first question when `--report-only` is absent.**
   Before, a run without the flag only reached the fix/no-fix decision at Step 9, after Step 4
   had already offered to install Rank Math, AIOS or SCF and Step 5 to pick an AIOS security
