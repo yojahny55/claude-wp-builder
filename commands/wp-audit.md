@@ -19,8 +19,9 @@ Parse `$ARGUMENTS` for:
   depending on a browser tool being present in this session. Needs a reachable URL, the
   same one `--host` supplies.
 - **`--report md|html|both`** — also write the run as a dated deliverable under
-  `.wp-audit/`. Absent, the audit prints to the console and writes only the ledger, which
-  is what every run did before this flag existed.
+  `.wp-audit/`. Absent, the audit prints to the console and writes only the ledger —
+  **except on a report-only run, where it defaults to `both`** (see below). An explicit
+  `--report md|html|both` always wins.
 - **`--report-lang en|es`** (default: `en`) — the language of that deliverable. It is read
   by a client, not by the person who ran the audit, so it follows the project's primary
   language rather than the plugin's. Take the default from `languages` in the project's
@@ -49,12 +50,19 @@ Use `AskUserQuestion`:
 
 ```
 What should this audit do?
-  [A] Report only — audit and write the report; nothing on the site is installed or changed
+  [A] Report only — audit and write the report (.md + .html); nothing on the site is installed or changed
   [B] Report, then offer fixes — the report comes first, then Step 9 asks before applying anything
 ```
 
 On A, set `--report-only` for the rest of the run, exactly as if it had been typed. On B,
 continue without it. When the flag was passed, do not ask.
+
+**A report-only run always writes the deliverable.** When `--report-only` is set — by the
+flag or by answer A — and `--report` is absent, set `--report both`. An explicit
+`--report md|html|both` wins. `--report-lang` keeps its own default. The operator who chose
+"report only" asked for a report and no changes; without this, the only report of that run
+was the console scrollback, gone at the next `/clear`, and the first report-only run on a
+project wrote no dated sidecar, so the next audit had no baseline to diff against.
 
 Before this question existed, a run without the flag only learned that the operator wanted a
 read-only audit at Step 9, after Steps 4 and 5 had already offered to install and configure
@@ -1121,11 +1129,12 @@ If all checks passed in a category:
 [SECURITY] ✓ All checks passed
 ```
 
-## Step 8.5: Write the dated deliverable (if `--report` was given)
+## Step 8.5: Write the dated deliverable (if `--report` was given, or the run is report-only)
 
 The console report above is for whoever ran the audit. It is gone when the scrollback is,
 and `.wp-audit-findings.json` is a working file — nobody hands a client a JSON array of
-check ids. When `--report` is given, this step writes the same run as documents.
+check ids. When `--report` is given, or the run is report-only (Step 1 defaults `--report`
+to `both` there), this step writes the same run as documents.
 
 ### Every finding says who applies it
 
@@ -1500,10 +1509,13 @@ If `--report-only` was used:
 Total: N issues found (X critical, Y warnings, Z info)
 Auto-fixable: M/N
 
+Report: .wp-audit/informe-<AAAA-MM-DD>.md
+        .wp-audit/informe-<AAAA-MM-DD>.html  (single file — open, send, or print to PDF)
+
 To auto-fix issues, run: /wp-audit <same flags without --report-only>
 
 Next steps:
-  - Review the report above
+  - Review the report written above
   - Run /wp-audit (without --report-only) to auto-fix issues
   - Run /wp-finalize for pre-delivery validation
 ```

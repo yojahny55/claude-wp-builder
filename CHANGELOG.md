@@ -81,6 +81,15 @@
 
 ### Changed
 
+- **A report-only `/wp-audit` always writes the `.md` + `.html` deliverable.** Choosing
+  "Report only" (flag or the Step 1 question) without `--report` used to print to the
+  console and nothing else: the report was gone at the next `/clear`, and the first
+  report-only run on a project wrote no dated sidecar, so the next audit had no baseline to
+  diff against. Step 1 now defaults `--report` to `both` on a report-only run (an explicit
+  `--report md|html|both` still wins), Step 8.5 runs for it, answer A says a document will be
+  written, and the Step 11 report-only summary prints both paths.
+  `tests/checks/audit-ask-report-only.sh` pins all four.
+
 - **`/wp-audit` asks for report-only as its first question when `--report-only` is absent.**
   Before, a run without the flag only reached the fix/no-fix decision at Step 9, after Step 4
   had already offered to install Rank Math, AIOS or SCF and Step 5 to pick an AIOS security
