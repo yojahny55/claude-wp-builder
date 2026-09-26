@@ -108,6 +108,21 @@
 
 ### Changed
 
+- **A report-only `/wp-audit` always writes the `.md` + `.html` deliverable.** Choosing
+  "Report only" (flag or the Step 1 question) without `--report` used to print to the
+  console and nothing else: the report was gone at the next `/clear`, and the first
+  report-only run on a project wrote no dated sidecar, so the next audit had no baseline to
+  diff against. Step 1 now defaults `--report` to `both` on a report-only run (an explicit
+  `--report md|html|both` still wins), Step 8.5 runs for it, answer A says a document will be
+  written, and the Step 11 summaries print the paths Step 8.5 actually wrote — one for
+  `--report md|html`. `bin/audit-report.mjs` now renders a run with no findings instead of
+  exiting 2 and writing nothing: the report says no issues were found, and its sidecar is the
+  baseline the next audit diffs against (a later run's findings are then new, and an earlier
+  run's are resolved). Both renderers show that sentence in place of the plan table and drop
+  the ownership split and the staging/production warning, which describe changes a clean run
+  has none of; a run whose checks partly did not run says so instead of claiming the
+  categories are clean. `tests/checks/audit-ask-report-only.sh` and
+  `tests/checks/audit-deliverable-report.sh` pin it, and the doc lines.
 - **OpenCodeReview now reviews on `qwen3.8-max` via the Alibaba token plan, with thinking off.**
   The plan enables thinking by default. A probe measured 26.5 s and 918 tokens (787 of them
   reasoning) with it on, and 5.7 s and 214 tokens with it off; the first reviews on it ran over
