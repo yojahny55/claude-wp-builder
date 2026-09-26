@@ -36,7 +36,8 @@
  * Site probes (--probes <module.mjs>) are where the theme-specific interactions live: the
  * login popup, AJAX pagination, a form's error state. The module's default export is an
  * array of { id, criterion, viewports?, run }, where `run({ page, url, path, viewport })`
- * returns anything JSON-serialisable. Extending that module and rerunning is how a
+ * returns anything JSON-serialisable, and must leave the page on `url`. A probe that times
+ * out cannot be stopped, only abandoned, so the harness reloads `url` before the next one. Extending that module and rerunning is how a
  * follow-up question is asked — never a new script with its own browser.
  *
  * usage:
@@ -70,6 +71,17 @@ function usage(msg, code = 2) {
   process.exit(code);
 }
 
+function seconds(v, flag) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) usage(`${flag} needs a positive number of seconds, got ${v}`);
+  return n;
+}
+
+// A rejection is not always an Error: a probe can reject with a string, or with nothing.
+function errMsg(e) {
+  return String((e && e.message) || e).split('\n')[0];
+}
+
 function parseArgs(argv) {
   const o = { out: 'ux-probe.json', viewports: ['mobile', 'tablet', 'desktop'], pageTimeout: 45,
     probeTimeout: 15, stateReset: false };
@@ -85,8 +97,8 @@ function parseArgs(argv) {
       case '--links-out': o.linksOut = next(); break;
       case '--state': o.state = next(); break;
       case '--state-reset': o.stateReset = true; break;
-      case '--page-timeout': o.pageTimeout = Number(next()); break;
-      case '--probe-timeout': o.probeTimeout = Number(next()); break;
+      case '--page-timeout': o.pageTimeout = seconds(next(), a); break;
+      case '--probe-timeout': o.probeTimeout = seconds(next(), a); break;
       case '-h': case '--help': process.stdout.write(USAGE + '\n'); process.exit(0);
       default: usage(`unknown argument ${a}`);
     }
@@ -94,7 +106,9 @@ function parseArgs(argv) {
   if (!o.site) usage('--site is required');
   if (!o.pages?.length) usage('--pages is required');
   try { o.siteUrl = new URL(o.site); } catch { usage(`--site is not a URL: ${o.site}`); }
+  if (!o.viewports.length) usage('--viewports is empty');
   for (const v of o.viewports) if (!VIEWPORTS[v]) usage(`unknown viewport ${v}`);
+  for (const p of o.pages) { try { new URL(p, o.siteUrl); } catch { usage(`--pages entry is not a URL or path: ${p}`); } }
   o.state = o.state || join(dirname(resolve(o.out)), 'ux-probe-state.json');
   return o;
 }
@@ -102,7 +116,10 @@ function parseArgs(argv) {
 function readState(o) {
   const fresh = { started: Date.now(), launches: 0, probes: {} };
   if (o.stateReset || !existsSync(o.state)) return fresh;
-  try { return { ...fresh, ...JSON.parse(readFileSync(o.state, 'utf8')) }; } catch { return fresh; }
+  // Absent is a new audit; unreadable is not. Failing open would hand out a fresh budget.
+  try { return { ...fresh, ...JSON.parse(readFileSync(o.state, 'utf8')) }; } catch (e) {
+    usage(`state ${o.state} is unreadable (${errMsg(e)}); refusing to reset the budget, use --state-reset`);
+  }
 }
 
 function writeState(o, s) {
@@ -145,8 +162,12 @@ function domProbes(collectLinks) {
 
   // UX-006: per text block, the longest line in characters. A Range's client rects are
   // one per line box; characters per line = line width x (chars / total width).
+  // The cap counts blocks kept, not blocks seen: a mega-menu's short <li>s come first in
+  // document order and would otherwise use it up and report "no long lines".
   const lineLength = [];
-  for (const el of [...document.querySelectorAll('p, li, dd, blockquote, figcaption')].slice(0, 300)) {
+  let lineLengthTruncated = false;
+  for (const el of document.querySelectorAll('p, li, dd, blockquote, figcaption')) {
+    if (lineLength.length >= 300) { lineLengthTruncated = true; break; }
     const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
     if (text.length < 60 || !visible(el)) continue;
     // Text nodes only: a Range over the element also returns the boxes of inline elements
@@ -169,6 +190,7 @@ function domProbes(collectLinks) {
   lineLength.sort((a, b) => b.longestLineChars - a.longestLineChars);
 
   // UX-009: action elements that sit side by side (same parent) closer than 8px.
+  // Capped: the pairwise scan below is O(n^2), and a gallery or mega-menu can carry thousands.
   const actions = [...document.querySelectorAll('button, [role="button"], input[type="submit"], input[type="button"], a')]
     .filter((el) => {
       if (!visible(el)) return false;
@@ -176,7 +198,7 @@ function domProbes(collectLinks) {
       const cs = getComputedStyle(el);
       return cs.backgroundColor !== 'rgba(0, 0, 0, 0)' || parseFloat(cs.borderTopWidth) > 0
         || parseFloat(cs.paddingTop) >= 6;
-    });
+    }).slice(0, 400);
   const actionGaps = [];
   for (let i = 0; i < actions.length; i++) {
     for (let j = i + 1; j < actions.length; j++) {
@@ -192,15 +214,18 @@ function domProbes(collectLinks) {
     }
   }
 
-  // UX-018: an in-text link must differ from its text at rest, not only on hover.
+  // UX-018: an in-text link must differ from its text at rest, not only on hover. Only a
+  // link that is neither underlined nor differs in colour or weight is a finding; links in
+  // navigation, header and footer are not in-text and are skipped.
   const linkStyle = [];
-  for (const a of [...document.querySelectorAll('p a, li a, dd a, td a')].slice(0, 200)) {
-    if (!visible(a) || !a.parentElement) continue;
+  let linkStyleTruncated = false;
+  for (const a of document.querySelectorAll('p a, li a, dd a, td a')) {
+    if (a.closest('nav, header, footer, [role="navigation"]') || !a.parentElement || !visible(a)) continue;
     const cs = getComputedStyle(a), ps = getComputedStyle(a.parentElement);
     const underline = cs.textDecorationLine.includes('underline') || parseFloat(cs.borderBottomWidth) > 0;
-    const colorDiffers = cs.color !== ps.color;
-    const weightDiffers = cs.fontWeight !== ps.fontWeight;
-    if (!underline) linkStyle.push({ selector: path(a), text: a.textContent.trim().slice(0, 40), underline, colorDiffers, weightDiffers });
+    if (underline || cs.color !== ps.color || cs.fontWeight !== ps.fontWeight) continue;
+    if (linkStyle.length >= 50) { linkStyleTruncated = true; break; }
+    linkStyle.push({ selector: path(a), text: a.textContent.trim().slice(0, 40) });
   }
 
   // UX-019: an image link needs an accessible name from somewhere.
@@ -233,7 +258,8 @@ function domProbes(collectLinks) {
       if (!seen.has(href)) { seen.add(href); links.push(href); }
     }
   }
-  return { lineLength: lineLength.slice(0, 20), actionGaps, linkStyle: linkStyle.slice(0, 50), imageLinks, required, links };
+  return { lineLength: lineLength.slice(0, 20), lineLengthTruncated, actionGaps, linkStyle, linkStyleTruncated,
+    imageLinks, required, links };
 }
 
 function withTimeout(p, ms, what) {
@@ -246,11 +272,13 @@ async function main() {
   const o = parseArgs(process.argv.slice(2));
   const state = readState(o);
   const elapsed = Date.now() - state.started;
+  // Name the state file: one inherited from an earlier audit's --out dir is recognisable by its date.
+  const from = `state ${o.state}, started ${new Date(state.started).toISOString()}`;
   if (state.launches >= MAX_LAUNCHES) {
-    usage(`launch budget spent (${state.launches}/${MAX_LAUNCHES}); report what you have, the rest is UNMEASURED (budget)`, 3);
+    usage(`launch budget spent (${state.launches}/${MAX_LAUNCHES}; ${from}); report what you have, the rest is UNMEASURED (budget)`, 3);
   }
   if (elapsed > WALL_CLOCK_MS) {
-    usage(`wall-clock budget spent (${Math.round(elapsed / 60000)} min of 15); report what you have, the rest is UNMEASURED (budget)`, 3);
+    usage(`wall-clock budget spent (${Math.round(elapsed / 60000)} min of 15; ${from}); report what you have, the rest is UNMEASURED (budget)`, 3);
   }
 
   let probes = [];
@@ -258,7 +286,7 @@ async function main() {
     try {
       const mod = await import(pathToFileURL(resolve(o.probes)).href + `?t=${Date.now()}`);
       probes = Array.isArray(mod.default) ? mod.default : [];
-    } catch (e) { usage(`cannot load --probes ${o.probes}: ${e.message}`); }
+    } catch (e) { usage(`cannot load --probes ${o.probes}: ${errMsg(e)}`); }
     for (const p of probes) if (!p || !p.id || typeof p.run !== 'function') usage('each site probe needs { id, run }');
   }
 
@@ -286,12 +314,19 @@ async function main() {
           await page.waitForTimeout(500);
           entry.status = res ? res.status() : null;
           entry.loadMs = Date.now() - t0;
-          entry.dom = await page.evaluate(domProbes, vp === 'desktop' || o.viewports.length === 1);
+          try {
+            entry.dom = await withTimeout(page.evaluate(domProbes, vp === 'desktop' || o.viewports.length === 1),
+              o.pageTimeout * 1000, 'DOM probes');
+          } catch (e) {
+            entry.dom = { verdict: 'unmeasured', reason: errMsg(e) };
+            report.pages.push(entry);
+            continue;
+          }
           if (entry.dom.links.length) for (const h of entry.dom.links) linkRows.push(`${h}\t${url}`);
           entry.dom.linkCount = entry.dom.links.length;
           delete entry.dom.links;
         } catch (e) {
-          entry.error = e.message.split('\n')[0];
+          entry.error = errMsg(e);
           report.pages.push(entry);
           continue;
         }
@@ -309,7 +344,7 @@ async function main() {
               o.probeTimeout * 1000, `probe ${probe.id}`);
             entry.site[probe.id] = { criterion: probe.criterion || null, value };
           } catch (e) {
-            const err = { run: state.launches, page: p, viewport: vp, error: e.message.split('\n')[0],
+            const err = { run: state.launches, page: p, viewport: vp, error: errMsg(e),
               source: String(probe.run).slice(0, 300) };
             // One attempt per run, however many page views it failed on: the budget is
             // about how many times the agent may rewrite a probe, not how many pages exist.
@@ -317,6 +352,10 @@ async function main() {
             state.probes[probe.id] = rec;
             entry.site[probe.id] = { criterion: probe.criterion || null, verdict: 'error', error: err.error,
               attemptsLeft: Math.max(0, MAX_ATTEMPTS - rec.errors.length) };
+            // The failed probe may still be driving the page; put it back on this URL so the
+            // next probe does not measure wherever the runaway one left it.
+            try { await page.goto(url, { waitUntil: 'load', timeout: o.pageTimeout * 1000 }); }
+            catch (e2) { entry.error = `page not restored after probe ${probe.id}: ${errMsg(e2)}`; break; }
           }
         }
         report.pages.push(entry);
@@ -331,7 +370,11 @@ async function main() {
   if (o.probes) report.probesFile = o.probes;
   mkdirSync(dirname(resolve(o.out)), { recursive: true });
   writeFileSync(o.out, JSON.stringify(report, null, 2) + '\n');
-  if (o.linksOut) writeFileSync(o.linksOut, [...new Set(linkRows)].join('\n') + (linkRows.length ? '\n' : ''));
+  // An empty collection (a run scoped to mobile/tablet) must not truncate an earlier run's evidence.
+  if (o.linksOut && linkRows.length) {
+    mkdirSync(dirname(resolve(o.linksOut)), { recursive: true });
+    writeFileSync(o.linksOut, [...new Set(linkRows)].join('\n') + '\n');
+  }
   process.stderr.write(`ux-probe: launch ${state.launches}/${MAX_LAUNCHES}, ${report.pages.length} page views, report ${o.out}\n`);
 }
 

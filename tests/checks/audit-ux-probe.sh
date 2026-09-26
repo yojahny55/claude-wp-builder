@@ -34,7 +34,7 @@ if [ -z "${PLAYWRIGHT_CORE:-}" ] && ! node -e "import('playwright-core')" >/dev/
 fi
 
 tmp=$(mktemp -d)
-trap 'kill "$srv" 2>/dev/null || true; rm -rf "$tmp"' EXIT
+trap 'kill "${srv:-}" 2>/dev/null || true; rm -rf "$tmp"' EXIT
 cat >"$tmp/server.mjs" <<'JS'
 import http from 'node:http';
 import { readFileSync } from 'node:fs';
@@ -49,6 +49,7 @@ JS
 node "$tmp/server.mjs" tests/fixtures/ux-probe >"$tmp/port" &
 srv=$!
 for _ in $(seq 50); do [ -s "$tmp/port" ] && break; sleep 0.1; done
+[ -s "$tmp/port" ] || fail "fixture server did not start"
 site="http://127.0.0.1:$(cat "$tmp/port")"
 
 run() { node "$tool" --site "$site" --pages /,/second/ --out "$tmp/out/r.json" \
@@ -63,12 +64,13 @@ j "$d const a=P('desktop','/').dom.lineLength[0].longestLineChars,b=P('mobile','
   || fail "UX-006 line length not measured per viewport"
 j "$d const g=P('desktop','/').dom.actionGaps;if(g.length!==1||g[0].gapPx!==4){console.log(JSON.stringify(g));process.exit(1)}" \
   || fail "UX-009 did not find exactly the 4px pair"
-j "$d const l=P('desktop','/').dom.linkStyle;if(!l.length||l[0].colorDiffers)process.exit(1)" \
-  || fail "UX-018 did not flag the link that looks like text"
+j "$d const l=P('desktop','/').dom.linkStyle;if(l.length!==1||l[0].text!=='a link that looks like text'){console.log(JSON.stringify(l));process.exit(1)}" \
+  || fail "UX-018 did not flag exactly the in-text link that looks like text (not the nav link, not the coloured one)"
 j "$d if(P('desktop','/').dom.imageLinks.length!==1)process.exit(1)" || fail "UX-019 did not find the unnamed image link"
 j "$d const q=P('desktop','/').dom.required;const n=q.find(x=>x.name==='name'),e=q.find(x=>x.name==='email');if(!n||n.marked||!e||!e.marked)process.exit(1)" \
   || fail "UX-001 did not separate the marked and unmarked required fields"
 j "$d if(P('desktop','/').site['account-popup'].value.opened!==true)process.exit(1)" || fail "site probe did not run on the loaded page"
+j "$d if(P('mobile','/').site['account-popup']!==undefined)process.exit(1)" || fail "a desktop-only site probe ran on the mobile viewport"
 j "$d const s=P('desktop','/').site['guessed-selector'];if(s.verdict!=='error'||s.attemptsLeft!==1)process.exit(1)" \
   || fail "a failing site probe is not an error with one attempt left"
 grep -Fq "$(printf '#top\t%s/' "$site")" "$tmp/out/links.txt" || fail "--links-out lost the raw fragment href"
@@ -87,5 +89,27 @@ grep -q 'launch budget spent' "$tmp/err" || fail "fourth launch did not say the 
 node -e "require('fs').writeFileSync('$tmp/old.json', JSON.stringify({started: Date.now() - 16*60*1000, launches: 0, probes: {}}))"
 set +e; node "$tool" --site "$site" --pages / --out "$tmp/o2/r.json" --state "$tmp/old.json" 2>"$tmp/err"; code=$?; set -e
 [ "$code" = 3 ] && grep -q 'wall-clock budget spent' "$tmp/err" || fail "a run past 15 minutes did not exit 3"
+grep -Fq "$tmp/old.json" "$tmp/err" || fail "the budget message does not name the state file"
+
+# --state-reset clears a spent budget on purpose.
+node "$tool" --site "$site" --pages / --out "$tmp/out/r.json" --state-reset 2>"$tmp/err" || fail "--state-reset run failed"
+j "if(r.launch!==1)process.exit(1)" || fail "--state-reset did not start a new budget"
+
+# A run that collects no links (no desktop viewport) keeps the previous --links-out.
+node "$tool" --site "$site" --pages / --out "$tmp/out/r.json" --viewports mobile,tablet \
+  --links-out "$tmp/out/links.txt" 2>"$tmp/err" || fail "mobile,tablet run failed"
+[ -s "$tmp/out/links.txt" ] || fail "a run with no links truncated the earlier --links-out"
+
+# An unreadable state file refuses instead of handing out a fresh budget.
+echo '{"launches": 2, "sta' >"$tmp/bad.json"
+set +e; node "$tool" --site "$site" --pages / --out "$tmp/o3/r.json" --state "$tmp/bad.json" 2>"$tmp/err"; code=$?; set -e
+[ "$code" = 2 ] && grep -q 'unreadable' "$tmp/err" || fail "a corrupt state file did not stop the run"
+
+# Bad arguments are usage errors, not a spent launch.
+for bad in '--page-timeout abc' '--probe-timeout 0' '--viewports ,'; do
+  set +e; node "$tool" --site "$site" --pages / --out "$tmp/o4/r.json" $bad 2>/dev/null; code=$?; set -e
+  [ "$code" = 2 ] || fail "$bad exited $code, expected 2"
+done
+[ ! -e "$tmp/o4/ux-probe-state.json" ] || fail "a usage error consumed a launch"
 
 echo PASS
