@@ -118,7 +118,10 @@
   `--report md|html`. `bin/audit-report.mjs` now renders a run with no findings instead of
   exiting 2 and writing nothing: the report says no issues were found, and its sidecar is the
   baseline the next audit diffs against (a later run's findings are then new, and an earlier
-  run's are resolved). `tests/checks/audit-ask-report-only.sh` and
+  run's are resolved). Both renderers show that sentence in place of the plan table and drop
+  the ownership split and the staging/production warning, which describe changes a clean run
+  has none of; a run whose checks partly did not run says so instead of claiming the
+  categories are clean. `tests/checks/audit-ask-report-only.sh` and
   `tests/checks/audit-deliverable-report.sh` pin it, and the doc lines.
 - **OpenCodeReview now reviews on `qwen3.8-max` via the Alibaba token plan, with thinking off.**
   The plan enables thinking by default. A probe measured 26.5 s and 918 tokens (787 of them

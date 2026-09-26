@@ -52,6 +52,8 @@ const STRINGS = {
     noPrevious:
       'No previous audit found. This report is the baseline every later run is measured against.',
     noFindings: 'No issues found in the categories audited.',
+    noFindingsUnmeasured:
+      'No issues found in the checks that ran. Some checks did not run — see Not measured below.',
     previousRun: 'Previous run',
     previousUnmeasured:
       ' — that run left %unmeasured% check(s) unmeasured, so what is "new" below may be what it never looked at',
@@ -90,6 +92,8 @@ const STRINGS = {
     noPrevious:
       'No hay auditoría anterior. Este informe es la línea base contra la que se mide cada ejecución posterior.',
     noFindings: 'No se encontraron incidencias en las categorías auditadas.',
+    noFindingsUnmeasured:
+      'No se encontraron incidencias en los criterios que se ejecutaron. Algunos no se ejecutaron: ver Sin medir más abajo.',
     previousRun: 'Ejecución anterior',
     previousUnmeasured:
       ' — esa ejecución dejó %unmeasured% criterio(s) sin medir, así que lo que aquí figura como nuevo puede ser lo que entonces no se miró',
@@ -424,6 +428,13 @@ function compare(findings, previous) {
   };
 }
 
+// The sentence a run with no findings renders in place of the plan. Both renderers call it.
+// With unmeasured checks it must not read as a clean bill of health: the Not measured
+// section below it says those checks never ran.
+function noFindingsText(model) {
+  return model.unmeasured.length ? model.t.noFindingsUnmeasured : model.t.noFindings;
+}
+
 function renderMarkdown(model) {
   const t = model.t;
   const lines = [];
@@ -440,8 +451,10 @@ function renderMarkdown(model) {
   push();
   push(scoreSentence(t, model.counts));
   push();
-  push(fill(t.ownershipCounts, model.ownership));
-  push();
+  if (model.plan.length) {
+    push(fill(t.ownershipCounts, model.ownership));
+    push();
+  }
 
   push(`## ${t.comparison}`);
   push();
@@ -487,24 +500,28 @@ function renderMarkdown(model) {
 
   push(`## ${t.plan}`);
   push();
-  if (model.plan.length === 0) push(t.noFindings);
-  else push(`| ${t.priority} | ${t.code} | ${t.page} | ${t.problem} | ${t.todo} | ${t.applied} |`);
-  if (model.plan.length) push('|---|---|---|---|---|---|');
-  for (const finding of model.plan) {
-    push(`| ${[
-      t.severity[finding.severity],
-      `\`${identity(finding)}\``,
-      finding.page || '—',
-      finding.message,
-      finding.fix || '—',
-      t.ownership[finding.ownership],
-    ].map(mdCell).join(' | ')} |`);
+  if (model.plan.length === 0) {
+    push(noFindingsText(model));
+    push();
+  } else {
+    push(`| ${t.priority} | ${t.code} | ${t.page} | ${t.problem} | ${t.todo} | ${t.applied} |`);
+    push('|---|---|---|---|---|---|');
+    for (const finding of model.plan) {
+      push(`| ${[
+        t.severity[finding.severity],
+        `\`${identity(finding)}\``,
+        finding.page || '—',
+        finding.message,
+        finding.fix || '—',
+        t.ownership[finding.ownership],
+      ].map(mdCell).join(' | ')} |`);
+    }
+    push();
+    push(fill(t.ownershipCounts, model.ownership));
+    push();
+    push(`> ${t.settingWarning}`);
+    push();
   }
-  push();
-  push(fill(t.ownershipCounts, model.ownership));
-  push();
-  push(`> ${t.settingWarning}`);
-  push();
 
   push(`## ${t.unmeasured}`);
   push();
@@ -582,6 +599,19 @@ ${body}
 <ul>${list(t.improved, c.resolved)}${list(t.regressed, c.added)}${list(t.carried, c.carried)}</ul>`;
   };
 
+  // A clean run shows the same sentence as the Markdown, not an empty table, and drops the
+  // ownership split and the setting warning, which describe changes there are none of.
+  const planBlock = model.plan.length === 0
+    ? `<p>${escapeHtml(noFindingsText(model))}</p>`
+    : `<table><thead>${row(
+      [t.priority, t.code, t.page, t.problem, t.todo, t.applied].map(escapeHtml),
+      'th',
+    )}</thead><tbody>
+${planRows}
+</tbody></table>
+<p>${escapeHtml(fill(t.ownershipCounts, model.ownership))}</p>
+<blockquote>${escapeHtml(t.settingWarning.replaceAll('**', ''))}</blockquote>`;
+
   const unmeasuredBlock = model.unmeasured.length
     ? `<p>${escapeHtml(t.unmeasuredNote)}</p><ul>${model.unmeasured
         .map((entry) => `<li><code>${escapeHtml(entry.check)}</code> — ${escapeHtml(entry.reason || entry.message || '')}</li>`)
@@ -646,7 +676,7 @@ ${body}
 
 <h2>${escapeHtml(t.summary)}</h2>
 <p>${escapeHtml(scoreSentence(t, model.counts))}</p>
-<p>${escapeHtml(fill(t.ownershipCounts, model.ownership))}</p>
+${model.plan.length ? `<p>${escapeHtml(fill(t.ownershipCounts, model.ownership))}</p>` : ''}
 
 <h2>${escapeHtml(t.comparison)}</h2>
 ${comparisonBlock()}
@@ -655,14 +685,7 @@ ${groupTable(t.byCategory, model.byCategory, t.category)}
 ${groupTable(t.byPage, model.byPage, t.page)}
 
 <h2>${escapeHtml(t.plan)}</h2>
-<table><thead>${row(
-    [t.priority, t.code, t.page, t.problem, t.todo, t.applied].map(escapeHtml),
-    'th',
-  )}</thead><tbody>
-${planRows}
-</tbody></table>
-<p>${escapeHtml(fill(t.ownershipCounts, model.ownership))}</p>
-<blockquote>${escapeHtml(t.settingWarning.replaceAll('**', ''))}</blockquote>
+${planBlock}
 
 <h2>${escapeHtml(t.unmeasured)}</h2>
 ${unmeasuredBlock}
