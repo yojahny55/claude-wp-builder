@@ -25,7 +25,7 @@ b=$(grep -n '^## Budget and stop rule' "$a" | cut -d: -f1)
 s1=$(grep -n '^## Step 1:' "$a" | cut -d: -f1)
 [ "$b" -lt "$s1" ] || fail "budget section comes after Step 1"
 
-grep -Fq '**One harness, many probes.**' "$a" || fail "one-harness rule missing"
+grep -Fq '**One harness, many probes: `bin/ux-probe.mjs`.**' "$a" || fail "one-harness rule missing"
 grep -Fq 'one-off script with its own browser launch' "$a" || fail "one-off scripts not forbidden"
 grep -Fq 'not `networkidle`' "$a" || fail "networkidle wait not discouraged"
 
