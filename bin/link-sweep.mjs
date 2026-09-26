@@ -27,9 +27,12 @@
  *     skills/wp-cli-patterns/scripts/resolve-link-targets.php), else the first path
  *     segment. Hundreds of term archives cost 20 renders rather than hundreds; --full
  *     lifts it;
- *   - --per-page <n> caps the requests charged to each page a link was found on (a link
- *     carried by several pages is charged once, to the first page with quota left), so a
- *     mega-menu of every archive on the site does not become the whole sweep;
+ *   - --per-page <n> caps the requests charged to each page a link was found on, so a
+ *     mega-menu of every archive on the site does not become the whole sweep. Pages are
+ *     compared as resolved URLs, so `/shop/` and `<site>/shop/` share one quota. Links found
+ *     on one page are charged first; a link carried by several pages (site-wide chrome) is
+ *     charged once, to the page with the most quota left, so chrome cannot drain the first
+ *     page that lists it. Links with no page column share one quota, `(no page)`;
  *   - a wall-clock budget (--budget, default 120 s): what is not done by then is
  *     UNMEASURED with the reason, and the tool still exits with a report.
  *
@@ -114,6 +117,13 @@ function readLines(o) {
   });
 }
 
+const NO_PAGE = '(no page)';
+
+// One spelling per page, so a quota cannot be multiplied by writing the page differently.
+function pageKey(o, page) {
+  try { const u = new URL(page, o.siteUrl); u.hash = ''; return u.href; } catch { return page; }
+}
+
 function classify(o, href, page) {
   let base = o.siteUrl;
   if (page) { try { base = new URL(page, o.siteUrl); } catch { /* malformed page column: resolve against the site */ } }
@@ -195,14 +205,17 @@ async function main() {
   for (const { href, page, group } of readLines(o)) {
     const c = classify(o, href, page);
     const r = byKey.get(c.key) || { url: c.url, class: c.class, pages: [], bad: c.bad, group: group || null };
-    if (page && !r.pages.includes(page)) r.pages.push(page);
+    const p = page ? pageKey(o, page) : null;
+    if (p && !r.pages.includes(p)) r.pages.push(p);
     byKey.set(c.key, r);
   }
   const all = [...byKey.values()];
   const queue = [];
   const perGroup = new Map();
   const perPage = new Map();
-  for (const r of all) {
+  // Single-page links first, so shared chrome is charged after every page's own links.
+  const order = [...all].sort((x, y) => (x.pages.length > 1) - (y.pages.length > 1));
+  for (const r of order) {
     if (r.class === 'fragment') { Object.assign(r, { verdict: 'fragment', status: null, reason: 'resolves to the page it is on' }); continue; }
     if (r.class === 'skipped') { Object.assign(r, { verdict: 'skipped', status: null, reason: r.bad ? 'unparseable href' : 'not an http(s) link' }); continue; }
     if (r.class === 'clone-origin' && !o.followClone) {
@@ -221,11 +234,15 @@ async function main() {
         continue;
       }
     }
-    if (o.perPage > 0 && r.pages.length) {
-      const page = r.pages.find((p) => (perPage.get(p) || 0) < o.perPage);
+    if (o.perPage > 0) {
+      const carriers = r.pages.length ? r.pages : [NO_PAGE];
+      const page = carriers
+        .filter((p) => (perPage.get(p) || 0) < o.perPage)
+        .sort((x, y) => (perPage.get(x) || 0) - (perPage.get(y) || 0))[0];
       if (!page) {
+        const named = carriers.slice(0, 3).join(', ') + (carriers.length > 3 ? ` +${carriers.length - 3} more` : '');
         Object.assign(r, { verdict: 'unmeasured', status: null,
-          reason: `over --per-page ${o.perPage} on every page carrying it` });
+          reason: `over --per-page ${o.perPage} on every page carrying it: ${named}` });
         continue;
       }
       perPage.set(page, (perPage.get(page) || 0) + 1);
