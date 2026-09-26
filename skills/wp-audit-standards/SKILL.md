@@ -120,23 +120,31 @@ archives once held MariaDB at ~18 cores and load 18, slowing every site on the b
 - **Status only, so no body.** `HEAD`, or `curl -r 0-0` when a server refuses `HEAD`. A
   full render is paid only when a check reads the page itself.
 - **Resolve internal targets through WP-CLI or the database first.** Whether a post or
-  term exists and is published is a query, not a page render: `url_to_postid()`,
-  `get_page_by_path()`, `get_term_by('slug', …)`, and the list of URLs to check is built
-  the same way. Only what the database cannot answer — external links, redirects, rewrite
-  rules a plugin owns — needs a real request.
-- **Sample term archives: 20 per taxonomy** (or per first path segment), unless the
-  operator asked for a full sweep. Hundreds of author or category archives are one
-  template; twenty of them say whether it works.
+  term exists and is published is a query, not a page render.
+  `skills/wp-cli-patterns/scripts/resolve-link-targets.php` does it: a link counts as
+  resolved only when the object is published and its own canonical URL has the link's
+  path, so it may send a good link to HTTP but never marks a broken one resolved. Only
+  what it cannot answer — drafts, query strings, redirects, external links, rewrite rules
+  a plugin owns — needs a real request.
+- **Sample term archives: 20 per taxonomy**, unless the operator asked for a full sweep.
+  Hundreds of author or category archives are one template; twenty of them say whether it
+  works. The resolver tags each link it passes on with its taxonomy, and the sweep samples
+  by that tag (falling back to the first path segment for untagged links).
 - **Use `bin/link-sweep.mjs`** rather than writing a crawler. It applies every limit above,
   classifies each link as internal, clone-origin (the `wordpress.url_origin` host, never
   requested from a clone unless that host was confirmed this run) or external, reports a
   CDN bot challenge as `UNMEASURED` instead of broken, and stops at a wall-clock budget:
 
   ```bash
-  # one link per line, optionally TAB + the page it was found on
-  node ${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs --site "$SITE_URL" --urls links.txt \
+  # links.txt: one href per line, TAB, the page it was found on
+  $WP eval-file ${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/scripts/resolve-link-targets.php \
+    links.txt resolved.json > http.txt
+  node ${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs --site "$SITE_URL" --urls http.txt \
     --clone-origin "$URL_ORIGIN" --budget 120 > sweep.json
   ```
+
+  `resolved.json` lists what the database answered, with the pages carrying each link;
+  those are resolved, not unmeasured.
 
   Links it did not request (sampled out, over budget, challenged, clone-origin) come back
   `unmeasured` with the reason. Report them as `UNMEASURED` with the count, never as a pass.

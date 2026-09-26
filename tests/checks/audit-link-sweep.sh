@@ -58,7 +58,7 @@ site="http://127.0.0.1:$port"
 } >"$tmp/urls"
 
 out=$(node "$tool" --site "$site" --urls "$tmp/urls" --clone-origin prod.example.com \
-  --concurrency 25 --per-prefix 10 --budget 60)
+  --concurrency 25 --per-group 10 --budget 60)
 peak=$(curl -s "$site/__peak")
 
 q() { node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const r=d.results.find(x=>x.url.endsWith(process.argv[1]));process.stdout.write(r?String(r[process.argv[2]]):'MISSING')" "$1" "$2" <<<"$out"; }
@@ -80,7 +80,17 @@ q /challenge-body/ reason | grep -q 'CDN bot challenge' || fail "challenge reaso
 [ "$(q '#' verdict)" = fragment ] || fail "fragment-only href not reported as fragment"
 [ "$(q mailto:x@example.com verdict)" = skipped ] || fail "mailto: not skipped"
 sampled=$(node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log(d.results.filter(r=>r.url.includes('/term/')&&/sampled/.test(r.reason||'')).length)" <<<"$out")
-[ "$sampled" = 20 ] || fail "per-prefix sampling kept $((30 - sampled)) of 30 /term/ links, expected 10"
+[ "$sampled" = 20 ] || fail "per-group sampling kept $((30 - sampled)) of 30 /term/ links, expected 10"
+
+# The third column is the sampling group: two taxonomies under one path segment are sampled
+# separately, not as one pool.
+{ for i in $(seq 5); do printf '/load/g%s/\t\ttax:a\n' "$i"; done
+  for i in $(seq 5); do printf '/load/h%s/\t\ttax:b\n' "$i"; done; } >"$tmp/grp"
+outg=$(node "$tool" --site "$site" --urls "$tmp/grp" --per-group 3 --budget 30)
+node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));
+const ok=d.results.filter(r=>r.verdict==='ok').length;
+if(ok!==6){console.log(ok);process.exit(1)}" <<<"$outg" \
+  || fail "--per-group 3 over two groups did not request 3 of each"
 
 # Budget: a zero budget measures nothing and says why, instead of hanging.
 out0=$(printf '/ok/\n' | node "$tool" --site "$site" --budget 0)
@@ -97,6 +107,15 @@ for a in agents/wp-audit-seo.md agents/wp-audit-ux.md; do
   grep -Fq 'Link and page sweeps against a site' "$a" || fail "$a does not point at the sweep rule"
   grep -Fq 'bin/link-sweep.mjs' "$a" || fail "$a does not name the helper"
 done
+grep -Fq 'resolve-link-targets.php' "$std" || fail "$std does not name the resolver"
+grep -Fq 'never marks a broken one resolved' "$std" || fail "$std lost the resolver's safety rule"
+[ -f skills/wp-cli-patterns/scripts/resolve-link-targets.php ] || fail "resolver script missing"
+# Every auditor is told, not only the two that were caught doing it.
+dispatch=$(awk '/^## Step 6:/{on=1} /^## Step 6.5:/{on=0} on' commands/wp-audit.md)
+grep -Fq 'Link and page sweeps against a site' <<<"$dispatch" || fail "/wp-audit's agent prompt lacks the sweep rule"
+grep -Fq 'crawler of your own' <<<"$dispatch" || fail "/wp-audit's agent prompt does not forbid improvised crawlers"
+grep -Fq 'audit-resolve-links-integration.sh' .github/workflows/ci.yml \
+  || fail "the resolver's WordPress check is not wired into CI"
 grep -Eq 'max-workers|max_workers=25' agents/wp-audit-ux.md && fail "wp-audit-ux still shows an uncapped sweep"
 
 echo PASS

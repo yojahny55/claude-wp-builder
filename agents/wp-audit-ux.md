@@ -86,11 +86,14 @@ way this audit goes wrong:
 record the status code. A list of links is not a finding; a `404` with the page it was
 found on is. Use the site's own host, and follow *Link and page sweeps against a site* in
 `skills/wp-audit-standards/SKILL.md` — at most 4 requests in flight, the database before
-HTTP. Run the sweep with `bin/link-sweep.mjs`, not a crawler of your own:
+HTTP. Resolve internal targets with `resolve-link-targets.php`, then sweep the rest with
+`bin/link-sweep.mjs`, not a crawler of your own:
 
 ```bash
 # links.txt: one href per line, TAB, the page it was found on
-node ${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs --site "<site-url>" --urls links.txt > sweep.json
+$WP eval-file ${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/scripts/resolve-link-targets.php \
+  links.txt resolved.json > http.txt
+node ${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs --site "<site-url>" --urls http.txt > sweep.json
 ```
 
 **The two are counted differently, and that is not a detail.** `UX-014` is page-level:

@@ -763,6 +763,14 @@ around the vendor file (an override in editable code, a filter, a report upstrea
 edits it. A check that reads one plugin's options is `N/A (stack: <name>)` when the stack
 names a different plugin for that concern.
 
+Any check that requests many URLs of the site — links followed, heads rendered, pages
+walked — follows "Link and page sweeps against a site" in
+skills/wp-audit-standards/SKILL.md: at most 4 requests in flight, internal targets resolved
+through ${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/scripts/resolve-link-targets.php
+before any HTTP, and ${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs for the rest. Never write a
+crawler of your own. The local site shares its database and web server with every other
+project on this machine.
+
 Run all checks for your tier level. Output your findings as a structured report with the following format for each issue:
 
 [<SEVERITY>] <CODE>: <message> (<file>:<line> if applicable)

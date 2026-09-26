@@ -68,7 +68,7 @@ jobs:
           # branch, which this job does not fetch, so it lives in doc-sync below where the
           # base is already there -- here it would take its own skip path and pass while
           # checking nothing.
-          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh'
+          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/audit-resolve-links-integration.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh'
           for f in tests/checks/*.sh; do
             case " $skip_here " in *" $f "*) continue ;; esac
             if out=$(bash "$f" 2>&1); then
@@ -255,6 +255,9 @@ jobs:
           echo "::endgroup::"
           echo "::group::contact form delivery"
           bash tests/checks/wp-cf7-delivery.sh
+          echo "::endgroup::"
+          echo "::group::link target resolver"
+          bash tests/checks/audit-resolve-links-integration.sh
           echo "::endgroup::"
 
   browser:

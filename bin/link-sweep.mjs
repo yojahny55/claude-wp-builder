@@ -22,18 +22,21 @@
  *   - a CDN bot challenge (403/503 with `cf-mitigated: challenge`, or a body carrying
  *     `challenge-platform`) is UNMEASURED, never broken, and never retried with another
  *     User-Agent;
- *   - internal links are sampled per first path segment (--per-prefix, default 20), so
- *     hundreds of term archives cost 20 renders rather than hundreds; --full lifts it;
+ *   - internal links are sampled per group (--per-group, default 20): the third input
+ *     column when present (`tax:<taxonomy>`, `type:<post_type>`, as written by
+ *     skills/wp-cli-patterns/scripts/resolve-link-targets.php), else the first path
+ *     segment. Hundreds of term archives cost 20 renders rather than hundreds; --full
+ *     lifts it;
  *   - a wall-clock budget (--budget, default 120 s): what is not done by then is
  *     UNMEASURED with the reason, and the tool still exits with a report.
  *
  * Input is one link per line on stdin or in --urls <file>, optionally followed by a TAB
- * and the page it was found on. Relative links resolve against the page, else --site.
+ * and the page it was found on, and optionally a TAB and a sampling group. Relative links resolve against the page, else --site.
  * Duplicates collapse into one request whose `pages` lists every page carrying it.
  *
  * usage:
  *   link-sweep.mjs --site <origin> [--urls <file>] [--clone-origin <host>]
- *                  [--follow-clone-origin] [--concurrency <1-4>] [--per-prefix <n>] [--full]
+ *                  [--follow-clone-origin] [--concurrency <1-4>] [--per-group <n>] [--full]
  *                  [--max <n>] [--timeout <s>] [--budget <s>] [--insecure]
  *
  * Output: JSON on stdout, `{ summary, results }`. Each result carries `url`, `class`,
@@ -45,7 +48,7 @@
 import { readFileSync } from 'node:fs';
 
 const USAGE = 'usage: link-sweep.mjs --site <origin> [--urls <file>] [--clone-origin <host>] ' +
-  '[--follow-clone-origin] [--concurrency <1-4>] [--per-prefix <n>] [--full] [--max <n>] ' +
+  '[--follow-clone-origin] [--concurrency <1-4>] [--per-group <n>] [--full] [--max <n>] ' +
   '[--timeout <s>] [--budget <s>] [--insecure]';
 const MAX_CONCURRENCY = 4;
 const UA = 'claude-wp-builder-link-sweep';
@@ -57,7 +60,7 @@ function usage(msg) {
 }
 
 function parseArgs(argv) {
-  const o = { concurrency: MAX_CONCURRENCY, perPrefix: 20, max: 0, timeout: 10, budget: 120,
+  const o = { concurrency: MAX_CONCURRENCY, perGroup: 20, max: 0, timeout: 10, budget: 120,
     full: false, followClone: false, insecure: false };
   const num = (v, flag) => {
     const n = Number(v);
@@ -73,7 +76,7 @@ function parseArgs(argv) {
       case '--clone-origin': o.cloneOrigin = next(); break;
       case '--follow-clone-origin': o.followClone = true; break;
       case '--concurrency': o.concurrency = num(next(), a); break;
-      case '--per-prefix': o.perPrefix = num(next(), a); break;
+      case '--per-group': o.perGroup = num(next(), a); break;
       case '--full': o.full = true; break;
       case '--max': o.max = num(next(), a); break;
       case '--timeout': o.timeout = num(next(), a); break;
@@ -102,8 +105,8 @@ function readLines(o) {
   try { text = o.urls ? readFileSync(o.urls, 'utf8') : readFileSync(0, 'utf8'); }
   catch (e) { usage(`cannot read ${o.urls || 'stdin'}: ${e.message}`); }
   return text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l) => {
-    const [href, page] = l.split('\t');
-    return { href: href.trim(), page: page ? page.trim() : null };
+    const [href, page, group] = l.split('\t');
+    return { href: href.trim(), page: page ? page.trim() : null, group: group ? group.trim() : null };
   });
 }
 
@@ -182,15 +185,15 @@ async function main() {
   const o = parseArgs(process.argv.slice(2));
   if (o.insecure) process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
   const byKey = new Map();
-  for (const { href, page } of readLines(o)) {
+  for (const { href, page, group } of readLines(o)) {
     const c = classify(o, href, page);
-    const r = byKey.get(c.key) || { url: c.url, class: c.class, pages: [], bad: c.bad };
+    const r = byKey.get(c.key) || { url: c.url, class: c.class, pages: [], bad: c.bad, group: group || null };
     if (page && !r.pages.includes(page)) r.pages.push(page);
     byKey.set(c.key, r);
   }
   const all = [...byKey.values()];
   const queue = [];
-  const perPrefix = new Map();
+  const perGroup = new Map();
   for (const r of all) {
     if (r.class === 'fragment') { Object.assign(r, { verdict: 'fragment', status: null, reason: 'resolves to the page it is on' }); continue; }
     if (r.class === 'skipped') { Object.assign(r, { verdict: 'skipped', status: null, reason: r.bad ? 'unparseable href' : 'not an http(s) link' }); continue; }
@@ -199,13 +202,14 @@ async function main() {
         reason: 'clone-origin host not confirmed this run (--follow-clone-origin)' });
       continue;
     }
-    if (r.class === 'internal' && !o.full && o.perPrefix > 0) {
-      const seg = new URL(r.url).pathname.split('/').filter(Boolean)[0] || '/';
-      const n = (perPrefix.get(seg) || 0) + 1;
-      perPrefix.set(seg, n);
-      if (n > o.perPrefix) {
+    if (r.class === 'internal' && !o.full && o.perGroup > 0) {
+      const seg = new URL(r.url).pathname.split('/').filter(Boolean)[0];
+      const key = r.group || (seg ? `/${seg}/` : '/');
+      const n = (perGroup.get(key) || 0) + 1;
+      perGroup.set(key, n);
+      if (n > o.perGroup) {
         Object.assign(r, { verdict: 'unmeasured', status: null,
-          reason: `sampled: over ${o.perPrefix} links under /${seg}/ (--full to sweep all)` });
+          reason: `sampled: over ${o.perGroup} links in ${key} (--full to sweep all)` });
         continue;
       }
     }

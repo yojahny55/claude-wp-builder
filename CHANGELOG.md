@@ -13,9 +13,15 @@
   `bin/link-sweep.mjs` implements it: it clamps concurrency to 4, classifies links as
   internal, clone-origin (never requested from a clone unless confirmed) or external,
   reports a CDN bot challenge as `UNMEASURED` rather than broken, and stops at a wall-clock
-  budget. `wp-audit-seo` and `wp-audit-ux` point at both. `tests/checks/audit-link-sweep.sh`
-  runs the tool against a local fixture server and measures the in-flight peak at the
-  server.
+  budget. Internal targets are answered by the database first:
+  `skills/wp-cli-patterns/scripts/resolve-link-targets.php` resolves a link only when the
+  object is published and its canonical URL has the link's path, and tags what it passes
+  on with its taxonomy so the sweep samples per taxonomy rather than per path segment.
+  `/wp-audit`'s agent prompt carries the rule to all seven auditors.
+  `tests/checks/audit-link-sweep.sh` runs the sweep against a local fixture server and
+  measures the in-flight peak at the server; `tests/checks/audit-resolve-links-integration.sh`
+  runs the resolver in the WordPress fixture and requests every link it resolved, each of
+  which must answer 200.
 - **A multi-currency plugin and a full-page/edge cache computed prices at two different
   granularities, and nothing checked whether they agreed.** A multi-currency plugin (CURCY/
   `woocommerce-multi-currency` is one shape of this) picks the price per request, usually from
