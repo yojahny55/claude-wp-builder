@@ -4,6 +4,18 @@
 
 ### Added
 
+- **Audit link sweeps have a load limit and a shipped tool.** The audits were told to
+  follow links and given no method, so an agent wrote its own crawler: 25 concurrent
+  `curl -L` workers over a store's term archives held MariaDB at ~18 cores and load 18 on a
+  shared dev machine. `skills/wp-audit-standards` now carries one rule for any link or page
+  sweep — at most 4 requests in flight, `HEAD` or a ranged GET, WP-CLI or the database
+  before HTTP, 20 term archives per taxonomy unless a full sweep is asked for — and
+  `bin/link-sweep.mjs` implements it: it clamps concurrency to 4, classifies links as
+  internal, clone-origin (never requested from a clone unless confirmed) or external,
+  reports a CDN bot challenge as `UNMEASURED` rather than broken, and stops at a wall-clock
+  budget. `wp-audit-seo` and `wp-audit-ux` point at both. `tests/checks/audit-link-sweep.sh`
+  runs the tool against a local fixture server and measures the in-flight peak at the
+  server.
 - **A multi-currency plugin and a full-page/edge cache computed prices at two different
   granularities, and nothing checked whether they agreed.** A multi-currency plugin (CURCY/
   `woocommerce-multi-currency` is one shape of this) picks the price per request, usually from

@@ -108,6 +108,39 @@ The catalog and the exact rule live in `/wp-audit` Step 2.3. The one test that k
 honest: *would this also be true on production?* If yes, it is a finding; if it exists only
 because this is a copy, suppress it.
 
+### Link and page sweeps against a site
+
+Any check that requests many URLs of the audited site — broken links, a rendered-head
+snapshot, a page walk — follows these limits. A local site shares one database and one web
+server with every other project on the machine, and an uncached WordPress page is
+expensive: an improvised crawler with 25 concurrent `curl -L` workers over a store's term
+archives once held MariaDB at ~18 cores and load 18, slowing every site on the box.
+
+- **At most 4 requests in flight.** Never a thread pool sized to the machine.
+- **Status only, so no body.** `HEAD`, or `curl -r 0-0` when a server refuses `HEAD`. A
+  full render is paid only when a check reads the page itself.
+- **Resolve internal targets through WP-CLI or the database first.** Whether a post or
+  term exists and is published is a query, not a page render: `url_to_postid()`,
+  `get_page_by_path()`, `get_term_by('slug', …)`, and the list of URLs to check is built
+  the same way. Only what the database cannot answer — external links, redirects, rewrite
+  rules a plugin owns — needs a real request.
+- **Sample term archives: 20 per taxonomy** (or per first path segment), unless the
+  operator asked for a full sweep. Hundreds of author or category archives are one
+  template; twenty of them say whether it works.
+- **Use `bin/link-sweep.mjs`** rather than writing a crawler. It applies every limit above,
+  classifies each link as internal, clone-origin (the `wordpress.url_origin` host, never
+  requested from a clone unless that host was confirmed this run) or external, reports a
+  CDN bot challenge as `UNMEASURED` instead of broken, and stops at a wall-clock budget:
+
+  ```bash
+  # one link per line, optionally TAB + the page it was found on
+  node ${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs --site "$SITE_URL" --urls links.txt \
+    --clone-origin "$URL_ORIGIN" --budget 120 > sweep.json
+  ```
+
+  Links it did not request (sampled out, over budget, challenged, clone-origin) come back
+  `unmeasured` with the reason. Report them as `UNMEASURED` with the count, never as a pass.
+
 ### Live checks target production, and the URL is confirmed
 
 Response headers and paid-file reachability can only be judged against the running
