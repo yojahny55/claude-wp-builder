@@ -111,7 +111,8 @@ function readLines(o) {
 }
 
 function classify(o, href, page) {
-  const base = page ? new URL(page, o.siteUrl) : o.siteUrl;
+  let base = o.siteUrl;
+  if (page) { try { base = new URL(page, o.siteUrl); } catch { /* malformed page column: resolve against the site */ } }
   if (/^#/.test(href)) return { key: `fragment:${base.href}${href}`, class: 'fragment', url: href };
   if (/^[a-z][a-z0-9+.-]*:/i.test(href) && !/^https?:/i.test(href)) {
     return { key: `skipped:${href}`, class: 'skipped', url: href };
@@ -167,7 +168,9 @@ async function request(o, url, deadline) {
         reason: 'blocked by CDN bot challenge — not a broken link; not retried' };
     }
     const moved = res.url && res.url !== url;
-    const verdict = res.status >= 400 ? 'broken' : moved ? 'redirect' : 'ok';
+    let verdict = 'ok';
+    if (res.status >= 400) verdict = 'broken';
+    else if (moved) verdict = 'redirect';
     return { verdict, status: res.status, final: res.url };
   } catch (e) {
     const timeout = e.name === 'TimeoutError' || e.name === 'AbortError';
@@ -243,4 +246,4 @@ async function main() {
   process.stdout.write(JSON.stringify({ summary, results: all }, null, 2) + '\n');
 }
 
-main();
+main().catch((e) => { process.stderr.write(`link-sweep: ${e && e.message ? e.message : e}\n`); process.exit(1); });
