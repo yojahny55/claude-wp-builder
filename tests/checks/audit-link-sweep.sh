@@ -13,7 +13,8 @@ tool=bin/link-sweep.mjs
 command -v node >/dev/null || { echo "PASS (SKIP: no node — $tool not exercised)"; exit 0; }
 
 tmp=$(mktemp -d)
-trap 'kill "$srv" 2>/dev/null || true; rm -rf "$tmp"' EXIT
+srv=""
+trap '[ -n "$srv" ] && kill "$srv" 2>/dev/null; rm -rf "$tmp"' EXIT
 
 # Fixture: counts requests in flight server-side, so the cap is measured where the load lands.
 cat >"$tmp/server.mjs" <<'EOF'
@@ -106,6 +107,11 @@ if(req!==4||cap!==1){console.log(req,cap);process.exit(1)}" <<<"$outp" \
 out0=$(printf '/ok/\n' | node "$tool" --site "$site" --budget 0)
 grep -q 'budget exhausted' <<<"$out0" || fail "--budget 0 did not report budget exhaustion"
 
+# A malformed page column must not abort the sweep: the link resolves against the site.
+outb=$(printf '/ok/\thttp://[bad\n' | node "$tool" --site "$site" --budget 30) \
+  || fail "a malformed page column aborted the sweep"
+grep -q '"verdict": "ok"' <<<"$outb" || fail "a link with a malformed page column was not measured"
+
 # The shared rule, and the agents that sweep links must point at it.
 std=skills/wp-audit-standards/SKILL.md
 grep -Fq '### Link and page sweeps against a site' "$std" || fail "$std lost the sweep rule"
@@ -120,6 +126,10 @@ done
 grep -Fq 'resolve-link-targets.php' "$std" || fail "$std does not name the resolver"
 grep -Fq 'never marks a broken one resolved' "$std" || fail "$std lost the resolver's safety rule"
 [ -f skills/wp-cli-patterns/scripts/resolve-link-targets.php ] || fail "resolver script missing"
+# On a subdirectory install a root-relative href outside the install goes to HTTP, never
+# resolved against the install (a /alpha/ on host/wp is host/alpha/, not host/wp/alpha/).
+grep -Fq "0 !== strpos( \$href, \$home_path . '/' )" skills/wp-cli-patterns/scripts/resolve-link-targets.php \
+  || fail "resolver lost the subdirectory-install guard"
 # Every auditor is told, not only the two that were caught doing it.
 dispatch=$(awk '/^## Step 6:/{on=1} /^## Step 6.5:/{on=0} on' commands/wp-audit.md)
 grep -Fq 'Link and page sweeps against a site' <<<"$dispatch" || fail "/wp-audit's agent prompt lacks the sweep rule"
