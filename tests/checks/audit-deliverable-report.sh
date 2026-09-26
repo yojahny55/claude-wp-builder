@@ -337,12 +337,69 @@ fi
 cat > "$tmp/empty.json" <<'JSON'
 {"site":"fixture","date":"2026-09-17","findings":[]}
 JSON
+# A clean run is a report, not a skip: it used to exit 2 and write nothing, so the first
+# report-only audit of a clean site left no sidecar for the next run to diff against.
+# The previous sidecar is rendered for its own date, so its filename and its payload agree
+# the way they always do in real use.
+node "$r" --run "$tmp/run1.json" --out "$tmp/out3" --date 2026-09-10 --format md >/dev/null \
+  || fail "$r failed to render the previous run for the clean-run fixture"
 set +e
-node "$r" --run "$tmp/empty.json" --out "$tmp/out3" --format md >/dev/null 2>&1
+node "$r" --run "$tmp/empty.json" --out "$tmp/out3" --format both >/dev/null 2>&1
 code=$?
 set -e
-[ "$code" -eq 2 ] \
-  || fail "a run with no findings exited $code -- a clean skip is 2, and 0 would claim a report exists"
+[ "$code" -eq 0 ] || fail "a run with no findings exited $code -- a clean run must still be rendered"
+for ext in md html json; do
+  [ -f "$tmp/out3/informe-2026-09-17.$ext" ] || fail "a clean run wrote no informe-2026-09-17.$ext"
+done
+for ext in md html; do
+  grep -Fq 'No issues found in the categories audited.' "$tmp/out3/informe-2026-09-17.$ext" \
+    || fail "a clean .$ext report does not say that nothing was found"
+done
+# Nothing to apply: no empty plan table, no ownership split, no staging/production warning.
+if tr '\n' ' ' < "$tmp/out3/informe-2026-09-17.html" | grep -Eq 'Remediation plan</h2> *<table'; then
+  fail "a clean .html report still renders an empty plan table"
+fi
+if grep -Fq 'Split: 0 in code' "$tmp/out3/informe-2026-09-17.md" \
+  || grep -Fq 'Split: 0 in code' "$tmp/out3/informe-2026-09-17.html"; then
+  fail "a clean report still prints the ownership split of zero changes"
+fi
+if grep -Fq 'repeat it on staging and production' "$tmp/out3/informe-2026-09-17.md" \
+  || grep -Fq 'repeat it on staging and production' "$tmp/out3/informe-2026-09-17.html"; then
+  fail "a clean report still warns about repeating setting changes that do not exist"
+fi
+if grep -Fq '|---|---|---|---|---|---|' "$tmp/out3/informe-2026-09-17.md"; then
+  fail "a clean .md report still prints an empty plan table"
+fi
+node -e 'const d=require(process.argv[1]); if(!Array.isArray(d.findings)||d.findings.length) process.exit(1)' \
+  "$tmp/out3/informe-2026-09-17.json" || fail "a clean run's sidecar is not an empty findings baseline"
+# Against the earlier run with findings, every one of them now reads as resolved.
+grep -Eq 'Resolved[^0-9]*[1-9]|Improved[^0-9]*[1-9]' "$tmp/out3/informe-2026-09-17.md" \
+  || fail "a clean run after a run with findings does not report them resolved"
+grep -Fq '2026-09-10' "$tmp/out3/informe-2026-09-17.md" \
+  || fail "a clean run does not name the 2026-09-10 run as the previous one"
+# The clean sidecar is itself a baseline: the next run must diff against it, not start over.
+cat > "$tmp/after-clean.json" <<'JSON'
+{"site":"fixture","date":"2026-09-24","findings":[
+  {"check":"SEC-001","resource":"file:wp-config.php","severity":"CRITICAL","ownership":"setting","message":"Debug on"}
+]}
+JSON
+node "$r" --run "$tmp/after-clean.json" --out "$tmp/out3" --format md >/dev/null \
+  || fail "$r failed on the run after a clean run"
+grep -Fq '2026-09-17' "$tmp/out3/informe-2026-09-24.md" \
+  || fail "the run after a clean run does not diff against the clean run's sidecar"
+if grep -Fq 'No previous audit found' "$tmp/out3/informe-2026-09-24.md"; then
+  fail "the run after a clean run reports no previous audit"
+fi
+# A run with no findings but unmeasured checks must not read as a clean bill of health.
+node "$r" --run "$tmp/nothing.json" --out "$tmp/out5" --format both >/dev/null \
+  || fail "$r refused a run with only unmeasured checks"
+for ext in md html; do
+  grep -Fq 'No issues found in the checks that ran.' "$tmp/out5/informe-2026-09-22.$ext" \
+    || fail "a run with unmeasured checks and no findings claims the categories are clean (.$ext)"
+  if grep -Fq 'No issues found in the categories audited.' "$tmp/out5/informe-2026-09-22.$ext"; then
+    fail "a run with unmeasured checks prints the unqualified clean sentence (.$ext)"
+  fi
+done
 
 set +e
 node "$r" --run "$tmp/does-not-exist.json" --out "$tmp/out4" >/dev/null 2>&1
