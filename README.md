@@ -576,7 +576,7 @@ external tool. `--report-lang en|es` picks the language the client reads it in.
 ```bash
 /wp-audit                    # Run all categories
 /wp-audit --security --seo   # Run specific categories
-/wp-audit --report-only      # Report without fixing
+/wp-audit --report-only      # Report without fixing (writes the .md + .html deliverable)
 /wp-audit --report both --report-lang es   # Also write the dated client report
 /wp-audit --suite --host https://example.com  # Measure in a real browser, unattended
 /wp-audit --usability --pages auto         # Audit the pages a person actually uses

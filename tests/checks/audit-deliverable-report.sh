@@ -171,13 +171,62 @@ grep -Fq '@media print' "$html" || fail "$html has no print rules, so printing t
 # The reader's colour scheme is honoured with no input, and the switch and the severity
 # filter work without a script -- a mail client strips scripts, and the rule above forbids
 # them anyway. Each needle is the mechanism, not a class name that could survive without it.
-grep -Fq 'prefers-color-scheme:dark' "$html" || fail "$html ignores a reader's dark colour scheme"
+# The dark media query must redefine the tokens, not just exist: the label swap also sits
+# in one, and it changes no colour.
+grep -Fq 'prefers-color-scheme:dark){:root{--ink:#e6e9ee' "$html" \
+  || fail "$html ignores a reader's dark colour scheme"
 grep -Fq ':root:has(#theme:checked)' "$html" || fail "$html has no script-free theme switch"
 grep -Fq 'tr[data-sev="INFO"]' "$html" || fail "$html has no script-free severity filter"
+# The rules are half of each mechanism; the controls that drive them are the other half.
+grep -Fq '<input type="checkbox" id="theme"' "$html" || fail "$html has the theme rules but no switch to drive them"
+grep -Fq '<label class="theme" for="theme">' "$html" || fail "$html has a theme switch with no visible label"
+grep -Fq ':root:has(#theme:focus-visible) .theme{outline' "$html" \
+  || fail "$html gives the theme switch no keyboard focus ring"
+for id in filter-all filter-critical filter-problems; do
+  grep -Fq "<input type=\"radio\" name=\"filter\" id=\"$id\"" "$html" \
+    || fail "$html has the filter rules but no $id control"
+done
 grep -Fq 'data-sev="CRITICAL"' "$html" || fail "$html does not tag finding rows by severity, so the filter hides nothing"
-# Printing ignores both: a PDF made while a filter was on must still carry every finding.
+# Printing ignores both the colour scheme and the filter, and hides the controls: a PDF
+# made in dark mode or while a filter was on must still be light and carry every finding.
 grep -Fq 'tr[data-sev]{display:table-row!important}' "$html" \
   || fail "$html lets an active filter drop rows from the printed report"
+grep -Fq ':root,:root:has(#theme:checked){--ink:#1b1f24' "$html" \
+  || fail "$html prints in dark mode when the reader had it on"
+grep -Fq '.toc,.filters,.theme{display:none}' "$html" \
+  || fail "$html prints the theme switch and the filter pills"
+# Rows inside a closed <details> are not rendered, and print CSS cannot reopen them: every
+# group must be open or the PDF carries only the first category.
+if grep -Eq '<details class="group"[^>]*>' "$html" && grep -E '<details class="group"' "$html" | grep -vq ' open>'; then
+  fail "$html renders a collapsed finding group, which a printed PDF drops"
+fi
+[ "$(grep -c '<details class="group"' "$html")" -eq 3 ] \
+  || fail "$html does not render one group per category of the run"
+# A clean count is good news in the header too, not a red zero.
+grep -Fq '<b class="bad">1</b>' "$html" || fail "$html does not colour a non-zero critical count"
+
+# A run that mixes categorised and uncategorised findings, and carries an INFO: every
+# finding must reach the plan, the INFO row must carry the value the filter matches, ids
+# must stay unique when category names slug alike, and a Total row must add up its rows.
+cat > "$tmp/mixed.json" <<'JSON'
+{"site":"fixture","date":"2026-09-02","findings":[
+  {"check":"SEC-001","resource":"file:wp-config.php","severity":"CRITICAL","ownership":"setting","category":"GEO / AI","page":"/","message":"One"},
+  {"check":"SEC-002","resource":"file:a.php","severity":"WARNING","ownership":"code","category":"geo-ai","message":"Two"},
+  {"check":"SEO-001","resource":"site","severity":"INFO","ownership":"content","message":"Uncategorised info"}
+]}
+JSON
+node "$r" --run "$tmp/mixed.json" --out "$tmp/mixed" --format html >/dev/null || fail "$r failed on a mixed run"
+mh="$tmp/mixed/informe-2026-09-02.html"
+grep -Fq 'Uncategorised info' "$mh" || fail "$mh drops a finding that has no category"
+grep -Fq 'data-sev="INFO"' "$mh" || fail "$mh does not tag an INFO row with the value its filter matches"
+dups=$(grep -o 'id="cat-[^"]*"' "$mh" | sort | uniq -d)
+[ -z "$dups" ] || fail "$mh repeats a group id: $dups"
+grep -Fq '1 finding<' "$mh" || fail "$mh says '1 findings' -- the pill is not singular for one"
+if grep -Fq '1 findings' "$mh"; then fail "$mh prints '1 findings'"; fi
+# By page: only one finding has a page, so its Total is 1, not the run's 3.
+bypage=$(awk '/<section id="by-page">/,/<\/section>/' "$mh")
+grep -Fq '<td class="num">1</td></tr></tbody>' <<<"$bypage" \
+  || fail "$mh prints a by-page Total that does not add up its own rows"
 
 # ---------------------------------------------------------------------------
 # 3. The comparison, on a second run
@@ -348,12 +397,72 @@ fi
 cat > "$tmp/empty.json" <<'JSON'
 {"site":"fixture","date":"2026-09-17","findings":[]}
 JSON
+# A clean run is a report, not a skip: it used to exit 2 and write nothing, so the first
+# report-only audit of a clean site left no sidecar for the next run to diff against.
+# The previous sidecar is rendered for its own date, so its filename and its payload agree
+# the way they always do in real use.
+node "$r" --run "$tmp/run1.json" --out "$tmp/out3" --date 2026-09-10 --format md >/dev/null \
+  || fail "$r failed to render the previous run for the clean-run fixture"
 set +e
-node "$r" --run "$tmp/empty.json" --out "$tmp/out3" --format md >/dev/null 2>&1
+node "$r" --run "$tmp/empty.json" --out "$tmp/out3" --format both >/dev/null 2>&1
 code=$?
 set -e
-[ "$code" -eq 2 ] \
-  || fail "a run with no findings exited $code -- a clean skip is 2, and 0 would claim a report exists"
+[ "$code" -eq 0 ] || fail "a run with no findings exited $code -- a clean run must still be rendered"
+for ext in md html json; do
+  [ -f "$tmp/out3/informe-2026-09-17.$ext" ] || fail "a clean run wrote no informe-2026-09-17.$ext"
+done
+# The header KPIs follow score(): a clean run's zero criticals is green, not red.
+grep -Fq '<div class="kpi"><b class="ok">0</b>' "$tmp/out3/informe-2026-09-17.html" \
+  || fail "a clean report colours its zero counts as problems"
+for ext in md html; do
+  grep -Fq 'No issues found in the categories audited.' "$tmp/out3/informe-2026-09-17.$ext" \
+    || fail "a clean .$ext report does not say that nothing was found"
+done
+# Nothing to apply: no empty plan table, no ownership split, no staging/production warning.
+if tr '\n' ' ' < "$tmp/out3/informe-2026-09-17.html" | grep -Eq 'Remediation plan</h2> *<table'; then
+  fail "a clean .html report still renders an empty plan table"
+fi
+if grep -Fq 'Split: 0 in code' "$tmp/out3/informe-2026-09-17.md" \
+  || grep -Fq 'Split: 0 in code' "$tmp/out3/informe-2026-09-17.html"; then
+  fail "a clean report still prints the ownership split of zero changes"
+fi
+if grep -Fq 'repeat it on staging and production' "$tmp/out3/informe-2026-09-17.md" \
+  || grep -Fq 'repeat it on staging and production' "$tmp/out3/informe-2026-09-17.html"; then
+  fail "a clean report still warns about repeating setting changes that do not exist"
+fi
+if grep -Fq '|---|---|---|---|---|---|' "$tmp/out3/informe-2026-09-17.md"; then
+  fail "a clean .md report still prints an empty plan table"
+fi
+node -e 'const d=require(process.argv[1]); if(!Array.isArray(d.findings)||d.findings.length) process.exit(1)' \
+  "$tmp/out3/informe-2026-09-17.json" || fail "a clean run's sidecar is not an empty findings baseline"
+# Against the earlier run with findings, every one of them now reads as resolved.
+grep -Eq 'Resolved[^0-9]*[1-9]|Improved[^0-9]*[1-9]' "$tmp/out3/informe-2026-09-17.md" \
+  || fail "a clean run after a run with findings does not report them resolved"
+grep -Fq '2026-09-10' "$tmp/out3/informe-2026-09-17.md" \
+  || fail "a clean run does not name the 2026-09-10 run as the previous one"
+# The clean sidecar is itself a baseline: the next run must diff against it, not start over.
+cat > "$tmp/after-clean.json" <<'JSON'
+{"site":"fixture","date":"2026-09-24","findings":[
+  {"check":"SEC-001","resource":"file:wp-config.php","severity":"CRITICAL","ownership":"setting","message":"Debug on"}
+]}
+JSON
+node "$r" --run "$tmp/after-clean.json" --out "$tmp/out3" --format md >/dev/null \
+  || fail "$r failed on the run after a clean run"
+grep -Fq '2026-09-17' "$tmp/out3/informe-2026-09-24.md" \
+  || fail "the run after a clean run does not diff against the clean run's sidecar"
+if grep -Fq 'No previous audit found' "$tmp/out3/informe-2026-09-24.md"; then
+  fail "the run after a clean run reports no previous audit"
+fi
+# A run with no findings but unmeasured checks must not read as a clean bill of health.
+node "$r" --run "$tmp/nothing.json" --out "$tmp/out5" --format both >/dev/null \
+  || fail "$r refused a run with only unmeasured checks"
+for ext in md html; do
+  grep -Fq 'No issues found in the checks that ran.' "$tmp/out5/informe-2026-09-22.$ext" \
+    || fail "a run with unmeasured checks and no findings claims the categories are clean (.$ext)"
+  if grep -Fq 'No issues found in the categories audited.' "$tmp/out5/informe-2026-09-22.$ext"; then
+    fail "a run with unmeasured checks prints the unqualified clean sentence (.$ext)"
+  fi
+done
 
 set +e
 node "$r" --run "$tmp/does-not-exist.json" --out "$tmp/out4" >/dev/null 2>&1

@@ -381,7 +381,8 @@ static screenshot per breakpoint cannot show scroll motion, which is why the che
 
 No category flag = all. Security installs/configures All-in-One WP Security; SEO installs
 Rank Math and seeds meta/schema. `--report-only` skips fixes and plugin installs; without
-the flag, the first question of the run asks whether you want the report only.
+the flag, the first question of the run asks whether you want the report only. A
+report-only run always writes the dated deliverable (`--report` defaults to `both`).
 Lighthouse-style checks need a browser automation tool; without one they report
 `UNMEASURED` and every file-scan check still runs.
 

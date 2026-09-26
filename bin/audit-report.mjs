@@ -31,9 +31,8 @@
 // in the dated sidecar, so a later reader can see that two sources reported it.
 //
 // Exit codes (house convention):
-//   0  documents written
+//   0  documents written — including for a run with no findings, which is a clean report
 //   1  invalid input — the run file is missing, unparseable, or a finding is incomplete
-//   2  clean skip — the run carries no findings to report
 //   3  crash
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
@@ -52,6 +51,9 @@ const STRINGS = {
     comparison: 'Compared with the previous audit',
     noPrevious:
       'No previous audit found. This report is the baseline every later run is measured against.',
+    noFindings: 'No issues found in the categories audited.',
+    noFindingsUnmeasured:
+      'No issues found in the checks that ran. Some checks did not run — see Not measured below.',
     previousRun: 'Previous run',
     previousUnmeasured:
       ' — that run left %unmeasured% check(s) unmeasured, so what is "new" below may be what it never looked at',
@@ -89,6 +91,9 @@ const STRINGS = {
     comparison: 'Comparativa con la auditoría anterior',
     noPrevious:
       'No hay auditoría anterior. Este informe es la línea base contra la que se mide cada ejecución posterior.',
+    noFindings: 'No se encontraron incidencias en las categorías auditadas.',
+    noFindingsUnmeasured:
+      'No se encontraron incidencias en los criterios que se ejecutaron. Algunos no se ejecutaron: ver Sin medir más abajo.',
     previousRun: 'Ejecución anterior',
     previousUnmeasured:
       ' — esa ejecución dejó %unmeasured% criterio(s) sin medir, así que lo que aquí figura como nuevo puede ser lo que entonces no se miró',
@@ -158,6 +163,9 @@ function parseArgs(argv) {
   }
   if (!STRINGS[opts.lang]) {
     die(1, `--lang must be one of ${Object.keys(STRINGS).join(', ')} (got: ${opts.lang})`);
+  }
+  if (!HTML_UI[opts.lang]) {
+    die(1, `--lang ${opts.lang} has no HTML strings — add it to HTML_UI as well as STRINGS`);
   }
   if (opts.date && !/^\d{4}-\d{2}-\d{2}$/.test(opts.date)) {
     die(1, `--date must be YYYY-MM-DD (got: ${opts.date})`);
@@ -423,6 +431,13 @@ function compare(findings, previous) {
   };
 }
 
+// The sentence a run with no findings renders in place of the plan. Both renderers call it.
+// With unmeasured checks it must not read as a clean bill of health: the Not measured
+// section below it says those checks never ran.
+function noFindingsText(model) {
+  return model.unmeasured.length ? model.t.noFindingsUnmeasured : model.t.noFindings;
+}
+
 function renderMarkdown(model) {
   const t = model.t;
   const lines = [];
@@ -439,8 +454,10 @@ function renderMarkdown(model) {
   push();
   push(scoreSentence(t, model.counts));
   push();
-  push(fill(t.ownershipCounts, model.ownership));
-  push();
+  if (model.plan.length) {
+    push(fill(t.ownershipCounts, model.ownership));
+    push();
+  }
 
   push(`## ${t.comparison}`);
   push();
@@ -486,23 +503,28 @@ function renderMarkdown(model) {
 
   push(`## ${t.plan}`);
   push();
-  push(`| ${t.priority} | ${t.code} | ${t.page} | ${t.problem} | ${t.todo} | ${t.applied} |`);
-  push('|---|---|---|---|---|---|');
-  for (const finding of model.plan) {
-    push(`| ${[
-      t.severity[finding.severity],
-      `\`${identity(finding)}\``,
-      finding.page || '—',
-      finding.message,
-      finding.fix || '—',
-      t.ownership[finding.ownership],
-    ].map(mdCell).join(' | ')} |`);
+  if (model.plan.length === 0) {
+    push(noFindingsText(model));
+    push();
+  } else {
+    push(`| ${t.priority} | ${t.code} | ${t.page} | ${t.problem} | ${t.todo} | ${t.applied} |`);
+    push('|---|---|---|---|---|---|');
+    for (const finding of model.plan) {
+      push(`| ${[
+        t.severity[finding.severity],
+        `\`${identity(finding)}\``,
+        finding.page || '—',
+        finding.message,
+        finding.fix || '—',
+        t.ownership[finding.ownership],
+      ].map(mdCell).join(' | ')} |`);
+    }
+    push();
+    push(fill(t.ownershipCounts, model.ownership));
+    push();
+    push(`> ${t.settingWarning}`);
+    push();
   }
-  push();
-  push(fill(t.ownershipCounts, model.ownership));
-  push();
-  push(`> ${t.settingWarning}`);
-  push();
 
   push(`## ${t.unmeasured}`);
   push();
@@ -539,12 +561,15 @@ function escapeHtml(value) {
 const HTML_UI = {
   en: {
     kicker: 'WordPress audit report',
+    finding: 'finding',
     findings: 'findings',
+    criticalOne: 'critical',
     critical: 'critical',
+    warningOne: 'warning',
     warnings: 'warnings',
     info: 'info',
     unmeasured: 'not measured',
-    detail: 'Findings by category',
+    uncategorised: 'Other findings',
     show: 'Show:',
     all: 'All',
     onlyCritical: 'Critical only',
@@ -554,7 +579,6 @@ const HTML_UI = {
     total: 'Total',
     evidence: 'Evidence',
     resource: 'Resource',
-    who: 'Who',
     legend: 'Legend',
     legendSeverity: 'Severity',
     legendOwner: 'Who applies the fix',
@@ -571,12 +595,15 @@ const HTML_UI = {
   },
   es: {
     kicker: 'Informe de auditoría WordPress',
+    finding: 'hallazgo',
     findings: 'hallazgos',
+    criticalOne: 'crítico',
     critical: 'críticos',
+    warningOne: 'advertencia',
     warnings: 'advertencias',
     info: 'informativos',
     unmeasured: 'sin medir',
-    detail: 'Hallazgos por categoría',
+    uncategorised: 'Otros hallazgos',
     show: 'Ver:',
     all: 'Todos',
     onlyCritical: 'Solo críticos',
@@ -586,7 +613,6 @@ const HTML_UI = {
     total: 'Total',
     evidence: 'Evidencia',
     resource: 'Recurso',
-    who: 'Quién',
     legend: 'Leyenda',
     legendSeverity: 'Severidad',
     legendOwner: 'Quién aplica la corrección',
@@ -648,6 +674,7 @@ b.ok{color:var(--ok)} b.bad{color:var(--bad)} b.mid{color:var(--mid)} b.info{col
 .theme{margin-left:auto;white-space:nowrap;cursor:pointer;font-size:13px;background:var(--paper);color:var(--ink);
   border:1px solid var(--rule);border-radius:7px;padding:5px 11px}
 .theme .to-light{display:none}
+:root:has(#theme:focus-visible) .theme{outline:2px solid var(--info);outline-offset:2px}
 :root:has(#theme:checked) .theme .to-dark{display:none}
 :root:has(#theme:checked) .theme .to-light{display:inline}
 @media (prefers-color-scheme:dark){
@@ -656,7 +683,7 @@ b.ok{color:var(--ok)} b.bad{color:var(--bad)} b.mid{color:var(--mid)} b.info{col
   :root:has(#theme:checked) .theme .to-light{display:none}
 }
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-main{padding:28px 24px 60px}
+main.wrap{padding:28px 24px 60px}
 section{background:var(--paper);border:1px solid var(--rule);border-radius:12px;padding:24px;margin:0 0 22px}
 section,details.group{scroll-margin-top:64px}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 0 12px}
@@ -704,9 +731,9 @@ details.group[open]>summary{border-bottom:1px solid var(--rule);background:var(-
 details.group>.scroll{margin:0 16px 16px}
 .pill{background:var(--na-bg);color:var(--muted);border-radius:999px;padding:2px 9px;font-size:12px}
 .pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.mid{background:var(--mid-bg);color:var(--mid)}
-footer{color:var(--muted);font-size:12.5px;padding-bottom:36px}
+footer.wrap{color:var(--muted);font-size:12.5px;padding-bottom:36px}
 @media (max-width:720px){
-  .wrap{padding:0 14px} main{padding:18px 14px 40px} section{padding:16px}
+  .wrap{padding:0 14px} main.wrap{padding:18px 14px 40px} section{padding:16px}
   h1{font-size:24px} .kpi.big b{font-size:28px}
 }
 @media print{
@@ -721,7 +748,9 @@ footer{color:var(--muted);font-size:12.5px;padding-bottom:36px}
 
 function renderHtml(model) {
   const t = model.t;
-  const ui = HTML_UI[model.lang] || HTML_UI.en;
+  // parseArgs() refuses a --lang HTML_UI does not carry, so this lookup cannot fall back.
+  const ui = HTML_UI[model.lang];
+  const plural = (n, one, many) => (n === 1 ? one : many);
   const esc = escapeHtml;
   const sevChip = (severity) =>
     `<span class="chip sev-${severity in SEVERITY_ORDER ? severity.toLowerCase() : 'other'}">${esc(
@@ -730,6 +759,8 @@ function renderHtml(model) {
   const ownTag = (owner) => `<span class="tag own-${owner}">${esc(t.ownership[owner] || owner)}</span>`;
   // A zero is good news and is coloured as such; a count is coloured by what it counts.
   const score = (value, tone) => `<span class="score ${value ? tone : 'ok'}">${value}</span>`;
+  // The header KPIs follow the same rule, so a clean run is not a red 0 at the top of the page.
+  const kpi = (value, tone) => `<b class="${value ? tone : 'ok'}">${value}</b>`;
   const categoryName = (name) => ui.categoryNames[name] || name;
   const slug = (value) => String(value).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const c = model.counts;
@@ -744,14 +775,17 @@ function renderHtml(model) {
   const groupTable = (heading, id, groups, label, name) => {
     if (!groups.size) return '';
     const rows = [...groups].map(([key, list]) => countRow(name(key), list)).join('');
+    // Totals of the rows printed, not of the run: groupBy skips findings without the key
+    // (site-wide findings have no page), and a Total larger than its rows reads as a sum error.
+    const listed = counts([...groups.values()].flat());
     return `<section id="${id}"><h2>${esc(heading)}</h2><div class="scroll"><table>
 <thead><tr><th>${esc(label)}</th><th>${esc(t.severity.CRITICAL)}</th><th>${esc(t.severity.WARNING)}</th><th>${esc(
       t.severity.INFO,
     )}</th><th>${esc(ui.total)}</th></tr></thead>
-<tbody>${rows}<tr class="sum"><td>${esc(ui.total)}</td><td>${score(c.CRITICAL, 'bad')}</td><td>${score(
-      c.WARNING,
+<tbody>${rows}<tr class="sum"><td>${esc(ui.total)}</td><td>${score(listed.CRITICAL, 'bad')}</td><td>${score(
+      listed.WARNING,
       'mid',
-    )}</td><td>${score(c.INFO, 'na')}</td><td class="num">${c.total}</td></tr></tbody></table></div></section>`;
+    )}</td><td>${score(listed.INFO, 'na')}</td><td class="num">${listed.total}</td></tr></tbody></table></div></section>`;
   };
 
   const findingRow = (finding) => `<tr data-sev="${esc(finding.severity)}">
@@ -780,19 +814,44 @@ function renderHtml(model) {
 <ul class="changes">${list(t.improved, cmp.resolved, 'ok')}${list(t.regressed, cmp.added, 'bad')}${list(t.carried, cmp.carried, 'mid')}</ul>`;
   };
 
-  // The detail groups by category when the run carries one, and falls back to a single
-  // group so a run without categories still lists every finding.
-  const byCategory = model.byCategory.size ? model.byCategory : new Map([[null, model.plan]]);
+  // The detail groups by category. Findings the run left without a category go into one
+  // trailing group, so the HTML lists every finding the Markdown does, and a run with no
+  // categories at all is that one group. Every group is open: the report is a document, and
+  // a printed PDF of a collapsed <details> would drop its findings.
+  const byCategory = new Map(model.byCategory);
+  const grouped = new Set([...byCategory.values()].flat());
+  const rest = model.plan.filter((finding) => !grouped.has(finding));
+  if (rest.length) byCategory.set(null, rest);
+  // Ids come from the group's position, not only its name: names are run input, and two
+  // that slug alike ("GEO / AI", "geo-ai") would share an id and misroute the table's link.
+  const groupIds = new Map([...byCategory.keys()].map((name, i) => [name, `cat-${slug(name || 'other') || 'group'}-${i}`]));
+  const groupLabel = (name) => {
+    if (name) return categoryName(name);
+    return model.byCategory.size ? ui.uncategorised : t.plan;
+  };
   const groups = [...byCategory]
-    .map(([name, list], i) => {
+    .map(([name, list]) => {
       const n = counts(list);
-      return `<details class="group" id="cat-${slug(name || 'all')}"${i === 0 ? ' open' : ''}>
-<summary><b>${esc(name ? categoryName(name) : t.plan)}</b> <span class="pill">${n.total} ${esc(ui.findings)}</span>${
-        n.CRITICAL ? ` <span class="pill bad">${n.CRITICAL} ${esc(ui.critical)}</span>` : ''
-      }${n.WARNING ? ` <span class="pill mid">${n.WARNING} ${esc(ui.warnings)}</span>` : ''}</summary>
+      return `<details class="group" id="${groupIds.get(name)}" open>
+<summary><b>${esc(groupLabel(name))}</b> <span class="pill">${n.total} ${esc(plural(n.total, ui.finding, ui.findings))}</span>${
+        n.CRITICAL ? ` <span class="pill bad">${n.CRITICAL} ${esc(plural(n.CRITICAL, ui.criticalOne, ui.critical))}</span>` : ''
+      }${n.WARNING ? ` <span class="pill mid">${n.WARNING} ${esc(plural(n.WARNING, ui.warningOne, ui.warnings))}</span>` : ''}</summary>
 ${findingTable(sortForPlan(list))}</details>`;
     })
     .join('\n');
+
+  // A clean run shows the same sentence as the Markdown, not an empty plan, and drops the
+  // filters, the ownership split and the setting warning, which describe changes there are
+  // none of.
+  const planBlock = model.plan.length === 0
+    ? `<p>${esc(noFindingsText(model))}</p>`
+    : `<div class="filters" role="radiogroup" aria-label="${esc(ui.show)}"><span>${esc(ui.show)}</span>
+<input type="radio" name="filter" id="filter-all" class="sr" checked><label for="filter-all">${esc(ui.all)}</label>
+<input type="radio" name="filter" id="filter-critical" class="sr"><label for="filter-critical">${esc(ui.onlyCritical)}</label>
+<input type="radio" name="filter" id="filter-problems" class="sr"><label for="filter-problems">${esc(ui.criticalAndWarnings)}</label></div>
+${groups}
+<p>${esc(fill(t.ownershipCounts, model.ownership))}</p>
+<p class="note">${esc(t.settingWarning.replaceAll('**', '').replaceAll('`', ''))}</p>`;
 
   const unmeasuredBlock = model.unmeasured.length
     ? `<p>${esc(t.unmeasuredNote)}</p><div class="scroll"><table><thead><tr><th>${esc(t.code)}</th><th></th><th>${esc(
@@ -834,29 +893,23 @@ ${findingTable(sortForPlan(list))}</details>`;
 <p class="meta">${esc([model.date, model.tier].filter(Boolean).join(' · '))}</p>
 ${model.categories.length ? `<p class="meta">${esc(t.categories)}: ${esc(model.categories.map(categoryName).join(', '))}</p>` : ''}
 <div class="kpis">
-<div class="kpi big"><b>${c.total}</b><span>${esc(ui.findings)}</span></div>
-<div class="kpi"><b class="bad">${c.CRITICAL}</b><span>${esc(ui.critical)}</span></div>
-<div class="kpi"><b class="mid">${c.WARNING}</b><span>${esc(ui.warnings)}</span></div>
+<div class="kpi big"><b>${c.total}</b><span>${esc(plural(c.total, ui.finding, ui.findings))}</span></div>
+<div class="kpi">${kpi(c.CRITICAL, 'bad')}<span>${esc(plural(c.CRITICAL, ui.criticalOne, ui.critical))}</span></div>
+<div class="kpi">${kpi(c.WARNING, 'mid')}<span>${esc(plural(c.WARNING, ui.warningOne, ui.warnings))}</span></div>
 <div class="kpi"><b>${c.INFO}</b><span>${esc(ui.info)}</span></div>
-<div class="kpi"><b class="info">${model.unmeasured.length}</b><span>${esc(ui.unmeasured)}</span></div>
+<div class="kpi">${kpi(model.unmeasured.length, 'info')}<span>${esc(ui.unmeasured)}</span></div>
 </div></div></header>
 <nav class="toc"><div class="wrap">${toc.map(([id, label]) => `<a href="#${id}">${esc(label)}</a>`).join('')}
 <label class="theme" for="theme"><span class="to-dark">🌙 ${esc(ui.dark)}</span><span class="to-light">☀️ ${esc(ui.light)}</span></label></div></nav>
 <main class="wrap">
 <section id="summary"><h2>${esc(t.summary)}</h2>
 <p>${esc(scoreSentence(t, c))}</p>
-<p>${esc(fill(t.ownershipCounts, model.ownership))}</p></section>
+${model.plan.length ? `<p>${esc(fill(t.ownershipCounts, model.ownership))}</p>` : ''}</section>
 <section id="comparison"><h2>${esc(t.comparison)}</h2>${comparisonBlock()}</section>
-${groupTable(t.byCategory, 'by-category', model.byCategory, t.category, (name) => `<a href="#cat-${slug(name)}">${esc(categoryName(name))}</a>`)}
+${groupTable(t.byCategory, 'by-category', model.byCategory, t.category, (name) => `<a href="#${groupIds.get(name)}">${esc(categoryName(name))}</a>`)}
 ${groupTable(t.byPage, 'by-page', model.byPage, t.page, (name) => `<code>${esc(name)}</code>`)}
 <section id="plan"><h2>${esc(t.plan)}</h2>
-<div class="filters" role="radiogroup" aria-label="${esc(ui.show)}"><span>${esc(ui.show)}</span>
-<input type="radio" name="filter" id="filter-all" class="sr" checked><label for="filter-all">${esc(ui.all)}</label>
-<input type="radio" name="filter" id="filter-critical" class="sr"><label for="filter-critical">${esc(ui.onlyCritical)}</label>
-<input type="radio" name="filter" id="filter-problems" class="sr"><label for="filter-problems">${esc(ui.criticalAndWarnings)}</label></div>
-${groups}
-<p>${esc(fill(t.ownershipCounts, model.ownership))}</p>
-<p class="note">${esc(t.settingWarning.replaceAll('**', '').replaceAll('`', ''))}</p></section>
+${planBlock}</section>
 <section id="unmeasured"><h2>${esc(t.unmeasured)}</h2>${unmeasuredBlock}</section>
 <section id="legend"><h2>${esc(ui.legend)}</h2><ul class="legend">
 <li><b>${esc(ui.legendSeverity)}:</b> ${['CRITICAL', 'WARNING', 'INFO'].map(sevChip).join(' ')}</li>
@@ -876,10 +929,9 @@ function main() {
     : loadRun(opts.run);
   const findings = run.findings;
 
-  if (findings.length === 0 && !(run.unmeasured || []).length) {
-    console.log('audit-report: the run carries no findings — nothing to write');
-    process.exit(2);
-  }
+  // A run with no findings is still rendered. A clean audit is a result the client is owed,
+  // and its sidecar is the baseline the next audit diffs against: skipping it left the first
+  // report-only run on a clean site with nothing to compare later runs to.
 
   const problems = [
     ...validate(findings),
