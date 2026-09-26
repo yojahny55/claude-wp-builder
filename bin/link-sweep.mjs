@@ -109,6 +109,7 @@ function hostOf(v) {
 
 function readLines(o) {
   let text;
+  if (!o.urls && process.stdin.isTTY) usage('no input: pipe links on stdin or pass --urls <file>');
   try { text = o.urls ? readFileSync(o.urls, 'utf8') : readFileSync(0, 'utf8'); }
   catch (e) { usage(`cannot read ${o.urls || 'stdin'}: ${e.message}`); }
   return text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l) => {
@@ -175,7 +176,9 @@ async function request(o, url, deadline) {
         body += dec.decode(value, { stream: true });
       }
       await reader?.cancel();
-      if (isChallenge(g, body)) res = g;
+      // The GET answers for the link from here on: judging the HEAD's status against the
+      // GET's body would call a page that served 200 to the GET a challenge.
+      res = g;
     }
     if (isChallenge(res, body)) {
       return { verdict: 'unmeasured', status: res.status, final: res.url,
