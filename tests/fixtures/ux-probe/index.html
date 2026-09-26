@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ux-probe fixture</title>
+<style>
+  body { font: 16px/1.5 sans-serif; margin: 0; padding: 16px; color: #222; }
+  .prose a { color: #222; text-decoration: none; }
+  .actions { display: flex; gap: 4px; }
+  .actions button { padding: 8px 12px; }
+  .ok-actions { display: flex; gap: 24px; margin-top: 16px; }
+  .ok-actions button { padding: 8px 12px; }
+  #popup { display: none; }
+  #popup.open { display: block; }
+</style></head>
+<body>
+<nav class="prose"><ul><li><a href="/second/">Menu entry styled like text</a></li></ul></nav>
+<p>An accent link <a href="/second/" style="color:#b00;text-decoration:none">that differs in colour</a> is set apart without an underline.</p>
+<p class="prose">This paragraph has no max-width, so on a wide desktop viewport every one of its lines runs far past the seventy-five characters a reader can follow comfortably, which is exactly what UX-006 measures, and on a phone it wraps into short lines instead. It also carries <a href="/second/">a link that looks like text</a> and nothing else to set it apart.</p>
+<div class="actions"><button type="button">Save</button><button type="button">Cancel</button></div>
+<div class="ok-actions"><button type="button">Yes</button><button type="button">No</button></div>
+<a href="/second/"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" width="40" height="40"></a>
+<a href="https://example.invalid/">External</a>
+<a href="#top">Top</a>
+<a href="mailto:x@example.invalid">Mail</a>
+<form>
+  <label for="name">Name</label><input id="name" name="name" required>
+  <label for="email">Email *</label><input id="email" name="email" type="email" required>
+</form>
+<button id="open" type="button" onclick="document.getElementById('popup').classList.add('open')">Account</button>
+<div id="popup">Signed out</div>
+</body></html>

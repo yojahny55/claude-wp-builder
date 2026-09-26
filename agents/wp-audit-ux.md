@@ -67,13 +67,17 @@ criterion is never given up: each failed selector becomes one more script, never
 `UNMEASURED`. One run went 25 minutes this way — 16 browser launches, a full crawl of the
 local site, a serial crawl of production — and never stopped to report. So:
 
-- **At most 3 browser launches per run.** One launch per viewport pass (mobile, desktop)
-  plus one for interactions. A launch opens several pages; it is not one per question.
+- **At most 3 browser launches per run.** A launch opens every page at every viewport; it
+  is not one per question. `bin/ux-probe.mjs` counts them in its state file and exits `3`
+  on a fourth.
 - **At most 2 attempts per criterion** to find or drive the element it needs. After the
   second, the criterion is `UNMEASURED`, and the evidence names each selector tried and why
-  it failed. A third guess at a theme's class names is not measurement.
+  it failed. A third guess at a theme's class names is not measurement. The harness stops
+  running a site probe that has failed in two runs and reports it `unmeasured` with both
+  errors and the code it ran — copy that into the evidence.
 - **15 minutes of wall clock**, then stop and report what you have. Whatever is left is
-  `UNMEASURED` with the reason `budget`, and the report goes out.
+  `UNMEASURED` with the reason `budget`, and the report goes out. The harness exits `3`
+  once 15 minutes have passed since its first run.
 - **No command outlives one Bash call.** Bound every sweep (`timeout <s>`, the helper's
   `--budget`). One that can exceed about 2 minutes runs with `run_in_background` while you
   measure something else. Never a `while read` loop over URLs that passes the Bash timeout
@@ -98,13 +102,34 @@ visible.
 For every page in scope, walk the page-level criteria. For the site-level ones, walk them
 once across the pages you measured and name the pages they differ between.
 
-**One harness, many probes.** Write one script that opens each page once per viewport,
-keeps the `page`, runs every DOM probe and every interaction probe in that session, and
-writes JSON. A follow-up question extends that script and reruns it; it is never a new
-one-off script with its own browser launch. On a page-builder page each fresh load costs
-20–60 s, so one-question-one-script spends the budget on loading. Wait for `load` plus a
-short settle, not `networkidle`: a page with 170 requests and a polling widget may never
-go idle.
+**One harness, many probes: `bin/ux-probe.mjs`.** It opens each page once per viewport
+(mobile, tablet, desktop) in a single browser launch, runs the built-in DOM probes and your
+site probes on the page already loaded, and writes JSON. It waits for `load` plus a short
+settle, not `networkidle`: a page with 170 requests and a polling widget may never go idle.
+On a page-builder page each fresh load costs 20–60 s, so one-question-one-script spends
+the budget on loading.
+
+```bash
+mkdir -p .wp-audit/ux
+node ${CLAUDE_PLUGIN_ROOT}/bin/ux-probe.mjs --site "<site-url>" --pages "/,/contact/" \
+  --probes .wp-audit/ux/probes.mjs --out .wp-audit/ux/probe.json \
+  --links-out .wp-audit/ux/links.txt
+```
+
+- **Built in, on every page and viewport:** `UX-006` longest line in characters, `UX-009`
+  action elements closer than 8 px, `UX-018` in-text links not underlined, `UX-019` image
+  links with no name, `UX-001` required fields with no visible marker, and every `href`
+  (desktop) written to `--links-out` as the input `resolve-link-targets.php` reads for
+  `UX-014`/`UX-015`. These are measurements to judge, not findings: a 4 px gap between a
+  pagination's page numbers may be fine.
+- **Theme-specific interactions go in `--probes`**, a module whose default export is an
+  array of `{ id, criterion, viewports?, run }`; `run({ page, url, path, viewport })`
+  returns what it measured. A follow-up question adds a probe to that module and reruns the
+  harness; it is never a new one-off script with its own browser launch.
+- **Exit `3` means the budget is spent.** Report what the JSON already holds, and mark
+  everything else `UNMEASURED (budget)`. Do not work around it with a browser of your own.
+- A new audit starts a new state file (the default lives beside `--out`). Never pass
+  `--state-reset` to get more launches inside one audit.
 
 Three criteria are measured rather than read, and reading them instead is the most common
 way this audit goes wrong:

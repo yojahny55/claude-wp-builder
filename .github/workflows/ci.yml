@@ -81,7 +81,7 @@ jobs:
           # branch, which this job does not fetch, so it lives in doc-sync below where the
           # base is already there -- here it would take its own skip path and pass while
           # checking nothing.
-          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/audit-resolve-links-integration.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh'
+          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/audit-resolve-links-integration.sh tests/checks/audit-ux-probe.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh'
           for f in tests/checks/*.sh; do
             case " $skip_here " in *" $f "*) continue ;; esac
             if out=$(bash "$f" 2>&1); then
@@ -321,6 +321,17 @@ jobs:
         run: |
           echo "::group::motion devices"
           bash tests/checks/motion-devices.sh
+          echo "::endgroup::"
+
+      # The usability harness in the same real Chrome. UX_PROBE_REQUIRE_BROWSER turns its
+      # skip path into a failure, for the same reason MOTION_REQUIRE_BROWSER does above.
+      - name: ux-probe harness in a real browser
+        env:
+          WP_BROWSER_CHROMIUM: /usr/bin/google-chrome
+          UX_PROBE_REQUIRE_BROWSER: "1"
+        run: |
+          echo "::group::ux-probe"
+          bash tests/checks/audit-ux-probe.sh
           echo "::endgroup::"
 
   visual:
