@@ -97,7 +97,13 @@ foreach ( $lines as $line ) {
 	if ( 0 === strpos( $href, '//' ) ) {
 		$url = ( isset( $home['scheme'] ) ? $home['scheme'] : 'https' ) . ':' . $href;
 	} elseif ( '/' === $href[0] ) {
-		$url = $origin . ( '' !== $home_path && 0 === strpos( $href, $home_path . '/' ) ? substr( $href, strlen( $home_path ) ) : $href );
+		// On a subdirectory install a root-relative href outside the install's path points
+		// at the bare host, not at this WordPress; resolving it here could mark a 404 resolved.
+		if ( '' !== $home_path && 0 !== strpos( $href, $home_path . '/' ) ) {
+			$http[] = $pass;
+			continue;
+		}
+		$url = $origin . ( '' !== $home_path ? substr( $href, strlen( $home_path ) ) : $href );
 	} elseif ( preg_match( '#^https?://#i', $href ) ) {
 		$url = $href;
 	} else {
@@ -129,7 +135,11 @@ foreach ( $lines as $line ) {
 		if ( ! $hit ) {
 			$id = url_to_postid( $url );
 			if ( $id ) {
-				$post  = get_post( $id );
+				$post = get_post( $id );
+				if ( ! $post ) {
+					$http[] = array( $href, $page, $group );
+					continue;
+				}
 				$group = '' !== $group ? $group : 'type:' . $post->post_type;
 				if ( 'publish' === $post->post_status && '' === $post->post_password
 					&& rlt_path( get_permalink( $post ) ) === $path ) {
