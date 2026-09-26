@@ -4,6 +4,24 @@
 
 ### Added
 
+- **Audit link sweeps have a load limit and a shipped tool.** The audits were told to
+  follow links and given no method, so an agent wrote its own crawler: 25 concurrent
+  `curl -L` workers over a store's term archives held MariaDB at ~18 cores and load 18 on a
+  shared dev machine. `skills/wp-audit-standards` now carries one rule for any link or page
+  sweep — at most 4 requests in flight, `HEAD` or a ranged GET, WP-CLI or the database
+  before HTTP, 20 term archives per taxonomy unless a full sweep is asked for — and
+  `bin/link-sweep.mjs` implements it: it clamps concurrency to 4, classifies links as
+  internal, clone-origin (never requested from a clone unless confirmed) or external,
+  reports a CDN bot challenge as `UNMEASURED` rather than broken, and stops at a wall-clock
+  budget. Internal targets are answered by the database first:
+  `skills/wp-cli-patterns/scripts/resolve-link-targets.php` resolves a link only when the
+  object is published and its canonical URL has the link's path, and tags what it passes
+  on with its taxonomy so the sweep samples per taxonomy rather than per path segment.
+  `/wp-audit`'s agent prompt carries the rule to all seven auditors.
+  `tests/checks/audit-link-sweep.sh` runs the sweep against a local fixture server and
+  measures the in-flight peak at the server; `tests/checks/audit-resolve-links-integration.sh`
+  runs the resolver in the WordPress fixture and requests every link it resolved, each of
+  which must answer 200.
 - **`/autofix` fixes what OpenCodeReview found.** A maintainer comments `/autofix` on a pull
   request and `.github/workflows/autofix.yml` hands the open, unresolved OCR threads to OpenCode
   (Alibaba token plan, `qwen3.8-max`, thinking off). It runs as six jobs split by what each one

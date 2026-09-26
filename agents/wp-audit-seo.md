@@ -295,6 +295,11 @@ echo wp_json_encode(\$out);
 
 ### Procedure — content and link checks
 
+Any step here that requests many URLs — following links, rendering heads — follows
+*Link and page sweeps against a site* in `skills/wp-audit-standards/SKILL.md`: at most 4
+requests in flight, WP-CLI or the database before HTTP, term archives sampled, and
+`bin/link-sweep.mjs` instead of a hand-written crawler.
+
 1. **SEO-035 to SEO-037** — count with `mb_strlen()`, never `strlen()`; the meta is UTF-8.
    Fall back to `post_title` when `rank_math_title` is empty. 60 chars is the safe Latin-script
    limit — Google truncates by pixel width (~580px), so CJK and Cyrillic titles hit it sooner.
