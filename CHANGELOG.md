@@ -108,6 +108,28 @@
 
 ### Changed
 
+- **The HTML deliverable read like a raw table dump.** `bin/audit-report.mjs` rendered one
+  long unstyled page: plain counts, a flat plan table and no way to narrow 100+ findings to
+  the ones that matter. The HTML now follows the layout of a mature audit report:
+  - a header with key figures (findings, critical, warnings, info, not measured) and a sticky
+    table of contents;
+  - sections as cards, with counts coloured by what they count and a zero shown as good news;
+  - severity chips and owner tags (code, setting, content, manual);
+  - findings grouped by category in collapsible panels, with resource and evidence under each
+    problem;
+  - a legend that explains what each owner means for who applies the fix.
+
+  It also follows the reader's system colour scheme and has a dark/light switch. The switch
+  and the "critical only / critical and warnings" filter are pure CSS (a hidden input and
+  `:has()`), so the file still carries no script and fetches nothing. Printing forces the
+  light palette and every row back on, so a PDF made while a filter was active still carries
+  every finding. Every category panel renders open, since a collapsed `<details>` prints
+  nothing; findings without a category get their own panel instead of vanishing from the
+  HTML; group ids stay unique when two category names slug alike; a table's Total adds up
+  its own rows; one finding reads "1 finding"; and a `--lang` without HTML strings is refused
+  rather than rendered half in English. A run with no findings keeps the no-findings sentence
+  and drops the filters, split and warning in the styled page too. The Markdown output is
+  unchanged.
 - **A report-only `/wp-audit` always writes the `.md` + `.html` deliverable.** Choosing
   "Report only" (flag or the Step 1 question) without `--report` used to print to the
   console and nothing else: the report was gone at the next `/clear`, and the first
