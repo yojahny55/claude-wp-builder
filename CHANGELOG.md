@@ -87,8 +87,9 @@
   report-only run on a project wrote no dated sidecar, so the next audit had no baseline to
   diff against. Step 1 now defaults `--report` to `both` on a report-only run (an explicit
   `--report md|html|both` still wins), Step 8.5 runs for it, answer A says a document will be
-  written, and the Step 11 report-only summary prints both paths.
-  `tests/checks/audit-ask-report-only.sh` pins all four.
+  written, and the Step 11 summaries print the paths Step 8.5 actually wrote — one for
+  `--report md|html`, and `Report: none written` for a clean run, where the renderer writes
+  nothing. `tests/checks/audit-ask-report-only.sh` pins all of it, and the doc lines.
 
 - **`/wp-audit` asks for report-only as its first question when `--report-only` is absent.**
   Before, a run without the flag only reached the fix/no-fix decision at Step 9, after Step 4

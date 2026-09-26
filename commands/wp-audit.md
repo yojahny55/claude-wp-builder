@@ -1519,3 +1519,10 @@ Next steps:
   - Run /wp-audit (without --report-only) to auto-fix issues
   - Run /wp-finalize for pre-delivery validation
 ```
+
+**The `Report:` lines name only what Step 8.5 actually wrote**, in both summaries above.
+`--report md` or `--report html` prints one line, not two. When the renderer exited `2`
+(the run carries no findings, so nothing is written), print
+`Report: none written — the run found no issues` instead of paths, and drop the line that
+tells the operator to review it. A summary that points at a file which does not exist is
+worse than no summary.

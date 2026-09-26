@@ -44,7 +44,9 @@ grep -Fq 'and `--report` is absent, set `--report both`' <<<"$step1" \
   || fail "Step 1 lost the --report both default for report-only"
 grep -Fq '[A] Report only — audit and write the report (.md + .html)' <<<"$step1" \
   || fail "answer A no longer says a document will be written"
-grep -Fq 'or the run is report-only (Step 1 defaults `--report`' "$audit" \
+step85=$(awk '/^## Step 8\.5:/{on=1;print;next} on&&/^## /{on=0} on' "$audit")
+[ -n "$step85" ] || fail "no Step 8.5 in $audit"
+grep -Fq 'or the run is report-only (Step 1 defaults `--report`' <<<"$step85" \
   || fail "Step 8.5 does not run on a report-only run"
 step11=$(awk '/^## Step 11:/{on=1;print;next} on&&/^## /{on=0} on' "$audit")
 [ -n "$step11" ] || fail "no Step 11 in $audit"
@@ -56,7 +58,18 @@ grep -Fq '.wp-audit/informe-<AAAA-MM-DD>.html' <<<"$ro" \
   || fail "Step 11 report-only summary does not print the .html path"
 grep -Fq 'Review the report written above' <<<"$ro" \
   || fail "Step 11 report-only summary no longer points at the written deliverable"
+# The paths are what Step 8.5 wrote, not a fixed pair: --report md writes one file, and a
+# run with no findings writes none (audit-report.mjs exits 2).
+grep -Fq '**The `Report:` lines name only what Step 8.5 actually wrote**' <<<"$step11" \
+  || fail "Step 11 prints a fixed pair of paths whatever was written"
+grep -Fq 'Report: none written — the run found no issues' <<<"$step11" \
+  || fail "Step 11 has no summary for a clean run that wrote nothing"
 
+# What the operator reads before running the command must say the same thing.
+tr '\n' ' ' < docs/commands.md | grep -Fq 'report-only run always writes the dated deliverable (`--report` defaults to `both`)' \
+  || fail "docs/commands.md no longer says a report-only run writes the deliverable"
+grep -Fq '/wp-audit --report-only      # Report without fixing (writes the .md + .html deliverable)' README.md \
+  || fail "README.md usage line no longer says report-only writes the deliverable"
 grep -Fq 'the first question of the run asks whether you want the report only' docs/commands.md \
   || fail "docs/commands.md does not describe the report-only question"
 
