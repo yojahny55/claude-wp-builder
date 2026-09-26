@@ -217,7 +217,8 @@ async function main() {
   const perGroup = new Map();
   const perPage = new Map();
   // Single-page links first, so shared chrome is charged after every page's own links.
-  const order = [...all].sort((x, y) => (x.pages.length > 1) - (y.pages.length > 1));
+  const isShared = (r) => Number(r.pages.length > 1);
+  const order = [...all].sort((x, y) => isShared(x) - isShared(y));
   for (const r of order) {
     if (r.class === 'fragment') { Object.assign(r, { verdict: 'fragment', status: null, reason: 'resolves to the page it is on' }); continue; }
     if (r.class === 'skipped') { Object.assign(r, { verdict: 'skipped', status: null, reason: r.bad ? 'unparseable href' : 'not an http(s) link' }); continue; }
