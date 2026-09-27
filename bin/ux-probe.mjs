@@ -357,9 +357,15 @@ async function main() {
         }
         const t0 = Date.now();
         let landed = url;
-        try {
+        // Load and settle the same way every time: `landed` is read after the settle, so a
+        // reload compared against it must settle too, or a client-side redirect reads as a move.
+        const load = async () => {
           const res = await page.goto(url, { waitUntil: 'load', timeout: o.pageTimeout * 1000 });
           await page.waitForTimeout(500);
+          return res;
+        };
+        try {
+          const res = await load();
           // Where the page settled after redirects (`/` -> `/es/`, http -> https): a probe is
           // judged against this, or every probe on a redirecting URL would read as having left.
           landed = page.url();
@@ -396,7 +402,7 @@ async function main() {
         // remaining probes measure another page under this path, so it stops them instead.
         // Returns false when the caller must stop the probe loop.
         const restore = async (probe) => {
-          try { await page.goto(url, { waitUntil: 'load', timeout: o.pageTimeout * 1000 }); }
+          try { await load(); }
           catch (e2) {
             entry.error = `page not restored after probe ${probe.id}: ${errMsg(e2)}`;
             skipRest(probe, `page not restored after ${probe.id}`);
