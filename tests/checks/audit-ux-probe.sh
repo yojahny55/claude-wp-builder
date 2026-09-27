@@ -40,7 +40,9 @@ import http from 'node:http';
 import { readFileSync } from 'node:fs';
 const dir = process.argv[2];
 const srv = http.createServer((req, res) => {
-  const f = req.url === '/' ? 'index.html' : req.url === '/second/' ? 'second.html' : null;
+  // /r/ redirects once a probe has set the `moved` cookie: a reload that settles elsewhere.
+  if (req.url === '/r/' && /moved=1/.test(req.headers.cookie || '')) { res.writeHead(302, { location: '/second/' }); res.end(); return; }
+  const f = req.url === '/' || req.url === '/r/' ? 'index.html' : req.url === '/second/' ? 'second.html' : null;
   if (!f) { res.writeHead(404); res.end(); return; }
   res.writeHead(200, { 'content-type': 'text/html' }); res.end(readFileSync(`${dir}/${f}`));
 });
@@ -114,6 +116,23 @@ node "$tool" --site "$site" --pages /,/second/ --viewports desktop --probes "$tm
   --out "$tmp/o7/r.json" --state "$tmp/late.json" 2>"$tmp/err" || { cat "$tmp/err"; fail "a run admitted before the deadline failed"; }
 node -e "const r=JSON.parse(require('fs').readFileSync('$tmp/o7/r.json','utf8'));const a=r.pages.find(x=>x.path==='/'),b=r.pages.find(x=>x.path==='/second/');if(!a||a.verdict||!a.dom||!b||b.verdict!=='unmeasured'||b.reason!=='budget'||r.complete!==false){console.log(JSON.stringify(r.pages.map(x=>[x.path,x.verdict,x.reason])),r.complete);process.exit(1)}" \
   || fail "a page view past the wall-clock deadline was measured, or the run still claims complete"
+
+# A probe that changes where the page reloads to (a cookie that alters a redirect) cannot be
+# undone by a reload: the remaining probes are unmeasured, not run against another page.
+cat >"$tmp/cookie.mjs" <<'JS'
+export default [
+  { id: 'sets-cookie', viewports: ['desktop'], run: async ({ page, url }) => {
+    await page.evaluate(() => { document.cookie = 'moved=1; path=/'; });
+    await page.goto(new URL('/second/', url).href);
+    return true;
+  } },
+  { id: 'after', viewports: ['desktop'], run: async () => true },
+];
+JS
+node "$tool" --site "$site" --pages /r/ --viewports desktop --probes "$tmp/cookie.mjs" \
+  --out "$tmp/o8/r.json" --state-reset 2>"$tmp/err" || { cat "$tmp/err"; fail "cookie-redirect run failed"; }
+node -e "const r=JSON.parse(require('fs').readFileSync('$tmp/o8/r.json','utf8'));const e=r.pages[0],a=e.site['after'];if(!e.site['sets-cookie'].leftPage||!a||a.verdict!=='unmeasured'||!/page restored to/.test(a.reason)){console.log(JSON.stringify(e));process.exit(1)}" \
+  || fail "a reload that settled on another page let later probes measure it"
 
 # --state-reset clears a spent budget on purpose.
 node "$tool" --site "$site" --pages / --out "$tmp/out/r.json" --state-reset 2>"$tmp/err" || fail "--state-reset run failed"

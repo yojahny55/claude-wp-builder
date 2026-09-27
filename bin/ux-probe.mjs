@@ -382,21 +382,32 @@ async function main() {
           continue;
         }
         entry.site = {};
-        // Put the page back on this URL. On failure every probe after `probe` on this page
-        // view is recorded unmeasured, and the caller stops the probe loop.
+        // Every probe after `probe` on this page view is recorded unmeasured with `reason`.
+        const skipRest = (probe, reason) => {
+          const idx = probes.indexOf(probe);
+          for (let k = idx + 1; k < probes.length; k++) {
+            const remaining = probes[k];
+            if (remaining.viewports && !remaining.viewports.includes(vp)) continue;
+            entry.site[remaining.id] = { verdict: 'unmeasured', criterion: remaining.criterion || null, reason };
+          }
+        };
+        // Put the page back where it first settled. A reload that settles elsewhere -- a
+        // language or session cookie the probe set changes the redirect -- would have the
+        // remaining probes measure another page under this path, so it stops them instead.
+        // Returns false when the caller must stop the probe loop.
         const restore = async (probe) => {
-          try { await page.goto(url, { waitUntil: 'load', timeout: o.pageTimeout * 1000 }); return true; }
+          try { await page.goto(url, { waitUntil: 'load', timeout: o.pageTimeout * 1000 }); }
           catch (e2) {
             entry.error = `page not restored after probe ${probe.id}: ${errMsg(e2)}`;
-            const idx = probes.indexOf(probe);
-            for (let k = idx + 1; k < probes.length; k++) {
-              const remaining = probes[k];
-              if (remaining.viewports && !remaining.viewports.includes(vp)) continue;
-              entry.site[remaining.id] = { verdict: 'unmeasured', criterion: remaining.criterion || null,
-                reason: `page not restored after ${probe.id}` };
-            }
+            skipRest(probe, `page not restored after ${probe.id}`);
             return false;
           }
+          if (!samePage(page.url(), landed)) {
+            entry.error = `after probe ${probe.id} the page reloads to ${page.url()}, not ${landed}`;
+            skipRest(probe, `page restored to ${page.url()} after ${probe.id}, not ${landed}`);
+            return false;
+          }
+          return true;
         };
         for (const probe of probes) {
           if (probe.viewports && !probe.viewports.includes(vp)) continue;
