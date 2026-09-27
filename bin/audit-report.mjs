@@ -164,7 +164,7 @@ function parseArgs(argv) {
   if (!STRINGS[opts.lang]) {
     die(1, `--lang must be one of ${Object.keys(STRINGS).join(', ')} (got: ${opts.lang})`);
   }
-  if (!HTML_UI[opts.lang]) {
+  if (opts.format !== 'md' && !HTML_UI[opts.lang]) {
     die(1, `--lang ${opts.lang} has no HTML strings — add it to HTML_UI as well as STRINGS`);
   }
   if (opts.date && !/^\d{4}-\d{2}-\d{2}$/.test(opts.date)) {
@@ -859,7 +859,7 @@ ${groups}
       )}</th></tr></thead><tbody>${model.unmeasured
         .map(
           (entry) =>
-            `<tr><td class="num">${esc(entry.check)}</td><td><span class="chip unmeasured">${esc(t.unmeasured)}</span></td><td class="ev">${esc(
+            `<tr><td class="num">${esc(entry.check)}</td><td><span class="chip unmeasured">${esc(ui.unmeasured)}</span></td><td class="ev">${esc(
               entry.reason || entry.message || '',
             )}</td></tr>`,
         )

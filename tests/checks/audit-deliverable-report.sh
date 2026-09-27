@@ -171,12 +171,14 @@ grep -Fq '@media print' "$html" || fail "$html has no print rules, so printing t
 # The reader's colour scheme is honoured with no input, and the switch and the severity
 # filter work without a script -- a mail client strips scripts, and the rule above forbids
 # them anyway. Each needle is the mechanism, not a class name that could survive without it.
+# The needles match the renderer's minified CSS byte for byte: reformat that stylesheet
+# and these must be updated with it.
 # The dark media query must redefine the tokens, not just exist: the label swap also sits
 # in one, and it changes no colour.
 grep -Fq 'prefers-color-scheme:dark){:root{--ink:#e6e9ee' "$html" \
   || fail "$html ignores a reader's dark colour scheme"
 grep -Fq ':root:has(#theme:checked)' "$html" || fail "$html has no script-free theme switch"
-grep -Fq 'tr[data-sev="INFO"]' "$html" || fail "$html has no script-free severity filter"
+grep -Fq ':root:has(#filter-problems:checked) tr[data-sev="INFO"]{display:none}' "$html" || fail "$html has no script-free severity filter"
 # The rules are half of each mechanism; the controls that drive them are the other half.
 grep -Fq '<input type="checkbox" id="theme"' "$html" || fail "$html has the theme rules but no switch to drive them"
 grep -Fq '<label class="theme" for="theme">' "$html" || fail "$html has a theme switch with no visible label"
