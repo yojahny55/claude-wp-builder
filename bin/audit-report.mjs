@@ -898,7 +898,7 @@ ${model.categories.length ? `<p class="meta">${esc(t.categories)}: ${esc(model.c
 <div class="kpi big"><b>${c.total}</b><span>${esc(plural(c.total, ui.finding, ui.findings))}</span></div>
 <div class="kpi">${kpi(c.CRITICAL, 'bad')}<span>${esc(plural(c.CRITICAL, ui.criticalOne, ui.critical))}</span></div>
 <div class="kpi">${kpi(c.WARNING, 'mid')}<span>${esc(plural(c.WARNING, ui.warningOne, ui.warnings))}</span></div>
-<div class="kpi"><b>${c.INFO}</b><span>${esc(ui.info)}</span></div>
+<div class="kpi">${kpi(c.INFO, 'info')}<span>${esc(ui.info)}</span></div>
 <div class="kpi">${kpi(model.unmeasured.length, 'info')}<span>${esc(ui.unmeasured)}</span></div>
 </div></div></header>
 <nav class="toc"><div class="wrap">${toc.map(([id, label]) => `<a href="#${id}">${esc(label)}</a>`).join('')}
