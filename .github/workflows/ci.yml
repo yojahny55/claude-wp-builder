@@ -69,7 +69,7 @@ jobs:
         run: |
           set -uo pipefail
           pass=0; failed=(); skipped=()
-          # Three checks are owned by their own jobs, which give them the WordPress and
+          # The checks below are owned by their own jobs, which give them the WordPress and
           # the browser they need. Running them here too would execute them a second time per
           # CI run -- and worse, this job has neither, so each would take its skip path,
           # exit 0 and be counted as a pass. A runner that lost Chrome would then still
@@ -81,7 +81,7 @@ jobs:
           # branch, which this job does not fetch, so it lives in doc-sync below where the
           # base is already there -- here it would take its own skip path and pass while
           # checking nothing.
-          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh'
+          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/audit-resolve-links-integration.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh'
           for f in tests/checks/*.sh; do
             case " $skip_here " in *" $f "*) continue ;; esac
             if out=$(bash "$f" 2>&1); then
@@ -270,10 +270,10 @@ jobs:
       # WordPress fixture cannot exist without downloading a WordPress. Everything it
       # installs is pinned in the provisioner, and every assertion runs against the local
       # install -- nothing here asserts against a remote service.
-      # Two checks, each provisioning its own fixture. They run in one step because the
+      # Each check provisions its own fixture. They run in one step because the
       # runner's default shell is `bash -e` -- confirmed in the job log, `shell:
-      # /usr/bin/bash -e {0}` -- so a failing check aborts the step and the second never
-      # starts. No explicit guard is needed between them, and the note is here because the
+      # /usr/bin/bash -e {0}` -- so a failing check aborts the step and the later ones never
+      # start. No explicit guard is needed between them, and the note is here because the
       # absence of one reads like an oversight.
       - name: WordPress fixture checks
         env:
@@ -287,6 +287,9 @@ jobs:
           echo "::endgroup::"
           echo "::group::contact form delivery"
           bash tests/checks/wp-cf7-delivery.sh
+          echo "::endgroup::"
+          echo "::group::link target resolver"
+          bash tests/checks/audit-resolve-links-integration.sh
           echo "::endgroup::"
 
   browser:

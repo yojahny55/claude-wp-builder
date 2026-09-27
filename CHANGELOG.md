@@ -4,6 +4,24 @@
 
 ### Added
 
+- **Audit link sweeps have a load limit and a shipped tool.** The audits were told to
+  follow links and given no method, so an agent wrote its own crawler: 25 concurrent
+  `curl -L` workers over a store's term archives held MariaDB at ~18 cores and load 18 on a
+  shared dev machine. `skills/wp-audit-standards` now carries one rule for any link or page
+  sweep — at most 4 requests in flight, `HEAD` or a ranged GET, WP-CLI or the database
+  before HTTP, 20 term archives per taxonomy unless a full sweep is asked for — and
+  `bin/link-sweep.mjs` implements it: it clamps concurrency to 4, classifies links as
+  internal, clone-origin (never requested from a clone unless confirmed) or external,
+  reports a CDN bot challenge as `UNMEASURED` rather than broken, and stops at a wall-clock
+  budget. Internal targets are answered by the database first:
+  `skills/wp-cli-patterns/scripts/resolve-link-targets.php` resolves a link only when the
+  object is published and its canonical URL has the link's path, and tags what it passes
+  on with its taxonomy so the sweep samples per taxonomy rather than per path segment.
+  `/wp-audit`'s agent prompt carries the rule to all seven auditors.
+  `tests/checks/audit-link-sweep.sh` runs the sweep against a local fixture server and
+  measures the in-flight peak at the server; `tests/checks/audit-resolve-links-integration.sh`
+  runs the resolver in the WordPress fixture and requests every link it resolved, each of
+  which must answer 200.
 - **`/autofix` fixes what OpenCodeReview found.** A maintainer comments `/autofix` on a pull
   request and `.github/workflows/autofix.yml` hands the open, unresolved OCR threads to OpenCode
   (Alibaba token plan, `qwen3.8-max`, thinking off). It runs as six jobs split by what each one
@@ -130,6 +148,17 @@
   rather than rendered half in English. A run with no findings keeps the no-findings sentence
   and drops the filters, split and warning in the styled page too. The Markdown output is
   unchanged.
+- **`wp-audit-ux` runs on a budget.** On an 8-page store audit it ran 25 minutes while the
+  other six agents finished in 8–14: one new script and browser launch per question, a
+  sweep of 1801 links pulled from a mega-menu, and a serial retry loop against production
+  links behind a CDN bot challenge. The agent now has a *Budget and stop rule* read before
+  Step 1 — at most 3 browser launches, 2 attempts per criterion before `UNMEASURED` with the
+  selectors tried, 15 minutes of wall clock, and no command that outlives one Bash call — plus
+  one harness that opens each page once per viewport and runs every probe in that session.
+  `UX-014` is scoped: links classified, internal targets resolved through WP-CLI first,
+  deduplicated, at most 50 HTTP requests per page, the clone-origin host never requested
+  from a clone, and a CDN challenge `UNMEASURED` rather than broken. `bin/link-sweep.mjs`
+  gains `--per-page` for the cap. `tests/checks/audit-ux-budget.sh` pins the contract.
 - **A report-only `/wp-audit` always writes the `.md` + `.html` deliverable.** Choosing
   "Report only" (flag or the Step 1 question) without `--report` used to print to the
   console and nothing else: the report was gone at the next `/clear`, and the first

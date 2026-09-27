@@ -27,7 +27,8 @@ runtime for the plugin itself. The only executable code shipped is:
   CSS conversion), `image-gen.mjs` (the image generator and its cost/key handling),
   `composition-preview.mjs` (renders `skills/wp-demo-craft/compositions/` previews),
   `theme-template-check.mjs` (the ABSPATH, compiled-class and widget-script gate behind
-  `/wp-finalize` Check 4 and the practices audit).
+  `/wp-finalize` Check 4 and the practices audit), `link-sweep.mjs` (the audits' link
+  sweep, with the 4-in-flight cap, sampling, clone-origin and CDN-challenge rules built in).
   `bin/lib/` holds what they share.
 - `skills/wp-polylang/scripts/*.php` — run inside a real WordPress via `wp eval-file`
 - `starter-theme/**` — PHP copied into user projects (never executed here)
