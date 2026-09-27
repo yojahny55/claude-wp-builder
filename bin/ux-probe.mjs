@@ -210,7 +210,7 @@ function domProbes(collectLinks) {
       const overlapX = dx === 0, overlapY = dy === 0;
       if (!overlapX && !overlapY) continue;
       const gap = overlapY ? dx : dy;
-      if (gap < 8) actionGaps.push({ a: path(a), b: path(b), gapPx: Math.round(gap * 10) / 10 });
+      if (gap < 8 && actionGaps.length < 50) actionGaps.push({ a: path(a), b: path(b), gapPx: Math.round(gap * 10) / 10 });
     }
   }
 
@@ -358,7 +358,17 @@ async function main() {
             // The failed probe may still be driving the page; put it back on this URL so the
             // next probe does not measure wherever the runaway one left it.
             try { await page.goto(url, { waitUntil: 'load', timeout: o.pageTimeout * 1000 }); }
-            catch (e2) { entry.error = `page not restored after probe ${probe.id}: ${errMsg(e2)}`; break; }
+            catch (e2) {
+              entry.error = `page not restored after probe ${probe.id}: ${errMsg(e2)}`;
+              const idx = probes.indexOf(probe);
+              for (let k = idx + 1; k < probes.length; k++) {
+                const remaining = probes[k];
+                if (remaining.viewports && !remaining.viewports.includes(vp)) continue;
+                entry.site[remaining.id] = { verdict: 'unmeasured', criterion: remaining.criterion || null,
+                  reason: `page not restored after ${probe.id}` };
+              }
+              break;
+            }
           }
         }
         report.pages.push(entry);
