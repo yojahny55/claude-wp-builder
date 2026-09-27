@@ -102,13 +102,18 @@ grep -q 'earlier audit' "$tmp/err" || fail "a stale state file was replaced with
 node -e "if(JSON.parse(require('fs').readFileSync('$tmp/o6/r.json','utf8')).launch!==1)process.exit(1)" \
   || fail "a stale state file did not start a new budget"
 
-# The wall clock is checked during the run, not only at its start: a run admitted with a
-# moment of budget left marks the page views it has no time for as unmeasured.
-node -e "require('fs').writeFileSync('$tmp/late.json', JSON.stringify({started: Date.now() - 15*60*1000 + 200, launches: 0, probes: {}}))"
-node "$tool" --site "$site" --pages /,/second/ --out "$tmp/o7/r.json" --state "$tmp/late.json" 2>"$tmp/err" \
-  || fail "a run admitted just before the deadline failed"
-node -e "const r=JSON.parse(require('fs').readFileSync('$tmp/o7/r.json','utf8'));if(!r.pages.length||!r.pages.every(x=>x.verdict==='unmeasured'&&x.reason==='budget'))process.exit(1)" \
-  || fail "page views past the wall-clock deadline were measured instead of marked unmeasured (budget)"
+# The wall clock is checked during the run, not only at its start. The run is admitted with
+# five seconds left and a probe on the first page takes six, so the first page view is
+# measured and the second is past the deadline: marked unmeasured, and the run incomplete.
+cat >"$tmp/slow.mjs" <<'JS'
+export default [{ id: 'slow', viewports: ['desktop'],
+  run: async ({ path }) => { if (path === '/') await new Promise((r) => setTimeout(r, 6000)); return true; } }];
+JS
+node -e "require('fs').writeFileSync('$tmp/late.json', JSON.stringify({started: Date.now() - 15*60*1000 + 5000, launches: 0, probes: {}}))"
+node "$tool" --site "$site" --pages /,/second/ --viewports desktop --probes "$tmp/slow.mjs" \
+  --out "$tmp/o7/r.json" --state "$tmp/late.json" 2>"$tmp/err" || { cat "$tmp/err"; fail "a run admitted before the deadline failed"; }
+node -e "const r=JSON.parse(require('fs').readFileSync('$tmp/o7/r.json','utf8'));const a=r.pages.find(x=>x.path==='/'),b=r.pages.find(x=>x.path==='/second/');if(!a||a.verdict||!a.dom||!b||b.verdict!=='unmeasured'||b.reason!=='budget'||r.complete!==false){console.log(JSON.stringify(r.pages.map(x=>[x.path,x.verdict,x.reason])),r.complete);process.exit(1)}" \
+  || fail "a page view past the wall-clock deadline was measured, or the run still claims complete"
 
 # --state-reset clears a spent budget on purpose.
 node "$tool" --site "$site" --pages / --out "$tmp/out/r.json" --state-reset 2>"$tmp/err" || fail "--state-reset run failed"

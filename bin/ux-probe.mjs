@@ -338,7 +338,9 @@ async function main() {
     process.on(sig, () => { try { flush(); } finally { process.exit(sig === 'SIGTERM' ? 143 : 130); } });
   }
   // Only the budget clock checked here: a run that starts at minute 14 must stop at 15.
-  const pastDeadline = () => Date.now() > deadline;
+  // A page view or probe skipped for time makes the run incomplete even though the loop ends normally.
+  let budgetCut = false;
+  const pastDeadline = () => (Date.now() > deadline ? (budgetCut = true) : false);
   const samePage = (a, b) => a.split('#')[0] === b.split('#')[0];
   try {
     for (const vp of o.viewports) {
@@ -354,9 +356,13 @@ async function main() {
           continue;
         }
         const t0 = Date.now();
+        let landed = url;
         try {
           const res = await page.goto(url, { waitUntil: 'load', timeout: o.pageTimeout * 1000 });
           await page.waitForTimeout(500);
+          // Where the page settled after redirects (`/` -> `/es/`, http -> https): a probe is
+          // judged against this, or every probe on a redirecting URL would read as having left.
+          landed = page.url();
           entry.status = res ? res.status() : null;
           entry.loadMs = Date.now() - t0;
           try {
@@ -410,7 +416,7 @@ async function main() {
             entry.site[probe.id] = { criterion: probe.criterion || null, value };
             // A probe must leave the page on `url`; one that navigated away would have every
             // later probe measure the wrong page under this path, so it is recorded and undone.
-            if (!samePage(page.url(), url)) {
+            if (!samePage(page.url(), landed)) {
               entry.site[probe.id].leftPage = page.url();
               if (!(await restore(probe))) break;
             }
@@ -432,7 +438,7 @@ async function main() {
       }
       await context.close();
     }
-    report.complete = true;
+    report.complete = !budgetCut;
   } finally {
     // A crashed browser must not mask the error that crashed it, nor stop the report.
     try { await browser.close(); } catch { /* already gone */ }
