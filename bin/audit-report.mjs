@@ -765,16 +765,18 @@ function renderHtml(model) {
   const slug = (value) => String(value).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const c = model.counts;
 
-  const countRow = (label, list) => {
+  // `labelHtml` is markup, not text: it is inserted as is, so every caller escapes the run
+  // input it wraps (group names come from the audited site). groupTable's `nameHtml` feeds it.
+  const countRow = (labelHtml, list) => {
     const n = counts(list);
-    return `<tr><td>${label}</td><td>${score(n.CRITICAL, 'bad')}</td><td>${score(n.WARNING, 'mid')}</td><td>${score(
+    return `<tr><td>${labelHtml}</td><td>${score(n.CRITICAL, 'bad')}</td><td>${score(n.WARNING, 'mid')}</td><td>${score(
       n.INFO,
       'na',
     )}</td><td class="num">${n.total}</td></tr>`;
   };
-  const groupTable = (heading, id, groups, label, name) => {
+  const groupTable = (heading, id, groups, label, nameHtml) => {
     if (!groups.size) return '';
-    const rows = [...groups].map(([key, list]) => countRow(name(key), list)).join('');
+    const rows = [...groups].map(([key, list]) => countRow(nameHtml(key), list)).join('');
     // Totals of the rows printed, not of the run: groupBy skips findings without the key
     // (site-wide findings have no page), and a Total larger than its rows reads as a sum error.
     const listed = counts([...groups.values()].flat());

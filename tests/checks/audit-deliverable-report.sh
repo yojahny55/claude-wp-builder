@@ -349,6 +349,19 @@ if [ -e "$tmp/out2/informe-2026-09-16.md" ]; then
   fail "$r wrote a report it had already refused"
 fi
 
+# Group names are run input from the audited site, and the by-category and by-page tables
+# insert their label cells as markup: every one must arrive escaped.
+cat > "$tmp/markup.json" <<'JSON'
+{"site":"fixture","date":"2026-09-20","findings":[
+  {"check":"SEO-001","severity":"WARNING","ownership":"code","category":"<img src=x onerror=alert(1)>","page":"/<script>alert(2)</script>","message":"markup in names"}
+]}
+JSON
+node "$r" --run "$tmp/markup.json" --out "$tmp/out6" --format html >/dev/null 2>&1 || fail "$r failed on a run with markup in its names"
+if grep -Fq '<img src=x' "$tmp/out6/informe-2026-09-20.html" || grep -Fq '<script>alert' "$tmp/out6/informe-2026-09-20.html"; then
+  fail "$r inserted a category or page name as raw HTML"
+fi
+grep -Fq '&lt;img src=x' "$tmp/out6/informe-2026-09-20.html" || fail "$r dropped the escaped category name instead of printing it"
+
 # A truthy non-string check id passed validation, reached the plan comparator and threw on
 # .localeCompare -- turning invalid input (exit 1, names the finding) into a crash (exit 3,
 # names a line of the renderer).
