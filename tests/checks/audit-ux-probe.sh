@@ -70,6 +70,9 @@ j "$d if(P('desktop','/').dom.imageLinks.length!==1)process.exit(1)" || fail "UX
 j "$d const q=P('desktop','/').dom.required;const n=q.find(x=>x.name==='name'),e=q.find(x=>x.name==='email');if(!n||n.marked||!e||!e.marked)process.exit(1)" \
   || fail "UX-001 did not separate the marked and unmarked required fields"
 j "$d if(P('desktop','/').site['account-popup'].value.opened!==true)process.exit(1)" || fail "site probe did not run on the loaded page"
+j "$d const w=P('desktop','/').site['wanders'];if(!w||!/\/second\/$/.test(w.leftPage||''))process.exit(1)" \
+  || fail "a probe that navigated away was not recorded with leftPage"
+j "if(r.complete!==true)process.exit(1)" || fail "a finished run is not marked complete"
 j "$d if(P('mobile','/').site['account-popup']!==undefined)process.exit(1)" || fail "a desktop-only site probe ran on the mobile viewport"
 j "$d const s=P('desktop','/').site['guessed-selector'];if(s.verdict!=='error'||s.attemptsLeft!==1)process.exit(1)" \
   || fail "a failing site probe is not an error with one attempt left"
@@ -90,6 +93,22 @@ node -e "require('fs').writeFileSync('$tmp/old.json', JSON.stringify({started: D
 set +e; node "$tool" --site "$site" --pages / --out "$tmp/o2/r.json" --state "$tmp/old.json" 2>"$tmp/err"; code=$?; set -e
 [ "$code" = 3 ] && grep -q 'wall-clock budget spent' "$tmp/err" || fail "a run past 15 minutes did not exit 3"
 grep -Fq "$tmp/old.json" "$tmp/err" || fail "the budget message does not name the state file"
+
+# A state file over an hour old belongs to an earlier audit, even with its launches spent.
+node -e "require('fs').writeFileSync('$tmp/stale.json', JSON.stringify({started: Date.now() - 2*60*60*1000, launches: 3, probes: {}}))"
+node "$tool" --site "$site" --pages / --out "$tmp/o6/r.json" --state "$tmp/stale.json" 2>"$tmp/err" \
+  || fail "a state file from an earlier audit blocked a new one"
+grep -q 'earlier audit' "$tmp/err" || fail "a stale state file was replaced without saying so"
+node -e "if(JSON.parse(require('fs').readFileSync('$tmp/o6/r.json','utf8')).launch!==1)process.exit(1)" \
+  || fail "a stale state file did not start a new budget"
+
+# The wall clock is checked during the run, not only at its start: a run admitted with a
+# moment of budget left marks the page views it has no time for as unmeasured.
+node -e "require('fs').writeFileSync('$tmp/late.json', JSON.stringify({started: Date.now() - 15*60*1000 + 200, launches: 0, probes: {}}))"
+node "$tool" --site "$site" --pages /,/second/ --out "$tmp/o7/r.json" --state "$tmp/late.json" 2>"$tmp/err" \
+  || fail "a run admitted just before the deadline failed"
+node -e "const r=JSON.parse(require('fs').readFileSync('$tmp/o7/r.json','utf8'));if(!r.pages.length||!r.pages.every(x=>x.verdict==='unmeasured'&&x.reason==='budget'))process.exit(1)" \
+  || fail "page views past the wall-clock deadline were measured instead of marked unmeasured (budget)"
 
 # --state-reset clears a spent budget on purpose.
 node "$tool" --site "$site" --pages / --out "$tmp/out/r.json" --state-reset 2>"$tmp/err" || fail "--state-reset run failed"

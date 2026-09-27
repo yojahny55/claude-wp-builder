@@ -128,8 +128,12 @@ node ${CLAUDE_PLUGIN_ROOT}/bin/ux-probe.mjs --site "<site-url>" --pages "/,/cont
   harness; it is never a new one-off script with its own browser launch.
 - **Exit `3` means the budget is spent.** Report what the JSON already holds, and mark
   everything else `UNMEASURED (budget)`. Do not work around it with a browser of your own.
-- A new audit starts a new state file (the default lives beside `--out`). Never pass
-  `--state-reset` to get more launches inside one audit.
+- The state file lives beside `--out`. One started over an hour ago belongs to an earlier
+  audit, and the harness replaces it with a new budget. Never pass `--state-reset` to get
+  more launches inside one audit.
+- Read `complete` in the JSON. `false` means the run stopped early (timeout, crash, or the
+  wall clock ran out mid-run): what it holds is real, and the rest is `UNMEASURED`. A site
+  probe that navigated away carries `leftPage`, and the harness put the page back.
 
 Three criteria are measured rather than read, and reading them instead is the most common
 way this audit goes wrong:

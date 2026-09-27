@@ -19,7 +19,11 @@
  *       attempts   a site probe that has errored twice is not run again: it is reported
  *                  `unmeasured` with each error and the probe source it ran, which is the
  *                  "selectors tried" evidence the report needs.
- *     A new audit starts with a new state file; --state-reset clears one on purpose.
+ *     A state file started over an hour ago belongs to an earlier audit and is replaced
+ *     with a new budget; --state-reset clears one on purpose.
+ *   - The wall clock is checked before every page view and probe, not only at start, and
+ *     the report is written however the run ends (finished, thrown, SIGTERM/SIGINT), with
+ *     `complete: false` unless every page view was attempted.
  *
  * Built-in DOM probes, run on every page at every viewport (criterion codes are the
  * UX-NNN catalog in skills/wp-audit-ux-standards/SKILL.md):
@@ -59,6 +63,9 @@ const USAGE = 'usage: ux-probe.mjs --site <origin> --pages </a/,/b/> [--out <fil
 const MAX_LAUNCHES = 3;
 const MAX_ATTEMPTS = 2;
 const WALL_CLOCK_MS = 15 * 60 * 1000;
+// A state file older than this belongs to an earlier audit: the output directory is fixed per
+// project and nothing rotates it, so without this every audit after the first starts spent.
+const STALE_STATE_MS = 60 * 60 * 1000;
 const VIEWPORTS = {
   mobile: { width: 390, height: 844 },
   tablet: { width: 768, height: 1024 },
@@ -270,9 +277,15 @@ function withTimeout(p, ms, what) {
 
 async function main() {
   const o = parseArgs(process.argv.slice(2));
-  const state = readState(o);
+  let state = readState(o);
+  if (Date.now() - state.started > STALE_STATE_MS) {
+    process.stderr.write(`ux-probe: state ${o.state} started ${new Date(state.started).toISOString()}, `
+      + 'over an hour ago, so it belongs to an earlier audit; starting a new budget\n');
+    state = { started: Date.now(), launches: 0, probes: {} };
+  }
   const elapsed = Date.now() - state.started;
-  // Name the state file: one inherited from an earlier audit's --out dir is recognisable by its date.
+  const deadline = state.started + WALL_CLOCK_MS;
+  // Name the state file, so an exit 3 says which budget was spent.
   const from = `state ${o.state}, started ${new Date(state.started).toISOString()}`;
   if (state.launches >= MAX_LAUNCHES) {
     usage(`launch budget spent (${state.launches}/${MAX_LAUNCHES}; ${from}); report what you have, the rest is UNMEASURED (budget)`, 3);
@@ -302,8 +315,31 @@ async function main() {
   state.launches += 1;
   writeState(o, state);
   const report = { site: o.site, launch: state.launches, maxLaunches: MAX_LAUNCHES,
-    minutesUsed: Math.round(elapsed / 6000) / 10, pages: [], probes: {} };
+    minutesUsed: Math.round(elapsed / 6000) / 10, complete: false, pages: [], probes: {} };
   const linkRows = [];
+  // The report is written however the run ends -- finished, thrown, or killed by a timeout --
+  // so evidence already measured is never lost and an older probe.json never reads as this run.
+  let flushed = false;
+  const flush = () => {
+    if (flushed) return;
+    flushed = true;
+    writeState(o, state);
+    for (const [id, rec] of Object.entries(state.probes)) report.probes[id] = { errors: rec.errors.length, exhausted: rec.errors.length >= MAX_ATTEMPTS };
+    if (o.probes) report.probesFile = o.probes;
+    mkdirSync(dirname(resolve(o.out)), { recursive: true });
+    writeFileSync(o.out, JSON.stringify(report, null, 2) + '\n');
+    // An empty collection (a run scoped to mobile/tablet) must not truncate an earlier run's evidence.
+    if (o.linksOut && linkRows.length) {
+      mkdirSync(dirname(resolve(o.linksOut)), { recursive: true });
+      writeFileSync(o.linksOut, [...new Set(linkRows)].join('\n') + '\n');
+    }
+  };
+  for (const sig of ['SIGTERM', 'SIGINT']) {
+    process.on(sig, () => { try { flush(); } finally { process.exit(sig === 'SIGTERM' ? 143 : 130); } });
+  }
+  // Only the budget clock checked here: a run that starts at minute 14 must stop at 15.
+  const pastDeadline = () => Date.now() > deadline;
+  const samePage = (a, b) => a.split('#')[0] === b.split('#')[0];
   try {
     for (const vp of o.viewports) {
       const context = await browser.newContext({ viewport: VIEWPORTS[vp] });
@@ -311,6 +347,12 @@ async function main() {
       for (const p of o.pages) {
         const url = new URL(p, o.siteUrl).href;
         const entry = { path: p, viewport: vp };
+        if (pastDeadline()) {
+          entry.verdict = 'unmeasured';
+          entry.reason = 'budget';
+          report.pages.push(entry);
+          continue;
+        }
         const t0 = Date.now();
         try {
           const res = await page.goto(url, { waitUntil: 'load', timeout: o.pageTimeout * 1000 });
@@ -334,8 +376,28 @@ async function main() {
           continue;
         }
         entry.site = {};
+        // Put the page back on this URL. On failure every probe after `probe` on this page
+        // view is recorded unmeasured, and the caller stops the probe loop.
+        const restore = async (probe) => {
+          try { await page.goto(url, { waitUntil: 'load', timeout: o.pageTimeout * 1000 }); return true; }
+          catch (e2) {
+            entry.error = `page not restored after probe ${probe.id}: ${errMsg(e2)}`;
+            const idx = probes.indexOf(probe);
+            for (let k = idx + 1; k < probes.length; k++) {
+              const remaining = probes[k];
+              if (remaining.viewports && !remaining.viewports.includes(vp)) continue;
+              entry.site[remaining.id] = { verdict: 'unmeasured', criterion: remaining.criterion || null,
+                reason: `page not restored after ${probe.id}` };
+            }
+            return false;
+          }
+        };
         for (const probe of probes) {
           if (probe.viewports && !probe.viewports.includes(vp)) continue;
+          if (pastDeadline()) {
+            entry.site[probe.id] = { verdict: 'unmeasured', criterion: probe.criterion || null, reason: 'budget' };
+            continue;
+          }
           const rec = state.probes[probe.id] || { errors: [] };
           if (rec.errors.length >= MAX_ATTEMPTS) {
             entry.site[probe.id] = { verdict: 'unmeasured', criterion: probe.criterion || null,
@@ -346,6 +408,12 @@ async function main() {
             const value = await withTimeout(probe.run({ page, url, path: p, viewport: vp }),
               o.probeTimeout * 1000, `probe ${probe.id}`);
             entry.site[probe.id] = { criterion: probe.criterion || null, value };
+            // A probe must leave the page on `url`; one that navigated away would have every
+            // later probe measure the wrong page under this path, so it is recorded and undone.
+            if (!samePage(page.url(), url)) {
+              entry.site[probe.id].leftPage = page.url();
+              if (!(await restore(probe))) break;
+            }
           } catch (e) {
             const err = { run: state.launches, page: p, viewport: vp, error: errMsg(e),
               source: String(probe.run).slice(0, 300) };
@@ -357,36 +425,18 @@ async function main() {
               attemptsLeft: Math.max(0, MAX_ATTEMPTS - rec.errors.length) };
             // The failed probe may still be driving the page; put it back on this URL so the
             // next probe does not measure wherever the runaway one left it.
-            try { await page.goto(url, { waitUntil: 'load', timeout: o.pageTimeout * 1000 }); }
-            catch (e2) {
-              entry.error = `page not restored after probe ${probe.id}: ${errMsg(e2)}`;
-              const idx = probes.indexOf(probe);
-              for (let k = idx + 1; k < probes.length; k++) {
-                const remaining = probes[k];
-                if (remaining.viewports && !remaining.viewports.includes(vp)) continue;
-                entry.site[remaining.id] = { verdict: 'unmeasured', criterion: remaining.criterion || null,
-                  reason: `page not restored after ${probe.id}` };
-              }
-              break;
-            }
+            if (!(await restore(probe))) break;
           }
         }
         report.pages.push(entry);
       }
       await context.close();
     }
+    report.complete = true;
   } finally {
-    await browser.close();
-    writeState(o, state);
-  }
-  for (const [id, rec] of Object.entries(state.probes)) report.probes[id] = { errors: rec.errors.length, exhausted: rec.errors.length >= MAX_ATTEMPTS };
-  if (o.probes) report.probesFile = o.probes;
-  mkdirSync(dirname(resolve(o.out)), { recursive: true });
-  writeFileSync(o.out, JSON.stringify(report, null, 2) + '\n');
-  // An empty collection (a run scoped to mobile/tablet) must not truncate an earlier run's evidence.
-  if (o.linksOut && linkRows.length) {
-    mkdirSync(dirname(resolve(o.linksOut)), { recursive: true });
-    writeFileSync(o.linksOut, [...new Set(linkRows)].join('\n') + '\n');
+    // A crashed browser must not mask the error that crashed it, nor stop the report.
+    try { await browser.close(); } catch { /* already gone */ }
+    flush();
   }
   process.stderr.write(`ux-probe: launch ${state.launches}/${MAX_LAUNCHES}, ${report.pages.length} page views, report ${o.out}\n`);
 }
