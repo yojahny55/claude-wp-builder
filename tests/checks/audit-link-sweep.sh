@@ -93,6 +93,34 @@ const ok=d.results.filter(r=>r.verdict==='ok').length;
 if(ok!==6){console.log(ok);process.exit(1)}" <<<"$outg" \
   || fail "--per-group 3 over two groups did not request 3 of each"
 
+# --per-page: a link on two pages is charged once, and what is over every page's quota is
+# unmeasured. Page A carries 3 links, page B carries 3 (one shared); cap 2 per page. Page B
+# is written relative once, and still shares one quota with its absolute spelling. Links
+# found on one page are charged first, so the shared link is the one left over.
+{ printf '%s\t%s\n' /load/p3/ "$site/a/" /load/p1/ "$site/a/" /load/p2/ "$site/a/" \
+    /load/p3/ "$site/b/" /load/p4/ /b/ /load/p5/ "$site/b/"; } >"$tmp/pp"
+outp=$(node "$tool" --site "$site" --urls "$tmp/pp" --per-page 2 --budget 30)
+node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));
+const req=d.results.filter(r=>r.verdict==='ok').length, cap=d.results.filter(r=>/per-page/.test(r.reason||''));
+if(req!==4||cap.length!==1||!cap[0].url.endsWith('/load/p3/')||!cap[0].reason.includes('/b/')){console.log(req,JSON.stringify(cap));process.exit(1)}" <<<"$outp" \
+  || fail "--per-page 2 over two pages did not request the 4 single-page links and cap the shared one, naming its pages"
+# Links with no page column share one quota instead of escaping the cap.
+outn=$(printf '/load/n1/\n/load/n2/\n/load/n3/\n' | node "$tool" --site "$site" --per-page 2 --budget 30)
+node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));
+const req=d.results.filter(r=>r.verdict==='ok').length, cap=d.results.filter(r=>/per-page .*\(no page\)/.test(r.reason||'')).length;
+if(req!==2||cap!==1){console.log(req,cap);process.exit(1)}" <<<"$outn" \
+  || fail "--per-page did not cap links that carry no page column"
+
+# A link refused by --per-page does not use up a --per-group slot: group g has 3 links, the
+# first on a page whose quota is already spent, and all of the other two are still measured.
+{ printf '%s\t%s\n' /load/z1/ "$site/full/"; printf '%s\t%s\ttax:g\n' /load/z2/ "$site/full/" \
+    /load/z3/ "$site/c/" /load/z4/ "$site/d/"; } >"$tmp/pg"
+outpg=$(node "$tool" --site "$site" --urls "$tmp/pg" --per-page 1 --per-group 2 --budget 30)
+node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));
+const ok=d.results.filter(r=>r.verdict==='ok').map(r=>r.url.replace(/.*\/load\//,'')).sort().join();
+if(ok!=='z1/,z3/,z4/'){console.log(ok);process.exit(1)}" <<<"$outpg" \
+  || fail "a link refused by --per-page consumed a --per-group slot"
+
 # Budget: a zero budget measures nothing and says why, instead of hanging.
 out0=$(printf '/ok/\n' | node "$tool" --site "$site" --budget 0)
 grep -q 'budget exhausted' <<<"$out0" || fail "--budget 0 did not report budget exhaustion"

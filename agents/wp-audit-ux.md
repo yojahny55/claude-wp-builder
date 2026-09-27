@@ -60,6 +60,25 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
   defect in markup the builder stores per page is `Owner: content` (fixed in the builder's
   editor), not `code`.
 
+## Budget and stop rule
+
+This audit runs beside six others, and they finish in 8–14 minutes. Without a budget a
+criterion is never given up: each failed selector becomes one more script, never an
+`UNMEASURED`. One run went 25 minutes this way — 16 browser launches, a full crawl of the
+local site, a serial crawl of production — and never stopped to report. So:
+
+- **At most 3 browser launches per run.** One launch per viewport pass (mobile, desktop)
+  plus one for interactions. A launch opens several pages; it is not one per question.
+- **At most 2 attempts per criterion** to find or drive the element it needs. After the
+  second, the criterion is `UNMEASURED`, and the evidence names each selector tried and why
+  it failed. A third guess at a theme's class names is not measurement.
+- **15 minutes of wall clock**, then stop and report what you have. Whatever is left is
+  `UNMEASURED` with the reason `budget`, and the report goes out.
+- **No command outlives one Bash call.** Bound every sweep (`timeout <s>`, the helper's
+  `--budget`). One that can exceed about 2 minutes runs with `run_in_background` while you
+  measure something else. Never a `while read` loop over URLs that passes the Bash timeout
+  and is then waited on.
+
 ## Step 1: Decide what applies, before measuring anything
 
 Walk the site's shape first and write down which criteria are N/A and why: no form, no
@@ -79,22 +98,55 @@ visible.
 For every page in scope, walk the page-level criteria. For the site-level ones, walk them
 once across the pages you measured and name the pages they differ between.
 
+**One harness, many probes.** Write one script that opens each page once per viewport,
+keeps the `page`, runs every DOM probe and every interaction probe in that session, and
+writes JSON. A follow-up question extends that script and reruns it; it is never a new
+one-off script with its own browser launch. On a page-builder page each fresh load costs
+20–60 s, so one-question-one-script spends the budget on loading. Wait for `load` plus a
+short settle, not `networkidle`: a page with 170 requests and a polling widget may never
+go idle.
+
 Three criteria are measured rather than read, and reading them instead is the most common
 way this audit goes wrong:
 
-**`UX-014` and `UX-015` — follow the links.** Collect every `href`, then request it and
-record the status code. A list of links is not a finding; a `404` with the page it was
-found on is. Use the site's own host, and follow *Link and page sweeps against a site* in
-`skills/wp-audit-standards/SKILL.md` — at most 4 requests in flight, the database before
-HTTP. Resolve internal targets with `resolve-link-targets.php`, then sweep the rest with
-`bin/link-sweep.mjs`, not a crawler of your own:
+**`UX-014` and `UX-015` — follow the links.** Collect the `href`s of the pages in scope,
+then request them and record the status code. A list of links is not a finding; a `404`
+with the page it was found on is. Use the site's own host, and follow
+*Link and page sweeps against a site* in `skills/wp-audit-standards/SKILL.md` — at most 4
+requests in flight. On a store with a mega-menu, "every href on 8 pages" is the whole
+catalogue, so the sweep is scoped:
+
+1. **Classify each `href`.** Internal (the site's host), clone-origin (the
+   `wordpress.url_origin` host, when `/wp-audit` Step 2.3 set `local_clone`), or external.
+2. **Resolve internal targets through WP-CLI first.** `resolve-link-targets.php` answers a
+   published post, page, term or post type archive from the database, without a render,
+   and tags the rest with their taxonomy for sampling. Only what it cannot answer goes to
+   HTTP. What it resolved is resolved, not unmeasured.
+3. **Deduplicate.** A header or mega-menu link carried by all 8 pages is one request; the
+   helper collapses it and lists every page it appears on.
+4. **Cap the HTTP sample at 50 per page** (`--per-page 50`). What is over the cap is
+   `UNMEASURED` with the count, never a pass.
+5. **Never request the clone-origin host** unless the operator confirmed it this run
+   (Step 2.3). A clone's content often carries production URLs typed into it; they are
+   `UNMEASURED (clone-origin)`, and their count goes in the evidence. On production they
+   are same-host links, so they are not a defect of the site (the clone rule: *would this
+   also be true on production?*).
+6. **A CDN bot challenge is not a broken link.** `403` with `cf-mitigated: challenge`, or a
+   `challenge-platform` body, is `UNMEASURED — blocked by CDN bot challenge`. Never retry it
+   with another User-Agent, and never loop over it.
+
+The resolver does 2; `bin/link-sweep.mjs` does 3 to 6. Do not write a crawler of your own:
 
 ```bash
 # links.txt: one href per line, TAB, the page it was found on
 $WP eval-file ${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/scripts/resolve-link-targets.php \
   links.txt resolved.json > http.txt
-node ${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs --site "<site-url>" --urls http.txt > sweep.json
+node ${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs --site "<site-url>" --urls http.txt \
+  --clone-origin "<url_origin host>" --per-page 50 --budget 120 > sweep.json
 ```
+
+Add `--follow-clone-origin` **only** when the operator confirmed the production host this
+run (Step 2.3). Without it, clone-origin links come back `unmeasured`, which is correct.
 
 **The two are counted differently, and that is not a detail.** `UX-014` is page-level:
 report one finding per page, `UX-014 : page:/contact/`, whose evidence lists every broken
@@ -106,7 +158,8 @@ A row per link turns one bad footer into forty findings that are one fix. And `/
 Step 7 merges on `check` + `resource`, so a resource written at the wrong granularity
 matches nothing the suite emits and both copies survive into the report.
 
-When you cannot follow them all, report `UNMEASURED` with the remaining list. Never infer a
+When you cannot follow them all, report `UNMEASURED` with the remaining count and why
+(sampled, budget, clone-origin, challenged). Never infer a
 link is fine because the target exists in the template hierarchy — a `href="#"` left in a
 menu resolves to the same page and is exactly what this catches.
 
