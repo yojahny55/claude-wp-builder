@@ -27,10 +27,10 @@ set -euo pipefail
 # change what a check here reports. The database is pinned to a MINOR line for the same
 # reason -- `mariadb:11` is a mutable tag, and a minor bump can move collation defaults
 # and optimizer behaviour under a suite whose whole purpose is to be reproducible.
-PINNED_WP="6.8.2"
-PINNED_POLYLANG="3.6.6"
-PINNED_SCF="6.5.0"
-PINNED_CF7="6.0.6"
+PINNED_WP="7.1.2"
+PINNED_POLYLANG="3.8.9"
+PINNED_SCF="6.9.5"
+PINNED_CF7="6.1.7"
 
 DB_HOST="${WP_FIXTURE_DB_HOST:-127.0.0.1:3307}"
 DB_USER="${WP_FIXTURE_DB_USER:-root}"
@@ -145,6 +145,15 @@ $WP plugin install secure-custom-fields --version="$PINNED_SCF" --activate --qui
 # is worth while three checks share one provisioner.
 $WP plugin install contact-form-7 --version="$PINNED_CF7" --activate --quiet \
   || die "contact-form-7 install failed"
+
+# Offline from here on. Everything above needed the network to download WordPress and its
+# plugins; nothing after this line may. The guard is a must-use plugin, so no plugin
+# reactivation or option write can turn it off, and it logs every host it refuses to
+# wp-content/net-guard.log -- which is how a check learns what tried to call out.
+here=$(cd "$(dirname "$0")" && pwd)
+mkdir -p "$DIR/wp-content/mu-plugins"
+cp "$here/net-guard.php" "$DIR/wp-content/mu-plugins/00-net-guard.php" \
+  || die "could not install the network guard"
 
 # Handing ownership to the caller: from here a failure must not delete the fixture.
 PARTIAL_DIR=""
