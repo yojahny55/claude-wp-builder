@@ -4,6 +4,21 @@
 
 ### Added
 
+- **`bin/ux-probe.mjs`, the usability audit's page harness.** `wp-audit-ux` used to write a
+  new script and launch a new Chromium for every question — 16 launches on one 8-page audit —
+  and a guessed selector always led to one more script. The harness opens every page once
+  per viewport in one launch (`load` plus a settle, never `networkidle`), runs built-in DOM
+  probes (`UX-006` line length, `UX-009` action gaps, `UX-018` link styling, `UX-019` image
+  link names, `UX-001` required markers, and every `href` for the link sweep) and the site's
+  own interaction probes from a `--probes` module on the page already loaded. Its state file
+  makes the agent's budget a fact: a fourth launch or a run past 15 minutes exits `3`, and a
+  site probe that failed in two runs is not run again but reported `unmeasured` with both
+  errors. The 15 minutes are checked before every page view and probe, not only at start;
+  the report is written however the run ends and says `complete: false` when it stopped
+  early; a state file over an hour old belongs to an earlier audit and starts a new budget;
+  and a probe that navigates away is recorded with `leftPage` and the page put back.
+  `tests/checks/audit-ux-probe.sh` drives it in a real Chromium against a static
+  fixture, and runs in CI's browser job.
 - **Audit link sweeps have a load limit and a shipped tool.** The audits were told to
   follow links and given no method, so an agent wrote its own crawler: 25 concurrent
   `curl -L` workers over a store's term archives held MariaDB at ~18 cores and load 18 on a

@@ -26,7 +26,7 @@ b=$(line_of '^## Budget and stop rule'); s1=$(line_of '^## Step 1:')
 [ -n "$b" ] && [ -n "$s1" ] || fail "budget section or Step 1 heading not found"
 [ "$b" -lt "$s1" ] || fail "budget section comes after Step 1"
 
-grep -Fq '**One harness, many probes.**' "$a" || fail "one-harness rule missing"
+grep -Fq '**One harness, many probes: `bin/ux-probe.mjs`.**' "$a" || fail "one-harness rule missing"
 grep -Fq 'one-off script with its own browser launch' "$a" || fail "one-off scripts not forbidden"
 grep -Fq 'not `networkidle`' "$a" || fail "networkidle wait not discouraged"
 
