@@ -141,6 +141,14 @@
 
 ### Changed
 
+- **The README describes the plugin that exists.** Its starter-theme section still described
+  a single plain-CSS starter; it now covers `__tailwind__` (default, with `basic` as an alias),
+  `__cinematic__`, the `_i18n-variants/` seam and the security and performance includes. The
+  `bin/` section listed one script out of 20 and is now a table of all of them. Tech Stack no
+  longer claims a plain-CSS path, the CSS conventions state the Tailwind rule first, the audit
+  section covers the findings ledger, the link-sweep and usability budgets and the WooCommerce
+  checks, the roadmap marks multi-page demos and CPTs as shipped, and a short Testing section
+  points at `tests/checks/`, CI and `/autofix`.
 - **The HTML deliverable read like a raw table dump.** `bin/audit-report.mjs` rendered one
   long unstyled page: plain counts, a flat plan table and no way to narrow 100+ findings to
   the ones that matter. The HTML now follows the layout of a mature audit report:
