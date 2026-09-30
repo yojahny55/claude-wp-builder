@@ -479,7 +479,7 @@ Both carry:
 
 The Tailwind starter adds:
 
-- **Settings page** — Tabs: General, Header, Footer, Contact, Address, Social, Legal, Designer, Spanish Translations
+- **Settings page** — Tabs: General, Header, Footer, Contact, Address, Social, Legal, Designer, plus Spanish Translations when `es` is a configured language
 - **Templates** — `404`, `archive`, `search`, `single`, `page`, plus a nav walker, template tags and CF7 helpers
 - **JS** — `motion.js`, accordion, tabs and directory filter, bundled from `assets/js/src/`
 
@@ -506,7 +506,7 @@ Commands run these and read the exit code. Several are gates, not helpers.
 | `ux-probe.mjs` | The usability audit's page harness — one browser launch per run, built-in DOM probes, a 3-launch / 15-minute budget enforced in code |
 | `geo-scan.sh` | Live is-agentic report for `--geo` |
 | `wp-cinematic-encode.sh` | ffmpeg wrapper behind `/wp-cinematic-encode` |
-| `doc-sync-check.sh` | Fails when a command, skill or agent has no row in this README or `docs/commands.md` |
+| `doc-sync-check.sh` | Fails when a command lacks a row here or in `docs/commands.md`, when a skill or agent lacks a row here, or when `commands/`, `agents/`, `skills/`, `starter-theme/` or `bin/` changed without a CHANGELOG entry |
 | `design-md-index.sh` · `domains-import.sh` | Rebuild vendored reference indexes |
 
 `bin/lib/` holds what they share.

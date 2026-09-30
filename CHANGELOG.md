@@ -144,7 +144,7 @@
 - **The README describes the plugin that exists.** Its starter-theme section still described
   a single plain-CSS starter; it now covers `__tailwind__` (default, with `basic` as an alias),
   `__cinematic__`, the `_i18n-variants/` seam and the security and performance includes. The
-  `bin/` section listed one script out of 21 and is now a table of all of them. Tech Stack no
+  `bin/` section listed one script out of 20 and is now a table of all of them. Tech Stack no
   longer claims a plain-CSS path, the CSS conventions state the Tailwind rule first, the audit
   section covers the findings ledger, the link-sweep and usability budgets and the WooCommerce
   checks, the roadmap marks multi-page demos and CPTs as shipped, and a short Testing section
