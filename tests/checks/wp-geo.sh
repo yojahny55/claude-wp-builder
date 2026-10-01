@@ -63,6 +63,33 @@ grep -q 'gtimeout' bin/geo-scan.sh || fail "bin/geo-scan.sh must fall back to gt
 # Security: the scanner must not download and execute npm packages unattended.
 ! grep -q 'npx' bin/geo-scan.sh || fail "bin/geo-scan.sh must not run npx (supply-chain risk)"
 grep -q 'is-agentic.com/api/v1/report' bin/geo-scan.sh || fail "bin/geo-scan.sh must call the public report API"
+# --start triggers a missing scan through the same HTTP endpoint the npm CLI uses, not the package.
+grep -q 'is-agentic.com/api/scan/stream' bin/geo-scan.sh || fail "bin/geo-scan.sh --start must start a scan through /api/scan/stream"
+# An SSE stream never closes on its own: the scan needs a limit that does not depend on a `timeout` binary.
+grep -q -- '--max-time' bin/geo-scan.sh || fail "bin/geo-scan.sh --start must cap the scan stream with curl --max-time"
+out=$(bash bin/geo-scan.sh example.com --bogus 2>&1) && status=0 || status=$?
+[ "$status" -eq 1 ] || fail "bin/geo-scan.sh must reject an unknown flag with exit 1 (got $status)"
+printf '%s\n' "$out" | grep -q 'usage:' || fail "bin/geo-scan.sh must print usage for an unknown flag"
+# --start against a fake curl: the report API answers 404, the scan stream answers $STREAM.
+geo_tmp=$(mktemp -d); trap 'rm -rf "$geo_tmp"' EXIT
+cat > "$geo_tmp/curl" <<'SHIM'
+#!/usr/bin/env bash
+case "$*" in
+  *scan/stream*) while [ $# -gt 0 ]; do [ "$1" = -o ] && o=$2; shift; done; printf '%b' "$STREAM" > "$o" ;;
+  *) printf 404 ;;
+esac
+SHIM
+chmod +x "$geo_tmp/curl"
+geo_start() { STREAM="$1" PATH="$geo_tmp:$PATH" bash bin/geo-scan.sh example.com --start 2>/dev/null; }
+out=$(geo_start ': {"type": "scan_complete"}\ndata: {"type": "progress"}\n') && status=0 || status=$?
+[ "$status" -eq 2 ] && printf '%s' "$out" | grep -q 'did not complete' \
+  || fail "geo-scan.sh --start must not read a completion event outside an SSE data: line"
+out=$(geo_start 'data: {"type": "error", "message": "target unreachable"}\n') && status=0 || status=$?
+[ "$status" -eq 2 ] && printf '%s' "$out" | grep -q 'target unreachable' \
+  || fail "geo-scan.sh --start must report the server's error event when the scan fails"
+out=$(geo_start 'event: x\ndata: {"type": "scan_complete"}\n') && status=0 || status=$?
+[ "$status" -eq 2 ] && printf '%s' "$out" | grep -q 'report is not available yet' \
+  || fail "geo-scan.sh --start must say the report is not ready after a completed scan"
 
 # Fixer: the RFC 8288 Link header belongs on send_headers — wp_headers filters request headers.
 grep -q 'send_headers' "$fixer" || fail "$fixer must emit the Link header on send_headers"

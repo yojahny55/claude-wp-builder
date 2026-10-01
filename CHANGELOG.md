@@ -4,6 +4,17 @@
 
 ### Added
 
+- **`bin/geo-scan.sh --start` scans a site that has no is-agentic report yet.** The script
+  only read existing reports, so the first audit of a site always ended `UNMEASURED` with
+  "scan it once at is-agentic.com", and somebody had to run `npx is-agentic` by hand before
+  the score existed. `--start` makes the call that CLI makes — `GET /api/scan/stream`, a
+  server-sent-event stream — with curl, waits up to 85 s for `scan_complete` or
+  `scan_archived`, and reads the report. No npm package is run, so the supply-chain reason
+  the script stopped using `npx` still holds. `/wp-audit` passes it for a host the operator
+  confirmed as public this run. `/wp-yolo` does not: a scan makes a third party fetch the
+  host, and an unattended run has nobody to confirm it should. A scan that does not
+  complete stays exit `2`.
+
 - **`bin/ux-probe.mjs`, the usability audit's page harness.** `wp-audit-ux` used to write a
   new script and launch a new Chromium for every question — 16 launches on one 8-page audit —
   and a guessed selector always led to one more script. The harness opens every page once
