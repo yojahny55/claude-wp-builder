@@ -1359,7 +1359,7 @@ ${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host> --start
 
 `--start` makes a host with no report yet get one: the script asks is-agentic to scan it
 (the same HTTP call `npx is-agentic` makes, through curl, no package run) and reads the
-report when the scan finishes. The scan is capped at 100 s, so run the command with a Bash
+report when the scan finishes. The three calls are capped at 115 s together, so run the command with a Bash
 timeout of at least 150000 ms. Pass it only for a host this run
 confirmed as public — the scan makes a third party fetch that site.
 

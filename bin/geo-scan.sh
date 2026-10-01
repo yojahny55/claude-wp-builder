@@ -86,8 +86,9 @@ trap 'rm -f "$body" "$stream" "$scan_err"' EXIT
 
 # `--get --data-urlencode` builds ?url=<encoded> without a hand-rolled encoder. `-w` gives
 # the status even when the body is an error document; `|| true` keeps `set -e` out of it.
+# $1 is curl's --max-time: the --start path splits one time budget across its three calls.
 fetch_report() {
-  $TIMEOUT curl -sS -o "$body" -w '%{http_code}' \
+  $TIMEOUT curl -sS --max-time "${1:-60}" -o "$body" -w '%{http_code}' \
     --get --data-urlencode "url=https://$host" \
     https://is-agentic.com/api/v1/report 2>/dev/null || true
 }
@@ -95,11 +96,11 @@ fetch_report() {
 # Start a scan and wait for it. The stream ends with a `scan_complete` or `scan_archived`
 # event when the report exists, or an `error` event when it does not. An SSE stream stays
 # open on its own, so the limit is curl's `--max-time`, which needs no `timeout` binary and
-# always applies. It stays under the 120 s a caller's tool call gets by default, so a slow
-# scan ends here as exit 2 and not as a killed process with no message. curl's stderr is
-# kept so a failed scan can say why (DNS, TLS, refused) instead of only "did not complete".
+# always applies. With the 10 s report check before it and the 15 s fetch after it, --start
+# stays under the 120 s a caller's tool call gets by default, so a slow scan ends here as
+# exit 2 and not as a killed process with no message. curl's stderr is kept so a failed scan can say why (DNS, TLS, refused) instead of only "did not complete".
 start_scan() {
-  curl -sS -N --max-time 100 -o "$stream" \
+  curl -sS -N --connect-timeout 15 --max-time 90 -o "$stream" \
     -H 'Accept: text/event-stream' -H 'Cache-Control: no-store' \
     --get --data-urlencode "target=https://$host" \
     https://is-agentic.com/api/scan/stream 2>"$scan_err" || true
@@ -107,12 +108,12 @@ start_scan() {
   grep -Eq '^data:.*"type" *: *"(scan_complete|scan_archived)"' "$stream"
 }
 
-http=$(fetch_report)
+if [ "$start" -eq 1 ]; then http=$(fetch_report 10); else http=$(fetch_report); fi
 
 if [ "$http" = "404" ] && [ "$start" -eq 1 ]; then
-  echo "no report for $host yet — starting a scan at is-agentic.com (up to 100 s)" >&2
+  echo "no report for $host yet — starting a scan at is-agentic.com (up to 90 s)" >&2
   if start_scan; then
-    http=$(fetch_report)
+    http=$(fetch_report 15)
   else
     reason=$(tail -n 1 "$scan_err")
     echo "SKIP: the is-agentic scan for $host did not complete${reason:+ ($reason)} — retry, or scan once at https://is-agentic.com"
