@@ -104,7 +104,10 @@ start_scan() {
     -H 'Accept: text/event-stream' -H 'Cache-Control: no-store' \
     --get --data-urlencode "target=https://$host" \
     https://is-agentic.com/api/scan/stream 2>"$scan_err" || true
-  # Match the event only in an SSE `data:` line, not in a comment or another field.
+  # Match the event only in an SSE `data:` line, not in a comment or another field. The
+  # contract, as the is-agentic CLI reads it: each event is one `data: {"type": "<name>", ...}`
+  # line, and a finished scan sends `scan_complete` or `scan_archived`. If that format
+  # changes, this match fails closed: the scan reads as not completed, exit 2, never a pass.
   grep -Eq '^data:.*"type" *: *"(scan_complete|scan_archived)"' "$stream"
 }
 
@@ -136,7 +139,11 @@ case "$http" in
     exit 2
     ;;
   404)
-    echo "SKIP: no completed report for $host — re-run with --start, or scan it once at https://is-agentic.com"
+    if [ "$start" -eq 1 ]; then
+      echo "SKIP: the scan of $host completed but its report is not available yet — retry in a minute, or check https://is-agentic.com"
+    else
+      echo "SKIP: no completed report for $host — re-run with --start, or scan it once at https://is-agentic.com"
+    fi
     exit 2
     ;;
   429|503)

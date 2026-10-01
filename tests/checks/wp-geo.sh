@@ -69,6 +69,7 @@ grep -q 'is-agentic.com/api/scan/stream' bin/geo-scan.sh || fail "bin/geo-scan.s
 grep -q -- '--max-time' bin/geo-scan.sh || fail "bin/geo-scan.sh --start must cap the scan stream with curl --max-time"
 out=$(bash bin/geo-scan.sh example.com --bogus 2>&1) && status=0 || status=$?
 [ "$status" -eq 1 ] || fail "bin/geo-scan.sh must reject an unknown flag with exit 1 (got $status)"
+printf '%s\n' "$out" | grep -q 'usage:' || fail "bin/geo-scan.sh must print usage for an unknown flag"
 
 # Fixer: the RFC 8288 Link header belongs on send_headers — wp_headers filters request headers.
 grep -q 'send_headers' "$fixer" || fail "$fixer must emit the Link header on send_headers"
