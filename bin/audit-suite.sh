@@ -65,7 +65,7 @@ case "$only" in a11y|seo|perf|all) : ;; *) echo "--only must be a11y, seo, perf 
 url_host="${url#*://}"; url_host="${url_host%%/*}"; url_host="${url_host##*@}"
 pw_args=()
 case "$url_host" in
-  localhost|localhost:*|*.localhost|*.localhost:*|*.local|*.local:*|*.local.com|*.local.com:*|*.test|*.test:*|127.*|10.*|192.168.*|\[::1\]*|0.0.0.0*|172.1[6-9].*|172.2[0-9].*|172.3[01].*) : ;;
+  localhost|localhost:*|*.localhost|*.localhost:*|*.local|*.local:*|*.local.com|*.local.com:*|*.test|*.test:*|127.*|10.*|192.168.*|\[::1\]*|0.0.0.0|0.0.0.0:*|172.1[6-9].*|172.2[0-9].*|172.3[01].*) : ;;
   *) pw_args=(--workers=1) ;;
 esac
 

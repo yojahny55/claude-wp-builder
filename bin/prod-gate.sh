@@ -110,6 +110,11 @@ if [ -f "$stamp" ]; then
   last="$(cat "$stamp" 2>/dev/null || echo 0)"
   wait_s="$(awk -v l="$last" -v d="$delay" -v n="$(now)" 'BEGIN { w = l + d - n; print (w > 0 ? w : 0) }')"
   sleep "$wait_s"
+  # --mark-blocked does not take the lock, so a ban recorded during the sleep must stop this send.
+  if [ -f "$blocked" ]; then
+    echo "BLOCKED: $host -- $(cat "$blocked"). Nothing sent; report this check UNMEASURED." >&2
+    exit 4
+  fi
 fi
 # The child must not inherit fd 9: a process it leaves behind (a browser, `cmd &`) would
 # otherwise hold the host's lock after the command returns.
@@ -132,5 +137,8 @@ if [ "$is_curl" -eq 1 ]; then
       fi ;;
     *) rm -f "$timeouts" ;;
   esac
+else
+  # Two timeouts count only when consecutive; any other command in between breaks the run.
+  rm -f "$dir/$key.timeouts"
 fi
 exit "$rc"
