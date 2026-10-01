@@ -16,6 +16,7 @@ fail() { echo "FAIL: $*"; exit 1; }
 gate=bin/prod-gate.sh
 [ -x "$gate" ] || fail "$gate missing or not executable"
 command -v flock >/dev/null 2>&1 || { echo "SKIP: flock not available"; echo PASS; exit 0; }
+command -v timeout >/dev/null 2>&1 || { echo "SKIP: timeout not available"; echo PASS; exit 0; }
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 export WP_AUDIT_GATE_DIR="$tmp/gate"
