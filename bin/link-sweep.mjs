@@ -194,14 +194,15 @@ async function request(o, url, deadline) {
       // GET's body would call a page that served 200 to the GET a challenge.
       res = g;
     }
+    // A CDN challenge is answered before the WAF test: it is not a ban and must not stop the sweep.
+    if (isChallenge(res, body)) {
+      return { verdict: 'unmeasured', status: res.status, final: res.url,
+        reason: 'blocked by CDN bot challenge — not a broken link; not retried' };
+    }
     if (o.stopOnBlock && (res.status === 429 || (res.status === 403 &&
         /mod_?security|crowdsec|captcha|request blocked|access denied by/i.test(body)))) {
       return { verdict: 'unmeasured', status: res.status, final: res.url, blocked: true,
         reason: `blocked by the server's WAF or rate limit (HTTP ${res.status}) — not retried` };
-    }
-    if (isChallenge(res, body)) {
-      return { verdict: 'unmeasured', status: res.status, final: res.url,
-        reason: 'blocked by CDN bot challenge — not a broken link; not retried' };
     }
     const moved = res.url && res.url !== url;
     let verdict = 'ok';

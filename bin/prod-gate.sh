@@ -38,7 +38,7 @@
 # agents of one run must share it; /wp-audit passes it in every dispatch prompt.
 #
 # Exit: the wrapped command's own exit code, or
-#   4 = the host is marked blocked; nothing was sent (stdout says why)
+#   4 = the host is marked blocked; nothing was sent (stderr says why)
 #   5 = another command held the host longer than --wait; nothing was sent
 #   1 = usage error, or flock is unavailable (the gate refuses to run unserialized)
 set -uo pipefail
