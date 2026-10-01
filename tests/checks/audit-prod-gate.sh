@@ -87,6 +87,13 @@ set +e; PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://argcurl.example -- notcu
 "$gate" --status https://argcurl.example >/dev/null; ra=$?; set -e
 [ "$ra" -eq 0 ] || fail "a non-curl command with a /curl argument marked the host blocked"
 
+# 4f2. Nested wrappers and timeout options with a separate value still reach curl.
+set +e
+PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://nest.example -- timeout -s KILL 30 env FOO=1 curl https://nest.example/ 2>/dev/null
+PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://nest.example -- timeout -k 5 30 env FOO=1 curl https://nest.example/ 2>/dev/null
+"$gate" --status https://nest.example >/dev/null; rn=$?; set -e
+[ "$rn" -eq 4 ] || fail "curl under 'timeout -s KILL 30 env' was not judged as curl"
+
 # 4g. Private ranges match a dotted IPv4 address only: a host name or a public address that
 #     shares the prefix is gated.
 for h in 10.example.com 172.160.0.1 192.168.example.com; do

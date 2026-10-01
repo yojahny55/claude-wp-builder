@@ -62,7 +62,7 @@ case "$only" in a11y|seo|perf|all) : ;; *) echo "--only must be a11y, seo, perf 
 # requests in a burst. An audit that hit production that way, beside six other agents, got
 # the auditing IP banned. Against a public host every pass runs with one worker: the same
 # tests and the same metrics, only paced. A local host keeps the template's parallelism.
-url_host="${url#*://}"; url_host="${url_host%%/*}"; url_host="${url_host##*@}"
+url_host="${url#*://}"; url_host="${url_host%%/*}"; url_host="${url_host%%\?*}"; url_host="${url_host%%#*}"; url_host="${url_host##*@}"
 pw_args=(--workers=1)
 case "$url_host" in
   localhost|localhost:*|*.localhost|*.localhost:*|*.local|*.local:*|*.local.com|*.local.com:*|*.test|*.test:*|\[::1\]*|0.0.0.0|0.0.0.0:*) pw_args=() ;;

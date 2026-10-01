@@ -88,6 +88,9 @@ esac
 mkdir -p "$dir" || { echo "cannot create $dir" >&2; exit 1; }
 key="$(printf '%s' "$host" | tr -c 'a-z0-9.-' '_')"
 blocked="$dir/$key.blocked" stamp="$dir/$key.last" lock="$dir/$key.lock"
+# Write the blocked flag whole: --mark-blocked runs without the lock, so a reader must never
+# see a truncated file. mv within one directory is atomic.
+set_blocked() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$1" > "$blocked.$$" && mv -f "$blocked.$$" "$blocked"; }
 
 case "$mode" in
   status)
@@ -95,7 +98,7 @@ case "$mode" in
     echo "open"; exit 0 ;;
   mark)
     reason="${1:-blocked}"
-    printf '%s %s\n' "$(date -u +%FT%TZ)" "$reason" > "$blocked"
+    set_blocked "$reason"
     echo "marked $host blocked: $reason" >&2; exit 0 ;;
 esac
 
@@ -131,26 +134,38 @@ fi
 "$@" 9>&-
 rc=$?
 now > "$stamp"
-# The command is curl when it is the program run, directly or through `timeout`/`env`;
-# an argument that merely ends in /curl (a URL, a path) does not count.
+# The command is curl when it is the program run, directly or through any nesting of
+# `timeout`/`env`; an argument that merely ends in /curl (a URL, a path) does not count.
 is_curl=0 i=1
-case "${!i}" in
-  timeout|gtimeout|*/timeout|*/gtimeout)
-    i=2; while [ "$i" -le $# ] && [[ "${!i}" == -* ]]; do i=$((i + 1)); done; i=$((i + 1)) ;;
-  env|*/env)
-    i=2; while [ "$i" -le $# ] && [[ "${!i}" == -* || "${!i}" == *=* ]]; do i=$((i + 1)); done ;;
-esac
-[ "$i" -le $# ] && case "${!i}" in curl|*/curl) is_curl=1 ;; esac
+while [ "$i" -le $# ]; do
+  case "${!i}" in
+    timeout|gtimeout|*/timeout|*/gtimeout)
+      i=$((i + 1))
+      while [ "$i" -le $# ]; do
+        case "${!i}" in
+          -s|-k|--signal|--kill-after) i=$((i + 2)) ;;  # options that take a separate value
+          -*) i=$((i + 1)) ;;
+          *) break ;;
+        esac
+      done
+      i=$((i + 1)) ;;  # the duration
+    env|*/env)
+      i=$((i + 1))
+      while [ "$i" -le $# ] && [[ "${!i}" == -* || "${!i}" == *=* ]]; do i=$((i + 1)); done ;;
+    curl|*/curl) is_curl=1; break ;;
+    *) break ;;
+  esac
+done
 if [ "$is_curl" -eq 1 ]; then
   timeouts="$dir/$key.timeouts"
   case "$rc" in
     7|35|52|56)
-      printf '%s %s\n' "$(date -u +%FT%TZ)" "connection refused or reset (curl $rc) -- possible IP ban" > "$blocked"
+      set_blocked "connection refused or reset (curl $rc) -- possible IP ban"
       echo "prod-gate: $host marked blocked (curl $rc). No further requests will be sent." >&2 ;;
     28)
       n=$(( $(cat "$timeouts" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$timeouts"
       if [ "$n" -ge 2 ]; then
-        printf '%s %s\n' "$(date -u +%FT%TZ)" "two curl timeouts in a row -- possible DROP ban" > "$blocked"
+        set_blocked "two curl timeouts in a row -- possible DROP ban"
         echo "prod-gate: $host marked blocked (two timeouts in a row). No further requests will be sent." >&2
       fi ;;
     *) rm -f "$timeouts" ;;

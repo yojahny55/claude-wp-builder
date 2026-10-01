@@ -199,7 +199,9 @@ async function request(o, url, deadline) {
       return { verdict: 'unmeasured', status: res.status, final: res.url,
         reason: 'blocked by CDN bot challenge — not a broken link; not retried' };
     }
-    if (o.stopOnBlock && (res.status === 429 || (res.status === 403 &&
+    // A 403 or a 503 counts only with a WAF signature in the body: a bare 503 is as often
+    // maintenance or an overloaded origin as a ban.
+    if (o.stopOnBlock && (res.status === 429 || ((res.status === 403 || res.status === 503) &&
         /mod_?security|crowdsec|captcha|request blocked|access denied by/i.test(body)))) {
       return { verdict: 'unmeasured', status: res.status, final: res.url, blocked: true,
         reason: `blocked by the server's WAF or rate limit (HTTP ${res.status}) — not retried` };
