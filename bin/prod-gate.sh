@@ -58,7 +58,7 @@ done
 target="${1:-}"
 [ -n "$target" ] || { echo "usage: prod-gate.sh [--dir d] [--delay s] <host> -- <command...>"; exit 1; }
 shift
-case "$delay" in ''|*[!0-9.]*) echo "--delay must be a number"; exit 1 ;; esac
+case "$delay" in ''|*[!0-9.]*|*.*.*|.) echo "--delay must be a number"; exit 1 ;; esac
 case "$wait_max" in ''|*[!0-9]*) echo "--wait must be an integer"; exit 1 ;; esac
 
 # One key per server: drop scheme, path, query, fragment, userinfo and port, so that
@@ -96,11 +96,11 @@ command -v flock >/dev/null 2>&1 \
   || { echo "prod-gate: flock is unavailable; refusing to send to a production host unserialized"; exit 1; }
 exec 9>"$lock"
 if ! flock -w "$wait_max" 9; then
-  echo "prod-gate: $host busy for more than ${wait_max}s (another agent's command). Nothing sent; call again later."
+  echo "prod-gate: $host busy for more than ${wait_max}s (another agent's command). Nothing sent; call again later." >&2
   exit 5
 fi
 if [ -f "$blocked" ]; then
-  echo "BLOCKED: $host -- $(cat "$blocked"). Nothing sent; report this check UNMEASURED."
+  echo "BLOCKED: $host -- $(cat "$blocked"). Nothing sent; report this check UNMEASURED." >&2
   exit 4
 fi
 if [ -f "$stamp" ]; then

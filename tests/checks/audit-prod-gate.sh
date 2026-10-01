@@ -102,4 +102,12 @@ for a in security seo a11y performance geo ux; do
     || fail "agents/wp-audit-$a.md does not route production requests through the gate"
 done
 
+for bad in 1.2.3 ...  .; do
+  set +e; "$gate" --delay "$bad" https://example.org/x -- true >/dev/null 2>&1; rd=$?; set -e
+  [ "$rd" -eq 1 ] || fail "--delay $bad was accepted (exit $rd)"
+done
+# Run-mode diagnostics go to stderr, so a wrapped command's stdout stays parseable.
+out="$("$gate" --delay 0 https://blocked.example -- true 2>/dev/null)" || true
+[ -z "$out" ] || fail "a blocked run wrote to stdout: $out"
+
 echo PASS
