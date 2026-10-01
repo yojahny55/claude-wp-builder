@@ -716,6 +716,15 @@ For each selected category, dispatch the corresponding agent using the Agent too
 
 **Dispatch order:** security → seo → a11y → performance → practices → geo → usability
 
+**When a production host is in play** (`--host`, or a production URL confirmed in Step 2.3),
+create `<scratch>/prod-gate` before dispatching and pass it as the gate dir in every prompt.
+The agents still run in parallel, and each measures exactly what it measured before. The
+gate makes the production server see one request at a time, paced, and stops all of them at
+the first block. Without it, one run against a server running fail2ban, CrowdSec and
+ModSecurity sent seven agents' traffic at once. The server banned the auditing IP within
+five minutes, and the run lost every live check. See "Production sits behind a WAF" in
+`skills/wp-audit-standards/SKILL.md`. A local-only run creates no gate and changes nothing.
+
 For each agent, use this prompt template (adapt the category-specific instructions):
 
 ### What each agent is scoped to
@@ -779,6 +788,21 @@ before any HTTP, and ${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs for the rest. Neve
 crawler of your own. The local site shares its database and web server with every other
 project on this machine.
 
+Production host: <the public URL live checks use, or "none">. Gate dir: <scratch>/prod-gate.
+Production runs fail2ban, CrowdSec and ModSecurity, and other audit agents are running beside
+you. Run every command that reaches the production host through the gate, with exactly the
+arguments you would have used otherwise:
+  WP_AUDIT_GATE_DIR=<gate dir> ${CLAUDE_PLUGIN_ROOT}/bin/prod-gate.sh [--delay 10] <host> -- <command>
+Use --delay 10 before readme, license, ?author=, the users REST route, xmlrpc or login.
+Run sweeps against it with --concurrency 1 --delay-ms 1000 --stop-on-block and a --budget of at least one
+second per link plus the timeout. Mark the host blocked on any of these:
+  - a 429
+  - a 403 carrying a WAF signature
+  - ERR_CONNECTION_REFUSED in a browser
+Use: prod-gate.sh --mark-blocked <host> "<reason>". If the gate exits 4, the host is blocked:
+report that check UNMEASURED with the gate's reason, and never retry. If it exits 5,
+another agent held the host. Nothing was sent, so call again. The local site is not gated.
+
 Run all checks for your tier level. Output your findings as a structured report with the following format for each issue:
 
 [<SEVERITY>] <CODE>: <message> (<file>:<line> if applicable)
@@ -829,6 +853,11 @@ Lighthouse score — were either unmeasured or asserted from the source. This ru
 ${CLAUDE_PLUGIN_ROOT}/bin/audit-suite.sh --url <public-url> --dir .wp-audit/suite \
   --site "<project name>" [--pages "/,/services/,/contact/"]
 ```
+
+Against a public URL, run it through the gate from Step 6:
+`WP_AUDIT_GATE_DIR=<scratch>/prod-gate ${CLAUDE_PLUGIN_ROOT}/bin/prod-gate.sh <public-url> -- ${CLAUDE_PLUGIN_ROOT}/bin/audit-suite.sh …`.
+The suite then runs with one Playwright worker. The tests, pages and metrics are the
+same; only the four parallel browsers are gone.
 
 `<public-url>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json` —
 **unless `local_clone` is true (Step 2.3): the suite must not probe the clone's own host**,

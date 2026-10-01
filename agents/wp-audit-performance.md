@@ -769,6 +769,13 @@ a slow site. The fix is scoping the cache key, not removing the cache.
 
 ## Rules
 
+**Requests to a production host go through `bin/prod-gate.sh`**, with the gate dir from the
+dispatch prompt, exactly as `skills/wp-audit-standards` "Production sits behind a WAF" says.
+Production runs fail2ban, CrowdSec and ModSecurity, and agents in parallel without the gate
+got an audit's IP banned. Use the same command, URL, headers and user agent as before: the
+gate changes the pace, not the measurement. When it exits `4`, report the check `UNMEASURED`
+and never retry. A local site is not gated.
+
 1. **Read project config before any checks** — `.claude/CLAUDE.md` for prefix/slug, `.wp-create.json` for `$WP`
 2. **Run Tier 1 code checks before Tier 2 runtime checks** — code issues are cheaper to detect
 3. **Output JSON report per wp-audit-standards schema** — every finding needs code, title, severity, status, details

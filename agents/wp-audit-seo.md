@@ -482,6 +482,13 @@ For Rank Math configuration issues (SEO-020 through SEO-034), **dispatch the `wp
 
 ## Rules
 
+**Requests to a production host go through `bin/prod-gate.sh`**, with the gate dir from the
+dispatch prompt, exactly as `skills/wp-audit-standards` "Production sits behind a WAF" says.
+Production runs fail2ban, CrowdSec and ModSecurity, and agents in parallel without the gate
+got an audit's IP banned. Use the same command, URL, headers and user agent as before: the
+gate changes the pace, not the measurement. When it exits `4`, report the check `UNMEASURED`
+and never retry. A local site is not gated.
+
 1. **Always read CLAUDE.md and .wp-create.json first** — these define the project context.
 2. **Reference the `wp-audit-seo-standards` skill** for all Rank Math option keys, meta keys, and configuration patterns.
 3. **All WordPress interaction via WP-CLI** — never edit PHP configuration directly for runtime settings.

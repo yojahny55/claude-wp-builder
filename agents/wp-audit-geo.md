@@ -373,6 +373,13 @@ change a third-party registry listing or a payment protocol.
 
 ## Rules
 
+**Requests to a production host go through `bin/prod-gate.sh`**, with the gate dir from the
+dispatch prompt, exactly as `skills/wp-audit-standards` "Production sits behind a WAF" says.
+Production runs fail2ban, CrowdSec and ModSecurity, and agents in parallel without the gate
+got an audit's IP banned. Use the same command, URL, headers and user agent as before: the
+gate changes the pace, not the measurement. When it exits `4`, report the check `UNMEASURED`
+and never retry. A local site is not gated.
+
 1. **Always read `.claude/CLAUDE.md` and `.wp-create.json` first** — they define the
    prefix, theme path, industry and the `$WP` wrapper.
 2. **Reference the `wp-audit-geo-standards` skill** for codes, applicability, the crawler

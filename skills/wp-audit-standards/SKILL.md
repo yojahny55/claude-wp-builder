@@ -116,7 +116,8 @@ server with every other project on the machine, and an uncached WordPress page i
 expensive: an improvised crawler with 25 concurrent `curl -L` workers over a store's term
 archives once held MariaDB at ~18 cores and load 18, slowing every site on the box.
 
-- **At most 4 requests in flight.** Never a thread pool sized to the machine.
+- **At most 4 requests in flight.** Never a thread pool sized to the machine. This protects
+  a local machine. A production host is paced by "Production sits behind a WAF" below.
 - **Status only, so no body.** `HEAD`, or `curl -r 0-0` when a server refuses `HEAD`. A
   full render is paid only when a check reads the page itself.
 - **Resolve internal targets through WP-CLI or the database first.** Whether a post or
@@ -157,6 +158,52 @@ nginx ignores — so a live check run against the clone is a false result, not a
 These checks use `--host`, or ask the user for the production URL (defaulting to
 `wordpress.url_origin`) and fire no external request until it is confirmed; with no public
 URL they are `UNMEASURED`, never `PASS`.
+
+### Production sits behind a WAF: same measurements, one request at a time
+
+Production servers run fail2ban, CrowdSec and ModSecurity. An audit must not trip them
+unless the operator asks for it explicitly. One audit got its machine's IP banned in five
+minutes:
+
+- Seven agents were dispatched in parallel against the production host, each allowed 4
+  requests in flight, so up to 28 ran at once, plus the Lighthouse and Playwright loads.
+- The security agent probed `readme.html`, `?author=1` and `/wp-json/wp/v2/users` in the
+  same burst.
+
+Leaky-bucket rules count requests per window, so the burst filled them, not the paths
+themselves. Every live check of that run was lost, and one agent's retries lengthened the
+ban.
+
+The fix changes **the pace, never the measurement**. Every check still runs the same command
+against the same host, with the same headers and user agents. That covers Lighthouse,
+Playwright, the suite, the GEO probes with AI user agents and `Accept: text/markdown`, and
+the security probes. Against a public host:
+
+- **Every request goes through `bin/prod-gate.sh`.** It holds a per-host lock shared by all
+  the agents of the run, so production sees one command at a time. It waits 2 s between
+  commands, and use `--delay 10` before reconnaissance-shaped paths: readme, license,
+  `?author=`, the users REST route, xmlrpc and login. A Lighthouse run or a Playwright launch
+  is one gated command. Browsers load a page's assets in parallel, as any visitor's would.
+- **Sweeps run at `--concurrency 1 --delay-ms 1000 --stop-on-block`, with a budget sized to
+  match.** Exit `4` from the sweep means it stopped at a block: mark the host blocked. Use
+  `--budget` of at least one second per link plus the timeout, so the slower pace does not
+  turn links into `budget exhausted`. The suite runs with one Playwright worker:
+  `bin/audit-suite.sh` does this itself for a public URL.
+- **The first block ends all production traffic, with no retry.** `prod-gate.sh` marks the
+  host blocked on curl's refused or reset codes. The caller marks it blocked with
+  `--mark-blocked` on any of these:
+  - a `429`
+  - a `403` carrying a WAF signature (`mod_security`, `crowdsec`, `cf-mitigated`, a captcha)
+  - `ERR_CONNECTION_REFUSED` in a browser
+
+  After that, every gated call exits `4` without sending anything. Exit `5` only means
+  another agent held the host past `--wait`. Nothing was sent, so call again. Every live check not yet
+  answered is `UNMEASURED: production blocked the audit`. A retry against a ban extends the
+  ban.
+
+**A local site keeps its own limits, unchanged.** `prod-gate.sh` passes a development host
+straight through, and nothing above applies to it. The local rule is "Link and page sweeps
+against a site", above.
 
 ---
 
