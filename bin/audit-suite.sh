@@ -57,6 +57,18 @@ done
 
 case "$only" in a11y|seo|perf|all) : ;; *) echo "--only must be a11y, seo, perf or all" >&2; exit 1 ;; esac
 
+# A public host is production, and production runs fail2ban, CrowdSec and ModSecurity. The
+# template's 4 workers mean 4 browsers loading full pages at once, which is about 400
+# requests in a burst. An audit that hit production that way, beside six other agents, got
+# the auditing IP banned. Against a public host every pass runs with one worker: the same
+# tests and the same metrics, only paced. A local host keeps the template's parallelism.
+url_host="${url#*://}"; url_host="${url_host%%/*}"
+pw_args=()
+case "$url_host" in
+  localhost|localhost:*|*.localhost|*.localhost:*|*.local|*.local:*|*.local.com|*.local.com:*|*.test|*.test:*|127.*|10.*|192.168.*|\[::1\]*|0.0.0.0*|172.1[6-9].*|172.2[0-9].*|172.3[01].*) : ;;
+  *) pw_args=(--workers=1) ;;
+esac
+
 # ---------------------------------------------------------------------------
 # Probe
 # ---------------------------------------------------------------------------
@@ -347,7 +359,7 @@ echo "audit-suite: chromium $chromium_exe"
 status=0
 run_pass() {
   echo "audit-suite: $1"
-  (cd "$dir" && npm run --silent "$2") || status=1
+  (cd "$dir" && npm run --silent "$2" -- ${pw_args[@]+"${pw_args[@]}"}) || status=1
 }
 
 # The DOM/axe pass again in the other engines the config declares. Their results land beside
@@ -362,7 +374,7 @@ cross_browser() {
       continue
     fi
     echo "audit-suite: accessibility and usability pass in $engine"
-    (cd "$dir" && npx --no-install playwright test tests/audit.spec.js --project="$engine") \
+    (cd "$dir" && npx --no-install playwright test tests/audit.spec.js --project="$engine" ${pw_args[@]+"${pw_args[@]}"}) \
       || { echo "audit-suite: the $engine pass ran and exited non-zero (a failure, not a skip)"; status=1; }
   done
 }

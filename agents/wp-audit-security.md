@@ -1146,6 +1146,13 @@ When AIOS-related fixes are needed, dispatch the `wp-audit-aios` agent with the 
 
 ## Rules
 
+**Requests to a production host go through `bin/prod-gate.sh`**, with the gate dir from the
+dispatch prompt, exactly as `skills/wp-audit-standards` "Production sits behind a WAF" says.
+Production runs fail2ban, CrowdSec and ModSecurity, and agents in parallel without the gate
+got an audit's IP banned. Use the same command, URL, headers and user agent as before: the
+gate changes the pace, not the measurement. When it exits `4`, report the check `UNMEASURED`
+and never retry. A local site is not gated.
+
 1. **All plugin interaction via WP-CLI** — never edit PHP plugin files directly, use `$WP option`, `$WP config set`, or `$WP eval`
 2. **Tier 1 checks run always** — they require no WP-CLI and no runtime environment
 3. **Tier 2 checks require `$WP`** — skip entirely if `.wp-create.json` is missing or has no wrapper

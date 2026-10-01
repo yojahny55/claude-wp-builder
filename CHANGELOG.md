@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Audits no longer get the auditing IP banned by a production WAF.** `/wp-audit`
+  dispatches its agents in parallel. The "4 requests in flight" limit applied to each agent,
+  not to the host. One run against a production server running fail2ban, CrowdSec and
+  ModSecurity sent up to 28 requests at once, plus the Lighthouse and Playwright loads.
+  At the same time the security agent sent `readme.html`, `?author=1` and
+  `/wp-json/wp/v2/users` in the same burst. The server banned the IP within five minutes,
+  every live check of the run came back `UNMEASURED`, and one agent's retries lengthened
+  the ban.
+
+  The new `bin/prod-gate.sh` wraps each command that reaches a public host. It holds a
+  per-host `flock` shared by every agent of the run, waits 2 s between commands (10 s
+  before reconnaissance-shaped paths), and marks the host blocked on the first refused
+  connection, `429` or WAF `403`. Every later call exits `4` without sending anything.
+
+  What is measured does not change. Each check runs the same command against the same host,
+  with the same headers and user agents. The suite drops to one Playwright worker for a
+  public URL only, and `link-sweep.mjs` gains an opt-in `--delay-ms`. A development host
+  bypasses the gate, so local audits run exactly as before. `tests/checks/audit-prod-gate.sh`
+  runs the gate for real.
+
 ### Added
 
 - **`bin/ux-probe.mjs`, the usability audit's page harness.** `wp-audit-ux` used to write a

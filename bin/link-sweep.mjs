@@ -44,18 +44,27 @@
  *   link-sweep.mjs --site <origin> [--urls <file>] [--clone-origin <host>]
  *                  [--follow-clone-origin] [--concurrency <1-4>] [--per-group <n>] [--full]
  *                  [--per-page <n>] [--max <n>] [--timeout <s>] [--budget <s>] [--insecure]
+ *                  [--delay-ms <n>] [--stop-on-block]
+ *
+ * --delay-ms waits that long after each request, per worker. Use it with --concurrency 1
+ * against a production host behind fail2ban, CrowdSec or ModSecurity, where a fast
+ * sequential sweep still fills a crawl-rate bucket. It changes the pace, not which links
+ * are requested. --stop-on-block ends the sweep at the first 429, WAF 403, refused or reset
+ * connection: every link not yet requested comes back `unmeasured`, and the exit code is 4
+ * so the caller can mark the host blocked. A retry against a ban extends the ban. A local
+ * site needs neither flag.
  *
  * Output: JSON on stdout, `{ summary, results }`. Each result carries `url`, `class`,
  * `status` (HTTP code or null), `final` (after redirects), `verdict`
  * (ok | broken | redirect | unmeasured | fragment | skipped), `reason` and `pages`.
  *
- * exit 0 = sweep ran (findings are in the JSON), 2 = usage.
+ * exit 0 = sweep ran (findings are in the JSON), 2 = usage, 4 = --stop-on-block stopped it.
  */
 import { readFileSync } from 'node:fs';
 
 const USAGE = 'usage: link-sweep.mjs --site <origin> [--urls <file>] [--clone-origin <host>] ' +
   '[--follow-clone-origin] [--concurrency <1-4>] [--per-group <n>] [--full] [--per-page <n>] [--max <n>] ' +
-  '[--timeout <s>] [--budget <s>] [--insecure]';
+  '[--timeout <s>] [--budget <s>] [--insecure] [--delay-ms <n>] [--stop-on-block]';
 const MAX_CONCURRENCY = 4;
 const UA = 'claude-wp-builder-link-sweep';
 
@@ -67,7 +76,7 @@ function usage(msg) {
 
 function parseArgs(argv) {
   const o = { concurrency: MAX_CONCURRENCY, perGroup: 20, perPage: 0, max: 0, timeout: 10, budget: 120,
-    full: false, followClone: false, insecure: false };
+    full: false, followClone: false, insecure: false, delayMs: 0, stopOnBlock: false };
   const num = (v, flag) => {
     const n = Number(v);
     if (!Number.isFinite(n) || n < 0) usage(`${flag} needs a non-negative number`);
@@ -89,6 +98,8 @@ function parseArgs(argv) {
       case '--timeout': o.timeout = num(next(), a); break;
       case '--budget': o.budget = num(next(), a); break;
       case '--insecure': o.insecure = true; break;
+      case '--delay-ms': o.delayMs = num(next(), a); break;
+      case '--stop-on-block': o.stopOnBlock = true; break;
       case '-h': case '--help': process.stdout.write(USAGE + '\n'); process.exit(0);
       default: usage(`unknown argument ${a}`);
     }
@@ -180,6 +191,11 @@ async function request(o, url, deadline) {
       // GET's body would call a page that served 200 to the GET a challenge.
       res = g;
     }
+    if (o.stopOnBlock && (res.status === 429 || (res.status === 403 &&
+        /mod_?security|crowdsec|captcha|request blocked|access denied by/i.test(body)))) {
+      return { verdict: 'unmeasured', status: res.status, final: res.url, blocked: true,
+        reason: `blocked by the server's WAF or rate limit (HTTP ${res.status}) — not retried` };
+    }
     if (isChallenge(res, body)) {
       return { verdict: 'unmeasured', status: res.status, final: res.url,
         reason: 'blocked by CDN bot challenge — not a broken link; not retried' };
@@ -197,7 +213,8 @@ async function request(o, url, deadline) {
     const code = e.cause?.code || e.code || e.name;
     // DNS failure is a dead link by definition; anything else is a failure to measure.
     if (code === 'ENOTFOUND') return { verdict: 'broken', status: null, reason: 'DNS: host not found' };
-    return { verdict: 'unmeasured', status: null, reason: timeout ? `timeout after ${o.timeout}s` : `request failed: ${code}` };
+    return { verdict: 'unmeasured', status: null, blocked: code === 'ECONNREFUSED' || code === 'ECONNRESET',
+      reason: timeout ? `timeout after ${o.timeout}s` : `request failed: ${code}` };
   }
 }
 
@@ -266,23 +283,33 @@ async function main() {
   let next = 0;
   let inFlight = 0;
   let peak = 0;
+  let blocked = null;
   const worker = async () => {
     while (next < queue.length) {
       const r = queue[next++];
+      if (blocked) {
+        Object.assign(r, { verdict: 'unmeasured', status: null, reason: `not requested: ${blocked}` });
+        continue;
+      }
       inFlight++;
       peak = Math.max(peak, inFlight);
       try { Object.assign(r, await request(o, r.url, deadline)); } finally { inFlight--; }
+      if (r.blocked && o.stopOnBlock && !blocked) blocked = `the sweep stopped at a block on ${r.url}`;
+      if (o.delayMs > 0 && next < queue.length) await new Promise((res) => setTimeout(res, o.delayMs));
     }
   };
   await Promise.all(Array.from({ length: Math.min(o.concurrency, queue.length) }, worker));
 
   const summary = { total: all.length, requested: queue.length, concurrency: o.concurrency,
     peak_in_flight: peak };
+  if (blocked) summary.stopped = blocked;
   for (const r of all) {
     delete r.bad;
+    delete r.blocked;
     summary[r.verdict] = (summary[r.verdict] || 0) + 1;
   }
   process.stdout.write(JSON.stringify({ summary, results: all }, null, 2) + '\n');
+  if (blocked) process.exitCode = 4;
 }
 
 main().catch((e) => { process.stderr.write(`link-sweep: ${e && e.message ? e.message : e}\n`); process.exit(1); });
