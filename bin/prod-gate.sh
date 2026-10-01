@@ -138,6 +138,9 @@ rc=$?
 now > "$stamp"
 # The command is curl when it is the program run, directly or through any nesting of
 # `timeout`/`env`; an argument that merely ends in /curl (a URL, a path) does not count.
+# Those two are the only wrappers the audit's callers use. Any other wrapper (nice, nohup)
+# or an env option this loop does not know hides curl: its block signals are then missed,
+# so callers send curl bare or through timeout/env.
 is_curl=0 i=1
 while [ "$i" -le $# ]; do
   case "${!i}" in
@@ -171,7 +174,7 @@ if [ "$is_curl" -eq 1 ]; then
       set_blocked "connection refused or reset (curl $rc) -- possible IP ban"
       echo "prod-gate: $host marked blocked (curl $rc). No further requests will be sent." >&2 ;;
     28)
-      n=$(( $(cat "$timeouts" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$timeouts"
+      n=$(( $(cat "$timeouts" 2>/dev/null || echo 0) + 1 )); printf '%s\n' "$n" > "$timeouts.$$" && mv -f "$timeouts.$$" "$timeouts"
       if [ "$n" -ge 2 ]; then
         set_blocked "two curl timeouts in a row -- possible DROP ban"
         echo "prod-gate: $host marked blocked (two timeouts in a row). No further requests will be sent." >&2

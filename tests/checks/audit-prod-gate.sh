@@ -31,7 +31,10 @@ out="$("$gate" http://site.local.com -- echo local-ok)"
 case "$(date +%s.%N)" in *N*) echo "SKIP: date has no %N"; echo PASS; exit 0 ;; esac
 log="$tmp/order.log"
 job() { "$gate" --delay 1 https://example.org/x -- bash -c "echo start-$1 \$(date +%s.%N) >> '$log'; sleep 1; echo end-$1 \$(date +%s.%N) >> '$log'"; }
-job a & job b & wait
+job a & pid_a=$!
+job b & pid_b=$!
+wait "$pid_a" || fail "concurrent job a failed"
+wait "$pid_b" || fail "concurrent job b failed"
 starts=$(grep -c '^start-' "$log"); [ "$starts" -eq 2 ] || fail "expected 2 gated runs, got $starts"
 first_end=$(awk '/^end-/{print $2; exit}' "$log")
 second_start=$(awk '/^start-/{n++; if(n==2){print $2; exit}}' "$log")
