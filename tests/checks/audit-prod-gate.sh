@@ -111,4 +111,12 @@ done
 out="$("$gate" --delay 0 https://blocked.example -- true 2>/dev/null)" || true
 [ -z "$out" ] || fail "a blocked run wrote to stdout: $out"
 
+# Exit 5: a host whose lock is held longer than --wait is not sent to, and the command does not run.
+"$gate" --delay 0 https://busy.example -- sleep 4 >/dev/null 2>&1 &
+sleep 1
+set +e; "$gate" --delay 0 --wait 1 https://busy.example -- touch "$tmp/busy" >/dev/null 2>&1; rb=$?; set -e
+wait
+[ "$rb" -eq 5 ] || fail "a held lock did not exit 5 after --wait (got $rb)"
+[ ! -e "$tmp/busy" ] || fail "the command ran although the lock was held"
+
 echo PASS
