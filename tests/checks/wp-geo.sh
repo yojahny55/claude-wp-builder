@@ -63,6 +63,10 @@ grep -q 'gtimeout' bin/geo-scan.sh || fail "bin/geo-scan.sh must fall back to gt
 # Security: the scanner must not download and execute npm packages unattended.
 ! grep -q 'npx' bin/geo-scan.sh || fail "bin/geo-scan.sh must not run npx (supply-chain risk)"
 grep -q 'is-agentic.com/api/v1/report' bin/geo-scan.sh || fail "bin/geo-scan.sh must call the public report API"
+# --start triggers a missing scan through the same HTTP endpoint the npm CLI uses, not the package.
+grep -q 'is-agentic.com/api/scan/stream' bin/geo-scan.sh || fail "bin/geo-scan.sh --start must start a scan through /api/scan/stream"
+out=$(bash bin/geo-scan.sh example.com --bogus 2>&1) && status=0 || status=$?
+[ "$status" -eq 1 ] || fail "bin/geo-scan.sh must reject an unknown flag with exit 1 (got $status)"
 
 # Fixer: the RFC 8288 Link header belongs on send_headers — wp_headers filters request headers.
 grep -q 'send_headers' "$fixer" || fail "$fixer must emit the Link header on send_headers"

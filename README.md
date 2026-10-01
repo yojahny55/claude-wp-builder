@@ -504,7 +504,7 @@ Commands run these and read the exit code. Several are gates, not helpers.
 | `audit-suite.sh` | Scaffolds and runs the Tier 3 browser suite (`/wp-audit --suite`) |
 | `link-sweep.mjs` | The audits' link sweep — at most 4 requests in flight, sampling, clone-origin and CDN-challenge rules built in |
 | `ux-probe.mjs` | The usability audit's page harness — one browser launch per run, built-in DOM probes, a 3-launch / 15-minute budget enforced in code |
-| `geo-scan.sh` | Live is-agentic report for `--geo` |
+| `geo-scan.sh` | Live is-agentic report for `--geo`; `--start` scans a host that has no report yet |
 | `wp-cinematic-encode.sh` | ffmpeg wrapper behind `/wp-cinematic-encode` |
 | `doc-sync-check.sh` | Fails when a command lacks a row here or in `docs/commands.md`, when a skill or agent lacks a row here, or when `commands/`, `agents/`, `skills/`, `starter-theme/` or `bin/` changed without a CHANGELOG entry |
 | `design-md-index.sh` · `domains-import.sh` | Rebuild vendored reference indexes |

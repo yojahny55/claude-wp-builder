@@ -1354,8 +1354,14 @@ agreed to visual changes, this category is reported and not applied.
 **GEO fixes:** Dispatch an agent with `subagent_type: wp-agentic-surfaces` with the full project context and the list of auto-fixable GEO findings. It owns `inc/agentic.php` and every generated agent surface (`llms.txt`, ARD catalog, agent-skills index, markdown negotiation, Link headers, agent-friendly 404, JSON-LD breadth, trust anchors) — do not re-implement the surfaces here. Before dispatching, run the live verifier to capture the before score; run it again after the fixer completes and report the before → after score:
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host>
+${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host> --start
 ```
+
+`--start` makes a host with no report yet get one: the script asks is-agentic to scan it
+(the same HTTP call `npx is-agentic` makes, through curl, no package run) and reads the
+report when the scan finishes. The scan is capped at 100 s, so run the command with a Bash
+timeout of at least 150000 ms. Pass it only for a host this run
+confirmed as public — the scan makes a third party fetch that site.
 
 `<home-host>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json` (or
 `$WP option get home`) — **unless `local_clone` is true (Step 2.3): the live scan must not probe
@@ -1366,7 +1372,7 @@ confirmed production URL, or `UNMEASURED — needs the public URL` with no scan 
 |---|---|---|---|
 | `0` | report returned | the score | — |
 | `1` | tool error | `ERROR` | record the error and continue |
-| `2` | no report yet, no network, or a transient `429`/`503` | `UNMEASURED` | scan once at `https://is-agentic.com` |
+| `2` | no network, a transient `429`/`503`, or a `--start` scan that did not complete (without `--start`: no report yet) | `UNMEASURED` | retry once; else scan at `https://is-agentic.com` |
 | `3` | the host is not publicly reachable | `UNMEASURED — configuration` | re-run with `--host <public-url>` |
 
 **None of these is a pass.** An absent score is not a good score; a category whose evidence
