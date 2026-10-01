@@ -63,10 +63,23 @@ case "$only" in a11y|seo|perf|all) : ;; *) echo "--only must be a11y, seo, perf 
 # the auditing IP banned. Against a public host every pass runs with one worker: the same
 # tests and the same metrics, only paced. A local host keeps the template's parallelism.
 url_host="${url#*://}"; url_host="${url_host%%/*}"; url_host="${url_host##*@}"
-pw_args=()
+pw_args=(--workers=1)
 case "$url_host" in
-  localhost|localhost:*|*.localhost|*.localhost:*|*.local|*.local:*|*.local.com|*.local.com:*|*.test|*.test:*|127.*|10.*|192.168.*|\[::1\]*|0.0.0.0|0.0.0.0:*|172.1[6-9].*|172.2[0-9].*|172.3[01].*) : ;;
-  *) pw_args=(--workers=1) ;;
+  localhost|localhost:*|*.localhost|*.localhost:*|*.local|*.local:*|*.local.com|*.local.com:*|*.test|*.test:*|\[::1\]*|0.0.0.0|0.0.0.0:*) pw_args=() ;;
+  *)
+    # Private ranges apply to a dotted IPv4 address only, by octet, as in prod-gate.sh:
+    # a prefix glob would also give `10.example.com` the local parallelism.
+    ip="${url_host%%:*}"
+    case "$ip" in
+      *[!0-9.]*) ;;
+      *.*.*.*)
+        IFS=. read -r o1 o2 _ <<< "$ip"
+        case "$o1" in
+          10|127) pw_args=() ;;
+          192) [ "$o2" = 168 ] && pw_args=() ;;
+          172) [ "${o2:-0}" -ge 16 ] && [ "${o2:-0}" -le 31 ] && pw_args=() ;;
+        esac ;;
+    esac ;;
 esac
 
 # ---------------------------------------------------------------------------

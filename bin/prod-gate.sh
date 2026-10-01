@@ -72,7 +72,17 @@ host="$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')"
 [ -n "$host" ] || { echo "cannot read a host from: $target" >&2; exit 1; }
 local_host=0
 case "$host" in
-  localhost|*.localhost|*.local|*.local.com|*.test|127.*|10.*|192.168.*|\[::1\]|0.0.0.0|172.1[6-9].*|172.2[0-9].*|172.3[01].*) local_host=1 ;;
+  localhost|*.localhost|*.local|*.local.com|*.test|\[::1\]|0.0.0.0) local_host=1 ;;
+  # Private ranges apply to a dotted IPv4 address only, by octet: a prefix glob would also
+  # pass `10.example.com` or `172.160.0.1` through ungated.
+  *[!0-9.]*) ;;
+  *.*.*.*)
+    IFS=. read -r o1 o2 _ <<< "$host"
+    case "$o1" in
+      10|127) local_host=1 ;;
+      192) [ "$o2" = 168 ] && local_host=1 ;;
+      172) [ "${o2:-0}" -ge 16 ] && [ "${o2:-0}" -le 31 ] && local_host=1 ;;
+    esac ;;
 esac
 
 mkdir -p "$dir" || { echo "cannot create $dir" >&2; exit 1; }
@@ -86,7 +96,7 @@ case "$mode" in
   mark)
     reason="${1:-blocked}"
     printf '%s %s\n' "$(date -u +%FT%TZ)" "$reason" > "$blocked"
-    echo "marked $host blocked: $reason"; exit 0 ;;
+    echo "marked $host blocked: $reason" >&2; exit 0 ;;
 esac
 
 [ "${1:-}" = "--" ] && shift
@@ -121,8 +131,16 @@ fi
 "$@" 9>&-
 rc=$?
 now > "$stamp"
-is_curl=0
-for a in "$@"; do case "$a" in curl|*/curl) is_curl=1; break ;; esac; done
+# The command is curl when it is the program run, directly or through `timeout`/`env`;
+# an argument that merely ends in /curl (a URL, a path) does not count.
+is_curl=0 i=1
+case "${!i}" in
+  timeout|gtimeout|*/timeout|*/gtimeout)
+    i=2; while [ "$i" -le $# ] && [[ "${!i}" == -* ]]; do i=$((i + 1)); done; i=$((i + 1)) ;;
+  env|*/env)
+    i=2; while [ "$i" -le $# ] && [[ "${!i}" == -* || "${!i}" == *=* ]]; do i=$((i + 1)); done ;;
+esac
+[ "$i" -le $# ] && case "${!i}" in curl|*/curl) is_curl=1 ;; esac
 if [ "$is_curl" -eq 1 ]; then
   timeouts="$dir/$key.timeouts"
   case "$rc" in

@@ -98,7 +98,7 @@ function parseArgs(argv) {
       case '--timeout': o.timeout = num(next(), a); break;
       case '--budget': o.budget = num(next(), a); break;
       case '--insecure': o.insecure = true; break;
-      case '--delay-ms': o.delayMs = num(next(), a); break;
+      case '--delay-ms': o.delayMs = Math.floor(num(next(), a)); break;
       case '--stop-on-block': o.stopOnBlock = true; break;
       case '-h': case '--help': process.stdout.write(USAGE + '\n'); process.exit(0);
       default: usage(`unknown argument ${a}`);
@@ -217,8 +217,10 @@ async function request(o, url, deadline) {
     const code = e.cause?.code || e.code || e.name;
     // DNS failure is a dead link by definition; anything else is a failure to measure.
     if (code === 'ENOTFOUND') return { verdict: 'broken', status: null, reason: 'DNS: host not found' };
-    return { verdict: 'unmeasured', status: null, blocked: o.stopOnBlock && (code === 'ECONNREFUSED' || code === 'ECONNRESET'),
+    const result = { verdict: 'unmeasured', status: null,
       reason: timeout ? `timeout after ${o.timeout}s` : `request failed: ${code}` };
+    if (o.stopOnBlock && (code === 'ECONNREFUSED' || code === 'ECONNRESET')) result.blocked = true;
+    return result;
   }
 }
 

@@ -81,6 +81,24 @@ PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://drop.example -- timeout 30 curl 
 set -e
 [ "$rd" -eq 4 ] || fail "two curl timeouts (curl wrapped in timeout) did not mark the host blocked"
 
+# 4f. A command that is not curl is not judged as curl, even with an argument ending in /curl.
+printf '#!/usr/bin/env bash\nexit 7\n' > "$tmp/bin/notcurl"
+set +e; PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://argcurl.example -- notcurl https://argcurl.example/api/curl 2>/dev/null
+"$gate" --status https://argcurl.example >/dev/null; ra=$?; set -e
+[ "$ra" -eq 0 ] || fail "a non-curl command with a /curl argument marked the host blocked"
+
+# 4g. Private ranges match a dotted IPv4 address only: a host name or a public address that
+#     shares the prefix is gated.
+for h in 10.example.com 172.160.0.1 192.168.example.com; do
+  "$gate" --delay 0 "https://$h" -- true
+  [ -e "$WP_AUDIT_GATE_DIR/$(printf '%s' "$h" | tr -c 'a-z0-9.-' '_').last" ] || fail "$h was treated as a local host"
+done
+for h in 10.0.0.5 172.20.1.1 192.168.1.10 127.0.0.1; do
+  "$gate" --delay 0 "https://$h" -- true
+  [ ! -e "$WP_AUDIT_GATE_DIR/$(printf '%s' "$h" | tr -c 'a-z0-9.-' '_').last" ] || fail "$h was not treated as a local host"
+done
+
+
 # 5. The measurement is unchanged: the suite keeps its tests and paces only a public URL,
 #    and link-sweep's delay is opt-in.
 grep -Fq 'pw_args=(--workers=1)' bin/audit-suite.sh || fail "audit-suite.sh no longer drops to one worker for a public URL"
