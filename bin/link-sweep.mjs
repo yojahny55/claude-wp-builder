@@ -46,7 +46,7 @@
  *                  [--per-page <n>] [--max <n>] [--timeout <s>] [--budget <s>] [--insecure]
  *                  [--delay-ms <n>] [--stop-on-block]
  *
- * --delay-ms waits that long after each request, per worker. Use it with --concurrency 1
+ * --delay-ms waits that long after each request and runs the sweep with one worker. Use it
  * against a production host behind fail2ban, CrowdSec or ModSecurity, where a fast
  * sequential sweep still fills a crawl-rate bucket. It changes the pace, not which links
  * are requested. --stop-on-block ends the sweep at the first 429, WAF 403, refused or reset
@@ -109,7 +109,9 @@ function parseArgs(argv) {
   o.concurrency = Math.min(Math.max(1, Math.floor(o.concurrency)), MAX_CONCURRENCY);
   // A request already in flight cannot be recalled when another detects a block, so a
   // ban-sensitive sweep runs one at a time rather than send more after the first refusal.
-  if (o.stopOnBlock) o.concurrency = 1;
+  // A delay paces the host only when one request is in flight; with N workers the real gap
+  // would be delayMs / N.
+  if (o.stopOnBlock || o.delayMs > 0) o.concurrency = 1;
   return o;
 }
 

@@ -27,6 +27,8 @@ out="$("$gate" http://site.local.com -- echo local-ok)"
 [ ! -e "$WP_AUDIT_GATE_DIR/site.local.com.last" ] || fail "local host left pacing state"
 
 # 2. Two concurrent calls to one public host run one after the other, --delay apart.
+#    The timing needs sub-second clock reads; BSD date prints a literal N for %N.
+case "$(date +%s.%N)" in *N*) echo "SKIP: date has no %N"; echo PASS; exit 0 ;; esac
 log="$tmp/order.log"
 job() { "$gate" --delay 1 https://example.org/x -- bash -c "echo start-$1 \$(date +%s.%N) >> '$log'; sleep 1; echo end-$1 \$(date +%s.%N) >> '$log'"; }
 job a & job b & wait
@@ -81,6 +83,15 @@ PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://drop.example -- timeout 30 curl 
 set -e
 [ "$rd" -eq 4 ] || fail "two curl timeouts (curl wrapped in timeout) did not mark the host blocked"
 
+# 4e2. Any other result between two timeouts breaks the run: timeout, success, timeout is not a ban.
+printf '#!/usr/bin/env bash\nexit "${FAKE_RC:-28}"\n' > "$tmp/bin/curl"
+set +e
+PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://flaky.example -- curl https://flaky.example/ 2>/dev/null
+FAKE_RC=0 PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://flaky.example -- curl https://flaky.example/ 2>/dev/null
+PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://flaky.example -- curl https://flaky.example/ 2>/dev/null
+"$gate" --status https://flaky.example >/dev/null; rf=$?; set -e
+[ "$rf" -eq 0 ] || fail "a successful curl between two timeouts did not reset the timeout count"
+
 # 4f. A command that is not curl is not judged as curl, even with an argument ending in /curl.
 printf '#!/usr/bin/env bash\nexit 7\n' > "$tmp/bin/notcurl"
 set +e; PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://argcurl.example -- notcurl https://argcurl.example/api/curl 2>/dev/null
@@ -91,7 +102,11 @@ set +e; PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://argcurl.example -- notcu
 set +e
 PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://nest.example -- timeout -s KILL 30 env FOO=1 curl https://nest.example/ 2>/dev/null
 PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://nest.example -- timeout -k 5 30 env FOO=1 curl https://nest.example/ 2>/dev/null
+PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://envu.example -- env -u HOME curl https://envu.example/ 2>/dev/null
+PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://envu.example -- env -u HOME curl https://envu.example/ 2>/dev/null
+"$gate" --status https://envu.example >/dev/null; ru=$?
 "$gate" --status https://nest.example >/dev/null; rn=$?; set -e
+[ "$ru" -eq 4 ] || fail "curl under 'env -u HOME' was not judged as curl"
 [ "$rn" -eq 4 ] || fail "curl under 'timeout -s KILL 30 env' was not judged as curl"
 
 # 4g. Private ranges match a dotted IPv4 address only: a host name or a public address that

@@ -151,7 +151,13 @@ while [ "$i" -le $# ]; do
       i=$((i + 1)) ;;  # the duration
     env|*/env)
       i=$((i + 1))
-      while [ "$i" -le $# ] && [[ "${!i}" == -* || "${!i}" == *=* ]]; do i=$((i + 1)); done ;;
+      while [ "$i" -le $# ]; do
+        case "${!i}" in
+          -u|-C|-S|--unset|--chdir|--split-string) i=$((i + 2)) ;;  # options that take a separate value
+          -*|*=*) i=$((i + 1)) ;;
+          *) break ;;
+        esac
+      done ;;
     curl|*/curl) is_curl=1; break ;;
     *) break ;;
   esac
