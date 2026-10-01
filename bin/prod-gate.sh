@@ -124,7 +124,8 @@ if [ -f "$stamp" ]; then
   # Fixed-point: awk's default %.6g prints 5e-05, which some sleep builds reject, and a
   # failed sleep would send the command unpaced.
   wait_s="$(awk -v l="$last" -v d="$delay" -v n="$(now)" 'BEGIN { w = l + d - n; printf "%.6f\n", (w > 0 ? w : 0) }')"
-  sleep "$wait_s"
+  # An interrupted sleep would send the command early, so a failed sleep sends nothing.
+  sleep "$wait_s" || { echo "prod-gate: pacing sleep interrupted. Nothing sent; call again." >&2; exit 1; }
   # --mark-blocked does not take the lock, so a ban recorded during the sleep must stop this send.
   if [ -f "$blocked" ]; then
     echo "BLOCKED: $host -- $(cat "$blocked"). Nothing sent; report this check UNMEASURED." >&2

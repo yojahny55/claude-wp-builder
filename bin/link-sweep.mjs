@@ -294,6 +294,7 @@ async function main() {
   let inFlight = 0;
   let peak = 0;
   let blocked = null;
+  let sent = 0;
   const worker = async () => {
     while (next < queue.length) {
       const r = queue[next++];
@@ -302,6 +303,7 @@ async function main() {
         continue;
       }
       inFlight++;
+      sent++;
       peak = Math.max(peak, inFlight);
       try { Object.assign(r, await request(o, r.url, deadline)); } finally { inFlight--; }
       if (r.blocked && o.stopOnBlock && !blocked) blocked = `the sweep stopped at a block on ${r.url}`;
@@ -310,7 +312,7 @@ async function main() {
   };
   await Promise.all(Array.from({ length: Math.min(o.concurrency, queue.length) }, worker));
 
-  const summary = { total: all.length, requested: queue.length, concurrency: o.concurrency,
+  const summary = { total: all.length, requested: sent, concurrency: o.concurrency,
     peak_in_flight: peak };
   if (blocked) summary.stopped = blocked;
   for (const r of all) {
