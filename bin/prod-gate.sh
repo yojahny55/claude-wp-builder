@@ -44,7 +44,7 @@
 set -uo pipefail
 
 dir="${WP_AUDIT_GATE_DIR:-${TMPDIR:-/tmp}/wp-audit-gate}" delay=2 wait_max=300 mode=run
-need() { [ $# -ge 2 ] && [ -n "$2" ] || { echo "$1 needs a value"; exit 1; }; }
+need() { [ $# -ge 2 ] && [ -n "$2" ] || { echo "$1 needs a value" >&2; exit 1; }; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --dir) need "$@"; dir="$2"; shift 2 ;;
@@ -55,24 +55,27 @@ while [ $# -gt 0 ]; do
     *) break ;;
   esac
 done
+# BSD date has no %N and prints a literal N; fall back to whole seconds there.
+now() { local t; t="$(date +%s.%N 2>/dev/null)"; case "$t" in ''|*N*) date +%s ;; *) printf '%s\n' "$t" ;; esac; }
+
 target="${1:-}"
-[ -n "$target" ] || { echo "usage: prod-gate.sh [--dir d] [--delay s] <host> -- <command...>"; exit 1; }
+[ -n "$target" ] || { echo "usage: prod-gate.sh [--dir d] [--delay s] <host> -- <command...>" >&2; exit 1; }
 shift
-case "$delay" in ''|*[!0-9.]*|*.*.*|.) echo "--delay must be a number"; exit 1 ;; esac
-case "$wait_max" in ''|*[!0-9]*) echo "--wait must be an integer"; exit 1 ;; esac
+case "$delay" in ''|*[!0-9.]*|*.*.*|.) echo "--delay must be a number" >&2; exit 1 ;; esac
+case "$wait_max" in ''|*[!0-9]*) echo "--wait must be an integer" >&2; exit 1 ;; esac
 
 # One key per server: drop scheme, path, query, fragment, userinfo and port, so that
 # `https://h?author=1`, `https://h:443/x` and `h` share one lock and one blocked flag.
 host="${target#*://}"; host="${host%%/*}"; host="${host%%\?*}"; host="${host%%#*}"; host="${host##*@}"
 case "$host" in \[*\]*) host="${host%%]*}]" ;; *) host="${host%%:*}" ;; esac
 host="$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')"
-[ -n "$host" ] || { echo "cannot read a host from: $target"; exit 1; }
+[ -n "$host" ] || { echo "cannot read a host from: $target" >&2; exit 1; }
 local_host=0
 case "$host" in
   localhost|*.localhost|*.local|*.local.com|*.test|127.*|10.*|192.168.*|\[::1\]|0.0.0.0|172.1[6-9].*|172.2[0-9].*|172.3[01].*) local_host=1 ;;
 esac
 
-mkdir -p "$dir" || { echo "cannot create $dir"; exit 1; }
+mkdir -p "$dir" || { echo "cannot create $dir" >&2; exit 1; }
 key="$(printf '%s' "$host" | tr -c 'a-z0-9.-' '_')"
 blocked="$dir/$key.blocked" stamp="$dir/$key.last" lock="$dir/$key.lock"
 
@@ -87,13 +90,13 @@ case "$mode" in
 esac
 
 [ "${1:-}" = "--" ] && shift
-[ $# -gt 0 ] || { echo "usage: prod-gate.sh [--dir d] [--delay s] <host> -- <command...>"; exit 1; }
+[ $# -gt 0 ] || { echo "usage: prod-gate.sh [--dir d] [--delay s] <host> -- <command...>" >&2; exit 1; }
 
 # A development host keeps its old behaviour: no lock, no delay.
 if [ "$local_host" -eq 1 ]; then exec "$@"; fi
 
 command -v flock >/dev/null 2>&1 \
-  || { echo "prod-gate: flock is unavailable; refusing to send to a production host unserialized"; exit 1; }
+  || { echo "prod-gate: flock is unavailable; refusing to send to a production host unserialized" >&2; exit 1; }
 exec 9>"$lock"
 if ! flock -w "$wait_max" 9; then
   echo "prod-gate: $host busy for more than ${wait_max}s (another agent's command). Nothing sent; call again later." >&2
@@ -105,14 +108,14 @@ if [ -f "$blocked" ]; then
 fi
 if [ -f "$stamp" ]; then
   last="$(cat "$stamp" 2>/dev/null || echo 0)"
-  wait_s="$(awk -v l="$last" -v d="$delay" -v n="$(date +%s.%N)" 'BEGIN { w = l + d - n; print (w > 0 ? w : 0) }')"
+  wait_s="$(awk -v l="$last" -v d="$delay" -v n="$(now)" 'BEGIN { w = l + d - n; print (w > 0 ? w : 0) }')"
   sleep "$wait_s"
 fi
 # The child must not inherit fd 9: a process it leaves behind (a browser, `cmd &`) would
 # otherwise hold the host's lock after the command returns.
 "$@" 9>&-
 rc=$?
-date +%s.%N > "$stamp"
+now > "$stamp"
 is_curl=0
 for a in "$@"; do case "$a" in curl|*/curl) is_curl=1; break ;; esac; done
 if [ "$is_curl" -eq 1 ]; then

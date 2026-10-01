@@ -107,6 +107,9 @@ function parseArgs(argv) {
   if (!o.site) usage('--site is required');
   try { o.siteUrl = new URL(o.site); } catch { usage(`--site is not a URL: ${o.site}`); }
   o.concurrency = Math.min(Math.max(1, Math.floor(o.concurrency)), MAX_CONCURRENCY);
+  // A request already in flight cannot be recalled when another detects a block, so a
+  // ban-sensitive sweep runs one at a time rather than send more after the first refusal.
+  if (o.stopOnBlock) o.concurrency = 1;
   return o;
 }
 
@@ -295,7 +298,7 @@ async function main() {
       peak = Math.max(peak, inFlight);
       try { Object.assign(r, await request(o, r.url, deadline)); } finally { inFlight--; }
       if (r.blocked && o.stopOnBlock && !blocked) blocked = `the sweep stopped at a block on ${r.url}`;
-      if (o.delayMs > 0 && next < queue.length) await new Promise((res) => setTimeout(res, o.delayMs));
+      if (!blocked && o.delayMs > 0 && next < queue.length) await new Promise((res) => setTimeout(res, o.delayMs));
     }
   };
   await Promise.all(Array.from({ length: Math.min(o.concurrency, queue.length) }, worker));
