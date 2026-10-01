@@ -121,7 +121,9 @@ if [ -f "$blocked" ]; then
 fi
 if [ -f "$stamp" ]; then
   last="$(cat "$stamp" 2>/dev/null || echo 0)"
-  wait_s="$(awk -v l="$last" -v d="$delay" -v n="$(now)" 'BEGIN { w = l + d - n; print (w > 0 ? w : 0) }')"
+  # Fixed-point: awk's default %.6g prints 5e-05, which some sleep builds reject, and a
+  # failed sleep would send the command unpaced.
+  wait_s="$(awk -v l="$last" -v d="$delay" -v n="$(now)" 'BEGIN { w = l + d - n; printf "%.6f\n", (w > 0 ? w : 0) }')"
   sleep "$wait_s"
   # --mark-blocked does not take the lock, so a ban recorded during the sleep must stop this send.
   if [ -f "$blocked" ]; then
