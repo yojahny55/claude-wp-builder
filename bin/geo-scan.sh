@@ -81,7 +81,8 @@ fi
 
 body=$(mktemp)
 stream=$(mktemp)
-trap 'rm -f "$body" "$stream"' EXIT
+scan_err=$(mktemp)
+trap 'rm -f "$body" "$stream" "$scan_err"' EXIT
 
 # `--get --data-urlencode` builds ?url=<encoded> without a hand-rolled encoder. `-w` gives
 # the status even when the body is an error document; `|| true` keeps `set -e` out of it.
@@ -92,18 +93,18 @@ fetch_report() {
 }
 
 # Start a scan and wait for it. The stream ends with a `scan_complete` or `scan_archived`
-# event when the report exists, or an `error` event when it does not. The limit stays under
-# the 120 s a caller's tool call gets by default, so a slow scan ends here as exit 2 and
-# not as a killed process with no message.
+# event when the report exists, or an `error` event when it does not. An SSE stream stays
+# open on its own, so the limit is curl's `--max-time`, which needs no `timeout` binary and
+# always applies. It stays under the 120 s a caller's tool call gets by default, so a slow
+# scan ends here as exit 2 and not as a killed process with no message. curl's stderr is
+# kept so a failed scan can say why (DNS, TLS, refused) instead of only "did not complete".
 start_scan() {
-  local limit=""
-  if command -v timeout >/dev/null 2>&1; then limit="timeout 100"
-  elif command -v gtimeout >/dev/null 2>&1; then limit="gtimeout 100"; fi
-  $limit curl -sS -N -o "$stream" \
+  curl -sS -N --max-time 100 -o "$stream" \
     -H 'Accept: text/event-stream' -H 'Cache-Control: no-store' \
     --get --data-urlencode "target=https://$host" \
-    https://is-agentic.com/api/scan/stream 2>/dev/null || true
-  grep -Eq '"type" *: *"(scan_complete|scan_archived)"' "$stream"
+    https://is-agentic.com/api/scan/stream 2>"$scan_err" || true
+  # Match the event only in an SSE `data:` line, not in a comment or another field.
+  grep -Eq '^data:.*"type" *: *"(scan_complete|scan_archived)"' "$stream"
 }
 
 http=$(fetch_report)
@@ -113,7 +114,8 @@ if [ "$http" = "404" ] && [ "$start" -eq 1 ]; then
   if start_scan; then
     http=$(fetch_report)
   else
-    echo "SKIP: the is-agentic scan for $host did not complete — retry, or scan once at https://is-agentic.com"
+    reason=$(tail -n 1 "$scan_err")
+    echo "SKIP: the is-agentic scan for $host did not complete${reason:+ ($reason)} — retry, or scan once at https://is-agentic.com"
     exit 2
   fi
 fi

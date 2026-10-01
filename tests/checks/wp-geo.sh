@@ -65,6 +65,8 @@ grep -q 'gtimeout' bin/geo-scan.sh || fail "bin/geo-scan.sh must fall back to gt
 grep -q 'is-agentic.com/api/v1/report' bin/geo-scan.sh || fail "bin/geo-scan.sh must call the public report API"
 # --start triggers a missing scan through the same HTTP endpoint the npm CLI uses, not the package.
 grep -q 'is-agentic.com/api/scan/stream' bin/geo-scan.sh || fail "bin/geo-scan.sh --start must start a scan through /api/scan/stream"
+# An SSE stream never closes on its own: the scan needs a limit that does not depend on a `timeout` binary.
+grep -q -- '--max-time' bin/geo-scan.sh || fail "bin/geo-scan.sh --start must cap the scan stream with curl --max-time"
 out=$(bash bin/geo-scan.sh example.com --bogus 2>&1) && status=0 || status=$?
 [ "$status" -eq 1 ] || fail "bin/geo-scan.sh must reject an unknown flag with exit 1 (got $status)"
 
