@@ -8,7 +8,7 @@
   only read existing reports, so the first audit of a site always ended `UNMEASURED` with
   "scan it once at is-agentic.com", and somebody had to run `npx is-agentic` by hand before
   the score existed. `--start` makes the call that CLI makes — `GET /api/scan/stream`, a
-  server-sent-event stream — with curl, waits up to 90 s for `scan_complete` or
+  server-sent-event stream — with curl, waits up to 85 s for `scan_complete` or
   `scan_archived`, and reads the report. No npm package is run, so the supply-chain reason
   the script stopped using `npx` still holds. `/wp-audit` passes it for a host the operator
   confirmed as public this run. `/wp-yolo` does not: a scan makes a third party fetch the
