@@ -23,6 +23,21 @@
   public URL only, and `link-sweep.mjs` gains an opt-in `--delay-ms`. A development host
   bypasses the gate, so local audits run exactly as before. `tests/checks/audit-prod-gate.sh`
   runs the gate for real.
+- **`/wp-audit` on a local clone no longer leaves measurable checks unmeasured, and a
+  report-only run writes nothing.** Agents read "live checks never target the clone" as
+  "everything rendered goes to production", so contrast, target size, focus, layout shift and
+  form validation came back `UNMEASURED` although they depend only on markup and CSS the clone
+  shares. Step 2.3 now carries a clone-safe versus production-only table, passed to every
+  agent; Step 6.8 rejects browser-category reports with no browser evidence and re-dispatches
+  each `UNMEASURED` whose reason is not credentials, network, production or tier; Step 6.2
+  runs the read-only GEO scan in every mode, so `--report-only` no longer leaves `Live scan:`
+  pending. The security and practices auditors deleted the `update_core` / `update_plugins`
+  transients, a database write; they now do so only with `Report-only: no` and otherwise
+  report the data's age. A clone with an active mail-transport plugin and no `pre_wp_mail`
+  filter is flagged before any form is submitted, with a block recipe in
+  `skills/wp-cli-patterns/`. Step 6.8 also prints `executed/catalog` per category with the unexecuted ids, requires
+  agents to return `checks_executed` as a field, and reports `INCOMPLETE` under 90% with an
+  unblocked id. Covered by `tests/checks/audit-clone-measurement.sh`.
 
 ### Added
 

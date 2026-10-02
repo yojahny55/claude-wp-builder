@@ -195,14 +195,19 @@ unrecoverable and nothing should keep pointing at it.
 some earlier background request. With no route to `api.wordpress.org` the refresh fails
 silently, the stale transient answers, and a count of `0` reports "no updates pending" when the
 real answer may be a dozen. Reach the API first, then delete the transients so the counts are
-rebuilt:
+rebuilt. Delete them only when the dispatch context says `Report-only: no`; deleting a
+transient is a database write, and a report-only run writes nothing:
 
 ```bash
 curl -sS --max-time 10 -o /dev/null https://api.wordpress.org/core/version-check/1.7/ \
   || echo "no route — WP-043 and WP-044 are UNMEASURED"
-$WP transient delete update_core
-$WP transient delete update_plugins
+$WP transient delete update_core      # Report-only: no only
+$WP transient delete update_plugins   # Report-only: no only
 ```
+
+With `Report-only: yes`, read the transient instead (`$WP transient get update_plugins
+--format=json`), report its `last_checked` age, and when it is older than 12 hours query the
+update API directly or report the count `UNMEASURED — cached data from <date>`.
 
 Without the route both checks are `UNMEASURED`, with the curl command as their evidence line.
 `agents/wp-audit-security.md` carries the same gate as SEC-038.
