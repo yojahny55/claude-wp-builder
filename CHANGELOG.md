@@ -10,7 +10,7 @@
   non-crawler address, which also blocks sync, pulls and the rest of the audit. The per-UA
   probe now runs on local and staging only. On a live host, A23 is inferred from
   `robots.txt`, WAF or bot-manager config and one neutral self-identifying fetch, and is
-  reported as `unverified-live`.
+  reported as `UNMEASURED`.
 
 - **Audits no longer get the auditing IP banned by a production WAF.** `/wp-audit`
   dispatches its agents in parallel. The "4 requests in flight" limit applied to each agent,

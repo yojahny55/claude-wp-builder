@@ -310,7 +310,8 @@ echo wp_json_encode(\$out);
    also cuts the auditor off from the site (sync, pulls, other checks). Probe per-UA only
    on a local or staging host that the project owns. For a live host, infer A23 from
    `robots.txt`, the WAF/bot-manager configuration and one plain fetch with a neutral,
-   self-identifying UA, and mark the finding `unverified-live` instead of spoofing.
+   self-identifying UA. Report A23 as `UNMEASURED` with a note that it was inferred and
+   not probed per UA. Never spoof to close the gap.
 6. **GEO-A26** — the web server answers a physical file before PHP ever runs, so a
    `llms.txt` sitting at the web root **wins over the theme's rewrite permanently**. The
    theme's endpoint is then dead code: it is correct, it is tested, and nothing it produces
