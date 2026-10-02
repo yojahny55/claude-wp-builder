@@ -515,3 +515,30 @@ $WP menu location list --format=table
 $WP rewrite flush
 $WP cache flush
 ```
+
+## Guard a clone against outbound mail and calls
+
+A restored clone carries the production SMTP credentials and any newsletter or webhook
+integration. Before submitting a form, subscribing, or running any audit that exercises one,
+drop a temporary must-use plugin that refuses mail and non-local HTTP:
+
+```bash
+mkdir -p wp-content/mu-plugins
+cat > wp-content/mu-plugins/zz-clone-guard.php <<'PHP'
+<?php
+// Temporary: remove when the test run ends.
+add_filter( 'pre_wp_mail', '__return_false', 1 );
+add_filter( 'pre_http_request', function ( $pre, $args, $url ) {
+	$host = wp_parse_url( $url, PHP_URL_HOST );
+	$home = wp_parse_url( home_url(), PHP_URL_HOST );
+	return ( $host && $host !== $home && 'localhost' !== $host ) ? new WP_Error( 'clone_guard', 'Blocked on clone: ' . $host ) : $pre;
+}, 1, 3 );
+PHP
+```
+
+Check it loaded: `$WP eval 'echo has_filter("pre_wp_mail") ? "guarded" : "open";'`.
+
+Cleanup is part of the recipe, not an afterthought: delete the test rows the run created
+(form entries, subscribers, comments), then `rm wp-content/mu-plugins/zz-clone-guard.php`.
+A browser pointed at the clone must also route-block third-party analytics and reCAPTCHA
+hosts, or it reports real hits to the production property.

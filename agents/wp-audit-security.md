@@ -492,7 +492,9 @@ if ! curl -sS --max-time 10 -o /dev/null https://api.wordpress.org/core/version-
 fi
 ```
 
-Then force the transients to be rebuilt rather than trusting whatever is cached:
+Then, **only when the dispatch context says `Report-only: no`**, force the transients to be
+rebuilt rather than trusting whatever is cached. Deleting a transient is a database write, and
+a report-only run writes nothing (see "Report-only writes nothing" below):
 
 ```bash
 $WP transient delete update_core
@@ -507,8 +509,15 @@ Rules that follow from this:
 - When the request fails, SEC-032, SEC-033 and SEC-034's update column are `UNMEASURED`, with
   the curl command as the evidence line. They are **never** reported as passing, and never as
   "0 updates pending".
-- When the request succeeds, delete the three transients first. A count read without deleting
-  them is a measurement of the cache, not of the site.
+- When the request succeeds and `Report-only: no`, delete the three transients first. A count
+  read without deleting them is a measurement of the cache, not of the site.
+- **Report-only writes nothing.** With `Report-only: yes` do not delete, set or update any
+  transient or option. Read the transient and report its age (`last_checked`); when it is
+  older than 12 hours, ask the API directly instead
+  (`curl -sS https://api.wordpress.org/core/version-check/1.7/`,
+  `https://api.wordpress.org/plugins/update-check/1.1/`) or report the count `UNMEASURED —
+  cached data from <date>`. A stale count stated as current is the defect; a read-only run
+  that says how old its data is has none.
 - Report the age of the data either way: `$WP transient get update_plugins --format=json` carries
   a `last_checked` timestamp, and a reader who sees it is a week old can judge the count.
 

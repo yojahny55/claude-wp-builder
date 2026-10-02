@@ -273,6 +273,53 @@ So when a live check needs a URL and `local_clone` is true:
 3. If no production URL is available, the live check is `UNMEASURED` with "needs the public
    URL", never `PASS`.
 
+### Clone-safe versus production-only measurement
+
+"Never probe the clone for live checks" does not mean "send everything to production". A
+check that depends only on the markup and CSS the theme and plugins emit gives the same answer
+on the clone, so it is measured there, with a browser when Tier 3 is available. Only what the
+server, the network or real traffic shapes needs production.
+
+| Clone-safe — measure on the clone | Production-only — needs the confirmed public URL, else `UNMEASURED` |
+|---|---|
+| contrast, target size, focus visibility, hover/active feedback, text-spacing | response headers (CSP, HSTS, cache-control, `X-Powered-By`) |
+| keyboard menu behaviour, form validation, layout shift (CLS) | `robots.txt`, `sitemap.xml` and `llms.txt` as served |
+| rendered head, schema graph, heading order, alt text, DOM structure | server rules (`.htaccess` vs nginx), redirects, TLS, HTTP version |
+| theme source, `$WP` options, postmeta, plugin list, file permissions | CDN and page-cache behaviour, compression |
+| link targets resolved through `resolve-link-targets.php` | real analytics, Search Console, field data (CrUX) |
+
+Pass this split to every agent in Step 6. An agent that reports a clone-safe check `UNMEASURED`
+because "this is a clone" has misread the rule, and Step 6.8 sends it back.
+
+**A browser pointed at a clone must not reach third parties.** Route-block analytics,
+tag-manager, reCAPTCHA and pixel hosts (everything that is not the clone's own origin or its
+CDN-served assets) for the whole run: a headless browser on the clone host otherwise sends
+real hits to the production analytics property.
+
+### A clone with a live mail transport is a finding, before any form is submitted
+
+A restored database carries the SMTP plugin's credentials and forced From address. A form
+submitted on the clone then sends real mail, and a newsletter plugin subscribes real addresses.
+Step 2.3's isolation table treats "mail plugin deactivated" as a clone artifact; the opposite
+state, a mail plugin **active and configured**, is not an artifact, it is a hazard.
+
+When `local_clone` is true and Tier 2 is available, measure it before dispatch:
+
+```bash
+$WP plugin list --status=active --field=name | grep -Ei 'smtp|mail|sendgrid|mailgun|postmark|ses|brevo|sendinblue'
+$WP eval 'echo has_filter("pre_wp_mail") ? "guarded" : "open";'
+ls wp-content/mu-plugins 2>/dev/null
+```
+
+An active mail-transport plugin with no `pre_wp_mail` filter (`open`) is a **WARNING** finding
+(`Owner: setting`, resource `mail-transport`), reported at the top of the run and in the
+blocking-warnings block. Then: **do not submit any form, subscribe, or trigger any mail-sending
+action** (contact forms, newsletter, checkout, password reset) until it is guarded. Offer the
+block recipe in `skills/wp-cli-patterns/SKILL.md` ("Guard a clone against outbound mail and
+calls") as a temporary mu-plugin and tell the user to remove it, and delete the test rows it
+protected, when the audit ends. Without Tier 2 the state is `UNMEASURED`, and the same
+no-submit rule applies.
+
 Print the two facts before tier detection, next to the adopted-site block when there is one:
 
 ```
@@ -768,6 +815,18 @@ Project context:
 - Local clone: <yes|no>
 - Clone-suppressed plugins: <clone_suppressed_plugins slugs, comma-separated, or "none">
 - Parked drop-ins: <clone_parked_dropins files, comma-separated, or "none">
+- Report-only: <yes|no>
+- Measurement split: clone-safe checks run on the clone; production-only checks need the confirmed public URL (Step 2.3, "Clone-safe versus production-only measurement")
+
+**`Report-only: yes` means the audit writes nothing.** No agent deletes or sets a transient,
+option, post or user, or activates or deactivates anything; it reads and measures. Where a read
+would be stale (update transients), the agent reports the data's age, queries the source
+directly, or reports `UNMEASURED`. A write found afterwards is a defect of the run, reported as
+one.
+
+**Clone-safe checks are measured, not skipped.** When `Local clone: yes`, the agents measure
+every clone-safe check from the Step 2.3 table on the clone, with the browser when
+`Browser measurement: available`; only production-only checks wait for the public URL.
 
 Step 2.3's clone suppression covers only the "deactivated"/"parked" finding for the items
 above — nothing else about them is suppressed. A plugin listed under Clone-suppressed
@@ -842,6 +901,21 @@ agent given no pages audits nothing while reporting cleanly.
 3. Mark the failed category in the report
 4. Skip the failed category in the fix phase
 
+## Step 6.2: Live GEO scan (when `geo` is selected)
+
+The is-agentic scan is read-only on the site, so it runs here, in every mode including
+`--report-only`, and not only in the Step 9 fix phase. Run it once the public host is
+confirmed by Step 2.3 (`--host`, or `wordpress.url` when the site is not a local clone):
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host> --start
+```
+
+Use a Bash timeout of at least 150000 ms. The exit-code table in Step 9 ("GEO fixes") applies
+unchanged, and so does its rule that none of them is a pass. The returned score, or the reason
+there is none, fills the report's `Live scan:` line at Step 8; it is never left `pending` by a
+run that skips Step 9. Step 9 runs the scan again only to report the before → after score.
+
 ## Step 6.5: Run the browser suite (`--suite` only)
 
 The seven agents read code, the database and a rendered `<head>`. None of them loads the page
@@ -899,6 +973,35 @@ owns it, with one rule:
   failure the suite measured on `/contact` and one the agent found in a stylesheet rule
   that no audited page uses are both real, and the second is the one nobody would find
   again.
+
+## Step 6.8: Coverage gate — UNMEASURED is not an answer until it is justified
+
+Before Step 7, read each returned report's `UNMEASURED` list and its measurement evidence.
+
+1. **Browser evidence is required.** When `Browser measurement: available`, an `a11y`, `ux` or
+   `performance` report with no browser-measured evidence (no `getComputedStyle`, bounding box,
+   screenshot or trace line) is rejected and its agent re-dispatched with the reason.
+2. **Each `UNMEASURED` is classified by its stated reason.** Acceptable, and kept: needs
+   credentials, needs the network or a third party, needs production (Step 2.3's
+   production-only column), needs a tier the run does not have. Anything else — "not run",
+   "no browser measurement", "clone", or no reason at all — is measurable with tools already
+   present.
+3. **Re-dispatch once.** Every `UNMEASURED` with an unacceptable reason goes back to its agent
+   once, together, with the measurement split restated. What is still unmeasured after that
+   keeps the agent's second reason.
+4. **Compute coverage against the catalog.** Every agent returns `checks_executed` as a field
+   (check ids, passes included), not in prose. For each category compute
+   `executed ∩ catalog / catalog`, with the catalog read from that agent's file as Step 2.5d
+   does, and print it in the report header:
+   `security 31/44 checks executed — never run: SEC-0xx, SEC-0yy…`.
+   An agent that returns no `checks_executed` counts as 0 and is re-dispatched. A category
+   under 90% blocks "audit complete": re-dispatch the missing ids once, then list what is
+   left, each id with its specific blocker. Without a recorded blocker for every missing id
+   the report says `INCOMPLETE`, never "complete". Ids that are `N/A` by site type or clone
+   are out of the denominator, as in Step 2.5d.
+5. **Say what happened.** The report records how many checks were re-dispatched and how many
+   stayed `UNMEASURED` for each acceptable reason, so a reader sees the coverage the run
+   actually reached rather than a summary that calls it complete.
 
 ## Step 6.9: Every finding is a measurement
 
@@ -1149,7 +1252,7 @@ Categories: <comma-separated selected categories>
   ✗ WARNING: <message> (GEO-A06)
   ℹ INFO: <message>
   ○ N/A: <layer> — <rationale>
-  Live scan: <score|unavailable — skipped: <reason>> (produced by Step 9's scan, below)
+  Live scan: <score|unavailable — skipped: <reason>> (produced by Step 6.2's scan; Step 9 adds before → after)
 
 ---
 Total: N issues (X critical, Y warnings, Z info)
@@ -1412,7 +1515,7 @@ live scan existed is in, because its manifest still holds the URL it was develop
 Print the reason on the `Live scan:` line and repeat it in the blocking-warnings block at the
 top of the report. Only a returned report yields a score; map its failed ORA check ids back to GEO codes using the `wp-audit-geo-standards` skill. Advisory and off-site findings (GEO-D05 through GEO-D08, GEO-U10, GEO-P01 through GEO-P05) are left unfixed.
 
-The before → after score this step produces is the value the Step 8 report's `Live scan:` line records: the report is printed before this step runs, so at Step 8 show that line as pending and fill it here.
+The before → after score this step produces is the value the Step 8 report's `Live scan:` line records: Step 6.2 already produced the score the report shows; this step adds the after score. On a fix run, show the line as `<score> → pending` at Step 8 and fill it here.
 
 After all fix agents complete, count how many issues were successfully fixed, and count
 them by owner. Print the `setting` fixes again as a list of steps to repeat on staging and
