@@ -103,6 +103,30 @@ from here with the adopted manifest. On B, stop and say so, as the row says. A s
 only files, with no running WordPress for WP-CLI to probe, cannot be adopted. In that case
 say so and stop.
 
+**Validation checks the manifest's shape, not whether it is true.** A blank scaffold that a real
+site was later restored over passes `validate` and describes the wrong site: `source: blank`,
+a theme slug with no directory, no plugins, against ~25 active ones. When Tier 2 is reachable
+(a `wp_cli.wrapper` that answers), also run:
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs drift '${PROJECT_PATH}'"
+```
+
+Exit `0`: the manifest fits the site, continue. Exit `4`: it does not; each `drift:` line names
+a disagreement (theme directory missing, active theme differs from `theme.slug`, active
+plugins absent from `plugins.installed`). Print the lines and ask with `AskUserQuestion`:
+
+```
+.wp-create.json no longer describes this site.
+  [A] Re-adopt it — read-only detection, keeps a timestamped backup of the old manifest (recommended)
+  [B] Continue with the manifest as it is
+```
+
+On A, run `wp-adopt.md` Steps 2 to 5 with `--replace`. On B, continue, and say in the report
+that every manifest-driven choice (plugin stack, theme slug, code scope) rests on a manifest
+the drift check disputed. Exit `1` (the probe could not run) is not drift: report it and
+continue. Skip the check when there is no Tier 2.
+
 Read `.claude/CLAUDE.md` to extract:
 - **Function prefix** (e.g., `kairo_`)
 - **Theme slug**
@@ -555,6 +579,10 @@ the scope is `none`.
 Then **always** add, if they exist: the 404, and any page carrying a form. They are where a
 third of the usability catalog lives and no derivation finds them by ranking.
 
+- **Taxonomy archives** are not at `/category/<slug>/` by assumption. Read the bases first:
+  `$WP option get category_base` and `$WP option get tag_base` (empty means `category` and
+  `tag`), and take archive URLs from the sitemap or `$WP term list category --field=url`
+  rather than building them.
 - **The 404** is a URL that cannot resolve — `<site>/<a path nothing serves>`. Do not look
   for it; construct it.
 - **The form page**, at Tier 2, from the site itself rather than by fetching every candidate:
@@ -805,6 +833,7 @@ Project context:
 - Languages: <languages>
 - Industry: <industry>
 - WP-CLI wrapper: <$WP or "not available">
+- Quiet WP-CLI: <`${CLAUDE_PLUGIN_ROOT}/bin/wp-quiet.sh $WP`, or "not needed">
 - Audit tier: <1|2|3>
 - Browser measurement: <available|not available>
 - Origin: <created|adopted>
@@ -817,6 +846,13 @@ Project context:
 - Parked drop-ins: <clone_parked_dropins files, comma-separated, or "none">
 - Report-only: <yes|no>
 - Measurement split: clone-safe checks run on the clone; production-only checks need the confirmed public URL (Step 2.3, "Clone-safe versus production-only measurement")
+
+**One quiet wrapper for noisy sites.** When Step 2 or Step 3 saw a plugin print PHP notices or
+deprecations into WP-CLI's stdout, pass `${CLAUDE_PLUGIN_ROOT}/bin/wp-quiet.sh $WP` as `Quiet
+WP-CLI` and tell every agent to run `$WP` calls whose output it parses through it. It strips
+the diagnostics from stdout, leaves stderr alone and keeps the exit code. An agent that builds
+its own filter is writing the same thing nine times, differently. The wrapper is for the run:
+it is never written into `.wp-create.json`.
 
 **`Report-only: yes` means the audit writes nothing.** No agent deletes or sets a transient,
 option, post or user, or activates or deactivates anything; it reads and measures. Where a read
@@ -868,6 +904,7 @@ Run all checks for your tier level. Output your findings as a structured report 
   Resource: <the stable thing this is about — see the resource table in Step 7>
   Fix: <auto|manual>
   Owner: <code|setting|content|manual>
+  Root cause: <optional short slug shared by every finding that one defect causes, e.g. display-errors>
   Method: <description of fix>
 
 Where SEVERITY is one of: CRITICAL, WARNING, INFO
@@ -890,6 +927,28 @@ Use these `subagent_type` values:
 - `wp-audit-practices` — best practices checks (ABSPATH guards, escaping, i18n, theme supports, coding standards, enqueue patterns, template hierarchy)
 - `wp-audit-geo` — GEO/AI-agent readiness checks (ORA layers Discovery/Access/Usability/Payments, AI crawler allowlist, `llms.txt` and ARD catalog, rendered-head DOM checks, agent-skills index, is-agentic live scan)
 - `wp-audit-ux` — usability checks (forms and data entry, navigation and task flow, links followed rather than inferred, hover and active states, rendered line length per breakpoint, logo and typography consistency across pages)
+
+**Shard by surface when the read-only scope is large.** One agent per category cannot read a
+parent theme plus two dozen plugins, and an agent that cannot narrows on its own and says so
+only in a closing line. On an adopted site (Step 2.2), count `code_scope.read_only`: when it
+holds more than 6 paths, or any path over ~5 MB of PHP/JS, dispatch each source-reading
+category once per group instead of once per category:
+
+| Group | Contents |
+|---|---|
+| editable | every `code_scope.editable` path |
+| parent theme | the read-only theme path |
+| large plugins | read-only plugins over ~5 MB (page builders, commerce, form suites) |
+| mid-size plugins | ~500 KB to 5 MB, batched about 6 per agent |
+| small plugins | under ~500 KB, batched about 12 per agent |
+
+Every shard prompt names its own paths and says "your surface is exactly these paths; the
+checks that are not about source files (rendered output, options, headers) run in the
+`editable` shard only". Each shard returns its own `checks_executed`. Step 7 merges shards per
+category: findings concatenate, `checks_executed` is the union, and Step 6.8's coverage is
+computed on the union, so a check that no shard executed is reported as never run. Keep the
+dispatch to at most 4 agents at a time. The rendered-surface categories (`seo`, `geo`,
+`a11y` page checks, `usability`) are not sharded: their surface is the site, not a path list.
 
 **`wp-audit-ux` is dispatched with the page list from Step 2.7, and its prompt says so.**
 It is the only auditor whose scope is a set of URLs rather than the theme directory, and an
@@ -1099,6 +1158,14 @@ so a resource written two ways never matches and the duplicate survives:
 `/contact/` are one `UX-014 : page:/contact/` whose evidence lists all three. One row per
 link would match nothing the suite emits, and would turn a page with a bad footer into
 forty findings that are one fix.
+
+**One defect is one finding.** A production `display_errors` leak surfaces as a notice before
+the document in security, both SEO files, the GEO head and performance. Agents tag these with
+the same `Root cause:` slug, and `bin/audit-report.mjs` folds findings that share one into the
+most severe, which lists the others under `also_affects` ("same cause: SEC-0xx site, …"). The
+totals count the defect once. When no agent tagged it, the aggregator does: two findings whose
+evidence quotes the same output line (the same notice text, the same header) get a shared slug
+here, before the report runs. Findings with no root cause pass through untouched.
 
 Sort all issues: CRITICAL first, then WARNING, then INFO.
 

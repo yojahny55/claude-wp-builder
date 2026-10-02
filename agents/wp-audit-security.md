@@ -270,6 +270,23 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 - Fail: No blocking rules found
 - Message: `Sensitive WordPress files (readme.html, license.txt) are publicly accessible`
 
+**SEC-044 — Content-Security-Policy header.** Response headers belong to the host that serves
+the site, and a local clone's own server answers headers production's edge never sets (and the
+reverse), so this check reads them from the production host only. Take the public URL
+confirmed in `/wp-audit` Step 2.3; with none, record `UNMEASURED` ("needs the public URL") and
+stop. Never probe the clone and report the result as the site's.
+
+```bash
+curl -sSI --max-time 15 -A "Mozilla/5.0" "https://<production-host>/" | grep -i '^content-security-policy'
+```
+
+No `content-security-policy` header is a finding. Only `content-security-policy-report-only`
+is `INFO` (the policy is not enforced). A present policy fails when `script-src` (falling back
+to `default-src`) allows bare `*`, `data:` or `'unsafe-eval'`. A `403`, challenge page, `5xx` or
+curl error is `UNMEASURED` with the status line as evidence: a WAF answer is not the site's
+header set. WordPress themes and page builders inline scripts, so the fix is a policy built
+for the site (start report-only), never a one-line paste, and it is not auto-applied.
+
 **SEC-043 — Duplicate/redeclared function across site code:**
 - This is Tier 1 — a code scan, no network and no vulnerability feed needed. Two files that
   each declare `function acme_get_field()` at the top level cannot both load; nothing short
@@ -373,6 +390,7 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 | SEC-040 | Gateway credentials stored at rest | Read every `woocommerce_*_settings` and `woocommerce-ppcp-*` row plus the listed gateway credential options (active or not), classify key names by segment. See Procedure | No row read holds a non-empty value classified CRITICAL | CRITICAL |
 | SEC-041 | Known-vulnerable plugins/themes | Match installed plugin/theme slugs and versions against the WPScan vulnerability API (`WPSCAN_API_TOKEN`), **after the SEC-038 network gate passes**; only public slugs are sent. See Procedure | 0 vulnerable matches | CRITICAL (loaded) / WARNING (inactive) |
 | SEC-042 | Abandoned plugins | wp.org API `last_updated` older than ~2 years, or `tested` far behind the installed core version, for every loaded plugin (active, plus clone-suppressed on a local clone), **after the SEC-038 network gate passes**. See Procedure | Not abandoned | WARNING |
+| SEC-044 | Content-Security-Policy header missing or unsafe | LIVE, production only. `curl -sSI` of the confirmed public home URL (`/wp-audit` Step 2.3) and read `content-security-policy` (and `content-security-policy-report-only`). See Procedure | A `Content-Security-Policy` header is present and its `script-src` (or `default-src` fallback) does not allow bare `*`, `data:` or `'unsafe-eval'`; report-only alone is `INFO`. `UNMEASURED` ("needs the public URL") on a local clone without a confirmed public URL, never `PASS` | WARNING |
 
 SEC-040 is `N/A ("no WooCommerce")`, out of the denominator, when `site.commerce` is `none` (`/wp-audit`
 Step 2.3) — this check has nothing to read without WooCommerce installed and active.

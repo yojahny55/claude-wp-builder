@@ -8,6 +8,7 @@
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { join, resolve, basename } from 'node:path';
 import { CURRENT_VERSION, STACK_KEYS } from './manifest.mjs';
 
@@ -77,7 +78,7 @@ foreach (get_plugins() as $file => $h) {
 $mu = array(); foreach (array_keys(get_mu_plugins()) as $f) { $mu[] = $f; }
 $t = wp_get_theme(); $parent = $t->parent();
 $langs = function_exists('pll_languages_list') ? pll_languages_list() : array();
-echo wp_json_encode(array(
+echo '<<WPCB-PROBE>>' . wp_json_encode(array(
   'home' => home_url(), 'blogname' => get_option('blogname'), 'locale' => get_locale(),
   'pll_default' => function_exists('pll_default_language') ? pll_default_language() : null, 'pll_languages' => $langs,
   'multisite' => is_multisite(), 'php' => PHP_VERSION, 'wp' => get_bloginfo('version'),
@@ -86,7 +87,7 @@ echo wp_json_encode(array(
   'theme_known_to_updater' => in_array(get_stylesheet(), $tknown, true),
   'parent_known_to_updater' => $parent ? in_array(get_template(), $tknown, true) : null,
   'plugins' => $plugins, 'mu_plugins' => $mu, 'mu_path' => $rel(WPMU_PLUGIN_DIR),
-));
+)) . '<<END-WPCB-PROBE>>';
 `.replace(/\n/g, ' ');
 
 export function detectWrapper(root) {
@@ -103,12 +104,50 @@ export function runProbe(wrapper) {
   const r = spawnSync(bin, [...args, 'eval', PROBE_PHP], { encoding: 'utf8', timeout: 120000 });
   if (r.error) return { ok: false, reason: `could not run ${bin}: ${r.error.code ?? r.error.message}` };
   if (r.status !== 0) return { ok: false, reason: `${wrapper} eval exited ${r.status}: ${(r.stderr || r.stdout).trim().split('\n').pop()}` };
-  const line = r.stdout.trim().split('\n').pop();
+  return parseProbeOutput(r.stdout, wrapper);
+}
+
+// A plugin that prints on boot (deprecation notices, a logger flushing at shutdown) puts text
+// before and after the probe's JSON, so the JSON travels between sentinels and only that
+// region is parsed. Output without sentinels (an older probe, a fake) falls back to its last
+// line, which is what this function read before the sentinels existed.
+export function parseProbeOutput(stdout, wrapper = 'the wrapper') {
+  const m = /<<WPCB-PROBE>>([\s\S]*?)<<END-WPCB-PROBE>>/.exec(stdout);
+  const text = m ? m[1] : stdout.trim().split('\n').pop();
   try {
-    return { ok: true, probe: JSON.parse(line) };
+    return { ok: true, probe: JSON.parse(text) };
   } catch {
-    return { ok: false, reason: `${wrapper} eval did not print the probe's JSON (a plugin echoing on boot?)` };
+    return { ok: false, reason: `${wrapper} eval did not print the probe's JSON between its sentinels` };
   }
+}
+
+// Compare a registered manifest with the site as it is now. A blank scaffold restored over by
+// a real site validates (the schema is satisfied) and describes the wrong site, so validation
+// cannot catch it. Returns one line per disagreement; empty means the manifest still fits.
+export function manifestDrift(manifest, probe, root) {
+  const out = [];
+  const slug = manifest.theme?.slug;
+  if (slug && !existsSync(join(root, 'wp-content', 'themes', slug))) {
+    out.push(`theme.slug "${slug}" has no directory under wp-content/themes`);
+  }
+  if (slug && probe.stylesheet && slug !== probe.stylesheet) {
+    out.push(`theme.slug "${slug}" is not the active theme "${probe.stylesheet}"`);
+  }
+  const active = probe.plugins.filter((p) => p.active).map((p) => p.slug);
+  const claimed = manifest.plugins?.installed ?? [];
+  const missing = active.filter((x) => !claimed.includes(x));
+  const extra = claimed.filter((x) => !active.includes(x));
+  if (missing.length) out.push(`${missing.length} active plugin(s) not in plugins.installed: ${missing.slice(0, 8).join(', ')}${missing.length > 8 ? ', …' : ''}`);
+  if (extra.length) out.push(`${extra.length} plugin(s) in plugins.installed that are not active: ${extra.slice(0, 8).join(', ')}${extra.length > 8 ? ', …' : ''}`);
+  if (manifest.project?.source === 'blank' && active.length) out.push('project.source is "blank" but the site has active plugins');
+  return out;
+}
+
+// A wrapper that points into a temp directory is a one-run helper (a script that filters
+// plugin noise), not how this site is reached. Persisting it breaks the next command.
+export function isTransientWrapper(wrapper, tmp = tmpdir()) {
+  const bin = resolve(wrapper.trim().split(/\s+/)[0].replace(/^["']|["']$/g, ''));
+  return [tmp, '/tmp', '/var/tmp', '/dev/shm'].some((d) => bin.startsWith(`${d}/`));
 }
 
 export function detectStack(probe) {

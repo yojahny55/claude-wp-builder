@@ -102,7 +102,7 @@ does not match the detected site type are reported `N/A`, not failed.
 | GEO-A01 | JS-free content | read raw `curl` output, then the rendered DOM; require first heading `H1`, sequential headings, and body text ≥500 chars at ≥5% text-to-markup ratio | ERROR | Yes |
 | GEO-A02 | Bot detection | WAF/robots allowlist lets the AI user agents through | WARNING | Yes |
 | GEO-A03 | Redirect hygiene | real `301`/`302` redirects, no meta-refresh or JS redirect | WARNING | Yes |
-| GEO-A04 | Agent-friendly 404 | nonexistent path returns a real `404` with a short markdown body pointing at the sitemap and `llms.txt` | WARNING | Yes |
+| GEO-A04 | Agent-friendly 404 (no soft-404) | every probed nonexistent-path shape returns a real `404` with a short markdown body pointing at the sitemap and `llms.txt`; one passing shape does not pass the check. See Procedure — soft-404 shapes | WARNING | Yes |
 | GEO-A05 | Docs not auth-gated | public pages return `200`, not a login gate | WARNING | Yes |
 | GEO-A06 | Metadata completeness | rendered head carries canonical + `html lang` + `og:image` + `og:type` together | WARNING | Yes |
 | GEO-A07 | Identity JSON-LD | one Organization / LocalBusiness JSON-LD block in the rendered head | WARNING | Yes |
@@ -173,7 +173,7 @@ are published.
 | GEO-D01 | `GET /.well-known/ard.json` and `/.well-known/ai-catalog.json` | status; entry count; id/mediaType/url shape | ERROR |
 | GEO-D02 | `GET /robots.txt` | named AI user agents; `Content-Signal` present and consistent | WARNING |
 | GEO-A01 | raw `curl` body vs rendered DOM | body text length, first heading tag, heading sequence, text-to-markup ratio | ERROR |
-| GEO-A04 | `GET` a nonexistent path | status line is `404`; body points at sitemap and `llms.txt` | WARNING |
+| GEO-A04 | `GET` four nonexistent-path shapes on each host (apex and `www`) | final status line per shape is `404`; body points at sitemap and `llms.txt` | WARNING |
 | GEO-A06 | rendered head snapshot | canonical, `html lang`, `og:image`, `og:type` all present | WARNING |
 | GEO-A07 | rendered head snapshot | count of `application/ld+json` identity blocks | WARNING |
 | GEO-A08 | rendered head snapshot | `sameAs` array non-empty | INFO |
@@ -191,6 +191,32 @@ are published.
 | GEO-A21 | `GET /.well-known/agent-skills/index.json` | version `0.2.0`; each `digest` is a real `sha256:` | INFO |
 | GEO-A23 | `GET` key routes with each AI UA | status per UA; no `403` or JS-only wall | WARNING |
 | GEO-U01 | rendered DOM | `main` landmark; single `H1`; heading sequence | WARNING |
+
+### Procedure — soft-404 shapes (GEO-A04)
+
+A site can return a real `404` for the path someone thinks of first and still answer `200` for
+others, so one probe proves nothing. Probe every shape below with `curl -sS -o /dev/null -w
+'%{http_code} %{redirect_url}\n'` and then again following redirects (`-L`, final status and
+final URL). Use random, never-published strings (e.g. `zz-audit-<random>`), and run the whole
+set on **both hosts**: the apex (`example.com`) and `www.example.com`, because the two are often
+served by different layers.
+
+1. **Top-level slug** — `/<made-up-slug>/`.
+2. **Nested path** — `/<made-up-section>/<made-up-slug>/`.
+3. **Near-prefix or typo of a real post slug** — take a real published slug and truncate or
+   mistype it (`/<real-slug-minus-last-chars>`). WordPress's `redirect_guess_404_permalink`
+   sends such a request to the closest post, so the answer is a `301` to a real page and a
+   `200`, never a `404`.
+4. **File-like path** — `/<made-up-name>.php` and `/<made-up-name>.html`.
+
+Any shape that ends in `200`, or in a redirect to the home page that ends in `200`, is a
+soft-404 and the check fails. Name the shape and the host in the finding. Two cases are named
+explicitly: an **apex-to-`www` redirect that sends unknown paths to the home page with `200`**
+(the apex host's rule, not WordPress, is answering), and the near-prefix guess above (fix:
+`add_filter('do_redirect_guess_404_permalink', '__return_false')`). A near-prefix shape that
+redirects to a genuinely matching post is reported as that behaviour, not waved through.
+Ending the set with one or more shapes unreachable (timeout, WAF challenge) is `UNMEASURED` for
+those shapes, and the check cannot read `PASS` while any shape is unmeasured or failing.
 
 ### Procedure — rendered-head snapshot (GEO-A06 to GEO-A08)
 

@@ -269,7 +269,7 @@ foreach (\$posts as \$p) {
       "@type": "ListItem",
       "position": 2,
       "name": "Category",
-      "item": "https://example.com/category/"
+      "item": "https://example.com/<category_base>/<term-slug>/"
     },
     {
       "@type": "ListItem",
@@ -279,6 +279,10 @@ foreach (\$posts as \$p) {
   ]
 }
 ```
+
+`<category_base>` is never assumed to be `category`: read it with `$WP option get category_base`
+(empty means the default, `category`) and the tag equivalent with `$WP option get tag_base`
+(empty means `tag`). Build archive URLs from those values, or from `get_term_link()`.
 
 ### Article
 

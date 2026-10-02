@@ -203,6 +203,37 @@ function loadRun(path) {
 // refused here rather than rendered as an empty cell. The same goes for a check id and a
 // message: a row a reader cannot act on is worse than a row that is missing, because it
 // takes up space in a plan and looks like work that is accounted for.
+// Several checks can trip over one defect: a notice printed before the document surfaces in
+// security, both SEO files, the GEO head and performance, and counting it five times inflates
+// every total. Findings that share a `root_cause` fold into the most severe one (the first on
+// a tie), which lists the others under `also_affects`. Findings with no root_cause pass through.
+function foldRootCauses(findings) {
+  const parents = new Map();
+  const out = [];
+  for (const finding of findings) {
+    const key = typeof finding.root_cause === 'string' ? finding.root_cause.trim() : '';
+    if (!key) { out.push(finding); continue; }
+    const held = parents.get(key);
+    if (!held) {
+      const parent = { ...finding, also_affects: [...(finding.also_affects || [])] };
+      parents.set(key, parent);
+      out.push(parent);
+    } else if ((SEVERITY_ORDER[finding.severity] ?? 99) < (SEVERITY_ORDER[held.severity] ?? 99)) {
+      // A more severe sibling becomes the parent; the old parent folds under it.
+      const parent = { ...finding, also_affects: [...(finding.also_affects || []), ...held.also_affects, { check: held.check, resource: held.resource || null }] };
+      parents.set(key, parent);
+      out[out.indexOf(held)] = parent;
+    } else {
+      held.also_affects.push({ check: finding.check, resource: finding.resource || null });
+    }
+  }
+  return out;
+}
+
+const alsoText = (finding) => (finding.also_affects && finding.also_affects.length
+  ? ` (same cause: ${finding.also_affects.map((a) => (a.resource ? `${a.check} ${a.resource}` : a.check)).join(', ')})`
+  : '');
+
 function validate(findings) {
   const problems = [];
   findings.forEach((finding, index) => {
@@ -417,8 +448,11 @@ function fill(template, values) {
 
 function compare(findings, previous) {
   if (!previous) return null;
-  const now = new Set(findings.map(identity));
-  const before = new Set(previous.findings.map(identity));
+  // A folded finding is still present: its identity travels under its parent's also_affects.
+  // Without this a sibling that outlives its parent reads as resolved-and-new.
+  const withFolded = (list) => new Set(list.flatMap((f) => [identity(f), ...(f.also_affects || []).map((a) => identity(a))]));
+  const now = withFolded(findings);
+  const before = withFolded(previous.findings);
   return {
     date: previous.date,
     // A previous run that measured nothing is not one that found nothing, and the
@@ -514,7 +548,7 @@ function renderMarkdown(model) {
         t.severity[finding.severity],
         `\`${identity(finding)}\``,
         finding.page || '—',
-        finding.message,
+        finding.message + alsoText(finding),
         finding.fix || '—',
         t.ownership[finding.ownership],
       ].map(mdCell).join(' | ')} |`);
@@ -794,7 +828,7 @@ function renderHtml(model) {
 <td class="nowrap">${sevChip(finding.severity)}</td>
 <td class="num">${esc(finding.check)}</td>
 <td>${finding.page ? `<code>${esc(finding.page)}</code>` : '<span class="muted">—</span>'}</td>
-<td><b>${esc(finding.message)}</b>${finding.resource ? `<br><span class="muted">${esc(ui.resource)}: ${esc(finding.resource)}</span>` : ''}${
+<td><b>${esc(finding.message)}</b>${finding.also_affects && finding.also_affects.length ? `<br><span class="muted">${esc(alsoText(finding).trim())}</span>` : ''}${finding.resource ? `<br><span class="muted">${esc(ui.resource)}: ${esc(finding.resource)}</span>` : ''}${
     finding.evidence ? `<span class="ev" title="${esc(finding.evidence)}">${esc(ui.evidence)}: ${esc(finding.evidence)}</span>` : ''
   }</td>
 <td class="ev">${finding.fix ? esc(finding.fix) : '<span class="muted">—</span>'}</td>
@@ -942,6 +976,8 @@ function main() {
   if (problems.length) {
     die(1, `audit-report: ${problems.length} finding(s) cannot be rendered:\n  ${problems.join('\n  ')}`);
   }
+  // Folded only after every finding has been validated, so a bad sibling cannot hide in a parent.
+  const folded = foldRootCauses(findings);
 
   const date = opts.date || run.date || new Date().toISOString().slice(0, 10);
   const outDir = opts.out;
@@ -957,13 +993,13 @@ function main() {
     date,
     tier: run.tier || null,
     categories: Array.isArray(run.categories) ? run.categories : [],
-    counts: counts(findings),
-    ownership: ownershipCounts(findings),
-    byCategory: groupBy(findings, 'category'),
-    byPage: groupBy(findings, 'page'),
-    plan: sortForPlan(findings),
+    counts: counts(folded),
+    ownership: ownershipCounts(folded),
+    byCategory: groupBy(folded, 'category'),
+    byPage: groupBy(folded, 'page'),
+    plan: sortForPlan(folded),
     unmeasured: Array.isArray(run.unmeasured) ? run.unmeasured : [],
-    comparison: compare(findings, previous),
+    comparison: compare(folded, previous),
   };
 
   const written = [];
@@ -991,7 +1027,7 @@ function main() {
         tier: model.tier,
         categories: model.categories,
         unmeasured: model.unmeasured.map((entry) => ({ check: entry.check, reason: entry.reason || null })),
-        findings: findings.map((finding) => ({
+        findings: folded.map((finding) => ({
           check: finding.check,
           resource: finding.resource || null,
           severity: finding.severity,
@@ -1000,6 +1036,8 @@ function main() {
           page: finding.page || null,
           message: finding.message,
           evidence: finding.evidence || null,
+          root_cause: finding.root_cause || null,
+          also_affects: finding.also_affects && finding.also_affects.length ? finding.also_affects : null,
         })),
       },
       null,
