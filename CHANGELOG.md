@@ -23,6 +23,22 @@
   public URL only, and `link-sweep.mjs` gains an opt-in `--delay-ms`. A development host
   bypasses the gate, so local audits run exactly as before. `tests/checks/audit-prod-gate.sh`
   runs the gate for real.
+- **Re-adoption, a quiet probe and a quiet wrapper, one defect counted once, sharded dispatch.**
+  `wp-config.mjs drift` (exit `4`) reports a manifest that validates but no longer describes
+  the site (a blank scaffold a real site was restored over), `/wp-audit` Step 2 offers
+  re-adoption, and `adopt --replace` keeps a timestamped backup instead of refusing. The adopt
+  probe prints its JSON between `<<WPCB-PROBE>>` sentinels so a plugin echoing on boot no
+  longer fails it, and a `--wrapper` pointing into a temp dir is no longer persisted into the
+  manifest (`--persist-wrapper` overrides). `bin/wp-quiet.sh` strips PHP diagnostics from
+  stdout and keeps the exit code; Step 6 passes it to the agents. Findings may carry a
+  `root_cause`; `bin/audit-report.mjs` folds findings that share one into the most severe
+  (`also_affects`), so one `display_errors` leak is one finding. Step 6 shards the read-only
+  code scope of an adopted site by surface and merges `checks_executed` per category. New
+  catalog entries PERF-068 (CLS), PERF-069 (INP) and SEC-044 (CSP); GEO-A04 probes four
+  path shapes on apex and `www`; taxonomy archive URLs read `category_base`/`tag_base`.
+  Covered by `wp-adopt-drift.sh`, `audit-root-cause.sh`, `audit-adopt-sharding.sh` and
+  `audit-catalog-gaps.sh`.
+
 - **`/wp-audit` on a local clone no longer leaves measurable checks unmeasured, and a
   report-only run writes nothing.** Agents read "live checks never target the clone" as
   "everything rendered goes to production", so contrast, target size, focus, layout shift and

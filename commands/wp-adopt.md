@@ -53,6 +53,17 @@ job), and exit `1` is reported verbatim as the table says.
 bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs adopt '${PROJECT_PATH}' --dry-run"
 ```
 
+Re-registering a site whose manifest is wrong (a blank scaffold the real site was restored
+over, found by `wp-config.mjs drift`): add `--replace`. The old manifest is kept as
+`.wp-create.json.bak-<timestamp>`; without the flag `adopt` refuses.
+
+The probe prints its JSON between `<<WPCB-PROBE>>` markers and only that region is parsed, so a
+plugin's PHP notices or a logger flushing at shutdown no longer fail it. For a site that is
+noisy in other ways, `bin/wp-quiet.sh <wrapper>` filters stdout. A `--wrapper` that points into
+a temp directory is used for the probe and **not** stored in the manifest, which keeps the
+detected wrapper (`--persist-wrapper` overrides this); a wrapper that is how the site is
+really reached (`ddev wp`, `docker exec … wp`) is stored as before.
+
 Pass `--wrapper="<command>"` when `$ARGUMENTS` gave one. Without it the wrapper is detected:
 `.ddev/config.yaml` → `ddev wp`, `.lando.yml` → `lando wp`, otherwise `wp --path=<root>`.
 A site in a plain Docker container needs the wrapper passed explicitly

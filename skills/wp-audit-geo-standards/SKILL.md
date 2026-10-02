@@ -399,7 +399,12 @@ Try one of those, or search the site.
 ```
 
 Never serve a `200` "soft 404"; `agent-friendly-404` checks the status line, not the
-body alone.
+body alone. A soft 404 is not only the missing-page template: probe a made-up top-level slug,
+a made-up nested path, a typo or near-prefix of a real post slug (WordPress's
+`redirect_guess_404_permalink` redirects it to the closest post with `200`) and a made-up
+`.php`/`.html` path, on both the apex and `www` hosts. An apex-to-`www` redirect that sends
+unknown paths to the home page with `200` is a soft 404 too. One passing shape does not pass
+the check.
 
 ### 6.8 JSON-LD identity and breadth
 
