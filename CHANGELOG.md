@@ -4,6 +4,14 @@
 
 ### Fixed
 
+- **`/wp-audit` no longer sends crawler user agents to a live host.** GEO-A23 asked for a
+  GET of key routes with each AI crawler UA. On a live host, CrowdSec `http-bad-user-agent`
+  and WAF bad-bot lists ban the source IP for hours when they see a crawler UA from a
+  non-crawler address, which also blocks sync, pulls and the rest of the audit. The per-UA
+  probe now runs on local and staging only. On a live host, A23 is inferred from
+  `robots.txt`, WAF or bot-manager config and one neutral self-identifying fetch, and is
+  reported as `unverified-live`.
+
 - **Audits no longer get the auditing IP banned by a production WAF.** `/wp-audit`
   dispatches its agents in parallel. The "4 requests in flight" limit applied to each agent,
   not to the host. One run against a production server running fail2ban, CrowdSec and
