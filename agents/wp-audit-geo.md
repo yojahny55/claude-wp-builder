@@ -189,7 +189,7 @@ are published.
 | GEO-A19 | `GET /` with `Accept: text/markdown` | response `Content-Type`; `Vary: Accept` | INFO |
 | GEO-A20 | response headers of `/` | RFC 8288 `Link:` alternates | INFO |
 | GEO-A21 | `GET /.well-known/agent-skills/index.json` | version `0.2.0`; each `digest` is a real `sha256:` | INFO |
-| GEO-A23 | `GET` key routes with each AI UA | status per UA; no `403` or JS-only wall | WARNING |
+| GEO-A23 | `GET` key routes with each AI UA (local/staging only — never spoof crawler UAs on a live host) | status per UA; no `403` or JS-only wall | WARNING |
 | GEO-U01 | rendered DOM | `main` landmark; single `H1`; heading sequence | WARNING |
 
 ### Procedure — soft-404 shapes (GEO-A04)
@@ -303,6 +303,15 @@ echo wp_json_encode(\$out);
    must be a rewrite endpoint. Record which it is.
 5. **GEO-A23** — issue each key route with each allowlisted AI user agent. A `403` or a
    JS-only wall for an agent is the finding.
+
+   **Never send a crawler user agent to a live or remote host.** Intrusion-prevention
+   tools (CrowdSec, fail2ban, WAF bad-bot rules) treat spoofed `CCBot`, `GPTBot`,
+   `Bytespider` and similar UAs as hostile and ban the whole source IP for hours, which
+   also cuts the auditor off from the site (sync, pulls, other checks). Probe per-UA only
+   on a local or staging host that the project owns. For a live host, infer A23 from
+   `robots.txt`, the WAF/bot-manager configuration and one plain fetch with a neutral,
+   self-identifying UA. Report A23 as `UNMEASURED` with a note that it was inferred and
+   not probed per UA. Never spoof to close the gap.
 6. **GEO-A26** — the web server answers a physical file before PHP ever runs, so a
    `llms.txt` sitting at the web root **wins over the theme's rewrite permanently**. The
    theme's endpoint is then dead code: it is correct, it is tested, and nothing it produces
