@@ -5,8 +5,9 @@
  * The Stripe gateway reads woocommerce_stripe_settings through get_option() on every call and
  * saves it through update_option(). A key defined as a STORE_KIT_STRIPE_* constant is merged
  * into that option when it is read and stripped from it when it is saved -- including the copy
- * Stripe's own configure_webhooks() nests inside test_webhook_data/webhook_data alongside the
- * flat field -- so a routine save never writes the constant's own value back into the row.
+ * of the API secret key Stripe's own configure_webhooks() nests inside
+ * test_webhook_data/webhook_data -- so a routine save never writes the constant's own value back
+ * into the row.
  * SEC-040 reads the raw row, so it reports what is actually stored.
  *
  * Three things are left in the database on purpose, and SEC-040 is what surfaces each one:
@@ -46,7 +47,12 @@ function store_kit_stripe_seed_only_fields() {
 	return array( 'test_webhook_secret', 'webhook_secret' );
 }
 
-/** The webhook secret Stripe nests a second time inside its own settings sub-array, per mode. */
+/**
+ * The API secret key Stripe nests a second time, per mode, inside the webhook data it stores.
+ * Not the whsec_ signing secret, despite the name: WC_Stripe_Account::configure_webhooks() saves
+ * 'secret' => WC_Stripe_API::get_secret_key() there, so maybe_decommission_webhook() can
+ * authenticate the DELETE with the key that created the endpoint.
+ */
 function store_kit_stripe_nested_webhook_fields() {
 	return array(
 		'test_webhook_data' => 'test_secret_key',

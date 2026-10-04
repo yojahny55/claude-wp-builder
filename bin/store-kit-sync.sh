@@ -23,6 +23,11 @@ fi
 tmp="$root/.store-kit.new.$$"
 rm -rf "$tmp"
 cp -R "$src" "$tmp"
-rm -rf "$dest"
-mv "$tmp" "$dest"
+# The old copy is renamed aside rather than deleted first: between an rm and the mv the plugin
+# would be absent, and a request in that window runs without the credential strip.
+old="$root/.store-kit.old.$$"
+rm -rf "$old"
+[ -e "$dest" ] && mv "$dest" "$old"
+if ! mv "$tmp" "$dest"; then [ -e "$old" ] && mv "$old" "$dest"; exit 1; fi
+rm -rf "$old"
 echo "store-kit ${have:-absent} -> $want"

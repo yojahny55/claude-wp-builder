@@ -253,6 +253,8 @@ grep -q '^setup: 0 set' <<<"$out" || fail "restoring the block changed something
 # An assigned page the client left unpublished is the client's: WooCommerce keeps it, setup must
 # neither replace it nor report it set on every run.
 terms=$(q 'echo (int) get_option( "woocommerce_terms_page_id" );')
+# WP-CLI runs as user 0; a page created with that author trips /wp-finalize's A10 sweep.
+[ "$(q "echo (int) get_post_field( 'post_author', $terms );")" != "0" ] || fail "setup created the terms page with post_author 0"
 q "wp_update_post( array( 'ID' => $terms, 'post_status' => 'draft' ) ); wp_update_post( array( 'ID' => $cart, 'post_status' => 'draft' ) );"
 out=$(run_setup) || fail "the run with draft store pages failed: $out"
 [ "$(q 'echo (int) get_option( "woocommerce_terms_page_id" );')" = "$terms" ] || fail "setup replaced the client's draft terms page: $out"

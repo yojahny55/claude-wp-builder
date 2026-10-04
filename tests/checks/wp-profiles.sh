@@ -117,7 +117,7 @@ set +e
 $cfg validate-profile tests/fixtures/profiles/bad-store.json >"$tmp/store" 2>&1; code=$?
 set -e
 [ "$code" = "1" ] || fail "a profile with an unknown store tier exited $code, want 1"
-grep -q 'store must be "catalog", "store" or "full"' "$tmp/store" || fail "the store-tier message does not name the three tiers"
+grep -q 'store must be "catalog", "store", "full"' "$tmp/store" || fail "the store-tier message does not name the three tiers"
 
 # --- A bundled plugin must actually ship in this repository. ------------------------
 set +e

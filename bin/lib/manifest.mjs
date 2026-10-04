@@ -377,6 +377,7 @@ export function validateStore(store) {
   }
 
   if (store.enquiry !== undefined) {
+    if (sells) p.push('store.enquiry is catalog-only: a store or full tier takes orders, so no enquiry channel is read');
     if (!Array.isArray(store.enquiry)) p.push('store.enquiry must be an array');
     else {
       for (const e of store.enquiry) if (!ENQUIRY.includes(e)) p.push(`store.enquiry has an unknown channel ${JSON.stringify(e)}: use ${ENQUIRY.join(', ')}`);
@@ -466,7 +467,10 @@ function validateTax(tax, p) {
     if (!filled(r.name)) p.push(`${rp}.name must be a non-empty string`);
     if (typeof r.shipping !== 'boolean') p.push(`${rp}.shipping must be true or false`);
     if (r.class !== undefined && !TAX_CLASSES.includes(r.class)) p.push(`${rp}.class must be ${TAX_CLASSES.join(', ')}`);
-    const key = [r.country, r.state ?? '', r.postcode ?? '', r.city ?? '', r.name, r.class ?? 'standard'].join('|');
+    // Normalised as wooset_tax_list() does in woo-lib.php: two rates setup reads as one identity
+    // would otherwise pass here and be inserted as duplicate rows no later run can match.
+    const list = (v) => [...new Set(String(v ?? '').toUpperCase().split(';').map((x) => x.trim()).filter(Boolean))].sort().join(';');
+    const key = [r.country, r.state ?? '', list(r.postcode), list(r.city), r.name, r.class ?? 'standard'].join('|');
     if (keys.has(key)) p.push(`${rp} duplicates another rate's country, state, postcode, city, name and class`);
     keys.add(key);
   });
@@ -612,7 +616,7 @@ export function validateProfile(profile) {
   if (!profile || typeof profile !== 'object') return ['the profile is not a JSON object'];
   if (!profile.name) problems.push('name is required');
   if (profile.store !== undefined && !STORE_TIERS.includes(profile.store)) {
-    problems.push(`store must be "catalog", "store" or "full", found ${JSON.stringify(profile.store)}`);
+    problems.push(`store must be ${STORE_TIERS.map((t) => `"${t}"`).join(', ')}, found ${JSON.stringify(profile.store)}`);
   }
   if (!Array.isArray(profile.plugins)) return [...problems, 'plugins must be an array'];
 

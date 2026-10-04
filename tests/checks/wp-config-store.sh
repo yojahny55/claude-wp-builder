@@ -43,6 +43,9 @@ refused('numeric cost', (s) => { s.shipping[0].methods[0].cost = 10; }, 'cost');
 refused('junk location', (s) => { s.shipping[0].locations = ['Florida']; }, 'locations');
 refused('five decimal places', (s) => { s.tax.rates[0].rate = '6.12345'; }, 'rate');
 refused('duplicate rate', (s) => { s.tax.rates.push(structuredClone(s.tax.rates[0])); }, 'duplicates');
+refused('rate differing only in city case', (s) => { s.tax.rates = [{ ...s.tax.rates[0], city: 'Tampa' }, { ...s.tax.rates[0], city: 'tampa' }]; }, 'duplicates');
+refused('rate differing only in postcode order', (s) => { s.tax.rates = [{ ...s.tax.rates[0], postcode: '33602;33603' }, { ...s.tax.rates[0], postcode: '33603; 33602' }]; }, 'duplicates');
+refused('enquiry on a selling store', (s) => { s.enquiry = ['form']; }, 'catalog-only');
 refused('tax flag as a string', (s) => { s.tax.enabled = 'yes'; }, 'store.tax.enabled');
 
 const cat = { tier: 'catalog', address: good.address, currency: 'USD', units: good.units, enquiry: ['whatsapp'] };

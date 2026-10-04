@@ -260,11 +260,34 @@ function wooset_step_pages( $store ) {
 	} elseif ( wooset_page_held( $terms ) ) {
 		wooset_report( 'client', 'page:terms', 'kept as ' . wooset_page_held( $terms ) . ': the client publishes the terms before launch' );
 	} else {
-		if ( $c['write'] ) {
-			$id = wp_insert_post( array( 'post_type' => 'page', 'post_status' => 'publish', 'post_title' => 'Terms and conditions', 'post_name' => 'terms' ) );
-			update_option( 'woocommerce_terms_page_id', (int) $id );
+		// As WC_Install::create_page() does: reuse a page already at the slug, and give a new one
+		// an author -- under WP-CLI the current user is 0, which /wp-finalize's A10 sweep refuses.
+		$existing = get_page_by_path( 'terms' );
+		if ( $existing && 'trash' !== $existing->post_status ) {
+			if ( $c['write'] ) {
+				update_option( 'woocommerce_terms_page_id', (int) $existing->ID );
+			}
+			wooset_report( 'set', 'page:terms', 'assigned the existing /terms page' );
+		} elseif ( ! $c['write'] ) {
+			wooset_report( 'set', 'page:terms', 'created empty: the client supplies the terms before launch' );
+		} else {
+			$admins = get_users( array( 'role' => 'administrator', 'number' => 1, 'orderby' => 'ID', 'fields' => 'ID' ) );
+			$id     = wp_insert_post(
+				array(
+					'post_type'   => 'page',
+					'post_status' => 'publish',
+					'post_title'  => 'Terms and conditions',
+					'post_name'   => 'terms',
+					'post_author' => $admins ? (int) $admins[0] : 1,
+				)
+			);
+			if ( $id ) {
+				update_option( 'woocommerce_terms_page_id', (int) $id );
+				wooset_report( 'set', 'page:terms', 'created empty: the client supplies the terms before launch' );
+			} else {
+				wooset_report( 'degraded', 'page:terms', 'the page could not be created: add one in Pages and assign it under WooCommerce > Settings > Advanced' );
+			}
 		}
-		wooset_report( 'set', 'page:terms', 'created empty: the client supplies the terms before launch' );
 	}
 	if ( 'catalog' !== $store['tier'] ) {
 		$mode = isset( $store['checkout'] ) ? $store['checkout'] : 'block';
@@ -356,10 +379,11 @@ function wooset_step_shipping( $store ) {
 		$name = $z['zone'];
 		$zone = wooset_find_zone( $name );
 		if ( ! $zone ) {
-			wooset_report( 'set', "zone:$name", 'created' );
 			if ( ! $c['write'] ) {
+				wooset_report( 'set', "zone:$name", 'created; its locations and methods are listed by the apply run' );
 				continue;
 			}
+			wooset_report( 'set', "zone:$name", 'created' );
 			$zone = new WC_Shipping_Zone();
 			$zone->set_zone_name( $name );
 			$zone->save();
@@ -598,8 +622,12 @@ function wooset_stripe_keys( $keys, $root ) {
 		return true;
 	}
 	$config = wooset_config_path();
-	if ( ! $config || ! class_exists( 'WPConfigTransformer' ) ) {
-		wooset_report( 'degraded', 'stripe:keys', 'wp-config.php is not writable here: the keys were not written' );
+	if ( ! class_exists( 'WPConfigTransformer' ) ) {
+		wooset_report( 'degraded', 'stripe:keys', 'WPConfigTransformer is not loaded (run this under wp eval-file): the keys were not written' );
+		return false;
+	}
+	if ( ! $config ) {
+		wooset_report( 'degraded', 'stripe:keys', 'wp-config.php is not writable here, or was not found: the keys were not written' );
 		return false;
 	}
 	if ( $GLOBALS['wooset_ctx']['write'] ) {
@@ -713,6 +741,29 @@ foreach ( $wooset_required as $wooset_path ) {
 	}
 	if ( ! is_string( $wooset_value ) || '' === trim( $wooset_value ) ) {
 		wooset_refuse( 'store block incomplete: store.' . $wooset_path . ' -- run wp-config.mjs validate' );
+	}
+}
+// The same for each entry the shipping and tax steps read. A rate with no country is written
+// with an empty one, which WooCommerce applies to every country; an unparseable location is
+// written as ':' and never compares equal again, so it re-sets on every run.
+foreach ( isset( $wooset_store['tax']['rates'] ) && is_array( $wooset_store['tax']['rates'] ) ? $wooset_store['tax']['rates'] : array() as $wooset_i => $wooset_rate ) {
+	foreach ( array( 'country', 'name', 'rate' ) as $wooset_key ) {
+		if ( ! is_array( $wooset_rate ) || ! isset( $wooset_rate[ $wooset_key ] ) || ! is_string( $wooset_rate[ $wooset_key ] ) || '' === trim( $wooset_rate[ $wooset_key ] ) ) {
+			wooset_refuse( "store block incomplete: store.tax.rates[$wooset_i].$wooset_key -- run wp-config.mjs validate" );
+		}
+	}
+}
+foreach ( isset( $wooset_store['shipping'] ) && is_array( $wooset_store['shipping'] ) ? $wooset_store['shipping'] : array() as $wooset_i => $wooset_zone ) {
+	if ( ! is_array( $wooset_zone ) || ! isset( $wooset_zone['zone'] ) || ! is_string( $wooset_zone['zone'] ) || '' === trim( $wooset_zone['zone'] ) ) {
+		wooset_refuse( "store block incomplete: store.shipping[$wooset_i].zone -- run wp-config.mjs validate" );
+	}
+	if ( ! isset( $wooset_zone['locations'] ) || ! is_array( $wooset_zone['locations'] ) ) {
+		wooset_refuse( "store block incomplete: store.shipping[$wooset_i].locations -- run wp-config.mjs validate" );
+	}
+	foreach ( $wooset_zone['locations'] as $wooset_code ) {
+		if ( null === wooset_location( $wooset_code ) ) {
+			wooset_refuse( "store.shipping[$wooset_i].locations has an unparseable code " . wp_json_encode( $wooset_code ) . ' -- run wp-config.mjs validate' );
+		}
 	}
 }
 if ( ! class_exists( 'WooCommerce' ) ) {
