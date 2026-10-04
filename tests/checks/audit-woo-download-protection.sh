@@ -239,4 +239,23 @@ has 'Only the table'"'"'s first three rows produce a verdict; everything else is
 has 'do not enumerate or download more files' \
   || fail "SEC-039 lost the 'one 200 is enough, do not download' bound"
 
+# --- The fix SEC-039 names ships in the templates this plugin writes. `^~` matters: without it
+#     the static-file regex location would serve a paid .png before the deny rule is reached.
+for t in templates/native/nginx.conf.tpl templates/native/nginx-no-ssl.conf.tpl; do
+  grep -Fq 'location ^~ /wp-content/uploads/woocommerce_uploads/ { deny all; }' "$t" \
+    || fail "$t does not deny woocommerce_uploads ahead of its regex locations"
+done
+# A path line denies nothing on its own: it has to sit inside @disallowed, and that matcher has to
+# be answered. Repeated path lines in one matcher merge into a single OR list (caddy adapt).
+caddy=templates/native/Caddyfile.tpl
+awk '/@disallowed \{/{f=1} f{print} f&&/\}/{exit}' "$caddy" | grep -Fq 'path /wp-content/uploads/woocommerce_uploads/*' \
+  || fail "$caddy does not match woocommerce_uploads inside its @disallowed matcher"
+grep -Fq 'respond @disallowed 404' "$caddy" \
+  || fail "$caddy has no respond for @disallowed, so the woocommerce_uploads match denies nothing"
+# Apache needs no rule of its own only while it still runs WooCommerce's own .htaccess deny.
+for t in templates/native/apache.conf.tpl templates/native/apache-no-ssl.conf.tpl; do
+  grep -Fq 'AllowOverride All' "$t" \
+    || fail "$t no longer lets WooCommerce's .htaccess deny woocommerce_uploads (SEC-039 on Apache)"
+done
+
 echo PASS

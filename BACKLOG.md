@@ -226,6 +226,26 @@ Improving the reliability and output quality of agents.
 
 Server setup, permissions, and WordPress configuration.
 
+- [ ] **WooCommerce stores (N01)** `PARTIAL`
+  Piece 1 of 8, the foundation, is delivered: three store profiles, the `store` block,
+  [`/wp-woo-setup`](commands/wp-woo-setup.md) with its [setup script](skills/wp-woocommerce/scripts/woo-setup.php),
+  and [`store-kit`](plugins/store-kit/store-kit.php), proven by
+  [the integration check](tests/checks/wp-woo-setup-integration.sh). Not started, each its own
+  spec: theme integration (the WhatsApp button and enquiry form render there), store demo pages,
+  product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang bridge,
+  subscriptions, bookings.
+
+- [ ] **One unexplained integration failure in store setup** `OPEN`
+  [The integration check](tests/checks/wp-woo-setup-integration.sh) failed once at "setup
+  overwrote the client's shipping cost", during a mutation run that cannot reach that
+  assertion; it was not reproduced in 4+ full runs or 12 targeted loops. The assertion now
+  prints the cost it read and setup's output, so a recurrence explains itself. Watch it in CI.
+
+- [ ] **Docker environments get no nginx config** `OPEN`
+  [`docker-compose.yml.tpl`](templates/docker/docker-compose.yml.tpl) mounts `./docker/nginx.conf`,
+  and no template or command writes that file — no owner exists yet. Until one does, a Docker
+  store also misses the `woocommerce_uploads` deny rule the native templates carry.
+
 - [x] **Set `FS_METHOD` to `direct`** `DELIVERED`
   Handled by `/wp-audit --security`.
 
