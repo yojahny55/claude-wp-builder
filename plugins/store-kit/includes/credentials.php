@@ -184,7 +184,9 @@ add_filter( 'sanitize_option_woocommerce_stripe_settings', 'store_kit_stripe_str
 
 function store_kit_stripe_notice() {
 	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only screen check.
-	if ( ! isset( $_GET['section'] ) || 'stripe' !== $_GET['section'] ) {
+	// The whole query, not section alone: any admin URL can carry section=stripe, and the notice
+	// names wp-config.php constants.
+	if ( ! isset( $_GET['page'], $_GET['tab'], $_GET['section'] ) || 'wc-settings' !== $_GET['page'] || 'checkout' !== $_GET['tab'] || 'stripe' !== $_GET['section'] ) {
 		return;
 	}
 

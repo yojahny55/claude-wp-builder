@@ -38,9 +38,9 @@ engine=$(line_of "get '\${PROJECT_PATH}' environment.engine" "$cmd")
 [ -n "$engine" ] && [ "$engine" -lt "$sync" ] && grep -Fq 'store profiles need native WP-CLI' "$cmd" \
   || fail "$cmd must read environment.engine and stop on anything but native before syncing store-kit"
 
-h=$(grep -nE '^\s*wooset_step_hpos\(' "$script" | cut -d: -f1)
-pg=$(grep -nE '^\s*wooset_step_pages\(' "$script" | cut -d: -f1)
-pay=$(grep -nE '^\s*wooset_step_payments\(' "$script" | cut -d: -f1)
+h=$(grep -nE '^\s*wooset_step_hpos\(' "$script" | cut -d: -f1 || true)
+pg=$(grep -nE '^\s*wooset_step_pages\(' "$script" | cut -d: -f1 || true)
+pay=$(grep -nE '^\s*wooset_step_payments\(' "$script" | cut -d: -f1 || true)
 [ -n "$h" ] && [ -n "$pg" ] && [ -n "$pay" ] && [ "$h" -lt "$pg" ] && [ "$pg" -lt "$pay" ] \
   || fail "$script must turn HPOS on before it touches pages, and pages before payments"
 grep -Fq "WP_CLI::runcommand( 'wc hpos enable'" "$script" || fail "$script no longer enables HPOS through WooCommerce's own command"

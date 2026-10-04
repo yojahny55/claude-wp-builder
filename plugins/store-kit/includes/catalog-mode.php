@@ -28,7 +28,8 @@ function store_kit_catalog_redirect() {
 		return;
 	}
 	if ( is_cart() || is_checkout() ) {
-		wp_safe_redirect( wc_get_page_permalink( 'shop' ) );
+		$shop = wc_get_page_permalink( 'shop' );
+		wp_safe_redirect( $shop ? $shop : home_url( '/' ) );
 		exit;
 	}
 }

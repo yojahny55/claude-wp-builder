@@ -20,14 +20,16 @@ if [ -n "$have" ] && [ "$(printf '%s\n%s\n' "$have" "$want" | sort -V | tail -1)
   exit 0
 fi
 # Copy beside, then swap: a half-copied plugin directory is a fatal on the next page load.
-tmp="$root/.store-kit.new.$$"
-rm -rf "$tmp"
-cp -R "$src" "$tmp"
+# mktemp names the scratch directories unpredictably and creates them atomically; the trap
+# removes whatever is left of them on any exit, interrupted or failed.
+tmp=$(mktemp -d "$root/.store-kit.new.XXXXXX")
+old=$(mktemp -d "$root/.store-kit.old.XXXXXX")
+trap 'rm -rf "$tmp" "$old"' EXIT
+# mktemp creates 0700; the web server reads the plugin as another user.
+chmod 755 "$tmp"
+cp -R "$src/." "$tmp"
 # The old copy is renamed aside rather than deleted first: between an rm and the mv the plugin
 # would be absent, and a request in that window runs without the credential strip.
-old="$root/.store-kit.old.$$"
-rm -rf "$old"
-[ -e "$dest" ] && mv "$dest" "$old"
-if ! mv "$tmp" "$dest"; then [ -e "$old" ] && mv "$old" "$dest"; exit 1; fi
-rm -rf "$old"
+[ -e "$dest" ] && mv "$dest" "$old/store-kit"
+if ! mv "$tmp" "$dest"; then [ -e "$old/store-kit" ] && mv "$old/store-kit" "$dest"; exit 1; fi
 echo "store-kit ${have:-absent} -> $want"
