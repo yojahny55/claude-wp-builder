@@ -946,7 +946,7 @@ One code is only **partly** addressable here, so it is not claimed resolved:
 
 | Code | What this fixer does, and what it cannot prove |
 |------|-------------------------------------------------|
-| GEO-A23 | Emits the robots allowlist and the routes, but per-UA reachability evidence belongs to `wp-audit-geo`, which probes each allowlisted user agent. The Step 5 check is a single unauthenticated fetch per route and does **not** prove A23. |
+| GEO-A23 | Emits the robots allowlist and the routes, but per-UA reachability evidence belongs to `wp-audit-geo`, which probes each allowlisted user agent on local/staging only; live hosts are never probed with spoofed crawler UAs. The Step 5 check is a single unauthenticated fetch per route and does **not** prove A23. |
 
 Codes the site type excludes are reported `N/A`; the advisory, off-site and copy-level
 codes below are detected by `wp-audit-geo` and deliberately **not** fixed from the theme:

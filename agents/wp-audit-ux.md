@@ -60,6 +60,29 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
   defect in markup the builder stores per page is `Owner: content` (fixed in the builder's
   editor), not `code`.
 
+## Budget and stop rule
+
+This audit runs beside six others, and they finish in 8–14 minutes. Without a budget a
+criterion is never given up: each failed selector becomes one more script, never an
+`UNMEASURED`. One run went 25 minutes this way — 16 browser launches, a full crawl of the
+local site, a serial crawl of production — and never stopped to report. So:
+
+- **At most 3 browser launches per run.** A launch opens every page at every viewport; it
+  is not one per question. `bin/ux-probe.mjs` counts them in its state file and exits `3`
+  on a fourth.
+- **At most 2 attempts per criterion** to find or drive the element it needs. After the
+  second, the criterion is `UNMEASURED`, and the evidence names each selector tried and why
+  it failed. A third guess at a theme's class names is not measurement. The harness stops
+  running a site probe that has failed in two runs and reports it `unmeasured` with both
+  errors and the code it ran — copy that into the evidence.
+- **15 minutes of wall clock**, then stop and report what you have. Whatever is left is
+  `UNMEASURED` with the reason `budget`, and the report goes out. The harness exits `3`
+  once 15 minutes have passed since its first run.
+- **No command outlives one Bash call.** Bound every sweep (`timeout <s>`, the helper's
+  `--budget`). One that can exceed about 2 minutes runs with `run_in_background` while you
+  measure something else. Never a `while read` loop over URLs that passes the Bash timeout
+  and is then waited on.
+
 ## Step 1: Decide what applies, before measuring anything
 
 Walk the site's shape first and write down which criteria are N/A and why: no form, no
@@ -79,16 +102,80 @@ visible.
 For every page in scope, walk the page-level criteria. For the site-level ones, walk them
 once across the pages you measured and name the pages they differ between.
 
+**One harness, many probes: `bin/ux-probe.mjs`.** It opens each page once per viewport
+(mobile, tablet, desktop) in a single browser launch, runs the built-in DOM probes and your
+site probes on the page already loaded, and writes JSON. It waits for `load` plus a short
+settle, not `networkidle`: a page with 170 requests and a polling widget may never go idle.
+On a page-builder page each fresh load costs 20–60 s, so one-question-one-script spends
+the budget on loading.
+
+```bash
+mkdir -p .wp-audit/ux
+node ${CLAUDE_PLUGIN_ROOT}/bin/ux-probe.mjs --site "<site-url>" --pages "/,/contact/" \
+  --probes .wp-audit/ux/probes.mjs --out .wp-audit/ux/probe.json \
+  --links-out .wp-audit/ux/links.txt
+```
+
+- **Built in, on every page and viewport:** `UX-006` longest line in characters, `UX-009`
+  action elements closer than 8 px, `UX-018` in-text links not underlined, `UX-019` image
+  links with no name, `UX-001` required fields with no visible marker, and every `href`
+  (desktop) written to `--links-out` as the input `resolve-link-targets.php` reads for
+  `UX-014`/`UX-015`. These are measurements to judge, not findings: a 4 px gap between a
+  pagination's page numbers may be fine.
+- **Theme-specific interactions go in `--probes`**, a module whose default export is an
+  array of `{ id, criterion, viewports?, run }`; `run({ page, url, path, viewport })`
+  returns what it measured. A follow-up question adds a probe to that module and reruns the
+  harness; it is never a new one-off script with its own browser launch.
+- **Exit `3` means the budget is spent.** Report what the JSON already holds, and mark
+  everything else `UNMEASURED (budget)`. Do not work around it with a browser of your own.
+- The state file lives beside `--out`. One started over an hour ago belongs to an earlier
+  audit, and the harness replaces it with a new budget. Never pass `--state-reset` to get
+  more launches inside one audit.
+- Read `complete` in the JSON. `false` means the run stopped early (timeout, crash, or the
+  wall clock ran out mid-run): what it holds is real, and the rest is `UNMEASURED`. A site
+  probe that navigated away carries `leftPage`, and the harness put the page back.
+
 Three criteria are measured rather than read, and reading them instead is the most common
 way this audit goes wrong:
 
-**`UX-014` and `UX-015` — follow the links.** Collect every `href`, then request it and
-record the status code. A list of links is not a finding; a `404` with the page it was
-found on is. Use the site's own host:
+**`UX-014` and `UX-015` — follow the links.** Collect the `href`s of the pages in scope,
+then request them and record the status code. A list of links is not a finding; a `404`
+with the page it was found on is. Use the site's own host, and follow
+*Link and page sweeps against a site* in `skills/wp-audit-standards/SKILL.md` — at most 4
+requests in flight. On a store with a mega-menu, "every href on 8 pages" is the whole
+catalogue, so the sweep is scoped:
+
+1. **Classify each `href`.** Internal (the site's host), clone-origin (the
+   `wordpress.url_origin` host, when `/wp-audit` Step 2.3 set `local_clone`), or external.
+2. **Resolve internal targets through WP-CLI first.** `resolve-link-targets.php` answers a
+   published post, page, term or post type archive from the database, without a render,
+   and tags the rest with their taxonomy for sampling. Only what it cannot answer goes to
+   HTTP. What it resolved is resolved, not unmeasured.
+3. **Deduplicate.** A header or mega-menu link carried by all 8 pages is one request; the
+   helper collapses it and lists every page it appears on.
+4. **Cap the HTTP sample at 50 per page** (`--per-page 50`). What is over the cap is
+   `UNMEASURED` with the count, never a pass.
+5. **Never request the clone-origin host** unless the operator confirmed it this run
+   (Step 2.3). A clone's content often carries production URLs typed into it; they are
+   `UNMEASURED (clone-origin)`, and their count goes in the evidence. On production they
+   are same-host links, so they are not a defect of the site (the clone rule: *would this
+   also be true on production?*).
+6. **A CDN bot challenge is not a broken link.** `403` with `cf-mitigated: challenge`, or a
+   `challenge-platform` body, is `UNMEASURED — blocked by CDN bot challenge`. Never retry it
+   with another User-Agent, and never loop over it.
+
+The resolver does 2; `bin/link-sweep.mjs` does 3 to 6. Do not write a crawler of your own:
 
 ```bash
-curl -s -o /dev/null -w '%{http_code} %{url_effective}\n' -L --max-time 10 "<url>"
+# links.txt: one href per line, TAB, the page it was found on
+$WP eval-file ${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/scripts/resolve-link-targets.php \
+  links.txt resolved.json > http.txt
+node ${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs --site "<site-url>" --urls http.txt \
+  --clone-origin "<url_origin host>" --per-page 50 --budget 120 > sweep.json
 ```
+
+Add `--follow-clone-origin` **only** when the operator confirmed the production host this
+run (Step 2.3). Without it, clone-origin links come back `unmeasured`, which is correct.
 
 **The two are counted differently, and that is not a detail.** `UX-014` is page-level:
 report one finding per page, `UX-014 : page:/contact/`, whose evidence lists every broken
@@ -100,7 +187,8 @@ A row per link turns one bad footer into forty findings that are one fix. And `/
 Step 7 merges on `check` + `resource`, so a resource written at the wrong granularity
 matches nothing the suite emits and both copies survive into the report.
 
-When you cannot follow them all, report `UNMEASURED` with the remaining list. Never infer a
+When you cannot follow them all, report `UNMEASURED` with the remaining count and why
+(sampled, budget, clone-origin, challenged). Never infer a
 link is fine because the target exists in the template hierarchy — a `href="#"` left in a
 menu resolves to the same page and is exactly what this catches.
 
@@ -159,6 +247,15 @@ A tag swap is not exempt. Turning a `<span>` into a `<button>` changes what the 
 applies, and a reset class added to compensate lands after the utilities already in the
 sheet and overrides them — a real case turned an icon from white to black and from 26px to
 18px without a single colour value being edited.
+
+## Production traffic is gated
+
+**Requests to a production host go through `bin/prod-gate.sh`**, with the gate dir from the
+dispatch prompt, exactly as `skills/wp-audit-standards` "Production sits behind a WAF" says.
+Production runs fail2ban, CrowdSec and ModSecurity, and agents in parallel without the gate
+got an audit's IP banned. Use the same command, URL, headers and user agent as before: the
+gate changes the pace, not the measurement. When it exits `4`, report the check `UNMEASURED`
+and never retry. A local site is not gated.
 
 ## What is not yours
 

@@ -3,7 +3,8 @@
  * wp-config.mjs: the one gate every command that reads .wp-create.json passes through.
  *
  * Exit codes are fixed and are part of the contract: 0 ok, 1 invalid or refused,
- * 2 a migration is available, 3 there is no manifest.
+ * 2 a migration is available, 3 there is no manifest. `drift` adds 4: the manifest
+ * validates but no longer describes the site.
  */
 import {
   readFileSync, existsSync, writeFileSync, copyFileSync, mkdirSync,
@@ -16,7 +17,7 @@ import {
   supersedeProseDecisions, testedVerdicts,
 } from './lib/manifest.mjs';
 import {
-  detectWrapper, runProbe, buildManifest, isWordPressRoot,
+  detectWrapper, runProbe, buildManifest, isWordPressRoot, manifestDrift, isTransientWrapper,
 } from './lib/adopt.mjs';
 
 const say = (s) => console.log(s);
@@ -248,8 +249,10 @@ function parseFlags(argv) {
 function cmdAdopt(projectPath, flags) {
   const root = resolve(projectPath);
   const file = join(root, MANIFEST_NAME);
-  if (existsSync(file)) {
+  const replacing = existsSync(file) && flags.replace;
+  if (existsSync(file) && !replacing) {
     warn(`${MANIFEST_NAME} already exists at ${root}: this site is already registered -- run validate instead`);
+    warn('if the manifest describes a different site (a blank scaffold the real site was restored over), run `wp-config.mjs drift` to see how, then adopt again with --replace: it keeps a timestamped backup');
     process.exit(1);
   }
   if (!isWordPressRoot(root)) {
@@ -259,10 +262,18 @@ function cmdAdopt(projectPath, flags) {
   const detected = detectWrapper(root);
   const wrapper = typeof flags.wrapper === 'string' ? flags.wrapper : detected.wrapper;
   const probed = runProbe(wrapper);
-  if (!probed.ok) {
-    warn(`probe failed: ${probed.reason}`);
-    warn('pass --wrapper="<the command that runs WP-CLI for this site>" if it is not the one above');
-    process.exit(1);
+  // The override runs the probe; it is written to the manifest only when it is how the site is
+  // reached. A helper script in a temp directory is not, unless --persist-wrapper says so.
+  const keepWrapper = flags['persist-wrapper'] || !isTransientWrapper(wrapper) ? wrapper : detected.wrapper;
+  if (keepWrapper !== wrapper) {
+    // The detected wrapper replaces the helper only if it reaches the site too; a site that is
+    // reachable only through the helper (Docker, SSH) would otherwise get a manifest that fails.
+    if (runProbe(detected.wrapper).ok) {
+      warn(`note: ${wrapper.split(/\s+/)[0]} is a temp-dir helper, so the manifest keeps ${detected.wrapper} (pass --persist-wrapper to store the override)`);
+    } else {
+      warn(`error: ${wrapper.split(/\s+/)[0]} is a temp-dir helper and ${detected.wrapper} does not reach this site, so nothing could be stored: pass --persist-wrapper, or use a wrapper that is not a temp file`);
+      process.exit(1);
+    }
   }
   const { probe } = probed;
   if (probe.multisite) {
@@ -281,7 +292,7 @@ function cmdAdopt(projectPath, flags) {
   };
   const {
     manifest, reasons, prefixSource, conflicts,
-  } = buildManifest(root, probe, { ...detected, wrapper }, overrides);
+  } = buildManifest(root, probe, { ...detected, wrapper: keepWrapper }, { ...overrides, wrapper: keepWrapper });
   const problems = validateManifest(manifest);
 
   if (flags['dry-run']) {
@@ -293,10 +304,33 @@ function cmdAdopt(projectPath, flags) {
     warn('nothing written: fix the values above with flags and run adopt again');
     process.exit(1);
   }
+  if (replacing) {
+    const bak = `${file}.bak-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+    copyFileSync(file, bak);
+    say(`note: previous manifest kept at ${bak}`);
+  }
   writeFileSync(file, `${JSON.stringify(manifest, null, 2)}\n`);
   say(`ok: wrote ${file} (origin: adopted)`);
   for (const c of conflicts) say(`note: ${c}`);
   cmdRenderContext(root);
+}
+
+// Does the registered manifest still describe the site WP-CLI is talking to? Exit 0 it does,
+// 4 it does not (one line per disagreement), 1 the probe could not run. validate cannot answer
+// this: a blank scaffold the real site was restored over satisfies the schema.
+function cmdDrift(projectPath) {
+  const root = resolve(projectPath);
+  const file = join(root, MANIFEST_NAME);
+  if (!existsSync(file)) { warn(`no ${MANIFEST_NAME} at ${root}`); process.exit(3); }
+  let manifest;
+  try { manifest = JSON.parse(readFileSync(file, 'utf8')); } catch { warn(`${MANIFEST_NAME} is not valid JSON`); process.exit(1); }
+  const wrapper = manifest.wp_cli?.wrapper || detectWrapper(root).wrapper;
+  const probed = runProbe(wrapper);
+  if (!probed.ok) { warn(`probe failed: ${probed.reason}`); process.exit(1); }
+  const lines = manifestDrift(manifest, probed.probe, root);
+  if (!lines.length) { say('ok: the manifest matches the site'); return; }
+  for (const l of lines) say(`drift: ${l}`);
+  process.exit(4);
 }
 
 const [cmd, target] = process.argv.slice(2);
@@ -305,8 +339,9 @@ else if (cmd === 'migrate' && target) cmdMigrate(target);
 else if (cmd === 'render-context' && target) cmdRenderContext(target);
 else if (cmd === 'get' && target && process.argv[4]) cmdGet(target, process.argv[4]);
 else if (cmd === 'validate-profile' && target) cmdValidateProfile(target);
+else if (cmd === 'drift' && target) cmdDrift(target);
 else if (cmd === 'adopt' && target) cmdAdopt(target, parseFlags(process.argv.slice(4)));
 else {
-  warn('usage: wp-config.mjs <validate|migrate|render-context|get|validate-profile|adopt> <project-path> [key|wp-version|adopt flags]');
+  warn('usage: wp-config.mjs <validate|migrate|render-context|get|validate-profile|adopt|drift> <project-path> [key|wp-version|adopt flags]');
   process.exit(1);
 }

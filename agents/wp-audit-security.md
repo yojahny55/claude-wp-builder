@@ -270,6 +270,23 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 - Fail: No blocking rules found
 - Message: `Sensitive WordPress files (readme.html, license.txt) are publicly accessible`
 
+**SEC-044 — Content-Security-Policy header.** Response headers belong to the host that serves
+the site, and a local clone's own server answers headers production's edge never sets (and the
+reverse), so this check reads them from the production host only. Take the public URL
+confirmed in `/wp-audit` Step 2.3; with none, record `UNMEASURED` ("needs the public URL") and
+stop. Never probe the clone and report the result as the site's.
+
+```bash
+curl -sSI --max-time 15 -A "Mozilla/5.0" "https://<production-host>/" | grep -i '^content-security-policy'
+```
+
+No `content-security-policy` header is a finding. Only `content-security-policy-report-only`
+is `INFO` (the policy is not enforced). A present policy fails when `script-src` (falling back
+to `default-src`) allows bare `*`, `data:` or `'unsafe-eval'`. A `403`, challenge page, `5xx` or
+curl error is `UNMEASURED` with the status line as evidence: a WAF answer is not the site's
+header set. WordPress themes and page builders inline scripts, so the fix is a policy built
+for the site (start report-only), never a one-line paste, and it is not auto-applied.
+
 **SEC-043 — Duplicate/redeclared function across site code:**
 - This is Tier 1 — a code scan, no network and no vulnerability feed needed. Two files that
   each declare `function acme_get_field()` at the top level cannot both load; nothing short
@@ -373,6 +390,7 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 | SEC-040@2 | Gateway credentials stored at rest | Read the stored row (not `get_option()`) of every `woocommerce_*_settings` and `woocommerce-ppcp-*` row plus the listed gateway credential options (active or not), classify key names by segment. See Procedure | No row read holds a non-empty value classified CRITICAL | CRITICAL |
 | SEC-041 | Known-vulnerable plugins/themes | Match installed plugin/theme slugs and versions against the WPScan vulnerability API (`WPSCAN_API_TOKEN`), **after the SEC-038 network gate passes**; only public slugs are sent. See Procedure | 0 vulnerable matches | CRITICAL (loaded) / WARNING (inactive) |
 | SEC-042 | Abandoned plugins | wp.org API `last_updated` older than ~2 years, or `tested` far behind the installed core version, for every loaded plugin (active, plus clone-suppressed on a local clone), **after the SEC-038 network gate passes**. See Procedure | Not abandoned | WARNING |
+| SEC-044 | Content-Security-Policy header missing or unsafe | LIVE, production only. `curl -sSI` of the confirmed public home URL (`/wp-audit` Step 2.3) and read `content-security-policy` (and `content-security-policy-report-only`). See Procedure | A `Content-Security-Policy` header is present and its `script-src` (or `default-src` fallback) does not allow bare `*`, `data:` or `'unsafe-eval'`; report-only alone is `INFO`. `UNMEASURED` ("needs the public URL") on a local clone without a confirmed public URL, never `PASS` | WARNING |
 
 SEC-040 is `N/A ("no WooCommerce")`, out of the denominator, when `site.commerce` is `none` (`/wp-audit`
 Step 2.3) — this check has nothing to read without WooCommerce installed and active. It stays
@@ -494,7 +512,9 @@ if ! curl -sS --max-time 10 -o /dev/null https://api.wordpress.org/core/version-
 fi
 ```
 
-Then force the transients to be rebuilt rather than trusting whatever is cached:
+Then, **only when the dispatch context says `Report-only: no`**, force the transients to be
+rebuilt rather than trusting whatever is cached. Deleting a transient is a database write, and
+a report-only run writes nothing (see "Report-only writes nothing" below):
 
 ```bash
 $WP transient delete update_core
@@ -509,8 +529,15 @@ Rules that follow from this:
 - When the request fails, SEC-032, SEC-033 and SEC-034's update column are `UNMEASURED`, with
   the curl command as the evidence line. They are **never** reported as passing, and never as
   "0 updates pending".
-- When the request succeeds, delete the three transients first. A count read without deleting
-  them is a measurement of the cache, not of the site.
+- When the request succeeds and `Report-only: no`, delete the three transients first. A count
+  read without deleting them is a measurement of the cache, not of the site.
+- **Report-only writes nothing.** With `Report-only: yes` do not delete, set or update any
+  transient or option. Read the transient and report its age (`last_checked`); when it is
+  older than 12 hours, ask the API directly instead
+  (`curl -sS https://api.wordpress.org/core/version-check/1.7/`,
+  `https://api.wordpress.org/plugins/update-check/1.1/`) or report the count `UNMEASURED —
+  cached data from <date>`. A stale count stated as current is the defect; a read-only run
+  that says how old its data is has none.
 - Report the age of the data either way: `$WP transient get update_plugins --format=json` carries
   a `last_checked` timestamp, and a reader who sees it is a week old can judge the count.
 
@@ -1161,6 +1188,13 @@ Edit root `.htaccess` to add before `# END WordPress`:
 When AIOS-related fixes are needed, dispatch the `wp-audit-aios` agent with the appropriate security level.
 
 ## Rules
+
+**Requests to a production host go through `bin/prod-gate.sh`**, with the gate dir from the
+dispatch prompt, exactly as `skills/wp-audit-standards` "Production sits behind a WAF" says.
+Production runs fail2ban, CrowdSec and ModSecurity, and agents in parallel without the gate
+got an audit's IP banned. Use the same command, URL, headers and user agent as before: the
+gate changes the pace, not the measurement. When it exits `4`, report the check `UNMEASURED`
+and never retry. A local site is not gated.
 
 1. **All plugin interaction via WP-CLI** — never edit PHP plugin files directly, use `$WP option`, `$WP config set`, or `$WP eval`
 2. **Tier 1 checks run always** — they require no WP-CLI and no runtime environment

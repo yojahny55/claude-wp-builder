@@ -57,6 +57,32 @@ done
 
 case "$only" in a11y|seo|perf|all) : ;; *) echo "--only must be a11y, seo, perf or all" >&2; exit 1 ;; esac
 
+# A public host is production, and production runs fail2ban, CrowdSec and ModSecurity. The
+# template's 4 workers mean 4 browsers loading full pages at once, which is about 400
+# requests in a burst. An audit that hit production that way, beside six other agents, got
+# the auditing IP banned. Against a public host every pass runs with one worker: the same
+# tests and the same metrics, only paced. A local host keeps the template's parallelism.
+url_host="${url#*://}"; url_host="${url_host%%/*}"; url_host="${url_host%%\?*}"; url_host="${url_host%%#*}"; url_host="${url_host##*@}"
+url_host="$(printf '%s' "$url_host" | tr '[:upper:]' '[:lower:]')"
+pw_args=(--workers=1)
+case "$url_host" in
+  localhost|localhost:*|*.localhost|*.localhost:*|*.local|*.local:*|*.local.com|*.local.com:*|*.test|*.test:*|\[::1\]*|0.0.0.0|0.0.0.0:*) pw_args=() ;;
+  *)
+    # Private ranges apply to a dotted IPv4 address only, by octet, as in prod-gate.sh:
+    # a prefix glob would also give `10.example.com` the local parallelism.
+    ip="${url_host%%:*}"
+    case "$ip" in
+      *[!0-9.]*) ;;
+      *.*.*.*)
+        IFS=. read -r o1 o2 _ <<< "$ip"
+        case "$o1" in
+          10|127) pw_args=() ;;
+          192) [ "$o2" = 168 ] && pw_args=() ;;
+          172) [ "${o2:-0}" -ge 16 ] && [ "${o2:-0}" -le 31 ] && pw_args=() ;;
+        esac ;;
+    esac ;;
+esac
+
 # ---------------------------------------------------------------------------
 # Probe
 # ---------------------------------------------------------------------------
@@ -347,7 +373,7 @@ echo "audit-suite: chromium $chromium_exe"
 status=0
 run_pass() {
   echo "audit-suite: $1"
-  (cd "$dir" && npm run --silent "$2") || status=1
+  (cd "$dir" && npm run --silent "$2" -- ${pw_args[@]+"${pw_args[@]}"}) || status=1
 }
 
 # The DOM/axe pass again in the other engines the config declares. Their results land beside
@@ -362,7 +388,7 @@ cross_browser() {
       continue
     fi
     echo "audit-suite: accessibility and usability pass in $engine"
-    (cd "$dir" && npx --no-install playwright test tests/audit.spec.js --project="$engine") \
+    (cd "$dir" && npx --no-install playwright test tests/audit.spec.js --project="$engine" ${pw_args[@]+"${pw_args[@]}"}) \
       || { echo "audit-suite: the $engine pass ran and exited non-zero (a failure, not a skip)"; status=1; }
   done
 }

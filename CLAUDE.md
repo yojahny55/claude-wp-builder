@@ -27,7 +27,11 @@ runtime for the plugin itself. The only executable code shipped is:
   CSS conversion), `image-gen.mjs` (the image generator and its cost/key handling),
   `composition-preview.mjs` (renders `skills/wp-demo-craft/compositions/` previews),
   `theme-template-check.mjs` (the ABSPATH, compiled-class and widget-script gate behind
-  `/wp-finalize` Check 4 and the practices audit).
+  `/wp-finalize` Check 4 and the practices audit), `link-sweep.mjs` (the audits' link
+  sweep, with the 4-in-flight cap, sampling, clone-origin and CDN-challenge rules built in),
+  `ux-probe.mjs` (the usability audit's page harness: one browser launch per run, built-in
+  DOM probes, site probes from a module, and the 3-launch / 15-minute / 2-attempt budget
+  enforced through a state file).
   `bin/lib/` holds what they share.
 - `skills/wp-polylang/scripts/*.php` and `skills/wp-woocommerce/scripts/*.php` — run inside a
   real WordPress via `wp eval-file`

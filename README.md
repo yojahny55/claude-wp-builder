@@ -465,23 +465,54 @@ commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. 
 
 ### Starter Theme
 
-Minimal boilerplate copied by `/wp-init`. Includes:
+`/wp-init` copies one of two starters from `starter-theme/`:
 
-- **i18n layer** — `prefix_get_field()`, `prefix_get_repeater()`, `prefix_t()`, `prefix_e()`, language detection (URL → cookie → browser → default)
-- **Settings page** — Tabs: General, Header, Footer, Contact, Address, Social, Legal, Designer, Spanish Translations
-- **CSS foundation** — Reset, custom property placeholders (colors, spacing, typography, shadows), utilities
-- **JS base** — Language switcher, mobile nav, scroll animations, sticky header
+| Starter | Path | What it is |
+|---------|------|------------|
+| `__tailwind__` | A, B (default) | Tailwind CSS 4 built with `@wordpress/scripts` (`npm run build` / `start` / `preview`), BEM blocks for sections. `--template=basic` survives only as an alias for it |
+| `__cinematic__` | C | The scroll-driven video reel — scene fields, scene renderer, cinematic loader, seed script. PHP 8.0 floor |
+
+Both carry:
+
+- **i18n layer** — `inc/i18n.php`, the single seam templates call through (`prefix_get_field()` and friends, never raw `get_field()`). The theme ships the suffix model; the Polylang versions live in `starter-theme/_i18n-variants/` and `/wp-init` copies the matching one over it, so switching model changes no template
+- **Security baseline** — `inc/security.php`
+- **Performance** — `inc/performance.php`
 - **ACF auto-loader** — `fields/*.php` files loaded automatically via `acf/init` hook
+
+The Tailwind starter adds:
+
+- **Settings page** — Tabs: General, Header, Footer, Contact, Address, Social, Legal, Designer, plus Spanish Translations when `es` is a configured language
+- **Templates** — `404`, `archive`, `search`, `single`, `page`, plus a nav walker, template tags and CF7 helpers
+- **JS** — `motion.js`, accordion, tabs and directory filter, bundled from `assets/js/src/`
 
 Placeholder tokens (`__starter__`, `__STARTER__`, `__STARTER_NAME__`) are replaced with the project name/slug during init.
 
 ### Scripts (`bin/`)
 
-- `bin/wp-config.mjs` — validates, migrates and reads `.wp-create.json`; every command
-  that reads the manifest calls `validate` first. Subcommands: `validate`, `migrate`,
-  `render-context`, `get`, `validate-profile`.
-- `bin/store-kit-sync.sh <plugins-dir>` — copies the bundled `plugins/store-kit` into a site
-  when it has none or an older one; never downgrades.
+Commands run these and read the exit code. Several are gates, not helpers.
+
+| Script | What it does |
+|--------|--------------|
+| `wp-config.mjs` | The single definition of a valid `.wp-create.json`; every command that reads the manifest calls `validate` first. Subcommands: `validate`, `migrate`, `render-context`, `get`, `validate-profile`, `adopt` |
+| `wp-env-setup.sh` | System-level setup behind `/wp-create` — vhosts, SSL, hosts entries |
+| `demo-verify.mjs` | The browser walk behind `/wp-demo-verify` and craft mode's probe — Chromium plus an existing Firefox |
+| `css-contour-lint.mjs` | Static companion to `demo-verify.mjs` — CSS that renders differently across engines |
+| `composition-preview.mjs` · `composition-gate.sh` | Render and gate the craft composition library |
+| `image-gen.mjs` | Fills a craft demo's image slots from a client file or a generation API, cached so a plate is never billed twice |
+| `tailwindify-parity.mjs` | Computed-style comparison proving a Tailwind conversion lost no declaration |
+| `tailwind-native-check.sh` · `tailwind-rebuild.sh` | Validate a theme against the Tailwind-native convention; recompile its CSS after agents write new classes |
+| `theme-template-check.mjs` | ABSPATH, compiled-class and widget-script gate behind `/wp-finalize` and the practices audit |
+| `audit-report.mjs` | Renders an audit run into the dated `.md` + `.html` deliverable |
+| `audit-suite.sh` | Scaffolds and runs the Tier 3 browser suite (`/wp-audit --suite`) |
+| `link-sweep.mjs` | The audits' link sweep — at most 4 requests in flight, sampling, clone-origin and CDN-challenge rules built in |
+| `ux-probe.mjs` | The usability audit's page harness — one browser launch per run, built-in DOM probes, a 3-launch / 15-minute budget enforced in code |
+| `geo-scan.sh` | Live is-agentic report for `--geo`; `--start` scans a host that has no report yet |
+| `wp-cinematic-encode.sh` | ffmpeg wrapper behind `/wp-cinematic-encode` |
+| `doc-sync-check.sh` | Fails when a command lacks a row here or in `docs/commands.md`, when a skill or agent lacks a row here, or when `commands/`, `agents/`, `skills/`, `starter-theme/` or `bin/` changed without a CHANGELOG entry |
+| `store-kit-sync.sh` | Copies the bundled `plugins/store-kit` into a site when it has none or an older one; never downgrades |
+| `design-md-index.sh` · `domains-import.sh` | Rebuild vendored reference indexes |
+
+`bin/lib/` holds what they share.
 
 ## Conventions
 
@@ -497,6 +528,10 @@ Placeholder tokens (`__starter__`, `__STARTER__`, `__STARTER_NAME__`) are replac
 | Bilingual | Append `_<lang>` → `hero_title_es` |
 
 ### CSS
+
+On the Tailwind starter (the default), utilities go in the markup, tokens live in the
+`@theme` block, and `@apply` is used only where the `wp-tailwind-system` decision ladder
+allows it. Section blocks still follow these rules:
 
 - Custom properties for all design tokens (never hardcode)
 - BEM naming: `.block__element--modifier`
@@ -576,12 +611,32 @@ database or server change that does **not** and has to be repeated on staging an
 production, `content` needs a person to write a text, `manual` needs judgment or an
 external tool. `--report-lang en|es` picks the language the client reads it in.
 
+A report-only run always writes the `.md` + `.html` pair, even without `--report`. When
+`--report-only` is absent, `/wp-audit` asks whether to fix or only report before it runs
+anything.
+
+### Findings and load limits
+
+- **Findings carry identity.** Each one is keyed by check id + resource in
+  `.wp-audit-findings.json`, next to `.wp-create.json`. A finding is marked `resolved` only
+  when its check ran again and measured it; a check that did not run reports `unmeasured`.
+- **Link sweeps are bounded.** `bin/link-sweep.mjs` keeps at most 4 requests in flight,
+  samples term archives, never requests a clone's origin unless confirmed, and reports a CDN
+  bot challenge as `UNMEASURED` rather than broken. Internal links are resolved against the
+  database first.
+- **The usability audit runs on a budget.** `bin/ux-probe.mjs` opens every page once per
+  viewport in one browser launch; a fourth launch or a run past 15 minutes stops it, and the
+  report says `complete: false`.
+- **WooCommerce stores get their own checks** — product SEO, paid downloads reachable
+  without a purchase, gateway credentials stored at rest, and a page cache that serves one
+  visitor's currency to everyone.
+
 ### Usage
 
 ```bash
 /wp-audit                    # Run all categories
 /wp-audit --security --seo   # Run specific categories
-/wp-audit --report-only      # Report without fixing
+/wp-audit --report-only      # Report without fixing (writes the .md + .html deliverable)
 /wp-audit --report both --report-lang es   # Also write the dated client report
 /wp-audit --suite --host https://example.com  # Measure in a real browser, unattended
 /wp-audit --usability --pages auto         # Audit the pages a person actually uses
@@ -598,7 +653,7 @@ external tool. `--report-lang en|es` picks the language the client reads it in.
 
 - **WordPress** legacy theme (no blocks, no FSE)
 - **ACF/SCF** for custom fields (programmatic, one file per section)
-- **Tailwind CSS 4** starter (`@wordpress/scripts` build, BEM blocks for sections) — a plain-CSS `basic` path remains for older themes
+- **Tailwind CSS 4** starter (`@wordpress/scripts` build, BEM blocks for sections); an existing plain-CSS theme converts with `/wp-tailwind-migrate`
 - **Vanilla JS** (no frameworks); the cinematic starter adds the `cinematic-scroll-kit` scroll engine
 - **Bilingual** via Polylang (default — real `/es/` URLs, hreflang, per-language meta) or field suffixes (opt-in at `/wp-init`, no SEO value for the second language)
 
@@ -615,11 +670,27 @@ The `/wp-demo` command works best with these skills installed. All other command
 
 See [BACKLOG.md](BACKLOG.md) for the full product backlog. Key areas of active development:
 
-- Visual regression testing with Playwright (demo vs WordPress comparison)
-- Multi-page demo support and custom post type auto-detection
+- Visual regression between a demo and the theme built from it — screenshot baselines exist today for the motion fixtures only
+- An end-to-end run of a generated site in CI, and a corpus of broken sites with expected audit findings
 - JavaScript specialist agent for sliders, animations, and interactivity
+- ~~Multi-page demo support~~ ✓ `/wp-yolo`, and ~~custom post types~~ ✓ `/wp-cpt`
 - ~~Tailwind CSS starter theme and build pipeline integration~~ ✓ shipped in v1.4.0
 - ~~Cinematic scroll-driven starter theme (WebCodecs scrub, ffmpeg encode pipeline)~~ ✓ shipped in v1.5.0
+
+## Testing
+
+Each check in `tests/checks/` is a standalone bash script that prints `PASS` or exits
+non-zero. Most assert that a command, agent or skill still states its contract; a few drive
+a real browser or a disposable WordPress.
+
+```bash
+for f in tests/checks/*.sh; do bash "$f"; done
+```
+
+CI runs every check on each pull request, plus `node --check`, `php -l` at the PHP floors
+(7.4, and 8.0 for the cinematic starter) and `bin/doc-sync-check.sh`. A maintainer can
+comment `/autofix` on a PR to have the open OpenCodeReview findings fixed and re-verified.
+Details in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
 

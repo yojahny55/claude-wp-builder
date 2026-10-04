@@ -1102,6 +1102,9 @@ Run, in order:
    - **exit 2** — no report exists yet, or no network: record it `UNMEASURED` and mark the
      run incomplete in Step 6, exactly as the completion rule requires below. An absent
      score is not a good score.
+     Do not add `--start` here: it makes is-agentic fetch the host, and an unattended
+     run has no operator to confirm the host is meant to be public. `/wp-audit --geo
+     --host <public-url>` passes it once the operator has.
    - **exit 3** — `wordpress.url` is not publicly reachable, so the site cannot be scanned
      at that address at all. Record it `UNMEASURED — configuration` and mark the run
      incomplete. This is not the same as exit 2 and must not be reported as one: it has a

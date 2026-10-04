@@ -142,6 +142,8 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 | PERF-065 | Multi-currency plugin active behind a page/edge cache with no currency-aware cache key | `$WP plugin list --status=active --format=json` — flag when one of the confirmed multi-currency plugin slugs (see *Procedure* for the list) is active together with a known full-page cache plugin (`wp-rocket`, `w3-total-cache`, `wp-super-cache`, `litespeed-cache`, `wp-fastest-cache`, `sg-cachepress`, `breeze`, `cache-enabler`) — or PERF-066 confirms an edge CDN cache in front of the origin. Any other active plugin whose slug/name merely matches `currency` is `UNCONFIRMED`, not flagged outright — see *Procedure* for why. See *Procedure — multi-currency and full-page cache* for how the plugin's currency-selection mechanism decides the severity | No full-page/edge cache detected — confirmed against the production host, not merely the absence of a known caching plugin locally — or the detected cache plugin's cookie-exclusion setting names the currency cookie; `N/A` ("no WooCommerce") when `site.commerce` is `none`; `N/A` ("no multi-currency plugin") when none is active; `UNMEASURED` ("needs the public URL") without a confirmed production URL, never `PASS` | WARNING/CRITICAL |
 | PERF-066 | Cache/CDN edge layer fronting the origin | LIVE. `curl -sSI <production_url>` against the confirmed production host (`/wp-audit` Step 2.3 — never the local clone, whose own server answers a rule production's edge never sees), then repeat the identical request once more against the same URL. Read `server:`, `cf-cache-status:`, `age:`, `x-cache:`, `via:`, `x-varnish:`, `x-proxy-cache:` and `x-fastcgi-cache:` from both responses. `cf-cache-status: HIT` on the second request confirms Cloudflare is caching the full page at the edge — `DYNAMIC` or `BYPASS` do not, even though Cloudflare sets the header either way, so its mere presence is not detection. When there is no `cf-cache-status` header, treat any of `age:` > 0, `x-cache: HIT`, a `via:` or `server:` naming Varnish, or a present `x-proxy-cache`/`x-fastcgi-cache` header as evidence of a full-page cache or CDN/proxy layer, a layer WP-CLI cannot see at all | Detection only, feeds PERF-065 and PERF-067; `N/A` ("no WooCommerce") when `site.commerce` is `none`; `N/A` ("no multi-currency plugin") when none is active; `UNMEASURED` ("needs the public URL") without a confirmed production URL | INFO |
 | PERF-067 | Confirmed cross-visitor currency bleed on a cached page | LIVE. Against the confirmed production host, request the same shop/product URL twice, selecting a different one of the store's currencies each time by whatever mechanism the active plugin uses (cookie, session or a `?currency=` parameter), and read the rendered price and the cache-status header PERF-066 detected (`cf-cache-status`, or its `x-cache`/equivalent counterpart on a non-Cloudflare layer) from each response | The second request's price/currency matches the currency it selected; FAIL when `cf-cache-status` is `HIT` on the second request (or the equivalent HIT value for the header PERF-066 detected) and the price still matches the FIRST request's currency. Same `N/A`/`UNMEASURED` gates as PERF-065/PERF-066 | WARNING/CRITICAL |
+| PERF-068 | Cumulative Layout Shift (CLS) above threshold | Per template, see "Procedure — CLS and INP in the browser" below. A `PerformanceObserver` on `layout-shift` (`buffered: true`), summing entries whose `hadRecentInput` is `false`, over the settled load plus one scroll to the bottom, at the mobile and desktop viewports the audit already screenshots at. Read-only and clone-safe: it only observes the page it loads, so a local clone is measured as itself (lab value, not field data) | Worst per-template CLS ≤0.1; `0.1–0.25` is `WARNING`, `>0.25` is `ERROR`; `UNMEASURED` ("needs a browser") when Tier 3 is unavailable, never `PASS` | WARNING/ERROR |
+| PERF-069 | Interaction to Next Paint (INP) above threshold | Per template, see "Procedure — CLS and INP in the browser" below. A `PerformanceObserver` on `event` (`durationThreshold: 16`, `buffered: true`) after scripted real input (click on the menu toggle, a form field, the first interactive control), reporting the worst `interactionId` duration | Worst interaction ≤200ms; `200–500ms` is `WARNING`, `>500ms` is `ERROR`; `UNMEASURED` ("no interaction exercised") when the page has nothing to press, and `UNMEASURED` without a browser. A lab run is an approximation of field INP and the finding says so | WARNING/ERROR |
 
 ### Procedure — multi-currency and full-page cache (PERF-065 to PERF-067)
 
@@ -287,6 +289,33 @@ so the fix preloads that file instead of guessing 400.
 Report PERF-054/PERF-055 per template, not once for the site: the fix in Step 5 is "eager the
 elements in the real LCP's row, lazy the rest, preload the weight that row renders in" — the
 same shape as the demo's own card grids, never a single sitewide `loading="lazy"` removal.
+
+**PERF-068/PERF-069 — CLS and INP in the browser, per template.** Neither value exists in
+WP-CLI, so both are measured in the page, like PERF-054, and recorded per template at both
+viewports rather than once for the site. Everything here only observes; it submits nothing
+and writes nothing, which is why it is safe on a local clone.
+
+```js
+// Runs in the page (Playwright `page.evaluate`, or paste into a console).
+window.__cls = 0;
+new PerformanceObserver((list) => {
+  for (const e of list.getEntries()) if (!e.hadRecentInput) window.__cls += e.value;
+}).observe({ type: 'layout-shift', buffered: true });
+
+window.__inp = 0;
+new PerformanceObserver((list) => {
+  for (const e of list.getEntries()) if (e.interactionId) window.__inp = Math.max(window.__inp, e.duration);
+}).observe({ type: 'event', durationThreshold: 16, buffered: true });
+```
+
+For CLS, load the template, wait for it to settle, scroll to the bottom and back, then read
+`window.__cls`. Name the largest shifting node (`entry.sources[0].node`) in the finding so the
+fix is aimed: the usual causes are images and iframes without `width`/`height`, a late web font
+swap, and a banner or embed injected above content. For INP, press the controls the template
+actually has (menu toggle, search field, first button or form field) with real input events
+and read `window.__inp`; a page with nothing to press is `UNMEASURED`, not `0`. The fixes
+(dimensions on media, `font-display`/preload, reserved space, splitting long handlers) belong
+to Step 5, and neither check is auto-applied.
 
 **PERF-049 — dead assets.** Glob the theme's `assets/` recursively, match the backup patterns,
 sum the sizes. Move findings to an archive directory outside the theme rather than deleting:
@@ -768,6 +797,13 @@ Never propose disabling the page cache site-wide as the fix — that trades a wr
 a slow site. The fix is scoping the cache key, not removing the cache.
 
 ## Rules
+
+**Requests to a production host go through `bin/prod-gate.sh`**, with the gate dir from the
+dispatch prompt, exactly as `skills/wp-audit-standards` "Production sits behind a WAF" says.
+Production runs fail2ban, CrowdSec and ModSecurity, and agents in parallel without the gate
+got an audit's IP banned. Use the same command, URL, headers and user agent as before: the
+gate changes the pace, not the measurement. When it exits `4`, report the check `UNMEASURED`
+and never retry. A local site is not gated.
 
 1. **Read project config before any checks** — `.claude/CLAUDE.md` for prefix/slug, `.wp-create.json` for `$WP`
 2. **Run Tier 1 code checks before Tier 2 runtime checks** — code issues are cheaper to detect
