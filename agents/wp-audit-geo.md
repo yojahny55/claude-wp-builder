@@ -144,6 +144,11 @@ does not match the detected site type are reported `N/A`, not failed.
 | GEO-P04 | x402 support | merchant only — x402 payments; advisory | INFO | No |
 | GEO-P05 | AP2 support | merchant only — Agent Payments Protocol; advisory | INFO | No |
 
+GEO-P01 to GEO-P05 are the checks here whose object is a payment, so they are
+`N/A ("catalog: nothing purchasable")` when `site.store_tier` is `catalog` (`/wp-audit` Step 2.3):
+a catalog is a merchant that deliberately takes no payment, and an agent payment protocol has
+nothing to pay for. `unknown` is not `catalog` — audit them.
+
 ### Procedure
 
 1. Use `Glob` to find all `.php` files in the theme directory, then `Grep` each pattern.

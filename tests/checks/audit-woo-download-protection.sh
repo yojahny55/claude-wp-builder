@@ -245,7 +245,17 @@ for t in templates/native/nginx.conf.tpl templates/native/nginx-no-ssl.conf.tpl;
   grep -Fq 'location ^~ /wp-content/uploads/woocommerce_uploads/ { deny all; }' "$t" \
     || fail "$t does not deny woocommerce_uploads ahead of its regex locations"
 done
-grep -Fq 'path /wp-content/uploads/woocommerce_uploads/*' templates/native/Caddyfile.tpl \
-  || fail "templates/native/Caddyfile.tpl does not refuse woocommerce_uploads"
+# A path line denies nothing on its own: it has to sit inside @disallowed, and that matcher has to
+# be answered. Repeated path lines in one matcher merge into a single OR list (caddy adapt).
+caddy=templates/native/Caddyfile.tpl
+awk '/@disallowed \{/{f=1} f{print} f&&/\}/{exit}' "$caddy" | grep -Fq 'path /wp-content/uploads/woocommerce_uploads/*' \
+  || fail "$caddy does not match woocommerce_uploads inside its @disallowed matcher"
+grep -Fq 'respond @disallowed 404' "$caddy" \
+  || fail "$caddy has no respond for @disallowed, so the woocommerce_uploads match denies nothing"
+# Apache needs no rule of its own only while it still runs WooCommerce's own .htaccess deny.
+for t in templates/native/apache.conf.tpl templates/native/apache-no-ssl.conf.tpl; do
+  grep -Fq 'AllowOverride All' "$t" \
+    || fail "$t no longer lets WooCommerce's .htaccess deny woocommerce_uploads (SEC-039 on Apache)"
+done
 
 echo PASS
