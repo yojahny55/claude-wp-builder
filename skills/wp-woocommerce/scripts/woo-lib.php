@@ -45,7 +45,9 @@ function wooset_sort( $value ) {
 }
 
 function wooset_canon( $value ) {
-	return json_encode( wooset_sort( $value ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+	// Substitute rather than fail: json_encode() returns false on bytes that are not UTF-8, and
+	// two falses compare equal, so a setting would read as converged whatever the block says.
+	return json_encode( wooset_sort( $value ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR );
 }
 
 function wooset_same( $a, $b ) {
