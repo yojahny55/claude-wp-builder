@@ -69,6 +69,9 @@ if [ -n "${WP_DESIGN_LIBRARY_URL:-}" ]; then
     || { echo "FAIL: live tools/list search"; exit 1; }
   printf '%s' "$response" | grep -Eq '"name"[[:space:]]*:[[:space:]]*"get_entry"' \
     || { echo "FAIL: live tools/list get_entry"; exit 1; }
+  # /wp-demo's first call is get_vocab; a server without it cannot follow the contract above.
+  printf '%s' "$response" | grep -Eq '"name"[[:space:]]*:[[:space:]]*"get_vocab"' \
+    || { echo "FAIL: live tools/list get_vocab"; exit 1; }
   call_body='{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search","arguments":{"query":"","limit":1}}}'
   response="$(curl -sf --max-time 10 -X POST "$mcp_url" \
     -H "authorization: Bearer ${WP_DESIGN_LIBRARY_TOKEN:?}" \
