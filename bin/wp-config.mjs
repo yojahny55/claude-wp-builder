@@ -9,6 +9,7 @@ import {
   readFileSync, existsSync, writeFileSync, copyFileSync, mkdirSync,
 } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   CURRENT_VERSION, MANIFEST_NAME, LOCAL_NAME, detectVersion, versionProblem, validateManifest, migrateManifest,
   renderContext, spliceContext, contextDrift, resolveSecret, getKey, SECRETS, validateProfile,
@@ -206,6 +207,15 @@ function cmdValidateProfile(file) {
     process.exit(1);
   }
   const problems = validateProfile(profile);
+  // `bundled` means a plugin this repository ships under plugins/<slug>/. The pure validator
+  // cannot see the filesystem; this can, and a bundled slug with nothing behind it would fail
+  // the build at install time instead of here.
+  const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  for (const entry of Array.isArray(profile?.plugins) ? profile.plugins : []) {
+    if (entry?.source !== 'bundled' || typeof entry.slug !== 'string') continue;
+    const main = join(pluginRoot, 'plugins', entry.slug, `${entry.slug}.php`);
+    if (!existsSync(main)) problems.push(`${entry.slug}: source "bundled", but plugins/${entry.slug}/${entry.slug}.php does not exist in this plugin`);
+  }
   // An optional WordPress version turns this from "is the profile well-formed" into "does
   // it claim to work here". Step 4.10 passes the site's own version, so a plugin whose
   // tested range does not cover it is reported before it is installed rather than after

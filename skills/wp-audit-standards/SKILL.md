@@ -95,6 +95,11 @@ holds: a commerce check must not fire on a site with no WooCommerce, or the scor
 site for lacking a feature it never claimed. Adding commerce depth therefore leaves a
 generic site's score unchanged, because every commerce check reads `N/A` on it.
 
+A catalog store (`site.store_tier` = `catalog`, read from the `store` block by `/wp-audit`
+Step 2.3) has no cart, checkout or payment, so a check on one of those surfaces is
+`N/A ("catalog: nothing purchasable")` there, excluded from the denominator, exactly as a
+commerce check is on a site with no WooCommerce.
+
 ### A local clone is audited for production's posture
 
 A project restored from a backup to run locally (`.wp-create.json` `project.source:

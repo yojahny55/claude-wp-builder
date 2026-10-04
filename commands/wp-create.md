@@ -171,8 +171,11 @@ Present all discovered profiles:
 === Plugin Profiles ===
   [1] starter — Minimal setup (SCF, Rank Math SEO, WP Fastest Cache)
   [2] full — Production-ready stack (SCF, Rank Math SEO, WP Super Cache, CF7, WP Mail SMTP, Site Kit), All In One Security
-  [3] agency (custom: ~/.wp-profiles/agency.json) — Agency starter pack
-  [4] none — No plugins
+  [3] woo-catalog — Products and prices, nothing purchasable (WooCommerce, store-kit)
+  [4] woo-store — A store that sells (WooCommerce, store-kit, Stripe, Turnstile, SMTP)
+  [5] woo-full — Store plus abandoned cart, email marketing, reviews, filters, feeds
+  [6] agency (custom: ~/.wp-profiles/agency.json) — Agency starter pack
+  [7] none — No plugins
 ```
 
 Let the user select a profile. Read the chosen JSON file to get the list of plugin slugs.
@@ -190,6 +193,10 @@ Profile JSON format:
   ]
 }
 ```
+
+A store profile carries `"store": "catalog" | "store" | "full"`; Step 5.5 then runs
+`/wp-woo-setup`. A plugin entry may say `"source": "bundled"` — a plugin this repository ships
+under `plugins/<slug>/` (today only `store-kit`); Step 4.10 copies it in.
 
 ### 3.8 Languages
 
@@ -358,6 +365,16 @@ bash -c "$WP config set FS_METHOD direct --type=constant"
 
 **Validation:** Check that `${PROJECT_PATH}/wp-config.php` exists and contains the correct DB credentials, and that `$WP config get FS_METHOD` returns `direct`.
 
+Mark the site as local. WordPress reads an unset `WP_ENVIRONMENT_TYPE` as `production`, and
+store setup keys its test-only behaviour — cash on delivery for the automated test order, a
+visible storefront — on this value:
+
+```bash
+bash -c "$WP config set WP_ENVIRONMENT_TYPE local --type=constant"
+```
+
+**Validation:** `$WP config get WP_ENVIRONMENT_TYPE` returns `local`.
+
 **On failure:** See Failure Handling table.
 
 ### Step 4.6: SSL Certificate (Native Only)
@@ -468,6 +485,29 @@ bash -c "$WP plugin install <slug> --activate"
 
 A plugin whose profile entry says `"source": "supplied"` is never fetched from WP.org. Ask
 for the zip or path.
+
+A plugin whose entry says `"source": "bundled"` ships inside claude-wp-builder. Copy it in and
+activate it; never fetch it from WordPress.org, where the same slug could belong to someone
+else. Its entry lists `woocommerce` first, because WordPress refuses to activate a plugin whose
+`Requires Plugins` is inactive.
+
+A store profile needs native WP-CLI, running on the host. The copy lands in the host's
+`wp-content/plugins`, and `/wp-woo-setup` later runs host paths: Docker (our templates) mounts
+only the theme, wp-env loads no plugin from the project, and DDEV and Lando run WP-CLI in a
+container that mounts neither this plugin's scripts nor the host project path. On anything but
+`native` (the environment chosen in Step 1; the manifest records it as `environment.engine`),
+stop here, before syncing, rather than failing at `plugin activate`, and
+say so in one line:
+
+> store profiles need native WP-CLI: on `<engine>` WP-CLI cannot see the plugin's scripts or the project directory
+
+Otherwise:
+
+```bash
+bash -c "bash '${CLAUDE_PLUGIN_ROOT}/bin/store-kit-sync.sh' '${PROJECT_PATH}/wp-content/plugins' && $WP plugin activate store-kit"
+```
+
+A failure here counts against the entry's `required` flag like any other install.
 
 **Three different things used to be recorded as `license_missing`, and they need different
 actions from the operator.** A premium plugin whose licence nobody bought, a zip that
@@ -858,6 +898,31 @@ bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'
 | `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
 
 On exit 2, run the migration before continuing.
+
+---
+
+## Step 5.5: Store setup (store profiles only)
+
+When the selected profile carries `"store"`, run `/wp-woo-setup` now, before anything chains to
+`/wp-init`. Installing WooCommerce alone leaves a store with HPOS off, no Terms page, no shipping,
+no tax and no payments — WooCommerce's own new-store defaults wait for a wp-admin visit that a
+WP-CLI build never makes. `/wp-woo-setup` asks the store questions (the tier defaults to the
+profile's `"store"` value), records the `store` block in the manifest just written, shows a dry
+run and applies it.
+
+Store profiles need native WP-CLI. Read `environment.engine` from the manifest just
+written:
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' environment.engine"
+```
+
+On anything but `native`, do not run `/wp-woo-setup`, which would copy store-kit where
+the container cannot see it; stop with one line:
+
+> store profiles need native WP-CLI: on `<engine>` WP-CLI cannot see the plugin's scripts or the project directory
+
+A profile without `"store"` skips this step.
 
 ---
 
