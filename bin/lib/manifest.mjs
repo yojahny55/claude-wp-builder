@@ -402,7 +402,7 @@ export function validateStore(store) {
   }
   if (store.checkout_reason !== undefined && store.checkout !== 'shortcode') p.push('store.checkout_reason only belongs beside checkout "shortcode"');
 
-  if (!isObj(store.payments)) p.push('store.payments is required on a store: gateway and mode');
+  if (!isObj(store.payments)) p.push('store.payments is required on a store or full tier: gateway and mode');
   else {
     const secretKeys = secretPaths.map(([, s]) => s.manifestPath.split('.').pop());
     unknownKeys(store.payments, ['gateway', 'mode', ...secretKeys], 'store.payments', p);

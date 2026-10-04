@@ -66,10 +66,18 @@ function esc_html( $s ) { return $s; }
 function get_option() { return array(); }
 require getenv( 'KIT' ) . '/includes/credentials.php';
 define( 'STORE_KIT_STRIPE_TEST_WEBHOOK_SECRET', 'whsec_const' );
-$_GET['section'] = 'stripe';
+// Another admin screen that happens to carry section=stripe prints nothing: the notice names constants.
+$_GET = array( 'page' => 'some-other-plugin', 'section' => 'stripe' );
+ob_start();
+store_kit_stripe_notice();
+if ( '' !== ob_get_clean() ) {
+	echo "LEAKED onto a screen that is not WooCommerce's Stripe settings\n";
+}
+$_GET = array( 'page' => 'wc-settings', 'tab' => 'checkout', 'section' => 'stripe' );
 store_kit_stripe_notice();
 PHP3
 ) || fail "store-kit's Stripe screen notice does not run"
+if grep -Fq 'LEAKED' <<<"$notice"; then fail "the Stripe notice prints on any admin screen with section=stripe"; fi
 if grep -Fq 'not saved from this screen' <<<"$notice"; then fail "the Stripe screen says a seeded webhook secret is not saved there: $notice"; fi
 grep -Fq 'To re-seed after updating the constant, clear the field on this screen' <<<"$notice" \
   || fail "the Stripe screen does not say how to re-seed a webhook secret from wp-config.php: $notice"
@@ -161,6 +169,9 @@ out=$(bash "$sync" "$p"); grep -q 'left alone' <<<"$out" && grep -q '99.0.0' "$p
 sed -i 's/^ \* Version: .*/ * Version: 0.0.1/' "$p/store-kit/store-kit.php"
 out=$(bash "$sync" "$p"); grep -q '^store-kit 0.0.1 -> ' <<<"$out" && cmp -s "$main" "$p/store-kit/store-kit.php" \
   || fail "an older copy on the site was not replaced: $out"
+# The swap goes through mktemp, which creates 0700 -- a plugin the web server cannot read.
+[ "$(stat -c %a "$p/store-kit")" = "755" ] || fail "the synced plugin directory is $(stat -c %a "$p/store-kit"), want 755"
+[ -z "$(find "$p" -maxdepth 1 -name '.store-kit.*')" ] || fail "the sync left scratch directories behind: $(ls -a "$p")"
 set +e; bash "$sync" "$p/missing" >/dev/null 2>&1; code=$?; set -e
 [ "$code" = "1" ] || fail "a plugins directory that does not exist exited $code, want 1"
 echo PASS

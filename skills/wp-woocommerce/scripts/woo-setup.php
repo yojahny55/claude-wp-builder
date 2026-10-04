@@ -61,8 +61,11 @@ function wooset_converge( $id, $desired, $get, $set, $note = '', $kind = '' ) {
 	$decision = $held
 		? ( wooset_same( $current, $desired ) ? 'ok' : 'client' )
 		: wooset_decide( $current, $desired, $recorded, $c['fresh'], $c['force'] );
-	if ( 'set' === $decision && $c['write'] ) {
-		call_user_func( $set, $desired );
+	// A setter returns false only when the write failed. Recording the hash anyway would make the
+	// next run read the unchanged value as the client's and never retry it.
+	if ( 'set' === $decision && $c['write'] && false === call_user_func( $set, $desired ) ) {
+		wooset_report( 'degraded', $id, 'the write failed: nothing was recorded, the next run retries it' );
+		return 'degraded';
 	}
 	if ( 'client' !== $decision && $c['write'] ) {
 		$c['state'][ $id ] = wooset_hash( $desired );
@@ -308,7 +311,7 @@ function wooset_step_pages( $store ) {
 					return wooset_page_mode( (string) get_post_field( 'post_content', $id ), $page );
 				},
 				function () use ( $id, $content ) {
-					wp_update_post( array( 'ID' => $id, 'post_content' => $content ) );
+					return (bool) wp_update_post( array( 'ID' => $id, 'post_content' => $content ) );
 				},
 				'shortcode' === $mode ? 'shortcode: ' . $store['checkout_reason'] : 'block'
 			);
@@ -743,6 +746,10 @@ foreach ( $wooset_required as $wooset_path ) {
 		wooset_refuse( 'store block incomplete: store.' . $wooset_path . ' -- run wp-config.mjs validate' );
 	}
 }
+if ( isset( $wooset_store['checkout'] ) && 'shortcode' === $wooset_store['checkout']
+	&& ( ! isset( $wooset_store['checkout_reason'] ) || ! is_string( $wooset_store['checkout_reason'] ) || '' === trim( $wooset_store['checkout_reason'] ) ) ) {
+	wooset_refuse( 'store block incomplete: store.checkout_reason, which checkout "shortcode" needs -- run wp-config.mjs validate' );
+}
 // The same for each entry the shipping and tax steps read. A rate with no country is written
 // with an empty one, which WooCommerce applies to every country; an unparseable location is
 // written as ':' and never compares equal again, so it re-sets on every run.
@@ -759,6 +766,9 @@ foreach ( isset( $wooset_store['shipping'] ) && is_array( $wooset_store['shippin
 	}
 	if ( ! isset( $wooset_zone['locations'] ) || ! is_array( $wooset_zone['locations'] ) ) {
 		wooset_refuse( "store block incomplete: store.shipping[$wooset_i].locations -- run wp-config.mjs validate" );
+	}
+	if ( ! isset( $wooset_zone['methods'] ) || ! is_array( $wooset_zone['methods'] ) ) {
+		wooset_refuse( "store block incomplete: store.shipping[$wooset_i].methods -- run wp-config.mjs validate" );
 	}
 	foreach ( $wooset_zone['locations'] as $wooset_code ) {
 		if ( null === wooset_location( $wooset_code ) ) {
