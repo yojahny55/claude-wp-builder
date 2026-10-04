@@ -165,7 +165,7 @@ grep -Fq 'Empty, never absent, when none were' <<<"$step23_flat" \
 grep -Fq 'clone rule silences "it is off", never "it is off' <<<"$step23_flat" \
   || fail "$audit Step 2.3 does not say the clone suppression covers only the deactivated/parked finding, not other findings on the same item"
 
-# --- The Step 6 dispatch template passes all four fields to every audit agent ---
+# --- The Step 6 dispatch template passes all five fields to every audit agent ---
 dispatch=$(sed -n '/^Project context:/,/^Run all checks for your tier level\./p' "$audit")
 [ -n "$dispatch" ] || fail "$audit: could not extract the Step 6 dispatch template (markers renamed?)"
 for line in 'Site type (commerce):' 'Store tier:' 'Local clone:' 'Clone-suppressed plugins:' 'Parked drop-ins:'; do
