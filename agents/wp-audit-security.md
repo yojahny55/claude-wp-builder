@@ -375,7 +375,9 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 | SEC-042 | Abandoned plugins | wp.org API `last_updated` older than ~2 years, or `tested` far behind the installed core version, for every loaded plugin (active, plus clone-suppressed on a local clone), **after the SEC-038 network gate passes**. See Procedure | Not abandoned | WARNING |
 
 SEC-040 is `N/A ("no WooCommerce")`, out of the denominator, when `site.commerce` is `none` (`/wp-audit`
-Step 2.3) — this check has nothing to read without WooCommerce installed and active.
+Step 2.3) — this check has nothing to read without WooCommerce installed and active. It stays
+scored on a catalog (`site.store_tier` `catalog`): its object is a credential at rest, not a
+checkout, and a gateway key left in a catalog's database leaks exactly as a selling store's does.
 
 ### Execution notes
 

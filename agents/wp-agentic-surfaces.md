@@ -32,7 +32,7 @@ Before writing any file or running any command, read the project files:
 Determine the **site type** from positive, recorded signals — never by scanning REST
 namespaces. Check in order:
 
-- `class_exists( 'WooCommerce' )` (via `$WP plugin is-installed woocommerce`) → `merchant`
+- `class_exists( 'WooCommerce' )` (via `$WP plugin is-active woocommerce`, the test `/wp-audit` Step 2.3 records as `site.commerce`) → `merchant`
 - the project's `Industry` is a local/business value **and** the settings carry a non-empty
   `business_address` → `local`
 - the audit or `.claude/CLAUDE.md` records a SaaS / public-API site (an OpenAPI spec or a

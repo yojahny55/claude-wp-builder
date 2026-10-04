@@ -163,4 +163,23 @@ out=$(bash "$sync" "$p"); grep -q '^store-kit 0.0.1 -> ' <<<"$out" && cmp -s "$m
   || fail "an older copy on the site was not replaced: $out"
 set +e; bash "$sync" "$p/missing" >/dev/null 2>&1; code=$?; set -e
 [ "$code" = "1" ] || fail "a plugins directory that does not exist exited $code, want 1"
+
+# The decision and its limits are recorded where every other one is.
+grep -q '^### A store is a recorded decision' CLAUDE.md || fail "CLAUDE.md does not record the store decision"
+# Bounded by the next heading of level 2 or 3, so a later ### section cannot satisfy it.
+decision=$(awk '/^### A store is a recorded decision/{f=1; print; next} f && /^##/{exit} f' CLAUDE.md | tr '\n' ' ')
+grep -Fq 'which `force` never writes on a store that already has orders' <<<"$decision" \
+  || fail "CLAUDE.md's store decision omits the launch-state exception to force"
+ceilings=$(awk '/^## Known ceilings/{f=1; next} f && /^## /{exit} f' CLAUDE.md)
+for c in 'Gateway keys from constants cover Stripe only' 'The general Store API limiter is off on purpose' \
+         '"Connect with Stripe" does not work with `store-kit` credentials' \
+         'Setup reports what the block stopped naming, and never deletes it' \
+         'Store profiles need native WP-CLI'; do
+  grep -Fq "$c" <<<"$ceilings" || fail "CLAUDE.md's Known ceilings does not record: $c"
+done
+grep -Fq -- '- [ ] **WooCommerce stores (N01)** `PARTIAL`' BACKLOG.md \
+  || fail "BACKLOG.md's N01 row is not an unchecked PARTIAL: the remaining pieces are the item"
+grep -Fq '**Docker environments get no nginx config**' BACKLOG.md \
+  || fail "BACKLOG.md lost the docker nginx row CLAUDE.md's deny-rule ceiling cites"
+
 echo PASS

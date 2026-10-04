@@ -168,7 +168,7 @@ grep -Fq 'clone rule silences "it is off", never "it is off' <<<"$step23_flat" \
 # --- The Step 6 dispatch template passes all four fields to every audit agent ---
 dispatch=$(sed -n '/^Project context:/,/^Run all checks for your tier level\./p' "$audit")
 [ -n "$dispatch" ] || fail "$audit: could not extract the Step 6 dispatch template (markers renamed?)"
-for line in 'Site type (commerce):' 'Local clone:' 'Clone-suppressed plugins:' 'Parked drop-ins:'; do
+for line in 'Site type (commerce):' 'Store tier:' 'Local clone:' 'Clone-suppressed plugins:' 'Parked drop-ins:'; do
   grep -Fq "$line" <<<"$dispatch" \
     || fail "$audit Step 6 dispatch template lost the '$line' line"
 done
@@ -183,5 +183,21 @@ grep -Fq 'N/A (local clone)' "$std" \
   || fail "$std does not document the N/A (local clone) status"
 grep -Eiq 'would this also be true on production' "$std" \
   || fail "$std lost the production-posture test"
+
+# --- The store tier: a catalog is not scored for a checkout it deliberately does not have. ---
+for needle in 'store.tier' 'site.store_tier' 'catalog: nothing purchasable' '`unknown` is not `catalog`' \
+              'cart, the checkout or a payment'; do
+  grep -Fq -- "$needle" <<<"$step23_flat" || fail "$audit Step 2.3 does not carry '$needle'"
+done
+grep -Fq 'catalog: nothing purchasable' "$std" || fail "$std does not state the catalog N/A rule"
+# Stated once is not applied: the rows whose object is a payment carry the gate themselves, and
+# the credential check says why it does not -- a key at rest leaks on a catalog too.
+geo=agents/wp-audit-geo.md; sec=agents/wp-audit-security.md
+geo_flat=$(tr '\n' ' ' <"$geo" | sed 's/  */ /g')
+grep -Fq 'GEO-P01 to GEO-P05 are the checks here whose object is a payment, so they are `N/A ("catalog: nothing purchasable")` when `site.store_tier` is `catalog`' <<<"$geo_flat" \
+  || fail "$geo does not apply the catalog N/A to its payment-protocol checks"
+sec_flat=$(tr '\n' ' ' <"$sec" | sed 's/  */ /g')
+grep -Fq 'It stays scored on a catalog' <<<"$sec_flat" \
+  || fail "$sec does not say SEC-040 stays scored on a catalog, inviting the tier gate onto a credential check"
 
 echo PASS

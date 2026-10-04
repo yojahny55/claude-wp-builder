@@ -34,6 +34,9 @@ server {
     }
 
     location ~ /\.ht { deny all; }
+    # WooCommerce keeps paid downloads here behind an .htaccess `deny from all`, which nginx
+    # never reads (SEC-039). `^~` so the static-file regex below cannot serve them first.
+    location ^~ /wp-content/uploads/woocommerce_uploads/ { deny all; }
     location = /favicon.ico { log_not_found off; access_log off; }
     location = /robots.txt { allow all; log_not_found off; access_log off; }
 
