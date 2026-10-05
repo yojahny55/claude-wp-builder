@@ -332,7 +332,7 @@ const ENQUIRY = ['form', 'where-to-buy', 'whatsapp'];
 const METHOD_KEYS = { flat_rate: ['type', 'cost'], free_shipping: ['type', 'min_amount'], local_pickup: ['type', 'cost'] };
 const TAX_CLASSES = ['standard', 'reduced-rate', 'zero-rate'];
 const STORE_COUNTRY = /^[A-Z]{2}(:[A-Z0-9-]{1,10})?$/;
-const STORE_LOCATION = /^([A-Z]{2}(:[A-Z0-9-]{1,10})?|postcode:[A-Za-z0-9 *.-]{1,20}|continent:[A-Z]{2})$/;
+const STORE_LOCATION = /^([A-Z]{2}(:[A-Z0-9-]{1,10})?|postcode:(?=[^\n]*[A-Za-z0-9])[A-Za-z0-9 *.-]{1,20}|continent:[A-Z]{2})$/;
 const MONEY = /^\d+(\.\d{1,2})?$/;
 const TAX_RATE = /^\d{1,3}(\.\d{1,4})?$/;
 

@@ -170,7 +170,8 @@ sed -i 's/^ \* Version: .*/ * Version: 0.0.1/' "$p/store-kit/store-kit.php"
 out=$(bash "$sync" "$p"); grep -q '^store-kit 0.0.1 -> ' <<<"$out" && cmp -s "$main" "$p/store-kit/store-kit.php" \
   || fail "an older copy on the site was not replaced: $out"
 # The swap goes through mktemp, which creates 0700 -- a plugin the web server cannot read.
-[ "$(stat -c %a "$p/store-kit")" = "755" ] || fail "the synced plugin directory is $(stat -c %a "$p/store-kit"), want 755"
+# find -perm, not stat: stat's format flags differ between GNU and BSD.
+[ -n "$(find "$p/store-kit" -maxdepth 0 -perm -005)" ] || fail "the synced plugin directory is not readable by other users: $(ls -ld "$p/store-kit")"
 [ -z "$(find "$p" -maxdepth 1 -name '.store-kit.*')" ] || fail "the sync left scratch directories behind: $(ls -a "$p")"
 set +e; bash "$sync" "$p/missing" >/dev/null 2>&1; code=$?; set -e
 [ "$code" = "1" ] || fail "a plugins directory that does not exist exited $code, want 1"
