@@ -181,6 +181,22 @@ bash -c "ssh user@host 'cd /remote/path && wp theme list --fields=name,status,ve
 
 ### Split the list by what the operator can do about it
 
+**Bundled plugins first.** A plugin claude-wp-builder ships — `store-kit` — is not on
+WordPress.org and is not the client's to supply: it comes back from this repository. Check the
+plugin root before asking WordPress.org, and read the bundled file's header:
+
+```bash
+bash -c "sed -n 's/^ \* Plugin Name: *//p' '${CLAUDE_PLUGIN_ROOT}/plugins/<slug>/<slug>.php' 2>/dev/null"
+```
+
+The plugin is `bundled` only when `plugins/<slug>/<slug>.php` exists **and** its `Plugin Name:`
+header prints exactly the `title` the source reported for that slug in the inventory above. A
+missing file prints nothing; a different name is a same-slug plugin that is not ours, and goes
+through the WordPress.org split below like any other.
+
+A `bundled` answer is reported as "shipped by claude-wp-builder — reinstall with `/wp-woo-setup`",
+which copies and activates it. Only the rest go through the WordPress.org split below.
+
 For each plugin and theme the source has **active** and the destination does not have on
 disk, decide which of three groups it belongs to:
 
@@ -210,6 +226,9 @@ that repeats what is already there buries the part that needs action.
 Recoverable — install these (versions from the source):
   wp plugin install contact-form-7 --version=6.0.1 --activate
   wp plugin install wordpress-seo --version=23.4 --activate
+
+Bundled with claude-wp-builder — reinstall with /wp-woo-setup:
+  store-kit                  1.0.0
 
 Not on WordPress.org — this clone is incomplete without them:
   woocommerce-subscriptions  6.4.1   (active on the source)
@@ -519,8 +538,11 @@ bash -c "$WP plugin list --fields=name,status,version --format=csv"
 bash -c "$WP theme list --fields=name,status,version --format=csv"
 ```
 
-Apply the same three-way split as A3.5 — recoverable, not on WordPress.org, unclassified —
-and write the same file beside the backup.
+Apply the same split as A3.5 — **bundled first**, then recoverable, not on WordPress.org,
+unclassified — and write the same file beside the backup. A plugin this repository ships is
+never sent to the client as "not on WordPress.org". There is no source header to compare here,
+so a slug with a `plugins/<slug>/<slug>.php` in this repository is `bundled` on the slug alone,
+and its line says so: "bundled — matched by slug only, no source header to compare".
 
 **Say that this list is weaker, and why.** `wp plugin list` reports what is on disk joined
 with what the options table activates, so a plugin the source had active whose directory
@@ -812,7 +834,7 @@ Replaced:     a WordPress site was already here — "Client Demo", 47 posts
   Backup      ~/.wp-clone-backups/client-demo-20260919T161145Z.sql
               (omit this block entirely when the destination was empty)
 
-Dependencies: 2 recoverable, 2 need the client's own copies, 0 unclassified
+Dependencies: 2 recoverable, 1 bundled, 2 need the client's own copies, 0 unclassified
   Inventory   ~/.wp-clone-backups/client-demo-20260919T161145Z-dependencies.md
   → This clone carries the database and uploads. Plugin and theme FILES were not
     transferred; the inventory lists what to install and what cannot be obtained.

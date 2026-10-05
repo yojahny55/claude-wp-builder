@@ -17,7 +17,7 @@ runtime for the plugin itself. The only executable code shipped is:
 - `bin/*.sh` — env setup, ffmpeg wrappers and gate scripts, invoked by commands
   (`wp-env-setup`, `wp-cinematic-encode`, `composition-gate`, `doc-sync-check`,
   `geo-scan`, `tailwind-native-check`, `tailwind-rebuild`, `design-md-index`,
-  `domains-import`)
+  `domains-import`, `store-kit-sync`)
 - `bin/*.mjs` — Node tools a command runs and reads the exit code of. These carry
   real logic, and several are load-bearing gates rather than helpers:
   `wp-config.mjs` (the single definition of a valid `.wp-create.json` — see
@@ -33,7 +33,12 @@ runtime for the plugin itself. The only executable code shipped is:
   DOM probes, site probes from a module, and the 3-launch / 15-minute / 2-attempt budget
   enforced through a state file).
   `bin/lib/` holds what they share.
-- `skills/wp-polylang/scripts/*.php` — run inside a real WordPress via `wp eval-file`
+- `skills/wp-polylang/scripts/*.php` and `skills/wp-woocommerce/scripts/*.php` — run inside a
+  real WordPress via `wp eval-file`
+- `plugins/store-kit/` — a WordPress plugin copied into stores by `/wp-create` and
+  `/wp-woo-setup` through `bin/store-kit-sync.sh`: catalog mode, and Stripe keys read from
+  `wp-config.php` instead of the database. Held to the PHP 7.4 floor, and exercised against a
+  real WooCommerce in the fixture.
 - `starter-theme/**` — PHP copied into user projects (never executed here)
 
 Editing a "feature" therefore usually means editing prose contracts, and the tests assert on
@@ -89,6 +94,10 @@ That job is the only place here that reaches the network on purpose: a WordPress
 cannot exist without a WordPress. Every version is pinned so an upstream release cannot
 change a result, and nothing it installs is asserted against — every assertion runs against
 the local install.
+And only while provisioning: once the downloads are done, `tests/fixtures/wp/net-guard.php`
+is installed as a must-use plugin that refuses every host but loopback and logs each attempt
+to `wp-content/net-guard.log`, so no fixture check can pass or fail because a real service
+answered.
 
 It pays for itself. Its first two runs found two defects no contract grep and no pure test
 could reach: `get_field_object()` returns false on a post with no value for the field, so
@@ -237,6 +246,22 @@ lightness** — on a dark craft palette `--color-light` correctly resolves to a
 near-black canvas, because what the starter's CSS depends on is the contrast pair,
 not the name. The table is appended to the theme's copied `DESIGN.md` under
 `## Token aliases` so later agents read the mapping instead of guessing it.
+
+### A store is a recorded decision
+
+A WooCommerce store records what it sells in the `store` block of `.wp-create.json` — tier
+(`catalog`, `store`, `full`), address, currency, checkout type, shipping, tax, Stripe in test
+mode — validated by `bin/wp-config.mjs` like every other manifest field, with the Stripe keys
+as secrets beside the database password. `/wp-woo-setup` writes the block and runs
+`skills/wp-woocommerce/scripts/woo-setup.php`, which brings WooCommerce in line with it. The
+script records a hash of every value it writes in `store_kit_setup_state`, so a value that no
+longer matches is the client's and is left alone unless `force` is passed — except launch state
+(coming soon, Stripe enabled and test mode, cash on delivery), which `force` never writes on a
+store that already has orders, even when the row is absent. Behaviour that must survive a theme
+switch lives in `plugins/store-kit/`, copied into the site by `bin/store-kit-sync.sh`: catalog
+mode, and Stripe API keys supplied from `wp-config.php` — its webhook-secret constant only seeds
+an empty field, so a secret Stripe rotates is saved to the database, and SEC-040 reports it.
+`/wp-audit` reads `store.tier`, so a catalog is never scored for a checkout it does not have.
 
 ## Authoring conventions
 
@@ -722,3 +747,41 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
 - **Generated credentials are only as private as the local file.** Splitting them into
   `.wp-create.local.json` keeps them out of the committed manifest; it encrypts nothing, and
   a password already committed needs rotating rather than migrating.
+- **Gateway keys from constants cover Stripe only.** `store-kit` supplies the Stripe settings
+  from `STORE_KIT_STRIPE_*` constants; every other gateway keeps its keys in its own option row,
+  and SEC-040 reports them. The same design would extend to another gateway one option at a time.
+- **"Connect with Stripe" does not work with `store-kit` credentials.** Its OAuth flow saves the
+  keys through `update_option()`, and `store-kit` strips the fields a constant supplies. Stripe
+  is configured with API keys.
+- **The general Store API limiter is off on purpose.** In WooCommerce 11.1.2 it keeps the same
+  per-IP row as the checkout limit, and ordinary cart traffic created that row first in the
+  measurement, so six checkout attempts in a row went through. Setup turns on only the checkout
+  limit; `tests/checks/store-kit.sh` fails if anything enables the general one.
+- **Setup ownership is by value hash.** A client edit that happens to restore setup's own value
+  reads as setup's, and the hash records a value, not a history.
+- **Setup reports what the block stopped naming, and never deletes it.** A zone, shipping method
+  or tax rate setup recorded that is no longer in the `store` block but still exists in
+  WooCommerce is a `degraded` line, counted in the summary — a stale rate or method keeps
+  charging, so a run must not read as a clean match. Removing it is the operator's act in
+  WooCommerce. Zones and rates are matched by name, so a renamed zone is a new zone plus a stale
+  one.
+- **Store profiles need native WP-CLI.** `bin/store-kit-sync.sh` copies into the host's
+  `wp-content/plugins`, and `woo-setup.php` and `.wp-create.json` are host paths; the Docker
+  template mounts only the theme, wp-env loads no plugin from the project, and DDEV and Lando
+  run WP-CLI in a container that mounts neither this plugin's scripts nor the host project path.
+  `/wp-create` and `/wp-woo-setup` read `environment.engine` and stop before syncing on anything
+  but `native` rather than fail at `plugin activate` or the dry run. Supporting a container
+  means mounting the plugin and the project into it, which no template does today.
+- **The fixture proves checkout through the Store API with cash on delivery.** A real card
+  payment and Stripe's own flow are never exercised — no network, no bill — and Turnstile's
+  verification is a stub at the HTTP boundary (`tests/fixtures/wp/net-guard.php`).
+- **Tax is merchant-provided rates.** No tax engine; Stripe Tax is the documented upgrade.
+- **Setup reads Stripe keys from the environment and `.wp-create.local.json` inside the WP-CLI
+  wrapper's own environment.** A Docker wrapper sees neither the host's environment nor host
+  paths unless they are passed or mounted — the limit `skills/wp-polylang/scripts/` carries too.
+- **The `woocommerce_uploads` deny rule reaches the native nginx and Caddy templates only.**
+  `templates/docker/docker-compose.yml.tpl` mounts a `docker/nginx.conf` that nothing in this
+  plugin writes (a BACKLOG row), and DDEV, Lando and wp-env keep their own server configs.
+  SEC-039 still measures every one of them live.
+- **`store-kit` is linted at PHP 7.4 and executed on the fixture's PHP.** Syntax on the floor is
+  proven; behaviour on 7.4 itself is not.

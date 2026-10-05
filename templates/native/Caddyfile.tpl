@@ -8,6 +8,7 @@
         path /xmlrpc.php
         path *.sql
         path /wp-content/uploads/*.php
+        path /wp-content/uploads/woocommerce_uploads/*
     }
     respond @disallowed 404
 }

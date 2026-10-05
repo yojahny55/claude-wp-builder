@@ -47,6 +47,17 @@ class wpdb {
 		}
 		return $out;
 	}
+
+	// The stored row, as WordPress keeps it: arrays and objects serialized, scalars as strings.
+	// prepare() recorded the one argument a single-row read passes.
+	public function get_var( $query ) {
+		$name = isset( $this->likes[0] ) ? $this->likes[0] : null;
+		if ( null === $name || ! array_key_exists( $name, $GLOBALS['sec040_options'] ) ) {
+			return null;
+		}
+		$v = $GLOBALS['sec040_options'][ $name ];
+		return ( is_array( $v ) || is_object( $v ) ) ? serialize( $v ) : (string) $v;
+	}
 }
 
 /** SQL LIKE with backslash escapes: `_` is one character, `%` any run, `\_` and `\%` literal. */
@@ -67,12 +78,26 @@ function sec040_like( $subject, $pattern ) {
 	return 1 === preg_match( '/^' . $re . '$/s', $subject );
 }
 
-// WordPress unserializes the stored value, so every get_option() hands back a fresh copy; an
-// edit to what it returned never touches what is stored. The stub does the same.
+// WordPress unserializes the stored value, so every get_option() hands back a fresh copy. A
+// read-time filter can add to it -- store-kit merges wp-config.php keys into
+// woocommerce_stripe_settings that way -- and $GLOBALS['sec040_injected'] plays that filter:
+// get_option() returns the key, the stored row does not hold it.
 function get_option( $name, $default = false ) {
-	return array_key_exists( $name, $GLOBALS['sec040_options'] )
-		? unserialize( serialize( $GLOBALS['sec040_options'][ $name ] ) )
-		: $default;
+	if ( ! array_key_exists( $name, $GLOBALS['sec040_options'] ) ) {
+		return $default;
+	}
+	$value = unserialize( serialize( $GLOBALS['sec040_options'][ $name ] ) );
+	if ( isset( $GLOBALS['sec040_injected'][ $name ] ) && is_array( $value ) ) {
+		$value = array_merge( $value, $GLOBALS['sec040_injected'][ $name ] );
+	}
+	return $value;
+}
+
+function maybe_unserialize( $data ) {
+	if ( is_string( $data ) && ( 'b:0;' === $data || false !== @unserialize( $data ) ) ) {
+		return unserialize( $data );
+	}
+	return $data;
 }
 
 // Like WordPress, update_option() returns false and saves nothing when the new value matches the
@@ -185,10 +210,17 @@ $fixture = array(
 		'api_key' => 'SENTINEL-28',
 		'title'   => 'Stored as an object',
 	),
+	// store-kit's shape: the stored row holds switches only; the key arrives at read time.
+	'woocommerce_stripe_settings'                   => array(
+		'enabled'  => 'yes',
+		'testmode' => 'yes',
+		'title'    => 'Card',
+	),
 	// Outside every enumerated pattern: never read, never touched.
 	'unrelated_plugin_api_key'                      => 'SENTINEL-99',
 	'woocommerce_currency'                          => 'EUR',
 );
+$GLOBALS['sec040_injected'] = array( 'woocommerce_stripe_settings' => array( 'test_secret_key' => 'SENTINEL-40' ) );
 
 // The explicit expected CRITICAL set, as "<option> <dotted path or ->".
 $expected_critical = array(

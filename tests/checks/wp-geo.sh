@@ -121,4 +121,16 @@ grep -q -- '--geo' "$yolo" || fail "$yolo missing --geo"
 grep -q 'geo-scan.sh' "$yolo" || fail "$yolo must run the live scan"
 grep -q 'GEO & agent-readiness' "$finalize" || fail "$finalize missing the GEO readiness check"
 
+# --- One answer to "is this a store": WooCommerce active, the same test /wp-audit Step 2.3 records.
+# Scoped to the three GEO files: elsewhere is-installed is right (install it if missing), and a
+# sentence that forbids it ("is-active, not is-installed") is not a detection. Case- and
+# backtick-tolerant, and reported by line, because a capital letter defeated the literal before.
+stale=$(grep -niE 'is-installed[[:space:]]+`?woocommerce' "$agent" "$fixer" "$skill" | grep -v 'is-active' || true)
+[ -z "$stale" ] || fail "a GEO file still detects a merchant with is-installed:
+$stale"
+for f in "$agent" "$fixer" "$skill"; do
+  grep -Fq 'is-active woocommerce' "$f" || fail "$f does not detect a merchant with is-active"
+  grep -Fq 'site.commerce' "$f" || fail "$f does not read site.commerce from /wp-audit Step 2.3, so it keeps a second answer to 'is this a store'"
+done
+
 echo PASS

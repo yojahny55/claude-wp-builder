@@ -62,7 +62,8 @@ when `.wp-create.json` is absent. Container wrappers need the manifest.
 Detects Docker, DDEV, Lando, wp-env, native Nginx/Apache/Caddy and PHP versions; lets you
 choose; downloads WordPress, creates DB, web-server config, SSL, hosts entry; installs a
 plugin profile (`starter` = SCF + Rank Math + WP Fastest Cache, `full` adds AIOS, CF7,
-WP Mail SMTP, Redirection, Site Kit; custom profiles in `.wp-profiles/` or `~/.wp-profiles/`).
+WP Mail SMTP, Redirection, Site Kit; `woo-catalog`, `woo-store` and `woo-full` are the three
+store tiers; custom profiles in `.wp-profiles/` or `~/.wp-profiles/`).
 Can adopt an existing install. Writes `.wp-create.json` holding the WP-CLI wrapper
 (`wp --path=…`, `docker exec … wp`, `ddev wp`, `lando wp`, `npx wp-env run cli wp`),
 environment type and languages.
@@ -93,6 +94,24 @@ Dispatches the `wp-context` agent over spreadsheets, PDFs, markdown, text. Repla
 `<!-- wp-context:start/end -->` block in `.claude/CLAUDE.md` with `## Project Constraints`
 and overwrites `docs/.scope-manifest.json`. Exits 0 with a note when the folder is absent.
 Idempotent — re-run after the client changes scope.
+
+### `/wp-woo-setup`
+
+```
+/wp-woo-setup [project-path]           # ask, record the store block, dry run, apply
+/wp-woo-setup [project-path] --force   # also take back values the client changed, except launch state on a store with orders
+```
+
+Records what the store sells and how in the `store` block of `.wp-create.json` — tier
+(`catalog`, `store`, `full`), address, currency, units, checkout type, enquiry channels,
+Stripe in test mode, shipping zones, tax rates — and runs
+`skills/wp-woocommerce/scripts/woo-setup.php` to bring WooCommerce in line with it. HPOS
+goes on before any order exists, and the store pages are assigned and given Polylang's
+default language. Shipping and tax are matched without duplicates, and the Stripe keys go
+into `wp-config.php` rather than the database. The checkout rate limit and Turnstile are
+switched on, and a catalog gets catalog mode. It shows a dry run first, reports every value
+as set, already right, the client's, or degraded, and can be re-run at any time. `/wp-create`
+runs it at the end when a store profile was chosen.
 
 ---
 

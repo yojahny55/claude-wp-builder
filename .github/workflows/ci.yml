@@ -81,7 +81,7 @@ jobs:
           # branch, which this job does not fetch, so it lives in doc-sync below where the
           # base is already there -- here it would take its own skip path and pass while
           # checking nothing.
-          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/audit-resolve-links-integration.sh tests/checks/audit-ux-probe.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh'
+          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/audit-resolve-links-integration.sh tests/checks/audit-ux-probe.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh tests/checks/wp-woo-setup-integration.sh'
           for f in tests/checks/*.sh; do
             case " $skip_here " in *" $f "*) continue ;; esac
             if out=$(bash "$f" 2>&1); then
@@ -231,7 +231,7 @@ jobs:
   integration:
     name: WordPress integration
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     # A real database, as a service container rather than a container this job starts:
     # the provisioner takes its connection details from the environment precisely so the
     # same script serves a developer's docker and this, without branching on which.
@@ -290,6 +290,9 @@ jobs:
           echo "::endgroup::"
           echo "::group::link target resolver"
           bash tests/checks/audit-resolve-links-integration.sh
+          echo "::endgroup::"
+          echo "::group::store setup and a real order"
+          bash tests/checks/wp-woo-setup-integration.sh
           echo "::endgroup::"
 
   browser:
