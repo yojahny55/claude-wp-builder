@@ -470,7 +470,7 @@ function validateTax(tax, p) {
     // Normalised as wooset_tax_list() does in woo-lib.php: two rates setup reads as one identity
     // would otherwise pass here and be inserted as duplicate rows no later run can match.
     const list = (v) => [...new Set(String(v ?? '').toUpperCase().split(';').map((x) => x.trim()).filter(Boolean))].sort().join(';');
-    const key = [r.country, r.state ?? '', list(r.postcode), list(r.city), r.name, r.class ?? 'standard'].join('|');
+    const key = [r.country, r.state ?? '', list(r.postcode), list(r.city), r.name ?? '', r.class ?? 'standard'].join('|');
     if (keys.has(key)) p.push(`${rp} duplicates another rate's country, state, postcode, city, name and class`);
     keys.add(key);
   });

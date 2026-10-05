@@ -42,7 +42,9 @@ refused('duplicate method', (s) => { s.shipping[0].methods.push({ type: 'flat_ra
 refused('numeric cost', (s) => { s.shipping[0].methods[0].cost = 10; }, 'cost');
 refused('junk location', (s) => { s.shipping[0].locations = ['Florida']; }, 'locations');
 refused('blank postcode', (s) => { s.shipping[0].locations = ['postcode:   ']; }, 'locations');
-must(validateStore({ ...structuredClone(good), shipping: [{ ...good.shipping[0], locations: ['postcode:SW1A 1AA', 'postcode:336*'] }] }).length === 0, 'a spaced or wildcard postcode is refused');
+const spaced = structuredClone(good);
+spaced.shipping[0].locations = ['postcode:SW1A 1AA', 'postcode:336*'];
+must(validateStore(spaced).length === 0, 'a spaced or wildcard postcode is refused');
 refused('five decimal places', (s) => { s.tax.rates[0].rate = '6.12345'; }, 'rate');
 refused('duplicate rate', (s) => { s.tax.rates.push(structuredClone(s.tax.rates[0])); }, 'duplicates');
 refused('rate differing only in city case', (s) => { s.tax.rates = [{ ...s.tax.rates[0], city: 'Tampa' }, { ...s.tax.rates[0], city: 'tampa' }]; }, 'duplicates');

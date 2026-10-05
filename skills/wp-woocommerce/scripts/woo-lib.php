@@ -205,7 +205,8 @@ function wooset_show( $value ) {
 		return '(absent)';
 	}
 	$s = is_scalar( $value ) ? (string) $value : wooset_canon( $value );
-	return strlen( $s ) > 60 ? substr( $s, 0, 57 ) . '...' : $s;
+	// By character: a byte cut can split a multibyte character and leave invalid UTF-8 in the report.
+	return mb_strlen( $s, 'UTF-8' ) > 60 ? mb_substr( $s, 0, 57, 'UTF-8' ) . '...' : $s;
 }
 
 /** A secret for one report line: enough to tell two values apart, never the value. */

@@ -324,11 +324,15 @@ try: print(json.load(sys.stdin).get("code") or "-")
 except ValueError: print("not-json")'; }
 ADDR='{"first_name":"QA","last_name":"Bot","address_1":"1 Test St","city":"Tampa","state":"FL","postcode":"33602","country":"US"}'
 BILL='{"first_name":"QA","last_name":"Bot","address_1":"1 Test St","city":"Tampa","state":"FL","postcode":"33602","country":"US","email":"qa@example.test"}'
+# A step before checkout that fails says so here, so a broken cart is not reported as a refused order.
 checkout() {  # $1 cart token, $2 Turnstile token; prints the checkout response
-  post "$1" cart/add-item "{\"id\":$PRODUCT,\"quantity\":2}" >/dev/null
+  out=$(post "$1" cart/add-item "{\"id\":$PRODUCT,\"quantity\":2}")
+  [ "$(code_of <<<"$out")" = "-" ] || fail "cart/add-item failed before checkout: $(head -c 300 <<<"$out")"
   rates=$(post "$1" cart/update-customer "{\"shipping_address\":$ADDR,\"billing_address\":$BILL}")
-  rate=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(r["rate_id"] for p in d["shipping_rates"] for r in p["shipping_rates"] if r["rate_id"].startswith("flat_rate")))' <<<"$rates")
-  post "$1" cart/select-shipping-rate "{\"package_id\":0,\"rate_id\":\"$rate\"}" >/dev/null
+  rate=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(r["rate_id"] for p in d["shipping_rates"] for r in p["shipping_rates"] if r["rate_id"].startswith("flat_rate")))' <<<"$rates" 2>/dev/null) \
+    || fail "no flat_rate shipping rate for the test address: $(head -c 300 <<<"$rates")"
+  out=$(post "$1" cart/select-shipping-rate "{\"package_id\":0,\"rate_id\":\"$rate\"}")
+  [ "$(code_of <<<"$out")" = "-" ] || fail "cart/select-shipping-rate failed before checkout: $(head -c 300 <<<"$out")"
   post "$1" checkout "{\"billing_address\":$BILL,\"shipping_address\":$ADDR,\"payment_method\":\"cod\",\"extensions\":{\"simple-cloudflare-turnstile\":{\"token\":\"$2\"}}}"
 }
 clear_limits() { q 'global $wpdb; $wpdb->query( "DELETE FROM {$wpdb->prefix}wc_rate_limits" );'; }

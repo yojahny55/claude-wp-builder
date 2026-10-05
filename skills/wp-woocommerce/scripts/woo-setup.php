@@ -61,11 +61,15 @@ function wooset_converge( $id, $desired, $get, $set, $note = '', $kind = '' ) {
 	$decision = $held
 		? ( wooset_same( $current, $desired ) ? 'ok' : 'client' )
 		: wooset_decide( $current, $desired, $recorded, $c['fresh'], $c['force'] );
-	// A setter returns false only when the write failed. Recording the hash anyway would make the
-	// next run read the unchanged value as the client's and never retry it.
-	if ( 'set' === $decision && $c['write'] && false === call_user_func( $set, $desired ) ) {
-		wooset_report( 'degraded', $id, 'the write failed: nothing was recorded, the next run retries it' );
-		return 'degraded';
+	// A write is proven by reading it back, not by the setter's return: update_option() answers
+	// false for an unchanged value as well as a failed one. Recording the hash after a write that
+	// did not land would make the next run read the old value as the client's and never retry it.
+	if ( 'set' === $decision && $c['write'] ) {
+		$ok = false !== call_user_func( $set, $desired ) && wooset_same( call_user_func( $get ), $desired );
+		if ( ! $ok ) {
+			wooset_report( 'degraded', $id, 'the write did not land: nothing was recorded, the next run retries it' );
+			return 'degraded';
+		}
 	}
 	if ( 'client' !== $decision && $c['write'] ) {
 		$c['state'][ $id ] = wooset_hash( $desired );
@@ -506,36 +510,46 @@ function wooset_step_tax( $store ) {
 			}
 		}
 		if ( ! $have ) {
-			wooset_report( 'set', $id, 'added at ' . $want['rate'] . '%' );
-			if ( $c['write'] ) {
-				$rid = WC_Tax::_insert_tax_rate(
-					array(
-						'tax_rate_country'  => $want['country'],
-						'tax_rate_state'    => $want['state'],
-						'tax_rate'          => $want['rate'],
-						'tax_rate_name'     => $want['name'],
-						'tax_rate_priority' => 1,
-						'tax_rate_compound' => 0,
-						'tax_rate_shipping' => $want['shipping'] ? 1 : 0,
-						'tax_rate_order'    => 0,
-						'tax_rate_class'    => 'standard' === $want['class'] ? '' : $want['class'],
-					)
-				);
-				if ( '' !== $want['postcode'] ) {
-					WC_Tax::_update_tax_rate_postcodes( $rid, $want['postcode'] );
-				}
-				if ( '' !== $want['city'] ) {
-					WC_Tax::_update_tax_rate_cities( $rid, $want['city'] );
-				}
-				$c['state'][ $id ] = wooset_hash( $owned );
+			if ( ! $c['write'] ) {
+				wooset_report( 'set', $id, 'added at ' . $want['rate'] . '%' );
+				continue;
 			}
+			$rid = WC_Tax::_insert_tax_rate(
+				array(
+					'tax_rate_country'  => $want['country'],
+					'tax_rate_state'    => $want['state'],
+					'tax_rate'          => $want['rate'],
+					'tax_rate_name'     => $want['name'],
+					'tax_rate_priority' => 1,
+					'tax_rate_compound' => 0,
+					'tax_rate_shipping' => $want['shipping'] ? 1 : 0,
+					'tax_rate_order'    => 0,
+					'tax_rate_class'    => 'standard' === $want['class'] ? '' : $want['class'],
+				)
+			);
+			// 0 is a failed insert: postcodes and cities written against rate 0 would attach to nothing.
+			if ( ! $rid ) {
+				wooset_report( 'degraded', $id, 'WooCommerce did not insert the rate: nothing was recorded, the next run retries it' );
+				continue;
+			}
+			if ( '' !== $want['postcode'] ) {
+				WC_Tax::_update_tax_rate_postcodes( $rid, $want['postcode'] );
+			}
+			if ( '' !== $want['city'] ) {
+				WC_Tax::_update_tax_rate_cities( $rid, $want['city'] );
+			}
+			$c['state'][ $id ] = wooset_hash( $owned );
+			wooset_report( 'set', $id, 'added at ' . $want['rate'] . '%' );
 			continue;
 		}
 		wooset_converge(
 			$id,
 			$owned,
 			function () use ( $have ) {
-				return array( 'rate' => $have['rate'], 'shipping' => $have['shipping'] );
+				// Read live, not from the snapshot taken before the loop, so the read-back after a write
+				// sees it; normalised as wooset_tax_row() does, so the two compare.
+				$row = WC_Tax::_get_tax_rate( $have['id'] );
+				return $row ? array( 'rate' => number_format( (float) $row['tax_rate'], 4, '.', '' ), 'shipping' => ! empty( $row['tax_rate_shipping'] ) ) : null;
 			},
 			function ( $v ) use ( $have ) {
 				WC_Tax::_update_tax_rate( $have['id'], array( 'tax_rate' => $v['rate'], 'tax_rate_shipping' => $v['shipping'] ? 1 : 0 ) );
