@@ -242,6 +242,8 @@ Server setup, permissions, and WordPress configuration.
   overwrote the client's shipping cost", during a mutation run that cannot reach that
   assertion; it was not reproduced in 4+ full runs or 12 targeted loops. The assertion now
   prints the cost it read and setup's output, so a recurrence explains itself. Watch it in CI.
+  As of October 5, 2026 it has not recurred: none of the last 60 CI runs failed on it. Close
+  this after a further month without a recurrence.
 
 - [ ] **Docker environments get no nginx config** `OPEN`
   [`docker-compose.yml.tpl`](templates/docker/docker-compose.yml.tpl) mounts `./docker/nginx.conf`,
