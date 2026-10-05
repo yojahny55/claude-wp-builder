@@ -18,26 +18,10 @@ if ( ! is_dir( $sink_dir ) ) {
 	mkdir( $sink_dir, 0755, true );
 }
 
-$sink = <<<'PHP'
-<?php
-/**
- * Fixture mail sink. Captures every outbound mail to wp-content/mail-sink.log as one JSON
- * object per line, and returns true from pre_wp_mail so core never attempts a send.
- */
-add_filter( 'pre_wp_mail', function ( $null, $atts ) {
-	$line = json_encode( array(
-		'to'      => isset( $atts['to'] ) ? $atts['to'] : '',
-		'subject' => isset( $atts['subject'] ) ? $atts['subject'] : '',
-		'message' => isset( $atts['message'] ) ? $atts['message'] : '',
-		'at'      => gmdate( 'c' ),
-	) );
-	file_put_contents( WP_CONTENT_DIR . '/mail-sink.log', $line . "\n", FILE_APPEND );
-	// true means "handled" -- core returns success and sends nothing itself.
-	return true;
-}, 10, 2 );
-PHP;
-
-file_put_contents( $sink_dir . '/00-mail-sink.php', $sink );
+if ( ! copy( __DIR__ . '/mail-sink.php', $sink_dir . '/00-mail-sink.php' ) ) {
+	echo "FAIL [setup] could not install the mail sink\n";
+	exit( 1 );
+}
 @unlink( WP_CONTENT_DIR . '/mail-sink.log' );
 
 if ( ! class_exists( 'WPCF7_ContactForm' ) ) {

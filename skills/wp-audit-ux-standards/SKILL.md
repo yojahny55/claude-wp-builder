@@ -78,7 +78,7 @@ marks `UX-019` N/A.
 
 | Code | Check | How to detect | Passes when | Severity | Owner |
 |---|---|---|---|---|---|
-| UX-014 | No broken internal links | collect every internal `href` and **follow it** | every internal link resolves | CRITICAL | code |
+| UX-014 | No broken internal links | collect the internal `href`s of the pages in scope, deduplicated and capped, and **follow them** | every internal link resolves | CRITICAL | code |
 | UX-015 | No broken external links | the same, for external hosts | no 404 and no DNS failure | WARNING | content |
 | UX-018 | Links are identifiable at rest | the `a` rule in its default state | recognisable without hovering, and not by colour alone | WARNING | code |
 | UX-019 | Image links carry alternative text | `a > img` with no `alt`, or an empty `alt` with no other label | every image link tells a screen reader where it goes | WARNING | content |
@@ -87,7 +87,10 @@ marks `UX-019` N/A.
 
 **`UX-014` is followed, not inferred.** A link that looks internal and 404s is the finding;
 a list of hrefs is not. When the links cannot be followed, report `UNMEASURED` with the
-list, never `PASS`.
+list, never `PASS`. The sweep is scoped, not exhaustive: internal targets resolved through
+WP-CLI first, each link requested once however many pages carry it, at most 50 HTTP
+requests per page, the clone-origin host never requested from a clone, and a CDN challenge
+`UNMEASURED` rather than broken — see `agents/wp-audit-ux.md` and `bin/link-sweep.mjs`.
 
 **One row per page, not per link.** Three broken links on `/contact/` are one finding,
 `UX-014 : page:/contact/`, whose evidence lists all three with their status codes. A row per

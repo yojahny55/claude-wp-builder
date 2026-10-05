@@ -32,7 +32,7 @@ Before writing any file or running any command, read the project files:
 Determine the **site type** from positive, recorded signals — never by scanning REST
 namespaces. Check in order:
 
-- `class_exists( 'WooCommerce' )` (via `$WP plugin is-installed woocommerce`) → `merchant`
+- `class_exists( 'WooCommerce' )` (via `$WP plugin is-active woocommerce`, the test `/wp-audit` Step 2.3 records as `site.commerce`) → `merchant`
 - the project's `Industry` is a local/business value **and** the settings carry a non-empty
   `business_address` → `local`
 - the audit or `.claude/CLAUDE.md` records a SaaS / public-API site (an OpenAPI spec or a
@@ -946,7 +946,7 @@ One code is only **partly** addressable here, so it is not claimed resolved:
 
 | Code | What this fixer does, and what it cannot prove |
 |------|-------------------------------------------------|
-| GEO-A23 | Emits the robots allowlist and the routes, but per-UA reachability evidence belongs to `wp-audit-geo`, which probes each allowlisted user agent. The Step 5 check is a single unauthenticated fetch per route and does **not** prove A23. |
+| GEO-A23 | Emits the robots allowlist and the routes, but per-UA reachability evidence belongs to `wp-audit-geo`, which probes each allowlisted user agent on local/staging only; live hosts are never probed with spoofed crawler UAs. The Step 5 check is a single unauthenticated fetch per route and does **not** prove A23. |
 
 Codes the site type excludes are reported `N/A`; the advisory, off-site and copy-level
 codes below are detected by `wp-audit-geo` and deliberately **not** fixed from the theme:

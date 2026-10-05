@@ -57,6 +57,17 @@ DIR=$(printf '%s\n' "$env_out" | sed -n "s/^export WP_FIXTURE_DIR='\(.*\)'$/\1/p
 [ -n "$DIR" ] || fail "the provisioner printed no WP_FIXTURE_DIR"
 [ -d "$DIR" ] || fail "the provisioner named $DIR, which is not a directory"
 
+# Offline after provisioning: a check must never pass or fail because a real service answered.
+# tests/fixtures/wp/net-guard.php refuses every host but loopback and logs each one.
+# Only the guard's own error code counts: a runner with no egress fails the request too, and
+# would otherwise pass this for the reason it exists to rule out. stderr is kept so a dead
+# bootstrap is not reported as a missing guard.
+reach=$(wp --path="$DIR" --allow-root eval '$r = wp_remote_get( "https://wordpress.org/" ); echo is_wp_error( $r ) && "fixture_offline" === $r->get_error_code() ? "refused" : "reached";' || true)
+[ "$reach" = "refused" ] || fail "the fixture reached the network after provisioning (got '$reach') -- tests/fixtures/wp/net-guard.php is not installed"
+# Anchored: core's own api.wordpress.org calls are logged in the same format.
+grep -q ' wordpress\.org$' "$DIR/wp-content/net-guard.log" 2>/dev/null \
+  || fail "the refused request was not logged to wp-content/net-guard.log"
+
 total=0
 for script in $SCRIPTS; do
   name=$(basename "$script")

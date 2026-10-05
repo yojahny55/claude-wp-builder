@@ -95,6 +95,11 @@ holds: a commerce check must not fire on a site with no WooCommerce, or the scor
 site for lacking a feature it never claimed. Adding commerce depth therefore leaves a
 generic site's score unchanged, because every commerce check reads `N/A` on it.
 
+A catalog store (`site.store_tier` = `catalog`, read from the `store` block by `/wp-audit`
+Step 2.3) has no cart, checkout or payment, so a check on one of those surfaces is
+`N/A ("catalog: nothing purchasable")` there, excluded from the denominator, exactly as a
+commerce check is on a site with no WooCommerce.
+
 ### A local clone is audited for production's posture
 
 A project restored from a backup to run locally (`.wp-create.json` `project.source:
@@ -108,6 +113,48 @@ The catalog and the exact rule live in `/wp-audit` Step 2.3. The one test that k
 honest: *would this also be true on production?* If yes, it is a finding; if it exists only
 because this is a copy, suppress it.
 
+### Link and page sweeps against a site
+
+Any check that requests many URLs of the audited site — broken links, a rendered-head
+snapshot, a page walk — follows these limits. A local site shares one database and one web
+server with every other project on the machine, and an uncached WordPress page is
+expensive: an improvised crawler with 25 concurrent `curl -L` workers over a store's term
+archives once held MariaDB at ~18 cores and load 18, slowing every site on the box.
+
+- **At most 4 requests in flight.** Never a thread pool sized to the machine. This protects
+  a local machine. A production host is paced by "Production sits behind a WAF" below.
+- **Status only, so no body.** `HEAD`, or `curl -r 0-0` when a server refuses `HEAD`. A
+  full render is paid only when a check reads the page itself.
+- **Resolve internal targets through WP-CLI or the database first.** Whether a post or
+  term exists and is published is a query, not a page render.
+  `skills/wp-cli-patterns/scripts/resolve-link-targets.php` does it: a link counts as
+  resolved only when the object is published and its own canonical URL has the link's
+  path, so it may send a good link to HTTP but never marks a broken one resolved. Only
+  what it cannot answer — drafts, query strings, redirects, external links, rewrite rules
+  a plugin owns — needs a real request.
+- **Sample term archives: 20 per taxonomy**, unless the operator asked for a full sweep.
+  Hundreds of author or category archives are one template; twenty of them say whether it
+  works. The resolver tags each link it passes on with its taxonomy, and the sweep samples
+  by that tag (falling back to the first path segment for untagged links).
+- **Use `bin/link-sweep.mjs`** rather than writing a crawler. It applies every limit above,
+  classifies each link as internal, clone-origin (the `wordpress.url_origin` host, never
+  requested from a clone unless that host was confirmed this run) or external, reports a
+  CDN bot challenge as `UNMEASURED` instead of broken, and stops at a wall-clock budget:
+
+  ```bash
+  # links.txt: one href per line, TAB, the page it was found on
+  $WP eval-file ${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/scripts/resolve-link-targets.php \
+    links.txt resolved.json > http.txt
+  node ${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs --site "$SITE_URL" --urls http.txt \
+    --clone-origin "$URL_ORIGIN" --budget 120 > sweep.json
+  ```
+
+  `resolved.json` lists what the database answered, with the pages carrying each link;
+  those are resolved, not unmeasured.
+
+  Links it did not request (sampled out, over budget, challenged, clone-origin) come back
+  `unmeasured` with the reason. Report them as `UNMEASURED` with the count, never as a pass.
+
 ### Live checks target production, and the URL is confirmed
 
 Response headers and paid-file reachability can only be judged against the running
@@ -116,6 +163,52 @@ nginx ignores — so a live check run against the clone is a false result, not a
 These checks use `--host`, or ask the user for the production URL (defaulting to
 `wordpress.url_origin`) and fire no external request until it is confirmed; with no public
 URL they are `UNMEASURED`, never `PASS`.
+
+### Production sits behind a WAF: same measurements, one request at a time
+
+Production servers run fail2ban, CrowdSec and ModSecurity. An audit must not trip them
+unless the operator asks for it explicitly. One audit got its machine's IP banned in five
+minutes:
+
+- Seven agents were dispatched in parallel against the production host, each allowed 4
+  requests in flight, so up to 28 ran at once, plus the Lighthouse and Playwright loads.
+- The security agent probed `readme.html`, `?author=1` and `/wp-json/wp/v2/users` in the
+  same burst.
+
+Leaky-bucket rules count requests per window, so the burst filled them, not the paths
+themselves. Every live check of that run was lost, and one agent's retries lengthened the
+ban.
+
+The fix changes **the pace, never the measurement**. Every check still runs the same command
+against the same host, with the same headers and user agents. That covers Lighthouse,
+Playwright, the suite, the GEO probes with AI user agents and `Accept: text/markdown`, and
+the security probes. Against a public host:
+
+- **Every request goes through `bin/prod-gate.sh`.** It holds a per-host lock shared by all
+  the agents of the run, so production sees one command at a time. It waits 2 s between
+  commands, and use `--delay 10` before reconnaissance-shaped paths: readme, license,
+  `?author=`, the users REST route, xmlrpc and login. A Lighthouse run or a Playwright launch
+  is one gated command. Browsers load a page's assets in parallel, as any visitor's would.
+- **Sweeps run at `--concurrency 1 --delay-ms 1000 --stop-on-block`, with a budget sized to
+  match.** Exit `4` from the sweep means it stopped at a block: mark the host blocked. Use
+  `--budget` of at least one second per link plus the timeout, so the slower pace does not
+  turn links into `budget exhausted`. The suite runs with one Playwright worker:
+  `bin/audit-suite.sh` does this itself for a public URL.
+- **The first block ends all production traffic, with no retry.** `prod-gate.sh` marks the
+  host blocked on curl's refused or reset codes. The caller marks it blocked with
+  `--mark-blocked` on any of these:
+  - a `429`
+  - a `403` carrying a WAF signature (`mod_security`, `crowdsec`, `cf-mitigated`, a captcha)
+  - `ERR_CONNECTION_REFUSED` in a browser
+
+  After that, every gated call exits `4` without sending anything. Exit `5` only means
+  another agent held the host past `--wait`. Nothing was sent, so call again. Every live check not yet
+  answered is `UNMEASURED: production blocked the audit`. A retry against a ban extends the
+  ban.
+
+**A local site keeps its own limits, unchanged.** `prod-gate.sh` passes a development host
+straight through, and nothing above applies to it. The local rule is "Link and page sweeps
+against a site", above.
 
 ---
 

@@ -22,12 +22,25 @@ on:
   pull_request:
   push:
     branches: [main]
+  # /autofix pushes with GITHUB_TOKEN, and a push made with that token starts no
+  # pull_request run -- so the fix commit would get no CI at all. autofix.yml dispatches
+  # this workflow on the branch with the PR's base, so doc-sync (CHANGELOG + baseline
+  # approval) judges the fix too. base_ref is required: autofix.yml is the only caller that
+  # dispatches this workflow, and a dispatch without it used to drop doc-sync silently while
+  # the other jobs reported green.
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: Base branch to compare against for doc-sync (the PR's base)
+        required: true
 
 permissions:
   contents: read
 
+# Event-aware: a dispatch must never share a group with (and cancel) the push run on the
+# same ref, e.g. main's own CI for a commit.
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event.pull_request.number || format('{0}-{1}', github.event_name, github.ref) }}
   cancel-in-progress: true
 
 jobs:
@@ -56,7 +69,7 @@ jobs:
         run: |
           set -uo pipefail
           pass=0; failed=(); skipped=()
-          # Three checks are owned by their own jobs, which give them the WordPress and
+          # The checks below are owned by their own jobs, which give them the WordPress and
           # the browser they need. Running them here too would execute them a second time per
           # CI run -- and worse, this job has neither, so each would take its skip path,
           # exit 0 and be counted as a pass. A runner that lost Chrome would then still
@@ -68,7 +81,7 @@ jobs:
           # branch, which this job does not fetch, so it lives in doc-sync below where the
           # base is already there -- here it would take its own skip path and pass while
           # checking nothing.
-          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh'
+          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/audit-resolve-links-integration.sh tests/checks/audit-ux-probe.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh tests/checks/wp-woo-setup-integration.sh'
           for f in tests/checks/*.sh; do
             case " $skip_here " in *" $f "*) continue ;; esac
             if out=$(bash "$f" 2>&1); then
@@ -169,9 +182,11 @@ jobs:
     name: Docs describe the plugin that exists
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Only on a pull request: the CHANGELOG rule compares the branch against its base,
-    # and a push to main has no base to compare against.
-    if: github.event_name == 'pull_request'
+    # Only with a base to compare against: a pull request, or a dispatch (base_ref is a
+    # required input, and the fetch step refuses a blank one). A push to main has none.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    env:
+      BASE_REF: ${{ github.base_ref || inputs.base_ref }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -182,11 +197,28 @@ jobs:
       # This is the first thing that executes it, and so the first thing that can catch
       # a command added to the README table but never created, or a PR with no CHANGELOG
       # entry, without a human remembering to look.
+      #
+      # On a dispatch, base_ref is caller-supplied. Only a branch-name shape reaches git, and
+      # `--` stops it being read as an option (`--depth=1` would succeed and destroy the
+      # merge-base both gates below use). A base that HEAD is not ahead of (base_ref naming
+      # the dispatched branch itself) leaves nothing to compare, and both gates would pass
+      # vacuously -- refuse that too.
       - name: Fetch the base ref
-        run: git fetch --no-tags origin "${{ github.base_ref }}"
+        run: |
+          set -euo pipefail
+          if ! [[ "$BASE_REF" =~ ^[A-Za-z0-9._/-]+$ ]] || [[ "$BASE_REF" == -* ]]; then
+            echo "::error::base_ref is not a branch name (allowed: A-Z a-z 0-9 . _ / -, not starting with -)"; exit 1
+          fi
+          git fetch --no-tags origin -- "$BASE_REF"
+          # A tag or full ref passes the shape test and the fetch, but updates no tracking ref,
+          # so rev-list below would die with a bare "unknown revision". Name the rule instead.
+          git show-ref --verify --quiet "refs/remotes/origin/$BASE_REF" \
+            || { echo "::error::origin/$BASE_REF does not exist — base_ref must be a branch name, not a tag or full ref"; exit 1; }
+          ahead=$(git rev-list --count "origin/$BASE_REF..HEAD")
+          [ "$ahead" -gt 0 ] || { echo "::error::HEAD is not ahead of origin/$BASE_REF — nothing to compare"; exit 1; }
 
       - name: Run the doc-sync gate
-        run: bash bin/doc-sync-check.sh --changelog-base "origin/${{ github.base_ref }}"
+        run: bash bin/doc-sync-check.sh --changelog-base "origin/$BASE_REF"
 
       # Same job because it needs the same thing: the base ref, to see which commits the
       # branch adds. I06 requires that baseline images change only through an explicit
@@ -194,12 +226,12 @@ jobs:
       # "baseline: <why>" in its subject. It cannot run in the checks job, which has no
       # base to diff against and would pass by skipping.
       - name: Baseline images changed only through the review step
-        run: bash tests/checks/baseline-approval.sh "origin/${{ github.base_ref }}"
+        run: bash tests/checks/baseline-approval.sh "origin/$BASE_REF"
 
   integration:
     name: WordPress integration
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     # A real database, as a service container rather than a container this job starts:
     # the provisioner takes its connection details from the environment precisely so the
     # same script serves a developer's docker and this, without branching on which.
@@ -238,10 +270,10 @@ jobs:
       # WordPress fixture cannot exist without downloading a WordPress. Everything it
       # installs is pinned in the provisioner, and every assertion runs against the local
       # install -- nothing here asserts against a remote service.
-      # Two checks, each provisioning its own fixture. They run in one step because the
+      # Each check provisions its own fixture. They run in one step because the
       # runner's default shell is `bash -e` -- confirmed in the job log, `shell:
-      # /usr/bin/bash -e {0}` -- so a failing check aborts the step and the second never
-      # starts. No explicit guard is needed between them, and the note is here because the
+      # /usr/bin/bash -e {0}` -- so a failing check aborts the step and the later ones never
+      # start. No explicit guard is needed between them, and the note is here because the
       # absence of one reads like an oversight.
       - name: WordPress fixture checks
         env:
@@ -255,6 +287,12 @@ jobs:
           echo "::endgroup::"
           echo "::group::contact form delivery"
           bash tests/checks/wp-cf7-delivery.sh
+          echo "::endgroup::"
+          echo "::group::link target resolver"
+          bash tests/checks/audit-resolve-links-integration.sh
+          echo "::endgroup::"
+          echo "::group::store setup and a real order"
+          bash tests/checks/wp-woo-setup-integration.sh
           echo "::endgroup::"
 
   browser:
@@ -286,6 +324,17 @@ jobs:
         run: |
           echo "::group::motion devices"
           bash tests/checks/motion-devices.sh
+          echo "::endgroup::"
+
+      # The usability harness in the same real Chrome. UX_PROBE_REQUIRE_BROWSER turns its
+      # skip path into a failure, for the same reason MOTION_REQUIRE_BROWSER does above.
+      - name: ux-probe harness in a real browser
+        env:
+          WP_BROWSER_CHROMIUM: /usr/bin/google-chrome
+          UX_PROBE_REQUIRE_BROWSER: "1"
+        run: |
+          echo "::group::ux-probe"
+          bash tests/checks/audit-ux-probe.sh
           echo "::endgroup::"
 
   visual:

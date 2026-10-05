@@ -58,7 +58,7 @@ ordinary content site as SaaS. Every check not implied by the detected type is r
 |---|---|---|
 | content / publisher / service | default when no positive signal matches | Discovery + Access + GUI-Usability |
 | **local business** | `industry` = local/business **and** a non-empty `business_address` | + LocalBusiness schema, NAP, reviews |
-| **merchant** | `class_exists('WooCommerce')` / `$WP plugin is-installed woocommerce` | + Payments, `pricing.md`, Product schema |
+| **merchant** | `site.commerce` `woocommerce` from `/wp-audit` Step 2.3; standalone, `class_exists('WooCommerce')` / `$WP plugin is-active woocommerce` | + Payments, `pricing.md`, Product schema |
 | **SaaS** / public API | an OpenAPI spec or a deliberate public API surface recorded in `.claude/CLAUDE.md` | + OpenAPI / api-catalog / MCP / OAuth |
 
 The auditor runs only the applicable subset and prints the exclusion rationale for
@@ -399,7 +399,12 @@ Try one of those, or search the site.
 ```
 
 Never serve a `200` "soft 404"; `agent-friendly-404` checks the status line, not the
-body alone.
+body alone. A soft 404 is not only the missing-page template: probe a made-up top-level slug,
+a made-up nested path, a typo or near-prefix of a real post slug (WordPress's
+`redirect_guess_404_permalink` redirects it to the closest post with `200`) and a made-up
+`.php`/`.html` path, on both the apex and `www` hosts. An apex-to-`www` redirect that sends
+unknown paths to the home page with `200` is a soft 404 too. One passing shape does not pass
+the check.
 
 ### 6.8 JSON-LD identity and breadth
 

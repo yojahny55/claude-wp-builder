@@ -295,6 +295,11 @@ echo wp_json_encode(\$out);
 
 ### Procedure — content and link checks
 
+Any step here that requests many URLs — following links, rendering heads — follows
+*Link and page sweeps against a site* in `skills/wp-audit-standards/SKILL.md`: at most 4
+requests in flight, WP-CLI or the database before HTTP, term archives sampled, and
+`bin/link-sweep.mjs` instead of a hand-written crawler.
+
 1. **SEO-035 to SEO-037** — count with `mb_strlen()`, never `strlen()`; the meta is UTF-8.
    Fall back to `post_title` when `rank_math_title` is empty. 60 chars is the safe Latin-script
    limit — Google truncates by pixel width (~580px), so CJK and Cyrillic titles hit it sooner.
@@ -476,6 +481,13 @@ or the CDN's cache-key rule). Point the report at that fix rather than proposing
 For Rank Math configuration issues (SEO-020 through SEO-034), **dispatch the `wp-audit-rankmath` agent** which handles full Rank Math installation, configuration, and SEO data seeding.
 
 ## Rules
+
+**Requests to a production host go through `bin/prod-gate.sh`**, with the gate dir from the
+dispatch prompt, exactly as `skills/wp-audit-standards` "Production sits behind a WAF" says.
+Production runs fail2ban, CrowdSec and ModSecurity, and agents in parallel without the gate
+got an audit's IP banned. Use the same command, URL, headers and user agent as before: the
+gate changes the pace, not the measurement. When it exits `4`, report the check `UNMEASURED`
+and never retry. A local site is not gated.
 
 1. **Always read CLAUDE.md and .wp-create.json first** — these define the project context.
 2. **Reference the `wp-audit-seo-standards` skill** for all Rank Math option keys, meta keys, and configuration patterns.

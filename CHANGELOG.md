@@ -2,7 +2,157 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`/wp-audit` no longer sends crawler user agents to a live host.** GEO-A23 asked for a
+  GET of key routes with each AI crawler UA. On a live host, CrowdSec `http-bad-user-agent`
+  and WAF bad-bot lists ban the source IP for hours when they see a crawler UA from a
+  non-crawler address, which also blocks sync, pulls and the rest of the audit. The per-UA
+  probe now runs on local and staging only. On a live host, A23 is inferred from
+  `robots.txt`, WAF or bot-manager config and one neutral self-identifying fetch, and is
+  reported as `UNMEASURED`.
+
+- **Audits no longer get the auditing IP banned by a production WAF.** `/wp-audit`
+  dispatches its agents in parallel. The "4 requests in flight" limit applied to each agent,
+  not to the host. One run against a production server running fail2ban, CrowdSec and
+  ModSecurity sent up to 28 requests at once, plus the Lighthouse and Playwright loads.
+  At the same time the security agent sent `readme.html`, `?author=1` and
+  `/wp-json/wp/v2/users` in the same burst. The server banned the IP within five minutes,
+  every live check of the run came back `UNMEASURED`, and one agent's retries lengthened
+  the ban.
+
+  The new `bin/prod-gate.sh` wraps each command that reaches a public host. It holds a
+  per-host `flock` shared by every agent of the run, waits 2 s between commands (10 s
+  before reconnaissance-shaped paths), and marks the host blocked on the first refused
+  connection, `429` or WAF `403`. Every later call exits `4` without sending anything.
+
+  What is measured does not change. Each check runs the same command against the same host,
+  with the same headers and user agents. The suite drops to one Playwright worker for a
+  public URL only, and `link-sweep.mjs` gains an opt-in `--delay-ms`. A development host
+  bypasses the gate, so local audits run exactly as before. `tests/checks/audit-prod-gate.sh`
+  runs the gate for real.
+- **Re-adoption, a quiet probe and a quiet wrapper, one defect counted once, sharded dispatch.**
+  `wp-config.mjs drift` (exit `4`) reports a manifest that validates but no longer describes
+  the site (a blank scaffold a real site was restored over), `/wp-audit` Step 2 offers
+  re-adoption, and `adopt --replace` keeps a timestamped backup instead of refusing. The adopt
+  probe prints its JSON between `<<WPCB-PROBE>>` sentinels so a plugin echoing on boot no
+  longer fails it, and a `--wrapper` pointing into a temp dir is no longer persisted into the
+  manifest (`--persist-wrapper` overrides). `bin/wp-quiet.sh` strips PHP diagnostics from
+  stdout and keeps the exit code; Step 6 passes it to the agents. Findings may carry a
+  `root_cause`; `bin/audit-report.mjs` folds findings that share one into the most severe
+  (`also_affects`), so one `display_errors` leak is one finding. Step 6 shards the read-only
+  code scope of an adopted site by surface and merges `checks_executed` per category. New
+  catalog entries PERF-068 (CLS), PERF-069 (INP) and SEC-044 (CSP); GEO-A04 probes four
+  path shapes on apex and `www`; taxonomy archive URLs read `category_base`/`tag_base`.
+  Covered by `wp-adopt-drift.sh`, `audit-root-cause.sh`, `audit-adopt-sharding.sh` and
+  `audit-catalog-gaps.sh`.
+
+- **`/wp-audit` on a local clone no longer leaves measurable checks unmeasured, and a
+  report-only run writes nothing.** Agents read "live checks never target the clone" as
+  "everything rendered goes to production", so contrast, target size, focus, layout shift and
+  form validation came back `UNMEASURED` although they depend only on markup and CSS the clone
+  shares. Step 2.3 now carries a clone-safe versus production-only table, passed to every
+  agent; Step 6.8 rejects browser-category reports with no browser evidence and re-dispatches
+  each `UNMEASURED` whose reason is not credentials, network, production or tier; Step 6.2
+  runs the read-only GEO scan in every mode, so `--report-only` no longer leaves `Live scan:`
+  pending. The security and practices auditors deleted the `update_core` / `update_plugins`
+  transients, a database write; they now do so only with `Report-only: no` and otherwise
+  report the data's age. A clone with an active mail-transport plugin and no `pre_wp_mail`
+  filter is flagged before any form is submitted, with a block recipe in
+  `skills/wp-cli-patterns/`. Step 6.8 also prints `executed/catalog` per category with the unexecuted ids, requires
+  agents to return `checks_executed` as a field, and reports `INCOMPLETE` under 90% with an
+  unblocked id. Covered by `tests/checks/audit-clone-measurement.sh`.
+
 ### Added
+
+- **`store-kit`, a plugin this repository ships into stores.** Catalog mode (prices shown,
+  nothing purchasable — the Store API refuses add-to-cart, Cart and Checkout redirect to the
+  shop) and Stripe API keys supplied from `STORE_KIT_STRIPE_*` constants in `wp-config.php`:
+  merged in when the gateway reads its settings and stripped when it saves them, so no database
+  dump or clone carries a working API key — including the copy Stripe's own webhook setup nests
+  a second time inside the settings row. A webhook-secret constant only ever seeds an empty row:
+  Stripe rotates its own webhook secret when Stripe reconfigures webhooks (connect, re-key, the
+  settings button, or after a plugin update) and saves the new one, and that value is left to
+  win and reach the database, with an admin notice naming the now-stale constant. A
+  constant whose prefix does not match its field's mode (test vs live) is never used at all, and
+  is reported by name — the guard against a live key ending up in a test-mode constant.
+  `bin/store-kit-sync.sh` installs the plugin and never downgrades. `Update URI: false` and a
+  provable Author/URI keep a same-named plugin from ever being mistaken for it.
+- **A `store` block in `.wp-create.json`.** Records what a WooCommerce store sells and how —
+  tier (`catalog`, `store`, `full`), address, currency, units, checkout type, enquiry channels,
+  Stripe in test mode, shipping zones, tax rates — and `bin/wp-config.mjs validate` refuses a
+  bad one by name. Stripe keys are secrets like the database password: `.wp-create.local.json`
+  or `WP_CREATE_STRIPE_TEST_*`, never the manifest. The generated CLAUDE.md block gains a
+  `Store tier` line only for a project that has the block, so every other project's block is
+  unchanged.
+- **`bin/geo-scan.sh --start` scans a site that has no is-agentic report yet.** The script
+  only read existing reports, so the first audit of a site always ended `UNMEASURED` with
+  "scan it once at is-agentic.com", and somebody had to run `npx is-agentic` by hand before
+  the score existed. `--start` makes the call that CLI makes — `GET /api/scan/stream`, a
+  server-sent-event stream — with curl, waits up to 85 s for `scan_complete` or
+  `scan_archived`, and reads the report. No npm package is run, so the supply-chain reason
+  the script stopped using `npx` still holds. `/wp-audit` passes it for a host the operator
+  confirmed as public this run. `/wp-yolo` does not: a scan makes a third party fetch the
+  host, and an unattended run has nobody to confirm it should. A scan that does not
+  complete stays exit `2`.
+
+- **`bin/ux-probe.mjs`, the usability audit's page harness.** `wp-audit-ux` used to write a
+  new script and launch a new Chromium for every question — 16 launches on one 8-page audit —
+  and a guessed selector always led to one more script. The harness opens every page once
+  per viewport in one launch (`load` plus a settle, never `networkidle`), runs built-in DOM
+  probes (`UX-006` line length, `UX-009` action gaps, `UX-018` link styling, `UX-019` image
+  link names, `UX-001` required markers, and every `href` for the link sweep) and the site's
+  own interaction probes from a `--probes` module on the page already loaded. Its state file
+  makes the agent's budget a fact: a fourth launch or a run past 15 minutes exits `3`, and a
+  site probe that failed in two runs is not run again but reported `unmeasured` with both
+  errors. The 15 minutes are checked before every page view and probe, not only at start;
+  the report is written however the run ends and says `complete: false` when it stopped
+  early; a state file over an hour old belongs to an earlier audit and starts a new budget;
+  and a probe that navigates away is recorded with `leftPage` and the page put back.
+  `tests/checks/audit-ux-probe.sh` drives it in a real Chromium against a static
+  fixture, and runs in CI's browser job.
+- **Audit link sweeps have a load limit and a shipped tool.** The audits were told to
+  follow links and given no method, so an agent wrote its own crawler: 25 concurrent
+  `curl -L` workers over a store's term archives held MariaDB at ~18 cores and load 18 on a
+  shared dev machine. `skills/wp-audit-standards` now carries one rule for any link or page
+  sweep — at most 4 requests in flight, `HEAD` or a ranged GET, WP-CLI or the database
+  before HTTP, 20 term archives per taxonomy unless a full sweep is asked for — and
+  `bin/link-sweep.mjs` implements it: it clamps concurrency to 4, classifies links as
+  internal, clone-origin (never requested from a clone unless confirmed) or external,
+  reports a CDN bot challenge as `UNMEASURED` rather than broken, and stops at a wall-clock
+  budget. Internal targets are answered by the database first:
+  `skills/wp-cli-patterns/scripts/resolve-link-targets.php` resolves a link only when the
+  object is published and its canonical URL has the link's path, and tags what it passes
+  on with its taxonomy so the sweep samples per taxonomy rather than per path segment.
+  `/wp-audit`'s agent prompt carries the rule to all seven auditors.
+  `tests/checks/audit-link-sweep.sh` runs the sweep against a local fixture server and
+  measures the in-flight peak at the server; `tests/checks/audit-resolve-links-integration.sh`
+  runs the resolver in the WordPress fixture and requests every link it resolved, each of
+  which must answer 200.
+- **`/autofix` fixes what OpenCodeReview found.** A maintainer comments `/autofix` on a pull
+  request and `.github/workflows/autofix.yml` hands the open, unresolved OCR threads to OpenCode
+  (Alibaba token plan, `qwen3.8-max`, thinking off). It runs as six jobs split by what each one
+  holds: the agent runs with a read-only token and produces only a patch; a filter job with no
+  repository code drops every edit to `tests/checks/` and `tests/baselines/` (the checks that
+  judge the patch, and baselines that need a `baseline:` commit), edits to `.github/` unless a
+  finding names that file, plus unrequested deletions, typechanges and stray new files, and
+  lists every kept change to a file no finding names in the summary; a verify job with no
+  secrets runs the contract checks before and after the patch, then `php -l` at the PHP floors
+  and `node --check`; only then does a publish job, which runs no repository code, push the
+  exact patch the filter hashed. The skip list is read from the default branch, so a PR cannot
+  switch off the checks judging it, and an empty comparison fails closed. Only commenters with
+  write, maintain or admin, and only branches in this repository; a failed permission lookup
+  fails the run instead of posting a false refusal. Each thread gets a fixed/skipped reply, and
+  a thread is resolved only when the agent reported it fixed *and* the pushed patch changed its
+  file. The summary comment says when the agent exited non-zero, quotes the last 30 lines of
+  each new check failure, warns past 100 review threads, and is posted even when the gate
+  itself fails. A push made with `GITHUB_TOKEN` starts no pull-request run, so the workflow
+  dispatches CI on the branch with the PR's base: `ci.yml` gains `workflow_dispatch` with a
+  required `base_ref` input that must look like a branch name and be behind HEAD, doc-sync runs
+  on every dispatch, and the concurrency group now includes the event so a dispatch never
+  cancels a push run. `ocr-review.yml` pins `alibaba/open-code-review` to a commit SHA and
+  fails fast when `OCR_LLM_EXTRA_BODY` is not a JSON object or carries `enable_thinking` for a
+  model that is not Qwen3, and warns when a Qwen3 model runs with thinking left on.
 
 - **A multi-currency plugin and a full-page/edge cache computed prices at two different
   granularities, and nothing checked whether they agreed.** A multi-currency plugin (CURCY/
@@ -25,6 +175,7 @@
   the local clone. `tests/checks/audit-multicurrency-cache.sh` pins the gate (on all three
   performance codes, not just PERF-065), the severity split and the fix (a
   cache-key/cookie-exclusion setting, never a code change).
+
 - **`wp-audit-seo` gained five WooCommerce-specific checks (SEO-064 to SEO-068), gated by the
   `site.commerce` flag from Step 2.3.** Before this, the SEO auditor's canonical and schema
   checks were written for an informational site and missed the failure modes that only exist
@@ -53,6 +204,7 @@
   rather than a silent pass.
   `tests/checks/audit-ecommerce-seo.sh` pins the five codes, the site-type gate, and the
   sitemap-file cap; the methodology is recorded in `skills/wp-audit-seo-standards` §18.
+
 - **`/wp-audit` did not notice a media file was missing.** An attachment post survives the
   deletion of its own file — by hand, by a partial migration, or by a restore that skipped
   part of the uploads directory — and nothing in core flags it, so the site keeps serving a
@@ -78,6 +230,34 @@
   tell a correct same-day comparison from an inverted one, since every bucket name it could
   match is spelled correctly either way — runs the script's own cutoff/bucket functions
   against real PHP (`tests/checks/lib/media-integrity-date-cutoff-behavior.php`).
+- **Three store profiles and the `wp-woocommerce` skill.** `woo-catalog` (products and prices,
+  nothing purchasable), `woo-store` (cart, block checkout, Stripe in test mode, Turnstile, SMTP)
+  and `woo-full` (plus abandoned cart, email marketing, reviews, search, filters, swatches,
+  wishlist and feeds). Every plugin has a written reason, and fifteen popular ones are listed as
+  avoided with the record behind each — `tests/checks/wp-profiles.sh` refuses a profile that
+  breaks either rule. Profiles gain a `store` tier key and a `bundled` source for plugins this
+  repository ships; `validate-profile` refuses a bundled slug with no plugin behind it.
+- **Store setup, proven against a real WooCommerce.** `skills/wp-woocommerce/scripts/woo-setup.php`
+  brings a store in line with its `store` block: HPOS before any order, store pages assigned
+  and given Polylang's default language, shipping and tax matched without duplicates, Stripe
+  keys written to `wp-config.php`, the checkout rate limit and Turnstile on, catalog mode for a
+  catalog. It records a hash of every value it writes and leaves the rest alone as the client's.
+  `force` takes those back, except launch state — coming soon, Stripe's switches, cash on
+  delivery — which it never changes on a store that has orders; a secret it leaves alone is
+  reported by fingerprint, never by value. It never deletes: a zone, method or rate it recorded
+  that the block no longer names is reported `degraded` and counted, an assigned page left
+  unpublished is the client's, and a block missing a key it reads is refused before any write.
+  `tests/checks/wp-woo-setup-integration.sh` proves it in the fixture (WooCommerce 11.1.2):
+  second runs change nothing, and the store takes a real Store API order — processing, in the
+  HPOS table, with the right total and both emails.
+- **`/wp-woo-setup`.** Asks the store questions once, records the answers as the `store` block,
+  shows a dry run, then runs the setup script. Stripe keys never enter the conversation: the
+  operator puts them in `.wp-create.local.json` or the environment, and the script reads them.
+  Recording the block regenerates an existing generated CLAUDE.md block, which gains a `Store
+  tier` row. It needs native WP-CLI, and stops before syncing on Docker, DDEV, Lando or wp-env.
+- **`/wp-create` sets up stores.** It marks every dev site `WP_ENVIRONMENT_TYPE=local`, installs
+  `bundled` plugins from this repository, and after writing the manifest runs `/wp-woo-setup`
+  when a store profile was chosen.
 
 ### Changed
 
@@ -87,6 +267,73 @@
   for. It now calls `get_vocab`, chooses the roles each page in the brief actually needs, and
   maps the store roles to their pages — a marketing homepage with product cards is not a
   `shop` page. `tests/checks/wp-library.sh` pins the vocabulary call and the store mapping.
+- **SEC-040 reads the stored row (`SEC-040@2`).** It used `get_option()`, which runs read-time
+  filters, so a key supplied from `wp-config.php` (as `store-kit` does) would be reported as a
+  key at rest. Both the detection and the scrub read `option_value` directly now. Projects that
+  ran revision 1 see SEC-040 listed as revised in the audit's coverage line.
+- **The README describes the plugin that exists.** Its starter-theme section still described
+  a single plain-CSS starter; it now covers `__tailwind__` (default, with `basic` as an alias),
+  `__cinematic__`, the `_i18n-variants/` seam and the security and performance includes. The
+  `bin/` section listed one script out of 20 and is now a table of all of them. Tech Stack no
+  longer claims a plain-CSS path, the CSS conventions state the Tailwind rule first, the audit
+  section covers the findings ledger, the link-sweep and usability budgets and the WooCommerce
+  checks, the roadmap marks multi-page demos and CPTs as shipped, and a short Testing section
+  points at `tests/checks/`, CI and `/autofix`.
+- **The HTML deliverable read like a raw table dump.** `bin/audit-report.mjs` rendered one
+  long unstyled page: plain counts, a flat plan table and no way to narrow 100+ findings to
+  the ones that matter. The HTML now follows the layout of a mature audit report:
+  - a header with key figures (findings, critical, warnings, info, not measured) and a sticky
+    table of contents;
+  - sections as cards, with counts coloured by what they count and a zero shown as good news;
+  - severity chips and owner tags (code, setting, content, manual);
+  - findings grouped by category in collapsible panels, with resource and evidence under each
+    problem;
+  - a legend that explains what each owner means for who applies the fix.
+
+  It also follows the reader's system colour scheme and has a dark/light switch. The switch
+  and the "critical only / critical and warnings" filter are pure CSS (a hidden input and
+  `:has()`), so the file still carries no script and fetches nothing. Printing forces the
+  light palette and every row back on, so a PDF made while a filter was active still carries
+  every finding. Every category panel renders open, since a collapsed `<details>` prints
+  nothing; findings without a category get their own panel instead of vanishing from the
+  HTML; group ids stay unique when two category names slug alike; a table's Total adds up
+  its own rows; one finding reads "1 finding"; and a `--lang` without HTML strings is refused
+  rather than rendered half in English. A run with no findings keeps the no-findings sentence
+  and drops the filters, split and warning in the styled page too. The Markdown output is
+  unchanged.
+- **`wp-audit-ux` runs on a budget.** On an 8-page store audit it ran 25 minutes while the
+  other six agents finished in 8–14: one new script and browser launch per question, a
+  sweep of 1801 links pulled from a mega-menu, and a serial retry loop against production
+  links behind a CDN bot challenge. The agent now has a *Budget and stop rule* read before
+  Step 1 — at most 3 browser launches, 2 attempts per criterion before `UNMEASURED` with the
+  selectors tried, 15 minutes of wall clock, and no command that outlives one Bash call — plus
+  one harness that opens each page once per viewport and runs every probe in that session.
+  `UX-014` is scoped: links classified, internal targets resolved through WP-CLI first,
+  deduplicated, at most 50 HTTP requests per page, the clone-origin host never requested
+  from a clone, and a CDN challenge `UNMEASURED` rather than broken. `bin/link-sweep.mjs`
+  gains `--per-page` for the cap. `tests/checks/audit-ux-budget.sh` pins the contract.
+- **A report-only `/wp-audit` always writes the `.md` + `.html` deliverable.** Choosing
+  "Report only" (flag or the Step 1 question) without `--report` used to print to the
+  console and nothing else: the report was gone at the next `/clear`, and the first
+  report-only run on a project wrote no dated sidecar, so the next audit had no baseline to
+  diff against. Step 1 now defaults `--report` to `both` on a report-only run (an explicit
+  `--report md|html|both` still wins), Step 8.5 runs for it, answer A says a document will be
+  written, and the Step 11 summaries print the paths Step 8.5 actually wrote — one for
+  `--report md|html`. `bin/audit-report.mjs` now renders a run with no findings instead of
+  exiting 2 and writing nothing: the report says no issues were found, and its sidecar is the
+  baseline the next audit diffs against (a later run's findings are then new, and an earlier
+  run's are resolved). Both renderers show that sentence in place of the plan table and drop
+  the ownership split and the staging/production warning, which describe changes a clean run
+  has none of; a run whose checks partly did not run says so instead of claiming the
+  categories are clean. `tests/checks/audit-ask-report-only.sh` and
+  `tests/checks/audit-deliverable-report.sh` pin it, and the doc lines.
+- **OpenCodeReview now reviews on `qwen3.8-max` via the Alibaba token plan, with thinking off.**
+  The plan enables thinking by default. A probe measured 26.5 s and 918 tokens (787 of them
+  reasoning) with it on, and 5.7 s and 214 tokens with it off; the first reviews on it ran over
+  30 minutes, against about 9 on the local model. `llm_extra_body` now comes from
+  `vars.OCR_LLM_EXTRA_BODY`, defaulting to `{"enable_thinking":false}`, because the field is
+  specific to Qwen3: repointing the model means setting that variable in the same change.
+
 - **`/wp-audit` asks for report-only as its first question when `--report-only` is absent.**
   Before, a run without the flag only reached the fix/no-fix decision at Step 9, after Step 4
   had already offered to install Rank Math, AIOS or SCF and Step 5 to pick an AIOS security
@@ -94,6 +341,18 @@
   "report only" now sets `--report-only` for the whole run, and Step 4 no longer offers plugin
   installs on a report-only run: it prints the dependency report and continues with what is
   available. `tests/checks/audit-ask-report-only.sh` pins both.
+- **The WordPress fixture runs WordPress 7.1 and is offline once provisioned.** Pins move to
+  WordPress 7.1.2, Polylang 3.8.9, SCF 6.9.5 and CF7 6.1.7 — WooCommerce 11.1 needs WordPress
+  7.0 — and the Polylang and CF7 checks pass unchanged on them. `tests/fixtures/wp/net-guard.php`
+  is installed after the downloads and refuses every outbound host, logging each to
+  `wp-content/net-guard.log`, so no fixture check can pass or fail because a real service
+  answered. The CF7 check's mail sink moved to `tests/fixtures/wp/mail-sink.php` for reuse.
+- **The audit knows what a store sells, and agrees on what a store is.** `/wp-audit` Step 2.3
+  reads `store.tier`: a catalog is `N/A ("catalog: nothing purchasable")` for cart, checkout and
+  payment checks. The GEO auditor and the agentic-surfaces fixer detect a merchant by WooCommerce
+  being **active**, as Step 2.3 does, instead of merely installed. `/wp-clone` reports `store-kit`
+  as bundled — reinstall with `/wp-woo-setup` — instead of unobtainable. The native nginx and
+  Caddy templates deny `woocommerce_uploads`, the fix SEC-039 names, on every site they write.
 
 ## [1.28.0] - 2026-09-23
 

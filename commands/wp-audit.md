@@ -19,8 +19,9 @@ Parse `$ARGUMENTS` for:
   depending on a browser tool being present in this session. Needs a reachable URL, the
   same one `--host` supplies.
 - **`--report md|html|both`** — also write the run as a dated deliverable under
-  `.wp-audit/`. Absent, the audit prints to the console and writes only the ledger, which
-  is what every run did before this flag existed.
+  `.wp-audit/`. Absent, the audit prints to the console and writes only the ledger —
+  **except on a report-only run, where it defaults to `both`** (see below). An explicit
+  `--report md|html|both` always wins.
 - **`--report-lang en|es`** (default: `en`) — the language of that deliverable. It is read
   by a client, not by the person who ran the audit, so it follows the project's primary
   language rather than the plugin's. Take the default from `languages` in the project's
@@ -49,12 +50,19 @@ Use `AskUserQuestion`:
 
 ```
 What should this audit do?
-  [A] Report only — audit and write the report; nothing on the site is installed or changed
+  [A] Report only — audit and write the report (.md + .html); nothing on the site is installed or changed
   [B] Report, then offer fixes — the report comes first, then Step 9 asks before applying anything
 ```
 
 On A, set `--report-only` for the rest of the run, exactly as if it had been typed. On B,
 continue without it. When the flag was passed, do not ask.
+
+**A report-only run always writes the deliverable.** When `--report-only` is set — by the
+flag or by answer A — and `--report` is absent, set `--report both`. An explicit
+`--report md|html|both` wins. `--report-lang` keeps its own default. The operator who chose
+"report only" asked for a report and no changes; without this, the only report of that run
+was the console scrollback, gone at the next `/clear`, and the first report-only run on a
+project wrote no dated sidecar, so the next audit had no baseline to diff against.
 
 Before this question existed, a run without the flag only learned that the operator wanted a
 read-only audit at Step 9, after Steps 4 and 5 had already offered to install and configure
@@ -94,6 +102,30 @@ On A, run `${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt.md` Steps 2 to 5 against
 from here with the adopted manifest. On B, stop and say so, as the row says. A site that is
 only files, with no running WordPress for WP-CLI to probe, cannot be adopted. In that case
 say so and stop.
+
+**Validation checks the manifest's shape, not whether it is true.** A blank scaffold that a real
+site was later restored over passes `validate` and describes the wrong site: `source: blank`,
+a theme slug with no directory, no plugins, against ~25 active ones. When Tier 2 is reachable
+(a `wp_cli.wrapper` that answers), also run:
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs drift '${PROJECT_PATH}'"
+```
+
+Exit `0`: the manifest fits the site, continue. Exit `4`: it does not; each `drift:` line names
+a disagreement (theme directory missing, active theme differs from `theme.slug`, active
+plugins absent from `plugins.installed`). Print the lines and ask with `AskUserQuestion`:
+
+```
+.wp-create.json no longer describes this site.
+  [A] Re-adopt it — read-only detection, keeps a timestamped backup of the old manifest (recommended)
+  [B] Continue with the manifest as it is
+```
+
+On A, run `wp-adopt.md` Steps 2 to 5 with `--replace`. On B, continue, and say in the report
+that every manifest-driven choice (plugin stack, theme slug, code scope) rests on a manifest
+the drift check disputed. Exit `1` (the probe could not run) is not drift: report it and
+continue. Skip the check when there is no Tier 2.
 
 Read `.claude/CLAUDE.md` to extract:
 - **Function prefix** (e.g., `kairo_`)
@@ -194,6 +226,22 @@ after a new commerce check ships scores exactly as it did before, because that c
 `is-active`, not `is-installed`: a store with WooCommerce deactivated is not currently a
 store, and its commerce surfaces are not live to audit.
 
+### Store tier — what the store sells
+
+A store set up by `/wp-woo-setup` records what it sells in `.wp-create.json`, and a catalog
+sells nothing: its products carry prices, and no cart or checkout is live. Read the tier once:
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' store.tier 2>/dev/null || echo unknown"
+```
+
+Set `site.store_tier` to `catalog`, `store` or `full`, or `unknown` when there is no `store`
+block (a store set up by hand, or before `/wp-woo-setup` existed). A check whose object is the
+cart, the checkout or a payment is **`N/A ("catalog: nothing purchasable")`** when
+`site.store_tier` is `catalog` — the rule `site.commerce` applies, one level down, for the same
+reason: a catalog must not be scored for a checkout it deliberately does not have. `unknown` is
+not `catalog`: it audits as a store.
+
 ### Local clone — audit production's posture, not the copy's
 
 When `.wp-create.json` carries `project.source: "restore"` (the field lives under
@@ -265,11 +313,59 @@ So when a live check needs a URL and `local_clone` is true:
 3. If no production URL is available, the live check is `UNMEASURED` with "needs the public
    URL", never `PASS`.
 
+### Clone-safe versus production-only measurement
+
+"Never probe the clone for live checks" does not mean "send everything to production". A
+check that depends only on the markup and CSS the theme and plugins emit gives the same answer
+on the clone, so it is measured there, with a browser when Tier 3 is available. Only what the
+server, the network or real traffic shapes needs production.
+
+| Clone-safe — measure on the clone | Production-only — needs the confirmed public URL, else `UNMEASURED` |
+|---|---|
+| contrast, target size, focus visibility, hover/active feedback, text-spacing | response headers (CSP, HSTS, cache-control, `X-Powered-By`) |
+| keyboard menu behaviour, form validation, layout shift (CLS) | `robots.txt`, `sitemap.xml` and `llms.txt` as served |
+| rendered head, schema graph, heading order, alt text, DOM structure | server rules (`.htaccess` vs nginx), redirects, TLS, HTTP version |
+| theme source, `$WP` options, postmeta, plugin list, file permissions | CDN and page-cache behaviour, compression |
+| link targets resolved through `resolve-link-targets.php` | real analytics, Search Console, field data (CrUX) |
+
+Pass this split to every agent in Step 6. An agent that reports a clone-safe check `UNMEASURED`
+because "this is a clone" has misread the rule, and Step 6.8 sends it back.
+
+**A browser pointed at a clone must not reach third parties.** Route-block analytics,
+tag-manager, reCAPTCHA and pixel hosts (everything that is not the clone's own origin or its
+CDN-served assets) for the whole run: a headless browser on the clone host otherwise sends
+real hits to the production analytics property.
+
+### A clone with a live mail transport is a finding, before any form is submitted
+
+A restored database carries the SMTP plugin's credentials and forced From address. A form
+submitted on the clone then sends real mail, and a newsletter plugin subscribes real addresses.
+Step 2.3's isolation table treats "mail plugin deactivated" as a clone artifact; the opposite
+state, a mail plugin **active and configured**, is not an artifact, it is a hazard.
+
+When `local_clone` is true and Tier 2 is available, measure it before dispatch:
+
+```bash
+$WP plugin list --status=active --field=name | grep -Ei 'smtp|mail|sendgrid|mailgun|postmark|ses|brevo|sendinblue'
+$WP eval 'echo has_filter("pre_wp_mail") ? "guarded" : "open";'
+ls wp-content/mu-plugins 2>/dev/null
+```
+
+An active mail-transport plugin with no `pre_wp_mail` filter (`open`) is a **WARNING** finding
+(`Owner: setting`, resource `mail-transport`), reported at the top of the run and in the
+blocking-warnings block. Then: **do not submit any form, subscribe, or trigger any mail-sending
+action** (contact forms, newsletter, checkout, password reset) until it is guarded. Offer the
+block recipe in `skills/wp-cli-patterns/SKILL.md` ("Guard a clone against outbound mail and
+calls") as a temporary mu-plugin and tell the user to remove it, and delete the test rows it
+protected, when the audit ends. Without Tier 2 the state is `UNMEASURED`, and the same
+no-submit rule applies.
+
 Print the two facts before tier detection, next to the adopted-site block when there is one:
 
 ```
 === Site ===
   Type          <commerce (WooCommerce) | non-commerce>
+  Store tier    <catalog | store | full | unknown>
   Local clone   <yes — production: https://… | no>
 ```
 
@@ -500,6 +596,10 @@ the scope is `none`.
 Then **always** add, if they exist: the 404, and any page carrying a form. They are where a
 third of the usability catalog lives and no derivation finds them by ranking.
 
+- **Taxonomy archives** are not at `/category/<slug>/` by assumption. Read the bases first:
+  `$WP option get category_base` and `$WP option get tag_base` (empty means `category` and
+  `tag`), and take archive URLs from the sitemap or `$WP term list category --field=url`
+  rather than building them.
 - **The 404** is a URL that cannot resolve — `<site>/<a path nothing serves>`. Do not look
   for it; construct it.
 - **The form page**, at Tier 2, from the site itself rather than by fetching every candidate:
@@ -708,6 +808,15 @@ For each selected category, dispatch the corresponding agent using the Agent too
 
 **Dispatch order:** security → seo → a11y → performance → practices → geo → usability
 
+**When a production host is in play** (`--host`, or a production URL confirmed in Step 2.3),
+create `<scratch>/prod-gate` before dispatching and pass it as the gate dir in every prompt.
+The agents still run in parallel, and each measures exactly what it measured before. The
+gate makes the production server see one request at a time, paced, and stops all of them at
+the first block. Without it, one run against a server running fail2ban, CrowdSec and
+ModSecurity sent seven agents' traffic at once. The server banned the auditing IP within
+five minutes, and the run lost every live check. See "Production sits behind a WAF" in
+`skills/wp-audit-standards/SKILL.md`. A local-only run creates no gate and changes nothing.
+
 For each agent, use this prompt template (adapt the category-specific instructions):
 
 ### What each agent is scoped to
@@ -741,6 +850,7 @@ Project context:
 - Languages: <languages>
 - Industry: <industry>
 - WP-CLI wrapper: <$WP or "not available">
+- Quiet WP-CLI: <`${CLAUDE_PLUGIN_ROOT}/bin/wp-quiet.sh $WP`, or "not needed">
 - Audit tier: <1|2|3>
 - Browser measurement: <available|not available>
 - Origin: <created|adopted>
@@ -748,9 +858,29 @@ Project context:
 - Read-only code: <code_scope.read_only, or "none" when created>
 - Stack: <seo=… security=… fields=… multilingual=… builder=… cache=…, or "plugin defaults" when created>
 - Site type (commerce): <site.commerce value — woocommerce|none>
+- Store tier: <site.store_tier — catalog|store|full|unknown>
 - Local clone: <yes|no>
 - Clone-suppressed plugins: <clone_suppressed_plugins slugs, comma-separated, or "none">
 - Parked drop-ins: <clone_parked_dropins files, comma-separated, or "none">
+- Report-only: <yes|no>
+- Measurement split: clone-safe checks run on the clone; production-only checks need the confirmed public URL (Step 2.3, "Clone-safe versus production-only measurement")
+
+**One quiet wrapper for noisy sites.** When Step 2 or Step 3 saw a plugin print PHP notices or
+deprecations into WP-CLI's stdout, pass `${CLAUDE_PLUGIN_ROOT}/bin/wp-quiet.sh $WP` as `Quiet
+WP-CLI` and tell every agent to run `$WP` calls whose output it parses through it. It strips
+the diagnostics from stdout, leaves stderr alone and keeps the exit code. An agent that builds
+its own filter is writing the same thing nine times, differently. The wrapper is for the run:
+it is never written into `.wp-create.json`.
+
+**`Report-only: yes` means the audit writes nothing.** No agent deletes or sets a transient,
+option, post or user, or activates or deactivates anything; it reads and measures. Where a read
+would be stale (update transients), the agent reports the data's age, queries the source
+directly, or reports `UNMEASURED`. A write found afterwards is a defect of the run, reported as
+one.
+
+**Clone-safe checks are measured, not skipped.** When `Local clone: yes`, the agents measure
+every clone-safe check from the Step 2.3 table on the clone, with the browser when
+`Browser measurement: available`; only production-only checks wait for the public URL.
 
 Step 2.3's clone suppression covers only the "deactivated"/"parked" finding for the items
 above — nothing else about them is suppressed. A plugin listed under Clone-suppressed
@@ -763,12 +893,36 @@ around the vendor file (an override in editable code, a filter, a report upstrea
 edits it. A check that reads one plugin's options is `N/A (stack: <name>)` when the stack
 names a different plugin for that concern.
 
+Any check that requests many URLs of the site — links followed, heads rendered, pages
+walked — follows "Link and page sweeps against a site" in
+skills/wp-audit-standards/SKILL.md: at most 4 requests in flight, internal targets resolved
+through ${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/scripts/resolve-link-targets.php
+before any HTTP, and ${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs for the rest. Never write a
+crawler of your own. The local site shares its database and web server with every other
+project on this machine.
+
+Production host: <the public URL live checks use, or "none">. Gate dir: <scratch>/prod-gate.
+Production runs fail2ban, CrowdSec and ModSecurity, and other audit agents are running beside
+you. Run every command that reaches the production host through the gate, with exactly the
+arguments you would have used otherwise:
+  WP_AUDIT_GATE_DIR=<gate dir> ${CLAUDE_PLUGIN_ROOT}/bin/prod-gate.sh [--delay 10] <host> -- <command>
+Use --delay 10 before readme, license, ?author=, the users REST route, xmlrpc or login.
+Run sweeps against it with --concurrency 1 --delay-ms 1000 --stop-on-block and a --budget of at least one
+second per link plus the timeout. Mark the host blocked on any of these:
+  - a 429
+  - a 403 carrying a WAF signature
+  - ERR_CONNECTION_REFUSED in a browser
+Use: prod-gate.sh --mark-blocked <host> "<reason>". If the gate exits 4, the host is blocked:
+report that check UNMEASURED with the gate's reason, and never retry. If it exits 5,
+another agent held the host. Nothing was sent, so call again. The local site is not gated.
+
 Run all checks for your tier level. Output your findings as a structured report with the following format for each issue:
 
 [<SEVERITY>] <CODE>: <message> (<file>:<line> if applicable)
   Resource: <the stable thing this is about — see the resource table in Step 7>
   Fix: <auto|manual>
   Owner: <code|setting|content|manual>
+  Root cause: <optional short slug shared by every finding that one defect causes, e.g. display-errors>
   Method: <description of fix>
 
 Where SEVERITY is one of: CRITICAL, WARNING, INFO
@@ -792,6 +946,28 @@ Use these `subagent_type` values:
 - `wp-audit-geo` — GEO/AI-agent readiness checks (ORA layers Discovery/Access/Usability/Payments, AI crawler allowlist, `llms.txt` and ARD catalog, rendered-head DOM checks, agent-skills index, is-agentic live scan)
 - `wp-audit-ux` — usability checks (forms and data entry, navigation and task flow, links followed rather than inferred, hover and active states, rendered line length per breakpoint, logo and typography consistency across pages)
 
+**Shard by surface when the read-only scope is large.** One agent per category cannot read a
+parent theme plus two dozen plugins, and an agent that cannot narrows on its own and says so
+only in a closing line. On an adopted site (Step 2.2), count `code_scope.read_only`: when it
+holds more than 6 paths, or any path over ~5 MB of PHP/JS, dispatch each source-reading
+category once per group instead of once per category:
+
+| Group | Contents |
+|---|---|
+| editable | every `code_scope.editable` path |
+| parent theme | the read-only theme path |
+| large plugins | read-only plugins over ~5 MB (page builders, commerce, form suites) |
+| mid-size plugins | ~500 KB to 5 MB, batched about 6 per agent |
+| small plugins | under ~500 KB, batched about 12 per agent |
+
+Every shard prompt names its own paths and says "your surface is exactly these paths; the
+checks that are not about source files (rendered output, options, headers) run in the
+`editable` shard only". Each shard returns its own `checks_executed`. Step 7 merges shards per
+category: findings concatenate, `checks_executed` is the union, and Step 6.8's coverage is
+computed on the union, so a check that no shard executed is reported as never run. Keep the
+dispatch to at most 4 agents at a time. The rendered-surface categories (`seo`, `geo`,
+`a11y` page checks, `usability`) are not sharded: their surface is the site, not a path list.
+
 **`wp-audit-ux` is dispatched with the page list from Step 2.7, and its prompt says so.**
 It is the only auditor whose scope is a set of URLs rather than the theme directory, and an
 agent given no pages audits nothing while reporting cleanly.
@@ -801,6 +977,21 @@ agent given no pages audits nothing while reporting cleanly.
 2. Continue with remaining agents (do not block the entire audit)
 3. Mark the failed category in the report
 4. Skip the failed category in the fix phase
+
+## Step 6.2: Live GEO scan (when `geo` is selected)
+
+The is-agentic scan is read-only on the site, so it runs here, in every mode including
+`--report-only`, and not only in the Step 9 fix phase. Run it once the public host is
+confirmed by Step 2.3 (`--host`, or `wordpress.url` when the site is not a local clone):
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host> --start
+```
+
+Use a Bash timeout of at least 150000 ms. The exit-code table in Step 9 ("GEO fixes") applies
+unchanged, and so does its rule that none of them is a pass. The returned score, or the reason
+there is none, fills the report's `Live scan:` line at Step 8; it is never left `pending` by a
+run that skips Step 9. Step 9 runs the scan again only to report the before → after score.
 
 ## Step 6.5: Run the browser suite (`--suite` only)
 
@@ -813,6 +1004,11 @@ Lighthouse score — were either unmeasured or asserted from the source. This ru
 ${CLAUDE_PLUGIN_ROOT}/bin/audit-suite.sh --url <public-url> --dir .wp-audit/suite \
   --site "<project name>" [--pages "/,/services/,/contact/"]
 ```
+
+Against a public URL, run it through the gate from Step 6:
+`WP_AUDIT_GATE_DIR=<scratch>/prod-gate ${CLAUDE_PLUGIN_ROOT}/bin/prod-gate.sh <public-url> -- ${CLAUDE_PLUGIN_ROOT}/bin/audit-suite.sh …`.
+The suite then runs with one Playwright worker. The tests, pages and metrics are the
+same; only the four parallel browsers are gone.
 
 `<public-url>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json` —
 **unless `local_clone` is true (Step 2.3): the suite must not probe the clone's own host**,
@@ -854,6 +1050,35 @@ owns it, with one rule:
   failure the suite measured on `/contact` and one the agent found in a stylesheet rule
   that no audited page uses are both real, and the second is the one nobody would find
   again.
+
+## Step 6.8: Coverage gate — UNMEASURED is not an answer until it is justified
+
+Before Step 7, read each returned report's `UNMEASURED` list and its measurement evidence.
+
+1. **Browser evidence is required.** When `Browser measurement: available`, an `a11y`, `ux` or
+   `performance` report with no browser-measured evidence (no `getComputedStyle`, bounding box,
+   screenshot or trace line) is rejected and its agent re-dispatched with the reason.
+2. **Each `UNMEASURED` is classified by its stated reason.** Acceptable, and kept: needs
+   credentials, needs the network or a third party, needs production (Step 2.3's
+   production-only column), needs a tier the run does not have. Anything else — "not run",
+   "no browser measurement", "clone", or no reason at all — is measurable with tools already
+   present.
+3. **Re-dispatch once.** Every `UNMEASURED` with an unacceptable reason goes back to its agent
+   once, together, with the measurement split restated. What is still unmeasured after that
+   keeps the agent's second reason.
+4. **Compute coverage against the catalog.** Every agent returns `checks_executed` as a field
+   (check ids, passes included), not in prose. For each category compute
+   `executed ∩ catalog / catalog`, with the catalog read from that agent's file as Step 2.5d
+   does, and print it in the report header:
+   `security 31/44 checks executed — never run: SEC-0xx, SEC-0yy…`.
+   An agent that returns no `checks_executed` counts as 0 and is re-dispatched. A category
+   under 90% blocks "audit complete": re-dispatch the missing ids once, then list what is
+   left, each id with its specific blocker. Without a recorded blocker for every missing id
+   the report says `INCOMPLETE`, never "complete". Ids that are `N/A` by site type or clone
+   are out of the denominator, as in Step 2.5d.
+5. **Say what happened.** The report records how many checks were re-dispatched and how many
+   stayed `UNMEASURED` for each acceptable reason, so a reader sees the coverage the run
+   actually reached rather than a summary that calls it complete.
 
 ## Step 6.9: Every finding is a measurement
 
@@ -951,6 +1176,14 @@ so a resource written two ways never matches and the duplicate survives:
 `/contact/` are one `UX-014 : page:/contact/` whose evidence lists all three. One row per
 link would match nothing the suite emits, and would turn a page with a bad footer into
 forty findings that are one fix.
+
+**One defect is one finding.** A production `display_errors` leak surfaces as a notice before
+the document in security, both SEO files, the GEO head and performance. Agents tag these with
+the same `Root cause:` slug, and `bin/audit-report.mjs` folds findings that share one into the
+most severe, which lists the others under `also_affects` ("same cause: SEC-0xx site, …"). The
+totals count the defect once. When no agent tagged it, the aggregator does: two findings whose
+evidence quotes the same output line (the same notice text, the same header) get a shared slug
+here, before the report runs. Findings with no root cause pass through untouched.
 
 Sort all issues: CRITICAL first, then WARNING, then INFO.
 
@@ -1104,7 +1337,7 @@ Categories: <comma-separated selected categories>
   ✗ WARNING: <message> (GEO-A06)
   ℹ INFO: <message>
   ○ N/A: <layer> — <rationale>
-  Live scan: <score|unavailable — skipped: <reason>> (produced by Step 9's scan, below)
+  Live scan: <score|unavailable — skipped: <reason>> (produced by Step 6.2's scan; Step 9 adds before → after)
 
 ---
 Total: N issues (X critical, Y warnings, Z info)
@@ -1121,11 +1354,12 @@ If all checks passed in a category:
 [SECURITY] ✓ All checks passed
 ```
 
-## Step 8.5: Write the dated deliverable (if `--report` was given)
+## Step 8.5: Write the dated deliverable (if `--report` was given, or the run is report-only)
 
 The console report above is for whoever ran the audit. It is gone when the scrollback is,
 and `.wp-audit-findings.json` is a working file — nobody hands a client a JSON array of
-check ids. When `--report` is given, this step writes the same run as documents.
+check ids. When `--report` is given, or the run is report-only (Step 1 defaults `--report`
+to `both` there), this step writes the same run as documents.
 
 ### Every finding says who applies it
 
@@ -1224,9 +1458,8 @@ baselines.
 
 | Exit | Meaning |
 |---|---|
-| `0` | documents written — print the paths |
+| `0` | documents written — print the paths. A run with no findings is written too: the report says nothing was found, and its sidecar is the baseline the next audit diffs against |
 | `1` | the run file is unusable, or a finding is incomplete — fix the run file and re-run |
-| `2` | the run carried no findings; say so and continue |
 | `3` | crash — report it and continue to Step 9 |
 
 It writes `.wp-audit/informe-<AAAA-MM-DD>.md`, `.html`, and a machine sidecar `.json`.
@@ -1338,8 +1571,14 @@ agreed to visual changes, this category is reported and not applied.
 **GEO fixes:** Dispatch an agent with `subagent_type: wp-agentic-surfaces` with the full project context and the list of auto-fixable GEO findings. It owns `inc/agentic.php` and every generated agent surface (`llms.txt`, ARD catalog, agent-skills index, markdown negotiation, Link headers, agent-friendly 404, JSON-LD breadth, trust anchors) — do not re-implement the surfaces here. Before dispatching, run the live verifier to capture the before score; run it again after the fixer completes and report the before → after score:
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host>
+${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host> --start
 ```
+
+`--start` makes a host with no report yet get one: the script asks is-agentic to scan it
+(the same HTTP call `npx is-agentic` makes, through curl, no package run) and reads the
+report when the scan finishes. The three calls are capped at 110 s together, so run the command with a Bash
+timeout of at least 150000 ms. Pass it only for a host this run
+confirmed as public — the scan makes a third party fetch that site.
 
 `<home-host>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json` (or
 `$WP option get home`) — **unless `local_clone` is true (Step 2.3): the live scan must not probe
@@ -1350,7 +1589,7 @@ confirmed production URL, or `UNMEASURED — needs the public URL` with no scan 
 |---|---|---|---|
 | `0` | report returned | the score | — |
 | `1` | tool error | `ERROR` | record the error and continue |
-| `2` | no report yet, no network, or a transient `429`/`503` | `UNMEASURED` | scan once at `https://is-agentic.com` |
+| `2` | no network, a transient `429`/`503`, or a `--start` scan that did not complete (without `--start`: no report yet) | `UNMEASURED` | retry once; else scan at `https://is-agentic.com` |
 | `3` | the host is not publicly reachable | `UNMEASURED — configuration` | re-run with `--host <public-url>` |
 
 **None of these is a pass.** An absent score is not a good score; a category whose evidence
@@ -1361,7 +1600,7 @@ live scan existed is in, because its manifest still holds the URL it was develop
 Print the reason on the `Live scan:` line and repeat it in the blocking-warnings block at the
 top of the report. Only a returned report yields a score; map its failed ORA check ids back to GEO codes using the `wp-audit-geo-standards` skill. Advisory and off-site findings (GEO-D05 through GEO-D08, GEO-U10, GEO-P01 through GEO-P05) are left unfixed.
 
-The before → after score this step produces is the value the Step 8 report's `Live scan:` line records: the report is printed before this step runs, so at Step 8 show that line as pending and fill it here.
+The before → after score this step produces is the value the Step 8 report's `Live scan:` line records: Step 6.2 already produced the score the report shows; this step adds the after score. On a fix run, show the line as `<score> → pending` at Step 8 and fill it here.
 
 After all fix agents complete, count how many issues were successfully fixed, and count
 them by owner. Print the `setting` fixes again as a list of steps to repeat on staging and
@@ -1500,10 +1739,20 @@ If `--report-only` was used:
 Total: N issues found (X critical, Y warnings, Z info)
 Auto-fixable: M/N
 
+Report: .wp-audit/informe-<AAAA-MM-DD>.md
+        .wp-audit/informe-<AAAA-MM-DD>.html  (single file — open, send, or print to PDF)
+
 To auto-fix issues, run: /wp-audit <same flags without --report-only>
 
 Next steps:
-  - Review the report above
+  - Review the report written above
   - Run /wp-audit (without --report-only) to auto-fix issues
   - Run /wp-finalize for pre-delivery validation
 ```
+
+**The `Report:` lines name only what Step 8.5 actually wrote**, in both summaries above.
+`--report md` or `--report html` prints one line, not two. A run with no findings is still
+written — the report says nothing was found — so its paths are printed like any other.
+When the renderer failed (exit `1` or `3`), print `Report: not written — <the reason>`
+instead of paths, and drop the line that tells the operator to review it. A summary that
+points at a file which does not exist is worse than no summary.

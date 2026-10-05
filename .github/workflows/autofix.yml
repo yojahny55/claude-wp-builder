@@ -1,0 +1,717 @@
+# /autofix — let an agent fix what OpenCodeReview found.
+#
+# A maintainer comments `/autofix` on a pull request. The open OpenCodeReview inline threads
+# (not resolved, not outdated) go to OpenCode on the Alibaba token plan, and ONE commit is
+# pushed to the PR branch -- only if the repo's contract checks are no worse than before the
+# fix. Every finding gets a fixed/skipped reply with a reason; fixed threads are resolved, so a
+# second /autofix only sees what is still open.
+#
+# Six jobs, split by what each one holds -- the point of the whole layout:
+#
+#   gate     runs no PR code. Permission check, OCR findings, skip list from the default branch.
+#   fix      the agent: a shell over the PR's code + the LLM key, and a READ-ONLY token.
+#            Its only product is a patch file and a report; it cannot push or comment.
+#   filter   runs no PR code. Applies the patch to a clean checkout and drops what the agent
+#            may not change: tests/checks/ and tests/baselines/ always (the checks verify
+#            runs to judge the patch, and the baselines they compare against -- a finding
+#            naming one is a human's fix, and finding text is untrusted PR content), .github/
+#            unless a finding names that exact file, deletions nobody asked for, and new files
+#            outside the findings' directories. Hashes the result.
+#   verify   no secrets, read-only token. Contract checks on the PR as it is (baseline), then
+#            with the filtered patch, then php -l / node --check on what changed.
+#   publish  holds the write token and runs NO repository code: applies the exact patch
+#            filter hashed, commits, pushes, dispatches CI.
+#   report   runs whenever the gate ran (a gate that failed after the 👀 still gets a
+#            comment): one summary comment, a reply per thread. A thread is resolved only
+#            when the pushed patch changed its file -- the agent's "fixed" alone leaves it open.
+#
+# Why it is shaped this way:
+#   * Maintainers only. The repo is public and a push lands on someone's branch, so the
+#     commenter must hold admin/maintain/write -- autofix can never push anything its caller
+#     could not have pushed by hand. author_association is not used: COLLABORATOR is granted
+#     for read-only collaborators too.
+#   * Same-repo PRs only. The agent runs with a shell over the PR's code; a fork PR is code
+#     nobody here wrote, so it is refused before anything is checked out.
+#   * The write token never shares a VM with the agent or with code the agent edited. In one
+#     job the agent could read the token from the runner, rewrite the check runner, or edit the
+#     baseline it is judged against (OCR found all three on the single-job version, PR #142).
+#   * The skip list comes from the default branch's ci.yml, not the PR's: a PR that widened
+#     its own skip list would otherwise switch off the checks judging it.
+#   * No review loop. A push made with GITHUB_TOKEN starts no pull_request run, so OCR does
+#     not re-review the fix (`/open-code-review` does, deliberately). The same rule would
+#     leave the fix with no CI, so publish dispatches CI on the branch with its base ref.
+#   * "No worse", not "green": /autofix must still work on a PR that already had an
+#     unrelated red check.
+#
+# Residual risk, accepted and written down: the fix job's shell can reach the network, so a
+# prompt injection in PR content or finding text could send AUTOFIX_LLM_API_KEY somewhere
+# (OpenCode's `webfetch: deny` is not egress control). The key is a separate secret so it
+# can be rotated alone. Verify executes agent-edited code, so a hostile patch could fake its
+# own result there; the worst case is a bad commit on a PR branch, which the dispatched CI
+# run and human review still judge.
+#
+# Secrets/vars: AUTOFIX_LLM_API_KEY (secret) · AUTOFIX_LLM_BASE_URL, AUTOFIX_LLM_MODEL (vars).
+name: Autofix OCR findings
+
+on:
+  issue_comment:
+    types: [created]
+
+# Only real /autofix requests share a group. Every other PR comment also starts this
+# workflow (and is skipped at the gate); in a shared group it would replace a queued
+# /autofix, because a group keeps only one pending run.
+concurrency:
+  group: >-
+    ${{
+      github.event.issue.pull_request
+      && startsWith(github.event.comment.body, '/autofix')
+      && format('autofix-{0}', github.event.issue.number)
+      || format('noop-{0}', github.run_id)
+    }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  gate:
+    if: |
+      github.event.issue.pull_request
+      && github.event.comment.user.type != 'Bot'
+      && startsWith(github.event.comment.body, '/autofix')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    outputs:
+      ref: ${{ steps.pr.outputs.ref }}
+      sha: ${{ steps.pr.outputs.sha }}
+      base_ref: ${{ steps.pr.outputs.base_ref }}
+      count: ${{ steps.findings.outputs.count }}
+      skip: ${{ steps.skip.outputs.skip }}
+      # Set before a refusal exits: the refusal is already a comment, so report must not
+      # add a second "gate failed" one.
+      refused: ${{ steps.pr.outputs.refused }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.issue.number }}
+      ACTOR: ${{ github.event.comment.user.login }}
+      COMMENT_ID: ${{ github.event.comment.id }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - name: Maintainer, open same-repo PR
+        id: pr
+        run: |
+          set -euo pipefail
+          # A failed lookup is not a permission. Collapsing it into `none` posted a false
+          # "@user has none" for every 403/404/rate limit. The endpoint needs only Metadata
+          # read, which every GITHUB_TOKEN carries (docs: "Permissions required for GitHub
+          # Apps" lists it under Repository permissions for "Metadata").
+          if ! perm=$(gh api "repos/$REPO/collaborators/$ACTOR/permission" --jq .permission 2>"$RUNNER_TEMP/perm.err"); then
+            cat "$RUNNER_TEMP/perm.err" >&2
+            echo "::error::permission lookup failed: $(tr '\n' ' ' < "$RUNNER_TEMP/perm.err" | head -c 300) -- no refusal posted, the check itself did not run"
+            exit 1
+          fi
+          [ -n "$perm" ] || { echo "::error::permission lookup returned no .permission field"; exit 1; }
+          case "$perm" in
+            admin|maintain|write) ;;
+            *) echo "refused=true" >> "$GITHUB_OUTPUT"
+               gh api "repos/$REPO/issues/$PR/comments" -f body="/autofix is limited to repo maintainers (@$ACTOR has \`$perm\`)." >/dev/null
+               echo "refused: $ACTOR has $perm"; exit 1 ;;
+          esac
+          pr=$(gh api "repos/$REPO/pulls/$PR")
+          head_repo=$(jq -r '.head.repo.full_name // ""' <<<"$pr")
+          state=$(jq -r .state <<<"$pr")
+          if [ "$head_repo" != "$REPO" ] || [ "$state" != open ]; then
+            echo "refused=true" >> "$GITHUB_OUTPUT"
+            gh api "repos/$REPO/issues/$PR/comments" -f body="/autofix only runs on open PRs from branches in this repository (head: \`${head_repo:-deleted}\`, state: \`$state\`)." >/dev/null
+            echo "refused: head=$head_repo state=$state"; exit 1
+          fi
+          {
+            echo "ref=$(jq -r .head.ref <<<"$pr")"
+            echo "sha=$(jq -r .head.sha <<<"$pr")"
+            echo "base_ref=$(jq -r .base.ref <<<"$pr")"
+          } >> "$GITHUB_OUTPUT"
+          gh api "repos/$REPO/issues/comments/$COMMENT_ID/reactions" -f content=eyes >/dev/null || true
+
+      # From the default branch: the PR's own ci.yml is PR-controlled.
+      - name: Contract-check skip list from the default branch
+        id: skip
+        run: |
+          set -euo pipefail
+          ci=$(gh api "repos/$REPO/contents/.github/workflows/ci.yml?ref=$DEFAULT_BRANCH" --jq .content | base64 -d)
+          skip=$(sed -n "s/^[[:space:]]*skip_here='\([^']*\)'.*/\1/p" <<<"$ci" | head -1)
+          [ -n "$skip" ] || { echo "::error::no skip_here list found in $DEFAULT_BRANCH's ci.yml"; exit 1; }
+          echo "skip list: $skip"
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+
+      - name: Collect open OCR findings
+        id: findings
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/findings"
+          owner=${REPO%/*}; name=${REPO#*/}
+          gh api graphql -F owner="$owner" -F name="$name" -F n="$PR" -f query='
+            query($owner:String!,$name:String!,$n:Int!){ repository(owner:$owner,name:$name){ pullRequest(number:$n){
+              reviewThreads(first:100){ pageInfo{ hasNextPage } nodes{ id isResolved isOutdated path line
+                comments(first:1){ nodes{ databaseId body } } } } } } }' > "$RUNNER_TEMP/threads.json"
+          python3 - "$RUNNER_TEMP" <<'PY'
+          import json, re, sys, pathlib
+          tmp = pathlib.Path(sys.argv[1])
+          threads = json.loads((tmp/"threads.json").read_text())["data"]["repository"]["pullRequest"]["reviewThreads"]
+          nodes = threads["nodes"]
+          # ponytail: one page of 100 threads, not a cursor loop. Past that the rest is
+          # unread, and the run says so here and in the summary comment rather than silently.
+          if threads["pageInfo"]["hasNextPage"]:
+              print("::warning::this PR has more than 100 review threads; findings beyond the first 100 were not read")
+              (tmp/"findings"/"truncated.txt").write_text("more than 100 review threads; only the first 100 were read\n")
+          out = []
+          for t in nodes:
+              c = (t["comments"]["nodes"] or [None])[0]
+              if not c or t["isResolved"] or t["isOutdated"] or "<!-- ocr-" not in c["body"]:
+                  continue
+              body = c["body"]
+              m = re.search(r"!\[([^\]]+)\]\(https://img\.shields\.io", body)
+              sev = m.group(1).replace(" · ", "/") if m else "unrated"
+              text = re.sub(r"<!--.*?-->", "", body, flags=re.S)
+              text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text).strip()
+              out.append({"id": len(out) + 1, "thread": t["id"], "comment": c["databaseId"],
+                          "path": t["path"], "line": t["line"], "severity": sev, "text": text})
+          (tmp/"findings"/"findings.json").write_text(json.dumps(out, indent=1))
+          md = ["# OpenCodeReview findings to fix", ""]
+          for f in out:
+              md += [f"## Finding {f['id']} — `{f['path']}` line {f['line']} ({f['severity']})", "", f["text"], ""]
+          (tmp/"findings"/"findings.md").write_text("\n".join(md))
+          print(f"{len(out)} open finding(s)")
+          PY
+          n=$(jq length "$RUNNER_TEMP/findings/findings.json")
+          echo "count=$n" >> "$GITHUB_OUTPUT"
+          if [ "$n" = 0 ]; then
+            # Same truncation line as report's summary: "none" may only mean "none in the first 100".
+            note=""
+            if [ -f "$RUNNER_TEMP/findings/truncated.txt" ]; then
+              note=$(printf '\n\n⚠️ %s — findings past them were not sent to the agent.' "$(tr -d '\n' < "$RUNNER_TEMP/findings/truncated.txt")")
+            fi
+            gh api "repos/$REPO/issues/$PR/comments" -f body="🔧 **/autofix**: no open OpenCodeReview findings on this PR — nothing to fix.$note" >/dev/null
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: steps.findings.outputs.count != '0'
+        with:
+          name: findings
+          path: ${{ runner.temp }}/findings/
+          retention-days: 7
+
+  fix:
+    needs: gate
+    if: needs.gate.outputs.count != '0'
+    runs-on: ubuntu-latest
+    # OpenCode gets 25 of these minutes. A job cut off here still gets a report: that is a
+    # separate job.
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    env:
+      BASE_SHA: ${{ needs.gate.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: findings
+          path: ${{ runner.temp }}/findings
+
+      - name: Run OpenCode on the findings
+        env:
+          AUTOFIX_LLM_API_KEY: ${{ secrets.AUTOFIX_LLM_API_KEY }}
+          AUTOFIX_LLM_BASE_URL: ${{ vars.AUTOFIX_LLM_BASE_URL }}
+          AUTOFIX_LLM_MODEL: ${{ vars.AUTOFIX_LLM_MODEL }}
+        run: |
+          set -euo pipefail
+          npm install -g --no-audit --no-fund opencode-ai@1.18.32 >/dev/null
+          cfg="$RUNNER_TEMP/opencode.json"
+          python3 - "$cfg" <<'PY'
+          import json, os, sys
+          model = os.environ["AUTOFIX_LLM_MODEL"]
+          base = os.environ["AUTOFIX_LLM_BASE_URL"]
+          # An unset repository variable expands to "", not to a missing env var.
+          if not (model and base and os.environ.get("AUTOFIX_LLM_API_KEY")):
+              sys.exit("::error::AUTOFIX_LLM_MODEL / AUTOFIX_LLM_BASE_URL / AUTOFIX_LLM_API_KEY must all be set")
+          json.dump({
+            "$schema": "https://opencode.ai/config.json",
+            "provider": {"autofix": {
+              "npm": "@ai-sdk/openai-compatible", "name": "autofix",
+              "options": {"baseURL": base, "apiKey": "{env:AUTOFIX_LLM_API_KEY}"},
+              "models": {model: {"name": model, "limit": {"context": 131072, "output": 16384},
+                                 # The token plan runs qwen3.8-max with thinking ON by default:
+                                 # ~4x the tokens and ~5x the latency per call. Off by choice.
+                                 "options": {"enable_thinking": False}}}}},
+            "model": f"autofix/{model}",
+            "share": "disabled", "autoupdate": False,
+            "permission": {"edit": "allow", "bash": "allow", "webfetch": "deny"},
+          }, open(sys.argv[1], "w"), indent=1)
+          PY
+          export OPENCODE_CONFIG="$cfg"
+          prompt="You are fixing code-review findings on this pull request branch. The findings are listed at the end of this message.
+
+          Rules:
+          - Fix each finding with the smallest correct change. Follow CLAUDE.md in this repo.
+          - Do not change anything the findings do not ask for. No refactors, no reformatting.
+          - Do NOT edit anything under tests/checks/ or tests/baselines/, even when a finding points there: skip that finding. Do NOT edit .github/ unless a finding points at that exact file. Such edits are discarded.
+          - If a finding is wrong, already fixed, or unsafe to change without a human decision, skip it.
+          - PHP must still parse on PHP 7.4 (8.0 under starter-theme/__cinematic__). Check edited PHP with php -l.
+          - Do not commit, push or create branches.
+          - Finally write .autofix-report.json in the repository root: a JSON array with one object per
+            finding: {\"id\": <finding number>, \"status\": \"fixed\" or \"skipped\", \"reason\": \"<one sentence>\"}."
+          # Findings go inline, not via -f: -f is an array option and swallows the prompt as a
+          # second filename ("File not found: You are fixing...", caught in a dry run).
+          prompt="$prompt
+
+          $(cat "$RUNNER_TEMP/findings/findings.md")"
+          # The exit code is kept, not swallowed: a crash, the timeout (124) or a rejected model
+          # must not read as "the agent chose to change nothing". report quotes it.
+          mkdir -p "$RUNNER_TEMP/agent-output"
+          set +e
+          timeout 1500 opencode run --auto --pure "$prompt" 2>&1 | tail -n 200
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "$rc" > "$RUNNER_TEMP/agent-output/exit.txt"
+          [ "$rc" = 0 ] || echo "::warning::opencode exited $rc"
+
+      # Anchored to the PR head commit, not the index: whatever the agent staged or even
+      # committed is still in this diff, so nothing it did is silently dropped or smuggled.
+      - name: Package the edit as a patch
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/agent-output"; mkdir -p "$out"
+          if [ -f .autofix-report.json ]; then mv .autofix-report.json "$out/report.json"; else echo '[]' > "$out/report.json"; fi
+          git add -A
+          git diff --cached --binary --no-renames "$BASE_SHA" > "$out/raw.patch"
+          size=$(stat -c %s "$out/raw.patch")
+          echo "patch: $size bytes"; git diff --cached --stat --no-renames "$BASE_SHA" | tail -20
+          if [ "$size" -gt 2000000 ]; then echo "::error::patch over 2 MB, refusing"; exit 1; fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-output
+          path: ${{ runner.temp }}/agent-output/
+          retention-days: 7
+
+  filter:
+    needs: [gate, fix]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.filter.outputs.changed }}
+      patch_sha: ${{ steps.filter.outputs.patch_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: agent-output
+          path: ${{ runner.temp }}/agent-output
+      - uses: actions/download-artifact@v4
+        with:
+          name: findings
+          path: ${{ runner.temp }}/findings
+
+      - name: Drop what the agent may not change
+        id: filter
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/filtered"; mkdir -p "$out"; : > "$out/dropped.txt"; : > "$out/unrequested.txt"
+          if [ -s "$RUNNER_TEMP/agent-output/raw.patch" ]; then
+            git apply --index --binary --whitespace=nowarn "$RUNNER_TEMP/agent-output/raw.patch"
+          fi
+          allowed=$(jq -r '.[].path' "$RUNNER_TEMP/findings/findings.json" | sort -u)
+          allowed_dirs=$(while IFS= read -r p; do [ -n "$p" ] && dirname -- "$p"; done <<<"$allowed" | sort -u)
+          git diff --cached --name-status --no-renames HEAD > "$RUNNER_TEMP/changes.txt"
+          while IFS=$'\t' read -r st f; do
+            [ -n "$f" ] || continue
+            named=false; grep -qxF -- "$f" <<<"$allowed" && named=true
+            why=""
+            # tests/checks/ is what verify runs to judge this patch, and finding text is
+            # untrusted: naming a check must not make it editable. tests/baselines/ needs a
+            # `baseline: <why>` commit subject this job never writes, so the dispatched CI
+            # would go red. Both are a human's fix, named or not.
+            case "$f" in
+              tests/checks/*|tests/baselines/*) why="protected path (never agent-editable, even when a finding names it)" ;;
+              .github/*) [ "$named" = true ] || why="protected path" ;;
+            esac
+            if [ -z "$why" ] && [ "$st" = D ] && [ "$named" = false ]; then why="deletion no finding asked for"; fi
+            # A typechange (file -> symlink, say) is as unrequested as a deletion.
+            if [ -z "$why" ] && [ "$st" = T ] && [ "$named" = false ]; then why="typechange no finding asked for"; fi
+            if [ -z "$why" ] && [ "$st" = A ] && [ "$named" = false ] && ! grep -qxF -- "$(dirname -- "$f")" <<<"$allowed_dirs"; then
+              why="new file outside the findings' directories"
+            fi
+            # Kept, but shown: a real fix may touch a helper no finding names, so an unnamed
+            # modification (or a new file beside a finding) is not dropped -- it is listed in
+            # the summary for the maintainer to check before merging.
+            if [ -z "$why" ] && [ "$named" = false ]; then printf '%s\t%s\n' "$f" "$st" >> "$out/unrequested.txt"; fi
+            [ -n "$why" ] || continue
+            if [ "$st" = A ]; then git rm -q -f -- "$f"; else git reset -q HEAD -- "$f"; git checkout -q HEAD -- "$f"; fi
+            printf '%s\t%s\n' "$f" "$why" >> "$out/dropped.txt"
+          done < "$RUNNER_TEMP/changes.txt"
+          git diff --cached --binary --no-renames HEAD > "$out/filtered.patch"
+          echo "--- dropped:"; cat "$out/dropped.txt"
+          echo "--- kept, no finding names the file:"; cat "$out/unrequested.txt"
+          echo "--- kept:"; git diff --cached --stat --no-renames HEAD | tail -20
+          if [ -s "$out/filtered.patch" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; else echo "changed=false" >> "$GITHUB_OUTPUT"; fi
+          echo "patch_sha=$(sha256sum "$out/filtered.patch" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: filtered
+          path: ${{ runner.temp }}/filtered/
+          retention-days: 7
+
+  verify:
+    needs: [gate, filter]
+    if: needs.filter.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      ok: ${{ steps.verdict.outputs.ok }}
+    env:
+      SKIP: ${{ needs.gate.outputs.skip }}
+      PATCH_SHA: ${{ needs.filter.outputs.patch_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+          persist-credentials: false
+
+      - name: Write the check runner
+        run: |
+          cat > "$RUNNER_TEMP/run-checks.sh" <<'SH'
+          #!/usr/bin/env bash
+          # Usage: run-checks.sh <label>. Prints each failing contract check, one per line, and
+          # records how many checks ran in $RUNNER_TEMP/ran-<label>. Mirrors ci.yml's contract
+          # loop, with the default branch's skip list ($SKIP).
+          # Each check's output is kept in $RUNNER_TEMP/out-<label>/, so a rejected fix can
+          # say why (Verdict quotes the tail of each new failure, as ci.yml does).
+          set -uo pipefail
+          label=$1; ran=0; logs="$RUNNER_TEMP/out-$label"; mkdir -p "$logs"
+          for f in tests/checks/*.sh; do
+            [ -f "$f" ] || continue
+            case " $SKIP " in *" $f "*) continue ;; esac
+            ran=$((ran + 1))
+            timeout 300 bash "$f" > "$logs/$(basename "$f").log" 2>&1 || printf '%s\n' "$f"
+          done
+          echo "$ran" > "$RUNNER_TEMP/ran-$label"
+          SH
+
+      # Before the patch exists on this machine.
+      - name: Baseline — contract checks on the PR as it is
+        run: bash "$RUNNER_TEMP/run-checks.sh" before > "$RUNNER_TEMP/fail-before.txt" || true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: filtered
+          path: ${{ runner.temp }}/filtered
+
+      - name: Apply the filtered patch
+        run: |
+          set -euo pipefail
+          got=$(sha256sum "$RUNNER_TEMP/filtered/filtered.patch" | cut -d' ' -f1)
+          [ "$got" = "$PATCH_SHA" ] || { echo "::error::patch hash $got != filter's $PATCH_SHA"; exit 1; }
+          git apply --index --binary --whitespace=nowarn "$RUNNER_TEMP/filtered/filtered.patch"
+          git diff --cached --name-only --diff-filter=d HEAD > "$RUNNER_TEMP/changed.txt"
+          cat "$RUNNER_TEMP/changed.txt"
+
+      - name: Contract checks with the fix
+        run: bash "$RUNNER_TEMP/run-checks.sh" after > "$RUNNER_TEMP/fail-after.txt" || true
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240  # 2.37.2
+        with:
+          php-version: '8.0'
+      - name: php -l at 8.0 (cinematic starter)
+        run: |
+          : > "$RUNNER_TEMP/lint.txt"
+          grep -E '^starter-theme/__cinematic__/.*\.php$' "$RUNNER_TEMP/changed.txt" | while IFS= read -r f; do
+            php -l "$f" >/dev/null || echo "php-8.0-lint:$f" >> "$RUNNER_TEMP/lint.txt"
+          done || true
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240  # 2.37.2
+        with:
+          php-version: '7.4'
+      - name: php -l at 7.4, node --check
+        run: |
+          grep -E '\.php$' "$RUNNER_TEMP/changed.txt" | grep -v '^starter-theme/__cinematic__/' | while IFS= read -r f; do
+            php -l "$f" >/dev/null || echo "php-7.4-lint:$f" >> "$RUNNER_TEMP/lint.txt"
+          done || true
+          grep -E '\.mjs$' "$RUNNER_TEMP/changed.txt" | while IFS= read -r f; do
+            node --check "$f" || echo "node-check:$f" >> "$RUNNER_TEMP/lint.txt"
+          done || true
+
+      - name: Verdict
+        id: verdict
+        run: |
+          set -uo pipefail
+          out="$RUNNER_TEMP/verify"; mkdir -p "$out"; : > "$out/new-failures.txt"; : > "$out/new-failures-output.txt"
+          before=$(cat "$RUNNER_TEMP/ran-before" 2>/dev/null || echo 0)
+          after=$(cat "$RUNNER_TEMP/ran-after" 2>/dev/null || echo 0)
+          echo "contract checks run: before=$before after=$after"
+          # Fail closed: a comparison of two empty lists proves nothing.
+          if [ "$before" -eq 0 ] || [ "$after" -eq 0 ]; then
+            echo "checks-did-not-run (before=$before after=$after)" >> "$out/new-failures.txt"
+          fi
+          comm -13 <(sort -u "$RUNNER_TEMP/fail-before.txt") <(sort -u "$RUNNER_TEMP/fail-after.txt") >> "$out/new-failures.txt" || true
+          cat "$RUNNER_TEMP/lint.txt" >> "$out/new-failures.txt" 2>/dev/null || true
+          # The same 30 lines ci.yml keeps per failure.
+          while IFS= read -r f; do
+            log="$RUNNER_TEMP/out-after/$(basename -- "$f").log"
+            [ -f "$log" ] || continue
+            { printf '=== %s (last 30 lines)\n' "$f"; tail -30 "$log"; echo; } >> "$out/new-failures-output.txt"
+          done < <(grep '^tests/checks/' "$out/new-failures.txt" || true)
+          if [ -s "$out/new-failures.txt" ]; then
+            echo "ok=false" >> "$GITHUB_OUTPUT"; echo "new failures:"; cat "$out/new-failures.txt"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verify
+          path: ${{ runner.temp }}/verify/
+          retention-days: 7
+
+  publish:
+    needs: [gate, filter, verify]
+    if: needs.verify.outputs.ok == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: write
+    outputs:
+      pushed: ${{ steps.push.outputs.pushed }}
+      sha: ${{ steps.push.outputs.sha }}
+      why: ${{ steps.push.outputs.why }}
+    steps:
+      # Nothing from the repository is executed in this job: checkout, git apply, git push.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: filtered
+          path: ${{ runner.temp }}/filtered
+      - uses: actions/download-artifact@v4
+        with:
+          name: agent-output
+          path: ${{ runner.temp }}/agent-output
+
+      - name: Commit and push
+        id: push
+        env:
+          PUSH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ACTOR: ${{ github.event.comment.user.login }}
+          BRANCH: ${{ needs.gate.outputs.ref }}
+          BASE_REF: ${{ needs.gate.outputs.base_ref }}
+          PATCH_SHA: ${{ needs.filter.outputs.patch_sha }}
+          FINDING_COUNT: ${{ needs.gate.outputs.count }}
+          AUTOFIX_MODEL: ${{ vars.AUTOFIX_LLM_MODEL }}
+        run: |
+          set -euo pipefail
+          got=$(sha256sum "$RUNNER_TEMP/filtered/filtered.patch" | cut -d' ' -f1)
+          [ "$got" = "$PATCH_SHA" ] || { echo "::error::patch hash $got != filter's $PATCH_SHA"; exit 1; }
+          git apply --index --binary --whitespace=nowarn "$RUNNER_TEMP/filtered/filtered.patch"
+          fixed=$(jq 'if type=="array" then [.[]|select(type=="object" and .status=="fixed")]|length else 0 end' \
+                    "$RUNNER_TEMP/agent-output/report.json" 2>/dev/null || echo 0)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "fix: address OpenCodeReview findings (/autofix)" \
+            -m "Requested by @$ACTOR. $fixed of $FINDING_COUNT finding(s) reported fixed by OpenCode ($AUTOFIX_MODEL)." \
+            -m "Contract checks: no new failures against the pre-fix baseline."
+          if git push -q "https://x-access-token:${PUSH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}"; then
+            echo "pushed=true" >> "$GITHUB_OUTPUT"; echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            gh workflow run ci.yml --repo "$REPO" --ref "$BRANCH" -f base_ref="$BASE_REF" \
+              || echo "::warning::could not dispatch CI"
+          else
+            echo "pushed=false" >> "$GITHUB_OUTPUT"; echo "why=moved" >> "$GITHUB_OUTPUT"
+          fi
+
+  report:
+    needs: [gate, fix, filter, verify, publish]
+    # Also on a gate that failed after the 👀 (skip list missing, GraphQL error, upload
+    # failure), which would otherwise leave the eyes as the only signal. Not on a refusal:
+    # that already is a comment. Not on zero findings: the gate already said so.
+    if: |
+      always() && needs.gate.result != 'skipped'
+      && needs.gate.outputs.refused != 'true'
+      && (needs.gate.result != 'success' || needs.gate.outputs.count != '0')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: findings
+          path: ${{ runner.temp }}/findings
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: agent-output
+          path: ${{ runner.temp }}/agent-output
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: filtered
+          path: ${{ runner.temp }}/filtered
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: verify
+          path: ${{ runner.temp }}/verify
+
+      - name: Summary comment and thread replies
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.issue.number }}
+          GATE: ${{ needs.gate.result }}
+          FIX: ${{ needs.fix.result }}
+          FILTER: ${{ needs.filter.result }}
+          CHANGED: ${{ needs.filter.outputs.changed }}
+          VERIFY: ${{ needs.verify.result }}
+          OK: ${{ needs.verify.outputs.ok }}
+          PUBLISH: ${{ needs.publish.result }}
+          PUSHED: ${{ needs.publish.outputs.pushed }}
+          WHY: ${{ needs.publish.outputs.why }}
+          SHA: ${{ needs.publish.outputs.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - "$RUNNER_TEMP" <<'PY'
+          import json, os, pathlib, re, subprocess, sys
+          tmp = pathlib.Path(sys.argv[1]); e = os.environ.get
+          def read(p, default=""):
+              p = tmp / p
+              return p.read_text() if p.exists() else default
+          findings = json.loads(read("findings/findings.json", "[]"))
+          # Per item and by string: one malformed entry must not discard the others, and an
+          # id of "3" or 3 must both match finding 3.
+          report = {}
+          try:
+              raw = json.loads(read("agent-output/report.json", "[]"))
+          except ValueError:
+              raw = []
+          for r in raw if isinstance(raw, list) else []:
+              if isinstance(r, dict) and "id" in r:
+                  report.setdefault(str(r["id"]).strip(), r)
+          # Check output and file names are agent-influenced: break 3+ backtick runs so they
+          # cannot close the fence, and @mentions so they cannot ping anyone.
+          def defang(s):
+              s = re.sub(r"`{3,}", lambda m: "​".join(m.group()), s)
+              return s.replace("@", "@​")
+          new = defang(read("verify/new-failures.txt").strip())
+          # ponytail: capped so a flood of failures cannot push the comment past GitHub's
+          # 65536-character body limit; the full text is in the verify artifact.
+          new_out = defang(read("verify/new-failures-output.txt").strip()[:20000])
+          # Files the pushed patch touches, read from filter's patch (a job that runs no PR
+          # code), not from verify (which ran agent-edited code). Only `diff --git` headers:
+          # an added line "++ b/x" shows up as "+++ b/x" in a hunk, so `+++` lines can be
+          # forged by content, while a hunk line always starts with " ", "+", "-" or "\" and
+          # base85 has no space. --no-renames makes a == b; deletions and binaries count too.
+          # ponytail: a git-quoted path (non-ASCII, control chars) is not decoded, so its
+          # thread stays open -- the conservative side.
+          changed = set()
+          for l in read("filtered/filtered.patch").splitlines():
+              if l.startswith("diff --git a/"):
+                  s = l[len("diff --git a/"):]; n = (len(s) - 3) // 2
+                  if s[n:n + 3] == " b/" and s[:n] == s[n + 3:]:
+                      changed.add(s[:n])
+          agent_rc = read("agent-output/exit.txt").strip()
+          truncated = read("findings/truncated.txt").strip()
+          # Paths below come from the agent's patch: defanged like any agent text.
+          dropped = [l.split("\t") for l in read("filtered/dropped.txt").splitlines() if l.strip()]
+          unrequested = [l.split("\t") for l in read("filtered/unrequested.txt").splitlines() if l.strip()]
+          sha = e("SHA") or ""
+          if e("GATE") != "success":
+              head = f"❌ the gate did not finish (`{e('GATE')}`) — nothing was run. See the run log linked above."
+          elif e("PUSHED") == "true":
+              head = f"✅ pushed `{sha[:7]}` — CI dispatched on the branch."
+          elif e("FIX") != "success":
+              head = f"❌ the agent step did not finish (`{e('FIX')}`) — nothing pushed. See the run log."
+          elif e("FILTER") != "success":
+              head = "❌ could not apply the agent's edit — nothing pushed. See the run log."
+          elif e("CHANGED") == "false" and agent_rc not in ("", "0"):
+              head = f"❌ the agent exited {agent_rc} (124 is the 25-minute timeout) — nothing pushed. See the run log."
+          elif e("CHANGED") == "false":
+              head = "⚪ nothing to push: the agent made no change, or only edits that were dropped (below)."
+          elif e("OK") == "false":
+              head = "❌ **not pushed** — the fix introduced new failures:\n```\n" + new + "\n```"
+              if new_out:
+                  head += "\n<details><summary>Output of the new failures</summary>\n\n````\n" + new_out + "\n````\n</details>"
+          elif e("VERIFY") != "success":
+              head = f"❌ verification did not finish (`{e('VERIFY')}`) — nothing pushed."
+          elif e("WHY") == "moved":
+              head = "❌ **not pushed** — the branch moved while autofix ran. Re-run `/autofix`."
+          else:
+              head = f"❌ publishing failed (`{e('PUBLISH')}`) — nothing pushed. See the run log."
+          def status(f):
+              r = report.get(str(f["id"]), {})
+              st = r.get("status") if r.get("status") in ("fixed", "skipped") else "unreported"
+              # The agent's reason is untrusted text (finding content can steer it).
+              why = defang(" ".join(str(r.get("reason", "no report from the agent")).split())[:300])
+              return st, why
+          if agent_rc not in ("", "0") and "the agent exited" not in head:
+              head += f"\n\nThe agent exited {agent_rc} (124 is the timeout), so its work may be partial."
+          lines = ["<!-- ocr-autofix -->", f"🔧 **/autofix** ({e('RUN_URL')})", "", head, ""]
+          if truncated:
+              lines += [f"⚠️ {truncated} — findings past them were not sent to the agent.", ""]
+          for f in findings:
+              st, why = status(f)
+              icon = {"fixed": "✅", "skipped": "⏭️"}.get(st, "❔")
+              lines.append(f"- {icon} **{st}** `{f['path']}:{f['line']}` ({f['severity']}) — {why}")
+          if dropped:
+              lines += ["", "Dropped from the agent's edit:"] + [f"- `{defang(d[0])}` — {d[-1]}" for d in dropped]
+          if unrequested:
+              lines += ["", "Changed without a finding naming the file — check before merging:"] + \
+                       [f"- `{defang(u[0])}` ({'added' if u[-1] == 'A' else 'modified'})" for u in unrequested]
+          lines += ["", "OCR does not re-review an autofix push by itself. Comment `/open-code-review` to review the fix."]
+          (tmp / "summary.md").write_text("\n".join(lines))
+          # Non-fatal per call: one rejected reply must not suppress the rest.
+          def gh(*a):
+              r = subprocess.run(["gh", "api", *a], stdout=subprocess.DEVNULL)
+              if r.returncode != 0:
+                  print(f"::warning::gh api {' '.join(a[:2])} exited {r.returncode}")
+          repo, pr = e("REPO"), e("PR")
+          gh(f"repos/{repo}/issues/{pr}/comments", "-F", f"body=@{tmp / 'summary.md'}")
+          if e("PUSHED") != "true":
+              sys.exit(0)
+          # Reply on each thread. Resolve only on evidence: the agent said fixed AND the pushed
+          # patch changed that file. A resolved thread is hidden from reviewers and from every
+          # later /autofix, so the agent's word alone must not close it.
+          for f in findings:
+              st, why = status(f)
+              if st == "fixed" and f["path"] not in changed:
+                  gh(f"repos/{repo}/pulls/{pr}/comments/{f['comment']}/replies",
+                     "-f", f"body=🔧 /autofix: reported **fixed**, but {sha[:7]} does not change `{f['path']}` — left open for a human. {why}")
+                  continue
+              gh(f"repos/{repo}/pulls/{pr}/comments/{f['comment']}/replies",
+                 "-f", f"body=🔧 /autofix: **{st}** in {sha[:7]} — {why}")
+              if st == "fixed" and f["path"] in changed:
+                  gh("graphql", "-f", "query=mutation($t:ID!){resolveReviewThread(input:{threadId:$t}){thread{isResolved}}}",
+                     "-F", f"t={f['thread']}")
+          PY
