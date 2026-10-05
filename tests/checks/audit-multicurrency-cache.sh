@@ -262,12 +262,14 @@ grep -Fq 'no mechanism' <<< "$flat_seo_prose" \
 grep -Fq 'that snapshot is' <<< "$flat_seo_prose" \
   || fail "$seo's procedure does not explain why the rendered-head/json_ld snapshot cannot stand in for SEO-069's production read"
 
-# --- CHANGELOG: an Unreleased entry exists and names the new codes ---
-unreleased=$(awk '/^## \[Unreleased\]/{f=1; next} f && /^## \[/{exit} f{print}' "$changelog")
-[ -n "$unreleased" ] || fail "$changelog has no content under [Unreleased]"
+# --- CHANGELOG: one section names all the new codes ---
+# Whichever section holds the entry, Unreleased or the release that shipped it: pinning
+# [Unreleased] made this check fail on the release that moved the entry down.
+section=$(awk '/^## \[/{if (hit) exit; buf=""} {buf = buf $0 "\n"} /PERF-065/{hit=1} END{if (hit) printf "%s", buf}' "$changelog")
+[ -n "$section" ] || fail "$changelog has no entry naming PERF-065"
 for code in PERF-065 PERF-066 PERF-067 SEO-069; do
-  grep -Fq "$code" <<< "$unreleased" \
-    || fail "$changelog's [Unreleased] section does not mention $code"
+  grep -Fq "$code" <<< "$section" \
+    || fail "$changelog's section for the multi-currency checks does not mention $code"
 done
 
 echo PASS

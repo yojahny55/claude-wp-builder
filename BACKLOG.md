@@ -13,7 +13,7 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 
 **Priority:** Items within each section are ordered by priority (highest first).
 
-**Reconciled** on September 23, 2026 against `main` at v1.28.0. Every item below was
+**Reconciled** on October 5, 2026 against `main` at v1.29.0. Every item below was
 checked against the command, agent or script that would own it — an item claiming to be
 open while the behavior ships reads as a project that does not know what it has built.
 Larger reworks of delivered behavior are proposals, not backlog items, and are tracked
@@ -230,10 +230,12 @@ Server setup, permissions, and WordPress configuration.
   Piece 1 of 8, the foundation, is delivered: three store profiles, the `store` block,
   [`/wp-woo-setup`](commands/wp-woo-setup.md) with its [setup script](skills/wp-woocommerce/scripts/woo-setup.php),
   and [`store-kit`](plugins/store-kit/store-kit.php), proven by
-  [the integration check](tests/checks/wp-woo-setup-integration.sh). Not started, each its own
-  spec: theme integration (the WhatsApp button and enquiry form render there), store demo pages,
-  product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang bridge,
-  subscriptions, bookings.
+  [the integration check](tests/checks/wp-woo-setup-integration.sh). The audit already reads
+  the store tier, detects a merchant by active plugin, and checks paid downloads (SEC-039) and
+  gateway keys at rest (SEC-040); a store-specific audit pass is still to come. Not started, each
+  its own spec: theme integration (the WhatsApp button and enquiry form render there), store demo
+  pages, product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang
+  bridge, subscriptions, bookings.
 
 - [ ] **One unexplained integration failure in store setup** `OPEN`
   [The integration check](tests/checks/wp-woo-setup-integration.sh) failed once at "setup

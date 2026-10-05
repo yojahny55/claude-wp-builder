@@ -52,6 +52,12 @@ it, run `/wp-adopt` instead: it registers the site read-only. Without
 WordPress root, taking languages from `.claude/CLAUDE.md`; Docker/DDEV/Lando wrappers only
 work through the manifest.
 
+**A WooCommerce store** picks `woo-catalog`, `woo-store` or `woo-full` as its profile.
+`/wp-create` then runs `/wp-woo-setup` (Step 5.5), which records the store in the `store` block
+of `.wp-create.json` and brings WooCommerce in line with it: HPOS, Terms page, shipping, tax,
+Stripe in test mode. Re-run `/wp-woo-setup` after editing the block. Store profiles need native
+WP-CLI. See the README's *WooCommerce stores* section and `skills/wp-woocommerce/`.
+
 ### 2. `/wp-init` — scaffold the theme — *required*
 
 ```

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.29.0] - 2026-10-05
+
 ### Fixed
 
 - **`/wp-audit` no longer sends crawler user agents to a live host.** GEO-A23 asked for a
@@ -261,6 +263,10 @@
 
 ### Changed
 
+- **The README walks through building a WooCommerce store.** The three store profiles, what
+  `/wp-woo-setup` writes and when to re-run it, what `store-kit` does, and the native WP-CLI
+  requirement, with a matching note in `docs/workflows.md`. Before, the store work appeared only
+  as table rows.
 - **`/wp-demo` picks design-library roles from the library's own vocabulary.** Step 2.6's
   sub-step 3.6 used to search a fixed list of twelve roles, so the store roles the library
   gained (`shop`, `product`, `cart`, `checkout`, `account`, `confirmation`) were never asked

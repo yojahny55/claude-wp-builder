@@ -6,7 +6,7 @@
 
 **Demo HTML to production WordPress theme — automated.**
 
-[![Version](https://img.shields.io/badge/version-1.28.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.29.0-blue.svg)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-Plugin-blueviolet.svg)](https://docs.anthropic.com/en/docs/claude-code)
@@ -35,6 +35,7 @@ DEMO     have a mockup?   →  /wp-init path/to/mockup.html   (reads it, skips t
 BUILD    A. /wp-yolo demo/            — whole multi-page demo → theme in one pass (runs B for you)
          B. /wp-header → /wp-footer → /wp-section … → /wp-page … → /wp-seed   (one piece at a time)
          C. /wp-cinematic-init → -encode → -scene → -seed         (scroll-driven video reel)
+         store? pick a woo-* profile in /wp-create  →  /wp-woo-setup   (WooCommerce, any path)
                                        │
 FINISH   /wp-finalize  →  /wp-demo-verify  →  /wp-audit (optional)
 ```
@@ -198,6 +199,31 @@ contract, for an admin tool, intranet or catalogue. Nothing paid is involved.
 
 `/wp-cinematic-init` → `/wp-cinematic-demo` → `/wp-cinematic-encode` per video →
 `/wp-cinematic-scene` per scene → `/wp-cinematic-seed`. See [docs/cinematic-mode.md](docs/cinematic-mode.md).
+
+### WooCommerce stores (optional, any path)
+
+Pick a store profile when `/wp-create` asks for a plugin profile. There are three tiers:
+
+| Profile | What the store does |
+|---|---|
+| `woo-catalog` | Products and prices, nothing purchasable: enquiry form, where-to-buy link or WhatsApp |
+| `woo-store` | Sells: cart, block checkout, Stripe in test mode, shipping, tax, bot protection |
+| `woo-full` | Everything in `woo-store`, plus abandoned cart, email marketing, reviews, search and filters, swatches, wishlist and product feeds |
+
+`/wp-create` then runs `/wp-woo-setup`. It asks the store questions, records the answers as a
+`store` block in `.wp-create.json`, shows a dry run, and applies it. That turns on HPOS and
+creates the Terms page, shipping zones, tax rates and payment settings, which a WP-CLI install
+otherwise leaves at WooCommerce's defaults. Run `/wp-woo-setup` again whenever you change the block.
+A value the client has changed in WooCommerce since is kept and reported, never overwritten
+unless you pass `--force`.
+
+Every store also gets **`store-kit`**, a small plugin this repository ships into the site. It
+provides catalog mode, and it reads the Stripe keys from `wp-config.php` constants, so no
+database dump or clone carries a working key. `/wp-audit` reads the store tier, so a catalog is
+never scored on a checkout it does not have.
+
+Store profiles need native WP-CLI. On Docker, DDEV, Lando or wp-env, `/wp-create` and
+`/wp-woo-setup` stop before installing anything.
 
 ### Finish (every path)
 
