@@ -88,7 +88,8 @@ need 'bundled first**, then recoverable' 'Path B splits three ways, so a bundled
 need 'matched by slug only' 'Path B classifies by slug without saying it had no header to compare'
 b=$(grep -n 'Bundled plugins first' "$f" | head -1 | cut -d: -f1 || true)
 o=$(grep -n 'api.wordpress.org/plugins/info' "$f" | head -1 | cut -d: -f1 || true)
-[ -n "$b" ] && [ -n "$o" ] && [ "$b" -lt "$o" ] \
+[ -n "$o" ] || fail "$f no longer looks plugins up at api.wordpress.org/plugins/info"
+[ -n "$b" ] && [ "$b" -lt "$o" ] \
   || fail "$f asks WordPress.org before checking for a bundled plugin, so store-kit would read as unobtainable"
 
 echo "PASS: dependencies are inventoried from the source, split three ways, and persisted"

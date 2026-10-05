@@ -37,9 +37,14 @@ awk '
 ' "$CI" || fail "$CI increments pass on the SKIP branch, or no longer has an else branch"
 
 # --- the job-owned exclusions, which this check now sits beside ------------------------------
-for owned in motion-devices wp-polylang-integration wp-cf7-delivery wp-woo-setup-integration visual-baselines baseline-approval; do
-  grep -Fq "tests/checks/$owned.sh" "$CI" \
-    || fail "$CI no longer excludes tests/checks/$owned.sh from the contract glob -- it would skip there and pass"
+# Read from the skip_here value itself: every name below is also invoked by its own job elsewhere
+# in the workflow, so a whole-file grep could never fail.
+skip_list=$(sed -n "s/^[[:space:]]*skip_here='\(.*\)'\$/\1/p" "$CI")
+[ -n "$skip_list" ] || fail "$CI has no skip_here list to read"
+for owned in motion-devices wp-polylang-integration wp-cf7-delivery wp-woo-setup-integration audit-resolve-links-integration audit-ux-probe visual-baselines baseline-approval; do
+  case " $skip_list " in *" tests/checks/$owned.sh "*) ;; *)
+    fail "$CI no longer excludes tests/checks/$owned.sh from the contract glob -- it would skip there and pass" ;;
+  esac
 done
 
 # --- the signal being accounted for actually exists ------------------------------------------

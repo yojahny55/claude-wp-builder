@@ -18,7 +18,8 @@ function wooset_scalar( $value ) {
 		return $value ? '1' : '';
 	}
 	if ( is_int( $value ) || is_float( $value ) ) {
-		return json_encode( $value );
+		// INF and NAN have no JSON form; json_encode() answers false, which reads as a boolean.
+		return is_finite( (float) $value ) ? json_encode( $value ) : (string) $value;
 	}
 	return $value;
 }

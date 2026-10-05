@@ -139,11 +139,17 @@ function wooset_page_content( $page, $mode ) {
 	// ponytail: WooCommerce's default block markup lives in a protected helper; reflection reads
 	// it rather than a copy that would go stale. If the helper is renamed, switching back to the
 	// block checkout reports degraded instead of guessing markup.
-	$m = new ReflectionMethod( 'WC_Install', $method );
-	if ( PHP_VERSION_ID < 80100 ) {
-		$m->setAccessible( true );
+	// A changed signature (instance method, new required argument) throws; that is the same
+	// "cannot read the markup" answer as a missing method, not a reason to abort the run.
+	try {
+		$m = new ReflectionMethod( 'WC_Install', $method );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$m->setAccessible( true );
+		}
+		return (string) $m->invoke( null );
+	} catch ( Throwable $e ) {
+		return null;
 	}
-	return (string) $m->invoke( null );
 }
 
 /** Stripe test keys: environment first, then <project>/.wp-create.local.json. Never printed. */
@@ -413,12 +419,20 @@ function wooset_step_shipping( $store ) {
 			$found = wooset_find_method( $zone, $m['type'] );
 			if ( ! $found ) {
 				// A method this run adds is this run's, whatever the store's history.
-				wooset_report( 'set', $id, 'added' );
-				if ( $c['write'] ) {
-					$iid = $zone->add_shipping_method( $m['type'] );
-					update_option( "woocommerce_{$m['type']}_{$iid}_settings", $owned );
-					$c['state'][ $id ] = wooset_hash( $owned );
+				if ( ! $c['write'] ) {
+					wooset_report( 'set', $id, 'added' );
+					continue;
 				}
+				// 0 means WooCommerce did not add it (an unregistered type). Writing settings under
+				// instance 0 would orphan them and record a method that does not exist.
+				$iid = $zone->add_shipping_method( $m['type'] );
+				if ( ! $iid ) {
+					wooset_report( 'degraded', $id, 'WooCommerce did not add it: is the ' . $m['type'] . ' method available on this site?' );
+					continue;
+				}
+				update_option( "woocommerce_{$m['type']}_{$iid}_settings", $owned );
+				$c['state'][ $id ] = wooset_hash( $owned );
+				wooset_report( 'set', $id, 'added' );
 				continue;
 			}
 			$key = "woocommerce_{$m['type']}_{$found->instance_id}_settings";

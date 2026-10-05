@@ -48,7 +48,10 @@ refused('rate differing only in postcode order', (s) => { s.tax.rates = [{ ...s.
 refused('enquiry on a selling store', (s) => { s.enquiry = ['form']; }, 'catalog-only');
 refused('tax flag as a string', (s) => { s.tax.enabled = 'yes'; }, 'store.tax.enabled');
 
-const cat = { tier: 'catalog', address: good.address, currency: 'USD', units: good.units, enquiry: ['whatsapp'] };
+const cat = { tier: 'catalog', address: structuredClone(good.address), currency: 'USD', units: structuredClone(good.units), enquiry: ['whatsapp'] };
+const full = { ...structuredClone(good), tier: 'full' };
+must(validateStore(full).length === 0, `a valid full-tier block is refused: ${validateStore(full).join('; ')}`);
+must(validateStore({ ...full, payments: undefined }).some((x) => x.includes('store.payments')), 'a full tier with no payments passes');
 must(validateStore(cat).length === 0, `a valid catalog is refused: ${validateStore(cat).join('; ')}`);
 must(validateStore({ ...cat, enquiry: [] }).some((x) => x.includes('store.enquiry')), 'a catalog with no enquiry channel passes');
 must(validateStore({ ...cat, enquiry: ['fax'] }).some((x) => x.includes('store.enquiry')), 'an unknown enquiry channel passes');
@@ -79,7 +82,8 @@ set +e; node bin/wp-config.mjs validate "$tmp/p" >"$tmp/v" 2>&1; code=$?; set -e
 grep -q 'store.payments.test_secret_key is a secret' "$tmp/v" || fail "the refusal does not say the key is a secret: $(cat "$tmp/v")"
 grep -q 'sk_test_leaked' "$tmp/v" && fail "the refusal printed the key"
 set +e; node bin/wp-config.mjs get "$tmp/p" store.payments.test_secret_key >/dev/null 2>"$tmp/g"; code=$?; set -e
-[ "$code" = "1" ] && grep -q 'stripe_test_secret_key' "$tmp/g" || fail "get reads a Stripe key's manifest path instead of naming the secret"
+[ "$code" = "1" ] || fail "get on a Stripe key's manifest path exited $code, want 1"
+grep -q 'stripe_test_secret_key' "$tmp/g" || fail "get reads a Stripe key's manifest path instead of naming the secret"
 node -e '
   const fs = require("fs"), f = process.argv[1] + "/.wp-create.json", m = JSON.parse(fs.readFileSync(f, "utf8"));
   delete m.store.payments; fs.writeFileSync(f, JSON.stringify(m, null, 2));

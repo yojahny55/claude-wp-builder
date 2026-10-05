@@ -903,15 +903,10 @@ On exit 2, run the migration before continuing.
 
 ## Step 5.5: Store setup (store profiles only)
 
-When the selected profile carries `"store"`, run `/wp-woo-setup` now, before anything chains to
-`/wp-init`. Installing WooCommerce alone leaves a store with HPOS off, no Terms page, no shipping,
-no tax and no payments — WooCommerce's own new-store defaults wait for a wp-admin visit that a
-WP-CLI build never makes. `/wp-woo-setup` asks the store questions (the tier defaults to the
-profile's `"store"` value), records the `store` block in the manifest just written, shows a dry
-run and applies it.
+A profile without `"store"` skips this step.
 
-Store profiles need native WP-CLI. Read `environment.engine` from the manifest just
-written:
+Store profiles need native WP-CLI, so check that first. Read `environment.engine` from the
+manifest just written:
 
 ```bash
 bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' environment.engine"
@@ -922,7 +917,12 @@ the container cannot see it; stop with one line:
 
 > store profiles need native WP-CLI: on `<engine>` WP-CLI cannot see the plugin's scripts or the project directory
 
-A profile without `"store"` skips this step.
+On `native`, run `/wp-woo-setup` now, before anything chains to `/wp-init`. Installing
+WooCommerce alone leaves a store with HPOS off, no Terms page, no shipping, no tax and no
+payments — WooCommerce's own new-store defaults wait for a wp-admin visit that a WP-CLI build
+never makes. `/wp-woo-setup` asks the store questions (the tier defaults to the profile's
+`"store"` value), records the `store` block in the manifest just written, shows a dry run and
+applies it.
 
 ---
 

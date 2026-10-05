@@ -141,8 +141,17 @@ for t in catalog store full; do
     const order = j.plugins.map((x) => x.slug);
     need(order.indexOf("woocommerce") < order.indexOf("store-kit"),
       "woocommerce must install before store-kit: WordPress refuses to activate a plugin whose Requires Plugins is inactive");
+    // The tiers differ by what can be bought: a catalog takes no payment, the others do.
+    need((t === "catalog") === !by["woocommerce-gateway-stripe"],
+      t === "catalog" ? "catalog is \"nothing purchasable\" but lists a payment gateway" : `${t} sells but lists no payment gateway`);
   ' "$p" "$t" || fail "$p is not a store profile"
 done
+# woo-full is everything in woo-store and more.
+node -e '
+  const slugs = (t) => new Set(require("./templates/profiles/woo-" + t + ".json").plugins.map((x) => x.slug));
+  const full = slugs("full"), missing = [...slugs("store")].filter((s) => !full.has(s));
+  if (missing.length) { console.log(missing.join(", ")); process.exit(1); }
+' >"$tmp/superset" || fail "woo-full drops plugins woo-store installs: $(cat "$tmp/superset")"
 
 # --- Every store-profile plugin has a reason; no shipped profile holds an avoided one. ---
 ref=skills/wp-woocommerce/references/plugins.md

@@ -310,6 +310,7 @@ SERVER_PID=$!
 up=""
 for _ in $(seq 1 40); do
   [ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/" || true)" = "200" ] && { up=1; break; }
+  kill -0 "$SERVER_PID" 2>/dev/null || { tail -10 "$DIR/woo-server.log"; fail "wp server exited before answering on port $PORT"; }
   sleep 1
 done
 [ -n "$up" ] || { tail -5 "$DIR/woo-server.log"; fail "the fixture site never answered on port $PORT"; }
@@ -317,7 +318,10 @@ S="http://127.0.0.1:$PORT/?rest_route=/wc/store/v1"
 token() { curl -s -D - -o /dev/null "$S/cart" | tr -d '\r' | awk -F': ' 'tolower($1)=="cart-token"{print $2}'; }
 post() { curl -s -H "Cart-Token: $1" -H 'Content-Type: application/json' -X POST "$S/$2" -d "$3"; }
 # "-" for a response with no code, so a burst always yields four words and positions never shift.
-code_of() { python3 -c 'import json,sys; print(json.load(sys.stdin).get("code") or "-")'; }
+# A body that is not JSON (a PHP fatal) prints "not-json" rather than vanishing from the burst.
+code_of() { python3 -c 'import json,sys
+try: print(json.load(sys.stdin).get("code") or "-")
+except ValueError: print("not-json")'; }
 ADDR='{"first_name":"QA","last_name":"Bot","address_1":"1 Test St","city":"Tampa","state":"FL","postcode":"33602","country":"US"}'
 BILL='{"first_name":"QA","last_name":"Bot","address_1":"1 Test St","city":"Tampa","state":"FL","postcode":"33602","country":"US","email":"qa@example.test"}'
 checkout() {  # $1 cart token, $2 Turnstile token; prints the checkout response

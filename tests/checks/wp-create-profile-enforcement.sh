@@ -157,10 +157,16 @@ s6=$(grep -n '^## Step 6: Chain' "$c" | cut -d: -f1 || true)
   || fail "$c must run store setup after the manifest exists (Step 5) and before chaining to /wp-init"
 # The instruction, not the slug: the sentence forbidding it on a container also names it.
 sed -n "${s55},${s6}p" "$c" | grep -Fq 'run `/wp-woo-setup` now' || fail "$c Step 5.5 does not run /wp-woo-setup"
-# store-kit and the setup script are host paths: both store steps refuse every container engine up front.
-for range in "${s410},${s411}" "${s55},${s6}"; do
-  sed -n "${range}p" "$c" | grep -Fq 'store profiles need native WP-CLI' \
-    || fail "$c lines $range do not stop a store profile on a container engine before syncing store-kit"
+# store-kit and the setup script are host paths: both store steps refuse every container engine
+# before the line that would act -- the sync in 4.10, the instruction to run setup in 5.5. Order
+# matters because the steps are read top to bottom.
+for pair in "${s410}:${s411}:bin/store-kit-sync.sh" "${s55}:${s6}:run \`/wp-woo-setup\` now"; do
+  from=${pair%%:*}; rest=${pair#*:}; to=${rest%%:*}; act=${rest#*:}
+  step=$(sed -n "${from},${to}p" "$c")
+  refuse=$(grep -nF 'store profiles need native WP-CLI' <<<"$step" | head -1 | cut -d: -f1 || true)
+  acts=$(grep -nF "$act" <<<"$step" | head -1 | cut -d: -f1 || true)
+  [ -n "$refuse" ] && [ -n "$acts" ] && [ "$refuse" -lt "$acts" ] \
+    || fail "$c lines $from-$to do not stop a store profile on a container engine before '$act'"
 done
 
 echo PASS
