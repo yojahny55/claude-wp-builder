@@ -696,12 +696,18 @@ The `/wp-demo` command works best with these skills installed. All other command
 
 See [BACKLOG.md](BACKLOG.md) for the full product backlog. Key areas of active development:
 
+- **WooCommerce stores, after the foundation** — theme integration (the enquiry form and
+  WhatsApp button render in the theme), store demo pages, product seeding and `/wp-woo-verify`,
+  a store audit and launch step, the Polylang bridge, then subscriptions and bookings
 - Visual regression between a demo and the theme built from it — screenshot baselines exist today for the motion fixtures only
 - An end-to-end run of a generated site in CI, and a corpus of broken sites with expected audit findings
 - JavaScript specialist agent for sliders, animations, and interactivity
-- ~~Multi-page demo support~~ ✓ `/wp-yolo`, and ~~custom post types~~ ✓ `/wp-cpt`
-- ~~Tailwind CSS starter theme and build pipeline integration~~ ✓ shipped in v1.4.0
-- ~~Cinematic scroll-driven starter theme (WebCodecs scrub, ffmpeg encode pipeline)~~ ✓ shipped in v1.5.0
+
+Recently shipped:
+
+- ✓ WooCommerce store foundation — store profiles, `/wp-woo-setup`, the bundled `store-kit` plugin and a store-aware audit (v1.29.0)
+- ✓ Usability audit with its own page harness, and audits that stay under a production WAF's limits (v1.29.0)
+- ✓ Multi-page demos (`/wp-yolo`), custom post types (`/wp-cpt`), the Tailwind starter (v1.4.0) and the cinematic starter (v1.5.0)
 
 ## Testing
 
