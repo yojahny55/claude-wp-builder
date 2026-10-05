@@ -261,6 +261,12 @@
 
 ### Changed
 
+- **`/wp-demo` picks design-library roles from the library's own vocabulary.** Step 2.6's
+  sub-step 3.6 used to search a fixed list of twelve roles, so the store roles the library
+  gained (`shop`, `product`, `cart`, `checkout`, `account`, `confirmation`) were never asked
+  for. It now calls `get_vocab`, chooses the roles each page in the brief actually needs, and
+  maps the store roles to their pages — a marketing homepage with product cards is not a
+  `shop` page. `tests/checks/wp-library.sh` pins the vocabulary call and the store mapping.
 - **SEC-040 reads the stored row (`SEC-040@2`).** It used `get_option()`, which runs read-time
   filters, so a key supplied from `wp-config.php` (as `store-kit` does) would be reported as a
   key at rest. Both the detection and the scrub read `option_value` directly now. Projects that
