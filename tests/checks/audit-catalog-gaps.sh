@@ -10,7 +10,7 @@ need() { grep -qF -- "$2" "$1" || fail "$1 lacks: $2"; }
 perf=agents/wp-audit-performance.md
 sec=agents/wp-audit-security.md
 geo=agents/wp-audit-geo.md
-std=skills/wp-audit-geo-standards/SKILL.md
+std=skills/wp-audit-geo-standards/references/surface-templates.md
 
 grep -qE '^\| PERF-068 \|' "$perf" || fail "PERF-068 (CLS) not tabulated"
 grep -qE '^\| PERF-069 \|' "$perf" || fail "PERF-069 (INP) not tabulated"
@@ -31,7 +31,7 @@ for t in "made-up top-level" "nested path" "near-prefix" "redirect_guess_404_per
     || fail "$geo soft-404 procedure lacks: $t"
 done
 need "$geo" "one passing shape does not pass"
-need skills/wp-audit-geo-standards/references/surface-templates.md "redirect_guess_404_permalink"
+need "$std" "redirect_guess_404_permalink"
 
 # archive bases are read, never assumed
 need skills/wp-audit-seo-standards/SKILL.md "category_base"

@@ -90,9 +90,9 @@ too — one detection, so the two can never disagree about whether a plugin is a
 
 ```php
 function prefix_seo_plugin_owns_schema() {
-    return defined('RANK_MATH_VERSION') || class_exists('RankMath')
-        || defined('WPSEO_VERSION') || class_exists('WPSEO_Options')
-        || defined('SEOPRESS_VERSION') || class_exists('SEOPress');
+    return defined('RANK_MATH_VERSION') || class_exists('RankMath', false)
+        || defined('WPSEO_VERSION') || class_exists('WPSEO_Options', false)
+        || defined('SEOPRESS_VERSION') || class_exists('SEOPress', false);
 }
 
 function prefix_add_meta_description() {

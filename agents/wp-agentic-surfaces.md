@@ -608,9 +608,9 @@ function <prefix>_html_to_markdown( $html ) {
  */
 if ( ! function_exists( '<prefix>_seo_plugin_owns_schema' ) ) {
     function <prefix>_seo_plugin_owns_schema() {
-        return defined( 'RANK_MATH_VERSION' ) || class_exists( 'RankMath' )
-            || defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Options' )
-            || defined( 'SEOPRESS_VERSION' ) || class_exists( 'SEOPress' );
+        return defined( 'RANK_MATH_VERSION' ) || class_exists( 'RankMath', false )
+            || defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Options', false )
+            || defined( 'SEOPRESS_VERSION' ) || class_exists( 'SEOPress', false );
     }
 }
 
