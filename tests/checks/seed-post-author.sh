@@ -14,8 +14,9 @@ s=commands/wp-seed.md
 skill=skills/wp-cli-patterns/SKILL.md
 
 # A create or import that is a command -- the verb followed by an argument -- not prose
-# about one ("`wp post create` and `wp media import` leave post_author at 0").
-cmd='(\$WP|\bwp) (post create|media import) +[-'"'"'"<]'
+# about one ("`wp post create` and `wp media import` leave post_author at 0"). The argument
+# may be a flag, a quoted or redirected value, or a bare path, URL or $variable.
+cmd='(\$WP|\bwp) (post create|media import) +[-'"'"'"<$./~[:alnum:]]'
 
 n=$(grep -cE "$cmd" "$s" || true)
 [ "$n" -ge 8 ] || fail "$s has only $n post create / media import commands -- this check would be close to vacuous"
