@@ -772,7 +772,8 @@ $WP = <value of wp_cli.wrapper from manifest>
 After creating a page template (e.g., `page-services.php`), create the corresponding WordPress page:
 
 ```bash
-PAGE_ID=$($WP post create --post_type=page --post_title='Services' --post_status=publish --porcelain)
+AUTHOR=$($WP user list --role=administrator --field=ID --number=1)  # once; see "Always set an author" in wp-cli-patterns
+PAGE_ID=$($WP post create --post_type=page --post_title='Services' --post_status=publish --post_author=$AUTHOR --porcelain)
 ```
 
 ### Assign the page template
@@ -799,7 +800,7 @@ $WP eval "echo get_page_template_slug($PAGE_ID);"
 If creating the front page template, also set the reading settings:
 
 ```bash
-HOME_ID=$($WP post create --post_type=page --post_title='Home' --post_status=publish --porcelain)
+HOME_ID=$($WP post create --post_type=page --post_title='Home' --post_status=publish --post_author=$AUTHOR --porcelain)
 $WP option update show_on_front 'page'
 $WP option update page_on_front $HOME_ID
 ```

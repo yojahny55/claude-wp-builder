@@ -255,7 +255,12 @@ foreach ( $manifest['items'] as $item ) {
 			$postarr['ID'] = (int) $item['target_id'];
 			$target_id     = wp_update_post( wp_slash( $postarr ), true );
 		} else {
-			$target_id = wp_insert_post( wp_slash( $postarr ), true );
+			// A new counterpart takes its source's author. Left out, wp_insert_post()
+			// falls back to get_current_user_id(), which is 0 under wp eval-file, and
+			// /wp-finalize Check 7 fails every translated page. An existing
+			// counterpart keeps whatever author an editor gave it.
+			$postarr['post_author'] = (int) $source_post->post_author;
+			$target_id              = wp_insert_post( wp_slash( $postarr ), true );
 		}
 
 		if ( is_wp_error( $target_id ) ) {

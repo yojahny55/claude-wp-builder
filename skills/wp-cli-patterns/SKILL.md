@@ -26,7 +26,7 @@ This skill teaches the **WP-CLI-first principle**: use WP-CLI commands instead o
 # GOOD (1 line):      $WP option update my_option 'value'
 
 # BAD:  Generate PHP with wp_insert_post()
-# GOOD: $WP post create --post_type=page --post_title='About' --post_status=publish
+# GOOD: $WP post create --post_type=page --post_title='About' --post_status=publish --post_author=$AUTHOR
 
 # BAD:  Generate PHP with wp_create_nav_menu()
 # GOOD: $WP menu create "Primary" && $WP menu item add-post primary 5

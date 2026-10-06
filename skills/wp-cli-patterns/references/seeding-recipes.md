@@ -21,7 +21,7 @@ All 16 domains agents should know. Every command below is prefixed with `$WP` in
 |--------|----------|
 | Database | `wp db create`, `wp db import`, `wp db export`, `wp db check`, `wp db query` |
 | Content | `wp post create`, `wp post update`, `wp post delete`, `wp post meta update` |
-| Media | `wp media import <url>`, `wp media regenerate` |
+| Media | `wp media import <url> --post_author=<id>`, `wp media regenerate` |
 | Options | `wp option get`, `wp option update`, `wp option delete` |
 | Menus | `wp menu create`, `wp menu item add-post`, `wp menu item add-custom`, `wp menu location assign` |
 | Plugins | `wp plugin install`, `wp plugin activate`, `wp plugin deactivate`, `wp plugin list` |
@@ -58,8 +58,8 @@ Use ACF's own API for field operations. This is storage-format-agnostic and hand
 # Simple field on options page
 $WP eval "update_field('hero_title', 'Building Digital Excellence', 'option');"
 
-# Image field (import first, use attachment ID)
-ID=$($WP media import 'https://images.unsplash.com/photo-xxx' --title='Hero Background' --porcelain)
+# Image field (import first, use attachment ID; $AUTHOR resolved once, as in SKILL.md)
+ID=$($WP media import 'https://images.unsplash.com/photo-xxx' --title='Hero Background' --post_author=$AUTHOR --porcelain)
 $WP eval "update_field('hero_image', $ID, 'option');"
 
 # Repeater field
@@ -180,7 +180,7 @@ create — and leave the other languages' menus to `/wp-polylang`'s import. Neve
 ### Import Media and Use Attachment ID
 
 ```bash
-ID=$($WP media import 'https://example.com/photo.jpg' --title='Hero Image' --porcelain)
+ID=$($WP media import 'https://example.com/photo.jpg' --title='Hero Image' --post_author=$AUTHOR --porcelain)
 $WP eval "update_field('hero_image', $ID, 'option');"
 ```
 

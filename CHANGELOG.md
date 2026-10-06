@@ -19,6 +19,20 @@
 
 ### Fixed
 
+- **`/wp-seed` sets a post author.** Every `wp post create` and `wp media import` it ran
+  left `post_author` at 0, a user that does not exist: the pages rendered, `the_author()`,
+  the Article schema's `author` and the admin column came out empty, and every seeded page
+  failed `/wp-finalize` Check 7's author sweep. `wp-cli-patterns` already had the rule and
+  the recipe ("Always set an author"); the command now follows it — it resolves an
+  administrator once in Step 0, stops when there is none, passes `--post_author` to every
+  create and import (including the Polylang counterparts and the `page_link` placeholder
+  pages), gives an author to a previously seeded page that has none when it updates it in
+  place, and runs the same sweep before it reports. The same omission is fixed where it
+  repeated: the skill's own examples, `wp-template`, `wp-acf`, `/wp-cinematic-seed`,
+  `/wp-cinematic-encode`, and `pll-import.php`, whose new counterparts came from
+  `wp_insert_post()` under `wp eval-file` — user 0 again — and now take their source's
+  author. `tests/checks/seed-post-author.sh` fails on any create or import command in a
+  command, agent or skill that carries no `--post_author`.
 - **Menu locations agree between the commands and the starters, on both i18n strategies.**
   Both starters register and render `primary-<lang>` / `footer-<lang>`, hyphenated, but
   `/wp-init` and `/wp-header` told the agent to register `primary_en`, `/wp-seed` assigned

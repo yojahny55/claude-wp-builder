@@ -65,6 +65,20 @@ bash -c "$WP option get siteurl"
 
 If this fails, abort with a message suggesting the user check that the WordPress environment is running.
 
+**Resolve the author once** — "Always set an author" in
+`${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/SKILL.md`. `wp post create` and `wp media import`
+leave `post_author` at 0, a user that does not exist: the page renders, and `the_author()`,
+the Article schema's `author` and the admin column come out empty, so every seeded page fails
+`/wp-finalize` Check 7's author sweep.
+
+```bash
+bash -c "$WP user list --role=administrator --field=ID --number=1"
+```
+
+Store the ID as **`$AUTHOR`**, substituted the same way as `$WP`, and pass
+`--post_author=$AUTHOR` to **every** `wp post create` and `wp media import` below. No
+administrator is a stop, not a default: report it rather than creating posts owned by nobody.
+
 ---
 
 ## Phase 1: Parse Demo HTML
@@ -232,20 +246,22 @@ bash -c "$WP post meta get <page_id> _<prefix>_seeded_content 2>/dev/null"
 Create only what resolution says to create, marking it in the same step:
 
 ```bash
-bash -c "ABOUT_ID=\$($WP post create --post_type=page --post_title='About' --post_name='about' --post_status=publish --porcelain) && $WP post meta add \$ABOUT_ID _<prefix>_seeded_content 1 && echo \$ABOUT_ID"
+bash -c "ABOUT_ID=\$($WP post create --post_type=page --post_title='About' --post_name='about' --post_status=publish --post_author=$AUTHOR --porcelain) && $WP post meta add \$ABOUT_ID _<prefix>_seeded_content 1 && echo \$ABOUT_ID"
 ```
 
-A page found **with** the marker keeps its ID and is updated in place — `wp post update` —
+A page found **with** the marker keeps its ID and is updated in place — `wp post update`,
+with `--post_author=$AUTHOR` when its author is 0, which is how a page seeded before the author
+rule existed gets one —
 so every menu item, `page_on_front` option and `page_link` field already pointing at it stays
 pointing at it. Re-creating a page that already exists breaks those references silently:
 the old page keeps the referrers, the new one gets the content.
 
 ```bash
 # Create each page and capture its ID
-bash -c "HOME_ID=\$($WP post create --post_type=page --post_title='Home' --post_status=publish --porcelain) && echo \$HOME_ID"
-bash -c "ABOUT_ID=\$($WP post create --post_type=page --post_title='About' --post_status=publish --porcelain) && echo \$ABOUT_ID"
-bash -c "SERVICES_ID=\$($WP post create --post_type=page --post_title='Services' --post_status=publish --porcelain) && echo \$SERVICES_ID"
-bash -c "CONTACT_ID=\$($WP post create --post_type=page --post_title='Contact' --post_status=publish --porcelain) && echo \$CONTACT_ID"
+bash -c "HOME_ID=\$($WP post create --post_type=page --post_title='Home' --post_status=publish --post_author=$AUTHOR --porcelain) && echo \$HOME_ID"
+bash -c "ABOUT_ID=\$($WP post create --post_type=page --post_title='About' --post_status=publish --post_author=$AUTHOR --porcelain) && echo \$ABOUT_ID"
+bash -c "SERVICES_ID=\$($WP post create --post_type=page --post_title='Services' --post_status=publish --post_author=$AUTHOR --porcelain) && echo \$SERVICES_ID"
+bash -c "CONTACT_ID=\$($WP post create --post_type=page --post_title='Contact' --post_status=publish --post_author=$AUTHOR --porcelain) && echo \$CONTACT_ID"
 ```
 
 Assign page templates if corresponding template files exist in the theme:
@@ -285,7 +301,7 @@ the same command that imports it, and look that up before importing:
 bash -c "$WP post list --post_type=attachment --meta_key=_<prefix>_seeded_source --meta_value='https://images.unsplash.com/photo-xxx' --format=ids"
 
 # Not found: import, and record both the marker and the source
-bash -c "HERO_IMG_ID=\$($WP media import 'https://images.unsplash.com/photo-xxx' --title='Hero Background' --porcelain) && $WP post meta add \$HERO_IMG_ID _<prefix>_seeded_content 1 && $WP post meta add \$HERO_IMG_ID _<prefix>_seeded_source 'https://images.unsplash.com/photo-xxx' && echo \$HERO_IMG_ID"
+bash -c "HERO_IMG_ID=\$($WP media import 'https://images.unsplash.com/photo-xxx' --title='Hero Background' --post_author=$AUTHOR --porcelain) && $WP post meta add \$HERO_IMG_ID _<prefix>_seeded_content 1 && $WP post meta add \$HERO_IMG_ID _<prefix>_seeded_source 'https://images.unsplash.com/photo-xxx' && echo \$HERO_IMG_ID"
 ```
 
 The source value is the URL for a remote image and the repository-relative path for a local
@@ -318,11 +334,11 @@ If the manifest (produced by `wp-normalize`) has a top-level `assets[]` array, e
 
 - **`logo`** → sideload the file, then set the site logo option:
   ```bash
-  bash -c "LOGO_ID=\$($WP media import '<file>' --title='Site Logo' --porcelain) && $WP eval \"update_field('site_logo', \$LOGO_ID, 'option');\""
+  bash -c "LOGO_ID=\$($WP media import '<file>' --title='Site Logo' --post_author=$AUTHOR --porcelain) && $WP eval \"update_field('site_logo', \$LOGO_ID, 'option');\""
   ```
 - **`hero`** (per page) → sideload, then set that page's `inner_hero_image` field on the page identified by `asset.page`:
   ```bash
-  bash -c "HERO_ID=\$($WP media import '<file>' --title='<Page> Hero' --porcelain) && $WP eval \"update_field('inner_hero_image', \$HERO_ID, <page_id>);\""
+  bash -c "HERO_ID=\$($WP media import '<file>' --title='<Page> Hero' --post_author=$AUTHOR --porcelain) && $WP eval \"update_field('inner_hero_image', \$HERO_ID, <page_id>);\""
   ```
 - **`content`** → sideload, then set the ACF field named in `asset.field` using the normal Phase 4 flow (options page or page-specific, per the field mapping table).
 - **`nav-graphic`** → sideload and register as a theme asset only (e.g. an `nav_graphic` field or enqueued static asset). **Never** assign a `nav-graphic` to `site_logo` or any content field — a mis-tagged nav graphic must not become the seeded logo.
@@ -541,7 +557,7 @@ Phase 2:
    client approved; re-translating it would throw away human copy and replace
    it with a machine's:
    ```bash
-   COUNTERPART=$(bash -c "$WP post create --post_type=page --post_title='<translated title>' --post_status=publish --porcelain")
+   COUNTERPART=$(bash -c "$WP post create --post_type=page --post_title='<translated title>' --post_status=publish --post_author=$AUTHOR --porcelain")
    bash -c "$WP eval \"pll_set_post_language($COUNTERPART, '<secondary_lang>');\""
    bash -c "$WP eval \"pll_save_post_translations(['<primary_lang>' => <page_id>, '<secondary_lang>' => $COUNTERPART]);\""
    ```
@@ -764,7 +780,8 @@ logged-out visitor with nothing in the UI to say so.
 For each such field currently empty, or resolving to a post that is not
 `publish`:
 
-1. Create a page in **publish** status whose body visibly states, in its own
+1. Create a page in **publish** status (`wp post create … --post_author=$AUTHOR`, like every
+   create in this command) whose body visibly states, in its own
    language, that the text is a generic placeholder pending review — never
    silently ship boilerplate as if it were the client's real copy.
 2. Mark it with `_<prefix>_seeded_content` (the marker every seeded record carries)
@@ -866,6 +883,16 @@ bash -c "$WP option update timezone_string 'America/New_York'"
 bash -c "$WP option update default_comment_status 'closed'"
 ```
 
+### Sweep for posts with no author
+
+The same query `/wp-finalize` Check 7 runs, with the same two exclusions (auto-drafts and
+menu items, which WordPress itself leaves at 0). It must print `0`; anything else is a create
+above that lost its `--post_author`, and the seed is not done until it is fixed:
+
+```bash
+bash -c "$WP db query \"SELECT COUNT(*) FROM \$($WP db prefix)posts WHERE post_author = 0 AND post_status != 'auto-draft' AND post_type != 'nav_menu_item';\""
+```
+
 ---
 
 ## Seed Report
@@ -877,6 +904,7 @@ Print a summary of everything that was seeded:
 Pages created:     Home (ID: 5), Services (ID: 7), Contact (ID: 8)
 Pages updated:     (none)
 Front page:        Home (ID: 5)
+Author:            admin (ID: 1) — 0 posts without one
 Media imported:    12 of 14 succeeded
   reused:          3 already imported from the same source
   WARNING:         2 images failed (see below)
