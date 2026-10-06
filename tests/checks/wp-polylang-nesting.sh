@@ -172,8 +172,10 @@ grep -Fq -- 'Nesting is walked to any depth' "$lib" \
 # importer already handles. Scanned across every markdown file of the skill, so moving the
 # ACF section into references/ cannot carry the old sentence along unseen.
 skill_md=$(find skills/wp-polylang -name '*.md' | sort)
+# Matched on each file flattened to one line, so a phrase wrapped across two lines still matches.
+flat_hit() { local n=$1; shift; local f; for f in "$@"; do tr '\n' ' ' < "$f" | sed 's/  */ /g' | grep -qF -- "$n" && echo "$f"; done; return 0; }
 for old in 'one level of nesting' '(one level)' 'Widen `pllx_acf_walk()`' 'is not walked. Widen'; do
-  hit=$(grep -lF -- "$old" $skill_md || true)
+  hit=$(flat_hit "$old" $skill_md)
   [ -z "$hit" ] || fail "$hit still claims a nesting ceiling the walker does not have ('$old')"
 done
 grep -qF 'walked to any depth' $skill_md \

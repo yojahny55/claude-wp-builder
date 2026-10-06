@@ -285,6 +285,35 @@
   release heading, which reads as a rename. A rename is the one move that conflicts every open
   PR on `CHANGELOG.md`, so both now say to insert the release heading below it.
 
+- **The i18n skills follow the review checklist, and their contracts are pinned.**
+  - `wp-polylang` was 487 of 500 lines, so every agent that needed `pll_save_post_translations`
+    paid for the ACF field rules, the link-rewrite pass and the rewrite-base pattern too. Those
+    moved to `references/acf-fields.md`, `references/internal-links.md` and
+    `references/taxonomies-and-rewrite-bases.md`. The scripts are a numbered workflow with
+    their path, dependencies and exit codes, and a verify loop that says when to stop. It now
+    states what the importer does that an agent would assume it does not — parents rewritten
+    every run, media ids copied as-is, ACF references owned per path — defines `$WP`, uses
+    one name per concept (translation group, counterpart, link-rewrite pass) and defaults to
+    SCF. Its central rule, that `pll_save_post_translations()` replaces the whole translation
+    group, and five other sections were unpinned; `wp-polylang.sh` now fails without each.
+  - `wp-bilingual` lost a history sentence, a checklist that restated its body and three
+    pointer stubs, says where its constants come from, and its menu example no longer names a
+    fallback function that exists nowhere.
+  - `wp-cli-patterns` stated `$WP` three times and repeated `wp-environments`' wrapper table;
+    it now states it once. The table of WP-CLI commands Claude already knows is gone; a
+    dry-run-first `search-replace` recipe replaced its bare listing. The clone guard is
+    numbered, stops when the guard did not load, checks the HTTP half too, says how it relates
+    to `/wp-clone`'s isolation plugin and gives the cleanup commands.
+    `references/shipped-scripts.md` gained `resolve-link-targets.php`. The author sweep and its
+    two exclusions are pinned, and compared with the copy `/wp-finalize` Check 7 runs.
+  - `wp-research` is a numbered procedure with a stop rule for the identity search, an example
+    competitor row and differentiation line, a rung-selection rule, a ceiling on paid
+    DataForSEO calls and the exact `firecrawl_url` request. The two-signal identity rule, the
+    three-row differentiation rule and the DataForSEO tools were unpinned, and two Firecrawl
+    pins were satisfied by the table alone; `wp-research.sh` now pins each.
+  - Every description was rewritten around the requests that should load it, with a "Not for"
+    boundary where a neighbouring skill was a near miss.
+
 ## [1.29.0] - 2026-10-05
 
 ### Fixed

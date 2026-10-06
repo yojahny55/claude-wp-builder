@@ -62,4 +62,37 @@ grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/scripts' "$s" \
 grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/SKILL.md' commands/wp-seed.md \
   || fail "commands/wp-seed.md cites wp-cli-patterns by a relative path, which resolves against the user's project"
 
+# --- every post has an author, and the sweep's two exclusions stay in both copies ---
+# wp post create and wp media import leave post_author at 0. The sweep that catches it
+# must skip auto-drafts and menu items, or it fails on a perfectly seeded site — and the
+# same SQL is the delivery gate in /wp-finalize Check 7, so the two copies are compared.
+grep -qF -- '--post_author=$AUTHOR' "$s" || fail "$s no longer passes an author to every create"
+sweep=$(grep -F 'SELECT COUNT(*) FROM $($WP db prefix)posts WHERE post_author = 0' "$s" | head -1 || true)
+[ -n "$sweep" ] || fail "$s has no post_author sweep"
+case "$sweep" in *"post_status != 'auto-draft'"*"post_type != 'nav_menu_item'"*) ;; *)
+  fail "$s's author sweep lost one of its two exclusions (auto-draft, nav_menu_item)" ;; esac
+grep -qF -- "$(printf '%s' "$sweep" | sed 's/^[[:space:]]*//')" commands/wp-finalize.md \
+  || fail "commands/wp-finalize.md's author check no longer matches the sweep in $s"
+
+# --- $WP comes from the manifest, never from a guess --------------------------------
+grep -qF "jq -r '.wp_cli.wrapper' .wp-create.json" "$s" || fail "$s does not say where \$WP comes from"
+grep -qF 'Never hardcode the' "$s" || fail "$s no longer forbids hardcoding the WP-CLI execution method"
+
+# --- the clone guard is a procedure with a stop -------------------------------------
+grep -qF 'Stop if it prints `open`' "$s" || fail "$s's clone guard does not stop when the guard did not load"
+grep -qF 'has_filter("pre_http_request")' "$s" \
+  || fail "$s's clone guard check tests mail only — /wp-clone's isolation plugin would satisfy it with HTTP still open"
+grep -qF '00-clone-isolation.php' "$s" || fail "$s's clone guard does not say how it relates to /wp-clone's isolation plugin"
+
+# --- a database-wide rewrite is dry-run first, and never touches guid ---------------
+grep -qF -- '--dry-run' "$r" || fail "$r's search-replace recipe has no dry run"
+grep -qF -- '--skip-columns=guid' "$r" || fail "$r's search-replace recipe rewrites guid"
+
+# --- every shipped script is explained in the reference ------------------------------
+for f in skills/wp-cli-patterns/scripts/*.php; do
+  name=$(basename "$f")
+  grep -qF "## \`$name\`" skills/wp-cli-patterns/references/shipped-scripts.md \
+    || fail "references/shipped-scripts.md has no section for $name"
+done
+
 echo PASS
