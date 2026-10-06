@@ -19,6 +19,21 @@
 
 ### Fixed
 
+- **The tailwind starter stops printing a second meta description beside an SEO plugin.**
+  Its `functions.php` printed `<meta name="description">` on the front page with no early
+  return, so a site running Rank Math — which `/wp-create`'s plugin profiles install —
+  shipped two description tags. The detection already existed as
+  `<prefix>_seo_plugin_owns_schema()`, the guard identity JSON-LD returns on, but only inside
+  the `inc/agentic.php` that `wp-agentic-surfaces` writes during a GEO fix, so the starter
+  could not call it; and `wp-theme-standards` taught a second, narrower detection (two
+  constants, no SEOPress). The starter now defines that one guard and returns on it before
+  the tag; `inc/agentic.php` declares it only inside `function_exists()`, since a theme
+  built from the starter already has it and a second declaration is a fatal; and the skill
+  teaches the same guard. The cinematic starter prints no description, so it had nothing to
+  fix. `tests/checks/meta-description-seo-plugin.sh` fails on a starter description tag
+  printed before the guard returns, on a second SEO-plugin detection, on the starter's and
+  the agent's guards detecting different plugins, and on an unguarded declaration in the
+  agent.
 - **`/wp-demo-verify`'s static-page gate stops counting a device that does not exist.**
   `bin/demo-verify.mjs` still listed `cascade` as scroll-reactive after the device left the
   motion contract, because `motion.js` never implemented it — so a page carrying

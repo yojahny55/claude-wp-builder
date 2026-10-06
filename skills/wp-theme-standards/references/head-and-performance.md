@@ -88,12 +88,20 @@ remove_action('wp_head', 'wp_generator');
 
 ## SEO Meta Descriptions
 
-Add meta description tags, but defer to SEO plugins if present.
+Add meta description tags, but defer to SEO plugins if present. The guard is the one the
+tailwind starter's `functions.php` defines and `inc/agentic.php`'s identity JSON-LD returns on
+too — one detection, so the two can never disagree about whether a plugin is active:
 
 ```php
+function prefix_seo_plugin_owns_schema() {
+    return defined('RANK_MATH_VERSION') || class_exists('RankMath')
+        || defined('WPSEO_VERSION') || class_exists('WPSEO_Options')
+        || defined('SEOPRESS_VERSION') || class_exists('SEOPress');
+}
+
 function prefix_add_meta_description() {
-    // Skip if Yoast or Rank Math is active
-    if (defined('WPSEO_VERSION') || defined('RANK_MATH_VERSION')) {
+    // Rank Math, Yoast or SEOPress prints its own description tag
+    if (prefix_seo_plugin_owns_schema()) {
         return;
     }
 
