@@ -1,4 +1,4 @@
-# Skill review — the judgment half of the audit
+# Skill review — what the grep gates cannot check
 
 `tests/checks/skill-authoring.sh` and `tests/checks/frontmatter-yaml.sh` check what a grep can
 see: the frontmatter parses, the description has a "Use when" clause, the body is under 500
@@ -67,5 +67,5 @@ Verdict: PASS | FIX
 ```
 
 Mark each finding **must** (the skill will not be found, loads wrong, or breaks a house rule —
-rules 1, 8, 10, 11, 12) or **should** (the guide's quality rules). The verdict is `FIX` while
+rules 1, 8, 10, 11, 12) or **should** (the best practices' quality rules). The verdict is `FIX` while
 any **must** finding stands. An empty table is a valid answer; do not invent findings to fill it.

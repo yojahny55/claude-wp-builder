@@ -39,4 +39,24 @@ grep -q 'Hundreds of "conversion failed" lines' "$skill" \
 grep -q 'wp_rio_process_queue does not exist" while the plugin is active' "$skill" \
   || { echo "FAIL: $skill has no troubleshooting row for the queue table a WP-CLI activation leaves missing"; exit 1; }
 
+# 3. The skill documents what the script writes and how to run it. Its settings table once
+#    listed 7 of the 16 settings the script overwrites, so an operator could not see that a
+#    run resets webp_delivery_mode or the schedule; nothing tied the two together.
+keys=$(grep -oE '^\s*\[[a-z0-9_]+\]=|SETTINGS\[[a-z0-9_]+\]=' "$script" | sed -E 's/^[^[]*\[([a-z0-9_]+)\]=$/\1/')
+[ -n "$keys" ] || { echo "FAIL: no SETTINGS keys found in $script — this assertion is matching nothing"; exit 1; }
+for k in $keys; do
+  grep -Fq "| \`$k\` |" "$skill" || { echo "FAIL: $skill's settings table does not list $k, which $script writes on every run"; exit 1; }
+done
+for bin in convert cwebp gif2webp curl unzip sha256sum; do
+  grep -Eq "^[^#]*(^|[^a-z_])$bin([^a-z_]|$)" "$script" || continue
+  awk '/^## Requirements/{f=1;next} /^## /{f=0} f' "$skill" | grep -Fq "$bin" \
+    || { echo "FAIL: $script calls $bin, which $skill's Requirements does not list"; exit 1; }
+done
+grep -Fq '"${CLAUDE_PLUGIN_ROOT}/skills/wp-robin/scripts/robin-fix.sh"' "$skill" \
+  || { echo "FAIL: $skill does not run the script by its \${CLAUDE_PLUGIN_ROOT} path"; exit 1; }
+! grep -Fq '<path-to-skill>' "$skill" || { echo "FAIL: $skill still uses a <path-to-skill> placeholder"; exit 1; }
+grep -Fq 'wp db export' "$skill" || { echo "FAIL: $skill does not back up the database before a run that overwrites settings"; exit 1; }
+grep -Fq 'Done when `error`, `processing` and `remaining` are all 0' "$skill" \
+  || { echo "FAIL: $skill does not say when the work is done"; exit 1; }
+
 echo "PASS"

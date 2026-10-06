@@ -1,5 +1,5 @@
 ---
-description: Contributor workflow for the plugin itself — scaffold a command/agent/skill with its check and doc rows, audit a skill against the authoring best practices, verify the repo, or open the PR in the house format
+description: Contributor workflow for the plugin itself — scaffold a command/agent/skill with its check and doc rows, review a skill against the authoring best practices, verify the repo, or open the PR in the house format
 allowed-tools: Read, Write, Edit, Grep, Glob, Bash, Agent
 argument-hint: "<new|review|check|pr|release> [type] [name]"
 ---
@@ -73,7 +73,7 @@ enforces the tier, so a missing `model:` fails the suite.
 
 ### `new skill <name>`
 
-A new skill is not done until it passes the audit — both halves of it.
+A new skill is not done until it passes both gates and the review.
 
 1. Read the two closest existing skills and follow their shape. Skills inform; they never act:
    if what you are writing tells an agent to *run* a procedure end to end, it belongs in an
@@ -100,7 +100,7 @@ A new skill is not done until it passes the audit — both halves of it.
 
 ---
 
-## Step 2b — `review <skill-name>`: the judgment half of the audit
+## Step 2b — `review <skill-name>`: the review the gates cannot do
 
 The gates prove the skill loads and is shaped right. They cannot tell whether its description
 would be chosen for the right requests, whether it explains what Claude already knows, or
@@ -217,7 +217,7 @@ Refuse unless the working tree is clean, the branch is `main`, `main` is up to d
 7. `env -u GH_TOKEN gh release create vX.Y.Z --title "…" --notes-file <file> --latest`.
 8. **Verify**: the release is published and not a draft; the tag resolves on the remote; and
    the raw `.claude-plugin/*.json` served from GitHub carry the new version — that is what a
-   user's install reads. There is no publish CI here; the GitHub release is the artifact.
+   user's install reads. The GitHub release is the artifact: verify all three by hand.
 9. Delete the merged head branch, and check whether older branches can go too.
 
 ## Step 6: Report

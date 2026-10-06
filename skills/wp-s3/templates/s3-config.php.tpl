@@ -20,8 +20,8 @@ define( 'S3_UPLOADS_REGION',     '{{REGION}}' );
 define( 'S3_UPLOADS_BUCKET_URL', '{{BUCKET_URL}}' );
 {{AUTH_BLOCK}}
 {{ENDPOINT_BLOCK}}
-// The bucket has ACLs disabled, which is the AWS default since 2023. The plugin sends an
-// ACL on every upload and a public one fails there; this value is accepted either way.
+// New AWS buckets have ACLs disabled. The plugin sends an ACL on every upload and a public
+// one fails there; this value is accepted either way.
 define( 'S3_UPLOADS_OBJECT_ACL', 'bucket-owner-full-control' );
 
 // Long cache: an edited image is written under a new name, so nothing is ever replaced

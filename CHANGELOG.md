@@ -266,6 +266,30 @@
 
 ### Changed
 
+- **The ops skills — `wp-robin`, `wp-s3`, `wp-environments`, `wp-contributing`,
+  `wp-woocommerce` — were reviewed against `references/skill-review.md`, and their contracts
+  are now pinned.** Each description names the requests that should load it and the nearby
+  ones that should not. `wp-robin` opens with a run-and-verify loop (back up the database, run,
+  done when `error`, `processing` and `remaining` are 0, re-run after a fix), lists all
+  sixteen settings the script overwrites, and moves its WebP delivery templates to
+  `references/webp-delivery.md`; `robin-webp-gaps.sh` now fails when a setting the script
+  writes or a binary it calls is missing from the skill. A library an earlier copy of the
+  script re-encoded into `<name>.webp.webp` is repaired by deleting those files and their
+  `item_type='webp'` rows. `wp-s3` gains one table of its scripts and templates with
+  arguments, environment variables and exit codes, a numbered order, a default for the IAM-role
+  transfer (temporary credentials) and for paid downloads (kept off S3), and measures
+  downloadable products with WP-CLI instead of asking on every run; `skill-authoring.sh` now
+  requires every file under a skill's `templates/` to be named, and `wp-s3-scripts.sh` pins the
+  template constants, the path-style endpoint, all five exclusions and the never-public bucket
+  paths. `wp-environments` names every `wp-env-setup.sh` subcommand with the SELinux rule for
+  vhosts, reads the manifest through `wp-config.mjs get` instead of `jq`, defines
+  `environment.type` and `environment.engine`, and points to `/wp-create` for Adopt Mode instead
+  of keeping a drifting copy. `wp-contributing` keeps only what a release rests on and leaves
+  the procedure to `/wp-contribute release`; `wp-contributing.sh` now pins every rule of the
+  review checklist. `wp-woocommerce` names the recorded keys (`store.tier`, `store.enquiry`,
+  `store.checkout`/`store.checkout_reason`, `store.payments.mode`), states `woo-setup.php`'s
+  arguments, exit codes and report-only rule, says no command takes a store live, and
+  `wp-woo-setup.sh` pins its store rules.
 - **The three demo skills read their recorded decisions and load only what a step needs.**
   `wp-demo-craft`'s References section was one fixed reading order, so every build read all
   thirteen references (about 37k tokens) before writing markup; it is now a table of file,

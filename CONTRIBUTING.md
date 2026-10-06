@@ -66,7 +66,8 @@ claude plugins add ./
 `skills/wp-contributing/SKILL.md` auto-loads when you edit this repository and carries the
 conventions that are not written down here — why a command must dispatch builders rather than
 reimplement them, how to write a grep-gate check, the two i18n systems and why mixing them
-fatals a theme, and the release ritual. Read it alongside this file.
+fatals a theme, and what a release rests on (`/wp-contribute release` runs it). Read it
+alongside this file.
 
 
 ### Writing a New Command
