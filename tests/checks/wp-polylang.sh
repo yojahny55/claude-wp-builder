@@ -223,6 +223,7 @@ grep -qF "pllx_acf_write( \$term_context, \$dotted, \$value, \$source_context )"
 
 # ── The skill must document the rewrite-base pattern and the term ACF surface ─
 # Both live in references/ beside SKILL.md, which names each file and when to read it.
+. tests/checks/lib/flat-hit.sh
 rb=skills/wp-polylang/references/taxonomies-and-rewrite-bases.md
 af=skills/wp-polylang/references/acf-fields.md
 il=skills/wp-polylang/references/internal-links.md
@@ -232,14 +233,13 @@ for f in "$rb" "$af" "$il"; do
 done
 grep -q '^## Rewrite bases are never translated' "$rb" \
   || { echo "FAIL: $rb does not document that Polylang never translates a CPT/taxonomy rewrite base"; exit 1; }
-grep -qF 'chosen by the URL already in hand, never by who is reading' "$rb" \
+flat_of "$rb" | grep -qF 'chosen by the URL already in hand, never by who is reading' \
   || { echo "FAIL: $rb does not state the rewrite-base swap must be decided from the URL, not the current reader"; exit 1; }
-tr '\n' ' ' < "$af" | grep -qi "taxonomy TERM's fields are a separate" \
+flat_of "$af" | grep -qi "taxonomy TERM's fields are a separate" \
   || { echo "FAIL: $af does not call out that a term's own fields are a separate surface from a post's"; exit 1; }
 
 # ── The rules a later edit could drop without anything failing ──────────────
 # Pinned on flattened prose, one substring per rule, so a reflow cannot break them.
-. tests/checks/lib/flat-hit.sh
 sflat=$(flat_of "$s")
 pin() { # <haystack> <needle> <why>
   case "$1" in *"$2"*) ;; *) echo "FAIL: $3"; exit 1 ;; esac
@@ -309,7 +309,8 @@ done
 # copies them by hand, or reads a blank image on a new counterpart as expected.
 hit=$(flat_hit 'untouched by the importer' "${skill_md[@]}")
 [ -z "$hit" ] || { echo "FAIL: $hit still says untranslated ACF types are untouched by the importer"; exit 1; }
-grep -qF 'pllx_acf_copy_untranslated()' "${skill_md[@]}" \
+hit=$(flat_hit 'pllx_acf_copy_untranslated()' "${skill_md[@]}")
+[ -n "$hit" ] \
   || { echo "FAIL: the skill no longer says pllx_acf_copy_untranslated() copies the untranslated ACF types"; exit 1; }
 grep -q '^function pllx_acf_copy_untranslated(' "$imp" \
   || { echo "FAIL: pll-import.php no longer defines pllx_acf_copy_untranslated(), which the skill documents"; exit 1; }

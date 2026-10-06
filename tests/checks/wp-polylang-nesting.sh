@@ -178,7 +178,8 @@ for old in 'one level of nesting' '(one level)' 'Widen `pllx_acf_walk()`' 'is no
   hit=$(flat_hit "$old" "${skill_md[@]}")
   [ -z "$hit" ] || fail "$hit still claims a nesting ceiling the walker does not have ('$old')"
 done
-grep -qF 'walked to any depth' "${skill_md[@]}" \
+hit=$(flat_hit 'walked to any depth' "${skill_md[@]}")
+[ -n "$hit" ] \
   || fail "no wp-polylang skill file states that ACF containers are walked to any depth"
 
 echo "PASS: ACF nesting walked to any depth, layout matched by name, paths resolved by structure ($(echo "$out" | grep -c PHPOK) run)"

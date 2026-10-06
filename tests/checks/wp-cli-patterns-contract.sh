@@ -93,6 +93,7 @@ grep -qF -- '--skip-columns=guid' "$r" || fail "$r's search-replace recipe rewri
 
 # --- every shipped script is explained in the reference ------------------------------
 for f in skills/wp-cli-patterns/scripts/*.php; do
+  [ -e "$f" ] || fail "no scripts in skills/wp-cli-patterns/scripts/ to check against the reference"
   name=$(basename "$f")
   grep -qF "## \`$name\`" skills/wp-cli-patterns/references/shipped-scripts.md \
     || fail "references/shipped-scripts.md has no section for $name"
