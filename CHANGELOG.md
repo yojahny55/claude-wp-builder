@@ -34,8 +34,13 @@
   (PHP 8 only) with no GIF branch, though GIF is an allowed format. It now lives in
   `scripts/webp-gd.php`, linted at 7.4 by CI. The skill no longer says the zip is downloaded
   when WP-CLI is absent or that the uploads directory is discovered, lists every binary the
-  script needs, and states its exit codes. `tests/checks/robin-fix-behavior.sh` runs the
-  script against a fake site, client and network.
+  script needs, and states its exit codes. A credential is read to the quote that opened it,
+  so a single-quoted password holding `"`, `;` or `)` (or a double-quoted one holding `'`)
+  reaches the client whole. With `cwebp` chosen, a GIF goes to `gif2webp` only when it is
+  installed, and to GD when it is not; with neither, the run says once that GIFs get no
+  `.webp` instead of failing each one as "conversion failed".
+  `tests/checks/robin-fix-behavior.sh` runs the script against a fake site, client and
+  network.
 - **The release ritual in `wp-contributing` and `/wp-contribute release` gates for real.**
   It chained `for … done && bash bin/doc-sync-check.sh`, and a loop's status is its last
   iteration's, so a red check earlier in the alphabet passed the gate. It also never
@@ -202,7 +207,7 @@
   - **`<html lang>` never followed the language on a suffix site.** The skill appended a second
     `lang` after `language_attributes()`, and a browser keeps the first of two, the site locale.
     Both starters' `inc/i18n.php` now filter `language_attributes`, so `?lang=es` pages declare
-    Spanish.
+    Spanish, and both filters return a string even when `preg_replace()` fails.
   - **The tailwind starter's language cookie could not be set.** The first call to
     `prefix_get_current_lang()` — the one that sets it — came from `wp_enqueue_scripts`, inside
     `wp_head()`, after output had begun, so a language switch lasted one page on a server
