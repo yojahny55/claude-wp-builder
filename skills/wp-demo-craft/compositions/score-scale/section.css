@@ -16,7 +16,7 @@
   /* At or below 0.1em; see references/taste.md on the tracking threshold. */
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--color-ink-soft);
 }
 .score-scale__title {
   margin: 0;
@@ -33,7 +33,7 @@
   font-family: var(--font-text);
   font-size: 0.8125rem;
   line-height: 1.5;
-  color: var(--color-muted);
+  color: var(--color-ink-soft);
 }
 
 /* The track is the scale itself. Band widths are the real point spans of the
@@ -74,7 +74,7 @@
 .score-scale__band-range {
   font-family: var(--font-text);
   font-size: clamp(0.6875rem, 1.1cqi, 0.8125rem);
-  color: var(--color-muted);
+  color: var(--color-ink-soft);
   font-variant-numeric: tabular-nums;
 }
 /* At narrow widths the five labels cannot sit side by side: the top band is 9.3% of

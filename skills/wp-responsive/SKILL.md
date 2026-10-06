@@ -132,10 +132,13 @@ The container stretches to fill the viewport on small screens and caps at the de
 ## Responsive Navigation: Hamburger (Mobile) to Horizontal (Desktop)
 
 Below `1024px` the desktop nav and header CTA are hidden, and a hamburger button (44x44,
-`aria-label="Toggle menu"`, `aria-expanded`) opens a full-screen mobile menu whose
-`aria-hidden` flips with it while body scroll is locked. From `1024px` the nav is a flex row
-and the hamburger and mobile menu are hidden. Markup, CSS and JS:
-[references/navigation.md](references/navigation.md).
+`aria-label="Toggle menu"`, `aria-expanded`, `aria-controls`) opens a full-screen mobile
+menu and locks body scroll. The open menu is a modal overlay, so it must pass the
+accessibility audit's A11Y-031: closed, it is `visibility: hidden` so its links leave the
+tab order; open, Tab and Shift+Tab cycle inside it, Escape closes it, and focus returns to
+the button. Crossing to `1024px` while it is open closes it, so body scroll is not left
+locked. From `1024px` the nav is a flex row and the hamburger and mobile menu are hidden.
+Markup, CSS and JS: [references/navigation.md](references/navigation.md).
 
 ---
 
@@ -193,13 +196,14 @@ font-size: clamp(<minimum>, <preferred>, <maximum>);
 
 ## Responsive Images
 
-- Give content images `srcset` and `sizes`; use `<picture>` only for art direction (a
-  different crop per viewport).
-- In templates, output images with `wp_get_attachment_image()`, which writes `srcset` from the
-  registered sizes. From an ACF/SCF image array, build `srcset` from `$image['sizes']` and
-  emit `width` and `height`.
-- Add `loading="lazy"` to all images below the fold. Do NOT add it to the hero/LCP image (which
-  should be preloaded instead); it gets `fetchpriority="high"`.
+- Give content images `srcset`, `sizes`, `width` and `height`; use `<picture>` only for art
+  direction (a different crop per viewport).
+- In templates, output images with `wp_get_attachment_image($image['ID'], …)`. ACF/SCF image
+  fields return an array (`return_format => 'array'`), so pass its `ID`: the array itself
+  prints nothing.
+- Add `loading="lazy"` to all images below the fold. Never add it to the hero/LCP image: it
+  gets `fetchpriority="high"` and no `loading` attribute (`'loading' => false` in
+  `wp_get_attachment_image()`).
 
 Markup for each case: [references/images.md](references/images.md).
 
@@ -263,39 +267,24 @@ A complete section to copy (base, `768px`, `1024px`):
 
 The page MUST NOT scroll horizontally at any viewport width. This is tested starting at **320px minimum**.
 
-### Common Causes and Fixes
+### Fix the element that overflows, never the wrapper
 
-```css
-/* Prevent overflow from images */
-img {
-    max-width: 100%;
-    height: auto;
-}
+Find the culprit before writing CSS. `/wp-demo-verify` names it: every `overflow` row in
+its findings carries `culprits`, the boxes that stick out. Without the tool, run this in the
+console at the failing width:
 
-/* Prevent overflow from fixed-width elements */
-.container {
-    width: 100%;
-    overflow-x: hidden; /* Only as a last resort on the body/container */
-}
-
-/* Prevent overflow from long words/URLs */
-.content {
-    overflow-wrap: break-word;
-    word-wrap: break-word;
-}
-
-/* Prevent overflow from pre/code blocks */
-pre, code {
-    overflow-x: auto;
-    max-width: 100%;
-}
-
-/* Prevent overflow from tables */
-.table-wrapper {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-}
+```js
+[...document.querySelectorAll('*')].filter((el) => el.getBoundingClientRect().right > document.documentElement.clientWidth)
 ```
+
+Then fix that element: a fixed `width` becomes `max-width: 100%`, a long word or URL gets
+`overflow-wrap: anywhere`, a wide table or code block gets its own `overflow-x: auto`
+wrapper, and a `position: absolute` box gets a `position: relative` ancestor inside the
+box it escapes.
+
+**Never put `overflow-x: hidden` on `.container`, `body` or a section wrapper.** It hides
+the overflow the check exists to find, clips focus rings and shadows that sit past the
+edge, and makes the element a scroll container, which breaks `position: sticky` inside it.
 
 ### Testing Rule
 
@@ -386,8 +375,8 @@ Before marking any page or section as complete, verify responsiveness at these v
 - [ ] Hamburger menu on mobile, horizontal nav on desktop with ARIA attributes
 - [ ] CSS Grid/Flexbox with mobile stacking
 - [ ] `clamp()` used for headings and display text
-- [ ] Responsive images with `srcset`, `sizes`, and `loading="lazy"`
-- [ ] WordPress `wp_get_attachment_image()` used in templates
+- [ ] Responsive images with `srcset` and `sizes`; `loading="lazy"` below the fold, never on the hero/LCP image
+- [ ] WordPress `wp_get_attachment_image($image['ID'], …)` used in templates
 - [ ] All touch targets minimum 24x24px (WCAG 2.5.8), none moved to get there
 - [ ] Every section has styles for all breakpoints
 - [ ] No horizontal scroll at any width (tested at 320px+)

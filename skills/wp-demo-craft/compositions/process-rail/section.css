@@ -8,13 +8,18 @@
   background: var(--color-canvas);
   border-top: 1px solid var(--color-hairline);
 }
+/* The heading sits above the rail, inside the sticky frame, so it stays on screen for the
+   whole travel. Inside the rail it panned off the left edge and left the steps unlabelled
+   for several hundred pixels of scroll (devices.md, `pan`). */
 .process-rail__frame {
   position: sticky;
   top: 0;
   height: 100vh;
   overflow: hidden;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(1.5rem, 3cqi, 2.5rem);
   /* No padding on the frame: travel is `rail.scrollWidth - frame.clientWidth`, and
      clientWidth counts padding, so a gutter here leaves the last card exactly one
      gutter past the right edge at full travel. The gutter lives on the rail, where
@@ -42,11 +47,9 @@
   width: max-content;
   will-change: transform;
 }
-.process-rail__intro {
-  flex: 0 0 auto;
-  width: min(26rem, 78cqi);
-  align-self: center;
-  padding-right: clamp(1rem, 2cqi, 2rem);
+/* Same inline inset as the rail, so the heading lines up with the first card. */
+.process-rail__head {
+  padding-inline: max(var(--space-gutter), calc((100cqw - var(--container-max, 1280px)) / 2));
 }
 .process-rail__kicker {
   font: 500 0.8rem/1.2 var(--font-text);
@@ -62,7 +65,7 @@
   letter-spacing: -0.025em;
   text-wrap: balance;
   margin: 0 0 1rem;
-  max-width: 14ch;
+  max-width: 22ch;
 }
 .process-rail__lede {
   font-size: 1.0625rem;
@@ -75,9 +78,9 @@
 .process-rail__step {
   flex: 0 0 auto;
   width: min(22rem, 74cqi);
-  /* Tall enough to own the pinned frame. A 340px card centred in a 100vh frame
-     leaves a quarter of the screen empty above and below it. */
-  min-height: min(72vh, 34rem);
+  /* Tall enough to own the pinned frame with the heading above it. A 340px card
+     centred in a 100vh frame leaves a quarter of the screen empty above and below. */
+  min-height: min(56vh, 30rem);
   display: flex;
   flex-direction: column;
   padding: 1.5rem;

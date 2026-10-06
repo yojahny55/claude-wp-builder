@@ -60,6 +60,49 @@
   "offers an enquiry form … or a WhatsApp button", products were "the Polylang bridge's job",
   and `/wp-woo-setup` put the WhatsApp number in "the theme's settings page": no starter
   renders either channel, carries those fields, or has a bridge.
+- **`wp-responsive`'s examples produce working output.** `references/images.md` passed the
+  ACF image field to `wp_get_attachment_image()` as an ID, but `agents/wp-acf.md` generates
+  image fields as arrays, so the call printed nothing; it now passes `$image['ID']`, and the
+  hand-built `srcset` with guessed width descriptors is gone. Every hero example carried
+  `loading="lazy"` against the skill's own LCP rule; heroes now set `fetchpriority="high"` and
+  `'loading' => false`. The navigation reference taught a drawer that fails the audit's
+  A11Y-031 — no focus trap, no Escape, no focus return, closed links still tabbable behind
+  `aria-hidden` — and left body scroll locked when the viewport crossed 1024px with the menu
+  open; it now does all four (verified in Chromium). The no-horizontal-scroll fix put
+  `overflow-x: hidden` on `.container`, hiding the overflow the section exists to find; it now
+  sends the reader to the culprit `/wp-demo-verify` names. `tests/checks/wp-responsive.sh`.
+
+- **The `wp-demo` skill no longer contradicts its command or its own rules.** It gave
+  plain-mode rules to every build without reading the recorded `demo mode`, so a craft build
+  loaded two contradicting instruction sets; it now says which parts apply in which mode. It
+  and `commands/wp-demo.md` Step 4 disagreed on token names (`--color-bg` against
+  `--color-background`), fonts (no CDN against a Google Fonts link) and images (SVG against
+  `placehold.co`); both now use `wp-css-system`'s token names, the one Google Fonts link
+  `/wp-init` self-hosts, and an inline-SVG `<img>` — `/wp-seed` imports every `img[src]` URL it
+  finds. It told builds to extract CSS into an `assets/css/styles.css` no current starter has.
+  Its skeleton broke its own accessibility rules (no skip link, no `id="main-content"`, a
+  hamburger without `aria-expanded`, `.sr-only` never defined, no focus style, no language
+  switcher), used a `.footer__tagline` class `/wp-seed` never reads and a bare `<p>` copyright,
+  hard-coded `© 2025`, and printed the footer twice. It also claimed two external skills were
+  "invoked automatically"; nothing invokes them. `tests/checks/wp-demo-skill.sh`.
+
+- **`wp-demo-craft`'s references agree with each other and with the engine.**
+  `design-md.md` defaulted `--motion-rise` to 22px, below the ~35px floor `devices.md` calls
+  invisible and against the compositions' 44px fallback. `devices.md` offered a `cascade`
+  device `motion.js` never implemented, left `data-motion-peak` and `data-motion-rail` out of
+  its "exactly as declared" contract, called the signature move optional while `uniqueness.md`
+  and `/wp-demo` require it, and named non-existent "shadow tokens". `taste.md` named tokens and
+  classes that exist nowhere (`--space-1..11`, `--font-measure`, `--shadow-e1/2/3`,
+  `--transition-ease-out`, `.scrim--lead`/`--trail`) and an engine behaviour no engine has;
+  `icon-row` and `score-scale` read a `--color-muted` no `DESIGN.md` defines, so their muted
+  text silently inherited full ink. `process-rail` put its heading inside the pan rail — the
+  advice `devices.md` retracts because it pans the section's label off screen — and allowed
+  three steps where `pan` needs five; the heading now sits above the rail and the minimum is
+  five (previews re-rendered). The scroll budget was restated with different numbers in
+  `taste.md`, `feel.md` and `compositions.md`; pointers led to a `devices.md §10` and SKILL.md
+  "pre-build checks" that do not exist; two counts were wrong; the role table had two rows on
+  one line; and two files ran plugin scripts by relative paths.
+  `tests/checks/wp-craft-consistency.sh`.
 
 - **`wp-demo-craft`, `/wp-cinematic-demo` and `/wp-cinematic-scene` load with their own
   frontmatter again.** Each had a value that is not valid YAML unquoted: an unquoted `: ` in

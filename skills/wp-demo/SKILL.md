@@ -10,9 +10,25 @@ This skill defines how to create **static HTML demo pages** that serve as the de
 
 ## Reference files
 
-- [references/demo-skeleton.md](references/demo-skeleton.md) — the full page skeleton (head,
-  `:root` tokens, reset, section delimiters, header through footer) and the complete footer
-  markup. Read when starting a demo page or writing its footer.
+- [references/demo-skeleton.md](references/demo-skeleton.md) — the plain-mode page skeleton
+  (font link, `:root` tokens, reset and accessibility rules, section delimiters, header with
+  language switcher, footer). Read when starting a demo page or writing its footer.
+
+---
+
+## Which parts apply
+
+Read `"demo mode"` from the project's `.wp-create.json` before using this skill; an absent
+key means `plain`. `/wp-demo` records it, and nothing downstream re-derives it.
+
+- **Both modes:** file naming, the section delimiters and the 1:1 mapping, accessibility,
+  navigation and the footer markup contract.
+- **Plain mode only:** the single-file rule, the `:root` token vocabulary, the font link and
+  the placeholder images below.
+- **Craft mode:** tokens come from `demo/DESIGN.md` onto the names in
+  `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/references/design-md.md`, never the
+  vocabulary below. Images are real client files or generated plates; a placeholder image
+  is a craft ship blocker. Compositions, motion and verification are `wp-demo-craft`'s.
 
 ---
 
@@ -21,7 +37,7 @@ This skill defines how to create **static HTML demo pages** that serve as the de
 Demos are the design-first step before WordPress development:
 
 1. **Design agreement** -- the client reviews a working HTML page in the browser
-2. **CSS extraction** -- the `<style>` block is extracted verbatim into the theme's `assets/css/styles.css`
+2. **Token carry** -- `/wp-init` reads the demo's colours and fonts and writes them into the theme's Tailwind `@theme` block; each section's CSS moves with its template part when `/wp-section` builds it
 3. **Section mapping** -- each marked section in the demo maps to a `template-parts/section-*.php` file in WordPress
 4. **Field definition** -- every piece of content in the demo becomes an ACF/SCF field
 
@@ -88,26 +104,17 @@ These comments serve as:
 
 ## Design System Variables in :root
 
-The `:root` block in the demo `<style>` is the **source of truth** for the design system. When converting to WordPress:
+In plain mode the `:root` block in the demo `<style>` is the **source of truth** for the design system. When converting to WordPress:
 
-1. The `:root` variables are copied **exactly** into `assets/css/styles.css`
+1. `/wp-init` reads its colour and font values and writes them into the theme's `@theme` block
 2. All CSS rules reference these variables (never hardcoded values)
-3. The variable names, values, and scale MUST match the `wp-css-system` skill definitions
+3. The variable names and scale are the `wp-css-system` skill's (`references/tokens.md`):
+   `--color-background`, `--spacing-md`, `--font-family-primary`, `--transition-base` —
+   never `--color-bg`, `--space-md`, `--font-heading` or `--transition`
 
----
-
-## External Skill Dependencies
-
-The demo creation process relies on two external skills for design guidance:
-
-- **`frontend-design`** -- provides visual design principles, layout patterns, and component inspiration
-- **`ui-ux-pro-max`** -- provides UX best practices, interaction patterns, and accessibility guidelines
-
-These skills are invoked automatically when creating demos. The demo author should follow their guidance for:
-- Visual hierarchy and whitespace
-- Color contrast and readability
-- Component patterns and interactions
-- Accessibility compliance
+Fonts load from one Google Fonts `<link>` in `<head>`, the only external request a plain demo
+makes: `/wp-init` Step 4.5 self-hosts the families it names, so the theme never calls
+Google at runtime.
 
 ---
 
@@ -191,23 +198,21 @@ Demos MUST follow semantic HTML5 and accessibility best practices.
 
 ## Placeholder Images
 
-Use placeholder services with realistic dimensions that match the final design intent.
+Plain mode only. A real client image from `docs/` always wins. Where there is none, the
+placeholder is an `<img>` whose `src` is an inline SVG at the intended aspect ratio, with
+`width`, `height` and real `alt` text — never an external image URL. A placeholder-service
+URL breaks the page offline, and `/wp-seed` imports every
+`img[src]` URL it finds into the media library. Keeping the `<img>` element, rather than a
+coloured CSS box, keeps the 1:1 mapping to an ACF image field.
 
 ```html
-<!-- Hero image -->
-<img src="https://placehold.co/600x400?text=Hero+Image" alt="Description of hero image">
+<!-- Hero image, 3:2 -->
+<img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 400'%3E%3Crect width='600' height='400' fill='%23e5e5e5'/%3E%3C/svg%3E"
+     width="600" height="400" alt="Description of hero image" fetchpriority="high">
 
-<!-- Team member photo -->
-<img src="https://placehold.co/300x300?text=Team+Member" alt="Team member name">
-
-<!-- Logo -->
-<img src="https://placehold.co/180x50?text=Logo" alt="Site Name">
-
-<!-- Service icon -->
-<img src="https://placehold.co/64x64?text=Icon" alt="Service name icon">
-
-<!-- Blog thumbnail -->
-<img src="https://placehold.co/400x250?text=Blog+Post" alt="Blog post title">
+<!-- Team member photo, 1:1 -->
+<img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%23e5e5e5'/%3E%3C/svg%3E"
+     width="300" height="300" alt="Team member name" loading="lazy">
 ```
 
 Choose dimensions that match the expected aspect ratio in the final design:
@@ -241,15 +246,15 @@ The demo navigation must match the planned WordPress site structure. Navigation 
 
 The footer follows a consistent pattern matching the WordPress settings page architecture:
 four columns (brand and logo, quick links, contact info, social) above a bottom bar carrying
-the copyright and legal links. Markup:
-[references/demo-skeleton.md](references/demo-skeleton.md#footer-markup).
+the copyright and legal links. Markup: the footer in
+[references/demo-skeleton.md](references/demo-skeleton.md).
 
-The footer maps to the WordPress settings/options page fields:
-- Logo: `site_logo` (option field)
-- Tagline: `footer_tagline` (option field)
-- Social links: `social_facebook`, `social_instagram`, etc. (option fields)
-- Copyright: `footer_copyright` (option field)
-- Contact info: `contact_email`, `contact_phone`, `contact_address` (option fields)
+The demo's contract with WordPress is the **class names**, not field names: `/wp-seed` reads
+`.footer__description` (the tagline) and `.footer__copyright` out of the demo, and `/wp-footer`
+owns which settings-page fields they become. Keep both classes: under any other class, or
+in a bare `<p>`, the seeder skips the line. The
+copyright line carries no year: a year typed into the demo is stale by the next January, and
+`/wp-footer`'s fallback prints the current one.
 
 ---
 

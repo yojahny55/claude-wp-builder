@@ -44,7 +44,7 @@ staggers the same children.
 Regenerate a preview:
 
 ```
-node bin/composition-preview.mjs --fill skills/wp-demo-craft/compositions/<name>
+node "${CLAUDE_PLUGIN_ROOT}/bin/composition-preview.mjs" --fill "${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/compositions/<name>"
 ```
 
 `--fill` substitutes the representative copy in `fills.json` for the `{{slot}}`
@@ -80,9 +80,10 @@ not writing it.
 | hero | hero-split | 0 | reveal, parallax | none |
 | hero | hero-type | 0 | element only | Aceternity "text generate" (MIT), rewritten as the block's own reveal |
 | hero | hero-bleed | 0 | parallax, scrim band | none |
-| proof | proof-row | 0 | count, marquee | Magic UI marquee + number ticker (MIT) |
+| proof | proof-row | 0 | count, element motion (scroll-linked marquee) | Magic UI marquee + number ticker (MIT) |
 | feature | feature-zigzag | 0 | reveal | none |
-| process | process-rail | 1.0 | pan | Aceternity sticky scroll reveal (MIT), rewritten as pan | | process | process-flow | 0 | element motion (segments draw, nodes light) | none |
+| process | process-rail | 1.0 | pan (five steps or more) | Aceternity sticky scroll reveal (MIT), rewritten as pan |
+| process | process-flow | 0 | element motion (segments draw, nodes light) | none |
 | offer | offer-table | 0 | element only | none |
 | testimonial | testimonial-pair | 0 | spotlight, element | Aceternity spotlight (MIT) |
 | faq | faq-list | 0 | reveal | none |

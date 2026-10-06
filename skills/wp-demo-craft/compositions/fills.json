@@ -64,7 +64,7 @@
   },
   "process-rail": {
     "kicker": "From first call to first step",
-    "title": "Four visits, and you meet the same two people at each",
+    "title": "Survey to aftercare, and you meet the same two people at each visit",
     "lede": "Most staircase jobs take fourteen weeks. Here is where the time goes, so you can plan the rest of the build around it.",
     "step_1_n": "01",
     "step_1_title": "Survey",
@@ -77,7 +77,10 @@
     "step_3_body": "Six to eight weeks in the shed. Strings, treads and handrail are cut from one parcel of timber so the grain and the colour run through the whole flight.",
     "step_4_n": "04",
     "step_4_title": "Fitting",
-    "step_4_body": "Three days on site with the pair who built it. We take the old flight out, put the new one in, and leave with the offcuts and the dust."
+    "step_4_body": "Three days on site with the pair who built it. We take the old flight out, put the new one in, and leave with the offcuts and the dust.",
+    "step_5_n": "05",
+    "step_5_title": "Aftercare",
+    "step_5_body": "One more visit after the first heating season, once the timber has settled. We tighten whatever has moved, re-oil the handrail and leave you the drawings to keep."
   },
   "offer-table": {
     "kicker": "What it costs",

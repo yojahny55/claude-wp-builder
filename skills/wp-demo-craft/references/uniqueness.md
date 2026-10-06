@@ -81,8 +81,9 @@ when it is not, which is the whole mechanism.
 
 **Every build invents one bespoke interaction that exists on that site alone.**
 Not in the composition library, not in any prior build, not a parameter change.
-Built in the page, with CSS of its own or a small script reading `--motion-p`.
-The engine stays untouched, always.
+Built in the page, with CSS of its own or a small script reading `--motion-p`; the
+script goes in its own `<script id="signature">` block, which `/wp-init` lifts to
+`assets/js/signature.js`. The engine stays untouched, always.
 
 This is the thing a visitor remembers after closing the tab, and it is the only
 part of a build that cannot be arrived at by following rules. It is also the

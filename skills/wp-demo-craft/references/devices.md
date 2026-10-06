@@ -6,7 +6,7 @@ Adapted from nateherkai/scroll-craft (MIT).
 
 - The attribute contract (directly below)
 - Two kinds of motion, and only one of them has a budget
-- The eight devices
+- The devices
 - The cue contract
 - The signature move
 - Video scrub is not in this kit
@@ -23,7 +23,12 @@ data-motion-count="0 3,500"   real figures only, written as it should render
                               (one value counts from zero to that target)
 data-motion-dir="up|down|left|right|iris"   wipe direction
 data-motion-drift="#0A0806"   the page ground this section takes over
+data-motion-peak              the one section allowed a pin span up to 3.0
+data-motion-rail              the element a pan section moves sideways
 ```
+
+Any other `data-motion` value is inert: the engine binds nothing to it, says nothing, and
+the section simply does not move.
 
 `data-motion="<name>"` drives reveal, pin, pan, wipe, kinetic, parallax, drift,
 tilt, magnet and spotlight. `count` is the one exception: it is dispatched by
@@ -120,8 +125,8 @@ A hover that adds an accent-tinted glow is a `slop` finding. A build gave its CT
 transparent)` and `impeccable detect` returned twelve "Glowing shadow accents" — on a
 build whose own `DESIGN.md` said "no glowing button" in those words.
 
-Spec hover as **depth tinted to the canvas hue** — the shadow tokens — never as a
-coloured halo around the element. The detector is strict here and it is right: an
+Spec hover as **depth tinted to the canvas hue** — an offset shadow mixed from the
+canvas colour — never as a coloured halo around the element. The detector is strict here and it is right: an
 accent glow is the single most reliable tell of a generated page.
 
 ### Driving a plain property off `--motion-p`
@@ -419,7 +424,7 @@ which belongs on a clock and loops. One build shipped the scroll version and dre
 "but why doesn't it move" from the operator; the fix was not better coupling but a
 7s alternating document timeline, coupled by mechanism two.
 
-## The eight devices
+## The devices
 
 ### `reveal`
 
@@ -502,7 +507,7 @@ and a `reveal` above the fold does not animate at all on the CSS path — so a p
 whose entire motion budget is `reveal` plus pointer devices is a static page that
 measures as animated. Every interior page therefore carries **at least one
 scroll-reactive device that is not `reveal`**: `drift`, `count`, `parallax` at a low
-rate, `pan`, or `cascade`. All of them cost 0 vh except `pan`, so the budget is
+rate, or `pan`. All of them cost 0 vh except `pan`, so the budget is
 never the reason a page has none. The index adds at most four
 viewport-heights beyond its section count in total; the role table in
 `compositions/README.md` lists each composition's cost, so the sum is arithmetic
@@ -518,7 +523,7 @@ item, plus one.
 
 **`pan` needs five items or more.** With three content-sized cards the rail cannot
 overflow a 1440 viewport at all, so the device travels zero and pins a section that
-never moves — pick `reveal` or `cascade` for a short set instead. Widening the cards
+never moves — pick `reveal`, or the `process-flow` composition, for a short set instead. Widening the cards
 to force overflow makes the cards wrong to fix the device, which is backwards.
 
 **Do not put the heading in the rail.** It was once suggested here as the way to buy
@@ -631,20 +636,9 @@ exactly the rule this floor exists to enforce. Write the `calc()` so that
 
 ## The signature move
 
-A build may invent one bespoke interaction that exists on that site alone, coded
-in `assets/js/signature.js` and driven from `--motion-p`. v2 does not require one
-— the composition library already gives a page its shape, and a required
-signature move is how a page acquires an interaction nobody asked for — but when
-the brief's tell-someone sentence points at an interaction, that interaction is
-the signature move.
-
-It is not a device-kit parameter change. A recoloured spotlight, a different tilt
-angle, a new easing curve on kinetic lines, or more of an existing device (a
-longer rail, a third wipe) do not count. A trace rail the scroll draws through
-the page, a wordmark the pointer pulls apart, an SVG drawing that draws itself,
-one control that regrades the whole page at once — those do. The test: describe
-it to someone who has seen the other builds. If they cannot tell it apart from
-something the kit already does, it is a parameter, not a move.
+Every build has one; `uniqueness.md` §4 defines it, says what counts, and owns the
+test that rejects one. It is never a parameter change to a device in this kit, and the
+engine is never edited to make one.
 
 ## Video scrub is not in this kit
 
