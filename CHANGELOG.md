@@ -107,7 +107,10 @@
   so a single-quoted password holding `"`, `;` or `)` (or a double-quoted one holding `'`)
   reaches the client whole. With `cwebp` chosen, a GIF goes to `gif2webp` only when it is
   installed, and to GD when it is not; with neither, the run says once that GIFs get no
-  `.webp` instead of failing each one as "conversion failed".
+  `.webp` instead of failing each one as "conversion failed". An image size registered with
+  double quotes (`add_image_size( "hero", … )`) is read by name instead of being stored as the
+  raw call text, and every setting is escaped for its SQL literal, so a backslash or quote in a
+  size name read from theme source cannot end the string.
   `tests/checks/robin-fix-behavior.sh` runs the script against a fake site, client and
   network.
 - **The release ritual in `wp-contributing` and `/wp-contribute release` gates for real.**
