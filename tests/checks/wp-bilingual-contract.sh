@@ -74,7 +74,7 @@ else
   out=$(php -d pcre.jit=0 "$harness" cinematic no-query 2>&1) \
     || { printf '%s\n' "$out" | sed 's/^/  /'; fail "the cinematic starter sets its language cookie from something other than ?lang="; }
 fi
-grep -nF -e 'never sets the cookie' -e 'sets no cookie' $skill_md \
+grep -rnF --include='*.md' -e 'never sets the cookie' -e 'sets no cookie' skills/wp-bilingual \
   && fail "the skill still says the cinematic starter never sets its language cookie"
 grep -qF "setcookie('__starter___lang'" "$ci" \
   || fail "$ci never calls setcookie() for the language it reads back from \$_COOKIE"
