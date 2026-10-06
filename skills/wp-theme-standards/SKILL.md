@@ -16,7 +16,7 @@ than retyping it:
 - [references/setup-and-enqueue.md](references/setup-and-enqueue.md) — enqueueing code (styles, scripts, `wp_localize_script()`, page-specific assets),
   theme supports and content width, custom body classes, the SCF/ACF options page, helper
   functions and SVG upload support. Read when writing `functions.php` or `inc/theme-setup.php`.
-- [references/head-and-performance.md](references/head-and-performance.md) — font preconnect, LCP preload, emoji and version removal, Organization schema and
+- [references/head-and-performance.md](references/head-and-performance.md) — the self-hosted font preload, the LCP preload, emoji and version removal, and
   the meta-description fallback. Read when writing anything hooked to `wp_head` or `init`.
 
 ---
@@ -50,43 +50,27 @@ Text Domain:  starter
 */
 ```
 
-> **Note:** Do not put actual styles in `style.css`. Use it only for the header declaration. All styles go in `assets/css/styles.css` (or similar), enqueued via `functions.php`.
+> **Note:** Do not put actual styles in `style.css`. Use it only for the header declaration. All styles go where the template's layout puts them (below), enqueued via `functions.php`.
 
 ---
 
-## Theme Directory Structure
+## Theme layout — read the recorded template, then the starter
 
-```
-theme-name/
-├── assets/
-│   ├── css/
-│   │   └── styles.css          # Main design system stylesheet
-│   ├── js/
-│   │   └── main.js             # Main client-side JS
-│   └── images/                 # Theme images (logo fallback, icons, etc.)
-├── inc/
-│   ├── theme-setup.php         # Theme supports, nav menus, content width
-│   ├── i18n.php                # Internationalization helpers (if bilingual)
-│   └── performance.php         # WebP delivery + prefix_image() right-size helper
-├── fields/                     # SCF/ACF field definitions — one file per group
-│   ├── hero.php                #   BARE acf_add_local_field_group() calls (seed only)
-│   ├── settings.php
-│   └── ...
-├── acf-json/                   # SCF/ACF Local JSON — the field SOURCE OF TRUTH
-│   ├── group_hero.json         #   auto-written from fields/*.php on first load,
-│   └── ...                     #   dashboard-editable, edits sync back here
-├── template-parts/
-│   ├── section-hero.php        # Reusable section templates
-│   ├── section-services.php
-│   └── ...
-├── functions.php               # Main functions file (requires inc/ files)
-├── header.php                  # Site header
-├── footer.php                  # Site footer
-├── front-page.php              # Homepage template
-├── index.php                   # Fallback template
-├── style.css                   # Theme declaration (headers only)
-└── screenshot.png              # Theme preview image
-```
+There is no single layout to type from memory. Read the `Template:` line in the project's
+`.claude/CLAUDE.md`, then take every path from the starter that template was copied from
+(or from the project's own theme, which `/wp-init` copied from it):
+
+| `Template:` | Styles | Scripts | Read |
+|---|---|---|---|
+| `tailwind` | exactly one compiled stylesheet, `assets/css/dist/main.css`, built from `assets/css/src/tailwindcss/` — never a second stylesheet enqueue | `assets/js/dist/index.js`, a wp-scripts bundle built from `assets/js/src/`; dependencies and version come from `index.asset.php` | `${CLAUDE_PLUGIN_ROOT}/starter-theme/__tailwind__/functions.php` and its `inc/` |
+| `cinematic` | `assets/css/cinematic.css` | the scroll engine, enqueued by `inc/cinematic-loader.php` | `${CLAUDE_PLUGIN_ROOT}/starter-theme/__cinematic__/functions.php` and `inc/cinematic-loader.php` |
+| `basic` | a project scaffolded before the basic starter was removed: its own `functions.php` is the only reference (`assets/css/styles.css`, `assets/js/main.js`) | | the project's theme |
+
+Both starters split `functions.php` into `inc/` files it requires — the Tailwind one into
+`theme-setup.php`, `i18n.php`, `performance.php`, `security.php`, `nav-walker.php`,
+`template-tags.php`, `template-functions.php` and `cf7-helpers.php`. Add code to the file
+that already owns its concern, never a parallel one: a second declaration of a starter
+function is a fatal error.
 
 ### SCF/ACF field model — Local JSON is the source of truth
 
@@ -110,17 +94,24 @@ ACF already defaults to the theme's `acf-json/`.
 
 **NEVER** add `<link>` or `<script>` tags directly in templates. Always use WordPress enqueueing functions.
 
-Enqueue the main stylesheet and `main.js` (in the footer) from one `wp_enqueue_scripts` callback; the code is in [references/setup-and-enqueue.md](references/setup-and-enqueue.md) § Asset Enqueueing.
+The theme has one `wp_enqueue_scripts` callback, in `functions.php`; add to it, never a
+second one. Styles and scripts are the files the layout table above names, scripts in the
+footer. On `Template: tailwind` the theme enqueues exactly one stylesheet, the compiled
+`assets/css/dist/main.css`: every rule — fonts included — is compiled into it, so a second
+stylesheet enqueue is always wrong there. The code is in
+[references/setup-and-enqueue.md](references/setup-and-enqueue.md) § Asset Enqueueing.
 
 ### Cache Busting
 
-Always use `filemtime()` for the version parameter on local assets. This forces browsers to re-download the file whenever it changes, without manual version bumping.
+Version a local stylesheet with `filemtime()` of the file itself, so browsers re-download it
+whenever it changes, without manual version bumping. The wp-scripts bundle is versioned by
+the `version` in its `index.asset.php`, which changes with the bundle's content.
 
 ```php
-filemtime(get_template_directory() . '/assets/css/styles.css')
+filemtime( PREFIX_DIR . '/assets/css/dist/main.css' )
 ```
 
-For external assets (CDN fonts, libraries), pass `null` as the version to omit the query string.
+For a third-party asset served from a CDN, pass `null` as the version to omit the query string.
 
 ### Passing PHP data to JavaScript
 
@@ -131,7 +122,11 @@ already enqueued — never an inline `<script>`. Example in [references/setup-an
 
 ## Page-Specific Asset Enqueueing
 
-Load page-specific CSS and JS only when needed using `is_page_template()` or `is_page()`.
+Load page-specific assets only where they are needed, keyed on the template file:
+`is_page_template( 'page-<name>.php' )`, and `is_front_page()` for the home page. Never key
+them on a slug with `is_page( '<slug>' )`: under the default `i18n strategy: polylang` each
+language is its own post with its own slug, so a slug test matches one language and the
+translated page loads without its assets.
 
 Code: [references/setup-and-enqueue.md](references/setup-and-enqueue.md) § Page-Specific Asset Enqueueing.
 
@@ -220,28 +215,12 @@ Sanitize all input before saving to the database.
 | `sanitize_url()` | URL input |
 
 ```php
-// Example: sanitize URL parameter
-if (isset($_GET['lang'])) {
-    $lang = sanitize_text_field($_GET['lang']);
+// Example: sanitize URL parameter. WordPress adds slashes to $_GET, $_POST and
+// $_COOKIE, so unslash before sanitizing or a quote reaches the database escaped.
+if ( isset( $_GET['lang'] ) ) {
+    $lang = sanitize_text_field( wp_unslash( $_GET['lang'] ) );
 }
 ```
-
----
-
-## WordPress Hooks Reference
-
-The hooks below are the ones most commonly used in theme development, listed in the order they typically fire.
-
-| Hook | Type | When to Use |
-|---|---|---|
-| `after_setup_theme` | Action | Register theme supports, nav menus, content width |
-| `init` | Action | Register post types, taxonomies, disable emojis |
-| `acf/init` | Action | Register ACF/SCF options pages |
-| `wp_enqueue_scripts` | Action | Enqueue all frontend CSS and JS |
-| `wp_head` | Action | Add meta tags, preconnect hints, schema markup, preload LCP |
-| `wp_footer` | Action | Add inline scripts before `</body>` |
-| `body_class` | Filter | Add custom CSS classes to `<body>` |
-| `upload_mimes` | Filter | Allow additional file types (SVG) |
 
 ---
 
@@ -288,11 +267,16 @@ The only exceptions are:
 
 ## Performance Optimizations
 
-**Font preconnect.** Hook `<link rel="preconnect">` for every external font host into `wp_head` at priority 1. Code: [references/head-and-performance.md](references/head-and-performance.md).
+**Fonts are self-hosted; preload exactly one.** The theme carries every family it names in
+`assets/fonts/` (`/wp-init` Step 4.5) and emits no `fonts.googleapis.com` request — a remote
+Google Fonts link is what `wp-audit-performance` PERF-022 reports. Preload one woff2 from
+`wp_head` at priority 1: the primary family's regular latin file, with `crossorigin`. A
+`preconnect` is only for a third-party origin the theme really requests on every page.
+Code: [references/head-and-performance.md](references/head-and-performance.md).
 
 ### LCP Image Preloading
 
-Preload the Largest Contentful Paint element (usually the hero image) on the homepage from `wp_head` at priority 2. Code: [references/head-and-performance.md](references/head-and-performance.md).
+Preload the Largest Contentful Paint element (usually the hero image) on the homepage from `wp_head` at priority 2, with the same candidates the `<img>` offers: `imagesrcset` and `imagesizes` from the attachment, never the full-size original's URL alone. A preload of one URL while the `<img>` picks another `srcset` candidate downloads both. Code: [references/head-and-performance.md](references/head-and-performance.md).
 
 The preloaded LCP `<img>` itself must carry `fetchpriority="high"` + `width`/`height`. If the hero is a background video, keep the poster `<img>` as the LCP element and lazy-load the `<video>` via JS on desktop only (never mobile / `navigator.connection.saveData`).
 
@@ -328,8 +312,13 @@ hands stored XSS to the Author role. Gate it on `unfiltered_html`, the
 capability core already uses for "may post markup that is trusted verbatim".
 
 The filter receives the user the list is built *for* as its second argument, which is not
-always the current user — check that user. The mime filter, the admin display fix and the
-filetype check are in [references/setup-and-enqueue.md](references/setup-and-enqueue.md) § SVG Upload Support.
+always the current user — check that user. The mime filter and the admin display fix are in
+[references/setup-and-enqueue.md](references/setup-and-enqueue.md) § SVG Upload Support; the
+starter ships the same gated filter in `inc/theme-setup.php`.
+
+**Never filter `wp_check_filetype_and_ext`.** A callback that returns the type from the file
+name answers for every upload, not only SVG, and switches off core's check that a file's
+content matches its extension — a script renamed to `.jpg` passes it.
 
 ---
 
@@ -359,9 +348,14 @@ Create small utility functions to keep templates clean.
 
 ## Schema.org Structured Data
 
-Add JSON-LD structured data for SEO and AI search optimization.
-
-Output one `Organization` node with an `@id` of `home_url() . '/#organization'` from `wp_head`. Code: [references/head-and-performance.md](references/head-and-performance.md).
+The theme prints no identity JSON-LD from `functions.php`. The `Organization` /
+`LocalBusiness` node (`@id` `home_url( '/' ) . '#organization'`) has one owner:
+`inc/agentic.php`, which the `wp-agentic-surfaces` agent writes (run by `/wp-audit --geo`),
+and which returns early through `<prefix>_seo_plugin_owns_schema()` when Rank Math, Yoast or
+SEOPress is active, because the SEO plugin then emits the graph. A second
+`<script type="application/ld+json">` beside the SEO plugin's reads as two `Organization`
+nodes to every validator; fields the plugin lacks are merged into its graph through
+`rank_math/json_ld` (`wp-audit-rankmath` Step 4.7), never printed beside it.
 
 ---
 
@@ -414,16 +408,16 @@ States: `.is-open` (added to `.nav__item--has-children` when its submenu is expa
 ## Summary Checklist
 
 - [ ] `style.css` has required WordPress headers
-- [ ] All assets enqueued via `wp_enqueue_style()` / `wp_enqueue_script()`
-- [ ] `filemtime()` used for cache busting on all local assets
+- [ ] All assets enqueued via `wp_enqueue_style()` / `wp_enqueue_script()`, from the one existing callback, at the paths the recorded template's starter uses
+- [ ] `filemtime()` (or `index.asset.php`) versions every local asset
 - [ ] All theme supports registered in `after_setup_theme`
 - [ ] All dynamic output escaped with appropriate function
 - [ ] No `query_posts()` anywhere
 - [ ] No inline styles or scripts in templates
 - [ ] Emojis disabled, WP version hidden
-- [ ] SVG uploads enabled
+- [ ] SVG uploads gated on `unfiltered_html`; no `wp_check_filetype_and_ext` filter
 - [ ] Custom body classes added
 - [ ] SCF/ACF options page registered
-- [ ] Schema.org structured data output
+- [ ] No identity JSON-LD outside `inc/agentic.php`
 - [ ] Meta descriptions added with SEO plugin check
-- [ ] Font preconnect and LCP preloading configured
+- [ ] No `fonts.googleapis.com`; one self-hosted woff2 preloaded; LCP image preloaded with `imagesrcset`

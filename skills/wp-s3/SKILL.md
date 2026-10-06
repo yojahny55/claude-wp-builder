@@ -40,8 +40,9 @@ choosing it:
 | `allow_url_fopen = On` | The plugin registers `s3://` as a URL-type stream wrapper |
 | `composer` | Releases since 3.0.10 ship without `vendor/`. On a PHP with no `iconv` the install adds `--ignore-platform-req=ext-iconv` by itself |
 | `git` | The plugin is cloned at a pinned commit and refused if the tag no longer points there. Without git the install stops: `--unverified-download` takes the tarball instead, which carries nothing that can be checked |
-| `curl`, `tar`, `python3` | The setup script; `curl` and `tar` only on the `--unverified-download` path |
-| A client binary named `mcli` or `mc` | Only for `/wp-s3-media` |
+| `php` CLI, `python3` | All three scripts: `php` reads `s3-config.php` and lints every PHP file setup or revert writes; `python3` edits `wp-config.php`, writes the client's private configuration and compares both sides of a transfer |
+| `curl`, `tar` | Setup, only on the `--unverified-download` path |
+| A client binary named `mcli` or `mc`, on `PATH` | `/wp-s3-media`, and `/wp-s3 --revert` unless `--keep-remote-media` is passed: the revert brings the media back through `s3-media.sh download`, with a key pair. Install the standalone binary as `~/.local/bin/mcli`, not inside the plugin directory, which a plugin update replaces |
 | WP-CLI | Optional. The credentials are proved by `scripts/check-credentials.php`, which does not need the plugin to be active |
 
 ## How to use

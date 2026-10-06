@@ -15,7 +15,7 @@ knowledge behind those values. It acts on nothing: the command runs the scripts.
 
 | Tier | What it is | Profile |
 |---|---|---|
-| `catalog` | Products and prices, nothing purchasable. Each product offers an enquiry form, a "where to buy" link (WooCommerce's External product type) or a WhatsApp button. Runs on WooCommerce with buying switched off by `store-kit`, so moving up a tier keeps every product, with no migration. | `templates/profiles/woo-catalog.json` |
+| `catalog` | Products and prices, nothing purchasable. Runs on WooCommerce with buying switched off by `store-kit`, so moving up a tier keeps every product, with no migration. `store.enquiry` records which enquiry channels apply — `form`, `where-to-buy`, `whatsapp` — and only `where-to-buy` works out of the box, as WooCommerce's External product type: no starter theme renders the enquiry form or the WhatsApp button. | `templates/profiles/woo-catalog.json` |
 | `store` | Cart, block checkout, Stripe (test mode until launch), shipping, tax, SMTP, Turnstile, and cookie consent where the market needs it. | `templates/profiles/woo-store.json` |
 | `full` | `store` plus abandoned-cart email, email marketing, reviews, search and filters, swatches, wishlist, and Google and Meta feeds. | `templates/profiles/woo-full.json` |
 
@@ -39,7 +39,8 @@ Measured on WooCommerce 11.1.2 unless marked (source).
   Refund policy — no Terms page.
 - **Polylang gives WooCommerce's pages no language** when it was configured after they were
   created, and `product` is not a translated post type by default. Setup assigns the default
-  language to the store pages; products are the Polylang bridge's job.
+  language to the store pages. Products stay untranslated: this plugin has
+  no bridge between WooCommerce and Polylang.
 - **Card testing.** The Store API rate limit is off by default, and card-testing scripts post to
   `/wc/store/v1/checkout` directly even on a classic-checkout store. Setup turns on the checkout
   limit: 3 attempts a minute per IP, refused as HTTP 400 `rate_limit_exceeded`. It never turns on

@@ -25,7 +25,7 @@ is a demo with several palettes.
    underneath this step, exactly as `impeccable@4` is pinned in `verify.md`. Take
    what the site declares. A site built on inline styles yields thin tokens;
    that is expected, and thin real tokens still beat invented ones.
-3. **The catalogue.** Open `references/design-md/INDEX.md` — 64 real brands, one
+3. **The catalogue.** Open `references/design-md/INDEX.md` — real brands, one
    row each with industry, tone, display face and accent. Pick two or three rows
    by industry and tone, read **only those files**, and fill the remaining gaps
    from them. Cite the rows you used, by domain, in the file.
@@ -41,21 +41,24 @@ is a defect, and the fingerprint gate will catch the second client it happens to
 
 ## Motion mapping
 
-The reference files describe how a site moves, and until now none of that reached
-the build: the token mapping extracted colour, type and spacing, and the motion
-vocabulary in 57 of the 67 catalogue entries was read by nobody. A demo therefore
-took its palette from a reference and its motion from nowhere.
+The reference files describe how a site moves. A token mapping that extracts only
+colour, type and spacing leaves the catalogue's motion vocabulary unread, and a demo
+then takes its palette from a reference and its motion from nowhere.
 
 Two tokens carry it, and every composition's element animation consumes them:
 
 | token | what it is | default when the reference is silent |
 |---|---|---|
 | `--ease-entry` | the easing an element arrives on | `cubic-bezier(.22,.61,.36,1)` |
-| `--motion-rise` | how far an element travels as it arrives | `22px` |
+| `--motion-rise` | how far an element travels as it arrives | `44px` |
 
 Read them off the reference the same way the colour tokens are read. A site whose
 motion is brisk and mechanical wants a shorter rise and a sharper curve; one whose
-motion is soft and long wants the opposite. Two numbers are not the whole of a
+motion is soft and long wants the opposite. **The rise never goes below about 35px**,
+however brisk the reference: under that the movement is smaller than the reader's own
+scroll increment and the entrance is invisible (`devices.md`, "Amplitude has a floor
+too"). 44px is the compositions' own `var()` fallback, so the default and the fallback
+agree. Two numbers are not the whole of a
 site's motion identity, but they are the two that every entrance in the library
 passes through, so getting them from the reference is the difference between a
 demo that moves like its reference and one that moves like the default.

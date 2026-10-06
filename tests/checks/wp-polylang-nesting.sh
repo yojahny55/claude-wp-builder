@@ -166,4 +166,17 @@ esac
 grep -Fq -- 'Nesting is walked to any depth' "$lib" \
   || fail "$lib no longer documents that nesting is walked to any depth"
 
+# The skill is what an agent reads, and it kept the old ceiling after the code dropped it:
+# "one level" in the table, "a group nested inside a repeater is not walked", and an
+# instruction to widen pllx_acf_walk(). An agent believing it hand-translates fields the
+# importer already handles. Scanned across every markdown file of the skill, so moving the
+# ACF section into references/ cannot carry the old sentence along unseen.
+skill_md=$(find skills/wp-polylang -name '*.md' | sort)
+for old in 'one level of nesting' '(one level)' 'Widen `pllx_acf_walk()`' 'is not walked. Widen'; do
+  hit=$(grep -lF -- "$old" $skill_md || true)
+  [ -z "$hit" ] || fail "$hit still claims a nesting ceiling the walker does not have ('$old')"
+done
+grep -qF 'walked to any depth' $skill_md \
+  || fail "no wp-polylang skill file states that ACF containers are walked to any depth"
+
 echo "PASS: ACF nesting walked to any depth, layout matched by name, paths resolved by structure ($(echo "$out" | grep -c PHPOK) run)"

@@ -19,8 +19,9 @@ the same section numbers they carry here:
   §11 FAQ generator. Read when emitting or checking structured data.
 - [references/seeding-commands.md](references/seeding-commands.md) — WP-CLI blocks for §3 options,
   §4 post meta, §6 title templates and §7 meta descriptions. Read when seeding SEO data.
-- [references/llms-and-robots.md](references/llms-and-robots.md) — §8 llms.txt and §9 robots.txt,
-  templates and generators. Read when writing either file.
+- [references/llms-and-robots.md](references/llms-and-robots.md) — §8 llms.txt and §9 robots.txt:
+  the classic robots block, and why neither file is written from here. Read before touching
+  either file.
 - [references/breadcrumbs.md](references/breadcrumbs.md) — §10 `prefix_breadcrumbs()`, its CSS and
   the Rank Math switch. Read when adding breadcrumbs to a theme.
 - [references/woocommerce-seo.md](references/woocommerce-seo.md) — §18, the store-only checks
@@ -183,17 +184,21 @@ The generator function and the bulk seed: see
 
 ---
 
-## 8. llms.txt Template
+## 8. llms.txt
 
-Template and WP-CLI generator: see [references/llms-and-robots.md](references/llms-and-robots.md).
+A dynamic route in `inc/agentic.php`, emitted by `wp-agentic-surfaces` to
+`wp-audit-geo-standards` §6.1 — never a physical file. A `llms.txt` at the web root shadows
+the route and is reported as GEO-A26. See
+[references/llms-and-robots.md](references/llms-and-robots.md).
 
 ---
 
-## 9. robots.txt Template
+## 9. robots.txt
 
-Template and WP-CLI generator: see [references/llms-and-robots.md](references/llms-and-robots.md).
-
-> **Note:** AI crawler policy (Allow vs Disallow) should be confirmed with the site owner before writing. The defaults above allow all major AI crawlers except Bytespider.
+The classic block (admin, search results, sitemap) is in
+[references/llms-and-robots.md](references/llms-and-robots.md). The AI-crawler allowlist
+and the `Content-Signal` header are `wp-audit-geo-standards` §4, and the whole file has one
+writer, `wp-agentic-surfaces` Step 4, which confirms the owner's AI-crawler posture first.
 
 ---
 
@@ -234,9 +239,9 @@ Recommended order for bulk SEO setup on a new or existing site:
 9. **Seed per-page SEO meta** — `rank_math_title`, `rank_math_focus_keyword`, robots (Section 4)
 10. **Seed meta descriptions** — auto-generate from excerpt/content (Section 7)
 11. **Set image alt texts** — bulk update missing alt attributes
-12. **Generate robots.txt** — write optimized robots.txt (Section 9)
-13. **Generate llms.txt** — write AI-readable site summary (Section 8)
-14. **Flush sitemap cache + rewrite rules** — finalize:
+12. **robots.txt and llms.txt** — not written in this sequence: `wp-agentic-surfaces` owns
+    both (Sections 8 and 9)
+13. **Flush sitemap cache + rewrite rules** — finalize:
 
 ```bash
 $WP eval "
@@ -267,11 +272,11 @@ echo \"Posts with meta descriptions: \$count\";
 # Verify sitemap exists
 $WP eval "echo home_url('/sitemap_index.xml');"
 
-# Verify robots.txt exists
-$WP eval "echo file_exists(ABSPATH . 'robots.txt') ? 'robots.txt exists' : 'robots.txt missing';"
+# robots.txt and llms.txt are served, not files: check the response
+$WP eval "foreach (array('robots.txt', 'llms.txt') as \$f) { \$r = wp_remote_get(home_url('/' . \$f)); echo \$f . ': HTTP ' . wp_remote_retrieve_response_code(\$r) . PHP_EOL; }"
 
-# Verify llms.txt exists
-$WP eval "echo file_exists(ABSPATH . 'llms.txt') ? 'llms.txt exists' : 'llms.txt missing';"
+# A physical llms.txt shadows the dynamic route (GEO-A26)
+$WP eval "echo file_exists(ABSPATH . 'llms.txt') ? 'PHYSICAL llms.txt present -- GEO-A26' : 'no physical llms.txt';"
 ```
 
 ---

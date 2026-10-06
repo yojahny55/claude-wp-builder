@@ -713,16 +713,15 @@ Generate `demo/index.html` with the following requirements:
 
 ### Structure
 - Single self-contained HTML5 file with all CSS embedded in a `<style>` block
-- No external dependencies (no CDN links, no external CSS/JS)
+- No external dependencies (no CDN links, no external CSS/JS), except the one Google Fonts `<link>` the wp-demo skill's skeleton carries — `/wp-init` Step 4.5 self-hosts it
 - Semantic HTML5 elements (`<header>`, `<main>`, `<section>`, `<footer>`, `<nav>`, `<article>`)
 
 ### CSS Design System
-Define CSS custom properties in `:root` for:
-- Colors: `--color-primary`, `--color-secondary`, `--color-accent`, `--color-dark`, `--color-light`, `--color-text`, `--color-text-light`, `--color-bg`, `--color-bg-alt`
-- Typography: `--font-heading`, `--font-body`, `--font-size-base`, `--font-size-sm`, `--font-size-lg`, `--font-size-xl`, `--font-size-2xl`, `--font-size-3xl`, `--font-size-4xl`
-- Spacing: `--space-xs`, `--space-sm`, `--space-md`, `--space-lg`, `--space-xl`, `--space-2xl`, `--space-3xl`
-- Layout: `--container-max`, `--container-padding`
-- Effects: `--radius-sm`, `--radius-md`, `--radius-lg`, `--shadow-sm`, `--shadow-md`, `--shadow-lg`, `--transition`
+Define CSS custom properties in `:root` with the token names in
+`${CLAUDE_PLUGIN_ROOT}/skills/wp-css-system/references/tokens.md`, the set the wp-demo skill's
+skeleton starts from: `--color-primary`, `--color-background`, `--color-text`,
+`--spacing-md`, `--font-family-primary`, `--font-size-base`, `--radius-md`,
+`--shadow-md`, `--transition-base`, `--container-max` and the rest of that file.
 
 ### Section Delimiters
 Every section MUST be wrapped with clear HTML comment delimiters:
@@ -747,7 +746,7 @@ These delimiters are critical — they are used by `/wp-section` to extract indi
 - Use **the client's real sentences from `demo/RESEARCH.md`** (`## What they
   actually say`) wherever it covers the section; realistic placeholder content
   relevant to the client's industry only where it does not
-- Include placeholder images using CSS background colors or SVG placeholders (no external image URLs)
+- Where no client image exists, use a placeholder `<img>` whose `src` is an inline SVG at the intended aspect ratio, with `width`, `height` and `alt` (no external image URLs)
 - Include bilingual hints as HTML comments where applicable: `<!-- i18n: hero_title -->`
 
 ### Header

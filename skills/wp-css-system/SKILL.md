@@ -4,14 +4,23 @@ description: Plain-CSS design system for template=basic themes — custom proper
 user-invocable: false
 ---
 
-> **Applies to `template=basic` only.** If the project's `.claude/CLAUDE.md` says
-> `Template: tailwind`, stop and use the `wp-tailwind-system` skill instead. The two
-> are mutually exclusive: this skill's BEM + `:root` custom-property system is the
-> wrong output surface for a Tailwind theme.
+> **Which parts apply is decided by the `Template:` line in the project's
+> `.claude/CLAUDE.md`. Read it first.**
+>
+> | `Template:` | This skill |
+> |---|---|
+> | `basic` — a theme scaffolded before the basic starter was removed | All of it. The output is `assets/css/styles.css`. |
+> | `tailwind` | **None. Stop** and use `wp-tailwind-system`: this skill's BEM + `:root` custom-property system is the wrong output surface for a Tailwind theme. |
+> | `cinematic` | **None. Stop.** The scene CSS is `assets/css/cinematic.css`, owned by the `wp-cinematic` agent and the cinematic starter. |
+> | no `.claude/CLAUDE.md`, or no `Template:` line — a plain demo before `/wp-init` | The rules that shape the demo's `<style>`: tokens, BEM, the reset and its specificity rules, delimiters, flex/grid layout, contours and search inputs. Not `assets/css/styles.css` or page-specific CSS files, which do not exist until a theme does. |
+>
+> A craft demo (`demo mode: craft` in `.wp-create.json`) takes its tokens from
+> `demo/DESIGN.md` and the `wp-demo-craft` compositions, not from this skill's token set.
 
 # CSS Design System Standards
 
-This skill defines the CSS architecture for `template=basic` themes. The system uses **CSS custom properties** (variables), **BEM naming**, and **no build tools** -- plain CSS files served directly.
+This skill defines the plain-CSS architecture for `Template: basic` themes and for plain
+demos. The system uses **CSS custom properties** (variables), **BEM naming**, and **no build tools** -- plain CSS files served directly.
 
 ## Reference files
 
@@ -30,7 +39,7 @@ This skill defines the CSS architecture for `template=basic` themes. The system 
    skill at all — see the banner above.)
 2. **No preprocessors** -- no Sass, Less, or PostCSS
 3. **No build step** -- CSS files are authored and served as-is
-4. **All values use custom properties** -- never hardcode colors, spacing, font sizes, or other design tokens directly in rules
+4. **All values use custom properties** -- never hardcode colors, spacing, font sizes, or other design tokens directly in rules. The one exception is transcription mode (`/wp-yolo`, `/wp-section --transcribe`; see `agents/wp-css.md` § Transcription Mode), where the demo's declared values are copied verbatim and a token is used only on an exact match
 5. **BEM naming convention** for all class names
 6. **Consistency between demo HTML and WordPress theme CSS** -- the design system carries over from the demo to the theme unchanged
 7. **Layout is flex or grid** -- `position: absolute` is only for a real superposition (see below)
@@ -44,15 +53,17 @@ primary, secondary and tertiary palette with light/dark variants, a neutral ramp
 (`--color-neutral-50` … `-900`) and semantic colours (`--color-text`,
 `--color-background`, `--color-border`, …); spacing `--spacing-xs` … `-3xl`;
 font families, sizes `--font-size-xs` … `-6xl`, weights and line heights;
-shadows, radii, transitions and `--container-max`. Every name and default value is
-in [references/tokens.md](references/tokens.md) — read it when writing the `:root`
-block or deciding which token a value maps to.
+shadows, radii, transitions and `--container-max`. Every name is in
+[references/tokens.md](references/tokens.md) — read it when writing the `:root`
+block or deciding which token a value maps to. **The names and the scale are the
+contract; the values there are placeholders.** Every colour and font comes from the
+client's brand or the demo's own `:root`, never from the sample palette.
 
 ---
 
 ## Using Custom Properties in Rules
 
-**Every** color, spacing, font size, shadow, radius, and transition value in CSS rules MUST reference a custom property. Never hardcode values.
+**Every** color, spacing, font size, shadow, radius, and transition value in CSS rules MUST reference a custom property. Never hardcode values — outside transcription mode (Principle 4).
 
 ```css
 /* CORRECT */
@@ -403,7 +414,7 @@ is the guard (`/wp-finalize` runs it over the theme and the demo):
   A border on a solid fill, a card or a divider is fine.
 - **Never `filter: drop-shadow()` on a bordered rounded ring.** The filter follows the
   anti-aliased edge and picks up the same artifacts. Stack ring and shadow in one
-  `box-shadow`: `box-shadow: 0 0 0 1px var(--color-accent), 0 2px 4px rgb(0 0 0 / .2);`.
+  `box-shadow`: `box-shadow: 0 0 0 1px var(--color-primary), 0 2px 4px rgb(0 0 0 / .2);`.
 
 ### Search Inputs: One Clear Control, and It Is Yours
 

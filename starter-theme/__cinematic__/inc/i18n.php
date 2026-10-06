@@ -51,3 +51,12 @@ function __starter___setting(string $name): string {
     }
     return $value;
 }
+
+/**
+ * <html lang> follows the request, not the site locale. header.php prints
+ * language_attributes(), which reads the locale: English on every request,
+ * ?lang=es included (WCAG 3.1.1).
+ */
+add_filter('language_attributes', function (string $output): string {
+    return (string) preg_replace('/lang="[^"]*"/', 'lang="' . esc_attr(__starter___current_lang()) . '"', $output);
+});

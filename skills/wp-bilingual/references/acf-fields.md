@@ -3,6 +3,10 @@
 The rules these follow — which fields get a `_<lang>` duplicate, and which language the
 editor-facing strings are written in — are in `../SKILL.md`.
 
+Both examples are for an **English-primary** project. On a Spanish-primary one the base field
+is the Spanish, the suffix is `_en`, and every label and instruction is written in Spanish
+(*"Dejar vacío para usar la versión en español."*); names and keys stay English either way.
+
 ## Contents
 
 - Field Organization
@@ -40,7 +44,7 @@ array(
 // Spanish Tab
 array(
     'key'       => 'field_hero_tab_es',
-    'label'     => 'Espanol',
+    'label'     => 'Español',
     'type'      => 'tab',
     'placement' => 'top',
 ),

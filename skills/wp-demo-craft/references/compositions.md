@@ -24,8 +24,8 @@ competitors. Together they are what makes the classification bind on the plan
 instead of sitting unread, and it is the same row format `/wp-demo` Step 2.6
 and `SKILL.md` state — do not restate it a fourth way.
 
-Sum the motion cost before building. The index adds at most four
-viewport-heights beyond its section count; the role table carries each
+Sum the motion cost before building and check it against the budget in
+`devices.md` (`### pin`), the one place it is written; the role table carries each
 composition's cost in vh so the sum is arithmetic, not a measurement taken after
 the page is already 12,000px tall. Promote exactly one composition to the peak
 with `data-motion-peak`. Interior pages take the cheap roles and never pin — **and they are composed, not
@@ -40,8 +40,8 @@ A page whose body is hand-authored markup while the role table covers its role i
 the finding, not a shortcut. Eleven pages built from one hand-rolled template —
 eyebrow, headline, rule, definition list — are indistinguishable from each other
 with the headlines removed, which is what the squint test measures and what it
-catches. Ten of the thirteen compositions cost 0 vh, so an interior page that
-declines them is not saving budget; it is declining the library.
+catches. Every composition except `process-rail` costs 0 vh, so an interior page
+that declines them is not saving budget; it is declining the library.
 
 Deviate from a composition only with a one-line reason in `demo/BRIEF.md`. A role
 the table does not cover is built by hand under the same contract — delimiters,

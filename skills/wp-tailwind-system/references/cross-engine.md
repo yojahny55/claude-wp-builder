@@ -9,7 +9,8 @@ Verification runs Chromium, plus Firefox on Linux when a build exists. Neither s
 Firefox on Windows does to a thin rounded contour: a 1px `border` with a `border-radius`
 draws visible notches where each corner curve meets the straight edge. A build shipped
 outline buttons and ringed icon links drawn that way. Linux Firefox does not reproduce it,
-so `bin/css-contour-lint.mjs` is the guard, and `/wp-finalize` runs it:
+so `${CLAUDE_PLUGIN_ROOT}/bin/css-contour-lint.mjs` is the guard (SKILL.md § Verify runs it;
+`/wp-finalize` runs it again):
 
 - **A 1px contour on a transparent or white/near-white background is a box-shadow**, never a
   `border`: outline buttons, focused and error fields, ringed icon links. Write

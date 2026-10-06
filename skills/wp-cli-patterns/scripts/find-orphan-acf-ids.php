@@ -8,8 +8,11 @@
  * get_field() is reported as REACHES-TEMPLATE, everything else as DEAD-DATA.
  * Without one, every orphan is reported as UNCLASSIFIED.
  *
- * Read-only. Exits 1 when any orphan reaches a template, 0 otherwise — dead data
- * is worth cleaning and is not worth failing a deploy over.
+ * Read-only. Needs ACF or SCF active. Exits 1 when any orphan reaches a template
+ * (or is UNCLASSIFIED), 0 otherwise — dead data is worth cleaning and is not worth
+ * failing a deploy over — and 2 when it cannot classify: the theme path is not a
+ * directory, or no ACF/SCF is active to resolve field types. 2 is not measured,
+ * never a pass.
  *
  * WHY THIS EXISTS. Deleting a post from wp-admin does not clear its ID out of the
  * fields that point at it. The ID stays in postmeta verbatim. On an audited site a

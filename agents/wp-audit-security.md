@@ -1086,7 +1086,8 @@ present but permissive (`unsafe-inline`, `ALLOWALL`) is the finding worth filing
 
 ## Step 4: Output Report
 
-Output the JSON report matching the schema from `wp-audit-standards` skill. Structure:
+Output the JSON report with the field names of the report contract in the
+`wp-audit-standards` skill. Structure:
 
 ```json
 {
@@ -1100,13 +1101,16 @@ Output the JSON report matching the schema from `wp-audit-standards` skill. Stru
     "pass": 0,
     "skipped": 0
   },
+  "checks_executed": ["SEC-001"],
   "findings": [
     {
-      "code": "SEC-001",
-      "check": "Unescaped output",
-      "severity": "WARNING",
+      "check": "SEC-001",
       "status": "FAIL",
-      "message": "Unescaped output found — echo $var without esc_html wrapper",
+      "severity": "WARNING",
+      "ownership": "code",
+      "resource": "wp-content/themes/slug/template-parts/header.php:42",
+      "message": "Unescaped output: echo $var without esc_html wrapper",
+      "evidence": "grep -n 'echo \\$' template-parts/header.php",
       "file": "wp-content/themes/slug/template-parts/header.php",
       "line": 42,
       "auto_fixable": true

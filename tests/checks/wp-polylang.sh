@@ -229,6 +229,42 @@ grep -qF 'chosen by the URL already in hand, never by who is reading' "$s" \
 tr '\n' ' ' < "$s" | grep -qi "taxonomy TERM's fields are a separate" \
   || { echo "FAIL: SKILL.md's ACF section does not call out that a term's own fields are a separate surface from a post's"; exit 1; }
 
+# ── The skill must point at code a reader can find ──────────────────────────
+# It said pllx_acf_ref_id() lived in pll-import.php after the function moved to
+# pll-lib.php. Every "`pllx_x()` in `pll-y.php`" claim is checked against the
+# script that is supposed to define it, so the next move cannot leave one behind.
+skill_md=$(find skills/wp-polylang -name '*.md' | sort)
+claims=$(grep -ohE '`pllx_[a-z_]+\(\)` in `pll-[a-z]+\.php`' $skill_md | sort -u)
+[ -n "$claims" ] || { echo "FAIL: the skill names no pllx_ helper by file -- this check would be vacuous"; exit 1; }
+while IFS= read -r claim; do
+  fn=$(printf '%s' "$claim" | sed -E 's/^`(pllx_[a-z_]+)\(\)`.*/\1/')
+  file=$(printf '%s' "$claim" | sed -E 's/.*`(pll-[a-z]+\.php)`$/\1/')
+  grep -q "^function $fn(" "skills/wp-polylang/scripts/$file" \
+    || { echo "FAIL: the skill says $fn() is in $file, but $file does not define it"; exit 1; }
+done <<<"$claims"
+
+# It cited a gitignored .superpowers/ report and a fixture mu-plugin that only ever
+# existed on a maintainer's own site. A user has neither, so a rule resting on them
+# reads as evidence and leads nowhere.
+for gone in '.superpowers' 'pll-acf-fixture.php' 'this test site' 'Task 8 report'; do
+  hit=$(grep -lF -- "$gone" $skill_md || true)
+  [ -z "$hit" ] || { echo "FAIL: $hit cites '$gone', which no user of the plugin has"; exit 1; }
+done
+
+# Non-text ACF types are copied onto the counterpart (pllx_acf_copy_untranslated), not
+# left "untouched by the importer" as the skill used to say -- an agent believing that
+# copies them by hand, or reads a blank image on a new counterpart as expected.
+hit=$(grep -lF 'untouched by the importer' $skill_md || true)
+[ -z "$hit" ] || { echo "FAIL: $hit still says untranslated ACF types are untouched by the importer"; exit 1; }
+grep -qF 'pllx_acf_copy_untranslated()' $skill_md \
+  || { echo "FAIL: the skill no longer says pllx_acf_copy_untranslated() copies the untranslated ACF types"; exit 1; }
+grep -q '^function pllx_acf_copy_untranslated(' "$imp" \
+  || { echo "FAIL: pll-import.php no longer defines pllx_acf_copy_untranslated(), which the skill documents"; exit 1; }
+
+# A command's plugin path must not be relative: it resolves against the user's project.
+grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/wp-polylang/SKILL.md' "$c" \
+  || { echo "FAIL: $c does not read the skill through \${CLAUDE_PLUGIN_ROOT}"; exit 1; }
+
 # ── The string helper must resolve its source from the primary language ────
 # A hardcoded 'en' as the lookup key breaks pll__() on every non-English-primary
 # project: the registry is keyed by the value pll_register_string() was given

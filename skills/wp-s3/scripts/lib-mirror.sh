@@ -148,10 +148,12 @@ require_mcli() {
         return 0
     fi
 
+    # Recommends a directory on PATH, not $dir: that one sits inside the installed plugin,
+    # which a plugin update replaces, so a client put there vanished on the next update.
     echo "ERROR: mcli is not installed." >&2
-    echo "Install the single standalone binary and put it on PATH or at $dir/mcli:" >&2
-    echo "  curl -fsSLo '$dir/mcli' https://dl.min.io/client/mc/release/linux-amd64/mc" >&2
+    echo "Install the single standalone binary on PATH, for example as ~/.local/bin/mcli:" >&2
+    echo "  mkdir -p ~/.local/bin && curl -fsSLo ~/.local/bin/mcli https://dl.min.io/client/mc/release/linux-amd64/mc" >&2
     echo "  curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc.sha256sum" >&2
-    echo "  # verify the checksum, then: chmod 755 '$dir/mcli'" >&2
+    echo "  # verify the checksum, then: chmod 755 ~/.local/bin/mcli" >&2
     return 1
 }

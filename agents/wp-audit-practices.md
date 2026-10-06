@@ -224,11 +224,13 @@ Every item below is answerable by reading the templates, so all of them run on e
 
 ## Step 4: Output Report
 
-Generate the audit report as JSON following the `wp-audit-standards` schema. Include:
+Generate the audit report as JSON with the field names of the report contract in
+`wp-audit-standards`. Include:
 
 - `audit_type`: `"practices"`
 - `tier`: which tiers were executed (1, 2, 3)
-- `findings`: array of finding objects, each with `code`, `severity`, `message`, `file`, `line`, `auto_fixable`
+- `checks_executed`: the id of every check that ran, passes included
+- `findings`: array of finding objects, each with `check`, `status`, `severity`, `ownership`, `resource`, `message`, `file`, `line`, `auto_fixable`
 - `summary`: counts by severity (CRITICAL, WARNING, INFO)
 - `score`: percentage of checks passed
 

@@ -161,11 +161,39 @@ for rule in 'Use when' 'Freedom matches fragility' 'One term per concept' 'Nothi
 done
 
 # ---------------------------------------------------------------------------
+# 9c. The release gates gate. The ritual chained `for f in …; do bash "$f"; done && bash
+#     bin/doc-sync-check.sh`: a loop's exit status is its LAST iteration's, so a red check
+#     earlier in the alphabet passed straight through the `&&`. It also skipped the BACKLOG.md
+#     reconciliation backlog-freshness.sh requires — following it cut a release whose own
+#     suite failed — and never said how to push the tag.
+# ---------------------------------------------------------------------------
+for f in "$s" "$c"; do
+  ! grep -Fq 'done && bash bin/doc-sync-check.sh' "$f" \
+    || fail "$f chains the check loop into doc-sync with &&, which only sees the last check's status"
+  grep -Fq '**Reconciled** on' "$f" \
+    || fail "$f releases without reconciling BACKLOG.md, which backlog-freshness.sh fails on"
+done
+grep -Fq 'fail=0; for f in tests/checks/*.sh; do bash "$f" || { echo "FAILED: $f"; fail=1; }; done' "$s" \
+  || fail "$s does not give the aggregating form of the check loop"
+grep -Fq '[ "$fail" = 0 ] && bash bin/doc-sync-check.sh' "$s" \
+  || fail "$s does not gate doc-sync on every check passing"
+grep -Fq 'git push origin main && git push origin vX.Y.Z' "$c" \
+  || fail "$c does not say how to push the release commit and its tag"
+step5=$(awk '/^## Step 5/{f=1} f' "$c")
+recon=$(grep -n 'Reconciled' <<<"$step5" | head -1 | cut -d: -f1 || true)
+commit=$(grep -n 'chore(release)' <<<"$step5" | head -1 | cut -d: -f1 || true)
+[ -n "$recon" ] && [ -n "$commit" ] && [ "$recon" -lt "$commit" ] \
+  || fail "$c Step 5 must reconcile BACKLOG.md before the release commit"
+
+# ---------------------------------------------------------------------------
 # 10. Both are documented where a contributor looks.
 # ---------------------------------------------------------------------------
 grep -Fq 'wp-contributing' README.md || fail "the wp-contributing skill is not in README.md's skills table"
 grep -Fq 'wp-contribute' CONTRIBUTING.md \
   || fail "CONTRIBUTING.md — the front door — never mentions /wp-contribute"
+# An agent without `model:` fails model-routing.sh; the front door listed the other three keys only.
+grep -Eq 'frontmatter with `name`, `description`, `tools`.*`model`' CONTRIBUTING.md \
+  || fail "CONTRIBUTING.md lists an agent's frontmatter without model, which model-routing.sh requires"
 
 # ---------------------------------------------------------------------------
 # 11. And the gate actually passes on this repo right now.

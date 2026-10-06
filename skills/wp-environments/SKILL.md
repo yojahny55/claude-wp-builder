@@ -21,45 +21,25 @@ This skill teaches how to detect the local development environment, read project
 
 ## 1. Environment Detection
 
-Run the detection script to discover what tools are available on the system:
+Run the detection script — run it, do not reimplement it. It needs no sudo, prints JSON on
+stdout and exits 0; an unknown subcommand prints the usage and exits 1:
 
 ```bash
-bin/wp-env-setup.sh detect
+bash -c "${CLAUDE_PLUGIN_ROOT}/bin/wp-env-setup.sh detect"
 ```
 
-This outputs JSON to stdout. Parse it to understand what is available. The full output structure:
+The top-level keys are `os`, `package_manager`, `web_servers` (`nginx`, `apache`, `caddy`),
+`php` (`versions`, `active`, `extensions`), `docker` (`installed`, `version`, `compose`),
+`tools` (`ddev`, `lando`, `wp-env`, `wp-cli`) and `database` (`mariadb`, `mysql`). A tool that
+is absent still carries every key, with an empty version — test `installed`, never the
+presence of `version`:
 
 ```json
-{
-  "os": "fedora",
-  "package_manager": "dnf",
-  "web_servers": {
-    "nginx": { "installed": true, "version": "1.24.0", "running": true },
-    "apache": { "installed": true, "version": "2.4.58", "running": false },
-    "caddy": { "installed": false }
-  },
-  "php": {
-    "versions": ["8.2", "8.3"],
-    "active": "8.3",
-    "extensions": ["mysql", "curl", "mbstring", "xml", "gd", "zip", "intl"]
-  },
-  "docker": {
-    "installed": true,
-    "version": "24.0.7",
-    "compose": true
-  },
-  "tools": {
-    "ddev": { "installed": false },
-    "lando": { "installed": false },
-    "wp-env": { "installed": false },
-    "wp-cli": { "installed": true, "version": "2.9.0" }
-  },
-  "database": {
-    "mariadb": { "installed": true, "version": "10.11", "running": true },
-    "mysql": { "installed": false }
-  }
-}
+"caddy": { "installed": false, "version": "", "running": false }
 ```
+
+`php.versions` lists the versions installed under `/etc/php/` (Debian, Ubuntu) or through
+Homebrew; anywhere else it holds only the active one.
 
 Use this output to:
 - Present available environment options to the user
@@ -93,7 +73,6 @@ The `.wp-create.json` file is the single source of truth for all commands, agent
   "database": {
     "name": "wp_my_project",
     "user": "root",
-    "password": "root",
     "host": "db"
   },
   "wordpress": {
@@ -131,7 +110,9 @@ The `.wp-create.json` file is the single source of truth for all commands, agent
 
 Always check for `.wp-create.json` at the project root before executing WP-CLI commands. If it exists, read `wp_cli.wrapper` and use it as the command prefix (referred to as `$WP` throughout this project).
 
-If `.wp-create.json` does not exist, commands and agents work without WP-CLI integration -- no breaking changes to existing workflows.
+If `.wp-create.json` does not exist, the commands' gate (`wp-config.mjs validate`) exits `3`:
+the project was not created by `/wp-create`. Most commands stop there; a site that already
+runs and only needs registering goes through `/wp-adopt`, which writes the manifest.
 
 ---
 
@@ -173,97 +154,75 @@ All template files (`.tpl` extension) use `{{placeholder}}` syntax. No template 
 2. Replace every `{{placeholder}}` with the corresponding value from `.wp-create.json` or the detection output
 3. Write the result to the final config file path (without the `.tpl` extension)
 
-### Example
+The templates live in `${CLAUDE_PLUGIN_ROOT}/templates/native/` and
+`${CLAUDE_PLUGIN_ROOT}/templates/docker/` (including the dot-files `.wp-env.json.tpl`,
+`.lando.yml.tpl` and `.ddev/`). A file written with a `{{…}}` token still in it is broken —
+docker compose and wp-env refuse it — so every token below is replaced, and these are all the
+tokens the templates use:
 
-Given `templates/native/nginx.conf.tpl` containing:
+| Placeholder | Source | Example |
+|-------------|--------|---------|
+| `{{domain}}` | `project.domain` | `my-project.local.com` |
+| `{{document_root}}` | `project.path` | `/var/www/html/my-project` |
+| `{{project_name}}` | `project.slug` | `my-project` |
+| `{{theme_slug}}` | `theme.slug` | `my-project` |
+| `{{php_version}}` | `environment.php_version` | `8.3` |
+| `{{web_server}}` | `environment.web_server` | `nginx` |
+| `{{db_name}}` | `database.name` | `wp_my_project` |
+| `{{db_user}}` | `database.user` | `root` |
+| `{{db_password}}` | **Not a manifest field.** `bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' db_password"` | generated per project, never a fixed default |
+| `{{ssl_cert}}` | Derived: `/etc/ssl/certs/<domain>.crt` | |
+| `{{ssl_key}}` | Derived: `/etc/ssl/private/<domain>.key` | |
+| `{{php_fpm_sock}}` | Derived: `/var/run/php/php<php_version>-fpm.sock` | |
+| `{{web_user}}` | Derived from the OS: `nginx` (Fedora/RHEL with nginx), `apache` (Fedora/RHEL with Apache), `www-data` (Debian/Ubuntu) | |
+| `{{max_upload_size}}` | `1024M` unless the user asks otherwise; nginx templates only | `1024M` |
+| `{{http_port}}` | Host port for HTTP: docker compose and wp-env (see section 5) | `80`, wp-env `8888` |
+| `{{https_port}}` | Host port for HTTPS, docker compose | `443` |
+| `{{tests_port}}` | wp-env's tests site | `8889` |
+| `{{phpmyadmin_port}}` | docker compose | `8080` |
+| `{{mailpit_port}}` | Mailpit's web UI, docker compose | `8025` |
+| `{{mailpit_smtp_port}}` | Mailpit's SMTP, docker compose | `1025` |
 
-```nginx
-server {
-    listen 443 ssl;
-    server_name {{domain}};
-    root {{document_root}};
-
-    ssl_certificate {{ssl_cert}};
-    ssl_certificate_key {{ssl_key}};
-
-    location ~ \.php$ {
-        fastcgi_pass unix:{{php_fpm_sock}};
-    }
-}
-```
-
-Replace placeholders with values from the manifest to produce the final nginx config —
-except the secrets. The database password is not in `.wp-create.json` any more: it lives in
-the gitignored `.wp-create.local.json`, and the only supported way to read it is
+The database password is the one value not read from `.wp-create.json`: it lives in the
+gitignored `.wp-create.local.json`, and the only supported way to read it is
 `wp-config.mjs get '${PROJECT_PATH}' db_password`, which resolves environment → local file →
 manifest and warns when the last rung wins. Reading that field out of the manifest yields an
 empty value on every project `/wp-create` has written since, and a silent legacy read on
-every project it has not.
-
-### Common Placeholders
-
-| Placeholder | Example Value |
-|-------------|---------------|
-| `{{domain}}` | `my-project.local.com` |
-| `{{document_root}}` | `/var/www/html/my-project` |
-| `{{php_version}}` | `8.3` |
-| `{{db_name}}` | `wp_my_project` |
-| `{{db_user}}` | `root` |
-| `{{db_password}}` | generated per project — never a fixed default, and never read from the manifest |
-| `{{db_host}}` | `localhost` or `db` |
-| `{{project_name}}` | `my-project` |
-| `{{ssl_cert}}` | `/etc/ssl/certs/my-project.local.com.crt` |
-| `{{ssl_key}}` | `/etc/ssl/private/my-project.local.com.key` |
-| `{{php_fpm_sock}}` | `/var/run/php/php8.3-fpm.sock` |
-| `{{web_user}}` | `nginx` or `www-data` or `apache` |
-
-### Mapping Placeholders to Manifest Fields
-
-| Placeholder | Manifest Path |
-|-------------|--------------|
-| `{{domain}}` | `project.domain` |
-| `{{document_root}}` | `project.path` |
-| `{{php_version}}` | `environment.php_version` |
-| `{{db_name}}` | `database.name` |
-| `{{db_user}}` | `database.user` |
-| `{{db_password}}` | **Not a manifest field.** `bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' db_password"` |
-| `{{db_host}}` | `database.host` |
-| `{{project_name}}` | `project.slug` |
-| `{{ssl_cert}}` | Derived: `/etc/ssl/certs/<domain>.crt` |
-| `{{ssl_key}}` | Derived: `/etc/ssl/private/<domain>.key` |
-| `{{php_fpm_sock}}` | Derived: `/var/run/php/php<php_version>-fpm.sock` |
-| `{{web_user}}` | Derived from OS: `nginx` (Fedora/RHEL), `www-data` (Debian/Ubuntu), `apache` (RHEL with Apache) |
+every project it has not. `${PROJECT_PATH}` is not an environment variable the way
+`${CLAUDE_PLUGIN_ROOT}` is: it is the directory holding `.wp-create.json`, and you substitute
+the real path yourself, because inside the double quotes an unset one expands to nothing. The
+command exits `0` with the value, `1` when no rung holds one (or the key is unknown), and `3`
+when there is no manifest.
 
 ---
 
 ## 5. Docker Port Conflict Detection
 
-Before starting Docker containers, check for port conflicts. Default ports used by the stack:
+Before starting containers, check only the host ports the templates publish. The database
+is not one of them — `docker-compose.yml.tpl` publishes no port for `db` — so a native
+MariaDB on 3306 is not a conflict.
 
-- **80/443** -- Web server (HTTP/HTTPS)
-- **3306** -- MariaDB/MySQL
-- **8080** -- phpMyAdmin
-- **8025** -- Mailpit
-
-### Detection Commands
+| Port | Placeholder | Template |
+|---|---|---|
+| 80 | `{{http_port}}` | `docker-compose.yml.tpl` |
+| 443 | `{{https_port}}` | `docker-compose.yml.tpl` |
+| 8080 | `{{phpmyadmin_port}}` | `docker-compose.yml.tpl` |
+| 8025 | `{{mailpit_port}}` | `docker-compose.yml.tpl` |
+| 1025 | `{{mailpit_smtp_port}}` | `docker-compose.yml.tpl` |
+| 8888 | `{{http_port}}` | `.wp-env.json.tpl` |
+| 8889 | `{{tests_port}}` | `.wp-env.json.tpl` |
 
 ```bash
-# Linux — check listening ports
-ss -tlnp | grep ':80 \|:443 \|:3306 \|:8080 \|:8025 '
-
+# Linux (docker compose; for wp-env check 8888 and 8889 instead)
+ss -tlnp | grep -E ':(80|443|8080|8025|1025) '
 # macOS or fallback
-lsof -i :80 -i :443 -i :3306 -i :8080 -i :8025
+lsof -i :80 -i :443 -i :8080 -i :8025 -i :1025
 ```
 
-### Conflict Resolution
-
-If a port is in use:
-
-1. Identify which process holds the port
-2. Offer the user alternatives:
-   - Stop the conflicting service
-   - Assign a different port (e.g., 8081 instead of 8080)
-3. Update the manifest and generated config files with the alternative port
+A port in use gets the next free alternative (8081 for 8080, 8444 for 443), substituted into
+its placeholder; stop the service holding it only when the user asks. No manifest field holds
+a port: the generated `docker-compose.yml` or `.wp-env.json` is the record, so read the port
+back from there.
 
 ---
 
@@ -271,18 +230,22 @@ If a port is in use:
 
 ### Native Environments
 
-PHP version management depends on the OS detected by `bin/wp-env-setup.sh detect`:
+Run the script; do not type the package names yourself — they differ per OS and the script
+already carries them, with the extensions WordPress needs (`cli fpm mysql curl mbstring xml
+gd zip intl`):
 
-| OS | Package Manager | Install Command | Switch Command |
-|----|----------------|-----------------|----------------|
-| Fedora/RHEL | `dnf` | `sudo dnf install php8.3 php8.3-fpm php8.3-mysql php8.3-mbstring php8.3-xml php8.3-gd php8.3-zip php8.3-intl` | Update PHP-FPM pool and restart service |
-| Ubuntu/Debian | `apt` | `sudo apt install php8.3 php8.3-fpm php8.3-mysql php8.3-mbstring php8.3-xml php8.3-gd php8.3-zip php8.3-intl` | `sudo update-alternatives --set php /usr/bin/php8.3` |
-| macOS | `brew` | `brew install php@8.3` | `brew link php@8.3 --force` |
-| Any (advanced) | `phpbrew` | `phpbrew install 8.3` | `phpbrew switch 8.3` |
+```bash
+bash -c "${CLAUDE_PLUGIN_ROOT}/bin/wp-env-setup.sh php-list"                  # installed versions, no sudo
+bash -c "${CLAUDE_PLUGIN_ROOT}/bin/wp-env-setup.sh php-install --version=8.3" # needs sudo
+```
 
-Use `bin/wp-env-setup.sh php-list` to see available PHP versions before attempting installation.
-
-Use `bin/wp-env-setup.sh php-install --version=8.3` to install a new version (requires sudo).
+`php-list` lists the versions already **installed** (`/etc/php/*/` on Debian and Ubuntu,
+Homebrew on macOS); anywhere else, Fedora included, it prints only the active one. It shows
+nothing that is merely available to install. `php-install` exits `1` without `--version` and
+on an unsupported OS. On Debian and Ubuntu it adds the `ondrej/php` PPA first; on Fedora it
+installs `php83` and its `php83-*` packages, falling back to the Remi naming. Switching the
+CLI version is not scripted: on Debian and Ubuntu it is
+`sudo update-alternatives --set php /usr/bin/php8.3`.
 
 ### Docker Environments
 
@@ -348,7 +311,7 @@ When `wp-config.php` is found:
 
 ## Summary Checklist
 
-- [ ] Run `bin/wp-env-setup.sh detect` and parse the JSON output before making environment decisions
+- [ ] Run `${CLAUDE_PLUGIN_ROOT}/bin/wp-env-setup.sh detect` and parse the JSON output before making environment decisions
 - [ ] Read `.wp-create.json` for all project configuration -- never hardcode values
 - [ ] Use `wp_cli.wrapper` from the manifest as the WP-CLI command prefix
 - [ ] Replace `{{placeholders}}` in `.tpl` files using manifest values

@@ -15,10 +15,17 @@ grep -Fq 'Below **24x24 CSS px fails** (WCAG 2.2 AA 2.5.8)' "$a" || fail "$a doe
 grep -Fq 'desktop (1440) **and** mobile (390)' "$a" || fail "$a does not measure at desktop and mobile"
 grep -Fq 'report it as INFO advice, never as a finding' "$a" || fail "$a still treats 44x44 as a finding"
 grep -Fq 'min 44x44px | WARNING' "$a" && fail "$a still fails targets under 44x44"
-grep -Fq '| Touch target size | 24x24 CSS pixels fails' skills/wp-audit-standards/SKILL.md \
+grep -Fq '| Touch target size | Smaller than 24x24 CSS pixels fails' skills/wp-audit-standards/SKILL.md \
   || fail "wp-audit-standards still sets 44x44 as the threshold"
-grep -Fq 'below 24×24 fails per WCAG 2.5.8' skills/wp-audit-ux-standards/SKILL.md \
-  || fail "UX-009 does not use the 24x24 threshold"
+# UX-009 is the spacing between action elements. The size threshold is A11Y-028's alone: when
+# UX-009 restated it, one 20px control was reported twice, under two codes, against the
+# usability skill's own rule that the accessibility code wins.
+ux9=$(grep -E '^\| UX-009 ' skills/wp-audit-ux-standards/SKILL.md || true)
+[ -n "$ux9" ] || fail "the usability catalog lost UX-009"
+grep -Fq 'A target smaller than 24×24 is `A11Y-028`, not this row' <<<"$ux9" \
+  || fail "UX-009 does not hand target size to A11Y-028"
+grep -Eq 'fails per WCAG 2\.5\.8|44×44' <<<"$ux9" \
+  && fail "UX-009 restates a target-size threshold that A11Y-028 owns"
 grep -Fq 'equal negative margin' skills/wp-responsive/SKILL.md || fail "wp-responsive lacks the no-move fix"
 
 # The generators of the three measured offenders.

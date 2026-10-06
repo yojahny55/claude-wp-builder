@@ -85,9 +85,10 @@ local site, a serial crawl of production — and never stopped to report. So:
 
 ## Step 1: Decide what applies, before measuring anything
 
-Walk the site's shape first and write down which criteria are N/A and why: no form, no
-external links, no images, no account, one page, no long prose, no icons. The applicability
-table in the standards skill is the list.
+Walk the site's shape first and write down which criteria are N/A and why. The
+*Applicability* list in the standards skill is the only statement of it — no form, no
+external links, no image used as a link, one page and the rest, each with the criteria it
+excludes; every criterion not on it applies.
 
 Do this **first**, not while scoring. Deciding applicability as you go lets an awkward
 criterion become N/A because it was hard to measure, which is the failure mode the split

@@ -42,7 +42,9 @@ All 16 domains agents should know. Every command below is prefixed with `$WP` in
 - `--format=json` — machine-readable output for parsing
 - `--format=table` — human-readable output for display
 - `--allow-root` — required inside Docker containers running as root
-- `--force` — skip confirmation prompts (e.g., `wp post delete 1 --force`)
+- `--force` on `wp post delete` — **permanently deletes, bypassing the trash**; without it the
+  post goes to the trash and can be restored. It is not a confirmation skip (that is `--yes`,
+  on the commands that prompt). Use it only on a record you have just confirmed is this run's own.
 
 ---
 
@@ -102,6 +104,11 @@ $WP cache flush
 
 ## Seeding Bilingual Content
 
+Which recipe applies is the project's recorded `i18n strategy` (absent means `suffix`).
+
+**`suffix`** — secondary-language values go into `_<lang>` duplicates, on pages and on the
+options page alike:
+
 ```bash
 # Primary language (no suffix)
 $WP eval "update_field('hero_title', 'Building Digital Excellence', 'option');"
@@ -113,11 +120,15 @@ $WP eval "update_field('hero_subtitle_es', 'Creamos sitios web que funcionan', '
 # Bilingual repeater subfields
 $WP eval "
 \$rows = get_field('services_cards', 'option');
-\$rows[0]['title_es'] = 'Diseno Web';
+\$rows[0]['title_es'] = 'Diseño Web';
 \$rows[1]['title_es'] = 'SEO';
 update_field('services_cards', \$rows, 'option');
 "
 ```
+
+**`polylang`** — seed the primary-language posts with unsuffixed fields only, and let
+`/wp-polylang` create and fill the other language's posts. Only the options page, which is
+global, keeps `_<lang>` duplicates, written exactly as in the `suffix` block above.
 
 ---
 
@@ -136,6 +147,16 @@ $WP option update page_on_front $HOME_ID
 
 ### Create and Assign Menus
 
+Assign only to locations the theme registers; `wp menu location assign` refuses any other name.
+List them rather than guessing (underscore or hyphen, suffixed or bare):
+
+```bash
+$WP menu location list --format=csv
+```
+
+**`suffix`** — one location per language (the tailwind starter registers `primary-en`,
+`primary-es`, `mobile-*` and `footer-*`), one menu per language, each assigned to its own:
+
 ```bash
 $WP menu create "Primary EN"
 $WP menu create "Primary ES"
@@ -143,11 +164,17 @@ $WP menu create "Primary ES"
 $WP menu item add-post primary-en $HOME_ID --title="Home"
 $WP menu item add-post primary-en $ABOUT_ID --title="About"
 $WP menu item add-post primary-es $HOME_ID --title="Inicio"
-$WP menu item add-post primary-es $ABOUT_ID --title="Acerca"
+$WP menu item add-post primary-es $ABOUT_ID --title="Acerca de"
 
-$WP menu location assign "Primary EN" primary_en
-$WP menu location assign "Primary ES" primary_es
+$WP menu location assign "Primary EN" primary-en
+$WP menu location assign "Primary ES" primary-es
 ```
+
+**`polylang`** — one bare location per name (`primary`, `footer`), with no language suffix.
+Assign the primary-language menu to it with `wp menu location assign` — that writes the core
+`nav_menu_locations` theme_mod, which Polylang's per-language slots only override and never
+create — and leave the other languages' menus to `/wp-polylang`'s import. Never create a
+`primary-es` location here. Why both halves are needed: "Menus" in `wp-polylang`.
 
 ### Import Media and Use Attachment ID
 

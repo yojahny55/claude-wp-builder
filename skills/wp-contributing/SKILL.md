@@ -137,9 +137,18 @@ quote the value; `tests/checks/frontmatter-yaml.sh` fails on it in every layer.
 
 ### Before you open a PR
 
-1. `for f in tests/checks/*.sh; do bash "$f"; done` — all green.
-2. `bash bin/doc-sync-check.sh` — README tables, `docs/commands.md`, frontmatter and the
-   version references all agree.
+1. Run every check and the doc-sync gate, from the repo root, exactly like this — a bare
+   `for` loop's exit status is its *last* check's, so a red check earlier in the alphabet
+   reads as green:
+
+   ```bash
+   fail=0; for f in tests/checks/*.sh; do bash "$f" || { echo "FAILED: $f"; fail=1; }; done
+   [ "$fail" = 0 ] && bash bin/doc-sync-check.sh
+   ```
+
+   No `FAILED:` line, and doc-sync passes. Fix what fails and run it again until it does.
+2. `bin/doc-sync-check.sh` is the half the greps cannot do — README tables,
+   `docs/commands.md`, frontmatter and the version references all agree.
 3. **New behavior has a new check.** This is the one reviewers actually block on.
    A new or changed skill also passes `/wp-contribute review <name>` — the judgment half
    of the audit, against [references/skill-review.md](references/skill-review.md).
@@ -185,7 +194,8 @@ around and the child silently keeps the wrong base.
 
 ```bash
 git checkout main && git pull --ff-only
-for f in tests/checks/*.sh; do bash "$f"; done && bash bin/doc-sync-check.sh
+fail=0; for f in tests/checks/*.sh; do bash "$f" || { echo "FAILED: $f"; fail=1; }; done
+[ "$fail" = 0 ] && bash bin/doc-sync-check.sh
 ```
 
 1. **Pick the bump** (semver): new command, agent or skill → minor. Fixes and doc work →
@@ -197,10 +207,19 @@ for f in tests/checks/*.sh; do bash "$f"; done && bash bin/doc-sync-check.sh
    Never rename the heading: every open PR edits under it, so a rename conflicts all of them on
    `CHANGELOG.md`. Write entries for any PR that merged without one — that happens, and release
    time is the last chance to catch it.
-4. `git commit -m "chore(release): vX.Y.Z"`, `git tag -a vX.Y.Z -m "vX.Y.Z"`, push the commit
-   and the tag.
-5. `env -u GH_TOKEN gh release create vX.Y.Z --title "…" --notes-file <file> --latest`.
-6. **Verify it is actually live:** the release is published and not a draft, the tag resolves
+4. **Reconcile `BACKLOG.md`** against what this release ships, and set its
+   `**Reconciled** on <Month D, YYYY>` line to today. `tests/checks/backlog-freshness.sh` fails
+   as soon as the new release heading is dated after that line.
+5. **Run the gates again** — the block above. The version and backlog checks can only go red
+   after steps 2-4; fix and re-run until both pass.
+6. Commit, tag and push the commit and the tag:
+
+   ```bash
+   git commit -am "chore(release): vX.Y.Z" && git tag -a vX.Y.Z -m "vX.Y.Z"
+   git push origin main && git push origin vX.Y.Z
+   ```
+7. `env -u GH_TOKEN gh release create vX.Y.Z --title "…" --notes-file <file> --latest`.
+8. **Verify it is actually live:** the release is published and not a draft, the tag resolves
    on the remote, and the raw `.claude-plugin/*.json` on GitHub serve the new version — that
    is what a user's install resolves against. There is no publish CI in this repo; the GitHub
    release *is* the artifact.

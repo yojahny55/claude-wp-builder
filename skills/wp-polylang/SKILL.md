@@ -164,20 +164,23 @@ Rules:
 - **Same host only.** Compared by *host*, not by a `home_url()` string
   prefix — `url_to_postid()` itself tolerates a scheme mismatch (measured:
   an `https://` href against an `http://` site still resolved), and a
-  literal prefix test would not. A different host is never touched.
+  literal prefix test would not. A leading `www.` is ignored on both sides,
+  as `url_to_postid()` ignores it. A different host is never touched.
 - **Resolved with `url_to_postid()`.** A zero result means it is not a post
   URL (an archive, a term, the home page) and is left exactly as it is.
-  Measured on this test site: a WooCommerce shop page's own permalink does
-  **not** resolve through `url_to_postid()` even with the correct host —
-  this is a real, observed limitation of WordPress's own resolver, not a
-  bug in this pass, and such links are silently left alone like any other
-  non-post URL.
+  A WooCommerce shop page's own permalink does **not** resolve through
+  `url_to_postid()` even with the correct host — a limitation of WordPress's
+  own resolver, not of this pass — so such links are left alone like any
+  other non-post URL.
 - **Re-pointed via `pll_get_post( $id, $target_lang )`.** If it returns
   nothing, the target has no counterpart yet: the link is left pointed at
   the source and `pllx_warn()` names both posts. A link into the other
   language is bad; a broken link is worse.
 - **Query string and fragment are preserved**, and a root-relative href is
   written back root-relative (`/servicios/?x=1#contacto` keeps both parts).
+  The one exception is the `p`, `page_id` and `attachment_id` arguments that
+  identified the source post: they are dropped, because `url_to_postid()`
+  matches them first and re-appending them would resolve back to the source.
 - Idempotent: every candidate rewrite is compared against the current value
   first, so a second run over unchanged content writes nothing and
   `post_content` stays byte-identical.
@@ -359,10 +362,17 @@ equivalent yet.
 | Field type | Key shape |
 |---|---|
 | `text`, `textarea`, `wysiwyg` | `name` |
-| `group` (one level) | `group_name.sub_name` |
-| `repeater` (one level) | `repeater_name.ROW_INDEX.sub_name` |
-| `flexible_content` (one level) | `flex_name.ROW_INDEX.sub_name` |
+| `group` | `group_name.sub_name` |
+| `repeater` | `repeater_name.ROW_INDEX.sub_name` |
+| `flexible_content` | `flex_name.ROW_INDEX.sub_name` |
 | `link` (title only) | `link_name.title` |
+
+Containers are walked to any depth: a `group` inside a `repeater` row, a
+`repeater` inside a flexible-content layout, and so on, each level adding its
+own segment (`sections.0.cta.label`). A flexible-content row's sub-fields are
+matched by layout **name**. The writer resolves a dotted path by the field
+structure, not by counting dots, and refuses a path that does not match it
+rather than writing to a guessed location.
 
 A `flexible_content` row's own `acf_fc_layout` tag is never emitted as a
 translatable key — it is a machine identifier, not text — but the importer
@@ -372,13 +382,15 @@ first time (a brand-new translation counterpart) gets it backfilled from the
 corresponding row on the *source* post, since that's the only other place
 that still identifies the row's layout. Without this, a fresh flexible-content
 row written through the same dot-notation path as a repeater row is invalid
-and SCF/ACF silently drops the whole field — this was measured, not assumed
-(see `tests/checks/wp-polylang-live.sh` and the Task 8 report in
-`.superpowers/sdd/2026-08-21-wp-polylang-retrofit/`).
+and SCF/ACF silently drops the whole field.
 
-**Copied verbatim, never translated** (present in the field group, absent
-from the dot-notation map, untouched by the importer): `image`, `number`,
-`true_false`, `url`, and any other type not listed above.
+**Copied, never translated** (present in the field group, absent from the
+dot-notation map): `image`, `number`, `true_false`, `url`, and any other type
+not listed above. `pllx_acf_copy_untranslated()` in `pll-import.php` copies
+their stored rows onto the counterpart verbatim — and only when the
+counterpart has never had that field set, so an editor's later change is never
+undone. An `image` or `file` id is copied as-is, not swapped for that
+attachment's own translation.
 
 **Re-pointed, not translated** (never walked into the manifest at all; fixed
 up directly on the target post by the link-rewrite pass in `pll-import.php`
@@ -390,15 +402,11 @@ run, resolves each reference through `pll_get_post()`, and writes the
 target-language equivalent onto the target post, since nothing else ever
 gives the target a value for these types to begin with.
 
-Measured on the test site's fixture (`pll-acf-fixture.php`, extended for
-Task 9): with `return_format` left at its default, `page_link` returns a
-permalink **string**, never an id, and is not configurable to return one —
-this is what "handle what you actually observe rather than what the
-documentation implies" turned up here. `post_object` and `relationship` were
-configured with `return_format => 'id'` for this pass to have a stable shape
-to write; `pllx_acf_ref_id()` in `pll-import.php` also tolerates the
-`return_format => 'object'` shape (`WP_Post`/array with `ID`) defensively,
-though that was not the configuration measured.
+With `return_format` left at its default, `page_link` returns a permalink
+**string**, never an id, and is not configurable to return one.
+`post_object` and `relationship` are expected with `return_format => 'id'`;
+`pllx_acf_ref_id()` in `pll-lib.php` also accepts the
+`return_format => 'object'` shape (`WP_Post`/array with `ID`).
 
 **A plain `url` field stays a negative control, deliberately.** An ACF `url`
 field that happens to hold an internal link is **not** re-pointed by this
@@ -407,9 +415,9 @@ would be. The reasoning: `url`, `image`, `number` and `true_false` are all
 generic scalar types with no reference semantics ACF itself is aware of —
 treating "the string looks like this site's URL" as a signal would mean
 guessing intent from content rather than from the field's declared type,
-and would make a project's actual "do not touch this URL" field (exactly
-what this test site's `pll_url` fixture field represents) unpredictably
-mutable depending on what a translator happens to paste into it. `link`,
+and would make a project's actual "do not touch this URL" field
+unpredictably mutable depending on what a translator happens to paste into
+it. `link`,
 `page_link`, `post_object` and `relationship` are unambiguous because ACF
 itself defines them as references; `url` is not, so it is left alone like
 any other scalar. If a project needs a plain `url` field re-pointed, model
@@ -424,14 +432,8 @@ a **second** object (type `clone`) whose value duplicates the original
 field's, backed by the same underlying meta; walking that would emit the same
 text twice under two different dotted keys, and writing both back
 independently risks the second write clobbering the first with a different
-translation. Both shapes were probed live before reaching this conclusion —
-adding a `clone` branch would open the exact "translate the same thing twice
-and let the last write win" defect class this plan exists to close, not
-prevent it.
-
-**Ceiling:** one level of nesting inside `group`, `repeater` and
-`flexible_content` — a group nested inside a repeater or a flexible-content
-layout is not walked. Widen `pllx_acf_walk()` if a project needs more.
+translation. Adding a `clone` branch would open exactly that "translate the
+same thing twice and let the last write win" defect.
 
 Verified against **Secure Custom Fields (SCF) 6.9.5** — the free,
 wordpress.org fork that ships `repeater`, `group`, `flexible_content` and

@@ -472,16 +472,19 @@ proposing that fix: it is measured there, and it made LCP worse.
 
 ## Step 4: Output Report
 
-Output findings as JSON following the `wp-audit-standards` schema. Each finding includes:
+Output findings as JSON with the field names of the report contract in `wp-audit-standards`,
+and return `checks_executed` beside them. Each finding includes:
 
 ```json
 {
-  "code": "PERF-001",
-  "title": "CSS too large",
-  "severity": "WARNING",
+  "check": "PERF-001",
   "status": "FAIL",
-  "details": "styles.css is 142KB, exceeds 100KB budget",
-  "autofix": false,
+  "severity": "WARNING",
+  "ownership": "code",
+  "resource": "assets/css/styles.css",
+  "message": "CSS too large: styles.css is 142KB, over the 100KB budget",
+  "evidence": "gzip -c assets/css/styles.css | wc -c",
+  "auto_fixable": false,
   "file": "assets/css/styles.css"
 }
 ```
@@ -807,8 +810,8 @@ and never retry. A local site is not gated.
 
 1. **Read project config before any checks** — `.claude/CLAUDE.md` for prefix/slug, `.wp-create.json` for `$WP`
 2. **Run Tier 1 code checks before Tier 2 runtime checks** — code issues are cheaper to detect
-3. **Output JSON report per wp-audit-standards schema** — every finding needs code, title, severity, status, details
-4. **Auto-fix only when `autofix: true`** — never modify code without the finding flagging it as auto-fixable
+3. **Output JSON report per the wp-audit-standards report contract** — every finding needs check, status, severity, ownership, resource, message
+4. **Auto-fix only when `auto_fixable: true`** — never modify code without the finding flagging it as auto-fixable
 5. **Performance boilerplate goes in `inc/performance.php`** — require it from `functions.php`, never inline everything
 6. **Replace `__STARTER_NAME__` with actual theme slug** — from `.claude/CLAUDE.md`
 7. **Test WP-CLI commands exist before running** — check `$WP` is set and responsive

@@ -29,7 +29,7 @@ This skill teaches the **WP-CLI-first principle**: use WP-CLI commands instead o
 # GOOD: $WP post create --post_type=page --post_title='About' --post_status=publish
 
 # BAD:  Generate PHP with wp_create_nav_menu()
-# GOOD: $WP menu create "Primary EN" && $WP menu item add-post primary-en 5
+# GOOD: $WP menu create "Primary" && $WP menu item add-post primary 5
 
 # BAD:  Generate PHP to activate a plugin
 # GOOD: $WP plugin activate secure-custom-fields
@@ -167,20 +167,24 @@ API is unavailable or for bulk performance — that path is coupled to ACF inter
 
 ---
 
-## Bilingual Naming Convention
+## Bilingual Field Names Follow the Recorded `i18n strategy`
 
-This convention matches the i18n helper system defined in the `wp-bilingual` skill.
+Read the `i18n strategy` line in the project's `.claude/CLAUDE.md` before seeding a field in a
+second language. An absent line means the project predates the choice and is `suffix`.
 
-- **Primary language fields use no suffix:** `hero_title`, `hero_description`, `cta_text`
-- **Secondary language fields append `_<lang>`:** `hero_title_es`, `hero_description_es`, `cta_text_es`
+- **`polylang`** (the default for new scaffolds): one post per language, and every post uses the
+  same unsuffixed field names. Seed the primary-language post only; `/wp-polylang` creates the
+  other language's posts and fills their fields. The one exception is the ACF **options page**,
+  which is global rather than per post and so keeps `_<lang>` duplicates (`footer_text_es`).
+  Never create `hero_title_es` on a page here — Polylang serves nothing from it. Method:
+  `wp-polylang`.
+- **`suffix`**: one page carries every language. The primary language uses the bare name
+  (`hero_title`); each secondary language appends `_<lang>` (`hero_title_es`). Read
+  `languages.additional` in `.wp-create.json` for the suffixes to generate, and skip every
+  `_<lang>` write when it is empty. Method: `wp-bilingual`.
 
-Seeding commands for both languages and for repeater subfields: [references/seeding-recipes.md](references/seeding-recipes.md).
-
-### Rules
-
-- Non-translatable fields (images, URLs, numbers, booleans) do NOT get language variants
-- Read `.wp-create.json` field `languages.additional` to know which suffixes to generate
-- If `languages.additional` is empty, skip all `_<lang>` field operations
+Either way, non-translatable fields (images, URLs, numbers, booleans) get no language variant.
+Seeding commands for both strategies: [references/seeding-recipes.md](references/seeding-recipes.md).
 
 ---
 
@@ -193,35 +197,43 @@ plain `php`.
 Run them; do not read them first. Each entry below is how to run the script and what its exit
 code means. What it measures and how to read its output are in [references/shipped-scripts.md](references/shipped-scripts.md).
 
+`S` below is `${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/scripts`.
+
 ### `check-dev-host.php` — the development host, in four tables
 
 ```bash
-$WP eval-file <skill>/scripts/check-dev-host.php          # needle from home_url()
-$WP eval-file <skill>/scripts/check-dev-host.php old.host # or an explicit host
+$WP eval-file "$S/check-dev-host.php"          # needle from home_url()
+$WP eval-file "$S/check-dev-host.php" old.host # or an explicit host
 ```
 
-Read-only. Exits 1 when any row carries the host, so it gates a deploy from a shell script.
+Read-only. Exits 0 when no row carries the host, 1 when any row does, so it gates a deploy from
+a shell script, and 2 when it could not determine a host to search for — treat 2 as not
+measured, never as a pass.
 
 ### `find-orphan-acf-ids.php` — IDs that outlive the post
 
 ```bash
-$WP eval-file <skill>/scripts/find-orphan-acf-ids.php <theme-path>
+$WP eval-file "$S/find-orphan-acf-ids.php" <theme-path>
 ```
 
-Read-only. Exits 1 when an orphan reaches a template; dead data alone exits 0.
+Read-only. Needs ACF or SCF active. Exits 1 when an orphan reaches a template; dead data alone
+exits 0. Exits 2 when it cannot classify — the theme path is not a directory, or no ACF/SCF is
+active to resolve field types — treat 2 as not measured, never as a pass. Without a theme path
+every finding is `UNCLASSIFIED` and counts toward exit 1, so pass one to separate what reaches
+the page from dead data.
 
 ### `audit-menu-links.php` — menu items that go nowhere
 
 ```bash
-$WP eval-file <skill>/scripts/audit-menu-links.php
+$WP eval-file "$S/audit-menu-links.php"
 ```
 
-Read-only. Exits 1 on any finding.
+Read-only. Exits 1 on any finding, 0 otherwise.
 
 ### `find-redeclared-functions.php` — one global function, two sources (SEC-043)
 
 ```bash
-php <skill>/scripts/find-redeclared-functions.php \
+php "$S/find-redeclared-functions.php" \
   loaded:plugin/<a>=wp-content/plugins/<a> inactive:plugin/<b>=wp-content/plugins/<b> \
   loaded:mu-plugin/<file>=wp-content/mu-plugins/<file> loaded:drop-in/<file>=wp-content/<file>
 ```
@@ -236,7 +248,7 @@ activated) or `INFO` (only inactive plugins).
 ### `find-missing-media-files.php` — attachments whose file is gone (WP-060/061/062)
 
 ```bash
-$WP eval-file <skill>/scripts/find-missing-media-files.php [archive-date] [sample-size]
+$WP eval-file "$S/find-missing-media-files.php" [archive-date] [sample-size]
 ```
 
 Read-only. Exits 1 when any `BEFORE-ARCHIVE` or `UNDATED` miss exists, 0 when every miss is
@@ -246,14 +258,14 @@ it does not accept, a failed query, or an uploads directory it cannot resolve or
 ### `resolve-link-targets.php` — internal links the database can answer
 
 ```bash
-$WP eval-file <skill>/scripts/resolve-link-targets.php links.txt resolved.json > http.txt
+$WP eval-file "$S/resolve-link-targets.php" links.txt resolved.json > http.txt
 ```
 
 Read-only. `links.txt` is one href per line, optionally a TAB and the page it was found on. The
 links the database answered go to `resolved.json`; the rest are printed as
-`href TAB page TAB group`, ready for `bin/link-sweep.mjs --urls`. Exits 0 when it ran, and 2 on
+`href TAB page TAB group`, ready for `${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs --urls`. Exits 0 when it ran, and 2 on
 a bad invocation, an unreadable input or an unwritable output. How an audit uses it is
-"Link and page sweeps against a site" in `skills/wp-audit-standards/SKILL.md`, the one place
+"Link and page sweeps against a site" in `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-standards/SKILL.md`, the one place
 that rule is written down.
 
 ## Match Records by Slug, Never by ID

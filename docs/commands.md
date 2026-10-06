@@ -41,7 +41,7 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-robin`](#wp-robin) | utility | — | target WordPress root | Robin settings, queue rows, `.webp` files |
 | [`/wp-s3`](#wp-s3) | utility | — | bucket, region, media URL, credentials | `s3-config.php`, the `require` in `wp-config.php`, the endpoint mu-plugin |
 | [`/wp-s3-media`](#wp-s3-media) | utility | — | a configured WordPress root | `wp-content/uploads` moved, and verified |
-| [`/wp-aos-animator`](#wp-aos-animator) | utility | — | theme templates | `vendors/aos/`, `functions.php` enqueue, JS init, `data-aos` attributes |
+| [`/wp-aos-animator`](#wp-aos-animator) | utility | — | theme templates | `assets/vendor/aos/`, `functions.php` enqueue, JS init, `data-aos` attributes |
 | [`/wp-contribute`](#wp-contribute) | contributors | — | this repository | new layer file + its check + doc rows; skill review; PR; release |
 
 \* `/wp-create` is optional if WordPress is already running: `/wp-seed` and `/wp-debug` fall
@@ -672,7 +672,8 @@ Runner for the `wp-aos-animator` skill. Reads
 audit → install → enqueue → init → animate pipeline, dispatching one subagent per template for
 the animate phase. `--report-only` stops after the audit, the same contract as `/wp-audit`'s
 flag. Intended for **plain** demos: a craft project already carries GSAP motion in its theme
-bundle, so the command asks before adding a second motion system.
+bundle, so the command asks before adding a second motion system, and a cinematic theme runs its
+own scroll engine, so the command stops there and changes nothing.
 
 ---
 

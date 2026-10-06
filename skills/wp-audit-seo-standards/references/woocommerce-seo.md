@@ -28,6 +28,11 @@ clone (`local_clone = true`), use `--host` if given, otherwise ask the user for
 confirmed. With no public URL, report `UNMEASURED`, never `PASS` — a local Apache honors a
 `.htaccess` rule a production Nginx ignores, which would turn a real defect into a false pass.
 
+The blocks below write their working files to `<scratch>`: create one directory for the run
+with `mktemp -d`, once, and substitute its path everywhere `<scratch>` appears. A fixed
+`/tmp/…` path is shared by every audit on the machine, so two concurrent or sharded runs
+read each other's product pages and sitemap lists.
+
 ### 18.1 Faceted/filtered URLs canonicalizing to themselves (SEO-064)
 
 Attribute and sort filters (`?filter_color=red`, `?orderby=price`, `?min_price=`) generate
@@ -76,15 +81,15 @@ a page that returned nothing said nothing about its canonical, defect or otherwi
 
 ```bash
 curl -sL --max-redirs 3 --max-time 15 "https://<production-host>/product/<slug>/" \
-  | tr '\n' ' ' > /tmp/product.html
-grep -o '"@type":"Product".*"availability":"[^"]*"' /tmp/product.html
+  | tr '\n' ' ' > <scratch>/product.html
+grep -o '"@type":"Product".*"availability":"[^"]*"' <scratch>/product.html
 # Scope to the MAIN product's own wrapper, not the whole page: related products and up-sells
 # (rendered after the summary via `woocommerce_after_single_product_summary`) go through the
 # same wc_get_product_class() and carry their own in/out-of-stock class, so an unscoped grep
 # picks up whichever product in those sections happens to match first. The main wrapper's id
 # is `product-<post ID>`, and the post ID is on <body class="... postid-<ID> ...">.
-pid=$(grep -oE 'postid-[0-9]+' /tmp/product.html | head -1 | grep -oE '[0-9]+')
-grep -oE "<div[^>]*id=\"product-$pid\"[^>]*>" /tmp/product.html | head -1 \
+pid=$(grep -oE 'postid-[0-9]+' <scratch>/product.html | head -1 | grep -oE '[0-9]+')
+grep -oE "<div[^>]*id=\"product-$pid\"[^>]*>" <scratch>/product.html | head -1 \
   | grep -oE '\b(instock|outofstock|onbackorder)\b'
 ```
 
@@ -124,19 +129,23 @@ database instead of the rendered page for every URL that resolves locally.
 # hundreds of sitemap files, and this loop must stay bounded regardless of catalog size.
 curl -sL --max-redirs 3 --max-time 15 "https://<production-host>/sitemap_index.xml" \
   | grep -oE '<loc>[^<]*(product|product_cat)-sitemap[^<]*</loc>' | sed 's/<[^>]*>//g' \
-  | head -n 50 > /tmp/product-sitemaps.txt
-: > /tmp/sitemap-urls.txt
+  | head -n 50 > <scratch>/product-sitemaps.txt
+: > <scratch>/sitemap-urls.txt
 while read -r sm; do
   curl -sL --max-redirs 3 --max-time 15 "$sm" \
-    | grep -oE '<loc>[^<]+</loc>' | sed 's/<[^>]*>//g' >> /tmp/sitemap-urls.txt
-done < /tmp/product-sitemaps.txt
+    | grep -oE '<loc>[^<]+</loc>' | sed 's/<[^>]*>//g' >> <scratch>/sitemap-urls.txt
+done < <scratch>/product-sitemaps.txt
+# An empty list measured nothing. Without this line the WP-CLI pass below prints nothing,
+# and nothing reads exactly like "no sitemap URL is noindexed".
+[ -s <scratch>/sitemap-urls.txt ] || echo "UNMEASURED: SEO-067 read no product sitemap URLs from the index"
 ```
 
 ```bash
 $WP eval "
-\$urls = file('/tmp/sitemap-urls.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+\$urls = file('<scratch>/sitemap-urls.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+if (!\$urls) { echo \"UNMEASURED: the sitemap URL list is empty\n\"; return; }
 \$tax_meta   = get_option('wpseo_taxonomy_meta', []); // Yoast fallback for term-level robots.
-\$unresolved = fopen('/tmp/sitemap-urls-unresolved.txt', 'w');
+\$unresolved = fopen('<scratch>/sitemap-urls-unresolved.txt', 'w');
 foreach (\$urls as \$url) {
     \$noindex  = false;
     \$resolved = false;
@@ -191,12 +200,12 @@ capped sample (`head -n 50` of the unresolved list, not the full sitemap), becau
 live page is exactly the per-URL cost the primary method exists to avoid.
 
 ```bash
-head -n 50 /tmp/sitemap-urls-unresolved.txt | while read -r u; do
+head -n 50 <scratch>/sitemap-urls-unresolved.txt | while read -r u; do
   # A body-text `grep -qi noindex` over the whole page false-positives on the word inside a
   # comment, inline JS or a consent-banner string, and false-negatives a page noindexed only
   # via the `X-Robots-Tag` response header (no meta tag at all). Read headers and body in the
   # same fetch, then check both signals.
-  headers=$(curl -sL --max-redirs 3 --max-time 15 -D - -o /tmp/sitemap-url-body.html "$u")
+  headers=$(curl -sL --max-redirs 3 --max-time 15 -D - -o <scratch>/sitemap-url-body.html "$u")
   if printf '%s' "$headers" | grep -qiE '^X-Robots-Tag:.*noindex'; then
     echo "SITEMAP+NOINDEX (X-Robots-Tag): $u"
     continue
@@ -204,7 +213,7 @@ head -n 50 /tmp/sitemap-urls-unresolved.txt | while read -r u; do
   # Anchor to the actual robots meta tag, not the bare word, and tolerate attribute order and
   # quote style: `<meta name="robots" content="noindex,...">` and
   # `<meta content='noindex,...' name='robots'>` must both match.
-  tag=$(grep -oiE '<meta[^>]+>' /tmp/sitemap-url-body.html | grep -i 'name=["'"'"']robots["'"'"']')
+  tag=$(grep -oiE '<meta[^>]+>' <scratch>/sitemap-url-body.html | grep -i 'name=["'"'"']robots["'"'"']')
   printf '%s' "$tag" | grep -qi 'noindex' && echo "SITEMAP+NOINDEX (meta): $u"
 done
 ```

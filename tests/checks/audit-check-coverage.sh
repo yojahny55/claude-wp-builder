@@ -73,8 +73,37 @@ SEO agents/wp-audit-seo.md
 A11Y agents/wp-audit-a11y.md
 PERF agents/wp-audit-performance.md
 GEO agents/wp-audit-geo.md
-UX agents/wp-audit-ux.md
+UX skills/wp-audit-ux-standards/SKILL.md
 PAIRS
+
+# Usability keeps its catalog in its skill's table, not in its agent. The command used to
+# point UX-* at agents/wp-audit-ux.md, which names 8 of the 36 criteria -- so the other 28
+# could never be reported as never measured, and the coverage line read green for them. A
+# bare id grep of the skill is wrong too: its prose names ids that are not criteria. The
+# catalog is the table rows, and every table row has to be one the documented pattern reads.
+ux=skills/wp-audit-ux-standards/SKILL.md
+flatc=$(tr '\n' ' ' < "$c" | sed 's/  */ /g')
+case "$flatc" in
+  *'`UX-*` in `agents/wp-audit-ux.md`'*) fail "$c still reads the UX catalog from the agent, which names a fraction of it" ;;
+esac
+case "$flatc" in
+  *'`UX-*` is every **table row** of `skills/wp-audit-ux-standards/SKILL.md` — a line starting `| UX-NNN |`'*) ;;
+  *) fail "$c does not read the UX catalog from the skill's table rows" ;;
+esac
+case "$flatc" in
+  *'for usability the table rows of its skill'*) ;;
+  *) fail "$c Step 6.8 computes usability coverage against something other than the skill's table rows" ;;
+esac
+all_rows=$(grep -cE '^\|[[:space:]]*UX-[0-9]' "$ux" || true)
+pat_rows=$(grep -cE '^\| UX-[0-9]{3} \|' "$ux" || true)
+[ "$all_rows" -gt 0 ] || fail "$ux has no UX table rows"
+[ "$all_rows" -eq "$pat_rows" ] \
+  || fail "$ux has $all_rows UX table rows but only $pat_rows match '| UX-NNN |', so the catalog read would drop some"
+dupes=$(grep -oE '^\| UX-[0-9]{3} \|' "$ux" | sort | uniq -d)
+[ -z "$dupes" ] || fail "$ux tabulates the same criterion twice: $dupes"
+for id in $(grep -oE '\bUX-[0-9]{3}\b' agents/wp-audit-ux.md | sort -u); do
+  grep -qE "^\| $id \|" "$ux" || fail "agents/wp-audit-ux.md reports $id, which is not a row of the catalog in $ux"
+done
 
 # --- check revisions ----------------------------------------------------------------------
 # checks_run recorded IDs, and an ID is an address rather than a version: a project holding

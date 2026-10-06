@@ -8,18 +8,18 @@ user-invocable: false
 
 ## What this skill does
 
-1. **Installs** Robin Image Optimizer if missing (via wp-cli or direct download)
+1. **Installs** Robin Image Optimizer if missing (via wp-cli, falling back to the WordPress.org zip when `wp plugin install` fails)
 2. **Configures** the plugin with proven settings — WebP enabled, AVIF off, all thumbnails included, backup enabled, auto-optimize on upload
 3. **Detects all registered thumbnail sizes** from the theme/plugins and adds them to the optimization list
 4. **Fixes stuck items** — webp queue items frozen in `processing` status
 5. **Registers attachments for optimization** if the queue is empty
-6. **Generates missing .webp files** locally using ImageMagick, cwebp, or PHP GD — including sizes added after the first run (a new `add_image_size()` plus `wp media regenerate`), because each attachment's files are compared against its webp rows
+6. **Generates missing .webp files** locally using ImageMagick, cwebp (gif2webp for GIFs), or PHP GD — including sizes added after the first run (a new `add_image_size()` plus `wp media regenerate`), because each attachment's files are compared against its webp rows
 7. **Syncs the database** — inserts correct `wp_rio_process_queue` records with proper sha256 hashes and file sizes
 8. **Handles hash collisions** from duplicate posts sharing the same file (uses `$url|webp|$post_id` fallback)
 
 ## How to use
 
-Run the bundled script. It auto-detects the WordPress root (walks up from current directory), reads DB credentials from `wp-config.php`, and discovers the site URL and uploads directory.
+Run the bundled script. It auto-detects the WordPress root (walks up from current directory), reads the DB credentials and table prefix from `wp-config.php`, and reads the site URL from the database. The uploads directory is not discovered: it is always `<root>/wp-content/uploads`, so a site that moved uploads elsewhere is not supported.
 
 ```bash
 bash <path-to-skill>/scripts/robin-fix.sh
@@ -30,6 +30,8 @@ To target a specific WordPress install:
 ```bash
 WP_ROOT=/srv/http/mysite bash <path-to-skill>/scripts/robin-fix.sh
 ```
+
+`scripts/webp-gd.php` is the PHP GD converter `robin-fix.sh` calls when neither ImageMagick nor cwebp is installed, and for GIFs when cwebp is installed without `gif2webp`. Never run it by hand.
 
 ## Settings applied
 
@@ -47,14 +49,25 @@ The script installs these reference settings (optimized for a production site):
 
 ## Requirements
 
-- **bash** and standard Unix tools (grep, sed, stat, sha256sum)
-- **mariadb** or **mysql** client (for DB queries)
-- One of: **ImageMagick** (`convert`), **cwebp**, or **PHP GD** (for webp generation)
-- **wp-cli** (optional — for installing/activating the plugin)
+| Binary | Why |
+|---|---|
+| `bash` 4+, GNU `grep` (`-P`), GNU `stat` (`-c`), `sed`, `awk`, `sha256sum` | The script itself. GNU only: it does not run on macOS's BSD tools |
+| `mariadb` or `mysql` client | Every query. `mariadb` is used when both exist |
+| `php` CLI | Every run: decodes `_wp_attachment_metadata` and builds the queue rows |
+| A converter: ImageMagick (`convert`), else `cwebp` (with `gif2webp` for GIFs; without it GIFs go to GD), else PHP GD with `imagewebp()` | Writing the `.webp` files. Without one, the queue repair still runs and no `.webp` file is written |
+| `wp` (WP-CLI) | Installing and activating the plugin. Optional when the plugin is already installed and active |
+| `curl`, `unzip` | Only for the direct download, tried when `wp plugin install` fails |
 
 ## When wp-cli is not available
 
-If wp-cli isn't found and the plugin isn't installed, the script falls back to downloading the plugin zip from WordPress.org and extracting it. Activation must be done manually (or install wp-cli).
+The script installs the plugin only through wp-cli, and downloads the WordPress.org zip only as the fallback when `wp plugin install` fails. With no wp-cli and no plugin it stops (exit 1): install the plugin from wp-admin → Plugins, or install wp-cli, and run it again. With the plugin installed it runs without wp-cli, but cannot activate the plugin.
+
+## Exit codes
+
+| Exit | Meaning |
+|---|---|
+| `0` | Ran to the end. Read the final counts: a `0` exit does not mean nothing failed |
+| `1` | Stopped with a message: no WordPress root, unreadable credentials, no database client or `php`, the plugin not installed, the queue table missing or the database unreachable, a failed attachment or webp query, or an uploads directory it cannot write. Settings and stuck-row fixes written before the stop stay written |
 
 ## What to expect
 

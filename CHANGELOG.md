@@ -19,6 +19,156 @@
 
 ### Fixed
 
+- **`robin-fix.sh` works on a site with a table prefix other than `wp_`, and stops failing
+  silently.** `$table_prefix` was matched with an unescaped `$` — a regex end-of-line anchor
+  — so the prefix always read as `wp_` and every query on any other site hit tables that do
+  not exist. A missing WordPress root or an unparseable `wp-config.php` exited 1 with no
+  message (a failing command substitution under `set -e`); double-quoted defines and a
+  `DB_HOST` with a port or socket were not read; every query called `mariadb`, though the
+  skill and `/wp-robin` accept a host with only `mysql`; the download fallback saved a 404
+  page as the plugin zip, so the run died on unzip's own exit code with no explanation and
+  left the temporary file behind, and it set the plugin as installed without checking that
+  anything was; every settings write
+  ended in `|| true` and the report counted keys, not writes; WP-CLI's activation check ran
+  from the caller's directory instead of the site's; and the PHP GD converter used `match`
+  (PHP 8 only) with no GIF branch, though GIF is an allowed format. It now lives in
+  `scripts/webp-gd.php`, linted at 7.4 by CI. The skill no longer says the zip is downloaded
+  when WP-CLI is absent or that the uploads directory is discovered, lists every binary the
+  script needs, and states its exit codes. A credential is read to the quote that opened it,
+  so a single-quoted password holding `"`, `;` or `)` (or a double-quoted one holding `'`)
+  reaches the client whole. With `cwebp` chosen, a GIF goes to `gif2webp` only when it is
+  installed, and to GD when it is not; with neither, the run says once that GIFs get no
+  `.webp` instead of failing each one as "conversion failed". An image size registered with
+  double quotes (`add_image_size( "hero", … )`) is read by name instead of being stored as the
+  raw call text, and every setting is escaped for its SQL literal, so a backslash or quote in a
+  size name read from theme source cannot end the string.
+  `tests/checks/robin-fix-behavior.sh` runs the script against a fake site, client and
+  network.
+- **The release ritual in `wp-contributing` and `/wp-contribute release` gates for real.**
+  It chained `for … done && bash bin/doc-sync-check.sh`, and a loop's status is its last
+  iteration's, so a red check earlier in the alphabet passed the gate. It also never
+  reconciled `BACKLOG.md`, so following it cut a release that `backlog-freshness.sh` failed,
+  and never said how to push the tag. Both now aggregate, reconcile, re-run the gates and
+  push with `git push origin main && git push origin vX.Y.Z`. `CONTRIBUTING.md` lists `model`
+  among an agent's required frontmatter keys, which `model-routing.sh` already enforced.
+- **`wp-environments` describes the environment `/wp-create` builds.** Its manifest sample
+  still carried `"password": "root"`; it ran `bin/wp-env-setup.sh` by a relative path; its
+  placeholder table listed `{{db_host}}`, which no template uses, and missed nine tokens the
+  templates do, so a `docker-compose.yml` or `.wp-env.json` built from it kept unreplaced
+  `{{http_port}}` and `{{tests_port}}`; it checked 3306 (unpublished) and missed Mailpit's
+  SMTP port; its PHP table typed package names the script does not install and called
+  `php-list` a list of available versions; and it said a project without `.wp-create.json`
+  works unchanged, where the gate exits 3. `tests/checks/wp-environments.sh` diffs the table
+  against every token under `templates/`.
+- **`/wp-s3 --revert` needs the transfer client, and the skill says so.** The skill called
+  the client "Only for `/wp-s3-media`", but the revert downloads the media through
+  `s3-media.sh download`, with a key pair. The missing-client message also told the operator
+  to install it inside the plugin directory, which a plugin update replaces.
+- **`wp-woocommerce` no longer describes unbuilt pieces as built.** A catalog product
+  "offers an enquiry form … or a WhatsApp button", products were "the Polylang bridge's job",
+  and `/wp-woo-setup` put the WhatsApp number in "the theme's settings page": no starter
+  renders either channel, carries those fields, or has a bridge.
+- **`wp-responsive`'s examples produce working output.** `references/images.md` passed the
+  ACF image field to `wp_get_attachment_image()` as an ID, but `agents/wp-acf.md` generates
+  image fields as arrays, so the call printed nothing; it now passes `$image['ID']`, and the
+  hand-built `srcset` with guessed width descriptors is gone. Every hero example carried
+  `loading="lazy"` against the skill's own LCP rule; heroes now set `fetchpriority="high"` and
+  `'loading' => false`. The navigation reference taught a drawer that fails the audit's
+  A11Y-031 — no focus trap, no Escape, no focus return, closed links still tabbable behind
+  `aria-hidden` — and left body scroll locked when the viewport crossed 1024px with the menu
+  open; it now does all four (verified in Chromium). The no-horizontal-scroll fix put
+  `overflow-x: hidden` on `.container`, hiding the overflow the section exists to find; it now
+  sends the reader to the culprit `/wp-demo-verify` names. `tests/checks/wp-responsive.sh`.
+
+- **The `wp-demo` skill no longer contradicts its command or its own rules.** It gave
+  plain-mode rules to every build without reading the recorded `demo mode`, so a craft build
+  loaded two contradicting instruction sets; it now says which parts apply in which mode. It
+  and `commands/wp-demo.md` Step 4 disagreed on token names (`--color-bg` against
+  `--color-background`), fonts (no CDN against a Google Fonts link) and images (SVG against
+  `placehold.co`); both now use `wp-css-system`'s token names, the one Google Fonts link
+  `/wp-init` self-hosts, and an inline-SVG `<img>` — `/wp-seed` imports every `img[src]` URL it
+  finds. It told builds to extract CSS into an `assets/css/styles.css` no current starter has.
+  Its skeleton broke its own accessibility rules (no skip link, no `id="main-content"`, a
+  hamburger without `aria-expanded`, `.sr-only` never defined, no focus style, no language
+  switcher), used a `.footer__tagline` class `/wp-seed` never reads and a bare `<p>` copyright,
+  hard-coded `© 2025`, and printed the footer twice. It also claimed two external skills were
+  "invoked automatically"; nothing invokes them. `tests/checks/wp-demo-skill.sh`.
+
+- **`wp-demo-craft`'s references agree with each other and with the engine.**
+  `design-md.md` defaulted `--motion-rise` to 22px, below the ~35px floor `devices.md` calls
+  invisible and against the compositions' 44px fallback. `devices.md` offered a `cascade`
+  device `motion.js` never implemented, left `data-motion-peak` and `data-motion-rail` out of
+  its "exactly as declared" contract, called the signature move optional while `uniqueness.md`
+  and `/wp-demo` require it, and named non-existent "shadow tokens". `taste.md` named tokens and
+  classes that exist nowhere (`--space-1..11`, `--font-measure`, `--shadow-e1/2/3`,
+  `--transition-ease-out`, `.scrim--lead`/`--trail`) and an engine behaviour no engine has;
+  `icon-row` and `score-scale` read a `--color-muted` no `DESIGN.md` defines, so their muted
+  text silently inherited full ink. `process-rail` put its heading inside the pan rail — the
+  advice `devices.md` retracts because it pans the section's label off screen — and allowed
+  three steps where `pan` needs five; the heading now sits above the rail and the minimum is
+  five (previews re-rendered). The scroll budget was restated with different numbers in
+  `taste.md`, `feel.md` and `compositions.md`; pointers led to a `devices.md §10` and SKILL.md
+  "pre-build checks" that do not exist; two counts were wrong; the role table had two rows on
+  one line; and two files ran plugin scripts by relative paths.
+  `tests/checks/wp-craft-consistency.sh`.
+- **The audit's report contract is the one the renderer reads.** `wp-audit-standards` told
+  every agent to emit an `issues` array with lowercase severities, `code` and `fix_method`;
+  no agent did, `bin/audit-report.mjs` reads none of it, and the schema had no `status` for
+  the `N/A` and `UNMEASURED` answers the skill itself demands. Each agent had drifted into a
+  shape of its own — `code` beside a `check` that meant the check's *name*, `title`/`details`/
+  `autofix`, a GEO severity `ERROR` the renderer refuses — so the run file had to be rebuilt
+  by hand from six vocabularies. The skill now states the renderer's fields (`check`,
+  `status`, `severity`, `ownership`, `resource`, `message`, `checks_executed`) and where each
+  status goes, every agent's example uses them, GEO's `ERROR` is written `CRITICAL`, and the
+  dispatch prompt names `WP-NNN` and `UX-NNN` instead of a `BP-NNN` no agent emits. The same
+  skill read WCAG's 18pt as 18px; large text is ≥24px, or ≥18.66px bold.
+  `tests/checks/audit-report-contract.sh` holds all of it.
+
+- **Usability coverage counts the whole catalog.** `/wp-audit` Step 2.5d and the Step 6.8
+  gate read `UX-*` ids from `agents/wp-audit-ux.md`, which names 8 of the 36 criteria, so the
+  other 28 could never be reported as never measured. Both now read the table rows of
+  `wp-audit-ux-standards`. The catalog's owner column follows the browser suite for the
+  criteria the suite emits (`UX-015`, `UX-038` were `content` here and `code` there, so a
+  defect's owner depended on whether `--suite` ran), `UX-009` stops restating the 24×24
+  target size that is `A11Y-028`'s, applicability is stated once instead of twice with
+  different answers, the numbers the suite owns are named so a new criterion cannot take
+  one, and the skill no longer says rendered criteria need `--suite` when `bin/ux-probe.mjs`
+  measures them. `tests/checks/audit-ux-owners.sh` and
+  `tests/checks/audit-ux-standards-contract.sh` are new; the coverage check reads the skill.
+
+- **The local SEO checks read Rank Math's real option, and the phone rule reconciles its own
+  example.** `wp-audit-local-standards` and `wp-audit-seo` read `rank_math_titles`, which
+  Rank Math never writes (`rank-math-options-titles`), so its name, address and phone
+  silently dropped out of the NAP comparison. Digits-only phone normalization left
+  `+34 900 00 00 00` and `900000000` unequal, the false positive the rule exists to prevent;
+  it now strips the country code, with worked pairs. The bilingual comparison is no longer
+  conditional on `suffix` (options-page fields keep `_<lang>` under both strategies),
+  click-to-call applies to service-area businesses too, an absent address is not reported on
+  one, `SEO-063` runs on an undetermined site, recommended schema properties stop being
+  findings no check id carries, `aggregateRating` is never recommended, and locations link
+  with `parentOrganization`, which supersedes `branchOf`.
+
+- **`wp-audit-geo-standards` agrees with `bin/geo-scan.sh` and the fixer.** A non-public host
+  exits `3`, not `2` as the skill said, and `--start` is documented. `Content-Signal` is an
+  HTTP header only — the skill also asked for a per-`User-agent` robots block, the one line
+  the fixer refuses to write because it makes the file invalid, and the auditor looked for the
+  signal inside `robots.txt`. A catalog store's payment-protocol codes are `N/A`, as the
+  auditor already had it; GEO-A07 to A10 are fixable only when no SEO plugin owns the graph;
+  the robots body lists every crawler the table allows (`GoogleOther` was missing);
+  `anthropic-ai` is one thing in both files; GEO-D04 is the `/agents.md` route the fixer
+  serves; and the citability rubric is no longer said to be scored by an auditor that has no
+  code for it. `tests/checks/wp-geo.sh` pins each.
+
+- **The SEO fixer no longer shadows the GEO route it runs before.**
+  `wp-audit-seo-standards` and `wp-audit-rankmath` wrote a physical `llms.txt` at the web
+  root and a `robots.txt` naming six of the ten AI crawlers GEO-D02 requires. `/wp-audit`
+  dispatches SEO fixes before GEO fixes, so every run that fixed both left a stale file in
+  front of `inc/agentic.php`'s dynamic route (GEO-A26), and whichever agent wrote `robots.txt`
+  last decided GEO-D02. `wp-agentic-surfaces` is now the one writer of both; the SEO skill
+  keeps the classic robots block, identical to the writer's. The WooCommerce SEO commands
+  stop writing to fixed `/tmp` paths that concurrent audits share, and an empty sitemap list
+  is `UNMEASURED` instead of a silent pass. `tests/checks/seo-robots-llms-owner.sh` is new.
+
 - **`wp-demo-craft`, `/wp-cinematic-demo` and `/wp-cinematic-scene` load with their own
   frontmatter again.** Each had a value that is not valid YAML unquoted: an unquoted `: ` in
   `wp-demo-craft`'s description and in `/wp-cinematic-demo`'s `<!-- SECTION: -->` example, and
@@ -41,6 +191,78 @@
   `wp-cli-patterns` and `wp-polylang` now index their scripts with what each is for, `wp-s3`
   says its config reader is a helper never run by hand (its `--export` mode prints the
   secret), and `tests/checks/skill-authoring.sh` fails on an unnamed script.
+
+- **The i18n skills describe the code they ship with.** A review of `wp-polylang`,
+  `wp-bilingual` and `wp-cli-patterns` against the scripts and starters found them telling
+  agents things that were false:
+  - `wp-polylang` said ACF containers were walked one level deep and told the reader to widen
+    `pllx_acf_walk()`, which already recurses to any depth, so an agent would
+    hand-translate fields the importer already handles. It placed `pllx_acf_ref_id()` in
+    `pll-import.php` (it is in `pll-lib.php`), said non-text ACF types were "untouched by the
+    importer" (they are copied onto a new counterpart), and cited a gitignored `.superpowers/`
+    report and a fixture that only ever existed on a maintainer's own site.
+  - `wp-bilingual` documented `prefix__()`, `prefix_is_spanish()` and
+    `prefix_get_js_translations()`, none of which any starter defines — a template written from
+    it fatals — and never mentioned that the cinematic starter ships a different three-helper
+    contract with no `prefix_get_field()`. Its reference was a hand-kept copy of the starter's
+    `inc/i18n.php` that had drifted; it is now a pointer to that file plus what the code does not
+    explain. Its Spanish samples had lost their accents.
+  - **`<html lang>` never followed the language on a suffix site.** The skill appended a second
+    `lang` after `language_attributes()`, and a browser keeps the first of two, the site locale.
+    Both starters' `inc/i18n.php` now filter `language_attributes`, so `?lang=es` pages declare
+    Spanish, and both filters return a string even when `preg_replace()` fails.
+  - **The tailwind starter's language cookie could not be set.** The first call to
+    `prefix_get_current_lang()` — the one that sets it — came from `wp_enqueue_scripts`, inside
+    `wp_head()`, after output had begun, so a language switch lasted one page on a server
+    without output buffering. The starter now makes that call on `init`, and the skill states
+    the real rule instead of "include `i18n.php` early".
+  - `wp-cli-patterns` taught `_es` suffix fields and per-language menu locations without
+    reading the recorded `i18n strategy`, so on a Polylang project (the default) it seeded
+    fields Polylang never serves and assigned menus to `primary_en`, a location neither
+    starter registers. It glossed `wp post delete --force` as a confirmation skip — it deletes
+    permanently — documented exits 0/1 for two scripts that also exit 2 when they could not
+    measure, and invoked every script through an unresolvable `<skill>/` path.
+  - `/wp-polylang` and `/wp-seed` cited their skills by a relative path, which resolves against
+    the user's project.
+
+  `tests/checks/wp-bilingual-contract.sh` (which runs both starters' `inc/i18n.php`) and
+  `tests/checks/wp-cli-patterns-contract.sh` are new; `wp-polylang.sh` and
+  `wp-polylang-nesting.sh` gained pins that fail on each old form.
+- **The CSS and theme skills stopped teaching output that breaks.** A fresh review of
+  `wp-aos-animator`, `wp-theme-standards`, `wp-css-system` and `wp-tailwind-system` found code
+  an agent would copy and ship broken:
+  - **`wp-aos-animator`** enqueued AOS with `_RATIO_WEB_`, one client project's constant —
+    undefined anywhere else, so a PHP 8 fatal on every page — plus a `jquery` dependency AOS
+    does not have and nothing ordering the deferred bundle after AOS, which turned the init
+    into a silent no-op. It used `fade-up-slow`, which `aos.css` does not define, and a delay
+    of 20, which matches no selector (`aos.css` ships 50 to 3000 in steps of 50); downloaded
+    with `curl -sL`, which saves a 404 page as `aos.js`; and audited only `assets/js/*.js`, so a
+    re-run on the starter's `assets/js/src/` bundle added a second `AOS.init`. Nothing kept it
+    out of a craft or cinematic theme, which already ship a motion engine: a Phase 0 now reads
+    `demo mode` and `Template:` and stops. `tests/checks/wp-aos-seams.sh` judges every
+    animation name, delay, constant and download line it teaches.
+  - **`wp-theme-standards`** overrode `wp_check_filetype_and_ext` for every upload, switching
+    off core's content check for all file types (the starter never shipped it); taught one
+    fixed layout matching neither starter, so a Tailwind theme got a second stylesheet; enqueued
+    remote Google Fonts that `/wp-init` self-hosts and PERF-022 reports; printed an
+    `Organization` JSON-LD block with no SEO-plugin guard, two nodes beside Rank Math's; and
+    read raw `get_field()`, keyed page assets on slugs (one language under Polylang), preloaded
+    the LCP original with no `imagesrcset` (two downloads on mobile) and sanitized `$_GET`
+    without `wp_unslash()`. The layout is now read from the recorded template and its starter,
+    identity JSON-LD belongs to `inc/agentic.php`, and the new
+    `tests/checks/wp-theme-standards.sh` fails on each old form.
+  - **`wp-css-system`**'s gate stopped only on `tailwind`, leaving cinematic themes and demos
+    with no `Template:` line unanswered; its sample palette read as defaults to ship; its grid
+    example had no mobile base and its outline button a border; and `agents/wp-css.md` (and one
+    skill example) used `--color-white`, `--color-accent` and `--color-accent-dark`, which the
+    token reference never defines. `wp-css-tokens.sh` now resolves every `var()` the examples
+    use, and the new `wp-css-system-contract.sh` holds the examples to the skill's own rules.
+  - **`wp-tailwind-system`**'s `references/breakpoints.md` marked `max-[769px]:hidden` — the
+    form its heading forbids — as the right conversion and said `max-[759px]` is `≤ 759`; two
+    references called plugin scripts by a bare `bin/` path (exit 127 from the user's project);
+    and Verify ran the convention check before any compile, where it skips its markup rule and
+    passes. Verify now compiles first, runs `theme-template-check.mjs`, states exit codes and
+    loops; the new `tests/checks/wp-tailwind-system-traps.sh` pins it.
 
 ### Changed
 

@@ -436,19 +436,37 @@ outline button, a ring, a focus or error border, or a `type="search"` field.
 
 ## Verify
 
-```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/tailwind-native-check.sh" <theme-dir>
+Run these, in order, once the theme's templates are written — the command that dispatched
+the section agents runs them, not an agent mid-walk, where a half-built theme fails them by
+construction (`agents/wp-tailwind.md`). The scripts ship with the
+plugin and the working directory is the user's project, so every path is rooted at
+`${CLAUDE_PLUGIN_ROOT}`; a bare relative `bin/…` path resolves to nothing there and exits
+127. The two `.mjs` checks need Node.
 
-# Unescaped BEM underscores inside arbitrary variants — must print nothing.
-grep -rnE '\[[^]"]*[a-z0-9]__[a-z]' --include='*.php' <theme-dir>
+1. **Compile.** `bash "${CLAUDE_PLUGIN_ROOT}/bin/tailwind-rebuild.sh" <theme-dir>`. Steps 2
+   and 3 read the compiled `assets/css/dist/main.css`: without it the convention check skips
+   its markup rule and the class check prints `SKIP classes`, and both exit 0 having checked
+   none of the markup.
+2. **Run the checks.**
 
-# Quotes inside an arbitrary variant — must print nothing.
-grep -rn '\[\[[a-z-]*=\"' --include='*.php' <theme-dir>
+   ```bash
+   # The convention: four directories, no empty or unimported file, no <style>. Exit 0 = PASS, 1 = FAIL.
+   "${CLAUDE_PLUGIN_ROOT}/bin/tailwind-native-check.sh" <theme-dir>
 
-# Contours Firefox on Windows notches, and a second search clear control — must PASS.
-node "${CLAUDE_PLUGIN_ROOT}/bin/css-contour-lint.mjs" <theme-dir>
-```
+   # Every utility-shaped class exists in the compiled CSS, and no HTML entity sits inside
+   # an arbitrary variant — the silent failures described above. Exit 0 = PASS, 1 = FAIL, 2 = usage.
+   node "${CLAUDE_PLUGIN_ROOT}/bin/theme-template-check.mjs" <theme-dir>
 
-The script ships with the plugin and the working directory is the user's project,
-so the path must be rooted at `${CLAUDE_PLUGIN_ROOT}`; a bare relative `bin/…` path
-resolves to nothing there and exits 127.
+   # Contours Firefox on Windows notches, and a second search clear control. Exit 0 = PASS, 1 = FAIL, 2 = usage.
+   node "${CLAUDE_PLUGIN_ROOT}/bin/css-contour-lint.mjs" <theme-dir>
+
+   # Unescaped BEM underscores inside arbitrary variants — must print nothing.
+   grep -rnE '\[[^]"]*[a-z0-9]__[a-z]' --include='*.php' <theme-dir>
+
+   # Quotes inside an arbitrary variant — must print nothing.
+   grep -rn '\[\[[a-z-]*="' --include='*.php' <theme-dir>
+   ```
+
+3. **Fix and repeat.** Fix every finding, recompile (step 1) and rerun step 2 until every
+   script exits 0 and both greps print nothing. Stop after three rounds and report what is
+   still failing rather than looping.

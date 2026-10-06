@@ -29,8 +29,10 @@ Rhythm comes from contrast between tight and generous, never one value
 repeated until everything weighs the same. If you cannot point to which
 intervals are tight and which are the breaks, the page has no rhythm.
 
-- Use a 4px-base scale (`--space-1` through `--space-11`). A 4-base gives
-  useful middle steps an 8-only scale misses.
+- Step every interval inside a section on a 4px base (multiples of `0.25rem`). A
+  4-base gives useful middle steps an 8-only scale misses. The two spacing tokens are
+  `--space-section` (between sections) and `--space-gutter` (the edge); everything else
+  is a literal on that base.
 - **More space above a heading than below it.** The gap belongs at the
   boundary between sections, not inside a heading-and-body pair. Getting this
   backwards is the single most common spacing error, and it makes the page
@@ -38,7 +40,8 @@ intervals are tight and which are the breaks, the page has no rhythm.
 - **The `--space-section` floor is a scroll budget, not a spacing preference.** A
   `clamp()` whose minimum is `4.5rem` puts 72px above and below every section on a
   390px screen; at nine sections that is 14.4vh of the page spent on padding alone,
-  over the 8-14vh budget before a single section has said anything. Floor it around
+  before a single section has said anything — length the budget in `devices.md` never
+  allowed for. Floor it around
   `2.75rem` and let the fluid middle do the work. This bullet exists because the
   suggested token did not follow the rule in the next line.
 - Section padding is fluid (`--space-section`). A phone should not inherit
@@ -78,11 +81,11 @@ render, not the number.
   flat scale. Check the ratio at the size it actually renders, not at the token's
   nominal value.
 - **Tracking tightens as size grows.** A typeface set at 6rem with default
-  tracking reads loose and amateur. A ramp handles this: `--font-track-tight`
-  on display, `--font-track-normal` on body. This is optical correction, not
-  decoration.
-- **Body measure 45 to 75ch.** `--font-measure` at 62ch. A full-width
-  paragraph on a 1600px monitor is unreadable regardless of font size.
+  tracking reads loose and amateur. The compositions set display type between
+  `-0.015em` and `-0.025em` and leave body at normal; follow them. This is optical
+  correction, not decoration.
+- **Body measure 45 to 75ch**, as a `max-width` in `ch` on the text element. A
+  full-width paragraph on a 1600px monitor is unreadable regardless of font size.
 - **Line height is inverse to measure.** Wider lines need more leading.
   Display sits at 0.94 to 1.06, body at 1.6.
 - **Light text on dark needs compensation on three axes**: slightly more line
@@ -92,11 +95,11 @@ render, not the number.
   the orphan word that makes a headline look accidental.
 - Display size maxes around ~6rem outside a genuine hero moment. Bigger is
   not more confident.
-- **Step the hero down one rung below ~700px.** `--font-t-4xl` floors at
-  3.4rem, which is a *desktop* floor: 390px wraps a normal hero headline into
-  six lines. `--font-t-2xl` on the hero inside a phone media query fixes it.
-  The portrait crop of the image is covered in devices.md; the portrait crop
-  of the type is missed more often.
+- **Step the hero down one rung below ~700px.** A hero `clamp()` that floors at
+  3.4rem has a *desktop* floor: 390px wraps a normal hero headline into six
+  lines. Give the clamp a phone-sized floor, around 2.25rem. The portrait crop
+  of the image is covered in `hero-depth.md`; the portrait crop of the type is
+  missed more often.
 - **Hero density, decided while authoring.** Headline at most two lines at
   1440 and three at 390 — the same limit `verify.md`'s mobile-headline line
   grades and every hero composition's README states — subtext at most about 25 words,
@@ -137,7 +140,8 @@ Dropping a serif word into a sans headline for visual interest is amateur.
 - **No pure black.** `#000` has no air in it. Off-black is the minimum.
 - Contrast, measured on the render: body ≥4.5:1, large text ≥3:1, controls
   and focus indicators ≥3:1.
-- Colour drift keeps the whole page in one theme family. See devices.md §10.
+- Colour drift keeps the whole page in one set of grounds; see `drift` in
+  `devices.md`.
 
 **Redefining `--color-ink` on a subtree does not re-ink text under it.**
 `color` is inherited by its *computed value*, so text whose `color` already
@@ -173,15 +177,15 @@ rule on its own sends people to a slightly weaker full-frame overlay.
 There are three shapes, and which one is right depends only on where the
 copy sits:
 
-1. **A corner** density, sized to the copy block. `.scrim--lead` /
-   `.scrim--trail`. Right when copy is anchored to a corner on a wide
+1. **A corner** density, sized to the copy block: a radial gradient anchored
+   at the copy's corner. Right when copy is anchored to a corner on a wide
    screen. An edge gradient darkens a whole band across the frame to cover
    one corner; a corner gradient puts density where the text is and leaves
    the photograph alone.
-2. **A band**, `.scrim--band`, transparent above roughly 58%. Right whenever
-   copy spans the full width of the frame, which is what *both* corner
-   anchors become below 860px. The engine already switches `.scrim--trail`
-   to band there for exactly that reason.
+2. **A band**, transparent above roughly 58% — `hero-bleed` carries one as
+   `.hero-bleed__scrim`. Right whenever copy spans the full width of the
+   frame, which is what *both* corner anchors become below 860px, so a corner
+   scrim switches to a band there, in the section's own CSS.
 3. **A column** density under the text column, on a section where copy holds
    one side and a full-bleed image the other. Leaves the other half of the
    frame untouched.
@@ -222,17 +226,18 @@ not one property. Five tools, used together:
 1. **Shadow offset and blur.** Real raised things cast light downward. A
    zero-offset coloured halo is decoration, not depth. Tint the shadow to
    the canvas hue; pure black shadows on a coloured ground look like dirt.
-2. **Edge light.** A 1px top highlight (`--shadow-edge`) sells a raised
-   surface better than any amount of blur; real lips catch light.
+2. **Edge light.** A 1px top highlight (an inset `box-shadow` one pixel
+   down, in a light tint of the surface) sells a raised surface better than
+   any amount of blur; real lips catch light.
 3. **Scale and blur with distance.** Things further away are smaller,
    softer, lower contrast. Parallax without this reads as sliding, not depth.
 4. **Overlap.** One element crossing another's boundary establishes more
    depth than shadow. Free, and underused.
-5. **Grain.** A flat dark ground bands on real displays. `.grain` at 4-5%
-   opacity is the difference between "a dark page" and "a lit room".
+5. **Grain.** A flat dark ground bands on real displays. A grain overlay at
+   4-5% opacity is the difference between "a dark page" and "a lit room".
 
-Three elevation steps (`--shadow-e1/2/3`), no more. If everything is
-elevated, nothing is.
+Three elevation steps, no more, each a shadow tinted to the canvas hue. If
+everything is elevated, nothing is.
 
 **Today's antidote is tomorrow's default.** Grain, film texture, asymmetry and
 tactile brutalism are now in every trend roundup published this year, which means
@@ -288,13 +293,13 @@ fast.
   sanctioned third, for wipes. Never animate width, height, margin, padding,
   top or left, never `transition: all`. Restrict continuous animation to
   transform and opacity only.
-- `--motion-p` is the one new custom property this plugin introduces: a 0-to-1
-  value published per section by the motion engine. It is the seam anything
-  not covered by the device kit hooks into via `calc()`.
+- `--motion-p` is the 0-to-1 progress the motion engine publishes on every
+  scrubbed section. It is the seam anything not covered by the device kit
+  hooks into via `calc()`.
 - **Never `ease-in` on UI.** It delays the moment the eye is already on.
   `ease-out` at 200ms feels faster than `ease-in` at 200ms.
-- Built-in CSS easings are too weak. Use `--transition-ease-out`
-  (`cubic-bezier(0.23, 1, 0.32, 1)`).
+- Built-in CSS easings are too weak. Use `--ease-entry`, the curve
+  `design-md.md` reads off the reference.
 - **UI transitions under 300ms.** Hover 120-180ms, buttons 100-160ms. Scroll
   devices are exempt: paced by hand, not by duration.
 - **Never `scale(0)`.** Enter from `scale(0.95)` plus `opacity: 0`. Nothing

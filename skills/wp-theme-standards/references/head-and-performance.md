@@ -5,42 +5,60 @@ project's function prefix from its `.claude/CLAUDE.md`.
 
 ## Contents
 
-- Font preconnect
+- Font preload
 - LCP image preloading
 - Disable WordPress emojis
 - Hide the WordPress version
-- Schema.org structured data
 - SEO meta descriptions
 
 ---
 
 ## Performance Optimizations
 
-### Font Preconnect
+### Font Preload
 
-Add preconnect hints for external font providers to speed up loading.
+The theme self-hosts its fonts (`/wp-init` Step 4.5) and requests nothing from
+`fonts.googleapis.com` or `fonts.gstatic.com`, so there is no font origin to preconnect to.
+Preload exactly one file — the primary family's regular (400) latin woff2 — guarded on the
+file existing. `crossorigin` is required even same-origin, or the font downloads twice:
 
 ```php
-function prefix_add_preconnect() {
-    echo '<link rel="preconnect" href="https://fonts.googleapis.com">' . "\n";
-    echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\n";
-}
-add_action('wp_head', 'prefix_add_preconnect', 1);
+add_action( 'wp_head', function() {
+    $font = PREFIX_DIR . '/assets/fonts/<primary-regular-latin>.woff2';
+    if ( file_exists( $font ) ) {
+        printf(
+            '<link rel="preload" as="font" type="font/woff2" href="%s" crossorigin>' . "\n",
+            esc_url( PREFIX_URI . '/assets/fonts/<primary-regular-latin>.woff2' )
+        );
+    }
+}, 1 );
 ```
 
 ### LCP Image Preloading
 
-Preload the Largest Contentful Paint (LCP) element (usually the hero image) on the homepage.
+Preload the Largest Contentful Paint (LCP) element (usually the hero image) on the homepage,
+with the same candidates the `<img>` offers. `imagesrcset` and `imagesizes` let the browser
+preload the candidate it will actually render; `href` alone preloads the full-size original
+and the `<img>` then downloads its own `srcset` pick as well. Pass the `sizes` the template
+gives `prefix_image()` for the same image:
 
 ```php
-function prefix_preload_lcp_image() {
-    if (is_front_page()) {
-        $hero_image = prefix_get_field('hero_image');
-        $hero_image_url = $hero_image ? $hero_image['url'] : prefix_asset('images/hero-image.png');
-        echo '<link rel="preload" as="image" href="' . esc_url($hero_image_url) . '" fetchpriority="high">' . "\n";
+add_action( 'wp_head', function() {
+    if ( ! is_front_page() ) {
+        return;
     }
-}
-add_action('wp_head', 'prefix_preload_lcp_image', 2);
+    $hero = prefix_get_field( 'hero_image' );
+    $id   = is_array( $hero ) ? (int) ( $hero['id'] ?? 0 ) : 0;
+    if ( ! $id ) {
+        return;
+    }
+    printf(
+        '<link rel="preload" as="image" href="%s" imagesrcset="%s" imagesizes="%s" fetchpriority="high">' . "\n",
+        esc_url( wp_get_attachment_image_url( $id, 'large' ) ),
+        esc_attr( (string) wp_get_attachment_image_srcset( $id, 'large' ) ),
+        esc_attr( '100vw' ) // the hero's real display width — the same `sizes` as its <img>
+    );
+}, 2 );
 ```
 
 ### Disable WordPress Emojis
@@ -68,33 +86,6 @@ Remove the generator meta tag that exposes the WordPress version.
 remove_action('wp_head', 'wp_generator');
 ```
 
-## Schema.org Structured Data
-
-Add JSON-LD structured data for SEO and AI search optimization.
-
-```php
-function prefix_output_schema_markup() {
-    $site_url  = home_url();
-    $site_name = get_bloginfo('name');
-
-    $schema = array(
-        '@context'    => 'https://schema.org',
-        '@type'       => 'Organization',
-        '@id'         => $site_url . '/#organization',
-        'name'        => $site_name,
-        'url'         => $site_url,
-        'description' => 'A brief description of the business.',
-    );
-
-    echo '<script type="application/ld+json">' . "\n";
-    echo wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
-    echo "\n" . '</script>' . "\n";
-}
-add_action('wp_head', 'prefix_output_schema_markup', 5);
-```
-
----
-
 ## SEO Meta Descriptions
 
 Add meta description tags, but defer to SEO plugins if present.
@@ -109,7 +100,7 @@ function prefix_add_meta_description() {
     $description = '';
 
     if (is_front_page()) {
-        $description = 'Your site description here.';
+        $description = prefix_get_field('site_description', 'option') ?: get_bloginfo('description');
     } elseif (is_singular('post')) {
         $post = get_post();
         $description = has_excerpt() ? get_the_excerpt($post) : wp_trim_words(strip_tags($post->post_content), 30, '...');

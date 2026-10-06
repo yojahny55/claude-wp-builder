@@ -71,6 +71,63 @@ grep -Fq '_<lang>' "$SKILL" \
 grep -Fq 'suffixes under *both* i18n strategies' "$SKILL" \
   || fail "$SKILL lost the crossover clause — under polylang the suffixed options fields would go unchecked"
 
+# The bilingual rule used to open "Under the `suffix` strategy ...", in the skill and in the
+# agent's SEO-057 row, which made the comparison conditional on suffix and left a Polylang
+# site's stale suffixed address unchecked -- the crossover clause above says the opposite.
+grep -Fq 'Under the `suffix` strategy the options-page fields' "$SKILL" \
+  && fail "$SKILL still makes the _<lang> comparison conditional on the suffix strategy"
+grep -Fq 'Under the `suffix` i18n strategy compare' "$AGENT" \
+  && fail "$AGENT SEO-057 still compares _<lang> variants only under the suffix strategy"
+grep -Fq 'always compare every `_<lang>` variant' "$AGENT" \
+  || fail "$AGENT SEO-057 does not compare the _<lang> variants under both strategies"
+
+# Rank Math stores its titles and local values in `rank-math-options-titles`. The local
+# check read `rank_math_titles`, which does not exist, so `wp option get` failed and the
+# Rank Math source silently dropped out of the NAP comparison.
+for f in "$SKILL" "$AGENT"; do
+  grep -Fq 'rank_math_titles' "$f" && fail "$f reads rank_math_titles, an option Rank Math never writes"
+  grep -Fq 'rank-math-options-titles' "$f" || fail "$f does not read Rank Math's real titles option"
+done
+grep -Fq 'knowledgegraph_name' "$SKILL" || fail "$SKILL does not name the Rank Math key the business name comes from"
+grep -Eq '^wp option get' "$SKILL" && fail "$SKILL shows bare wp, which fails on a Docker, DDEV or Lando wrapper"
+grep -Fq 'five different places' "$SKILL" && fail "$SKILL counts five sources over a table of three"
+
+# The phone rule has to reconcile the agent's own example. Digits alone turn
+# "+34 900 00 00 00" into 34900000000 and leave it unequal to 900000000.
+grep -Fq 'country calling code' "$SKILL" || fail "$SKILL phone normalization has no country-code step"
+grep -Fq '| `+34 900 00 00 00` (JSON-LD, Spain) | `900000000` (footer `tel:`) | `900000000` and `900000000` | same number, no finding |' "$SKILL" \
+  || fail "$SKILL lost the worked pair that proves the phone rule reconciles +34 900 00 00 00 with 900000000"
+grep -Fq 'a leading `+`; compare the digits.' "$SKILL" \
+  && fail "$SKILL still normalizes phones to bare digits, which reports +34 900 00 00 00 against 900000000"
+
+# The service-area exemption covers the map and the address, never click-to-call, in both files.
+grep -Eq '^\| SEO-056 \|.*`tel:` link is WARNING on every business type' "$AGENT" \
+  || fail "$AGENT SEO-056 does not apply the click-to-call half to every business type"
+grep -Fq 'Brick-and-mortar or hybrid only. Grep templates' "$AGENT" \
+  && fail "$AGENT SEO-056 still exempts a service-area business from click-to-call"
+grep -Fq 'a service-area business is never reported for an absent address' "$AGENT" \
+  || fail "$AGENT SEO-057 does not scope the absent-address finding to brick-and-mortar and hybrid"
+grep -Fq 'for it an absent address is not a finding' "$SKILL" \
+  || fail "$SKILL reports an absent address on a service-area business"
+
+# SEO-063 reads only the schema, and it is the one CRITICAL: an undetermined site still gets it.
+grep -Fq '(SEO-055, SEO-058, SEO-060, SEO-061, SEO-063)' "$SKILL" \
+  || fail "$SKILL leaves SEO-063 out of the type-independent checks"
+grep -Fq 'SEO-061 and SEO-063' "$AGENT" || fail "$AGENT leaves SEO-063 out of the undetermined-type run"
+
+# A recommended property with no check id cannot be a finding, and aggregateRating is never
+# recommended: an INFO nudge toward it is a nudge toward what SEO-063 rates CRITICAL.
+grep -Fq 'each one its own INFO finding when absent' "$SKILL" \
+  && fail "$SKILL turns recommended properties into findings that no check id carries"
+grep -Fq '`aggregateRating` **only when real review data backs it**' "$SKILL" \
+  && fail "$SKILL still recommends aggregateRating"
+grep -Fq '`aggregateRating` is never on that list' "$SKILL" \
+  || fail "$SKILL does not keep aggregateRating out of the recommendations"
+
+# schema.org supersedes branchOf with parentOrganization.
+grep -Fq 'through `parentOrganization`' "$SKILL" || fail "$SKILL does not link locations with parentOrganization"
+grep -Fq 'Organization through `branchOf`.' "$SKILL" && fail "$SKILL still requires the superseded branchOf"
+
 # Rendered markup is never changed without asking: a new element inherits browser default
 # styles and can override the utility classes already on the page.
 grep -Fq 'never auto-applied' "$AGENT" \

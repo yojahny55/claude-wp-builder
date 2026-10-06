@@ -12,7 +12,7 @@ A one-off `wp eval` for a single field is fine inline, as the phases below do
 throughout. Anything meant to be re-run — a bulk import, a script another
 command will need to trigger again later — is a different case: see "Non-Trivial
 Seed Logic Lives in `inc/seed/`, Never in a Scratchpad" in
-`skills/wp-cli-patterns/SKILL.md` before writing it as a throwaway file.
+`${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/SKILL.md` before writing it as a throwaway file.
 
 ## Step 0: Read Project Manifest
 

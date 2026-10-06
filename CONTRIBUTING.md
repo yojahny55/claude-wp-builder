@@ -78,7 +78,7 @@ fatals a theme, and the release ritual. Read it alongside this file.
 ### Writing a New Agent
 
 - Place the file in `agents/`.
-- Include frontmatter with `name`, `description`, and `tools` (order: `Read, Write, Edit, Grep, Glob, Bash`).
+- Include frontmatter with `name`, `description`, `tools` (order: `Read, Write, Edit, Grep, Glob, Bash`) and `model` — the cost tier (`opus`, `sonnet` or `haiku`); `tests/checks/model-routing.sh` fails an agent without one.
 - The agent **must** start with a "First Action (MANDATORY)" step that reads `.claude/CLAUDE.md`.
 - Reference existing agents like `agents/wp-template.md` or `agents/wp-acf.md` for the expected structure.
 

@@ -21,7 +21,7 @@ always be a list of things that happen, and a page of things happening is a
 page nobody can describe afterwards.
 
 Read this before writing the section list, alongside `grammars.md` and
-`devices.md`, before the pre-build checks in SKILL.md.
+`devices.md`.
 
 ---
 
@@ -176,7 +176,7 @@ their side. If the sentence only makes sense to someone who has read the
 build folder, it fails.
 
 This sentence goes in `demo/BRIEF.md`, and the signature move (defined in
-`devices.md`) usually lives inside it. If the signature move and the tell-someone sentence point at
+`uniqueness.md` §4) usually lives inside it. If the signature move and the tell-someone sentence point at
 different moments, one of them is decoration. Merge them, or cut the one
 that is not the peak.
 
@@ -234,7 +234,7 @@ instrument in the kit and the one most often left at default.
 | Pacing | Reads as | Built with |
 |---|---|---|
 | Short sections, hard cuts | Adrenaline, pulse, impatience | Sections under 1.4vh, no pin, dwell at 0 |
-| A long pin | Held breath, pressure, attention | Span 3+, overlapping cues, one idea |
+| A long pin | Held breath, pressure, attention | Span up to 3.0 on the peak (the cap in `devices.md`), overlapping cues, one idea |
 | An empty viewport before a reveal | Silence before the drop | A ground-only section, no cue until the next one |
 | A slow settle mid-section | The shot landing | Dwell 0.35 to 0.6 with the cue peak on the settle |
 | A fast cue with a long plateau | Confidence, arrival | A cue curve weighted toward an early peak and a long hold |
@@ -263,9 +263,9 @@ failed to load, and the harness reports both as dead scroll. If you are
 using the empty viewport before the peak, say so in `demo/BRIEF.md` so the
 verification pass knows the difference.
 
-The total-length budget still holds at 8 to 14 viewport-heights. Pacing is
+The total-length budget in `devices.md` (`### pin`) still holds. Pacing is
 how that budget is spent, not permission to spend more of it. A page that
-needs 20vh to land its curve has too many sections, not too little room.
+cannot land its curve inside it has too many sections, not too little room.
 
 ---
 

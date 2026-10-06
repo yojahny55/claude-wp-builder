@@ -22,7 +22,7 @@
      uppercase string as a signature (references/taste.md). */
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--color-ink-soft);
 }
 .icon-row__title {
   margin: 0;
@@ -60,7 +60,7 @@
   font-family: var(--font-text);
   font-size: 0.9375rem;
   line-height: 1.55;
-  color: var(--color-muted);
+  color: var(--color-ink-soft);
 }
 
 /* ---- Element motion -------------------------------------------------------

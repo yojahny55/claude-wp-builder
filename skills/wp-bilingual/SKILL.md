@@ -23,13 +23,31 @@ This skill defines ONE of the plugin's two translation methodologies: the **ACF/
 > version of this line claimed the plugin supported no Polylang at all, which
 > stopped being true when `/wp-polylang` shipped.
 
+## Which helpers exist depends on the starter
+
+The two starters ship different suffix contracts. Read `Template:` in the project's
+`.claude/CLAUDE.md` and call only the helpers that template defines — a call to one it does
+not define is a fatal error on the page.
+
+| `Template:` | Helpers in `inc/i18n.php` | Source |
+|---|---|---|
+| `tailwind` (and legacy `basic`) | `prefix_get_current_lang()`, `prefix_get_field()`, `prefix_get_repeater()`, `prefix_get_sub_field()`, `prefix_t()`, `prefix_e()`, `prefix_is_lang()`, `prefix_get_translations()`, `prefix_get_lang_url()` | `${CLAUDE_PLUGIN_ROOT}/starter-theme/__tailwind__/inc/i18n.php` |
+| `cinematic` | `prefix_current_lang()`, `prefix_b( $en, $es )`, `prefix_setting( $name )` — plus `prefix_get_sub( $name )` in `inc/scenes-renderer.php` for scene sub-fields | `${CLAUDE_PLUGIN_ROOT}/starter-theme/__cinematic__/inc/i18n.php` |
+
+Everything from "Translation Helper Functions" down describes the `tailwind` contract. On
+`cinematic`, a literal is `prefix_b( 'English', 'Español' )` (it allows `br`, `em`, `strong`,
+`i`, `b` and `span` through `wp_kses`), an options-page value is `prefix_setting( 'site_logo' )`
+(tries `site_logo_es` on a Spanish request), and there is no `prefix_get_field()`. The
+cinematic layer knows `en` and `es` only, and reads the `?lang=` parameter and the cookie but
+never sets the cookie.
+
 ## Reference files
 
-- [references/i18n-helpers.md](references/i18n-helpers.md) — the full source of
-  `prefix_get_current_lang()` and every translation helper, the static translations array,
-  JavaScript translations, the language switcher URL helper, and what `inc/i18n.php`
-  contains. Read when writing or repairing `inc/i18n.php` itself; templates only need the
-  calls shown below.
+- [references/i18n-helpers.md](references/i18n-helpers.md) — where the implementation lives
+  (the starter's `inc/i18n.php`, never a copy), why detection runs in its order, the cookie and
+  its `init` hook, the fallback rules, adding a string or passing strings to JavaScript, and a
+  switcher template. Read when changing `inc/i18n.php` or building the switcher; templates only
+  need the calls shown below.
 - [references/acf-fields.md](references/acf-fields.md) — complete field definitions for a
   suffix site: language tabs and suffixed repeater subfields. Read when writing
   `fields/*.php` for a project on this model.
@@ -82,31 +100,25 @@ Language is detected using a strict priority chain. The first match wins.
 
 **Priority: URL parameter > Cookie > Browser Accept-Language > Default**
 
-The full detection function is in `references/i18n-helpers.md` § Language Detection.
+### The language cookie
 
-### Important Notes on Cookies
+A switcher link carries `?lang=es`. The **first** call to `prefix_get_current_lang()` on that
+request sees the parameter and sets the `prefix_lang` cookie (path `/`, 365 days), so later
+requests need no parameter. Its result is cached for the rest of the request, so no later call
+sets the cookie.
 
-- `setcookie()` MUST be called **before any HTML output** (before headers are sent)
-- The `i18n.php` file must be included early in `functions.php`, before any template rendering
-- Cookie path is `/` so it works across all pages
-- Cookie lifetime: 365 days
-
----
-
-## Cookie Persistence
-
-When the user clicks a language switcher link (e.g., `?lang=es`), the cookie is set in the `prefix_get_current_lang()` function. Subsequent page loads read the cookie, so the URL parameter is only needed once.
-
-```php
-// Cookie is set when URL param is detected
-setcookie('prefix_lang', $current_lang, time() + (365 * 24 * 60 * 60), '/');
-```
+That first call must happen **before any output**, or `setcookie()` fails — the header can no
+longer be sent once `<!DOCTYPE html>` has gone out, and the choice silently lasts one page.
+Including `i18n.php` early does not achieve this; calling the function does. The starter hooks
+`prefix_get_current_lang()` on `init` for exactly this reason. Keep that hook, and never let a
+template be the first caller.
 
 ---
 
 ## Translation Helper Functions
 
-Each helper's implementation is in `references/i18n-helpers.md`; below is how templates call them.
+Each helper's implementation is the starter's `inc/i18n.php` (the table above); below is how
+templates call them.
 
 ### prefix_get_field() -- Auto-Translating Field Getter
 
@@ -173,20 +185,21 @@ For hardcoded UI strings (navigation labels, button text, form labels) that do n
 <button><?php prefix_e('btn_learn_more'); ?></button>
 
 <!-- When you need the raw string (e.g., for attributes) -->
-<a href="#" aria-label="<?php echo esc_attr(prefix__('nav_schedule')); ?>">
+<a href="#" aria-label="<?php echo esc_attr(prefix_t('nav_schedule')); ?>">
 ```
+
+`prefix_t()` returns the key itself when no language has an entry for it, never `''` — so
+`prefix_t( $key ) ?: $default` never reaches `$default`. Compare against the key instead.
 
 ### prefix_is_lang() and prefix_get_current_lang()
 
-Convenience helpers for language checks.
+Convenience helpers for language checks. There is no per-language alias; pass the code.
 
 **Usage:**
 
 ```php
-<?php if (prefix_is_spanish()) : ?>
-    <html lang="es">
-<?php else : ?>
-    <html lang="en">
+<?php if (prefix_is_lang('es')) : ?>
+    <p class="notice"><?php prefix_e('notice_spanish_only'); ?></p>
 <?php endif; ?>
 ```
 
@@ -194,19 +207,17 @@ Convenience helpers for language checks.
 
 ## Static Translations Array
 
-Define all hardcoded UI strings in a central translations function. Each entry is an associative array keyed by language code.
-
-The full array, and the `prefix_get_js_translations()` subset passed to JavaScript through
-`wp_localize_script()`, are in `references/i18n-helpers.md` § Static Translations Array.
+Every hardcoded UI string is a key in `prefix_get_translations()`, mapping each language code
+to its text. Adding one, and passing strings to JavaScript (there is no separate JavaScript
+helper), are in `references/i18n-helpers.md`.
 
 ---
 
 ## Language Switcher URL Generation
 
-Use `remove_query_arg()` and `add_query_arg()` to build language toggle URLs.
-
-The `prefix_get_lang_url()` helper and a switcher template are in
-`references/i18n-helpers.md` § Language Switcher URL Generation.
+`prefix_get_lang_url( $lang )` returns the current URL with `?lang=` replaced, built with
+`remove_query_arg()` and `add_query_arg()`. A switcher template is in
+`references/i18n-helpers.md`.
 
 ---
 
@@ -279,7 +290,7 @@ This rule applies everywhere:
 - `prefix_get_field()` instead of `get_field()`
 - `prefix_get_sub_field()` instead of `get_sub_field()`
 - `prefix_get_repeater()` instead of raw `get_field()` on repeaters
-- `prefix__()` / `prefix_e()` instead of hardcoded strings
+- `prefix_t()` / `prefix_e()` instead of hardcoded strings
 
 The only place `get_field()` is called directly is **inside** the helper functions themselves.
 
@@ -287,27 +298,29 @@ The only place `get_field()` is called directly is **inside** the helper functio
 
 ## Setting the HTML lang Attribute
 
-In `header.php`, set the document language dynamically.
+`header.php` prints `<html <?php language_attributes(); ?>>` and nothing else on that tag.
+`language_attributes()` reads the site locale, which on a suffix site is the primary language
+on every request, `?lang=es` included. Both starters' `inc/i18n.php` therefore filter it, so
+the attribute follows the request (WCAG 3.1.1). The `tailwind` form (`cinematic` calls
+`prefix_current_lang()`):
 
 ```php
-<!DOCTYPE html>
-<html <?php language_attributes(); ?> lang="<?php echo esc_attr(prefix_get_current_lang()); ?>">
-<head>
-    <meta charset="<?php bloginfo('charset'); ?>">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <?php wp_head(); ?>
-</head>
-<body <?php body_class(); ?>>
+add_filter('language_attributes', function ($output) {
+    return preg_replace('/lang="[^"]*"/', 'lang="' . esc_attr(prefix_get_current_lang()) . '"', $output);
+});
 ```
+
+Never add a second `lang="…"` after `language_attributes()` on the `<html>` tag. A browser keeps
+the first of two duplicate attributes, which is the site locale, so the second one changes
+nothing.
 
 ---
 
 ## File Structure
 
-The i18n system lives in a single file included early in `functions.php`, before the field loader's `acf/init` hook runs.
-
-The `require` order and the list of what `inc/i18n.php` contains are in
-`references/i18n-helpers.md` § File Structure.
+The i18n system is one file, `inc/i18n.php`, required from `functions.php` before the field
+loader's `acf/init` hook runs (field definitions may call its helpers). What it defines is the
+table at the top of this skill.
 
 ---
 
@@ -315,13 +328,13 @@ The `require` order and the list of what `inc/i18n.php` contains are in
 
 - [ ] `PREFIX_SUPPORTED_LANGS` and `PREFIX_DEFAULT_LANG` constants defined
 - [ ] Language detection follows priority: URL param > cookie > browser > default
-- [ ] Cookie set with 365-day expiry on language switch
+- [ ] Cookie set with 365-day expiry on language switch, by a first call made on `init`
 - [ ] `prefix_get_field()` used in ALL templates (never raw `get_field()`)
 - [ ] `prefix_get_repeater()` used for repeater fields with translatable subfields specified
 - [ ] `prefix_get_sub_field()` used inside `have_rows()` loops
-- [ ] `prefix__()` / `prefix_e()` used for all static UI strings
-- [ ] All secondary ACF fields have `_<lang>` suffix and "Leave empty to use English version" instruction
+- [ ] `prefix_t()` / `prefix_e()` used for all static UI strings
+- [ ] All secondary ACF fields have the `_<lang>` suffix and an instruction written in the primary language (see Rules)
 - [ ] Tab organization per language in ACF field groups
 - [ ] Menu locations registered per language: `<location>-<lang>`
 - [ ] Language switcher uses `remove_query_arg` / `add_query_arg`
-- [ ] HTML `lang` attribute set dynamically
+- [ ] HTML `lang` attribute follows the request through the `language_attributes` filter

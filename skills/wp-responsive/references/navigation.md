@@ -6,7 +6,14 @@ The markup, CSS and JavaScript behind `SKILL.md` § Responsive Navigation.
 
 - HTML Structure
 - CSS
-- JavaScript (Minimal)
+- JavaScript
+
+The open mobile menu is a modal overlay, so it is held to the accessibility audit's
+A11Y-031 (`agents/wp-audit-a11y.md`, CRITICAL): Tab is trapped inside it while it is open,
+Escape closes it, and focus returns to the button that opened it. Closed, it is
+`visibility: hidden`, which takes its links out of the tab order and out of the
+accessibility tree together. `aria-hidden="true"` on a menu that is only moved off-screen
+does neither job: its links stay focusable while screen readers are told they are not there.
 
 ## HTML Structure
 
@@ -19,7 +26,7 @@ The markup, CSS and JavaScript behind `SKILL.md` § Responsive Navigation.
             </a>
 
             <!-- Desktop navigation -->
-            <nav class="header__nav" id="main-nav">
+            <nav class="header__nav" aria-label="Main">
                 <a href="#" class="nav__link nav__link--active">Home</a>
                 <a href="#services" class="nav__link">Services</a>
                 <a href="/pricing" class="nav__link">Pricing</a>
@@ -29,8 +36,8 @@ The markup, CSS and JavaScript behind `SKILL.md` § Responsive Navigation.
             <!-- CTA button (visible on desktop) -->
             <a href="#contact" class="btn btn--primary header__cta">Get Started</a>
 
-            <!-- Hamburger button (visible on mobile) -->
-            <button class="header__hamburger" aria-label="Toggle menu" aria-expanded="false">
+            <!-- Hamburger button (visible on mobile); it stays above the open menu and closes it -->
+            <button class="header__hamburger" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobile-menu">
                 <span></span>
                 <span></span>
                 <span></span>
@@ -39,8 +46,8 @@ The markup, CSS and JavaScript behind `SKILL.md` § Responsive Navigation.
     </div>
 
     <!-- Mobile menu overlay -->
-    <div class="mobile-menu" id="mobile-menu" aria-hidden="true">
-        <nav class="mobile-menu__nav">
+    <div class="mobile-menu" id="mobile-menu">
+        <nav class="mobile-menu__nav" aria-label="Main">
             <a href="#" class="mobile-menu__link">Home</a>
             <a href="#services" class="mobile-menu__link">Services</a>
             <a href="/pricing" class="mobile-menu__link">Pricing</a>
@@ -61,6 +68,8 @@ The markup, CSS and JavaScript behind `SKILL.md` § Responsive Navigation.
 }
 
 .header__hamburger {
+    position: relative;
+    z-index: 1000; /* above the open menu, so it can close it */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -81,7 +90,8 @@ The markup, CSS and JavaScript behind `SKILL.md` § Responsive Navigation.
     transition: var(--transition-base);
 }
 
-/* Mobile menu (hidden by default) */
+/* Mobile menu: closed is off-screen AND visibility: hidden, so its links are not tabbable.
+   visibility flips after the slide-out, and immediately on the way in. */
 .mobile-menu {
     position: fixed;
     top: 0;
@@ -95,12 +105,15 @@ The markup, CSS and JavaScript behind `SKILL.md` § Responsive Navigation.
     justify-content: center;
     gap: var(--spacing-xl);
     transform: translateX(100%);
-    transition: transform 0.3s ease;
+    visibility: hidden;
+    transition: transform 0.3s ease, visibility 0s linear 0.3s;
     z-index: 999;
 }
 
 .mobile-menu.is-open {
     transform: translateX(0);
+    visibility: visible;
+    transition: transform 0.3s ease, visibility 0s;
 }
 
 .mobile-menu__link {
@@ -131,18 +144,57 @@ The markup, CSS and JavaScript behind `SKILL.md` § Responsive Navigation.
 }
 ```
 
-## JavaScript (Minimal)
+## JavaScript
 
 ```js
-const hamburger = document.querySelector('.header__hamburger');
-const mobileMenu = document.getElementById('mobile-menu');
+const toggle = document.querySelector('.header__hamburger');
+const menu = document.getElementById('mobile-menu');
+const FOCUSABLE = 'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
-if (hamburger && mobileMenu) {
-    hamburger.addEventListener('click', () => {
-        const isOpen = mobileMenu.classList.toggle('is-open');
-        hamburger.setAttribute('aria-expanded', isOpen);
-        mobileMenu.setAttribute('aria-hidden', !isOpen);
-        document.body.style.overflow = isOpen ? 'hidden' : '';
+if (toggle && menu) {
+    const isOpen = () => menu.classList.contains('is-open');
+
+    const setOpen = (open, returnFocus = true) => {
+        menu.classList.toggle('is-open', open);
+        toggle.setAttribute('aria-expanded', String(open));
+        document.body.style.overflow = open ? 'hidden' : '';
+        if (open) {
+            const first = menu.querySelector(FOCUSABLE);
+            if (first) first.focus();
+        } else if (returnFocus) {
+            toggle.focus(); // focus goes back to the control that opened the menu
+        }
+    };
+
+    toggle.addEventListener('click', () => setOpen(!isOpen()));
+
+    document.addEventListener('keydown', (e) => {
+        if (!isOpen()) return;
+        if (e.key === 'Escape') {
+            setOpen(false);
+            return;
+        }
+        if (e.key !== 'Tab') return;
+        // The toggle sits above the overlay and closes it, so it is part of the cycle.
+        // Read on every Tab, not once at open: the menu's content can change while it is open.
+        const items = [toggle, ...menu.querySelectorAll(FOCUSABLE)];
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (!items.includes(document.activeElement)) {
+            e.preventDefault();
+            (e.shiftKey ? last : first).focus();
+        } else if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+        }
+    });
+
+    // At 1024px the CSS hides the menu. Close it too, or body stays scroll-locked on desktop.
+    window.matchMedia('(min-width: 1024px)').addEventListener('change', (e) => {
+        if (e.matches && isOpen()) setOpen(false, false);
     });
 }
 ```
