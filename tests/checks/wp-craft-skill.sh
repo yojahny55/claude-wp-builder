@@ -43,6 +43,7 @@ grep -Fq 'two distinct' "$S" || fail "$S does not say what domain classification
 
 # --- the description finds the skill ------------------------------------------------
 desc=$(awk 'NR<=6 && /^description:/' "$S")
+[ -n "$desc" ] || fail "$S has no description: in its first 6 lines"
 for t in DESIGN.md BRIEF.md data-motion fingerprint 'Avoid list' /wp-polish 'Not for plain-mode demos'; do
   printf '%s' "$desc" | grep -Fq -- "$t" || fail "$S's description does not name $t"
 done

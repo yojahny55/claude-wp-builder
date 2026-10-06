@@ -70,9 +70,9 @@ grep -Fq 'culprits' "$s" || fail "$s does not send the reader to the element /wp
 # --- the contract a later trim could drop -----------------------------------------
 # min-width only: no max-width query outside the one example labelled WRONG, and no
 # exception for the mobile menu (navigation.md never needed one).
-awk 'FNR==1{p=0; prev=""} /^```/{p=!p; next} p && /@media[^{]*max-width/ && prev !~ /WRONG/ {print FILENAME ":" FNR; bad=1} {prev=$0} END{exit bad}' \
-  "$s" skills/wp-responsive/references/*.md >/dev/null \
-  || fail "a wp-responsive example writes a max-width query outside the one labelled WRONG"
+mq=$(awk 'FNR==1{p=0; prev=""} /^```/{p=!p; next} p && /@media[^{]*max-width/ && prev !~ /WRONG/ {print FILENAME ":" FNR; bad=1} {prev=$0} END{exit bad}' \
+  "$s" skills/wp-responsive/references/*.md) \
+  || fail "a wp-responsive example writes a max-width query outside the one labelled WRONG: $(echo $mq)"
 grep -Fq 'The only exception to the `max-width` rule' "$s" && fail "$s still carves a max-width exception for the hamburger"
 grep -Fq 'Always `min-width`, Never `max-width`' "$s" || fail "$s lost the min-width-only rule"
 # The gap-above-1024 lesson (commit 73e4668): a breakpoint holds until the next one.
