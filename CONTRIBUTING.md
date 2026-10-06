@@ -58,6 +58,7 @@ claude plugins add ./
 
 ```
 /wp-contribute new command wp-foo   # the file + its check + its README and docs rows
+/wp-contribute review wp-foo        # a skill against the authoring best practices
 /wp-contribute check                # every tests/checks/*.sh, plus the doc-sync gate
 /wp-contribute pr                   # branch, conventional commit, house PR body
 ```

@@ -141,6 +141,8 @@ quote the value; `tests/checks/frontmatter-yaml.sh` fails on it in every layer.
 2. `bash bin/doc-sync-check.sh` — README tables, `docs/commands.md`, frontmatter and the
    version references all agree.
 3. **New behavior has a new check.** This is the one reviewers actually block on.
+   A new or changed skill also passes `/wp-contribute review <name>` — the judgment half
+   of the audit, against [references/skill-review.md](references/skill-review.md).
 4. `CHANGELOG.md` gains an `[Unreleased]` entry. Say what changed and *why it was wrong
    before*; a release note that only names the feature is useless six months later.
 5. Docs follow the change: a new command needs a row in the README table **and** an entry in

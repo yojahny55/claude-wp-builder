@@ -42,7 +42,7 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-s3`](#wp-s3) | utility | — | bucket, region, media URL, credentials | `s3-config.php`, the `require` in `wp-config.php`, the endpoint mu-plugin |
 | [`/wp-s3-media`](#wp-s3-media) | utility | — | a configured WordPress root | `wp-content/uploads` moved, and verified |
 | [`/wp-aos-animator`](#wp-aos-animator) | utility | — | theme templates | `vendors/aos/`, `functions.php` enqueue, JS init, `data-aos` attributes |
-| [`/wp-contribute`](#wp-contribute) | contributors | — | this repository | new layer file + its check + doc rows; PR; release |
+| [`/wp-contribute`](#wp-contribute) | contributors | — | this repository | new layer file + its check + doc rows; skill review; PR; release |
 
 \* `/wp-create` is optional if WordPress is already running: `/wp-seed` and `/wp-debug` fall
 back to a bare `wp` on PATH (run from the WordPress root, languages from `.claude/CLAUDE.md`)
@@ -682,6 +682,7 @@ bundle, so the command asks before adding a second motion system.
 
 ```
 /wp-contribute new <command|agent|skill|check> <name>
+/wp-contribute review <skill-name>
 /wp-contribute check
 /wp-contribute pr [--title "..."]
 /wp-contribute release [major|minor|patch]     # maintainers
@@ -690,7 +691,10 @@ bundle, so the command asks before adding a second motion system.
 Operates on **this repository**, not on a WordPress project — it refuses unless the working
 directory is the plugin root. `new` scaffolds a layer file together with the two things a PR
 is always missing without it: a grep gate under `tests/checks/` and the README + docs rows.
-`check` runs the whole suite plus `bin/doc-sync-check.sh`. `pr` refuses on `main`, re-runs
+`review` audits a skill against the authoring best practices: the mechanical gates
+(`tests/checks/skill-authoring.sh`, `tests/checks/frontmatter-yaml.sh`), then a fresh subagent
+reading it against `skills/wp-contributing/references/skill-review.md`; `new skill` and `pr`
+both run it. `check` runs the whole suite plus `bin/doc-sync-check.sh`. `pr` refuses on `main`, re-runs
 both gates, then commits (Conventional Commits, no AI attribution), pushes over SSH and opens
 the PR in the house format. `release` is the maintainer path: four version references, the
 changelog rollup, tag, `gh release`, and verification that the published artifact is live.

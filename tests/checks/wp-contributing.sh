@@ -134,6 +134,33 @@ grep -Eq 'for key in name description tools model' "$d" \
   || fail "$d no longer checks the full agent frontmatter contract"
 
 # ---------------------------------------------------------------------------
+# 9b. A new skill passes the audit before it is done — both halves. The scaffold used to
+#     teach `trigger:`, a key Claude Code ignores, and nothing ran the gates or a review, so a
+#     skill could be written, committed and merged without anyone reading it against the
+#     authoring guide. CI catches the mechanical half; only the review catches the rest.
+# ---------------------------------------------------------------------------
+r=skills/wp-contributing/references/skill-review.md
+[ -f "$r" ] || fail "$r is missing — the review has no checklist to read"
+! grep -Fq 'trigger:' "$c" || fail "$c still teaches trigger:, a key Claude Code ignores"
+awk 'NR<=6 && /^allowed-tools:.*Agent/ { f = 1 } END { exit !f }' "$c" \
+  || fail "$c dispatches a review subagent but does not allow the Agent tool"
+grep -Fq 'review <skill-name>' "$c" || fail "$c has no review subcommand"
+for gate in tests/checks/skill-authoring.sh tests/checks/frontmatter-yaml.sh; do
+  grep -Fq "$gate" "$c" || fail "$c does not run $gate before a new skill is done"
+done
+grep -Fq 'references/skill-review.md' "$c" || fail "$c reviews without the checklist"
+grep -Eqi 'fresh subagent|one\*\* fresh subagent' "$c" \
+  || fail "$c does not review in a fresh context — the author's context hides the gaps"
+grep -Eqi 'run Step 2b for each skill' "$c" || fail "$c opens a PR without reviewing the skills it touches"
+grep -Fq 'Skill review' "$c" || fail "$c lets a declined finding vanish instead of listing it in the PR body"
+grep -Fq 'references/skill-review.md' "$s" || fail "$s never names its review checklist"
+# The checklist must carry the guide's judgment rules, not just exist.
+for rule in 'Use when' 'Freedom matches fragility' 'One term per concept' 'Nothing goes stale' \
+            'whether to run it' 'Skills inform; they never act' 'Should not load' 'Verdict: PASS | FIX'; do
+  grep -Fq "$rule" "$r" || fail "$r lost the rule: $rule"
+done
+
+# ---------------------------------------------------------------------------
 # 10. Both are documented where a contributor looks.
 # ---------------------------------------------------------------------------
 grep -Fq 'wp-contributing' README.md || fail "the wp-contributing skill is not in README.md's skills table"

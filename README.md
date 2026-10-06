@@ -435,7 +435,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-s3 [wp-root] [--revert]` | utility | — | Runner for the `wp-s3` skill — install and configure S3 Uploads so WordPress writes its media to S3, or take the site back off it |
 | `/wp-s3-media <upload\|download> [wp-root]` | utility | — | Runner for the `wp-s3` skill — move `wp-content/uploads` between the site and its bucket, with a transfer that verifies itself |
 | `/wp-aos-animator [theme] [--report-only]` | utility | — | Runner for the `wp-aos-animator` skill — audit, install, enqueue, initialize and seed AOS scroll animations across the templates |
-| `/wp-contribute <new\|check\|pr\|release>` | contributors | — | Work on the plugin itself — scaffold a command/agent/skill with its check and doc rows, verify the repo, open the PR |
+| `/wp-contribute <new\|review\|check\|pr\|release>` | contributors | — | Work on the plugin itself — scaffold a command/agent/skill with its check and doc rows, audit a skill against the authoring best practices, verify the repo, open the PR |
 
 \* Optional if WordPress is already running: without `.wp-create.json`, `/wp-seed` and `/wp-debug` fall back to a bare `wp` on PATH and the languages in `.claude/CLAUDE.md`. To audit, debug or clone into a site this plugin did not build, `/wp-adopt` registers it without changing it.
 The `wp-robin`, `wp-aos-animator` and `wp-s3` skills are invoked through their runner

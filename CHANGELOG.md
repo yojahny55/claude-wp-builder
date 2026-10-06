@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`/wp-contribute review <skill>` audits a skill against the authoring best practices, and a
+  new skill is not done until it passes.** `tests/checks/skill-authoring.sh` sees what a grep
+  can — frontmatter, a "Use when" clause, length, contents lists, named files — and cannot see
+  whether a description would be chosen for the right requests, whether a skill explains what
+  Claude already knows, or whether a fragile write is left to improvisation. `review` runs the
+  two gates, then hands the skill to a fresh subagent with
+  `skills/wp-contributing/references/skill-review.md`: twelve judgment rules from Anthropic's
+  guide adapted to this repository, returned as a findings table with a `PASS`/`FIX` verdict,
+  at most three rounds. Fresh, because the author's own context fills exactly the gaps the
+  written skill leaves. `new skill` now loops on the gates and then runs the review, `pr` runs
+  it for every skill a branch touches, and a declined finding goes into the PR body instead of
+  disappearing. The `new skill` scaffold also stopped teaching `trigger:`.
+
 ### Fixed
 
 - **`wp-demo-craft`, `/wp-cinematic-demo` and `/wp-cinematic-scene` load with their own

@@ -1,7 +1,7 @@
 ---
-description: Contributor workflow for the plugin itself — scaffold a command/agent/skill with its check and doc rows, verify the repo, or open the PR in the house format
-allowed-tools: Read, Write, Edit, Grep, Glob, Bash
-argument-hint: "<new|check|pr|release> [type] [name]"
+description: Contributor workflow for the plugin itself — scaffold a command/agent/skill with its check and doc rows, audit a skill against the authoring best practices, verify the repo, or open the PR in the house format
+allowed-tools: Read, Write, Edit, Grep, Glob, Bash, Agent
+argument-hint: "<new|review|check|pr|release> [type] [name]"
 ---
 
 # WP Contribute — Working on the Plugin Itself
@@ -20,6 +20,7 @@ every step here assumes.
 | Subcommand | Form |
 |---|---|
 | `new` | `/wp-contribute new <command\|agent\|skill\|check> <name>` |
+| `review` | `/wp-contribute review <skill-name>` |
 | `check` | `/wp-contribute check` |
 | `pr` | `/wp-contribute pr [--title "..."]` |
 | `release` | `/wp-contribute release [major\|minor\|patch]` — maintainers |
@@ -72,9 +73,53 @@ enforces the tier, so a missing `model:` fails the suite.
 
 ### `new skill <name>`
 
-`skills/<name>/SKILL.md` with `name`, `description`, `user-invocable: false`, plus `trigger:`
-when it should auto-invoke. Skills inform; they never act. If what you are writing tells an
-agent to *run* something, it belongs in an agent instead. Add it to the README skills table.
+A new skill is not done until it passes the audit — both halves of it.
+
+1. Read the two closest existing skills and follow their shape. Skills inform; they never act:
+   if what you are writing tells an agent to *run* a procedure end to end, it belongs in an
+   agent, or it is an action skill that needs a runner command.
+2. `skills/<name>/SKILL.md` with frontmatter `name` (the directory name), `description` and
+   `user-invocable: false`. The description says what the skill does, in the third person,
+   and ends with "Use when …" naming the agents, commands or project setting that call for it
+   — it is the only text Claude reads before loading the skill. One line, under 1,024
+   characters, no angle brackets; quote it if it must contain `: `.
+3. Write the body as the overview an agent needs on every run, under 500 lines. Templates, long
+   samples and catalogs go in `skills/<name>/references/`, each named in SKILL.md with a "read
+   when" line; a reference over 100 lines opens with a `## Contents` list. Name every bundled
+   script and say whether to run it.
+4. Run the mechanical gates, fix every line they print for this skill, and run them again until
+   both pass:
+
+   ```bash
+   bash tests/checks/skill-authoring.sh && bash tests/checks/frontmatter-yaml.sh
+   ```
+
+5. Run Step 2b (`review <name>`) and resolve what it returns.
+6. A row in the README skills table, a check under `tests/checks/` pinning the contract
+   wording, and a `CHANGELOG.md` entry under `[Unreleased]` → `### Added`.
+
+---
+
+## Step 2b — `review <skill-name>`: the judgment half of the audit
+
+The gates prove the skill loads and is shaped right. They cannot tell whether its description
+would be chosen for the right requests, whether it explains what Claude already knows, or
+whether a fragile write is left to improvisation. That is a review, and it runs on any skill,
+new or old.
+
+1. Run the two gates from step 4 above. A red gate is fixed first: there is no point judging
+   a skill that does not load.
+2. Dispatch **one** fresh subagent (`general-purpose`) — fresh, because the author's own
+   context fills exactly the gaps the written skill leaves:
+
+   > Review the skill at `skills/<name>/` against
+   > `skills/wp-contributing/references/skill-review.md`. Read that file first, then every
+   > file in the skill directory. Return the report in the format it specifies. Edit nothing.
+
+3. Fix every **must** finding and every **should** finding you agree with, re-run the gates,
+   and review again with a new subagent. Stop at `PASS`, or after three rounds.
+4. A finding you decline is not dropped: list it with the reason in the PR body under
+   "Skill review", along with the final verdict.
 
 ### `new check <name>`
 
@@ -107,7 +152,8 @@ loosening its assertion — that is the failure mode the check exists to prevent
 ## Step 4 — `pr`: open it in the house format
 
 1. **Refuse on `main`.** Create a branch first: `feat/…`, `fix/…`, `docs/…`, `chore/…`.
-2. Re-run Step 3. A red suite stops here.
+2. Re-run Step 3. A red suite stops here. If the branch adds or changes anything under
+   `skills/`, run Step 2b for each skill it touches; a `FIX` verdict stops here too.
 3. Confirm the contributor checklist: new behavior has a check · CHANGELOG `[Unreleased]`
    entry · README and `docs/` updated · **no version bump** (maintainer-only, and a bump in a
    PR conflicts at release).
@@ -126,6 +172,7 @@ What was wrong, and what this changes.
 
 ## Testing
 Which checks, which real WordPress project, what you verified by hand.
+A skill change adds "Skill review": the verdict, and any finding declined with its reason.
 
 ## Checklist
 - [ ] Tested against a real WordPress project
@@ -166,5 +213,5 @@ Refuse unless the working tree is clean, the branch is `main`, `main` is up to d
 ## Step 6: Report
 
 Print what was created or verified, one path per line, then the exact next command — for
-`new`, that is `/wp-contribute check`; for `check`, either `/wp-contribute pr` or the list of
+`new`, that is `/wp-contribute check`; for `review`, the findings table and verdict; for `check`, either `/wp-contribute pr` or the list of
 failures; for `pr`, the PR URL.
