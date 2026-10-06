@@ -68,9 +68,9 @@ else
   # The cinematic starter read its cookie and never set it, so a ?lang= switch lasted one
   # request. It sets it on init now -- and only for a language that came from ?lang= and
   # is not already stored, so an ordinary page view sends no header.
-  out=$(php tests/checks/lib/suffix-i18n-behavior.php cinematic stored-es 2>&1) \
+  out=$(php -d pcre.jit=0 "$harness" cinematic stored-es 2>&1) \
     || { printf '%s\n' "$out" | sed 's/^/  /'; fail "the cinematic starter re-sends its language cookie on a request whose cookie already matches ?lang="; }
-  out=$(php tests/checks/lib/suffix-i18n-behavior.php cinematic no-query 2>&1) \
+  out=$(php -d pcre.jit=0 "$harness" cinematic no-query 2>&1) \
     || { printf '%s\n' "$out" | sed 's/^/  /'; fail "the cinematic starter sets its language cookie from something other than ?lang="; }
 fi
 grep -nF -e 'never sets the cookie' -e 'sets no cookie' $skill_md \
