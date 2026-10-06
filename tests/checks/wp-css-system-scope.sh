@@ -9,6 +9,20 @@ grep -Eq 'template=basic|`basic`' "$f" \
 grep -q 'wp-tailwind-system' "$f" \
   || { echo "FAIL: wp-css-system does not redirect tailwind projects to wp-tailwind-system"; exit 1; }
 
+# The gate answers every recorded value, not only tailwind. /wp-init writes `tailwind` or
+# `cinematic`; the banner used to stop only on `tailwind`, so a cinematic theme read BEM +
+# :root rules for its cinematic.css, and a demo — which has no .claude/CLAUDE.md yet — had
+# no answer at all while /wp-demo sends every plain demo here.
+gate=$(awk 'NR > 1 && /^# /{exit} {print}' "$f" | tr '\n' ' ' | sed 's/  */ /g')
+# Here-strings, not `printf | grep -q`: under pipefail an early-exiting grep -q can give
+# printf a SIGPIPE and the pipeline then fails with the text present.
+grep -Eq '`cinematic` \| \*\*None\. Stop' <<<"$gate" \
+  || { echo "FAIL: wp-css-system's scope gate has no stop for Template: cinematic"; exit 1; }
+grep -Eq 'no `Template:` line' <<<"$gate" \
+  || { echo "FAIL: wp-css-system's scope gate does not say which rules apply to a demo with no Template: line"; exit 1; }
+grep -Fq 'demo mode: craft' <<<"$gate" \
+  || { echo "FAIL: wp-css-system's scope gate does not hand a craft demo's tokens to demo/DESIGN.md"; exit 1; }
+
 # The framework prohibition must be scoped, not absolute.
 #
 # Matched against a FLATTENED copy, never against a numbered line. The old form was

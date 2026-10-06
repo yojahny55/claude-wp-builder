@@ -17,9 +17,11 @@ everywhere.
 It exists because the skill is `user-invocable: false` — as every skill in this plugin is —
 so a user cannot reach it by typing its name. Skills inform; commands act. This is the command.
 
-Motion is not one-size-fits-all here: AOS is for a **plain** demo. A craft project already
-ships GSAP-driven motion through its theme bundle, so if `.wp-create.json` records
-`demo mode: craft`, say so and ask for confirmation before adding a second motion system.
+Motion is not one-size-fits-all here: AOS is for a **plain** demo, and the skill's Phase 0
+reads the decision. A craft project already ships GSAP-driven motion through its theme
+bundle, so if `.wp-create.json` records `demo mode: craft`, say so and ask for confirmation
+before adding a second motion system. A `Template: cinematic` theme drives its own scroll
+engine: stop and change nothing, with no confirmation that overrides it.
 
 ## Step 0: Parse Arguments
 

@@ -1,7 +1,13 @@
 # CSS Design Tokens
 
-The default `:root` tokens for `template=basic` themes, from the `wp-css-system` skill.
-Every rule references these; none hardcodes a value.
+The `:root` token set for `Template: basic` themes and plain demos, from the
+`wp-css-system` skill. Every rule references these; none hardcodes a value.
+
+**The names and the scale are the contract. The values are placeholders.** The green and
+gold palette, the `DM Sans` / `Cormorant Garamond` pair and every other value below only
+show the shape of a filled-in block. Replace each one from the client's brand, or copy it
+from the demo's own `:root`, which is the source of truth once a demo exists. A theme that
+ships these sample values unchanged ships someone else's brand.
 
 ## Contents
 

@@ -163,6 +163,41 @@
   `tests/checks/wp-bilingual-contract.sh` (which runs both starters' `inc/i18n.php`) and
   `tests/checks/wp-cli-patterns-contract.sh` are new; `wp-polylang.sh` and
   `wp-polylang-nesting.sh` gained pins that fail on each old form.
+- **The CSS and theme skills stopped teaching output that breaks.** A fresh review of
+  `wp-aos-animator`, `wp-theme-standards`, `wp-css-system` and `wp-tailwind-system` found code
+  an agent would copy and ship broken:
+  - **`wp-aos-animator`** enqueued AOS with `_RATIO_WEB_`, one client project's constant —
+    undefined anywhere else, so a PHP 8 fatal on every page — plus a `jquery` dependency AOS
+    does not have and nothing ordering the deferred bundle after AOS, which turned the init
+    into a silent no-op. It used `fade-up-slow`, which `aos.css` does not define, and a delay
+    of 20, which matches no selector (`aos.css` ships 50 to 3000 in steps of 50); downloaded
+    with `curl -sL`, which saves a 404 page as `aos.js`; and audited only `assets/js/*.js`, so a
+    re-run on the starter's `assets/js/src/` bundle added a second `AOS.init`. Nothing kept it
+    out of a craft or cinematic theme, which already ship a motion engine: a Phase 0 now reads
+    `demo mode` and `Template:` and stops. `tests/checks/wp-aos-seams.sh` judges every
+    animation name, delay, constant and download line it teaches.
+  - **`wp-theme-standards`** overrode `wp_check_filetype_and_ext` for every upload, switching
+    off core's content check for all file types (the starter never shipped it); taught one
+    fixed layout matching neither starter, so a Tailwind theme got a second stylesheet; enqueued
+    remote Google Fonts that `/wp-init` self-hosts and PERF-022 reports; printed an
+    `Organization` JSON-LD block with no SEO-plugin guard, two nodes beside Rank Math's; and
+    read raw `get_field()`, keyed page assets on slugs (one language under Polylang), preloaded
+    the LCP original with no `imagesrcset` (two downloads on mobile) and sanitized `$_GET`
+    without `wp_unslash()`. The layout is now read from the recorded template and its starter,
+    identity JSON-LD belongs to `inc/agentic.php`, and the new
+    `tests/checks/wp-theme-standards.sh` fails on each old form.
+  - **`wp-css-system`**'s gate stopped only on `tailwind`, leaving cinematic themes and demos
+    with no `Template:` line unanswered; its sample palette read as defaults to ship; its grid
+    example had no mobile base and its outline button a border; and `agents/wp-css.md` (and one
+    skill example) used `--color-white`, `--color-accent` and `--color-accent-dark`, which the
+    token reference never defines. `wp-css-tokens.sh` now resolves every `var()` the examples
+    use, and the new `wp-css-system-contract.sh` holds the examples to the skill's own rules.
+  - **`wp-tailwind-system`**'s `references/breakpoints.md` marked `max-[769px]:hidden` — the
+    form its heading forbids — as the right conversion and said `max-[759px]` is `≤ 759`; two
+    references called plugin scripts by a bare `bin/` path (exit 127 from the user's project);
+    and Verify ran the convention check before any compile, where it skips its markup rule and
+    passes. Verify now compiles first, runs `theme-template-check.mjs`, states exit codes and
+    loops; the new `tests/checks/wp-tailwind-system-traps.sh` pins it.
 
 ### Changed
 

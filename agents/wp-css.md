@@ -51,7 +51,7 @@ All design values MUST reference custom properties. Never hardcode raw values. (
 ```
 
 Common token categories to expect:
-- Colors: `--color-primary`, `--color-secondary`, `--color-accent`, `--color-text`, `--color-background`, etc.
+- Colors: `--color-primary`, `--color-secondary`, `--color-tertiary`, `--color-text`, `--color-text-inverse`, `--color-background`, etc.
 - Spacing: `--spacing-xs`, `--spacing-sm`, `--spacing-md`, `--spacing-lg`, `--spacing-xl`, `--spacing-2xl`
 - Typography: `--font-size-sm`, `--font-size-base`, `--font-size-lg`, `--font-size-xl`, `--font-size-2xl`, `--font-size-3xl`, `--font-size-4xl`
 - Fonts: `--font-family-secondary`, `--font-family-primary`
@@ -159,8 +159,8 @@ Every section MUST be wrapped in a clear comment delimiter:
 .hero__cta {
     display: inline-block;
     padding: var(--spacing-sm) var(--spacing-lg);
-    background-color: var(--color-accent);
-    color: var(--color-white);
+    background-color: var(--color-secondary);
+    color: var(--color-text-inverse);
     border-radius: var(--radius-md);
     text-decoration: none;
     font-weight: 600;
@@ -168,7 +168,7 @@ Every section MUST be wrapped in a clear comment delimiter:
 }
 
 .hero__cta:hover {
-    background-color: var(--color-accent-dark);
+    background-color: var(--color-secondary-dark);
 }
 
 @media (min-width: 768px) {
@@ -411,7 +411,7 @@ Enqueue page-specific styles conditionally in `functions.php`.
 .values__label {
     display: inline-block;
     font-size: var(--font-size-sm);
-    color: var(--color-accent);
+    color: var(--color-secondary);
     text-transform: uppercase;
     letter-spacing: 0.1em;
     font-weight: 600;
@@ -431,7 +431,7 @@ Enqueue page-specific styles conditionally in `functions.php`.
 }
 
 .values__card {
-    background: var(--color-white);
+    background: var(--color-background);
     border-radius: var(--radius-md);
     padding: var(--spacing-lg);
     box-shadow: var(--shadow-sm);

@@ -38,9 +38,10 @@ the named prefixes everywhere.
 <div class="max-lg:col-span-full max-md:pt-5">
 ```
 
-Mind the boundary when converting: `max-[759px]` is `≤ 759`, and `max-md` with
-`--breakpoint-md: 760px` is `< 760`. Same rule. Re-measure at the stop itself after the
-change — an off-by-one here moves a whole layout one pixel early.
+Mind the boundary when converting: the demo's `max-width: 759px` is `≤ 759`, and `max-md`
+with `--breakpoint-md: 760px` is `< 760`. Same rule — which is why each stop above is the
+demo's width plus one (next section). Re-measure at the stop itself after the change — an
+off-by-one here moves a whole layout one pixel early.
 
 An arbitrary variant is acceptable only for a one-off width that is genuinely not a
 breakpoint of the design (a single `max-[891px]:` where one field wraps). If it appears
@@ -54,26 +55,28 @@ EXCLUDES it. Converting one into the other with the same number is a 1px bug at
 exactly N, and N is very often a real device width (768, 1024): the two most
 common desktop-first stops a demo declares.
 
-**The rule: a demo's `max-width: Npx` becomes `max-[N+1px]:`, or a
-`--breakpoint-*` custom property set to `N+1` if the demo uses that stop by
-name more than twice.** `min-width` needs no adjustment — CSS `min-width: N`
-is already inclusive of N, and Tailwind's `min-*:` variants compile the same
-way, so they map straight across.
+**The rule: a demo's `max-width: Npx` becomes a `--breakpoint-*` stop set to `N+1`
+in `@theme`, used through its named `max-*` variant.** The `+1` lives in the one
+declaration, and the markup never repeats it. The arbitrary `max-[N+1px]:` form is
+only for the one-off width of the previous section — a width the design does not
+switch at. `min-width` needs no adjustment — CSS `min-width: N` is already inclusive
+of N, and Tailwind's `min-*:` variants compile the same way, so they map straight
+across.
 
 ```css
 /* demo: @media (max-width: 768px) { … } and @media (max-width: 1024px) { … } */
 @theme {
-  --breakpoint-md: 769px;  /* not 768 — Tailwind's own default is exclusive */
+  --breakpoint-md: 769px;  /* not 768 — Tailwind's max-* is exclusive */
   --breakpoint-lg: 1025px; /* not 1024, same reason */
 }
 ```
 
 ```html
 <!-- demo: @media (max-width: 768px) { .nav { display: none } } -->
-<!-- wrong: max-md: with the stock breakpoint-md (768) excludes width 768 -->
+<!-- wrong: max-md: against the stock --breakpoint-md (768px) excludes width 768 -->
+<!-- wrong: max-[768px]:hidden — the same off-by-one, as an arbitrary variant -->
+<!-- right: --breakpoint-md: 769px declared in @theme above, then the named variant -->
 <nav class="max-md:hidden">
-<!-- right: breakpoint-md redeclared to 769 above, OR the arbitrary form -->
-<nav class="max-[769px]:hidden">
 ```
 
 Never adopt Tailwind's stock breakpoint scale (`sm: 640`, `md: 768`, `lg: 1024`,

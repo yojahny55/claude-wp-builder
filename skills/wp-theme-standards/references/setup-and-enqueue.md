@@ -17,94 +17,67 @@ prefix from its `.claude/CLAUDE.md`.
 
 ## Asset Enqueueing
 
-### Styles
+The `Template: tailwind` starter's own callback, in `functions.php` — one compiled
+stylesheet and one wp-scripts bundle. Extend this callback; never add a second one, and
+never a second stylesheet: fonts and every other rule are compiled into `main.css`.
+`PREFIX_` / `prefix-` are the project's prefix and slug (the starter's `__STARTER__` /
+`__starter__`, renamed by `/wp-init`).
 
 ```php
-function prefix_scripts() {
-    // Google Fonts (external, no version needed)
-    wp_enqueue_style(
-        'prefix-fonts',
-        'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
-        array(),
-        null
-    );
+add_action( 'wp_enqueue_scripts', function() {
+    // The compiled Tailwind stylesheet, versioned by its own mtime.
+    $css_file = PREFIX_DIR . '/assets/css/dist/main.css';
+    if ( file_exists( $css_file ) ) {
+        wp_enqueue_style( 'prefix-tailwind', PREFIX_URI . '/assets/css/dist/main.css', array(), filemtime( $css_file ) );
+    }
 
-    // Main stylesheet with filemtime() cache busting
-    wp_enqueue_style(
-        'prefix-style',
-        get_template_directory_uri() . '/assets/css/styles.css',
-        array('prefix-fonts'),
-        filemtime(get_template_directory() . '/assets/css/styles.css')
-    );
-}
-add_action('wp_enqueue_scripts', 'prefix_scripts');
+    // style.css carries the theme header only.
+    wp_enqueue_style( 'prefix-style', get_stylesheet_uri(), array( 'prefix-tailwind' ), PREFIX_VERSION );
+
+    // The wp-scripts bundle, in the footer; dependencies and version from index.asset.php.
+    $js_file = PREFIX_DIR . '/assets/js/dist/index.js';
+    if ( file_exists( $js_file ) ) {
+        $asset_file = PREFIX_DIR . '/assets/js/dist/index.asset.php';
+        $asset      = file_exists( $asset_file ) ? require $asset_file : array( 'dependencies' => array(), 'version' => PREFIX_VERSION );
+        wp_enqueue_script( 'prefix-main', PREFIX_URI . '/assets/js/dist/index.js', $asset['dependencies'], $asset['version'], true );
+    }
+} );
 ```
 
-### Scripts
-
-```php
-// Main JavaScript — loaded in footer (last param = true)
-wp_enqueue_script(
-    'prefix-main',
-    get_template_directory_uri() . '/assets/js/main.js',
-    array(),
-    filemtime(get_template_directory() . '/assets/js/main.js'),
-    true
-);
-```
+A `Template: cinematic` theme enqueues from `inc/cinematic-loader.php` instead; read it
+there.
 
 ### wp_localize_script() for Passing PHP Data to JavaScript
 
-Use `wp_localize_script()` to safely pass PHP data (dynamic content, URLs, translations) to JavaScript.
+Use `wp_localize_script()` to safely pass PHP data (dynamic content, URLs, translations) to
+a script already enqueued. The starter passes its AJAX data this way:
 
 ```php
-// Pass calculator data to JS on the pricing page
-if (is_page('pricing')) {
-    $calculator_data = prefix_get_calculator_data();
-    wp_localize_script('prefix-main', 'prefixCalculator', $calculator_data);
-}
-
-// Pass i18n data to JS for all pages
-wp_localize_script('prefix-main', 'prefixI18n', array(
-    'currentLang' => prefix_get_current_lang(),
-    'strings'     => prefix_get_js_translations(),
-));
+wp_localize_script( 'prefix-main', 'PREFIX_data', array(
+    'ajax_url' => admin_url( 'admin-ajax.php' ),
+    'nonce'    => wp_create_nonce( 'prefix_nonce' ),
+    'site_url' => home_url( '/' ),
+    'lang'     => prefix_get_current_lang(),
+) );
 ```
 
-In JavaScript, access the data via the global variable name:
-
-```js
-console.log(prefixCalculator.setupOptions);
-console.log(prefixI18n.currentLang); // 'en' or 'es'
-```
+In JavaScript, read it from the global of that name: `PREFIX_data.lang`.
 
 ## Page-Specific Asset Enqueueing
 
-Load page-specific CSS and JS only when needed using `is_page_template()` or `is_page()`.
+Key page assets on the template file (`is_page_template()`) or `is_front_page()`, never on
+a slug: under Polylang each language is its own post with its own slug. Inside the same
+callback:
 
 ```php
-function prefix_scripts() {
-    // ... main styles/scripts ...
-
-    // Software page: dedicated CSS + JS
-    if (is_page_template('page-software.php')) {
-        wp_enqueue_style(
-            'prefix-software-style',
-            get_template_directory_uri() . '/assets/css/software.css',
-            array('prefix-style'),
-            filemtime(get_template_directory() . '/assets/css/software.css')
-        );
-        wp_enqueue_script(
-            'prefix-software-js',
-            get_template_directory_uri() . '/assets/js/software.js',
-            array('prefix-main'),
-            filemtime(get_template_directory() . '/assets/js/software.js'),
-            true
-        );
-    }
+if ( is_page_template( 'page-<name>.php' ) ) {
+    $js_file = PREFIX_DIR . '/assets/js/<name>.js';
+    wp_enqueue_script( 'prefix-<name>', PREFIX_URI . '/assets/js/<name>.js', array( 'prefix-main' ), filemtime( $js_file ), true );
 }
-add_action('wp_enqueue_scripts', 'prefix_scripts');
 ```
+
+On `Template: tailwind` a page's styles are not a second file: they are a
+`components/<name>.css` compiled into `main.css` (`wp-tailwind-system`).
 
 ---
 
@@ -166,28 +139,28 @@ add_action('after_setup_theme', 'prefix_content_width', 0);
 
 ## Custom Body Classes
 
-Add contextual CSS classes to the `<body>` tag for page-specific styling.
+Add contextual CSS classes to the `<body>` tag for page-specific styling. The starter
+already declares `prefix_body_classes()` in `inc/template-functions.php`; extend that
+function — a second `body_class` callback of the same name is a duplicate-declaration fatal.
+Key each class on the template, never on a slug:
 
 ```php
-function prefix_body_classes($classes) {
-    if (is_front_page()) {
+function prefix_body_classes( $classes ) {
+    if ( is_front_page() ) {
         $classes[] = 'home-page';
     }
-    if (is_page('pricing')) {
-        $classes[] = 'pricing-page';
+    if ( is_page_template( 'page-<name>.php' ) ) {
+        $classes[] = '<name>-page';
     }
-    if (is_page_template('page-software.php')) {
-        $classes[] = 'software-page';
-    }
-    if (is_singular('post')) {
+    if ( is_singular( 'post' ) ) {
         $classes[] = 'single-post-page';
     }
-    if (is_archive()) {
+    if ( is_archive() ) {
         $classes[] = 'archive-page';
     }
     return $classes;
 }
-add_filter('body_class', 'prefix_body_classes');
+add_filter( 'body_class', 'prefix_body_classes' );
 ```
 
 ---
@@ -198,56 +171,66 @@ All themes built with this system use **Secure Custom Fields (SCF)** or **Advanc
 
 ### Options Page Registration
 
-Register an options page for site-wide settings (logo, footer content, social links, etc.).
+One options page holds the site-wide settings (logo, footer content, social links). The
+starter registers it in `functions.php`; a theme built from it already has it, and a
+second registration is a second menu entry:
 
 ```php
-function prefix_register_options_page() {
-    if (function_exists('acf_add_options_page')) {
-        acf_add_options_page(array(
-            'page_title' => 'Site Settings',
-            'menu_title' => 'Site Settings',
+add_action( 'acf/init', function() {
+    if ( function_exists( 'acf_add_options_page' ) ) {
+        acf_add_options_page( array(
+            'page_title' => 'Site Name Settings',
+            'menu_title' => 'Site Name',
             'menu_slug'  => 'prefix-settings',
-            'capability' => 'edit_posts',
+            'capability' => 'manage_options',
             'redirect'   => false,
-            'icon_url'   => 'dashicons-admin-generic',
-            'position'   => 30,
-        ));
+            'icon_url'   => 'dashicons-admin-customizer',
+            'position'   => 2,
+        ) );
     }
-}
-add_action('acf/init', 'prefix_register_options_page');
+} );
 ```
 
 ### Retrieving Option Fields
 
+Through the i18n seam, like every other field read — `prefix_get_field()`, never raw
+`get_field()`, so an options field that carries `_<lang>` suffixes resolves to the visitor's
+language:
+
 ```php
 // Options page fields use 'option' as the post ID
-$logo = get_field('site_logo', 'option');
-$footer_text = get_field('footer_copyright', 'option');
+$logo        = prefix_get_field( 'site_logo', 'option' );
+$footer_text = prefix_get_field( 'footer_copyright', 'option' );
 ```
 
 ---
 
 ## Helper Functions
 
-Create small utility functions to keep templates clean.
+Create small utility functions to keep templates clean. Both ship in the starter's
+`functions.php`:
 
 ```php
 /**
  * Get theme asset URL
  */
-function prefix_asset($path) {
-    return get_template_directory_uri() . '/assets/' . ltrim($path, '/');
+function prefix_asset( $path ) {
+    return PREFIX_URI . '/assets/' . ltrim( $path, '/' );
 }
 
 /**
- * Get site logo with fallback
+ * Get the site logo URL: the settings field first, then the Customizer logo.
  */
-function prefix_get_logo() {
-    $logo = get_field('site_logo', 'option');
-    if ($logo) {
-        return $logo;
+function prefix_get_logo( $post_id = 'option' ) {
+    $logo = prefix_get_field( 'site_logo', $post_id );
+    if ( $logo && is_array( $logo ) ) {
+        return $logo['url'];
     }
-    return prefix_asset('images/logo.svg');
+    $custom_logo_id = get_theme_mod( 'custom_logo' );
+    if ( $custom_logo_id ) {
+        return wp_get_attachment_image_url( $custom_logo_id, 'full' );
+    }
+    return '';
 }
 ```
 
@@ -278,14 +261,8 @@ function prefix_fix_svg_display() {
     </style>';
 }
 add_action('admin_head', 'prefix_fix_svg_display');
-
-function prefix_check_filetype($data, $file, $filename, $mimes) {
-    $filetype = wp_check_filetype($filename, $mimes);
-    return array(
-        'ext'             => $filetype['ext'],
-        'type'            => $filetype['type'],
-        'proper_filename' => $data['proper_filename'],
-    );
-}
-add_filter('wp_check_filetype_and_ext', 'prefix_check_filetype', 10, 4);
 ```
+
+No `wp_check_filetype_and_ext` filter goes with it. One that returns the type from the file
+name answers for every upload and switches off core's content check for all file types; the
+starter ships the gated mime filter alone.

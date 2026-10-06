@@ -54,5 +54,12 @@ theme's i18n helper in the template: the modules contain no literals.
 `?<slug>=x` makes WordPress query that object and answer with its archive or a 404 before
 the template runs. Name the parameter something no registered type or taxonomy uses.
 
-`bin/theme-template-check.mjs --rule widgets` fails a theme whose templates carry the hook
-without the module imported.
+Run the widget gate after writing the markup — it fails a theme whose templates carry the
+hook without the module imported:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/theme-template-check.mjs" <theme-dir> --rule widgets
+```
+
+Needs Node. Exit 0 = pass, 1 = a `FAIL:` line per finding (import the named module in
+`assets/js/src/index.js` and run it again), 2 = usage (no theme directory given).

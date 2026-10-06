@@ -72,13 +72,15 @@ the tokens in `tokens.md` and the BEM rules in the skill itself.
     background: var(--color-primary-dark);
 }
 
-.btn--secondary {
+/* The outline variant: the contour is an inset shadow, never a border on a transparent
+   background (SKILL.md, "Contours That Render the Same in Every Engine"). */
+.btn--outline {
     background: transparent;
     color: var(--color-primary);
-    border: 2px solid var(--color-primary);
+    box-shadow: inset 0 0 0 1px var(--color-primary);
 }
 
-.btn--secondary:hover {
+.btn--outline:hover {
     background: var(--color-primary);
     color: var(--color-text-inverse);
 }
@@ -120,11 +122,19 @@ the tokens in `tokens.md` and the BEM rules in the skill itself.
 
 ## Grid Layout
 
+Mobile first: one column at the base, more at a `min-width` step.
+
 ```css
 .services__grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: 1fr;
     gap: var(--spacing-xl);
+}
+
+@media (min-width: 768px) {
+    .services__grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }
 ```
 
