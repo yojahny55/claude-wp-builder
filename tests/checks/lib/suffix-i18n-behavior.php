@@ -61,6 +61,18 @@ if ( $filters ) {
 		call_user_func( $cb, 'lang="en-US"' ) === 'lang="es"' );
 	check( 'the filter keeps the dir attribute and replaces lang only',
 		call_user_func( $cb, 'dir="rtl" lang="en-US"' ) === 'dir="rtl" lang="es"' );
+	// preg_replace() returns null on a PCRE error; a filter must hand the next one a string.
+	// The error is forced through the backtrack limit, which a JIT-compiled pattern ignores:
+	// PHP 7.4 keeps using one compiled before ini_set(), hence `php -d pcre.jit=0` in the
+	// caller and the probe, so this can never pass without the failure having happened.
+	ini_set( 'pcre.jit', '0' );
+	ini_set( 'pcre.backtrack_limit', '1' );
+	$forced = null === preg_replace( '/lang="[^"]*"/', '', 'lang="en-US"' );
+	$failed = call_user_func( $cb, 'lang="en-US"' );
+	ini_restore( 'pcre.backtrack_limit' );
+	ini_restore( 'pcre.jit' );
+	check( 'this PHP can be made to fail preg_replace() (run it with -d pcre.jit=0)', $forced );
+	check( 'the filter returns a string when preg_replace() fails', is_string( $failed ) );
 }
 
 if ( 'tailwind' === $which ) {
