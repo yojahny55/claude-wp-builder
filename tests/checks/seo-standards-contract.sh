@@ -54,7 +54,9 @@ done
 grep -Fq 'is_404()' "$b" || fail "$b lost the is_404() guard"
 
 # One bulk description seed, following the stated priority order.
-n=$(grep -c "update_post_meta(\\\\\$p->ID, 'rank_math_description', \\\\\$desc)" "$s" || true)
+# Single-quoted: the bash block in the reference escapes its dollars, so the file holds a literal \$.
+seed='update_post_meta(\$p->ID, '"'"'rank_math_description'"'"', \$desc)'
+n=$(grep -cF "$seed" "$s" || true)
 [ "$n" -eq 1 ] || fail "$s carries $n bulk description seeds; one, following SKILL.md §7, is the contract"
 bulk=$(awk '/^### Bulk Seed via WP-CLI/{on=1} on' "$s")
 grep -Fq "preg_match('/<p[^>]*>" <<<"$bulk" || fail "$s bulk seed skips the first-paragraph step of the priority order"
