@@ -149,7 +149,7 @@ for gate in tests/checks/skill-authoring.sh tests/checks/frontmatter-yaml.sh; do
   grep -Fq "$gate" "$c" || fail "$c does not run $gate before a new skill is done"
 done
 grep -Fq 'references/skill-review.md' "$c" || fail "$c reviews without the checklist"
-grep -Eqi 'fresh subagent|one\*\* fresh subagent' "$c" \
+grep -Fqi 'fresh subagent' "$c" \
   || fail "$c does not review in a fresh context — the author's context hides the gaps"
 grep -Eqi 'run Step 2b for each skill' "$c" || fail "$c opens a PR without reviewing the skills it touches"
 grep -Fq 'Skill review' "$c" || fail "$c lets a declined finding vanish instead of listing it in the PR body"
