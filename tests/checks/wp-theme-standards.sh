@@ -18,7 +18,7 @@
 #      with no imagesrcset (two downloads on mobile), and $_GET sanitized without
 #      wp_unslash().
 # Each is asserted in both directions where a wrong form existed.
-set -uo pipefail
+set -euo pipefail
 # `q "$text" <grep flags> <pattern>`: a here-string, never `printf | grep -q`. Under
 # pipefail an early-exiting `grep -q` hands printf a SIGPIPE and the pipeline returns 141,
 # which silently flips an assertion either way.
@@ -28,9 +28,9 @@ fail() { echo "FAIL: $*"; exit 1; }
 
 dir=skills/wp-theme-standards
 skill=$dir/SKILL.md
-refs=$(ls "$dir"/references/*.md 2>/dev/null)
-[ -f "$skill" ] && [ -n "$refs" ] || fail "$dir is missing SKILL.md or its references"
-all=$(cat "$skill" $refs)
+refs=( "$dir"/references/*.md )
+[ -f "$skill" ] && [ -e "${refs[0]}" ] || fail "$dir is missing SKILL.md or its references"
+all=$(cat "$skill" "${refs[@]}")
 flat=$(printf '%s' "$all" | tr '\n' ' ' | sed 's/  */ /g')
 # The code samples alone: every fenced block. Negative assertions read this, so a sentence
 # that names a forbidden form in order to forbid it cannot trip them.
@@ -71,7 +71,7 @@ grep -Fq 'inc/agentic.php' "$skill" || fail "$skill does not name inc/agentic.ph
 grep -Fq 'seo_plugin_owns_schema()' "$skill" || fail "$skill does not name the SEO-plugin guard identity JSON-LD returns on"
 
 # 5a. Field reads go through the seam: no raw get_field('…') call in the code samples.
-q "$all" -E "(^|[^_A-Za-z])get_field\( *'" \
+q "$code" -E "(^|[^_A-Za-z])get_field\( *'" \
   && fail "$dir calls raw get_field() in a sample — options and templates read through prefix_get_field()"
 grep -Fq "prefix_get_field( 'site_logo', \$post_id )" "$dir/references/setup-and-enqueue.md" \
   || fail "prefix_get_logo() does not read the logo through prefix_get_field() like the starter"
