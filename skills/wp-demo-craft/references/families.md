@@ -5,13 +5,22 @@
 - The seven families — Brutalist, Maximalist, Playful, Retro, Dense, Editorial, Premium-minimal
 - What this file cannot do
 
-The enforceable half of `uniqueness.md` §6. That section names seven aesthetic
-families by what they read as and who earns them; this file says, for each one,
-what its type does, what its palette does, what a card is, how it moves, how its
-pages tend to sequence — and what it **forbids**. The shape is adapted from the
-style-lane skills in [MengTo/Skills](https://github.com/MengTo/Skills) (MIT),
-whose one real lesson is that a committed direction is mostly a list of things
-it refuses to do.
+The seven aesthetic families `uniqueness.md` §6 argues for. The table says what each
+reads as and who earns it; the sections below say, for each one, what its type does,
+what its palette does, what a card is, how it moves, how its pages tend to sequence —
+and what it **forbids**. The shape is adapted from the style-lane skills in
+[MengTo/Skills](https://github.com/MengTo/Skills) (MIT), whose one real lesson is that
+a committed direction is mostly a list of things it refuses to do.
+
+| Family | Reads as | Earned by |
+|---|---|---|
+| Brutalist | Blunt, structural, unstyled on purpose | Tools, infrastructure, anything anti-marketing |
+| Maximalist | Dense, layered, loud, generous | Culture brands, events, food, anything abundant |
+| Playful | Bouncy, coloured, informal | Kids, games, consumer apps, community |
+| Retro | Specific to a decade, not vaguely nostalgic | Heritage brands, music, anything with a real lineage |
+| Dense | Information-forward, small type, high count | Data products, catalogues, reference, finance |
+| Editorial | Paper, folios, measure, restraint | Long-form substance |
+| Premium-minimal | Quiet, dark, one accent, air | Luxury, and only when asked for |
 
 **Pick one, before the first section.** Record it in `demo/BRIEF.md` under
 `## Family`, with that family's Avoid list copied verbatim underneath. The
@@ -25,7 +34,7 @@ that chose two chose none — which is the shape every "generic" note describes.
 family — contrast, spacing scale, type metrics, compositable motion,
 `:focus-visible`, reduced motion that keeps meaning, real copy. The floor is what
 separates a chosen family from a sloppy one, and the reason offering seven is
-safe. The two universal traps in §6 (cream-and-brass, violet-to-blue gradient)
+safe. The two universal traps in `uniqueness.md` §6 (cream-and-brass, violet-to-blue gradient)
 stay banned everywhere and are not repeated below.
 
 A family is a direction, not a template. Two brutalist builds still owe the

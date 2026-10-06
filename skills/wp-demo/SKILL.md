@@ -1,12 +1,15 @@
 ---
 name: wp-demo
-description: Demo HTML methodology — single-file demos with section comment delimiters that convert 1:1 into WordPress template parts, plus the responsive, accessibility, placeholder-image, navigation and footer requirements. Use when writing or editing a demo HTML file with /wp-demo, or converting one with /wp-init, /wp-section or /wp-yolo.
+description: Defines the demo page contract — single-file demo/index.html and demo/slug.html pages whose SECTION and END SECTION comment delimiters map 1:1 to WordPress template parts — plus the accessibility, navigation and footer markup every demo carries and, in plain mode, the token names, font link and placeholder images. Use when writing or editing a demo page with /wp-demo, or converting one with /wp-init, /wp-section, /wp-seed or /wp-yolo. Craft-mode design rules are in wp-demo-craft, responsive CSS in wp-responsive.
 user-invocable: false
 ---
 
 # Demo HTML Creation Methodology
 
-This skill defines how to create **static HTML demo pages** that serve as the design prototype and are later converted 1:1 into WordPress templates. Each demo is a single HTML file with all CSS embedded in a `<style>` block.
+A demo is a static HTML page that serves as the design prototype and is later converted 1:1
+into WordPress templates: the client approves it in a browser, `/wp-init` carries its tokens
+into the theme, `/wp-section` turns each delimited section into a template part, and every
+piece of content becomes an ACF/SCF field.
 
 ## Reference files
 
@@ -32,79 +35,47 @@ key means `plain`. `/wp-demo` records it, and nothing downstream re-derives it.
 
 ---
 
-## Purpose of Demos
+## Files
 
-Demos are the design-first step before WordPress development:
-
-1. **Design agreement** -- the client reviews a working HTML page in the browser
-2. **Token carry** -- `/wp-init` reads the demo's colours and fonts and writes them into the theme's Tailwind `@theme` block; each section's CSS moves with its template part when `/wp-section` builds it
-3. **Section mapping** -- each marked section in the demo maps to a `template-parts/section-*.php` file in WordPress
-4. **Field definition** -- every piece of content in the demo becomes an ACF/SCF field
+One file per page: `demo/index.html` for the homepage, `demo/<page-slug>.html` for the rest
+(`demo/pricing.html`). In plain mode each is a single file — meta tags, one `<style>` block,
+the markup and any inline JS — started from
+[references/demo-skeleton.md](references/demo-skeleton.md).
 
 ---
 
-## File Structure
+## Section Delimiters
 
-```
-demo/
-├── index.html          # Homepage demo
-├── pricing.html        # Pricing page demo
-├── about.html          # About page demo
-└── ...                 # One file per page
-```
-
-### Naming Convention
-
-- **Homepage**: `demo/index.html`
-- **Other pages**: `demo/<page-slug>.html` (e.g., `demo/pricing.html`, `demo/software.html`)
-
----
-
-## Single-File HTML Structure
-
-Each demo is a **single HTML file** containing everything: meta tags, embedded CSS, HTML content, and optional inline JS.
-
-### Template Skeleton
-
-Start every page from the skeleton in [references/demo-skeleton.md](references/demo-skeleton.md):
-fonts in `<head>`, then one `<style>` block holding the `:root` tokens, reset, layout and each
-section's rules under `/* ============ Section: Name ============ */`, then the page sections.
-Each section opens with `<!-- ============ SECTION: Name ============ -->` and closes with
-`<!-- ============ END SECTION: Name ============ -->`.
-
----
-
-## Section Comments
-
-Every distinct section MUST be wrapped with an HTML comment in this exact format:
+Every section is wrapped in an opening and a closing comment, exactly:
 
 ```html
 <!-- ============ SECTION: Hero ============ -->
+<section class="hero">…</section>
+<!-- ============ END SECTION: Hero ============ -->
 ```
 
-These comments serve as:
-1. **Visual delimiters** when scanning the HTML source
-2. **Mapping markers** -- each comment maps to a `template-parts/section-<name>.php` file in WordPress
-3. **Conversion guide** -- when building the WordPress theme, each section is extracted into its own template part
-
-### Common Section Names
+The name is a **verbatim join key**. `/wp-section`, `/wp-seed`, `/wp-polish` and the
+`wp-normalize` agent extract sections by it, and `demo/.demo-plan.json` records each section
+under the same name — a plan whose names do not match its own markup is discarded. So the
+name is identical in both comments, never reworded between them, and unique on the page.
+`Header` and `Footer` are the names of the shared chrome on every page. The section's CSS
+sits under the matching `/* ============ Section: Hero ============ */` delimiter, so it moves
+to its template part whole.
 
 | Comment | WordPress Template Part |
 |---|---|
 | `SECTION: Header` | `header.php` |
 | `SECTION: Hero` | `template-parts/section-hero.php` |
 | `SECTION: Services` | `template-parts/section-services.php` |
-| `SECTION: About` | `template-parts/section-about.php` |
 | `SECTION: Testimonials` | `template-parts/section-testimonials.php` |
-| `SECTION: CTA` | `template-parts/section-cta.php` |
 | `SECTION: Contact` | `template-parts/section-contact.php` |
 | `SECTION: Footer` | `footer.php` |
 
 ---
 
-## Design System Variables in :root
+## Design Tokens and Fonts (plain mode)
 
-In plain mode the `:root` block in the demo `<style>` is the **source of truth** for the design system. When converting to WordPress:
+The `:root` block in the demo `<style>` is the **source of truth** for the design system:
 
 1. `/wp-init` reads its colour and font values and writes them into the theme's `@theme` block
 2. All CSS rules reference these variables (never hardcoded values)
@@ -120,8 +91,6 @@ Google at runtime.
 
 ## 1:1 Section Mapping to WordPress
 
-Each section in the demo becomes a WordPress template part. The mapping is direct:
-
 ```
 Demo HTML                          WordPress
 ─────────────────────────────      ─────────────────────────────
@@ -133,66 +102,25 @@ Demo HTML                          WordPress
                                         alt="<?php echo esc_attr($img['alt']); ?>">
 ```
 
-### Conversion Rules
-
 - Static text becomes `prefix_get_field('field_name')`
-- Placeholder images become ACF image fields
-- Repeated items (cards, list items) become ACF repeater fields
-- Links become ACF URL or link fields
-- Navigation becomes `wp_nav_menu()`
+- Images become ACF image fields; repeated items (cards, list items) become repeaters
+- Links become ACF URL or link fields; navigation becomes `wp_nav_menu()`
 - The HTML structure and CSS classes are preserved exactly
-
----
-
-## Responsive Design Requirements
-
-Every demo MUST be fully responsive. See the `wp-responsive` skill for detailed breakpoint and responsive design standards.
-
-- Use mobile-first CSS with `min-width` media queries
-- Test at: 375px, 576px, 768px, 1024px, 1440px
-- No horizontal scrolling at any viewport width
-- Hamburger menu on mobile, horizontal nav on desktop
 
 ---
 
 ## Accessibility Requirements
 
-Demos MUST follow semantic HTML5 and accessibility best practices.
+The skeleton already carries each of these; keep them when editing:
 
-### Semantic Structure
-
-```html
-<header>    <!-- Site header with nav -->
-<nav>       <!-- Navigation -->
-<main>      <!-- Primary page content -->
-<section>   <!-- Thematic content sections -->
-<article>   <!-- Self-contained content (blog posts) -->
-<aside>     <!-- Supplementary content -->
-<footer>    <!-- Site footer -->
-```
-
-### ARIA and Accessibility
-
-- All images have descriptive `alt` attributes
-- Interactive elements have `aria-label` when the visible text is insufficient
-- Color contrast meets WCAG AA (4.5:1 for normal text, 3:1 for large text)
-- Focus styles are visible for keyboard navigation
-- Skip-to-content link at the top of the page
-- Form inputs have associated `<label>` elements
-- Hamburger button has `aria-label="Toggle menu"` and `aria-expanded`
-
-```html
-<!-- Skip to content link -->
-<a href="#main-content" class="sr-only sr-only--focusable">Skip to content</a>
-
-<!-- Hamburger with ARIA -->
-<button class="header__hamburger" aria-label="Toggle menu" aria-expanded="false">
-    <span></span><span></span><span></span>
-</button>
-
-<!-- Main content landmark -->
-<main id="main-content">
-```
+- A skip link first in `<body>`: `<a href="#main-content" class="sr-only sr-only--focusable">Skip to content</a>`,
+  with `.sr-only` and `.sr-only--focusable` defined in the `<style>` block
+- `<main id="main-content">` as its target
+- The hamburger button: `aria-label="Toggle menu"`, `aria-expanded="false"`,
+  `aria-controls` naming the mobile menu; its menu behaviour (focus trap, Escape, focus
+  return) is `wp-responsive`'s `references/navigation.md`
+- A visible `:focus-visible` style
+- Real `alt` text on every image, a `<label>` on every form input, WCAG AA contrast
 
 ---
 
@@ -201,9 +129,9 @@ Demos MUST follow semantic HTML5 and accessibility best practices.
 Plain mode only. A real client image from `docs/` always wins. Where there is none, the
 placeholder is an `<img>` whose `src` is an inline SVG at the intended aspect ratio, with
 `width`, `height` and real `alt` text — never an external image URL. A placeholder-service
-URL breaks the page offline, and `/wp-seed` imports every
-`img[src]` URL it finds into the media library. Keeping the `<img>` element, rather than a
-coloured CSS box, keeps the 1:1 mapping to an ACF image field.
+URL breaks the page offline, and `/wp-seed` imports every `img[src]` URL it finds into the
+media library. Keeping the `<img>` element, rather than a coloured CSS box, keeps the 1:1
+mapping to an ACF image field.
 
 ```html
 <!-- Hero image, 3:2 -->
@@ -215,17 +143,12 @@ coloured CSS box, keeps the 1:1 mapping to an ACF image field.
      width="300" height="300" alt="Team member name" loading="lazy">
 ```
 
-Choose dimensions that match the expected aspect ratio in the final design:
-- Hero images: 16:9 or 3:2 (e.g., 600x400, 800x450)
-- Thumbnails: 16:10 or 4:3 (e.g., 400x250, 300x225)
-- Avatars/portraits: 1:1 (e.g., 300x300)
-- Logos: wide ratio (e.g., 180x50, 200x60)
-
 ---
 
 ## Navigation Structure
 
-The demo navigation must match the planned WordPress site structure. Navigation items should reflect the actual pages and sections that will exist.
+The demo navigation matches the planned WordPress site structure: the pages and sections that
+will exist.
 
 ```html
 <nav class="header__nav">
@@ -236,16 +159,15 @@ The demo navigation must match the planned WordPress site structure. Navigation 
 </nav>
 ```
 
-- Internal page links use relative HTML file paths (`pricing.html`)
-- Section anchors use `#id` links (`#services`, `#contact`)
-- Active page gets the `--active` modifier class
+Internal pages link by relative file path (`pricing.html`), sections by `#id`, and the active
+page carries the `--active` modifier. The header also carries a language switcher with one
+link per configured language.
 
 ---
 
 ## Footer Pattern
 
-The footer follows a consistent pattern matching the WordPress settings page architecture:
-four columns (brand and logo, quick links, contact info, social) above a bottom bar carrying
+Four columns (brand and logo, quick links, contact info, social) above a bottom bar carrying
 the copyright and legal links. Markup: the footer in
 [references/demo-skeleton.md](references/demo-skeleton.md).
 
@@ -258,19 +180,11 @@ copyright line carries no year: a year typed into the demo is stale by the next 
 
 ---
 
-## Summary Checklist
+## Responsive Design and Verification
 
-- [ ] Single HTML file per page in `demo/` directory
-- [ ] All CSS embedded in `<style>` block (no external CSS files)
-- [ ] `:root` variables match the design system (wp-css-system skill)
-- [ ] Every section wrapped with `<!-- ============ SECTION: Name ============ -->` comment
-- [ ] CSS uses section comment delimiters: `/* ============ Section: Name ============ */`
-- [ ] BEM class names used throughout
-- [ ] Fully responsive at all breakpoints (375px to 1440px+)
-- [ ] Semantic HTML5 elements (header, nav, main, section, footer)
-- [ ] ARIA attributes on interactive elements
-- [ ] WCAG AA color contrast
-- [ ] Placeholder images with realistic dimensions
-- [ ] Navigation matches planned site structure
-- [ ] Footer includes: logo, copyright, social links, contact info, legal links
-- [ ] Each section maps 1:1 to a future WordPress template part
+Every demo is mobile-first with `min-width` queries only; the breakpoints, the mobile menu and
+the touch-target rules are the `wp-responsive` skill's. Then:
+
+1. Run `/wp-demo-verify demo/` (or on one page).
+2. Fix every overflow and clipped-copy finding at the element it names.
+3. Run it again. Stop when it reports no overflow and no clipped copy at any width.

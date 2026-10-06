@@ -6,7 +6,16 @@ Adapted from nateherkai/scroll-craft (MIT).
 
 - The attribute contract (directly below)
 - Two kinds of motion, and only one of them has a budget
-- The devices
+  - Motion belongs in the composition, not beside it
+  - Hover states: elevation, never a halo
+  - Driving a plain property off `--motion-p`
+  - One attribute, one device — and how to get past it
+  - How element animation is written (the four silent failures, transforms, `reveal` collisions)
+  - Shared timelines
+  - Stagger ladders
+  - Measuring motion: two readouts, and they answer different questions (the table is in `verify.md`)
+  - An override can conceal what it overrode
+- The devices: `reveal`, `pin` (and the budget), `pan`, `wipe`, `kinetic`, `parallax`, `count`, `drift`, pointer devices
 - The cue contract
 - The signature move
 - Video scrub is not in this kit
@@ -41,9 +50,9 @@ engine falls back to the section's first element child.
 
 ## Two kinds of motion, and only one of them has a budget
 
-This distinction was missing, and its absence is why builds came out static while
-passing every gate. One word — "motion" — covered two things with completely
-different costs, and the ceiling written for the expensive one was applied to both.
+Without this distinction builds come out static while passing every gate: one word —
+"motion" — covers two things with completely different costs, and the ceiling written
+for the expensive one gets applied to both.
 
 **Scroll choreography costs page length.** `pin`, `pan`, `kinetic`, `wipe` and
 `drift` scrub against a scroll range, which means the page must grow to give them
@@ -57,10 +66,9 @@ these lengthen the page by a single pixel. **They are not budgeted, not capped, 
 not rationed.** A section with eight of them is not over budget; it is a section that
 moves.
 
-Read that as permission, because the rules previously read as prohibition. Every
-gate in this skill punishes excess and, until recently, none punished absence — so an
-agent optimising to pass gates minimised motion, correctly, and shipped pages whose
-only animation was a single one-shot `reveal`. A measured build finished with a
+Read that as permission. A rule set whose gates punish excess and never absence
+teaches an agent optimising to pass them to minimise motion, correctly, and ship pages
+whose only animation is a single one-shot `reveal`. A measured build finished with a
 quarter of its scroll budget unspent while reading as completely static, which is the
 signature of a rule set that constrained the wrong axis.
 
@@ -107,7 +115,7 @@ was found only by enumerating every selector against the rendered DOM and counti
 matches.
 
 That is the argument for element motion living in each composition's own
-`section.css`, which is where it now lives: the file that names the elements is the
+`section.css`, which is where it lives: the file that names the elements is the
 file that animates them, so the names cannot drift apart. A composition that expects
 to be animated from outside owes the author a documented list of its animatable
 hooks — but preferring to carry its own motion is the better answer, and the one the
@@ -150,12 +158,11 @@ scrubbed device.
 cannot also carry `drift`, and the engine reads one name per element, so there is
 no syntax for two.
 
-That matters more than it sounds, because **every composition used to spend its
-root attribute on `reveal`**. Adding any section-level device to a composed
-section therefore meant *deleting* the composition's own motion first — so the
-library's default foreclosed every alternative, and an author who wanted a
-section to drift or pin had to break the composition to do it. No budget and no
-rule caused that; one attribute did.
+That matters more than it sounds: **a composition that spends its root attribute on
+`reveal` forecloses every section-level device.** Adding one means *deleting* the
+composition's own motion first, so an author who wants a section to drift or pin has
+to break the composition to do it. No budget and no rule causes that; one attribute
+does.
 
 The way past it is not a second attribute. It is that **a composition carrying
 element animation in its `section.css` does not need a root `reveal` at all** —
@@ -194,119 +201,9 @@ mechanism `utilities/motion.css` already uses for `reveal`:
 Stagger with `animation-range` offsets per child rather than one root `reveal` with
 `data-motion-stagger`.
 
-**Never animate a transform property on a direct child of a section that still carries
-`data-motion="reveal"`.** The device does `gsap.set(kids, { opacity: 0, y: rise })` on
-the section's *direct children* and GSAP takes ownership of the whole transform group on
-each one, writing its own inline values. A composition that also animates `scale`,
-`rotate` or `translate` on that same element has two systems writing the same thing, and
-which one is on screen depends on which ran first.
-
-That order is not the same in the two places this CSS lives. **The demo wins the race and
-the theme loses it**: in a demo `motion.js` is inlined and runs before the animation's
-start keyframe applies, while in the theme `initMotion` runs at `DOMContentLoaded`, by
-which point it does not. So the element animates correctly in the demo, and in the theme
-it is frozen at the keyframe's start value — measured as a conversion block sitting at
-`scale(0.88)` on all 16 pages of a build, and at `opacity: 0` on a hard jump to the page
-bottom. Status 200, nothing logged, and `/wp-demo-verify` passed that demo 66/66, because
-the demo is the side that wins.
-
-Two ways out, and the first is better:
-
-1. **Drop the root `reveal`.** A composition whose `section.css` already animates its
-   children does not need it — that is the order this section just described, and it
-   removes the collision by removing the second writer.
-2. **Animate only `opacity` and `translate`-free properties the device does not touch.**
-   A translate-only entrance under a root `reveal` still collides on `y`; the honest
-   version of this option is opacity alone.
-
-A composition's element motion is free to use any property it likes on a **descendant**
-that is not a direct child. The rule is about the children `reveal` reaches.
-
-**A stagger ladder goes out of order in four independent ways, and fixing one leaves
-the other three.** All four have been measured in this library or the build that uses
-it; none of them errors, and all four look correct in the source.
-
-1. **Index by type, not by child position.** `:nth-child` is a fact about the
-   parent's *other* children. `offer-table`'s plans are `<th>` preceded by a `<td>`
-   corner cell, so every rung was off by one: measured on the shipped markup, plan 1
-   received `entry 20%` — the rule written for plan 2 — and the `:nth-child(1)` rule
-   for `entry 14%` matched nothing at all. The peer build hit the same thing from the
-   other direction, by *adding* a `<span>` to a list three rounds after the ladder was
-   written, which shifted every `<li>` one place. `:nth-of-type` counts `li` among
-   `li` and cannot be shifted by a sibling of another type. The exception is a ladder whose
-   children are *deliberately* of mixed type — a label, a link and a step in one flow
-   — which has no type to count, so `:nth-child` is the only index available and is
-   correct. The stylesheet cannot tell that case from the broken one, so the scan does
-   not guess: the author writes `ladder-scan: allow-nth-child <selector> -- <why>` in a
-   comment, and a marker with no reason after it is refused. The point is to record a
-   judgement someone can check, not to provide a way to silence the scan.
-
-2. **One phase keyword per ladder.** `entry X%` and `cover X%` are not comparable.
-   The entry phase spans `min(elementH, viewportH)` of scroll and the cover phase
-   spans `viewportH + elementH`, so `entry 100%` sits at `min(h,vh) / (vh+h)` of
-   cover — measured at exactly that value across eight element/viewport pairs,
-   anywhere from **cover 11.8%** to **cover 47.1%**. A ladder that switches unit part
-   way up is therefore ordered correctly on the page it was written against and
-   inverts on the next one, by an amount nobody can know while writing it. Because
-   `entry` percentages may exceed 100, a `cover B%` endpoint converts to
-   `entry (100 + B)%` and the ordering becomes arithmetic again.
-
-3. **A rung past the last written index falls back to `normal`**, which on a view
-   timeline is `cover 0%` to `cover 100%` — a range with no relation to the stagger.
-   See "past the last written range" in the compositions.
-
-4. **Rungs on `view()` each build a timeline from their own box.** A row of items
-   with different body lengths gives every rung a different timeline, so a monotonic
-   set of ranges still fires out of order. This is the shared-timeline rule above,
-   arriving as a stagger bug instead of as a disagreement between two readouts.
-
-The first three are asserted by `tests/checks/lib/ladder-scan.py`. The fourth is not
-visible in one file.
-
-### Measuring motion: two readouts, and they answer different questions
-
-Every measurement mistake made while writing these rules — on both sides of the
-review — was the same mistake, made four times: reading the rendered value when the
-question was about the timeline.
-
-| reading | what it is | use it for |
-|---|---|---|
-| `animation.currentTime` | where the timeline is, raw, before the timing function | is this ladder in order? |
-| the computed property | what the reader actually sees, after the ease | does this look arrived? |
-
-`getComputedStyle(el).getPropertyValue('--x')` and `getBoundingClientRect()` both go
-through `animation-timing-function`. Two consequences, both of which produced a wrong
-number that looked plausible:
-
-- **Eased readings are not progress.** Measuring the `entry`-to-`cover` conversion by
-  reading an animated custom property put `entry 100%` at "cover 52.8%" where the
-  true value is 30.8% — the default `ease` distorted both sides. Setting
-  `animation-timing-function: linear` made all eight measurements match the
-  arithmetic exactly. Ordering conclusions survive an ease, because a monotonic
-  function preserves order; percentages do not.
-- **`getBoundingClientRect()` returns the transformed box.** An element mid-`scale`
-  reports its scaled size, so a row of nodes animating `scale: 1 → 1.08` measured 44,
-  43.8, 43.3 and 42.6px and every junction looked several pixels out. Both were
-  artefacts. Use `offsetWidth`/`offsetHeight` for layout, or inject
-  `* { animation: none !important }` before measuring geometry.
-
-### An override can conceal what it overrode
-
-A project override that *flattens* a ladder — giving every rung the same range —
-makes a broken ladder unobservable, because "all correct" and "all identical" look
-the same on a screenshot. Measured on the build using this library: an override
-collapsed two plan columns onto one range, so `offer-table`'s off-by-one could not
-appear there, and the cost of the override was the stagger itself, unnoticed for
-several rounds.
-
-So an override is two hazards, not one. It can silently fail to apply — a patch
-appended *above* the rules it means to replace loses on source order at equal
-specificity, and nothing errors — and it can silently succeed at hiding the defect
-underneath it. The only reliable signal in either direction is the computed value
-read back off the live element, which is also what found the off-by-one: the
-stylesheet says what was written, never what applied. The attribute contract gives a section **one** device; rich
-motion is many elements moving on their own timelines inside one section, and the
-attribute cannot express that while CSS does it trivially.
+Rich motion is many elements moving on their own timelines inside one section. The
+attribute contract gives a section **one** device and cannot express that; CSS does
+it trivially.
 
 Four ways this fails silently, all of them worth knowing before you write it.
 
@@ -321,7 +218,6 @@ un-animated value — and both had been read many times without anyone noticing,
 because the advice attached to them was fine. A rule with a number beside it can be
 checked by the next reader in the time it takes to disbelieve it. A rule without one
 is a claim.
-
 
 1. **Longhands only.** The `animation` shorthand resets `animation-timeline` to
    `auto`, which silently reverts the element to a time-based animation that runs
@@ -378,6 +274,36 @@ timeline. Measured on a real build: `anim=ns-pushin :: timeline=view()`, which t
 a set of drifting banners into banners that zoomed on scroll. One element, one
 animation rule, all longhands together.
 
+**Never animate a transform property on a direct child of a section that still carries
+`data-motion="reveal"`.** The device does `gsap.set(kids, { opacity: 0, y: rise })` on
+the section's *direct children* and GSAP takes ownership of the whole transform group on
+each one, writing its own inline values. A composition that also animates `scale`,
+`rotate` or `translate` on that same element has two systems writing the same thing, and
+which one is on screen depends on which ran first.
+
+That order is not the same in the two places this CSS lives. **The demo wins the race and
+the theme loses it**: in a demo `motion.js` is inlined and runs before the animation's
+start keyframe applies, while in the theme `initMotion` runs at `DOMContentLoaded`, by
+which point it does not. So the element animates correctly in the demo, and in the theme
+it is frozen at the keyframe's start value — measured as a conversion block sitting at
+`scale(0.88)` on all 16 pages of a build, and at `opacity: 0` on a hard jump to the page
+bottom. Status 200, nothing logged, and `/wp-demo-verify` passed that demo 66/66, because
+the demo is the side that wins.
+
+Two ways out, and the first is better:
+
+1. **Drop the root `reveal`.** A composition whose `section.css` already animates its
+   children does not need it — the order "One attribute, one device" gives, and it
+   removes the collision by removing the second writer.
+2. **Animate only `opacity` and `translate`-free properties the device does not touch.**
+   A translate-only entrance under a root `reveal` still collides on `y`; the honest
+   version of this option is opacity alone.
+
+A composition's element motion is free to use any property it likes on a **descendant**
+that is not a direct child. The rule is about the children `reveal` reaches.
+
+### Shared timelines
+
 **Two elements that display the same value share a named timeline; `view()` is
 only safe when each element's progress is its own business.** `view()` builds a
 timeline from **each element's own box**, so two elements carrying identical
@@ -423,6 +349,76 @@ marker they move by scrolling — and wrong for a value that should simply be al
 which belongs on a clock and loops. One build shipped the scroll version and drew
 "but why doesn't it move" from the operator; the fix was not better coupling but a
 7s alternating document timeline, coupled by mechanism two.
+
+### Stagger ladders
+
+**A stagger ladder goes out of order in four independent ways, and fixing one leaves
+the other three.** All four have been measured in this library or the build that uses
+it; none of them errors, and all four look correct in the source.
+
+1. **Index by type, not by child position.** `:nth-child` is a fact about the
+   parent's *other* children. `offer-table`'s plans are `<th>` preceded by a `<td>`
+   corner cell, so every rung was off by one: measured on the shipped markup, plan 1
+   received `entry 20%` — the rule written for plan 2 — and the `:nth-child(1)` rule
+   for `entry 14%` matched nothing at all. The peer build hit the same thing from the
+   other direction, by *adding* a `<span>` to a list three rounds after the ladder was
+   written, which shifted every `<li>` one place. `:nth-of-type` counts `li` among
+   `li` and cannot be shifted by a sibling of another type. The exception is a ladder whose
+   children are *deliberately* of mixed type — a label, a link and a step in one flow
+   — which has no type to count, so `:nth-child` is the only index available and is
+   correct. The stylesheet cannot tell that case from the broken one, so the scan does
+   not guess: the author writes `ladder-scan: allow-nth-child <selector> -- <why>` in a
+   comment, and a marker with no reason after it is refused. The point is to record a
+   judgement someone can check, not to provide a way to silence the scan.
+
+2. **One phase keyword per ladder.** `entry X%` and `cover X%` are not comparable.
+   The entry phase spans `min(elementH, viewportH)` of scroll and the cover phase
+   spans `viewportH + elementH`, so `entry 100%` sits at `min(h,vh) / (vh+h)` of
+   cover — measured at exactly that value across eight element/viewport pairs,
+   anywhere from **cover 11.8%** to **cover 47.1%**. A ladder that switches unit part
+   way up is therefore ordered correctly on the page it was written against and
+   inverts on the next one, by an amount nobody can know while writing it. Because
+   `entry` percentages may exceed 100, a `cover B%` endpoint converts to
+   `entry (100 + B)%` and the ordering becomes arithmetic again.
+
+3. **A rung past the last written index falls back to `normal`**, which on a view
+   timeline is `cover 0%` to `cover 100%` — a range with no relation to the stagger, so
+   the extra child leads or lags the others. Measured on `icon-row` with a fifth item at
+   1440: it read opacity 0.00, 0.17, 0.58 and 0.81 across four scroll positions while the
+   four written rungs read 1.00. Write a rung per child, or let the `@supports not`
+   fallback land it arrived.
+
+4. **Rungs on `view()` each build a timeline from their own box.** A row of items
+   with different body lengths gives every rung a different timeline, so a monotonic
+   set of ranges still fires out of order. This is the shared-timeline rule,
+   arriving as a stagger bug instead of as a disagreement between two readouts.
+
+The first three are asserted by `tests/checks/lib/ladder-scan.py`. The fourth is not
+visible in one file.
+
+### Measuring motion: two readouts, and they answer different questions
+
+Every wrong measurement made while writing these rules was the same mistake: reading
+the rendered value when the question was about the timeline. The table that tells
+`animation.currentTime` from the computed property, and the two plausible wrong
+numbers it prevents, are in `verify.md` ("Before you read a number off a moving
+page"). Read it before opening a probe.
+
+### An override can conceal what it overrode
+
+A project override that *flattens* a ladder — giving every rung the same range —
+makes a broken ladder unobservable, because "all correct" and "all identical" look
+the same on a screenshot. Measured on the build using this library: an override
+collapsed two plan columns onto one range, so `offer-table`'s off-by-one could not
+appear there, and the cost of the override was the stagger itself, unnoticed for
+several rounds.
+
+So an override is two hazards, not one. It can silently fail to apply — a patch
+appended *above* the rules it means to replace loses on source order at equal
+specificity, and nothing errors — and it can silently succeed at hiding the defect
+underneath it. The only reliable signal in either direction is the computed value
+read back off the live element, which is also what found the off-by-one: the
+stylesheet says what was written, never what applied.
 
 ## The devices
 
@@ -589,7 +585,7 @@ engines. Animate `--score` on the shared timeline above, not on `view()`.
 ### `drift`
 
 A property of sections, not a device. Three to five stops, all inside one
-theme family. If several short sections can be part-way through at once,
+palette. If several short sections can be part-way through at once,
 paint opaque per-section grounds instead.
 
 ### Pointer devices

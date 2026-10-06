@@ -266,6 +266,26 @@
 
 ### Changed
 
+- **The three demo skills read their recorded decisions and load only what a step needs.**
+  `wp-demo-craft`'s References section was one fixed reading order, so every build read all
+  thirteen references (about 37k tokens) before writing markup; it is now a table of file,
+  contents and read-when, and names `domains.csv` and what domain classification produces.
+  Its order of work opens with a checklist, splits the composition plan into sub-steps, names
+  `/wp-demo` and `/wp-yolo` as its runners and says which parts a cinematic build takes. The
+  seven-dimension fingerprint table moved into `fingerprint.md`, which owns the gate (with the
+  manifest's `"fingerprint"` keys), the family table into `families.md`, and the readouts
+  table into `verify.md`; `devices.md`'s element-motion material now sits under real
+  subsections in its Contents list. `image-prompt.md` gives `image-gen.mjs`'s invocation and
+  exit codes. Wording that went stale with the calendar ("current latest", "until v3.1") is
+  rewritten as the rule plus its reason, and "family", "plate" and "Avoid list" mean one thing
+  each. `wp-responsive` scopes its hand-written `@media` scale to plain-CSS demos (a tailwind
+  theme follows `wp-tailwind-system`; craft compositions size to their container), drops the
+  dead `max-width` exception and three conflicting viewport lists for a `/wp-demo-verify` loop
+  with a stop condition, and its description no longer pulls screenshot-walk requests.
+  `wp-demo` shows the delimiter pair as the verbatim join key it is, cuts what Claude already
+  knows, and ends on the same verify loop. All three descriptions name the near misses they
+  are not for. `tests/checks/wp-craft-skill.sh`, and contract pins added to
+  `wp-responsive.sh` and `wp-demo-skill.sh`.
 - **The five audit skills are found by the requests that need them, and load less.** Each
   description now names what a request would carry — `bin/prod-gate.sh`, Lighthouse, a
   `UX-014` on `page:/contact/`, `rank-math-options-titles`, `ard.json`, a sitemap that 404s —
