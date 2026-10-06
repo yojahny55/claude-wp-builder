@@ -119,6 +119,13 @@ out=$(run "$tmp" WP_ROOT="$wp"); rc=$?
 # 2, 3, 5. Plugin present: settings writes are refused, then the queue table is missing.
 mkdir -p "$wp/wp-content/plugins/robin-image-optimizer"
 touch "$wp/wp-content/plugins/robin-image-optimizer/robin-image-optimizer.php"
+# Size names come from theme source: a double-quoted one, and one holding a backslash.
+mkdir -p "$wp/wp-content/themes/t"
+cat > "$wp/wp-content/themes/t/functions.php" <<'PHP'
+<?php
+add_image_size( "dq-size", 300, 200 );
+add_image_size( 'bs\size', 10, 10 );
+PHP
 : > "$tmp/log"
 out=$(run "$tmp" WP_ROOT="$wp"); rc=$?
 [ "$rc" -eq 1 ] || fail "a missing queue table did not stop the run (exit $rc): $out"
@@ -130,6 +137,10 @@ grep -q 'abc_options' "$tmp/log" || fail "settings were written to a table witho
 grep -q -- '-h 127.0.0.1 --port=3307 dqdb' "$tmp/log" || fail "DB_HOST's port or the double-quoted DB_NAME did not reach the client: $(head -1 "$tmp/log")"
 grep -qF -- "-u dq'user -h" "$tmp/log" || fail "the double-quoted DB_USER holding a ' did not reach the client whole"
 grep -q 'pwd=p"w$' "$tmp/log" || fail "the single-quoted DB_PASSWORD holding a \" did not reach the client whole"
+sizes=$(grep -F 'wbcr_io_allowed_sizes_thumbnail' "$tmp/log" || true)
+grep -q 'dq-size' <<<"$sizes" || fail "a double-quoted add_image_size() name was not read: $sizes"
+! grep -qF 'add_image_size' <<<"$sizes" || fail "the raw add_image_size( call text was stored as a size name: $sizes"
+grep -qF 'bs\\size' <<<"$sizes" || fail "a backslash in a size name reached the SQL unescaped: $sizes"
 
 # 6. The GD converter on all three formats, where this PHP can test it.
 if php -r 'exit(function_exists("imagewebp") && function_exists("imagegif") ? 0 : 1);'; then
