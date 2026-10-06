@@ -42,11 +42,13 @@ revert=skills/wp-s3/scripts/s3-revert.sh
 lib=skills/wp-s3/scripts/lib-mirror.sh
 verify=skills/wp-s3/scripts/verify-transfer.py
 creds=skills/wp-s3/scripts/check-credentials.php
+skill=skills/wp-s3/SKILL.md
+cmd=commands/wp-s3.md
 
 tmp_config="$(mktemp -t wp-s3-check-XXXXXX.php)"
 trap 'rm -f "$tmp_config"' EXIT
 
-for f in "$setup" "$media" "$revert" "$lib" "$verify" "$creds"; do
+for f in "$setup" "$media" "$revert" "$lib" "$verify" "$creds" "$skill" "$cmd"; do
   [ -f "$f" ] || fail "$f is missing"
 done
 
@@ -214,15 +216,14 @@ grep -Fq -- '--unverified-download' "$setup" \
 #     missing-client message told them to install it inside the plugin directory, which a
 #     plugin update replaces.
 # ---------------------------------------------------------------------------
-skill=skills/wp-s3/SKILL.md
 grep -Fq 's3-media.sh" download' "$revert" \
   || fail "$revert no longer downloads through s3-media.sh — re-check what the skill says the revert needs"
 ! grep -Fq 'Only for `/wp-s3-media`' "$skill" \
   || fail "$skill says the client is only for /wp-s3-media; the revert downloads through it too"
 grep -Fq -- '`/wp-s3 --revert` unless `--keep-remote-media`' "$skill" \
   || fail "$skill does not say the revert needs the client unless --keep-remote-media is passed"
-grep -Fq 'S3_MEDIA_KEY' commands/wp-s3.md \
-  || fail "commands/wp-s3.md does not say a role-authenticated revert needs S3_MEDIA_KEY/S3_MEDIA_SECRET"
+grep -Fq 'S3_MEDIA_KEY' "$cmd" \
+  || fail "$cmd does not say a role-authenticated revert needs S3_MEDIA_KEY/S3_MEDIA_SECRET"
 ! grep -Fq "curl -fsSLo '\$dir/mcli'" "$lib" \
   || fail "$lib tells the operator to install the client inside the plugin, which an update replaces"
 

@@ -38,12 +38,14 @@ fi
 info "WordPress root: $WP_ROOT"
 
 # ── Read DB credentials via grep (no PHP require, works on broken installs) ─
-# Single or double quotes, both valid PHP. `|| true` for the same reason as find_wp_root:
-# a define the grep cannot match must reach the "Failed to parse" message below, not end
-# the run in silence.
+# Single or double quotes, both valid PHP. The value runs to the quote that opened it, so a
+# single-quoted password may hold `"` and a double-quoted one `'`; an escaped quote of the
+# same kind (`\'`) still ends it. `|| true` for the same reason as find_wp_root: a define
+# the grep cannot match must reach the "Failed to parse" message below, not end the run in
+# silence.
 parse_define() {
 	local key="$1" file="$2"
-	{ grep -oP "define\s*\(\s*['\"]${key}['\"]\s*,\s*['\"]?\K[^'\");]*" "$file" || true; } | head -1
+	{ grep -oP "define\s*\(\s*['\"]${key}['\"]\s*,\s*(['\"])\K.*?(?=\1)" "$file" || true; } | head -1
 }
 
 DB_NAME="$(parse_define DB_NAME "$WP_ROOT/wp-config.php")"
@@ -242,15 +244,29 @@ fi
 # GD counts only with imagewebp(): a GD built without WebP support loads the extension
 # and then fails every conversion. Same test the /wp-robin runner's pre-check uses.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+gd_webp() { php -r 'exit(function_exists("imagewebp") ? 0 : 1);' 2>/dev/null; }
 WEBP_CONVERTER=""
 if command -v convert &>/dev/null; then
 	WEBP_CONVERTER="imagemagick"
 elif command -v cwebp &>/dev/null; then
 	WEBP_CONVERTER="cwebp"
-elif php -r 'exit(function_exists("imagewebp") ? 0 : 1);' 2>/dev/null; then
+elif gd_webp; then
 	WEBP_CONVERTER="gd"
 fi
 info "WebP converter: ${WEBP_CONVERTER:-NONE}"
+# cwebp does not read GIF, and some distributions package gif2webp separately from it.
+# Without gif2webp a GIF goes to GD, which reads GIF; without either it is not converted,
+# and that is said once here rather than as one "conversion failed" per GIF.
+GIF_CONVERTER="$WEBP_CONVERTER"
+if [[ "$WEBP_CONVERTER" == cwebp ]] && ! command -v gif2webp &>/dev/null; then
+	if gd_webp; then
+		GIF_CONVERTER="gd"
+		info "GIF converter: gd (cwebp is installed without gif2webp)"
+	else
+		GIF_CONVERTER=""
+		warn "cwebp is installed without gif2webp and PHP GD has no imagewebp(): GIF attachments will get no .webp file. Install gif2webp (it ships with libwebp's tools)."
+	fi
+fi
 
 # The lossy quality every converter below is given, defined once so the three cannot drift
 # apart. It is not the plugin's `image_optimization_level_custom` (70): that one is Robin's
@@ -266,11 +282,12 @@ info "Site URL: $SITE_URL"
 
 # ── Convert image to WebP ───────────────────────────────────────────────────
 convert_to_webp() {
-	local src="$1" dst="$2"
+	local src="$1" dst="$2" conv="$WEBP_CONVERTER"
 	[[ -f "$dst" ]] && return 0
-	case "${WEBP_CONVERTER:-}" in
+	case "$src" in *.[gG][iI][fF]) conv="$GIF_CONVERTER" ;; esac
+	case "$conv" in
 		imagemagick) convert "$src" -quality "$WEBP_QUALITY" "$dst" 2>/dev/null ;;
-		# cwebp does not read GIF; gif2webp ships in the same libwebp tools package.
+		# cwebp does not read GIF; a GIF reaches this branch only when gif2webp is installed.
 		cwebp)
 			case "$src" in
 				*.[gG][iI][fF]) gif2webp -q "$WEBP_QUALITY" "$src" -o "$dst" 2>/dev/null ;;

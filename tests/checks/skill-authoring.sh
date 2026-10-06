@@ -20,14 +20,19 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail=0
 err() { echo "FAIL: $*"; fail=1; }
+# A quoted YAML scalar is the same value as the bare one; compare the value, not the quotes.
+unquote() { sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/"; }
 
 for f in skills/*/SKILL.md; do
   dir=$(dirname "$f")
   sk=$(basename "$dir")
   fm=$(awk 'NR == 1 && !/^---$/ { exit } NR > 1 && /^---$/ { exit } NR > 1' "$f")
   [ -n "$fm" ] || { err "$f has no frontmatter block"; continue; }
-  name=$(printf '%s\n' "$fm" | sed -n 's/^name: *//p')
-  desc=$(printf '%s\n' "$fm" | sed -n 's/^description: *//p')
+  # Without a closing ---, the whole file reads as frontmatter and the body counts as 0 lines.
+  awk 'NR > 1 && /^---$/ { found = 1; exit } END { exit !found }' "$f" \
+    || { err "$f has no closing frontmatter delimiter"; continue; }
+  name=$(printf '%s\n' "$fm" | sed -n 's/^name: *//p' | unquote)
+  desc=$(printf '%s\n' "$fm" | sed -n 's/^description: *//p' | unquote)
 
   [ "$name" = "$sk" ] || err "$f: name '$name' does not match its directory '$sk'"
   printf '%s' "$name" | grep -Eq '^[a-z0-9-]{1,64}$' \

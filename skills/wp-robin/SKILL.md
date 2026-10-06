@@ -53,7 +53,7 @@ attachment's files on disk with its queue rows, so a size added later (a new
    fallen after two runs, stop and report the script's warning lines.
 
 `scripts/webp-gd.php` is the PHP GD converter `robin-fix.sh` calls when neither ImageMagick
-nor cwebp is installed. Never run it by hand.
+nor cwebp is installed, and for GIFs when cwebp is installed without `gif2webp`. Never run it by hand.
 
 The script reads the DB credentials and table prefix from `wp-config.php` (single- or
 double-quoted defines, a `DB_HOST` with a port or socket) and the site URL from the
@@ -101,7 +101,7 @@ while `<img>` tags get WebP, or before changing `webp_delivery_mode`.
 | `bash` 4+, GNU `grep` (`-P`), GNU `stat` (`-c`), `sed`, `awk`, `sha256sum` | The script itself. GNU only: it does not run on macOS's BSD tools |
 | `mariadb` or `mysql` client | Every query. `mariadb` is used when both exist |
 | `php` CLI | Every run: decodes `_wp_attachment_metadata` and builds the queue rows |
-| A converter: ImageMagick (`convert`), else `cwebp` (with `gif2webp` for GIFs), else PHP GD with `imagewebp()` | Writing the `.webp` files. ImageMagick is preferred; GD reads PNG, JPEG and GIF. Without one, the queue repair still runs and no `.webp` file is written |
+| A converter: ImageMagick (`convert`), else `cwebp` (with `gif2webp` for GIFs; without it GIFs go to GD), else PHP GD with `imagewebp()` | Writing the `.webp` files. ImageMagick is preferred; GD reads PNG, JPEG and GIF. Without one, the queue repair still runs and no `.webp` file is written |
 | `wp` (WP-CLI) | Installing and activating the plugin. Optional when the plugin is already installed and active |
 | `curl`, `unzip` | Only for the direct download, tried when `wp plugin install` fails |
 

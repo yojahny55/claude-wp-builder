@@ -15,7 +15,8 @@ cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 cmd=commands/wp-woo-setup.md
 script=skills/wp-woocommerce/scripts/woo-setup.php
-for f in "$cmd" "$script"; do [ -r "$f" ] || fail "$f is missing or unreadable"; done
+skill=skills/wp-woocommerce/SKILL.md
+for f in "$cmd" "$script" "$skill"; do [ -r "$f" ] || fail "$f is missing or unreadable"; done
 
 line_of() { grep -n -- "$1" "$2" | head -1 | cut -d: -f1 || true; }
 dry=$(line_of '^## Step 5: Dry run first' "$cmd"); apply=$(line_of '^## Step 6: Apply' "$cmd")
@@ -45,7 +46,6 @@ engine=$(line_of "get '\${PROJECT_PATH}' environment.engine" "$cmd")
 # and the command put the WhatsApp number in "the theme's settings page": no starter renders
 # either channel, carries those fields, or has a bridge, so an agent following the old text
 # promised a client features that do not exist.
-skill=skills/wp-woocommerce/SKILL.md
 for old in 'Each product offers an enquiry form' "products are the Polylang bridge's job"; do
   if grep -Fq "$old" "$skill"; then fail "$skill still says: $old"; fi
 done
