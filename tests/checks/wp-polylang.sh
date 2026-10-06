@@ -221,24 +221,77 @@ grep -q 'pllx_acf_copy_untranslated_term' "$imp" \
 grep -qF "pllx_acf_write( \$term_context, \$dotted, \$value, \$source_context )" "$imp" \
   || { echo "FAIL: pll-import.php's term branch never writes the translated ACF values from the manifest back onto the term counterpart"; exit 1; }
 
-# ── SKILL.md must document the rewrite-base pattern and the term ACF surface ─
-grep -q '^## Rewrite bases are never translated' "$s" \
-  || { echo "FAIL: SKILL.md does not document that Polylang never translates a CPT/taxonomy rewrite base"; exit 1; }
-grep -qF 'chosen by the URL already in hand, never by who is reading' "$s" \
-  || { echo "FAIL: SKILL.md does not state the rewrite-base swap must be decided from the URL, not the current reader"; exit 1; }
-tr '\n' ' ' < "$s" | grep -qi "taxonomy TERM's fields are a separate" \
-  || { echo "FAIL: SKILL.md's ACF section does not call out that a term's own fields are a separate surface from a post's"; exit 1; }
+# ── The skill must document the rewrite-base pattern and the term ACF surface ─
+# Both live in references/ beside SKILL.md, which names each file and when to read it.
+. tests/checks/lib/flat-hit.sh
+rb=skills/wp-polylang/references/taxonomies-and-rewrite-bases.md
+af=skills/wp-polylang/references/acf-fields.md
+il=skills/wp-polylang/references/internal-links.md
+for f in "$rb" "$af" "$il"; do
+  [ -f "$f" ] || { echo "FAIL: $f is missing"; exit 1; }
+  grep -qF "$(basename "$f")" "$s" || { echo "FAIL: SKILL.md does not name references/$(basename "$f")"; exit 1; }
+done
+grep -q '^## Rewrite bases are never translated' "$rb" \
+  || { echo "FAIL: $rb does not document that Polylang never translates a CPT/taxonomy rewrite base"; exit 1; }
+flat_of "$rb" | grep -qF 'chosen by the URL already in hand, never by who is reading' \
+  || { echo "FAIL: $rb does not state the rewrite-base swap must be decided from the URL, not the current reader"; exit 1; }
+flat_of "$af" | grep -qi "taxonomy TERM's fields are a separate" \
+  || { echo "FAIL: $af does not call out that a term's own fields are a separate surface from a post's"; exit 1; }
+
+# ── The rules a later edit could drop without anything failing ──────────────
+# Pinned on flattened prose, one substring per rule, so a reflow cannot break them.
+sflat=$(flat_of "$s")
+pin() { # <haystack> <needle> <why>
+  case "$1" in *"$2"*) ;; *) echo "FAIL: $3"; exit 1 ;; esac
+}
+# The central rule: a save replaces the translation group, so read, merge, save.
+pin "$sflat" '**replaces** the whole translation group' \
+  "SKILL.md no longer warns that pll_save_post_translations() replaces the translation group -- a {source, target} save silently drops every other language"
+read_line=$(grep -nF 'pll_get_post_translations( $source_id );' "$s" | head -1 | cut -d: -f1 || true)
+save_line=$(grep -nF 'pll_save_post_translations( $group );' "$s" | head -1 | cut -d: -f1 || true)
+[ -n "$read_line" ] && [ -n "$save_line" ] && [ "$read_line" -lt "$save_line" ] \
+  || { echo "FAIL: SKILL.md's merge snippet no longer reads the translation group before saving it"; exit 1; }
+# Menus: the option overrides a theme_mod entry it never creates.
+pin "$sflat" 'That option is an override, not the assignment.' \
+  "SKILL.md no longer says the 'polylang' nav_menus option only overrides an existing theme_mod location"
+pin "$sflat" 'menu location assign <menu> <location>' \
+  "SKILL.md no longer says to register one language's menu with 'wp menu location assign' first"
+# Objects with no language, and the attachment trap in the sweep.
+pin "$sflat" '`post_type => "any"` silently skips attachments' \
+  "SKILL.md's no-language sweep no longer explains why it lists post types instead of using 'any'"
+pin "$sflat" 'Both must print nothing.' "SKILL.md's no-language sweep no longer says what a clean result is"
+# date_format / time_format are PHP formats, never prose.
+pin "$sflat" 'Translating these produces garbage.' \
+  "SKILL.md no longer excludes date_format and time_format from string translation"
+pin "$sflat" "get_option('date_format')" \
+  "SKILL.md no longer says to exclude the date formats by comparing against the option values"
+# The proper-noun taxonomy and the link rules, in their reference files.
+rbflat=$(flat_of "$rb")
+ilflat=$(flat_of "$il")
+pin "$rbflat" 'Leave such a taxonomy **out** of `pll_get_taxonomies`' \
+  "$rb no longer says to leave a taxonomy of proper nouns untranslated"
+pin "$ilflat" '**Same host only.**' "$il no longer limits the link-rewrite pass to the site's own host"
+pin "$ilflat" '**Resolved with `url_to_postid()`.**' "$il no longer says how a link is resolved to a post"
+# The scripts: path, exit codes, and the verify loop.
+pin "$sflat" '${CLAUDE_PLUGIN_ROOT}/skills/wp-polylang/scripts' "SKILL.md does not give the scripts' plugin path"
+pin "$sflat" 'exits `0` on success and `1` on failure' "SKILL.md does not state the scripts' exit codes"
+pin "$sflat" 'stop at exit 0' "SKILL.md's verify loop does not say when to stop"
+pin "$sflat" 'safe to re-run' "SKILL.md does not say pll-import.php is safe to re-run after a failure"
 
 # ── The skill must point at code a reader can find ──────────────────────────
 # It said pllx_acf_ref_id() lived in pll-import.php after the function moved to
 # pll-lib.php. Every "`pllx_x()` in `pll-y.php`" claim is checked against the
 # script that is supposed to define it, so the next move cannot leave one behind.
-skill_md=$(find skills/wp-polylang -name '*.md' | sort)
-claims=$(grep -ohE '`pllx_[a-z_]+\(\)` in `pll-[a-z]+\.php`' $skill_md | sort -u)
+# Read flattened, so a claim wrapped across two lines is still a claim -- one file per line,
+# so the end of one file and the start of the next cannot join into a claim neither makes.
+skill_md=()
+while IFS= read -r md; do skill_md+=("$md"); done < <(find skills/wp-polylang -name '*.md' | sort)
+claims=$(for md in "${skill_md[@]}"; do flat_of "$md"; echo; done \
+  | grep -oE '`pllx_[a-z0-9_]+\(\)` in `pll-[a-z0-9_-]+\.php`' | sort -u || true)
 [ -n "$claims" ] || { echo "FAIL: the skill names no pllx_ helper by file -- this check would be vacuous"; exit 1; }
 while IFS= read -r claim; do
-  fn=$(printf '%s' "$claim" | sed -E 's/^`(pllx_[a-z_]+)\(\)`.*/\1/')
-  file=$(printf '%s' "$claim" | sed -E 's/.*`(pll-[a-z]+\.php)`$/\1/')
+  fn=$(printf '%s' "$claim" | sed -E 's/^`(pllx_[a-z0-9_]+)\(\)`.*/\1/')
+  file=$(printf '%s' "$claim" | sed -E 's/.*`(pll-[a-z0-9_-]+\.php)`$/\1/')
   grep -q "^function $fn(" "skills/wp-polylang/scripts/$file" \
     || { echo "FAIL: the skill says $fn() is in $file, but $file does not define it"; exit 1; }
 done <<<"$claims"
@@ -247,16 +300,17 @@ done <<<"$claims"
 # existed on a maintainer's own site. A user has neither, so a rule resting on them
 # reads as evidence and leads nowhere.
 for gone in '.superpowers' 'pll-acf-fixture.php' 'this test site' 'Task 8 report'; do
-  hit=$(grep -lF -- "$gone" $skill_md || true)
+  hit=$(flat_hit "$gone" "${skill_md[@]}")
   [ -z "$hit" ] || { echo "FAIL: $hit cites '$gone', which no user of the plugin has"; exit 1; }
 done
 
 # Non-text ACF types are copied onto the counterpart (pllx_acf_copy_untranslated), not
 # left "untouched by the importer" as the skill used to say -- an agent believing that
 # copies them by hand, or reads a blank image on a new counterpart as expected.
-hit=$(grep -lF 'untouched by the importer' $skill_md || true)
+hit=$(flat_hit 'untouched by the importer' "${skill_md[@]}")
 [ -z "$hit" ] || { echo "FAIL: $hit still says untranslated ACF types are untouched by the importer"; exit 1; }
-grep -qF 'pllx_acf_copy_untranslated()' $skill_md \
+hit=$(flat_hit 'pllx_acf_copy_untranslated()' "${skill_md[@]}")
+[ -n "$hit" ] \
   || { echo "FAIL: the skill no longer says pllx_acf_copy_untranslated() copies the untranslated ACF types"; exit 1; }
 grep -q '^function pllx_acf_copy_untranslated(' "$imp" \
   || { echo "FAIL: pll-import.php no longer defines pllx_acf_copy_untranslated(), which the skill documents"; exit 1; }

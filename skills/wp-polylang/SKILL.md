@@ -1,6 +1,6 @@
 ---
 name: wp-polylang
-description: The Polylang i18n model — one post per language joined by translation groups, driven through the pll_* API and the bundled scripts run with wp eval-file. Covers menus, internal links, taxonomies, rewrite bases, ACF/SCF fields and strings. Use when the project's i18n strategy is polylang (the default for new scaffolds), or when retrofitting Polylang with /wp-polylang. Not for the suffix model; that is wp-bilingual.
+description: Documents how to drive Polylang from automation — one post per language joined into translation groups through the pll_* API, and the bundled pll-setup, pll-export, pll-import and pll-verify scripts run with wp eval-file. Covers per-language menus, internal links, posts and terms with no language, WooCommerce products and categories, proper-noun taxonomies, language prefixes and CPT rewrite bases, hreflang, ACF/SCF fields and strings. Use when the project's .claude/CLAUDE.md records i18n strategy polylang (the default for new scaffolds), when translating or retrofitting a site with /wp-polylang, or when a translated page serves the wrong language, links back to the source language or is missing from the site. Not for the suffix model with hero_title_es fields (wp-bilingual), and not for WPML.
 user-invocable: false
 ---
 
@@ -13,9 +13,26 @@ and `hero_title_es`; Polylang keeps one post per language, each with the same
 unsuffixed fields, joined into a translation group.
 
 Polylang is the default for new scaffolds, because only one post per language gives a
-crawler a URL, an hreflang pair and Rank Math meta per language. Choosing it does not
-deprecate `wp-bilingual`, and a project whose `.claude/CLAUDE.md` has no `i18n strategy`
-line predates the choice and is `suffix`.
+crawler a URL, an hreflang pair and Rank Math meta per language. A project whose
+`.claude/CLAUDE.md` has no `i18n strategy` line predates the choice and is `suffix`.
+
+`$WP` below is `wp_cli.wrapper` from `.wp-create.json` — the `wp` command itself on a native
+install, or its Docker, DDEV, Lando or wp-env wrapper. Tested range: Polylang 3.6 to 3.8 and
+Secure Custom Fields 6.9, free, with no paid addon.
+
+## Reference files
+
+- [references/acf-fields.md](references/acf-fields.md) — which ACF/SCF field types are
+  translated, copied or re-pointed, nesting, a term's own fields, and which plugin to use. Read
+  when a translated post or term carries custom fields, or a field came out blank, untranslated
+  or pointing at the source language.
+- [references/internal-links.md](references/internal-links.md) — what the link-rewrite pass
+  changes in post content, ACF references and `custom` menu items, and its rules. Read when a
+  translated page links back to the source language.
+- [references/taxonomies-and-rewrite-bases.md](references/taxonomies-and-rewrite-bases.md) —
+  why a taxonomy of proper nouns stays untranslated, prefixing links into it, and translating a
+  CPT's or taxonomy's rewrite base. Read when registering a taxonomy or CPT for translation, or
+  when a translated archive answers at an untranslated base.
 
 ## Data model
 
@@ -28,7 +45,7 @@ Polylang stores two things per translatable object:
 
 A translation group is a single term whose description holds a serialised map of
 `lang => object_id`. Both taxonomies must agree. **Writing either one directly is
-the mistake this document exists to prevent** — a group written by hand is
+the mistake this document exists to prevent** — a translation group written by hand is
 routinely asymmetric, and Polylang then reports the page as untranslated while
 the database looks correct.
 
@@ -38,16 +55,16 @@ Always go through the API:
 |---|---|
 | Set a post's language | `pll_set_post_language( $post_id, $lang )` |
 | Join posts as translations | `pll_save_post_translations( [ 'es' => 12, 'en' => 34 ] )` |
-| Read a post's group | `pll_get_post_translations( $post_id )` |
+| Read a post's translation group | `pll_get_post_translations( $post_id )` |
 | Set a term's language | `pll_set_term_language( $term_id, $lang )` |
 | Join terms as translations | `pll_save_term_translations( [ 'es' => 5, 'en' => 9 ] )` |
 | List configured languages | `pll_languages_list()` |
 | Default language | `pll_default_language()` |
 
-`pll_save_post_translations()` **replaces** the whole group rather than merging
+`pll_save_post_translations()` **replaces** the whole translation group rather than merging
 into it — it is not a delta call. Passing only `{source, target}` silently drops
-every other language already in that group, including languages the array
-never mentions. The correct pattern is to read the existing group first with
+every other language already in that translation group, including languages the array
+never mentions. Read the existing translation group first with
 `pll_get_post_translations()`, merge the source and target ids into it, and
 save the merged result:
 
@@ -67,27 +84,62 @@ exception — it merges internally, so it does not need this pattern.
 No `wp pll` command is available, so automation runs through `wp eval-file`:
 
 ```bash
-wp eval-file script.php es en
+$WP eval-file script.php es en
 ```
 
 - Positional arguments arrive as `$args`. `--flags` are **not** available; WP-CLI
   consumes those itself.
-- The file is evaluated as real PHP source, so quoting is not a hazard the way it
-  is with `wp eval "..."`.
+- The file is evaluated as real PHP source, so it carries none of the shell-quoting
+  hazards of a multi-statement `$WP eval "..."`.
 - `__DIR__` resolves to the script's own directory despite the `eval()` wrapper,
   so scripts can `require_once __DIR__ . '/pll-lib.php'`.
 
-Run the bundled scripts rather than writing new ones; `/wp-polylang` drives them in this
-order:
+### The bundled scripts, in order
 
-| Script | Run it to |
-|---|---|
-| `pll-setup.php <source_lang> <target_lang>` | verify Polylang is usable and create a missing language |
-| `pll-export.php <source_lang> <target_lang> <out.json>` | write a manifest of everything missing or stale in the target language |
-| `pll-import.php <translated.json>` | write a translated manifest back through the Polylang API |
-| `pll-verify.php <source_lang> <target_lang>` | audit the translated site |
+Run them rather than writing new ones. `SCRIPTS` is
+`${CLAUDE_PLUGIN_ROOT}/skills/wp-polylang/scripts`; `/wp-polylang` drives them in this order.
+Every script exits `0` on success and `1` on failure, printing the reason on stderr as
+`[x] …`. Exit 1 means stop and read stderr; there is no other code. Besides the causes in the
+table, each exits 1 on a missing argument (it prints its usage line) and on Polylang being
+inactive, and steps 2, 4 and 5 on a language Polylang has not configured — run step 1 first.
+
+| # | Run | What it does | Needs | Exit 1 means |
+|---|---|---|---|---|
+| 1 | `$WP eval-file "$SCRIPTS/pll-setup.php" <source> <target>` | Verifies Polylang is usable and creates a missing language with a sane locale (`en_US`, `es_ES`, not Polylang's first match) | Polylang active | Polylang inactive, an unrecognised code, or source = target |
+| 2 | `$WP eval-file "$SCRIPTS/pll-export.php" <source> <target> <out.json>` | Writes a manifest of everything missing or stale in the target language, and warns about objects with no language | Polylang active | The manifest could not be encoded or written |
+| 3 | — | Translate the manifest's values (`/wp-polylang` Step 5 holds the rules) | | |
+| 4 | `$WP eval-file "$SCRIPTS/pll-import.php" <translated.json>` | Validates the whole file before the first write, then writes it through the Polylang API, fixes parents, and runs the link-rewrite pass | Polylang; ACF or SCF only when the manifest carries `acf` values | A validation error (nothing was written) or a missing plugin |
+| 5 | `$WP eval-file "$SCRIPTS/pll-verify.php" <source> <target>` | Audits the translated site | Polylang active | Any hard failure — including "nothing to audit" |
 
 `pll-lib.php` holds the helpers the others `require`; it is never run on its own.
+
+`pll-import.php` is safe to re-run after any failure: hashes are recorded only after a
+successful write, so a second run resumes where the first stopped and skips everything already
+current. Loop on the verifier:
+
+1. Run `pll-verify.php`. Exit 0 is done.
+2. On exit 1, read every `[x]` line. A failed or partial write: re-run `pll-import.php`. A
+   missing counterpart: export, translate and import again. A link or menu item into the wrong
+   language: re-run `pll-import.php`, whose link-rewrite pass fixes it once the target's
+   counterpart exists.
+3. Re-run `pll-verify.php`, and stop at exit 0.
+
+Warnings do not fail the run, but "no language assigned" ones still need fixing: those objects
+were not audited at all. Assign the source language (below) and run the loop again.
+
+## What the importer does that you might not expect
+
+- Counterparts are created published, mirroring the source's status.
+- **Parents are rewritten on every run.** A counterpart's post or term parent is set to the
+  source parent's counterpart each time, so a page an editor deliberately re-parented in the
+  target language is put back. A child whose parent has no counterpart stays unhashed and is
+  retried on the next run.
+- **Media is not translated.** An image or file id in an ACF field is copied to the counterpart
+  as-is, not swapped for that attachment's own translation.
+- **ACF references are re-pointed and owned per path.** What the link-rewrite pass last wrote
+  into a `link`, `page_link`, `post_object` or `relationship` field is recorded in
+  `_pll_ref_<path>` meta, so an editor's later change to one row is left alone and reported
+  (`references/acf-fields.md`).
 
 ## Menus
 
@@ -99,96 +151,31 @@ $options['nav_menus'][ $theme_slug ][ $location ][ $lang ] = $menu_term_id;
 update_option( 'polylang', $options );
 ```
 
-`combine_location()` (public instance method on `PLL_Nav_Menu`, inherited by
-`PLL_Admin_Nav_Menu`) composes the synthetic `location___lang` key the admin UI
-and the frontend use. It is a naming helper, not a storage API — Polylang reads
-the option path above directly at `src/admin/admin-nav-menu.php:279`.
+**That option is an override, not the assignment.** Polylang's frontend filter only
+substitutes a location it finds already present in the core `nav_menu_locations`
+theme_mod; it never adds one. Written alone, on a location that theme_mod has never had,
+the option leaves the filter nothing to override: `wp_nav_menu()` falls through to its
+fallback markup for every language, the default included — and the default's fallback can
+look identical to its real menu, so nothing looks broken until a second language is
+checked. Register one language's menu the normal way first, with
+`$WP menu location assign <menu> <location>` (which writes the theme_mod), then write the
+per-language override. `pll-import.php` does this on every menu it writes: a location with
+no `nav_menu_locations` entry is seeded with the source-language menu.
 
-**That option is an override, not the assignment.** Polylang's own frontend
-filter only substitutes the value of a location it finds ALREADY present in
-the core `nav_menu_locations` theme_mod — it never adds a location that mod
-does not have. Writing straight into the `polylang` option (the snippet
-above, and nothing else) on a location the theme_mod has never heard of
-leaves the filter with nothing to override: `wp_nav_menu()` falls through to
-its hard-coded fallback markup, and this happens for EVERY configured
-language, including the default one. That is what makes it easy to miss — the
-default language's fallback can look identical to what its real menu would
-have rendered, so nothing looks broken until a second language is checked.
-Make sure at least one language's menu is registered the normal way first —
-`wp menu location assign <menu> <location>`, which does write the theme_mod —
-before or alongside writing the per-language override above. `pll-import.php`
-does this defensively on every menu it writes: if `nav_menu_locations` has no
-entry for the location, it seeds one with the source-language menu.
-
-A translated menu whose items still point at source-language objects is the most
-common Polylang misconfiguration, and it is invisible until a visitor clicks and
-lands in the wrong language. Re-point every item with
-`pll_get_post_translations()`.
-
-A `custom` menu item (a literal href, not an object id + type) is not
-automatically safe just because it is not `post_type` or `taxonomy`: a
-duplicated menu produces exactly this shape, and a `custom` item whose URL
-happens to be one of the site's own permalinks needs re-pointing the same
-way — see "Internal links inside translated content" below, which covers
-this case too.
+A translated menu whose items still point at source-language objects is the most common
+Polylang misconfiguration, and it is invisible until a visitor clicks and lands in the
+wrong language. Re-point every item with `pll_get_post_translations()` — `custom` items
+included, whenever their URL is one of the site's own permalinks.
 
 ## Internal links inside translated content
 
-A source post's content, or an ACF reference field, may link to another
-source-language post by its own permalink. That href is copied verbatim into
-the translated counterpart along with the rest of the content — nothing
-parses it — so after import it still points at the SOURCE-language post: a
-button on the English page sends the visitor back to the Spanish site. This
-is the same defect as an untranslated menu item, in post content instead of
-a menu.
-
-`pll-import.php` closes this with a link-rewrite pass that runs **after
-every post's counterpart exists**, for the same reason the parent-fixup pass
-does: a link's target may gain its own counterpart later than the post
-containing the link, on a run where the linking post itself was skipped by
-hash. The pass therefore runs over **every target-language post with a
-source-language counterpart**, not only the posts (re)written in the current
-run — cheap and idempotent, so this is safe to do unconditionally on every
-import, including a real site's already-translated pages. It applies to:
-
-- same-host `href="..."` attributes inside `post_content`;
-- ACF/SCF `link` (its `url` key — the `title` is translatable text and
-  travels through the manifest instead), `page_link`, `post_object` and
-  `relationship` fields (read from the SOURCE post every run, since these
-  types are never part of the translatable payload — see below — so nothing
-  else ever gives the target a value to begin with);
-- `custom` menu items, whenever their URL resolves to a post.
-
-Rules:
-
-- **Same host only.** Compared by *host*, not by a `home_url()` string
-  prefix — `url_to_postid()` itself tolerates a scheme mismatch (measured:
-  an `https://` href against an `http://` site still resolved), and a
-  literal prefix test would not. A leading `www.` is ignored on both sides,
-  as `url_to_postid()` ignores it. A different host is never touched.
-- **Resolved with `url_to_postid()`.** A zero result means it is not a post
-  URL (an archive, a term, the home page) and is left exactly as it is.
-  A WooCommerce shop page's own permalink does **not** resolve through
-  `url_to_postid()` even with the correct host — a limitation of WordPress's
-  own resolver, not of this pass — so such links are left alone like any
-  other non-post URL.
-- **Re-pointed via `pll_get_post( $id, $target_lang )`.** If it returns
-  nothing, the target has no counterpart yet: the link is left pointed at
-  the source and `pllx_warn()` names both posts. A link into the other
-  language is bad; a broken link is worse.
-- **Query string and fragment are preserved**, and a root-relative href is
-  written back root-relative (`/servicios/?x=1#contacto` keeps both parts).
-  The one exception is the `p`, `page_id` and `attachment_id` arguments that
-  identified the source post: they are dropped, because `url_to_postid()`
-  matches them first and re-appending them would resolve back to the source.
-- Idempotent: every candidate rewrite is compared against the current value
-  first, so a second run over unchanged content writes nothing and
-  `post_content` stays byte-identical.
-
-`pll-verify.php`'s check 9 audits the same condition on `post_content` as a
-**hard failure** — the same severity as its menu-item check, for the same
-reason — and check 1 (menus) now also inspects `custom` items whose URL
-resolves to a post.
+A link in a source post's content or ACF reference fields is copied into the counterpart
+verbatim, so after import it still points at the source-language post. `pll-import.php`'s
+link-rewrite pass re-points same-host links that resolve to a post, in `post_content`, in
+ACF references and in `custom` menu items, on every target-language post on every run;
+`pll-verify.php` fails the site on any it missed. The rules — same host only, resolved with
+`url_to_postid()`, left pointed at the source with a warning when the target has no
+counterpart — are in `references/internal-links.md`.
 
 ## An object with no language does not exist
 
@@ -197,11 +184,12 @@ carrying no `language` term matches none of them. A post, a page, a menu, a
 media item or a **taxonomy term** created without `pll_set_post_language()` /
 `pll_set_term_language()` is present in the database, visible in the admin, and
 absent from the site. There is no warning. Assign a language in the same step
-that creates the object, and sweep afterwards:
+that creates the object, and sweep afterwards.
 
 Sweep both halves. `post_type => "any"` silently skips attachments — they are
 `exclude_from_search` — so the types are listed and filtered instead, and terms
-need their own pass because no post query ever reaches them:
+need their own pass because no post query ever reaches them. `pll-verify.php` counts these
+objects per type; the sweep names each one:
 
 ```bash
 # Posts, pages, menu items and media.
@@ -215,84 +203,19 @@ Both must print nothing. The `pll_is_translated_*` guards keep the sweep quiet
 about types and taxonomies Polylang was never asked to translate, which have no
 language by design.
 
-## Do not translate a taxonomy of proper nouns
+## Taxonomies and rewrite bases
 
-Registering a taxonomy with `pll_get_taxonomies` looks free and is not. Where
-the terms are proper nouns — provinces, countries, brands, venue names — most
-of them are spelled identically in both languages, so translating the taxonomy
-duplicates every term in order to relabel the one or two that differ. Three
-things then go wrong:
+- **Do not translate a taxonomy of proper nouns** (provinces, brands, venues). Duplicating
+  every term to relabel the few that differ forces `-en` slugs into shared URLs, lets an
+  importer adopt the source term as its own counterpart and flip its language, and splits
+  facet counts. Leave such a taxonomy out of `pll_get_taxonomies`, write the reason into
+  `inc/post-types.php`, and add the language prefix to links into it with two filters.
+- **Polylang never translates a rewrite base.** A CPT registered with
+  `'rewrite' => ['slug' => 'lawyers']` answers at `/en/lawyers/`. A translated base takes an
+  extra rewrite rule plus a base swap in every permalink filter, chosen from the URL in hand,
+  never from the current reader.
 
-1. **Slugs.** WordPress forces term slugs to be unique per taxonomy, so the
-   translated copies can only be `matanzas-en`, `holguin-en`. An archive facet
-   writes that slug straight into a URL the visitor shares.
-2. **Import collision.** Because the "translated" name matches its source, an
-   importer adopts the *existing* term as its own counterpart and flips its
-   language — one project lost the province facet from every Spanish archive
-   this way, with 14 terms silently reassigned from `es` to `en`.
-3. **Counts.** A shared taxonomy's `get_terms()` count spans every object type
-   registered to it; per-post-type facet counts must be recomputed.
-
-Leave such a taxonomy **out** of `pll_get_taxonomies` so both languages share
-one clean term list, and write the reason into `inc/post-types.php` — the next
-person will otherwise "fix" the omission.
-
-**Consequence:** a taxonomy left out of `pll_get_taxonomies` gets none of
-Polylang's own URL handling — no language prefix on its rewrite rules, no
-prefix on `term_link()`. That is correct for the archive itself (both
-languages share the one clean term list this section argues for), but every
-OTHER page that links into it still needs those links to carry the current
-language, or a visitor following one switches language mid-click. Closing
-that without duplicating a single term takes two filters: add the taxonomy's
-rule group to the set Polylang prefixes (`pll_rewrite_rules`), and prefix the
-links the theme prints (`term_link`, via
-`PLL()->links_model->add_language_to_link()`). Neither filter touches the
-BASE segment of the URL — see the next section for that, which is a related
-but separate gap.
-
-## Rewrite bases are never translated, even when the taxonomy or CPT is
-
-Free Polylang prefixes a translated post's or term's URL with the language and
-translates its slug, but it never translates the static **rewrite base** — the
-literal path segment from a CPT's or taxonomy's `rewrite => ['slug' => …]`,
-registered once in PHP for every language. A CPT registered with
-`'rewrite' => ['slug' => 'lawyers']` still answers at `/en/lawyers/`, never at
-an actual English base, because there is no per-language slug to translate:
-the base is not stored on any post or term, it is a literal in
-`register_post_type()`/`register_taxonomy()`. There is no setting that fixes
-this; it has to be built.
-
-The pattern is two halves that must stay in step:
-
-1. **Rules, so the translated URL resolves.** Register one extra rewrite rule
-   per base, on top of the generated set, mapping the translated segment to
-   the same query vars the original rule produces. Leave the source-language
-   rules in place — the old URL keeps answering, and a 301 can retire it later
-   without a dead link in the meantime.
-2. **Links, so the theme prints the translated URL.** The rules alone leave
-   two working addresses for one page; every filter that can produce one of
-   these permalinks (`post_type_link`, `post_type_archive_link`, `term_link`,
-   and Polylang's own `pll_translation_url`) has to swap the base too, or the
-   site keeps linking to the untranslated one.
-
-**The base is chosen by the URL already in hand, never by who is reading.**
-Asking "what language is the current visitor in" gets the link a page prints
-about *itself* right and gets every link built *about its other-language
-twin* wrong — the hreflang pair and the language switcher are constructed
-while the reader is still on the source language, and are links INTO the
-target language. Symmetrically, Polylang builds a page's source-language twin
-by stripping the prefix off the URL already in hand, so a translated-base link
-whose swap depended on "current language" would hand Polylang a base that
-exists in no language at all. Decide from the URL's own prefix instead: a URL
-that already carries the language prefix takes the translated base: a URL
-that does not takes the source one.
-
-This composes with, and is independent of, "Do not translate a taxonomy of
-proper nouns" above: a taxonomy deliberately left untranslated still needs its
-prefix added by hand (that section's two filters), and if its base should read
-differently in the second language too, this section's base-swap runs on top
-of that — one layer adds the prefix, the other swaps what comes after it, and
-neither one replaces the other.
+Both patterns, with the filters: `references/taxonomies-and-rewrite-bases.md`.
 
 ## Labels registered in PHP are not translatable strings
 
@@ -322,9 +245,9 @@ crumb through the same `plural_<post_type>` key.
 
 ## What free Polylang covers
 
-Verified on Polylang 3.8.7 with no paid addon: `product` is translatable as a
-post type, and `product_cat`, `product_tag`, `product_brand` and the `pa_*`
-attribute taxonomies are all translatable. Product *content* needs no addon.
+Without a paid addon, `product` is translatable as a post type, and `product_cat`,
+`product_tag`, `product_brand` and the `pa_*` attribute taxonomies are all translatable.
+Product *content* needs no addon.
 
 What does need the paid Polylang for WooCommerce addon is the runtime plumbing —
 per-language cart, checkout and account page mapping, product variations, WC
@@ -332,118 +255,13 @@ emails. That is not content and is out of scope for content translation.
 
 ## ACF / SCF custom fields
 
-`pllx_acf_payload()` in `pll-lib.php` flattens a post's custom-field values to a
-dot-notation map (`pllx_acf_walk()`); `pllx_acf_write()` in `pll-lib.php`
-writes that map back through `update_field()`/`get_field()`. Both work against
-whatever plugin defines `get_field_objects()`, `get_field()` and
-`update_field()` — that is ACF or SCF, never both (see below).
-
-**This covers a post's own fields. A taxonomy TERM'S fields are a separate
-surface Polylang's own APIs never reach.** `pll_save_term_translations()`
-joins two terms into a translation group the same way
-`pll_save_post_translations()` joins posts, but nothing about that call
-copies or translates a single custom-field value — there is no post-meta
-duplication to lean on the way there almost is for posts, because term data
-never lived in post meta to begin with. A repeater or a plain text field
-attached to a term is invisible to the group-joining call entirely. ACF/SCF
-accept the string `"<taxonomy>_<term_id>"` everywhere a post id is otherwise
-expected (`get_field_objects()`, `get_field()`, `update_field()`), so this
-plugin's import walks and writes a term's fields through the identical
-`pllx_acf_walk()` / `pllx_acf_write()` machinery described below, just with
-that string in place of a post id, and copies its non-text fields with a
-term-meta counterpart of `pllx_acf_copy_untranslated()`. **Ceiling:**
-reference types (`link`, `page_link`, `post_object`, `relationship`) on a
-term are copied to no counterpart at all — the repoint pass below is written
-against `post_content` and post ids throughout and does not have a term
-equivalent yet.
-
-**Translated** (the value is walked, sent through translation, written back):
-
-| Field type | Key shape |
-|---|---|
-| `text`, `textarea`, `wysiwyg` | `name` |
-| `group` | `group_name.sub_name` |
-| `repeater` | `repeater_name.ROW_INDEX.sub_name` |
-| `flexible_content` | `flex_name.ROW_INDEX.sub_name` |
-| `link` (title only) | `link_name.title` |
-
-Containers are walked to any depth: a `group` inside a `repeater` row, a
-`repeater` inside a flexible-content layout, and so on, each level adding its
-own segment (`sections.0.cta.label`). A flexible-content row's sub-fields are
-matched by layout **name**. The writer resolves a dotted path by the field
-structure, not by counting dots, and refuses a path that does not match it
-rather than writing to a guessed location.
-
-A `flexible_content` row's own `acf_fc_layout` tag is never emitted as a
-translatable key — it is a machine identifier, not text — but the importer
-still needs it to write a valid row. A row the target already has keeps its
-existing tag untouched by the read-modify-write; a row being created for the
-first time (a brand-new translation counterpart) gets it backfilled from the
-corresponding row on the *source* post, since that's the only other place
-that still identifies the row's layout. Without this, a fresh flexible-content
-row written through the same dot-notation path as a repeater row is invalid
-and SCF/ACF silently drops the whole field.
-
-**Copied, never translated** (present in the field group, absent from the
-dot-notation map): `image`, `number`, `true_false`, `url`, and any other type
-not listed above. `pllx_acf_copy_untranslated()` in `pll-import.php` copies
-their stored rows onto the counterpart verbatim — and only when the
-counterpart has never had that field set, so an editor's later change is never
-undone. An `image` or `file` id is copied as-is, not swapped for that
-attachment's own translation.
-
-**Re-pointed, not translated** (never walked into the manifest at all; fixed
-up directly on the target post by the link-rewrite pass in `pll-import.php`
-— see "Internal links inside translated content" above): `link`'s `url` key,
-`page_link` (a permalink string, not an id — measured; see below), and
-`post_object` / `relationship` (ids, given `return_format => 'id'` — see
-below). `pllx_repoint_acf_refs()` reads these from the SOURCE post on every
-run, resolves each reference through `pll_get_post()`, and writes the
-target-language equivalent onto the target post, since nothing else ever
-gives the target a value for these types to begin with.
-
-With `return_format` left at its default, `page_link` returns a permalink
-**string**, never an id, and is not configurable to return one.
-`post_object` and `relationship` are expected with `return_format => 'id'`;
-`pllx_acf_ref_id()` in `pll-lib.php` also accepts the
-`return_format => 'object'` shape (`WP_Post`/array with `ID`).
-
-**A plain `url` field stays a negative control, deliberately.** An ACF `url`
-field that happens to hold an internal link is **not** re-pointed by this
-pass, even though a `link` or `page_link` field holding the identical value
-would be. The reasoning: `url`, `image`, `number` and `true_false` are all
-generic scalar types with no reference semantics ACF itself is aware of —
-treating "the string looks like this site's URL" as a signal would mean
-guessing intent from content rather than from the field's declared type,
-and would make a project's actual "do not touch this URL" field
-unpredictably mutable depending on what a translator happens to paste into
-it. `link`,
-`page_link`, `post_object` and `relationship` are unambiguous because ACF
-itself defines them as references; `url` is not, so it is left alone like
-any other scalar. If a project needs a plain `url` field re-pointed, model
-it as `link` or `page_link` instead.
-
-**`clone` fields are deliberately never walked as their own type.** With the
-default *seamless* display, a clone's sub-fields surface as ordinary siblings
-under their own names in `get_field_objects()` and are already covered by the
-branches above — walking `clone` too would re-emit the same value under a
-second key. With *group* display, `get_field_objects()` returns the clone as
-a **second** object (type `clone`) whose value duplicates the original
-field's, backed by the same underlying meta; walking that would emit the same
-text twice under two different dotted keys, and writing both back
-independently risks the second write clobbering the first with a different
-translation. Adding a `clone` branch would open exactly that "translate the
-same thing twice and let the last write win" defect.
-
-Verified against **Secure Custom Fields (SCF) 6.9.5** — the free,
-wordpress.org fork that ships `repeater`, `group`, `flexible_content` and
-`clone`, which ACF sells as PRO. ACF's free tier has none of those four types
-and exposes the rest of this surface (`text`, `textarea`, `wysiwyg`, plain
-`group`, plain `repeater`) through the identical API, so passing against SCF
-implies passing against ACF free. ACF PRO was not available to test against
-(no licence). **ACF and SCF cannot both be active** — both define
-`get_field()`, `get_field_objects()` and `update_field()`, and activating the
-second one over the first fatals the site. Install exactly one.
+The scripts carry a post's and a term's custom fields to the counterpart. Text types
+(`text`, `textarea`, `wysiwyg`, a `link`'s title) are walked to any depth through `group`,
+`repeater` and `flexible_content`, translated and written back by dotted path; other types
+are copied once, only to a counterpart that never had the field; reference types are
+re-pointed to the target language. A term's own fields are a separate surface that
+`pll_save_term_translations()` never touches. Use SCF, the scaffold default; never activate
+ACF and SCF together. The full rules: `references/acf-fields.md`.
 
 ## Strings
 
@@ -473,17 +291,10 @@ a while) keeps every one of its existing objects with **no language assigned
 at all**. `pll_get_post_language()` / `pll_get_term_language()` return `false`
 for them, not the default language.
 
-This matters for automation: a query filtered by `'lang' => $source` silently
-excludes objects with no language — they never enter the result set, so
-nothing downstream can see, count, or warn about them. Verified live on
-Polylang 3.8.7: a WooCommerce catalogue (7 products, 9 `product_cat` terms)
-enabled after initial activation had zero objects assigned any language,
-while `post`/`page`/`attachment`/`category` — all present at activation —
-were fully tagged. Anything that walks a site to find translatable content
-must query without a `lang` filter, classify each object's language itself,
-and count and report what has none — never assume "activated" means
-"assigned everywhere."
-
-On a site being retrofitted, the work is therefore not just creating
-counterparts and joining them into groups — it may also require assigning a
-source language to content Polylang never touched in the first place.
+A query filtered by `'lang' => $source` silently excludes those objects — they never enter
+the result set, so nothing downstream can see, count, or warn about them. A WooCommerce
+catalogue enabled after activation can have no product and no category with a language while
+`post`, `page`, `attachment` and `category` are fully tagged. Anything that walks a site to
+find translatable content must query without a `lang` filter, classify each object's
+language itself, and count and report what has none. On a retrofit the work therefore
+includes assigning a source language to content Polylang never touched.

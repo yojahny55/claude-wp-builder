@@ -5,38 +5,16 @@ Copyable commands for the rules in `wp-cli-patterns`. Every command is written w
 
 ## Contents
 
-- WP-CLI command reference and useful flags
+- Useful flags
 - ACF field seeding — `update_field()` via `wp eval`, direct `wp_options` rows, cache flush
 - Seeding bilingual content
 - Pages and front page, menus, media
+- Rewriting a URL across the database
 - Verifying a seed run, and final cleanup
 
 ---
 
-## WP-CLI Command Reference
-
-All 16 domains agents should know. Every command below is prefixed with `$WP` in practice.
-
-| Domain | Commands |
-|--------|----------|
-| Database | `wp db create`, `wp db import`, `wp db export`, `wp db check`, `wp db query` |
-| Content | `wp post create`, `wp post update`, `wp post delete`, `wp post meta update` |
-| Media | `wp media import <url>`, `wp media regenerate` |
-| Options | `wp option get`, `wp option update`, `wp option delete` |
-| Menus | `wp menu create`, `wp menu item add-post`, `wp menu item add-custom`, `wp menu location assign` |
-| Plugins | `wp plugin install`, `wp plugin activate`, `wp plugin deactivate`, `wp plugin list` |
-| Theme | `wp theme activate`, `wp theme list` |
-| Config | `wp config set`, `wp config get`, `wp config list` |
-| Rewrite | `wp rewrite structure`, `wp rewrite flush` |
-| Cache | `wp cache flush`, `wp transient delete --all` |
-| Cron | `wp cron event list`, `wp cron event run` |
-| Search | `wp search-replace 'old' 'new'` |
-| Scaffold | `wp scaffold child-theme`, `wp scaffold plugin` |
-| Export/Import | `wp export`, `wp import` |
-| User | `wp user create`, `wp user update` |
-| Eval | `wp eval 'php_code();'` |
-
-### Useful Flags
+## Useful Flags
 
 - `--porcelain` — return only the ID (useful for capturing post/attachment IDs)
 - `--format=json` — machine-readable output for parsing
@@ -182,6 +160,23 @@ create — and leave the other languages' menus to `/wp-polylang`'s import. Neve
 ID=$($WP media import 'https://example.com/photo.jpg' --title='Hero Image' --porcelain)
 $WP eval "update_field('hero_image', $ID, 'option');"
 ```
+
+### Rewrite a URL Across the Database
+
+`wp search-replace` rewrites every matching value in place, serialized arrays included, and
+there is no undo but a backup. Run exactly this sequence:
+
+```bash
+$WP db export before-search-replace.sql
+$WP search-replace 'https://old.example' 'https://new.example' --all-tables-with-prefix --skip-columns=guid --report-changed-only --dry-run
+# read the per-table counts; a table you did not expect is a reason to stop
+$WP search-replace 'https://old.example' 'https://new.example' --all-tables-with-prefix --skip-columns=guid --report-changed-only
+$WP cache flush
+```
+
+`--skip-columns=guid` because a `guid` is a historical identifier, not a URL, and feed readers
+key on it. Include the scheme in both strings, so `old.example` inside an unrelated word or
+path is not rewritten.
 
 ### Verify Operations
 
