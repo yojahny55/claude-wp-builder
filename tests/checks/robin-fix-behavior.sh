@@ -18,6 +18,10 @@
 #      refused write read as applied.
 #   6. The GD converter was inline PHP using `match`, a parse error before PHP 8.0, and had no
 #      GIF branch although GIF is an allowed format.
+#   7. Reading double-quoted defines stopped every value at either quote, so a single-quoted
+#      password holding `"` (or a double-quoted user holding `'`) reached the client cut short.
+#   8. With cwebp chosen, every GIF went to gif2webp whether or not it was installed, and
+#      each one failed as a bare "conversion failed".
 set -uo pipefail
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
 fail() { echo "FAIL: $*"; exit 1; }
@@ -50,26 +54,31 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
 # A PATH holding only what the script needs, and no `mariadb`: the queries must reach the
-# fake `mysql`, which logs them, refuses every settings write and reports no queue table.
+# fake `mysql`, which logs them with the password it was handed, refuses every settings
+# write and reports no queue table. With ROBIN_QUEUE=1 the table exists, and ROBIN_GAP and
+# ROBIN_META answer step 5 with one attachment (#7) that has no webp row.
 mkdir -p "$tmp/bin" "$tmp/t"
 for t in bash env grep sed awk sort tr wc head dirname basename mktemp rm date stat sha256sum id cat php; do
   p=$(command -v "$t") && ln -s "$p" "$tmp/bin/$t"
 done
 cat > "$tmp/bin/mysql" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$ROBIN_LOG"
+printf '%s pwd=%s\n' "$*" "${MYSQL_PWD-}" >> "$ROBIN_LOG"
 case "$*" in
   *"INSERT INTO "*options*) exit 1 ;;
-  *information_schema*) echo 0 ;;
+  *information_schema*) echo "${ROBIN_QUEUE:-0}" ;;
+  *"w.item_type = 'webp'"*) [ -z "${ROBIN_GAP:-}" ] || printf '7\t%s\t0\n' "$ROBIN_GAP" ;;
+  *"meta_key='_wp_attachment_metadata' LIMIT 1"*) printf '%s\n' "${ROBIN_META:-}" ;;
 esac
 exit 0
 SH
 printf '#!/usr/bin/env bash\nexit 1\n' > "$tmp/bin/wp"
-# A 404: the page is written when -f is absent, which is what curl does.
+# A 404: the page is written when -f is absent, which is what curl does. -f counts as a
+# short option or inside a cluster of them (-fsSL), never inside a long one (--form).
 cat > "$tmp/bin/curl" <<'SH'
 #!/usr/bin/env bash
 out=""; f=0
-while [ $# -gt 0 ]; do case "$1" in -o) out=$2; shift ;; -*f*) f=1 ;; esac; shift; done
+while [ $# -gt 0 ]; do case "$1" in -o) out=$2; shift ;; --fail|-f*|-[!-]*f*) f=1 ;; esac; shift; done
 [ "$f" = 1 ] && { echo "curl: (22) The requested URL returned error: 404" >&2; exit 22; }
 echo "404 Not Found" > "$out"
 SH
@@ -87,14 +96,15 @@ out=$(run "$tmp/nowhere"); rc=$?
 [ "$rc" -eq 1 ] && grep -q 'Could not find WordPress root' <<<"$out" \
   || fail "with no WordPress root the script exits $rc without saying why: $out"
 
-# A root whose wp-config.php uses double quotes, a non-default prefix and a port.
+# A root whose wp-config.php uses double quotes, a non-default prefix and a port, and whose
+# user and password each hold the quote the other style opens with.
 wp="$tmp/site"
 mkdir -p "$wp/wp-content/plugins" "$wp/wp-content/uploads"
 cat > "$wp/wp-config.php" <<'PHP'
 <?php
 define( "DB_NAME", "dqdb" );
-define( "DB_USER", "dquser" );
-define( "DB_PASSWORD", "" );
+define( "DB_USER", "dq'user" );
+define( 'DB_PASSWORD', 'p"w' );
 define( "DB_HOST", "127.0.0.1:3307" );
 $table_prefix = "abc_";
 PHP
@@ -118,7 +128,8 @@ grep -q 'abc_rio_process_queue does not exist' <<<"$out" || fail "the table pref
 [ -s "$tmp/log" ] || fail "no query reached the mysql client when mariadb is absent"
 grep -q 'abc_options' "$tmp/log" || fail "settings were written to a table without the site's prefix"
 grep -q -- '-h 127.0.0.1 --port=3307 dqdb' "$tmp/log" || fail "DB_HOST's port or the double-quoted DB_NAME did not reach the client: $(head -1 "$tmp/log")"
-grep -q 'dquser' "$tmp/log" || fail "the double-quoted DB_USER did not reach the client"
+grep -qF -- "-u dq'user -h" "$tmp/log" || fail "the double-quoted DB_USER holding a ' did not reach the client whole"
+grep -q 'pwd=p"w$' "$tmp/log" || fail "the single-quoted DB_PASSWORD holding a \" did not reach the client whole"
 
 # 6. The GD converter on all three formats, where this PHP can test it.
 if php -r 'exit(function_exists("imagewebp") && function_exists("imagegif") ? 0 : 1);'; then
@@ -131,6 +142,27 @@ if php -r 'exit(function_exists("imagewebp") && function_exists("imagegif") ? 0 
   ! php "$gd" "$tmp/bad.png" "$tmp/bad.webp" 82 || fail "$gd reported success on a file that is not an image"
 else
   echo "note: this PHP has no GD WebP support; the converter itself was not run"
+fi
+
+# 8. cwebp without gif2webp, and a queue with one GIF attachment missing its webp. The fake
+# cwebp fails on everything, as the real one does on a GIF.
+printf '#!/usr/bin/env bash\nexit 1\n' > "$tmp/bin/cwebp"
+chmod +x "$tmp/bin/cwebp"
+mkdir -p "$wp/wp-content/uploads/2026/10"
+gif="$wp/wp-content/uploads/2026/10/a.gif"
+php -r '$i = imagecreatetruecolor(8, 8); imagegif($i, $argv[1]);' "$gif" 2>/dev/null || printf 'GIF89a' > "$gif"
+meta=$(php -r 'echo serialize(array("file" => "2026/10/a.gif"));')
+gap=$(php -r 'echo base64_encode($argv[1]);' "$meta")
+out=$(run "$tmp" WP_ROOT="$wp" ROBIN_QUEUE=1 ROBIN_META="$meta" ROBIN_GAP="$gap"); rc=$?
+grep -q 'WebP converter: cwebp' <<<"$out" || fail "the fake cwebp was not chosen, so the GIF path was not exercised: $out"
+if php -r 'exit(function_exists("imagewebp") ? 0 : 1);'; then
+  [ "$rc" -eq 0 ] || fail "the GIF sync run exited $rc: $out"
+  grep -q 'GIF converter: gd' <<<"$out" || fail "cwebp without gif2webp did not hand GIFs to GD: $out"
+  [ "$(head -c 4 "$gif.webp" 2>/dev/null)" = RIFF ] || fail "the GIF got no .webp from GD when gif2webp is absent: $out"
+  grep -q '#7: 1 webp entries synced' <<<"$out" || fail "the converted GIF was not synced: $out"
+else
+  grep -q 'GIF attachments will get no .webp file' <<<"$out" \
+    || fail "cwebp without gif2webp or GD did not say that GIFs get no .webp: $out"
 fi
 
 echo PASS

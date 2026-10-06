@@ -21,8 +21,8 @@ for f in "$skill" "$ref" "$rm_agent" "$fixer"; do [ -r "$f" ] || fail "$f is mis
 
 # No physical llms.txt or robots.txt is written from the SEO side.
 for f in "$skill" "$ref" "$rm_agent"; do
-  grep -Fq "file_put_contents(ABSPATH . 'llms.txt'" "$f" && fail "$f writes a physical llms.txt, which shadows the GEO route (GEO-A26)"
-  grep -Fq "file_put_contents(ABSPATH . 'robots.txt'" "$f" && fail "$f writes robots.txt, which wp-agentic-surfaces Step 4 owns"
+  grep -Eq "file_put_contents\([[:space:]]*ABSPATH[[:space:]]*\.[[:space:]]*'llms\.txt'" "$f" && fail "$f writes a physical llms.txt, which shadows the GEO route (GEO-A26)"
+  grep -Eq "file_put_contents\([[:space:]]*ABSPATH[[:space:]]*\.[[:space:]]*'robots\.txt'" "$f" && fail "$f writes robots.txt, which wp-agentic-surfaces Step 4 owns"
 done
 grep -Fq 'Never write a physical `llms.txt`' "$ref" || fail "$ref does not forbid a physical llms.txt"
 grep -Fq "Never write a physical \`ABSPATH . 'llms.txt'\`" "$rm_agent" \

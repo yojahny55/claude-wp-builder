@@ -329,5 +329,5 @@ add_action('init', '__starter___get_current_lang');
  * request of a suffix site, ?lang=es included (WCAG 3.1.1).
  */
 add_filter('language_attributes', function ($output) {
-    return preg_replace('/lang="[^"]*"/', 'lang="' . esc_attr(__starter___get_current_lang()) . '"', $output);
+    return (string) preg_replace('/lang="[^"]*"/', 'lang="' . esc_attr(__starter___get_current_lang()) . '"', $output);
 });

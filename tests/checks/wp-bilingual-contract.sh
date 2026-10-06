@@ -14,7 +14,8 @@ fail() { echo "FAIL: $*"; exit 1; }
 s=skills/wp-bilingual/SKILL.md
 tw=starter-theme/__tailwind__/inc/i18n.php
 ci=starter-theme/__cinematic__/inc/i18n.php
-for f in "$s" "$tw" "$ci"; do [ -f "$f" ] || fail "$f is missing"; done
+harness=tests/checks/lib/suffix-i18n-behavior.php
+for f in "$s" "$tw" "$ci" "$harness"; do [ -f "$f" ] || fail "$f is missing"; done
 skill_md=$(find skills/wp-bilingual -name '*.md' | sort)
 flat=$(tr '\n' ' ' < "$s" | sed 's/  */ /g')
 
@@ -61,7 +62,7 @@ if ! command -v php >/dev/null 2>&1; then
   echo "SKIP: php not found — the greps above passed, the starter behaviour was not run"
 else
   for which in tailwind cinematic; do
-    out=$(php tests/checks/lib/suffix-i18n-behavior.php "$which" 2>&1) \
+    out=$(php -d pcre.jit=0 "$harness" "$which" 2>&1) \
       || { printf '%s\n' "$out" | sed 's/^/  /'; fail "the $which starter's inc/i18n.php does not set <html lang> or the cookie as the skill says"; }
   done
   # The cinematic starter read its cookie and never set it, so a ?lang= switch lasted one
