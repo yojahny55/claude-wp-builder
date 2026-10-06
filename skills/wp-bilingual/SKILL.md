@@ -31,8 +31,8 @@ not define is a fatal error on the page.
 
 | `Template:` | Helpers in `inc/i18n.php` | Source |
 |---|---|---|
-| `tailwind` (and legacy `basic`) | `prefix_get_current_lang()`, `prefix_get_field()`, `prefix_get_repeater()`, `prefix_get_sub_field()`, `prefix_t()`, `prefix_e()`, `prefix_is_lang()`, `prefix_get_translations()`, `prefix_get_lang_url()` | `${CLAUDE_PLUGIN_ROOT}/starter-theme/__tailwind__/inc/i18n.php` |
-| `cinematic` | `prefix_current_lang()`, `prefix_b( $en, $es )`, `prefix_setting( $name )` — plus `prefix_get_sub( $name )` in `inc/scenes-renderer.php` for scene sub-fields | `${CLAUDE_PLUGIN_ROOT}/starter-theme/__cinematic__/inc/i18n.php` |
+| `tailwind` (and legacy `basic`) | `prefix_get_current_lang()`, `prefix_get_field()`, `prefix_get_repeater()`, `prefix_get_sub_field()`, `prefix_t()`, `prefix_e()`, `prefix_is_lang()`, `prefix_get_translations()`, `prefix_get_lang_url()`, `prefix_nav_location()` | `${CLAUDE_PLUGIN_ROOT}/starter-theme/__tailwind__/inc/i18n.php` |
+| `cinematic` | `prefix_current_lang()`, `prefix_b( $en, $es )`, `prefix_setting( $name )`, `prefix_nav_location( $location )` — plus `prefix_get_sub( $name )` in `inc/scenes-renderer.php` for scene sub-fields | `${CLAUDE_PLUGIN_ROOT}/starter-theme/__cinematic__/inc/i18n.php` |
 
 Everything from "Translation Helper Functions" down describes the `tailwind` contract. On
 `cinematic`, a literal is `prefix_b( 'English', 'Español' )` (it allows `br`, `em`, `strong`,
@@ -232,8 +232,6 @@ function prefix_setup() {
     register_nav_menus(array(
         'primary-en' => __('Primary Navigation (EN)', 'theme-slug'),
         'primary-es' => __('Primary Navigation (ES)', 'theme-slug'),
-        'mobile-en'  => __('Mobile Navigation (EN)', 'theme-slug'),
-        'mobile-es'  => __('Mobile Navigation (ES)', 'theme-slug'),
         'footer-en'  => __('Footer Navigation (EN)', 'theme-slug'),
         'footer-es'  => __('Footer Navigation (ES)', 'theme-slug'),
     ));
@@ -243,23 +241,26 @@ add_action('after_setup_theme', 'prefix_setup');
 
 ### Usage in Templates
 
-Select the menu location dynamically based on the current language.
+Ask `prefix_nav_location()` for the location; never build the name in the template. Both
+starters define it in `inc/i18n.php`: here it returns `<location>-<current lang>`, and the
+Polylang variant returns the bare `<location>` that model registers instead — so a template
+that calls it renders a menu on either strategy, and one that concatenates `'primary-' .` by
+hand renders nothing once the project is on Polylang.
 
 ```php
 <?php
-$lang = prefix_get_current_lang();
-
 wp_nav_menu(array(
-    'theme_location' => 'primary-' . $lang,
+    'theme_location' => prefix_nav_location('primary'),
     'container'      => false,
-    'fallback_cb'    => 'prefix_nav_fallback',
+    'fallback_cb'    => false,
     'items_wrap'     => '%3$s',
     'walker'         => new Prefix_Nav_Walker(),
 ));
 ?>
 ```
 
-The pattern is: `<location>-<lang>` (e.g., `primary-en`, `primary-es`, `mobile-en`, `mobile-es`).
+The pattern is: `<location>-<lang>` with a **hyphen** (e.g., `primary-en`, `primary-es`,
+`footer-en`, `footer-es`). An underscore spelling is registered by neither starter.
 
 ---
 
@@ -335,6 +336,6 @@ table at the top of this skill.
 - [ ] `prefix_t()` / `prefix_e()` used for all static UI strings
 - [ ] All secondary ACF fields have the `_<lang>` suffix and an instruction written in the primary language (see Rules)
 - [ ] Tab organization per language in ACF field groups
-- [ ] Menu locations registered per language: `<location>-<lang>`
+- [ ] Menu locations registered per language: `<location>-<lang>`, and every template asks for one through `prefix_nav_location()`
 - [ ] Language switcher uses `remove_query_arg` / `add_query_arg`
 - [ ] HTML `lang` attribute follows the request through the `language_attributes` filter

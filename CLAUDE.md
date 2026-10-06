@@ -193,7 +193,7 @@ whole theme's model with no template changes. The Polylang variants live in
 by `/wp-init`. They are kept OUT of the theme directories on purpose: a starter
 carrying two definitions of the same function fatals the moment anything globs
 `inc/*.php`, and `tests/checks/tailwind-starter.sh` refuses that state. The two
-starters have different contracts (nine helpers vs three), so each variant
+starters have different contracts (ten helpers vs four), so each variant
 mirrors its own, and `tests/checks/wp-polylang.sh` asserts the pairing per
 starter.
 

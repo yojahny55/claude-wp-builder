@@ -19,6 +19,26 @@
 
 ### Fixed
 
+- **Menu locations agree between the commands and the starters, on both i18n strategies.**
+  Both starters register and render `primary-<lang>` / `footer-<lang>`, hyphenated, but
+  `/wp-init` and `/wp-header` told the agent to register `primary_en`, `/wp-seed` assigned
+  menus to `primary_en` / `footer_en` and `/wp-finalize` verified those names, so a suffix
+  site's nav rendered nothing, with HTTP 200 and no notice (`fallback_cb` is `false`).
+  Under `polylang` `/wp-init` registered a bare `primary` while the starter templates still
+  asked for `primary-<lang>`, which left both languages with no nav. Templates now ask
+  `<prefix>nav_location('primary')` in `inc/i18n.php` instead of building the name, and
+  each strategy's file answers for itself (`primary-<lang>` from the suffix helper, the
+  bare name from the Polylang variant). `/wp-init` Step 6 names the cinematic starter's
+  `functions.php`, which has no `inc/theme-setup.php`, and scopes the string registration
+  to `tailwind`, the only starter with `<prefix>get_translations()`. `/wp-header`,
+  `/wp-footer`, `wp-template` and `wp-cinematic` render through the helper, and `/wp-seed`
+  assigns the footer location as well as the primary one on both strategies. The tailwind
+  starter's `mobile-<lang>` locations are gone: nothing rendered them and nothing assigned
+  them, so `/wp-finalize`'s "every registered location has a menu" gate failed on them.
+  `/wp-cinematic-init` pointed at an `inc/seed-menus.php` that no starter ships, and now
+  defers to `/wp-seed` Phase 6. `tests/checks/menu-locations.sh` compares what every
+  starter registers, renders and answers against what each command registers, assigns and
+  verifies, per strategy.
 - **`robin-fix.sh` works on a site with a table prefix other than `wp_`, and stops failing
   silently.** `$table_prefix` was matched with an unescaped `$` — a regex end-of-line anchor
   — so the prefix always read as `wp_` and every query on any other site hit tables that do

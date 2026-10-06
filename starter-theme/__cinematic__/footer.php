@@ -11,7 +11,7 @@ defined('ABSPATH') || exit;
             &copy; <?php echo esc_html((string) gmdate('Y')); ?> <?php bloginfo('name'); ?>
         </p>
         <?php
-        $loc = 'footer-' . __starter___current_lang();
+        $loc = __starter___nav_location('footer'); // footer-<lang>, or bare under Polylang
         if (has_nav_menu($loc)) {
             wp_nav_menu([
                 'theme_location' => $loc,

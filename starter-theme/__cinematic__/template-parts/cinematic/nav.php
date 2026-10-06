@@ -8,7 +8,7 @@
 defined('ABSPATH') || exit;
 
 $lang     = __starter___current_lang();
-$location = 'primary-' . $lang;
+$location = __starter___nav_location('primary'); // primary-<lang>, or bare under Polylang
 $logo     = __starter___setting('site_logo');
 ?>
 <nav class="nav" aria-label="<?php echo esc_attr__('Primary', '__TEXTDOMAIN__'); ?>">

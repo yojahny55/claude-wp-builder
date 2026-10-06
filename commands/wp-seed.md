@@ -609,13 +609,24 @@ Repeat for every additional language configured in the manifest.
 
 ## Phase 6: Create Menus
 
-**Under `i18n strategy: polylang`**, create ONE menu per language and assign
-each to the SAME location — Polylang keeps a per-language slot for every
-registered location, and `theme-setup.php` registers `primary` / `footer`
-without language suffixes. Assign with:
+The location names come from the theme's `register_nav_menus()`, which
+`/wp-init` Step 6 wrote per strategy, and the templates ask for them through
+`<prefix>nav_location()` — so assign to exactly these, never to a name of your
+own (`wp menu location assign` refuses one the theme does not register):
+
+| `i18n strategy` | Locations |
+|---|---|
+| `polylang` | `primary`, `footer` — bare, registered once |
+| `suffix` | `primary-<lang>`, `footer-<lang>` — hyphenated, one pair per language |
+
+**Under `i18n strategy: polylang`**, create ONE primary and ONE footer menu per
+language, and assign every language's menu to the SAME location — Polylang keeps
+a per-language slot for every registered location, and the theme registers
+`primary` / `footer` without language suffixes. Assign each with:
 
 ```bash
 bash -c "$WP eval \"\$o = get_option('polylang'); \$o['nav_menus'][get_stylesheet()]['primary']['<lang>'] = <menu_id>; update_option('polylang', \$o);\""
+bash -c "$WP eval \"\$o = get_option('polylang'); \$o['nav_menus'][get_stylesheet()]['footer']['<lang>'] = <footer_menu_id>; update_option('polylang', \$o);\""
 ```
 
 **That option alone is not enough.** Polylang's frontend filter only
@@ -631,6 +642,7 @@ menu FIRST, so Polylang has something to override:
 
 ```bash
 bash -c "$WP menu location assign 'Primary <PRIMARY_LANG>' primary"
+bash -c "$WP menu location assign 'Footer <PRIMARY_LANG>' footer"
 ```
 
 Then write the per-language option above for every language, primary
@@ -659,13 +671,13 @@ trace: HTTP 200, no notice, no log line.
 **`$WP eval 'print_r(get_nav_menu_locations());'` will tell you it is fine.** It
 returns the core `nav_menu_locations` theme_mod, and Polylang's filter that *replaces*
 that map with its own per-language one is a **frontend** filter — it does not run
-under WP-CLI. So the CLI prints `primary => 15, mobile => 16, footer => 17`, all
+under WP-CLI. So the CLI prints `primary => 15, footer => 17`, all
 correct, on a site serving no navigation at all. Every CLI-based check of this will
 pass on a broken site; only an HTTP request sees what a visitor sees.
 
 Everything below this line describes the `suffix` strategy.
 
-Create navigation menus for each configured language. Menu location names use **underscore-separated** format matching `theme-setup.php` `register_nav_menus()`.
+Create navigation menus for each configured language. Menu location names are **hyphenated** — `primary-<lang>`, `footer-<lang>` — matching the theme's `register_nav_menus()` and the name the suffix `<prefix>nav_location()` asks for. An underscore spelling of these is registered by neither starter: `wp menu location assign` refuses it, and the header renders no menu.
 
 ### Create menu structures
 
@@ -685,7 +697,8 @@ Create only the missing ones:
 bash -c "$WP menu create 'Primary EN'"
 bash -c "$WP menu create 'Primary ES'"
 
-# Optionally create footer menus
+# Footer menus: the theme registers a footer location per language, and
+# /wp-finalize fails any registered location left without a menu
 bash -c "$WP menu create 'Footer EN'"
 bash -c "$WP menu create 'Footer ES'"
 ```
@@ -699,7 +712,9 @@ That is the same ownership rule, applied to a record whose identity is its posit
 
 ### Add menu items
 
-Add each page to its language menu, using the page IDs from Phase 2:
+Add each page to its language menu, using the page IDs from Phase 2. The first argument
+is the **menu** (`primary-en` is the slug WordPress derives from `Primary EN`), not the
+location; add the demo footer's links to `footer-en` / `footer-es` the same way:
 
 ```bash
 # English primary menu
@@ -717,14 +732,14 @@ bash -c "$WP menu item add-post primary-es <contact_id> --title='Contacto'"
 
 ### Assign menus to theme locations
 
-Use underscore-separated location names that match `register_nav_menus()` in the theme:
+Use the hyphenated location names `register_nav_menus()` registers in the theme:
 
 ```bash
-# Assign to theme locations (underscore-separated names)
-bash -c "$WP menu location assign 'Primary EN' primary_en"
-bash -c "$WP menu location assign 'Primary ES' primary_es"
-bash -c "$WP menu location assign 'Footer EN' footer_en"
-bash -c "$WP menu location assign 'Footer ES' footer_es"
+# Assign to theme locations (hyphenated, one pair per language)
+bash -c "$WP menu location assign 'Primary EN' primary-en"
+bash -c "$WP menu location assign 'Primary ES' primary-es"
+bash -c "$WP menu location assign 'Footer EN' footer-en"
+bash -c "$WP menu location assign 'Footer ES' footer-es"
 ```
 
 ### Verify menu assignment
@@ -868,7 +883,7 @@ Media imported:    12 of 14 succeeded
 ACF fields seeded: 23 fields (primary: en)
 Bilingual fields:  23 fields (es)
 Menus created:     Primary EN, Primary ES, Footer EN, Footer ES
-Menu locations:    primary_en, primary_es, footer_en, footer_es
+Menu locations:    primary-en, primary-es, footer-en, footer-es   (polylang: primary, footer)
 Timezone:          America/New_York
 Default content:   Deleted
 

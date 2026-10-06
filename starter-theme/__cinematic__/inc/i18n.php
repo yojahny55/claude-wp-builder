@@ -53,6 +53,16 @@ function __starter___setting(string $name): string {
 }
 
 /**
+ * Menu location for the current language: functions.php registers one per
+ * language (primary-en, footer-es, ...). The Polylang variant returns the bare
+ * name, which is all that model registers, so templates call this instead of
+ * building the name and swapping this file switches both.
+ */
+function __starter___nav_location(string $location): string {
+    return $location . '-' . __starter___current_lang();
+}
+
+/**
  * <html lang> follows the request, not the site locale. header.php prints
  * language_attributes(), which reads the locale: English on every request,
  * ?lang=es included (WCAG 3.1.1).

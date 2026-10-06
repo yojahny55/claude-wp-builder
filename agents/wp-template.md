@@ -502,10 +502,12 @@ class Prefix_Nav_Walker extends Walker_Nav_Menu {
 Usage in templates:
 
 ```php
-// The starter registers one location per language (primary-en, primary-es, …);
-// a bare 'primary' is not registered and renders nothing.
+// The registered name depends on the i18n strategy: primary-en, primary-es, …
+// under suffix, one bare 'primary' under polylang. prefix_nav_location() in
+// inc/i18n.php returns the right one; a name built here renders nothing on
+// the other strategy.
 wp_nav_menu(array(
-    'theme_location' => 'primary-' . prefix_get_current_lang(),
+    'theme_location' => prefix_nav_location('primary'),
     'container'      => 'nav',
     'container_class'=> 'nav',
     'menu_class'     => 'nav__menu',

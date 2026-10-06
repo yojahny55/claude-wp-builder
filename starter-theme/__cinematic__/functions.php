@@ -23,6 +23,9 @@ add_action('after_setup_theme', function () {
 
     load_theme_textdomain('__TEXTDOMAIN__', __STARTER___THEME_DIR . '/languages');
 
+    // One location per language under the suffix model; /wp-init Step 6
+    // rewrites this to one bare location per name under Polylang. Templates
+    // ask through __starter___nav_location(), which answers for either.
     register_nav_menus([
         'primary-en' => __('Primary Navigation (EN)', '__TEXTDOMAIN__'),
         'primary-es' => __('Primary Navigation (ES)', '__TEXTDOMAIN__'),

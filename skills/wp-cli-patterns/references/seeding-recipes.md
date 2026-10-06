@@ -154,8 +154,9 @@ List them rather than guessing (underscore or hyphen, suffixed or bare):
 $WP menu location list --format=csv
 ```
 
-**`suffix`** — one location per language (the tailwind starter registers `primary-en`,
-`primary-es`, `mobile-*` and `footer-*`), one menu per language, each assigned to its own:
+**`suffix`** — one location per language, hyphenated (both starters register `primary-en`,
+`primary-es`, `footer-en` and `footer-es`), one menu per language, each assigned to its own.
+Do the same for the footer menus:
 
 ```bash
 $WP menu create "Primary EN"
