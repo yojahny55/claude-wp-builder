@@ -15,9 +15,9 @@ s=skills/wp-bilingual/SKILL.md
 tw=starter-theme/__tailwind__/inc/i18n.php
 ci=starter-theme/__cinematic__/inc/i18n.php
 for f in "$s" "$tw" "$ci"; do [ -f "$f" ] || fail "$f is missing"; done
-skill_md=$(find skills/wp-bilingual -name '*.md' | sort)
-# Matched on each file flattened to one line, so a phrase wrapped across two lines still matches.
-flat_hit() { local n=$1; shift; local f; for f in "$@"; do tr '\n' ' ' < "$f" | sed 's/  */ /g' | grep -qF -- "$n" && echo "$f"; done; return 0; }
+skill_md=()
+while IFS= read -r md; do skill_md+=("$md"); done < <(find skills/wp-bilingual -name '*.md' | sort)
+. tests/checks/lib/flat-hit.sh
 flat=$(tr '\n' ' ' < "$s" | sed 's/  */ /g')
 
 # --- the helper names are the starters' names, in both directions --------------
@@ -32,7 +32,7 @@ for pair in "$tw:tailwind" "$ci:cinematic"; do
 done
 # ...and the names that drifted are gone from every file of the skill.
 for gone in 'prefix__(' 'prefix_is_spanish' 'prefix_get_js_translations'; do
-  hit=$(flat_hit "$gone" $skill_md)
+  hit=$(flat_hit "$gone" "${skill_md[@]}")
   [ -z "$hit" ] || fail "$hit still names $gone, which no starter defines"
 done
 
@@ -43,7 +43,7 @@ grep -qF 'there is no `prefix_get_field()`' "$s" \
   || fail "$s does not warn that the cinematic starter has no prefix_get_field()"
 
 # --- <html lang>: one attribute, set by a filter the starters ship --------------
-grep -qF 'language_attributes(); ?> lang=' $skill_md \
+grep -qF 'language_attributes(); ?> lang=' "${skill_md[@]}" \
   && fail "the skill still appends a second lang attribute after language_attributes() — the browser keeps the first, the site locale"
 grep -qF "add_filter('language_attributes'" "$s" \
   || fail "$s does not show the language_attributes filter that makes <html lang> follow the request"
@@ -70,7 +70,7 @@ fi
 
 # --- Spanish samples carry their accents -----------------------------------------
 for bad in "Saber Mas'" 'Enlaces Rapidos' 'Politica de Privacidad' 'Terminos y' 'Siguenos' "'Espanol'"; do
-  hit=$(flat_hit "$bad" $skill_md)
+  hit=$(flat_hit "$bad" "${skill_md[@]}")
   [ -z "$hit" ] || fail "$hit ships unaccented Spanish ('$bad')"
 done
 

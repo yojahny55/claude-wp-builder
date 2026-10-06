@@ -239,7 +239,7 @@ tr '\n' ' ' < "$af" | grep -qi "taxonomy TERM's fields are a separate" \
 
 # ── The rules a later edit could drop without anything failing ──────────────
 # Pinned on flattened prose, one substring per rule, so a reflow cannot break them.
-flat_of() { tr '\n' ' ' < "$1" | sed 's/  */ /g'; }
+. tests/checks/lib/flat-hit.sh
 sflat=$(flat_of "$s")
 pin() { # <haystack> <needle> <why>
   case "$1" in *"$2"*) ;; *) echo "FAIL: $3"; exit 1 ;; esac
@@ -266,10 +266,12 @@ pin "$sflat" 'Translating these produces garbage.' \
 pin "$sflat" "get_option('date_format')" \
   "SKILL.md no longer says to exclude the date formats by comparing against the option values"
 # The proper-noun taxonomy and the link rules, in their reference files.
-pin "$(flat_of "$rb")" 'Leave such a taxonomy **out** of `pll_get_taxonomies`' \
+rbflat=$(flat_of "$rb")
+ilflat=$(flat_of "$il")
+pin "$rbflat" 'Leave such a taxonomy **out** of `pll_get_taxonomies`' \
   "$rb no longer says to leave a taxonomy of proper nouns untranslated"
-pin "$(flat_of "$il")" '**Same host only.**' "$il no longer limits the link-rewrite pass to the site's own host"
-pin "$(flat_of "$il")" '**Resolved with `url_to_postid()`.**' "$il no longer says how a link is resolved to a post"
+pin "$ilflat" '**Same host only.**' "$il no longer limits the link-rewrite pass to the site's own host"
+pin "$ilflat" '**Resolved with `url_to_postid()`.**' "$il no longer says how a link is resolved to a post"
 # The scripts: path, exit codes, and the verify loop.
 pin "$sflat" '${CLAUDE_PLUGIN_ROOT}/skills/wp-polylang/scripts' "SKILL.md does not give the scripts' plugin path"
 pin "$sflat" 'exits `0` on success and `1` on failure' "SKILL.md does not state the scripts' exit codes"
@@ -280,11 +282,11 @@ pin "$sflat" 'safe to re-run' "SKILL.md does not say pll-import.php is safe to r
 # It said pllx_acf_ref_id() lived in pll-import.php after the function moved to
 # pll-lib.php. Every "`pllx_x()` in `pll-y.php`" claim is checked against the
 # script that is supposed to define it, so the next move cannot leave one behind.
-# Read flattened, so a claim wrapped across two lines is still a claim.
-skill_md=$(find skills/wp-polylang -name '*.md' | sort)
-# Matched on each file flattened to one line, so a phrase wrapped across two lines still matches.
-flat_hit() { local n=$1; shift; local f; for f in "$@"; do tr '\n' ' ' < "$f" | sed 's/  */ /g' | grep -qF -- "$n" && echo "$f"; done; return 0; }
-claims=$(cat $skill_md | tr '\n' ' ' | sed 's/  */ /g' \
+# Read flattened, so a claim wrapped across two lines is still a claim -- one file per line,
+# so the end of one file and the start of the next cannot join into a claim neither makes.
+skill_md=()
+while IFS= read -r md; do skill_md+=("$md"); done < <(find skills/wp-polylang -name '*.md' | sort)
+claims=$(for md in "${skill_md[@]}"; do flat_of "$md"; echo; done \
   | grep -oE '`pllx_[a-z_]+\(\)` in `pll-[a-z]+\.php`' | sort -u || true)
 [ -n "$claims" ] || { echo "FAIL: the skill names no pllx_ helper by file -- this check would be vacuous"; exit 1; }
 while IFS= read -r claim; do
@@ -298,16 +300,16 @@ done <<<"$claims"
 # existed on a maintainer's own site. A user has neither, so a rule resting on them
 # reads as evidence and leads nowhere.
 for gone in '.superpowers' 'pll-acf-fixture.php' 'this test site' 'Task 8 report'; do
-  hit=$(flat_hit "$gone" $skill_md)
+  hit=$(flat_hit "$gone" "${skill_md[@]}")
   [ -z "$hit" ] || { echo "FAIL: $hit cites '$gone', which no user of the plugin has"; exit 1; }
 done
 
 # Non-text ACF types are copied onto the counterpart (pllx_acf_copy_untranslated), not
 # left "untouched by the importer" as the skill used to say -- an agent believing that
 # copies them by hand, or reads a blank image on a new counterpart as expected.
-hit=$(flat_hit 'untouched by the importer' $skill_md)
+hit=$(flat_hit 'untouched by the importer' "${skill_md[@]}")
 [ -z "$hit" ] || { echo "FAIL: $hit still says untranslated ACF types are untouched by the importer"; exit 1; }
-grep -qF 'pllx_acf_copy_untranslated()' $skill_md \
+grep -qF 'pllx_acf_copy_untranslated()' "${skill_md[@]}" \
   || { echo "FAIL: the skill no longer says pllx_acf_copy_untranslated() copies the untranslated ACF types"; exit 1; }
 grep -q '^function pllx_acf_copy_untranslated(' "$imp" \
   || { echo "FAIL: pll-import.php no longer defines pllx_acf_copy_untranslated(), which the skill documents"; exit 1; }

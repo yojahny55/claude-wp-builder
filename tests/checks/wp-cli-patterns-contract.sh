@@ -17,7 +17,8 @@ fail() { echo "FAIL: $*"; exit 1; }
 s=skills/wp-cli-patterns/SKILL.md
 r=skills/wp-cli-patterns/references/seeding-recipes.md
 for f in "$s" "$r"; do [ -f "$f" ] || fail "$f is missing"; done
-skill_md=$(find skills/wp-cli-patterns -name '*.md' | sort)
+skill_md=()
+while IFS= read -r md; do skill_md+=("$md"); done < <(find skills/wp-cli-patterns -name '*.md' | sort)
 
 # --- field names and menus follow the recorded i18n strategy --------------------
 # Scoped to the section when its heading is there; the whole file otherwise, so a renamed
@@ -30,13 +31,13 @@ case "$sec" in *'An absent line means the project predates the choice and is `su
   fail "$s's bilingual section does not state the absent-line fallback" ;; esac
 grep -qF '`polylang`' "$r" || fail "$r has no polylang branch"
 # Neither starter registers an underscore location; assigning to one is assigning nowhere.
-grep -nE 'location assign .*(primary|footer|mobile)_(en|es)\b' $skill_md \
+grep -nE 'location assign .*(primary|footer|mobile)_(en|es)\b' "${skill_md[@]}" \
   && fail "a wp-cli-patterns recipe assigns a menu to an underscore location no starter registers"
 grep -qF 'menu location list' "$r" \
   || fail "$r does not list the theme's registered locations before assigning one"
 
 # --- a destructive flag is described as what it is ------------------------------
-grep -qF 'skip confirmation prompts (e.g., `wp post delete' $skill_md \
+grep -qF 'skip confirmation prompts (e.g., `wp post delete' "${skill_md[@]}" \
   && fail "wp-cli-patterns still glosses wp post delete --force as a confirmation skip"
 grep -qF 'permanently deletes, bypassing the trash' "$r" \
   || fail "$r does not say --force on wp post delete deletes permanently"
@@ -56,7 +57,7 @@ grep -qF 'Needs ACF or SCF active' "$s" \
   || fail "$s does not say find-orphan-acf-ids.php needs ACF or SCF"
 
 # --- plugin paths resolve -------------------------------------------------------
-grep -nF '<skill>/' $skill_md && fail "wp-cli-patterns still invokes scripts through an unresolvable <skill>/ placeholder"
+grep -nF '<skill>/' "${skill_md[@]}" && fail "wp-cli-patterns still invokes scripts through an unresolvable <skill>/ placeholder"
 grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/scripts' "$s" \
   || fail "$s does not resolve its scripts through \${CLAUDE_PLUGIN_ROOT}"
 grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/SKILL.md' commands/wp-seed.md \
