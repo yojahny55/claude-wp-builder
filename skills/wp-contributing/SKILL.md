@@ -1,6 +1,6 @@
 ---
 name: wp-contributing
-description: Contributing to the claude-wp-builder plugin itself — the four-layer architecture and what may call what, why tests are grep gates over prose, the frontmatter contract per layer, the two i18n systems, and the PR and release rituals. Use when editing this repository's own commands/, agents/, skills/, starter-theme/, bin/ or tests/, not when building a WordPress site with it.
+description: Documents how to change the claude-wp-builder plugin itself — the four-layer architecture (commands, agents, skills, starter-theme) and what may call what, why checks in tests/checks/ are grep gates over prose, the frontmatter contract per layer, the two i18n systems, opening a PR, and what a release rests on. Use when editing this repository's own commands/, agents/, skills/, starter-theme/, bin/ or tests/, when writing a check, opening a PR, cutting a release or editing CHANGELOG.md, BACKLOG.md or the .claude-plugin/ version files, or when running /wp-contribute. Not for building a WordPress site with the plugin, or for testing some other WordPress plugin.
 user-invocable: false
 ---
 
@@ -45,18 +45,23 @@ Calls go **down** only. The rules that follow from that:
   repository's own `CLAUDE.md`. It carries the function prefix, theme slug, languages,
   template and i18n strategy. `prefix_` in any agent or skill doc is a placeholder, never a
   literal.
-- **Plugin-relative paths in commands are always `${CLAUDE_PLUGIN_ROOT}/…`**, never relative.
-  A relative path resolves against the user's project, not the plugin.
+- **Plugin-relative paths in commands, agents and skills are always `${CLAUDE_PLUGIN_ROOT}/…`**,
+  never relative. A relative path resolves against the user's project, not the plugin.
 
-### Tests are grep gates over prose
+### Checks are grep gates over prose
 
-There is no runner and no framework. Each check is a standalone bash script that prints
-`PASS` or exits non-zero:
+There is no runner and no framework. Each check under `tests/checks/` is a standalone bash
+script that prints `PASS` or exits non-zero. Run them from the repo root:
 
 ```bash
 bash tests/checks/wp-yolo-gate.sh               # one check
-for f in tests/checks/*.sh; do bash "$f"; done  # all of them
 ```
+
+The whole set runs with the loop under "Before you open a PR" — never a bare `for` loop,
+whose status is only its last check's. A check that prints `PASS` with a `SKIP` line beside it
+did not run its real half: the browser checks skip without `playwright-core` and a Chromium or
+Firefox build, and run for real with
+`PLAYWRIGHT_CORE="$(npm root -g)/@playwright/test/node_modules/playwright-core"` set.
 
 Because the "code" is instructions to a model, a check asserts that **the contract wording is
 still present** in the command, agent or skill that owns it. That sounds weak and is not: the
@@ -84,7 +89,13 @@ echo PASS
 Three habits that make the difference:
 
 - **Assert both directions.** A positive grep alone is satisfied by deleting the feature.
-  Where a wrong old form existed, assert it is *gone* as well as that the right one is present.
+  Where a wrong old form existed, assert it is *gone* as well as that the right one is present
+  — `tests/checks/wp-contributing.sh` requires the "Use when" clause *and* refuses the
+  `trigger:` key it replaced:
+
+  ```bash
+  ! grep -Eq '^trigger:' "$s" || fail "$s still declares trigger:, a key Claude Code ignores"
+  ```
 - **Anchor on behavior, not headings.** A check that fails when someone renames a heading gets
   muted. Degrade to searching the whole file when the anchor is missing.
 - **Prefer `grep -F`** for text containing backticks, `$`, brackets or `--flags`. A clever
@@ -102,12 +113,16 @@ did. `tests/checks/tailwind-rebuild.sh` does this with a fake `npm` and fake wat
 | `agents/<name>.md` | `name`, `description`, `tools`, `model` | `tools` in the order `Read, Write, Edit, Grep, Glob, Bash`; `model` is a cost tier — `opus` for planning, `sonnet` for authoring and judgment, `haiku` for mechanical work (`tests/checks/model-routing.sh`) |
 | `skills/<name>/SKILL.md` | `name`, `description`, `user-invocable: false` | The description says what the skill does and ends with "Use when …" — it is the only text Claude sees before deciding to load the skill. `trigger:` is not a frontmatter field and is ignored. Body under 500 lines; detail goes in `references/` (`tests/checks/skill-authoring.sh`) |
 
-A file missing its frontmatter is **inert, not broken** — nothing errors, the capability
-simply never loads. That is why `bin/doc-sync-check.sh` asserts it mechanically. Frontmatter
-that does not parse as YAML is the same failure: an unquoted value containing `: ` (or ` #`, or
+A layer file missing its frontmatter is **inert, not broken** — nothing errors, it simply
+never loads. That is why `bin/doc-sync-check.sh` asserts it mechanically. Frontmatter that
+does not parse as YAML is the same failure: an unquoted value containing `: ` (or ` #`, or
 starting with a backtick) breaks the block, and Claude Code then loads the skill with **no
-fields set** — no description, and `user-invocable` back at its default of true. Rephrase, or
-quote the value; `tests/checks/frontmatter-yaml.sh` fails on it in every layer.
+fields set** — no description, and `user-invocable` back at its default of true. Quote the
+value; `tests/checks/frontmatter-yaml.sh` fails on it in every layer.
+
+Read `references/skill-review.md` when creating, changing or reviewing a skill: it is the
+checklist `/wp-contribute review` hands a fresh reviewer, and the part of the best practices
+no grep can check.
 
 ### The traps that cost the most
 
@@ -123,8 +138,7 @@ quote the value; `tests/checks/frontmatter-yaml.sh` fails on it in every layer.
 - **Template routing changes which agent runs.** `tailwind` → `wp-tailwind` in author mode;
   `cinematic` → an entirely different shape (one continuous reel, `/wp-cinematic-scene` per
   scene, `/wp-section --hybrid` for trailing blocks) that the section walk must refuse to
-  enter. `basic` is legacy: `starter-theme/__starter__/` was removed, so treat it as an alias
-  for `tailwind` rather than failing on it.
+  enter. Treat `basic` as an alias for `tailwind` rather than failing on it.
 - **Starter-theme edits use the placeholder tokens** — `__starter__`, `__STARTER__`,
   `__STARTER_NAME__`, `__STARTER_DOMAIN__` — replaced by `/wp-init`. A real slug committed
   into the starter ships to every future project.
@@ -148,10 +162,12 @@ quote the value; `tests/checks/frontmatter-yaml.sh` fails on it in every layer.
 
    No `FAILED:` line, and doc-sync passes. Fix what fails and run it again until it does.
 2. `bin/doc-sync-check.sh` is the half the greps cannot do — README tables,
-   `docs/commands.md`, frontmatter and the version references all agree.
+   `docs/commands.md`, frontmatter and the version references all agree. It compares the
+   CHANGELOG against `origin/main`; on a PR stacked on another branch pass
+   `--changelog-base <parent-branch>`, because with no ref it can resolve it skips that rule.
 3. **New behavior has a new check.** This is the one reviewers actually block on.
-   A new or changed skill also passes `/wp-contribute review <name>` — the judgment half
-   of the audit, against [references/skill-review.md](references/skill-review.md).
+   A new or changed skill also passes `/wp-contribute review <name>` — the review no grep
+   can do, against [references/skill-review.md](references/skill-review.md).
 4. `CHANGELOG.md` gains an `[Unreleased]` entry. Say what changed and *why it was wrong
    before*; a release note that only names the feature is useless six months later.
 5. Docs follow the change: a new command needs a row in the README table **and** an entry in
@@ -180,8 +196,9 @@ Small PRs, one concern each. When a PR is stacked on another (its base is the fi
 branch, because it edits files that only exist there), **merge the base first** — but *how*
 matters:
 
-- **Merge commit or rebase** → the base's commits land on `main` unchanged, GitHub retargets
-  the child to `main`, and its diff cleanly shrinks to just its own work.
+- **Merge commit** (the default; a rebase merge keeps the commits too) → the base's commits
+  land on `main` unchanged, GitHub retargets the child to `main`, and its diff cleanly shrinks
+  to just its own work.
 - **Squash** → the base's commits are replaced by one new SHA. The child's branch still
   carries the originals, so it re-proposes the parent's entire diff. Recover with
   `git rebase --onto main <last-parent-sha> <child-branch>` and force-push with lease.
@@ -190,39 +207,29 @@ GitHub only auto-retargets a child when the base branch is **deleted**, so keep
 **Settings → Automatically delete head branches** on. Without it, a squash-merged base sits
 around and the child silently keeps the wrong base.
 
-### The release ritual
+### Releases
 
-```bash
-git checkout main && git pull --ff-only
-fail=0; for f in tests/checks/*.sh; do bash "$f" || { echo "FAILED: $f"; fail=1; }; done
-[ "$fail" = 0 ] && bash bin/doc-sync-check.sh
-```
+`/wp-contribute release` is the procedure, step by step: run it rather than releasing by
+hand. What it rests on is the part worth knowing first:
 
-1. **Pick the bump** (semver): new command, agent or skill → minor. Fixes and doc work →
-   patch. A changed contract users' projects depend on → major.
-2. **Bump all four references together** — `.claude-plugin/plugin.json`,
-   `.claude-plugin/marketplace.json` (**twice**: `metadata.version` and the plugin entry), and
-   the README badge. `bin/doc-sync-check.sh` fails if they disagree.
-3. **Insert `## [X.Y.Z] - YYYY-MM-DD` below `## [Unreleased]` and move the entries down.**
-   Never rename the heading: every open PR edits under it, so a rename conflicts all of them on
-   `CHANGELOG.md`. Write entries for any PR that merged without one — that happens, and release
-   time is the last chance to catch it.
-4. **Reconcile `BACKLOG.md`** against what this release ships, and set its
-   `**Reconciled** on <Month D, YYYY>` line to today. `tests/checks/backlog-freshness.sh` fails
-   as soon as the new release heading is dated after that line.
-5. **Run the gates again** — the block above. The version and backlog checks can only go red
-   after steps 2-4; fix and re-run until both pass.
-6. Commit, tag and push the commit and the tag:
-
-   ```bash
-   git commit -am "chore(release): vX.Y.Z" && git tag -a vX.Y.Z -m "vX.Y.Z"
-   git push origin main && git push origin vX.Y.Z
-   ```
-7. `env -u GH_TOKEN gh release create vX.Y.Z --title "…" --notes-file <file> --latest`.
-8. **Verify it is actually live:** the release is published and not a draft, the tag resolves
-   on the remote, and the raw `.claude-plugin/*.json` on GitHub serve the new version — that
-   is what a user's install resolves against. There is no publish CI in this repo; the GitHub
-   release *is* the artifact.
+- **The version is stated in all four places at once** — `.claude-plugin/plugin.json`,
+  `.claude-plugin/marketplace.json` (**twice**: `metadata.version` and the plugin entry), and
+  the README badge. `bin/doc-sync-check.sh` fails if they disagree.
+- **`## [Unreleased]` is never renamed.** The release heading is inserted below it and the
+  entries move down. Every open PR edits under that heading, so a rename conflicts all of
+  them on `CHANGELOG.md`.
+- **`BACKLOG.md` is reconciled at every release**, and its `**Reconciled** on` line moves to
+  the release date. `tests/checks/backlog-freshness.sh` fails as soon as the newest release
+  heading is dated after that line — it became a check because the last hand reconciliation
+  went stale in a single day.
+- **The gates run again after the bump.** The version and backlog checks can only go red once
+  the version files, `CHANGELOG.md` and `BACKLOG.md` have changed.
+- **"Live" means three things**: the GitHub release is published, not a draft; the tag
+  resolves on the remote; and the raw `.claude-plugin/*.json` on GitHub serve the new
+  version, which is what a user's install resolves against. The GitHub release is the
+  artifact, so verify all three by hand.
+- `gh` runs as `env -u GH_TOKEN gh …`, so it authenticates with its own stored login rather
+  than with whatever `GH_TOKEN` the shell happens to export.
 
 Then delete the merged branch, and check no others accumulated: a branch whose PR is merged —
 or closed but superseded — is safe to delete once `git diff main <branch>` shows nothing on it

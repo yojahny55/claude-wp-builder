@@ -83,7 +83,7 @@ On `Template: tailwind` a page's styles are not a second file: they are a
 
 ## Theme Supports
 
-Register all required theme features inside an `after_setup_theme` hook.
+The Tailwind starter's `inc/theme-setup.php`:
 
 ```php
 function prefix_setup() {
@@ -115,18 +115,18 @@ function prefix_setup() {
     // RSS feed links in <head>
     add_theme_support('automatic-feed-links');
 
-    // Register navigation menus
+    // One location per language — the header's walker reads `primary-<lang>`.
     register_nav_menus(array(
-        'primary' => __('Primary Navigation', 'theme-slug'),
-        'footer'  => __('Footer Navigation', 'theme-slug'),
+        'primary-en' => __('Primary Navigation (EN)', '<slug>'),
+        'primary-es' => __('Primary Navigation (ES)', '<slug>'),
+        'footer-en'  => __('Footer Links (EN)', '<slug>'),
+        'footer-es'  => __('Footer Links (ES)', '<slug>'),
     ));
 }
 add_action('after_setup_theme', 'prefix_setup');
 ```
 
 ### Content Width
-
-Set the global content width for embeds and images.
 
 ```php
 function prefix_content_width() {
@@ -167,7 +167,6 @@ add_filter( 'body_class', 'prefix_body_classes' );
 
 ## SCF/ACF as Required Dependency
 
-All themes built with this system use **Secure Custom Fields (SCF)** or **Advanced Custom Fields (ACF)** as the custom fields plugin. SCF is an ACF-compatible fork and uses the same API (`get_field()`, `the_field()`, `have_rows()`, etc.).
 
 ### Options Page Registration
 
@@ -207,8 +206,7 @@ $footer_text = prefix_get_field( 'footer_copyright', 'option' );
 
 ## Helper Functions
 
-Create small utility functions to keep templates clean. Both ship in the starter's
-`functions.php`:
+Both ship in the starter's `functions.php`:
 
 ```php
 /**

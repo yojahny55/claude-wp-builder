@@ -1,6 +1,6 @@
 ---
 name: wp-bilingual
-description: The suffix i18n model — one page carries every language, with ACF/SCF fields duplicated as _lang suffixes (hero_title_es) and resolved by prefix_get_field(), prefix_t() and prefix_e(), plus language detection, the language cookie, the switcher and menus. Use when the project's .claude/CLAUDE.md records the suffix i18n strategy, or records no strategy at all. Not for Polylang projects; those use wp-polylang.
+description: Documents the suffix i18n model — one page carries every language, with ACF/SCF fields duplicated as _lang suffixes (hero_title_es) and resolved by prefix_get_field(), prefix_t() and prefix_e() on the tailwind starter or prefix_b() and prefix_setting() on the cinematic one, plus ?lang= detection, the language cookie, the language switcher, per-language menu locations and the html lang attribute, all in the theme's inc/i18n.php. Use when the project's .claude/CLAUDE.md records the suffix i18n strategy or records no strategy at all, when adding a second-language field or UI string, or when a ?lang=es page still shows the primary language. Not for Polylang projects (wp-polylang), and not for a one-language site.
 user-invocable: false
 ---
 
@@ -19,9 +19,8 @@ This skill defines ONE of the plugin's two translation methodologies: the **ACF/
 >
 > The two never mix in one project. If the project says `polylang`, stop
 > reading here and use the `wp-polylang` skill instead — the field naming,
-> the menu registration and the helper behaviour all differ. An earlier
-> version of this line claimed the plugin supported no Polylang at all, which
-> stopped being true when `/wp-polylang` shipped.
+> the menu registration and the helper behaviour all differ. An absent line means the project
+> predates the choice and is `suffix`.
 
 ## Which helpers exist depends on the starter
 
@@ -46,12 +45,14 @@ stored one — so a switch persists there too.
 
 - [references/i18n-helpers.md](references/i18n-helpers.md) — where the implementation lives
   (the starter's `inc/i18n.php`, never a copy), why detection runs in its order, the cookie and
-  its `init` hook, the fallback rules, adding a string or passing strings to JavaScript, and a
-  switcher template. Read when changing `inc/i18n.php` or building the switcher; templates only
-  need the calls shown below.
+  its `init` hook, the fallback rules, adding a string to `prefix_get_translations()` or passing
+  strings to JavaScript, and a language switcher built on `prefix_get_lang_url()`. Read when
+  changing `inc/i18n.php`, adding a UI string or building the switcher; templates only need the
+  calls shown below.
 - [references/acf-fields.md](references/acf-fields.md) — complete field definitions for a
-  suffix site: language tabs and suffixed repeater subfields. Read when writing
-  `fields/*.php` for a project on this model.
+  suffix site: language tabs (`type => 'tab'`) and suffixed repeater subfields. Read when writing
+  `fields/*.php` for a project on this model (`wp-theme-standards` owns the loader: `fields/*.php`
+  seeds `acf-json/`, which is then the editable source of truth).
 
 ---
 
@@ -85,10 +86,12 @@ For every translatable ACF/SCF field, the **primary language** (typically Englis
 
 ## Configuration Constants
 
-Define supported languages and the default at the top of `inc/i18n.php`.
+Two constants at the top of `inc/i18n.php` hold the project's languages. `/wp-init` sets them
+from the Languages and Primary language lines of `.claude/CLAUDE.md`; `PREFIX_DEFAULT_LANG` *is*
+the primary language, the one whose fields carry no suffix. For an English-primary site with
+Spanish:
 
 ```php
-// Define supported languages
 define('PREFIX_SUPPORTED_LANGS', array('en', 'es'));
 define('PREFIX_DEFAULT_LANG', 'en');
 ```
@@ -204,21 +207,9 @@ Convenience helpers for language checks. There is no per-language alias; pass th
 <?php endif; ?>
 ```
 
----
-
-## Static Translations Array
-
-Every hardcoded UI string is a key in `prefix_get_translations()`, mapping each language code
-to its text. Adding one, and passing strings to JavaScript (there is no separate JavaScript
-helper), are in `references/i18n-helpers.md`.
-
----
-
-## Language Switcher URL Generation
-
-`prefix_get_lang_url( $lang )` returns the current URL with `?lang=` replaced, built with
-`remove_query_arg()` and `add_query_arg()`. A switcher template is in
-`references/i18n-helpers.md`.
+Every string `prefix_t()` returns is a key in `prefix_get_translations()`, mapping each
+language code to its text. The language switcher links through `prefix_get_lang_url( $lang )`,
+which returns the current URL with `?lang=` replaced.
 
 ---
 
@@ -255,24 +246,16 @@ wp_nav_menu(array(
     'container'      => false,
     'fallback_cb'    => false,
     'items_wrap'     => '%3$s',
-    'walker'         => new Prefix_Nav_Walker(),
+    'walker'         => new Prefix_Nav_Walker(), // written by /wp-header
 ));
 ?>
 ```
 
-The pattern is: `<location>-<lang>` with a **hyphen** (e.g., `primary-en`, `primary-es`,
-`footer-en`, `footer-es`). An underscore spelling is registered by neither starter.
-
----
-
-## ACF Field Creation Rules
-
-When defining fields in `fields/*.php` for a bilingual site (see wp-theme-standards for the field loader / Local JSON model — `fields/*.php` is a one-time bootstrap seed, `acf-json/*.json` is the dashboard-editable source of truth):
-
-Use **Tab fields** to organize languages in the admin UI.
-Inside repeaters, add suffixed subfields for each translatable text subfield.
-
-Both, as full field definitions: `references/acf-fields.md`.
+The pattern is `<location>-<lang>` with a **hyphen** (`primary-en`, `primary-es`, `footer-en`,
+`footer-es`), as the tailwind starter's `inc/theme-setup.php` registers them; an underscore
+spelling is registered by neither starter. In `fields/*.php`, group each language's fields
+under its own **tab** field, and give each translatable repeater subfield a suffixed sibling
+(`references/acf-fields.md`).
 
 ---
 
@@ -323,20 +306,3 @@ nothing.
 The i18n system is one file, `inc/i18n.php`, required from `functions.php` before the field
 loader's `acf/init` hook runs (field definitions may call its helpers). What it defines is the
 table at the top of this skill.
-
----
-
-## Summary Checklist
-
-- [ ] `PREFIX_SUPPORTED_LANGS` and `PREFIX_DEFAULT_LANG` constants defined
-- [ ] Language detection follows priority: URL param > cookie > browser > default
-- [ ] Cookie set with 365-day expiry on language switch, by a first call made on `init`
-- [ ] `prefix_get_field()` used in ALL templates (never raw `get_field()`)
-- [ ] `prefix_get_repeater()` used for repeater fields with translatable subfields specified
-- [ ] `prefix_get_sub_field()` used inside `have_rows()` loops
-- [ ] `prefix_t()` / `prefix_e()` used for all static UI strings
-- [ ] All secondary ACF fields have the `_<lang>` suffix and an instruction written in the primary language (see Rules)
-- [ ] Tab organization per language in ACF field groups
-- [ ] Menu locations registered per language: `<location>-<lang>`, and every template asks for one through `prefix_nav_location()`
-- [ ] Language switcher uses `remove_query_arg` / `add_query_arg`
-- [ ] HTML `lang` attribute follows the request through the `language_attributes` filter

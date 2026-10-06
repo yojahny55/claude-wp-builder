@@ -1,16 +1,35 @@
 ---
 name: wp-audit-geo-standards
-description: GEO and AI-agent-readiness reference — the ORA/is-agentic check catalog, applicability by site type, AI crawler allowlist, llms.txt and well-known specs, GEO citability rubric, and WordPress implementation templates. Use when auditing or fixing how a site reads to AI search and agents (the wp-audit-geo and wp-agentic-surfaces agents), or when writing llms.txt, robots.txt AI-crawler rules or /.well-known agent files.
+description: GEO and AI-agent-readiness reference — the ORA and is-agentic scoring model, the GEO-D, GEO-A, GEO-U and GEO-P check catalog, applicability by site type (content, local, merchant, catalog store, SaaS), the AI crawler allowlist for robots.txt and the Content-Signal header, the dynamic llms.txt, ARD catalog (ard.json), agent-skills index, markdown negotiation and other surfaces inc/agentic.php serves, the bin/geo-scan.sh live verifier, and a citability rubric for writing copy that AI engines quote. Use when running /wp-audit --geo, explaining why is-agentic grades a site, fixing GEO findings with wp-agentic-surfaces, choosing which AI crawlers robots.txt allows, or writing section copy for ChatGPT and Perplexity to cite. Not for Rank Math titles, meta descriptions, sitemap or schema configuration (wp-audit-seo-standards), and not for accessibility fixes, which GEO-U01 to U05 only mirror.
 user-invocable: false
 ---
 
 # GEO & Agent-Readiness Standards
 
-Scored by **ORA**, surfaced at [is-agentic.com](https://is-agentic.com). Four layers,
-125 checks. Full live catalog: `GET https://ora.ai/api/checks`.
+Scored by **ORA**, surfaced at [is-agentic.com](https://is-agentic.com), in four layers.
+The live check catalog is `GET https://ora.ai/api/checks`; every count and weight below is a
+snapshot of it, so re-fetch it before quoting a number as current.
 
-This skill informs the audit (`agents/wp-audit-geo.md`) and the fix
-(`agents/wp-agentic-surfaces.md`). It never runs commands on its own.
+This skill informs the audit (`${CLAUDE_PLUGIN_ROOT}/agents/wp-audit-geo.md`) and the fix
+(`${CLAUDE_PLUGIN_ROOT}/agents/wp-agentic-surfaces.md`), which holds the executable version
+of every surface. It never runs commands on its own. Terms used throughout: a **crawler** is
+an AI user agent named in `robots.txt`; the **allowlist** is which crawlers `robots.txt`
+admits; a **surface** is a URL the theme serves for agents (`/llms.txt`, `/.well-known/…`);
+the **check catalog** is ORA's list of checks, and the **ARD catalog** is `ard.json`.
+
+## Reference files
+
+- [references/check-catalog.md](references/check-catalog.md) — every GEO code, the ORA check
+  ids it maps to and whether the theme can fix it. Read when mapping an ORA id to a code,
+  tabulating a code, or deciding whether a finding is fixable or advisory.
+- [references/surface-templates.md](references/surface-templates.md) — what each surface must
+  contain: the minimum robots body, `llms.txt`, `ard.json`, the agent-skills index,
+  `pricing.md`, markdown negotiation, `Link:` headers, the agent-friendly 404, JSON-LD
+  breadth, trust anchors, `llms-full.txt` and `auth.md`. Read when building or checking a
+  surface.
+- [references/citability.md](references/citability.md) — the citability rubric and a
+  weak-to-strong rewrite. Read when writing or tightening page copy (`/wp-section`,
+  `/wp-seed`); no audit code scores it.
 
 ---
 
@@ -64,7 +83,8 @@ ordinary content site as SaaS. Every check not implied by the detected type is r
 The auditor runs only the applicable subset and prints the exclusion rationale for
 every `N/A` layer. A WordPress site with WooCommerce active but products disabled
 still counts as `merchant` for detection purposes; the payment-protocol checks stay
-advisory either way.
+advisory either way, because no WooCommerce payment gateway speaks an agent payment
+protocol (§8).
 
 A catalog store is a merchant that deliberately takes no payment. When `/wp-audit` Step 2.3
 records `site.store_tier` = `catalog` (read from the `store` block of `.wp-create.json`),
@@ -74,99 +94,12 @@ Read the recorded tier; never infer it from whether a checkout page happens to e
 
 ---
 
-## 3. Check catalog — GEO codes
+## 3. Check catalog
 
-Prefix `GEO-<layer><nn>`; layer letter D/A/U/P. Each code maps to one or more ORA
-check ids and is the unit later agents reference and tabulate. Codes carry the full
-mapping here; the audit/fixable subset is what the fixer can actually change.
-
-Wildcard groups in the design spec §6 are expanded below to the concrete ids in the
-live catalog. `yes` = the theme/host can fix it. `advisory` = detected and reported,
-not fixed (off-site, network- or third-party-dependent). `*` = only when the site
-type implies it.
-
-### Discovery — GEO-D
-
-| Code | ORA check ids | Fixable |
-|---|---|---|
-| GEO-D01 | `ard-catalog`, `ai-catalog-published`, `ard-entries-valid` | yes — `/.well-known/ard.json` + `ai-catalog.json` alias |
-| GEO-D02 | `robots-ai-policy-quality`, `robots-agent-user-policy` | yes — robots policy + `Content-Signal` |
-| GEO-D03 | `ard-trust-manifest` | yes — trust manifest in the ARD catalog |
-| GEO-D04 | `agent-rules-repo`, `agent-plugins-repo` | yes — `/agents.md`, the AGENTS.md document served by `inc/agentic.php` |
-| GEO-D05 | `brand-search-accuracy` | advisory — measured via ORA / DataForSEO |
-| GEO-D06 | `agentic-search-specific`, `agentic-search-usecase` | advisory — share of voice |
-| GEO-D07 | `wikipedia-presence` | advisory — off-site |
-| GEO-D08 | `registry-branding`, `skills-sh-listed`, `chatgpt-app-listed`, `mcp-registry-listed`, `npm-sdk-package` | advisory — off-site |
-
-### Access — GEO-A
-
-| Code | ORA check ids | Fixable |
-|---|---|---|
-| GEO-A01 | `content-no-js` | yes — raw-HTML content ≥500 chars, first heading `H1`, sequential, ≥5% ratio |
-| GEO-A02 | `bot-detection` | yes — AI UA allowlist in WAF/robots |
-| GEO-A03 | `redirect-hygiene` | yes — real 301/302, no meta-refresh or JS redirect |
-| GEO-A04 | `agent-friendly-404` | yes — real 404 status + short markdown body |
-| GEO-A05 | `docs-auth-gate` | yes — keep public pages ungated |
-| GEO-A06 | `metadata-completeness` | yes — canonical + `lang` + `og:image` + `og:type` together |
-| GEO-A07 | `json-ld` | yes, when no SEO plugin owns the graph (§6.8) — identity JSON-LD |
-| GEO-A08 | `json-ld-entity-linking` | yes, when no SEO plugin owns the graph (§6.8) — `sameAs` |
-| GEO-A09 | `org-schema-completeness` | yes, when no SEO plugin owns the graph (§6.8) — `contactPoint` + `address` |
-| GEO-A10 | `schema-type-breadth` | yes, when no SEO plugin owns the graph (§6.8) — FAQPage/Service/Product/AggregateRating/BreadcrumbList |
-| GEO-A11 | `trust-anchors` | yes — `/about`, `/contact`, `/privacy` each ≥500 chars |
-| GEO-A12 | `sitemap`, `sitemap-lastmod` | yes — Rank Math `lastmod` on |
-| GEO-A13 | `llms-txt-exists` | yes — dynamic endpoint |
-| GEO-A14 | `llms-txt-formatting` | yes |
-| GEO-A15 | `llms-txt-links-resolve` | yes |
-| GEO-A16 | `modular-llms-txt` | yes — per-area `llms.txt` |
-| GEO-A17 | `agent-instruction` | yes — "When to use" block |
-| GEO-A18 | `page-token-budget` | yes — trim oversized pages |
-| GEO-A19 | `markdown-negotiation`, `markdown-negotiation-vary`, `markdown-url-fallback`, `markdown-frontmatter`, `code-fence-validity`, `markdown-link-alternate` | yes — `Accept: text/markdown` + `Vary` |
-| GEO-A20 | `link-headers-discovery` | yes — RFC 8288 `Link:` |
-| GEO-A21 | `agent-discovery-file`, `agent-skills-index-v2` | yes — `/.well-known/agent-skills/index.json` |
-| GEO-A22 * | `openapi-spec`, `public-api-docs`, `developer-portal`, `api-catalog-rfc9727` | SaaS/API only |
-| GEO-A23 | `agent-crawler-reachability` | yes |
-| GEO-A24 * | `pricing-info`, `pricing-md` | merchant/SaaS |
-| GEO-A25 † | — no ORA id | yes — every referenced `@id` resolves inside the `@graph` |
-| GEO-A26 † | — no ORA id | yes — no physical root file shadowing a theme rewrite |
-| GEO-A27 † | — no ORA id | no — fixed at the CDN, not in the theme |
-| GEO-A28 † | — no ORA id | yes — advertised URLs resolve and agree with the sitemap |
-
-† GEO-A25 through GEO-A28 are **plugin-added**: the ORA catalog has no check that resolves a schema
-reference, so a graph whose `publisher` points at an `@id` no node declares passes
-`json-ld`, `json-ld-entity-linking` and `org-schema-completeness` alike. Report it
-outside the ORA score — the score must stay reproducible against the published catalog.
-The same holds for the three serving-layer and surface-agreement codes: ORA scores what a
-URL returns, so it cannot see that the returning file is a physical one shadowing the
-theme, that the canonical path only answers through a redirect, or that a surface
-advertises pages the site does not publish.
-
-### Usability — GEO-U
-
-| Code | ORA check ids | Fixable |
-|---|---|---|
-| GEO-U01 | `ax-document-structure` | yes — `main`, landmarks, single H1, sequential |
-| GEO-U02 | `ax-native-controls` | yes |
-| GEO-U03 | `ax-accessible-names` | yes |
-| GEO-U04 | `ax-form-labeling` | yes |
-| GEO-U05 | `ax-tree-injection-safe` | yes |
-| GEO-U06 * | `json-error-responses`, `api-error-model` | API only |
-| GEO-U07 * | `mcp-server`, `mcp-server-identity`, `mcp-tool-listing`, `mcp-tool-naming`, `mcp-tool-descriptions`, `mcp-param-schemas`, `mcp-tool-annotations`, `mcp-resource-listing`, `mcp-resource-quality`, `mcp-auth-mechanism`, `mcp-oauth-metadata`, `mcp-pkce-s256`, `mcp-error-handling`, `mcp-transport-modern`, `mcp-server-card`, `mcp-multi-surface-coverage` | MCP only |
-| GEO-U08 * | `oauth-support`, `oauth-protected-resource`, `scoped-permissions`, `auth-md-exists`, `auth-md-structure`, `auth-md-walkthrough-simulation`, `agent-auth-discovery-metadata`, `agent-auth-www-authenticate`, `agent-auth-endpoints-reachable` | API/MCP only |
-| GEO-U09 * | `onboarding-friction`, `sandbox-environment` | SaaS only |
-| GEO-U10 | `cli-tool`, `webmcp`, `a2ui-support`, `nlweb-schema-feeds`, `nlweb-ask`, `nlweb-streaming` | advisory / emerging |
-
-### Payments — GEO-P (merchant only, `N/A` on a catalog store)
-
-| Code | ORA check ids | Fixable |
-|---|---|---|
-| GEO-P01 | `acp-support`, `acp-delegate-payment` | advisory |
-| GEO-P02 | `ucp-support` | advisory |
-| GEO-P03 | `mpp-support` (the Machine Payments Protocol; MCP payment rides on the MCP surface checks in GEO-U07) | advisory |
-| GEO-P04 | `x402-support` | advisory |
-| GEO-P05 | `ap2-support` | advisory |
-
-Payment protocols are largely advisory for WooCommerce today (see §8 Ceilings). The
-fixer reports the recommendation and does not fabricate protocol support.
+Codes are `GEO-<layer><nn>`, layer letter D, A, U or P. Each maps to one or more ORA check
+ids and is the unit the agents tabulate and report; the full table, with what the theme can
+fix, is [references/check-catalog.md](references/check-catalog.md). GEO-A25 to GEO-A28 are
+the plugin's own: ORA has no check for them, so they are reported outside the ORA score.
 
 ---
 
@@ -174,8 +107,7 @@ fixer reports the recommendation and does not fabricate protocol support.
 
 `robots.txt` must name each AI crawler explicitly — a bare `User-agent: *` does not
 satisfy `robots-agent-user-policy`. The default posture is **ALLOW** for the retrieval
-and training agents below; confirm the commercial intent with the site owner before
-changing it.
+and training crawlers below.
 
 | Crawler | Operator | Policy |
 |---|---|---|
@@ -193,42 +125,15 @@ changing it.
 | `anthropic-ai` | Anthropic, legacy token | not named — when it is, give it `ClaudeBot`'s policy |
 | `Bytespider` | ByteDance / TikTok | BLOCK for Western markets |
 
-Minimum robots body — every ALLOW row above, then the BLOCK row:
+The minimum robots body is every ALLOW row, then the BLOCK row, after the classic
+`User-agent: *` block — written out in
+[references/surface-templates.md](references/surface-templates.md).
 
-```
-User-agent: GPTBot
-Allow: /
-
-User-agent: OAI-SearchBot
-Allow: /
-
-User-agent: ChatGPT-User
-Allow: /
-
-User-agent: ClaudeBot
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
-
-User-agent: GoogleOther
-Allow: /
-
-User-agent: Applebot-Extended
-Allow: /
-
-User-agent: Amazonbot
-Allow: /
-
-User-agent: FacebookBot
-Allow: /
-
-User-agent: Bytespider
-Disallow: /
-```
+**The training posture is the owner's decision, and a deliberate one stands.** An existing
+`Disallow` for a named crawler, or an `ai-train=no` signal, is the site owner's answer, not
+a defect: the auditor reports it as a deliberate block (consistent or not with the signal,
+below), and the fixer asks before changing it — it never rewrites a deliberate block back to
+the default. The default applies only where the site states no posture at all.
 
 Send the policy signal as an HTTP response header, and never as a line of `robots.txt`:
 
@@ -250,203 +155,21 @@ way.
 
 ---
 
-## 5. GEO citability rubric
+## 5. Citability
 
-Citability is a property of the **copy**, not the markup. It scores how likely a
-generative engine is to lift a passage verbatim. Weights:
+Citability is a property of the **copy**, not the markup: how likely a generative engine is
+to lift a passage verbatim. The rubric — five weighted components, an optimal passage of
+134-167 words, answer-first openings — and a worked rewrite are in
+[references/citability.md](references/citability.md).
 
-| Component | Weight | What it means |
-|---|---|---|
-| Answer-block quality | 30% | A direct 1–2 sentence answer opens the section ("X is…") |
-| Self-containment | 25% | The passage reads correctly with no surrounding context |
-| Structural readability | 20% | Question-based H2s, short paragraphs, tables for 3+ comparisons |
-| Statistical density | 15% | Named numbers, units, dates sourced to first-party data |
-| Uniqueness | 10% | Original data or framing, not a restatement of the consensus |
+## 6. Surfaces
 
-Concrete rules:
-
-- **Optimal extractable passage length: 134-167 words.** Below that the engine has too
-  little to quote; above it gets truncated mid-argument.
-- Open every section with a 1–2 sentence answer before any elaboration. Do not bury the
-  answer under a definition parade.
-- Phrase H2s as questions where the content answers one (`What does X cost?`).
-- Use a table whenever three or more things are compared; prose comparisons are not
-  extractable as a unit.
-- Name sources and dates inline (`per the 2025 WordPress project survey…`).
-- Prefer first-party data — measured numbers we own — over adjectives.
-- One idea per passage; a section that answers two questions gets split.
-
-The rubric is for **generation**: `/wp-section` and `/wp-seed` authors apply it when
-writing copy. No GEO code scores it, so the auditor reports nothing against it.
-
----
-
-## 6. Surface templates
-
-The fixer writes the theme's `inc/agentic.php`, which owns every surface below. All are
-applicability-gated; a content site does not emit API or payment surfaces.
-
-### 6.1 Dynamic `llms.txt`
-
-Route `/llms.txt` (and `/llms-full.txt`) through WordPress, not a static file — a
-static file goes stale. Structure:
-
-```
-# {Site Name}
-
-> {One-line site description}
-
-## Key Facts
-- {Identity, location, hours, what the site sells/offers}
-- {Trust anchors: founded, credentials, first-party numbers}
-
-## Pages
-- [Page Title](url): excerpt or first 20 words
-
-## Posts
-- [Post Title](url): excerpt
-
-## When to use
-- {Agent-facing guidance: what this site is authoritative for, and when to reach it}
-
-## Contact
-- Website: {home_url}
-```
-
-Per-area modular files (`/services/llms.txt`, `/docs/llms.txt`, …) satisfy
-`modular-llms-txt`. Every link must resolve (`llms-txt-links-resolve`) and carry a
-short description (`llms-txt-formatting`).
-
-### 6.2 `/.well-known/ard.json` (Agentic Resource Discovery)
-
-ARD v0.91 canonical path; keep `/.well-known/ai-catalog.json` as the equivalent
-predecessor alias. Each entry names a resource with a `urn:air` identifier, a media
-type, and exactly one of `url` or `data`:
-
-```json
-{
-  "catalog": {
-    "id": "urn:air:example.com:catalog",
-    "name": "Example Site",
-    "entries": [
-      {
-        "id": "urn:air:example.com:mcp:docs",
-        "name": "Docs MCP",
-        "mediaType": "application/json",
-        "url": "https://example.com/mcp"
-      }
-    ]
-  }
-}
-```
-
-`ard-trust-manifest` adds the provenance/trust block alongside the entries.
-
-### 6.3 `/.well-known/agent-skills/index.json` v0.2.0
-
-```json
-{
-  "version": "0.2.0",
-  "skills": [
-    {
-      "name": "example-skill",
-      "description": "What the skill does",
-      "url": "https://example.com/.well-known/agent-skills/example-skill.md",
-      "digest": {
-        "algorithm": "sha256",
-        "value": "sha256:..."
-      }
-    }
-  ]
-}
-```
-
-The digest is a real `sha256:` of the referenced document — recompute it whenever the
-document changes, or the index is silently invalid.
-
-### 6.4 `pricing.md`
-
-For merchant/SaaS sites, publish `/pricing.md` (and keep `/pricing` as the HTML page):
-a plain-markdown table of plans, prices, currency and billing period, plus a one-line
-answer per tier. `pricing-info` also accepts the HTML page; `pricing-md` wants the
-markdown sibling.
-
-### 6.5 Markdown negotiation
-
-When the request's `Accept` header includes `text/markdown`, serve a markdown rendering
-of the page (or a link to one) and always send:
-
-```
-Vary: Accept
-Content-Type: text/markdown; charset=UTF-8
-```
-
-Balanced code fences (`code-fence-validity`) and optional YAML frontmatter
-(`markdown-frontmatter`) are required for a clean markdown response.
-
-### 6.6 RFC 8288 `Link:` headers
-
-Emit discovery relations on HTML responses, e.g.:
-
-```
-Link: <https://example.com/llms.txt>; rel="alternate"; type="text/plain",
-      <https://example.com/sitemap_index.xml>; rel="sitemap",
-      <https://example.com/.well-known/api-catalog>; rel="api-catalog"
-```
-
-### 6.7 Agent-friendly 404
-
-Return a real HTTP `404` with a short markdown body that points agents at the sitemap
-and `llms.txt`:
-
-```
-# 404 — Not found
-
-The page you asked for does not exist.
-- Site map: /sitemap_index.xml
-- Machine summary: /llms.txt
-
-Try one of those, or search the site.
-```
-
-Never serve a `200` "soft 404"; `agent-friendly-404` checks the status line, not the
-body alone. A soft 404 is not only the missing-page template: probe a made-up top-level slug,
-a made-up nested path, a typo or near-prefix of a real post slug (WordPress's
-`redirect_guess_404_permalink` redirects it to the closest post with `200`) and a made-up
-`.php`/`.html` path, on both the apex and `www` hosts. An apex-to-`www` redirect that sends
-unknown paths to the home page with `200` is a soft 404 too. One passing shape does not pass
-the check.
-
-### 6.8 JSON-LD identity and breadth
-
-Emit one identity graph (Organization / LocalBusiness) with `contactPoint`, `address`
-and a populated `sameAs` array (entity linking). Add breadth types Rank Math does not
-already emit — `FAQPage`, `Service`, `Product`, `AggregateRating`, `BreadcrumbList` —
-**guarded against duplicate schema sources**: if Rank Math already emits a type, the
-theme must not emit it a second time (§16 of the SEO standards skill).
-
-All of this is for a site with no SEO plugin. When Rank Math, Yoast or SEOPress owns the
-schema, the theme emits no JSON-LD at all — a second identity graph beside the plugin's is
-the duplicate source SEO-039 reports — so GEO-A07 to GEO-A10 cannot be fixed from the
-theme. They are reported as dependent on the SEO plugin's configuration, and
-`wp-audit-rankmath` fills the plugin's Organization / LocalBusiness `contactPoint`,
-`address` and `sameAs` (Rank Math emits neither `contactPoint` nor `address` by default).
-
-### 6.9 Trust anchors
-
-Ensure `/about`, `/contact`, `/privacy` exist as real published pages with ≥500
-characters each, seeded from the demo header/footer copy. They satisfy both
-`trust-anchors` and give the entity graph something to link to.
-
-### 6.10 `llms-full.txt` and `auth.md`
-
-`/llms-full.txt` is the `/llms.txt` route family carrying the body text of published
-pages and posts (capped at the first 200 — an unbounded dump can exhaust memory on a
-content-heavy site; `/llms.txt` remains the complete index), for agents that ingest the
-whole site. `/auth.md` (SaaS/API only, spec
-§7.3) is the credential walkthrough an agent reads before calling the API — scheme,
-discovery endpoints and a numbered obtain-and-send flow — and satisfies `auth-md-exists`,
-`auth-md-structure` and `auth-md-walkthrough-simulation` (GEO-U08).
+The fixer writes the theme's `inc/agentic.php`, which owns every surface; all are
+applicability-gated, so a content site emits no API or payment surface. What each must
+contain is [references/surface-templates.md](references/surface-templates.md). One rule
+belongs here because both agents act on it: **when Rank Math, Yoast or SEOPress owns the
+schema, the theme emits no JSON-LD**, so GEO-A07 to GEO-A10 are fixable only when no SEO
+plugin owns the graph — otherwise `wp-audit-rankmath` fills it.
 
 ---
 
@@ -461,8 +184,7 @@ would be a supply-chain risk. When no completed report exists yet, `--start` ask
 is-agentic to scan the host through the same HTTP endpoint the npm CLI uses and reads the
 report when the scan finishes, all within 110 s. Pass `--start` only for a host the
 operator confirmed as public this run: a scan makes is-agentic fetch the site. The script
-does not parse the JSON; the caller — the audit/fix agent — maps the failed ORA check ids
-back to GEO codes using §3, and re-runs the scan after the fixer completes.
+does not parse the JSON.
 
 | Exit | Meaning | What the caller does |
 |---|---|---|
@@ -471,9 +193,22 @@ back to GEO codes using §3, and re-runs the scan after the fixer completes.
 | `2` | skipped cleanly: no `curl`, no network, no completed report, a scan that did not finish, a transient `429`/`503` | record the skip and mark the run incomplete — never a pass |
 | `3` | the host is not publicly reachable: `localhost`, `.local`, `.test`, `*.local.com`, a private address, a name with no dot | pass the public URL (`/wp-audit --host`); a dev host is a configuration problem, not a missing report |
 
-- A fix is reported resolved **only when the ORA check flips**, not when the theme
-  file changed.
-- The evaluator reads a point-in-time scan; a green scan is evidence, not a guarantee.
+The loop:
+
+1. **Scan** the public host and note the report's scan time.
+2. **Map** each failed ORA check id to its GEO code with
+   [references/check-catalog.md](references/check-catalog.md).
+3. **Fix** what the theme can fix (`wp-agentic-surfaces`); leave advisory codes as
+   recommendations.
+4. **Re-scan once**, after the fix is deployed to the host the scan reads.
+5. **Compare.** A fix is resolved **only when its ORA check flips** in a report scanned
+   after the fix — never because the theme file changed. A report whose scan time precedes
+   the fix is the old report: `geo-scan.sh` only starts a scan when none exists, so it
+   returns the pre-fix report until is-agentic re-scans the site. Ask the operator to
+   re-scan at https://is-agentic.com; until then the code is `UNMEASURED`, not resolved.
+   Stop after that one re-scan.
+
+The evaluator reads a point-in-time scan; a green scan is evidence, not a guarantee.
 
 ---
 
@@ -482,8 +217,9 @@ back to GEO codes using §3, and re-runs the scan after the fixer completes.
 - **Off-site checks are advisory.** Wikipedia/Wikidata, registries, ChatGPT app
   listings, npm SDK packages and brand share-of-voice are detected and recommended,
   never fixed from a WordPress theme.
-- **Payments / AP2 / ACP / UCP / x402 are merchant-only and largely advisory** for
-  WooCommerce today.
+- **Payments / AP2 / ACP / UCP / x402 are merchant-only and advisory** for WooCommerce:
+  no WooCommerce gateway implements an agent payment protocol, so the fixer recommends and
+  never fabricates support.
 - **`markdown-negotiation` on edge-cached hosts is CDN-dependent.** The theme route
   covers standard PHP hosting; an aggressive CDN cache can serve HTML regardless of the
   `Accept` header and must be configured separately.

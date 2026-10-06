@@ -59,16 +59,14 @@ render, not the number.
 
 ## Typography
 
-- **Two families maximum.** Display carries voice, text carries prose. A
+- **Two typefaces maximum.** Display carries voice, text carries prose. A
   third is a costume.
 - **A small-caps eyebrow tracks at `0.08em`, and `0.16em` is over the line.**
   `impeccable detect` reads wide tracking on a short uppercase string as a slop
   signature, and the threshold sits between those two values. `page-head`'s own kicker
   uses `0.08em` and passes every round; a bespoke eyebrow at `0.16em` took one slop
-  finding per page and failed the gate on eleven of them. An author writing their own
-  eyebrow had no way to find the safe side except by trial, because the number was
-  written nowhere. It is written here now: stay at or below `0.1em`, and prefer copying
-  `page-head`'s kicker rule to inventing one.
+  finding per page and failed the gate on eleven of them. Stay at or below `0.1em`, and
+  prefer copying `page-head`'s kicker rule to inventing one.
 - **A heading element is a role, not a size — never use one as a small label.**
   An `<h2>` styled at 0.8rem does not read as small print to the type scale; it
   enters the h2 role and flattens the measured ladder for the **whole page**,
@@ -91,8 +89,7 @@ render, not the number.
 - **Light text on dark needs compensation on three axes**: slightly more line
   height, a touch more tracking, one step more weight. Dark-mode type set to
   light-mode metrics looks thin and blurry, and this is why.
-- `text-wrap: balance` on headings, `pretty` on body. Free, and it removes
-  the orphan word that makes a headline look accidental.
+- `text-wrap: balance` on headings, `pretty` on body.
 - Display size maxes around ~6rem outside a genuine hero moment. Bigger is
   not more confident.
 - **Step the hero down one rung below ~700px.** A hero `clamp()` that floors at
@@ -120,7 +117,7 @@ Use one only when the brand names it, or when the work is genuinely
 editorial, luxury, or heritage and you can say why *this* serif fits *this*
 brand.
 
-**Emphasis inside a headline** uses italic or bold in the same family.
+**Emphasis inside a headline** uses italic or bold in the same typeface.
 Dropping a serif word into a sans headline for visual interest is amateur.
 
 ---
@@ -132,7 +129,7 @@ Dropping a serif word into a sans headline for visual interest is amateur.
   confetti. No warm-grey CTA exception.
 - On a page that hard-cuts between **light and dark grounds**, one accent
   physically cannot clear 4.5:1 on both from a single stop. The page carries
-  a two-stop accent: one hue, two lightnesses, keyed per ground family and
+  a two-stop accent: one hue, two lightnesses, keyed per kind of ground (light or dark) and
   redefined per section alongside ink. Still one accent per ground, still one
   hue per page. Two different hues is not what this licenses.
 - **Secondary text tinted, never flat gray.** Derive it from the foreground
@@ -190,15 +187,11 @@ copy sits:
    one side and a full-bleed image the other. Leaves the other half of the
    frame untouched.
 
-**`width` and `height` attributes are presentational hints, and come in
-pairs.** The reference template ships every `<img>` with both, correctly, to
-reserve the aspect ratio and stop the page reflowing as media arrives. The
-common trap is overriding only one in CSS, leaving the other resolving to the
-attribute's raw pixel value, so `width: 100%` on a 1920x1080 image inside a
-narrow column renders it 1080px tall and pushes everything under it off the
-fold. It looks like a layout bug three elements away from the cause.
-**Override both or neither**, usually `width: 100%; height: auto`, or an
-explicit height plus `object-fit: cover` when the frame's shape is fixed.
+**An `<img>`'s `width` and `height` are overridden both or neither** — usually
+`width: 100%; height: auto`, or an explicit height plus `object-fit: cover` when the
+frame's shape is fixed. Overriding one leaves the other at the attribute's raw pixel
+value, and a 1920x1080 plate in a narrow column renders 1080px tall and pushes
+everything under it off the fold.
 
 Above all three: when a photographic ground sits behind a text column,
 **mask the image away from the text** rather than laying anything over it. A
@@ -240,7 +233,7 @@ Three elevation steps, no more, each a shadow tinted to the canvas hue. If
 everything is elevated, nothing is.
 
 **Today's antidote is tomorrow's default.** Grain, film texture, asymmetry and
-tactile brutalism are now in every trend roundup published this year, which means
+tactile brutalism are in every trend roundup, which means
 the next generation of models is learning them as the safe answer. Reaching for
 grain because it reads as anti-AI is the same move as reaching for a purple
 gradient because it read as modern. What does not commoditise is the reason: a
@@ -374,9 +367,8 @@ thickness, tabular numerals in anything that counts or tabulates.
 
 ## Token source of truth
 
-Tokens are declared once in `:root`, and the demo's `:root` block is the
-source of truth copied verbatim into the theme's stylesheet, so a hardcoded
-hex in a section is a defect.
+Tokens are declared once in `:root`, generated from `demo/DESIGN.md`, which
+`/wp-init` carries into the theme, so a hardcoded hex in a section is a defect.
 
 ---
 

@@ -146,7 +146,7 @@ Every section MUST be wrapped in a clear comment delimiter:
     font-size: clamp(1.75rem, 4vw, 3.5rem);
     font-family: var(--font-family-primary);
     color: var(--color-primary);
-    line-height: 1.2;
+    line-height: var(--line-height-tight);
 }
 
 .hero__description {
@@ -163,7 +163,7 @@ Every section MUST be wrapped in a clear comment delimiter:
     color: var(--color-text-inverse);
     border-radius: var(--radius-md);
     text-decoration: none;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     transition: background-color 0.3s ease;
 }
 
@@ -289,7 +289,7 @@ Use a consistent container for max-width and centering:
 ```css
 .container {
     width: 100%;
-    max-width: 1200px;
+    max-width: var(--container-max);
     margin: 0 auto;
     padding: 0 var(--spacing-md);
 }
@@ -414,7 +414,7 @@ Enqueue page-specific styles conditionally in `functions.php`.
     color: var(--color-secondary);
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     margin-bottom: var(--spacing-xs);
 }
 
@@ -451,7 +451,7 @@ Enqueue page-specific styles conditionally in `functions.php`.
 
 .values__card-title {
     font-size: var(--font-size-lg);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--color-primary);
     margin-bottom: var(--spacing-xs);
 }
@@ -459,7 +459,7 @@ Enqueue page-specific styles conditionally in `functions.php`.
 .values__card-description {
     font-size: var(--font-size-base);
     color: var(--color-text-light);
-    line-height: 1.6;
+    line-height: var(--line-height-relaxed);
 }
 
 @media (min-width: 768px) {

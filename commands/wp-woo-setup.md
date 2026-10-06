@@ -12,8 +12,9 @@ about shipping, tax or payments exists. This command records what the store is i
 block of `.wp-create.json`, then runs one script that brings WooCommerce in line with that
 block, prints every change, and can be re-run at any time without duplicating anything.
 
-The practice behind each value is in `skills/wp-woocommerce/SKILL.md`; the plugins each tier
-installs, and the ones left out, in `skills/wp-woocommerce/references/plugins.md`.
+The practice behind each value is in `${CLAUDE_PLUGIN_ROOT}/skills/wp-woocommerce/SKILL.md`; the
+plugins each tier installs, and the ones left out, in
+`${CLAUDE_PLUGIN_ROOT}/skills/wp-woocommerce/references/plugins.md`.
 
 ## Step 1: Gate
 

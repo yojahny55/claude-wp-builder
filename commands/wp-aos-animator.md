@@ -1,5 +1,5 @@
 ---
-description: Runner for the wp-aos-animator skill — audits, installs, enqueues, initializes and seeds AOS scroll animations across a theme's templates
+description: Runner for the wp-aos-animator skill — audits, installs, enqueues, initializes and adds AOS scroll animations across a theme's templates
 allowed-tools: Read, Write, Edit, Grep, Glob, Bash, Agent, AskUserQuestion
 argument-hint: "[<theme-path>] [template ...] [--report-only]"
 ---
@@ -73,9 +73,10 @@ test -f "<theme-path>/functions.php" && test -f "<theme-path>/style.css" && echo
 
 ## Step 2: Read the Skill
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-aos-animator/SKILL.md` in full. It owns all five phases,
-the two transform traps, the skip list, the per-element animation table and the verification
-grep. Everything below only sequences it and decides what runs in parallel.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-aos-animator/SKILL.md` in full. It owns every phase
+(Phases 2–4 in its `references/install.md`), the two transform traps, the skip list, the
+per-element animation list and the verification steps. Everything below only sequences it and
+decides what runs in parallel.
 
 ## Step 3: Phase 1 — Audit
 
@@ -95,11 +96,11 @@ first failure rather than continuing into Phase 5 with no library loaded.
 
 Build a deduplicated file list from the scope in Step 0, then run the skill's Phase 5 over it.
 
-The skill states that this phase parallelizes per template. Dispatch **one subagent per
+Phase 5 works one template at a time, so it parallelizes per template. Dispatch **one subagent per
 template file** when there is more than one in scope, each given: the single file path it owns,
 the elements the audit found in it, and the instruction to follow
 `${CLAUDE_PLUGIN_ROOT}/skills/wp-aos-animator/SKILL.md` Phase 5 — the skip list and the
-animation table included. No subagent gets more than one file, so two agents never edit the
+animation list included. No subagent gets more than one file, so two agents never edit the
 same template.
 
 Orchestrate and verify; do not author the edits yourself when you have dispatched them.

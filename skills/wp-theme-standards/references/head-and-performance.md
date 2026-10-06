@@ -63,8 +63,6 @@ add_action( 'wp_head', function() {
 
 ### Disable WordPress Emojis
 
-Remove the emoji detection script and styles that WordPress loads on every page.
-
 ```php
 function prefix_disable_emojis() {
     remove_action('wp_head', 'print_emoji_detection_script', 7);
@@ -79,8 +77,6 @@ add_action('init', 'prefix_disable_emojis');
 ```
 
 ### Hide WordPress Version
-
-Remove the generator meta tag that exposes the WordPress version.
 
 ```php
 remove_action('wp_head', 'wp_generator');

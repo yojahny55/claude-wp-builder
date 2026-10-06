@@ -121,9 +121,7 @@ Part of the `wp-audit-seo-standards` skill; section numbers match its SKILL.md.
 }
 ```
 
-`<category_base>` is never assumed to be `category`: read it with `$WP option get category_base`
-(empty means the default, `category`) and the tag equivalent with `$WP option get tag_base`
-(empty means `tag`). Build archive URLs from those values, or from `get_term_link()`.
+`<category_base>` is read, never assumed — SKILL.md §5 says how.
 
 ### Article
 

@@ -818,7 +818,9 @@ foreach ( array( 'about', 'contact', 'privacy' ) as \$slug ) {
 `robots.txt` must name each allowlisted AI crawler explicitly — a bare
 `User-agent: *` does not satisfy `robots-agent-user-policy` (GEO-D02). Confirm the
 commercial posture with the site owner first, then write the physical file, which wins
-over the `robots_txt` filter added in Step 1a:
+over the `robots_txt` filter added in Step 1a. An existing `Disallow` for a named crawler,
+or an `ai-train=no` signal, is a deliberate block — the owner's answer already given: keep
+it in the file you write, and change it only when the owner says so:
 
 ```bash
 $WP eval "

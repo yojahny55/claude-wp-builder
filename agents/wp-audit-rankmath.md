@@ -395,7 +395,7 @@ echo 'Sitemap configured.';
 
 After configuring the sitemap, validate it actually works. This script covers the six
 failure modes that can be checked mechanically; the remaining five in the
-`wp-audit-seo-standards` skill's failure-mode table (redirected URLs, robots.txt-blocked
+`wp-audit-seo-standards` skill's failure-mode table (`references/audit-gotchas.md` §15: redirected URLs, robots.txt-blocked
 URLs, duplicate `<loc>`, stale `lastmod`, wrong canonical) need the redirection and
 canonical data that Step 8.5 and `/wp-audit`'s SEO pass gather — check them there, and do
 not report "sitemap validated" on the strength of this script alone.

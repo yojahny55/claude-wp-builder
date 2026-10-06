@@ -9,8 +9,9 @@
 #      image-set(), with the plain url() first as the fallback, and resolves BOTH sibling
 #      names — `foto.png.webp` (Robin, most bulk optimizers) and `foto.webp` (WordPress);
 #   2. the wp-template agent tells builders to use it instead of a bare url();
-#   3. the wp-robin skill states that `picture` does not cover CSS, with the page-cache
-#      caveat on `url` mode and the server-side alternative for a stylesheet.
+#   3. the wp-robin skill states that `picture` does not cover CSS, and its webp-delivery
+#      reference carries the page-cache caveat on `url` mode and the server-side
+#      alternative for a stylesheet.
 set -uo pipefail
 # -e is off (several greps are allowed to miss), so the one command whose failure would
 # silently change what every path below resolves against answers for itself.
@@ -68,13 +69,21 @@ grep -Fq 'prefix_background_image' "$agent" \
 grep -Fq 'esc_attr()' "$agent" \
   || { echo "FAIL: $agent does not state that the helper's value is already escaped"; exit 1; }
 
-# 3. Skill documentation.
-grep -Fq 'webp_delivery_mode' "$skill" \
-  || { echo "FAIL: $skill does not document Robin's delivery modes"; exit 1; }
-grep -Fq 'Vary: Accept' "$skill" \
-  || { echo "FAIL: $skill offers the server-side rule without the Vary: Accept caveat"; exit 1; }
-grep -Fq 'page cache' "$skill" \
-  || { echo "FAIL: $skill does not state the page-cache caveat on url delivery mode"; exit 1; }
+# 3. Skill documentation. The delivery modes and server rules live in a reference file the
+#    skill names, so only the run that needs them pays for them; the skill must still say
+#    that `picture` misses CSS and send the reader there.
+delivery=skills/wp-robin/references/webp-delivery.md
+[ -f "$delivery" ] || { echo "FAIL: $delivery is missing"; exit 1; }
+grep -Fq 'references/webp-delivery.md' "$skill" \
+  || { echo "FAIL: $skill no longer sends the reader to $delivery"; exit 1; }
+grep -Fq 'webp_delivery_mode=picture' "$skill" \
+  || { echo "FAIL: $skill does not say that picture delivery misses CSS backgrounds"; exit 1; }
+grep -Fq 'webp_delivery_mode' "$delivery" \
+  || { echo "FAIL: $delivery does not document Robin's delivery modes"; exit 1; }
+grep -Fq 'Vary: Accept' "$delivery" \
+  || { echo "FAIL: $delivery offers the server-side rule without the Vary: Accept caveat"; exit 1; }
+grep -Fq 'page cache' "$delivery" \
+  || { echo "FAIL: $delivery does not state the page-cache caveat on url delivery mode"; exit 1; }
 
 # 4. The audit check that would have caught it.
 grep -Fq 'PERF-056' "$audit" \

@@ -11,6 +11,7 @@ how to read what it prints. How to run each one, and what its exit code means, i
 - `audit-menu-links.php` — menu items that go nowhere
 - `find-redeclared-functions.php` — one global function, two sources (SEC-043)
 - `find-missing-media-files.php` — attachments whose file is gone (WP-060/061/062)
+- `resolve-link-targets.php` — internal links the database can answer
 
 ---
 
@@ -102,3 +103,25 @@ clone whose file archive predates its database (`/wp-audit` Step 2.3). A miss wh
 was uploaded after that moment is `AFTER-ARCHIVE`: it exists in production, not in this copy's
 archive. A bare date is pushed to 23:59:59, so an upload on the archive day itself is never
 waved through. With no argument every miss is `UNDATED`.
+
+## `resolve-link-targets.php` — internal links the database can answer
+
+Whether a post or a term exists and is published is a query, not a page render. An audit that
+answered it over HTTP rendered hundreds of uncached store archives, 25 at a time, and held the
+database at about 18 cores on a shared development machine. This script answers what the
+database can, so only the rest need a request.
+
+**A link counts as resolved only when the database is sure.** `url_to_postid()` is lenient: it
+maps a wrong parent path, or a slug under the wrong base, to a real post that then answers with
+a redirect or a 404. So a match counts only when the object's own canonical URL
+(`get_permalink()`, `get_term_link()`, `get_post_type_archive_link()`) has the same path as the
+link. A published post, an existing term and a post type archive are resolved; a draft, a
+private post, a query string, an author archive, a paginated URL and anything unmatched go to
+HTTP. The error is only ever in one direction: a good link may be sent to HTTP, a broken one is
+never marked resolved.
+
+Each line it prints is `href TAB page TAB group`. The group is what
+`${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs` samples by: `tax:<taxonomy>` for a URL under a
+taxonomy's base, `type:<post_type>` for a URL that matched a post, empty otherwise (the sweep
+then falls back to the first path segment). Links on other hosts, fragments and non-http
+schemes pass through unchanged.

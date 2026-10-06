@@ -16,14 +16,16 @@ tw=starter-theme/__tailwind__/inc/i18n.php
 ci=starter-theme/__cinematic__/inc/i18n.php
 harness=tests/checks/lib/suffix-i18n-behavior.php
 for f in "$s" "$tw" "$ci" "$harness"; do [ -f "$f" ] || fail "$f is missing"; done
-skill_md=$(find skills/wp-bilingual -name '*.md' | sort)
+skill_md=()
+while IFS= read -r md; do skill_md+=("$md"); done < <(find skills/wp-bilingual -name '*.md' | sort)
+. tests/checks/lib/flat-hit.sh
 flat=$(tr '\n' ' ' < "$s" | sed 's/  */ /g')
 
 # --- the helper names are the starters' names, in both directions --------------
 # Every helper a starter defines is named in the skill under the prefix_ placeholder...
 for pair in "$tw:tailwind" "$ci:cinematic"; do
   file=${pair%%:*}
-  fns=$(grep -oP '^function __starter___\K[A-Za-z_0-9]+' "$file")
+  fns=$(grep -oP '^function __starter___\K[A-Za-z_0-9]+' "$file" || true)
   [ -n "$fns" ] || fail "no helpers found in $file -- this check would be vacuous"
   for fn in $fns; do
     grep -qF "prefix_$fn(" "$s" || fail "$s does not name prefix_$fn(), which the ${pair##*:} starter defines"
@@ -31,7 +33,7 @@ for pair in "$tw:tailwind" "$ci:cinematic"; do
 done
 # ...and the names that drifted are gone from every file of the skill.
 for gone in 'prefix__(' 'prefix_is_spanish' 'prefix_get_js_translations'; do
-  hit=$(grep -lF -- "$gone" $skill_md || true)
+  hit=$(flat_hit "$gone" "${skill_md[@]}")
   [ -z "$hit" ] || fail "$hit still names $gone, which no starter defines"
 done
 
@@ -42,7 +44,7 @@ grep -qF 'there is no `prefix_get_field()`' "$s" \
   || fail "$s does not warn that the cinematic starter has no prefix_get_field()"
 
 # --- <html lang>: one attribute, set by a filter the starters ship --------------
-grep -qF 'language_attributes(); ?> lang=' $skill_md \
+grep -qF 'language_attributes(); ?> lang=' "${skill_md[@]}" \
   && fail "the skill still appends a second lang attribute after language_attributes() — the browser keeps the first, the site locale"
 grep -qF "add_filter('language_attributes'" "$s" \
   || fail "$s does not show the language_attributes filter that makes <html lang> follow the request"
@@ -81,12 +83,23 @@ grep -qF "setcookie('__starter___lang'" "$ci" \
 
 # --- Spanish samples carry their accents -----------------------------------------
 for bad in "Saber Mas'" 'Enlaces Rapidos' 'Politica de Privacidad' 'Terminos y' 'Siguenos' "'Espanol'"; do
-  hit=$(grep -lF -- "$bad" $skill_md || true)
+  hit=$(flat_hit "$bad" "${skill_md[@]}")
   [ -z "$hit" ] || fail "$hit ships unaccented Spanish ('$bad')"
 done
 
 # --- the secondary-field instruction follows the primary language ---------------
 grep -qF '"Leave empty to use English version" instruction' "$s" \
   && fail "$s's checklist still gives the English instruction as the rule for every secondary field"
+
+# --- the description routes the right projects here, and the others away -------
+desc=$(sed -n 's/^description: //p' "$s")
+case "$desc" in *'records no strategy at all'*) ;; *)
+  fail "$s's description no longer claims projects with no recorded i18n strategy — those predate the choice and are suffix" ;; esac
+case "$desc" in *'wp-polylang'*) ;; *)
+  fail "$s's description no longer sends Polylang projects to wp-polylang" ;; esac
+
+# --- the constants are the project's recorded languages, not literals to copy ---
+case "$flat" in *'`PREFIX_DEFAULT_LANG` *is* the primary language'*) ;; *)
+  fail "$s does not say PREFIX_DEFAULT_LANG is the project's primary language" ;; esac
 
 echo PASS

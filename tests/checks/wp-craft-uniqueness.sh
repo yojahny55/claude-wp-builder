@@ -45,10 +45,14 @@ grep -Fq 'superset' "$D" \
 # v2 kept only the palette, on the reasoning that the composition library chooses
 # structure per role. A library with one good answer per role gives every build the
 # same answer, which is the thing structural fingerprinting catches.
-grep -Fq '4 of the 7' "$R/uniqueness.md" \
-  || fail "$R/uniqueness.md does not state the 4-of-7 gate"
+# The dimension table lives once, in fingerprint.md, which owns the gate; uniqueness.md
+# §5 points at it. Two copies of the table were how the 4-of-7 rule drifted before.
+grep -Fq 'fingerprint.md' "$R/uniqueness.md" \
+  || fail "$R/uniqueness.md §5 does not send the reader to fingerprint.md for the gate"
+grep -Fq 'Section-sequence shape' "$R/fingerprint.md" \
+  || fail "$R/fingerprint.md's dimension table has lost the structural axes, which is the v2 regression this file exists to prevent"
 grep -Fq 'Section-sequence shape' "$R/uniqueness.md" \
-  || fail "$R/uniqueness.md's dimension table has lost the structural axes, which is the v2 regression this file exists to prevent"
+  && fail "$R/uniqueness.md carries a second copy of the dimension table, which will drift from fingerprint.md's"
 grep -Fq '4 of the 7' "$R/fingerprint.md" \
   || fail "$R/fingerprint.md still gates on palette alone"
 grep -Fq 'count as **no match**' "$R/fingerprint.md" \

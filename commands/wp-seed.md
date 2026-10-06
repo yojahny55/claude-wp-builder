@@ -350,7 +350,7 @@ If the manifest (produced by `wp-normalize`) has a top-level `assets[]` array, e
 Populate all extracted content into ACF fields using WP-CLI. Primary language fields use **no suffix** (e.g., `hero_title`, not `hero_title_en`).
 
 **GEO citability.** When seeding copy that the demo did not supply — or tightening its
-extractable passages — apply the rubric in `skills/wp-audit-geo-standards/SKILL.md` §5:
+extractable passages — apply the rubric in `skills/wp-audit-geo-standards/references/citability.md`:
 answer-first 1–2 sentence openings, 134-167-word self-contained blocks, question-based
 H2s, a table for 3+ comparisons, and named sources/dates with first-party numbers.
 

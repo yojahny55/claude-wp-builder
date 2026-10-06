@@ -12,8 +12,6 @@ is the Spanish, the suffix is `_en`, and every label and instruction is written 
 - Field Organization
 - Repeater Subfields
 
-When defining fields in `fields/*.php` for a bilingual site (see wp-theme-standards for the field loader / Local JSON model — `fields/*.php` is a one-time bootstrap seed, `acf-json/*.json` is the dashboard-editable source of truth):
-
 ## Field Organization
 
 Use **Tab fields** to organize languages in the admin UI.

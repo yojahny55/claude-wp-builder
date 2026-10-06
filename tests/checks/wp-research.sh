@@ -31,9 +31,8 @@ grep -q '^user-invocable: false' "$s" || fail "$s must declare user-invocable: f
 sf=$(flat "$s")
 
 # Each tier is pinned by its own backticked form on the tier-values line
-# (skills/wp-research/SKILL.md:98-99) rather than the bare word: a bare
-# `grep -Fq firecrawl` cannot fail on its own, because the `firecrawl_url`
-# pin below (line ~41) already contains that substring.
+# rather than the bare word: a bare `grep -Fq firecrawl` cannot fail on its
+# own, because the `firecrawl_url` pin below already contains that substring.
 grep -Fq '`websearch`,' "$sf" \
   || fail "$s does not name the 'websearch' tier in its three-value list"
 grep -Fq '`firecrawl`,' "$sf" \
@@ -43,12 +42,39 @@ grep -Fq '`dataforseo`.' "$sf" \
 
 # Each rung must state what it degrades TO. A ladder that names three tiers but
 # never says one falls back to another is a list, not a ladder.
-grep -Fq 'Firecrawl MCP if connected' "$sf" \
+# Anchored on the bullet's own wording: the table row used to carry the same two phrases,
+# so deleting the bullet that states the fallback order left these pins green.
+grep -Fq '**Firecrawl MCP if connected**' "$sf" \
   || fail "$s does not state that Firecrawl is used via MCP when connected"
-grep -Fq 'firecrawl_url' "$sf" \
+grep -Fq 'otherwise the `firecrawl_url` HTTP endpoint' "$sf" \
   || fail "$s does not state the firecrawl_url HTTP fallback"
 grep -Fq 'fall back to `WebFetch` and say so in one line' "$sf" \
   || fail "$s does not state the WebFetch fallback and that it is announced"
+# The HTTP path has a defined request, or an agent improvises one against a self-hosted API.
+grep -Fq 'POST <firecrawl_url>/v1/scrape' "$sf" \
+  || fail "$s does not give the firecrawl_url request shape"
+grep -Fq 'Use the highest rung whose server is connected' "$sf" \
+  || fail "$s does not say which rung to use when more than one is available"
+
+# The rules that decide what the build may cite. Each was unpinned, and each is the
+# difference between attribution and a confident guess.
+grep -Fq 'confirmed by corroboration across two independent signals' "$sf" \
+  || fail "$s no longer requires two independent signals to confirm the client's identity — research.site would be recorded on one"
+grep -Fq 'never guess a URL' "$sf" \
+  || fail "$s no longer forbids guessing the client's URL from its name"
+grep -Fq 'stop searching and record the identity as unconfirmed' "$sf" \
+  || fail "$s's identification search has no stop rule"
+grep -Fq 'observed on at least three of the competitor rows' "$sf" \
+  || fail "$s no longer requires the differentiation line's X on three competitor rows"
+grep -Fq 'Read markup and stylesheets, not a screenshot' "$sf" \
+  || fail "$s no longer says to read markup rather than a screenshot"
+for tool in serp_organic_live_advanced on_page_content_parsing business_data_business_listings_search; do
+  grep -Fq "\`$tool\`" "$sf" || fail "$s no longer names the DataForSEO tool $tool"
+done
+grep -Fq 'by category **and** location' "$sf" \
+  || fail "$s no longer filters DataForSEO competitor listings by category and location"
+grep -Fq 'at most 5 SERP or listing calls per run' "$sf" \
+  || fail "$s puts no ceiling on paid DataForSEO calls"
 
 # The cap is the only thing stopping a run from wandering. Pin the numbers.
 grep -Fq 'at most 5 pages of the client' "$sf" \

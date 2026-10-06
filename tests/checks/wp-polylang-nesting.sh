@@ -171,12 +171,15 @@ grep -Fq -- 'Nesting is walked to any depth' "$lib" \
 # instruction to widen pllx_acf_walk(). An agent believing it hand-translates fields the
 # importer already handles. Scanned across every markdown file of the skill, so moving the
 # ACF section into references/ cannot carry the old sentence along unseen.
-skill_md=$(find skills/wp-polylang -name '*.md' | sort)
+skill_md=()
+while IFS= read -r md; do skill_md+=("$md"); done < <(find skills/wp-polylang -name '*.md' | sort)
+. tests/checks/lib/flat-hit.sh
 for old in 'one level of nesting' '(one level)' 'Widen `pllx_acf_walk()`' 'is not walked. Widen'; do
-  hit=$(grep -lF -- "$old" $skill_md || true)
+  hit=$(flat_hit "$old" "${skill_md[@]}")
   [ -z "$hit" ] || fail "$hit still claims a nesting ceiling the walker does not have ('$old')"
 done
-grep -qF 'walked to any depth' $skill_md \
+hit=$(flat_hit 'walked to any depth' "${skill_md[@]}")
+[ -n "$hit" ] \
   || fail "no wp-polylang skill file states that ACF containers are walked to any depth"
 
 echo "PASS: ACF nesting walked to any depth, layout matched by name, paths resolved by structure ($(echo "$out" | grep -c PHPOK) run)"

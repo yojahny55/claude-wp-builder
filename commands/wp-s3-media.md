@@ -82,8 +82,10 @@ error: report **both**, because the comparison is what says how much reached the
 side and therefore what a second run has left to do.
 
 **On a server with an IAM role** the script stops with no key pair to sign with, and prints
-the two ways forward. Read them to the user and let them choose; do not pick one, and never
-write credentials anywhere to get past it.
+the two ways forward. Recommend the first — temporary credentials in `S3_MEDIA_KEY` and
+`S3_MEDIA_SECRET`, exported by the user in their own terminal — because it works in both
+directions; the WP-CLI route uploads only and reports no summary. Never write credentials
+anywhere to get past it.
 
 ## Step 4: Report
 
