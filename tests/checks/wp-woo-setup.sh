@@ -73,6 +73,7 @@ done
 if grep -Fq 'periodically rotates' "$skill"; then fail "$skill says Stripe rotates the webhook secret periodically again"; fi
 if grep -Eq '(^|[^}/])templates/profiles/' "$skill"; then fail "$skill names a profile by a path relative to the plugin"; fi
 ref=skills/wp-woocommerce/references/plugins.md
+[ -r "$ref" ] || fail "$ref is missing or unreadable"
 for stale in 'will be our own' 'as of 2026' 'N01 piece' 'pending review' 'deprecated soon'; do
   if grep -Fq "$stale" "$ref"; then fail "$ref carries a roadmap or calendar claim that goes stale: $stale"; fi
 done

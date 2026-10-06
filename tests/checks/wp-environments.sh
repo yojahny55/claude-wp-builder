@@ -62,7 +62,8 @@ grep -Fq '"caddy": { "installed": false, "version": "", "running": false }' "$s"
 # 5. Every subcommand the script dispatches is named, with the SELinux rule for vhosts — it
 #    lived only in commands/wp-create.md, so an agent reading the skill had `sudo mv` left.
 setup=bin/wp-env-setup.sh
-subs=$(awk '/^main\(\)/{f=1} f && /^ *[a-z][a-z-]*\)/{sub(/^ */,""); sub(/\).*/,""); print}' "$setup")
+# Only the dispatch block: main() also parses flags in a case of its own.
+subs=$(awk '/^main\(\)/{f=1} f && /case "\$cmd" in/{c=1; next} c && /^ *esac/{exit} c && /^ *[a-z][a-z-]*\)/{sub(/^ */,""); sub(/\).*/,""); print}' "$setup")
 [ -n "$subs" ] || fail "no subcommands parsed from $setup — this assertion is matching nothing"
 for sub in $subs; do
   grep -Fq "\`$sub\`" "$s" || fail "$s does not name the $sub subcommand of $setup"

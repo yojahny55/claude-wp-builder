@@ -237,6 +237,7 @@ grep -Fq 'S3_MEDIA_KEY' "$cmd" \
 tpl=skills/wp-s3/templates/s3-config.php.tpl
 mu=skills/wp-s3/templates/s3-uploads-endpoint.php
 aws=skills/wp-s3/references/aws.md
+for f in "$tpl" "$mu" "$aws"; do [ -f "$f" ] || fail "$f is missing"; done
 for line in "define( 'S3_UPLOADS_AUTOENABLE', false );" \
             "define( 'S3_UPLOADS_OBJECT_ACL', 'bucket-owner-full-control' );" \
             "define( 'WC_LOG_DIR',            __DIR__ . '/wp-content/wc-logs-local/' );" \
