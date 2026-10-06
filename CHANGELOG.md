@@ -103,6 +103,63 @@
   "pre-build checks" that do not exist; two counts were wrong; the role table had two rows on
   one line; and two files ran plugin scripts by relative paths.
   `tests/checks/wp-craft-consistency.sh`.
+- **The audit's report contract is the one the renderer reads.** `wp-audit-standards` told
+  every agent to emit an `issues` array with lowercase severities, `code` and `fix_method`;
+  no agent did, `bin/audit-report.mjs` reads none of it, and the schema had no `status` for
+  the `N/A` and `UNMEASURED` answers the skill itself demands. Each agent had drifted into a
+  shape of its own — `code` beside a `check` that meant the check's *name*, `title`/`details`/
+  `autofix`, a GEO severity `ERROR` the renderer refuses — so the run file had to be rebuilt
+  by hand from six vocabularies. The skill now states the renderer's fields (`check`,
+  `status`, `severity`, `ownership`, `resource`, `message`, `checks_executed`) and where each
+  status goes, every agent's example uses them, GEO's `ERROR` is written `CRITICAL`, and the
+  dispatch prompt names `WP-NNN` and `UX-NNN` instead of a `BP-NNN` no agent emits. The same
+  skill read WCAG's 18pt as 18px; large text is ≥24px, or ≥18.66px bold.
+  `tests/checks/audit-report-contract.sh` holds all of it.
+
+- **Usability coverage counts the whole catalog.** `/wp-audit` Step 2.5d and the Step 6.8
+  gate read `UX-*` ids from `agents/wp-audit-ux.md`, which names 8 of the 36 criteria, so the
+  other 28 could never be reported as never measured. Both now read the table rows of
+  `wp-audit-ux-standards`. The catalog's owner column follows the browser suite for the
+  criteria the suite emits (`UX-015`, `UX-038` were `content` here and `code` there, so a
+  defect's owner depended on whether `--suite` ran), `UX-009` stops restating the 24×24
+  target size that is `A11Y-028`'s, applicability is stated once instead of twice with
+  different answers, the numbers the suite owns are named so a new criterion cannot take
+  one, and the skill no longer says rendered criteria need `--suite` when `bin/ux-probe.mjs`
+  measures them. `tests/checks/audit-ux-owners.sh` and
+  `tests/checks/audit-ux-standards-contract.sh` are new; the coverage check reads the skill.
+
+- **The local SEO checks read Rank Math's real option, and the phone rule reconciles its own
+  example.** `wp-audit-local-standards` and `wp-audit-seo` read `rank_math_titles`, which
+  Rank Math never writes (`rank-math-options-titles`), so its name, address and phone
+  silently dropped out of the NAP comparison. Digits-only phone normalization left
+  `+34 900 00 00 00` and `900000000` unequal, the false positive the rule exists to prevent;
+  it now strips the country code, with worked pairs. The bilingual comparison is no longer
+  conditional on `suffix` (options-page fields keep `_<lang>` under both strategies),
+  click-to-call applies to service-area businesses too, an absent address is not reported on
+  one, `SEO-063` runs on an undetermined site, recommended schema properties stop being
+  findings no check id carries, `aggregateRating` is never recommended, and locations link
+  with `parentOrganization`, which supersedes `branchOf`.
+
+- **`wp-audit-geo-standards` agrees with `bin/geo-scan.sh` and the fixer.** A non-public host
+  exits `3`, not `2` as the skill said, and `--start` is documented. `Content-Signal` is an
+  HTTP header only — the skill also asked for a per-`User-agent` robots block, the one line
+  the fixer refuses to write because it makes the file invalid, and the auditor looked for the
+  signal inside `robots.txt`. A catalog store's payment-protocol codes are `N/A`, as the
+  auditor already had it; GEO-A07 to A10 are fixable only when no SEO plugin owns the graph;
+  the robots body lists every crawler the table allows (`GoogleOther` was missing);
+  `anthropic-ai` is one thing in both files; GEO-D04 is the `/agents.md` route the fixer
+  serves; and the citability rubric is no longer said to be scored by an auditor that has no
+  code for it. `tests/checks/wp-geo.sh` pins each.
+
+- **The SEO fixer no longer shadows the GEO route it runs before.**
+  `wp-audit-seo-standards` and `wp-audit-rankmath` wrote a physical `llms.txt` at the web
+  root and a `robots.txt` naming six of the ten AI crawlers GEO-D02 requires. `/wp-audit`
+  dispatches SEO fixes before GEO fixes, so every run that fixed both left a stale file in
+  front of `inc/agentic.php`'s dynamic route (GEO-A26), and whichever agent wrote `robots.txt`
+  last decided GEO-D02. `wp-agentic-surfaces` is now the one writer of both; the SEO skill
+  keeps the classic robots block, identical to the writer's. The WooCommerce SEO commands
+  stop writing to fixed `/tmp` paths that concurrent audits share, and an empty sitemap list
+  is `UNMEASURED` instead of a silent pass. `tests/checks/seo-robots-llms-owner.sh` is new.
 
 - **`wp-demo-craft`, `/wp-cinematic-demo` and `/wp-cinematic-scene` load with their own
   frontmatter again.** Each had a value that is not valid YAML unquoted: an unquoted `: ` in

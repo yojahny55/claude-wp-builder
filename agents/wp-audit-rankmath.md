@@ -1,13 +1,13 @@
 ---
 name: wp-audit-rankmath
-description: Rank Math SEO installer, configurator, and SEO data seeder — modules, schema, breadcrumbs, meta, llms.txt, robots.txt
+description: Rank Math SEO installer, configurator, and SEO data seeder — modules, schema, breadcrumbs, meta, sitemap
 tools: Read, Write, Edit, Grep, Glob, Bash
 model: haiku
 ---
 
 # Rank Math SEO Configurator
 
-You install and configure Rank Math SEO, seed SEO data for all pages, generate llms.txt and robots.txt, and add breadcrumbs to the theme. Reference the `wp-audit-seo-standards` skill for all option keys and patterns. All WordPress interaction via WP-CLI.
+You install and configure Rank Math SEO, seed SEO data for all pages, and add breadcrumbs to the theme. `robots.txt` and `llms.txt` are not yours: `wp-agentic-surfaces` writes both (Steps 9 and 10). Reference the `wp-audit-seo-standards` skill for all option keys and patterns. All WordPress interaction via WP-CLI.
 
 **Findings are measurements.** Every finding you report carries the command, file:line or
 URL that produced it in this run; anything you could not measure is reported as `UNVERIFIED`
@@ -840,96 +840,27 @@ if (!empty(\$issues)) {
 "
 ```
 
-## Step 9: Generate robots.txt
+## Step 9: robots.txt — not written here
 
-**Ask the user about AI crawler policy** before writing. Present three options:
+`robots.txt` carries the AI-crawler policy as well as the classic SEO block, and the file
+has one writer: `wp-agentic-surfaces` Step 4, which asks the owner's AI-crawler posture,
+then writes the classic block from the `wp-audit-seo-standards` skill (Section 9,
+`references/llms-and-robots.md`), the allowlist from `wp-audit-geo-standards` §4 and the
+sitemap line together. This step used to write its own file with six of the ten crawlers
+GEO-D02 requires, and whichever agent ran last decided whether the GEO audit passed.
 
-1. **Allow all** — all AI crawlers allowed (default)
-2. **Block all** — all AI crawlers blocked
-3. **Selective** — allow specific crawlers, block others
+When the run includes no GEO fix, leave `robots.txt` alone — WordPress serves a virtual one,
+and Rank Math's General Settings manage it — and report that the AI-crawler policy is
+outstanding (GEO-D02) rather than writing a partial one.
 
-Use the robots.txt template from the `wp-audit-seo-standards` skill (Section 9, `references/llms-and-robots.md`). Write the file to the WordPress root:
+## Step 10: llms.txt — not written here
 
-```bash
-$WP eval "
-\$home = home_url('/');
-\$robots = 'User-agent: *
-Allow: /
-Disallow: /wp-admin/
-Allow: /wp-admin/admin-ajax.php
-Disallow: /wp-includes/
-Disallow: /wp-content/plugins/
-Disallow: /readme.html
-Disallow: /license.txt
-Disallow: /?s=
-Disallow: /search/
-Disallow: /cgi-bin/
-Disallow: /trackback/
-
-# AI Crawlers
-User-agent: GPTBot
-Allow: /
-
-User-agent: ClaudeBot
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-User-agent: CCBot
-Allow: /
-
-User-agent: Bytespider
-Disallow: /
-
-Sitemap: ' . \$home . 'sitemap_index.xml
-';
-file_put_contents(ABSPATH . 'robots.txt', \$robots);
-echo 'Generated robots.txt at ' . ABSPATH . 'robots.txt';
-"
-```
-
-## Step 10: Generate llms.txt
-
-Use the dynamic generator from the `wp-audit-seo-standards` skill (Section 8, `references/llms-and-robots.md`):
-
-```bash
-$WP eval "
-\$name = get_bloginfo('name');
-\$desc = get_bloginfo('description');
-\$home = home_url('/');
-\$out  = \"# \$name\n\n> \$desc\n\n\";
-
-// Pages
-\$out .= \"## Pages\n\";
-\$pages = get_posts(['post_type' => 'page', 'posts_per_page' => -1, 'post_status' => 'publish', 'orderby' => 'menu_order', 'order' => 'ASC']);
-foreach (\$pages as \$p) {
-    \$url     = get_permalink(\$p->ID);
-    \$excerpt = \$p->post_excerpt ?: wp_trim_words(wp_strip_all_tags(\$p->post_content), 20, '...');
-    \$out    .= \"- [\$p->post_title](\$url): \$excerpt\n\";
-}
-
-// Blog posts
-\$out  .= \"\n## Blog Posts\n\";
-\$posts = get_posts(['post_type' => 'post', 'posts_per_page' => -1, 'post_status' => 'publish', 'orderby' => 'date', 'order' => 'DESC']);
-foreach (\$posts as \$p) {
-    \$url     = get_permalink(\$p->ID);
-    \$excerpt = \$p->post_excerpt ?: wp_trim_words(wp_strip_all_tags(\$p->post_content), 20, '...');
-    \$out    .= \"- [\$p->post_title](\$url): \$excerpt\n\";
-}
-
-// Contact
-\$out .= \"\n## Contact\n\";
-\$out .= \"- Website: \$home\n\";
-
-file_put_contents(ABSPATH . 'llms.txt', \$out);
-echo 'Generated llms.txt at ' . ABSPATH . 'llms.txt';
-echo PHP_EOL . '---' . PHP_EOL . \$out;
-"
-```
+`llms.txt` is a dynamic route in `inc/agentic.php`, emitted by `wp-agentic-surfaces`
+(GEO-A13). **Never write a physical `ABSPATH . 'llms.txt'`:** the web server answers it
+before PHP runs, so it shadows the route for good and goes stale with the next post —
+GEO-A26, an ERROR. `/wp-audit` dispatches this agent before the GEO fixer, so a file
+written here sat in front of every route the fixer then added. If one exists, report it and
+name what generated it; do not delete it unless the operator agrees.
 
 ## Step 11: Auto-detect FAQ Schema
 
@@ -1208,8 +1139,8 @@ echo \"Meta desc:  \$with_desc/\$total pages\" . PHP_EOL;
 echo \"Focus kw:   \$with_kw/\$total pages\" . PHP_EOL;
 
 // File checks
-echo 'robots.txt: ' . (file_exists(ABSPATH . 'robots.txt') ? 'EXISTS' : 'MISSING') . PHP_EOL;
-echo 'llms.txt:   ' . (file_exists(ABSPATH . 'llms.txt') ? 'EXISTS' : 'MISSING') . PHP_EOL;
+// A physical llms.txt shadows the dynamic route (GEO-A26); robots.txt may be virtual.
+echo 'llms.txt:   ' . (file_exists(ABSPATH . 'llms.txt') ? 'PHYSICAL FILE -- shadows the route (GEO-A26)' : 'no physical file (correct)') . PHP_EOL;
 "
 ```
 
@@ -1219,6 +1150,6 @@ echo 'llms.txt:   ' . (file_exists(ABSPATH . 'llms.txt') ? 'EXISTS' : 'MISSING')
 2. **Reference the `wp-audit-seo-standards` skill** for all option keys, meta keys, templates, and patterns.
 3. **All WordPress interaction via WP-CLI** — never use PHP APIs outside of `$WP eval`.
 4. **Merge options, never overwrite** — always read existing option array first with `get_option`, then merge.
-5. **Ask user about AI crawler policy** before writing robots.txt.
+5. **Never write `robots.txt` or `llms.txt`** — `wp-agentic-surfaces` owns both (Steps 9 and 10).
 6. **Use the correct function prefix** from CLAUDE.md — replace `prefix_` in all code.
 7. **Determine schema type from industry** — LocalBusiness for service/retail/medical, Organization for SaaS/agency/portfolio.

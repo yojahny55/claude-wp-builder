@@ -44,11 +44,13 @@ service-area business has no street address *by design*.
 | Type | Signals | Checks that do NOT apply |
 |------|---------|--------------------------|
 | **Brick-and-mortar** | Street address in content, footer or schema; map embed with a pin; "visit us", "located at" | — (full set applies) |
-| **Service-area (SAB)** | No visible street address; "serving <region>", "we come to you", "mobile service"; `areaServed` present without `address.streetAddress` | SEO-056 map embed, SEO-057 address parity |
+| **Service-area (SAB)** | No visible street address; "serving <region>", "we come to you", "mobile service"; `areaServed` present without `address.streetAddress` | the map half of SEO-056; the address half of SEO-057 (parity and absence) |
 | **Hybrid** | Both a physical address and service-area language | — (full set applies, plus `areaServed`) |
 
 When signals are contradictory, report the type as `undetermined`, run only the checks
-that are type-independent (SEO-055, SEO-058, SEO-060, SEO-061) and say so in the report.
+that are type-independent (SEO-055, SEO-058, SEO-060, SEO-061, SEO-063) and say so in the
+report. SEO-059 and SEO-062 still run wherever their own preconditions hold — a
+`LocalBusiness` node to read `geo` from, more than one location page.
 
 ---
 
@@ -76,29 +78,27 @@ No vertical detected → generic `LocalBusiness` is correct, not a finding.
 
 ## Where WordPress Stores Each Value
 
-A local audit reads five different places for what is conceptually one fact. The
-discrepancies between them are the finding.
+A local audit reads three sources for what is conceptually one fact — the rendered page,
+the stored settings and the theme's templates — and the discrepancies between them are the
+finding. Stored settings are two different stores, so they get two columns.
 
-| Value | Source 1 — rendered | Source 2 — options | Source 3 — theme |
-|-------|---------------------|--------------------|------------------|
-| Business name | JSON-LD `name` | `wp option get blogname`; Rank Math `rank_math_titles` → `knowledgegraph_name` | options-page ACF field |
-| Address | JSON-LD `address.*` | Rank Math local module option keys | footer template part, contact template |
-| Phone | JSON-LD `telephone`; `tel:` href | options-page ACF field | footer template part |
-| Opening hours | JSON-LD `openingHoursSpecification` | options-page repeater | — |
-| Geo coordinates | JSON-LD `geo.latitude` / `geo.longitude` | options-page fields | map embed attributes |
+| Value | Rendered | Rank Math option (`rank-math-options-titles`) | Options-page ACF field (starter names) | Theme template |
+|-------|----------|-----------------------------------------------|----------------------------------------|----------------|
+| Business name | JSON-LD `name` | `knowledgegraph_name` (and WordPress's `blogname`) | — | header, footer |
+| Address | JSON-LD `address.*` | `local_address` | `business_address` | footer template part, contact template |
+| Phone | JSON-LD `telephone`; `tel:` href | `phone_numbers` | `contact_phone`, `header_phone` | footer template part |
+| Opening hours | JSON-LD `openingHoursSpecification` | `opening_hours` | the theme's hours repeater, when it has one | — |
+| Geo coordinates | JSON-LD `geo.latitude` / `geo.longitude` | `geo` | the theme's map fields, when it has them | map embed attributes |
 
-Read options with WP-CLI, never by parsing PHP:
+Rank Math keeps its local values inside the `rank-math-options-titles` option, not in an
+option of their own. An adopted site's field names are its own: read them from its field
+groups rather than assuming the starter's. The agent reads every option once, with `$WP`,
+in step 3 of its local procedure — never by parsing PHP.
 
-```bash
-wp option get rank_math_titles --format=json
-wp option get rank_math_modules --format=json
-```
-
-**Bilingual sites.** Under the `suffix` strategy the options-page fields carry their
-`_<lang>` suffixes — `business_address_en` — and **both** variants must be checked.
-This is the deliberate crossover documented in `wp-contributing`: options are global, so
-Polylang's per-post model does not reach them, and options-page fields keep their
-suffixes under *both* i18n strategies. An address that is correct in one language and
+**Bilingual sites.** Options-page fields carry their `_<lang>`
+suffixes under *both* i18n strategies — `business_address_es` — because options are global
+and Polylang's one-post-per-language model does not reach them. So always compare every `_<lang>` variant,
+whichever strategy the project records. An address that is correct in one language and
 stale in the other is a real NAP discrepancy, not a translation artifact.
 
 ---
@@ -111,15 +111,25 @@ a different defect from an address that differs between two languages.
 
 Normalize before comparing, or the check reports noise:
 
-- Phone: strip spaces, hyphens, parentheses and a leading `+`; compare the digits.
+- Phone: keep the digits only, then drop, in order, a leading `00`, the site's
+  country calling code (from `addressCountry`) and a leading trunk `0`; compare what is
+  left. The country code is the step that matters — digits alone leave `34900000000` and
+  `900000000` unequal, which is the false positive normalization exists to prevent.
 - Address: collapse whitespace, lowercase, strip trailing punctuation; treat common
   abbreviations as equal (`St.` / `Street`, `Ave` / `Avenue`).
 - Name: strip legal suffixes (`S.L.`, `Inc.`, `Ltd.`) before comparing; report a bare
   suffix difference as INFO, not WARNING.
 
-Absent NAP is more severe than inconsistent NAP: a local business whose address appears
-nowhere in the rendered HTML fails SEO-057 at WARNING even when the schema is perfect,
-because the schema alone gives a human visitor nothing.
+| Source A | Source B | Normalized | Verdict |
+|----------|----------|------------|---------|
+| `+34 900 00 00 00` (JSON-LD, Spain) | `900000000` (footer `tel:`) | `900000000` and `900000000` | same number, no finding |
+| `+44 20 7946 0000` (JSON-LD, UK) | `020 7946 0000` (footer) | `2079460000` and `2079460000` | same number, no finding |
+| `+34 900 00 00 00` | `+34 900 00 00 01` | `900000000` and `900000001` | SEO-057 |
+
+Absent NAP is more severe than inconsistent NAP: a brick-and-mortar or hybrid business
+whose address appears nowhere in the rendered HTML fails SEO-057 at WARNING even when the
+schema is perfect, because the schema alone gives a human visitor nothing. A service-area
+business has no street address by design, so for it an absent address is not a finding.
 
 ---
 
@@ -163,8 +173,10 @@ their own — rendered entirely client-side — is a CRITICAL finding: those pag
 exist for a crawler.
 
 **Schema per location.** Each location page carries its own `LocalBusiness` node with a
-unique `@id`, linked to the site-wide Organization through `branchOf`. A single shared
-`@id` across locations collapses them into one entity.
+unique `@id`, linked to the site-wide Organization through `parentOrganization` — schema.org
+supersedes `branchOf` with it; accept `branchOf` on older markup and never report correct
+`parentOrganization` markup for lacking it. A single shared `@id` across locations
+collapses them into one entity.
 
 ---
 
@@ -176,19 +188,23 @@ Required by Google for a local rich result:
 - `address` as a `PostalAddress` with `streetAddress`, `addressLocality`,
   `postalCode` and `addressCountry`
 
-Recommended, and each one its own INFO finding when absent:
+Recommended. These are not findings of their own: no check id carries them, and a finding
+without one can be neither rendered nor tracked across runs. List the absent ones in the
+local section of the report as recommendations. `geo` is the exception, because SEO-059
+checks it.
 
 - `telephone`, `url`, `image`
 - `geo` with `latitude` and `longitude` — **at least five decimal places**; three
-  decimals places the pin roughly a hundred metres off
+  decimals places the pin roughly a hundred metres off (SEO-059)
 - `openingHoursSpecification`
 - `priceRange` — under 100 characters
 - `areaServed` for service-area and hybrid businesses
-- `aggregateRating` **only when real review data backs it**
 
-`aggregateRating` invented by a theme, or carrying placeholder values, is a CRITICAL
-finding under SEO-063: it is structured-data spam and risks a manual action. The
-starter theme must never ship one.
+`aggregateRating` is never on that list. Absent, it is not a finding and not a
+recommendation, because recommending it is a nudge toward inventing one. Present without
+real review data behind it, or carrying placeholder values, it is a CRITICAL finding under
+SEO-063: structured-data spam that risks a manual action. The starter theme must never ship
+one.
 
 Schema is not a ranking factor. It earns rich results and gives AI systems parseable
 business data. Word the findings that way; a report claiming schema lifts rankings is

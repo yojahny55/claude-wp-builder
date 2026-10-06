@@ -847,8 +847,9 @@ This list allows training-capable crawlers (`GPTBot`, `ClaudeBot`, `Google-Exten
 `Applebot-Extended`), so the signal declares `ai-train=yes` — an allow plus `ai-train=no`
 is the contradiction `robots-ai-policy-quality` fails. A site that wants to opt out of
 training must also `Disallow` those bots and set `ai-train=no`. Keep `CCBot` and
-`anthropic-ai` consistent with the owner's answer — `CCBot` is context (allow only if the
-public corpus is wanted); `anthropic-ai` is training-only, unlike `ClaudeBot`.
+`anthropic-ai` consistent with the owner's answer — `CCBot` is not named unless the owner
+does not want the public corpus, and then it is disallowed; `anthropic-ai` is Anthropic's
+legacy token, so when it is named it gets `ClaudeBot`'s policy.
 
 **Do not write `Content-Signal:` as a bare line into `robots.txt`.** No robots.txt grammar
 defines that directive, so a validator that lints the file (Lighthouse included) reports

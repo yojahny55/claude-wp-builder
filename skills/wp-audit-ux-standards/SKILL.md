@@ -28,19 +28,27 @@ needs to be, and nothing in the audit says so. These are the criteria that say s
 ## The catalog
 
 Codes are `UX-NNN`. The numbers are the criteria's own, zero-padded, so `UX-006` and
-`UX-046` sort the way a reader expects and a ledger written this release still matches one
-written next release. **Numbers are never reused**: a retired criterion leaves a hole.
+`UX-034` sort the way a reader expects and an id never changes meaning between runs.
+**Numbers are never reused**: a retired criterion leaves a hole.
+
+`UX-022`, `UX-023` and `UX-039` to `UX-058` are not holes. They are the browser suite's own
+accessibility, SEO and performance criteria, which `templates/audit-suite/scripts/to-run.js`
+emits under this prefix — contrast arrives as `UX-045`, which is `A11Y-003` here. They are
+not usability criteria and not rows of this catalog. A new usability criterion takes the next
+number above `UX-058`.
 
 Each row carries the owner its fix belongs to, in the four-way split `/wp-audit` Step 8.5
 defines — `code` travels with the commit, `setting` does not, `content` needs somebody to
 write a text, `manual` needs judgement. The owner is a property of where the fix lands, not
-of whether the audit could apply it.
+of whether the audit could apply it. Where the browser suite emits a criterion too, the
+owner here is the suite's (`aplicacion()` in `templates/audit-suite/lib/plan.js`): a measured
+row replaces the agent's in the merge, so a second classification would make a defect's
+owner depend on whether `--suite` ran. A row the suite never emits keeps the owner below,
+whatever `plan.js` says about it.
 
 ### A. Forms and data entry
 
-Applicability: **a site with no form and no data entry marks this whole category N/A.**
-`UX-011` needs an action with consequences; `UX-037` and `UX-038` need the site to ask for
-personal data or an account.
+Applicability: see *Applicability* below — the whole group is N/A on a site with no form.
 
 | Code | Check | How to detect | Passes when | Severity | Owner |
 |---|---|---|---|---|---|
@@ -54,7 +62,7 @@ personal data or an account.
 | UX-024 | Error messages say what to do | read the message text | "Enter an email like name@domain.com", not "Error 3" | WARNING | content |
 | UX-035 | Focus moves to the first field in error | JS that focuses the first invalid field after submit | the user lands on what they must fix | INFO | code |
 | UX-037 | No unnecessary registration | walk the key flows | nothing demands an account for a task that does not need one | WARNING | manual |
-| UX-038 | The privacy policy is easy to find | a link in the footer and beside any form asking for personal data | reachable from where the data is asked for | WARNING | content |
+| UX-038 | The privacy policy is easy to find | a link in the footer and beside any form asking for personal data | reachable from where the data is asked for | WARNING | code |
 
 ### B. Navigation and task flow
 
@@ -68,18 +76,12 @@ personal data or an account.
 | UX-025 | The user can tell where they are | breadcrumbs, an active section, a section title | the position in the hierarchy is identifiable | INFO | code |
 | UX-036 | Navigation is ordered logically | read the menu order | frequency, task flow or theme — some order a person could name | INFO | manual |
 
-`UX-020` is N/A on a site small enough that search adds nothing — say so rather than
-failing it.
-
 ### C. Links
-
-Applicability: no external links marks `UX-015` and `UX-028` N/A; no image used as a link
-marks `UX-019` N/A.
 
 | Code | Check | How to detect | Passes when | Severity | Owner |
 |---|---|---|---|---|---|
 | UX-014 | No broken internal links | collect the internal `href`s of the pages in scope, deduplicated and capped, and **follow them** | every internal link resolves | CRITICAL | code |
-| UX-015 | No broken external links | the same, for external hosts | no 404 and no DNS failure | WARNING | content |
+| UX-015 | No broken external links | the same, for external hosts | no 404 and no DNS failure | WARNING | code |
 | UX-018 | Links are identifiable at rest | the `a` rule in its default state | recognisable without hovering, and not by colour alone | WARNING | code |
 | UX-019 | Image links carry alternative text | `a > img` with no `alt`, or an empty `alt` with no other label | every image link tells a screen reader where it goes | WARNING | content |
 | UX-027 | Link text matches its destination | compare the link text with the destination's `<title>`/H1 | the text predicts the page; no "click here" | INFO | content |
@@ -104,14 +106,12 @@ the same way or the duplicate survives.
 |---|---|---|---|---|---|
 | UX-005 | Clickable things react to hover | `:hover` rules and `cursor` | every clickable element gives visible feedback | INFO | code |
 | UX-008 | The current menu item is marked | `active`/`aria-current="page"` and the style behind it | the selected item is clearly different | WARNING | code |
-| UX-009 | Action elements have room between them | margins, padding and the rendered target (below 24×24 fails per WCAG 2.5.8; 44×44 is AAA advice) | adjacent controls do not induce a wrong tap | WARNING | code |
+| UX-009 | Action elements have room between them | the rendered gap between adjacent action elements, from `getBoundingClientRect()` — the harness lists pairs closer than 8 px | adjacent action elements do not induce a wrong tap. A target smaller than 24×24 is `A11Y-028`, not this row | WARNING | code |
 | UX-026 | Button text names the action | read the button labels | "Save changes", not "OK" where OK is ambiguous | INFO | content |
 | UX-030 | Icons match what they mean | compare each icon with its function | a magnifier searches, a cart buys | INFO | manual |
 | UX-031 | Selected icons differ from unselected | the icon's active state | the selected state is unmistakable | INFO | manual |
 
 ### E. Legibility
-
-`UX-045` (contrast) is deliberately absent: it is `A11Y-003`.
 
 | Code | Check | How to detect | Passes when | Severity | Owner |
 |---|---|---|---|---|---|
@@ -126,9 +126,6 @@ case is real too — a theme that never reduces its type can overflow on mobile 
 desktop. Report the longest line per breakpoint.
 
 ### F. Visual identity
-
-Applicability: no images, tables or charts marks `UX-033` N/A. A single-page site marks
-`UX-034` N/A, or reduces it to "the logo is present".
 
 | Code | Check | How to detect | Passes when | Severity | Owner |
 |---|---|---|---|---|---|
@@ -158,19 +155,26 @@ which is not a contract anyone stated.
 ## Applicability, and why it changes the score
 
 A site is not worse for lacking a feature it was never meant to have. Before scoring,
-decide which criteria apply to **this** site:
+decide which criteria apply to **this** site. This list is the only statement of
+applicability; every criterion not on it applies to every site.
 
-- no form at all → category A is N/A
+- no form and no data entry → all of group A (Forms and data entry)
+- no action with consequences (delete, pay, an irreversible send) → `UX-011`
+- no account and no personal data asked for → `UX-037`, `UX-038`
+- no modal and no multi-step flow → `UX-003`, `UX-004`
+- no navigation menu → `UX-008`, `UX-036`
 - no external links → `UX-015`, `UX-028`
-- no images → `UX-019`, `UX-033`
-- no account or personal data → `UX-037`, `UX-038`
-- a single page → `UX-021`, `UX-034`, `UX-025`, and `UX-017` is reduced
-- no long prose → `UX-006`, `UX-007`
+- no image used as a link → `UX-019`
+- no images, tables or charts → `UX-033`
+- a single page → `UX-021`, `UX-025`, `UX-034`; and `UX-017` asks only whether the page's
+  own navigation reaches each of its sections
+- fewer than 10 published pages and posts, and no blog, shop or other archive → `UX-020`
+- no text block over 5 lines → `UX-006`, `UX-007`
 - no icons → `UX-030`, `UX-031`
 
-**N/A is excluded from the denominator and reported separately.** A score of 30/40 on the
-criteria that applied is a measurement; 30/56 against a list including sixteen that never
-applied is a number that punishes a site for its own shape.
+**N/A is excluded from the denominator and reported separately.** On a brochure site where
+16 of the 36 criteria are N/A, 15 passed is 15/20 — a measurement. Scored as 15/36, against
+sixteen criteria that never applied, it punishes the site for its own shape.
 
 **When in doubt, the criterion applies.** N/A means "this site genuinely lacks the thing
 the criterion evaluates". It never means "this applies and is not implemented" — that is a
@@ -187,14 +191,18 @@ code, the measured characters per line and the breakpoint, the computed value. A
 answered from reading a template rather than loading a page is an inference, and it is
 reported as one — `UNMEASURED` with the command or the URL that would settle it.
 
-This is why `--suite` exists. Roughly two thirds of this catalog can be measured in a real
-browser, and `templates/audit-suite/` measures them. Without it, the criteria that need a
-rendered page are `UNMEASURED` and the ones a file scan can answer still run.
+Rendered measurements come from `${CLAUDE_PLUGIN_ROOT}/bin/ux-probe.mjs`, which the agent's
+Step 2 runs in a single browser launch: the longest line per breakpoint, the gaps between
+action elements, link styling at rest, image links with no name, required fields with no
+mark, and the `href`s `UX-014` and `UX-015` follow. `--suite`
+(`${CLAUDE_PLUGIN_ROOT}/templates/audit-suite/`) is a second measured path for the
+criteria it covers. With no browser at all, the criteria that need a rendered page are
+`UNMEASURED`, and the ones a file scan can answer still run.
 
 ## The standard a fix has to meet
 
-Every fix in the `code` column above is a visual change, and `UX-018`, `UX-005`, `UX-009`
-and `UX-006` move layout. So a fix to one of these is only correct when it is evidenced the
+Almost every fix in a row whose Owner is `code` is a visual change, and `UX-018`, `UX-005`,
+`UX-009` and `UX-006` move layout. So a fix to one of these is only correct when it is evidenced the
 same way a finding is:
 
 - **Consent.** A change to how the site looks is the client's decision, not the audit's. A

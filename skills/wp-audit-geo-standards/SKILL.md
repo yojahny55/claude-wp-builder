@@ -66,6 +66,12 @@ every `N/A` layer. A WordPress site with WooCommerce active but products disable
 still counts as `merchant` for detection purposes; the payment-protocol checks stay
 advisory either way.
 
+A catalog store is a merchant that deliberately takes no payment. When `/wp-audit` Step 2.3
+records `site.store_tier` = `catalog` (read from the `store` block of `.wp-create.json`),
+the payment-protocol codes GEO-P01 to GEO-P05 are `N/A ("catalog: nothing purchasable")`:
+an agent payment protocol has nothing to pay for. `unknown` is not `catalog` — audit them.
+Read the recorded tier; never infer it from whether a checkout page happens to exist.
+
 ---
 
 ## 3. Check catalog — GEO codes
@@ -86,7 +92,7 @@ type implies it.
 | GEO-D01 | `ard-catalog`, `ai-catalog-published`, `ard-entries-valid` | yes — `/.well-known/ard.json` + `ai-catalog.json` alias |
 | GEO-D02 | `robots-ai-policy-quality`, `robots-agent-user-policy` | yes — robots policy + `Content-Signal` |
 | GEO-D03 | `ard-trust-manifest` | yes — trust manifest in the ARD catalog |
-| GEO-D04 | `agent-rules-repo`, `agent-plugins-repo` | yes — `AGENTS.md` |
+| GEO-D04 | `agent-rules-repo`, `agent-plugins-repo` | yes — `/agents.md`, the AGENTS.md document served by `inc/agentic.php` |
 | GEO-D05 | `brand-search-accuracy` | advisory — measured via ORA / DataForSEO |
 | GEO-D06 | `agentic-search-specific`, `agentic-search-usecase` | advisory — share of voice |
 | GEO-D07 | `wikipedia-presence` | advisory — off-site |
@@ -102,10 +108,10 @@ type implies it.
 | GEO-A04 | `agent-friendly-404` | yes — real 404 status + short markdown body |
 | GEO-A05 | `docs-auth-gate` | yes — keep public pages ungated |
 | GEO-A06 | `metadata-completeness` | yes — canonical + `lang` + `og:image` + `og:type` together |
-| GEO-A07 | `json-ld` | yes — identity JSON-LD |
-| GEO-A08 | `json-ld-entity-linking` | yes — `sameAs` |
-| GEO-A09 | `org-schema-completeness` | yes — `contactPoint` + `address` |
-| GEO-A10 | `schema-type-breadth` | yes — FAQPage/Service/Product/AggregateRating/BreadcrumbList |
+| GEO-A07 | `json-ld` | yes, when no SEO plugin owns the graph (§6.8) — identity JSON-LD |
+| GEO-A08 | `json-ld-entity-linking` | yes, when no SEO plugin owns the graph (§6.8) — `sameAs` |
+| GEO-A09 | `org-schema-completeness` | yes, when no SEO plugin owns the graph (§6.8) — `contactPoint` + `address` |
+| GEO-A10 | `schema-type-breadth` | yes, when no SEO plugin owns the graph (§6.8) — FAQPage/Service/Product/AggregateRating/BreadcrumbList |
 | GEO-A11 | `trust-anchors` | yes — `/about`, `/contact`, `/privacy` each ≥500 chars |
 | GEO-A12 | `sitemap`, `sitemap-lastmod` | yes — Rank Math `lastmod` on |
 | GEO-A13 | `llms-txt-exists` | yes — dynamic endpoint |
@@ -149,7 +155,7 @@ advertises pages the site does not publish.
 | GEO-U09 * | `onboarding-friction`, `sandbox-environment` | SaaS only |
 | GEO-U10 | `cli-tool`, `webmcp`, `a2ui-support`, `nlweb-schema-feeds`, `nlweb-ask`, `nlweb-streaming` | advisory / emerging |
 
-### Payments — GEO-P (merchant only)
+### Payments — GEO-P (merchant only, `N/A` on a catalog store)
 
 | Code | ORA check ids | Fixable |
 |---|---|---|
@@ -183,11 +189,11 @@ changing it.
 | `Applebot-Extended` | Apple Intelligence | ALLOW |
 | `Amazonbot` | Amazon | ALLOW |
 | `FacebookBot` | Meta AI | ALLOW |
-| `CCBot` | Common Crawl | context — allow if the public corpus is wanted, otherwise block |
-| `anthropic-ai` | Anthropic legacy UA | context — alias of ClaudeBot; keep consistent |
+| `CCBot` | Common Crawl | not named — falls under `User-agent: *`; `Disallow` it only when the owner does not want the site in the public corpus |
+| `anthropic-ai` | Anthropic, legacy token | not named — when it is, give it `ClaudeBot`'s policy |
 | `Bytespider` | ByteDance / TikTok | BLOCK for Western markets |
 
-Minimum robots body:
+Minimum robots body — every ALLOW row above, then the BLOCK row:
 
 ```
 User-agent: GPTBot
@@ -208,6 +214,9 @@ Allow: /
 User-agent: Google-Extended
 Allow: /
 
+User-agent: GoogleOther
+Allow: /
+
 User-agent: Applebot-Extended
 Allow: /
 
@@ -221,12 +230,15 @@ User-agent: Bytespider
 Disallow: /
 ```
 
-Add the policy signal as a response header (and, where the host supports it, a
-per-`User-agent` block):
+Send the policy signal as an HTTP response header, and never as a line of `robots.txt`:
 
 ```
 Content-Signal: ai-train=yes, search=yes, ai-retrieval=yes
 ```
+
+No robots.txt grammar defines a `Content-Signal` directive, so a validator that lints the
+file — Lighthouse among them — reports the whole `robots.txt` invalid over that one line.
+The file may document the signal in a `#` comment; the header is what carries it.
 
 `Content-Signal` declares the site's AI usage posture and **must match the robots
 allowlist** — a signal that contradicts the rules fails both `robots-ai-policy-quality` and
@@ -264,9 +276,8 @@ Concrete rules:
 - Prefer first-party data — measured numbers we own — over adjectives.
 - One idea per passage; a section that answers two questions gets split.
 
-The rubric is for **generation** as well as audit: `/wp-section` and `/wp-seed` authors
-apply it when writing copy, and the auditor scores each page's extractable blocks
-against it.
+The rubric is for **generation**: `/wp-section` and `/wp-seed` authors apply it when
+writing copy. No GEO code scores it, so the auditor reports nothing against it.
 
 ---
 
@@ -414,6 +425,13 @@ already emit — `FAQPage`, `Service`, `Product`, `AggregateRating`, `Breadcrumb
 **guarded against duplicate schema sources**: if Rank Math already emits a type, the
 theme must not emit it a second time (§16 of the SEO standards skill).
 
+All of this is for a site with no SEO plugin. When Rank Math, Yoast or SEOPress owns the
+schema, the theme emits no JSON-LD at all — a second identity graph beside the plugin's is
+the duplicate source SEO-039 reports — so GEO-A07 to GEO-A10 cannot be fixed from the
+theme. They are reported as dependent on the SEO plugin's configuration, and
+`wp-audit-rankmath` fills the plugin's Organization / LocalBusiness `contactPoint`,
+`address` and `sameAs` (Rank Math emits neither `contactPoint` nor `address` by default).
+
 ### 6.9 Trust anchors
 
 Ensure `/about`, `/contact`, `/privacy` exist as real published pages with ≥500
@@ -434,21 +452,27 @@ discovery endpoints and a numbered obtain-and-send flow — and satisfies `auth-
 
 ## 7. Verification loop
 
-The live verifier is `bin/geo-scan.sh <domain>`: it issues a read-only `GET` to the public
-is-agentic report API (`https://is-agentic.com/api/v1/report?url=…`) under a 60-second
-timeout and **only prints the JSON report**. It never runs npm packages — `/wp-yolo` calls
-it unattended, so downloading and executing a package would be a supply-chain risk. If no
-completed report exists yet, the site owner runs one scan at https://is-agentic.com and the
-script reads it thereafter. The script does not parse the JSON; the caller — the audit/fix
-agent — maps the failed ORA check ids back to GEO codes using §3, and re-runs the scan after
-the fixer completes.
+The live verifier is `${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <domain|url> [--start]` — run
+it, do not read or reimplement it. It needs `curl`; `timeout` or `gtimeout` bound it when
+present. It issues a read-only `GET` to the public is-agentic report API
+(`https://is-agentic.com/api/v1/report?url=…`) and **only prints the JSON report**. It never
+runs npm packages — `/wp-yolo` calls it unattended, so downloading and executing a package
+would be a supply-chain risk. When no completed report exists yet, `--start` asks
+is-agentic to scan the host through the same HTTP endpoint the npm CLI uses and reads the
+report when the scan finishes, all within 110 s. Pass `--start` only for a host the
+operator confirmed as public this run: a scan makes is-agentic fetch the site. The script
+does not parse the JSON; the caller — the audit/fix agent — maps the failed ORA check ids
+back to GEO codes using §3, and re-runs the scan after the fixer completes.
+
+| Exit | Meaning | What the caller does |
+|---|---|---|
+| `0` | a non-empty report came back | map its failed ids to GEO codes |
+| `1` | the request failed, or the arguments were wrong | record the error; the GEO codes it would have measured are `UNMEASURED` |
+| `2` | skipped cleanly: no `curl`, no network, no completed report, a scan that did not finish, a transient `429`/`503` | record the skip and mark the run incomplete — never a pass |
+| `3` | the host is not publicly reachable: `localhost`, `.local`, `.test`, `*.local.com`, a private address, a name with no dot | pass the public URL (`/wp-audit --host`); a dev host is a configuration problem, not a missing report |
 
 - A fix is reported resolved **only when the ORA check flips**, not when the theme
   file changed.
-- Exit `0` = a non-empty report came back; `1` = the request failed; `2` = skipped cleanly
-  (no `curl`, no network, no completed report, or a transient `429`/`503`). A localhost or
-  otherwise non-public URL legitimately yields exit `2`; record the skip and mark the run
-  incomplete rather than silently passing.
 - The evaluator reads a point-in-time scan; a green scan is evidence, not a guarantee.
 
 ---

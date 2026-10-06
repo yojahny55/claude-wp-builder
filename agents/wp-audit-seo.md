@@ -79,7 +79,7 @@ Scan theme template files using Grep and Glob. No WP-CLI needed.
 | SEO-044 | Affiliate links missing `rel="sponsored"` | Grep templates for affiliate `href=` patterns (`amazon.`, `booking.`, `shareasale.`, `cj.com`, `impact.com`, `ref=`, `aff=`, `utm_source=affiliate`) without `rel="sponsored"`. Also flag `target="_blank"` without `rel="noopener"`. | WARNING | Yes |
 | SEO-049 | Dead asset references | Grep templates for `data-src`, `data-src-mobile` and `poster=` attributes, resolve each path against the theme directory and flag any file that does not exist — the browser pays for a 404. | WARNING | Yes |
 | SEO-055 | Local business without `LocalBusiness` schema | Applicability gate passes (see skill) but no `LocalBusiness` node or subtype appears in the theme's JSON-LD and Rank Math's `rich-snippet` module does not emit one | WARNING | Yes |
-| SEO-056 | No click-to-call or map embed | Brick-and-mortar or hybrid only. Grep templates for a `tel:` href and for a map embed; absence of the `tel:` link is WARNING, absence of the map is INFO | WARNING | No |
+| SEO-056 | No click-to-call or map embed | Grep templates for a `tel:` href and for a map embed. A missing `tel:` link is WARNING on every business type; a missing map is INFO, and brick-and-mortar or hybrid only — a service-area business has no location to pin | WARNING | No |
 | SEO-061 | Location or service page without local intent | For each location or service template, the `<h1>` and the title source carry neither a city nor the service term — a generic heading on a page whose whole purpose is local intent | WARNING | No |
 
 ### Procedure
@@ -128,7 +128,7 @@ These checks require a running WordPress installation. Use `$WP` from `.wp-creat
 | SEO-053 | Duplicate intent / cannibalization | Two published URLs target the same intent — a term archive and a post that both rank for one query. See Procedure | WARNING |
 | SEO-052 | Site-name signals disagree | Compare the snapshot's `og:site_name`, the `<title>` brand segment and the schema `WebSite.name` against `get_bloginfo('name')` and Rank Math's `website_name` / `knowledgegraph_name`; a `website_alternate_name` identical to `website_name` is also a finding | WARNING |
 | SEO-054 | Menu items that do not navigate | List every `custom` nav-menu item whose `_menu_item_url` is `#`, empty, or an absolute URL on the development host — excluding items that have children. See Procedure | WARNING |
-| SEO-057 | NAP disagrees across sources | Compare name, address and phone from the rendered JSON-LD, the options page and the footer template, pairwise, after the normalization in the skill. Each disagreeing pair is its own finding. Under the `suffix` i18n strategy compare every `_<lang>` variant too | WARNING |
+| SEO-057 | NAP disagrees across sources, or the address is absent | Compare name, address and phone from the rendered JSON-LD, the stored settings (Rank Math and the options page) and the footer template, pairwise, after the normalization in the skill. Each disagreeing pair is its own finding. A brick-and-mortar or hybrid business whose address appears nowhere in the rendered HTML is a finding too; a service-area business is never reported for an absent address. Options-page fields keep their `_<lang>` suffixes under both i18n strategies, so always compare every `_<lang>` variant | WARNING |
 | SEO-058 | Wrong or deprecated `LocalBusiness` subtype | The detected vertical requires a subtype the schema does not use, or the schema uses a deprecated one (`Attorney`, bare `MedicalBusiness` for a clinic, `VehicleListing` as a business type). See the skill's vertical table | WARNING |
 | SEO-059 | `geo` missing or imprecise | The `LocalBusiness` node has no `geo`, or `geo.latitude` / `geo.longitude` carry fewer than five decimal places — three decimals place the pin roughly 100 m off | INFO |
 | SEO-060 | No citation references in `sameAs` | The Organization or `LocalBusiness` node has an empty or absent `sameAs` array. Report only what the markup proves; never assert that a missing entry means a missing listing | INFO |
@@ -152,13 +152,14 @@ These checks require a running WordPress installation. Use `$WP` from `.wp-creat
 1. **Run the applicability gate first.** If the site is not a local business, report every
    local check as `not_applicable` and exclude them from the score. Do not report an absent
    address on a SaaS brochure site.
-2. **Determine the business type before anything else.** SEO-056 and SEO-057's address
-   comparison do not apply to a service-area business. When the signals contradict each
-   other, report the type as `undetermined` and run only SEO-055, SEO-058, SEO-060 and
-   SEO-061.
+2. **Determine the business type before anything else.** SEO-056's map and SEO-057's
+   address checks do not apply to a service-area business. When the signals contradict
+   each other, report the type as `undetermined` and run only SEO-055, SEO-058, SEO-060,
+   SEO-061 and SEO-063; SEO-059 and SEO-062 still run where their own preconditions hold.
 3. **Read the options once**, not per check:
-   `$WP option get rank_math_titles --format=json` and
-   `$WP option get rank_math_modules --format=json`.
+   `$WP option get rank-math-options-titles --format=json` (Rank Math's local values live
+   inside it: `knowledgegraph_name`, `local_address`, `phone_numbers`, `opening_hours`,
+   `geo`) and `$WP option get rank_math_modules --format=json`.
 4. **Take the schema from the rendered head**, reusing the snapshot the rendered-head
    procedure already captured. Parsing the theme's PHP misses everything Rank Math emits.
 5. **Normalize before comparing** for SEO-057, following the skill. An unnormalized
@@ -419,7 +420,7 @@ Without one, report them `UNMEASURED` with the request that would answer them:
 
 ## Step 4: Output Report
 
-Generate a JSON report following the `wp-audit-standards` schema:
+Generate a JSON report with the field names of the report contract in `wp-audit-standards`:
 
 ```json
 {
@@ -432,16 +433,19 @@ Generate a JSON report following the `wp-audit-standards` schema:
     "info": 0,
     "errors": 0
   },
+  "checks_executed": ["SEO-001"],
   "findings": [
     {
-      "code": "SEO-001",
-      "title": "Missing title-tag support",
-      "severity": "WARNING",
+      "check": "SEO-001",
       "status": "FAIL",
-      "detail": "functions.php does not call add_theme_support('title-tag')",
+      "severity": "WARNING",
+      "ownership": "code",
+      "resource": "functions.php",
+      "message": "Missing title-tag support: functions.php does not call add_theme_support('title-tag')",
+      "evidence": "grep -c \"add_theme_support( *'title-tag'\" functions.php returned 0",
       "file": "functions.php",
       "line": null,
-      "auto_fix": true
+      "auto_fixable": true
     }
   ]
 }
@@ -453,7 +457,7 @@ Write the report to `audit-results/seo.json`.
 
 ### Code-Level Fixes (Tier 1)
 
-Apply fixes directly using `Edit` for issues marked `auto_fix: true`:
+Apply fixes directly using `Edit` for issues marked `auto_fixable: true`:
 
 - **SEO-001** — Add `add_theme_support('title-tag')` to `functions.php` inside the theme setup function.
 - **SEO-002** — Remove hardcoded `<title>` from `header.php` (WordPress generates it via `wp_head`).

@@ -496,8 +496,12 @@ against `audit.checks_run[<category>]` — the IDs this project has actually exe
 The catalog is the set of check IDs in that category's own agent file — `SEC-*` in
 `agents/wp-audit-security.md`, `WP-*` in `agents/wp-audit-practices.md`, `SEO-*` in
 `agents/wp-audit-seo.md`, `A11Y-*` in `agents/wp-audit-a11y.md`, `PERF-*` in
-`agents/wp-audit-performance.md`, `GEO-*` in `agents/wp-audit-geo.md`, `UX-*` in
-`agents/wp-audit-ux.md`. Read the agent, not a
+`agents/wp-audit-performance.md`, `GEO-*` in `agents/wp-audit-geo.md`. Usability is the
+one category whose table lives in its skill rather than its agent: `UX-*` is every **table
+row** of `skills/wp-audit-ux-standards/SKILL.md` — a line starting `| UX-NNN |`. The agent
+names only the handful its procedure measures, and the skill's prose names ids that are not
+criteria (the suite-owned ones), so a bare id grep of either file is the wrong catalog. Read
+the owning file, not a
 list kept anywhere else: a stored list is a second copy that goes stale, and a stale copy
 here would report a green coverage line for checks nobody has run — the exact failure this
 diff exists to prevent, reproduced by the thing preventing it.
@@ -934,7 +938,7 @@ Where Owner says where the fix LANDS, never whether you can apply it:
   content  — a text somebody has to write or decide.
   manual   — human judgement or an external tool.
 A fix you apply automatically is still `setting` if it wrote to the database.
-Where CODE follows the pattern: SEC-NNN, SEO-NNN, A11Y-NNN, PERF-NNN, BP-NNN, GEO-Dnn/Axx/Uxx/Pxx
+Where CODE follows the pattern: SEC-NNN, SEO-NNN, A11Y-NNN, PERF-NNN, WP-NNN, GEO-Dnn/Axx/Uxx/Pxx, UX-NNN
 ```
 
 Use these `subagent_type` values:
@@ -1068,8 +1072,9 @@ Before Step 7, read each returned report's `UNMEASURED` list and its measurement
    keeps the agent's second reason.
 4. **Compute coverage against the catalog.** Every agent returns `checks_executed` as a field
    (check ids, passes included), not in prose. For each category compute
-   `executed ∩ catalog / catalog`, with the catalog read from that agent's file as Step 2.5d
-   does, and print it in the report header:
+   `executed ∩ catalog / catalog`, with the catalog read where Step 2.5d reads it — the
+   agent's file, and for usability the table rows of its skill — and print it in the report
+   header:
    `security 31/44 checks executed — never run: SEC-0xx, SEC-0yy…`.
    An agent that returns no `checks_executed` counts as 0 and is re-dispatched. A category
    under 90% blocks "audit complete": re-dispatch the missing ids once, then list what is
@@ -1439,7 +1444,8 @@ it is an argument, not an artifact:
 
 `check`, `severity`, `ownership` and `message` are required on every finding: the renderer
 **refuses a finding with no `ownership`** and exits `1` naming it, because a plan whose last
-column is blank is the plan this step exists to replace. `page` is the page a page-level finding is about and
+column is blank is the plan this step exists to replace. `severity` is `CRITICAL`, `WARNING`
+or `INFO` and nothing else: a GEO finding graded `ERROR` is written `CRITICAL`. `page` is the page a page-level finding is about and
 `null` otherwise. An `UNVERIFIED` finding from Step 6.9 is **not** a finding here: it was
 never measured, so it goes in `unmeasured` with the command that would settle it.
 
@@ -1692,7 +1698,7 @@ found nothing is measured, and it is the pass that has to be distinguishable fro
 never-run. A check reported `UNMEASURED` did not execute and is not recorded, so the next
 run with the tier it needed still sees it as outstanding.
 
-Write the IDs exactly as the agent's catalog spells them, revision included (`SEC-036`, `GEO-A11`, `SEC-036@2`). This is the
+Write the IDs exactly as the category's catalog (Step 2.5d) spells them, revision included (`SEC-036`, `GEO-A11`, `SEC-036@2`). This is the
 record Step 2.5d diffs against the catalogs, so an id invented here becomes a check that is
 never reported missing and never reported run. `bin/wp-config.mjs validate` refuses a
 `checks_run` whose shape is wrong — a bare string instead of an array, an unknown category,

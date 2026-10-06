@@ -131,7 +131,7 @@ one is available; without it, file the source-code finding and mark the check `U
 
 ## Step 7: Output Report
 
-Generate a JSON report following the `wp-audit-standards` schema:
+Generate a JSON report with the field names of the report contract in `wp-audit-standards`:
 
 ```json
 {
@@ -145,17 +145,21 @@ Generate a JSON report following the `wp-audit-standards` schema:
     "info": 0,
     "pass": 0
   },
+  "checks_executed": ["A11Y-020"],
   "findings": [
     {
-      "code": "A11Y-020",
-      "title": "Skip link missing",
+      "check": "A11Y-020",
+      "status": "FAIL",
       "severity": "CRITICAL",
+      "ownership": "code",
+      "resource": "header.php",
+      "message": "Skip link missing: no skip-to-content link in header.php",
+      "evidence": "grep -c 'skip-link' header.php returned 0",
       "file": "header.php",
       "line": null,
-      "description": "No skip-to-content link found in header.php",
       "wcag": "2.4.1",
-      "auto_fix": true,
-      "fix_snippet": "<!-- see Step 8 -->"
+      "auto_fixable": true,
+      "fix": "<!-- see Step 8 -->"
     }
   ]
 }

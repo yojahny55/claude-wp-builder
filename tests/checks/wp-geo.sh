@@ -121,6 +121,63 @@ grep -q -- '--geo' "$yolo" || fail "$yolo missing --geo"
 grep -q 'geo-scan.sh' "$yolo" || fail "$yolo must run the live scan"
 grep -q 'GEO & agent-readiness' "$finalize" || fail "$finalize missing the GEO readiness check"
 
+# --- The skill restates what bin/geo-scan.sh and the fixer do, and it had drifted from both.
+skill_flat=$(tr '\n' ' ' < "$skill" | sed 's/  */ /g')
+agent_flat=$(tr '\n' ' ' < "$agent" | sed 's/  */ /g')
+in_skill() { case "$skill_flat" in *"$1"*) return 0 ;; *) return 1 ;; esac; }
+
+# A dev host exits 3, not 2: the skill told the auditor a localhost legitimately yields 2,
+# which is the benign-skip reading geo-scan.sh split exit 3 off to prevent. And --start, which
+# /wp-audit and /wp-yolo both pass, was never mentioned.
+grep -q 'exit 3' bin/geo-scan.sh || fail "bin/geo-scan.sh no longer exits 3 for a non-public host -- update the skill and this check"
+in_skill '| `3` | the host is not publicly reachable' || fail "$skill does not document geo-scan.sh exit 3"
+in_skill 'geo-scan.sh <domain|url> [--start]' || fail "$skill does not give geo-scan.sh's real arguments"
+in_skill 'Pass `--start` only for a host the operator confirmed as public' || fail "$skill does not say when --start is allowed"
+in_skill 'non-public URL legitimately yields exit `2`' && fail "$skill still says a non-public host exits 2"
+
+# Content-Signal is an HTTP header. The skill asked for a per-User-agent block in robots.txt as
+# well -- the one line the fixer refuses to write, because it makes the whole file invalid.
+in_skill 'a per-`User-agent` block' && fail "$skill still asks for Content-Signal inside robots.txt"
+in_skill 'Send the policy signal as an HTTP response header, and never as a line of `robots.txt`' \
+  || fail "$skill does not say Content-Signal is a header only"
+case "$agent_flat" in *'carries a consistent `Content-Signal`'*) fail "$agent GEO-D02 still looks for Content-Signal inside robots.txt" ;; esac
+grep -Eq '^\| GEO-D02 \|.*`Content-Signal` HTTP response header' "$agent" \
+  || fail "$agent GEO-D02 does not read the Content-Signal header"
+
+# A catalog store takes no payment: the payment codes are N/A on it, in the skill as in the auditor.
+in_skill 'site.store_tier` = `catalog`' || fail "$skill does not read the recorded store tier"
+in_skill 'GEO-P01 to GEO-P05 are `N/A ("catalog: nothing purchasable")`' \
+  || fail "$skill scores a catalog store for payment protocols it deliberately lacks"
+in_skill '`unknown` is not `catalog`' || fail "$skill does not say an unknown tier audits as a store"
+
+# The citability rubric has no GEO code; the skill claimed the auditor scored it.
+in_skill 'the auditor scores each page' && fail "$skill still claims the auditor scores the citability rubric"
+
+# The minimum robots body is the table's ALLOW rows, and the fixer writes the same list.
+allow=$(grep -oE '^\| `[A-Za-z-]+` \|[^|]*\| ALLOW \|' "$skill" | sed -E 's/^\| `([A-Za-z-]+)`.*/\1/' | sort)
+[ -n "$allow" ] || fail "$skill has no ALLOW rows in its crawler table"
+for bot in $allow; do
+  grep -qx "User-agent: $bot" "$skill" || fail "$skill allows $bot in its table but leaves it out of the minimum robots body"
+done
+fixer_bots=$(grep -oE '\$bots = array\([^)]*\)' "$fixer" | grep -oE "'[A-Za-z-]+'" | tr -d "'" | sort)
+[ "$allow" = "$fixer_bots" ] || fail "the skill's ALLOW list and the fixer's robots \$bots list differ:
+skill: $(echo $allow)
+fixer: $(echo $fixer_bots)"
+in_skill 'alias of ClaudeBot' && fail "$skill still calls anthropic-ai an alias while the fixer called it training-only"
+grep -Fq 'training-only, unlike `ClaudeBot`' "$fixer" && fail "$fixer still contradicts the skill on anthropic-ai"
+
+# GEO-D04 is the /agents.md route the fixer serves; an auditor looking for a physical AGENTS.md
+# reported the fix as missing.
+grep -Eq '^\| GEO-D04 \|.*`/agents.md`' "$skill" || fail "$skill GEO-D04 does not name the /agents.md route"
+grep -Eq '^\| GEO-D04 \|.*`GET /agents.md`' "$agent" || fail "$agent GEO-D04 does not request /agents.md"
+grep -Fq "home_url( '/agents.md' )" "$fixer" || fail "$fixer no longer serves /agents.md -- update GEO-D04"
+
+# GEO-A07 to GEO-A10 are fixable only when no SEO plugin owns the graph, as the fixer's Rule 4 says.
+for code in GEO-A07 GEO-A08 GEO-A09 GEO-A10; do
+  grep -Eq "^\| $code \|.*when no SEO plugin owns the graph" "$skill" \
+    || fail "$skill marks $code fixable with no condition, though the fixer returns early under an SEO plugin"
+done
+
 # --- One answer to "is this a store": WooCommerce active, the same test /wp-audit Step 2.3 records.
 # Scoped to the three GEO files: elsewhere is-installed is right (install it if missing), and a
 # sentence that forbids it ("is-active, not is-installed") is not a detection. Case- and

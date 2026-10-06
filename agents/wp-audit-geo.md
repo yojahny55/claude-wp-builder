@@ -93,9 +93,9 @@ does not match the detected site type are reported `N/A`, not failed.
 | Code | Check | How to Detect | Severity | Auto-fix |
 |------|-------|---------------|----------|----------|
 | GEO-D01 | ARD / AI catalog published | `/.well-known/ard.json` (or the `ai-catalog.json` alias) with valid entries; grep the theme for the route or read it over HTTP in Tier 2 | ERROR | Yes |
-| GEO-D02 | Robots AI policy quality | `robots.txt` names each AI crawler explicitly and carries a consistent `Content-Signal`; a bare `User-agent: *` is a finding | WARNING | Yes |
+| GEO-D02 | Robots AI policy quality | `robots.txt` names each AI crawler explicitly, and the `Content-Signal` HTTP response header is present and consistent with it; a bare `User-agent: *` is a finding, and so is a `Content-Signal:` directive line inside `robots.txt`, which no robots grammar defines | WARNING | Yes |
 | GEO-D03 | Trust manifest | provenance/trust block alongside the ARD entries | INFO | Yes |
-| GEO-D04 | `AGENTS.md` | `AGENTS.md` (or agent-rules / agent-plugins repo) exists at the doc root | INFO | Yes |
+| GEO-D04 | `/agents.md` | `GET /agents.md` returns `200` with the AGENTS.md document — the route `inc/agentic.php` serves — or an agent-rules / agent-plugins repo exists | INFO | Yes |
 | GEO-D05 | Brand search accuracy | advisory — measured via ORA / DataForSEO, off-site | INFO | No |
 | GEO-D06 | Agentic search share of voice | advisory — measured off-site | INFO | No |
 | GEO-D07 | Wikipedia / Wikidata presence | advisory — off-site | INFO | No |
@@ -177,7 +177,7 @@ are published.
 | Code | Probe | What to record | Severity |
 |------|-------|----------------|----------|
 | GEO-D01 | `GET /.well-known/ard.json` and `/.well-known/ai-catalog.json` | status; entry count; id/mediaType/url shape | ERROR |
-| GEO-D02 | `GET /robots.txt` | named AI user agents; `Content-Signal` present and consistent | WARNING |
+| GEO-D02 | `GET /robots.txt`, and the response headers of `/` | named AI user agents; the `Content-Signal` header present and consistent with them; no bare `Content-Signal:` line in the file | WARNING |
 | GEO-A01 | raw `curl` body vs rendered DOM | body text length, first heading tag, heading sequence, text-to-markup ratio | ERROR |
 | GEO-A04 | `GET` four nonexistent-path shapes on each host (apex and `www`) | final status line per shape is `404`; body points at sitemap and `llms.txt` | WARNING |
 | GEO-A06 | rendered head snapshot | canonical, `html lang`, `og:image`, `og:type` all present | WARNING |
@@ -374,22 +374,28 @@ Generate a JSON report to `audit-results/geo.json`:
     "errors": 0,
     "na": 0
   },
+  "checks_executed": ["GEO-A13"],
   "findings": [
     {
-      "code": "GEO-A13",
-      "title": "llms.txt missing",
-      "severity": "ERROR",
+      "check": "GEO-A13",
       "status": "FAIL",
-      "detail": "/llms.txt returned 404; agents have no machine summary",
+      "severity": "CRITICAL",
+      "ownership": "code",
+      "resource": "page:/llms.txt",
+      "message": "llms.txt missing: /llms.txt returned 404, so agents have no machine summary",
+      "evidence": "curl -s -o /dev/null -w '%{http_code}' https://<host>/llms.txt returned 404",
       "file": null,
       "line": null,
-      "auto_fix": true
+      "auto_fixable": true
     }
   ]
 }
 ```
 
-`status` is one of `PASS`, `FAIL`, `N/A`, `UNMEASURED`. Report passing checks, `N/A`
+The field names are the report contract in `wp-audit-standards`. A code this file grades
+`ERROR` is written `"severity": "CRITICAL"` — the report renderer knows three severities, and
+the summary still counts it under `errors`. `status` is one of `PASS`, `FAIL`, `N/A`,
+`UNMEASURED`. Report passing checks, `N/A`
 exclusions and `UNMEASURED` codes too, so the report shows full coverage and the ORA
 re-weighting is reproducible.
 

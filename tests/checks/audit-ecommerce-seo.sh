@@ -207,15 +207,25 @@ grep -Fq "['wpseo_noindex']" <<< "$ecom_code" \
   || fail "SEO-067's term-level lookup does not read Yoast's wpseo_noindex flag"
 # The WP-CLI pass must actually PRODUCE the unresolved-URL file the fallback reads — a
 # fallback pointed at a file nothing writes silently checks zero URLs.
-grep -Fq "fopen('/tmp/sitemap-urls-unresolved.txt', 'w')" <<< "$ecom_flat" \
+grep -Fq "fopen('<scratch>/sitemap-urls-unresolved.txt', 'w')" <<< "$ecom_flat" \
   || fail "SEO-067's WP-CLI pass does not open the unresolved-URL file its own fallback reads"
 grep -Fq 'fwrite(\$unresolved' <<< "$ecom_flat" \
   || fail "SEO-067's WP-CLI pass opens the unresolved-URL file but never writes an unresolved URL to it"
 # Any HTTP that remains (sitemap files themselves, and the fallback for URLs the DB comparison
 # could not resolve) must be explicitly capped, not open-ended.
-grep -Fq 'head -n 50 > /tmp/product-sitemaps.txt' <<< "$ecom_flat" \
+grep -Fq 'head -n 50 > <scratch>/product-sitemaps.txt' <<< "$ecom_flat" \
   || fail "SEO-067 does not cap the sitemap-FILE list itself at 50, independent of the fallback cap"
-grep -Fq 'head -n 50 /tmp/sitemap-urls-unresolved.txt' <<< "$ecom_flat" \
+# Fixed /tmp paths were shared by every audit on the machine, so a concurrent or sharded run
+# read another run's product page and sitemap list. And an index fetch that returned nothing
+# left an empty URL list, which the WP-CLI pass turned into no output -- a pass.
+grep -Eq '/tmp/[A-Za-z0-9_-]' <<< "$ecom" && fail "$SKILL §18 still writes to a fixed /tmp path that concurrent audits share"
+grep -Fq 'create one directory for the run' <<< "$ecom_flat" \
+  || fail "$SKILL §18 does not say where <scratch> comes from"
+grep -Fq '[ -s <scratch>/sitemap-urls.txt ] || echo "UNMEASURED:' <<< "$ecom_flat" \
+  || fail "SEO-067 reads an empty sitemap URL list as a pass"
+grep -Fq 'if (!\$urls) { echo \"UNMEASURED:' <<< "$ecom_flat" \
+  || fail "SEO-067's WP-CLI pass prints nothing for an empty URL list, which reads as a pass"
+grep -Fq 'head -n 50 <scratch>/sitemap-urls-unresolved.txt' <<< "$ecom_flat" \
   || fail "SEO-067's fallback does not cap the unresolved-URL list at 50, independent of the sitemap-file cap"
 grep -Fq 'capped at 50' <<< "$commerce_flat" \
   || fail "SEO-067's procedure does not state the 50-item cap on sitemap files and the fallback"
@@ -232,7 +242,7 @@ grep -Fq 'tolerate attribute order and' <<< "$ecom_flat" \
 # The prose above can survive a code change; pin the operative patterns in the commands too.
 grep -Fq "grep -qiE '^X-Robots-Tag:.*noindex'" <<< "$ecom_code" \
   || fail "SEO-067 no longer tests the X-Robots-Tag header for noindex"
-meta_needle=$'grep -oiE \'<meta[^>]+>\' /tmp/sitemap-url-body.html | grep -i \'name=["'
+meta_needle=$'grep -oiE \'<meta[^>]+>\' <scratch>/sitemap-url-body.html | grep -i \'name=["'
 grep -Fq "$meta_needle" <<< "$ecom_code" \
   || fail "SEO-067's meta check is no longer anchored to the robots <meta> tag"
 

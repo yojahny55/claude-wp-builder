@@ -20,48 +20,60 @@ This skill defines the audit criteria, severity levels, report format, and quali
 
 ---
 
-## Report JSON Schema
+## Report contract
 
-All audit agents MUST output findings in this format:
+Every agent reports each check it ran with the field names `bin/audit-report.mjs` reads, so
+`/wp-audit` Step 8.5 copies a finding into the run file without renaming anything. A field
+spelled differently is a field the renderer never sees, and it refuses a finding with no
+`check`, `severity`, `ownership` or `message` (exit `1`).
+
+| Field | Required | Value |
+|---|---|---|
+| `check` | always | the check id exactly as the agent's catalog spells it — `SEC-036`, `GEO-A13`, `SEC-036@2` |
+| `status` | always | `PASS`, `FAIL`, `UNMEASURED` or `N/A` |
+| `severity` | on `FAIL` | `CRITICAL`, `WARNING` or `INFO`, uppercase |
+| `ownership` | on `FAIL` | `code`, `setting`, `content` or `manual` — where the fix lands (`/wp-audit` Step 8.5) |
+| `message` | on `FAIL` | what is wrong, in one sentence |
+| `resource` | on `FAIL` | the stable thing it is about: `page:/contact/`, `post:412`, `template-parts/hero.php:34`, `site` (`/wp-audit` Step 7) |
+| `evidence` | on `FAIL` | the command, selector, URL or measured value that produced it |
+| `reason` | on `UNMEASURED` and `N/A` | what stopped it, or why it does not apply |
+| `fix` | no | how to fix it |
+| `auto_fixable` | no | `true` when the agent can apply the fix without risk (see Auto-fixable below) |
+| `root_cause` | no | a slug every finding of one defect shares, e.g. `display-errors`; the renderer folds them into one |
+| `page`, `file`, `line` | no | where, when there is such a place |
+
+Where each status goes:
+
+- `FAIL` is a finding: a row in the run file's `findings`.
+- `UNMEASURED` goes in the run file's `unmeasured` as `{ "check", "reason" }`. The report
+  prints it under its own heading, and it is never a pass.
+- `PASS` and `N/A` are not rows. A `PASS` is still listed in `checks_executed`; an `N/A`
+  is reported with its reason and left out of the denominator.
+
+Beside its checks, every agent returns `checks_executed`: the id of every check that ran,
+passes included (`/wp-audit` Step 6.8). The line format of the `/wp-audit` Step 6 dispatch
+prompt carries the same fields under other labels: `Owner` is `ownership`, `Method` is `fix`,
+`Fix: auto` is `auto_fixable: true`, `Root cause` is `root_cause`.
+
+GEO's tables grade an ORA `required`-tier failure `ERROR`. The renderer knows three
+severities, so a GEO `ERROR` is written `CRITICAL` in a finding.
 
 ```json
 {
-  "category": "security|seo|a11y|performance|best-practices|geo|usability",
-  "tier": 1,
-  "issues": [
-    {
-      "severity": "critical|warning|info",
-      "code": "SEC-001",
-      "message": "Human-readable description",
-      "file": "path/to/file.php",
-      "line": 42,
-      "auto_fixable": true,
-      "fix_method": "Description of how to fix"
-    }
-  ],
-  "summary": {
-    "total": 0,
-    "critical": 0,
-    "warning": 0,
-    "info": 0,
-    "auto_fixable": 0
-  }
+  "category": "security",
+  "tier": 2,
+  "checks_executed": ["SEC-001", "SEC-036"],
+  "findings": [
+    { "check": "SEC-036", "status": "FAIL", "severity": "CRITICAL", "ownership": "setting",
+      "resource": "wp_options.siteurl", "message": "Development host stored in siteurl",
+      "evidence": "$WP option get siteurl", "fix": "$WP option update siteurl <production URL>",
+      "auto_fixable": true },
+    { "check": "SEC-001", "status": "PASS" },
+    { "check": "SEC-023", "status": "UNMEASURED", "reason": "needs production: no public URL confirmed" },
+    { "check": "SEC-039", "status": "N/A", "reason": "no WooCommerce" }
+  ]
 }
 ```
-
-### Field Requirements
-
-- `category` — one of: `security`, `seo`, `a11y`, `performance`, `best-practices`, `geo`, `usability`
-- `tier` — integer 1–3 indicating which audit tier produced the finding
-- `issues` — array of issue objects (may be empty)
-- `severity` — one of: `critical`, `warning`, `info`
-- `code` — prefixed issue code (see Issue Code Prefixes below)
-- `message` — human-readable description of the problem
-- `file` — relative path to the affected file
-- `line` — line number (0 if not applicable)
-- `auto_fixable` — boolean indicating whether the agent can safely fix this
-- `fix_method` — description of the fix approach
-- `summary` — counts aggregated from the issues array
 
 ---
 
@@ -249,9 +261,9 @@ Tier 1 whether or not a browser is present.
 | Requirement | Minimum |
 |-------------|---------|
 | Normal text contrast | 4.5:1 |
-| Large text contrast (>=18px or >=14px bold) | 3:1 |
+| Large text contrast (≥24px, or ≥18.66px bold — WCAG's 18pt / 14pt bold) | 3:1 |
 | UI component contrast | 3:1 |
-| Touch target size | 24x24 CSS pixels fails (WCAG 2.2 AA 2.5.8), measured at desktop and mobile; 44x44 is AAA advice (INFO) |
+| Touch target size | Smaller than 24x24 CSS pixels fails (WCAG 2.2 AA 2.5.8), measured at desktop and mobile; 44x44 is AAA advice (INFO) |
 | Minimum gray on white passing 4.5:1 | `#767676` |
 
 ---
