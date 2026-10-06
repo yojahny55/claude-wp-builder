@@ -90,6 +90,13 @@ asked=$(grep -rhoE "nav_location\( *'[a-z]+' *\)" commands agents skills | grep 
 for b in $asked; do
   case " $bases " in *" $b "*) ;; *) fail "an instruction renders nav_location('$b'), a location neither starter registers" ;; esac
 done
+# A register_nav_menus() example in an instruction registers only what the starters register.
+# A reference still listing `mobile-en` after the starter dropped it hands /wp-finalize's
+# "every registered location has a menu" gate a location nothing assigns.
+regd=$(grep -rhoE "^ *'[a-z]+-(en|es)' *=> *__\(" commands agents skills | grep -oE "[a-z]+-(en|es)" | words)
+for l in $regd; do
+  case " $suffix_set " in *" $l "*) ;; *) fail "an instruction registers '$l', a location neither starter registers" ;; esac
+done
 
 # --- 3. /wp-init Step 6 registers exactly what the helpers answer, per strategy --
 s6=$(region commands/wp-init.md '^## Step 6:' '^## Step 7:')
