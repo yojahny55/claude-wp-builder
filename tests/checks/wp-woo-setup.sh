@@ -7,7 +7,9 @@
 #   - store-kit is synced before the script runs;
 #   - the script turns HPOS on before it touches pages or payments;
 #   - it keeps its Polylang step and names the audit checks it satisfies;
-#   - no report line ever prints a key.
+#   - no report line ever prints a key;
+#   - the wp-woocommerce skill keeps its store rules, names the recorded keys, and describes
+#     only what is built.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
@@ -52,6 +54,29 @@ grep -Fq 'no starter theme renders the enquiry form or the WhatsApp button' "$sk
   || fail "$skill does not say the catalog's enquiry form and WhatsApp button are not rendered"
 grep -Fq 'no bridge between WooCommerce and Polylang' "$skill" \
   || fail "$skill does not say products stay untranslated"
+
+# The skill's own rules. No check read SKILL.md, so any of these could go with CI green: each
+# is a store default that costs money or orders when an agent gets it wrong.
+flat_skill=$(tr '\n' ' ' < "$skill" | tr -s ' ')
+for rule in 'which a store with orders never has written for it, absent or not, force or not' \
+            'It never turns on the **general limiter**' \
+            'Configure Stripe with API keys, not "Connect with Stripe"' \
+            '`store.checkout: shortcode` only with a written reason in `store.checkout_reason`' \
+            'Cash on delivery only in a `local` environment' \
+            'No command takes a store live' \
+            '`store.tier`' '`store.enquiry`' '`store.payments.mode`' \
+            'Arguments** are bare words' '**Exit `1`**: refused' '**Report-only:**' \
+            'Read it before adding, removing or swapping a plugin in a store profile'; do
+  case "$flat_skill" in *"$rule"*) ;; *) fail "$skill lost the rule: $rule" ;; esac
+done
+# Corrected in 2f3fbe8: Stripe rotates the webhook secret when it reconfigures webhooks, not on a schedule.
+if grep -Fq 'periodically rotates' "$skill"; then fail "$skill says Stripe rotates the webhook secret periodically again"; fi
+if grep -Eq '(^|[^}/])templates/profiles/' "$skill"; then fail "$skill names a profile by a path relative to the plugin"; fi
+ref=skills/wp-woocommerce/references/plugins.md
+[ -r "$ref" ] || fail "$ref is missing or unreadable"
+for stale in 'will be our own' 'as of 2026' 'N01 piece' 'pending review' 'deprecated soon'; do
+  if grep -Fq "$stale" "$ref"; then fail "$ref carries a roadmap or calendar claim that goes stale: $stale"; fi
+done
 
 h=$(grep -nE '^\s*wooset_step_hpos\(' "$script" | head -1 | cut -d: -f1 || true)
 pg=$(grep -nE '^\s*wooset_step_pages\(' "$script" | head -1 | cut -d: -f1 || true)

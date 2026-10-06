@@ -52,4 +52,33 @@ for n in 022 023 039 045 058; do
   grep -qE "^\| UX-$n \|" "$k" && fail "$k tabulates UX-$n, a number the browser suite already emits"
 done
 
+# --- contracts that lived only here, with no pin -------------------------------------------
+# UX-014 is one finding per page. A row per link turns one bad footer into forty findings, and
+# matches nothing the suite emits, so the check+resource merge keeps both copies.
+has '**One row per page, not per link.**' || fail "$k lost the one-row-per-page rule for UX-014"
+has '`UX-014 : page:/contact/`' || fail "$k lost the UX-014 resource example"
+# The site-level list: every id in it is a catalog row, and the seven are all there.
+site=$(grep -E '^- \*\*Site-level\*\*' "$k" || true)
+[ -n "$site" ] || fail "$k lost its site-level list"
+for id in UX-015 UX-028 UX-029 UX-032 UX-034 UX-036 UX-038; do
+  grep -Fq "\`$id\`" <<<"$site" || fail "$k site-level list lost $id"
+done
+for id in $(grep -oE 'UX-[0-9]{3}' <<<"$site"); do
+  grep -qE "^\| $id \|" "$k" || fail "$k names $id as site-level but has no catalog row for it"
+done
+# The standard a visual fix must meet.
+for t in '**Consent.**' '**Equivalence, measured.**' '**Coverage.**'; do
+  has "$t" || fail "$k lost the fix standard: $t"
+done
+# A catalog store has no checkout: the recorded tier decides, not a guess.
+has 'a catalog store (`site.store_tier` = `catalog`, recorded by `/wp-audit` Step 2.3)' \
+  || fail "$k does not read the recorded store tier for the checkout criteria"
+has '`unknown` is not `catalog`: it audits as a store' || fail "$k does not say an unknown tier audits as a store"
+# Plugin paths resolve from the plugin, not from the user's project.
+has 'see `agents/wp-audit-ux.md`' && fail "$k points at the agent with a relative path"
+has '`${CLAUDE_PLUGIN_ROOT}/agents/wp-audit-ux.md`' || fail "$k does not point at the agent's procedure"
+# The near-miss boundary the description carries.
+grep -Eq '^description: .*Not for contrast, ARIA, focus or target size \(wp-audit-a11y\)' "$k" \
+  || fail "$k description does not hand accessibility requests to wp-audit-a11y"
+
 echo "PASS: the usability catalog states applicability once, names its measurements, and leaves the suite's numbers alone"

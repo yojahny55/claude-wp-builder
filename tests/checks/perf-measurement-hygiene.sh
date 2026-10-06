@@ -15,15 +15,21 @@
 set -uo pipefail
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
 
-skill=skills/wp-audit-standards/SKILL.md
+# The lessons moved out of SKILL.md into a reference file every audit agent no longer pays
+# for on every run; SKILL.md must still name it, or nothing leads an agent there.
+skill=skills/wp-audit-standards/references/performance-lessons.md
 agent=agents/wp-audit-performance.md
-for f in "$skill" "$agent"; do
+for f in skills/wp-audit-standards/SKILL.md "$skill" "$agent"; do
   [ -f "$f" ] || { echo "FAIL: $f is missing"; exit 1; }
   # -f says it exists, not that it can be read. An unreadable file flattens to an empty
   # string, and the first assertion then reports "does not record 10,170 ms" — a message
   # about the contents when the fact is that nothing could read them.
   [ -r "$f" ] || { echo "FAIL: $f exists but cannot be read"; exit 1; }
 done
+grep -Fq 'references/performance-lessons.md' skills/wp-audit-standards/SKILL.md \
+  || { echo "FAIL: skills/wp-audit-standards/SKILL.md no longer names references/performance-lessons.md"; exit 1; }
+grep -Fq 'references/performance-lessons.md' "$agent" \
+  || { echo "FAIL: $agent does not point at references/performance-lessons.md"; exit 1; }
 flats=$(tr '\n' ' ' < "$skill" | sed 's/  */ /g')
 flata=$(tr '\n' ' ' < "$agent" | sed 's/  */ /g')
 

@@ -77,16 +77,20 @@ For a production site on AWS, also read
 `${CLAUDE_PLUGIN_ROOT}/skills/wp-s3/references/aws.md`: the bucket, CloudFront and IAM work
 happens before this command is useful, and the user may not have it yet.
 
-## Step 2: The Blocking Question
+## Step 2: Downloadable Products
 
-Ask this **before** collecting anything else, because a "yes" changes the recommendation
-rather than the configuration:
+Skip this step for `--revert`. Otherwise measure it **before** collecting anything else,
+because downloadable products change the recommendation rather than the configuration:
 
-> Does this site sell **downloadable products**?
+```bash
+bash -c "cd '<wp-root>' && wp plugin is-active woocommerce && wp post list --post_type=product --meta_key=_downloadable --meta_value=yes --format=count"
+```
 
-If yes, say plainly that paid downloads have no clean answer with this plugin — the skill's
-"Known failures" explains why — and ask whether to continue, keep those files off S3, or
-stop here. Do not configure anything until the user chooses.
+WooCommerce inactive, or a count of `0`: say so in one line and continue. A non-zero count:
+report it, say plainly that paid downloads have no clean answer with this plugin — the
+skill's "Known failures" explains why and gives the default, keeping those files off S3 —
+and ask whether to continue on that default or stop here. Without WP-CLI, ask the user
+instead. Do not configure anything until this is settled.
 
 ## Step 3: Collect the Connection
 
@@ -96,7 +100,7 @@ Use `AskUserQuestion` for everything except the secret:
 |---|---|
 | Bucket | May carry a prefix, as `bucket/site-prefix` |
 | Region | On an S3-compatible server, whatever it was configured with — commonly `us-east-1` |
-| Media URL | What visitors will load. `https://media.<domain>` on CloudFront, or `<endpoint>/<bucket>` |
+| Bucket URL | What visitors will load media from. `https://media.<domain>` on CloudFront, or `<endpoint>/<bucket>` |
 | Endpoint | Empty on AWS. A URL for any S3-compatible server |
 | Authentication | The server's IAM role, or an access key pair |
 
@@ -113,7 +117,7 @@ chosen authentication is a key pair, stop and ask again rather than working arou
 ## Step 4: Run the Script
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/skills/wp-s3/scripts/s3-setup.sh --wp-root '<wp-root>' --bucket '<bucket>' --region '<region>' --bucket-url '<media-url>' --auth key --key '<access-key-id>'
+bash ${CLAUDE_PLUGIN_ROOT}/skills/wp-s3/scripts/s3-setup.sh --wp-root '<wp-root>' --bucket '<bucket>' --region '<region>' --bucket-url '<bucket-url>' --auth key --key '<access-key-id>'
 ```
 
 Add `--endpoint '<url>'` for an S3-compatible server. For a server with an IAM role, use

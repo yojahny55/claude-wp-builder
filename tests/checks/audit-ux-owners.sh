@@ -20,7 +20,7 @@ for f in "$k" "$plan" "$bridge"; do [ -r "$f" ] || fail "$f is missing or unread
 
 flat=$(tr '\n' ' ' < "$k" | sed 's/  */ /g')
 case "$flat" in
-  *"the owner here is the suite's (\`aplicacion()\` in \`templates/audit-suite/lib/plan.js\`)"*) ;;
+  *"the owner here is the suite's (\`aplicacion()\` in \`\${CLAUDE_PLUGIN_ROOT}/templates/audit-suite/lib/plan.js\`)"*) ;;
   *) fail "$k does not say that the suite's owner governs the criteria the suite emits" ;;
 esac
 

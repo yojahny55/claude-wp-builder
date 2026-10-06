@@ -21,13 +21,17 @@ fail() { echo "FAIL: $1"; exit 1; }
 
 f=skills/wp-aos-animator/SKILL.md
 [ -f "$f" ] || fail "$f is missing"
+# The install snippets (Phases 2-4) live in references/install.md, which SKILL.md must name;
+# the seams below are judged over SKILL.md plus its references, wherever the snippet sits.
+grep -Fq 'references/install.md' "$f" || fail "$f does not link references/install.md, so no agent reaches Phases 2-4"
+corpus=$(cat "$f"; for r in skills/wp-aos-animator/references/*.md; do [ ! -f "$r" ] || cat "$r"; done)
 
-grep -Fq "removeAttribute('data-aos')" "$f" \
+q "$corpus" -F "removeAttribute('data-aos')" \
   || fail "$f: no removal of data-aos once the entrance settles (aos.css keeps rewriting the element's transitions otherwise)"
-grep -Fq "transitionend" "$f" || fail "$f: attribute removal is not tied to the entrance's own transitionend"
+q "$corpus" -F "transitionend" || fail "$f: attribute removal is not tied to the entrance's own transitionend"
 
-grep -Fq "AOS.refresh()" "$f" || fail "$f: no AOS.refresh() call"
-grep -Fq "addEventListener('load'" "$f" \
+q "$corpus" -F "AOS.refresh()" || fail "$f: no AOS.refresh() call"
+q "$corpus" -F "addEventListener('load'" \
   || fail "$f: AOS.refresh() is not re-run on window 'load' (DOMContentLoaded predates font/image reflow)"
 
 grep -Eiq 'LCP candidate|LCP element' "$f" \
@@ -35,7 +39,16 @@ grep -Eiq 'LCP candidate|LCP element' "$f" \
 grep -Fq 'data-aos="fade" data-aos-duration="400"' "$f" \
   || fail "$f: no fast-fade pattern documented for the LCP element"
 
-grep -Eiq 'prefers-reduced-motion' "$f" || fail "$f: no reduced-motion escape hatch"
+q "$corpus" -Ei 'prefers-reduced-motion' || fail "$f: no reduced-motion escape hatch"
+
+# The "never animate" rule and its skip list, in SKILL.md where every Phase 5 subagent reads
+# it. A transform makes a stacking context (a toolbar's dropdown paints under the next card)
+# and a containing block that rewrites transition-property (a drawer that slides on
+# translate jumps instead). Nothing pinned it, so an edit could drop it silently.
+grep -Fq '**stacking context**' "$f" || fail "$f lost the stacking-context half of the never-animate rule"
+grep -Fq '**containing block**' "$f" || fail "$f lost the containing-block half of the never-animate rule"
+grep -Fq 'Anything that slides' "$f" || fail "$f's skip list no longer skips elements that slide on translate"
+grep -Eq 'ancestor of a dropdown' "$f" || fail "$f's skip list no longer skips the ancestors of a dropdown"
 
 # ---------------------------------------------------------------------------
 # What the skill tells an agent to WRITE must work against AOS 2.3.4 and the starter.
@@ -50,7 +63,6 @@ grep -Eiq 'prefers-reduced-motion' "$f" || fail "$f: no reduced-motion escape ha
 # The corpus is SKILL.md plus any reference file, so moving a snippet out of SKILL.md
 # keeps it judged.
 # ---------------------------------------------------------------------------
-corpus=$(cat "$f"; for r in skills/wp-aos-animator/references/*.md; do [ ! -f "$r" ] || cat "$r"; done)
 
 # 1. No foreign constant, no jQuery dependency. Every all-caps constant on an AOS
 #    enqueue line is the theme's own placeholder (PREFIX_URI / PREFIX_DIR).
@@ -68,7 +80,8 @@ known=' fade fade-up fade-down fade-left fade-right fade-up-right fade-up-left f
 names=$( { printf '%s\n' "$corpus" | grep -oE "data-aos=\"[a-z-]+\"|'data-aos' => '[a-z-]+'" \
            | sed -E "s/.*[\"']([a-z-]+)[\"']$/\1/"
          # The convention table: the cell that OPENS with a backticked name is an animation.
-         printf '%s\n' "$corpus" | grep -E '^\|' | awk -F'|' '$3 ~ /^ *`[a-z-]+`/ { print $3 }' | grep -oE '^ *`[a-z-]+`' | tr -d '` '
+         # (`|| true`: a skill with no such table must not abort the whole check under pipefail.)
+         printf '%s\n' "$corpus" | grep -E '^\|' | awk -F'|' '$3 ~ /^ *`[a-z-]+`/ { print $3 }' | { grep -oE '^ *`[a-z-]+`' || true; } | tr -d '` '
        } | sort -u)
 [ -n "$names" ] || fail "$f: no data-aos animation names found to judge"
 for n in $names; do

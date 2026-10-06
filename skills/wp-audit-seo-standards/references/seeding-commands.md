@@ -6,9 +6,9 @@ keys, formulas and rules these commands write.
 ## Contents
 
 - 3. Options — read, and write by merging
-- 4. Post meta — seed one post, bulk-seed descriptions from content
-- 6. Title templates — seed the formulas per page type
-- 7. Meta descriptions — the generator function and the bulk seed
+- 4. Post meta — seed one post
+- 6. Title templates — seed the template per page type
+- 7. Meta descriptions — the generator function and the one bulk seed
 
 ## 3. Rank Math Option Keys
 
@@ -27,7 +27,7 @@ $WP eval "print_r(get_option('rank_math_modules'));"
 
 ### Writing Options
 
-Rank Math stores options as serialized arrays. Always merge rather than overwrite:
+Merge into the existing array (SKILL.md §3):
 
 ```bash
 $WP eval "
@@ -62,27 +62,12 @@ echo 'SEO meta set for post ' . \$post_id;
 "
 ```
 
-### Bulk-Seed Meta Descriptions from Content
-
-```bash
-$WP eval "
-\$posts = get_posts(['post_type' => ['post','page'], 'posts_per_page' => -1, 'post_status' => 'publish']);
-foreach (\$posts as \$p) {
-    \$existing = get_post_meta(\$p->ID, 'rank_math_description', true);
-    if (!empty(\$existing)) continue;
-    \$text = wp_strip_all_tags(\$p->post_excerpt ?: \$p->post_content);
-    \$desc = mb_substr(trim(preg_replace('/\s+/', ' ', \$text)), 0, 155);
-    if (mb_strlen(\$desc) > 10) {
-        update_post_meta(\$p->ID, 'rank_math_description', \$desc);
-        echo 'Set description for: ' . \$p->post_title . PHP_EOL;
-    }
-}
-"
-```
+Bulk descriptions are seeded by the one block in §7, which follows SKILL.md §7's priority
+order.
 
 ---
 
-## 6. Meta Title Formulas by Page Type
+## 6. Title Templates by Page Type
 
 ### Seed Title Templates via WP-CLI
 
@@ -148,23 +133,24 @@ function prefix_auto_meta_description( $post_id ) {
 
 ### Bulk Seed via WP-CLI
 
+The same order and the same cut as `prefix_auto_meta_description()` above — excerpt, then
+the first paragraph, then the content, cut at a word boundary — so a seeded description and
+a generated one never differ for the same post. Posts that already have one are skipped.
+
 ```bash
 $WP eval "
 \$posts = get_posts(['post_type' => ['post','page'], 'posts_per_page' => -1, 'post_status' => 'publish']);
 \$count = 0;
 foreach (\$posts as \$p) {
-    \$existing = get_post_meta(\$p->ID, 'rank_math_description', true);
-    if (!empty(\$existing)) continue;
-    \$text = wp_strip_all_tags(\$p->post_excerpt ?: \$p->post_content);
-    \$text = trim(preg_replace('/\s+/', ' ', \$text));
+    if (get_post_meta(\$p->ID, 'rank_math_description', true)) continue;
+    // SKILL.md §7 priority: excerpt, then the first paragraph, then the content.
+    \$text = \$p->post_excerpt;
+    if (!\$text && preg_match('/<p[^>]*>(.*?)<\/p>/is', \$p->post_content, \$m)) \$text = \$m[1];
+    if (!\$text) \$text = \$p->post_content;
+    \$text = trim(preg_replace('/\s+/', ' ', wp_strip_all_tags(\$text)));
     \$desc = mb_substr(\$text, 0, 155);
-    if (mb_strlen(\$text) > 155) {
-        \$desc = mb_substr(\$desc, 0, mb_strrpos(\$desc, ' '));
-    }
-    if (mb_strlen(\$desc) > 10) {
-        update_post_meta(\$p->ID, 'rank_math_description', \$desc);
-        \$count++;
-    }
+    if (mb_strlen(\$text) > 155) \$desc = mb_substr(\$desc, 0, mb_strrpos(\$desc, ' ')) . '...';
+    if (mb_strlen(\$desc) > 10) { update_post_meta(\$p->ID, 'rank_math_description', \$desc); \$count++; }
 }
 echo \"Seeded \$count meta descriptions.\";
 "

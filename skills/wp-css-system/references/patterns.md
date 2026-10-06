@@ -1,7 +1,7 @@
 # CSS Patterns
 
-Worked examples for `template=basic` themes, from the `wp-css-system` skill. They use
-the tokens in `tokens.md` and the BEM rules in the skill itself.
+Worked examples for `Template: basic` themes and plain demos, from the `wp-css-system`
+skill. They use the tokens in `tokens.md` and the BEM rules in the skill itself.
 
 ## Contents
 
@@ -15,6 +15,9 @@ the tokens in `tokens.md` and the BEM rules in the skill itself.
 
 ## BEM Real-World Examples
 
+The hero's inner wrapper is the shared `.container` utility (below), not a
+`.hero__container` that re-declares it: `<section class="hero"><div class="container">…`.
+
 ```css
 /* Block */
 .hero {
@@ -23,12 +26,6 @@ the tokens in `tokens.md` and the BEM rules in the skill itself.
 }
 
 /* Elements */
-.hero__container {
-    max-width: var(--container-max);
-    margin: 0 auto;
-    padding: 0 var(--spacing-md);
-}
-
 .hero__title {
     font-family: var(--font-family-secondary);
     font-size: var(--font-size-4xl);

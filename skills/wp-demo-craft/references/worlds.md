@@ -8,15 +8,15 @@ Ported from [nateherkai/scroll-craft](https://github.com/nateherkai/scroll-craft
 - The default is photographic
 - The eight preambles
 - Writing your own
-- Name the empty space, in every shot
+- Name the empty space, in every plate
 - If the canvas is light
 - Cohesion checks
 
 Pick one, write it as a **style preamble**, and record it in `demo/BRIEF.md`
 under `## World`. `bin/image-gen.mjs` reads that block and prepends it
-**verbatim** to every image prompt the build sends — the build writes the
+**verbatim** to every plate prompt the build sends — the build writes the
 preamble once, there, and never into a prompt. Reusing it word for word is what
-makes eight separately generated assets look like one shoot; paraphrasing it is
+makes eight separately generated plates look like one shoot; paraphrasing it is
 what makes them look like eight prompts, which is why the pasting is done by
 code. The rest of the prompt's shape is in `references/image-prompt.md`.
 
@@ -132,13 +132,13 @@ Every preamble names five things. Miss one and the set drifts.
    illustration, no digital glow, no plastic sheen." Models drift toward
    rendered-looking output; the negative list is what holds them.
 
-## Name the empty space, in every shot
+## Name the empty space, in every plate
 
-The preamble sets the world. Each shot prompt then names the subject, the frame,
+The preamble sets the world. Each plate prompt then names the subject, the frame,
 and **where the empty space is**.
 
 This is a requirement, not advice, and it is the single highest-leverage line in
-a prompt. Copy sits on these images, so the composition has to leave room for it:
+a prompt. Copy sits on these plates, so the composition has to leave room for it:
 
 - "large empty shadowed space across the upper left of the frame"
 - "the subject low and to the right, negative space above"
@@ -169,13 +169,13 @@ under it, not the brightest.
 
 ## Cohesion checks
 
-Lay every generated asset side by side:
+Lay every generated plate side by side:
 
 - **One light direction** across the set, or a deliberate reason it changes.
-- **One grade.** If one image is cooler than the rest, regenerate it rather than
+- **One grade.** If one plate is cooler than the rest, regenerate it rather than
   correcting it in CSS — a filter over a full-bleed image flattens it.
 - **One level of realism.** A photoreal hero followed by a rendered-looking
   second plate is worse than either style used consistently.
 - **The brand object identical everywhere.** Pass the real logo or product shot
   as the reference on every prompt that includes it. An object that drifts
-  between shots is the thing a client notices first.
+  between plates is the thing a client notices first.

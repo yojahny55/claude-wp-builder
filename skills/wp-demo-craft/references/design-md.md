@@ -20,8 +20,7 @@ is a demo with several palettes.
 2. **`npx designlang@12 <url>`** on the client's current site — the URL the docs
    name, **or `research.site` from `demo/RESEARCH.md` when `confidence` is
    `confirmed`** — then on each reference URL the docs name. Pinned to the major
-   version — 12 is the current latest on the npm registry, checked rather than
-   assumed — so a future major cannot change the flags or the output shape
+   version so a future major cannot change the flags or the output shape
    underneath this step, exactly as `impeccable@4` is pinned in `verify.md`. Take
    what the site declares. A site built on inline styles yields thin tokens;
    that is expected, and thin real tokens still beat invented ones.
@@ -70,8 +69,8 @@ it is a design decision rather than an extracted value.
 
 Where a reference describes a motion the library has no device for — a hover that
 lifts and shadows, a marquee, a cursor-following highlight — build it in the
-composition's own CSS under the same contract. The refuse list constrains taste,
-not technique.
+composition's own CSS under the same contract. The taste floor and the family's Avoid
+list constrain taste, not technique.
 
 ## Token mapping
 
@@ -96,15 +95,15 @@ computed-value time: it unsets rather than degrading, and a section with no
 content width would render its body copy flush against a 390px screen edge. The
 fallback is the floor, not the answer — a generated `:root` still writes the token.
 
-The `var()` fallback only ever covered an *absent* token. A present but
-malformed one (`wide`, an empty string) still made `calc()` invalid at
-computed-value time and unset `padding-inline` the same way. The build now
-emits `@property --container-max { syntax: "<length>"; inherits: true;
-initial-value: 1280px; }` alongside `:root`, so an invalid value falls back to
-`initial-value` instead of unsetting — the `var()` fallback remains the only
-guard where `@property` itself is unsupported.
+The `var()` fallback covers only an *absent* token. A present but malformed one
+(`wide`, an empty string) makes `calc()` invalid at computed-value time and unsets
+`padding-inline` the same way, so the build emits
+`@property --container-max { syntax: "<length>"; inherits: true;
+initial-value: 1280px; }` alongside `:root`: an invalid value then falls back to
+`initial-value` instead of unsetting. The `var()` fallback is the only guard where
+`@property` itself is unsupported.
 
-A hardcoded hex in a section is a defect: the same value now exists in two
+A hardcoded hex in a section is a defect: the same value then exists in two
 places, and the one in `:root` is the one `/wp-init` carries into the theme.
 `/wp-init` reads this file before it reads the demo's `:root`.
 
