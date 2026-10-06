@@ -9,7 +9,9 @@
 # navigation reference taught a drawer that fails the audit's A11Y-031 (no focus trap, no
 # Escape, no focus return, closed links still tabbable behind aria-hidden). And the
 # no-horizontal-scroll fix put overflow-x: hidden on .container, which hides the overflow
-# the section exists to find.
+# the section exists to find. Below those, the rules a later trim could silently drop:
+# min-width only, a breakpoint is a range, 24x24 (not 44x44) is the failing threshold,
+# the /wp-demo-verify loop, and the template scope.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
@@ -64,5 +66,33 @@ cssblk=$(awk '/^```css/{p=1;next} /^```/{p=0} p' "$s")
 printf '%s\n' "$cssblk" | grep -Eq 'overflow-x:[[:space:]]*hidden' \
   && fail "$s shows overflow-x: hidden in a CSS example; it hides the culprit instead of fixing it"
 grep -Fq 'culprits' "$s" || fail "$s does not send the reader to the element /wp-demo-verify names as the culprit"
+
+# --- the contract a later trim could drop -----------------------------------------
+# min-width only: no max-width query outside the one example labelled WRONG, and no
+# exception for the mobile menu (navigation.md never needed one).
+mq=$(awk 'FNR==1{p=0; prev=""} /^```/{p=!p; next} p && /@media[^{]*max-width/ && prev !~ /WRONG/ {print FILENAME ":" FNR; bad=1} {prev=$0} END{exit bad}' \
+  "$s" skills/wp-responsive/references/*.md) \
+  || fail "a wp-responsive example writes a max-width query outside the one labelled WRONG: $(echo $mq)"
+grep -Fq 'The only exception to the `max-width` rule' "$s" && fail "$s still carves a max-width exception for the hamburger"
+grep -Fq 'Always `min-width`, Never `max-width`' "$s" || fail "$s lost the min-width-only rule"
+# The gap-above-1024 lesson (commit 73e4668): a breakpoint holds until the next one.
+grep -Fq 'A breakpoint is a range, not a line' "$s" || fail "$s lost the range-not-a-line rule"
+grep -Fq '1100-1200' "$s" || fail "$s no longer names the range between breakpoints to check"
+grep -Fq 'Never add it to the hero/LCP image' "$s" || fail "$s lost the never-lazy hero rule"
+grep -Fq 'MUST carry this block' "$s" && grep -Fq 'prefers-reduced-motion: reduce' "$s" \
+  || fail "$s lost the reduced-motion requirement"
+grep -Fq '**24x24 CSS pixels**' "$s" || fail "$s lost the 24x24 failing threshold"
+grep -Fq 'it is advice, not a failing threshold' "$s" || fail "$s no longer says 44x44 is advice"
+grep -Eiq '(min(imum)?|at least) 44x44' "$s" && fail "$s makes 44x44 a requirement; the failing threshold is 24x24"
+# The validator loop, not a hand-run checklist.
+grep -Fq 'Run `/wp-demo-verify`' "$s" && grep -Fq 'Stop when it reports no overflow' "$s" \
+  || fail "$s does not loop on /wp-demo-verify with a stop condition"
+# Scope: the recorded decision, not a guess.
+grep -Fq 'read `template`' "$s" || fail "$s does not read the project's template before applying the @media scale"
+grep -Fq 'wp-tailwind-system' "$s" || fail "$s does not hand a tailwind theme to wp-tailwind-system"
+grep -Fq '"demo mode": "craft"' "$s" || fail "$s does not say craft compositions size to their container"
+desc=$(awk 'NR<=6 && /^description:/' "$s")
+printf '%s' "$desc" | grep -Fq '/wp-responsive-check' && fail "$s's description still pulls screenshot-walk requests (/wp-responsive-check)"
+printf '%s' "$desc" | grep -Fq 'Not for' || fail "$s's description names no near-miss it is not for"
 
 echo PASS

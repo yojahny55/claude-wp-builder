@@ -1,20 +1,35 @@
 ---
 name: wp-responsive
-description: Responsive design patterns for theme and demo CSS — mobile-first breakpoints, container widths, navigation, grid and flex stacking, fluid type with clamp(), responsive images, touch targets, reduced motion and no horizontal scroll. Use when writing or checking responsive styles for a section, header or footer (/wp-demo, /wp-init, /wp-responsive-check).
+description: Defines the mobile-first responsive rules for plain-CSS demo pages — the 576/768/1024/1200/1440 min-width breakpoint scale, container widths, the hamburger-to-horizontal header with an accessible mobile menu, grid and flex stacking, clamp() type, responsive images with a never-lazy hero, 24x24 touch targets, reduced motion and no horizontal scroll. Use when writing or fixing a section's breakpoints, a mobile menu, a hero's fluid type, image srcset or a too-small tap target in a /wp-demo page, or an image or touch target in a theme template. Not for a Tailwind theme's breakpoints (wp-tailwind-system), a screenshot walk of a site (/wp-demo-verify), or a cinematic site's mobile fallback (adaptive-mobile-strategy).
 user-invocable: false
 ---
 
 # Responsive Design Patterns
 
-This skill defines the responsive design system used across all themes and demos. It uses **mobile-first** CSS with `min-width` media queries, fluid typography, and responsive image techniques.
+Mobile-first CSS with `min-width` media queries, fluid type and responsive images, for the
+plain-CSS pages `/wp-demo` writes.
+
+## Which parts apply
+
+- **Plain-mode demo pages:** all of it. A demo is plain CSS whatever the project's template.
+- **Theme CSS:** read `template` from the project's `.claude/CLAUDE.md`. A `tailwind` theme
+  (and `basic`, its legacy alias) takes its breakpoints from `wp-tailwind-system`'s
+  `references/breakpoints.md` and never writes a media query by hand, so the scale and the
+  `@media` examples here do not apply to it.
+- **Craft mode** (`"demo mode": "craft"` in `.wp-create.json`): compositions size to their own
+  container with `@container` queries and `cqi` ramps
+  (`${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/compositions/README.md`); the breakpoint scale
+  and `vw` clamps here do not apply to them.
+- **Everywhere:** touch targets, images, reduced motion and no horizontal scroll.
 
 ## Reference files
 
 - [references/navigation.md](references/navigation.md) — the hamburger-to-horizontal header:
-  full HTML, CSS and toggle JavaScript. Read when building or fixing a header's mobile menu.
-- [references/images.md](references/images.md) — `srcset`/`sizes`, `<picture>` art direction,
-  `wp_get_attachment_image()` and lazy-loading markup. Read when emitting an image in a demo
-  or template.
+  full HTML, CSS and JavaScript, with the focus trap the audit requires. Read when building or
+  fixing a header's mobile menu.
+- [references/images.md](references/images.md) — the hero (LCP) image, below-the-fold images,
+  `<picture>` art direction and `wp_get_attachment_image()`. Read when emitting an image in a
+  demo or template.
 - [references/layout-patterns.md](references/layout-patterns.md) — worked CSS for grid and flex
   stacking, per-element touch targets, a complete section, section spacing, the heading scale
   and the footer. Read when writing a section's breakpoints and you want the pattern to copy.
@@ -23,9 +38,7 @@ This skill defines the responsive design system used across all themes and demos
 
 ## Mobile-First Breakpoint System
 
-All styles are written mobile-first. Base styles target the smallest screens, and `min-width` media queries progressively enhance for larger viewports.
-
-### Breakpoint Scale
+Base styles are the phone layout; each `min-width` breakpoint adds to them.
 
 | Name | Min-Width | Target Devices |
 |---|---|---|
@@ -36,14 +49,13 @@ All styles are written mobile-first. Base styles target the smallest screens, an
 | Large | `1200px` | Large desktops |
 | Extra Large | `1440px` | Ultra-wide screens |
 
-**A breakpoint is a range, not a line.** Whatever you declare at one step stays in force until the
-next step overrides it, so the layout must be checked BETWEEN the steps and not only at them. The
-first desktop step is the usual casualty: a row of cards that reads well at 1440 is handed the same
-row rule at 1024, where the columns are 40% narrower and the copy no longer fits. Before calling a
-component done, resize through the middle of each range — 1100-1200 especially — and give that
-range its own rule when the design's desktop layout does not survive it.
-
-### CSS Implementation
+**A breakpoint is a range, not a line.** Whatever you declare at one breakpoint stays in
+force until the next one overrides it, so the layout must be checked BETWEEN the breakpoints
+and not only at them. The first desktop breakpoint is the usual casualty: a row of cards that
+reads well at 1440 is handed the same row rule at 1024, where the columns are 40% narrower
+and the copy no longer fits. Before calling a section done, check the middle of each range —
+1100-1200 especially — and give that range its own rule when the design's desktop layout
+does not survive it.
 
 ```css
 /* Base: mobile-first (no media query) */
@@ -84,7 +96,8 @@ range its own rule when the design's desktop layout does not survive it.
 
 ### Rule: Always `min-width`, Never `max-width`
 
-Use `min-width` queries exclusively. This enforces mobile-first thinking -- you start with the constrained layout and add complexity as space increases.
+Use `min-width` queries only, the mobile menu included. You start with the constrained layout
+and add complexity as space increases; a `max-width` rule is desktop-first CSS undoing itself.
 
 ```css
 /* CORRECT: mobile-first with min-width */
@@ -94,13 +107,11 @@ Use `min-width` queries exclusively. This enforces mobile-first thinking -- you 
 @media (max-width: 767px) { ... }
 ```
 
-The only exception to the `max-width` rule is for the hamburger/mobile menu toggle (see Navigation section below), where `max-width` can be used to hide desktop nav on mobile. Even then, prefer showing/hiding with `min-width` when possible.
-
 ---
 
 ## Container Max-Widths Per Breakpoint
 
-The container stretches to fill the viewport on small screens and caps at the design system maximum on large screens.
+The container fills the viewport on small screens and caps at `--container-max` on large ones.
 
 ```css
 .container {
@@ -144,53 +155,27 @@ Markup, CSS and JS: [references/navigation.md](references/navigation.md).
 
 ## CSS Grid and Flexbox Stacking
 
-Grids start at one column and add columns at `768px`, `1024px` and `1200px`; flex rows start
-as `flex-direction: column` and become `row` at `1024px`. Use `column-reverse` on mobile when
-the image must come first. Worked examples:
+Grids start at one column and add columns at the breakpoints the content needs; flex rows
+start as `flex-direction: column` and become `row` at `1024px`. Use `column-reverse` on
+mobile when the image must come first. Worked examples:
 [references/layout-patterns.md](references/layout-patterns.md#css-grid-and-flexbox-stacking).
 
 ---
 
 ## Fluid Typography with clamp()
 
-Use `clamp()` for headings and large text to smoothly scale between viewport sizes without media query jumps.
-
-### Syntax
-
-```css
-font-size: clamp(<minimum>, <preferred>, <maximum>);
-```
-
-### Examples
+`h1`–`h3` and hero or display text use `clamp()`; body and small text stay on fixed `rem`
+tokens. The `vw` term sets how hard the size scales: `2vw` gentle, `3vw` moderate, `5vw`
+aggressive.
 
 ```css
-/* Hero title: 2rem at minimum, scales with viewport, caps at 4rem */
-.hero__title {
-    font-size: clamp(2rem, 5vw, 4rem);
-}
-
-/* Section title: 1.5rem to 2.5rem */
-.section__title {
-    font-size: clamp(1.5rem, 3vw, 2.5rem);
-}
-
-/* Body text: stays readable at all sizes */
-.hero__subtitle {
-    font-size: clamp(1rem, 2.5vw, 1.25rem);
-}
-
-/* Large display text */
-.display__heading {
-    font-size: clamp(2.5rem, 6vw, 5rem);
-}
+.hero__title     { font-size: clamp(2rem, 5vw, 4rem); }
+.section__title  { font-size: clamp(1.5rem, 3vw, 2.5rem); }
+.hero__subtitle  { font-size: clamp(1rem, 2.5vw, 1.25rem); }
 ```
 
-### Guidelines
-
-- Use `clamp()` for `h1` through `h3` and hero/display text
-- Body text and small text usually do not need `clamp()` -- a fixed `rem` value works fine
-- The `vw` unit in the preferred value controls how aggressively the text scales
-- Common preferred values: `2vw` (gentle), `3vw` (moderate), `5vw` (aggressive)
+The floor is a phone size. A hero floored at a desktop size wraps a normal headline into six
+lines at 390px.
 
 ---
 
@@ -209,7 +194,7 @@ Markup for each case: [references/images.md](references/images.md).
 
 ---
 
-## Touch-Friendly Targets
+## Touch Targets
 
 Every interactive element outside running text (links, buttons, form inputs, icon links)
 MUST render at least **24x24 CSS pixels** at every viewport — WCAG 2.2 AA 2.5.8, and the
@@ -217,9 +202,10 @@ threshold the accessibility audit fails on. **44x44** (2.5.5, AAA) is the comfor
 to design new controls at; it is advice, not a failing threshold.
 
 When a designed element is smaller than 24px (a 16px social icon, a 20px nav line, a
-breadcrumb home glyph), enlarge the hit area **without moving anything**: padding plus an
+breadcrumb home glyph), enlarge the touch target **without moving anything**: padding plus an
 equal negative margin, so the layout box and the text position stay where the design put
-them.
+them. The same applies to an icon button (close, hamburger, social link) inside a row whose
+spacing the design fixes.
 
 ```css
 /* 16px icon: 4px padding each side = 24x24, -4px margin keeps its place */
@@ -244,10 +230,6 @@ Measure it at desktop and mobile with `getBoundingClientRect()` (24x24 or more),
 compare the text's own `getBoundingClientRect().top/left` before and after the change: it
 must not move.
 
-### Icon Buttons
-
-For small icon buttons (close, hamburger, social links), the clickable area is at least 24px (44px where the design has room) even if the visible icon is smaller. Inside a row whose spacing is fixed by the design, use the padding plus negative margin pattern above instead of a fixed box.
-
 Sizing for buttons, navigation links, form inputs (`font-size: var(--font-size-base)`, which
 prevents zoom on iOS) and icon buttons:
 [references/layout-patterns.md](references/layout-patterns.md#touch-target-sizing-per-element).
@@ -256,16 +238,17 @@ prevents zoom on iOS) and icon buttons:
 
 ## Every Section MUST Have Responsive Styles
 
-When building any section, you MUST define how it looks at each major breakpoint. No section should rely on desktop-only styles.
-
-A complete section to copy (base, `768px`, `1024px`):
+Every section defines how it looks at each breakpoint it needs; none relies on desktop-only
+styles. A complete section to copy (base, `768px`, `1024px`):
 [references/layout-patterns.md](references/layout-patterns.md#pattern-for-every-section).
+Section padding, the heading scale and the footer grid:
+[references/layout-patterns.md](references/layout-patterns.md#responsive-section-spacing).
 
 ---
 
 ## No Horizontal Scroll
 
-The page MUST NOT scroll horizontally at any viewport width. This is tested starting at **320px minimum**.
+The page MUST NOT scroll horizontally at any viewport width, down to **320px**.
 
 ### Fix the element that overflows, never the wrapper
 
@@ -286,34 +269,13 @@ box it escapes.
 the overflow the check exists to find, clips focus rings and shadows that sit past the
 edge, and makes the element a scroll container, which breaks `position: sticky` inside it.
 
-### Testing Rule
-
-Before finalizing, verify no horizontal scroll exists at these widths:
-- 320px (oldest small phones)
-- 375px (iPhone SE / standard)
-- 576px (large phones)
-- 768px (tablets)
-- 1024px (desktops)
-- 1440px (large desktops)
-
 ---
 
 ## Reduced Motion
 
-Respect the user's preference to reduce animations and motion.
+Every stylesheet that uses animations or transitions MUST carry this block:
 
 ```css
-/* Define animations normally */
-.card {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
-}
-
-/* Remove animations for users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -326,59 +288,15 @@ Respect the user's preference to reduce animations and motion.
 }
 ```
 
-This MUST be included in every stylesheet that uses animations or transitions.
-
 ---
 
-## Section Spacing, Heading Scale and Footer
+## Verify
 
-Section padding steps from `--spacing-2xl` (mobile) to `--spacing-3xl` (`768px`) and
-`calc(var(--spacing-3xl) * 1.5)` (`1200px`). `h1`–`h3` use `clamp()`; `h4` and body text use
-fixed tokens. Footers stack to one column, go to two at `768px` and to `2fr 1fr 1fr 1fr` at
-`1024px`, with the bottom bar becoming a row at `768px`. The CSS for all three:
-[references/layout-patterns.md](references/layout-patterns.md#responsive-section-spacing).
-
----
-
-## Testing Checklist
-
-Before marking any page or section as complete, verify responsiveness at these viewport widths:
-
-| Width | Device Class | Check |
-|---|---|---|
-| 375px | Mobile (iPhone SE) | Layout stacks, text readable, touch targets 24px+ |
-| 576px | Large phone | Grid may shift to 2 columns |
-| 768px | Tablet | 2-column layouts, larger padding |
-| 1024px | Desktop | Full navigation visible, 3+ column grids |
-| 1440px | Large desktop | Max container width respected, generous whitespace |
-
-### What to Verify at Each Breakpoint
-
-- [ ] No horizontal scrolling
-- [ ] All text is readable (no truncation, no overflow)
-- [ ] Images scale properly (no stretching, no overflow)
-- [ ] Navigation switches between hamburger and horizontal
-- [ ] Grid layouts adjust column count appropriately
-- [ ] Touch targets are at least 24x24px at desktop and mobile (44x44 where the design has room)
-- [ ] Section spacing scales (tighter on mobile, looser on desktop)
-- [ ] Footer stacks properly on mobile
-- [ ] `prefers-reduced-motion` disables animations
-- [ ] Form inputs are at least 16px font size (prevents iOS zoom)
-
----
-
-## Summary Checklist
-
-- [ ] Mobile-first CSS with `min-width` media queries only
-- [ ] Breakpoints: 576px, 768px, 1024px, 1200px, 1440px
-- [ ] Container with responsive padding and max-width
-- [ ] Hamburger menu on mobile, horizontal nav on desktop with ARIA attributes
-- [ ] CSS Grid/Flexbox with mobile stacking
-- [ ] `clamp()` used for headings and display text
-- [ ] Responsive images with `srcset` and `sizes`; `loading="lazy"` below the fold, never on the hero/LCP image
-- [ ] WordPress `wp_get_attachment_image($image['ID'], …)` used in templates
-- [ ] All touch targets minimum 24x24px (WCAG 2.5.8), none moved to get there
-- [ ] Every section has styles for all breakpoints
-- [ ] No horizontal scroll at any width (tested at 320px+)
-- [ ] `prefers-reduced-motion` media query included
-- [ ] Tested at: 375px, 576px, 768px, 1024px, 1440px
+1. Run `/wp-demo-verify` on the page or the `demo/` directory. It walks every width this
+   skill cares about, including the ones between the breakpoints, and reports overflow with
+   its culprits and copy clipped by its container.
+2. Fix each finding at its source, as above.
+3. Run it again. Stop when it reports no overflow and no clipped copy at any width.
+4. Then check by hand what the walk cannot: 320px (narrower than its narrowest width), the
+   mobile menu open and closed from the keyboard, `prefers-reduced-motion`, and every touch
+   target at 24x24 or more without the text moving.

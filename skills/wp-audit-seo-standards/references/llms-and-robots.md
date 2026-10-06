@@ -11,11 +11,12 @@ Part of the `wp-audit-seo-standards` skill; section numbers match its SKILL.md.
 
 `llms.txt` is not written by this skill. It is a dynamic route in the theme's
 `inc/agentic.php`, emitted by the `wp-agentic-surfaces` agent to the structure in
-`wp-audit-geo-standards` §6.1, and audited as GEO-A13 to GEO-A16.
+`wp-audit-geo-standards` (`references/surface-templates.md` §6.1), and audited as GEO-A13
+to GEO-A16.
 
 **Never write a physical `llms.txt`.** The web server answers a file at the web root before
-PHP runs, so a file written to `ABSPATH . 'llms.txt'` shadows the theme's route for good: the file is stale the moment content changes, and the audit reports it as GEO-A26
-(ERROR). This skill used to ship exactly that generator, and `/wp-audit` dispatches the SEO
+PHP runs, so a file written to `ABSPATH . 'llms.txt'` shadows the theme's route for good:
+the file is stale the moment content changes, and the audit reports it as GEO-A26 (ERROR). This skill used to ship exactly that generator, and `/wp-audit` dispatches the SEO
 fixes before the GEO fixes, so every site fixed by both ended with a stale file in front of
 the fresh route.
 

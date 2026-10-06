@@ -413,12 +413,23 @@ grep -Fq 'the section stops being a sequence' "$C/process-flow/section.css" \
 # timeline. `getComputedStyle` and `getBoundingClientRect` both go through the timing
 # function, so an eased reading is not progress and a transformed box is not a layout
 # box. Recording the distinction is the only thing that stops it recurring.
+# The table and its two consequences live once, in verify.md, where the probe is
+# opened; devices.md keeps the heading and points there. Two copies had already
+# diverged in wording.
+vfy=skills/wp-demo-craft/references/verify.md
+[ -f "$vfy" ] || fail "$vfy is missing"
 grep -Fq 'two readouts, and they answer different questions' "$dev" \
   || fail "$dev does not separate animation.currentTime from the computed property; that conflation produced four wrong measurements"
-grep -Fq 'Eased readings are not progress' "$dev" \
-  || fail "$dev does not warn that a computed property is eased, which put entry 100% at cover 52.8% instead of 30.8%"
-grep -Fq 'returns the transformed box' "$dev" \
-  || fail "$dev does not warn that getBoundingClientRect reports the scaled box mid-animation"
+grep -Fq '`verify.md` ("Before you read a number off a moving' "$dev" \
+  || fail "$dev's readouts heading does not send the reader to the table in verify.md"
+grep -Fq '| `animation.currentTime` |' "$vfy" \
+  || fail "$vfy has lost the readouts table"
+grep -Fq 'An eased reading is not progress' "$vfy" \
+  || fail "$vfy does not warn that a computed property is eased, which put entry 100% at cover 52.8% instead of 30.8%"
+grep -Fq 'returns the transformed box' "$vfy" \
+  || fail "$vfy does not warn that getBoundingClientRect reports the scaled box mid-animation"
+grep -Fq '| `animation.currentTime` |' "$dev" \
+  && fail "$dev carries a second copy of the readouts table, which will drift from verify.md's"
 grep -Fq 'An override can conceal what it overrode' "$dev" \
   || fail "$dev does not record that a flattening override hides a broken ladder -- 'all correct' and 'all identical' look the same"
 

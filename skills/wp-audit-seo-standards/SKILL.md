@@ -1,12 +1,12 @@
 ---
 name: wp-audit-seo-standards
-description: Rank Math SEO reference — plugin detection, module and option keys, post meta keys, schema JSON-LD templates, title and description formulas, llms.txt and robots.txt templates, breadcrumbs, sitemap failure modes and WooCommerce SEO checks. Use when auditing, configuring or seeding SEO on a WordPress site that runs Rank Math (the wp-audit-seo and wp-audit-rankmath agents).
+description: Rank Math SEO reference for WordPress — detecting the plugin, the module, option and post meta keys (rank-math-options-titles), title templates and meta descriptions to seed with WP-CLI, JSON-LD schema templates, breadcrumbs, the classic robots.txt block, sitemap failure modes such as a sitemap_index.xml that 404s or returns HTML, the category-noindex gate, duplicate theme JSON-LD, title and description length limits, the Lighthouse link-text trap, and WooCommerce SEO checks SEO-064 to SEO-068. Use when auditing, configuring or seeding SEO on a site running Rank Math (wp-audit-seo, wp-audit-rankmath), or when per-category noindex, the sitemap or link-text fails. Not for llms.txt, AI-crawler rules in robots.txt or the Content-Signal header (wp-audit-geo-standards), and not for NAP or LocalBusiness subtype checks (wp-audit-local-standards).
 user-invocable: false
 ---
 
 # SEO Standards — Rank Math Reference
 
-This skill defines the SEO configuration standards, schema templates, and seeding commands for WordPress sites using **Rank Math SEO** as the primary SEO plugin.
+This skill defines the SEO configuration standards, schema templates, and seeding commands for WordPress sites using **Rank Math SEO** as the primary SEO plugin. `$WP` throughout is the WP-CLI wrapper from the project's `.wp-create.json` (`wp_cli.wrapper`).
 
 ---
 
@@ -24,6 +24,10 @@ the same section numbers they carry here:
   either file.
 - [references/breadcrumbs.md](references/breadcrumbs.md) — §10 `prefix_breadcrumbs()`, its CSS and
   the Rank Math switch. Read when adding breadcrumbs to a theme.
+- [references/audit-gotchas.md](references/audit-gotchas.md) — §13 to §17: the link-text and
+  meta-description traps, the category-noindex gate, the sitemap failure modes and their
+  validator, duplicate JSON-LD detection, and the length check. Read before reporting an SEO
+  finding fixed, or when validating the sitemap or the schema.
 - [references/woocommerce-seo.md](references/woocommerce-seo.md) — §18, the store-only checks
   SEO-064 to SEO-068. Read only when `site.commerce` is `woocommerce`.
 
@@ -139,9 +143,9 @@ Organization, LocalBusiness, FAQPage, BreadcrumbList and Article templates: see
 
 ---
 
-## 6. Meta Title Formulas by Page Type
+## 6. Title Templates by Page Type
 
-| Page Type | Formula |
+| Page Type | Title template |
 |-----------|---------|
 | Homepage | `%sitename% %sep% %sitedesc%` |
 | Page | `%title% %sep% %sitename%` |
@@ -187,8 +191,8 @@ The generator function and the bulk seed: see
 ## 8. llms.txt
 
 A dynamic route in `inc/agentic.php`, emitted by `wp-agentic-surfaces` to
-`wp-audit-geo-standards` §6.1 — never a physical file. A `llms.txt` at the web root shadows
-the route and is reported as GEO-A26. See
+`wp-audit-geo-standards` (`references/surface-templates.md` §6.1) — never a physical file.
+A `llms.txt` at the web root shadows the route and is reported as GEO-A26. See
 [references/llms-and-robots.md](references/llms-and-robots.md).
 
 ---
@@ -224,24 +228,10 @@ The auto-detection generator and its `wp_head` hook: see
 
 ---
 
-## 12. SEO Seeding Sequence
+## 12. After seeding: flush and verify
 
-Recommended order for bulk SEO setup on a new or existing site:
-
-1. **Install + activate Rank Math** — `$WP plugin install seo-by-rank-math --activate`
-2. **Enable modules** — activate all recommended modules (Section 2)
-3. **Configure general settings** — breadcrumbs, link behavior, image SEO (Section 3)
-4. **Configure title templates** — set formulas per page type (Section 6)
-5. **Configure sitemap** — set post types and taxonomies to include
-6. **Set Organization / LocalBusiness schema** — configure site-wide schema (Section 5)
-7. **Configure OG / Social defaults** — set default OG image, social profiles
-8. **Enable IndexNow** — activate instant indexing for Bing / Yandex
-9. **Seed per-page SEO meta** — `rank_math_title`, `rank_math_focus_keyword`, robots (Section 4)
-10. **Seed meta descriptions** — auto-generate from excerpt/content (Section 7)
-11. **Set image alt texts** — bulk update missing alt attributes
-12. **robots.txt and llms.txt** — not written in this sequence: `wp-agentic-surfaces` owns
-    both (Sections 8 and 9)
-13. **Flush sitemap cache + rewrite rules** — finalize:
+The order of a full setup is `wp-audit-rankmath`'s Steps 1 to 15, which run it. When they
+are done, flush the sitemap cache and the rewrite rules:
 
 ```bash
 $WP eval "
@@ -279,167 +269,29 @@ $WP eval "foreach (array('robots.txt', 'llms.txt') as \$f) { \$r = wp_remote_get
 $WP eval "echo file_exists(ABSPATH . 'llms.txt') ? 'PHYSICAL llms.txt present -- GEO-A26' : 'no physical llms.txt';"
 ```
 
----
-
-## 13. Lighthouse SEO Audit Gotchas (hard-won)
-
-Non-obvious traps that make a fix *look* applied while the audit keeps failing. Verify against these before reporting an SEO finding fixed.
-
-### `link-text` matches VISIBLE innerText — not `aria-label`
-
-The Lighthouse `link-text` audit (`core/audits/seo/link-text.js`) lowercases/trims the anchor's **`link.text`** (rendered innerText) and checks it against a blocklist: `click here`, `here`, `learn more`, `more`, `read more`, `this`, `start`, … (per-language). **`aria-label`, `title`, and `nodeLabel` are ignored** — adding an `aria-label` fixes the a11y accessible-name but does **not** satisfy this SEO audit.
-
-To keep a design's non-descriptive label (e.g. a "LEARN MORE" button) *and* pass, append a visually-hidden descriptive suffix **inside** the anchor so it becomes part of innerText:
-
-```php
-<a class="btn" href="<?php echo esc_url( $url ); ?>">
-    <?php echo esc_html( $label ); // e.g. "LEARN MORE" — stays visible ?>
-    <?php if ( $context ) : ?><span class="screen-reader-text"><?php
-        echo esc_html( 'about ' . $context ); // e.g. "about Home Search"
-    ?></span><?php endif; ?>
-</a>
-```
-
-Now `link.text` = "LEARN MORE about Home Search" → not a blocklist match → audit passes; the button still visually reads "LEARN MORE".
-
-- **Critical:** the hidden span must use the `.screen-reader-text` **clip** pattern (`position:absolute; clip: rect(...); width:1px`) — NOT `display:none` or `visibility:hidden`, which are excluded from innerText and would fail again. (A `.screen-reader-text` rule is required in the theme CSS; see a11y standards.)
-- The same non-descriptive label often repeats across a reusable button component — fix the component/template part once, then re-check *every* page that uses it (Lighthouse audits per-URL; a homepage pass doesn't clear inner pages).
-- `identical-links-same-purpose` (a11y, weight 0) can also flag two same-text links (e.g. two "VIEW ALL") pointing to different destinations — the same hidden-suffix technique resolves it.
-
-### Meta description: let the SEO plugin own it — don't emit a theme fallback
-
-If Rank Math (or Yoast) is active and configured, do **not** also `echo` a hardcoded `<meta name="description">` from the theme `wp_head`. Two tags = a duplicate-description warning, and the plugin's dynamic/templated value is the one you want. A common failure mode: a theme adds a front-page meta-description fallback "to be safe" while the SEO plugin's setup wizard was incomplete → once the wizard is finished, the tag is duplicated. Remove the theme fallback; verify only one `<meta name="description">` renders (`curl -s <url> | grep -o 'name="description"' | wc -l` → `1`).
-
-## 14. Category noindex — the dual-option gotcha (CRITICAL)
-
-Rank Math ignores `tax_category_robots` unless `tax_category_custom_robots = 'on'`.
-Without the gate, per-category noindex settings are silently discarded.
-
-```php
-// WRONG — silently does nothing:
-$opts['tax_category_robots_' . $term_id] = ['noindex'];
-
-// CORRECT — must also set the gate:
-$opts['tax_category_custom_robots'] = 'on';
-$opts['tax_category_robots_' . $term_id] = ['noindex'];
-```
-
-Both options must be saved in the same `update_option` call. The gate is a
-site-wide switch that enables per-term robots control. Without it, Rank Math
-falls back to the global robots setting for ALL categories.
-
-**Verification:**
-```bash
-# Check gate is set
-$WP eval "echo get_option('rank-math-options-titles')['tax_category_custom_robots'] ?? 'NOT SET';"
-
-# Check specific category
-$WP eval "
-\$term = get_term_by('slug', '<thin-category-slug>', 'category');
-\$opts = get_option('rank-math-options-titles');
-echo 'Gate: ' . (\$opts['tax_category_custom_robots'] ?? 'MISSING') . PHP_EOL;
-echo 'Robots: ' . print_r(\$opts['tax_category_robots_' . \$term->term_id] ?? 'NOT SET', true);
-"
-```
+Fix what a line reports, re-run the block, and stop when the titles print, the description
+count equals the published total, both files answer `HTTP 200` and no physical `llms.txt` is
+present.
 
 ---
 
-## 15. Sitemap failure modes (11 known)
+## 13–17. Audit gotchas
 
-After generating the sitemap, validate against these failure modes:
+Each rule below has its sample, detection command or validator in
+[references/audit-gotchas.md](references/audit-gotchas.md), under the same number.
 
-| # | Failure | Detection | Fix |
-|---|---------|-----------|-----|
-| 1 | Sitemap 404 | `curl -sI /sitemap_index.xml` returns 404 | Set `rank_math_registration_skip = 1` and `rank_math_is_configured = 1` |
-| 2 | Sitemap returns HTML | Response contains `<!DOCTYPE html` | registration_skip flag missing, or rewrite rules flushed |
-| 3 | Missing CPTs | Check `<sitemap>` entries for each translated post type | Register CPTs before `pll_init` fires (hook `init` at priority 99) |
-| 4 | Noindex pages in sitemap | Compare `rank_math_robots` meta with sitemap URLs | Rank Math should exclude noindex, but verify |
-| 5 | Draft posts in sitemap | Query `post_status IN ('draft','private')` | Rank Math excludes by default, but check after bulk operations |
-| 6 | Redirected URLs in sitemap | Check Rank Math redirections vs sitemap URLs | Remove redirected URLs from sitemap |
-| 7 | Blocked URLs (robots.txt) | Compare sitemap URLs with robots.txt Disallow | Remove blocked URLs from sitemap |
-| 8 | Duplicate URLs | Parse sitemap XML for duplicate `<loc>` values | Check canonical settings |
-| 9 | Wrong lastmod dates | Compare `<lastmod>` with `post_modified` | Rank Math uses post_modified, verify matches |
-| 10 | Attachment pages in sitemap | Check `pt_attachment_sitemap` option | Set to `off` |
-| 11 | Wrong canonical URLs in sitemap | Compare `<loc>` with `get_permalink()` | Check permalink structure and canonical settings |
-
-**Validation script:**
-```bash
-$WP eval "
-\$url = home_url('/sitemap_index.xml');
-\$r = wp_remote_get(\$url);
-\$code = wp_remote_retrieve_response_code(\$r);
-\$body = wp_remote_retrieve_body(\$r);
-\$ct = wp_remote_retrieve_header(\$r, 'content-type');
-
-echo \"HTTP \$code | Content-Type: \$ct\n\";
-if (\$code !== 200) echo \"FAIL: Sitemap not accessible\n\";
-if (stripos(\$body, '<!DOCTYPE html') !== false) echo \"FAIL: Returns HTML\n\";
-if (stripos(\$body, '<sitemapindex') === false && stripos(\$body, '<urlset') === false) echo \"FAIL: Missing XML root\n\";
-
-\$skip = get_option('rank_math_registration_skip', 0);
-\$cfg = get_option('rank_math_is_configured', 0);
-if (!\$skip) echo \"FAIL: registration_skip not set\n\";
-if (!\$cfg) echo \"FAIL: is_configured not set\n\";
-echo 'Done.';
-"
-```
-
----
-
-## 16. Schema conflict detection
-
-When Rank Math is active, the theme should NOT emit its own JSON-LD.
-Two schema blocks = duplicate structured data = Google may ignore both.
-
-```bash
-# Check for theme JSON-LD
-$WP eval "
-\$it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(get_template_directory()));
-\$conflicts = [];
-foreach (\$it as \$f) {
-    if (\$f->getExtension() !== 'php') continue;
-    if (strpos(file_get_contents(\$f->getPathname()), 'application/ld+json') !== false) {
-        \$conflicts[] = \$f->getFilename();
-    }
-}
-if (\$conflicts) {
-    echo 'CONFLICT: Theme JSON-LD in: ' . implode(', ', \$conflicts) . PHP_EOL;
-    echo 'FIX: Remove theme JSON-LD when Rank Math handles schema.' . PHP_EOL;
-} else {
-    echo 'OK: No theme JSON-LD conflicts.' . PHP_EOL;
-}
-"
-```
-
----
-
-## 17. Title/description quality thresholds
-
-Not just missing — but too long or too short.
-
-| Field | Min | Max | Google behavior |
-|-------|-----|-----|-----------------|
-| Title | — | 60 chars (~580px) | Truncated with "…" in SERP |
-| Description | 70 chars | 160 chars | Truncated or replaced with snippet |
-
-**Pixel width note:** Google truncates by pixel width, not character count.
-For Latin scripts, 60 chars ≈ 580px. For scripts with wider characters
-(CJK, Cyrillic), the char limit is lower. Use the Rank Math editor's pixel
-preview when available.
-
-**Validation:**
-```bash
-$WP eval "
-\$posts = get_posts(['post_type'=>['post','page'],'posts_per_page'=>-1,'post_status'=>'publish']);
-foreach (\$posts as \$p) {
-    \$t = get_post_meta(\$p->ID, 'rank_math_title', true) ?: \$p->post_title;
-    \$d = get_post_meta(\$p->ID, 'rank_math_description', true);
-    if (mb_strlen(\$t) > 60) echo 'LONG TITLE ['.mb_strlen(\$t).'] #'.\$p->ID.': '.mb_substr(\$t,0,60).'...' . PHP_EOL;
-    if (\$d && mb_strlen(\$d) > 160) echo 'LONG DESC ['.mb_strlen(\$d).'] #'.\$p->ID . PHP_EOL;
-    if (\$d && mb_strlen(\$d) < 70) echo 'SHORT DESC ['.mb_strlen(\$d).'] #'.\$p->ID . PHP_EOL;
-}
-"
-```
+- **§13 Lighthouse `link-text` reads visible innerText, never `aria-label`.** Keep a
+  design's "LEARN MORE" and pass by appending a `.screen-reader-text` suffix inside the
+  anchor — the clip pattern, never `display:none`, which innerText skips. And let the SEO
+  plugin own the meta description: a theme fallback becomes a duplicate tag.
+- **§14 Rank Math ignores `tax_category_robots_<term_id>` unless `tax_category_custom_robots`
+  is `'on'`**, saved in the same `update_option` call. Without the gate, per-category
+  noindex is silently discarded.
+- **§15 Eleven sitemap failure modes.** The first two — a sitemap that 404s or returns HTML —
+  are the missing `rank_math_registration_skip` and `rank_math_is_configured` flags.
+- **§16 When Rank Math is active, the theme emits no JSON-LD of its own.** Two schema blocks
+  are duplicate structured data.
+- **§17 Titles stop at 60 characters; descriptions run 70 to 160.**
 
 ---
 

@@ -95,7 +95,7 @@ Two consequences, each of which produced a plausible wrong number:
   `scale: 1 → 1.08` measured 44, 43.8, 43.3 and 42.6px, and every junction looked
   pixels out. Both artefacts. For layout, use `offsetWidth`/`offsetHeight`, or
   neutralise `animation`, `transform`, `translate`, `scale` and `rotate` for the
-  duration of the read — which is what `bin/demo-verify.mjs` now does before taking the
+  duration of the read — which is what `bin/demo-verify.mjs` does before taking the
   section bounds the walk drives to, having been measured walking a parallax bed 90px
   off its real position.
 
@@ -147,8 +147,8 @@ written down first.
   device to one page raises the count by exactly the per-page sample count. Measured
   on a build that gained a parallax bed on two pages: 80 advisory to 96, eight rows
   per page. An advisory rise that is an exact multiple of the sample count is a device
-  being *added*; one that is not is worth reading. `reveal` was reported as `dead-scroll` for every section that
-  used it until v3.1, which is what taught a build to dismiss 392 findings in
+  being *added*; one that is not is worth reading. A walk that reported every
+  `reveal` section as `dead-scroll` once taught a build to dismiss 392 findings in
   prose. A gate that cannot tell a good page from a broken one gets overruled,
   and then so does every gate beside it.
 - A stalled section that *does* carry `pin`/`pan`/`kinetic`/`wipe`/`drift` and
@@ -157,8 +157,8 @@ written down first.
   so its absence is not an unreadable device — it is an engine that never ran,
   which is exactly how a `file://`-blocked module script shipped a demo the
   client rejected.
-- `no-engine` — the page carries no `data-motion` at all. Fails the round. A
-  motionless page used to walk clean, because an empty frame signature could
+- `no-engine` — the page carries no `data-motion` at all. Fails the round.
+  Without it a motionless page walks clean, because an empty frame signature can
   never accumulate a stall.
 - **`static-page` — the page's whole device mix is `reveal` plus pointer devices, so
   nothing on it reacts to scrolling.** Fails the round. The remedy is almost never to
@@ -230,22 +230,15 @@ because `motion.js` drives reveal in GSAP there and a GSAP tween is invisible to
 `getAnimations()` — a working section would otherwise read `none` at both
 samples and be reported dead.
 
-It used to walk only each sheet's **top-level** `cssRules`, so an `@container`
-block nested inside `@media`, `@supports` or `@layer` was never linted at all —
-`proof-row`'s own CSS already nests `@media` inside `@supports`, so generated
-demos plausibly nest container queries too. The lint now recurses into
+**`container-noop` sees nested rules.** The lint recurses into
 `CSSMediaRule`, `CSSSupportsRule` and `CSSLayerBlockRule` bodies and collects
-every `@container` rule it finds at any depth, so a nested block is linted the
-same as a top-level one.
-
-It used to judge a selector by `document.querySelector(sel)`, its **first**
-match only, which was a false positive and not an under-report: a selector
-matching several elements applies as soon as one of them sits inside a
-container, and the rule was reported dead whenever the first match happened to
-be the one outside. `container-noop` blocks, so that failed a round on correct
-CSS. The lint now walks **every** match (`querySelectorAll`) and reports the
-selector only when no match has a container-establishing ancestor. The ancestor
-walk still starts at `parentElement`, because an element never matches a
+every `@container` rule it finds at any depth, so a block nested inside `@media`,
+`@supports` or `@layer` is linted the same as a top-level one — `proof-row`'s own
+CSS nests `@media` inside `@supports`, so generated demos nest container queries
+too. It walks **every** match (`querySelectorAll`) and reports the selector only
+when no match has a container-establishing ancestor, because a selector matching
+several elements applies as soon as one of them sits inside a container. The
+ancestor walk starts at `parentElement`, because an element never matches a
 container query against the container it establishes itself.
 
 **Cues that never peak**: an element that never reaches full opacity anywhere in

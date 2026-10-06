@@ -401,7 +401,7 @@ grep -Fq 'a measured padding under roughly 16px' skills/wp-demo-craft/references
 # The @container lint's scope limit is retired, not recorded: it now recurses
 # into @media/@supports/@layer, so a stale "top-level only" line would teach a
 # build to keep dismissing a nested @container as unlinted when it is not.
-grep -Fq 'The lint now recurses into' skills/wp-demo-craft/references/verify.md \
+grep -Fq 'The lint recurses into' skills/wp-demo-craft/references/verify.md \
   || fail "verify.md does not record that the @container lint now recurses into @media/@supports/@layer bodies"
 grep -Fq '`CSSMediaRule`, `CSSSupportsRule` and `CSSLayerBlockRule` bodies' skills/wp-demo-craft/references/verify.md \
   || fail "verify.md does not name all three grouping rule types the @container lint now recurses into"

@@ -1,18 +1,21 @@
 ---
 name: wp-aos-animator
-description: WordPress AOS animation installer — audits, installs, enqueues, initializes, and seeds Animate On Scroll on every visual element across all PHP templates. Use when the user asks to add scroll animations, AOS, fade-in effects, entrance animations, or "make elements appear on scroll" in any WordPress theme.
+description: Installs AOS (Animate On Scroll) into a plain-mode WordPress theme and adds data-aos entrance animations across its templates — the library under assets/vendor/aos/, the functions.php enqueue, the init module, and the attributes in front-page.php and template-parts/. Reads demo mode and the Template line first and stops on a craft or cinematic theme, which already run GSAP and data-motion. Use when the user asks to add scroll, fade-in or entrance animations, install AOS or put data-aos attributes on a plain theme's sections, or fix AOS elements that never appear or a dropdown painted behind cards after its entrance. Run through /wp-aos-animator. Not for GSAP, ScrollTrigger or data-motion work (wp-demo-craft).
 user-invocable: false
 ---
 
 # WP AOS Animator
 
-Automates AOS (Animate On Scroll) implementation in WordPress themes. Covers the full pipeline: audit → install → enqueue → init → animate.
+Adds AOS (Animate On Scroll) to a plain-mode WordPress theme: audit → install → enqueue →
+init → animate. The phases run in order, and each depends on the previous one succeeding.
 
-## Phases
+## Reference files
 
-Run these in order. Each phase depends on the previous one succeeding.
+- [references/install.md](references/install.md) — Phases 2 to 4: the download, the
+  `functions.php` enqueue and bundle dependency, the init module and the reduced-motion CSS.
+  Read it only when the Phase 1 audit finds AOS missing or half-installed.
 
-### Phase 0: Read the motion decision — AOS is for plain builds only
+## Phase 0: Read the motion decision — AOS is for plain builds only
 
 Read two recorded decisions before touching the theme:
 
@@ -25,7 +28,7 @@ Read two recorded decisions before touching the theme:
 | `demo mode: craft` | **Stop and report.** A craft theme already ships GSAP and `motion.js` (`data-motion`) in its bundle. Continue only if the user explicitly confirms a second motion system. |
 | `demo mode: plain` (or absent), `Template: tailwind` | Continue with Phase 1. |
 
-### Phase 1: Audit
+## Phase 1: Audit
 
 Check if AOS is already present and initialized, and record the baseline:
 
@@ -40,144 +43,18 @@ The starter's JavaScript is a wp-scripts bundle built from `assets/js/src/`, so 
 `AOS.init` grep must reach that directory: a grep of `assets/js/*.js` alone never finds an
 existing init, and a re-run then adds a second one.
 
-Report findings: what's present, what's missing, and the baseline count.
+Report what is present, what is missing, and the baseline count.
 
-### Phase 2: Install (if missing)
+## Phases 2–4: Install, enqueue, initialize
 
-If no `aos.js` / `aos.css` exists, download AOS 2.3.4 into `assets/vendor/aos/`. This
-needs `curl` and network access. `-f` makes a 404 fail instead of saving GitHub's error
-page as `aos.js`, and `test -s` stops the pipeline on an empty file:
+Run each phase whose piece the audit found missing, exactly as
+[references/install.md](references/install.md) gives it, and stop on the first failure —
+Phase 5 on a theme with no library loaded animates nothing.
 
-```bash
-mkdir -p <theme>/assets/vendor/aos
-curl -fsSL "https://raw.githubusercontent.com/michalsnik/aos/v2.3.4/dist/aos.js"  -o <theme>/assets/vendor/aos/aos.js
-curl -fsSL "https://raw.githubusercontent.com/michalsnik/aos/v2.3.4/dist/aos.css" -o <theme>/assets/vendor/aos/aos.css
-test -s <theme>/assets/vendor/aos/aos.js && test -s <theme>/assets/vendor/aos/aos.css && echo AOS-OK
-```
+## Phase 5: Animate templates
 
-No `AOS-OK` line means the install failed: stop and report, never continue to Phase 3.
-If Phase 1 found AOS already installed elsewhere in the theme, use that path instead.
-
-### Phase 3: Enqueue (if missing)
-
-In `functions.php`, inside the existing `wp_enqueue_scripts` callback and **before** the
-main bundle's `wp_enqueue_script()`, add the two files. `PREFIX_URI` and `PREFIX_DIR` are
-the theme's own constants — the starter's `__STARTER___URI` / `__STARTER___DIR`, which
-`/wp-init` renames to the project prefix in uppercase (`KAIRO_URI`). Read the names from
-the theme's `functions.php`; never paste a constant from another project, which is
-undefined here and a fatal error on PHP 8:
-
-```php
-// AOS
-wp_enqueue_style( 'aos-css', PREFIX_URI . '/assets/vendor/aos/aos.css', array(), filemtime( PREFIX_DIR . '/assets/vendor/aos/aos.css' ) );
-wp_enqueue_script( 'aos-js', PREFIX_URI . '/assets/vendor/aos/aos.js', array(), filemtime( PREFIX_DIR . '/assets/vendor/aos/aos.js' ), true );
-```
-
-AOS has no dependency of its own — no `jquery`. Then make the main bundle depend on
-`aos-js`, so WordPress always prints AOS first. Nothing else orders them: the starter
-defers its bundle, and an AOS script enqueued after it, or deferred as well, can run after
-the bundle — the init module's `if (!window.AOS) return;` then turns the whole setup into a
-silent no-op. In the starter the bundle's dependencies come from `index.asset.php`:
-
-```php
-wp_enqueue_script( '<slug>-main', /* … */ array_merge( $asset['dependencies'], array( 'aos-js' ) ), /* … */ );
-```
-
-If AOS JS is already enqueued but CSS is missing, add just the CSS line right before the JS line. Put them together with a `// AOS` comment.
-
-### Phase 4: Initialize (if missing)
-
-`AOS.init()` alone leaves two seams that only show up after the entrance has already run
-once, so a quick visual check of the first load will not catch them. Both were found by
-testing a real build past its first scroll, not by reading the AOS docs:
-
-1. **`aos.css` rewrites `transition-property`, `-duration` and `-delay` on every element that
-   still carries `data-aos`, for as long as the attribute stays on it** — not just while the
-   entrance plays. A card that lifts on hover, or a button that fades its background color,
-   loses that transition (and inherits the entrance's timing instead) for the rest of the
-   page's life, because the attribute is still there long after the entrance finished. Strip
-   `data-aos`/`data-aos-delay`/`data-aos-duration` off each element once its own entrance
-   settles, so `aos.css` stops matching it and the element's own classes govern its
-   transitions again. `once: true` makes this safe — AOS never needs the attribute back.
-2. **Measuring trigger points at `DOMContentLoaded` runs before web fonts and images have
-   settled layout.** A block whose position moves once a font swaps in (or an image finishes
-   loading) keeps AOS's stale, pre-reflow trigger point and can end up permanently below it —
-   invisible, forever, because `once: true` will never re-trigger it once the page has
-   scrolled past where AOS thought it was. Initialize on `DOMContentLoaded` (so the entrance
-   can start as soon as possible) but call `AOS.refresh()` again on `load`.
-
-Add a dedicated module (adjust the export style to the theme's existing JS — vanilla ES
-module shown, wrap in `$(document).ready(...)` instead if the theme is jQuery-based) and call
-it from wherever the theme's other init code runs:
-
-```js
-export default function aos() {
-  if (!window.AOS) {
-    return;
-  }
-
-  // Strip the attributes once an element's own entrance transition ends, so
-  // aos.css stops rewriting its transition-property/-duration/-delay and the
-  // element's own hover/interaction transitions apply again. `once: true`
-  // means AOS never needs the attribute back.
-  document.addEventListener('transitionend', (event) => {
-    const el = event.target;
-    if (event.propertyName === 'opacity' && el.classList?.contains('aos-animate')) {
-      el.removeAttribute('data-aos');
-      el.removeAttribute('data-aos-delay');
-      el.removeAttribute('data-aos-duration');
-    }
-  });
-
-  window.AOS.init({
-    once: true,
-    disable: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-  });
-
-  // Two things need the page's full load, not DOMContentLoaded:
-  const settle = () => {
-    // a) AOS measured trigger points before fonts/images finished reflowing
-    //    the layout — measure again now that they have.
-    window.AOS.refresh();
-    // b) AOS only fires once an element is ~120px inside the viewport, so
-    //    whatever peeks above the bottom edge of the FIRST screen sits empty
-    //    until the visitor scrolls. Reveal anything already on screen at once
-    //    instead of waiting for a scroll that may never come. Above-the-fold
-    //    elements still carry data-aos (for the fade itself) but are never
-    //    skipped outright — see Phase 5's LCP guidance for how to keep this
-    //    from delaying the LCP paint.
-    document.querySelectorAll('[data-aos]:not(.aos-animate)').forEach((el) => {
-      if (el.getBoundingClientRect().top < window.innerHeight) {
-        el.classList.add('aos-animate');
-      }
-    });
-  };
-  if (document.readyState === 'complete') {
-    settle();
-  } else {
-    window.addEventListener('load', settle, { once: true });
-  }
-}
-```
-
-Add the reduced-motion escape hatch to the theme's animation CSS — `AOS.init()`'s own
-`disable` option stops new entrances from triggering, but does not undo the starting
-`opacity: 0` / `transform` that `aos.css` already applied to every `[data-aos]` element
-before that check runs:
-
-```css
-@media (prefers-reduced-motion: reduce) {
-  [data-aos] {
-    opacity: 1 !important;
-    transform: none !important;
-    transition: none !important;
-  }
-}
-```
-
-### Phase 5: Animate templates
-
-Scan every `.php` template in the theme root and `template-parts/` directory. For each file:
+Scan every `.php` template in the theme root and `template-parts/` directory. Work one
+element at a time, each edit anchored on context unique to that element.
 
 **Never animate an element that also needs a stacking context or a slide.** AOS's
 `[data-aos^=fade]` rules put a `transform` on the element — a translate before the
@@ -239,7 +116,7 @@ Only AOS's own animation names exist. `fade-up` carries the upward slide; a name
 library does not define (a `fade-up-slow`, say) gets the fade with no movement. Make an
 entrance slower with `data-aos-duration`, never with an invented name.
 
-**Animate these elements (when they lack data-aos):**
+**Animate these elements (when they lack `data-aos`):**
 - `<h1>`, `<h2>`, `<h3>` — use `data-aos="fade-up" data-aos-duration="1000"`
 - `<p>`, section descriptions — use `data-aos="fade-up" data-aos-delay="50" data-aos-duration="1000"`
 - Buttons/CTAs — use `data-aos="fade-up" data-aos-delay="100" data-aos-duration="1000"`
@@ -249,23 +126,8 @@ entrance slower with `data-aos-duration`, never with an invented name.
 - Banner containers, CTA sections — use `data-aos="fade-up" data-aos-delay="200"`
 - Footer columns, social icons — use `data-aos="fade-up" data-aos-delay="100"` with +100 increments per sibling
 
-**Animation convention:**
-| Element type | Animation | Typical delay |
-|---|---|---|
-| Hero titles, section headings | `fade-up` + duration 1000 | 0 |
-| Subtitles, descriptions | `fade-up` + duration 1000 | 50 |
-| Buttons, CTAs | `fade-up` + duration 1000 | 100 |
-| Images, illustrations | `fade-up` | 150 |
-| Cards (looped with $index) | `fade-up` | `min( $index, 5 ) * 100` |
-| Layout grid items | `fade-up` | 100, 150, 200, 250... |
-| Banner content | `fade-up` | 200 |
-| Footer elements | `fade-up` | 100, 200, 300 |
+For `wp_get_attachment_image` calls, add the attributes to the 4th parameter array:
 
-### Edits approach
-
-Work through templates one at a time. Use `Read` to see the file, then `Edit` with exact string matching. Make each edit atomic — one element at a time. Use unique surrounding context so the Edit tool finds the right match.
-
-For `wp_get_attachment_image` calls that need animation, add data attributes to the 4th parameter array:
 ```php
 // Before
 echo wp_get_attachment_image($id, '', '', ['class' => '...']);
@@ -273,14 +135,16 @@ echo wp_get_attachment_image($id, '', '', ['class' => '...']);
 echo wp_get_attachment_image($id, '', '', ['class' => '...', 'data-aos' => 'fade-up', 'data-aos-delay' => '100']);
 ```
 
-### Parallelization
-
-Phase 5 can be parallelized: spawn one agent per template file. Each agent gets a specific file path and the list of elements to animate from the audit. The main agent orchestrates and verifies.
-
 ## Verification
 
-After all edits, run a quick sanity check:
-```bash
-grep -c "data-aos" <theme>/*.php <theme>/template-parts/*.php
-```
-Count should have increased from baseline (recorded in Phase 1).
+1. Count the attributes and compare with the Phase 1 baseline:
+
+   ```bash
+   grep -c "data-aos" <theme>/*.php <theme>/template-parts/*.php
+   ```
+
+2. If the count did not rise for a template Phase 5 was meant to change, run Phase 5 once
+   more on that file alone, then count again. Still unchanged: stop and report the file.
+3. Walk the page, because every failure above shows only after scrolling:
+   `/wp-demo-verify <url>`. A section that stays blank, a dropdown under the next card or a
+   drawer that jumps is one of the traps in Phase 5.

@@ -67,24 +67,13 @@ printf '%s' "$clause" | grep -Eq 'basic|this template' \
 # the first closing `---`, so a later mention in the skill's prose cannot satisfy
 # it. Whitespace around the colon is tolerated because YAML tolerates it.
 # ---------------------------------------------------------------------------
-# Two skills are deliberately user-invocable and are exempt by name. They INSTALL and
-# CONFIGURE rather than inform — `wp-robin` unsticks and reconfigures Robin Image
-# Optimizer, `wp-aos-animator` installs and enqueues AOS across a theme's templates —
-# and both are offered to the user on purpose. They arrived from main after this branch
-# forked, and they mean CLAUDE.md's flat "skills inform; they never act" is now the
-# convention for knowledge libraries rather than for every skill in the tree. The
-# exemption is a NAMED list, not a pattern, so the next skill that omits the key still
-# fails; and each name is asserted to still exist, so a rename cannot leave a silent
-# hole behind.
-ACTION_SKILLS='wp-robin wp-aos-animator'
-for a in $ACTION_SKILLS; do
-  [ -f "skills/$a/SKILL.md" ] || { echo "FAIL: skills/$a/SKILL.md is exempted from the user-invocable rule but no longer exists — a stale exemption silently widens this gate"; exit 1; }
-done
-
+# No skill is exempt. `wp-robin` and `wp-aos-animator` used to be skipped here as
+# "deliberately user-invocable" action skills, but the action skills are reached through
+# their runner commands and declare `user-invocable: false` like every other skill
+# (tests/checks/skill-runner-commands.sh requires it), so the exemption only hid them from
+# this gate.
 for s in skills/*/SKILL.md; do
   [ -f "$s" ] || { echo "FAIL: no skills/*/SKILL.md found — this gate is matching nothing"; exit 1; }
-  name=$(basename "$(dirname "$s")")
-  case " $ACTION_SKILLS " in *" $name "*) continue ;; esac
   fm=$(awk 'NR == 1 && $0 !~ /^---[[:space:]]*$/ { exit } NR > 1 && /^---[[:space:]]*$/ { exit } NR > 1 { print }' "$s")
   [ -n "$fm" ] || { echo "FAIL: $s has no YAML frontmatter block — every skill declares name, description and user-invocable: false"; exit 1; }
   printf '%s\n' "$fm" | grep -Eq '^[[:space:]]*user-invocable[[:space:]]*:[[:space:]]*false[[:space:]]*$' \
