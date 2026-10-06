@@ -19,6 +19,17 @@
 
 ### Fixed
 
+- **`/wp-demo-verify`'s static-page gate stops counting a device that does not exist.**
+  `bin/demo-verify.mjs` still listed `cascade` as scroll-reactive after the device left the
+  motion contract, because `motion.js` never implemented it — so a page carrying
+  `data-motion="cascade"` beside its reveals passed the gate while nothing on it moved.
+  `count` had the mirror defect: the gate read it off a `data-motion="count"` value, which
+  is inert, while `motion.js` dispatches it off `data-motion-count` alone, so a real counter
+  counted for nothing and a page whose only scroll device was one failed. Measured against
+  both on Chromium: the old gate passed the cascade page and failed the counter page; it
+  now does the reverse. `tests/checks/wp-craft-consistency.sh` holds the gate's set to the
+  devices `motion.js` binds, `count` to the attribute both files read, and the whole set to
+  the interior floor `devices.md` states.
 - **The cinematic starter keeps a `?lang=` switch.** Its `inc/i18n.php` read
   `$_COOKIE['__starter___lang']` and never called `setcookie()`, so a language switch lasted
   exactly one request and the next page came back in the browser's language. An `init`
