@@ -14,7 +14,7 @@ fail() { echo "FAIL: $*"; exit 1; }
 
 k=skills/wp-audit-standards/SKILL.md
 ref=skills/wp-audit-standards/references/performance-lessons.md
-for f in "$k" "$ref" bin/prod-gate.sh bin/link-sweep.mjs; do [ -r "$f" ] || fail "$f is missing or unreadable"; done
+for f in "$k" "$ref" bin/prod-gate.sh bin/link-sweep.mjs commands/wp-audit.md; do [ -r "$f" ] || fail "$f is missing or unreadable"; done
 flat=$(tr '\n' ' ' < "$k" | sed 's/  */ /g')
 has() { case "$flat" in *"$1"*) return 0 ;; *) return 1 ;; esac; }
 

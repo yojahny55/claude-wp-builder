@@ -45,8 +45,9 @@ grep -Fq 'stop when it prints only' "$g" || fail "$g sitemap validator has no fi
 # §16 and §17.
 grep -Fq "'application/ld+json'" "$g" || fail "$g lost the theme JSON-LD conflict detection"
 grep -Fq 'Titles stop at 60 characters; descriptions run 70 to 160' "$k" || fail "$k lost the title and description limits"
+grep -Fq "mb_strlen(\\\$" "$g" || fail "$g length validator no longer uses mb_strlen"
 for n in '> 60)' '> 160)' '< 70)'; do
-  grep -Fq "mb_strlen(\\\$" "$g" && grep -Fq "$n" "$g" || fail "$g length validator lost the $n bound"
+  grep -Fq "$n" "$g" || fail "$g length validator lost the $n bound"
 done
 
 # The breadcrumb trail stops on a 404.
