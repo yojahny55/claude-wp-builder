@@ -298,3 +298,20 @@ function __starter___get_lang_url($lang) {
     // Add new lang param
     return add_query_arg('lang', $lang, $url);
 }
+
+/*
+ * Make the first call before any output. It is the call that sets the language
+ * cookie, and setcookie() fails once header.php has started printing; left to
+ * the templates, the first call came from wp_enqueue_scripts inside wp_head(),
+ * so a ?lang= switch lasted one page.
+ */
+add_action('init', '__starter___get_current_lang');
+
+/*
+ * <html lang> follows the request, not the site locale. header.php prints
+ * language_attributes(), which reads the locale: the primary language on every
+ * request of a suffix site, ?lang=es included (WCAG 3.1.1).
+ */
+add_filter('language_attributes', function ($output) {
+    return preg_replace('/lang="[^"]*"/', 'lang="' . esc_attr(__starter___get_current_lang()) . '"', $output);
+});

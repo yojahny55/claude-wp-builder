@@ -1,290 +1,82 @@
-# Suffix i18n helpers — reference implementations
+# Suffix i18n helpers — what the starter file does not say
 
-The rules, and how templates call each helper, are in `../SKILL.md`. `prefix_` is the
-project's function prefix.
+The implementation is the file `/wp-init` copies into the theme as `inc/i18n.php`, with
+`__starter__` replaced by the project's prefix:
+
+- `tailwind`: `${CLAUDE_PLUGIN_ROOT}/starter-theme/__tailwind__/inc/i18n.php`
+- `cinematic`: `${CLAUDE_PLUGIN_ROOT}/starter-theme/__cinematic__/inc/i18n.php`
+
+Read the project's own `inc/i18n.php` before changing it, and never rewrite it from memory or
+from an example: the helper names are a contract every template calls, and one that does not
+exist is a fatal error on the page. Below is what the code does not explain.
 
 ## Contents
 
-- Language Detection
-- Translation Helper Functions — `prefix_get_field()`, `prefix_get_repeater()`,
-  `prefix_get_sub_field()`, `prefix__()` / `prefix_e()`, `prefix_is_lang()`
-- Static Translations Array, and JavaScript Translations
-- Language Switcher URL Generation
-- File Structure
+- Why detection runs in this order
+- The cookie, and why the first call is on `init`
+- Fallbacks
+- Adding a string, and strings for JavaScript
+- A switcher template
 
-## Language Detection
+## Why detection runs in this order
 
-Language is detected using a strict priority chain. The first match wins.
+`prefix_get_current_lang()` takes the first of: the `?lang=` parameter, the `prefix_lang`
+cookie, the first two letters of `Accept-Language`, `PREFIX_DEFAULT_LANG`. Each candidate is
+accepted only if it is in `PREFIX_SUPPORTED_LANGS`.
 
-**Priority: URL parameter > Cookie > Browser Accept-Language > Default**
+- The parameter wins, so a shared `?lang=es` link opens in Spanish whatever the visitor's
+  cookie says.
+- The cookie beats the browser, so a visitor's explicit choice outlives their browser setting.
+- The browser beats the default, so a first visit lands in a language the visitor reads.
 
-```php
-function prefix_get_current_lang() {
-    static $current_lang = null;
+## The cookie, and why the first call is on `init`
 
-    if ($current_lang !== null) {
-        return $current_lang;
-    }
+Only a request carrying `?lang=` sets the cookie, and only on the first call, because the result
+is cached in a `static` for the rest of the request. `setcookie()` needs the headers unsent, so
+the starter calls the function on `init`. Without that hook the first caller was
+`wp_enqueue_scripts`, inside `wp_head()`, after `<!DOCTYPE html>` had gone out — and on a server
+without output buffering the switch lasted one page.
 
-    // 1. Check URL parameter
-    if (isset($_GET['lang']) && in_array($_GET['lang'], PREFIX_SUPPORTED_LANGS)) {
-        $current_lang = sanitize_text_field($_GET['lang']);
-        // Set cookie for persistence (365 days)
-        setcookie('prefix_lang', $current_lang, time() + (365 * 24 * 60 * 60), '/');
-        return $current_lang;
-    }
+The cinematic starter reads the parameter and the cookie but sets no cookie.
 
-    // 2. Check cookie
-    if (isset($_COOKIE['prefix_lang']) && in_array($_COOKIE['prefix_lang'], PREFIX_SUPPORTED_LANGS)) {
-        $current_lang = sanitize_text_field($_COOKIE['prefix_lang']);
-        return $current_lang;
-    }
+## Fallbacks
 
-    // 3. Check browser language (Accept-Language header)
-    if (isset($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
-        $browser_lang = substr($_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2);
-        if (in_array($browser_lang, PREFIX_SUPPORTED_LANGS)) {
-            $current_lang = $browser_lang;
-            return $current_lang;
-        }
-    }
+- `prefix_get_field()`, `prefix_get_sub_field()` and `prefix_get_repeater()` try
+  `<name>_<lang>` on a secondary-language request and fall back to `<name>` when it is
+  `empty()` — an empty string, `null`, `0` and `'0'` all fall back.
+- `prefix_t()` tries the current language, then the primary language, then `en`, and finally
+  returns the key itself. It never returns `''`.
 
-    // 4. Default language
-    $current_lang = PREFIX_DEFAULT_LANG;
-    return $current_lang;
-}
-```
+## Adding a string, and strings for JavaScript
 
-## Translation Helper Functions
+Add the key to `prefix_get_translations()` with a value for every supported language, written as
+UTF-8 literals (`'Leer Más'`, never `'Leer Mas'` and never `&aacute;`). Templates then call
+`prefix_e( 'key' )` or `prefix_t( 'key' )`.
 
-### prefix_get_field() -- Auto-Translating Field Getter
+There is no JavaScript-strings helper. The starter already passes the current language to its
+script as `lang` in `wp_localize_script( '__starter__-main', '__STARTER___data', … )`; to pass
+strings, add the keys to that same array through `prefix_t()`:
 
 ```php
-function prefix_get_field($field_name, $post_id = null) {
-    $lang = prefix_get_current_lang();
-
-    // If secondary language, try suffixed field first
-    if ($lang !== PREFIX_DEFAULT_LANG) {
-        $translated_field = $field_name . '_' . $lang;
-        $value = get_field($translated_field, $post_id);
-
-        // If translated field has a value, return it
-        if (!empty($value)) {
-            return $value;
-        }
-    }
-
-    // Fallback to primary (default) field
-    return get_field($field_name, $post_id);
-}
+'strings' => array(
+    'directory_clear' => prefix_t( 'directory_clear' ),
+    'directory_empty' => prefix_t( 'directory_empty' ),
+),
 ```
 
-### prefix_get_repeater() -- Repeater Field Translation
+## A switcher template
 
-```php
-function prefix_get_repeater($field_name, $translatable_subfields = array(), $post_id = null) {
-    $lang = prefix_get_current_lang();
-    $repeater = get_field($field_name, $post_id);
-
-    if (!$repeater || !is_array($repeater)) {
-        return array();
-    }
-
-    // If default language or no translatable subfields, return as-is
-    if ($lang === PREFIX_DEFAULT_LANG || empty($translatable_subfields)) {
-        return $repeater;
-    }
-
-    // Process each row for translations
-    foreach ($repeater as $index => $row) {
-        foreach ($translatable_subfields as $subfield) {
-            $translated_key = $subfield . '_' . $lang;
-            // If translated subfield exists and has value, override the primary
-            if (isset($row[$translated_key]) && !empty($row[$translated_key])) {
-                $repeater[$index][$subfield] = $row[$translated_key];
-            }
-        }
-    }
-
-    return $repeater;
-}
-```
-
-### prefix_get_sub_field() -- Sub-field Translation Inside Loops
-
-```php
-function prefix_get_sub_field($field_name) {
-    $lang = prefix_get_current_lang();
-
-    if ($lang !== PREFIX_DEFAULT_LANG) {
-        $value = get_sub_field($field_name . '_' . $lang);
-        if (!empty($value)) {
-            return $value;
-        }
-    }
-
-    return get_sub_field($field_name);
-}
-```
-
-### prefix_t() and prefix_e() -- Static UI String Translation
-
-```php
-/**
- * Get static translation string (return)
- */
-function prefix__($key) {
-    $lang = prefix_get_current_lang();
-    $translations = prefix_get_translations();
-
-    if (isset($translations[$key][$lang])) {
-        return $translations[$key][$lang];
-    }
-
-    // Fallback to default language
-    if (isset($translations[$key][PREFIX_DEFAULT_LANG])) {
-        return $translations[$key][PREFIX_DEFAULT_LANG];
-    }
-
-    // Return key if translation not found
-    return $key;
-}
-
-/**
- * Echo static translation string (with escaping)
- */
-function prefix_e($key) {
-    echo esc_html(prefix__($key));
-}
-```
-
-### prefix_is_lang() and prefix_get_current_lang()
-
-```php
-/**
- * Check if current language matches
- */
-function prefix_is_lang($lang) {
-    return prefix_get_current_lang() === $lang;
-}
-
-/**
- * Alias: check if current language is Spanish
- */
-function prefix_is_spanish() {
-    return prefix_get_current_lang() === 'es';
-}
-```
-
-## Static Translations Array
-
-Define all hardcoded UI strings in a central translations function. Each entry is an associative array keyed by language code.
-
-```php
-function prefix_get_translations() {
-    return array(
-        // Navigation
-        'nav_home' => array(
-            'en' => 'Home',
-            'es' => 'Inicio',
-        ),
-        'nav_services' => array(
-            'en' => 'Services',
-            'es' => 'Servicios',
-        ),
-        'nav_pricing' => array(
-            'en' => 'Pricing',
-            'es' => 'Precios',
-        ),
-        'nav_contact' => array(
-            'en' => 'Contact',
-            'es' => 'Contacto',
-        ),
-
-        // Buttons
-        'btn_learn_more' => array(
-            'en' => 'Learn More',
-            'es' => 'Saber Mas',
-        ),
-        'btn_get_started' => array(
-            'en' => 'Get Started',
-            'es' => 'Comenzar',
-        ),
-        'btn_schedule' => array(
-            'en' => 'Schedule Appointment',
-            'es' => 'Agendar Cita',
-        ),
-
-        // Footer
-        'footer_services' => array(
-            'en' => 'Services',
-            'es' => 'Servicios',
-        ),
-        'footer_quick_links' => array(
-            'en' => 'Quick Links',
-            'es' => 'Enlaces Rapidos',
-        ),
-        'footer_privacy' => array(
-            'en' => 'Privacy Policy',
-            'es' => 'Politica de Privacidad',
-        ),
-        'footer_terms' => array(
-            'en' => 'Terms & Conditions',
-            'es' => 'Terminos y Condiciones',
-        ),
-
-        // Social
-        'social_follow_us' => array(
-            'en' => 'Follow Us',
-            'es' => 'Siguenos',
-        ),
-    );
-}
-```
-
-### JavaScript Translations
-
-For strings needed in client-side JS, create a filtered subset and pass via `wp_localize_script()`.
-
-```php
-function prefix_get_js_translations() {
-    $all = prefix_get_translations();
-    $lang = prefix_get_current_lang();
-    $js_strings = array();
-
-    // Pick only the keys needed in JS
-    $js_keys = array('btn_learn_more', 'btn_schedule', 'calc_per_month');
-    foreach ($js_keys as $key) {
-        if (isset($all[$key][$lang])) {
-            $js_strings[$key] = $all[$key][$lang];
-        }
-    }
-
-    return $js_strings;
-}
-```
-
-## Language Switcher URL Generation
-
-Use `remove_query_arg()` and `add_query_arg()` to build language toggle URLs.
-
-```php
-function prefix_get_lang_url($lang) {
-    $url = remove_query_arg('lang');
-    return add_query_arg('lang', $lang, $url);
-}
-```
-
-**Language switcher in a template:**
+Links built with `prefix_get_lang_url()`, labelled from the strings the starter already carries
+(`lang_en`, `lang_es`), so the label is never a hard-coded English phrase:
 
 ```php
 <div class="lang-switcher">
-    <?php $current_lang = prefix_get_current_lang(); ?>
     <?php foreach (PREFIX_SUPPORTED_LANGS as $lang) : ?>
-        <?php if ($lang !== $current_lang) : ?>
+        <?php if ($lang !== prefix_get_current_lang()) : ?>
             <a href="<?php echo esc_url(prefix_get_lang_url($lang)); ?>"
                class="lang-switcher__link"
-               aria-label="<?php echo esc_attr('Switch to ' . strtoupper($lang)); ?>">
+               hreflang="<?php echo esc_attr($lang); ?>"
+               aria-label="<?php echo esc_attr(prefix_t('lang_' . $lang)); ?>">
                 <?php echo esc_html(strtoupper($lang)); ?>
             </a>
         <?php endif; ?>
@@ -292,27 +84,4 @@ function prefix_get_lang_url($lang) {
 </div>
 ```
 
-## File Structure
-
-The i18n system lives in a single file included early in `functions.php`, before the field loader's `acf/init` hook runs.
-
-```php
-// functions.php — i18n must load before the fields/*.php bootstrap
-require get_template_directory() . '/inc/i18n.php';
-
-// Field groups loaded via the acf/init bootstrap loader (fields/*.php seeds
-// acf-json/, which becomes the dashboard-editable source of truth) —
-// see wp-theme-standards SKILL.md for the full loader.
-```
-
-The `inc/i18n.php` file contains:
-1. Language constants
-2. `prefix_get_current_lang()`
-3. `prefix_get_field()`
-4. `prefix_get_repeater()`
-5. `prefix_get_sub_field()`
-6. `prefix__()` and `prefix_e()`
-7. `prefix_get_lang_url()`
-8. `prefix_is_spanish()` / `prefix_is_lang()`
-9. `prefix_get_translations()` (the static strings array)
-10. `prefix_get_js_translations()`
+A third language needs its own `lang_<code>` key in `prefix_get_translations()`.

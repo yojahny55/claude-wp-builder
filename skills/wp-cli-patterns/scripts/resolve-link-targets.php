@@ -9,7 +9,8 @@
  *   stdout         the links that still need a request, as `href TAB page TAB group`,
  *                  ready for bin/link-sweep.mjs --urls
  *
- * Read-only. Exits 0 unless the input cannot be read.
+ * Read-only. Exits 0 when it ran, and 2 on a bad invocation, an unreadable input
+ * or an unwritable output.
  *
  * WHY THIS EXISTS. Whether a post or a term exists and is published is a query, not a
  * page render. An audit that answered it over HTTP rendered hundreds of uncached store

@@ -9,7 +9,8 @@
  * an old staging domain that outlived its machine, for example.
  *
  * Read-only. Exits 1 when it finds anything, 0 when it does not, so it can gate
- * a deploy from a shell script without an agent reading its output.
+ * a deploy from a shell script without an agent reading its output, and 2 when
+ * it could not determine a host to search for — not measured, never a pass.
  *
  * WHY THIS EXISTS. An audit swept `wp_options` for the development host, found 7
  * occurrences, fixed them and called the database clean. It was not: the same

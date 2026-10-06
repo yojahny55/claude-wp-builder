@@ -42,6 +42,43 @@
   says its config reader is a helper never run by hand (its `--export` mode prints the
   secret), and `tests/checks/skill-authoring.sh` fails on an unnamed script.
 
+- **The i18n skills describe the code they ship with.** A review of `wp-polylang`,
+  `wp-bilingual` and `wp-cli-patterns` against the scripts and starters found them telling
+  agents things that were false:
+  - `wp-polylang` said ACF containers were walked one level deep and told the reader to widen
+    `pllx_acf_walk()`, which already recurses to any depth, so an agent would
+    hand-translate fields the importer already handles. It placed `pllx_acf_ref_id()` in
+    `pll-import.php` (it is in `pll-lib.php`), said non-text ACF types were "untouched by the
+    importer" (they are copied onto a new counterpart), and cited a gitignored `.superpowers/`
+    report and a fixture that only ever existed on a maintainer's own site.
+  - `wp-bilingual` documented `prefix__()`, `prefix_is_spanish()` and
+    `prefix_get_js_translations()`, none of which any starter defines — a template written from
+    it fatals — and never mentioned that the cinematic starter ships a different three-helper
+    contract with no `prefix_get_field()`. Its reference was a hand-kept copy of the starter's
+    `inc/i18n.php` that had drifted; it is now a pointer to that file plus what the code does not
+    explain. Its Spanish samples had lost their accents.
+  - **`<html lang>` never followed the language on a suffix site.** The skill appended a second
+    `lang` after `language_attributes()`, and a browser keeps the first of two, the site locale.
+    Both starters' `inc/i18n.php` now filter `language_attributes`, so `?lang=es` pages declare
+    Spanish.
+  - **The tailwind starter's language cookie could not be set.** The first call to
+    `prefix_get_current_lang()` — the one that sets it — came from `wp_enqueue_scripts`, inside
+    `wp_head()`, after output had begun, so a language switch lasted one page on a server
+    without output buffering. The starter now makes that call on `init`, and the skill states
+    the real rule instead of "include `i18n.php` early".
+  - `wp-cli-patterns` taught `_es` suffix fields and per-language menu locations without
+    reading the recorded `i18n strategy`, so on a Polylang project (the default) it seeded
+    fields Polylang never serves and assigned menus to `primary_en`, a location neither
+    starter registers. It glossed `wp post delete --force` as a confirmation skip — it deletes
+    permanently — documented exits 0/1 for two scripts that also exit 2 when they could not
+    measure, and invoked every script through an unresolvable `<skill>/` path.
+  - `/wp-polylang` and `/wp-seed` cited their skills by a relative path, which resolves against
+    the user's project.
+
+  `tests/checks/wp-bilingual-contract.sh` (which runs both starters' `inc/i18n.php`) and
+  `tests/checks/wp-cli-patterns-contract.sh` are new; `wp-polylang.sh` and
+  `wp-polylang-nesting.sh` gained pins that fail on each old form.
+
 ### Changed
 
 - **Skills follow Anthropic's skill authoring guidance.** Measured against

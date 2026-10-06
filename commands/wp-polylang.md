@@ -9,7 +9,7 @@ argument-hint: "<source_lang> <target_lang>"
 Translate an existing site into a second language through Polylang. Run from the
 WordPress root.
 
-**Required skill:** read `skills/wp-polylang/SKILL.md` before doing anything. It
+**Required skill:** read `${CLAUDE_PLUGIN_ROOT}/skills/wp-polylang/SKILL.md` before doing anything. It
 documents the data model and the API contract, and the failure mode this command
 exists to avoid.
 
@@ -185,7 +185,7 @@ answer; the theme's tables are the seed and the fallback.
 wp eval-file "$SCRIPTS/pll-verify.php" <source_lang> <target_lang>
 ```
 
-Prints `Audited posts=<n> terms=<n> menu_items=<n> unassigned=<n> for <source> ->
+Prints `Audited posts=<n> terms=<n> menu_items=<n> internal_links=<n> unassigned=<n> for <source> ->
 <target>`, then either every failure (exit 1) or `PASS — 0 failures, <n>
 warning(s).` (exit 0).
 
