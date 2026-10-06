@@ -68,7 +68,7 @@ All paths relative to the theme root (`wp-content/themes/<slug>/`).
 
 - All static strings wrap in `{slug}_b('English', 'Español')`.
 - ACF retrieval uses `{slug}_get_field($name)` which appends `_es` when current lang is `es`.
-- Language cookie/query: `wp_unslash($_GET['lang'] ?? $_COOKIE['{slug}_lang'] ?? 'en')`.
+- Language cookie/query: `wp_unslash($_GET['lang'] ?? $_COOKIE['{slug}_lang'] ?? 'en')`. The starter's `inc/i18n.php` sets that cookie on `init` when a `?lang=` switch changes it; never set it from a template, where the headers have already gone.
 
 ### Hybrid mode
 

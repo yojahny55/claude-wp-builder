@@ -38,8 +38,9 @@ Everything from "Translation Helper Functions" down describes the `tailwind` con
 `cinematic`, a literal is `prefix_b( 'English', 'Español' )` (it allows `br`, `em`, `strong`,
 `i`, `b` and `span` through `wp_kses`), an options-page value is `prefix_setting( 'site_logo' )`
 (tries `site_logo_es` on a Spanish request), and there is no `prefix_get_field()`. The
-cinematic layer knows `en` and `es` only, and reads the `?lang=` parameter and the cookie but
-never sets the cookie.
+cinematic layer knows `en` and `es` only. It reads the `?lang=` parameter and the cookie, and
+an `init` callback sets the cookie when the language came from `?lang=` and differs from the
+stored one — so a switch persists there too.
 
 ## Reference files
 

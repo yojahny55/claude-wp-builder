@@ -19,6 +19,15 @@
 
 ### Fixed
 
+- **The cinematic starter keeps a `?lang=` switch.** Its `inc/i18n.php` read
+  `$_COOKIE['__starter___lang']` and never called `setcookie()`, so a language switch lasted
+  exactly one request and the next page came back in the browser's language. An `init`
+  callback now sets the cookie before any output, as the tailwind starter does — and only
+  when the language came from `?lang=` and differs from the one already stored, so an
+  ordinary page view sends no header. `wp-bilingual`, its i18n reference and `wp-cinematic`
+  no longer say the starter sets no cookie. `tests/checks/wp-bilingual-contract.sh` runs the
+  file and asserts the cookie is set on a switch, and not re-sent when it already matches or
+  when the language came from `Accept-Language`.
 - **`/wp-seed` sets a post author.** Every `wp post create` and `wp media import` it ran
   left `post_author` at 0, a user that does not exist: the pages rendered, `the_author()`,
   the Article schema's `author` and the admin column came out empty, and every seeded page
