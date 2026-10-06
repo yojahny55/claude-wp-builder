@@ -56,6 +56,7 @@ done
 
 # --- the generator is run, with its contract ------------------------------------------
 ip=$R/image-prompt.md
+[ -f "$ip" ] || fail "$ip is missing"
 grep -Fq 'node "${CLAUDE_PLUGIN_ROOT}/bin/image-gen.mjs" plan --demo demo/' "$ip" || fail "$ip does not give the plan invocation"
 grep -Fq 'node "${CLAUDE_PLUGIN_ROOT}/bin/image-gen.mjs" run --demo demo/' "$ip" || fail "$ip does not give the run invocation"
 for code in '`2` the plan was' '`3` no API key' '`4` one or more slots failed'; do

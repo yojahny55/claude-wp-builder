@@ -417,6 +417,7 @@ grep -Fq 'the section stops being a sequence' "$C/process-flow/section.css" \
 # opened; devices.md keeps the heading and points there. Two copies had already
 # diverged in wording.
 vfy=skills/wp-demo-craft/references/verify.md
+[ -f "$vfy" ] || fail "$vfy is missing"
 grep -Fq 'two readouts, and they answer different questions' "$dev" \
   || fail "$dev does not separate animation.currentTime from the computed property; that conflation produced four wrong measurements"
 grep -Fq '`verify.md` ("Before you read a number off a moving' "$dev" \

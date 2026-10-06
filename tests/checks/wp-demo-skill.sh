@@ -60,7 +60,7 @@ grep -Fq 'class="footer__description"' "$k" || fail "$k's footer tagline is not 
 grep -Fq 'class="footer__copyright"' "$k" || fail "$k's copyright line has no .footer__copyright class, so /wp-seed skips it"
 grep -q 'footer__tagline\|footer_tagline' "$s" "$k" && fail "the wp-demo skill still names footer_tagline/.footer__tagline, which no command reads"
 grep -Eq '&copy; *(19|20)[0-9]{2}' "$k" && fail "$k hard-codes a copyright year that every copied demo inherits"
-n=$(grep -c '<footer' "$k")
+n=$(grep -c '<footer' "$k" || true)
 [ "$n" -eq 1 ] || fail "$k prints the footer $n times; two copies drift"
 
 # --- the delimiter contract other commands parse -----------------------------------
