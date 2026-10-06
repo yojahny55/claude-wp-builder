@@ -25,8 +25,9 @@ grep -Fq 'bash -c "${CLAUDE_PLUGIN_ROOT}/bin/wp-env-setup.sh detect"' "$s" \
   || fail "$s names bin/wp-env-setup.sh by a relative path, which resolves against the user's project"
 
 # 2. The table covers every token the templates use, and nothing they do not.
-table=$(grep -oE '^\| `\{\{[a-z_]+\}\}`' "$s" | grep -oE '\{\{[a-z_]+\}\}' | sort -u)
-used=$(grep -rhoE '\{\{[a-z_]+\}\}' templates --exclude-dir=audit-suite | sort -u)
+table=$(grep -oE '^\| `\{\{[a-z_]+\}\}`' "$s" | grep -oE '\{\{[a-z_]+\}\}' | sort -u || true)
+[ -n "$table" ] || fail "$s has no {{placeholder}} table rows — this check is matching nothing"
+used=$(grep -rhoE '\{\{[a-z_]+\}\}' templates --exclude-dir=audit-suite | sort -u || true)
 [ -n "$used" ] || fail "no {{placeholder}} found under templates/ — this check is matching nothing"
 missing=$(comm -13 <(printf '%s\n' "$table") <(printf '%s\n' "$used"))
 [ -z "$missing" ] || fail "$s has no row for template tokens: $(echo $missing)"

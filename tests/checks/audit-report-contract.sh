@@ -81,6 +81,10 @@ for (const file of process.argv.slice(2)) {
     if (Array.isArray(doc.findings) && !Array.isArray(doc.checks_executed)) {
       err(`${file}: report example has no checks_executed`);
     }
+    // A bare-finding example cannot carry checks_executed, so its prose must name it.
+    if (!Array.isArray(doc.findings) && findings.length && !section.includes('`checks_executed`')) {
+      err(`${file}: report example is a bare finding and the step never asks for checks_executed`);
+    }
     for (const f of findings) {
       seen += 1;
       const id = f.check || f.code || '?';
