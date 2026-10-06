@@ -153,7 +153,7 @@ Group keys:     group_<section>
 ### GEO CITABILITY (include in the prompts that write section copy)
 
 Generative engines score the copy as well as people. When an agent authors or rewrites
-section text, apply the rubric in `skills/wp-audit-geo-standards/SKILL.md` §5:
+section text, apply the rubric in `skills/wp-audit-geo-standards/references/citability.md`:
 
 - Open each section with a direct 1–2 sentence answer before any elaboration.
 - Keep extractable passages to 134-167 self-contained words; one idea per passage.

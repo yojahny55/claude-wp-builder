@@ -266,6 +266,27 @@
 
 ### Changed
 
+- **The five audit skills are found by the requests that need them, and load less.** Each
+  description now names what a request would carry — `bin/prod-gate.sh`, Lighthouse, a
+  `UX-014` on `page:/contact/`, `rank-math-options-titles`, `ard.json`, a sitemap that 404s —
+  and the sibling skill that owns the near miss. `wp-audit-standards` moves its Lighthouse
+  lessons to `references/performance-lessons.md`, documents `prod-gate.sh` and
+  `link-sweep.mjs` with their invocations and exit codes (gate exit `5` now stops after three
+  tries, in the dispatch prompt too), numbers the sweep and the block handling, gives the WebP
+  loop and the AIOS fix as exact commands, and picks a default browser tool.
+  `wp-audit-geo-standards` splits its catalog, surface specs and citability rubric into
+  `references/` (the rubric gains a worked rewrite), records that a deliberate crawler block
+  is the owner's decision in the skill, the auditor and the fixer, numbers the verification
+  loop with a stop and a stale-report rule, and drops citations of a design spec that does not
+  ship. `wp-audit-seo-standards` moves §13–§17's samples to `references/audit-gotchas.md`,
+  keeps one bulk description seed that follows its own priority order, hands the setup order
+  to `wp-audit-rankmath` instead of a drifted copy, and says "title template" throughout.
+  `wp-audit-ux-standards` reads the recorded `store.tier` for checkout criteria and keeps the
+  fix procedure in the agent; `wp-audit-local-standards` gives one subtype per vertical, a
+  reproducible location sample, and two rule sentences where a citation directory list was.
+  The contracts that had no pin now do: `tests/checks/audit-standards-contract.sh` and
+  `tests/checks/seo-standards-contract.sh` are new, and the UX, local and GEO checks grew.
+
 - **Skills follow Anthropic's skill authoring guidance.** Measured against
   [the best-practices guide](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)
   and Claude Code's own loader, three things were wrong across the 21 skills:

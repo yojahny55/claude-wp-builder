@@ -113,7 +113,7 @@ signals for the same URL. Covers both products (`product-sitemap*.xml`) and prod
 categories (`product_cat-sitemap.xml`, off by default in Rank Math's sitemap settings —
 `tax_product_cat_sitemap`; only present when the store turned it on).
 
-**Primary method: compare locally via WP-CLI, the same way SKILL.md §15 #4 already does for this exact
+**Primary method: compare locally via WP-CLI, the same way `audit-gotchas.md` §15 #4 already does for this exact
 failure mode.** Fetching every sitemap FILE is cheap — a handful of requests even for a large
 catalog, since each file holds hundreds of URLs — but fetching every individual product or
 category PAGE to read its own robots signal does not scale: a catalog with a few thousand
@@ -221,7 +221,7 @@ done
 No output from a fetch that timed out, redirect-looped past the cap, or came back empty is
 `UNMEASURED` for that URL, never a silent pass — the same rule as 18.1-18.3.
 
-Reuse the sitemap failure-mode table in SKILL.md §15 (#4, "Noindex pages in sitemap") for the same
+Reuse the sitemap failure-mode table in `audit-gotchas.md` §15 (#4, "Noindex pages in sitemap") for the same
 comparison against Rank Math's own exclusion logic — §15 asks whether Rank Math is configured
 to exclude noindex URLs at generation time; this check confirms it actually did, against the
 sitemap as currently served.

@@ -918,7 +918,8 @@ second per link plus the timeout. Mark the host blocked on any of these:
   - ERR_CONNECTION_REFUSED in a browser
 Use: prod-gate.sh --mark-blocked <host> "<reason>". If the gate exits 4, the host is blocked:
 report that check UNMEASURED with the gate's reason, and never retry. If it exits 5,
-another agent held the host. Nothing was sent, so call again. The local site is not gated.
+another agent held the host. Nothing was sent, so call again, at most twice more; after a
+third 5, report the check UNMEASURED: production gate busy. The local site is not gated.
 
 Run all checks for your tier level. Output your findings as a structured report with the following format for each issue:
 

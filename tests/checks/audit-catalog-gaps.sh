@@ -31,7 +31,7 @@ for t in "made-up top-level" "nested path" "near-prefix" "redirect_guess_404_per
     || fail "$geo soft-404 procedure lacks: $t"
 done
 need "$geo" "one passing shape does not pass"
-need "$std" "redirect_guess_404_permalink"
+need skills/wp-audit-geo-standards/references/surface-templates.md "redirect_guess_404_permalink"
 
 # archive bases are read, never assumed
 need skills/wp-audit-seo-standards/SKILL.md "category_base"
