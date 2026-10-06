@@ -87,7 +87,7 @@ for (const file of process.argv.slice(2)) {
       for (const old of ['title', 'detail', 'details', 'description', 'auto_fix', 'autofix', 'fix_snippet', 'fix_method']) {
         if (old in f) err(`${file} ${id}: carries "${old}", which the contract does not define`);
       }
-      if (typeof f.check !== 'string' || !/^[A-Z0-9]+(-[A-Z0-9]+)+(@[1-9][0-9]*)?$/.test(f.check)) err(`${file}: finding has no check id`);
+      if (typeof f.check !== 'string' || !/^[A-Z0-9]+(-[A-Z0-9]+)+(@[1-9][0-9]*)?$/.test(f.check)) err(`${file} ${id}: finding has no valid check id`);
       if (!STATUS.includes(f.status)) err(`${file} ${id}: status ${JSON.stringify(f.status)} is not one of ${STATUS.join(', ')}`);
       if (f.status === 'FAIL') {
         if (!SEV.includes(f.severity)) err(`${file} ${id}: severity ${JSON.stringify(f.severity)} is not one the renderer accepts`);

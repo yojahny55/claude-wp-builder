@@ -16,7 +16,7 @@ fail() { echo "FAIL: $*"; exit 1; }
 
 s=skills/wp-cli-patterns/SKILL.md
 r=skills/wp-cli-patterns/references/seeding-recipes.md
-for f in "$s" "$r"; do [ -f "$f" ] || fail "$f is missing"; done
+for f in "$s" "$r" commands/wp-seed.md; do [ -f "$f" ] || fail "$f is missing"; done
 skill_md=$(find skills/wp-cli-patterns -name '*.md' | sort)
 
 # --- field names and menus follow the recorded i18n strategy --------------------
@@ -49,7 +49,9 @@ for script in check-dev-host find-orphan-acf-ids find-redeclared-functions find-
   [ -n "$entry" ] || fail "$s has no entry for $script.php"
   case "$entry" in *' 2 '*|*'and 2'*|*'Exits 2'*|*'exits 2'*) ;; *)
     fail "$s's $script.php entry does not document exit 2, which the script returns when it could not measure" ;; esac
-  head -30 "$f" | grep -qE '\b2\b' \
+  # The header is the opening docblock. A bare `\b2\b` passed on "Step 2.3"; the 2 must sit
+  # in the same sentence as an exit and not be part of another number.
+  grep -qiE 'exit[^.]*[^0-9.]2[^0-9.]' <<<"$(awk '{print} /\*\//{exit}' "$f" | tr '\n' ' ')" \
     || fail "$f's header documents no exit 2, which it returns"
 done
 grep -qF 'Needs ACF or SCF active' "$s" \
