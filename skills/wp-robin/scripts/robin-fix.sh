@@ -182,7 +182,7 @@ SETTINGS=(
 get_all_thumbnails() {
 	grep -rohP "(?:add_image_size|set_post_thumbnail_size)\s*\(\s*['\"]([^'\"]+)['\"]" \
 		"$WP_ROOT/wp-content/themes/" "$WP_ROOT/wp-content/plugins/" 2>/dev/null | \
-		sed -E "s/.*\(\s*'([^']+)'.*/\1/" | sort -u | tr '\n' ',' | sed 's/,$//'
+		sed -E "s/.*\(\s*['\"]([^'\"]+)['\"].*/\1/" | sort -u | tr '\n' ',' | sed 's/,$//'
 }
 
 # Start with built-in WordPress sizes
@@ -225,6 +225,10 @@ SETTINGS_OK=0
 SETTINGS_FAILED=()
 for key in "${!SETTINGS[@]}"; do
 	val="${SETTINGS[$key]}"
+	# Escaped for a single-quoted SQL literal: allowed_sizes_thumbnail is read from theme and
+	# plugin source, so a backslash or quote in a size name must not end the string.
+	val="${val//\\/\\\\}"
+	val="${val//\'/\'\'}"
 	if db_q "INSERT INTO ${TABLE_PREFIX}options (option_name, option_value) VALUES ('wbcr_io_${key}', '${val}') ON DUPLICATE KEY UPDATE option_value='${val}';"; then
 		SETTINGS_OK=$(( SETTINGS_OK + 1 ))
 	else

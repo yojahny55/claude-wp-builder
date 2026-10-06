@@ -94,7 +94,7 @@ case "$flatc" in
   *'for usability the table rows of its skill'*) ;;
   *) fail "$c Step 6.8 computes usability coverage against something other than the skill's table rows" ;;
 esac
-all_rows=$(grep -cE '^\|[[:space:]]*UX-' "$ux" || true)
+all_rows=$(grep -cE '^\|[[:space:]]*UX-[0-9]' "$ux" || true)
 pat_rows=$(grep -cE '^\| UX-[0-9]{3} \|' "$ux" || true)
 [ "$all_rows" -gt 0 ] || fail "$ux has no UX table rows"
 [ "$all_rows" -eq "$pat_rows" ] \
