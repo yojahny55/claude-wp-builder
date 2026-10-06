@@ -285,6 +285,25 @@
   release heading, which reads as a rename. A rename is the one move that conflicts every open
   PR on `CHANGELOG.md`, so both now say to insert the release heading below it.
 
+- **The four CSS and theme skills follow the review rules, and their contracts are pinned.**
+  Each description now names the files, settings and symptoms a request mentions and where
+  the skill stops (`Not for …`). `wp-aos-animator` moves its install snippets into
+  `references/install.md`, so a per-template Phase 5 subagent no longer pays for them, and
+  ends on a verification loop that walks the page with `/wp-demo-verify`. `wp-css-system`
+  moves its reset into `references/reset.md`, restates the reset-class trap in plain CSS (and
+  gives the Tailwind path its own `:where(.btn-reset)` line), and says how to run the contour
+  lint. `wp-tailwind-system` turns adding a CSS file and converting `@media` into numbered
+  steps, keeps one contour form, shows a bare selector distributed, and drops the incident
+  counts. `wp-theme-standards` drops what Claude already knows (the required-files table, the
+  sanitization table, the `WP_Query` sample), numbers the destructive Local JSON redefinition
+  with a database step and a dashboard-fields warning, guards the WebP batch on `magick` and
+  keeps the starter's per-language menu locations. New assertions in `wp-aos-seams.sh`,
+  `wp-css-system-contract.sh`, `wp-tailwind-system-traps.sh` and `wp-theme-standards.sh` pin
+  the stacking-context rule, BEM depth, the delimiter width, the token inventory, the
+  underscore and quote traps, the `hidden` attribute rule, the one `.btn`, and the SVG
+  `unfiltered_html` gate, none of which any check held before. `wp-css-system-scope.sh` loses
+  a stale exemption for two skills that already declare `user-invocable: false`.
+
 ## [1.29.0] - 2026-10-05
 
 ### Fixed

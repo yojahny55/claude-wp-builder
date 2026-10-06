@@ -1,13 +1,13 @@
 ---
 name: wp-tailwind-system
-description: Tailwind v4 conventions for themes built from the __tailwind__ starter — the decision ladder for utilities vs @apply, @theme tokens, file layout, preflight, arbitrary-variant traps and what is forbidden. Use when writing or converting markup or CSS in a project whose template is tailwind (the wp-tailwind agent, /wp-section, /wp-header, /wp-footer, /wp-tailwindify).
+description: Defines how markup and CSS are written in a theme built from the __tailwind__ starter (Tailwind v4) — the ladder from utilities to @apply classes in utilities/site.css and components/, @theme tokens, the four CSS directories and their layer() imports, Preflight, named breakpoints at the demo's width plus one, and the traps that compile without an error (an unescaped underscore or a quote inside an arbitrary variant, an unlayered import, a scoped reset outside :where(), a second .btn, the hidden utility on a script-toggled element). Use when writing or converting markup or CSS in a project whose template is tailwind — the wp-tailwind agent, /wp-section, /wp-header, /wp-footer, /wp-page, /wp-cpt, /wp-tailwindify, /wp-tailwind-migrate, /wp-yolo, /wp-finalize — or when a utility such as has-[.card__title]:underline does nothing. Not for a basic theme's BEM CSS (wp-css-system), nor Tailwind outside a WordPress starter.
 user-invocable: false
 ---
 
 # WP Tailwind System
 
 Applies when the project's `.claude/CLAUDE.md` says `Template: tailwind`. For
-`template=basic`, use `wp-css-system` instead — the two are mutually exclusive.
+`Template: basic`, use `wp-css-system` instead — the two are mutually exclusive.
 
 ## Reference files
 
@@ -62,23 +62,18 @@ utilities/animations.css  animation helpers
 
 ## Never create an empty file
 
-A `.css` file exists only once it holds **at least one rule**. Write the rule and
-the file in the same step, and add its `@import` to `main.css` in that same step.
-Never scaffold a file "to fill in later" — that is the exact bug this convention
-replaced.
+A `.css` file exists only once it holds **at least one rule**; a file scaffolded "to fill
+in later" is what this rule exists to stop. Adding one is a single step:
 
-Import order in `main.css`: `base` → `components` → `layouts` → `utilities`.
-
-Every `@import` also names its cascade layer, matching the directory: `base/` →
-`layer(base)`, `components/` and `layouts/` → `layer(components)`, `utilities/` →
-`layer(utilities)` — `@import "./utilities/site.css" layer(utilities);`. A file
-imported with no `layer()` sits OUTSIDE every layer, and unlayered CSS beats
-every layer regardless of source order or specificity (see "Unlayered CSS beats
-`@layer utilities`" below): a component class's own `display` has outranked a
-`hidden` utility this way, and a promoted utility group has outranked its own
-`max-md:hidden` modifier for the same reason, in the same file. The starter's
-own default imports already carry this; do the same for every file a later
-step adds.
+1. Pick its directory — one of the four above, by the ladder rung that sent the rule there.
+2. Write the file with that first rule in it.
+3. In the same step, add its `@import` to `main.css`, naming the cascade layer that matches
+   the directory: `base/` → `layer(base)`, `components/` and `layouts/` →
+   `layer(components)`, `utilities/` → `layer(utilities)` —
+   `@import "./utilities/site.css" layer(utilities);`. An import with no `layer()` leaves the
+   whole file unlayered, and unlayered CSS beats every utility (see "Unlayered CSS beats
+   `@layer utilities`" below). The starter's own imports already carry their layers.
+4. Keep the import order: `base` → `components` → `layouts` → `utilities`.
 
 ## Tokens
 
@@ -97,18 +92,21 @@ already covers.
 
 ## Responsive
 
-Mobile-first, using Tailwind's own prefixes. Never write a media query by hand.
+Mobile-first, using Tailwind's own breakpoint variants. Never write a media query by hand.
 
 ```html
 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-8">
 ```
 
-Converting a demo's media queries follows two rules, both in
-[references/breakpoints.md](references/breakpoints.md): declare the widths the demo
-switches at once, as named `--breakpoint-*` stops in `@theme`, and never ship
-`max-[<n>px]:`; and a demo's `max-width: Npx` becomes `N+1`, because Tailwind's
-`max-*` is exclusive where CSS `max-width` is inclusive. Read it before converting
-any `@media` query.
+Converting a demo's `@media` queries — read
+[references/breakpoints.md](references/breakpoints.md) first:
+
+1. Collect the widths the demo actually switches at.
+2. Declare each once as a named `--breakpoint-*` in `@theme`: a `min-width: N` as `N`, a
+   `max-width: N` as `N+1`, because Tailwind's `max-*` is exclusive where CSS `max-width` is
+   inclusive.
+3. Convert every query to the named variant (`md:`, `max-md:`) — never ship `max-[<n>px]:`.
+4. Re-measure the layout at each breakpoint itself, not only at 1440 and 390.
 
 ## `@apply` idiom
 
@@ -131,19 +129,17 @@ section agents cannot collide on a selector.
 `@import "tailwindcss"` brings Preflight, Tailwind's own reset. It replaces the
 browser's default stylesheet, so a theme whose every declaration was
 translated correctly still does not render like the plain-CSS demo it came
-from. Measured in a browser at six widths, on a faithful conversion of a
-three-page demo:
+from:
 
-| Element | Browser default | Under Preflight | Measured effect |
-|---|---|---|---|
-| `<button>` | `Arial 13.33px`, normal | inherits — `system-ui 16px/25.6px` | nav toggle grew |
-| `<img>` | `display:inline; max-width:none` | `display:block; max-width:100%` | service card 197.9px → 190.7px |
-| `<p>` | UA margin `14.4px` | `margin: 0` | footer column 71.04px → 56.8px |
-| `<a>` | `text-decoration: underline` | `none` | logo link lost its underline |
-| page | — | — | total height 1130.21px → 1108.78px |
+| Element | Browser default | Under Preflight |
+|---|---|---|
+| `<button>` | `Arial 13.33px`, normal | inherits — `system-ui 16px/25.6px` |
+| `<img>` | `display:inline; max-width:none` | `display:block; max-width:100%` |
+| `<p>` | UA margin `14.4px` | `margin: 0` |
+| `<a>` | `text-decoration: underline` | `none` |
 
 The table above is every case where Preflight CHANGES the UA default. `cursor`
-is the opposite case, and it is the one that has actually shipped broken:
+is the opposite case, and the easier one to break:
 Preflight does not touch it at all, so `<button>` stays on the UA default,
 which is `default`, not `pointer`. A demo's own reset commonly restores the
 hand with `button { cursor: pointer }`, and that line is not "covered by
@@ -156,7 +152,7 @@ comment form render their submit this way, and `button { cursor: pointer }`
 alone never reaches it). Pair it with `:disabled` / `[aria-disabled="true"] {
 cursor: default }` when the demo's reset does.
 
-Two consequences:
+Three consequences:
 
 1. Where the demo leaned on a UA default, re-add it explicitly as a utility on
    the element — `inline`, `max-w-none`, `my-[0.9em]`, `underline`. The demo
@@ -187,20 +183,35 @@ real declarations and none has a class to convert.
   *::after { box-sizing: border-box }` and `img { max-width: 100%; display:
   block }` read like the "global, no utility can carry it" case above, but
   Preflight (imported by `@import "tailwindcss"`) already sets both, inside its
-  own `base` layer. A hand-written second copy has shipped in this exact shape
-  and cost real damage: a button's declared box was read as its OUTER box
-  instead of its content box and rendered at a fraction of its design size, and
-  a slider arrow deliberately overhanging its button got clamped to the
-  button's width. Diff a bare selector against Preflight's own coverage
-  (below) before keeping it — a declaration Preflight already sets is dropped
-  entirely, never duplicated, even inside `base`.
+  own `base` layer. A second copy changes how boxes are measured — a button's
+  declared box read as its outer box rendered at a fraction of its design size,
+  and an arrow meant to overhang its button was clamped to it. Diff a bare
+  selector against Preflight's own coverage (above) before keeping it — a
+  declaration Preflight already sets is dropped entirely, never duplicated, even
+  inside `base`.
+
+```css
+/* demo */
+a { color: var(--color-brand); }
+```
+
+```html
+<!-- distributed: every <a> in the demo's markup gets the utility -->
+<a class="text-brand …" href="…">
+```
+
+```css
+/* kept as well, in base/reset.css, only because WordPress prints links the demo
+   never had (comment text, widget output) */
+:where(.entry-content) a { color: var(--color-brand); }
+```
 
 **A bare selector is dead only when every element it matches already carries a
 class that sets the same property — check the elements, not the stylesheet.**
 Enumerate the matches in the markup and read each `class` attribute. "Every
-`<a>` has a class" is exactly the reasoning that has already shipped a defect
-here: one logo link carried no class, so `a { color: var(--color-brand) }` was
-dropped and that anchor rendered in the body colour.
+`<a>` has a class" is the reasoning that drops a rule wrongly: one logo link with
+no class, and `a { color: var(--color-brand) }` gone means that anchor renders in
+the body colour.
 
 ### A kept reset goes in `:where()`, or it outranks the classes it was meant to serve
 
@@ -214,9 +225,7 @@ spelled correctly, and in the compiled stylesheet.
 
 That is a slow bug to find. `getComputedStyle` reports the reset's value, the
 class sits right there in the DevTools rule list, and the symptom reads as "my CSS
-is not loading" for as long as it takes to compare the two specificities. It cost
-a full debugging detour once — on `height`, on images exported at 3×, so they
-painted at triple the design size.
+is not loading" for as long as it takes to compare the two specificities.
 
 Write the reset so it contributes nothing:
 
@@ -224,6 +233,14 @@ Write the reset so it contributes nothing:
 /* :where() is always (0,0,0), so any class on the element beats it. */
 :where(.page) img { max-width: 100%; height: auto; }
 ```
+
+A reset CLASS has the same problem from the other side. An accessibility fix that turns a
+`<span class="icon-search text-white text-[1.625rem]">` into a `<button>` and adds a
+`.btn-reset` (`color: inherit; font: inherit`) ties at (0,1,0) with the utilities on the
+element, and source order decides: the reset can win, and the icon paints in the inherited
+colour and size. Preflight already strips a `<button>`'s UA styles, so a Tailwind theme
+rarely needs the class at all; where one is needed, write it as `:where(.btn-reset)` and
+measure the element's computed `color`, `fontSize` and box before and after.
 
 The rule generalises past resets: **when a rule exists to be overridden, put its
 selector in `:where()`.** Raising the override instead is a race you keep
@@ -272,11 +289,10 @@ into a descendant combinator that matches nothing:
 
 Escape both underscores: `[&.pager\_\_page--current]:bg-brown`.
 
-This is the single most expensive defect in this plugin's history — one project
-shipped 22 of them, and three were focus indicators that had **never once
-appeared**, an accessibility hole rather than a cosmetic one. Any BEM demo
-converted to Tailwind will produce them by the dozen. Never fix one instance;
-sweep the whole theme for the pattern (see **Verify**).
+It costs more than it looks: a focus indicator written this way **never appears**, an
+accessibility hole rather than a cosmetic one, and any BEM demo converted to Tailwind
+produces these by the dozen. Never fix one instance; sweep the whole theme for the
+pattern (see **Verify**).
 
 ### Quotes inside an arbitrary variant truncate the class
 
@@ -299,12 +315,10 @@ how specific — dequeue and reproduce, do not try to out-specify them.
 This is not only a "reset" concern — every hand-written CSS file in the theme
 has the same exposure, because a plain `@import "./file.css";` with no
 `layer()` leaves the WHOLE file unlayered, not just the rules that look like a
-reset. It has shipped twice in the same shape: a shared button component's own
-`display: inline-flex` outranked a `hidden` utility placed on the same element
-elsewhere, and — the same file, months later — a promoted "reveal on mobile"
-class outranked its OWN `max-md:hidden` modifier written right there in the
-markup, because the utilities file holding it carried no `layer()` either. Two
-rules follow directly:
+reset. A component's own `display: inline-flex` then outranks a `hidden` utility on
+the same element, and a promoted "reveal on mobile" class outranks its OWN
+`max-md:hidden` modifier written right there in the markup. Two rules follow
+directly:
 
 1. **Diff a carried-over reset against Preflight, declaration by declaration,
    before deciding what survives.** What Preflight already sets is dropped
@@ -312,8 +326,8 @@ rules follow directly:
    selectors" above). What survives goes in `base/reset.css`, imported
    `layer(base)`.
 2. **Every hand-written `components/`, `layouts/` and `utilities/` file is
-   imported with its matching `layer()`** — see "File layout" → "Never create
-   an empty file". This is true of the file on day one and stays true of every
+   imported with its matching `layer()`** — step 3 of "Never create an empty
+   file". This is true of the file on day one and stays true of every
    rule added to it later; a file that started layered does not need
    re-checking each time something is appended to it, but a NEW file's
    `@import` line does.
@@ -348,10 +362,10 @@ clips or strands whitespace in the other. In a bilingual theme:
 Check every fixed dimension against the longest string the field can hold before
 the second language exists, not after.
 
-## Cards and the starter's widgets
+## Cards and the starter's modules
 
 A row of cards pins its footer with `mt-auto` at the end of a `flex flex-col h-full`
-chain the template must keep, and tabs, accordions and directory filters come from
+chain the template part must keep, and tabs, accordions and directory filters come from
 the starter's modules with no script of their own. Both contracts are in
 [references/components.md](references/components.md) — read it before writing a
 card row, tabs, an accordion or FAQ, or a filterable directory.
@@ -393,7 +407,7 @@ Read `components/buttons.css` before writing any button class.
 
 ## Forbidden
 
-- `assets/css/styles.css` — that is the `template=basic` output surface. Never write it.
+- `assets/css/styles.css` — that is the `Template: basic` output surface. Never write it.
 - BEM-with-custom-properties authoring (`.block__element` + `var(--x)` from `:root`). That is `wp-css-system`'s job, not this one.
 - A `:root { --… }` block. Tokens belong in `@theme`.
 - Any directory under `assets/css/src/tailwindcss/` other than `base`,

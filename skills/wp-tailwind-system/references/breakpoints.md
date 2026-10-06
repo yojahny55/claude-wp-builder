@@ -1,7 +1,7 @@
 # Breakpoints
 
 From the `wp-tailwind-system` skill: how a demo's media queries become Tailwind
-variants. Mobile-first with Tailwind's own prefixes, never a hand-written `@media`.
+variants. Mobile-first with Tailwind's own breakpoint variants, never a hand-written `@media`.
 
 ## Name the breakpoints; never ship `max-[<n>px]:`
 
@@ -12,14 +12,14 @@ them, and that is a defect, not a detail:
 
 - **It breaks anything the scanner cannot see.** Tailwind compiles a variant only while
   some scanned file uses it. Markup that lives in the DATABASE — a CF7 form, a widget, a
-  block pattern — silently loses every rule the day the theme normalizes its variants.
-  (This has shipped: a footer form lost its whole responsive layout that way.)
+  block pattern — silently loses every rule the day the theme normalizes its variants: a
+  footer form can lose its whole responsive layout that way.
 - **Each pair leaves a 1px dead band.** `max-[759px]` and a `min-width: 760px` rule agree
   only by luck; the arbitrary form invites off-by-one boundaries nobody re-checks.
 - It is unreadable, and it makes every future width change a find-and-replace.
 
 So: take the widths the demo actually switches at, declare them ONCE in `@theme`, and use
-the named prefixes everywhere.
+the named variants everywhere.
 
 ```css
 @theme {

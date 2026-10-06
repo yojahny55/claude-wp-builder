@@ -92,4 +92,41 @@ q "$all" -E 'sanitize_[a-z_]+\( *\$_(GET|POST|COOKIE)' \
   && fail "$dir sanitizes a superglobal without wp_unslash()"
 grep -Fq 'wp_unslash( $_GET' "$skill" || fail "$skill's sanitization example does not unslash"
 
+# ---------------------------------------------------------------------------
+# The contract an edit could drop silently: nothing else pins it.
+# ---------------------------------------------------------------------------
+# 6. SVG uploads are gated on unfiltered_html, for the user the list is built FOR. The wrong
+#    old form — an ungated upload_mimes filter — hands stored XSS to the Author role.
+setup=$dir/references/setup-and-enqueue.md
+starter=starter-theme/__tailwind__/inc/theme-setup.php
+for f in "$skill" "$setup" "$starter"; do
+  grep -Fq 'unfiltered_html' "$f" || fail "$f does not gate SVG uploads on unfiltered_html"
+done
+for f in "$setup" "$starter"; do
+  grep -Eq "user_can\( *\\\$user, *'unfiltered_html' *\)" "$f" \
+    || fail "$f checks the current user, not the \$user upload_mimes passes — the gate answers for the wrong account"
+  # Every SVG mime assignment comes after the capability check in the same function.
+  bad=$(awk '/function [a-z_]*allow_svg_upload/{f=1; gated=0} f && /unfiltered_html/{gated=1} f && /\$mimes\[.svg.?\]/ && !gated {print FILENAME": "$0} f && /^}/{f=0}' "$f")
+  [ -z "$bad" ] || fail "an SVG mime is granted before the unfiltered_html check: $bad"
+  ungated=$(grep -c "\$mimes\['svg'\]" "$f" || true)
+  inside=$(awk '/function [a-z_]*allow_svg_upload/{f=1} f && /\$mimes\[.svg.\]/{n++} f && /^}/{f=0} END{print n+0}' "$f")
+  [ "$ungated" = "$inside" ] || fail "$f assigns \$mimes['svg'] outside the gated allow_svg_upload function"
+done
+
+# 7. The Local JSON field model, and a redefinition that cannot lose a client's fields.
+grep -Fq 'acf-json/<key>.json' "$skill" || fail "$skill lost the acf-json/<key>.json source-of-truth model"
+q "$flat" -F 'Delete the matching `acf-json/<key>.json`' || fail "$skill no longer says to delete the matching acf-json file to re-bootstrap"
+q "$flat" -F 'Fields a client added in the dashboard live only there' \
+  || fail "$skill's redefinition steps no longer warn that dashboard-added fields live only in the JSON"
+grep -Fq 'acf_delete_field_group(' "$skill" || fail "$skill gives no command for removing the database copy of a group"
+
+# 8. The WebP batch stops on a missing binary, reports what it did, and says why 82.
+grep -Fq 'command -v magick' "$skill" || fail "$skill's WebP batch does not stop when ImageMagick is missing"
+grep -Fq 'webp siblings written:' "$skill" || fail "$skill's WebP batch does not report how many siblings it wrote"
+q "$flat" -F 'PERF-053' || fail "$skill does not explain the WebP quality constant"
+
+# 9. Menus keep the starter's per-language locations.
+q "$code" -E "'primary' *=>" \
+  && fail "$dir registers a single 'primary' menu location; the starter registers one per language"
+
 echo PASS

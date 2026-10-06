@@ -57,4 +57,30 @@ q "$v" -F '/bin/theme-template-check.mjs" <theme-dir>' \
 q "$v" -Ei 'exit 0' || fail "Verify states no exit codes, so a non-zero exit reads as noise"
 q "$v" -F '=\"' && fail "Verify's quote grep still escapes the quote (grep warns on a stray \\\")"
 
+# ---------------------------------------------------------------------------
+# 4. The silent traps themselves. Each compiles without an error; nothing pinned them.
+# ---------------------------------------------------------------------------
+# 4a. `_` in an arbitrary variant is a space: the escaped form is the fix, the literal BEM
+#     form is shown matching nothing.
+grep -Fq '[&.pager\_\_page--current]:bg-brown' "$skill" || fail "$skill lost the escaped \\_\\_ form of a BEM class inside an arbitrary variant"
+grep -Eq '^\| `\[&\.pager__page--current\]:bg-brown` \| `\.pager page--current` \| nothing \|' "$skill" \
+  || fail "$skill no longer shows the unescaped BEM variant compiling to a descendant selector that matches nothing"
+# 4b. Quotes truncate the class: the unquoted attribute selector is the one offered.
+q "$(tr '\n' ' ' < "$skill")" -F 'unquoted identifier: `has-[[aria-expanded=true]]:bg-primary`' \
+  || fail "$skill no longer gives the unquoted [aria-expanded=true] form as the fix for a quoted attribute selector"
+# 4c. A script-toggled element is hidden with the attribute alone, never with the utility too.
+hid=$(awk '/^## `hidden` is two different things/{f=1; next} f && /^## /{exit} f' "$skill")
+[ -n "$hid" ] || fail "$skill lost the hidden-attribute vs hidden-utility section"
+q "$hid" -F 'hidden with the ATTRIBUTE alone' || fail "$skill no longer says a script-toggled element is hidden with the attribute alone"
+rightline=$(printf '%s\n' "$hid" | awk '/<!-- right -->/{getline; print; exit}')
+[ -n "$rightline" ] || fail "$skill's hidden section marks no example as right"
+q "$rightline" -E 'class="[^"]*(^|[" ])hidden[ "]' && fail "$skill marks an element carrying both the hidden utility and the attribute as right: $rightline"
+# 4d. One .btn: the starter's components/buttons.css owns it.
+q "$(tr '\n' ' ' < "$skill")" -F 'Never write a second `.btn`' || fail "$skill lost the one-.btn rule"
+# 4e. A reset class on a converted <button> ties with the utilities: the weightless form.
+q "$(tr '\n' ' ' < "$skill")" -F ':where(.btn-reset)' || fail "$skill does not give a reset class its weightless :where() form"
+# 4f. One way to draw a light contour: the inset shadow, not a ring alternative.
+grep -Fq 'ring-1 ring-inset' "$dir/references/cross-engine.md" \
+  && fail "cross-engine.md offers ring-1 ring-inset as a second, equal way to draw the contour"
+
 echo PASS
