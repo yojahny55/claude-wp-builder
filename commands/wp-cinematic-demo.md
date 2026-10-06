@@ -1,6 +1,6 @@
 ---
 name: wp-cinematic-demo
-description: Generate (or regenerate) the cinematic HTML demo for client approval. Wraps the kit's `cinematic-site` skill but emits to `<theme>/demo/` with the same `<!-- SECTION: -->` delimiters the rest of the plugin uses, so the demo can be polished with `/wp-polish` and audited with `/wp-responsive-check` like any other plugin demo.
+description: "Generate (or regenerate) the cinematic HTML demo for client approval. Wraps the kit's `cinematic-site` skill but emits to `<theme>/demo/` with the same `<!-- SECTION: -->` delimiters the rest of the plugin uses, so the demo can be polished with `/wp-polish` and audited with `/wp-responsive-check` like any other plugin demo."
 arguments:
   - name: --scenes
     description: Scene count (default 9)

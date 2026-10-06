@@ -2,6 +2,15 @@
 
 Adapted from nateherkai/scroll-craft (MIT).
 
+## Contents
+
+- The attribute contract (directly below)
+- Two kinds of motion, and only one of them has a budget
+- The eight devices
+- The cue contract
+- The signature move
+- Video scrub is not in this kit
+
 The attribute contract, exactly as declared:
 
 ```

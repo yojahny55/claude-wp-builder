@@ -93,7 +93,7 @@ paragraph below it — an agent that only reads these bullets must still get it 
   `max-[N+1px]:`, or redeclare the named breakpoint in `@theme` as `N+1` when the
   project uses that stop by name (`--breakpoint-md: 769px;`). `min-width` is already
   inclusive on both sides and needs no adjustment. Read
-  `skills/wp-tailwind-system/SKILL.md` § "`max-width: N` in the demo is INCLUSIVE" —
+  `skills/wp-tailwind-system/references/breakpoints.md` § "`max-width: N` in the demo is INCLUSIVE" —
   and re-measure the layout AT 768 and AT 1024 after converting, not only at the
   sweep's far corners.
 - **Every hand-written CSS file this conversion writes into is imported with its

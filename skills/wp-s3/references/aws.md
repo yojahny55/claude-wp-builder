@@ -1,5 +1,17 @@
 # S3 on AWS: the infrastructure side
 
+## Contents
+
+- Per site and environment
+- Bucket
+- Certificate and DNS
+- CloudFront
+- Bucket policy
+- IAM role for the server
+- Networking
+- Monitoring
+- Hand over to whoever configures WordPress
+
 What has to exist before `/wp-s3` is run against a production site. Everything here is
 configured once per site and environment, by whoever owns the AWS account.
 

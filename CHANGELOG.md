@@ -2,6 +2,75 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`/wp-contribute review <skill>` audits a skill against the authoring best practices, and a
+  new skill is not done until it passes.** `tests/checks/skill-authoring.sh` sees what a grep
+  can — frontmatter, a "Use when" clause, length, contents lists, named files — and cannot see
+  whether a description would be chosen for the right requests, whether a skill explains what
+  Claude already knows, or whether a fragile write is left to improvisation. `review` runs the
+  two gates, then hands the skill to a fresh subagent with
+  `skills/wp-contributing/references/skill-review.md`: twelve judgment rules from Anthropic's
+  guide adapted to this repository, returned as a findings table with a `PASS`/`FIX` verdict,
+  at most three rounds. Fresh, because the author's own context fills exactly the gaps the
+  written skill leaves. `new skill` now loops on the gates and then runs the review, `pr` runs
+  it for every skill a branch touches, and a declined finding goes into the PR body instead of
+  disappearing. The `new skill` scaffold also stopped teaching `trigger:`.
+
+### Fixed
+
+- **`wp-demo-craft`, `/wp-cinematic-demo` and `/wp-cinematic-scene` load with their own
+  frontmatter again.** Each had a value that is not valid YAML unquoted: an unquoted `: ` in
+  `wp-demo-craft`'s description and in `/wp-cinematic-demo`'s `<!-- SECTION: -->` example, and
+  an `--cta` argument description in `/wp-cinematic-scene` starting with a backtick. Claude Code
+  loads such a file with no fields set, so none of the three had a description to be matched
+  on, and `wp-demo-craft`'s `user-invocable` fell back to true, putting it in the `/` menu as
+  if it were a command. The values are quoted or rephrased, and the new
+  `tests/checks/frontmatter-yaml.sh` fails on those shapes in any command, agent or skill.
+
+- **The `wp-demo` skeleton is mobile-first.** It ended in a trailing `Section: Responsive`
+  block of `@media (max-width: …)` queries, against the min-width-only rule in its own skill
+  and in `wp-responsive`, and outside every section's block, so a section's CSS could not move
+  to its template part whole. A demo copied from it inherited both. Each section now carries
+  its own `min-width` steps; `tests/checks/wp-demo-mobile-first.sh` holds it there.
+
+- **Every bundled script is named in its own skill.** `resolve-link-targets.php`
+  (`wp-cli-patterns`), `pll-setup.php` and `pll-export.php` (`wp-polylang`) and
+  `read-s3-config.php` (`wp-s3`) were run by commands and other scripts but absent from the
+  SKILL.md that ships them, so the skill could not tell Claude whether to run them.
+  `wp-cli-patterns` and `wp-polylang` now index their scripts with what each is for, `wp-s3`
+  says its config reader is a helper never run by hand (its `--export` mode prints the
+  secret), and `tests/checks/skill-authoring.sh` fails on an unnamed script.
+
+### Changed
+
+- **Skills follow Anthropic's skill authoring guidance.** Measured against
+  [the best-practices guide](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)
+  and Claude Code's own loader, three things were wrong across the 21 skills:
+  - **Descriptions said what a skill was, never when to use it.** The description is the only
+    text Claude reads before choosing a skill, so seventeen descriptions were rewritten to end
+    with a "Use when …" clause naming the agents, commands or project state that call for it.
+    `trigger:`, which two skills carried and `wp-contributing` taught, is not a frontmatter
+    field and was ignored. It is gone, and the contributor guide now says so.
+  - **Eight SKILL.md bodies ran past the 500-line ceiling**, `wp-audit-seo-standards` to 1,182
+    lines, so every agent that read one paid for all of it up front. Each now keeps its rules
+    and decisions in SKILL.md and moves templates, long code samples and catalogs into
+    `references/`, linked one level deep with a "read when" line, so an agent loads them
+    only when it needs them.
+  - **Long reference files had no contents list**, so a partial read could not see what it
+    skipped, and `wp-demo-craft/references/image-prompt.md` was never named in its SKILL.md.
+
+  `tests/checks/skill-authoring.sh` holds every skill to these rules: a name that matches its
+  directory, a description under 1,024 characters with no angle brackets and a
+  "Use when" clause, no `trigger:`, a body under 500 lines, a `## Contents` list on any
+  reference file over 100 lines, and every top-level reference named in SKILL.md.
+
+- **Two stale statements were corrected while reading.** `wp-polylang` still said the suffix
+  model "remains the default", which stopped being true when new scaffolds moved to Polylang.
+  `wp-contributing` and `/wp-contribute` told the maintainer to "roll" `[Unreleased]` into the
+  release heading, which reads as a rename. A rename is the one move that conflicts every open
+  PR on `CHANGELOG.md`, so both now say to insert the release heading below it.
+
 ## [1.29.0] - 2026-10-05
 
 ### Fixed

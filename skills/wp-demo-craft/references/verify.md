@@ -2,6 +2,13 @@
 
 Adapted from nateherkai/scroll-craft (MIT).
 
+## Contents
+
+- Round structure
+- Before you read a number off a moving page
+- The rubric
+- What the machine measures
+
 A scroll page has no single state: every scroll position is a different frame,
 and the failures live between the two you happened to look at. So it is verified
 by walking it, and a craft build is verified in a loop — build, measure,

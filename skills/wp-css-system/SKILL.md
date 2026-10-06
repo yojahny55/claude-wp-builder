@@ -1,6 +1,6 @@
 ---
 name: wp-css-system
-description: CSS design system standards — custom properties, BEM naming, spacing/typography/color scales, no build tools
+description: Plain-CSS design system for template=basic themes — custom property tokens, BEM naming, spacing, typography and colour scales, reset rules, section delimiters and layout utilities, with no build tools. Use when writing or reviewing theme or demo CSS on a basic template (the wp-css agent, /wp-demo). A project whose template is tailwind uses wp-tailwind-system instead.
 user-invocable: false
 ---
 
@@ -12,6 +12,14 @@ user-invocable: false
 # CSS Design System Standards
 
 This skill defines the CSS architecture for `template=basic` themes. The system uses **CSS custom properties** (variables), **BEM naming**, and **no build tools** -- plain CSS files served directly.
+
+## Reference files
+
+- [references/tokens.md](references/tokens.md) — every `:root` token and its default
+  value. Read when writing the `:root` block or mapping a demo value to a token.
+- [references/patterns.md](references/patterns.md) — worked BEM examples, the
+  `.container` and `.section` utilities, and the grid, flex row, card and section
+  title patterns. Read when building a block and you want the house shape to copy.
 
 ---
 
@@ -31,139 +39,14 @@ This skill defines the CSS architecture for `template=basic` themes. The system 
 
 ## Custom Property Reference
 
-All design tokens are defined in `:root` at the top of the main stylesheet.
-
-### Colors
-
-```css
-:root {
-    /* Primary palette */
-    --color-primary: #1a5632;
-    --color-primary-light: #2d7a4a;
-    --color-primary-dark: #0f3d22;
-
-    /* Secondary palette */
-    --color-secondary: #c9a84c;
-    --color-secondary-light: #d4b96e;
-    --color-secondary-dark: #a88a2e;
-
-    /* Tertiary palette */
-    --color-tertiary: #2c3e50;
-    --color-tertiary-light: #3d5571;
-    --color-tertiary-dark: #1a2530;
-
-    /* Neutral scale (gray ramp) */
-    --color-neutral-50: #fafafa;
-    --color-neutral-100: #f5f5f5;
-    --color-neutral-200: #e5e5e5;
-    --color-neutral-300: #d4d4d4;
-    --color-neutral-400: #a3a3a3;
-    --color-neutral-500: #737373;
-    --color-neutral-600: #525252;
-    --color-neutral-700: #404040;
-    --color-neutral-800: #262626;
-    --color-neutral-900: #171717;
-
-    /* Semantic colors */
-    --color-text: var(--color-neutral-800);
-    --color-text-light: var(--color-neutral-500);
-    --color-text-inverse: #ffffff;
-    --color-background: #ffffff;
-    --color-background-alt: var(--color-neutral-50);
-    --color-border: var(--color-neutral-200);
-    --color-success: #16a34a;
-    --color-error: #dc2626;
-    --color-warning: #f59e0b;
-}
-```
-
-### Spacing Scale
-
-A consistent spacing scale based on `rem` units. Use these for all margin, padding, and gap values.
-
-```css
-:root {
-    --spacing-xs: 0.25rem;   /* 4px */
-    --spacing-sm: 0.5rem;    /* 8px */
-    --spacing-md: 1rem;      /* 16px */
-    --spacing-lg: 1.5rem;    /* 24px */
-    --spacing-xl: 2rem;      /* 32px */
-    --spacing-2xl: 3rem;     /* 48px */
-    --spacing-3xl: 4rem;     /* 64px */
-}
-```
-
-### Typography
-
-```css
-:root {
-    /* Font families */
-    --font-family-primary: 'DM Sans', 'Helvetica Neue', Arial, sans-serif;
-    --font-family-secondary: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
-
-    /* Font size scale */
-    --font-size-xs: 0.75rem;    /* 12px */
-    --font-size-sm: 0.875rem;   /* 14px */
-    --font-size-base: 1rem;     /* 16px */
-    --font-size-md: 1.125rem;   /* 18px */
-    --font-size-lg: 1.25rem;    /* 20px */
-    --font-size-xl: 1.5rem;     /* 24px */
-    --font-size-2xl: 2rem;      /* 32px */
-    --font-size-3xl: 2.5rem;    /* 40px */
-    --font-size-4xl: 3rem;      /* 48px */
-    --font-size-5xl: 3.5rem;    /* 56px */
-    --font-size-6xl: 4rem;      /* 64px */
-
-    /* Font weights */
-    --font-weight-regular: 400;
-    --font-weight-medium: 500;
-    --font-weight-semibold: 600;
-    --font-weight-bold: 700;
-
-    /* Line heights */
-    --line-height-tight: 1.2;
-    --line-height-normal: 1.5;
-    --line-height-relaxed: 1.75;
-}
-```
-
-### Shadows
-
-```css
-:root {
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
-}
-```
-
-### Border Radius
-
-```css
-:root {
-    --radius-sm: 0.25rem;   /* 4px */
-    --radius-md: 0.5rem;    /* 8px */
-    --radius-lg: 1rem;      /* 16px */
-    --radius-full: 9999px;  /* Pill/circle shape */
-}
-```
-
-### Transitions
-
-```css
-:root {
-    --transition-base: all 0.3s ease;
-    --transition-slow: all 0.5s ease;
-}
-```
-
-### Container
-
-```css
-:root {
-    --container-max: 1280px;
-}
-```
+All design tokens are defined in `:root` at the top of the main stylesheet: a
+primary, secondary and tertiary palette with light/dark variants, a neutral ramp
+(`--color-neutral-50` … `-900`) and semantic colours (`--color-text`,
+`--color-background`, `--color-border`, …); spacing `--spacing-xs` … `-3xl`;
+font families, sizes `--font-size-xs` … `-6xl`, weights and line heights;
+shadows, radii, transitions and `--container-max`. Every name and default value is
+in [references/tokens.md](references/tokens.md) — read it when writing the `:root`
+block or deciding which token a value maps to.
 
 ---
 
@@ -209,81 +92,8 @@ All CSS classes follow the **Block Element Modifier** pattern: `.block__element-
 - **Element**: A part of a block (`.card__title`, `.card__image`, `.nav__link`)
 - **Modifier**: A variation (`.card--featured`, `.btn--primary`, `.nav__link--active`)
 
-### Real-World Examples
-
-```css
-/* Block */
-.hero {
-    padding: var(--spacing-3xl) 0;
-    background: var(--color-background);
-}
-
-/* Elements */
-.hero__container {
-    max-width: var(--container-max);
-    margin: 0 auto;
-    padding: 0 var(--spacing-md);
-}
-
-.hero__title {
-    font-family: var(--font-family-secondary);
-    font-size: var(--font-size-4xl);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text);
-    margin-bottom: var(--spacing-md);
-}
-
-.hero__subtitle {
-    font-size: var(--font-size-lg);
-    color: var(--color-text-light);
-    margin-bottom: var(--spacing-xl);
-}
-
-.hero__cta {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
-
-/* Modifiers */
-.btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-sm) var(--spacing-lg);
-    border-radius: var(--radius-md);
-    font-weight: var(--font-weight-medium);
-    text-decoration: none;
-    transition: var(--transition-base);
-    cursor: pointer;
-    border: none;
-}
-
-.btn--primary {
-    background: var(--color-primary);
-    color: var(--color-text-inverse);
-}
-
-.btn--primary:hover {
-    background: var(--color-primary-dark);
-}
-
-.btn--secondary {
-    background: transparent;
-    color: var(--color-primary);
-    border: 2px solid var(--color-primary);
-}
-
-.btn--secondary:hover {
-    background: var(--color-primary);
-    color: var(--color-text-inverse);
-}
-
-.btn--large {
-    padding: var(--spacing-md) var(--spacing-xl);
-    font-size: var(--font-size-lg);
-}
-```
+Worked block, element and modifier rules (a hero, a button family) are in
+[references/patterns.md](references/patterns.md).
 
 ### Naming Rules
 
@@ -454,34 +264,8 @@ h1, h2, h3, ... { ... }
 
 ## Layout Utilities
 
-### Container
-
-```css
-.container {
-    width: 100%;
-    max-width: var(--container-max);
-    margin-left: auto;
-    margin-right: auto;
-    padding-left: var(--spacing-md);
-    padding-right: var(--spacing-md);
-}
-```
-
-### Section Spacing
-
-```css
-.section {
-    padding: var(--spacing-3xl) 0;
-}
-
-.section--compact {
-    padding: var(--spacing-2xl) 0;
-}
-
-.section--alt {
-    background-color: var(--color-background-alt);
-}
-```
+The `.container` and `.section` / `.section--compact` / `.section--alt` utilities
+are in [references/patterns.md](references/patterns.md).
 
 ### Layout is flex or grid -- `position: absolute` is for superposition only
 
@@ -589,82 +373,8 @@ When building the demo HTML first and then converting to WordPress:
 
 ## Common Patterns
 
-### Grid Layout
-
-```css
-.services__grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--spacing-xl);
-}
-```
-
-### Flexbox Row
-
-```css
-.header__inner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--spacing-lg);
-}
-```
-
-### Card Component
-
-```css
-.card {
-    background: var(--color-background);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm);
-    padding: var(--spacing-xl);
-    transition: var(--transition-base);
-}
-
-.card:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-}
-
-.card__title {
-    font-size: var(--font-size-xl);
-    font-weight: var(--font-weight-semibold);
-    margin-bottom: var(--spacing-sm);
-}
-
-.card__text {
-    font-size: var(--font-size-base);
-    color: var(--color-text-light);
-    line-height: var(--line-height-relaxed);
-}
-```
-
-### Section Title Pattern
-
-```css
-.section__label {
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--color-primary);
-    margin-bottom: var(--spacing-sm);
-}
-
-.section__title {
-    font-family: var(--font-family-secondary);
-    font-size: var(--font-size-3xl);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text);
-    margin-bottom: var(--spacing-md);
-}
-
-.section__description {
-    font-size: var(--font-size-lg);
-    color: var(--color-text-light);
-    max-width: 600px;
-}
-```
+Grid layout, flexbox row, card component and the section title pattern are in
+[references/patterns.md](references/patterns.md).
 
 ---
 

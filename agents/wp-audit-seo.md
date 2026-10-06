@@ -369,8 +369,8 @@ requests in flight, WP-CLI or the database before HTTP, term archives sampled, a
 
 ### Procedure — commerce checks (SEO-064 to SEO-068)
 
-Read `skills/wp-audit-seo-standards/SKILL.md` §18 before running these; it carries the curl
-snippets and the rationale for each. Do not run this section at all when the site is not a
+Read `skills/wp-audit-seo-standards/references/woocommerce-seo.md` (§18) before running these; it
+carries the curl snippets and the rationale for each. Do not run this section at all when the site is not a
 store — see step 1 below.
 
 1. **Applicability gate first.** Read `site.commerce` from `/wp-audit` Step 2.3. `none` means

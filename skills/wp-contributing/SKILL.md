@@ -2,7 +2,6 @@
 name: wp-contributing
 description: Contributing to the claude-wp-builder plugin itself — the four-layer architecture and what may call what, why tests are grep gates over prose, the frontmatter contract per layer, the two i18n systems, and the PR and release rituals. Use when editing this repository's own commands/, agents/, skills/, starter-theme/, bin/ or tests/, not when building a WordPress site with it.
 user-invocable: false
-trigger: auto-invoke when working inside the claude-wp-builder repository itself — editing commands/*.md, agents/*.md, skills/*/SKILL.md, starter-theme/**, bin/*.sh or tests/checks/*.sh
 ---
 
 # Contributing to Claude WP Builder
@@ -101,10 +100,14 @@ did. `tests/checks/tailwind-rebuild.sh` does this with a fake `npm` and fake wat
 |---|---|---|
 | `commands/<name>.md` | `description`, `allowed-tools`, `argument-hint` | Add `Agent` to `allowed-tools` only if it actually dispatches subagents |
 | `agents/<name>.md` | `name`, `description`, `tools`, `model` | `tools` in the order `Read, Write, Edit, Grep, Glob, Bash`; `model` is a cost tier — `opus` for planning, `sonnet` for authoring and judgment, `haiku` for mechanical work (`tests/checks/model-routing.sh`) |
-| `skills/<name>/SKILL.md` | `name`, `description`, `user-invocable: false` | Add `trigger:` when it should auto-invoke |
+| `skills/<name>/SKILL.md` | `name`, `description`, `user-invocable: false` | The description says what the skill does and ends with "Use when …" — it is the only text Claude sees before deciding to load the skill. `trigger:` is not a frontmatter field and is ignored. Body under 500 lines; detail goes in `references/` (`tests/checks/skill-authoring.sh`) |
 
 A file missing its frontmatter is **inert, not broken** — nothing errors, the capability
-simply never loads. That is why `bin/doc-sync-check.sh` asserts it mechanically.
+simply never loads. That is why `bin/doc-sync-check.sh` asserts it mechanically. Frontmatter
+that does not parse as YAML is the same failure: an unquoted value containing `: ` (or ` #`, or
+starting with a backtick) breaks the block, and Claude Code then loads the skill with **no
+fields set** — no description, and `user-invocable` back at its default of true. Rephrase, or
+quote the value; `tests/checks/frontmatter-yaml.sh` fails on it in every layer.
 
 ### The traps that cost the most
 
@@ -138,6 +141,8 @@ simply never loads. That is why `bin/doc-sync-check.sh` asserts it mechanically.
 2. `bash bin/doc-sync-check.sh` — README tables, `docs/commands.md`, frontmatter and the
    version references all agree.
 3. **New behavior has a new check.** This is the one reviewers actually block on.
+   A new or changed skill also passes `/wp-contribute review <name>` — the judgment half
+   of the audit, against [references/skill-review.md](references/skill-review.md).
 4. `CHANGELOG.md` gains an `[Unreleased]` entry. Say what changed and *why it was wrong
    before*; a release note that only names the feature is useless six months later.
 5. Docs follow the change: a new command needs a row in the README table **and** an entry in
@@ -188,8 +193,10 @@ for f in tests/checks/*.sh; do bash "$f"; done && bash bin/doc-sync-check.sh
 2. **Bump all four references together** — `.claude-plugin/plugin.json`,
    `.claude-plugin/marketplace.json` (**twice**: `metadata.version` and the plugin entry), and
    the README badge. `bin/doc-sync-check.sh` fails if they disagree.
-3. **Roll `[Unreleased]` into `## [X.Y.Z] - YYYY-MM-DD`**, and write entries for any PR that
-   merged without one — that happens, and release time is the last chance to catch it.
+3. **Insert `## [X.Y.Z] - YYYY-MM-DD` below `## [Unreleased]` and move the entries down.**
+   Never rename the heading: every open PR edits under it, so a rename conflicts all of them on
+   `CHANGELOG.md`. Write entries for any PR that merged without one — that happens, and release
+   time is the last chance to catch it.
 4. `git commit -m "chore(release): vX.Y.Z"`, `git tag -a vX.Y.Z -m "vX.Y.Z"`, push the commit
    and the tag.
 5. `env -u GH_TOKEN gh release create vX.Y.Z --title "…" --notes-file <file> --latest`.

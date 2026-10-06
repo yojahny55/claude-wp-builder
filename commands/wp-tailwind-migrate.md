@@ -214,7 +214,7 @@ BEM markup. Each dispatch prompt states:
   in a design tool has its queries at frame widths (1599, 1023, 759), and translating
   them literally gives hundreds of arbitrary variants. Collect the widths the demo
   actually switches at, declare them once as `--breakpoint-*` in `@theme`, and use the
-  named prefixes. See **Name the breakpoints** in `wp-tailwind-system` for why: chief
+  named prefixes. See **Name the breakpoints** in `skills/wp-tailwind-system/references/breakpoints.md` for why: chief
   among them, markup that lives in the DATABASE rather than in a scanned file loses
   every arbitrary variant the day the theme normalizes them.
 - All five inputs author mode's Inputs table declares — the `section HTML`,

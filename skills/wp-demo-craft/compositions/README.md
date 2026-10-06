@@ -1,5 +1,14 @@
 # Compositions
 
+## Contents
+
+- The composition contract, and container-relative sizing (directly below)
+- Regenerating a preview
+- Two container-query traps
+- The role table
+- Why no composition here carries a `data-motion-cue`
+- `prose` is a reserved class name
+
 A composition is a finished section in the plugin's own contract: delimiter,
 `data-motion-*` only, BEM block scoped to its name, tokens only, `{{slots}}` for
 copy. `/wp-demo` picks one per section of the feeling curve by role, pours the

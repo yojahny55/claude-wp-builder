@@ -20,10 +20,13 @@ PRA=agents/wp-audit-practices.md
 SEO=agents/wp-audit-seo.md
 CMD=commands/wp-audit.md
 SKILL=skills/wp-cli-patterns/SKILL.md
+# The script detail and the seeding recipes live beside SKILL.md; the host-name guard follows them.
+SCRIPTS_REF=skills/wp-cli-patterns/references/shipped-scripts.md
+RECIPES_REF=skills/wp-cli-patterns/references/seeding-recipes.md
 ORPHAN=skills/wp-cli-patterns/scripts/find-orphan-acf-ids.php
 MENU=skills/wp-cli-patterns/scripts/audit-menu-links.php
 
-for f in "$PRA" "$SEO" "$CMD" "$SKILL" "$ORPHAN" "$MENU"; do
+for f in "$PRA" "$SEO" "$CMD" "$SKILL" "$SCRIPTS_REF" "$RECIPES_REF" "$ORPHAN" "$MENU"; do
   [ -f "$f" ] || fail "$f is missing"
 done
 
@@ -156,7 +159,7 @@ awk '/^## Step 6\.9/{a=NR} /^## Step 6\.10/{b=NR} /^## Step 7/{c=NR}
 # --- no client, host or slug names reach the plugin --------------------------
 # A bare `.local` is generic and already used in commands/wp-audit.md to describe the shape of
 # a development URL. What must never appear is a real host: a label followed by a TLD.
-if grep -nEi "[a-z0-9-]+\.local\.[a-z]{2,}" "$PRA" "$SEO" "$CMD" "$SKILL" "$ORPHAN" "$MENU" >/dev/null 2>&1; then
+if grep -nEi "[a-z0-9-]+\.local\.[a-z]{2,}" "$PRA" "$SEO" "$CMD" "$SKILL" "$SCRIPTS_REF" "$RECIPES_REF" "$ORPHAN" "$MENU" >/dev/null 2>&1; then
   fail "a development host name reached the plugin"
 fi
 

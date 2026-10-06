@@ -1,6 +1,6 @@
 ---
 name: wp-environments
-description: Environment detection, configuration, and WP-CLI wrapper selection for local WordPress development
+description: Local WordPress environment detection and setup — which engine a project runs on (native, Docker, DDEV, Lando, wp-env), the .wp-create.json manifest, WP-CLI wrapper selection, template placeholders, Docker port conflicts, PHP versions and adopt mode. Use when creating, adopting or configuring a local site, or when choosing how to run WP-CLI against one.
 user-invocable: false
 ---
 

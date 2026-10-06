@@ -24,8 +24,12 @@ done
 for n in "closest('[data-accordion]')" "'single'" "setAttribute('aria-expanded'" "declared === null ? !group" "is-open"; do
   grep -Fq -- "$n" "$js/accordion.js" || fail "accordion.js lacks: $n"
 done
-grep -Fq 'data-accordion="single|multiple"' skills/wp-tailwind-system/SKILL.md \
-  || grep -Fq 'data-accordion="single\|multiple"' skills/wp-tailwind-system/SKILL.md \
+# The widget contract lives in a reference file the skill links to, not in SKILL.md itself.
+wref=skills/wp-tailwind-system/references/components.md
+grep -Fq 'references/components.md' skills/wp-tailwind-system/SKILL.md \
+  || fail "wp-tailwind-system's SKILL.md no longer links $wref, so no agent reaches the widget contract"
+grep -Fq 'data-accordion="single|multiple"' "$wref" \
+  || grep -Fq 'data-accordion="single\|multiple"' "$wref" \
   || fail "wp-tailwind-system does not document the accordion group modes"
 # Directory filter: count line, clear, URL reload, hidden when unfiltered.
 for n in "data-count-template" "data-count-template-one" "[data-filter-clear]" "count.hidden = !filtered" \
@@ -38,7 +42,7 @@ grep -Fq 'directory-filter.js' commands/wp-cpt.md || fail "/wp-cpt does not buil
 grep -Fq 'public query var' commands/wp-cpt.md || fail "/wp-cpt does not forbid a public query var as a filter GET name"
 grep -Fq '[data-directory]' agents/wp-template.md || fail "wp-template does not route every directory through [data-directory]"
 grep -Fq 'accordion.js' commands/wp-section.md || fail "/wp-section does not point tabs/accordions at the starter modules"
-grep -Fq '## Tabs, accordions and directory filters come from the starter' skills/wp-tailwind-system/SKILL.md \
+grep -Fq '## Tabs, accordions and directory filters come from the starter' "$wref" \
   || fail "wp-tailwind-system does not document the widget modules"
 for k in directory_count directory_count_one directory_clear directory_empty directory_search directory_all; do
   grep -Fq "'$k'" starter-theme/__tailwind__/inc/i18n.php || fail "inc/i18n.php has no $k string"

@@ -21,8 +21,13 @@ for f in "$s" "$c" "$d"; do [ -f "$f" ] || fail "$f is missing"; done
 # ---------------------------------------------------------------------------
 awk 'NR<=8 && /^user-invocable: false/ { f = 1 } END { exit !f }' "$s" \
   || fail "$s does not declare user-invocable: false — a skill that reads as invocable invites the 'skills act' mistake it warns against"
-awk 'NR<=8 && /^trigger:/ { f = 1 } END { exit !f }' "$s" \
-  || fail "$s has no trigger, so it never auto-loads and a contributor never sees it"
+# The description is the only text Claude reads before loading a skill; `trigger:` is not a
+# frontmatter field, and teaching it told contributors their skill would auto-load when it
+# would not.
+awk 'NR<=8 && /^description:.*Use when/ { f = 1 } END { exit !f }' "$s" \
+  || fail "$s has no 'Use when' clause in its description, so it never auto-loads and a contributor never sees it"
+! grep -Eq '^trigger:|Add `trigger:`' "$s" \
+  || fail "$s still declares or teaches trigger:, a key Claude Code ignores"
 awk 'NR<=8 && /^argument-hint:/ { f = 1 } END { exit !f }' "$c" || fail "$c has no argument-hint"
 
 # ---------------------------------------------------------------------------
@@ -127,6 +132,33 @@ grep -Fq '|| true' "$d" \
 grep -Fq 'allowed-tools' "$d" || fail "$d no longer checks command frontmatter beyond description"
 grep -Eq 'for key in name description tools model' "$d" \
   || fail "$d no longer checks the full agent frontmatter contract"
+
+# ---------------------------------------------------------------------------
+# 9b. A new skill passes the audit before it is done — both halves. The scaffold used to
+#     teach `trigger:`, a key Claude Code ignores, and nothing ran the gates or a review, so a
+#     skill could be written, committed and merged without anyone reading it against the
+#     authoring guide. CI catches the mechanical half; only the review catches the rest.
+# ---------------------------------------------------------------------------
+r=skills/wp-contributing/references/skill-review.md
+[ -f "$r" ] || fail "$r is missing — the review has no checklist to read"
+! grep -Fq 'trigger:' "$c" || fail "$c still teaches trigger:, a key Claude Code ignores"
+awk 'NR<=6 && /^allowed-tools:.*Agent/ { f = 1 } END { exit !f }' "$c" \
+  || fail "$c dispatches a review subagent but does not allow the Agent tool"
+grep -Fq 'review <skill-name>' "$c" || fail "$c has no review subcommand"
+for gate in tests/checks/skill-authoring.sh tests/checks/frontmatter-yaml.sh; do
+  grep -Fq "$gate" "$c" || fail "$c does not run $gate before a new skill is done"
+done
+grep -Fq 'references/skill-review.md' "$c" || fail "$c reviews without the checklist"
+grep -Fqi 'fresh subagent' "$c" \
+  || fail "$c does not review in a fresh context — the author's context hides the gaps"
+grep -Eqi 'run Step 2b for each skill' "$c" || fail "$c opens a PR without reviewing the skills it touches"
+grep -Fq 'Skill review' "$c" || fail "$c lets a declined finding vanish instead of listing it in the PR body"
+grep -Fq 'references/skill-review.md' "$s" || fail "$s never names its review checklist"
+# The checklist must carry the guide's judgment rules, not just exist.
+for rule in 'Use when' 'Freedom matches fragility' 'One term per concept' 'Nothing goes stale' \
+            'whether to run it' 'Skills inform; they never act' 'Should not load' 'Verdict: PASS | FIX'; do
+  grep -Fq "$rule" "$r" || fail "$r lost the rule: $rule"
+done
 
 # ---------------------------------------------------------------------------
 # 10. Both are documented where a contributor looks.

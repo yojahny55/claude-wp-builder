@@ -1,6 +1,6 @@
 ---
 name: wp-audit-ux-standards
-description: Usability criteria for a WordPress site — forms and data entry, navigation and task flow, links, interactive feedback, legibility and visual identity. Holds the UX-NNN catalog, the page-level vs site-level split, the applicability rules that keep a score honest, and which owner each fix belongs to. Read by the wp-audit-ux agent and by /wp-audit when it scores.
+description: Usability criteria for a WordPress site — forms and data entry, navigation and task flow, links, interactive feedback, legibility and visual identity. Holds the UX-NNN catalog, the page-level vs site-level split, the applicability rules that keep a score honest, and which owner each fix belongs to. Use when the wp-audit-ux agent audits a site or /wp-audit scores usability.
 user-invocable: false
 ---
 
