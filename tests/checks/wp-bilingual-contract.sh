@@ -49,6 +49,7 @@ grep -qF 'language_attributes(); ?> lang=' "${skill_md[@]}" \
 grep -qF "add_filter('language_attributes'" "$s" \
   || fail "$s does not show the language_attributes filter that makes <html lang> follow the request"
 for h in starter-theme/__tailwind__/header.php starter-theme/__cinematic__/header.php; do
+  [ -f "$h" ] || fail "$h is missing"
   grep -qF '<html <?php language_attributes(); ?>>' "$h" \
     || fail "$h no longer prints language_attributes() alone on <html>, so the starters' filter has nothing to act on"
 done

@@ -32,6 +32,7 @@ for field in check severity ownership message; do
     || fail "$rep no longer refuses a finding without $field -- re-read it before trusting this check"
   grep -Fq "| \`$field\` |" "$std" || fail "$std does not define the \`$field\` field the renderer requires"
 done
+grep -Fq '| `resource` |' "$std" || fail "$std does not define the \`resource\` field every FAIL example below must carry"
 sev=$(sed -n 's/^const SEVERITY_ORDER = { *\(.*\) *};$/\1/p' "$rep" | grep -oE '[A-Z]+' | tr '\n' ' ')
 [ "$sev" = "CRITICAL WARNING INFO " ] || fail "$rep severities changed to '$sev' -- update the contract"
 grep -Fq '| `severity` | on `FAIL` | `CRITICAL`, `WARNING` or `INFO`, uppercase |' "$std" \
