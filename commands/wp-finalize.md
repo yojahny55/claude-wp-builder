@@ -177,9 +177,13 @@ Verify required WordPress theme files and configurations:
 2. **index.php** exists (required WordPress fallback)
 3. **screenshot.png** exists (theme preview image)
 4. **SCF/ACF dependency:** Check `functions.php` or `inc/theme-setup.php` for SCF/ACF dependency notice or check
-5. **register_nav_menus** is called in `inc/theme-setup.php` — with per-language
-   locations (`primary_<lang>`, `footer_<lang>`) under `suffix`, and with one
-   bare location per name (`primary`, `footer`) under `polylang`
+5. **register_nav_menus** is called in `inc/theme-setup.php` (`functions.php` on
+   `cinematic`) — with per-language locations, hyphenated (`primary-<lang>`,
+   `footer-<lang>`), under `suffix`, and with one
+   bare location per name (`primary`, `footer`) under `polylang`. Those are the
+   names `<prefix>nav_location()` in `inc/i18n.php` returns; grep the templates for
+   a `theme_location` built by hand instead (`'primary-' .`, `'primary_' .`) — it
+   renders nothing on the other strategy
 6. **Brand surface — favicon / site icon.** Either a Site Icon is set
    (`$WP option get site_icon` is non-zero) or the theme itself emits a fallback:
    grep `functions.php`/`inc/theme-setup.php` for a `wp_head` callback that prints
@@ -269,7 +273,7 @@ If `.wp-create.json` exists in the project, read `wp_cli.wrapper` and run runtim
    $WP menu location list --format=table
    ```
    Verify all registered locations have menus assigned — the list depends on the
-   `i18n strategy`: `primary_<lang>`, `footer_<lang>` per language under
+   `i18n strategy`: `primary-<lang>`, `footer-<lang>` per language under
    `suffix`; bare `primary`, `footer` under `polylang`.
 
 3. **ACF fields return values:**
@@ -565,7 +569,7 @@ Layer 2 runs when `.wp-create.json` exists and WordPress is reachable (reuse `$W
    ```bash
    $WP menu location list --format=table
    ```
-   **PASS** if every registered nav location has a menu assigned — the list depends on the `i18n strategy` (under `suffix`: `primary_en`, `primary_es`, `footer_en`, `footer_es`; under `polylang`: bare `primary`, `footer`). **FAIL** listing unassigned locations.
+   **PASS** if every registered nav location has a menu assigned — the list depends on the `i18n strategy` (under `suffix`: `primary-en`, `primary-es`, `footer-en`, `footer-es`; under `polylang`: bare `primary`, `footer`). **FAIL** listing unassigned locations.
 
 4. **In-scope pages exist** — `critical`
 

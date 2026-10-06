@@ -34,7 +34,7 @@ All paths relative to the theme root (`wp-content/themes/<slug>/`).
 | `inc/scenes-renderer.php` | Helpers: `{slug}_cinematic_scenes()` returns repeater rows; `{slug}_cinematic_render_stage($rows)` prints the persistent `.stage`; `{slug}_cinematic_render_scene($row, $index)` prints a single scene. |
 | `template-parts/cinematic/stage.php` | Persistent fixed `.stage` with N stacked `<video>` elements (desktop) + `<picture>` posters (reduced-motion fallback). |
 | `template-parts/cinematic/scene.php` | Per-scene HUD + eyebrow + headline + body + cta. Mirrors `align`/`veil` attributes. |
-| `template-parts/cinematic/nav.php` | Lockup + hamburger + motion-toggle button. Wires WP nav menu locations `primary-{lang}`. |
+| `template-parts/cinematic/nav.php` | Lockup + hamburger + motion-toggle button. Wires the WP nav menu location `{slug}_nav_location('primary')` returns — `primary-{lang}` under `suffix`, the bare `primary` under `polylang`. Never build the name by hand. |
 | `front-page.php` | Renders nav → stage → scene loop → (if hybrid) trailing flex sections → footer. |
 | `inc/seed-cinematic.php` | WP-CLI `wp eval-file` script seeding N placeholder scenes with kit-provided sample videos. Idempotent. |
 
@@ -68,7 +68,7 @@ All paths relative to the theme root (`wp-content/themes/<slug>/`).
 
 - All static strings wrap in `{slug}_b('English', 'Español')`.
 - ACF retrieval uses `{slug}_get_field($name)` which appends `_es` when current lang is `es`.
-- Language cookie/query: `wp_unslash($_GET['lang'] ?? $_COOKIE['{slug}_lang'] ?? 'en')`.
+- Language cookie/query: `wp_unslash($_GET['lang'] ?? $_COOKIE['{slug}_lang'] ?? 'en')`. The starter's `inc/i18n.php` sets that cookie on `init` when a `?lang=` switch changes it; never set it from a template, where the headers have already gone.
 
 ### Hybrid mode
 

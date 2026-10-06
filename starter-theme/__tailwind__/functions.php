@@ -201,9 +201,26 @@ add_filter( 'script_loader_tag', function( $tag, $handle, $src ) {
 }, 10, 3 );
 
 /**
- * Meta description helper.
+ * Whether an SEO plugin owns the head's SEO output — its schema graph and the meta
+ * description — so the theme prints neither. inc/agentic.php (written by the
+ * wp-agentic-surfaces agent) returns on this same guard for identity JSON-LD, and
+ * declares it only for a theme that does not already have it.
+ */
+function __starter___seo_plugin_owns_schema() {
+    return defined( 'RANK_MATH_VERSION' ) || class_exists( 'RankMath' )
+        || defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Options' )
+        || defined( 'SEOPRESS_VERSION' ) || class_exists( 'SEOPress' );
+}
+
+/**
+ * Meta description helper. Steps aside for an SEO plugin, which prints its own: Rank
+ * Math, which /wp-create's plugin profiles install, would otherwise ship a second
+ * description tag.
  */
 add_action( 'wp_head', function() {
+    if ( __starter___seo_plugin_owns_schema() ) {
+        return;
+    }
     if ( is_front_page() ) {
         $desc = __starter___get_field( 'site_description', 'option' );
         if ( ! $desc ) {

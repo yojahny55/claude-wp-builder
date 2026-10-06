@@ -119,8 +119,6 @@ function prefix_setup() {
     register_nav_menus(array(
         'primary-en' => __('Primary Navigation (EN)', '<slug>'),
         'primary-es' => __('Primary Navigation (ES)', '<slug>'),
-        'mobile-en'  => __('Mobile Navigation (EN)', '<slug>'),
-        'mobile-es'  => __('Mobile Navigation (ES)', '<slug>'),
         'footer-en'  => __('Footer Links (EN)', '<slug>'),
         'footer-es'  => __('Footer Links (ES)', '<slug>'),
     ));

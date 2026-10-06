@@ -299,6 +299,22 @@ function __starter___get_lang_url($lang) {
     return add_query_arg('lang', $lang, $url);
 }
 
+/**
+ * Menu location for the current language
+ *
+ * inc/theme-setup.php registers one location per language (primary-en,
+ * primary-es, ...), so a template asks for the current language's own. The
+ * Polylang variant returns the bare name instead, because that model registers
+ * each location once and swaps the menu in per language. Templates call this
+ * rather than building the name, so swapping this file switches both.
+ *
+ * @param string $location Base location name ('primary', 'footer')
+ * @return string Registered location name
+ */
+function __starter___nav_location($location) {
+    return $location . '-' . __starter___get_current_lang();
+}
+
 /*
  * Make the first call before any output. It is the call that sets the language
  * cookie, and setcookie() fails once header.php has started printing; left to

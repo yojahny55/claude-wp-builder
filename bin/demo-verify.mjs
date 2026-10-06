@@ -615,13 +615,22 @@ const revealState = (idx) => {
  * was whether the mix could move. This one does.
  *
  * Returns the device kinds present, so the finding can name what the page actually has
- * rather than assert an absence. */
-const SCROLL_REACTIVE_DEVICES = new Set(['drift', 'count', 'parallax', 'pan', 'cascade']);
+ * rather than assert an absence.
+ *
+ * Only devices motion.js implements belong in the set (tests/checks/wp-craft-consistency.sh
+ * holds it to that). `cascade` sat here after it left the contract because motion.js never
+ * bound it, so a page carrying it passed this gate while nothing on it moved. `count` is
+ * read the way motion.js dispatches it, off `data-motion-count`: `data-motion="count"` on
+ * its own is inert, and a counter carrying only the attribute used to count for nothing. */
+const SCROLL_REACTIVE_DEVICES = new Set(['drift', 'count', 'parallax', 'pan']);
 const motionMix = () => {
   const devices = {};
   document.querySelectorAll('[data-motion]').forEach((el) => {
     const k = (el.getAttribute('data-motion') || '').trim();
-    if (k) devices[k] = (devices[k] || 0) + 1;
+    if (k && k !== 'count') devices[k] = (devices[k] || 0) + 1;
+  });
+  document.querySelectorAll('[data-motion-count]').forEach(() => {
+    devices.count = (devices.count || 0) + 1;
   });
   const cssScroll = [...document.querySelectorAll('*')].some((el) => {
     const st = getComputedStyle(el);

@@ -24,6 +24,23 @@ function __starter___current_lang(): string {
     return $lang;
 }
 
+/*
+ * Persist a ?lang= switch in the cookie __starter___current_lang() reads, or the
+ * choice lasts one request. On init, because setcookie() fails once header.php
+ * has started printing; and only when the language came from the URL and is not
+ * already the stored one, so an ordinary page view sends no header.
+ */
+add_action('init', function (): void {
+    if (!isset($_GET['lang'])) {
+        return;
+    }
+    $lang   = __starter___current_lang();
+    $stored = isset($_COOKIE['__starter___lang']) ? sanitize_key(wp_unslash($_COOKIE['__starter___lang'])) : '';
+    if ($lang === sanitize_key(wp_unslash($_GET['lang'])) && $lang !== $stored && !headers_sent()) {
+        setcookie('__starter___lang', $lang, time() + (365 * 24 * 60 * 60), '/');
+    }
+});
+
 /**
  * Bilingual literal. Allows br/em/strong/i/b/span via wp_kses
  * (esc_html was a prior bug — it escaped <br> as literal text).
@@ -50,6 +67,16 @@ function __starter___setting(string $name): string {
         $value = (string) get_field($name, 'option');
     }
     return $value;
+}
+
+/**
+ * Menu location for the current language: functions.php registers one per
+ * language (primary-en, footer-es, ...). The Polylang variant returns the bare
+ * name, which is all that model registers, so templates call this instead of
+ * building the name and swapping this file switches both.
+ */
+function __starter___nav_location(string $location): string {
+    return $location . '-' . __starter___current_lang();
 }
 
 /**

@@ -68,7 +68,18 @@ else
     out=$(php -d pcre.jit=0 "$harness" "$which" 2>&1) \
       || { printf '%s\n' "$out" | sed 's/^/  /'; fail "the $which starter's inc/i18n.php does not set <html lang> or the cookie as the skill says"; }
   done
+  # The cinematic starter read its cookie and never set it, so a ?lang= switch lasted one
+  # request. It sets it on init now -- and only for a language that came from ?lang= and
+  # is not already stored, so an ordinary page view sends no header.
+  out=$(php -d pcre.jit=0 "$harness" cinematic stored-es 2>&1) \
+    || { printf '%s\n' "$out" | sed 's/^/  /'; fail "the cinematic starter re-sends its language cookie on a request whose cookie already matches ?lang="; }
+  out=$(php -d pcre.jit=0 "$harness" cinematic no-query 2>&1) \
+    || { printf '%s\n' "$out" | sed 's/^/  /'; fail "the cinematic starter sets its language cookie from something other than ?lang="; }
 fi
+grep -rnF --include='*.md' -e 'never sets the cookie' -e 'sets no cookie' skills/wp-bilingual \
+  && fail "the skill still says the cinematic starter never sets its language cookie"
+grep -qF "setcookie('__starter___lang'" "$ci" \
+  || fail "$ci never calls setcookie() for the language it reads back from \$_COOKIE"
 
 # --- Spanish samples carry their accents -----------------------------------------
 for bad in "Saber Mas'" 'Enlaces Rapidos' 'Politica de Privacidad' 'Terminos y' 'Siguenos' "'Espanol'"; do

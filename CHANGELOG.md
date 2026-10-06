@@ -19,6 +19,75 @@
 
 ### Fixed
 
+- **The tailwind starter stops printing a second meta description beside an SEO plugin.**
+  Its `functions.php` printed `<meta name="description">` on the front page with no early
+  return, so a site running Rank Math — which `/wp-create`'s plugin profiles install —
+  shipped two description tags. The detection already existed as
+  `<prefix>_seo_plugin_owns_schema()`, the guard identity JSON-LD returns on, but only inside
+  the `inc/agentic.php` that `wp-agentic-surfaces` writes during a GEO fix, so the starter
+  could not call it; and `wp-theme-standards` taught a second, narrower detection (two
+  constants, no SEOPress). The starter now defines that one guard and returns on it before
+  the tag; `inc/agentic.php` declares it only inside `function_exists()`, since a theme
+  built from the starter already has it and a second declaration is a fatal; and the skill
+  teaches the same guard. The cinematic starter prints no description, so it had nothing to
+  fix. `tests/checks/meta-description-seo-plugin.sh` fails on a starter description tag
+  printed before the guard returns, on a second SEO-plugin detection, on the starter's and
+  the agent's guards detecting different plugins, and on an unguarded declaration in the
+  agent.
+- **`/wp-demo-verify`'s static-page gate stops counting a device that does not exist.**
+  `bin/demo-verify.mjs` still listed `cascade` as scroll-reactive after the device left the
+  motion contract, because `motion.js` never implemented it — so a page carrying
+  `data-motion="cascade"` beside its reveals passed the gate while nothing on it moved.
+  `count` had the mirror defect: the gate read it off a `data-motion="count"` value, which
+  is inert, while `motion.js` dispatches it off `data-motion-count` alone, so a real counter
+  counted for nothing and a page whose only scroll device was one failed. Measured against
+  both on Chromium: the old gate passed the cascade page and failed the counter page; it
+  now does the reverse. `tests/checks/wp-craft-consistency.sh` holds the gate's set to the
+  devices `motion.js` binds, `count` to the attribute both files read, and the whole set to
+  the interior floor `devices.md` states.
+- **The cinematic starter keeps a `?lang=` switch.** Its `inc/i18n.php` read
+  `$_COOKIE['__starter___lang']` and never called `setcookie()`, so a language switch lasted
+  exactly one request and the next page came back in the browser's language. An `init`
+  callback now sets the cookie before any output, as the tailwind starter does — and only
+  when the language came from `?lang=` and differs from the one already stored, so an
+  ordinary page view sends no header. `wp-bilingual`, its i18n reference and `wp-cinematic`
+  no longer say the starter sets no cookie. `tests/checks/wp-bilingual-contract.sh` runs the
+  file and asserts the cookie is set on a switch, and not re-sent when it already matches or
+  when the language came from `Accept-Language`.
+- **`/wp-seed` sets a post author.** Every `wp post create` and `wp media import` it ran
+  left `post_author` at 0, a user that does not exist: the pages rendered, `the_author()`,
+  the Article schema's `author` and the admin column came out empty, and every seeded page
+  failed `/wp-finalize` Check 7's author sweep. `wp-cli-patterns` already had the rule and
+  the recipe ("Always set an author"); the command now follows it — it resolves an
+  administrator once in Step 0, stops when there is none, passes `--post_author` to every
+  create and import (including the Polylang counterparts and the `page_link` placeholder
+  pages), gives an author to a previously seeded page that has none when it updates it in
+  place, and runs the same sweep before it reports. The same omission is fixed where it
+  repeated: the skill's own examples, `wp-template`, `wp-acf`, `/wp-cinematic-seed`,
+  `/wp-cinematic-encode`, and `pll-import.php`, whose new counterparts came from
+  `wp_insert_post()` under `wp eval-file` — user 0 again — and now take their source's
+  author. `tests/checks/seed-post-author.sh` fails on any create or import command in a
+  command, agent or skill that carries no `--post_author`.
+- **Menu locations agree between the commands and the starters, on both i18n strategies.**
+  Both starters register and render `primary-<lang>` / `footer-<lang>`, hyphenated, but
+  `/wp-init` and `/wp-header` told the agent to register `primary_en`, `/wp-seed` assigned
+  menus to `primary_en` / `footer_en` and `/wp-finalize` verified those names, so a suffix
+  site's nav rendered nothing, with HTTP 200 and no notice (`fallback_cb` is `false`).
+  Under `polylang` `/wp-init` registered a bare `primary` while the starter templates still
+  asked for `primary-<lang>`, which left both languages with no nav. Templates now ask
+  `<prefix>nav_location('primary')` in `inc/i18n.php` instead of building the name, and
+  each strategy's file answers for itself (`primary-<lang>` from the suffix helper, the
+  bare name from the Polylang variant). `/wp-init` Step 6 names the cinematic starter's
+  `functions.php`, which has no `inc/theme-setup.php`, and scopes the string registration
+  to `tailwind`, the only starter with `<prefix>get_translations()`. `/wp-header`,
+  `/wp-footer`, `wp-template` and `wp-cinematic` render through the helper, and `/wp-seed`
+  assigns the footer location as well as the primary one on both strategies. The tailwind
+  starter's `mobile-<lang>` locations are gone: nothing rendered them and nothing assigned
+  them, so `/wp-finalize`'s "every registered location has a menu" gate failed on them.
+  `/wp-cinematic-init` pointed at an `inc/seed-menus.php` that no starter ships, and now
+  defers to `/wp-seed` Phase 6. `tests/checks/menu-locations.sh` compares what every
+  starter registers, renders and answers against what each command registers, assigns and
+  verifies, per strategy.
 - **`robin-fix.sh` works on a site with a table prefix other than `wp_`, and stops failing
   silently.** `$table_prefix` was matched with an unescaped `$` — a regex end-of-line anchor
   — so the prefix always read as `wp_` and every query on any other site hit tables that do

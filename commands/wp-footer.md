@@ -60,7 +60,9 @@ Dispatch the **wp-template** agent with these instructions:
 > - **Legal links**: `prefix_get_field('legal_privacy_url', 'option')`, `prefix_get_field('legal_terms_url', 'option')`
 > - **Copyright**: `prefix_get_field('footer_copyright', 'option')` with fallback to `© {year} {blogname}`
 > - **Designer credit**: `prefix_get_field('footer_credit', 'option')` (optional)
-> - **Footer navigation**: `wp_nav_menu()` with `'footer_' . prefix_current_lang()` location
+> - **Footer navigation**: `wp_nav_menu()` with `'theme_location' => prefix_nav_location('footer')` —
+>   the `inc/i18n.php` helper returns `footer-<lang>` under `suffix` and the bare `footer` under
+>   `polylang`, the names `/wp-init` Step 6 registers. Never build the name yourself
 >
 > Close the file properly:
 > ```php

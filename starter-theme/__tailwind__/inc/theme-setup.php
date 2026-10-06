@@ -45,12 +45,13 @@ function __starter___setup() {
     // Add theme support for selective refresh for widgets.
     add_theme_support('customize-selective-refresh-widgets');
 
-    // Register navigation menus (per-language)
+    // Register navigation menus — one per language under the suffix model.
+    // Under Polylang, /wp-init Step 6 rewrites this to one bare location per
+    // name. Templates ask for a location through __starter___nav_location(),
+    // which answers for whichever model inc/i18n.php implements.
     register_nav_menus(array(
         'primary-en'   => __('Primary Navigation (EN)', '__starter__'),
         'primary-es'   => __('Primary Navigation (ES)', '__starter__'),
-        'mobile-en'    => __('Mobile Navigation (EN)', '__starter__'),
-        'mobile-es'    => __('Mobile Navigation (ES)', '__starter__'),
         'footer-en'    => __('Footer Links (EN)', '__starter__'),
         'footer-es'    => __('Footer Links (ES)', '__starter__'),
     ));

@@ -36,7 +36,7 @@ grep -q 'wp plugin install polylang' "$c" || { echo "FAIL: command doc does not 
 # error on a real page, and one extra is a helper no template can rely on.
 #
 # Asserted PER STARTER, not across them: __tailwind__ and __cinematic__ have
-# deliberately different contracts (nine helpers vs three), so a single global
+# deliberately different contracts (ten helpers vs four), so a single global
 # list would be wrong for both.
 for starter in __tailwind__ __cinematic__; do
   base="starter-theme/$starter/inc/i18n.php"

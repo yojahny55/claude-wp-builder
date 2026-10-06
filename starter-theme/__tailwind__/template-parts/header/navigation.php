@@ -11,10 +11,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 ?>
 <nav class="main-navigation" role="navigation" aria-label="<?php esc_attr_e('Main menu', '__starter__'); ?>">
     <?php
-    // inc/theme-setup.php registers one location per language (primary-en,
-    // primary-es, …), never a bare `primary`, which would render nothing here.
+    // The registered name depends on the i18n strategy (primary-en under the
+    // suffix model, a bare `primary` under Polylang); inc/i18n.php knows which.
+    // A name built here instead renders nothing on the other strategy.
     wp_nav_menu( array(
-        'theme_location' => 'primary-' . __starter___get_current_lang(),
+        'theme_location' => __starter___nav_location( 'primary' ),
         'container' => false,
         'menu_class' => 'primary-menu',
         'items_wrap' => '<ul role="menubar">%3$s</ul>',

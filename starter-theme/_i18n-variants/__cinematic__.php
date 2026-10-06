@@ -3,11 +3,11 @@
  * Minimal bilingual layer — Polylang variant.
  *
  * Drop-in replacement for inc/i18n.php when the project was scaffolded with
- * Polylang. Same three function names and signatures as the file it replaces,
+ * Polylang. Same four function names and signatures as the file it replaces,
  * so no template changes.
  *
  * Note this starter's contract is deliberately smaller than __tailwind__'s:
- * three functions, not nine. Each starter's Polylang variant mirrors ITS OWN
+ * four functions, not ten. Each starter's Polylang variant mirrors ITS OWN
  * i18n.php, and tests/checks/wp-polylang.sh asserts that pairing per starter
  * rather than across them.
  *
@@ -76,4 +76,16 @@ function __starter___setting(string $name): string {
         $value = (string) get_field($name, 'option');
     }
     return $value;
+}
+
+/**
+ * Menu location for the current language.
+ *
+ * Under Polylang each location is registered ONCE, with no language suffix
+ * (commands/wp-init.md Step 6), and Polylang swaps in the menu assigned to it
+ * for the current language -- so the answer is the bare name. The suffix
+ * i18n.php returns '<location>-<lang>', which this model never registers.
+ */
+function __starter___nav_location(string $location): string {
+    return $location;
 }

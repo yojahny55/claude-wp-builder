@@ -44,7 +44,8 @@ arguments:
    - Desktop: `ffprobe -show_frames -select_streams v:0 -read_intervals %+#10 -print_format csv | grep -c 'I'` ≥ 10 (sanity check that all-keyframe took).
    - Mobile: confirm aspect ratio = 9:16 via `ffprobe -show_entries stream=width,height`.
 6. If `--scene=N` is set AND a WordPress install is reachable:
-   - Run `wp media import <each output>` to add to Media Library.
+   - Run `wp media import <each output> --post_author=<admin ID>` to add to Media Library (without
+     the author the attachment belongs to user 0 and fails `/wp-finalize` Check 7).
    - Run `wp eval` to update the matching `cinematic_scenes` row's `video_desktop` / `video_mobile` / `poster` ACF fields to the new attachment IDs.
 7. Print before/after sizes and bitrate stats.
 

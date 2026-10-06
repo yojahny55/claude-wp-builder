@@ -602,12 +602,16 @@ function <prefix>_html_to_markdown( $html ) {
 
 /**
  * Identity JSON-LD — GEO-A07, GEO-A08, GEO-A09.
- * Guarded so it never duplicates the SEO plugin's own graph.
+ * Guarded so it never duplicates the SEO plugin's own graph. The tailwind starter's
+ * functions.php already defines this guard (its meta description returns on it too), so
+ * it is declared here only for a theme that lacks it — declaring it twice is a fatal.
  */
-function <prefix>_seo_plugin_owns_schema() {
-    return defined( 'RANK_MATH_VERSION' ) || class_exists( 'RankMath' )
-        || defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Options' )
-        || defined( 'SEOPRESS_VERSION' ) || class_exists( 'SEOPress' );
+if ( ! function_exists( '<prefix>_seo_plugin_owns_schema' ) ) {
+    function <prefix>_seo_plugin_owns_schema() {
+        return defined( 'RANK_MATH_VERSION' ) || class_exists( 'RankMath' )
+            || defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Options' )
+            || defined( 'SEOPRESS_VERSION' ) || class_exists( 'SEOPress' );
+    }
 }
 
 /**
@@ -982,7 +986,9 @@ codes below are detected by `wp-audit-geo` and deliberately **not** fixed from t
    `<prefix>_seo_plugin_owns_schema()` is true (Rank Math, Yoast or SEOPress). When one is
    active, report GEO-A07 to GEO-A10 as dependent on its configuration and name
    `wp-audit-rankmath` as the path to fill Organization/LocalBusiness `contactPoint`,
-   `address` and social `sameAs` — do not claim them resolved here.
+   `address` and social `sameAs` — do not claim them resolved here. Keep the guard's
+   declaration inside its `function_exists()` check: the tailwind starter's `functions.php`
+   defines the same function for its meta description, and declaring it twice is a fatal.
 5. **Gate by the recorded site type** — the emitted `<prefix>_AGENTIC_SITE_TYPE` decides
    pricing (`merchant`/`saas`), api-catalog and auth.md (`saas`) and `LocalBusiness`
    (`local`). Never sniff REST namespaces at runtime.

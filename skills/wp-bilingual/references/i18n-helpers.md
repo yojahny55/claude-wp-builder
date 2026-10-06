@@ -37,7 +37,9 @@ the starter calls the function on `init`. Without that hook the first caller was
 `wp_enqueue_scripts`, inside `wp_head()`, after `<!DOCTYPE html>` had gone out — and on a server
 without output buffering the switch lasted one page.
 
-The cinematic starter reads the parameter and the cookie but sets no cookie.
+The cinematic starter caches the same way but keeps its getter free of the side effect: a
+separate `init` callback sets the cookie, and only when the language came from `?lang=` and
+differs from the cookie already stored, so an ordinary page view sends no header.
 
 ## Fallbacks
 

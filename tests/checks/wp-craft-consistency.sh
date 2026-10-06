@@ -79,6 +79,29 @@ for d in $(printf '%s\n' "$floor" | grep -oE '`[a-z]+`' | tr -d '`' | sort -u); 
 done
 grep -Fq 'The eight devices' "$R/devices.md" && fail "devices.md heads its device list with a count that does not match it"
 
+# demo-verify's static-page gate decides "something here reacts to scrolling" from its own
+# list of names, and kept `cascade` after the contract dropped it: a page carrying
+# data-motion="cascade" passed the gate while nothing on it moved. Its set must be devices
+# motion.js implements -- `count` by the attribute motion.js dispatches it on, which the
+# gate must read too -- and must be the floor above, not a second opinion on it.
+V=bin/demo-verify.mjs
+sr=$(grep -oE 'SCROLL_REACTIVE_DEVICES = new Set\(\[[^]]*\]\)' "$V" | grep -oE "'[a-z]+'" | tr -d "'" | sort -u)
+[ -n "$sr" ] || fail "$V has no recognisable SCROLL_REACTIVE_DEVICES set -- this check would be vacuous"
+for d in $sr; do
+  if [ "$d" = count ]; then
+    grep -Fq "querySelectorAll('[data-motion-count]')" "$M" \
+      || fail "$V counts \`count\` as scroll-reactive, but motion.js no longer dispatches it on data-motion-count"
+    grep -Fq "querySelectorAll('[data-motion-count]')" "$V" \
+      || fail "$V counts \`count\` as scroll-reactive but never reads data-motion-count, the attribute motion.js dispatches it on"
+    continue
+  fi
+  printf '%s\n' "$engine" | grep -Fxq "$d" \
+    || fail "$V counts \`$d\` as scroll-reactive; motion.js does not implement it, so a page carrying it passes static-page with nothing moving"
+done
+want=$(printf '%s\n' "$floor" | grep -oE '`[a-z]+`' | tr -d '`' | grep -vx reveal | sort -u)
+[ "$sr" = "$want" ] \
+  || fail "$V's scroll-reactive set ($(echo $sr)) is not the devices.md interior floor ($(echo $want))"
+
 # --- the signature move is required, in every file that mentions it ------------------
 grep -Fq 'Every build invents one bespoke interaction' "$R/uniqueness.md" \
   || fail "$R/uniqueness.md no longer requires the signature move"

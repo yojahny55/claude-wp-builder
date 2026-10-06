@@ -74,7 +74,11 @@ The agent produces every file listed in its `Outputs you produce` table.
 
 1. Activate the theme via `wp theme activate <slug>`.
 2. Run `wp eval-file inc/seed-cinematic.php` to populate the placeholder scenes.
-3. Run `wp eval-file inc/seed-menus.php` if menus haven't been seeded yet.
+3. If `wp menu location list` shows no menu assigned yet, create and assign the menus the
+   reel's `nav.php` and `footer.php` render, exactly as `/wp-seed` Phase 6 (Create Menus)
+   does for the project's `i18n strategy`: `primary-<lang>` and `footer-<lang>` under
+   `suffix`, the bare `primary` and `footer` under `polylang`. The starter ships no menu
+   seeder of its own.
 4. Print next steps:
    - Replace placeholder videos: `/wp-cinematic-encode <input.mp4> --scene=N`
    - Author scene content: `/wp-cinematic-scene <n>`

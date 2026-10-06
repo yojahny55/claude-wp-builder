@@ -309,7 +309,9 @@ The theme prints no identity JSON-LD from `functions.php`. The `Organization` /
 `LocalBusiness` node (`@id` `home_url( '/' ) . '#organization'`) has one owner:
 `inc/agentic.php`, which the `wp-agentic-surfaces` agent writes (run by `/wp-audit --geo`),
 and which returns early through `<prefix>_seo_plugin_owns_schema()` when Rank Math, Yoast or
-SEOPress is active, because the SEO plugin then emits the graph. A second
+SEOPress is active, because the SEO plugin then emits the graph. The tailwind starter's
+`functions.php` defines that guard; `inc/agentic.php` declares it only for a theme that lacks
+it. A second
 `<script type="application/ld+json">` beside the SEO plugin's reads as two `Organization`
 nodes to every validator; fields the plugin lacks are merged into its graph through
 `rank_math/json_ld` (`wp-audit-rankmath` Step 4.7), never printed beside it.
@@ -320,7 +322,11 @@ nodes to every validator; fields the plugin lacks are merged into its graph thro
 
 Add meta description tags, but defer to SEO plugins if present.
 
-Return early when `WPSEO_VERSION` or `RANK_MATH_VERSION` is defined — the SEO plugin owns the tag then. Code: [references/head-and-performance.md](references/head-and-performance.md).
+Return early through `<prefix>_seo_plugin_owns_schema()` — the same guard identity JSON-LD
+uses, true when Rank Math, Yoast or SEOPress is active. The SEO plugin owns the tag then, and a
+theme that prints its own beside it ships two description tags. Never write a second
+detection: one that checks only two constants misses SEOPress and drifts from the schema
+guard. Code: [references/head-and-performance.md](references/head-and-performance.md).
 
 ---
 

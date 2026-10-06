@@ -45,10 +45,13 @@ Dispatch the **wp-template** agent with these instructions:
 > - `<body <?php body_class(); ?>>`
 > - Site header with:
 >   - Logo from settings: `prefix_get_field('site_logo', 'option')` with fallback to `get_bloginfo('name')`
->   - `wp_nav_menu()` call using the location the project's `i18n strategy`
->     registers: under `suffix`, the per-language location
->     (`'primary_' . prefix_get_current_lang()`); under `polylang`, the bare
->     location (`primary`) — Step 7 registers one location per name there
+>   - `wp_nav_menu()` with `'theme_location' => prefix_nav_location('primary')`, on
+>     both strategies. The helper in `inc/i18n.php` returns the location the
+>     project's `i18n strategy` registers: under `suffix`, the per-language
+>     location (`primary-<lang>`, hyphenated); under `polylang`, the bare
+>     location (`primary`) — Step 7 registers one location per name there.
+>     Never build the name yourself (`'primary-' . …`): it is right on one
+>     strategy and renders no menu on the other
 >   - Use the custom nav walker class
 >   - Language switcher per the project's `i18n strategy`: under `suffix`,
 >     render all configured languages (from `SUPPORTED_LANGS`) with active
@@ -275,7 +278,9 @@ Dispatch the **wp-acf** agent with these instructions:
 
 **Under `i18n strategy: polylang`** (read it from the project's
 `.claude/CLAUDE.md`), skip the per-language locations entirely: register
-`primary` and `footer` ONCE, call `wp_nav_menu()` with the bare location name,
+`primary` and `footer` ONCE (`/wp-init` Step 6 already replaced the starter's
+per-language entries — confirm it, and never add them back), let
+`wp_nav_menu()` take the bare location name from `prefix_nav_location()`,
 and render the switcher with Polylang's own walker, which already knows each
 page's counterpart URL:
 
@@ -292,22 +297,22 @@ unless the markup has to match a specific demo — the helper exists and works,
 but `pll_the_languages()` also marks the current language and hides languages
 with no counterpart.
 
-Everything below describes the `suffix` strategy.
-
-Read `inc/theme-setup.php` and ensure `register_nav_menus()` includes per-language menu locations:
+**Under `suffix`**, read `inc/theme-setup.php` and ensure `register_nav_menus()`
+includes per-language menu locations, hyphenated — `<location>-<lang>` is the
+name `prefix_nav_location()` builds, and the starter already ships these:
 
 ```php
 register_nav_menus(array(
-    'primary_en' => __('Primary Menu (English)', '<textdomain>'),
-    'primary_es' => __('Primary Menu (Spanish)', '<textdomain>'),
-    'footer_en'  => __('Footer Menu (English)', '<textdomain>'),
-    'footer_es'  => __('Footer Menu (Spanish)', '<textdomain>'),
+    'primary-en' => __('Primary Navigation (EN)', '<textdomain>'),
+    'primary-es' => __('Primary Navigation (ES)', '<textdomain>'),
+    'footer-en'  => __('Footer Links (EN)', '<textdomain>'),
+    'footer-es'  => __('Footer Links (ES)', '<textdomain>'),
 ));
 ```
 
 Adjust languages to match the project configuration. If the registrations already exist, do not duplicate them.
 
-Also ensure the nav walker file is included:
+On both strategies, ensure the nav walker file is included:
 ```php
 require_once get_template_directory() . '/inc/nav-walker.php';
 ```

@@ -36,8 +36,8 @@ Use ACF's own API for field operations. This is storage-format-agnostic and hand
 # Simple field on options page
 $WP eval "update_field('hero_title', 'Building Digital Excellence', 'option');"
 
-# Image field (import first, use attachment ID)
-ID=$($WP media import 'https://images.unsplash.com/photo-xxx' --title='Hero Background' --porcelain)
+# Image field (import first, use attachment ID; $AUTHOR resolved once, as in SKILL.md)
+ID=$($WP media import 'https://images.unsplash.com/photo-xxx' --title='Hero Background' --post_author=$AUTHOR --porcelain)
 $WP eval "update_field('hero_image', $ID, 'option');"
 
 # Repeater field
@@ -132,8 +132,9 @@ List them rather than guessing (underscore or hyphen, suffixed or bare):
 $WP menu location list --format=csv
 ```
 
-**`suffix`** — one location per language (the tailwind starter registers `primary-en`,
-`primary-es`, `mobile-*` and `footer-*`), one menu per language, each assigned to its own:
+**`suffix`** — one location per language, hyphenated (both starters register `primary-en`,
+`primary-es`, `footer-en` and `footer-es`), one menu per language, each assigned to its own.
+Do the same for the footer menus:
 
 ```bash
 $WP menu create "Primary EN"
@@ -157,7 +158,7 @@ create — and leave the other languages' menus to `/wp-polylang`'s import. Neve
 ### Import Media and Use Attachment ID
 
 ```bash
-ID=$($WP media import 'https://example.com/photo.jpg' --title='Hero Image' --porcelain)
+ID=$($WP media import 'https://example.com/photo.jpg' --title='Hero Image' --post_author=$AUTHOR --porcelain)
 $WP eval "update_field('hero_image', $ID, 'option');"
 ```
 

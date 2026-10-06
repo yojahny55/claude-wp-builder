@@ -345,6 +345,21 @@ function __starter___get_lang_url($lang) {
 }
 
 /**
+ * Menu location for the current language
+ *
+ * Under Polylang each location is registered ONCE, with no language suffix
+ * (commands/wp-init.md Step 6), and Polylang swaps in the menu assigned to it
+ * for the current language. So the answer is the bare name -- the suffix
+ * i18n.php returns '<location>-<lang>', which this model never registers.
+ *
+ * @param string $location Base location name ('primary', 'footer')
+ * @return string Registered location name
+ */
+function __starter___nav_location($location) {
+    return $location;
+}
+
+/**
  * Give a translated page its counterpart's page template.
  *
  * WordPress picks page-{slug}.php from the slug, and a translated page has its
