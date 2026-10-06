@@ -76,7 +76,7 @@ done
 # 6. The reset is all bare selectors — a class or scope in it is the (0,1,1) trap the skill
 #    warns about — and SKILL.md links it.
 grep -Fq 'references/reset.md' "$skill" || fail "$skill does not link references/reset.md"
-rsel=$(awk '/^```css/{f=1; next} /^```/{f=0} f' "$reset" | sed 's#/\*[^*]*\*/##g' | grep -E '^[^ {}][^{]*[{,]?$' | grep -E '\.[a-z]|#[a-z]' || true)
+rsel=$(awk '/^```css/{f=1; next} /^```/{f=0} f' "$reset" | sed -E 's#/\*([^*]|\*+[^*/])*\*+/##g' | grep -E '^[^ {}][^{]*[{,]?$' | grep -E '\.[a-z]|#[a-z]' || true)
 [ -z "$rsel" ] || fail "$reset scopes a reset selector with a class or id: $rsel"
 
 # 7. The contour lint is run from the plugin, with its exit codes.
