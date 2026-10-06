@@ -1,6 +1,6 @@
 ---
 name: wp-audit-geo-standards
-description: GEO and AI-agent-readiness reference — the ORA/is-agentic check catalog, applicability by site type, AI crawler allowlist, llms.txt/well-known specs, GEO citability rubric, and WordPress implementation templates
+description: GEO and AI-agent-readiness reference — the ORA/is-agentic check catalog, applicability by site type, AI crawler allowlist, llms.txt and well-known specs, GEO citability rubric, and WordPress implementation templates. Use when auditing or fixing how a site reads to AI search and agents (the wp-audit-geo and wp-agentic-surfaces agents), or when writing llms.txt, robots.txt AI-crawler rules or /.well-known agent files.
 user-invocable: false
 ---
 

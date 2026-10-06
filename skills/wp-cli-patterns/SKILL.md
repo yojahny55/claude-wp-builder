@@ -1,13 +1,19 @@
 ---
 name: wp-cli-patterns
-description: WP-CLI-first principle — use WP-CLI instead of generating PHP code whenever possible, with command reference, ACF seeding patterns, and environment-aware execution
+description: WP-CLI-first rules for every agent — run WP-CLI instead of generating PHP, the $WP wrapper convention, ACF seeding patterns, matching records by slug, the shipped diagnostic scripts, and guarding a clone against outbound mail. Use when writing or running any WP-CLI command, seeding pages, fields, menus or media, or working in a project that has a .wp-create.json.
 user-invocable: false
-trigger: auto-invoke when .wp-create.json exists in project root
 ---
 
 # WP-CLI Patterns — Best Practices for All Agents
 
 This skill teaches the **WP-CLI-first principle**: use WP-CLI commands instead of generating PHP code whenever possible. WP-CLI saves tokens, reduces errors, and executes faster than writing throwaway PHP files.
+
+## Reference files
+
+- [references/seeding-recipes.md](references/seeding-recipes.md) — the WP-CLI command table and flags, ACF and bilingual seeding commands, and the
+  page, menu, media, verification and cleanup recipes. Read when writing a seed run.
+- [references/shipped-scripts.md](references/shipped-scripts.md) — what each shipped script measures, why it is shaped that way and how to read its
+  output. Read before acting on a script's findings or writing a sweep that overlaps one.
 
 ---
 
@@ -146,88 +152,18 @@ When `.wp-create.json` does **not** exist, WP-CLI features are unavailable. Fall
 
 ## WP-CLI Command Reference
 
-All 16 domains agents should know. Every command below is prefixed with `$WP` in practice.
-
-| Domain | Commands |
-|--------|----------|
-| Database | `wp db create`, `wp db import`, `wp db export`, `wp db check`, `wp db query` |
-| Content | `wp post create`, `wp post update`, `wp post delete`, `wp post meta update` |
-| Media | `wp media import <url>`, `wp media regenerate` |
-| Options | `wp option get`, `wp option update`, `wp option delete` |
-| Menus | `wp menu create`, `wp menu item add-post`, `wp menu item add-custom`, `wp menu location assign` |
-| Plugins | `wp plugin install`, `wp plugin activate`, `wp plugin deactivate`, `wp plugin list` |
-| Theme | `wp theme activate`, `wp theme list` |
-| Config | `wp config set`, `wp config get`, `wp config list` |
-| Rewrite | `wp rewrite structure`, `wp rewrite flush` |
-| Cache | `wp cache flush`, `wp transient delete --all` |
-| Cron | `wp cron event list`, `wp cron event run` |
-| Search | `wp search-replace 'old' 'new'` |
-| Scaffold | `wp scaffold child-theme`, `wp scaffold plugin` |
-| Export/Import | `wp export`, `wp import` |
-| User | `wp user create`, `wp user update` |
-| Eval | `wp eval 'php_code();'` |
-
-### Useful Flags
-
-- `--porcelain` — return only the ID (useful for capturing post/attachment IDs)
-- `--format=json` — machine-readable output for parsing
-- `--format=table` — human-readable output for display
-- `--allow-root` — required inside Docker containers running as root
-- `--force` — skip confirmation prompts (e.g., `wp post delete 1 --force`)
+The command table for the 16 domains agents use, and the flags worth knowing (`--porcelain`,
+`--format=json`, `--allow-root`, `--force`), are in [references/seeding-recipes.md](references/seeding-recipes.md).
 
 ---
 
 ## ACF Field Seeding Patterns
 
-### Preferred: `update_field()` via `wp eval`
-
-Use ACF's own API for field operations. This is storage-format-agnostic and handles field key registration, serialization, and caching correctly.
-
-```bash
-# Simple field on options page
-$WP eval "update_field('hero_title', 'Building Digital Excellence', 'option');"
-
-# Image field (import first, use attachment ID)
-ID=$($WP media import 'https://images.unsplash.com/photo-xxx' --title='Hero Background' --porcelain)
-$WP eval "update_field('hero_image', $ID, 'option');"
-
-# Repeater field
-$WP eval "
-\$rows = array(
-  array('title' => 'Web Design', 'description' => 'Custom websites...', 'icon' => 43),
-  array('title' => 'SEO', 'description' => 'Search optimization...', 'icon' => 44),
-);
-update_field('services_cards', \$rows, 'option');
-"
-
-# Page post meta (field on a specific page)
-$WP eval "update_field('about_hero_title', 'Our Story', <post_id>);"
-```
-
-### Alternative: Direct `wp_options` for Bulk Operations
-
-Faster for bulk seeding but coupled to ACF internals. Use only when ACF API is unavailable or for bulk performance.
-
-ACF stores options page fields in `wp_options` with an `options_` prefix (e.g., field `hero_title` is stored as `options_hero_title`).
-
-```bash
-# Simple field
-$WP option update options_hero_title "Building Digital Excellence"
-$WP option update options_hero_image 42
-
-# Repeater fields (indexed subfields + count)
-$WP option update options_services_cards_0_title "Web Design"
-$WP option update options_services_cards_0_icon 43
-$WP option update options_services_cards_1_title "SEO"
-$WP option update options_services_cards_1_icon 44
-$WP option update options_services_cards 2  # total row count
-```
-
-### After Seeding: Always Flush Cache
-
-```bash
-$WP cache flush
-```
+Prefer ACF's own API, `update_field()` through `$WP eval`: it is storage-format-agnostic and
+handles field key registration, serialization, and caching correctly. Write the `wp_options` rows
+directly (`options_<field>`, a repeater as indexed subfields plus its row count) only when the ACF
+API is unavailable or for bulk performance — that path is coupled to ACF internals. Always
+`$WP cache flush` after seeding. Commands for simple, image, repeater and page fields: [references/seeding-recipes.md](references/seeding-recipes.md).
 
 ---
 
@@ -238,24 +174,7 @@ This convention matches the i18n helper system defined in the `wp-bilingual` ski
 - **Primary language fields use no suffix:** `hero_title`, `hero_description`, `cta_text`
 - **Secondary language fields append `_<lang>`:** `hero_title_es`, `hero_description_es`, `cta_text_es`
 
-### Seeding Bilingual Content
-
-```bash
-# Primary language (no suffix)
-$WP eval "update_field('hero_title', 'Building Digital Excellence', 'option');"
-
-# Secondary language (append _<lang>)
-$WP eval "update_field('hero_title_es', 'Construyendo Excelencia Digital', 'option');"
-$WP eval "update_field('hero_subtitle_es', 'Creamos sitios web que funcionan', 'option');"
-
-# Bilingual repeater subfields
-$WP eval "
-\$rows = get_field('services_cards', 'option');
-\$rows[0]['title_es'] = 'Diseno Web';
-\$rows[1]['title_es'] = 'SEO';
-update_field('services_cards', \$rows, 'option');
-"
-```
+Seeding commands for both languages and for repeater subfields: [references/seeding-recipes.md](references/seeding-recipes.md).
 
 ### Rules
 
@@ -271,6 +190,9 @@ update_field('services_cards', \$rows, 'option');
 `wp eval-file`, except `find-redeclared-functions.php`, which reads files only and runs with
 plain `php`.
 
+Run them; do not read them first. Each entry below is how to run the script and what its exit
+code means. What it measures and how to read its output are in [references/shipped-scripts.md](references/shipped-scripts.md).
+
 ### `check-dev-host.php` — the development host, in four tables
 
 ```bash
@@ -280,17 +202,6 @@ $WP eval-file <skill>/scripts/check-dev-host.php old.host # or an explicit host
 
 Read-only. Exits 1 when any row carries the host, so it gates a deploy from a shell script.
 
-Sweep `postmeta`, `posts` and `termmeta`, never `options` alone. `options` holds the least of
-this and is the only table people check. The rows that actually reach the page are elsewhere:
-a `custom` menu item stores its target verbatim in `postmeta._menu_item_url`, so after a push
-it is a navigation link that leaves the live site, and an absolute URL pasted into
-`post_content` is the same defect inside an article body. On one audited site `options` alone
-reported 7 occurrences and the full sweep reported 25.
-
-`home` and `siteurl` are excluded — they are what makes the local install work. A `guid` match
-is counted separately and never rewritten: WordPress treats a `guid` as a historical
-identifier, not a URL, and changing it breaks the key feed readers use.
-
 ### `find-orphan-acf-ids.php` — IDs that outlive the post
 
 ```bash
@@ -299,24 +210,6 @@ $WP eval-file <skill>/scripts/find-orphan-acf-ids.php <theme-path>
 
 Read-only. Exits 1 when an orphan reaches a template; dead data alone exits 0.
 
-Deleting a post from wp-admin does not clear its ID out of the relationship and post-object
-fields that point at it. A template that iterates such a field prints one card with no title,
-no terms and an empty `href` — a visible defect produced by a record that no longer exists.
-
-Two things the script does that a hand-written sweep usually does not:
-
-- **It resolves the field's type before treating a value as an ID.** A date field holds
-  `20250910` and a number field holds `142`; both are numeric, neither is a post ID, and
-  `get_post_status()` answers `false` for both. Skipping the type lookup turned 70 real
-  orphans into 248 reported ones, every extra a false positive.
-- **It splits by whether a template reads the field.** Pass the theme path and each finding is
-  `REACHES-TEMPLATE` or `DEAD-DATA`. On the audited site 70 orphans existed and exactly 1
-  reached the HTML — a flat list of 70 buries the one that is visible.
-
-A non-`publish` status is the same defect with a different cause and is reported too:
-`get_post_status()` returns `draft` or `trash` rather than `false`, and a trashed post still
-has a permalink the template will print.
-
 ### `audit-menu-links.php` — menu items that go nowhere
 
 ```bash
@@ -324,23 +217,6 @@ $WP eval-file <skill>/scripts/audit-menu-links.php
 ```
 
 Read-only. Exits 1 on any finding.
-
-A `custom` menu item stores its target in `postmeta._menu_item_url`, verbatim, so a broken menu
-link is invisible to anything that reads the theme. It reports `#` and empty URLs, and absolute
-URLs on the development host.
-
-It walks **every** menu, not only the ones assigned to a registered location: a menu assigned
-through a nav-menu widget has no location, and on the audited site that is exactly where the
-broken items were.
-
-**Items with children are excluded, and that exclusion is not optional.** A `custom` item with
-`#` that has children is a submenu header — it is not supposed to navigate. Without the
-exclusion the check fires on almost every menu that has a submenu, and the real findings are
-lost in the noise.
-
-Fix by converting the item to a `post_type` item rather than by editing its URL. A `post_type`
-item derives its URL from `siteurl` at render time and survives a migration; a `custom` item
-carries whatever host was typed into it, which is how `check-dev-host.php` findings are created.
 
 ### `find-redeclared-functions.php` — one global function, two sources (SEC-043)
 
@@ -357,27 +233,6 @@ treat 2 as not measured, never as a pass. An unreadable file or directory is pri
 `CRITICAL` (two loaded sources), `WARNING` (one loaded, the other inactive: it cannot be
 activated) or `INFO` (only inactive plugins).
 
-It tokenizes instead of grepping. A `function <name>(` grep over one real `wp-content` matched
-about 160,000 lines; the tokenizer found about 4,000 global declarations in ~15,600 files, in
-under 2 seconds. It knows which braces belong to a class, a function or an
-`if` / `elseif` guard that negates `function_exists`, `class_exists`, `interface_exists`,
-`trait_exists`, `enum_exists` or `defined` (braced, `:`/`endif;` or braceless), qualifies
-names by namespace, ignores `use function` imports, recognises `enum` bodies on runtimes
-older than 8.1, and treats a top-level `if ( function_exists() ) return;` (or any of those
-tests) as guarding the rest of the file. The whole condition is read, not its first test: a
-negated test guards from any operand of an `&&` chain, but not next to an `||`, where the
-body also runs when the other operand holds; an early return guards only when the test sits
-in an `||` chain (or alone).
-
-Skipped: `vendor/`, `node_modules/`, `tests/`, `examples/`, and — inside a plugin or theme
-directory — `object-cache.php` and `advanced-cache.php`. Those are the drop-in templates a
-cache plugin copies into `wp-content/`; on the audited site they produced 56 of 57
-collisions, each plugin against its own installed drop-in. Other drop-in names (`db.php`,
-…) are scanned: a plugin's own `includes/db.php` is ordinary code. A drop-in passed as a
-single file, parked `*.bak` included, is always scanned.
-
----
-
 ### `find-missing-media-files.php` — attachments whose file is gone (WP-060/061/062)
 
 ```bash
@@ -388,19 +243,18 @@ Read-only. Exits 1 when any `BEFORE-ARCHIVE` or `UNDATED` miss exists, 0 when ev
 `AFTER-ARCHIVE` or there are none, and 2 when it cannot measure: an archive date or sample size
 it does not accept, a failed query, or an uploads directory it cannot resolve or read.
 
-An attachment post survives the deletion of its own file, so nothing in core notices a broken
-`<img>` or a 404 download. The script walks every attachment in batches and resolves its main
-file, each registered image sub-size and the pre-scale `original_image` against the uploads
-directory, joining the bare sub-size filenames to the attachment's own `YYYY/MM` folder. It
-counts every miss and prints a sample per bucket (20 by default), never the whole list. A
-stored value that is not a local path (a remote or CDN URL, an empty or corrupt entry) is
-never checked against disk: it is counted and reported as skipped, not as missing.
+### `resolve-link-targets.php` — internal links the database can answer
 
-`archive-date` is `Y-m-d` or `Y-m-d H:i:s`, in the site's timezone, and is only for a local
-clone whose file archive predates its database (`/wp-audit` Step 2.3). A miss whose attachment
-was uploaded after that moment is `AFTER-ARCHIVE`: it exists in production, not in this copy's
-archive. A bare date is pushed to 23:59:59, so an upload on the archive day itself is never
-waved through. With no argument every miss is `UNDATED`.
+```bash
+$WP eval-file <skill>/scripts/resolve-link-targets.php links.txt resolved.json > http.txt
+```
+
+Read-only. `links.txt` is one href per line, optionally a TAB and the page it was found on. The
+links the database answered go to `resolved.json`; the rest are printed as
+`href TAB page TAB group`, ready for `bin/link-sweep.mjs --urls`. Exits 0 when it ran, and 2 on
+a bad invocation, an unreadable input or an unwritable output. How an audit uses it is
+"Link and page sweeps against a site" in `skills/wp-audit-standards/SKILL.md`, the one place
+that rule is written down.
 
 ## Match Records by Slug, Never by ID
 
@@ -460,61 +314,7 @@ a menu item has no author to display, so it is noise here rather than a defect.
 $WP db query "SELECT COUNT(*) FROM $($WP db prefix)posts WHERE post_author = 0 AND post_status != 'auto-draft' AND post_type != 'nav_menu_item';"
 ```
 
-### Create Pages and Set Front Page
-
-```bash
-AUTHOR=$($WP user list --role=administrator --field=ID --number=1)
-HOME_ID=$($WP post create --post_type=page --post_title='Home' --post_status=publish --post_author=$AUTHOR --porcelain)
-ABOUT_ID=$($WP post create --post_type=page --post_title='About' --post_status=publish --post_author=$AUTHOR --porcelain)
-
-$WP option update show_on_front 'page'
-$WP option update page_on_front $HOME_ID
-```
-
-### Create and Assign Menus
-
-```bash
-$WP menu create "Primary EN"
-$WP menu create "Primary ES"
-
-$WP menu item add-post primary-en $HOME_ID --title="Home"
-$WP menu item add-post primary-en $ABOUT_ID --title="About"
-$WP menu item add-post primary-es $HOME_ID --title="Inicio"
-$WP menu item add-post primary-es $ABOUT_ID --title="Acerca"
-
-$WP menu location assign "Primary EN" primary_en
-$WP menu location assign "Primary ES" primary_es
-```
-
-### Import Media and Use Attachment ID
-
-```bash
-ID=$($WP media import 'https://example.com/photo.jpg' --title='Hero Image' --porcelain)
-$WP eval "update_field('hero_image', $ID, 'option');"
-```
-
-### Verify Operations
-
-```bash
-# Verify a field was seeded
-$WP eval "echo get_field('hero_title', 'option') ? 'OK' : 'EMPTY';"
-
-# Verify a page exists with correct template
-$WP eval "echo get_page_template_slug($PAGE_ID);"
-
-# Verify plugin is active
-$WP plugin list --status=active --format=table
-
-# Verify menus are assigned
-$WP menu location list --format=table
-```
-
-### Final Cleanup After Seeding
-
-```bash
-$WP rewrite flush
-$WP cache flush
-```
+Recipes for pages and the front page, menus, media, verification and final cleanup: [references/seeding-recipes.md](references/seeding-recipes.md).
 
 ## Guard a clone against outbound mail and calls
 

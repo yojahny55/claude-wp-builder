@@ -15,7 +15,7 @@ arguments:
     description: Path to a markdown file OR inline string
     required: false
   - name: --cta
-    description: `Label|URL` pair
+    description: "`Label|URL` pair"
     required: false
   - name: --video
     description: Path to source video — triggers `/wp-cinematic-encode` first

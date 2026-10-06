@@ -607,7 +607,7 @@ echo 'IndexNow enabled. API key: ' . \$opts['bing_api_key'];
 
 ## Step 8: Seed Per-Page SEO Meta — and per-term meta
 
-Loop through all published pages and posts. For each, set `rank_math_title`, `rank_math_description`, `rank_math_focus_keyword`, `rank_math_robots`, and OG title/description. Use the bulk seeding pattern from the `wp-audit-seo-standards` skill:
+Loop through all published pages and posts. For each, set `rank_math_title`, `rank_math_description`, `rank_math_focus_keyword`, `rank_math_robots`, and OG title/description. Use the bulk seeding pattern from the `wp-audit-seo-standards` skill (`references/seeding-commands.md`):
 
 **This is a floor, not the finished title.** A `rank_math_title` written as the bare
 template string below renders *identically* to leaving the field empty — Rank Math
@@ -848,7 +848,7 @@ if (!empty(\$issues)) {
 2. **Block all** — all AI crawlers blocked
 3. **Selective** — allow specific crawlers, block others
 
-Use the robots.txt template from the `wp-audit-seo-standards` skill (Section 9). Write the file to the WordPress root:
+Use the robots.txt template from the `wp-audit-seo-standards` skill (Section 9, `references/llms-and-robots.md`). Write the file to the WordPress root:
 
 ```bash
 $WP eval "
@@ -894,7 +894,7 @@ echo 'Generated robots.txt at ' . ABSPATH . 'robots.txt';
 
 ## Step 10: Generate llms.txt
 
-Use the dynamic generator from the `wp-audit-seo-standards` skill (Section 8):
+Use the dynamic generator from the `wp-audit-seo-standards` skill (Section 8, `references/llms-and-robots.md`):
 
 ```bash
 $WP eval "
@@ -1002,7 +1002,7 @@ echo \"FAQ schema seeded for \$count pages.\";
 
 ### 12a. Add PHP Function
 
-Read the theme's `functions.php`. Add the `prefix_breadcrumbs()` function from the `wp-audit-seo-standards` skill (Section 10). Replace `prefix_` with the actual function prefix from CLAUDE.md:
+Read the theme's `functions.php`. Add the `prefix_breadcrumbs()` function from the `wp-audit-seo-standards` skill (Section 10, `references/breadcrumbs.md`). Replace `prefix_` with the actual function prefix from CLAUDE.md:
 
 ```php
 function prefix_breadcrumbs() {

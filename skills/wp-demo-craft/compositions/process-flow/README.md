@@ -1,5 +1,12 @@
 # process-flow
 
+## Contents
+
+- Role and slots (directly below)
+- The geometry, and why it is per-step
+- Two traps this composition is shaped around
+- The motion
+
 **Role:** process. A pipe with a node per step and a line the scroll draws along
 it: stacked on a phone, horizontal once the container can hold a column per step.
 The line's progress and the arrival of the node it points at are the same

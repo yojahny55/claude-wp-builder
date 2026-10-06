@@ -1,6 +1,6 @@
 ---
 name: wp-demo-craft
-description: Reference-first design floor for premium demos: a client DESIGN.md, a composition library, a motion budget and a render-verified loop. Read by /wp-demo in craft mode, /wp-yolo, /wp-cinematic-demo and /wp-demo-verify.
+description: Reference-first design floor for premium demos — a client DESIGN.md, a composition library, a motion budget and a render-verified loop. Use when building or verifying a craft-mode demo with /wp-demo in craft mode, /wp-yolo, /wp-cinematic-demo or /wp-demo-verify.
 user-invocable: false
 ---
 
@@ -143,3 +143,7 @@ Those three were absent for several releases while every constraint file was
 present, and the shape of what shipped followed exactly: builds that obeyed
 every rule, resembled each other, and were reported as "all the pages are
 almost the same thing". A skill made only of floors produces the floor.
+
+When a slot gets a generated plate, read `references/image-prompt.md`: the prompt skeleton,
+which part of it the build writes (the `SUBJECT` line) and which part `image-gen.mjs`
+composes around it.

@@ -1,6 +1,6 @@
 ---
 name: wp-research
-description: How to research a client's business and its competitors from the open web — identification, comparable-competitor selection, reading a site for design signal, and the source ladder. Read by the wp-research agent, dispatched from /wp-demo Step 2.4 and /wp-yolo.
+description: How to research a client's business and its competitors from the open web — identification, comparable-competitor selection, reading a site for design signal, and the source ladder. Use when the wp-research agent runs, dispatched from /wp-demo Step 2.4 and /wp-yolo.
 user-invocable: false
 ---
 

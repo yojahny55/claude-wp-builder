@@ -43,7 +43,10 @@ node "$lint" starter-theme/__tailwind__ starter-theme/__cinematic__ >/dev/null \
 # Wired where the other static gates run, and documented in both CSS systems.
 grep -Fq 'bin/css-contour-lint.mjs' commands/wp-finalize.md || fail "/wp-finalize does not run the contour lint"
 grep -Fq 'css-contour-lint.mjs' agents/wp-audit-practices.md || fail "the practices audit does not run the contour lint"
-for s in skills/wp-css-system/SKILL.md skills/wp-tailwind-system/SKILL.md; do
+# wp-tailwind-system keeps these rules in a reference file its SKILL.md links to.
+grep -Fq "references/cross-engine.md" skills/wp-tailwind-system/SKILL.md \
+  || fail "wp-tailwind-system no longer links references/cross-engine.md, so no agent reaches the contour rules"
+for s in skills/wp-css-system/SKILL.md skills/wp-tailwind-system/references/cross-engine.md; do
   grep -Fq 'inset 0 0 0 1px' "$s" || fail "$s does not state the inset box-shadow contour rule"
   grep -Fq -- '-webkit-search-cancel-button' "$s" || fail "$s does not say to hide the native search clear button"
   grep -Fq 'drop-shadow' "$s" || fail "$s does not warn about drop-shadow on a ring"

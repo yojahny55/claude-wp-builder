@@ -1,6 +1,6 @@
 ---
 name: wp-woocommerce
-description: WooCommerce store practice for sites this plugin builds — the three store tiers and the plugins each installs (and the ones deliberately avoided, with reasons), the setup facts a WP-CLI install gets wrong, and the scripts /wp-woo-setup runs to bring a store in line with the `store` block in .wp-create.json
+description: WooCommerce store practice for sites this plugin builds — the three store tiers and the plugins each installs (and the ones deliberately avoided, with reasons), the setup facts a WP-CLI install gets wrong, and the scripts /wp-woo-setup runs to bring a store in line with the store block in .wp-create.json. Use when creating, configuring or auditing a WooCommerce store.
 user-invocable: false
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: wp-tailwind-system
-description: Tailwind CSS conventions for themes built from the __tailwind__ starter — the decision ladder for utilities vs @apply, @theme tokens, file placement, and what is forbidden. Applies to template=tailwind only.
+description: Tailwind v4 conventions for themes built from the __tailwind__ starter — the decision ladder for utilities vs @apply, @theme tokens, file layout, preflight, arbitrary-variant traps and what is forbidden. Use when writing or converting markup or CSS in a project whose template is tailwind (the wp-tailwind agent, /wp-section, /wp-header, /wp-footer, /wp-tailwindify).
 user-invocable: false
 ---
 
@@ -8,6 +8,18 @@ user-invocable: false
 
 Applies when the project's `.claude/CLAUDE.md` says `Template: tailwind`. For
 `template=basic`, use `wp-css-system` instead — the two are mutually exclusive.
+
+## Reference files
+
+- [references/breakpoints.md](references/breakpoints.md) — naming the demo's
+  breakpoints, and why a `max-width: N` becomes `N+1`. Read when converting a
+  demo's `@media` queries or choosing a `max-*` variant.
+- [references/components.md](references/components.md) — the card-footer
+  `mt-auto` chain, and the starter's tabs, accordion and directory-filter modules.
+  Read when a section has a row of cards, tabs, an accordion or FAQ, or a filter bar.
+- [references/cross-engine.md](references/cross-engine.md) — the contours Firefox
+  on Windows notches, and the one search clear control. Read when drawing a 1px
+  outline, ring or field border, or a search input.
 
 ## Decision ladder
 
@@ -91,85 +103,12 @@ Mobile-first, using Tailwind's own prefixes. Never write a media query by hand.
 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-8">
 ```
 
-### Name the breakpoints; never ship `max-[<n>px]:`
-
-A demo converted from a design tool carries media queries at the FRAME widths it was
-drawn at — 1599, 1023, 759 — and none of those is a default Tailwind stop. Translating
-each one literally gives `max-[1599px]:`, `max-[1023px]:`, `max-[759px]:`, hundreds of
-them, and that is a defect, not a detail:
-
-- **It breaks anything the scanner cannot see.** Tailwind compiles a variant only while
-  some scanned file uses it. Markup that lives in the DATABASE — a CF7 form, a widget, a
-  block pattern — silently loses every rule the day the theme normalizes its variants.
-  (This has shipped: a footer form lost its whole responsive layout that way.)
-- **Each pair leaves a 1px dead band.** `max-[759px]` and a `min-width: 760px` rule agree
-  only by luck; the arbitrary form invites off-by-one boundaries nobody re-checks.
-- It is unreadable, and it makes every future width change a find-and-replace.
-
-So: take the widths the demo actually switches at, declare them ONCE in `@theme`, and use
-the named prefixes everywhere.
-
-```css
-@theme {
-  --breakpoint-sm:  430px;
-  --breakpoint-md:  760px;
-  --breakpoint-lg: 1024px;
-  --breakpoint-xl: 1281px;
-  --breakpoint-3xl: 1600px;
-}
-```
-
-```html
-<!-- wrong -->
-<div class="max-[1023px]:col-span-full max-[759px]:pt-5">
-<!-- right: max-lg = below 1024, max-md = below 760 -->
-<div class="max-lg:col-span-full max-md:pt-5">
-```
-
-Mind the boundary when converting: `max-[759px]` is `≤ 759`, and `max-md` with
-`--breakpoint-md: 760px` is `< 760`. Same rule. Re-measure at the stop itself after the
-change — an off-by-one here moves a whole layout one pixel early.
-
-An arbitrary variant is acceptable only for a one-off width that is genuinely not a
-breakpoint of the design (a single `max-[891px]:` where one field wraps). If it appears
-more than twice, it is a breakpoint: name it.
-
-### `max-width: N` in the demo is INCLUSIVE; `max-*` in Tailwind is EXCLUSIVE
-
-A plain-CSS demo's `@media (max-width: Npx)` matches width N itself. Tailwind 4
-compiles every `max-*` variant — named or arbitrary — as `width < N`, which
-EXCLUDES it. Converting one into the other with the same number is a 1px bug at
-exactly N, and N is very often a real device width (768, 1024): the two most
-common desktop-first stops a demo declares.
-
-**The rule: a demo's `max-width: Npx` becomes `max-[N+1px]:`, or a
-`--breakpoint-*` custom property set to `N+1` if the demo uses that stop by
-name more than twice.** `min-width` needs no adjustment — CSS `min-width: N`
-is already inclusive of N, and Tailwind's `min-*:` variants compile the same
-way, so they map straight across.
-
-```css
-/* demo: @media (max-width: 768px) { … } and @media (max-width: 1024px) { … } */
-@theme {
-  --breakpoint-md: 769px;  /* not 768 — Tailwind's own default is exclusive */
-  --breakpoint-lg: 1025px; /* not 1024, same reason */
-}
-```
-
-```html
-<!-- demo: @media (max-width: 768px) { .nav { display: none } } -->
-<!-- wrong: max-md: with the stock breakpoint-md (768) excludes width 768 -->
-<nav class="max-md:hidden">
-<!-- right: breakpoint-md redeclared to 769 above, OR the arbitrary form -->
-<nav class="max-[769px]:hidden">
-```
-
-Never adopt Tailwind's stock breakpoint scale (`sm: 640`, `md: 768`, `lg: 1024`,
-`xl: 1280`) as-is against a demo that declares those same numbers as
-`max-width` — the two disagree by exactly one pixel at the value that matters.
-Re-measure the layout AT 768 and AT 1024 after converting, not only at 1440
-and 390: those two widths are where the off-by-one hides, and a sweep that
-only samples far from every breakpoint never lands on it.
+Converting a demo's media queries follows two rules, both in
+[references/breakpoints.md](references/breakpoints.md): declare the widths the demo
+switches at once, as named `--breakpoint-*` stops in `@theme`, and never ship
+`max-[<n>px]:`; and a demo's `max-width: Npx` becomes `N+1`, because Tailwind's
+`max-*` is exclusive where CSS `max-width` is inclusive. Read it before converting
+any `@media` query.
 
 ## `@apply` idiom
 
@@ -409,59 +348,13 @@ clips or strands whitespace in the other. In a bilingual theme:
 Check every fixed dimension against the longest string the field can hold before
 the second language exists, not after.
 
-## Cards pin their footer with `mt-auto`, and the template keeps it
+## Cards and the starter's widgets
 
-A card in a row of cards has a footer (price, CTA, "read more") that sits on one line
-across the row, whatever the length of each card's text. That is a flex chain, and every
-link of it is a class the template must carry:
-
-```html
-<ul class="grid md:grid-cols-3 gap-6">
-  <li class="h-full">                                  <!-- grid cell stretches -->
-    <article class="flex flex-col h-full ...">         <!-- the card is a column -->
-      <h3>...</h3><p>...</p>
-      <div class="mt-auto pt-6 flex items-center justify-between">  <!-- footer pinned -->
-        <span>price</span><a href="...">CTA</a>
-      </div>
-    </article>
-  </li>
-</ul>
-```
-
-Drop any one class and the footers float at different heights. It does not show in a
-single card, or in a demo whose mock texts are all the same length. A build kept `mt-auto`
-on the demo's card link and the generated template dropped it. **Carry every layout
-utility from the demo section into the template (`flex`, `flex-col`, `h-full`, `mt-auto`,
-`grow`, `self-*`, `order-*`); never re-derive the layout.** A wrapper the template adds
-(the loop's `<li>`, a `get_template_part()` boundary) must not break the chain: it gets
-`h-full` or `flex` too.
-
-## Tabs, accordions and directory filters come from the starter's modules
-
-The `__tailwind__` starter ships three behaviour modules in `assets/js/src/`, imported by
-`index.js`. A section that shows one of these widgets writes the markup contract in the
-module's header comment and **no script of its own**. Hand-made copies drifted: a build's
-tabs only moved the underline and never switched a panel, and two of its three directories
-had no results count and no "clear filters".
-
-| Widget | Markup hook | Module | Contract in short |
-|---|---|---|---|
-| Tabs | `[data-tabs]` > `role="tablist"` > `role="tab"` + `role="tabpanel"` | `tabs.js` | `aria-selected` + `is-active` on the selected tab, other panels `hidden`, arrows/Home/End, `[data-tabs-marker]` as wide as the active tab's `[data-tab-label]` |
-| Accordion | `[data-accordion="single\|multiple"]` > `[data-accordion-trigger][aria-controls]` | `accordion.js` | FAQ list = `single` (the default); a trigger outside any group is a standalone fold that rests open and toggles on its own; state on `aria-expanded`, panel `hidden`, item `is-open` |
-| Directory filter | `[data-directory]` with `[data-filter-text]`, `[data-filter="<key>"]`, `[data-filter-count]`, `[data-filter-clear]`, `[data-filter-item]` | `directory-filter.js` | count line from `data-count-template` (`{count}`), hidden while unfiltered; clear resets every control and reloads without the URL's filter parameters |
-
-Style state from the attributes the modules set, never from `:focus`: the active tab is
-`aria-selected:text-accent` (or `.is-active`), and the chevron rotates from the trigger with
-`group` on the button and `group-aria-expanded:rotate-180` on the icon. Every visible string
-(tab labels, the count templates, "clear filters", the empty message) goes through the
-theme's i18n helper in the template: the modules contain no literals.
-
-**A filter's GET parameter is never a public query var.** A CPT or taxonomy slug is one:
-`?<slug>=x` makes WordPress query that object and answer with its archive or a 404 before
-the template runs. Name the parameter something no registered type or taxonomy uses.
-
-`bin/theme-template-check.mjs --rule widgets` fails a theme whose templates carry the hook
-without the module imported.
+A row of cards pins its footer with `mt-auto` at the end of a `flex flex-col h-full`
+chain the template must keep, and tabs, accordions and directory filters come from
+the starter's modules with no script of their own. Both contracts are in
+[references/components.md](references/components.md) — read it before writing a
+card row, tabs, an accordion or FAQ, or a filterable directory.
 
 ## `absolute` is for superposition, not for layout
 
@@ -534,38 +427,12 @@ hidden with the ATTRIBUTE alone. Never with the utility, and never with both.
 The same applies to any class that is really a state (`opacity-0`,
 `pointer-events-none`): pick ONE mechanism per element and let the script own it.
 
-## Contours that render the same in every engine
+## Contours and search inputs
 
-Verification runs Chromium, plus Firefox on Linux when a build exists. Neither shows what
-Firefox on Windows does to a thin rounded contour: a 1px `border` with a `border-radius`
-draws visible notches where each corner curve meets the straight edge. A build shipped
-outline buttons and ringed icon links drawn that way. Linux Firefox does not reproduce it,
-so `bin/css-contour-lint.mjs` is the guard, and `/wp-finalize` runs it:
-
-- **A 1px contour on a transparent or white/near-white background is a box-shadow**, never a
-  `border`: outline buttons, focused and error fields, ringed icon links. Write
-  `border-0 shadow-[inset_0_0_0_1px_var(--color-primary)]` (or `ring-1 ring-inset
-  ring-primary`); in CSS, `box-shadow: inset 0 0 0 1px <color>`. The shadow takes no layout
-  space, so the box loses the 1px per side the border had: add it back to the padding
-  (`px-[17px] py-[9px]` for `px-4 py-2`) and measure the box before and after, it must not
-  change. A border on a solid fill, a card or a divider is fine.
-- **Never `drop-shadow-*` on a bordered rounded ring.** The filter follows the anti-aliased
-  edge and picks up the same corner artifacts. Stack the ring and the shadow in one
-  `box-shadow` instead.
-- **One search clear control** (below).
-
-### Search inputs: one clear control, and it is yours
-
-Chromium and Safari draw a native clear "×" inside `type="search"`; Firefox draws none. A
-design that shows a clear affordance therefore needs a real `<button type="button">` that
-empties the field and fires `input`, and the native one must be hidden, or Chromium shows
-two:
-
-```css
-input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
-```
-
-A design with no clear affordance still hides the native one, for the same parity reason.
+A 1px contour on a light background is an inset box-shadow, never a `border`, and a
+search field has exactly one clear control, which is yours. Both rules are in
+[references/cross-engine.md](references/cross-engine.md) — read it before drawing an
+outline button, a ring, a focus or error border, or a `type="search"` field.
 
 ## Verify
 

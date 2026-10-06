@@ -1,6 +1,6 @@
 ---
 name: wp-audit-standards
-description: Audit criteria, severity definitions, report JSON schema, and quality thresholds for wp-audit agents
+description: Shared contract for every wp-audit-* agent — severity levels, the report JSON schema, issue code prefixes, site-type and local-clone rules, audit tiers, performance budgets, accessibility and Core Web Vitals thresholds, and deduplication rules. Use when running /wp-audit or any wp-audit-* agent, or when writing, merging or scoring audit findings.
 user-invocable: false
 ---
 

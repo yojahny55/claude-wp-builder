@@ -1,12 +1,23 @@
 ---
 name: wp-theme-standards
-description: WordPress legacy theme best practices — proper enqueueing, escaping, hooks, security, and performance
+description: Classic (non-block) WordPress theme standards — required files, directory layout, asset enqueueing and cache busting, theme supports, escaping and security, hooks, queries, performance, SVG uploads, the SCF/ACF dependency, naming and the navigation class contract. Use when writing or reviewing theme PHP (the wp-template and wp-css agents, /wp-finalize, /wp-debug).
 user-invocable: false
 ---
 
 # WordPress Legacy Theme Standards
 
 This skill defines the mandatory standards for building WordPress themes using the **legacy (classic) theme** architecture. No block themes, no Full Site Editing (FSE), no theme.json.
+
+## Reference files
+
+The rules are below. The PHP that implements them lives in two files — copy from there rather
+than retyping it:
+
+- [references/setup-and-enqueue.md](references/setup-and-enqueue.md) — enqueueing code (styles, scripts, `wp_localize_script()`, page-specific assets),
+  theme supports and content width, custom body classes, the SCF/ACF options page, helper
+  functions and SVG upload support. Read when writing `functions.php` or `inc/theme-setup.php`.
+- [references/head-and-performance.md](references/head-and-performance.md) — font preconnect, LCP preload, emoji and version removal, Organization schema and
+  the meta-description fallback. Read when writing anything hooked to `wp_head` or `init`.
 
 ---
 
@@ -99,41 +110,7 @@ ACF already defaults to the theme's `acf-json/`.
 
 **NEVER** add `<link>` or `<script>` tags directly in templates. Always use WordPress enqueueing functions.
 
-### Styles
-
-```php
-function prefix_scripts() {
-    // Google Fonts (external, no version needed)
-    wp_enqueue_style(
-        'prefix-fonts',
-        'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
-        array(),
-        null
-    );
-
-    // Main stylesheet with filemtime() cache busting
-    wp_enqueue_style(
-        'prefix-style',
-        get_template_directory_uri() . '/assets/css/styles.css',
-        array('prefix-fonts'),
-        filemtime(get_template_directory() . '/assets/css/styles.css')
-    );
-}
-add_action('wp_enqueue_scripts', 'prefix_scripts');
-```
-
-### Scripts
-
-```php
-// Main JavaScript — loaded in footer (last param = true)
-wp_enqueue_script(
-    'prefix-main',
-    get_template_directory_uri() . '/assets/js/main.js',
-    array(),
-    filemtime(get_template_directory() . '/assets/js/main.js'),
-    true
-);
-```
+Enqueue the main stylesheet and `main.js` (in the footer) from one `wp_enqueue_scripts` callback; the code is in [references/setup-and-enqueue.md](references/setup-and-enqueue.md) § Asset Enqueueing.
 
 ### Cache Busting
 
@@ -145,30 +122,10 @@ filemtime(get_template_directory() . '/assets/css/styles.css')
 
 For external assets (CDN fonts, libraries), pass `null` as the version to omit the query string.
 
-### wp_localize_script() for Passing PHP Data to JavaScript
+### Passing PHP data to JavaScript
 
-Use `wp_localize_script()` to safely pass PHP data (dynamic content, URLs, translations) to JavaScript.
-
-```php
-// Pass calculator data to JS on the pricing page
-if (is_page('pricing')) {
-    $calculator_data = prefix_get_calculator_data();
-    wp_localize_script('prefix-main', 'prefixCalculator', $calculator_data);
-}
-
-// Pass i18n data to JS for all pages
-wp_localize_script('prefix-main', 'prefixI18n', array(
-    'currentLang' => prefix_get_current_lang(),
-    'strings'     => prefix_get_js_translations(),
-));
-```
-
-In JavaScript, access the data via the global variable name:
-
-```js
-console.log(prefixCalculator.setupOptions);
-console.log(prefixI18n.currentLang); // 'en' or 'es'
-```
+Use `wp_localize_script()` to pass PHP data (dynamic content, URLs, translations) to a script you
+already enqueued — never an inline `<script>`. Example in [references/setup-and-enqueue.md](references/setup-and-enqueue.md).
 
 ---
 
@@ -176,29 +133,7 @@ console.log(prefixI18n.currentLang); // 'en' or 'es'
 
 Load page-specific CSS and JS only when needed using `is_page_template()` or `is_page()`.
 
-```php
-function prefix_scripts() {
-    // ... main styles/scripts ...
-
-    // Software page: dedicated CSS + JS
-    if (is_page_template('page-software.php')) {
-        wp_enqueue_style(
-            'prefix-software-style',
-            get_template_directory_uri() . '/assets/css/software.css',
-            array('prefix-style'),
-            filemtime(get_template_directory() . '/assets/css/software.css')
-        );
-        wp_enqueue_script(
-            'prefix-software-js',
-            get_template_directory_uri() . '/assets/js/software.js',
-            array('prefix-main'),
-            filemtime(get_template_directory() . '/assets/js/software.js'),
-            true
-        );
-    }
-}
-add_action('wp_enqueue_scripts', 'prefix_scripts');
-```
+Code: [references/setup-and-enqueue.md](references/setup-and-enqueue.md) § Page-Specific Asset Enqueueing.
 
 ---
 
@@ -206,55 +141,10 @@ add_action('wp_enqueue_scripts', 'prefix_scripts');
 
 Register all required theme features inside an `after_setup_theme` hook.
 
-```php
-function prefix_setup() {
-    // Let WordPress manage the document <title>
-    add_theme_support('title-tag');
-
-    // Enable featured images
-    add_theme_support('post-thumbnails');
-
-    // Custom logo support
-    add_theme_support('custom-logo', array(
-        'height'      => 100,
-        'width'       => 340,
-        'flex-height' => true,
-        'flex-width'  => true,
-    ));
-
-    // HTML5 markup for core elements
-    add_theme_support('html5', array(
-        'search-form',
-        'comment-form',
-        'comment-list',
-        'gallery',
-        'caption',
-        'style',
-        'script',
-    ));
-
-    // RSS feed links in <head>
-    add_theme_support('automatic-feed-links');
-
-    // Register navigation menus
-    register_nav_menus(array(
-        'primary' => __('Primary Navigation', 'theme-slug'),
-        'footer'  => __('Footer Navigation', 'theme-slug'),
-    ));
-}
-add_action('after_setup_theme', 'prefix_setup');
-```
-
-### Content Width
-
-Set the global content width for embeds and images.
-
-```php
-function prefix_content_width() {
-    $GLOBALS['content_width'] = apply_filters('prefix_content_width', 1280);
-}
-add_action('after_setup_theme', 'prefix_content_width', 0);
-```
+Required: `title-tag`, `post-thumbnails`, `custom-logo`, `html5` (search-form, comment-form,
+comment-list, gallery, caption, style, script), `automatic-feed-links`, and `register_nav_menus()`
+for `primary` and `footer`. Set `$GLOBALS['content_width']` (1280, filterable) on
+`after_setup_theme` at priority 0. Code: [references/setup-and-enqueue.md](references/setup-and-enqueue.md) § Theme Supports.
 
 ---
 
@@ -398,32 +288,11 @@ The only exceptions are:
 
 ## Performance Optimizations
 
-### Font Preconnect
-
-Add preconnect hints for external font providers to speed up loading.
-
-```php
-function prefix_add_preconnect() {
-    echo '<link rel="preconnect" href="https://fonts.googleapis.com">' . "\n";
-    echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\n";
-}
-add_action('wp_head', 'prefix_add_preconnect', 1);
-```
+**Font preconnect.** Hook `<link rel="preconnect">` for every external font host into `wp_head` at priority 1. Code: [references/head-and-performance.md](references/head-and-performance.md).
 
 ### LCP Image Preloading
 
-Preload the Largest Contentful Paint (LCP) element (usually the hero image) on the homepage.
-
-```php
-function prefix_preload_lcp_image() {
-    if (is_front_page()) {
-        $hero_image = prefix_get_field('hero_image');
-        $hero_image_url = $hero_image ? $hero_image['url'] : prefix_asset('images/hero-image.png');
-        echo '<link rel="preload" as="image" href="' . esc_url($hero_image_url) . '" fetchpriority="high">' . "\n";
-    }
-}
-add_action('wp_head', 'prefix_preload_lcp_image', 2);
-```
+Preload the Largest Contentful Paint element (usually the hero image) on the homepage from `wp_head` at priority 2. Code: [references/head-and-performance.md](references/head-and-performance.md).
 
 The preloaded LCP `<img>` itself must carry `fetchpriority="high"` + `width`/`height`. If the hero is a background video, keep the poster `<img>` as the LCP element and lazy-load the `<video>` via JS on desktop only (never mobile / `navigator.connection.saveData`).
 
@@ -445,30 +314,7 @@ find wp-content/uploads -type f \( -iname '*.jpg' -o -iname '*.png' \) \
   -exec sh -c 'f="$1"; w="${f%.*}.webp"; [ -f "$w" ] || magick "$f" -quality 82 "$w"' _ {} \;
 ```
 
-### Disable WordPress Emojis
-
-Remove the emoji detection script and styles that WordPress loads on every page.
-
-```php
-function prefix_disable_emojis() {
-    remove_action('wp_head', 'print_emoji_detection_script', 7);
-    remove_action('admin_print_scripts', 'print_emoji_detection_script');
-    remove_action('wp_print_styles', 'print_emoji_styles');
-    remove_action('admin_print_styles', 'print_emoji_styles');
-    remove_filter('the_content_feed', 'wp_staticize_emoji');
-    remove_filter('comment_text_rss', 'wp_staticize_emoji');
-    remove_filter('wp_mail', 'wp_staticize_emoji_for_email');
-}
-add_action('init', 'prefix_disable_emojis');
-```
-
-### Hide WordPress Version
-
-Remove the generator meta tag that exposes the WordPress version.
-
-```php
-remove_action('wp_head', 'wp_generator');
-```
+**Emojis and the version tag.** Remove the emoji detection script and styles on `init`, and `remove_action('wp_head', 'wp_generator')`. Code: [references/head-and-performance.md](references/head-and-performance.md).
 
 ---
 
@@ -481,42 +327,9 @@ the site's OWN origin: granting the mime type to everyone who can upload media
 hands stored XSS to the Author role. Gate it on `unfiltered_html`, the
 capability core already uses for "may post markup that is trusted verbatim".
 
-```php
-function prefix_allow_svg_upload($mimes, $user = null) {
-    // `get_allowed_mime_types()` passes the user the list is being built FOR, which
-    // is not always the current one: a CLI or programmatic upload runs on behalf of
-    // another account. Resolve the capability the same way core does one line above
-    // this filter, or the gate answers for the wrong user in both directions.
-    $allowed = $user ? user_can($user, 'unfiltered_html') : current_user_can('unfiltered_html');
-    if (!$allowed) {
-        return $mimes;
-    }
-    $mimes['svg']  = 'image/svg+xml';
-    $mimes['svgz'] = 'image/svg+xml';
-    return $mimes;
-}
-add_filter('upload_mimes', 'prefix_allow_svg_upload', 10, 2);
-
-function prefix_fix_svg_display() {
-    echo '<style>
-        .attachment-266x266, .thumbnail img {
-            width: 100% !important;
-            height: auto !important;
-        }
-    </style>';
-}
-add_action('admin_head', 'prefix_fix_svg_display');
-
-function prefix_check_filetype($data, $file, $filename, $mimes) {
-    $filetype = wp_check_filetype($filename, $mimes);
-    return array(
-        'ext'             => $filetype['ext'],
-        'type'            => $filetype['type'],
-        'proper_filename' => $data['proper_filename'],
-    );
-}
-add_filter('wp_check_filetype_and_ext', 'prefix_check_filetype', 10, 4);
-```
+The filter receives the user the list is built *for* as its second argument, which is not
+always the current user — check that user. The mime filter, the admin display fix and the
+filetype check are in [references/setup-and-enqueue.md](references/setup-and-enqueue.md) § SVG Upload Support.
 
 ---
 
@@ -524,27 +337,7 @@ add_filter('wp_check_filetype_and_ext', 'prefix_check_filetype', 10, 4);
 
 Add contextual CSS classes to the `<body>` tag for page-specific styling.
 
-```php
-function prefix_body_classes($classes) {
-    if (is_front_page()) {
-        $classes[] = 'home-page';
-    }
-    if (is_page('pricing')) {
-        $classes[] = 'pricing-page';
-    }
-    if (is_page_template('page-software.php')) {
-        $classes[] = 'software-page';
-    }
-    if (is_singular('post')) {
-        $classes[] = 'single-post-page';
-    }
-    if (is_archive()) {
-        $classes[] = 'archive-page';
-    }
-    return $classes;
-}
-add_filter('body_class', 'prefix_body_classes');
-```
+Code: [references/setup-and-enqueue.md](references/setup-and-enqueue.md) § Custom Body Classes.
 
 ---
 
@@ -552,34 +345,7 @@ add_filter('body_class', 'prefix_body_classes');
 
 All themes built with this system use **Secure Custom Fields (SCF)** or **Advanced Custom Fields (ACF)** as the custom fields plugin. SCF is an ACF-compatible fork and uses the same API (`get_field()`, `the_field()`, `have_rows()`, etc.).
 
-### Options Page Registration
-
-Register an options page for site-wide settings (logo, footer content, social links, etc.).
-
-```php
-function prefix_register_options_page() {
-    if (function_exists('acf_add_options_page')) {
-        acf_add_options_page(array(
-            'page_title' => 'Site Settings',
-            'menu_title' => 'Site Settings',
-            'menu_slug'  => 'prefix-settings',
-            'capability' => 'edit_posts',
-            'redirect'   => false,
-            'icon_url'   => 'dashicons-admin-generic',
-            'position'   => 30,
-        ));
-    }
-}
-add_action('acf/init', 'prefix_register_options_page');
-```
-
-### Retrieving Option Fields
-
-```php
-// Options page fields use 'option' as the post ID
-$logo = get_field('site_logo', 'option');
-$footer_text = get_field('footer_copyright', 'option');
-```
+Register one options page for site-wide settings (logo, footer content, social links) on `acf/init`, guarded by `function_exists('acf_add_options_page')`; options fields are read with `'option'` as the post ID. Code: [references/setup-and-enqueue.md](references/setup-and-enqueue.md).
 
 ---
 
@@ -587,25 +353,7 @@ $footer_text = get_field('footer_copyright', 'option');
 
 Create small utility functions to keep templates clean.
 
-```php
-/**
- * Get theme asset URL
- */
-function prefix_asset($path) {
-    return get_template_directory_uri() . '/assets/' . ltrim($path, '/');
-}
-
-/**
- * Get site logo with fallback
- */
-function prefix_get_logo() {
-    $logo = get_field('site_logo', 'option');
-    if ($logo) {
-        return $logo;
-    }
-    return prefix_asset('images/logo.svg');
-}
-```
+`prefix_asset($path)` and `prefix_get_logo()` are in [references/setup-and-enqueue.md](references/setup-and-enqueue.md) § Helper Functions.
 
 ---
 
@@ -613,26 +361,7 @@ function prefix_get_logo() {
 
 Add JSON-LD structured data for SEO and AI search optimization.
 
-```php
-function prefix_output_schema_markup() {
-    $site_url  = home_url();
-    $site_name = get_bloginfo('name');
-
-    $schema = array(
-        '@context'    => 'https://schema.org',
-        '@type'       => 'Organization',
-        '@id'         => $site_url . '/#organization',
-        'name'        => $site_name,
-        'url'         => $site_url,
-        'description' => 'A brief description of the business.',
-    );
-
-    echo '<script type="application/ld+json">' . "\n";
-    echo wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
-    echo "\n" . '</script>' . "\n";
-}
-add_action('wp_head', 'prefix_output_schema_markup', 5);
-```
+Output one `Organization` node with an `@id` of `home_url() . '/#organization'` from `wp_head`. Code: [references/head-and-performance.md](references/head-and-performance.md).
 
 ---
 
@@ -640,28 +369,7 @@ add_action('wp_head', 'prefix_output_schema_markup', 5);
 
 Add meta description tags, but defer to SEO plugins if present.
 
-```php
-function prefix_add_meta_description() {
-    // Skip if Yoast or Rank Math is active
-    if (defined('WPSEO_VERSION') || defined('RANK_MATH_VERSION')) {
-        return;
-    }
-
-    $description = '';
-
-    if (is_front_page()) {
-        $description = 'Your site description here.';
-    } elseif (is_singular('post')) {
-        $post = get_post();
-        $description = has_excerpt() ? get_the_excerpt($post) : wp_trim_words(strip_tags($post->post_content), 30, '...');
-    }
-
-    if ($description) {
-        echo '<meta name="description" content="' . esc_attr($description) . '">' . "\n";
-    }
-}
-add_action('wp_head', 'prefix_add_meta_description', 1);
-```
+Return early when `WPSEO_VERSION` or `RANK_MATH_VERSION` is defined — the SEO plugin owns the tag then. Code: [references/head-and-performance.md](references/head-and-performance.md).
 
 ---
 

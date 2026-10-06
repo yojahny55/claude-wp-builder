@@ -152,7 +152,8 @@ Refuse unless the working tree is clean, the branch is `main`, `main` is up to d
 2. Bump **all four** version references together: `.claude-plugin/plugin.json`,
    `.claude-plugin/marketplace.json` (twice — `metadata.version` and the plugin entry), and the
    README badge.
-3. Roll `[Unreleased]` into `## [X.Y.Z] - YYYY-MM-DD`. **Read every merged PR since the last
+3. Insert `## [X.Y.Z] - YYYY-MM-DD` below `## [Unreleased]` and move the entries down, leaving
+   `[Unreleased]` empty — never rename it. **Read every merged PR since the last
    tag** and write entries for any that landed without one.
 4. `chore(release): vX.Y.Z`, then `git tag -a vX.Y.Z -m "vX.Y.Z"`, then push the commit and the
    tag over SSH.

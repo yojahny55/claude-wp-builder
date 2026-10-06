@@ -1,12 +1,23 @@
 ---
 name: wp-responsive
-description: Responsive design patterns — mobile-first breakpoints, fluid typography, responsive images, touch targets
+description: Responsive design patterns for theme and demo CSS — mobile-first breakpoints, container widths, navigation, grid and flex stacking, fluid type with clamp(), responsive images, touch targets, reduced motion and no horizontal scroll. Use when writing or checking responsive styles for a section, header or footer (/wp-demo, /wp-init, /wp-responsive-check).
 user-invocable: false
 ---
 
 # Responsive Design Patterns
 
 This skill defines the responsive design system used across all themes and demos. It uses **mobile-first** CSS with `min-width` media queries, fluid typography, and responsive image techniques.
+
+## Reference files
+
+- [references/navigation.md](references/navigation.md) — the hamburger-to-horizontal header:
+  full HTML, CSS and toggle JavaScript. Read when building or fixing a header's mobile menu.
+- [references/images.md](references/images.md) — `srcset`/`sizes`, `<picture>` art direction,
+  `wp_get_attachment_image()` and lazy-loading markup. Read when emitting an image in a demo
+  or template.
+- [references/layout-patterns.md](references/layout-patterns.md) — worked CSS for grid and flex
+  stacking, per-element touch targets, a complete section, section spacing, the heading scale
+  and the footer. Read when writing a section's breakpoints and you want the pattern to copy.
 
 ---
 
@@ -120,224 +131,20 @@ The container stretches to fill the viewport on small screens and caps at the de
 
 ## Responsive Navigation: Hamburger (Mobile) to Horizontal (Desktop)
 
-### HTML Structure
-
-```html
-<header class="header">
-    <div class="container">
-        <div class="header__inner">
-            <a href="/" class="header__logo">
-                <img src="logo.svg" alt="Site Name">
-            </a>
-
-            <!-- Desktop navigation -->
-            <nav class="header__nav" id="main-nav">
-                <a href="#" class="nav__link nav__link--active">Home</a>
-                <a href="#services" class="nav__link">Services</a>
-                <a href="/pricing" class="nav__link">Pricing</a>
-                <a href="#contact" class="nav__link">Contact</a>
-            </nav>
-
-            <!-- CTA button (visible on desktop) -->
-            <a href="#contact" class="btn btn--primary header__cta">Get Started</a>
-
-            <!-- Hamburger button (visible on mobile) -->
-            <button class="header__hamburger" aria-label="Toggle menu" aria-expanded="false">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-        </div>
-    </div>
-
-    <!-- Mobile menu overlay -->
-    <div class="mobile-menu" id="mobile-menu" aria-hidden="true">
-        <nav class="mobile-menu__nav">
-            <a href="#" class="mobile-menu__link">Home</a>
-            <a href="#services" class="mobile-menu__link">Services</a>
-            <a href="/pricing" class="mobile-menu__link">Pricing</a>
-            <a href="#contact" class="mobile-menu__link">Contact</a>
-        </nav>
-        <a href="#contact" class="btn btn--primary mobile-menu__cta">Get Started</a>
-    </div>
-</header>
-```
-
-### CSS
-
-```css
-/* Mobile: hamburger visible, desktop nav hidden */
-.header__nav,
-.header__cta {
-    display: none;
-}
-
-.header__hamburger {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 5px;
-    width: 44px;
-    height: 44px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: var(--spacing-sm);
-}
-
-.header__hamburger span {
-    display: block;
-    width: 24px;
-    height: 2px;
-    background: var(--color-text);
-    transition: var(--transition-base);
-}
-
-/* Mobile menu (hidden by default) */
-.mobile-menu {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100vh;
-    background: var(--color-background);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-xl);
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
-    z-index: 999;
-}
-
-.mobile-menu.is-open {
-    transform: translateX(0);
-}
-
-.mobile-menu__link {
-    font-size: var(--font-size-xl);
-    font-weight: var(--font-weight-medium);
-    padding: var(--spacing-md);
-}
-
-/* Desktop (1024px+): show nav, hide hamburger */
-@media (min-width: 1024px) {
-    .header__nav {
-        display: flex;
-        align-items: center;
-        gap: var(--spacing-lg);
-    }
-
-    .header__cta {
-        display: inline-flex;
-    }
-
-    .header__hamburger {
-        display: none;
-    }
-
-    .mobile-menu {
-        display: none;
-    }
-}
-```
-
-### JavaScript (Minimal)
-
-```js
-const hamburger = document.querySelector('.header__hamburger');
-const mobileMenu = document.getElementById('mobile-menu');
-
-if (hamburger && mobileMenu) {
-    hamburger.addEventListener('click', () => {
-        const isOpen = mobileMenu.classList.toggle('is-open');
-        hamburger.setAttribute('aria-expanded', isOpen);
-        mobileMenu.setAttribute('aria-hidden', !isOpen);
-        document.body.style.overflow = isOpen ? 'hidden' : '';
-    });
-}
-```
+Below `1024px` the desktop nav and header CTA are hidden, and a hamburger button (44x44,
+`aria-label="Toggle menu"`, `aria-expanded`) opens a full-screen mobile menu whose
+`aria-hidden` flips with it while body scroll is locked. From `1024px` the nav is a flex row
+and the hamburger and mobile menu are hidden. Markup, CSS and JS:
+[references/navigation.md](references/navigation.md).
 
 ---
 
 ## CSS Grid and Flexbox Stacking
 
-### Grid: Columns on Desktop, Stacked on Mobile
-
-```css
-/* Mobile: single column */
-.features__grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--spacing-lg);
-}
-
-/* Tablet: 2 columns */
-@media (min-width: 768px) {
-    .features__grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: var(--spacing-xl);
-    }
-}
-
-/* Desktop: 3 columns */
-@media (min-width: 1024px) {
-    .features__grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-/* Large: 4 columns */
-@media (min-width: 1200px) {
-    .features__grid {
-        grid-template-columns: repeat(4, 1fr);
-    }
-}
-```
-
-### Flexbox: Row on Desktop, Column on Mobile
-
-```css
-/* Mobile: stacked vertically */
-.hero__inner {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xl);
-}
-
-/* Desktop: side by side */
-@media (min-width: 1024px) {
-    .hero__inner {
-        flex-direction: row;
-        align-items: center;
-    }
-
-    .hero__content {
-        flex: 1;
-    }
-
-    .hero__image {
-        flex: 1;
-    }
-}
-```
-
-### Reversing Order on Mobile
-
-```css
-.hero__inner {
-    display: flex;
-    flex-direction: column-reverse; /* image first on mobile */
-    gap: var(--spacing-xl);
-}
-
-@media (min-width: 1024px) {
-    .hero__inner {
-        flex-direction: row; /* content left, image right on desktop */
-    }
-}
-```
+Grids start at one column and add columns at `768px`, `1024px` and `1200px`; flex rows start
+as `flex-direction: column` and become `row` at `1024px`. Use `column-reverse` on mobile when
+the image must come first. Worked examples:
+[references/layout-patterns.md](references/layout-patterns.md#css-grid-and-flexbox-stacking).
 
 ---
 
@@ -386,94 +193,15 @@ font-size: clamp(<minimum>, <preferred>, <maximum>);
 
 ## Responsive Images
 
-### srcset and sizes Attributes
+- Give content images `srcset` and `sizes`; use `<picture>` only for art direction (a
+  different crop per viewport).
+- In templates, output images with `wp_get_attachment_image()`, which writes `srcset` from the
+  registered sizes. From an ACF/SCF image array, build `srcset` from `$image['sizes']` and
+  emit `width` and `height`.
+- Add `loading="lazy"` to all images below the fold. Do NOT add it to the hero/LCP image (which
+  should be preloaded instead); it gets `fetchpriority="high"`.
 
-Provide multiple image resolutions so the browser picks the best one for the viewport and pixel density.
-
-```html
-<img
-    src="image-800.jpg"
-    srcset="image-400.jpg 400w,
-            image-800.jpg 800w,
-            image-1200.jpg 1200w"
-    sizes="(min-width: 1024px) 50vw,
-           (min-width: 768px) 75vw,
-           100vw"
-    alt="Descriptive alt text"
-    loading="lazy"
->
-```
-
-### The `<picture>` Element
-
-Use `<picture>` for art direction -- serving different crops or images per viewport.
-
-```html
-<picture>
-    <source
-        media="(min-width: 1024px)"
-        srcset="hero-desktop.jpg"
-    >
-    <source
-        media="(min-width: 768px)"
-        srcset="hero-tablet.jpg"
-    >
-    <img
-        src="hero-mobile.jpg"
-        alt="Hero image description"
-        loading="lazy"
-    >
-</picture>
-```
-
-### WordPress wp_get_attachment_image()
-
-In WordPress templates, use the built-in function to output responsive images automatically.
-
-```php
-<?php
-$image_id = prefix_get_field('hero_image');
-if ($image_id) :
-    // WordPress generates srcset automatically from registered image sizes
-    echo wp_get_attachment_image($image_id, 'large', false, array(
-        'class'   => 'hero__image',
-        'loading' => 'lazy',
-        'sizes'   => '(min-width: 1024px) 50vw, 100vw',
-    ));
-endif;
-?>
-```
-
-If you have an image array (from ACF/SCF) instead of just the ID:
-
-```php
-<?php
-$image = prefix_get_field('hero_image');
-if ($image) :
-?>
-    <img
-        src="<?php echo esc_url($image['url']); ?>"
-        srcset="<?php echo esc_attr($image['sizes']['medium'] . ' 300w, ' . $image['sizes']['large'] . ' 1024w, ' . $image['url'] . ' ' . $image['width'] . 'w'); ?>"
-        sizes="(min-width: 1024px) 50vw, 100vw"
-        alt="<?php echo esc_attr($image['alt']); ?>"
-        width="<?php echo esc_attr($image['width']); ?>"
-        height="<?php echo esc_attr($image['height']); ?>"
-        loading="lazy"
-    >
-<?php endif; ?>
-```
-
-### Lazy Loading
-
-Add `loading="lazy"` to all images below the fold. Do NOT add it to the hero/LCP image (which should be preloaded instead).
-
-```html
-<!-- Hero image: NO lazy loading (it's the LCP element) -->
-<img src="hero.jpg" alt="Hero" fetchpriority="high">
-
-<!-- Below-the-fold images: lazy loaded -->
-<img src="service.jpg" alt="Service" loading="lazy">
-```
+Markup for each case: [references/images.md](references/images.md).
 
 ---
 
@@ -512,61 +240,13 @@ Measure it at desktop and mobile with `getBoundingClientRect()` (24x24 or more),
 compare the text's own `getBoundingClientRect().top/left` before and after the change: it
 must not move.
 
-### Buttons
-
-```css
-.btn {
-    min-height: 44px;
-    min-width: 44px;
-    padding: var(--spacing-sm) var(--spacing-lg);
-}
-```
-
-### Navigation Links
-
-```css
-.nav__link {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    padding: var(--spacing-sm) var(--spacing-md);
-}
-
-.mobile-menu__link {
-    display: block;
-    padding: var(--spacing-md) var(--spacing-lg);
-    min-height: 44px;
-}
-```
-
-### Form Inputs
-
-```css
-input[type="text"],
-input[type="email"],
-input[type="tel"],
-textarea,
-select {
-    min-height: 44px;
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: var(--font-size-base); /* Prevents zoom on iOS */
-}
-```
-
 ### Icon Buttons
 
 For small icon buttons (close, hamburger, social links), the clickable area is at least 24px (44px where the design has room) even if the visible icon is smaller. Inside a row whose spacing is fixed by the design, use the padding plus negative margin pattern above instead of a fixed box.
 
-```css
-.icon-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    padding: var(--spacing-sm);
-}
-```
+Sizing for buttons, navigation links, form inputs (`font-size: var(--font-size-base)`, which
+prevents zoom on iOS) and icon buttons:
+[references/layout-patterns.md](references/layout-patterns.md#touch-target-sizing-per-element).
 
 ---
 
@@ -574,47 +254,8 @@ For small icon buttons (close, hamburger, social links), the clickable area is a
 
 When building any section, you MUST define how it looks at each major breakpoint. No section should rely on desktop-only styles.
 
-### Pattern for Every Section
-
-```css
-/* ============ Section: Values ============ */
-
-/* Base: mobile */
-.values {
-    padding: var(--spacing-2xl) 0;
-}
-
-.values__grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--spacing-lg);
-}
-
-.values__title {
-    font-size: clamp(1.5rem, 3vw, 2.5rem);
-    text-align: center;
-    margin-bottom: var(--spacing-xl);
-}
-
-/* Tablet (768px+) */
-@media (min-width: 768px) {
-    .values__grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: var(--spacing-xl);
-    }
-}
-
-/* Desktop (1024px+) */
-@media (min-width: 1024px) {
-    .values {
-        padding: var(--spacing-3xl) 0;
-    }
-
-    .values__grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-```
+A complete section to copy (base, `768px`, `1024px`):
+[references/layout-patterns.md](references/layout-patterns.md#pattern-for-every-section).
 
 ---
 
@@ -700,97 +341,13 @@ This MUST be included in every stylesheet that uses animations or transitions.
 
 ---
 
-## Responsive Section Spacing
+## Section Spacing, Heading Scale and Footer
 
-Section vertical padding should scale with the viewport.
-
-```css
-.section {
-    padding: var(--spacing-2xl) 0;
-}
-
-@media (min-width: 768px) {
-    .section {
-        padding: var(--spacing-3xl) 0;
-    }
-}
-
-@media (min-width: 1200px) {
-    .section {
-        padding: calc(var(--spacing-3xl) * 1.5) 0;
-    }
-}
-```
-
----
-
-## Responsive Typography Scale
-
-While `clamp()` handles most heading sizes, ensure consistent scaling across the page.
-
-```css
-/* Mobile base sizes */
-h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
-h2 { font-size: clamp(1.5rem, 3.5vw, 2.5rem); }
-h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
-h4 { font-size: var(--font-size-lg); }
-
-p {
-    font-size: var(--font-size-base);
-    line-height: var(--line-height-normal);
-}
-
-@media (min-width: 768px) {
-    p {
-        font-size: var(--font-size-md);
-    }
-}
-```
-
----
-
-## Responsive Footer
-
-Footers typically use a multi-column grid on desktop and stack on mobile.
-
-```css
-.footer__grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--spacing-xl);
-}
-
-@media (min-width: 768px) {
-    .footer__grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (min-width: 1024px) {
-    .footer__grid {
-        grid-template-columns: 2fr 1fr 1fr 1fr;
-    }
-}
-
-.footer__bottom {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--spacing-sm);
-    text-align: center;
-    padding-top: var(--spacing-xl);
-    border-top: 1px solid var(--color-border);
-    margin-top: var(--spacing-xl);
-}
-
-@media (min-width: 768px) {
-    .footer__bottom {
-        flex-direction: row;
-        justify-content: space-between;
-        text-align: left;
-    }
-}
-```
+Section padding steps from `--spacing-2xl` (mobile) to `--spacing-3xl` (`768px`) and
+`calc(var(--spacing-3xl) * 1.5)` (`1200px`). `h1`–`h3` use `clamp()`; `h4` and body text use
+fixed tokens. Footers stack to one column, go to two at `768px` and to `2fr 1fr 1fr 1fr` at
+`1024px`, with the bottom bar becoming a row at `768px`. The CSS for all three:
+[references/layout-patterns.md](references/layout-patterns.md#responsive-section-spacing).
 
 ---
 

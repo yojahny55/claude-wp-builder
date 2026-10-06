@@ -1,6 +1,6 @@
 ---
 name: wp-audit-local-standards
-description: Local SEO audit reference — business-type and vertical detection, NAP consistency sources, LocalBusiness subtype selection, location-page quality gates and citation tiers, with the WordPress option and meta keys each check reads
+description: Local SEO audit reference — business-type and vertical detection, NAP consistency sources, LocalBusiness subtype selection, location-page quality gates and citation tiers, with the WordPress option and meta keys each check reads. Use when the wp-audit-seo agent audits a business with a physical location or service area.
 user-invocable: false
 ---
 

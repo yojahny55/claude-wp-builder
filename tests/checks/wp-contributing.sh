@@ -21,8 +21,13 @@ for f in "$s" "$c" "$d"; do [ -f "$f" ] || fail "$f is missing"; done
 # ---------------------------------------------------------------------------
 awk 'NR<=8 && /^user-invocable: false/ { f = 1 } END { exit !f }' "$s" \
   || fail "$s does not declare user-invocable: false — a skill that reads as invocable invites the 'skills act' mistake it warns against"
-awk 'NR<=8 && /^trigger:/ { f = 1 } END { exit !f }' "$s" \
-  || fail "$s has no trigger, so it never auto-loads and a contributor never sees it"
+# The description is the only text Claude reads before loading a skill; `trigger:` is not a
+# frontmatter field, and teaching it told contributors their skill would auto-load when it
+# would not.
+awk 'NR<=8 && /^description:.*Use when/ { f = 1 } END { exit !f }' "$s" \
+  || fail "$s has no 'Use when' clause in its description, so it never auto-loads and a contributor never sees it"
+! grep -Eq '^trigger:|Add `trigger:`' "$s" \
+  || fail "$s still declares or teaches trigger:, a key Claude Code ignores"
 awk 'NR<=8 && /^argument-hint:/ { f = 1 } END { exit !f }' "$c" || fail "$c has no argument-hint"
 
 # ---------------------------------------------------------------------------

@@ -7,7 +7,10 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-sk=skills/wp-tailwind-system/SKILL.md
+# The card contract moved out of SKILL.md into a reference file the skill links to.
+sk=skills/wp-tailwind-system/references/components.md
+grep -Fq "references/components.md" skills/wp-tailwind-system/SKILL.md \
+  || fail "skills/wp-tailwind-system/SKILL.md no longer links $sk, so no agent reaches the card contract"
 grep -Fq '## Cards pin their footer with `mt-auto`' "$sk" || fail "$sk has no card-footer section"
 for f in "$sk" agents/wp-template.md agents/wp-tailwind.md; do
   grep -Fq 'mt-auto' "$f" || fail "$f never names mt-auto for the card footer"

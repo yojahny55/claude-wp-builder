@@ -4,6 +4,15 @@ Ported from [nateherkai/scroll-craft](https://github.com/nateherkai/scroll-craft
 `references/uniqueness.md` (MIT), adapted for multi-page WordPress demos. Read it
 after the brief interview and before the composition plan.
 
+## Contents
+
+1. The template trap
+2. Two axes of sameness, and this plugin has both
+3. The default grammar carries a burden of proof
+4. The signature move
+5. The fingerprint gate
+6. Aesthetic range
+
 ## 1. The template trap
 
 The source skill's author built four sites with it — a protein coffee brand, a

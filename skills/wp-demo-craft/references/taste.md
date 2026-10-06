@@ -2,6 +2,20 @@
 
 Adapted from nateherkai/scroll-craft (MIT).
 
+## Contents
+
+- Spacing
+- Typography
+- Colour
+- Text over media
+- Depth
+- Cards
+- Motion
+- States and content
+- Browser surfaces
+- Token source of truth
+- The squint test
+
 Read before writing markup, not after. Build without a checklist announcement.
 
 Everything here checks the rendered result, not the intention. "I used the

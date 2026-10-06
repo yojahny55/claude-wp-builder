@@ -2,6 +2,15 @@
 
 Adapted from nateherkai/scroll-craft (MIT).
 
+## Contents
+
+1. The feeling curve
+2. The peak
+3. The tell-someone test
+4. Being in it, not watching it
+5. Pacing as emotion
+6. The feel check
+
 A page is not sections. It is a sequence of states a person passes through
 with their hand on a wheel. The device kit decides how a page looks, the
 grammar decides what a page is, and this file decides what it does to

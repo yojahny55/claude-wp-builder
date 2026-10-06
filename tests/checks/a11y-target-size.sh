@@ -24,7 +24,7 @@ grep -Fq 'equal negative margin' skills/wp-responsive/SKILL.md || fail "wp-respo
 # The generators of the three measured offenders.
 grep -Fq 'renders at least 24x24 at desktop and mobile' commands/wp-header.md || fail "/wp-header nav items have no 24x24 rule"
 grep -Fq 'renders at least 24x24 at desktop and mobile' commands/wp-footer.md || fail "/wp-footer social icons have no 24x24 rule"
-for f in agents/wp-audit-rankmath.md skills/wp-audit-seo-standards/SKILL.md; do
+for f in agents/wp-audit-rankmath.md skills/wp-audit-seo-standards/references/breadcrumbs.md; do
   grep -Fq 'margin: -4px;' "$f" || fail "$f breadcrumb links do not reach 24x24"
 done
 

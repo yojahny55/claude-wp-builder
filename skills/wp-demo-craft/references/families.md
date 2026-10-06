@@ -1,5 +1,10 @@
 # Families
 
+## Contents
+
+- The seven families — Brutalist, Maximalist, Playful, Retro, Dense, Editorial, Premium-minimal
+- What this file cannot do
+
 The enforceable half of `uniqueness.md` §6. That section names seven aesthetic
 families by what they read as and who earns them; this file says, for each one,
 what its type does, what its palette does, what a card is, how it moves, how its

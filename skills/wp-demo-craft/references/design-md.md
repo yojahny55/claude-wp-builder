@@ -1,5 +1,11 @@
 # demo/DESIGN.md
 
+## Contents
+
+- Assembly order, first source wins per field
+- Motion mapping
+- Token mapping
+
 The visual truth of the build, in the open Stitch DESIGN.md format: YAML front
 matter (`colors`, `typography`, `rounded`, `spacing`), then prose with a do and
 don't list. `demo/BRIEF.md` carries the story; this file carries the tokens.

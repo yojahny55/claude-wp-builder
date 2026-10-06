@@ -200,6 +200,10 @@ plugin is active, and setup leaves it deactivated on purpose. It is not what pro
 credentials — `scripts/check-credentials.php` does, through the SDK the plugin bundles,
 with the plugin off. After activating, `wp s3-uploads verify` works as usual.
 
+Every script reads `s3-config.php` through `scripts/read-s3-config.php`, which parses the
+constants without including the file. It is a helper, not a step: its `--export` mode prints
+the secret, so never run it by hand.
+
 **A missing image after the migration, `403` in the network panel.** A path that is not in
 the bucket policy. Add it there; do not make the bucket public.
 

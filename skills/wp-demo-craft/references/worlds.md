@@ -3,6 +3,15 @@
 Ported from [nateherkai/scroll-craft](https://github.com/nateherkai/scroll-craft)
 `references/worlds.md` (MIT). The art direction the whole demo lives inside.
 
+## Contents
+
+- The default is photographic
+- The eight preambles
+- Writing your own
+- Name the empty space, in every shot
+- If the canvas is light
+- Cohesion checks
+
 Pick one, write it as a **style preamble**, and record it in `demo/BRIEF.md`
 under `## World`. `bin/image-gen.mjs` reads that block and prepends it
 **verbatim** to every image prompt the build sends — the build writes the

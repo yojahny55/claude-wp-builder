@@ -4,6 +4,15 @@ Ported from [nateherkai/scroll-craft](https://github.com/nateherkai/scroll-craft
 `references/hero-depth.md` (MIT), adapted for demo heroes built from the
 composition library.
 
+## Contents
+
+- Layering is the baseline, not a polish pass
+- Plan the depth before generating assets
+- Preparing compositing assets
+- Choreograph restrained motion
+- Art-direct mobile separately
+- Acceptance
+
 ## Layering is the baseline, not a polish pass
 
 **A beautiful full-screen photograph with one parallax transform and some text

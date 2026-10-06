@@ -272,7 +272,10 @@ an empty field, so a secret Stripe rotates is saved to the database, and SEC-040
 `Read, Write, Edit, Grep, Glob, Bash`). Must open with the "First Action (MANDATORY)" block.
 
 **Skill** (`skills/<name>/SKILL.md`) — frontmatter `name`, `description`, `user-invocable: false`.
-Skills inform; they never act.
+Skills inform; they never act. The description says what the skill does and ends with a
+"Use when …" clause — it is the only text Claude reads before loading the skill. Keep the body
+under 500 lines and put templates, long samples and catalogs in `references/`, named from
+SKILL.md (`tests/checks/skill-authoring.sh`).
 
 **Starter theme edits** — use the placeholder tokens (`__starter__`, `__STARTER__`,
 `__STARTER_NAME__`), replaced by `/wp-init`.

@@ -1,6 +1,6 @@
 ---
 name: wp-polylang
-description: Polylang multilingual methodology — one post per language joined by translation groups, driven through the pll_* API
+description: The Polylang i18n model — one post per language joined by translation groups, driven through the pll_* API and the bundled scripts run with wp eval-file. Covers menus, internal links, taxonomies, rewrite bases, ACF/SCF fields and strings. Use when the project's i18n strategy is polylang (the default for new scaffolds), or when retrofitting Polylang with /wp-polylang. Not for the suffix model; that is wp-bilingual.
 user-invocable: false
 ---
 
@@ -12,7 +12,10 @@ are mutually exclusive per project: `_suffix` keeps one post with `hero_title`
 and `hero_title_es`; Polylang keeps one post per language, each with the same
 unsuffixed fields, joined into a translation group.
 
-`wp-bilingual` remains the default. Choosing Polylang does not deprecate it.
+Polylang is the default for new scaffolds, because only one post per language gives a
+crawler a URL, an hreflang pair and Rank Math meta per language. Choosing it does not
+deprecate `wp-bilingual`, and a project whose `.claude/CLAUDE.md` has no `i18n strategy`
+line predates the choice and is `suffix`.
 
 ## Data model
 
@@ -73,6 +76,18 @@ wp eval-file script.php es en
   is with `wp eval "..."`.
 - `__DIR__` resolves to the script's own directory despite the `eval()` wrapper,
   so scripts can `require_once __DIR__ . '/pll-lib.php'`.
+
+Run the bundled scripts rather than writing new ones; `/wp-polylang` drives them in this
+order:
+
+| Script | Run it to |
+|---|---|
+| `pll-setup.php <source_lang> <target_lang>` | verify Polylang is usable and create a missing language |
+| `pll-export.php <source_lang> <target_lang> <out.json>` | write a manifest of everything missing or stale in the target language |
+| `pll-import.php <translated.json>` | write a translated manifest back through the Polylang API |
+| `pll-verify.php <source_lang> <target_lang>` | audit the translated site |
+
+`pll-lib.php` holds the helpers the others `require`; it is never run on its own.
 
 ## Menus
 

@@ -23,12 +23,17 @@ fail() { echo "FAIL: $1"; exit 1; }
 cd "$(dirname "$0")/../.." || fail "cannot cd to the repository root"
 
 AGENT="agents/wp-audit-seo.md"
-SKILL="skills/wp-audit-seo-standards/SKILL.md"
+# §18 lives in its own reference file; SKILL.md keeps a pointer to it, asserted below.
+SKILL="skills/wp-audit-seo-standards/references/woocommerce-seo.md"
+SKILL_MD="skills/wp-audit-seo-standards/SKILL.md"
 
 [ -f "$AGENT" ] || fail "$AGENT is missing"
 [ -r "$AGENT" ] || fail "$AGENT exists but cannot be read"
 [ -f "$SKILL" ] || fail "$SKILL is missing"
 [ -r "$SKILL" ] || fail "$SKILL exists but cannot be read"
+# An unlinked reference file is never read: SKILL.md must still send the reader to it.
+grep -Fq '[references/woocommerce-seo.md](references/woocommerce-seo.md)' "$SKILL_MD" \
+  || fail "$SKILL_MD no longer links $SKILL, so nothing reads the commerce methodology"
 
 agent_flat=$(tr '\n' ' ' < "$AGENT" | sed 's/  */ /g') || fail "could not read $AGENT"
 [ -n "$agent_flat" ] || fail "$AGENT flattened to nothing — it was readable and is now empty"
@@ -47,8 +52,8 @@ grep -Fq '### Procedure — commerce checks (SEO-064 to SEO-068)' <<< "$commerce
 grep -Fq '8. **SEO-068** never fetches anything' <<< "$commerce_flat" \
   || fail "the commerce procedure extract is truncated — its last step (8. SEO-068) is missing"
 # The agent must still send the reader to the skill, or the curl snippets below are orphaned.
-grep -Fq 'Read `skills/wp-audit-seo-standards/SKILL.md` §18 before running these' <<< "$commerce_flat" \
-  || fail "the commerce procedure no longer sends the reader to the skill's §18"
+grep -Fq 'Read `skills/wp-audit-seo-standards/references/woocommerce-seo.md` (§18) before running these' <<< "$commerce_flat" \
+  || fail "the commerce procedure no longer sends the reader to the skill's §18 reference file"
 
 # --- all five codes exist, in the agent's check table -------------------------------------
 for code in SEO-064 SEO-065 SEO-066 SEO-067 SEO-068; do

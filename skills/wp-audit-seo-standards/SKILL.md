@@ -1,12 +1,30 @@
 ---
 name: wp-audit-seo-standards
-description: Rank Math SEO configuration reference, schema JSON-LD templates, meta patterns, and SEO seeding commands
+description: Rank Math SEO reference — plugin detection, module and option keys, post meta keys, schema JSON-LD templates, title and description formulas, llms.txt and robots.txt templates, breadcrumbs, sitemap failure modes and WooCommerce SEO checks. Use when auditing, configuring or seeding SEO on a WordPress site that runs Rank Math (the wp-audit-seo and wp-audit-rankmath agents).
 user-invocable: false
 ---
 
 # SEO Standards — Rank Math Reference
 
 This skill defines the SEO configuration standards, schema templates, and seeding commands for WordPress sites using **Rank Math SEO** as the primary SEO plugin.
+
+---
+
+## Reference files
+
+Rules, keys and gotchas stay in this file. Templates and scripts live in `references/`, under
+the same section numbers they carry here:
+
+- [references/schema-templates.md](references/schema-templates.md) — §5 JSON-LD templates and the
+  §11 FAQ generator. Read when emitting or checking structured data.
+- [references/seeding-commands.md](references/seeding-commands.md) — WP-CLI blocks for §3 options,
+  §4 post meta, §6 title templates and §7 meta descriptions. Read when seeding SEO data.
+- [references/llms-and-robots.md](references/llms-and-robots.md) — §8 llms.txt and §9 robots.txt,
+  templates and generators. Read when writing either file.
+- [references/breadcrumbs.md](references/breadcrumbs.md) — §10 `prefix_breadcrumbs()`, its CSS and
+  the Rank Math switch. Read when adding breadcrumbs to a theme.
+- [references/woocommerce-seo.md](references/woocommerce-seo.md) — §18, the store-only checks
+  SEO-064 to SEO-068. Read only when `site.commerce` is `woocommerce`.
 
 ---
 
@@ -77,36 +95,8 @@ then run a failing query on every request (TTFB several seconds on a real build)
 | `rank-math-options-sitemap` | Sitemap inclusions, ping settings |
 | `rank-math-options-instant-indexing` | IndexNow configuration |
 
-### Reading Options
-
-```bash
-# Get all general options
-$WP eval "print_r(get_option('rank-math-options-general'));"
-
-# Get all title options
-$WP eval "print_r(get_option('rank-math-options-titles'));"
-
-# Get active modules
-$WP eval "print_r(get_option('rank_math_modules'));"
-```
-
-### Writing Options
-
-Rank Math stores options as serialized arrays. Always merge rather than overwrite:
-
-```bash
-$WP eval "
-\$opts = (array) get_option('rank-math-options-general', []);
-\$opts['breadcrumbs']          = 'on';
-\$opts['strip_category_base']  = 'on';
-\$opts['nofollow_external_links'] = 'on';
-\$opts['new_window_external_links'] = 'on';
-\$opts['add_img_alt']          = 'on';
-\$opts['add_img_title']        = 'on';
-update_option('rank-math-options-general', \$opts);
-echo 'General options updated.';
-"
-```
+Rank Math stores options as serialized arrays. Always merge rather than overwrite.
+Read and write blocks: see [references/seeding-commands.md](references/seeding-commands.md).
 
 ---
 
@@ -131,193 +121,20 @@ echo 'General options updated.';
 | `rank_math_breadcrumb_title` | Breadcrumb label override | Free text |
 | `rank_math_pillar_content` | Pillar content flag | `on` |
 
-### Seeding Post Meta via WP-CLI
 
-```bash
-# Set SEO meta for a single post
-$WP eval "
-\$post_id = 42;
-update_post_meta(\$post_id, 'rank_math_title', '%title% %sep% %sitename%');
-update_post_meta(\$post_id, 'rank_math_description', 'Your meta description here.');
-update_post_meta(\$post_id, 'rank_math_focus_keyword', 'primary keyword');
-update_post_meta(\$post_id, 'rank_math_robots', ['index','follow']);
-update_post_meta(\$post_id, 'rank_math_twitter_card_type', 'summary_large_image');
-echo 'SEO meta set for post ' . \$post_id;
-"
-```
-
-### Bulk-Seed Meta Descriptions from Content
-
-```bash
-$WP eval "
-\$posts = get_posts(['post_type' => ['post','page'], 'posts_per_page' => -1, 'post_status' => 'publish']);
-foreach (\$posts as \$p) {
-    \$existing = get_post_meta(\$p->ID, 'rank_math_description', true);
-    if (!empty(\$existing)) continue;
-    \$text = wp_strip_all_tags(\$p->post_excerpt ?: \$p->post_content);
-    \$desc = mb_substr(trim(preg_replace('/\s+/', ' ', \$text)), 0, 155);
-    if (mb_strlen(\$desc) > 10) {
-        update_post_meta(\$p->ID, 'rank_math_description', \$desc);
-        echo 'Set description for: ' . \$p->post_title . PHP_EOL;
-    }
-}
-"
-```
+Seeding commands — one post, and bulk descriptions from content: see
+[references/seeding-commands.md](references/seeding-commands.md).
 
 ---
 
 ## 5. Schema JSON-LD Templates
 
-### Organization
-
-```json
-{
-  "@context": "https://schema.org",
-  "@type": "Organization",
-  "name": "",
-  "url": "",
-  "logo": {
-    "@type": "ImageObject",
-    "url": ""
-  },
-  "sameAs": [
-    "https://www.facebook.com/PROFILE",
-    "https://www.instagram.com/PROFILE",
-    "https://x.com/PROFILE",
-    "https://www.linkedin.com/company/PROFILE"
-  ]
-}
-```
-
-### LocalBusiness
-
-```json
-{
-  "@context": "https://schema.org",
-  "@type": "LocalBusiness",
-  "name": "",
-  "url": "",
-  "image": "",
-  "telephone": "",
-  "email": "",
-  "address": {
-    "@type": "PostalAddress",
-    "streetAddress": "",
-    "addressLocality": "",
-    "addressRegion": "",
-    "postalCode": "",
-    "addressCountry": ""
-  },
-  "geo": {
-    "@type": "GeoCoordinates",
-    "latitude": "",
-    "longitude": ""
-  },
-  "openingHoursSpecification": [
-    {
-      "@type": "OpeningHoursSpecification",
-      "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday"],
-      "opens": "09:00",
-      "closes": "17:00"
-    }
-  ],
-  "sameAs": []
-}
-```
-
-### FAQPage
-
-```json
-{
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {
-      "@type": "Question",
-      "name": "What is the question?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "The answer to the question."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Another question?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Another answer."
-      }
-    }
-  ]
-}
-```
-
-### BreadcrumbList
-
-```json
-{
-  "@context": "https://schema.org",
-  "@type": "BreadcrumbList",
-  "itemListElement": [
-    {
-      "@type": "ListItem",
-      "position": 1,
-      "name": "Home",
-      "item": "https://example.com/"
-    },
-    {
-      "@type": "ListItem",
-      "position": 2,
-      "name": "Category",
-      "item": "https://example.com/<category_base>/<term-slug>/"
-    },
-    {
-      "@type": "ListItem",
-      "position": 3,
-      "name": "Current Page"
-    }
-  ]
-}
-```
+Organization, LocalBusiness, FAQPage, BreadcrumbList and Article templates: see
+[references/schema-templates.md](references/schema-templates.md).
 
 `<category_base>` is never assumed to be `category`: read it with `$WP option get category_base`
 (empty means the default, `category`) and the tag equivalent with `$WP option get tag_base`
 (empty means `tag`). Build archive URLs from those values, or from `get_term_link()`.
-
-### Article
-
-```json
-{
-  "@context": "https://schema.org",
-  "@type": "Article",
-  "headline": "",
-  "author": {
-    "@type": "Person",
-    "name": "",
-    "url": ""
-  },
-  "datePublished": "2025-01-01T00:00:00+00:00",
-  "dateModified": "2025-01-01T00:00:00+00:00",
-  "image": {
-    "@type": "ImageObject",
-    "url": "",
-    "width": 1200,
-    "height": 630
-  },
-  "mainEntityOfPage": {
-    "@type": "WebPage",
-    "@id": "https://example.com/post-slug/"
-  },
-  "publisher": {
-    "@type": "Organization",
-    "name": "",
-    "logo": {
-      "@type": "ImageObject",
-      "url": ""
-    }
-  }
-}
-```
 
 ---
 
@@ -346,22 +163,7 @@ foreach (\$posts as \$p) {
 - `%date%` — Post publication date
 - `%excerpt%` — Post excerpt
 
-### Seed Title Templates via WP-CLI
-
-```bash
-$WP eval "
-\$opts = (array) get_option('rank-math-options-titles', []);
-\$opts['homepage_title']    = '%sitename% %sep% %sitedesc%';
-\$opts['pt_post_title']     = '%title% %sep% %sitename%';
-\$opts['pt_page_title']     = '%title% %sep% %sitename%';
-\$opts['tax_category_title'] = '%term% %sep% %sitename% %page%';
-\$opts['search_title']      = 'Search: %searchphrase% %sep% %sitename%';
-\$opts['404_title']         = 'Page Not Found %sep% %sitename%';
-\$opts['author_archive_title'] = '%name% %sep% %sitename%';
-update_option('rank-math-options-titles', \$opts);
-echo 'Title templates updated.';
-"
-```
+Seed them with the block in [references/seeding-commands.md](references/seeding-commands.md).
 
 ---
 
@@ -376,278 +178,29 @@ echo 'Title templates updated.';
 
 **Target length:** 150–160 characters.
 
-### Auto-Generate Description Function
-
-```php
-function prefix_auto_meta_description( $post_id ) {
-    $existing = get_post_meta( $post_id, 'rank_math_description', true );
-    if ( ! empty( $existing ) ) {
-        return $existing;
-    }
-
-    $post = get_post( $post_id );
-    if ( ! $post ) {
-        return '';
-    }
-
-    // Try excerpt first
-    if ( ! empty( $post->post_excerpt ) ) {
-        $text = $post->post_excerpt;
-    } else {
-        // Try first paragraph
-        $content = $post->post_content;
-        if ( preg_match( '/<p[^>]*>(.*?)<\/p>/is', $content, $matches ) ) {
-            $text = $matches[1];
-        } else {
-            $text = $content;
-        }
-    }
-
-    $text = wp_strip_all_tags( $text );
-    $text = trim( preg_replace( '/\s+/', ' ', $text ) );
-    $desc = mb_substr( $text, 0, 155 );
-
-    // Avoid cutting mid-word
-    if ( mb_strlen( $text ) > 155 ) {
-        $desc = mb_substr( $desc, 0, mb_strrpos( $desc, ' ' ) );
-        $desc .= '...';
-    }
-
-    return $desc;
-}
-```
-
-### Bulk Seed via WP-CLI
-
-```bash
-$WP eval "
-\$posts = get_posts(['post_type' => ['post','page'], 'posts_per_page' => -1, 'post_status' => 'publish']);
-\$count = 0;
-foreach (\$posts as \$p) {
-    \$existing = get_post_meta(\$p->ID, 'rank_math_description', true);
-    if (!empty(\$existing)) continue;
-    \$text = wp_strip_all_tags(\$p->post_excerpt ?: \$p->post_content);
-    \$text = trim(preg_replace('/\s+/', ' ', \$text));
-    \$desc = mb_substr(\$text, 0, 155);
-    if (mb_strlen(\$text) > 155) {
-        \$desc = mb_substr(\$desc, 0, mb_strrpos(\$desc, ' '));
-    }
-    if (mb_strlen(\$desc) > 10) {
-        update_post_meta(\$p->ID, 'rank_math_description', \$desc);
-        \$count++;
-    }
-}
-echo \"Seeded \$count meta descriptions.\";
-"
-```
+The generator function and the bulk seed: see
+[references/seeding-commands.md](references/seeding-commands.md).
 
 ---
 
 ## 8. llms.txt Template
 
-```
-# {Site Name}
-
-> {Site Description}
-
-## Pages
-- [Page Title](url): excerpt or first 20 words
-
-## Blog Posts
-- [Post Title](url): excerpt
-
-## Contact
-- Website: {home_url}
-```
-
-### Generate llms.txt via WP-CLI
-
-```bash
-$WP eval "
-\$name = get_bloginfo('name');
-\$desc = get_bloginfo('description');
-\$home = home_url('/');
-\$out  = \"# \$name\n\n> \$desc\n\n\";
-
-// Pages
-\$out .= \"## Pages\n\";
-\$pages = get_posts(['post_type' => 'page', 'posts_per_page' => -1, 'post_status' => 'publish', 'orderby' => 'menu_order', 'order' => 'ASC']);
-foreach (\$pages as \$p) {
-    \$url     = get_permalink(\$p->ID);
-    \$excerpt = \$p->post_excerpt ?: wp_trim_words(wp_strip_all_tags(\$p->post_content), 20, '...');
-    \$out    .= \"- [\$p->post_title](\$url): \$excerpt\n\";
-}
-
-// Blog posts
-\$out  .= \"\n## Blog Posts\n\";
-\$posts = get_posts(['post_type' => 'post', 'posts_per_page' => -1, 'post_status' => 'publish', 'orderby' => 'date', 'order' => 'DESC']);
-foreach (\$posts as \$p) {
-    \$url     = get_permalink(\$p->ID);
-    \$excerpt = \$p->post_excerpt ?: wp_trim_words(wp_strip_all_tags(\$p->post_content), 20, '...');
-    \$out    .= \"- [\$p->post_title](\$url): \$excerpt\n\";
-}
-
-// Contact
-\$out .= \"\n## Contact\n\";
-\$out .= \"- Website: \$home\n\";
-
-file_put_contents(ABSPATH . 'llms.txt', \$out);
-echo 'Generated llms.txt at ' . ABSPATH . 'llms.txt';
-echo PHP_EOL . '---' . PHP_EOL . \$out;
-"
-```
+Template and WP-CLI generator: see [references/llms-and-robots.md](references/llms-and-robots.md).
 
 ---
 
 ## 9. robots.txt Template
 
-```
-# robots.txt for WordPress
-User-agent: *
-Allow: /
-Disallow: /wp-admin/
-Allow: /wp-admin/admin-ajax.php
-Disallow: /wp-includes/
-Disallow: /wp-content/plugins/
-Disallow: /readme.html
-Disallow: /license.txt
-Disallow: /?s=
-Disallow: /search/
-Disallow: /cgi-bin/
-Disallow: /trackback/
-
-# AI Crawlers — Allow by default (confirm with user before changing)
-User-agent: GPTBot
-Allow: /
-
-User-agent: ClaudeBot
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-User-agent: CCBot
-Allow: /
-
-User-agent: Bytespider
-Disallow: /
-
-# Sitemap
-Sitemap: {home_url}/sitemap_index.xml
-```
+Template and WP-CLI generator: see [references/llms-and-robots.md](references/llms-and-robots.md).
 
 > **Note:** AI crawler policy (Allow vs Disallow) should be confirmed with the site owner before writing. The defaults above allow all major AI crawlers except Bytespider.
-
-### Generate robots.txt via WP-CLI
-
-```bash
-$WP eval "
-\$home = home_url('/');
-\$robots = 'User-agent: *
-Allow: /
-Disallow: /wp-admin/
-Allow: /wp-admin/admin-ajax.php
-Disallow: /wp-includes/
-Disallow: /wp-content/plugins/
-Disallow: /readme.html
-Disallow: /license.txt
-Disallow: /?s=
-Disallow: /search/
-Disallow: /cgi-bin/
-Disallow: /trackback/
-
-# AI Crawlers
-User-agent: GPTBot
-Allow: /
-
-User-agent: ClaudeBot
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-User-agent: CCBot
-Allow: /
-
-User-agent: Bytespider
-Disallow: /
-
-Sitemap: ' . \$home . 'sitemap_index.xml
-';
-file_put_contents(ABSPATH . 'robots.txt', \$robots);
-echo 'Generated robots.txt at ' . ABSPATH . 'robots.txt';
-"
-```
 
 ---
 
 ## 10. Breadcrumb Integration Code
 
-### PHP Function
-
-```php
-function prefix_breadcrumbs() {
-    // Not on the front page, and not on a 404: the trail says WHERE YOU ARE, and a
-    // 404 is not a place. Rank Math builds an "Error 404" crumb for it, which only
-    // restates the heading already on screen.
-    if (is_front_page() || is_404()) return;
-    echo '<nav class="breadcrumbs" aria-label="Breadcrumb">';
-    if (function_exists('rank_math_the_breadcrumbs')) {
-        rank_math_the_breadcrumbs();
-    } else {
-        echo '<a href="' . esc_url(home_url('/')) . '">Home</a>';
-        echo ' &raquo; ';
-        if (is_singular()) { the_title(); }
-        elseif (is_archive()) { the_archive_title(); }
-        elseif (is_search()) { echo 'Search results'; }
-        elseif (is_404()) { echo 'Page Not Found'; }
-    }
-    echo '</nav>';
-}
-```
-
-### Breadcrumb CSS
-
-```css
-.breadcrumbs {
-    padding: 12px 0;
-    font-size: 0.875rem;
-    color: #6b7280;
-}
-.breadcrumbs a {
-    color: #3b82f6;
-    text-decoration: none;
-    /* 24x24 target (WCAG 2.2 AA 2.5.8), a home icon included, without moving the text:
-       the padding and the equal negative margin cancel out in the layout. */
-    display: inline-block;
-    padding: 4px;
-    margin: -4px;
-}
-.breadcrumbs a:hover {
-    text-decoration: underline;
-}
-.breadcrumbs .separator {
-    margin: 0 0.5rem;
-    color: #9ca3af;
-}
-```
-
-### Enable Breadcrumbs in Rank Math
-
-```bash
-$WP eval "
-\$opts = (array) get_option('rank-math-options-general', []);
-\$opts['breadcrumbs'] = 'on';
-update_option('rank-math-options-general', \$opts);
-echo 'Breadcrumbs enabled.';
-"
-```
+`prefix_breadcrumbs()`, its CSS and the Rank Math switch: see
+[references/breadcrumbs.md](references/breadcrumbs.md).
 
 ---
 
@@ -661,87 +214,8 @@ FAQ content can appear in several forms. Detect and convert to JSON-LD schema au
 2. **`<details>/<summary>` HTML** — accordion-style FAQ in content
 3. **H2/H3 headings ending with `?`** — followed by `<p>` answer content
 
-### FAQ Auto-Detection and JSON-LD Generator
-
-```php
-function prefix_detect_faq_jsonld( $post_id ) {
-    $faqs = [];
-
-    // 1. Check ACF repeater fields
-    $acf_names = ['faq_items', 'faqs', 'faq_cards', 'faq'];
-    foreach ( $acf_names as $field_name ) {
-        if ( function_exists('have_rows') && have_rows( $field_name, $post_id ) ) {
-            while ( have_rows( $field_name, $post_id ) ) {
-                the_row();
-                $q = get_sub_field('question') ?: get_sub_field('title');
-                $a = get_sub_field('answer')   ?: get_sub_field('content') ?: get_sub_field('text');
-                if ( $q && $a ) {
-                    $faqs[] = [ 'q' => wp_strip_all_tags($q), 'a' => wp_strip_all_tags($a) ];
-                }
-            }
-        }
-    }
-
-    // 2. Check <details>/<summary> in content
-    $content = get_post_field('post_content', $post_id);
-    if ( preg_match_all('/<summary[^>]*>(.*?)<\/summary>\s*(.*?)<\/details>/is', $content, $matches, PREG_SET_ORDER) ) {
-        foreach ( $matches as $m ) {
-            $q = wp_strip_all_tags( $m[1] );
-            $a = wp_strip_all_tags( $m[2] );
-            if ( $q && $a ) {
-                $faqs[] = [ 'q' => $q, 'a' => $a ];
-            }
-        }
-    }
-
-    // 3. Check H2/H3 headings ending with ?
-    if ( preg_match_all('/<h[23][^>]*>(.*?\?)<\/h[23]>\s*<p>(.*?)<\/p>/is', $content, $matches, PREG_SET_ORDER) ) {
-        foreach ( $matches as $m ) {
-            $q = wp_strip_all_tags( $m[1] );
-            $a = wp_strip_all_tags( $m[2] );
-            if ( $q && $a ) {
-                $faqs[] = [ 'q' => $q, 'a' => $a ];
-            }
-        }
-    }
-
-    if ( empty( $faqs ) ) {
-        return '';
-    }
-
-    // Build JSON-LD
-    $schema = [
-        '@context'   => 'https://schema.org',
-        '@type'      => 'FAQPage',
-        'mainEntity' => [],
-    ];
-    foreach ( $faqs as $faq ) {
-        $schema['mainEntity'][] = [
-            '@type'          => 'Question',
-            'name'           => $faq['q'],
-            'acceptedAnswer' => [
-                '@type' => 'Answer',
-                'text'  => $faq['a'],
-            ],
-        ];
-    }
-
-    return '<script type="application/ld+json">' . wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT ) . '</script>';
-}
-```
-
-### Inject FAQ Schema into Head
-
-```php
-add_action('wp_head', function() {
-    if ( is_singular() ) {
-        $jsonld = prefix_detect_faq_jsonld( get_the_ID() );
-        if ( $jsonld ) {
-            echo $jsonld;
-        }
-    }
-});
-```
+The auto-detection generator and its `wp_head` hook: see
+[references/schema-templates.md](references/schema-templates.md).
 
 ---
 
@@ -966,222 +440,8 @@ foreach (\$posts as \$p) {
 
 ## 18. E-commerce SEO nuances (WooCommerce)
 
-Read this section only when `/wp-audit` Step 2.3 sets `site.commerce` to `woocommerce`; every
-check below is `N/A ("no WooCommerce")` and out of the denominator otherwise — never
-re-detect commerce here, Step 2.3 already did it. These are failure modes that only exist
-because the site is a store rather than a blog: faceted navigation multiplies category URLs,
-paginated archives can hide inventory instead of content, and stock is a fact the page can
-contradict itself about. They complement SEO-038 (canonical self-reference) and SEO-039
-(duplicate schema source), which already cover the generic cases.
-
-All four checks that read a live page target the production host, never the local clone —
-same rule as the rendered-head snapshot: per `/wp-audit` Step 2.3, when the project is a local
-clone (`local_clone = true`), use `--host` if given, otherwise ask the user for
-`production_url` (defaulting to `wordpress.url_origin`) and fire no request until it is
-confirmed. With no public URL, report `UNMEASURED`, never `PASS` — a local Apache honors a
-`.htaccess` rule a production Nginx ignores, which would turn a real defect into a false pass.
-
-### 18.1 Faceted/filtered URLs canonicalizing to themselves (SEO-064)
-
-Attribute and sort filters (`?filter_color=red`, `?orderby=price`, `?min_price=`) generate
-near-infinite variants of one category page. Each variant should declare a canonical back at
-the clean category URL. A filtered URL canonicalizing to itself tells Google every filter
-combination is a distinct page worth crawling and indexing — the opposite of the intent.
-
-```bash
-# -L (bounded) follows a redirect instead of returning an empty body for it; a redirect is not
-# the same fact as a canonical tag, so it must not be silently mistaken for either a match or
-# a miss.
-curl -sL --max-redirs 3 --max-time 15 "https://<production-host>/product-category/<slug>/" \
-  | grep -o '<link rel="canonical"[^>]*>'
-curl -sL --max-redirs 3 --max-time 15 "https://<production-host>/product-category/<slug>/?orderby=price" \
-  | grep -o '<link rel="canonical"[^>]*>'
-```
-
-Both must print the same clean URL. If the filtered fetch prints its own `?orderby=price` URL,
-that is the defect. A `noindex` on the filtered variant is an acceptable alternative to a
-canonical redirect — but the store needs **one** strategy applied consistently, not a
-canonical on some filters and a bare noindex on others.
-
-No output from either fetch — a redirect loop, a timeout, or a page with no canonical tag at
-all — is `UNMEASURED`, never a match and never a pass. An absent canonical is a different
-finding from a self-referencing one, and both require the fetch to have actually returned a
-page to say anything at all.
-
-### 18.2 Paginated category pages canonicalizing to page 1 (SEO-065)
-
-The opposite mistake from 18.1. Category pagination (`/product-category/<slug>/page/2/`) must
-be **self-referencing** — canonical to page 1 is the classic error and, unlike a paginated
-single post, is never the correct default here: it tells Google the products listed only on
-page 2+ do not exist, and they drop out of the index entirely. Self-canonicalizing page 2+ is
-the required, not merely tolerated, behavior for a WooCommerce category archive.
-
-```bash
-curl -sL --max-redirs 3 --max-time 15 "https://<production-host>/product-category/<slug>/page/2/" \
-  | grep -o '<link rel="canonical"[^>]*>'
-# Must contain .../page/2/ — a bare category URL here is the SEO-065 defect.
-```
-
-No output — the same UNMEASURED rule as 18.1 — is not the same finding as a bare category URL:
-a page that returned nothing said nothing about its canonical, defect or otherwise.
-
-### 18.3 `Offer.availability` disagreeing with real stock (SEO-066)
-
-```bash
-curl -sL --max-redirs 3 --max-time 15 "https://<production-host>/product/<slug>/" \
-  | tr '\n' ' ' > /tmp/product.html
-grep -o '"@type":"Product".*"availability":"[^"]*"' /tmp/product.html
-# Scope to the MAIN product's own wrapper, not the whole page: related products and up-sells
-# (rendered after the summary via `woocommerce_after_single_product_summary`) go through the
-# same wc_get_product_class() and carry their own in/out-of-stock class, so an unscoped grep
-# picks up whichever product in those sections happens to match first. The main wrapper's id
-# is `product-<post ID>`, and the post ID is on <body class="... postid-<ID> ...">.
-pid=$(grep -oE 'postid-[0-9]+' /tmp/product.html | head -1 | grep -oE '[0-9]+')
-grep -oE "<div[^>]*id=\"product-$pid\"[^>]*>" /tmp/product.html | head -1 \
-  | grep -oE '\b(instock|outofstock|onbackorder)\b'
-```
-
-No output from either grep — an empty body, a schema block that never rendered, or a wrapper
-markup this pattern does not recognize — is `UNMEASURED`, never read as "no mismatch found."
-A missing signal and a confirmed non-mismatch are different findings; only the second one is
-a pass.
-
-`https://schema.org/InStock` next to an `outofstock` class from the same fetch is the finding.
-Compare against the page's own rendered signal, not a WP-CLI stock query against the local
-database — a live availability claim compared with a possibly-stale clone value would flag
-stock that already changed in production. This is not cosmetic: Google has taken manual action
-against Product-schema spam before, and a stale `InStock` claim on a page the visitor sees
-marked "Out of stock" is exactly that shape of mismatch.
-
-### 18.4 Sitemap listing a noindexed URL (SEO-067)
-
-A product can be discontinued and noindexed while the XML sitemap generator has not yet
-regenerated and still lists it — indexed in the sitemap, excluded by the tag, two opposite
-signals for the same URL. Covers both products (`product-sitemap*.xml`) and product
-categories (`product_cat-sitemap.xml`, off by default in Rank Math's sitemap settings —
-`tax_product_cat_sitemap`; only present when the store turned it on).
-
-**Primary method: compare locally via WP-CLI, the same way §15 #4 already does for this exact
-failure mode.** Fetching every sitemap FILE is cheap — a handful of requests even for a large
-catalog, since each file holds hundreds of URLs — but fetching every individual product or
-category PAGE to read its own robots signal does not scale: a catalog with a few thousand
-products means a few thousand live requests for one check. Read the noindex signal from the
-database instead of the rendered page for every URL that resolves locally.
-
-```bash
-# Read every product- and product_cat-sitemap entry from the index; -L (bounded) follows the
-# 301/302 Rank Math puts on the bare, unnumbered filename once a catalog is large enough to
-# split into product-sitemap1.xml, product-sitemap2.xml, ... — a fetch without -L, or one that
-# guesses a single filename instead of reading the index, silently checks nothing.
-# Cap at 50 sitemap FILES (not URLs): a pathologically large catalog could still produce
-# hundreds of sitemap files, and this loop must stay bounded regardless of catalog size.
-curl -sL --max-redirs 3 --max-time 15 "https://<production-host>/sitemap_index.xml" \
-  | grep -oE '<loc>[^<]*(product|product_cat)-sitemap[^<]*</loc>' | sed 's/<[^>]*>//g' \
-  | head -n 50 > /tmp/product-sitemaps.txt
-: > /tmp/sitemap-urls.txt
-while read -r sm; do
-  curl -sL --max-redirs 3 --max-time 15 "$sm" \
-    | grep -oE '<loc>[^<]+</loc>' | sed 's/<[^>]*>//g' >> /tmp/sitemap-urls.txt
-done < /tmp/product-sitemaps.txt
-```
-
-```bash
-$WP eval "
-\$urls = file('/tmp/sitemap-urls.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-\$tax_meta   = get_option('wpseo_taxonomy_meta', []); // Yoast fallback for term-level robots.
-\$unresolved = fopen('/tmp/sitemap-urls-unresolved.txt', 'w');
-foreach (\$urls as \$url) {
-    \$noindex  = false;
-    \$resolved = false;
-    \$post_id  = url_to_postid(\$url);
-    if (\$post_id) {
-        \$resolved = true;
-        \$rm = get_post_meta(\$post_id, 'rank_math_robots', true);
-        \$noindex = is_array(\$rm) && in_array('noindex', \$rm, true);
-        if (!\$noindex) {
-            // Yoast stores this as real post meta; confirmed against the Rank Math Yoast
-            // importer, which reads the same key when migrating a site off Yoast.
-            \$noindex = '1' === get_post_meta(\$post_id, '_yoast_wpseo_meta-robots-noindex', true);
-        }
-    } else {
-        \$path  = trim((string) wp_parse_url(\$url, PHP_URL_PATH), '/');
-        \$parts = explode('/', \$path);
-        \$slug  = end(\$parts);
-        \$term  = get_term_by('slug', \$slug, 'product_cat');
-        if (\$term) {
-            \$resolved = true;
-            \$rm = get_term_meta(\$term->term_id, 'rank_math_robots', true);
-            \$noindex = is_array(\$rm) && in_array('noindex', \$rm, true);
-            if (!\$noindex) {
-                // Yoast never wrote real term meta for this — it lives in the
-                // wpseo_taxonomy_meta option, keyed by taxonomy then term ID. Confirmed
-                // against the same Rank Math Yoast importer (its termmeta() step).
-                \$field = \$tax_meta['product_cat'][\$term->term_id]['wpseo_noindex'] ?? '';
-                \$noindex = 'noindex' === \$field;
-            }
-        }
-    }
-    if (!\$resolved) {
-        fwrite(\$unresolved, \$url . \"\n\");
-        continue;
-    }
-    if (\$noindex) {
-        echo \"SITEMAP+NOINDEX (DB): \$url\n\";
-    }
-}
-fclose(\$unresolved);
-"
-```
-
-A URL that resolves to neither a post nor a `product_cat` term (rare for these two sitemaps,
-but possible after a slug change) has nothing to compare and is simply skipped here, not
-counted as a pass — note it and fall back to the bounded HTTP method below only for that
-handful of unresolved URLs, never for the whole list.
-
-**Fallback, and only for URLs the WP-CLI pass could not resolve:** the same signals as before
-— `X-Robots-Tag` header, then the anchored `<meta name="robots">` tag — over an explicitly
-capped sample (`head -n 50` of the unresolved list, not the full sitemap), because reading the
-live page is exactly the per-URL cost the primary method exists to avoid.
-
-```bash
-head -n 50 /tmp/sitemap-urls-unresolved.txt | while read -r u; do
-  # A body-text `grep -qi noindex` over the whole page false-positives on the word inside a
-  # comment, inline JS or a consent-banner string, and false-negatives a page noindexed only
-  # via the `X-Robots-Tag` response header (no meta tag at all). Read headers and body in the
-  # same fetch, then check both signals.
-  headers=$(curl -sL --max-redirs 3 --max-time 15 -D - -o /tmp/sitemap-url-body.html "$u")
-  if printf '%s' "$headers" | grep -qiE '^X-Robots-Tag:.*noindex'; then
-    echo "SITEMAP+NOINDEX (X-Robots-Tag): $u"
-    continue
-  fi
-  # Anchor to the actual robots meta tag, not the bare word, and tolerate attribute order and
-  # quote style: `<meta name="robots" content="noindex,...">` and
-  # `<meta content='noindex,...' name='robots'>` must both match.
-  tag=$(grep -oiE '<meta[^>]+>' /tmp/sitemap-url-body.html | grep -i 'name=["'"'"']robots["'"'"']')
-  printf '%s' "$tag" | grep -qi 'noindex' && echo "SITEMAP+NOINDEX (meta): $u"
-done
-```
-
-No output from a fetch that timed out, redirect-looped past the cap, or came back empty is
-`UNMEASURED` for that URL, never a silent pass — the same rule as 18.1-18.3.
-
-Reuse the sitemap failure-mode table in §15 (#4, "Noindex pages in sitemap") for the same
-comparison against Rank Math's own exclusion logic — §15 asks whether Rank Math is configured
-to exclude noindex URLs at generation time; this check confirms it actually did, against the
-sitemap as currently served.
-
-### 18.5 Post-migration reminder: reviews and the 301 map (SEO-068)
-
-Two losses a URL or platform migration causes, and that nothing recovers afterward:
-
-- **Reviews and `AggregateRating`** disappear from the schema if review rows are not migrated
-  under the same product IDs — the SERP stars go with them.
-- **Old indexed URLs** lose their ranking authority unless mapped one-to-one (301) to their new
-  equivalent. A blanket redirect of everything to the home page is treated by Google as a soft
-  404, not a redirect, and none of the old authority carries over.
-
-This is a reminder to raise, not a code scan or a live fetch: fire it once when a migration
-signal is present (`.wp-create.json` `project.source: restore` or a `migration` note, or the
-operator naming a recent platform/URL-structure change) and name the two losses above. It is never
-auto-fixed — the redirect map and the review migration are decisions for the team doing the
-move, not something an audit can generate from the running site.
+The store-only checks SEO-064 to SEO-068: faceted canonicals, paginated categories,
+`Offer.availability` against real stock, sitemap against noindex, and the post-migration
+reminder. They apply only when `/wp-audit` Step 2.3 sets `site.commerce` to `woocommerce`, and
+every live fetch targets the production host: see
+[references/woocommerce-seo.md](references/woocommerce-seo.md).
