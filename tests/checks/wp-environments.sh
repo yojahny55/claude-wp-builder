@@ -59,4 +59,26 @@ grep -Fq 'php-install --version=8.3' "$s" || fail "$s does not name the php-inst
 grep -Fq '"caddy": { "installed": false, "version": "", "running": false }' "$s" \
   || fail "$s does not show detect's real shape for an absent tool"
 
+# 5. Every subcommand the script dispatches is named, with the SELinux rule for vhosts — it
+#    lived only in commands/wp-create.md, so an agent reading the skill had `sudo mv` left.
+setup=bin/wp-env-setup.sh
+subs=$(awk '/^main\(\)/{f=1} f && /^ *[a-z][a-z-]*\)/{sub(/^ */,""); sub(/\).*/,""); print}' "$setup")
+[ -n "$subs" ] || fail "no subcommands parsed from $setup — this assertion is matching nothing"
+for sub in $subs; do
+  grep -Fq "\`$sub\`" "$s" || fail "$s does not name the $sub subcommand of $setup"
+done
+case "$(tr '\n' ' ' < "$s")" in *'never `sudo mv`'*) ;; *) fail "$s does not forbid moving a vhost into place with sudo mv" ;; esac
+grep -Fq 'restorecon' "$s" || fail "$s does not say vhost-install restores the SELinux context"
+
+# 6. Manifest values are read through the validator, and the engine is defined.
+grep -Fq "wp-config.mjs get '\${PROJECT_PATH}' wp_cli.wrapper" "$s" \
+  || fail "$s does not read the wrapper through wp-config.mjs get"
+! grep -Fq "jq -r '.wp_cli.wrapper'" "$s" || fail "$s still reads the wrapper with jq, around the validator"
+for e in native docker-compose ddev lando wp-env; do
+  grep -Fq "\`$e\`" "$s" || fail "$s does not list the $e engine"
+done
+grep -Fq 'need `native`' "$s" || fail "$s does not say store profiles need the native engine"
+! grep -Fq 'All operations are idempotent' "$s" || fail "$s still makes the unsupported blanket idempotency claim"
+grep -Fq "\"Adopt Mode\" section" "$s" || fail "$s does not send /wp-create's Adopt Mode procedure to the command that owns it"
+
 echo PASS

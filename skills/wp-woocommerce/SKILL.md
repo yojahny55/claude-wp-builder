@@ -1,6 +1,6 @@
 ---
 name: wp-woocommerce
-description: WooCommerce store practice for sites this plugin builds — the three store tiers and the plugins each installs (and the ones deliberately avoided, with reasons), the setup facts a WP-CLI install gets wrong, and the scripts /wp-woo-setup runs to bring a store in line with the store block in .wp-create.json. Use when creating, configuring or auditing a WooCommerce store.
+description: WooCommerce store practice for sites this plugin builds — the catalog, store and full tiers recorded as store.tier in .wp-create.json and the plugins each installs (and the ones deliberately avoided, with reasons), store-kit's catalog mode and Stripe keys kept as constants in wp-config.php, Stripe test mode, the HPOS, block-checkout and card-testing defaults a WP-CLI install gets wrong, and the woo-setup.php script /wp-woo-setup runs to bring a store in line with the store block. Use when creating, configuring or auditing a WooCommerce store, choosing a store tier or a store plugin, turning on catalog mode, or asking why Stripe keys live in wp-config.php. Not for translating products (wp-polylang), or a product post type for a client who will never sell online (/wp-cpt).
 user-invocable: false
 ---
 
@@ -11,16 +11,22 @@ A store is a recorded decision, like the i18n strategy and the demo mode. The `s
 with it, and every other command reads the block instead of guessing. This skill is the
 knowledge behind those values. It acts on nothing: the command runs the scripts.
 
+Read the block, never infer it: `store.tier` is the tier, `store.enquiry` the catalog's enquiry
+channels, `store.checkout` (with `store.checkout_reason`) the checkout type, and
+`store.payments.mode` the payment mode.
+
 ## The three tiers
 
-| Tier | What it is | Profile |
+| `store.tier` | What it is | Profile |
 |---|---|---|
-| `catalog` | Products and prices, nothing purchasable. Runs on WooCommerce with buying switched off by `store-kit`, so moving up a tier keeps every product, with no migration. `store.enquiry` records which enquiry channels apply — `form`, `where-to-buy`, `whatsapp` — and only `where-to-buy` works out of the box, as WooCommerce's External product type: no starter theme renders the enquiry form or the WhatsApp button. | `templates/profiles/woo-catalog.json` |
-| `store` | Cart, block checkout, Stripe (test mode until launch), shipping, tax, SMTP, Turnstile, and cookie consent where the market needs it. | `templates/profiles/woo-store.json` |
-| `full` | `store` plus abandoned-cart email, email marketing, reviews, search and filters, swatches, wishlist, and Google and Meta feeds. | `templates/profiles/woo-full.json` |
+| `catalog` | Products and prices, nothing purchasable. Runs on WooCommerce with buying switched off by `store-kit`, so moving up a tier keeps every product, with no migration. `store.enquiry` records which enquiry channels apply — `form`, `where-to-buy`, `whatsapp` — and only `where-to-buy` works out of the box, as WooCommerce's External product type: no starter theme renders the enquiry form or the WhatsApp button. | `${CLAUDE_PLUGIN_ROOT}/templates/profiles/woo-catalog.json` |
+| `store` | Cart, block checkout, Stripe in test mode, shipping, tax, SMTP, Turnstile, and cookie consent where the market needs it. | `${CLAUDE_PLUGIN_ROOT}/templates/profiles/woo-store.json` |
+| `full` | `store` plus abandoned-cart email, email marketing, reviews, search and filters, swatches, wishlist, and Google and Meta feeds. | `${CLAUDE_PLUGIN_ROOT}/templates/profiles/woo-full.json` |
 
-Why each plugin is there, why the popular alternatives are not, and the add-ons (digital
-downloads, print-on-demand, wholesale, multilingual): `references/plugins.md`.
+`references/plugins.md` holds why each plugin is there, why the popular alternatives are not,
+and the add-ons (digital downloads, print-on-demand, wholesale, multilingual). Read it before
+adding, removing or swapping a plugin in a store profile: `tests/checks/wp-profiles.sh` fails
+a profile plugin with no row under Picks, or one listed under Avoid.
 
 When a client will never sell online, a product custom post type from `/wp-cpt` is lighter
 than any tier: no sessions, no Action Scheduler, no Store API. The catalog tier is for the
@@ -41,11 +47,12 @@ Measured on WooCommerce 11.1.2 unless marked (source).
   created, and `product` is not a translated post type by default. Setup assigns the default
   language to the store pages. Products stay untranslated: this plugin has
   no bridge between WooCommerce and Polylang.
-- **Card testing.** The Store API rate limit is off by default, and card-testing scripts post to
-  `/wc/store/v1/checkout` directly even on a classic-checkout store. Setup turns on the checkout
-  limit: 3 attempts a minute per IP, refused as HTTP 400 `rate_limit_exceeded`. It never turns on
-  the general Store API limiter — both share one per-IP row, so ordinary traffic dilutes the
-  checkout limit to the general one.
+- **Card testing.** Both Store API limiters are off by default, and card-testing scripts post to
+  `/wc/store/v1/checkout` directly even on a classic-checkout store. Setup turns on the
+  **checkout limit** (`woocommerce_feature_rate_limit_checkout_enabled`): 3 attempts a minute
+  per IP, refused as HTTP 400 `rate_limit_exceeded`. It never turns on the **general limiter**
+  (`woocommerce_store_api_rate_limit_options`) — both keep one per-IP row, so ordinary cart
+  traffic dilutes the checkout limit to the general one.
 - **Turnstile loads its WooCommerce integration only once `cfturnstile_tested` is `yes`** (source),
   normally set by testing the keys in wp-admin. Setup sets it together with Cloudflare's
   always-pass test keys on a local site; real keys are a launch step.
@@ -70,20 +77,43 @@ Measured on WooCommerce 11.1.2 unless marked (source).
 - **Guest checkout on, account creation offered after purchase, coupons on.** A forced account is
   among the top reasons US shoppers abandon a checkout (Baymard, 2025).
 - **Block checkout by default.** It is WooCommerce's default and where new features land; classic
-  PHP checkout hooks do not fire on it. `shortcode` only with a written reason — an extension that
-  does not support blocks.
-- **Test mode until launch.** Cash on delivery only in a `local` environment, for the automated
-  test order; "coming soon" everywhere else.
+  PHP checkout hooks do not fire on it. `store.checkout: shortcode` only with a written reason in
+  `store.checkout_reason` — an extension that does not support blocks.
+- **Test mode, always.** `store.payments.mode` is `test`, and the validator accepts nothing
+  else. Cash on delivery only in a `local` environment, for the automated test order; "coming
+  soon" everywhere else.
+- **No command takes a store live.** Live Stripe keys, test mode and "coming soon" off, cash on
+  delivery off and real Turnstile keys are one launch step with a fixed order, and it is not
+  built: setup refuses a live key. Do not change these by hand — stop and hand the launch to
+  the operator.
 - **Abandoned-cart email depends on the market.** The US is opt-out (CAN-SPAM); the UK allows a
   soft opt-in only for an address typed at checkout; in the EU — Germany above all — treat it as
   advertising that needs prior consent.
 
 ## The scripts
 
-`scripts/woo-setup.php`, run through `wp eval-file` by `/wp-woo-setup`, brings the store in line
-with the block. `scripts/woo-lib.php` holds its decisions with no WordPress calls, so
-`tests/checks/woo-lib.sh` runs them under bare PHP. Setup records a hash of every value it
-writes in `store_kit_setup_state`; a value that no longer matches that hash is the client's and
-is left alone unless `force` is passed. The one exception is launch state — "coming soon",
-Stripe's `enabled`/`testmode`, cash on delivery — which a store with orders never has written
-for it, absent or not, force or not: change it in WooCommerce instead. PHP 7.4 floor.
+Never run them directly: `/wp-woo-setup` runs `scripts/woo-setup.php` (dry run in its Step 5,
+apply in Step 6) after the gates they depend on. What the command passes, for reading its
+output:
+
+```bash
+$WP eval-file "${CLAUDE_PLUGIN_ROOT}/skills/wp-woocommerce/scripts/woo-setup.php" '<project-path>' [dry-run] [force]
+```
+
+- **Arguments** are bare words, because `wp eval-file` refuses a `--flag` it does not know.
+- **Exit `0`**: the store matches the block, `degraded` lines allowed. **Exit `1`**: refused
+  before anything is written, with a `refused:` line saying why.
+- **It needs** native WP-CLI on the host (`environment.engine` is `native`), with WooCommerce
+  and `store-kit` active; otherwise it refuses.
+- **Report-only:** on a store that has orders, or was adopted, and where setup has never run, it
+  writes nothing and reports what it would change — until the operator passes `force`.
+
+Setup records a hash of every value it writes in `store_kit_setup_state`; a value that no
+longer matches that hash is the client's and is left alone unless `force` is passed. The one
+exception is launch state — "coming soon", Stripe's `enabled`/`testmode`, cash on delivery —
+which a store with orders never has written for it, absent or not, force or not: change it in
+WooCommerce instead.
+
+`scripts/woo-lib.php` holds setup's decisions with no WordPress calls, so
+`tests/checks/woo-lib.sh` runs them under bare PHP. Read it to see how a value is compared or
+decided; it is never run on its own. Both files hold the PHP 7.4 floor.

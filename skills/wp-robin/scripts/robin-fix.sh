@@ -156,7 +156,10 @@ fi
 # ── Step 1: Configure plugin settings ───────────────────────────────────────
 info "Applying reference settings..."
 
-# Reference settings (from a working site)
+# Reference settings, from the production site this script was built against. What each one
+# does and why is the "Settings it writes" table in SKILL.md, which
+# tests/checks/robin-webp-gaps.sh keeps in step with this list. The misspelled keys
+# (`interation`, `shedule`) are Robin's own option names.
 declare -A SETTINGS
 SETTINGS=(
 	[allowed_formats]="image/jpeg,image/png,image/gif"

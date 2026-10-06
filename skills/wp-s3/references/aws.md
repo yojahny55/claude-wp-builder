@@ -190,9 +190,8 @@ off the NAT bill.
 
 ## Monitoring
 
-CloudWatch alarms on the distribution's `5xx` and `4xx` rates. A rise in `403` usually means
-a public path missing from the bucket policy. Optionally, CloudFront access logs and
-CloudTrail data events on the bucket.
+A rise in `403` on the distribution usually means a public path missing from the bucket
+policy.
 
 ## Hand over to whoever configures WordPress
 
@@ -200,6 +199,6 @@ CloudTrail data events on the bucket.
 |---|---|
 | Bucket name | |
 | Region | |
-| Media domain, with `https://` | |
+| Bucket URL — `https://media.<domain>` | |
 | Role attached to the server | yes / no — if no, the key pair, over a secure channel |
 | Distribution ID | for the occasional invalidation |

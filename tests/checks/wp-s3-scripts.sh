@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sixteen properties of the wp-s3 scripts, every one of them wrong once, measured against
+# Seventeen properties of the wp-s3 scripts, every one of them wrong once, measured against
 # a real S3-compatible server and a real WordPress, and cheap to break again by editing
 # the obvious line. Each numbered section below asserts the property of the same number.
 #
@@ -31,6 +31,7 @@
 #  14. A transfer is judged by comparing both sides, not by the client's exit code.
 #  15. Plugin code is verified against a pinned commit before it is installed.
 #  16. The revert needs the transfer client and a key pair too, and says so.
+#  17. The documented configuration, exclusions and never-public paths are the real ones.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
@@ -224,5 +225,41 @@ grep -Fq 'S3_MEDIA_KEY' commands/wp-s3.md \
   || fail "commands/wp-s3.md does not say a role-authenticated revert needs S3_MEDIA_KEY/S3_MEDIA_SECRET"
 ! grep -Fq "curl -fsSLo '\$dir/mcli'" "$lib" \
   || fail "$lib tells the operator to install the client inside the plugin, which an update replaces"
+
+# ---------------------------------------------------------------------------
+# 17. The configuration contract the skill documents is the one the templates write, and
+#     the guards that keep private files private are all still there. Each line below was
+#     unpinned: flipping S3_UPLOADS_AUTOENABLE makes activating the plugin move files; losing
+#     the path-style line 404s every request on an S3-compatible server; dropping an exclude
+#     or a never-add row sends form attachments or optimizer originals into the bucket.
+# ---------------------------------------------------------------------------
+tpl=skills/wp-s3/templates/s3-config.php.tpl
+mu=skills/wp-s3/templates/s3-uploads-endpoint.php
+aws=skills/wp-s3/references/aws.md
+for line in "define( 'S3_UPLOADS_AUTOENABLE', false );" \
+            "define( 'S3_UPLOADS_OBJECT_ACL', 'bucket-owner-full-control' );" \
+            "define( 'WC_LOG_DIR',            __DIR__ . '/wp-content/wc-logs-local/' );" \
+            "define( 'WPCF7_UPLOADS_TMP_DIR', 'wpcf7-uploads-local' );"; do
+  grep -Fq "$line" "$tpl" || fail "$tpl lost: $line"
+done
+grep -Fq "\$params['use_path_style_endpoint'] = true;" "$mu" \
+  || fail "$mu no longer forces path-style addressing, which every S3-compatible server needs"
+for dir in wc-logs cache wio_backup wrio wpcf7_uploads; do
+  grep -Fq -- "--exclude \"$dir/*\"" "$media" || fail "$media no longer excludes $dir/"
+  grep -Fq "\`$dir/*\`" "$skill" || fail "$skill does not list $dir/ among the exclusions"
+done
+for p in 'uploads/wc-logs/' 'uploads/woocommerce_uploads/' 'uploads/wpcf7_uploads/' 'uploads/wrio/' 'uploads/wio_backup/'; do
+  awk '/\*\*Never\*\* add these/{f=1} f' "$aws" | grep -Fq "$p" \
+    || fail "$aws no longer lists $p among the paths never added to the bucket policy"
+done
+grep -Fq 'include the query string in the cache key' "$aws" \
+  || fail "$aws lost the query-string cache-key rule: Elementor's regenerated CSS keeps its filename and changes only ?ver="
+grep -Fq 'Read it before the first run against AWS' "$skill" || fail "$skill names $aws without saying when to read it"
+for v in S3_UPLOADS_SECRET_VALUE S3_MEDIA_KEY S3_MEDIA_SECRET WP_S3_LIST_TIMEOUT; do
+  grep -Fq "$v" "$skill" || fail "$skill does not name the $v environment variable"
+done
+! grep -Fq '<path-to-skill>' "$skill" || fail "$skill still uses a <path-to-skill> placeholder"
+grep -Fq -- '--meta_key=_downloadable' commands/wp-s3.md \
+  || fail "commands/wp-s3.md asks about downloadable products instead of measuring them"
 
 echo PASS

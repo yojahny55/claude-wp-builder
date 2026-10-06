@@ -14,7 +14,8 @@
 #   it had skipped, and some reference files were never named in SKILL.md at all.
 # - Four bundled scripts (resolve-link-targets.php, pll-setup.php, pll-export.php,
 #   read-s3-config.php) were not named in their own SKILL.md, so Claude could not know from
-#   the skill whether to run them.
+#   the skill whether to run them. wp-s3's templates/ were unnamed the same way, and this
+#   check looked only at scripts/ and references/, so nothing noticed.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail=0
@@ -61,6 +62,14 @@ for f in skills/*/SKILL.md; do
     while IFS= read -r s; do
       grep -Fq "$(basename "$s")" "$f" || err "$s is never named in $f — say whether to run it or what calls it"
     done < <(find "$dir/scripts" -type f | sort)
+  fi
+
+  # Same for templates: a file a script copies into a site is still part of what the skill
+  # ships, and wp-s3's two templates were never named in its SKILL.md.
+  if [ -d "$dir/templates" ]; then
+    while IFS= read -r t; do
+      grep -Fq "$(basename "$t")" "$f" || err "$t is never named in $f — say what copies it and when to read it"
+    done < <(find "$dir/templates" -type f | sort)
   fi
 
   # One level deep: every top-level reference file is named in SKILL.md itself, so a reader

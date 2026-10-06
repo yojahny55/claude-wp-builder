@@ -186,6 +186,33 @@ commit=$(grep -n 'chore(release)' <<<"$step5" | head -1 | cut -d: -f1 || true)
   || fail "$c Step 5 must reconcile BACKLOG.md before the release commit"
 
 # ---------------------------------------------------------------------------
+# 9d. The rest of the contract, every rule of which a later edit could drop with this check
+#     still green: the house rules the skill teaches, the one-copy rule for the release
+#     procedure (the skill and the command had already drifted apart), and the review
+#     checklist's remaining rules, must-list and reviewer instructions.
+# ---------------------------------------------------------------------------
+for rule in "Every agent's first mandatory step reads the project's \`.claude/CLAUDE.md\`" \
+            'always `${CLAUDE_PLUGIN_ROOT}/…`' \
+            '`__starter__`, `__STARTER__`' \
+            '**PHP 7.4 floor**' \
+            'Markup that lives in the database is invisible to every build step' \
+            '"Live" means three things' \
+            'Read `references/skill-review.md` when creating, changing or reviewing a skill' \
+            '--changelog-base <parent-branch>'; do
+  grep -Fq -- "$rule" "$s" || fail "$s lost the rule: $rule"
+done
+grep -Fq '`/wp-contribute release` is the procedure' "$s" \
+  || fail "$s does not send the release procedure to the command that owns it"
+! grep -Fq 'gh release create' "$s" \
+  || fail "$s carries a second copy of the release procedure; /wp-contribute release owns it"
+for rule in 'Every paragraph earns its tokens' 'One default, not a menu' \
+            'Examples are concrete and real for this repo' 'Workflows are steps' \
+            'Progressive disclosure, one level deep' 'The contract is pinned' \
+            'rules 1, 8, 10, 11, 12' 'edit nothing' 'do not invent findings'; do
+  grep -Fq "$rule" "$r" || fail "$r lost: $rule"
+done
+
+# ---------------------------------------------------------------------------
 # 10. Both are documented where a contributor looks.
 # ---------------------------------------------------------------------------
 grep -Fq 'wp-contributing' README.md || fail "the wp-contributing skill is not in README.md's skills table"
