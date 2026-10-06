@@ -15,8 +15,14 @@
 set -uo pipefail
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
 
-skill=skills/wp-audit-standards/SKILL.md
+# The lessons moved out of SKILL.md into a reference file every audit agent no longer pays
+# for on every run; SKILL.md must still name it, or nothing leads an agent there.
+skill=skills/wp-audit-standards/references/performance-lessons.md
+grep -Fq 'references/performance-lessons.md' skills/wp-audit-standards/SKILL.md \
+  || { echo "FAIL: skills/wp-audit-standards/SKILL.md no longer names references/performance-lessons.md"; exit 1; }
 agent=agents/wp-audit-performance.md
+grep -Fq 'references/performance-lessons.md' "$agent" \
+  || { echo "FAIL: $agent does not point at references/performance-lessons.md"; exit 1; }
 for f in "$skill" "$agent"; do
   [ -f "$f" ] || { echo "FAIL: $f is missing"; exit 1; }
   # -f says it exists, not that it can be read. An unreadable file flattens to an empty

@@ -8,6 +8,13 @@ fixer=agents/wp-agentic-surfaces.md
 audit=commands/wp-audit.md
 yolo=commands/wp-yolo.md
 finalize=commands/wp-finalize.md
+# The catalog, the surface specs and the citability rubric live in references/; SKILL.md keeps
+# the scoring model, applicability, the crawler allowlist and the verification loop.
+refs=skills/wp-audit-geo-standards/references
+catalog=$refs/check-catalog.md
+surfaces=$refs/surface-templates.md
+citability=$refs/citability.md
+for f in "$catalog" "$surfaces" "$citability"; do [ -f "$f" ] || fail "$f is missing"; done
 
 for f in "$skill" "$agent" "$fixer"; do [ -f "$f" ] || fail "$f is missing"; done
 
@@ -30,7 +37,7 @@ done
 
 # Skill: citability rubric + site types + required mechanisms.
 for t in '30%' '25%' '20%' '15%' '10%' '134-167' merchant 'local business' SaaS 'Content-Signal' 'text/markdown'; do
-  grep -q "$t" "$skill" || fail "$skill missing '$t'"
+  grep -q "$t" "$skill" "$citability" "$surfaces" || fail "the GEO skill missing '$t'"
 done
 
 # Auditor: model tier, report path, DOM parsing not regex.
@@ -44,7 +51,7 @@ grep -q 'DOMXPath' "$agent" || fail "$agent must parse the DOM, not regex the ma
 grep -qE '^\| GEO-A25 \|' "$agent" || fail "$agent must tabulate GEO-A25"
 grep -qF 'appear in the declared set' "$agent" || fail "$agent GEO-A25 must resolve references against the declared @id values"
 grep -q 'no ORA check id' "$agent" || fail "$agent must say GEO-A25 is outside the ORA score"
-grep -qF '| GEO-A25 ' "$skill" || fail "$skill must catalog GEO-A25"
+grep -qF '| GEO-A25 ' "$catalog" || fail "$catalog must catalog GEO-A25"
 
 # Fixer: model tier and the theme file it owns.
 grep -q '^model: sonnet' "$fixer" || fail "$fixer must be sonnet"
@@ -122,7 +129,7 @@ grep -q 'geo-scan.sh' "$yolo" || fail "$yolo must run the live scan"
 grep -q 'GEO & agent-readiness' "$finalize" || fail "$finalize missing the GEO readiness check"
 
 # --- The skill restates what bin/geo-scan.sh and the fixer do, and it had drifted from both.
-skill_flat=$(tr '\n' ' ' < "$skill" | sed 's/  */ /g')
+skill_flat=$(cat "$skill" "$catalog" "$surfaces" "$citability" | tr '\n' ' ' | sed 's/  */ /g')
 agent_flat=$(tr '\n' ' ' < "$agent" | sed 's/  */ /g')
 in_skill() { case "$skill_flat" in *"$1"*) return 0 ;; *) return 1 ;; esac; }
 
@@ -157,7 +164,7 @@ in_skill 'the auditor scores each page' && fail "$skill still claims the auditor
 allow=$(grep -oE '^\| `[A-Za-z-]+` \|[^|]*\| ALLOW \|' "$skill" | sed -E 's/^\| `([A-Za-z-]+)`.*/\1/' | sort)
 [ -n "$allow" ] || fail "$skill has no ALLOW rows in its crawler table"
 for bot in $allow; do
-  grep -qx "User-agent: $bot" "$skill" || fail "$skill allows $bot in its table but leaves it out of the minimum robots body"
+  grep -qx "User-agent: $bot" "$surfaces" || fail "$skill allows $bot in its table but $surfaces leaves it out of the robots body"
 done
 fixer_bots=$(grep -oE '\$bots = array\([^)]*\)' "$fixer" | grep -oE "'[A-Za-z-]+'" | tr -d "'" | sort)
 [ "$allow" = "$fixer_bots" ] || fail "the skill's ALLOW list and the fixer's robots \$bots list differ:
@@ -168,14 +175,43 @@ grep -Fq 'training-only, unlike `ClaudeBot`' "$fixer" && fail "$fixer still cont
 
 # GEO-D04 is the /agents.md route the fixer serves; an auditor looking for a physical AGENTS.md
 # reported the fix as missing.
-grep -Eq '^\| GEO-D04 \|.*`/agents.md`' "$skill" || fail "$skill GEO-D04 does not name the /agents.md route"
+grep -Eq '^\| GEO-D04 \|.*`/agents.md`' "$catalog" || fail "$catalog GEO-D04 does not name the /agents.md route"
 grep -Eq '^\| GEO-D04 \|.*`GET /agents.md`' "$agent" || fail "$agent GEO-D04 does not request /agents.md"
 grep -Fq "home_url( '/agents.md' )" "$fixer" || fail "$fixer no longer serves /agents.md -- update GEO-D04"
 
 # GEO-A07 to GEO-A10 are fixable only when no SEO plugin owns the graph, as the fixer's Rule 4 says.
 for code in GEO-A07 GEO-A08 GEO-A09 GEO-A10; do
-  grep -Eq "^\| $code \|.*when no SEO plugin owns the graph" "$skill" \
-    || fail "$skill marks $code fixable with no condition, though the fixer returns early under an SEO plugin"
+  grep -Eq "^\| $code \|.*when no SEO plugin owns the graph" "$catalog" \
+    || fail "$catalog marks $code fixable with no condition, though the fixer returns early under an SEO plugin"
+done
+
+# --- Contracts the skill carries that nothing pinned -----------------------------------------
+# The plugin-added codes, reported outside the ORA score so it stays reproducible.
+for code in GEO-A25 GEO-A26 GEO-A27 GEO-A28; do
+  grep -qF "| $code " "$catalog" || fail "$catalog lost the $code row"
+done
+in_skill 'are **plugin-added**' || fail "the GEO skill no longer says GEO-A25 to GEO-A28 sit outside the ORA score"
+# A registered REST namespace marked every Rank Math site as SaaS.
+in_skill 'A registered REST namespace is **not** a signal' || fail "$skill lost the REST-namespace rule"
+# The signal must match the allowlist.
+in_skill 'the matching signal is `ai-train=yes`' || fail "$skill lost the Content-Signal / allowlist consistency rule"
+# A deliberate block is the owner's answer: reported, never rewritten to the default.
+in_skill 'it never rewrites a deliberate block back to the default' || fail "$skill lets the fixer overwrite a deliberate crawler block"
+grep -Fq 'deliberate block' "$fixer" || fail "$fixer Step 4 overwrites an owner's deliberate crawler block"
+grep -Fq 'deliberate block' "$agent" || fail "$agent reports an owner's deliberate crawler block as a failure"
+# The verification loop stops, and a pre-fix report is never read as resolved.
+in_skill 'A report whose scan time precedes the fix is the old report' || fail "$skill reads a stale scan as the post-fix result"
+in_skill 'Stop after that one re-scan' || fail "$skill verification loop has no stop"
+# A reader of the installed plugin cannot resolve the gitignored design spec.
+in_skill 'design spec' && fail "the GEO skill cites the design spec, which does not ship"
+in_skill 'spec §7.3' && fail "the GEO skill cites the design spec, which does not ship"
+in_skill 'for WooCommerce today' && fail "the GEO skill dates its payment rule instead of giving the reason"
+# The citability rubric carries a worked rewrite.
+grep -Fq '## A rewrite, weak to strong' "$citability" || fail "$citability has no before/after passage"
+# The two commands that apply the rubric point at where it lives now.
+for c in commands/wp-seed.md commands/wp-section.md; do
+  grep -Fq 'skills/wp-audit-geo-standards/references/citability.md' "$c" || fail "$c does not point at the citability rubric"
+  grep -Fq 'skills/wp-audit-geo-standards/SKILL.md` §5' "$c" && fail "$c still points at the rubric's old place"
 done
 
 # --- One answer to "is this a store": WooCommerce active, the same test /wp-audit Step 2.3 records.

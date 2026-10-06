@@ -467,8 +467,8 @@ reported `UNMEASURED` without a browser, never assumed to pass:
 with LCP 10,170 ms, and 94 with LCP 1,580 ms once nothing else was running — no theme change
 between them. Do not run Lighthouse beside a second Lighthouse, the DOM/axe suite or a watch
 build, and re-measure before filing any metric finding. See *A Lighthouse run needs an idle
-machine* in `wp-audit-standards`, and *Inline critical CSS* in the same section before
-proposing that fix: it is measured there, and it made LCP worse.
+machine* in `wp-audit-standards` (`references/performance-lessons.md`), and *Inline critical
+CSS* in the same file before proposing that fix: it is measured there, and it made LCP worse.
 
 ## Step 4: Output Report
 

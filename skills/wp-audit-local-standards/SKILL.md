@@ -1,12 +1,12 @@
 ---
 name: wp-audit-local-standards
-description: Local SEO audit reference — business-type and vertical detection, NAP consistency sources, LocalBusiness subtype selection, location-page quality gates and citation tiers, with the WordPress option and meta keys each check reads. Use when the wp-audit-seo agent audits a business with a physical location or service area.
+description: Criteria for the local-SEO audit checks SEO-055 to SEO-063 — the two-signal applicability gate, brick-and-mortar, service-area and hybrid business types, LocalBusiness subtype by vertical (LegalService, MedicalClinic, Plumber, AutoDealer), NAP consistency across the rendered JSON-LD, Rank Math and the options page with phone and address normalization, geo precision, sameAs citation signals, aggregateRating spam, and doorway-page location sampling. Use when auditing a business with a street address or a service area, or when an SEO-055 to SEO-063 finding needs explaining, for example SEO-057 saying the phone differs between the footer and the schema. Not for configuring Rank Math's local module or seeding the business address (wp-audit-seo-standards), and not for generic SEO or WooCommerce checks.
 user-invocable: false
 ---
 
 # Local SEO Audit Standards
 
-The `SEO-055` through `SEO-063` checks in `agents/wp-audit-seo.md` are the *what*. This
+The `SEO-055` through `SEO-063` checks in `${CLAUDE_PLUGIN_ROOT}/agents/wp-audit-seo.md` are the *what*. This
 file is the *how* and the *why*: which signals decide a business type, which schema
 subtype a vertical requires, and where a WordPress site actually stores each value.
 
@@ -21,7 +21,7 @@ rather than reporting an absence as a pass.
 ## Applicability Gate
 
 Run the local checks only when the site is a local business. Otherwise every check
-reports `not_applicable` and none of them count toward the score.
+reports `N/A` and none of them count toward the score.
 
 A site is local when **any two** of these hold:
 
@@ -62,13 +62,15 @@ signals; never from the client's name.
 | Vertical | Detection signals | Required subtype |
 |----------|-------------------|------------------|
 | Restaurant | menu template or post type, dish names, reservations, "dine-in", "takeout" | `Restaurant` |
-| Healthcare | "patients", appointments, insurance accepted, practitioner bios, HIPAA notice | `MedicalClinic`, `Dentist` or `Hospital` |
+| Healthcare | "patients", appointments, insurance accepted, practitioner bios, HIPAA notice | `MedicalClinic`; `Dentist` for a dental practice; `Hospital` only for inpatient care |
 | Legal | "attorney", practice areas, bar admission, case results, "free consultation" | `LegalService` |
-| Home services | service-area language, "free estimate", licensed/insured/bonded, 24/7 | subtype + `areaServed` |
+| Home services | service-area language, "free estimate", licensed/insured/bonded, 24/7 | the trade's own subtype (`Plumber`, `Electrician`, `HVACBusiness`, `RoofingContractor`, `Locksmith`), else `HomeAndConstructionBusiness`; plus `areaServed` |
 | Real estate | listings, MLS references, agent bios, brokerage, "open house" | `RealEstateAgent` |
 | Automotive | inventory, VIN, test drive, service department, "new/used/certified" | `AutoDealer` |
 
-No vertical detected → generic `LocalBusiness` is correct, not a finding.
+No vertical detected → generic `LocalBusiness` is correct, not a finding. A site that
+matches two verticals passes SEO-058 with either subtype; recommend the one its home page
+leads with.
 
 **Deprecated subtypes that still appear in older themes:** `Attorney` (use
 `LegalService`), `VehicleListing` as a business type (use `AutoDealer`), bare
@@ -133,20 +135,12 @@ business has no street address by design, so for it an absent address is not a f
 
 ---
 
-## Citation Tiers
+## Citations
 
-Off-site, so the audit can only detect *references* to these from the site itself —
-badges, links and `sameAs` entries. Report what is present; never assert that a missing
-reference means a missing listing.
-
-- **Tier 1 (general):** the business profile itself, Yelp, the Better Business Bureau,
-  Facebook, Apple Maps, Bing Places.
-- **Tier 2 (authority):** chamber of commerce, local press, industry associations.
-- **Vertical directories:** per-industry listing sites appropriate to the vertical
-  detected above.
-
-The `sameAs` array in the Organization or LocalBusiness node is the one citation signal
-a code-only audit *can* verify, which is why SEO-060 anchors on it.
+Listings are off-site, so the audit sees only the site's own *references* to them — badges,
+links and `sameAs` entries. Report what is present; never assert that a missing reference
+means a missing listing. The `sameAs` array in the Organization or `LocalBusiness` node is
+the one citation signal a code-only audit *can* verify, which is why SEO-060 anchors on it.
 
 ---
 
@@ -164,13 +158,13 @@ Quality gates by page count, applied before the audit spends effort:
 | Location pages | Action |
 |----------------|--------|
 | 1–29 | Audit each one |
-| 30–49 | Audit a sample of 10, report the sample size in the finding |
-| 50+ | Audit a sample of 10 and report the total at INFO; a full walk is manual-only |
+| 30 or more | Audit a sample of 10 and report the total and the sample size in the finding; at 50 or more, also report the total at INFO — a full walk is manual-only |
 
-**URL structure.** Subdirectories (`/locations/<city>/`) consolidate authority better
-than subdomains. A store locator whose individual locations have no crawlable URL of
-their own — rendered entirely client-side — is a CRITICAL finding: those pages do not
-exist for a crawler.
+Pick the sample so a re-run audits the same pages: sort the location pages by slug and
+take 10 evenly spaced entries, starting with the first.
+
+A store locator whose individual locations have no crawlable URL of their own — rendered
+entirely client-side — is SEO-062 at CRITICAL: those pages do not exist for a crawler.
 
 **Schema per location.** Each location page carries its own `LocalBusiness` node with a
 unique `@id`, linked to the site-wide Organization through `parentOrganization` — schema.org
@@ -230,7 +224,6 @@ knows what the gap costs to close.
 
 ## Attribution
 
-The business-type and vertical taxonomies, the swap test and the citation tiering are
-adapted from the MIT-licensed `claude-seo` project by AgriciDaniel
+The business-type and vertical taxonomies and the swap test are adapted from the MIT-licensed `claude-seo` project by AgriciDaniel
 (<https://github.com/AgricIDaniel/claude-seo>). The WordPress mapping, the i18n rules,
 the severity assignments and the check codes are this plugin's own.
