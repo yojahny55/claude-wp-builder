@@ -287,11 +287,11 @@ pin "$sflat" 'safe to re-run' "SKILL.md does not say pll-import.php is safe to r
 skill_md=()
 while IFS= read -r md; do skill_md+=("$md"); done < <(find skills/wp-polylang -name '*.md' | sort)
 claims=$(for md in "${skill_md[@]}"; do flat_of "$md"; echo; done \
-  | grep -oE '`pllx_[a-z_]+\(\)` in `pll-[a-z]+\.php`' | sort -u || true)
+  | grep -oE '`pllx_[a-z0-9_]+\(\)` in `pll-[a-z0-9_-]+\.php`' | sort -u || true)
 [ -n "$claims" ] || { echo "FAIL: the skill names no pllx_ helper by file -- this check would be vacuous"; exit 1; }
 while IFS= read -r claim; do
-  fn=$(printf '%s' "$claim" | sed -E 's/^`(pllx_[a-z_]+)\(\)`.*/\1/')
-  file=$(printf '%s' "$claim" | sed -E 's/.*`(pll-[a-z]+\.php)`$/\1/')
+  fn=$(printf '%s' "$claim" | sed -E 's/^`(pllx_[a-z0-9_]+)\(\)`.*/\1/')
+  file=$(printf '%s' "$claim" | sed -E 's/.*`(pll-[a-z0-9_-]+\.php)`$/\1/')
   grep -q "^function $fn(" "skills/wp-polylang/scripts/$file" \
     || { echo "FAIL: the skill says $fn() is in $file, but $file does not define it"; exit 1; }
 done <<<"$claims"
