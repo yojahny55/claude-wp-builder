@@ -67,8 +67,8 @@ directory that contains `wp-config.php`."
 ## Step 1: Read the Skill
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-robin/SKILL.md` in full before running anything. It
-carries the requirements (a MySQL/MariaDB client, one of ImageMagick / `cwebp` / PHP GD, and
-optionally WP-CLI), the settings the script applies, what the output means, and the
+carries the requirements (a MySQL/MariaDB client, the `php` CLI, one of ImageMagick / `cwebp` /
+PHP GD, and optionally WP-CLI), the settings the script applies, what the output means, and the
 troubleshooting table you will need in Step 4. Do not summarise it back to the user — run it.
 
 ## Step 2: Check Requirements
@@ -78,10 +78,11 @@ one-line message:
 
 ```bash
 bash -c "command -v mariadb || command -v mysql"
+bash -c "command -v php"
 bash -c "command -v convert || command -v cwebp || php -r 'if (function_exists(\"imagewebp\")) { echo \"gd\"; exit 0; } exit 1;'"
 ```
 
-If no database client is found, stop and say so. If no webp converter is found, report the
+If no database client or no `php` is found, stop and say so. If no webp converter is found, report the
 install line from the skill's troubleshooting table for the user's package manager and ask
 whether to continue anyway (the queue repair still works; only webp generation is skipped).
 

@@ -138,6 +138,11 @@ grep -Fq "wp-config.mjs get '\${PROJECT_PATH}' db_password" "$env" \
 if grep -Eq '^\| `\{\{db_password\}\}` \| `root` \|' "$env"; then
   fail "$env still documents the removed fixed default as the db_password example value"
 fi
+# The manifest sample carried `"database": {"password": "root"}` -- the removed default, in
+# the field the password left -- and neither pin above could see a bare JSON key.
+if grep -Fq '"password":' "$env"; then
+  fail "$env shows a password inside a .wp-create.json sample; the manifest holds none"
+fi
 
 # --- Stores. ------------------------------------------------------------------------------
 grep -Fq 'config set WP_ENVIRONMENT_TYPE local --type=constant' "$c" \

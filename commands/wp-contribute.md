@@ -202,13 +202,23 @@ Refuse unless the working tree is clean, the branch is `main`, `main` is up to d
 3. Insert `## [X.Y.Z] - YYYY-MM-DD` below `## [Unreleased]` and move the entries down, leaving
    `[Unreleased]` empty — never rename it. **Read every merged PR since the last
    tag** and write entries for any that landed without one.
-4. `chore(release): vX.Y.Z`, then `git tag -a vX.Y.Z -m "vX.Y.Z"`, then push the commit and the
-   tag over SSH.
-5. `env -u GH_TOKEN gh release create vX.Y.Z --title "…" --notes-file <file> --latest`.
-6. **Verify**: the release is published and not a draft; the tag resolves on the remote; and
+4. **Reconcile `BACKLOG.md`** against what this release ships and set its
+   `**Reconciled** on <Month D, YYYY>` line to today. `tests/checks/backlog-freshness.sh` fails
+   as soon as the new release heading is dated after that line, so skipping this step cuts a
+   release whose own suite is red.
+5. **Re-run Step 3.** The version and backlog checks can only go red after steps 2-4. A
+   `FAILED:` line or a red doc-sync stops here: fix it and run Step 3 again until both pass.
+6. Commit, tag, and push both over SSH:
+
+   ```bash
+   git commit -am "chore(release): vX.Y.Z" && git tag -a vX.Y.Z -m "vX.Y.Z"
+   git push origin main && git push origin vX.Y.Z
+   ```
+7. `env -u GH_TOKEN gh release create vX.Y.Z --title "…" --notes-file <file> --latest`.
+8. **Verify**: the release is published and not a draft; the tag resolves on the remote; and
    the raw `.claude-plugin/*.json` served from GitHub carry the new version — that is what a
    user's install reads. There is no publish CI here; the GitHub release is the artifact.
-7. Delete the merged head branch, and check whether older branches can go too.
+9. Delete the merged head branch, and check whether older branches can go too.
 
 ## Step 6: Report
 

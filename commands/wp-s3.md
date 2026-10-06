@@ -130,6 +130,11 @@ For `--revert`:
 bash ${CLAUDE_PLUGIN_ROOT}/skills/wp-s3/scripts/s3-revert.sh '<wp-root>'
 ```
 
+The revert brings the media back to disk first, through the same transfer `/wp-s3-media`
+runs, so it needs the `mcli` client on `PATH` and a key pair — on a site that authenticates
+with an IAM role, `S3_MEDIA_KEY` and `S3_MEDIA_SECRET` in the environment, exported the same
+way as the secret above. Without them it stops before removing anything.
+
 Read its final output to the user in full. The two things it cannot undo — Elementor's
 stored URLs and WooCommerce's download settings — are printed there as ready commands.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fifteen properties of the wp-s3 scripts, every one of them wrong once, measured against
+# Sixteen properties of the wp-s3 scripts, every one of them wrong once, measured against
 # a real S3-compatible server and a real WordPress, and cheap to break again by editing
 # the obvious line. Each numbered section below asserts the property of the same number.
 #
@@ -30,6 +30,7 @@
 #  13. A vendor/ tree is not the version that was asked for.
 #  14. A transfer is judged by comparing both sides, not by the client's exit code.
 #  15. Plugin code is verified against a pinned commit before it is installed.
+#  16. The revert needs the transfer client and a key pair too, and says so.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
@@ -204,5 +205,24 @@ grep -Fq 'PLUGIN_COMMIT' "$setup" \
   || fail "$setup installs the plugin without checking what arrived against a pinned commit"
 grep -Fq -- '--unverified-download' "$setup" \
   || fail "$setup has no named way to accept an unverifiable download, so it either refuses always or checks nothing"
+
+# ---------------------------------------------------------------------------
+# 16. The revert needs the transfer client too. The skill said the client was "Only for
+#     /wp-s3-media", but s3-revert.sh brings the media down through s3-media.sh download, so
+#     an operator who believed it reached the revert with no client and no key pair. And the
+#     missing-client message told them to install it inside the plugin directory, which a
+#     plugin update replaces.
+# ---------------------------------------------------------------------------
+skill=skills/wp-s3/SKILL.md
+grep -Fq 's3-media.sh" download' "$revert" \
+  || fail "$revert no longer downloads through s3-media.sh — re-check what the skill says the revert needs"
+! grep -Fq 'Only for `/wp-s3-media`' "$skill" \
+  || fail "$skill says the client is only for /wp-s3-media; the revert downloads through it too"
+grep -Fq -- '`/wp-s3 --revert` unless `--keep-remote-media`' "$skill" \
+  || fail "$skill does not say the revert needs the client unless --keep-remote-media is passed"
+grep -Fq 'S3_MEDIA_KEY' commands/wp-s3.md \
+  || fail "commands/wp-s3.md does not say a role-authenticated revert needs S3_MEDIA_KEY/S3_MEDIA_SECRET"
+! grep -Fq "curl -fsSLo '\$dir/mcli'" "$lib" \
+  || fail "$lib tells the operator to install the client inside the plugin, which an update replaces"
 
 echo PASS

@@ -38,6 +38,21 @@ engine=$(line_of "get '\${PROJECT_PATH}' environment.engine" "$cmd")
 [ -n "$engine" ] && [ "$engine" -lt "$sync" ] && grep -Fq 'store profiles need native WP-CLI' "$cmd" \
   || fail "$cmd must read environment.engine and stop on anything but native before syncing store-kit"
 
+# Unbuilt pieces are not described as built. The skill said every catalog product "offers an
+# enquiry form ... or a WhatsApp button" and that products were "the Polylang bridge's job",
+# and the command put the WhatsApp number in "the theme's settings page": no starter renders
+# either channel, carries those fields, or has a bridge, so an agent following the old text
+# promised a client features that do not exist.
+skill=skills/wp-woocommerce/SKILL.md
+for old in 'Each product offers an enquiry form' "products are the Polylang bridge's job"; do
+  if grep -Fq "$old" "$skill"; then fail "$skill still says: $old"; fi
+done
+if grep -Fq "they live in the theme's settings" "$cmd"; then fail "$cmd still puts the WhatsApp number in a settings page no starter has"; fi
+grep -Fq 'no starter theme renders the enquiry form or the WhatsApp button' "$skill" \
+  || fail "$skill does not say the catalog's enquiry form and WhatsApp button are not rendered"
+grep -Fq 'no bridge between WooCommerce and Polylang' "$skill" \
+  || fail "$skill does not say products stay untranslated"
+
 h=$(grep -nE '^\s*wooset_step_hpos\(' "$script" | head -1 | cut -d: -f1 || true)
 pg=$(grep -nE '^\s*wooset_step_pages\(' "$script" | head -1 | cut -d: -f1 || true)
 pay=$(grep -nE '^\s*wooset_step_payments\(' "$script" | head -1 | cut -d: -f1 || true)

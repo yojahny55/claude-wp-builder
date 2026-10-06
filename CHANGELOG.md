@@ -19,6 +19,48 @@
 
 ### Fixed
 
+- **`robin-fix.sh` works on a site with a table prefix other than `wp_`, and stops failing
+  silently.** `$table_prefix` was matched with an unescaped `$` — a regex end-of-line anchor
+  — so the prefix always read as `wp_` and every query on any other site hit tables that do
+  not exist. A missing WordPress root or an unparseable `wp-config.php` exited 1 with no
+  message (a failing command substitution under `set -e`); double-quoted defines and a
+  `DB_HOST` with a port or socket were not read; every query called `mariadb`, though the
+  skill and `/wp-robin` accept a host with only `mysql`; the download fallback saved a 404
+  page as the plugin zip, so the run died on unzip's own exit code with no explanation and
+  left the temporary file behind, and it set the plugin as installed without checking that
+  anything was; every settings write
+  ended in `|| true` and the report counted keys, not writes; WP-CLI's activation check ran
+  from the caller's directory instead of the site's; and the PHP GD converter used `match`
+  (PHP 8 only) with no GIF branch, though GIF is an allowed format. It now lives in
+  `scripts/webp-gd.php`, linted at 7.4 by CI. The skill no longer says the zip is downloaded
+  when WP-CLI is absent or that the uploads directory is discovered, lists every binary the
+  script needs, and states its exit codes. `tests/checks/robin-fix-behavior.sh` runs the
+  script against a fake site, client and network.
+- **The release ritual in `wp-contributing` and `/wp-contribute release` gates for real.**
+  It chained `for … done && bash bin/doc-sync-check.sh`, and a loop's status is its last
+  iteration's, so a red check earlier in the alphabet passed the gate. It also never
+  reconciled `BACKLOG.md`, so following it cut a release that `backlog-freshness.sh` failed,
+  and never said how to push the tag. Both now aggregate, reconcile, re-run the gates and
+  push with `git push origin main && git push origin vX.Y.Z`. `CONTRIBUTING.md` lists `model`
+  among an agent's required frontmatter keys, which `model-routing.sh` already enforced.
+- **`wp-environments` describes the environment `/wp-create` builds.** Its manifest sample
+  still carried `"password": "root"`; it ran `bin/wp-env-setup.sh` by a relative path; its
+  placeholder table listed `{{db_host}}`, which no template uses, and missed nine tokens the
+  templates do, so a `docker-compose.yml` or `.wp-env.json` built from it kept unreplaced
+  `{{http_port}}` and `{{tests_port}}`; it checked 3306 (unpublished) and missed Mailpit's
+  SMTP port; its PHP table typed package names the script does not install and called
+  `php-list` a list of available versions; and it said a project without `.wp-create.json`
+  works unchanged, where the gate exits 3. `tests/checks/wp-environments.sh` diffs the table
+  against every token under `templates/`.
+- **`/wp-s3 --revert` needs the transfer client, and the skill says so.** The skill called
+  the client "Only for `/wp-s3-media`", but the revert downloads the media through
+  `s3-media.sh download`, with a key pair. The missing-client message also told the operator
+  to install it inside the plugin directory, which a plugin update replaces.
+- **`wp-woocommerce` no longer describes unbuilt pieces as built.** A catalog product
+  "offers an enquiry form … or a WhatsApp button", products were "the Polylang bridge's job",
+  and `/wp-woo-setup` put the WhatsApp number in "the theme's settings page": no starter
+  renders either channel, carries those fields, or has a bridge.
+
 - **`wp-demo-craft`, `/wp-cinematic-demo` and `/wp-cinematic-scene` load with their own
   frontmatter again.** Each had a value that is not valid YAML unquoted: an unquoted `: ` in
   `wp-demo-craft`'s description and in `/wp-cinematic-demo`'s `<!-- SECTION: -->` example, and

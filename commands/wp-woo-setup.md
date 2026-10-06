@@ -130,8 +130,9 @@ A project with no generated block is left alone: no `.claude/CLAUDE.md` is creat
 `/wp-init`. Any other exit-`1` message is a problem in the block — fix it, never regenerate
 around it.
 
-The WhatsApp number and its message are not in this block: they live in the theme's settings
-page, where the client can change them.
+The WhatsApp number and its message are not in this block: they belong in the theme's settings
+page, where the client can change them. No starter theme carries those fields, so a recorded
+`whatsapp` channel renders nothing until the theme adds them.
 
 ## Step 4: Stripe test keys — never in the chat
 

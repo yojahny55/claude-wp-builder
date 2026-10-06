@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # wp-robin: Install, configure, and fix Robin Image Optimizer.
 # Works on any WordPress site. Auto-detects WP root and DB credentials.
+#
+# Exit 0: ran to the end (read the final counts). Exit 1: stopped with a message; settings
+# and stuck-row fixes written before the stop stay written.
 set -euo pipefail
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -24,7 +27,9 @@ find_wp_root() {
 
 WP_ROOT="${WP_ROOT:-}"
 if [[ -z "$WP_ROOT" ]]; then
-	WP_ROOT="$(find_wp_root)"
+	# `|| true`: under `set -e` a failing command substitution ends the script on this
+	# line, so the message below was never printed and the run exited 1 in silence.
+	WP_ROOT="$(find_wp_root || true)"
 	if [[ -z "$WP_ROOT" ]]; then
 		err "Could not find WordPress root. Set WP_ROOT environment variable."
 		exit 1
@@ -33,20 +38,44 @@ fi
 info "WordPress root: $WP_ROOT"
 
 # ── Read DB credentials via grep (no PHP require, works on broken installs) ─
+# Single or double quotes, both valid PHP. `|| true` for the same reason as find_wp_root:
+# a define the grep cannot match must reach the "Failed to parse" message below, not end
+# the run in silence.
 parse_define() {
 	local key="$1" file="$2"
-	grep -oP "define\s*\(\s*'${key}'\s*,\s*'?\K[^');]*" "$file" | head -1
+	{ grep -oP "define\s*\(\s*['\"]${key}['\"]\s*,\s*['\"]?\K[^'\");]*" "$file" || true; } | head -1
 }
 
 DB_NAME="$(parse_define DB_NAME "$WP_ROOT/wp-config.php")"
 DB_USER="$(parse_define DB_USER "$WP_ROOT/wp-config.php")"
 DB_PASSWORD="$(parse_define DB_PASSWORD "$WP_ROOT/wp-config.php")"
 DB_HOST="$(parse_define DB_HOST "$WP_ROOT/wp-config.php")"
-TABLE_PREFIX="$(grep -oP "\$table_prefix\s*=\s*'\K[^']*" "$WP_ROOT/wp-config.php" 2>/dev/null || echo 'wp_')"
+TABLE_PREFIX="$(grep -oP "\\\$table_prefix\s*=\s*['\"]\K[^'\"]*" "$WP_ROOT/wp-config.php" 2>/dev/null || echo 'wp_')"
 TABLE_PREFIX="${TABLE_PREFIX:-wp_}"
 
 if [[ -z "$DB_NAME" || -z "$DB_USER" || -z "$DB_HOST" ]]; then
 	err "Failed to parse DB credentials from wp-config.php"
+	exit 1
+fi
+
+# DB_HOST may carry a port (`127.0.0.1:3307`) or a socket (`localhost:/run/mysqld.sock`),
+# which WordPress accepts and the client's -h does not.
+DB_CONN=(-h "$DB_HOST")
+case "$DB_HOST" in
+	*:/*) DB_CONN=(-h "${DB_HOST%%:*}" --socket="${DB_HOST#*:}") ;;
+	*:*)  DB_CONN=(-h "${DB_HOST%%:*}" --port="${DB_HOST##*:}") ;;
+esac
+
+# MariaDB ships `mariadb`; MySQL and older MariaDB packages ship only `mysql`. The runner's
+# pre-check accepts either, so this must too.
+DB_CLIENT="$(command -v mariadb || command -v mysql || true)"
+if [[ -z "$DB_CLIENT" ]]; then
+	err "No database client found: install the mariadb or mysql client."
+	exit 1
+fi
+# Every step from 4 on decodes metadata and builds queue rows with the PHP CLI.
+if ! command -v php &>/dev/null; then
+	err "The php CLI is required: it decodes the attachment metadata and builds the queue rows."
 	exit 1
 fi
 
@@ -56,13 +85,12 @@ UPLOAD_DIR="$WP_ROOT/wp-content/uploads"
 
 info "DB: ${DB_NAME}@${DB_HOST} | prefix=${TABLE_PREFIX}"
 
-# DB query helpers
+# DB query helper
 # stderr is deliberately NOT silenced: several callers tolerate a failed query with
-# `|| true` or `|| echo 0`, so mariadb's own message is the only evidence left that
+# `|| true` or `|| echo 0`, so the client's own message is the only evidence left that
 # anything went wrong. MYSQL_PWD keeps the password off the command line, so there
 # is no "insecure" warning to suppress here.
-db_q()  { MYSQL_PWD="$DB_PASSWORD" mariadb -u "$DB_USER" -h "$DB_HOST" "$DB_NAME" -N -s -e "$1"; }
-db_v()  { MYSQL_PWD="$DB_PASSWORD" mariadb -u "$DB_USER" -h "$DB_HOST" "$DB_NAME" -e "$1"; }
+db_q()  { MYSQL_PWD="$DB_PASSWORD" "$DB_CLIENT" -u "$DB_USER" "${DB_CONN[@]}" "$DB_NAME" -N -s -e "$1"; }
 
 # ── Check / install WP-CLI ──────────────────────────────────────────────────
 WP_CLI=""
@@ -75,32 +103,53 @@ fi
 # ── Step 0: Install plugin if missing ───────────────────────────────────────
 PLUGIN_DIR="$WP_ROOT/wp-content/plugins/robin-image-optimizer"
 PLUGIN_INSTALLED=false
+plugin_present() { [[ -f "$PLUGIN_DIR/index.php" || -f "$PLUGIN_DIR/robin-image-optimizer.php" ]]; }
 
-if [[ -f "$PLUGIN_DIR/index.php" ]] || [[ -f "$PLUGIN_DIR/robin-image-optimizer.php" ]]; then
+# The fallback when `wp plugin install` fails. -f makes curl fail on a 404 instead of
+# saving the error page; only a zip that unpacks into the plugin directory counts as an
+# install. It used to save the 404 body, hand it to unzip and end the run with unzip's
+# own exit code, leaving the temporary file behind.
+download_plugin() {
+	local zip ok=0
+	command -v curl &>/dev/null && command -v unzip &>/dev/null || { warn "curl and unzip are needed for the direct download"; return 1; }
+	zip="$(mktemp "${TMPDIR:-/tmp}/robin-image-optimizer.XXXXXX.zip")"
+	curl -fsSL "https://downloads.wordpress.org/plugin/robin-image-optimizer.latest-stable.zip" -o "$zip" \
+		&& unzip -oq "$zip" -d "$WP_ROOT/wp-content/plugins/" && ok=1
+	rm -f "$zip"
+	[[ $ok -eq 1 ]] && plugin_present
+}
+
+if plugin_present; then
 	info "Robin Image Optimizer already installed"
 	PLUGIN_INSTALLED=true
 elif [[ -n "$WP_CLI" ]]; then
 	info "Installing Robin Image Optimizer via wp-cli..."
-	(cd "$WP_ROOT" && $WP_CLI plugin install robin-image-optimizer --activate --allow-root 2>&1) || {
+	if (cd "$WP_ROOT" && $WP_CLI plugin install robin-image-optimizer --activate --allow-root 2>&1); then
+		PLUGIN_INSTALLED=true
+	else
 		warn "wp-cli install failed (maybe no admin access). Trying direct download..."
-		TMP_ZIP="$(mktemp /tmp/robin-image-optimizer.XXXXXX.zip)"
-		curl -sL "https://downloads.wordpress.org/plugin/robin-image-optimizer.latest-stable.zip" -o "$TMP_ZIP"
-		if [[ -f "$TMP_ZIP" ]]; then
-			unzip -o "$TMP_ZIP" -d "$WP_ROOT/wp-content/plugins/" 2>&1
-			rm -f "$TMP_ZIP"
-		fi
-	}
-	PLUGIN_INSTALLED=true
-else
-	warn "wp-cli not found and plugin not installed. Install wp-cli or the plugin manually."
-	warn "Run: curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar"
+		download_plugin && PLUGIN_INSTALLED=true
+	fi
+fi
+
+# Without the plugin there is no queue table to repair, so nothing below can succeed.
+if ! $PLUGIN_INSTALLED; then
+	if [[ -n "$WP_CLI" ]]; then
+		err "Robin Image Optimizer is not installed and could not be downloaded. Install it from wp-admin -> Plugins, then run this again."
+	else
+		err "Robin Image Optimizer is not installed and wp-cli was not found, so it cannot be installed from here."
+		err "Install the plugin from wp-admin -> Plugins, or install wp-cli: https://wp-cli.org/#installing"
+	fi
+	exit 1
 fi
 
 # ── Step 0.5: Ensure plugin is active ──────────────────────────────────────
+# From inside WP_ROOT, like the install above: run from anywhere else, WP-CLI asked
+# whichever site the current directory belongs to, or none.
 if $PLUGIN_INSTALLED && [[ -n "$WP_CLI" ]]; then
-	if ! ($WP_CLI plugin is-active robin-image-optimizer --allow-root 2>/dev/null); then
+	if ! (cd "$WP_ROOT" && $WP_CLI plugin is-active robin-image-optimizer --allow-root 2>/dev/null); then
 		info "Activating Robin Image Optimizer..."
-		$WP_CLI plugin activate robin-image-optimizer --allow-root 2>/dev/null || true
+		(cd "$WP_ROOT" && $WP_CLI plugin activate robin-image-optimizer --allow-root 2>/dev/null) || true
 	fi
 fi
 
@@ -168,22 +217,43 @@ done
 [[ -z "$ALLOWED_SQL" ]] && ALLOWED_SQL="'image/png','image/jpeg','image/jpg','image/gif'"
 info "  Formats: ${SETTINGS[allowed_formats]}"
 
+# Counted per write: the count used to be the number of keys, so a write the database
+# refused (a missing privilege, a wrong prefix) still read as applied.
+SETTINGS_OK=0
+SETTINGS_FAILED=()
 for key in "${!SETTINGS[@]}"; do
 	val="${SETTINGS[$key]}"
-	db_q "INSERT INTO ${TABLE_PREFIX}options (option_name, option_value) VALUES ('wbcr_io_${key}', '${val}') ON DUPLICATE KEY UPDATE option_value='${val}';" || true
+	if db_q "INSERT INTO ${TABLE_PREFIX}options (option_name, option_value) VALUES ('wbcr_io_${key}', '${val}') ON DUPLICATE KEY UPDATE option_value='${val}';"; then
+		SETTINGS_OK=$(( SETTINGS_OK + 1 ))
+	else
+		SETTINGS_FAILED+=("wbcr_io_${key}")
+	fi
 done
-info "  Settings applied ($(echo "${!SETTINGS[@]}" | wc -w) options)"
+if [[ ${#SETTINGS_FAILED[@]} -eq 0 ]]; then
+	info "  Settings applied (${SETTINGS_OK} options)"
+else
+	warn "  ${#SETTINGS_FAILED[@]} of ${#SETTINGS[@]} settings were NOT written: ${SETTINGS_FAILED[*]}"
+fi
 
 # ── Step 2: Detect available webp converter ─────────────────────────────────
+# GD counts only with imagewebp(): a GD built without WebP support loads the extension
+# and then fails every conversion. Same test the /wp-robin runner's pre-check uses.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WEBP_CONVERTER=""
 if command -v convert &>/dev/null; then
 	WEBP_CONVERTER="imagemagick"
 elif command -v cwebp &>/dev/null; then
 	WEBP_CONVERTER="cwebp"
-elif php -r "echo extension_loaded('gd')?1:0;" 2>/dev/null | grep -q 1; then
+elif php -r 'exit(function_exists("imagewebp") ? 0 : 1);' 2>/dev/null; then
 	WEBP_CONVERTER="gd"
 fi
 info "WebP converter: ${WEBP_CONVERTER:-NONE}"
+
+# The lossy quality every converter below is given, defined once so the three cannot drift
+# apart. It is not the plugin's `image_optimization_level_custom` (70): that one is Robin's
+# own setting, used only when the optimization level is `custom`, and this script writes
+# `normal`.
+WEBP_QUALITY=82
 
 # ── Get site URL ────────────────────────────────────────────────────────────
 SITE_URL=$(db_q "SELECT option_value FROM ${TABLE_PREFIX}options WHERE option_name='home' LIMIT 1;" || \
@@ -196,19 +266,17 @@ convert_to_webp() {
 	local src="$1" dst="$2"
 	[[ -f "$dst" ]] && return 0
 	case "${WEBP_CONVERTER:-}" in
-		imagemagick) convert "$src" -quality 82 "$dst" 2>/dev/null ;;
-		cwebp)       cwebp -q 82 "$src" -o "$dst" 2>/dev/null ;;
-		gd)
-			php -r "
-			\$info = @getimagesize('$src'); if (!\$info) exit(1);
-			\$img = match(\$info['mime']){'image/png'=>@imagecreatefrompng('$src'),'image/jpeg'=>@imagecreatefromjpeg('$src'),default=>null};
-			if (!\$img) exit(1);
-			imagepalettetotruecolor(\$img);
-			@imagewebp(\$img, '$dst', 82);
-			imagedestroy(\$img);
-			exit(file_exists('$dst')?0:1);
-			" 2>/dev/null
+		imagemagick) convert "$src" -quality "$WEBP_QUALITY" "$dst" 2>/dev/null ;;
+		# cwebp does not read GIF; gif2webp ships in the same libwebp tools package.
+		cwebp)
+			case "$src" in
+				*.[gG][iI][fF]) gif2webp -q "$WEBP_QUALITY" "$src" -o "$dst" 2>/dev/null ;;
+				*)              cwebp -q "$WEBP_QUALITY" "$src" -o "$dst" 2>/dev/null ;;
+			esac
 			;;
+		# A file, not inline PHP: CI lints it at the 7.4 floor, and the paths travel as
+		# arguments instead of being pasted into PHP source.
+		gd) php "$SCRIPT_DIR/webp-gd.php" "$src" "$dst" "$WEBP_QUALITY" 2>/dev/null ;;
 		*) return 1 ;;
 	esac
 }
