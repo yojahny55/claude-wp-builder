@@ -74,7 +74,7 @@ hid=$(awk '/^## `hidden` is two different things/{f=1; next} f && /^## /{exit} f
 q "$hid" -F 'hidden with the ATTRIBUTE alone' || fail "$skill no longer says a script-toggled element is hidden with the attribute alone"
 rightline=$(printf '%s\n' "$hid" | awk '/<!-- right -->/{getline; print; exit}')
 [ -n "$rightline" ] || fail "$skill's hidden section marks no example as right"
-q "$rightline" -E 'class="[^"]*(^|[" ])hidden[ "]' && fail "$skill marks an element carrying both the hidden utility and the attribute as right: $rightline"
+q "$rightline" -E 'class="([^"]* )?hidden[ "]' && fail "$skill marks an element carrying both the hidden utility and the attribute as right: $rightline"
 # 4d. One .btn: the starter's components/buttons.css owns it.
 q "$(tr '\n' ' ' < "$skill")" -F 'Never write a second `.btn`' || fail "$skill lost the one-.btn rule"
 # 4e. A reset class on a converted <button> ties with the utilities: the weightless form.

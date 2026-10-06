@@ -106,11 +106,11 @@ for f in "$setup" "$starter"; do
   grep -Eq "user_can\( *\\\$user, *'unfiltered_html' *\)" "$f" \
     || fail "$f checks the current user, not the \$user upload_mimes passes — the gate answers for the wrong account"
   # Every SVG mime assignment comes after the capability check in the same function.
-  bad=$(awk '/function [a-z_]*allow_svg_upload/{f=1; gated=0} f && /unfiltered_html/{gated=1} f && /\$mimes\[.svg.?\]/ && !gated {print FILENAME": "$0} f && /^}/{f=0}' "$f")
+  bad=$(awk '/function [A-Za-z0-9_]*allow_svg_upload/{f=1; gated=0} f && /unfiltered_html/{gated=1} f && /\$mimes\[.svgz?.\]/ && !gated {print FILENAME": "$0} f && /^}/{f=0}' "$f")
   [ -z "$bad" ] || fail "an SVG mime is granted before the unfiltered_html check: $bad"
-  ungated=$(grep -c "\$mimes\['svg'\]" "$f" || true)
-  inside=$(awk '/function [a-z_]*allow_svg_upload/{f=1} f && /\$mimes\[.svg.\]/{n++} f && /^}/{f=0} END{print n+0}' "$f")
-  [ "$ungated" = "$inside" ] || fail "$f assigns \$mimes['svg'] outside the gated allow_svg_upload function"
+  ungated=$(grep -cE '\$mimes\[.svgz?.\]' "$f" || true)
+  inside=$(awk '/function [A-Za-z0-9_]*allow_svg_upload/{f=1} f && /\$mimes\[.svgz?.\]/{n++} f && /^}/{f=0} END{print n+0}' "$f")
+  [ "$ungated" = "$inside" ] || fail "$f assigns \$mimes['svg'] or \$mimes['svgz'] outside the gated allow_svg_upload function"
 done
 
 # 7. The Local JSON field model, and a redefinition that cannot lose a client's fields.
