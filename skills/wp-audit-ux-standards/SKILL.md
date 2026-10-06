@@ -1,18 +1,14 @@
 ---
 name: wp-audit-ux-standards
-description: Usability criteria for a WordPress site — forms and data entry, navigation and task flow, links, interactive feedback, legibility and visual identity. Holds the UX-NNN catalog, the page-level vs site-level split, the applicability rules that keep a score honest, and which owner each fix belongs to. Use when the wp-audit-ux agent audits a site or /wp-audit scores usability.
+description: The UX-NNN usability catalog for a WordPress site — forms and data entry, navigation and task flow, broken internal and external links, hover and active states, line length per breakpoint, logo and typography consistency — with the page-level and site-level split, the applicability rules that decide which criteria are N/A and keep the score honest, the owner each fix belongs to, and the standard a visual fix must meet. Use when running /wp-audit --usability, explaining or fixing a UX-NNN finding such as UX-014 on page:/contact/, deciding whether a usability criterion is N/A on a brochure site or a catalog store, or scoring usability. Not for contrast, ARIA, focus or target size (wp-audit-a11y), Core Web Vitals or Lighthouse (wp-audit-performance), or titles and schema (wp-audit-seo-standards).
 user-invocable: false
 ---
 
 # Usability standards
 
-Six auditors cover security, SEO, accessibility, performance, WordPress standards and
-GEO. Between them they answer whether the code is safe, findable, compliant, fast, idiomatic
-and legible to an agent. None of them answers whether a person can use the site.
-
-That is not a gap in one of them. A form that marks no field as required is valid HTML,
-escapes correctly, loads fast and passes WCAG; the site is simply harder to use than it
-needs to be, and nothing in the audit says so. These are the criteria that say so.
+The criteria for whether a person can use the site, which the other six auditors do not
+ask: a form that marks no field as required is valid HTML, escapes correctly, loads fast and
+passes WCAG, and is still harder to use than it needs to be.
 
 ## What this is not
 
@@ -32,25 +28,26 @@ Codes are `UX-NNN`. The numbers are the criteria's own, zero-padded, so `UX-006`
 **Numbers are never reused**: a retired criterion leaves a hole.
 
 `UX-022`, `UX-023` and `UX-039` to `UX-058` are not holes. They are the browser suite's own
-accessibility, SEO and performance criteria, which `templates/audit-suite/scripts/to-run.js`
-emits under this prefix — contrast arrives as `UX-045`, which is `A11Y-003` here. They are
-not usability criteria and not rows of this catalog. A new usability criterion takes the next
-number above `UX-058`.
+accessibility, SEO and performance criteria, which
+`${CLAUDE_PLUGIN_ROOT}/templates/audit-suite/scripts/to-run.js` emits under this prefix —
+contrast arrives as `UX-045`, which is `A11Y-003` here. They are not usability criteria and
+not rows of this catalog. A new usability criterion takes the next number above `UX-058`.
 
 Each row carries the owner its fix belongs to, in the four-way split `/wp-audit` Step 8.5
 defines — `code` travels with the commit, `setting` does not, `content` needs somebody to
 write a text, `manual` needs judgement. The owner is a property of where the fix lands, not
 of whether the audit could apply it. Where the browser suite emits a criterion too, the
-owner here is the suite's (`aplicacion()` in `templates/audit-suite/lib/plan.js`): a measured
-row replaces the agent's in the merge, so a second classification would make a defect's
-owner depend on whether `--suite` ran. A row the suite never emits keeps the owner below,
-whatever `plan.js` says about it.
+owner here is the suite's (`aplicacion()` in
+`${CLAUDE_PLUGIN_ROOT}/templates/audit-suite/lib/plan.js`): a measured row replaces the
+agent's in the merge, so a second classification would make a defect's owner depend on
+whether `--suite` ran. A row the suite never emits keeps the owner below, whatever `plan.js`
+says about it.
 
 ### A. Forms and data entry
 
 Applicability: see *Applicability* below — the whole group is N/A on a site with no form.
 
-| Code | Check | How to detect | Passes when | Severity | Owner |
+| Code | Criterion | How to detect | Passes when | Severity | Owner |
 |---|---|---|---|---|---|
 | UX-001 | Required and optional fields are distinguishable | `required`/`aria-required`, label text, or a visible mark; check it is not colour alone | the distinction is visible and survives colour blindness | WARNING | code |
 | UX-002 | Field size matches the expected value | `size`, `maxlength`, `cols`/`rows`, rendered width against the datum | a postcode field is not as wide as an address | INFO | manual |
@@ -66,7 +63,7 @@ Applicability: see *Applicability* below — the whole group is N/A on a site wi
 
 ### B. Navigation and task flow
 
-| Code | Check | How to detect | Passes when | Severity | Owner |
+| Code | Criterion | How to detect | Passes when | Severity | Owner |
 |---|---|---|---|---|---|
 | UX-003 | Every page has an exit | a cancel/close/back control in modals and flows | the current task can be abandoned without being trapped | WARNING | code |
 | UX-004 | Multi-step processes go back | the wizard or stepper pattern | a working Previous that keeps what was entered | WARNING | code |
@@ -78,7 +75,7 @@ Applicability: see *Applicability* below — the whole group is N/A on a site wi
 
 ### C. Links
 
-| Code | Check | How to detect | Passes when | Severity | Owner |
+| Code | Criterion | How to detect | Passes when | Severity | Owner |
 |---|---|---|---|---|---|
 | UX-014 | No broken internal links | collect the internal `href`s of the pages in scope, deduplicated and capped, and **follow them** | every internal link resolves | CRITICAL | code |
 | UX-015 | No broken external links | the same, for external hosts | no 404 and no DNS failure | WARNING | code |
@@ -89,10 +86,10 @@ Applicability: see *Applicability* below — the whole group is N/A on a site wi
 
 **`UX-014` is followed, not inferred.** A link that looks internal and 404s is the finding;
 a list of hrefs is not. When the links cannot be followed, report `UNMEASURED` with the
-list, never `PASS`. The sweep is scoped, not exhaustive: internal targets resolved through
-WP-CLI first, each link requested once however many pages carry it, at most 50 HTTP
-requests per page, the clone-origin host never requested from a clone, and a CDN challenge
-`UNMEASURED` rather than broken — see `agents/wp-audit-ux.md` and `bin/link-sweep.mjs`.
+list, never `PASS`. The sweep is scoped, not exhaustive — each link requested once,
+at most 50 HTTP requests per page, a CDN challenge `UNMEASURED` rather than broken — and it
+runs through Step 2 of `${CLAUDE_PLUGIN_ROOT}/agents/wp-audit-ux.md`, which drives
+`${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs`. Run that procedure; do not rebuild it here.
 
 **One row per page, not per link.** Three broken links on `/contact/` are one finding,
 `UX-014 : page:/contact/`, whose evidence lists all three with their status codes. A row per
@@ -102,9 +99,9 @@ the same way or the duplicate survives.
 
 ### D. Interaction and visual feedback
 
-| Code | Check | How to detect | Passes when | Severity | Owner |
+| Code | Criterion | How to detect | Passes when | Severity | Owner |
 |---|---|---|---|---|---|
-| UX-005 | Clickable things react to hover | `:hover` rules and `cursor` | every clickable element gives visible feedback | INFO | code |
+| UX-005 | Action elements react to hover | `:hover` rules and `cursor` | every action element gives visible feedback | INFO | code |
 | UX-008 | The current menu item is marked | `active`/`aria-current="page"` and the style behind it | the selected item is clearly different | WARNING | code |
 | UX-009 | Action elements have room between them | the rendered gap between adjacent action elements, from `getBoundingClientRect()` — the harness lists pairs closer than 8 px | adjacent action elements do not induce a wrong tap. A target smaller than 24×24 is `A11Y-028`, not this row | WARNING | code |
 | UX-026 | Button text names the action | read the button labels | "Save changes", not "OK" where OK is ambiguous | INFO | content |
@@ -113,7 +110,7 @@ the same way or the duplicate survives.
 
 ### E. Legibility
 
-| Code | Check | How to detect | Passes when | Severity | Owner |
+| Code | Criterion | How to detect | Passes when | Severity | Owner |
 |---|---|---|---|---|---|
 | UX-006 | Line length | measure the **rendered** characters per line, per breakpoint | ≤85 characters. 86–100 is a warning; over 100 fails | WARNING | code |
 | UX-007 | Text blocks are 5–8 lines | the length of unbroken blocks | text is segmented rather than a wall | INFO | content |
@@ -127,7 +124,7 @@ desktop. Report the longest line per breakpoint.
 
 ### F. Visual identity
 
-| Code | Check | How to detect | Passes when | Severity | Owner |
+| Code | Criterion | How to detect | Passes when | Severity | Owner |
 |---|---|---|---|---|---|
 | UX-029 | The product's identity is present | `<link rel="icon">`, the logo, colour tokens, the type family | the brand is recognisable and consistent | WARNING | code |
 | UX-033 | Images, tables and charts are sharp | rendered sharpness, `srcset`, modern formats | crisp on standard and high-density screens | INFO | code |
@@ -171,6 +168,11 @@ applicability; every criterion not on it applies to every site.
 - fewer than 10 published pages and posts, and no blog, shop or other archive → `UX-020`
 - no text block over 5 lines → `UX-006`, `UX-007`
 - no icons → `UX-030`, `UX-031`
+- a catalog store (`site.store_tier` = `catalog`, recorded by `/wp-audit` Step 2.3) has no
+  cart, checkout or payment → `UX-004`, `UX-011`, `UX-012` and `UX-037` are never scored
+  against those flows, and are `N/A ("catalog: nothing purchasable")` when no other flow
+  carries them. `unknown` is not `catalog`: it audits as a store. Read the recorded tier;
+  never infer it from whether a checkout page happens to exist
 
 **N/A is excluded from the denominator and reported separately.** On a brochure site where
 16 of the 36 criteria are N/A, 15 passed is 15/20 — a measurement. Scored as 15/36, against
@@ -202,8 +204,8 @@ criteria it covers. With no browser at all, the criteria that need a rendered pa
 ## The standard a fix has to meet
 
 Almost every fix in a row whose Owner is `code` is a visual change, and `UX-018`, `UX-005`,
-`UX-009` and `UX-006` move layout. So a fix to one of these is only correct when it is evidenced the
-same way a finding is:
+`UX-009` and `UX-006` move layout. So a fix to one of these is only correct when it is
+evidenced the same way a finding is:
 
 - **Consent.** A change to how the site looks is the client's decision, not the audit's. A
   criterion that fails is reported; it is not quietly restyled into passing.
@@ -214,9 +216,6 @@ same way a finding is:
 - **Coverage.** Desktop and mobile, and every element carrying the class — not the one the
   finding named.
 
-A tag swap is not exempt, and it is the case that looks safest. The browser applies its own
-styles to the new element, and a reset class added to compensate lands after the utilities
-already in the sheet: one real change turned an icon from white to black and from 26px to
-18px with no colour value edited.
-
-`agents/wp-audit-ux.md` holds the procedure that satisfies this.
+A tag swap is not exempt, though it looks safest: the browser styles the new element
+itself. Step 4 of `${CLAUDE_PLUGIN_ROOT}/agents/wp-audit-ux.md` holds the measurement that
+satisfies this standard, and the case that taught it.

@@ -1,21 +1,36 @@
 ---
 name: wp-audit-standards
-description: Shared contract for every wp-audit-* agent — severity levels, the report JSON schema, issue code prefixes, site-type and local-clone rules, audit tiers, performance budgets, accessibility and Core Web Vitals thresholds, and deduplication rules. Use when running /wp-audit or any wp-audit-* agent, or when writing, merging or scoring audit findings.
+description: Shared contract for every wp-audit-* agent — severity levels, the report fields bin/audit-report.mjs reads (check, status, severity, ownership, resource), the SEC-, SEO-, A11Y-, PERF-, WP-, GEO- and UX- prefixes, deduplication, the N/A rules for a WooCommerce catalog store or a local clone of production, link sweeps through bin/link-sweep.mjs, pacing live checks through bin/prod-gate.sh behind fail2ban, CrowdSec or ModSecurity, Lighthouse measurement traps, page-weight budgets and the WCAG and Core Web Vitals thresholds. Use when writing, merging or scoring an audit finding, deciding whether a check is N/A, sweeping a site's links, sending any request to a production host during /wp-audit, or judging a Lighthouse or Core Web Vitals number. Not for a domain's own checks — Rank Math and SEO (wp-audit-seo-standards), local SEO (wp-audit-local-standards), GEO, llms.txt and AI crawlers (wp-audit-geo-standards), usability UX-NNN (wp-audit-ux-standards).
 user-invocable: false
 ---
 
 # WP Audit Standards
 
-This skill defines the audit criteria, severity levels, report format, and quality thresholds used by all wp-audit agents.
+The contract every `wp-audit-*` agent shares: how a finding is graded, named and reported,
+when a check is `N/A`, how a sweep and a production request are paced, and the thresholds
+the agents measure against. Each domain's own check catalog lives in its agent, and in
+`wp-audit-seo-standards`, `wp-audit-local-standards`, `wp-audit-geo-standards` and
+`wp-audit-ux-standards`.
+
+`$WP` throughout is the WP-CLI wrapper from the project's `.wp-create.json`
+(`wp_cli.wrapper`).
+
+## Reference files
+
+- [references/performance-lessons.md](references/performance-lessons.md) — Lighthouse
+  measurement traps (simulated against observed metrics, contention), the rejected
+  inline-critical-CSS experiment with its numbers, WebP and right-sizing for images a theme
+  prints from raw field URLs, and the AIOS × CF7 REST interaction. Read when filing or
+  fixing a `PERF-xxx` finding from a Lighthouse run.
 
 ---
 
-## Severity Levels
+## Severity levels
 
 | Severity | Meaning | Action |
 |----------|---------|--------|
 | **CRITICAL** | Security vulnerability, complete accessibility failure, broken core functionality | Fix immediately |
-| **WARNING** | Best-practice violation, degraded UX, performance issue | Fix before delivery |
+| **WARNING** | Best-practice violation, degraded UX, performance problem | Fix before delivery |
 | **INFO** | Optimization opportunity, minor improvement | Fix when convenient |
 
 ---
@@ -38,7 +53,7 @@ spelled differently is a field the renderer never sees, and it refuses a finding
 | `evidence` | on `FAIL` | the command, selector, URL or measured value that produced it |
 | `reason` | on `UNMEASURED` and `N/A` | what stopped it, or why it does not apply |
 | `fix` | no | how to fix it |
-| `auto_fixable` | no | `true` when the agent can apply the fix without risk (see Auto-fixable below) |
+| `auto_fixable` | no | `true` when the agent can apply the fix without risk (see *Auto-fixable* below) |
 | `root_cause` | no | a slug every finding of one defect shares, e.g. `display-errors`; the renderer folds them into one |
 | `page`, `file`, `line` | no | where, when there is such a place |
 
@@ -58,6 +73,8 @@ prompt carries the same fields under other labels: `Owner` is `ownership`, `Meth
 GEO's tables grade an ORA `required`-tier failure `ERROR`. The renderer knows three
 severities, so a GEO `ERROR` is written `CRITICAL` in a finding.
 
+One finding of each status:
+
 ```json
 {
   "category": "security",
@@ -75,27 +92,44 @@ severities, so a GEO `ERROR` is written `CRITICAL` in a finding.
 }
 ```
 
----
+### Auto-fixable
 
-## Issue Code Prefixes
+`auto_fixable: true` only when the fix cannot break the site: adding a missing attribute
+(`alt`, `aria-label`, `loading`), appending a CSS rule, setting a wp-config constant,
+installing or configuring a plugin through WP-CLI, adding a missing escaping wrapper, adding
+a nonce check to a simple form. Restructuring a template, changing application logic,
+removing code and design decisions are never auto-fixable.
+
+### Check id prefixes
 
 | Prefix | Domain |
 |--------|--------|
-| `SEC-xxx` | Security |
-| `SEO-xxx` | SEO |
-| `A11Y-xxx` | Accessibility |
-| `PERF-xxx` | Performance |
-| `WP-xxx` | Best Practices |
-| `GEO-Dnn`, `GEO-Axx`, `GEO-Uxx`, `GEO-Pxx` | GEO / AI-agent readiness, by ORA layer |
-| `UX-xxx` | Usability |
+| `SEC-NNN` | Security |
+| `SEO-NNN` | SEO |
+| `A11Y-NNN` | Accessibility |
+| `PERF-NNN` | Performance |
+| `WP-NNN` | Best Practices |
+| `GEO-Dnn`, `GEO-Ann`, `GEO-Unn`, `GEO-Pnn` | GEO / AI-agent readiness, by ORA layer |
+| `UX-NNN` | Usability |
 | `A11Y-AXE-*`, `PERF-LH-*` | Evidence rows from the browser suite — measurements of an existing criterion, never criteria of their own |
+
+### Deduplication
+
+When several agents report one defect:
+
+- **Security agent** owns vulnerability-class checks (XSS, SQLi, CSRF)
+- **Practices agent** owns coding-standards checks (escaping for theme review compliance)
+- **SEO agent** owns heading hierarchy for search ranking context
+- **A11y agent** owns heading hierarchy for screen reader navigation context
+- **The command** deduplicates identical `file:line` findings, keeping the highest severity
 
 ---
 
 ## Site type and local clones
 
-Two properties of the project change which checks apply. `/wp-audit` Step 2.3 reads them
-once and every agent honours the result; this is the methodology behind that step.
+Two properties of the project change which checks apply. `/wp-audit` Step 2.3 (*Site type
+and local clone*) reads them once and every agent honours the result; this is the
+methodology behind that step.
 
 ### Gate by site type, do not delete
 
@@ -107,65 +141,71 @@ holds: a commerce check must not fire on a site with no WooCommerce, or the scor
 site for lacking a feature it never claimed. Adding commerce depth therefore leaves a
 generic site's score unchanged, because every commerce check reads `N/A` on it.
 
-A catalog store (`site.store_tier` = `catalog`, read from the `store` block by `/wp-audit`
-Step 2.3) has no cart, checkout or payment, so a check on one of those surfaces is
+A catalog store (`site.store_tier` = `catalog`, read from the `store` block by the same
+step) has no cart, checkout or payment, so a check on one of those surfaces is
 `N/A ("catalog: nothing purchasable")` there, excluded from the denominator, exactly as a
 commerce check is on a site with no WooCommerce.
 
 ### A local clone is audited for production's posture
 
 A project restored from a backup to run locally (`.wp-create.json` `project.source:
-"restore"`, a `wordpress.url_origin`, or a non-public `wordpress.url` — see `/wp-audit`
-Step 2.3 for the exact field paths and the host list) has been deliberately altered to work
+"restore"`, a `wordpress.url_origin`, or a non-public `wordpress.url` — see the same step
+for the exact field paths and the host list) has been deliberately altered to work
 in isolation. Those alterations — a dev host in the database, deactivated payment/cache/mail
 plugins, `DISABLE_WP_CRON`, absent object-cache drop-ins, debug logging on, media uploaded
 after the file backup was taken — are the price of the copy, not defects of the site. On a
 clone they are **`N/A (local clone)`**, out of the denominator, and not printed as findings.
-The catalog and the exact rule live in `/wp-audit` Step 2.3. The one test that keeps this
+The catalog and the exact rule live in that step. The one test that keeps this
 honest: *would this also be true on production?* If yes, it is a finding; if it exists only
 because this is a copy, suppress it.
 
 ### Link and page sweeps against a site
 
 Any check that requests many URLs of the audited site — broken links, a rendered-head
-snapshot, a page walk — follows these limits. A local site shares one database and one web
+snapshot, a page walk — follows these steps. A local site shares one database and one web
 server with every other project on the machine, and an uncached WordPress page is
 expensive: an improvised crawler with 25 concurrent `curl -L` workers over a store's term
 archives once held MariaDB at ~18 cores and load 18, slowing every site on the box.
 
-- **At most 4 requests in flight.** Never a thread pool sized to the machine. This protects
-  a local machine. A production host is paced by "Production sits behind a WAF" below.
-- **Status only, so no body.** `HEAD`, or `curl -r 0-0` when a server refuses `HEAD`. A
-  full render is paid only when a check reads the page itself.
-- **Resolve internal targets through WP-CLI or the database first.** Whether a post or
-  term exists and is published is a query, not a page render.
-  `skills/wp-cli-patterns/scripts/resolve-link-targets.php` does it: a link counts as
-  resolved only when the object is published and its own canonical URL has the link's
-  path, so it may send a good link to HTTP but never marks a broken one resolved. Only
-  what it cannot answer — drafts, query strings, redirects, external links, rewrite rules
-  a plugin owns — needs a real request.
-- **Sample term archives: 20 per taxonomy**, unless the operator asked for a full sweep.
-  Hundreds of author or category archives are one template; twenty of them say whether it
-  works. The resolver tags each link it passes on with its taxonomy, and the sweep samples
-  by that tag (falling back to the first path segment for untagged links).
-- **Use `bin/link-sweep.mjs`** rather than writing a crawler. It applies every limit above,
-  classifies each link as internal, clone-origin (the `wordpress.url_origin` host, never
-  requested from a clone unless that host was confirmed this run) or external, reports a
-  CDN bot challenge as `UNMEASURED` instead of broken, and stops at a wall-clock budget:
+1. **Resolve internal targets through WP-CLI or the database first.** Whether a post or term
+   exists and is published is a query, not a page render.
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/scripts/resolve-link-targets.php` does it: a
+   link counts as resolved only when the object is published and its own canonical URL has
+   the link's path, so it may send a good link to HTTP but never marks a broken one resolved.
+   Only what it cannot answer — drafts, query strings, redirects, external links, rewrite
+   rules a plugin owns — needs a real request.
+2. **Sample term archives: 20 per taxonomy**, unless the operator asked for a full sweep.
+   Hundreds of author or category archives are one template; twenty of them say whether it
+   works. The resolver tags each link it passes on with its taxonomy, and the sweep samples
+   by that tag (falling back to the first path segment for untagged links).
+3. **Sweep the rest with `bin/link-sweep.mjs`** — run it, never write a crawler. It needs
+   node. It holds every limit for you: **At most 4 requests in flight**, whatever
+   `--concurrency` asks for, never a pool sized to the machine; status only, no body (`HEAD`,
+   or `curl -r 0-0` where a server refuses `HEAD`); the clone-origin host (the
+   `wordpress.url_origin` host) never requested from a clone unless it was confirmed this
+   run; a CDN bot challenge reported `UNMEASURED` instead of broken; and a wall-clock budget.
 
-  ```bash
-  # links.txt: one href per line, TAB, the page it was found on
-  $WP eval-file ${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/scripts/resolve-link-targets.php \
-    links.txt resolved.json > http.txt
-  node ${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs --site "$SITE_URL" --urls http.txt \
-    --clone-origin "$URL_ORIGIN" --budget 120 > sweep.json
-  ```
+   ```bash
+   # links.txt: one href per line, TAB, the page it was found on
+   $WP eval-file ${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/scripts/resolve-link-targets.php \
+     links.txt resolved.json > http.txt
+   node ${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs --site "$SITE_URL" --urls http.txt \
+     --clone-origin "$URL_ORIGIN" --budget 120 > sweep.json
+   ```
 
-  `resolved.json` lists what the database answered, with the pages carrying each link;
-  those are resolved, not unmeasured.
+   | Exit | Meaning |
+   |---|---|
+   | `0` | the sweep ran; its findings are in the JSON |
+   | `2` | usage error — fix the arguments |
+   | `4` | `--stop-on-block` stopped it at a block: mark the production host blocked (below) |
 
-  Links it did not request (sampled out, over budget, challenged, clone-origin) come back
-  `unmeasured` with the reason. Report them as `UNMEASURED` with the count, never as a pass.
+4. **Report what was not requested as `UNMEASURED`, with the count.** Links sampled out, over
+   budget, challenged or clone-origin come back `unmeasured` with the reason; none of them is
+   a pass. `resolved.json` lists what the database answered, with the pages carrying each
+   link — those are resolved, not unmeasured.
+
+This protects a local machine. A production host is paced by *Production sits behind a WAF*
+below.
 
 ### Live checks target production, and the URL is confirmed
 
@@ -178,53 +218,63 @@ URL they are `UNMEASURED`, never `PASS`.
 
 ### Production sits behind a WAF: same measurements, one request at a time
 
-Production servers run fail2ban, CrowdSec and ModSecurity. An audit must not trip them
-unless the operator asks for it explicitly. One audit got its machine's IP banned in five
-minutes:
-
-- Seven agents were dispatched in parallel against the production host, each allowed 4
-  requests in flight, so up to 28 ran at once, plus the Lighthouse and Playwright loads.
-- The security agent probed `readme.html`, `?author=1` and `/wp-json/wp/v2/users` in the
-  same burst.
-
-Leaky-bucket rules count requests per window, so the burst filled them, not the paths
-themselves. Every live check of that run was lost, and one agent's retries lengthened the
-ban.
+Production servers run fail2ban, CrowdSec and ModSecurity, and an audit must not trip them
+unless the operator asks for it explicitly. Seven agents in parallel once sent up to 28
+requests at once to one production host, plus Lighthouse and Playwright loads and a burst of
+reconnaissance probes; leaky-bucket rules count requests per window, the host banned the
+auditing IP within five minutes, and every live check of the run was lost (the header of
+`bin/prod-gate.sh` has the full account).
 
 The fix changes **the pace, never the measurement**. Every check still runs the same command
-against the same host, with the same headers and user agents. That covers Lighthouse,
-Playwright, the suite, the GEO probes with AI user agents and `Accept: text/markdown`, and
-the security probes. Against a public host:
+against the same host, with the same headers and user agents — Lighthouse, Playwright, the
+suite, the GEO probes with AI user agents and `Accept: text/markdown`, the security probes.
+Against a public host, run `bin/prod-gate.sh`; never reimplement it. It needs `flock` and
+refuses to send unserialized without it.
 
-- **Every request goes through `bin/prod-gate.sh`.** It holds a per-host lock shared by all
-  the agents of the run, so production sees one command at a time. It waits 2 s between
-  commands, and use `--delay 10` before reconnaissance-shaped paths: readme, license,
-  `?author=`, the users REST route, xmlrpc and login. A Lighthouse run or a Playwright launch
-  is one gated command. Browsers load a page's assets in parallel, as any visitor's would.
-- **Sweeps run at `--concurrency 1 --delay-ms 1000 --stop-on-block`, with a budget sized to
-  match.** Exit `4` from the sweep means it stopped at a block: mark the host blocked. Use
-  `--budget` of at least one second per link plus the timeout, so the slower pace does not
-  turn links into `budget exhausted`. The suite runs with one Playwright worker:
-  `bin/audit-suite.sh` does this itself for a public URL.
-- **The first block ends all production traffic, with no retry.** `prod-gate.sh` marks the
-  host blocked on curl's refused or reset codes. The caller marks it blocked with
-  `--mark-blocked` on any of these:
-  - a `429`
-  - a `403` carrying a WAF signature (`mod_security`, `crowdsec`, `cf-mitigated`, a captcha)
-  - `ERR_CONNECTION_REFUSED` in a browser
+1. **Send every request through the gate**, with the gate directory `/wp-audit` passes in the
+   dispatch prompt. The directory is the shared lock: every agent of the run must use the same
+   one, or each holds a lock of its own and production sees them all at once.
 
-  After that, every gated call exits `4` without sending anything. Exit `5` only means
-  another agent held the host past `--wait`. Nothing was sent, so call again. Every live check not yet
-  answered is `UNMEASURED: production blocked the audit`. A retry against a ban extends the
-  ban.
+   ```bash
+   WP_AUDIT_GATE_DIR=<gate dir> ${CLAUDE_PLUGIN_ROOT}/bin/prod-gate.sh [--delay 10] <host> -- <command> [args...]
+   ```
+
+   The gate runs one command at a time per host and waits 2 s between commands. Pass
+   `--delay 10` before reconnaissance-shaped paths: readme, license, `?author=`, the users
+   REST route, xmlrpc and login. A Lighthouse run or a Playwright launch is one gated
+   command; browsers load a page's assets in parallel, as any visitor's would.
+2. **Sweep at `--concurrency 1 --delay-ms 1000 --stop-on-block`**, with a `--budget` of at
+   least one second per link plus the timeout, so the slower pace does not turn links into
+   `budget exhausted`. The suite runs with one Playwright worker: `bin/audit-suite.sh` does
+   this itself for a public URL.
+3. **The first block ends all production traffic, with no retry.** The gate marks the host
+   blocked itself on curl's refused or reset codes, and on two curl timeouts in a row. Mark it
+   yourself on any of these:
+   - a `429`
+   - a `403` carrying a WAF signature (`mod_security`, `crowdsec`, `cf-mitigated`, a captcha)
+   - `ERR_CONNECTION_REFUSED` in a browser
+   - link-sweep exit `4`
+
+   ```bash
+   WP_AUDIT_GATE_DIR=<gate dir> ${CLAUDE_PLUGIN_ROOT}/bin/prod-gate.sh --mark-blocked <host> "<reason>"
+   ```
+
+4. **Read the gate's exit code:**
+
+   | Exit | Meaning | Then |
+   |---|---|---|
+   | the command's own | the command ran | judge its output |
+   | `4` | the host is marked blocked; nothing was sent | report the check `UNMEASURED: production blocked the audit`. Never retry — a retry against a ban extends the ban |
+   | `5` | another agent held the host past `--wait` (300 s); nothing was sent | call again, at most twice more; after a third `5`, report the check `UNMEASURED: production gate busy` |
+   | `1` | a usage error, or `flock` is missing | fix the call; without `flock`, nothing may be sent and the check is `UNMEASURED` |
 
 **A local site keeps its own limits, unchanged.** `prod-gate.sh` passes a development host
-straight through, and nothing above applies to it. The local rule is "Link and page sweeps
-against a site", above.
+straight through, and nothing above applies to it. The local rule is *Link and page sweeps
+against a site*, above.
 
 ---
 
-## Audit Tiers
+## Audit tiers
 
 ### Tier 1 — Code-only (always available)
 
@@ -237,14 +287,15 @@ Plugin management, option reading, database queries. Requires a working WordPres
 ### Tier 3 — + Browser measurement (when a browser automation tool is available)
 
 Lighthouse-style browser audits: Core Web Vitals, rendered-page checks, performance traces.
-Requires a browser automation tool — Playwright MCP, Chrome DevTools MCP or Claude in
-Chrome. It adds measurement, never criteria: every threshold Tier 3 measures against is
-recorded in this skill and in the audit agents, and a check a file scan can answer runs at
-Tier 1 whether or not a browser is present.
+Use the browser tool the session has. With more than one, use Chrome DevTools MCP for a
+Lighthouse run or a performance trace, Playwright MCP for everything else, and Claude in
+Chrome only when neither is present. It adds measurement, never criteria: every threshold
+Tier 3 measures against is recorded in this skill and in the audit agents, and a check a file
+scan can answer runs at Tier 1 whether or not a browser is present.
 
 ---
 
-## Performance Budgets
+## Performance budgets
 
 | Resource | Budget |
 |----------|--------|
@@ -256,7 +307,7 @@ Tier 1 whether or not a browser is present.
 
 ---
 
-## Accessibility Thresholds
+## Accessibility thresholds
 
 | Requirement | Minimum |
 |-------------|---------|
@@ -268,7 +319,7 @@ Tier 1 whether or not a browser is present.
 
 ---
 
-## Core Web Vitals Targets
+## Core Web Vitals targets
 
 | Metric | Good | Needs Work | Poor |
 |--------|------|-----------|------|
@@ -276,150 +327,13 @@ Tier 1 whether or not a browser is present.
 | INP | ≤200ms | 200ms–500ms | >500ms |
 | CLS | ≤0.1 | 0.1–0.25 | >0.25 |
 
----
-
-## Performance — Hard-won Lessons (Tier 3 / Lighthouse)
-
-Interpretation traps and fixes that actually move production bytes. Consult before filing or fixing a `PERF-xxx` finding from a Lighthouse run.
-
-### Read *observed* metrics before chasing a bad *simulated* score
-
-Lighthouse's default (`throttlingMethod: "simulate"`) reports **Lantern-simulated** LCP/FCP/TTI on a modeled slow-4G + 4× CPU. On a **dev server** this is dominated by local TTFB + the throttle model and can read 6–7 s while the page is actually instant. Before treating a high LCP as real, open the full JSON and compare:
-
-- `audits.metrics.details.items[0].largestContentfulPaint` (simulated) **vs** `...observedLargestContentfulPaint` (real paint).
-- If observed is ~200–900 ms and simulated is multi-second, the number is a **simulation/dev-server artifact** — the score barely moves regardless of theme changes, and production (with page cache + real CDN/TTFB) differs. Say so in the finding instead of burning effort chasing it. **Real byte reductions (WebP, right-sizing) still help production** and still shrink the *LCP resource*, so do those — just set score expectations.
-- `image-delivery-insight`, `render-blocking-insight`, `lcp-discovery-insight` etc. are **weight-0** in the Performance score (informative). Only the 5 metric audits (FCP/LCP/TBT/CLS/SI) carry weight. Fixing a weight-0 insight is a production win, not a score win — label it accordingly.
-
-### A Lighthouse run needs an idle machine, and a contended one is not a slow page
-
-A Lighthouse score is a measurement of the machine as much as of the page. The same page, same
-URL and same flags, measured on a busy laptop and then on an idle one, read **performance 62
-with LCP 10,170 ms** and **performance 94 with LCP 1,580 ms**. Nothing in the theme changed
-between the two runs. The first number is the kind that gets a morning spent on a
-non-existent regression, and it is indistinguishable from a real one by inspection.
-
-- **Never run Lighthouse next to anything else** — not a second Lighthouse, not the DOM/axe
-  suite, not a watch build, not a video call. Run it alone, and run the categories serially.
-- **A page that "hangs" under contention is usually not hanging.** An internal search spec
-  that looked stuck, and was left out of the suite for it, completed in 4–7 s once Lighthouse
-  stopped competing with it; the whole suite went from 4.3 minutes to 1.0 minute.
-- **Re-measure before filing a metric regression, on the idle machine, twice.** A single run
-  is not evidence. Where the two runs disagree by more than a few points, say so in the
-  finding rather than reporting the worse one.
-- The same applies to a *before/after* pair for a fix: both halves must be measured under the
-  same conditions, or the fix's number is the machine's number.
-
-### Inline critical CSS: measured on a real site, and rejected
-
-Inlining the critical CSS is the standard advice for a render-blocking stylesheet, and on a
-real build it made the metric it was meant to fix **worse**. Recorded here so the experiment is
-not repeated blind:
-
-| Variant | FCP | LCP | CLS |
-|---|---|---|---|
-| Baseline | 990 ms | 2950 ms | baseline |
-| 43KB critical CSS inlined | **570 ms** | **3150 ms** | improved |
-| 13KB (above-the-fold only) | improved | — | **0.139** |
-| Preloading jQuery + carousel + page JS | **1340 ms** | — | — |
-
-The inline block sits *ahead of the hero image on the same connection*, so the paint that
-counts starts later even though the first paint starts sooner. The trimmed variant is smaller
-than the styles the first viewport actually needs, which is what moved CLS to 0.139. All of it
-was reverted with zero pixels of difference.
-
-**The lesson is not "never inline".** It is that FCP and LCP move in opposite directions here,
-so a change justified by FCP alone is unmeasured, and the LCP number decides. On that site the
-real cause was elsewhere and only the Lighthouse breakdown showed it: 276 ms of *element
-render delay*, because the carousel re-built the first slide inside its own track and the
-second paint was the one being measured. A background the theme already painted without
-JavaScript was not the problem.
-
-### WebP: `image_editor_output_format` only covers NEW, attachment-pipeline images
-
-`add_filter('image_editor_output_format', ...)` converts uploads to WebP **only on new uploads**, and **only images that flow through WP's attachment functions** (`wp_get_attachment_image`, `the_post_thumbnail`). Themes that print **raw SCF/ACF field URLs** (`echo $field['url']`) or CSS `background-image: url(<field>)` bypass it entirely, so existing hero/about/neighborhood/banner images stay JPEG/PNG.
-
-To serve WebP for **existing + SCF-driven** images without touching every template:
-
-1. Pre-generate `.webp` siblings for existing uploads (one-time): `find uploads -iname '*.jpg' -o -iname '*.png'` → `magick "$f" -quality 82 "${f%.*}.webp"` (hero/LCP images can go lower, ~q68, since they sit behind scrims or are video-replaced).
-2. Add a front-end output-buffer that rewrites finished HTML — covers `src`, `srcset`, and inline `background-image` in one pass:
-
-```php
-add_action( 'template_redirect', function () {
-    if ( is_admin() || is_feed() || is_robots() ) return;
-    $u = wp_get_upload_dir(); $base = $u['baseurl']; $dir = $u['basedir'];
-    ob_start( function ( $html ) use ( $base, $dir ) {
-        $pat = '#' . preg_quote( $base, '#' ) . '/[^"\'\)\s]+?\.(?:jpe?g|png)#i';
-        return preg_replace_callback( $pat, function ( $m ) use ( $base, $dir ) {
-            $webp = preg_replace( '/\.(?:jpe?g|png)$/i', '.webp', $m[0] );
-            return file_exists( $dir . substr( $webp, strlen( $base ) ) ) ? $webp : $m[0];
-        }, $html );
-    } );
-} );
-```
-
-`template_redirect` is front-end-only, and with a page cache (WP Super Cache) the buffer runs once per cache build. WebP is universally supported by target browsers — matching the theme's existing unconditional `image_editor_output_format` policy — so no `Accept`-header branching is needed.
-
-### Right-size — never print `$field['url']` for a fixed slot
-
-Lighthouse "responsive-size" waste = serving a 2200px original in a 400px slot. Raw SCF field URLs (`$image['url']`) always emit the **full original**. Use the attachment ID so the browser gets a `srcset`:
-
-```php
-echo wp_get_attachment_image( (int) $image['id'], 'large', false, array(
-    'class' => 'about__bg', 'alt' => $heading, 'loading' => 'lazy',
-    'sizes' => '(max-width: 899px) 100vw, 136vw', // match the real CSS display width
-) );
-```
-
-Pick `sizes` from the element's actual rendered width (full-bleed → `100vw`; a 136%-wide bg → `136vw`; a 136px logo → `136px`). This composes with the WebP buffer above (the srcset `.jpg` URLs are rewritten to `.webp`).
-
-### Hero LCP pattern (poster-first, video deferred)
-
-Make the LCP element a **small poster image**, not the video: `<img fetchpriority="high" width/height>` + a `<link rel="preload" as="image">` for it in `wp_head`; lazy-load the background `<video>` via JS on **desktop only** (`min-width:1024px`), after the poster paints (`requestIdleCallback`), and **never** on mobile / `navigator.connection.saveData`. Preload the poster's WebP so the preload and the rendered `src` match (else the preload is wasted).
-
-### Render-blocking CSS
-
-Dequeue the near-empty theme `style.css` on the front end (it usually carries only the WP header comment; runtime styles live in the compiled bundle). Async-load below-the-fold plugin CSS (e.g. Contact Form 7) via `style_loader_tag` → `media='print' onload="this.media='all'"`.
-
-### AIOS × Lighthouse gotcha (Tier 2 ↔ Tier 3 interaction)
-
-If the security agent sets AIOS `aiowps_disallow_unauthorized_rest_requests = 1`, it returns **403** on CF7's REST endpoints (`/wp-json/contact-form-7/v1/...`). Lighthouse then **hangs up to 45 s** on those pending requests and logs console errors → Best-Practices drops (often 100 → 96) and metrics inflate. If a CF7 form is present, leave that AIOS setting off (or whitelist the CF7 REST namespace). Symptom in the JSON: `errors-in-console` / pending `Fetch` requests to `contact-form-7` with `statusCode: 403`.
-
-### Auto-fixable
-
-Agent can safely fix without risk of breaking the site:
-
-- Add missing attributes (e.g., `alt`, `aria-label`, `loading`)
-- Append CSS rules
-- Set wp-config constants
-- Install/configure plugins via WP-CLI
-- Add missing escaping wrappers
-- Add missing nonce checks to simple forms
-
-### Manual-only
-
-Requires human judgment:
-
-- Restructuring templates
-- Changing application logic
-- Removing code
-- Design decisions
-- Complex refactoring
+Read a Lighthouse number against [references/performance-lessons.md](references/performance-lessons.md)
+before filing it: a simulated LCP on a development host, or one measured beside another
+process, is not a regression.
 
 ---
 
-## Deduplication Rules
-
-When multiple agents find the same issue:
-
-- **Security agent** owns vulnerability-class checks (XSS, SQLi, CSRF)
-- **Practices agent** owns coding-standards checks (escaping for theme review compliance)
-- **SEO agent** owns heading hierarchy for search ranking context
-- **A11y agent** owns heading hierarchy for screen reader navigation context
-- **Command** deduplicates identical file:line findings, keeping the highest severity
-
----
-
-## Agent Interaction Model
+## Agent interaction model
 
 All plugin interaction via WP-CLI options/meta, never PHP APIs:
 

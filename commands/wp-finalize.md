@@ -344,7 +344,7 @@ If `.wp-create.json` exists in the project, read `wp_cli.wrapper` and run runtim
 
 ### Check 8: GEO & agent-readiness (report only)
 
-Static subset of the GEO checks in `skills/wp-audit-geo-standards/SKILL.md`,
+Static subset of the GEO checks in `skills/wp-audit-geo-standards/references/check-catalog.md`,
 reported here so a delivery reflects agent-readiness even when `/wp-audit --geo`
 was never run. Like every check in this command it **reports and never fixes** —
 run `/wp-audit --geo` to fix a finding, then re-run this check.

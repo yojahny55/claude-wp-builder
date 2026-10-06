@@ -61,16 +61,11 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 Site type is **detected, not assumed**. Print the applicable layer set and mark every
 other layer `N/A` with its rationale.
 
-Detection uses **positive signals only**. Do not scan registered REST namespaces:
-Rank Math, Yoast, SEOPress and CF7 all register one, so a namespace sweep marks an
-ordinary content site as SaaS and boots every plugin's REST callbacks.
-
-| Site type | Detection | Layers that apply |
-|-----------|-----------|-------------------|
-| content / publisher / service | default when nothing below matches | Discovery + Access + Usability |
-| local business | `industry` is a local/business value **and** a non-empty `business_address` option exists | + LocalBusiness schema, NAP, reviews |
-| merchant | `site.commerce` is `woocommerce` (WooCommerce **active**, from `/wp-audit` Step 2.3); run standalone, `$WP plugin is-active woocommerce` returns 0 | + Payments, `pricing.md`, Product schema |
-| SaaS / public API | an OpenAPI spec or a deliberate public API surface is recorded in `.claude/CLAUDE.md` | + OpenAPI / api-catalog / MCP / OAuth |
+Detect with the table in §2 of the skill — it is the only copy, so the two cannot disagree.
+Detection uses **positive signals only**; never scan registered REST namespaces, which
+every SEO and form plugin registers (the skill says why), and which boots every plugin's
+REST callbacks. Merchant is `site.commerce` = `woocommerce` from `/wp-audit` Step 2.3
+(WooCommerce **active**); run standalone, it is the first command below returning 0:
 
 ```bash
 $WP plugin is-active woocommerce && echo "merchant signal: WooCommerce active"
@@ -93,7 +88,7 @@ does not match the detected site type are reported `N/A`, not failed.
 | Code | Check | How to Detect | Severity | Auto-fix |
 |------|-------|---------------|----------|----------|
 | GEO-D01 | ARD / AI catalog published | `/.well-known/ard.json` (or the `ai-catalog.json` alias) with valid entries; grep the theme for the route or read it over HTTP in Tier 2 | ERROR | Yes |
-| GEO-D02 | Robots AI policy quality | `robots.txt` names each AI crawler explicitly, and the `Content-Signal` HTTP response header is present and consistent with it; a bare `User-agent: *` is a finding, and so is a `Content-Signal:` directive line inside `robots.txt`, which no robots grammar defines | WARNING | Yes |
+| GEO-D02 | Robots AI policy quality | `robots.txt` names each AI crawler explicitly, and the `Content-Signal` HTTP response header is present and consistent with it; a bare `User-agent: *` is a finding, and so is a `Content-Signal:` directive line inside `robots.txt`, which no robots grammar defines. A named crawler the owner disallowed is a deliberate block: report it as one, not as a failure, unless the signal contradicts it | WARNING | Yes |
 | GEO-D03 | Trust manifest | provenance/trust block alongside the ARD entries | INFO | Yes |
 | GEO-D04 | `/agents.md` | `GET /agents.md` returns `200` with the AGENTS.md document — the route `inc/agentic.php` serves — or an agent-rules / agent-plugins repo exists | INFO | Yes |
 | GEO-D05 | Brand search accuracy | advisory — measured via ORA / DataForSEO, off-site | INFO | No |

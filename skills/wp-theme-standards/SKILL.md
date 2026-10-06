@@ -1,12 +1,12 @@
 ---
 name: wp-theme-standards
-description: Classic (non-block) WordPress theme standards — required files, directory layout, asset enqueueing and cache busting, theme supports, escaping and security, hooks, queries, performance, SVG uploads, the SCF/ACF dependency, naming and the navigation class contract. Use when writing or reviewing theme PHP (the wp-template and wp-css agents, /wp-finalize, /wp-debug).
+description: Sets the standards for a classic (non-block) WordPress theme built from this plugin's starters — the layout read from the recorded template, one enqueue callback with filemtime cache busting, escaping (esc_html, wp_kses with an allowlist, never the_field), the unfiltered_html gate on SVG uploads, the SCF/ACF Local JSON field model in acf-json/, image delivery in inc/performance.php, self-hosted fonts and the LCP preload, and the .nav__toggle and .nav__link class contract shared by the walker and the header CSS. Use when writing or reviewing a theme's functions.php, inc/*.php or templates (enqueueing, escaping a headline that carries markup, theme supports, SVG uploads, image delivery, a stale stylesheet that will not update), or the nav classes in header CSS. Not for a site audit (wp-audit-standards) or Tailwind CSS (wp-tailwind-system).
 user-invocable: false
 ---
 
-# WordPress Legacy Theme Standards
+# WordPress Classic Theme Standards
 
-This skill defines the mandatory standards for building WordPress themes using the **legacy (classic) theme** architecture. No block themes, no Full Site Editing (FSE), no theme.json.
+This skill defines the mandatory standards for building WordPress themes using the **classic theme** architecture. No block themes, no Full Site Editing (FSE), no theme.json.
 
 ## Reference files
 
@@ -21,36 +21,8 @@ than retyping it:
 
 ---
 
-## Required Theme Files
-
-Every theme MUST include these files:
-
-| File | Purpose |
-|---|---|
-| `style.css` | Theme declaration with required headers |
-| `index.php` | Fallback template (required by WordPress) |
-| `functions.php` | Theme setup, hooks, enqueuing, helpers |
-| `screenshot.png` | Theme thumbnail (1200x900px recommended) |
-
-### style.css Headers
-
-The `style.css` file MUST begin with the theme declaration comment. This is how WordPress identifies the theme.
-
-```css
-/*
-Theme Name:   Starter Theme
-Theme URI:    https://example.com
-Author:       Developer Name
-Author URI:   https://example.com
-Description:  A custom legacy WordPress theme.
-Version:      1.0.0
-License:      GNU General Public License v2 or later
-License URI:  https://www.gnu.org/licenses/gpl-2.0.html
-Text Domain:  starter
-*/
-```
-
-> **Note:** Do not put actual styles in `style.css`. Use it only for the header declaration. All styles go where the template's layout puts them (below), enqueued via `functions.php`.
+`style.css` carries the theme header and no styles: every rule goes where the template's
+layout puts it (below), enqueued via `functions.php`.
 
 ---
 
@@ -77,16 +49,26 @@ function is a fatal error.
 Field groups are **not** left as pure PHP `acf_add_local_field_group()` registrations:
 a PHP-local group has no post (`ID=0`), never appears in **Custom Fields → Field
 Groups**, and can't be edited or extended by the client. Instead the `acf/init`
-loader in `functions.php` treats `fields/*.php` as a **one-time bootstrap** — it
+loader in the starter's `functions.php` (both starters carry it — read it there rather than
+rewriting it) treats `fields/*.php` as a **one-time bootstrap**: it
 registers each group once, writes it to `acf-json/<key>.json`, then loads only the
 Local JSON thereafter. ACF/SCF auto-loads `acf-json/`, so groups are visible,
 editable, and two-way synced (dashboard edits — including manually added fields —
-are written back to the JSON files and stay in version control).
+are written back to the JSON files and stay in version control). Never point
+`save_json`/`load_json` elsewhere — ACF already defaults to the theme's `acf-json/`.
 
-To **redefine** an existing group in code, edit its `fields/*.php` and delete the
-matching `acf-json/<key>.json` (plus `acf_delete_field_group('<key>')` if imported
-to the DB) so it re-bootstraps. Never point `save_json`/`load_json` elsewhere —
-ACF already defaults to the theme's `acf-json/`.
+To **redefine** an existing group in code — a destructive write, so in this order:
+
+1. Read `acf-json/<key>.json` first. Fields a client added in the dashboard live only
+   there; carry each one into `fields/<section>.php`, or it is lost in step 3.
+2. Edit `fields/<section>.php`.
+3. Delete the matching `acf-json/<key>.json` and, if the group was imported to the
+   database, delete it there too through the project's WP-CLI wrapper (`$WP` from
+   `.wp-create.json`): `$WP eval "var_dump( acf_delete_field_group( 'group_<section>' ) );"`
+   (`false` means it was never in the database, which is fine).
+4. Load any admin page so the loader re-bootstraps, then confirm `acf-json/<key>.json`
+   exists again with the new definition. Not rewritten means the loader did not run or
+   `acf-json/` is not writable — stop and report it.
 
 ---
 
@@ -137,30 +119,23 @@ Code: [references/setup-and-enqueue.md](references/setup-and-enqueue.md) § Page
 Register all required theme features inside an `after_setup_theme` hook.
 
 Required: `title-tag`, `post-thumbnails`, `custom-logo`, `html5` (search-form, comment-form,
-comment-list, gallery, caption, style, script), `automatic-feed-links`, and `register_nav_menus()`
-for `primary` and `footer`. Set `$GLOBALS['content_width']` (1280, filterable) on
-`after_setup_theme` at priority 0. Code: [references/setup-and-enqueue.md](references/setup-and-enqueue.md) § Theme Supports.
+comment-list, gallery, caption, style, script), `automatic-feed-links`, and the starter's
+`register_nav_menus()` locations — one per language (`primary-en`, `primary-es`, …), which the
+header's walker reads — kept, never collapsed into a single `primary`. Set
+`$GLOBALS['content_width']` (1280, filterable) on `after_setup_theme` at priority 0. The
+Tailwind starter does all of this in `inc/theme-setup.php`. Code:
+[references/setup-and-enqueue.md](references/setup-and-enqueue.md) § Theme Supports.
 
 ---
 
 ## Security: Output Escaping
 
-**Every** dynamic value rendered in HTML MUST be escaped. No exceptions.
+**Every** dynamic value rendered in HTML MUST be escaped, at the point of output: `esc_html()`
+for text, `esc_url()` for URLs, `esc_attr()` for attribute values, `wp_kses_post()` for
+editor (WYSIWYG) HTML — and, for a **text** field that carries a little markup by design,
+`wp_kses()` with an explicit allowlist:
+`<h2><?php echo wp_kses( $title, array( 'br' => array(), 'span' => array() ) ); ?></h2>`.
 
-| Function | Use When | Example |
-|---|---|---|
-| `esc_html()` | Outputting text content inside HTML tags | `<h1><?php echo esc_html($title); ?></h1>` |
-| `esc_url()` | Outputting URLs in href, src, action attributes | `<a href="<?php echo esc_url($link); ?>">` |
-| `esc_attr()` | Outputting values inside HTML attributes | `<div class="<?php echo esc_attr($class); ?>">` |
-| `wp_kses_post()` | Outputting rich text/HTML that should allow safe tags | `<div><?php echo wp_kses_post($content); ?></div>` |
-| `wp_kses()` + explicit allowlist | A **text** field that carries a little markup by design — a headline with a highlighted `<span>` and its line breaks | `<h2><?php echo wp_kses( $title, array( 'br' => array(), 'span' => array() ) ); ?></h2>` |
-
-### Rules
-
-- **Plain text** in tags: `esc_html()`
-- **URLs** anywhere: `esc_url()`
-- **Attribute values** (class, id, data-*): `esc_attr()`
-- **Rich HTML content** from WYSIWYG/editor fields: `wp_kses_post()`
 - **Never output raw** `get_field()`, `$_GET`, `$_POST`, or any user input without escaping
 - **`the_field()` and `the_sub_field()` echo unescaped.** Neither belongs in a template.
   Use `echo esc_html( prefix_get_field( … ) )` and its siblings, so the escaping is visible at
@@ -202,17 +177,8 @@ the tag still leaves a word gap.
 
 ## Security: Input Sanitization
 
-Sanitize all input before saving to the database.
-
-| Function | Use For |
-|---|---|
-| `sanitize_text_field()` | Single-line text input |
-| `sanitize_textarea_field()` | Multi-line text input |
-| `sanitize_email()` | Email addresses |
-| `absint()` | Positive integers |
-| `sanitize_file_name()` | File names |
-| `wp_kses_post()` | Rich HTML (on save) |
-| `sanitize_url()` | URL input |
+Sanitize all input before saving or using it, with the `sanitize_*()` function for its
+type, after `wp_unslash()`:
 
 ```php
 // Example: sanitize URL parameter. WordPress adds slashes to $_GET, $_POST and
@@ -226,28 +192,8 @@ if ( isset( $_GET['lang'] ) ) {
 
 ## Querying Posts
 
-**NEVER** use `query_posts()`. It modifies the main query and causes bugs.
-
-**ALWAYS** use `WP_Query` for custom queries.
-
-```php
-$args = array(
-    'post_type'      => 'post',
-    'posts_per_page' => 6,
-    'orderby'        => 'date',
-    'order'          => 'DESC',
-);
-$query = new WP_Query($args);
-
-if ($query->have_posts()) :
-    while ($query->have_posts()) : $query->the_post();
-        get_template_part('template-parts/content', get_post_type());
-    endwhile;
-    wp_reset_postdata();
-endif;
-```
-
-Always call `wp_reset_postdata()` after a custom `WP_Query` loop.
+**NEVER** use `query_posts()` — it replaces the main query. A custom query is a `WP_Query`,
+followed by `wp_reset_postdata()` after its loop.
 
 ---
 
@@ -291,11 +237,22 @@ Ship `inc/performance.php` (in the starter) in every theme. It handles the image
 5. `prefix_background_image($url)` — the declaration for a CSS background, with the `.webp` sibling in an `image-set()` behind the plain `url()` fallback.
 6. `prefix_lazy_background_attr($url, $idle = false)` — the same declaration, held in a data attribute until an IntersectionObserver paints it, for a **decorative background below the fold**. `background-image` has no `loading` attribute, so those download with the first paint however far down they sit. `prefix_print_lazy_background_noscript()` repeats every held-back declaration inside a `<noscript><style>` block on `wp_footer`. Never defer the hero: it is the LCP element.
 
-For a theme seeded from an existing demo (images already uploaded), batch-generate the `.webp` siblings once so (3) picks them up:
+For a theme seeded from an existing demo (images already uploaded), batch-generate the
+`.webp` siblings once so (3) picks them up. Run exactly this from the WordPress root (the
+directory holding `wp-content/`). It needs ImageMagick 7 (`magick`) built with WebP
+support, skips any image that already has a sibling, and reports what it wrote and what
+failed. Quality 82 is the plugin's one WebP setting — the same as `wp-robin`'s converter
+and `wp-audit-performance` PERF-053:
 
 ```bash
-find wp-content/uploads -type f \( -iname '*.jpg' -o -iname '*.png' \) \
-  -exec sh -c 'f="$1"; w="${f%.*}.webp"; [ -f "$w" ] || magick "$f" -quality 82 "$w"' _ {} \;
+command -v magick >/dev/null || { echo "magick (ImageMagick 7) not found — install it first" >&2; exit 1; }
+n=0; failed=0
+while IFS= read -r -d '' f; do
+  w="${f%.*}.webp"
+  [ -f "$w" ] && continue
+  if magick "$f" -quality 82 "$w"; then n=$((n+1)); else failed=$((failed+1)); echo "failed: $f" >&2; fi
+done < <(find wp-content/uploads -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \) -print0)
+echo "webp siblings written: $n, failed: $failed"
 ```
 
 **Emojis and the version tag.** Remove the emoji detection script and styles on `init`, and `remove_action('wp_head', 'wp_generator')`. Code: [references/head-and-performance.md](references/head-and-performance.md).
@@ -369,11 +326,11 @@ Return early when `WPSEO_VERSION` or `RANK_MATH_VERSION` is defined — the SEO 
 
 ## Naming Conventions
 
-- **All PHP functions** use a unique prefix: `prefix_` (replace with your theme slug, e.g., `kairo_`, `starter_`)
+- **All PHP functions** use the project's function prefix from `.claude/CLAUDE.md` — `prefix_` in this skill is a placeholder
 - **Template parts** are named `section-*.php` for content sections, `footer-*.php` for footer variants
-- **Page templates** are named `page-*.php` (e.g., `page-pricing.php`, `page-software.php`)
-- **CSS classes** use BEM: `.block__element--modifier`
-- **JS files** use lowercase with hyphens: `main.js`, `software.js`
+- **Page templates** are named `page-<name>.php`
+- **CSS classes**: BEM (`.block__element--modifier`) on `Template: basic`; utilities and `@apply` classes on `Template: tailwind` (`wp-tailwind-system`)
+- **JS files** use lowercase with hyphens: `<name>.js`
 
 ---
 
@@ -411,8 +368,11 @@ States: `.is-open` (added to `.nav__item--has-children` when its submenu is expa
 - [ ] All assets enqueued via `wp_enqueue_style()` / `wp_enqueue_script()`, from the one existing callback, at the paths the recorded template's starter uses
 - [ ] `filemtime()` (or `index.asset.php`) versions every local asset
 - [ ] All theme supports registered in `after_setup_theme`
-- [ ] All dynamic output escaped with appropriate function
+- [ ] All dynamic output escaped with appropriate function; a headline with markup through `wp_kses()` and its allowlist
+- [ ] No `the_field()` / `the_sub_field()` in a template; no raw `get_field()` — `prefix_get_field()` instead
 - [ ] No `query_posts()` anywhere
+- [ ] Field groups bootstrapped from `fields/*.php` into `acf-json/`
+- [ ] Nav walker and header CSS use the navigation class contract, with `.nav__link` and `.nav__toggle` on one baseline
 - [ ] No inline styles or scripts in templates
 - [ ] Emojis disabled, WP version hidden
 - [ ] SVG uploads gated on `unfiltered_html`; no `wp_check_filetype_and_ext` filter

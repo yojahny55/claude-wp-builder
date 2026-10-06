@@ -128,6 +128,21 @@ grep -Fq '`aggregateRating` is never on that list' "$SKILL" \
 grep -Fq 'through `parentOrganization`' "$SKILL" || fail "$SKILL does not link locations with parentOrganization"
 grep -Fq 'Organization through `branchOf`.' "$SKILL" && fail "$SKILL still requires the superseded branchOf"
 
+# Criteria that lived only in the skill, with nothing to fail when they were trimmed:
+# the subtype each vertical requires (SEO-058 defers to it), one default per vertical so two
+# runs decide SEO-058 the same way, the sampling gates SEO-062 applies, a reproducible sample,
+# and the unique @id per location.
+for subtype in '`Restaurant`' '`MedicalClinic`' '`LegalService`' '`RealEstateAgent`' '`AutoDealer`' '`HomeAndConstructionBusiness`'; do
+  grep -Eq "^\| [A-Z][a-z ]+ \|.*\| .*$subtype" "$SKILL" || fail "$SKILL vertical table lost the required subtype $subtype"
+done
+grep -Fq '`MedicalClinic`, `Dentist` or `Hospital`' "$SKILL" \
+  && fail "$SKILL offers three healthcare subtypes with no rule for choosing"
+grep -Fq 'passes SEO-058 with either subtype' "$SKILL" || fail "$SKILL has no tie-break for a site matching two verticals"
+grep -Fq 'Audit a sample of 10' "$SKILL" || fail "$SKILL lost the location-page sampling gate"
+grep -Fq 'sort the location pages by slug' "$SKILL" || fail "$SKILL sample is not reproducible between runs"
+grep -Fq 'unique `@id`' "$SKILL" || fail "$SKILL lost the unique @id per location"
+grep -Fq 'Deprecated subtypes' "$SKILL" || fail "$SKILL lost the deprecated subtypes SEO-058 flags"
+
 # Rendered markup is never changed without asking: a new element inherits browser default
 # styles and can override the utility classes already on the page.
 grep -Fq 'never auto-applied' "$AGENT" \
