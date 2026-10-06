@@ -24,12 +24,10 @@ closed on a pinned stage with a magnetic CTA, all four landed between 13.6 and
 13.8 viewport-heights with exactly one accent colour. What varied was the order
 of the middle sections and the palette.
 
-**This plugin inherited that failure and, for several releases, none of the
-cure.** The port took the taste floor, the refuse list, the feeling curve and the
-device kit — every one of them a *constraint* — and left behind the three
-systems that make two builds different from each other. The result was
-predictable and was in fact reported, in these words: *"all the pages are almost
-the same thing."*
+**This plugin inherited that failure.** Porting only the constraints — the taste
+floor, the feeling curve, the device kit — and leaving out the three systems that
+make two builds different from each other produced exactly the report it predicts:
+*"all the pages are almost the same thing."*
 
 > The world changes how a page LOOKS. The grammar changes what a page IS.
 > A build that only changes world is a re-skin.
@@ -129,49 +127,10 @@ building it. A move described after the fact is usually a device with a new name
 
 ## 5. The fingerprint gate
 
-The registry lives at `~/.claude/wp-builder/FINGERPRINTS.md`, one row per shipped
-craft build. It is per-user and it starts empty: the gate is about not repeating
-**yourself**.
-
-**Before building:** read it. Every row is a shape that is now taken.
-
-**Before writing markup:** check the planned build against every existing row on
-these seven dimensions.
-
-| # | Dimension | What it records |
-|---|---|---|
-| 1 | Grammar | Which grammar from `grammars.md`, or a named new one |
-| 2 | Chrome treatment | What the header and footer are, and what they are for |
-| 3 | Hero device | What the first screen does |
-| 4 | Section-sequence shape | The composition order on the home page, the section count, total viewport-heights |
-| 5 | Close pattern | How the last screen behaves and what the CTA sits in |
-| 6 | Signature move | The one bespoke interaction, in a phrase |
-| 7 | Type and palette | Display family, text family, accent hue |
-
-**The gate: a new build must differ from EVERY existing row on at least
-4 of the 7 dimensions.** Not 4 on average across the table — four against each
-row, individually.
-
-Dimension 6 is free, because a signature move is unique by definition. Dimension
-7 has its own absolute rule on top of the count: a build fails outright when,
-against any single row, **all three** of display family, text family and accent
-hue within 15 degrees match. Two brands sharing a canvas and one of two faces is
-coincidence; sharing the pair and the accent is the same site twice.
-
-**A previous revision of this file kept only dimension 7 and dropped 1 through
-6**, on the reasoning that the composition library chooses structure per role so
-structure did not need fingerprinting. That reasoning was wrong in a way worth
-recording: a library that offers one good answer per role will give every build
-the same answer, and fingerprinting structure is precisely what catches that.
-Cosmetic fingerprinting let two structurally identical sites pass because their
-fonts differed.
-
-**If the planned build fails the gate, change the plan, not the log.** Rewriting
-a row to make a new build fit is the one thing that makes this file worthless. It
-is a record of what exists, not a description of what you wish existed.
-
-**After shipping:** append one row, all seven dimensions, and say plainly what it
-shares with prior rows — the shared columns are what the next build has to avoid.
+Every build clears the fingerprint gate against every earlier build, on structure as
+well as on palette. The registry, the seven dimensions and the 4-of-7 rule are in
+`fingerprint.md`, which owns the gate; it is read before the composition plan and
+written after shipping.
 
 ## 6. Aesthetic range
 
@@ -179,20 +138,11 @@ Premium-minimal is a choice. It is not the costume this skill wears by default,
 and a shelf of dark-or-paper pages with one accent each is what happens when
 nobody decides otherwise.
 
-| Family | Reads as | Earned by |
-|---|---|---|
-| Brutalist | Blunt, structural, unstyled on purpose | Tools, infrastructure, anything anti-marketing |
-| Maximalist | Dense, layered, loud, generous | Culture brands, events, food, anything abundant |
-| Playful | Bouncy, coloured, informal | Kids, games, consumer apps, community |
-| Retro | Specific to a decade, not vaguely nostalgic | Heritage brands, music, anything with a real lineage |
-| Dense | Information-forward, small type, high count | Data products, catalogues, reference, finance |
-| Editorial | Paper, folios, measure, restraint | Long-form substance |
-| Premium-minimal | Quiet, dark, one accent, air | Luxury, and only when asked for |
-
-This table says what each family reads as; `families.md` says what each one
-**does** — type, palette, surfaces, motion, sequence — and what it forbids. The
-chosen family is recorded in `demo/BRIEF.md` under `## Family` with its Avoid
-list, and an Avoid hit on any page is a ship blocker.
+There are seven families — Brutalist, Maximalist, Playful, Retro, Dense, Editorial and
+Premium-minimal — and `families.md` says, for each, what it reads as, who earns it, what
+it **does** (type, palette, surfaces, motion, sequence) and what it forbids. The chosen
+family is recorded in `demo/BRIEF.md` under `## Family` with its Avoid list, and an
+Avoid hit on any page is a ship blocker.
 
 Go where the brief points. **If the client says "loud" and the demo comes back in
 charcoal with one accent, the interview was decorative.** The `surface

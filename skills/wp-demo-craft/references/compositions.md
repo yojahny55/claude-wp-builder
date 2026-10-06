@@ -1,10 +1,11 @@
 # Compositions
 
-`compositions/README.md` is the role table. Each folder beside it holds the
-fragment, its CSS written on the token names, two rendered previews (1440 and
-390) and a README naming what it ports and under which licence. **Look at the
-previews before choosing.** They are the reason this library exists: v1 had no
-picture of a good section anywhere in it.
+The role table — which composition serves which role, and what each costs in
+scroll — is in `compositions/README.md`; read it there, this file does not
+restate it. Each folder beside it holds the fragment, its CSS written on the
+token names, two rendered previews (1440 and 390) and a README naming what it
+ports and under which licence. **Look at the previews before choosing**: a rule
+with no picture of a good section beside it gives a build nothing to aim at.
 
 ## Choosing
 
@@ -21,8 +22,8 @@ it or breaks it — or "no research signal" when none applies. The two are
 different axes: the domain signal constrains page pattern and considerations,
 while the research signal is what lets a build deliberately not look like its
 competitors. Together they are what makes the classification bind on the plan
-instead of sitting unread, and it is the same row format `/wp-demo` Step 2.6
-and `SKILL.md` state — do not restate it a fourth way.
+instead of sitting unread. This file owns the row format; `SKILL.md` and
+`/wp-demo` Step 2.6 point here.
 
 Sum the motion cost before building and check it against the budget in
 `devices.md` (`### pin`), the one place it is written; the role table carries each

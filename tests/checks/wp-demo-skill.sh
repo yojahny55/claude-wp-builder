@@ -60,5 +60,25 @@ grep -Fq 'class="footer__description"' "$k" || fail "$k's footer tagline is not 
 grep -Fq 'class="footer__copyright"' "$k" || fail "$k's copyright line has no .footer__copyright class, so /wp-seed skips it"
 grep -q 'footer__tagline\|footer_tagline' "$s" "$k" && fail "the wp-demo skill still names footer_tagline/.footer__tagline, which no command reads"
 grep -Eq '&copy; *(19|20)[0-9]{2}' "$k" && fail "$k hard-codes a copyright year that every copied demo inherits"
+n=$(grep -c '<footer' "$k")
+[ "$n" -eq 1 ] || fail "$k prints the footer $n times; two copies drift"
+
+# --- the delimiter contract other commands parse -----------------------------------
+# /wp-section, /wp-seed, /wp-polish and wp-normalize extract sections by these comments,
+# and demo/.demo-plan.json joins on the name, so the pair and the verbatim name are the
+# contract, not a style.
+grep -Fq '<!-- ============ SECTION: Hero ============ -->' "$s" || fail "$s does not show the opening delimiter"
+grep -Fq '<!-- ============ END SECTION: Hero ============ -->' "$s" || fail "$s does not show the closing delimiter"
+grep -Fq 'verbatim join key' "$s" || fail "$s does not say the section name is a verbatim join key"
+grep -Fq 'identical in both comments' "$s" || fail "$s does not require the same name in the opening and closing comment"
+grep -Fq '`Header` and `Footer`' "$s" || fail "$s does not name the shared-chrome sections"
+grep -Fq 'These delimiters are critical' "$c" || fail "$c no longer marks the delimiters as critical"
+
+# --- description and loop ----------------------------------------------------------
+desc=$(awk 'NR<=6 && /^description:/' "$s")
+printf '%s' "$desc" | grep -q '[<>]' && fail "$s's description carries angle brackets"
+printf '%s' "$desc" | grep -Fq 'wp-demo-craft' || fail "$s's description does not send craft requests to wp-demo-craft"
+grep -Fq 'Run `/wp-demo-verify' "$s" && grep -Fq 'Stop when it reports no overflow' "$s" \
+  || fail "$s does not loop on /wp-demo-verify with a stop condition"
 
 echo PASS
