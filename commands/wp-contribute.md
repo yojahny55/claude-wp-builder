@@ -56,7 +56,7 @@ so the PR cannot arrive with the check or the doc row missing.
 3. A row in the README Commands Reference table (Command · Path · Required? · Description).
 4. An entry in `docs/commands.md`, and a step in `docs/workflows.md` if it belongs to a build
    path (A `/wp-yolo`, B step-by-step, C cinematic).
-5. A `CHANGELOG.md` entry under `[Unreleased]` → `### Added`.
+5. A `changes/<slug>.added.md` fragment (format in `changes/README.md`).
 
 **Do not write the command's body from a template.** Read the closest existing command
 (`commands/wp-section.md` for a builder, `commands/wp-audit.md` for a flag-driven one) and
@@ -96,7 +96,7 @@ A new skill is not done until it passes both gates and the review.
 
 5. Run Step 2b (`review <name>`) and resolve what it returns.
 6. A row in the README skills table, a check under `tests/checks/` pinning the contract
-   wording, and a `CHANGELOG.md` entry under `[Unreleased]` → `### Added`.
+   wording, and a `changes/<slug>.added.md` fragment.
 
 ---
 
@@ -141,7 +141,7 @@ bash bin/doc-sync-check.sh
 
 `bin/doc-sync-check.sh` asserts what the greps cannot: every command has a README row and a
 `docs/commands.md` entry, every documented command exists, every agent and skill is listed,
-frontmatter is present per layer, the four version references agree, and `CHANGELOG.md` moved
+frontmatter is present per layer, the four version references agree, and a `changes/` fragment was added
 when `commands/`, `agents/`, `skills/`, `starter-theme/` or `bin/` did.
 
 Report each failure with the file and the one-line fix. Do not "fix" a failing check by
@@ -154,8 +154,8 @@ loosening its assertion — that is the failure mode the check exists to prevent
 1. **Refuse on `main`.** Create a branch first: `feat/…`, `fix/…`, `docs/…`, `chore/…`.
 2. Re-run Step 3. A red suite stops here. If the branch adds or changes anything under
    `skills/`, run Step 2b for each skill it touches; a `FIX` verdict stops here too.
-3. Confirm the contributor checklist: new behavior has a check · CHANGELOG `[Unreleased]`
-   entry · README and `docs/` updated · **no version bump** (maintainer-only, and a bump in a
+3. Confirm the contributor checklist: new behavior has a check · `changes/` fragment
+   (never a `CHANGELOG.md` edit) · README and `docs/` updated · **no version bump** (maintainer-only, and a bump in a
    PR conflicts at release).
 4. Commit with a Conventional Commits subject in English — `feat:`, `fix:`, `docs:`, `chore:`,
    `refactor:` — and **no AI attribution**: no `Co-Authored-By`, no "Generated with", nothing
@@ -177,7 +177,7 @@ A skill change adds "Skill review": the verdict, and any finding declined with i
 ## Checklist
 - [ ] Tested against a real WordPress project
 - [ ] New behavior has a check in tests/checks/
-- [ ] CHANGELOG.md [Unreleased] updated
+- [ ] changes/ fragment added
 - [ ] README / docs updated
 - [ ] No version bump
 ```
@@ -199,9 +199,10 @@ Refuse unless the working tree is clean, the branch is `main`, `main` is up to d
 2. Bump **all four** version references together: `.claude-plugin/plugin.json`,
    `.claude-plugin/marketplace.json` (twice — `metadata.version` and the plugin entry), and the
    README badge.
-3. Insert `## [X.Y.Z] - YYYY-MM-DD` below `## [Unreleased]` and move the entries down, leaving
+3. Run `bash bin/changelog-release.sh X.Y.Z`: it compiles `changes/` into a
+   `## [X.Y.Z] - YYYY-MM-DD` block below `## [Unreleased]` and deletes the fragments, leaving
    `[Unreleased]` empty — never rename it. **Read every merged PR since the last
-   tag** and write entries for any that landed without one.
+   tag** and add entries to the new block for any that landed without a fragment.
 4. **Reconcile `BACKLOG.md`** against what this release ships and set its
    `**Reconciled** on <Month D, YYYY>` line to today. `tests/checks/backlog-freshness.sh` fails
    as soon as the new release heading is dated after that line, so skipping this step cuts a
