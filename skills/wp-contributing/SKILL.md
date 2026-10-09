@@ -163,12 +163,12 @@ no grep can check.
    No `FAILED:` line, and doc-sync passes. Fix what fails and run it again until it does.
 2. `bin/doc-sync-check.sh` is the half the greps cannot do — README tables,
    `docs/commands.md`, frontmatter and the version references all agree. It compares the
-   CHANGELOG against `origin/main`; on a PR stacked on another branch pass
+   changelog fragments against `origin/main`; on a PR stacked on another branch pass
    `--changelog-base <parent-branch>`, because with no ref it can resolve it skips that rule.
 3. **New behavior has a new check.** This is the one reviewers actually block on.
    A new or changed skill also passes `/wp-contribute review <name>` — the review no grep
    can do, against [references/skill-review.md](references/skill-review.md).
-4. `CHANGELOG.md` gains an `[Unreleased]` entry. Say what changed and *why it was wrong
+4. Add a `changes/<slug>.<section>.md` fragment — never edit `CHANGELOG.md` in a PR. Say what changed and *why it was wrong
    before*; a release note that only names the feature is useless six months later.
 5. Docs follow the change: a new command needs a row in the README table **and** an entry in
    `docs/commands.md`, and a step in `docs/workflows.md` if it belongs to a build path.
@@ -215,9 +215,8 @@ hand. What it rests on is the part worth knowing first:
 - **The version is stated in all four places at once** — `.claude-plugin/plugin.json`,
   `.claude-plugin/marketplace.json` (**twice**: `metadata.version` and the plugin entry), and
   the README badge. `bin/doc-sync-check.sh` fails if they disagree.
-- **`## [Unreleased]` is never renamed.** The release heading is inserted below it and the
-  entries move down. Every open PR edits under that heading, so a rename conflicts all of
-  them on `CHANGELOG.md`.
+- **`bin/changelog-release.sh X.Y.Z` writes the release block** from `changes/` fragments and
+  inserts it below `## [Unreleased]`, which is never renamed and stays as an empty anchor.
 - **`BACKLOG.md` is reconciled at every release**, and its `**Reconciled** on` line moves to
   the release date. `tests/checks/backlog-freshness.sh` fails as soon as the newest release
   heading is dated after that line — it became a check because the last hand reconciliation
