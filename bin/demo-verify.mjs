@@ -38,7 +38,7 @@ const TLS = { ignoreHTTPSErrors: true };
 const args = process.argv.slice(2);
 if (args.includes('--help')) {
   console.log(
-    'usage: demo-verify.mjs [file-or-dir-or-url] [--out DIR] [--positions N] [--widths 1440x900,390x844] [--no-firefox]\n' +
+    'usage: demo-verify.mjs [file-or-dir-or-url] [--out DIR] [--positions N] [--widths 1440x900,390x844] [--no-firefox] [--no-gaps]\n' +
     '       demo-verify.mjs --probe     exit 0 if playwright-core and a Chrome are usable, else 2'
   );
   process.exit(0);
@@ -690,6 +690,152 @@ const containerAudit = () => {
   return [...new Set(out)];
 };
 
+// Fractional-width gaps. Page builders emit breakpoints as integer pairs: max-width:767px for
+// mobile and min-width:768px for everything above. At a fractional CSS width (browser zoom, or
+// OS display scaling other than 100%: a 766px window at 110% is 767.27px wide) neither query
+// matches, so the page falls back to its unqueried defaults: a logo at its desktop-less 704px,
+// columns with no width, boxes hidden on every device visible again. Every integer-width shot
+// misses it, so this pass loads the page inside (N, N+1) and compares it with N and N+1.
+const GAP_MAX = 3;
+const GAP_SCALE = 1.1;
+
+/** Integer pairs max-width:N / min-width:N+1 in the page's same-origin stylesheets. */
+const gapEdges = () => {
+  const maxs = new Set();
+  const mins = new Set();
+  const walk = (rules) => {
+    for (const r of rules) {
+      if (r.media) {
+        const t = r.media.mediaText || '';
+        for (const m of t.matchAll(/\(\s*max-width\s*:\s*(\d+)px\s*\)/g)) maxs.add(Number(m[1]));
+        for (const m of t.matchAll(/\(\s*min-width\s*:\s*(\d+)px\s*\)/g)) mins.add(Number(m[1]));
+      }
+      try { if (r.cssRules) walk(r.cssRules); } catch { /* ignore */ }
+    }
+  };
+  for (const sheet of document.styleSheets) {
+    try { walk(sheet.cssRules); } catch { /* cross-origin sheet */ }
+  }
+  return [...maxs].filter((n) => mins.has(n + 1)).sort((a, b) => a - b);
+};
+
+/** Per-element widths and visibility, keyed by DOM path, plus the document overflow. */
+const gapMeasure = (edge) => {
+  const path = (el) => {
+    const out = [];
+    for (; el && el !== document.documentElement; el = el.parentElement) {
+      const sibs = el.parentElement ? [...el.parentElement.children] : [el];
+      out.unshift(el.tagName.toLowerCase() + ':' + (sibs.indexOf(el) + 1));
+    }
+    return out.join('>');
+  };
+  const label = (el) =>
+    el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') +
+    [...el.classList].slice(0, 2).map((c) => '.' + c).join('');
+  const els = {};
+  let n = 0;
+  for (const el of document.body.querySelectorAll('*')) {
+    if (++n > 4000) break;
+    if (['SCRIPT', 'STYLE', 'LINK', 'META', 'TITLE', 'HEAD'].includes(el.tagName)) continue;
+    const cs = getComputedStyle(el);
+    els[path(el)] = { label: label(el), none: cs.display === 'none', w: el.getBoundingClientRect().width };
+  }
+  return {
+    vw: window.visualViewport ? window.visualViewport.width : window.innerWidth,
+    sw: document.documentElement.scrollWidth,
+    maxMatches: matchMedia('(max-width:' + edge + 'px)').matches,
+    minMatches: matchMedia('(min-width:' + (edge + 1) + 'px)').matches,
+    els,
+  };
+};
+
+/** A browser whose CSS viewport lands strictly between edge and edge+1, or null. The window
+ *  chrome adds a fixed offset, so aim by formula and correct from what is read back. */
+async function launchInGap(edge) {
+  let win = Math.round((edge + 0.5) * GAP_SCALE - 78);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const b = await chromium.launch({
+      executablePath,
+      args: ['--force-device-scale-factor=' + GAP_SCALE, '--window-size=' + win + ',1000'],
+    });
+    const ctx = await b.newContext({ viewport: null, ...TLS });
+    const pg = await ctx.newPage();
+    await pg.goto('about:blank');
+    const vw = await pg.evaluate(() => window.visualViewport.width);
+    await ctx.close();
+    if (vw > edge && vw < edge + 1) return { browser: b, win, vw };
+    await b.close();
+    const off = edge + 0.5 - vw;
+    win += Math.round(off * GAP_SCALE) || (off > 0 ? 1 : -1);
+  }
+  return null;
+}
+
+async function gapPass(browser, url, outDir) {
+  const findings = [];
+  const probeCtx = await browser.newContext({ viewport: { width: 1280, height: 900 }, ...TLS });
+  const probePage = await probeCtx.newPage();
+  await probePage.goto(url, { waitUntil: 'load' });
+  const edges = (await probePage.evaluate(gapEdges)).slice(0, GAP_MAX);
+  await probeCtx.close();
+
+  const measureAt = async (width) => {
+    const ctx = await browser.newContext({ viewport: { width, height: 900 }, ...TLS });
+    const pg = await ctx.newPage();
+    await pg.goto(url, { waitUntil: 'load' });
+    await pg.waitForTimeout(300);
+    const m = await pg.evaluate(gapMeasure, width);
+    await ctx.close();
+    return m;
+  };
+
+  for (const edge of edges) {
+    const landed = await launchInGap(edge);
+    if (!landed) {
+      console.error('demo-verify: breakpoint gap ' + edge + '-' + (edge + 1) + 'px skipped: could not land a viewport inside it');
+      continue;
+    }
+    try {
+      const lo = await measureAt(edge);
+      const hi = await measureAt(edge + 1);
+      const ctx = await landed.browser.newContext({ viewport: null, ...TLS });
+      const pg = await ctx.newPage();
+      await pg.goto(url, { waitUntil: 'load' });
+      await pg.waitForTimeout(300);
+      const gap = await pg.evaluate(gapMeasure, edge);
+      if (gap.maxMatches || gap.minMatches) { await ctx.close(); continue; }
+
+      const culprits = [];
+      for (const [key, g] of Object.entries(gap.els)) {
+        const a = lo.els[key];
+        const b = hi.els[key];
+        if (!a || !b) continue;
+        const widest = Math.max(a.w, b.w);
+        if (!g.none && a.none && b.none)
+          culprits.push({ selector: g.label, why: 'visible in the gap, display:none at ' + edge + ' and ' + (edge + 1), width: Math.round(g.w) });
+        else if (!g.none && !a.none && !b.none && g.w > widest * 1.5 && g.w - widest > 100)
+          culprits.push({ selector: g.label, why: 'wider than at both neighbours', width: Math.round(g.w), at: [Math.round(a.w), Math.round(b.w)] });
+      }
+      const limit = Math.ceil(gap.vw) + 1;
+      const overflow = gap.sw > limit && lo.sw <= edge + 1 && hi.sw <= edge + 2;
+      if (culprits.length || overflow) {
+        mkdirSync(outDir, { recursive: true });
+        await pg.screenshot({ path: join(outDir, 'gap-' + edge + '.png'), fullPage: true });
+        await pg.screenshot({ path: join(outDir, 'gap-' + edge + '.jpg'), fullPage: true, type: 'jpeg', quality: SHEET_JPEG_QUALITY });
+        findings.push({
+          kind: 'breakpoint-gap', pass: 'normal', width: edge, gap: [edge, edge + 1],
+          viewport: Number(gap.vw.toFixed(2)), overflow: overflow ? gap.sw : false,
+          culprits: culprits.sort((x, y) => y.width - x.width).slice(0, 5),
+        });
+      }
+      await ctx.close();
+    } finally {
+      await landed.browser.close();
+    }
+  }
+  return findings;
+}
+
 let browser;
 let ffBrowser = null;
 let http = null;
@@ -1085,6 +1231,14 @@ try {
   }
 
   await captureResponsiveShots(browser, pageUrl, pageOut);
+  if (!args.includes('--no-gaps')) {
+    try {
+      findings.push(...(await gapPass(browser, pageUrl, pageOut)));
+    } catch (err) {
+      const why = err && typeof err.message === 'string' ? err.message.split('\n')[0] : String(err);
+      console.error('demo-verify: fractional-width pass failed on ' + pageUrl + ' (' + why + ') -- other findings kept');
+    }
+  }
   // Firefox is the second engine, never a requirement: a crash mid-pass keeps the
   // Chromium findings and says so, like a Firefox that never launched.
   if (ffBrowser) {

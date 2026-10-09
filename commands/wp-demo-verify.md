@@ -100,6 +100,17 @@ cross-engine path for real. A directory target walks every page. Output lands in
 `sheet.png` (full resolution, for a human who opens it directly) and `sheet.jpg`
 (downscaled to 1000px wide, quality 70 — the one to Read in Step 4).
 
+**Fractional widths.** Page builders emit breakpoints as integer pairs: `max-width: 767px`
+for mobile and `min-width: 768px` above it. At a fractional CSS width (browser zoom, or OS
+display scaling other than 100%: a 766px window at 110% is 767.27px) neither query matches,
+and the page falls back to its unqueried defaults. The integer shots above can never see it.
+So, in Chromium, the walk reads the page's same-origin stylesheets for `max-width: N` /
+`min-width: N+1` pairs (at most three), loads the page inside each (N, N+1) by launching with
+`--force-device-scale-factor=1.1` and a window sized until the CSS width read back lands in the
+gap (an edge it cannot land is skipped with a notice), and compares it with N and N+1. A page
+with only `min-width` queries, like a Tailwind one, has no gap and reports nothing.
+`--no-gaps` skips the pass.
+
 Exit codes: `0` nothing blocking — either no findings at all, or advisory ones
 only; `1` at least one blocking finding printed; `2` no usable browser; `3` the
 walk itself crashed (not a findings report, something threw mid-walk).
@@ -174,6 +185,12 @@ branch: `/wp-demo` probes first and stops on 2.)
   block sits outside it. A screen-reader span inside a carousel card is the usual
   case: it is 1px and shows in no screenshot. Give an ancestor inside the named box
   `position: relative`, usually the card.
+- **breakpoint-gap**: blocking. A `max-width: N` rule and a `min-width: N+1` rule leave the
+  fractional widths between them (zoom, display scaling) matched by neither, and the page
+  there differs from both N and N+1: it overflows, a box is more than 50% and 100px wider
+  than at either neighbour, or boxes hidden at both are visible. The row gives `width` (N),
+  the measured `viewport`, and up to five `culprits`; `gap-<N>.png` and `gap-<N>.jpg` sit
+  beside the sheets. Close the gap: `max-width: N.98px`, or range syntax `(width < N+1)`.
 - **clipped copy**: text taller than its own hidden-overflow box.
 
 ## Step 3.5: Undeclared inert controls
