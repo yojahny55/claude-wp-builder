@@ -102,7 +102,7 @@ for f in agents/*.md; do
 done
 
 # ---------------------------------------------------------------------------
-# 5. A behavior change needs a CHANGELOG entry. Contracts live in prose, so the
+# 5. A behavior change needs a changelog entry (a changes/ fragment, or a release). Contracts live in prose, so the
 #    changelog is the only record of what a release actually changed.
 # ---------------------------------------------------------------------------
 # `|| true` on the diff would turn a FAILED diff into "nothing changed" and skip the
@@ -114,15 +114,14 @@ if ! git rev-parse --verify --quiet "$base" >/dev/null 2>&1; then
 elif ! changed=$(git diff --name-only "$base"...HEAD -- commands/ agents/ skills/ starter-theme/ bin/ 2>/dev/null); then
   err "could not diff against $base (shallow clone, or no merge base) — the CHANGELOG rule could not be evaluated; re-run with --changelog-base <ref> or fetch more history"
 elif [ -n "$changed" ]; then
-  # Touching the file is not the contract; having an entry is. A whitespace edit to an
-  # old release note satisfied the previous check while the error message asked for an
-  # [Unreleased] entry that was never added.
-  if ! git diff --name-only "$base"...HEAD -- CHANGELOG.md | grep -q .; then
-    err "commands/agents/skills/starter-theme/bin changed since $base but CHANGELOG.md did not — add an [Unreleased] entry"
-  else
-    entries=$(awk '/^## \[Unreleased\]/ { f = 1; next } /^## \[/ { f = 0 } f && /^- / { n++ } END { print n + 0 }' CHANGELOG.md)
-    [ "$entries" -gt 0 ] \
-      || err "CHANGELOG.md changed but its [Unreleased] section has no entries — behavior moved, so describe it there"
+  # The entry is a new fragment under changes/ (see changes/README.md), not an edit to
+  # CHANGELOG.md: every branch editing the same [Unreleased] heading conflicts with every
+  # other, and GitHub ignores the merge=union driver that used to hide it. A release PR is
+  # the one legitimate CHANGELOG edit -- it adds a new `## [x.y.z]` heading.
+  added=$(git diff --name-only --diff-filter=A "$base"...HEAD -- 'changes/*.md' | grep -v '^changes/README.md$' || true)
+  release=$(git diff "$base"...HEAD -- CHANGELOG.md | grep -E '^\+## \[[0-9]+\.[0-9]+\.[0-9]+\]' || true)
+  if [ -z "$added" ] && [ -z "$release" ]; then
+    err "commands/agents/skills/starter-theme/bin changed since $base but no changes/<slug>.<section>.md fragment was added — see changes/README.md (do not edit CHANGELOG.md in a PR)"
   fi
 fi
 
