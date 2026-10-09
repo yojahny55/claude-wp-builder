@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# CHANGELOG.md is marked merge=union in .gitattributes so that concurrent branches appending
-# under the same heading merge instead of conflicting. The cost, stated in the release chores
-# in CLAUDE.md, is that union never reports a conflict -- so a structural mistake lands
-# silently, passes every test, and is found only by someone reading the top of the file.
+# CHANGELOG.md is written only at release, by bin/changelog-release.sh from changes/
+# fragments (see changes/README.md), so branches no longer append to it concurrently. This
+# guards the shape of the compiled file, which a hand edit at release can still break.
 #
-# It has landed twice. Both times a branch added a "### Added" or "### Fixed" heading under
+# Before fragments, merge=union hid every concurrent edit and a structural mistake landed
+# silently. It landed twice. Both times a branch added a "### Added" or "### Fixed" heading under
 # ## [Unreleased] without checking whether that block already had one, and the release went
 # out carrying two of the same section. Nothing in the suite looked at the file's shape.
 #
@@ -41,7 +41,7 @@ problems=$(awk '
 
 if [ -n "$problems" ]; then
   echo "$problems" | sed 's/^/  /'
-  fail "a version block repeats a section heading -- merge=union never reports this as a conflict, so it ships unless something looks"
+  fail "a version block repeats a section heading -- a hand-edited release can ship this unless something looks"
 fi
 
 # `grep -c` exits 1 on zero matches and 2 on a real error, and collapsing both into `|| true`
