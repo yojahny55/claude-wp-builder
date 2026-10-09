@@ -40,7 +40,8 @@ images on the sampled templates at 1440 and 390 px.
 
 ## Procedure
 
-1. **Back up the database.** Back up again before the URL replacement in step 4.
+1. **Back up the database.** Back up again before the URL replacement in step 4. On production
+   (the direct path in *Production order*), also back up the uploads directory.
 2. **Turn off Robin's auto-optimisation for the run** (`wbcr_io_auto_optimize_when_upload`
    = `0`), and restore the old value in a `finally` block. Otherwise Robin queues every
    regenerated size while the run writes them.
@@ -63,13 +64,18 @@ images on the sampled templates at 1440 and 390 px.
    `X-130x36.webp`. Search every text column of the prefixed tables for `uploads/<old>`,
    plain and with JSON-escaped slashes (`uploads\/<old>`, Elementor data). Unserialize,
    replace and serialize again, so string lengths stay right. Skip `guid` and Robin's
-   `rio_process_queue`: those rows describe the old PNGs.
+   `rio_process_queue`: those rows describe the old PNGs. On a live site, put it in
+   maintenance mode for this step and skip transients and sessions, so a write between the
+   read and the replace cannot restore an old value.
 5. **Flush generated CSS** (`wp elementor flush-css` on an Elementor site), then check the
    served HTML of each template. Every `uploads/` URL must exist on disk, and no `.png`
-   from uploads may remain.
+   from uploads may remain. On production, purge the page cache and the CDN first and
+   check the served HTML again: a cached page still names the PNGs, and step 7 would turn
+   those URLs into 404s.
 6. **Redirect old URLs.** A regex 301, for example `^wp-content/uploads/(.+)\.png$` to
    `/wp-content/uploads/$1.webp`. The web server serves a file that still exists, so the
-   rule only fires once the PNG is gone.
+   rule only fires once the PNG is gone. Apply it in production's own server config: the
+   clone's does not sync, and the pattern has no leading slash on Apache and one on nginx.
 7. **Move the old files aside, do not delete them.** Move each old path from the map, plus
    its Robin `<file>.png.webp` sibling, to a backup folder outside uploads. Check the site
    again, then report the new uploads size.
@@ -94,7 +100,8 @@ Run the conversion on a local clone first, as a rehearsal. Then pick one path fo
 
 - **Production takes no writes between the clone and the push** (a brochure site, or a
   freeze you control). Re-clone, convert, check step 5, then push the database and uploads.
-  There are no images uploaded after the clone to handle.
+  There are no images uploaded after the clone to handle. Back up production's database and
+  uploads first, and keep writes frozen until the push finishes.
 - **Production keeps taking writes** (a store with orders, a site with editors). Do not push
   the clone's database: it overwrites orders, customers and attachment rows created since the
   clone. Run this procedure directly on production instead: back up the database and the
