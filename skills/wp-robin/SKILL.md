@@ -1,6 +1,6 @@
 ---
 name: wp-robin
-description: Installs, configures and unsticks the Robin Image Optimizer plugin (robin-image-optimizer) through the bundled robin-fix.sh — writes Robin's wbcr_io_* settings (WebP on, AVIF off, every registered size), clears webp queue rows stuck in processing in wp_rio_process_queue, writes the missing .webp sibling files and the queue rows Robin expects, so its bulk run stops at "X remaining" no more; also covers why a CSS background-image still serves the JPEG or PNG under Robin's webp_delivery_mode=picture. Run through /wp-robin. Use when Robin Image Optimizer is stuck, looping or never finishes its bulk optimization, keeps showing "X remaining", is missing .webp files, needs installing and configuring on a site, or when a Robin site's CSS background-image still serves the original although the .webp sibling exists. Not for ShortPixel, Imagify or EWWW, moving media to S3 (wp-s3), or uploads and thumbnails that fail to generate (/wp-debug media).
+description: Installs, configures and unsticks the Robin Image Optimizer plugin (robin-image-optimizer) through the bundled robin-fix.sh — writes Robin's wbcr_io_* settings (WebP on, AVIF off, every registered size), clears webp queue rows stuck in processing in wp_rio_process_queue, writes the missing .webp sibling files and the queue rows Robin expects, so its bulk run stops at "X remaining" no more; also covers why a CSS background-image still serves the JPEG or PNG under Robin's webp_delivery_mode=picture. Run through /wp-robin. Use when Robin Image Optimizer is stuck, looping or never finishes its bulk optimization, keeps showing "X remaining", is missing .webp files, needs installing and configuring on a site, when a Robin site's CSS background-image still serves the original although the .webp sibling exists, or before converting PNG attachments to WebP in place. Not for ShortPixel, Imagify or EWWW, moving media to S3 (wp-s3), or uploads and thumbnails that fail to generate (/wp-debug media).
 user-invocable: false
 ---
 
@@ -93,6 +93,13 @@ style or a stylesheet keeps serving the original JPEG or PNG. The fix is in the 
 (`prefix_background_image()` in the `__tailwind__` starter) and, for stylesheets, in the
 server. Read `references/webp-delivery.md` when a CSS background still serves the original
 while `<img>` tags get WebP, or before changing `webp_delivery_mode`.
+
+## Converting PNG attachments to WebP
+
+Siblings double the storage of every image. When PNG originals are most of the uploads size,
+replacing each PNG attachment with a WebP original saves far more. Read
+`references/png-to-webp-conversion.md` before converting: the reference map of old to new
+files, the database replacement and the traps of an interrupted run.
 
 ## Requirements
 
