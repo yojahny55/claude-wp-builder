@@ -23,7 +23,7 @@ grep -Fq 'When the flag was passed, do not ask.' <<<"$step1" \
 
 # Order, independent of headings: the question must come before the adoption prompt and the
 # plugin-install prompt, so a whole-file fallback above cannot hide it moving back to Step 9.
-line_of() { grep -nF -- "$1" "$audit" | head -1 | cut -d: -f1; }
+line_of() { grep -nF -- "$1" "$audit" | head -1 | cut -d: -f1 || true; }
 q=$(line_of '[A] Report only')
 adopt=$(line_of '[A] Adopt it now')
 install=$(line_of '[A] Install all recommended WordPress plugins')
