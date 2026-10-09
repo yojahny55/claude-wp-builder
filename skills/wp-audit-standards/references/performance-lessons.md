@@ -9,6 +9,7 @@ Facts about Lighthouse scoring hold for Lighthouse 10 and later.
 - Read *observed* metrics before chasing a bad *simulated* score
 - A Lighthouse run needs an idle machine, and a contended one is not a slow page
 - Inline critical CSS: measured on a real site, and rejected
+- Per-template used CSS: what worked on a store, and what broke
 - WebP: `image_editor_output_format` only covers new, attachment-pipeline images
 - Right-size: never print `$field['url']` for a fixed slot
 - AIOS × Lighthouse: the CF7 REST gotcha
@@ -75,6 +76,40 @@ real cause was elsewhere and only the Lighthouse breakdown showed it: 276 ms of 
 render delay*, because the carousel re-built the first slide inside its own track and the
 second paint was the one being measured. A background the theme already painted without
 JavaScript was not the problem.
+
+## Per-template used CSS: what worked on a store, and what broke
+
+On a WooCommerce store with a vendor theme and Elementor, five stylesheets blocked the first
+paint: the theme sheet, its WooCommerce sheet, `elementor-frontend`, `wp-block-library` and a
+swatches plugin. Together they were 1.2-1.4 MB per page.
+
+**Dropping a sheet on pages that "do not need it" broke the site.** Removing the theme's
+WooCommerce sheet (335 KB) on content pages broke the cart panel and the mobile search modal
+on every page. Those panels are in the header and footer of every template, and they are
+styled by the WooCommerce sheet. Do not dequeue a vendor sheet by page type.
+
+**What worked:** keep every sheet, and change how it loads.
+
+1. Per template group (front page, archive, product, page, 404), extract the rules the
+   rendered page uses, with the panels and modals open. Save one used-CSS file per group.
+2. Print that file as the blocking stylesheet, and load the full sheet asynchronously:
+   `media="print" onload="this.media='all'"`, plus a `<noscript>` fallback.
+3. Keep cart, checkout and account on the normal blocking tags. Their states (errors,
+   shipping options, saved cards) are too many to capture.
+
+Blocking CSS went from 1.2-1.4 MB to 0.33-0.44 MB. The final render had 0 differences on
+8 URLs at 1440 and 390 px. With the full sheets blocked on purpose, the first paint still had
+0 differences, so the used CSS alone is complete.
+
+Three conditions travel with this fix:
+
+- **Regenerate the used CSS after every theme or plugin update.** A stale file does not break
+  the page, because the full sheet arrives later, but the first paint can be wrong.
+- **The Content-Security-Policy must allow the inline `onload`.** Without
+  `'unsafe-hashes'` plus the hash of `this.media='all'` (or `'unsafe-inline'`) in
+  `script-src`, the full sheets stay `media="print"` and only the used CSS applies.
+- **Measure with every panel open.** A used-CSS pass that loads the page and nothing else
+  misses the cart panel, the search modal and the mobile menu.
 
 ## WebP: `image_editor_output_format` only covers new, attachment-pipeline images
 
