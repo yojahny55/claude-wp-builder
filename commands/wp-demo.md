@@ -111,8 +111,9 @@ before writing any markup.
 0. **Gate.** Run `node "${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs" --probe`.
    On exit 2, run `npm i -D playwright-core` in the project root and probe again
    (the probe resolves `playwright-core` from `PLAYWRIGHT_CORE`, then the
-   plugin's own `node_modules`, then the project's, which is why installing here
-   works; say first that this writes a `package.json` and a `node_modules/` into
+   plugin's own `node_modules`, then the project's, then the global npm root
+   (`npm root -g`), which is why installing here works, and why a machine with
+   Playwright installed globally already passes; say first that this writes a `package.json` and a `node_modules/` into
    the WordPress project root). After the retry, **only exit 0 continues** —
    exit 2 means print what the probe said is missing (`playwright-core` or
    Chrome; the fix is `WP_DEMO_CHROME` pointing at a Chrome or Chromium already on

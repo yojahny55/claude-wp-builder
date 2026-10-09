@@ -298,8 +298,9 @@ SKILL.md (`tests/checks/skill-authoring.sh`).
 ## Release chores
 
 Version lives in `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` (twice) and the
-README badge — bump all of them together. Add an `[Unreleased]` entry to `CHANGELOG.md`; update
-`README.md` when adding a command.
+README badge — bump all of them together. Add a `changes/<slug>.<section>.md` fragment (format
+in `changes/README.md`) and never edit `CHANGELOG.md` in a PR; update `README.md` when adding a
+command.
 
 **Reconcile `BACKLOG.md` as part of cutting the release**, and update its `**Reconciled** on`
 line. `tests/checks/backlog-freshness.sh` fails when the newest release in the CHANGELOG is
@@ -309,14 +310,13 @@ anonymiser, resumable builds, a findings ledger, ACF nesting and a WordPress fix
 backlog mentioned none of them. The check cannot tell whether a reconciliation was any good —
 only that one happened, which is the part that kept being skipped.
 
-**Cutting a release never renames `## [Unreleased]`.** Insert the new
-`## [x.y.z] - YYYY-MM-DD` heading *below* it and move the entries down, leaving an
-empty `## [Unreleased]` at the top. Renaming it deletes the anchor every open branch
-is editing, so a release turns every open PR into a `CHANGELOG.md` conflict at once.
-`.gitattributes` marks the file `merge=union` so two branches appending under the same
-heading merge instead of conflicting; the cost is that union never reports a conflict,
-so a genuine same-line edit keeps both sides silently — check the top of the file after
-a release.
+**Changelog entries are fragments, compiled at release.** `bin/changelog-release.sh X.Y.Z`
+turns `changes/*.md` into a `## [X.Y.Z] - date` block inserted *below* `## [Unreleased]` and
+deletes the fragments; entries already under `[Unreleased]` are carried into the block. It never
+renames `## [Unreleased]`, which stays as an empty anchor at the top. Fragments exist because
+PRs that all insert under one heading conflict with each other once any one merges, and GitHub
+ignores `merge=union`, so the old workaround only worked in a local `git merge`.
+`tests/checks/changelog-fragments.sh` pins the format and runs the script on a scratch copy.
 
 ## Known ceilings
 
