@@ -90,10 +90,18 @@ images on the sampled templates at 1440 and 390 px.
 
 ## Production order
 
-Run the conversion on a local clone first. Push the database and uploads only after step 5
-passes. Check whether the sync tool deletes remote files that are missing locally. If it does
-not, move the old production PNGs to a backup folder outside uploads, as in step 7. Deleting
+Run the conversion on a local clone first, as a rehearsal. Then pick one path for production.
+
+- **Production takes no writes between the clone and the push** (a brochure site, or a
+  freeze you control). Re-clone, convert, check step 5, then push the database and uploads.
+  There are no images uploaded after the clone to handle.
+- **Production keeps taking writes** (a store with orders, a site with editors). Do not push
+  the clone's database: it overwrites orders, customers and attachment rows created since the
+  clone. Run this procedure directly on production instead: back up the database and the
+  uploads directory, then follow step 3 onwards with the map built there. The clone stays a
+  rehearsal.
+
+In both paths, old PNGs are moved to a backup folder outside uploads, as in step 7. Deleting
 them is a separate decision for the operator, made after the production site is verified.
-Then run the conversion and the URL replacement on production again, for images uploaded there
-after the clone was taken. Build the map again on production: the map from the clone does not
-list those images, and reusing it would act on files production may no longer match.
+When the sync tool deletes remote files that are missing locally, check what it removes
+before it runs.
