@@ -1478,6 +1478,8 @@ Hand over both and say which is which.
 against the newest earlier sidecar and opens the document with resolved / new / still
 failing, by finding identity rather than by count. It never parses its own Markdown back:
 a report edited by hand would otherwise change what the next comparison claims happened.
+A second run on the same day keeps the first: the renderer moves the earlier set to
+`informe-<AAAA-MM-DD>-<HHMM>.*` before writing, and diffs against it.
 The ledger and the sidecar are different records and both stay — the ledger is the
 project's running history of every finding ever seen, a sidecar is one dated snapshot.
 
