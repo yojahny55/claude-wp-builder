@@ -306,6 +306,23 @@ requests in flight, WP-CLI or the database before HTTP, term archives sampled, a
    limit — Google truncates by pixel width (~580px), so CJK and Cyrillic titles hit it sooner.
 2. **SEO-039** — only a finding when Rank Math is active. Rank Math is the single schema source;
    a theme that also emits JSON-LD produces two blocks and Google may trust neither.
+   The theme grep misses one duplicate that no theme file prints: **WooCommerce's own
+   BreadcrumbList.** `WC_Structured_Data` hooks `generate_breadcrumblist_data` to
+   `woocommerce_breadcrumb`, so every page that calls `woocommerce_breadcrumb()` (shop, product
+   categories, single product, often a 404 override) gets a WooCommerce BreadcrumbList next to
+   Rank Math's. Count `"BreadcrumbList"` in the rendered HTML of the shop page and one product
+   category; more than one is SEO-039, with the resource set to that page. Adding
+   `woocommerce_breadcrumb()` to a template to fix a missing-breadcrumb finding creates this
+   duplicate on the spot, so re-count after that fix. The fix keeps the visible trail and
+   removes only WooCommerce's schema, when Rank Math is active:
+
+   ```php
+   add_action( 'init', function () {
+   	if ( function_exists( 'WC' ) && WC()->structured_data && defined( 'RANK_MATH_VERSION' ) ) {
+   		remove_action( 'woocommerce_breadcrumb', array( WC()->structured_data, 'generate_breadcrumblist_data' ), 10 );
+   	}
+   }, 20 );
+   ```
 3. **SEO-044** — flag affiliate `href`s without `rel="sponsored"`, and any `target="_blank"`
    without `rel="noopener"`.
 4. **SEO-045 / SEO-046** — skip unless Polylang is active with more than one language. Not every
