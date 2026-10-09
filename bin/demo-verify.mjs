@@ -727,7 +727,16 @@ const containerAudit = () => {
 // columns with no width, boxes hidden on every device visible again. Every integer-width shot
 // misses it, so this pass loads the page inside (N, N+1) and compares it with N and N+1.
 const GAP_MAX = 3;
-const GAP_SCALE = 1.1;
+// Device scale factors to land in a gap with. Headless Chromium has no window chrome, so
+// --window-size is the CSS viewport plus a fraction from the scale, and the reachable widths
+// are multiples of 1/scale: at 1.1 some edges (991, 511) have no integer window size inside
+// (N, N+1), and 1.25 reaches them. Measured on Chromium 1243; below 500px headless clamps the
+// window, so those edges are skipped with a warning.
+const GAP_SCALES = [1.1, 1.25];
+// A culprit is wider in the gap than at both neighbours by this ratio and this many pixels,
+// which filters out sub-pixel rounding.
+const GAP_WIDTH_RATIO = 1.5;
+const GAP_MIN_PIXEL_DIFF = 100;
 
 /** Integer pairs max-width:N / min-width:N+1 in the page's same-origin stylesheets. */
 const gapEdges = () => {
@@ -779,34 +788,30 @@ const gapMeasure = (edge) => {
   };
 };
 
-// Window chrome offset (title bar + borders) varies by OS/DE; 78px is a
-// conservative estimate for Linux/GTK. Adjust if targeting other platforms.
-const CHROME_OFFSET = 78;
-
 /** A browser whose CSS viewport lands strictly between edge and edge+1, or null. The window
- *  chrome adds a fixed offset, so aim by formula and correct from what is read back. */
+ *  width maps to the viewport almost 1:1 (no chrome in headless), so try the widths around the
+ *  edge at each scale and keep the first that reads back inside the gap. */
 async function launchInGap(edge) {
-  let win = Math.round((edge + 0.5) * GAP_SCALE - CHROME_OFFSET);
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const b = await chromium.launch({
-      executablePath,
-      args: ['--force-device-scale-factor=' + GAP_SCALE, '--window-size=' + win + ',1000'],
-    });
-    let vw;
-    try {
-      const ctx = await b.newContext({ viewport: null, ...TLS });
-      const pg = await ctx.newPage();
-      await pg.goto('about:blank');
-      vw = await pg.evaluate(() => window.visualViewport.width);
-      await ctx.close();
-    } catch (e) {
+  for (const scale of GAP_SCALES) {
+    for (const win of [edge - 1, edge, edge - 2, edge + 1]) {
+      const b = await chromium.launch({
+        executablePath,
+        args: ['--force-device-scale-factor=' + scale, '--window-size=' + win + ',1000'],
+      });
+      let vw;
+      try {
+        const ctx = await b.newContext({ viewport: null, ...TLS });
+        const pg = await ctx.newPage();
+        await pg.goto('about:blank');
+        vw = await pg.evaluate(() => window.visualViewport.width);
+        await ctx.close();
+      } catch (e) {
+        await b.close();
+        throw e;
+      }
+      if (vw > edge && vw < edge + 1) return { browser: b, win, vw };
       await b.close();
-      throw e;
     }
-    if (vw > edge && vw < edge + 1) return { browser: b, win, vw };
-    await b.close();
-    const off = edge + 0.5 - vw;
-    win += Math.round(off * GAP_SCALE) || (off > 0 ? 1 : -1);
   }
   return null;
 }
@@ -843,22 +848,18 @@ async function gapPass(browser, url, outDir) {
       continue;
     }
     try {
-      const lo = await measureAt(edge);
-      const hi = await measureAt(edge + 1);
       const ctx = await landed.browser.newContext({ viewport: null, ...TLS });
       try {
         const pg = await ctx.newPage();
         await pg.goto(url, { waitUntil: 'load' });
         await pg.waitForTimeout(300);
         const gap = await pg.evaluate(gapMeasure, edge);
+        // The page's own queries matched, so there is no gap at this edge: skip the
+        // neighbour loads rather than measure and discard them.
         if (gap.maxMatches || gap.minMatches) continue;
+        const [lo, hi] = await Promise.all([measureAt(edge), measureAt(edge + 1)]);
 
         const culprits = [];
-        // Width ratio threshold: an element must be 1.5× wider than at both neighbours
-        // to be flagged, filtering out minor rounding differences.
-        const GAP_WIDTH_RATIO = 1.5;
-        // Minimum pixel difference to flag, avoiding noise from sub-pixel rendering.
-        const GAP_MIN_PIXEL_DIFF = 100;
         for (const [key, g] of Object.entries(gap.els)) {
           const a = lo.els[key];
           const b = hi.els[key];

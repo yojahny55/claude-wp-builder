@@ -28,10 +28,13 @@ grep -Fq 'max-width:767.98px' "$fx/fixed.html" || fail "$fx/fixed.html no longer
 if probe=$(node "$s" --probe 2>&1); then
   work="$(mktemp -d)"
   trap 'rm -rf "$work"' EXIT
-  node "$s" "$fx" --positions 2 --widths 1280x800 --no-firefox --out "$work/g" >/dev/null 2>&1 || true
-  [ -f "$work/g/findings.json" ] || fail "$s produced no findings.json for $fx"
+  # Keep the run's output: when it crashes, the failure has to say why.
+  node "$s" "$fx" --positions 2 --widths 1280x800 --no-firefox --out "$work/g" >"$work/g.log" 2>&1 || true
+  [ -f "$work/g/findings.json" ] || fail "$s produced no findings.json for $fx: $(tail -5 "$work/g.log")"
   verdict="$(node -e '
-    const r = require(process.argv[1]);
+    let r;
+    try { r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); }
+    catch (e) { console.log("findings.json is not valid JSON: " + e.message); process.exit(); }
     const page = (n) => r.pages.find((p) => p.url.endsWith("/" + n));
     const missing = ["index.html", "fixed.html"].filter((n) => !page(n));
     if (missing.length) { console.log("no findings for " + missing.join(", ")); process.exit(); }
@@ -47,7 +50,9 @@ if probe=$(node "$s" --probe 2>&1); then
   [ "$verdict" = "OK" ] || fail "$s on $fx: $verdict"
   [ -f "$work/g/index/gap-767.png" ] && [ -f "$work/g/index/gap-767.jpg" ] || fail "gap-767 shots were not written"
   # --no-gaps skips the pass
-  node "$s" "$fx/index.html" --positions 2 --widths 1280x800 --no-firefox --no-gaps --out "$work/n" >/dev/null 2>&1 || true
+  node "$s" "$fx/index.html" --positions 2 --widths 1280x800 --no-firefox --no-gaps --out "$work/n" >"$work/n.log" 2>&1 || true
+  # Without this, a run that wrote nothing makes grep exit 2 and the negation reads it as a pass.
+  [ -f "$work/n/findings.json" ] || fail "--no-gaps run produced no findings.json: $(tail -5 "$work/n.log")"
   ! grep -Fq breakpoint-gap "$work/n/findings.json" || fail "--no-gaps still ran the fractional pass"
 else
   echo "SKIP: no usable browser; the breakpoint-gap battery did not run -- $(tr '\n' ' ' <<<"$probe")"
