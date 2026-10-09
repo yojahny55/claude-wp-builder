@@ -11,7 +11,7 @@ s=bin/demo-verify.mjs
 grep -Fq "args.includes('--no-motion')" "$s" || fail "$s does not parse --no-motion"
 grep -Fq -- '--no-motion' commands/wp-demo-verify.md || fail "commands/wp-demo-verify.md does not document --no-motion"
 grep -Fq -- '--no-motion' commands/wp-responsive-check.md || fail "commands/wp-responsive-check.md does not pass --no-motion"
-grep -Fq -- '--no-motion' CHANGELOG.md || fail "CHANGELOG.md has no --no-motion entry"
+grep -Fq -- '--no-motion' changes/demo-verify-no-motion.fixed.md || fail "changes/demo-verify-no-motion.fixed.md has no --no-motion entry"
 
 command -v node >/dev/null || { echo "PASS (static only: no node)"; exit 0; }
 if ! probe=$(node "$s" --probe 2>&1); then
