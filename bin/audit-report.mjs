@@ -35,7 +35,7 @@
 //   1  invalid input — the run file is missing, unparseable, or a finding is incomplete
 //   3  crash
 
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, renameSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const OWNERSHIP = ['code', 'setting', 'content', 'manual'];
@@ -342,16 +342,50 @@ function mergeRuns(base, extras) {
   return { ...base, findings: merged, unmeasured };
 }
 
+// A sidecar is `informe-<date>.json`, or `informe-<date>-<HHMM[SS][-N]>.json` once a later
+// run on the same day has archived it. Within one date the unsuffixed file is always the
+// newest: archiving only ever happens to make room for it.
+const SIDECAR = /^informe-(\d{4}-\d{2}-\d{2})(?:-(\d{4}(?:\d{2})?(?:-\d+)?))?\.json$/;
+
+function sidecarOrder(name) {
+  const [, date, time] = SIDECAR.exec(name);
+  return `${date} ${time ? time.padEnd(6, '0') : '999999'}`;
+}
+
+// A second run on the same day used to overwrite the first run's documents and sidecar, and
+// the first run's sidecar was the only thing the second could compare against: the report
+// said "No previous audit found" and the earlier snapshot was gone. The earlier set is moved
+// aside under the time it was written, so it stays readable and becomes the previous run.
+function archiveSameDay(outDir, date) {
+  const sidecar = join(outDir, `informe-${date}.json`);
+  if (!existsSync(sidecar)) return;
+  const at = statSync(sidecar).mtime;
+  const pad = (n) => String(n).padStart(2, '0');
+  let stamp = `${pad(at.getHours())}${pad(at.getMinutes())}`;
+  if (existsSync(join(outDir, `informe-${date}-${stamp}.json`))) stamp += pad(at.getSeconds());
+  let candidate = stamp;
+  let n = 1;
+  while (existsSync(join(outDir, `informe-${date}-${candidate}.json`))) {
+    candidate = `${stamp}-${n++}`;
+  }
+  stamp = candidate;
+  for (const ext of ['json', 'md', 'html']) {
+    const from = join(outDir, `informe-${date}.${ext}`);
+    if (existsSync(from)) renameSync(from, join(outDir, `informe-${date}-${stamp}.${ext}`));
+  }
+  console.log(`audit-report: earlier run of ${date} kept as informe-${date}-${stamp}.*`);
+}
+
 // The previous run is the newest sidecar in the output directory that is not this run's
 // own. Markdown is never parsed back: a report rewritten by hand would then change what
 // the next comparison claims happened.
 function findPrevious(outDir, selfPath) {
   if (!existsSync(outDir)) return null;
   const sidecars = readdirSync(outDir)
-    .filter((name) => /^informe-\d{4}-\d{2}-\d{2}\.json$/.test(name))
+    .filter((name) => SIDECAR.test(name))
+    .sort((a, b) => sidecarOrder(a).localeCompare(sidecarOrder(b)))
     .map((name) => join(outDir, name))
-    .filter((path) => resolve(path) !== resolve(selfPath))
-    .sort();
+    .filter((path) => resolve(path) !== resolve(selfPath));
   if (sidecars.length === 0) return null;
   const path = sidecars[sidecars.length - 1];
   try {
@@ -984,6 +1018,7 @@ function main() {
   mkdirSync(outDir, { recursive: true });
 
   const sidecarPath = join(outDir, `informe-${date}.json`);
+  archiveSameDay(outDir, date);
   const previous = findPrevious(outDir, sidecarPath);
 
   const model = {

@@ -468,6 +468,20 @@ grep -Fq '2026-09-17' "$tmp/out3/informe-2026-09-24.md" \
 if grep -Fq 'No previous audit found' "$tmp/out3/informe-2026-09-24.md"; then
   fail "the run after a clean run reports no previous audit"
 fi
+# A second run on the same day keeps the first one and diffs against it. It used to
+# overwrite the first run's sidecar and then find nothing to compare with.
+cp "$tmp/out3/informe-2026-09-24.md" "$tmp/first-of-day.md"
+node "$r" --run "$tmp/empty.json" --out "$tmp/out3" --date 2026-09-24 --format md >/dev/null \
+  || fail "$r failed on a second run of the same day"
+archived=$(find "$tmp/out3" -name 'informe-2026-09-24-[0-9][0-9][0-9][0-9]*.json' | head -1)
+[ -n "$archived" ] || fail "a second run on the same day did not keep the first run's sidecar"
+cmp -s "${archived%.json}.md" "$tmp/first-of-day.md" \
+  || fail "a second run on the same day did not keep the first run's report"
+if grep -Fq 'No previous audit found' "$tmp/out3/informe-2026-09-24.md"; then
+  fail "a second run on the same day reports no previous audit"
+fi
+grep -Fq 'Resolved since the previous run:** 1' "$tmp/out3/informe-2026-09-24.md" \
+  || fail "a second run on the same day does not diff against the first run of that day"
 # A run with no findings but unmeasured checks must not read as a clean bill of health.
 node "$r" --run "$tmp/nothing.json" --out "$tmp/out5" --format both >/dev/null \
   || fail "$r refused a run with only unmeasured checks"
