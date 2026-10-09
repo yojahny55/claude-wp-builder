@@ -35,17 +35,20 @@ awk -v dir="$tmp" '
   /^## \[Unreleased\]/ { on = 1; next }
   /^## \[/ { on = 0 }
   on && /^### / { s = tolower(substr($0, 5)); out = dir "/old." s; next }
-  on && out { print > out }
+  on && out { print > out; next }
+  on && NF { print > (dir "/stray") }
 ' "$cl"
 
-for f in "${frags[@]}"; do
+for f in ${frags[@]+"${frags[@]}"}; do
   base=$(basename "$f" .md)
   sec=${base##*.}
   [[ " $order " == *" $sec "* && "$base" == *.* ]] \
     || { echo "$f: name must be <slug>.<section>.md with section in: $order" >&2; exit 1; }
   head -n1 "$f" | grep -q '^- ' || { echo "$f: must start with '- '" >&2; exit 1; }
 done
+[ ! -s "$tmp/stray" ] || { echo "[Unreleased] has text outside any ### section; move it under one first:" >&2; cat "$tmp/stray" >&2; exit 1; }
 for o in "$tmp"/old.*; do
+  [ -e "$o" ] || continue
   s=${o##*/old.}
   [[ " $order " == *" $s "* ]] || { echo "[Unreleased] has a '### $s' section this script does not know" >&2; exit 1; }
 done
@@ -56,7 +59,7 @@ block="$tmp/block"
   for sec in $order; do
     body=""
     [ -f "$tmp/old.$sec" ] && body=$(awk 'NF { p = 1 } p' "$tmp/old.$sec" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')
-    for f in "${frags[@]}"; do
+    for f in ${frags[@]+"${frags[@]}"}; do
       [ "$(basename "$f" .md | sed 's/.*\.//')" = "$sec" ] || continue
       [ -n "$body" ] && body+=$'\n\n'
       body+=$(cat "$f")

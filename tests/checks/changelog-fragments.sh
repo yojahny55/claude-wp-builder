@@ -48,4 +48,14 @@ awk '/- old added/{a=NR} /- frag added/{b=NR} /- frag fixed/{c=NR} END{exit !(a 
 [ "$(grep -c '^### Added' "$out")" -eq 2 ] || fail "expected one Added section per release block"
 ( cd "$t" && bash bin/changelog-release.sh 1.1.0 2026-02-02 2>/dev/null ) && fail "release script re-ran for an existing version"
 
+# No fragments (legacy Unreleased only): must not trip `set -u` on an empty array (bash < 4.4).
+rm -f "$t"/changes/*.fixed.md "$t"/changes/*.added.md
+printf '%s\n' '# Changelog' '' '## [Unreleased]' '' '### Fixed' '' '- only legacy' > "$t/CHANGELOG.md"
+( cd "$t" && bash bin/changelog-release.sh 1.2.0 2026-03-03 >/dev/null 2>&1 ) || fail "release script failed with no fragments"
+grep -q -- '- only legacy' "$t/CHANGELOG.md" || fail "legacy Unreleased entry lost when there are no fragments"
+# Text outside any section must refuse, not vanish.
+printf '%s\n' '# Changelog' '' '## [Unreleased]' '' '- bare entry' '' '### Added' '' '- a' > "$t/CHANGELOG.md"
+( cd "$t" && bash bin/changelog-release.sh 1.3.0 2026-04-04 >/dev/null 2>&1 ) && fail "release script dropped text outside a section instead of refusing"
+grep -q -- '- bare entry' "$t/CHANGELOG.md" || fail "refusal still rewrote CHANGELOG.md"
+
 echo "PASS: $n fragment(s) well formed, release script compiles in order"
