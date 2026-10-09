@@ -749,20 +749,30 @@ const gapMeasure = (edge) => {
   };
 };
 
+// Window chrome offset (title bar + borders) varies by OS/DE; 78px is a
+// conservative estimate for Linux/GTK. Adjust if targeting other platforms.
+const CHROME_OFFSET = 78;
+
 /** A browser whose CSS viewport lands strictly between edge and edge+1, or null. The window
  *  chrome adds a fixed offset, so aim by formula and correct from what is read back. */
 async function launchInGap(edge) {
-  let win = Math.round((edge + 0.5) * GAP_SCALE - 78);
+  let win = Math.round((edge + 0.5) * GAP_SCALE - CHROME_OFFSET);
   for (let attempt = 0; attempt < 4; attempt++) {
     const b = await chromium.launch({
       executablePath,
       args: ['--force-device-scale-factor=' + GAP_SCALE, '--window-size=' + win + ',1000'],
     });
-    const ctx = await b.newContext({ viewport: null, ...TLS });
-    const pg = await ctx.newPage();
-    await pg.goto('about:blank');
-    const vw = await pg.evaluate(() => window.visualViewport.width);
-    await ctx.close();
+    let vw;
+    try {
+      const ctx = await b.newContext({ viewport: null, ...TLS });
+      const pg = await ctx.newPage();
+      await pg.goto('about:blank');
+      vw = await pg.evaluate(() => window.visualViewport.width);
+      await ctx.close();
+    } catch (e) {
+      await b.close();
+      throw e;
+    }
     if (vw > edge && vw < edge + 1) return { browser: b, win, vw };
     await b.close();
     const off = edge + 0.5 - vw;
@@ -773,20 +783,27 @@ async function launchInGap(edge) {
 
 async function gapPass(browser, url, outDir) {
   const findings = [];
+  let edges;
   const probeCtx = await browser.newContext({ viewport: { width: 1280, height: 900 }, ...TLS });
-  const probePage = await probeCtx.newPage();
-  await probePage.goto(url, { waitUntil: 'load' });
-  const edges = (await probePage.evaluate(gapEdges)).slice(0, GAP_MAX);
-  await probeCtx.close();
+  try {
+    const probePage = await probeCtx.newPage();
+    await probePage.goto(url, { waitUntil: 'load' });
+    edges = (await probePage.evaluate(gapEdges)).slice(0, GAP_MAX);
+  } finally {
+    await probeCtx.close();
+  }
 
   const measureAt = async (width) => {
     const ctx = await browser.newContext({ viewport: { width, height: 900 }, ...TLS });
-    const pg = await ctx.newPage();
-    await pg.goto(url, { waitUntil: 'load' });
-    await pg.waitForTimeout(300);
-    const m = await pg.evaluate(gapMeasure, width);
-    await ctx.close();
-    return m;
+    try {
+      const pg = await ctx.newPage();
+      await pg.goto(url, { waitUntil: 'load' });
+      await pg.waitForTimeout(300);
+      const m = await pg.evaluate(gapMeasure, width);
+      return m;
+    } finally {
+      await ctx.close();
+    }
   };
 
   for (const edge of edges) {
@@ -799,36 +816,44 @@ async function gapPass(browser, url, outDir) {
       const lo = await measureAt(edge);
       const hi = await measureAt(edge + 1);
       const ctx = await landed.browser.newContext({ viewport: null, ...TLS });
-      const pg = await ctx.newPage();
-      await pg.goto(url, { waitUntil: 'load' });
-      await pg.waitForTimeout(300);
-      const gap = await pg.evaluate(gapMeasure, edge);
-      if (gap.maxMatches || gap.minMatches) { await ctx.close(); continue; }
+      try {
+        const pg = await ctx.newPage();
+        await pg.goto(url, { waitUntil: 'load' });
+        await pg.waitForTimeout(300);
+        const gap = await pg.evaluate(gapMeasure, edge);
+        if (gap.maxMatches || gap.minMatches) continue;
 
-      const culprits = [];
-      for (const [key, g] of Object.entries(gap.els)) {
-        const a = lo.els[key];
-        const b = hi.els[key];
-        if (!a || !b) continue;
-        const widest = Math.max(a.w, b.w);
-        if (!g.none && a.none && b.none)
-          culprits.push({ selector: g.label, why: 'visible in the gap, display:none at ' + edge + ' and ' + (edge + 1), width: Math.round(g.w) });
-        else if (!g.none && !a.none && !b.none && g.w > widest * 1.5 && g.w - widest > 100)
-          culprits.push({ selector: g.label, why: 'wider than at both neighbours', width: Math.round(g.w), at: [Math.round(a.w), Math.round(b.w)] });
+        const culprits = [];
+        // Width ratio threshold: an element must be 1.5× wider than at both neighbours
+        // to be flagged, filtering out minor rounding differences.
+        const GAP_WIDTH_RATIO = 1.5;
+        // Minimum pixel difference to flag, avoiding noise from sub-pixel rendering.
+        const GAP_MIN_PIXEL_DIFF = 100;
+        for (const [key, g] of Object.entries(gap.els)) {
+          const a = lo.els[key];
+          const b = hi.els[key];
+          if (!a || !b) continue;
+          const widest = Math.max(a.w, b.w);
+          if (!g.none && a.none && b.none)
+            culprits.push({ selector: g.label, why: 'visible in the gap, display:none at ' + edge + ' and ' + (edge + 1), width: Math.round(g.w) });
+          else if (!g.none && !a.none && !b.none && g.w > widest * GAP_WIDTH_RATIO && g.w - widest > GAP_MIN_PIXEL_DIFF)
+            culprits.push({ selector: g.label, why: 'wider than at both neighbours', width: Math.round(g.w), at: [Math.round(a.w), Math.round(b.w)] });
+        }
+        const limit = Math.ceil(gap.vw) + 1;
+        const overflow = gap.sw > limit && lo.sw <= edge + 1 && hi.sw <= edge + 2;
+        if (culprits.length || overflow) {
+          mkdirSync(outDir, { recursive: true });
+          await pg.screenshot({ path: join(outDir, 'gap-' + edge + '.png'), fullPage: true });
+          await pg.screenshot({ path: join(outDir, 'gap-' + edge + '.jpg'), fullPage: true, type: 'jpeg', quality: SHEET_JPEG_QUALITY });
+          findings.push({
+            kind: 'breakpoint-gap', pass: 'normal', width: edge, gap: [edge, edge + 1],
+            viewport: Number(gap.vw.toFixed(2)), overflow: overflow ? gap.sw : false,
+            culprits: culprits.sort((x, y) => y.width - x.width).slice(0, 5),
+          });
+        }
+      } finally {
+        await ctx.close();
       }
-      const limit = Math.ceil(gap.vw) + 1;
-      const overflow = gap.sw > limit && lo.sw <= edge + 1 && hi.sw <= edge + 2;
-      if (culprits.length || overflow) {
-        mkdirSync(outDir, { recursive: true });
-        await pg.screenshot({ path: join(outDir, 'gap-' + edge + '.png'), fullPage: true });
-        await pg.screenshot({ path: join(outDir, 'gap-' + edge + '.jpg'), fullPage: true, type: 'jpeg', quality: SHEET_JPEG_QUALITY });
-        findings.push({
-          kind: 'breakpoint-gap', pass: 'normal', width: edge, gap: [edge, edge + 1],
-          viewport: Number(gap.vw.toFixed(2)), overflow: overflow ? gap.sw : false,
-          culprits: culprits.sort((x, y) => y.width - x.width).slice(0, 5),
-        });
-      }
-      await ctx.close();
     } finally {
       await landed.browser.close();
     }
