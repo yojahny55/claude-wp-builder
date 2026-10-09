@@ -97,4 +97,14 @@ fi
 grep -Fq 'carries no findings list' "$work/shape.out" \
   || fail "the composition gate exited 1 on an uninterpretable detector payload without saying that is why, so it is indistinguishable from any other failure"
 
+# The detector follows the newest 4.x on purpose, so a new release is picked up without a PR.
+# A pinned exact version would freeze the rules instead of answering them.
+grep -Eq 'impeccable@4 detect' bin/composition-gate.sh \
+  || fail "bin/composition-gate.sh no longer follows the newest impeccable 4.x (pinned, or another major)"
+# Ignoring a rule is a debt with a named exit, not a place to park findings. Growing the list
+# needs this line changed too, which makes the decision visible in review.
+ign=$(grep -E '^IGNORED = ' bin/composition-gate.sh || true)
+[ "$ign" = 'IGNORED = {"hero-eyebrow-chip"}' ] \
+  || fail "the gate's IGNORED rules changed ($ign) — each entry needs its reason in the gate and this check updated"
+
 echo PASS
