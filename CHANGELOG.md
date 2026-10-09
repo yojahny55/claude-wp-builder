@@ -31,6 +31,17 @@
 
 ### Fixed
 
+- **`demo-verify.mjs --probe` finds a globally installed Playwright.** The script resolved
+  `playwright-core` from `PLAYWRIGHT_CORE`, then a bare import from `bin/`, then the working
+  directory's `node_modules`. On a machine where Playwright is installed only globally
+  (`npm i -g @playwright/test`) none of those exist, so the probe printed
+  `probe: missing playwright-core` and exited 2 although a working copy sat under
+  `npm root -g`; the docs worked around it by telling people to set `PLAYWRIGHT_CORE` by hand.
+  A last rung now asks `npm root -g` (short timeout, errors swallowed) and tries
+  `<root>/playwright-core` and `<root>/@playwright/test/node_modules/playwright-core`.
+  `PLAYWRIGHT_CORE` still skips the ladder, so the forced-failure check stays deterministic.
+  `tests/checks/demo-verify-global-playwright.sh` covers it with a fake `npm`.
+
 - **The tailwind starter stops printing a second meta description beside an SEO plugin.**
   Its `functions.php` printed `<meta name="description">` on the front page with no early
   return, so a site running Rank Math — which `/wp-create`'s plugin profiles install —
