@@ -101,8 +101,19 @@ else:
     print("composition-gate: detector JSON carries no findings list (top level: %s) — treating as could not scan"
           % type(data).__name__, file=sys.stderr)
     raise SystemExit(1)
+# Rules the gate does not block on yet, each with the reason and the way out. Keep this
+# list short: every entry is a finding nobody is looking at.
+# - hero-eyebrow-chip: added in impeccable 4.5.x; flags the kicker above the title in
+#   hero-bleed, hero-split, hero-type and page-head. Restyling those kickers is a design
+#   change that needs measuring and approval, done as its own PR, which removes this entry.
+IGNORED = {"hero-eyebrow-chip"}
+ignored = [f for f in findings if f.get("antipattern") in IGNORED]
+for name in sorted({f.get("antipattern") for f in ignored}):
+    print("composition-gate: ignoring %s (%d finding(s)) — see IGNORED in bin/composition-gate.sh"
+          % (name, sum(1 for f in ignored if f.get("antipattern") == name)), file=sys.stderr)
 blocking = [f for f in findings
-            if f.get("category") == "slop" and f.get("severity") == "warning"]
+            if f.get("category") == "slop" and f.get("severity") == "warning"
+            and f.get("antipattern") not in IGNORED]
 by_comp = collections.defaultdict(list)
 for f in blocking:
     by_comp[f.get("file", "?").split("/")[-1].replace(".html", "")].append(
