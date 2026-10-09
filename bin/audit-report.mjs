@@ -342,10 +342,10 @@ function mergeRuns(base, extras) {
   return { ...base, findings: merged, unmeasured };
 }
 
-// A sidecar is `informe-<date>.json`, or `informe-<date>-<HHMM[SS]>.json` once a later run on
-// the same day has archived it. Within one date the unsuffixed file is always the newest:
-// archiving only ever happens to make room for it.
-const SIDECAR = /^informe-(\d{4}-\d{2}-\d{2})(?:-(\d{4}(?:\d{2})?))?\.json$/;
+// A sidecar is `informe-<date>.json`, or `informe-<date>-<HHMM[SS][-N]>.json` once a later
+// run on the same day has archived it. Within one date the unsuffixed file is always the
+// newest: archiving only ever happens to make room for it.
+const SIDECAR = /^informe-(\d{4}-\d{2}-\d{2})(?:-(\d{4}(?:\d{2})?(?:-\d+)?))?\.json$/;
 
 function sidecarOrder(name) {
   const [, date, time] = SIDECAR.exec(name);
@@ -363,6 +363,12 @@ function archiveSameDay(outDir, date) {
   const pad = (n) => String(n).padStart(2, '0');
   let stamp = `${pad(at.getHours())}${pad(at.getMinutes())}`;
   if (existsSync(join(outDir, `informe-${date}-${stamp}.json`))) stamp += pad(at.getSeconds());
+  let candidate = stamp;
+  let n = 1;
+  while (existsSync(join(outDir, `informe-${date}-${candidate}.json`))) {
+    candidate = `${stamp}-${n++}`;
+  }
+  stamp = candidate;
   for (const ext of ['json', 'md', 'html']) {
     const from = join(outDir, `informe-${date}.${ext}`);
     if (existsSync(from)) renameSync(from, join(outDir, `informe-${date}-${stamp}.${ext}`));
