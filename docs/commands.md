@@ -337,7 +337,7 @@ menus, ACF fields, plugins) when `.wp-create.json` exists.
 ### `/wp-demo-verify`
 
 ```
-/wp-demo-verify <file-path-or-url> [--positions N]
+/wp-demo-verify <file-path-or-url> [--positions N] [--no-motion]
 ```
 
 Defaults to `demo/index.html`. Pass a URL to check a converted WordPress page instead, the

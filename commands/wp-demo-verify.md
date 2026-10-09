@@ -1,7 +1,7 @@
 ---
 description: Verify a demo directory, page or live URL — impeccable detector, scroll-walk screenshots per section and viewport, machine findings, and a seven-line critique written to demo/VERIFY.md
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
-argument-hint: "<demo-dir-or-file-path-or-url> [--positions N]"
+argument-hint: "<demo-dir-or-file-path-or-url> [--positions N] [--no-motion]"
 ---
 
 # WP Demo Verify
@@ -95,7 +95,18 @@ revision pinned by the loaded playwright-core's `browsers.json` is preferred ove
 cached one, and a mismatch is named in that line. `tests/checks/demo-verify-engines.sh` only
 exercises this pass when it finds a playwright-core: run it with
 `PLAYWRIGHT_CORE="$(npm root -g)/@playwright/test/node_modules/playwright-core"` to test the
-cross-engine path for real. A directory target walks every page. Output lands in
+cross-engine path for real.
+
+**`--no-motion`.** For a URL of an existing site the plugin did not build (a page-builder site,
+say) that never carried the motion engine. Without it every section blocks as `no-engine`, a
+true fact that says nothing about the layout, and the round fails for a reason that does not
+apply. With it the `no-engine` and `dead-scroll` judgments are not emitted; overflow, clipped
+copy, container-noop, the full-page shots and the Firefox pass still run. It is opt-in and
+never inferred: a converted plugin page that lost its engine must still fail, so do not pass it
+for a page `/wp-demo` or `/wp-yolo` built. A URL page with zero `[data-motion]` elements and no
+flag prints one line suggesting it.
+
+A directory target walks every page. Output lands in
 `<dir>/.verify/[<page>/]<width>/`, with `findings.json` and, per width, both
 `sheet.png` (full resolution, for a human who opens it directly) and `sheet.jpg`
 (downscaled to 1000px wide, quality 70 — the one to Read in Step 4).
@@ -127,7 +138,9 @@ branch: `/wp-demo` probes first and stops on 2.)
   failure this split exists to keep catching — not that the device is unreadable.
 - `no-engine` — the page carries no `data-motion` at all. Fails the round. A
   motionless page used to walk clean, because an empty frame signature could
-  never accumulate a stall.
+  never accumulate a stall. On a site the plugin did not build, this is expected
+  and not a defect: re-run with `--no-motion` (Step 2b). Never pass it for a page
+  the plugin built, where a missing engine is the failure being caught.
 - **`unobserved` is a per-section judgment; `no-engine` keeps a document-wide count.**
   The probe walks `[data-motion]` inside the walked section's own subtree, so an
   `unobserved` row is a fact about that section: it carries devices this harness

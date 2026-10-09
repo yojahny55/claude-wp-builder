@@ -417,7 +417,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-settings <text>` | B | optional | Extend the settings page |
 | `/wp-seed [file]` | B | required for content | Pages, media, fields, menus from the demo |
 | `/wp-finalize` | all | recommended | Pre-delivery checklist |
-| `/wp-demo-verify <path-or-url> [--positions N]` | all | recommended | Scroll-walk a demo dir or live page, impeccable detector, screenshots per section and viewport, seven-line critique into demo/VERIFY.md |
+| `/wp-demo-verify <path-or-url> [--positions N] [--no-motion]` | all | recommended | Scroll-walk a demo dir or live page, impeccable detector, screenshots per section and viewport, seven-line critique into demo/VERIFY.md |
 | `/wp-responsive-check <url>` | all | recommended | Alias, dispatches `/wp-demo-verify` (5-viewport layout check is now one part of what it walks) |
 | `/wp-audit [flags]` | all | optional | Security, SEO, a11y, performance, best practices, GEO |
 | `/wp-polylang <src> <dst>` | all | polylang only | Translate the site through Polylang |
