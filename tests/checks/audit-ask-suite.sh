@@ -28,7 +28,7 @@ suite=$(awk '/^### Ask for the browser suite up front/{on=1;print;next} on&&/^#/
 grep -Fq 'When the flag was passed, do not ask.' <<<"$suite" \
   || fail "Step 1 asks for the suite even when --suite was typed"
 
-line_of() { grep -nF -- "$1" "$audit" | head -1 | cut -d: -f1; }
+line_of() { grep -nF -- "$1" "$audit" | head -1 | cut -d: -f1 || true; }
 q=$(line_of 'Also run the browser suite (web-portal-audit')
 ro=$(line_of '[A] Report only')
 adopt=$(line_of '[A] Adopt it now')
