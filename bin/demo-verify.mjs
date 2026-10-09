@@ -785,6 +785,11 @@ try {
     // them, below the loop.
     if (!reduced) containerNoop.push(await page.evaluate(containerAudit));
     if (!reduced && !mix) mix = await page.evaluate(motionMix);
+    // Document-wide and invariant across sections/positions, so read it once per
+    // page rather than on every position iteration of every section below. The
+    // probe still returns it for the no-engine guard; this hoisted copy serves
+    // the advisory hint only.
+    const pageDeviceCount = await page.evaluate(() => document.querySelectorAll('[data-motion]').length);
     // `container-type` on an ancestor of the scroll subject freezes
     // `animation-timeline: view()` -- the timeline reports one constant progress at
     // every scroll position, so every CSS-path reveal lands dead. The existing
@@ -923,7 +928,7 @@ try {
         await page.evaluate((to) => window.scrollTo(0, to), y);
         await page.waitForTimeout(180);
         const frame = await page.evaluate(probe, b.idx);
-        if (targetIsUrl && !NO_MOTION && frame.pageDevices === 0 && !noMotionHinted.has(pageUrl)) {
+        if (targetIsUrl && !NO_MOTION && pageDeviceCount === 0 && !noMotionHinted.has(pageUrl)) {
           noMotionHinted.add(pageUrl);
           console.log('demo-verify: ' + pageUrl + ' carries no [data-motion] element. If this site was not built with the motion engine, re-run with --no-motion to skip the no-engine and dead-scroll judgments; without it every section blocks as no-engine.');
         }
