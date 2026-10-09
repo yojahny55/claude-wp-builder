@@ -288,7 +288,11 @@ because both indicators passed. The fix has four steps:
 4. **Measure before and after**, on every component the rule reaches, focused through the
    keyboard (`Tab`, not `.focus()` from a mouse-driven script, or `:focus-visible` does not
    match). Read `getComputedStyle(el)` → `outlineStyle`, `outlineWidth`, `outlineColor`,
-   `boxShadow`, `borderColor`, `borderWidth`. The element must show one indicator: the
+   `boxShadow`, `borderColor`, `borderWidth`. Read them after the focus transition ends:
+   many themes animate `outline` or `box-shadow` (`transition: all 0.25s`), and a read
+   right after `Tab` returns a colour in the middle of the animation. Wait for the longest
+   `transitionDuration` plus `transitionDelay` of the element, then read. A ring that
+   passes once it settles is not an A11Y-004 finding. The element must show one indicator: the
    design's own, or the new ring. A design border change plus a new outline on the same
    element is a regression, and the fix is not done until it is gone. Check every
    component, at desktop and mobile widths.

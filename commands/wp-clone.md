@@ -770,6 +770,22 @@ bash -c "$WP option get home"
 
 Both should return the local domain (e.g., `https://local-clone.local.com`). If they still show the old domain, the search-replace may have missed serialized data — re-run with `--precise` flag.
 
+`wp search-replace` changes the database only. Files generated under uploads keep the old
+domain. Elementor's local Google Fonts are the case that shows: its
+`uploads/elementor/google-fonts/css/*.css` files load each font from an absolute URL on the
+original host. In the clone the browser blocks those cross-origin font requests, the theme's
+fallback font renders, and text runs slightly wider (a button label can wrap to two lines).
+A visual comparison of clone and production then reports a difference that production does
+not have. Check for it:
+
+```bash
+grep -l "<remote-domain>" wp-content/uploads/elementor/google-fonts/css/*.css 2>/dev/null
+```
+
+Record each hit in the summary as a clone-only rendering difference. Do not rewrite those
+files when uploads can travel back to production through a sync. Serve rewritten copies from
+a clone-only mu-plugin that is never deployed instead.
+
 ### 6.3: Check Admin Accessibility
 
 ```bash
