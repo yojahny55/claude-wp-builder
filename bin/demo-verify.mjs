@@ -16,6 +16,7 @@ import { resolve, join, dirname, basename, extname, normalize, sep } from 'node:
 import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { createServer } from 'node:http';
+import { execFileSync } from 'node:child_process';
 import { findBrowser } from './lib/browsers.mjs';
 
 // Advisory kinds report what the harness could not see, not what the page got
@@ -207,6 +208,8 @@ function findChrome() {
   return null;
 }
 
+// playwright-core resolution order: PLAYWRIGHT_CORE, the bare import (from
+// bin/), the cwd's node_modules, then the global root (`npm root -g`).
 // PLAYWRIGHT_CORE lets the check suite force the no-browser path; a bogus
 // value must produce exit 2, never a crash, and skips the fallback ladder
 // below entirely so the forced failure stays deterministic.
@@ -227,8 +230,26 @@ try {
       // agent to do) is invisible to that resolution, so fall back to the
       // cwd's node_modules before giving up.
       const cwdEntry = join(process.cwd(), 'node_modules', 'playwright-core', 'index.mjs');
-      if (!existsSync(cwdEntry)) throw bare;
-      ({ chromium, firefox } = await import(pathToFileURL(cwdEntry).href));
+      if (existsSync(cwdEntry)) {
+        ({ chromium, firefox } = await import(pathToFileURL(cwdEntry).href));
+      } else {
+        // Last rung: a Playwright installed only globally (`npm i -g
+        // @playwright/test`) is on neither of the paths above, yet a working
+        // playwright-core sits under `npm root -g`. Asking npm is best effort:
+        // no npm, a hang or an odd exit just means the rung finds nothing.
+        let globalRoot = '';
+        try {
+          globalRoot = execFileSync('npm', ['root', '-g'], {
+            encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'],
+          }).trim();
+        } catch { /* npm missing or slow: fall through to the bare failure */ }
+        const globalEntry = globalRoot && [
+          join(globalRoot, 'playwright-core', 'index.mjs'),
+          join(globalRoot, '@playwright', 'test', 'node_modules', 'playwright-core', 'index.mjs'),
+        ].find((e) => existsSync(e));
+        if (!globalEntry) throw bare;
+        ({ chromium, firefox } = await import(pathToFileURL(globalEntry).href));
+      }
     }
   }
 } catch {

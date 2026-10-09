@@ -27,7 +27,7 @@
 ## Checklist
 
 - [ ] Tested with a real WordPress project (not just a dry run)
-- [ ] Updated CHANGELOG.md under `[Unreleased]`
+- [ ] Added a `changes/<slug>.<section>.md` fragment (not an edit to CHANGELOG.md)
 - [ ] Updated README.md (if new command or feature)
 - [ ] Frontmatter matches existing file patterns
 - [ ] No hardcoded paths, credentials, or personal data
