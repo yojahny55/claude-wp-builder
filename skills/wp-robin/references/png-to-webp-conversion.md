@@ -51,7 +51,9 @@ images on the sampled templates at 1440 and 390 px.
      quality 90). When `<name>.webp` already exists, use `<name>-png.webp` and never
      overwrite it.
    - Update `_wp_attached_file`, `post_mime_type`, and regenerate the sizes
-     (`wp_create_image_subsizes()` or `wp media regenerate <id>`).
+     (`wp_create_image_subsizes()`, which deletes nothing, or
+     `wp media regenerate <id> --skip-delete`: without the flag WP-CLI removes the old size
+     files before the map and the move-aside in step 7 can use them).
    - Write a **map** of every old file to its new file, relative to uploads: the original,
      the `-scaled` copy and every old size. Read the old names from the metadata before
      changing it.
@@ -90,5 +92,8 @@ images on the sampled templates at 1440 and 390 px.
 
 Run the conversion on a local clone first. Push the database and uploads only after step 5
 passes. Check whether the sync tool deletes remote files that are missing locally. If it does
-not, delete the old production PNGs from the map. Then run the conversion and the URL
-replacement on production again, for images uploaded there after the clone was taken.
+not, move the old production PNGs to a backup folder outside uploads, as in step 7. Deleting
+them is a separate decision for the operator, made after the production site is verified.
+Then run the conversion and the URL replacement on production again, for images uploaded there
+after the clone was taken. Build the map again on production: the map from the clone does not
+list those images, and reusing it would act on files production may no longer match.
