@@ -68,6 +68,28 @@ Before this question existed, a run without the flag only learned that the opera
 read-only audit at Step 9, after Steps 4 and 5 had already offered to install and configure
 plugins on the site. The answer belongs at the start, where it decides those prompts too.
 
+### Ask for the browser suite up front when the flag is absent
+
+If `--suite` was NOT passed, ask right after the report-only question, in the same
+`AskUserQuestion` call when both are asked, and still before any other prompt of the run:
+
+```
+Also run the browser suite (web-portal-audit, Playwright: axe-core, Lighthouse, rendered-page criteria)?
+  [A] Yes — run it in Step 6.5 against the public URL; first run on a machine installs its dependencies once
+  [B] No — Tier 3 uses a browser tool in this session if there is one, otherwise UNMEASURED
+```
+
+On A, set `--suite` for the rest of the run, exactly as if it had been typed: `--pages`
+defaults to `auto`, Step 3 counts the suite as a Tier 3 path, and Step 6.5 runs. The URL is
+the one Step 6.5 already resolves (`--host`, then `wordpress.url`, or on a local clone the
+confirmed production URL Step 2.3 asks for), so answering A asks for nothing more here. On B,
+continue without it. When the flag was passed, do not ask.
+
+The suite used to run only when someone remembered the flag, so the commonest invocation —
+a bare `/wp-audit` — never loaded a page the way a visitor does, even on a machine that had
+everything the suite needs. It is still not on by default: the first run installs packages
+and every run drives a real browser against a public site, which is the operator's call.
+
 ## Step 2: Read Project Context
 
 **First: validate the project configuration.**
