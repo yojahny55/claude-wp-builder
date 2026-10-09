@@ -72,10 +72,27 @@ images on the sampled templates at 1440 and 390 px.
    from uploads may remain. On production, purge the page cache and the CDN first and
    check the served HTML again: a cached page still names the PNGs, and step 7 would turn
    those URLs into 404s.
-6. **Redirect old URLs.** A regex 301, for example `^wp-content/uploads/(.+)\.png$` to
-   `/wp-content/uploads/$1.webp`. The web server serves a file that still exists, so the
-   rule only fires once the PNG is gone. Apply it in production's own server config: the
-   clone's does not sync, and the pattern has no leading slash on Apache and one on nginx.
+6. **Redirect old URLs, only for PNGs that are gone.** A server rule runs before the file
+   check, so without a condition it also redirects PNGs that still exist — non-attachment
+   files, and every converted PNG until step 7 moves it — to a `.webp` that may not exist.
+   Apache, above the WordPress block:
+
+   ```apache
+   RewriteCond %{REQUEST_FILENAME} !-f
+   RewriteCond %{DOCUMENT_ROOT}/wp-content/uploads/$1.webp -f
+   RewriteRule ^wp-content/uploads/(.+)\.png$ /wp-content/uploads/$1.webp [R=301,L]
+   ```
+
+   nginx, before any generic static-file `location` that also matches `.png`:
+
+   ```nginx
+   location ~ ^/wp-content/uploads/(?<png_base>.+)\.png$ {
+       if (!-f $request_filename) { return 301 /wp-content/uploads/$png_base.webp; }
+   }
+   ```
+
+   Apply it in production's own server config: the clone's does not sync. A redirect plugin
+   (Rank Math, Redirection) needs no condition, since WordPress never sees a file that exists.
 7. **Move the old files aside, do not delete them.** Move each old path from the map, plus
    its Robin `<file>.png.webp` sibling, to a backup folder outside uploads. Check the site
    again, then report the new uploads size.
