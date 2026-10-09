@@ -39,12 +39,21 @@ const TLS = { ignoreHTTPSErrors: true };
 const args = process.argv.slice(2);
 if (args.includes('--help')) {
   console.log(
-    'usage: demo-verify.mjs [file-or-dir-or-url] [--out DIR] [--positions N] [--widths 1440x900,390x844] [--no-firefox] [--no-gaps]\n' +
+    'usage: demo-verify.mjs [file-or-dir-or-url] [--out DIR] [--positions N] [--widths 1440x900,390x844] [--no-firefox] [--no-gaps] [--no-motion]\n' +
     '       demo-verify.mjs --probe     exit 0 if playwright-core and a Chrome are usable, else 2'
   );
   process.exit(0);
 }
 const PROBE = args.includes('--probe');
+// --no-motion: the target is not expected to carry the motion engine (an existing
+// site the plugin did not build). Every page of such a site reads as `no-engine`
+// on every section, which is true and useless: a real run against a page-builder
+// site gave 40 blocking rows and no defect. The flag drops the motion judgments
+// (no-engine, dead-scroll) and keeps overflow, clipped copy, container-noop, the
+// full-page shots and the Firefox pass. It is explicit on purpose: a converted
+// plugin page that lost its engine must still fail without it.
+const NO_MOTION = args.includes('--no-motion');
+const noMotionHinted = new Set();
 
 // The command documents demo/index.html as the default target, and exit 2 is
 // reserved for "no usable browser" so a caller can fall back to MCP screenshots.
@@ -968,6 +977,11 @@ try {
     // them, below the loop.
     if (!reduced) containerNoop.push(await page.evaluate(containerAudit));
     if (!reduced && !mix) mix = await page.evaluate(motionMix);
+    // Document-wide and invariant across sections/positions, so read it once per
+    // page rather than on every position iteration of every section below. The
+    // probe still returns it for the no-engine guard; this hoisted copy serves
+    // the advisory hint only.
+    const pageDeviceCount = await page.evaluate(() => document.querySelectorAll('[data-motion]').length);
     // `container-type` on an ancestor of the scroll subject freezes
     // `animation-timeline: view()` -- the timeline reports one constant progress at
     // every scroll position, so every CSS-path reveal lands dead. The existing
@@ -1106,6 +1120,10 @@ try {
         await page.evaluate((to) => window.scrollTo(0, to), y);
         await page.waitForTimeout(180);
         const frame = await page.evaluate(probe, b.idx);
+        if (targetIsUrl && !NO_MOTION && pageDeviceCount === 0 && !noMotionHinted.has(pageUrl)) {
+          noMotionHinted.add(pageUrl);
+          console.log('demo-verify: ' + pageUrl + ' carries no [data-motion] element. If this site was not built with the motion engine, re-run with --no-motion to skip the no-engine and dead-scroll judgments; without it every section blocks as no-engine.');
+        }
         await page.screenshot({ path: join(dir, String(shot++).padStart(3, '0') + '.png') });
 
         // Keyed by element index, not text: two cues sharing a string are real
@@ -1295,6 +1313,12 @@ try {
       const why = err && typeof err.message === 'string' ? err.message.split('\n')[0] : String(err);
       console.error('demo-verify: Firefox pass failed on ' + pageUrl + ' (' + why + ') -- Chromium findings kept');
     }
+  }
+  // The motion judgments are dropped here, after the whole walk, so the guards that
+  // produce them stay exactly as tests/checks/wp-craft-detect.sh pins them.
+  if (NO_MOTION) {
+    for (let i = findings.length - 1; i >= 0; i--)
+      if (findings[i].kind === 'no-engine' || findings[i].kind === 'dead-scroll') findings.splice(i, 1);
   }
   report.pages.push({ url: pageUrl, findings });
   } catch (err) {

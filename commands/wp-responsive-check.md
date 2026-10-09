@@ -13,6 +13,15 @@ argument:
 /wp-demo-verify $ARGUMENTS
 ```
 
+When the target is an existing site the plugin did not build (a page-builder site, any URL
+with no `data-motion` engine), append `--no-motion`: the walk then skips the `no-engine` and
+`dead-scroll` judgments, which would otherwise block every section, and still reports overflow,
+clipped copy and the full-page shots. Do not pass it for a page the plugin built.
+
+```bash
+/wp-demo-verify <url> --no-motion
+```
+
 It walks the five viewports this command used to cover (375, 576, 768, 1024, 1440)
 plus 620, 1100, 1152 and 1280, and adds the per-section scroll walk at 1440x900 and 390x844
 that a single static screenshot per breakpoint cannot show. The legacy five sample
