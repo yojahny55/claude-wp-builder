@@ -37,7 +37,7 @@ add_action('init', function (): void {
     $lang   = __starter___current_lang();
     $stored = isset($_COOKIE['__starter___lang']) ? sanitize_key(wp_unslash($_COOKIE['__starter___lang'])) : '';
     if ($lang === sanitize_key(wp_unslash($_GET['lang'])) && $lang !== $stored && !headers_sent()) {
-        setcookie('__starter___lang', $lang, time() + (365 * 24 * 60 * 60), '/');
+        setcookie('__starter___lang', $lang, array( 'expires' => time() + (365 * 24 * 60 * 60), 'path' => '/', 'samesite' => 'Lax', 'httponly' => true, 'secure' => is_ssl() ));
     }
 });
 

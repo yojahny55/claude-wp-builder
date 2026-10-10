@@ -7,8 +7,9 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-c=commands/wp-create.md
-. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; i=$EXPANDED
+. tests/checks/lib/expand-command.sh
+expand_command commands/wp-create.md; c=$EXPANDED
+expand_command commands/wp-init.md; i=$EXPANDED
 
 # --- Required and optional are different outcomes, in writing. --------------
 # A bare grep for 'required' was already true before any Task 6 edit -- section 3.7's

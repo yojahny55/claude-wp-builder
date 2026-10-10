@@ -7,6 +7,7 @@
 # dropped two of its three links.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 
 flat() { tr '\n' ' ' | sed -e 's/  */ /g'; }
 
@@ -18,7 +19,7 @@ section() { # file, heading-regex (ERE, matched against the whole heading line)
   awk -v start="$2" 'on && $0 ~ /^#{1,6} / && $0 !~ start { exit } $0 ~ start { on=1 } on { print }' "$1"
 }
 
-seed=commands/wp-seed.md
+seed=$wp_seed
 [ -f "$seed" ] || { echo "FAIL: $seed missing"; exit 1; }
 t=$(flat < "$seed")
 

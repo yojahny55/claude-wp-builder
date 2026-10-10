@@ -207,9 +207,9 @@ add_filter( 'script_loader_tag', function( $tag, $handle, $src ) {
  * declares it only for a theme that does not already have it.
  */
 function __starter___seo_plugin_owns_schema() {
-    return defined( 'RANK_MATH_VERSION' ) || class_exists( 'RankMath' )
-        || defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Options' )
-        || defined( 'SEOPRESS_VERSION' ) || class_exists( 'SEOPress' );
+    return defined( 'RANK_MATH_VERSION' ) || class_exists( 'RankMath', false )
+        || defined( 'WPSEO_VERSION' ) || class_exists( 'WPSEO_Options', false )
+        || defined( 'SEOPRESS_VERSION' ) || class_exists( 'SEOPress', false );
 }
 
 /**

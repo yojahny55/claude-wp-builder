@@ -12,6 +12,8 @@
 #   - every invocation used a `<skill>/scripts/…` placeholder nothing can resolve.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; wp_finalize=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 s=skills/wp-cli-patterns/SKILL.md
@@ -62,7 +64,7 @@ grep -qF 'Needs ACF or SCF active' "$s" \
 grep -nF '<skill>/' "${skill_md[@]}" && fail "wp-cli-patterns still invokes scripts through an unresolvable <skill>/ placeholder"
 grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/scripts' "$s" \
   || fail "$s does not resolve its scripts through \${CLAUDE_PLUGIN_ROOT}"
-grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/SKILL.md' commands/wp-seed.md \
+grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/SKILL.md' "$wp_seed" \
   || fail "commands/wp-seed.md cites wp-cli-patterns by a relative path, which resolves against the user's project"
 
 # --- every post has an author, and the sweep's two exclusions stay in both copies ---
@@ -74,7 +76,7 @@ sweep=$(grep -F 'SELECT COUNT(*) FROM $($WP db prefix)posts WHERE post_author = 
 [ -n "$sweep" ] || fail "$s has no post_author sweep"
 case "$sweep" in *"post_status != 'auto-draft'"*"post_type != 'nav_menu_item'"*) ;; *)
   fail "$s's author sweep lost one of its two exclusions (auto-draft, nav_menu_item)" ;; esac
-grep -qF -- "$(printf '%s' "$sweep" | sed 's/^[[:space:]]*//')" commands/wp-finalize.md \
+grep -qF -- "$(printf '%s' "$sweep" | sed 's/^[[:space:]]*//')" "$wp_finalize" \
   || fail "commands/wp-finalize.md's author check no longer matches the sweep in $s"
 
 # --- $WP comes from the manifest, never from a guess --------------------------------

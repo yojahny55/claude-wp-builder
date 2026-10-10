@@ -12,6 +12,7 @@
 # demo copied from it inherited a hard-coded "(c) 2025".
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
@@ -55,7 +56,7 @@ grep -Fq ':focus-visible' "$k" || fail "$k defines no visible focus style"
 grep -Fq 'header__lang' "$k" || fail "$k's header has no language switcher, which commands/wp-demo.md Step 4 requires"
 
 # --- footer classes /wp-seed reads ------------------------------------------------
-grep -Fq '`.footer__description`' commands/wp-seed.md && grep -Fq '`.footer__copyright`' commands/wp-seed.md \
+grep -Fq '`.footer__description`' "$wp_seed" && grep -Fq '`.footer__copyright`' "$wp_seed" \
   || fail "commands/wp-seed.md no longer maps .footer__description/.footer__copyright; re-check $k"
 grep -Fq 'class="footer__description"' "$k" || fail "$k's footer tagline is not .footer__description, so /wp-seed skips it"
 grep -Fq 'class="footer__copyright"' "$k" || fail "$k's copyright line has no .footer__copyright class, so /wp-seed skips it"

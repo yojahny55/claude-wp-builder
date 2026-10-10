@@ -5,11 +5,12 @@
 # than from the database, which is the thing they all have in common.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 
 fail() { echo "FAIL: $1"; exit 1; }
 
 p=commands/wp-polylang.md
-s=commands/wp-seed.md
+s=$wp_seed
 v=starter-theme/_i18n-variants/__tailwind__.php
 for x in "$p" "$s" "$v"; do test -f "$x" || fail "$x missing"; done
 

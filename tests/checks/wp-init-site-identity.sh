@@ -13,7 +13,7 @@ cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; init=$EXPANDED
-final=commands/wp-finalize.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; final=$EXPANDED
 for f in "$init" "$final"; do test -f "$f" || fail "$f missing"; done
 
 # 1. /wp-init writes both options.

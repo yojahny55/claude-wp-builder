@@ -36,9 +36,10 @@ dehyphen() {
 test -f commands/wp-init.md     || fail "commands/wp-init.md missing"
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; wp_init=$EXPANDED
 test -f commands/wp-finalize.md || fail "commands/wp-finalize.md missing"
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; wp_finalize=$EXPANDED
 
 init=$(flat "$(cat "$wp_init")")
-fin=$(flat "$(cat commands/wp-finalize.md)")
+fin=$(flat "$(cat "$wp_finalize")")
 
 # ---------------------------------------------------------------------------
 # Region. The conversion instruction lives in Step D4 and nowhere else, and a
@@ -336,7 +337,7 @@ printf '%s' "$fin" | grep -qF 'Skip when `Template:` is `basic`' \
 # The `|| true` on the strip is load-bearing: a region holding nothing but the
 # sentinel makes `grep -Fv` match nothing and exit 1, which under `set -euo pipefail`
 # kills the script from inside the command substitution — rc=1 and no FAIL printed.
-l3raw=$(awk '/Layer 3 \(measured visual parity/{f=1;next} f&&/^## Step 4:/{print "__END__"; exit} f' commands/wp-finalize.md)
+l3raw=$(awk '/Layer 3 \(measured visual parity/{f=1;next} f&&/^## Step 4:/{print "__END__"; exit} f' "$wp_finalize")
 # Emptiness first, so a DELETED subsection reports itself as deleted rather than as
 # an unterminated range — both exit 1, but only one of them names the mutation.
 [ -n "$l3raw" ] || fail "no Layer 3 section in wp-finalize.md"
@@ -356,7 +357,7 @@ printf '%s' "$l3" | grep -qF 'conversion defect' \
 # checks, opposite demands, and a correct Tailwind theme always reported a
 # spurious failure. Scope to the Check 3 region and prove the range closed.
 # ---------------------------------------------------------------------------
-c3raw=$(awk '/^### Check 3/,/^### Check 4/' commands/wp-finalize.md)
+c3raw=$(awk '/^### Check 3/,/^### Check 4/' "$wp_finalize")
 [ -n "$c3raw" ] || fail "wp-finalize has no Check 3 region"
 printf '%s\n' "$c3raw" | tail -1 | grep -q '^### Check 4' \
   || fail "the Check 3 region is not terminated by a '### Check 4' heading — its assertions would silently become file-wide"
