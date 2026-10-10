@@ -218,8 +218,7 @@ in_skill_md 'for WooCommerce today' && fail "$skill dates its payment rule inste
 grep -Fq '## A rewrite, weak to strong' "$citability" || fail "$citability has no before/after passage"
 # The two commands that apply the rubric point at where it lives now.
 for c in commands/wp-seed.md commands/wp-section.md; do [ -f "$c" ] || fail "$c is missing"; done
-for c in "$wp_seed" commands/wp-section.md; do
-for c in commands/wp-seed.md "$wp_section"; do
+for c in "$wp_seed" "$wp_section"; do
   grep -Fq 'skills/wp-audit-geo-standards/references/citability.md' "$c" || fail "$c does not point at the citability rubric"
   grep -Fq 'skills/wp-audit-geo-standards/SKILL.md` §5' "$c" && fail "$c still points at the rubric's old place"
 done
