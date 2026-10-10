@@ -7,23 +7,30 @@
 # on `## Step N:` headings to scope a grep to one step, so they read the expanded text.
 # tests/checks/wp-audit-run.sh is what proves every reference is pointed to at its step.
 #
-# The output is keyed by a hash of its inputs, so repeated calls reuse one file and no
-# check needs an EXIT trap of its own to clean it up.
+# The output is keyed by a hash of its inputs, this script included, so repeated calls reuse
+# one file, a change to the expansion itself is never served from a stale copy, and no check
+# needs an EXIT trap of its own to clean it up.
+#
+# A pointer to a reference that cannot be read exits the calling check. Returning instead
+# would leave the caller grepping a missing body, where an assertion of absence passes.
 
 expand_command() {
   local src=$1 refs dir out sum
   refs=$(grep -oE 'skills/[a-z0-9-]+/references/[a-z0-9-]+\.md' "$src" | awk '!seen[$0]++')
-  sum=$( { cat "$src"; for r in $refs; do cat "$r"; done; } | sha256sum | cut -c1-16)
+  for r in $refs; do
+    [ -r "$r" ] || { echo "expand-command: $src points to missing $r" >&2; exit 1; }
+  done
+  sum=$( { cat "${BASH_SOURCE[0]}" "$src"; for r in $refs; do cat "$r"; done; } | sha256sum | cut -c1-16)
   dir="${TMPDIR:-/tmp}/cwb-expanded"
   out="$dir/$(basename "$src" .md)-$sum.md"
   mkdir -p "$dir"
   if [ ! -s "$out" ]; then
     awk '
-      function body(f,   line, n, hdr) {
+      function body(f,   line, n, hdr, rc) {
         # Skip the reference file own header: the title, the sentence naming the step that
         # reads it, and the Contents list. The body starts at the first other line.
         hdr = 1
-        while ((getline line < f) > 0) {
+        while ((rc = (getline line < f)) > 0) {
           n++
           if (hdr) {
             if (n == 1 || line == "" || line ~ /^`commands\// || line == "## Contents" || line ~ /^- /) continue
@@ -31,6 +38,7 @@ expand_command() {
           }
           print line
         }
+        if (rc < 0) { print "expand-command: cannot read " f > "/dev/stderr"; exit 1 }
         close(f)
         print ""
       }
@@ -40,7 +48,8 @@ expand_command() {
         if ($0 == "" && pending != "") { body(pending); pending = "" }
       }
       END { if (pending != "") { print ""; body(pending) } }
-    ' "$src" > "$out.$$" && mv "$out.$$" "$out"
+    ' "$src" > "$out.$$" || { rm -f "$out.$$"; exit 1; }
+    mv "$out.$$" "$out"
   fi
   EXPANDED=$out
 }

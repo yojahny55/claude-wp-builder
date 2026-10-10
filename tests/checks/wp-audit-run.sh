@@ -45,7 +45,8 @@ size=$(wc -c < "$cmd")
 . tests/checks/lib/expand-command.sh
 expand_command "$cmd"
 for f in "$refs"/*.md; do
-  last=$(grep -v '^$' "$f" | tail -1)
+  # A closing code fence matches any other fence, so take the last line that is not one.
+  last=$(grep -v -e '^$' -e '^```' "$f" | tail -1)
   grep -Fqx -- "$last" "$EXPANDED" || err "expand-command.sh dropped the body of $(basename "$f")"
 done
 
