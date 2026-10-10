@@ -56,12 +56,6 @@
   now does the reverse. `tests/checks/wp-craft-consistency.sh` holds the gate's set to the
   devices `motion.js` binds, `count` to the attribute both files read, and the whole set to
   the interior floor `devices.md` states.
-- **The language cookie is `SameSite=Lax` and `HttpOnly`, and `Secure` on HTTPS.** Both
-  starters set it with the options array; no starter script reads it, so nothing needs
-  JavaScript access. The SEO-plugin detection the starter, `wp-agentic-surfaces` and
-  `wp-theme-standards` share calls `class_exists()` without the autoloader, so a Composer
-  autoloader cannot load a same-named class from another package while probing.
-
 - **The cinematic starter keeps a `?lang=` switch.** Its `inc/i18n.php` read
   `$_COOKIE['__starter___lang']` and never called `setcookie()`, so a language switch lasted
   exactly one request and the next page came back in the browser's language. An `init`
