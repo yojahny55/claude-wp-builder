@@ -8,6 +8,7 @@
 # command's score card without any file failing to parse.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 v=skills/wp-demo-craft/references/verify.md
@@ -36,7 +37,7 @@ grep -Fq 'three lines' "$v" || fail "verify.md does not cap the mobile headline 
 # check reads that file for the rubric. It said "six" for a release after the seventh
 # line landed, so Name-swap was never graded there. Assert the number, and refuse any
 # other count word rather than only the one that was wrong.
-c=commands/wp-demo.md
+c=$wp_demo
 [ -f "$c" ] || fail "$c is missing"
 grep -Fq 'the seven rubric lines' "$c" \
   || fail "$c does not hand the evaluator all seven rubric lines"

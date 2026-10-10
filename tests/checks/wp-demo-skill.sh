@@ -12,11 +12,12 @@
 # demo copied from it inherited a hard-coded "(c) 2025".
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 s=skills/wp-demo/SKILL.md
 k=skills/wp-demo/references/demo-skeleton.md
-c=commands/wp-demo.md
+c=$wp_demo
 for f in "$s" "$k" "$c"; do [ -f "$f" ] || fail "$f is missing"; done
 
 # --- the recorded decision, not a guess -------------------------------------------

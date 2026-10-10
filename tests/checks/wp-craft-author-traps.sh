@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 
 # Traps an author falls into because the plugin never said otherwise.
 #
@@ -15,7 +17,7 @@ dev=skills/wp-demo-craft/references/devices.md
 taste=skills/wp-demo-craft/references/taste.md
 feel=skills/wp-demo-craft/references/feel.md
 comp=skills/wp-demo-craft/compositions/README.md
-demo=commands/wp-demo.md
+demo=$wp_demo
 verify=bin/demo-verify.mjs
 hero=skills/wp-demo-craft/compositions/hero-bleed
 foot=skills/wp-demo-craft/compositions/footer-columns

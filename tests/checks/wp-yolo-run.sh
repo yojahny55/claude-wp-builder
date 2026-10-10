@@ -24,7 +24,7 @@ for f in "$refs"/*.md; do
   # The reference names its step, and that step heading still exists in the command.
   step=$(sed -n '1s/^# \/wp-yolo — //p' "$f")
   [ -n "$step" ] || { err "$f has no '# /wp-yolo — Step N' title"; continue; }
-  grep -Eq "^## ${step//./\\.}:" "$cmd" || err "$f belongs to $step, which $cmd no longer has"
+  grep -Fq -- "## ${step}:" "$cmd" || err "$f belongs to $step, which $cmd no longer has"
   # The pointer sits under that step, not elsewhere in the command.
   awk -v s="## ${step}:" -v b="references/$b" '
     index($0, s) == 1 { on = 1; next } /^## Step / { on = 0 } on && index($0, b) { found = 1 }
@@ -47,7 +47,8 @@ size=$(wc -c < "$cmd")
 expand_command "$cmd"
 for f in "$refs"/*.md; do
   # A closing code fence matches any other fence, so take the last line that is not one.
-  last=$(grep -v -e '^$' -e '^```' "$f" | tail -1)
+  last=$(grep -v -e '^$' -e '^```' "$f" | tail -1) || true
+  [ -n "$last" ] || { err "$(basename "$f") has no body"; continue; }
   grep -Fqx -- "$last" "$EXPANDED" || err "expand-command.sh dropped the body of $(basename "$f")"
 done
 

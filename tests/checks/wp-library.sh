@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -eu
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 grep -q '"wp-design-library"' .mcp.json || { echo "FAIL: mcp registration"; exit 1; }
 # A caret RANGE on the 1.x line, never an exact version. An exact pin had to be edited here, in
 # .mcp.json and in the README on every library release — and because it was edited by hand it went
@@ -13,26 +14,26 @@ grep -qE '"@yojahny/wp-design-library@\^1\.[0-9]+\.[0-9]+"' .mcp.json || { echo 
 # native binding and the server exits at startup with "Could not locate the bindings file".
 # The flag must come before the package: npx hands everything after it to the server.
 grep -q '"--allow-scripts=better-sqlite3", "@yojahny/wp-design-library@' .mcp.json || { echo "FAIL: npx must allow better-sqlite3 install scripts (npm 12), before the package"; exit 1; }
-grep -q 'References: library unavailable' commands/wp-demo.md || { echo "FAIL: degrade line"; exit 1; }
-grep -q 'every call fails before that happens' commands/wp-demo.md || { echo "FAIL: unavailable line is not limited to zero successful references"; exit 1; }
-grep -q 'keep their citations' commands/wp-demo.md || { echo "FAIL: partial library failures discard successful references"; exit 1; }
-grep -q 'search` per selected role' commands/wp-demo.md || { echo "FAIL: per-role query"; exit 1; }
-grep -q '`get_vocab` and choose the roles' commands/wp-demo.md || { echo "FAIL: library roles must come from its vocabulary"; exit 1; }
-grep -q '`shop` for a product listing or collection' commands/wp-demo.md || { echo "FAIL: store roles are not mapped to page types"; exit 1; }
-grep -q '## References' commands/wp-demo.md || { echo "FAIL: brief section"; exit 1; }
+grep -q 'References: library unavailable' "$wp_demo" || { echo "FAIL: degrade line"; exit 1; }
+grep -q 'every call fails before that happens' "$wp_demo" || { echo "FAIL: unavailable line is not limited to zero successful references"; exit 1; }
+grep -q 'keep their citations' "$wp_demo" || { echo "FAIL: partial library failures discard successful references"; exit 1; }
+grep -q 'search` per selected role' "$wp_demo" || { echo "FAIL: per-role query"; exit 1; }
+grep -q '`get_vocab` and choose the roles' "$wp_demo" || { echo "FAIL: library roles must come from its vocabulary"; exit 1; }
+grep -q '`shop` for a product listing or collection' "$wp_demo" || { echo "FAIL: store roles are not mapped to page types"; exit 1; }
+grep -q '## References' "$wp_demo" || { echo "FAIL: brief section"; exit 1; }
 grep -q 'Design library' README.md || { echo "FAIL: README"; exit 1; }
 # Inspo: page-level direction only, opt-in, and fenced. Each grep names the contract
 # line it protects, so a deleted rule fails here rather than silently widening scope.
-grep -q '3.7. Reference precedence' commands/wp-demo.md || { echo "FAIL: precedence ladder"; exit 1; }
-grep -q 'never enters `DESIGN.md`' commands/wp-demo.md || { echo "FAIL: colour exclusion"; exit 1; }
-grep -q '`get_reference_jsx` is never called' commands/wp-demo.md || { echo "FAIL: jsx exclusion"; exit 1; }
-grep -q 'ever reaches `/wp-yolo --transcribe`' commands/wp-demo.md || { echo "FAIL: transcribe exclusion"; exit 1; }
-grep -q 'carries no motion data' commands/wp-demo.md || { echo "FAIL: motion exclusion"; exit 1; }
-grep -q 'contract wins' commands/wp-demo.md || { echo "FAIL: external guidance is not subordinated"; exit 1; }
-grep -q 'A lower tier never overrides a higher one' commands/wp-demo.md || { echo "FAIL: ladder has no binding rule"; exit 1; }
-grep -q 'owns page-level direction only' commands/wp-demo.md || { echo "FAIL: inspo scope fence"; exit 1; }
-grep -q 'Skip this step in craft mode' commands/wp-demo.md || { echo "FAIL: plain-mode step does not skip in craft"; exit 1; }
-grep -q '^## Step 2.7: Page References (plain mode only)' commands/wp-demo.md || { echo "FAIL: plain-mode reference step"; exit 1; }
+grep -q '3.7. Reference precedence' "$wp_demo" || { echo "FAIL: precedence ladder"; exit 1; }
+grep -q 'never enters `DESIGN.md`' "$wp_demo" || { echo "FAIL: colour exclusion"; exit 1; }
+grep -q '`get_reference_jsx` is never called' "$wp_demo" || { echo "FAIL: jsx exclusion"; exit 1; }
+grep -q 'ever reaches `/wp-yolo --transcribe`' "$wp_demo" || { echo "FAIL: transcribe exclusion"; exit 1; }
+grep -q 'carries no motion data' "$wp_demo" || { echo "FAIL: motion exclusion"; exit 1; }
+grep -q 'contract wins' "$wp_demo" || { echo "FAIL: external guidance is not subordinated"; exit 1; }
+grep -q 'A lower tier never overrides a higher one' "$wp_demo" || { echo "FAIL: ladder has no binding rule"; exit 1; }
+grep -q 'owns page-level direction only' "$wp_demo" || { echo "FAIL: inspo scope fence"; exit 1; }
+grep -q 'Skip this step in craft mode' "$wp_demo" || { echo "FAIL: plain-mode step does not skip in craft"; exit 1; }
+grep -q '^## Step 2.7: Page References (plain mode only)' "$wp_demo" || { echo "FAIL: plain-mode reference step"; exit 1; }
 # Each mode must keep both rules. Extra mentions are harmless, but a summary or
 # two copies in one mode must not hide a missing rule in the other mode.
 step_has_text() {
@@ -40,7 +41,7 @@ step_has_text() {
     /^## Step / { active = index($0, heading) == 1; next }
     active && index($0, needle) { found = 1 }
     END { exit !found }
-  ' commands/wp-demo.md
+  ' "$wp_demo"
 }
 for step in 2.6 2.7; do
   step_has_text "$step" 'References: inspo unavailable' \

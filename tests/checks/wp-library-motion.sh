@@ -6,9 +6,10 @@
 # instruction to read them, and pin the vocabulary gap that makes a naive 1:1 mapping wrong.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
-d=commands/wp-demo.md
+d=$wp_demo
 v=skills/wp-demo-craft/references/devices.md
 # Guard both paths. The negative loop at the bottom is the one place a missing
 # file would pass SILENTLY: `if grep -Fq ...` reads grep's exit 2 as "absent",

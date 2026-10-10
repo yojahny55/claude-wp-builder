@@ -9,6 +9,7 @@
 # catalogue depends on — that omission is deliberate, not a botched copy.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 d=skills/wp-demo-craft/references/design-md
@@ -109,7 +110,7 @@ grep -Fq 'Skip it entirely when `demo mode` is **craft**' "$y" \
 # back. @property makes it fall back to initial-value instead. Anchored on the
 # opening brace, not the bare token+name pair, which a typo'd property name
 # (--container-maxx) would also satisfy while leaving the real bug unfixed.
-w=commands/wp-demo.md
+w=$wp_demo
 r=bin/composition-preview.mjs
 # Grep a CSS-comment-stripped copy of the command: the rule it carries lives in
 # a fenced css block, so a dead `/* @property ... */` instruction satisfies a

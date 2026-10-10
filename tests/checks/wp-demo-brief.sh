@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 
 # The brief: what the operator is asked before anything is built.
 #
@@ -15,7 +17,7 @@ set -euo pipefail
 
 fail() { echo "FAIL: $*"; exit 1; }
 
-demo=commands/wp-demo.md
+demo=$wp_demo
 [ -f "$demo" ] || fail "$demo is missing"
 
 # --- the command can actually ask ---------------------------------------------
