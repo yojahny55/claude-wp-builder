@@ -35,7 +35,8 @@ fail() { echo "FAIL: $1"; exit 1; }
 cd "$(dirname "$0")/../.." || fail "cannot cd to the repository root"
 
 practices=agents/wp-audit-practices.md
-audit=commands/wp-audit.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
+audit=$EXPANDED
 script=skills/wp-cli-patterns/scripts/find-missing-media-files.php
 behavior=tests/checks/lib/media-integrity-date-cutoff-behavior.php
 skill=skills/wp-cli-patterns/SKILL.md

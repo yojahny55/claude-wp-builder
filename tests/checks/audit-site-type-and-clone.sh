@@ -30,7 +30,8 @@ fail() { echo "FAIL: $1"; exit 1; }
 
 cd "$(dirname "$0")/../.." || fail "cannot cd to the repository root"
 
-audit=commands/wp-audit.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
+audit=$EXPANDED
 std=skills/wp-audit-standards/SKILL.md
 for f in "$audit" "$std"; do
   [ -f "$f" ] || fail "$f is missing"

@@ -18,7 +18,8 @@ fail() { echo "FAIL: $*"; exit 1; }
 suite=templates/audit-suite
 runner=bin/audit-suite.sh
 bridge="$suite/scripts/to-run.js"
-c=commands/wp-audit.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
+c=$EXPANDED
 
 for f in "$runner" "$bridge" "$suite/audit.config.js" "$suite/package.json" "$suite/VENDORED-FROM.txt"; do
   [ -f "$f" ] || fail "$f is missing"

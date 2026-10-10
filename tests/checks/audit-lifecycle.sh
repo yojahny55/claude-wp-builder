@@ -12,7 +12,8 @@ set -euo pipefail
 
 fail() { echo "FAIL: $1"; exit 1; }
 
-audit=commands/wp-audit.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
+audit=$EXPANDED
 yolo=commands/wp-yolo.md
 geo=agents/wp-audit-geo.md
 seo=agents/wp-audit-seo.md

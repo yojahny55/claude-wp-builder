@@ -7,7 +7,8 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-audit=commands/wp-audit.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
+audit=$EXPANDED
 [ -f "$audit" ] || fail "$audit missing"
 
 step1=$(awk '/^## Step 1:/{on=1} /^## Step 2:/{on=0} on' "$audit")
