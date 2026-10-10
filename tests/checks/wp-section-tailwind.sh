@@ -2,7 +2,8 @@
 # /wp-section must route its CSS agent by template. On tailwind it dispatches
 # wp-tailwind in author mode; on basic it keeps wp-css unchanged.
 set -euo pipefail
-f=commands/wp-section.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-section.md; wp_section=$EXPANDED
+f=$wp_section
 
 # Flattened once, up front, and reused by every assertion that matches a phrase a
 # correct re-wrap can split across two physical lines — including a break AT A

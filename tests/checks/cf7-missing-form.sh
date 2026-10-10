@@ -6,12 +6,13 @@
 # skipped. Behaviour test: CF7 and WordPress are stubbed, the real helper is loaded.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-section.md; wp_section=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 command -v php >/dev/null || { echo "SKIP: php not installed"; exit 0; }
 
 helper=starter-theme/__tailwind__/inc/cf7-helpers.php
 grep -Fq 'function __starter___contact_form()' "$helper" || fail "$helper has no contact-form helper"
-grep -Fq 'prefix_contact_form()' commands/wp-section.md || fail "/wp-section does not render the settings form through the helper"
+grep -Fq 'prefix_contact_form()' "$wp_section" || fail "/wp-section does not render the settings form through the helper"
 
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 cat > "$tmp/run.php" <<PHP
