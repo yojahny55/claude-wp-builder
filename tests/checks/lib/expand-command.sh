@@ -1,6 +1,11 @@
 # Source this file, then call `expand_command commands/<name>.md`; it sets EXPANDED to the
 # path of the command as a run reads it: every paragraph that sends the run to
-# `skills/<skill>/references/<file>.md` is followed by that file's body.
+# `skills/<name>-run/references/<file>.md` is followed by that file's body.
+#
+# Only the command's own `<name>-run` skill is expanded. A command also names other skills'
+# references as reading for a step (`/wp-demo` points at `wp-demo-craft`'s), and those are
+# not the command's text, so splicing them in would make a check pass on wording the
+# command never carried.
 #
 # A big command keeps its step headings and moves each step's detail to a reference file.
 # The checks that guard a step's wording still assert it "in the command", and still anchor
@@ -15,8 +20,9 @@
 # would leave the caller grepping a missing body, where an assertion of absence passes.
 
 expand_command() {
-  local src=$1 refs dir out sum r
-  refs=$(grep -oE 'skills/[a-z0-9-]+/references/[a-z0-9-]+\.md' "$src" | awk '!seen[$0]++')
+  local src=$1 refs dir out sum r own
+  own="skills/$(basename "$src" .md)-run/references/"
+  refs=$(grep -oE "${own}[a-z0-9-]+\\.md" "$src" | awk '!seen[$0]++')
   for r in $refs; do
     [ -r "$r" ] || { echo "expand-command: $src points to missing $r" >&2; exit 1; }
   done
@@ -25,7 +31,7 @@ expand_command() {
   out="$dir/$(basename "$src" .md)-$sum.md"
   mkdir -p "$dir"
   if [ ! -s "$out" ]; then
-    awk '
+    awk -v own="$own" '
       function body(f,   line, n, hdr, rc) {
         # Skip the reference file own header: the title, the sentence naming the step that
         # reads it, and the Contents list. The body starts at the first other line.
@@ -44,7 +50,7 @@ expand_command() {
       }
       {
         print
-        if (match($0, /skills\/[a-z0-9-]+\/references\/[a-z0-9-]+\.md/)) pending = substr($0, RSTART, RLENGTH)
+        if (match($0, own "[a-z0-9-]+[.]md")) pending = substr($0, RSTART, RLENGTH)
         if ($0 == "" && pending != "") { body(pending); pending = "" }
       }
       END { if (pending != "") { print ""; body(pending) } }
