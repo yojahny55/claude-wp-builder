@@ -69,8 +69,12 @@ done
 # fall through. The block stays byte-identical everywhere, so the amendment has to
 # live outside it -- and it has to announce itself, or a Claude acts on the row it
 # just read and stops on a legitimate path.
+. tests/checks/lib/expand-command.sh
 for c in wp-seed wp-debug wp-robin wp-init wp-audit wp-clone wp-adopt; do
-  grep -Fq 'Amending the exit `3` row above:' "commands/$c.md" \
+  # Read the command as a run does, with its step references in place.
+  src=commands/$c.md
+  if [ -d "skills/$c-run/references" ]; then expand_command "$src"; src=$EXPANDED; fi
+  grep -Fq 'Amending the exit `3` row above:' "$src" \
     || fail "commands/$c.md contradicts the exit 3 table row instead of amending it"
 done
 
