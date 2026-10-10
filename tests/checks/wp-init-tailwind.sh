@@ -3,6 +3,7 @@
 # same evidence rule /wp-yolo Step 2.6 states, and /wp-finalize must validate the
 # tailwind convention before delivery.
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 
 fail() { echo "FAIL: $1"; exit 1; }
 
