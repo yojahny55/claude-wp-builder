@@ -28,10 +28,14 @@ for f in "$refs"/*.md; do
   # The reference names its step, and that step heading still exists in the command.
   step=$(sed -n '1s/^# \/wp-create — //p' "$f")
   [ -n "$step" ] || { err "$f has no '# /wp-create — Step N' title"; continue; }
-  grep -Eq -- "^#{2,3} ${step}:" "$cmd" || err "$f belongs to $step, which $cmd no longer has"
+  # Compared as literal text, not a regex: the dot in "Step 4.3" would match any character.
+  awk -v s="$step" 'index($0, "## " s ":") == 1 || index($0, "### " s ":") == 1 { f = 1 }
+    END { exit !f }' "$cmd" || err "$f belongs to $step, which $cmd no longer has"
   # The pointer sits under that step, not elsewhere in the command.
   awk -v s="${step}" -v b="references/$b" '
-    /^##+ / { on = ($0 ~ "^###? " s ":"); next } on && index($0, b) { found = 1 }
+    # Only a level-2 or level-3 heading opens or closes a step; a deeper subheading stays inside it.
+    /^###? / { on = (index($0, "## " s ":") == 1 || index($0, "### " s ":") == 1); next }
+    on && index($0, b) { found = 1 }
     END { exit !found }' "$cmd" || err "$cmd points to $b outside $step"
 done
 
