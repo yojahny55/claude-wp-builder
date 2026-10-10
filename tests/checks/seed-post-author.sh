@@ -8,9 +8,10 @@
 # the cinematic seeders or pll-import.php's new counterparts.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
-s=commands/wp-seed.md
+s=$wp_seed
 skill=skills/wp-cli-patterns/SKILL.md
 
 # A create or import that is a command -- the verb followed by an argument -- not prose

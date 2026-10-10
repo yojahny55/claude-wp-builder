@@ -7,6 +7,7 @@ agent=agents/wp-audit-geo.md
 fixer=agents/wp-agentic-surfaces.md
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
 audit=$EXPANDED
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; yolo=$EXPANDED
 finalize=commands/wp-finalize.md
 # The catalog, the surface specs and the citability rubric live in references/; SKILL.md keeps
@@ -215,7 +216,7 @@ in_skill_md 'for WooCommerce today' && fail "$skill dates its payment rule inste
 grep -Fq '## A rewrite, weak to strong' "$citability" || fail "$citability has no before/after passage"
 # The two commands that apply the rubric point at where it lives now.
 for c in commands/wp-seed.md commands/wp-section.md; do [ -f "$c" ] || fail "$c is missing"; done
-for c in commands/wp-seed.md commands/wp-section.md; do
+for c in "$wp_seed" commands/wp-section.md; do
   grep -Fq 'skills/wp-audit-geo-standards/references/citability.md' "$c" || fail "$c does not point at the citability rubric"
   grep -Fq 'skills/wp-audit-geo-standards/SKILL.md` §5' "$c" && fail "$c still points at the rubric's old place"
 done

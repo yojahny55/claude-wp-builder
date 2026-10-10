@@ -7,6 +7,7 @@
 # because the scripts that seeded them were gone.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 
 flat() { tr '\n' ' ' | sed -e 's/  */ /g'; }
 
@@ -34,7 +35,7 @@ grep -qF 'gitignore `inc/seed/`' <<<"$t" \
 
 # The command that actually runs seeding must point here, without landing
 # inside the Phase 4/4.5/5 region another change already owns.
-seed=commands/wp-seed.md
+seed=$wp_seed
 grep -q 'skills/wp-cli-patterns/SKILL.md' "$seed" \
   || { echo "FAIL: wp-seed.md never points at wp-cli-patterns' seed-persistence rule"; exit 1; }
 
