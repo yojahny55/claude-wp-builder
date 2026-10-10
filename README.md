@@ -475,6 +475,7 @@ commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. 
 | `wp-demo-run` | The step detail of `/wp-demo` — one reference file per long step, read at that step so the command stays a short map |
 | `wp-init-run` | The step detail of `/wp-init` — one reference file per long step, read at that step so the command stays a short map |
 | `wp-seed-run` | The step detail of `/wp-seed` — one reference file per long phase, read at that phase so the command stays a short map |
+| `wp-create-run` | The step detail of `/wp-create` — one reference file per long step, read at that step so the command stays a short map |
 | `wp-contributing` | Contributing to this plugin — the layer rules, the grep-gate test style, and the PR and release rituals |
 
 ### Agents (specialized subagents dispatched by commands)
