@@ -357,7 +357,9 @@ and the demo is built exactly as it is today. To refresh it, delete
 
 The craft path queries `wp-design-library` over MCP when it is registered. The
 default starts `@yojahny/wp-design-library@^1.0.0` with npx — a caret range, so a
-library release reaches the plugin without an edit here. To use a hosted instance
+library release reaches the plugin without an edit here. The npx call passes
+`--allow-scripts=better-sqlite3`: npm 12 skips dependency install scripts by default,
+and without that one the library's SQLite binding is never built. To use a hosted instance
 instead, add the following server to your project's
 `.mcp.json`, keep that file out of version control, and supply the token through
 your MCP client's secret or environment-variable support when available:
