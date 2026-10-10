@@ -9,6 +9,10 @@ grep -q '"wp-design-library"' .mcp.json || { echo "FAIL: mcp registration"; exit
 # 1.0.0 precisely so a caret works; on 0.x a caret cannot cross a minor, which is what made
 # re-pinning by hand unavoidable in the first place.
 grep -qE '"@yojahny/wp-design-library@\^1\.[0-9]+\.[0-9]+"' .mcp.json || { echo "FAIL: the library must be a caret range on 1.x, not an exact pin"; exit 1; }
+# npm 12 skips dependency install scripts unless allowed; without this better-sqlite3 has no
+# native binding and the server exits at startup with "Could not locate the bindings file".
+# The flag must come before the package: npx hands everything after it to the server.
+grep -q '"--allow-scripts=better-sqlite3", "@yojahny/wp-design-library@' .mcp.json || { echo "FAIL: npx must allow better-sqlite3 install scripts (npm 12), before the package"; exit 1; }
 grep -q 'References: library unavailable' commands/wp-demo.md || { echo "FAIL: degrade line"; exit 1; }
 grep -q 'every call fails before that happens' commands/wp-demo.md || { echo "FAIL: unavailable line is not limited to zero successful references"; exit 1; }
 grep -q 'keep their citations' commands/wp-demo.md || { echo "FAIL: partial library failures discard successful references"; exit 1; }
