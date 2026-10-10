@@ -7,6 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; wp_yolo=$EXPANDED
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; wp_init=$EXPANDED
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
@@ -17,7 +18,7 @@ grep -Fq 'is not a deliverable' "$d" \
   || fail "$d does not say a failed craft build is not a deliverable"
 
 # Every command that builds on a demo must refuse a failed one.
-for c in commands/wp-init.md commands/wp-section.md "$wp_yolo"; do
+for c in "$wp_init" commands/wp-section.md "$wp_yolo"; do
   grep -Fq 'demo/FAILED.md' "$c" \
     || fail "$c does not stop on demo/FAILED.md, so a theme can be built from an unverified demo"
 done

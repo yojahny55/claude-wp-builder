@@ -4,6 +4,7 @@
 # live site (and /wp-yolo's parity gate) shows the CSS built at /wp-init time — no sections.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; wp_init=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 b=bin/tailwind-rebuild.sh
 
@@ -86,7 +87,7 @@ awk '/tailwind-rebuild.sh/{seen=1} /^\*\*`\/wp-responsive-check`\*\*|^[0-9]+\. \
 grep -Fq 'parity' "$f" || fail "$f lost its parity gate"
 
 # /wp-init tells the user how to see the site live
-grep -Fq 'npm run preview' commands/wp-init.md || fail "wp-init no longer mentions npm run preview"
-grep -Eqi 'second terminal|keep it running' commands/wp-init.md || fail "wp-init does not say to keep npm run preview running while building"
+grep -Fq 'npm run preview' "$wp_init" || fail "wp-init no longer mentions npm run preview"
+grep -Eqi 'second terminal|keep it running' "$wp_init" || fail "wp-init does not say to keep npm run preview running while building"
 
 echo PASS

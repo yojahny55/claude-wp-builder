@@ -8,7 +8,7 @@ set -euo pipefail
 # likely path through the command copied a directory that is not there.
 # A grep-for-the-wording check would not have caught it; this compares the
 # command against the filesystem.
-cmd=commands/wp-init.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; cmd=$EXPANDED
 test -f "$cmd" || { echo "FAIL: $cmd missing"; exit 1; }
 
 # Every `cp -r .../starter-theme/<x>/` target must exist. Scoped to actual cp

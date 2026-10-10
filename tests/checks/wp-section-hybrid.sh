@@ -4,6 +4,7 @@
 # trailing-flex overlay the cinematic starter's front-page.php renders, not a standalone group.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; wp_init=$EXPANDED
 f=commands/wp-section.md
 fail() { echo "FAIL: $*"; exit 1; }
 
@@ -22,7 +23,7 @@ grep -Fq "have_rows('trailing_sections')" starter-theme/__cinematic__/front-page
   || fail "cinematic front-page.php lost its trailing_sections loop"
 
 # every place that advertises the flag must keep doing so
-for g in commands/wp-init.md commands/wp-cinematic-init.md docs/cinematic-mode.md; do
+for g in "$wp_init" commands/wp-cinematic-init.md docs/cinematic-mode.md; do
   grep -Fq -- '--hybrid' "$g" || fail "$g no longer mentions --hybrid"
 done
 

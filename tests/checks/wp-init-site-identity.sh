@@ -12,7 +12,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-init=commands/wp-init.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; init=$EXPANDED
 final=commands/wp-finalize.md
 for f in "$init" "$final"; do test -f "$f" || fail "$f missing"; done
 

@@ -493,7 +493,7 @@ rsec=$(awk '/^### /{ if (inr) exit; if (tolower($0) ~ /polish/) inr = 1 } inr { 
 sentences "$rsec" 'demo/.prepolish/' | grep -Eqi "$SAVE" \
   || fail "README.md's /wp-polish section does not say the unpolished copy is kept in demo/.prepolish/ — this is the only place a reader learns the polished page is recoverable at all"
 
-fi_=commands/wp-init.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; fi_=$EXPANDED
 test -f "$fi_" || fail "$fi_ missing"
 
 # 9a. the block /wp-init writes into the generated project's .claude/CLAUDE.md.

@@ -15,7 +15,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-init=commands/wp-init.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; init=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; yolo=$EXPANDED
 starter=starter-theme/__tailwind__
 main_css="$starter/assets/css/src/tailwindcss/main.css"

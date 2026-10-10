@@ -48,7 +48,7 @@ grep -Eq '^  container: "[0-9.]+(px|rem|em)"$' "$p" \
 
 # The handoff: a DESIGN.md the demo was built from is worth nothing if /wp-init
 # scrapes the demo's :root instead of reading it, or leaves it behind in demo/.
-i=commands/wp-init.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; i=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; y=$EXPANDED
 grep -Fq 'demo/DESIGN.md' "$i" || fail "$i does not read demo/DESIGN.md"
 grep -Eqi 'before .*:root|first.*:root|instead of .*:root' "$i" || fail "$i does not prefer DESIGN.md over the :root scrape"
@@ -146,7 +146,7 @@ grep -Fq 'on every page this step writes' <<<"$ws" \
 # artifact that ships. Measured at 1920 on that rule: `wide` and empty both give
 # 0px without the rule and 312px with it. Comment-stripped for the same reason
 # as $w: the rule lives in a fenced css block.
-i4=commands/wp-init.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; i4=$EXPANDED
 i4s="$(perl -0pe 's{/\*.*?\*/}{}gs' "$i4")"
 grep -Eq '@property --container-max[[:space:]]*\{' <<<"$i4s" \
   || fail "$i4 Step D4 does not emit @property for --container-max, so a malformed token unsets padding-inline in the delivered theme"
