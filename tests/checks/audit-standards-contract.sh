@@ -87,7 +87,7 @@ grep -Fq '$WP option patch update aio_wp_security_configs aiowps_disallow_unauth
   || fail "$ref gives no exact command for the AIOS fix"
 rhas 'Only the five metric audits (FCP, LCP, TBT, CLS, Speed Index) carry weight' || fail "$ref lost which audits carry score weight"
 rhas 'Lighthouse 10 and later' || fail "$ref does not name the Lighthouse version its scoring facts hold for"
-grep -Fq 'TTI' "$ref" && fail "$ref names TTI, which Lighthouse 10 removed from the score"
+grep -Fqw 'TTI' "$ref" && fail "$ref names TTI, which Lighthouse 10 removed from the score"
 grep -Fq 'about__bg' "$ref" && fail "$ref carries a real build's selector instead of the prefix_ placeholder"
 
 # --- the agent interaction model ------------------------------------------------------------

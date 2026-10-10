@@ -4,7 +4,8 @@
 # project that adopted an existing WordPress without running /wp-create can still be seeded.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-f=commands/wp-seed.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
+f=$wp_seed
 fail() { echo "FAIL: $*"; exit 1; }
 
 grep -Fq 'which wp' "$f" || fail "$f does not probe for a bare wp on PATH"

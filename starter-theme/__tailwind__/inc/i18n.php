@@ -34,7 +34,7 @@ function __starter___get_current_lang() {
     if (isset($_GET['lang']) && in_array($_GET['lang'], __STARTER___SUPPORTED_LANGS)) {
         $current_lang = sanitize_text_field($_GET['lang']);
         // Set cookie for persistence
-        setcookie('__starter___lang', $current_lang, time() + (365 * 24 * 60 * 60), '/');
+        setcookie('__starter___lang', $current_lang, array( 'expires' => time() + (365 * 24 * 60 * 60), 'path' => '/', 'samesite' => 'Lax', 'httponly' => true, 'secure' => is_ssl() ));
         return $current_lang;
     }
 

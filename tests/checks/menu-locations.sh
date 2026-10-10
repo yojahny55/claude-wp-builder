@@ -11,6 +11,7 @@
 # `__starter___nav_location()` in inc/i18n.php, which each strategy's file answers.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; wp_finalize=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; wp_init=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
@@ -118,7 +119,7 @@ got=$(printf '%s\n' "$s7" | grep -oE "^ *'[a-z0-9_-]+' *=>" | grep -oE "[a-z0-9_
 [ "$got" = "$suffix_set" ] || fail "wp-header Step 7 registers [$got] under suffix; the starters register [$suffix_set]"
 
 # --- 5. /wp-seed Phase 6 assigns to them, per strategy, all of them ---------------
-p6=$(region commands/wp-seed.md '^## Phase 6:' '^## Phase 6[.]5:')
+p6=$(region "$wp_seed" '^## Phase 6:' '^## Phase 6[.]5:')
 p6p=$(printf '%s\n' "$p6" | awk '/^Everything below this line describes the `suffix` strategy/{exit} {print}')
 p6s=$(printf '%s\n' "$p6" | awk 'f{print} /^Everything below this line describes the `suffix` strategy/{f=1}')
 [ -n "$p6s" ] || fail "wp-seed Phase 6 lost the line that splits its polylang branch from its suffix branch"

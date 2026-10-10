@@ -34,6 +34,7 @@ function wp_unslash( $s ) { return $s; }
 function esc_attr( $s ) { return htmlspecialchars( (string) $s, ENT_QUOTES ); }
 function wp_kses( $s, $allowed ) { return $s; }
 function get_field( $name, $id = false ) { return ''; }
+function is_ssl() { return false; }
 
 $which = isset( $argv[1] ) ? $argv[1] : '';
 $files = array(
@@ -62,7 +63,12 @@ if ( 'cinematic' === $which ) {
 	// unqualified call resolves there before the global function, and everything else the
 	// file calls falls back to the stubs above.
 	$GLOBALS['cookies'] = array();
-	$src = preg_replace( '/^<\?php/', '', file_get_contents( $path ), 1 );
+	$raw = file_get_contents( $path );
+	if ( false === $raw ) {
+		fwrite( STDERR, "cannot read $path\n" );
+		exit( 2 );
+	}
+	$src = preg_replace( '/^<\?php/', '', $raw, 1 );
 	eval( 'namespace SuffixI18nProbe; function setcookie( ...$a ) { $GLOBALS["cookies"][] = $a; return true; } ' . $src );
 } else {
 	require $path;
@@ -120,7 +126,8 @@ if ( 'cinematic' === $which ) {
 		if ( $set ) {
 			check( 'the cookie carries the URL language', $set[0][0] === '__starter___lang' && $set[0][1] === 'es' );
 			check( 'the cookie outlives the request, site-wide',
-				isset( $set[0][2], $set[0][3] ) && $set[0][2] > time() + 86400 && $set[0][3] === '/' );
+				is_array( $set[0][2] ?? null ) && ( $set[0][2]['expires'] ?? 0 ) > time() + 86400 && ( $set[0][2]['path'] ?? '' ) === '/' );
+			check( 'the cookie is SameSite=Lax and HttpOnly', ( $set[0][2]['samesite'] ?? '' ) === 'Lax' && ! empty( $set[0][2]['httponly'] ) );
 		}
 	}
 }

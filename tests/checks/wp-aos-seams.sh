@@ -82,7 +82,7 @@ names=$( { printf '%s\n' "$corpus" | grep -oE "data-aos=\"[a-z-]+\"|'data-aos' =
          # The convention table: the cell that OPENS with a backticked name is an animation.
          # (`|| true`: a skill with no such table must not abort the whole check under pipefail.)
          printf '%s\n' "$corpus" | grep -E '^\|' | awk -F'|' '$3 ~ /^ *`[a-z-]+`/ { print $3 }' | { grep -oE '^ *`[a-z-]+`' || true; } | tr -d '` '
-       } | sort -u)
+       } | sort -u || true)
 [ -n "$names" ] || fail "$f: no data-aos animation names found to judge"
 for n in $names; do
   case "$known" in *" $n "*) ;; *) fail "$f: '$n' is not an AOS 2.3.4 animation — aos.css has no rule for it, so the element fades without the movement the name promises" ;; esac
@@ -114,6 +114,7 @@ q "$flatf" -F '`demo mode`' || fail "$f: never reads the recorded demo mode"
 q "$flatf" -E '`demo mode: craft` \| \*\*Stop' || fail "$f: a craft build is not stopped before AOS is added"
 q "$flatf" -E '`Template: cinematic` \| \*\*Stop' || fail "$f: a cinematic theme is not stopped before AOS is added"
 cmd=commands/wp-aos-animator.md
+[ -f "$cmd" ] || fail "$cmd is missing"
 grep -Fq 'Template: cinematic' "$cmd" || fail "$cmd does not stop on a cinematic theme"
 
 echo PASS

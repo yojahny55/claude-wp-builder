@@ -12,6 +12,7 @@
 #   - every invocation used a `<skill>/scripts/…` placeholder nothing can resolve.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; wp_finalize=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
@@ -63,7 +64,7 @@ grep -qF 'Needs ACF or SCF active' "$s" \
 grep -nF '<skill>/' "${skill_md[@]}" && fail "wp-cli-patterns still invokes scripts through an unresolvable <skill>/ placeholder"
 grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/scripts' "$s" \
   || fail "$s does not resolve its scripts through \${CLAUDE_PLUGIN_ROOT}"
-grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/SKILL.md' commands/wp-seed.md \
+grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/SKILL.md' "$wp_seed" \
   || fail "commands/wp-seed.md cites wp-cli-patterns by a relative path, which resolves against the user's project"
 
 # --- every post has an author, and the sweep's two exclusions stay in both copies ---

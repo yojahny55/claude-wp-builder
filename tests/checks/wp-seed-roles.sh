@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-f=commands/wp-seed.md
+cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
+f=$wp_seed
 for token in 'role' 'site_logo' 'inner_hero_image' 'nav-graphic'; do
   grep -q "$token" "$f" || { echo "FAIL: wp-seed missing '$token' role handling"; exit 1; }
 done
