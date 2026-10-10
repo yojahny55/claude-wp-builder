@@ -11,6 +11,8 @@
 # `__starter___nav_location()` in inc/i18n.php, which each strategy's file answers.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; wp_finalize=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; wp_init=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 flat() { tr '\n' ' ' | sed 's/  */ /g'; }
@@ -117,7 +119,7 @@ got=$(printf '%s\n' "$s7" | grep -oE "^ *'[a-z0-9_-]+' *=>" | grep -oE "[a-z0-9_
 [ "$got" = "$suffix_set" ] || fail "wp-header Step 7 registers [$got] under suffix; the starters register [$suffix_set]"
 
 # --- 5. /wp-seed Phase 6 assigns to them, per strategy, all of them ---------------
-p6=$(region commands/wp-seed.md '^## Phase 6:' '^## Phase 6[.]5:')
+p6=$(region "$wp_seed" '^## Phase 6:' '^## Phase 6[.]5:')
 p6p=$(printf '%s\n' "$p6" | awk '/^Everything below this line describes the `suffix` strategy/{exit} {print}')
 p6s=$(printf '%s\n' "$p6" | awk 'f{print} /^Everything below this line describes the `suffix` strategy/{f=1}')
 [ -n "$p6s" ] || fail "wp-seed Phase 6 lost the line that splits its polylang branch from its suffix branch"
@@ -130,14 +132,14 @@ got=$(printf '%s\n' "$p6s" | assigned)
 [ "$got" = "$suffix_set" ] || fail "wp-seed Phase 6 (suffix) assigns [$got]; the starters register [$suffix_set]"
 
 # --- 6. /wp-finalize verifies the same names, per strategy ------------------------
-fin=$(flat < commands/wp-finalize.md)
+fin=$(flat < "$wp_finalize")
 gate=$(printf '%s' "$fin" | grep -oE 'under `suffix`: [^;]*; under `polylang`: bare' || true)
 [ -n "$gate" ] || fail "wp-finalize's delivery gate no longer lists the locations per strategy"
 got=$(printf '%s' "$gate" | grep -oE '`[a-z0-9_-]+`' | tr -d '`' | grep -vx 'suffix\|polylang' | words)
 [ "$got" = "$suffix_set" ] \
   || fail "wp-finalize's delivery gate verifies [$got] under suffix; the starters register [$suffix_set]"
 for spec in 'Check 4|Check 5' 'Check 7|Tailwind convention'; do
-  chk=$(region commands/wp-finalize.md "^### ${spec%%|*}" "^### ${spec##*|}" | flat)
+  chk=$(region "$wp_finalize" "^### ${spec%%|*}" "^### ${spec##*|}" | flat)
   for b in $bases; do
     printf '%s' "$chk" | grep -qF "\`$b-<lang>\`" \
       || fail "wp-finalize ${spec%%|*} does not name \`$b-<lang>\` among the suffix locations it verifies"

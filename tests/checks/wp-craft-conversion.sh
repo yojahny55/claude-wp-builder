@@ -4,12 +4,15 @@
 # the page simply sits still. Each assertion below closes one way an attribute gets lost.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-section.md; wp_section=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 t=agents/wp-template.md
 c=agents/wp-css.md
 w=agents/wp-tailwind.md
 s=commands/wp-section.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; f=$EXPANDED
+s=$wp_section
 f=commands/wp-finalize.md
 
 grep -Fq 'data-motion' "$t" || fail "$t does not carry data-motion-* attributes into template parts"

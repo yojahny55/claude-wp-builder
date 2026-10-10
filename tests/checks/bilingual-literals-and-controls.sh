@@ -3,6 +3,7 @@
 # translation key, and a transcribed control's options come from real data or the control goes.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-section.md; wp_section=$EXPANDED
 
 # Flatten before matching multi-word prose: a line wrap inside one of these phrases
 # would silently break the plain grep, the exact failure mode the sibling checks
@@ -22,7 +23,7 @@ grep -qi 'Never write a user-visible literal' <<<"$t" || { echo "FAIL: wp-templa
 grep -qi 'control the data cannot answer\|control the demo drew' <<<"$t" || { echo "FAIL: wp-template has no data-backed-control rule"; exit 1; }
 grep -qi 'get_terms()' <<<"$t" || { echo "FAIL: wp-template does not name the real option source"; exit 1; }
 
-s=commands/wp-section.md
+s=$wp_section
 [ -f "$s" ] || { echo "FAIL: $s missing"; exit 1; }
 st=$(flat < "$s")
 grep -qi "never a control's option set" <<<"$st" || { echo "FAIL: transcription overlay has no option-set carve-out"; exit 1; }

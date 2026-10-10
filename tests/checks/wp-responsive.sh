@@ -19,7 +19,7 @@ fail() { echo "FAIL: $*"; exit 1; }
 s=skills/wp-responsive/SKILL.md
 img=skills/wp-responsive/references/images.md
 nav=skills/wp-responsive/references/navigation.md
-for f in "$s" "$img" "$nav"; do [ -f "$f" ] || fail "$f is missing"; done
+for f in "$s" "$img" "$nav" agents/wp-acf.md agents/wp-audit-a11y.md; do [ -f "$f" ] || fail "$f is missing"; done
 
 # --- images: the ACF field is an array ------------------------------------------
 grep -Fq "return_format' => 'array'" agents/wp-acf.md \

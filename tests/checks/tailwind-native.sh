@@ -2,6 +2,8 @@
 # The __tailwind__ starter must obey the tailwind-native CSS convention:
 # no comment-only CSS files, every file imported, no stray directories.
 set -euo pipefail
+cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; wp_finalize=$EXPANDED
 
 bin/tailwind-native-check.sh starter-theme/__tailwind__ >/dev/null \
   || { echo "FAIL: starter-theme/__tailwind__ violates the tailwind-native convention"; \
@@ -291,7 +293,7 @@ fi
 # including the "Ready to deliver! All 7 checks passed." line. The report must name it.
 # Only the presence is gated, not the arithmetic: the denominator is conditional (6, 7 or
 # 8) and asserting a count would false-fail the next time a check is added.
-report=$(awk '/^=== WP Finalize Report ===/,/^Result: Ready to deliver/' commands/wp-finalize.md)
+report=$(awk '/^=== WP Finalize Report ===/,/^Result: Ready to deliver/' "$wp_finalize")
 if [ -z "$report" ]; then
   echo "FAIL: commands/wp-finalize.md has no '=== WP Finalize Report ===' line — the range below would be empty and the assertion after it would assert nothing"; exit 1
 fi

@@ -5,6 +5,7 @@
 # starter now owns one module per widget, and the builders must use it.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-section.md; wp_section=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 js=starter-theme/__tailwind__/assets/js/src
@@ -41,7 +42,7 @@ done
 grep -Fq 'directory-filter.js' commands/wp-cpt.md || fail "/wp-cpt does not build its filter bar on directory-filter.js"
 grep -Fq 'public query var' commands/wp-cpt.md || fail "/wp-cpt does not forbid a public query var as a filter GET name"
 grep -Fq '[data-directory]' agents/wp-template.md || fail "wp-template does not route every directory through [data-directory]"
-grep -Fq 'accordion.js' commands/wp-section.md || fail "/wp-section does not point tabs/accordions at the starter modules"
+grep -Fq 'accordion.js' "$wp_section" || fail "/wp-section does not point tabs/accordions at the starter modules"
 grep -Fq '## Tabs, accordions and directory filters come from the starter' "$wref" \
   || fail "wp-tailwind-system does not document the widget modules"
 for k in directory_count directory_count_one directory_clear directory_empty directory_search directory_all; do

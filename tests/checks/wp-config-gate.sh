@@ -44,16 +44,21 @@ grep -Fq 'is not an environment variable the way' "$tmp/canonical" \
 # The list of gated commands is the filesystem, not a list kept here: a hardcoded
 # twelve-name loop happened to be right on the day it was written and shipped a
 # thirteenth ungated manifest-reading command green.
+# A command that moved a step's detail to its <name>-run references is read expanded: the
+# gate block can sit in a reference, and the block is what the run sees either way.
+. tests/checks/lib/expand-command.sh
 found=0
 for f in commands/*.md; do
-  grep -Fq '.wp-create.json' "$f" || continue   # only commands that read the manifest
+  x=$f
+  if grep -Fq "skills/$(basename "$f" .md)-run/references/" "$f"; then expand_command "$f"; x=$EXPANDED; fi
+  grep -Fq '.wp-create.json' "$x" || continue   # only commands that read the manifest
   rm -f "$tmp"/blk.*
   n=$(awk -v out="$tmp/blk." '
     /^\*\*First: validate the project configuration\.\*\*$/ { n++; inb = 1 }
     inb { print > (out n) }
     inb && /^On exit 2, run the migration before continuing\.$/ { inb = 0 }
     END { print n + 0 }
-  ' "$f")
+  ' "$x")
   [ "$n" -gt 0 ] || fail "$f reads the manifest but never calls the validator"
   for i in $(seq 1 "$n"); do
     diff -u "$tmp/canonical" "$tmp/blk.$i" >"$tmp/d" \

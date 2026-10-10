@@ -269,8 +269,7 @@ an empty field, so a secret Stripe rotates is saved to the database, and SEC-040
 `argument-hint`. Add `Agent` to `allowed-tools` only if it dispatches subagents.
 A command is read whole on every run, so a long step keeps its heading and entry condition in
 the command and moves its detail to `skills/<command>-run/references/<step>.md`, read at that
-step (`/wp-audit` with `wp-audit-run`, `/wp-yolo` with `wp-yolo-run`, `/wp-demo` with
-`wp-demo-run`, `/wp-init` with `wp-init-run`, and `/wp-clone` with `wp-clone-run`, are the model). Not a `commands/` subfolder: those load as extra slash commands.
+step (`/wp-audit` with `wp-audit-run`, `/wp-yolo` with `wp-yolo-run`, `/wp-demo` with `wp-demo-run`, `/wp-init` with `wp-init-run`, `/wp-seed` with `wp-seed-run`, `/wp-create` with `wp-create-run`, `/wp-finalize` with `wp-finalize-run`, `/wp-section` with `wp-section-run`, and `/wp-clone` with `wp-clone-run`, are the model). Not a `commands/` subfolder: those load as extra slash commands.
 Checks read such a command through `tests/checks/lib/expand-command.sh`, which splices in only
 the command's own `<command>-run` references.
 
