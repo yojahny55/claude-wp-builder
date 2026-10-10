@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; wp_finalize=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; wp_init=$EXPANDED
 s=skills/wp-polylang/SKILL.md
 test -f "$s" || { echo "FAIL: $s missing"; exit 1; }
@@ -153,7 +154,7 @@ printf '%s' "$h6" | grep -qF 'no `_<lang>` duplicate' \
 # in another check cannot satisfy it and a re-wrap cannot break it.
 fin_pair() { # <from-heading-prefix> <to-heading-prefix>
   local raw
-  raw=$(awk "/^### $1/,/^### $2/" commands/wp-finalize.md)
+  raw=$(awk "/^### $1/,/^### $2/" "$wp_finalize")
   printf '%s\n' "$raw" | tail -1 | grep -q "^### $2" \
     || { echo "FAIL: wp-finalize's '$1' region is not terminated by its '$2' heading — its assertions would silently degrade to file-wide greps"; exit 1; }
   printf '%s\n' "$raw" | tr '\n' ' ' | sed 's/  */ /g'

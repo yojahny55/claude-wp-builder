@@ -8,7 +8,8 @@ fixer=agents/wp-agentic-surfaces.md
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
 audit=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; yolo=$EXPANDED
-finalize=commands/wp-finalize.md
+cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; finalize=$EXPANDED
 # The catalog, the surface specs and the citability rubric live in references/; SKILL.md keeps
 # the scoring model, applicability, the crawler allowlist and the verification loop.
 refs=skills/wp-audit-geo-standards/references

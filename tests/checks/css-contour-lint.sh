@@ -7,6 +7,7 @@
 # static guard; /wp-finalize and the practices audit run it; both CSS skills state the rules.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; wp_finalize=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 command -v node >/dev/null || { echo "SKIP: node not installed"; exit 0; }
 
@@ -41,7 +42,7 @@ node "$lint" starter-theme/__tailwind__ starter-theme/__cinematic__ >/dev/null \
   || fail "a starter theme fails its own contour lint"
 
 # Wired where the other static gates run, and documented in both CSS systems.
-grep -Fq 'bin/css-contour-lint.mjs' commands/wp-finalize.md || fail "/wp-finalize does not run the contour lint"
+grep -Fq 'bin/css-contour-lint.mjs' "$wp_finalize" || fail "/wp-finalize does not run the contour lint"
 grep -Fq 'css-contour-lint.mjs' agents/wp-audit-practices.md || fail "the practices audit does not run the contour lint"
 # wp-tailwind-system keeps these rules in a reference file its SKILL.md links to.
 grep -Fq "references/cross-engine.md" skills/wp-tailwind-system/SKILL.md \

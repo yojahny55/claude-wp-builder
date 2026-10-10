@@ -8,6 +8,7 @@
 # decided, then asserts /wp-finalize and the practices audit actually run it.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; wp_finalize=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 command -v node >/dev/null || { echo "SKIP: node not installed"; exit 0; }
 
@@ -136,7 +137,7 @@ done
 # Wired where a delivery and an audit actually run it.
 # The invocation, not a prose mention of the path.
 run_gate='node "?\$\{CLAUDE_PLUGIN_ROOT\}/bin/theme-template-check\.mjs"? '
-grep -Eq "$run_gate" commands/wp-finalize.md || fail "/wp-finalize does not run theme-template-check"
+grep -Eq "$run_gate" "$wp_finalize" || fail "/wp-finalize does not run theme-template-check"
 grep -Eq "$run_gate" agents/wp-audit-practices.md || fail "wp-audit-practices does not run theme-template-check"
 
 echo PASS
