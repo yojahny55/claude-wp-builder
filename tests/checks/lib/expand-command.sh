@@ -15,7 +15,7 @@
 # would leave the caller grepping a missing body, where an assertion of absence passes.
 
 expand_command() {
-  local src=$1 refs dir out sum
+  local src=$1 refs dir out sum r
   refs=$(grep -oE 'skills/[a-z0-9-]+/references/[a-z0-9-]+\.md' "$src" | awk '!seen[$0]++')
   for r in $refs; do
     [ -r "$r" ] || { echo "expand-command: $src points to missing $r" >&2; exit 1; }
