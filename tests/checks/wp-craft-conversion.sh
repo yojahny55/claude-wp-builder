@@ -10,10 +10,8 @@ fail() { echo "FAIL: $*"; exit 1; }
 t=agents/wp-template.md
 c=agents/wp-css.md
 w=agents/wp-tailwind.md
-s=commands/wp-section.md
-. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; f=$EXPANDED
 s=$wp_section
-f=commands/wp-finalize.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; f=$EXPANDED
 
 grep -Fq 'data-motion' "$t" || fail "$t does not carry data-motion-* attributes into template parts"
 grep -Eqi 'verbatim|unchanged|as-is' "$t" \
