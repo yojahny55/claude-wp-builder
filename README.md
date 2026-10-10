@@ -357,7 +357,9 @@ and the demo is built exactly as it is today. To refresh it, delete
 
 The craft path queries `wp-design-library` over MCP when it is registered. The
 default starts `@yojahny/wp-design-library@^1.0.0` with npx — a caret range, so a
-library release reaches the plugin without an edit here. To use a hosted instance
+library release reaches the plugin without an edit here. The npx call passes
+`--allow-scripts=better-sqlite3`: npm 12 skips dependency install scripts by default,
+and without that one the library's SQLite binding is never built. To use a hosted instance
 instead, add the following server to your project's
 `.mcp.json`, keep that file out of version control, and supply the token through
 your MCP client's secret or environment-variable support when available:
@@ -417,7 +419,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-settings <text>` | B | optional | Extend the settings page |
 | `/wp-seed [file]` | B | required for content | Pages, media, fields, menus from the demo |
 | `/wp-finalize` | all | recommended | Pre-delivery checklist |
-| `/wp-demo-verify <path-or-url> [--positions N]` | all | recommended | Scroll-walk a demo dir or live page, impeccable detector, screenshots per section and viewport, seven-line critique into demo/VERIFY.md |
+| `/wp-demo-verify <path-or-url> [--positions N] [--no-motion]` | all | recommended | Scroll-walk a demo dir or live page, impeccable detector, screenshots per section and viewport, seven-line critique into demo/VERIFY.md |
 | `/wp-responsive-check <url>` | all | recommended | Alias, dispatches `/wp-demo-verify` (5-viewport layout check is now one part of what it walks) |
 | `/wp-audit [flags]` | all | optional | Security, SEO, a11y, performance, best practices, GEO |
 | `/wp-polylang <src> <dst>` | all | polylang only | Translate the site through Polylang |
@@ -468,6 +470,10 @@ commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. 
 | `wp-audit-ux-standards` | Usability criteria — the UX-NNN catalog, the page-level vs site-level split, the applicability rules that keep a score honest and the owner each fix belongs to |
 | `wp-audit-geo-standards` | GEO and AI-agent-readiness reference — the ORA/is-agentic check catalog, applicability by site type, AI crawler allowlist, llms.txt/well-known specs, GEO citability rubric and WordPress implementation templates |
 | `wp-audit-local-standards` | Local SEO audit reference — business-type and vertical detection, NAP consistency sources, LocalBusiness subtype selection, location-page quality gates and citation tiers, with the WordPress option and meta keys each check reads |
+| `wp-audit-run` | The step detail of `/wp-audit` — one reference file per long step, read at that step so the command stays a short map |
+| `wp-yolo-run` | The step detail of `/wp-yolo` — one reference file per long step, read at that step so the command stays a short map |
+| `wp-demo-run` | The step detail of `/wp-demo` — one reference file per long step, read at that step so the command stays a short map |
+| `wp-init-run` | The step detail of `/wp-init` — one reference file per long step, read at that step so the command stays a short map |
 | `wp-contributing` | Contributing to this plugin — the layer rules, the grep-gate test style, and the PR and release rituals |
 
 ### Agents (specialized subagents dispatched by commands)

@@ -123,7 +123,7 @@ PRs that appear to be unreviewed AI output (generic boilerplate, hallucinated AP
 1. Create a feature branch from `main`: `git checkout -b feat/your-feature`
 2. Test your changes with at least one real WordPress demo-to-theme workflow.
 3. Ensure all existing commands still work (no regressions).
-4. Update `CHANGELOG.md` under an `[Unreleased]` section.
+4. Add a `changes/<slug>.<section>.md` fragment (see `changes/README.md`). Do not edit `CHANGELOG.md`.
 5. Update `README.md` if you are adding a new command or feature.
 
 ### PR Format

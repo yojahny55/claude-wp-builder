@@ -6,7 +6,8 @@ shopt -s nullglob
 
 fail() { echo "FAIL: $1"; exit 1; }
 
-c=commands/wp-audit.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
+c=$EXPANDED
 [ -f "$c" ] || fail "$c is missing"
 
 grep -q 'Every finding is a measurement' "$c" || fail "/wp-audit has no findings-are-measurements contract"

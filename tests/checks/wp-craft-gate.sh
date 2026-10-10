@@ -4,9 +4,10 @@
 # nobody noticed.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
-d=commands/wp-demo.md
+d=$wp_demo
 grep -Fq -- 'demo-verify.mjs" --probe' "$d" || fail "$d does not run the probe"
 grep -Eqi 'exit(s| code)? 2' "$d" || fail "$d does not branch on probe exit 2"
 grep -Fq 'npm i -D playwright-core' "$d" || fail "$d does not try to install playwright-core"
@@ -51,7 +52,7 @@ grep -Fq 'signature move' "$d" \
 # multi-page path builds craft blind, which is exactly how the 12,000px page with
 # an empty first screen shipped. The only verification a yolo run otherwise reaches
 # is /wp-responsive-check, whose findings are folded into a review list, not a gate.
-y=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; y=$EXPANDED
 grep -Fq -- 'demo-verify.mjs" --probe' "$y" || fail "$y does not run the probe in craft mode"
 grep -Fq 'only exit 0 continues' "$y" || fail "$y proceeds to build when the craft probe fails"
 grep -Fq 'Either way **stop**' "$y" || fail "$y does not stop the run on a missing browser"
@@ -96,7 +97,7 @@ grep -Fq 'composition plan must say how' <<<"$same_client_section" \
 grep -Eiq "$excuse_vocab" <<<"$same_client_section" \
   && fail "fingerprint.md's same-client rule carries an excuse clause a repeat build could reach for"
 
-d=commands/wp-demo.md
+d=$wp_demo
 fp_gate_section=$(awk '/^2\. \*\*Fingerprint gate\.\*\*/{f=1} /^3\. \*\*Brief\.\*\*/{f=0} f' "$d")
 [ -n "$fp_gate_section" ] \
   || fail "$d has no Step 2.6 sub-step 2 (the fingerprint gate)"

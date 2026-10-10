@@ -337,7 +337,7 @@ menus, ACF fields, plugins) when `.wp-create.json` exists.
 ### `/wp-demo-verify`
 
 ```
-/wp-demo-verify <file-path-or-url> [--positions N]
+/wp-demo-verify <file-path-or-url> [--positions N] [--no-motion]
 ```
 
 Defaults to `demo/index.html`. Pass a URL to check a converted WordPress page instead, the
@@ -443,7 +443,9 @@ validation, a link followed rather than inferred. It scaffolds `.wp-audit/suite/
 `templates/audit-suite/` and installs the dependencies once per machine into a shared
 cache, so the second audit on a machine is not as expensive as the first. Without Node or
 npm it skips cleanly and Tier 3 reports `UNMEASURED`, which is what an absent browser tool
-already did.
+already did. Without the flag, the first
+question of the run also asks whether to run the suite; answering yes is the same as typing
+`--suite`.
 
 A machine that already has the suite's packages installed, globally or in a shared
 toolchain, can point the suite at them with `WP_AUDIT_SUITE_NODE_MODULES=<dir>` (for a

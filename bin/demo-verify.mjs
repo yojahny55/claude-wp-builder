@@ -16,6 +16,7 @@ import { resolve, join, dirname, basename, extname, normalize, sep } from 'node:
 import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { createServer } from 'node:http';
+import { execFileSync } from 'node:child_process';
 import { findBrowser } from './lib/browsers.mjs';
 
 // Advisory kinds report what the harness could not see, not what the page got
@@ -38,12 +39,21 @@ const TLS = { ignoreHTTPSErrors: true };
 const args = process.argv.slice(2);
 if (args.includes('--help')) {
   console.log(
-    'usage: demo-verify.mjs [file-or-dir-or-url] [--out DIR] [--positions N] [--widths 1440x900,390x844] [--no-firefox]\n' +
+    'usage: demo-verify.mjs [file-or-dir-or-url] [--out DIR] [--positions N] [--widths 1440x900,390x844] [--no-firefox] [--no-gaps] [--no-motion]\n' +
     '       demo-verify.mjs --probe     exit 0 if playwright-core and a Chrome are usable, else 2'
   );
   process.exit(0);
 }
 const PROBE = args.includes('--probe');
+// --no-motion: the target is not expected to carry the motion engine (an existing
+// site the plugin did not build). Every page of such a site reads as `no-engine`
+// on every section, which is true and useless: a real run against a page-builder
+// site gave 40 blocking rows and no defect. The flag drops the motion judgments
+// (no-engine, dead-scroll) and keeps overflow, clipped copy, container-noop, the
+// full-page shots and the Firefox pass. It is explicit on purpose: a converted
+// plugin page that lost its engine must still fail without it.
+const NO_MOTION = args.includes('--no-motion');
+const noMotionHinted = new Set();
 
 // The command documents demo/index.html as the default target, and exit 2 is
 // reserved for "no usable browser" so a caller can fall back to MCP screenshots.
@@ -198,6 +208,8 @@ function findChrome() {
   return null;
 }
 
+// playwright-core resolution order: PLAYWRIGHT_CORE, the bare import (from
+// bin/), the cwd's node_modules, then the global root (`npm root -g`).
 // PLAYWRIGHT_CORE lets the check suite force the no-browser path; a bogus
 // value must produce exit 2, never a crash, and skips the fallback ladder
 // below entirely so the forced failure stays deterministic.
@@ -218,8 +230,26 @@ try {
       // agent to do) is invisible to that resolution, so fall back to the
       // cwd's node_modules before giving up.
       const cwdEntry = join(process.cwd(), 'node_modules', 'playwright-core', 'index.mjs');
-      if (!existsSync(cwdEntry)) throw bare;
-      ({ chromium, firefox } = await import(pathToFileURL(cwdEntry).href));
+      if (existsSync(cwdEntry)) {
+        ({ chromium, firefox } = await import(pathToFileURL(cwdEntry).href));
+      } else {
+        // Last rung: a Playwright installed only globally (`npm i -g
+        // @playwright/test`) is on neither of the paths above, yet a working
+        // playwright-core sits under `npm root -g`. Asking npm is best effort:
+        // no npm, a hang or an odd exit just means the rung finds nothing.
+        let globalRoot = '';
+        try {
+          globalRoot = execFileSync('npm', ['root', '-g'], {
+            encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'],
+          }).trim();
+        } catch { /* npm missing or slow: fall through to the bare failure */ }
+        const globalEntry = globalRoot && [
+          join(globalRoot, 'playwright-core', 'index.mjs'),
+          join(globalRoot, '@playwright', 'test', 'node_modules', 'playwright-core', 'index.mjs'),
+        ].find((e) => existsSync(e));
+        if (!globalEntry) throw bare;
+        ({ chromium, firefox } = await import(pathToFileURL(globalEntry).href));
+      }
     }
   }
 } catch {
@@ -690,6 +720,178 @@ const containerAudit = () => {
   return [...new Set(out)];
 };
 
+// Fractional-width gaps. Page builders emit breakpoints as integer pairs: max-width:767px for
+// mobile and min-width:768px for everything above. At a fractional CSS width (browser zoom, or
+// OS display scaling other than 100%: a 766px window at 110% is 767.27px wide) neither query
+// matches, so the page falls back to its unqueried defaults: a logo at its desktop-less 704px,
+// columns with no width, boxes hidden on every device visible again. Every integer-width shot
+// misses it, so this pass loads the page inside (N, N+1) and compares it with N and N+1.
+const GAP_MAX = 3;
+// Device scale factors to land in a gap with. Headless Chromium has no window chrome, so
+// --window-size is the CSS viewport plus a fraction from the scale, and the reachable widths
+// are multiples of 1/scale: at 1.1 some edges (991, 511) have no integer window size inside
+// (N, N+1), and 1.25 reaches them. Measured on Chromium 1243; below 500px headless clamps the
+// window, so those edges are skipped with a warning.
+const GAP_SCALES = [1.1, 1.25];
+// A culprit is wider in the gap than at both neighbours by this ratio and this many pixels,
+// which filters out sub-pixel rounding.
+const GAP_WIDTH_RATIO = 1.5;
+const GAP_MIN_PIXEL_DIFF = 100;
+
+/** Integer pairs max-width:N / min-width:N+1 in the page's same-origin stylesheets. */
+const gapEdges = () => {
+  const maxs = new Set();
+  const mins = new Set();
+  const walk = (rules) => {
+    for (const r of rules) {
+      if (r.media) {
+        const t = r.media.mediaText || '';
+        for (const m of t.matchAll(/\(\s*max-width\s*:\s*(\d+)px\s*\)/g)) maxs.add(Number(m[1]));
+        for (const m of t.matchAll(/\(\s*min-width\s*:\s*(\d+)px\s*\)/g)) mins.add(Number(m[1]));
+      }
+      try { if (r.cssRules) walk(r.cssRules); } catch { /* ignore */ }
+    }
+  };
+  for (const sheet of document.styleSheets) {
+    try { walk(sheet.cssRules); } catch { /* cross-origin sheet */ }
+  }
+  return [...maxs].filter((n) => mins.has(n + 1)).sort((a, b) => a - b);
+};
+
+/** Per-element widths and visibility, keyed by DOM path, plus the document overflow. */
+const gapMeasure = (edge) => {
+  const path = (el) => {
+    const out = [];
+    for (; el && el !== document.documentElement; el = el.parentElement) {
+      const sibs = el.parentElement ? [...el.parentElement.children] : [el];
+      out.unshift(el.tagName.toLowerCase() + ':' + (sibs.indexOf(el) + 1));
+    }
+    return out.join('>');
+  };
+  const label = (el) =>
+    el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') +
+    [...el.classList].slice(0, 2).map((c) => '.' + c).join('');
+  const els = {};
+  let n = 0;
+  for (const el of document.body.querySelectorAll('*')) {
+    if (++n > 4000) break;
+    if (['SCRIPT', 'STYLE', 'LINK', 'META', 'TITLE', 'HEAD'].includes(el.tagName)) continue;
+    const cs = getComputedStyle(el);
+    els[path(el)] = { label: label(el), none: cs.display === 'none', w: el.getBoundingClientRect().width };
+  }
+  return {
+    vw: window.visualViewport ? window.visualViewport.width : window.innerWidth,
+    sw: document.documentElement.scrollWidth,
+    maxMatches: matchMedia('(max-width:' + edge + 'px)').matches,
+    minMatches: matchMedia('(min-width:' + (edge + 1) + 'px)').matches,
+    els,
+  };
+};
+
+/** A browser whose CSS viewport lands strictly between edge and edge+1, or null. The window
+ *  width maps to the viewport almost 1:1 (no chrome in headless), so try the widths around the
+ *  edge at each scale and keep the first that reads back inside the gap. */
+async function launchInGap(edge) {
+  for (const scale of GAP_SCALES) {
+    for (const win of [edge - 1, edge, edge - 2, edge + 1]) {
+      const b = await chromium.launch({
+        executablePath,
+        args: ['--force-device-scale-factor=' + scale, '--window-size=' + win + ',1000'],
+      });
+      let vw;
+      try {
+        const ctx = await b.newContext({ viewport: null, ...TLS });
+        const pg = await ctx.newPage();
+        await pg.goto('about:blank');
+        vw = await pg.evaluate(() => window.visualViewport.width);
+        await ctx.close();
+      } catch (e) {
+        await b.close();
+        throw e;
+      }
+      if (vw > edge && vw < edge + 1) return { browser: b, win, vw };
+      await b.close();
+    }
+  }
+  return null;
+}
+
+async function gapPass(browser, url, outDir) {
+  const findings = [];
+  let edges;
+  const probeCtx = await browser.newContext({ viewport: { width: 1280, height: 900 }, ...TLS });
+  try {
+    const probePage = await probeCtx.newPage();
+    await probePage.goto(url, { waitUntil: 'load' });
+    edges = (await probePage.evaluate(gapEdges)).slice(0, GAP_MAX);
+  } finally {
+    await probeCtx.close();
+  }
+
+  const measureAt = async (width) => {
+    const ctx = await browser.newContext({ viewport: { width, height: 900 }, ...TLS });
+    try {
+      const pg = await ctx.newPage();
+      await pg.goto(url, { waitUntil: 'load' });
+      await pg.waitForTimeout(300);
+      const m = await pg.evaluate(gapMeasure, width);
+      return m;
+    } finally {
+      await ctx.close();
+    }
+  };
+
+  for (const edge of edges) {
+    const landed = await launchInGap(edge);
+    if (!landed) {
+      console.error('demo-verify: breakpoint gap ' + edge + '-' + (edge + 1) + 'px skipped: could not land a viewport inside it');
+      continue;
+    }
+    try {
+      const ctx = await landed.browser.newContext({ viewport: null, ...TLS });
+      try {
+        const pg = await ctx.newPage();
+        await pg.goto(url, { waitUntil: 'load' });
+        await pg.waitForTimeout(300);
+        const gap = await pg.evaluate(gapMeasure, edge);
+        // The page's own queries matched, so there is no gap at this edge: skip the
+        // neighbour loads rather than measure and discard them.
+        if (gap.maxMatches || gap.minMatches) continue;
+        const [lo, hi] = await Promise.all([measureAt(edge), measureAt(edge + 1)]);
+
+        const culprits = [];
+        for (const [key, g] of Object.entries(gap.els)) {
+          const a = lo.els[key];
+          const b = hi.els[key];
+          if (!a || !b) continue;
+          const widest = Math.max(a.w, b.w);
+          if (!g.none && a.none && b.none)
+            culprits.push({ selector: g.label, why: 'visible in the gap, display:none at ' + edge + ' and ' + (edge + 1), width: Math.round(g.w) });
+          else if (!g.none && !a.none && !b.none && g.w > widest * GAP_WIDTH_RATIO && g.w - widest > GAP_MIN_PIXEL_DIFF)
+            culprits.push({ selector: g.label, why: 'wider than at both neighbours', width: Math.round(g.w), at: [Math.round(a.w), Math.round(b.w)] });
+        }
+        const limit = Math.ceil(gap.vw) + 1;
+        const overflow = gap.sw > limit && lo.sw <= edge + 1 && hi.sw <= edge + 2;
+        if (culprits.length || overflow) {
+          mkdirSync(outDir, { recursive: true });
+          await pg.screenshot({ path: join(outDir, 'gap-' + edge + '.png'), fullPage: true });
+          await pg.screenshot({ path: join(outDir, 'gap-' + edge + '.jpg'), fullPage: true, type: 'jpeg', quality: SHEET_JPEG_QUALITY });
+          findings.push({
+            kind: 'breakpoint-gap', pass: 'normal', width: edge, gap: [edge, edge + 1],
+            viewport: Number(gap.vw.toFixed(2)), overflow: overflow ? gap.sw : false,
+            culprits: culprits.sort((x, y) => y.width - x.width).slice(0, 5),
+          });
+        }
+      } finally {
+        await ctx.close();
+      }
+    } finally {
+      await landed.browser.close();
+    }
+  }
+  return findings;
+}
+
 let browser;
 let ffBrowser = null;
 let http = null;
@@ -776,6 +978,11 @@ try {
     // them, below the loop.
     if (!reduced) containerNoop.push(await page.evaluate(containerAudit));
     if (!reduced && !mix) mix = await page.evaluate(motionMix);
+    // Document-wide and invariant across sections/positions, so read it once per
+    // page rather than on every position iteration of every section below. The
+    // probe still returns it for the no-engine guard; this hoisted copy serves
+    // the advisory hint only.
+    const pageDeviceCount = await page.evaluate(() => document.querySelectorAll('[data-motion]').length);
     // `container-type` on an ancestor of the scroll subject freezes
     // `animation-timeline: view()` -- the timeline reports one constant progress at
     // every scroll position, so every CSS-path reveal lands dead. The existing
@@ -914,6 +1121,10 @@ try {
         await page.evaluate((to) => window.scrollTo(0, to), y);
         await page.waitForTimeout(180);
         const frame = await page.evaluate(probe, b.idx);
+        if (targetIsUrl && !NO_MOTION && pageDeviceCount === 0 && !noMotionHinted.has(pageUrl)) {
+          noMotionHinted.add(pageUrl);
+          console.log('demo-verify: ' + pageUrl + ' carries no [data-motion] element. If this site was not built with the motion engine, re-run with --no-motion to skip the no-engine and dead-scroll judgments; without it every section blocks as no-engine.');
+        }
         await page.screenshot({ path: join(dir, String(shot++).padStart(3, '0') + '.png') });
 
         // Keyed by element index, not text: two cues sharing a string are real
@@ -1085,6 +1296,14 @@ try {
   }
 
   await captureResponsiveShots(browser, pageUrl, pageOut);
+  if (!args.includes('--no-gaps')) {
+    try {
+      findings.push(...(await gapPass(browser, pageUrl, pageOut)));
+    } catch (err) {
+      const why = err && typeof err.message === 'string' ? err.message.split('\n')[0] : String(err);
+      console.error('demo-verify: fractional-width pass failed on ' + pageUrl + ' (' + why + ') -- other findings kept');
+    }
+  }
   // Firefox is the second engine, never a requirement: a crash mid-pass keeps the
   // Chromium findings and says so, like a Firefox that never launched.
   if (ffBrowser) {
@@ -1095,6 +1314,12 @@ try {
       const why = err && typeof err.message === 'string' ? err.message.split('\n')[0] : String(err);
       console.error('demo-verify: Firefox pass failed on ' + pageUrl + ' (' + why + ') -- Chromium findings kept');
     }
+  }
+  // The motion judgments are dropped here, after the whole walk, so the guards that
+  // produce them stay exactly as tests/checks/wp-craft-detect.sh pins them.
+  if (NO_MOTION) {
+    for (let i = findings.length - 1; i >= 0; i--)
+      if (findings[i].kind === 'no-engine' || findings[i].kind === 'dead-scroll') findings.splice(i, 1);
   }
   report.pages.push({ url: pageUrl, findings });
   } catch (err) {

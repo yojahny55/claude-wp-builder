@@ -8,6 +8,7 @@
 # would silently request square heroes and nothing else would notice.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 g=bin/image-gen.mjs
@@ -446,7 +447,7 @@ grep -qFx 'written=false' <<< "$out" \
 # 8. The command contract. Greps a comment-stripped copy so a rule parked in an
 #    HTML comment cannot satisfy the pin - the failure mode that let three
 #    `inherits: true` pins pass in v3.2 while the rule sat commented out.
-d=commands/wp-demo.md
+d=$wp_demo
 ds="$tmp/wp-demo-stripped.md"
 # Strip HTML comments so a rule parked in <!-- --> cannot satisfy a pin -- the
 # failure mode that let three `inherits: true` pins pass in v3.2 while the rule
@@ -504,7 +505,7 @@ grep -Fq '`"none"` records an earlier decline and is handled exactly like the no
 # Control: the step is inside wp-demo.md and NOT in wp-yolo.md, which must never
 # generate. A single shared pin would pass with the step in the wrong command.
 # Same comment-strip-and-collapse treatment, so this pin is immune to reflow too.
-y=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; y=$EXPANDED
 ys="$tmp/wp-yolo-stripped.md"
 perl -0pe 's{<!--.*?-->}{}gs; s{\s+}{ }g' "$y" > "$ys" \
   || fail "could not build the stripped copy of $y"
@@ -585,11 +586,11 @@ node "$g" plan --demo "$tmp" >/dev/null || fail "plan must still succeed with no
 sent=$(pj gaps.0.prompt_sent)
 case "$sent" in *"no text"*) ;; *) fail "NEGATIVE block must be present even with no DESIGN.md";; esac
 # And the command tells the build which half is its to write.
-grep -Fq 'image-prompt.md' commands/wp-demo.md \
+grep -Fq 'image-prompt.md' "$wp_demo" \
   || fail "commands/wp-demo.md 5.5 does not point at references/image-prompt.md"
-grep -Fq 'prompt_sent' commands/wp-demo.md \
+grep -Fq 'prompt_sent' "$wp_demo" \
   || fail "commands/wp-demo.md does not tell the build what a yes authorises (prompt_sent)"
-grep -Fq 'no longer matches the' commands/wp-demo.md \
+grep -Fq 'no longer matches the' "$wp_demo" \
   || fail "commands/wp-demo.md does not document the exit-2 refusal when DESIGN.md/BRIEF.md change after approval"
 
 # 11b. The DESIGN.md reader is lenient about what it cannot control. A file

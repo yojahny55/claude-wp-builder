@@ -571,9 +571,14 @@ function <prefix>_wants_markdown() {
 
 /**
  * Pull the main content region out of a rendered HTML document; fall back to the body.
+ * Many themes print the page title in a header band before <main>: when <main> has no h1,
+ * the document's first h1 is put back in front, so the markdown keeps its title.
  */
 function <prefix>_extract_main_content( $html ) {
     if ( preg_match( '#<main\b[^>]*>(.*?)</main>#is', $html, $match ) ) {
+        if ( false === stripos( $match[1], '<h1' ) && preg_match( '#<h1\b[^>]*>.*?</h1>#is', $html, $title ) ) {
+            return $title[0] . $match[1];
+        }
         return $match[1];
     }
     if ( preg_match( '#<body\b[^>]*>(.*?)</body>#is', $html, $match ) ) {
@@ -587,6 +592,16 @@ function <prefix>_extract_main_content( $html ) {
  */
 function <prefix>_html_to_markdown( $html ) {
     $html = preg_replace( '#<(script|style|noscript)\b[^>]*>.*?</\1>#is', '', $html );
+    // A form becomes the list of what it asks for. Stripped as markup, a contact page whose
+    // <main> holds only a form comes out empty, or as a run of option labels.
+    $html = preg_replace_callback( '#<form\b[^>]*>(.*?)</form>#is', function ( $form ) {
+        preg_match_all( '#<label\b[^>]*>(.*?)</label>#is', $form[1], $labels );
+        $fields = array_filter( array_map( function ( $label ) {
+            $label = preg_replace( '#<(select|textarea)\b[^>]*>.*?</\1>#is', '', $label ); // Options and defaults are not the label.
+            return trim( preg_replace( '/\s+/', ' ', wp_strip_all_tags( $label ) ), " \t*:" );
+        }, $labels[1] ) );
+        return $fields ? "\nForm on this page. Fields: " . implode( ', ', array_unique( $fields ) ) . "\n" : '';
+    }, $html );
     for ( $i = 1; $i <= 6; $i++ ) {
         $hashes = str_repeat( '#', $i );
         $html   = preg_replace( '#<h' . $i . '[^>]*>(.*?)</h' . $i . '>#is', "\n" . $hashes . ' $1' . "\n", $html );

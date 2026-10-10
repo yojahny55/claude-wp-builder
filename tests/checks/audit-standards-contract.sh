@@ -10,6 +10,7 @@
 # header is read too, so a change to either side fails here instead of drifting.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md; wp_audit=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 k=skills/wp-audit-standards/SKILL.md
@@ -65,7 +66,7 @@ grep -Fq '| `4` | the host is marked blocked; nothing was sent |' "$k" || fail "
 grep -Fq 'Never retry — a retry against a ban extends the ban' "$k" || fail "$k lets an agent retry against a ban"
 grep -Fq '| `5` | another agent held the host past `--wait` (300 s); nothing was sent | call again, at most twice more' "$k" \
   || fail "$k gives gate exit 5 no stop rule"
-grep -Fq 'call again, at most twice more' commands/wp-audit.md \
+grep -Fq 'call again, at most twice more' "$wp_audit" \
   || fail "commands/wp-audit.md's dispatch prompt gives gate exit 5 no stop rule"
 
 # --- the link sweep, against its own script -------------------------------------------------

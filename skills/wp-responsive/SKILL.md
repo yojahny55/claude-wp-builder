@@ -107,6 +107,14 @@ and add complexity as space increases; a `max-width` rule is desktop-first CSS u
 @media (max-width: 767px) { ... }
 ```
 
+A `max-width: N` rule paired with a `min-width: N+1` rule leaves a gap at fractional
+viewport widths. Browser zoom and OS display scaling produce them (a 766px window at 110%
+is 767.27px wide), and there neither query matches: the page falls back to its unqueried
+defaults, so a logo can render at 700px and a box hidden on every device can show. If a
+`max-width` query is unavoidable, such as in a page-builder's CSS, close the gap with
+`max-width: 767.98px`, or use range syntax: `@media (width < 768px)`.
+`/wp-demo-verify` reports the leftover case as `breakpoint-gap`.
+
 ---
 
 ## Container Max-Widths Per Breakpoint

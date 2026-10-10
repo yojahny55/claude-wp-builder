@@ -7,7 +7,8 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-audit=commands/wp-audit.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
+audit=$EXPANDED
 [ -f "$audit" ] || fail "$audit missing"
 
 step1=$(awk '/^## Step 1:/{on=1} /^## Step 2:/{on=0} on' "$audit")
@@ -23,7 +24,7 @@ grep -Fq 'When the flag was passed, do not ask.' <<<"$step1" \
 
 # Order, independent of headings: the question must come before the adoption prompt and the
 # plugin-install prompt, so a whole-file fallback above cannot hide it moving back to Step 9.
-line_of() { grep -nF -- "$1" "$audit" | head -1 | cut -d: -f1; }
+line_of() { grep -nF -- "$1" "$audit" | head -1 | cut -d: -f1 || true; }
 q=$(line_of '[A] Report only')
 adopt=$(line_of '[A] Adopt it now')
 install=$(line_of '[A] Install all recommended WordPress plugins')

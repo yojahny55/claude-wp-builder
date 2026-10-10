@@ -18,7 +18,8 @@ cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
 std=skills/wp-audit-standards/SKILL.md
-cmd=commands/wp-audit.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
+cmd=$EXPANDED
 rep=bin/audit-report.mjs
 for f in "$std" "$cmd" "$rep"; do [ -r "$f" ] || fail "$f is missing or unreadable"; done
 

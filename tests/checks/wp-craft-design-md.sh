@@ -9,6 +9,7 @@
 # catalogue depends on — that omission is deliberate, not a botched copy.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 d=skills/wp-demo-craft/references/design-md
@@ -47,8 +48,8 @@ grep -Eq '^  container: "[0-9.]+(px|rem|em)"$' "$p" \
 
 # The handoff: a DESIGN.md the demo was built from is worth nothing if /wp-init
 # scrapes the demo's :root instead of reading it, or leaves it behind in demo/.
-i=commands/wp-init.md
-y=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; i=$EXPANDED
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; y=$EXPANDED
 grep -Fq 'demo/DESIGN.md' "$i" || fail "$i does not read demo/DESIGN.md"
 grep -Eqi 'before .*:root|first.*:root|instead of .*:root' "$i" || fail "$i does not prefer DESIGN.md over the :root scrape"
 grep -Fq 'DESIGN.md' "$y" || fail "$y does not carry the DESIGN.md contract into the whole-site build"
@@ -109,7 +110,7 @@ grep -Fq 'Skip it entirely when `demo mode` is **craft**' "$y" \
 # back. @property makes it fall back to initial-value instead. Anchored on the
 # opening brace, not the bare token+name pair, which a typo'd property name
 # (--container-maxx) would also satisfy while leaving the real bug unfixed.
-w=commands/wp-demo.md
+w=$wp_demo
 r=bin/composition-preview.mjs
 # Grep a CSS-comment-stripped copy of the command: the rule it carries lives in
 # a fenced css block, so a dead `/* @property ... */` instruction satisfies a
@@ -145,7 +146,7 @@ grep -Fq 'on every page this step writes' <<<"$ws" \
 # artifact that ships. Measured at 1920 on that rule: `wide` and empty both give
 # 0px without the rule and 312px with it. Comment-stripped for the same reason
 # as $w: the rule lives in a fenced css block.
-i4=commands/wp-init.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; i4=$EXPANDED
 i4s="$(perl -0pe 's{/\*.*?\*/}{}gs' "$i4")"
 grep -Eq '@property --container-max[[:space:]]*\{' <<<"$i4s" \
   || fail "$i4 Step D4 does not emit @property for --container-max, so a malformed token unsets padding-inline in the delivered theme"

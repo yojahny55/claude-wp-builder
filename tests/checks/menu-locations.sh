@@ -11,6 +11,7 @@
 # `__starter___nav_location()` in inc/i18n.php, which each strategy's file answers.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; wp_init=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 flat() { tr '\n' ' ' | sed 's/  */ /g'; }
 words() { tr ' ' '\n' | sed '/^$/d' | sort -u | tr '\n' ' ' | sed 's/ $//'; }
@@ -99,7 +100,7 @@ for l in $regd; do
 done
 
 # --- 3. /wp-init Step 6 registers exactly what the helpers answer, per strategy --
-s6=$(region commands/wp-init.md '^## Step 6:' '^## Step 7:')
+s6=$(region "$wp_init" '^## Step 6:' '^## Step 7:')
 s6p=$(printf '%s\n' "$s6" | awk '/^### If `\$I18N = polylang`/{f=1; next} /^### /{f=0} f')
 s6s=$(printf '%s\n' "$s6" | awk '/^### If `\$I18N = suffix`/{f=1; next} /^### /{f=0} f')
 [ -n "$s6p" ] && [ -n "$s6s" ] || fail "wp-init Step 6 lost its per-strategy branches"

@@ -9,11 +9,12 @@
 # the prohibition.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 R=skills/wp-demo-craft/references
 S=skills/wp-demo-craft/SKILL.md
-D=commands/wp-demo.md
+D=$wp_demo
 
 for f in uniqueness hero-depth worlds; do
   [ -f "$R/$f.md" ] || fail "$R/$f.md is missing -- it is one of the three generative references, and without it the skill is floors only"

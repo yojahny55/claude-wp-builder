@@ -18,7 +18,8 @@ fail() { echo "FAIL: $1"; exit 1; }
 
 PRA=agents/wp-audit-practices.md
 SEO=agents/wp-audit-seo.md
-CMD=commands/wp-audit.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
+CMD=$EXPANDED
 SKILL=skills/wp-cli-patterns/SKILL.md
 # The script detail and the seeding recipes live beside SKILL.md; the host-name guard follows them.
 SCRIPTS_REF=skills/wp-cli-patterns/references/shipped-scripts.md

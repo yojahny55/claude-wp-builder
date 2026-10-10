@@ -12,10 +12,12 @@
 # this, the refuse list that used to live in taste.md is enforced nowhere.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; wp_yolo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 c=commands/wp-demo-verify.md
-d=commands/wp-demo.md
+d=$wp_demo
 
 grep -Eq 'impeccable@4' "$c" || fail "$c does not pin the detector to the real major version (4, not the nonexistent 1)"
 grep -Fq -- '--json' "$c" || fail "$c does not ask the detector for JSON"
@@ -219,7 +221,7 @@ grep -Fq 'f.advisory = true' "$vs" \
 if grep -Fq '`0` no machine findings, `1` findings printed' commands/wp-demo-verify.md; then
   fail "commands/wp-demo-verify.md still documents the pre-advisory exit codes, contradicting its own advisory-only-run line"
 fi
-grep -Fq 'Fold every **blocking** finding' commands/wp-yolo.md \
+grep -Fq 'Fold every **blocking** finding' "$wp_yolo" \
   || fail "commands/wp-yolo.md folds every finding into the fix list, advisory ones included, so the split it consumes does not reach the one command that acts on it"
 grep -Fq 'parallax' skills/wp-demo-craft/references/verify.md \
   || fail "skills/wp-demo-craft/references/verify.md does not record that parallax is left unjudged, so the limit reads as a bug"

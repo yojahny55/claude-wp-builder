@@ -6,6 +6,7 @@
 # honour the read-only code scope and the site's own plugin stack.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md; wp_audit=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 cfg="node $PWD/bin/wp-config.mjs"
 
@@ -119,11 +120,11 @@ import('$PWD/bin/lib/adopt.mjs').then(({ PROBE_PHP, buildManifest }) => {
 });" || fail "probe semantics"
 
 # --- The prose honours it --------------------------------------------------------
-grep -Fq 'Step 2.2: Adopted sites' commands/wp-audit.md || fail "wp-audit has no adopted-site step"
-grep -Fq 'forbid writes under `code_scope.read_only`' commands/wp-audit.md || fail "wp-audit fix phase does not guard read-only code"
-grep -Fq 'dispatch `wp-audit-rankmath` only when `stack.seo` is `rankmath`' commands/wp-audit.md \
+grep -Fq 'Step 2.2: Adopted sites' "$wp_audit" || fail "wp-audit has no adopted-site step"
+grep -Fq 'forbid writes under `code_scope.read_only`' "$wp_audit" || fail "wp-audit fix phase does not guard read-only code"
+grep -Fq 'dispatch `wp-audit-rankmath` only when `stack.seo` is `rankmath`' "$wp_audit" \
   || fail "wp-audit would dispatch Rank Math onto another SEO plugin"
-grep -Fq 'do not list `seo-by-rank-math`' commands/wp-audit.md || fail "wp-audit Step 4 still offers Rank Math beside another SEO plugin"
+grep -Fq 'do not list `seo-by-rank-math`' "$wp_audit" || fail "wp-audit Step 4 still offers Rank Math beside another SEO plugin"
 for c in wp-audit wp-debug wp-clone; do
   grep -Fq '${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt.md' "commands/$c.md" || fail "$c does not offer adoption"
   # A literal install path resolves only on the machine it was typed on.

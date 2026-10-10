@@ -34,9 +34,10 @@ dehyphen() {
 }
 
 test -f commands/wp-init.md     || fail "commands/wp-init.md missing"
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; wp_init=$EXPANDED
 test -f commands/wp-finalize.md || fail "commands/wp-finalize.md missing"
 
-init=$(flat "$(cat commands/wp-init.md)")
+init=$(flat "$(cat "$wp_init")")
 fin=$(flat "$(cat commands/wp-finalize.md)")
 
 # ---------------------------------------------------------------------------
@@ -48,7 +49,7 @@ fin=$(flat "$(cat commands/wp-finalize.md)")
 # The anchors deliberately match only `**Step D4` / `**Step D5`, so re-titling
 # either step keeps working.
 # ---------------------------------------------------------------------------
-d4_raw=$(awk '/^\*\*Step D4/,/^\*\*Step D5/' commands/wp-init.md)
+d4_raw=$(awk '/^\*\*Step D4/,/^\*\*Step D5/' "$wp_init")
 [ -n "$d4_raw" ] || fail "wp-init.md has no '**Step D4' block — the tailwind demo-conversion instruction lives there"
 printf '%s\n' "$d4_raw" | tail -1 | grep -q '^\*\*Step D5' \
   || fail "wp-init.md's Step D4 region is not terminated by its '**Step D5' heading — every assertion scoped to it would silently become file-wide"

@@ -254,6 +254,24 @@ code-only version. Read the LCP element from the Lighthouse/PSI report:
 
 PERF-016 and PERF-048 are two halves of one decision — never report them in isolation.
 
+Two cases this check gets wrong when read from the markup alone:
+
+- **Elementor's "Optimized Image Loading"** (option `elementor_optimized_image_loading`, on
+  by default) buffers the whole page and rewrites `<img>` tags after the theme has printed
+  them. It gives `fetchpriority="high"` to the first image of at least 50 000 px it meets,
+  which on most headers is the logo, and it sets `loading="lazy"` on every image after the
+  third, which can be the real LCP. A template filter that adds `loading="eager"` to the
+  LCP proves nothing until the served HTML is read: Elementor only keeps attributes that
+  are already in the markup, and a widget that prints its `<img>` with no `loading` attribute
+  gets one from the buffer. Read the logo and the LCP element in the served HTML. When the
+  logo carries the priority, the fix is
+  `add_filter( 'elementor/image-loading-optimization/min_priority_img_pixels', fn() => PHP_INT_MAX )`
+  plus explicit `loading="eager" fetchpriority="high"` on the LCP of each template.
+- **One LCP per viewport.** When the desktop and mobile LCP are different elements (a wide
+  banner that collapses on mobile, so the first card below it becomes the LCP), each may
+  carry `fetchpriority="high"`. Two high-priority images are a PERF-048 finding only when
+  both are LCP candidates at the same viewport. Name the viewport of each in the finding.
+
 **PERF-054/PERF-055 — finding the real LCP element, per template.** "The hero image is the
 LCP" is a guess, and guessing it produces the opposite of the intended fix: a card grid
 (a directory archive, a team/news strip) can put its LCP on the first row of CARDS, not on
@@ -348,6 +366,13 @@ knowing: passing `false` at enqueue is a no-op, so it cannot undo a `true` at re
 re-registration with no flag followed by a bare `wp_enqueue_script($h)` — the usual shape when a
 theme swaps a bundled library for a core handle — stays in `<head>`, which is the case this check
 exists for.
+
+Count blocking scripts from the **served HTML** (`curl` the page, read `<head>` before
+`</head>`), never from `document.head` in a loaded browser. Tag managers, chat widgets and
+lazy loaders insert `<script>` elements into `<head>` after load. Those scripts do not block
+rendering, and counting them reports a theme that defers everything as one that defers
+nothing. A head script is blocking only when the served tag has `src` and has no `defer`,
+`async` or `type="module"`.
 
 **PERF-052 — site-wide libraries.** For each third-party handle, find the template that uses
 it. If exactly one does, either move the enqueue into that template behind a conditional, or

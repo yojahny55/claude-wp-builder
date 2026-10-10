@@ -1,7 +1,7 @@
 ---
 description: Verify a demo directory, page or live URL — impeccable detector, scroll-walk screenshots per section and viewport, machine findings, and a seven-line critique written to demo/VERIFY.md
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
-argument-hint: "<demo-dir-or-file-path-or-url> [--positions N]"
+argument-hint: "<demo-dir-or-file-path-or-url> [--positions N] [--no-motion]"
 ---
 
 # WP Demo Verify
@@ -95,10 +95,32 @@ revision pinned by the loaded playwright-core's `browsers.json` is preferred ove
 cached one, and a mismatch is named in that line. `tests/checks/demo-verify-engines.sh` only
 exercises this pass when it finds a playwright-core: run it with
 `PLAYWRIGHT_CORE="$(npm root -g)/@playwright/test/node_modules/playwright-core"` to test the
-cross-engine path for real. A directory target walks every page. Output lands in
+cross-engine path for real.
+
+**`--no-motion`.** For a URL of an existing site the plugin did not build (a page-builder site,
+say) that never carried the motion engine. Without it every section blocks as `no-engine`, a
+true fact that says nothing about the layout, and the round fails for a reason that does not
+apply. With it the `no-engine` and `dead-scroll` judgments are not emitted; overflow, clipped
+copy, container-noop, the full-page shots and the Firefox pass still run. It is opt-in and
+never inferred: a converted plugin page that lost its engine must still fail, so do not pass it
+for a page `/wp-demo` or `/wp-yolo` built. A URL page with zero `[data-motion]` elements and no
+flag prints one line suggesting it.
+
+A directory target walks every page. Output lands in
 `<dir>/.verify/[<page>/]<width>/`, with `findings.json` and, per width, both
 `sheet.png` (full resolution, for a human who opens it directly) and `sheet.jpg`
 (downscaled to 1000px wide, quality 70 — the one to Read in Step 4).
+
+**Fractional widths.** Page builders emit breakpoints as integer pairs: `max-width: 767px`
+for mobile and `min-width: 768px` above it. At a fractional CSS width (browser zoom, or OS
+display scaling other than 100%: a 766px window at 110% is 767.27px) neither query matches,
+and the page falls back to its unqueried defaults. The integer shots above can never see it.
+So, in Chromium, the walk reads the page's same-origin stylesheets for `max-width: N` /
+`min-width: N+1` pairs (at most three), loads the page inside each (N, N+1) by launching with
+`--force-device-scale-factor=1.1` and a window sized until the CSS width read back lands in the
+gap (an edge it cannot land is skipped with a notice), and compares it with N and N+1. A page
+with only `min-width` queries, like a Tailwind one, has no gap and reports nothing.
+`--no-gaps` skips the pass.
 
 Exit codes: `0` nothing blocking — either no findings at all, or advisory ones
 only; `1` at least one blocking finding printed; `2` no usable browser; `3` the
@@ -127,7 +149,9 @@ branch: `/wp-demo` probes first and stops on 2.)
   failure this split exists to keep catching — not that the device is unreadable.
 - `no-engine` — the page carries no `data-motion` at all. Fails the round. A
   motionless page used to walk clean, because an empty frame signature could
-  never accumulate a stall.
+  never accumulate a stall. On a site the plugin did not build, this is expected
+  and not a defect: re-run with `--no-motion` (Step 2b). Never pass it for a page
+  the plugin built, where a missing engine is the failure being caught.
 - **`unobserved` is a per-section judgment; `no-engine` keeps a document-wide count.**
   The probe walks `[data-motion]` inside the walked section's own subtree, so an
   `unobserved` row is a fact about that section: it carries devices this harness
@@ -174,6 +198,12 @@ branch: `/wp-demo` probes first and stops on 2.)
   block sits outside it. A screen-reader span inside a carousel card is the usual
   case: it is 1px and shows in no screenshot. Give an ancestor inside the named box
   `position: relative`, usually the card.
+- **breakpoint-gap**: blocking. A `max-width: N` rule and a `min-width: N+1` rule leave the
+  fractional widths between them (zoom, display scaling) matched by neither, and the page
+  there differs from both N and N+1: it overflows, a box is more than 50% and 100px wider
+  than at either neighbour, or boxes hidden at both are visible. The row gives `width` (N),
+  the measured `viewport`, and up to five `culprits`; `gap-<N>.png` and `gap-<N>.jpg` sit
+  beside the sheets. Close the gap: `max-width: N.98px`, or range syntax `(width < N+1)`.
 - **clipped copy**: text taller than its own hidden-overflow box.
 
 ## Step 3.5: Undeclared inert controls

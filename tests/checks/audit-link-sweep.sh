@@ -6,6 +6,7 @@
 # asserts the limits, then pins the shared rule and the agents that must point at it.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md; wp_audit=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 tool=bin/link-sweep.mjs
@@ -149,7 +150,7 @@ grep -Fq 'never marks a broken one resolved' "$std" || fail "$std lost the resol
 grep -Fq "0 !== strpos( \$href, \$home_path . '/' )" skills/wp-cli-patterns/scripts/resolve-link-targets.php \
   || fail "resolver lost the subdirectory-install guard"
 # Every auditor is told, not only the two that were caught doing it.
-dispatch=$(awk '/^## Step 6:/{on=1} /^## Step 6.5:/{on=0} on' commands/wp-audit.md)
+dispatch=$(awk '/^## Step 6:/{on=1} /^## Step 6.5:/{on=0} on' "$wp_audit")
 grep -Fq 'Link and page sweeps against a site' <<<"$dispatch" || fail "/wp-audit's agent prompt lacks the sweep rule"
 grep -Fq 'crawler of your own' <<<"$dispatch" || fail "/wp-audit's agent prompt does not forbid improvised crawlers"
 grep -Fq 'audit-resolve-links-integration.sh' .github/workflows/ci.yml \
