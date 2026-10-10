@@ -19,7 +19,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-f=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; f=$EXPANDED
 [ -f "$f" ] || fail "$f is missing"
 [ -r "$f" ] || fail "$f exists but cannot be read"
 

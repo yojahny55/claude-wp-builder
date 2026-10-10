@@ -64,7 +64,7 @@ grep -Fq 'must not' <<<"$cap" \
 grep -Fq 'never in variants[]' "$n" \
   || fail "the schema does not record that the exemplar is never a variant"
 
-y=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; y=$EXPANDED
 s26=$(awk '/^## Step 2\.6:/,/^## Step 3:/' "$y")
 [ -n "$s26" ] || fail "no Step 2.6 region in wp-yolo"
 grep -Fq 'Convert a repeated card once, not once per copy.' <<<"$s26" \

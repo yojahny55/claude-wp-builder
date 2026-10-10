@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-f=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; f=$EXPANDED
 test -f "$f" || { echo "FAIL: $f missing"; exit 1; }
 grep -q 'argument-hint:' "$f" || { echo "FAIL: frontmatter"; exit 1; }
 for token in 'wp-normalize' 'yolo-manifest' 'checkpoint' '--yolo' '--careful' 'wp-cpt' 'wp-settings' 'wp-header' 'wp-footer' 'wp-section' 'wp-page 404' 'wp-page search' 'wp-seed' 'wp-finalize' 'Review'; do

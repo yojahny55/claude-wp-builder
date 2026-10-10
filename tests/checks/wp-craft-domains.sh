@@ -11,6 +11,7 @@
 # this plugin exists to refuse, so the refusal is asserted here.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; wp_yolo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 d=skills/wp-demo-craft/references/domains
@@ -86,7 +87,7 @@ grep -Eq '^Commit: [0-9a-f]{7,40}$' "$d/SOURCE.txt" \
 # decide colour or type. /wp-yolo never calls /wp-demo (same reason the browser
 # gate above is checked in both files, not just one), so it must run the same
 # classification itself, in the same terms.
-for f in commands/wp-demo.md commands/wp-yolo.md; do
+for f in commands/wp-demo.md "$wp_yolo"; do
   grep -Fq 'references/domains/domains.csv' "$f" || fail "$f does not read the domain table"
   grep -Fq '"domain"' "$f" || fail "$f does not record the domain in the manifest"
   grep -Fq 'two distinct keyword' "$f" || fail "$f does not state the two-keyword threshold"
@@ -154,7 +155,7 @@ grep -Fq 'no domain signal' "$r" \
 # has to hold on BOTH entry points or it is not a property of the manifest: with it
 # only in /wp-yolo, a second /wp-demo run silently overwrote an operator's
 # "name the domain directly" override with the match it had already been rejected for.
-for y in commands/wp-yolo.md commands/wp-demo.md; do
+for y in "$wp_yolo" commands/wp-demo.md; do
   grep -Fq 'already has `"domain"`' "$y" \
     || fail "$y does not check for an already-recorded domain before classifying"
   grep -Fq 'do not re-classify' "$y" \

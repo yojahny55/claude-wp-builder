@@ -504,7 +504,7 @@ grep -Fq '`"none"` records an earlier decline and is handled exactly like the no
 # Control: the step is inside wp-demo.md and NOT in wp-yolo.md, which must never
 # generate. A single shared pin would pass with the step in the wrong command.
 # Same comment-strip-and-collapse treatment, so this pin is immune to reflow too.
-y=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; y=$EXPANDED
 ys="$tmp/wp-yolo-stripped.md"
 perl -0pe 's{<!--.*?-->}{}gs; s{\s+}{ }g' "$y" > "$ys" \
   || fail "could not build the stripped copy of $y"

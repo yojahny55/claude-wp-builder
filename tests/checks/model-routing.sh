@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; wp_yolo=$EXPANDED
 # Every agent must declare a model tier; wp-yolo documents the routing contract.
 for f in agents/*.md; do
   m=$(sed -n "s/^model: //p" "$f")
@@ -14,6 +15,6 @@ grep -q "^model: haiku" agents/wp-cf7.md       || { echo "FAIL: wp-cf7 not haiku
 grep -q "^model: sonnet" agents/wp-template.md || { echo "FAIL: wp-template not sonnet"; exit 1; }
 grep -q "^model: sonnet" agents/wp-audit-geo.md || { echo "FAIL: wp-audit-geo not sonnet"; exit 1; }
 grep -q "^model: sonnet" agents/wp-agentic-surfaces.md || { echo "FAIL: wp-agentic-surfaces not sonnet"; exit 1; }
-grep -Eq "^## Model routing" commands/wp-yolo.md || { echo "FAIL: wp-yolo.md missing Model routing section"; exit 1; }
-grep -q "do \*\*not\*\* pass a \`model\` parameter" commands/wp-yolo.md || { echo "FAIL: wp-yolo.md missing no-override rule"; exit 1; }
+grep -Eq "^## Model routing" "$wp_yolo" || { echo "FAIL: wp-yolo.md missing Model routing section"; exit 1; }
+grep -q "do \*\*not\*\* pass a \`model\` parameter" "$wp_yolo" || { echo "FAIL: wp-yolo.md missing no-override rule"; exit 1; }
 echo PASS

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-f=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; f=$EXPANDED
 for token in 'wp-finalize' 'auto-fix|auto fix' 'block' 'Review' 're-verify|re-run'; do
   grep -Eqi "$token" "$f" || { echo "FAIL: wp-yolo gate missing '$token'"; exit 1; }
 done
