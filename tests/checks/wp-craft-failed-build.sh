@@ -5,6 +5,7 @@
 # five of seven rubric lines shipped with the shortfall as a footnote.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-section.md; wp_section=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; wp_yolo=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; wp_init=$EXPANDED
@@ -18,7 +19,7 @@ grep -Fq 'is not a deliverable' "$d" \
   || fail "$d does not say a failed craft build is not a deliverable"
 
 # Every command that builds on a demo must refuse a failed one.
-for c in "$wp_init" commands/wp-section.md "$wp_yolo"; do
+for c in "$wp_init" "$wp_section" "$wp_yolo"; do
   grep -Fq 'demo/FAILED.md' "$c" \
     || fail "$c does not stop on demo/FAILED.md, so a theme can be built from an unverified demo"
 done

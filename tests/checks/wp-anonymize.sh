@@ -39,7 +39,7 @@ need() { printf '%s' "$flat" | grep -Fq -- "$1" || fail "$2"; }
 # or unreadable file aborts the script with a raw "No such file or directory" -- no FAIL:
 # line, and before a single assertion has run. Measured. In CI that lands inside a ::group::
 # among a hundred other checks with nothing in it naming the contract file that went missing.
-c=commands/wp-clone.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-clone.md; c=$EXPANDED
 [ -f "$c" ] || fail "$c is missing -- /wp-anonymize's contract depends on /wp-clone naming it"
 [ -r "$c" ] || fail "$c exists but cannot be read"
 cflat=$(tr '\n\t\r' ' ' < "$c" | tr -s ' ')

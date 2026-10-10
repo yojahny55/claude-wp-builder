@@ -13,6 +13,7 @@
 #    reported verification they could not run, and the orchestrator re-ran it.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-section.md; wp_section=$EXPANDED
 fail() { echo "FAIL: $1"; exit 1; }
 
 # --- 3. an agent told to run a shell must have one ------------------------
@@ -109,7 +110,7 @@ fi
 grep -Fq '3+ times, or on 2+ distinct pages' skills/wp-tailwind-system/SKILL.md \
   || fail "the ladder's cross-section criterion moved; this check's premise needs rechecking"
 
-s=commands/wp-section.md
+s=$wp_section
 grep -Fq '**`--defer-promotion` flag**' "$s" \
   || fail "wp-section has no --defer-promotion flag"
 grep -Fq -e '--defer-promotion` suppresses Agent 3 on the `tailwind` path only' "$s" \

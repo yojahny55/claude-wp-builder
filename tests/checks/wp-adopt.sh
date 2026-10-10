@@ -125,11 +125,15 @@ grep -Fq 'forbid writes under `code_scope.read_only`' "$wp_audit" || fail "wp-au
 grep -Fq 'dispatch `wp-audit-rankmath` only when `stack.seo` is `rankmath`' "$wp_audit" \
   || fail "wp-audit would dispatch Rank Math onto another SEO plugin"
 grep -Fq 'do not list `seo-by-rank-math`' "$wp_audit" || fail "wp-audit Step 4 still offers Rank Math beside another SEO plugin"
+. tests/checks/lib/expand-command.sh
 for c in wp-audit wp-debug wp-clone; do
-  grep -Fq '${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt.md' "commands/$c.md" || fail "$c does not offer adoption"
+  src=commands/$c.md
+  # /wp-clone keeps the adoption offer in a step reference, so read it expanded.
+  if [ "$c" = wp-clone ]; then expand_command "$src"; src=$EXPANDED; fi
+  grep -Fq '${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt.md' "$src" || fail "$c does not offer adoption"
   # A literal install path resolves only on the machine it was typed on.
   # Strip the correct references, then any path left ending in /commands/wp-adopt.md is literal.
-  sed 's#${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt\.md##g' "commands/$c.md" | grep -Eq '/commands/wp-adopt\.md' \
+  sed 's#${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt\.md##g' "$src" | grep -Eq '/commands/wp-adopt\.md' \
     && fail "$c points at wp-adopt.md through a literal path"
 done
 for a in security seo a11y performance practices geo ux; do

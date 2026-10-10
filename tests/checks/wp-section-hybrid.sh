@@ -4,8 +4,9 @@
 # trailing-flex overlay the cinematic starter's front-page.php renders, not a standalone group.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-section.md; wp_section=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; wp_init=$EXPANDED
-f=commands/wp-section.md
+f=$wp_section
 fail() { echo "FAIL: $*"; exit 1; }
 
 grep -Fq -- '--hybrid' "$f" || fail "$f does not parse --hybrid"

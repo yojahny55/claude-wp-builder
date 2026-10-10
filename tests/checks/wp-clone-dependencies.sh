@@ -13,7 +13,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-f=commands/wp-clone.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-clone.md; f=$EXPANDED
 [ -f "$f" ] || fail "$f is missing"
 # `--` before the pattern: two needles here start with a dash (`--version=`,
 # `-dependencies.md`) and grep parses those as options otherwise, failing with a usage

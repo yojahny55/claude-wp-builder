@@ -14,7 +14,7 @@ fail() { echo "FAIL: $*"; exit 1; }
 TMPDIR_ISO="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_ISO"' EXIT
 
-f=commands/wp-clone.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-clone.md; f=$EXPANDED
 [ -f "$f" ] || fail "$f is missing"
 need() { grep -Fq "$1" "$f" || fail "$f $2"; }
 
