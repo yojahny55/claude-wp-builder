@@ -51,7 +51,7 @@ grep -Fq 'signature move' "$d" \
 # multi-page path builds craft blind, which is exactly how the 12,000px page with
 # an empty first screen shipped. The only verification a yolo run otherwise reaches
 # is /wp-responsive-check, whose findings are folded into a review list, not a gate.
-y=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; y=$EXPANDED
 grep -Fq -- 'demo-verify.mjs" --probe' "$y" || fail "$y does not run the probe in craft mode"
 grep -Fq 'only exit 0 continues' "$y" || fail "$y proceeds to build when the craft probe fails"
 grep -Fq 'Either way **stop**' "$y" || fail "$y does not stop the run on a missing browser"

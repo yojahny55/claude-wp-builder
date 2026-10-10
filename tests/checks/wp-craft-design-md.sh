@@ -48,7 +48,7 @@ grep -Eq '^  container: "[0-9.]+(px|rem|em)"$' "$p" \
 # The handoff: a DESIGN.md the demo was built from is worth nothing if /wp-init
 # scrapes the demo's :root instead of reading it, or leaves it behind in demo/.
 i=commands/wp-init.md
-y=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; y=$EXPANDED
 grep -Fq 'demo/DESIGN.md' "$i" || fail "$i does not read demo/DESIGN.md"
 grep -Eqi 'before .*:root|first.*:root|instead of .*:root' "$i" || fail "$i does not prefer DESIGN.md over the :root scrape"
 grep -Fq 'DESIGN.md' "$y" || fail "$y does not carry the DESIGN.md contract into the whole-site build"

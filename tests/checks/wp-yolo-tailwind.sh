@@ -25,7 +25,7 @@
 # Direction and literal paths from here on; grep -F wherever a fixed string will
 # do, so the byte/character distinction cannot come back.
 set -euo pipefail
-f=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; f=$EXPANDED
 t=commands/wp-tailwindify.md
 # agents/wp-tailwind.md is here for exactly one assertion, and it is not a
 # digression: Step 2.6's skip rule is "utilities and no project stylesheet", and

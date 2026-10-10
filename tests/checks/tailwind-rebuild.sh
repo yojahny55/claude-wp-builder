@@ -79,7 +79,7 @@ for c in wp-section wp-header wp-footer wp-page wp-cpt; do
 done
 
 # /wp-yolo: once, before finalize / responsive-check / the parity gate
-f=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; f=$EXPANDED
 grep -Fq 'bin/tailwind-rebuild.sh' "$f" || fail "$f never recompiles Tailwind before its gate"
 awk '/tailwind-rebuild.sh/{seen=1} /^\*\*`\/wp-responsive-check`\*\*|^[0-9]+\. \*\*`\/wp-responsive-check`\*\*/{ if(!seen){exit 1} }' "$f" \
   || fail "$f runs /wp-responsive-check before rebuilding Tailwind"

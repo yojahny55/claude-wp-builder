@@ -28,7 +28,7 @@ r=agents/wp-audit-rankmath.md
 a=agents/wp-acf.md
 f=commands/wp-finalize.md
 t=agents/wp-template.md
-y=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; y=$EXPANDED
 for x in "$r" "$a" "$f" "$t" "$y"; do test -f "$x" || fail "$x missing"; done
 
 # D1 — options set, nothing emitted. Configuring is not evidence of output.

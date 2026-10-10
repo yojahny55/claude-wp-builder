@@ -16,7 +16,7 @@ cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
 init=commands/wp-init.md
-yolo=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; yolo=$EXPANDED
 starter=starter-theme/__tailwind__
 main_css="$starter/assets/css/src/tailwindcss/main.css"
 for f in "$init" "$yolo" "$main_css" "$starter/functions.php"; do

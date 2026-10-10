@@ -14,7 +14,7 @@ fail() { echo "FAIL: $1"; exit 1; }
 
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
 audit=$EXPANDED
-yolo=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; yolo=$EXPANDED
 geo=agents/wp-audit-geo.md
 seo=agents/wp-audit-seo.md
 sec=agents/wp-audit-security.md

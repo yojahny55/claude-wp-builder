@@ -8,7 +8,7 @@ cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
 d=commands/wp-demo.md
-y=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; y=$EXPANDED
 i=commands/wp-init.md
 p=commands/wp-polish.md
 

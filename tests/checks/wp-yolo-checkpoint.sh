@@ -4,7 +4,7 @@
 # command name as the --yolo flag and rolled straight into Step 4.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-f=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; f=$EXPANDED
 fail() { echo "FAIL: $1"; exit 1; }
 
 grep -q "^allowed-tools:.*AskUserQuestion" "$f" || fail "wp-yolo cannot ask: AskUserQuestion missing from allowed-tools"

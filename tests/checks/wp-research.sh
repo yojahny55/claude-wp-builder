@@ -227,7 +227,7 @@ grep -Fq "the client's real sentences from \`demo/RESEARCH.md\`" "$df" \
 #    change in particular exists in two files; editing one and not the other
 #    makes the two entry points classify the same project differently.
 # ---------------------------------------------------------------------------
-y=commands/wp-yolo.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; y=$EXPANDED
 yf=$(flat "$y")
 
 grep -Fq 'records `"research": "none"`, skip in one line' "$yf" \
