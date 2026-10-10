@@ -8,6 +8,7 @@
 # would silently request square heroes and nothing else would notice.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
@@ -525,7 +526,7 @@ grep -Fq 'never generates images' "$ys" \
 #    already bitten this branch twice: deleting either rule alone must
 #    redden only its own pin. Same comment-strip-and-collapse treatment as
 #    assertion 8/9, so a pure reflow of the prose cannot fail this either.
-sm=commands/wp-seed.md
+sm=$wp_seed
 sms="$tmp/wp-seed-stripped.md"
 perl -0pe 's{<!--.*?-->}{}gs; s{\s+}{ }g' "$sm" > "$sms" \
   || fail "could not build the stripped copy of $sm"

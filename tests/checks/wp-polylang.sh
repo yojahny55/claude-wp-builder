@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; wp_init=$EXPANDED
 s=skills/wp-polylang/SKILL.md
 test -f "$s" || { echo "FAIL: $s missing"; exit 1; }
@@ -204,7 +205,7 @@ grep -q "get_theme_mod( 'nav_menu_locations'" "$imp" \
 grep -q "set_theme_mod( 'nav_menu_locations'" "$imp" \
   || { echo "FAIL: pll-import.php's menu branch never backfills 'nav_menu_locations' -- Polylang's filter has nothing to override on a site whose menu was assigned only through the 'polylang' option"; exit 1; }
 
-seed=commands/wp-seed.md
+seed=$wp_seed
 grep -q "menu location assign" "$seed" \
   || { echo "FAIL: wp-seed.md's polylang menu phase never registers a location through 'wp menu location assign' -- it only writes the 'polylang' option, the same gap pll-import.php now guards against"; exit 1; }
 

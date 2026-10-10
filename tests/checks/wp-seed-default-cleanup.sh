@@ -18,7 +18,8 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/../.." || exit 1
-SEED="commands/wp-seed.md"
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
+SEED="$wp_seed"
 fails=0
 fail() { printf 'FAIL: %s\n' "$1"; fails=$((fails + 1)); }
 
