@@ -2,6 +2,7 @@
 # /wp-section must route its CSS agent by template. On tailwind it dispatches
 # wp-tailwind in author mode; on basic it keeps wp-css unchanged.
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-section.md; wp_section=$EXPANDED
 f=$wp_section
 
