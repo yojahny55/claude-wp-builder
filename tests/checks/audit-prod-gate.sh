@@ -11,6 +11,7 @@
 # commands, and greps the contract into every agent that sends live requests.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md; wp_audit=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 gate=bin/prod-gate.sh
@@ -139,8 +140,8 @@ grep -Fq '### Production sits behind a WAF: same measurements, one request at a 
   || fail "wp-audit-standards lost the production pacing rule"
 grep -Fq 'the pace, never the measurement' skills/wp-audit-standards/SKILL.md \
   || fail "wp-audit-standards no longer says the gate leaves measurement unchanged"
-grep -Fq 'prod-gate.sh' commands/wp-audit.md || fail "wp-audit.md does not pass the gate to its agents"
-grep -Fq 'Gate dir: <scratch>/prod-gate' commands/wp-audit.md || fail "wp-audit.md dispatch prompt lost the gate dir"
+grep -Fq 'prod-gate.sh' "$wp_audit" || fail "wp-audit.md does not pass the gate to its agents"
+grep -Fq 'Gate dir: <scratch>/prod-gate' "$wp_audit" || fail "wp-audit.md dispatch prompt lost the gate dir"
 for a in security seo a11y performance geo ux; do
   grep -Fq 'Requests to a production host go through `bin/prod-gate.sh`' "agents/wp-audit-$a.md" \
     || fail "agents/wp-audit-$a.md does not route production requests through the gate"

@@ -14,7 +14,8 @@ set -uo pipefail
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
 fail() { echo "FAIL: $*"; exit 1; }
 
-audit=commands/wp-audit.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
+audit=$EXPANDED
 standards=skills/wp-audit-standards/SKILL.md
 perf=agents/wp-audit-performance.md
 

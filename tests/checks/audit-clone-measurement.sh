@@ -7,7 +7,8 @@ set -euo pipefail
 fail() { echo "FAIL: $1"; exit 1; }
 cd "$(dirname "$0")/../.." || fail "cannot cd to the repository root"
 
-audit=commands/wp-audit.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
+audit=$EXPANDED
 has() { grep -Fq -- "$2" "$1" || fail "$1 lacks: $2"; }
 
 has "$audit" "### Clone-safe versus production-only measurement"

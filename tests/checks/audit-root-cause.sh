@@ -4,6 +4,7 @@
 # severe one, which lists the rest under also_affects.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md; wp_audit=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 cat >"$tmp/run.json" <<'JSON'
@@ -19,5 +20,5 @@ n=$(node -e "const fs=require('fs');const d='$tmp/o';console.log(JSON.parse(fs.r
 grep -Fq 'same cause: SEC-001 site, GEO-A01 site' "$tmp"/o/*.md || fail "the folded checks are not named in the report"
 grep -Fq 'SEO-002' "$tmp"/o/*.md || fail "the most severe finding did not become the parent"
 # Contract in the dispatch prompt and aggregation step.
-grep -Fq 'Root cause:' commands/wp-audit.md || fail "finding format lacks Root cause"
+grep -Fq 'Root cause:' "$wp_audit" || fail "finding format lacks Root cause"
 echo PASS

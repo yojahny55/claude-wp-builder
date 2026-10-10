@@ -12,7 +12,8 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-c=commands/wp-audit.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
+c=$EXPANDED
 m=bin/lib/manifest.mjs
 for f in "$c" "$m"; do [ -f "$f" ] || fail "$f is missing"; done
 need() { grep -Fq -- "$1" "$c" || fail "$c $2"; }

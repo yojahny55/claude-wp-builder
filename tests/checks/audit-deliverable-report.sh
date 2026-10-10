@@ -18,7 +18,8 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-c=commands/wp-audit.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
+c=$EXPANDED
 r=bin/audit-report.mjs
 for f in "$c" "$r"; do
   [ -f "$f" ] || fail "$f is missing"

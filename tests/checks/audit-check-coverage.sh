@@ -14,7 +14,8 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-c=commands/wp-audit.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
+c=$EXPANDED
 m=bin/lib/manifest.mjs
 [ -f "$c" ] || fail "$c is missing"
 [ -f "$m" ] || fail "$m is missing"
