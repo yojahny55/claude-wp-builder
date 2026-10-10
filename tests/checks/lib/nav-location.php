@@ -20,6 +20,7 @@ function wp_unslash( $s ) { return $s; }
 function esc_attr( $s ) { return htmlspecialchars( (string) $s, ENT_QUOTES ); }
 function wp_kses( $s, $allowed ) { return $s; }
 function get_field( $name, $id = false ) { return ''; }
+function is_ssl() { return false; }
 
 if ( count( $argv ) !== 4 ) {
 	fwrite( STDERR, "usage: php nav-location.php <file> <lang> <base>\n" );

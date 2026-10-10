@@ -32,6 +32,9 @@ tw=starter-theme/__tailwind__/functions.php
 [ "$(grep -rcE "^function $guard_fn\(" starter-theme --include=*.php | awk -F: '{s+=$2} END{print s+0}')" = 1 ] \
   || fail "the starters do not define $guard_fn() exactly once"
 grep -qE "^function $guard_fn\(" "$tw" || fail "$tw does not define $guard_fn(), which its meta description returns on"
+# Reads the agent's fenced PHP as source: from `function <name>(` to the first `;` after
+# `return`. Prose between the two would be read as code; the empty-body guard below fails
+# rather than comparing nothing, and a mismatch prints both bodies.
 body() { # <file> <function-name-regex>: the guard's return expression, whitespace-normalised
   awk -v fn="$2" '$0 ~ "function " fn "\\(" {f=1; next} f && /return/{r=1} r{print} r && /;/{exit}' "$1" \
     | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//'

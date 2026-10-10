@@ -164,12 +164,13 @@ in_skill_docs '`unknown` is not `catalog`' || fail "the GEO skill docs do not sa
 in_skill_docs 'the auditor scores each page' && fail "the GEO skill docs still claim the auditor scores the citability rubric"
 
 # The minimum robots body is the table's ALLOW rows, and the fixer writes the same list.
-allow=$(grep -oE '^\| `[A-Za-z-]+` \|[^|]*\| ALLOW \|' "$skill" | sed -E 's/^\| `([A-Za-z-]+)`.*/\1/' | sort)
+allow=$(grep -oE '^\| `[A-Za-z-]+` \|[^|]*\| ALLOW \|' "$skill" | sed -E 's/^\| `([A-Za-z-]+)`.*/\1/' | sort || true)
 [ -n "$allow" ] || fail "$skill has no ALLOW rows in its crawler table"
 for bot in $allow; do
   grep -qx "User-agent: $bot" "$surfaces" || fail "$skill allows $bot in its table but $surfaces leaves it out of the robots body"
 done
-fixer_bots=$(grep -oE '\$bots = array\([^)]*\)' "$fixer" | grep -oE "'[A-Za-z-]+'" | tr -d "'" | sort)
+fixer_bots=$(grep -oE '\$bots = array\([^)]*\)' "$fixer" | grep -oE "'[A-Za-z-]+'" | tr -d "'" | sort || true)
+[ -n "$fixer_bots" ] || fail "$fixer has no \$bots = array(...) robots list"
 [ "$allow" = "$fixer_bots" ] || fail "the skill's ALLOW list and the fixer's robots \$bots list differ:
 skill: $(echo $allow)
 fixer: $(echo $fixer_bots)"
