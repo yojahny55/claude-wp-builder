@@ -270,7 +270,7 @@ an empty field, so a secret Stripe rotates is saved to the database, and SEC-040
 A command is read whole on every run, so a long step keeps its heading and entry condition in
 the command and moves its detail to `skills/<command>-run/references/<step>.md`, read at that
 step (`/wp-audit` with `wp-audit-run`, `/wp-yolo` with `wp-yolo-run`, `/wp-demo` with
-`wp-demo-run`, and `/wp-init` with `wp-init-run`, are the model). Not a `commands/` subfolder: those load as extra slash commands.
+`wp-demo-run`, `/wp-init` with `wp-init-run`, and `/wp-create` with `wp-create-run`, are the model). Not a `commands/` subfolder: those load as extra slash commands.
 Checks read such a command through `tests/checks/lib/expand-command.sh`, which splices in only
 the command's own `<command>-run` references.
 
