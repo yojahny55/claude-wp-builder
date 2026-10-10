@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; wp_init=$EXPANDED
 s=skills/wp-polylang/SKILL.md
 test -f "$s" || { echo "FAIL: $s missing"; exit 1; }
 head -1 "$s" | grep -q '^---$' || { echo "FAIL: no frontmatter"; exit 1; }
@@ -103,8 +104,8 @@ for starter in __tailwind__ __cinematic__; do
 done
 
 # /wp-init must offer the choice, and record it.
-grep -q '_i18n-variants' "commands/wp-init.md" || { echo "FAIL: /wp-init never installs a Polylang i18n variant"; exit 1; }
-grep -qi 'polylang' "commands/wp-init.md" || { echo "FAIL: /wp-init does not mention Polylang at all"; exit 1; }
+grep -q '_i18n-variants' "$wp_init" || { echo "FAIL: /wp-init never installs a Polylang i18n variant"; exit 1; }
+grep -qi 'polylang' "$wp_init" || { echo "FAIL: /wp-init does not mention Polylang at all"; exit 1; }
 
 # The two i18n models must not be described as mutually exclusive any more.
 grep -q 'no WPML, no Polylang' "skills/wp-bilingual/SKILL.md" && {
@@ -176,7 +177,7 @@ printf '%s' "$l2" | grep -qF 'under `polylang`: bare `primary`, `footer`' \
 # The suffix model serves both languages from one URL off ?lang=/cookie, so a
 # crawler only ever sees the primary language and there is nowhere to store a
 # translated title. It stays available as a toggle; it is not the default.
-s07=$(awk '/^## Step 0.7:/,/^## Pre-Step:/' commands/wp-init.md)
+s07=$(awk '/^## Step 0.7:/,/^## Pre-Step:/' "$wp_init")
 [ -n "$s07" ] || { echo "FAIL: no Step 0.7 region in commands/wp-init.md"; exit 1; }
 printf '%s' "$s07" | grep -qF 'Default: `polylang`' \
   || { echo "FAIL: /wp-init Step 0.7 does not default to polylang — a bilingual site scaffolded on Enter gets the suffix model, whose second language cannot be indexed"; exit 1; }

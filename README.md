@@ -473,6 +473,7 @@ commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. 
 | `wp-audit-run` | The step detail of `/wp-audit` — one reference file per long step, read at that step so the command stays a short map |
 | `wp-yolo-run` | The step detail of `/wp-yolo` — one reference file per long step, read at that step so the command stays a short map |
 | `wp-demo-run` | The step detail of `/wp-demo` — one reference file per long step, read at that step so the command stays a short map |
+| `wp-init-run` | The step detail of `/wp-init` — one reference file per long step, read at that step so the command stays a short map |
 | `wp-contributing` | Contributing to this plugin — the layer rules, the grep-gate test style, and the PR and release rituals |
 
 ### Agents (specialized subagents dispatched by commands)

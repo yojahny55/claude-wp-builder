@@ -22,7 +22,7 @@ fail() { echo "FAIL: $*"; exit 1; }
 
 f=agents/wp-acf.md
 skill=skills/wp-bilingual/SKILL.md
-init=commands/wp-init.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; init=$EXPANDED
 for x in "$f" "$skill" "$init"; do
   [ -s "$x" ] || fail "$x is missing or empty"
   [ -r "$x" ] || fail "$x exists but cannot be read"

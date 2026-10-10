@@ -10,7 +10,7 @@ fail() { echo "FAIL: $*"; exit 1; }
 
 d=$wp_demo
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; y=$EXPANDED
-i=commands/wp-init.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; i=$EXPANDED
 p=commands/wp-polish.md
 
 # --- The flags and the recorded decision. -----------------------------------
