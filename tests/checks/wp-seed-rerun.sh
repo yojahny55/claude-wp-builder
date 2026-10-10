@@ -10,9 +10,10 @@
 # must be written by the same command that creates the record.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
-f=commands/wp-seed.md
+f=$wp_seed
 [ -f "$f" ] || fail "$f is missing"
 
 need() { grep -Fq "$1" "$f" || fail "$f $2"; }

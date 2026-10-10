@@ -23,9 +23,11 @@ grep -Fq '[references/audit-gotchas.md](references/audit-gotchas.md)' "$k" || fa
 
 # §14 -- the gate and the per-term key are written together, in the CORRECT block.
 correct=$(awk '/\/\/ CORRECT/{on=1} on{print} on && /^```$/{exit}' "$g")
+[ -n "$correct" ] || fail "could not extract the CORRECT block from $g"
 grep -Fq "tax_category_custom_robots'] = 'on'" <<<"$correct" || fail "$g CORRECT block does not set the custom-robots gate"
 grep -Fq "tax_category_robots_' . \$term_id" <<<"$correct" || fail "$g CORRECT block does not set the per-category robots key"
 wrong=$(awk '/\/\/ WRONG/{on=1} on && /\/\/ CORRECT/{exit} on{print}' "$g")
+[ -n "$wrong" ] || fail "could not extract the WRONG block from $g"
 grep -Fq 'tax_category_custom_robots' <<<"$wrong" && fail "$g WRONG block sets the gate, so it no longer shows the failure"
 grep -Fq 'saved in the same `update_option` call' "$k" || fail "$k does not say the gate and the key are written together"
 
@@ -67,7 +69,7 @@ grep -Fq "\`wp-audit-rankmath\`'s Steps 1 to 15" "$k" || fail "$k does not hand 
 grep -Fq 'stop when the titles print' "$k" || fail "$k verification has no stop condition"
 
 # One term for one setting, and the wrapper is defined.
-grep -Eq 'Title Formulas|\| Formula \|' "$k" "$s" && fail "the SEO skill calls title templates formulas again"
+grep -Eq 'Title Formulas|[|] Formula [|]' "$k" "$s" && fail "the SEO skill calls title templates formulas again"
 grep -Fq '`$WP` throughout is the WP-CLI wrapper' "$k" || fail "$k uses \$WP without saying what it is"
 
 # llms.txt and AI-crawler policy are the GEO skill's, and the description says so.

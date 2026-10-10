@@ -3,13 +3,14 @@
 # and whatever it invents has to be listed for the client.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 
 # Flatten before matching multi-word prose: a line wrap inside one of these phrases
 # would silently break the plain grep, the exact failure mode the sibling checks
 # (wp-research.sh, design-value-transfer.sh, wp-tailwind-migrate.sh) already guard against.
 flat() { tr '\n' ' ' | sed -e 's/  */ /g'; }
 
-s=commands/wp-seed.md
+s=$wp_seed
 [ -f "$s" ] || { echo "FAIL: $s missing"; exit 1; }
 t=$(flat < "$s")
 

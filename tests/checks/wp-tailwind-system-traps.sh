@@ -40,7 +40,7 @@ grep -Fq '`max-[759px]` is `≤ 759`' "$bp" \
 grep -Fq 'references/breakpoints.md' "$skill" || fail "$skill no longer links references/breakpoints.md"
 
 # 2. Every plugin script the skill or its references name is rooted at the plugin.
-bare=$(cat "$skill" "$dir"/references/*.md | grep -oE '.{0,22}bin/[a-z-]+\.(sh|mjs)' | grep -v 'CLAUDE_PLUGIN_ROOT}\?/bin/' || true)
+bare=$(cat "$skill" "$dir"/references/*.md | grep -oE '.{0,22}bin/[a-z-]+\.(sh|mjs)' | grep -vF '${CLAUDE_PLUGIN_ROOT}/bin/' || true)
 [ -z "$bare" ] || fail "a script is called by a bare relative bin/ path, which exits 127 from the user's project: $bare"
 grep -Fq 'theme-template-check.mjs" <theme-dir> --rule widgets' "$dir/references/components.md" \
   || fail "components.md calls the widget gate without a theme directory — the script exits 2"
