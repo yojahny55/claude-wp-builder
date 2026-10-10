@@ -13,6 +13,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; wp_finalize=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 s=skills/wp-cli-patterns/SKILL.md
@@ -75,7 +76,7 @@ sweep=$(grep -F 'SELECT COUNT(*) FROM $($WP db prefix)posts WHERE post_author = 
 [ -n "$sweep" ] || fail "$s has no post_author sweep"
 case "$sweep" in *"post_status != 'auto-draft'"*"post_type != 'nav_menu_item'"*) ;; *)
   fail "$s's author sweep lost one of its two exclusions (auto-draft, nav_menu_item)" ;; esac
-grep -qF -- "$(printf '%s' "$sweep" | sed 's/^[[:space:]]*//')" commands/wp-finalize.md \
+grep -qF -- "$(printf '%s' "$sweep" | sed 's/^[[:space:]]*//')" "$wp_finalize" \
   || fail "commands/wp-finalize.md's author check no longer matches the sweep in $s"
 
 # --- $WP comes from the manifest, never from a guess --------------------------------

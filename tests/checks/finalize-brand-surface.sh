@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $1"; exit 1; }
 
-f=commands/wp-finalize.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; f=$EXPANDED
 [ -f "$f" ] || fail "$f is missing"
 
 grep -Eiq 'favicon|site.icon' "$f" || fail "$f: no favicon/site-icon check in the finalize checklist"

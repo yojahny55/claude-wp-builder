@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $1"; exit 1; }
 
 skill=skills/wp-audit-geo-standards/SKILL.md
@@ -9,7 +10,7 @@ fixer=agents/wp-agentic-surfaces.md
 audit=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; yolo=$EXPANDED
-finalize=commands/wp-finalize.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; finalize=$EXPANDED
 # The catalog, the surface specs and the citability rubric live in references/; SKILL.md keeps
 # the scoring model, applicability, the crawler allowlist and the verification loop.
 refs=skills/wp-audit-geo-standards/references

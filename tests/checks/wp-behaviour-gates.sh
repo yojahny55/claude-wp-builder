@@ -12,7 +12,6 @@
 # becomes a deliberate act instead of a silent one.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-cd "$(dirname "$0")/../.."
 
 # These assert on prose, deliberately: this repo's contracts ARE prose, and the
 # house style is a grep that fails when the wording defining a rule disappears
@@ -26,7 +25,7 @@ fail() { echo "FAIL: $1"; exit 1; }
 
 r=agents/wp-audit-rankmath.md
 a=agents/wp-acf.md
-f=commands/wp-finalize.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; f=$EXPANDED
 t=agents/wp-template.md
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; y=$EXPANDED
 for x in "$r" "$a" "$f" "$t" "$y"; do test -f "$x" || fail "$x missing"; done

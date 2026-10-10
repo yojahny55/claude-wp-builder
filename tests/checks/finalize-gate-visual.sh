@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-f=commands/wp-finalize.md
+cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; f=$EXPANDED
 for token in 'site_logo' 'inner_hero_image' 'claude-in-chrome' 'getComputedStyle' 'hard delta|hard-delta' 'soft delta|soft-delta' 'skip'; do
   grep -Eqi "$token" "$f" || { echo "FAIL: finalize missing '$token'"; exit 1; }
 done
