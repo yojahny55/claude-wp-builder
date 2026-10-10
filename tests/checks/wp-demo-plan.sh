@@ -3,8 +3,9 @@
 # them per page, /wp-yolo says so, and a hand-edited page still gets classified.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 
-d=commands/wp-demo.md
+d=$wp_demo
 n=agents/wp-normalize.md
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; y=$EXPANDED
 for f in "$d" "$n" "$y"; do test -f "$f" || { echo "FAIL: $f missing"; exit 1; }; done

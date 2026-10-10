@@ -12,11 +12,12 @@
 # this, the refuse list that used to live in taste.md is enforced nowhere.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; wp_yolo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 c=commands/wp-demo-verify.md
-d=commands/wp-demo.md
+d=$wp_demo
 
 grep -Eq 'impeccable@4' "$c" || fail "$c does not pin the detector to the real major version (4, not the nonexistent 1)"
 grep -Fq -- '--json' "$c" || fail "$c does not ask the detector for JSON"

@@ -4,6 +4,7 @@
 # a check that only asserted "the file exists" would pass on an empty stub.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 s=skills/wp-demo-craft/SKILL.md
@@ -154,18 +155,18 @@ grep -Eqi 'trend roundup|becoming the next default|next default' "$r/taste.md" \
 # The inventory is a numbered sub-step with a named destination. The bare phrase
 # 'Assets on disk' is satisfied by any parenthetical that mentions it in passing,
 # so pin both halves: the step that does the work, and the heading it writes to.
-grep -Fq '**3.5. Inventory the assets on disk.**' commands/wp-demo.md \
+grep -Fq '**3.5. Inventory the assets on disk.**' "$wp_demo" \
   || fail "commands/wp-demo.md has no numbered step that inventories the assets under docs/, so a real logo is never wired in"
-grep -Fq 'under `## Assets on disk`' commands/wp-demo.md \
+grep -Fq 'under `## Assets on disk`' "$wp_demo" \
   || fail "commands/wp-demo.md does not write the asset inventory into demo/BRIEF.md under ## Assets on disk"
 # The exemption SENTENCE, not the phrase. Both halves of the old pair were
 # defeated together: the positive half matched 'placeholder-content clauses'
 # anywhere in a 300-line file, and the negative half matched the old exact
 # string — so any rewording that was not a verbatim revert slipped through both.
 # Requiring the clause list and the exemption in one line is what a reword breaks.
-grep -Eq 'single-file.*placeholder-content clauses, which' commands/wp-demo.md \
+grep -Eq 'single-file.*placeholder-content clauses, which' "$wp_demo" \
   || fail "commands/wp-demo.md's craft exemption does not list the placeholder-content clauses, so craft inherits Step 4's placeholder logo and placeholder image"
-grep -Fq 'no-CDN and `:root` token clauses' commands/wp-demo.md \
+grep -Fq 'no-CDN and `:root` token clauses' "$wp_demo" \
   && fail "commands/wp-demo.md still carries the old exemption line, so craft inherits the placeholder clauses whatever else the file says"
 # The ship blocker. Its bullet survives a negation that keeps the opening clause
 # intact — '…"TBD" in rendered text **is acceptable in rounds one and two**' — so

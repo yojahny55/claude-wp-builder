@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 
 # The interior-page floor.
 #
@@ -17,7 +19,7 @@ fail() { echo "FAIL: $*"; exit 1; }
 
 comp=skills/wp-demo-craft/references/compositions.md
 dev=skills/wp-demo-craft/references/devices.md
-demo=commands/wp-demo.md
+demo=$wp_demo
 verify=bin/demo-verify.mjs
 
 for f in "$comp" "$dev" "$demo" "$verify"; do [ -f "$f" ] || fail "$f is missing"; done

@@ -8,6 +8,7 @@
 # a reflow cannot fail the build and a code comment cannot satisfy a pin.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 tmp=$(mktemp -d)
@@ -157,7 +158,7 @@ grep -Fq 'It is **never** called `domain`' "$af" \
 # ---------------------------------------------------------------------------
 # C. /wp-demo Step 2.4: position, branch order, and the READ half of "none".
 # ---------------------------------------------------------------------------
-d=commands/wp-demo.md
+d=$wp_demo
 df=$(flat "$d")
 
 grep -Fq '## Step 2.4: Research' "$df" || fail "$d has no Step 2.4"

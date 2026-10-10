@@ -4,9 +4,10 @@
 # nobody noticed.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
-d=commands/wp-demo.md
+d=$wp_demo
 grep -Fq -- 'demo-verify.mjs" --probe' "$d" || fail "$d does not run the probe"
 grep -Eqi 'exit(s| code)? 2' "$d" || fail "$d does not branch on probe exit 2"
 grep -Fq 'npm i -D playwright-core' "$d" || fail "$d does not try to install playwright-core"
@@ -96,7 +97,7 @@ grep -Fq 'composition plan must say how' <<<"$same_client_section" \
 grep -Eiq "$excuse_vocab" <<<"$same_client_section" \
   && fail "fingerprint.md's same-client rule carries an excuse clause a repeat build could reach for"
 
-d=commands/wp-demo.md
+d=$wp_demo
 fp_gate_section=$(awk '/^2\. \*\*Fingerprint gate\.\*\*/{f=1} /^3\. \*\*Brief\.\*\*/{f=0} f' "$d")
 [ -n "$fp_gate_section" ] \
   || fail "$d has no Step 2.6 sub-step 2 (the fingerprint gate)"

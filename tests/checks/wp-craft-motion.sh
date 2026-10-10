@@ -5,12 +5,13 @@
 # and the accessibility floor must hold without them asking for it.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 m=starter-theme/__tailwind__/assets/js/src/motion.js
 i=starter-theme/__tailwind__/assets/js/src/index.js
 p=starter-theme/__tailwind__/package.json
-d=commands/wp-demo.md
+d=$wp_demo
 
 [ -f "$m" ] || fail "$m is missing"
 
@@ -133,7 +134,7 @@ grep -Fq './utilities/motion.css' starter-theme/__tailwind__/assets/css/src/tail
 # NOTE: not "$d" — the device loop above (`for d in reveal pin pan ...`) reassigns
 # that variable and leaves it as "spotlight" for the rest of the script, so a
 # reference to "$d" here would silently grep a nonexistent file named spotlight.
-grep -Fq 'motion.css' commands/wp-demo.md \
+grep -Fq 'motion.css' "$wp_demo" \
   || fail "commands/wp-demo.md does not inline the motion stylesheet into the demo"
 
 # --- the counter has to survive a unit --------------------------------------------

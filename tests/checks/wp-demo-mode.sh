@@ -5,9 +5,10 @@
 # never had (or loses the motion the client approved).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
-d=commands/wp-demo.md
+d=$wp_demo
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; y=$EXPANDED
 i=commands/wp-init.md
 p=commands/wp-polish.md

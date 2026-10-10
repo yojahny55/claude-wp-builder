@@ -7,6 +7,7 @@
 # notice when they do not.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; wp_yolo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 command -v node >/dev/null || { echo "SKIP: node not installed"; exit 0; }
@@ -16,7 +17,7 @@ runner=bin/audit-suite.sh
 
 # No runner or doc tells anyone to install a browser.
 for f in "$runner" bin/demo-verify.mjs bin/composition-preview.mjs bin/tailwindify-parity.mjs \
-    commands/wp-audit.md commands/wp-demo-verify.md commands/wp-demo.md "$wp_yolo"; do
+    commands/wp-audit.md commands/wp-demo-verify.md "$wp_demo" "$wp_yolo"; do
   [ -f "$f" ] || continue
   if grep -v '^\s*#' "$f" | grep -Eq 'playwright install( |$|")|npx playwright install'; then
     fail "$f still installs a browser (or tells the user to)"

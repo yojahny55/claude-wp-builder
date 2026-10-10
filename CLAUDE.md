@@ -269,9 +269,10 @@ an empty field, so a secret Stripe rotates is saved to the database, and SEC-040
 `argument-hint`. Add `Agent` to `allowed-tools` only if it dispatches subagents.
 A command is read whole on every run, so a long step keeps its heading and entry condition in
 the command and moves its detail to `skills/<command>-run/references/<step>.md`, read at that
-step (`/wp-audit` with `wp-audit-run`, and `/wp-yolo` with `wp-yolo-run`, are the model). Not
-a `commands/` subfolder: those load as extra slash commands. Checks read such a command
-through `tests/checks/lib/expand-command.sh`.
+step (`/wp-audit` with `wp-audit-run`, `/wp-yolo` with `wp-yolo-run`, and `/wp-demo` with
+`wp-demo-run`, are the model). Not a `commands/` subfolder: those load as extra slash commands.
+Checks read such a command through `tests/checks/lib/expand-command.sh`, which splices in only
+the command's own `<command>-run` references.
 
 **Agent** (`agents/<name>.md`) — frontmatter `name`, `description`, `tools`, `model` (`opus`|`sonnet`|`haiku` — cost tier, see `tests/checks/model-routing.sh`) (order:
 `Read, Write, Edit, Grep, Glob, Bash`). Must open with the "First Action (MANDATORY)" block.
