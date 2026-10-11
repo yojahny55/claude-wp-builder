@@ -36,187 +36,11 @@ If `$ARGUMENTS` provides a screenshot path, read the screenshot file for additio
 
 ## Step 4: Dispatch wp-template Agent
 
-Dispatch the **wp-template** agent with these instructions:
+Dispatch the **wp-template** agent with the prompt in the reference below, handing it the demo header from Step 2 and the project context from Step 1.
 
-> Generate the following files in the theme directory:
->
-> ### header.php
-> - Start with `<!DOCTYPE html>`, `<html <?php language_attributes(); ?>>`, `<head>`, `<meta charset>`, `<meta viewport>`, `<?php wp_head(); ?>`, `</head>`
-> - `<body <?php body_class(); ?>>`
-> - Site header with:
->   - Logo from settings: `prefix_get_field('site_logo', 'option')` with fallback to `get_bloginfo('name')`
->   - `wp_nav_menu()` with `'theme_location' => prefix_nav_location('primary')`, on
->     both strategies. The helper in `inc/i18n.php` returns the location the
->     project's `i18n strategy` registers: under `suffix`, the per-language
->     location (`primary-<lang>`, hyphenated); under `polylang`, the bare
->     location (`primary`) — Step 7 registers one location per name there.
->     Never build the name yourself (`'primary-' . …`): it is right on one
->     strategy and renders no menu on the other
->   - Use the custom nav walker class
->   - Language switcher per the project's `i18n strategy`: under `suffix`,
->     render all configured languages (from `SUPPORTED_LANGS`) with active
->     state, linking through `prefix_get_lang_url()`; under `polylang`,
->     render it with `pll_the_languages()` — Step 7 says why (it marks the
->     current language and hides languages with no counterpart).
->     **Never transcribe the demo's switcher markup.** A demo's switcher is a
->     mockup — typically two `href="#"` links with `aria-current` hardcoded on
->     one — and it renders as a working control, which is why copying it across
->     survives review. Take its *styling* from the demo and its *behaviour* from
->     the helper above. `demo/.demo-plan.json`'s `inert[]` declares it when the
->     demo came from `/wp-demo`; a demo from elsewhere declares nothing, so
->     assume the switcher is inert unless its markup proves otherwise — and
->     **the proof is the `href`, never the trappings.** A mock switcher carries
->     `hreflang` on both links and `aria-current="true"` on one, which is
->     precisely what a working one carries; a measured demo had both. Only where
->     each link points distinguishes them
->   - Mobile hamburger toggle button with aria attributes
->   - Skip-to-content link for accessibility
->   - The `<header>` keeps `id="masthead"`. When the demo header is sticky or fixed, in-page
->     anchors must land below it: the tailwind starter's `index.js` writes the header's live
->     `top` + height into `--header-offset` (so an `.admin-bar #masthead { top: 32px }` rule
->     counts the admin bar) and `base/reset.css` sets
->     `html { scroll-padding-top: calc(var(--header-offset, 0px) + 1.25rem) }`, so both
->     depend on that id. On a non-starter theme, write the same `scroll-padding-top` from the
->     measured desktop and mobile header heights. Verify at both widths by opening a
->     `#section` link: the section heading sits fully below the header
->
-> ### inc/nav-walker.php
-> - Custom Walker_Nav_Menu extension named `Prefix_Nav_Walker` (using actual prefix)
-> - Every menu item's `<a>` renders at least 24x24 at desktop and mobile (WCAG 2.2 AA
->   2.5.8). When the demo's line is shorter, add padding plus an equal negative margin so
->   the hit area grows and the text does not move. For a 20px line: `tailwind` →
->   `py-0.5 -my-0.5` on the `<a>`; `basic` → `.nav__link { padding-block: 2px; margin-block: -2px; }`
-> - Support for dropdown/submenu items if the demo has them
-> - Proper escaping on all output
->
-> ### Class naming — include the line matching the project's `Template:`, drop the other
-> Both files above are yours on both paths; only the class system changes.
-> - `basic` → BEM class naming on output elements
-> - `tailwind` → keep the Tailwind utility classes already on the demo header you were
->   handed, element for element. Never replace them with BEM names and never invent new
->   class names: `wp-tailwind` runs after you and renames only the groups its promotion
->   ladder promotes. See "File ownership" under "CSS agent routing" below.
->
-> Make sure to match the visual layout from the demo as closely as possible.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-header-run/references/template-dispatch.md` now and send its quoted prompt: the `header.php` and `inc/nav-walker.php` contract, the language switcher rule and the class naming per `Template:`.
 
-### CSS agent routing
-
-Read `Template:` from `.claude/CLAUDE.md`. When `Template:` is `tailwind`, dispatch
-`wp-tailwind`; when it is `basic`, dispatch `wp-css`.
-
-- `basic` → dispatch `wp-css` exactly as described below.
-- `tailwind` → dispatch `wp-tailwind` in **author** mode instead. The header's
-  `@apply` target is `layouts/header.css`, created only if a rule is genuinely
-  needed — a nav expressible in utilities produces no CSS file at all. The agent
-  reads `skills/wp-tailwind-system/SKILL.md`. It must never write
-  `assets/css/styles.css`.
-- `cinematic` → not routed by this command. Cinematic projects are built by
-  the `/wp-cinematic-*` family (`/wp-init` Step 0.5 dispatches
-  `/wp-cinematic-init`), and their CSS is `assets/css/cinematic.css` — not
-  `styles.css` and not the Tailwind tree. Dispatch no CSS agent here.
-
-Dispatch exactly one of the two, never both.
-
-Every `tailwind` dispatch opens its quoted prompt with this line, verbatim:
-
-> Mode: **author**
-
-The quoted prompt it opens is the one under "The `tailwind` prompt body" below — **not**
-Step 5's quoted prompt, which is the `basic` branch's and names `assets/css/styles.css`,
-the one file the `tailwind` path must never write.
-
-`agents/wp-tailwind.md` gates Section Authoring Mode on that line and on nothing else, so
-the line is not decoration: omit it and the dispatched agent falls into Demo Conversion
-Mode, reads the prompt as a demo-file conversion and writes a `.tmp` nobody asked for. A
-bare `author` anywhere else in the prompt — in prose, or inside an input path like
-`demo/author.html` — selects nothing, precisely so that an ordinary demo page named after
-the word cannot flip the mode by accident.
-
-This routing governs the "Dispatch **wp-css** agent" step below (Step 5, the header and
-navigation CSS) — that step marks its `tailwind` counterpart with `(routed — see "CSS agent
-routing" above)` rather than repeating the block.
-
-**Editing rule for this file.** `tests/checks/wp-commands-tailwind.sh` walks every
-dispatch site by matching `Dispatch` and `**wp-css**` on one physical line, and accounts
-for every other bolded `**wp-css**` in the file. So: keep `Dispatch` and `**wp-css**`
-together on a single line at each dispatch site (never hard-wrap between them), and write
-`wp-css` unbolded when you mean it in prose. The one place bolded prose is allowed is
-inside this `### CSS agent routing` block — everything from this heading down to the next
-heading at `###` or above is exempt, sub-headings and fenced examples included.
-
-#### The `tailwind` prompt body
-
-Dispatch `wp-tailwind` with the prompt below in place of Step 5, once Step 4's
-`wp-template` agent has returned. It supplies all five inputs
-`agents/wp-tailwind.md`'s Inputs table declares — the markup, the local `@apply` target,
-the block name, the theme path and the function prefix. The header is site chrome rather
-than a page, so its local target is named with `--layout header`, which selects
-`layouts/header.css`; `--page <slug>` is the other spelling of that same input and the two
-are mutually exclusive. `layouts/` is one of the four sanctioned directories, and it is
-absent from a fresh theme only because git cannot track an empty directory — creating it
-alongside its first rule is licensed by `skills/wp-tailwind-system/SKILL.md`'s **File
-layout** section.
-
-**File ownership.** `wp-template` owns `header.php` and `inc/nav-walker.php` on both
-paths — it is the only agent carrying the ACF, escaping and i18n contract
-(`prefix_get_field()`, `wp_nav_menu()`, `esc_html()` / `esc_url()` / `esc_attr()`,
-`wp_head()`), none of which `agents/wp-tailwind.md` describes. On `tailwind`,
-`wp-template` keeps the Tailwind utility classes already on the demo header it was handed
-instead of inventing BEM names, and `wp-tailwind` runs **after** Step 4 returns — never
-beside it — editing only class names in the files `wp-template` wrote. The invariant: the
-header never ships without its ACF wiring and escaping, and never ships on BEM class names
-in a Tailwind theme.
-
-> Mode: **author**
->
-> Promote the site header's repeated utility groups for this Tailwind theme.
->
-> Read `skills/wp-tailwind-system/SKILL.md` before writing anything — it owns the
-> decision ladder and the prohibition list.
->
-> Context:
-> - Layout: `--layout header` (decides `layouts/header.css`; no `--page` on this
->   dispatch — the header is site chrome, not a page)
-> - Block name: `--block <block>` (scopes every `@apply` class you create)
-> - Theme path: `<theme path>`
-> - Function prefix: `<prefix>`
-> - Section HTML: `header.php` and `inc/nav-walker.php`, which the wp-template agent
->   has already written and which are quoted below, already carrying Tailwind utility
->   classes.
->
-> Requirements:
-> 1. Those two files belong to wp-template. Edit them in place; do not create them and
->    do not rewrite them. The only thing you change is class names. Leave every
->    `prefix_get_field()` call, every `esc_html()` / `esc_url()` / `esc_attr()`
->    wrapper, every `wp_nav_menu()` argument and every PHP control structure exactly
->    as you found it.
-> 2. Tailwind utility classes in the markup are the default. A nav expressible in
->    utilities produces no CSS file at all, and the files come back unchanged.
-> 3. A utility group repeated 3+ times, or on 2+ pages, becomes a semantic class via
->    `@apply` — `utilities/site.css` if it spans pages, `layouts/header.css` if it is
->    local to the header. The header renders on every page, so read that condition
->    carefully: what belongs in `layouts/header.css` is a group used only inside the
->    header, however many pages the header itself appears on. Grep the theme's other
->    `components/*.css`, `layouts/*.css` and `*.php` before choosing.
-> 4. Name a class you write into `layouts/header.css` `<block>__<element>`. Name one
->    you write into `utilities/site.css` `site__<element>` instead — it qualified for
->    that file precisely because it spans more than one block.
-> 5. If `layouts/header.css` does not exist, create it with its first rule already in
->    it and add its `@import` to `main.css` in the same step, in `base` → `components`
->    → `layouts` → `utilities` order, naming its cascade layer (`layer(components)` for
->    `layouts/header.css`, `layer(utilities)` for `utilities/site.css`) — a bare
->    `@import` beats every Tailwind utility regardless of specificity. Never leave an
->    empty file.
-> 6. Colors and fonts come from the `@theme` block as utilities (`bg-primary`,
->    `font-primary`). No `:root`, no hardcoded hex a token already covers.
-> 7. Responsive via Tailwind prefixes (`md:`, `lg:`) — including the hamburger
->    collapse. No hand-written `@media`.
-> 8. Never write `assets/css/styles.css`. Never emit a `<style>` block.
->
-> Header markup:
-> ```php
-> <paste header.php and inc/nav-walker.php here>
-> ```
+Then read `${CLAUDE_PLUGIN_ROOT}/skills/wp-header-run/references/css-routing.md` now and follow it: it routes the CSS agent by `Template:` (dispatch exactly one of `wp-css` or `wp-tailwind`, never both), carries the `wp-tailwind` author-mode prompt that replaces Step 5 on `tailwind`, and the file ownership rule.
 
 ## Step 5: Dispatch the CSS Agent
 
@@ -226,7 +50,7 @@ needed, into `layouts/header.css`. Nothing on the `tailwind` path writes
 `assets/css/styles.css`, `:root` custom properties, or BEM rules — so do not follow the
 instructions below there.
 
-Dispatch the **wp-css** agent (routed — see "CSS agent routing" above; on `tailwind`, dispatch `wp-tailwind` in author mode instead):
+Dispatch the **wp-css** agent (routed — see "CSS agent routing" in Step 4; on `tailwind`, dispatch `wp-tailwind` in author mode instead):
 
 > Add header and navigation CSS to `assets/css/styles.css`. Include:
 >

@@ -479,6 +479,7 @@ commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. 
 | `wp-finalize-run` | The check detail of `/wp-finalize` — one reference file per long check, read at that check so the command stays a short map |
 | `wp-section-run` | The step detail of `/wp-section` — one reference file per long step, read at that step so the command stays a short map |
 | `wp-clone-run` | The step detail of `/wp-clone` — one reference file per clone path and for the post-clone verification, read at that step so the command stays a short map |
+| `wp-header-run` | The step detail of `/wp-header` — one reference file for the wp-template prompt and one for the CSS routing, read at that step so the command stays a short map |
 | `wp-contributing` | Contributing to this plugin — the layer rules, the grep-gate test style, and the PR and release rituals |
 
 ### Agents (specialized subagents dispatched by commands)

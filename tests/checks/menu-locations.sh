@@ -11,6 +11,7 @@
 # `__starter___nav_location()` in inc/i18n.php, which each strategy's file answers.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-header.md; wp_header=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; wp_finalize=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; wp_init=$EXPANDED
@@ -48,7 +49,7 @@ for st in __tailwind__ __cinematic__; do
   # On tailwind, header.php and footer.php are placeholders that /wp-header and /wp-footer
   # replace, so what those two prompts render counts as rendered there too.
   srcs=("starter-theme/$st")
-  [ "$st" = __tailwind__ ] && srcs+=(commands/wp-header.md commands/wp-footer.md)
+  [ "$st" = __tailwind__ ] && srcs+=("$wp_header" commands/wp-footer.md)
   rendered=$(grep -rhoE "nav_location\( *'[a-z]+' *\)" "${srcs[@]}" --include=*.php --include=*.md \
              | grep -oE "'[a-z]+'" | tr -d "'" | words)
   [ -n "$rendered" ] || fail "no $st template asks __starter___nav_location() for a location"
@@ -85,7 +86,7 @@ under=$(grep -rnE '\b(primary|footer|mobile)_(en|es|<lang>|\{lang\})\b' commands
 [ -z "$under" ] || fail "an underscore menu location, which neither starter registers:"$'\n'"$under"
 lit=$(grep -rnE "'theme_location' *=> *['\"]" commands agents skills || true)
 [ -z "$lit" ] || fail "an instruction hands the agent a hand-built theme_location instead of prefix_nav_location():"$'\n'"$lit"
-grep -qF "prefix_nav_location('primary')" commands/wp-header.md \
+grep -qF "prefix_nav_location('primary')" "$wp_header" \
   || fail "wp-header.md no longer tells wp-template to render prefix_nav_location('primary')"
 grep -qF "prefix_nav_location('footer')" commands/wp-footer.md \
   || fail "wp-footer.md no longer tells wp-template to render prefix_nav_location('footer')"
