@@ -182,82 +182,8 @@ what to call it rather than inventing one.
 
 Dispatch `wp-tailwind` in **author mode** per template, in parallel.
 
-Every dispatch prompt opens with this line, verbatim:
-
-> Mode: **author**
-
-`agents/wp-tailwind.md` selects Section Authoring Mode on that line and on nothing
-else. It used to gate on a bare `author` token anywhere in the prompt, which an
-ordinary input path (`demo/author.html`) supplies by accident, so the token is no
-longer read: a prompt that only *describes* author mode in prose now runs Demo
-Conversion Mode and writes a `.tmp` conversion of a template nobody asked to convert.
-
-**Author mode takes its markup in two states, and every dispatch prompt must say which
-one this is** — see *Input state* in `agents/wp-tailwind.md`. A migration is the
-plain-CSS state: there is no converted demo anywhere in this chain, so the agent owes
-the markup the declaration-to-utility translation before it authors anything, and it
-only knows that from the prompt. Say nothing and it assumes the other state — already
-Tailwind-native, nothing to translate — and applies the `@apply` ladder to untouched
-BEM markup. Each dispatch prompt states:
-
-- The literal line `Mode: **author**`, first in the prompt. That line is what selects
-  Section Authoring Mode in `agents/wp-tailwind.md`; without it every other item in
-  this list is handed to an agent running Demo Conversion Mode.
-- The markup handed over is **plain-CSS, not converted**, so the agent owes it the
-  translation its *Input state* section prescribes for that state.
-- The template's own markup **and** the matching CSS rules from Step 1's audit. A rule
-  in a stylesheet the agent was never given is a rule it cannot translate.
-- Translate each declaration to the equivalent utility, and every `@media` query to
-  the matching Tailwind breakpoint prefix rather than re-writing the query. Prefer the
-  `@theme` tokens Step 3 extracted over a built-in colour scale.
-- **When no built-in stop matches, name one — do not emit `max-[<n>px]:`.** A demo drawn
-  in a design tool has its queries at frame widths (1599, 1023, 759), and translating
-  them literally gives hundreds of arbitrary variants. Collect the widths the demo
-  actually switches at, declare them once as `--breakpoint-*` in `@theme`, and use the
-  named prefixes. See **Name the breakpoints** in `skills/wp-tailwind-system/references/breakpoints.md` for why: chief
-  among them, markup that lives in the DATABASE rather than in a scanned file loses
-  every arbitrary variant the day the theme normalizes them.
-- All five inputs author mode's Inputs table declares — the `section HTML`,
-  `--block <name>`, `--page <slug>`, the **theme path** and the project's function
-  **prefix**. `--block` and `--page` are the two author mode requires outright; the
-  theme path and the prefix are the two a dispatch most often forgets, and without
-  them the agent has no theme root to write into and no prefix for the function names
-  its markup calls. That `--page` names the template's `components/<slug>.css`; it is
-  not this command's `--page` flag, which selects what gets migrated at all.
-- **Write only the template and its `components/<slug>.css`.** Do **not** create or
-  edit `utilities/site.css`, and do **not** edit `main.css`. Author mode's Procedure
-  tells the agent to promote a cross-page group into `utilities/site.css` and to
-  register its `@import` in `main.css` in the same step — correct for a single agent,
-  a last-write-wins race for a parallel walk, where every agent creates the same two
-  files at once and the last one to finish erases the rest. Its cross-page grep has
-  the same defect from the other side: under a parallel walk the sibling templates
-  are not converted yet, so it greps a corpus that does not exist and concludes
-  "one page" every time. Have the agent **report** the groups it would have promoted
-  instead. Step 4b promotes and registers, once, serially, over the finished corpus.
-- **Do not run `bin/tailwind-native-check.sh` yourself.** This command owns the
-  convention check and runs it once, in Step 6, after the old CSS is gone. Run from
-  inside a Step 4 agent it fails by construction: `assets/css/styles.css` is still
-  present until Step 5 deletes it, and the unconverted templates still carry
-  plain-CSS class names until the walk finishes. An agent that runs it sees FAIL on a correctly
-  progressing migration and either reports failure or starts "fixing" a half-migrated
-  theme.
-
-Each agent:
-
-- Rewrites its template's markup with Tailwind utility classes.
-- Puts a group local to one page in `components/<slug>.css` via `@apply`, creating
-  that file with its first rule already in it — but only once that group is **repeated**
-  in the sense `skills/wp-tailwind-system/SKILL.md` defines: the same group of utilities
-  3+ times, or on 2+ distinct pages. A group used twice inside one section stays inline.
-  Promoting below that threshold trades markup you can read for a class you have to look
-  up.
-- Reports — rather than writes — every group it judges worth promoting across pages,
-  naming the utilities in it and the pages it saw it on.
-- Keeps every `@apply` class named `<block>__<element>` so parallel agents cannot
-  collide.
-
-No agent creates a directory under `assets/css/src/tailwindcss/`. The four Step 2
-directories are the entire layout; a new one fails the convention check in Step 6.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-tailwind-migrate-run/references/step-4.md` now and follow
+it — it is this step, not background. It holds the dispatch prompt (the verbatim `Mode: **author**` line, the plain-CSS input state, the breakpoint rule, the five inputs, the write boundary and the no-convention-check rule) and what each agent does.
 
 Under `--page`, dispatch only that template's agent.
 
@@ -318,88 +244,8 @@ runs `wp-scripts build` over `assets/js/src/index.js` first, which a theme migra
 off the plain-CSS path need not have — the CSS would never compile and the failure
 would read as a Tailwind one.
 
-Then run the convention check, still without changing directory. Step 0's warning is
-what makes that possible: the build above ran in the theme root, the check below is a
-**plugin-relative** script that takes the theme path as its *argument*, and the
-screenshot block after it is theme-relative again. Run the check by its full path from
-the plugin root — `${CLAUDE_PLUGIN_ROOT}` is that path — and do not run it from inside
-the theme expecting `bin/` to resolve there:
-
-```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/tailwind-native-check.sh" <theme-path>
-```
-
-That script judges a **whole-theme** migration, and two of its rules cannot hold
-part-way through a `--page` run: it fails while `assets/css/styles.css` still exists
-(Step 5 deliberately keeps it until the last template is migrated) and it fails while
-any template still carries plain-CSS class names instead of utilities. Under `--page`,
-record both as expected and re-run the check for real once the last template lands. On
-a completed whole-theme run rule 1 is a genuine failure. Rule 6 scales to the theme: it
-demands Tailwind utilities in every template that carries a class attribute, up to a
-ceiling of three, so a correct two-template theme passes it. Any count it reports below
-that floor is a genuine half-migrated theme, not an artefact of the theme being small.
-Say which case you are in rather than reporting the count as a defect.
-
-Then re-shoot every migrated page and compare against the Step 0 golden:
-
-```bash
-for slug in <every page migrated>; do
-  mkdir -p .tailwind-migrate/after/"$slug"
-  # /wp-responsive-check <url-for-$slug>
-  # Method B — the five fixed names are already in the cwd:
-  mv responsive-*.png .tailwind-migrate/after/"$slug"/ 2>/dev/null || true
-  # Method A — copy each capture as in Step 0; the glob may match nothing.
-  [ "$(ls .tailwind-migrate/after/"$slug"/responsive-*.png 2>/dev/null | wc -l)" -eq 5 ] \
-    || { echo "Error: after-shots for $slug are incomplete."; exit 1; }
-done
-```
-
-**The comparison mechanism, stated because there isn't an automatic one.**
-`/wp-responsive-check` analyses a single page for layout faults; it does not diff two
-images and will not tell you the migration changed something. For each page and each
-of the five widths: **Read both PNGs** — `.tailwind-migrate/before/<slug>/responsive-<w>.png`
-and `.tailwind-migrate/after/<slug>/responsive-<w>.png` — and compare them directly,
-naming what differs (spacing, colour, font, wrap point, element order).
-
-### A differing-pixel count proves nothing until you know its noise floor
-
-`compare -metric AE before.png after.png null: 2>&1` looks like the objective test this
-step wants, and it is not one on its own. Anything the GPU composites — `backdrop-filter`
-above all, but also large gradients and transformed layers — does not rasterise
-identically between two runs. Measured on a page with six `backdrop-blur` cards: two
-consecutive captures of **the same unchanged page** differed by 135k pixels, while
-baseline against the migrated version differed by 26k. Read in isolation, the real
-comparison looked five times cleaner than the page compared against itself.
-
-So before you compare anything, **capture the same page twice and diff those two**. That
-number is the floor. A before/after count at or under it says nothing; only a count well
-above it is evidence, and it still needs the visual read to say what moved.
-
-### The numeric contract is the actual oracle
-
-Screenshots are the fallback. What survives a migration unchanged is *geometry*, so
-measure it directly in the page, before and after, and diff the numbers:
-
-- page height, section count, every section's height, the gap between consecutive sections
-- for each heading: box, line count, computed font-size, line-height, letter-spacing
-- for each image/art group: rendered box
-- counts of the repeated pieces (cards, list items, tiles)
-- **the on-screen order of every row that can reverse** — for each flex row, whether the
-  art sits left of the text, and each row's computed `flex-direction`
-
-That last one is not padding. A rewrite that drops a `flex-row-reverse` mirrors a whole
-section left-to-right while every box keeps its exact size — page height, section
-heights, gaps and every element box stay byte-identical, and a contract built only from
-sizes reports a perfect match. It happened; the screenshot read is what caught it, which
-is precisely why both halves of this step exist.
-
-Report each page and viewport as match or diverged, with the specific difference.
-**Do not report the migration as successful without this comparison** — a
-Tailwind-native theme that renders differently is a failed migration, not a completed
-one. "The check passed" is not the same claim: `bin/tailwind-native-check.sh` validates
-the CSS convention and cannot see the rendered design at all.
-
-If a viewport diverged, fix it and re-compare before finishing.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-tailwind-migrate-run/references/step-6.md` now and follow
+it — it is this step, not background. It covers running the convention check by its full path and reading it under `--page`, the after-shots, the before/after comparison with its noise floor and numeric contract, and the rule that the migration is not reported successful without that comparison.
 
 ## Report
 

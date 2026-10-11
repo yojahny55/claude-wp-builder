@@ -480,6 +480,10 @@ commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. 
 | `wp-section-run` | The step detail of `/wp-section` — one reference file per long step, read at that step so the command stays a short map |
 | `wp-clone-run` | The step detail of `/wp-clone` — one reference file per clone path and for the post-clone verification, read at that step so the command stays a short map |
 | `wp-page-run` | The step detail of `/wp-page` — one reference file per long page type (blog, legal, 404, search, embed), read at that type so the command stays a short map |
+| `wp-demo-verify-run` | The step detail of `/wp-demo-verify` — one reference file for the detector, the walk and the reading of findings, read at that step so the command stays a short map |
+| `wp-header-run` | The step detail of `/wp-header` — one reference file for the wp-template prompt and one for the CSS routing, read at that step so the command stays a short map |
+| `wp-tailwind-migrate-run` | The step detail of `/wp-tailwind-migrate` — one reference file for the author-mode dispatch and one for the verification, read at that step so the command stays a short map |
+| `wp-tailwindify-run` | The step detail of `/wp-tailwindify` — one reference file for the agent dispatch and one for the verification, read at that step so the command stays a short map |
 | `wp-contributing` | Contributing to this plugin — the layer rules, the grep-gate test style, and the PR and release rituals |
 
 ### Agents (specialized subagents dispatched by commands)

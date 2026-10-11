@@ -7,6 +7,7 @@
 # hit area with padding plus an equal negative margin, so the text does not move.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-header.md; wp_header=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 a=agents/wp-audit-a11y.md
@@ -29,7 +30,7 @@ grep -Eq 'fails per WCAG 2\.5\.8|44×44' <<<"$ux9" \
 grep -Fq 'equal negative margin' skills/wp-responsive/SKILL.md || fail "wp-responsive lacks the no-move fix"
 
 # The generators of the three measured offenders.
-grep -Fq 'renders at least 24x24 at desktop and mobile' commands/wp-header.md || fail "/wp-header nav items have no 24x24 rule"
+grep -Fq 'renders at least 24x24 at desktop and mobile' "$wp_header" || fail "/wp-header nav items have no 24x24 rule"
 grep -Fq 'renders at least 24x24 at desktop and mobile' commands/wp-footer.md || fail "/wp-footer social icons have no 24x24 rule"
 for f in agents/wp-audit-rankmath.md skills/wp-audit-seo-standards/references/breadcrumbs.md; do
   grep -Fq 'margin: -4px;' "$f" || fail "$f breadcrumb links do not reach 24x24"

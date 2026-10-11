@@ -26,7 +26,7 @@
 # do, so the byte/character distinction cannot come back.
 set -euo pipefail
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; f=$EXPANDED
-t=commands/wp-tailwindify.md
+expand_command commands/wp-tailwindify.md; t=$EXPANDED
 # agents/wp-tailwind.md is here for exactly one assertion, and it is not a
 # digression: Step 2.6's skip rule is "utilities and no project stylesheet", and
 # that rule only terminates because the CONVERSION removes the project

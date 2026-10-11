@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# commands/wp-demo-verify.md was 18 KB, so every /wp-demo-verify run read the detector rules,
+# the whole walk and the catalogue of finding kinds up front, though each is needed only at
+# its own step. Steps 2a, 2b and 3 moved to skills/wp-demo-verify-run/references/, read at
+# the step that needs them. A reference nothing points to is a step the run silently never
+# performs, so every file there must be named in the command under its own heading and in the
+# skill's table, and the command must stay a map rather than grow back.
+#
+# The headings are "## Step 2a: ...", so the anchor takes a colon or a space after the title.
+# Ceiling: the command is 7.4 KB with the three references moved out, so 9 KB leaves room for
+# a few added lines but fails if a step's detail is pasted back in.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+fail=0
+err() { echo "FAIL: $*"; fail=1; }
+
+cmd=commands/wp-demo-verify.md
+skill=skills/wp-demo-verify-run/SKILL.md
+refs=skills/wp-demo-verify-run/references
+
+[ -r "$skill" ] || { echo "FAIL: $skill is missing"; exit 1; }
+
+for f in "$refs"/*.md; do
+  b=$(basename "$f")
+  grep -Fq "\${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-verify-run/references/$b\` now and" "$cmd" \
+    || err "$cmd never sends the run to $b"
+  grep -Fq "(references/$b)" "$skill" || err "$skill does not list $b"
+  # The reference names its step, and that step heading still exists in the command.
+  step=$(sed -n '1s/^# \/wp-demo-verify — //p' "$f")
+  [ -n "$step" ] || { err "$f has no '# /wp-demo-verify — Step N' title"; continue; }
+  grep -Eq -- "^## ${step}( |:)" "$cmd" || err "$f belongs to $step, which $cmd no longer has"
+  # The pointer sits under that step, not elsewhere in the command.
+  awk -v s="^## ${step}( |:)" -v b="references/$b" '
+    $0 ~ s { on = 1; next } /^## (Step|Path) / { on = 0 } on && index($0, b) { found = 1 }
+    END { exit !found }' "$cmd" || err "$cmd points to $b outside $step"
+done
+
+# Every pointer in the command resolves to a file.
+for p in $(grep -oE 'skills/wp-demo-verify-run/references/[a-z0-9-]+\.md' "$cmd" | sort -u); do
+  [ -r "$p" ] || err "$cmd points to $p, which does not exist"
+done
+
+# Two pointers in one paragraph would leave the expansion one body short: expand-command.sh
+# splices a single reference in at the blank line that closes the paragraph naming it.
+awk '/^$/ { n = 0; next } /skills\/wp-demo-verify-run\/references\// { if (++n > 1) bad = 1 }
+  END { exit bad }' "$cmd" || err "$cmd names two wp-demo-verify-run references in one paragraph"
+
+# The command stays a map. Steps 1, 3.5, 4 and 5 stay whole: the target resolution, the
+# inert-control grade, the sheet critique and the report are what the run needs in view.
+size=$(wc -c < "$cmd")
+[ "$size" -le 9216 ] || err "$cmd is $size bytes; move long step detail to $refs"
+
+# The expansion the checks read must carry every reference body.
+. tests/checks/lib/expand-command.sh
+expand_command "$cmd"
+for f in "$refs"/*.md; do
+  # A closing code fence matches any other fence, so take the last line that is not one.
+  last=$(grep -v -e '^$' -e '^```' "$f" | tail -1) || true
+  [ -n "$last" ] || { err "$(basename "$f") has no body"; continue; }
+  grep -Fqx -- "$last" "$EXPANDED" || err "expand-command.sh dropped the body of $(basename "$f")"
+done
+
+[ "$fail" = 0 ] && echo PASS || exit 1

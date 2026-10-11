@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Every command that emits CSS must route by template, not hardcode wp-css.
 set -euo pipefail
-# /wp-page keeps its long page types in skills/wp-page-run/references/; read it as a run does.
+cd "$(dirname "$0")/../.."
+# /wp-page and /wp-header keep long steps in skills/<command>-run/references/; read them as a run does.
 . tests/checks/lib/expand-command.sh
-expand_command commands/wp-page.md
-page_md=$EXPANDED
-for f in "$page_md" commands/wp-header.md commands/wp-footer.md commands/wp-cpt.md; do
+expand_command commands/wp-page.md; page_md=$EXPANDED
+expand_command commands/wp-header.md; wp_header=$EXPANDED
+for f in "$page_md" "$wp_header" commands/wp-footer.md commands/wp-cpt.md; do
   # Backticked, so this cannot be satisfied by the `wp-tailwind-system` skill
   # reference line 9 separately mandates — a bare 'wp-tailwind' grep was a
   # decoration that could never fail on its own.
@@ -263,7 +264,7 @@ walk_sites() {
 
 walk_sites "$page_md"
 walk_sites commands/wp-cpt.md
-walk_sites commands/wp-header.md
+walk_sites "$wp_header"
 walk_sites commands/wp-footer.md
 
 # The routing blocks cover `basic` and `tailwind`. `cinematic` is upstream's
@@ -273,7 +274,7 @@ walk_sites commands/wp-footer.md
 # the routing block states the cinematic case as NOT routed. Scoped to the
 # block (heading to next `## Step` heading), so a passing mention elsewhere
 # cannot satisfy it, and flattened so a re-wrap cannot break it.
-hdr_route=$(awk '/^### CSS agent routing$/,/^## Step 5:/' commands/wp-header.md \
+hdr_route=$(awk '/^### CSS agent routing$/,/^## Step 5:/' "$wp_header" \
   | tr '\n' ' ' | sed 's/  */ /g' || true)
 printf '%s' "$hdr_route" | grep -qiF 'cinematic' \
   || { echo "FAIL: wp-header's CSS agent routing block never names cinematic — an agent handed a cinematic project falls through to the basic path and writes BEM CSS into a theme that has its own cinematic.css"; exit 1; }

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-header.md; wp_header=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; wp_finalize=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; wp_init=$EXPANDED
@@ -127,13 +128,13 @@ grep -q 'no WPML, no Polylang' "skills/wp-bilingual/SKILL.md" && {
 # check, the same contract as the frozen bullet labels in
 # tests/checks/wp-init-tailwind.sh.
 step_quotes() { # <from-step> <to-step>
-  awk "/^## Step $1:/,/^## Step $2:/" commands/wp-header.md \
+  awk "/^## Step $1:/,/^## Step $2:/" "$wp_header" \
     | grep '^[[:space:]]*>' | sed 's/^[[:space:]]*>//' \
     | tr '\n' ' ' | sed 's/  */ /g'
 }
 for spec in "4 5" "6 7"; do
   set -- $spec
-  raw=$(awk "/^## Step $1:/,/^## Step $2:/" commands/wp-header.md)
+  raw=$(awk "/^## Step $1:/,/^## Step $2:/" "$wp_header")
   printf '%s\n' "$raw" | tail -1 | grep -q "^## Step $2:" \
     || { echo "FAIL: wp-header's Step $1 region is not terminated by its '## Step $2:' heading — every assertion scoped to it would silently degrade to a file-wide grep"; exit 1; }
 done
