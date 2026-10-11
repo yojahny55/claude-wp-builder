@@ -31,7 +31,7 @@ for f in "$refs"/*.md; do
   [ -n "$step" ] || { err "$f has no '# /wp-audit — Step N' title"; continue; }
   grep -Eq "^## ${step//./\\.}:" "$cmd" || err "$f belongs to $step, which $cmd no longer has"
   # The pointer sits under that step, not elsewhere in the command.
-  awk -v s="^## ${step}( |:)" -v b="references/$b" '
+  awk -v s="^## ${step//./[.]}( |:)" -v b="references/$b" '
     $0 ~ s { on = 1; next } /^## / { on = 0 } on && index($0, b) { found = 1 }
     END { exit !found }' "$cmd" || err "$cmd points to $b outside $step"
 done
