@@ -3,6 +3,7 @@
 # them per page, /wp-yolo says so, and a hand-edited page still gets classified.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo-verify.md; dv=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 
 d=$wp_demo
@@ -34,7 +35,7 @@ grep -Fq 'section.cssRules' "$n" || { echo "FAIL: wp-normalize no longer capture
 # inert[]: declared while authoring, graded as a declaration, read as a worklist.
 grep -Eq '"inert"' "$d" || { echo "FAIL: wp-demo does not write inert[]"; exit 1; }
 grep -Eq 'Write it while authoring, or do not write it' "$d" || { echo "FAIL: wp-demo does not forbid backfilling inert[]"; exit 1; }
-grep -Eq 'Grade the declaration, never the control' commands/wp-demo-verify.md || { echo "FAIL: verify grades the control"; exit 1; }
+grep -Eq 'Grade the declaration, never the control' "$dv" || { echo "FAIL: verify grades the control"; exit 1; }
 grep -Eq 'inert\[\]' "$y" || { echo "FAIL: wp-yolo does not read inert[] as a worklist"; exit 1; }
 grep -Fq "Never transcribe the demo's switcher markup" commands/wp-header.md || { echo "FAIL: wp-header may still transcribe a mock switcher"; exit 1; }
 # A form with no action is inert too, and it is the one that costs a lead.

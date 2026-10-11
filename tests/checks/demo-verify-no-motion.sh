@@ -5,11 +5,12 @@
 # without it a page that lost its engine must still block.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo-verify.md; dv=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 s=bin/demo-verify.mjs
 grep -Fq "args.includes('--no-motion')" "$s" || fail "$s does not parse --no-motion"
-grep -Fq -- '--no-motion' commands/wp-demo-verify.md || fail "commands/wp-demo-verify.md does not document --no-motion"
+grep -Fq -- '--no-motion' "$dv" || fail "commands/wp-demo-verify.md does not document --no-motion"
 grep -Fq -- '--no-motion' commands/wp-responsive-check.md || fail "commands/wp-responsive-check.md does not pass --no-motion"
 grep -Fq -- '--no-motion' changes/demo-verify-no-motion.fixed.md || fail "changes/demo-verify-no-motion.fixed.md has no --no-motion entry"
 

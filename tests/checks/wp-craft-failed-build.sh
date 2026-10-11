@@ -48,7 +48,7 @@ done
 grep -Fq 'Clear the marker before the first round' "$wp_demo" \
   || fail "commands/wp-demo.md does not clear demo/FAILED.md before the first round, so the marker can describe a run other than the last one"
 
-v=commands/wp-demo-verify.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo-verify.md; v=$EXPANDED
 grep -Fq '## Round N' "$v" \
   || fail "$v does not require a per-round heading, so rounds cannot be counted from disk"
 grep -Fq 'Findings judged to be capture artefacts' "$v" \

@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-c=commands/wp-demo-verify.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo-verify.md; c=$EXPANDED
 s=bin/demo-verify.mjs
 r=commands/wp-responsive-check.md
 
