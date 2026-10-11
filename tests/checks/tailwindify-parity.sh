@@ -83,7 +83,7 @@ if command -v node >/dev/null 2>&1; then
 fi
 
 # And the command has to actually run it.
-cmd=commands/wp-tailwindify.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-tailwindify.md; cmd=$EXPANDED
 flat=$(tr '\n' ' ' < "$cmd" | sed 's/  */ /g')
 printf '%s' "$flat" | grep -qF 'tailwindify-parity.mjs' \
   || { echo "FAIL: $cmd never invokes bin/tailwindify-parity.mjs — a gate nothing calls is documentation"; exit 1; }
