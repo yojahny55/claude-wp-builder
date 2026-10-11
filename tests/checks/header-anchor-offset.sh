@@ -5,6 +5,7 @@
 # fixed .nav's measured height.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-header.md; wp_header=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 css=starter-theme/__tailwind__/assets/css/src/tailwindcss/base/reset.css
@@ -30,6 +31,6 @@ eng=starter-theme/__cinematic__/assets/js/cinematic-engine.js
 grep -Fq "setProperty('--nav-h'" "$eng" || fail "$eng does not keep --nav-h equal to the rendered nav"
 grep -Fq 'new ResizeObserver(setNavH)' "$eng" || fail "$eng does not re-measure the nav when it resizes"
 
-grep -Fq 'scroll-padding-top' commands/wp-header.md || fail "/wp-header does not carry the anchor offset contract"
+grep -Fq 'scroll-padding-top' "$wp_header" || fail "/wp-header does not carry the anchor offset contract"
 
 echo PASS
