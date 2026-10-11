@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # Every command that emits CSS must route by template, not hardcode wp-css.
 set -euo pipefail
-for f in commands/wp-page.md commands/wp-header.md commands/wp-footer.md commands/wp-cpt.md; do
+# /wp-page keeps its long page types in skills/wp-page-run/references/; read it as a run does.
+. tests/checks/lib/expand-command.sh
+expand_command commands/wp-page.md
+page_md=$EXPANDED
+for f in "$page_md" commands/wp-header.md commands/wp-footer.md commands/wp-cpt.md; do
   # Backticked, so this cannot be satisfied by the `wp-tailwind-system` skill
   # reference line 9 separately mandates — a bare 'wp-tailwind' grep was a
   # decoration that could never fail on its own.
@@ -257,7 +261,7 @@ walk_sites() {
   done <<< "$sites"
 }
 
-walk_sites commands/wp-page.md
+walk_sites "$page_md"
 walk_sites commands/wp-cpt.md
 walk_sites commands/wp-header.md
 walk_sites commands/wp-footer.md
