@@ -11,7 +11,8 @@
 # satisfies any flat-text match; and every widening keeps its inversion, because a gate
 # that rejects correct prose is the more common defect here, not the more careful one.
 set -euo pipefail
-f=commands/wp-tailwind-migrate.md
+cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-tailwind-migrate.md; f=$EXPANDED
 
 [ -f "$f" ] || { echo "FAIL: $f missing"; exit 1; }
 
@@ -527,7 +528,7 @@ fi
 # emphasis stripped, so `> **Mode:** author` also satisfies it.
 # The `|| true` is load-bearing: grep exits 1 when a file has no `>` lines at all, and under
 # `set -euo pipefail` that aborts the whole script inside a command substitution.
-qmode=$(grep -E '^[[:space:]]*>' commands/wp-tailwind-migrate.md \
+qmode=$(grep -E '^[[:space:]]*>' "$f" \
         | sed -e 's/^[[:space:]]*>//' -e 's/[*_]//g' | tr '\n' ' ' | sed 's/  */ /g' || true)
 if ! printf '%s' "$qmode" | grep -qiE 'Mode: ?author'; then
   echo "FAIL: commands/wp-tailwind-migrate.md has no QUOTED \`Mode: **author**\` line for its Step 4 dispatch — agents/wp-tailwind.md selects Section Authoring Mode on that line and on nothing else, so the migration dispatch would run Demo Conversion Mode and convert a template nobody asked to convert"; exit 1
