@@ -35,41 +35,8 @@ runs it as the craft gate before writing any markup.
 npx -y impeccable@4 detect <target> --json > <dir>/.verify/impeccable.json
 ```
 
-`impeccable` is an external package this repo does not install, vendor or
-configure — it is fetched from the npm registry at run time via `npx`. Pin the
-major version (`@4`; `@1` does not exist on the registry) so a future major
-release cannot silently change rule identifiers or output shape underneath
-this gate.
-
-The exit code says whether the scan ran, not how many findings it made: `0`
-is a clean or advisory-only scan, `1` means a requested target could not be
-scanned at all, `2` means the scan completed and found at least one
-non-advisory finding — findings do not fail the process the way a linter's
-would, so a nonzero exit does not by itself mean "could not run." Only exit
-`1` is that case; treat it, any other exit code, a missing `npx`/no network
-reaching the registry, or stdout that fails to parse as JSON the same way:
-report **"detector could not run"** and fail the round on that basis, never
-read as zero findings. Human-readable text goes to stderr, so the redirect
-above captures only the JSON on stdout, which is what findings are counted
-from — never the exit code.
-
-Once the array parses: sixty-one deterministic rules, no model, each finding
-carrying a `category` (`slop` or `quality`) and a `severity`. A `slop` finding
-with `severity: "warning"` fails the round outright, before a screenshot is
-taken — that is the AI-tell axis and the real gate. The tool's help also
-describes an `advisory` soft-signal tier, though no finding carrying it has
-been reproduced here (an em-dash-dense file, which that help names as an
-advisory rule, returned zero findings): **if the tool emits an advisory tier,
-a finding flagged with it is listed but does not by itself fail the round**,
-matching the detector's stated design that advisories never block automation.
-The gate does not rest on that, because it keys on `slop` plus `warning`
-directly. `quality` findings are listed in the
-report and fixed when the rubric below also flags the same section, but do
-not by themselves fail a round. A target that is a URL is scanned with
-Puppeteer by the detector itself; a file or directory is scanned statically.
-Run against the demo that motivated this gate, the detector found twenty
-issues, seven of them `slop`; run against this library's own `hero-split`
-composition, it returns an empty array.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-verify-run/references/detector.md` now and follow
+it — it is this step, not background. It covers the detector's exit codes and what counts as "detector could not run", the `slop` plus `warning` gate, advisories and `quality` findings.
 
 ## Step 2b: Walk it
 
@@ -77,134 +44,17 @@ composition, it returns an empty array.
 node "${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs" <target>
 ```
 
-Six positions per section at 1440x900 and 390x844, plus a reduced-motion pass at
-desktop width, then full-page shots at 375, 576, 620, 768, 1024, 1100, 1152, 1280 and 1440
-(this replaces `/wp-responsive-check`).
-
-**Firefox pass.** When a Playwright Firefox build already exists on the machine (Playwright's
-browser cache, or `WP_BROWSER_FIREFOX`), the same nine full-page shots are taken in Firefox
-under `.verify/[<page>/]firefox/`, and at each walk width every layout element's box is
-compared between Chromium and Firefox. A box that differs by more than 2px (position within
-its parent, width or height) is an `engine-delta` finding, advisory, the 15 largest per
-width. Nothing is ever downloaded: without a Firefox build the run prints a notice and stays
-Chromium-only; `--no-firefox` skips it on purpose. Firefox on Linux does not reproduce every
-Windows rendering defect (a 1px rounded border draws corner artifacts only on Windows), so
-the static CSS lint in `/wp-finalize` stays the guard for those. The browser executable and
-its revision are logged at startup (`browsers: firefox <path> (revision N, ...)`); the
-revision pinned by the loaded playwright-core's `browsers.json` is preferred over a newer
-cached one, and a mismatch is named in that line. `tests/checks/demo-verify-engines.sh` only
-exercises this pass when it finds a playwright-core: run it with
-`PLAYWRIGHT_CORE="$(npm root -g)/@playwright/test/node_modules/playwright-core"` to test the
-cross-engine path for real.
-
-**`--no-motion`.** For a URL of an existing site the plugin did not build (a page-builder site,
-say) that never carried the motion engine. Without it every section blocks as `no-engine`, a
-true fact that says nothing about the layout, and the round fails for a reason that does not
-apply. With it the `no-engine` and `dead-scroll` judgments are not emitted; overflow, clipped
-copy, container-noop, the full-page shots and the Firefox pass still run. It is opt-in and
-never inferred: a converted plugin page that lost its engine must still fail, so do not pass it
-for a page `/wp-demo` or `/wp-yolo` built. A URL page with zero `[data-motion]` elements and no
-flag prints one line suggesting it.
-
-A directory target walks every page. Output lands in
-`<dir>/.verify/[<page>/]<width>/`, with `findings.json` and, per width, both
-`sheet.png` (full resolution, for a human who opens it directly) and `sheet.jpg`
-(downscaled to 1000px wide, quality 70 — the one to Read in Step 4).
-
-**Fractional widths.** Page builders emit breakpoints as integer pairs: `max-width: 767px`
-for mobile and `min-width: 768px` above it. At a fractional CSS width (browser zoom, or OS
-display scaling other than 100%: a 766px window at 110% is 767.27px) neither query matches,
-and the page falls back to its unqueried defaults. The integer shots above can never see it.
-So, in Chromium, the walk reads the page's same-origin stylesheets for `max-width: N` /
-`min-width: N+1` pairs (at most three), loads the page inside each (N, N+1) by launching with
-`--force-device-scale-factor=1.1` and a window sized until the CSS width read back lands in the
-gap (an edge it cannot land is skipped with a notice), and compares it with N and N+1. A page
-with only `min-width` queries, like a Tailwind one, has no gap and reports nothing.
-`--no-gaps` skips the pass.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-verify-run/references/walk.md` now and follow
+it — it is this step, not background. It covers the viewports and positions walked, the Firefox pass, `--no-motion`, the output layout, fractional widths and `--no-gaps`, and the fallback on exit code 2.
 
 Exit codes: `0` nothing blocking — either no findings at all, or advisory ones
 only; `1` at least one blocking finding printed; `2` no usable browser; `3` the
 walk itself crashed (not a findings report, something threw mid-walk).
 
-**On exit code 2**, fall back in this order: the Chrome or Playwright MCP
-screenshot tools if either is connected, then ask the user for screenshots at the
-five viewports. Say which route you used. (A craft build never reaches this
-branch: `/wp-demo` probes first and stops on 2.)
-
 ## Step 3: Read the findings
 
-- **dead scroll**: consecutive positions where nothing changed. Shorten the
-  section's span or add a cue. Authored silence recorded in `demo/BRIEF.md` is not
-  dead scroll; say so instead of "fixing" it.
-- `unobserved` — the page carries devices but none the harness can sample, and
-  the stalled section carries no scrubbed device of its own. Advisory: it never
-  fails a round. `reveal` was reported as `dead-scroll` for every section that
-  used it until v3.1, which is what taught a build to dismiss 392 findings in
-  prose. A gate that cannot tell a good page from a broken one gets overruled,
-  and then so does every gate beside it.
-- A stalled section that *does* carry `pin`/`pan`/`kinetic`/`wipe`/`drift` and
-  still has nothing samplable reports blocking `dead-scroll`, not `unobserved`.
-  `drive()` is contractually required to publish `--motion-p` for those devices,
-  so its absence means the engine never ran — the `file://`-blocked module script
-  failure this split exists to keep catching — not that the device is unreadable.
-- `no-engine` — the page carries no `data-motion` at all. Fails the round. A
-  motionless page used to walk clean, because an empty frame signature could
-  never accumulate a stall. On a site the plugin did not build, this is expected
-  and not a defect: re-run with `--no-motion` (Step 2b). Never pass it for a page
-  the plugin built, where a missing engine is the failure being caught.
-- **`unobserved` is a per-section judgment; `no-engine` keeps a document-wide count.**
-  The probe walks `[data-motion]` inside the walked section's own subtree, so an
-  `unobserved` row is a fact about that section: it carries devices this harness
-  cannot read. Pointer devices — `tilt`, `magnet`, `spotlight` — publish nothing a
-  scroll walk can sample, so a section carrying only those is unreadable, not dead.
-  `no-engine` is still the page's fact ("this demo carries no `data-motion` at
-  all") and still prints one row per section. A section carrying no device of its
-  own, on a page that does move, is reported as nothing at all — a plain
-  `<section>` is not a defect.
-- A section carrying no `pin`/`pan`/`kinetic`/`wipe`/`drift` is not judged by the
-  walk at all. `reveal` is a one-shot entry transition a few pixels long — it
-  runs on the child's own `view()` progress, around `scrollY = top - viewport` —
-  so whether a sparse walk lands inside it is sampling luck, and a miss reported
-  dead scroll on a section that reveals perfectly. Such a section is judged by
-  two samples instead, below the fold and fully entered, and reports
-  `dead-scroll` only when no reveal child's **scroll-driven animation** advanced
-  between them — `getAnimations()` filtered to a `ViewTimeline`, not the computed
-  opacity or transform, which an unrelated `@keyframes` or a re-resolving
-  percentage transform could move on a section with no reveal wired at all. A
-  child with no scroll-driven animation reads as `none` at both points, so an
-  unwired reveal is reported rather than skipped. A section that already sits
-  above the fold on load is not judged: its entry happened before the walk could
-  see it.
-- **An advisory-only run exits 0.** `unobserved` and `external-module` are the
-  only advisory kinds; every other kind blocks and still exits 1. Advisory
-  findings are printed with `[advisory]` on the line, and their `findings.json`
-  rows carry `"advisory": true` (blocking rows carry no flag) — read the field
-  rather than matching on the kind. The summary reads `nothing blocking, N
-  advisory finding(s)` — read that as "nothing to fix here, and here is what I
-  could not see", not as a clean run.
-- `container-noop` — an `@container` rule whose subject has no ancestor
-  establishing a container. Fails the round: the rule provably never applies. An
-  element never matches a container query against the container it establishes
-  itself, so a block that queries its own root silently loses its breakpoints.
-- `external-module` — the page loads `<script type="module" src=…>`. Advisory.
-  Verification serves over HTTP so it runs, but a client double-clicking the
-  file gets an opaque origin and Chrome blocks it, and the engine never boots.
-- **cue never reaches full opacity**: the window is too narrow or the ramps eat
-  it. Widen the window or set explicit ramps.
-- **horizontal overflow**: at any width, always a defect. The row lists up to five
-  `culprits`, the boxes past the right edge that no ancestor clips, widest first.
-  Fix those, not the rows under them. A culprit with `escapes` is a
-  `position: absolute` box that got past that clipping box, because its containing
-  block sits outside it. A screen-reader span inside a carousel card is the usual
-  case: it is 1px and shows in no screenshot. Give an ancestor inside the named box
-  `position: relative`, usually the card.
-- **breakpoint-gap**: blocking. A `max-width: N` rule and a `min-width: N+1` rule leave the
-  fractional widths between them (zoom, display scaling) matched by neither, and the page
-  there differs from both N and N+1: it overflows, a box is more than 50% and 100px wider
-  than at either neighbour, or boxes hidden at both are visible. The row gives `width` (N),
-  the measured `viewport`, and up to five `culprits`; `gap-<N>.png` and `gap-<N>.jpg` sit
-  beside the sheets. Close the gap: `max-width: N.98px`, or range syntax `(width < N+1)`.
-- **clipped copy**: text taller than its own hidden-overflow box.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-verify-run/references/findings.md` now and follow
+it — it is this step, not background. It covers every finding kind the walk reports (dead scroll, `unobserved`, `no-engine`, `container-noop`, `external-module`, cue opacity, horizontal overflow, breakpoint-gap, clipped copy) and which ones block a round.
 
 ## Step 3.5: Undeclared inert controls
 

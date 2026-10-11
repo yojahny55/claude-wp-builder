@@ -479,6 +479,7 @@ commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. 
 | `wp-finalize-run` | The check detail of `/wp-finalize` — one reference file per long check, read at that check so the command stays a short map |
 | `wp-section-run` | The step detail of `/wp-section` — one reference file per long step, read at that step so the command stays a short map |
 | `wp-clone-run` | The step detail of `/wp-clone` — one reference file per clone path and for the post-clone verification, read at that step so the command stays a short map |
+| `wp-demo-verify-run` | The step detail of `/wp-demo-verify` — one reference file for the detector, the walk and the reading of findings, read at that step so the command stays a short map |
 | `wp-header-run` | The step detail of `/wp-header` — one reference file for the wp-template prompt and one for the CSS routing, read at that step so the command stays a short map |
 | `wp-tailwind-migrate-run` | The step detail of `/wp-tailwind-migrate` — one reference file for the author-mode dispatch and one for the verification, read at that step so the command stays a short map |
 | `wp-tailwindify-run` | The step detail of `/wp-tailwindify` — one reference file for the agent dispatch and one for the verification, read at that step so the command stays a short map |

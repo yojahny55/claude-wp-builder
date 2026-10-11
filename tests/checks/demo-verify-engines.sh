@@ -6,6 +6,7 @@
 # that differs by more than 2px between the engines. Nothing is ever downloaded.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo-verify.md; dv=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
 s=bin/demo-verify.mjs
@@ -19,11 +20,11 @@ grep -Fq -- '--no-firefox' "$s" || fail "$s cannot skip the Firefox pass"
 grep -Fq 'nothing is downloaded' "$s" || fail "$s does not say a missing Firefox is a skip, not a download"
 
 # Docs tell the truth about the widths.
-grep -Fq '375, 576, 620, 768, 1024, 1100, 1152, 1280 and 1440' commands/wp-demo-verify.md \
+grep -Fq '375, 576, 620, 768, 1024, 1100, 1152, 1280 and 1440' "$dv" \
   || fail "commands/wp-demo-verify.md lists other widths than the script shoots"
 grep -Fq 'screenshots at 9 viewports' commands/wp-responsive-check.md || fail "wp-responsive-check still claims 7 viewports"
 grep -Fq '7 viewports' README.md commands/wp-responsive-check.md && fail "a doc still says 7 viewports"
-grep -Fq 'Firefox pass' commands/wp-demo-verify.md || fail "commands/wp-demo-verify.md does not document the Firefox pass"
+grep -Fq 'Firefox pass' "$dv" || fail "commands/wp-demo-verify.md does not document the Firefox pass"
 
 # Runtime, when this machine can: the Firefox shots land beside Chromium's.
 command -v node >/dev/null || { echo "PASS (static only: no node)"; exit 0; }

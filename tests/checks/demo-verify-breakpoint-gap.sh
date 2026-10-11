@@ -11,7 +11,7 @@ cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
 s=bin/demo-verify.mjs
-c=commands/wp-demo-verify.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo-verify.md; c=$EXPANDED
 r=skills/wp-responsive/SKILL.md
 fx=tests/fixtures/breakpoint-gap
 

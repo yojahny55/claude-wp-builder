@@ -16,7 +16,7 @@ cd "$(dirname "$0")/../.."
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; wp_yolo=$EXPANDED
 fail() { echo "FAIL: $*"; exit 1; }
 
-c=commands/wp-demo-verify.md
+. tests/checks/lib/expand-command.sh; expand_command commands/wp-demo-verify.md; c=$EXPANDED
 d=$wp_demo
 
 grep -Eq 'impeccable@4' "$c" || fail "$c does not pin the detector to the real major version (4, not the nonexistent 1)"
@@ -120,7 +120,7 @@ grep -Fq 'overflow: document.documentElement.scrollWidth > window.innerWidth + 1
   || fail "$v does not read horizontal overflow from the document element, so overflow caused outside the walked section goes unreported"
 grep -Fq "data-motion') === 'reveal'" "$vs" \
   || fail "$v does not sample the reveal device, so every reveal-only section reports dead scroll"
-for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
+for f in skills/wp-demo-craft/references/verify.md "$c"; do
   grep -Fq 'unobserved' "$f" || fail "$f does not document the unobserved finding"
   grep -Fq 'no-engine' "$f" || fail "$f does not document the no-engine finding"
 done
@@ -181,7 +181,7 @@ grep -Fq "animation-timeline', 'view()" skills/wp-demo-craft/references/verify.m
   || fail "skills/wp-demo-craft/references/verify.md does not record that reveal is unjudged without view() support, so the limit reads as a bug"
 grep -Fq '} else if (b.scrub) {' "$vs" \
   || fail "$v pushes dead-scroll from the walk for an entry-driven section, which is the false positive the two-point sample replaces"
-for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
+for f in skills/wp-demo-craft/references/verify.md "$c"; do
   grep -Fq 'below the fold and fully entered' "$f" \
     || fail "$f does not document that a section with no scrubbed device is judged by two samples, not by the walk"
 done
@@ -202,7 +202,7 @@ grep -Fq "' [advisory]'" "$vs" \
   || fail "$v does not label advisory findings in the printed line, so a reader cannot see why a run with findings exited 0"
 grep -Fq 'nothing blocking, ' "$vs" \
   || fail "$v does not distinguish an advisory-only run from a run with nothing to report"
-for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
+for f in skills/wp-demo-craft/references/verify.md "$c"; do
   grep -Fq 'advisory-only run exits 0' "$f" \
     || fail "$f does not document that an advisory-only run exits 0"
   # The artifact has to be self-describing, or every consumer carries its own
@@ -218,7 +218,7 @@ grep -Fq 'f.advisory = true' "$vs" \
   || fail "$v writes findings.json without the advisory flag, so the label exists only on stdout"
 # The command contradicted itself: an exit-code line that predates the advisory
 # split, three lines from the line that documents it.
-if grep -Fq '`0` no machine findings, `1` findings printed' commands/wp-demo-verify.md; then
+if grep -Fq '`0` no machine findings, `1` findings printed' "$c"; then
   fail "commands/wp-demo-verify.md still documents the pre-advisory exit codes, contradicting its own advisory-only-run line"
 fi
 grep -Fq 'Fold every **blocking** finding' "$wp_yolo" \
@@ -371,7 +371,7 @@ grep -A1 -F "server.listen(0, '127.0.0.1', () => {" "$vs" \
 # bare kind name: both files also name-drop 'external-module' in passing, in
 # the sentence that lists the advisory kinds, so a grep for the bare word alone
 # stays green even with the dedicated explanatory bullet deleted outright.
-for f in skills/wp-demo-craft/references/verify.md commands/wp-demo-verify.md; do
+for f in skills/wp-demo-craft/references/verify.md "$c"; do
   grep -Fq 'container-noop' "$f" || fail "$f does not document the container-noop finding"
   grep -Fq 'provably never applies' "$f" \
     || fail "$f does not explain that container-noop fails the round because the rule provably never applies"
