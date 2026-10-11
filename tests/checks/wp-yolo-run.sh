@@ -16,6 +16,11 @@ refs=skills/wp-yolo-run/references
 
 [ -r "$skill" ] || { echo "FAIL: $skill is missing"; exit 1; }
 
+# An empty references/ would otherwise run the loop once on the literal glob.
+shopt -s nullglob
+set -- "$refs"/*.md
+[ $# -gt 0 ] || { echo "FAIL: $refs has no references"; exit 1; }
+
 for f in "$refs"/*.md; do
   b=$(basename "$f")
   grep -Fq "\${CLAUDE_PLUGIN_ROOT}/skills/wp-yolo-run/references/$b\` now and follow it" "$cmd" \
@@ -24,10 +29,10 @@ for f in "$refs"/*.md; do
   # The reference names its step, and that step heading still exists in the command.
   step=$(sed -n '1s/^# \/wp-yolo — //p' "$f")
   [ -n "$step" ] || { err "$f has no '# /wp-yolo — Step N' title"; continue; }
-  grep -Fq -- "## ${step}:" "$cmd" || err "$f belongs to $step, which $cmd no longer has"
+  grep -Eq -- "^## ${step}( |:)" "$cmd" || err "$f belongs to $step, which $cmd no longer has"
   # The pointer sits under that step, not elsewhere in the command.
-  awk -v s="## ${step}:" -v b="references/$b" '
-    index($0, s) == 1 { on = 1; next } /^## Step / { on = 0 } on && index($0, b) { found = 1 }
+  awk -v s="^## ${step}( |:)" -v b="references/$b" '
+    $0 ~ s { on = 1; next } /^## / { on = 0 } on && index($0, b) { found = 1 }
     END { exit !found }' "$cmd" || err "$cmd points to $b outside $step"
 done
 

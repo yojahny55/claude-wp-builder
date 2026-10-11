@@ -20,6 +20,11 @@ refs=skills/wp-create-run/references
 
 [ -r "$skill" ] || { echo "FAIL: $skill is missing"; exit 1; }
 
+# An empty references/ would otherwise run the loop once on the literal glob.
+shopt -s nullglob
+set -- "$refs"/*.md
+[ $# -gt 0 ] || { echo "FAIL: $refs has no references"; exit 1; }
+
 for f in "$refs"/*.md; do
   b=$(basename "$f")
   grep -Fq "\${CLAUDE_PLUGIN_ROOT}/skills/wp-create-run/references/$b\` now and" "$cmd" \
