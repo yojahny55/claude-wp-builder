@@ -175,19 +175,20 @@ const file = process.argv[2];
 let source = fs.readFileSync(file, 'utf8');
 const quote = (value) => JSON.stringify(String(value));
 
-// Every rewrite asserts it changed something. A regex that quietly matches nothing leaves
+// Every rewrite asserts its pattern matched. A regex that quietly matches nothing leaves
 // the previous baseURL in place and the suite measures the wrong site -- exits 0, reports
 // findings, names no error. That is the exact failure this file exists to close, and it is
 // reachable on any re-run, because audit.config.js is deliberately never overwritten.
+// The assertion is on the match, not on the text changing: a re-run against the same URL
+// and site name rewrites each value to itself, and that is a no-op, not a failure.
 const rewrite = (text, pattern, replacement, what) => {
-  const next = text.replace(pattern, replacement);
-  if (next === text) {
+  if (!pattern.test(text)) {
     throw new Error(
       `${file} has no assignable "${what}" -- expected \`${what}: '<value>'\`. `
       + 'Fix the file or delete it and let the scaffold re-seed it; leaving it would audit the wrong site.',
     );
   }
-  return next;
+  return text.replace(pattern, replacement);
 };
 
 source = rewrite(source, /(\bbaseURL:\s*)(['"]).*?\2/, `$1${quote(process.env.BASE_URL)}`, 'baseURL');

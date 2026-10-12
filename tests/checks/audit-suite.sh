@@ -183,6 +183,29 @@ if (!c.notFoundPath) { console.error("the tail of the file was eaten: notFoundPa
 ' "$cfg" || fail "the rewritten config does not hold what it was given"
 
 # ---------------------------------------------------------------------------
+# 3c. A re-run against the same site is not a failure
+# ---------------------------------------------------------------------------
+# The rewrite asserted that the text changed, so the second run against the same URL and
+# site name rewrote each value to itself and stopped with "has no assignable baseURL" --
+# every re-audit of a project failed until someone edited its config by hand. The guard
+# must hold on the match instead: same values pass, a config with no baseURL still fails.
+for run in 1 2; do
+  RUNNER="$runner" CFG="$cfg" BASE_URL="https://example.com" SITE="Example" PAGES="/,/a/,/b/" \
+    node "$tmp/rewrite.js" 2>/dev/null \
+    || fail "$runner refused re-run $run against the URL and site name the config already holds"
+done
+node -e '
+const c = require(process.argv[1]);
+if (c.baseURL !== "https://example.com" || c.siteName !== "Example") process.exit(1);
+' "$cfg" || fail "the same-value re-run changed baseURL or siteName"
+
+nobase="$tmp/audit.config.nobase.js"
+sed '/\bbaseURL:/d' "$cfg" > "$nobase"
+if RUNNER="$runner" CFG="$nobase" BASE_URL="https://example.com" node "$tmp/rewrite.js" 2>/dev/null; then
+  fail "$runner accepted a config with no baseURL -- the suite would audit whatever site it last held"
+fi
+
+# ---------------------------------------------------------------------------
 # 4. The runner refuses and skips in the right places
 # ---------------------------------------------------------------------------
 set +e
