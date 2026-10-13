@@ -507,7 +507,9 @@ function compare(findings, previous, scope = {}) {
     // A previous run that measured nothing is not one that found nothing, and the
     // difference decides how to read every "new since" below it.
     unmeasured: Array.isArray(previous.unmeasured) ? previous.unmeasured.length : 0,
-    counts: counts(previous.findings),
+    // A finding the previous run carried forward unmeasured is in its sidecar for the baseline,
+    // not in its score: it was not found by that run.
+    counts: counts(previous.findings.filter((finding) => !finding.not_remeasured)),
     resolved: previous.findings.filter((finding) => !now.has(identity(finding)) && measuredNow(finding)),
     notMeasured: previous.findings.filter((finding) => !now.has(identity(finding)) && !measuredNow(finding)),
     added: findings.filter((finding) => !before.has(identity(finding))),

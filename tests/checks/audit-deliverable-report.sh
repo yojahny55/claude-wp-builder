@@ -296,6 +296,10 @@ node "$r" --run "$tmp/run-nm2.json" --out "$tmp/out-nm" --format md >/dev/null \
   || fail "$r failed on the run that covers the category again"
 grep -Fq 'Resolved since the previous run:** 1' "$tmp/out-nm/informe-2026-09-17.md" \
   || fail "a finding left unmeasured one run was lost from the baseline instead of resolving once measured"
+# That baseline finding rode in the 2026-09-16 sidecar, but that run did not find it: the
+# previous-run score must count its one real finding, not two.
+grep -Fq 'Previous run:** 2026-09-16 — Findings: 1 (' "$tmp/out-nm/informe-2026-09-17.md" \
+  || fail "the previous-run score counts a finding that run only carried forward unmeasured"
 
 # ---------------------------------------------------------------------------
 # 3b. The merge: two sources, one report
