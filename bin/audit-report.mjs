@@ -22,6 +22,12 @@
 // Usage:
 //   bin/audit-report.mjs --run <run.json> [--merge <other.json>...] [--out <dir>]
 //                        [--format md|html|both] [--lang en|es] [--date YYYY-MM-DD]
+//                        [--notes <file>]
+//
+// --notes reads a plain-text file whose paragraphs (separated by a blank line) become the
+// "Scope and coverage" section, after any `notes` the run file itself carries. It is for what
+// the findings cannot say: what was audited and against which environment, what was left out
+// and why, which numbers come from a local clone rather than the live site.
 //
 // --merge folds another run file into this one. One audit produces two sources of findings
 // -- the agents, and the browser suite -- and rendering them separately would split one
@@ -44,6 +50,7 @@ const SEVERITY_ORDER = { CRITICAL: 0, WARNING: 1, INFO: 2 };
 const STRINGS = {
   en: {
     title: 'Web audit',
+    scope: 'Scope and coverage',
     date: 'Date',
     tier: 'Tier',
     categories: 'Categories',
@@ -84,6 +91,7 @@ const STRINGS = {
     severity: { CRITICAL: 'High', WARNING: 'Medium', INFO: 'Low' },
   },
   es: {
+    scope: 'Alcance y cobertura',
     title: 'Auditoría web',
     date: 'Fecha',
     tier: 'Nivel',
@@ -147,6 +155,7 @@ function parseArgs(argv) {
       case '--out':
       case '--format':
       case '--lang':
+      case '--notes':
       case '--date': {
         if (value === undefined || value.startsWith('--')) {
           die(1, `${flag} needs a value`);
@@ -278,6 +287,41 @@ function validateUnmeasured(entries) {
   return problems;
 }
 
+// Free text for the "Scope and coverage" section. A run file carries it as `notes`: one string
+// or an array of strings, each a paragraph (a paragraph whose lines all start with "- " is
+// rendered as a list). The HTML report escapes it like any other cell. The Markdown report
+// keeps it as written: the auditor writes these notes, and a path in backticks or a link
+// should render in the .md the way it was typed.
+function normalizeNotes(value, where) {
+  if (value === undefined || value === null) return [];
+  const list = Array.isArray(value) ? value : [value];
+  list.forEach((item, index) => {
+    if (typeof item !== 'string') {
+      die(1, `${where} "notes"[${index}] is not a string -- notes are plain-text paragraphs`);
+    }
+  });
+  return list.map((item) => item.trim()).filter(Boolean);
+}
+
+function readNotesFile(path) {
+  let raw;
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch (error) {
+    die(1, `cannot read ${path}: ${error.message}`);
+  }
+  return raw.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
+}
+
+// A paragraph is a list when every line is a "- " bullet, otherwise running text.
+function noteBlock(note) {
+  const lines = note.split('\n').map((line) => line.trim()).filter(Boolean);
+  if (lines.length && lines.every((line) => line.startsWith('- '))) {
+    return { list: lines.map((line) => line.slice(2).trim()) };
+  }
+  return { text: lines.join(' ') };
+}
+
 function identity(finding) {
   return finding.resource ? `${finding.check}:${finding.resource}` : finding.check;
 }
@@ -341,7 +385,11 @@ function mergeRuns(base, extras) {
   }
 
   if (superseded) console.log(`audit-report: ${superseded} finding(s) reported by two sources, kept once`);
-  return { ...base, findings: merged, unmeasured };
+  const notes = [
+    ...normalizeNotes(base.notes, 'the run file'),
+    ...extras.flatMap((extra) => normalizeNotes(extra.notes, 'a merged run file')),
+  ];
+  return { ...base, findings: merged, unmeasured, notes };
 }
 
 // A sidecar is `informe-<date>.json`, or `informe-<date>-<HHMM[SS][-N]>.json` once a later
@@ -543,6 +591,17 @@ function renderMarkdown(model) {
   if (model.plan.length) {
     push(fill(t.ownershipCounts, model.ownership));
     push();
+  }
+
+  if (model.notes.length) {
+    push(`## ${t.scope}`);
+    push();
+    for (const note of model.notes) {
+      const block = noteBlock(note);
+      if (block.list) block.list.forEach((item) => push(`- ${item}`));
+      else push(block.text);
+      push();
+    }
   }
 
   push(`## ${t.comparison}`);
@@ -955,8 +1014,20 @@ ${groups}
         .join('')}</tbody></table></div>`
     : `<p>${esc(t.none)}</p>`;
 
+  const notesBlock = model.notes.length
+    ? `<section id="scope"><h2>${esc(t.scope)}</h2>${model.notes
+        .map((note) => {
+          const block = noteBlock(note);
+          return block.list
+            ? `<ul>${block.list.map((item) => `<li>${esc(item)}</li>`).join('')}</ul>`
+            : `<p>${esc(block.text)}</p>`;
+        })
+        .join('')}</section>\n`
+    : '';
+
   const toc = [
     ['summary', t.summary],
+    model.notes.length ? ['scope', t.scope] : null,
     ['comparison', t.comparison],
     model.byCategory.size ? ['by-category', t.byCategory] : null,
     model.byPage.size ? ['by-page', t.byPage] : null,
@@ -994,7 +1065,7 @@ ${model.categories.length ? `<p class="meta">${esc(t.categories)}: ${esc(model.c
 <section id="summary"><h2>${esc(t.summary)}</h2>
 <p>${esc(scoreSentence(t, c))}</p>
 ${model.plan.length ? `<p>${esc(fill(t.ownershipCounts, model.ownership))}</p>` : ''}</section>
-<section id="comparison"><h2>${esc(t.comparison)}</h2>${comparisonBlock()}</section>
+${notesBlock}<section id="comparison"><h2>${esc(t.comparison)}</h2>${comparisonBlock()}</section>
 ${groupTable(t.byCategory, 'by-category', model.byCategory, t.category, (name) => `<a href="#${groupIds.get(name)}">${esc(categoryName(name))}</a>`)}
 ${groupTable(t.byPage, 'by-page', model.byPage, t.page, (name) => `<code>${esc(name)}</code>`)}
 <section id="plan"><h2>${esc(t.plan)}</h2>
@@ -1016,6 +1087,10 @@ function main() {
   const run = opts.merge.length
     ? mergeRuns(loadRun(opts.run), opts.merge.map(loadRun))
     : loadRun(opts.run);
+  const notes = [
+    ...normalizeNotes(run.notes, 'the run file'),
+    ...(opts.notes ? readNotesFile(opts.notes) : []),
+  ];
   const findings = run.findings;
 
   // A run with no findings is still rendered. A clean audit is a result the client is owed,
@@ -1053,6 +1128,7 @@ function main() {
     byPage: groupBy(folded, 'page'),
     plan: sortForPlan(folded),
     unmeasured: Array.isArray(run.unmeasured) ? run.unmeasured : [],
+    notes,
     comparison: compare(folded, previous, {
       unmeasured: Array.isArray(run.unmeasured) ? run.unmeasured : [],
       categories: Array.isArray(run.categories) ? run.categories : [],
@@ -1083,6 +1159,7 @@ function main() {
         site: model.site,
         tier: model.tier,
         categories: model.categories,
+        notes: model.notes,
         unmeasured: model.unmeasured.map((entry) => ({ check: entry.check, reason: entry.reason || null })),
         // A previous finding this run did not measure stays in the baseline, flagged, so the
         // first run that does measure it can report it resolved instead of losing it.

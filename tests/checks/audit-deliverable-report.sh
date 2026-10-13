@@ -262,6 +262,46 @@ grep -Fq 'Still failing:** 2' "$md2" || fail "$md2 does not report the carried f
 grep -Fq 'SEO-012' "$md2" || fail "$md2 does not name the resolved finding"
 grep -Fq '2026-09-01' "$md2" || fail "$md2 does not name the run it compared against"
 
+# Scope and coverage: free text the findings cannot carry. It reaches both documents, the
+# sidecar, and is escaped in the HTML; --notes adds a file's paragraphs after the run's own.
+cat > "$tmp/run-notes.json" <<'JSON'
+{
+  "site": "fixture",
+  "date": "2026-09-19",
+  "notes": ["Audited the local clone, not the live site.", "- Not run: crawl of the live host\n- Not run: mail deliverability <b>x</b>"],
+  "findings": []
+}
+JSON
+printf 'Metrics come from a clone behind no CDN.\n\nSecond paragraph.\n' > "$tmp/extra-notes.txt"
+node "$r" --run "$tmp/run-notes.json" --notes "$tmp/extra-notes.txt" --out "$tmp/out-notes" --format both >/dev/null \
+  || fail "$r failed on a run carrying notes"
+for ext in md html; do
+  f="$tmp/out-notes/informe-2026-09-19.$ext"
+  grep -Fq 'Scope and coverage' "$f" || fail "$f has no Scope and coverage section (.$ext)"
+  grep -Fq 'Audited the local clone' "$f" || fail "$f drops the run file's notes (.$ext)"
+  grep -Fq 'Metrics come from a clone' "$f" || fail "$f drops the --notes file (.$ext)"
+  grep -Fq 'Not run: crawl of the live host' "$f" || fail "$f drops a bulleted note (.$ext)"
+done
+grep -Fq '<li>Not run: crawl of the live host</li>' "$tmp/out-notes/informe-2026-09-19.html" \
+  || fail "a bulleted note is not rendered as a list in the HTML"
+if grep -Fq '<b>x</b>' "$tmp/out-notes/informe-2026-09-19.html"; then
+  fail "a note reaches the HTML unescaped"
+fi
+node -e 'const d=require(process.argv[1]); if(!Array.isArray(d.notes)||d.notes.length!==4) process.exit(1)' \
+  "$tmp/out-notes/informe-2026-09-19.json" || fail "the sidecar does not keep the notes"
+node "$r" --run "$tmp/run2.json" --out "$tmp/out-nonotes" --format both >/dev/null \
+  || fail "$r failed on a run with no notes"
+if grep -Fq 'Scope and coverage' "$tmp/out-nonotes/informe-2026-09-15.md" "$tmp/out-nonotes/informe-2026-09-15.html"; then
+  fail "a run with no notes prints an empty Scope and coverage section"
+fi
+node "$r" --run "$tmp/run-notes.json" --lang es --out "$tmp/out-notes-es" --format md >/dev/null \
+  || fail "$r failed on a Spanish run with notes"
+grep -Fq 'Alcance y cobertura' "$tmp/out-notes-es/informe-2026-09-19.md" \
+  || fail "the Spanish report has no Alcance y cobertura section"
+printf '{"site":"fixture","date":"2026-09-19","notes":[1],"findings":[]}' > "$tmp/run-badnotes.json"
+set +e; node "$r" --run "$tmp/run-badnotes.json" --out "$tmp/out-bad" >/dev/null 2>&1; code=$?; set -e
+[ "$code" -eq 1 ] || fail "a non-string note exited $code instead of 1"
+
 # A previous finding is resolved only if this run looked at it. Same baseline, but now the
 # run lists SEO-012 as unmeasured (a check it could not run here) and covers only security:
 # the missing finding was not fixed, it was not re-measured, and the report must not claim it.

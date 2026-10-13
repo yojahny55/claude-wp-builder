@@ -70,6 +70,7 @@ it is an argument, not an artifact:
   "date": "<YYYY-MM-DD>",
   "tier": "<the same label Step 3 printed>",
   "categories": ["security", "seo", "usability"],
+  "notes": ["<scope and coverage: what was audited, against which environment, what was left out and why>"],
   "findings": [
     {
       "check": "SEC-036",
@@ -88,6 +89,14 @@ it is an argument, not an artifact:
   ]
 }
 ```
+
+`notes` is optional free text for what the findings cannot say: the environment audited, what
+was out of scope or skipped and why, which numbers come from a local clone. It is a string or
+an array of strings, each a paragraph (a paragraph whose lines all start with `- ` renders as a
+list). The renderer prints it as "Scope and coverage" (`Alcance y cobertura` with `--lang es`)
+in the Markdown and the HTML, and keeps it in the sidecar. `--notes <file>` adds the paragraphs
+of a plain-text file after the run's own, so nobody edits the generated report by hand to add
+this section.
 
 `check`, `severity`, `ownership` and `message` are required on every finding: the renderer
 **refuses a finding with no `ownership`** and exits `1` naming it, because a plan whose last
