@@ -262,6 +262,41 @@ grep -Fq 'Still failing:** 2' "$md2" || fail "$md2 does not report the carried f
 grep -Fq 'SEO-012' "$md2" || fail "$md2 does not name the resolved finding"
 grep -Fq '2026-09-01' "$md2" || fail "$md2 does not name the run it compared against"
 
+# A previous finding is resolved only if this run looked at it. Same baseline, but now the
+# run lists SEO-012 as unmeasured (a check it could not run here) and covers only security:
+# the missing finding was not fixed, it was not re-measured, and the report must not claim it.
+mkdir -p "$tmp/out-nm"
+cp "$tmp/out/informe-2026-09-01.json" "$tmp/out-nm/"
+cat > "$tmp/run-nm.json" <<'JSON'
+{
+  "site": "fixture",
+  "date": "2026-09-16",
+  "categories": ["security"],
+  "unmeasured": [{"check":"SEO-012","reason":"needs the production crawl"}],
+  "findings": [
+    {"check":"SEC-036","resource":"wp_options.siteurl","severity":"CRITICAL","ownership":"setting","category":"security","page":"/","message":"Development host in siteurl"}
+  ]
+}
+JSON
+node "$r" --run "$tmp/run-nm.json" --out "$tmp/out-nm" --format both >/dev/null \
+  || fail "$r failed on a run that left a previous finding unmeasured"
+for ext in md html; do
+  f="$tmp/out-nm/informe-2026-09-16.$ext"
+  grep -Fq 'Not re-measured in this run' "$f" \
+    || fail "$f does not separate a previous finding the run never measured (.$ext)"
+done
+if grep -Eq 'Resolved since the previous run:\*\* *[1-9]' "$tmp/out-nm/informe-2026-09-16.md"; then
+  fail "a previous finding whose check was unmeasured, or whose category was not run, counts as resolved"
+fi
+# The unmeasured finding stays in the baseline, so the first run that does measure it can
+# resolve it: SEO-012 is seo, this run covers seo again and no longer reports it.
+node -e 'const r=require(process.argv[1]); delete r.unmeasured; r.categories=["security","seo"]; r.date="2026-09-17"; require("fs").writeFileSync(process.argv[2], JSON.stringify(r))' \
+  "$tmp/run-nm.json" "$tmp/run-nm2.json"
+node "$r" --run "$tmp/run-nm2.json" --out "$tmp/out-nm" --format md >/dev/null \
+  || fail "$r failed on the run that covers the category again"
+grep -Fq 'Resolved since the previous run:** 1' "$tmp/out-nm/informe-2026-09-17.md" \
+  || fail "a finding left unmeasured one run was lost from the baseline instead of resolving once measured"
+
 # ---------------------------------------------------------------------------
 # 3b. The merge: two sources, one report
 # ---------------------------------------------------------------------------
