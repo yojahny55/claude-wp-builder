@@ -287,6 +287,37 @@ curl error is `UNMEASURED` with the status line as evidence: a WAF answer is not
 header set. WordPress themes and page builders inline scripts, so the fix is a policy built
 for the site (start report-only), never a one-line paste, and it is not auto-applied.
 
+**SEC-045 — File-manager plugin installed.** A file manager in wp-admin reads, uploads and
+edits any file the web server can write, PHP included. It ignores `DISALLOW_FILE_EDIT`, which
+only hides the core theme and plugin editors, so one stolen admin session becomes code
+execution. Most of these plugins are a wrapper around elFinder, whose connector is a PHP file
+under the plugin folder that answers direct requests whether the plugin is active or not: that
+is how File Manager (`wp-file-manager`) was mass-exploited without login in 2020.
+So an inactive copy is a finding too, not only an active one.
+
+Match on either signal, for every installed plugin:
+
+```bash
+$WP plugin list --fields=name,status --format=csv
+# known slugs: wp-file-manager, file-manager-advanced, filester
+# fingerprint: the plugin folder bundles elFinder
+{ find wp-content/plugins -maxdepth 6 -type f -iname 'elfinder*.js'
+  find wp-content/plugins -maxdepth 6 -type f -iname 'connector*.php' -exec grep -l 'elFinder' {} +
+} | awk -F/ '{print $3}' | sort -u
+```
+
+A `connector*.php` counts only when it names elFinder. The file name alone is common:
+Smush, Forminator and any plugin vendoring `illuminate/contracts` ship one, and matching
+on the name would report them as file managers and tell the owner to delete them.
+
+The fingerprint is what catches renamed forks and premium copies the slug list does not
+know. Report the slug, its status and the matched signal. The message for an active copy is
+`File manager <slug> is active: any admin session can edit PHP on the server`. For an inactive
+copy it is `File manager <slug> is installed (inactive); its bundled elFinder connector stays
+reachable`. The fix is to delete the plugin, never to deactivate it: `Fix: manual`, because the
+site owner may still use it, and removal is their decision. A file manager is never one of the
+`Clone-suppressed plugins` categories, so a local clone reports it like production does.
+
 **SEC-043 — Duplicate/redeclared function across site code:**
 - This is Tier 1 — a code scan, no network and no vulnerability feed needed. Two files that
   each declare `function acme_get_field()` at the top level cannot both load; nothing short
@@ -391,6 +422,7 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 | SEC-041 | Known-vulnerable plugins/themes | Match installed plugin/theme slugs and versions against the WPScan vulnerability API (`WPSCAN_API_TOKEN`), **after the SEC-038 network gate passes**; only public slugs are sent. See Procedure | 0 vulnerable matches | CRITICAL (loaded) / WARNING (inactive) |
 | SEC-042 | Abandoned plugins | wp.org API `last_updated` older than ~2 years, or `tested` far behind the installed core version, for every loaded plugin (active, plus clone-suppressed on a local clone), **after the SEC-038 network gate passes**. See Procedure | Not abandoned | WARNING |
 | SEC-044 | Content-Security-Policy header missing or unsafe | LIVE, production only. `curl -sSI` of the confirmed public home URL (`/wp-audit` Step 2.3) and read `content-security-policy` (and `content-security-policy-report-only`). See Procedure | A `Content-Security-Policy` header is present and its `script-src` (or `default-src` fallback) does not allow bare `*`, `data:` or `'unsafe-eval'`; report-only alone is `INFO`. `UNMEASURED` ("needs the public URL") on a local clone without a confirmed public URL, never `PASS` | WARNING |
+| SEC-045 | File-manager plugin installed | Every installed plugin (active **and** inactive): slug on the known list, or its folder bundles elFinder. See Procedure | None installed | WARNING |
 
 SEC-040 is `N/A ("no WooCommerce")`, out of the denominator, when `site.commerce` is `none` (`/wp-audit`
 Step 2.3) — this check has nothing to read without WooCommerce installed and active. It stays
