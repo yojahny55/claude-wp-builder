@@ -144,6 +144,7 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 | PERF-067 | Confirmed cross-visitor currency bleed on a cached page | LIVE. Against the confirmed production host, request the same shop/product URL twice, selecting a different one of the store's currencies each time by whatever mechanism the active plugin uses (cookie, session or a `?currency=` parameter), and read the rendered price and the cache-status header PERF-066 detected (`cf-cache-status`, or its `x-cache`/equivalent counterpart on a non-Cloudflare layer) from each response | The second request's price/currency matches the currency it selected; FAIL when `cf-cache-status` is `HIT` on the second request (or the equivalent HIT value for the header PERF-066 detected) and the price still matches the FIRST request's currency. Same `N/A`/`UNMEASURED` gates as PERF-065/PERF-066 | WARNING/CRITICAL |
 | PERF-068 | Cumulative Layout Shift (CLS) above threshold | Per template, see "Procedure — CLS and INP in the browser" below. A `PerformanceObserver` on `layout-shift` (`buffered: true`), summing entries whose `hadRecentInput` is `false`, over the settled load plus one scroll to the bottom, at the mobile and desktop viewports the audit already screenshots at. Read-only and clone-safe: it only observes the page it loads, so a local clone is measured as itself (lab value, not field data) | Worst per-template CLS ≤0.1; `0.1–0.25` is `WARNING`, `>0.25` is `ERROR`; `UNMEASURED` ("needs a browser") when Tier 3 is unavailable, never `PASS` | WARNING/ERROR |
 | PERF-069 | Interaction to Next Paint (INP) above threshold | Per template, see "Procedure — CLS and INP in the browser" below. A `PerformanceObserver` on `event` (`durationThreshold: 16`, `buffered: true`) after scripted real input (click on the menu toggle, a form field, the first interactive control), reporting the worst `interactionId` duration | Worst interaction ≤200ms; `200–500ms` is `WARNING`, `>500ms` is `ERROR`; `UNMEASURED` ("no interaction exercised") when the page has nothing to press, and `UNMEASURED` without a browser. A lab run is an approximation of field INP and the finding says so | WARNING/ERROR |
+| PERF-070 | Page-cache drop-in loaded without its plugin | `advanced-cache.php` exists, `WP_CACHE` is true, and the plugin that wrote it is not active. See "Procedure — page-cache drop-in without its plugin" below | Owner active, or no drop-in, or the owner is clone-suppressed on a local clone | WARNING |
 
 ### Procedure — multi-currency and full-page cache (PERF-065 to PERF-067)
 
@@ -378,6 +379,50 @@ nothing. A head script is blocking only when the served tag has `src` and has no
 it. If exactly one does, either move the enqueue into that template behind a conditional, or
 defer it as in PERF-047. Usual offenders: `aos` (scroll sections), `swiper` (carousels),
 `animate` (single elements), `lightbox` (gallery pages).
+
+### Procedure — page-cache drop-in without its plugin (PERF-070)
+
+A page-cache plugin writes `wp-content/advanced-cache.php` and sets `WP_CACHE` to true in
+`wp-config.php`. Deactivating the plugin from wp-admin does not always undo both, and
+WordPress loads the drop-in on every request for as long as `WP_CACHE` is true, before any
+plugin. The drop-in can then keep serving pages from the old cache with nothing left to purge
+it, so an edit does not show up, or it runs code for a plugin that is gone.
+
+**On a local clone this is usually not a defect.** `/wp-audit` Step 2.3 deactivates the
+page-cache plugin on purpose and lists it under `Clone-suppressed plugins`. The drop-in and
+`WP_CACHE` came with the copy from production, where the same plugin is active and the drop-in
+belongs. Read the clone context lines from the dispatch, by the names the security agent uses
+(`Local clone`, `Clone-suppressed plugins`). Never guess them from which plugins are inactive.
+
+Read the drop-in and the constant once:
+
+```bash
+$WP eval 'echo defined("WP_CACHE") && WP_CACHE ? "WP_CACHE=on" : "WP_CACHE=off", PHP_EOL;'
+head -c 2000 wp-content/advanced-cache.php
+$WP plugin list --fields=name,status --format=csv
+```
+
+Find the owner from markers in the file. Examples: `SWCFPC_ADVANCED_CACHE` is Super Page
+Cache (`wp-cloudflare-page-cache`), `WPCACHEHOME` is WP Super Cache (`wp-super-cache`),
+`WP_ROCKET_ADVANCED_CACHE` is WP Rocket (`wp-rocket`), `W3TC` is W3 Total Cache
+(`w3-total-cache`), `LSCACHE_ADV_CACHE` is LiteSpeed Cache (`litespeed-cache`). When no marker
+matches, look for an installed plugin's slug written in the file (most drop-ins include a path
+under `wp-content/plugins/<slug>/`).
+
+| State | Result |
+|---|---|
+| No `advanced-cache.php` | pass |
+| Owner found and active | pass |
+| `WP_CACHE` off | `INFO`: the file is not loaded; it is a leftover to delete or a cache to turn back on |
+| `WP_CACHE` on, owner inactive or not installed, `Local clone: yes`, owner on `Clone-suppressed plugins` | no finding; print `PERF-070: clone artifact — <slug> is clone-suppressed (active on production)` |
+| `WP_CACHE` on, owner inactive or not installed, any other case | `WARNING` |
+| `WP_CACHE` on, no owner found | `INFO`, with the drop-in's first comment lines as evidence |
+
+The message for the `WARNING` is `advanced-cache.php from <slug> loads on every request, but
+<slug> is <inactive|not installed>`. The fix is manual: reactivate the plugin, or remove the
+drop-in and set `WP_CACHE` to false. Which one depends on whether the site owner still wants
+that cache, so it is never auto-applied. A clone that removed the drop-in or parked it as
+`advanced-cache.php.bak` is already covered by Step 2.3 and is not this check.
 
 ### Procedure — database bloat checks (PERF-061 to PERF-064)
 
