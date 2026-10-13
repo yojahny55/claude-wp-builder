@@ -136,7 +136,27 @@ bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs drift '${PROJECT_PATH}'"
 
 Exit `0`: the manifest fits the site, continue. Exit `4`: it does not; each `drift:` line names
 a disagreement (theme directory missing, active theme differs from `theme.slug`, active
-plugins absent from `plugins.installed`). Print the lines and ask with `AskUserQuestion`:
+plugins absent from `plugins.installed`, plugins in `plugins.installed` that are not active).
+Print the lines and ask with `AskUserQuestion`.
+
+When **every** line is a plugin-list line (`active plugin(s) not in plugins.installed` or
+`plugin(s) in plugins.installed that are not active`), the owner changed plugins and the
+manifest still describes this site:
+
+```
+The plugin list changed since .wp-create.json was written.
+  [A] Refresh — update plugins and stack only, keep everything else (recommended)
+  [B] Re-adopt — full read-only detection, keeps a timestamped backup and carries the audit history and code scope over
+  [C] Continue with the manifest as it is
+```
+
+On A, run `bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs refresh '${PROJECT_PATH}'"`: it
+re-probes, rewrites `plugins.installed` and `stack` (and the PHP and WordPress versions), keeps
+a `.bak-<timestamp>`, regenerates the CLAUDE.md block and validates. Anything else in the manifest
+is untouched.
+
+When any line is structural (theme directory missing, active theme differs, `source` is
+`"blank"`), the manifest describes another site and `refresh` refuses it:
 
 ```
 .wp-create.json no longer describes this site.
@@ -144,9 +164,11 @@ plugins absent from `plugins.installed`). Print the lines and ask with `AskUserQ
   [B] Continue with the manifest as it is
 ```
 
-On A, run `wp-adopt.md` Steps 2 to 5 with `--replace`. On B, continue, and say in the report
-that every manifest-driven choice (plugin stack, theme slug, code scope) rests on a manifest
-the drift check disputed. Exit `1` (the probe could not run) is not drift: report it and
+Re-adoption (`wp-adopt.md` Steps 2 to 5 with `--replace`) over a real adoption carries over
+`audit`, `store`, the prefix, the industry and the code scope, so the next audit still has its
+baseline; over a blank scaffold it starts from the probe. On a continue answer, say in the
+report that every manifest-driven choice (plugin stack, theme slug, code scope) rests on a
+manifest the drift check disputed. Exit `1` (the probe could not run) is not drift: report it and
 continue. Skip the check when there is no Tier 2.
 
 Read `.claude/CLAUDE.md` to extract:
@@ -303,12 +325,14 @@ ${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host> --start
 
 Use a Bash timeout of at least 150000 ms. The exit-code table in Step 9 ("GEO fixes") applies
 unchanged, and so does its rule that none of them is a pass. The returned score, or the reason
-there is none, fills the report's `Live scan:` line at Step 8; it is never left `pending` by a
+there is none, fills the report's `Live scan:` line at Step 8 (`<score>`, `<score> (stale: scanned <date>)` for exit `4`, or `unavailable — challenged by a bot interstitial` for a `CHALLENGED` skip); it is never left `pending` by a
 run that skips Step 9. Step 9 runs the scan again only to report the before → after score.
 
 ## Step 6.5: Run the browser suite (`--suite` only)
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/browser-suite.md` now and follow it — it is this step, not background. It covers how the browser suite runs, and how its findings merge with the agents' findings.
+
+**Order: the suite against a production host starts only after every Step 6 agent has returned.** `prod-gate.sh` holds a per-host lock for the whole wrapped command, and a suite run against a slow production host lasts many minutes. Agents that need the gate meanwhile wait out `--wait`, exit 5, and report their production checks `UNMEASURED: production gate busy`. Never start the suite beside the agents; the agents' production checks finish first.
 
 ## Step 6.8: Coverage gate — UNMEASURED is not an answer until it is justified
 

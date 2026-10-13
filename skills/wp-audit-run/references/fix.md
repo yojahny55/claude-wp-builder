@@ -35,6 +35,8 @@ If the user declines, skip to Step 10.
 
 If the user confirms, dispatch fix operations by category.
 
+**Cache purges on a clone are local only.** When `local_clone` is true, tell every fix agent to purge only local caches (`$WP cache flush`, the plugin's local fallback or file cache). A CDN or page-cache purge command (for example `wp cfcache purge_cache` from a Cloudflare page-cache plugin) can call the real CDN API with the production zone credentials restored from the database. See *Purging caches on a clone* in `wp-cli-patterns`.
+
 **On an adopted site** (Step 2.2), every `<theme_path>` below means the editable code only.
 Pass `code_scope.editable` and forbid writes under `code_scope.read_only`. After each fix
 agent returns, check that nothing under a read-only path changed:
@@ -113,10 +115,13 @@ confirmed production URL, or `UNMEASURED — needs the public URL` with no scan 
 
 | Exit | Meaning | Report as | Actionable |
 |---|---|---|---|
-| `0` | report returned | the score | — |
+| `0` | current report returned | the score | — |
 | `1` | tool error | `ERROR` | record the error and continue |
-| `2` | no network, a transient `429`/`503`, or a `--start` scan that did not complete (without `--start`: no report yet) | `UNMEASURED` | retry once; else scan at `https://is-agentic.com` |
+| `2` | no network, a transient `429`/`503`, or a `--start` scan that did not complete (without `--start`: no report yet), or a report that is a bot-challenge page (`CHALLENGED`) | `UNMEASURED` (`unavailable — challenged by a bot interstitial` when challenged) | retry once; else scan at `https://is-agentic.com` |
 | `3` | the host is not publicly reachable | `UNMEASURED — configuration` | re-run with `--host <public-url>` |
+| `4` | report returned but older than 24 h and not refreshable (`STALE:` on stderr) | the score, marked stale: `Live scan: 28 (stale: scanned 2026-10-12)` | scan again at `https://is-agentic.com`; the score is not evidence of the site now |
+
+A challenged report (exit `2`) is printed as `Live scan: unavailable — challenged by a bot interstitial`: its score describes the interstitial the scanner was served, so it is never shown as a score. A stale one (exit `4`) is never the "after" score of a fix made since it was scanned.
 
 **None of these is a pass.** An absent score is not a good score; a category whose evidence
 was never collected must not read like one that was collected and came back clean — which is

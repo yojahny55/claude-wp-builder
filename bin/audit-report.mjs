@@ -68,6 +68,7 @@ const STRINGS = {
     improved: 'Resolved since the previous run',
     regressed: 'New since the previous run',
     carried: 'Still failing',
+    notRemeasured: 'Not re-measured in this run (not counted as resolved)',
     byCategory: 'By category',
     byPage: 'By page',
     category: 'Category',
@@ -109,6 +110,7 @@ const STRINGS = {
     improved: 'Resueltos desde la ejecución anterior',
     regressed: 'Nuevos desde la ejecución anterior',
     carried: 'Siguen fallando',
+    notRemeasured: 'Sin volver a medir en esta ejecución (no cuentan como resueltos)',
     byCategory: 'Por categoría',
     byPage: 'Por página',
     category: 'Categoría',
@@ -528,8 +530,21 @@ function fill(template, values) {
   );
 }
 
-function compare(findings, previous) {
+// `scope` says what THIS run measured: `unmeasured` (entries with a check id) and
+// `categories` (the categories the run covered; empty means the run did not say).
+// A previous finding that is absent now is "resolved" only if its check was looked at. One
+// whose check is listed as unmeasured, or whose category the run did not cover, is carried
+// as "not re-measured": absence of evidence is not a fix, and calling it one hid the
+// production-only checks a local run skips behind a "Resolved" count.
+function compare(findings, previous, scope = {}) {
   if (!previous) return null;
+  const skippedChecks = new Set((scope.unmeasured || []).map((entry) => entry.check));
+  const coveredCategories = new Set((scope.categories || []).map((name) => String(name).toLowerCase()));
+  const measuredNow = (finding) => {
+    if (skippedChecks.has(finding.check)) return false;
+    if (coveredCategories.size && finding.category && !coveredCategories.has(String(finding.category).toLowerCase())) return false;
+    return true;
+  };
   // A folded finding is still present: its identity travels under its parent's also_affects.
   // Without this a sibling that outlives its parent reads as resolved-and-new.
   const withFolded = (list) => new Set(list.flatMap((f) => [identity(f), ...(f.also_affects || []).map((a) => identity(a))]));
@@ -540,8 +555,11 @@ function compare(findings, previous) {
     // A previous run that measured nothing is not one that found nothing, and the
     // difference decides how to read every "new since" below it.
     unmeasured: Array.isArray(previous.unmeasured) ? previous.unmeasured.length : 0,
-    counts: counts(previous.findings),
-    resolved: previous.findings.filter((finding) => !now.has(identity(finding))),
+    // A finding the previous run carried forward unmeasured is in its sidecar for the baseline,
+    // not in its score: it was not found by that run.
+    counts: counts(previous.findings.filter((finding) => !finding.not_remeasured)),
+    resolved: previous.findings.filter((finding) => !now.has(identity(finding)) && measuredNow(finding)),
+    notMeasured: previous.findings.filter((finding) => !now.has(identity(finding)) && !measuredNow(finding)),
     added: findings.filter((finding) => !before.has(identity(finding))),
     carried: findings.filter((finding) => before.has(identity(finding))),
   };
@@ -595,7 +613,8 @@ function renderMarkdown(model) {
     push(`**${t.previousRun}:** ${c.date} — ${scoreSentence(t, c.counts)}`
       + (c.unmeasured ? fill(t.previousUnmeasured, { unmeasured: c.unmeasured }) : ''));
     push();
-    for (const [label, list] of [[t.improved, c.resolved], [t.regressed, c.added], [t.carried, c.carried]]) {
+    for (const [label, list] of [[t.improved, c.resolved], [t.regressed, c.added], [t.carried, c.carried], [t.notRemeasured, c.notMeasured]]) {
+      if (list === c.notMeasured && !list.length) continue;
       push(`- **${label}:** ${list.length}`);
       for (const finding of sortForPlan(list)) {
         push(`  - \`${mdCell(identity(finding))}\` — ${mdCell(finding.message)}`);
@@ -940,7 +959,7 @@ function renderHtml(model) {
     return `<p><b>${esc(t.previousRun)}:</b> ${esc(cmp.date)} — ${esc(
       scoreSentence(t, cmp.counts) + (cmp.unmeasured ? fill(t.previousUnmeasured, { unmeasured: cmp.unmeasured }) : ''),
     )}</p>
-<ul class="changes">${list(t.improved, cmp.resolved, 'ok')}${list(t.regressed, cmp.added, 'bad')}${list(t.carried, cmp.carried, 'mid')}</ul>`;
+<ul class="changes">${list(t.improved, cmp.resolved, 'ok')}${list(t.regressed, cmp.added, 'bad')}${list(t.carried, cmp.carried, 'mid')}${cmp.notMeasured.length ? list(t.notRemeasured, cmp.notMeasured, 'mid') : ''}</ul>`;
   };
 
   // The detail groups by category. Findings the run left without a category go into one
@@ -1110,7 +1129,10 @@ function main() {
     plan: sortForPlan(folded),
     unmeasured: Array.isArray(run.unmeasured) ? run.unmeasured : [],
     notes,
-    comparison: compare(folded, previous),
+    comparison: compare(folded, previous, {
+      unmeasured: Array.isArray(run.unmeasured) ? run.unmeasured : [],
+      categories: Array.isArray(run.categories) ? run.categories : [],
+    }),
   };
 
   const written = [];
@@ -1139,7 +1161,12 @@ function main() {
         categories: model.categories,
         notes: model.notes,
         unmeasured: model.unmeasured.map((entry) => ({ check: entry.check, reason: entry.reason || null })),
-        findings: folded.map((finding) => ({
+        // A previous finding this run did not measure stays in the baseline, flagged, so the
+        // first run that does measure it can report it resolved instead of losing it.
+        findings: [
+          ...folded,
+          ...(model.comparison ? model.comparison.notMeasured.map((finding) => ({ ...finding, not_remeasured: true })) : []),
+        ].map((finding) => ({
           check: finding.check,
           resource: finding.resource || null,
           severity: finding.severity,
@@ -1150,6 +1177,7 @@ function main() {
           evidence: finding.evidence || null,
           root_cause: finding.root_cause || null,
           also_affects: finding.also_affects && finding.also_affects.length ? finding.also_affects : null,
+          ...(finding.not_remeasured ? { not_remeasured: true } : {}),
         })),
       },
       null,

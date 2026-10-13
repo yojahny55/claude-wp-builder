@@ -18,6 +18,7 @@ import {
 } from './lib/manifest.mjs';
 import {
   detectWrapper, runProbe, buildManifest, isWordPressRoot, manifestDrift, isTransientWrapper,
+  isPluginListDrift, isScaffoldManifest, carryOver, detectStack,
 } from './lib/adopt.mjs';
 
 const say = (s) => console.log(s);
@@ -290,13 +291,26 @@ function cmdAdopt(projectPath, flags) {
     editable: list(flags.editable),
     read_only: list(flags['read-only']),
   };
-  const {
-    manifest, reasons, prefixSource, conflicts,
-  } = buildManifest(root, probe, { ...detected, wrapper: keepWrapper }, { ...overrides, wrapper: keepWrapper });
+  const built = buildManifest(root, probe, { ...detected, wrapper: keepWrapper }, { ...overrides, wrapper: keepWrapper });
+  const { manifest, reasons, conflicts } = built;
+  let { prefixSource } = built;
+  // --replace over a real adoption or build keeps the operator's decisions and the audit
+  // history; over a blank scaffold there is nothing to keep and it behaves as a first adoption.
+  let carried = [];
+  if (replacing) {
+    let old = null;
+    try { old = JSON.parse(readFileSync(file, 'utf8')); } catch { /* unreadable: nothing to carry */ }
+    if (old && typeof old === 'object' && !isScaffoldManifest(old, root, probe.stylesheet)) {
+      carried = carryOver(old, manifest, root, flags);
+      if (carried.includes('project.prefix')) prefixSource = 'carried over from the previous manifest';
+    }
+  }
   const problems = validateManifest(manifest);
 
   if (flags['dry-run']) {
-    say(JSON.stringify({ manifest, reasons, prefix_source: prefixSource, conflicts, problems }, null, 2));
+    say(JSON.stringify({
+      manifest, reasons, prefix_source: prefixSource, conflicts, carried_over: carried, problems,
+    }, null, 2));
     return;
   }
   if (problems.length) {
@@ -312,6 +326,7 @@ function cmdAdopt(projectPath, flags) {
   writeFileSync(file, `${JSON.stringify(manifest, null, 2)}\n`);
   say(`ok: wrote ${file} (origin: adopted)`);
   for (const c of conflicts) say(`note: ${c}`);
+  if (carried.length) say(`note: kept from the previous manifest: ${carried.join(', ')}`);
   cmdRenderContext(root);
 }
 
@@ -333,6 +348,40 @@ function cmdDrift(projectPath) {
   process.exit(4);
 }
 
+// Update only what the probe measures (the active plugin list, the stack, the PHP and WordPress
+// versions) and keep every operator decision. The lighter answer to plugin-list drift; a
+// structural disagreement (theme directory missing, another active theme) still needs adopt --replace.
+function cmdRefresh(projectPath) {
+  const root = resolve(projectPath);
+  const { file, manifest } = loadManifest(root);
+  const wrapper = manifest.wp_cli?.wrapper || detectWrapper(root).wrapper;
+  const probed = runProbe(wrapper);
+  if (!probed.ok) { warn(`probe failed: ${probed.reason}`); process.exit(1); }
+  const { probe } = probed;
+  const structural = manifestDrift(manifest, probe, root).filter((l) => !isPluginListDrift(l));
+  if (structural.length) {
+    for (const l of structural) warn(`drift: ${l}`);
+    warn('refresh only updates the plugin list and stack: this manifest describes another site -- run adopt with --replace');
+    process.exit(1);
+  }
+  const next = structuredClone(manifest);
+  next.plugins = { ...next.plugins, installed: probe.plugins.filter((p) => p.active).map((p) => p.slug) };
+  if (next.stack !== undefined || next.origin === 'adopted') next.stack = detectStack(probe).stack;
+  if (next.environment && probe.php) next.environment.php_version = probe.php;
+  if (next.wordpress && probe.wp) next.wordpress.version = probe.wp;
+  const problems = validateManifest(next);
+  if (problems.length) {
+    for (const p of problems) warn(`invalid: ${p}`);
+    warn('nothing written');
+    process.exit(1);
+  }
+  const bak = `${file}.bak-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+  copyFileSync(file, bak);
+  writeFileSync(file, `${JSON.stringify(next, null, 2)}\n`);
+  say(`ok: refreshed plugins.installed and stack in ${file} (previous manifest kept at ${bak})`);
+  cmdRenderContext(root);
+}
+
 const [cmd, target] = process.argv.slice(2);
 if (cmd === 'validate' && target) cmdValidate(target);
 else if (cmd === 'migrate' && target) cmdMigrate(target);
@@ -340,8 +389,9 @@ else if (cmd === 'render-context' && target) cmdRenderContext(target);
 else if (cmd === 'get' && target && process.argv[4]) cmdGet(target, process.argv[4]);
 else if (cmd === 'validate-profile' && target) cmdValidateProfile(target);
 else if (cmd === 'drift' && target) cmdDrift(target);
+else if (cmd === 'refresh' && target) cmdRefresh(target);
 else if (cmd === 'adopt' && target) cmdAdopt(target, parseFlags(process.argv.slice(4)));
 else {
-  warn('usage: wp-config.mjs <validate|migrate|render-context|get|validate-profile|adopt|drift> <project-path> [key|wp-version|adopt flags]');
+  warn('usage: wp-config.mjs <validate|migrate|render-context|get|validate-profile|adopt|drift|refresh> <project-path> [key|wp-version|adopt flags]');
   process.exit(1);
 }

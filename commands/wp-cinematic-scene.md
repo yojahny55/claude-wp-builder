@@ -59,7 +59,7 @@ Replaces the per-scene `/wp-section` workflow when the theme is cinematic. ACF r
    ];
    update_row('cinematic_scenes', $index, $row, $page_id);
    ```
-4. Run `wp cache flush` and (if WP Super Cache active) `wp super-cache flush`.
+4. Run `wp cache flush` and (if WP Super Cache active) `wp super-cache flush` (local file cache only; on a clone never run a CDN-backed purge such as `wp cfcache purge_cache`, see *Purging caches on a clone* in `wp-cli-patterns`).
 
 ## Custom per-scene template
 
