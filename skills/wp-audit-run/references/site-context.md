@@ -148,10 +148,10 @@ brotli), so LCP, FCP, TBT, the Lighthouse performance score and total bytes desc
 server as much as the site. One run's mobile baseline was meaningless: a 468 KB uncompressed
 stylesheet that production serves as 69 KB of brotli over h2. When `local_clone` is true:
 
-1. Probe the clone once, on the home page and its main stylesheet:
-   `curl -sI --compressed -o /dev/null -w '%{http_version}\n' <url>` plus the `Content-Encoding`
-   header of the same response.
-2. When the public URL is confirmed, probe it the same way and compare.
+1. Probe the clone once, with a GET on the home page and again on its main stylesheet:
+   `curl -s --compressed -o /dev/null -w '%{http_version} %header{content-encoding}\n' <url>`
+   (`%header{}` needs curl 7.83 or later). A HEAD request can answer differently from a GET.
+2. When the public URL is confirmed, probe the same two paths there the same way and compare.
 3. When they differ (or production was not probed), label every clone timing and size metric
    `clone measurement — serving layer differs (<clone: encoding, HTTP version> vs <production: …>)`.
    Such a number is never a baseline and never a finding by itself; the production figure, or

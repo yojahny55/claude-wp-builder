@@ -22,7 +22,7 @@ Against a public URL, run it through the gate from Step 6:
 The suite then runs with one Playwright worker. The tests, pages and metrics are the
 same; only the four parallel browsers are gone.
 
-**On a clone, the suite's Lighthouse results are clone measurements.** The suite must not probe the clone for live checks, but where it is pointed at the clone for the clone-safe checks its LCP, FCP, TBT, performance score and byte totals inherit the clone's serving layer (compression, HTTP version). Label them as Step 2.3's *Clone-safe versus production-only measurement* says (`clone measurement — serving layer differs (…)`) and never use them as a baseline or a finding by themselves.
+**Lighthouse results and the serving layer.** With `local_clone` true the suite never targets the clone (below), so its LCP, FCP, TBT, performance score and byte totals are those of the confirmed public URL; without one they are `UNMEASURED`. Should a run be pointed at a local host anyway, those numbers inherit the clone's serving layer (compression, HTTP version): label them `clone measurement — serving layer differs (…)` as *Clone-safe versus production-only measurement* in `site-context.md` says, and never use them as a baseline or a finding by themselves.
 
 `<public-url>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json` —
 **unless `local_clone` is true (Step 2.3): the suite must not probe the clone's own host**,
