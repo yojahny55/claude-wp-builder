@@ -300,7 +300,7 @@ function cmdAdopt(projectPath, flags) {
   if (replacing) {
     let old = null;
     try { old = JSON.parse(readFileSync(file, 'utf8')); } catch { /* unreadable: nothing to carry */ }
-    if (old && typeof old === 'object' && !isScaffoldManifest(old, root)) {
+    if (old && typeof old === 'object' && !isScaffoldManifest(old, root, probe.stylesheet)) {
       carried = carryOver(old, manifest, root, flags);
       if (carried.includes('project.prefix')) prefixSource = 'carried over from the previous manifest';
     }

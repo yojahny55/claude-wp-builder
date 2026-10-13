@@ -87,6 +87,14 @@ $cfg adopt "$site" --replace >/dev/null || fail "replace over a scaffold failed"
 grep -Fq '"audit"' "$site/.wp-create.json" && fail "a blank scaffold's audit block was carried over"
 grep -Fq 'old_' "$site/.wp-create.json" && fail "a blank scaffold's prefix was carried over"
 
+# Old theme directory still on disk but another theme is active: decisions are not carried.
+mkdir -p "$site/wp-content/themes/old-theme"
+cat >"$site/.wp-create.json" <<'JSON'
+{"manifest_version":3,"origin":"adopted","project":{"name":"x","prefix":"old_"},"audit":{"last_run":"2026-01-01"},"theme":{"slug":"old-theme","initialized":false},"plugins":{"installed":[]},"wp_cli":{"wrapper":"wp"}}
+JSON
+$cfg adopt "$site" --replace >/dev/null || fail "replace over another-theme manifest failed"
+grep -Fq '"audit"' "$site/.wp-create.json" && fail "decisions for another active theme were carried over"
+
 # 5c. refresh: plugins and stack only; refuses structural drift.
 node -e "
 const fs=require('fs');const f=process.argv[1]+'/.wp-create.json';const m=JSON.parse(fs.readFileSync(f));

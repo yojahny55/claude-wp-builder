@@ -152,10 +152,14 @@ export function isPluginListDrift(line) {
 
 // A blank scaffold carries no operator decisions worth keeping: it was never an adoption or a
 // real build, or a real site was restored over it. Same two signals manifestDrift uses.
-export function isScaffoldManifest(manifest, root) {
+export function isScaffoldManifest(manifest, root, activeTheme) {
   if (manifest?.project?.source === 'blank') return true;
   const slug = manifest?.theme?.slug;
-  return Boolean(slug) && !existsSync(join(root, 'wp-content', 'themes', slug));
+  if (!slug) return false;
+  // Another active theme means the decisions were made for another site, even if the old
+  // theme's directory is still on disk.
+  if (activeTheme && slug !== activeTheme) return true;
+  return !existsSync(join(root, 'wp-content', 'themes', slug));
 }
 
 // What a re-adoption keeps from the manifest it replaces: audit history, the store block, and
