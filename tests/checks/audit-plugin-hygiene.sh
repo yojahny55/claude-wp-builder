@@ -18,6 +18,10 @@ for slug in wp-file-manager file-manager-advanced filester; do
   grep -Eq "^# known slugs:.*${slug}" "$sec" || fail "$sec SEC-045 known-slug list lost ${slug}"
 done
 grep -Fq "elfinder*.js" "$sec" || fail "$sec SEC-045 lost the elFinder fingerprint"
+# A bare connector*.php name matches Smush, Forminator and vendored illuminate/contracts;
+# the connector signal must be confirmed by its content.
+grep -Fq -- "-iname 'connector*.php' -exec grep -l 'elFinder'" "$sec" \
+  || fail "$sec SEC-045 connector*.php signal must be confirmed by an elFinder content match"
 grep -Fq 'whether the plugin is active or not' "$sec" || fail "$sec SEC-045 no longer says why an inactive copy counts"
 grep -Fq 'never to deactivate it' "$sec" || fail "$sec SEC-045 fix must be removal, not deactivation"
 

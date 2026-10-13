@@ -301,9 +301,14 @@ Match on either signal, for every installed plugin:
 $WP plugin list --fields=name,status --format=csv
 # known slugs: wp-file-manager, file-manager-advanced, filester
 # fingerprint: the plugin folder bundles elFinder
-find wp-content/plugins -maxdepth 6 -type f \( -iname 'elfinder*.js' -o -iname 'connector*.php' \) \
-  | awk -F/ '{print $3}' | sort -u
+{ find wp-content/plugins -maxdepth 6 -type f -iname 'elfinder*.js'
+  find wp-content/plugins -maxdepth 6 -type f -iname 'connector*.php' -exec grep -l 'elFinder' {} +
+} | awk -F/ '{print $3}' | sort -u
 ```
+
+A `connector*.php` counts only when it names elFinder. The file name alone is common:
+Smush, Forminator and any plugin vendoring `illuminate/contracts` ship one, and matching
+on the name would report them as file managers and tell the owner to delete them.
 
 The fingerprint is what catches renamed forks and premium copies the slug list does not
 know. Report the slug, its status and the matched signal. The message for an active copy is
