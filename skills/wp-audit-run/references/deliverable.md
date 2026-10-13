@@ -122,7 +122,9 @@ Hand over both and say which is which.
 
 **The sidecar is what makes the next report comparable.** The renderer diffs this run
 against the newest earlier sidecar and opens the document with resolved / new / still
-failing, by finding identity rather than by count. It never parses its own Markdown back:
+failing, by finding identity rather than by count. A previous finding counts as resolved
+only if this run measured its check: one listed in `unmeasured`, or in a category the run's
+`categories` leaves out, is shown as "Not re-measured" and stays in the baseline. It never parses its own Markdown back:
 a report edited by hand would otherwise change what the next comparison claims happened.
 A second run on the same day keeps the first: the renderer moves the earlier set to
 `informe-<AAAA-MM-DD>-<HHMM>.*` before writing, and diffs against it.
