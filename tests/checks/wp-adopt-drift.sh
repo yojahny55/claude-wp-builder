@@ -52,6 +52,67 @@ $cfg adopt "$tmp/site" --replace --wrapper="/tmp/wpcb-helper-$$.sh" >/dev/null 2
 rm -f /tmp/wpcb-helper-$$.sh
 grep -Fq 'wpcb-helper' "$tmp/site/.wp-create.json" && fail "temp helper wrapper was persisted"
 
+# 5b. --replace over a REAL adoption keeps audit, store, decisions; over a scaffold it does not.
+site="$tmp/site"
+mkdir -p "$site/wp-content/plugins/mine" "$site/wp-content/plugins/vendor"
+node -e "
+const fs=require('fs');const f=process.argv[1]+'/.wp-create.json';const m=JSON.parse(fs.readFileSync(f));
+m.audit={last_run:'2026-01-01',issues_found:3};m.store={tier:'catalog',address:{street:'1 Main',city:'Town',postcode:'1000',country:'US'},enquiry:['form'],currency:'USD',units:{weight:'kg',dimension:'cm'}};
+m.project.prefix='keep_';m.project.industry='construction';m.project.adopted='2026-01-01';
+m.code_scope={editable:['wp-content/plugins/mine','wp-content/gone'],read_only:['wp-content/themes/real-child','wp-content/plugins/a']};
+fs.writeFileSync(f,JSON.stringify(m));" "$site"
+d=$($cfg adopt "$site" --replace --dry-run) || fail "dry-run replace failed"
+echo "$d" | grep -Fq '"carried_over"' || fail "dry-run does not report carried_over"
+$cfg adopt "$site" --replace >/dev/null || fail "replace over a real adoption failed"
+node -e "
+const m=JSON.parse(require('fs').readFileSync(process.argv[1]+'/.wp-create.json'));
+const bad=(w)=>{console.error('FAIL: '+w);process.exit(1)};
+if(m.audit?.issues_found!==3)bad('audit block lost');
+if(m.store?.tier!=='catalog')bad('store block lost');
+if(m.project.prefix!=='keep_'||m.project.industry!=='construction')bad('prefix/industry lost');
+if(m.project.adopted!=='2026-01-01')bad('adopted date lost');
+if(!m.code_scope.read_only.includes('wp-content/themes/real-child'))bad('read-only decision reverted to editable');
+if(m.code_scope.editable.includes('wp-content/themes/real-child'))bad('theme came back editable');
+if(m.code_scope.editable.includes('wp-content/gone'))bad('a path gone from disk was kept');
+if(!m.code_scope.editable.includes('wp-content/plugins/mine'))bad('editable decision lost');
+" "$site" || exit 1
+# An explicit flag beats the carried default.
+$cfg adopt "$site" --replace --prefix=flag_ >/dev/null || fail "replace with --prefix failed"
+grep -Fq '"flag_"' "$site/.wp-create.json" || fail "explicit --prefix did not win"
+# Blank scaffold: nothing carried.
+cat >"$site/.wp-create.json" <<'JSON'
+{"manifest_version":3,"project":{"source":"blank","name":"x","prefix":"old_"},"audit":{"last_run":"2026-01-01"},"theme":{"slug":"ghost","initialized":false},"plugins":{"installed":[]},"wp_cli":{"wrapper":"wp"}}
+JSON
+$cfg adopt "$site" --replace >/dev/null || fail "replace over a scaffold failed"
+grep -Fq '"audit"' "$site/.wp-create.json" && fail "a blank scaffold's audit block was carried over"
+grep -Fq 'old_' "$site/.wp-create.json" && fail "a blank scaffold's prefix was carried over"
+
+# 5c. refresh: plugins and stack only; refuses structural drift.
+node -e "
+const fs=require('fs');const f=process.argv[1]+'/.wp-create.json';const m=JSON.parse(fs.readFileSync(f));
+m.audit={last_run:'2026-02-02'};m.project.industry='construction';m.plugins.installed=['a','gone'];m.stack.seo='rankmath';
+fs.writeFileSync(f,JSON.stringify(m));" "$site"
+set +e; $cfg drift "$site" >/dev/null; rc=$?; set -e
+[ "$rc" = 4 ] || fail "plugin-list drift not detected before refresh"
+$cfg refresh "$site" >/dev/null || fail "refresh failed"
+node -e "
+const m=JSON.parse(require('fs').readFileSync(process.argv[1]+'/.wp-create.json'));
+const bad=(w)=>{console.error('FAIL: '+w);process.exit(1)};
+if(m.plugins.installed.join()!=='a')bad('plugins.installed not refreshed');
+if(m.stack.seo!=='none')bad('stack not refreshed');
+if(m.audit?.last_run!=='2026-02-02'||m.project.industry!=='construction')bad('refresh touched a decision');
+" "$site" || exit 1
+$cfg drift "$site" >/dev/null || fail "still drifts after refresh"
+ls "$site"/.wp-create.json.bak-* >/dev/null 2>&1 || fail "refresh kept no backup"
+node -e "
+const fs=require('fs');const f=process.argv[1]+'/.wp-create.json';const m=JSON.parse(fs.readFileSync(f));
+m.theme.slug='ghost';fs.writeFileSync(f,JSON.stringify(m));" "$site"
+set +e; $cfg refresh "$site" >/dev/null 2>&1; rc=$?; set -e
+[ "$rc" = 1 ] || fail "refresh accepted structural drift"
+grep -Fq 'ghost' "$site/.wp-create.json" || fail "refresh rewrote a refused manifest"
+grep -Fq '[A] Refresh' commands/wp-audit.md || fail "wp-audit.md does not offer Refresh"
+grep -Fq 'carried_over' commands/wp-adopt.md || fail "wp-adopt.md does not document carry-over"
+
 # 6. wp-quiet strips diagnostics, keeps real output and the exit code.
 printf '#!/usr/bin/env bash\necho "PHP Notice:  n in /a.php on line 2"\necho "Deprecated: d in /b.php on line 3"\necho "#0 /x.php(1): f()"\necho real\nexit 7\n' >"$tmp/noisy.sh"; chmod +x "$tmp/noisy.sh"
 set +e; q=$(bin/wp-quiet.sh "$tmp/noisy.sh"); rc=$?; set -e

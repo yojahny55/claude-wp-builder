@@ -143,6 +143,56 @@ export function manifestDrift(manifest, probe, root) {
   return out;
 }
 
+// A drift line that only says the plugin list changed (an owner deactivated or installed
+// plugins) is measured fact the probe can refresh; every other line says the manifest
+// describes another site, which only a re-adoption answers.
+export function isPluginListDrift(line) {
+  return /^\d+ active plugin\(s\) not in plugins\.installed|^\d+ plugin\(s\) in plugins\.installed that are not active/.test(line);
+}
+
+// A blank scaffold carries no operator decisions worth keeping: it was never an adoption or a
+// real build, or a real site was restored over it. Same two signals manifestDrift uses.
+export function isScaffoldManifest(manifest, root) {
+  if (manifest?.project?.source === 'blank') return true;
+  const slug = manifest?.theme?.slug;
+  return Boolean(slug) && !existsSync(join(root, 'wp-content', 'themes', slug));
+}
+
+// What a re-adoption keeps from the manifest it replaces: audit history, the store block, and
+// the operator's decisions as defaults (an explicit flag still wins, applied by the caller).
+// Scope paths that no longer exist on disk are dropped; paths in neither old list are new
+// and keep the proposal's placement.
+export function carryOver(old, manifest, root, flags = {}) {
+  const notes = [];
+  if (old.audit !== undefined) { manifest.audit = old.audit; notes.push('audit'); }
+  if (old.store !== undefined) { manifest.store = old.store; notes.push('store'); }
+  if (old.project?.adopted) manifest.project.adopted = old.project.adopted;
+  if (!flags.prefix && typeof old.project?.prefix === 'string' && old.project.prefix) {
+    manifest.project.prefix = old.project.prefix;
+    notes.push('project.prefix');
+  }
+  if (!flags.industry && typeof old.project?.industry === 'string' && old.project.industry) {
+    manifest.project.industry = old.project.industry;
+    notes.push('project.industry');
+  }
+  const oldScope = old.code_scope ?? {};
+  const known = new Set([...(oldScope.editable ?? []), ...(oldScope.read_only ?? [])]);
+  const live = (l) => (Array.isArray(l) ? l : []).filter((x) => existsSync(join(root, x)));
+  const fresh = (l) => l.filter((x) => !known.has(x));
+  const proposed = manifest.code_scope;
+  const kept = {};
+  if (flags.editable === undefined && Array.isArray(oldScope.editable)) {
+    kept.editable = [...live(oldScope.editable), ...fresh(proposed.editable)];
+    notes.push('code_scope.editable');
+  }
+  if (flags['read-only'] === undefined && Array.isArray(oldScope.read_only)) {
+    kept.read_only = [...live(oldScope.read_only), ...fresh(proposed.read_only)];
+    notes.push('code_scope.read_only');
+  }
+  manifest.code_scope = { ...proposed, ...kept };
+  return notes;
+}
+
 // A wrapper that points into a temp directory is a one-run helper (a script that filters
 // plugin noise), not how this site is reached. Persisting it breaks the next command.
 export function isTransientWrapper(wrapper, tmp = tmpdir()) {
