@@ -16,6 +16,20 @@ command -v node >/dev/null || { echo "SKIP: node not installed"; exit 0; }
 lib=bin/lib/browsers.mjs
 runner=bin/audit-suite.sh
 
+# Reached through a symlink to the checkout, the lookup must still run as a command. It
+# compared the link to the real path, printed nothing and exited 0, and the runner skipped
+# Tier 3 as "no browser" on any machine where the plugin is linked into place.
+linkdir=$(mktemp -d); trap 'rm -rf "$linkdir"' EXIT
+real=$(pwd -P); ln -s "$real" "$linkdir/linked-plugin"
+mkdir -p "$linkdir/nocore"
+lookup() { env -u WP_BROWSER_CHROMIUM HOME="$linkdir/home" PLAYWRIGHT_CORE="$linkdir/nocore" \
+  node "$1" chromium 2>/dev/null || true; }
+direct=$(lookup "$real/bin/lib/browsers.mjs")
+via_link=$(lookup "$linkdir/linked-plugin/bin/lib/browsers.mjs")
+# Needs a browser on the machine to mean anything; without one both are empty and agree.
+[ "$via_link" = "$direct" ] \
+  || fail "browsers.mjs run through a symlinked checkout printed '$via_link' where the real path printed '$direct'"
+
 # No runner or doc tells anyone to install a browser.
 for f in "$runner" bin/demo-verify.mjs bin/composition-preview.mjs bin/tailwindify-parity.mjs \
     commands/wp-audit.md "$dv" "$wp_demo" "$wp_yolo"; do
@@ -26,7 +40,7 @@ for f in "$runner" bin/demo-verify.mjs bin/composition-preview.mjs bin/tailwindi
 done
 
 # Behaviour: a fake cache with two revisions, and one with nothing in it.
-tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+tmp=$(mktemp -d); trap 'rm -rf "$linkdir" "$tmp"' EXIT
 mk() { mkdir -p "$(dirname "$1")"; printf '#!/bin/sh\n' > "$1"; chmod +x "$1"; }
 mk "$tmp/cache/firefox-1500/firefox/firefox"
 mk "$tmp/cache/firefox-1543/firefox/firefox"

@@ -25,7 +25,7 @@
  * CLI: `node bin/lib/browsers.mjs <chromium|firefox|webkit>` prints the path on stdout and
  * exits 0, or prints nothing on stdout and exits 2.
  */
-import { existsSync, readdirSync, readFileSync, accessSync, constants } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, accessSync, realpathSync, constants } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
@@ -147,7 +147,11 @@ export function findBrowser(engine) {
   return null;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Compare REAL paths: Node resolves symlinks when loading the module, so import.meta.url is
+// the real path while argv[1] keeps the link. Reached through a symlinked checkout (a plugin
+// directory linked from elsewhere), the direct comparison never matched, the lookup printed
+// nothing and exited 0, and the runner read that as "no browser" and skipped Tier 3.
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const engine = process.argv[2];
   if (!TAILS[engine]) {
     console.error('usage: browsers.mjs <chromium|firefox|webkit>');
