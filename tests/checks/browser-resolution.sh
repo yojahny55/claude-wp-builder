@@ -40,7 +40,7 @@ for f in "$runner" bin/demo-verify.mjs bin/composition-preview.mjs bin/tailwindi
 done
 
 # Behaviour: a fake cache with two revisions, and one with nothing in it.
-tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+tmp=$(mktemp -d); trap 'rm -rf "$linkdir" "$tmp"' EXIT
 mk() { mkdir -p "$(dirname "$1")"; printf '#!/bin/sh\n' > "$1"; chmod +x "$1"; }
 mk "$tmp/cache/firefox-1500/firefox/firefox"
 mk "$tmp/cache/firefox-1543/firefox/firefox"
