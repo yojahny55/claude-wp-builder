@@ -488,6 +488,8 @@ reported `UNMEASURED` without a browser, never assumed to pass:
 | INP (Interaction to Next Paint) | <200ms |
 | CLS (Cumulative Layout Shift) | <0.1 |
 
+**On a local clone, timing and size numbers are not the site's.** LCP, FCP, TBT, the Lighthouse score and total bytes measured on the clone inherit its serving layer (e.g. no compression, HTTP/1.1 against production's brotli over h2). Probe the clone's `Content-Encoding` and HTTP version once; when they differ from production's, label each such number `clone measurement — serving layer differs (…)` and neither baseline nor report it as a finding. Request counts, render-blocking handles, image intrinsic versus rendered size and CLS stay valid. Rule: *Clone-safe versus production-only measurement* in `wp-audit-run`'s `site-context.md`.
+
 **Measure on an idle machine, alone.** The same page under CPU contention read performance 62
 with LCP 10,170 ms, and 94 with LCP 1,580 ms once nothing else was running — no theme change
 between them. Do not run Lighthouse beside a second Lighthouse, the DOM/axe suite or a watch
@@ -671,6 +673,8 @@ $WP config set WP_POST_REVISIONS 5 --raw --type=constant
 # Increase autosave interval
 $WP config set AUTOSAVE_INTERVAL 120 --raw --type=constant
 ```
+
+On a local clone, purge only local caches (`$WP cache flush`, `$WP cfcache purge_fallback_cache`). Never run a CDN or page-cache purge command such as `$WP cfcache purge_cache`: it can call the real CDN API with the production credentials restored from the database. See *Purging caches on a clone* in `wp-cli-patterns`.
 
 ### Font display fix
 

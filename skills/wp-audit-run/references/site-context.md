@@ -142,6 +142,24 @@ server, the network or real traffic shapes needs production.
 | theme source, `$WP` options, postmeta, plugin list, file permissions | CDN and page-cache behaviour, compression |
 | link targets resolved through `resolve-link-targets.php` | real analytics, Search Console, field data (CrUX) |
 
+**Timing and transfer-size metrics measured on the clone inherit the clone's serving layer.** A
+clone's web server (say Apache, no compression, HTTP/1.1) is not production's (say nginx, h2,
+brotli), so LCP, FCP, TBT, the Lighthouse performance score and total bytes describe the clone's
+server as much as the site. One run's mobile baseline was meaningless: a 468 KB uncompressed
+stylesheet that production serves as 69 KB of brotli over h2. When `local_clone` is true:
+
+1. Probe the clone once, on the home page and its main stylesheet:
+   `curl -sI --compressed -o /dev/null -w '%{http_version}\n' <url>` plus the `Content-Encoding`
+   header of the same response.
+2. When the public URL is confirmed, probe it the same way and compare.
+3. When they differ (or production was not probed), label every clone timing and size metric
+   `clone measurement — serving layer differs (<clone: encoding, HTTP version> vs <production: …>)`.
+   Such a number is never a baseline and never a finding by itself; the production figure, or
+   `UNMEASURED`, stands in its place.
+
+Render-path facts do not depend on the serving layer and stay clone-safe: request counts,
+render-blocking handles, image intrinsic versus rendered size, CLS.
+
 Pass this split to every agent in Step 6. An agent that reports a clone-safe check `UNMEASURED`
 because "this is a clone" has misread the rule, and Step 6.8 sends it back.
 

@@ -310,6 +310,8 @@ run that skips Step 9. Step 9 runs the scan again only to report the before → 
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/browser-suite.md` now and follow it — it is this step, not background. It covers how the browser suite runs, and how its findings merge with the agents' findings.
 
+**Order: the suite against a production host starts only after every Step 6 agent has returned.** `prod-gate.sh` holds a per-host lock for the whole wrapped command, and a suite run against a slow production host lasts many minutes. Agents that need the gate meanwhile wait out `--wait`, exit 5, and report their production checks `UNMEASURED: production gate busy`. Never start the suite beside the agents; the agents' production checks finish first.
+
 ## Step 6.8: Coverage gate — UNMEASURED is not an answer until it is justified
 
 Before Step 7, read each returned report's `UNMEASURED` list and its measurement evidence.

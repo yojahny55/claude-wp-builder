@@ -12,10 +12,17 @@ ${CLAUDE_PLUGIN_ROOT}/bin/audit-suite.sh --url <public-url> --dir .wp-audit/suit
   --site "<project name>" [--pages "/,/services/,/contact/"]
 ```
 
+**Start it only after every Step 6 agent has returned.** The gate holds a per-host lock for the whole
+wrapped command, and a suite run against a slow production host lasts many minutes. Any agent that calls
+the gate meanwhile waits `--wait` (300 s), exits 5 and, after three 5s, reports its check
+`UNMEASURED: production gate busy`. The agents' production checks go first; the suite runs alone after them.
+
 Against a public URL, run it through the gate from Step 6:
 `WP_AUDIT_GATE_DIR=<scratch>/prod-gate ${CLAUDE_PLUGIN_ROOT}/bin/prod-gate.sh <public-url> -- ${CLAUDE_PLUGIN_ROOT}/bin/audit-suite.sh …`.
 The suite then runs with one Playwright worker. The tests, pages and metrics are the
 same; only the four parallel browsers are gone.
+
+**On a clone, the suite's Lighthouse results are clone measurements.** The suite must not probe the clone for live checks, but where it is pointed at the clone for the clone-safe checks its LCP, FCP, TBT, performance score and byte totals inherit the clone's serving layer (compression, HTTP version). Label them as Step 2.3's *Clone-safe versus production-only measurement* says (`clone measurement — serving layer differs (…)`) and never use them as a baseline or a finding by themselves.
 
 `<public-url>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json` —
 **unless `local_clone` is true (Step 2.3): the suite must not probe the clone's own host**,

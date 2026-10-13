@@ -105,6 +105,8 @@ Use: prod-gate.sh --mark-blocked <host> "<reason>". If the gate exits 4, the hos
 report that check UNMEASURED with the gate's reason, and never retry. If it exits 5,
 another agent held the host. Nothing was sent, so call again, at most twice more; after a
 third 5, report the check UNMEASURED: production gate busy. The local site is not gated.
+The browser suite (Step 6.5) goes through the same gate but is never run beside the agents: it
+starts only after all of them have returned, because it holds the host lock for many minutes.
 
 Run all checks for your tier level. Output your findings as a structured report with the following format for each issue:
 
