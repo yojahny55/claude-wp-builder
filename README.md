@@ -544,7 +544,7 @@ Commands run these and read the exit code. Several are gates, not helpers.
 | `tailwindify-parity.mjs` | Computed-style comparison proving a Tailwind conversion lost no declaration |
 | `tailwind-native-check.sh` · `tailwind-rebuild.sh` | Validate a theme against the Tailwind-native convention; recompile its CSS after agents write new classes |
 | `theme-template-check.mjs` | ABSPATH, compiled-class and widget-script gate behind `/wp-finalize` and the practices audit |
-| `audit-report.mjs` | Renders an audit run into the dated `.md` + `.html` deliverable |
+| `audit-report.mjs` | Renders an audit run into the dated `.md` + `.html` deliverable, with an optional Scope and coverage section (`notes`, `--notes`) |
 | `audit-suite.sh` | Scaffolds and runs the Tier 3 browser suite (`/wp-audit --suite`) |
 | `link-sweep.mjs` | The audits' link sweep — at most 4 requests in flight, sampling, clone-origin and CDN-challenge rules built in |
 | `ux-probe.mjs` | The usability audit's page harness — one browser launch per run, built-in DOM probes, a 3-launch / 15-minute budget enforced in code |
