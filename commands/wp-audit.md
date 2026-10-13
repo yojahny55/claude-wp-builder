@@ -325,7 +325,7 @@ ${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host> --start
 
 Use a Bash timeout of at least 150000 ms. The exit-code table in Step 9 ("GEO fixes") applies
 unchanged, and so does its rule that none of them is a pass. The returned score, or the reason
-there is none, fills the report's `Live scan:` line at Step 8; it is never left `pending` by a
+there is none, fills the report's `Live scan:` line at Step 8 (`<score>`, `<score> (stale: scanned <date>)` for exit `4`, or `unavailable — challenged by a bot interstitial` for a `CHALLENGED` skip); it is never left `pending` by a
 run that skips Step 9. Step 9 runs the scan again only to report the before → after score.
 
 ## Step 6.5: Run the browser suite (`--suite` only)

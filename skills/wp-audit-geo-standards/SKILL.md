@@ -175,7 +175,7 @@ plugin owns the graph — otherwise `wp-audit-rankmath` fills it.
 
 ## 7. Verification loop
 
-The live verifier is `${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <domain|url> [--start]` — run
+The live verifier is `${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <domain|url> [--start] [--max-age-hours N]` — run
 it, do not read or reimplement it. It needs `curl`; `timeout` or `gtimeout` bound it when
 present. It issues a read-only `GET` to the public is-agentic report API
 (`https://is-agentic.com/api/v1/report?url=…`) and **only prints the JSON report**. It never
@@ -184,14 +184,19 @@ would be a supply-chain risk. When no completed report exists yet, `--start` ask
 is-agentic to scan the host through the same HTTP endpoint the npm CLI uses and reads the
 report when the scan finishes, all within 110 s. Pass `--start` only for a host the
 operator confirmed as public this run: a scan makes is-agentic fetch the site. The script
-does not parse the JSON.
+reads only two things from the JSON: `scanned_at`, whose age it always prints on stderr, and
+bot-challenge signatures. A report older than 24 h (`--max-age-hours N` or
+`GEO_SCAN_MAX_AGE_HOURS`) is re-requested through the same scan call when `--start` is given;
+if no fresher report comes back it is printed marked `STALE:` and exits `4`. A report that
+is a bot-challenge page, not the site, is not printed and exits `2` with `CHALLENGED`.
 
 | Exit | Meaning | What the caller does |
 |---|---|---|
-| `0` | a non-empty report came back | map its failed ids to GEO codes |
+| `0` | a non-empty, current report came back | map its failed ids to GEO codes |
 | `1` | the request failed, or the arguments were wrong | record the error; the GEO codes it would have measured are `UNMEASURED` |
-| `2` | skipped cleanly: no `curl`, no network, no completed report, a scan that did not finish, a transient `429`/`503` | record the skip and mark the run incomplete — never a pass |
+| `2` | skipped cleanly: no `curl`, no network, no completed report, a scan that did not finish, a transient `429`/`503`, or a report that is a bot-challenge page (`CHALLENGED`) | record the skip and mark the run incomplete — never a pass; for `CHALLENGED`, allow is-agentic through the host's bot protection |
 | `3` | the host is not publicly reachable: `localhost`, `.local`, `.test`, `*.local.com`, a private address, a name with no dot | pass the public URL (`/wp-audit --host`); a dev host is a configuration problem, not a missing report |
+| `4` | a report came back and is printed, but is older than the age limit and could not be refreshed | report the score as stale (`Live scan: <score> (stale: scanned <date>)`); it is not a measurement of the site now, so no fix is resolved by it |
 
 The loop:
 
@@ -203,8 +208,8 @@ The loop:
 4. **Re-scan once**, after the fix is deployed to the host the scan reads.
 5. **Compare.** A fix is resolved **only when its ORA check flips** in a report scanned
    after the fix — never because the theme file changed. A report whose scan time precedes
-   the fix is the old report: `geo-scan.sh` only starts a scan when none exists, so it
-   returns the pre-fix report until is-agentic re-scans the site. Ask the operator to
+   the fix is the old report: `geo-scan.sh` returns exit `4` with a `STALE:` line when
+   is-agentic does not produce a newer report than the pre-fix one. Ask the operator to
    re-scan at https://is-agentic.com; until then the code is `UNMEASURED`, not resolved.
    Stop after that one re-scan.
 

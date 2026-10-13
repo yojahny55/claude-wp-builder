@@ -402,6 +402,12 @@ the other needs all of it, and a reader counting failures cannot tell them apart
 share a label. Count them on separate lines of the summary, and never fold `UNMEASURED` into
 the passing total.
 
+The live is-agentic score (`bin/geo-scan.sh`) follows the same rule. A `CHALLENGED` skip (exit
+2) means the scanner read a bot-challenge page, so report it as `Live scan: unavailable —
+challenged by a bot interstitial` and every code it would have measured as `UNMEASURED`. An
+exit 4 means the report is older than 24 h: report `Live scan: <score> (stale: scanned
+<date>)`, and do not count a code as resolved by a report scanned before the fix.
+
 ## Step 5: Fix Phase
 
 Dispatch the `wp-agentic-surfaces` agent for the fixable surfaces — it owns

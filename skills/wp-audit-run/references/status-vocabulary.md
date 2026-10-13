@@ -68,7 +68,7 @@ Categories: <comma-separated selected categories>
   ✗ WARNING: <message> (GEO-A06)
   ℹ INFO: <message>
   ○ N/A: <layer> — <rationale>
-  Live scan: <score|unavailable — skipped: <reason>> (produced by Step 6.2's scan; Step 9 adds before → after)
+  Live scan: <score|<score> (stale: scanned <date>)|unavailable — challenged by a bot interstitial|unavailable — skipped: <reason>> (produced by Step 6.2's scan; Step 9 adds before → after)
 
 ---
 Total: N issues (X critical, Y warnings, Z info)

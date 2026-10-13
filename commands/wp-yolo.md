@@ -433,6 +433,10 @@ Run, in order:
      (`/wp-audit --geo --host <public-url>`). A build served from a `.local` host reaches
      this every time, and reporting it as an ordinary skip is what let a whole category
      stay unmeasured on project after project without anyone noticing.
+   - **exit 4** — a report came back but is older than 24 h: record the score as
+     `stale: scanned <date>` and mark the run incomplete; do not count it as the
+     before/after of a fix. A `CHALLENGED` skip arrives as exit 2: record it
+     `unavailable — challenged by a bot interstitial`.
    - **exit 1** — the scan errored: report the error and mark the run incomplete.
 
 **Completion rule.** Items 4 through 8 are part of the build, not follow-ups for the
