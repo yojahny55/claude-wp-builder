@@ -287,7 +287,9 @@ function validateUnmeasured(entries) {
 
 // Free text for the "Scope and coverage" section. A run file carries it as `notes`: one string
 // or an array of strings, each a paragraph (a paragraph whose lines all start with "- " is
-// rendered as a list). It is text the author wrote, so it is escaped like any other cell.
+// rendered as a list). The HTML report escapes it like any other cell. The Markdown report
+// keeps it as written: the auditor writes these notes, and a path in backticks or a link
+// should render in the .md the way it was typed.
 function normalizeNotes(value, where) {
   if (value === undefined || value === null) return [];
   const list = Array.isArray(value) ? value : [value];
