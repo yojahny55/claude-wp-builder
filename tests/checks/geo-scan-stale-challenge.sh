@@ -60,6 +60,10 @@ run "$tmp/old.json" "$tmp/old.json"
 run "$tmp/old.json" "$tmp/old.json" --max-age-hours 100
 [ "$status" -eq 0 ] || fail "--max-age-hours must raise the limit (got $status)"
 
+# A limit of 0 would mark every report stale, a fresh one included: it is refused.
+run "$tmp/fresh.json" "$tmp/fresh.json" --max-age-hours 0
+[ "$status" -eq 1 ] || fail "--max-age-hours 0 must be refused as usage (got $status)"
+
 for c in challenge challenge2; do
   run "$tmp/$c.json" "$tmp/$c.json" --start
   [ "$status" -eq 2 ] || fail "a challenged report ($c) must exit 2 (got $status)"

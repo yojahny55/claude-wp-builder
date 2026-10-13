@@ -45,6 +45,7 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$target" ] || usage
 case "$max_age" in ''|*[!0-9]*) usage ;; esac
+[ "$max_age" -gt 0 ] || usage
 
 # Bare host: strip scheme, userinfo, path, query and fragment so a full URL cannot
 # produce a malformed `url=` value.
@@ -96,7 +97,8 @@ fi
 body=$(mktemp)
 stream=$(mktemp)
 scan_err=$(mktemp)
-trap 'rm -f "$body" "$stream" "$scan_err"' EXIT
+old_body=""
+trap 'rm -f "$body" "$stream" "$scan_err" ${old_body:+"$old_body"}' EXIT
 
 # `--get --data-urlencode` builds ?url=<encoded> without a hand-rolled encoder. `-w` gives
 # the status even when the body is an error document; `|| true` keeps `set -e` out of it.
