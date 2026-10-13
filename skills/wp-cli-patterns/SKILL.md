@@ -345,3 +345,15 @@ the container there.
    `<form-entry-type>` is the form plugin's own entry post type (`flamingo_inbound` for Contact
    Form 7 with Flamingo). `--force` here deletes permanently, which is intended for test rows;
    never pass it an ID you did not just see in the listing.
+
+## Purging caches on a clone
+
+A purge command is an outbound call when the plugin holds API credentials. On a restored clone
+the options table still carries production's keys, so `wp cfcache purge_cache` (Super Page Cache
+for Cloudflare, `wp-cloudflare-page-cache`) can reach the real Cloudflare API and purge the live
+zone. Only the local fallback cache purge, `wp cfcache purge_fallback_cache`, is safe.
+
+The general rule: on a clone purge local caches only (`$WP cache flush`, a file or fallback
+cache). Before any purge command from a CDN or page-cache plugin, read the plugin's settings for
+an API key, token or zone ID; if one is present, do not run it. The `pre_http_request` guard above
+blocks the call as a second line, but do not rely on it alone.

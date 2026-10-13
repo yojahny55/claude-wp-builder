@@ -1026,6 +1026,8 @@ If an object cache plugin is active:
 $WP cache flush
 ```
 
+On a local clone flush local caches only; never run a CDN or page-cache plugin's purge command (see *Purging caches on a clone* in `wp-cli-patterns`).
+
 ## Step 15: Polylang-specific Rank Math Integration
 
 If Polylang is active, verify:

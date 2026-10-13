@@ -35,6 +35,8 @@ If the user declines, skip to Step 10.
 
 If the user confirms, dispatch fix operations by category.
 
+**Cache purges on a clone are local only.** When `local_clone` is true, tell every fix agent to purge only local caches (`$WP cache flush`, the plugin's local fallback or file cache). A CDN or page-cache purge command (for example `wp cfcache purge_cache` from a Cloudflare page-cache plugin) can call the real CDN API with the production zone credentials restored from the database. See *Purging caches on a clone* in `wp-cli-patterns`.
+
 **On an adopted site** (Step 2.2), every `<theme_path>` below means the editable code only.
 Pass `code_scope.editable` and forbid writes under `code_scope.read_only`. After each fix
 agent returns, check that nothing under a read-only path changed:
