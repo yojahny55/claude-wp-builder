@@ -136,7 +136,27 @@ bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs drift '${PROJECT_PATH}'"
 
 Exit `0`: the manifest fits the site, continue. Exit `4`: it does not; each `drift:` line names
 a disagreement (theme directory missing, active theme differs from `theme.slug`, active
-plugins absent from `plugins.installed`). Print the lines and ask with `AskUserQuestion`:
+plugins absent from `plugins.installed`, plugins in `plugins.installed` that are not active).
+Print the lines and ask with `AskUserQuestion`.
+
+When **every** line is a plugin-list line (`active plugin(s) not in plugins.installed` or
+`plugin(s) in plugins.installed that are not active`), the owner changed plugins and the
+manifest still describes this site:
+
+```
+The plugin list changed since .wp-create.json was written.
+  [A] Refresh — update plugins and stack only, keep everything else (recommended)
+  [B] Re-adopt — full read-only detection, keeps a timestamped backup and carries the audit history and code scope over
+  [C] Continue with the manifest as it is
+```
+
+On A, run `bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs refresh '${PROJECT_PATH}'"`: it
+re-probes, rewrites `plugins.installed` and `stack` (and the PHP and WordPress versions), keeps
+a `.bak-<timestamp>`, regenerates the CLAUDE.md block and validates. Anything else in the manifest
+is untouched.
+
+When any line is structural (theme directory missing, active theme differs, `source` is
+`"blank"`), the manifest describes another site and `refresh` refuses it:
 
 ```
 .wp-create.json no longer describes this site.
@@ -144,9 +164,11 @@ plugins absent from `plugins.installed`). Print the lines and ask with `AskUserQ
   [B] Continue with the manifest as it is
 ```
 
-On A, run `wp-adopt.md` Steps 2 to 5 with `--replace`. On B, continue, and say in the report
-that every manifest-driven choice (plugin stack, theme slug, code scope) rests on a manifest
-the drift check disputed. Exit `1` (the probe could not run) is not drift: report it and
+Re-adoption (`wp-adopt.md` Steps 2 to 5 with `--replace`) over a real adoption carries over
+`audit`, `store`, the prefix, the industry and the code scope, so the next audit still has its
+baseline; over a blank scaffold it starts from the probe. On a continue answer, say in the
+report that every manifest-driven choice (plugin stack, theme slug, code scope) rests on a
+manifest the drift check disputed. Exit `1` (the probe could not run) is not drift: report it and
 continue. Skip the check when there is no Tier 2.
 
 Read `.claude/CLAUDE.md` to extract:

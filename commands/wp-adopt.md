@@ -57,6 +57,14 @@ Re-registering a site whose manifest is wrong (a blank scaffold the real site wa
 over, found by `wp-config.mjs drift`): add `--replace`. The old manifest is kept as
 `.wp-create.json.bak-<timestamp>`; without the flag `adopt` refuses.
 
+When the manifest being replaced is a real adoption or build (not a blank scaffold), `--replace`
+carries its decisions over instead of re-proposing them: the `audit` block, the `store` block,
+`project.adopted`, and as defaults the prefix, the industry and the editable and read-only code
+scope (paths that no longer exist are dropped; plugins or themes in neither old list get the
+normal proposal). An explicit flag still wins. The dry-run JSON lists what was kept in
+`carried_over`; present it with the proposal. Over a blank scaffold nothing is carried. If only
+the plugin list changed, `wp-config.mjs refresh` is the lighter tool and needs no re-adoption.
+
 The probe prints its JSON between `<<WPCB-PROBE>>` markers and only that region is parsed, so a
 plugin's PHP notices or a logger flushing at shutdown no longer fail it. For a site that is
 noisy in other ways, `bin/wp-quiet.sh <wrapper>` filters stdout. A `--wrapper` that points into
