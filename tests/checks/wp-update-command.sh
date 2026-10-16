@@ -12,18 +12,18 @@ c=commands/wp-update.md
 
 for s in 'db export' 'wp-config.php' 'must come **before** the operands' 'core update-db' \
   '--format=csv' 'Unauthorized' 'Never try to work around' 'version skew' 'wc update' \
-  'elementor update db' 'elementor flush-css' 'debug.log' 'shopper-flow suite' 'retry that one section once' \
-  'explicit confirmation' 'maintenance window' 'Rollback' 'parent of an active child theme' 'outside the docroot'; do
+  'elementor update db' 'elementor flush-css' 'debug.log' 'shopper-flow regression suite' 'retry that one section once' \
+  'grep -vEc' 'pre_wp_mail' 'regression:compare' 'Live gateway keys stop a clone' 'explicit confirmation' 'maintenance window' 'Rollback' 'parent of an active child theme' 'outside the docroot'; do
   grep -Fq -- "$s" "$c" || fail "$c lost: $s"
 done
 
 # Step order: backup before update, clone check before report.
-b=$(grep -n '^## Step 2: Backup' "$c" | cut -d: -f1)
-u=$(grep -n '^## Step 3: Update' "$c" | cut -d: -f1)
+b=$(grep -n '^## Step 2: Backup' "$c" | cut -d: -f1 || true)
+u=$(grep -n '^## Step 3: Update' "$c" | cut -d: -f1 || true)
 [ -n "$b" ] && [ -n "$u" ] && [ "$b" -lt "$u" ] || fail "backup step must precede update step"
 
 # The exclude flag sits before the operands in the core tarball line.
-line=$(grep -F 'core.tar.gz' "$c" | grep -F 'tar -czf' | head -1)
+line=$(grep -F 'core.tar.gz' "$c" | grep -F 'tar -czf' | head -1 || true)
 case "$line" in *--exclude=wp-config.php*-C*) ;; *) fail "tar --exclude must precede the operands";; esac
 
 # Wrong forms stay out.

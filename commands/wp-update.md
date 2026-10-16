@@ -64,6 +64,21 @@ Treat the root as a **local clone** when `.wp-create.json` has `project.source: 
 2. Record the start marks used by Step 5: the byte size of `wp-content/debug.log`
    (`stat -c %s`, 0 if absent) and the time. On a clone also record the enabled WooCommerce
    gateways and the active plugin list, for Step 6.
+   When the site had performance work (see Step 5.3), also count the render-blocking scripts in
+   the home page `<head>` now, for the same comparison afterwards:
+
+   ```bash
+   curl -s --max-time 30 <home-url> | sed -n '/<head/,/<\/head>/p' | grep -oE '<script\b[^>]*\bsrc=[^>]*>' | grep -vEc '\b(defer|async)\b|type="module"'
+   ```
+
+   If the repo has the shopper-flow regression suite (`.wp-audit/suite/`, see
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/browser-suite.md`), take its baseline
+   now on a clone: `REGRESSION_LABEL=before npm run test:regression`.
+   **Live gateway keys stop a clone here, before anything is updated.** On a clone, check
+   `$WP option list --search='woocommerce_*_settings' --field=option_value | grep -E '(sk|rk|pk)_live_'`;
+   a hit means the update would run against a payment account that can charge real customers.
+   Report it and ask (`AskUserQuestion`) whether to disable the gateway first; do not go on
+   without an answer.
 3. List what is available:
 
 ```bash
@@ -141,14 +156,18 @@ version is reported, not retried with guessed flags.
    `Uncaught` and `Parse error` lines. A new fatal is a failure, not a note.
 3. **Head scripts**: when the site had performance work (deferred or delayed scripts, or a
    page-cache/optimizer plugin), compare the render-blocking `<script src>` in the home page
-   `<head>` with and without `defer`/`async`/`type=module` against a pre-update count taken in
-   Step 1; a new blocking script is a regression to report.
-4. **Regression suite**: if the repo has the audit-suite shopper-flow suite
-   (`templates/audit-suite`, installed per `/wp-audit`), run its shopper-flow tests against the
-   site and quote the pass/fail counts. If it is absent, say "regression suite not available"
-   and list the manual flows to click (add to cart, checkout, login, search); do not invent a
-   substitute. The first admin-side load after an update can time out while caches rebuild:
-   retry that one section once before reporting it FAIL.
+   `<head>` with and without `defer`/`async`/`type=module` against the pre-update count taken
+   in Step 1.2 (same command); a new blocking script is a regression to report.
+4. **Regression suite**: if `.wp-audit/suite/` exists (the shopper-flow suite installed by
+   `/wp-audit`), run `REGRESSION_LABEL=after npm run test:regression` there and
+   `npm run regression:compare -- before after`, and quote the pass/fail counts. It is meant for
+   a local clone and never places an order; it is not an audit pass, so do not point
+   `bin/audit-suite.sh` at the site for this. On production do not run it unless
+   the user asks, and then through `bin/prod-gate.sh` as `browser-suite.md` describes. A flow
+   that went PASS to SKIP is a regression, not a note. If there is no baseline or no suite, say
+   "regression suite not available" and list the manual flows to click (add to cart, checkout,
+   login, search); do not invent a substitute. The first admin-side load after an update can
+   time out while caches rebuild: retry that one section once before reporting it FAIL.
 5. Extra attention to anything flagged as version skew in Step 3.
 
 ## Step 6: Clone-aware Checks
@@ -156,15 +175,16 @@ version is reported, not retried with guessed flags.
 On a local clone, after Step 5, re-check that updates did not undo the
 isolation. Read the state, change nothing without asking:
 
-- Outgoing mail is still disabled (the clone's mail-blocking mu-plugin is still present and
-  `wp_mail` is still overridden).
-- Payment gateways that were off are still off (`$WP eval` listing enabled WooCommerce
-  gateways, compared with Step 1's list taken before updating).
+- Outgoing mail is still disabled (`wp-content/mu-plugins/00-clone-isolation.php` is still
+  present; it captures mail at `pre_wp_mail`, so do not look for an overridden `wp_mail`).
+- Payment gateways that are enabled now were already enabled in Step 1's list (`$WP eval`
+  listing enabled WooCommerce gateways, compared with that list); a newly enabled one is a
+  regression.
 - `DISABLE_WP_CRON` and the disabled-plugin set are unchanged; no plugin that was inactive is
   now active.
 
 Anything re-enabled is reported as a regression with the command that turns it off again;
-offer it, do not run it silently. Never run the update on a clone against live gateway keys.
+offer it, do not run it silently. The live-gateway-key gate is in Step 1.2, before the update.
 
 ## Step 7: Report
 
