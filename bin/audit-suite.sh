@@ -149,14 +149,14 @@ mkdir -p "$dir"
 if [ -n "$(ls -A "$dir" 2>/dev/null || true)" ] && [ ! -f "$dir/VENDORED-FROM.txt" ]; then
   cat >&2 <<EOF
 audit-suite: $dir is not empty and carries no VENDORED-FROM.txt, so it is not a suite this
-  scaffolded. Refusing: this step removes lib/, tests/, scripts/, package.json and others by
+  scaffolded. Refusing: this step removes lib/, tests/, scripts/, regression/, package.json and others by
   name, and those names exist in plenty of directories that are not a suite.
   Point --dir at an empty directory, or at one a previous run scaffolded.
 EOF
   exit 1
 fi
 
-for item in lib tests scripts playwright.config.js global-setup.js package.json .gitignore .env.example README.md VENDORED-FROM.txt; do
+for item in lib tests scripts regression playwright.config.js playwright.regression.config.js global-setup.js package.json .gitignore .env.example README.md VENDORED-FROM.txt; do
   [ -e "$template/$item" ] || continue
   rm -rf "${dir:?}/$item"
   cp -r "$template/$item" "$dir/$item"

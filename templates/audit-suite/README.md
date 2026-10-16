@@ -96,6 +96,67 @@ Los fallos de contraste de axe son una decisión de paleta, no un arreglo de có
 
 Las filas `41.1`–`41.7` y `a11y-*` son **evidencia**, no criterios nuevos: no cuentan en el denominador del porcentaje, para que las cifras sigan siendo comparables con informes anteriores.
 
+## Regresión de flujos de comprador (WooCommerce)
+
+Suite aparte de la auditoría: no mide calidad, comprueba que **el comercio sigue funcionando**.
+Se ejecuta **antes y después** de un trabajo de rendimiento o de una actualización de
+núcleo/plugins/tema, y la diferencia demuestra qué se rompió.
+
+```bash
+REGRESSION_LABEL=before npm run test:regression   # antes del cambio
+# ... se aplica la actualización o la optimización ...
+REGRESSION_LABEL=after  npm run test:regression   # después
+npm run regression:compare -- before after        # sale con 1 si algo pasó de PASS a FAIL, a SKIP o desapareció (--allow-skips lo rebaja a aviso si las dos ejecuciones tienen distinto alcance)
+```
+
+**Punto de entrada:** `npm run test:regression` (config `playwright.regression.config.js`, proyectos
+`regression-desktop` y `regression-mobile`; también `test:regression:desktop` / `:mobile`). Los tests se
+titulan `[<id>] … @regression`. Escribe `results/regression/<etiqueta>.md` y `.json` (sin etiqueta,
+`latest`). Un solo worker y sin reintentos globales: los flujos comparten carrito y sesión.
+
+| Flujo (`id`) | Qué comprueba |
+|---|---|
+| `home` | carga 200, título, cabecera, sin errores PHP ni imágenes rotas |
+| `search-live`, `search-results` | sugerencias AJAX (SKIP si el buscador no las tiene) y página de resultados |
+| `archive` | categoría con productos, filtros y paginación |
+| `sorting` | orden por precio ascendente y descendente |
+| `currency` | con un cambiador de moneda: cambia el precio, el símbolo y persiste al navegar |
+| `product-page`, `variation` | galería, zoom (solo escritorio) y selección de variación |
+| `add-to-cart` | añadir por AJAX y que el carrito crezca |
+| `quick-view`, `wishlist` | vista rápida (SKIP en móvil si está oculta) y lista de deseos añadir/quitar |
+| `cart` | cantidad, eliminar línea y rechazo de un cupón inexistente |
+| `checkout` | renderiza y marca inválido un campo obligatorio vacío, **sin pulsar “Realizar pedido”** |
+| `account` | formulario de acceso/registro y rechazo de credenciales falsas |
+| `contact-form`, `newsletter` | validación y envío; solo escriben en un clon (ver abajo) |
+| `mobile-menu`, `sticky-header` | menú móvil abre/cierra; el contenido no salta al hacer scroll |
+| `admin` | acceso y pantallas clave en 200 sin errores PHP |
+| `sweep` | recorre N URLs y registra errores JS y peticiones fallidas por carga |
+
+Cada flujo da `PASS`, `FAIL` o `SKIP`. Un flujo cuya función no existe en el sitio (sin lista de deseos,
+sin plugin multimoneda, sin vista rápida) sale `SKIP` **con el motivo**, nunca `FAIL`.
+
+**Configurar.** Todo funciona con los valores de `regression/defaults.js` en un comercio WooCommerce
+estándar. Lo que no coincida se fija en el bloque `regression` de `audit.config.js` (se mezcla encima):
+`urls` (slugs del catálogo, carrito, checkout, cuenta, contacto), `selectors` (solo los que cambien),
+`currency` (`urlParam` + `codes` si el plugin cambia de moneda por URL), `skipFlows`, `sweep`. Los
+productos, la categoría y el término de búsqueda se descubren con la API Store de WooCommerce.
+Credenciales solo por entorno (`.env.example`): `REGRESSION_ADMIN_USER/PASS`, `REGRESSION_CUSTOMER_USER/PASS`.
+El navegador es el de `CHROMIUM_PATH` o `regression.executablePath`; no se instala ninguno.
+
+**Reglas que no se saltan**
+- **Nunca hace pedidos ni envía correo real.** El checkout se valida sin enviarlo y se aborta cualquier
+  POST de pedido. El formulario de contacto y la newsletter solo se envían si el host es un clon
+  (`.local`, `.test`, `localhost`, IP privada; `regression.clone` lo fuerza) o con `allowWrites: true`.
+- **Ejecútala contra el clon, no contra producción.** En un clon con el correo anulado, un `mail_failed`
+  de Contact Form 7 es lo esperado y cuenta como PASS; fuera de un clon es un FAIL.
+- **La primera petición al admin tras una actualización puede agotar el tiempo** (migraciones, caché
+  fría): el flujo `admin` reintenta una vez antes de dar FAIL.
+- **Los carruseles con orden aleatorio** cambian de contenido en cada carga: la suite no compara
+  contenido de carruseles, solo que cargan y no rompen; no añadas aserciones sobre su primer elemento.
+- La newsletter deja un suscriptor `regression-…@example.com` en el clon: bórralo al terminar.
+- Los errores JS y las peticiones fallidas del `sweep` no bloquean por sí solos: se registran y
+  `regression:compare` avisa de los **nuevos** respecto a la ejecución anterior.
+
 ## Qué sigue siendo manual
 
 Criterios de juicio humano: 2 (tamaño de campo acorde), 27 (nombre de enlace ~ destino), 30 (icono representa su función), 36 (orden lógico de navegación), 37 (registros innecesarios); y el **número literal de GTmetrix** (Lighthouse es un proxy). El informe los marca como REVISION MANUAL.

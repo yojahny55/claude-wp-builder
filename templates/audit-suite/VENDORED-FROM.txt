@@ -5,3 +5,7 @@ date:   2026-09-17
 This tree is vendored, not authored here. Changes belong upstream first;
 tests/checks/audit-suite-sync.sh compares the two when the source is present
 and SKIPs when it is not.
+
+Plugin-owned additions (no upstream counterpart, not compared by the sync check):
+regression/, tests/regression.spec.js, playwright.regression.config.js,
+scripts/regression-compare.js -- the WooCommerce shopper-flow regression suite.
