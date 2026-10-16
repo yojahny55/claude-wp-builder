@@ -29,6 +29,8 @@ runtime for the plugin itself. The only executable code shipped is:
   `theme-template-check.mjs` (the ABSPATH, compiled-class and widget-script gate behind
   `/wp-finalize` Check 4 and the practices audit), `link-sweep.mjs` (the audits' link
   sweep, with the 4-in-flight cap, sampling, clone-origin and CDN-challenge rules built in),
+  `h2-proxy.mjs` (HTTP/2 + brotli proxy in front of a local site for Lighthouse runs),
+  `contrast-propose.mjs` (palette proposal for failing contrast pairs),
   `ux-probe.mjs` (the usability audit's page harness: one browser launch per run, built-in
   DOM probes, site probes from a module, and the 3-launch / 15-minute / 2-attempt budget
   enforced through a state file), `style-diff.mjs` (before/after computed-style snapshots and
