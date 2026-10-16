@@ -177,9 +177,11 @@ gives `mysql` an empty input, and WP-CLI still prints `Success: Imported from 'S
 `docker exec -i` (or `wp-env run cli` with stdin attached), or stop and ask for a native
 wrapper. Do not trust the success line, and do not trust a table count either: `/wp-create`
 already made tables in C2, so "more than zero" is true of an import that loaded nothing. Verify
-the import itself: `$WP option get siteurl` must return one of the source URLs from C3 (not the
-local one), and `$WP db query "SELECT COUNT(*) FROM <prefix>options"` must be above zero, with
-the prefix read in C3. Stop if either fails.
+the import itself, reading the raw row without booting WordPress: `$WP db query "SELECT option_value
+FROM <prefix>options WHERE option_name='siteurl'" --skip-column-names` must return one of the source
+URLs from C3 (not the local one), with the prefix read in C3. `$WP option get siteurl` is no
+substitute: a `WP_SITEURL` constant, which C5 rewrites to the local URL, overrides the stored value
+through a core filter. Stop if it does not match.
 
 ### C7: Search-Replace URLs
 
