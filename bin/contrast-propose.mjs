@@ -78,7 +78,8 @@ for (let i = 0; i < argv.length; i++) {
             if (v.id !== 'color-contrast') continue;
             for (const n of v.nodes || []) {
                 const d = (n.any || []).map((a) => a.data).find((x) => x && x.fgColor && x.bgColor);
-                if (d) rows.push({ fg: d.fgColor, bg: d.bgColor, need: Number(d.expectedContrastRatio) || 4.5, target: (n.target || []).join(' '), text: n.html, page: e.page || e.url });
+                // axe writes the requirement as a string such as '3:1'
+                if (d) rows.push({ fg: d.fgColor, bg: d.bgColor, need: parseFloat(d.expectedContrastRatio) || 4.5, target: (n.target || []).join(' '), text: n.html, page: e.page || e.url });
             }
         }
     }
