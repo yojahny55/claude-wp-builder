@@ -422,7 +422,7 @@ and never retry. A local site is not gated.
    suite's `A11Y-AXE-*` colour rows) fail, group the failing pairs and produce a proposal for
    the client's approval: for each pair the nearest compliant shade (lightness moved, hue kept)
    with the ratio before and after, plus the affected texts, node counts and pages.
-   `node /srv/http/claude-wp-builder/bin/contrast-propose.mjs --axe <axe.json>` (or repeated
+   `node ${CLAUDE_PLUGIN_ROOT}/bin/contrast-propose.mjs --axe <axe.json>` (or repeated
    `--pair fg:bg[:need]`) computes the table. Colours are a design change: no colour value is
    written to the site until the client approves the palette. Text over images is `incomplete`
    in axe and must be listed as not measured.

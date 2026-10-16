@@ -38,4 +38,19 @@ has '`h2-proxy.mjs`' README.md
 has '`contrast-propose.mjs`' README.md
 # the old claim that PERF-047 is auto-fixable must be gone
 ! grep -F 'PERF-047 | Render-blocking third-party CSS' agents/wp-audit-performance.md | grep -Fq '| Yes |' || fail "PERF-047 is still marked auto-fixable"
+
+# Behaviour: a proposal must reach its ratio on the rounded hex that ships, and --json must
+# survive a pipe (process.exit after console.log once cut it at 64 KiB).
+cp=bin/contrast-propose.mjs
+node "$cp" --pair '#e3fecc:#03b07d' --pair '#dd1a3a:#e3bb9e' --json \
+  | node -e 'const o=JSON.parse(require("fs").readFileSync(0,"utf8"));process.exit(o.length===2&&o.every(r=>r.ok||r.after>=r.need)?0:1)' \
+  || fail "contrast-propose proposed a shade below its required ratio"
+args=(); for i in $(seq 1 600); do args+=(--pair "#$(printf '%06x' $((i*20011 % 16777215))):#ffffff"); done
+node "$cp" "${args[@]}" --json | node -e 'JSON.parse(require("fs").readFileSync(0,"utf8"))' \
+  || fail "contrast-propose --json is truncated through a pipe"
+printf '%s' '{"violations":[{"id":"color-contrast","nodes":[{"target":["p"],"html":"<p>x</p>","any":[{"data":{"fgColor":"#e3fecc","bgColor":"#03b07d","expectedContrastRatio":4.5}}]}]}]}' > "${TMPDIR:-/tmp}/axe-native.$$.json"
+node "$cp" --axe "${TMPDIR:-/tmp}/axe-native.$$.json" | grep -Fq '#e3fecc on #03b07d' || { rm -f "${TMPDIR:-/tmp}/axe-native.$$.json"; fail "contrast-propose cannot read raw axe-core results"; }
+rm -f "${TMPDIR:-/tmp}/axe-native.$$.json"
+grep -Fq "listen(PORT, '127.0.0.1'" bin/h2-proxy.mjs || fail "h2-proxy must bind loopback only"
+! git grep -n '/srv/http/claude-wp-builder' -- agents commands skills >/dev/null 2>&1 || fail "a distributed doc names an absolute plugin path"
 echo PASS

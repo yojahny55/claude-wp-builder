@@ -46,7 +46,7 @@ function nearest(move, fixed, need) {
         for (let i = 1; i <= 1000; i++) {
             const nl = l + dir * i / 1000;
             if (nl < 0 || nl > 1) break;
-            const c = hsl2rgb([h, s, nl]);
+            const c = hsl2rgb([h, s, nl]).map(Math.round); // test the colour that ships, not the float
             if (ratio(c, fixed) >= need) { if (!best || i < best.steps) best = { rgb: c, steps: i }; break; }
         }
     }
@@ -71,9 +71,15 @@ for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--pair') { const [fg, bg, n] = argv[++i].split(':'); rows.push({ fg, bg, need: Number(n) || 4.5 }); }
     else if (argv[i] === '--axe') {
         const raw = JSON.parse(fs.readFileSync(argv[++i], 'utf8'));
-        // accepts a flat list, or the per-page shape {page, viewport, violations:[...]}
-        for (const e of raw) for (const v of (e.violations || [e])) {
-            if (v.fg && v.bg) rows.push({ fg: v.fg, bg: v.bg, need: Number(v.need) || 4.5, target: v.target, text: v.text, page: v.page || e.page });
+        // accepts a flat list, the per-page shape {page, viewport, violations:[...]}, a single such
+        // object, or raw axe-core results (violations[id=color-contrast].nodes[].any[].data)
+        for (const e of Array.isArray(raw) ? raw : [raw]) for (const v of (e.violations || [e])) {
+            if (v.fg && v.bg) { rows.push({ fg: v.fg, bg: v.bg, need: Number(v.need) || 4.5, target: v.target, text: v.text, page: v.page || e.page }); continue; }
+            if (v.id !== 'color-contrast') continue;
+            for (const n of v.nodes || []) {
+                const d = (n.any || []).map((a) => a.data).find((x) => x && x.fgColor && x.bgColor);
+                if (d) rows.push({ fg: d.fgColor, bg: d.bgColor, need: Number(d.expectedContrastRatio) || 4.5, target: (n.target || []).join(' '), text: n.html, page: e.page || e.url });
+            }
         }
     }
 }
@@ -86,8 +92,10 @@ for (const r of rows) {
     groups.set(k, g);
 }
 const out = [...groups.values()].map((g) => ({ ...g, ...propose(g.fg, g.bg, g.need), texts: [...g.texts].slice(0, 8), pages: [...g.pages] }));
-if (argv.includes('--json')) { console.log(JSON.stringify(out, null, 2)); process.exit(0); }
+if (argv.includes('--json')) console.log(JSON.stringify(out, null, 2));
+else {
 console.log('| Current (text on ground) | Ratio | Needs | Proposed | Ratio | Moves | Nodes | Pages |\n|---|---|---|---|---|---|---|---|');
 for (const o of out) {
     console.log(`| ${o.fg} on ${o.bg} | ${o.before.toFixed(2)} | ${o.need} | ${o.ok ? 'passes' : o.newFg ? `${o.newFg} on ${o.newBg}` : 'no shade reaches it'} | ${o.after ? o.after.toFixed(2) : '-'} | ${o.changes || '-'} | ${o.nodes} | ${o.pages.join(', ') || '-'} |`);
+}
 }

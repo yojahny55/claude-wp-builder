@@ -113,4 +113,4 @@ const server = http2.createSecureServer({ key: fs.readFileSync(key), cert: fs.re
     res.writeHead(out.status, headers);
     res.end(body);
 });
-server.listen(PORT, () => console.log(`h2 proxy ${TO} -> ${FROM} cache=${useCache ? 'on' : 'off'}`));
+server.listen(PORT, '127.0.0.1', () => console.log(`h2 proxy ${TO} -> ${FROM} cache=${useCache ? 'on' : 'off'}`));
