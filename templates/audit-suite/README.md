@@ -104,7 +104,7 @@ núcleo/plugins/tema, y la diferencia demuestra qué se rompió.
 REGRESSION_LABEL=before npm run test:regression   # antes del cambio
 # ... se aplica la actualización o la optimización ...
 REGRESSION_LABEL=after  npm run test:regression   # después
-npm run regression:compare -- before after        # sale con 1 si algo pasó de PASS a FAIL
+npm run regression:compare -- before after        # sale con 1 si algo pasó de PASS a FAIL, a SKIP o desapareció (--allow-skips lo rebaja a aviso si las dos ejecuciones tienen distinto alcance)
 ```
 
 **Punto de entrada:** `npm run test:regression` (config `playwright.regression.config.js`, proyectos

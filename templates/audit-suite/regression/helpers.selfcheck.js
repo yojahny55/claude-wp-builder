@@ -14,7 +14,7 @@ assert.ok(D.selectors.addToCart && D.urls.cart, 'los defaults traen selectores y
 for (const h of ['localhost', 'shop.local', 'a.test', 'site.local.example', '127.0.0.1', '192.168.1.5']) {
   assert.ok(H.isCloneHost(h), `${h} es un clon`);
 }
-for (const h of ['example.com', 'www.shop.org', 'localhost.example.com', 'locale.example.com', '']) {
+for (const h of ['example.com', 'www.shop.org', 'localhost.example.com', 'locale.example.com', '10.example.com', '127.0.0.1.example.org', 'local.example.com', '192.168.1.example.com', '172.16.0.1.nip.io', '']) {
   assert.ok(!H.isCloneHost(h), `${h} NO es un clon`);
 }
 
@@ -49,9 +49,12 @@ const before = { rows: [row('a', 'regression-desktop', 'PASS'), row('b', 'regres
 const after = { rows: [row('a', 'regression-desktop', 'PASS'), row('b', 'regression-desktop', 'FAIL', 'boom'), row('c', 'regression-desktop', 'PASS'), row('d', 'regression-desktop', 'SKIP', 'gone')],
   sweep: [{ project: 'regression-desktop', url: '/x', status: 500, jsErrors: ['TypeError'], failed: [] }] };
 const cmp = H.compareRuns(before, after);
-assert.strictEqual(cmp.regressions.length, 2, 'PASS->FAIL y URL del barrido que deja de cargar');
+assert.strictEqual(cmp.regressions.length, 3, 'PASS->FAIL, PASS->SKIP y URL del barrido que deja de cargar');
 assert.strictEqual(cmp.fixed.length, 1);
-assert.ok(cmp.warnings.some((w) => /PASS -> SKIP/.test(w)), 'una funcion que desaparece avisa');
+assert.ok(cmp.regressions.some((w) => /PASS -> SKIP/.test(w)), 'una funcion que pasa a SKIP es regresion');
+assert.ok(H.compareRuns(before, after, { allowSkips: true }).warnings.some((w) => /PASS -> SKIP/.test(w)), 'allowSkips la rebaja a aviso');
+const gone = H.compareRuns({ rows: [row('a', 'regression-mobile', 'PASS')], sweep: [{ project: 'regression-mobile', url: '/c', status: 200, jsErrors: [], failed: [] }] }, { rows: [], sweep: [] });
+assert.strictEqual(gone.regressions.length, 2, 'filas y URLs que desaparecen son regresion');
 assert.ok(cmp.warnings.some((w) => /JS nuevo/.test(w)));
 assert.strictEqual(H.compareRuns(before, before).regressions.length, 0);
 

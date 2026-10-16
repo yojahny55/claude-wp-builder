@@ -18,8 +18,9 @@ function isCloneHost(hostname) {
   const h = String(hostname || '').toLowerCase();
   if (!h) return false;
   if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local') || h.endsWith('.test')) return true;
-  if (/(^|\.)local\./.test(h)) return true; // p. ej. sitio.local.example
-  if (/^127\./.test(h) || /^10\./.test(h) || /^192\.168\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
+  if (/\.local\./.test(h)) return true; // p. ej. sitio.local.example; 'local.example.com' (publico) no
+  // IPs privadas completas: un prefijo no basta ('10.example.com' es un dominio publico)
+  if (/^(127|10)(\.\d{1,3}){3}$/.test(h) || /^192\.168(\.\d{1,3}){2}$/.test(h) || /^172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}$/.test(h)) return true;
   return false;
 }
 
@@ -144,21 +145,33 @@ function renderMarkdown(run) {
 
 /**
  * Compara dos ejecuciones (antes/despues). Regresion = PASS -> FAIL, o una URL del
- * barrido que antes cargaba y ahora no. PASS -> SKIP es un aviso: la funcion puede
- * haber desaparecido. Errores JS o peticiones fallidas nuevas en el barrido, tambien.
+ * barrido que antes cargaba y ahora no. PASS -> SKIP o una fila que desaparece tambien
+ * lo son (la funcion puede haberse roto); con { allowSkips } pasan a aviso. Errores JS o peticiones fallidas nuevas en el barrido, tambien.
  */
-function compareRuns(before, after) {
+function compareRuns(before, after, opts = {}) {
   const key = (r) => `${r.project}::${r.id}`;
   const prev = new Map((before.rows || []).map((r) => [key(r), r]));
+  const seen = new Set((after.rows || []).map(key));
   const regressions = [], warnings = [], fixed = [];
+  // Una funcion que dejo de poder ejercitarse (SKIP, o la fila desaparece) es lo que provoca una
+  // actualizacion rota: la API Store que no responde pone en SKIP medio flujo. Solo --allow-skips
+  // (comparar ejecuciones de alcance distinto) lo rebaja a aviso.
+  const lost = opts.allowSkips ? warnings : regressions;
   for (const r of after.rows || []) {
     const p = prev.get(key(r));
     if (!p) continue;
     if (p.status === 'PASS' && r.status === 'FAIL') regressions.push(`${r.id} [${r.project}]: PASS -> FAIL (${r.evidence})`);
-    else if (p.status === 'PASS' && r.status === 'SKIP') warnings.push(`${r.id} [${r.project}]: PASS -> SKIP (${r.evidence})`);
+    else if (p.status === 'PASS' && r.status === 'SKIP') lost.push(`${r.id} [${r.project}]: PASS -> SKIP (${r.evidence})`);
     else if (p.status === 'FAIL' && r.status === 'PASS') fixed.push(`${r.id} [${r.project}]`);
   }
+  for (const p of before.rows || []) {
+    if (p.status === 'PASS' && !seen.has(key(p))) lost.push(`${p.id} [${p.project}]: PASS -> ausente en la segunda ejecucion`);
+  }
   const sprev = new Map((before.sweep || []).map((s) => [`${s.project}::${s.url}`, s]));
+  const safter = new Set((after.sweep || []).map((s) => `${s.project}::${s.url}`));
+  for (const p of before.sweep || []) {
+    if (p.status > 0 && p.status < 400 && !safter.has(`${p.project}::${p.url}`)) lost.push(`sweep ${p.url} [${p.project}]: HTTP ${p.status} -> ausente en la segunda ejecucion`);
+  }
   for (const s of after.sweep || []) {
     const p = sprev.get(`${s.project}::${s.url}`);
     if (!p) continue;
