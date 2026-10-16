@@ -8,8 +8,9 @@
 #
 # The headings here are "## Path A", "## Path B" and "## Step 6", so the heading anchor takes
 # either a colon or a space after the title (wp-init's "## Step N:" form is not the only one).
-# Ceiling: the command is 13.5 KB with the three references moved out, so 15 KB leaves room
-# for a few added lines but fails if a path's detail is pasted back in.
+# Ceiling: the command is 16 KB with the four references moved out (Path C and the gateway
+# step added), so 17 KB leaves room for a few added lines but fails if a path's detail is
+# pasted back in.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail=0
@@ -54,7 +55,7 @@ awk '/^$/ { n = 0; next } /skills\/wp-clone-run\/references\// { if (++n > 1) ba
 # The command stays a map. Steps 0 to 1.5, 5.4 and 5.5 stay whole, because they are the
 # argument parse, the destination gate and the isolation gates the run needs in view.
 size=$(wc -c < "$cmd")
-[ "$size" -le 15360 ] || err "$cmd is $size bytes; move long step detail to $refs"
+[ "$size" -le 17408 ] || err "$cmd is $size bytes; move long step detail to $refs"
 
 # The expansion the checks read must carry every reference body.
 . tests/checks/lib/expand-command.sh
