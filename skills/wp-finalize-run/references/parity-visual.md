@@ -22,7 +22,7 @@ Layer 3 is the backstop that measures **computed styles**, not just screenshots,
    `demo/.original/<slug>.html` is absent the page was never converted: note that and skip
    this item for that page.
 
-4. **Measure computed styles.** Via `javascript_tool`, run `getComputedStyle()` on matching selectors on both pages (hero, nav, section backgrounds, headings, buttons) and compare the results.
+4. **Measure computed styles.** Via `javascript_tool`, run `getComputedStyle()` on matching selectors on both pages (hero, nav, section backgrounds, headings, buttons) and compare the results. For the full page rather than a hand-picked selector list, `node ${CLAUDE_PLUGIN_ROOT}/bin/style-diff.mjs snapshot` records every element's computed style and box at desktop and mobile, and `diff` compares two snapshots with a pixel tolerance; take two baselines and pass them as `--noise` so rotating sliders and random-order carousels are set apart instead of failing the run.
 
 5. **Classify every delta:**
    - **Hard delta (BLOCK)** — critical:

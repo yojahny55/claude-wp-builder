@@ -556,6 +556,13 @@ values below, and has the operator confirm them:
 Then it writes `.wp-create.json` with `"origin": "adopted"` and the generated block in
 `.claude/CLAUDE.md`. Nothing on the site changes.
 
+Optionally (asked once, default no) it then publishes the site to a git remote: core, the
+theme(s) and the listed own plugins, never uploads, `wp-config.php`, `.htaccess` or `.env`. It
+builds in a scratch clone with a whitelist `.gitignore` and `* -text` `.gitattributes`, refuses to
+commit if `wp-config.php` is staged, scans for secrets, pushes `dev` and `master`, and records the
+remote and paths under `git_publish` in `.wp-create.json`. The site folder does not become a
+repository and its `.gitignore` is not edited.
+
 `/wp-audit`, `/wp-debug` and `/wp-clone` offer adoption themselves when they find no manifest.
 On an adopted site:
 
