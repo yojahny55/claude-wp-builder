@@ -217,7 +217,7 @@ constant, so the state is visible afterwards.
 
 ```bash
 for d in object-cache.php advanced-cache.php; do
-  [ -f "$LOCAL_PATH/wp-content/$d" ] && mv "$LOCAL_PATH/wp-content/$d" "$LOCAL_PATH/wp-content/$d.bak"
+  if [ -f "wp-content/$d" ]; then mv -n "wp-content/$d" "wp-content/$d.bak"; fi
 done
 bash -c "$WP config get WP_CACHE --type=constant" >/dev/null 2>&1 \
   && bash -c "$WP config set WP_CACHE false --raw --type=constant"
