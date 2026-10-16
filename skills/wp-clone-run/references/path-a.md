@@ -325,6 +325,29 @@ Also handle protocol changes if needed (https to http or vice versa):
 bash -c "$WP search-replace 'https://staging.example.com' 'https://local-clone.local.com' --all-tables --precise"
 ```
 
+**Second pass: the JSON-escaped form.** Elementor stores URLs JSON-escaped in the postmeta
+rows `_elementor_data` and `_elementor_element_cache`, where every slash is `\/`
+(`https:\/\/staging.example.com`). The plain pass above never matches that text, so a clone keeps
+banners and assets pointing at production. Run the same replacement on the escaped strings,
+for each scheme the first pass covered, with and without `www.`:
+
+```bash
+bash -c "$WP search-replace 'https:\/\/staging.example.com' 'https:\/\/local-clone.local.com' --all-tables --precise"
+bash -c "$WP search-replace 'http:\/\/staging.example.com' 'http:\/\/local-clone.local.com' --all-tables --precise"
+```
+
+Quoting: inside the outer double quotes a backslash before `/` is kept as written, and the
+inner single quotes pass it to WP-CLI untouched, so the command above is exact. Do not
+double the backslashes. Repeat both lines for the `www.` host when the source site used it.
+`--precise` unserializes PHP-serialized values; the escaped text sits inside JSON strings, so
+a serialized string whose length changes is still rewritten safely, but a bare byte replace
+of serialized data would corrupt its length prefixes. When Elementor is active, regenerate
+its CSS, which also holds absolute URLs:
+
+```bash
+bash -c "$WP elementor flush-css"
+```
+
 ### A12: Fix Up
 
 ```bash
