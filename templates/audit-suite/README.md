@@ -92,6 +92,8 @@ Reporte HTML de Playwright: `npm run test:report`.
 
   El informe trae con eso un **resumen de Lighthouse por página** (una tabla de escritorio y otra de móvil, con las cuatro categorías y los Core Web Vitals) y, en el detalle de cada página, sus **incidencias de Lighthouse a resolver**: un audit fallido por fila, con categoría, severidad, impacto y en cuál de los dos perfiles falla. El HTML navegable de cada medición queda en `results/lighthouse/lh-<página>-<perfil>.html`.
 
+Los fallos de contraste de axe son una decisión de paleta, no un arreglo de código: agrúpalos y genera la propuesta (el tono conforme más cercano por par, con la razón antes y después, y los textos y páginas afectados) con `node bin/contrast-propose.mjs --axe <axe.json>` del plugin, y pásala al cliente. No se cambia ningún color sin su aprobación.
+
 Las filas `41.1`–`41.7` y `a11y-*` son **evidencia**, no criterios nuevos: no cuentan en el denominador del porcentaje, para que las cifras sigan siendo comparables con informes anteriores.
 
 ## Qué sigue siendo manual

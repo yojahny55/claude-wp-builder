@@ -65,7 +65,7 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 | PERF-003 | @import used | Grep CSS for `@import` (render-blocking) | WARNING | No |
 | PERF-004 | Unused CSS classes | Compare CSS class selectors vs classes in templates | INFO | No |
 | PERF-005 | CSS custom props redefining | Check if `:root` values redefined per section unnecessarily | INFO | No |
-| PERF-047 | Render-blocking third-party CSS | Grep `functions.php` and `inc/` for `wp_enqueue_style` of a known library (`aos`, `swiper`, `animate`, `lightbox`, `slick`) loaded without the `media="print"` + `onload` swap. Synchronous third-party CSS in `<head>` blocks the LCP. | WARNING | Yes |
+| PERF-047 | Render-blocking third-party CSS | Grep `functions.php` and `inc/` for `wp_enqueue_style` of a known library (`aos`, `swiper`, `animate`, `lightbox`, `slick`) loaded without the `media="print"` + `onload` swap. Synchronous third-party CSS in `<head>` blocks the LCP. On a site with a huge vendor stylesheet or many blocking sheets, also measure which blocking sheets touch any above-the-fold element in all sampled views (templates × widths): those that touch none are deferrable, and a vendor sheet with 2-5 % used rules wants a generated used-CSS subset in its own cascade position. Never drop a sheet by page type, keep `@font-face` sheets blocking, and include a carousel library's base CSS whole. Method and pitfalls: `wp-audit-standards/references/performance-lessons.md` (*Used-CSS subset*, *Deferring stylesheets*). | WARNING | No — needs a per-site generator and a first-paint comparison |
 | PERF-052 | Library CSS/JS loaded site-wide | For each third-party handle, check the enqueue is wrapped in `is_page_template()` / `is_front_page()` / `is_singular()` or hooked from the template that uses it. A library used by one section but shipped on every page is the finding. | WARNING | Yes |
 
 ### JavaScript Checks
@@ -357,6 +357,16 @@ asset is animated (a GIF, or an animated WebP/AVIF), and the commands above woul
 its first frame while the RMSE comparison — which reads that same frame — reported no difference.
 Report the weight, mark it `Auto-fix: No`, and leave the remedy to a human: an animated file that
 is too heavy wants an animated WebP or a muted looping video, not a still.
+
+**PERF-010 — moving everything to the footer has three follow-ups.** Where the finding is
+"blocking scripts in `<head>`", the fix is a late pass (priority `PHP_INT_MAX`, excluding admin,
+Customizer and page-builder preview) that sets every handle's group to the footer, and it breaks
+three things unless handled: inline scripts printed by widgets that call `jQuery(...)` need a
+`DOMContentLoaded` wrapper; removing `jquery-migrate` needs `jQuery.migrateWarnings` read on the
+sampled pages first (`$(window).load(fn)` needs a shim); and a tag manager printed by an SEO
+plugin can go to `data-src` loaded on first interaction or 5 s after `load`, which is a decision
+for the owner. Expect FCP to improve and LCP not to move when CSS sets it. Details and
+measurements: `wp-audit-standards/references/performance-lessons.md`, *JavaScript*.
 
 **PERF-010 — where the group actually comes from.** A handle's group is set by whichever call
 passes `in_footer => true`, registration or enqueue: `wp_enqueue_script()` forwards its `$args`

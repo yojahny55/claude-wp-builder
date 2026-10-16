@@ -60,6 +60,10 @@ owns it, with one rule:
   suite's finding and drop the agent's — the agent reasoned about the code, the suite
   loaded the page. The kept finding's evidence notes that it superseded another source, and
   the sidecar keeps that evidence.
+- **Contrast findings end in a proposal, not a patch.** Group the failing `A11Y-AXE-*` colour
+  pairs and run `bin/contrast-propose.mjs --axe <axe.json>`: nearest compliant shade per pair,
+  ratio before and after, affected texts and pages, for the client to approve. No colour is
+  changed without that approval, and text over images (axe `incomplete`) is listed as not measured.
 - Where they describe *different* resources, they are different findings. A contrast
   failure the suite measured on `/contact` and one the agent found in a stylesheet rule
   that no audited page uses are both real, and the second is the one nobody would find
