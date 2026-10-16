@@ -76,7 +76,7 @@ async function discover(c) {
   // Con urls.product el id debe ser el de ESE producto (el de otro mezclaria dos productos en una ejecucion).
   // Compara rutas decodificadas (el slug con acentos llega en minusculas y la URL pegada en mayusculas); con
   // enlaces permanentes simples la ruta es '/' y lo que identifica al producto es la query (?product=slug).
-  const norm = (u) => { try { const x = new URL(u, c.base); const p = decodeURIComponent(x.pathname).replace(/\/$/, '').toLowerCase(); return p || x.search; } catch { return String(u); } };
+  const norm = (u) => { try { const x = new URL(u, c.base); const p = decodeURIComponent(x.pathname).replace(/\/$/, '').toLowerCase(); return p + x.search; } catch { return String(u); } };
   const ok = (p) => p.type === 'simple' && p.is_purchasable && p.is_in_stock && !p.has_options;
   const found = c.cfg.urls.product && st.products.find((p) => norm(p.permalink) === norm(c.cfg.urls.product));
   const configured = found && ok(found) ? found : null; // vendido o con opciones: SKIP con motivo, no un FAIL falso
