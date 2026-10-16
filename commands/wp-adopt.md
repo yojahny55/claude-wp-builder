@@ -235,8 +235,8 @@ working copy.
 whitelisted paths in with `rsync` (never `--delete` outside them).
 
 `rsync` filter rules are **first match wins**. Put every `--exclude` before any `--include`:
-an `--include='/*.php'` placed ahead of `--exclude='/wp-config.php'` once copied `wp-config.php`
-(database credentials and salts) into the working copy. Also exclude tool artifacts:
+an `--include='/*.php'` placed ahead of `--exclude='/wp-config*'` once copied `wp-config.php`
+(database credentials and salts); the glob also keeps `wp-config-staging.php` and `wp-config.php.bak` out into the working copy. Also exclude tool artifacts:
 `.codebase-memory`, `.claude`, `.playwright-mcp`, `*.log`.
 
 **3. Write the whitelist `.gitignore` and `.gitattributes` in the copy.** Pattern, one
@@ -251,7 +251,7 @@ an `--include='/*.php'` placed ahead of `--exclude='/wp-config.php'` once copied
 /wp-content/plugins/*
 !/wp-content/plugins/<own-plugin>/
 !/wp-content/mu-plugins/
-/wp-config.php
+/wp-config*
 .htaccess
 .env
 *.log
@@ -263,9 +263,11 @@ rewrites them.
 
 **4. Guards, before every commit.** Stage with `git add -A`, then:
 
-- `git ls-files | grep -x wp-config.php` must print nothing. Anything else stops the step.
+- `git ls-files | grep -E '(^|/)wp-config'` must print nothing, so a variant such as
+  `wp-config-staging.php` or `wp-config.php.bak` stops the step too. Anything else stops the step.
 - Secret scan of the staged files (`git diff --cached`): API keys, passwords, tokens
-  (`AKIA`, `sk_live_`, `ghp_`, `password\s*=`, `secret`, `token` assignments, salts) and local
+  (`AKIA`, `sk_live_`, `ghp_`, `password\s*=`, `secret`, `token` assignments,
+  `DB_PASSWORD|DB_USER|(AUTH|SECURE_AUTH|LOGGED_IN|NONCE)_(KEY|SALT)`) and local
   hostnames (`*.local`, `*.test`, `localhost`). Show hits and stop; the operator decides.
 
 **5. Push** both branches, and report each branch's SHA (`git rev-parse <branch>`).

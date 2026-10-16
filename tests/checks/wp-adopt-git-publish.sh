@@ -8,7 +8,7 @@ cd "$(dirname "$0")/../.."
 f=commands/wp-adopt.md
 fail() { echo "FAIL: $*"; exit 1; }
 for t in '## Step 6 (opt-in): Publish to a git remote' 'git ls-remote' 'first match wins' \
-  "git ls-files | grep -x wp-config.php" '* -text' '/wp-content/*' 'git_publish' 'pre-receive' \
+  "git ls-files | grep -E '(^|/)wp-config'" "--exclude='/wp-config*'" 'DB_PASSWORD|DB_USER'  '* -text' '/wp-content/*' 'git_publish' 'pre-receive' \
   '.codebase-memory' 'Secret scan' 'Default **no**' 'Do not edit `.gitignore` yourself'; do
   grep -Fq -- "$t" "$f" || fail "$f lost: $t"
 done
