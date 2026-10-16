@@ -433,6 +433,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-debug [issue]` | utility | — | WP-CLI diagnostics and fixes |
 | `/wp-clone --from --to` | utility | — | Clone a remote site locally |
 | `/wp-anonymize` | utility | — | Replace real people in a clone with deterministic fakes |
+| `/wp-update [wp-root] [--plugins] [--exclude] [--core-only]` | utility | — | Update core, plugins and themes behind a backup outside the docroot, run the migrations, report licence-blocked premium plugins as skipped, verify, and print the rollback |
 | `/wp-robin [wp-root]` | utility | — | Runner for the `wp-robin` skill — install and configure Robin Image Optimizer, unstick the bulk queue, generate missing `.webp` |
 | `/wp-s3 [wp-root] [--revert]` | utility | — | Runner for the `wp-s3` skill — install and configure S3 Uploads so WordPress writes its media to S3, or take the site back off it |
 | `/wp-s3-media <upload\|download> [wp-root]` | utility | — | Runner for the `wp-s3` skill — move `wp-content/uploads` between the site and its bucket, with a transfer that verifies itself |

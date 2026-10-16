@@ -344,6 +344,7 @@ Full pipeline, dependency (`cinematic-scroll-kit`) and encoding details: [cinema
 |---------|-------------|
 | `/wp-debug [issue]` | Something is broken — white screen, missing fields, plugin conflicts. Keyword-aware WP-CLI diagnostics with offered fixes. |
 | `/wp-clone --from=ssh://user@host/path --to=/local/path` | You need a copy of a staging/production site locally. Also `--sql= --uploads=` for a manual dump. |
+| `/wp-update [/path/to/wordpress] [--exclude=a,b]` | Core, plugins or themes have updates pending and you want a backup, the migrations and a verification pass around them. |
 | `/wp-robin [/path/to/wordpress]` | Robin Image Optimizer is stuck, unconfigured, or missing `.webp` files. Runner for the `wp-robin` skill. |
 | `/wp-aos-animator [<theme>] [--report-only]` | A plain project wants scroll animations. Runner for the `wp-aos-animator` skill — audit, install, enqueue, init, animate. |
 | `/wp-s3 [/path/to/wordpress] [--revert]` | The site's media should live in S3 or any S3-compatible bucket instead of on the server's disk. Runner for the `wp-s3` skill — install, configure, or reverse. |

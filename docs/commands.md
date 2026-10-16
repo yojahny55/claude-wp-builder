@@ -38,6 +38,7 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-debug`](#wp-debug) | utility | — | `.wp-create.json` | offered fixes |
 | [`/wp-clone`](#wp-clone) | utility | — | remote site | local install |
 | [`/wp-anonymize`](#wp-anonymize) | utility | — | cloned database | anonymised database |
+| [`/wp-update`](#wp-update) | utility | — | target WordPress root | updated core/plugins/themes, dated backup, migrations, verification report |
 | [`/wp-robin`](#wp-robin) | utility | — | target WordPress root | Robin settings, queue rows, `.webp` files |
 | [`/wp-s3`](#wp-s3) | utility | — | bucket, region, media URL, credentials | `s3-config.php`, the `require` in `wp-config.php`, the endpoint mu-plugin |
 | [`/wp-s3-media`](#wp-s3-media) | utility | — | a configured WordPress root | `wp-content/uploads` moved, and verified |
@@ -608,6 +609,25 @@ identity and they are what the clone exists to debug.
 Every table outside the catalog is reported by name and row count under *Not examined*, and
 residue found by the verification pass is reported as a failure rather than beside a success
 summary.
+
+### `/wp-update`
+
+```
+/wp-update                                  # preflight the project root, ask what to update
+/wp-update /path/to/wordpress --exclude=some-plugin
+/wp-update --core-only
+```
+
+Preflight (WP-CLI boots, core/plugin/theme updates listed, the parent of an active child theme
+held back unless approved), then a backup outside the docroot (`wp db export` plus tarballs of
+plugins and core, `wp-config.php` excluded), then `wp core update`/`update-db`, plugin and theme
+updates with per-item status, and the migrations that apply (`wp wc update`,
+`wp elementor update db`, CSS flush, cache flush). Premium plugins whose licence is bound to
+another domain and answer `Unauthorized` are reported as skipped, never worked around, and
+version skew (Elementor updated, Elementor Pro not) is flagged. Verification covers key pages,
+new fatals in `debug.log`, head scripts and, when present, the audit-suite shopper-flow suite.
+A local clone is re-checked so mail and payment gateways stay off; production needs explicit
+confirmation. The report ends with versions before and after and the rollback recipe.
 
 ### `/wp-robin`
 
