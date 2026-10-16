@@ -74,8 +74,12 @@ async function discover(c) {
   const simple = st.products.find((p) => p.type === 'simple' && p.is_purchasable && p.is_in_stock && !p.has_options);
   const variable = st.products.find((p) => p.type === 'variable' && p.is_in_stock);
   // Con urls.product el id debe ser el de ESE producto (el de otro mezclaria dos productos en una ejecucion).
-  const pathOf = (u) => abs(u).split('?')[0].replace(/\/$/, '');
-  const configured = c.cfg.urls.product && st.products.find((p) => pathOf(p.permalink) === pathOf(c.cfg.urls.product));
+  // Compara rutas decodificadas (el slug con acentos llega en minusculas y la URL pegada en mayusculas); con
+  // enlaces permanentes simples la ruta es '/' y lo que identifica al producto es la query (?product=slug).
+  const norm = (u) => { try { const x = new URL(u, c.base); const p = decodeURIComponent(x.pathname).replace(/\/$/, '').toLowerCase(); return p || x.search; } catch { return String(u); } };
+  const ok = (p) => p.type === 'simple' && p.is_purchasable && p.is_in_stock && !p.has_options;
+  const found = c.cfg.urls.product && st.products.find((p) => norm(p.permalink) === norm(c.cfg.urls.product));
+  const configured = found && ok(found) ? found : null; // vendido o con opciones: SKIP con motivo, no un FAIL falso
   st.simple = c.cfg.urls.product ? { permalink: c.cfg.urls.product, id: configured ? configured.id : 0, name: configured ? configured.name : '', configured: true } : simple && { id: simple.id, name: simple.name, permalink: abs(simple.permalink) };
   st.variable = c.cfg.urls.variableProduct ? { permalink: c.cfg.urls.variableProduct } : variable && { id: variable.id, name: variable.name, permalink: abs(variable.permalink) };
   const cat = st.products.flatMap((p) => p.categories || []).find((x) => x.link);
@@ -87,7 +91,7 @@ async function discover(c) {
 /** Deja el carrito con un producto simple, por la URL ?add-to-cart= (equivale a pulsar el boton). */
 async function cartWithOne(c) {
   const st = await discover(c);
-  if (st.simple && st.simple.configured && !st.simple.id) c.skip('urls.product esta configurada pero la API Store no lista ese producto (per_page=60): sin su id no se puede llenar el carrito');
+  if (st.simple && st.simple.configured && !st.simple.id) c.skip('urls.product esta configurada pero la API Store no lo lista (per_page=60) o no es un producto simple comprable y en stock: sin su id no se puede llenar el carrito');
   if (!st.simple || !st.simple.id) c.skip('no se encontro un producto simple comprable con id (la API Store de WooCommerce no responde): sin ella no se puede llenar el carrito');
   await c.go(`/?add-to-cart=${st.simple.id}`);
   const n = await c.cartCount();
