@@ -213,6 +213,25 @@ subscription renewals, abandoned-cart mail, scheduled publishes — all of them 
 against whatever integrations the database still points at. `/wp-debug` already reports this
 constant, so the state is visible afterwards.
 
+### 5.4.3: Park the cache drop-ins
+
+```bash
+for d in object-cache.php advanced-cache.php; do
+  [ -f "$LOCAL_PATH/wp-content/$d" ] && mv "$LOCAL_PATH/wp-content/$d" "$LOCAL_PATH/wp-content/$d.bak"
+done
+bash -c "$WP config get WP_CACHE --type=constant" >/dev/null 2>&1 \
+  && bash -c "$WP config set WP_CACHE false --raw --type=constant"
+```
+
+A production `wp-content/object-cache.php` (Redis or Memcached) or `advanced-cache.php`
+(page cache) is loaded by WordPress even under `--skip-plugins`. Without that backend on the
+local machine, every WP-CLI call fails ("Error establishing a Redis connection"), including
+the import fix-up, and a page-cache drop-in would serve pages with production URLs. Park them
+as `<name>.bak`, never delete, so the operator can restore them, and set `WP_CACHE` to
+`false` when `wp-config.php` defines it as true. Do this before the first command that boots
+WordPress. Record each parked file and the `WP_CACHE` change in the clone report and in the
+manifest, so nobody ships the `.bak` state back to production.
+
 ## Step 5.5: Isolate the Clone — after the import
 
 **Both paths arrive here, and nothing may load the site in a browser before this step

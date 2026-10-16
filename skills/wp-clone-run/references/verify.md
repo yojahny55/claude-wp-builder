@@ -29,6 +29,20 @@ bash -c "$WP option get home"
 
 Both should return the local domain (e.g., `https://local-clone.local.com`). If they still show the old domain, the search-replace may have missed serialized data — re-run with `--precise` flag.
 
+Also count rows that still hold the source host in either form. Elementor keeps URLs
+JSON-escaped (`https:\/\/<remote-domain>`), so a `LIKE` on
+`https://<remote-domain>` misses them. Match the bare host, with no scheme or slashes, which
+hits both spellings:
+
+```bash
+PREFIX=$(bash -c "$WP db prefix")
+bash -c "$WP db query \"SELECT meta_key, COUNT(*) FROM ${PREFIX}postmeta WHERE meta_value LIKE '%<remote-domain>%' GROUP BY meta_key\""
+```
+
+The query must return no rows for `_elementor_data` and `_elementor_element_cache`. Any count means the
+second (escaped) search-replace pass did not run or missed a host spelling; re-run it, then
+`elementor flush-css`.
+
 `wp search-replace` changes the database only. Files generated under uploads keep the old
 domain. Elementor's local Google Fonts are the case that shows: its
 `uploads/elementor/google-fonts/css/*.css` files load each font from an absolute URL on the
