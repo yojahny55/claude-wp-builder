@@ -16,17 +16,26 @@ grep -Fq 'Procedure — embedded ICC profiles on images (PERF-075)' "$perf" || f
 grep -Fq 'Procedure — Elementor widget controls queried on the front end (PERF-076)' "$perf" || fail "no PERF-076 procedure"
 grep -Fq 'Procedure — missing Elementor generated CSS (PERF-077)' "$perf" || fail "no PERF-077 procedure"
 
-grep -Fq '%[profile:icc]' "$perf" || fail "PERF-075 lost the identify detection"
-grep -Fq 'CMYK' "$perf" || fail "PERF-075 lost the CMYK criterion"
-grep -Fq 'never auto-applied' "$perf" || fail "PERF-075 lost the never-auto-applied rule"
-grep -Fq 'register_controls' "$perf" || fail "PERF-076 lost register_controls"
-grep -Fq 'WP-026' "$perf" || fail "PERF-076 must cross-reference WP-026, not duplicate it"
-grep -Fq 'identical' "$perf" || fail "PERF-076 fix lost the identical-HTML verification"
-grep -Fq 'elementor flush-css' "$perf" || fail "PERF-077 lost the flush-css fix"
-grep -Fq 'text/css' "$perf" || fail "PERF-077 lost the content-type test"
-grep -Fq 'CSS Print Method' "$perf" || fail "PERF-077 lost the print-method note"
-grep -Fq 'inconclusive' "$perf" || fail "PERF-077 lost the clone-without-uploads outcome"
-grep -Fq 'relative only' "$perf" || fail "PERF-076 lost the clone-timing caveat"
+# Each assertion runs inside its own procedure section, so deleting the section fails it.
+section() { awk -v h="$1" 'index($0,h)==1{f=1; next} f && /^##+ /{exit} f{print}' "$perf"; }
+icc=$(section '### Procedure — embedded ICC profiles on images (PERF-075)')
+ctl=$(section '### Procedure — Elementor widget controls queried on the front end (PERF-076)')
+css=$(section '### Procedure — missing Elementor generated CSS (PERF-077)')
+[ -n "$icc" ] || fail "PERF-075 procedure section is empty"
+[ -n "$ctl" ] || fail "PERF-076 procedure section is empty"
+[ -n "$css" ] || fail "PERF-077 procedure section is empty"
+
+grep -Fq '%[profile:icc]' <<<"$icc" || fail "PERF-075 lost the identify detection"
+grep -Fq 'CMYK' <<<"$icc" || fail "PERF-075 lost the CMYK criterion"
+grep -Fq 'never auto-applied' <<<"$icc" || fail "PERF-075 lost the never-auto-applied rule"
+grep -Fq 'register_controls' <<<"$ctl" || fail "PERF-076 lost register_controls"
+grep -Fq 'WP-026' <<<"$ctl" || fail "PERF-076 must cross-reference WP-026, not duplicate it"
+grep -Fq 'identical' <<<"$ctl" || fail "PERF-076 fix lost the identical-HTML verification"
+grep -Fq 'relative only' <<<"$ctl" || fail "PERF-076 lost the clone-timing caveat"
+grep -Fq 'elementor flush-css' <<<"$css" || fail "PERF-077 lost the flush-css fix"
+grep -Fq 'text/css' <<<"$css" || fail "PERF-077 lost the content-type test"
+grep -Fq 'CSS Print Method' <<<"$css" || fail "PERF-077 lost the print-method note"
+grep -Fq 'inconclusive' <<<"$css" || fail "PERF-077 lost the clone-without-uploads outcome"
 
 # WP-026 must still exist for the cross-reference to resolve.
 grep -qE '^\| WP-026 \|' agents/wp-audit-practices.md || fail "WP-026 vanished, PERF-076 points at it"
