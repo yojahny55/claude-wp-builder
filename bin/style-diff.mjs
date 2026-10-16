@@ -51,7 +51,8 @@
  * Output: snapshot writes <out>/<label>.json (label defaults to a timestamp) and prints
  * the path; diff prints a text report and, with --out, the same as JSON.
  * exit 0 = no non-noise style diff (size diffs fail only with --fail-on-size), 1 = style
- * diffs found, 2 = usage or no browser (nothing is installed or downloaded).
+ * diffs found, 2 = usage or no browser (nothing is installed or downloaded), 3 = INCOMPLETE:
+ * no diff, but a page or viewport was unmeasured, which is never a pass.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -286,15 +287,16 @@ function runDiff(o) {
   const [A, B] = o.files.map(readSnap);
   const noiseSnaps = o.noise.map(readSnap);
   const rep = { a: A.label, b: B.label, tolerance: o.tolerance, noise: noiseSnaps.length === 2,
-    pages: [], totals: { style: 0, size: 0, structure: 0, noisy: 0, newConsoleErrors: 0, newFailedRequests: 0 } };
+    pages: [], totals: { style: 0, size: 0, structure: 0, noisy: 0, unmeasured: 0, newConsoleErrors: 0, newFailedRequests: 0 } };
   for (const url of Object.keys(A.pages)) {
     const pageRep = { url, viewports: [] };
-    if (!B.pages[url]) { pageRep.missing = 'page absent from B'; rep.pages.push(pageRep); continue; }
+    if (!B.pages[url]) { pageRep.missing = 'page absent from B'; rep.totals.unmeasured++; rep.pages.push(pageRep); continue; }
     for (const vk of Object.keys(A.pages[url])) {
       const va = A.pages[url][vk], vb = B.pages[url][vk];
       const vr = { viewport: vk };
       if (!vb) vr.unmeasured = 'viewport absent from B';
       else if (va.unmeasured || vb.unmeasured) vr.unmeasured = va.unmeasured || vb.unmeasured;
+      if (vr.unmeasured) rep.totals.unmeasured++;
       else {
         const noisy = new Set();
         if (noiseSnaps.length === 2) {
@@ -322,10 +324,11 @@ function runDiff(o) {
     rep.pages.push(pageRep);
   }
   const fail = rep.totals.style > 0 || (o.failOnSize && (rep.totals.size > 0 || rep.totals.structure > 0));
-  rep.verdict = fail ? 'DIFF' : 'CLEAN';
+  const incomplete = !fail && rep.totals.unmeasured > 0;
+  rep.verdict = fail ? 'DIFF' : incomplete ? 'INCOMPLETE' : 'CLEAN';
   printReport(rep, o);
   if (o.out) { mkdirSync(dirname(resolve(o.out)), { recursive: true }); writeFileSync(o.out, JSON.stringify(rep, null, 2) + '\n'); }
-  process.exit(fail ? 1 : 0);
+  process.exit(fail ? 1 : incomplete ? 3 : 0);
 }
 
 function printReport(rep, o) {
@@ -354,7 +357,7 @@ function printReport(rep, o) {
     }
   }
   const t = rep.totals;
-  L.push(`\n${rep.verdict}: ${t.style} style, ${t.size} size, ${t.structure} structure, ${t.noisy} noisy excluded, ` +
+  L.push(`\n${rep.verdict}: ${t.style} style, ${t.size} size, ${t.structure} structure, ${t.noisy} noisy excluded, ${t.unmeasured} unmeasured, ` +
     `${t.newConsoleErrors} new console errors, ${t.newFailedRequests} new failed requests`);
   process.stdout.write(L.join('\n') + '\n');
 }

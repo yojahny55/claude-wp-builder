@@ -44,4 +44,9 @@ printf '%s' "$out" | grep -Fq 'nth-child(2)' && printf '%s' "$out" | sed -n '/ST
   && fail "the noisy element was reported as a style diff"
 # Same page against itself: clean, exit 0.
 node "$tool" diff "$tmp/b1.json" "$tmp/b1.json" >/dev/null || fail "identical snapshots did not exit 0"
+# An unmeasured viewport is never a pass: no diff, but not CLEAN either.
+node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1]));for(const u of Object.values(j.pages))for(const v of Object.values(u))v.unmeasured="load failed: timeout";fs.writeFileSync(process.argv[2],JSON.stringify(j))' "$tmp/b1.json" "$tmp/broken.json"
+node "$tool" diff "$tmp/b1.json" "$tmp/broken.json" >"$tmp/inc.txt"; rc=$?
+[ "$rc" = 3 ] || fail "an unmeasured run exited $rc, not 3"
+grep -Fq 'INCOMPLETE' "$tmp/inc.txt" || fail "an unmeasured run was not reported as INCOMPLETE"
 echo "PASS: style-diff reports a tag-swap regression, sets noise apart and exits 1/0"
