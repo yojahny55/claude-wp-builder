@@ -64,3 +64,15 @@ owns it, with one rule:
   failure the suite measured on `/contact` and one the agent found in a stylesheet rule
   that no audited page uses are both real, and the second is the one nobody would find
   again.
+
+### The shopper-flow regression suite is not an audit pass
+
+`.wp-audit/suite/` also holds `npm run test:regression` (projects `regression-desktop` and
+`regression-mobile`, tests tagged `@regression`). It answers "does the store still work", not
+"is it good", so it produces no findings and `scripts/to-run.js` ignores it: its output is
+`results/regression/<REGRESSION_LABEL>.md` and `.json`. Run it with `REGRESSION_LABEL=before` ahead
+of performance or update work and `after` once done, then `npm run regression:compare -- before after`.
+It runs against the local clone only: it never places an order, and the flows that write (contact,
+newsletter) are skipped off a clone unless `regression.allowWrites` is set. The first admin request
+after an update can time out; the admin flow retries once before it reports `FAIL`.
+

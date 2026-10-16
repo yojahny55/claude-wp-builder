@@ -458,6 +458,20 @@ Its `audit.config.js` is written once and then left alone: it carries the select
 somebody inspected the real DOM to find, and a scaffold that overwrote it every run would
 re-measure a different site without saying so.
 
+The same scaffold carries a **WooCommerce shopper-flow regression suite**, separate from the
+audit: it proves a performance or update change broke nothing. From the scaffolded
+`.wp-audit/suite/`, run `REGRESSION_LABEL=before npm run test:regression` before the change and
+`REGRESSION_LABEL=after npm run test:regression` after it, then
+`npm run regression:compare -- before after`, which exits `1` on any flow that went from
+`PASS` to `FAIL`. It runs a desktop and a mobile project over home, search, archive filters,
+sorting, currency switching, product page, add to cart, quick view, wishlist, cart, checkout
+validation, account, contact and newsletter forms, mobile menu, sticky header, an admin smoke and
+a final URL sweep. A flow whose feature the site lacks is `SKIP` with the reason. It never places
+an order or sends real mail: the flows that write run only on a local clone (or with
+`regression.allowWrites`), so run it against the clone, not production. A later `/wp-update`
+calls this entry point; settings live in the `regression` block of `audit.config.js` and the
+report is `results/regression/<label>.md`.
+
 Where a measured finding and a code finding describe the same **check and the same
 resource**, the measurement wins and the superseded source is noted in its evidence —
 otherwise one defect is reported twice and every count is inflated. This is not done by
