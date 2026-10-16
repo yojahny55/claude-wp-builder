@@ -90,10 +90,13 @@ core, themes and plugins under `--to`. When the destination is occupied on Path 
 the code that is about to be replaced:
 
 ```bash
-bash -c "tar -czf ~/.wp-clone-backups/<project-slug>-code-$(date -u +%Y%m%dT%H%M%SZ).tar.gz wp-content/themes wp-content/plugins wp-content/mu-plugins"
+dirs=""; for d in themes plugins mu-plugins; do [ -d "wp-content/$d" ] && dirs="$dirs wp-content/$d"; done
+bash -c "tar -czf ~/.wp-clone-backups/<project-slug>-code-$(date -u +%Y%m%dT%H%M%SZ).tar.gz $dirs"
 ```
 
-Uploads are not archived (same ceiling as the database-only backup), and neither is core.
+Only the directories that exist are archived (`tar` exits 2 on a missing operand, and a fresh
+`/wp-create` has no `mu-plugins`). Uploads are not archived (same ceiling as the database-only
+backup), and neither is core.
 
 Print the full path on its own line. A backup whose location the operator has to reconstruct
 is not one they will find at the moment they need it.

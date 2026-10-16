@@ -172,7 +172,14 @@ against the source's data.
 bash -c "set -o pipefail; gzip -dc /path/dump.sql.gz | grep -avE '^(CREATE DATABASE|USE \`)' | $WP db import -"   # filter from C3; .sql: cat; .zip: unzip -p
 ```
 
-Count the tables afterwards and stop if there are none.
+The wrapper must forward stdin: a Docker wrapper written `docker exec <slug>-wp wp …` (no `-i`)
+gives `mysql` an empty input, and WP-CLI still prints `Success: Imported from 'STDIN'`. Use
+`docker exec -i` (or `wp-env run cli` with stdin attached), or stop and ask for a native
+wrapper. Do not trust the success line, and do not trust a table count either: `/wp-create`
+already made tables in C2, so "more than zero" is true of an import that loaded nothing. Verify
+the import itself: `$WP option get siteurl` must return one of the source URLs from C3 (not the
+local one), and `$WP db query "SELECT COUNT(*) FROM <prefix>options"` must be above zero, with
+the prefix read in C3. Stop if either fails.
 
 ### C7: Search-Replace URLs
 

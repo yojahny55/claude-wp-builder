@@ -43,6 +43,8 @@ imp=$(grep -n 'db import -' "$f" | head -1 | cut -d: -f1 || true)
 # The dump streams into the import: no scratch copy, and a corrupt stream must fail.
 need 'is never written to disk' 'Path C writes the decompressed dump to disk'
 need 'set -o pipefail' 'Path C lets a truncated dump import silently'
+need 'docker exec -i' 'Path C trusts a stdin import through a wrapper that drops stdin'
+need 'Do not trust the success line' 'Path C accepts an import that loaded nothing'
 need 'unzip -oq' 'Path C unzip can stop to ask about overwriting core files'
 need 'cp -a <container>/. .' 'Path C moves the container instead of merging it'
 need 'The operator'"'"'s file is never edited' 'Path C may edit the operator dump'
