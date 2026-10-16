@@ -64,6 +64,8 @@ need 'blog_public' 'does not keep the clone out of search results'
 # Payment gateways are DISABLED, not only reported (decision reversed: a clone must never be
 # able to charge or refund a real customer). The other integrations stay report-only.
 need 'Payment gateways are disabled, not only reported' 'does not disable payment gateways in the clone'
+need '`bacs`, `cheque`, `cod`' 'does not keep the allow-list of credential-free core gateways'
+need 'tar -czf ~/.wp-clone-backups/<project-slug>-code-' 'Path C does not archive the code it overwrites'
 need 'payment_gateways()' 'does not detect the enabled WooCommerce gateways'
 need 'plugin deactivate' 'does not deactivate gateway plugins'
 need 'woocommerce_<gateway>_settings' 'does not name where the gateway settings and keys live'

@@ -52,18 +52,20 @@ is the docroot. A tar is read in order, so only its first entries are scanned; i
 is the number of `/` in the matched path before `wp-load.php` (`public_html/wp-load.php` is 1,
 `wp-load.php` is 0). Honour `--strip=<n>` when the user gives it.
 
-**Dump to a clean stream.** Decompress to a private scratch directory (`mktemp -d`, mode 700)
-and drop the lines that would send the import to the source's database. A panel dump carries
-`CREATE DATABASE` and ``USE `source_db` ``; left in, the tables land in the source's name and the
-local database stays empty:
+**Dump to a clean stream.** Drop the lines that would send the import to the source's
+database. A panel dump carries `CREATE DATABASE` and ``USE `source_db` ``; left in, the tables
+land in the source's name and the local database stays empty. The filtered stream goes straight
+into the import (C6) and is never written to disk: a decompressed store dump can be several
+times the size of the `.gz`, `/tmp` is often a RAM-backed tmpfs, and a scratch copy is a full
+database export that would need removing on every outcome:
 
 ```bash
-bash -c "gzip -dc /path/dump.sql.gz | grep -avE '^(CREATE DATABASE|USE \`)' > \"\$SCRATCH/dump.sql\""   # .sql: cat; .zip: unzip -p
+# C6 runs this; set -o pipefail so a truncated or corrupt dump fails the import instead of loading half
+set -o pipefail; gzip -dc /path/dump.sql.gz | grep -avE '^(CREATE DATABASE|USE \`)'   # .sql: cat; .zip: unzip -p
 ```
 
-The operator's file is never edited. The scratch copy is a full database export: remove it
-whether the import succeeded or not, and say in the summary that the original at `--db=` was
-left in place (same rule as B3).
+The operator's file is never edited. Say in the summary that the original at `--db=` was left
+in place (same rule as B3).
 
 **Table prefix.** Read it from the dump, not from the archive's `wp-config.php`, because the
 database is what has to match. The prefix is the part before `options` in the first
@@ -87,13 +89,18 @@ Extract over the destination, not through a temporary copy.
 
 ```bash
 bash -c "tar -xzf /path/site.tar.gz -C /local/path --strip-components=<n>"
-bash -c "unzip -q /path/site.zip -d /local/path"
+bash -c "unzip -oq /path/site.zip -d /local/path"
 ```
 
-`unzip` has no strip option: extract whole, then move the docroot's contents up one level
-(same filesystem, so `mv` renames, with dotglob so `.htaccess` comes along) and remove the
-leftover container directory. Check that `wp-load.php` exists in the destination afterwards and
-stop if not.
+`-o` is required: `/wp-create` has already put WordPress core in the destination, and without it
+`unzip` stops to ask whether to replace `wp-load.php`, reading the answer from the terminal, so a
+non-interactive run hangs.
+
+`unzip` has no strip option: extract whole, then **merge** the docroot's contents up one level
+(`cp -a <container>/. . && rm -rf <container>`; a `mv` fails on `wp-admin/`, `wp-includes/` and
+`wp-content/`, which already exist, and leaves the site's own `wp-content` inside the container).
+Check that `wp-load.php` exists in the destination afterwards and that the active theme's
+directory from the archive is there too, and stop if not.
 
 `--exclude=<pattern>` (repeatable, for example the folder of paid downloads or a cache
 directory) is passed through to `tar --exclude` or `unzip -x`. Say what was skipped in the
@@ -162,7 +169,7 @@ source's plugins and mu-plugins with it, and the first command that loads WordPr
 against the source's data.
 
 ```bash
-bash -c "$WP db import \"$SCRATCH/dump.sql\""
+bash -c "set -o pipefail; gzip -dc /path/dump.sql.gz | grep -avE '^(CREATE DATABASE|USE \`)' | $WP db import -"   # filter from C3; .sql: cat; .zip: unzip -p
 ```
 
 Count the tables afterwards and stop if there are none.

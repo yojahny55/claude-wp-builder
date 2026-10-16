@@ -37,11 +37,14 @@ gate=$(grep -n 'Now run Step 1.5 (The Destination Gate)' "$f" | sed -n 3p | cut 
 ext=$(grep -n 'tar -xzf /path/site.tar.gz' "$f" | head -1 | cut -d: -f1 || true)
 [ -n "$gate" ] && [ -n "$ext" ] && [ "$gate" -lt "$ext" ] || fail "Path C extracts before the destination gate"
 iso=$(grep -n 'Now run Step 5.4 (Isolate the Clone' "$f" | sed -n 3p | cut -d: -f1 || true)
-imp=$(grep -n 'db import \\"\$SCRATCH' "$f" | head -1 | cut -d: -f1 || true)
+imp=$(grep -n 'db import -' "$f" | head -1 | cut -d: -f1 || true)
 [ -n "$iso" ] && [ -n "$imp" ] && [ "$iso" -lt "$imp" ] || fail "Path C imports before Step 5.4 isolation"
 
-# The scratch dump copy is removed regardless of outcome; the operator's file is not.
-need 'whether the import succeeded or not' 'Path C leaves the decompressed dump behind on failure'
+# The dump streams into the import: no scratch copy, and a corrupt stream must fail.
+need 'is never written to disk' 'Path C writes the decompressed dump to disk'
+need 'set -o pipefail' 'Path C lets a truncated dump import silently'
+need 'unzip -oq' 'Path C unzip can stop to ask about overwriting core files'
+need 'cp -a <container>/. .' 'Path C moves the container instead of merging it'
 need 'The operator'"'"'s file is never edited' 'Path C may edit the operator dump'
 
 # Old wrong forms are gone.

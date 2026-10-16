@@ -85,6 +85,16 @@ bash -c "$WP db export ~/.wp-clone-backups/<project-slug>-$(date -u +%Y%m%dT%H%M
 and so does an `rm -rf` of a project someone has given up on. `~/.wp-clone-backups/` is the
 one place that survives both.
 
+**Path C overwrites files as well, and the export does not cover them.** Extraction replaces
+core, themes and plugins under `--to`. When the destination is occupied on Path C, also archive
+the code that is about to be replaced:
+
+```bash
+bash -c "tar -czf ~/.wp-clone-backups/<project-slug>-code-$(date -u +%Y%m%dT%H%M%SZ).tar.gz wp-content/themes wp-content/plugins wp-content/mu-plugins"
+```
+
+Uploads are not archived (same ceiling as the database-only backup), and neither is core.
+
 Print the full path on its own line. A backup whose location the operator has to reconstruct
 is not one they will find at the moment they need it.
 
@@ -108,6 +118,8 @@ Error: the destination already holds a WordPress site.
 
 Importing replaces this database. A backup was written first:
   ~/.wp-clone-backups/client-demo-20260919T161145Z.sql
+(Path C also replaces theme, plugin and core files; themes, plugins and mu-plugins were
+archived beside it as `*-code-*.tar.gz`, uploads and core were not.)
 
 Re-run with --force to proceed, or clone into a different path.
 ```
@@ -263,12 +275,21 @@ only; skip when it is not active):
 $WP eval 'if ( function_exists( "WC" ) ) { foreach ( WC()->payment_gateways()->payment_gateways() as $id => $g ) { if ( "yes" === $g->enabled ) { echo $id, "\t", ( new ReflectionClass( $g ) )->getFileName(), "\n"; } } }'
 ```
 
-For each enabled gateway whose class file lives in another plugin's directory, deactivate that
-plugin (`$WP plugin deactivate <slug>`) and set the gateway's `enabled` to `no` in
-`woocommerce_<gateway>_settings`, so reactivating the plugin does not bring it back on. A
-gateway from WooCommerce core that holds no remote credentials (bank transfer, cheque, cash on
-delivery) stays, and is listed. List every gateway touched in the clone report, with its id, its
-plugin and what was done.
+Turn off **every** enabled gateway except an allow-list of the core gateways that hold no remote
+credentials: `bacs`, `cheque`, `cod`. A rule written as "the ones that look dangerous" misses
+the PayPal Standard that ships in WooCommerce core with API credentials for refunds, and a
+custom gateway defined in a theme or mu-plugin. For each gateway not on the allow-list:
+
+- set `enabled` to `no` in `woocommerce_<gateway>_settings`
+  (`$WP option patch update woocommerce_<id>_settings enabled no`), so reactivating its plugin
+  does not bring it back on;
+- when its class file is under `wp-content/plugins/<slug>/` and `<slug>` is not `woocommerce`,
+  also deactivate that plugin (`$WP plugin deactivate <slug>`);
+- when it lives in a theme or mu-plugin there is no plugin to deactivate: the `enabled` setting
+  is the only switch, and the report names the file.
+
+List every gateway touched in the clone report, with its id, its plugin or file and what was
+done.
 
 **Warn that the keys are still there.** The API keys stay in `woocommerce_<gateway>_settings`,
 and reactivating a gateway on the clone points at the real API. A bug that needs the payment
