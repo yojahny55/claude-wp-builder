@@ -96,6 +96,14 @@ after, at desktop and mobile, on every element carrying the class — and report
 A value that moved and was not meant to is a regression, not a fix. If the user has not
 agreed to visual changes, this category is reported and not applied.
 
+The measurement is `node ${CLAUDE_PLUGIN_ROOT}/bin/style-diff.mjs`: take **two** snapshots
+before the change (`snapshot --label base1`, `--label base2`), one after, then
+`diff base1.json after.json --noise base1.json base2.json`. Two untouched baselines differ
+only in random-order carousels and sub-pixel separators; those elements are listed as noisy and
+never fail the run, so a non-zero exit means a style value the change moved. Add
+`--state menu=<toggle-selector>@390` to record an opened mobile menu. Run it at desktop and
+mobile (the default 1366x768 and 390x844) and read the diff for every element sharing the class.
+
 **GEO fixes:** Dispatch an agent with `subagent_type: wp-agentic-surfaces` with the full project context and the list of auto-fixable GEO findings. It owns `inc/agentic.php` and every generated agent surface (`llms.txt`, ARD catalog, agent-skills index, markdown negotiation, Link headers, agent-friendly 404, JSON-LD breadth, trust anchors) — do not re-implement the surfaces here. Before dispatching, run the live verifier to capture the before score; run it again after the fixer completes and report the before → after score:
 
 ```bash
