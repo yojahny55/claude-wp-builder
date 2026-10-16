@@ -39,7 +39,7 @@ grep -Fq 'inconclusive' <<<"$css" || fail "PERF-077 lost the clone-without-uploa
 
 # WP-026 must still exist for the cross-reference to resolve.
 grep -qE '^\| WP-026 \|' agents/wp-audit-practices.md || fail "WP-026 vanished, PERF-076 points at it"
-# Reserved by another PR: this one must not take them.
-! grep -qE '^\| PERF-07[1-4] \|' "$perf" || fail "PERF-071..074 are reserved by another PR"
+# PERF-071..074 now exist (db bloat attribution); ids must stay unique.
+[ "$(grep -cE '^\| PERF-07[5-7] \|' "$perf")" = 3 ] || fail "PERF-075..077 must each be tabulated exactly once"
 
 echo PASS
