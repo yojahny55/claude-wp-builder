@@ -35,8 +35,8 @@ ver=$(grep -n '^## Step 6: Post-Clone Verification' "$f" | head -1 | cut -d: -f1
 # BOTH paths must reach it. Path A and Path B each end with their own hand-off, and a
 # clone that skipped straight to Step 6 from either one would be uncontained.
 skips=$(grep -c 'Skip to \*\*Step 5.5: Isolate the Clone' "$f" || true)
-[ "${skips:-0}" -ge 2 ] \
-  || fail "$f routes only ${skips:-0} path(s) to Step 5.5; Path A and Path B must both arrive there"
+[ "${skips:-0}" -ge 3 ] \
+  || fail "$f routes only ${skips:-0} path(s) to Step 5.5; Paths A, B and C must all arrive there"
 if grep -Fq 'Skip to **Step 6: Post-Clone Verification**' "$f"; then
   fail "$f still lets a path skip straight to Step 6, bypassing isolation"
 fi
@@ -61,9 +61,25 @@ need 'blog_public' 'does not keep the clone out of search results'
 
 # Report, do not mutate. The reasoning has to travel with the rule or someone "finishes"
 # it later by auto-disabling the gateway.
-need 'do not silently change them' 'does not state that live integrations are reported rather than edited'
-need 'Reporting is the action here' 'does not defend reporting over auto-disabling'
-need 'makes that bug disappear' 'does not say what an auto-switch costs the session that needed the clone'
+# Payment gateways are DISABLED, not only reported (decision reversed: a clone must never be
+# able to charge or refund a real customer). The other integrations stay report-only.
+need 'Payment gateways are disabled, not only reported' 'does not disable payment gateways in the clone'
+need '`bacs`, `cheque`, `cod`' 'does not keep the allow-list of credential-free core gateways'
+need 'tar -czf ~/.wp-clone-backups/<project-slug>-code-' 'Path C does not archive the code it overwrites'
+need 'Only the directories that exist are archived' 'the code backup fails on a missing mu-plugins directory'
+need 'payment_gateways()' 'does not detect the enabled WooCommerce gateways'
+need 'plugin deactivate' 'does not deactivate gateway plugins'
+need 'woocommerce_<gateway>_settings' 'does not name where the gateway settings and keys live'
+need 'reactivating a gateway' 'does not warn that reactivating a gateway points at the real API'
+need 'List every gateway touched' 'does not list each disabled gateway in the clone report'
+need 'Payment gateways disabled:' 'the clone summary does not report the disabled gateways'
+need 'reported, not changed' 'does not keep the non-gateway integrations report-only'
+for old in 'Reporting is the action here' 'makes that bug disappear' 'do not silently change them'; do
+  ! grep -Fq "$old" "$f" || fail "$f still carries the report-only gateway rule: $old"
+done
+# pre_wp_mail is not airtight: direct PHPMailer use and wholesale wp_mail() replacements skip it.
+need 'drives PHPMailer directly' 'does not say pre_wp_mail misses code that drives PHPMailer directly'
+need 'Redefining' 'does not offer redefining wp_mail() in the mu-plugin as the stronger guard'
 need 'real customer data' 'does not tell the operator that live customer records are now on this machine'
 
 # A failed isolation must stop, not warn. Continuing to Step 6 loads the site.
@@ -90,7 +106,7 @@ need 'collapsed to one line' \
 # The mail guard and the cron constant are files, so they do not need the database and
 # survive the import. Both paths must therefore reach them BEFORE their own `wp db import`.
 imports=$(grep -c 'Now run Step 5.4 (Isolate the Clone' "$f" || true)
-[ "${imports:-0}" -ge 2 ] \
+[ "${imports:-0}" -ge 3 ] \
   || fail "$f routes only ${imports:-0} path(s) to Step 5.4 before the import; both paths must isolate before anything boots WordPress"
 
 # Every import must be preceded by the hand-off, not just two of them somewhere in the file.

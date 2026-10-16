@@ -103,4 +103,19 @@ module.exports = {
 
   // URL inexistente para comprobar la 404 personalizada (pauta 50)
   notFoundPath: '/pagina-inexistente-xyz-audit-404/',
+
+  // Suite de regresion de flujos de comprador (WooCommerce): `npm run test:regression`.
+  // Todo es OPCIONAL: los valores por defecto estan en regression/defaults.js y lo que
+  // pongas aqui se mezcla encima (objetos en profundidad; listas y cadenas se sustituyen).
+  // Un flujo cuya funcion no existe en el sitio sale SKIP con el motivo, no FAIL.
+  regression: {
+    // urls: { shop: '/catalogo/', cart: '/carrito/', checkout: '/finalizar-compra/',
+    //         account: '/mi-cuenta/', contact: '/contacto/' },       // slugs distintos a los de WooCommerce
+    // currency: { urlParam: 'currency', codes: ['EUR', 'USD'] },     // cambio de moneda por URL
+    // selectors: { menuToggle: '.mi-hamburguesa' },                 // solo los que no coincidan
+    // clone: true,        // forzar el aislamiento de clon ('auto' lo deduce del host)
+    // allowWrites: false, // true = permitir newsletter/contacto fuera de un clon (correo real)
+    // skipFlows: ['quick-view'],
+    // sweep: { max: 25, urls: ['/ruta-extra/'] },
+  },
 };

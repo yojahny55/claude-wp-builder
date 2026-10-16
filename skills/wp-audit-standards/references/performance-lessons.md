@@ -8,10 +8,15 @@ Facts about Lighthouse scoring hold for Lighthouse 10 and later.
 
 - Read *observed* metrics before chasing a bad *simulated* score
 - A Lighthouse run needs an idle machine, and a contended one is not a slow page
+- A local lab that resembles production: HTTP/2, compression, medians
 - Inline critical CSS: measured on a real site, and rejected
 - Per-template used CSS: what worked on a store, and what broke
 - WebP: `image_editor_output_format` only covers new, attachment-pipeline images
 - Right-size: never print `$field['url']` for a fixed slot
+- Used-CSS subset of a huge parent stylesheet, and the carousel regression
+- Deferring stylesheets that touch nothing above the fold
+- JavaScript: footer, DOMContentLoaded, jquery-migrate, tag managers, duplicate AJAX, idle CPU
+- Images that still double-download or ignore WebP, and layout shift from hidden widgets
 - AIOS × Lighthouse: the CF7 REST gotcha
 
 ## Read *observed* metrics before chasing a bad *simulated* score
@@ -51,6 +56,43 @@ non-existent regression, and it is indistinguishable from a real one by inspecti
   finding rather than reporting the worse one.
 - The same applies to a *before/after* pair for a fix: both halves must be measured under the
   same conditions, or the fix's number is the machine's number.
+
+## A local lab that resembles production: HTTP/2, compression, medians
+
+A clone served by a stock local Apache or nginx (HTTP/1.1, no compression) turns "Modern HTTP",
+"Minify", "Enable text compression" and most "render-blocking" findings into environment
+artifacts, and the simulated LCP comes out about twice what production shows. Fix the lab
+before reading the score, not the theme:
+
+1. Enable compression on the vhost (Apache: `a2enmod deflate` or the distro's equivalent, then
+   `AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml`).
+2. Put an HTTP/2 + TLS proxy in front for Lighthouse runs only. `bin/h2-proxy.mjs` is one:
+   `node bin/h2-proxy.mjs --target http://<site-host> --port 8443 &` serves
+   `https://<site-host>:8443/` with HTTP/2, brotli/gzip for text, and an in-memory HTML cache for
+   anonymous requests (what a page cache or CDN would do; `--no-cache` for real PHP TTFB,
+   `/__purge` to empty it). The certificate is self-signed and generated at runtime with
+   `openssl` into a temp dir, so no key is ever committed; `--cert`/`--key` bring your own.
+   Stop it with `kill <pid>`, not `pkill -f`.
+3. Run Lighthouse against the proxy, mobile, **5 runs, take the median**. The spread between
+   runs on one URL is large enough to flip a decision, so never decide on a single run:
+
+   ```bash
+   for i in 1 2 3 4 5; do
+     CHROME_PATH=/usr/bin/chromium lighthouse "https://<site-host>:8443/<path>" \
+       --only-categories=performance --output=json --output-path="lh-$i.json" --quiet \
+       --chrome-flags="--headless=new --ignore-certificate-errors"
+   done
+   # median of categories.performance.score and audits[first-contentful-paint|largest-contentful-paint|
+   # total-blocking-time|cumulative-layout-shift].numericValue across lh-*.json
+   ```
+
+   Lighthouse's default is already the mobile profile. Purge the proxy cache and warm each URL
+   once before the runs. Lighthouse needs the idle machine described above.
+
+On the store this came from, the same code scored home 41-55 / category 75 against plain
+Apache and 93 / 95 behind the proxy, with all the gains below applied. Say which serving layer a
+number was measured on; the proxy narrows the gap to production, it does not close it (see the
+clone caveat in `wp-audit-run/references/site-context.md`).
 
 ## Inline critical CSS: measured on a real site, and rejected
 
@@ -110,6 +152,125 @@ Three conditions travel with this fix:
   `script-src`, the full sheets stay `media="print"` and only the used CSS applies.
 - **Measure with every panel open.** A used-CSS pass that loads the page and nothing else
   misses the cart panel, the search modal and the mobile menu.
+
+## Used-CSS subset of a huge parent stylesheet, and the carousel regression
+
+A commercial parent theme shipped one 1.3 MB stylesheet of which 2-5 % applied to any page.
+Dropping it per page type breaks panels (above); blocking on it costs seconds on mobile. What
+held up is a generated subset that keeps the final cascade identical:
+
+1. **Collect used rules across a URL sample.** Per template group, load a sample of real URLs
+   at 1366 and 390 px (add a tablet width), **with and without JavaScript**, and keep every rule
+   whose selector matches an element that is rendered above the fold plus a margin (about
+   200 px). Open panels and modals before collecting. Rules in `@media`/`@supports` keep their
+   wrapper; `@font-face` and `@keyframes` are always kept; hover/focus/pseudo-element states
+   count as their element; an element hidden by `display:none` or opacity 0 still counts when
+   it precedes the first below-the-fold element, but only for the rules that hide or position
+   it (otherwise closed popups open). Rewrite relative `url()` to root-relative.
+2. **Write `<stylesheet>-used.css`** and print it as the blocking stylesheet **in the full
+   sheet's own position** in `<head>`. Load the full sheet in the same position with the
+   `media="print"` swap (see above), so when it arrives the cascade order is what it always
+   was. Never move the full sheet to a different position: that changes which rule wins.
+3. **Group by template**, not one file for the site: product, archive, post, commerce (cart,
+   checkout, account, wishlist), front page, generic page. Finer groups cut the inline CSS of
+   posts and pages by about a third compared with one shared block. A page built in a page
+   builder belongs to the builder's group, not to the blog's.
+4. **Keep a kill switch** (a request header or query arg that serves the full sheets) so
+   before/after screenshots and computed-style diffs can be taken on the same build. The
+   acceptance test is a first-paint comparison against the full sheets over the whole sample at
+   two widths, not a visual impression.
+5. **Regenerate after every theme, plugin or page-builder header/footer change.** The generator
+   is site-specific (stylesheet ids, group URLs, how the theme prints the block), so it is not
+   shipped here; keep it in the theme's own `tools/`.
+
+**Applying the full sheets at load raised TBT.** Each full-sheet application forces a style
+recalculation over a big DOM, and Lighthouse counts it as main-thread work. Apply the deferred
+sheets on the first interaction (pointer, scroll, touch, key, focus) in one batch, with a
+`load`-time fallback only for sheets the used-CSS file could not cover.
+
+**Regression to test for:** the used-CSS file for a carousel library omitted the library's base
+rules because the sampled first screens had none visible. Carousels below the fold then
+initialised against unstyled markup and looped (`RangeError: Maximum call stack size
+exceeded` on scroll, mobile only). Include the carousel library's base stylesheet **whole** in
+every group's critical CSS, and let the functional suite scroll every sampled page on mobile
+and fail on any console error.
+
+## Deferring stylesheets that touch nothing above the fold
+
+The other half of the same idea needs no generator. For each blocking stylesheet, measure
+whether any of its selectors matches an element above the fold **in all sampled views**
+(templates × widths). A sheet that touches none (wishlist, icon fonts used in pseudo-elements
+below the fold, newsletter, ajax-filter, select2, block-library styles on pages without blocks
+and similar; 17 on one store) loads without blocking. Three rules:
+
+- A sheet that carries `@font-face` stays blocking: deferring it swaps fonts late and shifts
+  layout.
+- Defer by moving the `href` to `data-href` and applying it on first interaction, not with
+  `media="print"` alone, when the point is to keep the request out of the load window.
+- Verify with the same first-paint comparison as above. Blocking sheets on the home page went
+  36 to 26 and on product and category pages 20 to 13; mobile FCP improved 0.1-0.3 s while the
+  simulated LCP stayed 7-8 s, because the LCP there was set by something else (an image, a
+  CSS background). Report what moved, not what was hoped for.
+
+## JavaScript: footer, DOMContentLoaded, jquery-migrate, tag managers, duplicate AJAX, idle CPU
+
+- **All front scripts to the footer.** A late `script_loader_tag`/`wp_default_scripts`-style pass
+  at `PHP_INT_MAX` priority moves every handle to the footer, excluding the admin, the
+  Customizer and the page-builder preview. A default WooCommerce store went from 8-9 blocking
+  `<head>` scripts to 0 and from 44 to 36 blocking requests on the home page; FCP improved
+  0.3-0.5 s, **LCP did not move** (CSS set it). Inline scripts that widgets print in the
+  middle of the page and that call `jQuery(...)` must be wrapped in `DOMContentLoaded`, or they
+  run before jQuery exists.
+- **`jquery-migrate`: remove it only after checking `jQuery.migrateWarnings`.** Load the
+  sampled pages with migrate present and read the array. `$(window).load(fn)` was removed in
+  jQuery 3 and a parent theme plus a widget plugin still used it: ship a three-line shim
+  (`$.fn.load` for `window` delegating to `on('load', fn)`) or those scripts silently stop.
+- **A tag manager can cost seconds of CPU on mobile.** gtag.js printed by an SEO plugin (GA4)
+  was 1.5 s of main-thread time. Print it as `data-src` and load it on the first pointer
+  move, touch, key or scroll **or 5 s after `load`**, whichever comes first. The timer keeps
+  counting visits that touch nothing; without it analytics undercounts and the change is not
+  shippable. It is a decision for the site owner, not an auto-fix.
+- **Duplicate AJAX POSTs on every page.** A multi-currency plugin and a wishlist plugin each
+  POSTed on every view, bypassing the page cache. A `$.ajaxPrefilter` that aborts the call when
+  its answer is already known (the currency cookie equals the currency printed in the HTML; a
+  logged-out visitor's wishlist is known to be empty from a cookie set only by a real empty
+  response) turned 2 uncached PHP requests per view into 0. Clear the shortcut cookie on any
+  action that could change the answer.
+- **Idle CPU.** Measure CPU with the page left alone for 10 s. Infinite CSS animations on the
+  home page (34 % CPU), a hidden gallery shimmer animating `left`, and a `requestAnimationFrame`
+  loop from a countdown library loaded on every page were the sources. Limit animations to a
+  few iterations and pause them off-screen; load the countdown library only when a scheduled
+  sale exists. Idle CPU went 34 to 6.5 % (home) and 3.3 to 0.3 % (product).
+- **Main-thread cost hides in third-party observers.** A page-builder anchor-scroll helper that
+  walked the whole document on every mutation (about 1 s of mobile CPU) and a lazy-loading
+  library that forced a full layout on each `load` event were each replaced by a small
+  `IntersectionObserver`/guard. Check the Lighthouse main-thread breakdown before assuming it
+  is your code.
+
+## Images that still double-download or ignore WebP, and layout shift from hidden widgets
+
+- **`imagesLoaded` plus lazy `<picture>`.** `imagesLoaded` reads `img.src`, which for a lazy
+  image inside `<picture>` is the fallback JPEG until `currentSrc` exists, so each thumbnail was
+  fetched twice (fallback plus WebP). Make it read `currentSrc` or skip images that are still
+  lazy. Fallback requests went 1-3 to 0 and a blog page lost about 190 KB.
+- **Zoom plugins read `img.src` too** and so request the JPEG/PNG fallback on every product
+  page (about 100 KB). Point them at the WebP `data-` attribute or the `currentSrc`.
+- **CSS background banners are not rewritten by most WebP plugins** (they rewrite `<img>` and
+  `srcset`). The WebP buffer above handles them; otherwise convert and reference the sibling
+  by hand. Confirm with the network panel that the fallback format is requested 0 times.
+- **A colour profile larger than the picture.** A CMYK ICC profile of 0.5-1.8 MB was embedded in
+  thumbnails; Chrome ignores it. Stripping without recompressing (`jpegtran -copy none`,
+  `webpmux -strip icc`) cut 123 MB to 3.8 MB with identical pixels. Back up first.
+- **`fetchpriority="high"` on the wrong image.** When the LCP is a CSS background already
+  preloaded, a page builder's high priority on the first thumbnail competes with it: removing
+  it moved one page from 89 to 94. Preload the real LCP resource and give priority to that one only.
+- **CLS from sticky bars and hidden carousels.** A sticky announcement bar inserted by JS
+  pushed the page 78 px (desktop) and 138 px (mobile): reserve its height in CSS before it
+  renders (CLS 0.17-0.66 to 0.00-0.03). A parent theme hid every uninitialised slick carousel
+  and the product gallery then pushed the summary on init (CLS 0.42): reserve the first image
+  and the thumbnail row's box before JS (CLS 0.002; remaining jump when slides differ in
+  height is slick's own). A fixed header that leaves the flow on scroll needs a spacer of its
+  height (CLS on scroll 0.15 to 0).
 
 ## WebP: `image_editor_output_format` only covers new, attachment-pipeline images
 

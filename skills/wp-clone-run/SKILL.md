@@ -1,6 +1,6 @@
 ---
 name: wp-clone-run
-description: "The step detail of the /wp-clone run, split out of commands/wp-clone.md so the command stays a short map — Path A (SSH automated clone, A1-A13), Path B (manual import from a SQL dump and uploads archive, B1-B7) and Step 6 (post-clone verification and the clone summary). Use when /wp-clone reaches a step that names one of these reference files, or when changing how a /wp-clone step behaves. Not for the destination gate or the isolation steps (they stay in the command), nor for anonymizing the clone (wp-anonymize)."
+description: "The step detail of the /wp-clone run, split out of commands/wp-clone.md so the command stays a short map — Path A (SSH automated clone, A1-A13), Path B (manual import from a SQL dump and uploads archive, B1-B7), Path C (restore from a full-site files archive plus a database dump, C1-C8) and Step 6 (post-clone verification and the clone summary). Use when /wp-clone reaches a step that names one of these reference files, or when changing how a /wp-clone step behaves. Not for the destination gate or the isolation steps (they stay in the command), nor for anonymizing the clone (wp-anonymize)."
 user-invocable: false
 ---
 
@@ -19,6 +19,7 @@ read it whole and follow it in order.
 |---|---|---|
 | Path A | [references/path-a.md](references/path-a.md) | A1-A13: prerequisites, SSH and remote WP-CLI checks, the remote dependency inventory (A3.5), database export and download, uploads rsync, the local `/wp-create`, import, URL search-replace, fix-up and permissions |
 | Path B | [references/path-b.md](references/path-b.md) | B1-B7: validating the provided files, the local `/wp-create`, import, the dependency inventory from the database (B3.5), uploads extraction, original domain, URL search-replace, fix-up |
+| Path C | [references/path-c.md](references/path-c.md) | C1-C8: validating the archive and dump, the local `/wp-create`, reading the docroot depth, table prefix and source URLs from the archive index and the dump, extracting the site (optionally with uploads on another disk), reconciling `wp-config.php`, the import, the URL search-replace with heavy tables skipped, local safety |
 | 6 | [references/verify.md](references/verify.md) | 6.1-6.7: WordPress loads, URLs, admin access, theme, plugins, the HTTP check and the clone summary |
 
 ## Changing a step

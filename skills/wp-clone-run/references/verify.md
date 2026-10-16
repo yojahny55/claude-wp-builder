@@ -29,6 +29,20 @@ bash -c "$WP option get home"
 
 Both should return the local domain (e.g., `https://local-clone.local.com`). If they still show the old domain, the search-replace may have missed serialized data — re-run with `--precise` flag.
 
+Also count rows that still hold the source host in either form. Elementor keeps URLs
+JSON-escaped (`https:\/\/<remote-domain>`), so a `LIKE` on
+`https://<remote-domain>` misses them. Match the bare host, with no scheme or slashes, which
+hits both spellings:
+
+```bash
+PREFIX=$(bash -c "$WP db prefix")
+bash -c "$WP db query \"SELECT meta_key, COUNT(*) FROM ${PREFIX}postmeta WHERE meta_value LIKE '%<remote-domain>%' GROUP BY meta_key\""
+```
+
+The query must return no rows for `_elementor_data` and `_elementor_element_cache`. Any count means the
+second (escaped) search-replace pass did not run or missed a host spelling; re-run it, then
+`elementor flush-css`.
+
 `wp search-replace` changes the database only. Files generated under uploads keep the old
 domain. Elementor's local Google Fonts are the case that shows: its
 `uploads/elementor/google-fonts/css/*.css` files load each font from an absolute URL on the
@@ -102,7 +116,7 @@ Destination:  <local-path>
 Local URL:    <local-url>
 Admin URL:    <local-url>/wp-admin/
 DB replaced:  <old-domain> → <new-domain>
-Uploads:      <synced | extracted | skipped>
+Uploads:      <synced | extracted | linked to <dir> | skipped>
 Admin users:  <list of admin usernames>
 
 Replaced:     a WordPress site was already here — "Client Demo", 47 posts
@@ -113,10 +127,13 @@ Dependencies: 2 recoverable, 1 bundled, 2 need the client's own copies, 0 unclas
   Inventory   ~/.wp-clone-backups/client-demo-20260919T161145Z-dependencies.md
   → This clone carries the database and uploads. Plugin and theme FILES were not
     transferred; the inventory lists what to install and what cannot be obtained.
+  (Path C: omit this block — the plugin and theme files came from the archive. Report
+   instead what was excluded with --exclude, the cache drop-ins set aside, and that the
+   old domain can remain in the tables the search-replace skipped.)
 
 Database dump:
   Path A        exported, transferred, imported and deleted from both machines
-  Path B        /tmp/dump.sql is yours and was left in place — it is a full database
+  Path B and C  /tmp/dump.sql is yours and was left in place — it is a full database
                 export; remove or protect it once this clone is verified
 
 Isolation:
@@ -124,12 +141,17 @@ Isolation:
   Cron          disabled (DISABLE_WP_CRON)
   Indexing      discouraged (blog_public = 0)
 
+Payment gateways disabled:
+  - stripe: plugin woocommerce-gateway-stripe deactivated, enabled = no
+  - cod: WooCommerce core, no remote credentials, left enabled
+  → API keys are still stored in woocommerce_<gateway>_settings; reactivating a gateway
+    points at the real API.
+
 Still live — reported, not changed:
-  - woocommerce_stripe_settings holds a live secret key (option: woocommerce_stripe_settings)
   - 2 webhooks still point at <old-domain> (options: *_webhook_url)
   - This database holds real customer records: 1,284 orders, 903 customer accounts.
     → /wp-anonymize replaces them with deterministic fakes and lists what it did not examine.
-  → These are decisions, not defaults. Nothing above was edited.
+  → These are decisions, not defaults. Nothing in this block was edited.
 
 Next steps:
   - Visit <local-url> to verify the site

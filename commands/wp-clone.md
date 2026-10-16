@@ -6,7 +6,7 @@ argument-hint: "--from=ssh://user@host/path --to=/var/www/html/local [--force]"
 
 # WP Clone — Remote/Staging Site Cloning
 
-Clone an existing WordPress site into a local development environment. Supports two paths: automated SSH-based cloning or manual import from SQL dump + uploads archive.
+Clone an existing WordPress site into a local development environment. Supports three paths: automated SSH-based cloning, manual import from a SQL dump + uploads archive, or a restore from a full-site files archive + database dump (hosting-panel backup).
 
 ## Step 0: Parse Arguments
 
@@ -18,6 +18,9 @@ Parse `$ARGUMENTS` for the following flags:
 | `--to=` | Yes | Local destination path (e.g., `/var/www/html/local-clone`) |
 | `--sql=` | Path B only | Path to a SQL dump file (e.g., `/tmp/dump.sql`) |
 | `--uploads=` | Path B only | Path to uploads zip/tar archive (e.g., `/tmp/uploads.zip`) |
+| `--files=` | Path C only | Full-site archive of the docroot (`.zip`, `.tar.gz`, `.tgz`, `.tar`) |
+| `--db=` | Path C only | Database dump (`.sql`, `.sql.gz`, `.gz`, `.zip`) |
+| `--strip=`, `--url-old=`, `--exclude=`, `--uploads-target=`, `--keep-config`, `--keep-plugins`, `--admin-user=` | No (Path C) | Docroot depth, source URL, patterns not to extract (repeatable), a directory on another disk for uploads (symlinked), keep the archive's `wp-config.php`, skip plugin deactivation, administrator to create |
 | `--force` | No | Proceed when the destination already holds a WordPress site. The backup in Step 1.5 is still taken — `--force` means "I know what is there", not "skip the safety net" |
 
 **Parsing rules:**
@@ -27,13 +30,15 @@ Parse `$ARGUMENTS` for the following flags:
 - If neither `--from=` nor `--sql=` is provided, ask the user which path they want:
   > "How would you like to clone?
   > A) SSH — automated pull from a remote server
-  > B) Manual — import from a SQL dump file + uploads archive"
+  > B) Manual — import from a SQL dump file + uploads archive
+  > C) Site archive — restore from a full-site files archive + database dump"
 
 ## Step 1: Determine Clone Path
 
 | Condition | Path |
 |-----------|------|
 | `--from=ssh://...` is provided | **Path A — SSH Automated** |
+| `--files=` is provided (with `--db=`) | **Path C — Site Archive Restore** |
 | `--sql=` is provided | **Path B — Manual Import** |
 | Neither provided | Ask user (see Step 0) |
 
@@ -80,6 +85,8 @@ bash -c "$WP db export ~/.wp-clone-backups/<project-slug>-$(date -u +%Y%m%dT%H%M
 and so does an `rm -rf` of a project someone has given up on. `~/.wp-clone-backups/` is the
 one place that survives both.
 
+**Path C** also archives the code it will overwrite (`path-c.md` C4); the export is database-only.
+
 Print the full path on its own line. A backup whose location the operator has to reconstruct
 is not one they will find at the moment they need it.
 
@@ -103,6 +110,7 @@ Error: the destination already holds a WordPress site.
 
 Importing replaces this database. A backup was written first:
   ~/.wp-clone-backups/client-demo-20260919T161145Z.sql
+(Path C also replaces code: it was archived beside it as `*-code-*.tar.gz`; uploads were not.)
 
 Re-run with --force to proceed, or clone into a different path.
 ```
@@ -135,6 +143,13 @@ it — it is this path, not background. It covers A1 to A13: prerequisites, SSH 
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-clone-run/references/path-b.md` now and follow
 it — it is this path, not background. It covers B1 to B7: validating the provided files, the local /wp-create, the import, the dependency inventory from the database, the uploads extraction, the original domain, the URL search-replace and the fix-up.
+
+---
+
+## Path C — Site Archive Restore
+
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-clone-run/references/path-c.md` now and follow
+it — it is this path, not background. It covers C1 to C8: validating the files, the local /wp-create, reading the docroot depth, table prefix and source URLs, extracting the site (optionally with uploads on another disk), reconciling wp-config.php, the import, the URL search-replace and the local safety steps.
 
 ---
 
@@ -198,6 +213,11 @@ so WooCommerce marks the order email sent and does not retry, and no plugin ente
 path that a real send would never have triggered. The clone behaves like the original
 everywhere except at the wire.
 
+**What this does not stop:** code that drives PHPMailer directly never calls `wp_mail()`, and
+a plugin that replaces `wp_mail()` wholesale (SMTP plugins do) skips the filter. Redefining
+`wp_mail()` in the mu-plugin is stronger: must-use plugins load before regular ones, so a
+definition guarded by `function_exists` wins.
+
 A **must-use** plugin, because it cannot be deactivated from wp-admin, survives any plugin
 being reactivated, and cannot be undone by an option write. Its filename sorts first and its
 header says what it is, so nobody mistakes it for part of the site.
@@ -212,6 +232,25 @@ WordPress spawns cron on page loads. On a store clone the due queue is the sourc
 subscription renewals, abandoned-cart mail, scheduled publishes — all of them wanting to run
 against whatever integrations the database still points at. `/wp-debug` already reports this
 constant, so the state is visible afterwards.
+
+### 5.4.3: Park the cache drop-ins
+
+```bash
+for d in object-cache.php advanced-cache.php; do
+  if [ -f "wp-content/$d" ]; then mv -n "wp-content/$d" "wp-content/$d.bak"; fi
+done
+bash -c "$WP config get WP_CACHE --type=constant" >/dev/null 2>&1 \
+  && bash -c "$WP config set WP_CACHE false --raw --type=constant"
+```
+
+A production `wp-content/object-cache.php` (Redis or Memcached) or `advanced-cache.php`
+(page cache) is loaded by WordPress even under `--skip-plugins`. Without that backend on the
+local machine, every WP-CLI call fails ("Error establishing a Redis connection"), including
+the import fix-up, and a page-cache drop-in would serve pages with production URLs. Park them
+as `<name>.bak`, never delete, so the operator can restore them, and set `WP_CACHE` to
+`false` when `wp-config.php` defines it as true. Do this before the first command that boots
+WordPress. Record each parked file and the `WP_CACHE` change in the clone report and in the
+manifest, so nobody ships the `.bak` state back to production.
 
 ## Step 5.5: Isolate the Clone — after the import
 
@@ -235,25 +274,44 @@ is not production, and reproducing it faithfully is exactly the problem.
 bash -c "$WP option update blog_public 0"
 ```
 
-### 5.5.2: Report live integrations — do not silently change them
+### 5.5.2: Disable payment gateways, report the other live integrations
 
-Search the clone for credentials and endpoints that still address production, and **report
-what is found without editing it**:
+**Payment gateways are disabled, not only reported.** A clone must never be able to charge or
+refund a real customer, and a gateway that stays enabled with live keys can. Before
+deactivating anything, list the gateways that are on and the plugin that owns each (WooCommerce
+only; skip when it is not active):
+
+```bash
+$WP eval 'if ( function_exists( "WC" ) ) { foreach ( WC()->payment_gateways()->payment_gateways() as $id => $g ) { if ( "yes" === $g->enabled ) { echo $id, "\t", ( new ReflectionClass( $g ) )->getFileName(), "\n"; } } }'
+```
+
+Turn off **every** enabled gateway except an allow-list of the core gateways that hold no remote
+credentials: `bacs`, `cheque`, `cod`. A rule naming "the dangerous ones" misses core's PayPal
+Standard (API credentials for refunds) and gateways defined in a theme or mu-plugin. For each
+other gateway:
+
+- set `enabled` to `no` in `woocommerce_<gateway>_settings`
+  (`$WP option patch update woocommerce_<id>_settings enabled no`), so reactivating its plugin
+  does not bring it back on;
+- when its class file is under `wp-content/plugins/<slug>/` and `<slug>` is not `woocommerce`,
+  also deactivate that plugin (`$WP plugin deactivate <slug>`);
+- when it lives in a theme or mu-plugin there is no plugin to deactivate: the `enabled` setting
+  is the only switch, and the report names the file.
+
+List every gateway touched in the report: id, plugin or file, action.
+
+**Warn that the keys are still there.** The API keys stay in `woocommerce_<gateway>_settings`,
+and reactivating a gateway on the clone points at the real API. A bug that needs the payment
+flow reproduced is a decision the operator takes on purpose, with test credentials.
+
+The rest is **reported, not changed**: search the clone for credentials and endpoints that
+still address production, and say what each is, where it lives and what it points at.
 
 ```bash
 bash -c "$WP option list --search='*_webhook*' --format=table"
 bash -c "$WP option list --search='*_live_*' --format=table"
-bash -c "$WP plugin list --status=active --field=name | grep -iE 'stripe|paypal|woocommerce|mailchimp|zapier'"
+bash -c "$WP plugin list --status=active --field=name | grep -iE 'stripe|paypal|mailchimp|zapier'"
 ```
-
-Report each finding as: what it is, where it lives, and what it still points at.
-
-**Reporting is the action here.** Flipping a gateway into test mode would change the
-behaviour under test, and a clone of a store usually exists *because* something about
-payment needs reproducing — a silent switch makes that bug disappear and wastes the session
-that was meant to find it. Silent edits also hide the far more serious fact the operator
-needs to hold: a database on this machine contains live credentials. What to do about that
-is a decision, not a default. Say what is live, and let the operator choose.
 
 The one thing not to leave to a decision is **real customer data**, which is already on the
 disk by the time this step runs. Say so plainly in the report, and name the remedy:

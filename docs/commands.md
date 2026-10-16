@@ -459,6 +459,20 @@ Its `audit.config.js` is written once and then left alone: it carries the select
 somebody inspected the real DOM to find, and a scaffold that overwrote it every run would
 re-measure a different site without saying so.
 
+The same scaffold carries a **WooCommerce shopper-flow regression suite**, separate from the
+audit: it proves a performance or update change broke nothing. From the scaffolded
+`.wp-audit/suite/`, run `REGRESSION_LABEL=before npm run test:regression` before the change and
+`REGRESSION_LABEL=after npm run test:regression` after it, then
+`npm run regression:compare -- before after`, which exits `1` on any flow that went from
+`PASS` to `FAIL`. It runs a desktop and a mobile project over home, search, archive filters,
+sorting, currency switching, product page, add to cart, quick view, wishlist, cart, checkout
+validation, account, contact and newsletter forms, mobile menu, sticky header, an admin smoke and
+a final URL sweep. A flow whose feature the site lacks is `SKIP` with the reason. It never places
+an order or sends real mail: the flows that write run only on a local clone (or with
+`regression.allowWrites`), so run it against the clone, not production. A later `/wp-update`
+calls this entry point; settings live in the `regression` block of `audit.config.js` and the
+report is `results/regression/<label>.md`.
+
 Where a measured finding and a code finding describe the same **check and the same
 resource**, the measurement wins and the superseded source is noted in its evidence —
 otherwise one defect is reported twice and every count is inflated. This is not done by
@@ -557,6 +571,13 @@ values below, and has the operator confirm them:
 Then it writes `.wp-create.json` with `"origin": "adopted"` and the generated block in
 `.claude/CLAUDE.md`. Nothing on the site changes.
 
+Optionally (asked once, default no) it then publishes the site to a git remote: core, the
+theme(s) and the listed own plugins, never uploads, `wp-config.php`, `.htaccess` or `.env`. It
+builds in a scratch clone with a whitelist `.gitignore` and `* -text` `.gitattributes`, refuses to
+commit if `wp-config.php` is staged, scans for secrets, pushes `dev` and `master`, and records the
+remote and paths under `git_publish` in `.wp-create.json`. The site folder does not become a
+repository and its `.gitignore` is not edited.
+
 `/wp-audit`, `/wp-debug` and `/wp-clone` offer adoption themselves when they find no manifest.
 On an adopted site:
 
@@ -581,7 +602,21 @@ Health, plugins, DB, config, filesystem checks via the WP-CLI wrapper from `.wp-
 ```
 /wp-clone --from=ssh://user@host/path --to=/var/www/html/local          # SSH automated
 /wp-clone --sql=/tmp/dump.sql --uploads=/tmp/uploads.zip --to=/var/www/html/local   # manual
+/wp-clone --files=/tmp/site.tar.gz --db=/tmp/dump.sql.gz --to=/var/www/html/local    # site archive
 ```
+
+Path C restores from a hosting-panel backup: a full-docroot archive (`.zip`, `.tar.gz`, `.tgz`,
+`.tar`) plus a dump (`.sql`, `.sql.gz`, `.gz`, `.zip`). It finds the docroot from the archive
+index (`--strip=` overrides), reads the table prefix and source URLs from the dump, points
+`wp-config.php` at the local database, rewrites URLs and skips log, session and queue tables in
+the search-replace (the old domain may remain there). `--uploads-target=<dir>` keeps uploads on
+another disk through a symlink; every directory on the way must be searchable by the web server
+user. Other flags: `--exclude=`, `--url-old=`, `--keep-config`, `--keep-plugins`,
+`--admin-user=`.
+
+Every path disables the payment gateways it finds (the owning plugin is deactivated and
+`enabled` set to `no`) and lists them in the report. The API keys stay in
+`woocommerce_<gateway>_settings`, so reactivating a gateway points at the real API.
 
 ### `/wp-anonymize`
 

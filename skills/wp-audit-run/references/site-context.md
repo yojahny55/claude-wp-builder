@@ -158,6 +158,12 @@ stylesheet that production serves as 69 KB of brotli over h2. When `local_clone`
    Such a number is never a baseline and never a finding by itself; the production figure, or
    `UNMEASURED`, stands in its place.
 
+The layer can be made to resemble production's: enable compression on the vhost and front the
+clone with `bin/h2-proxy.mjs` (HTTP/2, brotli, a page-cache-like HTML cache) for the Lighthouse
+run, mobile, 5 runs, median. Say which layer a number came from; the recipe is in
+`wp-audit-standards/references/performance-lessons.md`, *A local lab that resembles
+production*. A score measured that way is still `clone measurement`, only a better one.
+
 Render-path facts do not depend on the serving layer and stay clone-safe: request counts,
 render-blocking handles, image intrinsic versus rendered size, CLS.
 

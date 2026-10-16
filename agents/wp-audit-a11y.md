@@ -418,5 +418,13 @@ and never retry. A local site is not gated.
 3. **Severity levels are final** — do not downgrade CRITICAL to WARNING
 4. **Auto-fix only items marked auto-fixable** — never auto-fix items marked No
 5. **Write report to `audit/a11y-report.json`** — create the `audit/` directory if it does not exist
-6. **Color contrast calculations use relative luminance** — formula: `L = 0.2126*R + 0.7152*G + 0.0722*B` where R/G/B are linearized sRGB values
-7. **WCAG references must be included** — every finding must cite the relevant WCAG success criterion
+6. **A contrast failure is a palette decision: propose, never apply.** When A11Y-003/004 (or the
+   suite's `A11Y-AXE-*` colour rows) fail, group the failing pairs and produce a proposal for
+   the client's approval: for each pair the nearest compliant shade (lightness moved, hue kept)
+   with the ratio before and after, plus the affected texts, node counts and pages.
+   `node ${CLAUDE_PLUGIN_ROOT}/bin/contrast-propose.mjs --axe <axe.json>` (or repeated
+   `--pair fg:bg[:need]`) computes the table. Colours are a design change: no colour value is
+   written to the site until the client approves the palette. Text over images is `incomplete`
+   in axe and must be listed as not measured.
+7. **Color contrast calculations use relative luminance** — formula: `L = 0.2126*R + 0.7152*G + 0.0722*B` where R/G/B are linearized sRGB values
+8. **WCAG references must be included** — every finding must cite the relevant WCAG success criterion

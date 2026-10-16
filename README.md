@@ -431,7 +431,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-cinematic-seed` | C | required | Seed every scene from a manifest, idempotent |
 | `/wp-adopt [wp-root]` | utility | — | Register a site not built with `/wp-create` — read-only, so `/wp-audit`, `/wp-debug` and `/wp-clone` run on it |
 | `/wp-debug [issue]` | utility | — | WP-CLI diagnostics and fixes |
-| `/wp-clone --from --to` | utility | — | Clone a remote site locally |
+| `/wp-clone --from --to` | utility | — | Clone a remote site locally (SSH, SQL dump + uploads, or a full-site archive + dump); payment gateways are disabled in the clone |
 | `/wp-anonymize` | utility | — | Replace real people in a clone with deterministic fakes |
 | `/wp-update [wp-root] [--plugins] [--exclude] [--core-only]` | utility | — | Update core, plugins and themes behind a backup outside the docroot, run the migrations, report licence-blocked premium plugins as skipped, verify, and print the rollback |
 | `/wp-robin [wp-root]` | utility | — | Runner for the `wp-robin` skill — install and configure Robin Image Optimizer, unstick the bulk queue, generate missing `.webp` |
@@ -548,7 +548,10 @@ Commands run these and read the exit code. Several are gates, not helpers.
 | `audit-report.mjs` | Renders an audit run into the dated `.md` + `.html` deliverable, with an optional Scope and coverage section (`notes`, `--notes`) |
 | `audit-suite.sh` | Scaffolds and runs the Tier 3 browser suite (`/wp-audit --suite`) |
 | `link-sweep.mjs` | The audits' link sweep — at most 4 requests in flight, sampling, clone-origin and CDN-challenge rules built in |
+| `h2-proxy.mjs` | HTTP/2 + TLS + brotli proxy (runtime self-signed cert, HTML cache) in front of a local HTTP site, so Lighthouse on a clone resembles production |
+| `contrast-propose.mjs` | Nearest compliant shade per failing colour pair, ratio before/after, affected texts and pages: the palette proposal for client approval |
 | `ux-probe.mjs` | The usability audit's page harness — one browser launch per run, built-in DOM probes, a 3-launch / 15-minute budget enforced in code |
+| `style-diff.mjs` | Before/after visual regression by computed style — per-element snapshots at desktop and mobile, a diff with pixel tolerance, and a two-baseline noise filter for carousels and animations |
 | `geo-scan.sh` | Live is-agentic report for `--geo`; `--start` scans a host that has no report yet |
 | `wp-cinematic-encode.sh` | ffmpeg wrapper behind `/wp-cinematic-encode` |
 | `doc-sync-check.sh` | Fails when a command lacks a row here or in `docs/commands.md`, when a skill or agent lacks a row here, or when `commands/`, `agents/`, `skills/`, `starter-theme/` or `bin/` changed without a CHANGELOG entry |

@@ -65,7 +65,7 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 | PERF-003 | @import used | Grep CSS for `@import` (render-blocking) | WARNING | No |
 | PERF-004 | Unused CSS classes | Compare CSS class selectors vs classes in templates | INFO | No |
 | PERF-005 | CSS custom props redefining | Check if `:root` values redefined per section unnecessarily | INFO | No |
-| PERF-047 | Render-blocking third-party CSS | Grep `functions.php` and `inc/` for `wp_enqueue_style` of a known library (`aos`, `swiper`, `animate`, `lightbox`, `slick`) loaded without the `media="print"` + `onload` swap. Synchronous third-party CSS in `<head>` blocks the LCP. | WARNING | Yes |
+| PERF-047 | Render-blocking third-party CSS | Grep `functions.php` and `inc/` for `wp_enqueue_style` of a known library (`aos`, `swiper`, `animate`, `lightbox`, `slick`) loaded without the `media="print"` + `onload` swap. Synchronous third-party CSS in `<head>` blocks the LCP. On a site with a huge vendor stylesheet or many blocking sheets, also measure which blocking sheets touch any above-the-fold element in all sampled views (templates × widths): those that touch none are deferrable, and a vendor sheet with 2-5 % used rules wants a generated used-CSS subset in its own cascade position. Never drop a sheet by page type, keep `@font-face` sheets blocking, and include a carousel library's base CSS whole. Method and pitfalls: `wp-audit-standards/references/performance-lessons.md` (*Used-CSS subset*, *Deferring stylesheets*). | WARNING | No — needs a per-site generator and a first-paint comparison |
 | PERF-052 | Library CSS/JS loaded site-wide | For each third-party handle, check the enqueue is wrapped in `is_page_template()` / `is_front_page()` / `is_singular()` or hooked from the template that uses it. A library used by one section but shipped on every page is the finding. | WARNING | Yes |
 
 ### JavaScript Checks
@@ -131,6 +131,10 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 | PERF-062 | `woocommerce_sessions` oversized | `$WP db query "SELECT COUNT(*) FROM $($WP db prefix)woocommerce_sessions WHERE session_expiry < UNIX_TIMESTAMP();"` | ≤1,000 expired rows | WARNING |
 | PERF-063 | Expired-transient backlog exceeds prune budget | `$WP db query "SELECT COUNT(*) AS rows_, COALESCE(SUM(LENGTH(o.option_value)),0) AS bytes FROM $($WP db prefix)options t LEFT JOIN $($WP db prefix)options o ON o.option_name = CONCAT('_transient_', SUBSTRING(t.option_name, LENGTH('_transient_timeout_') + 1)) WHERE t.option_name LIKE '\_transient\_timeout\_%' AND t.option_value < UNIX_TIMESTAMP();"` | ≤5,000 rows AND ≤5MB | INFO |
 | PERF-064 | Orphaned `postmeta` | `$WP db query "SELECT COUNT(*) FROM $($WP db prefix)postmeta pm LEFT JOIN $($WP db prefix)posts p ON p.ID = pm.post_id WHERE p.ID IS NULL;"` | ≤500 orphaned rows | INFO |
+| PERF-071 | Action Scheduler pending backlog attributed to an inactive, removed or unconfigured plugin | `$WP db query "SELECT COALESCE(g.slug,'') AS grp, SUBSTRING_INDEX(a.hook,'_',2) AS hook_prefix, COUNT(*) AS pending FROM $($WP db prefix)actionscheduler_actions a LEFT JOIN $($WP db prefix)actionscheduler_groups g ON g.group_id = a.group_id WHERE a.status = 'pending' GROUP BY grp, hook_prefix HAVING pending > 1000 ORDER BY pending DESC LIMIT 20;"`, then map each group/hook prefix to its plugin. See "Procedure — database bloat attribution (PERF-071 to PERF-074)" below | No group/hook prefix over 10,000 pending rows, and none over 1,000 whose plugin is inactive, removed or never connected. N/A when `actionscheduler_actions` does not exist | WARNING |
+| PERF-072 | One plugin floods `options` (transients or options sharing a name prefix) | `$WP db query "SELECT p, COUNT(*) AS n, SUM(LENGTH(v)) AS bytes FROM (SELECT SUBSTRING_INDEX(CASE WHEN option_name LIKE '\_site\_transient\_timeout\_%' THEN SUBSTRING(option_name, 25) WHEN option_name LIKE '\_site\_transient\_%' THEN SUBSTRING(option_name, 17) WHEN option_name LIKE '\_transient\_timeout\_%' THEN SUBSTRING(option_name, 20) WHEN option_name LIKE '\_transient\_%' THEN SUBSTRING(option_name, 12) ELSE option_name END, '_', 2) AS p, option_value AS v FROM $($WP db prefix)options) x GROUP BY p HAVING n > 1000 ORDER BY n DESC LIMIT 20;"` | No single prefix over 10,000 rows | WARNING |
+| PERF-073 | Rank Math 404 monitor log growing without a cap | `$WP eval` reading `rank_math_404_logs` row count and size, and the monitor mode and limit stored in the `rank-math-options-general` option. See the procedure below; PERF-060 only checks that the table exists | ≤30,000 rows and ≤20MB, or a mode/limit that bounds it. N/A when the 404 Monitor module is off or the table does not exist | WARNING |
+| PERF-074 | Autoloaded options whose owner plugin or theme is not installed | `$WP eval` listing autoloaded options whose name prefix matches no installed plugin or theme, with their size. See the procedure below | ≤50KB of orphan autoloaded data | INFO |
 | PERF-043 | Too many revisions | `$WP post list --post_type='revision' --format=count` | ≤100 | INFO |
 | PERF-044 | Memory limit low | `$WP eval "echo defined('WP_MEMORY_LIMIT') ? WP_MEMORY_LIMIT : ini_get('memory_limit');"` | ≥256M | WARNING |
 | PERF-045 | Excessive cron events | `$WP cron event list --format=count` | ≤50 | INFO |
@@ -145,6 +149,9 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 | PERF-068 | Cumulative Layout Shift (CLS) above threshold | Per template, see "Procedure — CLS and INP in the browser" below. A `PerformanceObserver` on `layout-shift` (`buffered: true`), summing entries whose `hadRecentInput` is `false`, over the settled load plus one scroll to the bottom, at the mobile and desktop viewports the audit already screenshots at. Read-only and clone-safe: it only observes the page it loads, so a local clone is measured as itself (lab value, not field data) | Worst per-template CLS ≤0.1; `0.1–0.25` is `WARNING`, `>0.25` is `ERROR`; `UNMEASURED` ("needs a browser") when Tier 3 is unavailable, never `PASS` | WARNING/ERROR |
 | PERF-069 | Interaction to Next Paint (INP) above threshold | Per template, see "Procedure — CLS and INP in the browser" below. A `PerformanceObserver` on `event` (`durationThreshold: 16`, `buffered: true`) after scripted real input (click on the menu toggle, a form field, the first interactive control), reporting the worst `interactionId` duration | Worst interaction ≤200ms; `200–500ms` is `WARNING`, `>500ms` is `ERROR`; `UNMEASURED` ("no interaction exercised") when the page has nothing to press, and `UNMEASURED` without a browser. A lab run is an approximation of field INP and the finding says so | WARNING/ERROR |
 | PERF-070 | Page-cache drop-in loaded without its plugin | `advanced-cache.php` exists, `WP_CACHE` is true, and the plugin that wrote it is not active. See "Procedure — page-cache drop-in without its plugin" below | Owner active, or no drop-in, or the owner is clone-suppressed on a local clone | WARNING |
+| PERF-075 | Image carries an embedded ICC colour profile that outweighs the pixels | Per attachment file, see "Procedure — embedded ICC profiles on images" below. `magick identify -format '%[colorspace]\|%[profile:icc]\|%b\n'` (or `exiftool -ICC_Profile:all -b`) over `uploads/` JPEG/PNG/WebP | No file with a profile over 100KB, and no CMYK file served on the web | WARNING |
+| PERF-076 | Heavy unbounded query inside an Elementor widget's `register_controls()` | Grep active plugins and themes for `register_controls` (and `_register_controls`) bodies that hold `posts_per_page' => -1`, `'limit' => -1`, `numberposts' => -1` or `get_terms` without `number`; then time key templates. See "Procedure — Elementor widget controls queried on the front end" below | No such query, or it is bounded or skipped on the front end | WARNING |
+| PERF-077 | Elementor generated CSS missing or answered with a non-CSS response | Fetch key pages, collect every `uploads/elementor/css/*.css` URL, `HEAD` each. See "Procedure — missing Elementor generated CSS" below | Every file answers `200` with a `text/css` content type | WARNING |
 
 ### Procedure — multi-currency and full-page cache (PERF-065 to PERF-067)
 
@@ -358,6 +365,16 @@ its first frame while the RMSE comparison — which reads that same frame — re
 Report the weight, mark it `Auto-fix: No`, and leave the remedy to a human: an animated file that
 is too heavy wants an animated WebP or a muted looping video, not a still.
 
+**PERF-010 — moving everything to the footer has three follow-ups.** Where the finding is
+"blocking scripts in `<head>`", the fix is a late pass (priority `PHP_INT_MAX`, excluding admin,
+Customizer and page-builder preview) that sets every handle's group to the footer, and it breaks
+three things unless handled: inline scripts printed by widgets that call `jQuery(...)` need a
+`DOMContentLoaded` wrapper; removing `jquery-migrate` needs `jQuery.migrateWarnings` read on the
+sampled pages first (`$(window).load(fn)` needs a shim); and a tag manager printed by an SEO
+plugin can go to `data-src` loaded on first interaction or 5 s after `load`, which is a decision
+for the owner. Expect FCP to improve and LCP not to move when CSS sets it. Details and
+measurements: `wp-audit-standards/references/performance-lessons.md`, *JavaScript*.
+
 **PERF-010 — where the group actually comes from.** A handle's group is set by whichever call
 passes `in_footer => true`, registration or enqueue: `wp_enqueue_script()` forwards its `$args`
 to `_wp_scripts_add_args_data()` whenever they are non-empty, so
@@ -423,6 +440,114 @@ The message for the `WARNING` is `advanced-cache.php from <slug> loads on every 
 drop-in and set `WP_CACHE` to false. Which one depends on whether the site owner still wants
 that cache, so it is never auto-applied. A clone that removed the drop-in or parked it as
 `advanced-cache.php.bak` is already covered by Step 2.3 and is not this check.
+
+### Procedure — embedded ICC profiles on images (PERF-075)
+
+Print and photo tools export JPEGs with the full CMYK press profile attached (often
+0.5 to 2MB). Image editors and generators copy it into every resized copy and every WebP made
+from it, so a 300px thumbnail can weigh more than a full photo. Browsers have to parse the
+profile, and CMYK JPEGs render inconsistently.
+
+Skip files that are missing on disk; a file this check cannot read is not a finding, and a
+clone whose file archive predates the database is covered by Step 2.3. The result is a property of
+the file bytes, so a local clone and production give the same answer and nothing is suppressed.
+
+```bash
+$WP eval 'echo wp_get_upload_dir()["basedir"];'
+find <basedir> -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) \
+  -not -path '*/woocommerce_uploads/*' -print0 \
+  | xargs -0 -n1 magick identify -format '%[colorspace]|%[profile:icc]|%b|%i\n' 2>/dev/null
+```
+
+`%[profile:icc]` is a presence test for the profile (it names it); read its byte size with
+`magick <file> icc:- 2>/dev/null | wc -c` or `exiftool -s3 -ProfileSize`. Flag a file when the profile is over 100KB or the colorspace is
+`CMYK`. Group the files by attachment: resolve each path to its attachment ID with
+`$WP db query` on `_wp_attached_file`
+(or by stripping the `-<w>x<h>` size suffix) and report IDs, file count, and the total profile
+bytes, since one source image usually explains dozens of files (every generated size plus its
+WebP).
+
+Report `WARNING` listing attachment IDs, file counts and bytes recoverable. The fix is manual:
+back up the originals first, then strip or convert, then regenerate the sizes and WebP copies:
+
+```bash
+magick in.jpg -profile sRGB.icc -strip out.jpg   # CMYK source: convert to sRGB first
+magick in.jpg -strip out.jpg                      # sRGB or untagged source: drop the profile
+$WP media regenerate <ids> --yes                  # rebuild sizes; re-run the WebP optimizer
+```
+
+Converting colour changes how an image looks, so this is never auto-applied.
+
+### Procedure — Elementor widget controls queried on the front end (PERF-076)
+
+Elementor registers a widget's controls whenever it builds the widget, and that includes
+rendering the page on the front end, not only the editor. A third-party widget that fills a
+select control with `WC_Product_Query`, `get_posts` or `get_terms` and no limit therefore runs
+that query on every uncached page view. On a catalog of about 1,800 products one such widget
+cost about 0.85s and 280MB of peak memory per home render; limiting it to the editor cut the
+page's TTFB from 1.50s to 0.83s.
+
+Static half (the same on a clone and on production). Find the functions and look at the
+queries inside:
+
+```bash
+grep -rnE "function _?register_controls" wp-content/plugins wp-content/themes --include=*.php -l
+# then, in those files, the unbounded forms:
+grep -nE "posts_per_page'?\"? *=> *-1|'limit' *=> *-1|numberposts'? *=> *-1|get_terms\(" <file>
+```
+
+Only active plugins and the active theme count. Confirm the query sits inside the
+`register_controls` body (or a helper it calls) and not in an AJAX or editor-only callback. For
+the general unbounded-query rule see WP-026 in `agents/wp-audit-practices.md`; this check is
+the Elementor-specific case WP-026 cannot see, because the cost is hidden behind a control
+dropdown and not in a template.
+
+Runtime half. Time key templates (home, shop, a product, a category) with the cache bypassed,
+several runs each, and take the median:
+
+```bash
+for i in 1 2 3 4 5; do curl -s -o /dev/null -H 'Cache-Control: no-cache' \
+  -w '%{time_starttransfer}\n' "<url>?nocache=$RANDOM"; done
+```
+
+On a local clone absolute seconds are not production's (see Step 3), so a clone reports the
+static half as the finding and the timing as relative only (compare pages with each other,
+never with the threshold). Elsewhere flag a template whose median TTFB is over 0.8s.
+
+Report `WARNING` naming the file, the function and the query. The fix is manual and the
+generic pattern is a filter limited to the front end: hook `pre_get_posts` (or the query-args
+filter the widget exposes) and return early unless `! is_admin()`, `! wp_doing_ajax()`,
+`! defined('REST_REQUEST')` and the request is not an Elementor preview or editor; and only
+when a `debug_backtrace()` of limited depth shows the call comes from that widget's
+`register_controls`. Then compare the rendered HTML before and after: it must be identical.
+Editing the third-party plugin is not an option, since an update erases it.
+
+### Procedure — missing Elementor generated CSS (PERF-077)
+
+Elementor writes each page's CSS to `uploads/elementor/css/post-<id>.css` and references it
+with a `?ver=` query. Some updates and plugin activations empty that folder. Pages then
+request files that no longer exist. A plain `404` costs a round trip and leaves sections
+unstyled, and with a redirect or "404 to home" plugin the request is answered with the home
+page's HTML as a `3xx` chain ending in a full page served as CSS: wasted bytes and still
+unstyled.
+
+```bash
+curl -s <page-url> | grep -oE "[^\"']*uploads/elementor/css/[^\"'?]*\.css[^\"']*" | sort -u
+curl -sI -o /dev/null -w '%{http_code} %{content_type} %{redirect_url}\n' <css-url>   # one per file
+```
+
+Do this for the key templates (home, shop, a product, a category, a built page). Flag a
+file that answers `404`, any `3xx`, or a `200` whose content type is not `text/css`. The
+result is the same on production, so nothing is suppressed on a local clone, with one
+exception: if the clone's `uploads/elementor` is absent altogether and attachments are also
+missing on disk, the file archive left it out and the check is `INFO: inconclusive, uploads not
+restored`, not a finding.
+
+Report `WARNING` with the URLs and statuses. The fix is `$WP elementor flush-css` (regenerates
+on demand) and, where Elementor's Tools screen offers it, Regenerate CSS & Data. If the folder
+keeps emptying, an on-demand regeneration mu-plugin may be proposed, and note the setting
+Elementor, Settings, Advanced, CSS Print Method: `Internal Embedding` stops the file requests
+altogether, at the cost of inline CSS per page. Neither is auto-applied.
 
 ### Procedure — database bloat checks (PERF-061 to PERF-064)
 
@@ -506,6 +631,103 @@ reports 0 rows affected, so no single statement holds a long table lock on a liv
 ```
 $WP db query "DELETE FROM $($WP db prefix)postmeta WHERE meta_id IN (SELECT meta_id FROM (SELECT pm.meta_id FROM $($WP db prefix)postmeta pm LEFT JOIN $($WP db prefix)posts p ON p.ID = pm.post_id WHERE p.ID IS NULL LIMIT 5000) x);"
 ```
+
+### Procedure — database bloat attribution (PERF-071 to PERF-074)
+
+PERF-061 to PERF-064 count rows; these four say *whose* rows they are, because the fix is
+different: pruning a table that a live plugin refills in an hour fixes nothing, while a
+backlog written by a plugin that is off, deleted or never connected is dead weight to remove at
+the source. Like PERF-061 to PERF-064 they are real on production, so they report normally. The
+one clone-aware input is "is the plugin active": on a local clone read `Clone-suppressed
+plugins` from the dispatch (the names the security agent uses) and treat those as **active**,
+never as inactive — they were switched off by the copy, not by the owner. Never infer that list
+from which plugins are inactive. Every command resolves the real prefix with `$($WP db prefix)`
+(or `$wpdb->prefix` inside `$WP eval`), never `wp_`, and every query below is a read-only
+`SELECT`. **No fix here is auto-applied**: each deletes data, so each requires explicit approval
+and a prior `$WP db export`.
+
+**PERF-071 — Action Scheduler pending backlog with no live owner.** PERF-061 counts finished
+rows; this one counts `pending` ones, which nothing prunes, because Action Scheduler assumes a
+pending action will run. A plugin that schedules work for an integration that was never
+connected (or whose plugin was removed, leaving its recurring schedules) never completes
+them. One real case: 1,885,748 pending actions, plus a log row each, from two ad-platform
+plugins for WooCommerce that had never been connected; `actionscheduler_actions` and
+`actionscheduler_logs` weighed about 2 GB and every queue-claim query scanned them. Run the
+query in the row, then map each group slug and hook prefix to a plugin: the group is usually the
+plugin's slug or name, otherwise match the hook prefix against `$WP plugin list` slugs
+(underscores and hyphens interchangeable) and against the source with
+`grep -rl '<hook>' wp-content/plugins`. Report `WARNING` when a group/hook prefix exceeds
+10,000 pending rows, or exceeds 1,000 and its plugin is inactive, not installed, or active but
+has no connection or credentials configured. Name plugin, hook prefix, count and the
+oldest `scheduled_date`. Report `N/A` only when the table does not exist, not when WooCommerce
+is off. Fix, with approval and a backup: deactivate and remove the plugin if it is unused,
+then delete its rows in batches of about 50,000 (actions and their logs, so no
+orphan log rows are left), repeating until 0 rows are affected so no statement holds a long
+lock: `$WP db query "DELETE FROM $($WP db prefix)actionscheduler_actions WHERE status='pending' AND hook LIKE '<prefix>%' LIMIT 50000;"`,
+then `DELETE` the matching `actionscheduler_logs` rows whose `action_id` no longer exists
+(same batching) and `OPTIMIZE TABLE` both. Do not use `$WP action-scheduler clean` for this:
+it only ever touches terminal states.
+
+**PERF-072 — one plugin floods `options`.** PERF-063 sizes the expired-transient backlog as a
+whole; this one groups every `options` row by the plugin-looking prefix of its name, after
+stripping `_transient_timeout_`, `_transient_`, `_site_transient_timeout_` and
+`_site_transient_` (a transient and its timeout row then land in the same group). The prefix is
+the first two `_`-separated segments, a heuristic: confirm the owner by searching the plugin
+sources for the full prefix before naming it. Flag any single prefix with more than 10,000
+rows, with its row count and byte sum. One real case: about 739,000 temporary options written
+by one cart-recovery plugin took `options` from 36 MB to 200 MB, and only showed up in
+PERF-042's table list as a big table with no owner. Core prefixes (`widget_`, `theme_mods_`,
+`wc_`/`woocommerce_` session and note data) can legitimately be large; read the group before
+calling it a finding. Fix, with approval and a backup: fix or remove the plugin first (otherwise
+it refills), then delete in batches by prefix,
+`$WP db query "DELETE FROM $($WP db prefix)options WHERE option_name LIKE '\_transient\_<prefix>%' OR option_name LIKE '\_transient\_timeout\_<prefix>%' LIMIT 50000;"`,
+repeated until 0 rows are affected. Never delete non-transient options by prefix without
+reading what they hold.
+
+**PERF-073 — Rank Math 404 monitor growth.** PERF-060 (and `wp-audit-rankmath`) only check that
+`rank_math_404_logs` exists; neither looks at how big it has become. In advanced mode with
+no limit the monitor logs every distinct 404 request with its referrer and user agent, and
+bot probing makes it grow without bound. One real case: 289,340 rows (78 MB) after months of
+scanner traffic; simple mode with a limit of 30,000 and a compaction brought it to 16,292 rows
+(9 MB). Read the three values once; do not hardcode the option keys, print every key that
+mentions `404` since Rank Math has renamed them across versions:
+
+```bash
+$WP eval 'global $wpdb; $t=$wpdb->prefix."rank_math_404_logs"; if($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s",$t))!==$t){echo "N/A: no table".PHP_EOL;return;} echo "rows=".$wpdb->get_var("SELECT COUNT(*) FROM `$t`").PHP_EOL; echo "mb=".$wpdb->get_var($wpdb->prepare("SELECT ROUND((data_length+index_length)/1048576,1) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name=%s",$t)).PHP_EOL; foreach((array)get_option("rank-math-options-general",[]) as $k=>$v){ if(false!==strpos($k,"404")){ echo $k."=".(is_scalar($v)?$v:wp_json_encode($v)).PHP_EOL; } }'
+```
+
+`WARNING` when the table is over 30,000 rows or 20 MB, or the mode is advanced and no limit
+is set (a limit of 0 or empty). `N/A` when the 404 Monitor module is off
+(`rank_math_modules` has no `404-monitor`) or the table is missing (that is PERF-060's
+finding). Fix, with approval and a backup: in Rank Math > General Settings > 404 Monitor, use
+simple mode or set a log limit (30,000 was workable), then trim the table, keeping the newest
+rows, in batches. The Rank Math UI's "Clear Log" empties it entirely, which is acceptable only
+when the log history is not wanted.
+
+**PERF-074 — orphan autoloaded options.** PERF-036/037 report how much autoloaded data there is
+and which ten are heaviest; they do not say whose it is. Options left by a plugin or theme that is
+no longer installed (an installer library of a removed multilingual plugin, a deleted slider, an
+inactive coming-soon plugin) are loaded by `wp_load_alloptions()` on every request for nothing. One
+real case: 23 such options turned to autoload off took the autoloaded payload from 420 KB to
+232 KB. List the autoloaded options (same `IN ('yes','on','auto-on','auto')` filter as PERF-036: WP
+6.6+ writes `on`/`auto`, not only `yes`) whose first name segment does not match any installed
+plugin or theme:
+
+```bash
+$WP eval 'global $wpdb; $slugs=[]; foreach(array_keys(get_plugins()) as $f){ $slugs[]=strtolower(preg_replace("/[^a-z0-9]/i","",dirname($f)==="."?basename($f,".php"):dirname($f))); } foreach(wp_get_themes() as $s=>$th){ $slugs[]=strtolower(preg_replace("/[^a-z0-9]/i","",$s)); } $core="/^(siteurl|home|blog|admin_email|users_can|default_|comment|ping|posts_per|date_format|time_format|start_of_week|permalink|rewrite|active_plugins|template|stylesheet|current_theme|theme_mods|widget|sidebars|cron|recently_|user_roles|wp_|fresh_site|db_|initial_|show_|upload|use_|thumbnail|medium|large|image|site_|page_|category|tag_|link_|mailserver|moderation|gmt_offset|timezone|WPLANG|auto_|finished_|can_compress|embed|wp_user_roles|nav_menu|sticky|blogname|blogdescription|admin_|woocommerce|action_scheduler|_)/i"; $rows=$wpdb->get_results("SELECT option_name, LENGTH(option_value) AS b FROM {$wpdb->options} WHERE autoload IN (\x27yes\x27,\x27on\x27,\x27auto-on\x27,\x27auto\x27)"); $tot=0; foreach($rows as $r){ if(preg_match($core,$r->option_name)){continue;} $p=strtolower(preg_replace("/[^a-z0-9]/i","",strtok(ltrim($r->option_name,"_"),"_-"))); if(strlen($p)<3){continue;} $hit=false; foreach($slugs as $sl){ if(0===strpos($sl,$p)||0===strpos($p,$sl)){$hit=true;break;} } if(!$hit){ $tot+=$r->b; echo $r->b."\t".$r->option_name.PHP_EOL; } } echo "orphan_bytes=".$tot.PHP_EOL;' | sort -rn | head -40
+```
+
+The match is a name heuristic, because options carry no owner column: a vendor-prefixed option
+(an options library, an SDK shared by several plugins) can match nothing and still be live, and a
+plugin whose option prefix differs from its slug will be listed. That is why the result is
+`INFO`, a list to review, never a delete list; promote it to `WARNING` only when the orphan
+total passes 100KB after you have confirmed the owners by searching the source of every large
+entry. Installed plugins count whether active or not, and on a local clone the
+`Clone-suppressed plugins` count too, so the result is the same on production and on a clone.
+Fix, with approval and a backup: set the confirmed orphans to autoload off rather than deleting
+them (`$WP option autoload set <name> off`, WP-CLI 2.10+, otherwise `UPDATE` the `autoload`
+column to `off` through `$wpdb`), which is reversible and removes the per-request cost. Delete
+them only after the owner is confirmed gone for good.
 
 **Autoload budget — already covered, not duplicated here.** PERF-036 already reports the summed
 autoloaded-options size against an ≤800KB threshold at `WARNING`, and PERF-037 already lists the
