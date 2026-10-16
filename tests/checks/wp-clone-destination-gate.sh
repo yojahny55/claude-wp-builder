@@ -23,8 +23,8 @@ need 'Step 1.5: The Destination Gate' 'has no destination gate'
 # Written once, reached from both paths. A second copy would drift, and the copy that
 # drifted would be the one guarding the path nobody tested.
 invocations=$(grep -c 'Step 1.5 (The Destination Gate)' "$f" || true)
-[ "${invocations:-0}" -ge 3 ] \
-  || fail "$f invokes the gate ${invocations:-0} time(s); both db imports and the uploads rsync must each reach it"
+[ "${invocations:-0}" -ge 4 ] \
+  || fail "$f invokes the gate ${invocations:-0} time(s); each path's first write must reach it"
 
 # Every destructive site must be downstream of an invocation. Checked by position, because
 # prose saying "run the gate" somewhere after the import would read correct and guard nothing.

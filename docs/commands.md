@@ -601,7 +601,21 @@ Health, plugins, DB, config, filesystem checks via the WP-CLI wrapper from `.wp-
 ```
 /wp-clone --from=ssh://user@host/path --to=/var/www/html/local          # SSH automated
 /wp-clone --sql=/tmp/dump.sql --uploads=/tmp/uploads.zip --to=/var/www/html/local   # manual
+/wp-clone --files=/tmp/site.tar.gz --db=/tmp/dump.sql.gz --to=/var/www/html/local    # site archive
 ```
+
+Path C restores from a hosting-panel backup: a full-docroot archive (`.zip`, `.tar.gz`, `.tgz`,
+`.tar`) plus a dump (`.sql`, `.sql.gz`, `.gz`, `.zip`). It finds the docroot from the archive
+index (`--strip=` overrides), reads the table prefix and source URLs from the dump, points
+`wp-config.php` at the local database, rewrites URLs and skips log, session and queue tables in
+the search-replace (the old domain may remain there). `--uploads-target=<dir>` keeps uploads on
+another disk through a symlink; every directory on the way must be searchable by the web server
+user. Other flags: `--exclude=`, `--url-old=`, `--keep-config`, `--keep-plugins`,
+`--admin-user=`.
+
+Every path disables the payment gateways it finds (the owning plugin is deactivated and
+`enabled` set to `no`) and lists them in the report. The API keys stay in
+`woocommerce_<gateway>_settings`, so reactivating a gateway points at the real API.
 
 ### `/wp-anonymize`
 

@@ -431,7 +431,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-cinematic-seed` | C | required | Seed every scene from a manifest, idempotent |
 | `/wp-adopt [wp-root]` | utility | — | Register a site not built with `/wp-create` — read-only, so `/wp-audit`, `/wp-debug` and `/wp-clone` run on it |
 | `/wp-debug [issue]` | utility | — | WP-CLI diagnostics and fixes |
-| `/wp-clone --from --to` | utility | — | Clone a remote site locally |
+| `/wp-clone --from --to` | utility | — | Clone a remote site locally (SSH, SQL dump + uploads, or a full-site archive + dump); payment gateways are disabled in the clone |
 | `/wp-anonymize` | utility | — | Replace real people in a clone with deterministic fakes |
 | `/wp-robin [wp-root]` | utility | — | Runner for the `wp-robin` skill — install and configure Robin Image Optimizer, unstick the bulk queue, generate missing `.webp` |
 | `/wp-s3 [wp-root] [--revert]` | utility | — | Runner for the `wp-s3` skill — install and configure S3 Uploads so WordPress writes its media to S3, or take the site back off it |

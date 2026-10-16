@@ -363,8 +363,11 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   it: it asserted only that isolation preceded Step 6. Step 5.5 keeps `blog_public`, which
   genuinely has to wait — it is a `wp_options` row the import would overwrite.
   What it does **not** do is change live payment credentials, webhook URLs or API keys: it
-  reports them. Flipping a gateway to test mode would change the behaviour under test, and a
-  store clone often exists because a payment bug needs reproducing. The cost of that choice is
+  reports them. It does switch payment gateways off (every enabled one outside `bacs`, `cheque`
+  and `cod`, with the keys left stored), because a clone that can charge or refund a real
+  customer is worse than one that needs a gateway re-enabled on purpose with test credentials
+  when a payment bug has to be reproduced. Webhooks and the keys of integrations that are not
+  gateways stay report-only. The cost of that choice is
   real and is the operator's to carry — a clone can still reach a production endpoint through
   any integration that does not use `wp_mail()` or cron, and the database holds live customer
   records from the moment the import finishes. `/wp-anonymize` is the opt-in remedy, and
