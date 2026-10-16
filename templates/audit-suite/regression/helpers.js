@@ -146,7 +146,8 @@ function renderMarkdown(run) {
 /**
  * Compara dos ejecuciones (antes/despues). Regresion = PASS -> FAIL, o una URL del
  * barrido que antes cargaba y ahora no. PASS -> SKIP o una fila que desaparece tambien
- * lo son (la funcion puede haberse roto); con { allowSkips } pasan a aviso. Errores JS o peticiones fallidas nuevas en el barrido, tambien.
+ * lo son (la funcion puede haberse roto); con { allowSkips } pasan a aviso. Una URL del barrido
+ * que desaparece solo avisa: el barrido se descubre y cambia con el contenido. Errores JS o peticiones fallidas nuevas en el barrido, tambien.
  */
 function compareRuns(before, after, opts = {}) {
   const key = (r) => `${r.project}::${r.id}`;
@@ -170,7 +171,9 @@ function compareRuns(before, after, opts = {}) {
   const sprev = new Map((before.sweep || []).map((s) => [`${s.project}::${s.url}`, s]));
   const safter = new Set((after.sweep || []).map((s) => `${s.project}::${s.url}`));
   for (const p of before.sweep || []) {
-    if (p.status > 0 && p.status < 400 && !safter.has(`${p.project}::${p.url}`)) lost.push(`sweep ${p.url} [${p.project}]: HTTP ${p.status} -> ausente en la segunda ejecucion`);
+    // El barrido se descubre (primeros productos, paginas y categorias, recortado a sweep.max): que una
+    // URL ya no salga puede ser contenido nuevo, no una rotura. Solo avisa.
+    if (p.status > 0 && p.status < 400 && !safter.has(`${p.project}::${p.url}`)) warnings.push(`sweep ${p.url} [${p.project}]: ya no esta en el barrido (HTTP ${p.status} antes); si es una URL fija, revisala a mano`);
   }
   for (const s of after.sweep || []) {
     const p = sprev.get(`${s.project}::${s.url}`);

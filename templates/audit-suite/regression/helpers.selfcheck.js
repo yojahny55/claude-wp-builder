@@ -54,7 +54,8 @@ assert.strictEqual(cmp.fixed.length, 1);
 assert.ok(cmp.regressions.some((w) => /PASS -> SKIP/.test(w)), 'una funcion que pasa a SKIP es regresion');
 assert.ok(H.compareRuns(before, after, { allowSkips: true }).warnings.some((w) => /PASS -> SKIP/.test(w)), 'allowSkips la rebaja a aviso');
 const gone = H.compareRuns({ rows: [row('a', 'regression-mobile', 'PASS')], sweep: [{ project: 'regression-mobile', url: '/c', status: 200, jsErrors: [], failed: [] }] }, { rows: [], sweep: [] });
-assert.strictEqual(gone.regressions.length, 2, 'filas y URLs que desaparecen son regresion');
+assert.strictEqual(gone.regressions.length, 1, 'una fila que desaparece es regresion');
+assert.ok(gone.warnings.some((w) => /ya no esta en el barrido/.test(w)), 'una URL descubierta que ya no sale solo avisa');
 assert.ok(cmp.warnings.some((w) => /JS nuevo/.test(w)));
 assert.strictEqual(H.compareRuns(before, before).regressions.length, 0);
 

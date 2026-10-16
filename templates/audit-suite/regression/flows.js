@@ -73,7 +73,10 @@ async function discover(c) {
   const abs = (u) => { try { return new URL(u, c.base).pathname + new URL(u, c.base).search; } catch { return u; } };
   const simple = st.products.find((p) => p.type === 'simple' && p.is_purchasable && p.is_in_stock && !p.has_options);
   const variable = st.products.find((p) => p.type === 'variable' && p.is_in_stock);
-  st.simple = c.cfg.urls.product ? { permalink: c.cfg.urls.product, id: simple ? simple.id : 0, name: simple ? simple.name : '', configured: true } : simple && { id: simple.id, name: simple.name, permalink: abs(simple.permalink) };
+  // Con urls.product el id debe ser el de ESE producto (el de otro mezclaria dos productos en una ejecucion).
+  const pathOf = (u) => abs(u).split('?')[0].replace(/\/$/, '');
+  const configured = c.cfg.urls.product && st.products.find((p) => pathOf(p.permalink) === pathOf(c.cfg.urls.product));
+  st.simple = c.cfg.urls.product ? { permalink: c.cfg.urls.product, id: configured ? configured.id : 0, name: configured ? configured.name : '', configured: true } : simple && { id: simple.id, name: simple.name, permalink: abs(simple.permalink) };
   st.variable = c.cfg.urls.variableProduct ? { permalink: c.cfg.urls.variableProduct } : variable && { id: variable.id, name: variable.name, permalink: abs(variable.permalink) };
   const cat = st.products.flatMap((p) => p.categories || []).find((x) => x.link);
   st.category = c.cfg.urls.category || (cat ? abs(cat.link) : '');
@@ -84,7 +87,7 @@ async function discover(c) {
 /** Deja el carrito con un producto simple, por la URL ?add-to-cart= (equivale a pulsar el boton). */
 async function cartWithOne(c) {
   const st = await discover(c);
-  if (st.simple && st.simple.configured && !st.simple.id) c.skip('urls.product esta configurada pero la API Store no devolvio ningun producto simple comprable: sin su id no se puede llenar el carrito');
+  if (st.simple && st.simple.configured && !st.simple.id) c.skip('urls.product esta configurada pero la API Store no lista ese producto (per_page=60): sin su id no se puede llenar el carrito');
   if (!st.simple || !st.simple.id) c.skip('no se encontro un producto simple comprable con id (la API Store de WooCommerce no responde): sin ella no se puede llenar el carrito');
   await c.go(`/?add-to-cart=${st.simple.id}`);
   const n = await c.cartCount();
