@@ -207,6 +207,80 @@ If the root is a git repository, check `git check-ignore` for both files and say
 each one would be committed. Do not edit `.gitignore` yourself. Committing them is the
 operator's decision, and a shared repository may not want another tool's config in it.
 
+Then offer one optional follow-up, once: "Publish this site to a git remote?" Default **no**, and
+nothing below runs unless the operator says yes. It never touches the site's own `.gitignore`.
+
+## Step 6 (opt-in): Publish to a git remote
+
+Only when the operator answered yes at Step 5. The site folder stays what it is — **not a
+repository** — unless the operator asks for that separately. Everything is built in a scratch
+working copy.
+
+**1. Ask** (AskUserQuestion, one round; confirm the summary before any push):
+
+- **Remote URL** (SSH). The web host and the SSH host may differ (`gitlab.example.com` in the
+  browser, `git.example.com` over SSH), so test the URL before anything else:
+  `git ls-remote <url>`. Failure stops the step with git's message.
+- **What to include.** Default: WordPress core, the theme(s) in `code_scope.editable`, and own
+  plugins / mu-plugins the operator lists explicitly. **Never** `wp-content/uploads`, `wp-config.php`,
+  `.htaccess` or `.env`, whatever the operator answers.
+- **Branch layout.** Default `dev` + `master`.
+- **Does the remote already have commits?** `git ls-remote --heads` answers it. GitLab creates
+  `main` with a README: either build on top of it, or rename `main` to `master` (push `master`;
+  the default branch and its protection must then be changed in the web UI before `main` can be
+  deleted — a push that deletes the default branch is rejected by a pre-receive hook, so do not
+  try it).
+
+**2. Build in a scratch copy.** `git clone <url> "$(mktemp -d)/pub"`, then copy only the
+whitelisted paths in with `rsync` (never `--delete` outside them).
+
+`rsync` filter rules are **first match wins**. Put every `--exclude` before any `--include`:
+an `--include='/*.php'` placed ahead of `--exclude='/wp-config.php'` once copied `wp-config.php`
+(database credentials and salts) into the working copy. Also exclude tool artifacts:
+`.codebase-memory`, `.claude`, `.playwright-mcp`, `*.log`.
+
+**3. Write the whitelist `.gitignore` and `.gitattributes` in the copy.** Pattern, one
+`!` pair per theme and plugin:
+
+```gitignore
+/wp-content/*
+!/wp-content/themes/
+/wp-content/themes/*
+!/wp-content/themes/<theme>/
+!/wp-content/plugins/
+/wp-content/plugins/*
+!/wp-content/plugins/<own-plugin>/
+!/wp-content/mu-plugins/
+/wp-config.php
+.htaccess
+.env
+*.log
+```
+
+`.gitattributes` holds one line, `* -text`, so line endings stay byte-identical to the server.
+Without it git warns about CRLF to LF on hundreds of theme and core files, and a later deploy
+rewrites them.
+
+**4. Guards, before every commit.** Stage with `git add -A`, then:
+
+- `git ls-files | grep -x wp-config.php` must print nothing. Anything else stops the step.
+- Secret scan of the staged files (`git diff --cached`): API keys, passwords, tokens
+  (`AKIA`, `sk_live_`, `ghp_`, `password\s*=`, `secret`, `token` assignments, salts) and local
+  hostnames (`*.local`, `*.test`, `localhost`). Show hits and stop; the operator decides.
+
+**5. Push** both branches, and report each branch's SHA (`git rev-parse <branch>`).
+
+**6. Record it** so later pushes reuse the same whitelist, in `.wp-create.json` under a
+`git_publish` key (remote URL, branches, `include` paths); no credentials:
+
+```bash
+node -e 'const f=process.argv[1],m=JSON.parse(require("fs").readFileSync(f));m.git_publish={remote:process.argv[2],branches:["dev","master"],include:process.argv[3].split(",")};require("fs").writeFileSync(f,JSON.stringify(m,null,2)+"\n")' \
+  '${PROJECT_PATH}/.wp-create.json' '<url>' '<path>,<path>'
+```
+
+On a later run, if `git_publish` exists, offer to reuse it instead of asking again, and run the
+same guards.
+
 ## What an adopted manifest changes downstream
 
 | Key | Read by | Effect |
@@ -214,5 +288,6 @@ operator's decision, and a shared repository may not want another tool's config 
 | `origin: "adopted"` | `/wp-audit`, `/wp-debug`, `/wp-clone` | the site is registered, but no theme was scaffolded. The builders (`/wp-init`, `/wp-section`, `/wp-seed`, …) do **not** check `origin` and assume a starter theme. They are not supported on an adopted site, and nothing stops them yet |
 | `code_scope.editable` | `/wp-audit` agents and fix phase | the only paths a fix may edit |
 | `code_scope.read_only` | `/wp-audit` agents | audited and reported with `Fix: manual`, `Owner: manual`. Never edited |
+| `git_publish` | `/wp-adopt` Step 6 | remote, branches and included paths of an earlier publish, reused by the next one; absent unless the operator opted in |
 | `stack.*` | `/wp-audit` Steps 4, 5, 6 and 9 | no offer to install Rank Math or AIOS when another plugin owns SEO or security |
 | `i18n strategy: none` | `/wp-audit` Step 2.5c | recorded as detected, not asked. `stack.multilingual` names the plugin |
