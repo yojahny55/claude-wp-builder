@@ -85,18 +85,7 @@ bash -c "$WP db export ~/.wp-clone-backups/<project-slug>-$(date -u +%Y%m%dT%H%M
 and so does an `rm -rf` of a project someone has given up on. `~/.wp-clone-backups/` is the
 one place that survives both.
 
-**Path C overwrites files as well, and the export does not cover them.** Extraction replaces
-core, themes and plugins under `--to`. When the destination is occupied on Path C, also archive
-the code that is about to be replaced:
-
-```bash
-dirs=""; for d in themes plugins mu-plugins; do [ -d "wp-content/$d" ] && dirs="$dirs wp-content/$d"; done
-bash -c "tar -czf ~/.wp-clone-backups/<project-slug>-code-$(date -u +%Y%m%dT%H%M%SZ).tar.gz $dirs"
-```
-
-Only the directories that exist are archived (`tar` exits 2 on a missing operand, and a fresh
-`/wp-create` has no `mu-plugins`). Uploads are not archived (same ceiling as the database-only
-backup), and neither is core.
+**Path C** also archives the code it will overwrite (`path-c.md` C4); the export is database-only.
 
 Print the full path on its own line. A backup whose location the operator has to reconstruct
 is not one they will find at the moment they need it.
@@ -121,8 +110,7 @@ Error: the destination already holds a WordPress site.
 
 Importing replaces this database. A backup was written first:
   ~/.wp-clone-backups/client-demo-20260919T161145Z.sql
-(Path C also replaces theme, plugin and core files; themes, plugins and mu-plugins were
-archived beside it as `*-code-*.tar.gz`, uploads and core were not.)
+(Path C also replaces code: it was archived beside it as `*-code-*.tar.gz`; uploads were not.)
 
 Re-run with --force to proceed, or clone into a different path.
 ```
@@ -298,9 +286,9 @@ $WP eval 'if ( function_exists( "WC" ) ) { foreach ( WC()->payment_gateways()->p
 ```
 
 Turn off **every** enabled gateway except an allow-list of the core gateways that hold no remote
-credentials: `bacs`, `cheque`, `cod`. A rule written as "the ones that look dangerous" misses
-the PayPal Standard that ships in WooCommerce core with API credentials for refunds, and a
-custom gateway defined in a theme or mu-plugin. For each gateway not on the allow-list:
+credentials: `bacs`, `cheque`, `cod`. A rule naming "the dangerous ones" misses core's PayPal
+Standard (API credentials for refunds) and gateways defined in a theme or mu-plugin. For each
+other gateway:
 
 - set `enabled` to `no` in `woocommerce_<gateway>_settings`
   (`$WP option patch update woocommerce_<id>_settings enabled no`), so reactivating its plugin
@@ -310,8 +298,7 @@ custom gateway defined in a theme or mu-plugin. For each gateway not on the allo
 - when it lives in a theme or mu-plugin there is no plugin to deactivate: the `enabled` setting
   is the only switch, and the report names the file.
 
-List every gateway touched in the clone report, with its id, its plugin or file and what was
-done.
+List every gateway touched in the report: id, plugin or file, action.
 
 **Warn that the keys are still there.** The API keys stay in `woocommerce_<gateway>_settings`,
 and reactivating a gateway on the clone points at the real API. A bug that needs the payment

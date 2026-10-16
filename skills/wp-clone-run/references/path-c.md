@@ -85,6 +85,16 @@ correct it before anything is written.
 **Now run Step 1.5 (The Destination Gate).** Extraction overwrites the destination's files,
 so the gate runs before it, not at the import.
 
+**Back up the code first (occupied destination).** ```bash
+dirs=""; for d in themes plugins mu-plugins; do [ -d "wp-content/$d" ] && dirs="$dirs wp-content/$d"; done
+bash -c "tar -czf ~/.wp-clone-backups/<project-slug>-code-$(date -u +%Y%m%dT%H%M%SZ).tar.gz $dirs"
+```
+
+Only the directories that exist are archived (`tar` exits 2 on a missing operand, and a fresh
+`/wp-create` has no `mu-plugins`). Uploads are not archived (same ceiling as the database-only
+backup), and neither is core.
+
+
 Extract over the destination, not through a temporary copy.
 
 ```bash
