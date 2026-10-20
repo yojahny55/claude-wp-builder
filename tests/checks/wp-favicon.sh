@@ -31,7 +31,7 @@ grep -Fq 'wp-config.mjs validate' "$f" || fail "$f reads the manifest but never 
 for t in __tailwind__ __cinematic__; do
   g=starter-theme/$t/functions.php
   grep -Fq 'assets/img/favicon/site.webmanifest' "$g" || fail "$g no longer links the web manifest"
-  grep -Fq 'file_exists' "$g" || fail "$g links the manifest without checking that it exists"
+  grep -Eq "file_exists\( *get_theme_file_path\( *'assets/img/favicon/site\.webmanifest'" "$g" || fail "$g links the manifest without checking that it exists"
 done
 
 # Documented in both tables and the backlog row points at this check.
