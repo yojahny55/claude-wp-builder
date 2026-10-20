@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="400" viewBox="0 0 1280 400" role="img" aria-labelledby="t d">
+  <title id="t">Claude WP Builder</title>
+  <desc id="d">Demo HTML flows through a Claude Code plugin into a finished WordPress theme.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14122b"/>
+      <stop offset="1" stop-color="#2a1b5e"/>
+    </linearGradient>
+    <linearGradient id="flow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7c5cff"/>
+      <stop offset="1" stop-color="#21d4fd"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="400" fill="url(#bg)"/>
+  <g font-family="'Noto Sans','Segoe UI',Helvetica,Arial,sans-serif">
+    <text x="80" y="170" font-size="56" font-weight="700" fill="#ffffff">Claude WP Builder</text>
+    <text x="82" y="222" font-size="28" fill="#c9c3f5">Demo HTML to production WordPress theme.</text>
+    <text x="82" y="262" font-size="28" fill="url(#flow)" font-weight="600">Automated.</text>
+    <text x="82" y="330" font-size="20" fill="#9a93d6" font-family="'Noto Sans Mono',Menlo,Consolas,monospace">/wp-init  /wp-yolo  /wp-finalize  /wp-audit</text>
+  </g>
+  <g transform="translate(720 90)" font-family="'Noto Sans Mono',Menlo,Consolas,monospace">
+    <rect x="0" y="0" width="190" height="220" rx="16" fill="#1d1a40" stroke="#4b3fa8" stroke-width="2"/>
+    <text x="24" y="52" font-size="22" fill="#ff9ec7">&lt;section&gt;</text>
+    <rect x="24" y="76" width="142" height="12" rx="6" fill="#4b3fa8"/>
+    <rect x="24" y="100" width="110" height="12" rx="6" fill="#4b3fa8"/>
+    <rect x="24" y="124" width="128" height="12" rx="6" fill="#4b3fa8"/>
+    <text x="24" y="190" font-size="20" fill="#9a93d6">demo.html</text>
+    <path d="M214 110 H300" stroke="#7c5cff" stroke-width="6" stroke-linecap="round" fill="none"/>
+    <path d="M286 92 L306 110 L286 128" stroke="#21d4fd" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <rect x="330" y="0" width="190" height="220" rx="16" fill="#1d1a40" stroke="#21d4fd" stroke-width="2"/>
+    <circle cx="425" cy="78" r="38" fill="none" stroke="#21d4fd" stroke-width="5"/>
+    <text x="425" y="92" font-size="40" font-weight="700" fill="#21d4fd" text-anchor="middle" font-family="'Noto Sans','Segoe UI',Arial,sans-serif">W</text>
+    <text x="425" y="160" font-size="20" fill="#ffffff" text-anchor="middle">theme + ACF</text>
+    <text x="425" y="190" font-size="20" fill="#9a93d6" text-anchor="middle">bilingual</text>
+  </g>
+</svg>
