@@ -9,6 +9,9 @@ fail() { echo "FAIL: $*"; exit 1; }
 f=commands/wp-favicon.md
 [ -f "$f" ] || fail "$f is missing"
 
+grep -Fq 'mkdir -p' "$f" || fail "$f does not create the favicon directory before writing"
+grep -Fq -- '-density 1024' "$f" || fail "$f rasterizes an SVG at 72 dpi and scales it up"
+grep -Fq 'absent counts as `0`' "$f" || fail "$f does not treat a missing site_icon option as unset"
 for sz in favicon-16x16.png favicon-32x32.png apple-touch-icon.png icon-192.png icon-512.png favicon.ico site.webmanifest; do
   grep -Fq "$sz" "$f" || fail "$f no longer produces $sz"
 done
@@ -16,7 +19,7 @@ grep -Fq 'option update site_icon' "$f" || fail "$f does not set the site_icon o
 grep -Fq 'has_site_icon()' "$f" || fail "$f does not verify the Site Icon after setting it"
 grep -Fq 'Not square' "$f" || fail "$f no longer refuses a non-square source"
 grep -Fq 'Raster under 512 px' "$f" || fail "$f no longer refuses a raster under 512 px"
-grep -Fq 'never' "$f" && grep -Fq 'install one' "$f" || fail "$f no longer forbids installing ImageMagick"
+grep -Fq 'and never install one' "$f" || fail "$f no longer forbids installing ImageMagick"
 grep -Fq -- '--force' "$f" || fail "$f lost --force for replacing an existing icon"
 grep -Fq 'Do not invent `theme_color`' "$f" || fail "$f may guess manifest colours"
 

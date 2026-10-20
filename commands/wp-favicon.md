@@ -42,8 +42,7 @@ Read `.claude/CLAUDE.md` for the theme directory. If it is missing, tell the use
 
 `$ARGUMENTS` starts with the image path (PNG, JPG, WebP or SVG). No path: print the usage line
 and stop. Tooling is `magick` (ImageMagick 7); an SVG also needs the librsvg delegate, or
-`rsvg-convert` to rasterize it first. If neither is on the machine, say so and stop — never
-install one.
+`rsvg-convert` to rasterize it first. If neither is on the machine, say so and stop, and never install one.
 
 ```bash
 magick identify -format '%w %h\n' "<image>[0]"
@@ -67,11 +66,15 @@ Write into `<theme>/assets/img/favicon/`:
 | `icon-512.png` | 512 | `site.webmanifest`, the Site Icon source |
 | `favicon.ico` | 16, 32, 48 | legacy `/favicon.ico` requests |
 
+`-density 1024` goes before the input so an SVG rasterizes large and is scaled down, not
+rasterized at 72 dpi and scaled up.
+
 ```bash
-for s in 16 32 192 512; do magick "<image>[0]" -background none -resize ${s}x${s} "<dir>/icon-$s.png"; done
+mkdir -p "<dir>"
+for s in 16 32 192 512; do magick -background none -density 1024 "<image>[0]" -resize ${s}x${s} "<dir>/icon-$s.png"; done
 mv "<dir>/icon-16.png" "<dir>/favicon-16x16.png"; mv "<dir>/icon-32.png" "<dir>/favicon-32x32.png"
-magick "<image>[0]" -background none -resize 180x180 "<dir>/apple-touch-icon.png"
-magick "<image>[0]" -background none -define icon:auto-resize=16,32,48 "<dir>/favicon.ico"
+magick -background none -density 1024 "<image>[0]" -resize 180x180 "<dir>/apple-touch-icon.png"
+magick -background none -density 1024 "<image>[0]" -define icon:auto-resize=16,32,48 "<dir>/favicon.ico"
 ```
 
 Then write `<dir>/site.webmanifest` with `name` and `short_name` from
@@ -82,12 +85,14 @@ those are colours, and a colour on a site is asked about, not guessed.
 ## Step 4: Set the Site Icon
 
 ```bash
-$WP option get site_icon
+$WP option get site_icon 2>/dev/null || echo 0
 ```
+
+A fresh install has no `site_icon` row, so the read fails with no output; absent counts as `0`.
 
 - `0`: import and set it.
 - Non-zero without `--force`: the client or a previous run already chose an icon. Report its
-  attachment ID and stop before Step 4's write; the generated files stay on disk.
+  attachment ID and stop before the import; the generated files stay on disk.
 - Non-zero with `--force`: replace it.
 
 ```bash
