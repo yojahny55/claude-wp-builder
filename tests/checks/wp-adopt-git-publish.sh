@@ -14,5 +14,5 @@ for t in '## Step 6 (opt-in): Publish to a git remote' 'git ls-remote' 'first ma
 done
 grep -Fq 'git_publish' docs/commands.md || fail "docs/commands.md does not document git_publish"
 ! grep -Eq 'echo .*>> *\.gitignore|edit the site.s \.gitignore' "$f" || fail "step tells the model to edit the site .gitignore"
-[ -f changes/adopt-git-publish.added.md ] || fail "changelog fragment missing"
+grep -Fq 'publishes an adopted site to a git remote' CHANGELOG.md || fail "changelog entry missing"
 echo PASS

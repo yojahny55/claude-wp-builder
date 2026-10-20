@@ -34,5 +34,5 @@ for c in 071 072; do
 done
 ! grep -Eq '^\| PERF-07[1-4] \|.*\| CRITICAL \|$' "$perf" || fail "PERF-071..074 must not be CRITICAL"
 
-grep -Fq 'PERF-071' changes/audit-db-bloat-attribution.added.md || fail "changelog fragment missing"
+grep -Fq 'PERF-071' CHANGELOG.md || fail "changelog entry missing"
 echo PASS

@@ -36,5 +36,5 @@ case "$line" in *--exclude=wp-config.php*-C*) ;; *) fail "tar --exclude must pre
 for d in README.md docs/commands.md docs/workflows.md; do
   grep -Fq '/wp-update' "$d" || fail "$d lacks /wp-update"
 done
-[ -f changes/wp-update-command.added.md ] || fail "changelog fragment missing"
+grep -Fq "/wp-update" CHANGELOG.md || fail "changelog entry missing"
 echo PASS

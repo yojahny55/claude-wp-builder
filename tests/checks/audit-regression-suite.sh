@@ -33,7 +33,7 @@ grep -Eq 'for item in .*\bregression\b.*playwright\.regression\.config\.js' bin/
 grep -Fq 'npm run test:regression' "$suite/README.md" || fail "the suite README does not document the entry point"
 grep -Fq 'test:regression' docs/commands.md || fail "docs/commands.md does not document the regression suite"
 grep -Fq 'regression' skills/wp-audit-run/references/browser-suite.md || fail "browser-suite.md does not mention the regression suite"
-ls changes/*regression*.added.md >/dev/null 2>&1 || fail "no changes/*regression*.added.md fragment"
+grep -Fq 'regression suite' CHANGELOG.md || fail "no changelog entry for the regression suite"
 
 # 2. Safety: no real orders, no real mail off a clone, SKIP rather than FAIL for absent features.
 grep -Fq 'wc-ajax=checkout' "$flows" || fail "the checkout flow no longer aborts order POSTs"
