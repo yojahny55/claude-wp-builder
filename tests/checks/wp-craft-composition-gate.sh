@@ -97,6 +97,10 @@ fi
 grep -Fq 'carries no findings list' "$work/shape.out" \
   || fail "the composition gate exited 1 on an uninterpretable detector payload without saying that is why, so it is indistinguishable from any other failure"
 
+# An empty detector payload is a dropped connection, not a verdict: the gate retries once.
+grep -Eq 'for attempt in 1 2' bin/composition-gate.sh \
+  || fail "bin/composition-gate.sh no longer retries the detector on an empty payload (a transient npx failure fails the gate)"
+
 # The detector follows the newest 4.x on purpose, so a new release is picked up without a PR.
 # A pinned exact version would freeze the rules instead of answering them.
 grep -Eq 'impeccable@4 detect' bin/composition-gate.sh \
