@@ -13,7 +13,7 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 
 **Priority:** Items within each section are ordered by priority (highest first).
 
-**Reconciled** on October 5, 2026 against `main` at v1.29.0. Every item below was
+**Reconciled** on October 20, 2026 against `main` at v1.30.0. Every item below was
 checked against the command, agent or script that would own it — an item claiming to be
 open while the behavior ships reads as a project that does not know what it has built.
 Larger reworks of delivered behavior are proposals, not backlog items, and are tracked
@@ -66,7 +66,7 @@ Ensuring the WordPress output matches the demo HTML 1:1 in appearance and conten
 
 - [ ] **Visual regression testing with Playwright** `PARTIAL`
   After each section build, take screenshots at key viewports and compare against the demo. Loop fixes until the section matches the demo visually.
-  **Gap:** baselines, tolerances and an approval step now exist, but only over the motion fixtures. [visual-baselines](tests/checks/visual-baselines.sh) renders inside a pinned Playwright container, diffs against committed PNGs at a 0.1% tolerance and prints the percentage on every shot; [baseline-approval](tests/checks/baseline-approval.sh) requires a `baseline: <why>` subject on any commit that changes them. What is still missing is the comparison I06 actually names — a built section against the demo it came from — which needs a generated site, the same gap the audit corpus waits on. The fixtures here are geometric, so these baselines see layout move and would not see a colour or font change.
+  **Gap:** baselines, tolerances and an approval step now exist, but only over the motion fixtures. [visual-baselines](tests/checks/visual-baselines.sh) renders inside a pinned Playwright container, diffs against committed PNGs at a 0.1% tolerance and prints the percentage on every shot; [baseline-approval](tests/checks/baseline-approval.sh) requires a `baseline: <why>` subject on any commit that changes them. What is still missing is the comparison I06 actually names — a built section against the demo it came from — which needs a generated site, the same gap the audit corpus waits on. The fixtures here are geometric, so these baselines see layout move and would not see a colour or font change. [`bin/style-diff.mjs`](bin/style-diff.mjs) adds before/after computed-style regression on a real page, which does see colour and font, but it is not the section-versus-demo loop.
 
 - [x] **Enforce CSS match from demo** `DELIVERED`
   Transcription mode (`--transcribe`, `/wp-yolo`) makes agents copy the demo's exact declared values instead of re-authoring them — [wp-css](agents/wp-css.md), [wp-template](agents/wp-template.md), [wp-section](commands/wp-section.md). The Layer 1 demo-parity gate in [wp-finalize](commands/wp-finalize.md) blocks delivery on a font or background mismatch.
@@ -166,6 +166,8 @@ Improving the reliability and output quality of agents.
   by the update transients and making the operator confirm every path. [`/wp-audit`](commands/wp-audit.md)
   then audits vendor code but never edits it, and reads the site type and whether it is a
   local clone before any category runs, so a staging copy is not scored as a live site.
+  An opt-in `/wp-adopt` step publishes the adopted site to a git remote, and
+  [`/wp-update`](commands/wp-update.md) runs backed-up, verified updates.
   Check: [wp-adopt](tests/checks/wp-adopt.sh). Shipped in v1.28.0.
 
 - [x] **Security audit reaches what the plugin counts could not** `DELIVERED`
@@ -234,7 +236,7 @@ Server setup, permissions, and WordPress configuration.
   and [`store-kit`](plugins/store-kit/store-kit.php), proven by
   [the integration check](tests/checks/wp-woo-setup-integration.sh). The audit already reads
   the store tier, detects a merchant by active plugin, and checks paid downloads (SEC-039) and
-  gateway keys at rest (SEC-040); a store-specific audit pass is still to come. Not started, each
+  gateway keys at rest (SEC-040); a shopper-flow regression suite ([check](tests/checks/audit-regression-suite.sh)) now proves search, cart and checkout survive a change; a store-specific audit pass is still to come. Not started, each
   its own spec: theme integration (the WhatsApp button and enquiry form render there), store demo
   pages, product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang
   bridge, subscriptions, bookings.
@@ -294,8 +296,8 @@ Longer-term features and exploration areas.
 - [ ] **WebP conversion on upload** `OPEN`
   An mu-plugin that converts PNG and JPEG to WebP inside `wp_handle_upload` at priority 5, before WordPress generates the thumbnails, so every size is born WebP. Measured working against `s3://` paths — it copies to a local temp file because `cwebp` cannot read a stream wrapper — and it walks a quality ladder against a PSNR threshold, keeping the original when no candidate beats its size. It replaces an optimizer plugin's delivery for new uploads; [wp-robin](skills/wp-robin/SKILL.md) stays, since sites without S3 still run it. No owner in this repo yet.
 
-- [ ] **WebP migration of an existing library** `OPEN`
-  The other half of the item above, and the larger one: convert a library already on disk, update `wp_postmeta` sizes, replace URLs in content and Elementor data, verify coverage, and delete the originals only after the coverage check passes. A ten-step procedure with backups at each step exists and has been run end to end on a real site, but it lives outside this repo and no owner exists here.
+- [ ] **WebP migration of an existing library** `PARTIAL`
+  The other half of the item above, and the larger one: convert a library already on disk, update `wp_postmeta` sizes, replace URLs in content and Elementor data, verify coverage, and delete the originals only after the coverage check passes. A ten-step procedure with backups at each step exists and has been run end to end on a real site, the written procedure now ships as [png-to-webp-conversion](skills/wp-robin/references/png-to-webp-conversion.md) (old-to-new file map, serialization-safe database replace, 301 rules). **Gap:** it has no command or script, so nothing runs it for you.
 
 - [ ] **Blocking the REST API in Apache** `OPEN`
   A `<If>` block matching `HTTP_HOST` plus `REQUEST_URI ^/wp-json` and `rest_route=` in the query string, which is evaluated after `<Directory>` and therefore wins whichever vhost serves the request — the case that defeats a per-vhost rule on a host with duplicated includes. Leaves `admin-ajax.php` alone. Belongs in [wp-environments](skills/wp-environments/SKILL.md) as a reference.

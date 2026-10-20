@@ -18,7 +18,7 @@ for f in skills/wp-audit-run/references/fix.md skills/wp-finalize-run/references
   grep -Fq -- '--noise' "$f" || fail "$f does not tell the reader to take two baselines (--noise)"
 done
 grep -Fq 'style-diff.mjs' README.md || fail "README bin table has no style-diff.mjs row"
-ls changes/*style-diff*.added.md >/dev/null 2>&1 || fail "no changes/ fragment for the tool"
+grep -Fq 'style-diff.mjs' CHANGELOG.md || fail "no changelog entry for the tool"
 
 # Behavior needs a browser; without one, say so rather than pass silently.
 core=${PLAYWRIGHT_CORE:-}

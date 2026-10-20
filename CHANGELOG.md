@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.30.0] - 2026-10-20
+
 ### Added
 
 - **`/wp-contribute review <skill>` audits a skill against the authoring best practices, and a
@@ -16,6 +18,454 @@
   written skill leaves. `new skill` now loops on the gates and then runs the review, `pr` runs
   it for every skill a branch touches, and a declined finding goes into the PR body instead of
   disappearing. The `new skill` scaffold also stopped teaching `trigger:`.
+
+- `/wp-adopt` gains an opt-in Step 6 that publishes an adopted site to a git remote (SSH). It builds in a scratch clone with a whitelist `.gitignore` and a `* -text` `.gitattributes` (so line endings stay byte-identical to the server), refuses to commit when `wp-config.php` is in the staged tree, scans staged files for secrets, pushes `dev` and `master`, and records the remote and included paths under `git_publish` in `.wp-create.json`. Documents that rsync filters are first-match: an `--include` placed before `--exclude='/wp-config.php'` once copied the config file into the working copy. The default is unchanged: the step is asked once, defaults to no, and the site's own `.gitignore` is never edited.
+
+- **PERF-071 to PERF-074 attribute database bloat to the plugin that causes it.** PERF-061 to
+  PERF-064 count rows but never say whose they are, so a real store kept 1.9 million pending
+  Action Scheduler actions from ad-platform plugins that were never connected (about 2 GB), 739,000
+  temporary options from one cart-recovery plugin, a 289,340-row Rank Math 404 log, and 23
+  autoloaded options of removed plugins. PERF-071 groups pending actions by group and hook prefix
+  and flags a backlog over 10,000 or one whose plugin is off or removed. PERF-072 flags one name
+  prefix over 10,000 `options` rows. PERF-073 sizes `rank_math_404_logs` and reads the monitor
+  mode and limit (PERF-060 only checks the table exists). PERF-074 lists autoloaded options whose
+  owner is not installed. All reads, every fix needs approval and a backup, and a clone-suppressed
+  plugin counts as active so a clone and production agree. `tests/checks/audit-db-bloat.sh` covers
+  them.
+
+- **/wp-audit reports heavy embedded ICC profiles on images (PERF-075), unbounded queries in
+  Elementor widget controls (PERF-076) and missing Elementor generated CSS (PERF-077).** A
+  WooCommerce review found three costs no check named. Five attachments carried 0.5 to 1.8MB CMYK
+  ICC profiles copied into 95 files, so a 300px thumbnail weighed 1.8MB. A third-party widget
+  filled a control dropdown with an unbounded product query, which Elementor also runs when
+  rendering on the front end, costing about 0.85s and 280MB per uncached home render. And
+  Elementor had emptied its CSS folder, so pages requested `post-<id>.css` files that 404ed or
+  were redirected to the home page. PERF-075 and PERF-077 read file bytes and HTTP responses, so
+  a local clone and production agree. PERF-076 is a static finding on a clone, with timings
+  relative only; it points to WP-026 for the general rule. All three are manual fixes.
+  `tests/checks/audit-perf-elementor-images.sh` covers them.
+
+- **SEC-045 reports file-manager plugins, and PERF-070 reports a page-cache drop-in left
+  without its plugin.** A plugin review on an adopted store found both, and no audit had
+  reported either. A file manager (File Manager, Filester, Advanced File Manager, or any fork
+  that bundles elFinder) edits PHP from wp-admin and ignores `DISALLOW_FILE_EDIT`; its elFinder
+  connector answers direct requests even when the plugin is inactive, so SEC-045 checks
+  inactive copies too. PERF-070 flags `advanced-cache.php` loaded with `WP_CACHE` true while the
+  plugin that wrote it is off, since nothing purges that cache any more. On a local clone it
+  defers to Step 2.3: when the owner is on `Clone-suppressed plugins` (active on production),
+  it prints a clone-artifact line instead of a finding. `tests/checks/audit-plugin-hygiene.sh`
+  covers both.
+
+- **The audit report can carry a "Scope and coverage" section.** The renderer had no field for
+  free text, so a user hand-added an "Alcance y cobertura" section to the generated report and
+  lost it on the next run. A run file now takes `notes` (a string or an array of paragraphs) and
+  `bin/audit-report.mjs` accepts `--notes <file>`; both render in the `.md` and the `.html`
+  (escaped, localised) and are kept in the sidecar. `tests/checks/audit-deliverable-report.sh`
+  covers it.
+
+- **`wp-config.mjs refresh <path>` updates only what the probe measures.** `drift` could not
+  tell "the owner deactivated or installed plugins" from "this manifest describes another
+  site", and the only remedy was a full re-adoption. `refresh` rewrites `plugins.installed`,
+  `stack` and the PHP and WordPress versions, keeps every other field, writes a timestamped
+  backup, re-renders the CLAUDE.md block and validates; it refuses when drift is structural
+  (missing theme directory, another active theme). `/wp-audit` Step 2 offers it when every drift
+  line is a plugin-list line.
+
+- **`/wp-demo-verify` finds the gap between `max-width: N` and `min-width: N+1`.** Page
+  builders emit integer breakpoint pairs, and at a fractional CSS width (browser zoom, or OS
+  display scaling such as 110% with a 766px window, 767.27px wide) neither query matches. On
+  a real Elementor site that gave a 704px logo instead of 112px, columns with no width, and a
+  box hidden on every device visible with 119px headings. The walk only shot integer widths,
+  so it could never see it and the defect reached the client's eyes. It now reads the page's
+  same-origin stylesheets for such pairs (up to three), loads the page inside each gap in
+  Chromium (`--force-device-scale-factor=1.1`, window size searched and read back), compares
+  it with N and N+1, and reports a blocking `breakpoint-gap` with up to five culprits and a
+  `gap-<N>.png`/`.jpg`. Mobile-first pages report nothing; `--no-gaps` skips it.
+  `wp-responsive` now says to write `max-width: N.98px` or `(width < N+1)` when a `max-width`
+  query cannot be avoided. Check: `tests/checks/demo-verify-breakpoint-gap.sh`.
+
+- **`bin/h2-proxy.mjs` and `bin/contrast-propose.mjs`, plus the performance lessons of a full
+  store optimization.** Lighthouse on a clone behind a stock local server (HTTP/1.1, no
+  compression) reports serving-layer artifacts as findings and doubles the simulated LCP.
+  `h2-proxy.mjs` fronts a local HTTP site with HTTP/2, brotli and an anonymous-HTML cache using
+  a throwaway certificate generated at runtime. `contrast-propose.mjs` turns failing contrast
+  pairs into the nearest compliant shade with ratios before and after, for client approval.
+  `performance-lessons.md` gains the lab recipe (5 runs, median), the used-CSS subset method
+  and its carousel regression, deferring stylesheets that touch nothing above the fold, the
+  JavaScript, image and layout-shift lessons. `tests/checks/perf-local-lab.sh` covers them.
+
+- **Two measured lessons from a WooCommerce store.** `skills/wp-robin/references/png-to-webp-conversion.md`
+  converts PNG attachments to WebP originals instead of adding `.webp` siblings: when it is
+  worth it (uploads 3.5 GB to 509 MB on that store), a map of every old file to its new one
+  because `-scaled` sizes change name, a serialization-safe database replacement that skips
+  Robin's queue, a regex 301, and the traps of an interrupted run. `performance-lessons.md`
+  gains "Per-template used CSS": keep every vendor sheet and load it asynchronously behind a
+  per-template used-CSS file (blocking CSS 1.2-1.4 MB to 0.33-0.44 MB), why dropping the
+  WooCommerce sheet broke header panels, and the CSP `'unsafe-hashes'` the inline `onload`
+  needs.
+
+- **README banner, social preview and Quickstart.** `docs/assets/` carries a hand-drawn
+  SVG banner shown at the top of the README, plus a 1280x640 social preview (SVG source and
+  PNG) for the repository settings. A five-line Quickstart sits between Installation and
+  Workflow.
+
+- **Both starter themes link `site.webmanifest` when it exists.** `functions.php` prints
+  `<link rel="manifest">` from `assets/img/favicon/` only if the file is there, so a theme that
+  never ran `/wp-favicon` prints nothing and one that did needs no further edit.
+
+- `bin/style-diff.mjs`, a before/after visual-regression tool based on computed styles. `snapshot` records, for every element of each page at 1366x768 and 390x844, a positional selector path, a computed-style subset (colour, background, font, line height, border, display, visibility, opacity, margin, padding) and the box size, plus console errors and failed requests; `--scroll` triggers lazy content and `--state name=selector@width` records a clicked state such as an opened mobile menu. `diff` compares two snapshots, reports style and size differences separately with a pixel tolerance, and exits 1 on style differences. Passing two snapshots taken before the change as `--noise` sets apart elements that already differ between them (random-order carousels, sliders, a 0/1 px separator), which on a WooCommerce store were the only differences between two untouched baselines. Why: a tag swap or a reset class (`.btn-reset { color: inherit; font: inherit }`) beats the utility classes already on an element on source order and can turn a white 26px icon into a black 18px one with no edited value and no visible layout shift, so the audit-fix and finalize docs, which only described measuring by hand, now point at a tool that measures every element on every page.
+
+- **A WooCommerce shopper-flow regression suite ships with the browser suite.** Performance
+  and update work had no way to prove it broke nothing: the audit measures quality, not whether
+  a customer can still search, add to cart and reach the checkout. `npm run test:regression` in
+  `.wp-audit/suite/` (desktop and mobile projects, `@regression` tests) walks home, live and
+  results search, archive filters and pagination, sorting, currency switching, product gallery,
+  zoom and variations, AJAX add to cart, quick view, wishlist, cart update/remove/coupon,
+  checkout validation, account forms, contact and newsletter forms, mobile menu, sticky header,
+  an admin smoke and a final URL sweep recording JS errors and failed requests. Each flow is
+  `PASS`, `FAIL` or `SKIP` with a reason, and a flow whose feature the site lacks skips rather than
+  fails. It never places an order or presses the checkout button, and the two flows that write
+  (contact, newsletter) run only on a local clone or with `allowWrites`, where a Contact Form 7
+  `mail_failed` is accepted as the expected result of disabled mail. `REGRESSION_LABEL=before|after`
+  names a run and `npm run regression:compare -- before after` exits 1 on any PASS to FAIL.
+  Configured through a `regression` block in `audit.config.js`; the report lands in
+  `results/regression/<label>.md`. `tests/checks/audit-regression-suite.sh` covers it.
+
+- **`/wp-audit` asks whether to run the browser suite.** Without `--suite`, the first
+  question of the run now also offers the Playwright suite (axe-core, Lighthouse and the
+  rendered-page criteria vendored from `web-portal-audit`). A yes acts exactly as the typed
+  flag and reuses Step 6.5's public-URL resolution. Before, a bare `/wp-audit` never ran it.
+
+- **`/wp-clone` Path C restores a site from a full-site files archive plus a database dump.**
+  Hosting-panel backups (Plesk, cPanel) hand over the whole docroot as one `.zip` or `.tar.gz`
+  and a dump, which Path B (dump plus uploads only) could not use. `--files=` and `--db=` select
+  the path. It reads the archive index to find the docroot depth (the shallowest `wp-load.php`;
+  `--strip=` overrides), reads the table prefix and the `siteurl`/`home` values from the dump,
+  strips `CREATE DATABASE`/`USE` lines so the import cannot land in the source's database,
+  reconciles `wp-config.php` with the local credentials (pinned `WP_HOME`/`WP_SITEURL` and forced
+  SSL undone), sets cache drop-ins aside, extracts without unpacking to a temporary directory,
+  and skips log, session and queue tables in the URL search-replace with a note that the old
+  domain can remain there. `--uploads-target=<dir>` keeps a large media library on another disk
+  through a symlink, with the traps spelled out: the web server user must be able to traverse
+  every directory of the target (a mode-700 home directory blocks it) and NTFS mounts need
+  group and umask mount options. The step detail lives in
+  `skills/wp-clone-run/references/path-c.md`; `commands/wp-clone.md` stays a map.
+
+- **`/wp-favicon <image>`.** One square image becomes the favicon set: 16, 32, 180, 192 and
+  512 px PNGs, a multi-size `favicon.ico` and `site.webmanifest` in the theme, plus the
+  WordPress Site Icon set through WP-CLI. A non-square or under-512 px raster is refused
+  rather than cropped or upscaled, and an icon already set is kept unless `--force`.
+
+- **`/wp-update` updates core, plugins and themes behind a backup and a verification pass.** Updating a store by
+  hand meant remembering the order (backup, core, db update, plugins, migrations, checks) and
+  rediscovering the traps: `tar --exclude` after the operands has no effect, premium plugins
+  licensed to another domain fail with `Unauthorized` and must be skipped rather than bypassed,
+  and a half-updated pair such as Elementor and Elementor Pro leaves version skew. The command
+  backs up outside the docroot, runs WooCommerce and Elementor migrations, verifies pages and
+  `debug.log`, keeps a clone's mail and gateways disabled, and prints the rollback.
+
+### Changed
+
+- **The ops skills — `wp-robin`, `wp-s3`, `wp-environments`, `wp-contributing`,
+  `wp-woocommerce` — were reviewed against `references/skill-review.md`, and their contracts
+  are now pinned.** Each description names the requests that should load it and the nearby
+  ones that should not. `wp-robin` opens with a run-and-verify loop (back up the database, run,
+  done when `error`, `processing` and `remaining` are 0, re-run after a fix), lists all
+  sixteen settings the script overwrites, and moves its WebP delivery templates to
+  `references/webp-delivery.md`; `robin-webp-gaps.sh` now fails when a setting the script
+  writes or a binary it calls is missing from the skill. A library an earlier copy of the
+  script re-encoded into `<name>.webp.webp` is repaired by deleting those files and their
+  `item_type='webp'` rows. `wp-s3` gains one table of its scripts and templates with
+  arguments, environment variables and exit codes, a numbered order, a default for the IAM-role
+  transfer (temporary credentials) and for paid downloads (kept off S3), and measures
+  downloadable products with WP-CLI instead of asking on every run; `skill-authoring.sh` now
+  requires every file under a skill's `templates/` to be named, and `wp-s3-scripts.sh` pins the
+  template constants, the path-style endpoint, all five exclusions and the never-public bucket
+  paths. `wp-environments` names every `wp-env-setup.sh` subcommand with the SELinux rule for
+  vhosts, reads the manifest through `wp-config.mjs get` instead of `jq`, defines
+  `environment.type` and `environment.engine`, and points to `/wp-create` for Adopt Mode instead
+  of keeping a drifting copy. `wp-contributing` keeps only what a release rests on and leaves
+  the procedure to `/wp-contribute release`; `wp-contributing.sh` now pins every rule of the
+  review checklist. `wp-woocommerce` names the recorded keys (`store.tier`, `store.enquiry`,
+  `store.checkout`/`store.checkout_reason`, `store.payments.mode`), states `woo-setup.php`'s
+  arguments, exit codes and report-only rule, says no command takes a store live, and
+  `wp-woo-setup.sh` pins its store rules.
+- **The three demo skills read their recorded decisions and load only what a step needs.**
+  `wp-demo-craft`'s References section was one fixed reading order, so every build read all
+  thirteen references (about 37k tokens) before writing markup; it is now a table of file,
+  contents and read-when, and names `domains.csv` and what domain classification produces.
+  Its order of work opens with a checklist, splits the composition plan into sub-steps, names
+  `/wp-demo` and `/wp-yolo` as its runners and says which parts a cinematic build takes. The
+  seven-dimension fingerprint table moved into `fingerprint.md`, which owns the gate (with the
+  manifest's `"fingerprint"` keys), the family table into `families.md`, and the readouts
+  table into `verify.md`; `devices.md`'s element-motion material now sits under real
+  subsections in its Contents list. `image-prompt.md` gives `image-gen.mjs`'s invocation and
+  exit codes. Wording that went stale with the calendar ("current latest", "until v3.1") is
+  rewritten as the rule plus its reason, and "family", "plate" and "Avoid list" mean one thing
+  each. `wp-responsive` scopes its hand-written `@media` scale to plain-CSS demos (a tailwind
+  theme follows `wp-tailwind-system`; craft compositions size to their container), drops the
+  dead `max-width` exception and three conflicting viewport lists for a `/wp-demo-verify` loop
+  with a stop condition, and its description no longer pulls screenshot-walk requests.
+  `wp-demo` shows the delimiter pair as the verbatim join key it is, cuts what Claude already
+  knows, and ends on the same verify loop. All three descriptions name the near misses they
+  are not for. `tests/checks/wp-craft-skill.sh`, and contract pins added to
+  `wp-responsive.sh` and `wp-demo-skill.sh`.
+- **The five audit skills are found by the requests that need them, and load less.** Each
+  description now names what a request would carry — `bin/prod-gate.sh`, Lighthouse, a
+  `UX-014` on `page:/contact/`, `rank-math-options-titles`, `ard.json`, a sitemap that 404s —
+  and the sibling skill that owns the near miss. `wp-audit-standards` moves its Lighthouse
+  lessons to `references/performance-lessons.md`, documents `prod-gate.sh` and
+  `link-sweep.mjs` with their invocations and exit codes (gate exit `5` now stops after three
+  tries, in the dispatch prompt too), numbers the sweep and the block handling, gives the WebP
+  loop and the AIOS fix as exact commands, and picks a default browser tool.
+  `wp-audit-geo-standards` splits its catalog, surface specs and citability rubric into
+  `references/` (the rubric gains a worked rewrite), records that a deliberate crawler block
+  is the owner's decision in the skill, the auditor and the fixer, numbers the verification
+  loop with a stop and a stale-report rule, and drops citations of a design spec that does not
+  ship. `wp-audit-seo-standards` moves §13–§17's samples to `references/audit-gotchas.md`,
+  keeps one bulk description seed that follows its own priority order, hands the setup order
+  to `wp-audit-rankmath` instead of a drifted copy, and says "title template" throughout.
+  `wp-audit-ux-standards` reads the recorded `store.tier` for checkout criteria and keeps the
+  fix procedure in the agent; `wp-audit-local-standards` gives one subtype per vertical, a
+  reproducible location sample, and two rule sentences where a citation directory list was.
+  The contracts that had no pin now do: `tests/checks/audit-standards-contract.sh` and
+  `tests/checks/seo-standards-contract.sh` are new, and the UX, local and GEO checks grew.
+
+- **Skills follow Anthropic's skill authoring guidance.** Measured against
+  [the best-practices guide](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)
+  and Claude Code's own loader, three things were wrong across the 21 skills:
+  - **Descriptions said what a skill was, never when to use it.** The description is the only
+    text Claude reads before choosing a skill, so seventeen descriptions were rewritten to end
+    with a "Use when …" clause naming the agents, commands or project state that call for it.
+    `trigger:`, which two skills carried and `wp-contributing` taught, is not a frontmatter
+    field and was ignored. It is gone, and the contributor guide now says so.
+  - **Eight SKILL.md bodies ran past the 500-line ceiling**, `wp-audit-seo-standards` to 1,182
+    lines, so every agent that read one paid for all of it up front. Each now keeps its rules
+    and decisions in SKILL.md and moves templates, long code samples and catalogs into
+    `references/`, linked one level deep with a "read when" line, so an agent loads them
+    only when it needs them.
+  - **Long reference files had no contents list**, so a partial read could not see what it
+    skipped, and `wp-demo-craft/references/image-prompt.md` was never named in its SKILL.md.
+
+  `tests/checks/skill-authoring.sh` holds every skill to these rules: a name that matches its
+  directory, a description under 1,024 characters with no angle brackets and a
+  "Use when" clause, no `trigger:`, a body under 500 lines, a `## Contents` list on any
+  reference file over 100 lines, and every top-level reference named in SKILL.md.
+
+- **Two stale statements were corrected while reading.** `wp-polylang` still said the suffix
+  model "remains the default", which stopped being true when new scaffolds moved to Polylang.
+  `wp-contributing` and `/wp-contribute` told the maintainer to "roll" `[Unreleased]` into the
+  release heading, which reads as a rename. A rename is the one move that conflicts every open
+  PR on `CHANGELOG.md`, so both now say to insert the release heading below it.
+
+- **The i18n skills follow the review checklist, and their contracts are pinned.**
+  - `wp-polylang` was 487 of 500 lines, so every agent that needed `pll_save_post_translations`
+    paid for the ACF field rules, the link-rewrite pass and the rewrite-base pattern too. Those
+    moved to `references/acf-fields.md`, `references/internal-links.md` and
+    `references/taxonomies-and-rewrite-bases.md`. The scripts are a numbered workflow with
+    their path, dependencies and exit codes, and a verify loop that says when to stop. It now
+    states what the importer does that an agent would assume it does not — parents rewritten
+    every run, media ids copied as-is, ACF references owned per path — defines `$WP`, uses
+    one name per concept (translation group, counterpart, link-rewrite pass) and defaults to
+    SCF. Its central rule, that `pll_save_post_translations()` replaces the whole translation
+    group, and five other sections were unpinned; `wp-polylang.sh` now fails without each.
+  - `wp-bilingual` lost a history sentence, a checklist that restated its body and three
+    pointer stubs, says where its constants come from, and its menu example no longer names a
+    fallback function that exists nowhere.
+  - `wp-cli-patterns` stated `$WP` three times and repeated `wp-environments`' wrapper table;
+    it now states it once. The table of WP-CLI commands Claude already knows is gone; a
+    dry-run-first `search-replace` recipe replaced its bare listing. The clone guard is
+    numbered, stops when the guard did not load, checks the HTTP half too, says how it relates
+    to `/wp-clone`'s isolation plugin and gives the cleanup commands.
+    `references/shipped-scripts.md` gained `resolve-link-targets.php`. The author sweep and its
+    two exclusions are pinned, and compared with the copy `/wp-finalize` Check 7 runs.
+  - `wp-research` is a numbered procedure with a stop rule for the identity search, an example
+    competitor row and differentiation line, a rung-selection rule, a ceiling on paid
+    DataForSEO calls and the exact `firecrawl_url` request. The two-signal identity rule, the
+    three-row differentiation rule and the DataForSEO tools were unpinned, and two Firecrawl
+    pins were satisfied by the table alone; `wp-research.sh` now pins each.
+  - Every description was rewritten around the requests that should load it, with a "Not for"
+    boundary where a neighbouring skill was a near miss.
+- **The four CSS and theme skills follow the review rules, and their contracts are pinned.**
+  Each description now names the files, settings and symptoms a request mentions and where
+  the skill stops (`Not for …`). `wp-aos-animator` moves its install snippets into
+  `references/install.md`, so a per-template Phase 5 subagent no longer pays for them, and
+  ends on a verification loop that walks the page with `/wp-demo-verify`. `wp-css-system`
+  moves its reset into `references/reset.md`, restates the reset-class trap in plain CSS (and
+  gives the Tailwind path its own `:where(.btn-reset)` line), and says how to run the contour
+  lint. `wp-tailwind-system` turns adding a CSS file and converting `@media` into numbered
+  steps, keeps one contour form, shows a bare selector distributed, and drops the incident
+  counts. `wp-theme-standards` drops what Claude already knows (the required-files table, the
+  sanitization table, the `WP_Query` sample), numbers the destructive Local JSON redefinition
+  with a database step and a dashboard-fields warning, guards the WebP batch on `magick` and
+  keeps the starter's per-language menu locations. New assertions in `wp-aos-seams.sh`,
+  `wp-css-system-contract.sh`, `wp-tailwind-system-traps.sh` and `wp-theme-standards.sh` pin
+  the stacking-context rule, BEM depth, the delimiter width, the token inventory, the
+  underscore and quote traps, the `hidden` attribute rule, the one `.btn`, and the SVG
+  `unfiltered_html` gate, none of which any check held before. `wp-css-system-scope.sh` loses
+  a stale exemption for two skills that already declare `user-invocable: false`.
+
+- **Changelog entries are `changes/<slug>.<section>.md` fragments, not edits to `CHANGELOG.md`.**
+  Every PR inserted under the same `## [Unreleased]` heading. `merge=union` resolved that in a
+  local `git merge`, but GitHub ignores merge drivers, so merging one PR marked every other open
+  PR as conflicting on `CHANGELOG.md`, and union hid real same-line collisions besides. A PR now
+  adds its own file; `bin/changelog-release.sh X.Y.Z` compiles them into the release block at
+  release and deletes them. `bin/doc-sync-check.sh` requires a new fragment (or a release
+  heading) when `commands/`, `agents/`, `skills/`, `starter-theme/` or `bin/` change, and
+  `.gitattributes` no longer marks the file `merge=union`.
+
+- **PERF-010, PERF-047, the clone serving-layer caveat and the contrast docs point at the new
+  lessons.** PERF-047 now also covers deferring sheets that touch nothing above the fold and
+  generated used-CSS subsets (no longer auto-fixable: it needs a per-site generator and a
+  first-paint comparison). PERF-010 names the three follow-ups of a footer move
+  (`DOMContentLoaded`, `jquery-migrate`, tag managers). A contrast failure now ends in a
+  palette proposal for approval, never a colour edit.
+
+- **`/wp-audit` reads each long step when it reaches it.** `commands/wp-audit.md` was 97 KB,
+  and every run paid for all of it up front, including the fix phase on a report-only run and
+  the adopted-site rules on a site this plugin built. It is now a 24 KB map: every step keeps
+  its heading, entry condition and order, and fourteen long steps send the run to one file
+  each in the new `wp-audit-run` skill. No step's wording changed. The checks that guard the
+  audit read the command with its references expanded in place
+  (`tests/checks/lib/expand-command.sh`), and `tests/checks/wp-audit-run.sh` fails when a
+  reference is not pointed to at its step or not listed in the skill.
+
+- **`/wp-clone` now disables payment gateways instead of only reporting them.** Step 5.5.2
+  said reporting was the action, on the reasoning that a silent switch hides the bug a payment
+  clone exists to reproduce. A clone that keeps an enabled gateway with live keys can charge or
+  refund a real customer, so it now lists the enabled WooCommerce gateways, deactivates the
+  plugin that owns each, sets `enabled` to `no` in `woocommerce_<gateway>_settings`, lists every
+  one in the clone report and warns that the API keys stay stored and that reactivating a
+  gateway points at the real API. Webhooks, live-mode options and other integrations are still
+  reported only. `tests/checks/wp-clone-isolation.sh` asserts the new behaviour and that the
+  report-only wording is gone. The mail guard section now also says `pre_wp_mail` does not stop
+  code that drives PHPMailer directly, or a plugin that replaces `wp_mail()` wholesale, and that
+  redefining `wp_mail()` in a must-use plugin is the stronger guard.
+
+- **`/wp-clone` reads each long step when it reaches it.** `commands/wp-clone.md` was 38 KB, and
+  every run paid for both clone paths and the post-clone verification up front, though a run
+  takes one path. It is now a 13 KB map: every step heading, entry condition and the step order
+  stay, and three long parts send the run to one file each in the new `wp-clone-run` skill —
+  Path A (SSH automated clone), Path B (manual import) and Step 6 (post-clone verification and
+  summary). No step's wording changed. The checks that read `/wp-clone` now read it with its
+  references expanded in place, and `tests/checks/wp-clone-run.sh` fails when a reference is
+  not pointed to at its step or not listed in the skill.
+
+- **`/wp-create` reads each long step when it reaches it.** `commands/wp-create.md` was 37 KB,
+  and every run paid for all of it up front, including the plugin-profile install and the
+  manifest shape. It is now a 26 KB map: every step keeps its heading, entry condition and
+  order, and three long parts send the run to one file each in the new `wp-create-run` skill —
+  Step 4.3 (environment config templates), Step 4.10 (plugin profile install) and Step 5 (the
+  `.wp-create.json` manifest). No step's wording changed. The checks that read `/wp-create`
+  now read it with its references expanded in place, and `tests/checks/wp-create-run.sh` fails
+  when a reference is not pointed to at its step or not listed in the skill.
+
+- **`/wp-demo` reads each long step when it reaches it.** `commands/wp-demo.md` was 56 KB, and
+  every run paid for all of it up front, including the craft brief, composition plan and craft
+  build on a plain build that never uses them. It is now a 19 KB map: every step keeps its
+  heading, entry condition and order, and four long parts send the run to one file each in the
+  new `wp-demo-run` skill — Step 2.6 items 3 (brief), 5 (composition plan) and 6 (build), and
+  Step 4.9 (section plan). No step's wording changed. The checks that read `/wp-demo` now read
+  it with its references expanded in place, and `tests/checks/wp-demo-run.sh` fails when a
+  reference is not pointed to at its step or not listed in the skill.
+
+- **`/wp-demo-verify` reads each long step when it reaches it.** `commands/wp-demo-verify.md`
+  was 18 KB, and every run paid for the detector rules, the whole scroll walk and the catalogue
+  of finding kinds up front. It is now a 7 KB map: every step heading, the target resolution,
+  the inert-control grade, the sheet critique and the report stay, and three long parts send
+  the run to one file each in the new `wp-demo-verify-run` skill — Step 2a (detector), Step 2b
+  (walk) and Step 3 (reading the findings). No step's wording changed. The checks that read
+  `/wp-demo-verify` now read it with its references expanded in place, and
+  `tests/checks/wp-demo-verify-run.sh` fails when a reference is not pointed to at its step or
+  not listed in the skill.
+
+- **`/wp-finalize` reads each long check when it reaches it.** `commands/wp-finalize.md` was
+  36 KB, and every run paid for all of it up front, including the WP-CLI runtime validation, the
+  GEO scan and the three demo-parity layers on a project that needed none of them. It is now an
+  11 KB map: every step and check keeps its heading, entry condition and order, and seven long
+  checks send the run to one file each in the new `wp-finalize-run` skill — Check 2 (bilingual
+  coverage), Check 4 (theme structure), Check 7 (WP-CLI runtime validation), Check 8 (GEO and
+  agent-readiness) and demo-parity Layers 1 to 3. No check's wording changed. The checks that read
+  `/wp-finalize` now read it with its references expanded in place, and
+  `tests/checks/wp-finalize-run.sh` fails when a reference is not pointed to at its check or not
+  listed in the skill.
+
+- **`/wp-header` reads its long step when it reaches it.** `commands/wp-header.md` was 18 KB,
+  and every run paid up front for the whole `wp-template` prompt, the CSS routing and the
+  `wp-tailwind` author-mode prompt. It is now a 7.5 KB map: every step heading, the argument
+  handling and Steps 5 to 8 stay, and Step 4 sends the run to two files in the new
+  `wp-header-run` skill. No step's wording changed. The checks that read `/wp-header` now read
+  it with its references expanded in place, and `tests/checks/wp-header-run.sh` fails when a
+  reference is not pointed to at its step or not listed in the skill.
+
+- **`/wp-init` reads each long step when it reaches it.** `commands/wp-init.md` was 49 KB, and
+  every run paid for all of it up front, including the Demo-First Path and the font carry on a
+  scaffold with no demo. It is now a 22 KB map: every step keeps its heading, entry condition
+  and order, and five long parts send the run to one file each in the new `wp-init-run` skill —
+  the Demo-First Path (Steps D1-D5), Step 4.5 (font carry), Step 5 (i18n), Step 7 (the project
+  `.claude/CLAUDE.md`) and Step 9 (plugins, activation, site identity, Tailwind build). No
+  step's wording changed. The checks that read `/wp-init` now read it with its references
+  expanded in place, and `tests/checks/wp-init-run.sh` fails when a reference is not pointed to
+  at its step or not listed in the skill.
+
+- **`/wp-page` reads each page type when it reaches it.** `commands/wp-page.md` was 19 KB, and
+  every run paid for the dispatch prompts of all seven page types up front, though a run builds
+  one. It is now a 10.8 KB map: the argument parse, the CSS agent routing, the `tailwind` prompt
+  body and the generic and custom types stay, and five long types send the run to one file each
+  in the new `wp-page-run` skill (blog, legal, 404, search, embed). No type's wording changed.
+  The checks that read `/wp-page` now read it with its references expanded in place, and
+  `tests/checks/wp-page-run.sh` fails when a reference is not pointed to at its type or not
+  listed in the skill.
+
+- **`/wp-section` reads its dispatch detail when it reaches Step 5.** `commands/wp-section.md`
+  was 33 KB, and every run paid for all of it up front, including the two-phase contact flow on
+  a section that is not a contact section, and the other way round. It is now a 14 KB map: every
+  step keeps its heading, entry condition and order, and Step 5 sends the run to one file each in
+  the new `wp-section-run` skill — the dispatch rules every section shares (field naming, GEO
+  citability, the `--transcribe` overlay, CSS agent routing, file ownership), the three-agent
+  dispatch for an ordinary section, and the two-phase dispatch for a contact section. No step's
+  wording changed. The checks that read `/wp-section` now read it with its references expanded in
+  place, and `tests/checks/wp-section-run.sh` fails when a reference is not pointed to at its step
+  or not listed in the skill.
+
+- **`/wp-seed` reads each long phase when it reaches it.** `commands/wp-seed.md` was 45 KB, and
+  every run paid for all of it up front, including the menu and bilingual detail while still
+  parsing the demo. It is now an 18 KB map: every step and phase keeps its heading, entry
+  condition and order, and six long parts send the run to one file each in the new
+  `wp-seed-run` skill — Phase 1 (parse the demo), Phase 3 (import media), Phase 4 (ACF fields),
+  Phase 5 (bilingual content), Phase 6 (menus) and Phase 7 (final setup). No phase's wording
+  changed. The checks that read `/wp-seed` now read it with its references expanded in place,
+  and `tests/checks/wp-seed-run.sh` fails when a reference is not pointed to at its phase or
+  not listed in the skill.
+
+- **`/wp-tailwindify` reads its two long steps when it reaches them.** `commands/wp-tailwindify.md`
+  was 15.4 KB, and every run paid for the agent dispatch context and the verification detail up
+  front. It is now a 5.8 KB map: every step heading, the argument parse, the already-Tailwind
+  check and the next-steps report stay, and Step 3 (the context handed to the `wp-tailwind` agent
+  and the temporary-path write contract) and Step 4 (structural checks, the rendering parity gate
+  and the checked move) send the run to one file each in the new `wp-tailwindify-run` skill. No
+  step's wording changed. The checks that read `/wp-tailwindify` now read it with its references
+  expanded in place, and `tests/checks/wp-tailwindify-run.sh` fails when a reference is not
+  pointed to at its step or not listed in the skill.
+
+- **`/wp-tailwind-migrate` reads its two long steps when it reaches them.**
+  `commands/wp-tailwind-migrate.md` was 23 KB and every run paid for all of it up front. It is
+  now a 14 KB map: the baseline gate, the Tailwind v4 check, the golden capture and the other
+  steps keep their wording in place, and Step 4 (the author-mode dispatch) and Step 6 (the
+  convention check and the before/after comparison) send the run to one file each in the new
+  `wp-tailwind-migrate-run` skill. No step's wording changed. The checks that read the command
+  now read it with its references expanded in place, and
+  `tests/checks/wp-tailwind-migrate-run.sh` fails when a reference is not pointed to at its step
+  or not listed in the skill.
+
+- **`/wp-yolo` reads each long step when it reaches it.** `commands/wp-yolo.md` was 76 KB, and
+  every run paid for all of it up front, including the Tailwind conversion on a basic-template
+  build and the build ledger on a run that never resumes. It is now a 32 KB map: every step
+  keeps its heading, entry condition and order, and eight long steps send the run to one file
+  each in the new `wp-yolo-run` skill. Steps 1, 4 and 5 stay whole, because they are the gates
+  and the dispatch order. No step's wording changed. The checks that read `/wp-yolo` now read
+  it with its references expanded in place, and `tests/checks/wp-yolo-run.sh` fails when a
+  reference is not pointed to at its step or not listed in the skill.
 
 ### Fixed
 
@@ -344,146 +794,161 @@
     passes. Verify now compiles first, runs `theme-template-check.mjs`, states exit codes and
     loops; the new `tests/checks/wp-tailwind-system-traps.sh` pins it.
 
-### Changed
+- **Re-adopting a site no longer wipes its audit history and confirmed code scope.**
+  `wp-config.mjs adopt --replace` built a new manifest from the probe and kept only a backup,
+  so the `audit` block (the next audit's baseline), the `store` block, the prefix, the industry
+  and the code scope the operator had confirmed were lost; the scope was re-proposed from update
+  transients and client code moved to read-only came back as editable. `/wp-audit` sends the
+  operator to `--replace` whenever `drift` exits 4, so every such re-adoption did this. Over a
+  real adoption `--replace` now carries those over (explicit flags still win, vanished paths are
+  dropped, new plugins go through the normal proposal) and the dry-run reports `carried_over`;
+  over a blank scaffold it behaves as before.
 
-- **The ops skills — `wp-robin`, `wp-s3`, `wp-environments`, `wp-contributing`,
-  `wp-woocommerce` — were reviewed against `references/skill-review.md`, and their contracts
-  are now pinned.** Each description names the requests that should load it and the nearby
-  ones that should not. `wp-robin` opens with a run-and-verify loop (back up the database, run,
-  done when `error`, `processing` and `remaining` are 0, re-run after a fix), lists all
-  sixteen settings the script overwrites, and moves its WebP delivery templates to
-  `references/webp-delivery.md`; `robin-webp-gaps.sh` now fails when a setting the script
-  writes or a binary it calls is missing from the skill. A library an earlier copy of the
-  script re-encoded into `<name>.webp.webp` is repaired by deleting those files and their
-  `item_type='webp'` rows. `wp-s3` gains one table of its scripts and templates with
-  arguments, environment variables and exit codes, a numbered order, a default for the IAM-role
-  transfer (temporary credentials) and for paid downloads (kept off S3), and measures
-  downloadable products with WP-CLI instead of asking on every run; `skill-authoring.sh` now
-  requires every file under a skill's `templates/` to be named, and `wp-s3-scripts.sh` pins the
-  template constants, the path-style endpoint, all five exclusions and the never-public bucket
-  paths. `wp-environments` names every `wp-env-setup.sh` subcommand with the SELinux rule for
-  vhosts, reads the manifest through `wp-config.mjs get` instead of `jq`, defines
-  `environment.type` and `environment.engine`, and points to `/wp-create` for Adopt Mode instead
-  of keeping a drifting copy. `wp-contributing` keeps only what a release rests on and leaves
-  the procedure to `/wp-contribute release`; `wp-contributing.sh` now pins every rule of the
-  review checklist. `wp-woocommerce` names the recorded keys (`store.tier`, `store.enquiry`,
-  `store.checkout`/`store.checkout_reason`, `store.payments.mode`), states `woo-setup.php`'s
-  arguments, exit codes and report-only rule, says no command takes a store live, and
-  `wp-woo-setup.sh` pins its store rules.
-- **The three demo skills read their recorded decisions and load only what a step needs.**
-  `wp-demo-craft`'s References section was one fixed reading order, so every build read all
-  thirteen references (about 37k tokens) before writing markup; it is now a table of file,
-  contents and read-when, and names `domains.csv` and what domain classification produces.
-  Its order of work opens with a checklist, splits the composition plan into sub-steps, names
-  `/wp-demo` and `/wp-yolo` as its runners and says which parts a cinematic build takes. The
-  seven-dimension fingerprint table moved into `fingerprint.md`, which owns the gate (with the
-  manifest's `"fingerprint"` keys), the family table into `families.md`, and the readouts
-  table into `verify.md`; `devices.md`'s element-motion material now sits under real
-  subsections in its Contents list. `image-prompt.md` gives `image-gen.mjs`'s invocation and
-  exit codes. Wording that went stale with the calendar ("current latest", "until v3.1") is
-  rewritten as the rule plus its reason, and "family", "plate" and "Avoid list" mean one thing
-  each. `wp-responsive` scopes its hand-written `@media` scale to plain-CSS demos (a tailwind
-  theme follows `wp-tailwind-system`; craft compositions size to their container), drops the
-  dead `max-width` exception and three conflicting viewport lists for a `/wp-demo-verify` loop
-  with a stop condition, and its description no longer pulls screenshot-walk requests.
-  `wp-demo` shows the delimiter pair as the verbatim join key it is, cuts what Claude already
-  knows, and ends on the same verify loop. All three descriptions name the near misses they
-  are not for. `tests/checks/wp-craft-skill.sh`, and contract pins added to
-  `wp-responsive.sh` and `wp-demo-skill.sh`.
-- **The five audit skills are found by the requests that need them, and load less.** Each
-  description now names what a request would carry — `bin/prod-gate.sh`, Lighthouse, a
-  `UX-014` on `page:/contact/`, `rank-math-options-titles`, `ard.json`, a sitemap that 404s —
-  and the sibling skill that owns the near miss. `wp-audit-standards` moves its Lighthouse
-  lessons to `references/performance-lessons.md`, documents `prod-gate.sh` and
-  `link-sweep.mjs` with their invocations and exit codes (gate exit `5` now stops after three
-  tries, in the dispatch prompt too), numbers the sweep and the block handling, gives the WebP
-  loop and the AIOS fix as exact commands, and picks a default browser tool.
-  `wp-audit-geo-standards` splits its catalog, surface specs and citability rubric into
-  `references/` (the rubric gains a worked rewrite), records that a deliberate crawler block
-  is the owner's decision in the skill, the auditor and the fixer, numbers the verification
-  loop with a stop and a stale-report rule, and drops citations of a design spec that does not
-  ship. `wp-audit-seo-standards` moves §13–§17's samples to `references/audit-gotchas.md`,
-  keeps one bulk description seed that follows its own priority order, hands the setup order
-  to `wp-audit-rankmath` instead of a drifted copy, and says "title template" throughout.
-  `wp-audit-ux-standards` reads the recorded `store.tier` for checkout criteria and keeps the
-  fix procedure in the agent; `wp-audit-local-standards` gives one subtype per vertical, a
-  reproducible location sample, and two rule sentences where a citation directory list was.
-  The contracts that had no pin now do: `tests/checks/audit-standards-contract.sh` and
-  `tests/checks/seo-standards-contract.sh` are new, and the UX, local and GEO checks grew.
+- **SEO and performance audits catch three false readings on WooCommerce and Elementor sites.**
+  `wp-audit-seo` SEO-039 now counts BreadcrumbList blocks in the rendered shop and category
+  pages: `WC_Structured_Data` adds its own to every `woocommerce_breadcrumb()` call, next to
+  Rank Math's, and no theme grep sees it. The fix removes only WooCommerce's schema.
+  `wp-audit-performance` PERF-048 explains Elementor's "Optimized Image Loading", which gives
+  `fetchpriority="high"` to the logo and lazy-loads the real LCP after the theme has printed
+  the page, and accepts one high-priority image per viewport. PERF-010 counts blocking scripts
+  from the served HTML, not from a loaded DOM that holds scripts inserted after load.
 
-- **Skills follow Anthropic's skill authoring guidance.** Measured against
-  [the best-practices guide](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)
-  and Claude Code's own loader, three things were wrong across the 21 skills:
-  - **Descriptions said what a skill was, never when to use it.** The description is the only
-    text Claude reads before choosing a skill, so seventeen descriptions were rewritten to end
-    with a "Use when …" clause naming the agents, commands or project state that call for it.
-    `trigger:`, which two skills carried and `wp-contributing` taught, is not a frontmatter
-    field and was ignored. It is gone, and the contributor guide now says so.
-  - **Eight SKILL.md bodies ran past the 500-line ceiling**, `wp-audit-seo-standards` to 1,182
-    lines, so every agent that read one paid for all of it up front. Each now keeps its rules
-    and decisions in SKILL.md and moves templates, long code samples and catalogs into
-    `references/`, linked one level deep with a "read when" line, so an agent loads them
-    only when it needs them.
-  - **Long reference files had no contents list**, so a partial read could not see what it
-    skipped, and `wp-demo-craft/references/image-prompt.md` was never named in its SKILL.md.
+- **Three readings that reported defects a site did not have.** The `wp-agentic-surfaces`
+  markdown template now puts back the page `<h1>` when a theme prints it before `<main>`, and turns a
+  form into "Form on this page. Fields: ..." instead of stripping it, so a contact page whose
+  `<main>` holds only a form is no longer empty. `wp-audit-a11y` reads focus styles after the
+  focus transition ends: a theme that animates its outline was reported with the colour from
+  the middle of the animation. `/wp-clone` Step 6.2 warns that Elementor's local Google Fonts
+  CSS under uploads keeps the original host's URLs, so the clone renders a fallback font and a
+  visual comparison with production shows false differences.
 
-  `tests/checks/skill-authoring.sh` holds every skill to these rules: a name that matches its
-  directory, a description under 1,024 characters with no angle brackets and a
-  "Use when" clause, no `trigger:`, a body under 500 lines, a `## Contents` list on any
-  reference file over 100 lines, and every top-level reference named in SKILL.md.
+- **A finding whose check was not measured in this run is no longer reported as resolved.**
+  `compare()` in `bin/audit-report.mjs` counted every previous finding that was missing from the
+  new run as resolved, including those whose check the run listed under `unmeasured` (a
+  production-only check skipped on a local run) or whose category it did not cover, so skipping a
+  check read as fixing it. Those findings now appear under "Not re-measured in this run" and stay
+  in the sidecar flagged `not_remeasured`, so the first run that does measure them can resolve
+  them. `tests/checks/audit-deliverable-report.sh` covers it.
 
-- **Two stale statements were corrected while reading.** `wp-polylang` still said the suffix
-  model "remains the default", which stopped being true when new scaffolds moved to Polylang.
-  `wp-contributing` and `/wp-contribute` told the maintainer to "roll" `[Unreleased]` into the
-  release heading, which reads as a rename. A rename is the one move that conflicts every open
-  PR on `CHANGELOG.md`, so both now say to insert the release heading below it.
+- **A second audit report on the same day no longer erases the first one.** `bin/audit-report.mjs`
+  names its files after the date only and skipped its own output path when it looked for the
+  previous sidecar, so a re-run on the same day overwrote the morning's `.md`, `.html` and
+  `.json` and then reported "No previous audit found". The earlier set is now kept as
+  `informe-<date>-<HHMM>.*` (the time its sidecar was written) and becomes the previous run;
+  sidecars sort by date and time. `tests/checks/audit-deliverable-report.sh` covers it.
 
-- **The i18n skills follow the review checklist, and their contracts are pinned.**
-  - `wp-polylang` was 487 of 500 lines, so every agent that needed `pll_save_post_translations`
-    paid for the ACF field rules, the link-rewrite pass and the rewrite-base pattern too. Those
-    moved to `references/acf-fields.md`, `references/internal-links.md` and
-    `references/taxonomies-and-rewrite-bases.md`. The scripts are a numbered workflow with
-    their path, dependencies and exit codes, and a verify loop that says when to stop. It now
-    states what the importer does that an agent would assume it does not — parents rewritten
-    every run, media ids copied as-is, ACF references owned per path — defines `$WP`, uses
-    one name per concept (translation group, counterpart, link-rewrite pass) and defaults to
-    SCF. Its central rule, that `pll_save_post_translations()` replaces the whole translation
-    group, and five other sections were unpinned; `wp-polylang.sh` now fails without each.
-  - `wp-bilingual` lost a history sentence, a checklist that restated its body and three
-    pointer stubs, says where its constants come from, and its menu example no longer names a
-    fallback function that exists nowhere.
-  - `wp-cli-patterns` stated `$WP` three times and repeated `wp-environments`' wrapper table;
-    it now states it once. The table of WP-CLI commands Claude already knows is gone; a
-    dry-run-first `search-replace` recipe replaced its bare listing. The clone guard is
-    numbered, stops when the guard did not load, checks the HTTP half too, says how it relates
-    to `/wp-clone`'s isolation plugin and gives the cleanup commands.
-    `references/shipped-scripts.md` gained `resolve-link-targets.php`. The author sweep and its
-    two exclusions are pinned, and compared with the copy `/wp-finalize` Check 7 runs.
-  - `wp-research` is a numbered procedure with a stop rule for the identity search, an example
-    competitor row and differentiation line, a rung-selection rule, a ceiling on paid
-    DataForSEO calls and the exact `firecrawl_url` request. The two-signal identity rule, the
-    three-row differentiation rule and the DataForSEO tools were unpinned, and two Firecrawl
-    pins were satisfied by the table alone; `wp-research.sh` now pins each.
-  - Every description was rewritten around the requests that should load it, with a "Not for"
-    boundary where a neighbouring skill was a near miss.
-- **The four CSS and theme skills follow the review rules, and their contracts are pinned.**
-  Each description now names the files, settings and symptoms a request mentions and where
-  the skill stops (`Not for …`). `wp-aos-animator` moves its install snippets into
-  `references/install.md`, so a per-template Phase 5 subagent no longer pays for them, and
-  ends on a verification loop that walks the page with `/wp-demo-verify`. `wp-css-system`
-  moves its reset into `references/reset.md`, restates the reset-class trap in plain CSS (and
-  gives the Tailwind path its own `:where(.btn-reset)` line), and says how to run the contour
-  lint. `wp-tailwind-system` turns adding a CSS file and converting `@media` into numbered
-  steps, keeps one contour form, shows a bare selector distributed, and drops the incident
-  counts. `wp-theme-standards` drops what Claude already knows (the required-files table, the
-  sanitization table, the `WP_Query` sample), numbers the destructive Local JSON redefinition
-  with a database step and a dashboard-fields warning, guards the WebP batch on `magick` and
-  keeps the starter's per-language menu locations. New assertions in `wp-aos-seams.sh`,
-  `wp-css-system-contract.sh`, `wp-tailwind-system-traps.sh` and `wp-theme-standards.sh` pin
-  the stacking-context rule, BEM depth, the delimiter width, the token inventory, the
-  underscore and quote traps, the `hidden` attribute rule, the one `.btn`, and the SVG
-  `unfiltered_html` gate, none of which any check held before. `wp-css-system-scope.sh` loses
-  a stale exemption for two skills that already declare `user-invocable: false`.
+- **Three audit gaps found on real runs of a local clone.** The browser suite (Step 6.5) held the
+  production gate's per-host lock for many minutes while Step 6 agents waited, exited 5 and reported
+  `UNMEASURED: production gate busy`; the docs now order it to start only after every agent has
+  returned. Timing and size metrics (LCP, FCP, TBT, Lighthouse score, bytes) measured on a clone
+  were reported as the site's although they inherit the clone's serving layer (one baseline came
+  from a 468 KB uncompressed stylesheet that production serves as 69 KB of brotli over h2); they
+  are now probed against production's, labelled `clone measurement — serving layer differs`, and
+  never a baseline or finding by themselves. Cache-purge instructions now say that on a clone only
+  local caches are purged, because `wp cfcache purge_cache` can call the real Cloudflare API with
+  production credentials restored from the database.
+
+- **Re-running the browser suite against the same site no longer fails.** `bin/audit-suite.sh`
+  rewrites `baseURL` and `siteName` in the kept `audit.config.js` and asserted that the text
+  changed, so a second `/wp-audit --suite` against the URL and site name the config already
+  held stopped with "has no assignable baseURL" and measured nothing until someone edited the
+  config by hand. The guard now asserts that the pattern matched: a same-value re-run passes,
+  and a config with no `baseURL` still fails. `tests/checks/audit-suite.sh` covers both.
+
+- **A symlinked checkout no longer makes the audit suite skip Tier 3 as "no browser".**
+  `bin/lib/browsers.mjs` decided it was being run as a command by comparing `argv[1]` with
+  `import.meta.url`; Node resolves symlinks for the second, so reached through a link (the plugin
+  directory linked into place, or a path such as `.../claude-wp-builder` that is a link) the
+  comparison failed, the lookup printed nothing and exited 0, and `bin/audit-suite.sh` read that
+  as "no existing Chromium" and exited 2. Both sides are now compared by real path, and
+  `tests/checks/audit-suite.sh` passes again from a linked path.
+  `tests/checks/browser-resolution.sh` covers it.
+
+- **`/wp-clone` left Elementor URLs pointing at production and broke on production cache drop-ins.**
+  Search-replace only matched the plain `https://old-host`, but Elementor stores URLs
+  JSON-escaped (`https:\/\/old-host`) in `_elementor_data` and `_elementor_element_cache`; on a
+  real store clone 149 values kept the production host (broken banners, assets loaded from
+  production). Both paths now run a second, escaped pass (exact quoting shown) and `elementor
+  flush-css`, and verification counts the host in postmeta in either spelling. Separately, a
+  production `object-cache.php` or `advanced-cache.php` made every WP-CLI call fail on a machine
+  without that backend; a new step parks them as `.bak`, sets `WP_CACHE` false and records both
+  in the report.
+
+- **The composition gate ignores `hero-eyebrow-chip` for now, and keeps following the newest
+  `impeccable` 4.x.** impeccable 4.5.1 and 4.5.2 added a `hero-eyebrow-chip` rule that flags the
+  kicker above the title in `hero-bleed`, `hero-split`, `hero-type` and `page-head`, so
+  `tests/checks/wp-craft-composition-gate.sh` and `Contract checks` failed on `main` and on every
+  open PR with no change in the repository. Restyling those kickers is a design change that needs
+  measuring and approval, so it is a separate PR. Until then `bin/composition-gate.sh` lists the
+  rule in `IGNORED`, prints how many findings it skipped on every run, and still blocks on every
+  other slop rule, new ones included. The check fails if the gate is pinned to one version or the
+  ignore list changes without it. `/wp-demo-verify` is unchanged and still reports the rule on a
+  built demo.
+
+- **The composition gate retries the detector once on an empty payload.** `impeccable@4`
+  is resolved against the registry on every run, so a dropped connection left an empty
+  findings file and failed the gate (and its check) as "could not scan", then passed on the
+  next run. An empty answer is now retried once; any JSON the detector returns is used as is.
+
+- **`/wp-demo-verify --no-motion` stops an existing site from failing on an engine it never had.**
+  `/wp-responsive-check` now dispatches to `/wp-demo-verify`, and a URL target runs against any
+  page. Against a site the plugin did not build, every section on every page reported the
+  blocking `no-engine` (40 rows across 5 pages in a real run, with overflow and clipped copy all
+  clean), so the walk exited 1 for a reason that does not apply, which teaches people to ignore
+  the gate. The flag drops the `no-engine` and `dead-scroll` judgments and keeps overflow,
+  clipped copy, container-noop, the full-page shots and the Firefox pass. It is explicit rather
+  than inferred because a converted plugin page that lost its engine looks identical and must
+  still fail; without the flag a URL page with no `[data-motion]` only gains one line suggesting
+  it. `/wp-responsive-check` passes it for existing sites.
+
+- **The `wp-design-library` MCP server starts under npm 12.** npm 12 no longer runs a
+  dependency's install scripts unless the package is allowed, so `npx` installed
+  `better-sqlite3` without building its native binding and the server died at startup with
+  `Could not locate the bindings file`; the client reported `Connection closed`. `.mcp.json`
+  now passes `--allow-scripts=better-sqlite3` to `npx`, which allows that one package and
+  nothing else; npm 11 accepts the flag as well. A cache entry
+  left broken by an earlier start is not rebuilt: delete its `~/.npm/_npx/<hash>` folder once.
+
+- **`tests/checks/lib/expand-command.sh` no longer overwrites a caller's `r`.** Its loop
+  variable was not declared `local`, so a check that held a path in `r` and then expanded a
+  command grepped the wrong file. `wp-behaviour-gates.sh` was the first check to hit it.
+
+- **`tests/checks/lib/expand-command.sh` splices in only the command's own `-run` references.**
+  It expanded every `skills/*/references/*.md` path a command named, so a command that points
+  at another skill's reference as reading (`/wp-demo` names `wp-demo-craft`'s `fingerprint.md`)
+  got that file's text spliced in, and a check could pass on wording the command never
+  carried. It now expands only `skills/<command>-run/references/`.
+
+- **`geo-scan.sh` no longer presents two kinds of report as the site's current score.** A
+  report that already existed was printed with exit 0 whatever its age, so an audit run after
+  fixes could read the previous day's scan. The script now prints the report's `scanned_at`
+  age on stderr and, past 24 h (`--max-age-hours N` or `GEO_SCAN_MAX_AGE_HOURS`), re-requests
+  a scan through the same call the no-report path uses (with `--start`); a report it cannot
+  refresh is printed marked `STALE:` with the new exit `4`. A report whose body is a CDN
+  bot-challenge page (the scanner was served "One moment, please..." and scored that) is no
+  longer printed as a score: it exits `2` with `SKIP: CHALLENGED` and the evidence. The
+  audit docs map these to `Live scan: <score> (stale: scanned <date>)` and
+  `Live scan: unavailable — challenged by a bot interstitial`.
+
+- **The language cookie is `SameSite=Lax` and `HttpOnly`, and `Secure` on HTTPS.** Both
+  starters set it with the options array; no starter script reads it, so nothing needs
+  JavaScript access. The SEO-plugin detection the starter, `wp-agentic-surfaces` and
+  `wp-theme-standards` share calls `class_exists()` without the autoloader, so a Composer
+  autoloader cannot load a same-named class from another package while probing.
+
+- **The `*-run.sh` checks match a step title's dots literally again.** Moving them to the
+  `^## ${step}( |:)` regex let the `.` in a title like `Step 4.4` match any character, so a
+  renamed heading such as `## Step 4X4:` still read as the step. Dots are now passed as `[.]`,
+  which means the same thing to `grep -E` and to `awk` (an escaped `\.` in `awk -v` loses its
+  backslash).
+
+- **The `*-run.sh` checks now fail clearly on an empty `references/` and bound each step at any `##` heading.**
+  With no reference files, the loop ran once on the literal `*.md` glob and failed with "never
+  sends the run to *.md"; each check now sets `nullglob` and says the directory has no references.
+  The "pointer sits under its step" test reset only on `## Step` (or `Step|Path`, `Step|Phase`)
+  headings, so a pointer moved under a later heading such as `## Report` in `/wp-tailwind-migrate`
+  still read as inside the last step; any `##` heading now ends the step. The checks that matched
+  `## Step N:` literally also accept `## Step N ` now, like the others.
 
 ## [1.29.0] - 2026-10-05
 
