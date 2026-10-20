@@ -2,6 +2,8 @@
 
 <div align="center">
 
+<img src="docs/assets/banner.svg" alt="Claude WP Builder: demo HTML to production WordPress theme" width="100%">
+
 # Claude WP Builder
 
 **Demo HTML to production WordPress theme — automated.**
@@ -86,6 +88,22 @@ Add to your project's `.claude/settings.json` so all collaborators get it automa
   }
 }
 ```
+
+## Quickstart
+
+Five minutes, one page, from an empty folder to a theme that renders the demo.
+
+```
+/wp-create --path=/var/www/html/my-project   # local WordPress + .wp-create.json
+cd /var/www/html/my-project
+/wp-init path/to/mockup.html                 # scaffold theme, read project details from the demo
+/wp-yolo demo/                               # whole demo to theme in one pass
+/wp-finalize                                 # pre-delivery checklist
+/wp-demo-verify http://my-project.test       # scroll-walk screenshots + critique
+```
+
+No mockup yet? Run `/wp-init`, then `/wp-demo` to generate one. Each step is optional
+beyond `/wp-init` and `/wp-yolo`; see [docs/workflows.md](docs/workflows.md) for the other paths.
 
 ## Workflow
 
