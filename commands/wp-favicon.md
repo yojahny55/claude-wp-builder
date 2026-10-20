@@ -114,11 +114,18 @@ $WP eval 'echo has_site_icon() ? "site icon OK: " . get_site_icon_url(32) : "MIS
 ```
 
 `MISSING` is a failure: report it and do not say the icon is set. Then give the absolute path
-of every file written, and print the one line `site.webmanifest` needs, because WordPress does
-not link a manifest by itself:
+of every file written. `site.webmanifest` needs a link, because WordPress does
+not link a manifest by itself. Both starter themes already print it from `functions.php`
+when `assets/img/favicon/site.webmanifest` exists, so a theme scaffolded from them needs
+nothing more. For a theme without that hook, add this to its `wp_head`:
 
-```html
-<link rel="manifest" href="<?php echo esc_url( get_theme_file_uri( 'assets/img/favicon/site.webmanifest' ) ); ?>">
+```php
+add_action( 'wp_head', function() {
+    if ( file_exists( get_theme_file_path( 'assets/img/favicon/site.webmanifest' ) ) ) {
+        printf( '<link rel="manifest" href="%s">' . "\n", esc_url( get_theme_file_uri( 'assets/img/favicon/site.webmanifest' ) ) );
+    }
+});
 ```
 
-Add it to the theme's `wp_head` hook only if the user asks.
+Check with `$WP eval 'ob_start(); wp_head(); echo strpos(ob_get_clean(), "rel=\"manifest\"") !== false ? "manifest linked" : "manifest NOT linked";'`.
+Add the hook to a theme that lacks it only if the user asks.

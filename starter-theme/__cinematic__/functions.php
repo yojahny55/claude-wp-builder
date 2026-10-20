@@ -41,6 +41,16 @@ require_once __STARTER___THEME_DIR . '/inc/scenes-renderer.php';
 require_once __STARTER___THEME_DIR . '/inc/performance.php';
 require_once __STARTER___THEME_DIR . '/inc/security.php';
 
+/**
+ * Link the web manifest `/wp-favicon` writes. Silent while the file is absent, so a theme
+ * that never ran that command prints nothing.
+ */
+add_action('wp_head', function() {
+    if (file_exists(get_theme_file_path('assets/img/favicon/site.webmanifest'))) {
+        printf('<link rel="manifest" href="%s">' . "\n", esc_url(get_theme_file_uri('assets/img/favicon/site.webmanifest')));
+    }
+});
+
 // Field groups use ACF/SCF Local JSON (acf-json/) as the single source of truth
 // so they stay editable in the dashboard AND versioned in code. fields/*.php are
 // a one-time bootstrap: registered on first load with no JSON yet, then persisted

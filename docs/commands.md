@@ -324,8 +324,8 @@ Source must be square, and raster sources at least 512 px (an SVG passes); it ne
 upscales. Writes 16, 32, 180, 192 and 512 px PNGs, a multi-size `favicon.ico` and
 `site.webmanifest` into `assets/img/favicon/`, imports the 512 px icon and sets `site_icon`.
 An icon already set is left alone unless `--force`. Needs ImageMagick 7 (`magick`); it is not
-installed for you. WordPress does not link a manifest, so the command prints the one
-`<link rel="manifest">` line instead of editing the theme.
+installed for you. WordPress does not link a manifest; both starter themes print the link when
+the file exists, and the command shows the hook for a theme without it.
 
 ### `/wp-seed`
 
