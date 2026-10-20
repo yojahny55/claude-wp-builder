@@ -78,7 +78,13 @@ fi
 
 echo "composition-gate: assembled $count compositions (each >= $MIN_DOC_BYTES bytes on disk)"
 
-npx -y impeccable@4 detect "$WORK" --json > "$WORK/findings.json" 2>/dev/null || true
+# `@4` is resolved against the registry on every run, so one dropped connection leaves an
+# empty findings.json and reads as "could not scan". Retry once on an empty payload only: a
+# detector that answered, with any JSON, is never re-run.
+for attempt in 1 2; do
+  npx -y impeccable@4 detect "$WORK" --json > "$WORK/findings.json" 2>/dev/null || true
+  [ -s "$WORK/findings.json" ] && break
+done
 
 python3 - "$WORK/findings.json" "$count" <<'PY'
 import json, sys, collections
