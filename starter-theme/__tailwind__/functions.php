@@ -233,6 +233,16 @@ add_action( 'wp_head', function() {
 });
 
 /**
+ * Link the web manifest `/wp-favicon` writes. Silent while the file is absent, so a theme
+ * that never ran that command prints nothing.
+ */
+add_action( 'wp_head', function() {
+    if ( file_exists( get_theme_file_path( 'assets/img/favicon/site.webmanifest' ) ) ) {
+        printf( '<link rel="manifest" href="%s">' . "\n", esc_url( get_theme_file_uri( 'assets/img/favicon/site.webmanifest' ) ) );
+    }
+});
+
+/**
  * Asset URL helper.
  */
 function __starter___asset( $path ) {

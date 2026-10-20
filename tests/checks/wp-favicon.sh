@@ -26,6 +26,14 @@ grep -Fq 'Do not invent `theme_color`' "$f" || fail "$f may guess manifest colou
 # The gate block is checked byte-for-byte by wp-config-gate.sh; here only that it is present.
 grep -Fq 'wp-config.mjs validate' "$f" || fail "$f reads the manifest but never calls the validator"
 
+# Both starters link the manifest the command writes, and only when the file exists, so a
+# theme that never ran the command prints nothing.
+for t in __tailwind__ __cinematic__; do
+  g=starter-theme/$t/functions.php
+  grep -Fq 'assets/img/favicon/site.webmanifest' "$g" || fail "$g no longer links the web manifest"
+  grep -Eq "file_exists\( *get_theme_file_path\( *'assets/img/favicon/site\.webmanifest'" "$g" || fail "$g links the manifest without checking that it exists"
+done
+
 # Documented in both tables and the backlog row points at this check.
 grep -Fq '/wp-favicon' README.md || fail "README.md does not list /wp-favicon"
 grep -Fq '(#wp-favicon)' docs/commands.md || fail "docs/commands.md does not list /wp-favicon"
