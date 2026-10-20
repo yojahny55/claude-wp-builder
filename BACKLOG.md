@@ -140,8 +140,10 @@ Making the command flow smoother and more guided.
 - [ ] **Maintenance mode command** `OPEN`
   New `/wp-maintenance` command to enable/disable maintenance mode — either via a custom template or by installing a maintenance plugin via WP-CLI.
 
-- [ ] **Favicon command** `OPEN`
-  New `/wp-favicon` command that takes any image, generates all required favicon sizes (16x16, 32x32, 180x180, 192x192, 512x512), creates `favicon.ico`, generates `site.webmanifest`, and sets the site icon via `$WP option update site_icon`.
+- [x] **Favicon command** `DELIVERED`
+  [wp-favicon](commands/wp-favicon.md) takes one square image, writes the 16, 32, 180, 192 and
+  512 px PNGs, `favicon.ico` and `site.webmanifest`, and sets `site_icon` through WP-CLI. Check:
+  [favicon](tests/checks/wp-favicon.sh).
 
 - [x] **Suggest next command after each step** `DELIVERED`
   [wp-header](commands/wp-header.md) and [wp-section](commands/wp-section.md) end by naming the next command to run.

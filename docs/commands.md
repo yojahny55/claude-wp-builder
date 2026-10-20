@@ -22,6 +22,7 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-page`](#wp-page) | B | optional | screenshot | `page-*.php`, `archive.php`, `single.php`, `404.php`, … |
 | [`/wp-cpt`](#wp-cpt) | B | optional | demo section hints | CPT registration, fields, archive/single, teaser, `inc/seed/<name>.php` |
 | [`/wp-settings`](#wp-settings) | B | optional | `fields/settings.php` | new settings fields |
+| [`/wp-favicon`](#wp-favicon) | all | optional | one square image | `assets/img/favicon/*`, Site Icon |
 | [`/wp-seed`](#wp-seed) | B | required for content | demo HTML, `.wp-create.json` | WP pages, media, ACF values, menus |
 | [`/wp-finalize`](#wp-finalize) | all | recommended | theme, WP-CLI | report only |
 | [`/wp-demo-verify`](#wp-demo-verify) | all | recommended | URL or file | `.verify/` screenshots, contact sheet, findings |
@@ -312,6 +313,19 @@ pages using `page-legal.php` from site search only — they stay published and i
 ```
 
 Adds fields/tabs to `fields/settings.php`; under `suffix` adds `_<lang>` variants.
+
+### `/wp-favicon`
+
+```
+/wp-favicon <image> [--force]
+```
+
+Source must be square, and raster sources at least 512 px (an SVG passes); it never crops or
+upscales. Writes 16, 32, 180, 192 and 512 px PNGs, a multi-size `favicon.ico` and
+`site.webmanifest` into `assets/img/favicon/`, imports the 512 px icon and sets `site_icon`.
+An icon already set is left alone unless `--force`. Needs ImageMagick 7 (`magick`); it is not
+installed for you. WordPress does not link a manifest, so the command prints the one
+`<link rel="manifest">` line instead of editing the theme.
 
 ### `/wp-seed`
 
