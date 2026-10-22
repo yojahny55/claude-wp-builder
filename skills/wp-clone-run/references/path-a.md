@@ -300,11 +300,7 @@ bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'
 
 On exit 2, run the migration before continuing.
 
-**Amending the exit `3` row above:** Exit `3` here means the step before this one neither
-created nor adopted the destination. Run `${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt.md`
-Steps 2 to 5 against it if it runs WordPress, then run the validator again. If it does not
-run WordPress, or adoption fails, stop and say so, as the row says. Never import a database
-into a destination this command has no manifest for.
+**Exit `3` policy:** `destination-adopt`, defined in `${CLAUDE_PLUGIN_ROOT}/skills/wp-manifest-gate/SKILL.md`. Read it when the validator exits `3`.
 
 This runs after A9, not before Step 0 — the manifest does not exist until `/wp-create`
 has finished creating it.

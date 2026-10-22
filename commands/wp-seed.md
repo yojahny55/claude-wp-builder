@@ -33,8 +33,7 @@ bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'
 
 On exit 2, run the migration before continuing.
 
-**Amending the exit `3` row above:** Exit `3` here falls through to the bare-`wp` fallback below rather than stopping outright
-— this command also seeds a WordPress root that was never run through `/wp-create`.
+**Exit `3` policy:** `bare-wp-fallback`, defined in `${CLAUDE_PLUGIN_ROOT}/skills/wp-manifest-gate/SKILL.md`. Read it when the validator exits `3`.
 
 Read `.wp-create.json` from the project root to obtain the WP-CLI wrapper and language configuration.
 

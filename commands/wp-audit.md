@@ -109,9 +109,9 @@ bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'
 
 On exit 2, run the migration before continuing.
 
-**Amending the exit `3` row above:** Exit `3` is not a stop here until the operator declines
-adoption. A site this plugin did not build has no manifest, and auditing it is a legitimate
-use, not a misconfiguration. Ask with `AskUserQuestion`:
+**Exit `3` policy:** `adopt-or-stop`, defined in `${CLAUDE_PLUGIN_ROOT}/skills/wp-manifest-gate/SKILL.md`. Read it when the validator exits `3`.
+
+The question itself stays here, because its order against the other prompts is pinned. Ask with `AskUserQuestion`:
 
 ```
 No .wp-create.json: this site was not created by /wp-create.
@@ -119,11 +119,9 @@ No .wp-create.json: this site was not created by /wp-create.
   [B] Stop
 ```
 
-On A, run `${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt.md` Steps 2 to 5 against
-`${PROJECT_PATH}`. Then run the validator again: it must exit `0`, and the audit continues
-from here with the adopted manifest. On B, stop and say so, as the row says. A site that is
-only files, with no running WordPress for WP-CLI to probe, cannot be adopted. In that case
-say so and stop.
+On A, run `${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt.md` Steps 2 to 5 against `${PROJECT_PATH}`,
+then run the validator again: it must exit `0`, and the audit continues with the adopted manifest.
+On B, or on a site that is only files with no WordPress for WP-CLI to probe, say so and stop.
 
 **Validation checks the manifest's shape, not whether it is true.** A blank scaffold that a real
 site was later restored over passes `validate` and describes the wrong site: `source: blank`,
@@ -183,9 +181,12 @@ generated block that adoption wrote. **Function prefix** and **Industry** are ro
 block. The theme directory path is `code_scope`, not one directory. See
 **Step 2.2** below.
 
-If `.claude/CLAUDE.md` does not exist, tell the user:
+If `.claude/CLAUDE.md` does not exist, the project context is missing; stop and tell the user
+which command writes it. An existing WordPress site this plugin did not build: `/wp-adopt`
+(or answer `[A]` at the exit `3` question above, which runs it). A new project with no site yet:
+`/wp-init`. Never send an existing site to `/wp-init`, which scaffolds a starter theme:
 ```
-Error: Project not initialized. Run /wp-init first to set up the project context.
+Error: No project context (.claude/CLAUDE.md). Run /wp-adopt for an existing site, or /wp-init for a new project.
 ```
 And stop execution.
 
