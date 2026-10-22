@@ -31,6 +31,9 @@ CONFIG="$WP_ROOT/s3-config.php"
 LOCAL="$WP_ROOT/wp-content/uploads"
 MU="$WP_ROOT/wp-content/mu-plugins/s3-uploads-endpoint.php"
 STAMP="$(date +%Y%m%d-%H%M%S)"
+# The backup holds database credentials: private directory outside the docroot, not a
+# *.bak-* file beside wp-config.php, which the web server would serve as plain text.
+BACKUP_DIR="${WP_S3_BACKUP_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wp-s3-backups}/$(printf '%s' "$WP_ROOT" | cksum | cut -d' ' -f1)"
 
 [[ -d "$LOCAL" ]] || die "no $LOCAL"
 [[ -w "$LOCAL" ]] || die "$LOCAL is not writable: the media cannot come back to disk"
@@ -83,10 +86,12 @@ fi
 
 # ---------------------------------------------------------------- 4. unhook the config
 if grep -q "s3-config.php" "$WP_ROOT/wp-config.php"; then
-    cp -p "$WP_ROOT/wp-config.php" "$WP_ROOT/wp-config.php.bak-$STAMP"
+    ( umask 077 && mkdir -p "$BACKUP_DIR" ) && chmod 700 "$BACKUP_DIR" \
+        && ( umask 077 && cp -p "$WP_ROOT/wp-config.php" "$BACKUP_DIR/wp-config.php.bak-$STAMP" ) \
+        || die "could not back up wp-config.php to $BACKUP_DIR"
     set +e
     python3 - "$WP_ROOT/wp-config.php" <<'PY'
-import os, re, sys
+import os, re, shutil, sys
 path = sys.argv[1]
 with open(path) as handle:
     text = handle.read()
@@ -107,6 +112,12 @@ with open(tmp, "w") as handle:
     handle.write(new)
     handle.flush()
     os.fsync(handle.fileno())
+shutil.copymode(path, tmp)
+try:
+    st = os.stat(path)
+    os.chown(tmp, st.st_uid, st.st_gid)
+except PermissionError:
+    pass
 os.replace(tmp, path)
 PY
     status=$?
@@ -118,7 +129,7 @@ PY
         # nobody touched sends them to fix the wrong thing.
         die "could not rewrite wp-config.php (python exited $status; its error is above).
        Nothing has been renamed and the site still works. Fix that and run again
-       (backup: wp-config.php.bak-$STAMP)."
+       (backup: $BACKUP_DIR/wp-config.php.bak-$STAMP)."
     fi
     if [[ $status -eq 3 ]]; then
         # Stopping here leaves the site working: wp-config.php still requires a
@@ -129,10 +140,10 @@ PY
         die "the require block in wp-config.php was edited by hand and could not be removed.
        Nothing has been renamed and the site still works. Remove this block yourself:
            if ( file_exists( __DIR__ . '/s3-config.php' ) ) { require __DIR__ . '/s3-config.php'; }
-       then run this script again (backup: wp-config.php.bak-$STAMP)."
+       then run this script again (backup: $BACKUP_DIR/wp-config.php.bak-$STAMP)."
     fi
-    php -l "$WP_ROOT/wp-config.php" >/dev/null || die "wp-config.php no longer parses; restore wp-config.php.bak-$STAMP"
-    echo "4. Removed the require from wp-config.php (backup: wp-config.php.bak-$STAMP)"
+    php -l "$WP_ROOT/wp-config.php" >/dev/null || die "wp-config.php no longer parses; restore $BACKUP_DIR/wp-config.php.bak-$STAMP"
+    echo "4. Removed the require from wp-config.php (backup: $BACKUP_DIR/wp-config.php.bak-$STAMP)"
 else
     echo "4. wp-config.php does not require s3-config.php."
 fi

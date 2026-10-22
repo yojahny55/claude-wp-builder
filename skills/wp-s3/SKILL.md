@@ -94,7 +94,9 @@ it.
 
 `s3-config.php` is written `0640` and added to the site's `.gitignore`. Give it the web
 server's group. `wp-config.php` is backed up as `wp-config.php.bak-<timestamp>` before the
-`require` is inserted, and the insertion is idempotent.
+`require` is inserted — into `~/.local/state/wp-s3-backups/` (`$WP_S3_BACKUP_DIR`), mode `0700`, never
+next to the original, where the web server would serve it as plain text — and keeps its mode and owner;
+the secret can be passed with `--secret-file` (mode `0600`) instead of the environment; and the insertion is idempotent.
 
 ## The transfer verifies itself
 

@@ -13,7 +13,12 @@
 #       --bucket-url https://media.example.com \
 #       [--endpoint https://s3.example.com] \
 #       [--auth instance|key] [--key <access-key-id>] \
-#       [--version 3.0.13] [--unverified-download] [--skip-plugin-install]
+#       [--version 3.0.13] [--unverified-download] [--skip-plugin-install] \
+#       [--secret-file /path/to/file-with-the-secret]
+#
+# Backups of wp-config.php and s3-config.php go to a private directory outside the
+# docroot ($WP_S3_BACKUP_DIR, default ~/.local/state/wp-s3-backups), never next to the
+# originals: a *.bak-* file is not .php, so the web server hands it out as plain text.
 
 set -euo pipefail
 
@@ -36,6 +41,7 @@ ENDPOINT=""
 AUTH="key"
 KEY=""
 SKIP_INSTALL="no"
+SECRET_FILE=""
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -51,6 +57,7 @@ while [[ $# -gt 0 ]]; do
         --version)    PLUGIN_VERSION="${2:-}"; shift 2 ;;
         --unverified-download) ALLOW_UNVERIFIED="yes"; shift ;;
         --skip-plugin-install) SKIP_INSTALL="yes"; shift ;;
+        --secret-file) SECRET_FILE="${2:-}"; shift 2 ;;
         *) die "unknown option: $1" ;;
     esac
 done
@@ -61,6 +68,19 @@ WP_ROOT="${WP_ROOT%/}"
 [[ -n "$BUCKET" ]]     || die "--bucket is required"
 [[ -n "$REGION" ]]     || die "--region is required"
 [[ -n "$BUCKET_URL" ]] || die "--bucket-url is required"
+
+# The secret may come from a file the operator created at 0600 instead of the environment:
+# a variable exported by a `!` line of the chat never reaches the shell that runs this.
+if [[ -n "$SECRET_FILE" ]]; then
+    [[ -z "${S3_UPLOADS_SECRET_VALUE:-}" ]] || die "give the secret in the environment or with --secret-file, not both"
+    [[ -f "$SECRET_FILE" && -r "$SECRET_FILE" ]] || die "--secret-file $SECRET_FILE is not a readable file"
+    case "$(stat -c %a "$SECRET_FILE")" in
+        400|600) ;;
+        *) die "--secret-file must be mode 0600 or 0400 (chmod 600 '$SECRET_FILE')" ;;
+    esac
+    S3_UPLOADS_SECRET_VALUE="$(<"$SECRET_FILE")"
+    S3_UPLOADS_SECRET_VALUE="${S3_UPLOADS_SECRET_VALUE%$'\n'}"
+fi
 
 case "$AUTH" in
     instance)
@@ -92,6 +112,15 @@ CONFIG="$WP_ROOT/s3-config.php"
 MU_DIR="$WP_ROOT/wp-content/mu-plugins"
 PLUGIN_DIR="$WP_ROOT/wp-content/plugins/S3-Uploads"
 STAMP="$(date +%Y%m%d-%H%M%S)"
+
+# Backups hold database credentials and the previous S3 secret, so they live in a private
+# directory outside the docroot, one subdirectory per WordPress root.
+BACKUP_DIR="${WP_S3_BACKUP_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wp-s3-backups}/$(printf '%s' "$WP_ROOT" | cksum | cut -d' ' -f1)"
+( umask 077 && mkdir -p "$BACKUP_DIR" ) || die "could not create the backup directory $BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
+backup() { # backup <file> <name>: private copy, mode 0600
+    ( umask 077 && cp -p "$1" "$BACKUP_DIR/$2.bak-$STAMP" ) && chmod 600 "$BACKUP_DIR/$2.bak-$STAMP"
+}
 
 echo "== S3 Uploads setup on $WP_ROOT =="
 
@@ -237,8 +266,8 @@ fi
 
 # ---------------------------------------------------------------- 2. s3-config.php
 if [[ -f "$CONFIG" ]]; then
-    cp -p "$CONFIG" "$CONFIG.bak-$STAMP"
-    echo "2. Existing s3-config.php backed up to s3-config.php.bak-$STAMP"
+    backup "$CONFIG" s3-config.php || die "could not back up s3-config.php"
+    echo "2. Existing s3-config.php backed up to $BACKUP_DIR/s3-config.php.bak-$STAMP"
 fi
 
 if [[ -n "$ENDPOINT" ]]; then
@@ -312,9 +341,9 @@ echo "2. Wrote $CONFIG (0640). Set its group to the web server's if it is not al
 if grep -q "s3-config.php" "$WP_ROOT/wp-config.php"; then
     echo "3. wp-config.php already requires s3-config.php; not touching it."
 else
-    cp -p "$WP_ROOT/wp-config.php" "$WP_ROOT/wp-config.php.bak-$STAMP"
+    backup "$WP_ROOT/wp-config.php" wp-config.php || die "could not back up wp-config.php"
     python3 - "$WP_ROOT/wp-config.php" <<'PY'
-import os, re, sys
+import os, re, shutil, sys
 path = sys.argv[1]
 with open(path) as handle:
     text = handle.read()
@@ -337,10 +366,17 @@ with open(tmp, "w") as handle:
     handle.write(text)
     handle.flush()
     os.fsync(handle.fileno())
+# The rename must not change who can read wp-config.php: carry over its mode and owner.
+shutil.copymode(path, tmp)
+try:
+    st = os.stat(path)
+    os.chown(tmp, st.st_uid, st.st_gid)
+except PermissionError:
+    pass
 os.replace(tmp, path)
 PY
-    php -l "$WP_ROOT/wp-config.php" >/dev/null || die "wp-config.php no longer parses; restore wp-config.php.bak-$STAMP"
-    echo "3. Added the require to wp-config.php (backup: wp-config.php.bak-$STAMP)"
+    php -l "$WP_ROOT/wp-config.php" >/dev/null || die "wp-config.php no longer parses; restore $BACKUP_DIR/wp-config.php.bak-$STAMP"
+    echo "3. Added the require to wp-config.php (backup: $BACKUP_DIR/wp-config.php.bak-$STAMP)"
 fi
 
 # ---------------------------------------------------------------- 4. mu-plugin
