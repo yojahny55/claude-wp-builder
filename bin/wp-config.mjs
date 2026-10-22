@@ -4,7 +4,8 @@
  *
  * Exit codes are fixed and are part of the contract: 0 ok, 1 invalid or refused,
  * 2 a migration is available, 3 there is no manifest. `drift` adds 4: the manifest
- * validates but no longer describes the site.
+ * validates but no longer describes the site. `require-origin` adds 5: the site is adopted
+ * (a third-party theme this plugin did not build) and the calling builder must stop.
  */
 import {
   readFileSync, existsSync, writeFileSync, copyFileSync, mkdirSync,
@@ -14,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import {
   CURRENT_VERSION, MANIFEST_NAME, LOCAL_NAME, detectVersion, versionProblem, validateManifest, migrateManifest,
   renderContext, spliceContext, contextDrift, resolveSecret, getKey, SECRETS, validateProfile,
-  supersedeProseDecisions, testedVerdicts,
+  supersedeProseDecisions, testedVerdicts, isAdopted,
 } from './lib/manifest.mjs';
 import {
   detectWrapper, runProbe, buildManifest, isWordPressRoot, manifestDrift, isTransientWrapper,
@@ -382,6 +383,28 @@ function cmdRefresh(projectPath) {
   cmdRenderContext(root);
 }
 
+// The guard every builder (/wp-init, /wp-section, /wp-seed, ...) runs first. They assume a starter
+// theme, and an adopted site has a third-party one: left alone they overwrite it or generate a
+// theme that does not belong. Exit 0 the site is created (or has no manifest: validate owns that
+// case), or --force-adopted was passed; 5 it is adopted and the builder stops; 1 the manifest is
+// not valid JSON.
+function cmdRequireOrigin(projectPath, flags) {
+  const file = join(resolve(projectPath), MANIFEST_NAME);
+  if (!existsSync(file)) return;
+  let manifest;
+  try { manifest = JSON.parse(readFileSync(file, 'utf8')); } catch (err) {
+    warn(`${MANIFEST_NAME} is not valid JSON ${jsonParseErrorLocation(err)}`);
+    process.exit(1);
+  }
+  if (!isAdopted(manifest)) return;
+  if (flags['force-adopted']) {
+    say('note: adopted site, continuing because --force-adopted was passed; the builder will write into a theme this plugin did not create');
+    return;
+  }
+  warn('adopted site with a third-party theme: use /wp-audit, /wp-debug or /wp-update (--force-adopted overrides this on purpose)');
+  process.exit(5);
+}
+
 const [cmd, target] = process.argv.slice(2);
 if (cmd === 'validate' && target) cmdValidate(target);
 else if (cmd === 'migrate' && target) cmdMigrate(target);
@@ -390,8 +413,9 @@ else if (cmd === 'get' && target && process.argv[4]) cmdGet(target, process.argv
 else if (cmd === 'validate-profile' && target) cmdValidateProfile(target);
 else if (cmd === 'drift' && target) cmdDrift(target);
 else if (cmd === 'refresh' && target) cmdRefresh(target);
+else if (cmd === 'require-origin' && target) cmdRequireOrigin(target, parseFlags(process.argv.slice(4)));
 else if (cmd === 'adopt' && target) cmdAdopt(target, parseFlags(process.argv.slice(4)));
 else {
-  warn('usage: wp-config.mjs <validate|migrate|render-context|get|validate-profile|adopt|drift|refresh> <project-path> [key|wp-version|adopt flags]');
+  warn('usage: wp-config.mjs <validate|migrate|render-context|get|validate-profile|adopt|drift|refresh|require-origin> <project-path> [key|wp-version|adopt flags]');
   process.exit(1);
 }
