@@ -17,11 +17,42 @@ if ( ! defined( 'ABSPATH' ) ) {
  * a raw SCF/ACF field URL (echo $field['url']) or a CSS background-image bypass
  * it — those are handled by the output-buffer rewrite in (3).
  */
-add_filter( 'image_editor_output_format', function ( $formats ) {
+/**
+ * Whether a PNG is worth re-encoding to WebP for its sub-sizes.
+ *
+ * Indexed-palette and alpha PNGs (colour types 3, 4 and 6 in the IHDR chunk) are
+ * logos, icons and flat graphics: re-encoding them is lossy for the palette cases
+ * and often larger than the source, so they keep their format. So do tiny files,
+ * where the saving is smaller than the request-to-request variance. Photographic
+ * truecolor PNGs (colour types 0 and 2) are where the conversion pays.
+ *
+ * @param string $filename Path of the source image.
+ * @return bool
+ */
+function __starter___png_should_become_webp( $filename ) {
+	if ( ! is_string( $filename ) || ! is_readable( $filename ) || filesize( $filename ) < 16384 ) {
+		return false;
+	}
+	$fh = fopen( $filename, 'rb' );
+	if ( ! $fh ) {
+		return false;
+	}
+	$head = fread( $fh, 26 );
+	fclose( $fh );
+	// Byte 25 of a PNG is the colour type of the IHDR chunk.
+	if ( false === $head || strlen( $head ) < 26 || "\x89PNG" !== substr( $head, 0, 4 ) ) {
+		return false;
+	}
+	return in_array( ord( $head[25] ), array( 0, 2 ), true );
+}
+
+add_filter( 'image_editor_output_format', function ( $formats, $filename = '' ) {
 	$formats['image/jpeg'] = 'image/webp';
-	$formats['image/png']  = 'image/webp';
+	if ( __starter___png_should_become_webp( $filename ) ) {
+		$formats['image/png'] = 'image/webp';
+	}
 	return $formats;
-} );
+}, 10, 2 );
 
 /**
  * 2) On upload, also write a WebP sibling next to the FULL-SIZE original, so
@@ -39,7 +70,11 @@ add_filter( 'wp_generate_attachment_metadata', function ( $metadata, $attachment
 		return $metadata;
 	}
 	$webp = preg_replace( '/\.(?:jpe?g|png)$/i', '.webp', $file );
-	if ( file_exists( $webp ) ) {
+	// A sibling that is older than its original belongs to a file that has since been
+	// replaced under the same name (or regenerated): keep it and the front end keeps
+	// serving the previous picture. Only a fresh sibling is left alone.
+	clearstatcache( true, $webp );
+	if ( file_exists( $webp ) && __starter___webp_is_fresh( $webp, $file ) ) {
 		return $metadata;
 	}
 	$editor = wp_get_image_editor( $file );
@@ -48,6 +83,19 @@ add_filter( 'wp_generate_attachment_metadata', function ( $metadata, $attachment
 	}
 	return $metadata;
 }, 10, 2 );
+
+/**
+ * Is a WebP sibling at least as new as the original it was made from?
+ *
+ * @param string $webp     Path of the sibling.
+ * @param string $original Path of the jpg/jpeg/png.
+ * @return bool False when either mtime cannot be read or the sibling is older.
+ */
+function __starter___webp_is_fresh( $webp, $original ) {
+	$webp_time = @filemtime( $webp );
+	$orig_time = @filemtime( $original );
+	return false !== $webp_time && false !== $orig_time && $webp_time >= $orig_time;
+}
 
 /**
  * Does an uploads URL at this position belong to a declaration the theme already
@@ -128,8 +176,11 @@ function __starter___webp_sibling_url( $url ) {
 		return '';
 	}
 
+	// A sibling older than its original is stale (the media was replaced under the
+	// same name): serving it would show the previous picture, so it counts as absent.
 	foreach ( array( $relative . '.webp', preg_replace( '/\.(?:jpe?g|png)$/i', '.webp', $relative ) ) as $candidate ) {
-		if ( file_exists( $uploads['basedir'] . $candidate ) ) {
+		if ( file_exists( $uploads['basedir'] . $candidate )
+			&& __starter___webp_is_fresh( $uploads['basedir'] . $candidate, $uploads['basedir'] . $relative ) ) {
 			$cache[ $url ] = $input_base . $candidate;
 			return $cache[ $url ];
 		}
@@ -161,13 +212,24 @@ function __starter___webp_sibling_url( $url ) {
  * stylesheet.
  */
 add_action( 'template_redirect', function () {
-	if ( is_admin() || is_feed() || is_robots() ) {
+	// Only HTML documents are rewritten. Sitemaps (core and SEO plugins), embeds,
+	// feeds and robots.txt are served through this same action but are not HTML.
+	if ( is_admin() || is_feed() || is_robots() || is_embed()
+		|| '' !== (string) get_query_var( 'sitemap' )
+		|| '' !== (string) get_query_var( 'sitemap-stylesheet' ) ) {
 		return;
 	}
 	$uploads  = wp_get_upload_dir();
 	$base_url = $uploads['baseurl'];
 
 	ob_start( function ( $html ) use ( $base_url ) {
+		// Anything that announced a non-HTML Content-Type by now (llms.txt, JSON,
+		// XML served by a plugin on template_redirect) is left byte for byte.
+		foreach ( headers_list() as $header ) {
+			if ( 0 === stripos( $header, 'Content-Type:' ) && false === stripos( $header, 'text/html' ) ) {
+				return $html;
+			}
+		}
 		// strpos on the uploads URL is ~free and skips the regex on any page
 		// with no uploaded images (404s, search, text-only pages).
 		if ( '' === $html || false === strpos( $html, $base_url ) ) {
@@ -225,7 +287,16 @@ function __starter___image( $field, $size = 'large', $attr = array() ) {
 	if ( ! $url ) {
 		return '';
 	}
-	$out = '<img src="' . esc_url( $url ) . '"';
+	// No attachment means no stored alt or size: default to an empty alt (decorative,
+	// so a screen reader skips it instead of reading the file name) and use the
+	// dimensions an ACF/SCF image array already carries, so the box is reserved.
+	$defaults = array( 'alt' => is_array( $field ) ? (string) ( $field['alt'] ?? '' ) : '' );
+	if ( is_array( $field ) && ! empty( $field['width'] ) && ! empty( $field['height'] ) ) {
+		$defaults['width']  = (int) $field['width'];
+		$defaults['height'] = (int) $field['height'];
+	}
+	$attr = array_merge( $defaults, $attr );
+	$out  = '<img src="' . esc_url( $url ) . '"';
 	foreach ( $attr as $k => $v ) {
 		$out .= ' ' . esc_attr( $k ) . '="' . esc_attr( $v ) . '"';
 	}

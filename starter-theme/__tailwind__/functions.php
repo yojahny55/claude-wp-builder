@@ -43,6 +43,24 @@ add_action( 'acf/init', function() {
     // Bootstrap each group from PHP only if it isn't already Local JSON. A group
     // that has a acf-json/<key>.json is the source of truth (dashboard edits sync
     // there); re-running its PHP would re-register it read-only and shadow edits.
+    // Steady state costs nothing: the signature (file names, newest mtime, and the
+    // acf-json/ directory's own mtime, which moves when a JSON is added or removed)
+    // is stored once the scan finds nothing left to bootstrap, and a matching
+    // signature skips the glob, the reads and the regex below on every request.
+    // To force a rescan, delete the option.
+    $signature = function() use ( $fields_dir, $json_dir ) {
+        $files = glob( $fields_dir . '/*.php' ) ?: array();
+        sort( $files );
+        $newest = 0;
+        foreach ( $files as $f ) {
+            $newest = max( $newest, (int) @filemtime( $f ) );
+        }
+        clearstatcache( true, $json_dir );
+        return md5( implode( '|', array_map( 'basename', $files ) ) . '#' . $newest . '#' . (int) @filemtime( $json_dir ) );
+    };
+    $option = '__starter___fields_scan';
+    if ( get_option( $option ) === $signature() ) { return; }
+
     $bootstrapped = false;
     foreach ( glob( $fields_dir . '/*.php' ) as $file ) {
         if ( ! is_readable( $file ) ) { continue; }
@@ -61,7 +79,11 @@ add_action( 'acf/init', function() {
     // Steady state — every group already has JSON: nothing to persist, so skip
     // the scan entirely. An unwritable acf-json/ degrades to read-only PHP
     // groups instead of emitting warnings on every request.
-    if ( ! $bootstrapped || ! is_writable( $json_dir ) ) {
+    if ( ! $bootstrapped ) {
+        update_option( $option, $signature(), false );
+        return;
+    }
+    if ( ! is_writable( $json_dir ) ) {
         return;
     }
 
@@ -167,14 +189,16 @@ add_action( 'wp_enqueue_scripts', function() {
             __STARTER___URI . '/assets/js/dist/index.js',
             $asset['dependencies'],
             $asset['version'],
-            true
+            // WP 6.3+ prints the defer attribute itself; see the fallback filter below.
+            array( 'strategy' => 'defer', 'in_footer' => true )
         );
     }
 
-    // Localization for AJAX
+    // Front-end data for the bundle. No nonce on purpose: the theme has no AJAX
+    // handler to verify one, and a nonce printed into every page goes stale inside
+    // a page cache. A handler added later should create its nonce on demand.
     wp_localize_script( '__starter__-main', '__STARTER___data', array(
         'ajax_url' => admin_url( 'admin-ajax.php' ),
-        'nonce'    => wp_create_nonce( '__starter___nonce' ),
         'site_url' => home_url( '/' ),
         'lang'     => __starter___get_current_lang(),
     ));
@@ -188,17 +212,18 @@ add_action( 'after_setup_theme', function() {
 });
 
 /**
- * Defer non-critical JS for performance.
+ * Defer non-critical JS on WordPress older than 6.3, which ignores the 'strategy'
+ * argument above (an array in the old $in_footer slot is simply truthy). From 6.3
+ * core handles it, so the filter is not registered at all.
  */
-add_filter( 'script_loader_tag', function( $tag, $handle, $src ) {
-    if ( is_admin() ) {
+if ( version_compare( get_bloginfo( 'version' ), '6.3', '<' ) ) {
+    add_filter( 'script_loader_tag', function( $tag, $handle ) {
+        if ( '__starter__-main' === $handle && false === strpos( $tag, ' defer' ) ) {
+            return preg_replace( '/^<script\b/', '<script defer', $tag, 1 );
+        }
         return $tag;
-    }
-    if ( '__starter__-main' === $handle ) {
-        return str_replace( ' src', ' defer src', $tag );
-    }
-    return $tag;
-}, 10, 3 );
+    }, 10, 2 );
+}
 
 /**
  * Whether an SEO plugin owns the head's SEO output — its schema graph and the meta

@@ -38,6 +38,8 @@ function add_action( $hook, $cb ) { $GLOBALS['t_actions'][ $hook ][] = $cb; }
 function is_admin() { return false; }
 function is_feed() { return false; }
 function is_robots() { return false; }
+function is_embed() { return false; }
+function get_query_var() { return ''; }
 
 // Registered before any fixture exists, so every exit path — including the early one
 // when no template_redirect callback is found — removes the temporary library.
