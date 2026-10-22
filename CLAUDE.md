@@ -74,8 +74,8 @@ created and deleted by the suite and is guarded by a pre-existence probe).
 
 `.github/workflows/ci.yml` runs all of it on every pull request: the checks above (all of
 them, aggregated — it does not stop at the first red), `node --check` on `bin/*.mjs`,
-`php -l` on every PHP file, `bash -n` on every `bin/` and `skills/` shell script (plus an
-informational `shellcheck`, see `.shellcheckrc`), and `bin/doc-sync-check.sh`. Run the checks yourself before
+`php -l` on every PHP file, `bash -n` on every `bin/` and `skills/` shell script (plus a
+blocking `shellcheck`, see `.shellcheckrc`), and `bin/doc-sync-check.sh`. Run the checks yourself before
 claiming a change works. Shell scripts that run `sudo`, `rm` or `sed` on user-derived input are
 tested with hostile arguments through the stub PATH in `tests/lib/stub-path.sh`
 (`tests/checks/hostile-input-env-setup.sh` is the model). CI is the net under that, not a replacement for it.
