@@ -24,6 +24,12 @@
 //                        [--format md|html|both] [--lang en|es] [--date YYYY-MM-DD]
 //                        [--notes <file>]
 //
+// The output directory is, in order: --out, the WP_AUDIT_OUT_DIR environment variable, the
+// manifest's `audit.out_dir` (read from ./.wp-create.json), then `.wp-audit`. The renderer
+// diffs against the newest sidecar IN THAT DIRECTORY, so changing the directory between runs
+// starts a new baseline. Every written file is printed as an absolute path, and a directory
+// inside a git work tree that is not ignored gets a one-line warning.
+//
 // --notes reads a plain-text file whose paragraphs (separated by a blank line) become the
 // "Scope and coverage" section, after any `notes` the run file itself carries. It is for what
 // the findings cannot say: what was audited and against which environment, what was left out
@@ -43,6 +49,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, renameSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const OWNERSHIP = ['code', 'setting', 'content', 'manual'];
 const SEVERITY_ORDER = { CRITICAL: 0, WARNING: 1, INFO: 2 };
@@ -140,7 +147,7 @@ function die(code, message) {
 }
 
 function parseArgs(argv) {
-  const opts = { out: '.wp-audit', format: 'both', lang: 'en', run: null, date: null, merge: [] };
+  const opts = { out: null, format: 'both', lang: 'en', run: null, date: null, merge: [] };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     const value = argv[i + 1];
@@ -182,6 +189,26 @@ function parseArgs(argv) {
     die(1, `--date must be YYYY-MM-DD (got: ${opts.date})`);
   }
   return opts;
+}
+
+// --out > WP_AUDIT_OUT_DIR > audit.out_dir in ./.wp-create.json > .wp-audit
+function resolveOutDir(flag) {
+  if (flag) return flag;
+  if (process.env.WP_AUDIT_OUT_DIR) return process.env.WP_AUDIT_OUT_DIR;
+  try {
+    const manifest = JSON.parse(readFileSync('.wp-create.json', 'utf8'));
+    const dir = manifest?.audit?.out_dir;
+    if (typeof dir === 'string' && dir !== '') return dir;
+  } catch { /* no manifest, or unreadable: fall through to the default */ }
+  return '.wp-audit';
+}
+
+// One line, never fatal: a report inside a work tree that nothing ignores gets committed.
+function warnIfUnignored(outDir) {
+  const git = (args) => spawnSync('git', ['-C', outDir, ...args], { encoding: 'utf8' });
+  if (git(['rev-parse', '--is-inside-work-tree']).status !== 0) return;
+  if (git(['check-ignore', '-q', '--', 'probe']).status === 0) return;
+  console.warn(`audit-report: ${outDir} is inside a git work tree and is not ignored -- add it to .gitignore, or run node bin/wp-config.mjs gitignore-check <site-root>`);
 }
 
 function loadRun(path) {
@@ -1108,8 +1135,9 @@ function main() {
   const folded = foldRootCauses(findings);
 
   const date = opts.date || run.date || new Date().toISOString().slice(0, 10);
-  const outDir = opts.out;
+  const outDir = resolveOutDir(opts.out);
   mkdirSync(outDir, { recursive: true });
+  warnIfUnignored(outDir);
 
   const sidecarPath = join(outDir, `informe-${date}.json`);
   archiveSameDay(outDir, date);
@@ -1186,7 +1214,7 @@ function main() {
   );
   written.push(sidecarPath);
 
-  for (const path of written) console.log(`audit-report: wrote ${path}`);
+  for (const path of written) console.log(`audit-report: wrote ${resolve(path)}`);
   process.exit(0);
 }
 

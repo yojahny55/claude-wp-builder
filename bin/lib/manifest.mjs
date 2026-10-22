@@ -183,6 +183,13 @@ export function validateManifest(manifest) {
     }
   }
 
+  // Where /wp-audit renders its reports. Absolute is allowed: a report belongs outside
+  // the site more often than inside it.
+  const outDir = at(manifest, 'audit.out_dir');
+  if (outDir !== undefined && (typeof outDir !== 'string' || outDir === '')) {
+    problems.push('audit.out_dir must be a non-empty string (the directory /wp-audit writes its reports to)');
+  }
+
   const checksRun = at(manifest, 'audit.checks_run');
   if (checksRun !== undefined) {
     if (checksRun === null || typeof checksRun !== 'object' || Array.isArray(checksRun)) {
