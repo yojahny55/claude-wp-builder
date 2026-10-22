@@ -67,7 +67,7 @@ has() { printf '%s\n' "$1" | grep -Fq -- "$2"; }
 # pos <text> <literal>: 1-based offset of the first occurrence, or empty.
 pos() { printf '%s\n' "$1" | awk -v s="$2" '{ i = index($0, s); if (i) print i }'; }
 
-sec=agents/wp-audit-security.md
+sec=$(bash tests/checks/lib/agent-text.sh wp-audit-security)
 adopt=commands/wp-adopt.md
 script=skills/wp-cli-patterns/scripts/find-redeclared-functions.php
 skill=skills/wp-cli-patterns/SKILL.md
@@ -77,10 +77,16 @@ done
 
 tier1="$(section "$sec" '## Step 1: Tier 1' '## Step 2: Tier 2')"
 tier2="$(section "$sec" '## Step 2: Tier 2' '## Step 3')"
-inv="$(section "$sec" '## Plugin inventory — shared by' '## Step 1: Tier 1')"
+# The inventory, the SEC-041/042 procedure and the SEC-043 detection moved out of the agent
+# into references the agent reads on demand; extract each from the file that now holds it.
+# Their end markers are gone with the move, so each runs to the end of its own file.
+invref=skills/wp-audit-standards/references/sec-plugin-inventory.md
+procref=skills/wp-audit-standards/references/sec-procedures-vulnerability-feed.md
+detref=skills/wp-audit-standards/references/sec-detection-details-advanced.md
+inv="$(section "$invref" '## Plugin inventory — shared by' '## NO-SUCH-END')"
 recheck="$(section "$sec" '- **Vendor-plugin re-check.**' '## Plugin inventory')"
-proc="$(section "$sec" '### Procedure — SEC-041 and SEC-042' '## Step 3')"
-s43="$(section "$sec" '**SEC-043 — Duplicate/redeclared function' '## Step 2: Tier 2')"
+proc="$(section "$procref" '### Procedure — SEC-041 and SEC-042' '## NO-SUCH-END')"
+s43="$(section "$detref" '**SEC-043 — Duplicate/redeclared function' '## NO-SUCH-END')"
 rules="$(section "$sec" '10. **SEC-041 and SEC-042 share' '13. **The WPScan token')"
 rules="$rules $(section "$sec" '13. **The WPScan token' 'never in a finding')"
 adoptsec="$(section "$adopt" 'Re-verify the first case before offering the list' '2. **Function prefix.**')"

@@ -39,7 +39,7 @@ fail() { echo "FAIL: $1"; exit 1; }
 
 cd "$(dirname "$0")/../.." || fail "cannot cd to the repository root"
 
-agent=agents/wp-audit-performance.md
+agent=$(bash tests/checks/lib/agent-text.sh wp-audit-performance)
 changelog=CHANGELOG.md
 for f in "$agent" "$changelog"; do
   [ -s "$f" ] || fail "$f is missing or empty"

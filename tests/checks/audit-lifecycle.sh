@@ -17,7 +17,7 @@ audit=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; yolo=$EXPANDED
 geo=agents/wp-audit-geo.md
 seo=agents/wp-audit-seo.md
-sec=agents/wp-audit-security.md
+sec=$(bash tests/checks/lib/agent-text.sh wp-audit-security)
 prac=agents/wp-audit-practices.md
 scan=bin/geo-scan.sh
 
