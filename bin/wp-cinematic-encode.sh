@@ -83,27 +83,31 @@ OUT_MOBILE="$OUT_DIR/${base}.mobile.mp4"
 OUT_POSTER="$POSTER_DIR/${base}.jpg"
 
 # ---- encode (parallel) ---------------------------------------------------
+# Per-run log dir: a fixed /tmp name is shared by every run on the machine. Kept on failure
+# so the path printed below can be read; removed on success.
+LOG_DIR=$(mktemp -d)
+trap '[[ "${fail:-0}" -eq 0 ]] && rm -rf "$LOG_DIR"' EXIT
 pids=()
 
 if [[ $MOBILE_ONLY -eq 0 ]]; then
   info "Encoding desktop (all-keyframe): $OUT_DESKTOP"
-  bash "$KIT_DIR/scripts/encode-keyframe.sh" "$INPUT" "$OUT_DESKTOP" >/tmp/wp-cine-desktop.log 2>&1 &
+  bash "$KIT_DIR/scripts/encode-keyframe.sh" "$INPUT" "$OUT_DESKTOP" >"$LOG_DIR/wp-cine-desktop.log" 2>&1 &
   pids+=($!)
 fi
 
 if [[ $DESKTOP_ONLY -eq 0 ]]; then
   info "Encoding mobile (9:16 portrait): $OUT_MOBILE"
   if [[ $KEEP_SOURCE_ASPECT -eq 1 ]]; then
-    ffmpeg -y -i "$INPUT" -c:v libx264 -crf 26 -preset slow -movflags +faststart -an "$OUT_MOBILE" >/tmp/wp-cine-mobile.log 2>&1 &
+    ffmpeg -y -i "$INPUT" -c:v libx264 -crf 26 -preset slow -movflags +faststart -an "$OUT_MOBILE" >"$LOG_DIR/wp-cine-mobile.log" 2>&1 &
   else
-    bash "$KIT_DIR/scripts/encode-mobile-portrait.sh" "$INPUT" "$OUT_MOBILE" >/tmp/wp-cine-mobile.log 2>&1 &
+    bash "$KIT_DIR/scripts/encode-mobile-portrait.sh" "$INPUT" "$OUT_MOBILE" >"$LOG_DIR/wp-cine-mobile.log" 2>&1 &
   fi
   pids+=($!)
 fi
 
 if [[ $POSTER -eq 1 ]]; then
   info "Extracting poster frame: $OUT_POSTER"
-  ffmpeg -y -i "$INPUT" -vf "select=eq(n\,30)" -frames:v 1 -q:v 5 "$OUT_POSTER" >/tmp/wp-cine-poster.log 2>&1 &
+  ffmpeg -y -i "$INPUT" -vf "select=eq(n\,30)" -frames:v 1 -q:v 5 "$OUT_POSTER" >"$LOG_DIR/wp-cine-poster.log" 2>&1 &
   pids+=($!)
 fi
 
@@ -111,7 +115,7 @@ fail=0
 for pid in "${pids[@]}"; do
   if ! wait "$pid"; then fail=1; fi
 done
-[[ $fail -ne 0 ]] && { err "One or more encodes failed. Check /tmp/wp-cine-*.log"; exit 1; }
+[[ $fail -ne 0 ]] && { err "One or more encodes failed. Check $LOG_DIR/wp-cine-*.log"; exit 1; }
 
 # ---- verify --------------------------------------------------------------
 if [[ -f "$OUT_DESKTOP" ]]; then
