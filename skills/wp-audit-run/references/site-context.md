@@ -46,7 +46,7 @@ A store set up by `/wp-woo-setup` records what it sells in `.wp-create.json`, an
 sells nothing: its products carry prices, and no cart or checkout is live. Read the tier once:
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' store.tier 2>/dev/null || echo unknown"
+bash -c 'node "$1/bin/wp-config.mjs" get "$2" store.tier 2>/dev/null || echo unknown' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 Set `site.store_tier` to `catalog`, `store` or `full`, or `unknown` when there is no `store`

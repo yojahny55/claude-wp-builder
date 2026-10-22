@@ -14,10 +14,10 @@ and sets the WordPress Site Icon so core emits the `<link rel="icon">` tags itse
 
 **First: validate the project configuration.**
 
-`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report".
+`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report". The path travels as a positional argument, never inside the `-c` string: write it in single quotes, and a path that holds a single quote gets each one written as `'\''`.
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 | Exit | Meaning | Do |
@@ -32,7 +32,7 @@ On exit 2, run the migration before continuing.
 Read the WP-CLI wrapper once and use it as `$WP` below:
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' wp_cli.wrapper"
+bash -c 'node "$1/bin/wp-config.mjs" get "$2" wp_cli.wrapper' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 Read `.claude/CLAUDE.md` for the theme directory. If it is missing, tell the user to run
