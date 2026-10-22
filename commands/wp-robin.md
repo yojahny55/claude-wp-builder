@@ -123,5 +123,11 @@ For anything non-zero in the error or orphan columns, quote the matching row of 
 troubleshooting table and the fix it names. Do not invent a fix that is not in the skill —
 if the symptom is not covered there, say so and hand back the raw output.
 
+Verify after optimizing, do not assume: fetch the home page, find the LCP/hero image (the
+`fetchpriority="high"` or first above-the-fold `<img>` or `background-image`) and confirm its
+file has a `.webp` sibling on disk and is delivered as WebP (`<picture>` or the `image-set()`).
+A hero without a sibling is reported as a gap, since it is the image that decides LCP. If the
+site returns images in AJAX HTML, say that `references/webp-delivery.md` covers it.
+
 Close with the next command when one applies: `/wp-debug media` if uploads still misbehave,
 `/wp-audit --performance` to re-check image weight on the built site.
