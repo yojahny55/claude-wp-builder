@@ -50,6 +50,12 @@ printf '%s' "$flata" | grep -Fq 'desktop and mobile' \
 printf '%s' "$flata" | grep -Fq 'is not this measurement' \
   || { echo "FAIL: $a11y does not say why a screenshot diff cannot see this — a 26px icon becoming 18px in a flex row moves nothing else"; exit 1; }
 
+# States and dark mode: a change can match at rest and differ on hover or focus, or in dark.
+for needle in ':hover' ':focus-visible' 'dark mode' "document.querySelectorAll('.<class>')"; do
+  printf '%s' "$flata" | grep -Fq "$needle" \
+    || { echo "FAIL: $a11y does not require measuring $needle in the tag-swap comparison"; exit 1; }
+done
+
 # 2. The CSS skill must carry the specificity reason, or the rule reads as superstition.
 grep -Fq 'A reset class loses to nothing and wins on source order' "$css" \
   || { echo "FAIL: $css does not explain why a reset class beats the utilities already on the element"; exit 1; }
