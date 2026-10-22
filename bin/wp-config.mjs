@@ -7,7 +7,7 @@
  * validates but no longer describes the site.
  */
 import {
-  readFileSync, existsSync, writeFileSync, copyFileSync, mkdirSync,
+  readFileSync, existsSync, writeFileSync, copyFileSync, mkdirSync, renameSync, unlinkSync, rmdirSync, statSync,
 } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,6 +20,40 @@ import {
   detectWrapper, runProbe, buildManifest, isWordPressRoot, manifestDrift, isTransientWrapper,
   isPluginListDrift, isScaffoldManifest, carryOver, detectStack,
 } from './lib/adopt.mjs';
+
+// Every manifest write goes through here: the bytes land in a sibling temp file and are
+// renamed over the target, so a reader (or a parallel builder) sees the old file or the
+// new one, never a half-written one. rename(2) is atomic within a directory.
+function writeAtomic(file, data) {
+  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    writeFileSync(tmp, data);
+    renameSync(tmp, file);
+  } catch (err) {
+    try { unlinkSync(tmp); } catch { /* nothing to clean */ }
+    throw err;
+  }
+}
+
+// Serializes read-modify-write cycles (`set`) across processes. An atomic rename stops torn
+// reads but not lost updates: two writers that both read before either writes would each
+// overwrite the other's key. mkdir is the portable atomic test-and-set; a lock older than
+// 30 s belongs to a dead writer and is taken over.
+function withLock(file, fn) {
+  const lock = `${file}.lock`;
+  const deadline = Date.now() + 10000;
+  for (;;) {
+    try { mkdirSync(lock); break; } catch (err) {
+      if (err.code !== 'EEXIST') throw err;
+      try {
+        if (Date.now() - statSync(lock).mtimeMs > 30000) { rmdirSync(lock); continue; }
+      } catch { continue; }
+      if (Date.now() > deadline) { warn(`could not lock ${file}: another writer holds ${lock}`); process.exit(1); }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+    }
+  }
+  try { return fn(); } finally { try { rmdirSync(lock); } catch { /* already gone */ } }
+}
 
 const say = (s) => console.log(s);
 const warn = (s) => console.error(s);
@@ -111,7 +145,7 @@ function cmdMigrate(projectPath) {
   // Versioned on purpose: /wp-create writes .wp-create.json.bak when the user chooses
   // Overwrite, and reusing that name would destroy their pre-overwrite copy.
   copyFileSync(file, `${file}.v${version}.bak`);
-  writeFileSync(file, `${JSON.stringify(next, null, 2)}\n`);
+  writeAtomic(file, `${JSON.stringify(next, null, 2)}\n`);
   for (const n of notes) say(n);
   say(`ok: migrated to version ${CURRENT_VERSION}`);
 
@@ -158,7 +192,7 @@ function cmdRenderContext(projectPath) {
   // refusals above must leave the file exactly as they found it.
   const owned = supersedeProseDecisions(spliced, manifest);
   mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, owned);
+  writeAtomic(file, owned);
   say(`ok: wrote the generated block in ${file}`);
   if (owned !== spliced) say(`ok: superseded the legacy decision lines in ${file}`);
 }
@@ -323,7 +357,7 @@ function cmdAdopt(projectPath, flags) {
     copyFileSync(file, bak);
     say(`note: previous manifest kept at ${bak}`);
   }
-  writeFileSync(file, `${JSON.stringify(manifest, null, 2)}\n`);
+  writeAtomic(file, `${JSON.stringify(manifest, null, 2)}\n`);
   say(`ok: wrote ${file} (origin: adopted)`);
   for (const c of conflicts) say(`note: ${c}`);
   if (carried.length) say(`note: kept from the previous manifest: ${carried.join(', ')}`);
@@ -377,9 +411,47 @@ function cmdRefresh(projectPath) {
   }
   const bak = `${file}.bak-${new Date().toISOString().replace(/[:.]/g, '-')}`;
   copyFileSync(file, bak);
-  writeFileSync(file, `${JSON.stringify(next, null, 2)}\n`);
+  writeAtomic(file, `${JSON.stringify(next, null, 2)}\n`);
   say(`ok: refreshed plugins.installed and stack in ${file} (previous manifest kept at ${bak})`);
   cmdRenderContext(root);
+}
+
+// Set one dotted key in the manifest: `set <project> <key> <value>`. The value is parsed as
+// JSON when it parses (numbers, booleans, objects, arrays) and kept as a string otherwise.
+// The read-modify-write runs under a lock and the manifest is validated before it is
+// written, so a parallel builder or wp-research can neither lose a key nor leave a manifest
+// the gate would refuse. Secret paths and prototype keys are refused.
+function cmdSet(projectPath, key, raw) {
+  const parts = key.split('.');
+  if (parts.some((k) => !k || k === '__proto__' || k === 'constructor' || k === 'prototype')) {
+    warn(`invalid key: ${key}`);
+    process.exit(1);
+  }
+  if (Object.keys(SECRETS).some((n) => key === SECRETS[n].manifestPath || key.startsWith(`${SECRETS[n].manifestPath}.`))) {
+    warn(`refusing to set ${key}: secrets live in the environment or ${LOCAL_NAME}, not the manifest`);
+    process.exit(1);
+  }
+  let value = raw;
+  try { value = JSON.parse(raw); } catch { /* a plain string */ }
+  const file = join(resolve(projectPath), MANIFEST_NAME);
+  if (!existsSync(file)) { warn(`no ${MANIFEST_NAME} at ${resolve(projectPath)} -- run /wp-create first`); process.exit(3); }
+  withLock(file, () => {
+    const { manifest } = loadManifest(projectPath);
+    let o = manifest;
+    for (const k of parts.slice(0, -1)) {
+      if (!Object.hasOwn(o, k) || o[k] === null || typeof o[k] !== 'object' || Array.isArray(o[k])) o[k] = {};
+      o = o[k];
+    }
+    o[parts[parts.length - 1]] = value;
+    const problems = validateManifest(manifest);
+    if (problems.length) {
+      for (const p of problems) warn(`invalid: ${p}`);
+      warn('nothing written');
+      process.exit(1);
+    }
+    writeAtomic(file, `${JSON.stringify(manifest, null, 2)}\n`);
+  });
+  say(`ok: set ${key} in ${file}`);
 }
 
 const [cmd, target] = process.argv.slice(2);
@@ -390,8 +462,9 @@ else if (cmd === 'get' && target && process.argv[4]) cmdGet(target, process.argv
 else if (cmd === 'validate-profile' && target) cmdValidateProfile(target);
 else if (cmd === 'drift' && target) cmdDrift(target);
 else if (cmd === 'refresh' && target) cmdRefresh(target);
+else if (cmd === 'set' && target && process.argv[4] && process.argv[5] !== undefined) cmdSet(target, process.argv[4], process.argv[5]);
 else if (cmd === 'adopt' && target) cmdAdopt(target, parseFlags(process.argv.slice(4)));
 else {
-  warn('usage: wp-config.mjs <validate|migrate|render-context|get|validate-profile|adopt|drift|refresh> <project-path> [key|wp-version|adopt flags]');
+  warn('usage: wp-config.mjs <validate|migrate|render-context|get|set|validate-profile|adopt|drift|refresh> <project-path> [key [value]|wp-version|adopt flags]');
   process.exit(1);
 }

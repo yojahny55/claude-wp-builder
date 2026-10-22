@@ -365,8 +365,9 @@ The theme directory is the versioned deliverable and `/wp-yolo` requires a git r
 cd <theme-dir>
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
   git init -q
-  printf 'node_modules/\n.DS_Store\n*.log\n' > .gitignore
-  # Tailwind build output is regenerable — ignore dist if this is the tailwind template
+  printf 'node_modules/\n.DS_Store\n*.log\n.tailwind-rebuild.lock\n' > .gitignore
+  # .tailwind-rebuild.lock is bin/tailwind-rebuild.sh's flock file; it is never deleted
+  # (removing it races parallel builders), so it must never be committed either.
   git add -A && git commit -q -m "chore: scaffold <slug> theme from starter"
 }
 ```

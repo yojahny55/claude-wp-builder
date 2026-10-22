@@ -60,7 +60,13 @@ done
 build() {
   if [ ! -d "$theme/node_modules" ]; then
     echo "tailwind: node_modules missing — running npm install once"
-    (cd "$theme" && npm install --silent)
+    # Bounded: a hung registry must not hold the lock (and every parallel builder behind
+    # it) forever. `timeout` is GNU coreutils; without it the install runs unbounded.
+    if command -v timeout >/dev/null 2>&1; then
+      (cd "$theme" && timeout "${TAILWIND_REBUILD_INSTALL_TIMEOUT:-600}" npm install --silent)
+    else
+      (cd "$theme" && npm install --silent)
+    fi
   fi
   # ponytail: tailwindbuild only, never the starter's `build` — that also runs wp-scripts
   # and takes 10x longer; JS is untouched by the section/header/footer/page builders.
@@ -71,13 +77,21 @@ build() {
 # /wp-yolo dispatches section builders in parallel, so two can land here at once for the
 # same theme: concurrent `npm install` corrupts node_modules and concurrent compiles tear
 # dist/main.css. One lock per theme, in the theme, so separate projects never block.
+#
+# The lock file is NEVER deleted. flock locks the inode, not the path: removing the file
+# while a third process is about to open it leaves that process locking an unlinked inode
+# while a fourth creates a fresh file, and two builds run at once. An empty leftover file
+# is the price of a lock that holds; the starter's .gitignore lists it.
 lock="$theme_abs/.tailwind-rebuild.lock"
 if command -v flock >/dev/null 2>&1; then
-  exec 9>"$lock"
-  flock 9
+  exec 9>>"$lock"
+  # Bounded wait: a crashed or hung holder must not wedge every later builder.
+  if ! flock -w "${TAILWIND_REBUILD_LOCK_TIMEOUT:-900}" 9; then
+    echo "tailwind: timed out waiting for the build lock ($lock) — another build is still running" >&2
+    exit 1
+  fi
   build
   exec 9>&-
-  rm -f "$lock"
 else
   # ponytail: no flock (macOS ships none) — build unlocked rather than not at all.
   build
