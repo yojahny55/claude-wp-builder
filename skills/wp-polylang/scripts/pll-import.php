@@ -2,7 +2,9 @@
 /**
  * Write a translated manifest back through the Polylang API.
  *
- * Usage: wp eval-file pll-import.php <translated.json>
+ * Usage: wp eval-file pll-import.php <translated.json> [dry-run]
+ *
+ *   dry-run  validate, print what would be created or modified, write nothing
  *
  * The whole file is validated before the first write. Counterparts are created
  * published, mirroring the source status, so writing half of them and finding
@@ -149,6 +151,32 @@ if ( $errors ) {
 		pllx_warn( $e );
 	}
 	pllx_fail( sprintf( '%d validation error(s); nothing was written.', count( $errors ) ) );
+}
+
+// ── Dry run: report the plan and stop before the first write ────────────────
+// The flag is a bare word because `wp eval-file` refuses a `--flag` it does not know.
+// Everything above only reads, so a dry run has validated exactly what a real run would.
+global $args;
+if ( in_array( 'dry-run', is_array( $args ) ? $args : array(), true ) ) {
+	$plan = array( 'create' => 0, 'update' => 0 );
+	foreach ( $manifest['items'] as $item ) {
+		$kind = $item['kind'];
+		if ( 'string' === $kind ) {
+			$verb = 'update';
+			$what = 'Polylang string ' . $item['id'];
+		} elseif ( 'menu' === $kind ) {
+			$verb = 'create';
+			$what = 'translated menu items for menu ' . $item['id'] . ' (rebuilt; also rewrites _menu_item_url)';
+		} else {
+			$verb = empty( $item['target_id'] ) ? 'create' : 'update';
+			$what = $kind . ' ' . (int) $item['source_id'] . ( 'update' === $verb ? ' -> ' . (int) $item['target_id'] : '' ) . " ($target)";
+		}
+		$plan[ 'create' === $verb ? 'create' : 'update' ]++;
+		pllx_info( "would-$verb $what" );
+	}
+	pllx_info( 'would-update internal links, ACF references and custom menu item URLs in the ' . $target . ' content' );
+	pllx_info( sprintf( 'plan: %d create, %d update; nothing was written (dry-run).', $plan['create'], $plan['update'] ) );
+	return;
 }
 
 // ── Write ───────────────────────────────────────────────────────────────────

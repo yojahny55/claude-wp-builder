@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# /wp-polylang: the import rewrites posts, menus and _menu_item_url in place and Step 3.5 moves
+# every URL to /<lang>/..., yet the command said nothing about a backup, offered no dry run and
+# called a bare `wp`, ignoring the .wp-create.json wrapper (Docker, custom paths). It must back
+# up the database outside the docroot, preview the import, ask before hide_default=0, and use $WP.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+fail() { echo "FAIL: $*"; exit 1; }
+c=commands/wp-polylang.md
+i=skills/wp-polylang/scripts/pll-import.php
+
+grep -Fq '## Step 2.5' "$c" || fail "no backup step"
+grep -Fq '$WP db export' "$c" || fail "backup step does not run \$WP db export"
+grep -Fq 'outside the docroot' "$c" || fail "backup is not required to live outside the docroot"
+b=$(grep -n '^## Step 2.5' "$c" | cut -d: -f1); m=$(grep -n '^## Step 6' "$c" | cut -d: -f1)
+[ "$b" -lt "$(grep -n '^## Step 3:' "$c" | cut -d: -f1)" ] || fail "backup must come before configuring languages"
+grep -Fq 'pll-import.php" "$MANIFEST.translated" dry-run' "$c" || fail "Step 6 has no dry-run invocation"
+d=$(grep -n 'translated" dry-run' "$c" | head -1 | cut -d: -f1)
+r=$(grep -n 'pll-import.php" "$MANIFEST.translated"$' "$c" | head -1 | cut -d: -f1)
+[ "$d" -lt "$r" ] || fail "dry-run must come before the real import"
+grep -Fq 'AskUserQuestion' "$c" && grep -Fq 'without a yes' "$c" || fail "hide_default=0 is not gated on confirmation"
+grep -Fq "wp_cli.wrapper" "$c" || fail "command does not read the WP-CLI wrapper"
+! grep -E '^ *wp (plugin|eval-file|eval|rewrite|db) ' "$c" || fail "bare wp call left in the command; use \$WP"
+
+grep -Fq "'dry-run'" "$i" || fail "pll-import.php has no dry-run mode"
+dr=$(grep -n "in_array( 'dry-run'" "$i" | head -1 | cut -d: -f1)
+w=$(grep -n '^\$written  ' "$i" | head -1 | cut -d: -f1)
+[ -n "$dr" ] && [ -n "$w" ] && [ "$dr" -lt "$w" ] || fail "dry-run must return before the first write"
+sed -n "${dr},${w}p" "$i" | grep -Eq 'wp_(insert|update)_post|wp_update_nav_menu_item|update_post_meta' \
+  && fail "the dry-run block itself writes" || true
+command -v php >/dev/null && { php -l "$i" >/dev/null || fail "pll-import.php does not parse"; }
+
+echo PASS
