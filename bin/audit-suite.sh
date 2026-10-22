@@ -25,17 +25,29 @@
 # Usage:
 #   bin/audit-suite.sh --url <base-url> [--dir <suite-dir>] [--pages <p1,p2,...>]
 #                      [--only a11y|seo|perf|all] [--site <name>] [--probe]
+#                      [--max-timeouts <n>]
+#
+# The audited host is always the one in --url: it reaches the suite as BASE_URL in the
+# environment, and the persistent audit.config.js is never rewritten to hold it. A request to
+# a production host (any public host, or one the manifest's `environments` marks role prod)
+# only ever goes out through bin/prod-gate.sh: when this script is not already running under
+# the gate it re-runs itself through it. After --max-timeouts (default 3, or
+# WP_AUDIT_MAX_TIMEOUTS) page timeouts in a row the run stops and exits 2 with the cause.
 #
 # Exit codes (house convention):
 #   0  the suite ran and results/run.json was written
+#   4/5  the production gate refused (host marked blocked / busy); nothing was sent
 #   1  a real failure -- the suite could not run, or the conversion refused its own output
-#   2  clean skip -- node or an existing Chromium is unavailable, or --probe found nothing to run
+#   2  clean skip -- node or an existing Chromium is unavailable, --probe found nothing to run,
+#      or the host stopped answering (the "UNMEASURED:" line names the cause)
 #   3  crash
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")/.." && pwd)"
 template="$here/templates/audit-suite"
 
+orig_args=("$@")
+max_timeouts="${WP_AUDIT_MAX_TIMEOUTS:-3}"
 url=""
 dir=".wp-audit/suite"
 pages=""
@@ -50,12 +62,15 @@ while [ $# -gt 0 ]; do
     --pages) pages="${2:?--pages needs a value}"; shift 2 ;;
     --only) only="${2:?--only needs a value}"; shift 2 ;;
     --site) site="${2:?--site needs a value}"; shift 2 ;;
+    --max-timeouts) max_timeouts="${2:?--max-timeouts needs a value}"; shift 2 ;;
     --probe) probe=1; shift ;;
     *) echo "unknown argument: $1" >&2; exit 1 ;;
   esac
 done
 
 case "$only" in a11y|seo|perf|all) : ;; *) echo "--only must be a11y, seo, perf or all" >&2; exit 1 ;; esac
+case "$max_timeouts" in ''|*[!0-9]*|0) echo "--max-timeouts must be a positive integer" >&2; exit 1 ;; esac
+export WP_AUDIT_MAX_TIMEOUTS="$max_timeouts"
 
 # A public host is production, and production runs fail2ban, CrowdSec and ModSecurity. The
 # template's 4 workers mean 4 browsers loading full pages at once, which is about 400
@@ -82,6 +97,28 @@ case "$url_host" in
         esac ;;
     esac ;;
 esac
+
+# A host is production when it is public (above) or when the manifest's `environments` says
+# role prod for it. Without that key the public-host rule is the whole criterion.
+gate_host="${url_host%%:*}"
+manifest_prod=0
+manifest="${WP_CREATE_JSON:-.wp-create.json}"
+if [ -n "$url_host" ] && [ -f "$manifest" ] && command -v node >/dev/null 2>&1; then
+  node - "$manifest" "$gate_host" <<'NODE' && manifest_prod=1
+const [file, host] = process.argv.slice(2);
+let env;
+try { env = JSON.parse(require('fs').readFileSync(file, 'utf8')).environments; } catch { process.exit(1); }
+const entries = Array.isArray(env) ? env : Object.entries(env || {}).map(([name, v]) => (typeof v === 'object' && v ? { name, ...v } : { name, url: v }));
+const hostOf = (v) => { try { return new URL(/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`).hostname.toLowerCase(); } catch { return ''; } };
+const prod = entries.some((e) => e && /^prod(uction)?$/i.test(String(e.role || e.name || ''))
+  && [e.url, e.host, e.domain].filter(Boolean).some((v) => hostOf(String(v)) === host));
+process.exit(prod ? 0 : 1);
+NODE
+fi
+is_prod=0
+prod_flag=()
+if [ "$manifest_prod" -eq 1 ] || [ ${#pw_args[@]} -gt 0 ]; then is_prod=1; fi
+if [ "$manifest_prod" -eq 1 ]; then pw_args=(--workers=1); prod_flag=(--prod); fi
 
 # ---------------------------------------------------------------------------
 # Probe
@@ -133,6 +170,14 @@ fi
 
 [ -n "$url" ] || { echo "audit-suite: --url is required" >&2; exit 1; }
 
+# No request to a production host leaves this script ungated, whoever called it. The gate
+# exports WP_AUDIT_GATE_HELD=<host> to its child, so a run the caller already wrapped goes
+# on without taking the host's lock a second time (flock would wait on itself).
+if [ "$is_prod" -eq 1 ] && [ "${WP_AUDIT_GATE_HELD:-}" != "$gate_host" ]; then
+  echo "audit-suite: $gate_host is a production host -- re-running through bin/prod-gate.sh"
+  exec "$here/bin/prod-gate.sh" ${prod_flag[@]+"${prod_flag[@]}"} "$url" -- "$0" ${orig_args[@]+"${orig_args[@]}"}
+fi
+
 # ---------------------------------------------------------------------------
 # Scaffold
 # ---------------------------------------------------------------------------
@@ -156,7 +201,7 @@ EOF
   exit 1
 fi
 
-for item in lib tests scripts regression playwright.config.js playwright.regression.config.js global-setup.js package.json .gitignore .env.example README.md VENDORED-FROM.txt; do
+for item in lib guard tests scripts regression playwright.config.js playwright.guard.config.js playwright.regression.config.js global-setup.js package.json package-lock.json .gitignore .env.example README.md VENDORED-FROM.txt; do
   [ -e "$template/$item" ] || continue
   rm -rf "${dir:?}/$item"
   cp -r "$template/$item" "$dir/$item"
@@ -167,8 +212,14 @@ if [ ! -f "$dir/audit.config.js" ]; then
   echo "audit-suite: wrote $dir/audit.config.js from the template -- set its selectors against the real DOM"
 fi
 
-# baseURL and the page list are the two values that must follow this invocation rather than
-# the file, or a suite copied between projects audits the wrong site and says nothing.
+# The audited host follows this invocation, never the file. audit.config.js is persistent
+# state: rewriting baseURL in it meant a hand edit or an earlier run could leave the next one
+# pointed at another host, and a suite once ran against production that way. So baseURL is
+# only read here (a mismatch is reported), BASE_URL goes out through the environment, and an
+# override line at the end of the config makes it win in every spec that reads audit.baseURL.
+# The page list and site name are still written, as before.
+rm -f "$dir/results/unmeasured.json"
+export BASE_URL="$url"
 if ! BASE_URL="$url" PAGES="$pages" SITE="$site" node - "$dir/audit.config.js" <<'NODE'
 const fs = require('fs');
 const file = process.argv[2];
@@ -191,7 +242,20 @@ const rewrite = (text, pattern, replacement, what) => {
   return text.replace(pattern, replacement);
 };
 
-source = rewrite(source, /(\bbaseURL:\s*)(['"]).*?\2/, `$1${quote(process.env.BASE_URL)}`, 'baseURL');
+const held = /(\bbaseURL:\s*)(['"])(.*?)\2/.exec(source);
+if (!held) {
+  throw new Error(
+    `${file} has no assignable "baseURL" -- expected \`baseURL: '<value>'\`. `
+    + 'Fix the file or delete it and let the scaffold re-seed it; leaving it would audit the wrong site.',
+  );
+}
+const hostOf = (value) => { try { return new URL(value).host.toLowerCase(); } catch { return value; } };
+if (hostOf(held[3]) !== hostOf(process.env.BASE_URL)) {
+  console.error(`audit-suite: ${file} holds baseURL ${held[3]} but --url is ${process.env.BASE_URL}; auditing --url (BASE_URL), the file is not edited`);
+}
+if (!source.includes('WP_AUDIT_BASE_URL_OVERRIDE')) {
+  source = `${source.replace(/\s*$/, '\n')}\n// BASE_URL (set per run by bin/audit-suite.sh) wins over the baseURL above.\nif (process.env.BASE_URL) module.exports.baseURL = process.env.BASE_URL; // WP_AUDIT_BASE_URL_OVERRIDE\n`;
+}
 if (process.env.SITE) {
   source = rewrite(source, /(\bsiteName:\s*)(['"]).*?\2/, `$1${quote(process.env.SITE)}`, 'siteName');
 }
@@ -239,7 +303,7 @@ if (process.env.PAGES) {
 fs.writeFileSync(file, source);
 NODE
 then
-  echo "audit-suite: could not point $dir/audit.config.js at $url" >&2
+  echo "audit-suite: could not prepare $dir/audit.config.js for $url" >&2
   exit 1
 fi
 
@@ -266,7 +330,12 @@ if [ -n "${WP_AUDIT_SUITE_NODE_MODULES:-}" ]; then
 else
   # The cache is keyed by the template's package.json. A dependency bump therefore installs
   # into a new directory instead of mutating the one older projects are still symlinked to.
-  key="$(cksum < "$template/package.json" | awk '{print $1}')"
+  # The lockfile is part of the key: same package.json with different pins is a different tree.
+  [ -f "$template/package-lock.json" ] || {
+    echo "audit-suite: $template/package-lock.json is missing -- refusing an unlocked install (it would resolve whatever is newest). Nothing is installed." >&2
+    exit 1
+  }
+  key="$(cat "$template/package.json" "$template/package-lock.json" | cksum | awk '{print $1}')"
 
   # The leaf must be named exactly node_modules. Node resolves a package's own imports from
   # its real path, walking up through directories literally called node_modules, so the
@@ -288,9 +357,11 @@ else
       trap 'rm -rf "$lock" ${staging:+"$staging"}' EXIT INT TERM
       echo "audit-suite: installing the suite's dependencies once into $modules"
       staging="$(mktemp -d "$cache/install-XXXXXX")"
-      cp "$template/package.json" "$staging/package.json"
-      if ! (cd "$staging" && npm install --no-audit --no-fund --silent); then
-        echo "audit-suite: npm install failed -- the browser suite cannot run here"
+      cp "$template/package.json" "$template/package-lock.json" "$staging/"
+      # `npm ci` installs exactly what the lockfile pins and fails if it disagrees with
+      # package.json. No browser is fetched: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD is belt and braces.
+      if ! (cd "$staging" && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci --no-audit --no-fund --silent); then
+        echo "audit-suite: npm ci failed -- the browser suite cannot run here"
         exit 2
       fi
       # Move, do not copy: a half-written cache that a later run treats as complete is worse
@@ -372,9 +443,20 @@ echo "audit-suite: chromium $chromium_exe"
 # and never beside the DOM/axe suite. This is the same rule wp-audit-standards states for a
 # hand-run Lighthouse, enforced here rather than left to whoever reads it.
 status=0
+aborted=""
+# The timeout guard (guard/timeout-guard.js, a reporter in playwright.guard.config.js) writes
+# results/unmeasured.json after N page timeouts in a row. Once it exists nothing else is sent.
+check_abort() {
+  if [ -z "$aborted" ] && [ -f "$dir/results/unmeasured.json" ]; then
+    aborted="$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).reason||"page timeouts")' "$dir/results/unmeasured.json" 2>/dev/null || echo "page timeouts")"
+  fi
+  [ -n "$aborted" ]
+}
 run_pass() {
+  check_abort && return 0
   echo "audit-suite: $1"
   (cd "$dir" && npm run --silent "$2" -- ${pw_args[@]+"${pw_args[@]}"}) || status=1
+  check_abort || true
 }
 
 # The DOM/axe pass again in the other engines the config declares. Their results land beside
@@ -383,13 +465,14 @@ run_pass() {
 # no existing executable is skipped with a notice, never installed.
 cross_browser() {
   for engine in firefox webkit; do
+    check_abort && return 0
     exe_var="${engine}_exe"
     if [ -z "${!exe_var}" ]; then
       echo "audit-suite: no existing $engine build found -- $engine pass skipped (nothing is downloaded)"
       continue
     fi
     echo "audit-suite: accessibility and usability pass in $engine"
-    (cd "$dir" && npx --no-install playwright test tests/audit.spec.js --project="$engine" ${pw_args[@]+"${pw_args[@]}"}) \
+    (cd "$dir" && npx --no-install playwright test -c playwright.guard.config.js tests/audit.spec.js --project="$engine" ${pw_args[@]+"${pw_args[@]}"}) \
       || { echo "audit-suite: the $engine pass ran and exited non-zero (a failure, not a skip)"; status=1; }
   done
 }
@@ -405,6 +488,11 @@ case "$only" in
     run_pass "Lighthouse pass (alone -- a contended machine is not a slow page)" test:perf
     ;;
 esac
+
+if check_abort; then
+  echo "audit-suite: UNMEASURED: the browser tier did not complete -- $aborted. No further requests were sent to $url_host."
+  exit 2
+fi
 
 # A failing spec is a finding, not a broken run: the suite reports a site that does not
 # comply by failing. What matters is whether it produced results to convert -- but "every
