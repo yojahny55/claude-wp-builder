@@ -232,6 +232,7 @@ acf_add_local_field_group(array(
             'label' => 'CTA Button URL',
             'name' => 'hero_cta_url',
             'type' => 'url',
+            'instructions' => 'Full address starting with https://. For a link to a spot on the same page, use a text field instead.',
         ),
 
         // ── Spanish Tab ──
@@ -419,7 +420,7 @@ acf_add_local_field_group(array(
 | `textarea` | `rows`, `default_value` | Multi-line text |
 | `wysiwyg` | `tabs` ('all', 'visual', 'text'), `toolbar` ('full', 'basic'), `media_upload` | Rich text editor |
 | `image` | `return_format` ('array', 'url', 'id'), `preview_size`, `min_width`, `max_width` | Image upload |
-| `url` | `default_value`, `placeholder` | URL input |
+| `url` | `default_value`, `placeholder` | Absolute URL input. Rejects `#section` and rejects a path like `/contact/`: use `text` for those (see rule 19) |
 | `email` | `default_value`, `placeholder` | Email input |
 | `number` | `min`, `max`, `step`, `default_value` | Numeric input |
 | `true_false` | `default_value`, `ui` (1 for toggle), `message` | Boolean toggle |
@@ -516,6 +517,7 @@ Multiple conditions in one rule (AND logic — ALL must match):
 16. **Every group gets a `menu_order` equal to its section's position on the page it belongs to**, numbered per page (the front page's hero is 1, the section right after it is 2, and so on — a different page starts back at 1). Leaving `menu_order` at ACF's default of 0 stacks every group in the order ACF happened to load the files, which is rarely the order the page draws them, and the editor becomes a puzzle instead of a mirror of the page.
 17. **Group titles are numbered and in the project's PRIMARY language, never mixed.** `1. Hero`, `2. Practice Areas`, `3. Our Process` — the same wording and the same order the page uses for that section, so the editor list reads top-to-bottom like the page does. A group that is the single box for one record of a `<cpt>` (its per-post detail fields, not a page section) states what it is without a number: `<CPT> Details`, not `4. <CPT> Details` — it has no siblings on a page to be numbered against.
 18. **When the demo shows the same kind of content twice at different lengths for different purposes — a short line on a card and a full write-up on a detail page — model TWO fields from the start**, e.g. `<section>_excerpt` (the card's own short text) and `<section>_bio` (the long form). A single field trying to serve both breaks in both directions: seeded with the short text, the detail page is empty; seeded with the long text, the card overflows its box. If a record's excerpt is left blank, the template falls back to a trimmed slice of the long field — that is a template concern (`wp_trim_words()` or similar), never a reason to collapse the two fields back into one.
+19. **A `url` field stores an absolute URL only; a link that is only an anchor (`#contact`) or a site path (`/contact/`) goes in a `text` field.** ACF validates `url` on save, so the editor refuses `#contact` and a seeded `#contact` is shown as invalid the next time the page is saved. Read each link the demo's section uses before choosing the type: `href="#..."` gives `text`, an external `https://` link gives `url`, a link to another page of the site gives `page_link`. The template prints a `text` link with `esc_url()`, never raw, and prepends nothing: `#contact` on the front page is correct, and on any other page the field holds `home_url('/#contact')` written out in full.
 
 ## Verify key uniqueness by EXECUTION, never by grep — MANDATORY
 
@@ -607,6 +609,9 @@ $WP eval "update_field('services_cards', array(
   array('title' => 'Web Design', 'icon' => 43),
   array('title' => 'SEO', 'icon' => 44),
 ), 'option');"
+
+# Anchor-only links (#contact) go in text fields, never url fields: see rule 19
+$WP eval "update_field('hero_cta_anchor', '#contact', 'option');"
 
 # Bilingual variants
 $WP eval "update_field('hero_title_es', 'Construyendo Excelencia Digital', 'option');"
