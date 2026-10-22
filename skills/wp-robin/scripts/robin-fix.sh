@@ -38,21 +38,35 @@ fi
 info "WordPress root: $WP_ROOT"
 
 # ── Read DB credentials via grep (no PHP require, works on broken installs) ─
-# Single or double quotes, both valid PHP. The value runs to the quote that opened it, so a
-# single-quoted password may hold `"` and a double-quoted one `'`; an escaped quote of the
-# same kind (`\'`) still ends it. `|| true` for the same reason as find_wp_root: a define
+# Lines that start with //, #, * or /* are skipped first: a commented-out
+# `// define('DB_NAME', 'old')` above the live one must not win. A value is read as a PHP
+# string literal (single or double quoted) that runs to the closing quote of the kind that
+# opened it, skipping backslash escapes, so a password holding `\'` is no longer cut short;
+# the escapes PHP itself unescapes are then undone (`\\` and `\'` in single quotes, `\\`,
+# `\"` and `\$` in double quotes). `|| true` for the same reason as find_wp_root: a define
 # the grep cannot match must reach the "Failed to parse" message below, not end the run in
 # silence.
+config_code_lines() { grep -vE '^[[:space:]]*(//|#|\*|/\*)' "$1" || true; }
+
 parse_define() {
-	local key="$1" file="$2"
-	{ grep -oP "define\s*\(\s*['\"]${key}['\"]\s*,\s*(['\"])\K.*?(?=\1)" "$file" || true; } | head -1
+	local key="$1" file="$2" q="['\"]" lit body
+	lit="$(config_code_lines "$file" \
+		| { grep -oP "define\s*\(\s*${q}${key}${q}\s*,\s*\K(${q})(?:\\\\.|(?!\1)[^\\\\])*\1" || true; } \
+		| head -1)"
+	[[ ${#lit} -ge 2 ]] || return 0
+	body="${lit:1:${#lit}-2}"
+	if [[ "${lit:0:1}" == "'" ]]; then
+		sed -E "s/\\\\([\\\\'])/\\1/g" <<<"$body"
+	else
+		sed -E 's/\\([\\"$])/\1/g' <<<"$body"
+	fi
 }
 
 DB_NAME="$(parse_define DB_NAME "$WP_ROOT/wp-config.php")"
 DB_USER="$(parse_define DB_USER "$WP_ROOT/wp-config.php")"
 DB_PASSWORD="$(parse_define DB_PASSWORD "$WP_ROOT/wp-config.php")"
 DB_HOST="$(parse_define DB_HOST "$WP_ROOT/wp-config.php")"
-TABLE_PREFIX="$(grep -oP "\\\$table_prefix\s*=\s*['\"]\K[^'\"]*" "$WP_ROOT/wp-config.php" 2>/dev/null || echo 'wp_')"
+TABLE_PREFIX="$(config_code_lines "$WP_ROOT/wp-config.php" 2>/dev/null | { grep -oP "\\\$table_prefix\s*=\s*['\"]\K[^'\"]*" || true; } | head -1)"
 TABLE_PREFIX="${TABLE_PREFIX:-wp_}"
 
 if [[ -z "$DB_NAME" || -z "$DB_USER" || -z "$DB_HOST" ]]; then
@@ -250,7 +264,15 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 gd_webp() { php -r 'exit(function_exists("imagewebp") ? 0 : 1);' 2>/dev/null; }
 WEBP_CONVERTER=""
-if command -v convert &>/dev/null; then
+# ImageMagick 7 ships `magick`; `convert` is its deprecated 6.x name (and on some systems
+# another program), so `magick` is looked for first.
+IM_BIN=""
+if command -v magick &>/dev/null; then
+	IM_BIN="magick"
+elif command -v convert &>/dev/null; then
+	IM_BIN="convert"
+fi
+if [[ -n "$IM_BIN" ]]; then
 	WEBP_CONVERTER="imagemagick"
 elif command -v cwebp &>/dev/null; then
 	WEBP_CONVERTER="cwebp"
@@ -290,7 +312,7 @@ convert_to_webp() {
 	[[ -f "$dst" ]] && return 0
 	case "$src" in *.[gG][iI][fF]) conv="$GIF_CONVERTER" ;; esac
 	case "$conv" in
-		imagemagick) convert "$src" -quality "$WEBP_QUALITY" "$dst" 2>/dev/null ;;
+		imagemagick) "$IM_BIN" "$src" -quality "$WEBP_QUALITY" "$dst" 2>/dev/null ;;
 		# cwebp does not read GIF; a GIF reaches this branch only when gif2webp is installed.
 		cwebp)
 			case "$src" in
@@ -309,6 +331,27 @@ convert_to_webp() {
 # WordPress stores attachment metadata with serialize(), so json_decode() always
 # returns null here. Falls back to JSON for the rare filtered install.
 PHP_META='$s=file_get_contents("php://stdin");$m=@unserialize($s, ["allowed_classes" => false]);if(!is_array($m)){$m=json_decode($s,true);}if(!is_array($m)){$m=[];}'
+
+# ── Build the INSERT for one webp queue row ─────────────────────────────────
+# Arguments: table, object_id, item_hash, original_size, final_size, mime, created_at,
+# thumbnails_count, size name, source url, source path, webp url, webp path. Numbers are
+# cast; every string is sent as UNHEX('..') so it is data, whatever bytes it holds.
+BUILD_WEBP_INSERT='$a = array_slice($argv, 1);
+if (count($a) !== 13 || !preg_match("/^[A-Za-z0-9_]+$/", $a[0])) { fwrite(STDERR, "bad arguments\n"); exit(1); }
+$h = function ($v) { return "CONVERT(UNHEX(\x27" . bin2hex((string) $v) . "\x27) USING utf8mb4)"; };
+$extra = json_encode([
+	"class" => "RIOP_WebP_Extra_Data",
+	"thumbnails_count" => (int) $a[7],
+	"convert_from" => "attachment",
+	"converted_from_size" => $a[8],
+	"source_src" => $a[9],
+	"source_path" => $a[10],
+	"converted_src" => $a[11],
+	"converted_path" => $a[12],
+], JSON_UNESCAPED_SLASHES);
+if ($extra === false) { fwrite(STDERR, "extra_data is not encodable\n"); exit(1); }
+echo "INSERT INTO ", $a[0], " (object_id,item_type,item_hash,result_status,processing_level,is_backed_up,original_size,final_size,original_mime_type,final_mime_type,extra_data,created_at) VALUES (",
+	(int) $a[1], ",\x27webp\x27,", $h($a[2]), ",\x27success\x27,\x27normal\x27,0,", (int) $a[3], ",", (int) $a[4], ",", $h($a[5]), ",\x27image/webp\x27,", $h($extra), ",", (int) $a[6], ");";'
 
 # ── The queue table must exist before any of the steps below ────────────────
 # Robin creates it on activation. Without this guard a missing table makes every
@@ -590,18 +633,16 @@ else
 			WEBP_SIZE=$(stat -c%s "$WEBP_PATH" 2>/dev/null || echo 0)
 			WEBP_URL="${s_url}.webp"
 
-			EXTRA_DATA=$(php -r 'echo json_encode([
-				"class"=>"RIOP_WebP_Extra_Data",
-				"thumbnails_count"=>'${THUMB_COUNT:-0}',
-				"convert_from"=>"attachment",
-				"converted_from_size"=>"'$s_name'",
-				"source_src"=>"'$s_url'",
-				"source_path"=>"'$s_path'",
-				"converted_src"=>"'$WEBP_URL'",
-				"converted_path"=>"'$WEBP_PATH'",
-			],JSON_UNESCAPED_SLASHES);')
+			# The names and paths come from attachment metadata and file names (`O'Brien.jpg`,
+			# `plan (1).png`), so none of them is pasted into PHP or SQL source. They travel
+			# as arguments to one PHP process, which builds extra_data and hands back the whole
+			# INSERT with every string as a hex literal: no quote, backslash or `$` in a name
+			# can end a literal, and it does not depend on the server's sql_mode.
+			INSERT_SQL=$(php -r "$BUILD_WEBP_INSERT" -- "$QUEUE_TABLE" "$post_id" "$ITEM_HASH" "$s_bytes" \
+				"$WEBP_SIZE" "$MIME" "$TS" "${THUMB_COUNT:-0}" "$s_name" "$s_url" "$s_path" \
+				"$WEBP_URL" "$WEBP_PATH") || { warn "    ${s_name}: could not build the queue row, skipping"; continue; }
 
-			db_q "INSERT INTO ${QUEUE_TABLE} (object_id,item_type,item_hash,result_status,processing_level,is_backed_up,original_size,final_size,original_mime_type,final_mime_type,extra_data,created_at) VALUES (${post_id},'webp','${ITEM_HASH}','success','normal',0,${s_bytes},${WEBP_SIZE},'${MIME}','image/webp','${EXTRA_DATA}',${TS});" && {
+			db_q "$INSERT_SQL" && {
 				((INSERTED++)) || true
 				EXISTING_HASHES="${EXISTING_HASHES}"$'\n'"${ITEM_HASH}"
 			}
