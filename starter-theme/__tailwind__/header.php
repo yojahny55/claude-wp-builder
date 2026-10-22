@@ -21,6 +21,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 <body <?php body_class(); ?>>
 <?php wp_body_open(); ?>
 
+<a class="skip-link screen-reader-text" href="#primary"><?php esc_html_e( 'Skip to content', '__starter__' ); ?></a>
+
 <!-- Replace with /wp-header output -->
 <header id="masthead" class="site-header">
     <?php get_template_part( 'template-parts/header/site-branding' ); ?>
