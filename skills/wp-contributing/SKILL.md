@@ -168,6 +168,10 @@ no grep can check.
 3. **New behavior has a new check.** This is the one reviewers actually block on.
    A new or changed skill also passes `/wp-contribute review <name>` — the review no grep
    can do, against [references/skill-review.md](references/skill-review.md).
+3b. **Before the push, review the diff with OCR** (`ocr`, delegated mode) and resolve what it
+   reports; CI runs the same review on the PR. If `ocr` is not installed, stop and say so —
+   do not install it. `/wp-contribute review` is not this step: it reviews a skill against the
+   authoring best practices, not a diff.
 4. Add a `changes/<slug>.<section>.md` fragment — never edit `CHANGELOG.md` in a PR. Say what changed and *why it was wrong
    before*; a release note that only names the feature is useless six months later.
 5. Docs follow the change: a new command needs a row in the README table **and** an entry in

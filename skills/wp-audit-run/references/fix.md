@@ -10,6 +10,7 @@
 - Usability fixes change how the site looks, so they are measured before and after
 - GEO fixes: the live scan, its exit codes, and why none of them is a pass
 - Counting fixes by owner, and the settings to repeat on staging and production
+- Git hygiene for any phase that edits: clean tree, path-scoped commits, mass deletions
 
 If `--report-only` was set, print:
 ```
@@ -145,3 +146,12 @@ After all fix agents complete, count how many issues were successfully fixed, an
 them by owner. Print the `setting` fixes again as a list of steps to repeat on staging and
 production: they were applied to a database this deploy will not carry, and a fix nobody
 repeats is indistinguishable from one that was never made.
+
+## Git hygiene for any phase that edits
+
+Applies before the first edit of this step, and to `/wp-update`. Skip it when the root is not a git repository.
+
+- **Clean tree first.** Run `git status --short | head -20`. Changes that this run did not make belong to someone else or to an earlier session: show them and ask for confirmation before continuing. Do not stash, reset or commit them.
+- **Commit by path.** `git add <paths>` with the files this run changed, never `git add -A` or `git commit -a`.
+- **Mass deletions.** Before committing, count the deleted files with `git status --short | grep -c '^ *D'`. If more than 50 files are deleted, stop and report it: this run did not delete them, and committing them removes plugins or uploads from history.
+- **At the end,** print how many commits exist since the last reviewed point (`git rev-list --count <last-reviewed>..HEAD`, or the commit count of this run when there is none) so unreviewed work is visible.
