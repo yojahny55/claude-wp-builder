@@ -57,7 +57,7 @@ EOF
     tone=unknown
     case "$canvas" in
       '#0'*|'#1'*|'#2'*) tone=dark ;;
-      '#f'*|'#F'*|'#e'*|'#E'*|'#ffffff') tone=light ;;
+      '#f'*|'#F'*|'#e'*|'#E'*) tone=light ;;
     esac
     industry=general
     case "$(echo "$desc" | tr 'A-Z' 'a-z')" in
