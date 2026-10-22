@@ -104,12 +104,12 @@ gate_host="${url_host%%:*}"
 manifest_prod=0
 manifest="${WP_CREATE_JSON:-.wp-create.json}"
 if [ -n "$url_host" ] && [ -f "$manifest" ] && command -v node >/dev/null 2>&1; then
-  node - "$manifest" "$gate_host" <<'NODE' && manifest_prod=1
+  node - "$manifest" "${gate_host#www.}" <<'NODE' && manifest_prod=1
 const [file, host] = process.argv.slice(2);
 let env;
 try { env = JSON.parse(require('fs').readFileSync(file, 'utf8')).environments; } catch { process.exit(1); }
 const entries = Array.isArray(env) ? env : Object.entries(env || {}).map(([name, v]) => (typeof v === 'object' && v ? { name, ...v } : { name, url: v }));
-const hostOf = (v) => { try { return new URL(/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`).hostname.toLowerCase(); } catch { return ''; } };
+const hostOf = (v) => { try { return new URL(/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`).hostname.toLowerCase().replace(/^www\./, ''); } catch { return ''; } };
 const prod = entries.some((e) => e && /^prod(uction)?$/i.test(String(e.role || e.name || ''))
   && [e.url, e.host, e.domain].filter(Boolean).some((v) => hostOf(String(v)) === host));
 process.exit(prod ? 0 : 1);
