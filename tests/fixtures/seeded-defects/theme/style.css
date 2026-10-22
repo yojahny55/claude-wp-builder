@@ -1,0 +1,14 @@
+/*
+Theme Name: Seeded Defects Fixture
+Version: 0.0.1
+Text Domain: seeded
+*/
+
+/* SEEDED PERF-003: render-blocking @import */
+@import url("assets/css/extra.css");
+
+/* SEEDED A11Y-026: focus outline removed with no replacement */
+a:focus,
+button:focus {
+  outline: none;
+}
