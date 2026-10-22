@@ -52,6 +52,10 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 - **Page-builder markup lives in the database.** When `stack.builder` is not `none`, a
   defect in markup the builder stores per page is `Owner: content` (fixed in the builder's
   editor), not `code`.
+- **Design impact is declared on every finding.** `design_impact` (`Design impact:` in the text
+  report) is `true` when the fix could change how the site renders: a colour, font, size,
+  spacing, an asset's dimensions, a new or changed CSS rule, or a tag or class swap. It is
+  `false` only when the fix leaves every computed style and box as it was. When unsure, `true`.
 - **Cache plugin.** When `stack.cache` is not `none`, caching, minification and lazy-loading findings name that plugin's setting as the fix, `Owner: setting`. Do not propose `.htaccess` caching rules or a `performance.php` that duplicate what the plugin already does.
 
 ## Step 1: Tier 1 — Code-Only Checks
@@ -775,6 +779,7 @@ and return `checks_executed` beside them. Each finding includes:
   "status": "FAIL",
   "severity": "WARNING",
   "ownership": "code",
+  "design_impact": false,
   "resource": "assets/css/styles.css",
   "message": "CSS too large: styles.css is 142KB, over the 100KB budget",
   "evidence": "gzip -c assets/css/styles.css | wc -c",

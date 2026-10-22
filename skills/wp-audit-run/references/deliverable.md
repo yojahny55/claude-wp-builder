@@ -100,7 +100,8 @@ this section.
 
 `check`, `severity`, `ownership` and `message` are required on every finding: the renderer
 **refuses a finding with no `ownership`** and exits `1` naming it, because a plan whose last
-column is blank is the plan this step exists to replace. `severity` is `CRITICAL`, `WARNING`
+column is blank is the plan this step exists to replace. `design_impact` (`true` or `false`, default `false`) marks a fix that could change how the site
+renders; the report tags those rows, and Step 9 never applies them without asking. `severity` is `CRITICAL`, `WARNING`
 or `INFO` and nothing else: a GEO finding graded `ERROR` is written `CRITICAL`. `page` is the page a page-level finding is about and
 `null` otherwise. An `UNVERIFIED` finding from Step 6.9 is **not** a finding here: it was
 never measured, so it goes in `unmeasured` with the command that would settle it.

@@ -88,6 +88,7 @@ const STRINGS = {
       'These checks apply to this site and did not run. They are not passes — say what stopped them before treating this report as complete.',
     none: 'None',
     ownership: { code: 'Code', setting: 'Setting', content: 'Content', manual: 'Manual' },
+    designImpact: 'Visual change',
     severity: { CRITICAL: 'High', WARNING: 'Medium', INFO: 'Low' },
   },
   es: {
@@ -130,6 +131,7 @@ const STRINGS = {
       'Estos criterios aplican a este sitio y no se ejecutaron. No son aprobados: di qué lo impidió antes de dar el informe por completo.',
     none: 'Ninguno',
     ownership: { code: 'Código', setting: 'Ajuste', content: 'Contenido', manual: 'Manual' },
+    designImpact: 'Cambio visual',
     severity: { CRITICAL: 'Alta', WARNING: 'Media', INFO: 'Baja' },
   },
 };
@@ -662,7 +664,7 @@ function renderMarkdown(model) {
         finding.page || '—',
         finding.message + alsoText(finding),
         finding.fix || '—',
-        t.ownership[finding.ownership],
+        t.ownership[finding.ownership] + (finding.design_impact === true ? ` · ${t.designImpact}` : ''),
       ].map(mdCell).join(' | ')} |`);
     }
     push();
@@ -944,7 +946,7 @@ function renderHtml(model) {
     finding.evidence ? `<span class="ev" title="${esc(finding.evidence)}">${esc(ui.evidence)}: ${esc(finding.evidence)}</span>` : ''
   }</td>
 <td class="ev">${finding.fix ? esc(finding.fix) : '<span class="muted">—</span>'}</td>
-<td class="nowrap">${ownTag(finding.ownership)}</td></tr>`;
+<td class="nowrap">${ownTag(finding.ownership)}${finding.design_impact === true ? ` <span class="tag own-manual">${esc(t.designImpact)}</span>` : ''}</td></tr>`;
   const findingTable = (list) => `<div class="scroll"><table>
 <thead><tr>${[t.priority, t.code, t.page, t.problem, t.todo, t.applied].map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead>
 <tbody>${list.map(findingRow).join('\n')}</tbody></table></div>`;
@@ -1171,6 +1173,7 @@ function main() {
           resource: finding.resource || null,
           severity: finding.severity,
           ownership: finding.ownership,
+          design_impact: finding.design_impact === true,
           category: finding.category || null,
           page: finding.page || null,
           message: finding.message,
