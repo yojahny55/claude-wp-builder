@@ -175,7 +175,13 @@ version is reported, not retried with guessed flags.
    "regression suite not available" and list the manual flows to click (add to cart, checkout,
    login, search); do not invent a substitute. The first admin-side load after an update can
    time out while caches rebuild: retry that one section once before reporting it FAIL.
-5. Extra attention to anything flagged as version skew in Step 3.
+5. **Critical CSS cuts**: when the active theme has an `assets/build.json` manifest, run
+   `node ${CLAUDE_PLUGIN_ROOT}/bin/assets-fresh.mjs <theme-dir>` (add `--root <wp-root>` when
+   the manifest pins core or plugin sheets by path). A core, plugin or builder update rewrites
+   the sheets the cuts were taken from, and the cuts go stale in silence. A non-zero exit
+   ("regenerate critical cuts") is reported as a finding with the project's cut-regeneration
+   step; do not regenerate them here. No manifest prints SKIP and is not a finding.
+6. Extra attention to anything flagged as version skew in Step 3.
 
 ## Step 6: Clone-aware Checks
 
