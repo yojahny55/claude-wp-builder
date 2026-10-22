@@ -11,6 +11,7 @@
 - GEO fixes: the live scan, its exit codes, and why none of them is a pass
 - Counting fixes by owner, and the settings to repeat on staging and production
 - Git hygiene for any phase that edits: clean tree, path-scoped commits, mass deletions
+- Counting fixes by owner, the replay log, and backups for bulk database fixes
 
 If `--report-only` was set, print:
 ```
@@ -145,7 +146,7 @@ The before → after score this step produces is the value the Step 8 report's `
 After all fix agents complete, count how many issues were successfully fixed, and count
 them by owner. Print the `setting` fixes again as a list of steps to repeat on staging and
 production: they were applied to a database this deploy will not carry, and a fix nobody
-repeats is indistinguishable from one that was never made.
+repeats is indistinguishable from one that was never made. Print that list from `<out>/replay.json`, not from memory, then give the path of the file.
 
 ## Git hygiene for any phase that edits
 
@@ -155,3 +156,43 @@ Applies before the first edit of this step, and to `/wp-update`. Skip it when th
 - **Commit by path.** `git add <paths>` with the files this run changed, never `git add -A` or `git commit -a`.
 - **Mass deletions.** Before committing, count the deleted files with `git status --short | grep -c '^ *D'`. If more than 50 files are deleted, stop and report it: this run did not delete them, and committing them removes plugins or uploads from history.
 - **At the end,** print how many commits exist since the last reviewed point (`git rev-list --count <last-reviewed>..HEAD`, or the commit count of this run when there is none) so unreviewed work is visible.
+## The replay log
+
+Every `setting` fix, and every content fix that writes to the database, is appended to
+`<out>/replay.json` (next to the report) at the moment it is applied, before the next fix
+starts. Fix agents are told this in their fix prompt. One entry per fix:
+
+```json
+{
+  "check": "SEC-014",
+  "resource": "option:blog_public",
+  "command": "wp option update blog_public 1",
+  "previous value": "0",
+  "applied_in": "local",
+  "applied_on": { "local": true, "staging": false, "prod": false }
+}
+```
+
+- `command` is the exact WP-CLI command that was run, with its arguments, so it can be
+  repeated verbatim.
+- `previous value` is read **before** the write and stored as the value to revert to
+  (`null` when the option or row did not exist).
+- `applied_in` is the environment the fix ran against; `applied_on` starts with only that one
+  `true`. Whoever repeats the step on another environment flips its flag.
+
+A fix that is not in `replay.json` was not recorded; do not report it as applied.
+
+**Planned, not implemented:** `/wp-audit --replay <env>` would run every entry whose
+`applied_on[<env>]` is false against that environment, flip the flag, and stop on the first
+error. Against production it would go through `bin/prod-gate.sh` and the production
+confirmation like any other write. Until then the log is read by a person.
+
+## Bulk database fixes keep the old value
+
+A fix that changes more than 25 rows (a search-replace, a bulk post-meta or term update, a
+bulk status change) dumps the previous values to `<out>/backups/` before it is applied. This
+is part of the fix, not an option: for example
+`$WP db export <out>/backups/<check>-<timestamp>.sql --tables=<affected tables>` or, for a
+narrow change, a CSV of `ID,<field>,<previous value>` from `$WP db query`. The replay entry
+records the backup path in a `backup` field. Without the backup the fix is not applied; report it
+`manual`. At 25 rows or fewer, `previous value` in the replay entry is enough.
