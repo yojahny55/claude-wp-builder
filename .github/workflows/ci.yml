@@ -65,7 +65,13 @@ jobs:
       # Every check runs, then the job reports. Exiting on the first red would hand back
       # one defect per round trip -- a PR that broke three contracts would take three
       # pushes to discover it broke three contracts.
+      # WP_HOSTILE_STRICT=1 turns the hostile-input harness's XFAIL into a failure: a script
+      # that accepts a hostile argument fails CI instead of printing a warning. It is
+      # only meaningful once the validation exists in bin/, so it must not be merged ahead
+      # of the change that adds it.
       - name: Run every contract check
+        env:
+          WP_HOSTILE_STRICT: "1"
         run: |
           set -uo pipefail
           pass=0; failed=(); skipped=()
