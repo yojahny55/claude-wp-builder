@@ -139,6 +139,11 @@ no grep can check.
   `cinematic` → an entirely different shape (one continuous reel, `/wp-cinematic-scene` per
   scene, `/wp-section --hybrid` for trailing blocks) that the section walk must refuse to
   enter. Treat `basic` as an alias for `tailwind` rather than failing on it.
+- **Files the plugin writes into a site root are registered.** Any new working-state file or
+  directory (ledger, report directory, local override, backup, a plugin's runtime cache) must
+  be added to `TOOL_STATE_PATHS` in `bin/wp-config.mjs`, or `gitignore-check` never proposes
+  ignoring it and the file ends up in the user's history.
+  `tests/checks/state-files-gitignore.sh` pins the contract.
 - **Starter-theme edits use the placeholder tokens** — `__starter__`, `__STARTER__`,
   `__STARTER_NAME__`, `__STARTER_DOMAIN__` — replaced by `/wp-init`. A real slug committed
   into the starter ships to every future project.

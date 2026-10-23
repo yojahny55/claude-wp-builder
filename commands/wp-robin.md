@@ -109,6 +109,15 @@ bash -c 'WP_ROOT="$1" bash "${CLAUDE_PLUGIN_ROOT}/skills/wp-robin/scripts/robin-
 The script is long-running on a large Media Library. Let it finish and keep its full output —
 it reports every step, and Step 4 reads that output rather than re-deriving the state.
 
+### Step 3.5: Git ignore for what Robin writes
+
+After a successful run, if the target is a git work tree, run
+`node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs gitignore-check <wp-root>` (it reads
+`TOOL_STATE_PATHS`, which includes Robin's runtime cache and test state under
+`wp-content/plugins/robin-image-optimizer/`). Exit `4` means git would commit them: quote the
+exact `missing:` rules in the report so the operator can add them. Do not edit `.gitignore`
+unless the operator says yes.
+
 ## Step 4: Report
 
 Print the script's own summary, then interpret it against the skill:

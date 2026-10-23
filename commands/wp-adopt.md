@@ -204,8 +204,14 @@ It must exit `0`.
 ```
 
 If the root is a git repository, check `git check-ignore` for both files and say whether
-each one would be committed. Do not edit `.gitignore` yourself. Committing them is the
-operator's decision, and a shared repository may not want another tool's config in it.
+each one would be committed. Committing them is the operator's decision, and a shared
+repository may not want another tool's config in it.
+
+Then run `node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs gitignore-check <root>`. It lists the
+plugin's own working-state files (the audit ledger and `.wp-audit/` reports, the local secrets
+override, manifest backups) that git would commit; exit `4` means some are missing. Do not edit `.gitignore` yourself.
+The sole exception is those plugin-owned entries, and only after the operator says yes to a single AskUserQuestion (default yes) that names the
+exact lines. Never add or reorder anything else in the file.
 
 Then offer one optional follow-up, once: "Publish this site to a git remote?" Default **no**, and
 nothing below runs unless the operator says yes. It never touches the site's own `.gitignore`.

@@ -101,6 +101,15 @@ replacing each PNG attachment with a WebP original saves far more. Read
 `references/png-to-webp-conversion.md` before converting: the reference map of old to new
 files, the database replacement and the traps of an interrupted run.
 
+## Robin's runtime files and git
+
+Robin writes a cache directory and test-run state inside its own plugin folder
+(`wp-content/plugins/robin-image-optimizer/libs/factory/bootstrap/assets/cache/` and
+`.phpunit.result.cache`). They are regenerated on every run and must not be committed. After
+installing, `/wp-robin` runs `node bin/wp-config.mjs gitignore-check <root>` and reports the
+exact ignore rules still missing. The `.webp` files in uploads are media, handled by whatever
+policy the site has for uploads, not by these rules.
+
 ## Requirements
 
 | Binary | Why |
