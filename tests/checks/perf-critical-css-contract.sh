@@ -31,9 +31,13 @@ t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 mkdir -p "$t/assets/css" "$t/assets/critical"
 echo 'a{color:red}' > "$t/assets/css/bundle.min.css"
 echo 'a{color:red}' > "$t/assets/critical/single.css"
-h=$(sha256sum "$t/assets/css/bundle.min.css" | cut -d' ' -f1)
+h=$(node -e 'const fs=require("fs"),crypto=require("crypto");process.stdout.write(crypto.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex"))' "$t/assets/css/bundle.min.css")
 printf '{"sheets":{"assets/css/bundle.min.css":"%s"},"cuts":{"assets/critical/single.css":{"source":"assets/css/bundle.min.css","hash":"%s"}}}' "$h" "$h" > "$t/assets/build.json"
 node bin/assets-fresh.mjs "$t" >/dev/null || fail "fresh manifest was reported stale"
+printf '{"cuts":{"assets/critical/single.css":{"hash":"%s"}}}' "$h" > "$t/assets/build.json"
+if node bin/assets-fresh.mjs "$t" >"$t/malformed.out" 2>&1; then fail "cut without a source was accepted"; else rc=$?; [[ $rc -eq 2 ]] || fail "malformed manifest exited $rc, expected 2"; fi
+grep -Fq 'missing required "source" or "hash" property' "$t/malformed.out" || fail "malformed manifest lacks a clear schema error"
+printf '{"sheets":{"assets/css/bundle.min.css":"%s"},"cuts":{"assets/critical/single.css":{"source":"assets/css/bundle.min.css","hash":"%s"}}}' "$h" "$h" > "$t/assets/build.json"
 echo 'a{color:blue}' > "$t/assets/css/bundle.min.css"
 out=$(node bin/assets-fresh.mjs "$t" 2>&1) && fail "changed sheet passed as fresh"
 printf '%s' "$out" | grep -Fq 'regenerate critical cuts' || fail "stale output lacks the message"

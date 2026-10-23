@@ -69,6 +69,10 @@ for (const [rel, want] of Object.entries(manifest.sheets ?? {})) {
   if (got !== want) stale.push(`sheet ${rel}: ${got ? 'content changed' : 'missing'}`);
 }
 for (const [cut, meta] of Object.entries(manifest.cuts ?? {})) {
+  if (!meta || typeof meta.source !== 'string' || typeof meta.hash !== 'string') {
+    console.error(`ERROR: cut "${cut}" in manifest is missing required "source" or "hash" property`);
+    process.exit(2);
+  }
   if (sha(cut) === null) stale.push(`cut ${cut}: missing`);
   const got = sha(meta.source);
   if (got !== meta.hash) stale.push(`cut ${cut}: source ${meta.source} ${got ? 'changed since the cut' : 'is missing'}`);
