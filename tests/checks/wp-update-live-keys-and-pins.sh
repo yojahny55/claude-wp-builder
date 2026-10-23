@@ -9,7 +9,14 @@ cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
 # A grep for live keys must count (-c) or be quiet (-q), never print the match.
-for f in commands/*.md skills/*/SKILL.md agents/*.md; do
+shopt -s nullglob
+command_files=( commands/*.md )
+skill_files=( skills/*/SKILL.md )
+agent_files=( agents/*.md )
+[ "${#command_files[@]}" -gt 0 ] || fail "no command markdown files were checked"
+[ "${#skill_files[@]}" -gt 0 ] || fail "no skill markdown files were checked"
+[ "${#agent_files[@]}" -gt 0 ] || fail "no agent markdown files were checked"
+for f in "${command_files[@]}" "${skill_files[@]}" "${agent_files[@]}"; do
   while IFS= read -r line; do
     case "$line" in
       *grep*_live_*) echo "$line" | grep -Eq 'grep -[a-zA-Z]*[cq]' \
