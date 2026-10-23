@@ -76,7 +76,9 @@ define('DB_NAME', 'multiline_commented_db');
 */
 /* define('DB_HOST', 'commented_host'); */
 define('DB_NAME', 'livedb');
-define("DB_USER", "us\"er");
+/* inline comment begins
+define('DB_USER', 'commented_inline_block_user');
+*/ define("DB_USER", "us\"er");
 define("DB_PASSWORD", "a\tb\\c\"d\$e\u{41}");
 define('DB_HOST', 'localhost'); // define('DB_HOST', 'trailing_comment_host');
 // $table_prefix = 'bad_';
@@ -128,6 +130,7 @@ sql=$(head -1 "$tmp/insert")
 grep -q "INSERT INTO wp_rio_process_queue .*VALUES (7,'webp',CONVERT(UNHEX(" <<<"$sql" || fail "the INSERT lost its shape: ${sql:0:300}"
 # Decode extra_data back and compare with the real path.
 hexes=$(grep -o "UNHEX('[0-9a-f]*')" <<<"$sql" | sed "s/UNHEX('//; s/')//")
+[ -n "$hexes" ] || fail "the INSERT had no extractable UNHEX payload"
 decoded=$(php -r 'foreach (explode("\n", trim(stream_get_contents(STDIN))) as $h) { $j = json_decode(hex2bin($h), true); if (is_array($j) && isset($j["source_path"])) { echo $j["source_path"], "\n", $j["converted_path"], "\n", $j["converted_from_size"], "\n"; } }' <<<"$hexes")
 want_src="$wp/wp-content/uploads/$rel"
 [ "$(sed -n 1p <<<"$decoded")" = "$want_src" ] || fail "source_path did not round-trip: $decoded"

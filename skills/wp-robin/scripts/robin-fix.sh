@@ -49,19 +49,34 @@ info "WordPress root: $WP_ROOT"
 config_code_lines() {
 	awk '
 		BEGIN { in_block = 0 }
-		{
-			line = $0
-			if (in_block) {
-				if (line ~ /\*\//) { sub(/^.*\*\//, "", line); in_block = 0 }
-				else next
+		function strip_comments(line, i, c, next_char, out, quote, escaped, n) {
+			n = length(line)
+			out = ""
+			quote = ""
+			escaped = 0
+			for (i = 1; i <= n; i++) {
+				c = substr(line, i, 1)
+				next_char = substr(line, i + 1, 1)
+				if (in_block) {
+					if (c == "*" && next_char == "/") { in_block = 0; i++ }
+					continue
+				}
+				if (quote != "") {
+					out = out c
+					if (escaped) escaped = 0
+					else if (c == "\\") escaped = 1
+					else if (c == quote) quote = ""
+					continue
+				}
+				if (c == "\047" || c == "\042") { quote = c; out = out c; continue }
+				if (c == "/" && next_char == "*") { in_block = 1; i++; continue }
+				if (c == "/" && next_char == "/") break
+				if (c == "#") break
+				out = out c
 			}
-			if (line ~ /^[[:space:]]*\/\*/) {
-				if (line ~ /\*\//) sub(/^[[:space:]]*\/\*.*\*\//, "", line)
-				else { in_block = 1; next }
-			}
-			if (line ~ /^[[:space:]]*(\/\/|#|\*)/) next
-			print line
+			return out
 		}
+		{ line = strip_comments($0); if (line ~ /[^[:space:]]/) print line }
 	' "$1"
 }
 
