@@ -19,7 +19,9 @@ grep -Fq 'php -l' agents/wp-acf.md || fail "wp-acf does not lint the fields file
 grep -Fq 'php -l' agents/wp-cf7.md || fail "wp-cf7 does not lint the seeder"
 grep -Fq 'wp-config.mjs validate' agents/wp-acf.md || fail "wp-acf does not re-run the manifest gate"
 grep -Fq 'wp-config.mjs validate' agents/wp-cf7.md || fail "wp-cf7 does not re-run the manifest gate"
-grep -Fq '.yolo-manifest.json' agents/wp-normalize.md && grep -Fq 'JSON.parse' agents/wp-normalize.md \
+grep -Fq '.yolo-manifest.json' agents/wp-normalize.md \
+  || fail "wp-normalize does not reference the manifest it wrote"
+grep -Fq 'JSON.parse' agents/wp-normalize.md \
   || fail "wp-normalize does not parse the manifest it wrote"
 grep -Fq 'for this step **only**' agents/wp-normalize.md || fail "wp-normalize's Bash grant lost its scope limit"
 echo PASS

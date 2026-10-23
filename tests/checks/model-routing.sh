@@ -22,5 +22,5 @@ grep -Eq "^## Model routing" "$wp_yolo" || { echo "FAIL: wp-yolo.md missing Mode
 grep -q "do \*\*not\*\* pass a \`model\` parameter" "$wp_yolo" || { echo "FAIL: wp-yolo.md missing no-override rule"; exit 1; }
 # wp-normalize holds Bash for its final validation step only (agent-validation-steps.sh).
 grep -Eq "^tools:.*\bBash\b" agents/wp-normalize.md || { echo "FAIL: wp-normalize has no Bash for its validation step"; exit 1; }
-bash tests/checks/agent-validation-steps.sh >/dev/null || { echo "FAIL: haiku agents lost their validation step"; exit 1; }
+bash tests/checks/agent-validation-steps.sh
 echo PASS
