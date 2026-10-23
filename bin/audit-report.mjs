@@ -206,8 +206,18 @@ function resolveOutDir(flag) {
 // One line, never fatal: a report inside a work tree that nothing ignores gets committed.
 function warnIfUnignored(outDir) {
   const git = (args) => spawnSync('git', ['-C', outDir, ...args], { encoding: 'utf8' });
-  if (git(['rev-parse', '--is-inside-work-tree']).status !== 0) return;
-  if (git(['check-ignore', '-q', '--', 'probe']).status === 0) return;
+  const inside = git(['rev-parse', '--is-inside-work-tree']);
+  if (inside.error || inside.status === null) {
+    console.warn(`audit-report: cannot check whether ${outDir} is ignored because git is unavailable: ${inside.error?.message ?? 'git did not exit'}`);
+    return;
+  }
+  if (inside.status !== 0) return;
+  const ignored = git(['check-ignore', '-q', '--', 'probe']);
+  if (ignored.error || ignored.status === null) {
+    console.warn(`audit-report: cannot check whether ${outDir} is ignored because git is unavailable: ${ignored.error?.message ?? 'git did not exit'}`);
+    return;
+  }
+  if (ignored.status === 0) return;
   console.warn(`audit-report: ${outDir} is inside a git work tree and is not ignored -- add it to .gitignore, or run node bin/wp-config.mjs gitignore-check <site-root>`);
 }
 

@@ -416,12 +416,25 @@ function cmdGitignoreCheck(projectPath) {
   const root = resolve(projectPath);
   if (!existsSync(root)) { warn(`no such directory: ${root}`); process.exit(1); }
   const git = (args) => spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' });
-  if (git(['rev-parse', '--is-inside-work-tree']).status !== 0) {
+  const inside = git(['rev-parse', '--is-inside-work-tree']);
+  if (inside.error || inside.status === null) {
+    warn(`git unavailable; cannot check tool state ignores: ${inside.error?.message ?? 'git did not exit'}`);
+    process.exit(1);
+  }
+  if (inside.status !== 0) {
     say('ok: not a git work tree, nothing to ignore');
     return;
   }
-  const missing = TOOL_STATE_PATHS.filter((e) => (!e.when || existsSync(join(root, e.when)))
-    && git(['check-ignore', '-q', '--', e.probe]).status !== 0);
+  const missing = [];
+  for (const e of TOOL_STATE_PATHS) {
+    if (e.when && !existsSync(join(root, e.when))) continue;
+    const ignored = git(['check-ignore', '-q', '--', e.probe]);
+    if (ignored.error || ignored.status === null) {
+      warn(`git unavailable; cannot check tool state ignores: ${ignored.error?.message ?? 'git did not exit'}`);
+      process.exit(1);
+    }
+    if (ignored.status !== 0) missing.push(e);
+  }
   if (!missing.length) { say('ok: every tool state path is ignored'); return; }
   for (const e of missing) say(`missing: ${e.rule}  # ${e.why}`);
   process.exit(4);
