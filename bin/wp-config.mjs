@@ -440,6 +440,40 @@ function cmdGitignoreCheck(projectPath) {
   process.exit(4);
 }
 
+// Register one named remote environment. Read-only toward the site: it only edits the manifest.
+// No token flag exists on purpose; the token goes in the gitignored local file by hand.
+function cmdEnvSet(projectPath, flags) {
+  const { file, manifest } = loadManifest(projectPath);
+  const name = flags.name;
+  if (typeof name !== 'string' || !/^[a-z0-9][a-z0-9_-]*$/i.test(name)) {
+    warn('usage: wp-config.mjs env-set <project-path> --name=<env> --role=local|staging|prod --url=<url> [--sync=envsync --transport=http|https [--allow-http]]');
+    process.exit(1);
+  }
+  if (flags.sync !== undefined && flags.transport !== 'http' && flags.transport !== 'https') {
+    warn('--sync requires --transport=http|https');
+    process.exit(1);
+  }
+  if (flags.sync !== undefined && flags.transport === 'http' && !flags['allow-http']) {
+    warn('--transport=http requires --allow-http');
+    process.exit(1);
+  }
+  const env = { role: flags.role, url: flags.url };
+  if (flags.sync !== undefined) {
+    env.sync = { tool: flags.sync, transport: flags.transport };
+    if (flags['allow-http']) env.sync.allow_http = true;
+  }
+  const next = structuredClone(manifest);
+  next.environments = { ...(next.environments ?? {}), [name]: env };
+  const problems = validateManifest(next);
+  if (problems.length) {
+    for (const p of problems) warn(`invalid: ${p}`);
+    warn('nothing written');
+    process.exit(1);
+  }
+  writeFileSync(file, `${JSON.stringify(next, null, 2)}\n`);
+  say(`ok: environments.${name} (${env.role}) written to ${file}`);
+}
+
 const [cmd, target] = process.argv.slice(2);
 if (cmd === 'validate' && target) cmdValidate(target);
 else if (cmd === 'migrate' && target) cmdMigrate(target);
@@ -449,8 +483,9 @@ else if (cmd === 'validate-profile' && target) cmdValidateProfile(target);
 else if (cmd === 'drift' && target) cmdDrift(target);
 else if (cmd === 'refresh' && target) cmdRefresh(target);
 else if (cmd === 'gitignore-check' && target) cmdGitignoreCheck(target);
+else if (cmd === 'env-set' && target) cmdEnvSet(target, parseFlags(process.argv.slice(4)));
 else if (cmd === 'adopt' && target) cmdAdopt(target, parseFlags(process.argv.slice(4)));
 else {
-  warn('usage: wp-config.mjs <validate|migrate|render-context|get|validate-profile|adopt|drift|refresh|gitignore-check> <project-path> [key|wp-version|adopt flags]');
+  warn('usage: wp-config.mjs <validate|migrate|render-context|get|validate-profile|adopt|drift|refresh|gitignore-check|env-set> <project-path> [key|wp-version|adopt flags]');
   process.exit(1);
 }

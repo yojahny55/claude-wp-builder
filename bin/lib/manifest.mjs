@@ -262,6 +262,70 @@ export function validateManifest(manifest) {
   }
   if (isAdopted(manifest)) problems.push(...validateAdopted(manifest));
   if (manifest.store !== undefined) problems.push(...validateStore(manifest.store));
+  if (manifest.environments !== undefined) problems.push(...validateEnvironments(manifest.environments));
+  return problems;
+}
+
+export const ENV_ROLES = ['local', 'staging', 'prod'];
+
+// Named remote environments: which one is production is a recorded fact, so the prod gates of
+// /wp-update, /wp-clone and /wp-audit read `role` instead of guessing from a URL. The sync
+// block names the tool and its transport and never carries a token -- that lives in the
+// gitignored local file, like db_password.
+export function validateEnvironments(envs) {
+  const problems = [];
+  if (envs === null || typeof envs !== 'object' || Array.isArray(envs)) {
+    return ['environments must be an object keyed by environment name'];
+  }
+  const productionNames = [];
+  for (const [name, env] of Object.entries(envs)) {
+    const at_ = `environments[${JSON.stringify(name)}]`;
+    if (!/^[a-z0-9][a-z0-9_-]*$/i.test(name)) {
+      problems.push(`${at_} name must start with a letter or number and contain only letters, numbers, underscores, or hyphens`);
+    }
+    if (env === null || typeof env !== 'object' || Array.isArray(env)) {
+      problems.push(`${at_} must be an object`);
+      continue;
+    }
+    if (env.role === 'prod') productionNames.push(name);
+    if (!ENV_ROLES.includes(env.role)) {
+      problems.push(`${at_}.role must be one of ${ENV_ROLES.join(', ')}, found ${JSON.stringify(env.role)}`);
+    }
+    if (typeof env.url !== 'string' || !/^https?:\/\/[^\s/]+/.test(env.url)) {
+      problems.push(`${at_}.url must be an http(s) URL`);
+    }
+    for (const key of Object.keys(env)) {
+      if (/token|secret|password|key/i.test(key)) {
+        problems.push(`${at_}.${key} looks like a credential: keep it in the gitignored local file, never in the manifest`);
+      } else if (!['role', 'url', 'sync'].includes(key)) {
+        problems.push(`${at_} has an unknown key: ${key}`);
+      }
+    }
+    const sync = env.sync;
+    if (sync === undefined) continue;
+    if (sync === null || typeof sync !== 'object' || Array.isArray(sync)) {
+      problems.push(`${at_}.sync must be an object`);
+      continue;
+    }
+    if (sync.tool !== 'envsync') problems.push(`${at_}.sync.tool must be "envsync", found ${JSON.stringify(sync.tool)}`);
+    if (sync.transport !== 'http' && sync.transport !== 'https') {
+      problems.push(`${at_}.sync.transport must be "http" or "https", found ${JSON.stringify(sync.transport)}`);
+    }
+    if (sync.allow_http !== undefined && typeof sync.allow_http !== 'boolean') {
+      problems.push(`${at_}.sync.allow_http must be a boolean`);
+    }
+    if (sync.transport === 'http' && sync.allow_http !== true) {
+      problems.push(`${at_}.sync.transport is "http": set allow_http to true to say so on purpose`);
+    }
+    for (const key of Object.keys(sync)) {
+      if (!['tool', 'transport', 'allow_http'].includes(key)) {
+        problems.push(`${at_}.sync has an unknown key: ${key}${/token|secret|password|key/i.test(key) ? ' (credentials never go in the manifest)' : ''}`);
+      }
+    }
+  }
+  if (productionNames.length > 1) {
+    problems.push(`only one environment may have role "prod": ${productionNames.map((name) => JSON.stringify(name)).join(', ')}`);
+  }
   return problems;
 }
 

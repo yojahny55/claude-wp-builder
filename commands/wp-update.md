@@ -50,6 +50,12 @@ Read the WP-CLI wrapper from `.wp-create.json` (`wp_cli.wrapper`), else use
 
 ### 0.3 Clone or production
 
+When `.wp-create.json` has `environments`, the role decides: read
+`bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' environments"` and treat
+the root as **production** when an entry with `role: "prod"` has the same host as `wordpress.url`
+(scheme and `www.` ignored), and as a **local clone** when it matches a `role: "local"` entry.
+Without `environments` (or when no entry matches), fall back to the URL rule below.
+
 Treat the root as a **local clone** when `.wp-create.json` has `project.source: "restore"` or
 `wordpress.url_origin`, or `wordpress.url` is a non-public host (`localhost`, `*.local`,
 `*.local.com`, `*.test`, private ranges) — the same rule `/wp-audit` uses. Otherwise it is
