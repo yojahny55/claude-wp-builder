@@ -18,8 +18,9 @@ grep -Fq -- 'from `<out>/replay.json`' "$fix" || fail "fix.md does not print the
 for t in 'agents/' 'run-state.json' 'fewer than 15 lines' 'before the Step 7 synthesis' '/clear'; do
   grep -Fq -- "$t" "$disp" || fail "dispatch.md lacks: $t"
 done
-awk '/^## Step 6: / { step = 1; next } /^## Step / && step { exit } step && /references\/dispatch\.md/ { found = 1 } END { exit !found }' commands/wp-audit.md \
+# Stop at the next top-level step, not a numbered sub-step within Step 6.
+awk '/^## Step 6: / { step = 1; next } /^## Step [0-9]+:/ && step { exit } step && /references\/dispatch\.md/ { found = 1 } END { exit !found }' commands/wp-audit.md \
   || fail "wp-audit.md Step 6 no longer sends agents to dispatch.md"
-awk '/^## Step 9: / { step = 1; next } /^## Step / && step { exit } step && /references\/fix\.md/ { found = 1 } END { exit !found }' commands/wp-audit.md \
+awk '/^## Step 9: / { step = 1; next } /^## Step [0-9]+:/ && step { exit } step && /references\/fix\.md/ { found = 1 } END { exit !found }' commands/wp-audit.md \
   || fail "wp-audit.md Step 9 no longer sends fixes to fix.md"
 echo PASS
