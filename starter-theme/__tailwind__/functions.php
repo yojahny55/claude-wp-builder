@@ -43,10 +43,10 @@ add_action( 'acf/init', function() {
     // Bootstrap each group from PHP only if it isn't already Local JSON. A group
     // that has a acf-json/<key>.json is the source of truth (dashboard edits sync
     // there); re-running its PHP would re-register it read-only and shadow edits.
-    // Steady state costs nothing: the signature (file names, newest mtime, and the
-    // acf-json/ directory's own mtime, which moves when a JSON is added or removed)
-    // is stored once the scan finds nothing left to bootstrap, and a matching
-    // signature skips the glob, the reads and the regex below on every request.
+    // The signature (file names, newest mtime, and the acf-json/ directory's own mtime,
+    // which moves when a JSON is added or removed) is stored once the scan finds nothing
+    // left to bootstrap. It still checks file names and mtimes on each request; a matching
+    // signature skips reading every file and running the regex below.
     // To force a rescan, delete the option.
     $signature = function() use ( $fields_dir, $json_dir ) {
         $files = glob( $fields_dir . '/*.php' ) ?: array();

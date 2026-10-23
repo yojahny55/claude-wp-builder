@@ -46,9 +46,12 @@ function __starter___png_should_become_webp( $filename ) {
 	return in_array( ord( $head[25] ), array( 0, 2 ), true );
 }
 
+// WordPress passed only $formats to this filter before 6.7, so there is no path
+// with which to distinguish photographic PNGs from palette/alpha artwork. Keep the
+// previous all-PNG mapping on those versions; use the selective check when available.
 add_filter( 'image_editor_output_format', function ( $formats, $filename = '' ) {
 	$formats['image/jpeg'] = 'image/webp';
-	if ( __starter___png_should_become_webp( $filename ) ) {
+	if ( '' === $filename || __starter___png_should_become_webp( $filename ) ) {
 		$formats['image/png'] = 'image/webp';
 	}
 	return $formats;

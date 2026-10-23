@@ -32,6 +32,7 @@ grep -Fq 'text/html' "$perf" || fail "buffer does not restrict to text/html"
 # 3. PNG conversion is conditional
 grep -Fq 'function __starter___png_should_become_webp(' "$perf" || fail "no PNG gate"
 ! grep -Fq "\$formats['image/png']  = 'image/webp';" "$perf" || fail "PNG is still converted unconditionally"
+grep -Fq "'' === \$filename" "$perf" || fail "older WordPress versions lost the legacy PNG format fallback"
 
 # 4. image helper without an attachment
 grep -Fq "'alt' =>" "$perf" || fail "bare-URL <img> still has no default alt"
@@ -48,7 +49,8 @@ if command -v php >/dev/null 2>&1; then
   cat > "$tmp/t.php" <<'PHP'
 <?php
 define( 'ABSPATH', '/' );
-function add_filter() {}
+$GLOBALS['t_filters'] = array();
+function add_filter( $hook, $cb ) { $GLOBALS['t_filters'][ $hook ][] = $cb; }
 function add_action() {}
 $src = str_replace( '__starter__', 'st', file_get_contents( $argv[1] ) );
 eval( '?>' . $src );
@@ -63,9 +65,17 @@ if ( st_webp_is_fresh( "$d/a.webp", "$d/a.jpg" ) ) { fwrite( STDERR, "stale sibl
 // PNG: colour type 6 (alpha) stays PNG, colour type 2 (truecolor) converts.
 foreach ( array( 6 => false, 2 => true ) as $type => $want ) {
 	$png = "\x89PNG\r\n\x1a\n" . pack( 'N', 13 ) . 'IHDR' . pack( 'NN', 10, 10 ) . chr( 8 ) . chr( $type ) . str_repeat( "\0", 20000 );
-	file_put_contents( "$d/p.png", $png );
-	if ( st_png_should_become_webp( "$d/p.png" ) !== $want ) { fwrite( STDERR, "png colour type $type misjudged\n" ); exit( 1 ); }
+	file_put_contents( "$d/color-$type.png", $png );
+	if ( st_png_should_become_webp( "$d/color-$type.png" ) !== $want ) { fwrite( STDERR, "png colour type $type misjudged\n" ); exit( 1 ); }
 }
+$format = $GLOBALS['t_filters']['image_editor_output_format'][0] ?? null;
+if ( ! $format ) { fwrite( STDERR, "image_editor_output_format filter not registered\n" ); exit( 1 ); }
+$legacy = $format( array() );
+if ( ( $legacy['image/png'] ?? '' ) !== 'image/webp' ) { fwrite( STDERR, "one-argument legacy filter lost PNG-to-WebP conversion\n" ); exit( 1 ); }
+$alpha = $format( array(), "$d/color-6.png" );
+if ( isset( $alpha['image/png'] ) ) { fwrite( STDERR, "modern filter converted alpha PNG\n" ); exit( 1 ); }
+$photo = $format( array(), "$d/color-2.png" );
+if ( ( $photo['image/png'] ?? '' ) !== 'image/webp' ) { fwrite( STDERR, "modern filter skipped truecolor PNG\n" ); exit( 1 ); }
 PHP
   php "$tmp/t.php" "$perf" "$tmp" || fail "helper behavior"
 else
