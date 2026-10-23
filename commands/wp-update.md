@@ -82,8 +82,10 @@ Treat the root as a **local clone** when `.wp-create.json` has `project.source: 
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/browser-suite.md`), take its baseline
    now on a clone: `REGRESSION_LABEL=before npm run test:regression`.
    **Live gateway keys stop a clone here, before anything is updated.** On a clone, check
-   `$WP option list --search='woocommerce_*_settings' --field=option_value | grep -E '(sk|rk|pk)_live_'`;
-   a hit means the update would run against a payment account that can charge real customers.
+   `$WP option list --search='woocommerce_*_settings' --field=option_value | grep -cE '(sk|rk|pk)_live_'`;
+   a count above zero means the update would run against a payment account that can charge
+   real customers. Print only the count: never the matching lines, since a live key must not
+   reach the transcript. Report "N options hold live keys", not the keys.
    Report it and ask (`AskUserQuestion`) whether to disable the gateway first; do not go on
    without an answer.
 3. List what is available:

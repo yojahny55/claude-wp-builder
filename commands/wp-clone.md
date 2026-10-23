@@ -309,7 +309,7 @@ still address production, and say what each is, where it lives and what it point
 
 ```bash
 bash -c "$WP option list --search='*_webhook*' --format=table"
-bash -c "$WP option list --search='*_live_*' --format=table"
+bash -c "$WP option list --search='*_live_*' --fields=option_name --format=table"
 bash -c "$WP plugin list --status=active --field=name | grep -iE 'stripe|paypal|mailchimp|zapier'"
 ```
 
