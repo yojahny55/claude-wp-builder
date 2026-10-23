@@ -130,6 +130,7 @@ installed it runs without wp-cli, but cannot activate the plugin.
 |---|---|---|
 | `WebP converter: NONE` | No ImageMagick, cwebp or GD with WebP | Install ImageMagick (`apt install imagemagick`, `dnf install ImageMagick`, `pacman -S imagemagick`), then run again |
 | A CSS `background-image` still serves the original PNG/JPG while `<img>` tags get WebP | `webp_delivery_mode=picture` rewrites `<img>` only | Read `references/webp-delivery.md` |
+| Cards loaded by infinite scroll, tabs or "load more" serve PNG/JPEG while the first page gets WebP | Robin processes `template_redirect` only; `admin-ajax.php` and REST HTML are not covered | Read `references/webp-delivery.md`, section on AJAX-returned HTML |
 | `Failed to parse DB credentials from wp-config.php` | The `DB_*` values are not literal `define()` strings (built from `getenv()`, for example) | Run with the credentials readable as literals, or fix the queue by hand |
 | `settings were NOT written` | The database user cannot write the options table | Grant the privilege, or run as a user that has it |
 | Hash collisions persist | The same file is shared by three or more duplicate attachments | Delete the duplicate attachment posts |
