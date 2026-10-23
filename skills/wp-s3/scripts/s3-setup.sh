@@ -74,7 +74,8 @@ WP_ROOT="${WP_ROOT%/}"
 if [[ -n "$SECRET_FILE" ]]; then
     [[ -z "${S3_UPLOADS_SECRET_VALUE:-}" ]] || die "give the secret in the environment or with --secret-file, not both"
     [[ -f "$SECRET_FILE" && -r "$SECRET_FILE" ]] || die "--secret-file $SECRET_FILE is not a readable file"
-    case "$(stat -c %a "$SECRET_FILE")" in
+    secret_mode="$(stat -c %a "$SECRET_FILE" 2>/dev/null || stat -f %Lp "$SECRET_FILE" 2>/dev/null || true)"
+    case "$secret_mode" in
         400|600) ;;
         *) die "--secret-file must be mode 0600 or 0400 (chmod 600 '$SECRET_FILE')" ;;
     esac
@@ -117,7 +118,7 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 # directory outside the docroot, one subdirectory per WordPress root.
 BACKUP_DIR="${WP_S3_BACKUP_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wp-s3-backups}/$(printf '%s' "$WP_ROOT" | cksum | cut -d' ' -f1)"
 ( umask 077 && mkdir -p "$BACKUP_DIR" ) || die "could not create the backup directory $BACKUP_DIR"
-chmod 700 "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR" || die "could not restrict permissions on backup directory $BACKUP_DIR"
 backup() { # backup <file> <name>: private copy, mode 0600
     ( umask 077 && cp -p "$1" "$BACKUP_DIR/$2.bak-$STAMP" ) && chmod 600 "$BACKUP_DIR/$2.bak-$STAMP"
 }

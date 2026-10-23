@@ -224,7 +224,8 @@ Read it before the first run against AWS, and when media returns `403`.
 
 `scripts/s3-revert.sh` disables rewriting, **downloads the media before removing the
 configuration** — without `s3-config.php` there is no bucket, region or credential left to
-fetch them with — deactivates the plugin, removes the `require`, and renames `s3-config.php`
-and the mu-plugin to `.disabled` rather than deleting them. It deletes nothing in the
-bucket. Two things it cannot undo, because they are site data: Elementor's stored URLs and
-WooCommerce's download settings. It prints both commands, filled in.
+fetch them with — deactivates the plugin and removes the `require`. It parks the credential
+file in the private backup directory outside the docroot with mode `0600`, and renames the
+mu-plugin to `.disabled`. It deletes nothing in the bucket. Two things it cannot undo,
+because they are site data: Elementor's stored URLs and WooCommerce's download settings. It
+prints both commands, filled in.

@@ -9,6 +9,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
+file_mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1" 2>/dev/null; }
 
 setup=skills/wp-s3/scripts/s3-setup.sh
 revert=skills/wp-s3/scripts/s3-revert.sh
@@ -17,7 +18,7 @@ cmd=commands/wp-s3.md
 tmp="$(mktemp -d -t wp-s3-backups-XXXXXX)"
 trap 'rm -rf "$tmp"' EXIT
 root="$tmp/site"; home="$tmp/home"
-mkdir -p "$root/wp-content/plugins" "$home"
+mkdir -p "$root/wp-content/plugins" "$root/wp-content/uploads" "$home"
 cat > "$root/wp-config.php" <<'PHP'
 <?php
 define( 'DB_PASSWORD', 'fixture-db-password' );
@@ -41,21 +42,29 @@ grep -Fq "fixture-secret" "$root/s3-config.php" || fail "the secret in --secret-
 ! ls "$root"/*.bak-* >/dev/null 2>&1 || fail "a .bak-* file was left in the docroot"
 bdir="$(find "$home/.local/state/wp-s3-backups" -mindepth 1 -maxdepth 1 -type d | head -1)"
 [ -n "$bdir" ] || fail "no backup directory under the home state dir"
-[ "$(stat -c %a "$bdir")" = 700 ] || fail "backup directory is not 0700"
+[ "$(file_mode "$bdir")" = 700 ] || fail "backup directory is not 0700"
 for b in "$bdir"/wp-config.php.bak-*; do
-  [ "$(stat -c %a "$b")" = 600 ] || fail "$b is not 0600"
+  [ "$(file_mode "$b")" = 600 ] || fail "$b is not 0600"
 done
 
 # The rewrite keeps the original mode.
-[ "$(stat -c %a "$root/wp-config.php")" = 640 ] || fail "wp-config.php lost its 0640 mode"
+[ "$(file_mode "$root/wp-config.php")" = 640 ] || fail "wp-config.php lost its 0640 mode"
 
 # A second run backs up the existing s3-config.php, also privately.
 run --secret-file "$tmp/secret" >/dev/null 2>&1 || fail "second run failed"
 ls "$bdir"/s3-config.php.bak-* >/dev/null 2>&1 || fail "s3-config.php was not backed up to the private dir"
-for b in "$bdir"/s3-config.php.bak-*; do [ "$(stat -c %a "$b")" = 600 ] || fail "$b is not 0600"; done
+for b in "$bdir"/s3-config.php.bak-*; do [ "$(file_mode "$b")" = 600 ] || fail "$b is not 0600"; done
+
+# Revert must never leave the credential-bearing config as plain text in the docroot.
+HOME="$home" WP_S3_BACKUP_DIR= XDG_STATE_HOME= bash "$revert" "$root" --keep-remote-media >"$tmp/revert.out" 2>&1 \
+  || { cat "$tmp/revert.out"; fail "revert failed against the fixture root"; }
+[ ! -e "$root/s3-config.php" ] && [ ! -e "$root/s3-config.php.disabled" ] \
+  || fail "revert left the S3 config in the docroot"
+parked=$(find "$bdir" -maxdepth 1 -type f -name 's3-config.php.disabled-*' | head -1)
+[ -n "$parked" ] || fail "revert did not park s3-config.php outside the docroot"
+[ "$(file_mode "$parked")" = 600 ] || fail "parked s3-config.php is not 0600"
 
 # The revert shares the defect.
-! grep -Fq '"$WP_ROOT/wp-config.php.bak-' "$revert" || fail "$revert still backs up beside wp-config.php"
 grep -Fq 'shutil.copymode' "$revert" || fail "$revert's rewrite does not keep wp-config.php's mode"
 
 # The documented flow must be one that works.

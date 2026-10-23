@@ -152,8 +152,12 @@ fi
 # Renamed rather than deleted: the bucket is still there, and turning this back on
 # should cost one `mv`, not another round of credentials.
 if [[ -f "$CONFIG" ]]; then
-    mv "$CONFIG" "$CONFIG.disabled"
-    echo "5. s3-config.php -> s3-config.php.disabled"
+    ( umask 077 && mkdir -p "$BACKUP_DIR" ) && chmod 700 "$BACKUP_DIR" \
+        || die "could not restrict permissions on backup directory $BACKUP_DIR"
+    PARKED_CONFIG="$BACKUP_DIR/s3-config.php.disabled-$STAMP"
+    mv "$CONFIG" "$PARKED_CONFIG" && chmod 600 "$PARKED_CONFIG" \
+        || die "could not park s3-config.php in the private backup directory $BACKUP_DIR"
+    echo "5. s3-config.php moved outside the docroot to $PARKED_CONFIG (mode 0600)"
 fi
 if [[ -f "$MU" ]]; then
     mv "$MU" "$MU.disabled"
@@ -165,8 +169,8 @@ fi
 # `pipefail` carries that into the assignment and errexit ends the script one line before
 # the summary it exists to print.
 BUCKET_URL=""
-if [[ -f "$CONFIG.disabled" ]]; then
-    BUCKET_URL="$(php "$SKILL_DIR/scripts/read-s3-config.php" "$CONFIG.disabled" --names 2>/dev/null \
+if [[ -n "${PARKED_CONFIG:-}" && -f "$PARKED_CONFIG" ]]; then
+    BUCKET_URL="$(php "$SKILL_DIR/scripts/read-s3-config.php" "$PARKED_CONFIG" --names 2>/dev/null \
         | sed -n 's/^S3_UPLOADS_BUCKET_URL: //p')"
 fi
 # Guarded like every other `wp` call here: without WP-CLI the bare invocation prints
