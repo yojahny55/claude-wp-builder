@@ -48,12 +48,10 @@ info "WordPress root: $WP_ROOT"
 # silence.
 config_code_lines() {
 	awk '
-		BEGIN { in_block = 0 }
-		function strip_comments(line, i, c, next_char, out, quote, escaped, n) {
+		BEGIN { in_block = 0; quote = ""; escaped = 0 }
+		function strip_comments(line, i, c, next_char, out, n) {
 			n = length(line)
 			out = ""
-			quote = ""
-			escaped = 0
 			for (i = 1; i <= n; i++) {
 				c = substr(line, i, 1)
 				next_char = substr(line, i + 1, 1)
@@ -76,41 +74,52 @@ config_code_lines() {
 			}
 			return out
 		}
-		{ line = strip_comments($0); if (line ~ /[^[:space:]]/) print line }
+		{ print strip_comments($0) }
 	' "$1"
 }
 
 decode_php_string() {
-	local lit="$1" body
-	[[ ${#lit} -ge 2 ]] || return 0
-	body="${lit:1:${#lit}-2}"
-	if [[ "${lit:0:1}" == "'" ]]; then
-		sed -E "s/\\\\([\\\\'])/\\1/g" <<<"$body"
-	else
-		php -r '$s = preg_replace_callback("/\\\\u\\{([0-9a-fA-F]+)\\}/", function ($m) {
-			$n = hexdec($m[1]);
-			if ($n < 0x80) return chr($n);
-			if ($n < 0x800) return chr(0xc0 | ($n >> 6)) . chr(0x80 | ($n & 0x3f));
-			if ($n < 0x10000) return chr(0xe0 | ($n >> 12)) . chr(0x80 | (($n >> 6) & 0x3f)) . chr(0x80 | ($n & 0x3f));
-			return chr(0xf0 | ($n >> 18)) . chr(0x80 | (($n >> 12) & 0x3f)) . chr(0x80 | (($n >> 6) & 0x3f)) . chr(0x80 | ($n & 0x3f));
-		}, $argv[1]); echo stripcslashes($s);' -- "$body"
-	fi
+	local lit="$1"
+	[[ ${#lit} -ge 2 ]] || { printf '\0'; return 0; }
+	php -r '$literal = $argv[1]; $body = substr($literal, 1, -1);
+		if (39 === ord($literal[0])) {
+			$slash = chr(92); $quote = chr(39);
+			$body = str_replace(array($slash . $slash, $slash . $quote), array($slash, $quote), $body);
+		} else {
+			$body = preg_replace_callback("/\\\\u\\{([0-9a-fA-F]+)\\}/", function ($m) {
+				$n = hexdec($m[1]);
+				if ($n < 0x80) return chr($n);
+				if ($n < 0x800) return chr(0xc0 | ($n >> 6)) . chr(0x80 | ($n & 0x3f));
+				if ($n < 0x10000) return chr(0xe0 | ($n >> 12)) . chr(0x80 | (($n >> 6) & 0x3f)) . chr(0x80 | ($n & 0x3f));
+				return chr(0xf0 | ($n >> 18)) . chr(0x80 | (($n >> 12) & 0x3f)) . chr(0x80 | (($n >> 6) & 0x3f)) . chr(0x80 | ($n & 0x3f));
+			}, $body);
+			$body = stripcslashes($body);
+		}
+		echo $body, "\0";' -- "$lit"
 }
 
 parse_define() {
 	local key="$1" file="$2" q="['\"]" lit
-	lit="$(config_code_lines "$file" \
-		| { grep -oP "define\s*\(\s*${q}${key}${q}\s*,\s*\K(${q})(?:\\\\.|(?!\1)[^\\\\])*\1" || true; } \
-		| head -1)"
+	lit=""
+	IFS= read -r -d '' lit < <(config_code_lines "$file" \
+		| grep -zoP "(?s)define\s*\(\s*${q}${key}${q}\s*,\s*\K(${q})(?:\\\\.|(?!\1)[^\\\\])*\1") || true
 	decode_php_string "$lit"
 }
 
-DB_NAME="$(parse_define DB_NAME "$WP_ROOT/wp-config.php")"
-DB_USER="$(parse_define DB_USER "$WP_ROOT/wp-config.php")"
-DB_PASSWORD="$(parse_define DB_PASSWORD "$WP_ROOT/wp-config.php")"
-DB_HOST="$(parse_define DB_HOST "$WP_ROOT/wp-config.php")"
-PREFIX_LITERAL="$(config_code_lines "$WP_ROOT/wp-config.php" | { grep -oP "\\\$table_prefix\s*=\s*\K(['\"])(?:\\\\.|(?!\1)[^\\\\])*\1" || true; } | head -1)"
-TABLE_PREFIX="$(decode_php_string "$PREFIX_LITERAL")"
+read_define() {
+	local key="$1" file="$2" variable="$3"
+	IFS= read -r -d '' "$variable" < <(parse_define "$key" "$file") || true
+}
+
+read_define DB_NAME "$WP_ROOT/wp-config.php" DB_NAME
+read_define DB_USER "$WP_ROOT/wp-config.php" DB_USER
+read_define DB_PASSWORD "$WP_ROOT/wp-config.php" DB_PASSWORD
+read_define DB_HOST "$WP_ROOT/wp-config.php" DB_HOST
+PREFIX_LITERAL=""
+IFS= read -r -d '' PREFIX_LITERAL < <(config_code_lines "$WP_ROOT/wp-config.php" \
+	| { grep -zoP "(?s)\\\$table_prefix\s*=\s*\K(['\"])(?:\\\\.|(?!\1)[^\\\\])*\1" || true; }) || true
+TABLE_PREFIX=""
+IFS= read -r -d '' TABLE_PREFIX < <(decode_php_string "$PREFIX_LITERAL") || true
 TABLE_PREFIX="${TABLE_PREFIX:-wp_}"
 
 if [[ -z "$DB_NAME" || -z "$DB_USER" || -z "$DB_HOST" ]]; then

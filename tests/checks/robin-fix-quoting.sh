@@ -25,13 +25,15 @@ command -v php >/dev/null 2>&1 || { echo "SKIP: php not found -- the static half
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/bin" "$tmp/t" "$tmp/fake"
-for t in bash env grep sed awk sort tr wc head dirname basename mktemp rm date stat sha256sum id cat php; do
+for t in bash env grep sed awk sort tr wc head dirname basename mktemp rm date stat sha256sum id cat php base64; do
   p=$(command -v "$t") && ln -s "$p" "$tmp/bin/$t"
 done
 # mysql records every call; the step-5 INSERT (recognised by UNHEX) goes to its own file.
 cat > "$tmp/bin/mysql" <<'SH'
 #!/usr/bin/env bash
-printf '%s pwd=%s\n' "$*" "${MYSQL_PWD-}" >> "$ROBIN_LOG"
+printf '%s pwd_b64=' "$*" >> "$ROBIN_LOG"
+printf '%s' "${MYSQL_PWD-}" | base64 | tr -d '\n' >> "$ROBIN_LOG"
+printf '\n' >> "$ROBIN_LOG"
 case "$*" in
   *"INSERT INTO "*options*) exit 1 ;;
   *"INSERT INTO "*UNHEX*) printf '%s\n' "$*" >> "$ROBIN_INSERT" ;;
@@ -79,7 +81,8 @@ define('DB_NAME', 'livedb');
 /* inline comment begins
 define('DB_USER', 'commented_inline_block_user');
 */ define("DB_USER", "us\"er");
-define("DB_PASSWORD", "a\tb\\c\"d\$e\u{41}");
+define("DB_PASSWORD", "a\tb\\c\"d\$e\u{41}
+");
 define('DB_HOST', 'localhost'); // define('DB_HOST', 'trailing_comment_host');
 // $table_prefix = 'bad_';
 /*
@@ -94,7 +97,8 @@ first=$(head -1 "$tmp/log")
 grep -Fq -- 'livedb' <<<"$first" || fail "a commented-out DB_NAME won over the live define: $first"
 ! grep -Eq 'commented_|trailing_comment' "$tmp/log" || fail "a commented define reached the client: $first"
 grep -Fq -- '-u us"er -h localhost livedb' <<<"$first" || fail "the double-quoted DB_USER with an escaped quote was not read whole: $first"
-grep -Fq -- $'pwd=a\tb\\c"d$eA' "$tmp/log" || fail "the double-quoted password escapes were not decoded: $first"
+expected_pwd=$(printf '%s' $'a\tb\\c"d$eA\n' | base64 | tr -d '\n')
+grep -Fq "pwd_b64=$expected_pwd" "$tmp/log" || fail "the multiline double-quoted password or its trailing newline was not decoded: $first"
 grep -Fq "pfx'_options" "$tmp/log" || fail "an escaped quote truncated the live \$table_prefix"
 
 # ---- file names with quotes, backslashes and $ ------------------------------
@@ -129,9 +133,9 @@ sql=$(head -1 "$tmp/insert")
 ! grep -Fq "Brien" <<<"$sql" || fail "the file name reached the SQL in the clear: $sql"
 grep -q "INSERT INTO wp_rio_process_queue .*VALUES (7,'webp',CONVERT(UNHEX(" <<<"$sql" || fail "the INSERT lost its shape: ${sql:0:300}"
 # Decode extra_data back and compare with the real path.
-hexes=$(grep -o "UNHEX('[0-9a-f]*')" <<<"$sql" | sed "s/UNHEX('//; s/')//")
+hexes=$(grep -oP "UNHEX\\('[[:xdigit:]]*'\\)" <<<"$sql" | sed "s/UNHEX('//; s/')//")
 [ -n "$hexes" ] || fail "the INSERT had no extractable UNHEX payload"
-decoded=$(php -r 'foreach (explode("\n", trim(stream_get_contents(STDIN))) as $h) { $j = json_decode(hex2bin($h), true); if (is_array($j) && isset($j["source_path"])) { echo $j["source_path"], "\n", $j["converted_path"], "\n", $j["converted_from_size"], "\n"; } }' <<<"$hexes")
+decoded=$(php -r '$found = false; foreach (explode("\n", trim(stream_get_contents(STDIN))) as $h) { $raw = hex2bin($h); if (false === $raw) { fwrite(STDERR, "invalid extracted hex payload\n"); exit(1); } $j = json_decode($raw, true); if (is_array($j) && isset($j["source_path"])) { echo $j["source_path"], "\n", $j["converted_path"], "\n", $j["converted_from_size"], "\n"; $found = true; } } if (!$found) { fwrite(STDERR, "no extracted payload decoded to expected extra_data\n"); exit(1); }' <<<"$hexes") || fail "the extracted UNHEX payload could not be decoded into extra_data"
 want_src="$wp/wp-content/uploads/$rel"
 [ "$(sed -n 1p <<<"$decoded")" = "$want_src" ] || fail "source_path did not round-trip: $decoded"
 [ "$(sed -n 2p <<<"$decoded")" = "$want_src.webp" ] || fail "converted_path did not round-trip: $decoded"
