@@ -60,7 +60,8 @@ add_action( 'acf/init', function() {
         return md5( implode( '|', array_map( 'basename', $files ) ) . '#' . $newest . '#' . (int) @filemtime( $json_dir ) );
     };
     $option = '__starter___fields_scan';
-    if ( get_option( $option ) === $signature( $files ) ) { return; }
+    $current_signature = $signature( $files );
+    if ( get_option( $option ) === $current_signature ) { return; }
 
     $bootstrapped = false;
     foreach ( $files as $file ) {
@@ -81,7 +82,7 @@ add_action( 'acf/init', function() {
     // the scan entirely. An unwritable acf-json/ degrades to read-only PHP
     // groups instead of emitting warnings on every request.
     if ( ! $bootstrapped ) {
-        update_option( $option, $signature( $files ), false );
+        update_option( $option, $current_signature, false );
         return;
     }
     if ( ! is_writable( $json_dir ) ) {
@@ -137,6 +138,8 @@ add_action( 'acf/init', function() {
         }
     }
     if ( $all_persisted ) {
+        // The JSON writes changed this directory's mtime, which is part of the
+        // signature, so refresh it once after bootstrapping is complete.
         clearstatcache( true, $json_dir );
         update_option( $option, $signature( $files ), false );
     }
