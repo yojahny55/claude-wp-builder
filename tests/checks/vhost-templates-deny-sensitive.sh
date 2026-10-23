@@ -24,7 +24,8 @@ for f in nginx.conf.tpl nginx-no-ssl.conf.tpl; do
     grep -Fq "$ph" "$p" || fail "$f lost placeholder $ph"
   done
 done
-for ph in '{{ssl_cert}}' '{{ssl_key}}'; do grep -Fq "$ph" $d/nginx.conf.tpl || fail "nginx.conf.tpl lost $ph"; done
+for ph in '{{ssl_cert}}' '{{ssl_key}}'; do grep -Fq "$ph" "$d/nginx.conf.tpl" || fail "nginx.conf.tpl lost $ph"; done
+for ph in '{{ssl_cert}}' '{{ssl_key}}'; do grep -Fq "$ph" "$d/apache.conf.tpl" || fail "apache.conf.tpl lost $ph"; done
 
 for f in apache.conf.tpl apache-no-ssl.conf.tpl; do
   p="$d/$f"
@@ -38,6 +39,7 @@ for f in apache.conf.tpl apache-no-ssl.conf.tpl; do
 done
 
 c=$d/Caddyfile.tpl
+grep -Fq 'path */.*' "$c" || fail "Caddyfile: dotfiles path pattern missing"
 grep -Fq 'not path /.well-known/*' "$c" || fail "Caddyfile: dotfiles not denied (or .well-known not excepted)"
 grep -Fq 'path *.bak' "$c" && grep -Fq 'path *.log' "$c" && grep -Fq 'path *.sql' "$c" || fail "Caddyfile: sql/bak/log not denied"
 grep -Fq '*.bak-*' "$c" || fail "Caddyfile: .bak-* not denied"
