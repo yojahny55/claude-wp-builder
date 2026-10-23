@@ -69,6 +69,9 @@ foreach ( array( 6 => false, 2 => true ) as $type => $want ) {
 	file_put_contents( "$d/color-$type.png", $png );
 	if ( st_png_should_become_webp( "$d/color-$type.png" ) !== $want ) { fwrite( STDERR, "png colour type $type misjudged\n" ); exit( 1 ); }
 }
+$bad_png = "\x89PNG\r\n\x1a\n" . pack( 'N', 13 ) . 'IDAT' . pack( 'NN', 10, 10 ) . chr( 8 ) . chr( 2 ) . str_repeat( "\0", 20000 );
+file_put_contents( "$d/bad-header.png", $bad_png );
+if ( st_png_should_become_webp( "$d/bad-header.png" ) ) { fwrite( STDERR, "png with a non-IHDR first chunk accepted\n" ); exit( 1 ); }
 $format = $GLOBALS['t_filters']['image_editor_output_format'][0] ?? null;
 if ( ! $format ) { fwrite( STDERR, "image_editor_output_format filter not registered\n" ); exit( 1 ); }
 $legacy = $format( array() );

@@ -55,7 +55,8 @@ add_action( 'acf/init', function() {
         foreach ( $files as $f ) {
             $newest = max( $newest, (int) @filemtime( $f ) );
         }
-        clearstatcache( true, $json_dir );
+        // PHP's stat cache is request-local; a new request sees directory changes
+        // without clearing it here. Avoid doing filesystem cache work on cache hits.
         return md5( implode( '|', array_map( 'basename', $files ) ) . '#' . $newest . '#' . (int) @filemtime( $json_dir ) );
     };
     $option = '__starter___fields_scan';
@@ -125,6 +126,20 @@ add_action( 'acf/init', function() {
 
     flock( $lock, LOCK_UN );
     fclose( $lock );
+
+    // Cache only when every PHP-local group now has JSON. A failed write must
+    // leave the scan uncached so the next request can retry bootstrapping.
+    $all_persisted = true;
+    foreach ( acf_get_field_groups() as $g ) {
+        if ( ( $g['local'] ?? '' ) === 'php' && ! file_exists( "$json_dir/{$g['key']}.json" ) ) {
+            $all_persisted = false;
+            break;
+        }
+    }
+    if ( $all_persisted ) {
+        clearstatcache( true, $json_dir );
+        update_option( $option, $signature( $files ), false );
+    }
 });
 
 /**

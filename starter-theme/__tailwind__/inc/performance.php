@@ -41,7 +41,7 @@ function __starter___png_should_become_webp( $filename ) {
 	$head = fread( $fh, 26 );
 	fclose( $fh );
 	// Byte 25 of a PNG is the colour type of the IHDR chunk.
-	if ( false === $head || strlen( $head ) < 26 || "\x89PNG" !== substr( $head, 0, 4 ) ) {
+	if ( false === $head || strlen( $head ) < 26 || "\x89PNG" !== substr( $head, 0, 4 ) || 'IHDR' !== substr( $head, 12, 4 ) ) {
 		return false;
 	}
 	return in_array( ord( $head[25] ), array( 0, 2 ), true );
