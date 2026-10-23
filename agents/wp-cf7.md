@@ -433,31 +433,36 @@ $WP plugin is-active contact-form-7
 Use the `WPCF7_ContactForm::get_template()` API to create forms. **NEVER use raw `post create`** — the CF7 API handles internal metadata, mail configuration, and validation rules.
 
 ```bash
-FORM_ID=$($WP eval "
-\$form = WPCF7_ContactForm::get_template();
+# The PHP lives in a file and the template directory arrives as an eval-file argument
+# ($args[0]). Spliced into a quoted PHP string through `$(pwd)`, a path containing a
+# quote ends the string and breaks the command.
+cat > cf7/create-form-en.php <<'PHP'
+<?php
+$cf7_dir = rtrim($args[0], '/');
+$form = WPCF7_ContactForm::get_template();
 
 // Sender on the site's own domain, the rule CF7's own template follows: admin_email only
 // when it already is on that domain, otherwise wordpress@<domain>. Computed on the
 // environment the seeder runs on, so staging and production each get their own domain.
-\$domain = strtolower((string) wp_parse_url(home_url(), PHP_URL_HOST));
-\$domain = preg_replace('/^www\\./', '', \$domain);
-\$admin  = get_option('admin_email');
+$domain = strtolower((string) wp_parse_url(home_url(), PHP_URL_HOST));
+$domain = preg_replace('/^www\./', '', $domain);
+$admin  = get_option('admin_email');
 // CF7's own test: case-insensitive, and a parent domain counts (admin@example.com on shop.example.com).
-\$from   = wpcf7_is_email_in_domain(\$admin, \$domain) ? \$admin : 'wordpress@' . \$domain;
-\$sender = get_option('blogname') . ' <' . \$from . '>';
+$from   = wpcf7_is_email_in_domain($admin, $domain) ? $admin : 'wordpress@' . $domain;
+$sender = get_option('blogname') . ' <' . $from . '>';
 
 // Set form title
-\$form->set_title('Contact Form - EN');
+$form->set_title('Contact Form - EN');
 
 // Set form body
-\$form->set_properties(array(
-    'form' => file_get_contents('$(pwd)/cf7/form-en.html'),
+$form->set_properties(array(
+    'form' => file_get_contents($cf7_dir . '/form-en.html'),
     'mail' => array(
         'active'             => true,
         'subject'            => '[your-subject] - New contact from [your-name]',
-        'sender'             => \$sender,
+        'sender'             => $sender,
         'recipient'          => get_option('admin_email'),
-        'body'               => file_get_contents('$(pwd)/cf7/email-admin-en.html'),
+        'body'               => file_get_contents($cf7_dir . '/email-admin-en.html'),
         'additional_headers' => 'Reply-To: [your-email]',
         'attachments'        => '',
         'use_html'           => true,
@@ -465,9 +470,9 @@ FORM_ID=$($WP eval "
     'mail_2' => array(
         'active'             => true,
         'subject'            => 'Thank you for contacting us',
-        'sender'             => \$sender,
+        'sender'             => $sender,
         'recipient'          => '[your-email]',
-        'body'               => file_get_contents('$(pwd)/cf7/email-user-en.html'),
+        'body'               => file_get_contents($cf7_dir . '/email-user-en.html'),
         'additional_headers' => '',
         'attachments'        => '',
         'use_html'           => true,
@@ -486,9 +491,11 @@ FORM_ID=$($WP eval "
     'additional_settings' => '',
 ));
 
-\$form->save();
-echo \$form->id();
-")
+$form->save();
+echo $form->id();
+PHP
+
+FORM_ID=$($WP eval-file cf7/create-form-en.php "$(pwd)/cf7")
 
 echo "Created EN form with ID: $FORM_ID"
 ```
