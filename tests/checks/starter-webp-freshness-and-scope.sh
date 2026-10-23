@@ -31,7 +31,8 @@ grep -Fq 'text/html' "$perf" || fail "buffer does not restrict to text/html"
 
 # 3. PNG conversion is conditional
 grep -Fq 'function __starter___png_should_become_webp(' "$perf" || fail "no PNG gate"
-! grep -Fq "\$formats['image/png']  = 'image/webp';" "$perf" || fail "PNG is still converted unconditionally"
+grep -Fq "if ( '' === \$filename || __starter___png_should_become_webp( \$filename ) ) {" "$perf" || fail "PNG conversion is not guarded by the legacy fallback and selective check"
+grep -Fq "\$formats['image/png'] = 'image/webp';" "$perf" || fail "PNG conversion mapping is missing"
 grep -Fq "'' === \$filename" "$perf" || fail "older WordPress versions lost the legacy PNG format fallback"
 
 # 4. image helper without an attachment

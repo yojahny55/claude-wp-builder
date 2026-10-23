@@ -30,7 +30,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @return bool
  */
 function __starter___png_should_become_webp( $filename ) {
-	if ( ! is_string( $filename ) || ! is_readable( $filename ) || filesize( $filename ) < 16384 ) {
+	$size = is_string( $filename ) && is_readable( $filename ) ? @filesize( $filename ) : false;
+	if ( false === $size || $size < 16384 ) {
 		return false;
 	}
 	$fh = fopen( $filename, 'rb' );
@@ -73,9 +74,9 @@ add_filter( 'wp_generate_attachment_metadata', function ( $metadata, $attachment
 		return $metadata;
 	}
 	$webp = preg_replace( '/\.(?:jpe?g|png)$/i', '.webp', $file );
-	// A sibling that is older than its original belongs to a file that has since been
-	// replaced under the same name (or regenerated): keep it and the front end keeps
-	// serving the previous picture. Only a fresh sibling is left alone.
+	// A sibling that is older than its original is stale (the media was replaced under
+	// the same name): regenerate it below so the front end serves the current picture.
+	// Only a fresh sibling skips regeneration.
 	clearstatcache( true, $webp );
 	if ( file_exists( $webp ) && __starter___webp_is_fresh( $webp, $file ) ) {
 		return $metadata;
