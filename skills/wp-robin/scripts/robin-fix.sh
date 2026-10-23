@@ -38,35 +38,64 @@ fi
 info "WordPress root: $WP_ROOT"
 
 # ── Read DB credentials via grep (no PHP require, works on broken installs) ─
-# Lines that start with //, #, * or /* are skipped first: a commented-out
+# PHP line and block comments are skipped first: a commented-out
 # `// define('DB_NAME', 'old')` above the live one must not win. A value is read as a PHP
 # string literal (single or double quoted) that runs to the closing quote of the kind that
 # opened it, skipping backslash escapes, so a password holding `\'` is no longer cut short;
-# the escapes PHP itself unescapes are then undone (`\\` and `\'` in single quotes, `\\`,
-# `\"` and `\$` in double quotes). `|| true` for the same reason as find_wp_root: a define
+# the escapes PHP itself unescapes are then undone (`\\` and `\'` in single quotes, and PHP
+# string escapes in double quotes). `|| true` for the same reason as find_wp_root: a define
 # the grep cannot match must reach the "Failed to parse" message below, not end the run in
 # silence.
-config_code_lines() { grep -vE '^[[:space:]]*(//|#|\*|/\*)' "$1" || true; }
+config_code_lines() {
+	awk '
+		BEGIN { in_block = 0 }
+		{
+			line = $0
+			if (in_block) {
+				if (line ~ /\*\//) { sub(/^.*\*\//, "", line); in_block = 0 }
+				else next
+			}
+			if (line ~ /^[[:space:]]*\/\*/) {
+				if (line ~ /\*\//) sub(/^[[:space:]]*\/\*.*\*\//, "", line)
+				else { in_block = 1; next }
+			}
+			if (line ~ /^[[:space:]]*(\/\/|#|\*)/) next
+			print line
+		}
+	' "$1"
+}
 
-parse_define() {
-	local key="$1" file="$2" q="['\"]" lit body
-	lit="$(config_code_lines "$file" \
-		| { grep -oP "define\s*\(\s*${q}${key}${q}\s*,\s*\K(${q})(?:\\\\.|(?!\1)[^\\\\])*\1" || true; } \
-		| head -1)"
+decode_php_string() {
+	local lit="$1" body
 	[[ ${#lit} -ge 2 ]] || return 0
 	body="${lit:1:${#lit}-2}"
 	if [[ "${lit:0:1}" == "'" ]]; then
 		sed -E "s/\\\\([\\\\'])/\\1/g" <<<"$body"
 	else
-		sed -E 's/\\([\\"$])/\1/g' <<<"$body"
+		php -r '$s = preg_replace_callback("/\\\\u\\{([0-9a-fA-F]+)\\}/", function ($m) {
+			$n = hexdec($m[1]);
+			if ($n < 0x80) return chr($n);
+			if ($n < 0x800) return chr(0xc0 | ($n >> 6)) . chr(0x80 | ($n & 0x3f));
+			if ($n < 0x10000) return chr(0xe0 | ($n >> 12)) . chr(0x80 | (($n >> 6) & 0x3f)) . chr(0x80 | ($n & 0x3f));
+			return chr(0xf0 | ($n >> 18)) . chr(0x80 | (($n >> 12) & 0x3f)) . chr(0x80 | (($n >> 6) & 0x3f)) . chr(0x80 | ($n & 0x3f));
+		}, $argv[1]); echo stripcslashes($s);' -- "$body"
 	fi
+}
+
+parse_define() {
+	local key="$1" file="$2" q="['\"]" lit
+	lit="$(config_code_lines "$file" \
+		| { grep -oP "define\s*\(\s*${q}${key}${q}\s*,\s*\K(${q})(?:\\\\.|(?!\1)[^\\\\])*\1" || true; } \
+		| head -1)"
+	decode_php_string "$lit"
 }
 
 DB_NAME="$(parse_define DB_NAME "$WP_ROOT/wp-config.php")"
 DB_USER="$(parse_define DB_USER "$WP_ROOT/wp-config.php")"
 DB_PASSWORD="$(parse_define DB_PASSWORD "$WP_ROOT/wp-config.php")"
 DB_HOST="$(parse_define DB_HOST "$WP_ROOT/wp-config.php")"
-TABLE_PREFIX="$(config_code_lines "$WP_ROOT/wp-config.php" 2>/dev/null | { grep -oP "\\\$table_prefix\s*=\s*['\"]\K[^'\"]*" || true; } | head -1)"
+PREFIX_LITERAL="$(config_code_lines "$WP_ROOT/wp-config.php" | { grep -oP "\\\$table_prefix\s*=\s*\K(['\"])(?:\\\\.|(?!\1)[^\\\\])*\1" || true; } | head -1)"
+TABLE_PREFIX="$(decode_php_string "$PREFIX_LITERAL")"
 TABLE_PREFIX="${TABLE_PREFIX:-wp_}"
 
 if [[ -z "$DB_NAME" || -z "$DB_USER" || -z "$DB_HOST" ]]; then

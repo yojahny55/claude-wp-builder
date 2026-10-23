@@ -71,13 +71,19 @@ cat > "$wp/wp-config.php" <<'PHP'
 /*
  * define('DB_PASSWORD', 'commented_pw');
  */
+/*
+define('DB_NAME', 'multiline_commented_db');
+*/
 /* define('DB_HOST', 'commented_host'); */
 define('DB_NAME', 'livedb');
 define("DB_USER", "us\"er");
-define('DB_PASSWORD', 'a\'b\\c"d$e');
+define("DB_PASSWORD", "a\tb\\c\"d\$e\u{41}");
 define('DB_HOST', 'localhost'); // define('DB_HOST', 'trailing_comment_host');
 // $table_prefix = 'bad_';
-$table_prefix = 'pfx_';
+/*
+$table_prefix = 'commented_';
+*/
+$table_prefix = 'pfx\'_';
 PHP
 : > "$tmp/log"
 out=$(run "$tmp" WP_ROOT="$wp"); rc=$?
@@ -86,8 +92,8 @@ first=$(head -1 "$tmp/log")
 grep -Fq -- 'livedb' <<<"$first" || fail "a commented-out DB_NAME won over the live define: $first"
 ! grep -Eq 'commented_|trailing_comment' "$tmp/log" || fail "a commented define reached the client: $first"
 grep -Fq -- '-u us"er -h localhost livedb' <<<"$first" || fail "the double-quoted DB_USER with an escaped quote was not read whole: $first"
-grep -Fq -- "pwd=a'b\\c\"d\$e" "$tmp/log" || fail "the password with \\' and \\\\ was cut short or left escaped: $first"
-grep -Fq 'pfx_options' "$tmp/log" || fail "a commented \$table_prefix won over the live one"
+grep -Fq -- $'pwd=a\tb\\c"d$eA' "$tmp/log" || fail "the double-quoted password escapes were not decoded: $first"
+grep -Fq "pfx'_options" "$tmp/log" || fail "an escaped quote truncated the live \$table_prefix"
 
 # ---- file names with quotes, backslashes and $ ------------------------------
 name="O'Brien \"q\" \$HOME \`id\` plan (1).png"
@@ -112,7 +118,8 @@ sync() {  # extra PATH dirs as args; leaves the INSERT in $tmp/insert
 sync magick convert
 [ "$rc" -eq 0 ] || fail "the sync run exited $rc: $out"
 grep -Fq 'WebP converter: imagemagick' <<<"$out" || fail "ImageMagick was not chosen: $out"
-[ -s "$tmp/conv" ] && grep -q '^magick ' "$tmp/conv" || fail "magick was not preferred over convert: $(cat "$tmp/conv" 2>/dev/null)"
+[ -s "$tmp/conv" ] || fail "no image conversion was attempted: $out"
+grep -q '^magick ' "$tmp/conv" || fail "magick was not preferred over convert: $(cat "$tmp/conv")"
 ! grep -q '^convert ' "$tmp/conv" || fail "the deprecated convert was used although magick exists"
 [ -s "$tmp/insert" ] || fail "no queue row was inserted for a file name with quotes: $out"
 sql=$(head -1 "$tmp/insert")
