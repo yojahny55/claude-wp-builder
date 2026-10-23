@@ -61,6 +61,13 @@ Treat the root as a **local clone** when `.wp-create.json` has `project.source: 
 1. WP-CLI must boot: `$WP core version`. If it fails with a drop-in error (object cache,
    advanced-cache), retry with `--skip-plugins --skip-themes` for the read-only listing and tell
    the user which drop-in is blocking; do not rename drop-ins without asking.
+1b. **Git tree.** When the root is a git repository, run `git status --short | head -20` before
+   the backup. Changes this run did not make belong to someone else or to an earlier session:
+   show them and ask for confirmation before continuing; never stash, reset or commit them.
+   Commits made by this command are by path (`git add <paths>`, never `git add -A`). Before
+   committing, if `git status` shows more than 50 deleted files, stop and report it instead.
+   At the end, Step 7 prints how many commits are unreviewed. Details: *Git hygiene for any
+   phase that edits* in `skills/wp-audit-run/references/fix.md`.
 2. Record the start marks used by Step 5: the byte size of `wp-content/debug.log`
    (`stat -c %s`, 0 if absent) and the time. On a clone also record the enabled WooCommerce
    gateways and the active plugin list, for Step 6.
@@ -195,6 +202,7 @@ Print one block, then the rollback:
 - Migrations run and their outcome; version skew flagged.
 - Verification: page table, new fatals (count), head-script result, suite result.
 - Backup path and its contents.
+- Commits made since the last reviewed point (git roots only).
 - **Rollback**: `$WP db import "$B/db.sql"`; then restore files by extracting the matching tar
   over the root (`tar -xzf "$B/plugins.tar.gz" -C <wp-root>/wp-content` after removing the
   updated plugin directories; `tar -xzf "$B/core.tar.gz" -C <wp-root>` for core), then
