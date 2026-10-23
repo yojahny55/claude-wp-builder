@@ -599,3 +599,18 @@ Do NOT create `-es` variants when the project is monolingual.
 12. **Size the control itself to `width: 100%`, not only its `.wpcf7-form-control-wrap`**; keep the AJAX spinner's margins inside the form's box; write loading-state padding as `padding-inline-end`, never `padding-right` — a physical longhand does not beat the logical `padding-inline` an `@apply px-*` compiles to
 13. **The `_form` post meta is the live form; `cf7/*.html` is only a reference.** Push every change through the seeder (or directly to `_form`), and push every language's form together — a fix landing on one language's post and not the other's is a bilingual bug.
 14. **`mail.sender` and `mail_2.sender` are on the site's domain, never `admin_email` unchecked and never a free-mail domain**; `[your-email]` is a recipient only in `mail_2` on a protected form; CF7's `WPCF7_ConfigValidator` runs after every save and its messages are reported
+
+## Final validation — MANDATORY, the last step before you report
+
+The rules above are prose, and `tests/checks/` only greps that prose: nothing else catches
+a generated seeder that does not parse. Before reporting done, lint every PHP file you wrote
+or edited and re-run the manifest gate. Report the output; a failure is yours to fix, not to
+mention.
+
+```bash
+php -l <theme-dir>/inc/seed/cf7.php
+[ -f .wp-create.json ] && node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate "<project-path>"
+```
+
+Then re-read the form you pushed with `$WP post meta get <form-id> _form` and confirm it is
+the markup you generated (rule 13): the lint proves syntax, not that the live form changed.
