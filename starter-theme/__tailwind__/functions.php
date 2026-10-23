@@ -43,13 +43,13 @@ add_action( 'acf/init', function() {
     // Bootstrap each group from PHP only if it isn't already Local JSON. A group
     // that has a acf-json/<key>.json is the source of truth (dashboard edits sync
     // there); re-running its PHP would re-register it read-only and shadow edits.
-    // The signature (file names, newest mtime, and the acf-json/ directory's own mtime,
+    $files = glob( $fields_dir . '/*.php' ) ?: array();
+    // The signature (this request's file list, newest mtime, and the acf-json/ directory's own mtime,
     // which moves when a JSON is added or removed) is stored once the scan finds nothing
     // left to bootstrap. It still checks file names and mtimes on each request; a matching
     // signature skips reading every file and running the regex below.
     // To force a rescan, delete the option.
-    $signature = function() use ( $fields_dir, $json_dir ) {
-        $files = glob( $fields_dir . '/*.php' ) ?: array();
+    $signature = function( $files ) use ( $json_dir ) {
         sort( $files );
         $newest = 0;
         foreach ( $files as $f ) {
@@ -59,10 +59,10 @@ add_action( 'acf/init', function() {
         return md5( implode( '|', array_map( 'basename', $files ) ) . '#' . $newest . '#' . (int) @filemtime( $json_dir ) );
     };
     $option = '__starter___fields_scan';
-    if ( get_option( $option ) === $signature() ) { return; }
+    if ( get_option( $option ) === $signature( $files ) ) { return; }
 
     $bootstrapped = false;
-    foreach ( glob( $fields_dir . '/*.php' ) as $file ) {
+    foreach ( $files as $file ) {
         if ( ! is_readable( $file ) ) { continue; }
         $src = file_get_contents( $file );
         if ( preg_match_all( "/'key'\\s*=>\\s*'(group_[A-Za-z0-9_]+)'/", $src, $m ) ) {
@@ -80,7 +80,7 @@ add_action( 'acf/init', function() {
     // the scan entirely. An unwritable acf-json/ degrades to read-only PHP
     // groups instead of emitting warnings on every request.
     if ( ! $bootstrapped ) {
-        update_option( $option, $signature(), false );
+        update_option( $option, $signature( $files ), false );
         return;
     }
     if ( ! is_writable( $json_dir ) ) {
@@ -216,7 +216,8 @@ add_action( 'after_setup_theme', function() {
  * argument above (an array in the old $in_footer slot is simply truthy). From 6.3
  * core handles it, so the filter is not registered at all.
  */
-if ( version_compare( get_bloginfo( 'version' ), '6.3', '<' ) ) {
+global $wp_version;
+if ( isset( $wp_version ) && version_compare( $wp_version, '6.3', '<' ) ) {
     add_filter( 'script_loader_tag', function( $tag, $handle ) {
         if ( '__starter__-main' === $handle && false === strpos( $tag, ' defer' ) ) {
             return preg_replace( '/^<script\b/', '<script defer', $tag, 1 );
