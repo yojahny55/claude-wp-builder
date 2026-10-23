@@ -45,3 +45,14 @@ rm "$t/assets/build.json"
 node bin/assets-fresh.mjs "$t" | grep -Fq SKIP || fail "missing manifest should SKIP"
 
 echo PASS
+
+# Test missing cut file on disk
+t2=$(mktemp -d); trap 'rm -rf "$t2"' EXIT
+mkdir -p "$t2/assets/css" "$t2/assets/critical"
+echo 'a{color:red}' > "$t2/assets/css/bundle.min.css"
+echo 'a{color:red}' > "$t2/assets/critical/single.css"
+h2=$(node -e 'const fs=require("fs"),crypto=require("crypto");process.stdout.write(crypto.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex"))' "$t2/assets/css/bundle.min.css")
+printf '{"sheets":{"assets/css/bundle.min.css":"%s"},"cuts":{"assets/critical/single.css":{"source":"assets/css/bundle.min.css","hash":"%s"}}}' "$h2" "$h2" > "$t2/assets/build.json"
+rm "$t2/assets/critical/single.css"
+out2=$(node bin/assets-fresh.mjs "$t2" 2>&1) && fail "missing cut file passed as fresh"
+printf '%s' "$out2" | grep -Fq 'regenerate critical cuts' || fail "missing cut output lacks the message"
