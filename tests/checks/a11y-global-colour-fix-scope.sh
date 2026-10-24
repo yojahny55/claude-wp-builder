@@ -31,4 +31,4 @@ printf '%s' "$flatc" | grep -Fq 'Overrides at the End of the Stylesheet' \
 printf '%s' "$flatc" | grep -Eiq 'overlay|text over an image' \
   || { echo "FAIL: $css does not say to exclude overlay cards from a broad override"; exit 1; }
 
-echo "PASS: global colour fixes are scoped narrowly and measured across light, dark, overlay, hover and focus"
+echo "PASS: global colour fixes are scoped narrowly and measured in the theme-switch, overlay and mid-transition contexts"
