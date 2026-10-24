@@ -147,7 +147,7 @@ fi
 # s3-config.php.disabled beside the original is served as plain text by the web server.
 if [[ -f "$CONFIG" ]]; then
     ( umask 077 && mkdir -p "$PARK_DIR" ) && chmod 700 "$PARK_DIR" \
-        || die "could not create $PARK_DIR. Nothing has been moved; s3-config.php is still in place."
+        || die "could not create or use $PARK_DIR (it may exist already, owned by another user or not writable). Nothing has been moved; s3-config.php is still in place."
     ( umask 077 && cp "$CONFIG" "$PARKED" ) && chmod 600 "$PARKED" \
         || { rm -f "$PARKED"; die "could not copy s3-config.php to $PARKED. Nothing has been moved."; }
     rm -f "$CONFIG"
