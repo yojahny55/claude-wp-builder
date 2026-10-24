@@ -22,8 +22,9 @@ has "$suite/audit.config.js" 'WP_AUDIT_BASE_URL_OVERRIDE'
 cat > "$tmp/rewrite.js" <<'JS'
 const fs = require('fs');
 const src = fs.readFileSync(process.env.RUNNER, 'utf8');
-const start = src.indexOf("const fs = require('fs');", src.indexOf("<<'NODE'"));
-const body = src.slice(start, src.indexOf('\nNODE\n', start));
+const blocks = [...src.matchAll(/<<'NODE'[^\n]*\n([\s\S]*?)\nNODE\n/g)].map((m) => m[1]);
+const body = blocks.find((b) => b.includes('baseURL'));
+if (!body) { console.error('no heredoc that prepares baseURL found in ' + process.env.RUNNER); process.exit(3); }
 process.argv[2] = process.env.CFG;
 eval(body);
 JS
@@ -43,6 +44,7 @@ got="$(BASE_URL=https://audited.example node -e 'console.log(require(process.arg
 # 2. A production host never gets a request outside the gate, even when the caller forgot it.
 has bin/prod-gate.sh 'WP_AUDIT_GATE_HELD="$host"'
 has bin/prod-gate.sh '--prod) force_prod=1'
+has "$runner" 'the production check by manifest was skipped'
 has "$runner" 'prod-gate.sh'
 has "$runner" 'WP_AUDIT_GATE_HELD'
 fakebin="$tmp/bin"; mkdir -p "$fakebin"; printf '#!/bin/sh\nexit 0\n' > "$fakebin/chromium"; chmod +x "$fakebin/chromium"
@@ -66,10 +68,7 @@ has "$runner" 'results/unmeasured.json'
 git check-ignore -q "$suite/package-lock.json" && fail "$suite/package-lock.json is gitignored"
 has "$runner" 'npm ci'
 hasnt "$runner" 'npm install --no-audit'
-node -e '
-const p=require(process.argv[1]), l=require(process.argv[2]);
-for (const [n,v] of Object.entries(p.devDependencies)) if (!l.packages[""].devDependencies[n]) process.exit(1);
-' "$PWD/$suite/package.json" "$PWD/$suite/package-lock.json" || fail "package-lock.json does not match package.json"
+(cd "$suite" && npm ls --package-lock-only >/dev/null 2>&1) || fail "package-lock.json does not match package.json"
 
 # 5. Tier 3 UNMEASURED is a bold line in the first 40 lines of both documents.
 cat > "$tmp/run.json" <<'JSON'

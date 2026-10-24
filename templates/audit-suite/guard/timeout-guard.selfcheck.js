@@ -1,4 +1,4 @@
-// node lib/timeout-guard.selfcheck.js -- the guard trips on N consecutive timeouts, not on N total.
+// node guard/timeout-guard.selfcheck.js -- the guard trips on N consecutive timeouts, not on N total.
 const assert = require('assert');
 const fs = require('fs');
 const os = require('os');

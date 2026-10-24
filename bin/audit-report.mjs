@@ -1105,7 +1105,8 @@ ${groups}
 <p class="kicker">${esc(ui.kicker)}</p>
 <h1>${esc(model.site)}</h1>
 <p class="meta">${esc([model.date, model.tier].filter(Boolean).join(' · '))}</p>
-${model.tier3Unmeasured ? `<p class="meta"><strong>${esc(t.tier3Unmeasured)}</strong></p>\n` : ''}${model.categories.length ? `<p class="meta">${esc(t.categories)}: ${esc(model.categories.map(categoryName).join(', '))}</p>` : ''}
+${model.tier3Unmeasured ? `<p class="meta"><strong>${esc(t.tier3Unmeasured)}</strong></p>` : ''}
+${model.categories.length ? `<p class="meta">${esc(t.categories)}: ${esc(model.categories.map(categoryName).join(', '))}</p>` : ''}
 <div class="kpis">
 <div class="kpi big"><b>${c.total}</b><span>${esc(plural(c.total, ui.finding, ui.findings))}</span></div>
 <div class="kpi">${kpi(c.CRITICAL, 'bad')}<span>${esc(plural(c.CRITICAL, ui.criticalOne, ui.critical))}</span></div>
