@@ -36,9 +36,18 @@ grep -Fq 'designImpact' bin/audit-report.mjs || fail "audit-report.mjs does not 
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 cat > "$tmp/run.json" <<'JSON'
 {"site":"example","date":"2026-01-01","tier":"standard","findings":[
- {"check":"A11Y-025","severity":"CRITICAL","ownership":"code","design_impact":true,"message":"No focus styles"}]}
+ {"check":"A11Y-025","severity":"CRITICAL","ownership":"code","design_impact":true,"message":"No focus styles"},
+ {"check":"SEC-001","severity":"WARNING","ownership":"setting","message":"Plain finding"}]}
 JSON
-node bin/audit-report.mjs --run "$tmp/run.json" --out "$tmp/out" --format md >/dev/null 2>&1 \
-  || fail "audit-report.mjs rejected a run with design_impact"
-grep -rFq 'Visual change' "$tmp/out" || fail "the report does not tag a design_impact finding"
+for fmt in md html; do
+  out="$tmp/out-$fmt"
+  node bin/audit-report.mjs --run "$tmp/run.json" --out "$out" --format "$fmt" >/dev/null 2>&1 \
+    || fail "audit-report.mjs rejected a run with design_impact ($fmt)"
+  n=$(grep -rFo 'Visual change' "$out" | wc -l)
+  [ "$n" -ge 1 ] || fail "the $fmt report does not tag a design_impact finding"
+done
+# Negative: the tag belongs to the one flagged finding, not to every row (md: exactly once).
+[ "$(grep -rFo 'Visual change' "$tmp/out-md" | wc -l)" -eq 1 ] \
+  || fail "the md report tags a finding without design_impact"
+grep -rFq 'class="tag design-impact"' "$tmp/out-html" || fail "html report lacks the design-impact tag class"
 echo PASS

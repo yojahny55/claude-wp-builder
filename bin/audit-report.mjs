@@ -767,6 +767,7 @@ const HTML_UI = {
     legend: 'Legend',
     legendSeverity: 'Severity',
     legendOwner: 'Who applies the fix',
+    legendDesign: 'Changes how the page looks; needs consent and a before/after measurement before it is applied.',
     ownerHelp: {
       code: 'a file in the theme or the site\'s own plugins; fixed once, travels with the commit.',
       setting: 'a WordPress option, a plugin\'s configuration, a server or CDN rule — does not travel with the commit.',
@@ -801,6 +802,7 @@ const HTML_UI = {
     legend: 'Leyenda',
     legendSeverity: 'Severidad',
     legendOwner: 'Quién aplica la corrección',
+    legendDesign: 'Cambia el aspecto de la página; requiere consentimiento y medición antes y después de aplicarla.',
     ownerHelp: {
       code: 'archivo del tema o de un plugin propio; se corrige una vez y viaja con el commit.',
       setting: 'opción de WordPress, configuración de un plugin, regla del servidor o del CDN; no viaja con el commit.',
@@ -897,6 +899,7 @@ tr.sum td{background:var(--canvas);font-weight:600;border-top:2px solid var(--ru
 .own-setting{background:var(--mid-bg);color:var(--mid);border-color:var(--mid-rule)}
 .own-content{background:var(--ok-bg);color:var(--ok);border-color:var(--ok-rule)}
 .own-manual{background:var(--na-bg);color:var(--na);border-color:var(--na-rule)}
+.design-impact{background:transparent;color:var(--mid);border:1px dashed var(--mid-rule)}
 .note{color:var(--muted);font-size:13px;border-left:3px solid var(--rule);padding-left:12px;margin-top:14px}
 .changes{margin:0;padding-left:18px} .changes li{margin-bottom:8px} .changes ul{color:var(--muted);font-size:13px}
 .legend{margin:0;padding-left:18px;font-size:13.5px} .legend li{margin-bottom:8px}
@@ -983,7 +986,7 @@ function renderHtml(model) {
     finding.evidence ? `<span class="ev" title="${esc(finding.evidence)}">${esc(ui.evidence)}: ${esc(finding.evidence)}</span>` : ''
   }</td>
 <td class="ev">${finding.fix ? esc(finding.fix) : '<span class="muted">—</span>'}</td>
-<td class="nowrap">${ownTag(finding.ownership)}${finding.design_impact === true ? ` <span class="tag own-manual">${esc(t.designImpact)}</span>` : ''}</td></tr>`;
+<td class="nowrap">${ownTag(finding.ownership)}${finding.design_impact === true ? ` <span class="tag design-impact">${esc(t.designImpact)}</span>` : ''}</td></tr>`;
   const findingTable = (list) => `<div class="scroll"><table>
 <thead><tr>${[t.priority, t.code, t.page, t.problem, t.todo, t.applied].map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead>
 <tbody>${list.map(findingRow).join('\n')}</tbody></table></div>`;
@@ -1113,6 +1116,7 @@ ${planBlock}</section>
 <section id="legend"><h2>${esc(ui.legend)}</h2><ul class="legend">
 <li><b>${esc(ui.legendSeverity)}:</b> ${['CRITICAL', 'WARNING', 'INFO'].map(sevChip).join(' ')}</li>
 <li><b>${esc(ui.legendOwner)}:</b><ul>${OWNERSHIP.map((owner) => `<li>${ownTag(owner)} ${esc(ui.ownerHelp[owner])}</li>`).join('')}</ul></li>
+<li><span class="tag design-impact">${esc(t.designImpact)}</span> ${esc(ui.legendDesign)}</li>
 </ul></section>
 </main>
 <footer class="wrap"><p>${esc(`${t.title} · ${model.site} · ${model.date}`)}</p></footer>
