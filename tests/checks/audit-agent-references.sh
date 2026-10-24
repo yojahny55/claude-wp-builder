@@ -27,7 +27,7 @@ while read -r agent pfx codes budget; do
   [ "$n" -ge 3 ] || fail "$agent has only $n $pfx-*.md references; the split is gone"
   # Every check code in a reference is also in the agent: the table row is the index, so a
   # procedure cannot hold a check the agent never lists.
-  for c in $(grep -ohE "\b$codes-[0-9]{3}\b" "$refs"/$pfx-*.md | sort -u); do
+  for c in $(grep -ohE "(^|[^A-Za-z0-9])$codes-[0-9]{3}([^0-9]|$)" "$refs"/$pfx-*.md | grep -oE "$codes-[0-9]{3}" | sort -u); do
     grep -Eq "^\| $c(@[0-9]+)? \|" "$f" || grep -Fq "$c" "$f" || fail "$c is in a $pfx reference but not in $f"
   done
 done <<'LIST'

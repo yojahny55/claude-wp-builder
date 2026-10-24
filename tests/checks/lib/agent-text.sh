@@ -16,6 +16,11 @@ esac
 dir="${TMPDIR:-/tmp}/wpb-agent-text"
 mkdir -p "$dir"
 out="$dir/$name.$$.md"
-cat "$root/agents/$name.md" "$root"/skills/wp-audit-standards/references/$pat > "$out"
+trap 'rm -f "$out"' EXIT
+# Sorted under the C locale so the bytes do not depend on the caller's LC_COLLATE; an empty
+# match is an error instead of cat being handed the literal glob.
+mapfile -t refs < <(compgen -G "$root/skills/wp-audit-standards/references/$pat" | LC_ALL=C sort)
+[ "${#refs[@]}" -gt 0 ] || { echo "agent-text.sh: no references match $pat" >&2; exit 1; }
+cat "$root/agents/$name.md" "${refs[@]}" > "$out"
 mv -f "$out" "$dir/$name.md"
 echo "$dir/$name.md"

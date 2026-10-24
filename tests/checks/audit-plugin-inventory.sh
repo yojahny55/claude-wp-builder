@@ -71,7 +71,10 @@ sec=$(bash tests/checks/lib/agent-text.sh wp-audit-security)
 adopt=commands/wp-adopt.md
 script=skills/wp-cli-patterns/scripts/find-redeclared-functions.php
 skill=skills/wp-cli-patterns/SKILL.md
-for f in "$sec" "$adopt" "$script" "$skill"; do
+invref=skills/wp-audit-standards/references/sec-plugin-inventory.md
+procref=skills/wp-audit-standards/references/sec-procedures-vulnerability-feed.md
+detref=skills/wp-audit-standards/references/sec-detection-details-advanced.md
+for f in "$sec" "$adopt" "$script" "$skill" "$invref" "$procref" "$detref"; do
   [ -f "$f" ] || fail "$f is missing"
 done
 
@@ -80,9 +83,6 @@ tier2="$(section "$sec" '## Step 2: Tier 2' '## Step 3')"
 # The inventory, the SEC-041/042 procedure and the SEC-043 detection moved out of the agent
 # into references the agent reads on demand; extract each from the file that now holds it.
 # Their end markers are gone with the move, so each runs to the end of its own file.
-invref=skills/wp-audit-standards/references/sec-plugin-inventory.md
-procref=skills/wp-audit-standards/references/sec-procedures-vulnerability-feed.md
-detref=skills/wp-audit-standards/references/sec-detection-details-advanced.md
 inv="$(section "$invref" '## Plugin inventory — shared by' '## NO-SUCH-END')"
 recheck="$(section "$sec" '- **Vendor-plugin re-check.**' '## Plugin inventory')"
 proc="$(section "$procref" '### Procedure — SEC-041 and SEC-042' '## NO-SUCH-END')"
