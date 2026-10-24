@@ -8,7 +8,7 @@ argument-hint: "--path=/var/www/html/my-project"
 
 Create a full local WordPress development environment: detect available tools, download WordPress, create the database, configure the web server, install plugins, and generate the `.wp-create.json` manifest. Supports native (Nginx/Apache/Caddy), Docker, DDEV, Lando, and wp-env environments.
 
-**`$WP` convention:** Throughout this command, `$WP` refers to the WP-CLI wrapper determined by the chosen environment. For native installs it is `wp --path=<path>`, for Docker it is `docker exec <container> wp --allow-root`, for DDEV it is `ddev wp`, for Lando it is `lando wp`, for wp-env it is `npx wp-env run cli wp`. Substitute the correct wrapper in every WP-CLI command below.
+**`$WP` convention:** Throughout this command, `$WP` refers to the WP-CLI wrapper determined by the chosen environment. For native installs it is `wp --path=<path>`, for Docker it is `docker exec <container> wp --allow-root`, for DDEV it is `ddev wp`, for Lando it is `lando wp`, for wp-env it is `npx wp-env run cli wp`. Substitute the correct wrapper in every WP-CLI command below. Inside a `bash -c` call the wrapper is handed to the child shell as an environment variable (`WP="$WP" bash -c '$WP … "$1"' _ '${PROJECT_PATH}'`), so it still expands to the command plus its flags and the path stays a positional argument.
 
 ---
 
@@ -21,7 +21,7 @@ Extract the `--path=` value from `$ARGUMENTS`.
 - If no path is provided, ask the user:
   > "Where should the WordPress project be created? Provide an absolute path (e.g., /var/www/html/my-project):"
 - Resolve the path to an absolute path.
-- Store it as `PROJECT_PATH` for use in all subsequent steps.
+- Store it as `PROJECT_PATH` for use in all subsequent steps. It travels into `bash -c` as a positional argument, never inside the `-c` string: write it in single quotes, and a path that holds a single quote gets each one written as `'\''`.
 
 ---
 
@@ -103,7 +103,7 @@ Only offer environment types whose prerequisites are met. If only one viable opt
 ### 2a: Check for existing `wp-config.php` (Adopt Mode)
 
 ```bash
-bash -c "test -f '${PROJECT_PATH}/wp-config.php' && echo 'EXISTS' || echo 'NOT_FOUND'"
+bash -c 'test -f "$1/wp-config.php" && echo EXISTS || echo NOT_FOUND' _ '${PROJECT_PATH}'
 ```
 
 If `wp-config.php` exists at `PROJECT_PATH`, enter **Adopt Mode** (see the full Adopt Mode section below). This skips WordPress download, database creation, config creation, and core install.
@@ -111,7 +111,7 @@ If `wp-config.php` exists at `PROJECT_PATH`, enter **Adopt Mode** (see the full 
 ### 2b: Check for existing `.wp-create.json`
 
 ```bash
-bash -c "test -f '${PROJECT_PATH}/.wp-create.json' && echo 'EXISTS' || echo 'NOT_FOUND'"
+bash -c 'test -f "$1/.wp-create.json" && echo EXISTS || echo NOT_FOUND' _ '${PROJECT_PATH}'
 ```
 
 If `.wp-create.json` already exists, see the **Existing `.wp-create.json` Handling** section below.
@@ -249,7 +249,7 @@ Execute all 14 steps in order. Each step validates its result before proceeding.
 ### Step 4.1: Create Directory Structure
 
 ```bash
-bash -c "mkdir -p '${PROJECT_PATH}/wp-content/themes' '${PROJECT_PATH}/wp-content/plugins' '${PROJECT_PATH}/wp-content/uploads'"
+bash -c 'mkdir -p "$1/wp-content/themes" "$1/wp-content/plugins" "$1/wp-content/uploads"' _ '${PROJECT_PATH}'
 ```
 
 **Validation:** Verify the directories exist.
@@ -257,7 +257,7 @@ bash -c "mkdir -p '${PROJECT_PATH}/wp-content/themes' '${PROJECT_PATH}/wp-conten
 ### Step 4.2: Download WordPress
 
 ```bash
-bash -c "$WP core download --version=latest --path='${PROJECT_PATH}'"
+WP="$WP" bash -c '$WP core download --version=latest --path="$1"' _ '${PROJECT_PATH}'
 ```
 
 For Docker environments where WP-CLI runs inside the container, download WordPress into the bind-mounted path or use the container's entrypoint to handle it.
@@ -345,25 +345,25 @@ Skip for Docker environments that use `localhost` or handle their own DNS (DDEV,
 **Docker (own templates):**
 
 ```bash
-bash -c "cd '${PROJECT_PATH}' && docker-compose up -d"
+bash -c 'cd "$1" && docker-compose up -d' _ '${PROJECT_PATH}'
 ```
 
 **DDEV:**
 
 ```bash
-bash -c "cd '${PROJECT_PATH}' && ddev start"
+bash -c 'cd "$1" && ddev start' _ '${PROJECT_PATH}'
 ```
 
 **Lando:**
 
 ```bash
-bash -c "cd '${PROJECT_PATH}' && lando start"
+bash -c 'cd "$1" && lando start' _ '${PROJECT_PATH}'
 ```
 
 **wp-env:**
 
 ```bash
-bash -c "cd '${PROJECT_PATH}' && npx wp-env start"
+bash -c 'cd "$1" && npx wp-env start' _ '${PROJECT_PATH}'
 ```
 
 **Native:**
@@ -455,7 +455,7 @@ bash -c "grep -hE '^user =' /etc/php-fpm.d/*.conf 2>/dev/null || grep -hE '^(use
 Grant it write access via an inherited default ACL:
 
 ```bash
-bash -c "setfacl -R -m g:${WEB_USER}:rwX -m d:g:${WEB_USER}:rwX '${PROJECT_PATH}/wp-content'"
+bash -c 'setfacl -R -m "g:$1:rwX" -m "d:g:$1:rwX" "$2/wp-content"' _ '${WEB_USER}' '${PROJECT_PATH}'
 ```
 
 A plain `chmod -R g+w` is not sufficient: WordPress creates `uploads/<year>/<month>` at runtime under umask 022, so each new month's directory is created mode 755 and uploads break again. The `d:` (default) entry makes every directory created later inherit group write. Capital `X` sets execute on directories only, so uploaded files never become executable.
