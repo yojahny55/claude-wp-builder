@@ -75,7 +75,6 @@ done
 # byte-identical everywhere; what a command does on exit 3 is now one named policy line that
 # points at the skill. Assert both directions: the policy line is present and names a policy the
 # skill defines, and no command (or step reference) still carries the old inline paragraph.
-. tests/checks/lib/expand-command.sh
 gate=skills/wp-manifest-gate/SKILL.md
 [ -f "$gate" ] || fail "$gate is missing"
 grep -Eq '^user-invocable: false$' "$gate" || fail "$gate must stay user-invocable: false"
@@ -94,7 +93,9 @@ for c in "${!want[@]}"; do
 done
 # Any command that names a policy at all must name one the skill defines.
 for f in commands/*.md; do
-  p=$(policy_of "$f"); [ -n "$p" ] || continue
+  x=$f
+  if grep -Fq "skills/$(basename "$f" .md)-run/references/" "$f"; then expand_command "$f"; x=$EXPANDED; fi
+  p=$(policy_of "$x"); [ -n "$p" ] || continue
   grep -Fq "### \`$p\`" "$gate" || fail "$f names an undefined exit 3 policy: $p"
 done
 # The old inline amendment, anywhere a run reads: gone.
