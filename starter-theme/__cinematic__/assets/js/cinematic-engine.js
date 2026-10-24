@@ -88,6 +88,18 @@
     document.body.classList.add('reduced-motion');
     scenes.forEach(s => s.classList.add('in'));
     setVeil(scenes[0]);
+    // The inline mobile clip is emitted with autoplay + loop; looping motion with no
+    // way to stop it fails WCAG 2.2.2. Stop it and fall back to its poster frame:
+    // preload="none" + load() resets the element to the poster state.
+    document.querySelectorAll('.scene__video-mobile').forEach(v => {
+      v.removeAttribute('autoplay');
+      v.removeAttribute('loop');
+      v.autoplay = false;
+      v.loop = false;
+      v.preload = 'none';
+      v.pause();
+      v.load();
+    });
     return;
   }
 

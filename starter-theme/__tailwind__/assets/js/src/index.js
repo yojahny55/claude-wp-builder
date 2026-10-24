@@ -78,18 +78,45 @@ if (document.readyState === 'loading') {
 }
 
 // Mobile menu toggle
-document.addEventListener('DOMContentLoaded', () => {
+//
+// Guarded by readyState like the initialisers above: a cache or "delay JS" plugin
+// can load this bundle after DOMContentLoaded has fired, and a listener registered
+// only on that event would then never run, leaving the button dead.
+const initMobileMenu = () => {
   const menuToggle = document.querySelector('.menu-toggle');
   const mobileMenu = document.querySelector('.mobile-menu');
-
-  if (menuToggle && mobileMenu) {
-    menuToggle.addEventListener('click', () => {
-      mobileMenu.classList.toggle('hidden');
-      const expanded = menuToggle.getAttribute('aria-expanded') === 'true';
-      menuToggle.setAttribute('aria-expanded', !expanded);
-    });
+  if (!menuToggle || !mobileMenu) {
+    return;
   }
-});
+
+  // aria-controls needs an id on the controlled element.
+  if (!mobileMenu.id) {
+    mobileMenu.id = 'mobile-menu';
+  }
+  menuToggle.setAttribute('aria-controls', mobileMenu.id);
+
+  const setOpen = (open) => {
+    mobileMenu.classList.toggle('hidden', !open);
+    menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+
+  menuToggle.addEventListener('click', () => {
+    setOpen(menuToggle.getAttribute('aria-expanded') !== 'true');
+  });
+
+  // Escape closes an open menu and hands focus back to the button that opened it.
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && menuToggle.getAttribute('aria-expanded') === 'true') {
+      setOpen(false);
+      menuToggle.focus();
+    }
+  });
+};
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initMobileMenu);
+} else {
+  initMobileMenu();
+}
 
 // Decorative CSS backgrounds wait until they are near the viewport.
 //
