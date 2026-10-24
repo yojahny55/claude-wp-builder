@@ -46,10 +46,15 @@ exec "$real_sed" "\$@"
 SED
   chmod +x "$STUB_DIR/sed"
   export STUB_LOG
-  PATH="$STUB_DIR:$PATH"
+  STUB_ORIG_PATH="${STUB_ORIG_PATH:-$PATH}"
+  PATH="$STUB_DIR:$STUB_ORIG_PATH"
 }
 
-stub_path_cleanup() { [ -n "${STUB_DIR:-}" ] && "$STUB_REAL_RM" -rf "$STUB_DIR"; return 0; }
+stub_path_cleanup() {
+  [ -z "${STUB_DIR:-}" ] || "$STUB_REAL_RM" -rf "$STUB_DIR"
+  [ -z "${STUB_ORIG_PATH:-}" ] || PATH="$STUB_ORIG_PATH"
+  return 0
+}
 
 # run_stubbed CMD... : run with the stubs on PATH; never aborts the caller.
 run_stubbed() {

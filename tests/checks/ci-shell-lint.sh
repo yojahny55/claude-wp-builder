@@ -13,7 +13,7 @@ grep -Fq "bash -n" "$CI" || fail "ci.yml does not run bash -n on the shell scrip
 grep -Fq "find bin skills -name '*.sh'" "$CI" || fail "ci.yml does not cover bin/ and skills/*/scripts/"
 [ "$(grep -Fc 'no shell scripts found' "$CI")" -ge 2 ] || fail "ci.yml lost a zero-script guard"
 grep -Fq 'shellcheck --severity=warning' "$CI" || fail "ci.yml does not run shellcheck at warning severity"
-awk '/name: shellcheck/{f=1} f&&/continue-on-error: true/{ok=1} END{exit ok?0:1}' "$CI" \
+awk '/name: shellcheck/{f=1;next} f&&/^ *- name:/{f=0} f&&/continue-on-error: true/{ok=1} END{exit ok?0:1}' "$CI" \
   || fail "shellcheck lost continue-on-error: promote it deliberately, in the change that clears the backlog, and update this check"
 
 [ -f .shellcheckrc ] || fail ".shellcheckrc is missing"
