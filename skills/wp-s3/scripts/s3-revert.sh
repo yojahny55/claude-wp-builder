@@ -149,7 +149,7 @@ if [[ -f "$CONFIG" ]]; then
     ( umask 077 && mkdir -p "$PARK_DIR" ) && chmod 700 "$PARK_DIR" \
         || die "could not create $PARK_DIR. Nothing has been moved; s3-config.php is still in place."
     ( umask 077 && cp "$CONFIG" "$PARKED" ) && chmod 600 "$PARKED" \
-        || die "could not copy s3-config.php to $PARKED. Nothing has been moved."
+        || { rm -f "$PARKED"; die "could not copy s3-config.php to $PARKED. Nothing has been moved."; }
     rm -f "$CONFIG"
     echo "5. s3-config.php -> $PARKED (0600, outside the docroot)"
     echo "   To turn S3 back on: mv '$PARKED' '$CONFIG' and re-run /wp-s3 setup to restore the require."
