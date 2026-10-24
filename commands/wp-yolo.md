@@ -175,7 +175,9 @@ without any flag on this command:
 - **sonnet** — code authoring and judgment audits: `wp-template`, `wp-css`, `wp-tailwind`,
   `wp-cinematic`, `wp-audit-a11y|performance|practices|security|seo`.
 - **haiku** — mechanical generation and WP-CLI config: `wp-acf`, `wp-cf7`,
-  `wp-audit-aios`, `wp-audit-rankmath`.
+  `wp-audit-aios`, `wp-audit-rankmath`. `wp-acf` and `wp-cf7` stay here because each ends
+  in a mandatory `php -l` + `wp-config.mjs validate` step; `wp-normalize` (opus) ends in a
+  manifest parse, with Bash granted for that step alone.
 
 When dispatching an agent with the Agent tool, do **not** pass a `model` parameter — a
 per-invocation override beats frontmatter (resolution order: env var >
