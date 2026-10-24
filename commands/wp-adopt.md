@@ -201,8 +201,8 @@ commands only read the site; the second only writes the manifest:
 
 ```bash
 bash -c "$WP envsync env list"
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs env-set '${PROJECT_PATH}' \
-  --name=<name> --role=<local|staging|prod> --url=<url> --sync=envsync --transport=<http|https>"
+bash -c 'node "$1/bin/wp-config.mjs" env-set "$2" \
+  --name=<name> --role=<local|staging|prod> --url=<url> --sync=envsync --transport=<http|https>' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 Pass `--allow-http` only for an `http` environment the operator confirms on purpose. Ask the
