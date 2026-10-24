@@ -117,7 +117,7 @@ policy the site has for uploads, not by these rules.
 | `bash` 4+, GNU `grep` (`-P`), GNU `stat` (`-c`), `sed`, `awk`, `sha256sum` | The script itself. GNU only: it does not run on macOS's BSD tools |
 | `mariadb` or `mysql` client | Every query. `mariadb` is used when both exist |
 | `php` CLI | Every run: decodes `_wp_attachment_metadata` and builds the queue rows |
-| A converter: ImageMagick (`convert`), else `cwebp` (with `gif2webp` for GIFs; without it GIFs go to GD), else PHP GD with `imagewebp()` | Writing the `.webp` files. ImageMagick is preferred; GD reads PNG, JPEG and GIF. Without one, the queue repair still runs and no `.webp` file is written |
+| A converter: ImageMagick (`magick`, else the older `convert`), else `cwebp` (with `gif2webp` for GIFs; without it GIFs go to GD), else PHP GD with `imagewebp()` | Writing the `.webp` files. ImageMagick is preferred; GD reads PNG, JPEG and GIF. Without one, the queue repair still runs and no `.webp` file is written |
 | `wp` (WP-CLI) | Installing and activating the plugin. Optional when the plugin is already installed and active |
 | `curl`, `unzip` | Only for the direct download, tried when `wp plugin install` fails |
 

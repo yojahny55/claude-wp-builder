@@ -79,7 +79,7 @@ one-line message:
 ```bash
 bash -c "command -v mariadb || command -v mysql"
 bash -c "command -v php"
-bash -c "command -v convert || command -v cwebp || php -r 'if (function_exists(\"imagewebp\")) { echo \"gd\"; exit 0; } exit 1;'"
+bash -c "command -v magick || command -v convert || command -v cwebp || php -r 'if (function_exists(\"imagewebp\")) { echo \"gd\"; exit 0; } exit 1;'"
 ```
 
 If no database client or no `php` is found, stop and say so. If no webp converter is found, report the
