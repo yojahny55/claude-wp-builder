@@ -245,7 +245,7 @@ export function validateManifest(manifest) {
           problems.push('audit.last_answers cannot hold both clone_only: true and a production_url');
         }
       }
-      if (typeof answers.answered !== 'string' || Number.isNaN(Date.parse(answers.answered))) {
+      if (typeof answers.answered !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/.test(answers.answered) || Number.isNaN(Date.parse(answers.answered))) {
         problems.push('audit.last_answers.answered must be an ISO 8601 timestamp');
       }
     }

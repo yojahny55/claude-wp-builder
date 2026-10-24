@@ -38,6 +38,7 @@ const cases = {
   bad_url: [{ ...good, production_url: 'example.com' }, 1],
   clone_and_url: [{ ...good, clone_only: true }, 1],
   bad_date: [{ ...good, answered: 'yesterday' }, 1],
+  lenient_date: [{ ...good, answered: '2026' }, 1],
   unknown_key: [{ ...good, password: 'x' }, 1],
   not_object: ['report-only', 1],
 };
@@ -49,5 +50,5 @@ for (const [name, [a, want]] of Object.entries(cases)) {
 process.exit(bad ? 1 : 0);
 JS
 trap 'rm -f ./.probe-reaudit.mjs' EXIT
-node ./.probe-reaudit.mjs || fail "wp-config validation of audit.last_answers"
+node ./.probe-reaudit.mjs || fail "manifest validation of audit.last_answers"
 echo PASS
