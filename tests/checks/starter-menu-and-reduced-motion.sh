@@ -38,13 +38,16 @@ grep -Fq '.skip-link.screen-reader-text' starter-theme/__cinematic__/assets/css/
   || fail "cinematic skip link has no styles (it would render as visible text)"
 
 # The reduced branch must reach the mobile clip before it returns.
-reduced=$(awk '/if \(reduced\) \{/{f=1} f{print} f&&/return;/{exit}' "$eng")
-echo "$reduced" | grep -Fq '.scene__video-mobile' || fail "reduced-motion branch does not touch .scene__video-mobile"
-echo "$reduced" | grep -Fq 'pause()' || fail "reduced-motion branch does not pause the mobile clip"
+reduced=$(awk '/if[[:space:]]*\([[:space:]]*reduced[[:space:]]*\)[[:space:]]*\{/{f=1} f{print} f&&/return;/{exit}' "$eng" \
+  | sed -e 's://.*$::' -e '/\/\*/,/\*\//d')
+[ -n "$reduced" ] || fail "could not extract the reduced-motion branch from $eng"
+echo "$reduced" | grep -Eq "querySelectorAll\('\.scene__video-mobile'\)" || fail "reduced-motion branch does not touch .scene__video-mobile"
+echo "$reduced" | grep -Eq '\.pause\(\)' || fail "reduced-motion branch does not pause the mobile clip"
 echo "$reduced" | grep -Fq "removeAttribute('autoplay')" || fail "reduced-motion branch leaves autoplay on"
 echo "$reduced" | grep -Fq "removeAttribute('loop')" || fail "reduced-motion branch leaves loop on"
 
 if command -v node >/dev/null 2>&1; then
-  node --check "$js" && node --check "$eng" || fail "JS does not parse"
+  node --input-type=module --check < "$js" || fail "$js does not parse as a module"
+  node --check "$eng" || fail "$eng does not parse"
 fi
 echo PASS
