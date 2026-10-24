@@ -65,8 +65,26 @@ add_action('acf/init', function () {
     // Bootstrap each group from PHP only if it isn't already Local JSON. A group
     // that has a acf-json/<key>.json is the source of truth (dashboard edits sync
     // there); re-running its PHP would re-register it read-only and shadow edits.
+    //
+    // Steady state costs one option read: a signature of the fields/*.php names and
+    // newest mtime plus the acf-json/ directory mtime (it moves when a JSON is added
+    // or removed) is stored once a scan finds nothing left to bootstrap, and a match
+    // skips the glob, the file reads and the regex on every later request. It is never
+    // stored after a pass that bootstrapped, or when acf-json/ is unwritable, so a
+    // failed or partial persist is retried. Delete the option to force a rescan.
+    $signature = function () use ($fields_dir, $json_dir) {
+        $files = glob($fields_dir . '/*.php') ?: [];
+        sort($files);
+        $newest = 0;
+        foreach ($files as $f) { $newest = max($newest, (int) @filemtime($f)); }
+        clearstatcache(true, $json_dir);
+        return md5(implode('|', array_map('basename', $files)) . '#' . $newest . '#' . (int) @filemtime($json_dir));
+    };
+    $option = '__starter___fields_scan';
+    if (get_option($option) === $signature()) { return; }
+
     $bootstrapped = false;
-    foreach (glob($fields_dir . '/*.php') as $f) {
+    foreach (glob($fields_dir . '/*.php') ?: [] as $f) {
         if (!is_readable($f)) { continue; }
         $src = file_get_contents($f);
         if (preg_match_all("/'key'\\s*=>\\s*'(group_[A-Za-z0-9_]+)'/", $src, $m)) {
@@ -83,7 +101,11 @@ add_action('acf/init', function () {
     // Steady state — every group already has JSON: nothing to persist, so skip
     // the scan entirely. An unwritable acf-json/ degrades to read-only PHP
     // groups instead of emitting warnings on every request.
-    if (!$bootstrapped || !is_writable($json_dir)) { return; }
+    if (!$bootstrapped) {
+        update_option($option, $signature(), false);
+        return;
+    }
+    if (!is_writable($json_dir)) { return; }
 
     // One writer at a time: two concurrent first loads would both write the same
     // files, and a half-written JSON reads back as a corrupt field group.
