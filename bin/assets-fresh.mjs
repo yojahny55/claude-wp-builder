@@ -30,20 +30,31 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const args = process.argv.slice(2);
-const flag = (name, dflt) => {
-  const i = args.indexOf(name);
-  if (i === -1) return dflt;
-  const v = args[i + 1];
-  if (v === undefined || v.startsWith('--')) {
-    console.error(`ERROR: ${name} needs a value`);
-    process.exit(2);
+const KNOWN = new Set(['--manifest', '--root']);
+const opts = {};
+const positional = [];
+const argv = process.argv.slice(2);
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i];
+  if (a.startsWith('--')) {
+    if (!KNOWN.has(a)) {
+      console.error(`ERROR: unknown flag ${a}`);
+      process.exit(2);
+    }
+    const v = argv[i + 1];
+    if (v === undefined || v.startsWith('--')) {
+      console.error(`ERROR: ${a} needs a value`);
+      process.exit(2);
+    }
+    opts[a] = v;
+    i++;
+  } else {
+    positional.push(a);
   }
-  return v;
-};
-const manifestRel = flag('--manifest', 'assets/build.json');
-const rootArg = flag('--root', null);
-const themeDir = args.find((a, i) => !a.startsWith('--') && !(i > 0 && ['--manifest', '--root'].includes(args[i - 1])));
+}
+const manifestRel = opts['--manifest'] ?? 'assets/build.json';
+const rootArg = opts['--root'] ?? null;
+const themeDir = positional[0];
 if (!themeDir) {
   console.error('usage: assets-fresh.mjs <theme-dir> [--manifest assets/build.json] [--root <dir>]');
   process.exit(2);

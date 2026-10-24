@@ -27,7 +27,9 @@ grep -Fq 'bin/assets-fresh.mjs' "$A" || fail "auditor does not call assets-fresh
 grep -Fq 'bin/assets-fresh.mjs' commands/wp-update.md || fail "/wp-update does not call assets-fresh.mjs"
 
 command -v node >/dev/null || { echo "SKIP: node missing, behavior half not run"; echo PASS; exit 0; }
-t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
+cleanup_dirs=""
+trap 'rm -rf $cleanup_dirs' EXIT
+t=$(mktemp -d); cleanup_dirs="$t"
 mkdir -p "$t/assets/css" "$t/assets/critical"
 echo 'a{color:red}' > "$t/assets/css/bundle.min.css"
 echo 'a{color:red}' > "$t/assets/critical/single.css"
@@ -45,7 +47,7 @@ rm "$t/assets/build.json"
 node bin/assets-fresh.mjs "$t" | grep -Fq SKIP || fail "missing manifest should SKIP"
 
 # Test missing cut file on disk
-t2=$(mktemp -d); trap 'rm -rf "$t" "$t2"' EXIT
+t2=$(mktemp -d); cleanup_dirs="$t $t2"
 mkdir -p "$t2/assets/css" "$t2/assets/critical"
 echo 'a{color:red}' > "$t2/assets/css/bundle.min.css"
 echo 'a{color:red}' > "$t2/assets/critical/single.css"
@@ -55,5 +57,15 @@ rm "$t2/assets/critical/single.css"
 out2=$(node bin/assets-fresh.mjs "$t2" 2>&1) && fail "missing cut file passed as fresh"
 printf '%s' "$out2" | grep -Fq 'regenerate critical cuts' || fail "missing cut output lacks the message"
 [[ $(printf '%s' "$out2" | grep -c 'cut assets/critical/single.css') -eq 1 ]] || fail "missing cut reported more than once"
+
+# Unknown flag is refused rather than its value being taken for the theme dir
+node bin/assets-fresh.mjs --verbose true "$t2" >/dev/null 2>&1 && fail "unknown flag accepted"
+
+# Test missing source sheet while the cut file still exists
+echo 'a{color:red}' > "$t2/assets/critical/single.css"
+rm "$t2/assets/css/bundle.min.css"
+printf '{"cuts":{"assets/critical/single.css":{"source":"assets/css/bundle.min.css","hash":"%s"}}}' "$h2" > "$t2/assets/build.json"
+out3=$(node bin/assets-fresh.mjs "$t2" 2>&1) && fail "missing source sheet passed as fresh"
+printf '%s' "$out3" | grep -Fq 'is missing' || fail "missing source output lacks 'is missing'"
 
 echo PASS
