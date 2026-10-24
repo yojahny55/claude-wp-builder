@@ -156,6 +156,7 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 | PERF-075 | Image carries an embedded ICC colour profile that outweighs the pixels | Per attachment file, see "Procedure — embedded ICC profiles on images" below. `magick identify -format '%[colorspace]\|%[profile:icc]\|%b\n'` (or `exiftool -ICC_Profile:all -b`) over `uploads/` JPEG/PNG/WebP | No file with a profile over 100KB, and no CMYK file served on the web | WARNING |
 | PERF-076 | Heavy unbounded query inside an Elementor widget's `register_controls()` | Grep active plugins and themes for `register_controls` (and `_register_controls`) bodies that hold `posts_per_page' => -1`, `'limit' => -1`, `numberposts' => -1` or `get_terms` without `number`; then time key templates. See "Procedure — Elementor widget controls queried on the front end" below | No such query, or it is bounded or skipped on the front end | WARNING |
 | PERF-077 | Elementor generated CSS missing or answered with a non-CSS response | Fetch key pages, collect every `uploads/elementor/css/*.css` URL, `HEAD` each. See "Procedure — missing Elementor generated CSS" below | Every file answers `200` with a `text/css` content type | WARNING |
+| PERF-078 | Images in AJAX-returned HTML served without `<picture>`/WebP | Only when WebP delivery is on (Robin `webp_delivery_mode=picture` or equivalent) and the theme or a plugin registers `wp_ajax_*` / `wp_ajax_nopriv_*` actions. Grep the theme for those hooks and keep the handlers whose output contains `<img` (infinite scroll, tabs, load more). Request each with `curl` (POST to `admin-ajax.php`, the action and the parameters its handler reads) and, in the response, count `<img>` whose file has a sibling `.webp` on disk but is not inside a `<picture>`. See "Procedure — AJAX-returned images and WebP" below | Zero such images. `UNMEASURED` ("cannot launch the action") when the action needs a nonce, login or parameters that cannot be reproduced, or no site URL is reachable; `N/A` when WebP delivery is off or no handler returns `<img>`; never `PASS` unrequested | WARNING |
 
 ### Procedure — multi-currency and full-page cache (PERF-065 to PERF-067)
 
@@ -552,6 +553,24 @@ on demand) and, where Elementor's Tools screen offers it, Regenerate CSS & Data.
 keeps emptying, an on-demand regeneration mu-plugin may be proposed, and note the setting
 Elementor, Settings, Advanced, CSS Print Method: `Internal Embedding` stops the file requests
 altogether, at the cost of inline CSS per page. Neither is auto-applied.
+
+### Procedure — AJAX-returned images and WebP (PERF-078)
+
+Robin wraps `<img>` in `<picture>` on `template_redirect`, which is the full page. HTML built
+by `admin-ajax.php` (infinite scroll, tabs, "load more") never passes through it, so those
+images keep serving the PNG or JPEG although the `.webp` sibling exists (354 KB against 39 KB
+on a real build). The fix and its caveats are in `skills/wp-robin/references/webp-delivery.md`.
+
+```bash
+grep -rnE "wp_ajax(_nopriv)?_[a-z0-9_]+" <theme-dir> --include=*.php      # actions
+curl -s -X POST -d 'action=<action>&<params>' <site>/wp-admin/admin-ajax.php > /tmp/ajax.html
+grep -oE '<img[^>]+src="[^"]+\.(png|jpe?g)"' /tmp/ajax.html               # then test each for a .webp sibling and a <picture> parent
+```
+
+Read the handler for the parameters and nonce it needs. A nonce or login wall that cannot be
+reproduced makes the check `UNMEASURED`, not `PASS`. Report the count and the bytes the
+siblings would save (`stat` both files). Do not auto-apply: the recipe couples the theme to
+Robin's internal classes and needs the owner's decision.
 
 ### Procedure — database bloat checks (PERF-061 to PERF-064)
 

@@ -57,9 +57,17 @@ must compose is `content`, a judgement is `manual`.
 ### Render it
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/bin/audit-report.mjs --run <run.json> --out .wp-audit \
+${CLAUDE_PLUGIN_ROOT}/bin/audit-report.mjs --run <run.json> \
   --format <md|html|both> --lang <en|es>
 ```
+
+**Where it writes.** The directory is, in order: `--out <dir>`, the `WP_AUDIT_OUT_DIR`
+environment variable, the manifest's `audit.out_dir`, then `.wp-audit`. If it falls inside a
+git work tree and is not ignored, the renderer warns on one line; run
+`wp-config.mjs gitignore-check <site-root>` and offer to ignore it (see `ledger.md`). The
+renderer compares against the newest sidecar **in that directory**, so changing the directory
+between runs starts a new baseline: keep one directory per site. Always print the absolute
+path of every file generated; the renderer prints them, relay them as written.
 
 Write `<run.json>` first, into the session's scratch directory rather than the project —
 it is an argument, not an artifact:
@@ -110,7 +118,7 @@ never measured, so it goes in `unmeasured` with the command that would settle it
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/bin/audit-report.mjs --run <agents.json> \
-  --merge .wp-audit/suite/results/run.json --out .wp-audit --format both --lang <en|es>
+  --merge .wp-audit/suite/results/run.json --format both --lang <en|es>
 ```
 
 The renderer applies Step 7's second rule — same `check` **and** same `resource` keeps the
