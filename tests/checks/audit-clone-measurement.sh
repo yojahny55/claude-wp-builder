@@ -36,8 +36,8 @@ if grep -Eq "pending and fill it" "$audit"; then
   fail "Live scan line is still left pending by Step 9 only"
 fi
 
-sec=$(bash tests/checks/lib/agent-text.sh wp-audit-security)
-for a in "$sec" agents/wp-audit-practices.md; do
+sec_agent=$(bash tests/checks/lib/agent-text.sh wp-audit-security)
+for a in "$sec_agent" agents/wp-audit-practices.md; do
   has "$a" "Report-only: no"
   has "$a" "Report-only: yes"
 done

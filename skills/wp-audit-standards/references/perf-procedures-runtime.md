@@ -170,9 +170,10 @@ images keep serving the PNG or JPEG although the `.webp` sibling exists (354 KB 
 on a real build). The fix and its caveats are in `skills/wp-robin/references/webp-delivery.md`.
 
 ```bash
+T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 grep -rnE "wp_ajax(_nopriv)?_[a-z0-9_]+" <theme-dir> --include=*.php      # actions
-curl -s -X POST -d 'action=<action>&<params>' <site>/wp-admin/admin-ajax.php > /tmp/ajax.html
-grep -oE '<img[^>]+src="[^"]+\.(png|jpe?g)"' /tmp/ajax.html               # then test each for a .webp sibling and a <picture> parent
+curl -s -X POST -d 'action=<action>&<params>' <site>/wp-admin/admin-ajax.php > "$T/ajax.html"
+grep -oE '<img[^>]+src="[^"]+\.(png|jpe?g)"' "$T/ajax.html"               # then test each for a .webp sibling and a <picture> parent
 ```
 
 Read the handler for the parameters and nonce it needs. A nonce or login wall that cannot be

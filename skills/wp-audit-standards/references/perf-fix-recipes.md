@@ -199,15 +199,17 @@ as a font that is "slightly off" on one page and nobody can say why:
 
 ```bash
 # Every character the site actually renders, from the database and the templates.
+T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 wp post list --post_type=any --post_status=publish --field=ID \
-  | xargs -n1 -I{} wp post get {} --field=post_content > /tmp/site-text.txt
-wp post list --post_type=any --post_status=publish --field=post_title >> /tmp/site-text.txt
-cat wp-content/themes/<slug>/**/*.php >> /tmp/site-text.txt   # hardcoded UI strings
+  | xargs -n1 -I{} wp post get {} --field=post_content > $T/site-text.txt
+wp post list --post_type=any --post_status=publish --field=post_title >> $T/site-text.txt
+cat wp-content/themes/<slug>/**/*.php >> $T/site-text.txt   # hardcoded UI strings
 
-python3 - <<'PY'
+python3 - "$T/site-text.txt" <<'PY'
+import sys
 from fontTools.ttLib import TTFont
 cmap = set(TTFont('Family-Regular.subset.woff2').getBestCmap())
-text = set(open('/tmp/site-text.txt', encoding='utf-8', errors='replace').read())
+text = set(open(sys.argv[1], encoding='utf-8', errors='replace').read())
 missing = {c for c in text if ord(c) not in cmap and c.isprintable() and not c.isspace()}
 print('MISSING:', sorted(missing) if missing else 'none')
 PY

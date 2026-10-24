@@ -26,9 +26,10 @@ stylesheet, take the woff2 URLs out of it, and store them next to the self-hoste
 
 ```bash
 mkdir -p <theme-dir>/assets/fonts
+T=$(mktemp -d)   # keep it until the font-face rewrite below, then rm -rf "$T"
 UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
-curl -fsS -A "$UA" "<the demo's exact css2 URL>" -o /tmp/gf.css
-urls=$(grep -oE 'https://fonts\.gstatic\.com/[^)]+\.woff2' /tmp/gf.css | sort -u)
+curl -fsS -A "$UA" "<the demo's exact css2 URL>" -o $T/gf.css
+urls=$(grep -oE 'https://fonts\.gstatic\.com/[^)]+\.woff2' $T/gf.css | sort -u)
 [ -n "$urls" ] || { echo "no woff2 URLs in the Google Fonts response — carry failed" >&2; exit 1; }
 printf '%s\n' "$urls" \
   | xargs -r -n1 sh -c 'curl -fsS -o "<theme-dir>/assets/fonts/$(basename "$1")" "$1"' _
@@ -45,7 +46,7 @@ The `-A` is not decoration. Google serves a *different* stylesheet per user agen
 default `curl` UA gets the legacy TTF build — you download fonts that work, in a format two
 generations old, and never notice. Send a modern browser UA and the response is woff2.
 
-Then write `/tmp/gf.css` into the theme's font-face location with each `src: url()` rewritten
+Then write `$T/gf.css` into the theme's font-face location with each `src: url()` rewritten
 to `assets/fonts/<basename>`, keeping every `@font-face` block the response contains:
 
 - Keep the `unicode-range` descriptors exactly as Google emitted them. They are what makes the
