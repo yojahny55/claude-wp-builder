@@ -5,7 +5,7 @@ fail() { echo "FAIL: $*"; exit 1; }
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
 a=$EXPANDED
 has() { grep -Fq -- "$2" "$1" || fail "$1 lacks: $2"; }
-has $a "wp-config.mjs drift"
+has $a 'wp-config.mjs" drift'
 has $a "Validation checks the manifest's shape, not whether it is true."
 has $a "Exit \`4\`"
 has $a "Re-adopt it"
