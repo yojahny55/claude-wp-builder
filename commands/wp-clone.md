@@ -60,6 +60,12 @@ seeded content, ACF values, test orders, a demo built this afternoon. `/wp-seed`
 entire ownership model to avoid overwriting a client's work inside a database. Replacing
 that database wholesale was, until this gate, one command with no prompt.
 
+**Never import into production.** When the destination's `.wp-create.json` has `environments`,
+a `role: "prod"` entry whose host matches the destination's `wordpress.url` (scheme and `www.`
+ignored) stops the clone here, whatever the flags: `--force` does not override it. The same
+entries tell Path A which environment is the source (`role: "prod"` or `"staging"`).
+Without `environments`, the checks below are all there is.
+
 ### 1.5.1: Is the destination occupied?
 
 ```bash
@@ -309,7 +315,7 @@ still address production, and say what each is, where it lives and what it point
 
 ```bash
 bash -c "$WP option list --search='*_webhook*' --format=table"
-bash -c "$WP option list --search='*_live_*' --format=table"
+bash -c "$WP option list --search='*_live_*' --fields=option_name --format=table"
 bash -c "$WP plugin list --status=active --field=name | grep -iE 'stripe|paypal|mailchimp|zapier'"
 ```
 
