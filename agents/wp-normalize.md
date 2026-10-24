@@ -1,7 +1,7 @@
 ---
 name: wp-normalize
 description: Demo-folder analyzer — converts an arbitrary multi-page HTML site into the plugin's canonical delimited demo format plus a build manifest, splitting sections and classifying content types
-tools: Read, Write, Edit, Grep, Glob
+tools: Read, Write, Edit, Grep, Glob, Bash
 model: opus
 ---
 
@@ -531,3 +531,21 @@ manifest top level under `"fonts"` if it applies globally, or per-section under
 
 List every unresolved shared-component or asset-role ambiguity in `review[]` alongside
 the existing classification entries — the checkpoint reader treats them the same way.
+
+## Final validation — MANDATORY, the last step before you report
+
+`Bash` is granted to this agent for this step **only**: do not use it to analyze the demo,
+fetch anything, or write files — the analysis stays your own DOM reasoning. Before reporting
+done, confirm the manifest you wrote parses and that every page file it names exists (paths are relative to the project root):
+
+```bash
+node -e '
+const fs = require("fs");
+const m = JSON.parse(fs.readFileSync("demo/.yolo-manifest.json", "utf8"));
+const missing = (m.pages || []).filter((p) => p.file && !fs.existsSync(p.file));
+if (missing.length) { console.error("missing page files:", missing.map((p) => p.file).join(", ")); process.exit(1); }
+console.log("ok: manifest parses,", (m.pages || []).length, "page(s)");
+'
+```
+
+A parse error or a missing file is yours to fix before the checkpoint sees the manifest.

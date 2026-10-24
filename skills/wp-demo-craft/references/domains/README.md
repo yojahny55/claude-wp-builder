@@ -1,10 +1,12 @@
 # Domain table
 
 Vendored from `nextlevelbuilder/ui-ux-pro-max-skill` (MIT). Regenerate with
-`bin/domains-import.sh`, which overwrites `domains.csv` in place, clones
-`main` unpinned, and records the exact commit it imported in `SOURCE.txt` —
-that file, not a version number here, is the source of truth for what was
-actually vendored.
+`bin/domains-import.sh`, which overwrites `domains.csv` in place, fetches the
+upstream tag or commit in `DOMAINS_REF` (pinned by default, never a moving
+branch) and records the exact commit it imported in `SOURCE.txt` — that file,
+not a version number here, is the source of truth for what was actually
+vendored. The CSV reaches the agent's context, so after moving the pin read
+the `git diff` of `domains.csv` before committing it.
 
 ## What is here
 

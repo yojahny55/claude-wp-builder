@@ -109,6 +109,15 @@ bash -c 'WP_ROOT="$1" bash "${CLAUDE_PLUGIN_ROOT}/skills/wp-robin/scripts/robin-
 The script is long-running on a large Media Library. Let it finish and keep its full output —
 it reports every step, and Step 4 reads that output rather than re-deriving the state.
 
+### Step 3.5: Git ignore for what Robin writes
+
+After a successful run, if the target is a git work tree, run
+`node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs gitignore-check <wp-root>` (it reads
+`TOOL_STATE_PATHS`, which includes Robin's runtime cache and test state under
+`wp-content/plugins/robin-image-optimizer/`). Exit `4` means git would commit them: quote the
+exact `missing:` rules in the report so the operator can add them. Do not edit `.gitignore`
+unless the operator says yes.
+
 ## Step 4: Report
 
 Print the script's own summary, then interpret it against the skill:
@@ -122,6 +131,12 @@ Print the script's own summary, then interpret it against the skill:
 For anything non-zero in the error or orphan columns, quote the matching row of the skill's
 troubleshooting table and the fix it names. Do not invent a fix that is not in the skill —
 if the symptom is not covered there, say so and hand back the raw output.
+
+Verify after optimizing, do not assume: fetch the home page, find the LCP/hero image (the
+`fetchpriority="high"` or first above-the-fold `<img>` or `background-image`) and confirm its
+file has a `.webp` sibling on disk and is delivered as WebP (`<picture>` or the `image-set()`).
+A hero without a sibling is reported as a gap, since it is the image that decides LCP. If the
+site returns images in AJAX HTML, say that `references/webp-delivery.md` covers it.
 
 Close with the next command when one applies: `/wp-debug media` if uploads still misbehave,
 `/wp-audit --performance` to re-check image weight on the built site.
