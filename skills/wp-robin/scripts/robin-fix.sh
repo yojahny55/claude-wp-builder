@@ -84,7 +84,7 @@ decode_php_string() {
 	php -r '$literal = $argv[1]; $body = substr($literal, 1, -1);
 		if (39 === ord($literal[0])) {
 			$slash = chr(92); $quote = chr(39);
-			$body = str_replace(array($slash . $slash, $slash . $quote), array($slash, $quote), $body);
+			$body = strtr($body, array($slash . $slash => $slash, $slash . $quote => $quote));
 		} else {
 			$body = preg_replace_callback("/\\\\(?:u\\{([0-9a-fA-F]+)\\}|[0-7]{1,3}|x[0-9a-fA-F]{1,2}|.)/s", function ($m) {
 				if (!isset($m[1]) || "" === $m[1]) return stripcslashes($m[0]);

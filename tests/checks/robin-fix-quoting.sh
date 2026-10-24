@@ -21,6 +21,7 @@ grep -Fq 'command -v magick || command -v convert' commands/wp-robin.md || fail 
 grep -Fq '`magick`, else the older `convert`' skills/wp-robin/SKILL.md || fail "SKILL.md does not say magick is preferred over convert"
 
 command -v php >/dev/null 2>&1 || { echo "SKIP: php not found -- the static half passed, the script was not run"; exit 0; }
+echo test | grep -oP test >/dev/null 2>&1 || { echo "SKIP: grep -P (PCRE) not supported"; exit 0; }
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
