@@ -17,8 +17,8 @@ for f in nginx.conf.tpl nginx-no-ssl.conf.tpl; do
   grep -Fq 'try_files $uri =404;' "$p" || fail "$f: no try_files guard before fastcgi"
   ! grep -Fq 'location ~ /\.ht {' "$p" || fail "$f: still has the narrow /.ht rule"
   # regex locations match in order: the denies must precede the PHP block
-  deny=$(grep -n 'uploads/\.\*\\\.php' "$p" | head -1 | cut -d: -f1)
-  php=$(grep -n 'location ~ \\\.php\$' "$p" | head -1 | cut -d: -f1)
+  deny=$(grep -Fn 'location ~* /uploads/.*\.php$ { deny all; }' "$p" | head -1 | cut -d: -f1)
+  php=$(grep -Fn 'location ~ \.php$' "$p" | head -1 | cut -d: -f1)
   [ -n "$deny" ] && [ -n "$php" ] && [ "$deny" -lt "$php" ] || fail "$f: uploads deny must come before the PHP location"
   for ph in '{{domain}}' '{{document_root}}' '{{php_fpm_sock}}' '{{max_upload_size}}'; do
     grep -Fq "$ph" "$p" || fail "$f lost placeholder $ph"
@@ -41,7 +41,7 @@ done
 c=$d/Caddyfile.tpl
 grep -Fq 'path */.*' "$c" || fail "Caddyfile: dotfiles path pattern missing"
 grep -Fq 'not path /.well-known/*' "$c" || fail "Caddyfile: dotfiles not denied (or .well-known not excepted)"
-grep -Fq 'path *.bak' "$c" && grep -Fq 'path *.log' "$c" && grep -Fq 'path *.sql' "$c" || fail "Caddyfile: sql/bak/log not denied"
+for ext in bak log sql; do grep -Fq "path *.$ext" "$c" || fail "Caddyfile: *.$ext not denied"; done
 grep -Fq '*.bak-*' "$c" || fail "Caddyfile: .bak-* not denied"
 grep -Fq '/wp-content/uploads/*.php' "$c" || fail "Caddyfile: PHP in uploads not denied"
 for ph in '{{domain}}' '{{document_root}}' '{{php_fpm_sock}}'; do grep -Fq "$ph" "$c" || fail "Caddyfile lost $ph"; done
