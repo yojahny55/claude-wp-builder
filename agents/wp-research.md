@@ -96,7 +96,16 @@ column but URL.
 
 ## The manifest record
 
-Write into `.wp-create.json`:
+Write into `.wp-create.json` **with the `set` subcommand, never with Edit or Write**.
+Other builders (`/wp-yolo` runs several in parallel) read and write the same file, and a
+free-form edit loses their keys or leaves a half-written file. `set` locks, validates and
+renames atomically; pass the whole record as one JSON argument:
+
+```bash
+node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs set "${PROJECT_PATH}" research '<the JSON below, on one line>'
+```
+
+The record:
 
 ```jsonc
 "research": {
@@ -109,7 +118,7 @@ Write into `.wp-create.json`:
 }
 ```
 
-Or the scalar `"research": "none"` when the operator declines or every rung
+Or the scalar `"research": "none"` (`set … research none`) when the operator declines or every rung
 of the ladder fails. `"none"` is permanent: it means no later run asks again
 and no later run retries.
 
