@@ -32,7 +32,7 @@ cfg="$tmp/audit.config.js"
 sed "s#https://example.com#https://stale-host.example#" "$suite/audit.config.js" | grep -v WP_AUDIT_BASE_URL_OVERRIDE > "$cfg"
 before="$(grep -F 'baseURL:' "$cfg")"
 for run in 1 2; do
-  RUNNER="$runner" CFG="$cfg" BASE_URL="https://audited.example" node "$tmp/rewrite.js" 2> "$tmp/err" \
+  RUNNER="$runner" CFG="$cfg" BASE_URL="https://audited.example" node "$tmp/rewrite.js" 2>> "$tmp/err" \
     || fail "$runner could not prepare a config holding another host"
 done
 [ "$(grep -F 'baseURL:' "$cfg")" = "$before" ] || fail "$runner edited baseURL in audit.config.js"
@@ -74,13 +74,15 @@ hasnt "$runner" 'npm install --no-audit'
 cat > "$tmp/run.json" <<'JSON'
 {"site":"Example","tier3":"unmeasured","findings":[],"unmeasured":[{"check":"tier3-browser","reason":"no browser"}]}
 JSON
-node bin/audit-report.mjs --run "$tmp/run.json" --out "$tmp/out-report" --format both --date 2026-01-01 >/dev/null
+node bin/audit-report.mjs --run "$tmp/run.json" --out "$tmp/out-report" --format both --date 2026-01-01 >/dev/null \
+  || fail "audit-report.mjs failed on tier3-unmeasured input"
 for f in md html; do
   head -n 40 "$tmp/out-report/informe-2026-01-01.$f" | grep -Eq '(\*\*|<strong>)Tier 3 \(browser measurement\) was NOT measured' \
     || fail "informe-*.$f has no bold Tier 3 UNMEASURED line in its first 40 lines"
 done
 echo '{"site":"Example","findings":[],"unmeasured":[]}' > "$tmp/run2.json"
-node bin/audit-report.mjs --run "$tmp/run2.json" --out "$tmp/out-clean" --format both --date 2026-01-01 >/dev/null
+node bin/audit-report.mjs --run "$tmp/run2.json" --out "$tmp/out-clean" --format both --date 2026-01-01 >/dev/null \
+  || fail "audit-report.mjs failed on a clean run"
 ! grep -Fq 'was NOT measured' "$tmp/out-clean"/informe-2026-01-01.* || fail "the notice shows on a run that measured Tier 3"
 
 has skills/wp-audit-run/references/browser-suite.md 'The audited host is `--url`, never the config.'

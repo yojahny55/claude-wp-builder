@@ -5,7 +5,9 @@ const os = require('os');
 const path = require('path');
 const Guard = require('./timeout-guard');
 
-const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tg-')), 'unmeasured.json');
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tg-'));
+process.on('exit', () => fs.rmSync(tmpDir, { recursive: true, force: true }));
+const out = path.join(tmpDir, 'unmeasured.json');
 let interrupted = 0;
 const g = new Guard({ max: 3, out, interrupt: () => { interrupted += 1; } });
 const t = { title: 'home' };
