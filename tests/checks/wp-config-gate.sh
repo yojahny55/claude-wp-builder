@@ -78,7 +78,7 @@ done
 gate=skills/wp-manifest-gate/SKILL.md
 [ -f "$gate" ] || fail "$gate is missing"
 grep -Eq '^user-invocable: false$' "$gate" || fail "$gate must stay user-invocable: false"
-policy_of() { sed -n 's/^\*\*Exit `3` policy:\*\* `\([a-z-]*\)`.*/\1/p' "$1" | head -n 1; }
+policy_of() { sed -n 's/^\*\*Exit `3` policy:\*\* `\([a-zA-Z0-9_-]*\)`.*/\1/p' "$1" | head -n 1; }
 declare -A want=(
   [wp-seed]=bare-wp-fallback [wp-robin]=bare-wp-fallback [wp-s3]=bare-wp-fallback [wp-update]=bare-wp-fallback
   [wp-debug]=adopt-or-bare-wp [wp-audit]=adopt-or-stop [wp-adopt]=register [wp-init]=scaffold
@@ -104,8 +104,10 @@ done
 # The prologue is not copied beside the block either: the paragraph that says where PROJECT_PATH
 # comes from lives only inside the byte-identical block, once per gate.
 for f in commands/*.md; do
-  n=$(grep -Fc 'is not an environment variable the way' "$f" || true)
-  g=$(grep -Fc '**First: validate the project configuration.**' "$f" || true)
+  x=$f
+  if grep -Fq "skills/$(basename "$f" .md)-run/references/" "$f"; then expand_command "$f"; x=$EXPANDED; fi
+  n=$(grep -Fc 'is not an environment variable the way' "$x" || true)
+  g=$(grep -Fc '**First: validate the project configuration.**' "$x" || true)
   [ "$n" -le "$g" ] || fail "$f repeats the PROJECT_PATH prologue outside its gate block"
 done
 # wp-audit must not send an adoptable site to /wp-init when the context file is missing.
