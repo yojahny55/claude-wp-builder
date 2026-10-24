@@ -86,14 +86,14 @@ decode_php_string() {
 			$slash = chr(92); $quote = chr(39);
 			$body = str_replace(array($slash . $slash, $slash . $quote), array($slash, $quote), $body);
 		} else {
-			$body = preg_replace_callback("/\\\\u\\{([0-9a-fA-F]+)\\}/", function ($m) {
+			$body = preg_replace_callback("/\\\\(?:u\\{([0-9a-fA-F]+)\\}|[0-7]{1,3}|x[0-9a-fA-F]{1,2}|.)/s", function ($m) {
+				if (!isset($m[1]) || "" === $m[1]) return stripcslashes($m[0]);
 				$n = hexdec($m[1]);
 				if ($n < 0x80) return chr($n);
 				if ($n < 0x800) return chr(0xc0 | ($n >> 6)) . chr(0x80 | ($n & 0x3f));
 				if ($n < 0x10000) return chr(0xe0 | ($n >> 12)) . chr(0x80 | (($n >> 6) & 0x3f)) . chr(0x80 | ($n & 0x3f));
 				return chr(0xf0 | ($n >> 18)) . chr(0x80 | (($n >> 12) & 0x3f)) . chr(0x80 | (($n >> 6) & 0x3f)) . chr(0x80 | ($n & 0x3f));
 			}, $body);
-			$body = stripcslashes($body);
 		}
 		echo $body, "\0";' -- "$lit"
 }

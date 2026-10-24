@@ -95,7 +95,7 @@ out=$(run "$tmp" WP_ROOT="$wp"); rc=$?
 [ -s "$tmp/log" ] || fail "no query reached the client: $out"
 first=$(head -1 "$tmp/log")
 grep -Fq -- 'livedb' <<<"$first" || fail "a commented-out DB_NAME won over the live define: $first"
-! grep -Eq 'commented_|trailing_comment' "$tmp/log" || fail "a commented define reached the client: $first"
+! grep -Eq 'commented_|trailing_comment' "$tmp/log" || fail "a commented define reached the client: $(grep -E 'commented_|trailing_comment' "$tmp/log")"
 grep -Fq -- '-u us"er -h localhost livedb' <<<"$first" || fail "the double-quoted DB_USER with an escaped quote was not read whole: $first"
 expected_pwd=$(printf '%s' $'a\tb\\c"d$eA\n' | base64 | tr -d '\n')
 grep -Fq "pwd_b64=$expected_pwd" "$tmp/log" || fail "the multiline double-quoted password or its trailing newline was not decoded: $first"
