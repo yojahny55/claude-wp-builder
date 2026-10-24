@@ -218,3 +218,35 @@ and only needs auditing, debugging or cloning into.
 `/wp-create` enters Adopt Mode when the target path already holds a `wp-config.php`. The
 procedure — what it skips, what it reads from the existing install, the multisite refusal —
 is `commands/wp-create.md`'s "Adopt Mode" section; follow it there.
+
+## 8. Remote environments
+
+The sections above cover the LOCAL environment. A site also has remote ones (staging,
+production), and the manifest records them by name so no command has to guess which URL is
+production:
+
+```json
+"environments": {
+  "staging": { "role": "staging", "url": "https://staging.example.com",
+               "sync": { "tool": "envsync", "transport": "https", "allow_http": false } },
+  "prod":    { "role": "prod",    "url": "https://www.example.com",
+               "sync": { "tool": "envsync", "transport": "https", "allow_http": false } }
+}
+```
+
+- `role` is `local`, `staging` or `prod`. `sync` is optional; `tool` is `envsync` and
+  `transport` is `http` or `https` (`http` needs `allow_http: true`, said on purpose).
+- **No token in the manifest.** `validate` refuses any credential-looking key. The sync token
+  goes in the gitignored `.wp-create.local.json`, typed by the operator into the file, never
+  pasted in the chat; confirm with `git check-ignore .wp-create.local.json` before and after.
+- Write one entry with `wp-config.mjs env-set '${PROJECT_PATH}' --name=prod --role=prod
+  --url=<url> --sync=envsync --transport=https`. `/wp-adopt` Step 4 does it from
+  `wp envsync env list` when the `ix-wp-envsync` plugin is active.
+- **The production gate reads the role.** `/wp-update`, `/wp-clone` and `/wp-audit` treat the
+  target as production when `environments[*].role == prod` and its `url` matches the site
+  (scheme and `www` ignored); only when the manifest has no `environments` do they fall back
+  to the old rule of comparing the URL against non-public hosts.
+
+The EnvSync recipes (pull by scope, push only what is missing, volatile tables, the token)
+are in [references/sync-environments.md](references/sync-environments.md). The skill that
+drives the tool is `wp-envsync`; these are the rules that sit around it.
