@@ -94,7 +94,9 @@ it.
 
 `s3-config.php` is written `0640` and added to the site's `.gitignore`. Give it the web
 server's group. `wp-config.php` is backed up as `wp-config.php.bak-<timestamp>` before the
-`require` is inserted, and the insertion is idempotent.
+`require` is inserted — into `~/.local/state/wp-s3-backups/` (`$WP_S3_BACKUP_DIR`), mode `0700`, never
+next to the original, where the web server would serve it as plain text — and keeps its mode and owner;
+the secret can be passed with `--secret-file` (mode `0600`) instead of the environment; and the insertion is idempotent.
 
 ## The transfer verifies itself
 
@@ -222,7 +224,8 @@ Read it before the first run against AWS, and when media returns `403`.
 
 `scripts/s3-revert.sh` disables rewriting, **downloads the media before removing the
 configuration** — without `s3-config.php` there is no bucket, region or credential left to
-fetch them with — deactivates the plugin, removes the `require`, and renames `s3-config.php`
-and the mu-plugin to `.disabled` rather than deleting them. It deletes nothing in the
-bucket. Two things it cannot undo, because they are site data: Elementor's stored URLs and
-WooCommerce's download settings. It prints both commands, filled in.
+fetch them with — deactivates the plugin and removes the `require`. It parks the credential
+file in the private backup directory outside the docroot with mode `0600`, and renames the
+mu-plugin to `.disabled`. It deletes nothing in the bucket. Two things it cannot undo,
+because they are site data: Elementor's stored URLs and WooCommerce's download settings. It
+prints both commands, filled in.
