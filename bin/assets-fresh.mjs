@@ -34,12 +34,16 @@ const args = process.argv.slice(2);
 const flag = (name, dflt) => {
   const i = args.indexOf(name);
   if (i === -1) return dflt;
-  const [v] = args.splice(i, 2).slice(1);
-  return v ?? dflt;
+  const v = args[i + 1];
+  if (v === undefined || v.startsWith('--')) {
+    console.error(`ERROR: ${name} needs a value`);
+    process.exit(2);
+  }
+  return v;
 };
 const manifestRel = flag('--manifest', 'assets/build.json');
 const rootArg = flag('--root', null);
-const themeDir = args[0];
+const themeDir = args.find((a, i) => !a.startsWith('--') && !(i > 0 && ['--manifest', '--root'].includes(args[i - 1])));
 if (!themeDir) {
   console.error('usage: assets-fresh.mjs <theme-dir> [--manifest assets/build.json] [--root <dir>]');
   process.exit(2);
@@ -61,7 +65,13 @@ try {
 
 const sha = (rel) => {
   const p = resolve(root, rel);
-  return existsSync(p) ? createHash('sha256').update(readFileSync(p)).digest('hex') : null;
+  if (!existsSync(p)) return null;
+  try {
+    return createHash('sha256').update(readFileSync(p)).digest('hex');
+  } catch (e) {
+    console.error(`ERROR: cannot read ${p}: ${e.message}`);
+    process.exit(2);
+  }
 };
 const stale = [];
 for (const [rel, want] of Object.entries(manifest.sheets ?? {})) {
@@ -73,7 +83,10 @@ for (const [cut, meta] of Object.entries(manifest.cuts ?? {})) {
     console.error(`ERROR: cut "${cut}" in manifest is missing required "source" or "hash" property`);
     process.exit(2);
   }
-  if (sha(cut) === null) stale.push(`cut ${cut}: missing`);
+  if (sha(cut) === null) {
+    stale.push(`cut ${cut}: missing`);
+    continue;
+  }
   const got = sha(meta.source);
   if (got !== meta.hash) stale.push(`cut ${cut}: source ${meta.source} ${got ? 'changed since the cut' : 'is missing'}`);
 }

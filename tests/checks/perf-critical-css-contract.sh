@@ -44,10 +44,8 @@ printf '%s' "$out" | grep -Fq 'regenerate critical cuts' || fail "stale output l
 rm "$t/assets/build.json"
 node bin/assets-fresh.mjs "$t" | grep -Fq SKIP || fail "missing manifest should SKIP"
 
-echo PASS
-
 # Test missing cut file on disk
-t2=$(mktemp -d); trap 'rm -rf "$t2"' EXIT
+t2=$(mktemp -d); trap 'rm -rf "$t" "$t2"' EXIT
 mkdir -p "$t2/assets/css" "$t2/assets/critical"
 echo 'a{color:red}' > "$t2/assets/css/bundle.min.css"
 echo 'a{color:red}' > "$t2/assets/critical/single.css"
@@ -56,3 +54,6 @@ printf '{"sheets":{"assets/css/bundle.min.css":"%s"},"cuts":{"assets/critical/si
 rm "$t2/assets/critical/single.css"
 out2=$(node bin/assets-fresh.mjs "$t2" 2>&1) && fail "missing cut file passed as fresh"
 printf '%s' "$out2" | grep -Fq 'regenerate critical cuts' || fail "missing cut output lacks the message"
+[[ $(printf '%s' "$out2" | grep -c 'cut assets/critical/single.css') -eq 1 ]] || fail "missing cut reported more than once"
+
+echo PASS
