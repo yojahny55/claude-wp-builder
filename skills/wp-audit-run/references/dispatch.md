@@ -108,7 +108,7 @@ third 5, report the check UNMEASURED: production gate busy. The local site is no
 The browser suite (Step 6.5) goes through the same gate but is never run beside the agents: it
 starts only after all of them have returned, because it holds the host lock for many minutes.
 
-Run all checks for your tier level. Output your findings as a structured report with the following format for each issue:
+Run all checks for your tier level. Write your full report to `<out>/agents/<agent>.md` (create `agents/` if missing) and return to the parent only the findings JSON plus a summary of fewer than 15 lines. Write the file for each finding in this format:
 
 [<SEVERITY>] <CODE>: <message> (<file>:<line> if applicable)
   Resource: <the stable thing this is about — see the resource table in Step 7>
@@ -169,3 +169,25 @@ agent given no pages audits nothing while reporting cleanly.
 2. Continue with remaining agents (do not block the entire audit)
 3. Mark the failed category in the report
 4. Skip the failed category in the fix phase
+
+## Reports on disk and the run state
+
+The parent never keeps an agent's full report in its context. The agent's full report goes to `<out>/agents/<agent>.md`, for example `<out>/agents/wp-audit-security.md`, and what comes back to the parent is the findings JSON and a summary of fewer than 15 lines. The parent writes the file itself from the returned text when the agent could not (an agent without write access), **as soon as that agent returns and before the Step 7 synthesis**. Synthesis reads the findings back from `agents/`, not from memory, so a `/clear` between Step 6 and Step 7 loses nothing.
+
+`<out>/run-state.json` is what makes the run resumable. Create it before dispatch and rewrite it after every step that finishes:
+
+```json
+{
+  "host": "https://example.test",
+  "tier": 2,
+  "flags": ["--all", "--report"],
+  "categories": ["security", "seo"],
+  "steps_done": ["2", "3", "6"],
+  "agents_done": ["wp-audit-security"],
+  "next": "Step 6: dispatch wp-audit-seo"
+}
+```
+
+On start, if `<out>/run-state.json` exists, offer to resume from `next` instead of starting over: reuse its flags, host and tier, and skip every agent listed in `agents_done` whose `agents/<agent>.md` exists. A run whose state file is missing or unreadable starts fresh.
+
+When Step 8 (and 8.5) finish and the fix offer is next, `/wp-audit` writes `next` as "Step 9: offer fixes" and suggests `/clear` before it: the synthesis is on disk, and Step 9 reads it from there.

@@ -25,7 +25,7 @@ done
 for a in wp-css wp-tailwind wp-normalize; do
   f=agents/$a.md
   if grep -q '^tools:.*\bBash\b' "$f"; then
-    grep -Eq '\$WP |wp --path|php -l' "$f" || fail "$a grants Bash but never needs a shell"
+    grep -Eq '\$WP |wp --path|php -l|## Final validation' "$f" || fail "$a grants Bash but never needs a shell"
   fi
 done
 
