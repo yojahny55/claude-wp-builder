@@ -27,10 +27,10 @@ from `$ARGUMENTS`, or the working directory when none is given.
 
 **First: validate the project configuration.**
 
-`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report".
+`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report". The path travels as a positional argument, never inside the `-c` string: write it in single quotes, and a path that holds a single quote gets each one written as `'\''`.
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 | Exit | Meaning | Do |
@@ -50,7 +50,7 @@ job), and exit `1` is reported verbatim as the table says.
 ## Step 2: Probe (dry run)
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs adopt '${PROJECT_PATH}' --dry-run"
+bash -c 'node "$1/bin/wp-config.mjs" adopt "$2" --dry-run' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 Re-registering a site whose manifest is wrong (a blank scaffold the real site was restored
@@ -180,9 +180,9 @@ relative to the WordPress root. Pass `--read-only=` with an empty value when not
 read-only.
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs adopt '${PROJECT_PATH}' \
+bash -c 'node "$1/bin/wp-config.mjs" adopt "$2" "${@:3}"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}' \
   --wrapper='<wrapper>' --prefix='<prefix>' --industry='<industry>' \
-  --editable='<path>,<path>' --read-only='<path>,<path>'"
+  --editable='<path>,<path>' --read-only='<path>,<path>'
 ```
 
 It re-probes, validates and writes nothing if validation fails. On success it writes
@@ -190,7 +190,7 @@ It re-probes, validates and writes nothing if validation fails. On success it wr
 operator wrote in that file outside the markers is kept. Then confirm:
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 It must exit `0`.
@@ -201,8 +201,8 @@ commands only read the site; the second only writes the manifest:
 
 ```bash
 bash -c "$WP envsync env list"
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs env-set '${PROJECT_PATH}' \
-  --name=<name> --role=<local|staging|prod> --url=<url> --sync=envsync --transport=<http|https>"
+bash -c 'node "$1/bin/wp-config.mjs" env-set "$2" "${@:3}"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}' \
+  --name=<name> --role=<local|staging|prod> --url=<url> --sync=envsync --transport=<http|https>
 ```
 
 Pass `--allow-http` only for an `http` environment the operator confirms on purpose. Ask the
