@@ -130,6 +130,24 @@ Standard breakpoints:
 - `1024px` — desktop
 - `1280px` — large desktop
 
+### An element that exists only on mobile is hidden by the desktop query
+
+Mobile-first means the base rule shows the element and a `min-width` query takes it away. The base rule alone leaves a mobile-only block visible on desktop, and a mobile rule that sets `display` leaves a wrapper box that breaks the inline flow of its children. For every element the demo shows only on mobile (a menu footer, a mobile CTA bar, a toggle button), write the desktop override in the same block:
+
+```css
+/* Base: mobile */
+.mobile-nav__footer { display: block; }
+.mobile-nav__links  { display: flex; flex-direction: column; }
+
+/* Desktop (1024px+): footer gone, links flow inline in the header row */
+@media (min-width: 1024px) {
+    .mobile-nav__footer { display: none; }
+    .mobile-nav__links  { display: contents; }
+}
+```
+
+Use `display: none` for an element with no desktop role. Use `display: contents` for a wrapper whose children must join the parent's flex or grid row. Before you return the file, list every mobile-only class and confirm that each one has its `min-width` override in a query that wins over the base rule. A desktop override placed before the base rule loses on source order.
+
 ## Section Delimiters
 
 Every section MUST be wrapped in a clear comment delimiter:
@@ -505,6 +523,7 @@ Enqueue page-specific styles conditionally in `functions.php`.
 11. **Each section gets its own commented block** — keep CSS organized and scannable
 12. **Layout is flex or grid** — `position: absolute` only for a real superposition (badge on an image, floating icon, tooltip, veil, sticky/fixed); never to reproduce a demo's `left`/`top` coordinates
 13. **Use logical grouping** — within each section block, order properties: layout, box model, typography, visual, misc
+14. **Every mobile-only element has a desktop override in the same block** — `display: none` if it has no desktop role, `display: contents` if its children join the parent's row; the override sits after the base rule
 
 ## Transcription Mode (when dispatched by /wp-yolo)
 
