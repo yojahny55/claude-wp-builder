@@ -617,3 +617,18 @@ $WP eval "update_field('hero_title_es', 'Construyendo Excelencia Digital', 'opti
 ```bash
 $WP cache flush
 ```
+
+## Final validation — MANDATORY, the last step before you report
+
+The rules above are prose, and `tests/checks/` only greps that prose: nothing else catches
+a generated file that does not parse. Before reporting done, lint every file you wrote or
+edited and re-run the manifest gate. Report the output; a failure is yours to fix, not to
+mention.
+
+```bash
+for f in <theme-dir>/fields/*.php; do php -l "$f" || exit 1; done
+[ -f .wp-create.json ] && node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate "<project-path>"
+```
+
+This sits beside the key-uniqueness run above, not instead of it: `php -l` proves the files
+parse, the execution proves the keys are unique.
