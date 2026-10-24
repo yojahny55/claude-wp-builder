@@ -8,9 +8,9 @@
  * paths are listed that git would commit.
  */
 import {
-  readFileSync, existsSync, writeFileSync, copyFileSync, mkdirSync, renameSync, unlinkSync, rmdirSync, statSync,
+  readFileSync, existsSync, writeFileSync, copyFileSync, mkdirSync, renameSync, unlinkSync, rmdirSync, statSync, readdirSync,
 } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
+import { join, resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import {
@@ -29,7 +29,23 @@ import {
 // Only `set` also takes withLock: migrate, render-context, adopt and refresh are one-shot
 // commands run by a single operator or a sequential flow, so they are single-writer by
 // contract; the temp name carries the pid, so concurrent writers never share a temp file.
+function sweepOrphans(dir, prefix, suffixOk, maxAgeMs) {
+  // A writer killed between create and rename/rmdir leaves its temp file or aside directory
+  // behind. Anything this old belongs to a dead process (a live write takes milliseconds).
+  let names = [];
+  try { names = readdirSync(dir); } catch { return; }
+  for (const n of names) {
+    if (!n.startsWith(prefix) || !suffixOk(n)) continue;
+    const p = join(dir, n);
+    try {
+      if (Date.now() - statSync(p).mtimeMs <= maxAgeMs) continue;
+      if (statSync(p).isDirectory()) rmdirSync(p); else unlinkSync(p);
+    } catch { /* raced with its owner or another sweeper */ }
+  }
+}
+
 function writeAtomic(file, data) {
+  sweepOrphans(dirname(file), `${basename(file)}.`, (n) => n.endsWith('.tmp'), 60000);
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
   try {
     writeFileSync(tmp, data);
@@ -46,6 +62,7 @@ function writeAtomic(file, data) {
 // 30 s belongs to a dead writer and is taken over.
 function withLock(file, fn) {
   const lock = `${file}.lock`;
+  sweepOrphans(dirname(file), `${basename(lock)}.stale.`, () => true, 60000);
   const deadline = Date.now() + 10000;
   for (;;) {
     try { mkdirSync(lock); break; } catch (err) {
@@ -53,17 +70,22 @@ function withLock(file, fn) {
       try {
         if (Date.now() - statSync(lock).mtimeMs > 30000) {
           // Move the stale lock aside under a unique name first (rename is atomic), then
-          // re-check the age of what we actually moved: if another process had already
-          // replaced it with a fresh lock, put it back instead of deleting a live holder's lock.
+          // re-check the age of what we actually moved. The aside copy is always removed,
+          // never renamed back: rename(2) onto an empty directory replaces it on POSIX, so
+          // restoring could destroy a lock another process acquired in the meantime. If we
+          // moved a fresh lock, re-create the lock path with mkdir, which fails (EEXIST)
+          // instead of replacing when someone else holds it. The window this leaves is a few
+          // microseconds; a holder releases by path, so it cannot be closed without owner files.
           const aside = `${lock}.stale.${process.pid}.${Date.now()}`;
           renameSync(lock, aside);
-          if (Date.now() - statSync(aside).mtimeMs > 30000) rmdirSync(aside);
-          else { try { renameSync(aside, lock); } catch { rmdirSync(aside); } }
+          const fresh = Date.now() - statSync(aside).mtimeMs <= 30000;
+          rmdirSync(aside);
+          if (fresh) { try { mkdirSync(lock); } catch { /* someone else holds it now */ } }
           continue;
         }
       } catch { continue; }
       if (Date.now() > deadline) { warn(`could not lock ${file}: another writer holds ${lock}`); process.exit(1); }
-      for (const until = Date.now() + 50; Date.now() < until;) { /* synchronous 50 ms poll wait */ }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50); // sleeps without spinning the CPU
     }
   }
   try { return fn(); } finally { try { rmdirSync(lock); } catch { /* already gone */ } }
@@ -475,9 +497,12 @@ function cmdSet(projectPath, key, raw) {
   const file = join(resolve(projectPath), MANIFEST_NAME);
   if (!existsSync(file)) { warn(`no ${MANIFEST_NAME} at ${resolve(projectPath)} -- run /wp-create first`); process.exit(3); }
   // process.exit() inside the lock would skip withLock's finally and orphan the lock, so the
-  // callback only reports; the exit happens after the lock is released.
-  const problems = withLock(file, () => {
-    const { manifest } = loadManifest(projectPath);
+  // callback only returns what went wrong (including an unreadable manifest); the exit happens after the lock is released.
+  const outcome = withLock(file, () => {
+    let manifest;
+    try { manifest = JSON.parse(readFileSync(file, 'utf8')); } catch (err) {
+      return { fatal: `${MANIFEST_NAME} is not valid JSON ${jsonParseErrorLocation(err)}`, found: [] };
+    }
     let o = manifest;
     for (const k of parts.slice(0, -1)) {
       if (!Object.hasOwn(o, k) || o[k] === null || typeof o[k] !== 'object' || Array.isArray(o[k])) {
@@ -489,8 +514,10 @@ function cmdSet(projectPath, key, raw) {
     o[parts[parts.length - 1]] = value;
     const found = validateManifest(manifest);
     if (!found.length) writeAtomic(file, `${JSON.stringify(manifest, null, 2)}\n`);
-    return found;
+    return { found };
   });
+  if (outcome.fatal) { warn(outcome.fatal); process.exit(1); }
+  const problems = outcome.found;
   if (problems.length) {
     for (const p of problems) warn(`invalid: ${p}`);
     warn('nothing written');

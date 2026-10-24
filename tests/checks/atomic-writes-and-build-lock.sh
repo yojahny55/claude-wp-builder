@@ -38,10 +38,14 @@ node bin/wp-config.mjs set "$proj" environments 5 >/dev/null 2>&1 && fail "set a
 ls -A "$proj" | grep -E '\.tmp$|\.lock$' && fail "set left a temp or lock file behind"
 
 # --- behavior: parallel sets lose no key and never leave invalid JSON ---
+pids=()
 for i in 1 2 3 4 5 6 7 8; do
-  node bin/wp-config.mjs set "$proj" "extra_$i" "$i" >/dev/null 2>&1 &
+  node bin/wp-config.mjs set "$proj" "extra_$i" "$i" >"$tmp/set_$i.log" 2>&1 &
+  pids+=("$!")
 done
-wait
+for pid in "${pids[@]}"; do
+  wait "$pid" || fail "a parallel set exited non-zero (lock timeout?): $(cat "$tmp"/set_*.log | head -3)"
+done
 for i in 1 2 3 4 5 6 7 8; do
   [ "$(node -p "require('$proj/.wp-create.json').extra_$i")" = "$i" ] || fail "parallel set lost extra_$i"
 done
@@ -53,6 +57,7 @@ echo '{}' > "$t/package.json"
 cat > "$tmp/fb/npm" <<NPM
 #!/usr/bin/env bash
 mkdir "$tmp/inuse" 2>/dev/null || echo OVERLAP >> "$tmp/overlap"
+echo RAN >> "$tmp/ran"
 sleep 0.3
 rmdir "$tmp/inuse" 2>/dev/null || true
 NPM
@@ -61,6 +66,7 @@ chmod +x "$tmp/fb/npm" "$tmp/fb/pgrep"
 if command -v flock >/dev/null 2>&1; then
   for i in 1 2 3 4; do PATH="$tmp/fb:$PATH" bash bin/tailwind-rebuild.sh "$t" >/dev/null 2>&1 & done
   wait
+  [ -s "$tmp/ran" ] || fail "no build ran at all, so the overlap check below proves nothing"
   [ ! -e "$tmp/overlap" ] || fail "two builds ran at once"
   [ -e "$t/.tailwind-rebuild.lock" ] || fail "tailwind-rebuild.sh removed its lock file"
 else
