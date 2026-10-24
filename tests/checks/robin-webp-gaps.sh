@@ -38,6 +38,8 @@ grep -q 'Hundreds of "conversion failed" lines' "$skill" \
   || { echo "FAIL: $skill has no troubleshooting row for an unwritable uploads directory"; exit 1; }
 grep -q 'wp_rio_process_queue does not exist" while the plugin is active' "$skill" \
   || { echo "FAIL: $skill has no troubleshooting row for the queue table a WP-CLI activation leaves missing"; exit 1; }
+grep -Fq 'RIO_Process_Queue::try_create_plugin_tables()' "$skill" \
+  || { echo "FAIL: $skill's missing-queue-table row does not give the WP-CLI fix, which sends users to wp-admin for nothing"; exit 1; }
 
 # 3. The skill documents what the script writes and how to run it. Its settings table once
 #    listed 7 of the 16 settings the script overwrites, so an operator could not see that a

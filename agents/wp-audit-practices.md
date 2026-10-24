@@ -391,11 +391,12 @@ Collect the class names each template part emits, then require each to appear in
 CSS:
 
 ```bash
+T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 grep -rhoE 'class="[^"]+"' <theme>/template-parts/ \
-  | tr -d '"' | sed 's/class=//' | tr ' ' '\n' | sort -u > /tmp/emitted
+  | tr -d '"' | sed 's/class=//' | tr ' ' '\n' | sort -u > $T/emitted
 grep -rhoE '\.[a-zA-Z][-_a-zA-Z0-9]*' <theme>/*.css <theme>/assets/css/ 2>/dev/null \
-  | tr -d '.' | sort -u > /tmp/defined
-comm -23 /tmp/emitted /tmp/defined
+  | tr -d '.' | sort -u > $T/defined
+comm -23 $T/emitted $T/defined
 ```
 
 Ignore classes that come from a framework the theme loads (Tailwind utilities, WordPress core
