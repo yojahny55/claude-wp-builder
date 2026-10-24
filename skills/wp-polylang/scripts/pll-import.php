@@ -162,16 +162,22 @@ if ( in_array( 'dry-run', is_array( $args ) ? $args : array(), true ) ) {
 	foreach ( $manifest['items'] as $item ) {
 		$kind = $item['kind'];
 		if ( 'string' === $kind ) {
+			$value = isset( $item['fields']['value'] ) ? $item['fields']['value'] : '';
+			if ( '' === $value ) {
+				pllx_info( "would-skip Polylang string {$item['id']} (empty translated value)" );
+				continue;
+			}
 			$verb = 'update';
 			$what = 'Polylang string ' . $item['id'];
 		} elseif ( 'menu' === $kind ) {
 			// Mirror the write path's lookup (read-only): reuse by target_id or by the derived name.
 			$src_menu = wp_get_nav_menu_object( (int) $item['menu_id'] );
-			$has_menu = false;
-			if ( $src_menu ) {
-				$has_menu = ( ! empty( $item['target_id'] ) && wp_get_nav_menu_object( (int) $item['target_id'] ) )
-					|| wp_get_nav_menu_object( $src_menu->name . ' (' . strtoupper( $target ) . ')' );
+			if ( ! $src_menu ) {
+				pllx_info( "would-skip menu {$item['id']} (source menu no longer exists)" );
+				continue;
 			}
+			$has_menu = ( ! empty( $item['target_id'] ) && wp_get_nav_menu_object( (int) $item['target_id'] ) )
+				|| wp_get_nav_menu_object( $src_menu->name . ' (' . strtoupper( $target ) . ')' );
 			$verb = $has_menu ? 'update' : 'create';
 			$what = ( $has_menu ? 'existing translated menu rebuilt' : 'new translated menu' ) . ' for menu ' . $item['id'] . ' (items rebuilt; also rewrites _menu_item_url)';
 		} else {
