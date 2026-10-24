@@ -195,6 +195,22 @@ bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'
 
 It must exit `0`.
 
+**Remote environments (read-only on the site).** When `ix-wp-envsync` is in the adopted
+manifest's `plugins.installed`, list its environments and register each one by name. Both
+commands only read the site; the second only writes the manifest:
+
+```bash
+bash -c "$WP envsync env list"
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs env-set '${PROJECT_PATH}' \
+  --name=<name> --role=<local|staging|prod> --url=<url> --sync=envsync --transport=<http|https>"
+```
+
+Pass `--allow-http` only for an `http` environment the operator confirms on purpose. Ask the
+operator for any `role` the listing does not state, and never record a token: it goes in the
+gitignored `.wp-create.json` sibling `.wp-create.local.json` by hand (see `wp-environments`,
+section 8). Then run `wp-config.mjs refresh '${PROJECT_PATH}'` so `stack` and the plugin list are
+current, and `validate` again; it must exit `0`.
+
 ## Step 5: Say what was written, and where it may go
 
 ```
@@ -204,8 +220,14 @@ It must exit `0`.
 ```
 
 If the root is a git repository, check `git check-ignore` for both files and say whether
-each one would be committed. Do not edit `.gitignore` yourself. Committing them is the
-operator's decision, and a shared repository may not want another tool's config in it.
+each one would be committed. Committing them is the operator's decision, and a shared
+repository may not want another tool's config in it.
+
+Then run `node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs gitignore-check <root>`. It lists the
+plugin's own working-state files (the audit ledger and `.wp-audit/` reports, the local secrets
+override, manifest backups) that git would commit; exit `4` means some are missing. Do not edit `.gitignore` yourself.
+The sole exception is those plugin-owned entries, and only after the operator says yes to a single AskUserQuestion (default yes) that names the
+exact lines. Never add or reorder anything else in the file.
 
 Then offer one optional follow-up, once: "Publish this site to a git remote?" Default **no**, and
 nothing below runs unless the operator says yes. It never touches the site's own `.gitignore`.
