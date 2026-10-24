@@ -24,7 +24,7 @@ grep -Fq 'webp-delivery.md' skills/wp-robin/SKILL.md || fail "SKILL.md does not 
 grep -Fq 'infinite scroll' skills/wp-robin/SKILL.md || fail "SKILL.md troubleshooting lost the AJAX row"
 
 grep -Fq '| PERF-078 |' "$A" || fail "PERF-078 row missing"
-grep -Fq 'Procedure — AJAX-returned images and WebP (PERF-078)' "$A" || fail "PERF-078 procedure missing"
+grep -Fq 'Procedure — AJAX-returned images and WebP (PERF-078)' skills/wp-audit-standards/references/perf-procedures-runtime.md || fail "PERF-078 procedure missing"
 row=$(grep -F '| PERF-078 |' "$A")
 grep -Fq 'wp_ajax_nopriv_' <<<"$row" || fail "PERF-078 does not locate wp_ajax_nopriv_ handlers"
 grep -Fq 'UNMEASURED' <<<"$row" || fail "PERF-078 lost the UNMEASURED outcome"

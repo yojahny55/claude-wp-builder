@@ -22,6 +22,27 @@ the agents measure against. Each domain's own check catalog lives in its agent, 
   inline-critical-CSS experiment with its numbers, WebP and right-sizing for images a theme
   prints from raw field URLs, and the AIOS × CF7 REST interaction. Read when filing or
   fixing a `PERF-xxx` finding from a Lighthouse run.
+- Check procedures moved out of two agents, each read on demand when the agent's index sends
+  you there (the agents keep the check tables):
+  - [references/perf-procedures-cache-and-render.md](references/perf-procedures-cache-and-render.md) —
+    `wp-audit-performance`: multi-currency behind a page cache (PERF-065 to PERF-067) and the render
+    path (PERF-047 to PERF-055, PERF-068, PERF-069, PERF-010, PERF-049 to PERF-053).
+  - [references/perf-procedures-runtime.md](references/perf-procedures-runtime.md) —
+    `wp-audit-performance`: page-cache drop-in, ICC profiles, Elementor (PERF-070, PERF-075 to PERF-077).
+  - [references/perf-procedures-database.md](references/perf-procedures-database.md) —
+    `wp-audit-performance`: database bloat and attribution (PERF-061 to PERF-064, PERF-071 to PERF-074).
+  - [references/perf-fix-recipes.md](references/perf-fix-recipes.md) — `wp-audit-performance` Fix Phase
+    boilerplate and per-finding fixes.
+  - [references/sec-plugin-inventory.md](references/sec-plugin-inventory.md) — `wp-audit-security`:
+    the plugin inventory SEC-041, SEC-042, SEC-043 share.
+  - [references/sec-detection-details-advanced.md](references/sec-detection-details-advanced.md) —
+    `wp-audit-security`: detection rules for SEC-043, SEC-044, SEC-045.
+  - [references/sec-procedures-deploy-and-downloads.md](references/sec-procedures-deploy-and-downloads.md) —
+    `wp-audit-security`: SEC-036 to SEC-039.
+  - [references/sec-procedures-gateway-credentials.md](references/sec-procedures-gateway-credentials.md) —
+    `wp-audit-security`: SEC-040.
+  - [references/sec-procedures-vulnerability-feed.md](references/sec-procedures-vulnerability-feed.md) —
+    `wp-audit-security`: SEC-041, SEC-042.
 
 ---
 

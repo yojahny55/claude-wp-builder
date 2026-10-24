@@ -8,8 +8,8 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-sec=agents/wp-audit-security.md
-perf=agents/wp-audit-performance.md
+sec=$(bash tests/checks/lib/agent-text.sh wp-audit-security)
+perf=$(bash tests/checks/lib/agent-text.sh wp-audit-performance)
 ctx=skills/wp-audit-run/references/site-context.md
 
 # SEC-045: tabulated, covers inactive copies, and finds forks by the elFinder fingerprint.

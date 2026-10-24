@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-perf=agents/wp-audit-performance.md
+perf=$(bash tests/checks/lib/agent-text.sh wp-audit-performance)
 for c in 071 072 073 074; do
   grep -qE "^\| PERF-$c \|" "$perf" || fail "PERF-$c not tabulated in $perf"
   grep -Fq "PERF-$c" "$perf" || fail "PERF-$c missing"
