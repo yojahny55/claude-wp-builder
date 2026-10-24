@@ -433,31 +433,36 @@ $WP plugin is-active contact-form-7
 Use the `WPCF7_ContactForm::get_template()` API to create forms. **NEVER use raw `post create`** — the CF7 API handles internal metadata, mail configuration, and validation rules.
 
 ```bash
-FORM_ID=$($WP eval "
-\$form = WPCF7_ContactForm::get_template();
+# The PHP lives in a file and the template directory arrives as an eval-file argument
+# ($args[0]). Spliced into a quoted PHP string through `$(pwd)`, a path containing a
+# quote ends the string and breaks the command.
+cat > cf7/create-form-en.php <<'PHP'
+<?php
+$cf7_dir = rtrim($args[0], '/');
+$form = WPCF7_ContactForm::get_template();
 
 // Sender on the site's own domain, the rule CF7's own template follows: admin_email only
 // when it already is on that domain, otherwise wordpress@<domain>. Computed on the
 // environment the seeder runs on, so staging and production each get their own domain.
-\$domain = strtolower((string) wp_parse_url(home_url(), PHP_URL_HOST));
-\$domain = preg_replace('/^www\\./', '', \$domain);
-\$admin  = get_option('admin_email');
+$domain = strtolower((string) wp_parse_url(home_url(), PHP_URL_HOST));
+$domain = preg_replace('/^www\./', '', $domain);
+$admin  = get_option('admin_email');
 // CF7's own test: case-insensitive, and a parent domain counts (admin@example.com on shop.example.com).
-\$from   = wpcf7_is_email_in_domain(\$admin, \$domain) ? \$admin : 'wordpress@' . \$domain;
-\$sender = get_option('blogname') . ' <' . \$from . '>';
+$from   = wpcf7_is_email_in_domain($admin, $domain) ? $admin : 'wordpress@' . $domain;
+$sender = get_option('blogname') . ' <' . $from . '>';
 
 // Set form title
-\$form->set_title('Contact Form - EN');
+$form->set_title('Contact Form - EN');
 
 // Set form body
-\$form->set_properties(array(
-    'form' => file_get_contents('$(pwd)/cf7/form-en.html'),
+$form->set_properties(array(
+    'form' => file_get_contents($cf7_dir . '/form-en.html'),
     'mail' => array(
         'active'             => true,
         'subject'            => '[your-subject] - New contact from [your-name]',
-        'sender'             => \$sender,
+        'sender'             => $sender,
         'recipient'          => get_option('admin_email'),
-        'body'               => file_get_contents('$(pwd)/cf7/email-admin-en.html'),
+        'body'               => file_get_contents($cf7_dir . '/email-admin-en.html'),
         'additional_headers' => 'Reply-To: [your-email]',
         'attachments'        => '',
         'use_html'           => true,
@@ -465,9 +470,9 @@ FORM_ID=$($WP eval "
     'mail_2' => array(
         'active'             => true,
         'subject'            => 'Thank you for contacting us',
-        'sender'             => \$sender,
+        'sender'             => $sender,
         'recipient'          => '[your-email]',
-        'body'               => file_get_contents('$(pwd)/cf7/email-user-en.html'),
+        'body'               => file_get_contents($cf7_dir . '/email-user-en.html'),
         'additional_headers' => '',
         'attachments'        => '',
         'use_html'           => true,
@@ -486,9 +491,11 @@ FORM_ID=$($WP eval "
     'additional_settings' => '',
 ));
 
-\$form->save();
-echo \$form->id();
-")
+$form->save();
+echo $form->id();
+PHP
+
+FORM_ID=$($WP eval-file cf7/create-form-en.php "$(pwd)/cf7")
 
 echo "Created EN form with ID: $FORM_ID"
 ```
@@ -599,3 +606,18 @@ Do NOT create `-es` variants when the project is monolingual.
 12. **Size the control itself to `width: 100%`, not only its `.wpcf7-form-control-wrap`**; keep the AJAX spinner's margins inside the form's box; write loading-state padding as `padding-inline-end`, never `padding-right` — a physical longhand does not beat the logical `padding-inline` an `@apply px-*` compiles to
 13. **The `_form` post meta is the live form; `cf7/*.html` is only a reference.** Push every change through the seeder (or directly to `_form`), and push every language's form together — a fix landing on one language's post and not the other's is a bilingual bug.
 14. **`mail.sender` and `mail_2.sender` are on the site's domain, never `admin_email` unchecked and never a free-mail domain**; `[your-email]` is a recipient only in `mail_2` on a protected form; CF7's `WPCF7_ConfigValidator` runs after every save and its messages are reported
+
+## Final validation — MANDATORY, the last step before you report
+
+The rules above are prose, and `tests/checks/` only greps that prose: nothing else catches
+a generated seeder that does not parse. Before reporting done, lint every PHP file you wrote
+or edited and re-run the manifest gate. Report the output; a failure is yours to fix, not to
+mention.
+
+```bash
+php -l <theme-dir>/inc/seed/cf7.php
+[ -f .wp-create.json ] && node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate "<project-path>"
+```
+
+Then re-read the form you pushed with `$WP post meta get <form-id> _form` and confirm it is
+the markup you generated (rule 13): the lint proves syntax, not that the live form changed.

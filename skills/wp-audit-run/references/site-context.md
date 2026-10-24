@@ -58,6 +58,11 @@ not `catalog`: it audits as a store.
 
 ### Local clone — audit production's posture, not the copy's
 
+When the manifest has `environments`, a `role: "prod"` entry is the recorded production: the
+site is production when its `wordpress.url` host matches that entry's `url`, and `production_url`
+is that entry's `url`. A host that matches a `role: "local"` or `"staging"` entry is not
+production. Only without `environments`, or when no entry matches, use the URL rule that follows.
+
 When `.wp-create.json` carries `project.source: "restore"` (the field lives under
 `project`, not at the manifest's root — `restore` itself holds only
 `files_archive`, `db_archive` and `url_rewritten`, none of which name production), or a

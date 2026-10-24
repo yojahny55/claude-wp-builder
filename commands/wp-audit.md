@@ -427,7 +427,7 @@ Count totals per category and overall.
 
 ## Step 7.5: Reconcile against the finding ledger
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/ledger.md` now and follow it — it is this step, not background. It covers finding identity, the five ledger statuses, where the ledger lives, and the derived counts.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/ledger.md` now and follow it — it is this step, not background. It covers finding identity, the five ledger statuses, where the ledger lives, the derived counts, and the state-file contract: the ledger is not versioned, so run `node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs gitignore-check <site-root>` and offer to ignore what it lists.
 
 ## Step 8: Present Report
 

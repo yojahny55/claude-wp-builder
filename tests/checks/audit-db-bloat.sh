@@ -202,51 +202,51 @@ proc_flat=$(printf '%s' "$proc" | tr '\n' ' ' | sed 's/  */ /g')
 
 grep -Eq '\$WP action-scheduler clean' "$agent" \
   || fail "$agent does not give '\$WP action-scheduler clean' as the PERF-061 fix"
-printf '%s' "$proc" | grep -Fq "do_action('woocommerce_cleanup_sessions')" \
+grep -Fq "do_action('woocommerce_cleanup_sessions')" <<<"$proc" \
   || fail "$agent does not give the woocommerce_cleanup_sessions fix for PERF-062"
-printf '%s' "$proc" | grep -Eq '\$WP transient delete --expired' \
+grep -Eq '\$WP transient delete --expired' <<<"$proc" \
   || fail "$agent does not give '\$WP transient delete --expired' as the PERF-063 fix"
-printf '%s' "$proc" | grep -Eq '\$WP db export' \
+grep -Eq '\$WP db export' <<<"$proc" \
   || fail "$agent does not require a backup (\$WP db export) before the PERF-064 delete"
-printf '%s' "$proc" | grep -Fiq 'never auto-fix' \
+grep -Fiq 'never auto-fix' <<<"$proc" \
   || fail "$agent does not forbid auto-fixing the destructive PERF-064 delete"
 
 # PERF-064's batched form must actually be runnable: a DELETE ... JOIN can't take LIMIT, so
 # the batch has to go through a LIMIT-able subquery, materialized in a derived table (the
 # classic "can't specify target table for update in FROM clause" workaround), built with the
 # dynamic prefix like every other cell, and repeated until it deletes 0 rows.
-printf '%s' "$proc_flat" | grep -Eiq "(cannot|can't|does not|doesn't) (take|accept|support) (a )?\`?LIMIT" \
+grep -Eiq "(cannot|can't|does not|doesn't) (take|accept|support) (a )?\`?LIMIT" <<<"$proc_flat" \
   || fail "$agent does not explain that DELETE ... JOIN cannot take LIMIT, which is why PERF-064 needs a subquery batch form"
-printf '%s' "$proc" | grep -Fq 'WHERE meta_id IN (SELECT meta_id FROM (SELECT' \
+grep -Fq 'WHERE meta_id IN (SELECT meta_id FROM (SELECT' <<<"$proc" \
   || fail "$agent gives no runnable batched-delete command for PERF-064 (subquery form with a derived table)"
-printf '%s' "$proc" | grep -Fq 'LIMIT 5000' \
+grep -Fq 'LIMIT 5000' <<<"$proc" \
   || fail "$agent's PERF-064 batch command has no LIMIT, so it is not actually batched"
-printf '%s' "$proc" | grep -Fq '$($WP db prefix)postmeta' \
+grep -Fq '$($WP db prefix)postmeta' <<<"$proc" \
   || fail "$agent's PERF-064 batch command hardcodes the table name instead of resolving the real prefix"
-printf '%s' "$proc_flat" | grep -Eiq '(repeatedly|in a loop|loop it|until it)' \
+grep -Eiq '(repeatedly|in a loop|loop it|until it)' <<<"$proc_flat" \
   || fail "$agent does not say to run the PERF-064 batch repeatedly"
-printf '%s' "$proc" | grep -Fq '0 rows affected' \
+grep -Fq '0 rows affected' <<<"$proc" \
   || fail "$agent does not say to stop the PERF-064 batch loop at 0 rows affected"
 
 # --- Not clone artifacts: must report normally, never folded into Step 2.3 suppression ---
-printf '%s' "$proc" | grep -Fq 'real on production' \
+grep -Fq 'real on production' <<<"$proc" \
   || fail "$agent does not say these bloat patterns are real on production, not clone artifacts"
-printf '%s' "$proc_flat" | grep -Eiq '(never|not|must not be|is not) suppressed' \
+grep -Eiq '(never|not|must not be|is not) suppressed' <<<"$proc_flat" \
   || fail "$agent does not forbid suppressing these under the local-clone rule"
 
 # N/A is bounded to "table genuinely absent", never a blanket commerce gate.
-printf '%s' "$proc" | grep -Fq 'N/A' || fail "$agent gives no N/A condition for the DB bloat checks"
-printf '%s' "$proc" | grep -Fq 'not when WooCommerce is inactive' \
+grep -Fq 'N/A' <<<"$proc" || fail "$agent gives no N/A condition for the DB bloat checks"
+grep -Fq 'not when WooCommerce is inactive' <<<"$proc" \
   || fail "$agent does not forbid gating PERF-061 to N/A merely because WooCommerce is inactive"
 
 # --- Duplication check: autoload and expired-transient-existence were NOT re-added ---
-printf '%s' "$proc" | grep -Fq 'already covered, not duplicated' \
+grep -Fq 'already covered, not duplicated' <<<"$proc" \
   || fail "$agent does not explain why the autoload budget got no new code"
-printf '%s' "$proc" | grep -Fq 'PERF-036' \
+grep -Fq 'PERF-036' <<<"$proc" \
   || fail "$agent does not point to the existing PERF-036 autoload threshold"
-printf '%s' "$proc" | grep -Fq 'PERF-039' \
+grep -Fq 'PERF-039' <<<"$proc" \
   || fail "$agent does not point to the existing PERF-039 expired-transient check"
-printf '%s' "$proc" | grep -Fq 'does not duplicate that check' \
+grep -Fq 'does not duplicate that check' <<<"$proc" \
   || fail "$agent does not say PERF-063 avoids duplicating PERF-039"
 
 # --- CHANGELOG: an Added entry exists, names the codes, and explains the why ---
