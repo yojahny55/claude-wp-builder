@@ -199,6 +199,7 @@ jobs:
             bash -n "$f"
             n=$((n + 1))
           done < <(find bin skills -name '*.sh' -not -path '*/node_modules/*' | sort)
+          [ "$n" -gt 0 ] || { echo "ERROR: no shell scripts found"; exit 1; }
           printf 'ok: %d shell script(s) parse\n' "$n"
 
       - name: shellcheck (blocking, severity warning)

@@ -27,7 +27,8 @@ while IFS= read -r f; do
 done < <(find bin skills -name '*.sh' -not -path '*/node_modules/*' | sort)
 [ "$n" -gt 0 ] || fail "found no shell scripts to parse"
 if command -v shellcheck >/dev/null 2>&1; then
-  shellcheck --severity=warning bin/*.sh skills/*/scripts/*.sh >/dev/null 2>&1 \
+  mapfile -t sc_files < <(find bin skills -name '*.sh' -not -path '*/node_modules/*' | sort)
+  shellcheck --severity=warning "${sc_files[@]}" >/dev/null 2>&1 \
     || fail "shellcheck reports findings (blocking in CI)"
 fi
 echo PASS
