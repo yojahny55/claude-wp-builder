@@ -70,7 +70,7 @@ done
 [ "$found" -ge 13 ] || fail "only $found gate blocks found, want at least 13"
 
 # --- Exit 3 has ONE definition: skills/wp-manifest-gate/SKILL.md. ---------
-# Eight commands each carried their own "Amending the exit `3` row above" paragraph, hand-copied,
+# Nine commands each carried their own "Amending the exit `3` row above" paragraph, hand-copied,
 # and they drifted (/wp-audit also told adoptable sites to run /wp-init). The block stays
 # byte-identical everywhere; what a command does on exit 3 is now one named policy line that
 # points at the skill. Assert both directions: the policy line is present and names a policy the
