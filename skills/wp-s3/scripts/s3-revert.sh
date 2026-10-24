@@ -31,6 +31,10 @@ CONFIG="$WP_ROOT/s3-config.php"
 LOCAL="$WP_ROOT/wp-content/uploads"
 MU="$WP_ROOT/wp-content/mu-plugins/s3-uploads-endpoint.php"
 STAMP="$(date +%Y%m%d-%H%M%S)"
+# The parked config holds the bucket credentials: a private directory outside the docroot
+# keyed by the site root, never a file the web server can serve.
+PARK_DIR="${WP_S3_BACKUP_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wp-s3-backups}/$(printf '%s' "$WP_ROOT" | cksum | cut -d' ' -f1)"
+PARKED="$PARK_DIR/s3-config.php.disabled"
 
 [[ -d "$LOCAL" ]] || die "no $LOCAL"
 [[ -w "$LOCAL" ]] || die "$LOCAL is not writable: the media cannot come back to disk"
@@ -138,11 +142,17 @@ else
 fi
 
 # ---------------------------------------------------------------- 5. park, do not delete
-# Renamed rather than deleted: the bucket is still there, and turning this back on
-# should cost one `mv`, not another round of credentials.
+# Moved rather than deleted: the bucket is still there, and turning this back on should
+# cost one `mv`, not another round of credentials. It goes OUTSIDE the docroot, because
+# s3-config.php.disabled beside the original is served as plain text by the web server.
 if [[ -f "$CONFIG" ]]; then
-    mv "$CONFIG" "$CONFIG.disabled"
-    echo "5. s3-config.php -> s3-config.php.disabled"
+    ( umask 077 && mkdir -p "$PARK_DIR" ) && chmod 700 "$PARK_DIR" \
+        || die "could not create or use $PARK_DIR (it may exist already, owned by another user or not writable). Nothing has been moved; s3-config.php is still in place."
+    ( umask 077 && cp "$CONFIG" "$PARKED" ) && chmod 600 "$PARKED" \
+        || { rm -f "$PARKED"; die "could not copy s3-config.php to $PARKED. Nothing has been moved."; }
+    rm -f "$CONFIG"
+    echo "5. s3-config.php -> $PARKED (0600, outside the docroot)"
+    echo "   To turn S3 back on: mv '$PARKED' '$CONFIG' and re-run /wp-s3 setup to restore the require."
 fi
 if [[ -f "$MU" ]]; then
     mv "$MU" "$MU.disabled"
@@ -154,9 +164,9 @@ fi
 # `pipefail` carries that into the assignment and errexit ends the script one line before
 # the summary it exists to print.
 BUCKET_URL=""
-if [[ -f "$CONFIG.disabled" ]]; then
-    BUCKET_URL="$(php "$SKILL_DIR/scripts/read-s3-config.php" "$CONFIG.disabled" --names 2>/dev/null \
-        | sed -n 's/^S3_UPLOADS_BUCKET_URL: //p')"
+if [[ -f "$PARKED" ]]; then
+    BUCKET_URL="$(php "$SKILL_DIR/scripts/read-s3-config.php" "$PARKED" --names 2>/dev/null \
+        | sed -n 's/^S3_UPLOADS_BUCKET_URL: //p')" || BUCKET_URL=""
 fi
 # Guarded like every other `wp` call here: without WP-CLI the bare invocation prints
 # "command not found" into the middle of the commands printed below.
