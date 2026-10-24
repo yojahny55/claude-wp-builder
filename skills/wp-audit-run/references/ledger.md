@@ -1,5 +1,13 @@
 # /wp-audit — Step 7.5
 
+## Contents
+
+- A finding's identity is its check and its resource
+- Five statuses, and only one of them is a judgement
+- Where the ledger lives, and why not in the manifest
+- The ledger is working state: it is not versioned
+- What the counts become
+
 `commands/wp-audit.md` sends the run here at Step 7.5. Follow it in order; nothing in it is optional background.
 
 `issues_found`, `issues_fixed` and `carried_over` are three integers, and three integers
@@ -64,6 +72,28 @@ So the ledger is its own file, beside the manifest:
 
 `audit.findings_ledger` in the manifest records only its path and the run that last wrote it
 — a pointer, fixed in size.
+
+### The ledger is working state: it is not versioned
+
+`.wp-audit-findings.json` and the `.wp-audit/` report directory are **working state**, not
+source. They are regenerable, they differ between a clone and the live site, and a committed
+ledger turns every audit into a diff on a file nobody reviews. They are not versioned.
+
+When the ledger is written (and before the first write on a project), run:
+
+```bash
+node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs gitignore-check <site-root>
+```
+
+Exit `0` means nothing to do (or the root is not a git work tree). Exit `4` lists the
+entries git would commit, one `missing:` line each, from `TOOL_STATE_PATHS` in
+`bin/wp-config.mjs`. Then warn in one line ("the audit ledger and reports are not ignored by
+git") and ask with AskUserQuestion, default **yes**, whether to append the missing entries
+to the root `.gitignore`. Append only those lines and touch nothing else in the file. On no,
+do not ask again in this run.
+
+This is the one exception to `/wp-adopt`'s "never edit `.gitignore`" rule: it covers only
+entries this plugin owns, and only after the operator answers yes.
 
 **A missing ledger means "no history", never "nothing ever failed".** It can be deleted,
 gitignored, or simply never written by an older plugin version, and the audit cannot tell
