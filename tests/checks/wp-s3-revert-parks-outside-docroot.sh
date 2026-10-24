@@ -25,8 +25,9 @@ out="$(HOME="$home" WP_S3_BACKUP_DIR= XDG_STATE_HOME= PATH="$(dirname "$(command
   || fail "something s3-config-shaped is still inside the docroot"
 parked="$(find "$home/.local/state/wp-s3-backups" -name s3-config.php.disabled | head -1)"
 [ -n "$parked" ] || fail "no parked config under the private state dir"
-[ "$(stat -c %a "$parked")" = 600 ] || fail "parked config is not 0600"
-[ "$(stat -c %a "$(dirname "$parked")")" = 700 ] || fail "parked directory is not 0700"
+mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
+[ "$(mode "$parked")" = 600 ] || fail "parked config is not 0600"
+[ "$(mode "$(dirname "$parked")")" = 700 ] || fail "parked directory is not 0700"
 grep -Fq canary-secret "$parked" || fail "the parked copy lost its content, so it cannot be re-enabled"
 grep -Fq "mv '$parked'" <<<"$out" || fail "the output does not print the mv that restores it"
 

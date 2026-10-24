@@ -32,7 +32,7 @@ LOCAL="$WP_ROOT/wp-content/uploads"
 MU="$WP_ROOT/wp-content/mu-plugins/s3-uploads-endpoint.php"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 # The parked config holds the bucket credentials: a private directory outside the docroot
-# (same location and keying as s3-setup.sh's backups), never a file the web server can serve.
+# keyed by the site root, never a file the web server can serve.
 PARK_DIR="${WP_S3_BACKUP_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wp-s3-backups}/$(printf '%s' "$WP_ROOT" | cksum | cut -d' ' -f1)"
 PARKED="$PARK_DIR/s3-config.php.disabled"
 
@@ -148,7 +148,7 @@ fi
 if [[ -f "$CONFIG" ]]; then
     ( umask 077 && mkdir -p "$PARK_DIR" ) && chmod 700 "$PARK_DIR" \
         || die "could not create $PARK_DIR. Nothing has been moved; s3-config.php is still in place."
-    ( umask 077 && cp -p "$CONFIG" "$PARKED" ) && chmod 600 "$PARKED" \
+    ( umask 077 && cp "$CONFIG" "$PARKED" ) && chmod 600 "$PARKED" \
         || die "could not copy s3-config.php to $PARKED. Nothing has been moved."
     rm -f "$CONFIG"
     echo "5. s3-config.php -> $PARKED (0600, outside the docroot)"
