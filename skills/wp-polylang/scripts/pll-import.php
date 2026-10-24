@@ -165,8 +165,15 @@ if ( in_array( 'dry-run', is_array( $args ) ? $args : array(), true ) ) {
 			$verb = 'update';
 			$what = 'Polylang string ' . $item['id'];
 		} elseif ( 'menu' === $kind ) {
-			$verb = 'create';
-			$what = 'translated menu items for menu ' . $item['id'] . ' (rebuilt; also rewrites _menu_item_url)';
+			// Mirror the write path's lookup (read-only): reuse by target_id or by the derived name.
+			$src_menu = wp_get_nav_menu_object( (int) $item['menu_id'] );
+			$has_menu = false;
+			if ( $src_menu ) {
+				$has_menu = ( ! empty( $item['target_id'] ) && wp_get_nav_menu_object( (int) $item['target_id'] ) )
+					|| wp_get_nav_menu_object( $src_menu->name . ' (' . strtoupper( $target ) . ')' );
+			}
+			$verb = $has_menu ? 'update' : 'create';
+			$what = ( $has_menu ? 'existing translated menu rebuilt' : 'new translated menu' ) . ' for menu ' . $item['id'] . ' (items rebuilt; also rewrites _menu_item_url)';
 		} else {
 			$verb = empty( $item['target_id'] ) ? 'create' : 'update';
 			$what = $kind . ' ' . (int) $item['source_id'] . ( 'update' === $verb ? ' -> ' . (int) $item['target_id'] : '' ) . " ($target)";
