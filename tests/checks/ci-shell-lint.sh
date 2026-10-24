@@ -11,7 +11,7 @@ CI=.github/workflows/ci.yml
 grep -Fq "bash -n" "$CI" || fail "ci.yml does not run bash -n on the shell scripts"
 grep -Fq "find bin skills -name '*.sh'" "$CI" || fail "ci.yml does not cover bin/ and skills/*/scripts/"
 grep -Fq 'shellcheck --severity=warning' "$CI" || fail "ci.yml does not run shellcheck at warning severity"
-awk '/name: shellcheck/{f=1} f&&/continue-on-error/{bad=1} /^  doc-sync:/{f=0} END{exit bad?1:0}' "$CI" \
+awk '/name: shellcheck/{f=1} f&&/continue-on-error/{bad=1} /^  [a-z][a-z0-9_-]*:[[:space:]]*$/{f=0} END{exit bad?1:0}' "$CI" \
   || fail "shellcheck regained continue-on-error: it is a blocking gate"
 
 [ -f .shellcheckrc ] || fail ".shellcheckrc is missing"
@@ -28,6 +28,6 @@ done < <(find bin skills -name '*.sh' -not -path '*/node_modules/*' | sort)
 [ "$n" -gt 0 ] || fail "found no shell scripts to parse"
 if command -v shellcheck >/dev/null 2>&1; then
   shellcheck --severity=warning bin/*.sh skills/*/scripts/*.sh >/dev/null 2>&1 \
-    || echo "note: shellcheck reports findings (blocking in CI)" >&2
+    || fail "shellcheck reports findings (blocking in CI)"
 fi
 echo PASS
