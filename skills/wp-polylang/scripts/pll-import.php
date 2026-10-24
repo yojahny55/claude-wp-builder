@@ -2,7 +2,9 @@
 /**
  * Write a translated manifest back through the Polylang API.
  *
- * Usage: wp eval-file pll-import.php <translated.json>
+ * Usage: wp eval-file pll-import.php <translated.json> [dry-run]
+ *
+ *   dry-run  validate, print what would be created or modified, write nothing
  *
  * The whole file is validated before the first write. Counterparts are created
  * published, mirroring the source status, so writing half of them and finding
@@ -149,6 +151,53 @@ if ( $errors ) {
 		pllx_warn( $e );
 	}
 	pllx_fail( sprintf( '%d validation error(s); nothing was written.', count( $errors ) ) );
+}
+
+// ── Dry run: report the plan and stop before the first write ────────────────
+// The flag is a bare word because `wp eval-file` refuses a `--flag` it does not know.
+// Everything above only reads, so a dry run has validated exactly what a real run would.
+global $args;
+if ( in_array( 'dry-run', is_array( $args ) ? $args : array(), true ) ) {
+	$plan = array( 'create' => 0, 'update' => 0 );
+	foreach ( $manifest['items'] as $item ) {
+		$kind = $item['kind'];
+		if ( 'string' === $kind ) {
+			$value = isset( $item['fields']['value'] ) ? $item['fields']['value'] : '';
+			if ( '' === $value ) {
+				pllx_info( "would-skip Polylang string {$item['id']} (empty translated value)" );
+				continue;
+			}
+			$verb = 'update';
+			$what = 'Polylang string ' . $item['id'];
+		} elseif ( 'menu' === $kind ) {
+			// Mirror the write path's lookup (read-only): reuse by target_id or by the derived name.
+			$src_menu = wp_get_nav_menu_object( (int) $item['menu_id'] );
+			if ( ! $src_menu ) {
+				pllx_info( "would-skip menu {$item['id']} (source menu no longer exists)" );
+				continue;
+			}
+			$has_menu = ( ! empty( $item['target_id'] ) && wp_get_nav_menu_object( (int) $item['target_id'] ) )
+				|| wp_get_nav_menu_object( $src_menu->name . ' (' . strtoupper( $target ) . ')' );
+			$verb = $has_menu ? 'update' : 'create';
+			$what = ( $has_menu ? 'existing translated menu rebuilt' : 'new translated menu' ) . ' for menu ' . $item['id'] . ' (items rebuilt; also rewrites _menu_item_url)';
+		} else {
+			// Mirror the write path's existence checks (read-only): a target_id whose object was
+			// deleted since the manifest was built is created again, not updated.
+			if ( 'post' === $kind ) {
+				$verb = ( ! empty( $item['target_id'] ) && get_post( $item['target_id'] ) ) ? 'update' : 'create';
+			} elseif ( 'term' === $kind ) {
+				$verb = ( ! empty( $item['target_id'] ) && get_term( $item['target_id'], $item['taxonomy'] ) instanceof WP_Term ) ? 'update' : 'create';
+			} else {
+				$verb = empty( $item['target_id'] ) ? 'create' : 'update';
+			}
+			$what = $kind . ' ' . (int) $item['source_id'] . ( 'update' === $verb ? ' -> ' . (int) $item['target_id'] : '' ) . " ($target)";
+		}
+		$plan[ 'create' === $verb ? 'create' : 'update' ]++;
+		pllx_info( "would-$verb $what" );
+	}
+	pllx_info( 'would-update internal links, ACF references and custom menu item URLs in the ' . $target . ' content' );
+	pllx_info( sprintf( 'plan: %d create, %d update; nothing was written (dry-run).', $plan['create'], $plan['update'] ) );
+	return;
 }
 
 // ── Write ───────────────────────────────────────────────────────────────────
