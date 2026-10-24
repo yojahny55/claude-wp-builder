@@ -33,9 +33,8 @@ that one happened.
 
 Issues discovered during testing that need to be resolved.
 
-- [ ] **Fix anchor links in SCF URL fields** `OPEN`
-  Hash-only links (`#section`) can't be stored in ACF `url` type fields since they require a full URL. Use `text` type for anchor-only links, or validate and prepend the site URL.
-  [wp-acf](agents/wp-acf.md) emits `'type' => 'url'` with no anchor-only branch.
+- [x] **Fix anchor links in SCF URL fields** `DELIVERED`
+  [wp-acf](agents/wp-acf.md) rule 19 sends hash-only and site-path links to a `text` field, keeps `url` for absolute addresses, and shows the seed call. [acf-anchor-links](tests/checks/acf-anchor-links.sh) guards it.
 
 - [x] **Fix desktop breakpoint rules in responsive CSS** `DELIVERED`
   [wp-css](agents/wp-css.md) states the rule under *Mobile-First Responsive Design* with the `display: none` / `display: contents` example, requires the list-and-confirm pass before returning the file, and repeats it as rule 14. [css-desktop-overrides](tests/checks/css-desktop-overrides.sh) guards it.
