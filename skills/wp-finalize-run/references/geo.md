@@ -22,12 +22,13 @@ run `/wp-audit --geo` to fix a finding, then re-run this check.
 1. **GEO-A01 / GEO-U01 — raw-HTML content and heading order.** Fetch with no JS
    execution — this is what an agent that does not run JavaScript sees:
    ```bash
-   curl -s "$SITE/" > /tmp/geo-home.html
-   perl -0777 -pe 's/<(script|style)\b[^>]*>.*?<\/\1>//gis' /tmp/geo-home.html \
+   T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+   curl -s "$SITE/" > $T/geo-home.html
+   perl -0777 -pe 's/<(script|style)\b[^>]*>.*?<\/\1>//gis' $T/geo-home.html \
      | sed -e 's/<[^>]*>/ /g' | tr -s ' \n' ' ' | wc -c   # visible text, must be >= 500
-   grep -o '<h1' /tmp/geo-home.html | wc -l                               # must be exactly 1
-   grep -o '<main' /tmp/geo-home.html | wc -l                             # must be >= 1
-   grep -oE '<h[1-6]' /tmp/geo-home.html                                  # must be sequential, no skipped level
+   grep -o '<h1' $T/geo-home.html | wc -l                               # must be exactly 1
+   grep -o '<main' $T/geo-home.html | wc -l                             # must be >= 1
+   grep -oE '<h[1-6]' $T/geo-home.html                                  # must be sequential, no skipped level
    ```
    `<script>` and `<style>` are stripped before counting — otherwise inline JS/CSS
    inflates the character count and a JS-only page false-passes.
@@ -50,12 +51,13 @@ run `/wp-audit --geo` to fix a finding, then re-run this check.
 
 3. **GEO-A07 / GEO-A08 / GEO-A09 / GEO-A10 — JSON-LD identity and entity graph.**
    ```bash
-   curl -s "$SITE/" > /tmp/geo-home.html
-   grep -o 'application/ld+json' /tmp/geo-home.html | wc -l                   # GEO-A07, must be >= 1
-   grep -o '"sameAs"' /tmp/geo-home.html | wc -l                              # GEO-A08, must be >= 1
-   grep -q 'contactPoint' /tmp/geo-home.html                    # GEO-A09, must be present
-   grep -q '"address"' /tmp/geo-home.html                       # GEO-A09, must be present
-   grep -oE '"FAQPage"|"Service"|"Product"|"AggregateRating"|"BreadcrumbList"' /tmp/geo-home.html | wc -l   # GEO-A10, must be >= 1
+   T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+   curl -s "$SITE/" > $T/geo-home.html
+   grep -o 'application/ld+json' $T/geo-home.html | wc -l                   # GEO-A07, must be >= 1
+   grep -o '"sameAs"' $T/geo-home.html | wc -l                              # GEO-A08, must be >= 1
+   grep -q 'contactPoint' $T/geo-home.html                    # GEO-A09, must be present
+   grep -q '"address"' $T/geo-home.html                       # GEO-A09, must be present
+   grep -oE '"FAQPage"|"Service"|"Product"|"AggregateRating"|"BreadcrumbList"' $T/geo-home.html | wc -l   # GEO-A10, must be >= 1
    ```
    **PASS** if an identity JSON-LD block is present, links the entity via
    `sameAs`, carries `contactPoint` and `address`, and declares at least one of

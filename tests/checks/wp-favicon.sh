@@ -24,7 +24,7 @@ grep -Fq -- '--force' "$f" || fail "$f lost --force for replacing an existing ic
 grep -Fq 'Do not invent `theme_color`' "$f" || fail "$f may guess manifest colours"
 
 # The gate block is checked byte-for-byte by wp-config-gate.sh; here only that it is present.
-grep -Fq 'wp-config.mjs validate' "$f" || fail "$f reads the manifest but never calls the validator"
+grep -Fq 'wp-config.mjs" validate' "$f" || fail "$f reads the manifest but never calls the validator"
 
 # Both starters link the manifest the command writes, and only when the file exists, so a
 # theme that never ran the command prints nothing.
