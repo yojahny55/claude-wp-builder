@@ -34,6 +34,14 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 # The backup holds database credentials: private directory outside the docroot, not a
 # *.bak-* file beside wp-config.php, which the web server would serve as plain text.
 BACKUP_DIR="${WP_S3_BACKUP_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wp-s3-backups}/$(printf '%s' "$WP_ROOT" | cksum | cut -d' ' -f1)"
+( umask 077 && mkdir -p "$BACKUP_DIR" ) && chmod 700 "$BACKUP_DIR" \
+    || die "could not create or restrict the backup directory $BACKUP_DIR"
+python3 - "$WP_ROOT" "$BACKUP_DIR" <<'PY' || die "backup directory must be outside the WordPress document root"
+import os, sys
+root, backup = (os.path.realpath(p) for p in sys.argv[1:])
+if backup == root or backup.startswith(root + os.sep):
+    sys.exit(1)
+PY
 
 [[ -d "$LOCAL" ]] || die "no $LOCAL"
 [[ -w "$LOCAL" ]] || die "$LOCAL is not writable: the media cannot come back to disk"
@@ -116,7 +124,7 @@ shutil.copymode(path, tmp)
 try:
     st = os.stat(path)
     os.chown(tmp, st.st_uid, st.st_gid)
-except PermissionError:
+except OSError:
     pass
 os.replace(tmp, path)
 PY

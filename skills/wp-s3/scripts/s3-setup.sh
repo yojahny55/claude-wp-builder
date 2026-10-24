@@ -76,7 +76,7 @@ if [[ -n "$SECRET_FILE" ]]; then
     [[ -f "$SECRET_FILE" && -r "$SECRET_FILE" ]] || die "--secret-file $SECRET_FILE is not a readable file"
     secret_mode="$(stat -c %a "$SECRET_FILE" 2>/dev/null || stat -f %Lp "$SECRET_FILE" 2>/dev/null || true)"
     case "$secret_mode" in
-        400|600) ;;
+        400|600|0400|0600) ;;
         *) die "--secret-file must be mode 0600 or 0400 (chmod 600 '$SECRET_FILE')" ;;
     esac
     S3_UPLOADS_SECRET_VALUE="$(<"$SECRET_FILE")"
@@ -119,6 +119,12 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP_DIR="${WP_S3_BACKUP_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wp-s3-backups}/$(printf '%s' "$WP_ROOT" | cksum | cut -d' ' -f1)"
 ( umask 077 && mkdir -p "$BACKUP_DIR" ) || die "could not create the backup directory $BACKUP_DIR"
 chmod 700 "$BACKUP_DIR" || die "could not restrict permissions on backup directory $BACKUP_DIR"
+python3 - "$WP_ROOT" "$BACKUP_DIR" <<'PY' || die "backup directory must be outside the WordPress document root"
+import os, sys
+root, backup = (os.path.realpath(p) for p in sys.argv[1:])
+if backup == root or backup.startswith(root + os.sep):
+    sys.exit(1)
+PY
 backup() { # backup <file> <name>: private copy, mode 0600
     ( umask 077 && cp -p "$1" "$BACKUP_DIR/$2.bak-$STAMP" ) && chmod 600 "$BACKUP_DIR/$2.bak-$STAMP"
 }
@@ -372,7 +378,7 @@ shutil.copymode(path, tmp)
 try:
     st = os.stat(path)
     os.chown(tmp, st.st_uid, st.st_gid)
-except PermissionError:
+except OSError:
     pass
 os.replace(tmp, path)
 PY

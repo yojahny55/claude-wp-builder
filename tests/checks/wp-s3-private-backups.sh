@@ -31,6 +31,15 @@ run() { HOME="$home" WP_S3_BACKUP_DIR= XDG_STATE_HOME= env -u S3_UPLOADS_SECRET_
   --wp-root "$root" --bucket b --region r --bucket-url https://m.example.test --auth key --key K \
   --skip-plugin-install "$@"; }
 
+# An operator override cannot put credential backups under the web root, even via symlink.
+mkdir -p "$root/private"
+HOME="$home" WP_S3_BACKUP_DIR="$root/private" XDG_STATE_HOME= S3_UPLOADS_SECRET_VALUE=fixture-secret \
+  bash "$setup" --wp-root "$root" --bucket b --region r --bucket-url https://m.example.test \
+  --auth key --key K --skip-plugin-install >"$tmp/inside.out" 2>&1 \
+  && fail "a backup directory inside the document root was accepted"
+grep -Fq 'backup directory must be outside' "$tmp/inside.out" || fail "inside-docroot rejection was unclear"
+[ ! -e "$root/s3-config.php" ] || fail "setup wrote credential config before rejecting the backup location"
+
 # A secret file readable by others is refused; the env var and the file are exclusive.
 run --secret-file "$tmp/secret" >/dev/null 2>&1 && fail "a world-readable --secret-file was accepted"
 chmod 600 "$tmp/secret"
@@ -43,17 +52,24 @@ grep -Fq "fixture-secret" "$root/s3-config.php" || fail "the secret in --secret-
 bdir="$(find "$home/.local/state/wp-s3-backups" -mindepth 1 -maxdepth 1 -type d | head -1)"
 [ -n "$bdir" ] || fail "no backup directory under the home state dir"
 [ "$(file_mode "$bdir")" = 700 ] || fail "backup directory is not 0700"
-for b in "$bdir"/wp-config.php.bak-*; do
-  [ "$(file_mode "$b")" = 600 ] || fail "$b is not 0600"
+shopt -s nullglob
+wp_backups=("$bdir"/wp-config.php.bak-*)
+[ "${#wp_backups[@]}" -gt 0 ] || fail "no wp-config.php backup was created"
+for b in "${wp_backups[@]}"; do
+  case "$(file_mode "$b")" in 600|0600) ;; *) fail "$b is not 0600" ;; esac
 done
+shopt -u nullglob
 
 # The rewrite keeps the original mode.
 [ "$(file_mode "$root/wp-config.php")" = 640 ] || fail "wp-config.php lost its 0640 mode"
 
 # A second run backs up the existing s3-config.php, also privately.
 run --secret-file "$tmp/secret" >/dev/null 2>&1 || fail "second run failed"
-ls "$bdir"/s3-config.php.bak-* >/dev/null 2>&1 || fail "s3-config.php was not backed up to the private dir"
-for b in "$bdir"/s3-config.php.bak-*; do [ "$(file_mode "$b")" = 600 ] || fail "$b is not 0600"; done
+shopt -s nullglob
+s3_backups=("$bdir"/s3-config.php.bak-*)
+[ "${#s3_backups[@]}" -gt 0 ] || fail "s3-config.php was not backed up to the private dir"
+for b in "${s3_backups[@]}"; do case "$(file_mode "$b")" in 600|0600) ;; *) fail "$b is not 0600" ;; esac; done
+shopt -u nullglob
 
 # Revert must never leave the credential-bearing config as plain text in the docroot.
 HOME="$home" WP_S3_BACKUP_DIR= XDG_STATE_HOME= bash "$revert" "$root" --keep-remote-media >"$tmp/revert.out" 2>&1 \
@@ -62,7 +78,7 @@ HOME="$home" WP_S3_BACKUP_DIR= XDG_STATE_HOME= bash "$revert" "$root" --keep-rem
   || fail "revert left the S3 config in the docroot"
 parked=$(find "$bdir" -maxdepth 1 -type f -name 's3-config.php.disabled-*' | head -1)
 [ -n "$parked" ] || fail "revert did not park s3-config.php outside the docroot"
-[ "$(file_mode "$parked")" = 600 ] || fail "parked s3-config.php is not 0600"
+[ "$(file_mode "$parked")" = 600 ] || [ "$(file_mode "$parked")" = 0600 ] || fail "parked s3-config.php is not 0600"
 
 # The revert shares the defect.
 grep -Fq 'shutil.copymode' "$revert" || fail "$revert's rewrite does not keep wp-config.php's mode"
