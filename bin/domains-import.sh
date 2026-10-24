@@ -10,13 +10,23 @@
 # Confidence comes from upstream's own data-provenance.json where a record
 # exists for the row, and defaults to 0.5 where none does, so a weak match can
 # be reported as weak rather than asserted.
+#
+# The upstream repository is third-party and the CSV built from it is read by agents, so
+# the import is pinned: DOMAINS_REF is a tag or a full commit SHA (default: the commit
+# last reviewed). To move it, set DOMAINS_REF, run the script, and READ THE DIFF of
+# domains.csv before committing — a changed row is text an agent will follow.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+DOMAINS_REF="${DOMAINS_REF:-4aad0584d92131626b16d4ff4d77f0455385013c}"
 d=skills/wp-demo-craft/references/domains
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-git clone -q --depth 1 https://github.com/nextlevelbuilder/ui-ux-pro-max-skill "$tmp/up"
+# init + fetch rather than `clone --branch`, which cannot take a commit SHA.
+git init -q "$tmp/up"
+git -C "$tmp/up" fetch -q --depth 1 https://github.com/nextlevelbuilder/ui-ux-pro-max-skill "$DOMAINS_REF" \
+  || { echo "could not fetch upstream ref $DOMAINS_REF" >&2; exit 1; }
+git -C "$tmp/up" checkout -q FETCH_HEAD
 src="$tmp/up/src/ui-ux-pro-max/data/products.csv"
 prov="$tmp/up/src/ui-ux-pro-max/data/data-provenance.json"
 [ -f "$src" ] || { echo "upstream products.csv not found; the catalogue moved" >&2; exit 1; }
@@ -24,12 +34,10 @@ prov="$tmp/up/src/ui-ux-pro-max/data/data-provenance.json"
 mkdir -p "$d"
 cp "$tmp/up/LICENSE" "$d/LICENSE"
 
-# The clone above is unpinned (always `main`), so a version string in README.md
-# would go stale the moment upstream tags a release. Record what was actually
-# imported instead: the ref, the exact commit, and the date, so provenance is a
-# fact recorded at import time rather than a claim that has to be kept in sync.
+# Record what was actually imported: the requested ref, the exact commit, and the
+# date, so provenance is a fact recorded at import time.
 sha=$(git -C "$tmp/up" rev-parse HEAD)
-ref=$(git -C "$tmp/up" symbolic-ref --short HEAD 2>/dev/null || echo HEAD)
+ref="$DOMAINS_REF"
 cat > "$d/SOURCE.txt" <<EOF
 Source: https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
 Ref: $ref

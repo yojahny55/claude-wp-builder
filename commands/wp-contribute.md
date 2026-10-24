@@ -102,6 +102,9 @@ A new skill is not done until it passes both gates and the review.
 
 ## Step 2b — `review <skill-name>`: the review the gates cannot do
 
+`review` reviews a **skill** against the authoring best practices. It does not review a diff,
+and it is not the pre-push review: that is the OCR step in Step 4.
+
 The gates prove the skill loads and is shaped right. They cannot tell whether its description
 would be chosen for the right requests, whether it explains what Claude already knows, or
 whether a fragile write is left to improvisation. That is a review, and it runs on any skill,
@@ -160,8 +163,12 @@ loosening its assertion — that is the failure mode the check exists to prevent
 4. Commit with a Conventional Commits subject in English — `feat:`, `fix:`, `docs:`, `chore:`,
    `refactor:` — and **no AI attribution**: no `Co-Authored-By`, no "Generated with", nothing
    naming the tool. The body says what was wrong before, not just what changed.
-5. Push over SSH with `git push -u origin <branch>` (not `gh`).
-6. Create the PR with `env -u GH_TOKEN gh pr create`, body in English:
+5. **Before the push, review the diff with OCR.** Run the `ocr-review` skill (the `ocr` CLI in
+   delegated mode) over the branch diff against `main` and resolve what it reports. CI reviews
+   every PR with OCR (`.github/workflows/ocr-review.yml`); running it first means the bot finds
+   nothing new. If `ocr` is not installed, stop and say so — do not install it.
+6. Push over SSH with `git push -u origin <branch>` (not `gh`).
+7. Create the PR with `env -u GH_TOKEN gh pr create`, body in English:
 
 ```
 ## Summary

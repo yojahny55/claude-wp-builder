@@ -17,7 +17,7 @@ senders=$(grep -Ec "'sender'[[:space:]]*=>" "$a" || true)
 computed=$(grep -Ec "'sender'[[:space:]]*=>[[:space:]]*\\\\?\\\$sender[[:space:]]*," "$a" || true)
 [ "$computed" -ge 2 ] && [ "$computed" = "$senders" ] \
   || fail "$a: $computed of $senders 'sender' lines use the computed site-domain sender (mail and mail_2 need it)"
-grep -Fq "'wordpress@' . \\\$domain" "$a" || fail "$a does not fall back to wordpress@<site domain>"
+grep -Eq "'wordpress@' \. \\\\?\\\$domain" "$a" || fail "$a does not fall back to wordpress@<site domain>"
 grep -Fq 'gmail.com' "$a" || fail "$a does not warn on free-mail sender domains"
 grep -Fq 'new WPCF7_ConfigValidator(' "$a" || fail "$a does not run CF7's configuration validator"
 grep -Fq 'collect_error_messages(' "$a" || fail "$a does not surface the validator's messages"

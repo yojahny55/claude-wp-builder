@@ -10,7 +10,7 @@
 - A3.5 — Inventory Remote Dependencies
 - Split the list by what the operator can do about it
 - Write it down, and say where
-- A4 — Export Remote Database
+- A4 — Export Remote Database (measure first, compress, resumable)
 - A5 — Download Database Dump
 - A6 — Detect Remote Upload Size
 - A7 — Rsync Uploads
@@ -148,6 +148,25 @@ committed to the project's repository.
 
 ### A4: Export Remote Database
 
+**Measure before dumping.** An unmeasured dump of a store or a busy site can be gigabytes of
+logs, queues and sessions. Ask the remote database what weighs what:
+
+```bash
+bash -c "ssh user@host \"cd /remote/path && wp db query 'SELECT table_name, ROUND((data_length+index_length)/1048576,1) AS mb FROM information_schema.tables WHERE table_schema=DATABASE() ORDER BY (data_length+index_length) DESC LIMIT 10' --skip-column-names\""
+```
+
+Show the top 10 with their total. Then offer to exclude tables that are logs, queues, sessions
+or cache (for example `*_actionscheduler_*`, `*_woocommerce_sessions`, `*_wsal_*`, `*_404_logs`,
+`*_email_logs`, `*_wc_admin_note*`, `*_redirection_logs`, `*_statistics_*`). Never offer a table
+that holds posts, options, users or plugin settings. Pass the chosen ones as
+`--exclude_tables=<list>` (a comma-separated list; resolve wildcards with `wp db tables
+'<pattern>' --format=csv`). Say in the summary which tables were left out.
+
+**If the source runs `wp envsync`** (`wp help envsync` succeeds remotely, or the manifest of the
+source records `sync.tool: envsync`), offer it as the alternative transport for the database
+and uploads (see the `wp-environments` skill, `references/sync-environments.md`) instead of
+the SSH dump below.
+
 **The dump is the whole production database** — customer records, order rows, password
 hashes, and whatever API keys and tokens the site keeps in `wp_options`. It exists, briefly,
 as a plain file on two machines. Both copies get a unique name and owner-only permissions,
@@ -156,7 +175,7 @@ and both are deleted.
 Pick the remote path first, and keep it for A5:
 
 ```bash
-bash -c "REMOTE_DUMP=\$(ssh user@host 'mktemp -t wp-clone-XXXXXXXX.sql') && echo \$REMOTE_DUMP"
+bash -c "REMOTE_DUMP=\$(ssh user@host 'mktemp -t wp-clone-XXXXXXXX.sql.gz') && echo \$REMOTE_DUMP"
 ```
 
 `mktemp`, never a fixed name under `/tmp`, for two independent reasons. A predictable
@@ -168,8 +187,13 @@ second site's database into its own destination, with nothing to say so.
 Export with a restrictive umask so the file is never briefly world-readable:
 
 ```bash
-bash -c "ssh user@host \"cd /remote/path && umask 077 && (wp db export '\$REMOTE_DUMP' --allow-root 2>/dev/null || wp db export '\$REMOTE_DUMP')\""
+bash -c "ssh user@host \"cd /remote/path && umask 077 && (wp db export - --single-transaction --allow-root 2>/dev/null || wp db export - --single-transaction) | gzip > '\$REMOTE_DUMP'\""
 ```
+
+`--single-transaction` takes a consistent snapshot of InnoDB tables without locking the live
+site, and `gzip` compresses in transit so the dump is written once and is a fraction of the
+size. A failed `wp db export` inside the pipe leaves a truncated file: check the remote file
+is non-empty and `gzip -t '$REMOTE_DUMP'` passes before downloading it.
 
 `umask 077` applies to files the command creates, so it has to be set in the same shell as
 the export — `chmod` afterwards leaves a window in which the dump already exists with the
@@ -178,8 +202,11 @@ default mode.
 ### A5: Download Database Dump
 
 ```bash
-bash -c "LOCAL_DUMP=\$(mktemp -t wp-clone-XXXXXXXX.sql) && chmod 600 \"\$LOCAL_DUMP\" && scp user@host:\"\$REMOTE_DUMP\" \"\$LOCAL_DUMP\" && echo \$LOCAL_DUMP"
+bash -c "LOCAL_DUMP=\$(mktemp -t wp-clone-XXXXXXXX.sql) && chmod 600 \"\$LOCAL_DUMP\" && cp -p \"\$LOCAL_DUMP\" \"\$LOCAL_DUMP.gz\" && rsync --partial --progress user@host:\"\$REMOTE_DUMP\" \"\$LOCAL_DUMP.gz\" && gunzip -f \"\$LOCAL_DUMP.gz\" && echo \$LOCAL_DUMP"
 ```
+
+`rsync --partial` keeps what arrived, so a dropped connection resumes with the same command
+instead of restarting; re-run only the `rsync` with the same `$LOCAL_DUMP.gz` and `$REMOTE_DUMP`, then `gunzip -f`.
 
 **Delete the remote copy whether or not the transfer worked:**
 
