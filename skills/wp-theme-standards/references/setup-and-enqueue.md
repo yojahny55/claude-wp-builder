@@ -63,6 +63,51 @@ wp_localize_script( 'prefix-main', 'PREFIX_data', array(
 
 In JavaScript, read it from the global of that name: `PREFIX_data.lang`.
 
+### The nonce is half of the contract
+
+Creating a nonce proves nothing until a handler verifies it. Pair the localized value with
+a handler that checks it, checks the capability, and sanitizes its input:
+
+```php
+add_action( 'wp_ajax_prefix_save_note', 'prefix_save_note' );        // logged-in users
+// add_action( 'wp_ajax_nopriv_prefix_save_note', ... ) only for a public action, and
+// then the nonce is a CSRF speed bump, not authorization: add rate limiting or a captcha.
+
+function prefix_save_note() {
+    // Dies with a 403 on a missing or invalid nonce. The third argument true is the
+    // default; never pass false, which turns the check into a return value nobody reads.
+    check_ajax_referer( 'prefix_nonce', 'nonce' );
+
+    if ( ! current_user_can( 'edit_posts' ) ) {
+        wp_send_json_error( array( 'message' => __( 'Not allowed.', 'textdomain' ) ), 403 );
+    }
+
+    $note = isset( $_POST['note'] ) ? sanitize_textarea_field( wp_unslash( $_POST['note'] ) ) : '';
+
+    wp_send_json_success( array( 'note' => $note ) );
+}
+```
+
+The script sends the value back under the key the handler reads (`nonce` above):
+`body.append( 'nonce', PREFIX_data.nonce )`, or `X-WP-Nonce` for the REST API, where the
+action must be `wp_rest`.
+
+Rules the example follows:
+
+- **One action name per purpose** (`prefix_nonce` here is the example's; a
+  `prefix_save_note` action is better), the same string in `wp_create_nonce()` and
+  `check_ajax_referer()`.
+- **`check_ajax_referer()` is the AJAX check**, not `wp_verify_nonce()` followed by nothing.
+  Use `wp_verify_nonce()` only when you must branch on the result yourself.
+- **A nonce authenticates the request, not the user.** Anything that changes data or reads
+  private data also needs `current_user_can()` for the specific capability.
+- **Never echo the nonce into the HTML of a cached page for logged-out visitors**: a page
+  cache freezes it, and it expires in 12 to 24 hours. Localize it only on pages that are not
+  cached for that audience, or fetch a fresh one through an uncached endpoint.
+- **Prefer `wp_add_inline_script()` for structured data.** `wp_localize_script()` casts
+  scalar values to strings, so numbers and booleans arrive as `"1"`. For a non-string
+  payload use `wp_add_inline_script( 'prefix-main', 'const PREFIX_data = ' . wp_json_encode( $data ) . ';', 'before' )`.
+
 ## Page-Specific Asset Enqueueing
 
 Key page assets on the template file (`is_page_template()`) or `is_front_page()`, never on
