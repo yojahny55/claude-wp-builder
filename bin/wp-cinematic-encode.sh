@@ -45,6 +45,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# --scene goes into the PHP of `wp eval` below, so it must be a plain number.
+if [[ -n "$SCENE" && ! "$SCENE" =~ ^[1-9][0-9]*$ ]]; then
+  err "--scene must be a positive integer, got: $SCENE"; exit 2
+fi
+
 [[ -z "$INPUT" ]] && { err "Missing <input.mp4>"; exit 2; }
 [[ -z "$THEME" ]] && { err "Missing --theme=<theme-dir>"; exit 2; }
 [[ ! -f "$INPUT" ]] && { err "Input not found: $INPUT"; exit 1; }
@@ -142,6 +147,12 @@ if [[ -n "$SCENE" ]] && command -v wp >/dev/null && wp core is-installed --path=
   [[ -f "$OUT_DESKTOP" ]] && desktop_id=$(wp --path="$WP_PATH" media import "$OUT_DESKTOP" --porcelain 2>/dev/null || true)
   [[ -f "$OUT_MOBILE"  ]] && mobile_id=$(wp --path="$WP_PATH"  media import "$OUT_MOBILE"  --porcelain 2>/dev/null || true)
   [[ -f "$OUT_POSTER"  ]] && poster_id=$(wp --path="$WP_PATH"  media import "$OUT_POSTER"  --porcelain 2>/dev/null || true)
+
+  # wp media import --porcelain prints an attachment ID; anything else (an error
+  # line, stray output) must never reach the PHP below.
+  for _id in desktop_id mobile_id poster_id; do
+    [[ -z "${!_id}" || "${!_id}" =~ ^[0-9]+$ ]] || { err "Unexpected media import output for $_id: ${!_id}"; printf -v "$_id" ''; }
+  done
 
   if [[ -n "$desktop_id$mobile_id$poster_id" ]]; then
     # Update the matching ACF row on the home page.
