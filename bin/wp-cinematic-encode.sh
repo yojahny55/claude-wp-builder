@@ -83,10 +83,12 @@ OUT_MOBILE="$OUT_DIR/${base}.mobile.mp4"
 OUT_POSTER="$POSTER_DIR/${base}.jpg"
 
 # ---- encode (parallel) ---------------------------------------------------
-# Per-run log dir: a fixed /tmp name is shared by every run on the machine. Kept on failure
-# so the path printed below can be read; removed on success.
+# Per-run log dir from mktemp -d, so concurrent runs never collide. fail starts at 1 so any
+# early exit keeps the logs; it drops to 0 only once every encode succeeded, and then the
+# dir is removed on exit.
 LOG_DIR=$(mktemp -d)
-trap '[[ "${fail:-0}" -eq 0 ]] && rm -rf "$LOG_DIR"' EXIT
+fail=1
+trap 'if [[ "$fail" -eq 0 ]]; then rm -rf "$LOG_DIR"; fi' EXIT
 pids=()
 
 if [[ $MOBILE_ONLY -eq 0 ]]; then
@@ -111,11 +113,12 @@ if [[ $POSTER -eq 1 ]]; then
   pids+=($!)
 fi
 
-fail=0
+encode_failed=0
 for pid in "${pids[@]}"; do
-  if ! wait "$pid"; then fail=1; fi
+  if ! wait "$pid"; then encode_failed=1; fi
 done
-[[ $fail -ne 0 ]] && { err "One or more encodes failed. Check $LOG_DIR/wp-cine-*.log"; exit 1; }
+fail=$encode_failed
+[[ $encode_failed -ne 0 ]] && { err "One or more encodes failed. Check $LOG_DIR/wp-cine-*.log"; exit 1; }
 
 # ---- verify --------------------------------------------------------------
 if [[ -f "$OUT_DESKTOP" ]]; then
