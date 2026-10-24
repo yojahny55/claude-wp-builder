@@ -1093,6 +1093,19 @@ decision: a file under `vendors/` is third-party and usually minified already, s
 alone; and `assets/js/min/` must be excluded from the theme bundle's own exclude list only if
 that list names `min` — check `bundle`/`zip` scripts before assuming the twins ship.
 
+### Source assets, minified twins and critical cuts: one commit
+
+When the theme builds its assets (`.min` twins, a bundle, a hash manifest such as
+`assets/build.json`) and, optionally, inlines per-template critical CSS cuts, the order after
+touching any CSS or JS source is fixed: (1) regenerate the `.min` files and the bundle, which
+rewrites the manifest; (2) regenerate the critical cuts from the new bundle. Running only (1)
+invalidates every cut without any error. Commit sources, `.min`, bundle, cuts and the manifest
+together. Run `node ${CLAUDE_PLUGIN_ROOT}/bin/assets-fresh.mjs <theme-dir>` before reporting
+done: it recomputes content hashes and exits non-zero with "regenerate critical cuts" when the
+manifest and the files disagree. Do not propose inline critical CSS unless the five conditions
+in `performance-lessons.md` ("Inline critical CSS") hold: per-group cuts, a non-blocking full
+sheet, a content-hash invalidation, same-DOM verification, and a decision on observed LCP.
+
 ### Hero fetchpriority fix
 
 Edit the hero template to add `fetchpriority="high"` to the main hero image.
