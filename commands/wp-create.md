@@ -645,7 +645,7 @@ Store profiles need native WP-CLI, so check that first. Read `environment.engine
 manifest just written:
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' environment.engine"
+bash -c 'node "$1/bin/wp-config.mjs" get "$2" environment.engine' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 On anything but `native`, do not run `/wp-woo-setup`, which would copy store-kit where
