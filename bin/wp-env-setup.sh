@@ -26,6 +26,29 @@ print_success() { [[ "$JSON_OUTPUT" == "false" ]] && echo -e "${GREEN}[OK]${NC} 
 print_warning() { [[ "$JSON_OUTPUT" == "false" ]] && echo -e "${YELLOW}[WARN]${NC} $1"; }
 print_error() { [[ "$JSON_OUTPUT" == "false" ]] && echo -e "${RED}[ERROR]${NC} $1"; }
 
+# A domain ends up in sudo rm paths, /etc/hosts, a sed regex and an openssl
+# subject, so it is checked before any command acts on it: lowercase letters,
+# digits, dots and hyphens only, starting and ending alphanumeric. That rules out
+# "/", "..", spaces, regex metacharacters and shell syntax in one place.
+validate_domain() {
+    local domain="$1"
+    if [[ ! "$domain" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$ ]]; then
+        print_error "Invalid domain '$domain': use lowercase letters, digits, dots and hyphens only"
+        exit 1
+    fi
+}
+
+# hosts file path; overridable so tests never touch the real /etc/hosts
+HOSTS_FILE="${WP_ENV_HOSTS_FILE:-/etc/hosts}"
+
+# True when HOSTS_FILE has a 127.0.0.1 line for exactly this domain (anchored,
+# so foo.local does not match foo.local.es or myfoo.local). Domain is already
+# validated, so only the dots need escaping.
+hosts_has_domain() {
+    local escaped="${1//./\\.}"
+    grep -Eq "^127\.0\.0\.1[[:space:]]+${escaped}([[:space:]]|\$)" "$HOSTS_FILE" 2>/dev/null
+}
+
 detect_os() {
     if [[ -f /etc/fedora-release ]]; then
         OS="fedora"; PKG_MANAGER="dnf"
@@ -235,6 +258,7 @@ cmd_ssl_generate() {
     done
 
     [[ -z "$domain" ]] && { print_error "Usage: wp-env-setup.sh ssl-generate --domain=example.local.com"; exit 1; }
+    validate_domain "$domain"
 
     detect_os
     local cert_dir="/etc/ssl/certs"
@@ -245,7 +269,8 @@ cmd_ssl_generate() {
     sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
         -keyout "$key_dir/$domain.key" \
         -out "$cert_dir/$domain.crt" \
-        -subj "/C=US/ST=Local/L=Local/O=Local Dev/OU=Local Dev/CN=$domain" 2>/dev/null
+        -subj "/C=US/ST=Local/L=Local/O=Local Dev/OU=Local Dev/CN=$domain" \
+        -addext "subjectAltName=DNS:$domain"
 
     # Trust the certificate on macOS
     if [[ "$OS" == "macos" ]]; then
@@ -270,12 +295,13 @@ cmd_hosts_add() {
     done
 
     [[ -z "$domain" ]] && { print_error "Usage: wp-env-setup.sh hosts-add --domain=example.local.com"; exit 1; }
+    validate_domain "$domain"
 
-    if grep -q "127.0.0.1 $domain" /etc/hosts 2>/dev/null; then
-        print_warning "$domain already exists in /etc/hosts"
+    if hosts_has_domain "$domain"; then
+        print_warning "$domain already exists in $HOSTS_FILE"
     else
-        echo "127.0.0.1 $domain" | sudo tee -a /etc/hosts > /dev/null
-        print_success "Added $domain to /etc/hosts"
+        echo "127.0.0.1 $domain" | sudo tee -a "$HOSTS_FILE" > /dev/null
+        print_success "Added $domain to $HOSTS_FILE"
     fi
 }
 
@@ -286,12 +312,14 @@ cmd_hosts_remove() {
     done
 
     [[ -z "$domain" ]] && { print_error "Usage: wp-env-setup.sh hosts-remove --domain=example.local.com"; exit 1; }
+    validate_domain "$domain"
 
-    if grep -q "127.0.0.1 $domain" /etc/hosts 2>/dev/null; then
-        sudo sed -i.bak "/127.0.0.1 $domain/d" /etc/hosts
-        print_success "Removed $domain from /etc/hosts"
+    if hosts_has_domain "$domain"; then
+        local escaped="${domain//./\\.}"
+        sudo sed -i.bak -E "/^127\.0\.0\.1[[:space:]]+${escaped}([[:space:]]|\$)/d" "$HOSTS_FILE"
+        print_success "Removed $domain from $HOSTS_FILE"
     else
-        print_warning "$domain not found in /etc/hosts"
+        print_warning "$domain not found in $HOSTS_FILE"
     fi
 }
 
@@ -494,6 +522,7 @@ cmd_native_setup() {
         print_error "Usage: wp-env-setup.sh native-setup --domain=x --document-root=x --web-server=nginx|apache|caddy [--vhost-src=/tmp/x.conf] [--template-dir=x] [--no-ssl]"
         exit 1
     }
+    validate_domain "$domain"
 
     detect_os
 
@@ -552,6 +581,7 @@ cmd_native_remove() {
     done
 
     [[ -z "$domain" ]] && { print_error "Usage: wp-env-setup.sh native-remove --domain=x [--web-server=nginx]"; exit 1; }
+    validate_domain "$domain"
 
     detect_os
 
