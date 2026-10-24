@@ -69,19 +69,52 @@ $(cat "$tmp/d")"
 done
 [ "$found" -ge 13 ] || fail "only $found gate blocks found, want at least 13"
 
-# --- Where exit 3 is not a stop, the table row is AMENDED, not contradicted. -
-# The row three lines above says "stop and say so"; these commands legitimately
-# fall through. The block stays byte-identical everywhere, so the amendment has to
-# live outside it -- and it has to announce itself, or a Claude acts on the row it
-# just read and stops on a legitimate path.
-. tests/checks/lib/expand-command.sh
-for c in wp-seed wp-debug wp-robin wp-init wp-audit wp-clone wp-adopt; do
-  # Read the command as a run does, with its step references in place.
+# --- Exit 3 has ONE definition: skills/wp-manifest-gate/SKILL.md. ---------
+# Nine commands each carried their own "Amending the exit `3` row above" paragraph, hand-copied,
+# and they drifted (/wp-audit also told adoptable sites to run /wp-init). The block stays
+# byte-identical everywhere; what a command does on exit 3 is now one named policy line that
+# points at the skill. Assert both directions: the policy line is present and names a policy the
+# skill defines, and no command (or step reference) still carries the old inline paragraph.
+gate=skills/wp-manifest-gate/SKILL.md
+[ -f "$gate" ] || fail "$gate is missing"
+grep -Eq '^user-invocable: false$' "$gate" || fail "$gate must stay user-invocable: false"
+policy_of() { sed -n 's/^\*\*Exit `3` policy:\*\* `\([a-zA-Z0-9_-]*\)`.*/\1/p' "$1" | head -n 1; }
+declare -A want=(
+  [wp-seed]=bare-wp-fallback [wp-robin]=bare-wp-fallback [wp-s3]=bare-wp-fallback [wp-update]=bare-wp-fallback
+  [wp-debug]=adopt-or-bare-wp [wp-audit]=adopt-or-stop [wp-adopt]=register [wp-init]=scaffold
+  [wp-clone]=destination-adopt
+)
+for c in "${!want[@]}"; do
   src=commands/$c.md
   if [ -d "skills/$c-run/references" ]; then expand_command "$src"; src=$EXPANDED; fi
-  grep -Fq 'Amending the exit `3` row above:' "$src" \
-    || fail "commands/$c.md contradicts the exit 3 table row instead of amending it"
+  got=$(policy_of "$src")
+  [ "$got" = "${want[$c]}" ] || fail "commands/$c.md exit 3 policy is '${got:-none}', want '${want[$c]}'"
+  grep -Fq "### \`$got\`" "$gate" || fail "$gate does not define the policy $got"
 done
+# Any command that names a policy at all must name one the skill defines.
+for f in commands/*.md; do
+  x=$f
+  if grep -Fq "skills/$(basename "$f" .md)-run/references/" "$f"; then expand_command "$f"; x=$EXPANDED; fi
+  p=$(policy_of "$x"); [ -n "$p" ] || continue
+  grep -Fq "### \`$p\`" "$gate" || fail "$f names an undefined exit 3 policy: $p"
+done
+# The old inline amendment, anywhere a run reads: gone.
+! grep -rFq 'Amending the exit `3` row above' commands skills \
+  || fail "an inline 'Amending the exit 3 row above' paragraph is back: name a policy from $gate instead"
+# The prologue is not copied beside the block either: the paragraph that says where PROJECT_PATH
+# comes from lives only inside the byte-identical block, once per gate.
+for f in commands/*.md; do
+  x=$f
+  if grep -Fq "skills/$(basename "$f" .md)-run/references/" "$f"; then expand_command "$f"; x=$EXPANDED; fi
+  n=$(grep -Fc 'is not an environment variable the way' "$x" || true)
+  g=$(grep -Fc '**First: validate the project configuration.**' "$x" || true)
+  [ "$n" -le "$g" ] || fail "$f repeats the PROJECT_PATH prologue outside its gate block"
+done
+# wp-audit must not send an adoptable site to /wp-init when the context file is missing.
+! grep -Fq 'Project not initialized. Run /wp-init first' commands/wp-audit.md \
+  || fail "wp-audit.md tells an existing site to run /wp-init"
+grep -Fq 'Run /wp-adopt for an existing site' commands/wp-audit.md \
+  || fail "wp-audit.md does not offer /wp-adopt when .claude/CLAUDE.md is missing"
 
 # --- The ceilings are recorded where the other ceilings live. ---------------
 grep -Fq 'wp-config.mjs' CLAUDE.md || fail "CLAUDE.md does not mention the validator"
