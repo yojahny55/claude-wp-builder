@@ -175,7 +175,15 @@ if ( in_array( 'dry-run', is_array( $args ) ? $args : array(), true ) ) {
 			$verb = $has_menu ? 'update' : 'create';
 			$what = ( $has_menu ? 'existing translated menu rebuilt' : 'new translated menu' ) . ' for menu ' . $item['id'] . ' (items rebuilt; also rewrites _menu_item_url)';
 		} else {
-			$verb = empty( $item['target_id'] ) ? 'create' : 'update';
+			// Mirror the write path's existence checks (read-only): a target_id whose object was
+			// deleted since the manifest was built is created again, not updated.
+			if ( 'post' === $kind ) {
+				$verb = ( ! empty( $item['target_id'] ) && get_post( $item['target_id'] ) ) ? 'update' : 'create';
+			} elseif ( 'term' === $kind ) {
+				$verb = ( ! empty( $item['target_id'] ) && get_term( $item['target_id'], $item['taxonomy'] ) instanceof WP_Term ) ? 'update' : 'create';
+			} else {
+				$verb = empty( $item['target_id'] ) ? 'create' : 'update';
+			}
 			$what = $kind . ' ' . (int) $item['source_id'] . ( 'update' === $verb ? ' -> ' . (int) $item['target_id'] : '' ) . " ($target)";
 		}
 		$plan[ 'create' === $verb ? 'create' : 'update' ]++;

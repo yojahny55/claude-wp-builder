@@ -12,20 +12,21 @@ i=skills/wp-polylang/scripts/pll-import.php
 grep -Fq '## Step 2.5' "$c" || fail "no backup step"
 grep -Fq '$WP db export' "$c" || fail "backup step does not run \$WP db export"
 grep -Fq 'outside the docroot' "$c" || fail "backup is not required to live outside the docroot"
-b=$(grep -n '^## Step 2.5' "$c" | cut -d: -f1); m=$(grep -n '^## Step 6' "$c" | cut -d: -f1)
-[ "$b" -lt "$m" ] || fail "backup must come before Step 6"
-[ "$b" -lt "$(grep -n '^## Step 3:' "$c" | cut -d: -f1)" ] || fail "backup must come before configuring languages"
+b=$(grep -n '^## Step 2.5' "$c" | cut -d: -f1 || true); m=$(grep -n '^## Step 6' "$c" | cut -d: -f1 || true)
+[ -n "$b" ] && [ -n "$m" ] && [ "$b" -lt "$m" ] || fail "backup must come before Step 6"
+s3=$(grep -n '^## Step 3:' "$c" | cut -d: -f1 || true)
+[ -n "$s3" ] && [ "$b" -lt "$s3" ] || fail "backup must come before configuring languages"
 grep -Fq 'pll-import.php" "$MANIFEST.translated" dry-run' "$c" || fail "Step 6 has no dry-run invocation"
-d=$(grep -n 'translated" dry-run' "$c" | head -1 | cut -d: -f1)
-r=$(grep -n 'pll-import.php" "$MANIFEST.translated"$' "$c" | head -1 | cut -d: -f1)
+d=$(grep -n 'translated" dry-run' "$c" | head -1 | cut -d: -f1 || true)
+r=$(grep -n 'pll-import.php" "$MANIFEST.translated"$' "$c" | head -1 | cut -d: -f1 || true)
 [ "$d" -lt "$r" ] || fail "dry-run must come before the real import"
 grep -Fq 'AskUserQuestion' "$c" && grep -Fq 'without a yes' "$c" || fail "hide_default=0 is not gated on confirmation"
 grep -Fq "wp_cli.wrapper" "$c" || fail "command does not read the WP-CLI wrapper"
 ! grep -E '^ *wp (plugin|eval-file|eval|rewrite|db) ' "$c" || fail "bare wp call left in the command; use \$WP"
 
 grep -Fq "'dry-run'" "$i" || fail "pll-import.php has no dry-run mode"
-dr=$(grep -n "in_array( 'dry-run'" "$i" | head -1 | cut -d: -f1)
-w=$(grep -n '^\$written  ' "$i" | head -1 | cut -d: -f1)
+dr=$(grep -n "in_array( 'dry-run'" "$i" | head -1 | cut -d: -f1 || true)
+w=$(grep -n '^\$written  ' "$i" | head -1 | cut -d: -f1 || true)
 [ -n "$dr" ] && [ -n "$w" ] && [ "$dr" -lt "$w" ] || fail "dry-run must return before the first write"
 sed -n "${dr},${w}p" "$i" | grep -Eq 'wp_(insert|update)_post|wp_update_nav_menu_item|update_post_meta' \
   && fail "the dry-run block itself writes" || true
