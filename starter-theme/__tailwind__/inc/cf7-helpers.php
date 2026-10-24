@@ -65,8 +65,22 @@ add_action('plugins_loaded', function() {
      * Filter CF7 mail components to:
      * 1. Set content type to text/html
      * 2. Replace %%placeholder%% tokens with ACF settings values
+     *
+     * Only for mails the theme's forms declare as HTML (`use_html` on the mail
+     * template, which is what the wp-cf7 agent writes). Any other CF7 form on the
+     * site is the client's own, usually plain text, and forcing text/html on it makes
+     * a visitor's [your-message] be parsed as markup: injected links and remote
+     * images in a message the site owner trusts.
+     *
+     * Substituted values are escaped for the context they land in: the body is HTML,
+     * the subject is a plain-text header.
      */
     add_filter('wpcf7_mail_components', function ($components, $form, $mail) {
+        // get() with $replace = false returns the raw template flag, not a tag-expanded one.
+        if (!is_object($mail) || !method_exists($mail, 'get') || !$mail->get('use_html', false)) {
+            return $components;
+        }
+
         // Set HTML content type (requires CF7 5.7+)
         // Fallback: also hook wpcf7_mail_content_type if needed
         $components['content_type'] = 'text/html';
@@ -76,9 +90,9 @@ add_action('plugins_loaded', function() {
         $es_form_id = get_theme_mod('__starter___cf7_form_es', 0);
         $suffix = ($form->id() === (int) $es_form_id) ? '_es' : '';
 
-        // Build replacement map — use raw get_field() since we manually control language suffix
+        // Build the raw values — use raw get_field() since we manually control language suffix
         $logo = __starter___get_field('site_logo', 'option');
-        $replacements = array(
+        $values = array(
             '%%site_url%%'         => home_url(),
             '%%site_logo%%'        => is_array($logo) ? ($logo['url'] ?? '') : ($logo ?: ''),
             '%%contact_email%%'    => get_field('contact_email' . $suffix, 'option')
@@ -94,18 +108,36 @@ add_action('plugins_loaded', function() {
         // Social links (not translatable — no suffix)
         $social_fields = array('facebook', 'instagram', 'tiktok', 'linkedin', 'youtube');
         foreach ($social_fields as $network) {
-            $replacements['%%social_' . $network . '%%'] = get_field('social_' . $network, 'option') ?: '';
+            $values['%%social_' . $network . '%%'] = get_field('social_' . $network, 'option') ?: '';
         }
 
-        // Apply replacements to body and subject
+        // URLs are escaped as URLs, everything else as text.
+        $url_tokens = array('%%site_url%%', '%%site_logo%%');
+        foreach ($social_fields as $network) {
+            $url_tokens[] = '%%social_' . $network . '%%';
+        }
+        $html = array();
+        $text = array();
+        foreach ($values as $token => $value) {
+            $value = (string) $value;
+            if (in_array($token, $url_tokens, true)) {
+                $html[$token] = esc_url($value);
+                $text[$token] = esc_url_raw($value);
+            } else {
+                $html[$token] = esc_html($value);
+                $text[$token] = wp_strip_all_tags($value);
+            }
+        }
+
+        // Apply replacements to body (HTML) and subject (plain text)
         $components['body'] = str_replace(
-            array_keys($replacements),
-            array_values($replacements),
+            array_keys($html),
+            array_values($html),
             $components['body']
         );
         $components['subject'] = str_replace(
-            array_keys($replacements),
-            array_values($replacements),
+            array_keys($text),
+            array_values($text),
             $components['subject']
         );
 

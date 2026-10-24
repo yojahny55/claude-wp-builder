@@ -170,6 +170,7 @@ export function carryOver(old, manifest, root, flags = {}) {
   const notes = [];
   if (old.audit !== undefined) { manifest.audit = old.audit; notes.push('audit'); }
   if (old.store !== undefined) { manifest.store = old.store; notes.push('store'); }
+  if (old.environments !== undefined) { manifest.environments = old.environments; notes.push('environments'); }
   if (old.project?.adopted) manifest.project.adopted = old.project.adopted;
   if (!flags.prefix && typeof old.project?.prefix === 'string' && old.project.prefix) {
     manifest.project.prefix = old.project.prefix;
