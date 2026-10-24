@@ -30,7 +30,8 @@ stub_path_init() {
   STUB_REAL_RM=$(command -v rm)
   real_sed=$(command -v sed)
   for n in $STUB_NAMES; do
-    printf '#!/bin/sh\nprintf "%%s" "%s" >> "$STUB_LOG"\nfor a in "$@"; do printf " [%%s]" "$a" >> "$STUB_LOG"; done\nprintf "\\n" >> "$STUB_LOG"\nexit 0\n' "$n" > "$STUB_DIR/$n"
+    case "$n" in ''|*[!a-zA-Z0-9_-]*) echo "bad stub name: $n" >&2; return 1 ;; esac
+    printf '#!/bin/sh\nprintf "%%s" "%s" >> "$STUB_LOG"\nfor a in "$@"; do printf " [%%s]" "$(printf %%s "$a" | tr "\\n" " ")" >> "$STUB_LOG"; done\nprintf "\\n" >> "$STUB_LOG"\nexit 0\n' "$n" > "$STUB_DIR/$n"
     chmod +x "$STUB_DIR/$n"
   done
   cat > "$STUB_DIR/sed" <<SED
@@ -38,7 +39,7 @@ stub_path_init() {
 inplace=0
 for a in "\$@"; do case "\$a" in -i*|--in-place*) inplace=1 ;; esac; done
 if [ "\$inplace" = 1 ]; then
-  printf 'sed' >> "\$STUB_LOG"; for a in "\$@"; do printf ' [%s]' "\$a" >> "\$STUB_LOG"; done; printf '\n' >> "\$STUB_LOG"
+  printf 'sed' >> "\$STUB_LOG"; for a in "\$@"; do printf ' [%s]' "\$(printf %s "\$a" | tr '\\n' ' ')" >> "\$STUB_LOG"; done; printf '\n' >> "\$STUB_LOG"
   exit 0
 fi
 exec "$real_sed" "\$@"

@@ -37,6 +37,8 @@ for cmd in "${cmds[@]}"; do
     calls=$(stub_destructive_calls)
     if [ -n "$calls" ] || [ "$STUB_RC" = 0 ]; then
       leaks=$((leaks + 1))
+      if [ -n "$calls" ]; then echo "LEAK: $cmd triggered destructive calls" >&2
+      else echo "NOTE: $cmd exited 0 without refusing (no validation?)" >&2; fi
       [ "$leaks" -gt 6 ] || echo "note: $cmd --domain=$(printf %q "$d") was not refused (rc=$STUB_RC)" >&2
       [ -z "$calls" ] || [ "$leaks" -gt 6 ] || printf '%s\n' "$calls" | sed 's/^/        would run: /' >&2
     fi

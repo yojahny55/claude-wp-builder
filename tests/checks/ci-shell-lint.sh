@@ -11,6 +11,7 @@ CI=.github/workflows/ci.yml
 
 grep -Fq "bash -n" "$CI" || fail "ci.yml does not run bash -n on the shell scripts"
 grep -Fq "find bin skills -name '*.sh'" "$CI" || fail "ci.yml does not cover bin/ and skills/*/scripts/"
+[ "$(grep -Fc 'no shell scripts found' "$CI")" -ge 2 ] || fail "ci.yml lost a zero-script guard"
 grep -Fq 'shellcheck --severity=warning' "$CI" || fail "ci.yml does not run shellcheck at warning severity"
 awk '/name: shellcheck/{f=1} f&&/continue-on-error: true/{ok=1} END{exit ok?0:1}' "$CI" \
   || fail "shellcheck lost continue-on-error: promote it deliberately, in the change that clears the backlog, and update this check"
@@ -28,7 +29,8 @@ while IFS= read -r f; do
 done < <(find bin skills -name '*.sh' -not -path '*/node_modules/*' | sort)
 [ "$n" -gt 0 ] || fail "found no shell scripts to parse"
 if command -v shellcheck >/dev/null 2>&1; then
-  shellcheck --severity=warning bin/*.sh skills/*/scripts/*.sh >/dev/null 2>&1 \
+  mapfile -t files < <(find bin skills -name '*.sh' -not -path '*/node_modules/*' | sort)
+  shellcheck --severity=warning "${files[@]}" >/dev/null 2>&1 \
     || echo "note: shellcheck reports findings (informational in CI)" >&2
 fi
 echo PASS
