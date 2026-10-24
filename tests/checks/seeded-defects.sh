@@ -29,14 +29,14 @@ jq -e 'all(.defects[]; (.check|type=="string") and (.domain|type=="string") and 
 
 while IFS=$'\t' read -r code domain file pattern; do
   case "$domain" in
-    security) cat=agents/wp-audit-security.md ;;
-    accessibility) cat=agents/wp-audit-a11y.md ;;
-    seo) cat=agents/wp-audit-seo.md ;;
-    performance) cat=agents/wp-audit-performance.md ;;
-    best-practices) cat=agents/wp-audit-practices.md ;;
+    security) catalog=agents/wp-audit-security.md ;;
+    accessibility) catalog=agents/wp-audit-a11y.md ;;
+    seo) catalog=agents/wp-audit-seo.md ;;
+    performance) catalog=agents/wp-audit-performance.md ;;
+    best-practices) catalog=agents/wp-audit-practices.md ;;
     *) fail "$code: unknown domain $domain" ;;
   esac
-  grep -Fq "| $code |" "$cat" || fail "$code is not a check in $cat"
+  grep -Fq "| $code |" "$catalog" || fail "$code is not a check in $catalog"
   [ -f "$fx/$file" ] || fail "$code: $fx/$file does not exist"
   grep -Fq -- "$pattern" "$fx/$file" || fail "$code: pattern not found in $file (defect fixed or reworded?): $pattern"
   grep -Fq "SEEDED $code" "$fx/$file" || fail "$code: $file has no 'SEEDED $code' marker"
@@ -44,7 +44,7 @@ done < <(jq -r '.defects[] | [.check,.domain,.file,.pattern] | @tsv' "$exp")
 
 # No marker without an entry: an unlisted seeded defect would be invisible to the comparison.
 listed=$(jq -r '.defects[].check' "$exp" | sort)
-found=$(grep -rhoE 'SEEDED [A-Z0-9]+-[0-9]+' "$fx/theme" "$fx/plugin" | awk '{print $2}' | sort -u)
+found=$(jq -r '.defects[].file' "$exp" | while IFS= read -r f; do grep -rhoE 'SEEDED [A-Z0-9]+-[0-9]+' "$fx/$f" 2>/dev/null || true; done | awk '{print $2}' | sort -u)
 [ "$listed" = "$found" ] || fail "SEEDED markers and expected-findings.json disagree"
 
 # The fixture must be valid PHP, or the audits see a parse error instead of the defects.
@@ -57,7 +57,7 @@ grep -Fq 'WP_FIXTURE_SEEDED' tests/fixtures/wp/provision.sh || fail "provision.s
 
 if [ -n "${SEEDED_FINDINGS:-}" ]; then
   [ -f "$SEEDED_FINDINGS" ] || fail "SEEDED_FINDINGS=$SEEDED_FINDINGS does not exist"
-  fired=$(jq -r '[.. | objects | select(.status? == "FAIL") | .check] | unique[]' "$SEEDED_FINDINGS" | sed 's/@.*//')
+  fired=$(jq -r '[.findings[] | select(.status == "FAIL") | .check] | unique[]' "$SEEDED_FINDINGS" | sed 's/@.*//')
   missed=""
   for c in $listed; do grep -Fxq "$c" <<<"$fired" || missed="$missed $c"; done
   [ -z "$missed" ] || fail "the audit missed seeded defects:$missed"
