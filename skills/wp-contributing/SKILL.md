@@ -139,6 +139,11 @@ no grep can check.
   `cinematic` → an entirely different shape (one continuous reel, `/wp-cinematic-scene` per
   scene, `/wp-section --hybrid` for trailing blocks) that the section walk must refuse to
   enter. Treat `basic` as an alias for `tailwind` rather than failing on it.
+- **Files the plugin writes into a site root are registered.** Any new working-state file or
+  directory (ledger, report directory, local override, backup, a plugin's runtime cache) must
+  be added to `TOOL_STATE_PATHS` in `bin/wp-config.mjs`, or `gitignore-check` never proposes
+  ignoring it and the file ends up in the user's history.
+  `tests/checks/state-files-gitignore.sh` pins the contract.
 - **Starter-theme edits use the placeholder tokens** — `__starter__`, `__STARTER__`,
   `__STARTER_NAME__`, `__STARTER_DOMAIN__` — replaced by `/wp-init`. A real slug committed
   into the starter ships to every future project.
@@ -168,6 +173,10 @@ no grep can check.
 3. **New behavior has a new check.** This is the one reviewers actually block on.
    A new or changed skill also passes `/wp-contribute review <name>` — the review no grep
    can do, against [references/skill-review.md](references/skill-review.md).
+3b. **Before the push, review the diff with OCR** (`ocr`, delegated mode) and resolve what it
+   reports; CI runs the same review on the PR. If `ocr` is not installed, stop and say so —
+   do not install it. `/wp-contribute review` is not this step: it reviews a skill against the
+   authoring best practices, not a diff.
 4. Add a `changes/<slug>.<section>.md` fragment — never edit `CHANGELOG.md` in a PR. Say what changed and *why it was wrong
    before*; a release note that only names the feature is useless six months later.
 5. Docs follow the change: a new command needs a row in the README table **and** an entry in
