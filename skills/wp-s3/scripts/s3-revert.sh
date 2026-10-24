@@ -163,7 +163,9 @@ if [[ -f "$CONFIG" ]]; then
     ( umask 077 && mkdir -p "$BACKUP_DIR" ) && chmod 700 "$BACKUP_DIR" \
         || die "could not restrict permissions on backup directory $BACKUP_DIR"
     PARKED_CONFIG="$BACKUP_DIR/s3-config.php.disabled-$STAMP"
-    mv "$CONFIG" "$PARKED_CONFIG" && chmod 600 "$PARKED_CONFIG" \
+    # Copy under umask 077 so the parked file is born 0600 (mv would keep the source mode),
+    # then remove the original.
+    ( umask 077 && cp "$CONFIG" "$PARKED_CONFIG" ) && chmod 600 "$PARKED_CONFIG" && rm -f "$CONFIG" \
         || die "could not park s3-config.php in the private backup directory $BACKUP_DIR"
     echo "5. s3-config.php moved outside the docroot to $PARKED_CONFIG (mode 0600)"
 fi

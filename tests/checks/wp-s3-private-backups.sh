@@ -38,6 +38,12 @@ HOME="$home" WP_S3_BACKUP_DIR="$root/private" XDG_STATE_HOME= S3_UPLOADS_SECRET_
   --auth key --key K --skip-plugin-install >"$tmp/inside.out" 2>&1 \
   && fail "a backup directory inside the document root was accepted"
 grep -Fq 'backup directory must be outside' "$tmp/inside.out" || fail "inside-docroot rejection was unclear"
+ln -s "$root" "$tmp/symlink-into-root"
+HOME="$home" WP_S3_BACKUP_DIR="$tmp/symlink-into-root/private" XDG_STATE_HOME= S3_UPLOADS_SECRET_VALUE=fixture-secret \
+  bash "$setup" --wp-root "$root" --bucket b --region r --bucket-url https://m.example.test \
+  --auth key --key K --skip-plugin-install >"$tmp/symlink.out" 2>&1 \
+  && fail "a symlink into the document root was accepted"
+grep -Fq 'backup directory must be outside' "$tmp/symlink.out" || fail "symlink rejection was unclear"
 [ ! -e "$root/s3-config.php" ] || fail "setup wrote credential config before rejecting the backup location"
 
 # A secret file readable by others is refused; the env var and the file are exclusive.
@@ -51,7 +57,7 @@ grep -Fq "fixture-secret" "$root/s3-config.php" || fail "the secret in --secret-
 ! ls "$root"/*.bak-* >/dev/null 2>&1 || fail "a .bak-* file was left in the docroot"
 bdir="$(find "$home/.local/state/wp-s3-backups" -mindepth 1 -maxdepth 1 -type d | head -1)"
 [ -n "$bdir" ] || fail "no backup directory under the home state dir"
-[ "$(file_mode "$bdir")" = 700 ] || fail "backup directory is not 0700"
+case "$(file_mode "$bdir")" in 700|0700) ;; *) false ;; esac || fail "backup directory is not 0700"
 shopt -s nullglob
 wp_backups=("$bdir"/wp-config.php.bak-*)
 [ "${#wp_backups[@]}" -gt 0 ] || fail "no wp-config.php backup was created"
@@ -80,7 +86,7 @@ parked=$(find "$bdir" -maxdepth 1 -type f -name 's3-config.php.disabled-*' | hea
 [ -n "$parked" ] || fail "revert did not park s3-config.php outside the docroot"
 [ "$(file_mode "$parked")" = 600 ] || [ "$(file_mode "$parked")" = 0600 ] || fail "parked s3-config.php is not 0600"
 
-# The revert shares the defect.
+# The revert must also preserve wp-config.php's mode.
 grep -Fq 'shutil.copymode' "$revert" || fail "$revert's rewrite does not keep wp-config.php's mode"
 
 # The documented flow must be one that works.
