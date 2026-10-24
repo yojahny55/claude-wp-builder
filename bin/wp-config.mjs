@@ -26,6 +26,9 @@ import {
 // Every manifest write goes through here: the bytes land in a sibling temp file and are
 // renamed over the target, so a reader (or a parallel builder) sees the old file or the
 // new one, never a half-written one. rename(2) is atomic within a directory.
+// Only `set` also takes withLock: migrate, render-context, adopt and refresh are one-shot
+// commands run by a single operator or a sequential flow, so they are single-writer by
+// contract; the temp name carries the pid, so concurrent writers never share a temp file.
 function writeAtomic(file, data) {
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
   try {
@@ -48,10 +51,19 @@ function withLock(file, fn) {
     try { mkdirSync(lock); break; } catch (err) {
       if (err.code !== 'EEXIST') throw err;
       try {
-        if (Date.now() - statSync(lock).mtimeMs > 30000) { rmdirSync(lock); continue; }
+        if (Date.now() - statSync(lock).mtimeMs > 30000) {
+          // Move the stale lock aside under a unique name first (rename is atomic), then
+          // re-check the age of what we actually moved: if another process had already
+          // replaced it with a fresh lock, put it back instead of deleting a live holder's lock.
+          const aside = `${lock}.stale.${process.pid}.${Date.now()}`;
+          renameSync(lock, aside);
+          if (Date.now() - statSync(aside).mtimeMs > 30000) rmdirSync(aside);
+          else { try { renameSync(aside, lock); } catch { rmdirSync(aside); } }
+          continue;
+        }
       } catch { continue; }
       if (Date.now() > deadline) { warn(`could not lock ${file}: another writer holds ${lock}`); process.exit(1); }
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+      for (const until = Date.now() + 50; Date.now() < until;) { /* synchronous 50 ms poll wait */ }
     }
   }
   try { return fn(); } finally { try { rmdirSync(lock); } catch { /* already gone */ } }
@@ -462,22 +474,28 @@ function cmdSet(projectPath, key, raw) {
   try { value = JSON.parse(raw); } catch { /* a plain string */ }
   const file = join(resolve(projectPath), MANIFEST_NAME);
   if (!existsSync(file)) { warn(`no ${MANIFEST_NAME} at ${resolve(projectPath)} -- run /wp-create first`); process.exit(3); }
-  withLock(file, () => {
+  // process.exit() inside the lock would skip withLock's finally and orphan the lock, so the
+  // callback only reports; the exit happens after the lock is released.
+  const problems = withLock(file, () => {
     const { manifest } = loadManifest(projectPath);
     let o = manifest;
     for (const k of parts.slice(0, -1)) {
-      if (!Object.hasOwn(o, k) || o[k] === null || typeof o[k] !== 'object' || Array.isArray(o[k])) o[k] = {};
+      if (!Object.hasOwn(o, k) || o[k] === null || typeof o[k] !== 'object' || Array.isArray(o[k])) {
+        if (Object.hasOwn(o, k)) warn(`note: replacing existing non-object value at ${k}`);
+        o[k] = {};
+      }
       o = o[k];
     }
     o[parts[parts.length - 1]] = value;
-    const problems = validateManifest(manifest);
-    if (problems.length) {
-      for (const p of problems) warn(`invalid: ${p}`);
-      warn('nothing written');
-      process.exit(1);
-    }
-    writeAtomic(file, `${JSON.stringify(manifest, null, 2)}\n`);
+    const found = validateManifest(manifest);
+    if (!found.length) writeAtomic(file, `${JSON.stringify(manifest, null, 2)}\n`);
+    return found;
   });
+  if (problems.length) {
+    for (const p of problems) warn(`invalid: ${p}`);
+    warn('nothing written');
+    process.exit(1);
+  }
   say(`ok: set ${key} in ${file}`);
 }
 

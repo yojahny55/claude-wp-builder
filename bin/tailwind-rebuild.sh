@@ -63,9 +63,16 @@ build() {
     # Bounded: a hung registry must not hold the lock (and every parallel builder behind
     # it) forever. `timeout` is GNU coreutils; without it the install runs unbounded.
     if command -v timeout >/dev/null 2>&1; then
-      (cd "$theme" && timeout "${TAILWIND_REBUILD_INSTALL_TIMEOUT:-600}" npm install --silent)
+      installer=(timeout "${TAILWIND_REBUILD_INSTALL_TIMEOUT:-600}" npm install --silent)
     else
-      (cd "$theme" && npm install --silent)
+      installer=(npm install --silent)
+    fi
+    # A killed or failed install leaves a half-populated node_modules that the guard above
+    # would then trust forever; remove it so the next run installs again.
+    if ! (cd "$theme" && "${installer[@]}"); then
+      rm -rf "$theme/node_modules"
+      echo "tailwind: npm install failed or timed out — removed partial node_modules" >&2
+      return 1
     fi
   fi
   # ponytail: tailwindbuild only, never the starter's `build` — that also runs wp-scripts

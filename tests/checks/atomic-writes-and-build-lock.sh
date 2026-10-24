@@ -34,7 +34,8 @@ node bin/wp-config.mjs set "$proj" research none >/dev/null || fail "set refused
 [ "$(node -p "require('$proj/.wp-create.json').research")" = none ] || fail "set did not store a plain string"
 node bin/wp-config.mjs set "$proj" database.password x >/dev/null 2>&1 && fail "set accepted a secret path"
 node bin/wp-config.mjs set "$proj" __proto__.x 1 >/dev/null 2>&1 && fail "set accepted a prototype key"
-ls "$proj" | grep -E '\.tmp$|\.lock$' && fail "set left a temp or lock file behind"
+node bin/wp-config.mjs set "$proj" environments 5 >/dev/null 2>&1 && fail "set accepted an invalid environments value"
+ls -A "$proj" | grep -E '\.tmp$|\.lock$' && fail "set left a temp or lock file behind"
 
 # --- behavior: parallel sets lose no key and never leave invalid JSON ---
 for i in 1 2 3 4 5 6 7 8; do
@@ -51,10 +52,9 @@ t="$tmp/t"; mkdir -p "$t/assets/css/src/tailwindcss" "$t/node_modules" "$tmp/fb"
 echo '{}' > "$t/package.json"
 cat > "$tmp/fb/npm" <<NPM
 #!/usr/bin/env bash
-n=\$(cat "$tmp/running" 2>/dev/null || echo 0); echo \$((n+1)) > "$tmp/running"
-[ \$((n+1)) -le 1 ] || echo OVERLAP >> "$tmp/overlap"
+mkdir "$tmp/inuse" 2>/dev/null || echo OVERLAP >> "$tmp/overlap"
 sleep 0.3
-echo \$n > "$tmp/running"
+rmdir "$tmp/inuse" 2>/dev/null || true
 NPM
 printf '#!/usr/bin/env bash\nexit 1\n' > "$tmp/fb/pgrep"
 chmod +x "$tmp/fb/npm" "$tmp/fb/pgrep"
