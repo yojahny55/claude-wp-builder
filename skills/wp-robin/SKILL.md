@@ -101,6 +101,15 @@ replacing each PNG attachment with a WebP original saves far more. Read
 `references/png-to-webp-conversion.md` before converting: the reference map of old to new
 files, the database replacement and the traps of an interrupted run.
 
+## Robin's runtime files and git
+
+Robin writes a cache directory and test-run state inside its own plugin folder
+(`wp-content/plugins/robin-image-optimizer/libs/factory/bootstrap/assets/cache/` and
+`.phpunit.result.cache`). They are regenerated on every run and must not be committed. After
+installing, `/wp-robin` runs `node bin/wp-config.mjs gitignore-check <root>` and reports the
+exact ignore rules still missing. The `.webp` files in uploads are media, handled by whatever
+policy the site has for uploads, not by these rules.
+
 ## Requirements
 
 | Binary | Why |
@@ -130,6 +139,7 @@ installed it runs without wp-cli, but cannot activate the plugin.
 |---|---|---|
 | `WebP converter: NONE` | No ImageMagick, cwebp or GD with WebP | Install ImageMagick (`apt install imagemagick`, `dnf install ImageMagick`, `pacman -S imagemagick`), then run again |
 | A CSS `background-image` still serves the original PNG/JPG while `<img>` tags get WebP | `webp_delivery_mode=picture` rewrites `<img>` only | Read `references/webp-delivery.md` |
+| Cards loaded by infinite scroll, tabs or "load more" serve PNG/JPEG while the first page gets WebP | Robin processes `template_redirect` only; `admin-ajax.php` and REST HTML are not covered | Read `references/webp-delivery.md`, section on AJAX-returned HTML |
 | `Failed to parse DB credentials from wp-config.php` | The `DB_*` values are not literal `define()` strings (built from `getenv()`, for example) | Run with the credentials readable as literals, or fix the queue by hand |
 | `settings were NOT written` | The database user cannot write the options table | Grant the privilege, or run as a user that has it |
 | Hash collisions persist | The same file is shared by three or more duplicate attachments | Delete the duplicate attachment posts |
