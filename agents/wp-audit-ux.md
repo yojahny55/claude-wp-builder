@@ -59,6 +59,10 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 - **Page-builder markup lives in the database.** When `stack.builder` is not `none`, a
   defect in markup the builder stores per page is `Owner: content` (fixed in the builder's
   editor), not `code`.
+- **Design impact is declared on every finding.** `design_impact` (`Design impact:` in the text
+  report) is `true` when the fix could change how the site renders: a colour, font, size,
+  spacing, an asset's dimensions, a new or changed CSS rule, or a tag or class swap. It is
+  `false` only when the fix leaves every computed style and box as it was. When unsure, `true`.
 
 ## Budget and stop rule
 
@@ -211,6 +215,7 @@ Output one line per finding, in the shape `/wp-audit` Step 6 defines:
   Resource: <page:/the/path/ for a page-level finding, `site` for a site-level one>
   Fix: <auto|manual>
   Owner: <code|setting|content|manual>
+  Design impact: <true|false>
   Method: <what to change>
   Evidence: <the selector, the status code, the measured value>
 ```
