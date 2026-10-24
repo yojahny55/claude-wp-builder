@@ -15,7 +15,10 @@ Before generating ANY form definitions, read the following project files:
 
 1. **`.claude/CLAUDE.md`** — Extract:
    - The **function prefix** (e.g., `kairo_`, `acme_`)
-   - The **languages** configured (e.g., English primary, Spanish secondary)
+   - The **languages** configured: the `- **Primary language:**` line plus every code on the
+     `- **Secondary language(s):**` line (and `.wp-create.json`'s language list when it has
+     one). That set is your **language list** for the whole run; nothing below assumes it is
+     exactly `en` + `es`
    - The **theme slug** (used in `@package` tags)
 
 2. **`.wp-create.json`** — Extract:
@@ -500,7 +503,19 @@ FORM_ID=$($WP eval-file cf7/create-form-en.php "$(pwd)/cf7")
 echo "Created EN form with ID: $FORM_ID"
 ```
 
-Repeat for each language (ES, etc.) with translated content and messages.
+**Every language on the language list gets its own form post, not just the first.** The
+block above is the English one; produce the others from the same template, so the languages
+cannot drift apart:
+
+- Copy it to `cf7/create-form-<lang>.php` per language and change only what is language
+  specific: the title (`Contact Form - <LANG>`), the three file names (`form-<lang>.html`,
+  `email-admin-<lang>.html`, `email-user-<lang>.html`), the mail subjects, and the
+  `messages` array (translated; the English and Spanish tables above are the reference, any
+  other language is translated the same way, key for key).
+- Run them in a loop over the language list, capture each ID as `FORM_ID_<LANG>`, and run the
+  configuration validator below once per ID.
+- Do not stop at the primary language: a project with two or more languages whose seeder
+  only writes the primary form leaves the others with no form at all.
 
 ### Sender, recipients and delivery
 
@@ -551,25 +566,29 @@ the message: SPF, DKIM and DMARC all fail for a domain the site does not control
 
 ### Store and output form IDs
 
-Store the ES form ID in a theme_mod so that `inc/cf7-helpers.php` can detect the language at runtime for email placeholder resolution:
+Store each secondary-language form ID in a theme_mod so that `inc/cf7-helpers.php` can detect
+the language at runtime for email placeholder resolution (`prefix_cf7_form_<lang>`; the
+starter's helper reads the `_es` one, so keep that name for Spanish):
 
 ```bash
-# Store ES form ID for language detection in cf7-helpers.php
+# One theme_mod per secondary language, e.g. prefix_cf7_form_es
 if [ -n "$FORM_ID_ES" ]; then
     $WP eval "set_theme_mod('prefix_cf7_form_es', $FORM_ID_ES);"
 fi
 ```
 
-Output form IDs for the `/wp-section` command to pass to the template agent:
+Output one `FORM_ID_<LANG>` line per language on the list for the `/wp-section` command to
+pass to the template agent:
 
 ```bash
 echo "FORM_ID_EN=$FORM_ID_EN"
-echo "FORM_ID_ES=$FORM_ID_ES"
+echo "FORM_ID_ES=$FORM_ID_ES"   # ...and one more line per additional language
 ```
 
 ## File Output
 
-The agent generates the following files in the `cf7/` directory:
+The agent generates the following files in the `cf7/` directory, one set per language on the
+language list (the table shows `en` and `es`; a third language adds a third column of files):
 
 | File | Description |
 |---|---|
@@ -582,13 +601,13 @@ The agent generates the following files in the `cf7/` directory:
 
 ## Monolingual Fallback
 
-If only one language is configured (English only), create only the EN variants. Files still use the `-en` suffix for consistency:
+If only one language is configured (English only), create only the EN variants. Files still use the language suffix for consistency (`-en` here):
 
 - `cf7/form-en.html`
 - `cf7/email-admin-en.html`
 - `cf7/email-user-en.html`
 
-Do NOT create `-es` variants when the project is monolingual.
+Do NOT create variants for languages the project does not have.
 
 ## Rules
 
@@ -597,10 +616,10 @@ Do NOT create `-es` variants when the project is monolingual.
 3. **Always check CF7 is installed before WP-CLI commands** — `$WP plugin is-installed contact-form-7`
 4. **Use `WPCF7_ContactForm::get_template()` API** — never raw `post create` for CF7 forms
 5. **Read `:root` colors from CSS, fall back to defaults** — primary `#0066cc`, text `#333333`, bg `#f5f5f5`, muted `#999999`
-6. **Return form IDs as the final output line** — e.g., `EN Form ID: 42 | ES Form ID: 43`
+6. **Return form IDs as the final output line** — e.g., `EN Form ID: 42 | ES Form ID: 43` (one entry per language on the list)
 7. **No utility classes inside the form markup** — one hook class per element, declared in the theme's CSS. No build step reads the database.
 8. **Ship `inc/seed/cf7.php`** — the form is a post row and does not travel with the theme without it.
-9. **Every language gets the same form** — same fields, same required markers (`*` in the placeholder, "(required)" in the visually hidden label), same consent line. A translated form that quietly drops the required markers is a bilingual bug nobody reads in review.
+9. **Every language on the list gets a form, and the same form** — same fields, same required markers (`*` in the placeholder, "(required)" in the visually hidden label), same consent line. A translated form that quietly drops the required markers is a bilingual bug nobody reads in review.
 10. **Screenshot the invalid state before declaring the form done** — submit it empty and look at where CF7 puts its per-field errors and its response notice.
 11. **Every `[acceptance]` tag carries `acceptance_as_validation:on`** — without it the submit button stays disabled on an unchecked box, with no error shown and no way to discover why
 12. **Size the control itself to `width: 100%`, not only its `.wpcf7-form-control-wrap`**; keep the AJAX spinner's margins inside the form's box; write loading-state padding as `padding-inline-end`, never `padding-right` — a physical longhand does not beat the logical `padding-inline` an `@apply px-*` compiles to

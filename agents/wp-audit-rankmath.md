@@ -85,10 +85,11 @@ Setting the flags is not evidence the flags worked. Read the front end:
 
 ```bash
 HOME=$($WP option get home)
-curl -fsSk "$HOME" -o /tmp/rm-head.html
-grep -c 'application/ld+json' /tmp/rm-head.html
-grep -c '<meta name="description"' /tmp/rm-head.html
-grep -c '<meta property="og:' /tmp/rm-head.html
+T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+curl -fsSk "$HOME" -o $T/rm-head.html
+grep -c 'application/ld+json' $T/rm-head.html
+grep -c '<meta name="description"' $T/rm-head.html
+grep -c '<meta property="og:' $T/rm-head.html
 curl -o /dev/null -sk -w '%{http_code}\n' "$HOME/sitemap_index.xml"
 ```
 
