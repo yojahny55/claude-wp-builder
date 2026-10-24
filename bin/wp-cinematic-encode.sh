@@ -45,6 +45,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# --scene goes into the PHP of `wp eval` below, so it must be a plain number.
+if [[ -n "$SCENE" && ! "$SCENE" =~ ^[1-9][0-9]*$ ]]; then
+  err "--scene must be a positive integer, got: $SCENE"; exit 2
+fi
+
 [[ -z "$INPUT" ]] && { err "Missing <input.mp4>"; exit 2; }
 [[ -z "$THEME" ]] && { err "Missing --theme=<theme-dir>"; exit 2; }
 [[ ! -f "$INPUT" ]] && { err "Input not found: $INPUT"; exit 1; }
@@ -83,35 +88,42 @@ OUT_MOBILE="$OUT_DIR/${base}.mobile.mp4"
 OUT_POSTER="$POSTER_DIR/${base}.jpg"
 
 # ---- encode (parallel) ---------------------------------------------------
+# Per-run log dir from mktemp -d, so concurrent runs never collide. fail starts at 1 so any
+# early exit keeps the logs; it drops to 0 only once every encode succeeded, and then the
+# dir is removed on exit.
+LOG_DIR=$(mktemp -d)
+fail=1
+trap 'if [[ "$fail" -eq 0 ]]; then rm -rf "$LOG_DIR"; fi' EXIT
 pids=()
 
 if [[ $MOBILE_ONLY -eq 0 ]]; then
   info "Encoding desktop (all-keyframe): $OUT_DESKTOP"
-  bash "$KIT_DIR/scripts/encode-keyframe.sh" "$INPUT" "$OUT_DESKTOP" >/tmp/wp-cine-desktop.log 2>&1 &
+  bash "$KIT_DIR/scripts/encode-keyframe.sh" "$INPUT" "$OUT_DESKTOP" >"$LOG_DIR/wp-cine-desktop.log" 2>&1 &
   pids+=($!)
 fi
 
 if [[ $DESKTOP_ONLY -eq 0 ]]; then
   info "Encoding mobile (9:16 portrait): $OUT_MOBILE"
   if [[ $KEEP_SOURCE_ASPECT -eq 1 ]]; then
-    ffmpeg -y -i "$INPUT" -c:v libx264 -crf 26 -preset slow -movflags +faststart -an "$OUT_MOBILE" >/tmp/wp-cine-mobile.log 2>&1 &
+    ffmpeg -y -i "$INPUT" -c:v libx264 -crf 26 -preset slow -movflags +faststart -an "$OUT_MOBILE" >"$LOG_DIR/wp-cine-mobile.log" 2>&1 &
   else
-    bash "$KIT_DIR/scripts/encode-mobile-portrait.sh" "$INPUT" "$OUT_MOBILE" >/tmp/wp-cine-mobile.log 2>&1 &
+    bash "$KIT_DIR/scripts/encode-mobile-portrait.sh" "$INPUT" "$OUT_MOBILE" >"$LOG_DIR/wp-cine-mobile.log" 2>&1 &
   fi
   pids+=($!)
 fi
 
 if [[ $POSTER -eq 1 ]]; then
   info "Extracting poster frame: $OUT_POSTER"
-  ffmpeg -y -i "$INPUT" -vf "select=eq(n\,30)" -frames:v 1 -q:v 5 "$OUT_POSTER" >/tmp/wp-cine-poster.log 2>&1 &
+  ffmpeg -y -i "$INPUT" -vf "select=eq(n\,30)" -frames:v 1 -q:v 5 "$OUT_POSTER" >"$LOG_DIR/wp-cine-poster.log" 2>&1 &
   pids+=($!)
 fi
 
-fail=0
+encode_failed=0
 for pid in "${pids[@]}"; do
-  if ! wait "$pid"; then fail=1; fi
+  if ! wait "$pid"; then encode_failed=1; fi
 done
-[[ $fail -ne 0 ]] && { err "One or more encodes failed. Check /tmp/wp-cine-*.log"; exit 1; }
+fail=$encode_failed
+[[ $encode_failed -ne 0 ]] && { err "One or more encodes failed. Check $LOG_DIR/wp-cine-*.log"; exit 1; }
 
 # ---- verify --------------------------------------------------------------
 if [[ -f "$OUT_DESKTOP" ]]; then
@@ -135,6 +147,12 @@ if [[ -n "$SCENE" ]] && command -v wp >/dev/null && wp core is-installed --path=
   [[ -f "$OUT_DESKTOP" ]] && desktop_id=$(wp --path="$WP_PATH" media import "$OUT_DESKTOP" --porcelain 2>/dev/null || true)
   [[ -f "$OUT_MOBILE"  ]] && mobile_id=$(wp --path="$WP_PATH"  media import "$OUT_MOBILE"  --porcelain 2>/dev/null || true)
   [[ -f "$OUT_POSTER"  ]] && poster_id=$(wp --path="$WP_PATH"  media import "$OUT_POSTER"  --porcelain 2>/dev/null || true)
+
+  # wp media import --porcelain prints an attachment ID; anything else (an error
+  # line, stray output) must never reach the PHP below.
+  for _id in desktop_id mobile_id poster_id; do
+    [[ -z "${!_id}" || "${!_id}" =~ ^[0-9]+$ ]] || { err "Unexpected media import output for $_id: ${!_id}"; printf -v "$_id" ''; }
+  done
 
   if [[ -n "$desktop_id$mobile_id$poster_id" ]]; then
     # Update the matching ACF row on the home page.
