@@ -4,7 +4,7 @@
 # <html> and the guard reads <body>; and a dark-mode measurement taken mid-transition reads false
 # blacks. The agent has to say how to scope the selector and how to measure it, and the CSS skill
 # has to say where overrides go.
-set -uo pipefail
+set -euo pipefail
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
 
 a11y=agents/wp-audit-a11y.md

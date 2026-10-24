@@ -50,7 +50,7 @@ printf '%s' "$flata" | grep -Fq 'desktop and mobile' \
 printf '%s' "$flata" | grep -Fq 'is not this measurement' \
   || { echo "FAIL: $a11y does not say why a screenshot diff cannot see this — a 26px icon becoming 18px in a flex row moves nothing else"; exit 1; }
 
-# States and dark mode: a change can match at rest and differ on hover or focus, or in dark.
+# States, dark mode and element scope: a change can match at rest and differ on hover or focus, in dark, or on a sibling element sharing the class.
 for needle in ':hover' ':focus-visible' 'dark mode' "document.querySelectorAll('.<class>')"; do
   printf '%s' "$flata" | grep -Fq "$needle" \
     || { echo "FAIL: $a11y does not require measuring $needle in the tag-swap comparison"; exit 1; }
