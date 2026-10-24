@@ -24,6 +24,11 @@ same; only the four parallel browsers are gone.
 
 **Lighthouse results and the serving layer.** With `local_clone` true the suite never targets the clone (below), so its LCP, FCP, TBT, performance score and byte totals are those of the confirmed public URL; without one they are `UNMEASURED`. Should a run be pointed at a local host anyway, those numbers inherit the clone's serving layer (compression, HTTP version): label them `clone measurement — serving layer differs (…)` as *Clone-safe versus production-only measurement* in `site-context.md` says, and never use them as a baseline or a finding by themselves.
 
+**Which URL is production.** When the manifest has `environments`, the entry with `role: "prod"`
+is the production gate: its `url` is the confirmed production URL, and a target whose host
+matches a `role: "local"` entry is a clone. Without `environments`, the URL comparison below
+is the fallback.
+
 `<public-url>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json` —
 **unless `local_clone` is true (Step 2.3): the suite must not probe the clone's own host**,
 so Step 2.3's live-check rule applies instead of that fallback — the confirmed production
