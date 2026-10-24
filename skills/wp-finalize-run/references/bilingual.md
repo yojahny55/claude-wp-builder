@@ -35,11 +35,12 @@ Branch on the project's `i18n strategy` (read it from `.claude/CLAUDE.md`):
    defines:
 
    ```bash
+   T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
    grep -rhoE "(prefix_t|prefix_e)\(\s*'[^']+'" --include='*.php' . \
-     | grep -oE "'[^']+'" | tr -d "'" | sort -u > /tmp/keys-used.txt
+     | grep -oE "'[^']+'" | tr -d "'" | sort -u > $T/keys-used.txt
    $WP eval 'foreach (array_keys(prefix_get_translations()) as $k) echo $k . "\n";' \
-     | sort -u > /tmp/keys-defined.txt
-   comm -23 /tmp/keys-used.txt /tmp/keys-defined.txt
+     | sort -u > $T/keys-defined.txt
+   comm -23 $T/keys-used.txt $T/keys-defined.txt
    ```
 
    Any line of output is a key that will render as itself. Substitute the project's

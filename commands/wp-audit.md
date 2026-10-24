@@ -98,10 +98,10 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/re-audit.md` now and 
 
 **First: validate the project configuration.**
 
-`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report".
+`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report". The path travels as a positional argument, never inside the `-c` string: write it in single quotes, and a path that holds a single quote gets each one written as `'\''`.
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 | Exit | Meaning | Do |
@@ -135,7 +135,7 @@ a theme slug with no directory, no plugins, against ~25 active ones. When Tier 2
 (a `wp_cli.wrapper` that answers), also run:
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs drift '${PROJECT_PATH}'"
+bash -c 'node "$1/bin/wp-config.mjs" drift "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 Exit `0`: the manifest fits the site, continue. Exit `4`: it does not; each `drift:` line names
@@ -154,7 +154,7 @@ The plugin list changed since .wp-create.json was written.
   [C] Continue with the manifest as it is
 ```
 
-On A, run `bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs refresh '${PROJECT_PATH}'"`: it
+On A, run `bash -c 'node "$1/bin/wp-config.mjs" refresh "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'`: it
 re-probes, rewrites `plugins.installed` and `stack` (and the PHP and WordPress versions), keeps
 a `.bak-<timestamp>`, regenerates the CLAUDE.md block and validates. Anything else in the manifest
 is untouched.

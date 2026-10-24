@@ -20,10 +20,10 @@ plugins each tier installs, and the ones left out, in
 
 **First: validate the project configuration.**
 
-`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report".
+`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report". The path travels as a positional argument, never inside the `-c` string: write it in single quotes, and a path that holds a single quote gets each one written as `'\''`.
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 | Exit | Meaning | Do |
@@ -38,7 +38,7 @@ On exit 2, run the migration before continuing.
 Read the WP-CLI wrapper once and use it as `$WP` below:
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' wp_cli.wrapper"
+bash -c 'node "$1/bin/wp-config.mjs" get "$2" wp_cli.wrapper' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 ## Step 2: WooCommerce and store-kit
@@ -50,7 +50,7 @@ WP-CLI in a container that mounts neither this plugin's scripts nor the host pro
 the recorded environment first:
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' environment.engine"
+bash -c 'node "$1/bin/wp-config.mjs" get "$2" environment.engine' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 Anything but `native`: stop here, before syncing anything, rather than failing later at
@@ -114,7 +114,7 @@ Then validate. An invalid block is fixed and validated again; the script never r
 block that does not validate:
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 A store block adds a `Store tier` row to the generated block in `.claude/CLAUDE.md`, so on a
@@ -124,7 +124,7 @@ longer matches the manifest. Then, and only when `.claude/CLAUDE.md` already con
 validate again:
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs render-context '${PROJECT_PATH}'"
+bash -c 'node "$1/bin/wp-config.mjs" render-context "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 A project with no generated block is left alone: no `.claude/CLAUDE.md` is created before
