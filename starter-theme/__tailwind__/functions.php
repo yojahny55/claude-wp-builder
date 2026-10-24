@@ -64,10 +64,12 @@ add_action( 'acf/init', function() {
     if ( get_option( $option ) === $current_signature ) { return; }
 
     $bootstrapped = false;
+    $theme_keys   = array(); // group keys declared by this theme's fields/ files
     foreach ( $files as $file ) {
         if ( ! is_readable( $file ) ) { continue; }
         $src = file_get_contents( $file );
         if ( preg_match_all( "/'key'\\s*=>\\s*'(group_[A-Za-z0-9_]+)'/", $src, $m ) ) {
+            $theme_keys = array_merge( $theme_keys, $m[1] );
             $pending = false;
             foreach ( $m[1] as $key ) {
                 if ( ! file_exists( "$json_dir/$key.json" ) ) { $pending = true; break; }
@@ -132,6 +134,9 @@ add_action( 'acf/init', function() {
     // leave the scan uncached so the next request can retry bootstrapping.
     $all_persisted = true;
     foreach ( acf_get_field_groups() as $g ) {
+        // Only theme-owned groups: a plugin's PHP-local group has no JSON here
+        // and must not keep the scan permanently uncached.
+        if ( ! in_array( $g['key'], $theme_keys, true ) ) { continue; }
         if ( ( $g['local'] ?? '' ) === 'php' && ! file_exists( "$json_dir/{$g['key']}.json" ) ) {
             $all_persisted = false;
             break;
