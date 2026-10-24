@@ -46,7 +46,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # --scene goes into the PHP of `wp eval` below, so it must be a plain number.
-if [[ -n "$SCENE" && ! "$SCENE" =~ ^[0-9]+$ ]]; then
+if [[ -n "$SCENE" && ! "$SCENE" =~ ^[1-9][0-9]*$ ]]; then
   err "--scene must be a positive integer, got: $SCENE"; exit 2
 fi
 

@@ -32,7 +32,7 @@ print_error() { [[ "$JSON_OUTPUT" == "false" ]] && echo -e "${RED}[ERROR]${NC} $
 # "/", "..", spaces, regex metacharacters and shell syntax in one place.
 validate_domain() {
     local domain="$1"
-    if [[ ! "$domain" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]; then
+    if [[ ! "$domain" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$ ]]; then
         print_error "Invalid domain '$domain': use lowercase letters, digits, dots and hyphens only"
         exit 1
     fi
