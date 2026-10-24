@@ -8,6 +8,7 @@ Part of the `wp-audit-standards` skill. Moved verbatim out of `agents/wp-audit-p
 - Procedure — embedded ICC profiles on images (PERF-075)
 - Procedure — Elementor widget controls queried on the front end (PERF-076)
 - Procedure — missing Elementor generated CSS (PERF-077)
+- Procedure — AJAX-returned images and WebP (PERF-078)
 
 ### Procedure — page-cache drop-in without its plugin (PERF-070)
 
@@ -160,3 +161,22 @@ on demand) and, where Elementor's Tools screen offers it, Regenerate CSS & Data.
 keeps emptying, an on-demand regeneration mu-plugin may be proposed, and note the setting
 Elementor, Settings, Advanced, CSS Print Method: `Internal Embedding` stops the file requests
 altogether, at the cost of inline CSS per page. Neither is auto-applied.
+
+### Procedure — AJAX-returned images and WebP (PERF-078)
+
+Robin wraps `<img>` in `<picture>` on `template_redirect`, which is the full page. HTML built
+by `admin-ajax.php` (infinite scroll, tabs, "load more") never passes through it, so those
+images keep serving the PNG or JPEG although the `.webp` sibling exists (354 KB against 39 KB
+on a real build). The fix and its caveats are in `skills/wp-robin/references/webp-delivery.md`.
+
+```bash
+grep -rnE "wp_ajax(_nopriv)?_[a-z0-9_]+" <theme-dir> --include=*.php      # actions
+curl -s -X POST -d 'action=<action>&<params>' <site>/wp-admin/admin-ajax.php > /tmp/ajax.html
+grep -oE '<img[^>]+src="[^"]+\.(png|jpe?g)"' /tmp/ajax.html               # then test each for a .webp sibling and a <picture> parent
+```
+
+Read the handler for the parameters and nonce it needs. A nonce or login wall that cannot be
+reproduced makes the check `UNMEASURED`, not `PASS`. Report the count and the bytes the
+siblings would save (`stat` both files). Do not auto-apply: the recipe couples the theme to
+Robin's internal classes and needs the owner's decision.
+
