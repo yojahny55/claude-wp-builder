@@ -73,7 +73,7 @@ case "$(tr '\n' ' ' < "$s")" in *'never `sudo mv`'*) ;; *) fail "$s does not for
 grep -Fq 'restorecon' "$s" || fail "$s does not say vhost-install restores the SELinux context"
 
 # 6. Manifest values are read through the validator, and the engine is defined.
-grep -Fq "wp-config.mjs get '\${PROJECT_PATH}' wp_cli.wrapper" "$s" \
+grep -Fq 'wp-config.mjs" get "$2" wp_cli.wrapper' "$s" \
   || fail "$s does not read the wrapper through wp-config.mjs get"
 ! grep -Fq "jq -r '.wp_cli.wrapper'" "$s" || fail "$s still reads the wrapper with jq, around the validator"
 for e in native docker-compose ddev lando wp-env; do

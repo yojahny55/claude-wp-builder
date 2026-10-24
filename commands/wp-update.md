@@ -27,10 +27,10 @@ clone; the clone gets extra checks (Step 6), production gets a confirmation gate
 
 **First: validate the project configuration.**
 
-`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report".
+`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report". The path travels as a positional argument, never inside the `-c` string: write it in single quotes, and a path that holds a single quote gets each one written as `'\''`.
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 | Exit | Meaning | Do |
@@ -51,7 +51,7 @@ Read the WP-CLI wrapper from `.wp-create.json` (`wp_cli.wrapper`), else use
 ### 0.3 Clone or production
 
 When `.wp-create.json` has `environments`, the role decides: read
-`bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' environments"` and treat
+`bash -c 'node "$1/bin/wp-config.mjs" get "$2" environments' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'` and treat
 the root as **production** when an entry with `role: "prod"` has the same host as `wordpress.url`
 (scheme and `www.` ignored), and as a **local clone** when it matches a `role: "local"` entry.
 Without `environments` (or when no entry matches), fall back to the URL rule below.

@@ -38,6 +38,10 @@ function add_action( $hook, $cb ) { $GLOBALS['t_actions'][ $hook ][] = $cb; }
 function is_admin() { return false; }
 function is_feed() { return false; }
 function is_robots() { return false; }
+$GLOBALS['t_is_embed'] = false;
+function is_embed() { return $GLOBALS['t_is_embed']; }
+$GLOBALS['t_query_vars'] = array();
+function get_query_var( $name = '' ) { return $GLOBALS['t_query_vars'][ $name ] ?? ''; }
 
 // Registered before any fixture exists, so every exit path — including the early one
 // when no template_redirect callback is found — removes the temporary library.
@@ -170,6 +174,28 @@ echo $plain;
 ob_end_flush();
 $plain_out = ob_get_clean();
 check( 'an already-sibling URL in the markup is left alone', $plain_out, $plain );
+
+// Sitemap documents use template_redirect too, but must not pass through the HTML buffer.
+foreach ( array( 'sitemap' => '1', 'sitemap-stylesheet' => '1' ) as $query_var => $value ) {
+	$GLOBALS['t_query_vars'][ $query_var ] = $value;
+	ob_start();
+	$outer_level = ob_get_level();
+	foreach ( $callbacks as $cb ) { $cb(); }
+	echo $plain;
+	while ( ob_get_level() > $outer_level ) { ob_end_flush(); }
+	$sitemap_out = ob_get_clean();
+	check( "$query_var bypasses the WebP buffer", $sitemap_out, $plain );
+	unset( $GLOBALS['t_query_vars'][ $query_var ] );
+}
+$GLOBALS['t_is_embed'] = true;
+ob_start();
+$outer_level = ob_get_level();
+foreach ( $callbacks as $cb ) { $cb(); }
+echo $plain;
+while ( ob_get_level() > $outer_level ) { ob_end_flush(); }
+$embed_out = ob_get_clean();
+check( 'embeds bypass the WebP buffer', $embed_out, $plain );
+$GLOBALS['t_is_embed'] = false;
 
 if ( $fails ) {
 	echo "FAIL:\n  " . implode( "\n  ", $fails ) . "\n";
