@@ -79,8 +79,8 @@ and `bin/wp-config.mjs` is the single definition of a valid one. The fields this
 Read a value through the validator, not with `jq`:
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' wp_cli.wrapper"
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs validate '${PROJECT_PATH}'"
+bash -c 'node "$1/bin/wp-config.mjs" get "$2" wp_cli.wrapper' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
+bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 `${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` is: it is
@@ -131,7 +131,7 @@ tokens the templates use:
 | `{{web_server}}` | `environment.web_server` | `nginx` |
 | `{{db_name}}` | `database.name` | `wp_my_project` |
 | `{{db_user}}` | `database.user` | `root` |
-| `{{db_password}}` | **Not a manifest field.** `bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs get '${PROJECT_PATH}' db_password"` | generated per project, never a fixed default |
+| `{{db_password}}` | **Not a manifest field.** `bash -c 'node "$1/bin/wp-config.mjs" get "$2" db_password' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'` | generated per project, never a fixed default |
 | `{{ssl_cert}}` | Derived: `/etc/ssl/certs/<domain>.crt` | |
 | `{{ssl_key}}` | Derived: `/etc/ssl/private/<domain>.key` | |
 | `{{php_fpm_sock}}` | Derived: `/var/run/php/php<php_version>-fpm.sock` | |
