@@ -24,7 +24,7 @@ n=$(jq '.defects | length' "$exp")
 [ "$n" -ge 8 ] && [ "$n" -le 12 ] || fail "corpus has $n defects, expected 8 to 12"
 jq -e 'all(.defects[]; (.check|type=="string") and (.domain|type=="string") and (.file|type=="string") and (.pattern|type=="string") and (.pattern|length>0))' "$exp" >/dev/null \
   || fail "a defect lacks check, domain, file or pattern"
-[ "$(jq '[.defects[].check] | unique | length' "$exp")" = "$n" ] || fail "a check code is listed twice"
+[ "$(jq '[.defects[].check] | unique | length' "$exp")" -eq "$n" ] || fail "a check code is listed twice"
 [ "$(jq '[.defects[].domain] | unique | length' "$exp")" -ge 5 ] || fail "corpus must cover security, accessibility, seo, performance and best-practices"
 
 while IFS=$'\t' read -r code domain file pattern; do
