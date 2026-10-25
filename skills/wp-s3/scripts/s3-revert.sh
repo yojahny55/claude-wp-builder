@@ -95,7 +95,7 @@ fi
 # ---------------------------------------------------------------- 4. unhook the config
 if grep -q "s3-config.php" "$WP_ROOT/wp-config.php"; then
     ( umask 077 && mkdir -p "$BACKUP_DIR" ) && chmod 700 "$BACKUP_DIR" \
-        && ( umask 077 && cp -p "$WP_ROOT/wp-config.php" "$BACKUP_DIR/wp-config.php.bak-$STAMP" ) \
+        && ( umask 077 && cp "$WP_ROOT/wp-config.php" "$BACKUP_DIR/wp-config.php.bak-$STAMP" ) \
         || die "could not back up wp-config.php to $BACKUP_DIR"
     set +e
     python3 - "$WP_ROOT/wp-config.php" <<'PY'
@@ -124,8 +124,9 @@ shutil.copymode(path, tmp)
 try:
     st = os.stat(path)
     os.chown(tmp, st.st_uid, st.st_gid)
-except OSError:
-    pass
+except OSError as e:
+    if e.errno != 1:  # EPERM: not root, expected
+        sys.stderr.write('WARNING: could not preserve ownership of wp-config.php: %s\n' % e)
 os.replace(tmp, path)
 PY
     status=$?

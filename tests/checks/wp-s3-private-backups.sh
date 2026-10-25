@@ -67,7 +67,7 @@ done
 shopt -u nullglob
 
 # The rewrite keeps the original mode.
-[ "$(file_mode "$root/wp-config.php")" = 640 ] || fail "wp-config.php lost its 0640 mode"
+case "$(file_mode "$root/wp-config.php")" in 640|0640) ;; *) false ;; esac || fail "wp-config.php lost its 0640 mode"
 
 # A second run backs up the existing s3-config.php, also privately.
 run --secret-file "$tmp/secret" >/dev/null 2>&1 || fail "second run failed"

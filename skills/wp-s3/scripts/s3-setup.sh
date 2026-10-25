@@ -80,7 +80,7 @@ if [[ -n "$SECRET_FILE" ]]; then
         *) die "--secret-file must be mode 0600 or 0400 (chmod 600 '$SECRET_FILE')" ;;
     esac
     S3_UPLOADS_SECRET_VALUE="$(<"$SECRET_FILE")"
-    S3_UPLOADS_SECRET_VALUE="${S3_UPLOADS_SECRET_VALUE%$'\n'}"
+    S3_UPLOADS_SECRET_VALUE="${S3_UPLOADS_SECRET_VALUE%$'\r'}"
 fi
 
 case "$AUTH" in
@@ -126,7 +126,7 @@ if backup == root or backup.startswith(root + os.sep):
     sys.exit(1)
 PY
 backup() { # backup <file> <name>: private copy, mode 0600
-    ( umask 077 && cp -p "$1" "$BACKUP_DIR/$2.bak-$STAMP" ) && chmod 600 "$BACKUP_DIR/$2.bak-$STAMP"
+    ( umask 077 && cp "$1" "$BACKUP_DIR/$2.bak-$STAMP" ) && chmod 600 "$BACKUP_DIR/$2.bak-$STAMP"
 }
 
 echo "== S3 Uploads setup on $WP_ROOT =="
@@ -378,8 +378,9 @@ shutil.copymode(path, tmp)
 try:
     st = os.stat(path)
     os.chown(tmp, st.st_uid, st.st_gid)
-except OSError:
-    pass
+except OSError as e:
+    if e.errno != 1:  # EPERM: not root, expected
+        sys.stderr.write('WARNING: could not preserve ownership of wp-config.php: %s\n' % e)
 os.replace(tmp, path)
 PY
     php -l "$WP_ROOT/wp-config.php" >/dev/null || die "wp-config.php no longer parses; restore $BACKUP_DIR/wp-config.php.bak-$STAMP"
