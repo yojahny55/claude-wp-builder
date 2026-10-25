@@ -108,18 +108,24 @@ node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs set "${PROJECT_PATH}" research - <<
 JSON
 ```
 
-The record:
+The record is the bare JSON object below, sent on stdin as strict JSON. Do not paste the
+`"research":` key in front of it (the key is the `set` argument) and do not paste comments:
+`set` refuses anything on stdin that does not parse. Placeholders in angle brackets are
+yours to fill:
 
-```jsonc
-"research": {
+```json
+{
   "at": "<ISO date>",
-  "site": "<url>",          // omit the key entirely when confidence is unconfirmed
+  "site": "<url>",
   "location": "<city, region, country>",
-  "confidence": "confirmed",   // or "unconfirmed"
-  "tier": "websearch",         // or "firecrawl" or "dataforseo"
+  "confidence": "confirmed",
+  "tier": "websearch",
   "competitors": 4
 }
 ```
+
+Notes: omit `site` entirely when `confidence` is `unconfirmed`; `confidence` is `confirmed` or
+`unconfirmed`; `tier` is `websearch`, `firecrawl` or `dataforseo`.
 
 Or the scalar `"research": "none"` (`set … research none`) when the operator declines or every rung
 of the ladder fails. `"none"` is permanent: it means no later run asks again

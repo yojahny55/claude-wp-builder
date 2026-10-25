@@ -47,6 +47,15 @@ node bin/wp-config.mjs set "$proj" research a b >/dev/null 2>&1 && fail "set acc
 node bin/wp-config.mjs set "$proj" research '{"confidence":"unconfirmed","name":"Val d' 'Or"}' >/dev/null 2>&1 && fail "set accepted an apostrophe-split value"
 node bin/wp-config.mjs set "$proj" research '{"broken":' >/dev/null 2>&1 && fail "set stored broken JSON as a string"
 [ "$(cat "$proj/.wp-create.json")" = "$before" ] || fail "a refused set changed the manifest"
+cp "$proj/.wp-create.json" "$tmp/manifest.before"
+node bin/wp-config.mjs set "$proj" research - >/dev/null 2>&1 <<'JSON' && fail "set accepted the wrapped, commented record on stdin"
+"research": {
+  "at": "2026-01-01", // comment
+  "competitors": 4
+}
+JSON
+node bin/wp-config.mjs set "$proj" research '"Val d' >/dev/null 2>&1 && fail "set stored a truncated JSON string"
+cmp -s "$proj/.wp-create.json" "$tmp/manifest.before" || fail "a refused set changed the manifest"
 node bin/wp-config.mjs set "$proj" research - >/dev/null 2>&1 <<'JSON' || fail "set refused JSON with apostrophes on stdin"
 {"confidence":"unconfirmed","location":"Val d'Or, Coeur d'Alene","tier":"websearch","competitors":2}
 JSON

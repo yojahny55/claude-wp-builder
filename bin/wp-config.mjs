@@ -498,7 +498,9 @@ function cmdSet(projectPath, key, raw) {
     process.exit(1);
   }
   // `-` reads the value from stdin, so a heredoc carries JSON that contains apostrophes or quotes.
+  let fromStdin = false;
   if (raw === '-') {
+    fromStdin = true;
     try { raw = readFileSync(0, 'utf8').trim(); } catch { raw = ''; }
     if (!raw) { warn('refusing to set: stdin was empty'); process.exit(1); }
   }
@@ -506,8 +508,11 @@ function cmdSet(projectPath, key, raw) {
   try { value = JSON.parse(raw); } catch (err) {
     // A value that looks like JSON but does not parse is a broken argument (an unescaped quote
     // split it, a truncation), never a string the caller meant to store.
-    if (/^\s*[{[]/.test(raw)) {
-      warn(`refusing to set ${key}: the value looks like JSON but does not parse (${err.message}); pass it on stdin with \`-\``);
+    // Stdin is always a JSON document, and a value opening with a quote is a JSON string cut short.
+    if (fromStdin || /^\s*[{["]/.test(raw)) {
+      warn(`refusing to set ${key}: the value is not valid JSON (${err.message}); ${fromStdin
+        ? 'send strict JSON on stdin: the bare object, no `"key":` wrapper, no comments'
+        : 'pass it on stdin with `-`'}`);
       process.exit(1);
     }
   }
