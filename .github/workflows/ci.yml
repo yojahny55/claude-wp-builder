@@ -192,7 +192,7 @@ jobs:
   # annotation and the count; once the backlog is cleared or baselined, delete
   # `continue-on-error` and it becomes a gate. Exclusions live in .shellcheckrc, each with
   # its reason. shellcheck ships on ubuntu-latest, so nothing is installed here.
-  shell:
+  shell-lint:
     name: Shell scripts
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -207,6 +207,7 @@ jobs:
             bash -n "$f"
             n=$((n + 1))
           done < <(find bin skills -name '*.sh' -not -path '*/node_modules/*' | sort)
+          [ "$n" -gt 0 ] || { echo 'ERROR: no shell scripts found' >&2; exit 1; }
           printf 'ok: %d shell script(s) parse\n' "$n"
 
       - name: shellcheck (informational, severity warning)
@@ -215,6 +216,7 @@ jobs:
           set -uo pipefail
           shellcheck --version | sed -n 2p
           mapfile -t files < <(find bin skills -name '*.sh' -not -path '*/node_modules/*' | sort)
+          [ "${#files[@]}" -gt 0 ] || { echo 'ERROR: no shell scripts found' >&2; exit 1; }
           shellcheck --severity=warning --format=gcc "${files[@]}" | tee /tmp/shellcheck.out
           rc=${PIPESTATUS[0]}
           sed -E 's/^([^:]+):([0-9]+):([0-9]+): (warning|error): (.*)$/::\4 file=\1,line=\2,col=\3::\5/' /tmp/shellcheck.out

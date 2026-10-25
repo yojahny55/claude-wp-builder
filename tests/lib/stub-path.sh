@@ -30,7 +30,8 @@ stub_path_init() {
   STUB_REAL_RM=$(command -v rm)
   real_sed=$(command -v sed)
   for n in $STUB_NAMES; do
-    printf '#!/bin/sh\nprintf "%%s" "%s" >> "$STUB_LOG"\nfor a in "$@"; do printf " [%%s]" "$a" >> "$STUB_LOG"; done\nprintf "\\n" >> "$STUB_LOG"\nexit 0\n' "$n" > "$STUB_DIR/$n"
+    case "$n" in ''|*[!a-zA-Z0-9_-]*) echo "bad stub name: $n" >&2; return 1 ;; esac
+    printf '#!/bin/sh\nprintf "%%s" "%s" >> "$STUB_LOG"\nfor a in "$@"; do printf " [%%s]" "$(printf %%s "$a" | tr "\\n" " ")" >> "$STUB_LOG"; done\nprintf "\\n" >> "$STUB_LOG"\nexit 0\n' "$n" > "$STUB_DIR/$n"
     chmod +x "$STUB_DIR/$n"
   done
   cat > "$STUB_DIR/sed" <<SED
@@ -38,17 +39,22 @@ stub_path_init() {
 inplace=0
 for a in "\$@"; do case "\$a" in -i*|--in-place*) inplace=1 ;; esac; done
 if [ "\$inplace" = 1 ]; then
-  printf 'sed' >> "\$STUB_LOG"; for a in "\$@"; do printf ' [%s]' "\$a" >> "\$STUB_LOG"; done; printf '\n' >> "\$STUB_LOG"
+  printf 'sed' >> "\$STUB_LOG"; for a in "\$@"; do printf ' [%s]' "\$(printf %s "\$a" | tr '\\n' ' ')" >> "\$STUB_LOG"; done; printf '\n' >> "\$STUB_LOG"
   exit 0
 fi
 exec "$real_sed" "\$@"
 SED
   chmod +x "$STUB_DIR/sed"
   export STUB_LOG
-  PATH="$STUB_DIR:$PATH"
+  STUB_ORIG_PATH="${STUB_ORIG_PATH:-$PATH}"
+  PATH="$STUB_DIR:$STUB_ORIG_PATH"
 }
 
-stub_path_cleanup() { [ -n "${STUB_DIR:-}" ] && "$STUB_REAL_RM" -rf "$STUB_DIR"; return 0; }
+stub_path_cleanup() {
+  [ -z "${STUB_DIR:-}" ] || "$STUB_REAL_RM" -rf "$STUB_DIR"
+  [ -z "${STUB_ORIG_PATH:-}" ] || PATH="$STUB_ORIG_PATH"
+  return 0
+}
 
 # run_stubbed CMD... : run with the stubs on PATH; never aborts the caller.
 run_stubbed() {
@@ -59,5 +65,6 @@ run_stubbed() {
 stub_called() { grep -Eq "^$1( |\$)" "$STUB_LOG"; }
 
 # Calls that would have changed something. A bare `sed` never appears here (only in-place
-# sed is logged); `wp` and `mysql` count, since both write to a live site.
+# sed is logged, which is why `sed` is safe in the list below: if the stub ever logs plain
+# sed too, drop it from the pattern); `wp` and `mysql` count, since both write to a live site.
 stub_destructive_calls() { grep -E '^(sudo|rm|mysql|mysqldump|wp|tee|systemctl|chown|chmod|ln|mv|cp|mkdir|openssl|install|security|sed)( |$)' "$STUB_LOG" || true; }
