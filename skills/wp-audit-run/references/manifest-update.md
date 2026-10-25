@@ -28,6 +28,13 @@ Add or update the `audit` key in the JSON:
     "issues_found": N,
     "issues_fixed": M,
     "carried_over": K,
+    "last_answers": {
+      "mode": "report-only",
+      "suite": true,
+      "production_url": "https://example.com",
+      "clone_only": false,
+      "answered": "<ISO 8601 timestamp>"
+    },
     "findings_ledger": { "path": ".wp-audit-findings.json", "written": "<ISO 8601 timestamp>" },
     "browser_measurement_available": true
   },
@@ -94,6 +101,13 @@ record Step 2.5d diffs against the catalogs, so an id invented here becomes a ch
 never reported missing and never reported run. `bin/wp-config.mjs validate` refuses a
 `checks_run` whose shape is wrong — a bare string instead of an array, an unknown category,
 an id that is not shaped like one — because the diff consumes it directly.
+
+`last_answers` records what the operator chose this run so Step 1.5 can offer it back next
+time: `mode` (`report-only` or `fixes`), `suite` (boolean), `production_url` (the confirmed
+URL, or `null`) with `clone_only: true` when none was given, and `answered` (now). Overwrite it
+every run with this run's final answers, including the ones taken from the reuse prompt; do not
+carry an old value forward, so its date means the last time a person confirmed it. Secrets
+never belong here. `bin/wp-config.mjs validate` refuses a malformed block.
 
 `carried_over` is `issues_found - issues_fixed` for this run — the number Step 2.5e re-opens
 next time. Write `manifest_version` on every run, including the run that adds it to a project
