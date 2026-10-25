@@ -1,7 +1,7 @@
 ---
 description: Full-site builder — convert a complete multi-page HTML demo folder into a WordPress theme in one pass
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, AskUserQuestion
-argument-hint: "<demo-folder> [--yolo] [--careful]"
+argument-hint: "<demo-folder> [--yolo] [--careful] [--force-adopted]"
 ---
 
 # WP YOLO — Full-Site Demo → WordPress Theme
@@ -16,6 +16,22 @@ dependency order.
 never calls `/wp-demo`, so plates already in `demo/assets/img/` travel into the
 theme like any other demo asset. Generation is `/wp-demo`'s alone, because it is
 the command with a human present to approve the spend.
+
+## Adopted-site guard
+
+Run this before anything else. This command builds a theme, sections or content on the assumption
+that the theme is one this plugin scaffolded; on an adopted site (a third-party theme) it would
+overwrite that theme or generate one that does not belong. `${PROJECT_PATH}` is the WordPress project
+root, the directory that holds the project manifest.
+
+```bash
+bash -c 'node "$1/bin/wp-config.mjs" require-origin "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
+```
+
+Exit `0` continue. Exit `5` stop and print the message verbatim: `adopted site with a third-party theme:
+use /wp-audit, /wp-debug or /wp-update`. If `$ARGUMENTS` contains `--force-adopted`, append it to the
+call (and ignore it everywhere else): the operator chose to build on an adopted site on purpose.
+When set, pass it on to every builder this command dispatches, or each one stops on its own guard.
 
 ## Step 1: Parse Arguments & Gate
 
