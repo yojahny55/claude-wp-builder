@@ -229,6 +229,7 @@ auto-fixable finding, and apply only the recipes those findings name:
 - `.htaccess` performance block (gzip, browser caching, Cache-Control, ETags)
 - WP-CLI fixes: expired transients, revisions, autosave interval
 - font-display fix and font subsetting fix
+- source assets, minified twins and critical cuts regenerated and committed together
 - image lazy-loading fix and hero `fetchpriority` fix
 - unminified theme JavaScript fix
 - multi-currency cache-key fix (PERF-065 to PERF-067)
