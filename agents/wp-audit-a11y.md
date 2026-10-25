@@ -50,6 +50,10 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 - **Page-builder markup lives in the database.** When `stack.builder` is not `none`, a
   defect in markup the builder stores per page is `Owner: content` (fixed in the builder's
   editor), not `code`.
+- **Design impact is declared on every finding.** `design_impact` (`Design impact:` in the text
+  report) is `true` when the fix could change how the site renders: a colour, font, size,
+  spacing, an asset's dimensions, a new or changed CSS rule, or a tag or class swap. It is
+  `false` only when the fix leaves every computed style and box as it was. When unsure, `true`.
 
 ## Step 1: Perceivable Checks
 
@@ -152,6 +156,7 @@ Generate a JSON report with the field names of the report contract in `wp-audit-
       "status": "FAIL",
       "severity": "CRITICAL",
       "ownership": "code",
+      "design_impact": false,
       "resource": "header.php",
       "message": "Skip link missing: no skip-to-content link in header.php",
       "evidence": "grep -c 'skip-link' header.php returned 0",
