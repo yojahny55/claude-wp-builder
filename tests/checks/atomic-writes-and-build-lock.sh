@@ -44,7 +44,7 @@ for i in 1 2 3 4 5 6 7 8; do
   pids+=("$!")
 done
 for pid in "${pids[@]}"; do
-  wait "$pid" || fail "a parallel set exited non-zero (lock timeout?): $(cat "$tmp"/set_*.log | head -3)"
+  wait "$pid" || fail "a parallel set exited non-zero (lock timeout?): $(head -3 "$tmp"/set_*.log)"
 done
 for i in 1 2 3 4 5 6 7 8; do
   [ "$(node -p "require('$proj/.wp-create.json').extra_$i")" = "$i" ] || fail "parallel set lost extra_$i"
@@ -64,8 +64,11 @@ NPM
 printf '#!/usr/bin/env bash\nexit 1\n' > "$tmp/fb/pgrep"
 chmod +x "$tmp/fb/npm" "$tmp/fb/pgrep"
 if command -v flock >/dev/null 2>&1; then
-  for i in 1 2 3 4; do PATH="$tmp/fb:$PATH" bash bin/tailwind-rebuild.sh "$t" >/dev/null 2>&1 & done
-  wait
+  bpids=()
+  for i in 1 2 3 4; do PATH="$tmp/fb:$PATH" bash bin/tailwind-rebuild.sh "$t" >/dev/null 2>&1 & bpids+=("$!"); done
+  bfails=0
+  for pid in "${bpids[@]}"; do wait "$pid" || bfails=$((bfails+1)); done
+  [ "$bfails" = 0 ] || fail "$bfails of 4 serialized builds exited non-zero"
   [ -s "$tmp/ran" ] || fail "no build ran at all, so the overlap check below proves nothing"
   [ ! -e "$tmp/overlap" ] || fail "two builds ran at once"
   [ -e "$t/.tailwind-rebuild.lock" ] || fail "tailwind-rebuild.sh removed its lock file"

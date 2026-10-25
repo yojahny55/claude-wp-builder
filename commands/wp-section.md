@@ -1,12 +1,27 @@
 ---
 description: One-shot section builder — generates ACF fields + template part + CSS for a section from the demo
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
-argument-hint: "<section-name> [screenshot-path] [--cf7] [--hybrid] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>]"
+argument-hint: "<section-name> [screenshot-path] [--cf7] [--hybrid] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>] [--force-adopted]"
 ---
 
 # WP Section — One-Shot Section Builder
 
 Generate ACF field definitions, a template part, and CSS for a single section — all in one command. On `basic` it dispatches three agents in parallel; on `tailwind`, `wp-tailwind` runs after `wp-template` returns (see File ownership below).
+
+## Adopted-site guard
+
+Run this before anything else. This command builds a theme, sections or content on the assumption
+that the theme is one this plugin scaffolded; on an adopted site (a third-party theme) it would
+overwrite that theme or generate one that does not belong. `${PROJECT_PATH}` is the WordPress project
+root, the directory that holds the project manifest.
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs require-origin '${PROJECT_PATH}'"
+```
+
+Exit `0` continue. Exit `5` stop and print the message verbatim: `adopted site with a third-party theme:
+use /wp-audit, /wp-debug or /wp-update`. If `$ARGUMENTS` contains `--force-adopted`, append it to the
+call (and ignore it everywhere else): the operator chose to build on an adopted site on purpose.
 
 ## Step 1: Parse Arguments
 
