@@ -32,6 +32,8 @@ server {
     location ~ /\.(?!well-known) { deny all; }
     location ~* \.(sql|bak|log)$ { deny all; }
     location ~* \.bak- { deny all; }
+    # The PHP location below is \.php$ only, so evil.php.jpg is served as a static file here; a
+    # server that adds handlers for other names must widen this rule to match.
     location ~* /uploads/.*\.php$ { deny all; }
 
     location ~ \.php$ {
