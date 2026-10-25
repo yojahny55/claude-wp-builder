@@ -100,6 +100,10 @@ body.reduced-motion .stage__c,
 body.reduced-motion .stage__v{display:none !important}
 body.reduced-motion .stage__poster:first-of-type{opacity:1}
 
+/* Skip link: visually hidden (still in the accessibility tree) until it takes keyboard focus. */
+.skip-link.screen-reader-text{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;border:0;clip:rect(1px,1px,1px,1px);clip-path:inset(50%);word-wrap:normal}
+.skip-link.screen-reader-text:focus{position:fixed;top:.5rem;left:.5rem;z-index:100000;clip:auto;clip-path:none;width:auto;height:auto;padding:.75rem 1rem;background:var(--paper);color:var(--ink)}
+
 /* veils — three flavours faded in by JS based on current scene's data-veil */
 .stage__veil{
   position:absolute;inset:0;z-index:2;pointer-events:none;
