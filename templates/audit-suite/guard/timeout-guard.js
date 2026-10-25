@@ -12,10 +12,17 @@ const path = require('path');
 
 const TIMEOUT_MESSAGE = /Timeout \d+ms exceeded|net::ERR_TIMED_OUT|ETIMEDOUT|ERR_CONNECTION_TIMED_OUT/i;
 
+// A browser that cannot start is a local resource problem (four workers on little RAM), not
+// a host that stopped answering: counting it would write unmeasured.json with the wrong cause.
+const LAUNCH_FAILURE = /browserType\.launch|\blaunch:/i;
+
 function isTimeout(result) {
   if (result.status === 'timedOut') return true;
   if (result.status !== 'failed') return false;
-  return (result.errors || [result.error]).some((e) => e && TIMEOUT_MESSAGE.test(String(e.message || '')));
+  return (result.errors || [result.error]).some((e) => {
+    const message = e ? String(e.message || '') : '';
+    return TIMEOUT_MESSAGE.test(message) && !LAUNCH_FAILURE.test(message);
+  });
 }
 
 class TimeoutGuard {
