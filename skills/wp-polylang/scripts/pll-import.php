@@ -167,8 +167,10 @@ if ( in_array( 'dry-run', is_array( $args ) ? $args : array(), true ) ) {
 				pllx_info( "would-skip Polylang string {$item['id']} (empty translated value)" );
 				continue;
 			}
+			// Not mirrored: the write path also skips a string whose id no longer matches a
+			// registered Polylang string, or when PLL_MO is unavailable. Counted as an update here.
 			$verb = 'update';
-			$what = 'Polylang string ' . $item['id'];
+			$what = 'Polylang string ' . $item['id'] . ' (assumes the string is still registered)';
 		} elseif ( 'menu' === $kind ) {
 			// Mirror the write path's lookup (read-only): reuse by target_id or by the derived name.
 			$src_menu = wp_get_nav_menu_object( (int) $item['menu_id'] );
@@ -183,6 +185,10 @@ if ( in_array( 'dry-run', is_array( $args ) ? $args : array(), true ) ) {
 		} else {
 			// Mirror the write path's existence checks (read-only): a target_id whose object was
 			// deleted since the manifest was built is created again, not updated.
+			if ( 'term' === $kind && ( ! isset( $item['fields']['name'] ) || '' === $item['fields']['name'] ) ) {
+				pllx_info( "would-skip term {$item['source_id']} (empty translated name)" );
+				continue;
+			}
 			if ( 'post' === $kind ) {
 				$verb = ( ! empty( $item['target_id'] ) && get_post( $item['target_id'] ) ) ? 'update' : 'create';
 			} elseif ( 'term' === $kind ) {

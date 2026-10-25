@@ -19,7 +19,7 @@ s3=$(grep -n '^## Step 3:' "$c" | cut -d: -f1 || true)
 grep -Fq 'pll-import.php" "$MANIFEST.translated" dry-run' "$c" || fail "Step 6 has no dry-run invocation"
 d=$(grep -n 'translated" dry-run' "$c" | head -1 | cut -d: -f1 || true)
 r=$(grep -n 'pll-import.php" "$MANIFEST.translated"$' "$c" | head -1 | cut -d: -f1 || true)
-[ "$d" -lt "$r" ] || fail "dry-run must come before the real import"
+[ -n "$d" ] && [ -n "$r" ] && [ "$d" -lt "$r" ] || fail "dry-run must come before the real import"
 grep -Fq 'AskUserQuestion' "$c" && grep -Fq 'without a yes' "$c" || fail "hide_default=0 is not gated on confirmation"
 grep -Fq "wp_cli.wrapper" "$c" || fail "command does not read the WP-CLI wrapper"
 ! grep -E '^ *wp (plugin|eval-file|eval|rewrite|db) ' "$c" || fail "bare wp call left in the command; use \$WP"
