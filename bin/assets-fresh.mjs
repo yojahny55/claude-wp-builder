@@ -74,6 +74,11 @@ try {
   process.exit(2);
 }
 
+if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
+  console.error(`ERROR: ${manifestPath} is not a JSON object`);
+  process.exit(2);
+}
+
 const sha = (rel) => {
   const p = resolve(root, rel);
   if (!existsSync(p)) return null;
