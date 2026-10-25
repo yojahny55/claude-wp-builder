@@ -79,7 +79,8 @@ while IFS= read -r line; do
     *"cd \"\$1\""*) grep -Fxq "PWD:$hostile" "$tmp/argv" || fail "cd did not land in the path: $line" ;;
     *setfacl*) grep -Fxq "ARG:g:$webuser:rwX" "$tmp/argv" && grep -Fxq "ARG:$hostile/wp-content" "$tmp/argv" \
          || fail "setfacl args not intact: $line" ;;
-    *store-kit-sync*) grep -Fxq "ARG:$hostile/wp-content/plugins" "$tmp/argv" || fail "store-kit-sync path not intact: $line" ;;
+    *store-kit-sync*) grep -Fxq "ARG:$hostile/wp-content/plugins" "$tmp/argv" || fail "store-kit-sync path not intact: $line"
+         case $line in *'$WP '*) grep -Fxq 'ARG:--allow-root' "$tmp/argv" || fail "\$WP flags were lost after store-kit-sync: $line" ;; esac ;;
     *'$WP '*) grep -Fxq 'ARG:--allow-root' "$tmp/argv" || fail "\$WP flags were lost: $line"
          grep -Fq "$hostile" "$tmp/argv" || fail "wp did not receive the path intact: $line" ;;
     *) fail "unrecognized call shape, no assertion covers it: $line" ;;
