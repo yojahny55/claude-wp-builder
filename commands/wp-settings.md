@@ -1,12 +1,27 @@
 ---
 description: Extend the theme settings page with additional ACF fields beyond the defaults
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
-argument-hint: "[description of settings to add]"
+argument-hint: "[description of settings to add] [--force-adopted]"
 ---
 
 # WP Settings — Extend Theme Settings Page
 
 Add new fields, tabs, or sections to the theme's ACF/SCF settings page.
+
+## Adopted-site guard
+
+Run this before anything else. This command builds a theme, sections or content on the assumption
+that the theme is one this plugin scaffolded; on an adopted site (a third-party theme) it would
+overwrite that theme or generate one that does not belong. `${PROJECT_PATH}` is the WordPress project
+root, the directory that holds the project manifest.
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs require-origin '${PROJECT_PATH}'"
+```
+
+Exit `0` continue. Exit `5` stop and print the message verbatim: `adopted site with a third-party theme:
+use /wp-audit, /wp-debug or /wp-update`. If `$ARGUMENTS` contains `--force-adopted`, append it to the
+call (and ignore it everywhere else): the operator chose to build on an adopted site on purpose.
 
 ## Step 1: Read Project Context
 

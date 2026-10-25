@@ -1,7 +1,7 @@
 ---
 description: Convert an already-built plain-CSS theme to Tailwind-native — utilities in the markup, @apply only where the ladder demands it
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
-argument-hint: "<theme-path> [--page <slug>]"
+argument-hint: "<theme-path> [--page <slug>] [--force-adopted]"
 ---
 
 # WP Tailwind Migrate
@@ -20,6 +20,21 @@ first careful pass before committing to the full conversion.
 
 Read `skills/wp-tailwind-system/SKILL.md` before starting. It owns the decision
 ladder and the file layout that every step below assumes.
+
+## Adopted-site guard
+
+Run this before anything else. This command builds a theme, sections or content on the assumption
+that the theme is one this plugin scaffolded; on an adopted site (a third-party theme) it would
+overwrite that theme or generate one that does not belong. `${PROJECT_PATH}` is the WordPress project
+root, the directory that holds the project manifest.
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs require-origin '${PROJECT_PATH}'"
+```
+
+Exit `0` continue. Exit `5` stop and print the message verbatim: `adopted site with a third-party theme:
+use /wp-audit, /wp-debug or /wp-update`. If `$ARGUMENTS` contains `--force-adopted`, append it to the
+call (and ignore it everywhere else): the operator chose to build on an adopted site on purpose.
 
 ## Step 0 — Baseline gate
 
