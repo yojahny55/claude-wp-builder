@@ -391,8 +391,10 @@ cmd_php_install() {
 
     case "$OS" in
         fedora|rhel)
+            # shellcheck disable=SC2046 # word splitting is the point: one package argument per extension
             sudo dnf install -y "php${version//./}" $(echo "$extensions" | sed "s/[^ ]*/php${version//./}-&/g") || {
                 # Try remi repo format
+                # shellcheck disable=SC2046 # word splitting is the point: one package argument per extension
                 sudo dnf install -y "php$version" $(echo "$extensions" | sed "s/[^ ]*/php$version-php-&/g")
             }
             ;;
@@ -402,6 +404,7 @@ cmd_php_install() {
                 sudo add-apt-repository -y ppa:ondrej/php 2>/dev/null || true
                 sudo apt update
             fi
+            # shellcheck disable=SC2046 # word splitting is the point: one package argument per extension
             sudo apt install -y "php$version" $(echo "$extensions" | sed "s/[^ ]*/php$version-&/g")
             ;;
         macos)

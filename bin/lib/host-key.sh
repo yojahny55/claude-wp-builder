@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared by bin/prod-gate.sh and bin/audit-suite.sh: the one key a server is known by.
 # host_key <url-or-host> prints it: scheme, path, query, fragment, userinfo and port are
 # dropped, bracketed IPv6 literals keep their brackets, and the result is lower-cased. Both

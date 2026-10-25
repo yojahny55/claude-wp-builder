@@ -13,6 +13,7 @@ warn()  { echo -e "${YELLOW}[!]${NC} $*"; }
 err()   { echo -e "${RED}[x]${NC} $*"; }
 
 # ── Auto-detect WordPress root ──────────────────────────────────────────────
+# shellcheck disable=SC2120  # the directory argument is optional; the one caller relies on the pwd default
 find_wp_root() {
 	local dir="${1:-$(pwd)}"
 	while [[ "$dir" != "/" ]]; do
