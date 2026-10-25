@@ -121,6 +121,11 @@ parked=$(find "$home/.local/state/wp-s3-backups" -type f -name 's3-config.php.di
 [ -n "$parked" ] || fail "revert did not park s3-config.php outside the docroot"
 [ "$(file_mode "$parked")" = 600 ] || [ "$(file_mode "$parked")" = 0600 ] || fail "parked s3-config.php is not 0600"
 
+# Setup and revert derive the directory from the same root: revert parks beside setup's backups.
+pdir="$(dirname "$parked")"
+ls "$pdir"/wp-config.php.bak-* >/dev/null 2>&1 \
+  || fail "revert parked in $pdir, which holds none of setup's wp-config.php backups"
+
 # The revert must also preserve wp-config.php's mode.
 grep -Fq 'shutil.copymode' "$revert" || fail "$revert's rewrite does not keep wp-config.php's mode"
 

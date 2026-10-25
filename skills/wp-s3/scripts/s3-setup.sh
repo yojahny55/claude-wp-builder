@@ -116,7 +116,15 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 
 # Backups hold database credentials and the previous S3 secret, so they live in a private
 # directory outside the docroot, one subdirectory per WordPress root.
-BACKUP_DIR="${WP_S3_BACKUP_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wp-s3-backups}/$(printf '%s' "$WP_ROOT" | cksum | cut -d' ' -f1)"
+# The key derivation is identical in s3-revert.sh (same 24 sha256 hex chars): revert looks for
+# these backups in the same directory it parks the config in. Keep the two in step.
+# An `if`, not `a | b || c`: under pipefail a missing sha256sum (macOS) is exit 127 and errexit ends the script before the shasum fallback.
+if command -v sha256sum >/dev/null 2>&1; then
+    ROOT_KEY="$(printf '%s' "$WP_ROOT" | sha256sum | cut -c1-24)"
+else
+    ROOT_KEY="$(printf '%s' "$WP_ROOT" | shasum -a 256 | cut -c1-24)"
+fi
+BACKUP_DIR="${WP_S3_BACKUP_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wp-s3-backups}/$ROOT_KEY"
 ( umask 077 && mkdir -p "$BACKUP_DIR" ) || die "could not create the backup directory $BACKUP_DIR"
 chmod 700 "$BACKUP_DIR" || die "could not restrict permissions on backup directory $BACKUP_DIR"
 python3 - "$WP_ROOT" "$BACKUP_DIR" <<'PY' || die "backup directory must be outside the WordPress document root"
