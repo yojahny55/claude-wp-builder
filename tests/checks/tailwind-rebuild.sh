@@ -60,7 +60,7 @@ if [ -d /proc/self ]; then
     || fail "$b rebuilt over a watcher started from a parent directory (npm --prefix) whose -o is this theme"
 fi
 
-# the lock must not survive the run, and a second run must not deadlock on it
+# the lock must be released (a second run must not deadlock on it); the file itself stays, since deleting it races other builders
 : > "$tmp/npm.log"
 PATH="$tmp/fakebin_nowatch:$PATH" true
 mkdir -p "$tmp/fakebin_nowatch"
@@ -69,7 +69,7 @@ printf '#!/usr/bin/env bash\nexit 1\n' > "$tmp/fakebin_nowatch/pgrep"; chmod +x 
 PATH="$tmp/fakebin_nowatch:$PATH" bash "$b" "$tmp/t" >/dev/null
 PATH="$tmp/fakebin_nowatch:$PATH" timeout 10 bash "$b" "$tmp/t" >/dev/null \
   || fail "$b deadlocked or failed on a second consecutive run — the lock is not released"
-[ ! -e "$tmp/t/.tailwind-rebuild.lock" ] || fail "$b leaves .tailwind-rebuild.lock behind in the theme"
+# (the file is kept on purpose -- see atomic-writes-and-build-lock.sh; wp-init gitignores it)
 
 # every builder that writes template classes calls it before its summary
 for c in wp-section wp-header wp-footer wp-page wp-cpt; do
