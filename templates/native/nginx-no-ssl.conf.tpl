@@ -13,14 +13,24 @@ server {
         try_files $uri $uri/ /index.php?$args;
     }
 
+    # Deny before the PHP block: regex locations match in order, and a dotfile, a dump or a
+    # backup under the project root (.wp-create*.json, .git/, .env, *.sql, *.bak) would
+    # otherwise be served by the generic try_files.
+    location ~ /\.(?!well-known) { deny all; }
+    location ~* \.(sql|bak|log)$ { deny all; }
+    location ~* \.bak- { deny all; }
+    # The PHP location below is \.php$ only, so evil.php.jpg is served as a static file here; a
+    # server that adds handlers for other names must widen this rule to match.
+    location ~* /uploads/.*\.php$ { deny all; }
+
     location ~ \.php$ {
+        try_files $uri =404;
         include fastcgi_params;
         fastcgi_pass unix:{{php_fpm_sock}};
         fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
     }
 
-    location ~ /\.ht { deny all; }
     # WooCommerce keeps paid downloads here behind an .htaccess `deny from all`, which nginx
     # never reads (SEC-039). `^~` so the static-file regex below cannot serve them first.
     location ^~ /wp-content/uploads/woocommerce_uploads/ { deny all; }
