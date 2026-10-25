@@ -117,7 +117,7 @@ HOME="$home" WP_S3_BACKUP_DIR= XDG_STATE_HOME= bash "$revert" "$root" --keep-rem
   || { cat "$tmp/revert.out"; fail "revert failed against the fixture root"; }
 [ ! -e "$root/s3-config.php" ] && [ ! -e "$root/s3-config.php.disabled" ] \
   || fail "revert left the S3 config in the docroot"
-parked=$(find "$bdir" -maxdepth 1 -type f -name 's3-config.php.disabled-*' | head -1)
+parked=$(find "$home/.local/state/wp-s3-backups" -type f -name 's3-config.php.disabled*' | head -1)
 [ -n "$parked" ] || fail "revert did not park s3-config.php outside the docroot"
 [ "$(file_mode "$parked")" = 600 ] || [ "$(file_mode "$parked")" = 0600 ] || fail "parked s3-config.php is not 0600"
 

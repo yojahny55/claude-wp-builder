@@ -31,9 +31,18 @@ CONFIG="$WP_ROOT/s3-config.php"
 LOCAL="$WP_ROOT/wp-content/uploads"
 MU="$WP_ROOT/wp-content/mu-plugins/s3-uploads-endpoint.php"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-# The backup holds database credentials: private directory outside the docroot, not a
-# *.bak-* file beside wp-config.php, which the web server would serve as plain text.
-BACKUP_DIR="${WP_S3_BACKUP_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wp-s3-backups}/$(printf '%s' "$WP_ROOT" | cksum | cut -d' ' -f1)"
+# The backup and the parked config hold credentials: one private directory outside the
+# docroot, keyed by the site root, never a *.bak-* / *.disabled file the web server could serve.
+# sha256 rather than a 32-bit cksum: two roots sharing a key would overwrite each other's parked credentials.
+# An `if`, not `a | b || c`: under pipefail a missing sha256sum (macOS) is exit 127 and errexit ends the script before the shasum fallback.
+if command -v sha256sum >/dev/null 2>&1; then
+    ROOT_KEY="$(printf '%s' "$WP_ROOT" | sha256sum | cut -c1-24)"
+else
+    ROOT_KEY="$(printf '%s' "$WP_ROOT" | shasum -a 256 | cut -c1-24)"
+fi
+BACKUP_DIR="${WP_S3_BACKUP_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wp-s3-backups}/$ROOT_KEY"
+PARK_DIR="$BACKUP_DIR"
+PARKED="$PARK_DIR/s3-config.php.disabled"
 ( umask 077 && mkdir -p "$BACKUP_DIR" ) && chmod 700 "$BACKUP_DIR" \
     || die "could not create or restrict the backup directory $BACKUP_DIR"
 python3 - "$WP_ROOT" "$BACKUP_DIR" <<'PY' || die "backup directory must be outside the WordPress document root"
@@ -169,17 +178,29 @@ else
 fi
 
 # ---------------------------------------------------------------- 5. park, do not delete
-# Renamed rather than deleted: the bucket is still there, and turning this back on
-# should cost one `mv`, not another round of credentials.
+# Moved rather than deleted: the bucket is still there, and turning this back on should
+# cost one `mv`, not another round of credentials. It goes OUTSIDE the docroot, because
+# s3-config.php.disabled beside the original is served as plain text by the web server.
+# park_config <src> <dst>: 0600 copy inside the private directory, then remove the source.
+park_config() {
+    ( umask 077 && mkdir -p "$PARK_DIR" ) && chmod 700 "$PARK_DIR" \
+        || die "could not create or use $PARK_DIR (it may exist already, owned by another user or not writable). Nothing has been moved; $1 is still in place."
+    ( umask 077 && cp "$1" "$2" ) && chmod 600 "$2" \
+        || { rm -f "$2"; die "could not copy $1 to $2. Nothing has been moved."; }
+    rm -f "$1"
+}
 if [[ -f "$CONFIG" ]]; then
-    ( umask 077 && mkdir -p "$BACKUP_DIR" ) && chmod 700 "$BACKUP_DIR" \
-        || die "could not restrict permissions on backup directory $BACKUP_DIR"
-    PARKED_CONFIG="$BACKUP_DIR/s3-config.php.disabled-$STAMP"
-    # Copy under umask 077 so the parked file is born 0600 (mv would keep the source mode),
-    # then remove the original.
-    ( umask 077 && cp "$CONFIG" "$PARKED_CONFIG" ) && chmod 600 "$PARKED_CONFIG" && rm -f "$CONFIG" \
-        || die "could not park s3-config.php in the private backup directory $BACKUP_DIR"
-    echo "5. s3-config.php moved outside the docroot to $PARKED_CONFIG (mode 0600)"
+    park_config "$CONFIG" "$PARKED"
+    echo "5. s3-config.php -> $PARKED (0600, outside the docroot)"
+    echo "   To turn S3 back on: mv '$PARKED' '$CONFIG' and re-run /wp-s3 setup to restore the require."
+fi
+# An earlier version of this script left s3-config.php.disabled in the docroot, served as
+# plain text. Park it too, keeping both when a parked copy already exists.
+if [[ -f "$CONFIG.disabled" ]]; then
+    LEGACY_DST="$PARKED"
+    [[ ! -e "$LEGACY_DST" ]] || LEGACY_DST="$PARKED.legacy-$STAMP"
+    park_config "$CONFIG.disabled" "$LEGACY_DST"
+    echo "5. Legacy s3-config.php.disabled -> $LEGACY_DST (0600, outside the docroot)"
 fi
 if [[ -f "$MU" ]]; then
     mv "$MU" "$MU.disabled"
@@ -191,9 +212,9 @@ fi
 # `pipefail` carries that into the assignment and errexit ends the script one line before
 # the summary it exists to print.
 BUCKET_URL=""
-if [[ -n "${PARKED_CONFIG:-}" && -f "$PARKED_CONFIG" ]]; then
-    BUCKET_URL="$(php "$SKILL_DIR/scripts/read-s3-config.php" "$PARKED_CONFIG" --names 2>/dev/null \
-        | sed -n 's/^S3_UPLOADS_BUCKET_URL: //p')"
+if [[ -f "$PARKED" ]]; then
+    BUCKET_URL="$(php "$SKILL_DIR/scripts/read-s3-config.php" "$PARKED" --names 2>/dev/null \
+        | sed -n 's/^S3_UPLOADS_BUCKET_URL: //p')" || BUCKET_URL=""
 fi
 # Guarded like every other `wp` call here: without WP-CLI the bare invocation prints
 # "command not found" into the middle of the commands printed below.

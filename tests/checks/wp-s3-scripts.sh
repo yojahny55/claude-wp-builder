@@ -145,7 +145,7 @@ done
 #     config to park: the reader exits non-zero there, and `pipefail` used to carry that
 #     into an assignment that errexit turned into a silent stop one line short.
 # ---------------------------------------------------------------------------
-grep -Fq 'if [[ -n "${PARKED_CONFIG:-}" && -f "$PARKED_CONFIG" ]]; then' "$revert" \
+grep -Fq 'if [[ -f "$PARKED" ]]; then' "$revert" \
   || fail "$revert reads the parked config without checking that there is one"
 
 # ---------------------------------------------------------------------------
