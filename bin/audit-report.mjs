@@ -91,6 +91,8 @@ const STRINGS = {
       'A `setting` is a database or server change. Applied on a local clone it does **not** travel with the commit — repeat it on staging and production, where there is no WP-CLI.',
     otherSeverity: ' — %other% with an unrecognised severity, from an older report',
     unmeasured: 'Not measured',
+    tier3Unmeasured:
+      'Tier 3 (browser measurement) was NOT measured in this run — nothing here comes from a loaded page, so do not read the absence of Tier 3 findings as a pass.',
     unmeasuredNote:
       'These checks apply to this site and did not run. They are not passes — say what stopped them before treating this report as complete.',
     none: 'None',
@@ -134,6 +136,8 @@ const STRINGS = {
       'Un `ajuste` es un cambio de base de datos o de servidor. Aplicado sobre un clon local **no** viaja con el commit: hay que repetirlo en staging y en producción, donde no hay WP-CLI.',
     otherSeverity: ' — %other% con severidad no reconocida, de un informe anterior',
     unmeasured: 'Sin medir',
+    tier3Unmeasured:
+      'El Nivel 3 (medición en navegador) NO se midió en esta ejecución — nada de lo que aparece sale de una página cargada, así que la ausencia de hallazgos de Nivel 3 no significa que pase.',
     unmeasuredNote:
       'Estos criterios aplican a este sitio y no se ejecutaron. No son aprobados: di qué lo impidió antes de dar el informe por completo.',
     none: 'Ninguno',
@@ -611,6 +615,15 @@ function noFindingsText(model) {
   return model.unmeasured.length ? model.t.noFindingsUnmeasured : model.t.noFindings;
 }
 
+// Tier 3 is unmeasured when the run says so (`tier3: "unmeasured"`) or lists an unmeasured
+// entry whose check id starts with `tier3`/`tier-3`. The reader of a report with no browser
+// findings otherwise assumes the browser tier passed.
+function tier3Unmeasured(run) {
+  const entries = Array.isArray(run.unmeasured) ? run.unmeasured : [];
+  return String(run.tier3 || '').toLowerCase() === 'unmeasured'
+    || entries.some((entry) => /^tier-?3(\b|_)/i.test(String((entry && entry.check) || '')));
+}
+
 function renderMarkdown(model) {
   const t = model.t;
   const lines = [];
@@ -625,6 +638,10 @@ function renderMarkdown(model) {
 
   push(`## ${t.summary}`);
   push();
+  if (model.tier3Unmeasured) {
+    push(`**${t.tier3Unmeasured}**`);
+    push();
+  }
   push(scoreSentence(t, model.counts));
   push();
   if (model.plan.length) {
@@ -1085,7 +1102,7 @@ ${groups}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>${esc(`${t.title} — ${model.site} — ${model.date}`)}</title>
-<style>${HTML_CSS}</style>
+<style>${HTML_CSS.replace(/\s*\n\s*/g, ' ')}</style>
 </head>
 <body>
 <input type="checkbox" id="theme" class="sr">
@@ -1093,6 +1110,7 @@ ${groups}
 <p class="kicker">${esc(ui.kicker)}</p>
 <h1>${esc(model.site)}</h1>
 <p class="meta">${esc([model.date, model.tier].filter(Boolean).join(' · '))}</p>
+${model.tier3Unmeasured ? `<p class="meta"><strong>${esc(t.tier3Unmeasured)}</strong></p>` : ''}
 ${model.categories.length ? `<p class="meta">${esc(t.categories)}: ${esc(model.categories.map(categoryName).join(', '))}</p>` : ''}
 <div class="kpis">
 <div class="kpi big"><b>${c.total}</b><span>${esc(plural(c.total, ui.finding, ui.findings))}</span></div>
@@ -1105,7 +1123,7 @@ ${model.categories.length ? `<p class="meta">${esc(t.categories)}: ${esc(model.c
 <label class="theme" for="theme"><span class="to-dark">🌙 ${esc(ui.dark)}</span><span class="to-light">☀️ ${esc(ui.light)}</span></label></div></nav>
 <main class="wrap">
 <section id="summary"><h2>${esc(t.summary)}</h2>
-<p>${esc(scoreSentence(t, c))}</p>
+${model.tier3Unmeasured ? `<p><strong>${esc(t.tier3Unmeasured)}</strong></p>\n` : ''}<p>${esc(scoreSentence(t, c))}</p>
 ${model.plan.length ? `<p>${esc(fill(t.ownershipCounts, model.ownership))}</p>` : ''}</section>
 ${notesBlock}<section id="comparison"><h2>${esc(t.comparison)}</h2>${comparisonBlock()}</section>
 ${groupTable(t.byCategory, 'by-category', model.byCategory, t.category, (name) => `<a href="#${groupIds.get(name)}">${esc(categoryName(name))}</a>`)}
@@ -1172,6 +1190,7 @@ function main() {
     byPage: groupBy(folded, 'page'),
     plan: sortForPlan(folded),
     unmeasured: Array.isArray(run.unmeasured) ? run.unmeasured : [],
+    tier3Unmeasured: tier3Unmeasured(run),
     notes,
     comparison: compare(folded, previous, {
       unmeasured: Array.isArray(run.unmeasured) ? run.unmeasured : [],
