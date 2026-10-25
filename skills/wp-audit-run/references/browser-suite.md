@@ -2,6 +2,14 @@
 
 `commands/wp-audit.md` sends the run here at Step 6.5. Follow it in order; nothing in it is optional background.
 
+## Contents
+
+- Running the suite, the gate and the audited host
+- Exit codes
+- The suite's findings and the agents' findings can be the same defect
+- The shopper-flow regression suite is not an audit pass
+- Tier 3 UNMEASURED must be visible in the report
+
 The seven agents read code, the database and a rendered `<head>`. None of them loads the page
 the way a visitor does, so the criteria that only exist in a rendered page — contrast as
 measured, line width at each breakpoint, a form's validation, a broken link followed, a
@@ -19,7 +27,20 @@ the gate meanwhile waits `--wait` (300 s), exits 5 and, after three 5s, reports 
 
 Against a public URL, run it through the gate from Step 6:
 `WP_AUDIT_GATE_DIR=<scratch>/prod-gate ${CLAUDE_PLUGIN_ROOT}/bin/prod-gate.sh <public-url> -- ${CLAUDE_PLUGIN_ROOT}/bin/audit-suite.sh …`.
-The suite then runs with one Playwright worker. The tests, pages and metrics are the
+The script does not depend on the caller remembering: for a production host (a public host, or
+one the manifest's `environments` marks role prod) it re-runs itself through `prod-gate.sh`
+when it is not already under it, and a blocked or busy host ends the run with exit `4` or `5`
+before anything is sent. The suite then runs with one Playwright worker.
+
+**The audited host is `--url`, never the config.** `audit.config.js` is persistent, so
+`audit-suite.sh` does not write `baseURL` into it: it passes `BASE_URL` in the environment on
+every run, compares the file's `baseURL` with `--url`, says so on stderr when they differ and
+audits `--url`. A hand-edited or stale `baseURL` therefore cannot send a run to another host.
+
+**A host that stops answering ends the run.** After `--max-timeouts` page timeouts in a row
+(default 3, or `WP_AUDIT_MAX_TIMEOUTS`) the guard reporter writes `results/unmeasured.json`, the
+remaining passes are skipped and the script exits `2` with an `UNMEASURED:` line naming the cause.
+Do not re-run it against the same host to "try again"; check the host first. The tests, pages and metrics are the
 same; only the four parallel browsers are gone.
 
 **Lighthouse results and the serving layer.** With `local_clone` true the suite never targets the clone (below), so its LCP, FCP, TBT, performance score and byte totals are those of the confirmed public URL; without one they are `UNMEASURED`. Should a run be pointed at a local host anyway, those numbers inherit the clone's serving layer (compression, HTTP version): label them `clone measurement — serving layer differs (…)` as *Clone-safe versus production-only measurement* in `site-context.md` says, and never use them as a baseline or a finding by themselves.
@@ -38,14 +59,16 @@ public URL` and this run is skipped.
 config already holds, which on a first run is the template's placeholder — so a run that
 looks successful measures pages that are not this site's.
 The first run scaffolds `.wp-audit/suite/` from `templates/audit-suite/` and installs the
-suite's dependencies **once per machine**, into a shared cache keyed by the template's
+suite's dependencies **once per machine** with `npm ci` against the template's `package-lock.json`
+(no lockfile means no install, with a message; no browser is ever downloaded), into a shared cache keyed by the template's
 `package.json`. Later runs and later projects reuse it.
 
 | Exit | Meaning | What to report |
 |---|---|---|
 | `0` | the suite ran; `.wp-audit/suite/results/run.json` holds its findings | fold them in |
 | `1` | it could not run, or produced nothing to convert | report the error; Tier 3 findings stay `UNMEASURED` |
-| `2` | no Node, no npm, or the browser would not install | Tier 3 `UNMEASURED` — a skip, not a failure |
+| `2` | no Node, no npm, no existing browser, or the host stopped answering | Tier 3 `UNMEASURED` — a skip, not a failure; quote the `UNMEASURED:` cause |
+| `4` / `5` | the production gate refused: host marked blocked / busy | Tier 3 `UNMEASURED: production gate …`; nothing was sent |
 | `3` | crash | report it and continue |
 
 **`audit.config.js` is written once and then left alone.** It carries the selectors
@@ -85,3 +108,9 @@ It runs against the local clone only: it never places an order, and the flows th
 newsletter) are skipped off a clone unless `regression.allowWrites` is set. The first admin request
 after an update can time out; the admin flow retries once before it reports `FAIL`.
 
+### Tier 3 UNMEASURED must be visible in the report
+
+When the suite did not run (exit `2`, `4` or `5`), put `"tier3": "unmeasured"` in the run file (and an
+`unmeasured` entry whose check id starts with `tier3`, with the cause). `bin/audit-report.mjs` then
+opens the summary of the `.md` and the header of the `.html` with a bold line saying Tier 3 was not
+measured, so a report with no browser findings is not read as a pass.
