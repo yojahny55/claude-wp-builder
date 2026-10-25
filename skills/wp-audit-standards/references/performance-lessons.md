@@ -9,7 +9,7 @@ Facts about Lighthouse scoring hold for Lighthouse 10 and later.
 - Read *observed* metrics before chasing a bad *simulated* score
 - A Lighthouse run needs an idle machine, and a contended one is not a slow page
 - A local lab that resembles production: HTTP/2, compression, medians
-- Inline critical CSS: measured on a real site, and rejected
+- Inline critical CSS: conditional, and rejected without its five conditions
 - Per-template used CSS: what worked on a store, and what broke
 - WebP: `image_editor_output_format` only covers new, attachment-pipeline images
 - Right-size: never print `$field['url']` for a fixed slot
@@ -94,11 +94,15 @@ Apache and 93 / 95 behind the proxy, with all the gains below applied. Say which
 number was measured on; the proxy narrows the gap to production, it does not close it (see the
 clone caveat in `wp-audit-run/references/site-context.md`).
 
-## Inline critical CSS: measured on a real site, and rejected
+## Inline critical CSS: conditional, and rejected without its five conditions
 
-Inlining the critical CSS is the standard advice for a render-blocking stylesheet, and on a
-real build it made the metric it was meant to fix **worse**. Recorded here so the experiment is
-not repeated blind:
+Inlining the critical CSS is the standard advice for a render-blocking stylesheet. Done as one
+blob ahead of the hero, on a first experiment, it made the metric it was meant to fix
+**worse**; done per template group with the conditions below, it held up on a real news build
+(a bundled sheet set, content-hash build, cuts per template group). Both results are recorded
+so the experiment is neither repeated blind nor ruled out.
+
+The failed first experiment:
 
 | Variant | FCP | LCP | CLS |
 |---|---|---|---|
@@ -107,17 +111,40 @@ not repeated blind:
 | 13KB (above-the-fold only) | improved | not measured | **0.139** |
 | Preloading jQuery + carousel + page JS | **1340 ms** | not measured | not measured |
 
-The inline block sits *ahead of the hero image on the same connection*, so the paint that
-counts starts later even though the first paint starts sooner. The trimmed variant is smaller
-than the styles the first viewport actually needs, which is what moved CLS to 0.139. All of it
-was reverted with zero pixels of difference.
+The inline block sat *ahead of the hero image on the same connection*, so the paint that
+counts started later even though the first paint started sooner. The trimmed variant was
+smaller than the styles the first viewport actually needs, which is what moved CLS to 0.139.
 
-**The lesson is not "never inline".** It is that FCP and LCP move in opposite directions here,
-so a change justified by FCP alone is unmeasured, and the LCP number decides. On that site the
-real cause was elsewhere and only the Lighthouse breakdown showed it: 276 ms of *element
-render delay*, because the carousel re-built the first slide inside its own track and the
-second paint was the one being measured. A background the theme already painted without
-JavaScript was not the problem.
+**Propose inline critical CSS only when all five conditions hold; with any one missing it is
+not a fix, report it as rejected:**
+
+1. **A cut per template group**, not one for the site (for example `single`, `elementor` and
+   `listing`), generated from sample URLs of that group at 412, 768 and 1440 px. Templates
+   with no group get no cut and keep the normal blocking tag.
+2. **The full sheet stays and loads without blocking** (`media="print"` plus the `onload`
+   swap and a `<noscript>` fallback, in the sheet's own position so the cascade is unchanged).
+   The cut is a first-paint aid, never a replacement. Check the CSP allows the inline `onload`.
+3. **A hash of the origin sheet's CONTENT (never mtime) invalidates the cut by itself.** The
+   inline helper compares the hash recorded at cut time with the sheet it is about to defer
+   and drops the cut on a mismatch. Without it, a rebuilt bundle or a WordPress, plugin or
+   builder update leaves the cut stale in silence. `bin/assets-fresh.mjs` recomputes the
+   hashes and fails with "regenerate critical cuts"; `/wp-update` runs it after an update.
+4. **Verified on the SAME DOM.** With JavaScript, disable the full `<link>` sheets, then
+   compare computed styles and bounding rectangles of every element before and after, at 412,
+   768 and 1440 px. Never compare two page loads: the front page rotates its content and
+   posts load more on scroll, so two loads differ for reasons that have nothing to do with CSS.
+5. **Decided on observed LCP**, from real or throttled-browser runs, not on FCP and not on
+   simulated (Lighthouse-modelled) LCP. FCP and LCP moved in opposite directions in the table
+   above; a change justified by FCP alone is unmeasured, and the LCP number decides.
+
+The build is two steps in a fixed order, and forgetting the second is the failure that
+shipped: rebuild the `.min` files and bundle (which rewrites the manifest), **then** regenerate
+the cuts. Commit sources, `.min`, bundle, cuts and the hash manifest in the same commit.
+
+On the failed experiment the real cause was elsewhere and only the Lighthouse breakdown showed
+it: 276 ms of *element render delay*, because the carousel re-built the first slide inside its
+own track and the second paint was the one being measured. A background the theme already
+painted without JavaScript was not the problem.
 
 ## Per-template used CSS: what worked on a store, and what broke
 
