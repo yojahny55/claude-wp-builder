@@ -44,7 +44,9 @@ grep -Fq 'path */.*' "$c" || fail "Caddyfile: dotfiles path pattern missing"
 grep -Fq 'not path /.well-known/*' "$c" || fail "Caddyfile: dotfiles not denied (or .well-known not excepted)"
 for ext in bak log sql; do grep -Fq "path *.$ext" "$c" || fail "Caddyfile: *.$ext not denied"; done
 grep -Fq '*.bak-*' "$c" || fail "Caddyfile: .bak-* not denied"
-grep -Fq '/wp-content/uploads/*.php' "$c" || fail "Caddyfile: PHP in uploads not denied"
+grep -Fq 'path_regexp ^/wp-content/uploads/.*\.php$' "$c" || fail "Caddyfile: PHP in uploads not denied at any depth"
+! grep -Fq '/wp-content/uploads/*.php' "$c" || fail "Caddyfile: single-level uploads glob misses dated subdirectories"
+grep -Fq 'path /xmlrpc.php' "$c" || fail "Caddyfile: xmlrpc block missing"
 grep -Fq 'path /wp-content/uploads/woocommerce_uploads/*' "$c" || fail "Caddyfile: woocommerce_uploads not denied"
 for ph in '{{domain}}' '{{document_root}}' '{{php_fpm_sock}}'; do grep -Fq "$ph" "$c" || fail "Caddyfile lost $ph"; done
 

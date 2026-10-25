@@ -10,10 +10,15 @@
         path *.bak
         path *.log
         path *.bak-*
-        path /wp-content/uploads/*.php
         path /wp-content/uploads/woocommerce_uploads/*
     }
     respond @disallowed 404
+
+    # PHP at any depth under uploads: Caddy's path glob never crosses "/", so a
+    # glob would miss the dated subdirectories. A regexp is a separate matcher
+    # because different matcher types inside one block are ANDed.
+    @uploadsphp path_regexp ^/wp-content/uploads/.*\.php$
+    respond @uploadsphp 404
 
     # Dotfiles and dot-directories (.git, .env, .wp-create*.json) except .well-known.
     @dotfiles {
