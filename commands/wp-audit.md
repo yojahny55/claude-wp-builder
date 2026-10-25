@@ -90,6 +90,10 @@ a bare `/wp-audit` — never loaded a page the way a visitor does, even on a mac
 everything the suite needs. It is still not on by default: the first run installs packages
 and every run drives a real browser against a public site, which is the operator's call.
 
+## Step 1.5: Recognize a re-audit
+
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/re-audit.md` now and follow it — it is this step, not background. It covers detecting a prior run (`audit.last_run`, the findings ledger, the dated sidecar), printing `Re-audit of <date>`, the single reuse prompt for the stored `audit.last_answers`, scoped mode, and how the run and its report are labelled. When it asked its one reuse question, the report-only and suite questions below are not asked again.
+
 ## Step 2: Read Project Context
 
 **First: validate the project configuration.**

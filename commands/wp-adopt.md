@@ -306,7 +306,7 @@ same guards.
 
 | Key | Read by | Effect |
 |---|---|---|
-| `origin: "adopted"` | `/wp-audit`, `/wp-debug`, `/wp-clone` | the site is registered, but no theme was scaffolded. The builders (`/wp-init`, `/wp-section`, `/wp-seed`, …) do **not** check `origin` and assume a starter theme. They are not supported on an adopted site, and nothing stops them yet |
+| `origin: "adopted"` | `/wp-audit`, `/wp-debug`, `/wp-clone`, every builder | the site is registered, but no theme was scaffolded. The builders (`/wp-init`, `/wp-section`, `/wp-seed`, `/wp-yolo`, `/wp-header`, `/wp-footer`, `/wp-page`, `/wp-cpt`, `/wp-settings`, `/wp-tailwind-migrate`, `/wp-cinematic-init`, `/wp-cinematic-scene`, `/wp-cinematic-seed`) assume a starter theme, so each runs `wp-config.mjs require-origin` first and stops with exit `5`; `--force-adopted` overrides it on purpose |
 | `code_scope.editable` | `/wp-audit` agents and fix phase | the only paths a fix may edit |
 | `code_scope.read_only` | `/wp-audit` agents | audited and reported with `Fix: manual`, `Owner: manual`. Never edited |
 | `git_publish` | `/wp-adopt` Step 6 | remote, branches and included paths of an earlier publish, reused by the next one; absent unless the operator opted in |

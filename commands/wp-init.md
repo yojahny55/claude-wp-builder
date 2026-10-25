@@ -1,12 +1,27 @@
 ---
 description: Scaffold a new WordPress project — copies starter theme, replaces placeholders, generates .claude/CLAUDE.md
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
-argument-hint: "[project-name]"
+argument-hint: "[project-name] [--force-adopted]"
 ---
 
 # WP Init — Project Scaffolding
 
 Scaffold a new WordPress project from the starter theme, configure i18n, and generate the project CLAUDE.md.
+
+## Adopted-site guard
+
+Run this before anything else. This command builds a theme, sections or content on the assumption
+that the theme is one this plugin scaffolded; on an adopted site (a third-party theme) it would
+overwrite that theme or generate one that does not belong. `${PROJECT_PATH}` is the WordPress project
+root, the directory that holds the project manifest.
+
+```bash
+bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs require-origin '${PROJECT_PATH}'"
+```
+
+Exit `0` continue. Exit `5` stop and print the message verbatim: `adopted site with a third-party theme:
+use /wp-audit, /wp-debug or /wp-update`. If `$ARGUMENTS` contains `--force-adopted`, append it to the
+call (and ignore it everywhere else): the operator chose to build on an adopted site on purpose.
 
 ## Step 0.5: Select Starter Template
 
