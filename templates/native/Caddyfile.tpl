@@ -16,8 +16,10 @@
 
     # PHP at any depth under uploads: Caddy's path glob never crosses "/", so a
     # glob would miss the dated subdirectories. A regexp is a separate matcher
-    # because different matcher types inside one block are ANDed.
-    @uploadsphp path_regexp ^/wp-content/uploads/.*\.php$
+    # because different matcher types inside one block are ANDed. The pattern ends in
+    # (/|$), not $: php_fastcgi splits the path at ".php" into script and PATH_INFO, so
+    # /uploads/x/evil.php/foo would run evil.php and escape a bare \.php$ anchor.
+    @uploadsphp path_regexp ^/wp-content/uploads/.*\.php(/|$)
     respond @uploadsphp 404
 
     # Dotfiles and dot-directories (.git, .env, .wp-create*.json) except .well-known.

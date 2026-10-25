@@ -16,7 +16,7 @@
     <FilesMatch "(^\.(?!well-known)|\.(sql|bak|log)$|\.bak-)">
         Require all denied
     </FilesMatch>
-    <LocationMatch "^/wp-content/uploads/.*\.php$">
+    <LocationMatch "^/wp-content/uploads/.*\.php(/|$)">
         Require all denied
     </LocationMatch>
 
