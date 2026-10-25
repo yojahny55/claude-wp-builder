@@ -14,10 +14,11 @@ has skills/wp-audit-run/references/site-context.md "inherit the clone's serving 
 has skills/wp-audit-run/references/site-context.md "clone measurement — serving layer differs"
 has skills/wp-audit-run/references/site-context.md "never a baseline and never a finding by itself"
 has skills/wp-audit-run/references/browser-suite.md "clone measurement — serving layer differs"
-has agents/wp-audit-performance.md "clone measurement — serving layer differs"
+perf=$(bash tests/checks/lib/agent-text.sh wp-audit-performance)
+has "$perf" "clone measurement — serving layer differs"
 has skills/wp-cli-patterns/SKILL.md "## Purging caches on a clone"
 has skills/wp-cli-patterns/SKILL.md "wp cfcache purge_fallback_cache"
-for f in skills/wp-audit-run/references/fix.md agents/wp-audit-performance.md agents/wp-audit-rankmath.md commands/wp-cinematic-scene.md; do
+for f in skills/wp-audit-run/references/fix.md "$perf" agents/wp-audit-rankmath.md commands/wp-cinematic-scene.md; do
   has "$f" "Purging caches on a clone"
 done
 

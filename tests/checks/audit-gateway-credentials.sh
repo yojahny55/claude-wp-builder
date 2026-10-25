@@ -17,7 +17,7 @@ cd "$(dirname "$0")/../.."
 
 fail() { echo "FAIL: $1"; exit 1; }
 
-SEC=agents/wp-audit-security.md
+SEC=$(bash tests/checks/lib/agent-text.sh wp-audit-security)
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
 AUDIT=$EXPANDED
 

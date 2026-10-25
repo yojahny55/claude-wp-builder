@@ -369,7 +369,7 @@ if grep -q rate_limit_exceeded <<<"$codes"; then fail "attempts were refused wit
 q 'update_option( "woocommerce_feature_rate_limit_checkout_enabled", "yes" );'
 
 # --- No key at rest, by SEC-040's own detection snippet --------------------------------------
-proc=$(awk '/^### Procedure — SEC-040/{f=1;print;next} /^##/{f=0} f' agents/wp-audit-security.md)
+proc=$(awk '/^### Procedure — SEC-040/{f=1;print;next} /^##/{f=0} f' agents/wp-audit-security.md skills/wp-audit-standards/references/sec-procedures-gateway-credentials.md)
 awk -v out="$PROJ/sec040.php" '
   { line = $0; sub(/[ \t\r]+$/, "", line) }
   line == "$WP eval '"'"'" && !done { f = 1; print "<?php" > out; next }

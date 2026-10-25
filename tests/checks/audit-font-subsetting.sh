@@ -18,7 +18,7 @@ fail() { echo "FAIL: $1"; exit 1; }
 
 cd "$(dirname "$0")/../.." || fail "cannot cd to the repository root"
 
-audit=agents/wp-audit-performance.md
+audit=$(bash tests/checks/lib/agent-text.sh wp-audit-performance)
 # -s, not -f: an empty file fails every assertion below on its own, and eleven
 # near-identical "does not mention" lines hide the one fact that explains them.
 [ -s "$audit" ] || fail "$audit is missing or empty"

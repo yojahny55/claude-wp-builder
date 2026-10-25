@@ -17,7 +17,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
 
-audit=agents/wp-audit-performance.md
+audit=$(bash tests/checks/lib/agent-text.sh wp-audit-performance)
 [ -f "$audit" ] || { echo "FAIL: $audit is missing"; exit 1; }
 # -f says it exists, not that it can be read. Without this an unreadable file flattens to an
 # empty string and reports whichever assertion runs first — "has no PERF-058 row" — which
