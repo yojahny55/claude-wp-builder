@@ -36,13 +36,13 @@ for f in apache.conf.tpl apache-no-ssl.conf.tpl; do
   # (/|$), not $: /uploads/x/evil.php/foo (PATH_INFO) maps to evil.php and reaches the PHP handler.
   # mod_mime applies AddHandler to .php in ANY position of the name and ignores case, so
   # evil.php.jpg and evil.PHP run under mod_php: the rule needs (?i) and (\.|/|$) after the extension.
-  grep -Fq '<LocationMatch "(?i)^/wp-content/uploads/.*\.php[0-9]?(\.|/|$)">' "$p" || fail "$f: PHP in uploads not denied case-insensitively / in any name position (needs (?i) and \.php[0-9]?(\.|/|$)), or not anchored to wp-content/uploads"
+  grep -Fq '<LocationMatch "(?i)^/wp-content/uploads/.*\.(php[0-9]?|phar|pht(ml)?)(\.|/|$)">' "$p" || fail "$f: PHP in uploads not denied case-insensitively / in any name position (needs (?i) and the php|phar|phtml alternation), or not anchored to wp-content/uploads"
   ! grep -Fq '<LocationMatch "^/wp-content/uploads/.*\.php' "$p" || fail "$f: old case-sensitive uploads rule is bypassed by evil.PHP and evil.php.jpg"
   printf '%s\n' '/wp-content/uploads/2026/evil.php/foo' '/wp-content/uploads/2026/evil.php/x.jpg' '/wp-content/uploads/2026/evil.php' \
-    '/wp-content/uploads/2026/evil.php.jpg' '/wp-content/uploads/2026/evil.PHP' '/wp-content/uploads/2026/evil.Php5' |
-    while IFS= read -r u; do printf '%s' "$u" | grep -Eiq '^/wp-content/uploads/.*\.php[0-9]?(\.|/|$)' || fail "$f: case $u not matched"; done
-  for ok in /index.php/foo /wp-content/uploads/2026/x.php_.jpg /wp-content/uploads/2026/a.jpg; do
-    ! printf '%s' "$ok" | grep -Eiq '^/wp-content/uploads/.*\.php[0-9]?(\.|/|$)' || fail "$f: rule must not touch $ok"
+    '/wp-content/uploads/2026/evil.php.jpg' '/wp-content/uploads/2026/evil.PHP' '/wp-content/uploads/2026/evil.Php5' '/wp-content/uploads/2026/e.phtml' '/wp-content/uploads/2026/e.phar' '/wp-content/uploads/2026/e.pht' |
+    while IFS= read -r u; do printf '%s' "$u" | grep -Eiq '^/wp-content/uploads/.*\.(php[0-9]?|phar|pht(ml)?)(\.|/|$)' || fail "$f: case $u not matched"; done
+  for ok in /index.php/foo /wp-content/uploads/2026/x.php_.jpg /wp-content/uploads/2026/my.phpunit.pdf /wp-content/uploads/2026/a.jpg; do
+    ! printf '%s' "$ok" | grep -Eiq '^/wp-content/uploads/.*\.(php[0-9]?|phar|pht(ml)?)(\.|/|$)' || fail "$f: rule must not touch $ok"
   done
   # DirectoryMatch compares the filesystem path: a docroot under a dot-directory or an ancestor
   # named uploads would be denied wholesale, so the rules must be URL-side.
@@ -57,7 +57,7 @@ grep -Fq 'path */.*' "$c" || fail "Caddyfile: dotfiles path pattern missing"
 grep -Fq 'not path /.well-known/*' "$c" || fail "Caddyfile: dotfiles not denied (or .well-known not excepted)"
 for ext in bak log sql; do grep -Fq "path *.$ext" "$c" || fail "Caddyfile: *.$ext not denied"; done
 grep -Fq '*.bak-*' "$c" || fail "Caddyfile: .bak-* not denied"
-grep -Fq 'path_regexp (?i)^/wp-content/uploads/.*\.php[0-9]?(\.|/|$)' "$c" || fail "Caddyfile: PHP in uploads not denied at any depth, case-insensitively, or bypassable with PATH_INFO / evil.php.jpg"
+grep -Fq 'path_regexp (?i)^/wp-content/uploads/.*\.(php[0-9]?|phar|pht(ml)?)(\.|/|$)' "$c" || fail "Caddyfile: PHP in uploads not denied at any depth, case-insensitively, or bypassable with PATH_INFO / evil.php.jpg"
 ! grep -Fq '/wp-content/uploads/*.php' "$c" || fail "Caddyfile: single-level uploads glob misses dated subdirectories"
 grep -Fq 'path /xmlrpc.php' "$c" || fail "Caddyfile: xmlrpc block missing"
 grep -Fq 'path /wp-content/uploads/woocommerce_uploads/*' "$c" || fail "Caddyfile: woocommerce_uploads not denied"
