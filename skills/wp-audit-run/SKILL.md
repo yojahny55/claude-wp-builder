@@ -21,6 +21,7 @@ quotes it.
 
 | Step | File | Covers |
 |---|---|---|
+| 1.5 | [references/re-audit.md](references/re-audit.md) | Detecting a prior run, the single reuse prompt, scoped mode, labelling the report as a re-audit |
 | 2.2 | [references/adopted-site.md](references/adopted-site.md) | Editable and read-only code scope on a site `/wp-adopt` registered |
 | 2.3 | [references/site-context.md](references/site-context.md) | Store detection and tier, local-clone rules, the public-URL question, clone-safe checks, live mail transport |
 | 2.5 | [references/manifest-reconcile.md](references/manifest-reconcile.md) | 2.5a-2.5e: schema version, measured stack, missing decisions, coverage matrix, freshness |
