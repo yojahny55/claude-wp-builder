@@ -84,9 +84,9 @@ declare -A want=(
   [wp-debug]=adopt-or-bare-wp [wp-audit]=adopt-or-stop [wp-adopt]=register [wp-init]=scaffold
   [wp-clone]=destination-adopt
 )
-for c in "${!want[@]}"; do
+for c in $(printf '%s\n' "${!want[@]}" | sort); do
   src=commands/$c.md
-  if [ -d "skills/$c-run/references" ]; then expand_command "$src"; src=$EXPANDED; fi
+  if grep -Fq "skills/$c-run/references/" "$src"; then expand_command "$src"; src=$EXPANDED; fi
   got=$(policy_of "$src")
   [ "$got" = "${want[$c]}" ] || fail "commands/$c.md exit 3 policy is '${got:-none}', want '${want[$c]}'"
   grep -Fq "### \`$got\`" "$gate" || fail "$gate does not define the policy $got"
@@ -99,7 +99,7 @@ for f in commands/*.md; do
   grep -Fq "### \`$p\`" "$gate" || fail "$f names an undefined exit 3 policy: $p"
 done
 # The old inline amendment, anywhere a run reads: gone.
-! grep -rFq 'Amending the exit `3` row above' commands skills \
+! grep -rFq --include='*.md' 'Amending the exit `3` row above' commands skills \
   || fail "an inline 'Amending the exit 3 row above' paragraph is back: name a policy from $gate instead"
 # The prologue is not copied beside the block either: the paragraph that says where PROJECT_PATH
 # comes from lives only inside the byte-identical block, once per gate.
