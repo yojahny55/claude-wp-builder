@@ -8,7 +8,7 @@
     </Directory>
 
     # Dotfiles (except .well-known), dumps and backups are never served; PHP never runs in uploads.
-    # LocationMatch (URL), not DirectoryMatch (filesystem path): a docroot under a dot-directory
+    # Match the URL, not the filesystem path: a docroot under a dot-directory
     # or below an ancestor named uploads must not trip these.
     <LocationMatch "/\.(?!well-known)">
         Require all denied
