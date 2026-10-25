@@ -30,20 +30,49 @@ present. If it is not, stop and say so.
 
 Set `SCRIPTS="${CLAUDE_PLUGIN_ROOT}/skills/wp-polylang/scripts"`.
 
+Read the project's WP-CLI wrapper once and call it `$WP` below; when none is recorded, use
+`wp --path=<wp-root>`:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs" get "<wp-root>" wp_cli.wrapper
+```
+
+Every `wp` call in this command goes through
+`$WP`, so a Docker or custom-path project runs against its own WordPress and not whatever
+`wp` resolves to on the host.
+
 ## Step 2: Ensure Polylang is installed
+
+(`$WP plugin install polylang` is the fallback; the plain `wp plugin install polylang` form
+is the same call without a wrapper.)
 
 ```bash
 # Three states, not two: active, installed-but-deactivated, absent. `install` on an
 # already-installed plugin is not a reliable activator, so try activation first.
-wp plugin is-active polylang \
-  || wp plugin activate polylang \
-  || wp plugin install polylang --activate
+$WP plugin is-active polylang \
+  || $WP plugin activate polylang \
+  || $WP plugin install polylang --activate
 ```
+
+## Step 2.5: Back up the database
+
+The import rewrites posts, menus and `_menu_item_url` in place, and Step 3.5 changes every
+URL on the site. Nothing here is undone by re-running, so take a database export first,
+into a folder **outside the docroot** (the pattern `/wp-update` uses):
+
+```bash
+B=~/wp-polylang-backups/<site-slug>-$(date -u +%Y%m%dT%H%M%SZ); mkdir -p "$B"
+$WP db export "$B/db.sql"
+test -s "$B/db.sql"
+```
+
+Stop if the export fails or is empty. Report the path; restoring is
+`$WP db import "$B/db.sql"`, then `$WP rewrite flush`.
 
 ## Step 3: Configure languages
 
 ```bash
-wp eval-file "$SCRIPTS/pll-setup.php" <source_lang> <target_lang>
+$WP eval-file "$SCRIPTS/pll-setup.php" <source_lang> <target_lang>
 ```
 
 Creates whichever of the two languages Polylang does not already have configured,
@@ -70,7 +99,10 @@ and the front page and posts page have none.
 This is a real decision, not a default to apply quietly: **every English URL moves
 to `/en/…`**. Say so before setting it, because it changes every link a client may
 already have shared, and it is the kind of change that has to happen before launch
-rather than after.
+rather than after. **Ask for explicit confirmation** (`AskUserQuestion`) naming that effect,
+and do not set `hide_default=0` without a yes. On a declined or unanswered question, leave
+`hide_default` as it is and say the routing step was skipped. If the site is already live,
+say that existing links and search results for the default language will need redirects.
 
 ```bash
 $WP eval "
@@ -113,7 +145,7 @@ done
 
 ```bash
 MANIFEST="$(mktemp -t pll-manifest-XXXXXX.json)"
-wp eval-file "$SCRIPTS/pll-export.php" <source_lang> <target_lang> "$MANIFEST"
+$WP eval-file "$SCRIPTS/pll-export.php" <source_lang> <target_lang> "$MANIFEST"
 ```
 
 Walks every translatable post type and taxonomy — posts, terms, registered
@@ -152,8 +184,19 @@ Write the file as UTF-8 JSON.
 
 ## Step 6: Import
 
+Dry run first. It validates the whole file, prints what the import would create or modify,
+and writes nothing (`dry-run` is a bare word, because `wp eval-file` refuses a `--flag` it
+does not know):
+
 ```bash
-wp eval-file "$SCRIPTS/pll-import.php" "$MANIFEST.translated"
+$WP eval-file "$SCRIPTS/pll-import.php" "$MANIFEST.translated" dry-run
+```
+
+Show the operator the `would-create` / `would-update` lines and the `plan:` summary, and
+continue on their go-ahead. Then the real import:
+
+```bash
+$WP eval-file "$SCRIPTS/pll-import.php" "$MANIFEST.translated"
 ```
 
 Takes a single argument — the translated manifest; source and target language
@@ -182,7 +225,7 @@ answer; the theme's tables are the seed and the fallback.
 ## Step 7: Verify
 
 ```bash
-wp eval-file "$SCRIPTS/pll-verify.php" <source_lang> <target_lang>
+$WP eval-file "$SCRIPTS/pll-verify.php" <source_lang> <target_lang>
 ```
 
 Prints `Audited posts=<n> terms=<n> menu_items=<n> internal_links=<n> unassigned=<n> for <source> ->

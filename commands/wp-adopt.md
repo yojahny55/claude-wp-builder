@@ -42,10 +42,7 @@ bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '$
 
 On exit 2, run the migration before continuing.
 
-**Amending the exit `3` row above:** Exit `3` is the one this command continues on — it is the
-unregistered site it exists for. Every other outcome stops: exit `0` or `2` means the site is
-already registered (say so; adoption never overwrites a manifest, and a migration is not its
-job), and exit `1` is reported verbatim as the table says.
+**Exit `3` policy:** `register`, defined in `${CLAUDE_PLUGIN_ROOT}/skills/wp-manifest-gate/SKILL.md`. Read it when the validator exits `3`.
 
 ## Step 2: Probe (dry run)
 
