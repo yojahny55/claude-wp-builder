@@ -25,7 +25,9 @@ n=$(jq '.defects | length' "$exp")
 jq -e 'all(.defects[]; (.check|type=="string") and (.domain|type=="string") and (.file|type=="string") and (.pattern|type=="string") and (.pattern|length>0))' "$exp" >/dev/null \
   || fail "a defect lacks check, domain, file or pattern"
 [ "$(jq '[.defects[].check] | unique | length' "$exp")" -eq "$n" ] || fail "a check code is listed twice"
-[ "$(jq '[.defects[].domain] | unique | length' "$exp")" -ge 5 ] || fail "corpus must cover security, accessibility, seo, performance and best-practices"
+for d in security accessibility seo performance best-practices; do
+  jq -e --arg d "$d" '[.defects[].domain] | index($d) != null' "$exp" >/dev/null || fail "corpus has no defect in the $d domain"
+done
 
 while IFS=$'\t' read -r code domain file pattern; do
   case "$domain" in
@@ -43,10 +45,16 @@ while IFS=$'\t' read -r code domain file pattern; do
   grep -Fq "SEEDED $code" "$fx/$file" || fail "$code: $file has no 'SEEDED $code' marker"
 done < <(jq -r '.defects[] | [.check,.domain,.file,.pattern] | @tsv' "$exp")
 
-# No marker without an entry (scans every file under the fixture, not just listed ones): an unlisted seeded defect would be invisible to the comparison.
-listed=$(jq -r '.defects[].check' "$exp" | sort -u)
-found=$(grep -rhoE 'SEEDED [A-Z0-9]+-[0-9]+' "$fx" 2>/dev/null | awk '{print $2}' | sort -u)
-[ "$listed" = "$found" ] || fail "SEEDED markers and expected-findings.json disagree"
+# No marker without an entry (scans every fixture source file, not just listed ones; the JSON and
+# the README are excluded so prose about a marker is not read as one). An unlisted seeded defect
+# would be invisible to the comparison. grep exits 1 on no match, so it is tolerated here and the
+# diff below reports the empty side by name instead of the script dying silently.
+listed=$(jq -r '.defects[].check' "$exp" | LC_ALL=C sort -u)
+found=$( { grep -rhoE --exclude='*.json' --exclude='*.md' 'SEEDED [A-Z0-9]+-[0-9]+' "$fx" 2>/dev/null || true; } | awk '{print $2}' | LC_ALL=C sort -u)
+if ! drift=$(diff <(printf '%s\n' "$listed") <(printf '%s\n' "$found")); then
+  fail "SEEDED markers and expected-findings.json disagree (< only in expected-findings.json, > only in markers):
+$drift"
+fi
 
 # The fixture must be valid PHP, or the audits see a parse error instead of the defects.
 if command -v php >/dev/null; then
