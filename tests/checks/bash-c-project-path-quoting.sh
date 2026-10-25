@@ -15,8 +15,10 @@ if grep -rnE "bash -c \"node [^\"]*wp-config\.mjs[^\"]*PROJECT_PATH" commands sk
 $(cat "$tmp/hits")"
 fi
 
-# 1b. Static: no `bash -c "..."` in the plugin interpolates a project path or the web user,
+# 1b. Static: no `bash -c "..."` in the plugin spells out PROJECT_PATH or WEB_USER inside the string,
 # whatever the command (test -f, mkdir, cd, setfacl, wp core download, eval-file, store-kit).
+# Not covered: a path that arrives inside a native `$WP` (`wp --path=<path>`) in a `bash -c "$WP ..."`
+# string; that is a declared limit, not something this grep can see.
 if grep -rnE 'bash -c "[^"]*\$\{?(PROJECT_PATH|WEB_USER)' commands skills agents >"$tmp/hits"; then
   fail "a bash -c string still interpolates PROJECT_PATH or WEB_USER:
 $(cat "$tmp/hits")"
