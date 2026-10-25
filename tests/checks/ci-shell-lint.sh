@@ -27,6 +27,12 @@ lint_ci() {
   if grep -Eq '\|\|[[:space:]]*(true|:)' <<<"$step"; then
     echo "the shellcheck step swallows its exit status with || true"; return 1
   fi
+  # scope: shellcheck covers bin/ and skills/ only. tests/ is parsed (bash -n) but not
+  # shellchecked: shellcheck is not available where this was written, so a clean tests/ could
+  # not be verified, and widening a blocking gate blind would turn CI red on unseen findings.
+  # Widening it is a deliberate change: do it here and in ci.yml together, after a green run.
+  grep -Fq "find bin skills -name '*.sh'" <<<"$step" || { echo "the shellcheck step does not scan bin/ and skills/"; return 1; }
+  grep -Fq 'no shell scripts found' <<<"$step" || { echo "the shellcheck step lost its empty-file-list guard (shellcheck with no args reads stdin and hangs)"; return 1; }
   grep -Fq 'exit "$rc"' <<<"$step" || { echo 'the shellcheck step does not end by propagating its exit status (exit "$rc")'; return 1; }
   return 0
 }
@@ -40,7 +46,9 @@ sed '/^  shell-lint:/,/timeout-minutes/ s/^    timeout-minutes: 10$/&\n    conti
 sed 's/^          exit "\$rc"$/          exit "$rc" || true/' "$CI" > "$tmp/or-true.yml"
 sed 's/^      - name: shellcheck (blocking, severity warning)$/&\n        continue-on-error: true/' "$CI" > "$tmp/step-coe.yml"
 sed 's/^          exit "\$rc"$/          true/' "$CI" > "$tmp/no-exit.yml"
-for neg in job-coe or-true step-coe no-exit; do
+sed "s/mapfile -t files < <(find bin skills /mapfile -t files < <(find bin /" "$CI" > "$tmp/scope.yml"
+awk '/mapfile -t files/{f=1} f&&/ERROR: no shell scripts found/{f=0;next} 1' "$CI" > "$tmp/noguard.yml"
+for neg in job-coe or-true step-coe no-exit scope noguard; do
   cmp -s "$CI" "$tmp/$neg.yml" && fail "negative case $neg did not alter ci.yml (fixture drifted)"
   lint_ci "$tmp/$neg.yml" >/dev/null && fail "negative case $neg was accepted: the gate can be disarmed unnoticed"
 done
@@ -59,6 +67,8 @@ done < <(find bin skills tests -name '*.sh' -not -path '*/node_modules/*' | sort
 [ "$n" -gt 0 ] || fail "found no shell scripts to parse"
 if command -v shellcheck >/dev/null 2>&1; then
   mapfile -t sc_files < <(find bin skills -name '*.sh' -not -path '*/node_modules/*' | sort)
+  [ "${#sc_files[@]}" -gt 0 ] || fail "found no shell scripts for shellcheck (it would read stdin and hang)"
+  # same scope as ci.yml on purpose (bin/ and skills/); see the scope note in lint_ci
   shellcheck --severity=warning "${sc_files[@]}" >/dev/null 2>&1 \
     || fail "shellcheck reports findings (blocking in CI)"
 fi
