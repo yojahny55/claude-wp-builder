@@ -158,6 +158,16 @@ applying.
 
 ---
 
+## Overrides at the End of the Stylesheet
+
+Avoid patch sheets that accumulate overrides at the end: each one wins on source order, hides
+the rule it beats, and widens until it reaches elements it was never meant for. Fix the rule
+at its source instead. When an override is unavoidable, group it in one block under a comment
+that states the reason, keep the selector as narrow as it can be, and exclude cards with an
+overlay or text over an image. Never use a bare `a` or a bare utility class for a colour fix.
+In dark mode, put the exclusion on the element that actually carries the theme attribute
+(`html` versus `body`) and check it with `getComputedStyle`.
+
 ## Delimiters
 
 The stylesheet is divided into delimited blocks, one per concern and one per page section,
