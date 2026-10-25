@@ -23,6 +23,8 @@ done
 grep -Fq 'const initMobileMenu' "$js" || fail "mobile menu is not an init function"
 grep -Fq "document.addEventListener('DOMContentLoaded', initMobileMenu)" "$js" \
   || fail "mobile menu has no DOMContentLoaded branch"
+tr -d '\n' < "$js" | grep -Eq "if \(document\.readyState === 'loading'\) \{ *document\.addEventListener\('DOMContentLoaded', initMobileMenu\); *\} else \{ *initMobileMenu\(\); *\}" \
+  || fail "mobile menu has no readyState guard joining DOMContentLoaded and the immediate call"
 grep -Fq 'initMobileMenu();' "$js" || fail "mobile menu is never run when the DOM is already parsed"
 grep -Fq "'Escape'" "$js" || fail "mobile menu has no Escape handler"
 grep -Fq 'aria-controls' "$js" || fail "mobile menu toggle has no aria-controls"
