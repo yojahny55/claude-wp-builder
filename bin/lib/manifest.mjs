@@ -215,6 +215,41 @@ export function validateManifest(manifest) {
       }
     }
   }
+  // The answers the operator gave last run, so a re-audit can offer them back in one
+  // question. A stored answer is a claim about the past: it is validated strictly because
+  // a malformed one is replayed into a run that talks to a public URL.
+  const answers = at(manifest, 'audit.last_answers');
+  if (answers !== undefined) {
+    if (answers === null || typeof answers !== 'object' || Array.isArray(answers)) {
+      problems.push('audit.last_answers must be an object');
+    } else {
+      for (const key of Object.keys(answers)) {
+        if (!['mode', 'suite', 'production_url', 'clone_only', 'answered'].includes(key)) {
+          problems.push(`audit.last_answers has an unknown key: ${key}`);
+        }
+      }
+      if (answers.mode !== 'report-only' && answers.mode !== 'fixes') {
+        problems.push('audit.last_answers.mode must be "report-only" or "fixes"');
+      }
+      if (typeof answers.suite !== 'boolean') {
+        problems.push('audit.last_answers.suite must be true or false');
+      }
+      if (answers.clone_only !== undefined && typeof answers.clone_only !== 'boolean') {
+        problems.push('audit.last_answers.clone_only must be true or false');
+      }
+      const prod = answers.production_url;
+      if (prod !== undefined && prod !== null) {
+        if (typeof prod !== 'string' || !/^https?:\/\/[^\s/]+/.test(prod)) {
+          problems.push('audit.last_answers.production_url must be an http(s) URL or null');
+        } else if (answers.clone_only === true) {
+          problems.push('audit.last_answers cannot hold both clone_only: true and a production_url');
+        }
+      }
+      if (typeof answers.answered !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/.test(answers.answered) || Number.isNaN(Date.parse(answers.answered))) {
+        problems.push('audit.last_answers.answered must be an ISO 8601 timestamp');
+      }
+    }
+  }
   const badVersion = versionProblem(manifest);
   if (badVersion) problems.push(badVersion);
 

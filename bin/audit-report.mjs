@@ -91,10 +91,13 @@ const STRINGS = {
       'A `setting` is a database or server change. Applied on a local clone it does **not** travel with the commit — repeat it on staging and production, where there is no WP-CLI.',
     otherSeverity: ' — %other% with an unrecognised severity, from an older report',
     unmeasured: 'Not measured',
+    tier3Unmeasured:
+      'Tier 3 (browser measurement) was NOT measured in this run — nothing here comes from a loaded page, so do not read the absence of Tier 3 findings as a pass.',
     unmeasuredNote:
       'These checks apply to this site and did not run. They are not passes — say what stopped them before treating this report as complete.',
     none: 'None',
     ownership: { code: 'Code', setting: 'Setting', content: 'Content', manual: 'Manual' },
+    designImpact: 'Visual change',
     severity: { CRITICAL: 'High', WARNING: 'Medium', INFO: 'Low' },
   },
   es: {
@@ -133,10 +136,13 @@ const STRINGS = {
       'Un `ajuste` es un cambio de base de datos o de servidor. Aplicado sobre un clon local **no** viaja con el commit: hay que repetirlo en staging y en producción, donde no hay WP-CLI.',
     otherSeverity: ' — %other% con severidad no reconocida, de un informe anterior',
     unmeasured: 'Sin medir',
+    tier3Unmeasured:
+      'El Nivel 3 (medición en navegador) NO se midió en esta ejecución — nada de lo que aparece sale de una página cargada, así que la ausencia de hallazgos de Nivel 3 no significa que pase.',
     unmeasuredNote:
       'Estos criterios aplican a este sitio y no se ejecutaron. No son aprobados: di qué lo impidió antes de dar el informe por completo.',
     none: 'Ninguno',
     ownership: { code: 'Código', setting: 'Ajuste', content: 'Contenido', manual: 'Manual' },
+    designImpact: 'Cambio visual',
     severity: { CRITICAL: 'Alta', WARNING: 'Media', INFO: 'Baja' },
   },
 };
@@ -609,6 +615,15 @@ function noFindingsText(model) {
   return model.unmeasured.length ? model.t.noFindingsUnmeasured : model.t.noFindings;
 }
 
+// Tier 3 is unmeasured when the run says so (`tier3: "unmeasured"`) or lists an unmeasured
+// entry whose check id starts with `tier3`/`tier-3`. The reader of a report with no browser
+// findings otherwise assumes the browser tier passed.
+function tier3Unmeasured(run) {
+  const entries = Array.isArray(run.unmeasured) ? run.unmeasured : [];
+  return String(run.tier3 || '').toLowerCase() === 'unmeasured'
+    || entries.some((entry) => /^tier-?3(\b|_)/i.test(String((entry && entry.check) || '')));
+}
+
 function renderMarkdown(model) {
   const t = model.t;
   const lines = [];
@@ -623,6 +638,10 @@ function renderMarkdown(model) {
 
   push(`## ${t.summary}`);
   push();
+  if (model.tier3Unmeasured) {
+    push(`**${t.tier3Unmeasured}**`);
+    push();
+  }
   push(scoreSentence(t, model.counts));
   push();
   if (model.plan.length) {
@@ -699,7 +718,7 @@ function renderMarkdown(model) {
         finding.page || '—',
         finding.message + alsoText(finding),
         finding.fix || '—',
-        t.ownership[finding.ownership],
+        t.ownership[finding.ownership] + (finding.design_impact === true ? ` · ${t.designImpact}` : ''),
       ].map(mdCell).join(' | ')} |`);
     }
     push();
@@ -765,6 +784,7 @@ const HTML_UI = {
     legend: 'Legend',
     legendSeverity: 'Severity',
     legendOwner: 'Who applies the fix',
+    legendDesign: 'Changes how the page looks; needs consent and a before/after measurement before it is applied.',
     ownerHelp: {
       code: 'a file in the theme or the site\'s own plugins; fixed once, travels with the commit.',
       setting: 'a WordPress option, a plugin\'s configuration, a server or CDN rule — does not travel with the commit.',
@@ -799,6 +819,7 @@ const HTML_UI = {
     legend: 'Leyenda',
     legendSeverity: 'Severidad',
     legendOwner: 'Quién aplica la corrección',
+    legendDesign: 'Cambia el aspecto de la página; requiere consentimiento y medición antes y después de aplicarla.',
     ownerHelp: {
       code: 'archivo del tema o de un plugin propio; se corrige una vez y viaja con el commit.',
       setting: 'opción de WordPress, configuración de un plugin, regla del servidor o del CDN; no viaja con el commit.',
@@ -895,6 +916,7 @@ tr.sum td{background:var(--canvas);font-weight:600;border-top:2px solid var(--ru
 .own-setting{background:var(--mid-bg);color:var(--mid);border-color:var(--mid-rule)}
 .own-content{background:var(--ok-bg);color:var(--ok);border-color:var(--ok-rule)}
 .own-manual{background:var(--na-bg);color:var(--na);border-color:var(--na-rule)}
+.design-impact{background:transparent;color:var(--mid);border:1px dashed var(--mid-rule)}
 .note{color:var(--muted);font-size:13px;border-left:3px solid var(--rule);padding-left:12px;margin-top:14px}
 .changes{margin:0;padding-left:18px} .changes li{margin-bottom:8px} .changes ul{color:var(--muted);font-size:13px}
 .legend{margin:0;padding-left:18px;font-size:13.5px} .legend li{margin-bottom:8px}
@@ -981,7 +1003,7 @@ function renderHtml(model) {
     finding.evidence ? `<span class="ev" title="${esc(finding.evidence)}">${esc(ui.evidence)}: ${esc(finding.evidence)}</span>` : ''
   }</td>
 <td class="ev">${finding.fix ? esc(finding.fix) : '<span class="muted">—</span>'}</td>
-<td class="nowrap">${ownTag(finding.ownership)}</td></tr>`;
+<td class="nowrap">${ownTag(finding.ownership)}${finding.design_impact === true ? ` <span class="tag design-impact">${esc(t.designImpact)}</span>` : ''}</td></tr>`;
   const findingTable = (list) => `<div class="scroll"><table>
 <thead><tr>${[t.priority, t.code, t.page, t.problem, t.todo, t.applied].map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead>
 <tbody>${list.map(findingRow).join('\n')}</tbody></table></div>`;
@@ -1080,7 +1102,7 @@ ${groups}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>${esc(`${t.title} — ${model.site} — ${model.date}`)}</title>
-<style>${HTML_CSS}</style>
+<style>${HTML_CSS.replace(/\s*\n\s*/g, ' ')}</style>
 </head>
 <body>
 <input type="checkbox" id="theme" class="sr">
@@ -1088,6 +1110,7 @@ ${groups}
 <p class="kicker">${esc(ui.kicker)}</p>
 <h1>${esc(model.site)}</h1>
 <p class="meta">${esc([model.date, model.tier].filter(Boolean).join(' · '))}</p>
+${model.tier3Unmeasured ? `<p class="meta"><strong>${esc(t.tier3Unmeasured)}</strong></p>` : ''}
 ${model.categories.length ? `<p class="meta">${esc(t.categories)}: ${esc(model.categories.map(categoryName).join(', '))}</p>` : ''}
 <div class="kpis">
 <div class="kpi big"><b>${c.total}</b><span>${esc(plural(c.total, ui.finding, ui.findings))}</span></div>
@@ -1100,7 +1123,7 @@ ${model.categories.length ? `<p class="meta">${esc(t.categories)}: ${esc(model.c
 <label class="theme" for="theme"><span class="to-dark">🌙 ${esc(ui.dark)}</span><span class="to-light">☀️ ${esc(ui.light)}</span></label></div></nav>
 <main class="wrap">
 <section id="summary"><h2>${esc(t.summary)}</h2>
-<p>${esc(scoreSentence(t, c))}</p>
+${model.tier3Unmeasured ? `<p><strong>${esc(t.tier3Unmeasured)}</strong></p>\n` : ''}<p>${esc(scoreSentence(t, c))}</p>
 ${model.plan.length ? `<p>${esc(fill(t.ownershipCounts, model.ownership))}</p>` : ''}</section>
 ${notesBlock}<section id="comparison"><h2>${esc(t.comparison)}</h2>${comparisonBlock()}</section>
 ${groupTable(t.byCategory, 'by-category', model.byCategory, t.category, (name) => `<a href="#${groupIds.get(name)}">${esc(categoryName(name))}</a>`)}
@@ -1111,6 +1134,7 @@ ${planBlock}</section>
 <section id="legend"><h2>${esc(ui.legend)}</h2><ul class="legend">
 <li><b>${esc(ui.legendSeverity)}:</b> ${['CRITICAL', 'WARNING', 'INFO'].map(sevChip).join(' ')}</li>
 <li><b>${esc(ui.legendOwner)}:</b><ul>${OWNERSHIP.map((owner) => `<li>${ownTag(owner)} ${esc(ui.ownerHelp[owner])}</li>`).join('')}</ul></li>
+<li><span class="tag design-impact">${esc(t.designImpact)}</span> ${esc(ui.legendDesign)}</li>
 </ul></section>
 </main>
 <footer class="wrap"><p>${esc(`${t.title} · ${model.site} · ${model.date}`)}</p></footer>
@@ -1166,6 +1190,7 @@ function main() {
     byPage: groupBy(folded, 'page'),
     plan: sortForPlan(folded),
     unmeasured: Array.isArray(run.unmeasured) ? run.unmeasured : [],
+    tier3Unmeasured: tier3Unmeasured(run),
     notes,
     comparison: compare(folded, previous, {
       unmeasured: Array.isArray(run.unmeasured) ? run.unmeasured : [],
@@ -1209,6 +1234,7 @@ function main() {
           resource: finding.resource || null,
           severity: finding.severity,
           ownership: finding.ownership,
+          design_impact: finding.design_impact === true,
           category: finding.category || null,
           page: finding.page || null,
           message: finding.message,
