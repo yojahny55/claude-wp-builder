@@ -1,12 +1,27 @@
 ---
 description: Custom post type builder — registers a CPT and generates its fields, archive, single, optional teaser query-section, and seed helper
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
-argument-hint: "<name> [--no-teaser] [--from-demo <section-name>]"
+argument-hint: "<name> [--no-teaser] [--from-demo <section-name>] [--force-adopted]"
 ---
 
 # WP CPT — Custom Post Type Builder
 
 Register a custom post type and generate everything it needs: registration, ACF fields bound to the type, archive + single templates, an optional home/teaser query-section, and a seed helper.
+
+## Adopted-site guard
+
+Run this before anything else. This command builds a theme, sections or content on the assumption
+that the theme is one this plugin scaffolded; on an adopted site (a third-party theme) it would
+overwrite that theme or generate one that does not belong. `${PROJECT_PATH}` is the WordPress project
+root, the directory that holds the project manifest.
+
+```bash
+bash -c 'node "$1/bin/wp-config.mjs" require-origin "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
+```
+
+Exit `0` continue. Exit `5` stop and print the message verbatim: `adopted site with a third-party theme:
+use /wp-audit, /wp-debug or /wp-update`. If `$ARGUMENTS` contains `--force-adopted`, append it to the
+call (and ignore it everywhere else): the operator chose to build on an adopted site on purpose.
 
 ## Step 1: Parse Arguments
 - **First word** = CPT name, singular lowercase (e.g., `team`, `service`, `project`). Required.

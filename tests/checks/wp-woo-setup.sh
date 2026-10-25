@@ -23,7 +23,7 @@ dry=$(line_of '^## Step 5: Dry run first' "$cmd"); apply=$(line_of '^## Step 6: 
 [ -n "$dry" ] && [ -n "$apply" ] && [ "$dry" -lt "$apply" ] || fail "$cmd must show the dry run (Step 5) before applying (Step 6)"
 sync=$(line_of 'store-kit-sync.sh' "$cmd")
 [ -n "$sync" ] && [ "$sync" -lt "$dry" ] || fail "$cmd must sync store-kit before the first run of the script"
-grep -q "woo-setup.php' '\${PROJECT_PATH}' dry-run" "$cmd" || fail "$cmd does not pass dry-run as a bare word"
+grep -Fq "woo-setup.php\" \"\$2\" dry-run' _ " "$cmd" || fail "$cmd does not pass dry-run as a bare word"
 if grep -E 'eval-file.*--(dry-run|force)' "$cmd" >/dev/null; then fail "$cmd passes a --flag to eval-file, which WP-CLI refuses"; fi
 if grep -Fq "get '\${PROJECT_PATH}' stripe_" "$cmd"; then fail "$cmd reads a Stripe key into the transcript"; fi
 grep -Fq '| `0` | the store matches the block' "$cmd" || fail "$cmd lost its exit 0 row"
