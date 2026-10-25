@@ -102,26 +102,30 @@ Use `AskUserQuestion` for everything except the secret:
 | Endpoint | Empty on AWS. A URL for any S3-compatible server |
 | Authentication | The server's IAM role, or an access key pair |
 
-**The secret never goes in a flag, an argument, a file you write, or your own output.** Ask
-the user to export it into the environment themselves, in their own terminal:
+**The secret never goes in a flag, an argument, a file you write, or your own output.** A
+`!` line of the chat runs in its own subprocess, so a variable exported there never reaches
+the shell that runs the script. Instead, ask the user to put the secret in a private file
+themselves, in their own prompt (it is never echoed and never enters the transcript):
 
 ```
-! read -rsp 'S3_UPLOADS_SECRET_VALUE: ' S3_UPLOADS_SECRET_VALUE && echo && export S3_UPLOADS_SECRET_VALUE
+! (umask 077; read -rsp 'S3 secret: ' s && printf '%s' "$s" > "$HOME/.wp-s3-secret"; echo)
 ```
 
-Then run the script in that same shell. If the secret is not in the environment and the
-chosen authentication is a key pair, stop and ask again rather than working around it.
+Then pass the path with `--secret-file "$HOME/.wp-s3-secret"` in Step 4. The script refuses a
+file that is not mode `0600`/`0400`, and reads it without printing it. Tell the user to
+delete the file once the script has finished. If there is no secret file and the chosen
+authentication is a key pair, stop and ask again rather than working around it.
 
 ## Step 4: Run the Script
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/skills/wp-s3/scripts/s3-setup.sh --wp-root '<wp-root>' --bucket '<bucket>' --region '<region>' --bucket-url '<bucket-url>' --auth key --key '<access-key-id>'
+bash ${CLAUDE_PLUGIN_ROOT}/skills/wp-s3/scripts/s3-setup.sh --wp-root '<wp-root>' --bucket '<bucket>' --region '<region>' --bucket-url '<bucket-url>' --auth key --key '<access-key-id>' --secret-file "$HOME/.wp-s3-secret"
 ```
 
 Add `--endpoint '<url>'` for an S3-compatible server. For a server with an IAM role, use
 `--auth instance` and drop `--key`.
 
-The script backs up `wp-config.php` before editing it, writes `s3-config.php` at `0640`,
+The script backs up `wp-config.php` before editing it (into a private `0700` directory outside the docroot, `~/.local/state/wp-s3-backups/`, never beside the original), keeps its mode and owner, writes `s3-config.php` at `0640`,
 installs the mu-plugin, and refuses to finish if anything it generated does not parse. It
 does **not** activate the plugin: say so, because a user who expects media in the bucket
 after this step will think it failed.

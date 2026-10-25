@@ -31,8 +31,8 @@ CONFIG="$WP_ROOT/s3-config.php"
 LOCAL="$WP_ROOT/wp-content/uploads"
 MU="$WP_ROOT/wp-content/mu-plugins/s3-uploads-endpoint.php"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-# The parked config holds the bucket credentials: a private directory outside the docroot
-# keyed by the site root, never a file the web server can serve.
+# The backup and the parked config hold credentials: one private directory outside the
+# docroot, keyed by the site root, never a *.bak-* / *.disabled file the web server could serve.
 # sha256 rather than a 32-bit cksum: two roots sharing a key would overwrite each other's parked credentials.
 # An `if`, not `a | b || c`: under pipefail a missing sha256sum (macOS) is exit 127 and errexit ends the script before the shasum fallback.
 if command -v sha256sum >/dev/null 2>&1; then
@@ -40,8 +40,17 @@ if command -v sha256sum >/dev/null 2>&1; then
 else
     ROOT_KEY="$(printf '%s' "$WP_ROOT" | shasum -a 256 | cut -c1-24)"
 fi
-PARK_DIR="${WP_S3_BACKUP_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wp-s3-backups}/$ROOT_KEY"
+BACKUP_DIR="${WP_S3_BACKUP_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wp-s3-backups}/$ROOT_KEY"
+PARK_DIR="$BACKUP_DIR"
 PARKED="$PARK_DIR/s3-config.php.disabled"
+( umask 077 && mkdir -p "$BACKUP_DIR" ) && chmod 700 "$BACKUP_DIR" \
+    || die "could not create or restrict the backup directory $BACKUP_DIR"
+python3 - "$WP_ROOT" "$BACKUP_DIR" <<'PY' || die "backup directory must be outside the WordPress document root"
+import os, sys
+root, backup = (os.path.realpath(p) for p in sys.argv[1:])
+if backup == root or backup.startswith(root + os.sep):
+    sys.exit(1)
+PY
 
 [[ -d "$LOCAL" ]] || die "no $LOCAL"
 [[ -w "$LOCAL" ]] || die "$LOCAL is not writable: the media cannot come back to disk"
@@ -94,10 +103,12 @@ fi
 
 # ---------------------------------------------------------------- 4. unhook the config
 if grep -q "s3-config.php" "$WP_ROOT/wp-config.php"; then
-    cp -p "$WP_ROOT/wp-config.php" "$WP_ROOT/wp-config.php.bak-$STAMP"
+    ( umask 077 && mkdir -p "$BACKUP_DIR" ) && chmod 700 "$BACKUP_DIR" \
+        && ( umask 077 && cp "$WP_ROOT/wp-config.php" "$BACKUP_DIR/wp-config.php.bak-$STAMP" ) \
+        || die "could not back up wp-config.php to $BACKUP_DIR"
     set +e
     python3 - "$WP_ROOT/wp-config.php" <<'PY'
-import os, re, sys
+import os, re, shutil, sys
 path = sys.argv[1]
 with open(path) as handle:
     text = handle.read()
@@ -118,7 +129,25 @@ with open(tmp, "w") as handle:
     handle.write(new)
     handle.flush()
     os.fsync(handle.fileno())
-os.replace(tmp, path)
+shutil.copymode(path, tmp)
+st = os.stat(path)
+try:
+    os.chown(tmp, st.st_uid, st.st_gid)
+except OSError as e:
+    sys.stderr.write('NOTE: could not chown the temporary file (%s); writing wp-config.php in place.\n' % e)
+tst = os.stat(tmp)
+if (tst.st_uid, tst.st_gid) == (st.st_uid, st.st_gid):
+    os.replace(tmp, path)
+else:
+    # A rename would hand wp-config.php to the operator's group and the web server could
+    # lose read access. Rewrite the original inode instead: owner, group and mode stay.
+    os.unlink(tmp)
+    with open(path, "r+") as handle:
+        handle.seek(0)
+        handle.write(new)
+        handle.truncate()
+        handle.flush()
+        os.fsync(handle.fileno())
 PY
     status=$?
     set -e
@@ -129,7 +158,7 @@ PY
         # nobody touched sends them to fix the wrong thing.
         die "could not rewrite wp-config.php (python exited $status; its error is above).
        Nothing has been renamed and the site still works. Fix that and run again
-       (backup: wp-config.php.bak-$STAMP)."
+       (backup: $BACKUP_DIR/wp-config.php.bak-$STAMP)."
     fi
     if [[ $status -eq 3 ]]; then
         # Stopping here leaves the site working: wp-config.php still requires a
@@ -140,10 +169,10 @@ PY
         die "the require block in wp-config.php was edited by hand and could not be removed.
        Nothing has been renamed and the site still works. Remove this block yourself:
            if ( file_exists( __DIR__ . '/s3-config.php' ) ) { require __DIR__ . '/s3-config.php'; }
-       then run this script again (backup: wp-config.php.bak-$STAMP)."
+       then run this script again (backup: $BACKUP_DIR/wp-config.php.bak-$STAMP)."
     fi
-    php -l "$WP_ROOT/wp-config.php" >/dev/null || die "wp-config.php no longer parses; restore wp-config.php.bak-$STAMP"
-    echo "4. Removed the require from wp-config.php (backup: wp-config.php.bak-$STAMP)"
+    php -l "$WP_ROOT/wp-config.php" >/dev/null || die "wp-config.php no longer parses; restore $BACKUP_DIR/wp-config.php.bak-$STAMP"
+    echo "4. Removed the require from wp-config.php (backup: $BACKUP_DIR/wp-config.php.bak-$STAMP)"
 else
     echo "4. wp-config.php does not require s3-config.php."
 fi
