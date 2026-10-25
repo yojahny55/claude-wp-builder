@@ -100,7 +100,9 @@ esac
 
 # A host is production when it is public (above) or when the manifest's `environments` says
 # role prod for it. Without that key the public-host rule is the whole criterion.
-gate_host="${url_host%%:*}"
+# shellcheck source=lib/host-key.sh
+. "$here/bin/lib/host-key.sh"
+gate_host="$(host_key "$url")"
 manifest_prod=0
 manifest="${WP_CREATE_JSON:-.wp-create.json}"
 if [ -n "$url_host" ] && [ -f "$manifest" ] && command -v node >/dev/null 2>&1; then
