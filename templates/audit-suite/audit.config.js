@@ -119,3 +119,8 @@ module.exports = {
     // sweep: { max: 25, urls: ['/ruta-extra/'] },
   },
 };
+
+// El baseURL de arriba es solo un valor por defecto. bin/audit-suite.sh pasa BASE_URL por
+// entorno en cada corrida, y esta linea hace que gane tambien en los specs que leen
+// audit.baseURL: un config viejo o editado a mano no apunta la suite a otro host.
+if (process.env.BASE_URL) module.exports.baseURL = process.env.BASE_URL; // WP_AUDIT_BASE_URL_OVERRIDE
