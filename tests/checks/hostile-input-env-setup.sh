@@ -5,13 +5,8 @@
 # neighbouring checks grep the script's text. This one runs it with hostile arguments
 # against the stub harness in tests/lib/stub-path.sh and asserts what it would have done.
 #
-# Another change adds the validation to the script. So that this check does not couple the
-# two branches, it has two modes:
-#   - the script rejects the hostile domain -> asserted hard, PASS;
-#   - the script does not yet                -> printed as XFAIL and still exits 0, UNLESS
-#     WP_HOSTILE_STRICT=1, which makes it fail. Flip the default (set WP_HOSTILE_STRICT=1
-#     in .github/workflows/ci.yml) in the change that lands the validation, so a later
-#     regression cannot hide behind XFAIL.
+# The script rejects a hostile domain before anything runs; any case that reaches a
+# destructive stub is a failure, with no soft mode, so removing the validation turns CI red.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 . tests/lib/stub-path.sh
@@ -57,8 +52,6 @@ done
 
 if [ "$leaks" -eq 0 ]; then
   echo PASS
-elif [ "${WP_HOSTILE_STRICT:-0}" = 1 ]; then
-  fail "$leaks hostile-domain case(s) reached a destructive call"
 else
-  echo "XFAIL: $leaks hostile-domain case(s) are not refused yet (expected until the domain validation lands; WP_HOSTILE_STRICT=1 makes this a failure)"
+  fail "$leaks hostile-domain case(s) reached a destructive call"
 fi

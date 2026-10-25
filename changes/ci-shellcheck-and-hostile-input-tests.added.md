@@ -7,5 +7,5 @@
   logging stand-ins for `sudo`, `rm`, `sed -i`, `wp`, `mysql` and friends on a temporary
   `PATH`, and `tests/checks/hostile-input-env-setup.sh` runs `wp-env-setup.sh` with
   traversal, separator and injection-shaped `--domain` values, expecting a refusal before
-  anything would run. It reports XFAIL until the script validates the domain, and fails
-  under `WP_HOSTILE_STRICT=1`.
+  anything would run. It fails if any hostile case reaches a destructive call, so removing
+  the domain validation turns CI red.
