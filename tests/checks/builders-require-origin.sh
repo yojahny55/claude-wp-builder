@@ -11,14 +11,14 @@ fail() { echo "FAIL: $*"; exit 1; }
 builders="init section seed yolo header footer page cpt settings tailwind-migrate cinematic-init cinematic-scene cinematic-seed"
 for b in $builders; do
   f="commands/wp-$b.md"
-  grep -Fq 'wp-config.mjs require-origin' "$f" || fail "$f does not call wp-config.mjs require-origin"
+  grep -Eq 'wp-config\.mjs"? require-origin' "$f" || fail "$f does not call wp-config.mjs require-origin"
   grep -Fq -- '--force-adopted' "$f" || fail "$f does not document --force-adopted"
 done
 
 for n in audit debug update clone anonymize finalize robin s3 s3-media demo create context; do
   f="commands/wp-$n.md"
   [ -f "$f" ] || continue
-  ! grep -Fq 'wp-config.mjs require-origin' "$f" || fail "$f is not a builder and must not be gated by require-origin"
+  ! grep -Eq 'wp-config\.mjs"? require-origin' "$f" || fail "$f is not a builder and must not be gated by require-origin"
 done
 
 grep -Fq 'adds 5' <(sed -n 1,12p bin/wp-config.mjs) || fail "wp-config.mjs header does not document exit 5"
