@@ -69,7 +69,7 @@ Copy the bundled `store-kit` in when the site has none or an older one — it ne
 and activate it:
 
 ```bash
-bash -c "bash '${CLAUDE_PLUGIN_ROOT}/bin/store-kit-sync.sh' '${PROJECT_PATH}/wp-content/plugins' && $WP plugin activate store-kit"
+WP="$WP" bash -c 'bash "$1/bin/store-kit-sync.sh" "$2/wp-content/plugins" && $WP plugin activate store-kit' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 ## Step 3: Record the store
@@ -155,7 +155,7 @@ notice naming the now-stale constant.
 ## Step 5: Dry run first
 
 ```bash
-bash -c "$WP eval-file '${CLAUDE_PLUGIN_ROOT}/skills/wp-woocommerce/scripts/woo-setup.php' '${PROJECT_PATH}' dry-run"
+WP="$WP" bash -c '$WP eval-file "$1/skills/wp-woocommerce/scripts/woo-setup.php" "$2" dry-run' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 The flags are bare words — `dry-run`, `force` — because `wp eval-file` refuses a `--flag` it
@@ -165,7 +165,7 @@ the `plan:` summary. Continue on their go-ahead.
 ## Step 6: Apply
 
 ```bash
-bash -c "$WP eval-file '${CLAUDE_PLUGIN_ROOT}/skills/wp-woocommerce/scripts/woo-setup.php' '${PROJECT_PATH}'"
+WP="$WP" bash -c '$WP eval-file "$1/skills/wp-woocommerce/scripts/woo-setup.php" "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 Append ` force` only when the operator passed `--force`. It takes back values the client
