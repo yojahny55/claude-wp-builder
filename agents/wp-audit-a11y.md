@@ -50,6 +50,10 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 - **Page-builder markup lives in the database.** When `stack.builder` is not `none`, a
   defect in markup the builder stores per page is `Owner: content` (fixed in the builder's
   editor), not `code`.
+- **Design impact is declared on every finding.** `design_impact` (`Design impact:` in the text
+  report) is `true` when the fix could change how the site renders: a colour, font, size,
+  spacing, an asset's dimensions, a new or changed CSS rule, or a tag or class swap. It is
+  `false` only when the fix leaves every computed style and box as it was. When unsure, `true`.
 
 ## Step 1: Perceivable Checks
 
@@ -152,6 +156,7 @@ Generate a JSON report with the field names of the report contract in `wp-audit-
       "status": "FAIL",
       "severity": "CRITICAL",
       "ownership": "code",
+      "design_impact": false,
       "resource": "header.php",
       "message": "Skip link missing: no skip-to-content link in header.php",
       "evidence": "grep -c 'skip-link' header.php returned 0",
@@ -198,6 +203,12 @@ So for every element whose tag or class list changes:
 3. **Check desktop and mobile**, and **every element that shares the class** — not only the one
    that was being looked at. A reset class added for one icon reaches every element that already
    carried it.
+4. **Measure the states, not only the base.** Repeat the comparison with `:hover` and
+   `:focus-visible` forced (CDP `CSS.forcePseudoState`, or a class that mirrors the state), and
+   again in dark mode when the site has a theme switch. A change that matches at rest can still
+   differ on hover or focus, and an ID-level outline from the Customizer can cancel the focus
+   rule. List every affected element with `document.querySelectorAll('.<class>')` and measure
+   each, including the ones on other templates.
 
 A screenshot diff at the page level is not this measurement: a 26px icon becoming an 18px icon
 inside a flex row moves nothing else and can fall under the tolerance. Measure the element.
@@ -428,3 +439,13 @@ and never retry. A local site is not gated.
    in axe and must be listed as not measured.
 7. **Color contrast calculations use relative luminance** — formula: `L = 0.2126*R + 0.7152*G + 0.0722*B` where R/G/B are linearized sRGB values
 8. **WCAG references must be included** — every finding must cite the relevant WCAG success criterion
+9. **A global colour fix is written narrow and measured against every context.** Use the
+   narrowest selector that works and measure it against ALL the contexts where the class
+   appears: light background, dark background, text over image or overlay (cards), hover and
+   focus. A broad link or contrast override repaints cards whose text sits on an overlay.
+   Before writing `:not([data-theme=...])`, find where the theme switch attribute really lives
+   (`data-theme`, a `.dark` class, or `prefers-color-scheme`) on `document.documentElement`
+   versus `body`, and confirm with `getComputedStyle` that the selector excludes what it
+   should: a `:not()` on `body` never excludes a switch set on `<html>`. Measure with
+   `transition: none` forced, or wait for the transition to end, or dark mode reads false
+   blacks mid-fade.

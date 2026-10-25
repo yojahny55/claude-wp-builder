@@ -4,7 +4,7 @@
 
 ## Contents
 
-- The report-only exit, and the fix offer split by owner
+- The report-only exit, and the fix offer split by owner, `visual` fixes and builder first
 - Adopted sites: editable code only
 - Fix dispatch per category: security, SEO, a11y, performance, best practices, usability
 - Usability fixes change how the site looks, so they are measured before and after
@@ -26,12 +26,49 @@ owner rather than as one number, so the user can see what is being proposed:
 M auto-fixable issues: C in code (travel with the commit), S in settings
 (database or server — applied here, must be repeated on staging and production).
 K more are content or manual and stay with you.
+V change how the site looks and are NOT in that number: listed below, one at a time.
 
 Apply them? (y/n)
 ```
 
-When Step 8.5 did not run, derive the same split from the findings anyway — the four
-owners are a property of a fix, not of the report.
+When Step 8.5 did not run, derive the same split from the findings anyway — the owners are
+a property of a fix, not of the report.
+
+**The fourth class, `visual`.** Code, setting and content say where a fix lands; `visual`
+says whether it changes the render, and it is decided first. A finding is `visual` when its
+`design_impact` is `true`, or when its fix touches a colour or the palette, typography, a
+size, spacing, an asset's dimensions, any new or modified CSS rule (focus styles included),
+or a tag or class (a `<span>` becoming a `<button>` changes the render with no value
+edited, and the reset class added to compensate can beat the utilities already on the
+element). A finding with no `design_impact` field is judged by that list, never assumed
+safe. The rules:
+
+- A `visual` finding is **never** counted as auto-fixable, whatever its `Fix:` says, and a
+  "y" to the offer above does not cover it. A report's "auto-fixable" label does not
+  override this.
+- List each one apart, with its **measurement before the change**: `getComputedStyle()` of
+  the element (`color`, `backgroundColor`, `fontSize`, `fontFamily`, `borderWidth`,
+  `borderRadius`) and `getBoundingClientRect()` (width, height), at desktop and mobile. Say
+  what would change and why, then wait.
+- Apply them **one at a time**, each after its own answer. Measure again after applying: the
+  values must match the ones before, except what the user agreed to change. Do it on every
+  element that shares the class or the component, at desktop and mobile. A mismatch outside
+  what was agreed is a regression to fix before the next one, not a note in the report.
+- `node ${CLAUDE_PLUGIN_ROOT}/bin/style-diff.mjs` takes this measurement on every element
+  of a page (the recipe is under *Usability fixes* below); use it instead of picking
+  elements by hand.
+- When the user declines a `visual` finding it stays in the report as open, untouched.
+
+**Builder first.** When `stack.builder` is not `none` (for example `elementor`) and the
+element is a widget of that builder with a control for the setting, the preferred fix is
+the builder's own data, not the theme's CSS: the same widget, edited where the site's editor
+would edit it. Back up the builder's data for the affected posts before writing (a copy of
+the builder's post meta, or a database export of those rows), and record the backup path.
+The fix is `Owner: content`, because that data lives in the database and does not travel
+with the commit. If the control cannot express what is needed (it has no separate light
+and dark value, or no hover state, or it applies to a single widget when the defect is
+site-wide), the fix goes to the theme instead, with the reason written in the finding's
+`Method`. Either way it is `visual` and follows the rules above.
 
 If the user declines, skip to Step 10.
 
@@ -96,7 +133,8 @@ distinguishable only by colour.
 agent its own Step 4: measure `getComputedStyle()` and `getBoundingClientRect()` before and
 after, at desktop and mobile, on every element carrying the class — and report both sets.
 A value that moved and was not meant to is a regression, not a fix. If the user has not
-agreed to visual changes, this category is reported and not applied.
+agreed to visual changes, this category is reported and not applied: every one of them is
+`visual` in the sense above.
 
 The measurement is `node ${CLAUDE_PLUGIN_ROOT}/bin/style-diff.mjs`: take **two** snapshots
 before the change (`snapshot --label base1`, `--label base2`), one after, then
