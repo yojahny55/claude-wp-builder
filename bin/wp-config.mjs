@@ -626,6 +626,14 @@ function cmdEnvSet(projectPath, flags) {
     warn('--transport=http requires --allow-http');
     process.exit(1);
   }
+  if (typeof flags.role !== 'string' || !['local', 'staging', 'prod'].includes(flags.role)) {
+    warn('--role is required and must be one of local, staging, prod');
+    process.exit(1);
+  }
+  if (typeof flags.url !== 'string' || !/^https?:\/\/[^\s/]+/.test(flags.url)) {
+    warn('--url is required and must be an http(s) URL');
+    process.exit(1);
+  }
   const env = { role: flags.role, url: flags.url };
   if (flags.sync !== undefined) {
     env.sync = { tool: flags.sync, transport: flags.transport };
