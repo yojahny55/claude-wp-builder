@@ -30,10 +30,13 @@ for ph in '{{ssl_cert}}' '{{ssl_key}}'; do grep -Fq "$ph" "$d/apache.conf.tpl" |
 
 for f in apache.conf.tpl apache-no-ssl.conf.tpl; do
   p="$d/$f"
-  grep -Fq '<DirectoryMatch "/\.(?!well-known)">' "$p" || fail "$f: dot-directories not denied"
+  grep -Fq '<LocationMatch "/\.(?!well-known)">' "$p" || fail "$f: dot-directories not denied"
   grep -Fq '\.(sql|bak|log)$' "$p" || fail "$f: sql/bak/log not denied"
   grep -Fq '\.bak-' "$p" || fail "$f: .bak-* not denied"
-  grep -Fq '<DirectoryMatch "/uploads/">' "$p" || fail "$f: PHP in uploads not denied"
+  grep -Fq '<LocationMatch "^/wp-content/uploads/.*\.php$">' "$p" || fail "$f: PHP in uploads not denied, or not anchored to wp-content/uploads"
+  # DirectoryMatch compares the filesystem path: a docroot under a dot-directory or an ancestor
+  # named uploads would be denied wholesale, so the rules must be URL-side.
+  ! grep -Fq 'DirectoryMatch' "$p" || fail "$f: DirectoryMatch matches the absolute filesystem path, use LocationMatch"
   for ph in '{{domain}}' '{{document_root}}' '{{php_fpm_sock}}'; do
     grep -Fq "$ph" "$p" || fail "$f lost placeholder $ph"
   done
