@@ -67,6 +67,7 @@ has() { printf '%s\n' "$1" | grep -Fq -- "$2"; }
 # pos <text> <literal>: 1-based offset of the first occurrence, or empty.
 pos() { printf '%s\n' "$1" | awk -v s="$2" '{ i = index($0, s); if (i) print i }'; }
 
+sec_src=agents/wp-audit-security.md
 sec=$(bash tests/checks/lib/agent-text.sh wp-audit-security)
 adopt=commands/wp-adopt.md
 script=skills/wp-cli-patterns/scripts/find-redeclared-functions.php
@@ -96,47 +97,47 @@ done
 
 # --- Codes: one table row each, in the right tier ---
 dupes="$(grep -oE '^\| SEC-[0-9]{3} \|' "$sec" | sort | uniq -d)"
-[ -z "$dupes" ] || fail "$sec defines these codes in more than one table row: $dupes"
-has "$tier1" '| SEC-043 |' || fail "$sec: the SEC-043 row is not in the Tier 1 table"
-has "$tier2" '| SEC-043 |' && fail "$sec: SEC-043 has a row in the Tier 2 table"
+[ -z "$dupes" ] || fail "$sec_src defines these codes in more than one table row: $dupes"
+has "$tier1" '| SEC-043 |' || fail "$sec_src: the SEC-043 row is not in the Tier 1 table"
+has "$tier2" '| SEC-043 |' && fail "$sec_src: SEC-043 has a row in the Tier 2 table"
 for code in SEC-041 SEC-042; do
-  has "$tier2" "| $code |" || fail "$sec: the $code row is not in the Tier 2 table"
-  has "$tier1" "| $code |" && fail "$sec: $code has a row in the Tier 1 table"
+  has "$tier2" "| $code |" || fail "$sec_src: the $code row is not in the Tier 2 table"
+  has "$tier1" "| $code |" && fail "$sec_src: $code has a row in the Tier 1 table"
 done
 has "$s43" 'This is Tier 1 — a code scan, no network and no vulnerability feed needed' \
-  || fail "$sec does not say SEC-043 needs no network"
+  || fail "$sec_src does not say SEC-043 needs no network"
 
 # --- SEC-041/042 are gated exactly like SEC-038 ---
 has "$proc" 'Same gate as SEC-038, reused exactly, not reimplemented' \
-  || fail "$sec does not say the SEC-041/042 gate reuses SEC-038"
+  || fail "$sec_src does not say the SEC-041/042 gate reuses SEC-038"
 for code in SEC-041 SEC-042; do
   grep -E "^\| $code \|" "$sec" | grep -Fq 'after the SEC-038 network gate passes' \
-    || fail "$sec: the $code table row is not tied to the SEC-038 network gate"
+    || fail "$sec_src: the $code table row is not tied to the SEC-038 network gate"
 done
 has "$proc" 'When it fails, SEC-041 and SEC-042 are `UNMEASURED`' \
-  || fail "$sec does not make SEC-041/042 UNMEASURED when the SEC-038 probe fails"
-has "$proc" 'never `PASS`' || fail "$sec does not forbid PASS when the network gate fails"
-has "$proc" 'Do not hardcode a CVE list' || fail "$sec does not forbid a hardcoded CVE list"
-grep -Eq 'CVE-[0-9]{4}-[0-9]+' "$sec" && fail "$sec hardcodes a literal CVE identifier"
+  || fail "$sec_src does not make SEC-041/042 UNMEASURED when the SEC-038 probe fails"
+has "$proc" 'never `PASS`' || fail "$sec_src does not forbid PASS when the network gate fails"
+has "$proc" 'Do not hardcode a CVE list' || fail "$sec_src does not forbid a hardcoded CVE list"
+grep -Eq 'CVE-[0-9]{4}-[0-9]+' "$sec" && fail "$sec_src hardcodes a literal CVE identifier"
 
 # --- Clone context: three named dispatch lines, one rule when absent ---
 for line in 'Local clone: <yes|no>' 'Clone-suppressed plugins: <slug>' 'Parked drop-ins: <file>'; do
-  has "$inv" "$line" || fail "$sec does not read the dispatch line '$line'"
+  has "$inv" "$line" || fail "$sec_src does not read the dispatch line '$line'"
 done
 has "$inv" 'When the three lines are absent, treat the project as **not a clone**' \
-  || fail "$sec has no rule for a dispatch without the clone-context lines"
-has "$inv" 'do not guess a list' || fail "$sec may still derive the clone-suppressed list by guessing"
+  || fail "$sec_src has no rule for a dispatch without the clone-context lines"
+has "$inv" 'do not guess a list' || fail "$sec_src may still derive the clone-suppressed list by guessing"
 
 # --- Step 2.3 suppresses a finding, never an inventory entry ---
 has "$inv" 'It does not take the plugin out of the inventory' \
-  || fail "$sec does not keep clone-suppressed plugins in the inventory"
+  || fail "$sec_src does not keep clone-suppressed plugins in the inventory"
 has "$inv" '**plus every slug on the `Clone-suppressed plugins` line**' \
-  || fail "$sec does not count clone-suppressed plugins as loaded"
-has "$proc" 'excluding anything Step 2.3' && fail "$sec still excludes clone-suppressed plugins from SEC-041/042"
-has "$s43" 'is not scanned here either' && fail "$sec still drops clone-suppressed plugins from SEC-043"
+  || fail "$sec_src does not count clone-suppressed plugins as loaded"
+has "$proc" 'excluding anything Step 2.3' && fail "$sec_src still excludes clone-suppressed plugins from SEC-041/042"
+has "$s43" 'is not scanned here either' && fail "$sec_src still drops clone-suppressed plugins from SEC-043"
 has "$rules" 'Step 2.3 suppresses a finding, never an inventory entry' \
-  || fail "$sec rule 11 does not keep suppressed plugins in the inventory"
-has "$rules" 'respect the Step 2.3 clone suppression' && fail "$sec rule 11 still skips clone-suppressed plugins"
+  || fail "$sec_src rule 11 does not keep suppressed plugins in the inventory"
+has "$rules" 'respect the Step 2.3 clone suppression' && fail "$sec_src rule 11 still skips clone-suppressed plugins"
 
 # --- Runnable snippets: headers via get_plugins(), -g and a status on every info-API curl ---
 grep -Fq -- '--field=plugin_uri' "$sec" "$adopt" && fail "a snippet still uses the nonexistent --field=plugin_uri"
@@ -154,72 +155,72 @@ for f in "$sec" "$adopt"; do
   [ "$n_info" = "$n_w" ] || fail "$f: an info-API curl does not print the HTTP status ($n_w of $n_info)"
 done
 has "$inv" 'themes/info/1.2/?action=theme_information&request[slug]=' \
-  || fail "$sec has no theme route for deciding whether a theme slug is public"
-has "$inv" '`update_themes`' || fail "$sec does not accept the update_themes transient for themes"
+  || fail "$sec_src has no theme route for deciding whether a theme slug is public"
+has "$inv" '`update_themes`' || fail "$sec_src does not accept the update_themes transient for themes"
 
 # --- Listing states and what "matches" means ---
 for needle in '`error` is `Plugin not found.`' '`error` is `closed`' '**lookup failed**' \
               'strip HTML tags' 'case-fold' 'without a leading `www.`' \
               '`id` `w.org/plugins/<slug>`' 'counts as **no listing**' 'Read the body before the status'; do
-  has "$inv" "$needle" || fail "$sec Plugin inventory lacks: $needle"
+  has "$inv" "$needle" || fail "$sec_src Plugin inventory lacks: $needle"
 done
 has "$inv" 'with `closed_date` and `reason`: the plugin was on wp.org and was closed. The slug is public' \
-  || fail "$sec does not count a closed plugin's slug as public for SEC-041"
-has "$proc" 'the lookup answers **closed**' || fail "$sec SEC-042 does not fail a closed plugin"
-has "$proc" 'Name `closed_date` and `reason` in the finding' || fail "$sec SEC-042 does not name closed_date/reason"
+  || fail "$sec_src does not count a closed plugin's slug as public for SEC-041"
+has "$proc" 'the lookup answers **closed**' || fail "$sec_src SEC-042 does not fail a closed plugin"
+has "$proc" 'Name `closed_date` and `reason` in the finding' || fail "$sec_src SEC-042 does not name closed_date/reason"
 has "$proc" '`UNMEASURED` per item, "wp.org error: <status>"' \
-  || fail "$sec SEC-042 has no verdict for a failed per-item lookup"
+  || fail "$sec_src SEC-042 has no verdict for a failed per-item lookup"
 
 # --- SEC-041: one feed, token on stdin, quota order, verdicts ---
-has "$proc" 'https://wpscan.com/api/v3/plugins/<slug>' || fail "$sec does not name the SEC-041 endpoint"
-has "$proc" 'WPSCAN_API_TOKEN' || fail "$sec does not say how the token is supplied"
-has "$proc" '`UNMEASURED` ("no vulnerability feed credentials")' || fail "$sec: a missing token is not UNMEASURED"
-has "$proc" '# Keep the token secret: never echo it' || fail "$sec lost the token-secrecy comment"
-has "$proc" 'if [ -z "${WPSCAN_API_TOKEN:-}" ]; then' || fail "$sec: the snippet does not stop when the token is unset"
-has "$proc" '| curl -sS --max-time 15 -K -' || fail "$sec: the token is not fed to curl on stdin"
-grep -Eq 'echo[^|]*\$\{?WPSCAN_API_TOKEN' "$sec" && fail "$sec: a snippet echoes the token"
-grep -Eq 'curl [^|]*-H[^|]*WPSCAN_API_TOKEN' "$sec" && fail "$sec: the token is on the curl command line"
-has "$proc" 'Stop querying on `429`' || fail "$sec does not stop querying on 429"
-has "$proc" '**loaded** plugins and themes before the inactive ones' || fail "$sec does not query loaded items first"
-has "$proc" '`requests_remaining`' || fail "$sec does not read the WPScan quota first"
-has "$proc" '**CRITICAL** for a loaded plugin/theme' || fail "$sec: a vulnerable loaded plugin is not CRITICAL"
-has "$proc" '**WARNING** for an inactive one' || fail "$sec: a vulnerable inactive plugin is not WARNING"
-has "$proc" '`PASS` for that item, for this feed' || fail "$sec: a public slug with no feed entry is not PASS"
-has "$proc" 'no public vulnerability database entry' || fail "$sec: a non-public vendor plugin is not UNMEASURED"
-has "$proc" 'no public metadata' || fail "$sec: SEC-042 does not mark an unlisted vendor plugin UNMEASURED"
-grep -Eq 'wp.org security advisories|advisory data' "$sec" && fail "$sec names wp.org advisories as a source"
+has "$proc" 'https://wpscan.com/api/v3/plugins/<slug>' || fail "$sec_src does not name the SEC-041 endpoint"
+has "$proc" 'WPSCAN_API_TOKEN' || fail "$sec_src does not say how the token is supplied"
+has "$proc" '`UNMEASURED` ("no vulnerability feed credentials")' || fail "$sec_src: a missing token is not UNMEASURED"
+has "$proc" '# Keep the token secret: never echo it' || fail "$sec_src lost the token-secrecy comment"
+has "$proc" 'if [ -z "${WPSCAN_API_TOKEN:-}" ]; then' || fail "$sec_src: the snippet does not stop when the token is unset"
+has "$proc" '| curl -sS --max-time 15 -K -' || fail "$sec_src: the token is not fed to curl on stdin"
+grep -Eq 'echo[^|]*\$\{?WPSCAN_API_TOKEN' "$sec" && fail "$sec_src: a snippet echoes the token"
+grep -Eq 'curl [^|]*-H[^|]*WPSCAN_API_TOKEN' "$sec" && fail "$sec_src: the token is on the curl command line"
+has "$proc" 'Stop querying on `429`' || fail "$sec_src does not stop querying on 429"
+has "$proc" '**loaded** plugins and themes before the inactive ones' || fail "$sec_src does not query loaded items first"
+has "$proc" '`requests_remaining`' || fail "$sec_src does not read the WPScan quota first"
+has "$proc" '**CRITICAL** for a loaded plugin/theme' || fail "$sec_src: a vulnerable loaded plugin is not CRITICAL"
+has "$proc" '**WARNING** for an inactive one' || fail "$sec_src: a vulnerable inactive plugin is not WARNING"
+has "$proc" '`PASS` for that item, for this feed' || fail "$sec_src: a public slug with no feed entry is not PASS"
+has "$proc" 'no public vulnerability database entry' || fail "$sec_src: a non-public vendor plugin is not UNMEASURED"
+has "$proc" 'no public metadata' || fail "$sec_src: SEC-042 does not mark an unlisted vendor plugin UNMEASURED"
+grep -Eq 'wp.org security advisories|advisory data' "$sec" && fail "$sec_src names wp.org advisories as a source"
 
 # --- Which slugs go where: one rule, stated once and repeated in the rules ---
 has "$inv" '**`code_scope.editable` slugs go to wp.org only, and only from the vendor re-check**' \
-  || fail "$sec does not state the single editable-slug rule"
-has "$inv" 'never sent to a third-party vulnerability feed' || fail "$sec may send editable slugs to the feed"
-has "$inv" '**Only public slugs are sent to the vulnerability feed.**' || fail "$sec does not restrict the feed to public slugs"
+  || fail "$sec_src does not state the single editable-slug rule"
+has "$inv" 'never sent to a third-party vulnerability feed' || fail "$sec_src may send editable slugs to the feed"
+has "$inv" '**Only public slugs are sent to the vulnerability feed.**' || fail "$sec_src does not restrict the feed to public slugs"
 has "$rules" 'editable slugs go to wp.org only, from the vendor re-check; only public slugs reach WPScan' \
-  || fail "$sec rule 12 disagrees with the editable-slug rule"
-has "$rules" 'The WPScan token never leaves stdin' || fail "$sec has no rule keeping the token off the command line"
-grep -Fq 'It is still skipped for' "$sec" && fail "$sec still carries the old contradictory editable-slug wording"
+  || fail "$sec_src rule 12 disagrees with the editable-slug rule"
+has "$rules" 'The WPScan token never leaves stdin' || fail "$sec_src has no rule keeping the token off the command line"
+grep -Fq 'It is still skipped for' "$sec" && fail "$sec_src still carries the old contradictory editable-slug wording"
 has "$inv" 'proved public there (this plugin'"'"'s listing, or closed): a public slug like any other' \
-  || fail "$sec: a closed or listed editable plugin is not checked by SEC-041/042"
-has "$inv" 'SEC-041 and SEC-042 do not look them up at all' && fail "$sec still drops every editable plugin from SEC-041/042"
+  || fail "$sec_src: a closed or listed editable plugin is not checked by SEC-041/042"
+has "$inv" 'SEC-041 and SEC-042 do not look them up at all' && fail "$sec_src still drops every editable plugin from SEC-041/042"
 has "$inv" 'the entry'"'"'s `package` host must be `downloads.wordpress.org` or its `url` host `wordpress.org`' \
-  || fail "$sec trusts a transient entry a premium updater may have injected"
+  || fail "$sec_src trusts a transient entry a premium updater may have injected"
 has "$inv" 'It is **this plugin'"'"'s listing** when the transient entry above proves it' \
-  || fail "$sec does not accept a listing the transient ties to the plugin"
+  || fail "$sec_src does not accept a listing the transient ties to the plugin"
 has "$proc" 'Pass: this plugin'"'"'s listing (tied by the transient or by author/home)' \
-  || fail "$sec SEC-042 has no verdict for a transient-proved listing"
+  || fail "$sec_src SEC-042 has no verdict for a transient-proved listing"
 
 # --- Vendor re-check runs its own route probe first ---
-has "$recheck" 'Run the SEC-038 route probe yourself, first' || fail "$sec: the vendor re-check does not run the route probe"
+has "$recheck" 'Run the SEC-038 route probe yourself, first' || fail "$sec_src: the vendor re-check does not run the route probe"
 p_probe="$(pos "$recheck" 'Run the SEC-038 route probe yourself, first')"
 p_lookup="$(pos "$recheck" 'look its slug up on wp.org')"
-[ -n "$p_lookup" ] && [ "$p_probe" -lt "$p_lookup" ] || fail "$sec: the re-check looks up wp.org before probing the route"
-has "$recheck" 'not verified: no route to api.wordpress.org' || fail "$sec: the re-check assumes a result offline"
-has "$recheck" 'not a scored finding' || fail "$sec: the vendor reminder is not unscored"
-has "$recheck" 'A **closed** listing gets no reminder' || fail "$sec: the re-check treats a closed plugin as vendor"
-has "$recheck" 'reason `public wp.org plugin`' || fail "$sec: the re-check does not remind for a public wp.org plugin"
+[ -n "$p_lookup" ] && [ "$p_probe" -lt "$p_lookup" ] || fail "$sec_src: the re-check looks up wp.org before probing the route"
+has "$recheck" 'not verified: no route to api.wordpress.org' || fail "$sec_src: the re-check assumes a result offline"
+has "$recheck" 'not a scored finding' || fail "$sec_src: the vendor reminder is not unscored"
+has "$recheck" 'A **closed** listing gets no reminder' || fail "$sec_src: the re-check treats a closed plugin as vendor"
+has "$recheck" 'reason `public wp.org plugin`' || fail "$sec_src: the re-check does not remind for a public wp.org plugin"
 has "$recheck" 'A plugin proved public here (its own listing, or closed) is a public slug for SEC-041 and SEC-042' \
-  || fail "$sec: the re-check's public answers do not reach SEC-041/042"
-has "$recheck" 'Vendor-plugin re-check ===' || fail "$sec lost the re-check print block"
+  || fail "$sec_src: the re-check's public answers do not reach SEC-041/042"
+has "$recheck" 'Vendor-plugin re-check ===' || fail "$sec_src lost the re-check print block"
 
 # --- SEC-043: scope, script, severity ---
 for needle in 'active and inactive' 'wp-content/mu-plugins/*.php' '`Parked drop-ins` line' \
@@ -231,21 +232,21 @@ for needle in 'active and inactive' 'wp-content/mu-plugins/*.php' '`Parked drop-
               '**WARNING** — exactly one loaded source declares it; the inactive plugin cannot be activated' \
               '**INFO** — only inactive plugins declare it' 'activates a plugin in a sandbox' \
               'declared in a conditionally included file'; do
-  has "$s43" "$needle" || fail "$sec SEC-043 lacks: $needle"
+  has "$s43" "$needle" || fail "$sec_src SEC-043 lacks: $needle"
 done
-has "$s43" '**CRITICAL** when one side is an inactive plugin' && fail "$sec SEC-043 still makes an inactive side CRITICAL"
-has "$s43" 'Pattern: top-level `function' && fail "$sec SEC-043 still describes a grep pattern"
-has "$s43" 'within the 3 lines above' && fail "$sec SEC-043 still uses the 3-line guard heuristic"
+has "$s43" '**CRITICAL** when one side is an inactive plugin' && fail "$sec_src SEC-043 still makes an inactive side CRITICAL"
+has "$s43" 'Pattern: top-level `function' && fail "$sec_src SEC-043 still describes a grep pattern"
+has "$s43" 'within the 3 lines above' && fail "$sec_src SEC-043 still uses the 3-line guard heuristic"
 # Every plugin loop in the snippet (at least loaded and inactive) must fall back to
 # <slug>.php, or a single-file plugin is a missing source. The expected count comes from the
 # loops present, so a new loop only has to carry the fallback too.
 loops="$(grep -cF 'p=wp-content/plugins/$slug' "$sec")"
 fallbacks="$(grep -cF 'p=wp-content/plugins/$slug; [ -e "$p" ] || p="$p.php"' "$sec")"
 [ "$loops" -ge 2 ] \
-  || fail "$sec: the SEC-043 snippet must hold both plugin loops (loaded and inactive); found $loops"
+  || fail "$sec_src: the SEC-043 snippet must hold both plugin loops (loaded and inactive); found $loops"
 [ "$fallbacks" = "$loops" ] \
-  || fail "$sec: $((loops - fallbacks)) of $loops plugin loops in the SEC-043 snippet lack the single-file <slug>.php fallback"
-has "$s43" 'for f in wp-content/mu-plugins/*; do' && fail "$sec SEC-043 still scans every entry in mu-plugins as loaded"
+  || fail "$sec_src: $((loops - fallbacks)) of $loops plugin loops in the SEC-043 snippet lack the single-file <slug>.php fallback"
+has "$s43" 'for f in wp-content/mu-plugins/*; do' && fail "$sec_src SEC-043 still scans every entry in mu-plugins as loaded"
 grep -Fq '### `find-redeclared-functions.php`' "$skill" || fail "$skill does not document find-redeclared-functions.php"
 
 # --- /wp-adopt: runnable lookup, branches, propose-then-confirm order ---

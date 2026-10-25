@@ -3,9 +3,9 @@
 # demand, so a check that greps "the agent" still sees text that moved out to
 # skills/wp-audit-standards/references/ (agents/wp-audit-performance.md ->
 # perf-*.md plus the older performance-lessons.md, agents/wp-audit-security.md -> sec-*.md).
-# The agent file comes first. The content is deterministic, so concurrent callers write the same
-# bytes, and the final file is deliberately left in place as a cache across calls; only the
-# per-process temp file is removed. Keep the output free of timestamps or anything per-run.
+# The agent file comes first. The output is rebuilt on every call (nothing reads an existing copy as a
+# cache): each caller writes its own per-process temp file and renames it into place, so a
+# concurrent reader sees one complete version or the other, never a partial concatenation. Keep the output free of timestamps or anything per-run.
 #   perf=$(bash "$(dirname "$0")/lib/agent-text.sh" wp-audit-performance)
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../../.." && pwd)"
@@ -13,12 +13,13 @@ name="${1:?agent name}"
 case "$name" in
   wp-audit-performance) pat='perf-*.md'; extra='performance-lessons.md' ;;
   wp-audit-security)    pat='sec-*.md'; extra='' ;;
-  *) echo "$root/agents/$name.md"; exit 0 ;;
+  *) [ -f "$root/agents/$name.md" ] || { echo "agent-text.sh: $root/agents/$name.md not found" >&2; exit 1; }
+     echo "$root/agents/$name.md"; exit 0 ;;
 esac
 dir="${TMPDIR:-/tmp}/wpb-agent-text"
 mkdir -p "$dir"
 out="$dir/$name.$$.md"
-trap 'rm -f "$out"' EXIT   # no-op after the mv below: the final file is the cache
+trap 'rm -f "$out"' EXIT   # no-op after the mv below
 # Sorted under the C locale so the bytes do not depend on the caller's LC_COLLATE; an empty
 # match is an error instead of cat being handed the literal glob.
 mapfile -t refs < <(compgen -G "$root/skills/wp-audit-standards/references/$pat" | LC_ALL=C sort)
