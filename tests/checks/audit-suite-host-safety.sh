@@ -58,6 +58,7 @@ rc=0
 
 # 2b. A bracketed IPv6 literal keeps one key in both scripts: the child of a gated run compares
 # WP_AUDIT_GATE_HELD with its own key, and `%%:*` alone cut `[2001:db8::1]` to `[2001`.
+# A missing node_modules dir makes the runner exit 1 right after the gate: no install, no browser, no network.
 has bin/lib/host-key.sh 'host_key()'
 has bin/prod-gate.sh 'host_key "$target"'
 has "$runner" 'host_key "$url"'
@@ -71,7 +72,8 @@ hasnt "$runner" 'gate_host="${url_host%%:*}"'
 v6="$tmp/v6"; mkdir -p "$v6/gate"
 rc=0
 (cd "$tmp" && WP_AUDIT_GATE_HELD='[2001:db8::1]' WP_AUDIT_GATE_DIR="$v6/gate" WP_BROWSER_CHROMIUM="$fakebin/chromium" \
-  timeout 15 bash "$OLDPWD/$runner" --url 'https://[2001:db8::1]/' --dir "$tmp/suite-v6" > "$tmp/out-v6" 2>&1) || rc=$?
+  WP_AUDIT_SUITE_NODE_MODULES="$tmp/none" \
+  timeout 10 bash "$OLDPWD/$runner" --url 'https://[2001:db8::1]/' --dir "$tmp/suite-v6" > "$tmp/out-v6" 2>&1) || rc=$?
 ! grep -Fq 're-running through bin/prod-gate.sh' "$tmp/out-v6" || { cat "$tmp/out-v6"; fail "a child holding the gate for an IPv6 host re-ran the gate"; }
 
 # 3. Consecutive timeouts stop the run; the runner turns that into UNMEASURED, exit 2.
