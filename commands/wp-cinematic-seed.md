@@ -11,9 +11,27 @@ arguments:
   - name: --dry-run
     description: Print what would change without writing
     required: false
+  - name: --force-adopted
+    description: Build on an adopted site (third-party theme) on purpose; otherwise the command stops
+    required: false
 ---
 
 # /wp-cinematic-seed
+
+## Adopted-site guard
+
+Run this before anything else. This command builds a theme, sections or content on the assumption
+that the theme is one this plugin scaffolded; on an adopted site (a third-party theme) it would
+overwrite that theme or generate one that does not belong. `${PROJECT_PATH}` is the WordPress project
+root, the directory that holds the project manifest.
+
+```bash
+bash -c 'node "$1/bin/wp-config.mjs" require-origin "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
+```
+
+Exit `0` continue. Exit `5` stop and print the message verbatim: `adopted site with a third-party theme:
+use /wp-audit, /wp-debug or /wp-update`. If `$ARGUMENTS` contains `--force-adopted`, append it to the
+call (and ignore it everywhere else): the operator chose to build on an adopted site on purpose.
 
 ## Manifest shape
 

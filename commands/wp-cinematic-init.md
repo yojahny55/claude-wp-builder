@@ -14,6 +14,9 @@ arguments:
   - name: --skip-kit-install
     description: Skip `npx skills add` and use vendored fallback from starter-theme/__cinematic__/assets/cinematic-kit/
     required: false
+  - name: --force-adopted
+    description: Build on an adopted site (third-party theme) on purpose; otherwise the command stops
+    required: false
 ---
 
 # /wp-cinematic-init
@@ -21,6 +24,21 @@ arguments:
 Use this when the demo is **not** a standard sectioned page but a cinematic scroll-driven reel: persistent video stage, N scenes that crossfade/scrub as the user scrolls, mobile autoplay-loop fork, motion-toggle, reduced-motion guard.
 
 This command is a thin shim. It does three things and hands off:
+
+## Adopted-site guard
+
+Run this before anything else. This command builds a theme, sections or content on the assumption
+that the theme is one this plugin scaffolded; on an adopted site (a third-party theme) it would
+overwrite that theme or generate one that does not belong. `${PROJECT_PATH}` is the WordPress project
+root, the directory that holds the project manifest.
+
+```bash
+bash -c 'node "$1/bin/wp-config.mjs" require-origin "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
+```
+
+Exit `0` continue. Exit `5` stop and print the message verbatim: `adopted site with a third-party theme:
+use /wp-audit, /wp-debug or /wp-update`. If `$ARGUMENTS` contains `--force-adopted`, append it to the
+call (and ignore it everywhere else): the operator chose to build on an adopted site on purpose.
 
 ## Step 0 — Detect kit
 
