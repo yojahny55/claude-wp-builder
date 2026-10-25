@@ -178,6 +178,45 @@ jobs:
           done < <(find starter-theme/__cinematic__ -name '*.php')
           printf 'ok: %d file(s) parse on 8.0\n' "$n"
 
+  # bash -n is blocking: nothing in the tree fails it today, and a script that does not
+  # parse is dead on arrival whatever it was meant to do. shellcheck is INFORMATIONAL for
+  # now (continue-on-error): this repo's scripts have never been linted, so the size of the
+  # historical backlog is unknown, and turning on a blocking gate blind would go red on
+  # main for reasons no pull request introduced. The step prints every warning as an
+  # annotation and the count; once the backlog is cleared or baselined, delete
+  # `continue-on-error` and it becomes a gate. Exclusions live in .shellcheckrc, each with
+  # its reason. shellcheck ships on ubuntu-latest, so nothing is installed here.
+  shell-lint:
+    name: Shell scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: bash -n every shell script
+        run: |
+          set -euo pipefail
+          n=0
+          while IFS= read -r f; do
+            bash -n "$f"
+            n=$((n + 1))
+          done < <(find bin skills -name '*.sh' -not -path '*/node_modules/*' | sort)
+          [ "$n" -gt 0 ] || { echo 'ERROR: no shell scripts found' >&2; exit 1; }
+          printf 'ok: %d shell script(s) parse\n' "$n"
+
+      - name: shellcheck (informational, severity warning)
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          shellcheck --version | sed -n 2p
+          mapfile -t files < <(find bin skills -name '*.sh' -not -path '*/node_modules/*' | sort)
+          [ "${#files[@]}" -gt 0 ] || { echo 'ERROR: no shell scripts found' >&2; exit 1; }
+          shellcheck --severity=warning --format=gcc "${files[@]}" | tee /tmp/shellcheck.out
+          rc=${PIPESTATUS[0]}
+          sed -E 's/^([^:]+):([0-9]+):([0-9]+): (warning|error): (.*)$/::\4 file=\1,line=\2,col=\3::\5/' /tmp/shellcheck.out
+          printf 'shellcheck: %d finding(s) in %d script(s)\n' "$(wc -l < /tmp/shellcheck.out)" "${#files[@]}"
+          exit "$rc"
+
   doc-sync:
     name: Docs describe the plugin that exists
     runs-on: ubuntu-latest

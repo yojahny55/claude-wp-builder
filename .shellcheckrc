@@ -1,0 +1,10 @@
+# Read by `shellcheck` (CI "Shell scripts" job, and any local run from the repo root).
+# CI passes --severity=warning, so only warnings and errors count; these codes are then
+# excluded because they flag the repo's established style, not defects:
+#   SC1090, SC1091  cannot follow `. "$file"` / `source` with a computed or relative path
+#   SC2034          "unused" variable: colour constants and globals read by sourced files
+#   SC2155          `local x=$(cmd)` masks cmd's exit status; scripts here already run
+#                   under `set -e` and treat the substitution as best-effort
+#   SC2317          "unreachable" command: functions invoked through traps and dispatch
+# Add a code here only with a line saying why it is noise for this repo.
+disable=SC1090,SC1091,SC2034,SC2155,SC2317
