@@ -114,6 +114,7 @@ Run all checks for your tier level. Write your full report to `<out>/agents/<age
   Resource: <the stable thing this is about — see the resource table in Step 7>
   Fix: <auto|manual>
   Owner: <code|setting|content|manual>
+  Design impact: <true|false>
   Root cause: <optional short slug shared by every finding that one defect causes, e.g. display-errors>
   Method: <description of fix>
 
@@ -126,6 +127,11 @@ Where Owner says where the fix LANDS, never whether you can apply it:
   content  — a text somebody has to write or decide.
   manual   — human judgement or an external tool.
 A fix you apply automatically is still `setting` if it wrote to the database.
+Where Design impact is `true` when applying the fix could change how the site renders: a colour,
+  a font, a size, spacing, an asset's dimensions, a new or changed CSS rule, or a tag or class
+  change (a `<span>` that becomes a `<button>` changes the render with no value edited). It is
+  independent of Owner, and `false` means the fix leaves every computed style and box as it was.
+  `/wp-audit` Step 9 never applies a `true` finding without asking.
 Where CODE follows the pattern: SEC-NNN, SEO-NNN, A11Y-NNN, PERF-NNN, WP-NNN, GEO-Dnn/Axx/Uxx/Pxx, UX-NNN
 ```
 

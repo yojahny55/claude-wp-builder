@@ -58,7 +58,7 @@ say so in one line:
 Otherwise:
 
 ```bash
-bash -c "bash '${CLAUDE_PLUGIN_ROOT}/bin/store-kit-sync.sh' '${PROJECT_PATH}/wp-content/plugins' && $WP plugin activate store-kit"
+WP="$WP" bash -c 'bash "$1/bin/store-kit-sync.sh" "$2/wp-content/plugins" && $WP plugin activate store-kit' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 A failure here counts against the entry's `required` flag like any other install.
