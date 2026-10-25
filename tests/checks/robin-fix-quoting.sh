@@ -132,7 +132,7 @@ grep -q '^magick ' "$tmp/conv" || fail "magick was not preferred over convert: $
 sql=$(head -1 "$tmp/insert")
 # The name never appears in the SQL text: every string travels as a hex literal.
 ! grep -Fq "Brien" <<<"$sql" || fail "the file name reached the SQL in the clear: $sql"
-grep -q "INSERT INTO `wp_rio_process_queue` .*VALUES (7,'webp',CONVERT(UNHEX(" <<<"$sql" || fail "the INSERT lost its shape: ${sql:0:300}"
+grep -q "INSERT INTO .wp_rio_process_queue. .*VALUES (7,'webp',CONVERT(UNHEX(" <<<"$sql" || fail "the INSERT lost its shape: ${sql:0:300}"
 # Decode extra_data back and compare with the real path.
 hexes=$(grep -oP "UNHEX\\('[[:xdigit:]]*'\\)" <<<"$sql" | sed "s/UNHEX('//; s/')//")
 [ -n "$hexes" ] || fail "the INSERT had no extractable UNHEX payload"
