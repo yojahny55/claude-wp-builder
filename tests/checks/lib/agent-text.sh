@@ -23,7 +23,10 @@ trap 'rm -f "$out"' EXIT   # no-op after the mv below: the final file is the cac
 # match is an error instead of cat being handed the literal glob.
 mapfile -t refs < <(compgen -G "$root/skills/wp-audit-standards/references/$pat" | LC_ALL=C sort)
 [ "${#refs[@]}" -gt 0 ] || { echo "agent-text.sh: no references match $pat" >&2; exit 1; }
-[ -z "$extra" ] || refs+=("$root/skills/wp-audit-standards/references/$extra")
+if [ -n "$extra" ]; then
+  [ -f "$root/skills/wp-audit-standards/references/$extra" ] || { echo "agent-text.sh: extra file $extra not found" >&2; exit 1; }
+  refs+=("$root/skills/wp-audit-standards/references/$extra")
+fi
 cat "$root/agents/$name.md" "${refs[@]}" > "$out"
 mv -f "$out" "$dir/$name.md"
 echo "$dir/$name.md"
