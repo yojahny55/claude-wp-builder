@@ -33,7 +33,7 @@ overwrite that theme or generate one that does not belong. `${PROJECT_PATH}` is 
 root, the directory that holds the project manifest.
 
 ```bash
-bash -c "node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs require-origin '${PROJECT_PATH}'"
+bash -c 'node "$1/bin/wp-config.mjs" require-origin "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
 Exit `0` continue. Exit `5` stop and print the message verbatim: `adopted site with a third-party theme:
