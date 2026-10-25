@@ -10,7 +10,7 @@ cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
 L=skills/wp-audit-standards/references/performance-lessons.md
-A=agents/wp-audit-performance.md
+A=$(bash tests/checks/lib/agent-text.sh wp-audit-performance)
 
 grep -Fq 'Inline critical CSS: conditional' "$L" || fail "lessons lost the conditional section"
 ! grep -Fq 'measured on a real site, and rejected' "$L" || fail "lessons still files inline critical CSS as rejected"

@@ -42,7 +42,7 @@ node_bin=$(command -v node)
 set +e; out=$(node "$w" gitignore-check "$t"); rc=$?; set -e
 [ "$rc" = 4 ] || fail "unignored root should exit 4, got $rc"
 echo "$out" | grep -Fq 'missing: .wp-audit-findings.json' || fail "ledger not reported missing"
-printf '.wp-audit/\n.wp-audit-findings.json\n.wp-create.local.json\n.wp-create.json.bak*\n.wp-create.json.v*.bak\n' > "$t/.gitignore"
+printf '.wp-audit/\n.wp-audit-findings.json\n.wp-create.local.json\n.wp-create.json.bak*\n.wp-create.json.v*.bak\n.wp-create.json.*.tmp\n.wp-create.json.lock*\n' > "$t/.gitignore"
 node "$w" gitignore-check "$t" >/dev/null || fail "fully ignored root should exit 0"
 n=$(mktemp -d); trap 'rm -rf "$t" "$n"' EXIT
 node "$w" gitignore-check "$n" >/dev/null || fail "non-git root should exit 0"

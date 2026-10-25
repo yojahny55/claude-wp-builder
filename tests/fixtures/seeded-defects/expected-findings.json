@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "defects": [
+    {"check": "SEC-001",  "domain": "security",       "file": "theme/index.php",              "pattern": "echo $_GET['s'];",              "note": "unescaped request value"},
+    {"check": "SEC-002",  "domain": "security",       "file": "plugin/seeded-defects.php",    "pattern": "$wpdb->query( \"DELETE",        "note": "SQL built without prepare()"},
+    {"check": "SEC-003",  "domain": "security",       "file": "plugin/seeded-defects.php",    "pattern": "isset( $_POST['seeded_delete'] )", "note": "no nonce check"},
+    {"check": "SEC-004",  "domain": "security",       "file": "theme/functions.php",          "pattern": "eval( base64_decode(",          "note": "eval of decoded string"},
+    {"check": "SEC-005",  "domain": "security",       "file": "theme/functions.php",          "pattern": "$seeded_api_key =",             "note": "hardcoded credential"},
+    {"check": "A11Y-007", "domain": "accessibility",  "file": "theme/header.php",             "pattern": "user-scalable=no",              "note": "viewport blocks zoom"},
+    {"check": "A11Y-026", "domain": "accessibility",  "file": "theme/style.css",              "pattern": "outline: none;",                "note": "focus outline removed"},
+    {"check": "A11Y-042", "domain": "accessibility",  "file": "theme/searchform.php",         "pattern": "<input type=\"text\" name=\"s\"", "note": "input with no label"},
+    {"check": "SEO-002",  "domain": "seo",            "file": "theme/header.php",             "pattern": "<title>Seeded Defects Fixture</title>", "note": "hardcoded title tag"},
+    {"check": "PERF-003", "domain": "performance",    "file": "theme/style.css",              "pattern": "@import url(",                  "note": "render-blocking @import"},
+    {"check": "WP-020",   "domain": "best-practices", "file": "theme/index.php",              "pattern": "query_posts( 'cat=3' )",        "note": "query_posts() used"}
+  ]
+}

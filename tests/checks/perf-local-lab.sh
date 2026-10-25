@@ -29,15 +29,16 @@ for t in 'A local lab that resembles production' 'bin/h2-proxy.mjs' '5 runs, tak
   'PHP_INT_MAX' 'DOMContentLoaded' 'jQuery.migrateWarnings' '5 s after `load`' '$.ajaxPrefilter' \
   'currentSrc' 'Applying the full sheets at load raised TBT'; do has "$t" "$L"; done
 has 'h2-proxy.mjs' skills/wp-audit-run/references/site-context.md
-has 'Never drop a sheet by page type' agents/wp-audit-performance.md
-has 'jQuery.migrateWarnings' agents/wp-audit-performance.md
+perf=$(bash tests/checks/lib/agent-text.sh wp-audit-performance)
+has 'Never drop a sheet by page type' "$perf"
+has 'jQuery.migrateWarnings' "$perf"
 has 'propose, never apply' agents/wp-audit-a11y.md
 has 'contrast-propose.mjs' skills/wp-audit-run/references/browser-suite.md
 has 'contrast-propose.mjs' templates/audit-suite/README.md
 has '`h2-proxy.mjs`' README.md
 has '`contrast-propose.mjs`' README.md
 # the old claim that PERF-047 is auto-fixable must be gone
-! grep -F 'PERF-047 | Render-blocking third-party CSS' agents/wp-audit-performance.md | grep -Fq '| Yes |' || fail "PERF-047 is still marked auto-fixable"
+! grep -F 'PERF-047 | Render-blocking third-party CSS' "$perf" | grep -Fq '| Yes |' || fail "PERF-047 is still marked auto-fixable"
 
 # Behaviour: a proposal must reach its ratio on the rounded hex that ships, and --json must
 # survive a pipe (process.exit after console.log once cut it at 64 KiB).

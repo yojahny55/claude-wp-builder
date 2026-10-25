@@ -32,7 +32,7 @@ fail() { echo "FAIL: $1"; exit 1; }
 
 cd "$(dirname "$0")/../.." || fail "cannot cd to the repository root"
 
-sec=agents/wp-audit-security.md
+sec=$(bash tests/checks/lib/agent-text.sh wp-audit-security)
 [ -f "$sec" ] || fail "$sec is missing"
 [ -r "$sec" ] || fail "$sec exists but cannot be read"
 

@@ -40,7 +40,7 @@ fail() { echo "FAIL: $1" >&2; exit 1; }
 
 cd "$(dirname "$0")/../.." || fail "cannot cd to the repository root"
 
-perf=agents/wp-audit-performance.md
+perf=$(bash tests/checks/lib/agent-text.sh wp-audit-performance)
 seo=agents/wp-audit-seo.md
 changelog=CHANGELOG.md
 
@@ -165,14 +165,14 @@ grep -Fq 'confirmed HIT plus the wrong price is the confirmed defect' <<< "$flat
 # --- Direction 5: the fix is a setting, never a code workaround ---
 grep -Fq 'Multi-currency cache-key fix' "$perf" \
   || fail "$perf has no fix section for PERF-065/PERF-067"
-# The fix section runs from its own heading to the "## Rules" heading that follows it today.
-# Both ends are named, so a failure says which one moved: a heading of any level that shows up
-# inside the extract means the section's shape changed and this end marker needs a look.
-# awk records that it reached ## Rules: without it, a removed or renamed end heading would let
-# the extract run to EOF.
-fix=$(awk '/^### Multi-currency cache-key fix/{f=1; next} f && /^## Rules/{found=1; exit} f{print} END{exit(found ? 0 : 1)}' "$perf") \
-  || fail "$perf's Multi-currency cache-key fix section is not terminated by ## Rules"
-[ -n "$fix" ] || fail "$perf's Multi-currency cache-key fix section is empty"
+# The fix section runs from its own heading to the end of the recipes file (it is the last one).
+# The fix recipes moved to a reference file; the section is its last one, so it ends at the end
+# of that file. awk still records that the start heading was found, so a removed or renamed
+# heading cannot pass as an empty extract.
+fixref=skills/wp-audit-standards/references/perf-fix-recipes.md
+fix=$(awk '/^### Multi-currency cache-key fix/{f=1; found=1; next} f{print} END{exit(found ? 0 : 1)}' "$fixref") \
+  || fail "$fixref has no Multi-currency cache-key fix section"
+[ -n "$fix" ] || fail "$fixref's Multi-currency cache-key fix section is empty"
 # Lines inside a fenced code block are not headings: a shell comment in a snippet starts with
 # "# " too. Fences may be indented (a snippet nested in a list). A #### subheading inside the
 # section is fine; a heading at level 1-3 means a sibling section now starts inside the extract.

@@ -71,9 +71,9 @@ case "$wait_max" in ''|*[!0-9]*) echo "--wait must be an integer" >&2; exit 1 ;;
 
 # One key per server: drop scheme, path, query, fragment, userinfo and port, so that
 # `https://h?author=1`, `https://h:443/x` and `h` share one lock and one blocked flag.
-host="${target#*://}"; host="${host%%/*}"; host="${host%%\?*}"; host="${host%%#*}"; host="${host##*@}"
-case "$host" in \[*\]*) host="${host%%]*}]" ;; *) host="${host%%:*}" ;; esac
-host="$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')"
+# shellcheck source=lib/host-key.sh
+. "$(dirname "$0")/lib/host-key.sh"
+host="$(host_key "$target")"
 [ -n "$host" ] || { echo "cannot read a host from: $target" >&2; exit 1; }
 local_host=0
 case "$host" in

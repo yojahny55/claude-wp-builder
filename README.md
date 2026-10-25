@@ -556,7 +556,7 @@ Commands run these and read the exit code. Several are gates, not helpers.
 
 | Script | What it does |
 |--------|--------------|
-| `wp-config.mjs` | The single definition of a valid `.wp-create.json`; every command that reads the manifest calls `validate` first. Subcommands: `validate`, `migrate`, `render-context`, `get`, `validate-profile`, `adopt`, `drift`, `refresh` |
+| `wp-config.mjs` | The single definition of a valid `.wp-create.json`; every command that reads the manifest calls `validate` first. Subcommands: `validate`, `migrate`, `render-context`, `get`, `set`, `validate-profile`, `adopt`, `drift`, `refresh` |
 | `wp-env-setup.sh` | System-level setup behind `/wp-create` — vhosts, SSL, hosts entries |
 | `demo-verify.mjs` | The browser walk behind `/wp-demo-verify` and craft mode's probe — Chromium plus an existing Firefox |
 | `css-contour-lint.mjs` | Static companion to `demo-verify.mjs` — CSS that renders differently across engines |

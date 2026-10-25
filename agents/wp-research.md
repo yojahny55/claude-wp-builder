@@ -96,20 +96,38 @@ column but URL.
 
 ## The manifest record
 
-Write into `.wp-create.json`:
+Write into `.wp-create.json` **with the `set` subcommand, never with Edit or Write**.
+Other builders (`/wp-yolo` runs several in parallel) read and write the same file, and a
+free-form edit loses their keys or leaves a half-written file. `set` locks, validates and
+renames atomically; pass the whole record as JSON on stdin (`-`) through a quoted heredoc,
+so an apostrophe in a place name cannot split the argument:
 
-```jsonc
-"research": {
+```bash
+node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs set "${PROJECT_PATH}" research - <<'JSON'
+<the JSON below>
+JSON
+```
+
+The record is the bare JSON object below, sent on stdin as strict JSON. Do not paste the
+`"research":` key in front of it (the key is the `set` argument) and do not paste comments:
+`set` refuses anything on stdin that does not parse. Placeholders in angle brackets are
+yours to fill:
+
+```json
+{
   "at": "<ISO date>",
-  "site": "<url>",          // omit the key entirely when confidence is unconfirmed
+  "site": "<url>",
   "location": "<city, region, country>",
-  "confidence": "confirmed",   // or "unconfirmed"
-  "tier": "websearch",         // or "firecrawl" or "dataforseo"
+  "confidence": "confirmed",
+  "tier": "websearch",
   "competitors": 4
 }
 ```
 
-Or the scalar `"research": "none"` when the operator declines or every rung
+Notes: omit `site` entirely when `confidence` is `unconfirmed`; `confidence` is `confirmed` or
+`unconfirmed`; `tier` is `websearch`, `firecrawl` or `dataforseo`.
+
+Or the scalar `"research": "none"` (`set … research none`) when the operator declines or every rung
 of the ladder fails. `"none"` is permanent: it means no later run asks again
 and no later run retries.
 

@@ -46,7 +46,7 @@ function esc_url( $s ) { return str_replace( array( '"', '<', '>' ), '', $s ); }
 function esc_url_raw( $s ) { return esc_url( $s ); }
 function wp_strip_all_tags( $s ) { return strip_tags( $s ); }
 class Form { function id() { return 1; } }
-class Mail { function __construct( $h ) { $this->h = $h; } function get( $k, $r = true ) { return $this->h; } }
+class Mail { function __construct( $h ) { $this->f = array( 'use_html' => $h ); } function get( $k, $r = false ) { return $this->f[ $k ] ?? $r; } }
 eval( '?>' . str_replace( '__starter__', 'st', file_get_contents( $argv[1] ) ) );
 ( $GLOBALS['hooks']['plugins_loaded'] )();
 $cb = $GLOBALS['hooks']['wpcf7_mail_components'];
