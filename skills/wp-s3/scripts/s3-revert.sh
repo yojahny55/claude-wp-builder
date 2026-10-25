@@ -33,7 +33,10 @@ MU="$WP_ROOT/wp-content/mu-plugins/s3-uploads-endpoint.php"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 # The parked config holds the bucket credentials: a private directory outside the docroot
 # keyed by the site root, never a file the web server can serve.
-PARK_DIR="${WP_S3_BACKUP_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wp-s3-backups}/$(printf '%s' "$WP_ROOT" | cksum | cut -d' ' -f1)"
+# sha256 rather than a 32-bit cksum: two roots sharing a key would overwrite each other's parked credentials.
+ROOT_KEY="$(printf '%s' "$WP_ROOT" | sha256sum 2>/dev/null | cut -c1-24)"
+[[ -n "$ROOT_KEY" ]] || ROOT_KEY="$(printf '%s' "$WP_ROOT" | shasum -a 256 | cut -c1-24)"
+PARK_DIR="${WP_S3_BACKUP_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wp-s3-backups}/$ROOT_KEY"
 PARKED="$PARK_DIR/s3-config.php.disabled"
 
 [[ -d "$LOCAL" ]] || die "no $LOCAL"
