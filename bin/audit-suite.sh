@@ -473,7 +473,7 @@ cross_browser() {
     fi
     echo "audit-suite: accessibility and usability pass in $engine"
     (cd "$dir" && npx --no-install playwright test -c playwright.guard.config.js tests/audit.spec.js --project="$engine" ${pw_args[@]+"${pw_args[@]}"}) \
-      || { echo "audit-suite: the $engine pass ran and exited non-zero (a failure, not a skip)"; status=1; }
+      || { check_abort || { echo "audit-suite: the $engine pass ran and exited non-zero (a failure, not a skip)"; status=1; }; }
   done
 }
 
