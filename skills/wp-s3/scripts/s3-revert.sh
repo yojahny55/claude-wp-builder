@@ -121,13 +121,24 @@ with open(tmp, "w") as handle:
     handle.flush()
     os.fsync(handle.fileno())
 shutil.copymode(path, tmp)
+st = os.stat(path)
 try:
-    st = os.stat(path)
     os.chown(tmp, st.st_uid, st.st_gid)
 except OSError as e:
-    if e.errno != 1:  # EPERM: not root, expected
-        sys.stderr.write('WARNING: could not preserve ownership of wp-config.php: %s\n' % e)
-os.replace(tmp, path)
+    sys.stderr.write('NOTE: could not chown the temporary file (%s); writing wp-config.php in place.\n' % e)
+tst = os.stat(tmp)
+if (tst.st_uid, tst.st_gid) == (st.st_uid, st.st_gid):
+    os.replace(tmp, path)
+else:
+    # A rename would hand wp-config.php to the operator's group and the web server could
+    # lose read access. Rewrite the original inode instead: owner, group and mode stay.
+    os.unlink(tmp)
+    with open(path, "r+") as handle:
+        handle.seek(0)
+        handle.write(new)
+        handle.truncate()
+        handle.flush()
+        os.fsync(handle.fileno())
 PY
     status=$?
     set -e

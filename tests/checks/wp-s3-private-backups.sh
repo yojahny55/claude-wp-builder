@@ -25,6 +25,7 @@ define( 'DB_PASSWORD', 'fixture-db-password' );
 require_once ABSPATH . 'wp-settings.php';
 PHP
 chmod 640 "$root/wp-config.php"
+orig_og="$(stat -c %U:%G "$root/wp-config.php")"
 printf '%s\n' 'fixture-secret' > "$tmp/secret"; chmod 644 "$tmp/secret"
 
 run() { HOME="$home" WP_S3_BACKUP_DIR= XDG_STATE_HOME= env -u S3_UPLOADS_SECRET_VALUE bash "$setup" \
@@ -68,6 +69,40 @@ shopt -u nullglob
 
 # The rewrite keeps the original mode.
 case "$(file_mode "$root/wp-config.php")" in 640|0640) ;; *) false ;; esac || fail "wp-config.php lost its 0640 mode"
+
+# ...and the original owner:group (the rename must not hand the file to another group).
+[ "$(stat -c %U:%G "$root/wp-config.php")" = "$orig_og" ] || fail "wp-config.php lost its owner:group"
+
+# When chown cannot restore the group (not root, group the operator is not primary in),
+# the rewrite must go in place instead of renaming a file with the wrong group over it.
+# Reproduced without root: chgrp the fixture to a supplementary group, and make os.chown
+# fail through a sitecustomize, which is what EPERM on a foreign group looks like.
+alt_gid=""
+for g in $(id -G); do [ "$g" != "$(id -g)" ] && { alt_gid=$g; break; }; done
+if [ -n "$alt_gid" ]; then
+  mkdir -p "$tmp/eperm"
+  printf '%s\n' 'import os' 'def _deny(*a, **k): raise PermissionError(1, "Operation not permitted")' 'os.chown = _deny' > "$tmp/eperm/sitecustomize.py"
+  root2="$tmp/site2"; mkdir -p "$root2/wp-content/plugins" "$root2/wp-content/uploads"
+  cp "$root/wp-config.php" "$root2/wp-config.php"
+  # Fresh config without the s3 require, mode 0640, group = a supplementary group.
+  printf '%s\n' '<?php' "define( 'DB_PASSWORD', 'fixture-db-password' );" "require_once ABSPATH . 'wp-settings.php';" > "$root2/wp-config.php"
+  chmod 640 "$root2/wp-config.php"; chgrp "$alt_gid" "$root2/wp-config.php"
+  before_og="$(stat -c %U:%G "$root2/wp-config.php")"; before_ino="$(stat -c %i "$root2/wp-config.php")"
+  HOME="$home" WP_S3_BACKUP_DIR= XDG_STATE_HOME= PYTHONPATH="$tmp/eperm" S3_UPLOADS_SECRET_VALUE=fixture-secret \
+    bash "$setup" --wp-root "$root2" --bucket b --region r --bucket-url https://m.example.test \
+    --auth key --key K --skip-plugin-install >"$tmp/eperm.out" 2>&1 || { cat "$tmp/eperm.out"; fail "setup failed when chown was refused"; }
+  grep -Fq "s3-config.php" "$root2/wp-config.php" || fail "the require was not written when chown was refused"
+  [ "$(stat -c %U:%G "$root2/wp-config.php")" = "$before_og" ] || fail "setup changed wp-config.php's group when chown was refused"
+  [ "$(stat -c %i "$root2/wp-config.php")" = "$before_ino" ] || fail "setup replaced the wp-config.php inode when chown was refused"
+  case "$(file_mode "$root2/wp-config.php")" in 640|0640) ;; *) fail "setup changed wp-config.php's mode when chown was refused" ;; esac
+  HOME="$home" WP_S3_BACKUP_DIR= XDG_STATE_HOME= PYTHONPATH="$tmp/eperm" bash "$revert" "$root2" --keep-remote-media >"$tmp/eperm-revert.out" 2>&1 \
+    || { cat "$tmp/eperm-revert.out"; fail "revert failed when chown was refused"; }
+  ! grep -Fq "s3-config.php" "$root2/wp-config.php" || fail "revert did not remove the require when chown was refused"
+  [ "$(stat -c %U:%G "$root2/wp-config.php")" = "$before_og" ] || fail "revert changed wp-config.php's group when chown was refused"
+  [ "$(stat -c %i "$root2/wp-config.php")" = "$before_ino" ] || fail "revert replaced the wp-config.php inode when chown was refused"
+else
+  echo "NOTE: no supplementary group; the refused-chown case was not exercised"
+fi
 
 # A second run backs up the existing s3-config.php, also privately.
 run --secret-file "$tmp/secret" >/dev/null 2>&1 || fail "second run failed"
