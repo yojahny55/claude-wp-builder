@@ -10,6 +10,7 @@ CI=.github/workflows/ci.yml
 
 grep -Fq "bash -n" "$CI" || fail "ci.yml does not run bash -n on the shell scripts"
 grep -Fq "find bin skills tests -name '*.sh'" "$CI" || fail "ci.yml does not parse bin/, skills/*/scripts/ and tests/"
+[ "$(grep -Fc 'no shell scripts found' "$CI")" -ge 2 ] || fail "ci.yml lost a zero-script guard"
 grep -Fq 'shellcheck --severity=warning' "$CI" || fail "ci.yml does not run shellcheck at warning severity"
 awk '/name: shellcheck/{f=1} f&&/continue-on-error/{bad=1} /^  [a-z][a-z0-9_-]*:[[:space:]]*$/{f=0} END{exit bad?1:0}' "$CI" \
   || fail "shellcheck regained continue-on-error: it is a blocking gate"

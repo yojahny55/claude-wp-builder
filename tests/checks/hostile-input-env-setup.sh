@@ -5,13 +5,8 @@
 # neighbouring checks grep the script's text. This one runs it with hostile arguments
 # against the stub harness in tests/lib/stub-path.sh and asserts what it would have done.
 #
-# Another change adds the validation to the script. So that this check does not couple the
-# two branches, it has two modes:
-#   - the script rejects the hostile domain -> asserted hard, PASS;
-#   - the script does not yet                -> printed as XFAIL and still exits 0, UNLESS
-#     WP_HOSTILE_STRICT=1, which makes it fail. Flip the default (set WP_HOSTILE_STRICT=1
-#     in .github/workflows/ci.yml) in the change that lands the validation, so a later
-#     regression cannot hide behind XFAIL.
+# The script rejects a hostile domain before anything runs; any case that reaches a
+# destructive stub is a failure, with no soft mode, so removing the validation turns CI red.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 . tests/lib/stub-path.sh
@@ -31,28 +26,32 @@ hostile=('../x' 'a/b' 'x;touch y' 'x$(id)' 'x/../../etc' 'a.local.com
 b' '-rf')
 cmds=(hosts-add hosts-remove ssl-generate)
 leaks=0
+verbose_cap=6   # print per-case detail for the first few leaks only; the count still fails the check
 for cmd in "${cmds[@]}"; do
   for d in "${hostile[@]}"; do
     run_stubbed bash bin/wp-env-setup.sh "$cmd" "--domain=$d"
     calls=$(stub_destructive_calls)
     if [ -n "$calls" ] || [ "$STUB_RC" = 0 ]; then
       leaks=$((leaks + 1))
-      [ "$leaks" -gt 6 ] || echo "note: $cmd --domain=$(printf %q "$d") was not refused (rc=$STUB_RC)" >&2
-      [ -z "$calls" ] || [ "$leaks" -gt 6 ] || printf '%s\n' "$calls" | sed 's/^/        would run: /' >&2
+      if [ -n "$calls" ]; then echo "LEAK: $cmd triggered destructive calls" >&2
+      else echo "NOTE: $cmd exited 0 without refusing (no validation?)" >&2; fi
+      [ "$leaks" -gt "$verbose_cap" ] || echo "note: $cmd --domain=$(printf %q "$d") was not refused (rc=$STUB_RC)" >&2
+      [ -z "$calls" ] || [ "$leaks" -gt "$verbose_cap" ] || printf '%s\n' "$calls" | sed 's/^/        would run: /' >&2
     fi
   done
 done
 
-# A sane domain must still get through to the stubs, or "rejects everything" would pass.
-run_stubbed bash bin/wp-env-setup.sh hosts-add --domain=example.local.com
-if ! stub_called sudo && ! grep -q 'already exists' <<<"$STUB_OUT"; then
-  fail "a valid domain no longer reaches the sudo call: the check cannot tell refusal from breakage"
-fi
+# A sane domain must still get through to the stubs on every command, or "rejects everything"
+# would pass. The domain is unique per run so a real /etc/hosts entry cannot satisfy the check.
+sane="sanity-$$.local.com"
+# hosts-remove is a no-op for an absent entry, so it is excluded: it makes no call to observe.
+for cmd in hosts-add ssl-generate; do
+  run_stubbed bash bin/wp-env-setup.sh "$cmd" "--domain=$sane"
+  [ -s "$STUB_LOG" ] || fail "$cmd: a valid domain reaches no stubbed call: the check cannot tell refusal from breakage"
+done
 
 if [ "$leaks" -eq 0 ]; then
   echo PASS
-elif [ "${WP_HOSTILE_STRICT:-0}" = 1 ]; then
-  fail "$leaks hostile-domain case(s) reached a destructive call"
 else
-  echo "XFAIL: $leaks hostile-domain case(s) are not refused yet (expected until the domain validation lands; WP_HOSTILE_STRICT=1 makes this a failure)"
+  fail "$leaks hostile-domain case(s) reached a destructive call"
 fi

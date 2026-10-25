@@ -39,21 +39,96 @@ fi
 info "WordPress root: $WP_ROOT"
 
 # ── Read DB credentials via grep (no PHP require, works on broken installs) ─
-# Single or double quotes, both valid PHP. The value runs to the quote that opened it, so a
-# single-quoted password may hold `"` and a double-quoted one `'`; an escaped quote of the
-# same kind (`\'`) still ends it. `|| true` for the same reason as find_wp_root: a define
+# PHP line and block comments are skipped first: a commented-out
+# `// define('DB_NAME', 'old')` above the live one must not win. A value is read as a PHP
+# string literal (single or double quoted) that runs to the closing quote of the kind that
+# opened it, skipping backslash escapes, so a password holding `\'` is no longer cut short;
+# the escapes PHP itself unescapes are then undone (`\\` and `\'` in single quotes, and PHP
+# string escapes in double quotes). `|| true` for the same reason as find_wp_root: a define
 # the grep cannot match must reach the "Failed to parse" message below, not end the run in
 # silence.
-parse_define() {
-	local key="$1" file="$2"
-	{ grep -oP "define\s*\(\s*['\"]${key}['\"]\s*,\s*(['\"])\K.*?(?=\1)" "$file" || true; } | head -1
+config_code_lines() {
+	awk '
+		BEGIN { in_block = 0; quote = ""; escaped = 0 }
+		function strip_comments(line, i, c, next_char, out, n) {
+			n = length(line)
+			out = ""
+			for (i = 1; i <= n; i++) {
+				c = substr(line, i, 1)
+				next_char = substr(line, i + 1, 1)
+				if (in_block) {
+					if (c == "*" && next_char == "/") { in_block = 0; i++ }
+					continue
+				}
+				if (quote != "") {
+					out = out c
+					if (escaped) escaped = 0
+					else if (c == "\\") escaped = 1
+					else if (c == quote) quote = ""
+					continue
+				}
+				if (c == "\047" || c == "\042") { quote = c; out = out c; continue }
+				if (c == "/" && next_char == "*") { in_block = 1; i++; continue }
+				if (c == "/" && next_char == "/") break
+				if (c == "#") break
+				out = out c
+			}
+			return out
+		}
+		{ print strip_comments($0) }
+	' "$1"
 }
 
-DB_NAME="$(parse_define DB_NAME "$WP_ROOT/wp-config.php")"
-DB_USER="$(parse_define DB_USER "$WP_ROOT/wp-config.php")"
-DB_PASSWORD="$(parse_define DB_PASSWORD "$WP_ROOT/wp-config.php")"
-DB_HOST="$(parse_define DB_HOST "$WP_ROOT/wp-config.php")"
-TABLE_PREFIX="$(grep -oP "\\\$table_prefix\s*=\s*['\"]\K[^'\"]*" "$WP_ROOT/wp-config.php" 2>/dev/null || echo 'wp_')"
+decode_php_string() {
+	local lit="$1"
+	[[ ${#lit} -ge 2 ]] || { printf '\0'; return 0; }
+	php -r '$literal = $argv[1]; $body = substr($literal, 1, -1);
+		if (39 === ord($literal[0])) {
+			$slash = chr(92); $quote = chr(39);
+			$body = strtr($body, array($slash . $slash => $slash, $slash . $quote => $quote));
+		} else {
+			$map = array("n" => "\n", "t" => "\t", "r" => "\r", "v" => chr(11), "e" => chr(27), "f" => chr(12),
+				chr(92) => chr(92), chr(36) => chr(36), chr(34) => chr(34));
+			$body = preg_replace_callback("/\\\\(?:u\\{([0-9a-fA-F]+)\\}|([0-7]{1,3})|x([0-9a-fA-F]{1,2})|.)/s", function ($m) use ($map) {
+				if (isset($m[1]) && "" !== $m[1]) {
+					$n = hexdec($m[1]);
+					if ($n > 0x10ffff) return $m[0];
+					if ($n < 0x80) return chr($n);
+					if ($n < 0x800) return chr(0xc0 | ($n >> 6)) . chr(0x80 | ($n & 0x3f));
+					if ($n < 0x10000) return chr(0xe0 | ($n >> 12)) . chr(0x80 | (($n >> 6) & 0x3f)) . chr(0x80 | ($n & 0x3f));
+					return chr(0xf0 | ($n >> 18)) . chr(0x80 | (($n >> 12) & 0x3f)) . chr(0x80 | (($n >> 6) & 0x3f)) . chr(0x80 | ($n & 0x3f));
+				}
+				if (isset($m[2]) && "" !== $m[2]) return chr(octdec($m[2]) & 0xff);
+				if (isset($m[3]) && "" !== $m[3]) return chr(hexdec($m[3]));
+				$c = substr($m[0], 1);
+				return isset($map[$c]) ? $map[$c] : $m[0];
+			}, $body);
+		}
+		echo $body, "\0";' -- "$lit"
+}
+
+parse_define() {
+	local key="$1" file="$2" q="['\"]" lit
+	lit=""
+	IFS= read -r -d '' lit < <(config_code_lines "$file" \
+		| grep -zoP "(?s)define\s*\(\s*${q}${key}${q}\s*,\s*\K(${q})(?:\\\\.|(?!\1)[^\\\\])*\1") || true
+	decode_php_string "$lit"
+}
+
+read_define() {
+	local key="$1" file="$2" variable="$3"
+	IFS= read -r -d '' "$variable" < <(parse_define "$key" "$file") || true
+}
+
+read_define DB_NAME "$WP_ROOT/wp-config.php" DB_NAME
+read_define DB_USER "$WP_ROOT/wp-config.php" DB_USER
+read_define DB_PASSWORD "$WP_ROOT/wp-config.php" DB_PASSWORD
+read_define DB_HOST "$WP_ROOT/wp-config.php" DB_HOST
+PREFIX_LITERAL=""
+IFS= read -r -d '' PREFIX_LITERAL < <(config_code_lines "$WP_ROOT/wp-config.php" \
+	| { grep -zoP "(?s)\\\$table_prefix\s*=\s*\K(['\"])(?:\\\\.|(?!\1)[^\\\\])*\1" || true; }) || true
+TABLE_PREFIX=""
+IFS= read -r -d '' TABLE_PREFIX < <(decode_php_string "$PREFIX_LITERAL") || true
 TABLE_PREFIX="${TABLE_PREFIX:-wp_}"
 
 if [[ -z "$DB_NAME" || -z "$DB_USER" || -z "$DB_HOST" ]]; then
@@ -251,7 +326,15 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 gd_webp() { php -r 'exit(function_exists("imagewebp") ? 0 : 1);' 2>/dev/null; }
 WEBP_CONVERTER=""
-if command -v convert &>/dev/null; then
+# ImageMagick 7 ships `magick`; `convert` is its deprecated 6.x name (and on some systems
+# another program), so `magick` is looked for first.
+IM_BIN=""
+if command -v magick &>/dev/null; then
+	IM_BIN="magick"
+elif command -v convert &>/dev/null; then
+	IM_BIN="convert"
+fi
+if [[ -n "$IM_BIN" ]]; then
 	WEBP_CONVERTER="imagemagick"
 elif command -v cwebp &>/dev/null; then
 	WEBP_CONVERTER="cwebp"
@@ -291,7 +374,7 @@ convert_to_webp() {
 	[[ -f "$dst" ]] && return 0
 	case "$src" in *.[gG][iI][fF]) conv="$GIF_CONVERTER" ;; esac
 	case "$conv" in
-		imagemagick) convert "$src" -quality "$WEBP_QUALITY" "$dst" 2>/dev/null ;;
+		imagemagick) "$IM_BIN" "$src" -quality "$WEBP_QUALITY" "$dst" 2>/dev/null ;;
 		# cwebp does not read GIF; a GIF reaches this branch only when gif2webp is installed.
 		cwebp)
 			case "$src" in
@@ -310,6 +393,27 @@ convert_to_webp() {
 # WordPress stores attachment metadata with serialize(), so json_decode() always
 # returns null here. Falls back to JSON for the rare filtered install.
 PHP_META='$s=file_get_contents("php://stdin");$m=@unserialize($s, ["allowed_classes" => false]);if(!is_array($m)){$m=json_decode($s,true);}if(!is_array($m)){$m=[];}'
+
+# ── Build the INSERT for one webp queue row ─────────────────────────────────
+# Arguments: table, object_id, item_hash, original_size, final_size, mime, created_at,
+# thumbnails_count, size name, source url, source path, webp url, webp path. Numbers are
+# cast; every string is sent as UNHEX('..') so it is data, whatever bytes it holds.
+BUILD_WEBP_INSERT='$a = array_slice($argv, 1);
+if (count($a) !== 13 || !preg_match("/^[^`\\x00]+$/", $a[0])) { fwrite(STDERR, "bad arguments\n"); exit(1); }
+$h = function ($v) { return "CONVERT(UNHEX(\x27" . bin2hex((string) $v) . "\x27) USING utf8mb4)"; };
+$extra = json_encode([
+	"class" => "RIOP_WebP_Extra_Data",
+	"thumbnails_count" => (int) $a[7],
+	"convert_from" => "attachment",
+	"converted_from_size" => $a[8],
+	"source_src" => $a[9],
+	"source_path" => $a[10],
+	"converted_src" => $a[11],
+	"converted_path" => $a[12],
+], JSON_UNESCAPED_SLASHES);
+if ($extra === false) { fwrite(STDERR, "extra_data is not encodable\n"); exit(1); }
+echo "INSERT INTO `", $a[0], "` (object_id,item_type,item_hash,result_status,processing_level,is_backed_up,original_size,final_size,original_mime_type,final_mime_type,extra_data,created_at) VALUES (",
+	(int) $a[1], ",\x27webp\x27,", $h($a[2]), ",\x27success\x27,\x27normal\x27,0,", (int) $a[3], ",", (int) $a[4], ",", $h($a[5]), ",\x27image/webp\x27,", $h($extra), ",", (int) $a[6], ");";'
 
 # ── The queue table must exist before any of the steps below ────────────────
 # Robin creates it on activation. Without this guard a missing table makes every
@@ -591,18 +695,16 @@ else
 			WEBP_SIZE=$(stat -c%s "$WEBP_PATH" 2>/dev/null || echo 0)
 			WEBP_URL="${s_url}.webp"
 
-			EXTRA_DATA=$(php -r 'echo json_encode([
-				"class"=>"RIOP_WebP_Extra_Data",
-				"thumbnails_count"=>'${THUMB_COUNT:-0}',
-				"convert_from"=>"attachment",
-				"converted_from_size"=>"'$s_name'",
-				"source_src"=>"'$s_url'",
-				"source_path"=>"'$s_path'",
-				"converted_src"=>"'$WEBP_URL'",
-				"converted_path"=>"'$WEBP_PATH'",
-			],JSON_UNESCAPED_SLASHES);')
+			# The names and paths come from attachment metadata and file names (`O'Brien.jpg`,
+			# `plan (1).png`), so none of them is pasted into PHP or SQL source. They travel
+			# as arguments to one PHP process, which builds extra_data and hands back the whole
+			# INSERT with every string as a hex literal: no quote, backslash or `$` in a name
+			# can end a literal, and it does not depend on the server's sql_mode.
+			INSERT_SQL=$(php -r "$BUILD_WEBP_INSERT" -- "$QUEUE_TABLE" "$post_id" "$ITEM_HASH" "$s_bytes" \
+				"$WEBP_SIZE" "$MIME" "$TS" "${THUMB_COUNT:-0}" "$s_name" "$s_url" "$s_path" \
+				"$WEBP_URL" "$WEBP_PATH") || { warn "    ${s_name}: could not build the queue row, skipping"; continue; }
 
-			db_q "INSERT INTO ${QUEUE_TABLE} (object_id,item_type,item_hash,result_status,processing_level,is_backed_up,original_size,final_size,original_mime_type,final_mime_type,extra_data,created_at) VALUES (${post_id},'webp','${ITEM_HASH}','success','normal',0,${s_bytes},${WEBP_SIZE},'${MIME}','image/webp','${EXTRA_DATA}',${TS});" && {
+			db_q "$INSERT_SQL" && {
 				((INSERTED++)) || true
 				EXISTING_HASHES="${EXISTING_HASHES}"$'\n'"${ITEM_HASH}"
 			}

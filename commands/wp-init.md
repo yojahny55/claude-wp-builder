@@ -125,10 +125,7 @@ bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '$
 
 On exit 2, run the migration before continuing.
 
-**Amending the exit `3` row above:** Exit `3` is not a stop here: this command also scaffolds a theme onto a WordPress
-install that was never run through `/wp-create`, and the "If `.wp-create.json` does NOT
-exist" branch below is that legitimate path. Treat exit `3` as "no manifest to read
-config from" and fall through to that branch instead of aborting.
+**Exit `3` policy:** `scaffold`, defined in `${CLAUDE_PLUGIN_ROOT}/skills/wp-manifest-gate/SKILL.md`. Read it when the validator exits `3`.
 
 Before anything else, check if `.wp-create.json` exists in the current working directory or parent directories (same search pattern as `wp-content/themes/`).
 

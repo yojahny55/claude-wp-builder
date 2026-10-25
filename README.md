@@ -485,6 +485,7 @@ commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. 
 | `wp-s3` | WordPress media on S3 — installs and configures S3 Uploads, migrates the library with a transfer that verifies itself, and reverses the whole thing. Run through `/wp-s3` and `/wp-s3-media` |
 | `wp-woocommerce` | WooCommerce store practice — the three store tiers and the plugins each installs (and the ones deliberately avoided, with reasons), the setup facts a WP-CLI install gets wrong, and the setup script `/wp-woo-setup` runs |
 | `wp-environments` | Environment detection and the WP-CLI wrapper every command runs through |
+| `wp-manifest-gate` | What each command does on every exit of the manifest validator, and the named exit-3 policy per command (stop, adopt-or-stop, bare-wp-fallback, ...) |
 | `wp-audit-standards` | Audit criteria, severity definitions, report schema and quality thresholds for the `wp-audit-*` agents |
 | `wp-audit-seo-standards` | Rank Math configuration reference, schema JSON-LD templates, meta patterns and SEO seeding commands |
 | `wp-audit-ux-standards` | Usability criteria — the UX-NNN catalog, the page-level vs site-level split, the applicability rules that keep a score honest and the owner each fix belongs to |
