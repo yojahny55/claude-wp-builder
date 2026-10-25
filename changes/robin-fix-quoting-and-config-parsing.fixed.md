@@ -5,6 +5,6 @@
   One PHP process now receives the values as arguments, builds `extra_data` and returns
   the INSERT with every string as a hex literal. `parse_define` took the first
   `define('DB_NAME', ...)` even when it sat in a `//`, `#` or `*` comment and cut a password
-  holding `\'` short; it now skips comment lines and follows PHP's escapes. ImageMagick 7
+  holding `\'` short; it now skips comment lines and decodes only the escapes PHP does (an unknown one such as `\w` keeps its backslash). ImageMagick 7
   ships `magick` and deprecates `convert`: the script, `/wp-robin` Step 2 and the skill now
   prefer `magick` and fall back to `convert`.

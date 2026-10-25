@@ -86,13 +86,21 @@ decode_php_string() {
 			$slash = chr(92); $quote = chr(39);
 			$body = strtr($body, array($slash . $slash => $slash, $slash . $quote => $quote));
 		} else {
-			$body = preg_replace_callback("/\\\\(?:u\\{([0-9a-fA-F]+)\\}|[0-7]{1,3}|x[0-9a-fA-F]{1,2}|.)/s", function ($m) {
-				if (!isset($m[1]) || "" === $m[1]) return stripcslashes($m[0]);
-				$n = hexdec($m[1]);
-				if ($n < 0x80) return chr($n);
-				if ($n < 0x800) return chr(0xc0 | ($n >> 6)) . chr(0x80 | ($n & 0x3f));
-				if ($n < 0x10000) return chr(0xe0 | ($n >> 12)) . chr(0x80 | (($n >> 6) & 0x3f)) . chr(0x80 | ($n & 0x3f));
-				return chr(0xf0 | ($n >> 18)) . chr(0x80 | (($n >> 12) & 0x3f)) . chr(0x80 | (($n >> 6) & 0x3f)) . chr(0x80 | ($n & 0x3f));
+			$map = array("n" => "\n", "t" => "\t", "r" => "\r", "v" => chr(11), "e" => chr(27), "f" => chr(12),
+				chr(92) => chr(92), chr(36) => chr(36), chr(34) => chr(34));
+			$body = preg_replace_callback("/\\\\(?:u\\{([0-9a-fA-F]+)\\}|([0-7]{1,3})|x([0-9a-fA-F]{1,2})|.)/s", function ($m) use ($map) {
+				if (isset($m[1]) && "" !== $m[1]) {
+					$n = hexdec($m[1]);
+					if ($n > 0x10ffff) return $m[0];
+					if ($n < 0x80) return chr($n);
+					if ($n < 0x800) return chr(0xc0 | ($n >> 6)) . chr(0x80 | ($n & 0x3f));
+					if ($n < 0x10000) return chr(0xe0 | ($n >> 12)) . chr(0x80 | (($n >> 6) & 0x3f)) . chr(0x80 | ($n & 0x3f));
+					return chr(0xf0 | ($n >> 18)) . chr(0x80 | (($n >> 12) & 0x3f)) . chr(0x80 | (($n >> 6) & 0x3f)) . chr(0x80 | ($n & 0x3f));
+				}
+				if (isset($m[2]) && "" !== $m[2]) return chr(octdec($m[2]) & 0xff);
+				if (isset($m[3]) && "" !== $m[3]) return chr(hexdec($m[3]));
+				$c = substr($m[0], 1);
+				return isset($map[$c]) ? $map[$c] : $m[0];
 			}, $body);
 		}
 		echo $body, "\0";' -- "$lit"

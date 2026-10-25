@@ -102,6 +102,21 @@ expected_pwd=$(printf '%s' $'a\tb\\c"d$eA\n' | base64 | tr -d '\n')
 grep -Fq "pwd_b64=$expected_pwd" "$tmp/log" || fail "the multiline double-quoted password or its trailing newline was not decoded: $first"
 grep -Fq "pfx'_options" "$tmp/log" || fail "an escaped quote truncated the live \$table_prefix"
 
+# Unknown escapes keep their backslash in PHP double quotes, `\e` is ESC, and `\'` is not an escape there.
+cat > "$wp/wp-config.php" <<'PHP'
+<?php
+define('DB_NAME', 'db'); define('DB_USER', 'u'); define('DB_HOST', 'localhost');
+define("DB_PASSWORD", "p\w\'x\e");
+$table_prefix = 'wp_';
+PHP
+: > "$tmp/log"
+out=$(run "$tmp" WP_ROOT="$wp"); rc=$?
+[ -s "$tmp/log" ] || fail "no query reached the client for the unknown-escape password: $out"
+expected_pwd=$(printf '%s' 'p\w\'"'"'x'$'\033' | base64 | tr -d '\n')
+grep -Fq "pwd_b64=$expected_pwd" "$tmp/log" || fail "unknown escapes in a double-quoted password were decoded differently from PHP (want p\\w\\'x<ESC>): $(head -1 "$tmp/log")"
+want=$(php -r 'echo base64_encode(eval("return " . $argv[1] . ";"));' -- '"p\w\'"'"'x\e"')
+[ "$want" = "$expected_pwd" ] || fail "the fixture's expected bytes disagree with what PHP itself makes of the literal"
+
 # ---- file names with quotes, backslashes and $ ------------------------------
 name="O'Brien \"q\" \$HOME \`id\` plan (1).png"
 rel="2026/10/$name"
