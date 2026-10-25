@@ -1,12 +1,27 @@
 ---
 description: Build the WordPress header — responsive nav, logo, language switcher, WP menu system integration
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
-argument-hint: "[screenshot-path]"
+argument-hint: "[screenshot-path] [--force-adopted]"
 ---
 
 # WP Header — WordPress Header Builder
 
 Generate a fully functional WordPress header with responsive navigation, logo from settings, language switcher, and WP menu system integration.
+
+## Adopted-site guard
+
+Run this before anything else. This command builds a theme, sections or content on the assumption
+that the theme is one this plugin scaffolded; on an adopted site (a third-party theme) it would
+overwrite that theme or generate one that does not belong. `${PROJECT_PATH}` is the WordPress project
+root, the directory that holds the project manifest.
+
+```bash
+bash -c 'node "$1/bin/wp-config.mjs" require-origin "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
+```
+
+Exit `0` continue. Exit `5` stop and print the message verbatim: `adopted site with a third-party theme:
+use /wp-audit, /wp-debug or /wp-update`. If `$ARGUMENTS` contains `--force-adopted`, append it to the
+call (and ignore it everywhere else): the operator chose to build on an adopted site on purpose.
 
 ## Step 1: Read Project Context
 
