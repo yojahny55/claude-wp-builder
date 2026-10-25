@@ -390,7 +390,7 @@ PHP_META='$s=file_get_contents("php://stdin");$m=@unserialize($s, ["allowed_clas
 # thumbnails_count, size name, source url, source path, webp url, webp path. Numbers are
 # cast; every string is sent as UNHEX('..') so it is data, whatever bytes it holds.
 BUILD_WEBP_INSERT='$a = array_slice($argv, 1);
-if (count($a) !== 13 || !preg_match("/^[A-Za-z0-9_]+$/", $a[0])) { fwrite(STDERR, "bad arguments\n"); exit(1); }
+if (count($a) !== 13 || !preg_match("/^[^`\\x00]+$/", $a[0])) { fwrite(STDERR, "bad arguments\n"); exit(1); }
 $h = function ($v) { return "CONVERT(UNHEX(\x27" . bin2hex((string) $v) . "\x27) USING utf8mb4)"; };
 $extra = json_encode([
 	"class" => "RIOP_WebP_Extra_Data",
@@ -403,7 +403,7 @@ $extra = json_encode([
 	"converted_path" => $a[12],
 ], JSON_UNESCAPED_SLASHES);
 if ($extra === false) { fwrite(STDERR, "extra_data is not encodable\n"); exit(1); }
-echo "INSERT INTO ", $a[0], " (object_id,item_type,item_hash,result_status,processing_level,is_backed_up,original_size,final_size,original_mime_type,final_mime_type,extra_data,created_at) VALUES (",
+echo "INSERT INTO `", $a[0], "` (object_id,item_type,item_hash,result_status,processing_level,is_backed_up,original_size,final_size,original_mime_type,final_mime_type,extra_data,created_at) VALUES (",
 	(int) $a[1], ",\x27webp\x27,", $h($a[2]), ",\x27success\x27,\x27normal\x27,0,", (int) $a[3], ",", (int) $a[4], ",", $h($a[5]), ",\x27image/webp\x27,", $h($extra), ",", (int) $a[6], ");";'
 
 # ── The queue table must exist before any of the steps below ────────────────
