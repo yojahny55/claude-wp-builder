@@ -28,10 +28,14 @@
 #   - A call waits at most --wait seconds (default 300) for another agent's command to
 #     finish, then exits 5 without sending anything. Call it again later; a wait is not a
 #     retry, since nothing was sent.
-#   - A development host is not gated: a local site runs exactly as it did before.
+#   - A development host is not gated: a local site runs exactly as it did before, unless
+#     the caller passes --prod (the manifest's `environments` marks that host as role prod).
+#   - The wrapped command inherits WP_AUDIT_GATE_HELD=<host>. A script that must never reach
+#     a production host ungated (bin/audit-suite.sh) re-runs itself through the gate when the
+#     variable does not name its host, and proceeds without a second lock when it does.
 #
 # Usage:
-#   prod-gate.sh [--dir <state-dir>] [--delay <s>] [--wait <s>] <url-or-host> -- <command> [args...]
+#   prod-gate.sh [--dir <state-dir>] [--delay <s>] [--wait <s>] [--prod] <url-or-host> -- <command> [args...]
 #   prod-gate.sh [--dir <state-dir>] --mark-blocked <url-or-host> "<reason>"
 #   prod-gate.sh [--dir <state-dir>] --status <url-or-host>
 # State dir: --dir, else $WP_AUDIT_GATE_DIR, else ${TMPDIR:-/tmp}/wp-audit-gate. All the
@@ -43,13 +47,14 @@
 #   1 = usage error, or flock is unavailable (the gate refuses to run unserialized)
 set -uo pipefail
 
-dir="${WP_AUDIT_GATE_DIR:-${TMPDIR:-/tmp}/wp-audit-gate}" delay=2 wait_max=300 mode=run
+dir="${WP_AUDIT_GATE_DIR:-${TMPDIR:-/tmp}/wp-audit-gate}" delay=2 wait_max=300 mode=run force_prod=0
 need() { [ $# -ge 2 ] && [ -n "$2" ] || { echo "$1 needs a value" >&2; exit 1; }; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --dir) need "$@"; dir="$2"; shift 2 ;;
     --delay) need "$@"; delay="$2"; shift 2 ;;
     --wait) need "$@"; wait_max="$2"; shift 2 ;;
+    --prod) force_prod=1; shift ;;
     --mark-blocked) mode=mark; shift ;;
     --status) mode=status; shift ;;
     *) break ;;
@@ -85,6 +90,7 @@ case "$host" in
     esac ;;
 esac
 
+[ "$force_prod" -eq 1 ] && local_host=0
 mkdir -p "$dir" || { echo "cannot create $dir" >&2; exit 1; }
 key="$(printf '%s' "$host" | tr -c 'a-z0-9.-' '_')"
 blocked="$dir/$key.blocked" stamp="$dir/$key.last" lock="$dir/$key.lock"
@@ -134,7 +140,7 @@ if [ -f "$stamp" ]; then
 fi
 # The child must not inherit fd 9: a process it leaves behind (a browser, `cmd &`) would
 # otherwise hold the host's lock after the command returns.
-"$@" 9>&-
+WP_AUDIT_GATE_HELD="$host" "$@" 9>&-
 rc=$?
 now > "$stamp"
 # The command is curl when it is the program run, directly or through any nesting of
