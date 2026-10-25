@@ -9,7 +9,7 @@ fail() { echo "FAIL: $*"; exit 1; }
 CI=.github/workflows/ci.yml
 
 grep -Fq "bash -n" "$CI" || fail "ci.yml does not run bash -n on the shell scripts"
-grep -Fq "find bin skills -name '*.sh'" "$CI" || fail "ci.yml does not cover bin/ and skills/*/scripts/"
+grep -Fq "find bin skills tests -name '*.sh'" "$CI" || fail "ci.yml does not parse bin/, skills/*/scripts/ and tests/"
 grep -Fq 'shellcheck --severity=warning' "$CI" || fail "ci.yml does not run shellcheck at warning severity"
 awk '/name: shellcheck/{f=1} f&&/continue-on-error/{bad=1} /^  [a-z][a-z0-9_-]*:[[:space:]]*$/{f=0} END{exit bad?1:0}' "$CI" \
   || fail "shellcheck regained continue-on-error: it is a blocking gate"
@@ -24,7 +24,7 @@ n=0
 while IFS= read -r f; do
   bash -n "$f" || fail "$f does not parse"
   n=$((n + 1))
-done < <(find bin skills -name '*.sh' -not -path '*/node_modules/*' | sort)
+done < <(find bin skills tests -name '*.sh' -not -path '*/node_modules/*' | sort)
 [ "$n" -gt 0 ] || fail "found no shell scripts to parse"
 if command -v shellcheck >/dev/null 2>&1; then
   mapfile -t sc_files < <(find bin skills -name '*.sh' -not -path '*/node_modules/*' | sort)
