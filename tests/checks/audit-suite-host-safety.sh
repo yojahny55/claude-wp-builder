@@ -56,6 +56,24 @@ rc=0
 [ "$rc" = 4 ] || { cat "$tmp/out"; fail "an ungated call to a blocked production host exited $rc, not the gate's 4"; }
 [ ! -e "$tmp/suite" ] || fail "something was scaffolded before the gate refused"
 
+# 2b. A bracketed IPv6 literal keeps one key in both scripts: the child of a gated run compares
+# WP_AUDIT_GATE_HELD with its own key, and `%%:*` alone cut `[2001:db8::1]` to `[2001`.
+has bin/lib/host-key.sh 'host_key()'
+has bin/prod-gate.sh 'host_key "$target"'
+has "$runner" 'host_key "$url"'
+hasnt "$runner" 'gate_host="${url_host%%:*}"'
+(
+  . bin/lib/host-key.sh
+  [ "$(host_key 'https://[2001:DB8::1]:8443/x?a=1')" = '[2001:db8::1]' ] || exit 1
+  [ "$(host_key 'https://user@Example.COM:443/p')" = 'example.com' ] || exit 1
+  [ "$(host_key 'example.com')" = 'example.com' ] || exit 1
+) || fail "host_key does not normalize an IPv6 literal, a port or userinfo"
+v6="$tmp/v6"; mkdir -p "$v6/gate"
+rc=0
+(cd "$tmp" && WP_AUDIT_GATE_HELD='[2001:db8::1]' WP_AUDIT_GATE_DIR="$v6/gate" WP_BROWSER_CHROMIUM="$fakebin/chromium" \
+  timeout 15 bash "$OLDPWD/$runner" --url 'https://[2001:db8::1]/' --dir "$tmp/suite-v6" > "$tmp/out-v6" 2>&1) || rc=$?
+! grep -Fq 're-running through bin/prod-gate.sh' "$tmp/out-v6" || { cat "$tmp/out-v6"; fail "a child holding the gate for an IPv6 host re-ran the gate"; }
+
 # 3. Consecutive timeouts stop the run; the runner turns that into UNMEASURED, exit 2.
 node "$suite/guard/timeout-guard.selfcheck.js" | grep -Fq PASS || fail "the timeout guard self-check fails"
 has "$suite/playwright.guard.config.js" 'guard/timeout-guard'
