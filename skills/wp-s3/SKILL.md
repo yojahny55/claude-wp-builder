@@ -222,7 +222,11 @@ Read it before the first run against AWS, and when media returns `403`.
 
 `scripts/s3-revert.sh` disables rewriting, **downloads the media before removing the
 configuration** — without `s3-config.php` there is no bucket, region or credential left to
-fetch them with — deactivates the plugin, removes the `require`, and renames `s3-config.php`
-and the mu-plugin to `.disabled` rather than deleting them. It deletes nothing in the
+fetch them with — deactivates the plugin, removes the `require`, moves `s3-config.php` to
+a `0600` file in a private `0700` directory outside the docroot
+(`~/.local/state/wp-s3-backups/<key>/s3-config.php.disabled`, `$WP_S3_BACKUP_DIR` to
+override) and renames the mu-plugin to `.disabled`, rather than deleting them. A
+`.disabled` file left beside `s3-config.php` is served as plain text, credentials included.
+Re-enabling is a `mv` of the parked file back, which the script prints. It deletes nothing in the
 bucket. Two things it cannot undo, because they are site data: Elementor's stored URLs and
 WooCommerce's download settings. It prints both commands, filled in.

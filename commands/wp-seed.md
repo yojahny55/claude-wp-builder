@@ -1,7 +1,7 @@
 ---
 description: Seed WordPress content from demo HTML — parses sections, creates pages, imports media, populates ACF fields, builds menus, supports bilingual content
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
-argument-hint: "[demo-file.html] [--exclude-slugs <slug,slug,...>] [--force-fields]"
+argument-hint: "[demo-file.html] [--exclude-slugs <slug,slug,...>] [--force-fields] [--force-adopted]"
 ---
 
 # WP Seed — Content Seeding from Demo HTML
@@ -13,6 +13,21 @@ throughout. Anything meant to be re-run — a bulk import, a script another
 command will need to trigger again later — is a different case: see "Non-Trivial
 Seed Logic Lives in `inc/seed/`, Never in a Scratchpad" in
 `${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/SKILL.md` before writing it as a throwaway file.
+
+## Adopted-site guard
+
+Run this before anything else. This command builds a theme, sections or content on the assumption
+that the theme is one this plugin scaffolded; on an adopted site (a third-party theme) it would
+overwrite that theme or generate one that does not belong. `${PROJECT_PATH}` is the WordPress project
+root, the directory that holds the project manifest.
+
+```bash
+bash -c 'node "$1/bin/wp-config.mjs" require-origin "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
+```
+
+Exit `0` continue. Exit `5` stop and print the message verbatim: `adopted site with a third-party theme:
+use /wp-audit, /wp-debug or /wp-update`. If `$ARGUMENTS` contains `--force-adopted`, append it to the
+call (and ignore it everywhere else): the operator chose to build on an adopted site on purpose.
 
 ## Step 0: Read Project Manifest
 
@@ -33,8 +48,7 @@ bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '$
 
 On exit 2, run the migration before continuing.
 
-**Amending the exit `3` row above:** Exit `3` here falls through to the bare-`wp` fallback below rather than stopping outright
-— this command also seeds a WordPress root that was never run through `/wp-create`.
+**Exit `3` policy:** `bare-wp-fallback`, defined in `${CLAUDE_PLUGIN_ROOT}/skills/wp-manifest-gate/SKILL.md`. Read it when the validator exits `3`.
 
 Read `.wp-create.json` from the project root to obtain the WP-CLI wrapper and language configuration.
 

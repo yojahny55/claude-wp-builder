@@ -52,6 +52,10 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 - **Page-builder markup lives in the database.** When `stack.builder` is not `none`, a
   defect in markup the builder stores per page is `Owner: content` (fixed in the builder's
   editor), not `code`.
+- **Design impact is declared on every finding.** `design_impact` (`Design impact:` in the text
+  report) is `true` when the fix could change how the site renders: a colour, font, size,
+  spacing, an asset's dimensions, a new or changed CSS rule, or a tag or class swap. It is
+  `false` only when the fix leaves every computed style and box as it was. When unsure, `true`.
 - **Cache plugin.** When `stack.cache` is not `none`, caching, minification and lazy-loading findings name that plugin's setting as the fix, `Owner: setting`. Do not propose `.htaccess` caching rules or a `performance.php` that duplicate what the plugin already does.
 
 ## Step 1: Tier 1 — Code-Only Checks
@@ -795,6 +799,7 @@ and return `checks_executed` beside them. Each finding includes:
   "status": "FAIL",
   "severity": "WARNING",
   "ownership": "code",
+  "design_impact": false,
   "resource": "assets/css/styles.css",
   "message": "CSS too large: styles.css is 142KB, over the 100KB budget",
   "evidence": "gzip -c assets/css/styles.css | wc -c",
@@ -1092,6 +1097,19 @@ Two things this fix does not cover, and both belong in the report rather than in
 decision: a file under `vendors/` is third-party and usually minified already, so it is left
 alone; and `assets/js/min/` must be excluded from the theme bundle's own exclude list only if
 that list names `min` — check `bundle`/`zip` scripts before assuming the twins ship.
+
+### Source assets, minified twins and critical cuts: one commit
+
+When the theme builds its assets (`.min` twins, a bundle, a hash manifest such as
+`assets/build.json`) and, optionally, inlines per-template critical CSS cuts, the order after
+touching any CSS or JS source is fixed: (1) regenerate the `.min` files and the bundle, which
+rewrites the manifest; (2) regenerate the critical cuts from the new bundle. Running only (1)
+invalidates every cut without any error. Commit sources, `.min`, bundle, cuts and the manifest
+together. Run `node ${CLAUDE_PLUGIN_ROOT}/bin/assets-fresh.mjs <theme-dir>` before reporting
+done: it recomputes content hashes and exits non-zero with "regenerate critical cuts" when the
+manifest and the files disagree. Do not propose inline critical CSS unless the five conditions
+in `performance-lessons.md` ("Inline critical CSS") hold: per-group cuts, a non-blocking full
+sheet, a content-hash invalidation, same-DOM verification, and a decision on observed LCP.
 
 ### Hero fetchpriority fix
 

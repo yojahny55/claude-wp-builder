@@ -35,8 +35,7 @@ bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '$
 
 On exit 2, run the migration before continuing.
 
-**Amending the exit `3` row above:** Exit `3` here falls through to the resolution order below rather than stopping outright
-— this command targets any WordPress root, not only one created by `/wp-create`.
+**Exit `3` policy:** `bare-wp-fallback`, defined in `${CLAUDE_PLUGIN_ROOT}/skills/wp-manifest-gate/SKILL.md`. Read it when the validator exits `3`.
 
 `$ARGUMENTS` is optional and holds at most one value:
 
@@ -79,7 +78,7 @@ one-line message:
 ```bash
 bash -c "command -v mariadb || command -v mysql"
 bash -c "command -v php"
-bash -c "command -v convert || command -v cwebp || php -r 'if (function_exists(\"imagewebp\")) { echo \"gd\"; exit 0; } exit 1;'"
+bash -c "command -v magick || command -v convert || command -v cwebp || php -r 'if (function_exists(\"imagewebp\")) { echo \"gd\"; exit 0; } exit 1;'"
 ```
 
 If no database client or no `php` is found, stop and say so. If no webp converter is found, report the
