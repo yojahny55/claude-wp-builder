@@ -164,6 +164,15 @@ if [ "${WP_FIXTURE_STORE:-0}" = "1" ]; then
   $WP config set WP_ENVIRONMENT_TYPE local --type=constant --quiet || die "could not mark the fixture local"
 fi
 
+# The seeded-defects corpus, for a real audit run over known defects. Copied, never
+# activated: the theme and plugin are broken on purpose and activating them would only
+# put their defects in the way of the other checks. See tests/fixtures/seeded-defects.
+if [ "${WP_FIXTURE_SEEDED:-0}" = "1" ]; then
+  seeded="$(cd "$(dirname "$0")/.." && pwd)/seeded-defects"
+  cp -R "$seeded/theme" "$DIR/wp-content/themes/seeded-defects" || die "could not copy the seeded theme"
+  cp -R "$seeded/plugin" "$DIR/wp-content/plugins/seeded-defects" || die "could not copy the seeded plugin"
+fi
+
 # Offline from here on. Everything above needed the network to download WordPress and its
 # plugins; nothing after this line may. The guard is a must-use plugin, so no plugin
 # reactivation or option write can turn it off, and it logs every host it refuses to
