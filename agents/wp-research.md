@@ -99,10 +99,13 @@ column but URL.
 Write into `.wp-create.json` **with the `set` subcommand, never with Edit or Write**.
 Other builders (`/wp-yolo` runs several in parallel) read and write the same file, and a
 free-form edit loses their keys or leaves a half-written file. `set` locks, validates and
-renames atomically; pass the whole record as one JSON argument:
+renames atomically; pass the whole record as JSON on stdin (`-`) through a quoted heredoc,
+so an apostrophe in a place name cannot split the argument:
 
 ```bash
-node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs set "${PROJECT_PATH}" research '<the JSON below, on one line>'
+node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs set "${PROJECT_PATH}" research - <<'JSON'
+<the JSON below>
+JSON
 ```
 
 The record:

@@ -8,3 +8,6 @@
   holding an unlinked file while a fourth created a new one, so two compiles ran together.
   The lock file is now kept (and gitignored by `/wp-init`), the wait for it is bounded, and
   the implicit `npm install` inside it has a timeout.
+  `set` also refuses a parent key whose value would carry a secret (`database`, `wordpress`),
+  extra arguments, and a value that starts with `{` or `[` but does not parse; `-` reads the
+  value from stdin, and `wp-research` passes its record that way through a quoted heredoc.

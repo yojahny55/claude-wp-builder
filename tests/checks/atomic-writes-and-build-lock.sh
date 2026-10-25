@@ -37,6 +37,21 @@ node bin/wp-config.mjs set "$proj" __proto__.x 1 >/dev/null 2>&1 && fail "set ac
 node bin/wp-config.mjs set "$proj" environments 5 >/dev/null 2>&1 && fail "set accepted an invalid environments value"
 ls -A "$proj" | grep -E '\.tmp$|\.lock$' && fail "set left a temp or lock file behind"
 
+# --- behavior: a parent key cannot smuggle a secret, and a broken argument is refused ---
+before="$(cat "$proj/.wp-create.json")"
+node bin/wp-config.mjs set "$proj" database '{"name":"wp","user":"root","password":"hunter2","host":"localhost"}' >/dev/null 2>&1 && fail "set accepted a parent key carrying a secret"
+node bin/wp-config.mjs set "$proj" wordpress '{"admin_password":"hunter2"}' >/dev/null 2>&1 && fail "set accepted wordpress.admin_password through its parent"
+[ "$(cat "$proj/.wp-create.json")" = "$before" ] || fail "a refused secret set changed the manifest"
+grep -q hunter2 "$proj/.wp-create.json" && fail "a secret reached the manifest"
+node bin/wp-config.mjs set "$proj" research a b >/dev/null 2>&1 && fail "set accepted extra arguments"
+node bin/wp-config.mjs set "$proj" research '{"confidence":"unconfirmed","name":"Val d' 'Or"}' >/dev/null 2>&1 && fail "set accepted an apostrophe-split value"
+node bin/wp-config.mjs set "$proj" research '{"broken":' >/dev/null 2>&1 && fail "set stored broken JSON as a string"
+[ "$(cat "$proj/.wp-create.json")" = "$before" ] || fail "a refused set changed the manifest"
+node bin/wp-config.mjs set "$proj" research - >/dev/null 2>&1 <<'JSON' || fail "set refused JSON with apostrophes on stdin"
+{"confidence":"unconfirmed","location":"Val d'Or, Coeur d'Alene","tier":"websearch","competitors":2}
+JSON
+[ "$(node -p "require('$proj/.wp-create.json').research.location")" = "Val d'Or, Coeur d'Alene" ] || fail "stdin value was not stored intact"
+
 # --- behavior: parallel sets lose no key and never leave invalid JSON ---
 pids=()
 for i in 1 2 3 4 5 6 7 8; do

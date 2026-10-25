@@ -497,8 +497,20 @@ function cmdSet(projectPath, key, raw) {
     warn(`refusing to set ${key}: secrets live in the environment or ${LOCAL_NAME}, not the manifest`);
     process.exit(1);
   }
+  // `-` reads the value from stdin, so a heredoc carries JSON that contains apostrophes or quotes.
+  if (raw === '-') {
+    try { raw = readFileSync(0, 'utf8').trim(); } catch { raw = ''; }
+    if (!raw) { warn('refusing to set: stdin was empty'); process.exit(1); }
+  }
   let value = raw;
-  try { value = JSON.parse(raw); } catch { /* a plain string */ }
+  try { value = JSON.parse(raw); } catch (err) {
+    // A value that looks like JSON but does not parse is a broken argument (an unescaped quote
+    // split it, a truncation), never a string the caller meant to store.
+    if (/^\s*[{[]/.test(raw)) {
+      warn(`refusing to set ${key}: the value looks like JSON but does not parse (${err.message}); pass it on stdin with \`-\``);
+      process.exit(1);
+    }
+  }
   const file = join(resolve(projectPath), MANIFEST_NAME);
   if (!existsSync(file)) { warn(`no ${MANIFEST_NAME} at ${resolve(projectPath)} -- run /wp-create first`); process.exit(3); }
   // process.exit() inside the lock would skip withLock's finally and orphan the lock, so the
@@ -508,6 +520,8 @@ function cmdSet(projectPath, key, raw) {
     try { manifest = JSON.parse(readFileSync(file, 'utf8')); } catch (err) {
       return { fatal: `${MANIFEST_NAME} is not valid JSON ${jsonParseErrorLocation(err)}`, found: [] };
     }
+    const secretAt = (m, path) => path.split('.').reduce((a, k) => (a !== null && typeof a === 'object' && Object.hasOwn(a, k) ? a[k] : undefined), m);
+    const before = Object.values(SECRETS).map((sp) => JSON.stringify(secretAt(manifest, sp.manifestPath)));
     let o = manifest;
     for (const k of parts.slice(0, -1)) {
       if (!Object.hasOwn(o, k) || o[k] === null || typeof o[k] !== 'object' || Array.isArray(o[k])) {
@@ -517,6 +531,12 @@ function cmdSet(projectPath, key, raw) {
       o = o[k];
     }
     o[parts[parts.length - 1]] = value;
+    // A parent key (`database`, `wordpress`) can carry a secret as a child of the value.
+    const leaked = Object.values(SECRETS).find((sp, i) => {
+      const now = secretAt(manifest, sp.manifestPath);
+      return now !== undefined && JSON.stringify(now) !== before[i];
+    });
+    if (leaked) return { fatal: `refusing to set ${key}: it would write ${leaked.manifestPath}; secrets live in the environment or ${LOCAL_NAME}, not the manifest`, found: [] };
     const found = validateManifest(manifest);
     if (!found.length) writeAtomic(file, `${JSON.stringify(manifest, null, 2)}\n`);
     return { found };
@@ -626,6 +646,7 @@ else if (cmd === 'get' && target && process.argv[4]) cmdGet(target, process.argv
 else if (cmd === 'validate-profile' && target) cmdValidateProfile(target);
 else if (cmd === 'drift' && target) cmdDrift(target);
 else if (cmd === 'refresh' && target) cmdRefresh(target);
+else if (cmd === 'set' && process.argv.length > 6) { warn('set takes exactly <project> <key> <value>; quote the value or pass it on stdin with `-`'); process.exit(1); }
 else if (cmd === 'set' && target && process.argv[4] && process.argv[5] !== undefined) cmdSet(target, process.argv[4], process.argv[5]);
 else if (cmd === 'require-origin' && target) cmdRequireOrigin(target, parseFlags(process.argv.slice(4)));
 else if (cmd === 'gitignore-check' && target) cmdGitignoreCheck(target);
