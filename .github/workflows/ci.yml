@@ -186,7 +186,7 @@ jobs:
   # annotation and the count; once the backlog is cleared or baselined, delete
   # `continue-on-error` and it becomes a gate. Exclusions live in .shellcheckrc, each with
   # its reason. shellcheck ships on ubuntu-latest, so nothing is installed here.
-  shell:
+  shell-lint:
     name: Shell scripts
     runs-on: ubuntu-latest
     timeout-minutes: 10

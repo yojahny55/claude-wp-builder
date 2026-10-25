@@ -46,11 +46,14 @@ for cmd in "${cmds[@]}"; do
   done
 done
 
-# A sane domain must still get through to the stubs, or "rejects everything" would pass.
-run_stubbed bash bin/wp-env-setup.sh hosts-add --domain=example.local.com
-if ! stub_called sudo && ! grep -q 'already exists' <<<"$STUB_OUT"; then
-  fail "a valid domain no longer reaches the sudo call: the check cannot tell refusal from breakage"
-fi
+# A sane domain must still get through to the stubs on every command, or "rejects everything"
+# would pass. The domain is unique per run so a real /etc/hosts entry cannot satisfy the check.
+sane="sanity-$$.local.com"
+# hosts-remove is a no-op for an absent entry, so it is excluded: it makes no call to observe.
+for cmd in hosts-add ssl-generate; do
+  run_stubbed bash bin/wp-env-setup.sh "$cmd" "--domain=$sane"
+  [ -s "$STUB_LOG" ] || fail "$cmd: a valid domain reaches no stubbed call: the check cannot tell refusal from breakage"
+done
 
 if [ "$leaks" -eq 0 ]; then
   echo PASS

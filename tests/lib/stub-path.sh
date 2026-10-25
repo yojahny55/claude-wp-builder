@@ -65,5 +65,6 @@ run_stubbed() {
 stub_called() { grep -Eq "^$1( |\$)" "$STUB_LOG"; }
 
 # Calls that would have changed something. A bare `sed` never appears here (only in-place
-# sed is logged); `wp` and `mysql` count, since both write to a live site.
+# sed is logged, which is why `sed` is safe in the list below: if the stub ever logs plain
+# sed too, drop it from the pattern); `wp` and `mysql` count, since both write to a live site.
 stub_destructive_calls() { grep -E '^(sudo|rm|mysql|mysqldump|wp|tee|systemctl|chown|chmod|ln|mv|cp|mkdir|openssl|install|security|sed)( |$)' "$STUB_LOG" || true; }
