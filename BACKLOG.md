@@ -13,7 +13,7 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 
 **Priority:** Items within each section are ordered by priority (highest first).
 
-**Reconciled** on October 20, 2026 against `main` at v1.30.0. Every item below was
+**Reconciled** on October 27, 2026 against `main` at v1.31.0. Every item below was
 checked against the command, agent or script that would own it — an item claiming to be
 open while the behavior ships reads as a project that does not know what it has built.
 Larger reworks of delivered behavior are proposals, not backlog items, and are tracked
@@ -132,8 +132,8 @@ Making the command flow smoother and more guided.
 - [x] **Walk the default-motion branch** `DELIVERED`
   [motion-devices](tests/checks/motion-devices.sh) now drives both paths. Under default motion it loads the real pinned GSAP from `node_modules` and asserts the rail's transform tracks scroll and that the JS `reveal` branch hides its children and then shows them — reached by forcing `CSS.supports('animation-timeline', …)` to report false, since every browser the suite can run supports it and the CSS engine would otherwise take over.
 
-- [ ] **Broken-site corpus with expected audit findings** `OPEN`
-  A fixture site seeded with known defects and a file of the findings an audit should report. Without it no test can fail because an audit *missed* a defect — the ceiling CLAUDE.md records for the whole audit family. No owner exists yet; it would build on [provision.sh](tests/fixtures/wp/provision.sh), which already stands up a disposable WordPress for the translation and CF7 suites.
+- [ ] **Broken-site corpus with expected audit findings** `PARTIAL`
+  A fixture site seeded with known defects and a file of the findings an audit should report. Without it no test can fail because an audit *missed* a defect — the ceiling CLAUDE.md records for the whole audit family. [seeded-defects](tests/fixtures/seeded-defects/) now ships a theme and plugin with 11 marked defects and `expected-findings.json`, and [provision.sh](tests/fixtures/wp/provision.sh) installs them with `WP_FIXTURE_SEEDED=1`. **Gap:** [the check](tests/checks/seeded-defects.sh) only validates the corpus offline; comparing a real `/wp-audit` run against it needs `SEEDED_FINDINGS`, and CI has no audit run to compare.
 
 - [ ] **Maintenance mode command** `OPEN`
   New `/wp-maintenance` command to enable/disable maintenance mode — either via a custom template or by installing a maintenance plugin via WP-CLI.

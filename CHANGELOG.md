@@ -2,6 +2,363 @@
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-10-27
+
+### Added
+
+- **`/wp-audit` recognizes a re-audit.** Step 1.5 detects a prior run (`audit.last_run`,
+  the findings ledger, the dated sidecar), prints `Re-audit of <date>`, and asks one
+  question to reuse the stored mode, browser suite and production URL (or clone-only)
+  instead of re-asking each, with a scoped option that re-measures only open findings and
+  categories touching files changed since the last run. Stale or unconfirmed answers are
+  never reused silently. Answers persist in `audit.last_answers`, validated by
+  `bin/wp-config.mjs`, and the report states its baseline.
+
+- **`/wp-audit` keeps a replay log and a resumable run state on disk.** Setting and
+  database fixes were printed once at the end and then lost, per-agent reports lived only
+  in the conversation, and a bulk database fix kept no old value. Now each such fix is
+  appended to `<out>/replay.json` with its WP-CLI command, previous value and per-environment
+  `applied_on` flags, and the closing list is printed from that file. Each agent's full
+  report is written to `<out>/agents/<agent>.md` before synthesis (the parent receives only
+  the findings JSON and a short summary), `<out>/run-state.json` lets a run resume after
+  `/clear`, and a fix touching more than 25 rows dumps the previous values to
+  `<out>/backups/` first. A `--replay <env>` flag is documented as future work.
+
+- **CI parses and lints the shell scripts, and a stub-PATH harness tests them with hostile
+  input.** CI linted PHP and ES modules but never `bin/*.sh` or `skills/*/scripts/*.sh`,
+  and their checks only grepped the script text, so nothing ran a script that calls `sudo`,
+  `rm` or `sed` with a hostile argument. CI now runs `bash -n` on all of them (blocking)
+  and `shellcheck` at warning severity (blocking; exclusions are documented in `.shellcheckrc`). `tests/lib/stub-path.sh` puts
+  logging stand-ins for `sudo`, `rm`, `sed -i`, `wp`, `mysql` and friends on a temporary
+  `PATH`, and `tests/checks/hostile-input-env-setup.sh` runs `wp-env-setup.sh` with
+  traversal, separator and injection-shaped `--domain` values, expecting a refusal before
+  anything would run. It fails if any hostile case reaches a destructive call, so removing
+  the domain validation turns CI red.
+
+- **Inline critical CSS is now a conditional recommendation, not a rejected one.** The
+  performance lessons recorded one failed experiment (FCP better, LCP worse) as "rejected",
+  and the auditor only offered `.min` copies. A real build later made per-template cuts work,
+  and the failures it hit were all process: the second of two build scripts forgotten (the
+  cuts invalidated in silence), cuts left stale after a core or builder update, verification
+  over two different page loads instead of one DOM, and a decision taken on simulated LCP.
+  `performance-lessons.md` now states five conditions, `wp-audit-performance` gives the
+  regenerate-and-commit order, and the new `bin/assets-fresh.mjs` recomputes content hashes
+  and fails with "regenerate critical cuts"; `/wp-update` runs it in its verification step.
+
+- **`/wp-polylang` backs up first and can preview the import.** The command never mentioned
+  a backup although `pll-import.php` updates posts and menus in place and rewrites
+  `_menu_item_url`, and Step 3.5 moves every URL to `/<lang>/…` with no confirmation. It now
+  exports the database outside the docroot (Step 2.5), runs `pll-import.php … dry-run` (lists
+  what would be created or modified, writes nothing) before the real import, asks before
+  setting `hide_default=0`, and calls `$WP` instead of a bare `wp`, so the `.wp-create.json`
+  wrapper (Docker, custom paths) is honoured.
+
+- **WebP delivery now covers HTML returned by admin-ajax, and the audit checks it.** The
+  Robin reference listed the delivery modes as if `picture` covered the whole site, but Robin
+  only processes `template_redirect`, so infinite scroll, tabs and "load more" kept serving
+  the PNG or JPEG next to an existing `.webp` (354 KB against 39 KB on a real build).
+  `webp-delivery.md` gains the symptom, the measurement and the recipe (a theme helper that
+  reuses Robin's API, availability checked before the buffer starts, with the warning about
+  coupling to internal classes) and a rule not to serve or preload a `.webp` that weighs as
+  much as the original. `wp-audit-performance` adds PERF-078 (UNMEASURED when the action
+  cannot be launched) and `/wp-robin` verifies that the hero image has a `.webp`.
+
+- **Seeded-defects corpus for the audits.** `tests/fixtures/seeded-defects/` holds a theme and
+  plugin with eleven deliberate defects (security, accessibility, SEO, performance, best
+  practices) and `expected-findings.json` naming the check that must fire for each.
+  `tests/checks/seeded-defects.sh` keeps the list honest offline (shape, catalog membership,
+  defect still present, markers match) and compares it with a real audit's findings when
+  `SEEDED_FINDINGS` is set. `WP_FIXTURE_SEEDED=1` makes `provision.sh` copy the corpus into the
+  fixture. Before, nothing showed whether an edit to an audit agent stopped it seeing a defect
+  it used to catch.
+
+- **State-file contract and configurable report directory.** The audit ledger
+  (`.wp-audit-findings.json`), the `.wp-audit/` reports, manifest backups and Robin's runtime
+  cache were written without ever saying whether they belong in git, and in a normal repo the
+  ledger got committed. `TOOL_STATE_PATHS` in `bin/wp-config.mjs` is now the single list, and
+  `wp-config.mjs gitignore-check <root>` prints the entries git would commit (exit 4).
+  `/wp-adopt`, `/wp-audit` and `/wp-robin` call it and offer (default yes) to ignore the
+  plugin's own entries, the one exception to `/wp-adopt`'s no-`.gitignore` rule. Reports go to
+  `--out`, else `WP_AUDIT_OUT_DIR`, else `audit.out_dir`, else `.wp-audit`; the renderer warns
+  when that directory is unignored inside a git tree and prints absolute paths.
+
+- **Named remote environments, EnvSync recipes and a measured DB dump in `/wp-clone`.** The
+  manifest takes an optional `environments` map (`role` local, staging or prod, `url`, and a
+  token-free `sync` block) that `validate` checks and `wp-config.mjs env-set` writes;
+  `/wp-adopt` registers the environments `wp envsync env list` reports. The production gates
+  of `/wp-update`, `/wp-clone` and `/wp-audit` read `role: "prod"` instead of comparing URLs
+  and keep the URL rule only when there are no `environments`. `wp-environments` gains the
+  EnvSync recipes (pull by scope, push only what is missing, volatile tables, token
+  handling). `/wp-clone` Path A measured nothing before dumping: it now lists the ten heaviest
+  tables, offers to skip log, queue, session and cache tables, and exports with
+  `--single-transaction` through `gzip`, downloaded with a resumable `rsync --partial`.
+
+### Changed
+
+- **A11y fixes are measured by scope and state.** The tag-swap comparison now also covers
+  `:hover`, `:focus-visible`, dark mode and every element sharing the class. A global colour
+  fix must use the narrowest selector and be measured on light, dark, text over an overlay,
+  hover and focus; the theme-switch attribute is located on `<html>` or `<body>` before
+  writing a `:not()` guard, with transitions off. `wp-css-system` gains a section on
+  end-of-sheet overrides. Before, a broad override could repaint overlay cards and a
+  `:not([data-theme])` guard could silently never exclude dark mode.
+
+- **The two largest audit agents load far less per dispatch.** `wp-audit-performance` (84 KB) and
+  `wp-audit-security` (79 KB) carried every procedure, script, fix recipe and the plugin
+  inventory in the file the loader reads whole on each invocation, although a given run needs a
+  few of them. The check tables, the report contract and the rules stay in the agent; the long
+  per-check procedures moved verbatim to `skills/wp-audit-standards/references/perf-*.md` and
+  `sec-*.md`, and each agent carries an index saying which file to read before which check. No
+  check code was removed or reworded, and the checks that grep the agents now read the agent
+  plus its references through `tests/checks/lib/agent-text.sh`.
+
+- **`/wp-audit` no longer applies fixes that change how a site looks without asking.** The fix
+  offer split work by owner (code, setting, content) but not by whether the render changes, so
+  a "y" also applied CSS focus styles, size and spacing changes and tag or class swaps, which
+  were never measured. Findings now carry `design_impact`, shown in the report; those marked
+  `true` form a `visual` class that is never counted as auto-fixable, is listed with its
+  computed-style and box measurement first, and is applied one at a time and re-measured. When
+  the site's builder has a control for the setting, the fix goes to the builder's data (backed
+  up first) rather than the theme's CSS, unless the control cannot express it.
+
+- **Builders stop on adopted sites.** `/wp-init`, `/wp-section`, `/wp-seed`, `/wp-yolo`,
+  `/wp-header`, `/wp-footer`, `/wp-page`, `/wp-cpt`, `/wp-settings`, `/wp-tailwind-migrate`
+  and the three `/wp-cinematic-*` builders assume a starter theme and never read `origin`,
+  so on an adopted site (a third-party theme) they could overwrite it or generate a theme that
+  does not belong. Each now runs the new `wp-config.mjs require-origin` first, which exits `5`
+  on an adopted manifest; `--force-adopted` overrides it on purpose. `/wp-audit`, `/wp-debug`,
+  `/wp-update`, `/wp-clone` and the other non-builders are not gated.
+
+- **`shellcheck` is now a blocking CI gate.** It ran as informational (`continue-on-error`)
+  because the scripts had never been linted. The `Shell scripts` job now fails on any
+  finding at warning severity. The three intentionally split `$(...)` package lists in
+  `bin/wp-env-setup.sh` carry an inline `# shellcheck disable=SC2046` with the reason, and
+  `tests/checks/ci-shell-lint.sh` now fails if the step regains `continue-on-error`.
+
+- **`/wp-contribute pr` runs the OCR review before the push, and fix flows check the git tree.**
+  The local flow opened PRs without the diff review CI already runs, and `review` (a skill
+  review) read as if it were that step; both now say what each one does, and a missing `ocr`
+  stops the flow instead of being installed. `/wp-update` and the `/wp-audit` fix step now
+  show foreign uncommitted changes and ask before editing, commit by path, stop on a mass
+  deletion before committing, and report the unreviewed commit count at the end.
+
+- **One exit-3 policy instead of eight copies.** `/wp-audit`, `/wp-debug`, `/wp-adopt`,
+  `/wp-init`, `/wp-seed`, `/wp-robin`, `/wp-s3`, `/wp-update` and the two `/wp-clone` paths each
+  carried a hand-written "Amending the exit `3` row above" paragraph, and they had drifted. They
+  now name one policy defined in the new `wp-manifest-gate` skill (`stop`, `adopt-or-stop`,
+  `adopt-or-bare-wp`, `bare-wp-fallback`, `scaffold`, `register`, `destination-adopt`);
+  `tests/checks/wp-config-gate.sh` pins the table and refuses the inline paragraph.
+
+### Fixed
+
+- **Anchor-only links no longer go into ACF `url` fields.** `wp-acf` always emitted
+  `'type' => 'url'` for a link, but ACF validates that type as an absolute URL, so a `#contact`
+  link was refused by the editor. A new rule picks `text` for anchors and site paths, `url` for
+  external addresses and `page_link` for other pages, and a check keeps the rule in place.
+
+- **`wp-acf`, `wp-cf7` and `wp-normalize` end in a validation step they can run.** The
+  first two generate PHP under fine-grained rules on the haiku tier and their tests only grep
+  prose, so a generated file that did not parse shipped unnoticed; `wp-normalize` wrote the
+  manifest the whole build follows with no Bash to check it. `wp-acf` and `wp-cf7` now finish
+  with `php -l` on what they wrote plus `wp-config.mjs validate`, and `wp-normalize` gets
+  Bash for one final manifest parse. The tiers are unchanged (the step is the cheaper fix);
+  `model-routing.sh` records why and a new check pins the steps.
+
+- **Manifest writes are atomic and the Tailwind rebuild lock holds.** `wp-config.mjs`
+  wrote `.wp-create.json` (migrate, adopt, refresh) and the rendered CLAUDE.md block with a
+  bare `writeFileSync`, and `wp-research` edited the manifest freehand, so parallel builders
+  could read a torn file or lose each other's keys. Writes now go through a temp file plus
+  rename, and a new `wp-config.mjs set <project> <key> <value>` changes one key under a lock
+  and validates before writing; `wp-research` uses it. `bin/tailwind-rebuild.sh` deleted its
+  lock file after building, and since `flock` locks the inode a third process could end up
+  holding an unlinked file while a fourth created a new one, so two compiles ran together.
+  The lock file is now kept (and gitignored by `/wp-init`), the wait for it is bounded, and
+  the implicit `npm install` inside it has a timeout.
+  `set` also refuses a parent key whose value would carry a secret (`database`, `wordpress`),
+  extra arguments, and a value that starts with `{` or `[` but does not parse; `-` reads the
+  value from stdin, and `wp-research` passes its record that way through a quoted heredoc.
+
+- **`/wp-audit` no longer sends an existing site to `/wp-init`.** With no
+  `.claude/CLAUDE.md` it said "Project not initialized. Run /wp-init first", which contradicts
+  the adoption flow and points a site that already has a theme at a command that scaffolds a
+  starter. It now suggests `/wp-adopt` for an existing site and `/wp-init` for a new project.
+
+- **Browser suite: audited host, production gate, timeouts, lockfile, visible UNMEASURED.**
+  `bin/audit-suite.sh` rewrote `baseURL` inside the persistent `audit.config.js`, so a stale
+  or hand-edited value pointed the next run at the wrong host (in one case production, with
+  90 s timeouts, outside the gate). The audited host now comes from `--url` through
+  `BASE_URL`; the config is only read, and a mismatch is reported. The script re-runs itself
+  through `bin/prod-gate.sh` for any production host (public, or role prod in the manifest's
+  `environments` when present) instead of trusting the caller; the gate exports
+  `WP_AUDIT_GATE_HELD` and accepts `--prod`. After 3 consecutive page timeouts
+  (`--max-timeouts` / `WP_AUDIT_MAX_TIMEOUTS`) the run stops and exits 2 with the cause
+  instead of hammering a silent host. Dependencies install with `npm ci` from a committed
+  `package-lock.json` (no lockfile, no install; still no browser download). A run with Tier 3
+  unmeasured now opens the report summary (`.md` and `.html`) with a bold notice.
+
+- **The audit suite no longer re-takes its own gate on an IPv6 host, and a browser launch
+  timeout is no longer read as a silent host.** `bin/audit-suite.sh` cut `https://[2001:db8::1]/`
+  to `[2001`, so the child of a gated run never matched `WP_AUDIT_GATE_HELD`, re-ran the gate
+  and waited 300 s on its own lock. Both scripts now derive the key from one helper,
+  `bin/lib/host-key.sh`. The timeout guard also ignores `browserType.launch` timeouts (four
+  workers on little RAM), which wrote `unmeasured.json` with the wrong cause.
+
+- **Mobile-only elements now get their desktop override.** `wp-css` never stated that an
+  element shown only on mobile needs a `min-width` rule to hide it (`display: none`) or to
+  dissolve its wrapper (`display: contents`), so such blocks stayed visible or broke the
+  inline flow on desktop. The agent now has the rule with an example, a list-and-confirm step
+  before it returns, and a check keeps both in place.
+
+- **`wp-config.mjs env-set` refuses a missing or invalid `--role` or `--url` up front.** A
+  call without them used to write an environment entry with `undefined` values and rely on
+  manifest validation to complain afterwards; it now stops with a usage message before
+  touching the manifest. The CF7 HTML-scope check's mail stub also answers by key, as the
+  real `WPCF7_Mail::get()` does.
+
+- **Live payment keys no longer reach the transcript, and the domains import is pinned.**
+  `/wp-update` looked for live gateway keys with `grep -E '(sk|rk|pk)_live_'`, which prints
+  the full key line; it now counts (`grep -cE`) and reports only how many options hold one.
+  `/wp-clone` listed `*_live_*` options with their values; it now lists names only.
+  `bin/domains-import.sh` cloned a third-party repository's `main` unpinned and fed the CSV
+  to the agent's context; it now fetches `DOMAINS_REF` (a tag or full SHA, defaulting to the
+  commit last reviewed) and tells the maintainer to read the CSV diff before committing.
+
+- **Audit snippets and `wp-cinematic-encode.sh` no longer share fixed `/tmp` files.**
+  Paths such as `/tmp/emitted`, `/tmp/site-text.txt`, `/tmp/rm-head.html`,
+  `/tmp/geo-home.html` and `/tmp/wp-cine-*.log` were the same on every run, so two
+  concurrent runs or sessions could read each other's output and compare one site against
+  another. They now use a per-run `mktemp -d`, and `tests/checks/no-fixed-tmp-paths.sh`
+  fails on a new literal `/tmp/` outside the documented exceptions.
+
+- **The AJAX nonce example is complete, and `wp-cf7` writes a form per language.** The
+  `wp-theme-standards` enqueue reference showed `wp_create_nonce()` with nothing that
+  verified it; it now pairs the localized nonce with a handler using `check_ajax_referer()`,
+  a capability check and input sanitizing, and notes the page-cache and `wp_localize_script()`
+  string-casting pitfalls. The `wp-cf7` agent only created the English form post; it now
+  creates one per language on the project's language list (primary plus every secondary),
+  with the same fields, messages translated key for key, and one form ID per language.
+
+- **`robin-fix.sh` no longer pastes file names into PHP and SQL, and reads `wp-config.php`
+  like PHP does.** The webp queue row was built with `php -r '... "'$s_path'" ...'` and a
+  `VALUES (... '${EXTRA_DATA}' ...)` string, so an upload named `O'Brien.jpg` (or any name
+  with `"` or `$`, which rsync and metadata can deliver) broke the step or injected code.
+  One PHP process now receives the values as arguments, builds `extra_data` and returns
+  the INSERT with every string as a hex literal. `parse_define` took the first
+  `define('DB_NAME', ...)` even when it sat in a `//`, `#` or `*` comment and cut a password
+  holding `\'` short; it now skips comment lines and decodes only the escapes PHP does (an unknown one such as `\w` keeps its backslash). ImageMagick 7
+  ships `magick` and deprecates `convert`: the script, `/wp-robin` Step 2 and the skill now
+  prefer `magick` and fall back to `convert`.
+
+- **wp-robin: the missing queue table is created from the command line.** After
+  `wp plugin activate`, Robin's `rio_process_queue` table can be absent because WP-CLI
+  activation skipped its table setup, and the skill's only fix was to deactivate and
+  reactivate the plugin in wp-admin, which a headless or scripted run cannot do. The
+  troubleshooting row now gives `wp eval 'RIO_Process_Queue::try_create_plugin_tables();'`,
+  the call Robin's own activator makes, and keeps wp-admin as the fallback without WP-CLI.
+
+- **`/wp-s3` no longer leaves credentials in the docroot.** The setup and revert scripts
+  wrote `wp-config.php.bak-<stamp>` and `s3-config.php.bak-<stamp>` next to the originals;
+  those names do not end in `.php`, so the web server served them as plain text (database
+  password, previous S3 secret). Backups now go to a `0700` directory outside the docroot
+  (`~/.local/state/wp-s3-backups/`, override with `WP_S3_BACKUP_DIR`) at `0600`. The
+  `wp-config.php` rewrite also keeps the original mode, owner and group instead of resetting them
+  (when `chown` is refused, it rewrites the file in place rather than renaming over it);
+  the revert parks its credential-bearing `s3-config.php` outside the docroot too.
+  The documented secret flow (`! read … && export …`) could never work, since a `!` line
+  runs in a subprocess; the command now has the user write a `0600` file and passes it with
+  the new `--secret-file`.
+
+- **`/wp-s3 --revert` no longer leaves the S3 credentials in the docroot.** It parked the
+  config as `s3-config.php.disabled` beside `wp-config.php`, which a web server serves as
+  plain text (the `.php` extension is gone), exposing the bucket key and secret. The file now
+  moves to a `0600` file inside a `0700` directory outside the docroot
+  (`~/.local/state/wp-s3-backups/<key>/`, override with `WP_S3_BACKUP_DIR`), and the script
+  prints the `mv` that turns S3 back on.
+  A `s3-config.php.disabled` left in the docroot by the earlier version is parked the same
+  way (kept beside an existing parked copy with a `.legacy-<stamp>` suffix), and the hash
+  of the site root falls back to `shasum` on hosts without `sha256sum`.
+
+- `s3-setup.sh` now derives its private backup directory with the same key as `s3-revert.sh`
+  (24 hex characters of the site root's sha256, `shasum -a 256` where `sha256sum` is absent), so
+  a revert parks the config beside the backups setup made instead of in a different subdirectory.
+
+- **Tailwind starter: the CF7 HTML mail filter only touches the theme's own forms.**
+  `wpcf7_mail_components` forced `text/html` on every Contact Form 7 form on the site, so on
+  a plain-text form of the client's own, a visitor's `[your-message]` was parsed as HTML in
+  the owner's inbox (injected links, remote images). It now acts only when the mail template
+  has `use_html` set, which is what the wp-cf7 agent writes. Substituted settings values are
+  escaped for where they land: `esc_html()`/`esc_url()` in the body, plain text in the
+  subject. The `wp-cf7` agent also passes the template directory to `wp eval-file` as an
+  argument instead of splicing `$(pwd)` into a quoted PHP string, which broke on a path
+  containing a quote.
+
+- **Cinematic starter: the ACF field-group scan ran on every request.** `functions.php`
+  globbed `fields/*.php`, read each file and ran a regex over it on every `acf/init` to find
+  groups with no Local JSON yet, even when every group already had one. It now stores a
+  signature (file names, newest mtime, and the `acf-json/` directory mtime, which moves when
+  a JSON is added or removed) in an option once a scan finds nothing left to bootstrap, and a
+  matching signature skips the scan. The signature is never stored after a pass that
+  bootstrapped or while `acf-json/` is unwritable, so a failed or partial persist is retried
+  on the next request. Delete the `__starter___fields_scan` option to force a rescan.
+
+- **Starters: mobile menu init, menu semantics, skip link, reduced-motion video.** The
+  Tailwind starter's mobile menu registered on `DOMContentLoaded` only, so a bundle loaded
+  later by a cache or "delay JS" plugin left the button dead; it now runs on the same
+  `readyState` guard as the rest of the file, closes on Escape (returning focus to the
+  button) and sets `aria-controls`. `navigation.php` no longer puts `role="menubar"` on a
+  plain list of links or `role="navigation"` on a `<nav>`, and both starter headers gain a
+  skip link. In the cinematic starter, `prefers-reduced-motion` returned before touching
+  `.scene__video-mobile`, so the autoplaying loop kept playing (WCAG 2.2.2); it is now
+  paused, stripped of autoplay and loop, and reset to its poster.
+
+- **Tailwind starter: stale WebP siblings, over-broad output buffering, per-request ACF scan.**
+  A `.webp` sibling was used whenever it existed, so a medium replaced under the same name
+  (or `wp media regenerate`) kept serving the old picture; it now counts only when it is at
+  least as new as its original, and the upload hook rebuilds a stale one. The WebP output
+  buffer also ran over sitemaps, embeds and non-HTML responses; it now rewrites `text/html`
+  only. From WordPress 6.7, indexed and alpha PNGs and tiny PNGs are no longer re-encoded to
+  WebP; earlier versions keep the previous all-PNG mapping because that filter does not pass
+  a filename. `__starter___image()` with a bare URL emits `alt=""` and known dimensions. `functions.php`
+  stores a signature of `fields/*.php` and skips the glob/read/regex scan when nothing
+  changed (its comment already claimed so), no longer prints a nonce on every page for an AJAX
+  handler that does not exist, and defers the bundle through the script `strategy` argument
+  (WP 6.3+) instead of a `str_replace` on markup.
+
+- **Script inputs are validated before they reach sudo, sed, SQL and PHP.**
+  `bin/wp-env-setup.sh` used `--domain=` as-is in `sudo rm -f /etc/ssl/certs/$domain.crt`
+  (a `../` or `/` walked out of the cert directory) and as an unanchored regex in
+  `/etc/hosts` (removing `foo.local` also deleted `foo.local.es` and `myfoo.local`, and an
+  existing `foo.local.es` made `hosts-add` think `foo.local` was present). It now rejects
+  anything outside `^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$` up front, matches hosts lines with an
+  anchored pattern, and `ssl-generate` adds `subjectAltName` (browsers reject CN-only
+  certificates) and no longer hides openssl's stderr. `bin/wp-cinematic-encode.sh` pasted
+  `--scene=` into the PHP of `wp eval`, so a crafted value ran code; it must now be an
+  integer, as must the attachment IDs from `wp media import`.
+
+### Security
+
+- **The project path no longer travels inside a `bash -c` string.** Every `wp-config.mjs` call in the commands and skills used to interpolate the path into a double-quoted `bash -c` string, so a path containing a single quote, `$()`, a backtick or `;` could break the quoting or run code. The call now uses a fixed single-quoted `-c` script and passes the plugin root and the path as positional arguments, and the shared prologue says how to write the path safely. A new check feeds hostile paths through every call shape and fails on the old form.
+
+- **The remaining `bash -c` calls that carried the project path or the web user are quoted safely too.** The `test -f`, `mkdir -p`, `wp core download`, `cd && docker-compose/ddev/lando/wp-env`, `setfacl`, store-kit sync and `wp eval-file` calls in `/wp-create`, `/wp-woo-setup` and the plugin-profile reference still interpolated `${PROJECT_PATH}` (and `${WEB_USER}`) into a double-quoted `-c` string, so a value holding a single quote, `$()` or a backtick could run code. They now use a fixed single-quoted `-c` script with the values as positional arguments; `$WP` is handed to the child shell as an environment variable so it still expands to the command plus its flags. The quoting check now fails on any `bash -c "..."` that spells either variable inside the string and runs every new call shape with a hostile path. A path carried inside a native `$WP` wrapper in a `bash -c "$WP ..."` string is not covered.
+
+- **Native vhost templates deny sensitive files.** The nginx, Apache and Caddy templates
+  denied only `/.ht` (nginx) and served everything else under the project root, so
+  `.wp-create*.json` (which can hold test payment keys) and its `.bak` copies, `.git/`,
+  `.env` and `*.sql` dumps were downloadable, and PHP ran inside `uploads/`. They now deny
+  dotfiles (except `.well-known`), `.sql`/`.bak`/`.log`/`.bak-*` files and PHP in uploads, and
+  nginx runs `try_files $uri =404` before `fastcgi_pass`.
+  The Apache rules match the URL (`LocationMatch`, uploads anchored to `/wp-content/uploads/`),
+  not the filesystem path, so a docroot under a dot-directory or below a directory named
+  `uploads` is not denied wholesale.
+  The uploads PHP rule in Apache and Caddy is `(?i)^/wp-content/uploads/.*\.(php[0-9]?|phar|pht(ml)?)(\.|/|$)`,
+  not `\.php$`: it also covers `.phar`, `.phtml` and `.pht`, which the Debian/Ubuntu and RHEL global PHP handlers execute. `mod_mime` applies `AddHandler .php` to the extension in any position of the name
+  and ignores case, and PATH_INFO maps `evil.php/foo` to `evil.php`. Measured on Apache 2.4 with
+  `mod_php`: `evil.php`, `evil.php/foo`, `evil.php/x.jpg`, `evil.php.jpg`, `evil.PHP`, `evil.php5/x`, `evil.phtml`, `evil.phar` and `evil.pht` answer 403,
+  while `x.php_.jpg` (the name WordPress gives a renamed upload), `my.phpunit.pdf`, `a.jpg` and `/index.php/foo` are
+  untouched. The Caddy pattern is the same regexp, checked by reading only (no Caddy binary).
+  nginx needs no change: its PHP location is `\.php$` with no PATH_INFO split, so neither
+  `evil.php/foo` nor `evil.php.jpg` reaches fastcgi.
+
 ## [1.30.0] - 2026-10-20
 
 ### Added
