@@ -432,7 +432,9 @@ Count totals per category and overall.
 
 ## Step 7.5: Reconcile against the finding ledger
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/ledger.md` now and follow it — it is this step, not background. It covers finding identity, the five ledger statuses, where the ledger lives, the derived counts, and the state-file contract: the ledger is not versioned, so run `node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs gitignore-check <site-root>` and offer to ignore what it lists.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/ledger.md` now and follow it — it is this step, not background. It covers finding identity, the six ledger statuses, recording a human decision (`--accept`) or a fix (`--mark-fixed`) and re-rendering the report (`--rerender`) without auditing, the ledger shape, where the ledger lives, the derived counts, and the state-file contract: the ledger is not versioned, so run `node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs gitignore-check <site-root>` and offer to ignore what it lists.
+
+Between audits, a human decision or an applied fix goes into the ledger with `bin/audit-report.mjs` (`--accept <id> --reason`, `--unaccept`, `--mark-fixed <id> --evidence`), the report is refreshed with `--rerender` and counts are quoted from `--summary`. Never patch a generated report by hand, never keep a declined finding only in session memory, and never list `accepted` entries as pending work.
 
 ## Step 8: Present Report
 

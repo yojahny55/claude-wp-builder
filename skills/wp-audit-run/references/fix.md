@@ -57,7 +57,11 @@ safe. The rules:
 - `node ${CLAUDE_PLUGIN_ROOT}/bin/style-diff.mjs` takes this measurement on every element
   of a page (the recipe is under *Usability fixes* below); use it instead of picking
   elements by hand.
-- When the user declines a `visual` finding it stays in the report as open, untouched.
+- When the user declines a `visual` finding it stays in the report as open, untouched. A
+  decline is a decision: record it with `audit-report.mjs --accept <id> --reason "..."`
+  (`ledger.md`) so later sessions stop proposing it, instead of remembering it in the session.
+- The offer, and every "pending" or "what is left" list in this step, leaves out `accepted`
+  entries and shows `fixed_unverified` ones as awaiting verification.
 
 **Builder first.** When `stack.builder` is not `none` (for example `elementor`) and the
 element is a widget of that builder with a control for the setting, the preferred fix is
@@ -71,6 +75,12 @@ site-wide), the fix goes to the theme instead, with the reason written in the fi
 `Method`. Either way it is `visual` and follows the rules above.
 
 If the user declines, skip to Step 10.
+
+**After a fix is applied, record it in the ledger, not by editing the report.** Once a fix
+and its Step 6.10 verification are done, run `audit-report.mjs --mark-fixed <ids> --evidence
+"<what was changed>"`, then `audit-report.mjs --rerender` so the `.md`/`.html` reflect it.
+The entry becomes `fixed_unverified`; it is `resolved` only after a later run measures the
+check clean (`ledger.md`). Never hand-write a "fixes applied" section into a report.
 
 If the user confirms, dispatch fix operations by category.
 
