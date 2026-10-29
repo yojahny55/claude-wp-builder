@@ -212,6 +212,7 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 | SEC-042 | Abandoned plugins | wp.org API `last_updated` older than ~2 years, or `tested` far behind the installed core version, for every loaded plugin (active, plus clone-suppressed on a local clone), **after the SEC-038 network gate passes**. See Procedure | Not abandoned | WARNING |
 | SEC-044 | Content-Security-Policy header missing or unsafe | LIVE, production only. `curl -sSI` of the confirmed public home URL (`/wp-audit` Step 2.3) and read `content-security-policy` (and `content-security-policy-report-only`). See Procedure | A `Content-Security-Policy` header is present and its `script-src` (or `default-src` fallback) does not allow bare `*`, `data:` or `'unsafe-eval'`; report-only alone is `INFO`. `UNMEASURED` ("needs the public URL") on a local clone without a confirmed public URL, never `PASS` | WARNING |
 | SEC-045 | File-manager plugin installed | Every installed plugin (active **and** inactive): slug on the known list, or its folder bundles elFinder. See Procedure | None installed | WARNING |
+| SEC-046 | MCP / OAuth / agent endpoints exposed over REST | `$WP eval` over `rest_get_server()->get_routes()` for MCP/OAuth/agent routes, owning plugin and required capability, plus an unauthenticated LIVE probe of each route (through `bin/prod-gate.sh` on production). See Procedure | No such route; or present, anonymous requests refused and every capability admin-level (INFO). Reachable anonymously, or minimum capability `read`: WARNING. An intentional public endpoint is a choice: the finding says `confirm intended`, never `remove` | WARNING / INFO |
 
 SEC-040 is `N/A ("no WooCommerce")`, out of the denominator, when `site.commerce` is `none` (`/wp-audit`
 Step 2.3) — this check has nothing to read without WooCommerce installed and active. It stays
@@ -239,6 +240,7 @@ matches a check you are about to run, before running it. Each file keeps the ori
 |---|---|---|
 | `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-standards/references/sec-procedures-deploy-and-downloads.md` | SEC-036, SEC-037, SEC-038 (always: SEC-032, SEC-033, SEC-041 and SEC-042 wait on SEC-038), SEC-039 on WooCommerce | Procedure — SEC-036 and SEC-037 (deploy safety); Procedure — SEC-038 (update counts need a network); Procedure — SEC-039 (paid downloads reachable without a purchase) |
 | `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-standards/references/sec-procedures-gateway-credentials.md` | SEC-040 on WooCommerce | Procedure — SEC-040 (payment-gateway credentials stored at rest): detection snippet, classifier, scrub, pass and fail rules |
+| `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-standards/references/sec-procedures-mcp-endpoints.md` | SEC-046 | Procedure — SEC-046 (REST routes that serve MCP, OAuth or agent servers): inventory snippet, live probe, severity ladder, fix text |
 | `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-standards/references/sec-procedures-vulnerability-feed.md` | SEC-041, SEC-042 (also read sec-plugin-inventory.md) | Procedure — SEC-041 and SEC-042 (vulnerability and abandonment need a live feed) |
 
 ## Step 3: Response-Header Checks

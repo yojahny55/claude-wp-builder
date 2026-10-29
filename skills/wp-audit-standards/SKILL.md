@@ -41,6 +41,8 @@ the agents measure against. Each domain's own check catalog lives in its agent, 
     `wp-audit-security`: SEC-036 to SEC-039.
   - [references/sec-procedures-gateway-credentials.md](references/sec-procedures-gateway-credentials.md) —
     `wp-audit-security`: SEC-040.
+  - [references/sec-procedures-mcp-endpoints.md](references/sec-procedures-mcp-endpoints.md) —
+    `wp-audit-security`: SEC-046.
   - [references/sec-procedures-vulnerability-feed.md](references/sec-procedures-vulnerability-feed.md) —
     `wp-audit-security`: SEC-041, SEC-042.
 

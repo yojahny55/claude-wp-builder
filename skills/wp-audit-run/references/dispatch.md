@@ -19,7 +19,7 @@ and said nothing about the layer the defect was actually in.
 | Surface | Owner | Examples |
 |---|---|---|
 | theme source | every agent, per category | escaping, enqueues, template structure |
-| plugin configuration and DB options | `wp-audit-seo` (SEO options), `wp-audit-security` (dev-host leakage, SEC-036) | Rank Math option values, site-name options |
+| plugin configuration and DB options | `wp-audit-seo` (SEO options), `wp-audit-security` (dev-host leakage, SEC-036; exposed MCP/OAuth REST routes, SEC-046) | Rank Math option values, site-name options |
 | per-post meta coverage | `wp-audit-seo` | missing descriptions, focus keywords, canonical |
 | rendered output | `wp-audit-seo` (head), `wp-audit-geo` (head, schema graph, DOM) | `og:site_name`, dangling schema `@id` |
 | serving layer | `wp-audit-geo` (GEO-A26, GEO-A27) | a physical root file shadowing a theme rewrite, CDN path rewrites |
