@@ -265,7 +265,9 @@ The sole exception is those plugin-owned entries, and only after the operator sa
 exact lines. Never add or reorder anything else in the file.
 
 Then offer one optional follow-up, once: "Publish this site to a git remote?" Default **no**, and
-nothing below runs unless the operator says yes. It never touches the site's own `.gitignore`.
+nothing below runs unless the operator says yes. Publishing from a scratch copy (Step 6) never
+touches the site's own `.gitignore`. If the operator instead wants the site folder itself under
+git, with core included as the team's convention for adopted sites, that is Step 6b.
 
 ## Step 6 (opt-in): Publish to a git remote
 
@@ -340,7 +342,34 @@ node -e 'const f=process.argv[1],m=JSON.parse(require("fs").readFileSync(f));m.g
 On a later run, if `git_publish` exists, offer to reuse it instead of asking again, and run the
 same guards.
 
-## What an adopted manifest changes downstream
+## Step 6b (opt-in): Put the site root under git in place
+
+Only when the operator asks for the site folder itself to become the repository. Default **no**.
+This is the one place the site's `.gitignore` is written, and only through
+`wp-config.mjs git-init`, which refuses when the root already is a repository or sits inside one.
+
+**The team pushes one branch per site, the one the operator names (usually `dev`).** A second
+branch such as `master` is never created or pushed implicitly; if the operator wants it, they
+ask for it in a separate step. Ask (AskUserQuestion, one round): the remote URL (test it with
+`git ls-remote <url>`), and the branch, with no default pre-selected other than `dev`.
+
+1. **Plan, writes nothing:**
+   `node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs git-init <root> --branch=<b> --remote=<url> --dry-run`
+   lists the `.gitignore` rules to add. They come from `${CLAUDE_PLUGIN_ROOT}/templates/git/wordpress.gitignore`
+   (wp-config, uploads, cache/upgrade/backup/maintenance dirs, `*.sql`, `*.sql.gz`, `*.zip`, `*.log`,
+   `.htaccess` and `.user.ini`, which differ per server and are rewritten by WordPress) plus every
+   `TOOL_STATE_PATHS` entry, merged into an existing `.gitignore` without duplicates. Show the list.
+2. **Init and summary:** the same command without `--dry-run` writes the `.gitignore`, runs
+   `git init -b <b>`, adds `origin`, then prints the file count, the top-level directories, files
+   above 5 MB (`--large-mb=<n>`) and any secret-looking file (`wp-config*` backups, `.env`, keys).
+   It stages nothing. Exit `4` means secret-looking files: extend the `.gitignore` and run
+   `git -C <root> ls-files -o --exclude-standard` again before going on. Stop and show the summary.
+3. **Commit, only after the operator confirms the summary:** `... --branch=<b> --remote=<url> --commit`
+   (refuses a staged secret-looking file and resets the index).
+4. **Push, only after an explicit yes to the printed command:** `... --push --yes` pushes
+   `refs/heads/<b>` only. Run `--push` without `--yes` first: it prints the command and refuses.
+   Never run `git push --all`, `--mirror` or a push of any other branch.
+
 
 | Key | Read by | Effect |
 |---|---|---|
