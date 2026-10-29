@@ -8,6 +8,7 @@
 - Store tier — what the store sells
 - Local clone — audit production's posture, not the copy's
 - Live checks need a public URL, and you ask for it
+- Clone health preflight
 - Clone-safe versus production-only measurement
 - A clone with a live mail transport is a finding, before any form is submitted
 
@@ -170,6 +171,54 @@ So when a live check needs a URL and `local_clone` is true:
    external request at a host the user has not confirmed this run.
 3. If no production URL is available, the live check is `UNMEASURED` with "needs the public
    URL", never `PASS`.
+
+### Clone health preflight
+
+Runs when `local_clone` is true, or whenever the audited host is a local vhost, and runs
+**before any agent is dispatched**. A clone can answer the home page and 404 every other URL, and then each
+page measurement of the run is wrong without anything saying so: a clone of a site served by
+nginx has no `.htaccess`, because nginx never needed one, and the local Apache has nothing to
+route permalinks with. The vhost can also answer HTTP only, which makes an https-based check
+invalid. Measure both once, here:
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/bin/clone-preflight.sh --url <audited host URL> --wp "$WP"
+```
+
+It reads a post permalink, a page and a category archive through WP-CLI, requests each on the
+audited host (re-rooted from whatever host WP-CLI printed), and requires `200`. It also probes
+http and https and prints the `scheme` the host answers. Keep that scheme and pass it to every
+agent as `Audited scheme:` (see `dispatch.md`), so none of them probes the other one; a host
+that answers only http means the https-dependent checks are `UNMEASURED: clone answers http
+only`, not failed.
+
+Exit 0: continue. Exit 4: read `diagnosis=` and say it to the user before going on; never
+continue silently.
+
+- `htaccess-missing`, `htaccess-empty` or `htaccess-no-wp-block`, on Apache (or an unknown
+  server): the rewrite block is absent. Offer to write the stock WordPress block. **Ask
+  first** (`AskUserQuestion`: write it / leave it), and say that `wp rewrite flush --hard`
+  may write nothing here, because WP-CLI does not detect Apache's mod_rewrite, so do not
+  suggest it as the fix. Run the same command with `--write-htaccess`, but only after the user said yes;
+  it backs up an existing file as `.htaccess.bak-<timestamp>`, appends the
+  block (it never overwrites other rules), re-probes, and prints the `local_only=` line.
+- `plain-permalinks`: the site uses `?p=` URLs, so rewrite rules are not the cause. Say so and
+  look at the 404 itself (a missing post, a wrong host).
+- `nginx-rules`, `rewrite-not-applied`, `host-unreachable`: report the diagnosis; the fix is the
+  vhost or server block, not a file this audit writes.
+
+**The written `.htaccess` is a local-only change.** Production runs nginx and never reads it,
+so it must not be pushed or deployed. The script marks it in the repo's `.git/info/exclude`
+(never `.gitignore`, which is committed), reports it as `local_only=`, and when git already
+tracks `.htaccess` it says so instead of hiding the change. Name it as a local-only change in
+the report's hand-off, beside the other clone alterations. Its backups are tool state
+(`.htaccess.bak-*` in `TOOL_STATE_PATHS`).
+
+If the preflight fails and the user declines to fix it, every page-based check is
+`UNMEASURED: clone does not serve internal URLs (<diagnosis>)`: the rendered head, headings,
+links followed, alt text, contrast and every per-page score. Code, configuration and database
+checks still run. Record the reason in the report header; do not drop the pages quietly and
+do not score them.
 
 ### Clone-safe versus production-only measurement
 

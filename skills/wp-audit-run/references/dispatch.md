@@ -49,6 +49,8 @@ Project context:
 - Site type (commerce): <site.commerce value — woocommerce|none>
 - Store tier: <site.store_tier — catalog|store|full|unknown>
 - Local clone: <yes|no>
+- Audited scheme: <http|https, from the clone health preflight in Step 2.3; "n/a" when the host is not a local clone>. Request the audited host with this scheme only.
+- Clone health: <ok|failed: diagnosis, page-based checks UNMEASURED>
 - Clone-suppressed plugins: <clone_suppressed_plugins slugs, comma-separated, or "none">
 - Parked drop-ins: <clone_parked_dropins files, comma-separated, or "none">
 - Report-only: <yes|no>

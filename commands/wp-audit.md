@@ -215,7 +215,7 @@ It covers the code scope (editable and read-only), and what adoption changes in 
 
 ## Step 2.3: Site type and local clone
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/site-context.md` now and follow it — it is this step, not background. It covers store detection, store tier, the local-clone rules, the public-URL question, clone-safe versus production-only checks, and the live mail transport finding.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/site-context.md` now and follow it — it is this step, not background. It covers store detection, store tier, the local-clone rules, the public-URL question, the clone health preflight (internal URLs must answer 200 before any agent runs), clone-safe versus production-only checks, and the live mail transport finding.
 
 ## Step 2.5: Reconcile the Manifest
 

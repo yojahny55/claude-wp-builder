@@ -110,6 +110,7 @@ const TOOL_STATE_PATHS = [
   { rule: '.wp-create.json.*.tmp', probe: '.wp-create.json.1.2.tmp', why: 'atomic-write temp files left by a killed writer' },
   { rule: '.wp-create.json.lock*', probe: '.wp-create.json.lock.stale.1.2/x', why: 'manifest write lock and its stale asides' },
   { rule: '.wp-create.json.v*.bak', probe: '.wp-create.json.v1.bak', why: 'manifest migration backups' },
+  { rule: '.htaccess.bak-*', probe: '.htaccess.bak-20260101000000', why: 'backups of a local-clone .htaccess the clone preflight extended' },
   {
     rule: '/wp-content/plugins/robin-image-optimizer/libs/factory/bootstrap/assets/cache/',
     probe: 'wp-content/plugins/robin-image-optimizer/libs/factory/bootstrap/assets/cache/x',
