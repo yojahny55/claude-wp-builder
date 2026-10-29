@@ -67,7 +67,9 @@ echo "server=${server:-unknown}"
 
 # 2. Permalinks and three internal URLs, taken from WP-CLI and requested on the audited host.
 # shellcheck disable=SC2086
-structure=$($wp option get permalink_structure 2>/dev/null | tail -1)
+structure=$($wp option get permalink_structure 2>/dev/null) \
+  || { echo "clone-preflight: WP-CLI failed (check --wp); cannot resolve the site" >&2; exit 1; }
+structure=$(printf '%s\n' "$structure" | tail -1)
 if [ -z "$structure" ]; then echo "permalinks=plain"; else echo "permalinks=pretty"; fi
 if [ -z "$root" ]; then
   # shellcheck disable=SC2086
@@ -141,7 +143,8 @@ if [ "$write" = 1 ]; then
     *)
       if [ -e "$f" ]; then
         bak="$f.bak-$(date +%Y%m%d%H%M%S)"
-        cp -p "$f" "$bak" && echo "backup=$bak"
+        cp -p "$f" "$bak" || { echo "clone-preflight: cannot back up $f; nothing written" >&2; exit 1; }
+        echo "backup=$bak"
         [ -s "$f" ] && { printf '\n' >> "$f"; }
       fi
       wp_block >> "$f" || { echo "clone-preflight: cannot write $f" >&2; exit 1; }
@@ -157,8 +160,14 @@ if [ "$write" = 1 ]; then
     else
       ex=$(git -C "$root" rev-parse --git-path info/exclude)
       case "$ex" in /*) ;; *) ex="$root/$ex" ;; esac
-      mkdir -p "$(dirname "$ex")" && printf '/.htaccess\n' >> "$ex" \
-        && echo "local_only=excluded in $ex (not .gitignore, not committed)"
+      prefix=$(git -C "$root" rev-parse --show-prefix)
+      if mkdir -p "$(dirname "$ex")" && printf '/%s.htaccess\n' "$prefix" >> "$ex" \
+         && git -C "$root" check-ignore -q .htaccess; then
+        echo "local_only=excluded in $ex (not .gitignore, not committed)"
+      else
+        echo "local_only=failed (could not exclude .htaccess; do not commit it)" >&2
+        exit 1
+      fi
     fi
   else
     echo "local_only=not-a-git-tree"
@@ -172,7 +181,9 @@ fi
 
 ht=$(htstate)
 echo "htaccess=$ht"
-if [ "$structure" = "" ]; then
+if [ -z "$post$page$cat" ]; then
+  echo "diagnosis=no-probe-urls (WP-CLI returned no post, page or category to request)"
+elif [ "$structure" = "" ]; then
   echo "diagnosis=plain-permalinks (internal URLs use ?p=, rewrite rules are not the cause)"
 elif [ "$ht" != ok ]; then
   case "$server" in

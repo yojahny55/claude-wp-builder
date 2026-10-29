@@ -95,6 +95,18 @@ echo "$out" | grep -Fq 'local_only=' || fail "local-only status not reported"
 git -C "$t/site" check-ignore -q .htaccess || fail ".htaccess not excluded locally"
 [ ! -e "$t/site/.gitignore" ] || fail "script edited .gitignore"
 
+# 4b. Site root below the repo root: the exclude entry must carry the prefix.
+rm -rf "$t/repo"; mkdir -p "$t/repo/wp"; git -C "$t/repo" init -q
+out=$(bash "$root/$s" --url "http://127.0.0.1:$port" --wp "$t/bin/wp" --root "$t/repo/wp" --write-htaccess) \
+  || fail "write into a subdirectory site failed"
+git -C "$t/repo" check-ignore -q wp/.htaccess || fail "subdirectory .htaccess not excluded"
+
+# 4c. A broken WP-CLI is exit 1, not a plain-permalinks diagnosis.
+printf '#!/bin/sh\nexit 1\n' > "$t/bin/badwp"; chmod +x "$t/bin/badwp"
+bash "$root/$s" --url "http://127.0.0.1:$port" --wp "$t/bin/badwp" --root "$t/site" >/dev/null 2>&1 \
+  && fail "failing WP-CLI exited 0"
+[ $? -ne 0 ] || true
+
 # 5. Unreachable host.
 out=$(bash "$root/$s" --url "http://127.0.0.1:1" --wp "$t/bin/wp" --root "$t/site") && fail "dead host exited 0"
 echo "$out" | grep -Fq 'diagnosis=host-unreachable' || fail "dead host not diagnosed"
