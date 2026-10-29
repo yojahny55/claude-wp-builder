@@ -5,7 +5,7 @@
  * Exit codes are fixed and are part of the contract: 0 ok, 1 invalid or refused,
  * 2 a migration is available, 3 there is no manifest. `drift` adds 4: the manifest
  * validates but no longer describes the site. `gitignore-check` also uses 4: tool state
- * paths are listed that git would commit. `require-origin` adds 5: the site is adopted
+ * paths are listed that git would commit; `git-init` uses 4 when the dry-run summary found secret-looking files. `require-origin` adds 5: the site is adopted
  * (a third-party theme this plugin did not build) and the calling builder must stop.
  */
 import {
@@ -799,6 +799,131 @@ function cmdEnvSet(projectPath, flags) {
   say(`ok: environments.${name} (${env.role}) written to ${file}`);
 }
 
+// ---- git-init: put an adopted site's whole root under git, in place --------------------------
+// Opt-in team convention (core included). Phases, each its own invocation so the operator
+// confirms between them: plan (--dry-run, changes nothing) -> init (writes .gitignore, git init,
+// remote add, prints the summary, stages nothing) -> --commit -> --push --yes.
+// Only the named branch is ever created or pushed.
+const SECRET_FILE = /(^|\/)(wp-config[^/]*|\.env(\..*)?|\.htpasswd|id_rsa[^/]*|[^/]*\.(pem|key|p12|pfx)|credentials[^/]*\.json)$/i;
+
+function gitIgnoreMerge(root, existing) {
+  const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const tpl = readFileSync(join(pluginRoot, 'templates', 'git', 'wordpress.gitignore'), 'utf8').split('\n');
+  const toolRules = TOOL_STATE_PATHS.filter((e) => !e.when || existsSync(join(root, e.when))).map((e) => e.rule);
+  const have = new Set(existing.split('\n').map((l) => l.trim()).filter(Boolean));
+  const out = [];
+  let pending = [];
+  const emit = (line) => { if (!have.has(line)) { out.push(...pending, line); have.add(line); } pending = []; };
+  for (const raw of tpl) {
+    const line = raw.trim();
+    if (!line) { pending = []; continue; }
+    if (line.startsWith('#')) { pending.push(line); continue; }
+    emit(line);
+  }
+  pending = ['# claude-wp-builder working state'];
+  for (const r of toolRules) emit(r);
+  return out;
+}
+
+function cmdGitInit(projectPath, flags) {
+  const root = resolve(projectPath);
+  if (!existsSync(root)) { warn(`no such directory: ${root}`); process.exit(1); }
+  const git = (args, opts = {}) => spawnSync('git', ['-C', root, ...args], { encoding: 'utf8', ...opts });
+  const branch = flags.branch;
+  if (typeof branch !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(branch) || git(['check-ref-format', '--branch', branch]).status !== 0) {
+    warn('usage: wp-config.mjs git-init <project-path> --branch=<name> --remote=<url> [--dry-run | --commit [--message=<m>] | --push --yes]');
+    warn('--branch is required: the one branch the team pushes. No second branch is created or pushed.');
+    process.exit(1);
+  }
+  const top = git(['rev-parse', '--show-toplevel']);
+  const isRepo = top.status === 0;
+
+  if (flags.commit || flags.push) {
+    if (!isRepo || resolve(top.stdout.trim()) !== root) { warn('refused: the root is not a git repository of its own; run git-init first'); process.exit(1); }
+    const cur = git(['symbolic-ref', '--short', 'HEAD']).stdout.trim();
+    if (cur !== branch) { warn(`refused: HEAD is ${cur || 'detached'}, not ${branch}`); process.exit(1); }
+    // Only a repo this command created: same origin as --remote, and (for --commit) no history yet.
+    if (git(['remote', 'get-url', 'origin']).stdout.trim() !== flags.remote) { warn('refused: origin does not match --remote'); process.exit(1); }
+    if (flags.commit && git(['rev-parse', '--verify', '-q', 'HEAD']).status === 0) { warn('refused: the repository already has commits; git-init only makes the initial import'); process.exit(1); }
+  }
+  if (flags.commit) {
+    const added = git(['add', '-A']);
+    if (added.status !== 0) { git(['reset', '-q']); warn(added.stderr || 'git add failed'); process.exit(1); }
+    const staged = git(['diff', '--cached', '--name-only', '-z']).stdout.split('\0').filter(Boolean);
+    const bad = staged.filter((f) => SECRET_FILE.test(f));
+    // Mode 160000: a nested repository (a plugin cloned with its own .git) staged as an empty gitlink.
+    const links = git(['diff', '--cached', '--raw', '-z']).stdout.split('\0').filter((x) => x.startsWith(':160000') || x.includes(' 160000 ')).length;
+    if (bad.length || links) {
+      git(['reset', '-q']);
+      for (const f of bad) warn(`refused: ${f} looks like a secret; add it to .gitignore and run again`);
+      if (links) warn(`refused: ${links} nested repositor${links === 1 ? 'y' : 'ies'} (own .git) would be committed as empty gitlinks; ignore them or remove their .git`);
+      process.exit(1);
+    }
+    if (!staged.length) { warn('refused: nothing to commit'); process.exit(1); }
+    const msg = typeof flags.message === 'string' ? flags.message : 'chore: initial import of site';
+    const r = git(['commit', '-q', '-m', msg]);
+    if (r.status !== 0) { warn(r.stderr || 'git commit failed'); process.exit(1); }
+    say(`ok: committed ${staged.length} files on ${branch} (${git(['rev-parse', '--short', 'HEAD']).stdout.trim()}). Nothing is pushed.`);
+    say(`next: after an explicit yes, run: wp-config.mjs git-init ${root} --branch=${branch} --remote=<url> --push --yes`);
+    return;
+  }
+  if (flags.push) {
+    const remote = git(['remote', 'get-url', 'origin']).stdout.trim();
+    const cmd = `git -C ${root} push -u origin refs/heads/${branch}:refs/heads/${branch}`;
+    say(`push command: ${cmd}`);
+    say(`remote: ${remote}`);
+    if (!flags.yes) { warn('refused: pass --yes only after the operator confirmed this exact command'); process.exit(1); }
+    const r = git(['push', '-u', 'origin', `refs/heads/${branch}:refs/heads/${branch}`], { stdio: 'inherit' });
+    if (r.status !== 0) process.exit(1);
+    say(`ok: pushed ${branch} only`);
+    return;
+  }
+
+  const remote = flags.remote;
+  if (typeof remote !== 'string' || !remote || remote.startsWith('-') || /\s/.test(remote)) {
+    warn('--remote=<url> is required (no whitespace, not starting with -)');
+    process.exit(1);
+  }
+  if (isRepo || existsSync(join(root, '.git'))) {
+    warn(`refused: ${root} is already a git repository or inside one (${isRepo ? top.stdout.trim() : '.git exists'}); git-init never touches an existing repo`);
+    process.exit(1);
+  }
+  const igFile = join(root, '.gitignore');
+  const existing = existsSync(igFile) ? readFileSync(igFile, 'utf8') : '';
+  const add = gitIgnoreMerge(root, existing);
+  say(`plan: git init -b ${branch}; origin = ${remote}; only ${branch} will ever be pushed`);
+  say(`plan: .gitignore ${existing ? 'gains' : 'is created with'} ${add.filter((l) => !l.startsWith('#')).length} rules`);
+  if (flags['dry-run']) { for (const l of add) say(`  + ${l}`); say('dry run: nothing written'); return; }
+
+  writeFileSync(igFile, existing + (existing && !existing.endsWith('\n') ? '\n' : '') + (existing && add.length ? '\n' : '') + add.join('\n') + (add.length ? '\n' : ''));
+  for (const args of [['init', '-q', '-b', branch], ['remote', 'add', 'origin', remote]]) {
+    const r = git(args);
+    if (r.status !== 0) { warn(r.stderr || `git ${args[0]} failed`); process.exit(1); }
+  }
+  const files = git(['ls-files', '-o', '--exclude-standard', '-z']).stdout.split('\0').filter(Boolean);
+  const limit = (Number(flags['large-mb']) || 5) * 1024 * 1024;
+  const dirs = new Map();
+  const large = [];
+  const secrets = [];
+  for (const f of files) {
+    const d = f.includes('/') ? `${f.split('/')[0]}/` : '(root files)';
+    dirs.set(d, (dirs.get(d) ?? 0) + 1);
+    let size = 0;
+    try { size = statSync(join(root, f)).size; } catch { /* vanished */ }
+    if (size > limit) large.push([f, size]);
+    if (SECRET_FILE.test(f)) secrets.push(f);
+  }
+  say(`summary: ${files.length} files would be committed on ${branch}`);
+  for (const [d, n] of [...dirs].sort((a, b) => b[1] - a[1])) say(`  ${String(n).padStart(7)}  ${d}`);
+  large.sort((a, b) => b[1] - a[1]);
+  say(`large files (> ${limit / 1048576} MB): ${large.length || 'none'}`);
+  for (const [f, s] of large.slice(0, 20)) say(`  ${(s / 1048576).toFixed(1)} MB  ${f}`);
+  say(`secret-looking files: ${secrets.length || 'none'}`);
+  for (const f of secrets) say(`  SECRET? ${f}`);
+  say('stop: nothing is staged or committed. Show this to the operator; on yes run --commit.');
+  if (secrets.length) process.exit(4);
+}
+
 const [cmd, target] = process.argv.slice(2);
 if (cmd === 'validate' && target) cmdValidate(target);
 else if (cmd === 'migrate' && target) cmdMigrate(target);
@@ -814,9 +939,10 @@ else if (cmd === 'set' && process.argv.length > 6) { warn('set takes exactly <pr
 else if (cmd === 'set' && target && process.argv[4] && process.argv[5] !== undefined) cmdSet(target, process.argv[4], process.argv[5]);
 else if (cmd === 'require-origin' && target) cmdRequireOrigin(target, parseFlags(process.argv.slice(4)));
 else if (cmd === 'gitignore-check' && target) cmdGitignoreCheck(target);
+else if (cmd === 'git-init' && target) cmdGitInit(target, parseFlags(process.argv.slice(4)));
 else if (cmd === 'env-set' && target) cmdEnvSet(target, parseFlags(process.argv.slice(4)));
 else if (cmd === 'adopt' && target) cmdAdopt(target, parseFlags(process.argv.slice(4)));
 else {
-  warn('usage: wp-config.mjs <validate|migrate|render-context|get|set|validate-profile|adopt|drift|refresh|keep-inactive|remove-plugin|code-home|gitignore-check|env-set|require-origin> <project-path> [key [value]|wp-version|adopt flags]');
+  warn('usage: wp-config.mjs <validate|migrate|render-context|get|set|validate-profile|adopt|drift|refresh|keep-inactive|remove-plugin|code-home|gitignore-check|git-init|env-set|require-origin> <project-path> [key [value]|wp-version|adopt flags]');
   process.exit(1);
 }
