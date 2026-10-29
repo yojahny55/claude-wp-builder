@@ -106,6 +106,18 @@ function launchProxy(allow) {
 
 // Launch options for one engine with the block applied. An explicit proxy or a resolver
 // rule the caller already passed is left alone: it is somebody's deliberate setting.
+// Under @playwright/test the config's use.launchOptions reach launch() through the library's
+// default launch options, and the library spreads the explicit argument over them, so a block
+// built from the explicit argument alone would replace the config's args and proxy. Fold the
+// defaults in first so the block adds to them.
+function withDefaults(defaults, options) {
+  const d = defaults || {};
+  const opts = Object.assign({}, options || {});
+  if (Array.isArray(d.args) && d.args.length) opts.args = d.args.concat(Array.isArray(opts.args) ? opts.args : []);
+  if (!opts.proxy && d.proxy) opts.proxy = d.proxy;
+  return opts;
+}
+
 function applyToLaunch(engine, options, allow) {
   const opts = Object.assign({}, options || {});
   if (engine === 'chromium') {
@@ -118,4 +130,4 @@ function applyToLaunch(engine, options, allow) {
   return opts;
 }
 
-module.exports = { hostOf, parseHosts, allowlistFor, isBlocked, chromiumArgs, launchProxy, applyToLaunch, DEAD_PROXY };
+module.exports = { hostOf, parseHosts, allowlistFor, isBlocked, chromiumArgs, launchProxy, applyToLaunch, withDefaults, DEAD_PROXY };

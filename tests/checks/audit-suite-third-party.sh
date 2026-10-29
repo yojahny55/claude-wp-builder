@@ -43,6 +43,10 @@ ok(!args.includes("[::1]"), "an IPv6 literal reached the resolver rules");
 const fx = t.applyToLaunch("firefox", {}, a);
 ok(fx.proxy && fx.proxy.bypass.includes("site.example"), "firefox gets no blocking proxy");
 ok(t.applyToLaunch("firefox", { proxy: { server: "http://p:1" } }, a).proxy.server === "http://p:1", "an explicit proxy was overridden");
+const dflt = { args: ["--ignore-certificate-errors"], proxy: { server: "http://corp:3128" } };
+const cr = t.applyToLaunch("chromium", t.withDefaults(dflt, {}), a);
+ok(cr.args.includes("--ignore-certificate-errors") && cr.args.some((x) => x.startsWith("--host-resolver-rules")), "the config launch args were dropped or the block was not added: " + cr.args);
+ok(t.applyToLaunch("firefox", t.withDefaults(dflt, {}), a).proxy.server === "http://corp:3128", "the config proxy was replaced by the block");
 ' "$tp" || fail "$tp does not implement the allowlist"
 grep -Fq "third-party.cjs" bin/lib/pw-executables.cjs || fail "the suite preload does not use the shared allowlist"
 grep -Fq "lib/third-party.cjs" bin/ux-probe.mjs || fail "ux-probe does not use the shared allowlist"

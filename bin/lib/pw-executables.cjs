@@ -103,7 +103,8 @@ try {
       const i = method === 'launchPersistentContext' ? 1 : 0;
       const opts = Object.assign({}, args[i] || {});
       if (!opts.executablePath && exe[name]) opts.executablePath = exe[name];
-      args[i] = block ? thirdParty.applyToLaunch(name, opts, block) : opts;
+      const defaults = (this._playwright && this._playwright._defaultLaunchOptions) || {};
+      args[i] = block ? thirdParty.applyToLaunch(name, thirdParty.withDefaults(defaults, opts), block) : opts;
       const result = original.apply(this, args);
       if (!settleMs || !result || typeof result.then !== 'function') return result;
       return result.then((handle) => { patchHandle(handle, method); return handle; });
