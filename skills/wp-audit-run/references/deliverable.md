@@ -154,7 +154,7 @@ project's running history of every finding ever seen, a sidecar is one dated sna
 A report is never edited by hand: not to add a "fixes applied" section, not to remove a
 finding the client declined. The sidecar is what the next run compares against, and a
 hand-edited document silently disagrees with it. Record the decision in the ledger
-(`audit-report.mjs --out /home/lacho/audits/.wt-wpb/results --accept ... --reason`, `--mark-fixed ... --evidence`, see `ledger.md`)
+(`audit-report.mjs --accept ... --reason`, `--mark-fixed ... --evidence`, see `ledger.md`)
 and run `audit-report.mjs --rerender`: it rebuilds the newest `.md`/`.html` from its sidecar
 and the ledger, lists accepted findings and fixes awaiting verification in their own sections,
 leaves them out of the headline counts and the plan, and adds a note that no check re-ran.
