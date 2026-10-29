@@ -57,7 +57,11 @@ safe. The rules:
 - `node ${CLAUDE_PLUGIN_ROOT}/bin/style-diff.mjs` takes this measurement on every element
   of a page (the recipe is under *Usability fixes* below); use it instead of picking
   elements by hand.
-- When the user declines a `visual` finding it stays in the report as open, untouched.
+- When the user declines a `visual` finding it stays in the report as open, untouched. A
+  decline is a decision: record it with `audit-report.mjs --accept <id> --reason "..."`
+  (`ledger.md`) so later sessions stop proposing it, instead of remembering it in the session.
+- The offer, and every "pending" or "what is left" list in this step, leaves out `accepted`
+  entries and shows `fixed_unverified` ones as awaiting verification.
 - **The decision sheet.** Ask for the answers once, in one page, not in chat and not in a
   hand-built HTML. Write the proposals (id, title, page, selector, viewports, the `css` for
   the "after", options with one `recommended`, measured values) and run
@@ -95,6 +99,12 @@ first fix: it says which fixes stay in Elementor and which must be code, the bac
 and replay steps, and the widget traps. Any other builder: do not load it.
 
 If the user declines, skip to Step 10.
+
+**After a fix is applied, record it in the ledger, not by editing the report.** Once a fix
+and its Step 6.10 verification are done, run `audit-report.mjs --mark-fixed <ids> --evidence
+"<what was changed>"`, then `audit-report.mjs --rerender` so the `.md`/`.html` reflect it.
+The entry becomes `fixed_unverified`; it is `resolved` only after a later run measures the
+check clean (`ledger.md`). Never hand-write a "fixes applied" section into a report.
 
 If the user confirms, dispatch fix operations by category.
 
