@@ -566,6 +566,7 @@ Commands run these and read the exit code. Several are gates, not helpers.
 | `tailwind-native-check.sh` · `tailwind-rebuild.sh` | Validate a theme against the Tailwind-native convention; recompile its CSS after agents write new classes |
 | `theme-template-check.mjs` | ABSPATH, compiled-class and widget-script gate behind `/wp-finalize` and the practices audit |
 | `audit-report.mjs` | Renders an audit run into the dated `.md` + `.html` deliverable, with an optional Scope and coverage section (`notes`, `--notes`) |
+| `audit-runbook.mjs` | Renders `/wp-audit`'s replay record as an ordered production runbook: pre-deploy checks, code, wp-config, WP-CLI with a production `--url`, nginx and Apache server rules marked not applied, post-deploy, verification curls |
 | `audit-suite.sh` | Scaffolds and runs the Tier 3 browser suite (`/wp-audit --suite`) |
 | `link-sweep.mjs` | The audits' link sweep — at most 4 requests in flight, sampling, clone-origin and CDN-challenge rules built in |
 | `h2-proxy.mjs` | HTTP/2 + TLS + brotli proxy (runtime self-signed cert, HTML cache) in front of a local HTTP site, so Lighthouse on a clone resembles production |

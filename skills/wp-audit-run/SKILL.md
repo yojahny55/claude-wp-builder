@@ -35,6 +35,7 @@ quotes it.
 | 8 | [references/status-vocabulary.md](references/status-vocabulary.md) | The five statuses and the console report |
 | 8.5 | [references/deliverable.md](references/deliverable.md) | Finding owners, `bin/audit-report.mjs`, report before fix |
 | 9 | [references/fix.md](references/fix.md) | The report-only exit, the fix offer, the fix rules |
+| 9 | [references/server-rules.md](references/server-rules.md) | Vetted Apache and nginx snippets per server-rule fix and PHP-served endpoint, read by `bin/audit-runbook.mjs` |
 | 10 | [references/manifest-update.md](references/manifest-update.md) | The `audit` block written to `.wp-create.json` |
 
 ## Changing a step

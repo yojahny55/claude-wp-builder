@@ -448,6 +448,15 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/deliverable.md` now a
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/fix.md` now and follow it — it is this step, not background. It covers the report-only exit, the fix offer, and the rules each fix follows.
 
+Every fix appends its entry to `<out>/replay.json` as it lands, and the step ends with the
+production runbook that `bin/audit-runbook.mjs` renders from that record. When the production
+server is nginx, or is not recorded, an `.htaccess`-only fix is never reported as done for
+production: it is applied locally and waits for the server owner.
+
+When a fix lands in a web-server rule, or adds a URL that WordPress serves from PHP, read
+`${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/server-rules.md` now and follow it: it
+holds the Apache rule beside its nginx equivalent, and the id the replay entry records.
+
 ## Step 10: Update Manifest
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/manifest-update.md` now and follow it — it is this step, not background. It covers the audit block written back to .wp-create.json.
