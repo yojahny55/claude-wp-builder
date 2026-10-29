@@ -63,8 +63,11 @@ re-asks what was just answered.
 
 On B, measure less, not differently:
 
-1. Re-measure every ledger entry whose status is `new`, `still_failing` or `unmeasured`
-   (`ledger.md`): each by its own check on its own resource.
+1. Re-measure every ledger entry whose status is `new`, `still_failing`, `unmeasured` or
+   `fixed_unverified` (`ledger.md`): each by its own check on its own resource. Skip
+   `accepted` entries: a human closed them, and re-proposing one is how a declined finding
+   keeps coming back. A `fixed_unverified` entry that measures clean becomes `resolved`; one
+   that is still found returns to `still_failing`.
 2. List files changed since `audit.last_run`: `git log --since=<last_run> --name-only` in the
    project root (modification times when it is not a git repository). Map each file to the
    categories that read it (theme PHP and templates: all code-facing categories; CSS and
@@ -74,6 +77,16 @@ On B, measure less, not differently:
    with the baseline's result, never as passing. A resolved status still requires a
    measurement in this run (Step 7.5).
 4. If the changed-file list cannot be produced, fall back to a full audit and say so.
+
+## Between audits: use the commands, not the report or memory
+
+When the user says a finding stays as it is, or that fixes were applied since the last run,
+and no audit is wanted now, do not remember it, and do not edit the `.md`/`.html` by hand
+(the next comparison would then differ from what the sidecar says). Record it:
+`audit-report.mjs --accept <id> --reason "..."` or `--mark-fixed <id> --evidence "..."`, then
+`audit-report.mjs --rerender` to refresh the report and `audit-report.mjs --summary` for the
+counts to quote (`ledger.md`). A full re-audit is for measuring, not for bookkeeping.
+Every list of pending work built from the baseline leaves `accepted` entries out.
 
 ## Labelling the run
 

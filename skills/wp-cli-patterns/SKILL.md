@@ -121,6 +121,17 @@ really does on `wp post delete`) are in [references/seeding-recipes.md](referenc
 
 ---
 
+## Shell Hygiene for Every Agent
+
+These rules hold for every agent and command that runs a shell, not only for seeding.
+
+- **Call WP-CLI through `$WP`, and through `${CLAUDE_PLUGIN_ROOT}/bin/wp-quiet.sh $WP` when the dispatch names a quiet wrapper.** Never pipe bare `wp` into `grep -v Deprecated`: on PHP 8.5 WP-CLI prints `Deprecated` notices from its own phar on every call, `grep -v` drops only the matching line, and `wp-quiet.sh` also drops the stack trace that follows it.
+- **On PHP 8.5, if `wp eval` fails inside WP-CLI's own `Eval_Command`** (for example "Unparenthesized `a ?: b ? c : d` is not supported"), the fault is in WP-CLI's parser, not in your code. Write the code to a `mktemp` file and run `$WP eval-file <file>`.
+- **Never chain `sleep`, and never use `nohup`.** The harness blocks long `sleep` chains, and a `nohup` job detaches so nobody is told when it ends. Start a long job with the harness's background run (`run_in_background`), which notifies when the job exits.
+- **Use `cp -f` and `mv -f` in scripted copies.** An interactive alias may prompt on overwrite, and a prompt stalls a run that has nobody to answer it.
+
+---
+
 ## ACF Field Seeding Patterns
 
 Prefer ACF's own API, `update_field()` through `$WP eval`: it is storage-format-agnostic and

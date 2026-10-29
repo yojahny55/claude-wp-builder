@@ -98,6 +98,10 @@ function contextFieldsFor(manifest) {
 // The concerns a site's own plugins can already own. /wp-audit used to assume Rank Math and
 // AIOS and offered to install them; on a site that runs Yoast and Wordfence that is a
 // second SEO plugin and a second firewall, not a fix. `none` means nothing was detected.
+// Where the site's own code lives when the site has no editable theme or plugin of its own.
+// Recorded once by adoption so a fix never has to invent a home for a hook.
+export const CODE_HOME_KINDS = ['child-theme', 'site-plugin', 'mu-plugin'];
+
 export const STACK_KEYS = ['seo', 'security', 'fields', 'multilingual', 'builder', 'cache'];
 
 // Required fields by dotted path. Anything not listed is optional and preserved.
@@ -188,6 +192,12 @@ export function validateManifest(manifest) {
   const outDir = at(manifest, 'audit.out_dir');
   if (outDir !== undefined && (typeof outDir !== 'string' || outDir === '')) {
     problems.push('audit.out_dir must be a non-empty string (the directory /wp-audit writes its reports to)');
+  }
+
+  // Where every site's reports live side by side; the renderer writes to <root>/<site>/results.
+  const auditsRoot = at(manifest, 'audit.audits_root');
+  if (auditsRoot !== undefined && (typeof auditsRoot !== 'string' || auditsRoot === '')) {
+    problems.push('audit.audits_root must be a non-empty string (the directory holding one <site>/results folder per site)');
   }
 
   const checksRun = at(manifest, 'audit.checks_run');
@@ -294,6 +304,31 @@ export function validateManifest(manifest) {
   const origin = manifest.origin;
   if (origin !== undefined && origin !== 'created' && origin !== 'adopted') {
     problems.push(`origin must be "created" or "adopted", found ${JSON.stringify(origin)}`);
+  }
+  const parked = at(manifest, 'plugins.intentionally_inactive');
+  if (parked !== undefined && (!Array.isArray(parked) || parked.some((x) => typeof x !== 'string' || x === ''))) {
+    problems.push('plugins.intentionally_inactive must be an array of plugin slugs (plugins the operator keeps deactivated on purpose)');
+  }
+  const home = at(manifest, 'code_home');
+  if (home !== undefined) {
+    if (home === null || typeof home !== 'object' || Array.isArray(home)) {
+      problems.push('code_home must be an object with "kind" and "path"');
+    } else {
+      if (!CODE_HOME_KINDS.includes(home.kind)) problems.push(`code_home.kind must be one of ${CODE_HOME_KINDS.join(', ')}, found ${JSON.stringify(home.kind)}`);
+      if (typeof home.path !== 'string' || home.path === '' || home.path.startsWith('/') || home.path.split('/').includes('..')) {
+        problems.push(`code_home.path must be a path relative to the WordPress root that does not climb out of it, found ${JSON.stringify(home.path)}`);
+      }
+      // The names reach printed WP-CLI steps (theme_mods copy, theme activate): plain slugs only.
+      if (typeof home.path === 'string' && !/^[a-z0-9][a-z0-9._/-]*$/i.test(home.path)) {
+        problems.push(`code_home.path may hold only letters, digits and . _ - /, found ${JSON.stringify(home.path)}`);
+      }
+      if (home.parent !== undefined && (typeof home.parent !== 'string' || !/^[a-z0-9][a-z0-9._-]*$/i.test(home.parent))) {
+        problems.push(`code_home.parent must be a plain theme slug, found ${JSON.stringify(home.parent)}`);
+      }
+      for (const key of Object.keys(home)) {
+        if (!['kind', 'path', 'created', 'parent'].includes(key)) problems.push(`code_home has an unknown key: ${key}`);
+      }
+    }
   }
   if (isAdopted(manifest)) problems.push(...validateAdopted(manifest));
   if (manifest.store !== undefined) problems.push(...validateStore(manifest.store));

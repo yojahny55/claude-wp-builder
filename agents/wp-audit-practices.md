@@ -92,7 +92,7 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 
 | Code | Check | How to Detect | Severity | Auto-fix |
 |------|-------|---------------|----------|----------|
-| WP-016 | Missing ABSPATH check | Run `node ${CLAUDE_PLUGIN_ROOT}/bin/theme-template-check.mjs <theme> --rule abspath`: every `.php` file, `inc/seed/` and `fields/` included, must carry `defined( 'ABSPATH' )` — the **quoted** form only. The script is the gate; a grep sample is what let sixteen unguarded seed files through | WARNING | Yes |
+| WP-016 | Missing ABSPATH check | Run `node ${CLAUDE_PLUGIN_ROOT}/bin/theme-template-check.mjs <theme> --rule abspath`: every `.php` file, `inc/seed/` and `fields/` included, must carry `defined( 'ABSPATH' )` — the **quoted** form only. Run it over `code_scope.editable` only; hits in `code_scope.read_only` fold into the `vendor notes` line. The script is the gate; a grep sample is what let sixteen unguarded seed files through | WARNING | Yes |
 | WP-046 | Unquoted `ABSPATH` constant | Grep for `defined\( *ABSPATH *\)` without quotes; a PHP 8 fatal, not a style issue | CRITICAL | Yes |
 | WP-047 | Template classes absent from the stylesheet | Every class a template part emits must exist in the theme's CSS. See Procedure | WARNING | No |
 | WP-053 | Tailwind class that never compiled | On a compiled Tailwind theme run `node ${CLAUDE_PLUGIN_ROOT}/bin/theme-template-check.mjs <theme> --rule classes`. It fails on an HTML entity inside a class token (`group-aria-[expanded=&quot;false&quot;]:rotate-90` emitted nothing on a real build) and on a utility-shaped token with no selector in `assets/css/dist/*.css`. `CANNOT VERIFY` lines are runtime-built classes: report them as INFO, never as findings | WARNING | No |
@@ -106,7 +106,7 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 
 | Code | Check | How to Detect | Severity | Auto-fix |
 |------|-------|---------------|----------|----------|
-| WP-020 | query_posts used | Grep for `\bquery_posts\(` | CRITICAL | No |
+| WP-020 | query_posts used | Grep for `\bquery_posts\(` | CRITICAL (in `code_scope.read_only`: a `vendor notes` INFO line, not a finding; `adopted-site.md`) | No |
 | WP-021 | Missing wp_reset_postdata | Grep for `new WP_Query` without `wp_reset_postdata` after the loop | WARNING | No |
 | WP-022 | Unprefixed functions | Grep for `^function\s+(?!prefix_)` where prefix is from CLAUDE.md | WARNING | No |
 | WP-023 | Anonymous hooks | Grep for `add_action.*function\s*\(\|add_filter.*function\s*\(` (anonymous funcs can't be unhooked) | INFO | No |
@@ -144,12 +144,12 @@ These checks require WP-CLI access via `$WP`. Skip this tier if `.wp-create.json
 
 | Code | Check | Command | Pass Criteria | Severity |
 |------|-------|---------|---------------|----------|
-| WP-040 | WP_DEBUG true | `$WP config get WP_DEBUG` | false | WARNING |
+| WP-040 | WP_DEBUG true | `$WP config get WP_DEBUG` | false | WARNING (`INFO` on a local clone) |
 | WP-041 | FS_METHOD not set | `$WP config get FS_METHOD 2>/dev/null` | `direct` | INFO |
 | WP-042 | PHP version old | `$WP eval "echo phpversion();"` | >=8.1 | WARNING |
 | WP-043 | WordPress outdated | `$WP core check-update`, **only after the network check below** | No updates | WARNING |
 | WP-044 | Plugin updates | `$WP plugin list --update=available --format=count`, **only after the network check below** | 0 | INFO |
-| WP-045 | Bad file permissions | Check uploads/plugins/upgrade dir permissions | 755 | WARNING |
+| WP-045 | Bad file permissions | Check uploads/plugins/upgrade dir permissions | 755 | WARNING (`INFO` on a local clone) |
 | WP-060 | Attachment's main file (`_wp_attached_file`) missing from the uploads directory | `$WP eval-file <skills>/wp-cli-patterns/scripts/find-missing-media-files.php` | 0 BEFORE-ARCHIVE/UNDATED misses | WARNING |
 | WP-061 | A registered image sub-size is missing (main file present) | same script, `size:*` labels | 0 BEFORE-ARCHIVE/UNDATED misses | WARNING |
 | WP-062 | The pre-scale `original_image` backup (from `_wp_attachment_metadata`) is missing | same script, `original_image` label | 0 BEFORE-ARCHIVE/UNDATED misses | WARNING |

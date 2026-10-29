@@ -34,7 +34,7 @@ runtime for the plugin itself. The only executable code shipped is:
   `ux-probe.mjs` (the usability audit's page harness: one browser launch per run, built-in
   DOM probes, site probes from a module, and the 3-launch / 15-minute / 2-attempt budget
   enforced through a state file), `style-diff.mjs` (before/after computed-style snapshots and
-  diff with a two-baseline noise filter: the measurement behind "a tag swap is a visual change").
+  diff with a two-baseline noise filter: the measurement behind "a tag swap is a visual change"), `decision-sheet.mjs` (the approval page for `design_impact` findings and the parser for its answers).
   `bin/lib/` holds what they share.
 - `skills/wp-polylang/scripts/*.php` and `skills/wp-woocommerce/scripts/*.php` — run inside a
   real WordPress via `wp eval-file`

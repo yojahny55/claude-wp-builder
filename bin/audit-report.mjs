@@ -20,12 +20,53 @@
 //      its own Markdown back.
 //
 // Usage:
-//   bin/audit-report.mjs --run <run.json> [--merge <other.json>...] [--out <dir>]
-//                        [--format md|html|both] [--lang en|es] [--date YYYY-MM-DD]
-//                        [--notes <file>]
+//   bin/audit-report.mjs --run <run.json> [--agents <dir|file>...] [--merge <other.json>...]
+//                        [--out <dir>] [--format md|html|both] [--lang en|es]
+//                        [--date YYYY-MM-DD] [--notes <file>] [--site-root <dir>]
+//
+// --agents builds the findings straight from the agents' report files (a directory of
+// *.json, or one file) instead of a run file somebody had to assemble by hand; --run may then
+// carry only the metadata (site, date, tier, categories, notes) or be omitted. Every finding,
+// from either source, goes through the normalizer in bin/lib/audit-schema.mjs: known key
+// aliases are accepted (`code` for `check`, `owner` for `ownership`, ...). A finding in an
+// agent report that has no id, an id outside the agents' catalogs, or that is also reported
+// as a pass is refused. (Findings in --run come from the aggregator or the browser suite,
+// whose ids are not the agents', so they are normalized but not held to the catalogs.)
+//
+// --lang defaults to the manifest's `languages.primary` when it is es or en, else en.
+// The manifest is ./.wp-create.json, or <--site-root>/.wp-create.json.
+//
+//   bin/audit-report.mjs --accept <id,...> --reason "<why>"   [--ledger <file>] [--out <dir>]
+//   bin/audit-report.mjs --unaccept <id,...>
+//   bin/audit-report.mjs --mark-fixed <id,...> --evidence "<what was done>"
+//   bin/audit-report.mjs --rerender [--format ...] [--lang ...] [--notes <file>]
+//   bin/audit-report.mjs --summary [--json]
+//
+// The last five record a decision or read the state WITHOUT auditing. An <id> is a finding's
+// identity as the ledger spells it, `check:resource` (or just `check` when it has no
+// resource); a bare `check` selects every ledger entry of that check. Pass several ids
+// comma-separated or by repeating the flag. They combine: `--mark-fixed ... --rerender
+// --summary` records, rebuilds the report, then prints the counts.
+//
+//   --accept / --unaccept   a human decision, the only way an entry becomes `accepted`: the
+//                           audit stops re-raising it and the report lists it apart from the
+//                           plan. --unaccept puts it back to the status it had.
+//   --mark-fixed            fixes applied since the last run. The entry becomes
+//                           `fixed_unverified`: reported, never `resolved` -- only a re-run
+//                           that measures the check can say that.
+//   --rerender              rebuilds the .md/.html of the NEWEST sidecar from that sidecar
+//                           plus the ledger. No check runs, so nothing becomes resolved.
+//   --summary [--json]      counts by status and by severity, from the ledger (or from the
+//                           newest sidecar when there is no ledger). Quote these, not memory.
+//
+// The ledger is `--ledger <file>`, else the manifest's `audit.findings_ledger.path`, else
+// `.wp-audit-findings.json`, both read from the site root (--site-root, default the current
+// directory).
 //
 // The output directory is, in order: --out, the WP_AUDIT_OUT_DIR environment variable, the
-// manifest's `audit.out_dir` (read from ./.wp-create.json), then `.wp-audit`. The renderer
+// manifest's `audit.out_dir`, `<audits root>/<site>/results` when an audits root is set (the
+// WP_AUDITS_ROOT environment variable or the manifest's `audit.audits_root`), then
+// `.wp-audit`. With no audits root configured nothing changes. The renderer
 // diffs against the newest sidecar IN THAT DIRECTORY, so changing the directory between runs
 // starts a new baseline. Every written file is printed as an absolute path, and a directory
 // inside a git work tree that is not ignored gets a one-line warning.
@@ -48,8 +89,9 @@
 //   3  crash
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, renameSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve, basename, isAbsolute } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { normalizeEntry, normalizeReport, loadReports } from './lib/audit-schema.mjs';
 
 const OWNERSHIP = ['code', 'setting', 'content', 'manual'];
 const SEVERITY_ORDER = { CRITICAL: 0, WARNING: 1, INFO: 2 };
@@ -99,6 +141,16 @@ const STRINGS = {
     ownership: { code: 'Code', setting: 'Setting', content: 'Content', manual: 'Manual' },
     designImpact: 'Visual change',
     severity: { CRITICAL: 'High', WARNING: 'Medium', INFO: 'Low' },
+    decisionsLine: 'Set aside, not counted above: %accepted% accepted by a human, %fixed% fixed and awaiting a measured re-run',
+    noOpen: 'No open issues. What remains is accepted by a human or fixed and awaiting a measured re-run — see below.',
+    accepted: 'Accepted by a human',
+    acceptedNote: 'A person decided these stay as they are. They are not in the plan or in the counts above, and a later audit does not re-raise them.',
+    fixedUnverified: 'Fixed, awaiting a measured re-run',
+    fixedNote: 'A person reports these as fixed. No check has re-run since, so they are neither open nor resolved: only a run that measures them can resolve them, and one that still finds them returns them to still failing.',
+    reason: 'Reason',
+    evidenceCol: 'Evidence',
+    decidedOn: 'Date',
+    rerendered: 'Re-rendered on %today% from the audit of %date% and the ledger decisions recorded since. No check was run again, so nothing here is newly resolved.',
   },
   es: {
     scope: 'Alcance y cobertura',
@@ -144,6 +196,16 @@ const STRINGS = {
     ownership: { code: 'Código', setting: 'Ajuste', content: 'Contenido', manual: 'Manual' },
     designImpact: 'Cambio visual',
     severity: { CRITICAL: 'Alta', WARNING: 'Media', INFO: 'Baja' },
+    decisionsLine: 'Apartados, no contados arriba: %accepted% aceptados por una persona, %fixed% corregidos a la espera de una nueva medición',
+    noOpen: 'No hay incidencias abiertas. Lo que queda está aceptado por una persona o corregido a la espera de una nueva medición: ver más abajo.',
+    accepted: 'Aceptados por una persona',
+    acceptedNote: 'Una persona decidió que se quedan como están. No figuran en el plan ni en los recuentos de arriba, y una auditoría posterior no los vuelve a plantear.',
+    fixedUnverified: 'Corregidos, a la espera de una nueva medición',
+    fixedNote: 'Una persona indica que están corregidos. Ningún criterio se ha vuelto a medir, así que no están abiertos ni resueltos: solo una ejecución que los mida puede resolverlos, y si la ejecución los sigue encontrando vuelven a seguir fallando.',
+    reason: 'Motivo',
+    evidenceCol: 'Evidencia',
+    decidedOn: 'Fecha',
+    rerendered: 'Regenerado el %today% a partir de la auditoría del %date% y de las decisiones del registro posteriores. No se volvió a medir ningún criterio, así que nada de lo que aparece está resuelto de nuevo.',
   },
 };
 
@@ -152,15 +214,48 @@ function die(code, message) {
   process.exit(code);
 }
 
+const DECISION_FLAGS = { '--accept': 'accept', '--unaccept': 'unaccept', '--mark-fixed': 'markFixed' };
+
 function parseArgs(argv) {
-  const opts = { out: null, format: 'both', lang: 'en', run: null, date: null, merge: [] };
+  const opts = {
+    out: null, format: 'both', lang: null, run: null, date: null, merge: [], agents: [], siteRoot: '.', ledger: null,
+    accept: [], unaccept: [], markFixed: [], reason: null, evidence: null,
+    rerender: false, summary: false, json: false,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     const value = argv[i + 1];
     switch (flag) {
+      case '--rerender':
+      case '--summary':
+      case '--json':
+        opts[flag.slice(2)] = true;
+        break;
       case '--merge': {
         if (value === undefined || value.startsWith('--')) die(1, `${flag} needs a value`);
         opts.merge.push(value);
+        i += 1;
+        break;
+      }
+      case '--agents': {
+        if (value === undefined || value.startsWith('--')) die(1, `${flag} needs a value`);
+        opts.agents.push(value);
+        i += 1;
+        break;
+      }
+      case '--site-root': {
+        if (value === undefined || value.startsWith('--')) die(1, `${flag} needs a value`);
+        opts.siteRoot = value;
+        i += 1;
+        break;
+      }
+      case '--accept':
+      case '--unaccept':
+      case '--mark-fixed': {
+        if (value === undefined || value.startsWith('--')) die(1, `${flag} needs a value`);
+        // Comma-separated, or the flag repeated. A resource can hold spaces but not a comma
+        // in any identity the ledger spells, so a comma is the separator.
+        opts[DECISION_FLAGS[flag]].push(...value.split(',').map((id) => id.trim()).filter(Boolean));
         i += 1;
         break;
       }
@@ -169,6 +264,9 @@ function parseArgs(argv) {
       case '--format':
       case '--lang':
       case '--notes':
+      case '--ledger':
+      case '--reason':
+      case '--evidence':
       case '--date': {
         if (value === undefined || value.startsWith('--')) {
           die(1, `${flag} needs a value`);
@@ -181,10 +279,28 @@ function parseArgs(argv) {
         die(1, `unknown argument: ${flag}`);
     }
   }
-  if (!opts.run) die(1, '--run <run.json> is required');
+  const rendering = Boolean(opts.run) || opts.agents.length > 0;
+  const deciding = opts.accept.length + opts.unaccept.length + opts.markFixed.length > 0;
+  if (!rendering && !deciding && !opts.rerender && !opts.summary) {
+    die(1, '--run <run.json> or --agents <dir|file> is required (or --accept, --unaccept, --mark-fixed, --rerender, --summary)');
+  }
+  if (rendering && (deciding || opts.rerender || opts.summary)) {
+    die(1, '--run and --agents render a new audit; it cannot be combined with --accept, --unaccept, --mark-fixed, --rerender or --summary');
+  }
+  if (opts.merge.length && !rendering) die(1, '--merge needs --run or --agents');
+  if (opts.json && !opts.summary) die(1, '--json only applies to --summary');
+  if (opts.accept.length && !(opts.reason && opts.reason.trim())) {
+    die(1, '--accept needs --reason "<why it stays>": a decision with no reason is the one nobody can review later');
+  }
+  if (opts.markFixed.length && !(opts.evidence && opts.evidence.trim())) {
+    die(1, '--mark-fixed needs --evidence "<what was changed>"');
+  }
+  if (opts.reason && !opts.accept.length) die(1, '--reason only applies to --accept');
+  if (opts.evidence && !opts.markFixed.length) die(1, '--evidence only applies to --mark-fixed');
   if (!['md', 'html', 'both'].includes(opts.format)) {
     die(1, `--format must be md, html or both (got: ${opts.format})`);
   }
+  if (opts.lang === null) opts.lang = defaultLang(opts.siteRoot);
   if (!STRINGS[opts.lang]) {
     die(1, `--lang must be one of ${Object.keys(STRINGS).join(', ')} (got: ${opts.lang})`);
   }
@@ -197,15 +313,38 @@ function parseArgs(argv) {
   return opts;
 }
 
-// --out > WP_AUDIT_OUT_DIR > audit.out_dir in ./.wp-create.json > .wp-audit
-function resolveOutDir(flag) {
+function readManifest(siteRoot) {
+  try {
+    return JSON.parse(readFileSync(join(siteRoot, '.wp-create.json'), 'utf8'));
+  } catch { return null; /* no manifest, or unreadable: every default below still works */ }
+}
+
+// The report is read by a client, so it follows the site's primary language, not the
+// plugin's. Only languages the renderer has strings for count; anything else is English.
+function defaultLang(siteRoot) {
+  const primary = readManifest(siteRoot)?.languages?.primary;
+  const code = typeof primary === 'string' ? primary.trim().toLowerCase().split(/[-_]/)[0] : '';
+  return STRINGS[code] && HTML_UI[code] ? code : 'en';
+}
+
+const slugify = (value) => String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+// --out > WP_AUDIT_OUT_DIR > audit.out_dir > <audits root>/<site>/results > .wp-audit
+// The audits root (WP_AUDITS_ROOT, or audit.audits_root in the manifest) is where an operator
+// keeps every site's reports side by side; with none set, the old default is unchanged.
+function resolveOutDir(flag, siteRoot, run) {
   if (flag) return flag;
   if (process.env.WP_AUDIT_OUT_DIR) return process.env.WP_AUDIT_OUT_DIR;
-  try {
-    const manifest = JSON.parse(readFileSync('.wp-create.json', 'utf8'));
-    const dir = manifest?.audit?.out_dir;
-    if (typeof dir === 'string' && dir !== '') return dir;
-  } catch { /* no manifest, or unreadable: fall through to the default */ }
+  const manifest = readManifest(siteRoot);
+  const dir = manifest?.audit?.out_dir;
+  if (typeof dir === 'string' && dir !== '') return dir;
+  const root = process.env.WP_AUDITS_ROOT || manifest?.audit?.audits_root;
+  if (typeof root === 'string' && root !== '') {
+    // The site root's folder name is the last candidate so that the commands that run without
+    // a run file (--accept, --rerender, --summary) still find the folder a render wrote.
+    const site = slugify(manifest?.project?.slug || manifest?.project?.name || run?.site || run?.project || basename(resolve(siteRoot)));
+    if (site) return join(root, site, 'results');
+  }
   return '.wp-audit';
 }
 
@@ -227,7 +366,7 @@ function warnIfUnignored(outDir) {
   console.warn(`audit-report: ${outDir} is inside a git work tree and is not ignored -- add it to .gitignore, or run node bin/wp-config.mjs gitignore-check <site-root>`);
 }
 
-function loadRun(path) {
+function loadRun(path, { findingsOptional = false } = {}) {
   let raw;
   try {
     raw = readFileSync(path, 'utf8');
@@ -240,6 +379,8 @@ function loadRun(path) {
   } catch (error) {
     die(1, `${path} is not valid JSON: ${error.message}`);
   }
+  // With --agents the findings come from the agents' reports and the run file is metadata.
+  if (findingsOptional && run.findings === undefined) run.findings = [];
   if (!Array.isArray(run.findings)) {
     die(1, `${path} has no "findings" array`);
   }
@@ -494,6 +635,238 @@ function findPrevious(outDir, selfPath) {
   }
 }
 
+// ---------------------------------------------------------------------------------------
+// The ledger: the project's running record of every finding. The audit writes it (Step 7.5);
+// the commands below are how a HUMAN decision gets in without an audit. Shape:
+//   { "ledger_version": 1, "findings": [ { "check", "resource", "status", "severity",
+//     "first_seen", "last_seen", "evidence" } ] }
+// `findings` is an ARRAY of objects, not an object keyed by identity.
+// ---------------------------------------------------------------------------------------
+const LEDGER_STATUSES = ['new', 'still_failing', 'resolved', 'accepted', 'fixed_unverified', 'unmeasured'];
+// Entries a re-audit still has to measure, and the ones a plan can still be made of.
+const OPEN_STATUSES = ['new', 'still_failing', 'unmeasured'];
+const LEDGER_SHAPE = '{"ledger_version":1,"findings":[{"check":"SEC-036","resource":"wp_options.siteurl","status":"still_failing","severity":"CRITICAL","first_seen":"<ISO>","last_seen":"<ISO>","evidence":"<command>"}]}';
+
+const nowIso = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+
+// Read from the same manifest as the output directory (--site-root), so a decision recorded
+// from another directory lands in that site's ledger. A relative pointer is relative to it.
+function resolveLedgerPath(flag, siteRoot = '.') {
+  if (flag) return flag;
+  const pointer = readManifest(siteRoot)?.audit?.findings_ledger;
+  const path = typeof pointer === 'string' ? pointer : pointer?.path;
+  if (typeof path === 'string' && path !== '') return isAbsolute(path) ? path : join(siteRoot, path);
+  return join(siteRoot, '.wp-audit-findings.json');
+}
+
+// A ledger that is not this shape is refused with the shape, because the failure otherwise
+// shows up in whatever reads it next (a one-off script indexing a string as an object).
+function loadLedger(path, { required }) {
+  if (!existsSync(path)) {
+    if (required) die(1, `no ledger at ${path} -- pass --ledger <file>, or run an audit first`);
+    return { path, data: { ledger_version: 1, findings: [] }, exists: false };
+  }
+  let data;
+  try {
+    data = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    die(1, `${path} is not valid JSON: ${error.message}`);
+  }
+  if (!data || typeof data !== 'object' || !Array.isArray(data.findings)) {
+    die(1, `${path} is not a findings ledger: expected ${LEDGER_SHAPE}`);
+  }
+  data.findings.forEach((entry, index) => {
+    if (!entry || typeof entry !== 'object' || typeof entry.check !== 'string' || !entry.check) {
+      die(1, `${path} findings[${index}] is not an entry with a string "check": expected ${LEDGER_SHAPE}`);
+    }
+  });
+  return { path, data, exists: true };
+}
+
+function saveLedger(ledger) {
+  const tmp = `${ledger.path}.tmp-${process.pid}`;
+  writeFileSync(tmp, `${JSON.stringify(ledger.data, null, 2)}\n`);
+  renameSync(tmp, ledger.path);
+}
+
+function newestSidecar(outDir) {
+  if (!existsSync(outDir)) return null;
+  const names = readdirSync(outDir)
+    .filter((name) => SIDECAR.test(name))
+    .sort((a, b) => sidecarOrder(a).localeCompare(sidecarOrder(b)));
+  if (!names.length) return null;
+  const path = join(outDir, names[names.length - 1]);
+  let data;
+  try {
+    data = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    die(1, `${path} is not valid JSON: ${error.message}`);
+  }
+  if (!Array.isArray(data.findings)) die(1, `${path} has no "findings" array`);
+  return { path, data };
+}
+
+// `--accept SEC-036` selects every entry of the check; `SEC-036:wp_options.siteurl` one.
+// Every token is resolved before anything is written, so a typo changes nothing. A token
+// the ledger lacks may still name a finding of the newest sidecar (an audit run with
+// --report only, say), which is then added to the ledger as it stood.
+function selectEntries(ledger, tokens, outDir) {
+  const picked = [];
+  const missing = [];
+  let sidecar;
+  for (const token of tokens) {
+    let matches = ledger.data.findings.filter((entry) => identity(entry) === token);
+    if (!matches.length) matches = ledger.data.findings.filter((entry) => entry.check === token);
+    if (!matches.length) {
+      if (sidecar === undefined) sidecar = newestSidecar(outDir);
+      const found = sidecar ? sidecar.data.findings.filter((f) => !f.not_remeasured && (identity(f) === token || f.check === token)) : [];
+      matches = found.map((f) => {
+        const entry = {
+          check: f.check, resource: f.resource || null, status: 'still_failing', severity: f.severity,
+          first_seen: nowIso(), last_seen: nowIso(), evidence: f.evidence || null,
+        };
+        ledger.data.findings.push(entry);
+        return entry;
+      });
+    }
+    if (!matches.length) missing.push(token);
+    for (const entry of matches) if (!picked.includes(entry)) picked.push(entry);
+  }
+  if (missing.length) {
+    die(1, `audit-report: not in the ledger (${ledger.path}) nor in the newest report: ${missing.join(', ')}\n`
+      + '  an id is `check:resource` as the ledger spells it, or a bare `check` for all its resources -- --summary --json lists them');
+  }
+  return picked;
+}
+
+function recordDecisions(opts, outDir) {
+  const ledger = loadLedger(resolveLedgerPath(opts.ledger, opts.siteRoot), { required: false });
+  const at = nowIso();
+  const say = (verb, entry, extra = '') => console.log(`audit-report: ${verb} ${identity(entry)}${extra}`);
+
+  if (opts.accept.length) {
+    for (const entry of selectEntries(ledger, opts.accept, outDir)) {
+      if (entry.status === 'accepted') { say('already accepted:', entry); continue; }
+      entry.previous_status = entry.status || 'still_failing';
+      entry.status = 'accepted';
+      entry.accepted_reason = opts.reason.trim();
+      entry.accepted_at = at;
+      say('accepted', entry);
+    }
+  }
+  if (opts.unaccept.length) {
+    for (const entry of selectEntries(ledger, opts.unaccept, outDir)) {
+      if (entry.status !== 'accepted') { say('not accepted, left alone:', entry, ` (${entry.status})`); continue; }
+      entry.status = LEDGER_STATUSES.includes(entry.previous_status) && entry.previous_status !== 'accepted'
+        ? entry.previous_status : 'still_failing';
+      delete entry.previous_status;
+      delete entry.accepted_reason;
+      delete entry.accepted_at;
+      say('unaccepted', entry, ` -> ${entry.status}`);
+    }
+  }
+  if (opts.markFixed.length) {
+    for (const entry of selectEntries(ledger, opts.markFixed, outDir)) {
+      if (entry.status === 'accepted') { say('skipped (accepted -- --unaccept it first):', entry); continue; }
+      if (entry.status === 'resolved') { say('skipped (already resolved by a measurement):', entry); continue; }
+      entry.status = 'fixed_unverified';
+      entry.fix_evidence = opts.evidence.trim();
+      entry.fixed_at = at;
+      say('marked fixed_unverified', entry);
+    }
+  }
+  ledger.data.ledger_version = ledger.data.ledger_version || 1;
+  saveLedger(ledger);
+  console.log(`audit-report: wrote ${resolve(ledger.path)}`);
+  if (opts.markFixed.length) console.log('audit-report: fixed_unverified is not resolved -- only a run that measures the check resolves it');
+  if (!opts.rerender) console.log('audit-report: the report on disk still shows the old state -- run --rerender to refresh it');
+}
+
+// Ledger decisions as the renderers need them. `fresh` is true when the findings come from
+// a run just measured: a `fixed_unverified` entry that run still found is open (the fix did
+// not hold), whatever the ledger says. A rerender has no fresh measurement, so the entry
+// stays set aside.
+function splitByDecision(findings, entries, fresh) {
+  const byId = new Map(entries.map((entry) => [identity(entry), entry]));
+  const present = new Set(findings.map(identity));
+  const decorate = (finding, entry) => ({
+    ...finding,
+    decision: entry.status === 'accepted'
+      ? { reason: entry.accepted_reason || '', at: entry.accepted_at || '' }
+      : { reason: entry.fix_evidence || '', at: entry.fixed_at || '' },
+  });
+  const open = [];
+  const accepted = [];
+  const fixed = [];
+  for (const finding of findings) {
+    const entry = byId.get(identity(finding));
+    if (entry?.status === 'accepted') accepted.push(decorate(finding, entry));
+    else if (entry?.status === 'fixed_unverified' && !fresh) fixed.push(decorate(finding, entry));
+    else {
+      if (entry?.status === 'fixed_unverified') {
+        console.error(`audit-report: ${identity(finding)} is marked fixed_unverified but this run still found it -- reported as open`);
+      }
+      open.push(finding);
+    }
+  }
+  // Decisions about findings this run does not carry still belong in the report.
+  for (const entry of entries) {
+    if (present.has(identity(entry)) || !['accepted', 'fixed_unverified'].includes(entry.status)) continue;
+    const stub = {
+      check: entry.check, resource: entry.resource || null, severity: entry.severity,
+      message: entry.message || entry.evidence || entry.check,
+    };
+    (entry.status === 'accepted' ? accepted : fixed).push(decorate(stub, entry));
+  }
+  return { open, accepted, fixed };
+}
+
+function statusTable(rows) {
+  const blank = () => ({ CRITICAL: 0, WARNING: 0, INFO: 0, other: 0, total: 0 });
+  const byStatus = Object.fromEntries(LEDGER_STATUSES.map((status) => [status, blank()]));
+  const bySeverity = blank();
+  for (const row of rows) {
+    const status = row.status || 'unknown';
+    byStatus[status] ||= blank();
+    const bucket = row.severity in SEVERITY_ORDER ? row.severity : 'other';
+    byStatus[status][bucket] += 1;
+    byStatus[status].total += 1;
+    bySeverity[bucket] += 1;
+    bySeverity.total += 1;
+  }
+  const open = blank();
+  for (const status of OPEN_STATUSES) for (const key of Object.keys(open)) open[key] += byStatus[status][key];
+  return { by_status: byStatus, by_severity: bySeverity, open };
+}
+
+function printSummary(opts, outDir) {
+  const ledger = loadLedger(resolveLedgerPath(opts.ledger, opts.siteRoot), { required: false });
+  let source = 'ledger';
+  let path = ledger.path;
+  let rows = ledger.data.findings;
+  if (!ledger.exists) {
+    const sidecar = newestSidecar(outDir);
+    if (!sidecar) die(1, `audit-report: no ledger at ${ledger.path} and no sidecar in ${outDir} -- nothing to summarise`);
+    source = 'sidecar';
+    path = sidecar.path;
+    rows = sidecar.data.findings.filter((f) => !f.not_remeasured).map((f) => ({ ...f, status: f.status || 'open' }));
+  }
+  const table = statusTable(rows);
+  const result = { source, path: resolve(path), total: rows.length, ...table };
+  if (opts.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  const pad = (v, n) => String(v).padEnd(n);
+  console.log(`audit-report: ${source} ${resolve(path)} -- ${rows.length} entries`);
+  console.log(`${pad('status', 18)}${pad('CRITICAL', 10)}${pad('WARNING', 9)}${pad('INFO', 6)}${pad('other', 7)}total`);
+  const line = (label, b) => console.log(`${pad(label, 18)}${pad(b.CRITICAL, 10)}${pad(b.WARNING, 9)}${pad(b.INFO, 6)}${pad(b.other, 7)}${b.total}`);
+  for (const [status, bucket] of Object.entries(table.by_status)) line(status, bucket);
+  line('open*', table.open);
+  line('all', table.by_severity);
+  console.log(`* open = ${OPEN_STATUSES.join(' + ')}. accepted and fixed_unverified are set aside, resolved is closed.`);
+}
+
 function counts(findings) {
   const out = { total: findings.length, CRITICAL: 0, WARNING: 0, INFO: 0, other: 0 };
   for (const finding of findings) {
@@ -592,6 +965,8 @@ function compare(findings, previous, scope = {}) {
   // Without this a sibling that outlives its parent reads as resolved-and-new.
   const withFolded = (list) => new Set(list.flatMap((f) => [identity(f), ...(f.also_affects || []).map((a) => identity(a))]));
   const now = withFolded(findings);
+  // A finding a human accepted may be left out of the run on purpose; that is not a fix.
+  for (const id of scope.keep || []) now.add(id);
   const before = withFolded(previous.findings);
   return {
     date: previous.date,
@@ -600,7 +975,7 @@ function compare(findings, previous, scope = {}) {
     unmeasured: Array.isArray(previous.unmeasured) ? previous.unmeasured.length : 0,
     // A finding the previous run carried forward unmeasured is in its sidecar for the baseline,
     // not in its score: it was not found by that run.
-    counts: counts(previous.findings.filter((finding) => !finding.not_remeasured)),
+    counts: counts(previous.findings.filter((finding) => !finding.not_remeasured && !finding.status)),
     resolved: previous.findings.filter((finding) => !now.has(identity(finding)) && measuredNow(finding)),
     notMeasured: previous.findings.filter((finding) => !now.has(identity(finding)) && !measuredNow(finding)),
     added: findings.filter((finding) => !before.has(identity(finding))),
@@ -612,6 +987,7 @@ function compare(findings, previous, scope = {}) {
 // With unmeasured checks it must not read as a clean bill of health: the Not measured
 // section below it says those checks never ran.
 function noFindingsText(model) {
+  if (model.accepted.length || model.fixed.length) return model.t.noOpen;
   return model.unmeasured.length ? model.t.noFindingsUnmeasured : model.t.noFindings;
 }
 
@@ -644,6 +1020,10 @@ function renderMarkdown(model) {
   }
   push(scoreSentence(t, model.counts));
   push();
+  if (model.accepted.length || model.fixed.length) {
+    push(fill(t.decisionsLine, { accepted: model.accepted.length, fixed: model.fixed.length }));
+    push();
+  }
   if (model.plan.length) {
     push(fill(t.ownershipCounts, model.ownership));
     push();
@@ -725,6 +1105,23 @@ function renderMarkdown(model) {
     push(fill(t.ownershipCounts, model.ownership));
     push();
     push(`> ${t.settingWarning}`);
+    push();
+  }
+
+  for (const [heading, note, list, column] of [
+    [t.accepted, t.acceptedNote, model.accepted, t.reason],
+    [t.fixedUnverified, t.fixedNote, model.fixed, t.evidenceCol],
+  ]) {
+    if (!list.length) continue;
+    push(`## ${heading}`);
+    push();
+    push(note);
+    push();
+    push(`| ${t.code} | ${t.problem} | ${column} | ${t.decidedOn} |`);
+    push('|---|---|---|---|');
+    for (const finding of sortForPlan(list)) {
+      push(`| ${[`\`${identity(finding)}\``, finding.message, finding.decision.reason || '—', String(finding.decision.at).slice(0, 10) || '—'].map(mdCell).join(' | ')} |`);
+    }
     push();
   }
 
@@ -1073,6 +1470,14 @@ ${groups}
         .join('')}</tbody></table></div>`
     : `<p>${esc(t.none)}</p>`;
 
+  const decisionSection = (id, heading, note, list, column) => (list.length
+    ? `<section id="${id}"><h2>${esc(heading)}</h2><p>${esc(note)}</p><div class="scroll"><table><thead><tr><th>${esc(t.code)}</th><th>${esc(t.problem)}</th><th>${esc(column)}</th><th>${esc(t.decidedOn)}</th></tr></thead><tbody>${sortForPlan(list)
+      .map((finding) => `<tr><td class="num">${esc(identity(finding))}</td><td>${esc(finding.message)}</td><td class="ev">${finding.decision.reason ? esc(finding.decision.reason) : '<span class="muted">—</span>'}</td><td class="nowrap">${esc(String(finding.decision.at).slice(0, 10) || '—')}</td></tr>`)
+      .join('')}</tbody></table></div></section>\n`
+    : '');
+  const decisionsBlock = decisionSection('accepted', t.accepted, t.acceptedNote, model.accepted, t.reason)
+    + decisionSection('fixed', t.fixedUnverified, t.fixedNote, model.fixed, t.evidenceCol);
+
   const notesBlock = model.notes.length
     ? `<section id="scope"><h2>${esc(t.scope)}</h2>${model.notes
         .map((note) => {
@@ -1091,6 +1496,8 @@ ${groups}
     model.byCategory.size ? ['by-category', t.byCategory] : null,
     model.byPage.size ? ['by-page', t.byPage] : null,
     ['plan', t.plan],
+    model.accepted.length ? ['accepted', t.accepted] : null,
+    model.fixed.length ? ['fixed', t.fixedUnverified] : null,
     ['unmeasured', t.unmeasured],
     ['legend', ui.legend],
   ].filter(Boolean);
@@ -1124,13 +1531,13 @@ ${model.categories.length ? `<p class="meta">${esc(t.categories)}: ${esc(model.c
 <main class="wrap">
 <section id="summary"><h2>${esc(t.summary)}</h2>
 ${model.tier3Unmeasured ? `<p><strong>${esc(t.tier3Unmeasured)}</strong></p>\n` : ''}<p>${esc(scoreSentence(t, c))}</p>
-${model.plan.length ? `<p>${esc(fill(t.ownershipCounts, model.ownership))}</p>` : ''}</section>
+${model.accepted.length || model.fixed.length ? `<p>${esc(fill(t.decisionsLine, { accepted: model.accepted.length, fixed: model.fixed.length }))}</p>\n` : ''}${model.plan.length ? `<p>${esc(fill(t.ownershipCounts, model.ownership))}</p>` : ''}</section>
 ${notesBlock}<section id="comparison"><h2>${esc(t.comparison)}</h2>${comparisonBlock()}</section>
 ${groupTable(t.byCategory, 'by-category', model.byCategory, t.category, (name) => `<a href="#${groupIds.get(name)}">${esc(categoryName(name))}</a>`)}
 ${groupTable(t.byPage, 'by-page', model.byPage, t.page, (name) => `<code>${esc(name)}</code>`)}
 <section id="plan"><h2>${esc(t.plan)}</h2>
 ${planBlock}</section>
-<section id="unmeasured"><h2>${esc(t.unmeasured)}</h2>${unmeasuredBlock}</section>
+${decisionsBlock}<section id="unmeasured"><h2>${esc(t.unmeasured)}</h2>${unmeasuredBlock}</section>
 <section id="legend"><h2>${esc(ui.legend)}</h2><ul class="legend">
 <li><b>${esc(ui.legendSeverity)}:</b> ${['CRITICAL', 'WARNING', 'INFO'].map(sevChip).join(' ')}</li>
 <li><b>${esc(ui.legendOwner)}:</b><ul>${OWNERSHIP.map((owner) => `<li>${ownTag(owner)} ${esc(ui.ownerHelp[owner])}</li>`).join('')}</ul></li>
@@ -1143,11 +1550,146 @@ ${planBlock}</section>
 `;
 }
 
-function main() {
-  const opts = parseArgs(process.argv.slice(2));
+// Bring every finding to the canonical keys and fold in the agents' own report files.
+// Returns the problems the normalizer refuses in the agent reports: an id outside the catalogs, and a check
+// reported both as a finding and as a pass. The aliases it translates are accepted silently
+// (they are listed in the standards skill), so an agent that wrote `owner` still renders;
+// what it refuses is a report that cannot say which check it is about.
+function aggregateAgents(run, agentPaths) {
+  const problems = [];
+  const findings = [];
+  const unmeasured = Array.isArray(run.unmeasured) ? run.unmeasured : [];
+  const executed = new Set(Array.isArray(run.checks_executed) ? run.checks_executed : []);
+  const seenUnmeasured = new Set(unmeasured.map((e) => `${e?.check ?? e?.code}|${e?.reason ?? ''}`));
+
+  // The run file's own findings may come from the browser suite, whose ids are the suite's
+  // (`UX-045` is contrast there), so they are normalized but not held to the agents' catalogs.
+  run.findings.forEach((raw) => findings.push(normalizeEntry(raw).entry));
+  const extra = [];
+  for (const path of agentPaths) {
+    let reports;
+    try {
+      reports = loadReports(path);
+    } catch (error) {
+      die(1, `cannot read agent reports at ${path}: ${error.message}`);
+    }
+    for (const { label, report } of reports) {
+      const n = normalizeReport(report, label);
+      problems.push(...n.problems);
+      n.executed.forEach((id) => executed.add(id));
+      n.passes.forEach((p) => executed.add(p.check));
+      n.findings.forEach((f) => { executed.add(f.check); findings.push(f); });
+      for (const u of n.unmeasured) {
+        const key = `${u.check}|${u.reason ?? ''}`;
+        if (!seenUnmeasured.has(key)) { seenUnmeasured.add(key); extra.push(u); }
+      }
+    }
+  }
+  run.findings = findings;
+  run.unmeasured = [...unmeasured.map((e) => (e && typeof e === 'object' ? normalizeEntry(e).entry : e)), ...extra];
+  if (executed.size) run.checks_executed = [...executed];
+  return problems;
+}
+
+const toSidecarFinding = (finding) => ({
+  check: finding.check,
+  resource: finding.resource || null,
+  severity: finding.severity,
+  ownership: finding.ownership,
+  design_impact: finding.design_impact === true,
+  category: finding.category || null,
+  page: finding.page || null,
+  message: finding.message,
+  fix: finding.fix || null,
+  evidence: finding.evidence || null,
+  root_cause: finding.root_cause || null,
+  also_affects: finding.also_affects && finding.also_affects.length ? finding.also_affects : null,
+  ...(finding.status ? { status: finding.status } : {}),
+  ...(finding.not_remeasured ? { not_remeasured: true } : {}),
+});
+
+// Everything both entry points share: split by ledger decision, build the model, write the
+// documents and the sidecar. `stem` names the files (`informe-<date>` or an archived run's).
+function writeReport({ opts, outDir, stem, date, run, folded, baseNotes, extraNotes, previous, fresh }) {
+  const ledger = loadLedger(resolveLedgerPath(opts.ledger, opts.siteRoot), { required: false });
+  const { open, accepted, fixed } = splitByDecision(folded, ledger.data.findings, fresh);
+  const unmeasured = Array.isArray(run.unmeasured) ? run.unmeasured : [];
+  const categories = Array.isArray(run.categories) ? run.categories : [];
+  const setAside = [...accepted, ...fixed];
+
+  const model = {
+    lang: opts.lang,
+    t: STRINGS[opts.lang],
+    site: run.site || run.project || 'site',
+    date,
+    tier: run.tier || null,
+    categories,
+    counts: counts(open),
+    ownership: ownershipCounts(open),
+    byCategory: groupBy(open, 'category'),
+    byPage: groupBy(open, 'page'),
+    plan: sortForPlan(open),
+    accepted,
+    fixed,
+    unmeasured,
+    tier3Unmeasured: tier3Unmeasured(run),
+    notes: [...baseNotes, ...extraNotes],
+    comparison: compare(open, previous, { unmeasured, categories, keep: setAside.map(identity) }),
+  };
+
+  const written = [];
+  if (opts.format === 'md' || opts.format === 'both') {
+    const path = join(outDir, `${stem}.md`);
+    writeFileSync(path, renderMarkdown(model));
+    written.push(path);
+  }
+  if (opts.format === 'html' || opts.format === 'both') {
+    const path = join(outDir, `${stem}.html`);
+    writeFileSync(path, renderHtml(model));
+    written.push(path);
+  }
+
+  // The sidecar is written last and holds exactly what the next run diffs against. It is
+  // not the ledger: the ledger is the project's running record of every finding ever seen,
+  // this is one dated snapshot of one run. A finding set aside carries its `status`, so the
+  // previous-run count the next report prints is the open count this one printed.
+  const statusOf = new Map(setAside.map((finding) => [identity(finding), accepted.includes(finding) ? 'accepted' : 'fixed_unverified']));
+  const sidecarPath = join(outDir, `${stem}.json`);
+  const sidecarTmp = `${sidecarPath}.tmp-${process.pid}`;
+  writeFileSync(
+    sidecarTmp,
+    `${JSON.stringify(
+      {
+        report_version: 1,
+        date,
+        site: model.site,
+        tier: model.tier,
+        categories: model.categories,
+        notes: baseNotes,
+        unmeasured: model.unmeasured.map((entry) => ({ check: entry.check, reason: entry.reason || null })),
+        // A previous finding this run did not measure stays in the baseline, flagged, so the
+        // first run that does measure it can report it resolved instead of losing it.
+        findings: [
+          ...folded.map((finding) => (statusOf.has(identity(finding)) ? { ...finding, status: statusOf.get(identity(finding)) } : finding)),
+          ...(model.comparison ? model.comparison.notMeasured.map((finding) => ({ ...finding, not_remeasured: true })) : []),
+        ].map(toSidecarFinding),
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  renameSync(sidecarTmp, sidecarPath);
+  written.push(sidecarPath);
+
+  for (const path of written) console.log(`audit-report: wrote ${resolve(path)}`);
+}
+
+function renderRun(opts) {
+  const base = opts.run ? loadRun(opts.run, { findingsOptional: opts.agents.length > 0 }) : { findings: [] };
   const run = opts.merge.length
-    ? mergeRuns(loadRun(opts.run), opts.merge.map(loadRun))
-    : loadRun(opts.run);
+    ? mergeRuns(base, opts.merge.map(loadRun))
+    : base;
+  const schemaProblems = aggregateAgents(run, opts.agents);
   const notes = [
     ...normalizeNotes(run.notes, 'the run file'),
     ...(opts.notes ? readNotesFile(opts.notes) : []),
@@ -1159,6 +1701,7 @@ function main() {
   // report-only run on a clean site with nothing to compare later runs to.
 
   const problems = [
+    ...schemaProblems,
     ...validate(findings),
     ...validateUnmeasured(Array.isArray(run.unmeasured) ? run.unmeasured : []),
   ];
@@ -1169,88 +1712,50 @@ function main() {
   const folded = foldRootCauses(findings);
 
   const date = opts.date || run.date || new Date().toISOString().slice(0, 10);
-  const outDir = resolveOutDir(opts.out);
+  const outDir = resolveOutDir(opts.out, opts.siteRoot, run);
   mkdirSync(outDir, { recursive: true });
   warnIfUnignored(outDir);
 
   const sidecarPath = join(outDir, `informe-${date}.json`);
   archiveSameDay(outDir, date);
   const previous = findPrevious(outDir, sidecarPath);
+  writeReport({ opts, outDir, stem: `informe-${date}`, date, run, folded, baseNotes: notes, extraNotes: [], previous, fresh: true });
+}
 
-  const model = {
-    lang: opts.lang,
-    t: STRINGS[opts.lang],
-    site: run.site || run.project || 'site',
-    date,
-    tier: run.tier || null,
-    categories: Array.isArray(run.categories) ? run.categories : [],
-    counts: counts(folded),
-    ownership: ownershipCounts(folded),
-    byCategory: groupBy(folded, 'category'),
-    byPage: groupBy(folded, 'page'),
-    plan: sortForPlan(folded),
-    unmeasured: Array.isArray(run.unmeasured) ? run.unmeasured : [],
-    tier3Unmeasured: tier3Unmeasured(run),
-    notes,
-    comparison: compare(folded, previous, {
-      unmeasured: Array.isArray(run.unmeasured) ? run.unmeasured : [],
-      categories: Array.isArray(run.categories) ? run.categories : [],
-    }),
-  };
+// Rebuild the newest report from its own sidecar and the ledger. The sidecar already holds
+// every field the renderers read (this tool wrote it), so no audit and no run file is
+// needed; the documents of that date are overwritten in place and nothing is archived.
+function rerender(opts, outDir) {
+  const latest = newestSidecar(outDir);
+  if (!latest) die(1, `audit-report: --rerender found no informe-*.json in ${outDir} -- run an audit first, or pass --out`);
+  const run = latest.data;
+  const live = run.findings.filter((finding) => !finding.not_remeasured).map((finding) => {
+    const { status, ...rest } = finding; // set aside by an earlier render: the ledger decides again
+    return rest;
+  });
+  const problems = validate(live);
+  if (problems.length) die(1, `audit-report: ${latest.path} cannot be rendered:\n  ${problems.join('\n  ')}`);
+  const date = String(run.date || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) die(1, `audit-report: ${latest.path} has no valid "date"`);
+  const stem = basename(latest.path, '.json');
+  const baseNotes = normalizeNotes(run.notes, 'the sidecar');
+  const extraNotes = [
+    ...(opts.notes ? readNotesFile(opts.notes) : []),
+    fill(STRINGS[opts.lang].rerendered, { today: new Date().toISOString().slice(0, 10), date }),
+  ];
+  const previous = findPrevious(outDir, latest.path);
+  writeReport({ opts, outDir, stem, date, run, folded: live, baseNotes, extraNotes, previous, fresh: false });
+}
 
-  const written = [];
-  if (opts.format === 'md' || opts.format === 'both') {
-    const path = join(outDir, `informe-${date}.md`);
-    writeFileSync(path, renderMarkdown(model));
-    written.push(path);
-  }
-  if (opts.format === 'html' || opts.format === 'both') {
-    const path = join(outDir, `informe-${date}.html`);
-    writeFileSync(path, renderHtml(model));
-    written.push(path);
-  }
-
-  // The sidecar is written last and holds exactly what the next run diffs against. It is
-  // not the ledger: the ledger is the project's running record of every finding ever seen,
-  // this is one dated snapshot of one run.
-  writeFileSync(
-    sidecarPath,
-    `${JSON.stringify(
-      {
-        report_version: 1,
-        date,
-        site: model.site,
-        tier: model.tier,
-        categories: model.categories,
-        notes: model.notes,
-        unmeasured: model.unmeasured.map((entry) => ({ check: entry.check, reason: entry.reason || null })),
-        // A previous finding this run did not measure stays in the baseline, flagged, so the
-        // first run that does measure it can report it resolved instead of losing it.
-        findings: [
-          ...folded,
-          ...(model.comparison ? model.comparison.notMeasured.map((finding) => ({ ...finding, not_remeasured: true })) : []),
-        ].map((finding) => ({
-          check: finding.check,
-          resource: finding.resource || null,
-          severity: finding.severity,
-          ownership: finding.ownership,
-          design_impact: finding.design_impact === true,
-          category: finding.category || null,
-          page: finding.page || null,
-          message: finding.message,
-          evidence: finding.evidence || null,
-          root_cause: finding.root_cause || null,
-          also_affects: finding.also_affects && finding.also_affects.length ? finding.also_affects : null,
-          ...(finding.not_remeasured ? { not_remeasured: true } : {}),
-        })),
-      },
-      null,
-      2,
-    )}\n`,
-  );
-  written.push(sidecarPath);
-
-  for (const path of written) console.log(`audit-report: wrote ${resolve(path)}`);
+function main() {
+  const opts = parseArgs(process.argv.slice(2));
+  // The audits-root fallback names the folder after the run's site when the manifest has no
+  // slug, so a render resolves its own directory once the run is loaded.
+  const outDir = resolveOutDir(opts.out, opts.siteRoot);
+  if (opts.accept.length || opts.unaccept.length || opts.markFixed.length) recordDecisions(opts, outDir);
+  if (opts.run || opts.agents.length) renderRun(opts);
+  else if (opts.rerender) rerender(opts, outDir);
+  if (opts.summary) printSummary(opts, outDir);
   process.exit(0);
 }
 

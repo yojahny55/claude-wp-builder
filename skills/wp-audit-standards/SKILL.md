@@ -22,6 +22,9 @@ the agents measure against. Each domain's own check catalog lives in its agent, 
   inline-critical-CSS experiment with its numbers, WebP and right-sizing for images a theme
   prints from raw field URLs, and the AIOS × CF7 REST interaction. Read when filing or
   fixing a `PERF-xxx` finding from a Lighthouse run.
+- [references/builder-elementor.md](references/builder-elementor.md) — where an Elementor fix
+  belongs (widget data or child theme), the post-edit steps, widget false positives and the
+  measurement rule. Read only when `stack.builder` is `elementor`.
 - Check procedures moved out of two agents, each read on demand when the agent's index sends
   you there (the agents keep the check tables):
   - [references/perf-procedures-cache-and-render.md](references/perf-procedures-cache-and-render.md) —
@@ -41,6 +44,8 @@ the agents measure against. Each domain's own check catalog lives in its agent, 
     `wp-audit-security`: SEC-036 to SEC-039.
   - [references/sec-procedures-gateway-credentials.md](references/sec-procedures-gateway-credentials.md) —
     `wp-audit-security`: SEC-040.
+  - [references/sec-procedures-mcp-endpoints.md](references/sec-procedures-mcp-endpoints.md) —
+    `wp-audit-security`: SEC-046.
   - [references/sec-procedures-vulnerability-feed.md](references/sec-procedures-vulnerability-feed.md) —
     `wp-audit-security`: SEC-041, SEC-042.
 
@@ -93,6 +98,23 @@ prompt carries the same fields under other labels: `Owner` is `ownership`, `Meth
 
 GEO's tables grade an ORA `required`-tier failure `ERROR`. The renderer knows three
 severities, so a GEO `ERROR` is written `CRITICAL` in a finding.
+
+**Aliases the aggregator accepts.** `bin/audit-report.mjs` (through `bin/lib/audit-schema.mjs`)
+translates these, so a drifted key still renders; the left column is what to write.
+
+| Canonical | Accepted instead |
+|---|---|
+| `check` | `code`, `id`, `check_id`, `check_code` |
+| `ownership` | `owner`, `fix_owner` |
+| `message` | `title`, `description`, `summary`, `problem` |
+| `fix` (the text) | `method`, `remediation` |
+| `auto_fixable` | `fix: auto` / `fix: true` (the dispatch line's `Fix: auto\|manual`) |
+| `root_cause` | `rootCause` |
+| `severity` | `ERROR`, `HIGH` (CRITICAL); `WARN`, `MEDIUM` (WARNING); `LOW`, `NOTE` (INFO); any case |
+
+It refuses, with exit `1`, a finding that has no check id, an id that is not in any catalog, or
+a check that is both a `FAIL` and a `PASS` (or listed in `passes`) for the same resource.
+`bin/audit-coverage.mjs` reads the same reports, so `checks_executed` is the field it counts.
 
 One finding of each status:
 

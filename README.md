@@ -572,6 +572,7 @@ Commands run these and read the exit code. Several are gates, not helpers.
 | `contrast-propose.mjs` | Nearest compliant shade per failing colour pair, ratio before/after, affected texts and pages: the palette proposal for client approval |
 | `ux-probe.mjs` | The usability audit's page harness — one browser launch per run, built-in DOM probes, a 3-launch / 15-minute budget enforced in code |
 | `style-diff.mjs` | Before/after visual regression by computed style — per-element snapshots at desktop and mobile, a diff with pixel tolerance, and a two-baseline noise filter for carousels and animations |
+| `decision-sheet.mjs` | The page that asks for `design_impact` approvals — before/after pictures at desktop and mobile, measured values, choice buttons and a copy-answers box; `--parse` reads the pasted answers back as JSON |
 | `geo-scan.sh` | Live is-agentic report for `--geo`; `--start` scans a host that has no report yet |
 | `wp-cinematic-encode.sh` | ffmpeg wrapper behind `/wp-cinematic-encode` |
 | `doc-sync-check.sh` | Fails when a command lacks a row here or in `docs/commands.md`, when a skill or agent lacks a row here, or when `commands/`, `agents/`, `skills/`, `starter-theme/` or `bin/` changed without a CHANGELOG entry |
