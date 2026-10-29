@@ -150,6 +150,13 @@ grep -Fq 'wp option get a --format=json --url=https://www.example.org | jq . && 
 ! grep -Fq -- '--path' "$e" || fail "space-form --path kept"
 grep -Fq 'location = /llms.txt {' "$e" || fail "an endpoint without needs_server_rule got no nginx rule"
 
+# A shorter local host seen first must not rewrite the tail of a longer one.
+mkdir -p "$tmp/order"
+echo '[{"check":"O-1","kind":"db-option","command":"wp option update home https://www.demo.test/x"}]' > "$tmp/order/replay.json"
+run --out "$tmp/order" --date 2026-01-08 --local-host demo.test >/dev/null || fail "the host-order replay was refused"
+grep -Fq 'wp option update home https://www.example.org/x' "$tmp/order/runbook-2026-01-08.md" \
+  || fail "a shorter local host rewrote part of a longer one"
+
 # --- 7. every rule in the table parses and renders ---------------------------------------
 ids=$(grep -oE '^### `[a-z0-9-]+`' "$rules" | tr -d '#` ')
 [ "$(wc -w <<<"$ids")" -ge 8 ] || fail "server-rules.md lost rules"

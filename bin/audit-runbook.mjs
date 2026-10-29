@@ -259,6 +259,10 @@ function validate(entries, rules) {
     if (entry.server_rule != null && !rules[entry.server_rule]) problems.push(`${at}: unknown server_rule ${JSON.stringify(entry.server_rule)} (see references/server-rules.md)`);
     if (entry.endpoint != null && (typeof entry.endpoint !== 'string' || !entry.endpoint.startsWith('/'))) problems.push(`${at}: endpoint must be a path starting with /`);
     if (/^virtual-endpoint/.test(entry.server_rule ?? '') && !entry.endpoint) problems.push(`${at}: ${entry.server_rule} needs the endpoint it routes`);
+    if (typeof entry.endpoint === 'string' && entry.endpoint.startsWith('/')) {
+      const inferred = entry.endpoint.endsWith('/') ? 'virtual-endpoint-prefix' : 'virtual-endpoint';
+      if (!rules[inferred]) problems.push(`${at}: the endpoint needs the ${inferred} rule, which references/server-rules.md no longer defines`);
+    }
   });
   return problems;
 }
@@ -312,7 +316,8 @@ function main() {
   const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   function scrubHosts(text) {
     let out = text;
-    for (const h of localHosts) {
+    // Longest first, so `demo.test` cannot rewrite the tail of `www.demo.test` before it is seen.
+    for (const h of [...localHosts].sort((x, y) => y.length - x.length)) {
       const withScheme = new RegExp(`https?:(\\\\?/){2}${escapeRe(h)}`, 'gi');
       out = out.replace(withScheme, (m) => (m.includes('\\/') ? urlRef.replace(/\//g, '\\/') : urlRef));
       out = out.replace(new RegExp(escapeRe(h), 'gi'), prodHost ?? '<prod-host>');
@@ -409,10 +414,15 @@ function main() {
   }
 
   // --- 3/4. wp-config and database -----------------------------------------------------
+  // An empty or null previous value is quoted, so the revert line shows that it was empty.
+  const revertText = (v) => {
+    if (typeof v === 'string' && v !== '') return v;
+    return JSON.stringify(v);
+  };
   const commandItem = (e) => {
     push(`- ${tick(e)} ${label(e)}${e.applied_on?.prod ? ` (${S.already})` : ''}`, ...fence('bash', prodCommand(e.command)));
     const notes = [];
-    if (e['previous value'] !== undefined) notes.push(`${S.revert}: \`${short(scrubHosts(e['previous value'] === null || e['previous value'] === '' ? JSON.stringify(e['previous value']) : typeof e['previous value'] === 'string' ? e['previous value'] : JSON.stringify(e['previous value'])))}\``);
+    if (e['previous value'] !== undefined) notes.push(`${S.revert}: \`${short(scrubHosts(revertText(e['previous value'])))}\``);
     if (e.backup) notes.push(`${S.backup}: \`${scrubHosts(String(e.backup))}\``);
     if (notes.length) push(`  ${notes.join(' · ')}`, '');
     if (Array.isArray(e.ids) && e.ids.length) {
