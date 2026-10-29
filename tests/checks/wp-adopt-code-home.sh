@@ -54,6 +54,7 @@ jq_ 'j.code_scope.editable.includes("wp-content/themes/vendor-child")' <"$site/.
 $cfg code-home "$site" | grep -Fq 'child-theme at wp-content/themes/vendor-child' || fail "code-home does not report the recorded choice"
 $cfg validate "$site" >/dev/null || fail "validate after code-home"
 if $cfg code-home "$site" --kind=bogus 2>/dev/null; then fail "bogus kind accepted"; fi
+if $cfg code-home "$site" --kind=child-theme --path='wp-content/themes/x; rm -rf ~' 2>/dev/null; then fail "shell metacharacters accepted in code_home.path"; fi
 
 # 4. Plugin-list drift is refreshed without a backup churn; a second refresh is a no-op.
 mkprobe "$base,$(plug newbie true true)"

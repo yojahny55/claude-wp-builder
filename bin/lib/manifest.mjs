@@ -312,6 +312,13 @@ export function validateManifest(manifest) {
       if (typeof home.path !== 'string' || home.path === '' || home.path.startsWith('/') || home.path.split('/').includes('..')) {
         problems.push(`code_home.path must be a path relative to the WordPress root that does not climb out of it, found ${JSON.stringify(home.path)}`);
       }
+      // The names reach printed WP-CLI steps (theme_mods copy, theme activate): plain slugs only.
+      if (typeof home.path === 'string' && !/^[a-z0-9][a-z0-9._/-]*$/i.test(home.path)) {
+        problems.push(`code_home.path may hold only letters, digits and . _ - /, found ${JSON.stringify(home.path)}`);
+      }
+      if (home.parent !== undefined && (typeof home.parent !== 'string' || !/^[a-z0-9][a-z0-9._-]*$/i.test(home.parent))) {
+        problems.push(`code_home.parent must be a plain theme slug, found ${JSON.stringify(home.parent)}`);
+      }
       for (const key of Object.keys(home)) {
         if (!['kind', 'path', 'created', 'parent'].includes(key)) problems.push(`code_home has an unknown key: ${key}`);
       }
