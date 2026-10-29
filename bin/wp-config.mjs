@@ -841,14 +841,21 @@ function cmdGitInit(projectPath, flags) {
     if (!isRepo || resolve(top.stdout.trim()) !== root) { warn('refused: the root is not a git repository of its own; run git-init first'); process.exit(1); }
     const cur = git(['symbolic-ref', '--short', 'HEAD']).stdout.trim();
     if (cur !== branch) { warn(`refused: HEAD is ${cur || 'detached'}, not ${branch}`); process.exit(1); }
+    // Only a repo this command created: same origin as --remote, and (for --commit) no history yet.
+    if (git(['remote', 'get-url', 'origin']).stdout.trim() !== flags.remote) { warn('refused: origin does not match --remote'); process.exit(1); }
+    if (flags.commit && git(['rev-parse', '--verify', '-q', 'HEAD']).status === 0) { warn('refused: the repository already has commits; git-init only makes the initial import'); process.exit(1); }
   }
   if (flags.commit) {
-    git(['add', '-A']);
-    const staged = git(['diff', '--cached', '--name-only']).stdout.split('\n').filter(Boolean);
+    const added = git(['add', '-A']);
+    if (added.status !== 0) { git(['reset', '-q']); warn(added.stderr || 'git add failed'); process.exit(1); }
+    const staged = git(['diff', '--cached', '--name-only', '-z']).stdout.split('\0').filter(Boolean);
     const bad = staged.filter((f) => SECRET_FILE.test(f));
-    if (bad.length) {
+    // Mode 160000: a nested repository (a plugin cloned with its own .git) staged as an empty gitlink.
+    const links = git(['diff', '--cached', '--raw', '-z']).stdout.split('\0').filter((x) => x.startsWith(':160000') || x.includes(' 160000 ')).length;
+    if (bad.length || links) {
       git(['reset', '-q']);
       for (const f of bad) warn(`refused: ${f} looks like a secret; add it to .gitignore and run again`);
+      if (links) warn(`refused: ${links} nested repositor${links === 1 ? 'y' : 'ies'} (own .git) would be committed as empty gitlinks; ignore them or remove their .git`);
       process.exit(1);
     }
     if (!staged.length) { warn('refused: nothing to commit'); process.exit(1); }
