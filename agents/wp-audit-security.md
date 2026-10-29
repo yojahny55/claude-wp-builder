@@ -203,7 +203,7 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 | SEC-033 | Plugin updates available | `$WP plugin list --update=available --format=count`, **after SEC-038 passes** | 0 | INFO |
 | SEC-034 | Inactive plugins | `$WP plugin list --status=inactive --format=count` | 0 | INFO |
 | SEC-035 | AIOS not configured | `$WP option get aio_wp_security_configs --format=json` | Exists and configured | INFO |
-| SEC-036 | Development host in the database | `$WP eval` sweep of `options`, `postmeta`, `posts` and `termmeta` for the dev host. See Procedure | CRITICAL |
+| SEC-036 | Development host in the database | `$WP eval` sweep of `options`, `postmeta`, `posts` and `termmeta` for the dev host. See Procedure. On a local clone: `INFO` pre-deploy gate, `guid` excluded (`/wp-audit` Step 2.3, "Local clone — severity ceiling") | CRITICAL |
 | SEC-037 | Backup or editor files inside the theme | Glob the theme for `*.bak*`, `*.orig`, `*.save`, `*~`, `*.php.[0-9]*`, `*.sql` | WARNING |
 | SEC-038 | Update counts reported without network access | Reach `api.wordpress.org` before reading any update count. See Procedure | WARNING |
 | SEC-039 | Paid downloads reachable without a purchase | WooCommerce only. Read `woocommerce_file_download_method`, then fetch a real `woocommerce_uploads` file over HTTP and read the status. See Procedure | CRITICAL |

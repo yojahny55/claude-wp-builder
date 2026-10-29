@@ -52,6 +52,7 @@ Project context:
 - Clone-suppressed plugins: <clone_suppressed_plugins slugs, comma-separated, or "none">
 - Parked drop-ins: <clone_parked_dropins files, comma-separated, or "none">
 - Report-only: <yes|no>
+- Clone severity ceiling: <when `Local clone: yes`, "apply Step 2.3 'Local clone — severity ceiling'"; else "not a clone">
 - Measurement split: clone-safe checks run on the clone; production-only checks need the confirmed public URL (Step 2.3, "Clone-safe versus production-only measurement")
 
 **One quiet wrapper for noisy sites.** When Step 2 or Step 3 saw a plugin print PHP notices or
@@ -66,6 +67,12 @@ option, post or user, or activates or deactivates anything; it reads and measure
 would be stale (update transients), the agent reports the data's age, queries the source
 directly, or reports `UNMEASURED`. A write found afterwards is a defect of the run, reported as
 one.
+
+**Only catalog codes, one finding per root cause.** An agent returns a finding only under a
+code its category's catalog defines (Step 2.5d). A pattern with no code goes to the agent's
+notes, not to the findings JSON, and shard-local labels are not codes. Hits sharing a root
+cause are one finding before they are counted; Step 7's merge drops a finding whose code is
+not in the catalog and names its agent, as it does for a finding with no evidence.
 
 **Clone-safe checks are measured, not skipped.** When `Local clone: yes`, the agents measure
 every clone-safe check from the Step 2.3 table on the clone, with the browser when
