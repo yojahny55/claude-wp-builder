@@ -58,6 +58,25 @@ safe. The rules:
   of a page (the recipe is under *Usability fixes* below); use it instead of picking
   elements by hand.
 - When the user declines a `visual` finding it stays in the report as open, untouched.
+- **The decision sheet.** Ask for the answers once, in one page, not in chat and not in a
+  hand-built HTML. Write the proposals (id, title, page, selector, viewports, the `css` for
+  the "after", options with one `recommended`, measured values) and run
+  `node ${CLAUDE_PLUGIN_ROOT}/bin/decision-sheet.mjs build --out /home/<user>/audits/<site>/results --proposals <file>`
+  (or `--sidecar <informe-*.json>` to start from the sidecar's `design_impact` findings).
+  It writes one self-contained `decisions-<date>.html` into the results directory, never the
+  site: per card a before and after picture at desktop and mobile, the measured values, a
+  `recommended` badge, approve / reject / postpone / other (free text) as radio buttons, and a
+  "Copy answers" button that produces the `DECISION <id>: <option> | <note>` block. A card
+  that could not be measured says so; a picture is never faked. Hand the user the path. The
+  injected "after" CSS is forced `!important` and transitions are frozen, so the picture shows
+  the proposed value, not the old rule; a rule that changed nothing is reported ineffective.
+- When the user pastes the block back, run
+  `node ${CLAUDE_PLUGIN_ROOT}/bin/decision-sheet.mjs --parse -` (or a file) and act on the JSON,
+  never on a hand reading of the text: `approved` is applied one at a time as above;
+  `rejected` stays unapplied and its ledger entry becomes `accepted` (the user decided to keep
+  it), so the next audit does not raise it again; `postponed` and `pending` stay open and are
+  asked again next round; `other` carries the user's instruction in `note`. Never apply a
+  `visual` finding without an answer for its id.
 
 **Builder first.** When `stack.builder` is not `none` (for example `elementor`) and the
 element is a widget of that builder with a control for the setting, the preferred fix is
