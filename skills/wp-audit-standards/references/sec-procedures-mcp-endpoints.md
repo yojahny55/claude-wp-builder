@@ -24,7 +24,7 @@ reflection can read it) and the capabilities its permission callback tests (read
 callback's own source lines; empty means unknown, not "none").
 
 ```bash
-$WP eval '
+$WP eval "$(cat <<'PHP'
 // --- SEC-046 inventory: read-only, it only reads the registered routes ---
 $hit = '#(^|[/_-])(mcp|oauth|a2a|agents?)([/_-]|$)#i';
 $out = [];
@@ -48,7 +48,7 @@ foreach ( rest_get_server()->get_routes() as $route => $handlers ) {
 					? implode( '', array_slice( file( $file ), $rf->getStartLine() - 1, $rf->getEndLine() - $rf->getStartLine() + 1 ) )
 					: '';
 				if ( preg_match_all( '/current_user_can\(\s*[\'"]([a-z_]+)[\'"]/', $src, $m ) ) { $caps = array_unique( $m[1] ); }
-				if ( ! $caps && preg_match( '/return\s+true\s*;/', $src ) ) { $anon = true; }
+				if ( ! $caps && preg_match( '/\{\s*return\s+true\s*;\s*\}/', $src ) ) { $anon = true; }
 			}
 		} catch ( Throwable $e ) { /* not reflectable: caps stay empty = unknown */ }
 		if ( ! $file ) { // owner of an open route: the handler's file, since __return_true lives in core
@@ -71,19 +71,21 @@ foreach ( rest_get_server()->get_routes() as $route => $handlers ) {
 }
 echo wp_json_encode( $out );
 // --- end SEC-046 inventory ---
-'
+PHP
+)"
 ```
 
 `anon: true` means the permission callback is `__return_true`, absent, or a function whose
-body only returns `true`. Callbacks that delegate to another function read as `caps: []`
-and `anon: false`: that is "unknown", and the live probe below is what settles it. Route
+only statement is `return true;`. Anything else without a literal `current_user_can()` reads as
+`caps: []` and `anon: false`: that is "unknown", never a finding by itself, and the live probe
+below is what settles it. Route
 patterns with a regex group (`(?P<id>...)`) are listed but not probed.
 
 **Live probe.** Static reading cannot see a rewrite, a firewall rule or a filter that turns
-a route off at request time, so reachability is measured. Send each listed concrete route
-**unauthenticated**: `GET` when the handler declares it, otherwise `POST` with body `{}`.
-Nothing else is sent, no token is ever supplied, and a `POST` to an MCP route is an
-initialisation request, not an action.
+a route off at request time, so reachability is measured. Send a `GET` to each listed concrete
+route, **unauthenticated**. Never send a `POST`: an OAuth or agent route may register a client
+or open a session. A route that declares no `GET` is `UNVERIFIED`, with the command a person
+can run by hand. No token is ever supplied.
 
 ```bash
 curl -sS -o /dev/null -w '%{http_code}\n' --max-time 15 -A "Mozilla/5.0" \
@@ -93,7 +95,9 @@ curl -sS -o /dev/null -w '%{http_code}\n' --max-time 15 -A "Mozilla/5.0" \
 - Requests to a production host go through `bin/prod-gate.sh`, exactly as the agent's Rules say.
   When the gate exits `4`, the probe is `UNMEASURED` for that host; the static inventory
   still counts. A local site is not gated.
-- `2xx` is **reachable**. `401` or `403` is gated. `404` means the route is not served.
+- `2xx` is **reachable**. `400`, `405` and `422` come from the handler itself, so they are
+  reachable too (the request got past authentication). `401` or `403` is gated. `404` means the
+  route is not served. `3xx` and `5xx` are inconclusive: `UNMEASURED` with the status line.
   A `403`/challenge page from a WAF is not the site's answer: record it as gated-by-edge, not as a pass.
 - Probe the host the audit measures (production when confirmed in `/wp-audit` Step 2.3,
   otherwise the local URL), and say which one in the evidence line.

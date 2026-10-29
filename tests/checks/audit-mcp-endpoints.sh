@@ -46,9 +46,13 @@ grep -Fq 'never `remove`' "$ref" || fail "$ref does not forbid a remove instruct
 grep -Fq 'Never add an MCP surface to' "$geo" || fail "$geo may contradict SEC-046"
 grep -Fq 'SEC-046' "$geo" || fail "$geo does not point to SEC-046"
 
-# The snippet is read-only PHP.
-if sed -n '/^\$WP eval/,/^'"'"'$/p' "$ref" | grep -qE 'update_option|delete_option|register_rest_route|file_put_contents'; then
+# The snippet is read-only PHP, passed through a quoted heredoc (PHP is full of single quotes).
+grep -Fq "\$WP eval \"\$(cat <<'PHP'" "$ref" || fail "$ref snippet is not passed through a quoted heredoc"
+body=$(sed -n "/<<'PHP'/,/^PHP\$/p" "$ref")
+[ -n "$body" ] || fail "$ref inventory snippet not found"
+if grep -qE 'update_option|delete_option|add_option|wp_insert_|->query|wp_remote_|unlink|file_put_contents|register_rest_route' <<<"$body"; then
   fail "$ref inventory snippet writes"
 fi
+grep -Fq 'Never send a `POST`' "$ref" || fail "$ref probe may POST to an OAuth/agent route"
 
 echo PASS
