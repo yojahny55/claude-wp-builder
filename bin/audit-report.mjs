@@ -60,7 +60,8 @@
 //                           newest sidecar when there is no ledger). Quote these, not memory.
 //
 // The ledger is `--ledger <file>`, else the manifest's `audit.findings_ledger.path`, else
-// `.wp-audit-findings.json` in the current directory.
+// `.wp-audit-findings.json`, both read from the site root (--site-root, default the current
+// directory).
 //
 // The output directory is, in order: --out, the WP_AUDIT_OUT_DIR environment variable, the
 // manifest's `audit.out_dir`, `<audits root>/<site>/results` when an audits root is set (the
@@ -88,7 +89,7 @@
 //   3  crash
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, renameSync, statSync } from 'node:fs';
-import { join, resolve, basename } from 'node:path';
+import { join, resolve, basename, isAbsolute } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { normalizeEntry, normalizeReport, loadReports } from './lib/audit-schema.mjs';
 
@@ -339,7 +340,9 @@ function resolveOutDir(flag, siteRoot, run) {
   if (typeof dir === 'string' && dir !== '') return dir;
   const root = process.env.WP_AUDITS_ROOT || manifest?.audit?.audits_root;
   if (typeof root === 'string' && root !== '') {
-    const site = slugify(manifest?.project?.slug || manifest?.project?.name || run?.site || run?.project);
+    // The site root's folder name is the last candidate so that the commands that run without
+    // a run file (--accept, --rerender, --summary) still find the folder a render wrote.
+    const site = slugify(manifest?.project?.slug || manifest?.project?.name || run?.site || run?.project || basename(resolve(siteRoot)));
     if (site) return join(root, site, 'results');
   }
   return '.wp-audit';
@@ -646,14 +649,14 @@ const LEDGER_SHAPE = '{"ledger_version":1,"findings":[{"check":"SEC-036","resour
 
 const nowIso = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 
-function resolveLedgerPath(flag) {
+// Read from the same manifest as the output directory (--site-root), so a decision recorded
+// from another directory lands in that site's ledger. A relative pointer is relative to it.
+function resolveLedgerPath(flag, siteRoot = '.') {
   if (flag) return flag;
-  try {
-    const pointer = JSON.parse(readFileSync('.wp-create.json', 'utf8'))?.audit?.findings_ledger;
-    const path = typeof pointer === 'string' ? pointer : pointer?.path;
-    if (typeof path === 'string' && path !== '') return path;
-  } catch { /* no manifest: fall through to the default */ }
-  return '.wp-audit-findings.json';
+  const pointer = readManifest(siteRoot)?.audit?.findings_ledger;
+  const path = typeof pointer === 'string' ? pointer : pointer?.path;
+  if (typeof path === 'string' && path !== '') return isAbsolute(path) ? path : join(siteRoot, path);
+  return join(siteRoot, '.wp-audit-findings.json');
 }
 
 // A ledger that is not this shape is refused with the shape, because the failure otherwise
@@ -737,7 +740,7 @@ function selectEntries(ledger, tokens, outDir) {
 }
 
 function recordDecisions(opts, outDir) {
-  const ledger = loadLedger(resolveLedgerPath(opts.ledger), { required: false });
+  const ledger = loadLedger(resolveLedgerPath(opts.ledger, opts.siteRoot), { required: false });
   const at = nowIso();
   const say = (verb, entry, extra = '') => console.log(`audit-report: ${verb} ${identity(entry)}${extra}`);
 
@@ -837,7 +840,7 @@ function statusTable(rows) {
 }
 
 function printSummary(opts, outDir) {
-  const ledger = loadLedger(resolveLedgerPath(opts.ledger), { required: false });
+  const ledger = loadLedger(resolveLedgerPath(opts.ledger, opts.siteRoot), { required: false });
   let source = 'ledger';
   let path = ledger.path;
   let rows = ledger.data.findings;
@@ -1608,7 +1611,7 @@ const toSidecarFinding = (finding) => ({
 // Everything both entry points share: split by ledger decision, build the model, write the
 // documents and the sidecar. `stem` names the files (`informe-<date>` or an archived run's).
 function writeReport({ opts, outDir, stem, date, run, folded, baseNotes, extraNotes, previous, fresh }) {
-  const ledger = loadLedger(resolveLedgerPath(opts.ledger), { required: false });
+  const ledger = loadLedger(resolveLedgerPath(opts.ledger, opts.siteRoot), { required: false });
   const { open, accepted, fixed } = splitByDecision(folded, ledger.data.findings, fresh);
   const unmeasured = Array.isArray(run.unmeasured) ? run.unmeasured : [];
   const categories = Array.isArray(run.categories) ? run.categories : [];
