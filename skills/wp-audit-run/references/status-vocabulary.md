@@ -1,5 +1,11 @@
 # /wp-audit — Step 8
 
+## Contents
+
+- Status vocabulary
+- Allowed UNMEASURED reasons
+- The console report format
+
 `commands/wp-audit.md` sends the run here at Step 8. Follow it in order; nothing in it is optional background.
 
 ### Status vocabulary
@@ -26,6 +32,23 @@ stays) is listed as accepted and left out of open and critical totals and of nex
 and is never called `resolved`. Only a measured re-run turns `fixed_unverified` into
 `resolved`, and a re-run that still finds it returns it to `still_failing`. Quote counts from
 `audit-report.mjs --summary`, not from memory.
+
+### Allowed UNMEASURED reasons
+
+An `UNMEASURED` check is accepted, and kept out of the "missing" list, only when its reason is
+one of these four (Step 6.8, point 2; `bin/audit-coverage.mjs` applies them):
+
+| Reason | Example wording |
+|---|---|
+| needs credentials | "needs a logged-in user", "needs the gateway API key" |
+| needs the network or a third party | "third-party API unreachable", "rate limit" |
+| needs production | "needs the public URL", "production gate busy", "host blocked" |
+| needs a tier the run does not have | "needs Tier 3", "no WP-CLI", "no browser tool and no suite" |
+
+Anything else is measurable with tools already present and counts as missing: "not measured in
+this run", "not run", "no browser measurement" when a browser is available, "clone", or no
+reason at all. An `N/A` needs a reason too (the site has no WooCommerce); one without is
+missing.
 
 The reconciliation block from Step 2.5 goes **first**, above the per-category counts. A
 never-run category and a stale record change how every number below them should be read, so

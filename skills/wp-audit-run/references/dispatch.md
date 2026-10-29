@@ -54,8 +54,20 @@ Project context:
 - Clone-suppressed plugins: <clone_suppressed_plugins slugs, comma-separated, or "none">
 - Parked drop-ins: <clone_parked_dropins files, comma-separated, or "none">
 - Report-only: <yes|no>
+- Must-run ids: <the category's exact catalog ids, from `${CLAUDE_PLUGIN_ROOT}/bin/audit-coverage.mjs --list <category>` (comma-separated)>
 - Clone severity ceiling: <when `Local clone: yes`, "apply Step 2.3 'Local clone — severity ceiling'"; else "not a clone">
 - Measurement split: clone-safe checks run on the clone; production-only checks need the confirmed public URL (Step 2.3, "Clone-safe versus production-only measurement")
+
+**The must-run list is the contract, and it is exact.** Before dispatching each category, run
+`${CLAUDE_PLUGIN_ROOT}/bin/audit-coverage.mjs --list <category>` and paste its output as
+`Must-run ids`. Every id on it comes back in `checks_executed`, or as `N/A` with the reason
+the site does not have the feature, or as `UNMEASURED` with one of the allowed reasons in
+`status-vocabulary.md` ("Allowed UNMEASURED reasons"). "Not measured in this run", "not run",
+"no browser measurement" and a missing reason are not reasons: Step 6.8 counts those ids as
+missing and sends them back. Without the list an agent picks which checks to run, and a
+category came back at 38 of 61 and cost two extra agents. A re-dispatch (Step 6.8) uses the
+same line carrying only the missing ids. A shard (below) gets the full list and omits the ids
+that are not about its surface; it does not report them `N/A`.
 
 **One quiet wrapper for noisy sites.** When Step 2 or Step 3 saw a plugin print PHP notices or
 deprecations into WP-CLI's stdout, pass `${CLAUDE_PLUGIN_ROOT}/bin/wp-quiet.sh $WP` as `Quiet
@@ -117,7 +129,7 @@ third 5, report the check UNMEASURED: production gate busy. The local site is no
 The browser suite (Step 6.5) goes through the same gate but is never run beside the agents: it
 starts only after all of them have returned, because it holds the host lock for many minutes.
 
-Run all checks for your tier level. Write your full report to `<out>/agents/<agent>.md` (create `agents/` if missing) and return to the parent only the findings JSON plus a summary of fewer than 15 lines. Write the file for each finding in this format:
+Run every id on your Must-run list and report each one. Return the findings in the Report contract of skills/wp-audit-standards/SKILL.md, with exactly its key names (`check`, `ownership`, `auto_fixable`, ...), a `checks_executed` array of every id you ran (passes included), each id in one place only (a failing check is not also a pass). Write your full report to `<out>/agents/<agent>.md` (create `agents/` if missing) and return to the parent only the findings JSON plus a summary of fewer than 15 lines. Write the file for each finding in this format:
 
 [<SEVERITY>] <CODE>: <message> (<file>:<line> if applicable)
   Resource: <the stable thing this is about — see the resource table in Step 7>
@@ -187,7 +199,7 @@ agent given no pages audits nothing while reporting cleanly.
 
 ## Reports on disk and the run state
 
-The parent never keeps an agent's full report in its context. The agent's full report goes to `<out>/agents/<agent>.md`, for example `<out>/agents/wp-audit-security.md`, and what comes back to the parent is the findings JSON and a summary of fewer than 15 lines. The parent writes the file itself from the returned text when the agent could not (an agent without write access), **as soon as that agent returns and before the Step 7 synthesis**. Synthesis reads the findings back from `agents/`, not from memory, so a `/clear` between Step 6 and Step 7 loses nothing.
+The parent never keeps an agent's full report in its context. The agent's full report goes to `<out>/agents/<agent>.md`, for example `<out>/agents/wp-audit-security.md`, and what comes back to the parent is the findings JSON and a summary of fewer than 15 lines. The parent writes the file itself from the returned text when the agent could not (an agent without write access), **as soon as that agent returns and before the Step 7 synthesis**. The returned findings JSON is also saved as `<out>/agents/<agent>.json` (a shard as `<agent>-<shard>.json`), because Step 6.8's `bin/audit-coverage.mjs --results <out>/agents` and Step 8.5's `bin/audit-report.mjs --agents <out>/agents` read that file, and nothing else. Synthesis reads the findings back from `agents/`, not from memory, so a `/clear` between Step 6 and Step 7 loses nothing.
 
 `<out>/run-state.json` is what makes the run resumable. Create it before dispatch and rewrite it after every step that finishes:
 

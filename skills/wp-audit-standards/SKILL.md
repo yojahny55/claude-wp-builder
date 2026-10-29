@@ -99,6 +99,23 @@ prompt carries the same fields under other labels: `Owner` is `ownership`, `Meth
 GEO's tables grade an ORA `required`-tier failure `ERROR`. The renderer knows three
 severities, so a GEO `ERROR` is written `CRITICAL` in a finding.
 
+**Aliases the aggregator accepts.** `bin/audit-report.mjs` (through `bin/lib/audit-schema.mjs`)
+translates these, so a drifted key still renders; the left column is what to write.
+
+| Canonical | Accepted instead |
+|---|---|
+| `check` | `code`, `id`, `check_id`, `check_code` |
+| `ownership` | `owner`, `fix_owner` |
+| `message` | `title`, `description`, `summary`, `problem` |
+| `fix` (the text) | `method`, `remediation` |
+| `auto_fixable` | `fix: auto` / `fix: true` (the dispatch line's `Fix: auto\|manual`) |
+| `root_cause` | `rootCause` |
+| `severity` | `ERROR`, `HIGH` (CRITICAL); `WARN`, `MEDIUM` (WARNING); `LOW`, `NOTE` (INFO); any case |
+
+It refuses, with exit `1`, a finding that has no check id, an id that is not in any catalog, or
+a check that is both a `FAIL` and a `PASS` (or listed in `passes`) for the same resource.
+`bin/audit-coverage.mjs` reads the same reports, so `checks_executed` is the field it counts.
+
 One finding of each status:
 
 ```json
