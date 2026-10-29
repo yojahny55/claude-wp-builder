@@ -254,6 +254,13 @@ Exit `0` means it can run, `2` means this machine has no Node or npm and Tier 3 
 unmeasured — which is a skip, not a failure, and is reported as `UNMEASURED` exactly like
 an absent browser tool.
 
+**"No browser tool in this session" is not "no browser on this machine".** Before printing
+`no browser tool available`, run `node ${CLAUDE_PLUGIN_ROOT}/bin/lib/browsers.mjs chromium`:
+it finds an existing Chromium in Playwright's caches or the system one (`/usr/bin/chromium`,
+Chrome), and exit `0` with a path means the suite and `bin/ux-probe.mjs` can measure. Only
+its exit `2` on top of an absent tool is a missing browser. Nothing is ever installed to
+change that answer.
+
 The criteria themselves — budgets, Core Web Vitals thresholds, the WCAG 2.2 additions, the
 HTML5 cross-check — live in the audit agents and in `wp-audit-standards`, and every check
 that a file scan can answer runs at Tier 1 regardless. Tier 3 adds measurement, not

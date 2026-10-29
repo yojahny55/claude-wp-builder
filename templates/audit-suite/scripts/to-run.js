@@ -157,6 +157,25 @@ function main() {
     pages: row.paginas,
   }));
 
+  // Pages the timeout guard recorded as not measured: a slow page on a host that answered, or
+  // a check that ran on a page already closed under it. Without this they would simply be
+  // missing from the run, and a page with no findings reads as a page that passed.
+  const pagesFile = path.join(resultsDir, '..', 'unmeasured-pages.json');
+  if (fs.existsSync(pagesFile)) {
+    let entries = [];
+    try { entries = JSON.parse(fs.readFileSync(pagesFile, 'utf8')); } catch (e) {
+      throw new Error(`${pagesFile} is unreadable (${e.message}) -- the pages it lists would read as measured`);
+    }
+    for (const entry of Array.isArray(entries) ? entries : []) {
+      const label = `${entry.page || 'page'}${entry.project ? ` [${entry.project}]` : ''}`;
+      unmeasured.push({
+        check: `SUITE-PAGE-${label.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '')}`,
+        reason: `${label}: ${entry.reason || 'not measured'}`,
+        pages: [entry.page || label],
+      });
+    }
+  }
+
   const run = {
     site: opts.site || audit.siteName || 'site',
     date: opts.date || new Date().toISOString().slice(0, 10),
