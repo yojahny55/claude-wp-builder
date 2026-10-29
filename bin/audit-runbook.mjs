@@ -58,7 +58,8 @@ const RULES_FILE = join(dirname(fileURLToPath(import.meta.url)), '..', 'skills',
 const DEFAULT_ENDPOINTS = ['/robots.txt', '/llms.txt'];
 // Hosts that are never public. Any of these left in the runbook is a leak even when the
 // manifest did not name it.
-const NON_PUBLIC = /\b[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.(?:local\.com|localhost|local|test)\b/gi;
+// Only in host position (after a scheme, an @ or --url=), so a file such as foo.test.js is not one.
+const NON_PUBLIC = /(?:\/\/|\\\/\\\/|@|--url=)([a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.(?:local\.com|localhost|local|test))\b/gi;
 
 const STRINGS = {
   en: {
@@ -320,14 +321,16 @@ function main() {
   }
   function prodCommand(command) {
     let c = command.trim().replace(/^bash -c\s+(["'])(.*)\1$/s, '$2');
-    c = c.replace(/^\$WP\b/, 'wp').replace(/(^|\s)--path=\S+/g, '');
+    c = c.replace(/\$\{?WP\}?(?![A-Za-z0-9_])/g, 'wp').replace(/(^|\s)--path(?:=|\s+)\S+/g, '');
     const scrubbed = scrubHosts(c);
     if (scrubbed !== c) rewritten += 1;
     c = scrubbed;
-    if (/^wp\s/.test(c)) {
-      c = /(^|\s)--url=\S+/.test(c) ? c.replace(/(^|\s)--url=\S+/, `$1--url=${urlRef}`) : `${c} --url=${urlRef}`;
-    }
-    return c;
+    // A compound command (&&, ||, ;, |) gets the production --url on every wp call in it,
+    // not once at the end, where it would land after a pipe.
+    return c.split(/(\s*(?:&&|\|\||;|\|)\s*)/).map((part) => {
+      if (!/^wp\s/.test(part)) return part;
+      return /(^|\s)--url=\S+/.test(part) ? part.replace(/(^|\s)--url=\S+/, `$1--url=${urlRef}`) : `${part} --url=${urlRef}`;
+    }).join('');
   }
   const short = (v) => {
     const s = typeof v === 'string' ? v : JSON.stringify(v);
@@ -430,7 +433,7 @@ function main() {
 
   // --- 5. server rules -----------------------------------------------------------------
   push(`## ${S.server}`, '');
-  const serverEntries = entries.filter((e) => e.kind === 'server' || e.needs_server_rule === true || e.server_rule);
+  const serverEntries = entries.filter((e) => e.kind === 'server' || e.needs_server_rule === true || e.server_rule || e.endpoint);
   if (!serverEntries.length) push(S.none, '');
   else push(`> ${S.needsOwner}`, '');
   const order = server === 'apache' || server === 'litespeed' ? ['apache', 'nginx'] : ['nginx', 'apache'];
@@ -487,7 +490,7 @@ function main() {
   // --- leak gate: nothing local leaves in the runbook ----------------------------------
   const lower = md.toLowerCase();
   const leaks = [...localHosts].filter((h) => lower.includes(h));
-  for (const m of md.matchAll(NON_PUBLIC)) if (!leaks.includes(m[0].toLowerCase())) leaks.push(m[0].toLowerCase());
+  for (const m of md.matchAll(NON_PUBLIC)) if (!leaks.includes(m[1].toLowerCase())) leaks.push(m[1].toLowerCase());
   if (md.includes(root) && root !== '/') leaks.push(root);
   if (leaks.length) die(1, `the runbook would carry a local host or path (${leaks.join(', ')}); correct the replay entry that holds it`);
 

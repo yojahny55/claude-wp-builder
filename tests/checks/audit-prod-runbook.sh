@@ -137,6 +137,19 @@ refuse "unknown server rule" '[{"check":"X-2","kind":"server","file":".htaccess"
 refuse "db-option with no command" '[{"check":"X-3","kind":"db-option"}]'
 refuse "unknown kind" '[{"check":"X-4","kind":"ftp","command":"x"}]'
 
+# --- 6b. OCR findings: compound commands, endpoint without the flag, file names ----------
+mkdir -p "$tmp/edge"
+cat > "$tmp/edge/replay.json" <<'JSON'
+[ { "check": "E-1", "kind": "db-option", "command": "$WP option get a --format=json | jq . && ${WP} option update b 1 --path /srv/x" },
+  { "check": "E-2", "kind": "code", "file": "wp-content/themes/t/foo.test.js", "endpoint": "/llms.txt" } ]
+JSON
+run --out "$tmp/edge" --date 2026-01-07 >/dev/null || fail "a file name ending in .test.js was refused as a host"
+e="$tmp/edge/runbook-2026-01-07.md"
+grep -Fq 'wp option get a --format=json --url=https://www.example.org | jq . && wp option update b 1 --url=https://www.example.org' "$e" \
+  || fail "compound command not rewritten on every wp call"
+! grep -Fq -- '--path' "$e" || fail "space-form --path kept"
+grep -Fq 'location = /llms.txt {' "$e" || fail "an endpoint without needs_server_rule got no nginx rule"
+
 # --- 7. every rule in the table parses and renders ---------------------------------------
 ids=$(grep -oE '^### `[a-z0-9-]+`' "$rules" | tr -d '#` ')
 [ "$(wc -w <<<"$ids")" -ge 8 ] || fail "server-rules.md lost rules"
