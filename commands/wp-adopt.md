@@ -370,6 +370,7 @@ ask for it in a separate step. Ask (AskUserQuestion, one round): the remote URL 
    `refs/heads/<b>` only. Run `--push` without `--yes` first: it prints the command and refuses.
    Never run `git push --all`, `--mirror` or a push of any other branch.
 
+## What an adopted manifest changes downstream
 
 | Key | Read by | Effect |
 |---|---|---|
