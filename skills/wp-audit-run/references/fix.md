@@ -107,6 +107,20 @@ agent returns, check that nothing under a read-only path changed:
 modification times compared with a snapshot taken before dispatch. A write there is a
 failed fix: revert it and report it. Additionally:
 
+- **Where hook-based fixes go.** A fix that needs a hook, filter, header or constant (not an
+  edit to an existing editable file) is written under `code_home`: read it with
+  `wp-config.mjs get code_home.kind` and `get code_home.path`, never improvise a location.
+  - Set and the path exists: write there.
+  - Set but not created (`wp-config.mjs code-home '${PROJECT_PATH}'` says so): creating it is
+    one operator-approved step. For a child theme, run the `theme_mods` copy that
+    `wp-config.mjs code-home --kind=child-theme` prints **before** `theme activate`, then run
+    it again so the new directory joins `code_scope.editable`. Activating the child changes
+    rendering, so measure before and after and consult the operator first.
+  - Not set (`get code_home.kind` exits `1`) and the editable scope holds no theme, mu-plugin
+    or site plugin: ask once with `AskUserQuestion` (child theme / site plugin / mu-plugin, one
+    line of trade-off each) and record the answer with `wp-config.mjs code-home`. Do not
+    default to a plugin, and do not write to a read-only path or a sync/deploy plugin.
+  Findings whose only fix is a hook stay `manual` until a home exists.
 - **Security fixes:** dispatch `wp-audit-aios` only when `stack.security` is `aios`. With
   another security plugin, its configuration findings stay `manual`. The wp-config
   constants and server rules below still apply, because they belong to no plugin.
