@@ -19,7 +19,7 @@ and said nothing about the layer the defect was actually in.
 | Surface | Owner | Examples |
 |---|---|---|
 | theme source | every agent, per category | escaping, enqueues, template structure |
-| plugin configuration and DB options | `wp-audit-seo` (SEO options), `wp-audit-security` (dev-host leakage, SEC-036) | Rank Math option values, site-name options |
+| plugin configuration and DB options | `wp-audit-seo` (SEO options), `wp-audit-security` (dev-host leakage, SEC-036; exposed MCP/OAuth REST routes, SEC-046) | Rank Math option values, site-name options |
 | per-post meta coverage | `wp-audit-seo` | missing descriptions, focus keywords, canonical |
 | rendered output | `wp-audit-seo` (head), `wp-audit-geo` (head, schema graph, DOM) | `og:site_name`, dangling schema `@id` |
 | serving layer | `wp-audit-geo` (GEO-A26, GEO-A27) | a physical root file shadowing a theme rewrite, CDN path rewrites |
@@ -49,10 +49,13 @@ Project context:
 - Site type (commerce): <site.commerce value — woocommerce|none>
 - Store tier: <site.store_tier — catalog|store|full|unknown>
 - Local clone: <yes|no>
+- Audited scheme: <http|https, from the clone health preflight in Step 2.3; "n/a" when the host is not a local clone>. Request the audited host with this scheme only.
+- Clone health: <ok|failed: diagnosis, page-based checks UNMEASURED>
 - Clone-suppressed plugins: <clone_suppressed_plugins slugs, comma-separated, or "none">
 - Parked drop-ins: <clone_parked_dropins files, comma-separated, or "none">
 - Report-only: <yes|no>
 - Must-run ids: <the category's exact catalog ids, from `${CLAUDE_PLUGIN_ROOT}/bin/audit-coverage.mjs --list <category>` (comma-separated)>
+- Clone severity ceiling: <when `Local clone: yes`, "apply Step 2.3 'Local clone — severity ceiling'"; else "not a clone">
 - Measurement split: clone-safe checks run on the clone; production-only checks need the confirmed public URL (Step 2.3, "Clone-safe versus production-only measurement")
 
 **The must-run list is the contract, and it is exact.** Before dispatching each category, run
@@ -78,6 +81,12 @@ option, post or user, or activates or deactivates anything; it reads and measure
 would be stale (update transients), the agent reports the data's age, queries the source
 directly, or reports `UNMEASURED`. A write found afterwards is a defect of the run, reported as
 one.
+
+**Only catalog codes, one finding per root cause.** An agent returns a finding only under a
+code its category's catalog defines (Step 2.5d). A pattern with no code goes to the agent's
+notes, not to the findings JSON, and shard-local labels are not codes. Hits sharing a root
+cause are one finding before they are counted; Step 7's merge drops a finding whose code is
+not in the catalog and names its agent, as it does for a finding with no evidence.
 
 **Clone-safe checks are measured, not skipped.** When `Local clone: yes`, the agents measure
 every clone-safe check from the Step 2.3 table on the clone, with the browser when

@@ -58,6 +58,25 @@ safe. The rules:
   of a page (the recipe is under *Usability fixes* below); use it instead of picking
   elements by hand.
 - When the user declines a `visual` finding it stays in the report as open, untouched.
+- **The decision sheet.** Ask for the answers once, in one page, not in chat and not in a
+  hand-built HTML. Write the proposals (id, title, page, selector, viewports, the `css` for
+  the "after", options with one `recommended`, measured values) and run
+  `node ${CLAUDE_PLUGIN_ROOT}/bin/decision-sheet.mjs build --out /home/<user>/audits/<site>/results --proposals <file>`
+  (or `--sidecar <informe-*.json>` to start from the sidecar's `design_impact` findings).
+  It writes one self-contained `decisions-<date>.html` into the results directory, never the
+  site: per card a before and after picture at desktop and mobile, the measured values, a
+  `recommended` badge, approve / reject / postpone / other (free text) as radio buttons, and a
+  "Copy answers" button that produces the `DECISION <id>: <option> | <note>` block. A card
+  that could not be measured says so; a picture is never faked. Hand the user the path. The
+  injected "after" CSS is forced `!important` and transitions are frozen, so the picture shows
+  the proposed value, not the old rule; a rule that changed nothing is reported ineffective.
+- When the user pastes the block back, run
+  `node ${CLAUDE_PLUGIN_ROOT}/bin/decision-sheet.mjs --parse -` (or a file) and act on the JSON,
+  never on a hand reading of the text: `approved` is applied one at a time as above;
+  `rejected` stays unapplied and its ledger entry becomes `accepted` (the user decided to keep
+  it), so the next audit does not raise it again; `postponed` and `pending` stay open and are
+  asked again next round; `other` carries the user's instruction in `note`. Never apply a
+  `visual` finding without an answer for its id.
 
 **Builder first.** When `stack.builder` is not `none` (for example `elementor`) and the
 element is a widget of that builder with a control for the setting, the preferred fix is
@@ -69,6 +88,11 @@ with the commit. If the control cannot express what is needed (it has no separat
 and dark value, or no hover state, or it applies to a single widget when the defect is
 site-wide), the fix goes to the theme instead, with the reason written in the finding's
 `Method`. Either way it is `visual` and follows the rules above.
+
+When `stack.builder` is `elementor`, read
+`${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-standards/references/builder-elementor.md` before the
+first fix: it says which fixes stay in Elementor and which must be code, the backup, flush
+and replay steps, and the widget traps. Any other builder: do not load it.
 
 If the user declines, skip to Step 10.
 
@@ -83,6 +107,20 @@ agent returns, check that nothing under a read-only path changed:
 modification times compared with a snapshot taken before dispatch. A write there is a
 failed fix: revert it and report it. Additionally:
 
+- **Where hook-based fixes go.** A fix that needs a hook, filter, header or constant (not an
+  edit to an existing editable file) is written under `code_home`: read it with
+  `wp-config.mjs get code_home.kind` and `get code_home.path`, never improvise a location.
+  - Set and the path exists: write there.
+  - Set but not created (`wp-config.mjs code-home '${PROJECT_PATH}'` says so): creating it is
+    one operator-approved step. For a child theme, run the `theme_mods` copy that
+    `wp-config.mjs code-home --kind=child-theme` prints **before** `theme activate`, then run
+    it again so the new directory joins `code_scope.editable`. Activating the child changes
+    rendering, so measure before and after and consult the operator first.
+  - Not set (`get code_home.kind` exits `1`) and the editable scope holds no theme, mu-plugin
+    or site plugin: ask once with `AskUserQuestion` (child theme / site plugin / mu-plugin, one
+    line of trade-off each) and record the answer with `wp-config.mjs code-home`. Do not
+    default to a plugin, and do not write to a read-only path or a sync/deploy plugin.
+  Findings whose only fix is a hook stay `manual` until a home exists.
 - **Security fixes:** dispatch `wp-audit-aios` only when `stack.security` is `aios`. With
   another security plugin, its configuration findings stay `manual`. The wp-config
   constants and server rules below still apply, because they belong to no plugin.

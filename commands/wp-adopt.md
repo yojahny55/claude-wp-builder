@@ -52,7 +52,9 @@ bash -c 'node "$1/bin/wp-config.mjs" adopt "$2" --dry-run' _ "${CLAUDE_PLUGIN_RO
 
 Re-registering a site whose manifest is wrong (a blank scaffold the real site was restored
 over, found by `wp-config.mjs drift`): add `--replace`. The old manifest is kept as
-`.wp-create.json.bak-<timestamp>`; without the flag `adopt` refuses.
+`.wp-create.json.bak-<timestamp>` in `~/.local/state/wp-builder-backups/<root>-<hash>/`
+(`$XDG_STATE_HOME` is honoured, the newest 20 are kept), never in the site root, where the web
+server would serve it and git would commit it; without the flag `adopt` refuses.
 
 When the manifest being replaced is a real adoption or build (not a blank scaffold), `--replace`
 carries its decisions over instead of re-proposing them: the `audit` block, the `store` block,
@@ -79,8 +81,11 @@ wrapper, or a plugin that prints output while WordPress boots. Ask for the wrapp
 `AskUserQuestion` and retry once. Multisite is refused, and that refusal is final.
 
 The dry run prints JSON: `manifest` (the proposal), `reasons` (why each path went where it
-went), `prefix_source`, `conflicts` (two plugins active for one concern) and `problems`
-(what `validate` would refuse).
+went), `prefix_source`, `conflicts` (two plugins active for one concern), `problems`
+(what `validate` would refuse), `carried_over`, `code_home_needed` and `code_home_options`.
+Add `--json` to any `adopt` call (dry run or real) to guarantee that stdout is that one JSON
+document and nothing else: the `ok:`/`note:` lines of a real run come back in its `notes`
+array and the backup path in `backup`. Parse that, never the human lines.
 
 ## Step 3: Confirm the proposal with the operator
 
@@ -167,6 +172,34 @@ Ask with `AskUserQuestion`, one question each:
 3. **Industry.** This value picks between Organization and LocalBusiness schema in
    `/wp-audit`. Offer `unknown` when the operator has no answer.
 
+4. **Where site-owned code lives.** Ask only when the dry run says `code_home_needed: true`:
+   nothing in the editable scope is code the site owns (a commercial theme with no child
+   theme, and at most a sync or deploy plugin as the only editable plugin). Hook-based audit
+   fixes then have nowhere to go, and the answer is asked once here, not improvised per fix.
+   Offer `code_home_options` with a one-line reason each:
+   - **Child theme** (`<parent>-child`): theme-bound code (template overrides, styles,
+     theme hooks). Recommended when the theme is the site's front end.
+   - **Site plugin**: code that must survive a theme change (CPTs, shortcodes, tracking, security headers).
+   - **mu-plugin**: always loaded, cannot be deactivated from the admin; for small, critical hooks.
+
+   Pass the answer as `--code-home=child-theme|site-plugin|mu-plugin` (and
+   `--code-home-path=<path>` to change the proposed location). Adoption only **records** it in
+   `code_home` (`kind`, `path`, `created`, and `parent` for a child theme); it creates nothing,
+   because this command never writes to the site. A path that already exists joins
+   `code_scope.editable`. Change the answer later with `wp-config.mjs code-home '${PROJECT_PATH}' --kind=<kind>`.
+
+   **When the answer is a child theme**, say the cost before it is built: `theme_mods_<parent>`
+   (Customizer colors, logo, menu locations, widget areas) is stored per theme, so activating a
+   new child starts from empty settings. `wp-config.mjs code-home` prints the copy to run
+   **before** the child is activated:
+   ```bash
+   $WP option get theme_mods_<parent> --format=json | $WP option update theme_mods_<child> --format=json
+   $WP theme activate <child>
+   ```
+   Additional CSS and widget content are per theme too; compare them after the switch. The
+   switch itself changes how the site renders, so it follows the design-consultation rule: show
+   the operator before and after, do not do it silently.
+
 Report every `conflicts` line as-is, for example two SEO plugins active at once. It is a
 finding about the site, not something to resolve here.
 
@@ -179,7 +212,7 @@ read-only.
 ```bash
 bash -c 'node "$1/bin/wp-config.mjs" adopt "$2" "${@:3}"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}' \
   --wrapper='<wrapper>' --prefix='<prefix>' --industry='<industry>' \
-  --editable='<path>,<path>' --read-only='<path>,<path>'
+  --editable='<path>,<path>' --read-only='<path>,<path>' [--code-home=<kind>] --json
 ```
 
 It re-probes, validates and writes nothing if validation fails. On success it writes
@@ -208,6 +241,11 @@ gitignored `.wp-create.json` sibling `.wp-create.local.json` by hand (see `wp-en
 section 8). Then run `wp-config.mjs refresh '${PROJECT_PATH}'` so `stack` and the plugin list are
 current, and `validate` again; it must exit `0`.
 
+**After a plugin is deleted**, never edit `.wp-create.json` by hand: `wp-config.mjs refresh`
+drops every plugin no longer on disk from `plugins.installed` and from `code_scope`, and
+regenerates the CLAUDE.md block in the same step. `wp-config.mjs remove-plugin '${PROJECT_PATH}' <slug>`
+does the same by name when WP-CLI cannot be probed.
+
 ## Step 5: Say what was written, and where it may go
 
 ```
@@ -227,7 +265,9 @@ The sole exception is those plugin-owned entries, and only after the operator sa
 exact lines. Never add or reorder anything else in the file.
 
 Then offer one optional follow-up, once: "Publish this site to a git remote?" Default **no**, and
-nothing below runs unless the operator says yes. It never touches the site's own `.gitignore`.
+nothing below runs unless the operator says yes. Publishing from a scratch copy (Step 6) never
+touches the site's own `.gitignore`. If the operator instead wants the site folder itself under
+git, with core included as the team's convention for adopted sites, that is Step 6b.
 
 ## Step 6 (opt-in): Publish to a git remote
 
@@ -302,6 +342,34 @@ node -e 'const f=process.argv[1],m=JSON.parse(require("fs").readFileSync(f));m.g
 On a later run, if `git_publish` exists, offer to reuse it instead of asking again, and run the
 same guards.
 
+## Step 6b (opt-in): Put the site root under git in place
+
+Only when the operator asks for the site folder itself to become the repository. Default **no**.
+This is the one place the site's `.gitignore` is written, and only through
+`wp-config.mjs git-init`, which refuses when the root already is a repository or sits inside one.
+
+**The team pushes one branch per site, the one the operator names (usually `dev`).** A second
+branch such as `master` is never created or pushed implicitly; if the operator wants it, they
+ask for it in a separate step. Ask (AskUserQuestion, one round): the remote URL (test it with
+`git ls-remote <url>`), and the branch, with no default pre-selected other than `dev`.
+
+1. **Plan, writes nothing:**
+   `node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs git-init <root> --branch=<b> --remote=<url> --dry-run`
+   lists the `.gitignore` rules to add. They come from `${CLAUDE_PLUGIN_ROOT}/templates/git/wordpress.gitignore`
+   (wp-config, uploads, cache/upgrade/backup/maintenance dirs, `*.sql`, `*.sql.gz`, `*.zip`, `*.log`,
+   `.htaccess` and `.user.ini`, which differ per server and are rewritten by WordPress) plus every
+   `TOOL_STATE_PATHS` entry, merged into an existing `.gitignore` without duplicates. Show the list.
+2. **Init and summary:** the same command without `--dry-run` writes the `.gitignore`, runs
+   `git init -b <b>`, adds `origin`, then prints the file count, the top-level directories, files
+   above 5 MB (`--large-mb=<n>`) and any secret-looking file (`wp-config*` backups, `.env`, keys).
+   It stages nothing. Exit `4` means secret-looking files: extend the `.gitignore` and run
+   `git -C <root> ls-files -o --exclude-standard` again before going on. Stop and show the summary.
+3. **Commit, only after the operator confirms the summary:** `... --branch=<b> --remote=<url> --commit`
+   (refuses a staged secret-looking file and resets the index).
+4. **Push, only after an explicit yes to the printed command:** `... --push --yes` pushes
+   `refs/heads/<b>` only. Run `--push` without `--yes` first: it prints the command and refuses.
+   Never run `git push --all`, `--mirror` or a push of any other branch.
+
 ## What an adopted manifest changes downstream
 
 | Key | Read by | Effect |
@@ -309,6 +377,8 @@ same guards.
 | `origin: "adopted"` | `/wp-audit`, `/wp-debug`, `/wp-clone`, every builder | the site is registered, but no theme was scaffolded. The builders (`/wp-init`, `/wp-section`, `/wp-seed`, `/wp-yolo`, `/wp-header`, `/wp-footer`, `/wp-page`, `/wp-cpt`, `/wp-settings`, `/wp-tailwind-migrate`, `/wp-cinematic-init`, `/wp-cinematic-scene`, `/wp-cinematic-seed`) assume a starter theme, so each runs `wp-config.mjs require-origin` first and stops with exit `5`; `--force-adopted` overrides it on purpose |
 | `code_scope.editable` | `/wp-audit` agents and fix phase | the only paths a fix may edit |
 | `code_scope.read_only` | `/wp-audit` agents | audited and reported with `Fix: manual`, `Owner: manual`. Never edited |
+| `code_home` | `/wp-audit` fix phase | where hook-based fixes are written when the site has no editable theme or plugin of its own; read with `wp-config.mjs get code_home.kind` and `get code_home.path` |
+| `plugins.intentionally_inactive` | `wp-config.mjs drift` and `refresh` | plugins kept deactivated on purpose (a security plugin turned off on a local copy only): not drift, kept in `plugins.installed` and in `stack`. Record with `wp-config.mjs keep-inactive '${PROJECT_PATH}' <slug>` (`--unset` to undo) |
 | `git_publish` | `/wp-adopt` Step 6 | remote, branches and included paths of an earlier publish, reused by the next one; absent unless the operator opted in |
 | `stack.*` | `/wp-audit` Steps 4, 5, 6 and 9 | no offer to install Rank Math or AIOS when another plugin owns SEO or security |
 | `i18n strategy: none` | `/wp-audit` Step 2.5c | recorded as detected, not asked. `stack.multilingual` names the plugin |

@@ -140,26 +140,30 @@ bash -c 'node "$1/bin/wp-config.mjs" drift "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PR
 Exit `0`: the manifest fits the site, continue. Exit `4`: it does not; each `drift:` line names
 a disagreement (theme directory missing, active theme differs from `theme.slug`, active
 plugins absent from `plugins.installed`, plugins in `plugins.installed` that are not active).
-Print the lines and ask with `AskUserQuestion`.
+Print the lines.
 
-When **every** line is a plugin-list line (`active plugin(s) not in plugins.installed` or
-`plugin(s) in plugins.installed that are not active`), the owner changed plugins and the
-manifest still describes this site:
+When **every** line is a plugin-list line (`active plugin(s) not in plugins.installed`,
+`plugin(s) in plugins.installed that are not active`, or `plugin path(s) in code_scope no longer
+on disk`), the owner changed plugins and the manifest still describes this site. That is
+measured fact, not a decision, so **do not ask**: run `refresh` straight away and print one
+line for the report, `Manifest refreshed: <the drift lines>`. Run `bash -c 'node "$1/bin/wp-config.mjs" refresh "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'`: it
+re-probes, rewrites `plugins.installed` and `stack` (and the PHP and WordPress versions), drops
+plugins that are gone from disk out of `plugins.installed` and `code_scope`, keeps a
+`.bak-<timestamp>` outside the docroot, regenerates the CLAUDE.md block and validates. Anything
+else in the manifest is untouched, and a run with nothing to change writes nothing. If `refresh`
+exits `1` (for example the pruned scope would leave no editable code), report its message and
+ask then.
 
-```
-The plugin list changed since .wp-create.json was written.
-  [A] Refresh — update plugins and stack only, keep everything else (recommended)
-  [B] Re-adopt — full read-only detection, keeps a timestamped backup and carries the audit history and code scope over
-  [C] Continue with the manifest as it is
-```
-
-On A, run `bash -c 'node "$1/bin/wp-config.mjs" refresh "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'`: it
-re-probes, rewrites `plugins.installed` and `stack` (and the PHP and WordPress versions), keeps
-a `.bak-<timestamp>`, regenerates the CLAUDE.md block and validates. Anything else in the manifest
-is untouched.
+A plugin the operator keeps deactivated on purpose (a security plugin turned off on the local
+copy only) is not drift: record it once with
+`bash -c 'node "$1/bin/wp-config.mjs" keep-inactive "$2" "$3"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}' <slug>`
+after asking (`AskUserQuestion`, default no), since a plugin that fell inactive by accident is
+exactly what this check should surface.
 
 When any line is structural (theme directory missing, active theme differs, `source` is
-`"blank"`), the manifest describes another site and `refresh` refuses it:
+`"blank"`, a non-plugin `code_scope` path missing), the theme or code scope changed and the
+manifest may describe another site; `refresh` refuses it. Only this case is put to the
+operator:
 
 ```
 .wp-create.json no longer describes this site.
@@ -212,7 +216,7 @@ It covers the code scope (editable and read-only), and what adoption changes in 
 
 ## Step 2.3: Site type and local clone
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/site-context.md` now and follow it — it is this step, not background. It covers store detection, store tier, the local-clone rules, the public-URL question, clone-safe versus production-only checks, and the live mail transport finding.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/site-context.md` now and follow it — it is this step, not background. It covers store detection, store tier, the local-clone rules, the public-URL question, the clone health preflight (internal URLs must answer 200 before any agent runs), clone-safe versus production-only checks, and the live mail transport finding.
 
 ## Step 2.5: Reconcile the Manifest
 
