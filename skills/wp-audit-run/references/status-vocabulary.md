@@ -25,6 +25,14 @@ site has no API to check" and "this check applies and nothing ever ran it". A re
 failures cannot tell those apart, and the second one is the one that needs action. Count them
 separately in every summary line, and never fold `UNMEASURED` into the passing total.
 
+Findings in the ledger carry a separate set of statuses (`ledger.md`), and two of them must be
+reported apart from the counts above, never folded into them: `accepted` (a human decided it
+stays) is listed as accepted and left out of open and critical totals and of next steps;
+`fixed_unverified` (a fix was applied, no check has re-run) is listed as awaiting verification
+and is never called `resolved`. Only a measured re-run turns `fixed_unverified` into
+`resolved`, and a re-run that still finds it returns it to `still_failing`. Quote counts from
+`audit-report.mjs --summary`, not from memory.
+
 ### Allowed UNMEASURED reasons
 
 An `UNMEASURED` check is accepted, and kept out of the "missing" list, only when its reason is

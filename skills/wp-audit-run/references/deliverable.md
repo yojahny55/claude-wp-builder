@@ -167,6 +167,17 @@ A second run on the same day keeps the first: the renderer moves the earlier set
 The ledger and the sidecar are different records and both stay — the ledger is the
 project's running history of every finding ever seen, a sidecar is one dated snapshot.
 
+### Changing the report after the fact
+
+A report is never edited by hand: not to add a "fixes applied" section, not to remove a
+finding the client declined. The sidecar is what the next run compares against, and a
+hand-edited document silently disagrees with it. Record the decision in the ledger
+(`audit-report.mjs --accept ... --reason`, `--mark-fixed ... --evidence`, see `ledger.md`)
+and run `audit-report.mjs --rerender`: it rebuilds the newest `.md`/`.html` from its sidecar
+and the ledger, lists accepted findings and fixes awaiting verification in their own sections,
+leaves them out of the headline counts and the plan, and adds a note that no check re-ran.
+`--summary [--json]` prints the counts by status and severity.
+
 ### The report goes out before anything is fixed
 
 Run this step before Step 9, always, including when the user has already said to fix
