@@ -70,6 +70,11 @@ and dark value, or no hover state, or it applies to a single widget when the def
 site-wide), the fix goes to the theme instead, with the reason written in the finding's
 `Method`. Either way it is `visual` and follows the rules above.
 
+When `stack.builder` is `elementor`, read
+`${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-standards/references/builder-elementor.md` before the
+first fix: it says which fixes stay in Elementor and which must be code, the backup, flush
+and replay steps, and the widget traps. Any other builder: do not load it.
+
 If the user declines, skip to Step 10.
 
 If the user confirms, dispatch fix operations by category.
