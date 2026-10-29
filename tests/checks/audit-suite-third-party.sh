@@ -49,7 +49,8 @@ ok(cr.args.includes("--ignore-certificate-errors") && cr.args.some((x) => x.star
 ok(t.applyToLaunch("firefox", t.withDefaults(dflt, {}), a).proxy.server === "http://corp:3128", "the config proxy was replaced by the block");
 ok(/proxy/.test(t.blockSkipped("firefox", t.withDefaults(dflt, {})) || ""), "a config proxy that turns the block off is not reported");
 ok(/host-resolver-rules/.test(t.blockSkipped("chromium", { args: ["--host-resolver-rules=MAP foo 127.0.0.1"] }) || ""), "a resolver rule that turns the block off is not reported");
-ok(t.blockSkipped("chromium", t.withDefaults(dflt, {})) === null && t.blockSkipped("webkit", {}) === null, "an engine the block applies to was reported as skipped");
+ok(/proxy/.test(t.blockSkipped("chromium", t.withDefaults(dflt, {})) || ""), "a config proxy that bypasses the chromium resolver rule is not reported");
+ok(t.blockSkipped("chromium", { args: ["--ignore-certificate-errors"] }) === null && t.blockSkipped("webkit", {}) === null, "an engine the block applies to was reported as skipped");
 ' "$tp" || fail "$tp does not implement the allowlist"
 grep -Fq "third-party.cjs" bin/lib/pw-executables.cjs || fail "the suite preload does not use the shared allowlist"
 grep -Fq "lib/third-party.cjs" bin/ux-probe.mjs || fail "ux-probe does not use the shared allowlist"

@@ -125,7 +125,10 @@ function blockSkipped(engine, options) {
   const opts = options || {};
   if (engine === 'chromium') {
     const args = Array.isArray(opts.args) ? opts.args : [];
-    return args.some((a) => String(a).startsWith('--host-resolver-rules')) ? 'the launch args already carry --host-resolver-rules' : null;
+    if (args.some((a) => String(a).startsWith('--host-resolver-rules'))) return 'the launch args already carry --host-resolver-rules';
+    // Through an HTTP proxy the proxy resolves the target host, so the resolver rule never runs.
+    if (opts.proxy) return `the launch options set a proxy, which resolves hosts itself (${opts.proxy.server || 'no server'})`;
+    return null;
   }
   return opts.proxy ? `the launch options already set a proxy (${opts.proxy.server || 'no server'})` : null;
 }
