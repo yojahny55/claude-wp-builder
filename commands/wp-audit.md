@@ -22,10 +22,11 @@ Parse `$ARGUMENTS` for:
   `.wp-audit/`. Absent, the audit prints to the console and writes only the ledger —
   **except on a report-only run, where it defaults to `both`** (see below). An explicit
   `--report md|html|both` always wins.
-- **`--report-lang en|es`** (default: `en`) — the language of that deliverable. It is read
-  by a client, not by the person who ran the audit, so it follows the project's primary
-  language rather than the plugin's. Take the default from `languages` in the project's
-  `.claude/CLAUDE.md` when the flag is absent and that line names one.
+- **`--report-lang en|es`** (default: the manifest's `languages.primary` when it is `es` or
+  `en`, else `en`) — the language of that deliverable. It is read by a client, not by the
+  person who ran the audit, so it follows the project's primary language rather than the
+  plugin's. The renderer applies this default itself when the flag is absent, so a Spanish
+  site gets a Spanish report without anyone typing it; pass the flag only to override.
 - **`--host <public-url>`** — the publicly reachable URL to scan, overriding
   `wordpress.url` from the manifest. A project whose manifest holds a `.local` or `192.168.*`
   URL can never be scanned from the manifest alone; this is how such a project supplies one
@@ -354,17 +355,31 @@ Before Step 7, read each returned report's `UNMEASURED` list and its measurement
 3. **Re-dispatch once.** Every `UNMEASURED` with an unacceptable reason goes back to its agent
    once, together, with the measurement split restated. What is still unmeasured after that
    keeps the agent's second reason.
-4. **Compute coverage against the catalog.** Every agent returns `checks_executed` as a field
-   (check ids, passes included), not in prose. For each category compute
-   `executed ∩ catalog / catalog`, with the catalog read where Step 2.5d reads it — the
-   agent's file, and for usability the table rows of its skill — and print it in the report
-   header:
-   `security 31/44 checks executed — never run: SEC-0xx, SEC-0yy…`.
-   An agent that returns no `checks_executed` counts as 0 and is re-dispatched. A category
-   under 90% blocks "audit complete": re-dispatch the missing ids once, then list what is
-   left, each id with its specific blocker. Without a recorded blocker for every missing id
-   the report says `INCOMPLETE`, never "complete". Ids that are `N/A` by site type or clone
-   are out of the denominator, as in Step 2.5d.
+4. **Compute coverage with the script, never by hand.** This sub-step is mandatory: it is
+   not skipped because the agents "looked complete", and it is not recomputed with an ad-hoc
+   regex over the catalogs. Every agent returns `checks_executed` as a field (check ids,
+   passes included), saved by the parent as `<out>/agents/<agent>.json` (see "Reports on
+   disk" in the dispatch reference). Then:
+
+   ```bash
+   node ${CLAUDE_PLUGIN_ROOT}/bin/audit-coverage.mjs --results <out>/agents --json
+   ```
+
+   It reads each catalog where Step 2.5d reads it (the agent's file, and for usability the
+   table rows of its skill), unions shards per category and prints, per category,
+   `security 31/44 checks executed — never run: SEC-0xx, SEC-0yy…` with the missing ids. Put
+   that line in the report header. Exit `0`: every category is at 90% or more. Exit `1`: a
+   category is under 90% and blocks "audit complete". Exit `2`: an agent report is invalid.
+   An agent that returns no `checks_executed` counts as 0. Ids that are `N/A` by site type or
+   clone, with a reason, are out of the denominator as in Step 2.5d. An `UNMEASURED` whose
+   reason is not one of the allowed ones (point 2, and "Allowed UNMEASURED reasons" in the
+   status vocabulary) is reported as missing, however the agent worded it.
+   **The re-dispatch sends only the missing ids.** For each category under 90%, get them with
+   `bin/audit-coverage.mjs --list <category> --results <out>/agents` and hand them to the
+   agent as its must-run list (the same line the first dispatch carried, now shorter); never
+   resend the whole catalog. Then run the script again with `--final`: it exits `1`
+   (`INCOMPLETE`) only when a missing id has no allowed blocker. List what is left, each id
+   with its specific blocker; without one the report says `INCOMPLETE`, never "complete".
 5. **Say what happened.** The report records how many checks were re-dispatched and how many
    stayed `UNMEASURED` for each acceptable reason, so a reader sees the coverage the run
    actually reached rather than a summary that calls it complete.
@@ -379,7 +394,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/fix-verification.md` 
 
 ## Step 7: Aggregate Reports
 
-Collect reports from all agents. For each agent's output, parse the findings into a unified list.
+Collect reports from all agents. For each agent's output, parse the findings into a unified list. The parser is `bin/audit-report.mjs --agents <out>/agents` (Step 8.5): it normalizes the aliases agents drift into (`code` for `check`, `owner` for `ownership`, `fix: auto` for `auto_fixable`), refuses a finding with no catalog id or one also reported as a pass, and builds the run file's findings, so `run.json` is never assembled by a hand-written script.
 
 **Deduplication** runs on two different keys, because two different things collide here.
 

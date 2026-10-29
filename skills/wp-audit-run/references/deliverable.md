@@ -57,12 +57,30 @@ must compose is `content`, a judgement is `manual`.
 ### Render it
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/bin/audit-report.mjs --run <run.json> \
-  --format <md|html|both> --lang <en|es>
+${CLAUDE_PLUGIN_ROOT}/bin/audit-report.mjs --run <run.json> --agents <out>/agents \
+  --format <md|html|both>
 ```
 
+`--agents` reads the agents' report files (`<out>/agents/*.json`, Step 6) and builds the
+findings and the `unmeasured` list from them, so `<run.json>` carries only the metadata below
+(`site`, `date`, `tier`, `categories`, `notes`) and no one writes a script to assemble it. The
+normalizer accepts the key aliases agents drift into (`code`, `id`, `check_id` for `check`;
+`owner` for `ownership`; `title`, `description` for `message`; `fix: auto|manual` for
+`auto_fixable`; `rootCause` for `root_cause`; severity `ERROR` or lowercase), and it exits `1`
+naming any finding with no id, an id that is in no catalog, or a check reported both as a
+finding and as a pass. The alias list is documented once, in `wp-audit-standards`.
+
+**`--lang` is optional.** It defaults to the manifest's `languages.primary` when that is `es`
+or `en`, else `en`; the renderer reads `.wp-create.json` from the working directory, or from
+`--site-root <dir>`. Pass `--lang` only to override. A Spanish site used to get an English
+report because the default ignored the project.
+
 **Where it writes.** The directory is, in order: `--out <dir>`, the `WP_AUDIT_OUT_DIR`
-environment variable, the manifest's `audit.out_dir`, then `.wp-audit`. If it falls inside a
+environment variable, the manifest's `audit.out_dir`, then `<audits root>/<site>/results` when
+an audits root is configured (the `WP_AUDITS_ROOT` environment variable, or the manifest's
+`audit.audits_root`; `<site>` is the manifest's `project.slug`), then `.wp-audit`. With no audits
+root configured the last default is unchanged. Set the audits root once and every site's report
+lands in its own `results` folder, instead of wherever the working directory happened to be. If it falls inside a
 git work tree and is not ignored, the renderer warns on one line; run
 `wp-config.mjs gitignore-check <site-root>` and offer to ignore it (see `ledger.md`). The
 renderer compares against the newest sidecar **in that directory**, so changing the directory

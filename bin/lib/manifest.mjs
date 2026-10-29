@@ -190,6 +190,12 @@ export function validateManifest(manifest) {
     problems.push('audit.out_dir must be a non-empty string (the directory /wp-audit writes its reports to)');
   }
 
+  // Where every site's reports live side by side; the renderer writes to <root>/<site>/results.
+  const auditsRoot = at(manifest, 'audit.audits_root');
+  if (auditsRoot !== undefined && (typeof auditsRoot !== 'string' || auditsRoot === '')) {
+    problems.push('audit.audits_root must be a non-empty string (the directory holding one <site>/results folder per site)');
+  }
+
   const checksRun = at(manifest, 'audit.checks_run');
   if (checksRun !== undefined) {
     if (checksRun === null || typeof checksRun !== 'object' || Array.isArray(checksRun)) {

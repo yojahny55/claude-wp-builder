@@ -20,12 +20,26 @@
 //      its own Markdown back.
 //
 // Usage:
-//   bin/audit-report.mjs --run <run.json> [--merge <other.json>...] [--out <dir>]
-//                        [--format md|html|both] [--lang en|es] [--date YYYY-MM-DD]
-//                        [--notes <file>]
+//   bin/audit-report.mjs --run <run.json> [--agents <dir|file>...] [--merge <other.json>...]
+//                        [--out <dir>] [--format md|html|both] [--lang en|es]
+//                        [--date YYYY-MM-DD] [--notes <file>] [--site-root <dir>]
+//
+// --agents builds the findings straight from the agents' report files (a directory of
+// *.json, or one file) instead of a run file somebody had to assemble by hand; --run may then
+// carry only the metadata (site, date, tier, categories, notes) or be omitted. Every finding,
+// from either source, goes through the normalizer in bin/lib/audit-schema.mjs: known key
+// aliases are accepted (`code` for `check`, `owner` for `ownership`, ...). A finding in an
+// agent report that has no id, an id outside the agents' catalogs, or that is also reported
+// as a pass is refused. (Findings in --run come from the aggregator or the browser suite,
+// whose ids are not the agents', so they are normalized but not held to the catalogs.)
+//
+// --lang defaults to the manifest's `languages.primary` when it is es or en, else en.
+// The manifest is ./.wp-create.json, or <--site-root>/.wp-create.json.
 //
 // The output directory is, in order: --out, the WP_AUDIT_OUT_DIR environment variable, the
-// manifest's `audit.out_dir` (read from ./.wp-create.json), then `.wp-audit`. The renderer
+// manifest's `audit.out_dir`, `<audits root>/<site>/results` when an audits root is set (the
+// WP_AUDITS_ROOT environment variable or the manifest's `audit.audits_root`), then
+// `.wp-audit`. With no audits root configured nothing changes. The renderer
 // diffs against the newest sidecar IN THAT DIRECTORY, so changing the directory between runs
 // starts a new baseline. Every written file is printed as an absolute path, and a directory
 // inside a git work tree that is not ignored gets a one-line warning.
@@ -50,6 +64,7 @@
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, renameSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { normalizeEntry, normalizeReport, loadReports } from './lib/audit-schema.mjs';
 
 const OWNERSHIP = ['code', 'setting', 'content', 'manual'];
 const SEVERITY_ORDER = { CRITICAL: 0, WARNING: 1, INFO: 2 };
@@ -153,7 +168,7 @@ function die(code, message) {
 }
 
 function parseArgs(argv) {
-  const opts = { out: null, format: 'both', lang: 'en', run: null, date: null, merge: [] };
+  const opts = { out: null, format: 'both', lang: null, run: null, date: null, merge: [], agents: [], siteRoot: '.' };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     const value = argv[i + 1];
@@ -161,6 +176,18 @@ function parseArgs(argv) {
       case '--merge': {
         if (value === undefined || value.startsWith('--')) die(1, `${flag} needs a value`);
         opts.merge.push(value);
+        i += 1;
+        break;
+      }
+      case '--agents': {
+        if (value === undefined || value.startsWith('--')) die(1, `${flag} needs a value`);
+        opts.agents.push(value);
+        i += 1;
+        break;
+      }
+      case '--site-root': {
+        if (value === undefined || value.startsWith('--')) die(1, `${flag} needs a value`);
+        opts.siteRoot = value;
         i += 1;
         break;
       }
@@ -181,10 +208,11 @@ function parseArgs(argv) {
         die(1, `unknown argument: ${flag}`);
     }
   }
-  if (!opts.run) die(1, '--run <run.json> is required');
+  if (!opts.run && !opts.agents.length) die(1, '--run <run.json> or --agents <dir|file> is required');
   if (!['md', 'html', 'both'].includes(opts.format)) {
     die(1, `--format must be md, html or both (got: ${opts.format})`);
   }
+  if (opts.lang === null) opts.lang = defaultLang(opts.siteRoot);
   if (!STRINGS[opts.lang]) {
     die(1, `--lang must be one of ${Object.keys(STRINGS).join(', ')} (got: ${opts.lang})`);
   }
@@ -197,15 +225,36 @@ function parseArgs(argv) {
   return opts;
 }
 
-// --out > WP_AUDIT_OUT_DIR > audit.out_dir in ./.wp-create.json > .wp-audit
-function resolveOutDir(flag) {
+function readManifest(siteRoot) {
+  try {
+    return JSON.parse(readFileSync(join(siteRoot, '.wp-create.json'), 'utf8'));
+  } catch { return null; /* no manifest, or unreadable: every default below still works */ }
+}
+
+// The report is read by a client, so it follows the site's primary language, not the
+// plugin's. Only languages the renderer has strings for count; anything else is English.
+function defaultLang(siteRoot) {
+  const primary = readManifest(siteRoot)?.languages?.primary;
+  const code = typeof primary === 'string' ? primary.trim().toLowerCase().split(/[-_]/)[0] : '';
+  return STRINGS[code] && HTML_UI[code] ? code : 'en';
+}
+
+const slugify = (value) => String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+// --out > WP_AUDIT_OUT_DIR > audit.out_dir > <audits root>/<site>/results > .wp-audit
+// The audits root (WP_AUDITS_ROOT, or audit.audits_root in the manifest) is where an operator
+// keeps every site's reports side by side; with none set, the old default is unchanged.
+function resolveOutDir(flag, siteRoot, run) {
   if (flag) return flag;
   if (process.env.WP_AUDIT_OUT_DIR) return process.env.WP_AUDIT_OUT_DIR;
-  try {
-    const manifest = JSON.parse(readFileSync('.wp-create.json', 'utf8'));
-    const dir = manifest?.audit?.out_dir;
-    if (typeof dir === 'string' && dir !== '') return dir;
-  } catch { /* no manifest, or unreadable: fall through to the default */ }
+  const manifest = readManifest(siteRoot);
+  const dir = manifest?.audit?.out_dir;
+  if (typeof dir === 'string' && dir !== '') return dir;
+  const root = process.env.WP_AUDITS_ROOT || manifest?.audit?.audits_root;
+  if (typeof root === 'string' && root !== '') {
+    const site = slugify(manifest?.project?.slug || manifest?.project?.name || run?.site || run?.project);
+    if (site) return join(root, site, 'results');
+  }
   return '.wp-audit';
 }
 
@@ -227,7 +276,7 @@ function warnIfUnignored(outDir) {
   console.warn(`audit-report: ${outDir} is inside a git work tree and is not ignored -- add it to .gitignore, or run node bin/wp-config.mjs gitignore-check <site-root>`);
 }
 
-function loadRun(path) {
+function loadRun(path, { findingsOptional = false } = {}) {
   let raw;
   try {
     raw = readFileSync(path, 'utf8');
@@ -240,6 +289,8 @@ function loadRun(path) {
   } catch (error) {
     die(1, `${path} is not valid JSON: ${error.message}`);
   }
+  // With --agents the findings come from the agents' reports and the run file is metadata.
+  if (findingsOptional && run.findings === undefined) run.findings = [];
   if (!Array.isArray(run.findings)) {
     die(1, `${path} has no "findings" array`);
   }
@@ -1143,11 +1194,54 @@ ${planBlock}</section>
 `;
 }
 
+// Bring every finding to the canonical keys and fold in the agents' own report files.
+// Returns the problems the normalizer refuses in the agent reports: an id outside the catalogs, and a check
+// reported both as a finding and as a pass. The aliases it translates are accepted silently
+// (they are listed in the standards skill), so an agent that wrote `owner` still renders;
+// what it refuses is a report that cannot say which check it is about.
+function aggregateAgents(run, agentPaths) {
+  const problems = [];
+  const findings = [];
+  const unmeasured = Array.isArray(run.unmeasured) ? run.unmeasured : [];
+  const executed = new Set(Array.isArray(run.checks_executed) ? run.checks_executed : []);
+  const seenUnmeasured = new Set(unmeasured.map((e) => `${e?.check ?? e?.code}|${e?.reason ?? ''}`));
+
+  // The run file's own findings may come from the browser suite, whose ids are the suite's
+  // (`UX-045` is contrast there), so they are normalized but not held to the agents' catalogs.
+  run.findings.forEach((raw) => findings.push(normalizeEntry(raw).entry));
+  const extra = [];
+  for (const path of agentPaths) {
+    let reports;
+    try {
+      reports = loadReports(path);
+    } catch (error) {
+      die(1, `cannot read agent reports at ${path}: ${error.message}`);
+    }
+    for (const { label, report } of reports) {
+      const n = normalizeReport(report, label);
+      problems.push(...n.problems);
+      n.executed.forEach((id) => executed.add(id));
+      n.passes.forEach((p) => executed.add(p.check));
+      n.findings.forEach((f) => { executed.add(f.check); findings.push(f); });
+      for (const u of n.unmeasured) {
+        const key = `${u.check}|${u.reason ?? ''}`;
+        if (!seenUnmeasured.has(key)) { seenUnmeasured.add(key); extra.push(u); }
+      }
+    }
+  }
+  run.findings = findings;
+  run.unmeasured = [...unmeasured.map((e) => (e && typeof e === 'object' ? normalizeEntry(e).entry : e)), ...extra];
+  if (executed.size) run.checks_executed = [...executed];
+  return problems;
+}
+
 function main() {
   const opts = parseArgs(process.argv.slice(2));
+  const base = opts.run ? loadRun(opts.run, { findingsOptional: opts.agents.length > 0 }) : { findings: [] };
   const run = opts.merge.length
-    ? mergeRuns(loadRun(opts.run), opts.merge.map(loadRun))
-    : loadRun(opts.run);
+    ? mergeRuns(base, opts.merge.map(loadRun))
+    : base;
+  const schemaProblems = aggregateAgents(run, opts.agents);
   const notes = [
     ...normalizeNotes(run.notes, 'the run file'),
     ...(opts.notes ? readNotesFile(opts.notes) : []),
@@ -1159,6 +1253,7 @@ function main() {
   // report-only run on a clean site with nothing to compare later runs to.
 
   const problems = [
+    ...schemaProblems,
     ...validate(findings),
     ...validateUnmeasured(Array.isArray(run.unmeasured) ? run.unmeasured : []),
   ];
@@ -1169,7 +1264,7 @@ function main() {
   const folded = foldRootCauses(findings);
 
   const date = opts.date || run.date || new Date().toISOString().slice(0, 10);
-  const outDir = resolveOutDir(opts.out);
+  const outDir = resolveOutDir(opts.out, opts.siteRoot, run);
   mkdirSync(outDir, { recursive: true });
   warnIfUnignored(outDir);
 
