@@ -8,6 +8,7 @@
 - Store tier — what the store sells
 - Local clone — audit production's posture, not the copy's
 - Live checks need a public URL, and you ask for it
+- Clone health preflight
 - Clone-safe versus production-only measurement
 - A clone with a live mail transport is a finding, before any form is submitted
 
@@ -84,13 +85,13 @@ reader wants production's posture, not a list of what localization changed:
 
 | Condition normally a finding | Why it is a clone artifact here |
 |---|---|
-| Dev host stored in the database (SEC-036) | the clone's own URL is *supposed* to be the local host |
+| Dev host stored in the database (SEC-036), for `siteurl` / `home` only | the clone's own URL is *supposed* to be the local host; the rest of SEC-036 follows "Local clone — severity ceiling" below |
 | Known-local plugins deactivated (payment gateways, a CDN/page-cache plugin, an object-cache/Redis plugin, a mail plugin, a security/scanner plugin) | turned off so the copy does not reach live payment, cache or mail endpoints |
 | `DISABLE_WP_CRON` true, `WP_CACHE` false | set so an isolated copy does not fire scheduled or cached work |
 | `object-cache.php` / `advanced-cache.php` absent or left as `*.bak` | the backing service (Redis, a CDN cache) does not exist locally |
 | `advanced-cache.php` still in place, with `WP_CACHE` true, while the page-cache plugin that wrote it is clone-suppressed (PERF-070) | the drop-in and the constant came with the copy from production, where that plugin is active |
 | A must-use plugin that neutralizes mail or external calls (e.g. a local `wp_mail()` override) | added by the clone to keep the copy from contacting the outside world |
-| `WP_DEBUG` / `WP_DEBUG_LOG` on (SEC-008/009) | a development copy logs; production is what those checks are about |
+| `WP_DEBUG` / `WP_DEBUG_LOG` on (SEC-008/009) | a development copy logs; production is what those checks are about (WP-040 is `INFO`, see the severity ceiling below) |
 | An attachment whose file is missing on disk **when the file archive predates the database** | the media was uploaded after the file backup was taken; it exists in production |
 
 Do not widen this list to excuse a real defect: a plugin deactivated on the clone that has no
@@ -117,6 +118,44 @@ suppression they record reaches exactly one finding per item — "this plugin is
 known vulnerability, an outdated version, or a hardcoded credential is still a finding: the
 clone rule silences "it is off", never "it is off *and* it is broken."
 
+### Local clone — severity ceiling
+
+A clone is measured through its own database, files and web server, and none of the three is
+production's. A finding is rated for what it says about production, so when `local_clone` is
+true these rules cap or relabel it. They apply to every agent and every shard; Step 6 passes
+them in the dispatch with the other clone context. The cap is applied by the agent that
+produced the finding, never fixed afterwards in the report.
+
+1. **SEC-036 is a pre-deploy gate, not a defect.** The dev host in a clone's database is the
+   normal state after a pull. Report it `INFO`, never in the headline count, as a **push
+   blocker**: one line saying the dev host must be rewritten before any push, with the
+   per-table counts. `siteurl` and `home` are not counted. `guid` rows are not counted at all:
+   WordPress never rewrites a guid and nothing renders it. On a non-clone it stays `CRITICAL`.
+2. **Database schema and data findings are capped at `WARNING`.** A missing table, a row
+   count, revisions, a user list, an administrator that looks suspicious, a stored option: the
+   clone's database is a copy that the sync tool may have trimmed, so the finding carries
+   `confirm on prod` and is never `CRITICAL` from the clone alone. Before reporting a missing
+   table, read the sync tool's exclude list when the manifest's `environments` or the tool's
+   own configuration names one (for example EnvSync's `--exclude-tables`, or a log table group
+   such as `@logs`): a table on that list is absent because the pull skipped it, so the finding
+   is `N/A (excluded by the sync tool)`, not a defect. With no list available, say so in the
+   evidence and keep the `WARNING` cap.
+3. **Transport and server findings measured on the local server are not open findings.**
+   Compression, `Expires` / `Cache-Control`, HTTP version, cache TTL, TLS and anything else
+   that comes from the local web server are reported once as
+   `local server only, unverified on prod`, outside the open count, unless the number was measured through the production
+   gate (a confirmed public URL, or `bin/h2-proxy.mjs`, labelled as in the timing rules
+   above). Never edit `.htaccess` or the vhost to make a local run look better: that
+   changes the clone, not the site.
+4. **Probe the scheme before any HTTP check.** A local host often answers plain HTTP only.
+   Probe once (`curl -s -o /dev/null -w '%{http_code}' http://<host>/` and the `https://` form)
+   and run every fetch-based check on the scheme that answers. A check that failed because
+   `https://` does not listen locally is `UNMEASURED` ("local host answers HTTP only"), never
+   a finding about the site.
+5. **WP-040 (`WP_DEBUG` on) and WP-045 (file permissions) are `INFO` on a clone**, every run,
+   in every shard. A clone's debug flag and file owner are the copy's; confirm both on
+   production, where they keep their `WARNING` severity.
+
 ### Live checks need a public URL, and you ask for it
 
 Some checks can only be answered against the running production site: response headers, and
@@ -132,6 +171,54 @@ So when a live check needs a URL and `local_clone` is true:
    external request at a host the user has not confirmed this run.
 3. If no production URL is available, the live check is `UNMEASURED` with "needs the public
    URL", never `PASS`.
+
+### Clone health preflight
+
+Runs when `local_clone` is true, or whenever the audited host is a local vhost, and runs
+**before any agent is dispatched**. A clone can answer the home page and 404 every other URL, and then each
+page measurement of the run is wrong without anything saying so: a clone of a site served by
+nginx has no `.htaccess`, because nginx never needed one, and the local Apache has nothing to
+route permalinks with. The vhost can also answer HTTP only, which makes an https-based check
+invalid. Measure both once, here:
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/bin/clone-preflight.sh --url <audited host URL> --wp "$WP"
+```
+
+It reads a post permalink, a page and a category archive through WP-CLI, requests each on the
+audited host (re-rooted from whatever host WP-CLI printed), and requires `200`. It also probes
+http and https and prints the `scheme` the host answers. Keep that scheme and pass it to every
+agent as `Audited scheme:` (see `dispatch.md`), so none of them probes the other one; a host
+that answers only http means the https-dependent checks are `UNMEASURED: clone answers http
+only`, not failed.
+
+Exit 0: continue. Exit 4: read `diagnosis=` and say it to the user before going on; never
+continue silently.
+
+- `htaccess-missing`, `htaccess-empty` or `htaccess-no-wp-block`, on Apache (or an unknown
+  server): the rewrite block is absent. Offer to write the stock WordPress block. **Ask
+  first** (`AskUserQuestion`: write it / leave it), and say that `wp rewrite flush --hard`
+  may write nothing here, because WP-CLI does not detect Apache's mod_rewrite, so do not
+  suggest it as the fix. Run the same command with `--write-htaccess`, but only after the user said yes;
+  it backs up an existing file as `.htaccess.bak-<timestamp>`, appends the
+  block (it never overwrites other rules), re-probes, and prints the `local_only=` line.
+- `plain-permalinks`: the site uses `?p=` URLs, so rewrite rules are not the cause. Say so and
+  look at the 404 itself (a missing post, a wrong host).
+- `nginx-rules`, `rewrite-not-applied`, `host-unreachable`: report the diagnosis; the fix is the
+  vhost or server block, not a file this audit writes.
+
+**The written `.htaccess` is a local-only change.** Production runs nginx and never reads it,
+so it must not be pushed or deployed. The script marks it in the repo's `.git/info/exclude`
+(never `.gitignore`, which is committed), reports it as `local_only=`, and when git already
+tracks `.htaccess` it says so instead of hiding the change. Name it as a local-only change in
+the report's hand-off, beside the other clone alterations. Its backups are tool state
+(`.htaccess.bak-*` in `TOOL_STATE_PATHS`).
+
+If the preflight fails and the user declines to fix it, every page-based check is
+`UNMEASURED: clone does not serve internal URLs (<diagnosis>)`: the rendered head, headings,
+links followed, alt text, contrast and every per-page score. Code, configuration and database
+checks still run. Record the reason in the report header; do not drop the pages quietly and
+do not score them.
 
 ### Clone-safe versus production-only measurement
 

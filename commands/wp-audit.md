@@ -22,10 +22,11 @@ Parse `$ARGUMENTS` for:
   `.wp-audit/`. Absent, the audit prints to the console and writes only the ledger —
   **except on a report-only run, where it defaults to `both`** (see below). An explicit
   `--report md|html|both` always wins.
-- **`--report-lang en|es`** (default: `en`) — the language of that deliverable. It is read
-  by a client, not by the person who ran the audit, so it follows the project's primary
-  language rather than the plugin's. Take the default from `languages` in the project's
-  `.claude/CLAUDE.md` when the flag is absent and that line names one.
+- **`--report-lang en|es`** (default: the manifest's `languages.primary` when it is `es` or
+  `en`, else `en`) — the language of that deliverable. It is read by a client, not by the
+  person who ran the audit, so it follows the project's primary language rather than the
+  plugin's. The renderer applies this default itself when the flag is absent, so a Spanish
+  site gets a Spanish report without anyone typing it; pass the flag only to override.
 - **`--host <public-url>`** — the publicly reachable URL to scan, overriding
   `wordpress.url` from the manifest. A project whose manifest holds a `.local` or `192.168.*`
   URL can never be scanned from the manifest alone; this is how such a project supplies one
@@ -139,26 +140,30 @@ bash -c 'node "$1/bin/wp-config.mjs" drift "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PR
 Exit `0`: the manifest fits the site, continue. Exit `4`: it does not; each `drift:` line names
 a disagreement (theme directory missing, active theme differs from `theme.slug`, active
 plugins absent from `plugins.installed`, plugins in `plugins.installed` that are not active).
-Print the lines and ask with `AskUserQuestion`.
+Print the lines.
 
-When **every** line is a plugin-list line (`active plugin(s) not in plugins.installed` or
-`plugin(s) in plugins.installed that are not active`), the owner changed plugins and the
-manifest still describes this site:
+When **every** line is a plugin-list line (`active plugin(s) not in plugins.installed`,
+`plugin(s) in plugins.installed that are not active`, or `plugin path(s) in code_scope no longer
+on disk`), the owner changed plugins and the manifest still describes this site. That is
+measured fact, not a decision, so **do not ask**: run `refresh` straight away and print one
+line for the report, `Manifest refreshed: <the drift lines>`. Run `bash -c 'node "$1/bin/wp-config.mjs" refresh "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'`: it
+re-probes, rewrites `plugins.installed` and `stack` (and the PHP and WordPress versions), drops
+plugins that are gone from disk out of `plugins.installed` and `code_scope`, keeps a
+`.bak-<timestamp>` outside the docroot, regenerates the CLAUDE.md block and validates. Anything
+else in the manifest is untouched, and a run with nothing to change writes nothing. If `refresh`
+exits `1` (for example the pruned scope would leave no editable code), report its message and
+ask then.
 
-```
-The plugin list changed since .wp-create.json was written.
-  [A] Refresh — update plugins and stack only, keep everything else (recommended)
-  [B] Re-adopt — full read-only detection, keeps a timestamped backup and carries the audit history and code scope over
-  [C] Continue with the manifest as it is
-```
-
-On A, run `bash -c 'node "$1/bin/wp-config.mjs" refresh "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'`: it
-re-probes, rewrites `plugins.installed` and `stack` (and the PHP and WordPress versions), keeps
-a `.bak-<timestamp>`, regenerates the CLAUDE.md block and validates. Anything else in the manifest
-is untouched.
+A plugin the operator keeps deactivated on purpose (a security plugin turned off on the local
+copy only) is not drift: record it once with
+`bash -c 'node "$1/bin/wp-config.mjs" keep-inactive "$2" "$3"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}' <slug>`
+after asking (`AskUserQuestion`, default no), since a plugin that fell inactive by accident is
+exactly what this check should surface.
 
 When any line is structural (theme directory missing, active theme differs, `source` is
-`"blank"`), the manifest describes another site and `refresh` refuses it:
+`"blank"`, a non-plugin `code_scope` path missing), the theme or code scope changed and the
+manifest may describe another site; `refresh` refuses it. Only this case is put to the
+operator:
 
 ```
 .wp-create.json no longer describes this site.
@@ -211,7 +216,7 @@ It covers the code scope (editable and read-only), and what adoption changes in 
 
 ## Step 2.3: Site type and local clone
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/site-context.md` now and follow it — it is this step, not background. It covers store detection, store tier, the local-clone rules, the public-URL question, clone-safe versus production-only checks, and the live mail transport finding.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/site-context.md` now and follow it — it is this step, not background. It covers store detection, store tier, the local-clone rules, the public-URL question, the clone health preflight (internal URLs must answer 200 before any agent runs), clone-safe versus production-only checks, and the live mail transport finding.
 
 ## Step 2.5: Reconcile the Manifest
 
@@ -354,17 +359,31 @@ Before Step 7, read each returned report's `UNMEASURED` list and its measurement
 3. **Re-dispatch once.** Every `UNMEASURED` with an unacceptable reason goes back to its agent
    once, together, with the measurement split restated. What is still unmeasured after that
    keeps the agent's second reason.
-4. **Compute coverage against the catalog.** Every agent returns `checks_executed` as a field
-   (check ids, passes included), not in prose. For each category compute
-   `executed ∩ catalog / catalog`, with the catalog read where Step 2.5d reads it — the
-   agent's file, and for usability the table rows of its skill — and print it in the report
-   header:
-   `security 31/44 checks executed — never run: SEC-0xx, SEC-0yy…`.
-   An agent that returns no `checks_executed` counts as 0 and is re-dispatched. A category
-   under 90% blocks "audit complete": re-dispatch the missing ids once, then list what is
-   left, each id with its specific blocker. Without a recorded blocker for every missing id
-   the report says `INCOMPLETE`, never "complete". Ids that are `N/A` by site type or clone
-   are out of the denominator, as in Step 2.5d.
+4. **Compute coverage with the script, never by hand.** This sub-step is mandatory: it is
+   not skipped because the agents "looked complete", and it is not recomputed with an ad-hoc
+   regex over the catalogs. Every agent returns `checks_executed` as a field (check ids,
+   passes included), saved by the parent as `<out>/agents/<agent>.json` (see "Reports on
+   disk" in the dispatch reference). Then:
+
+   ```bash
+   node ${CLAUDE_PLUGIN_ROOT}/bin/audit-coverage.mjs --results <out>/agents --json
+   ```
+
+   It reads each catalog where Step 2.5d reads it (the agent's file, and for usability the
+   table rows of its skill), unions shards per category and prints, per category,
+   `security 31/44 checks executed — never run: SEC-0xx, SEC-0yy…` with the missing ids. Put
+   that line in the report header. Exit `0`: every category is at 90% or more. Exit `1`: a
+   category is under 90% and blocks "audit complete". Exit `2`: an agent report is invalid.
+   An agent that returns no `checks_executed` counts as 0. Ids that are `N/A` by site type or
+   clone, with a reason, are out of the denominator as in Step 2.5d. An `UNMEASURED` whose
+   reason is not one of the allowed ones (point 2, and "Allowed UNMEASURED reasons" in the
+   status vocabulary) is reported as missing, however the agent worded it.
+   **The re-dispatch sends only the missing ids.** For each category under 90%, get them with
+   `bin/audit-coverage.mjs --list <category> --results <out>/agents` and hand them to the
+   agent as its must-run list (the same line the first dispatch carried, now shorter); never
+   resend the whole catalog. Then run the script again with `--final`: it exits `1`
+   (`INCOMPLETE`) only when a missing id has no allowed blocker. List what is left, each id
+   with its specific blocker; without one the report says `INCOMPLETE`, never "complete".
 5. **Say what happened.** The report records how many checks were re-dispatched and how many
    stayed `UNMEASURED` for each acceptable reason, so a reader sees the coverage the run
    actually reached rather than a summary that calls it complete.
@@ -379,7 +398,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/fix-verification.md` 
 
 ## Step 7: Aggregate Reports
 
-Collect reports from all agents. For each agent's output, parse the findings into a unified list.
+Collect reports from all agents. For each agent's output, parse the findings into a unified list. The parser is `bin/audit-report.mjs --agents <out>/agents` (Step 8.5): it normalizes the aliases agents drift into (`code` for `check`, `owner` for `ownership`, `fix: auto` for `auto_fixable`), refuses a finding with no catalog id or one also reported as a pass, and builds the run file's findings, so `run.json` is never assembled by a hand-written script.
 
 **Deduplication** runs on two different keys, because two different things collide here.
 
@@ -432,7 +451,9 @@ Count totals per category and overall.
 
 ## Step 7.5: Reconcile against the finding ledger
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/ledger.md` now and follow it — it is this step, not background. It covers finding identity, the five ledger statuses, where the ledger lives, the derived counts, and the state-file contract: the ledger is not versioned, so run `node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs gitignore-check <site-root>` and offer to ignore what it lists.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/ledger.md` now and follow it — it is this step, not background. It covers finding identity, the six ledger statuses, recording a human decision (`--accept`) or a fix (`--mark-fixed`) and re-rendering the report (`--rerender`) without auditing, the ledger shape, where the ledger lives, the derived counts, and the state-file contract: the ledger is not versioned, so run `node ${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs gitignore-check <site-root>` and offer to ignore what it lists.
+
+Between audits, a human decision or an applied fix goes into the ledger with `bin/audit-report.mjs` (`--accept <id> --reason`, `--unaccept`, `--mark-fixed <id> --evidence`), the report is refreshed with `--rerender` and counts are quoted from `--summary`. Never patch a generated report by hand, never keep a declined finding only in session memory, and never list `accepted` entries as pending work.
 
 ## Step 8: Present Report
 

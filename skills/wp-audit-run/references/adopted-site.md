@@ -9,9 +9,16 @@ so three assumptions made everywhere else are false here:
    the child theme, the site's own plugins, mu-plugins. `code_scope.read_only` lists vendor
    code: a commercial parent theme and third-party plugins. **Both lists are audited.**
    - Findings in editable code follow the normal rules.
-   - Findings in read-only code are always reported with `Fix: manual` and `Owner: manual`.
-     Their `Method` names the way around the vendor file, never an edit to it: an override
-     in the child theme, a filter from the site's own plugin, or a report to the vendor.
+   - Read-only code produces findings only from checks that affect the running site: a known
+     vulnerability (SEC-041 and the vendor feeds), an available update, an abandoned plugin
+     (SEC-042). Those are reported with `Fix: manual` and `Owner: manual`; their `Method` names
+     the way around the vendor file, never an edit to it: an override in the child theme, a
+     filter from the site's own plugin, or a report to the vendor.
+   - Pattern hits in `code_scope.read_only` (a deprecated function, a missing `ABSPATH` guard,
+     `eval()`, `unserialize`, raw `$wpdb->query` counts, `posts_per_page => -1`, `RAND()`, a
+     coding-standard code of any category) are not findings. Each plugin gets **one** `INFO`
+     line, `vendor notes: <slug> — <n> pattern hits (<codes>)`, with no fix and no weight in the
+     headline or the totals. The same root cause reported under several codes is one hit.
 
    An update overwrites every file under a read-only path. A fix written there is lost at
    the next update and hides the defect until then.
@@ -29,6 +36,12 @@ so three assumptions made everywhere else are false here:
    otherwise `none`. `none` means the site is monolingual, or `stack.multilingual` names a
    plugin this one does not build for. `none` never falls back to `suffix`: an adopted site
    has no ACF `_<lang>` fields to check.
+
+**A finding carries a catalog code.** The code must exist in the category's catalog (Step
+2.5d). A pattern with no code is a note in the agent's report, never a finding: no
+shard-local labels (`PERF-0xx` invented for one run, `SEC-ACCT`), and no code is reused with a
+different meaning. Same-root-cause hits are grouped into one finding before they are counted,
+so merging shards never raises the total.
 
 Print it before the tier detection, so the scope of the run is visible up front:
 

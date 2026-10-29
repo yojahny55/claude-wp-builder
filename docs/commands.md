@@ -599,6 +599,13 @@ commit if `wp-config.php` is staged, scans for secrets, pushes `dev` and `master
 remote and paths under `git_publish` in `.wp-create.json`. The site folder does not become a
 repository and its `.gitignore` is not edited.
 
+Alternatively (also opt-in) the site folder itself can become the repository, core included:
+`wp-config.mjs git-init` writes a WordPress `.gitignore` from `templates/git/wordpress.gitignore`
+merged with the plugin's tool state entries, runs `git init -b <branch>`, adds the remote and
+prints a summary (file count, directories, large and secret-looking files), then stops. The commit
+and the push each need their own confirmation; only the named branch is pushed, never a second one.
+It refuses when the folder already is, or is inside, a repository.
+
 `/wp-audit`, `/wp-debug` and `/wp-clone` offer adoption themselves when they find no manifest.
 On an adopted site:
 

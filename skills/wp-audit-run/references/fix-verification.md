@@ -27,3 +27,8 @@ fix nobody ran.
 
 A fix whose reproducing case cannot be found is reported as `UNVERIFIED`, exactly like a
 finding that could not be measured. It is not counted as resolved.
+
+A fix that was reloaded on its reproducing case and came back clean is still not `resolved`
+in the ledger: it is recorded with `audit-report.mjs --mark-fixed <id> --evidence "<the case
+reloaded and what it showed>"`, which sets `fixed_unverified`. Only a later run that measures
+the check turns it into `resolved` (`ledger.md`).

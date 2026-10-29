@@ -55,6 +55,13 @@ Each check belongs to one of three tiers:
 penalized for having no API, OAuth, MCP, or payment surface — those checks are
 reported `N/A` exactly as ORA excludes them.
 
+An MCP or OAuth server a plugin registered without anyone choosing it is a security
+question, not a GEO gap: `wp-audit-security` SEC-046 lists those REST routes and asks the
+owner to confirm them. A site that publishes an MCP server on purpose records it in
+`.claude/CLAUDE.md`; only then do the MCP/OAuth surface checks (GEO-U07, GEO-U08) apply,
+and neither GEO nor SEC-046 tells the owner to remove it. Never add an MCP surface to
+satisfy a GEO check.
+
 Grades: **A+** 95+ · **A** 86+ · **B** 70+ · **C** 48+ · **D** 28+ · **F** <28.
 
 The weighted layer score is `Σ(maxScore of passed applicable checks) / Σ(maxScore of

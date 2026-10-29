@@ -5,7 +5,7 @@
  * Exit codes are fixed and are part of the contract: 0 ok, 1 invalid or refused,
  * 2 a migration is available, 3 there is no manifest. `drift` adds 4: the manifest
  * validates but no longer describes the site. `gitignore-check` also uses 4: tool state
- * paths are listed that git would commit. `require-origin` adds 5: the site is adopted
+ * paths are listed that git would commit; `git-init` uses 4 when the dry-run summary found secret-looking files. `require-origin` adds 5: the site is adopted
  * (a third-party theme this plugin did not build) and the calling builder must stop.
  */
 import {
@@ -14,6 +14,8 @@ import {
 import { join, resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { homedir } from 'node:os';
+import { createHash } from 'node:crypto';
 import {
   CURRENT_VERSION, MANIFEST_NAME, LOCAL_NAME, detectVersion, versionProblem, validateManifest, migrateManifest,
   renderContext, spliceContext, contextDrift, resolveSecret, getKey, SECRETS, validateProfile,
@@ -21,7 +23,8 @@ import {
 } from './lib/manifest.mjs';
 import {
   detectWrapper, runProbe, buildManifest, isWordPressRoot, manifestDrift, isTransientWrapper,
-  isPluginListDrift, isScaffoldManifest, carryOver, detectStack,
+  isPluginListDrift, isScaffoldManifest, carryOver, detectStack, refreshManifest, needsCodeHome, planCodeHome,
+  themeModsSteps, CODE_HOME_KINDS,
 } from './lib/adopt.mjs';
 
 // Every manifest write goes through here: the bytes land in a sibling temp file and are
@@ -103,10 +106,11 @@ const TOOL_STATE_PATHS = [
   { rule: '.wp-audit/', probe: '.wp-audit/x', why: 'audit reports and suite results' },
   { rule: '.wp-audit-findings.json', probe: '.wp-audit-findings.json', why: 'the /wp-audit findings ledger' },
   { rule: '.wp-create.local.json', probe: '.wp-create.local.json', why: 'local secrets override' },
-  { rule: '.wp-create.json.bak*', probe: '.wp-create.json.bak-x', why: 'manifest backups' },
+  { rule: '.wp-create.json.bak*', probe: '.wp-create.json.bak-x', why: 'manifest backups (older versions wrote them here; now kept outside the root)' },
   { rule: '.wp-create.json.*.tmp', probe: '.wp-create.json.1.2.tmp', why: 'atomic-write temp files left by a killed writer' },
   { rule: '.wp-create.json.lock*', probe: '.wp-create.json.lock.stale.1.2/x', why: 'manifest write lock and its stale asides' },
   { rule: '.wp-create.json.v*.bak', probe: '.wp-create.json.v1.bak', why: 'manifest migration backups' },
+  { rule: '.htaccess.bak-*', probe: '.htaccess.bak-20260101000000', why: 'backups of a local-clone .htaccess the clone preflight extended' },
   {
     rule: '/wp-content/plugins/robin-image-optimizer/libs/factory/bootstrap/assets/cache/',
     probe: 'wp-content/plugins/robin-image-optimizer/libs/factory/bootstrap/assets/cache/x',
@@ -121,8 +125,30 @@ const TOOL_STATE_PATHS = [
   },
 ];
 
-const say = (s) => console.log(s);
+// With --json, stdout carries exactly one JSON document: every `ok:`/`note:` line a command
+// would print is collected here and returned inside it instead.
+let jsonMode = false;
+const jsonNotes = [];
+const say = (s) => { if (jsonMode) jsonNotes.push(s); else console.log(s); };
 const warn = (s) => console.error(s);
+
+// Manifest backups live outside the docroot: a copy of .wp-create.json beside the site is
+// served by the web server and read by anyone who guesses its name, and it is working state
+// git would commit. One private directory per site root, newest BACKUP_KEEP files kept.
+const BACKUP_KEEP = 20;
+function backupManifest(root, file) {
+  const base = process.env.WP_BUILDER_BACKUP_DIR
+    || join(process.env.XDG_STATE_HOME || join(homedir(), '.local', 'state'), 'wp-builder-backups');
+  const dir = join(base, `${basename(root)}-${createHash('sha1').update(root).digest('hex').slice(0, 8)}`);
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const bak = join(dir, `${MANIFEST_NAME}.bak-${new Date().toISOString().replace(/[:.]/g, '-')}`);
+  copyFileSync(file, bak);
+  try {
+    const old = readdirSync(dir).filter((n) => n.startsWith(`${MANIFEST_NAME}.bak-`)).sort().slice(0, -BACKUP_KEEP);
+    for (const n of old) unlinkSync(join(dir, n));
+  } catch { /* pruning is best effort */ }
+  return bak;
+}
 
 function claudeMdPath(projectPath) {
   return join(resolve(projectPath), '.claude', 'CLAUDE.md');
@@ -348,6 +374,7 @@ function parseFlags(argv) {
 }
 
 function cmdAdopt(projectPath, flags) {
+  jsonMode = Boolean(flags.json);
   const root = resolve(projectPath);
   const file = join(root, MANIFEST_NAME);
   const replacing = existsSync(file) && flags.replace;
@@ -391,6 +418,11 @@ function cmdAdopt(projectPath, flags) {
     editable: list(flags.editable),
     read_only: list(flags['read-only']),
   };
+  const homeKind = flags['code-home'];
+  if (homeKind !== undefined && !CODE_HOME_KINDS.includes(homeKind)) {
+    warn(`--code-home must be one of ${CODE_HOME_KINDS.join(', ')}`);
+    process.exit(1);
+  }
   const built = buildManifest(root, probe, { ...detected, wrapper: keepWrapper }, { ...overrides, wrapper: keepWrapper });
   const { manifest, reasons, conflicts } = built;
   let { prefixSource } = built;
@@ -405,11 +437,23 @@ function cmdAdopt(projectPath, flags) {
       if (carried.includes('project.prefix')) prefixSource = 'carried over from the previous manifest';
     }
   }
+  // Where the site's own code lives. Only recorded (never created: adoption does not write to
+  // the site); a path that already exists joins the editable scope.
+  if (homeKind !== undefined) {
+    manifest.code_home = planCodeHome(homeKind, probe, root, typeof flags['code-home-path'] === 'string' ? flags['code-home-path'] : undefined);
+  }
+  if (manifest.code_home?.created && !manifest.code_scope.read_only.includes(manifest.code_home.path)
+    && !manifest.code_scope.editable.includes(manifest.code_home.path)) {
+    manifest.code_scope.editable.push(manifest.code_home.path);
+  }
+  const codeHomeNeeded = needsCodeHome(manifest);
   const problems = validateManifest(manifest);
 
   if (flags['dry-run']) {
-    say(JSON.stringify({
-      manifest, reasons, prefix_source: prefixSource, conflicts, carried_over: carried, problems,
+    console.log(JSON.stringify({
+      dry_run: true, manifest, reasons, prefix_source: prefixSource, conflicts, carried_over: carried, problems,
+      code_home_needed: codeHomeNeeded,
+      code_home_options: codeHomeNeeded ? CODE_HOME_KINDS.map((k) => planCodeHome(k, probe, root)) : [],
     }, null, 2));
     return;
   }
@@ -418,16 +462,23 @@ function cmdAdopt(projectPath, flags) {
     warn('nothing written: fix the values above with flags and run adopt again');
     process.exit(1);
   }
+  let backup = null;
   if (replacing) {
-    const bak = `${file}.bak-${new Date().toISOString().replace(/[:.]/g, '-')}`;
-    copyFileSync(file, bak);
-    say(`note: previous manifest kept at ${bak}`);
+    backup = backupManifest(root, file);
+    say(`note: previous manifest kept at ${backup}`);
   }
   writeAtomic(file, `${JSON.stringify(manifest, null, 2)}\n`);
   say(`ok: wrote ${file} (origin: adopted)`);
   for (const c of conflicts) say(`note: ${c}`);
   if (carried.length) say(`note: kept from the previous manifest: ${carried.join(', ')}`);
+  if (codeHomeNeeded) say('note: no editable code of the site\'s own: re-run adopt with --code-home=child-theme|site-plugin|mu-plugin (or `wp-config.mjs code-home`) once the operator chooses');
   cmdRenderContext(root);
+  if (jsonMode) {
+    console.log(JSON.stringify({
+      dry_run: false, written: file, backup, manifest, conflicts, carried_over: carried, problems,
+      code_home_needed: codeHomeNeeded, notes: jsonNotes,
+    }, null, 2));
+  }
 }
 
 // Does the registered manifest still describe the site WP-CLI is talking to? Exit 0 it does,
@@ -464,21 +515,118 @@ function cmdRefresh(projectPath) {
     warn('refresh only updates the plugin list and stack: this manifest describes another site -- run adopt with --replace');
     process.exit(1);
   }
-  const next = structuredClone(manifest);
-  next.plugins = { ...next.plugins, installed: probe.plugins.filter((p) => p.active).map((p) => p.slug) };
-  if (next.stack !== undefined || next.origin === 'adopted') next.stack = detectStack(probe).stack;
-  if (next.environment && probe.php) next.environment.php_version = probe.php;
-  if (next.wordpress && probe.wp) next.wordpress.version = probe.wp;
+  const { next, pruned } = refreshManifest(manifest, probe, root);
   const problems = validateManifest(next);
   if (problems.length) {
     for (const p of problems) warn(`invalid: ${p}`);
     warn('nothing written');
     process.exit(1);
   }
-  const bak = `${file}.bak-${new Date().toISOString().replace(/[:.]/g, '-')}`;
-  copyFileSync(file, bak);
+  if (JSON.stringify(next) === JSON.stringify(manifest)) {
+    say(`ok: ${file} already matches the site, nothing to refresh`);
+    return;
+  }
+  const bak = backupManifest(root, file);
   writeAtomic(file, `${JSON.stringify(next, null, 2)}\n`);
   say(`ok: refreshed plugins.installed and stack in ${file} (previous manifest kept at ${bak})`);
+  if (pruned.length) say(`ok: dropped from code_scope, no longer on disk: ${pruned.join(', ')}`);
+  // Same step, so the block never lists a plugin the manifest has dropped.
+  cmdRenderContext(root);
+}
+
+// Record a plugin the operator keeps deactivated on purpose (a security plugin turned off on a
+// local copy only). It stays in plugins.installed and in the stack, and is not drift.
+// `--unset` takes it back off the list.
+function cmdKeepInactive(projectPath, slug, flags) {
+  const { file, manifest } = loadManifest(projectPath);
+  if (!slug || !/^[a-z0-9][a-z0-9._-]*$/i.test(slug)) {
+    warn('usage: wp-config.mjs keep-inactive <project-path> <plugin-slug> [--unset]');
+    process.exit(1);
+  }
+  const next = structuredClone(manifest);
+  const list = new Set(next.plugins?.intentionally_inactive ?? []);
+  const installed = new Set(next.plugins?.installed ?? []);
+  if (flags.unset) { list.delete(slug); } else { list.add(slug); installed.add(slug); }
+  next.plugins = { ...next.plugins, installed: [...installed], intentionally_inactive: [...list] };
+  const problems = validateManifest(next);
+  if (problems.length) {
+    for (const p of problems) warn(`invalid: ${p}`);
+    warn('nothing written');
+    process.exit(1);
+  }
+  writeAtomic(file, `${JSON.stringify(next, null, 2)}\n`);
+  say(`ok: ${slug} ${flags.unset ? 'is drift again if it differs from the site' : 'recorded as intentionally inactive'} in ${file}`);
+}
+
+// Forget a plugin that was deleted from the site: out of plugins.installed, the inactive list
+// and both scope lists, and the generated block regenerated in the same step. The manifest
+// is never hand-edited for this (the block then fails validate, and render-context would
+// put the slug back from whatever list still held it).
+function cmdRemovePlugin(projectPath, slug) {
+  const { file, manifest } = loadManifest(projectPath);
+  if (!slug || !/^[a-z0-9][a-z0-9._-]*$/i.test(slug)) {
+    warn('usage: wp-config.mjs remove-plugin <project-path> <plugin-slug>');
+    process.exit(1);
+  }
+  const next = structuredClone(manifest);
+  const paths = [`wp-content/plugins/${slug}`, `wp-content/plugins/${slug}.php`];
+  const dropped = [];
+  const without = (arr, keep) => (Array.isArray(arr) ? arr.filter((x) => { const k = keep(x); if (!k) dropped.push(x); return k; }) : arr);
+  if (next.plugins?.installed) next.plugins.installed = without(next.plugins.installed, (x) => x !== slug);
+  if (next.plugins?.intentionally_inactive) next.plugins.intentionally_inactive = without(next.plugins.intentionally_inactive, (x) => x !== slug);
+  if (next.code_scope) {
+    next.code_scope.editable = without(next.code_scope.editable, (x) => !paths.includes(x));
+    next.code_scope.read_only = without(next.code_scope.read_only, (x) => !paths.includes(x));
+  }
+  if (!dropped.length) { say(`ok: ${slug} is not in the manifest, nothing to remove`); return; }
+  const problems = validateManifest(next);
+  if (problems.length) {
+    for (const p of problems) warn(`invalid: ${p}`);
+    warn('nothing written');
+    process.exit(1);
+  }
+  const bak = backupManifest(resolve(projectPath), file);
+  writeAtomic(file, `${JSON.stringify(next, null, 2)}\n`);
+  say(`ok: removed ${slug} from ${file} (${dropped.join(', ')}; previous manifest kept at ${bak})`);
+  cmdRenderContext(projectPath);
+}
+
+// Record where the site's own code lives (child-theme, site-plugin or mu-plugin), or print
+// the choice already recorded. Writes the manifest only; creating the theme or plugin is a
+// fix-flow step with the operator's consent. For a child theme it prints the theme_mods copy
+// that must run before the theme is activated.
+function cmdCodeHome(projectPath, flags) {
+  const root = resolve(projectPath);
+  const { file, manifest } = loadManifest(root);
+  if (flags.kind === undefined) {
+    if (!manifest.code_home) { say('code_home: not set'); return; }
+    say(`code_home: ${manifest.code_home.kind} at ${manifest.code_home.path} (${existsSync(join(root, manifest.code_home.path)) ? 'exists' : 'not created yet'})`);
+    return;
+  }
+  if (!CODE_HOME_KINDS.includes(flags.kind)) { warn(`--kind must be one of ${CODE_HOME_KINDS.join(', ')}`); process.exit(1); }
+  const wrapper = manifest.wp_cli?.wrapper || detectWrapper(root).wrapper;
+  const probed = runProbe(wrapper);
+  if (!probed.ok) { warn(`probe failed: ${probed.reason}`); process.exit(1); }
+  const next = structuredClone(manifest);
+  next.code_home = planCodeHome(flags.kind, probed.probe, root, typeof flags.path === 'string' ? flags.path : undefined);
+  const scope = next.code_scope ?? (next.code_scope = { editable: [], read_only: [] });
+  if (next.code_home.created && !scope.editable.includes(next.code_home.path) && !scope.read_only.includes(next.code_home.path)) {
+    scope.editable.push(next.code_home.path);
+  }
+  const problems = validateManifest(next);
+  if (problems.length) {
+    for (const p of problems) warn(`invalid: ${p}`);
+    warn('nothing written');
+    process.exit(1);
+  }
+  writeAtomic(file, `${JSON.stringify(next, null, 2)}\n`);
+  say(`ok: code_home is ${next.code_home.kind} at ${next.code_home.path} (${next.code_home.created ? 'exists, in code_scope.editable' : 'not created yet'})`);
+  if (next.code_home.kind === 'child-theme' && !next.code_home.created) {
+    const child = basename(next.code_home.path);
+    say(`step: create ${next.code_home.path} (style.css with Template: ${next.code_home.parent}, functions.php), then BEFORE activating it copy the parent's theme_mods:`);
+    for (const l of themeModsSteps(next.code_home.parent, child, wrapper)) say(`  ${l}`);
+    say('step: Additional CSS and widget assignments are per theme as well; compare them after the switch');
+  }
   cmdRenderContext(root);
 }
 
@@ -653,6 +801,131 @@ function cmdEnvSet(projectPath, flags) {
   say(`ok: environments.${name} (${env.role}) written to ${file}`);
 }
 
+// ---- git-init: put an adopted site's whole root under git, in place --------------------------
+// Opt-in team convention (core included). Phases, each its own invocation so the operator
+// confirms between them: plan (--dry-run, changes nothing) -> init (writes .gitignore, git init,
+// remote add, prints the summary, stages nothing) -> --commit -> --push --yes.
+// Only the named branch is ever created or pushed.
+const SECRET_FILE = /(^|\/)(wp-config[^/]*|\.env(\..*)?|\.htpasswd|id_rsa[^/]*|[^/]*\.(pem|key|p12|pfx)|credentials[^/]*\.json)$/i;
+
+function gitIgnoreMerge(root, existing) {
+  const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const tpl = readFileSync(join(pluginRoot, 'templates', 'git', 'wordpress.gitignore'), 'utf8').split('\n');
+  const toolRules = TOOL_STATE_PATHS.filter((e) => !e.when || existsSync(join(root, e.when))).map((e) => e.rule);
+  const have = new Set(existing.split('\n').map((l) => l.trim()).filter(Boolean));
+  const out = [];
+  let pending = [];
+  const emit = (line) => { if (!have.has(line)) { out.push(...pending, line); have.add(line); } pending = []; };
+  for (const raw of tpl) {
+    const line = raw.trim();
+    if (!line) { pending = []; continue; }
+    if (line.startsWith('#')) { pending.push(line); continue; }
+    emit(line);
+  }
+  pending = ['# claude-wp-builder working state'];
+  for (const r of toolRules) emit(r);
+  return out;
+}
+
+function cmdGitInit(projectPath, flags) {
+  const root = resolve(projectPath);
+  if (!existsSync(root)) { warn(`no such directory: ${root}`); process.exit(1); }
+  const git = (args, opts = {}) => spawnSync('git', ['-C', root, ...args], { encoding: 'utf8', ...opts });
+  const branch = flags.branch;
+  if (typeof branch !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(branch) || git(['check-ref-format', '--branch', branch]).status !== 0) {
+    warn('usage: wp-config.mjs git-init <project-path> --branch=<name> --remote=<url> [--dry-run | --commit [--message=<m>] | --push --yes]');
+    warn('--branch is required: the one branch the team pushes. No second branch is created or pushed.');
+    process.exit(1);
+  }
+  const top = git(['rev-parse', '--show-toplevel']);
+  const isRepo = top.status === 0;
+
+  if (flags.commit || flags.push) {
+    if (!isRepo || resolve(top.stdout.trim()) !== root) { warn('refused: the root is not a git repository of its own; run git-init first'); process.exit(1); }
+    const cur = git(['symbolic-ref', '--short', 'HEAD']).stdout.trim();
+    if (cur !== branch) { warn(`refused: HEAD is ${cur || 'detached'}, not ${branch}`); process.exit(1); }
+    // Only a repo this command created: same origin as --remote, and (for --commit) no history yet.
+    if (git(['remote', 'get-url', 'origin']).stdout.trim() !== flags.remote) { warn('refused: origin does not match --remote'); process.exit(1); }
+    if (flags.commit && git(['rev-parse', '--verify', '-q', 'HEAD']).status === 0) { warn('refused: the repository already has commits; git-init only makes the initial import'); process.exit(1); }
+  }
+  if (flags.commit) {
+    const added = git(['add', '-A']);
+    if (added.status !== 0) { git(['reset', '-q']); warn(added.stderr || 'git add failed'); process.exit(1); }
+    const staged = git(['diff', '--cached', '--name-only', '-z']).stdout.split('\0').filter(Boolean);
+    const bad = staged.filter((f) => SECRET_FILE.test(f));
+    // Mode 160000: a nested repository (a plugin cloned with its own .git) staged as an empty gitlink.
+    const links = git(['diff', '--cached', '--raw', '-z']).stdout.split('\0').filter((x) => x.startsWith(':160000') || x.includes(' 160000 ')).length;
+    if (bad.length || links) {
+      git(['reset', '-q']);
+      for (const f of bad) warn(`refused: ${f} looks like a secret; add it to .gitignore and run again`);
+      if (links) warn(`refused: ${links} nested repositor${links === 1 ? 'y' : 'ies'} (own .git) would be committed as empty gitlinks; ignore them or remove their .git`);
+      process.exit(1);
+    }
+    if (!staged.length) { warn('refused: nothing to commit'); process.exit(1); }
+    const msg = typeof flags.message === 'string' ? flags.message : 'chore: initial import of site';
+    const r = git(['commit', '-q', '-m', msg]);
+    if (r.status !== 0) { warn(r.stderr || 'git commit failed'); process.exit(1); }
+    say(`ok: committed ${staged.length} files on ${branch} (${git(['rev-parse', '--short', 'HEAD']).stdout.trim()}). Nothing is pushed.`);
+    say(`next: after an explicit yes, run: wp-config.mjs git-init ${root} --branch=${branch} --remote=<url> --push --yes`);
+    return;
+  }
+  if (flags.push) {
+    const remote = git(['remote', 'get-url', 'origin']).stdout.trim();
+    const cmd = `git -C ${root} push -u origin refs/heads/${branch}:refs/heads/${branch}`;
+    say(`push command: ${cmd}`);
+    say(`remote: ${remote}`);
+    if (!flags.yes) { warn('refused: pass --yes only after the operator confirmed this exact command'); process.exit(1); }
+    const r = git(['push', '-u', 'origin', `refs/heads/${branch}:refs/heads/${branch}`], { stdio: 'inherit' });
+    if (r.status !== 0) process.exit(1);
+    say(`ok: pushed ${branch} only`);
+    return;
+  }
+
+  const remote = flags.remote;
+  if (typeof remote !== 'string' || !remote || remote.startsWith('-') || /\s/.test(remote)) {
+    warn('--remote=<url> is required (no whitespace, not starting with -)');
+    process.exit(1);
+  }
+  if (isRepo || existsSync(join(root, '.git'))) {
+    warn(`refused: ${root} is already a git repository or inside one (${isRepo ? top.stdout.trim() : '.git exists'}); git-init never touches an existing repo`);
+    process.exit(1);
+  }
+  const igFile = join(root, '.gitignore');
+  const existing = existsSync(igFile) ? readFileSync(igFile, 'utf8') : '';
+  const add = gitIgnoreMerge(root, existing);
+  say(`plan: git init -b ${branch}; origin = ${remote}; only ${branch} will ever be pushed`);
+  say(`plan: .gitignore ${existing ? 'gains' : 'is created with'} ${add.filter((l) => !l.startsWith('#')).length} rules`);
+  if (flags['dry-run']) { for (const l of add) say(`  + ${l}`); say('dry run: nothing written'); return; }
+
+  writeFileSync(igFile, existing + (existing && !existing.endsWith('\n') ? '\n' : '') + (existing && add.length ? '\n' : '') + add.join('\n') + (add.length ? '\n' : ''));
+  for (const args of [['init', '-q', '-b', branch], ['remote', 'add', 'origin', remote]]) {
+    const r = git(args);
+    if (r.status !== 0) { warn(r.stderr || `git ${args[0]} failed`); process.exit(1); }
+  }
+  const files = git(['ls-files', '-o', '--exclude-standard', '-z']).stdout.split('\0').filter(Boolean);
+  const limit = (Number(flags['large-mb']) || 5) * 1024 * 1024;
+  const dirs = new Map();
+  const large = [];
+  const secrets = [];
+  for (const f of files) {
+    const d = f.includes('/') ? `${f.split('/')[0]}/` : '(root files)';
+    dirs.set(d, (dirs.get(d) ?? 0) + 1);
+    let size = 0;
+    try { size = statSync(join(root, f)).size; } catch { /* vanished */ }
+    if (size > limit) large.push([f, size]);
+    if (SECRET_FILE.test(f)) secrets.push(f);
+  }
+  say(`summary: ${files.length} files would be committed on ${branch}`);
+  for (const [d, n] of [...dirs].sort((a, b) => b[1] - a[1])) say(`  ${String(n).padStart(7)}  ${d}`);
+  large.sort((a, b) => b[1] - a[1]);
+  say(`large files (> ${limit / 1048576} MB): ${large.length || 'none'}`);
+  for (const [f, s] of large.slice(0, 20)) say(`  ${(s / 1048576).toFixed(1)} MB  ${f}`);
+  say(`secret-looking files: ${secrets.length || 'none'}`);
+  for (const f of secrets) say(`  SECRET? ${f}`);
+  say('stop: nothing is staged or committed. Show this to the operator; on yes run --commit.');
+  if (secrets.length) process.exit(4);
+}
+
 const [cmd, target] = process.argv.slice(2);
 if (cmd === 'validate' && target) cmdValidate(target);
 else if (cmd === 'migrate' && target) cmdMigrate(target);
@@ -661,13 +934,17 @@ else if (cmd === 'get' && target && process.argv[4]) cmdGet(target, process.argv
 else if (cmd === 'validate-profile' && target) cmdValidateProfile(target);
 else if (cmd === 'drift' && target) cmdDrift(target);
 else if (cmd === 'refresh' && target) cmdRefresh(target);
+else if (cmd === 'keep-inactive' && target) cmdKeepInactive(target, process.argv[4] && !process.argv[4].startsWith('--') ? process.argv[4] : undefined, parseFlags(process.argv.slice(4)));
+else if (cmd === 'remove-plugin' && target) cmdRemovePlugin(target, process.argv[4]);
+else if (cmd === 'code-home' && target) cmdCodeHome(target, parseFlags(process.argv.slice(4)));
 else if (cmd === 'set' && process.argv.length > 6) { warn('set takes exactly <project> <key> <value>; quote the value or pass it on stdin with `-`'); process.exit(1); }
 else if (cmd === 'set' && target && process.argv[4] && process.argv[5] !== undefined) cmdSet(target, process.argv[4], process.argv[5]);
 else if (cmd === 'require-origin' && target) cmdRequireOrigin(target, parseFlags(process.argv.slice(4)));
 else if (cmd === 'gitignore-check' && target) cmdGitignoreCheck(target);
+else if (cmd === 'git-init' && target) cmdGitInit(target, parseFlags(process.argv.slice(4)));
 else if (cmd === 'env-set' && target) cmdEnvSet(target, parseFlags(process.argv.slice(4)));
 else if (cmd === 'adopt' && target) cmdAdopt(target, parseFlags(process.argv.slice(4)));
 else {
-  warn('usage: wp-config.mjs <validate|migrate|render-context|get|set|validate-profile|adopt|drift|refresh|gitignore-check|env-set|require-origin> <project-path> [key [value]|wp-version|adopt flags]');
+  warn('usage: wp-config.mjs <validate|migrate|render-context|get|set|validate-profile|adopt|drift|refresh|keep-inactive|remove-plugin|code-home|gitignore-check|git-init|env-set|require-origin> <project-path> [key [value]|wp-version|adopt flags]');
   process.exit(1);
 }

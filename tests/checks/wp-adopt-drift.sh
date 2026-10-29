@@ -6,8 +6,8 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 cfg="node $PWD/bin/wp-config.mjs"
-tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
-mkdir -p "$tmp/bin" "$tmp/site/wp-content/themes/real-child"
+tmp=$(mktemp -d); export WP_BUILDER_BACKUP_DIR="$tmp/backups"; trap 'rm -rf "$tmp"' EXIT
+mkdir -p "$tmp/bin" "$tmp/site/wp-content/themes/real-child" "$tmp/site/wp-content/plugins/a"
 touch "$tmp/site/wp-load.php" "$tmp/site/wp-config.php"
 
 probe='{"home":"https://x.test","blogname":"X","locale":"en_US","pll_default":null,"pll_languages":[],"multisite":false,"php":"8.2.1","wp":"6.8","stylesheet":"real-child","template":"real","theme_path":"wp-content/themes/real-child","parent_path":null,"theme_known_to_updater":false,"parent_known_to_updater":null,"plugins":[{"file":"a/a.php","slug":"a","name":"A","update_uri":"","active":true,"known_to_updater":false,"path":"wp-content/plugins/a"}],"mu_plugins":[],"mu_path":"wp-content/mu-plugins"}'
@@ -41,7 +41,8 @@ grep -Fq -- '--replace' "$tmp/err" || fail "refusal does not mention --replace"
 
 # 4. --replace backs up, then writes the real site.
 $cfg adopt "$tmp/site" --replace >/dev/null || fail "adopt --replace failed"
-ls "$tmp/site"/.wp-create.json.bak-* >/dev/null 2>&1 || fail "no backup kept"
+ls "$tmp"/backups/*/.wp-create.json.bak-* >/dev/null 2>&1 || fail "no backup kept outside the docroot"
+ls "$tmp/site"/.wp-create.json.bak-* >/dev/null 2>&1 && fail "a backup was left in the site root"
 grep -Fq '"real-child"' "$tmp/site/.wp-create.json" || fail "manifest not rewritten"
 $cfg drift "$tmp/site" >/dev/null || fail "fresh adoption still drifts"
 
@@ -111,14 +112,15 @@ if(m.stack.seo!=='none')bad('stack not refreshed');
 if(m.audit?.last_run!=='2026-02-02'||m.project.industry!=='construction')bad('refresh touched a decision');
 " "$site" || exit 1
 $cfg drift "$site" >/dev/null || fail "still drifts after refresh"
-ls "$site"/.wp-create.json.bak-* >/dev/null 2>&1 || fail "refresh kept no backup"
+ls "$tmp"/backups/*/.wp-create.json.bak-* >/dev/null 2>&1 || fail "refresh kept no backup"
+ls "$site"/.wp-create.json.bak-* >/dev/null 2>&1 && fail "refresh left a backup in the site root"
 node -e "
 const fs=require('fs');const f=process.argv[1]+'/.wp-create.json';const m=JSON.parse(fs.readFileSync(f));
 m.theme.slug='ghost';fs.writeFileSync(f,JSON.stringify(m));" "$site"
 set +e; $cfg refresh "$site" >/dev/null 2>&1; rc=$?; set -e
 [ "$rc" = 1 ] || fail "refresh accepted structural drift"
 grep -Fq 'ghost' "$site/.wp-create.json" || fail "refresh rewrote a refused manifest"
-grep -Fq '[A] Refresh' commands/wp-audit.md || fail "wp-audit.md does not offer Refresh"
+grep -Fq 'Manifest refreshed' commands/wp-audit.md || fail "wp-audit.md does not auto-refresh plugin-list drift"
 grep -Fq 'carried_over' commands/wp-adopt.md || fail "wp-adopt.md does not document carry-over"
 
 # 6. wp-quiet strips diagnostics, keeps real output and the exit code.

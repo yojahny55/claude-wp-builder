@@ -10,7 +10,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve, basename } from 'node:path';
-import { CURRENT_VERSION, STACK_KEYS } from './manifest.mjs';
+import { CURRENT_VERSION, STACK_KEYS, CODE_HOME_KINDS } from './manifest.mjs';
 
 // Active plugin slug (its directory, or the file for a single-file plugin) -> the name the
 // audit agents branch on. First match per concern wins, in this order, so a site running two
@@ -135,10 +135,21 @@ export function manifestDrift(manifest, probe, root) {
   }
   const active = probe.plugins.filter((p) => p.active).map((p) => p.slug);
   const claimed = manifest.plugins?.installed ?? [];
+  // A plugin the operator turned off on purpose (a security plugin disabled on a local copy)
+  // is recorded in plugins.intentionally_inactive and is not a disagreement.
+  const parked = manifest.plugins?.intentionally_inactive ?? [];
   const missing = active.filter((x) => !claimed.includes(x));
-  const extra = claimed.filter((x) => !active.includes(x));
+  const extra = claimed.filter((x) => !active.includes(x) && !parked.includes(x));
   if (missing.length) out.push(`${missing.length} active plugin(s) not in plugins.installed: ${missing.slice(0, 8).join(', ')}${missing.length > 8 ? ', …' : ''}`);
   if (extra.length) out.push(`${extra.length} plugin(s) in plugins.installed that are not active: ${extra.slice(0, 8).join(', ')}${extra.length > 8 ? ', …' : ''}`);
+  // A plugin that was deleted leaves its path behind in the scope lists, and the generated
+  // block would keep listing it. Plugin paths are measured fact (refresh prunes them); any
+  // other missing path means the scope was written for another tree.
+  const gone = scopePaths(manifest).filter((x) => !existsSync(join(root, x)));
+  const gonePlugins = gone.filter((x) => x.startsWith('wp-content/plugins/'));
+  const goneOther = gone.filter((x) => !x.startsWith('wp-content/plugins/') && x !== `wp-content/themes/${slug}`);
+  if (gonePlugins.length) out.push(`${gonePlugins.length} plugin path(s) in code_scope no longer on disk: ${gonePlugins.slice(0, 8).join(', ')}${gonePlugins.length > 8 ? ', …' : ''}`);
+  if (goneOther.length) out.push(`${goneOther.length} path(s) in code_scope no longer on disk: ${goneOther.slice(0, 8).join(', ')}`);
   if (manifest.project?.source === 'blank' && active.length) out.push('project.source is "blank" but the site has active plugins');
   return out;
 }
@@ -147,7 +158,86 @@ export function manifestDrift(manifest, probe, root) {
 // plugins) is measured fact the probe can refresh; every other line says the manifest
 // describes another site, which only a re-adoption answers.
 export function isPluginListDrift(line) {
-  return /^\d+ active plugin\(s\) not in plugins\.installed|^\d+ plugin\(s\) in plugins\.installed that are not active/.test(line);
+  return /^\d+ active plugin\(s\) not in plugins\.installed|^\d+ plugin\(s\) in plugins\.installed that are not active|^\d+ plugin path\(s\) in code_scope no longer on disk/.test(line);
+}
+
+function scopePaths(manifest) {
+  const s = manifest.code_scope ?? {};
+  return [...(Array.isArray(s.editable) ? s.editable : []), ...(Array.isArray(s.read_only) ? s.read_only : [])]
+    .filter((x) => typeof x === 'string');
+}
+
+// What `refresh` writes: the measured facts (active plugins, stack, versions) and nothing
+// the operator decided. Plugins recorded as intentionally inactive stay in the list while
+// they are still on disk, and still count toward the stack: the stack describes the site,
+// not this machine's switches. Plugin paths that no longer exist leave code_scope, so the
+// generated block stops listing a deleted plugin as read-only code.
+export function refreshManifest(manifest, probe, root) {
+  const next = structuredClone(manifest);
+  const onDisk = new Set(probe.plugins.map((p) => p.slug));
+  const parked = (next.plugins?.intentionally_inactive ?? []).filter((x) => onDisk.has(x));
+  const active = probe.plugins.filter((p) => p.active).map((p) => p.slug);
+  next.plugins = { ...next.plugins, installed: [...new Set([...active, ...parked])] };
+  if (next.plugins.intentionally_inactive !== undefined) next.plugins.intentionally_inactive = parked;
+  if (next.stack !== undefined || next.origin === 'adopted') {
+    const probeForStack = { ...probe, plugins: probe.plugins.map((p) => ({ ...p, active: p.active || parked.includes(p.slug) })) };
+    next.stack = detectStack(probeForStack).stack;
+  }
+  if (next.environment && probe.php) next.environment.php_version = probe.php;
+  if (next.wordpress && probe.wp) next.wordpress.version = probe.wp;
+  const pruned = [];
+  if (next.code_scope) {
+    for (const list of ['editable', 'read_only']) {
+      if (!Array.isArray(next.code_scope[list])) continue;
+      next.code_scope[list] = next.code_scope[list].filter((x) => {
+        const gone = typeof x === 'string' && x.startsWith('wp-content/plugins/') && !existsSync(join(root, x));
+        if (gone) pruned.push(x);
+        return !gone;
+      });
+    }
+  }
+  return { next, pruned };
+}
+
+// Plugins that exist to move or inspect the site, not to carry its behavior. An editable
+// scope holding only these has no home for the fixes an audit proposes.
+export const TOOLING_PLUGINS = ['ix-wp-envsync'];
+export { CODE_HOME_KINDS };
+
+// True when nothing in the editable scope is code the site owns: no theme, no mu-plugin
+// directory, and no plugin beyond the tooling ones. The operator is then asked once where
+// site-owned code lives, instead of every fix inventing an answer.
+export function needsCodeHome(manifest) {
+  if (manifest.code_home) return false;
+  const editable = manifest.code_scope?.editable ?? [];
+  return !editable.some((x) => {
+    if (x.startsWith('wp-content/themes/') || x.startsWith('wp-content/mu-plugins')) return true;
+    const slug = x.replace(/^wp-content\/plugins\//, '').replace(/\.php$/, '');
+    return !TOOLING_PLUGINS.includes(slug);
+  });
+}
+
+// The planned location of the site's own code. Nothing is created here: adoption never
+// writes to the site. `created` says whether the path exists yet; the fix flow checks it.
+export function planCodeHome(kind, probe, root, wanted) {
+  const parent = probe.template || probe.stylesheet;
+  const path = wanted
+    || (kind === 'child-theme' ? `wp-content/themes/${probe.parent_path ? probe.stylesheet : `${parent}-child`}`
+      : kind === 'site-plugin' ? `wp-content/plugins/${basename(root).toLowerCase().replace(/[^a-z0-9-]+/g, '-')}-site`
+        : probe.mu_path || 'wp-content/mu-plugins');
+  const home = { kind, path, created: existsSync(join(root, path)) };
+  if (kind === 'child-theme') home.parent = parent;
+  return home;
+}
+
+// The WP-CLI that moves the parent theme's Customizer settings (menus, colors, logo, widget
+// area assignments) to a new child theme. theme_mods are stored per stylesheet, so activating
+// the child without this resets them. Run it BEFORE `theme activate`.
+export function themeModsSteps(parent, child, wrapper = 'wp') {
+  return [
+    `${wrapper} option get theme_mods_${parent} --format=json | ${wrapper} option update theme_mods_${child} --format=json`,
+    `${wrapper} theme activate ${child}`,
+  ];
 }
 
 // A blank scaffold carries no operator decisions worth keeping: it was never an adoption or a
@@ -171,6 +261,8 @@ export function carryOver(old, manifest, root, flags = {}) {
   if (old.audit !== undefined) { manifest.audit = old.audit; notes.push('audit'); }
   if (old.store !== undefined) { manifest.store = old.store; notes.push('store'); }
   if (old.environments !== undefined) { manifest.environments = old.environments; notes.push('environments'); }
+  if (old.code_home !== undefined && manifest.code_home === undefined) { manifest.code_home = old.code_home; notes.push('code_home'); }
+  if (old.plugins?.intentionally_inactive !== undefined) { manifest.plugins.intentionally_inactive = old.plugins.intentionally_inactive; notes.push('plugins.intentionally_inactive'); }
   if (old.project?.adopted) manifest.project.adopted = old.project.adopted;
   if (!flags.prefix && typeof old.project?.prefix === 'string' && old.project.prefix) {
     manifest.project.prefix = old.project.prefix;
