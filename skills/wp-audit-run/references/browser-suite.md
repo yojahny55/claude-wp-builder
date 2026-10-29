@@ -5,6 +5,7 @@
 ## Contents
 
 - Running the suite, the gate and the audited host
+- Run settings are flags, not config edits
 - Exit codes
 - The suite's findings and the agents' findings can be the same defect
 - The shopper-flow regression suite is not an audit pass
@@ -42,6 +43,48 @@ audits `--url`. A hand-edited or stale `baseURL` therefore cannot send a run to 
 remaining passes are skipped and the script exits `2` with an `UNMEASURED:` line naming the cause.
 Do not re-run it against the same host to "try again"; check the host first. The tests, pages and metrics are the
 same; only the four parallel browsers are gone.
+
+**A slow page is not a silent host.** After each timeout the guard sends one GET to `--url`.
+Only a host that does not answer it, refuses the connection, or answers `403`/`429`/`503`
+counts toward `--max-timeouts`. A host that answers resets the count: the page is recorded in
+`results/unmeasured-pages.json` as a slow page with the timing, and the run goes on. So does a
+check that ran on a page a timeout had already closed. `scripts/to-run.js` turns each entry
+into an `UNMEASURED` row (`SUITE-PAGE-*`) with that reason; quote it, never report it as the
+criterion's finding.
+
+### Run settings are flags, not config edits
+
+Never edit the generated `playwright.config.js` to tune a run. Pass the flag instead:
+
+| Flag | Default | Use it when |
+|---|---|---|
+| `--workers <n>` | 4 locally, 1 on production (more is refused there) | a machine short of RAM starts browsers that hang at launch |
+| `--timeout <s>` | the template's 90 | a heavy page needs longer per test |
+| `--engines chromium[,firefox][,webkit]` | all three, each one that exists | the other engines are not needed this run; `chromium` is required |
+| `--settle <s>` | 5 | pages load to `domcontentloaded`, then get this long to go network-idle; a video embed or a polling widget never does |
+| `--block-third-party` / `--no-block-third-party` | ON against a local host, OFF against production | a clone must not send real hits to production analytics, embeds or widget APIs; against production, pass it to measure the site's own payload |
+| `--allow-hosts <h1,.cdn.example>` | — | the site serves its own assets from another host (`.domain` allows its subdomains) |
+
+There is no `--project`; engines are `--engines`. The block allows the audited host, its
+www/non-www twin and loopback (`bin/lib/third-party.cjs`, the list `bin/ux-probe.mjs` uses
+too), and the run prints the allowlist. With the block on, Lighthouse scores describe the site
+without its third parties: say so beside them. The broken-link check is an HTTP request, not a
+page load, and still verifies external links.
+
+A generated config somebody did edit is kept: `.scaffold-sums` records each config as
+scaffolded, a re-run that finds it changed keeps it and says so, and deleting it takes the
+template's again. The flags remain the way to tune a run, because a kept file misses every
+later template fix.
+
+**The suite directory holds only the suite.** A non-empty `--dir` that no earlier run
+scaffolded is refused, and the message lists what is in it. Write run logs elsewhere
+(`.wp-audit/suite.log`, not `.wp-audit/suite/run.log`).
+
+**Before reporting "no browser", look for one.** `node ${CLAUDE_PLUGIN_ROOT}/bin/lib/browsers.mjs chromium`
+prints an existing Chromium (Playwright's caches, then the system one such as `/usr/bin/chromium`).
+Exit `0` with a path means the suite and `bin/ux-probe.mjs` can measure, even when the session has no
+browser tool; the suite uses whatever it finds and nothing is ever installed to change that answer.
+Exit `2` from that lookup, on top of an absent browser tool, is the only "no browser".
 
 **Lighthouse results and the serving layer.** With `local_clone` true the suite never targets the clone (below), so its LCP, FCP, TBT, performance score and byte totals are those of the confirmed public URL; without one they are `UNMEASURED`. Should a run be pointed at a local host anyway, those numbers inherit the clone's serving layer (compression, HTTP version): label them `clone measurement — serving layer differs (…)` as *Clone-safe versus production-only measurement* in `site-context.md` says, and never use them as a baseline or a finding by themselves.
 

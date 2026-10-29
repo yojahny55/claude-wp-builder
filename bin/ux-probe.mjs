@@ -44,10 +44,20 @@
  * out cannot be stopped, only abandoned, so the harness reloads `url` before the next one. Extending that module and rerunning is how a
  * follow-up question is asked — never a new script with its own browser.
  *
+ * Third parties (bin/lib/third-party.cjs, the same allowlist the browser suite uses):
+ *   --block-third-party   abort every request to a host other than --site's (its www twin and
+ *                         loopback) and --allow-hosts. Widgets that answer an automated client
+ *                         with 403, and analytics a clone must not feed, stop perturbing the
+ *                         page being measured.
+ *   --block-hosts <list>  abort requests to these hosts only (`.example.com` = and subdomains).
+ *   --allow-hosts <list>  extra hosts --block-third-party lets through.
+ * The report's `blocked` field counts the requests stopped, per host.
+ *
  * usage:
  *   ux-probe.mjs --site <origin> --pages </a/,/b/> [--out <file.json>] [--probes <module>]
  *                [--viewports mobile,tablet,desktop] [--links-out <file>] [--state <file>]
  *                [--state-reset] [--page-timeout <s>] [--probe-timeout <s>]
+ *                [--block-third-party] [--block-hosts <h1,h2>] [--allow-hosts <h1,h2>]
  *
  * exit 0 = ran (findings and unmeasured items are in the JSON), 2 = usage or no browser,
  * 3 = budget spent (launches or wall clock) — report what you have.
@@ -56,10 +66,12 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { findBrowser } from './lib/browsers.mjs';
+import thirdParty from './lib/third-party.cjs';
 
 const USAGE = 'usage: ux-probe.mjs --site <origin> --pages </a/,/b/> [--out <file.json>] ' +
   '[--probes <module>] [--viewports mobile,tablet,desktop] [--links-out <file>] [--state <file>] ' +
-  '[--state-reset] [--page-timeout <s>] [--probe-timeout <s>]';
+  '[--state-reset] [--page-timeout <s>] [--probe-timeout <s>] ' +
+  '[--block-third-party] [--block-hosts <h1,h2>] [--allow-hosts <h1,h2>]';
 const MAX_LAUNCHES = 3;
 const MAX_ATTEMPTS = 2;
 const WALL_CLOCK_MS = 15 * 60 * 1000;
@@ -106,6 +118,9 @@ function parseArgs(argv) {
       case '--state-reset': o.stateReset = true; break;
       case '--page-timeout': o.pageTimeout = seconds(next(), a); break;
       case '--probe-timeout': o.probeTimeout = seconds(next(), a); break;
+      case '--block-third-party': o.blockThirdParty = true; break;
+      case '--block-hosts': o.blockHosts = thirdParty.parseHosts(next()); break;
+      case '--allow-hosts': o.allowHosts = next(); break;
       case '-h': case '--help': process.stdout.write(USAGE + '\n'); process.exit(0);
       default: usage(`unknown argument ${a}`);
     }
@@ -117,6 +132,12 @@ function parseArgs(argv) {
   for (const v of o.viewports) if (!VIEWPORTS[v]) usage(`unknown viewport ${v}`);
   for (const p of o.pages) { try { new URL(p, o.siteUrl); } catch { usage(`--pages entry is not a URL or path: ${p}`); } }
   o.state = o.state || join(dirname(resolve(o.out)), 'ux-probe-state.json');
+  if (o.blockThirdParty && o.blockHosts) usage('--block-third-party and --block-hosts are exclusive: one blocks all but a list, the other only a list');
+  if (o.blockHosts && !o.blockHosts.length) usage('--block-hosts is empty');
+  if (o.allowHosts && !o.blockThirdParty) usage('--allow-hosts only applies with --block-third-party');
+  o.block = null;
+  if (o.blockThirdParty) o.block = { allow: thirdParty.allowlistFor(o.site, o.allowHosts) };
+  else if (o.blockHosts) o.block = { block: o.blockHosts };
   return o;
 }
 
@@ -316,6 +337,8 @@ async function main() {
   writeState(o, state);
   const report = { site: o.site, launch: state.launches, maxLaunches: MAX_LAUNCHES,
     minutesUsed: Math.round(elapsed / 6000) / 10, complete: false, pages: [], probes: {} };
+  const blocked = {};
+  if (o.block) report.blocked = { mode: o.block.allow ? 'third-party' : 'hosts', list: o.block.allow || o.block.block, hosts: blocked };
   const linkRows = [];
   // The report is written however the run ends -- finished, thrown, or killed by a timeout --
   // so evidence already measured is never lost and an older probe.json never reads as this run.
@@ -345,6 +368,15 @@ async function main() {
   try {
     for (const vp of o.viewports) {
       const context = await browser.newContext({ viewport: VIEWPORTS[vp] });
+      if (o.block) {
+        await context.route('**/*', (route) => {
+          const u = route.request().url();
+          if (!thirdParty.isBlocked(u, o.block)) return route.continue();
+          const h = new URL(u).hostname;
+          blocked[h] = (blocked[h] || 0) + 1;
+          return route.abort('blockedbyclient');
+        });
+      }
       const page = await context.newPage();
       for (const p of o.pages) {
         const url = new URL(p, o.siteUrl).href;

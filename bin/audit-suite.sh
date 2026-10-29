@@ -25,7 +25,28 @@
 # Usage:
 #   bin/audit-suite.sh --url <base-url> [--dir <suite-dir>] [--pages <p1,p2,...>]
 #                      [--only a11y|seo|perf|all] [--site <name>] [--probe]
-#                      [--max-timeouts <n>]
+#                      [--max-timeouts <n>] [--workers <n>] [--timeout <seconds>]
+#                      [--engines chromium[,firefox][,webkit]] [--settle <seconds>]
+#                      [--block-third-party | --no-block-third-party] [--allow-hosts <h1,h2>]
+#
+# Run settings are flags, not edits to the generated playwright.config.js:
+#   --workers     Playwright workers for the DOM and SEO passes (the Lighthouse pass always
+#                 runs with one). Default: the template's 4 locally, 1 against production,
+#                 where more than 1 is refused.
+#   --timeout     per-test timeout in seconds (default: the template's 90).
+#   --engines     which engines run the accessibility pass; chromium is required, because it
+#                 carries every pass. Default chromium,firefox,webkit (each one that exists).
+#   --settle      a page is loaded to `domcontentloaded` and then given at most this long to
+#                 go network-idle (default 5). A page with a video embed or a polling widget
+#                 never goes idle, and waiting for it timed out every page of such a site.
+#   --block-third-party / --no-block-third-party
+#                 block every host but the audited one (its www twin and loopback) and
+#                 --allow-hosts. Default ON against a local host, where analytics, embeds and
+#                 widgets would be real hits on production properties from a clone; OFF
+#                 against production unless passed. `.example.com` in --allow-hosts allows
+#                 a domain and its subdomains.
+# A generated config somebody edited is kept, not overwritten (see "Scaffold" below), but the
+# flags are the supported way: they apply to every run and survive a template update.
 #
 # The audited host is always the one in --url: it reaches the suite as BASE_URL in the
 # environment, and the persistent audit.config.js is never rewritten to hold it. A request to
@@ -54,6 +75,12 @@ pages=""
 only="all"
 site=""
 probe=0
+workers=""
+timeout_s=""
+engines="chromium,firefox,webkit"
+settle_s="5"
+block=""
+allow_hosts=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -63,7 +90,16 @@ while [ $# -gt 0 ]; do
     --only) only="${2:?--only needs a value}"; shift 2 ;;
     --site) site="${2:?--site needs a value}"; shift 2 ;;
     --max-timeouts) max_timeouts="${2:?--max-timeouts needs a value}"; shift 2 ;;
+    --workers) workers="${2:?--workers needs a value}"; shift 2 ;;
+    --timeout) timeout_s="${2:?--timeout needs a value}"; shift 2 ;;
+    --engines) engines="${2:?--engines needs a value}"; shift 2 ;;
+    --settle) settle_s="${2:?--settle needs a value}"; shift 2 ;;
+    --block-third-party) block=1; shift ;;
+    --no-block-third-party) block=0; shift ;;
+    --allow-hosts) allow_hosts="${2:?--allow-hosts needs a value}"; shift 2 ;;
     --probe) probe=1; shift ;;
+    # Not a flag of this script: the engines are --engines. Said here because it was tried.
+    --project|--project=*) echo "audit-suite: there is no --project; choose engines with --engines chromium[,firefox][,webkit]" >&2; exit 1 ;;
     *) echo "unknown argument: $1" >&2; exit 1 ;;
   esac
 done
@@ -71,6 +107,15 @@ done
 case "$only" in a11y|seo|perf|all) : ;; *) echo "--only must be a11y, seo, perf or all" >&2; exit 1 ;; esac
 case "$max_timeouts" in ''|*[!0-9]*|0) echo "--max-timeouts must be a positive integer" >&2; exit 1 ;; esac
 export WP_AUDIT_MAX_TIMEOUTS="$max_timeouts"
+case "$workers" in ''|[1-9]|[1-9][0-9]) : ;; *) echo "--workers must be a positive integer" >&2; exit 1 ;; esac
+case "$timeout_s" in ''|[1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9]) : ;; *) echo "--timeout must be a positive number of seconds" >&2; exit 1 ;; esac
+case "$settle_s" in [0-9]|[1-9][0-9]) : ;; *) echo "--settle must be 0-99 seconds" >&2; exit 1 ;; esac
+engines="$(printf '%s' "$engines" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+IFS=, read -r -a engine_list <<< "$engines"
+for e in "${engine_list[@]}"; do
+  case "$e" in chromium|firefox|webkit) : ;; *) echo "--engines: unknown engine '$e' (chromium, firefox, webkit)" >&2; exit 1 ;; esac
+done
+case ",$engines," in *,chromium,*) : ;; *) echo "--engines must include chromium: it carries every pass, the others only repeat the accessibility pass" >&2; exit 1 ;; esac
 
 # A public host is production, and production runs fail2ban, CrowdSec and ModSecurity. The
 # template's 4 workers mean 4 browsers loading full pages at once, which is about 400
@@ -121,6 +166,24 @@ is_prod=0
 prod_flag=()
 if [ "$manifest_prod" -eq 1 ] || [ ${#pw_args[@]} -gt 0 ]; then is_prod=1; fi
 if [ "$manifest_prod" -eq 1 ]; then pw_args=(--workers=1); prod_flag=(--prod); fi
+
+# --workers replaces the default above, except that production stays at one: the burst of
+# parallel browsers is what got an auditing IP banned, whoever asks for it.
+if [ -n "$workers" ]; then
+  if [ "$is_prod" -eq 1 ] && [ "$workers" -gt 1 ]; then
+    echo "audit-suite: refusing --workers $workers against production host $url_host -- production runs with one worker" >&2
+    exit 1
+  fi
+  pw_args=(--workers="$workers")
+fi
+# --timeout reaches every pass but Lighthouse's, which sets its own per test.
+if [ -n "$timeout_s" ]; then pw_args+=(--timeout="$((timeout_s * 1000))"); fi
+
+# Third parties: blocked by default from a local host, opt-in against production. A run that
+# measures production as visitors get it keeps the third parties unless told otherwise.
+if [ -z "$block" ]; then
+  if [ "$is_prod" -eq 1 ]; then block=0; else block=1; fi
+fi
 
 # ---------------------------------------------------------------------------
 # Probe
@@ -193,21 +256,57 @@ mkdir -p "$dir"
 # project root, a shared parent) would delete real work before anything is copied back, and
 # `${dir:?}` only guards against the variable being empty. So a non-empty directory has to
 # prove it is a previous scaffold before this touches it.
+# The refusal names what it found: the usual cause is a log or a note somebody wrote into the
+# directory before its first run, and "not empty" alone sent a run off to guess which file.
 if [ -n "$(ls -A "$dir" 2>/dev/null || true)" ] && [ ! -f "$dir/VENDORED-FROM.txt" ]; then
+  stray="$(ls -A "$dir" | head -n 10 | sed 's/^/    /')"
+  count="$(ls -A "$dir" | wc -l | tr -d ' ')"
   cat >&2 <<EOF
 audit-suite: $dir is not empty and carries no VENDORED-FROM.txt, so it is not a suite this
-  scaffolded. Refusing: this step removes lib/, tests/, scripts/, regression/, package.json and others by
+  scaffolded. It holds $count entr$([ "$count" = 1 ] && echo y || echo ies)$([ "$count" -gt 10 ] && echo ', the first 10'):
+$stray
+  Refusing: this step removes lib/, tests/, scripts/, regression/, package.json and others by
   name, and those names exist in plenty of directories that are not a suite.
-  Point --dir at an empty directory, or at one a previous run scaffolded.
+  Move those files out (a run log belongs outside the suite directory), or point --dir at an
+  empty directory or at one a previous run scaffolded.
 EOF
   exit 1
 fi
 
+# playwright.config.js, playwright.regression.config.js and global-setup.js are where somebody
+# tunes a run by hand (workers, timeouts, projects), and refreshing them unconditionally
+# discarded those edits at the start of the very run they were made for, without a word. So each one is refreshed only while it
+# is still what the scaffold wrote: .scaffold-sums records the checksum of each as copied, and
+# a file whose checksum no longer matches is kept, with a notice. A scaffold older than that
+# record has no checksum to compare, so a config that differs from the template is kept too:
+# keeping an outdated file is recoverable, discarding an edit is not. Delete a kept file to
+# take the template's again. Everything else is the template's and is always refreshed.
+sums="$dir/.scaffold-sums"
+sum_of() { cksum < "$1" | awk '{print $1}'; }
+recorded_sum() { if [ -f "$sums" ]; then awk -v f="$1" '$2 == f {print $1}' "$sums"; fi; }
+new_sums=""
 for item in lib guard tests scripts regression playwright.config.js playwright.guard.config.js playwright.regression.config.js global-setup.js package.json package-lock.json .gitignore .env.example README.md VENDORED-FROM.txt; do
   [ -e "$template/$item" ] || continue
+  case "$item" in
+    # Not playwright.guard.config.js: it is the plugin's own wrapper (it injects the timeout
+    # guard), so it always takes the template's, or an older scaffold would keep it forever.
+    playwright.config.js|playwright.regression.config.js|global-setup.js)
+      if [ -f "$dir/$item" ] && ! cmp -s "$dir/$item" "$template/$item"; then
+        held="$(recorded_sum "$item")"
+        if [ -z "$held" ] || [ "$held" != "$(sum_of "$dir/$item")" ]; then
+          echo "audit-suite: keeping your edited $dir/$item (the template's is $template/$item; delete yours to take it). Prefer --workers, --timeout, --engines and --block-third-party: they need no edit."
+          # The kept file's record stays as it was (or absent), so it reads as edited next run too.
+          [ -n "$held" ] && new_sums="$new_sums$held $item"$'\n'
+          continue
+        fi
+      fi
+      new_sums="$new_sums$(sum_of "$template/$item") $item"$'\n'
+      ;;
+  esac
   rm -rf "${dir:?}/$item"
   cp -r "$template/$item" "$dir/$item"
 done
+printf '%s' "$new_sums" > "$sums"
 
 if [ ! -f "$dir/audit.config.js" ]; then
   cp "$template/audit.config.js" "$dir/audit.config.js"
@@ -220,7 +319,7 @@ fi
 # only read here (a mismatch is reported), BASE_URL goes out through the environment, and an
 # override line at the end of the config makes it win in every spec that reads audit.baseURL.
 # The page list and site name are still written, as before.
-rm -f "$dir/results/unmeasured.json"
+rm -f "$dir/results/unmeasured.json" "$dir/results/unmeasured-pages.json"
 export BASE_URL="$url"
 if ! BASE_URL="$url" PAGES="$pages" SITE="$site" node - "$dir/audit.config.js" <<'NODE'
 const fs = require('fs');
@@ -438,6 +537,17 @@ case "${NODE_OPTIONS:-}" in
 esac
 echo "audit-suite: chromium $chromium_exe"
 
+# The run settings the preload applies inside the vendored files (bin/lib/pw-executables.cjs).
+export WP_AUDIT_SETTLE_MS="$((settle_s * 1000))"
+if [ "$block" = 1 ]; then
+  export WP_AUDIT_BLOCK_THIRD_PARTY=1 WP_AUDIT_ALLOW_HOSTS="$allow_hosts"
+  allowed="$(node -e 'const t=require(process.argv[1]);console.log(t.allowlistFor(process.argv[2],process.argv[3]).join(", "))' "$here/bin/lib/third-party.cjs" "$url" "$allow_hosts")"
+  echo "audit-suite: third-party hosts blocked; allowed: $allowed"
+else
+  export WP_AUDIT_BLOCK_THIRD_PARTY=0
+  echo "audit-suite: third-party hosts are NOT blocked (pass --block-third-party to block them)"
+fi
+
 # ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
@@ -457,7 +567,11 @@ check_abort() {
 run_pass() {
   check_abort && return 0
   echo "audit-suite: $1"
-  (cd "$dir" && npm run --silent "$2" -- ${pw_args[@]+"${pw_args[@]}"}) || status=1
+  local args=(${pw_args[@]+"${pw_args[@]}"})
+  # The Lighthouse pass keeps its own --workers=1 (npm takes the last value given, so a
+  # --workers here would override it) and sets its own per-test timeout.
+  if [ "$2" = test:perf ]; then args=(); fi
+  (cd "$dir" && npm run --silent "$2" -- ${args[@]+"${args[@]}"}) || status=1
   check_abort || true
 }
 
@@ -468,6 +582,7 @@ run_pass() {
 cross_browser() {
   for engine in firefox webkit; do
     check_abort && return 0
+    case ",$engines," in *,"$engine",*) : ;; *) echo "audit-suite: $engine pass not requested (--engines $engines)"; continue ;; esac
     exe_var="${engine}_exe"
     if [ -z "${!exe_var}" ]; then
       echo "audit-suite: no existing $engine build found -- $engine pass skipped (nothing is downloaded)"

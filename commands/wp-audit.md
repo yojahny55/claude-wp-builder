@@ -93,7 +93,7 @@ and every run drives a real browser against a public site, which is the operator
 
 ## Step 1.5: Recognize a re-audit
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/re-audit.md` now and follow it — it is this step, not background. It covers detecting a prior run (`audit.last_run`, the findings ledger, the dated sidecar), printing `Re-audit of <date>`, the single reuse prompt for the stored `audit.last_answers`, scoped mode, and how the run and its report are labelled. When it asked its one reuse question, the report-only and suite questions below are not asked again.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/re-audit.md` now and follow it — it is this step, not background. It covers prior-run detection, the single reuse prompt, scoped mode and run labelling. When it asked its one reuse question, the report-only and suite questions below are not asked again.
 
 ## Step 2: Read Project Context
 
@@ -216,11 +216,11 @@ It covers the code scope (editable and read-only), and what adoption changes in 
 
 ## Step 2.3: Site type and local clone
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/site-context.md` now and follow it — it is this step, not background. It covers store detection, store tier, the local-clone rules, the public-URL question, the clone health preflight (internal URLs must answer 200 before any agent runs), clone-safe versus production-only checks, and the live mail transport finding.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/site-context.md` now and follow it — it is this step, not background. It covers store detection and tier, the local-clone rules, the public-URL question, the clone health preflight, clone-safe versus production-only checks and the live mail transport finding.
 
 ## Step 2.5: Reconcile the Manifest
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/manifest-reconcile.md` now and follow it — it is this step, not background. It covers sub-steps 2.5a to 2.5e: schema version, measuring the stack, missing recorded decisions, the category coverage matrix, freshness and carry-over.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/manifest-reconcile.md` now and follow it — it is this step, not background. It covers sub-steps 2.5a to 2.5e: schema version, stack measurement, recorded decisions, the coverage matrix, freshness and carry-over.
 
 ## Step 2.7: Fix the page scope
 
@@ -258,6 +258,10 @@ ${CLAUDE_PLUGIN_ROOT}/bin/audit-suite.sh --probe
 Exit `0` means it can run, `2` means this machine has no Node or npm and Tier 3 stays
 unmeasured — which is a skip, not a failure, and is reported as `UNMEASURED` exactly like
 an absent browser tool.
+
+**No session browser tool is not no browser.** Before printing
+`no browser tool available`, run `node ${CLAUDE_PLUGIN_ROOT}/bin/lib/browsers.mjs chromium`:
+only its exit `2` is a missing browser (`browser-suite.md`).
 
 The criteria themselves — budgets, Core Web Vitals thresholds, the WCAG 2.2 additions, the
 HTML5 cross-check — live in the audit agents and in `wp-audit-standards`, and every check

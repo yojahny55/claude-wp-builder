@@ -133,6 +133,10 @@ node ${CLAUDE_PLUGIN_ROOT}/bin/ux-probe.mjs --site "<site-url>" --pages "/,/cont
   array of `{ id, criterion, viewports?, run }`; `run({ page, url, path, viewport })`
   returns what it measured. A follow-up question adds a probe to that module and reruns the
   harness; it is never a new one-off script with its own browser launch.
+- **Third parties: `--block-third-party`** (with `--allow-hosts` for the site's own CDN) when
+  auditing a local clone, so widgets that answer an automated client with `403` and analytics a
+  clone must not feed stay out of the measurement; `--block-hosts <h1,h2>` blocks only the
+  listed hosts. The JSON's `blocked` field counts what was stopped, per host.
 - **Exit `3` means the budget is spent.** Report what the JSON already holds, and mark
   everything else `UNMEASURED (budget)`. Do not work around it with a browser of your own.
 - The state file lives beside `--out`. One started over an hour ago belongs to an earlier
