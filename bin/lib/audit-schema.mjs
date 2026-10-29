@@ -117,19 +117,20 @@ export function normalizeEntry(raw) {
   const notes = [];
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { entry: raw, notes };
   const entry = { ...raw };
-  for (const canonical of Object.keys(KEY_ALIASES)) {
-    if (entry[canonical] === undefined) {
-      for (const alias of KEY_ALIASES[canonical]) {
-        if (entry[alias] !== undefined) { entry[canonical] = entry[alias]; notes.push(`${alias} -> ${canonical}`); break; }
-      }
-    }
-    for (const alias of KEY_ALIASES[canonical]) delete entry[alias];
-  }
-  // `Fix: auto|manual` (the dispatch line) and `fix: true` mean auto_fixable, not the fix text.
+  // `Fix: auto|manual` (the dispatch line) and `fix: true` mean auto_fixable, not the fix text;
+  // convert first so `method` / `remediation` can then supply the text.
   if (entry.fix === true || entry.fix === false || /^(auto|manual)$/i.test(String(entry.fix ?? ''))) {
     if (entry.auto_fixable === undefined) entry.auto_fixable = entry.fix === true || /^auto$/i.test(String(entry.fix));
     notes.push('fix (auto|manual|boolean) -> auto_fixable');
     delete entry.fix;
+  }
+  // An alias is consumed only when it fills a missing canonical key; otherwise it is left as
+  // it came, so a run file that carries both keeps what it always carried.
+  for (const canonical of Object.keys(KEY_ALIASES)) {
+    if (entry[canonical] !== undefined) continue;
+    for (const alias of KEY_ALIASES[canonical]) {
+      if (entry[alias] !== undefined) { entry[canonical] = entry[alias]; delete entry[alias]; notes.push(`${alias} -> ${canonical}`); break; }
+    }
   }
   if (typeof entry.check === 'string') entry.check = entry.check.trim();
   if (typeof entry.severity === 'string') {

@@ -77,6 +77,7 @@ node "$rep" --run "$t/run.json" --agents "$t/agents" --out "$t/o" --lang en --fo
 grep -Fq 'SEC-002' "$t/o/informe-2026-01-02.md" || fail "aliased finding missing from the report"
 node -e "const j=JSON.parse(require('fs').readFileSync('$t/o/informe-2026-01-02.json','utf8'));const f=j.findings[0];if(f.check!=='SEC-002'||f.ownership!=='code'||f.severity!=='WARNING')process.exit(1)" \
   || fail "aliases were not translated to the canonical keys"
+grep -Fq 'use prepare' "$t/o/informe-2026-01-02.md" || fail "method was lost when fix: auto was converted to auto_fixable"
 cat > "$t/agents/a.json" <<'J'
 {"category":"security","findings":[{"check":"SEC-9999","severity":"WARNING","ownership":"code","message":"x"}]}
 J
