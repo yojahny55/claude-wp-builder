@@ -82,8 +82,9 @@ scaffolded is refused, and the message lists what is in it. Write run logs elsew
 
 **Before reporting "no browser", look for one.** `node ${CLAUDE_PLUGIN_ROOT}/bin/lib/browsers.mjs chromium`
 prints an existing Chromium (Playwright's caches, then the system one such as `/usr/bin/chromium`).
-The suite uses whatever it finds and never downloads one; exit `2` from that lookup is the only
-"no browser".
+Exit `0` with a path means the suite and `bin/ux-probe.mjs` can measure, even when the session has no
+browser tool; the suite uses whatever it finds and nothing is ever installed to change that answer.
+Exit `2` from that lookup, on top of an absent browser tool, is the only "no browser".
 
 **Lighthouse results and the serving layer.** With `local_clone` true the suite never targets the clone (below), so its LCP, FCP, TBT, performance score and byte totals are those of the confirmed public URL; without one they are `UNMEASURED`. Should a run be pointed at a local host anyway, those numbers inherit the clone's serving layer (compression, HTTP version): label them `clone measurement — serving layer differs (…)` as *Clone-safe versus production-only measurement* in `site-context.md` says, and never use them as a baseline or a finding by themselves.
 
