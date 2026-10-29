@@ -1,0 +1,32 @@
+# WordPress site tracked in place (core included). Merged into the site's .gitignore by
+# `wp-config.mjs git-init`; existing lines are kept and never duplicated.
+
+# Secrets and per-environment configuration (unanchored, so nested backups are caught too). wp-config.php carries database credentials and salts.
+wp-config*
+.env
+.env.*
+
+# .htaccess and .user.ini differ per server (rewrite rules, PHP limits, sometimes basic-auth
+# paths) and WordPress rewrites .htaccess itself on a permalink save: tracking them makes every
+# environment fight over the file. Remove these two lines to version them on purpose.
+.htaccess
+.user.ini
+
+# User content: large, not source, and synced by other means.
+/wp-content/uploads/
+
+# Caches, upgrade scratch space, backups and maintenance output.
+/wp-content/cache/
+/wp-content/upgrade/
+/wp-content/ai1wm-backups/
+/wp-content/backups*/
+/wp-content/maintenance/
+/wp-content/advanced-cache.php
+/wp-content/object-cache.php
+/wp-content/debug.log
+
+# Dumps, archives and logs.
+*.sql
+*.sql.gz
+*.zip
+*.log

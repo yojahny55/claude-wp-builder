@@ -22,6 +22,9 @@ the agents measure against. Each domain's own check catalog lives in its agent, 
   inline-critical-CSS experiment with its numbers, WebP and right-sizing for images a theme
   prints from raw field URLs, and the AIOS × CF7 REST interaction. Read when filing or
   fixing a `PERF-xxx` finding from a Lighthouse run.
+- [references/builder-elementor.md](references/builder-elementor.md) — where an Elementor fix
+  belongs (widget data or child theme), the post-edit steps, widget false positives and the
+  measurement rule. Read only when `stack.builder` is `elementor`.
 - Check procedures moved out of two agents, each read on demand when the agent's index sends
   you there (the agents keep the check tables):
   - [references/perf-procedures-cache-and-render.md](references/perf-procedures-cache-and-render.md) —
@@ -41,6 +44,8 @@ the agents measure against. Each domain's own check catalog lives in its agent, 
     `wp-audit-security`: SEC-036 to SEC-039.
   - [references/sec-procedures-gateway-credentials.md](references/sec-procedures-gateway-credentials.md) —
     `wp-audit-security`: SEC-040.
+  - [references/sec-procedures-mcp-endpoints.md](references/sec-procedures-mcp-endpoints.md) —
+    `wp-audit-security`: SEC-046.
   - [references/sec-procedures-vulnerability-feed.md](references/sec-procedures-vulnerability-feed.md) —
     `wp-audit-security`: SEC-041, SEC-042.
 

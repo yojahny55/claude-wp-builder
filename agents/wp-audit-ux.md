@@ -58,7 +58,9 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
   the stack already owns.
 - **Page-builder markup lives in the database.** When `stack.builder` is not `none`, a
   defect in markup the builder stores per page is `Owner: content` (fixed in the builder's
-  editor), not `code`.
+  editor), not `code`. When `stack.builder` is `elementor`, also read
+  `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-standards/references/builder-elementor.md` (known
+  widget false positives and where each fix belongs); with another builder, do not.
 - **Design impact is declared on every finding.** `design_impact` (`Design impact:` in the text
   report) is `true` when the fix could change how the site renders: a colour, font, size,
   spacing, an asset's dimensions, a new or changed CSS rule, or a tag or class swap. It is
