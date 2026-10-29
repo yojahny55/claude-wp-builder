@@ -23,6 +23,8 @@ problem: a push writes it into production, where it becomes a logo that 404s, an
 `url` that points at a machine nobody outside the office can reach, a menu item that leaves
 the site, or a schema graph that identifies the business by a hostname that does not resolve.
 
+**On a local clone this check is a pre-deploy gate (`INFO`, listed as a push blocker, `siteurl`/`home` not counted); see `/wp-audit` Step 2.3, "Local clone — severity ceiling".**
+
 **Search four tables, not one.** `wp_options` is where this check started and it is the table
 that holds the least of it. A first pass that read only `wp_options` on a real site reported
 7 occurrences; the same needle across all four tables reported 25. The three it skipped are
@@ -32,7 +34,7 @@ the ones that reach the page:
 |-------|---------------------------|---------------------------|
 | `options` | plugin option arrays, the SEO plugin's social and schema values | rendered into `<head>` on every request |
 | `postmeta` | custom-field URLs, builder payloads, `_menu_item_url` of `custom` menu items | a menu item that points at the dev host is a link off the live site |
-| `posts` | `post_content` and `guid` — an editor pasted an absolute URL | printed inside the article body |
+| `posts` | `post_content` only — an editor pasted an absolute URL. `guid` is never searched: WordPress does not rewrite it and nothing renders it | printed inside the article body |
 | `termmeta` | term images and per-term link fields | printed on archive pages |
 
 Derive the needle from `home` rather than hard-coding it, and query every table in one pass:
@@ -46,7 +48,7 @@ global \$wpdb;
 \$queries = array(
     'options'  => array(\"SELECT option_name AS id, option_name AS label FROM \$wpdb->options WHERE option_value LIKE %s AND option_name NOT IN ('home','siteurl')\"),
     'postmeta' => array(\"SELECT post_id AS id, meta_key AS label FROM \$wpdb->postmeta WHERE meta_value LIKE %s\"),
-    'posts'    => array(\"SELECT ID AS id, post_type AS label FROM \$wpdb->posts WHERE post_content LIKE %s OR guid LIKE %s\"),
+    'posts'    => array(\"SELECT ID AS id, post_type AS label FROM \$wpdb->posts WHERE post_content LIKE %s\"),
     'termmeta' => array(\"SELECT term_id AS id, meta_key AS label FROM \$wpdb->termmeta WHERE meta_value LIKE %s\"),
 );
 
@@ -67,8 +69,8 @@ the local site work. Every other row is. Report the count per table and then eac
 reader can tell an option array from a menu item from an editor's paste; the SEO plugin's own
 options and `_menu_item_url` are the ones that reach production markup, so name those first.
 
-A `guid` is a historical identifier WordPress does not resolve as a URL, so a `guid`-only hit
-is WARNING rather than CRITICAL. Say which column matched instead of merging the two.
+A `guid` is a historical identifier WordPress never rewrites and does not resolve as a URL, so
+it is not searched and not counted, on a clone or anywhere else.
 
 `skills/wp-cli-patterns/scripts/check-dev-host.php` runs exactly this sweep, read-only, and
 exits 1 when it finds anything, so the same measurement can gate a deploy without an agent.
