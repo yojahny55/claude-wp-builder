@@ -51,6 +51,12 @@ assert.ok(/slow page/.test(slow[0].reason) && /HTTP 200 in 800 ms/.test(slow[0].
 sg.onTestEnd({ id: 'p0', title: 'page 0' }, { status: 'passed' });
 assert.strictEqual(JSON.parse(fs.readFileSync(slowPages, 'utf8')).length, 4, 'a passing retry clears its entry');
 
+// A second pass is a new guard on the same file: it keeps what the first pass recorded.
+const sg2 = new Guard({ max: 2, out: slowOut, pagesOut: slowPages, baseURL: 'https://host.example/',
+  probe: () => ({ status: 200, ms: 5 }), interrupt: () => {} });
+sg2.onTestEnd({ titlePath: () => ['', 'firefox', 'audit.spec.js', 'x'], title: 'x' }, { status: 'timedOut' });
+assert.strictEqual(JSON.parse(fs.readFileSync(slowPages, 'utf8')).length, 5, 'a later pass dropped an earlier pass\'s pages');
+
 // A host that refuses (no answer, or 403/429/503) still counts and trips.
 for (const probe of [{ error: 'UND_ERR_CONNECT_TIMEOUT', ms: 5000 }, { status: 429, ms: 40 }]) {
   let n = 0;

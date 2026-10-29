@@ -273,9 +273,9 @@ EOF
   exit 1
 fi
 
-# The Playwright configs and global-setup.js are where somebody tunes a run by hand (workers,
-# timeouts, projects), and refreshing them unconditionally discarded those edits at the start
-# of the very run they were made for, without a word. So each one is refreshed only while it
+# playwright.config.js, playwright.regression.config.js and global-setup.js are where somebody
+# tunes a run by hand (workers, timeouts, projects), and refreshing them unconditionally
+# discarded those edits at the start of the very run they were made for, without a word. So each one is refreshed only while it
 # is still what the scaffold wrote: .scaffold-sums records the checksum of each as copied, and
 # a file whose checksum no longer matches is kept, with a notice. A scaffold older than that
 # record has no checksum to compare, so a config that differs from the template is kept too:
@@ -288,7 +288,9 @@ new_sums=""
 for item in lib guard tests scripts regression playwright.config.js playwright.guard.config.js playwright.regression.config.js global-setup.js package.json package-lock.json .gitignore .env.example README.md VENDORED-FROM.txt; do
   [ -e "$template/$item" ] || continue
   case "$item" in
-    playwright.config.js|playwright.guard.config.js|playwright.regression.config.js|global-setup.js)
+    # Not playwright.guard.config.js: it is the plugin's own wrapper (it injects the timeout
+    # guard), so it always takes the template's, or an older scaffold would keep it forever.
+    playwright.config.js|playwright.regression.config.js|global-setup.js)
       if [ -f "$dir/$item" ] && ! cmp -s "$dir/$item" "$template/$item"; then
         held="$(recorded_sum "$item")"
         if [ -z "$held" ] || [ "$held" != "$(sum_of "$dir/$item")" ]; then

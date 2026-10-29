@@ -136,9 +136,12 @@ rm "$cfg"
 suite_run --url http://site.localhost/ --dir "$tmp/s" > /dev/null 2>&1 || true
 cmp -s "$cfg" "$suite/playwright.config.js" || fail "deleting the kept config did not restore the template's"
 # A scaffold from before the checksum record: a config that differs from the template is kept.
-rm "$tmp/s/.scaffold-sums"; echo '// older edit' >> "$tmp/s/playwright.guard.config.js"
+rm "$tmp/s/.scaffold-sums"; echo '// older edit' >> "$tmp/s/global-setup.js"
+echo '// stale wrapper' >> "$tmp/s/playwright.guard.config.js"
 suite_run --url http://site.localhost/ --dir "$tmp/s" > /dev/null 2>&1 || true
-grep -Fq 'older edit' "$tmp/s/playwright.guard.config.js" || fail "an edit in a scaffold without .scaffold-sums was discarded"
+grep -Fq 'older edit' "$tmp/s/global-setup.js" || fail "an edit in a scaffold without .scaffold-sums was discarded"
+# The plugin's own guard wrapper is always refreshed: an old copy would never get its fixes.
+cmp -s "$tmp/s/playwright.guard.config.js" "$suite/playwright.guard.config.js" || fail "a stale playwright.guard.config.js was kept"
 
 # ---------------------------------------------------------------------------
 # 4. Real browser: the preload's settle and block, and ux-probe's --block-* flags

@@ -85,15 +85,23 @@ class TimeoutGuard {
     const probeMs = Number.parseInt(process.env.WP_AUDIT_PROBE_MS || '', 10);
     this.probeMs = probeMs > 0 ? probeMs : 5000;
     this.probe = options.probe || ((url) => probeHost(url, this.probeMs));
+    // Each pass is its own `playwright test` process with its own guard, all writing one file,
+    // so a guard starts from what the earlier passes recorded instead of overwriting it.
+    // bin/audit-suite.sh deletes the file once, before the first pass.
     this.pages = {};
+    try {
+      for (const e of JSON.parse(fs.readFileSync(this.pagesOut, 'utf8'))) if (e && e.key) this.pages[e.key] = e;
+    } catch { /* absent or unreadable: start empty */ }
   }
 
   printsToStdio() { return false; }
 
   record(test, result, reason) {
     const titlePath = typeof test.titlePath === 'function' ? test.titlePath() : [];
-    const key = test.id || titlePath.join(' > ') || test.title;
-    if (reason) this.pages[key] = { page: test.title, project: titlePath[1] || '', reason };
+    // The title path carries the project, so the key is unique across passes; a test id is
+    // unique only inside one run.
+    const key = titlePath.length ? titlePath.join(' > ') : (test.id || test.title);
+    if (reason) this.pages[key] = { key, page: test.title, project: titlePath[1] || '', reason };
     else if (!(key in this.pages)) return;
     else delete this.pages[key];
     fs.mkdirSync(path.dirname(this.pagesOut), { recursive: true });
