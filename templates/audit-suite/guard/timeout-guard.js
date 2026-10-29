@@ -51,7 +51,10 @@ fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(Number(ms)) })
   });
 `;
 function probeHost(url, ms) {
-  const r = spawnSync(process.execPath, ['-e', PROBE_SCRIPT, url, String(ms)], { encoding: 'utf8', timeout: ms + 3000 });
+  // Without the suite's NODE_OPTIONS: the probe is a bare fetch and needs no Playwright patch.
+  const env = Object.assign({}, process.env);
+  delete env.NODE_OPTIONS;
+  const r = spawnSync(process.execPath, ['-e', PROBE_SCRIPT, url, String(ms)], { encoding: 'utf8', timeout: ms + 3000, env });
   try { return JSON.parse(String(r.stdout || '').trim().split('\n').pop()); } catch { return { error: 'probe failed', ms }; }
 }
 const TLS_ANSWER = /CERT|SELF_SIGNED|UNABLE_TO_VERIFY|ERR_TLS|ERR_SSL/i;

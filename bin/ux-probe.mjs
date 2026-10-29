@@ -135,8 +135,9 @@ function parseArgs(argv) {
   if (o.blockThirdParty && o.blockHosts) usage('--block-third-party and --block-hosts are exclusive: one blocks all but a list, the other only a list');
   if (o.blockHosts && !o.blockHosts.length) usage('--block-hosts is empty');
   if (o.allowHosts && !o.blockThirdParty) usage('--allow-hosts only applies with --block-third-party');
-  o.block = o.blockThirdParty ? { allow: thirdParty.allowlistFor(o.site, o.allowHosts) }
-    : o.blockHosts ? { block: o.blockHosts } : null;
+  o.block = null;
+  if (o.blockThirdParty) o.block = { allow: thirdParty.allowlistFor(o.site, o.allowHosts) };
+  else if (o.blockHosts) o.block = { block: o.blockHosts };
   return o;
 }
 

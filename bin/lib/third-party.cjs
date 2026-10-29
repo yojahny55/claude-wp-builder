@@ -118,6 +118,18 @@ function withDefaults(defaults, options) {
   return opts;
 }
 
+// Why applyToLaunch would leave this engine unblocked, or null when it applies the block.
+// A proxy cannot be chained and Chromium keeps only one resolver switch, so the caller's
+// setting wins; the launcher says so instead of letting third-party requests through unseen.
+function blockSkipped(engine, options) {
+  const opts = options || {};
+  if (engine === 'chromium') {
+    const args = Array.isArray(opts.args) ? opts.args : [];
+    return args.some((a) => String(a).startsWith('--host-resolver-rules')) ? 'the launch args already carry --host-resolver-rules' : null;
+  }
+  return opts.proxy ? `the launch options already set a proxy (${opts.proxy.server || 'no server'})` : null;
+}
+
 function applyToLaunch(engine, options, allow) {
   const opts = Object.assign({}, options || {});
   if (engine === 'chromium') {
@@ -130,4 +142,4 @@ function applyToLaunch(engine, options, allow) {
   return opts;
 }
 
-module.exports = { hostOf, parseHosts, allowlistFor, isBlocked, chromiumArgs, launchProxy, applyToLaunch, withDefaults, DEAD_PROXY };
+module.exports = { hostOf, parseHosts, allowlistFor, isBlocked, chromiumArgs, launchProxy, applyToLaunch, withDefaults, blockSkipped, DEAD_PROXY };

@@ -95,6 +95,7 @@ try {
   const entry = require.resolve('@playwright/test', { paths: [process.cwd()] });
   const pw = require(entry);
   const proto = Object.getPrototypeOf(pw.chromium);
+  const warned = new Set();
   for (const method of ['launch', 'launchPersistentContext', 'launchServer']) {
     const original = proto[method];
     if (typeof original !== 'function' || original.__wpAuditPatched) continue;
@@ -104,7 +105,17 @@ try {
       const opts = Object.assign({}, args[i] || {});
       if (!opts.executablePath && exe[name]) opts.executablePath = exe[name];
       const defaults = (this._playwright && this._playwright._defaultLaunchOptions) || {};
-      args[i] = block ? thirdParty.applyToLaunch(name, thirdParty.withDefaults(defaults, opts), block) : opts;
+      if (block) {
+        const merged = thirdParty.withDefaults(defaults, opts);
+        const skipped = thirdParty.blockSkipped(name, merged);
+        if (skipped && !warned.has(name)) {
+          warned.add(name);
+          process.stderr.write(`wp-audit: third-party block is off for ${name}: ${skipped}\n`);
+        }
+        args[i] = thirdParty.applyToLaunch(name, merged, block);
+      } else {
+        args[i] = opts;
+      }
       const result = original.apply(this, args);
       if (!settleMs || !result || typeof result.then !== 'function') return result;
       return result.then((handle) => { patchHandle(handle, method); return handle; });

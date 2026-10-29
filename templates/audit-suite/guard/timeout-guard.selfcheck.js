@@ -79,7 +79,11 @@ assert.ok(/page closed/.test(JSON.parse(fs.readFileSync(closedPages, 'utf8'))[0]
 // The real probe, against a server in another process (spawnSync blocks this one's loop).
 const { spawn } = require('child_process');
 const child = spawn(process.execPath, ['-e', "const s=require('http').createServer((q,r)=>r.end('ok')).listen(0,'127.0.0.1',()=>console.log(s.address().port))"]);
+// A server that never starts fails the check instead of hanging it.
+const watchdog = setTimeout(() => { child.kill(); console.error('FAIL: the probe server did not start'); process.exit(1); }, 10000);
+child.on('error', (e) => { clearTimeout(watchdog); console.error(`FAIL: the probe server did not start: ${e.message}`); process.exit(1); });
 child.stdout.once('data', (d) => {
+  clearTimeout(watchdog);
   const answered = Guard.probeHost(`http://127.0.0.1:${String(d).trim()}/`, 3000);
   child.kill();
   assert.strictEqual(answered.status, 200, JSON.stringify(answered));
