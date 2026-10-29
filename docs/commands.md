@@ -503,6 +503,13 @@ no WP-CLI; `content` needs a person to write a text; `manual` needs judgment or 
 tool. `--report-lang` picks the language of the document, since a client reads it and not
 the person who ran the audit.
 
+Every fix the run applies is appended to `replay.json` in the report directory as it lands,
+typed by how it reaches production (code, option, post meta, wp-config, server rule,
+post-deploy step). `bin/audit-runbook.mjs` renders that record as `runbook-<date>.md`: the
+production steps in the order they run, WP-CLI rewritten to the production URL, and every
+`.htaccess` fix and PHP-served endpoint given its nginx rule beside the Apache one, marked
+not applied, because a production nginx never reads `.htaccess`.
+
 `--geo` audits Generative Engine Optimization and AI-agent readiness. It detects the site
 type first — content, local business, merchant or SaaS — and gates each check on that, so a
 shop's payments codes and a SaaS's API codes are reported `N/A` rather than failed. The

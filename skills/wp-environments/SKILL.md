@@ -236,6 +236,13 @@ production:
 
 - `role` is `local`, `staging` or `prod`. `sync` is optional; `tool` is `envsync` and
   `transport` is `http` or `https` (`http` needs `allow_http: true`, said on purpose).
+- `server` (optional) is that environment's web server: `nginx`, `apache`, `litespeed`,
+  `caddy` or `unknown`. `page_cache` (optional) names its page cache (`fastcgi-cache`,
+  `litespeed-cache`, `none`). The local `environment.web_server` says nothing about
+  production, and `/wp-audit`'s production runbook reads these two to decide whether an
+  `.htaccess` fix needs an nginx rule and which cache to purge. Set them with `env-set …
+  --server=nginx --page-cache=fastcgi-cache`; `env-set` rewrites the whole entry, so repeat
+  every flag.
 - **No token in the manifest.** `validate` refuses any credential-looking key. The sync token
   goes in the gitignored `.wp-create.local.json`, typed by the operator into the file, never
   pasted in the chat; confirm with `git check-ignore .wp-create.local.json` before and after.

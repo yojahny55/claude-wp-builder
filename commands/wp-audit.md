@@ -476,6 +476,9 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/deliverable.md` now a
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/fix.md` now and follow it — it is this step, not background. It covers the report-only exit, the fix offer, and the rules each fix follows.
 
+Finish with `bin/audit-runbook.mjs`. For a web-server rule or a PHP-served URL, read
+`${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/server-rules.md` now and follow it.
+
 ## Step 10: Update Manifest
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/manifest-update.md` now and follow it — it is this step, not background. It covers the audit block written back to .wp-create.json.

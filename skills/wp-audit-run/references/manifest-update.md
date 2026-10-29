@@ -131,6 +131,7 @@ Report: .wp-audit/informe-<AAAA-MM-DD>.md
 
 Repeat on staging and production (settings do not travel with the commit):
   1. <the setting fix, as the command that applied it>
+Runbook: <out>/runbook-<AAAA-MM-DD>.md  (ordered production steps, from <out>/replay.json)
 
 Manual issues:
   1. [SEC-002] SQL injection in custom-query.php:45 — use $wpdb->prepare()
