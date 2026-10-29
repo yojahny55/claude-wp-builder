@@ -55,6 +55,12 @@ write the measured value:
   tier 3      RE-PROBED  now available (was false)
 ```
 
+A drift that is only the plugin list (`plugins.installed`, or a deleted plugin's path still in
+`code_scope`) is refreshed by `wp-config.mjs refresh` without a question and reported as
+`Manifest refreshed: <lines>` (see `commands/wp-audit.md`, Step 2); only a theme or code-scope
+change is put to the operator. A plugin kept off on purpose is recorded with
+`wp-config.mjs keep-inactive` and is not drift.
+
 Drift is reported, never silently corrected: a manifest that claimed Yoast while the site
 ran Rank Math sent every SEO check at the wrong plugin, and the run that discovers this
 should say so out loud. A wrong `web_server` sends cache-purge and `.htaccess`-versus-nginx
