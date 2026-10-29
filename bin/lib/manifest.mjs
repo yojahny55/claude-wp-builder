@@ -337,6 +337,7 @@ export function validateManifest(manifest) {
 }
 
 export const ENV_ROLES = ['local', 'staging', 'prod'];
+export const ENV_SERVERS = ['nginx', 'apache', 'litespeed', 'caddy', 'unknown'];
 
 // Named remote environments: which one is production is a recorded fact, so the prod gates of
 // /wp-update, /wp-clone and /wp-audit read `role` instead of guessing from a URL. The sync
@@ -367,9 +368,17 @@ export function validateEnvironments(envs) {
     for (const key of Object.keys(env)) {
       if (/token|secret|password|key/i.test(key)) {
         problems.push(`${at_}.${key} looks like a credential: keep it in the gitignored local file, never in the manifest`);
-      } else if (!['role', 'url', 'sync'].includes(key)) {
+      } else if (!['role', 'url', 'sync', 'server', 'page_cache'].includes(key)) {
         problems.push(`${at_} has an unknown key: ${key}`);
       }
+    }
+    // The server and page cache of that environment: the production runbook prints nginx
+    // rules and the purge step from them, because a local Apache says nothing about either.
+    if (env.server !== undefined && !ENV_SERVERS.includes(env.server)) {
+      problems.push(`${at_}.server must be one of ${ENV_SERVERS.join(', ')}, found ${JSON.stringify(env.server)}`);
+    }
+    if (env.page_cache !== undefined && (typeof env.page_cache !== 'string' || !/^[a-z0-9][a-z0-9._-]*$/i.test(env.page_cache))) {
+      problems.push(`${at_}.page_cache must be a cache name such as fastcgi-cache or none, found ${JSON.stringify(env.page_cache)}`);
     }
     const sync = env.sync;
     if (sync === undefined) continue;

@@ -763,7 +763,7 @@ function cmdEnvSet(projectPath, flags) {
   const { file, manifest } = loadManifest(projectPath);
   const name = flags.name;
   if (typeof name !== 'string' || !/^[a-z0-9][a-z0-9_-]*$/i.test(name)) {
-    warn('usage: wp-config.mjs env-set <project-path> --name=<env> --role=local|staging|prod --url=<url> [--sync=envsync --transport=http|https [--allow-http]]');
+    warn('usage: wp-config.mjs env-set <project-path> --name=<env> --role=local|staging|prod --url=<url> [--server=nginx|apache|litespeed|caddy|unknown] [--page-cache=<name>] [--sync=envsync --transport=http|https [--allow-http]]');
     process.exit(1);
   }
   if (flags.sync !== undefined && flags.transport !== 'http' && flags.transport !== 'https') {
@@ -783,6 +783,8 @@ function cmdEnvSet(projectPath, flags) {
     process.exit(1);
   }
   const env = { role: flags.role, url: flags.url };
+  if (flags.server !== undefined) env.server = flags.server;
+  if (flags['page-cache'] !== undefined) env.page_cache = flags['page-cache'];
   if (flags.sync !== undefined) {
     env.sync = { tool: flags.sync, transport: flags.transport };
     if (flags['allow-http']) env.sync.allow_http = true;

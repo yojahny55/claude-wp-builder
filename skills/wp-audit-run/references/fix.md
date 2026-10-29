@@ -12,6 +12,8 @@
 - Counting fixes by owner, and the settings to repeat on staging and production
 - Git hygiene for any phase that edits: clean tree, path-scoped commits, mass deletions
 - Counting fixes by owner, the replay log, and backups for bulk database fixes
+- Production on nginx: an `.htaccess` fix is not a production fix
+- The production runbook, rendered from the replay log
 
 If `--report-only` was set, print:
 ```
@@ -143,7 +145,12 @@ failed fix: revert it and report it. Additionally:
 
 The categories:
 
-**Security fixes:** Dispatch an agent with `subagent_type: wp-audit-aios` with the security level context and the list of security issues to fix. Also apply direct fixes where applicable (wp-config constants via `$WP config set`, .htaccess hardening edits).
+**Every fix below is recorded as it lands.** Each fix agent's prompt says to append its entry
+to `<out>/replay.json` (*The replay log*, below) before it starts the next fix, with the
+`kind` that says how the fix reaches production. A theme file is recorded too, as `kind:
+code`: the runbook needs it to check the commit and the theme activation.
+
+**Security fixes:** Dispatch an agent with `subagent_type: wp-audit-aios` with the security level context and the list of security issues to fix. Also apply direct fixes where applicable (wp-config constants via `$WP config set`, recorded as `kind: wp-config`, and .htaccess hardening edits, recorded as `kind: server` under the nginx rule below).
 
 **SEO fixes:** Dispatch an agent with `subagent_type: wp-audit-rankmath` with the full project context and the list of SEO issues to fix. Also apply direct fixes where applicable (remove hardcoded meta tags, add `add_theme_support('title-tag')`).
 
@@ -159,7 +166,7 @@ Fixes include: adding skip links, ARIA attributes, CSS focus styles, alt text pl
 Fix the following issues in the WordPress theme at <theme_path>:
 <list of auto-fixable performance issues with their codes and fix methods>
 ```
-Fixes include: performance.php boilerplate, .htaccess caching rules, adding image dimension attributes, lazy loading attributes.
+Fixes include: performance.php boilerplate, .htaccess caching rules (`kind: server`, see the nginx rule below), adding image dimension attributes, lazy loading attributes.
 
 **Best Practices fixes:** Dispatch the `wp-audit-practices` agent again with fix instructions:
 ```
@@ -233,6 +240,8 @@ After all fix agents complete, count how many issues were successfully fixed, an
 them by owner. Print the `setting` fixes again as a list of steps to repeat on staging and
 production: they were applied to a database this deploy will not carry, and a fix nobody
 repeats is indistinguishable from one that was never made. Print that list from `<out>/replay.json`, not from memory, then give the path of the file.
+Then render the production runbook from the same file (*The production runbook*, below) and
+give its path too. Never write that list, a runbook or a "server steps" file by hand.
 
 ## Git hygiene for any phase that edits
 
@@ -244,34 +253,68 @@ Applies before the first edit of this step, and to `/wp-update`. Skip it when th
 - **At the end,** print how many commits exist since the last reviewed point (`git rev-list --count <last-reviewed>..HEAD`, or the commit count of this run when there is none) so unreviewed work is visible.
 ## The replay log
 
-Every `setting` fix, and every content fix that writes to the database, is appended to
-`<out>/replay.json` (next to the report) at the moment it is applied, before the next fix
-starts. Fix agents are told this in their fix prompt. One entry per fix:
+Every fix that is applied is appended to `<out>/replay.json` (next to the report) at the moment it
+is applied, before the next fix starts: code, settings, content written to the database, server
+rules and the steps that must run after a deploy. Fix agents are told this in their fix prompt.
+`<out>` is the report directory of Step 8.5, never the site root. The default `.wp-audit/` is
+already in `TOOL_STATE_PATHS`; a new file at the site root would have to be added there.
+
+The file is one object, and each fix adds one entry to `entries`:
 
 ```json
 {
-  "check": "SEC-014",
-  "resource": "option:blog_public",
-  "command": "wp option update blog_public 1",
-  "previous value": "0",
-  "applied_in": "local",
-  "applied_on": { "local": true, "staging": false, "prod": false }
+  "replay_version": 1,
+  "entries": [
+    {
+      "check": "SEC-014",
+      "kind": "db-option",
+      "resource": "option:blog_public",
+      "command": "wp option update blog_public 1",
+      "previous value": "0",
+      "needs_server_rule": false,
+      "applied_in": "local",
+      "applied_on": { "local": true, "staging": false, "prod": false }
+    }
+  ]
 }
 ```
 
+`kind` says how the fix reaches production, and it decides where the runbook puts it:
+
+| `kind` | What it is | Required besides `check` |
+|---|---|---|
+| `code` | a file in the editable code, new assets (fonts, images) included; it travels with the commit | `file` (path from the site root, or a list) |
+| `db-option` | an option set by WP-CLI: a plugin's settings, `theme_mods_*`, a flag such as `elementor_mcp_enabled` | `command`, `previous value` |
+| `post-meta` | a post, term or post-meta row: an SEO description, a builder widget's data, a bulk script over IDs | `command`, `previous value` or `backup`; `ids` and `selector` when it iterates on IDs |
+| `wp-config` | a `wp-config.php` constant, which is not in git | `command` (`wp config set …`), `previous value` |
+| `server` | a web-server rule (`.htaccess` here, or the server configuration) | `file`, `server_rule` (an id from `references/server-rules.md`, or `null` when none fits) |
+| `post-deploy` | a step that must run on production after the deploy: `wp media regenerate --only-missing` after adding an image size, deleting leftover sync tables | `command` |
+
 - `command` is the exact WP-CLI command that was run, with its arguments, so it can be
-  repeated verbatim.
+  repeated verbatim. The runbook rewrites `$WP`, `--path` and the local URL itself, so record
+  the command as it ran.
 - `previous value` is read **before** the write and stored as the value to revert to
   (`null` when the option or row did not exist).
+- `needs_server_rule` is `true` when the fix only works once the production server routes or
+  serves something: every `server` entry, and a `code` entry that adds a URL served by PHP
+  (`/llms.txt`, a dynamic `/robots.txt`, `/.well-known/…`). Such an entry also carries
+  `endpoint`, the path it serves (a prefix ends in `/`).
+- `ids` lists the rows a bulk script touched. Those IDs come from the local database, so add
+  `selector`, the read-only command that selects the same rows by something stable (slug,
+  post type, meta value) and can be run on production first.
+- `verify` (optional) is a read-only command that proves the fix on production, with `expect`
+  for what it prints. The runbook adds it to its verification list.
 - `applied_in` is the environment the fix ran against; `applied_on` starts with only that one
   `true`. Whoever repeats the step on another environment flips its flag.
 
-A fix that is not in `replay.json` was not recorded; do not report it as applied.
+A fix that is not in `replay.json` was not recorded; do not report it as applied. An older
+record that is a bare array of entries, with no `kind`, is still read: the runbook infers the
+kind from `resource` and `command`.
 
 **Planned, not implemented:** `/wp-audit --replay <env>` would run every entry whose
 `applied_on[<env>]` is false against that environment, flip the flag, and stop on the first
 error. Against production it would go through `bin/prod-gate.sh` and the production
-confirmation like any other write. Until then the log is read by a person.
+confirmation like any other write. Until then a person runs the runbook rendered from it (*The production runbook*, below).
 
 ## Bulk database fixes keep the old value
 
@@ -282,3 +325,47 @@ is part of the fix, not an option: for example
 narrow change, a CSV of `ID,<field>,<previous value>` from `$WP db query`. The replay entry
 records the backup path in a `backup` field. Without the backup the fix is not applied; report it
 `manual`. At 25 rows or fewer, `previous value` in the replay entry is enough.
+
+## Production on nginx: an `.htaccess` fix is not a production fix
+
+Read the production server from the manifest: the `server` field of the `role: "prod"` entry
+in `environments` (`wp-config.mjs env-set … --server=nginx`). `environment.web_server`
+describes the local clone, not production. When that field is `nginx`, `caddy`, `unknown` or
+absent, an `.htaccess` rule does nothing in production. In that case:
+
+- Record the fix as `kind: server`, `needs_server_rule: true`, `applied_on.prod: false`.
+- Report it as `applied locally — production needs the server owner`. **Never** count it as
+  fixed for production, in the fix count, the summary or the report.
+- Name its rule from `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/server-rules.md`,
+  which holds the Apache rule and the nginx equivalent side by side. When no rule there fits,
+  record `server_rule: null`: the runbook says there is no vetted equivalent, and nobody
+  improvises one.
+- A URL that WordPress serves from PHP (`/llms.txt`, `/robots.txt`, `/.well-known/…`) gets
+  `needs_server_rule: true` and its `endpoint`, whatever the server. nginx answers 404 or 403
+  for it until a `location` sends it to `index.php`. A physical file of the same name in the
+  web root shadows the route on any server, and on one site it carried the local host.
+
+## The production runbook
+
+At the end of this step, render the record:
+
+```bash
+node ${CLAUDE_PLUGIN_ROOT}/bin/audit-runbook.mjs --replay <out>/replay.json --out <out> \
+  --lang <report language> [--prod-url <confirmed production URL>]
+```
+
+It writes `<out>/runbook-<YYYY-MM-DD>.md` and prints its absolute path; relay it as written.
+It reads the production URL, `server` and `page_cache` from the `role: "prod"` environment and
+the builder and cache from `stack`, and a flag overrides each one. The sections are in the
+order they must run: pre-deploy checks (the development host in the database, physical files
+that shadow a PHP-served endpoint, the local host in recorded files, files to commit), code
+and the theme activation it assumes, wp-config, database commands with `--url` set to the
+production URL, server rules (nginx and Apache, each marked `not applied`), post-deploy
+(`wp elementor flush-css` when `stack.builder` is `elementor`, the page-cache purge when a
+cache is known) and verification curls.
+
+| Exit | Meaning |
+|---|---|
+| `0` | runbook written; print the path |
+| `1` | the record is unusable, an entry lacks what its `kind` needs, a `server_rule` is unknown, or the runbook would carry a local host or path. Fix the entry and run it again |
+| `3` | crash: report it, and hand over `replay.json` itself |
