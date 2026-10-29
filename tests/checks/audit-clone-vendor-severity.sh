@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 has() { grep -Fq -- "$2" "$1" || fail "$1 lacks: $2"; }
-lacks() { ! grep -Fq -- "$2" "$1" || fail "$1 still has: $2"; }
+lacks() { [ -r "$1" ] || fail "$1 missing"; if grep -Fq -- "$2" "$1"; then fail "$1 still has: $2"; fi; }
 
 sc=skills/wp-audit-run/references/site-context.md
 ad=skills/wp-audit-run/references/adopted-site.md
