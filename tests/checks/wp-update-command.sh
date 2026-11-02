@@ -13,7 +13,7 @@ c=commands/wp-update.md
 for s in 'db export' 'wp-config.php' 'must come **before** the operands' 'core update-db' \
   '--format=csv' 'Unauthorized' 'Never try to work around' 'version skew' 'wc update' \
   'elementor update db' 'elementor flush-css' 'debug.log' 'shopper-flow regression suite' 'retry that one section once' \
-  'grep -vEc' 'pre_wp_mail' 'regression:compare' 'Live gateway keys stop a clone' 'explicit confirmation' 'maintenance window' 'Rollback' 'parent of an active child theme' 'outside the docroot'; do
+  'grep -vEc' 'pre_wp_mail' 'regression:compare' 'Live gateway keys stop a clone' 'explicit confirmation' 'maintenance window' 'Rollback' 'parent of an active child theme' 'outside the docroot' 'Invalid field: parent' 'Can the web server write' 'PCLZIP_ERR_BAD_FORMAT' 'Plugins bundled with a theme' "! -name wp-config.php"; do
   grep -Fq -- "$s" "$c" || fail "$c lost: $s"
 done
 

@@ -73,6 +73,15 @@ Treat the root as a **local clone** when `.wp-create.json` has `project.source: 
    committing, if `git status` shows more than 50 deleted files, stop and report it instead.
    At the end, Step 7 prints how many commits are unreviewed. Details: *Git hygiene for any
    phase that edits* in `skills/wp-audit-run/references/fix.md`.
+1c. **Can the web server write?** A root copied or rsynced from elsewhere often keeps a POSIX
+   ACL mask of `r-x` on `wp-content` and its subfolders, which cancels the `rwx` entry of the web
+   server group: wp-admin updates then fail with "some files could not be copied" and the
+   translation folders turn read-only. Run `getfacl -p <wp-root>/wp-content/{plugins,themes,languages,uploads} | grep ^mask`
+   (skip where `getfacl` does not exist). Report any `r-x` mask and offer
+   `setfacl -R -m m::rwx <dir>` for the folders that need it; do not apply it silently. Also look for a
+   leftover `<wp-root>/.maintenance` from an interrupted admin update: when it is there the
+   front end answers with the maintenance page, so report it and remove it only after confirming
+   no update is running.
 2. Record the start marks used by Step 5: the byte size of `wp-content/debug.log`
    (`stat -c %s`, 0 if absent) and the time. On a clone also record the enabled WooCommerce
    gateways and the active plugin list, for Step 6.
@@ -102,7 +111,9 @@ $WP theme list --update=available --fields=name,version,update_version,status --
 ```
 
 4. Show the three tables. Mark each theme that is the **parent of an active child theme**
-   (`$WP theme list --fields=name,parent --format=csv`) as *held*: a commercial or customized
+   (the one whose `status` is `parent` in `$WP theme list --fields=name,status --format=csv`;
+   WP-CLI has no `parent` field and `--fields=name,parent` stops with `Invalid field: parent`)
+   as *held*: a commercial or customized
    parent is never updated without a separate question, because the child's overrides can break
    on a new parent. Ask which to update (`AskUserQuestion`: all / all except a list / only a
    list / core only), honouring the flags. If nothing is available, report that and stop.
@@ -116,9 +127,11 @@ Back up **before** any update, into a dated folder **outside the docroot** (defa
 B=~/wp-update-backups/<site-slug>-$(date -u +%Y%m%dT%H%M%SZ); mkdir -p "$B"
 $WP db export "$B/db.sql"
 tar -czf "$B/plugins.tar.gz" -C <wp-root>/wp-content plugins
-tar -czf "$B/core.tar.gz" --exclude=wp-config.php -C <wp-root> wp-admin wp-includes $(cd <wp-root> && ls *.php | grep -v '^wp-config\.php$')
+tar -czf "$B/core.tar.gz" --exclude=wp-config.php -C <wp-root> wp-admin wp-includes $(cd <wp-root> && find . -maxdepth 1 -name '*.php' ! -name wp-config.php -printf '%f\n')
 ```
 
+List the root files with `find`, never `ls`: an aliased `ls --color` writes escape codes into the
+names and `tar` stops with `Cannot stat`, leaving a core archive without its root files.
 `tar --exclude` must come **before** the operands (the file and directory names) or it has no
 effect; the second pattern above also leaves `wp-config.php` out of the operand list so a
 credentials file is not copied into the backup. Add `themes.tar.gz` when themes will be updated.
@@ -138,13 +151,22 @@ $WP theme update <slug> [<slug>...] --format=csv > "$B/theme-update.csv"
 Use `--all --exclude=<csv>` when the answer was "all except". Read the status column per plugin
 (`Updated` / `Error`). One failing plugin does not stop the rest; record it.
 
-**Premium plugins that answer `Download failed. "Unauthorized"`** (or a licence/401 error) have
+**Premium plugins that answer `Download failed. "Unauthorized"`** (or a licence/401 error, or
+download a package that is not a zip: `PCLZIP_ERR_BAD_FORMAT`, "Unable to find End of Central Dir
+Record signature", where the vendor serves an HTML error page for a non-production domain) have
 a licence bound to the production domain. Report each as **skipped**, with the reason and the
 options: update it in production, or upload the vendor zip manually. Never try to work around
 licensing (no cracked zips, no licence-server spoofing, no editing the licence option). Record
 **version skew** when a plugin and its companion moved apart — for example Elementor updated but
 Elementor Pro not, or WooCommerce updated but one of its paid extensions not — and carry it to
 Step 5 and the report as a regression-run flag.
+
+**Plugins bundled with a theme.** Some commercial themes ship their own plugins as zips inside
+the theme (look for `<theme>/libs/plugins/*.zip` or a TGMPA list) and expect them at the theme's
+version. After a parent-theme update, compare each bundled zip's `Version:` header with the
+installed plugin and, when they differ, install the zip (`$WP plugin install <zip> --force`)
+and flag the pair as one version-skew set. A theme newer than its companion plugin is the usual
+cause of a broken front end after a theme update.
 
 ## Step 4: Post-update Migrations
 
