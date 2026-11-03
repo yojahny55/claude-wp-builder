@@ -3,6 +3,8 @@
 # after the operands silently excludes nothing (wp-config.php landed in the backup);
 # premium plugins licensed to the production domain fail with "Unauthorized" and the easy
 # fix is to bypass the licence; and updates on a clone can re-enable mail or gateways.
+# A later pass added: a core release whose locale package lags, vendor updates that only wp-admin
+# shows, long SSH runs, and items silently dropped from "update everything".
 # The command must keep each of those in its wording, and the old wrong forms must stay out.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -13,7 +15,7 @@ c=commands/wp-update.md
 for s in 'db export' 'wp-config.php' 'must come **before** the operands' 'core update-db' \
   '--format=csv' 'Unauthorized' 'Never try to work around' 'version skew' 'wc update' \
   'elementor update db' 'elementor flush-css' 'debug.log' 'shopper-flow regression suite' 'retry that one section once' \
-  'grep -vEc' 'pre_wp_mail' 'regression:compare' 'Live gateway keys stop a clone' 'explicit confirmation' 'maintenance window' 'Rollback' 'parent of an active child theme' 'outside the docroot' 'Invalid field: parent' 'Can the web server write' 'PCLZIP_ERR_BAD_FORMAT' 'Plugins bundled with a theme' "! -name wp-config.php"; do
+  'grep -vEc' 'pre_wp_mail' 'regression:compare' 'Live gateway keys stop a clone' 'explicit confirmation' 'maintenance window' 'Rollback' 'parent of an active child theme' 'outside the docroot' 'Invalid field: parent' 'Can the web server write' 'PCLZIP_ERR_BAD_FORMAT' 'Plugins bundled with a theme' "! -name wp-config.php" 'Never drop an item from the approved set' 'never chained with `&&`' 'run_in_background' 'no <locale> package' 'Updates only wp-admin can see' 'admin-only' 'language plugin update --all'; do
   grep -Fq -- "$s" "$c" || fail "$c lost: $s"
 done
 
@@ -30,6 +32,9 @@ case "$line" in *--exclude=wp-config.php*-C*) ;; *) fail "tar --exclude must pre
 ! grep -Eq 'tar [^|]*wp-admin[^|]* --exclude' "$c" || fail "tar --exclude after operands"
 ! grep -Eqi 'bypass the licen[cs]e|crack' <(grep -vF 'Never try to work around' "$c" | grep -vF 'no cracked zips') \
   || fail "command suggests bypassing licensing"
+! grep -Eq '\$WP core update *(&&|;|\|\|)' "$c" || fail "core update chained to the next command"
+grep -Fq -- 'curl -sf --max-time 30' "$c" || fail "locale check must fail loudly on network errors"
+grep -Fq -- 'API unreachable' "$c" || fail "locale check must tell a network error from no package"
 ! grep -Eq 'CLAUDE_PLUGIN_ROOT\}?/?\.\./' "$c" || fail "relative plugin path"
 
 # Wired into docs.
