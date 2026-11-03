@@ -37,6 +37,10 @@ grep -Fq -- 'curl -sf --max-time 30' "$c" || fail "locale check must fail loudly
 grep -Fq -- 'API unreachable' "$c" || fail "locale check must tell a network error from no package"
 ! grep -Eq 'CLAUDE_PLUGIN_ROOT\}?/?\.\./' "$c" || fail "relative plugin path"
 
+# A bundled-plugin zip never downgrades an installed plugin.
+grep -Fq 'only when its version is' "$c" || fail "bundled zip install not gated on higher version"
+grep -Fq 'would downgrade it' "$c" || fail "bundled zip downgrade warning missing"
+
 # Wired into docs.
 for d in README.md docs/commands.md docs/workflows.md; do
   grep -Fq '/wp-update' "$d" || fail "$d lacks /wp-update"

@@ -210,8 +210,11 @@ Step 5 and the report as a regression-run flag.
 **Plugins bundled with a theme.** Some commercial themes ship their own plugins as zips inside
 the theme (look for `<theme>/libs/plugins/*.zip` or a TGMPA list) and expect them at the theme's
 version. After a parent-theme update, compare each bundled zip's `Version:` header with the
-installed plugin and, when they differ, install the zip (`$WP plugin install <zip> --force`)
-and flag the pair as one version-skew set. A theme newer than its companion plugin is the usual
+installed plugin. Install the zip (`$WP plugin install <zip> --force`) only when its version is
+**higher** than the installed one (compare with `sort -V`, never string equality), and flag the
+pair as one version-skew set. When the installed plugin is already newer or equal, do not
+install: `--force` would downgrade it and can break its database migrations. Report the pair
+instead. A theme newer than its companion plugin is the usual
 cause of a broken front end after a theme update. Install the zips in the same run, right after
 the theme, and verify in Step 5 that theme and companion versions match.
 
