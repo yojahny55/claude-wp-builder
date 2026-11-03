@@ -73,6 +73,15 @@ Treat the root as a **local clone** when `.wp-create.json` has `project.source: 
    committing, if `git status` shows more than 50 deleted files, stop and report it instead.
    At the end, Step 7 prints how many commits are unreviewed. Details: *Git hygiene for any
    phase that edits* in `skills/wp-audit-run/references/fix.md`.
+1c. **Can the web server write?** A root copied or rsynced from elsewhere often keeps a POSIX
+   ACL mask of `r-x` on `wp-content` and its subfolders, which cancels the `rwx` entry of the web
+   server group: wp-admin updates then fail with "some files could not be copied" and the
+   translation folders turn read-only. Run `getfacl -p <wp-root>/wp-content/{plugins,themes,languages,uploads} | grep ^mask`
+   (skip where `getfacl` does not exist). Report any `r-x` mask and offer
+   `setfacl -R -m m::rwx <dir>` for the folders that need it; do not apply it silently. Also look for a
+   leftover `<wp-root>/.maintenance` from an interrupted admin update: when it is there the
+   front end answers with the maintenance page, so report it and remove it only after confirming
+   no update is running.
 2. Record the start marks used by Step 5: the byte size of `wp-content/debug.log`
    (`stat -c %s`, 0 if absent) and the time. On a clone also record the enabled WooCommerce
    gateways and the active plugin list, for Step 6.
@@ -102,10 +111,19 @@ $WP theme list --update=available --fields=name,version,update_version,status --
 ```
 
 4. Show the three tables. Mark each theme that is the **parent of an active child theme**
-   (`$WP theme list --fields=name,parent --format=csv`) as *held*: a commercial or customized
+   (the one whose `status` is `parent` in `$WP theme list --fields=name,status --format=csv`;
+   WP-CLI has no `parent` field and `--fields=name,parent` stops with `Invalid field: parent`)
+   as *held*: a commercial or customized
    parent is never updated without a separate question, because the child's overrides can break
    on a new parent. Ask which to update (`AskUserQuestion`: all / all except a list / only a
    list / core only), honouring the flags. If nothing is available, report that and stop.
+   **Never drop an item from the approved set on your own.** An answer of "update everything"
+   covers major-version jumps too: flag the risky ones (a new major version, a plugin marked
+   "not tested" with the target core) in the table before asking, but once the user has said
+   all, update them or report the technical reason they could not be updated. Skipping a plugin
+   because it looks risky is the user's call, not the run's. The one exception is a *held*
+   parent theme: it is a separate question, an "all" answer does not cover it unless the user
+   names it, and it is reported as held, not dropped silently.
 
 ## Step 2: Backup
 
@@ -116,9 +134,11 @@ Back up **before** any update, into a dated folder **outside the docroot** (defa
 B=~/wp-update-backups/<site-slug>-$(date -u +%Y%m%dT%H%M%SZ); mkdir -p "$B"
 $WP db export "$B/db.sql"
 tar -czf "$B/plugins.tar.gz" -C <wp-root>/wp-content plugins
-tar -czf "$B/core.tar.gz" --exclude=wp-config.php -C <wp-root> wp-admin wp-includes $(cd <wp-root> && ls *.php | grep -v '^wp-config\.php$')
+tar -czf "$B/core.tar.gz" --exclude=wp-config.php -C <wp-root> wp-admin wp-includes $(cd <wp-root> && find . -maxdepth 1 -name '*.php' ! -name wp-config.php -printf '%f\n')
 ```
 
+List the root files with `find`, never `ls`: an aliased `ls --color` writes escape codes into the
+names and `tar` stops with `Cannot stat`, leaving a core archive without its root files.
 `tar --exclude` must come **before** the operands (the file and directory names) or it has no
 effect; the second pattern above also leaves `wp-config.php` out of the operand list so a
 credentials file is not copied into the backup. Add `themes.tar.gz` when themes will be updated.
@@ -130,21 +150,73 @@ fails, stop. Uploads are not backed up here (updates do not touch them); say so 
 Core, then plugins, then themes, each only if approved. Capture CSV so each item has a status.
 
 ```bash
-$WP core update && $WP core update-db
+$WP core update
+$WP core update-db
 $WP plugin update <slug> [<slug>...] --format=csv > "$B/plugin-update.csv"
 $WP theme update <slug> [<slug>...] --format=csv > "$B/theme-update.csv"
 ```
 
+Run the three as separate commands, never chained with `&&`: a core failure must not skip the
+plugins, and each result is read on its own. Run `core update-db` only when `core update`
+reported success (or the version changed); after a failed core update, skip it and record why.
+
+**Long runs over SSH.** A remote WP-CLI call that outlives the shell timeout (about two
+minutes) is cut off or moved to the background, and a core, WPML or builder update easily takes
+longer. Send the whole `ssh ... '<update>'` command with the harness's background run
+(`run_in_background`), which notifies when it exits, and read its output file; never chain
+`sleep` and never use `nohup` (see *Shell Hygiene* in `skills/wp-cli-patterns/SKILL.md`). Do not
+start a second copy while one runs. Right after a multilingual-suite update `$WP plugin list`
+itself can take minutes while the plugin migrates; wait for it instead of retrying.
+
+**Core when the site locale has no package yet.** Core translations for a new release can lag
+the release by days. `<v>` is the version `$WP core check-update` offers; pass it as
+`$WP core update --version=<v>` when the check below passes. On a site whose locale has no
+package for `<v>`, that command stops with `Download failed` (the download URL ends in `-<locale>.zip`) before anything is
+changed. Before the core step, ask the update API whether an offer for `<v>` exists in the site
+locale (`$WP language core list --status=active --field=language` gives it; `en_US` needs no check):
+
+```bash
+curl -sf --max-time 30 "https://api.wordpress.org/core/version-check/1.7/?locale=<locale>" | python3 -c "import sys,json;print([o['version'] for o in json.load(sys.stdin)['offers'] if o.get('locale')=='<locale>'])"
+```
+
+If the call fails or returns something that is not JSON, report **API unreachable**, not
+"no package", and ask the user before skipping core. When `<v>` is not in that list (or the
+list is empty), the locale package is not published yet:
+the API then offers only the `en_US` build. Do **not** switch the site to `en_US` to get past
+it, because that changes the admin language. Report core as
+**skipped: no <locale> package for <v> yet**, update plugins and themes, and tell the user to
+retry later or update core from wp-admin once the package appears.
+Confirm afterwards that the version did not change and that no `.maintenance` was left behind.
+
 Use `--all --exclude=<csv>` when the answer was "all except". Read the status column per plugin
 (`Updated` / `Error`). One failing plugin does not stop the rest; record it.
 
-**Premium plugins that answer `Download failed. "Unauthorized"`** (or a licence/401 error) have
+**Premium plugins that answer `Download failed. "Unauthorized"`** (or a licence/401 error, or
+download a package that is not a zip: `PCLZIP_ERR_BAD_FORMAT`, "Unable to find End of Central Dir
+Record signature", where the vendor serves an HTML error page for a non-production domain) have
 a licence bound to the production domain. Report each as **skipped**, with the reason and the
 options: update it in production, or upload the vendor zip manually. Never try to work around
-licensing (no cracked zips, no licence-server spoofing, no editing the licence option). Record
+licensing (no cracked zips, no licence-server spoofing, no editing the licence option).
+
+**Updates only wp-admin can see.** Some paid plugins publish their update through the vendor's
+licence check in the dashboard, so WP-CLI answers `Warning: Update package not available`
+(`Paquete de actualización no disponible`) or `Plugin already updated` while wp-admin shows a
+newer version. That is not a failure of the run and not a reason to retry: record the plugin as
+**admin-only**, with the version wp-admin offers, and hand it to the user in the report. Record
 **version skew** when a plugin and its companion moved apart — for example Elementor updated but
 Elementor Pro not, or WooCommerce updated but one of its paid extensions not — and carry it to
 Step 5 and the report as a regression-run flag.
+
+**Plugins bundled with a theme.** Some commercial themes ship their own plugins as zips inside
+the theme (look for `<theme>/libs/plugins/*.zip` or a TGMPA list) and expect them at the theme's
+version. After a parent-theme update, compare each bundled zip's `Version:` header with the
+installed plugin. Install the zip (`$WP plugin install <zip> --force`) only when its version is
+**higher** than the installed one (compare with `sort -V`, never string equality), and flag the
+pair as one version-skew set. When the installed plugin is already newer or equal, do not
+install: `--force` would downgrade it and can break its database migrations. Report the pair
+instead. A theme newer than its companion plugin is the usual
+cause of a broken front end after a theme update. Install the zips in the same run, right after
+the theme, and verify in Step 5 that theme and companion versions match.
 
 ## Step 4: Post-update Migrations
 
@@ -155,6 +227,10 @@ Run only those whose plugin is active (`$WP plugin is-active <slug>`), and recor
 | WooCommerce | `$WP wc update` (database updates; skip when it reports none pending) |
 | Elementor | `$WP elementor update db`, then `$WP elementor flush-css` |
 | Elementor Pro | `$WP elementor update db --pro` — skip if Pro was skipped in Step 3 |
+
+After the migrations, refresh the translation packs, since a new core or plugin version can
+ship new strings: `$WP language core update`, `$WP language plugin update --all`,
+`$WP language theme update --all`. A pack that is not published yet is reported, not an error.
 
 Then `$WP rewrite flush` if permalinks are in use and a plugin that registers post types or
 endpoints changed, and `$WP cache flush`. A command that does not exist for the installed
@@ -211,7 +287,8 @@ offer it, do not run it silently. The live-gateway-key gate is in Step 1.2, befo
 Print one block, then the rollback:
 
 - Versions before and after for core, each plugin and theme.
-- Skipped items with reason (licence, held parent theme, excluded) and the next option.
+- Skipped items with reason (licence, **admin-only**, held parent theme, excluded, no core
+  package for the locale) and the next option.
 - Migrations run and their outcome; version skew flagged.
 - Verification: page table, new fatals (count), head-script result, suite result.
 - Backup path and its contents.
