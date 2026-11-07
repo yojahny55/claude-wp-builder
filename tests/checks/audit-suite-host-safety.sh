@@ -58,7 +58,6 @@ rc=0
 
 # 2b. A bracketed IPv6 literal keeps one key in both scripts: the child of a gated run compares
 # WP_AUDIT_GATE_HELD with its own key, and `%%:*` alone cut `[2001:db8::1]` to `[2001`.
-# A missing node_modules dir makes the runner exit 1 right after the gate: no install, no browser, no network.
 has bin/lib/host-key.sh 'host_key()'
 has bin/prod-gate.sh 'host_key "$target"'
 has "$runner" 'host_key "$url"'
@@ -71,10 +70,14 @@ hasnt "$runner" 'gate_host="${url_host%%:*}"'
 ) || fail "host_key does not normalize an IPv6 literal, a port or userinfo"
 v6="$tmp/v6"; mkdir -p "$v6/gate"
 rc=0
+# A missing node_modules dir makes the runner exit 1 right after the gate: no install, no browser, no network.
+# The case asserts it reached that exit, so a runner that fails earlier cannot pass it.
 (cd "$tmp" && WP_AUDIT_GATE_HELD='[2001:db8::1]' WP_AUDIT_GATE_DIR="$v6/gate" WP_BROWSER_CHROMIUM="$fakebin/chromium" \
   WP_AUDIT_SUITE_NODE_MODULES="$tmp/none" \
   timeout 10 bash "$OLDPWD/$runner" --url 'https://[2001:db8::1]/' --dir "$tmp/suite-v6" > "$tmp/out-v6" 2>&1) || rc=$?
 ! grep -Fq 're-running through bin/prod-gate.sh' "$tmp/out-v6" || { cat "$tmp/out-v6"; fail "a child holding the gate for an IPv6 host re-ran the gate"; }
+[ "$rc" = 1 ] && grep -Fq 'WP_AUDIT_SUITE_NODE_MODULES=' "$tmp/out-v6" && grep -Fq 'is not a directory' "$tmp/out-v6" \
+  || { cat "$tmp/out-v6"; fail "the IPv6 case did not reach the node_modules exit after the gate (rc=$rc)"; }
 
 # 3. Consecutive timeouts stop the run; the runner turns that into UNMEASURED, exit 2.
 node "$suite/guard/timeout-guard.selfcheck.js" | grep -Fq PASS || fail "the timeout guard self-check fails"
