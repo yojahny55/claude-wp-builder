@@ -12,7 +12,7 @@
 #    first and say why — and the skill must document both that and the missing queue table
 #    a WP-CLI activation can leave behind.
 set -uo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../.." || exit 1
 
 script=skills/wp-robin/scripts/robin-fix.sh
 skill=skills/wp-robin/SKILL.md

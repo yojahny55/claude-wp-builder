@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Source this file, then call `expand_command commands/<name>.md`; it sets EXPANDED to the
 # path of the command as a run reads it: every paragraph that sends the run to
 # `skills/<name>-run/references/<file>.md` is followed by that file's body.

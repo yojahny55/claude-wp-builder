@@ -96,6 +96,7 @@ FIXTURE_TMPDIR="$(mktemp -d)"
 FIXTURE_MEDIA_FILE="$FIXTURE_TMPDIR/pll-fixture.png"
 
 cleanup() {
+  # shellcheck disable=SC2320  # cleanup() is an EXIT trap handler: $? here is the exit status being trapped
   local status=$?
   rm -rf "$FIXTURE_TMPDIR"
   # Nothing was created yet -- do not run a site mutation just to delete zero

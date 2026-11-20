@@ -17,7 +17,7 @@ echo '<?php // wp-config' > "$root/wp-config.php"
 printf "<?php\ndefine('S3_UPLOADS_SECRET', 'canary-secret');\n" > "$root/s3-config.php"
 echo '<?php' > "$root/wp-content/mu-plugins/s3-uploads-endpoint.php"
 
-out="$(HOME="$home" WP_S3_BACKUP_DIR= XDG_STATE_HOME= PATH="$(dirname "$(command -v bash)"):/usr/bin:/bin" \
+out="$(HOME="$home" WP_S3_BACKUP_DIR='' XDG_STATE_HOME='' PATH="$(dirname "$(command -v bash)"):/usr/bin:/bin" \
   bash "$revert" "$root" --keep-remote-media 2>&1)" || { echo "$out"; fail "revert did not finish"; }
 
 [ ! -e "$root/s3-config.php" ] || fail "s3-config.php is still in the docroot"
@@ -36,7 +36,7 @@ root2="$tmp/site2"; home2="$tmp/home2"
 mkdir -p "$root2/wp-content/uploads" "$home2"
 echo '<?php // wp-config' > "$root2/wp-config.php"
 printf "<?php\ndefine('S3_UPLOADS_SECRET', 'legacy-canary');\n" > "$root2/s3-config.php.disabled"
-out="$(HOME="$home2" WP_S3_BACKUP_DIR= XDG_STATE_HOME= PATH="$(dirname "$(command -v bash)"):/usr/bin:/bin" \
+out="$(HOME="$home2" WP_S3_BACKUP_DIR='' XDG_STATE_HOME='' PATH="$(dirname "$(command -v bash)"):/usr/bin:/bin" \
   bash "$revert" "$root2" --keep-remote-media 2>&1)" || { echo "$out"; fail "legacy revert did not finish"; }
 [ ! -e "$root2/s3-config.php.disabled" ] || fail "legacy .disabled is still in the docroot"
 parked2="$(find "$home2/.local/state/wp-s3-backups" -name 's3-config.php.disabled*' | head -1)"
@@ -56,7 +56,7 @@ if command -v shasum >/dev/null 2>&1; then
   mkdir -p "$root3/wp-content/uploads" "$home3"
   echo '<?php // wp-config' > "$root3/wp-config.php"
   printf "<?php\n" > "$root3/s3-config.php"
-  out="$(HOME="$home3" WP_S3_BACKUP_DIR= XDG_STATE_HOME= PATH="$bin" \
+  out="$(HOME="$home3" WP_S3_BACKUP_DIR='' XDG_STATE_HOME='' PATH="$bin" \
     bash "$revert" "$root3" --keep-remote-media 2>&1)" || { echo "$out"; fail "revert aborted without sha256sum"; }
   [ -n "$(find "$home3/.local/state/wp-s3-backups" -name s3-config.php.disabled)" ] \
     || fail "no parked config when sha256sum is absent"

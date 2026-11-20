@@ -39,6 +39,7 @@ printf '%s\n' 'x' > "$t/changes/README.md"
 out="$t/CHANGELOG.md"
 grep -qx '## \[Unreleased\]' "$out" || fail "release script dropped the Unreleased anchor"
 grep -qx '## \[1.1.0\] - 2026-02-02' "$out" || fail "release script wrote no release heading"
+# shellcheck disable=SC2010  # fixture dir with fixed ASCII names; the listing is the assertion
 ls "$t/changes" | grep -qx 'a.fixed.md' && fail "release script left a compiled fragment behind"
 [ -f "$t/changes/README.md" ] || fail "release script deleted changes/README.md"
 awk '/^## \[Unreleased\]/{u=NR} /^## \[1.1.0\]/{r=NR} /^## \[1.0.0\]/{o=NR} END{exit !(u<r && r<o)}' "$out" \

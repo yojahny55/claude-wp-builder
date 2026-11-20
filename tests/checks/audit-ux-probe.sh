@@ -22,6 +22,7 @@ grep -Fq -- '--probes' "$a" || fail "$a does not say where site probes go"
 grep -Fq 'Exit `3` means the budget is spent.' "$a" || fail "$a does not say what an exhausted budget means"
 
 skip() {
+  [ "${CHECKS_REQUIRE_BROWSER:-0}" = 1 ] && fail "CHECKS_REQUIRE_BROWSER=1 and $1"
   echo "PASS (static only -- the harness was NOT exercised in a browser: $1)"
   echo "  To run it for real: PLAYWRIGHT_CORE=\"\$(npm root -g)/@playwright/test/node_modules/playwright-core\" bash $0"
   [ "${UX_PROBE_REQUIRE_BROWSER:-0}" = 1 ] && fail "UX_PROBE_REQUIRE_BROWSER=1 and $1"

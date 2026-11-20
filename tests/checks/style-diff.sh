@@ -8,7 +8,7 @@
 # This check runs the tool on a file:// fixture, asserts it catches the regression and ignores
 # the noise, and pins the docs that must point at it.
 set -uo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../.." || exit 1
 fail() { echo "FAIL: $*"; exit 1; }
 tool=bin/style-diff.mjs
 [ -f "$tool" ] || fail "$tool is missing"

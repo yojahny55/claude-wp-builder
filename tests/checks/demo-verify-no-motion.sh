@@ -14,8 +14,15 @@ grep -Fq -- '--no-motion' "$dv" || fail "commands/wp-demo-verify.md does not doc
 grep -Fq -- '--no-motion' commands/wp-responsive-check.md || fail "commands/wp-responsive-check.md does not pass --no-motion"
 grep -Fq -- '--no-motion' CHANGELOG.md || fail "CHANGELOG.md has no --no-motion entry"
 
-command -v node >/dev/null || { echo "PASS (static only: no node)"; exit 0; }
+if ! command -v node >/dev/null; then
+  [ "${CHECKS_REQUIRE_BROWSER:-0}" = 1 ] && { echo "FAIL: CHECKS_REQUIRE_BROWSER=1 and there is no node"; exit 1; }
+  echo "PASS (static only: no node)"; exit 0
+fi
 if ! probe=$(node "$s" --probe 2>&1); then
+  if [ "${CHECKS_REQUIRE_BROWSER:-0}" = 1 ]; then
+    echo "FAIL: CHECKS_REQUIRE_BROWSER=1 and the walk cannot happen: no usable playwright-core or Chromium here -- $(tr '\n' ' ' <<<"$probe")"
+    exit 1
+  fi
   echo "PASS (static only -- the walk was NOT exercised: no usable playwright-core or Chromium here -- $(tr '\n' ' ' <<<"$probe"))"
   echo "  To run it for real, point PLAYWRIGHT_CORE at an installed playwright-core, e.g."
   echo "  PLAYWRIGHT_CORE=\"\$(npm root -g)/@playwright/test/node_modules/playwright-core\" bash $0"

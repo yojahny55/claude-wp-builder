@@ -121,7 +121,10 @@ got=$(printf '%s\n' "$s7" | grep -oE "^ *'[a-z0-9_-]+' *=>" | grep -oE "[a-z0-9_
 
 # --- 5. /wp-seed Phase 6 assigns to them, per strategy, all of them ---------------
 p6=$(region "$wp_seed" '^## Phase 6:' '^## Phase 6[.]5:')
-p6p=$(printf '%s\n' "$p6" | awk '/^Everything below this line describes the `suffix` strategy/{exit} {print}')
+# A here-string, not printf into a pipe: awk exits early here, and a writer still
+# writing into a closed pipe dies of SIGPIPE, which pipefail and set -e turn into a
+# silent exit (see wp-section-tailwind.sh's contact block).
+p6p=$(awk '/^Everything below this line describes the `suffix` strategy/{exit} {print}' <<<"$p6")
 p6s=$(printf '%s\n' "$p6" | awk 'f{print} /^Everything below this line describes the `suffix` strategy/{f=1}')
 [ -n "$p6s" ] || fail "wp-seed Phase 6 lost the line that splits its polylang branch from its suffix branch"
 assigned() { grep -oE "menu location assign '[^']+' [a-z0-9_-]+" | awk '{print $NF}' | words; }

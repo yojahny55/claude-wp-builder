@@ -36,6 +36,7 @@ wp-audit-security sec SEC 32000
 LIST
 # performance-lessons.md predates the split and does not follow the perf-*.md convention: it is
 # indexed in SKILL.md and read through its own pointers, so it is checked here by name.
+# shellcheck disable=SC2043  # deliberate single-item list: a new reference file is added by extending it
 for r in performance-lessons.md; do
   grep -Fq "$r" "$skill" || fail "$skill does not list $r"
   grep -Eq '^## Contents' "$refs/$r" || fail "$refs/$r has no Contents list"

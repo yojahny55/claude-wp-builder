@@ -225,7 +225,12 @@ fi
 # the wrong reason. An empty region proves nothing; say so.
 contact_start='### For CONTACT sections'
 contact_end='^Wait for all Phase 1 agents to complete'
-contact_block=$(awk -v s="$contact_start" 'index($0, s) { f = 1 } f' "$f" | awk -v e="$contact_end" '{ print } $0 ~ e { exit }')
+# One awk reading the file, not two joined by a pipe. The second awk of a pipe exits at
+# the end line while the first is still writing the rest of the file; the writer then
+# dies of SIGPIPE, pipefail turns that into 141, and set -e ends the check with no
+# output. It only happens when the reader wins the race, which a loaded 4-core CI runner
+# made it do while every local run passed.
+contact_block=$(awk -v s="$contact_start" -v e="$contact_end" 'index($0, s) { f = 1 } f { print; if ($0 ~ e) exit }' "$f")
 [ -n "$contact_block" ] \
   || { echo "FAIL: wp-section has no \"$contact_start\" block — the two-phase contact dispatch is where wp-cf7's form IDs gate wp-template, and the assertions below would be scanning an empty string"; exit 1; }
 printf '%s\n' "$contact_block" | tail -1 | grep -q "$contact_end" \
