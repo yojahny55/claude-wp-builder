@@ -37,7 +37,7 @@ To preserve hand edits across regeneration, wrap them in:
 - `header.php`, `footer.php` (standard parts)
 - `inc/performance.php`, `inc/security.php` (head cleanup and the security baseline — XML-RPC, user enumeration, file editors, response headers)
 
-These are copied from the kit when the theme is scaffolded. Nothing re-syncs them afterwards: to pick up a newer kit, update it (re-run `npx skills add yojahny55/cinematic-scroll-kit -g -y`, or `git pull` inside `.cinematic-kit`) and copy the changed files over by hand, reviewing the diff first.
+A scaffolded theme gets all of these from this starter, not from the kit, and nothing re-syncs them afterwards. `cinematic.css` and `cinematic-engine.js` began as copies of the kit's templates but now carry starter code of their own (the mobile menu and the motion toggle), so a newer kit (re-run `npx skills add yojahny55/cinematic-scroll-kit -g -y`, or `git pull` inside `.cinematic-kit`) is merged into them by hand against its diff, never copied over them.
 
 ## Engine boot
 

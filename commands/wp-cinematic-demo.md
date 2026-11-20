@@ -48,7 +48,7 @@ sequence information is something the reader needs.
 4. **Post-process** for plugin compatibility:
    - Wrap each scene with `<!-- SECTION: scene-N -->` ... `<!-- END SECTION -->` delimiters so `/wp-section` and `/wp-polish` recognize them.
    - Wrap trailing blocks with `<!-- SECTION: pricing -->`, `<!-- SECTION: contact -->`, etc.
-   - Inject the standard `<!-- DEMO: name=cinematic, archetype=cinematic-scroll, hybrid=<false when --no-hybrid was passed, else true> -->` header comment so `/wp-init` demo-first detection picks it up.
+   - Inject the standard `<!-- DEMO: name=cinematic, archetype=cinematic-scroll, hybrid=true -->` header comment (`hybrid=false` when `--no-hybrid` was passed) so `/wp-init` demo-first detection picks it up.
 5. If `--brand` provided, dispatch kit skill `01-narrative-from-brand` first; pipe its narrative into `02-storyboard-from-narrative`; feed the storyboard scenes into the demo generator (instead of placeholders).
 6. Generate placeholder videos by symlinking the kit's sample reels into `demo/assets/videos/` (do NOT copy — saves disk).
 7. Open `demo/index.html` in the user's browser via `wp-open` helper, or print the file:// path.
