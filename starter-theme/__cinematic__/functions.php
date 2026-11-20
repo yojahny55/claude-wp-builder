@@ -9,7 +9,7 @@
 
 defined('ABSPATH') || exit;
 
-define('__STARTER___VERSION', '__VERSION__');
+define('__STARTER___VERSION', '1.0.0');
 define('__STARTER___THEME_DIR', get_template_directory());
 define('__STARTER___THEME_URI', get_template_directory_uri());
 
@@ -21,16 +21,16 @@ add_action('after_setup_theme', function () {
     add_theme_support('responsive-embeds');
     add_theme_support('automatic-feed-links');
 
-    load_theme_textdomain('__TEXTDOMAIN__', __STARTER___THEME_DIR . '/languages');
+    load_theme_textdomain('__starter__', __STARTER___THEME_DIR . '/languages');
 
     // One location per language under the suffix model; /wp-init Step 6
     // rewrites this to one bare location per name under Polylang. Templates
     // ask through __starter___nav_location(), which answers for either.
     register_nav_menus([
-        'primary-en' => __('Primary Navigation (EN)', '__TEXTDOMAIN__'),
-        'primary-es' => __('Primary Navigation (ES)', '__TEXTDOMAIN__'),
-        'footer-en'  => __('Footer Navigation (EN)', '__TEXTDOMAIN__'),
-        'footer-es'  => __('Footer Navigation (ES)', '__TEXTDOMAIN__'),
+        'primary-en' => __('Primary Navigation (EN)', '__starter__'),
+        'primary-es' => __('Primary Navigation (ES)', '__starter__'),
+        'footer-en'  => __('Footer Navigation (EN)', '__starter__'),
+        'footer-es'  => __('Footer Navigation (ES)', '__starter__'),
     ]);
 });
 
