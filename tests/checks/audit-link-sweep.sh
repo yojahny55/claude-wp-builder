@@ -20,7 +20,7 @@ trap '[ -n "$srv" ] && kill "$srv" 2>/dev/null; rm -rf "$tmp"' EXIT
 # Fixture: counts requests in flight server-side, so the cap is measured where the load lands.
 cat >"$tmp/server.mjs" <<'EOF'
 import http from 'node:http';
-let inFlight = 0, peak = 0, headRefused = 0, originHits = 0;
+let inFlight = 0, peak = 0, headRefused = 0, originHits = 0, directHits = 0;
 const srv = http.createServer((req, res) => {
   inFlight++; peak = Math.max(peak, inFlight);
   const done = (code, headers = {}, body = '') => setTimeout(() => {
@@ -28,7 +28,7 @@ const srv = http.createServer((req, res) => {
   }, 60);
   const p = req.url;
   if (/^localhost/.test(req.headers.host || '')) originHits++;
-  if (p === '/__peak') { inFlight--; res.end(JSON.stringify({ peak, headRefused, originHits })); return; }
+  if (p === '/__peak') { inFlight--; res.end(JSON.stringify({ peak, headRefused, originHits, directHits })); return; }
   if (p === '/ok/') return done(200);
   if (p === '/gone/') return done(404);
   if (p === '/moved/') return done(301, { location: '/ok/' });
@@ -37,6 +37,7 @@ const srv = http.createServer((req, res) => {
   if (p === '/to-meta6/') return done(302, { location: 'http://[::ffff:169.254.169.254]/latest/meta-data/' });
   if (p === '/to-meta6hex/') return done(302, { location: 'http://[::ffff:a9fe:a9fe]/' });
   if (p === '/to-awsv6/') return done(302, { location: 'http://[fd00:ec2::254]/' });
+  if (p === '/direct-private') { directHits++; return done(200); }
   if (p === '/loop/') return done(302, { location: '/loop/' });
   if (p === '/nohead/') {
     if (req.method === 'HEAD') { headRefused++; return done(405); }
@@ -152,6 +153,18 @@ done
 [ "$(qr /moved/ verdict)" = redirect ] || fail "a same-site redirect is no longer followed"
 outf=$(printf '/to-origin/\n' | node "$tool" --site "$site" --clone-origin localhost --follow-clone-origin --budget 30)
 grep -q '"verdict": "redirect"' <<<"$outf" || fail "--follow-clone-origin did not allow the redirect to the origin"
+
+# A direct link is a request too: the policy runs on the initial URL, not only on redirect hops.
+# From a public site, a link straight to a metadata address or to a private/loopback server is
+# refused before any request leaves (the fixture must see no hit); a same-host link is unaffected.
+outd=$(printf 'http://127.0.0.1:%s/direct-private\thttps://public.example/\nhttp://169.254.169.254/latest/meta-data/\thttps://public.example/\nhttp://[::ffff:169.254.169.254]/\thttps://public.example/\n' "$port" \
+  | node "$tool" --site https://public.example --budget 30)
+dh=$(curl -s "$site/__peak" | node -e "console.log(JSON.parse(require('fs').readFileSync(0,'utf8')).directHits)")
+[ "$dh" = 0 ] || fail "a direct link to a private/loopback host was fetched from a public site ($dh hits)"
+node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const bad=d.results.filter(r=>r.verdict!=='unmeasured'||!r.reason);if(d.results.length!==3||bad.length){console.log(JSON.stringify(d.results));process.exit(1)}" <<<"$outd" \
+  || fail "direct links to private/metadata hosts were not all UNMEASURED with a reason"
+grep -q 'private/loopback' <<<"$outd" && grep -q 'link-local/metadata' <<<"$outd" || fail "direct-link refusal reasons missing"
+[ "$(q /ok/ verdict)" = ok ] || fail "a same-host link is affected by the direct-link check"
 
 # The classifier and the resolved-address check, without a network: the lookup is injected.
 node --input-type=module - <<'JS' || fail "address classification (bin/lib/net-class.mjs) is wrong"

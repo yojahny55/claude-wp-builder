@@ -47,6 +47,18 @@ chown_call=$(grep -F 'sudo [find]' "$STUB_LOG" | grep -F '[chown]' || true)
 [ -n "$chown_call" ] || fail "permissions: no chown recorded"
 grep -Fq '[-type] [d] [-o] [-type] [f]' <<<"$chown_call" || fail "permissions: chown is not limited to -type d / -type f (a symlink would be followed)"
 grep -Fq '[chown] [-h]' <<<"$chown_call" || fail "permissions: chown lacks -h"
+# Each change is applied relative to the directory find visits (-execdir), so an ancestor swapped
+# for a symlink between the listing and the exec cannot send root's chmod/chown outside the tree.
+grep -F 'sudo [find]' "$STUB_LOG" | grep -Fq '[-exec]' && fail "permissions: a path-resolving -exec is back"
+for tool in chown 'chmod] [755' 'chmod] [644'; do
+  grep -F 'sudo [find]' "$STUB_LOG" | grep -F "[-execdir] [$tool" | grep -Fq '[{}] [+]' || fail "permissions: $tool is not -execdir ... {} +"
+done
+# A writable-directory entry that is a symlink is not chmod-ed through.
+"$REAL_MKDIR" -p "$W/elsewhere"; "$(PATH="$STUB_ORIG_PATH" command -v ln)" -s "$W/elsewhere" "$wp/wp-content/plugins"
+run_stubbed bash "$SCRIPT" permissions --path="$wp" --web-user=www-data
+[ "$STUB_RC" = 0 ] || fail "permissions with a symlinked plugins dir failed: $STUB_OUT"
+! grep -F 'sudo [chmod]' "$STUB_LOG" | grep -Fq "wp-content/plugins" || fail "permissions: chmod 775 followed a symlinked wp-content/plugins"
+grep -Fq 'symlink' <<<"$STUB_OUT" || fail "permissions: no warning for the symlinked directory"
 
 # SH-12: vhost-install --dest, service-reload --service, native-setup --web-server.
 echo 'x' > "$W/v.conf"

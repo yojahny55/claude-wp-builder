@@ -178,16 +178,16 @@ const MAX_HOPS = 5;
 // what a hostname resolves to at check time; the clone origin only with --follow-clone-origin;
 // a private or loopback host only when the swept site is itself on one (a local dev sweep).
 // DNS rebinding between this lookup and fetch()'s own remains possible: see checkResolved.
-async function checkHop(o, u) {
-  if (!/^https?:$/.test(u.protocol)) throw new Refused(`redirect to a non-http(s) target (${u.protocol}) not followed`);
+async function checkHop(o, u, what = 'redirect to') {
+  if (!/^https?:$/.test(u.protocol)) throw new Refused(`${what} a non-http(s) target (${u.protocol}) not followed`);
   const host = u.hostname;
   if (bareHost(host) === bareHost(o.siteUrl.hostname)) return;
-  if (isLinkLocal(host)) throw new Refused(`redirect to link-local/metadata host ${host} not followed`);
+  if (isLinkLocal(host)) throw new Refused(`${what} link-local/metadata host ${host} not followed`);
   if (o.cloneOrigin && bareHost(host) === bareHost(hostOf(o.cloneOrigin)) && !o.followClone) {
-    throw new Refused(`redirect to the clone-origin host ${host} not followed without --follow-clone-origin`);
+    throw new Refused(`${what} the clone-origin host ${host} not followed without --follow-clone-origin`);
   }
   if (isPrivateHost(host) && !isPrivateHost(o.siteUrl.hostname)) {
-    throw new Refused(`redirect to private/loopback host ${host} not followed from a non-local site`);
+    throw new Refused(`${what} private/loopback host ${host} not followed from a non-local site`);
   }
   await checkResolved(host, { siteLocal: isPrivateHost(o.siteUrl.hostname), lookup: dnsLookup });
 }
@@ -196,6 +196,10 @@ async function checkHop(o, u) {
 // The returned response carries `finalUrl`, the last URL actually requested.
 async function fetchChecked(o, url, init) {
   let cur = url;
+  // The original link gets the same per-target policy as a redirect hop (same-host links pass).
+  let first;
+  try { first = new URL(url); } catch { throw new Refused('link with an unparseable URL'); }
+  await checkHop(o, first, 'link to');
   for (let hop = 0; ; hop++) {
     const res = await fetch(cur, { ...init, redirect: 'manual' });
     const loc = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;

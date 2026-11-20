@@ -389,16 +389,22 @@ cmd_permissions() {
     # .git and node_modules are pruned: their ownership and executable bits are not ours to reset.
     # chown without -R still follows a symlink given as an operand, so only real directories and
     # files are listed (a symlink to /etc/shadow is skipped) and -h keeps it off any link that races in.
-    sudo find "$path" \( -name .git -o -name node_modules \) -prune -o \( -type d -o -type f \) -exec chown -h "$web_user:$web_user" {} +
-    sudo find "$path" \( -name .git -o -name node_modules \) -prune -o -type d -exec chmod 755 {} \;
-    sudo find "$path" \( -name .git -o -name node_modules \) -prune -o -type f -exec chmod 644 {} \;
+    # -execdir applies each change relative to the directory find is visiting, so an ancestor swapped
+    # for a symlink after the listing cannot redirect the change to a path outside the tree.
+    sudo find "$path" \( -name .git -o -name node_modules \) -prune -o \( -type d -o -type f \) -execdir chown -h "$web_user:$web_user" {} +
+    sudo find "$path" \( -name .git -o -name node_modules \) -prune -o -type d -execdir chmod 755 {} +
+    sudo find "$path" \( -name .git -o -name node_modules \) -prune -o -type f -execdir chmod 644 {} +
 
     # Writable directories
     for dir in uploads plugins themes cache; do
-        [[ -d "$path/wp-content/$dir" ]] && sudo chmod 775 "$path/wp-content/$dir"
+        if [[ -L "$path/wp-content/$dir" ]]; then
+            print_warning "wp-content/$dir is a symlink; leaving its permissions alone"
+        elif [[ -d "$path/wp-content/$dir" ]]; then
+            sudo chmod 775 "$path/wp-content/$dir"
+        fi
     done
     mkdir -p "$path/wp-content/uploads"
-    sudo chmod 775 "$path/wp-content/uploads"
+    [[ -L "$path/wp-content/uploads" ]] || sudo chmod 775 "$path/wp-content/uploads"
 
     # Add current user to web group
     local current_user
