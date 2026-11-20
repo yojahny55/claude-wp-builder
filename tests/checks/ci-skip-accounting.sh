@@ -79,6 +79,12 @@ rout=$(bash "$RUN" --exclude "$fx/bad.sh"$'\n'"$fx/skip.sh" "$fx/ok.sh" "$fx/bad
   || fail "$RUN reads only the first line of a multi-line --exclude (got: $(grep -F 'PASS=' <<<"$rout"))"
 rrc=0; timeout 20 bash "$RUN" --exclude >/dev/null 2>&1 || rrc=$?
 [ "$rrc" -eq 2 ] || fail "$RUN --exclude with no value exits $rrc, expected 2 (124 means it hung)"
+# A check that dies with no output still reports why: its exit status. Without it a
+# silent set -e exit (SIGPIPE under pipefail was the real one) is an empty FAIL group.
+printf '#!/usr/bin/env bash\nexit 141\n' >"$fx/mute.sh"
+rout=$(bash "$RUN" "$fx/mute.sh" 2>&1)
+grep -Fq '(no output)' <<<"$rout" && grep -Fq 'exit status 141' <<<"$rout" \
+  || fail "$RUN prints neither '(no output)' nor the exit status for a check that failed silently"
 rout=$(bash "$RUN" -j 2 "$fx/ok.sh" "$fx/bad.sh" 2>&1); rrc=$?
 [ "$rrc" -eq 1 ] && grep -Fq 'PASS=1 SKIP=0 FAIL=1' <<<"$rout" || fail "$RUN does not fail the run on a failing check"
 rout=$(bash "$RUN" --exclude "$fx/bad.sh" "$fx/ok.sh" "$fx/bad.sh" 2>&1) \

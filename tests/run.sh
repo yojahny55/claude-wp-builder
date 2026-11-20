@@ -139,10 +139,16 @@ secs() { printf '%d.%01ds' "$(($1 / 1000))" "$((($1 % 1000) / 100))"; }
 for i in "${failed[@]}"; do
   f=$(disp "${selected[$i]}")
   if [ -n "${GITHUB_ACTIONS:-}" ]; then printf '::group::FAIL %s\n' "$f"; else printf '== FAIL %s\n' "$f"; fi
+  rc=$(cat "$work/$i.rc" 2>/dev/null || echo '?')
   tail -30 "$work/$i.out"
+  # A check that dies under set -e prints nothing, and a FAIL group with an empty body
+  # gives the reader nothing to go on. The exit status is the one fact always there:
+  # 141 is SIGPIPE (a pipe whose reader exited first), 127 a missing command.
+  [ -s "$work/$i.out" ] || printf '(no output)\n'
+  printf 'exit status %s\n' "$rc"
   if [ -n "${GITHUB_ACTIONS:-}" ]; then
     printf '::endgroup::\n'
-    printf '::error file=%s::%s failed\n' "$f" "$f"
+    printf '::error file=%s::%s failed (exit %s)\n' "$f" "$f" "$rc"
   fi
 done
 
