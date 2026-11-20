@@ -140,16 +140,16 @@ hits=$(curl -s "$site/__peak" | node -e "console.log(JSON.parse(require('fs').re
 [ "$hits" = 0 ] || fail "a redirect reached the clone-origin host without --follow-clone-origin ($hits requests)"
 qr() { node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const r=d.results.find(x=>x.url.endsWith(process.argv[1]));process.stdout.write(r?String(r[process.argv[2]]):'MISSING')" "$1" "$2" <<<"$outr"; }
 [ "$(qr /to-origin/ verdict)" = unmeasured ] || fail "redirect to the clone origin was not UNMEASURED"
-qr /to-origin/ reason | grep -q 'follow-clone-origin' || fail "clone-origin redirect refusal does not name the flag"
+qr /to-origin/ reason | grep >/dev/null -c 'follow-clone-origin' || fail "clone-origin redirect refusal does not name the flag"
 [ "$(qr /to-meta/ verdict)" = unmeasured ] || fail "redirect to a link-local address was not UNMEASURED"
-qr /to-meta/ reason | grep -q 'link-local' || fail "link-local redirect refusal reason missing"
+qr /to-meta/ reason | grep >/dev/null -c 'link-local' || fail "link-local redirect refusal reason missing"
 # An IPv4-mapped IPv6 spelling of the metadata address (dotted and hex), and the AWS IPv6
 # metadata address, are refused by literal: the request never leaves, so the reason is ours.
 for r in /to-meta6/ /to-meta6hex/ /to-awsv6/; do
   [ "$(qr $r verdict)" = unmeasured ] || fail "redirect to $r was not UNMEASURED"
-  qr $r reason | grep -q 'link-local/metadata' || fail "redirect $r was not refused as link-local/metadata: $(qr $r reason)"
+  qr $r reason | grep >/dev/null -c 'link-local/metadata' || fail "redirect $r was not refused as link-local/metadata: $(qr $r reason)"
 done
-[ "$(qr /loop/ verdict)" = unmeasured ] && qr /loop/ reason | grep -q 'more than 5 redirects' || fail "a redirect loop was not stopped at 5 hops"
+[ "$(qr /loop/ verdict)" = unmeasured ] && qr /loop/ reason | grep >/dev/null -c 'more than 5 redirects' || fail "a redirect loop was not stopped at 5 hops"
 [ "$(qr /moved/ verdict)" = redirect ] || fail "a same-site redirect is no longer followed"
 outf=$(printf '/to-origin/\n' | node "$tool" --site "$site" --clone-origin localhost --follow-clone-origin --budget 30)
 grep -q '"verdict": "redirect"' <<<"$outf" || fail "--follow-clone-origin did not allow the redirect to the origin"

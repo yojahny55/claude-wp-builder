@@ -36,8 +36,8 @@ refused "permissions bad web-user" bash "$SCRIPT" permissions --path="$wp" --web
 refused "permissions via dotdot" bash "$SCRIPT" permissions --path="$wp/.."
 run_stubbed bash "$SCRIPT" permissions --path="$wp" --web-user=www-data
 [ "$STUB_RC" = 0 ] || fail "permissions on a WP dir failed: $STUB_OUT"
-grep -F '[find]' "$STUB_LOG" | grep -q '\[-name\] \[.git\]' || fail "permissions: .git is not pruned"
-grep -F '[find]' "$STUB_LOG" | grep -q '\[node_modules\]' || fail "permissions: node_modules is not pruned"
+grep -F '[find]' "$STUB_LOG" | grep >/dev/null -c '\[-name\] \[.git\]' || fail "permissions: .git is not pruned"
+grep -F '[find]' "$STUB_LOG" | grep >/dev/null -c '\[node_modules\]' || fail "permissions: node_modules is not pruned"
 ! grep -Eq 'chown\] \[-R\]' "$STUB_LOG" || fail "permissions: recursive chown is back"
 # A symlink inside the tree must not have its target re-owned: chown follows it unless the find
 # is limited to real dirs/files and chown gets -h.
@@ -49,9 +49,9 @@ grep -Fq '[-type] [d] [-o] [-type] [f]' <<<"$chown_call" || fail "permissions: c
 grep -Fq '[chown] [-h]' <<<"$chown_call" || fail "permissions: chown lacks -h"
 # Each change is applied relative to the directory find visits (-execdir), so an ancestor swapped
 # for a symlink between the listing and the exec cannot send root's chmod/chown outside the tree.
-grep -F '[find]' "$STUB_LOG" | grep -Fq '[-exec]' && fail "permissions: a path-resolving -exec is back"
+grep -F '[find]' "$STUB_LOG" | grep >/dev/null -Fc '[-exec]' && fail "permissions: a path-resolving -exec is back"
 for tool in chown 'chmod] [755' 'chmod] [644'; do
-  grep -F '[find]' "$STUB_LOG" | grep -F "[-execdir] [$tool" | grep -Fq '[{}] [+]' || fail "permissions: $tool is not -execdir ... {} +"
+  grep -F '[find]' "$STUB_LOG" | grep -F "[-execdir] [$tool" | grep >/dev/null -Fc '[{}] [+]' || fail "permissions: $tool is not -execdir ... {} +"
 done
 # find runs under a sanitized absolute PATH (a relative or empty PATH entry aborts -execdir).
 fcalls=$(grep -F '[find]' "$STUB_LOG")
@@ -60,14 +60,14 @@ while IFS= read -r l; do
   grep -Eq '^sudo \[env\] \[PATH=(/[^]:]+)(:/[^]:]+)*\] \[find\]' <<<"$l" || fail "permissions: find is not run as sudo env PATH=<absolute> find: $l"
 done <<<"$fcalls"
 # The writable directories are changed by find -type d -execdir, not by a separate [[ -L ]] then chmod.
-grep -F '[find]' "$STUB_LOG" | grep -F '[-name] [uploads]' | grep -F '[-type] [d]' | grep -Fq '[-execdir] [chmod] [775]' \
+grep -F '[find]' "$STUB_LOG" | grep -F '[-name] [uploads]' | grep -F '[-type] [d]' | grep >/dev/null -Fc '[-execdir] [chmod] [775]' \
   || fail "permissions: uploads is not chmod-ed by find -type d -execdir"
-! grep -F 'sudo [chmod]' "$STUB_LOG" | grep -Fq '775' || fail "permissions: a bare sudo chmod 775 is back"
+! grep -F 'sudo [chmod]' "$STUB_LOG" | grep >/dev/null -Fc '775' || fail "permissions: a bare sudo chmod 775 is back"
 # A writable-directory entry that is a symlink is not chmod-ed through.
 "$REAL_MKDIR" -p "$W/elsewhere"; "$(PATH="$STUB_ORIG_PATH" command -v ln)" -s "$W/elsewhere" "$wp/wp-content/plugins"
 run_stubbed bash "$SCRIPT" permissions --path="$wp" --web-user=www-data
 [ "$STUB_RC" = 0 ] || fail "permissions with a symlinked plugins dir failed: $STUB_OUT"
-! grep -F 'sudo [env]' "$STUB_LOG" | grep -F '[chmod] [775]' | grep -Fq '[-name] [plugins]' || fail "permissions: chmod 775 followed a symlinked wp-content/plugins"
+! grep -F 'sudo [env]' "$STUB_LOG" | grep -F '[chmod] [775]' | grep >/dev/null -Fc '[-name] [plugins]' || fail "permissions: chmod 775 followed a symlinked wp-content/plugins"
 grep -Fq 'symlink' <<<"$STUB_OUT" || fail "permissions: no warning for the symlinked directory"
 
 # SH-12: vhost-install --dest, service-reload --service, native-setup --web-server.
@@ -93,10 +93,10 @@ run_stubbed env WP_ENV_HTTPD_LAYOUT_PROBE="$W/no-such-dir" bash "$SCRIPT" native
 [ "$STUB_RC" = 0 ] || fail "native-setup apache (debian layout) failed: $STUB_OUT"
 grep -Fq "sudo [install] [-m] [644] [-o] [root] [-g] [root] [$W/v.conf] [/etc/apache2/sites-available/deb-$$.local.com.conf]" "$STUB_LOG" \
   || fail "debian layout did not install to /etc/apache2/sites-available/<domain>.conf"
-l_inst=$(grep -n 'sudo \[install\]' "$STUB_LOG" | head -1 | cut -d: -f1)
-l_mod=$(grep -n 'sudo \[a2enmod\] \[ssl\] \[proxy_fcgi\] \[rewrite\]' "$STUB_LOG" | head -1 | cut -d: -f1)
-l_site=$(grep -n "sudo \[a2ensite\] \[deb-$$.local.com\]" "$STUB_LOG" | head -1 | cut -d: -f1)
-l_rel=$(grep -n 'sudo \[systemctl\]' "$STUB_LOG" | head -1 | cut -d: -f1)
+l_inst=$(grep -n 'sudo \[install\]' "$STUB_LOG" | sed -n 1p | cut -d: -f1)
+l_mod=$(grep -n 'sudo \[a2enmod\] \[ssl\] \[proxy_fcgi\] \[rewrite\]' "$STUB_LOG" | sed -n 1p | cut -d: -f1)
+l_site=$(grep -n "sudo \[a2ensite\] \[deb-$$.local.com\]" "$STUB_LOG" | sed -n 1p | cut -d: -f1)
+l_rel=$(grep -n 'sudo \[systemctl\]' "$STUB_LOG" | sed -n 1p | cut -d: -f1)
 [ -n "$l_inst" ] && [ -n "$l_mod" ] && [ -n "$l_site" ] && [ -n "$l_rel" ] || fail "a2enmod/a2ensite/reload not all recorded"
 [ "$l_inst" -lt "$l_mod" ] && [ "$l_mod" -lt "$l_rel" ] && [ "$l_site" -lt "$l_rel" ] || fail "a2enmod/a2ensite not between install and reload"
 # the RHEL layout installs under /etc/httpd/conf.d and must not call them
