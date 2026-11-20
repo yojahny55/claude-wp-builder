@@ -72,7 +72,9 @@ resolve() {
 disp() { printf '%s' "${1#"$PWD/"}"; }
 
 excluded=" "
-read -r -a exclude_list <<<"$exclude"   # split on spaces, no glob expansion
+# Split on any whitespace, newlines included, with no glob expansion. read -d '' reads the
+# whole value and returns 1 at its end, which is expected.
+read -r -d '' -a exclude_list <<<"$exclude" || true
 for e in "${exclude_list[@]}"; do excluded+="$(resolve "$e") "; done
 selected=(); dropped=" "
 for f in "${files[@]}"; do

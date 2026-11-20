@@ -74,6 +74,9 @@ rout=$(cd "$fx" && bash "$OLDPWD/$RUN" --exclude bad.sh ok.sh bad.sh 2>&1) \
 rout=$(cd "$fx" && bash "$OLDPWD/$RUN" --exclude ./bad.sh ok.sh bad.sh 2>&1) \
   && grep -Fq 'PASS=1 SKIP=0 FAIL=0' <<<"$rout" \
   || fail "$RUN treats ./bad.sh and bad.sh as different checks (got: $(grep -F 'PASS=' <<<"$rout"))"
+rout=$(bash "$RUN" --exclude "$fx/bad.sh"$'\n'"$fx/skip.sh" "$fx/ok.sh" "$fx/bad.sh" "$fx/skip.sh" 2>&1) \
+  && grep -Fq 'PASS=1 SKIP=0 FAIL=0' <<<"$rout" \
+  || fail "$RUN reads only the first line of a multi-line --exclude (got: $(grep -F 'PASS=' <<<"$rout"))"
 rrc=0; timeout 20 bash "$RUN" --exclude >/dev/null 2>&1 || rrc=$?
 [ "$rrc" -eq 2 ] || fail "$RUN --exclude with no value exits $rrc, expected 2 (124 means it hung)"
 rout=$(bash "$RUN" -j 2 "$fx/ok.sh" "$fx/bad.sh" 2>&1); rrc=$?
