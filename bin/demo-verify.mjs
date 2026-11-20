@@ -98,6 +98,17 @@ const targetIsDir = !targetIsUrl && existsSync(target) && statSync(target).isDir
 const pages = targetIsDir
   ? readdirSync(target).filter((f) => f.endsWith('.html')).sort().map((f) => join(target, f))
   : [target];
+// Nothing to walk is a usage error, not a clean pass. A directory with no .html
+// and a mistyped file path both used to reach the summary as "no machine
+// findings on 0 page(s)" and exit 0, which a caller reads as verified. Exit 1,
+// not 2: 2 means "no browser" and sends the caller down the wrong branch.
+if (!PROBE && !targetIsUrl) {
+  const missing = targetIsDir ? pages.length === 0 : !existsSync(target);
+  if (missing) {
+    console.error('demo-verify: no pages to verify at ' + target + (targetIsDir ? ' (no .html files in the directory)' : ' (path does not exist)'));
+    process.exit(1);
+  }
+}
 // resolve() on a URL string treats it as a filesystem path, which is never
 // what the caller means; a URL target with no --out writes into cwd/.verify
 // instead of guessing a directory from the URL text.
