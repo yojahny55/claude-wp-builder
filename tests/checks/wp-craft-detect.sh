@@ -410,9 +410,14 @@ grep -Fq '`CSSMediaRule`, `CSSSupportsRule` and `CSSLayerBlockRule` bodies' skil
 if grep -Fq 'it walks only each sheet' skills/wp-demo-craft/references/verify.md; then
   fail "verify.md still records the retired top-level-only limit as current behaviour"
 fi
-if grep -Fq 'The `@container` lint under-reports in one known way' CLAUDE.md; then
-  fail "CLAUDE.md still lists the retired @container top-level-only limit as a known ceiling"
-fi
+# Both files: the ceilings live in docs/known-ceilings.md, and a check on CLAUDE.md alone
+# would stay green on a file that no longer holds them.
+for doc in CLAUDE.md docs/known-ceilings.md; do
+  [ -f "$doc" ] || fail "$doc is missing, so the zero-occurrence control would be vacuous"
+  if grep -Fq 'The `@container` lint under-reports in one known way' "$doc"; then
+    fail "$doc still lists the retired @container top-level-only limit as a known ceiling"
+  fi
+done
 # The first-match limit is retired, not recorded: it was a blocking false
 # positive, not an under-report, so the file must say the lint reads every match
 # — a stale "first match only" line teaches a build to dismiss a finding that is

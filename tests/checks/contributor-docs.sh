@@ -14,7 +14,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-DOCS=(CLAUDE.md CONTRIBUTING.md BACKLOG.md)
+DOCS=(CLAUDE.md CONTRIBUTING.md BACKLOG.md docs/known-ceilings.md docs/testing.md docs/architecture.md)
 # The top-level directories this repo ships, read FROM the repo rather than typed here.
 # A hard-coded list is a second copy: add a top-level directory, reference it in these
 # docs, and every path under it is skipped silently -- the check still passes, having

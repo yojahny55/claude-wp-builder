@@ -192,7 +192,12 @@ grep -Eq '@property --container-max[[:space:]]*\{' <<<"$tokens" \
 # Permanent zero-occurrence control: this ceiling is fixed, so its old wording
 # must never reappear in CLAUDE.md. Stays green forever unless the ceiling
 # entry is reverted while the code fix (and the greps above) stay in place.
-grep -Fq 'only guards an absent token, not a malformed one' CLAUDE.md \
-  && fail "CLAUDE.md still records the old container-max ceiling as unfixed"
+# Checked in CLAUDE.md and in docs/known-ceilings.md, where the ceilings now live: checking
+# only CLAUDE.md would stay green forever on a file that no longer holds the text.
+for doc in CLAUDE.md docs/known-ceilings.md; do
+  [ -f "$doc" ] || fail "$doc is missing, so the zero-occurrence control would be vacuous"
+  grep -Fq 'only guards an absent token, not a malformed one' "$doc" \
+    && fail "$doc still records the old container-max ceiling as unfixed"
+done
 
 echo PASS
