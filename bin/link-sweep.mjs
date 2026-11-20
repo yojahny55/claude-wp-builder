@@ -19,6 +19,10 @@
  *       external      any other http(s) host
  *       fragment      `#…` pointing at the page it is on: reported, never requested
  *       skipped       mailto:, tel:, javascript: and other non-http schemes
+ *   - redirects are followed by hand, at most 5 hops, and every target is checked before it is
+ *     requested: the clone-origin host is refused without --follow-clone-origin, link-local and
+ *     metadata addresses are always refused, and a private or loopback host is refused unless
+ *     the swept site is itself on one. A refused hop makes the link UNMEASURED with the reason;
  *   - a CDN bot challenge (403/503 with `cf-mitigated: challenge`, or a body carrying
  *     `challenge-platform`) is UNMEASURED, never broken, and never retried with another
  *     User-Agent;
@@ -61,6 +65,8 @@
  * exit 0 = sweep ran (findings are in the JSON), 2 = usage, 4 = --stop-on-block stopped it.
  */
 import { readFileSync } from 'node:fs';
+import { lookup as dnsLookup } from 'node:dns/promises';
+import { Refused, isLinkLocal, isPrivateHost, checkResolved } from './lib/net-class.mjs';
 
 const USAGE = 'usage: link-sweep.mjs --site <origin> [--urls <file>] [--clone-origin <host>] ' +
   '[--follow-clone-origin] [--concurrency <1-4>] [--per-group <n>] [--full] [--per-page <n>] [--max <n>] ' +
@@ -165,23 +171,62 @@ function isChallenge(res, body) {
   return /challenge-platform|cf-chl-|_cf_chl_opt/i.test(body || '');
 }
 
+const MAX_HOPS = 5;
+
+// Refuse a redirect target the original link's classification never saw. Link-local and
+// metadata addresses are refused by their literal spelling (IPv4-mapped IPv6 included) and by
+// what a hostname resolves to at check time; the clone origin only with --follow-clone-origin;
+// a private or loopback host only when the swept site is itself on one (a local dev sweep).
+// DNS rebinding between this lookup and fetch()'s own remains possible: see checkResolved.
+async function checkHop(o, u) {
+  if (!/^https?:$/.test(u.protocol)) throw new Refused(`redirect to a non-http(s) target (${u.protocol}) not followed`);
+  const host = u.hostname;
+  if (bareHost(host) === bareHost(o.siteUrl.hostname)) return;
+  if (isLinkLocal(host)) throw new Refused(`redirect to link-local/metadata host ${host} not followed`);
+  if (o.cloneOrigin && bareHost(host) === bareHost(hostOf(o.cloneOrigin)) && !o.followClone) {
+    throw new Refused(`redirect to the clone-origin host ${host} not followed without --follow-clone-origin`);
+  }
+  if (isPrivateHost(host) && !isPrivateHost(o.siteUrl.hostname)) {
+    throw new Refused(`redirect to private/loopback host ${host} not followed from a non-local site`);
+  }
+  await checkResolved(host, { siteLocal: isPrivateHost(o.siteUrl.hostname), lookup: dnsLookup });
+}
+
+// fetch() with redirects followed by hand, at most MAX_HOPS, each target checked first.
+// The returned response carries `finalUrl`, the last URL actually requested.
+async function fetchChecked(o, url, init) {
+  let cur = url;
+  for (let hop = 0; ; hop++) {
+    const res = await fetch(cur, { ...init, redirect: 'manual' });
+    const loc = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+    if (!loc) { res.finalUrl = cur; return res; }
+    await res.body?.cancel();
+    if (hop >= MAX_HOPS) throw new Refused(`more than ${MAX_HOPS} redirects not followed`);
+    let next;
+    try { next = new URL(loc, cur); } catch { throw new Refused('redirect with an unparseable Location'); }
+    next.hash = '';
+    await checkHop(o, next);
+    cur = next.href;
+  }
+}
+
 async function request(o, url, deadline) {
   const left = deadline - Date.now();
   if (left <= 0) return { verdict: 'unmeasured', status: null, reason: 'budget exhausted before this link' };
   const signal = AbortSignal.timeout(Math.min(o.timeout * 1000, left));
   const headers = { 'user-agent': UA };
   try {
-    let res = await fetch(url, { method: 'HEAD', redirect: 'follow', headers, signal });
+    let res = await fetchChecked(o, url, { method: 'HEAD', headers, signal });
     let body = '';
     if (res.status === 405 || res.status === 501) {
-      res = await fetch(url, { method: 'GET', redirect: 'follow', signal,
+      res = await fetchChecked(o, url, { method: 'GET', signal,
         headers: { ...headers, range: 'bytes=0-0' } });
       await res.body?.cancel();
     }
     if ([403, 429, 503].includes(res.status) && !res.headers.get('cf-mitigated')) {
       // A HEAD carries no body; read at most 64 KB of one GET to tell a challenge page from a
       // real refusal. One request, same User-Agent: a challenge is not a reason to retry.
-      const g = await fetch(url, { method: 'GET', redirect: 'follow', headers, signal });
+      const g = await fetchChecked(o, url, { method: 'GET', headers, signal });
       const reader = g.body?.getReader();
       let got = 0;
       const dec = new TextDecoder();
@@ -198,22 +243,23 @@ async function request(o, url, deadline) {
     }
     // A CDN challenge is answered before the WAF test: it is not a ban and must not stop the sweep.
     if (isChallenge(res, body)) {
-      return { verdict: 'unmeasured', status: res.status, final: res.url,
+      return { verdict: 'unmeasured', status: res.status, final: res.finalUrl,
         reason: 'blocked by CDN bot challenge — not a broken link; not retried' };
     }
     // A 403 or a 503 counts only with a WAF signature in the body: a bare 503 is as often
     // maintenance or an overloaded origin as a ban.
     if (o.stopOnBlock && (res.status === 429 || ((res.status === 403 || res.status === 503) &&
         /mod_?security|crowdsec|captcha|request blocked|access denied by/i.test(body)))) {
-      return { verdict: 'unmeasured', status: res.status, final: res.url, blocked: true,
+      return { verdict: 'unmeasured', status: res.status, final: res.finalUrl, blocked: true,
         reason: `blocked by the server's WAF or rate limit (HTTP ${res.status}) — not retried` };
     }
-    const moved = res.url && res.url !== url;
+    const moved = res.finalUrl !== url;
     let verdict = 'ok';
     if (res.status >= 400) verdict = 'broken';
     else if (moved) verdict = 'redirect';
-    return { verdict, status: res.status, final: res.url };
+    return { verdict, status: res.status, final: res.finalUrl };
   } catch (e) {
+    if (e instanceof Refused) return { verdict: 'unmeasured', status: null, reason: e.message };
     const timeout = e.name === 'TimeoutError' || e.name === 'AbortError';
     if (timeout && Date.now() >= deadline) {
       return { verdict: 'unmeasured', status: null, reason: 'budget exhausted during request' };

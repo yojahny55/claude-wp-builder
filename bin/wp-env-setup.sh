@@ -21,10 +21,10 @@ PKG_MANAGER=""
 # Utility functions
 ##############################################################################
 
-print_status() { [[ "$JSON_OUTPUT" == "false" ]] && echo -e "${BLUE}[INFO]${NC} $1"; }
-print_success() { [[ "$JSON_OUTPUT" == "false" ]] && echo -e "${GREEN}[OK]${NC} $1"; }
-print_warning() { [[ "$JSON_OUTPUT" == "false" ]] && echo -e "${YELLOW}[WARN]${NC} $1"; }
-print_error() { [[ "$JSON_OUTPUT" == "false" ]] && echo -e "${RED}[ERROR]${NC} $1"; }
+print_status() { if [[ "$JSON_OUTPUT" == "false" ]]; then echo -e "${BLUE}[INFO]${NC} $1"; fi; }
+print_success() { if [[ "$JSON_OUTPUT" == "false" ]]; then echo -e "${GREEN}[OK]${NC} $1"; fi; }
+print_warning() { if [[ "$JSON_OUTPUT" == "false" ]]; then echo -e "${YELLOW}[WARN]${NC} $1"; fi; }
+print_error() { if [[ "$JSON_OUTPUT" == "false" ]]; then echo -e "${RED}[ERROR]${NC} $1"; fi; }
 
 # A domain ends up in sudo rm paths, /etc/hosts, a sed regex and an openssl
 # subject, so it is checked before any command acts on it: lowercase letters,
@@ -34,6 +34,28 @@ validate_domain() {
     local domain="$1"
     if [[ ! "$domain" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$ ]]; then
         print_error "Invalid domain '$domain': use lowercase letters, digits, dots and hyphens only"
+        exit 1
+    fi
+}
+
+# The RHEL-style Apache layout is chosen by whether this directory exists. Overridable so a
+# test can select the layout; it only decides WHICH fixed /etc path is written, never where.
+HTTPD_LAYOUT_PROBE="${WP_ENV_HTTPD_LAYOUT_PROBE:-/etc/httpd/conf.d}"
+
+# Web servers native-setup knows how to configure.
+validate_web_server() {
+    case "$1" in
+        nginx|apache|caddy) ;;
+        *) print_error "Unknown web server '$1': use nginx, apache or caddy"; exit 1;;
+    esac
+}
+
+# Root writes a vhost to --dest, so it must sit under a web server's config tree, with no ".."
+# component that could climb out of it. Shared by vhost-install and native-setup.
+validate_vhost_dest() {
+    local dest="$1"
+    if [[ ! "$dest" =~ ^/etc/(nginx|httpd|apache2|caddy)/[^[:space:]]+$ || "$dest" =~ (^|/)\.\.(/|$) ]]; then
+        print_error "Refusing --dest outside /etc/{nginx,httpd,apache2,caddy}/: $dest"
         exit 1
     fi
 }
@@ -338,6 +360,19 @@ cmd_permissions() {
 
     [[ -z "$path" ]] && { print_error "Usage: wp-env-setup.sh permissions --path=/var/www/html/site [--web-user=nginx]"; exit 1; }
     [[ ! -d "$path" ]] && { print_error "Directory not found: $path"; exit 1; }
+    path=$(realpath -- "$path") || { print_error "Cannot resolve path: $path"; exit 1; }
+    if [[ "$path" == "/" || "$path" == "${HOME:-}" || "$path" == "$(realpath -- "${HOME:-/nonexistent}" 2>/dev/null || true)" ]]; then
+        print_error "Refusing to change permissions on $path"
+        exit 1
+    fi
+    if [[ ! -f "$path/wp-config.php" && ! -d "$path/wp-content" ]]; then
+        print_error "Not a WordPress directory (no wp-config.php or wp-content/): $path"
+        exit 1
+    fi
+    if [[ -n "$web_user" && ! "$web_user" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+        print_error "Invalid --web-user '$web_user'"
+        exit 1
+    fi
 
     detect_os
     if [[ -z "$web_user" ]]; then
@@ -351,9 +386,12 @@ cmd_permissions() {
 
     print_status "Setting permissions for $path (web user: $web_user)..."
 
-    sudo chown -R "$web_user:$web_user" "$path"
-    sudo find "$path" -type d -exec chmod 755 {} \;
-    sudo find "$path" -type f -exec chmod 644 {} \;
+    # .git and node_modules are pruned: their ownership and executable bits are not ours to reset.
+    # chown without -R still follows a symlink given as an operand, so only real directories and
+    # files are listed (a symlink to /etc/shadow is skipped) and -h keeps it off any link that races in.
+    sudo find "$path" \( -name .git -o -name node_modules \) -prune -o \( -type d -o -type f \) -exec chown -h "$web_user:$web_user" {} +
+    sudo find "$path" \( -name .git -o -name node_modules \) -prune -o -type d -exec chmod 755 {} \;
+    sudo find "$path" \( -name .git -o -name node_modules \) -prune -o -type f -exec chmod 644 {} \;
 
     # Writable directories
     for dir in uploads plugins themes cache; do
@@ -432,6 +470,11 @@ cmd_service_reload() {
 
     [[ -z "$service" ]] && { print_error "Usage: wp-env-setup.sh service-reload --service=nginx"; exit 1; }
 
+    case "$service" in
+        nginx|apache|apache2|httpd|caddy|php-fpm*|php[0-9]*-fpm) ;;
+        *) print_error "Refusing to reload unknown service '$service'"; exit 1;;
+    esac
+
     detect_os
     print_status "Reloading $service..."
 
@@ -473,6 +516,7 @@ cmd_vhost_install() {
         exit 1
     }
     [[ ! -f "$src" ]] && { print_error "Source file not found: $src"; exit 1; }
+    validate_vhost_dest "$dest"
 
     # Install atomically with correct mode + owner. `install` is preferable to
     # `mv`/`cp` because it sets all three in one call without race windows.
@@ -523,8 +567,31 @@ cmd_native_setup() {
         exit 1
     }
     validate_domain "$domain"
+    validate_web_server "$web_server"
 
     detect_os
+
+    # Work out and validate the vhost destination before anything runs under sudo, so a refusal
+    # leaves no certificate and no hosts entry behind.
+    local dest="" debian_apache=false
+    if [[ -n "$vhost_src" ]]; then
+        case "$web_server" in
+            nginx)  dest="/etc/nginx/conf.d/$domain.conf";;
+            apache)
+                if [[ -d "$HTTPD_LAYOUT_PROBE" ]]; then
+                    dest="/etc/httpd/conf.d/$domain.conf"
+                else
+                    dest="/etc/apache2/sites-available/$domain.conf"
+                    debian_apache=true
+                fi
+                ;;
+            caddy)
+                print_error "--vhost-src is not supported for caddy (configs append to Caddyfile). Install manually."
+                return 1
+                ;;
+        esac
+        validate_vhost_dest "$dest"
+    fi
 
     # SSL
     if [[ "$ssl" == "true" && "$web_server" != "caddy" ]]; then
@@ -537,23 +604,11 @@ cmd_native_setup() {
     # Vhost config — if --vhost-src is provided, install it; otherwise print
     # guidance for Claude to write the config and then call vhost-install.
     if [[ -n "$vhost_src" ]]; then
-        local dest
-        case "$web_server" in
-            nginx)  dest="/etc/nginx/conf.d/$domain.conf";;
-            apache)
-                if [[ -d /etc/httpd/conf.d ]]; then
-                    dest="/etc/httpd/conf.d/$domain.conf"
-                else
-                    dest="/etc/apache2/sites-available/$domain.conf"
-                fi
-                ;;
-            caddy)
-                print_error "--vhost-src is not supported for caddy (configs append to Caddyfile). Install manually."
-                return 1
-                ;;
-        esac
-        if [[ -n "$dest" ]]; then
-            cmd_vhost_install --src="$vhost_src" --dest="$dest"
+        cmd_vhost_install --src="$vhost_src" --dest="$dest"
+        # Debian keeps vhosts in sites-available; they are served only once enabled.
+        if [[ "$debian_apache" == "true" ]]; then
+            sudo a2enmod ssl proxy_fcgi rewrite
+            sudo a2ensite "$domain"
         fi
     else
         print_status "Web server config should be generated by Claude from templates and placed in the appropriate directory."

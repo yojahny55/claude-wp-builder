@@ -179,4 +179,45 @@ awk '/^## Step 9: / { s = 1; next } /^## Step [0-9]+:/ && s { exit } s && /audit
 grep -Fq 'runbook-<AAAA-MM-DD>.md' skills/wp-audit-run/references/manifest-update.md || fail "summary does not print the runbook"
 grep -Fq "'server', 'page_cache'" bin/lib/manifest.mjs || fail "manifest does not accept environments[].server/page_cache"
 grep -Fq -- '--server=nginx --page-cache=' skills/wp-environments/SKILL.md || fail "wp-environments does not document --server"
+# --- 7. quoting: operators inside quotes, and record-derived file names ------------------
+# A pipe inside a quoted value is data, not a pipeline: no --url may land inside the quotes.
+# A file name from the record is quoted for the shell lines the operator pastes.
+site2="$tmp/site2"
+mkdir -p "$site2/wp-content/themes/child-theme" "$tmp/out2"
+cp "$site/.wp-create.json" "$site2/.wp-create.json"
+cat > "$tmp/out2/replay.json" <<'JSON'
+{ "replay_version": 1, "entries": [
+  { "check": "SEO-030", "kind": "db-option", "resource": "option:blogname",
+    "command": "wp option update blogname \"%title% | %sitename%\"", "previous value": "x",
+    "applied_in": "local", "applied_on": { "local": true, "prod": false } },
+  { "check": "SEO-031", "kind": "db-option", "resource": "option:other",
+    "command": "wp option update other 'a && b ; c' && wp cache flush", "previous value": "x",
+    "applied_in": "local", "applied_on": { "local": true, "prod": false } },
+  { "check": "PERF-040", "kind": "post-deploy",
+    "command": "wp post list --format=ids | xargs wp post delete",
+    "applied_in": "local", "applied_on": { "local": true, "prod": false } },
+  { "check": "PERF-042", "kind": "post-deploy",
+    "command": "wp x a\\ && wp y",
+    "applied_in": "local", "applied_on": { "local": true, "prod": false } },
+  { "check": "PERF-041", "kind": "code", "file": "wp-content/themes/child-theme/a b; touch x'y.css",
+    "applied_in": "local", "applied_on": { "local": true, "prod": false } }
+] }
+JSON
+(cd "$site2" && node "$OLDPWD/$gen" --out "$tmp/out2" --date 2026-01-05) >/dev/null || fail "quoting fixture render failed"
+md2="$tmp/out2/runbook-2026-01-05.md"
+grep -Fq "wp option update blogname \"%title% | %sitename%\" --url=https://www.example.org" "$md2" \
+  || fail "a quoted pipe was split as a pipeline (or the url was not appended after the quoted value)"
+! grep -Fq '| %sitename%" --url' "$md2" || true
+! grep -Eq '%title%[^"]*--url=[^"]*\|' "$md2" || fail "--url landed inside a quoted value"
+grep -Fq "wp option update other 'a && b ; c' --url=https://www.example.org && wp cache flush" "$md2" \
+  || fail "operators inside single quotes were split, or a real && was not"
+grep -Fq 'wp post list --format=ids --url=https://www.example.org | xargs wp post delete' "$md2" \
+  || fail "an ordinary pipe lost its per-command --url"
+grep -Fq 'wp x a\  --url=https://www.example.org && wp y --url=https://www.example.org' "$md2" \
+  || fail "an escaped space was split off its argument: --url must follow it with its own separator"
+! grep -Fq 'a\ --url=' "$md2" || fail "--url was glued to an escaped space"
+grep -Fq "git ls-files --error-unmatch -- 'wp-content/themes/child-theme/a b; touch x'\\''y.css'" "$md2" \
+  || fail "a hostile file name is not single-quoted in git ls-files"
+! grep -Fq -- '-- wp-content/themes/child-theme/a b' "$md2" || fail "a file name with spaces is still interpolated bare"
+
 echo PASS
