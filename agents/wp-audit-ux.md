@@ -186,7 +186,8 @@ node ${CLAUDE_PLUGIN_ROOT}/bin/link-sweep.mjs --site "<site-url>" --urls http.tx
 ```
 
 Add `--follow-clone-origin` **only** when the operator confirmed the production host this
-run (Step 2.3). Without it, clone-origin links come back `unmeasured`, which is correct.
+run (Step 2.3). Without it, clone-origin links come back `unmeasured`, which is correct. A redirect that leads to that host is held to the same rule, and
+redirects to link-local or metadata addresses are never followed; the link is `unmeasured`.
 
 **The two are counted differently, and that is not a detail.** `UX-014` is page-level:
 report one finding per page, `UX-014 : page:/contact/`, whose evidence lists every broken

@@ -20,17 +20,25 @@ trap '[ -n "$srv" ] && kill "$srv" 2>/dev/null; rm -rf "$tmp"' EXIT
 # Fixture: counts requests in flight server-side, so the cap is measured where the load lands.
 cat >"$tmp/server.mjs" <<'EOF'
 import http from 'node:http';
-let inFlight = 0, peak = 0, headRefused = 0;
+let inFlight = 0, peak = 0, headRefused = 0, originHits = 0, directHits = 0;
 const srv = http.createServer((req, res) => {
   inFlight++; peak = Math.max(peak, inFlight);
   const done = (code, headers = {}, body = '') => setTimeout(() => {
     inFlight--; res.writeHead(code, headers); res.end(req.method === 'HEAD' ? '' : body);
   }, 60);
   const p = req.url;
-  if (p === '/__peak') { inFlight--; res.end(JSON.stringify({ peak, headRefused })); return; }
+  if (/^localhost/.test(req.headers.host || '')) originHits++;
+  if (p === '/__peak') { inFlight--; res.end(JSON.stringify({ peak, headRefused, originHits, directHits })); return; }
   if (p === '/ok/') return done(200);
   if (p === '/gone/') return done(404);
   if (p === '/moved/') return done(301, { location: '/ok/' });
+  if (p === '/to-origin/') return done(302, { location: `http://localhost:${srv.address().port}/ok/` });
+  if (p === '/to-meta/') return done(302, { location: 'http://169.254.169.254/latest/meta-data/' });
+  if (p === '/to-meta6/') return done(302, { location: 'http://[::ffff:169.254.169.254]/latest/meta-data/' });
+  if (p === '/to-meta6hex/') return done(302, { location: 'http://[::ffff:a9fe:a9fe]/' });
+  if (p === '/to-awsv6/') return done(302, { location: 'http://[fd00:ec2::254]/' });
+  if (p === '/direct-private') { directHits++; return done(200); }
+  if (p === '/loop/') return done(302, { location: '/loop/' });
   if (p === '/nohead/') {
     if (req.method === 'HEAD') { headRefused++; return done(405); }
     return done(req.headers.range === 'bytes=0-0' ? 206 : 500);
@@ -121,6 +129,79 @@ node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));
 const ok=d.results.filter(r=>r.verdict==='ok').map(r=>r.url.replace(/.*\/load\//,'')).sort().join();
 if(ok!=='z1/,z3/,z4/'){console.log(ok);process.exit(1)}" <<<"$outpg" \
   || fail "a link refused by --per-page consumed a --per-group slot"
+
+# A redirect is a request too: it is checked against the same rules as the link. A link on the
+# site that redirects to the clone-origin host must not reach it without --follow-clone-origin;
+# a redirect to a link-local/metadata address is never followed; a loop stops at 5 hops. The
+# fixture is reachable as 127.0.0.1 (the site) and as localhost (standing in for the origin).
+printf '/to-origin/\n/to-meta/\n/to-meta6/\n/to-meta6hex/\n/to-awsv6/\n/loop/\n/moved/\n' >"$tmp/redir"
+outr=$(node "$tool" --site "$site" --urls "$tmp/redir" --clone-origin localhost --budget 30)
+hits=$(curl -s "$site/__peak" | node -e "console.log(JSON.parse(require('fs').readFileSync(0,'utf8')).originHits)")
+[ "$hits" = 0 ] || fail "a redirect reached the clone-origin host without --follow-clone-origin ($hits requests)"
+qr() { node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const r=d.results.find(x=>x.url.endsWith(process.argv[1]));process.stdout.write(r?String(r[process.argv[2]]):'MISSING')" "$1" "$2" <<<"$outr"; }
+[ "$(qr /to-origin/ verdict)" = unmeasured ] || fail "redirect to the clone origin was not UNMEASURED"
+qr /to-origin/ reason | grep >/dev/null -c 'follow-clone-origin' || fail "clone-origin redirect refusal does not name the flag"
+[ "$(qr /to-meta/ verdict)" = unmeasured ] || fail "redirect to a link-local address was not UNMEASURED"
+qr /to-meta/ reason | grep >/dev/null -c 'link-local' || fail "link-local redirect refusal reason missing"
+# An IPv4-mapped IPv6 spelling of the metadata address (dotted and hex), and the AWS IPv6
+# metadata address, are refused by literal: the request never leaves, so the reason is ours.
+for r in /to-meta6/ /to-meta6hex/ /to-awsv6/; do
+  [ "$(qr $r verdict)" = unmeasured ] || fail "redirect to $r was not UNMEASURED"
+  qr $r reason | grep >/dev/null -c 'link-local/metadata' || fail "redirect $r was not refused as link-local/metadata: $(qr $r reason)"
+done
+[ "$(qr /loop/ verdict)" = unmeasured ] && qr /loop/ reason | grep >/dev/null -c 'more than 5 redirects' || fail "a redirect loop was not stopped at 5 hops"
+[ "$(qr /moved/ verdict)" = redirect ] || fail "a same-site redirect is no longer followed"
+outf=$(printf '/to-origin/\n' | node "$tool" --site "$site" --clone-origin localhost --follow-clone-origin --budget 30)
+grep -q '"verdict": "redirect"' <<<"$outf" || fail "--follow-clone-origin did not allow the redirect to the origin"
+
+# A direct link is a request too: the policy runs on the initial URL, not only on redirect hops.
+# From a public site, a link straight to a metadata address or to a private/loopback server is
+# refused before any request leaves (the fixture must see no hit); a same-host link is unaffected.
+outd=$(printf 'http://127.0.0.1:%s/direct-private\thttps://public.example/\nhttp://169.254.169.254/latest/meta-data/\thttps://public.example/\nhttp://[::ffff:169.254.169.254]/\thttps://public.example/\n' "$port" \
+  | node "$tool" --site https://public.example --budget 30)
+dh=$(curl -s "$site/__peak" | node -e "console.log(JSON.parse(require('fs').readFileSync(0,'utf8')).directHits)")
+[ "$dh" = 0 ] || fail "a direct link to a private/loopback host was fetched from a public site ($dh hits)"
+node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const bad=d.results.filter(r=>r.verdict!=='unmeasured'||!r.reason);if(d.results.length!==3||bad.length){console.log(JSON.stringify(d.results));process.exit(1)}" <<<"$outd" \
+  || fail "direct links to private/metadata hosts were not all UNMEASURED with a reason"
+grep -q 'private/loopback' <<<"$outd" && grep -q 'link-local/metadata' <<<"$outd" || fail "direct-link refusal reasons missing"
+[ "$(q /ok/ verdict)" = ok ] || fail "a same-host link is affected by the direct-link check"
+
+# A dead external host (.invalid never resolves) is a broken link, not an unmeasured one: the
+# resolution failure on the original URL is reported by the request, not refused as a redirect.
+outi=$(printf '%s\t%s\n' 'https://nonexistent-zzq.invalid/x' "$site/page-a/" | node "$tool" --site "$site" --budget 20)
+node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const r=d.results[0];
+if(!r||r.verdict!=='broken'){console.log(JSON.stringify(r));process.exit(1)}" <<<"$outi" \
+  || fail "a direct link to an unresolvable (.invalid) host was not reported broken"
+
+# The classifier and the resolved-address check, without a network: the lookup is injected.
+node --input-type=module - <<'JS' || fail "address classification (bin/lib/net-class.mjs) is wrong"
+import { classifyHost as c, checkResolved, Refused, siteIsLocal } from './bin/lib/net-class.mjs';
+const want = { '[::ffff:a9fe:a9fe]': 'metadata', '::ffff:169.254.169.254': 'metadata', '[::ffff:7f00:1]': 'private',
+  'fd00:ec2::254': 'metadata', '[::1]': 'private', '::': 'private', 'fe80::1': 'linklocal', 'fc00::1': 'private',
+  'fd12::1': 'private', '0.0.0.0': 'private', '169.254.1.1': 'linklocal', '10.0.0.1': 'private', '172.16.0.1': 'private',
+  '172.32.0.1': 'public', '192.168.1.1': 'private', 'localhost': 'private', 'metadata.google.internal': 'metadata',
+  '8.8.8.8': 'public', '[::ffff:808:808]': 'public', 'example.com': 'public', '2001:db8::1': 'public' };
+for (const [h, k] of Object.entries(want)) if (c(h) !== k) { console.error(h, c(h), 'expected', k); process.exit(1); }
+const look = (map) => async (h) => { if (!map[h]) { const e = new Error('x'); e.code = 'ENOTFOUND'; throw e; } return map[h].map((address) => ({ address })); };
+const refusal = async (host, siteLocal, map) => { try { await checkResolved(host, { siteLocal, lookup: look(map) }); return null; } catch (e) { if (!(e instanceof Refused)) throw e; return e.message; } };
+const m = { 'rebind.example': ['93.184.216.34', '169.254.169.254'], 'lan.example': ['10.0.0.5'], 'ok.example': ['93.184.216.34'], 'v6.example': ['::ffff:7f00:1'] };
+if (!/link-local\/metadata/.test(await refusal('rebind.example', true, m))) { console.error('any-address metadata not refused'); process.exit(1); }
+if (!/private\/loopback/.test(await refusal('lan.example', false, m))) { console.error('private from a non-local site not refused'); process.exit(1); }
+if (await refusal('lan.example', true, m) !== null) { console.error('private refused from a local site'); process.exit(1); }
+if (!/private\/loopback/.test(await refusal('v6.example', false, m))) { console.error('mapped loopback answer not refused'); process.exit(1); }
+if (await refusal('ok.example', false, m) !== null) { console.error('public name refused'); process.exit(1); }
+if (!/could not resolve redirect host/.test(await refusal('nx.example', false, m))) { console.error('lookup failure is not a reasoned refusal'); process.exit(1); }
+{ let r = 'x'; try { await checkResolved('nx.example', { siteLocal: false, lookup: look(m), allowUnresolved: true }); r = null; } catch (e) { r = e.message; }
+  if (r !== null) { console.error('an unresolved original link was refused'); process.exit(1); } }
+{ const ac = new AbortController(); const slow = () => new Promise(() => {}); setTimeout(() => ac.abort(new Error('timeout')), 50);
+  let msg = ''; try { await checkResolved('slow.example', { siteLocal: false, lookup: slow, signal: ac.signal }); } catch (e) { msg = e.message; }
+  if (!/could not resolve/.test(msg)) { console.error('a hung lookup was not bounded by the signal'); process.exit(1); } }
+// The site's own locality is judged by resolution too: a dev name /etc/hosts points at
+// loopback is local, so another local host it links to is followed, not refused.
+{ const sm = { 'www.dev.example': ['127.0.0.1', '::1'], 'mixed.example': ['127.0.0.1', '93.184.216.34'], 'ok.example': ['93.184.216.34'] };
+  const cases = [['www.dev.example', true], ['mixed.example', false], ['ok.example', false], ['nx.example', false], ['localhost', true], ['127.0.0.1', true], ['8.8.8.8', false]];
+  for (const [h, want] of cases) { const got = await siteIsLocal(h, { lookup: look(sm) }); if (got !== want) { console.error('siteIsLocal', h, got, 'expected', want); process.exit(1); } } }
+JS
 
 # Budget: a zero budget measures nothing and says why, instead of hanging.
 out0=$(printf '/ok/\n' | node "$tool" --site "$site" --budget 0)

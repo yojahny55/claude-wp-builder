@@ -23,8 +23,8 @@ services:
     container_name: {{project_name}}-web
     restart: unless-stopped
     ports:
-      - "{{http_port}}:80"
-      - "{{https_port}}:443"
+      - "127.0.0.1:{{http_port}}:80"
+      - "127.0.0.1:{{https_port}}:443"
     volumes:
       - wordpress_data:/var/www/html
       - ./wp-content/themes/{{theme_slug}}:/var/www/html/wp-content/themes/{{theme_slug}}
@@ -53,7 +53,7 @@ services:
     container_name: {{project_name}}-pma
     restart: unless-stopped
     ports:
-      - "{{phpmyadmin_port}}:80"
+      - "127.0.0.1:{{phpmyadmin_port}}:80"
     environment:
       PMA_HOST: db
       PMA_USER: {{db_user}}
@@ -68,8 +68,8 @@ services:
     container_name: {{project_name}}-mail
     restart: unless-stopped
     ports:
-      - "{{mailpit_port}}:8025"
-      - "{{mailpit_smtp_port}}:1025"
+      - "127.0.0.1:{{mailpit_port}}:8025"
+      - "127.0.0.1:{{mailpit_smtp_port}}:1025"
     networks:
       - {{project_name}}_network
 

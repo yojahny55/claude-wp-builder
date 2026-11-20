@@ -162,6 +162,40 @@ body.reduced-motion .stage__poster:first-of-type{opacity:1}
 .nav__progress span{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--sage),var(--mist));width:0%}
 @media (max-width:780px){ .nav__links a:not(.nav__cta){display:none} }
 
+/* Mobile menu + motion toggle (nav.php). Breakpoint matches the link-hiding rule above. */
+.nav__hamburger,.mobile-menu{display:none}
+.nav__motion-toggle{color:var(--bone);font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;transition:color .3s}
+.nav__motion-toggle:hover,.nav__motion-toggle:focus-visible{color:var(--paper)}
+.mobile-menu{
+  position:fixed; inset:0; z-index:200;
+  flex-direction:column; padding:var(--gutter);
+  background:var(--ink); color:var(--bone);
+  visibility:visible; opacity:1; transition:opacity .3s;
+  overflow-y:auto;
+}
+.mobile-menu[aria-hidden="true"]{visibility:hidden;opacity:0}
+.mobile-menu__close{align-self:flex-end;width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:var(--bone);font-size:1.75rem;line-height:1}
+.mobile-menu__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1.25rem;font-family:var(--serif);font-size:clamp(1.75rem, 8vw, 2.5rem);text-transform:none;letter-spacing:0}
+.mobile-menu__list a{color:var(--bone);transition:color .3s}
+.mobile-menu__list a:hover,.mobile-menu__list a:focus-visible{color:var(--paper)}
+.mobile-menu__controls{margin-top:auto;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:1rem;padding-top:2rem}
+.mobile-menu__lang-row{display:flex;gap:1rem}
+.mobile-menu__lang-item{font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--bone)}
+.mobile-menu__lang-item.is-active{color:var(--paper);text-decoration:underline;text-underline-offset:.4em}
+.mobile-menu__motion-btn{padding:.55rem .95rem;border:1px solid rgba(180,196,190,.35);border-radius:999px;color:var(--paper);font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;transition:background .3s,border-color .3s,color .3s}
+.mobile-menu__motion-btn:hover,.mobile-menu__motion-btn:focus-visible{background:var(--mist);color:var(--ink);border-color:var(--mist)}
+@media (max-width:780px){
+  .nav__links .nav__motion-toggle{display:none}
+  .nav__hamburger{display:flex;align-items:center;justify-content:center;grid-column:3;width:44px;height:44px;padding:0;margin-right:-.75rem;color:var(--bone)}
+  .nav__hamburger-bars,.nav__hamburger-bars::before,.nav__hamburger-bars::after{display:block;width:22px;height:1px;background:var(--bone)}
+  .nav__hamburger-bars{position:relative}
+  .nav__hamburger-bars::before,.nav__hamburger-bars::after{content:"";position:absolute;left:0}
+  .nav__hamburger-bars::before{top:-7px}
+  .nav__hamburger-bars::after{top:7px}
+  .mobile-menu{display:flex}
+}
+@media (prefers-reduced-motion:reduce){ .mobile-menu{transition:none} }
+
 /* ----------------------------------------------------------------
    Scene primitive — pure scroll runway holding copy only
 ---------------------------------------------------------------- */
