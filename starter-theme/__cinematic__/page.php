@@ -1,0 +1,31 @@
+<?php
+/**
+ * The template for displaying all pages.
+ *
+ * @package __starter__
+ */
+
+defined('ABSPATH') || exit;
+
+get_header();
+?>
+
+<main id="cinematic" class="site-main" role="main">
+    <?php while (have_posts()) : the_post(); ?>
+        <article id="post-<?php the_ID(); ?>" <?php post_class(); ?>>
+            <header class="entry-header">
+                <h1 class="entry-title"><?php the_title(); ?></h1>
+            </header>
+            <div class="entry-content"><?php the_content(); ?></div>
+        </article>
+
+        <?php
+        if (comments_open() || get_comments_number()) {
+            comments_template();
+        }
+        ?>
+    <?php endwhile; ?>
+</main>
+
+<?php
+get_footer();

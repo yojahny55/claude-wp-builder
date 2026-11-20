@@ -8,8 +8,11 @@ arguments:
   - name: --scenes
     description: Number of scenes to scaffold (default 9, min 1, max 12)
     required: false
-  - name: --hybrid
-    description: Allow trailing flex sections after the reel (default yes; pass --no-hybrid to disable)
+  - name: --no-hybrid
+    description: Disable trailing flex sections after the reel (hybrid is on by default; --no-hybrid is the only spelling)
+    required: false
+  - name: --acf-flavor
+    description: Custom fields plugin, scf or acf-pro; handed to /wp-init, which asks when it is absent
     required: false
   - name: --skip-kit-install
     description: Skip `npx skills add` and use vendored fallback from starter-theme/__cinematic__/assets/cinematic-kit/
@@ -62,15 +65,15 @@ If both fail → use vendored fallback and log: "Using vendored kit copy (offlin
 
 ## Step 1 — Hand off to /wp-init
 
-Invoke `/wp-init --path=<path> --mode=cinematic --starter=__cinematic__ --acf-flavor=<scf|acf-pro>` and let the standard bootstrap run:
+Invoke `/wp-init --path=<path> --mode=cinematic` (add `--acf-flavor=<value>` only when it was passed here, otherwise omit it so `/wp-init` asks Step 0.6; add `--no-hybrid` when it was passed here, and `--force-adopted` likewise). These are exactly the flags `/wp-init` Step 0.4 parses. Because it was entered with `--mode=cinematic`, `/wp-init` does not dispatch back here and does not resolve the kit again (Step 0 above did). It owns only the shared bootstrap:
 - Project name/slug/text domain/languages
+- Copying `starter-theme/__cinematic__/` as the theme, placeholders, project CLAUDE.md
 - Server choice (Nginx native, Docker, etc.)
-- Database
-- ACF flavor
+- Database, custom fields plugin, theme activation
 
-When `/wp-init` reaches the "section scaffolding" phase, it **skips** the usual `/wp-section` loop and instead dispatches to step 2 below.
+`/wp-init` returns here; continue with Step 2. It never runs the `wp-cinematic` agent, scenes, seeding or menus, and has no `/wp-section` loop for the reel.
 
-## Step 2 — Cinematic scaffold (dispatch `wp-cinematic` agent)
+## Step 2 — Cinematic scaffold (dispatch `wp-cinematic` agent; owned only here)
 
 Pass to the `wp-cinematic` agent:
 

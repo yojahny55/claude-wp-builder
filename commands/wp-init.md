@@ -1,7 +1,7 @@
 ---
 description: Scaffold a new WordPress project — copies starter theme, replaces placeholders, generates .claude/CLAUDE.md
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
-argument-hint: "[project-name] [--force-adopted]"
+argument-hint: "[project-name] [--path=<dir>] [--mode=cinematic|--starter=__cinematic__|--template=tailwind|cinematic] [--acf-flavor=scf|acf-pro] [--no-hybrid] [--force-adopted]"
 ---
 
 # WP Init — Project Scaffolding
@@ -23,9 +23,16 @@ Exit `0` continue. Exit `5` stop and print the message verbatim: `adopted site w
 use /wp-audit, /wp-debug or /wp-update`. If `$ARGUMENTS` contains `--force-adopted`, append it to the
 call (and ignore it everywhere else): the operator chose to build on an adopted site on purpose.
 
+## Step 0.4: Flag intake
+
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-init-run/references/flag-intake.md` now and parse `--path`,
+`--mode=cinematic`, `--starter=__cinematic__`, `--template`, `--acf-flavor` and `--no-hybrid`
+from `$ARGUMENTS` before asking anything. A preset skips Step 0.5 or 0.6. Only `--mode=cinematic` or
+`--starter=__cinematic__` mark entry from `/wp-cinematic-init`, which is never dispatched back to.
+
 ## Step 0.5: Select Starter Template
 
-Ask the user to choose a starter template:
+Skip this step when Step 0.4 preset `$TEMPLATE`. Ask the user to choose a starter template:
 
 > **Select a starter template:**
 > 1. **Tailwind Starter** — Tailwind CSS 4 + WordPress Scripts build pipeline, BrowserSync
@@ -46,20 +53,16 @@ failing on it.
 
 ### If `$TEMPLATE = cinematic`
 
-This branch follows a different scaffolding shape — the page is one continuous reel, not discrete sections. After Step 0.6, dispatch to `/wp-cinematic-init` for the cinematic-specific flow:
+This branch follows a different scaffolding shape: the page is one continuous reel, not discrete sections. Who owns what depends on how the run started:
 
-1. Resolve `cinematic-scroll-kit` (globally-installed skill → `./.cinematic-kit/` → vendored fallback in `starter-theme/__cinematic__/assets/cinematic-kit/`).
-2. If none present, offer: `npx skills add yojahny55/cinematic-scroll-kit -g -y` (recommended). Decline → use vendored fallback.
-3. Copy `starter-theme/__cinematic__/` as the theme.
-4. Run the `wp-cinematic` agent against `schemas/scene.json` to generate `fields/scenes.php`, `fields/trailing-sections.php` (if hybrid), `inc/seed-cinematic.php`, and per-scene template fragments.
-5. Skip the per-section `/wp-section` loop. Author scenes via `/wp-cinematic-scene <n>` and append trailing flex sections via `/wp-section <name> --hybrid` if hybrid mode is on.
-6. Seed with `/wp-cinematic-seed` (uses kit sample videos).
+- **Entered from `/wp-cinematic-init`**: only `--mode=cinematic` or `--starter=__cinematic__` mark this (`--template=cinematic` does not: a user can type it with no caller). The caller is already running, so do NOT dispatch to it again (that is a loop), and do not resolve the kit (the caller's Step 0 did). Run this command's normal steps with Step 3 copying `starter-theme/__cinematic__/`, and no `/wp-section` loop, then return to the caller. The `wp-cinematic` agent, `/wp-cinematic-scene`, `/wp-cinematic-seed`, activation-time seeding and menus belong to the caller's Steps 2-3 alone: never run them here.
+- **Any other cinematic run** (`--template=cinematic`, or option 2 above): after Step 0.6, dispatch to `/wp-cinematic-init` (which re-enters here with `--mode=cinematic`) and stop.
 
-Hybrid mode is **on by default** for cinematic — pass `--no-hybrid` to disable trailing sections.
+Hybrid mode is **on by default** for cinematic — `--no-hybrid` (the one spelling, here and in `/wp-cinematic-init`) disables trailing sections.
 
 ## Step 0.6: Select Custom Fields Plugin
 
-Ask the user to choose a custom fields plugin:
+Skip this step when Step 0.4 preset `$CF_PLUGIN`. Ask the user to choose a custom fields plugin:
 
 > **Select custom fields plugin:**
 > 1. **SCF** (Secure Custom Fields) — Free, community fork
