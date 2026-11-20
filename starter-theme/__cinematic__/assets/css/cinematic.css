@@ -169,7 +169,7 @@ body.reduced-motion .stage__poster:first-of-type{opacity:1}
 .mobile-menu{
   position:fixed; inset:0; z-index:200;
   flex-direction:column; padding:var(--gutter);
-  background:rgba(8,10,11,.96); color:var(--bone);
+  background:var(--ink); color:var(--bone);
   visibility:visible; opacity:1; transition:opacity .3s;
   overflow-y:auto;
 }
