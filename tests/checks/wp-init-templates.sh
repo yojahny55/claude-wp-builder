@@ -20,6 +20,7 @@ targets=$(grep -E '^\s*cp -r ' "$cmd" | grep -oP 'starter-theme/\K__[a-z]+__(?=/
 for t in $targets; do
   [[ -d "starter-theme/$t" ]] || {
     echo "FAIL: /wp-init copies starter-theme/$t/, which does not exist"
+# shellcheck disable=SC2011  # ls -d on fixed starter dir names; only feeds a failure message
     echo "      present: $(ls -d starter-theme/__*__ 2>/dev/null | xargs -n1 basename | tr '\n' ' ')"
     exit 1
   }

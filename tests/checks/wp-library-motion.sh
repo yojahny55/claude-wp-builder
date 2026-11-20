@@ -63,7 +63,7 @@ done
 # unquoted data-motion=marquee is not -- but devices.md quotes every value it
 # declares, including the ten-device line pinned above.
 for absent in marquee stack tabs; do
-  if grep -Eq "data-motion=[\"']$absent[\"']" "$v"; then
+  if grep -Eq "data-motion=[\"']${absent}[\"']" "$v"; then
     fail "$v now declares $absent as a device, so wp-demo.md's build-it-by-hand rule is stale"
   fi
 done

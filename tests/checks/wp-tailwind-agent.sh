@@ -189,7 +189,7 @@ fi
 # behind once the region is flattened. `(/SKILL\.md)?` because the skill is named
 # by path and that path's own dot would otherwise close the sentence window.
 skill='wp[ -]{1,2}tailwind[ -]{1,2}system(/SKILL\.md)?'
-if ! printf '%s' "$saflat" | grep -Eqi "(read|follow|consult|obey|defer to)[^.]{0,70}$skill|$skill[^.]{0,70}(read|follow|consult|obey|defer)"; then
+if ! printf '%s' "$saflat" | grep -Eqi "(read|follow|consult|obey|defer to)[^.]{0,70}$skill|${skill}[^.]{0,70}(read|follow|consult|obey|defer)"; then
   echo "FAIL: Section Authoring Mode never directs the agent to READ the wp-tailwind-system skill — naming the skill is not deferring to it, and the ladder, file layout and prohibition list live only there"; exit 1
 fi
 if printf '%s' "$saflat" | grep -Eqi "(do not|does not|don'?t|never|must not|no need to)[ a-z]{0,24}(read|consult|follow|open)[^.]{0,70}$skill"; then

@@ -72,7 +72,7 @@ echo "$out" | grep -Fq 'diagnosis=htaccess-missing' || fail "wrong diagnosis"
 [ ! -e "$t/site/.htaccess" ] || fail "script wrote .htaccess without --write-htaccess"
 
 # 2. Plain permalinks are named, not blamed on rewrites.
-out=$(FAKE_STRUCT= run) && fail "plain permalinks case exited 0 with 404s"
+out=$(FAKE_STRUCT='' run) && fail "plain permalinks case exited 0 with 404s"
 echo "$out" | grep -Fq 'permalinks=plain' || fail "plain permalinks not reported"
 echo "$out" | grep -Fq 'diagnosis=plain-permalinks' || fail "plain permalinks not diagnosed"
 

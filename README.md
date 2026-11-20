@@ -758,7 +758,7 @@ non-zero. Most assert that a command, agent or skill still states its contract; 
 a real browser or a disposable WordPress.
 
 ```bash
-for f in tests/checks/*.sh; do bash "$f"; done
+bash tests/run.sh   # all checks in parallel; a skipped check is counted apart from a pass
 ```
 
 CI runs every check on each pull request, plus `node --check`, `php -l` at the PHP floors

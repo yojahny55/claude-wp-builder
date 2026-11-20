@@ -48,7 +48,7 @@ done
 for css in "$C"/*/section.css; do
   for t in $(grep -oE 'var\(--[a-z0-9-]+\)' "$css" | sed 's/^var(//; s/)$//' | sort -u); do
     printf '%s\n' "$allowed" | grep -Fxq -- "$t" && continue
-    grep -Eq -- "(^|[;{[:space:]])$t[[:space:]]*:" "$css" && continue
+    grep -Eq -- "(^|[;{[:space:]])${t}[[:space:]]*:" "$css" && continue
     fail "$css reads var($t) with no fallback, and no DESIGN.md defines it"
   done
 done

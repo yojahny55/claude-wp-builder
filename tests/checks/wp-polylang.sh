@@ -329,6 +329,7 @@ grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/wp-polylang/SKILL.md' "$c" \
 # (the PRIMARY language, per commands/wp-init.md Step 6), so asking for 'en'
 # there never matches and a client's edits under Languages > Strings are
 # silently ignored.
+# shellcheck disable=SC2100  # path assignment, not arithmetic
 tw=starter-theme/_i18n-variants/__tailwind__.php
 # Scoped to the $source assignment specifically -- a later, unrelated fallback
 # in the same function legitimately defaults to 'en' when a key has no entry

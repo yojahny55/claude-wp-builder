@@ -12,7 +12,7 @@
 # $($WP db prefix) word-splits it correctly on its own. Drop the wrapper and quote the
 # expansion at the point of use, which is where a path with a space would otherwise bite.
 set -uo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../.." || exit 1
 
 # Only the escaped-quote form is the bug. `COUNTERPART=$(bash -c "$WP post create …")`
 # on its own line is fine — it is not inside an outer double-quoted string, so its quotes

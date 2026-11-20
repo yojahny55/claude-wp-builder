@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Sourced by the checks that match prose, never run on its own. Each file is flattened to one
 # line, so a phrase wrapped across two lines still matches -- and flattened on its own, so a
 # match can never span the end of one file and the start of the next.

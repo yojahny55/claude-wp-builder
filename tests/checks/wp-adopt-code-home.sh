@@ -66,6 +66,7 @@ $cfg drift "$site" >/dev/null || fail "still drifts after refresh"
 n=$(ls "$tmp"/backups/*/ | wc -l)
 $cfg refresh "$site" | grep -Fq 'nothing to refresh' || fail "second refresh was not a no-op"
 [ "$(ls "$tmp"/backups/*/ | wc -l)" = "$n" ] || fail "a no-op refresh wrote a backup"
+# shellcheck disable=SC2010  # fixture docroot with fixed ASCII names; the listing is the assertion
 [ -z "$(ls "$site" | grep -F bak || true)" ] && [ -z "$(ls -A "$site" | grep -F '.wp-create.json.bak' || true)" ] || fail "backup left in the docroot"
 
 # 5. An intentionally inactive plugin is not drift, survives refresh, and still counts for the stack.
@@ -103,6 +104,7 @@ case "$bak" in "$tmp/backups/"*) ;; *) fail "backup path is not under the backup
 [ -f "$bak" ] || fail "backup file missing"
 [ "$(jq_ 'j.manifest.code_home.kind' <"$tmp/r.json")" = child-theme ] || fail "replace lost code_home"
 [ "$(jq_ 'j.manifest.plugins.intentionally_inactive' <"$tmp/r.json")" = '["wordfence"]' ] || fail "replace lost the parked list"
+# shellcheck disable=SC2010  # fixture docroot with fixed ASCII names; the listing is the assertion
 [ -z "$(ls -A "$site" | grep -F '.bak' || true)" ] || fail "re-adoption left a backup in the docroot"
 
 # 8. The prose points at the new surface.

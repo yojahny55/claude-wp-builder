@@ -17,6 +17,7 @@ fail() { echo "FAIL: $*"; exit 1; }
 
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; init=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; yolo=$EXPANDED
+# shellcheck disable=SC2100  # path assignment, not arithmetic
 starter=starter-theme/__tailwind__
 main_css="$starter/assets/css/src/tailwindcss/main.css"
 for f in "$init" "$yolo" "$main_css" "$starter/functions.php"; do
