@@ -182,12 +182,14 @@ grep -q '^### A store is a recorded decision' CLAUDE.md || fail "CLAUDE.md does 
 decision=$(awk '/^### A store is a recorded decision/{f=1; print; next} f && /^##/{exit} f' CLAUDE.md | tr '\n' ' ')
 grep -Fq 'which `force` never writes on a store that already has orders' <<<"$decision" \
   || fail "CLAUDE.md's store decision omits the launch-state exception to force"
-ceilings=$(awk '/^## Known ceilings/{f=1; next} f && /^## /{exit} f' CLAUDE.md)
+# The ceilings moved out of CLAUDE.md into docs/known-ceilings.md; CLAUDE.md keeps a pointer.
+grep -Fq 'docs/known-ceilings.md' CLAUDE.md || fail "CLAUDE.md does not point at docs/known-ceilings.md"
+ceilings=$(cat docs/known-ceilings.md)
 for c in 'Gateway keys from constants cover Stripe only' 'The general Store API limiter is off on purpose' \
          '"Connect with Stripe" does not work with `store-kit` credentials' \
          'Setup reports what the block stopped naming, and never deletes it' \
          'Store profiles need native WP-CLI'; do
-  grep -Fq "$c" <<<"$ceilings" || fail "CLAUDE.md's Known ceilings does not record: $c"
+  grep -Fq "$c" <<<"$ceilings" || fail "docs/known-ceilings.md does not record: $c"
 done
 grep -Fq -- '- [ ] **WooCommerce stores (N01)** `PARTIAL`' BACKLOG.md \
   || fail "BACKLOG.md's N01 row is not an unchecked PARTIAL: the remaining pieces are the item"

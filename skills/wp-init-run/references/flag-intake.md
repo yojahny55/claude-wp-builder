@@ -16,3 +16,10 @@ values; `/wp-cinematic-init` hands off through exactly this list and no other.
 A preset value is final: **skip Step 0.5 when `$TEMPLATE` is preset and Step 0.6 when `$CF_PLUGIN` is
 preset**, and do not ask again. An empty `--acf-flavor=` counts as absent (ask Step 0.6). A non-empty unknown value for
 either flag is an error: print it and stop, rather than silently asking.
+
+## Order of the steps
+
+The order is fixed: the manifest validation (Pre-Step) and the `demo/FAILED.md` stop (Step 0.45) run
+before Step 0.5, 0.6 and 0.7 ask anything and before Step 0.5 dispatches to `/wp-cinematic-init`.
+A run the manifest or a flag has already answered skips that question; it never asks first and
+validates afterwards.

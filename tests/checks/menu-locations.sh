@@ -82,7 +82,7 @@ for st in __tailwind__ __cinematic__; do
 done
 
 # --- 2. no command, agent or skill names a location the starters never register --
-under=$(grep -rnE '\b(primary|footer|mobile)_(en|es|<lang>|\{lang\})\b' commands agents skills CLAUDE.md docs/commands.md || true)
+under=$(grep -rnE '\b(primary|footer|mobile)_(en|es|<lang>|\{lang\})\b' commands agents skills CLAUDE.md docs/commands.md docs/known-ceilings.md docs/testing.md docs/architecture.md || true)
 [ -z "$under" ] || fail "an underscore menu location, which neither starter registers:"$'\n'"$under"
 lit=$(grep -rnE "'theme_location' *=> *['\"]" commands agents skills || true)
 [ -z "$lit" ] || fail "an instruction hands the agent a hand-built theme_location instead of prefix_nav_location():"$'\n'"$lit"

@@ -1,7 +1,7 @@
 ---
 description: Responsive validation — screenshots at 9 viewports, checks for layout issues
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
-argument-hint: "<url-or-file-path>"
+argument-hint: "<url-or-file-path> [--no-motion]"
 ---
 
 # WP Responsive Check — Responsive Validation

@@ -1,25 +1,21 @@
 ---
-name: wp-cinematic-encode
 description: Encode source videos for cinematic scroll-scrub (all-keyframe MP4) and mobile autoplay-loop (9:16 portrait crop). Thin wrapper over the kit's `scripts/encode-keyframe.sh` and `scripts/encode-mobile-portrait.sh`. Drops encoded files into `<theme>/assets/videos/` and updates the matching ACF row if `--scene=N` is provided.
-arguments:
-  - name: <input>
-    description: Path to source MP4 (any resolution/bitrate)
-    required: true
-  - name: --scene
-    description: Scene number to bind output to (1-N). If omitted, files land in assets/videos/ without ACF wiring.
-    required: false
-  - name: --desktop-only
-    description: Only generate desktop all-keyframe variant
-    required: false
-  - name: --mobile-only
-    description: Only generate 9:16 portrait variant
-    required: false
-  - name: --poster
-    description: Also extract a poster frame (default frame 30) for reduced-motion fallback
-    required: false
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob
+argument-hint: "<input> [--scene <scene>] [--desktop-only] [--mobile-only] [--poster]"
 ---
 
 # /wp-cinematic-encode
+
+## Arguments
+
+| Argument | Required | Meaning |
+|---|---|---|
+| `<input>` | yes | Path to source MP4 (any resolution/bitrate) |
+| `--scene` | no | Scene number to bind output to (1-N). If omitted, files land in assets/videos/ without ACF wiring. |
+| `--desktop-only` | no | Only generate desktop all-keyframe variant |
+| `--mobile-only` | no | Only generate 9:16 portrait variant |
+| `--poster` | no | Also extract a poster frame (default frame 30) for reduced-motion fallback |
+
 
 ## What it does
 

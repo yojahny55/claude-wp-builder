@@ -118,6 +118,7 @@ grep -Fq 'Run /wp-adopt for an existing site' commands/wp-audit.md \
 
 # --- The ceilings are recorded where the other ceilings live. ---------------
 grep -Fq 'wp-config.mjs' CLAUDE.md || fail "CLAUDE.md does not mention the validator"
-grep -Fqi 'binds the commands that call it' CLAUDE.md || fail "CLAUDE.md does not record the validator's ceiling"
+grep -Fqi 'binds the commands that call it' docs/known-ceilings.md || fail "docs/known-ceilings.md does not record the validator's ceiling"
+grep -Fqi 'binds the commands that call it' CLAUDE.md || fail "CLAUDE.md's Known ceilings summary dropped the validator's ceiling"
 
 echo PASS
