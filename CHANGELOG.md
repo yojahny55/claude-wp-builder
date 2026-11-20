@@ -2,6 +2,292 @@
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-11-20
+
+### Added
+
+- **An adopted site records where its own code lives.** When adoption finds no editable
+  theme or plugin of the site's own (a commercial theme and, at most, a sync plugin), it asks
+  once for a child theme, a site plugin or an mu-plugin and stores the answer as `code_home`
+  (`--code-home=`, `wp-config.mjs code-home`). Hook-based audit fixes read that field instead
+  of improvising a location. For a child theme the command prints the `theme_mods_<parent>`
+  copy that must run before the theme is activated.
+- **`wp-config.mjs keep-inactive` and `remove-plugin`.** A plugin deactivated on purpose is
+  recorded in `plugins.intentionally_inactive` and is no longer drift (it stays in the
+  stack); a deleted plugin is dropped from the manifest, both scope lists and the generated
+  block in one step.
+- **`adopt --json`.** Stdout is exactly one JSON document (dry run and real run), with the
+  human lines under `notes` and the backup path under `backup`; the dry run also reports
+  `code_home_needed` and `code_home_options`.
+
+- **`wp-config.mjs git-init` puts an adopted site's root under git in place.** Opt-in
+  (`/wp-adopt` Step 6b): it refuses a root that is already, or sits inside, a repository,
+  merges a WordPress `.gitignore` (template plus every tool state path) without duplicates,
+  runs `git init -b <branch>`, adds the remote and prints a dry-run summary with large and
+  secret-looking files before anything is staged. Commit and push are separate confirmed
+  steps, and only the named branch is ever pushed, never a second one.
+
+- **/wp-audit checks that a local clone serves its own pages before any agent runs.** A clone
+  of a site served by nginx has no `.htaccess`, so on the local Apache every permalink 404ed
+  while the home page answered 200, and the page measurements of the run were silently wrong
+  until a person asked. `bin/clone-preflight.sh` (Step 2.3) requests a post, a page and a
+  category archive on the audited host and requires 200, reports whether the host answers http
+  or https (passed to every agent as `Audited scheme:`), diagnoses a missing, empty or
+  WordPress-less `.htaccess` (noting that `wp rewrite flush --hard` writes nothing under
+  WP-CLI), and, only after the user agrees, backs up the file and appends the stock rewrite
+  block as a local-only change kept out of git. If it fails and the user declines, page-based
+  checks are `UNMEASURED` with the reason.
+
+- **Step 6.8 coverage is a script, and every agent gets its exact must-run list.** `bin/audit-coverage.mjs` reads each category's catalog from the agent's own file and the run's `checks_executed`, prints `executed/total`, percent and the missing ids per category (`--json`, exit 1 under the threshold, `--final` for the second pass, `--list <category>` for the exact must-run list). The first dispatch passes that list to each agent and a re-dispatch sends only the missing ids. Before this the gate was prose: one run skipped it, others recomputed it with ad-hoc regexes, and a first dispatch with no id list came back at 38/61 and 58/68 and cost two extra agents. An `UNMEASURED` whose reason is not one of the allowed ones ("not measured in this run", "not run", no reason) is reported as missing; the allowed reasons are now written down in the status vocabulary.
+
+- **`bin/decision-sheet.mjs`, the approval page for `design_impact` findings.** Builds one
+  self-contained HTML in the audit results directory: per finding a before and after picture
+  at desktop and mobile (the injected CSS is forced `!important` and transitions are frozen,
+  so the "after" shows the proposed value), measured values, a recommended badge, approve /
+  reject / postpone / other radio options and a copy-answers box that works with a plain click.
+  `--parse` reads the pasted `DECISION <id>: <option> | <note>` block back as JSON, with
+  rejected findings flagged for the ledger as `accepted`. `fix.md` now routes every `visual`
+  finding through it and forbids applying one without an answer.
+
+- **Elementor fix playbook for adopted sites.** `/wp-audit` fixes on an Elementor site kept
+  rediscovering the same facts: what stays in Elementor and what must be theme code, that
+  `$WP elementor flush-css` (not `flush-cache`) follows every data edit, the Loop Grid
+  pagination, `fetchpriority`, ARIA-role and thumbnail-link traps, and that heading changes
+  restyle. `skills/wp-audit-standards/references/builder-elementor.md` now holds them, and
+  `fix.md` and the a11y, UX and performance agents load it only when `stack.builder` is
+  `elementor`.
+
+- **`/wp-audit` reports MCP, OAuth and agent servers exposed over REST (SEC-046).** Plugins
+  now register MCP and OAuth servers as REST routes, on by default, some accepting the
+  subscriber-level `read` capability, with a signing secret in `wp_options` that every
+  database sync copies. No check read the route table, so an owner found them by chance.
+  SEC-046 lists the matching routes with their owning plugin and required capability, probes (GET only)
+  each one unauthenticated (through the production gate), and rates it: WARNING when
+  reachable or `read`-level, INFO when admin-only, PASS when none. The fix names the known
+  switches (two plugin filters, an Elementor option), says a filter goes where
+  `code_scope.editable` allows and a DB option must be repeated per environment, and asks to
+  rotate a stored secret that was ever exposed. An intentional public endpoint is "confirm
+  intended", never "remove", and the GEO guidance now says so.
+
+- **Record decisions and fixes in the audit ledger without auditing.** `bin/audit-report.mjs`
+  gains `--accept <id> --reason`, `--unaccept`, `--mark-fixed <id> --evidence`, `--rerender`
+  and `--summary [--json]`. `accepted` was defined as "set by a human" but nothing let a
+  human set it, so a declined finding was proposed again every session and fixes applied
+  between audits left the ledger stale (or got hand-written into the report). Accepted
+  entries now leave the open and critical counts and the plan and get their own report
+  section; a new `fixed_unverified` status holds a fix no check has re-measured and only a
+  measured re-run turns it into `resolved`. `--rerender` rebuilds the newest report from its
+  sidecar and the ledger, `--summary` prints counts by status and severity, and `ledger.md`
+  documents the file's shape. The sidecar now also keeps each finding's `fix`.
+
+- **`/wp-audit` renders a production runbook from its replay record.** Every applied fix now
+  appends a typed entry to `<out>/replay.json` (`kind`: code, db-option, post-meta,
+  wp-config, server, post-deploy; the exact command or file, the previous value or backup,
+  and a `needs_server_rule` flag), and `bin/audit-runbook.mjs` renders it as
+  `<out>/runbook-<date>.md` in the order production needs: pre-deploy checks, code and theme
+  activation, wp-config, WP-CLI with a production `--url`, server rules, post-deploy
+  (Elementor `flush-css`, page-cache purge) and verification curls. Before, the replay log
+  covered settings only and every session wrote its "for production" list and its server
+  steps by hand. Those lists reported `.htaccess` fixes as done for an nginx production,
+  missed the nginx `location` that PHP-served endpoints such as `/llms.txt` and
+  `/.well-known/` need, and let a physical `robots.txt` carrying the local host shadow the
+  dynamic route. The runbook takes its Apache and nginx snippets from the new
+  `skills/wp-audit-run/references/server-rules.md`, marks each one not applied, rewrites
+  commands to the production URL, and refuses to write a runbook that would carry a local
+  host. Named environments gain optional `server` and `page_cache` fields
+  (`wp-config.mjs env-set --server= --page-cache=`).
+
+- **`bin/audit-suite.sh` run flags and third-party blocking.** `--workers`, `--timeout`,
+  `--engines` and `--settle` replace hand edits of the generated `playwright.config.js`
+  (which the scaffold used to overwrite at the start of the run, so they never applied;
+  an edited config is now kept, tracked by `.scaffold-sums`). `--block-third-party` /
+  `--no-block-third-party` with `--allow-hosts` block every host but the audited one, on
+  by default against a local host so a clone sends no real hits to production analytics or
+  embeds; `--workers` above 1 is refused against production, and `--project` points to
+  `--engines`. A non-empty `--dir` refusal now lists the files in the way.
+  `bin/ux-probe.mjs` gains `--block-third-party`, `--block-hosts` and `--allow-hosts` on the
+  same allowlist (`bin/lib/third-party.cjs`). `/wp-audit` now looks for an existing Chromium
+  with `bin/lib/browsers.mjs` before reporting "no browser".
+
+### Changed
+
+- **Plugin-list drift no longer interrupts `/wp-audit`.** When the only disagreement is the
+  plugin list, `refresh` runs without a question and the report logs it; the audit asks only
+  for theme or code-scope changes. `refresh` now also drops plugins that are gone from disk
+  out of `code_scope` (so `render-context` stops listing a deleted plugin as read-only code),
+  and does nothing when nothing changed.
+- **Manifest backups leave the docroot.** `adopt --replace` and `refresh` write
+  `.wp-create.json.bak-<timestamp>` to `~/.local/state/wp-builder-backups/<root>-<hash>/`
+  (`$XDG_STATE_HOME` honoured, newest 20 kept) instead of beside the site, where they were
+  served and committable.
+
+- **`audit-report.mjs` normalizes agent reports instead of trusting their key names.** `--agents <dir|file>` builds the findings and the unmeasured list from the agents' report files, and every finding goes through `bin/lib/audit-schema.mjs`: `code`/`id` for `check`, `owner` for `ownership`, `fix: auto` for `auto_fixable` and the like are accepted (the alias table lives once, in `wp-audit-standards`), while a finding in an agent report with no id, an id in no catalog, or a check reported as both a finding and a pass is refused with exit 1. Before this each agent drifted into its own keys and the parent wrote a throwaway script per run to rebuild `run.json`.
+
+- **The audit report follows the site's language and an audits root.** `--lang` (`--report-lang`) defaults to the manifest's `languages.primary` when it is `es` or `en`, else `en`; it used to default to `en` whatever the site was, so a Spanish site needed it asked for. The output directory gains one step before `.wp-audit`: `<audits root>/<site>/results` when `WP_AUDITS_ROOT` or the manifest's `audit.audits_root` is set, so reports land beside the other sites' instead of wherever the working directory was. With neither set the directory is unchanged; `--out`, `WP_AUDIT_OUT_DIR` and `audit.out_dir` still win. `--site-root <dir>` reads the manifest from somewhere other than the working directory.
+
+- **CI checks now measure what they claim.** `tests/run.sh` runs every check in parallel and counts a
+  skip (a `SKIP` line, or a browser check's "static only -- NOT exercised" pass) apart from a pass.
+  With `CHECKS_REQUIRE_BROWSER=1` those browser checks fail instead of skipping, and the browser job
+  sets it for the ones its runner can serve. The syntax job also parses `.cjs` files, shellcheck now
+  covers `tests/`, actions are pinned to commit SHAs, the WP-CLI phar is verified against its
+  published checksum, and a push to main is no longer cancelled by the next one.
+
+### Fixed
+
+- **Agents keep shell noise and blocking patterns out of their runs.** The `wp-cli-patterns` skill, which every seeding and audit agent loads, now states four shell rules: call WP-CLI through the `$WP` wrapper and its quiet filter, send a failing `wp eval` on PHP 8.5 to `wp eval-file`, never chain `sleep` or use `nohup` (start long jobs in the background instead), and use `cp -f` / `mv -f` in scripted copies. `tests/checks/agent-shell-hygiene.sh` pins them.
+
+- **A clone audit and vendor-code noise no longer inflate the headline.** On a local clone,
+  SEC-036 is an `INFO` pre-deploy gate (listed as a push blocker, `guid` rows never searched or
+  counted), database schema and data findings cap at `WARNING` with "confirm on prod" after
+  reading the sync tool's exclude list, transport findings measured on the local server are
+  "local server only, unverified on prod" and not counted, the scheme the local host answers is
+  probed before HTTP checks, and WP-040 and WP-045 are `INFO`. In `code_scope.read_only`, only
+  vulnerability, update and abandoned-plugin checks produce findings; pattern hits collapse into
+  one `vendor notes` INFO line per plugin. A finding must carry a catalog code (no shard-local
+  labels), and hits with one root cause are grouped before counting.
+
+- **The browser suite completes on third-party-heavy sites.** On a site loading 160-250
+  requests a page (video embeds, analytics, widgets) the suite timed out on every page and
+  Tier 3 stayed UNMEASURED. Pages now load to `domcontentloaded` plus a bounded settle
+  (`--settle`, default 5 s) instead of waiting for a network idle that never comes. The
+  timeout brake sends one GET to the audited host after each timeout and counts it only when
+  the host does not answer or refuses (403/429/503); a slow page on a host that answers, and
+  a check that ran on a page a timeout had closed, are recorded in
+  `results/unmeasured-pages.json` and reach the run file as `SUITE-PAGE-*` UNMEASURED rows
+  with the reason, instead of tripping the brake or reading as a metadata error.
+
+- **The cinematic starter's mobile menu and motion toggle now work.** `nav.php` emitted a
+  hamburger, a `#mobile-menu` dialog and a motion toggle that `cinematic.css` and
+  `cinematic-engine.js` never styled or wired: on mobile the button did nothing, and the dialog
+  rendered unstyled in normal flow on every viewport. The menu is now hidden on desktop and a
+  focus-trapped overlay at 780px and below (Escape and link clicks close it, `inert` while
+  closed). A pause/play toggle, also added to the desktop nav, pauses every video and stops the
+  engine from playing one while paused, defaulting to paused under `prefers-reduced-motion`
+  (WCAG 2.2.2).
+
+- **The cinematic starter is now an activatable classic theme.** It shipped no `index.php`,
+  `page.php`, `single.php` or `404.php`, so WordPress refused to activate the generated theme
+  and any non-front-page request had no template. Minimal escaped versions are added. The
+  loader also looked for a `templates/cinematic.php` page template that no command or agent
+  ever creates; it now keys on the front page alone, which is where the reel renders, and the
+  `_is_cinematic` filter remains the way to opt other pages in.
+
+- **The cinematic starter no longer ships unreplaced placeholders.** It used `__TEXTDOMAIN__`
+  and `__VERSION__`, which `/wp-init` Step 4 never replaces, so every generated cinematic theme
+  carried the literal tokens in its stylesheet header, constants, menu labels and nav. It now
+  uses `__starter__` as the text domain and a literal `1.0.0`, like the Tailwind starter.
+  `tests/checks/wp-init-templates.sh` fails on any `__token__` in either starter that Step 4
+  does not replace.
+
+- **Contract checks no longer fail at random on a busy runner.** Hundreds of checks piped a
+  producer into `grep -q` or `head` under `set -o pipefail`. Those readers stop at the first
+  match, so a producer still writing died of SIGPIPE and the pipeline reported failure for a
+  pattern that was found, or, inside a command substitution under `set -e`, the check exited
+  141 with no output. It only happened when the reader won the race, so local runs passed and
+  CI failed unrelated pull requests. The readers now consume their whole input
+  (`grep >/dev/null -c`, `sed -n 1p`), awk programs that exit early read a here-string or a
+  process substitution, `tests/run.sh` prints the exit status of every failed check, and
+  `tests/checks/no-early-exit-pipes.sh` refuses the pattern from coming back.
+
+- **The composition gate answers impeccable's new `kicker-above-heading` rule.** A newer
+  impeccable 4.x release flags the small label above the section title in ten non-hero
+  compositions, which turned `tests/checks/wp-craft-composition-gate.sh` red on `main`
+  and on every open PR. The rule is now ignored only in those ten compositions, through a
+  new per-composition `IGNORED_AT` list in `bin/composition-gate.sh`, so a new composition
+  that adds a kicker still fails the gate. Removing the kickers
+  changes how every craft build looks, so it waits for a measured design PR. The detector
+  still follows the newest 4.x.
+
+- **`demo-verify` refuses a target with nothing to walk.** A directory with no `.html`
+  files, or a page path that does not exist, used to end in "no machine findings on
+  0 page(s)" with exit 0, so an empty `demo/` or a typo read as a clean verification. It
+  now exits 1 with "no pages to verify" before looking for a browser, and
+  `/wp-demo-verify`'s walk reference says to fix the target rather than report a pass.
+
+- **`wp-env-setup.sh` no longer aborts in `--json` mode, and Apache on Debian is served.**
+  The output helpers returned non-zero when quiet, so `set -e` ended the script at the
+  first message after work was done. `native-setup` for Apache on the Debian layout now
+  enables the required modules and the site before the reload instead of leaving the
+  installed vhost inactive.
+
+- **The production runbook no longer splits a command on an operator inside quotes.**
+  `bin/audit-runbook.mjs` split each recorded command on `|`, `;`, `&&` and `||` without
+  reading quotes, so a value such as `"%title% | %sitename%"` received a stray `--url=` inside
+  the quoted text. The split is now quote-aware; an ordinary pipeline keeps one `--url` per
+  `wp` call.
+
+- **`/wp-init` now parses the flags `/wp-cinematic-init` hands it.** The hand-off passed
+  `--path`, `--mode`, `--starter` and `--acf-flavor`, none of which `/wp-init` read, so it asked
+  for the template and the custom-fields plugin again, and choosing cinematic dispatched back to
+  `/wp-cinematic-init` in a loop. A new Step 0.4 owns those values and skips Steps 0.5 and 0.6
+  when they are preset, and a run entered with `--mode=cinematic` no longer dispatches back.
+  The hybrid switch had two spellings (`--hybrid` and `--no-hybrid`); it is now `--no-hybrid`
+  in both commands.
+  Only `--mode=cinematic` and `--starter=__cinematic__` mark entry from the caller;
+  `--template=cinematic` still dispatches. When entered from the caller, `/wp-init` does the
+  shared bootstrap only (starter copy, placeholders, server, database) and returns: the agent,
+  scenes, seeding and menus are owned by `/wp-cinematic-init` alone, and `--acf-flavor` is
+  passed only when given.
+  Choosing cinematic now dispatches `/wp-cinematic-init --path=<dir>` with `--acf-flavor` and
+  `--no-hybrid` when set; a caller-entered `/wp-init` prints a return line instead of "Next step"
+  and the live-view line; and `/wp-cinematic-init` builds the agent payload from `--scenes` and
+  `--no-hybrid` instead of hard-coding 9 and hybrid on.
+
+- **`/wp-update` stops tripping on restored clones and bundled-plugin themes.** The held
+  parent-theme lookup no longer asks WP-CLI for a `parent` field it does not have; the core
+  backup lists root PHP files with `find` instead of `ls`, which broke under a coloured `ls`
+  alias; the preflight reports an ACL mask of `r-x` (web server cannot write) and a leftover
+  `.maintenance`; a vendor package that is not a zip is skipped like an unlicensed one; and
+  plugins that a commercial theme ships inside itself are reinstalled when the theme moves.
+  A core release whose translation package for the site locale is not out yet is now
+  reported as skipped instead of aborting the run (core, plugins and themes run as separate
+  commands, no `&&` chain); long updates over SSH go through the harness's background run (no `nohup`);
+  paid-plugin updates that only wp-admin shows (`Update package not available`, `already
+  updated`) are listed as admin-only; language packs are refreshed after the migrations; and an
+  "update everything" answer is no longer narrowed by the run on its own judgement.
+
+### Security
+
+- **The Docker template publishes its ports on loopback only.** The web server,
+  phpMyAdmin and Mailpit were mapped as `{{port}}:80`, which Docker binds to every
+  interface, so a project started on a shared network exposed them to that network.
+  Each mapping is now `127.0.0.1:{{port}}:…`, and `tests/checks/wp-environments.sh`
+  fails if a bare mapping comes back.
+
+- **`wp-env-setup.sh` checks its arguments before running anything privileged.**
+  `permissions` resolves the path and accepts only a WordPress directory (not `/` or the
+  home directory), validates `--web-user`, leaves `.git` and `node_modules` alone, and re-owns only real directories and files
+  (`chown -h`, symlinks are not followed). Each `chown`/`chmod` runs through `sudo env PATH=<absolute system path> find -execdir`
+  (a relative or empty `PATH` entry would abort `-execdir`, and `sudo` may keep the caller's `PATH`),
+  so it is applied relative to the directory `find` is visiting. That closes the race on intermediate
+  directories, and a symlink is excluded by type. GNU `chmod` has no `-h`, so a leaf swapped for a
+  symlink between `find`'s stat and the exec remains a narrow residual risk. The `wp-content` writable
+  directories are changed in the same pass (`-type d`); one that is a symlink is skipped with a warning.
+  `vhost-install` writes only under the web servers' config directories,
+  `service-reload` accepts only known web server and PHP-FPM units, and `native-setup`
+  validates the web server and the vhost destination before the certificate or hosts file is touched.
+
+- **`bin/link-sweep.mjs` checks every redirect hop and the original link itself.** Redirects
+  were followed automatically, so a link on the site that redirected to the clone-origin host
+  was requested without `--follow-clone-origin`, and a redirect to a link-local or metadata
+  address was followed. Redirects are now followed by hand (at most 5 hops) and each target is
+  checked first, and the original link is checked the same way before its first request (a page
+  linking straight to a metadata address or a private host from a public site is `unmeasured`):
+  the clone origin needs `--follow-clone-origin`; link-local and metadata addresses are refused
+  by their literal spelling (IPv4-mapped IPv6 such as `::ffff:169.254.169.254`, and
+  `fd00:ec2::254`, included) and, for a hostname, by every address it resolves to at check time;
+  a private or loopback host (literal or resolved) is refused unless the swept site is itself
+  on one, which is judged by what the site's host resolves to (a dev name that `/etc/hosts`
+  points at loopback is local) and not by its spelling alone. A failed lookup leaves the link `unmeasured` with the reason. DNS rebinding between
+  that lookup and the request itself is not closed. A refused hop leaves the link `unmeasured`
+  with the reason.
+
+- **Runbook shell lines quote every path taken from the replay record.** File names and
+  theme slugs were interpolated bare into the `git ls-files`, `git grep`, `ls` and `wp`
+  lines the operator pastes, so a name with spaces or shell metacharacters broke the line or
+  ran extra commands. `bin/audit-runbook.mjs` now single-quotes any value that is not a
+  plain path word.
+
 ## [1.31.0] - 2026-10-27
 
 ### Added
