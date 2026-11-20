@@ -84,11 +84,13 @@ grep -Fq -- 'belong to the caller' <<<"$branch" || { echo "FAIL: /wp-init caller
 
 # Dispatch flags, caller-mode Step 10, and no literal scene/hybrid values in the agent payload.
 grep -Fq -- '/wp-cinematic-init --path=${PROJECT_PATH}' <<<"$branch" || { echo "FAIL: /wp-init dispatch to /wp-cinematic-init does not pass --path"; exit 1; }
-grep -Fq -- '`--no-hybrid` when given' <<<"$branch" || { echo "FAIL: /wp-init dispatch does not forward --no-hybrid"; exit 1; }
+grep -Fq -- '`--no-hybrid` and `--force-adopted` when given' <<<"$branch" || { echo "FAIL: /wp-init dispatch does not forward --no-hybrid and --force-adopted"; exit 1; }
 step10=$(sed -n '/^## Step 10/,$p' "$cmd")
 grep -Fq -- '**Entered with `--mode=cinematic`' <<<"$step10" || { echo "FAIL: /wp-init Step 10 has no caller-mode wording"; exit 1; }
 grep -Fq -- '/wp-cinematic-init --path=<path>`' <<<"$step10" || { echo "FAIL: /wp-init Step 10 has no /wp-cinematic-init --path recovery line"; exit 1; }
 ! grep -Fq -- '"scene_count": 9' "$ci" || { echo "FAIL: $ci hard-codes scene_count 9"; exit 1; }
+grep -Fq -- 'Validate `--scenes` first: an integer from 1 to 12' "$ci" || { echo "FAIL: $ci does not validate --scenes before passing it to the agent"; exit 1; }
+grep -Fq -- '(both summaries, plain and demo-first)' "$cmd" || { echo "FAIL: /wp-init Step 10 caller override does not cover the demo-first summary"; exit 1; }
 ! grep -Fq -- '"hybrid": true' "$ci" || { echo "FAIL: $ci hard-codes hybrid true"; exit 1; }
 grep -Fq -- '<false when --no-hybrid was passed, else true>' "$ci" || { echo "FAIL: $ci hybrid does not follow --no-hybrid"; exit 1; }
 

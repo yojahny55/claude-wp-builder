@@ -75,6 +75,8 @@ Invoke `/wp-init --path=<path> --mode=cinematic` (add `--acf-flavor=<value>` onl
 
 ## Step 2 — Cinematic scaffold (dispatch `wp-cinematic` agent; owned only here)
 
+Validate `--scenes` first: an integer from 1 to 12, or absent (9). Any other value is an error: print it and stop, as `/wp-init` does for an unknown `--acf-flavor`.
+
 Pass to the `wp-cinematic` agent:
 
 ```json
@@ -84,7 +86,7 @@ Pass to the `wp-cinematic` agent:
   "text_domain": "<from /wp-init>",
   "languages": ["en", "es"],
   "acf_flavor": "<scf|acf-pro>",
-  "scene_count": <--scenes value, default 9>,
+  "scene_count": <--scenes value, an integer 1-12, default 9>,
   "hybrid": <false when --no-hybrid was passed, else true>
 }
 ```
