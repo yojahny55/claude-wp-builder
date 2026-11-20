@@ -50,7 +50,7 @@ grep -Fq 'fetchpriority="high"' "$img" || fail "$img's markup hero does not set 
 grep -Fq 'A11Y-031' agents/wp-audit-a11y.md || fail "A11Y-031 is gone from the audit; re-check $nav"
 grep -Fq 'aria-controls="mobile-menu"' "$nav" || fail "$nav's hamburger does not name the menu it controls"
 # The closed-state rule itself, not the prose that explains it.
-awk '/^\.mobile-menu \{/{p=1} p{print} p && /^\}/{exit}' "$nav" | grep -Fq 'visibility: hidden;' \
+awk '/^\.mobile-menu \{/{p=1} p{print} p && /^\}/{exit}' "$nav" | grep >/dev/null -Fc 'visibility: hidden;' \
   || fail "$nav hides the closed menu only by transform, so its links stay in the tab order"
 grep -Fq "e.key === 'Escape'" "$nav" || fail "$nav's menu does not close on Escape"
 grep -Fq "e.key !== 'Tab'" "$nav" || fail "$nav's menu does not trap Tab while open"
@@ -58,12 +58,12 @@ grep -Fq 'toggle.focus()' "$nav" || fail "$nav does not return focus to the butt
 grep -Fq "matchMedia('(min-width: 1024px)')" "$nav" \
   || fail "$nav leaves body scroll locked when the viewport crosses 1024px with the menu open"
 # In the code, not the prose: the prose names aria-hidden to explain why it is not used.
-awk '/^```/{p=!p;next} p' "$nav" | grep -Eq 'aria-hidden="true"|setAttribute\(.aria-hidden' \
+awk '/^```/{p=!p;next} p' "$nav" | grep >/dev/null -Ec 'aria-hidden="true"|setAttribute\(.aria-hidden' \
   && fail "$nav hides the menu with aria-hidden while its links stay focusable"
 
 # --- no horizontal scroll: fix the element, never hide it -------------------------
 cssblk=$(awk '/^```css/{p=1;next} /^```/{p=0} p' "$s")
-printf '%s\n' "$cssblk" | grep -Eq 'overflow-x:[[:space:]]*hidden' \
+printf '%s\n' "$cssblk" | grep >/dev/null -Ec 'overflow-x:[[:space:]]*hidden' \
   && fail "$s shows overflow-x: hidden in a CSS example; it hides the culprit instead of fixing it"
 grep -Fq 'culprits' "$s" || fail "$s does not send the reader to the element /wp-demo-verify names as the culprit"
 
@@ -92,7 +92,7 @@ grep -Fq 'read `template`' "$s" || fail "$s does not read the project's template
 grep -Fq 'wp-tailwind-system' "$s" || fail "$s does not hand a tailwind theme to wp-tailwind-system"
 grep -Fq '"demo mode": "craft"' "$s" || fail "$s does not say craft compositions size to their container"
 desc=$(awk 'NR<=6 && /^description:/' "$s")
-printf '%s' "$desc" | grep -Fq '/wp-responsive-check' && fail "$s's description still pulls screenshot-walk requests (/wp-responsive-check)"
-printf '%s' "$desc" | grep -Fq 'Not for' || fail "$s's description names no near-miss it is not for"
+printf '%s' "$desc" | grep >/dev/null -Fc '/wp-responsive-check' && fail "$s's description still pulls screenshot-walk requests (/wp-responsive-check)"
+printf '%s' "$desc" | grep >/dev/null -Fc 'Not for' || fail "$s's description names no near-miss it is not for"
 
 echo PASS

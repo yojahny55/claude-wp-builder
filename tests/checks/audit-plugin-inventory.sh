@@ -63,7 +63,7 @@ section() {
     f' "$1" \
     | tr '\n' ' ' | tr -s ' '
 }
-has() { printf '%s\n' "$1" | grep -Fq -- "$2"; }
+has() { printf '%s\n' "$1" | grep >/dev/null -Fc -- "$2"; }
 # pos <text> <literal>: 1-based offset of the first occurrence, or empty.
 pos() { printf '%s\n' "$1" | awk -v s="$2" '{ i = index($0, s); if (i) print i }'; }
 
@@ -111,7 +111,7 @@ has "$s43" 'This is Tier 1 — a code scan, no network and no vulnerability feed
 has "$proc" 'Same gate as SEC-038, reused exactly, not reimplemented' \
   || fail "$sec_src does not say the SEC-041/042 gate reuses SEC-038"
 for code in SEC-041 SEC-042; do
-  grep -E "^\| $code \|" "$sec" | grep -Fq 'after the SEC-038 network gate passes' \
+  grep -E "^\| $code \|" "$sec" | grep >/dev/null -Fc 'after the SEC-038 network gate passes' \
     || fail "$sec_src: the $code table row is not tied to the SEC-038 network gate"
 done
 has "$proc" 'When it fails, SEC-041 and SEC-042 are `UNMEASURED`' \
@@ -329,19 +329,19 @@ out="$(php "$script" loaded:a="$fx/a" loaded:b="$fx/b" inactive:c="$fx/c" inacti
 # argument, not a global read at call time, so each fixture's assertions name the run they
 # check. ENVIRON, not -v: awk -v expands backslash escapes, and a namespaced name holds a `\t`.
 row() { printf '%s\n' "$1" | N="$2()" awk -F'\t' '$2 == ENVIRON["N"]'; }
-row "$out" acme_loaded_pair | grep -q '^CRITICAL' || fail "$script: two loaded sources are not CRITICAL"
+row "$out" acme_loaded_pair | grep >/dev/null -c '^CRITICAL' || fail "$script: two loaded sources are not CRITICAL"
 [ -z "$(row "$out" acme_skipped)" ] || fail "$script scanned vendor/ or a drop-in template inside a plugin"
-row "$out" acme_loaded_pair | grep -Eq $'\t(c|g) ' && fail "$script collided a namespaced function with a global one"
-row "$out" 'acme\tools\acme_loaded_pair' | grep -q '^WARNING' \
+row "$out" acme_loaded_pair | grep >/dev/null -Ec $'\t(c|g) ' && fail "$script collided a namespaced function with a global one"
+row "$out" 'acme\tools\acme_loaded_pair' | grep >/dev/null -c '^WARNING' \
   || fail "$script does not qualify names by namespace (one loaded + one inactive namespaced copy)"
-row "$out" acme_mixed_case | grep -q '^CRITICAL' || fail "$script is not case-insensitive"
-row "$out" acme_inactive_side | grep -q '^WARNING' || fail "$script: one loaded + one inactive is not WARNING"
-row "$out" acme_inactive_side | grep -q $'\td d.php' && fail "$script ignored a top-of-file early-return guard"
+row "$out" acme_mixed_case | grep >/dev/null -c '^CRITICAL' || fail "$script is not case-insensitive"
+row "$out" acme_inactive_side | grep >/dev/null -c '^WARNING' || fail "$script: one loaded + one inactive is not WARNING"
+row "$out" acme_inactive_side | grep >/dev/null -c $'\td d.php' && fail "$script ignored a top-of-file early-return guard"
 for n in acme_method_only acme_guarded_one acme_guarded_two acme_alt acme_early; do
   [ -z "$(row "$out" "$n")" ] || fail "$script reported $n, which is a method, guarded or behind an early return"
 done
 out="$(php "$script" inactive:e="$fx/a/a.php" inactive:f="$fx/b/b.php" 2>/dev/null || true)"
-row "$out" acme_loaded_pair | grep -q '^INFO' || fail "$script: only-inactive collisions are not INFO"
+row "$out" acme_loaded_pair | grep >/dev/null -c '^INFO' || fail "$script: only-inactive collisions are not INFO"
 
 # Second fixture: imports, braceless and nested functions, every guard form, enums, where
 # drop-in templates are skipped, a parked drop-in, a missing source and an unreadable one.
@@ -387,26 +387,26 @@ for n in imported_fn grouped_a grouped_b mixed_fn imported_global; do
   [ -z "$(row "$out" "$n")" ] || fail "$script counted the import 'use function $n' as a declaration"
 done
 [ -z "$(row "$out" brace_less)" ] || fail "$script missed a braceless function_exists guard"
-row "$out" after_braceless | grep -q '^CRITICAL' || fail "$script kept a braceless guard open past its statement"
+row "$out" after_braceless | grep >/dev/null -c '^CRITICAL' || fail "$script kept a braceless guard open past its statement"
 [ -z "$(row "$out" nested_fn)" ] || fail "$script counted a function declared inside a function body"
-row "$out" outer_fn | grep -q '^CRITICAL' || fail "$script lost the enclosing named function"
+row "$out" outer_fn | grep >/dev/null -c '^CRITICAL' || fail "$script lost the enclosing named function"
 for n in cls_guarded def_guarded elif_guarded alt_elif; do
   [ -z "$(row "$out" "$n")" ] || fail "$script missed the guard around $n (class_exists / defined / elseif)"
 done
-row "$out" alt_else | grep -q '^CRITICAL' || fail "$script treated the else branch of a guard chain as guarded"
+row "$out" alt_else | grep >/dev/null -c '^CRITICAL' || fail "$script treated the else branch of a guard chain as guarded"
 # The whole condition decides, not whichever existence test comes first: a negated test is
 # a guard anywhere in an && chain, and no guard at all next to an ||.
 for n in and_second paren_guard early_or; do
   [ -z "$(row "$out" "$n")" ] || fail "$script missed the guard around $n (a later && operand / wrapping parentheses / an || early return)"
 done
 for n in or_negated mixed_ops cmp_ops early_and; do
-  row "$out" "$n" | grep -q '^CRITICAL' || fail "$script treated $n as guarded, but its condition lets the body run while the function exists"
+  row "$out" "$n" | grep >/dev/null -c '^CRITICAL' || fail "$script treated $n as guarded, but its condition lets the body run while the function exists"
 done
 [ -z "$(row "$out" enum_method)" ] || fail "$script counted an enum method as a global function"
-row "$out" after_enum | grep -q '^CRITICAL' || fail "$script lost track of the enum body"
-row "$out" includes_db | grep -q '^CRITICAL' || fail "$script skipped a plugin's own includes/db.php"
+row "$out" after_enum | grep >/dev/null -c '^CRITICAL' || fail "$script lost track of the enum body"
+row "$out" includes_db | grep >/dev/null -c '^CRITICAL' || fail "$script skipped a plugin's own includes/db.php"
 [ -z "$(row "$out" tpl_skip)" ] || fail "$script scanned an advanced-cache.php template inside a plugin"
-row "$out" parked_one | grep -q $'	parked parked.php.bak:1' || fail "$script did not scan a parked *.php.bak drop-in"
+row "$out" parked_one | grep >/dev/null -c $'	parked parked.php.bak:1' || fail "$script did not scan a parked *.php.bak drop-in"
 
 rc=0
 err="$(php "$script" loaded:y="$fx/y" loaded:gone="$fx/does-not-exist" 2>&1 >/dev/null)" || rc=$?

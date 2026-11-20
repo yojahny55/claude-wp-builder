@@ -30,7 +30,7 @@ rules=$(printf '%s' "$code" | grep -oE '(@media[^{]*\{ *)?[.a-z_][^{}]*\{[^{}]*\
 multi=$(printf '%s\n' "$rules" | grep -E 'grid-template-columns: *repeat\( *[2-9]' || true)
 if [ -n "$multi" ]; then
   q "$multi" -v '@media *(min-width' \
-    && fail "$pat sets a multi-column grid outside a min-width step — a phone gets every column: $(printf '%s\n' "$multi" | grep -v '@media' | head -1)"
+    && fail "$pat sets a multi-column grid outside a min-width step — a phone gets every column: $(printf '%s\n' "$multi" | grep -v '@media' | sed -n 1p)"
 fi
 q "$rules" -E '^\.services__grid *\{[^}]*grid-template-columns: *1fr' \
   || fail "$pat's grid example has no one-column mobile base"

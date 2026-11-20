@@ -98,7 +98,7 @@ grep -Fq 'banned as a default' "$R/worlds.md" \
 # Every preamble has to carry its negative list, or the model drifts to rendered.
 for w in 1 2 3 4 5 6 7 8; do
   blk=$(awk -v n="$w" 'BEGIN{p=0} index($0, "### " n ". ") == 1 {p=1;next} /^### /{p=0} p' "$R/worlds.md")
-  printf '%s' "$blk" | grep -qiE 'not (3d|rendered|cgi)|no cgi|no render|not rendered|no 3d' \
+  printf '%s' "$blk" | grep >/dev/null -ciE 'not (3d|rendered|cgi)|no cgi|no render|not rendered|no 3d' \
     || fail "$R/worlds.md preamble $w has no negative list; without it the model drifts toward rendered-looking output"
 done
 
@@ -126,7 +126,7 @@ for fam in Brutalist Maximalist Playful Retro Dense Editorial Premium-minimal; d
   blk=$(awk -v n="### $fam" 'BEGIN{p=0} index($0, n) == 1 {p=1;next} /^### /{p=0} p' "$F")
   [ -n "$blk" ] || fail "$F has no ### $fam section"
   for part in '**Type**' '**Palette**' '**Surfaces**' '**Motion**' '**Sequence**' '**Avoid**'; do
-    printf '%s' "$blk" | grep -Fq "$part" || fail "$F: $fam lacks $part"
+    printf '%s' "$blk" | grep >/dev/null -Fc "$part" || fail "$F: $fam lacks $part"
   done
   n=$(printf '%s' "$blk" | awk '/\*\*Avoid\*\*/{p=1;next} p && /^ *- /{c++} END{print c+0}')
   [ "$n" -ge 3 ] || fail "$F: $fam's Avoid list has $n items; fewer than three is a mood, not a list"

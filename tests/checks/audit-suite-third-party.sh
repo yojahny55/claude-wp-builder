@@ -58,7 +58,7 @@ grep -Fq "lib/third-party.cjs" bin/ux-probe.mjs || fail "ux-probe does not use t
 # ---------------------------------------------------------------------------
 # 2. The guard tells a slow page from a silent host, and records closed pages
 # ---------------------------------------------------------------------------
-node "$suite/guard/timeout-guard.selfcheck.js" 2>/dev/null | grep -Fq PASS || fail "the timeout guard self-check fails"
+node "$suite/guard/timeout-guard.selfcheck.js" 2>/dev/null | grep >/dev/null -Fc PASS || fail "the timeout guard self-check fails"
 
 # The bridge reports what the guard recorded as UNMEASURED with its reason.
 b="$tmp/bridge"; cp -r "$suite/." "$b/"; mkdir -p "$b/results/audit"
@@ -119,7 +119,7 @@ rc=0; suite_run --url http://site.localhost/ --dir "$tmp/s" --workers 2 --timeou
 grep -Fq 'third-party hosts blocked; allowed:' "$tmp/out" || fail "a local run did not block third parties by default"
 grep -Eq '^npm test:a11y .*--workers=2 --timeout=240000 .*block=1 allow=cdn.example.net settle=3000' "$tmp/calls" \
   || { cat "$tmp/calls"; fail "--workers/--timeout/--settle/--allow-hosts did not reach the accessibility pass"; }
-grep -E '^npm test:perf' "$tmp/calls" | grep -Fq -- '--workers=' && fail "the Lighthouse pass got a --workers that overrides its own 1"
+grep -E '^npm test:perf' "$tmp/calls" | grep >/dev/null -Fc -- '--workers=' && fail "the Lighthouse pass got a --workers that overrides its own 1"
 grep -Fq 'firefox pass not requested' "$tmp/out" || fail "--engines chromium still ran the firefox pass"
 grep -Fq 'project=firefox' "$tmp/calls" && fail "--engines chromium still invoked a firefox project"
 

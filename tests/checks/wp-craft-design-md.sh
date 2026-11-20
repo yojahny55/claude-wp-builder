@@ -165,7 +165,7 @@ grep -Fq 'at the top level of' <<<"$i4s" \
 grep -Fq -- '`--space-gutter`, `--container-max`' <<<"$i4s" \
   || fail "$i4 Step D4 does not write --container-max into the @theme block, so the theme loses the demo's content width"
 
-tr '\n' ' ' < "$r" | grep -Eq '@property --container-max[[:space:]]*\{[^}]*inherits: true' \
+tr '\n' ' ' < "$r" | grep >/dev/null -Ec '@property --container-max[[:space:]]*\{[^}]*inherits: true' \
   || fail "$r's @property rule does not set inherits: true, so a well-formed --container-max never reaches the preview's sections"
 grep -Eq '@property --container-max[[:space:]]*\{' "$r" \
   || fail "$r does not emit @property, so previews and client demos differ"

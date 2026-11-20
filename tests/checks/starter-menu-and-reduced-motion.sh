@@ -23,7 +23,7 @@ done
 grep -Fq 'const initMobileMenu' "$js" || fail "mobile menu is not an init function"
 grep -Fq "document.addEventListener('DOMContentLoaded', initMobileMenu)" "$js" \
   || fail "mobile menu has no DOMContentLoaded branch"
-tr -d '\n' < "$js" | grep -Eq "if \(document\.readyState === 'loading'\) \{ *document\.addEventListener\('DOMContentLoaded', initMobileMenu\); *\} else \{ *initMobileMenu\(\); *\}" \
+tr -d '\n' < "$js" | grep >/dev/null -Ec "if \(document\.readyState === 'loading'\) \{ *document\.addEventListener\('DOMContentLoaded', initMobileMenu\); *\} else \{ *initMobileMenu\(\); *\}" \
   || fail "mobile menu has no readyState guard joining DOMContentLoaded and the immediate call"
 grep -Fq 'initMobileMenu();' "$js" || fail "mobile menu is never run when the DOM is already parsed"
 grep -Fq "'Escape'" "$js" || fail "mobile menu has no Escape handler"
@@ -47,10 +47,10 @@ grep -Fq '.skip-link.screen-reader-text' starter-theme/__cinematic__/assets/css/
 reduced=$(awk '/if[[:space:]]*\([[:space:]]*reduced[[:space:]]*\)[[:space:]]*\{/{f=1; depth=0} f{for(i=1;i<=length($0);i++){c=substr($0,i,1); if(c=="{")depth++; if(c=="}")depth--}; print; if(depth==0){exit}}' "$eng" \
   | sed -e 's://.*$::' -e '/\/\*/,/\*\//d')
 [ -n "$reduced" ] || fail "could not extract the reduced-motion branch from $eng"
-echo "$reduced" | grep -Eq "querySelectorAll\('\.scene__video-mobile'\)" || fail "reduced-motion branch does not touch .scene__video-mobile"
-echo "$reduced" | grep -Eq '\.pause\(\)' || fail "reduced-motion branch does not pause the mobile clip"
-echo "$reduced" | grep -Fq "removeAttribute('autoplay')" || fail "reduced-motion branch leaves autoplay on"
-echo "$reduced" | grep -Fq "removeAttribute('loop')" || fail "reduced-motion branch leaves loop on"
+echo "$reduced" | grep >/dev/null -Ec "querySelectorAll\('\.scene__video-mobile'\)" || fail "reduced-motion branch does not touch .scene__video-mobile"
+echo "$reduced" | grep >/dev/null -Ec '\.pause\(\)' || fail "reduced-motion branch does not pause the mobile clip"
+echo "$reduced" | grep >/dev/null -Fc "removeAttribute('autoplay')" || fail "reduced-motion branch leaves autoplay on"
+echo "$reduced" | grep >/dev/null -Fc "removeAttribute('loop')" || fail "reduced-motion branch leaves loop on"
 
 if command -v node >/dev/null 2>&1; then
   node --input-type=module --check < "$js" || fail "$js does not parse as a module"

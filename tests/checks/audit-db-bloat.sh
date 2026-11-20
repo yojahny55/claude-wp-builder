@@ -101,12 +101,12 @@ row() {
 for code in PERF-061 PERF-062 PERF-063 PERF-064; do
   r=$(row "$code")
   [ -n "$r" ] || fail "$agent has no $code table row"
-  if printf '%s' "$r" | grep -Eq 'FROM wp_[A-Za-z0-9_]'; then
+  if printf '%s' "$r" | grep >/dev/null -Ec 'FROM wp_[A-Za-z0-9_]'; then
     fail "$code hardcodes the wp_ prefix in its SQL instead of reading the site's real one"
   fi
-  printf '%s' "$r" | grep -Fq '$($WP db prefix)' \
+  printf '%s' "$r" | grep >/dev/null -Fc '$($WP db prefix)' \
     || fail "$code does not build its table name from "'$($WP db prefix)'
-  if printf '%s' "$r" | grep -Eiq '\b(UPDATE|DELETE|INSERT|REPLACE|LOAD DATA)\b'; then
+  if printf '%s' "$r" | grep >/dev/null -Eic '\b(UPDATE|DELETE|INSERT|REPLACE|LOAD DATA)\b'; then
     fail "$code's check cell contains a word WP-CLI's db query treats as row-modifying (UPDATE/DELETE/INSERT/REPLACE/LOAD DATA) — it would print only 'Rows affected: -1', never the number the Pass criterion needs"
   fi
 done
@@ -117,34 +117,34 @@ done
 for code in PERF-036 PERF-037 PERF-039; do
   r=$(row "$code")
   [ -n "$r" ] || fail "$agent has no $code table row"
-  if printf '%s' "$r" | grep -Eq 'FROM wp_[A-Za-z0-9_]'; then
+  if printf '%s' "$r" | grep >/dev/null -Ec 'FROM wp_[A-Za-z0-9_]'; then
     fail "$code hardcodes the wp_ prefix in its SQL instead of reading the site's real one"
   fi
-  printf '%s' "$r" | grep -Fq '$($WP db prefix)' \
+  printf '%s' "$r" | grep >/dev/null -Fc '$($WP db prefix)' \
     || fail "$code does not build its table name from "'$($WP db prefix)'
 done
-printf '%s' "$(row 'PERF-039')" | grep -Fq '\_transient\_timeout\_%' \
+printf '%s' "$(row 'PERF-039')" | grep >/dev/null -Fc '\_transient\_timeout\_%' \
   || fail "PERF-039's LIKE pattern does not escape its leading underscores — same full-scan bug as PERF-063 had"
 
 # PERF-061 — Action Scheduler backlog: table name, a real row-count threshold, not "Info only".
 r=$(row 'PERF-061')
-printf '%s' "$r" | grep -Fq 'actionscheduler_actions' \
+printf '%s' "$r" | grep >/dev/null -Fc 'actionscheduler_actions' \
   || fail "PERF-061 does not name the actionscheduler_actions table"
-printf '%s' "$r" | grep -Fq '10,000' \
+printf '%s' "$r" | grep >/dev/null -Fc '10,000' \
   || fail "PERF-061 has no concrete row-count threshold"
-printf '%s' "$r" | grep -Fq 'WARNING' \
+printf '%s' "$r" | grep >/dev/null -Fc 'WARNING' \
   || fail "PERF-061 is not WARNING"
-if printf '%s' "$r" | grep -Fiq 'info only'; then
+if printf '%s' "$r" | grep >/dev/null -Fic 'info only'; then
   fail "PERF-061 is still an INFO-only row like PERF-042 — it must carry a threshold"
 fi
 
 # PERF-062 — woocommerce_sessions: table name, expiry column, threshold.
 r=$(row 'PERF-062')
-printf '%s' "$r" | grep -Fq 'woocommerce_sessions' \
+printf '%s' "$r" | grep >/dev/null -Fc 'woocommerce_sessions' \
   || fail "PERF-062 does not name the woocommerce_sessions table"
-printf '%s' "$r" | grep -Fq 'session_expiry' \
+printf '%s' "$r" | grep >/dev/null -Fc 'session_expiry' \
   || fail "PERF-062 does not check session_expiry"
-printf '%s' "$r" | grep -Fq '1,000' \
+printf '%s' "$r" | grep >/dev/null -Fc '1,000' \
   || fail "PERF-062 has no concrete threshold"
 
 # PERF-063 — expired-transient backlog: threshold on rows AND bytes, not just "any"; the LIKE
@@ -155,26 +155,26 @@ printf '%s' "$r" | grep -Fq '1,000' \
 # matching PERF-039's own plain COUNT(*) of the same expired markers instead of undercounting
 # against it.
 r=$(row 'PERF-063')
-printf '%s' "$r" | grep -Fq '_transient_timeout_' \
+printf '%s' "$r" | grep >/dev/null -Fc '_transient_timeout_' \
   || fail "PERF-063 does not query the transient timeout markers"
-printf '%s' "$r" | grep -Fq '5,000' || fail "PERF-063 has no row threshold"
-printf '%s' "$r" | grep -Fq '5MB' || fail "PERF-063 has no byte threshold"
-printf '%s' "$r" | grep -Fq '\_transient\_timeout\_%' \
+printf '%s' "$r" | grep >/dev/null -Fc '5,000' || fail "PERF-063 has no row threshold"
+printf '%s' "$r" | grep >/dev/null -Fc '5MB' || fail "PERF-063 has no byte threshold"
+printf '%s' "$r" | grep >/dev/null -Fc '\_transient\_timeout\_%' \
   || fail "PERF-063's LIKE pattern does not escape its leading underscores — it forces a full table scan of options"
-printf '%s' "$r" | grep -Fq 'LEFT JOIN' \
+printf '%s' "$r" | grep >/dev/null -Fc 'LEFT JOIN' \
   || fail "PERF-063 does not LEFT JOIN to the transient value row — an INNER JOIN drops orphaned expired-timeout markers that PERF-039 still counts"
-printf '%s' "$r" | grep -Fq 'COALESCE' \
+printf '%s' "$r" | grep >/dev/null -Fc 'COALESCE' \
   || fail "PERF-063 does not COALESCE its byte sum — an all-orphan match set would sum to NULL instead of a comparable 0"
-printf '%s' "$r" | grep -Fq 'CONCAT(' \
+printf '%s' "$r" | grep >/dev/null -Fc 'CONCAT(' \
   || fail "PERF-063's join condition does not use CONCAT/SUBSTRING to build the value option's name"
 
 # PERF-064 — orphaned postmeta: LEFT JOIN against posts, IS NULL, threshold.
 r=$(row 'PERF-064')
-printf '%s' "$r" | grep -Fq 'postmeta' || fail "PERF-064 does not query the postmeta table"
-printf '%s' "$r" | grep -Fq 'LEFT JOIN' || fail "PERF-064 does not LEFT JOIN against posts"
-printf '%s' "$r" | grep -Fq 'IS NULL' || fail "PERF-064 does not filter on a missing owner"
+printf '%s' "$r" | grep >/dev/null -Fc 'postmeta' || fail "PERF-064 does not query the postmeta table"
+printf '%s' "$r" | grep >/dev/null -Fc 'LEFT JOIN' || fail "PERF-064 does not LEFT JOIN against posts"
+printf '%s' "$r" | grep >/dev/null -Fc 'IS NULL' || fail "PERF-064 does not filter on a missing owner"
 # The threshold is the number and its unit next to an upper-bound word, not one exact spelling.
-printf '%s' "$r" | grep -Eiq '(≤|<=|at most|no more than|up to) ?500 orphaned' \
+printf '%s' "$r" | grep >/dev/null -Eic '(≤|<=|at most|no more than|up to) ?500 orphaned' \
   || fail "PERF-064's threshold is not an upper bound of 500 orphaned rows"
 
 # --- The prefix-awareness note itself is present, not just the fixed cells ---

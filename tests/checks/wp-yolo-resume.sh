@@ -39,7 +39,7 @@ flat=$(tr '\n\t\r' ' ' < "$f" | tr -s ' ')
 # `--needle` starts with a dash and grep parses it as an option without the `--`
 # terminator, so the check would die with a usage error instead of reporting a miss.
 need() {
-  printf '%s' "$flat" | grep -Fq -- "$1" || fail "$2"
+  printf '%s' "$flat" | grep >/dev/null -Fc -- "$1" || fail "$2"
 }
 
 # ---------------------------------------------------------------------------

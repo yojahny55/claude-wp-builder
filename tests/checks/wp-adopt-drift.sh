@@ -23,7 +23,7 @@ chmod +x "$tmp/bin/wp"; export PATH="$tmp/bin:$PATH"
 
 # 1. Sentinels: noise on both sides of the JSON no longer breaks the probe.
 out=$($cfg adopt "$tmp/site" --dry-run) || fail "probe broke on boot noise"
-echo "$out" | grep -Fq '"real-child"' || fail "probe JSON not parsed from between sentinels"
+echo "$out" | grep >/dev/null -Fc '"real-child"' || fail "probe JSON not parsed from between sentinels"
 
 # 2. A stale blank-scaffold manifest validates but drifts.
 cat >"$tmp/site/.wp-create.json" <<'JSON'
@@ -31,8 +31,8 @@ cat >"$tmp/site/.wp-create.json" <<'JSON'
 JSON
 set +e; d=$($cfg drift "$tmp/site"); rc=$?; set -e
 [ "$rc" = 4 ] || fail "drift exit was $rc, expected 4"
-echo "$d" | grep -Fq 'ghost' || fail "drift did not name the missing theme"
-echo "$d" | grep -Fq 'not in plugins.installed' || fail "drift did not name the plugin gap"
+echo "$d" | grep >/dev/null -Fc 'ghost' || fail "drift did not name the missing theme"
+echo "$d" | grep >/dev/null -Fc 'not in plugins.installed' || fail "drift did not name the plugin gap"
 
 # 3. adopt refuses without --replace, and names the way out.
 set +e; $cfg adopt "$tmp/site" 2>"$tmp/err"; rc=$?; set -e
@@ -63,7 +63,7 @@ m.project.prefix='keep_';m.project.industry='construction';m.project.adopted='20
 m.code_scope={editable:['wp-content/plugins/mine','wp-content/gone'],read_only:['wp-content/themes/real-child','wp-content/plugins/a']};
 fs.writeFileSync(f,JSON.stringify(m));" "$site"
 d=$($cfg adopt "$site" --replace --dry-run) || fail "dry-run replace failed"
-echo "$d" | grep -Fq '"carried_over"' || fail "dry-run does not report carried_over"
+echo "$d" | grep >/dev/null -Fc '"carried_over"' || fail "dry-run does not report carried_over"
 $cfg adopt "$site" --replace >/dev/null || fail "replace over a real adoption failed"
 node -e "
 const m=JSON.parse(require('fs').readFileSync(process.argv[1]+'/.wp-create.json'));

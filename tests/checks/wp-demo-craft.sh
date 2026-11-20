@@ -175,7 +175,7 @@ grep -Fq 'no-CDN and `:root` token clauses' "$wp_demo" \
 grep -Fq -- '- A placeholder image, a placeholder logo' skills/wp-demo-craft/SKILL.md \
   || fail "SKILL.md does not blocklist placeholder imagery, which spine rule 1 does not cover"
 sed -n '/^- A placeholder image, a placeholder logo/,/^$/p' skills/wp-demo-craft/SKILL.md \
-  | grep -Eqi 'acceptable|is fine|is ok|allowed|tolerated|until round|in rounds? ' \
+  | grep >/dev/null -Eci 'acceptable|is fine|is ok|allowed|tolerated|until round|in rounds? ' \
   && fail "SKILL.md's placeholder blocker has been softened into something a build may defer; it is a ship blocker in every round"
 
 echo PASS

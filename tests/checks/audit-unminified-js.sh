@@ -28,12 +28,12 @@ flat=$(tr '\n' ' ' < "$audit" | sed 's/  */ /g')
 # 1. The criterion, and the exemption that keeps it off generated themes.
 grep -Fq 'PERF-058' "$audit" \
   || { echo "FAIL: $audit has no PERF-058 row for unminified theme JavaScript"; exit 1; }
-printf '%s' "$flat" | grep -Fq 'is NOT a finding' \
+printf '%s' "$flat" | grep >/dev/null -Fc 'is NOT a finding' \
   || { echo "FAIL: PERF-058 does not exempt a bundled theme — a build that already minifies would be reported on every theme this plugin generates"; exit 1; }
 # Both twin shapes. Checking only one of them reports a theme that already has the fix.
-printf '%s' "$flat" | grep -Fq '.min.js' \
+printf '%s' "$flat" | grep >/dev/null -Fc '.min.js' \
   || { echo "FAIL: PERF-058 does not check for a sibling <name>.min.js twin"; exit 1; }
-printf '%s' "$flat" | grep -Fq 'assets/js/min/' \
+printf '%s' "$flat" | grep >/dev/null -Fc 'assets/js/min/' \
   || { echo "FAIL: PERF-058 does not check for an assets/js/min/ twin"; exit 1; }
 
 # 2. The fix: one filter, and the existence test inside it.
@@ -47,22 +47,22 @@ grep -Fq 'file_exists( get_template_directory()' "$audit" \
 # sentence wraps inside the code fence. A bracket expression, not `\*`: escaping an ordinary
 # character is undefined in POSIX ERE, so `\*` is a literal asterisk on GNU grep and anyone's
 # guess on BSD — a portability trap that would read as a broken contract, not a broken test.
-printf '%s' "$flat" | grep -Eq 'serves the [*]? ?original unchanged' \
+printf '%s' "$flat" | grep >/dev/null -Ec 'serves the [*]? ?original unchanged' \
   || { echo "FAIL: the PERF-058 fix does not state that a missing twin falls back to the source"; exit 1; }
 # The obvious wrong fix is named, so it is not re-proposed as an improvement.
-printf '%s' "$flat" | grep -Fq 'the obvious fix and the wrong one' \
+printf '%s' "$flat" | grep >/dev/null -Fc 'the obvious fix and the wrong one' \
   || { echo "FAIL: the PERF-058 fix does not say why rewriting every wp_enqueue_script() call is rejected"; exit 1; }
 
 # 3. The trap. A silent failure that reads as a working change is the one thing an auditor
 # must hand to the project rather than keep.
-printf '%s' "$flat" | grep -Fq 'editing a file under' \
+printf '%s' "$flat" | grep >/dev/null -Fc 'editing a file under' \
   || { echo "FAIL: the PERF-058 fix does not warn that editing a source file has no effect once the twin exists"; exit 1; }
 # The whole instruction, not the words 'version constant', which appear in any prose about
 # a theme constant and would hold with the bump deleted. Matched against $flat: the file is
 # already flattened, so the phrase is found whether or not the paragraph wraps inside it.
-printf '%s' "$flat" | grep -Fq "bump the theme's version constant" \
+printf '%s' "$flat" | grep >/dev/null -Fc "bump the theme's version constant" \
   || { echo "FAIL: the PERF-058 fix does not require the theme version constant to be bumped, so the rebuilt file is served from cache"; exit 1; }
-printf '%s' "$flat" | grep -Fq ".claude/CLAUDE.md" \
+printf '%s' "$flat" | grep >/dev/null -Fc ".claude/CLAUDE.md" \
   || { echo "FAIL: the PERF-058 fix does not record the trap in the project's own CLAUDE.md, where the next session will read it"; exit 1; }
 
 echo "PASS: PERF-058 reports unminified theme JavaScript and its fix carries the filter, the fallback and the trap"

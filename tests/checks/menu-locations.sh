@@ -111,7 +111,7 @@ got=$(printf '%s\n' "$s6p" | grep -oE "^- \`'[a-z0-9_-]+' =>" | grep -oE "'[a-z0
 [ "$got" = "$bases" ] || fail "wp-init Step 6 registers [$got] under polylang; the Polylang helpers answer [$bases]"
 got=$(printf '%s\n' "$s6s" | grep -oE "^ *- \`'[a-z0-9_-]+' =>" | grep -oE "'[a-z0-9_-]+'" | tr -d "'" | words)
 [ "$got" = "$suffix_set" ] || fail "wp-init Step 6 registers [$got] under suffix; the starters register [$suffix_set]"
-printf '%s' "$s6" | flat | grep -qF '`functions.php` on `cinematic`' \
+printf '%s' "$s6" | flat | grep >/dev/null -cF '`functions.php` on `cinematic`' \
   || fail "wp-init Step 6 does not say the cinematic starter registers its menus in functions.php -- it has no inc/theme-setup.php to edit"
 
 # --- 4. /wp-header Step 7 registers the same names ---------------------------------
@@ -145,7 +145,7 @@ got=$(printf '%s' "$gate" | grep -oE '`[a-z0-9_-]+`' | tr -d '`' | grep -vx 'suf
 for spec in 'Check 4|Check 5' 'Check 7|Tailwind convention'; do
   chk=$(region "$wp_finalize" "^### ${spec%%|*}" "^### ${spec##*|}" | flat)
   for b in $bases; do
-    printf '%s' "$chk" | grep -qF "\`$b-<lang>\`" \
+    printf '%s' "$chk" | grep >/dev/null -cF "\`$b-<lang>\`" \
       || fail "wp-finalize ${spec%%|*} does not name \`$b-<lang>\` among the suffix locations it verifies"
   done
 done

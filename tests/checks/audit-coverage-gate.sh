@@ -41,7 +41,7 @@ node "$cov" --results "$t/ok.json" >/dev/null || fail "full coverage exits non-z
 mk "$t/low.json" 20
 rc=0; out=$(node "$cov" --results "$t/low.json") || rc=$?
 [ "$rc" = 1 ] || fail "20/$n did not exit 1 (got $rc)"
-echo "$out" | grep -Eq "^security 20/$n checks executed .*never run: SEC-" || fail "coverage line malformed: $out"
+echo "$out" | grep >/dev/null -Ec "^security 20/$n checks executed .*never run: SEC-" || fail "coverage line malformed: $out"
 { node "$cov" --results "$t/low.json" --json || true; } | node -e "const j=JSON.parse(require('fs').readFileSync(0,'utf8'));if(j.status!=='BELOW_THRESHOLD'||j.categories[0].missing.length!==$n-20)process.exit(1)" \
   || fail "--json is wrong"
 # a re-dispatch list holds only what is missing
@@ -51,12 +51,12 @@ miss=$(node "$cov" --list security --results "$t/low.json")
 first=$(echo "$ids" | cut -d, -f$((n-1))); last=$(echo "$ids" | cut -d, -f$n)
 mk "$t/na.json" $((n-2)) ",findings:[{code:'$first',status:'N/A',reason:'no WooCommerce'},{code:'$last',status:'UNMEASURED',reason:'needs production: no public URL'}]"
 out=$(node "$cov" --results "$t/na.json" --final) || fail "allowed reasons failed --final: $out"
-echo "$out" | grep -Fq "blocked $last: production" || fail "allowed reason not reported as blocked"
+echo "$out" | grep >/dev/null -Fc "blocked $last: production" || fail "allowed reason not reported as blocked"
 # "not measured in this run" is not a reason: missing, and --final reports INCOMPLETE
 mk "$t/bad.json" $((n-1)) ",findings:[{check:'$last',status:'UNMEASURED',reason:'not measured in this run'}]"
 rc=0; out=$(node "$cov" --results "$t/bad.json" --final) || rc=$?
 [ "$rc" = 1 ] || fail "a disallowed UNMEASURED reason passed --final"
-echo "$out" | grep -Fq "missing $last: UNMEASURED reason not allowed" || fail "disallowed reason not reported as missing"
+echo "$out" | grep >/dev/null -Fc "missing $last: UNMEASURED reason not allowed" || fail "disallowed reason not reported as missing"
 node "$cov" --results "$t/bad.json" >/dev/null || fail "99% should pass the plain threshold gate"
 # a finding that is also a pass is invalid input (exit 2)
 mk "$t/dup.json" "$n" ",findings:[{check:'SEC-002',status:'FAIL',severity:'warning',owner:'code',message:'x',resource:'site'}],passes:['SEC-002']"

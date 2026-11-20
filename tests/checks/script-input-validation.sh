@@ -80,7 +80,7 @@ for s in "1');system('x');//" 'abc' '-1' '1.5' '1 2' '$(id)'; do
   fi
   [ ! -s "$log" ] || fail "wp-cinematic-encode ran wp for --scene=$s"
 done
-bash "$enc_sh" in.mp4 --theme=. --scene=3 2>&1 | grep -Fq 'must be a positive integer' \
+bash "$enc_sh" in.mp4 --theme=. --scene=3 2>&1 | grep >/dev/null -Fc 'must be a positive integer' \
   && fail "wp-cinematic-encode rejected a numeric --scene"
 grep -Fq '=~ ^[0-9]+$' "$enc_sh" || fail "wp-cinematic-encode lost its numeric guard"
 

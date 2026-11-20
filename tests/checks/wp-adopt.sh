@@ -55,9 +55,9 @@ out=$($cfg adopt "$tmp/site" --dry-run) || fail "dry run exited non-zero"
 j() { node -e "const j=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log(JSON.stringify($1))" <<<"$out"; }
 [ "$(j 'j.manifest.code_scope.editable')" = '["wp-content/themes/shop-child","wp-content/plugins/acme-gateway"]' ] \
   || fail "editable scope wrong: $(j 'j.manifest.code_scope.editable')"
-j 'j.manifest.code_scope.read_only' | grep -Fq '"wp-content/themes/shop"' || fail "parent theme not read-only"
-j 'j.manifest.code_scope.read_only' | grep -Fq 'wordpress-seo' || fail "updater-known plugin not read-only"
-j 'j.manifest.code_scope' | grep -Fq 'hello' && fail "an inactive plugin entered the code scope"
+j 'j.manifest.code_scope.read_only' | grep >/dev/null -Fc '"wp-content/themes/shop"' || fail "parent theme not read-only"
+j 'j.manifest.code_scope.read_only' | grep >/dev/null -Fc 'wordpress-seo' || fail "updater-known plugin not read-only"
+j 'j.manifest.code_scope' | grep >/dev/null -Fc 'hello' && fail "an inactive plugin entered the code scope"
 [ "$(j 'j.manifest.stack.seo')" = '"yoast"' ] || fail "SEO stack not detected as yoast"
 [ "$(j 'j.manifest.stack.security')" = '"wordfence"' ] || fail "security stack not detected as wordfence"
 [ "$(j 'j.manifest.stack.builder')" = '"elementor"' ] || fail "builder not detected"
@@ -133,7 +133,7 @@ for c in wp-audit wp-debug wp-clone; do
   grep -Fq '${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt.md' "$src" || fail "$c does not offer adoption"
   # A literal install path resolves only on the machine it was typed on.
   # Strip the correct references, then any path left ending in /commands/wp-adopt.md is literal.
-  sed 's#${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt\.md##g' "$src" | grep -Eq '/commands/wp-adopt\.md' \
+  sed 's#${CLAUDE_PLUGIN_ROOT}/commands/wp-adopt\.md##g' "$src" | grep >/dev/null -Ec '/commands/wp-adopt\.md' \
     && fail "$c points at wp-adopt.md through a literal path"
 done
 for a in security seo a11y performance practices geo ux; do

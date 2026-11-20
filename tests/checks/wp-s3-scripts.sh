@@ -66,7 +66,7 @@ grep -Fq 'check-credentials.php' "$setup" \
   || fail "$setup does not run check-credentials.php, so nothing proves the credentials before the plugin is activated"
 # Running it is the defect; printing it as the command to run after activation is correct
 # advice, so `echo` lines are exempt.
-! grep -E '^[^#]*wp s3-uploads verify' "$setup" | grep -qv 'echo' \
+! grep -E '^[^#]*wp s3-uploads verify' "$setup" | grep >/dev/null -cv 'echo' \
   || fail "$setup runs 'wp s3-uploads verify', which cannot work while the plugin is deactivated — that is the whole reason check-credentials.php exists"
 grep -Fq 'listObjectsV2' "$creds" \
   || fail "$creds does not list the bucket, so it proves nothing about the credentials"
@@ -125,7 +125,7 @@ grep -Fq 'php_single_quoted' "$setup" \
 code_only() { sed 's/\(^\|[[:space:]]\)#.*$/\1/' "$1"; }
 for f in "$media" "$lib" "$revert"; do
   for flag in --overwrite --remove; do
-    ! code_only "$f" | grep -Eq "(^|[[:space:]\"'\(\$])${flag}([[:space:]\"'\)]|$)" \
+    ! code_only "$f" | grep >/dev/null -Ec "(^|[[:space:]\"'\(\$])${flag}([[:space:]\"'\)]|$)" \
       || fail "$f passes $flag to the client"
   done
 done
@@ -251,7 +251,7 @@ for dir in wc-logs cache wio_backup wrio wpcf7_uploads; do
   grep -Fq "\`$dir/*\`" "$skill" || fail "$skill does not list $dir/ among the exclusions"
 done
 for p in 'uploads/wc-logs/' 'uploads/woocommerce_uploads/' 'uploads/wpcf7_uploads/' 'uploads/wrio/' 'uploads/wio_backup/'; do
-  awk '/\*\*Never\*\* add these/{f=1} f' "$aws" | grep -Fq "$p" \
+  awk '/\*\*Never\*\* add these/{f=1} f' "$aws" | grep >/dev/null -Fc "$p" \
     || fail "$aws no longer lists $p among the paths never added to the bucket policy"
 done
 grep -Fq 'include the query string in the cache key' "$aws" \
