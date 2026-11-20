@@ -1,40 +1,26 @@
 ---
-name: wp-cinematic-scene
 description: Author, replace, or regenerate a single cinematic scene. Updates the matching `cinematic_scenes` repeater row (eyebrow, headline, body, CTA, videos, poster) and — if the scene needs a non-default layout — emits a per-scene template fragment override at `template-parts/cinematic/scene-<id>.php`. Cinematic equivalent of `/wp-section`.
-arguments:
-  - name: <n>
-    description: Scene number (1..N) OR scene_id (e.g. scene-intro)
-    required: true
-  - name: --eyebrow
-    description: Inline kicker text (bilingual via `--eyebrow-es`)
-    required: false
-  - name: --headline
-    description: Headline text (bilingual via `--headline-es`)
-    required: false
-  - name: --body
-    description: Path to a markdown file OR inline string
-    required: false
-  - name: --cta
-    description: "`Label|URL` pair"
-    required: false
-  - name: --video
-    description: Path to source video — triggers `/wp-cinematic-encode` first
-    required: false
-  - name: --align
-    description: left | center | right (default left)
-    required: false
-  - name: --veil
-    description: none | soft | heavy (default soft)
-    required: false
-  - name: --regenerate-schema
-    description: Re-read schemas/scene.json and rewrite fields/scenes.php (preserves @user-block markers)
-    required: false
-  - name: --force-adopted
-    description: Build on an adopted site (third-party theme) on purpose; otherwise the command stops
-    required: false
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
+argument-hint: "<n> [--eyebrow <eyebrow>] [--headline <headline>] [--body <body>] [--cta <cta>] [--video <video>] [--align <left|center|right>] [--veil <none|soft|heavy>] [--regenerate-schema] [--force-adopted]"
 ---
 
 # /wp-cinematic-scene
+
+## Arguments
+
+| Argument | Required | Meaning |
+|---|---|---|
+| `<n>` | yes | Scene number (1..N) OR scene_id (e.g. scene-intro) |
+| `--eyebrow` | no | Inline kicker text (bilingual via `--eyebrow-es`) |
+| `--headline` | no | Headline text (bilingual via `--headline-es`) |
+| `--body` | no | Path to a markdown file OR inline string |
+| `--cta` | no | `Label\|URL` pair |
+| `--video` | no | Path to source video — triggers `/wp-cinematic-encode` first |
+| `--align` | no | left \| center \| right (default left) |
+| `--veil` | no | none \| soft \| heavy (default soft) |
+| `--regenerate-schema` | no | Re-read schemas/scene.json and rewrite fields/scenes.php (preserves @user-block markers) |
+| `--force-adopted` | no | Build on an adopted site (third-party theme) on purpose; otherwise the command stops |
+
 
 Replaces the per-scene `/wp-section` workflow when the theme is cinematic. ACF row updates run via `wp eval-file` so the change is live immediately — no admin click-through.
 

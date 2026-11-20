@@ -1,7 +1,7 @@
 ---
 description: Full-site builder — convert a complete multi-page HTML demo folder into a WordPress theme in one pass
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, AskUserQuestion
-argument-hint: "<demo-folder> [--yolo] [--careful] [--force-adopted]"
+argument-hint: "<demo-folder> [--yolo] [--careful] [--force] [--resume [--accept-drift] [--skip <unit>] [--rebuild <unit>]] [--force-adopted]"
 ---
 
 # WP YOLO — Full-Site Demo → WordPress Theme

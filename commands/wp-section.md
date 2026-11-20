@@ -1,7 +1,7 @@
 ---
 description: One-shot section builder — generates ACF fields + template part + CSS for a section from the demo
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
-argument-hint: "<section-name> [screenshot-path] [--cf7] [--hybrid] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>] [--force-adopted]"
+argument-hint: "<section-name> [screenshot-path] [--cf7] [--hybrid] [--no-hybrid] [--defer-promotion] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>] [--force-adopted]"
 ---
 
 # WP Section — One-Shot Section Builder

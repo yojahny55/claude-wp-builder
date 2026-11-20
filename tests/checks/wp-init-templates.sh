@@ -67,8 +67,8 @@ grep -Fq 'do NOT dispatch to it again' "$cmd" || { echo "FAIL: /wp-init lost the
 ci=commands/wp-cinematic-init.md
 grep -Fq -- '/wp-init --path=<path> --mode=cinematic' "$ci" || { echo "FAIL: $ci does not hand off with the flags /wp-init parses"; exit 1; }
 ! grep -Fq -- '--starter=__cinematic__ --acf' "$ci" || { echo "FAIL: $ci still passes the redundant --starter flag"; exit 1; }
-! grep -Eq -- '^  - name: --hybrid$' "$ci" || { echo "FAIL: $ci still declares --hybrid; the one spelling is --no-hybrid"; exit 1; }
-grep -Fq -- '- name: --no-hybrid' "$ci" || { echo "FAIL: $ci does not declare --no-hybrid"; exit 1; }
+! grep -Eq -- '^\| `--hybrid` ' "$ci" || { echo "FAIL: $ci still declares --hybrid; the one spelling is --no-hybrid"; exit 1; }
+grep -Fq -- '--no-hybrid' <(sed -n '/^argument-hint:/p' "$ci") || { echo "FAIL: $ci does not declare --no-hybrid"; exit 1; }
 
 # Caller markers, conditional --acf-flavor, and no double work in the caller-entered branch.
 fi=skills/wp-init-run/references/flag-intake.md

@@ -1,6 +1,6 @@
 ---
 description: Translate an existing WordPress site into a second language using Polylang
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion
 argument-hint: "<source_lang> <target_lang>"
 ---
 
