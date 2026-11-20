@@ -35,36 +35,36 @@ flatfix=$(printf '%s' "$fix" | tr '\n' ' ' | sed 's/  */ /g')
 # 1. The criterion and its exemption.
 grep -Fq 'PERF-059' "$audit" \
   || fail "$audit has no PERF-059 row for an unsubsetted self-hosted font"
-printf '%s' "$flat" | grep -Fq 'unicode-range' \
+printf '%s' "$flat" | grep >/dev/null -Fc 'unicode-range' \
   || fail "PERF-059 does not mention unicode-range, so it cannot tell a subsetted carry from a whole family"
-printf '%s' "$flat" | grep -Fq 'Do NOT report a face carried with' \
+printf '%s' "$flat" | grep >/dev/null -Fc 'Do NOT report a face carried with' \
   || fail "PERF-059 does not exempt the Google unicode-range carry that /wp-init Step 4.5 produces"
 
 # 2. The fix, and the flag that keeps it from degrading the rendering.
-printf '%s' "$fix" | grep -Fq 'pyftsubset' \
+printf '%s' "$fix" | grep >/dev/null -Fc 'pyftsubset' \
   || fail "the PERF-059 fix names no subsetting tool"
 # `-e --`: the needle starts with a dash, which grep would otherwise read as an option.
-printf '%s' "$fix" | grep -Fq -e "--layout-features='*'" \
+printf '%s' "$fix" | grep >/dev/null -Fc -e "--layout-features='*'" \
   || fail "the PERF-059 fix drops kerning and ligatures — a subset that renders worse at the same coverage is a regression, not a saving"
-printf '%s' "$fix" | grep -Fq 'brotli' \
+printf '%s' "$fix" | grep >/dev/null -Fc 'brotli' \
   || fail "the PERF-059 fix does not name the brotli dependency woff2 output needs, so --flavor=woff2 fails at the point of use"
 
 # 3. The verification, which is the whole reason this is safe to auto-fix.
-printf '%s' "$flatfix" | grep -Fq "against the site's real text" \
+printf '%s' "$flatfix" | grep >/dev/null -Fc "against the site's real text" \
   || fail "the PERF-059 fix does not verify coverage against the site's own text — checking the range list against itself proves nothing"
-printf '%s' "$fix" | grep -Fq 'getBestCmap()' \
+printf '%s' "$fix" | grep >/dev/null -Fc 'getBestCmap()' \
   || fail "the PERF-059 fix carries no cmap coverage check"
-printf '%s' "$flatfix" | grep -Fq 'is a refusal, not a warning' \
+printf '%s' "$flatfix" | grep >/dev/null -Fc 'is a refusal, not a warning' \
   || fail "the PERF-059 fix does not make a missing glyph block the replacement"
 # Silent failure mode, stated. This is what stops the check being dropped as ceremony.
-printf '%s' "$flatfix" | grep -Fq 'does not error' \
+printf '%s' "$flatfix" | grep >/dev/null -Fc 'does not error' \
   || fail "the PERF-059 fix does not say that a missing glyph fails silently through font fallback"
 # Field and term text lives outside post_content. A sample that misses it passes a subset that
 # is missing characters the site renders.
-printf '%s' "$flatfix" | grep -Fq 'outside `post_content`' \
+printf '%s' "$flatfix" | grep >/dev/null -Fc 'outside `post_content`' \
   || fail "the PERF-059 fix does not warn that ACF/SCF field values and term names are not in post_content"
 # A subset is lossy and one-way.
-printf '%s' "$flatfix" | grep -Fq 'cannot be widened back' \
+printf '%s' "$flatfix" | grep >/dev/null -Fc 'cannot be widened back' \
   || fail "the PERF-059 fix does not require keeping the original family, which a subset cannot be widened back into"
 
 echo "PASS: PERF-059 reports an unsubsetted self-hosted font and its fix verifies coverage before replacing one"

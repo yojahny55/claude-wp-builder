@@ -51,7 +51,7 @@ for k in $keys; do
 done
 for bin in convert cwebp gif2webp curl unzip sha256sum; do
   grep -Eq "^[^#]*(^|[^a-z_])$bin([^a-z_]|$)" "$script" || continue
-  awk '/^## Requirements/{f=1;next} /^## /{f=0} f' "$skill" | grep -Fq "$bin" \
+  awk '/^## Requirements/{f=1;next} /^## /{f=0} f' "$skill" | grep >/dev/null -Fc "$bin" \
     || { echo "FAIL: $script calls $bin, which $skill's Requirements does not list"; exit 1; }
 done
 grep -Fq '"${CLAUDE_PLUGIN_ROOT}/skills/wp-robin/scripts/robin-fix.sh"' "$skill" \

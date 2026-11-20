@@ -200,7 +200,7 @@ grep -Fq '.toc,.filters,.theme{display:none}' "$html" \
   || fail "$html prints the theme switch and the filter pills"
 # Rows inside a closed <details> are not rendered, and print CSS cannot reopen them: every
 # group must be open or the PDF carries only the first category.
-if grep -Eq '<details class="group"[^>]*>' "$html" && grep -E '<details class="group"' "$html" | grep -vq ' open>'; then
+if grep -Eq '<details class="group"[^>]*>' "$html" && grep -E '<details class="group"' "$html" | grep >/dev/null -vc ' open>'; then
   fail "$html renders a collapsed finding group, which a printed PDF drops"
 fi
 [ "$(grep -c '<details class="group"' "$html")" -eq 3 ] \
@@ -514,7 +514,7 @@ for ext in md html; do
     || fail "a clean .$ext report does not say that nothing was found"
 done
 # Nothing to apply: no empty plan table, no ownership split, no staging/production warning.
-if tr '\n' ' ' < "$tmp/out3/informe-2026-09-17.html" | grep -Eq 'Remediation plan</h2> *<table'; then
+if tr '\n' ' ' < "$tmp/out3/informe-2026-09-17.html" | grep >/dev/null -Ec 'Remediation plan</h2> *<table'; then
   fail "a clean .html report still renders an empty plan table"
 fi
 if grep -Fq 'Split: 0 in code' "$tmp/out3/informe-2026-09-17.md" \
@@ -553,7 +553,7 @@ fi
 cp "$tmp/out3/informe-2026-09-24.md" "$tmp/first-of-day.md"
 node "$r" --run "$tmp/empty.json" --out "$tmp/out3" --date 2026-09-24 --format md >/dev/null \
   || fail "$r failed on a second run of the same day"
-archived=$(find "$tmp/out3" -name 'informe-2026-09-24-[0-9][0-9][0-9][0-9]*.json' | head -1)
+archived=$(find "$tmp/out3" -name 'informe-2026-09-24-[0-9][0-9][0-9][0-9]*.json' | sed -n 1p)
 [ -n "$archived" ] || fail "a second run on the same day did not keep the first run's sidecar"
 cmp -s "${archived%.json}.md" "$tmp/first-of-day.md" \
   || fail "a second run on the same day did not keep the first run's report"

@@ -21,7 +21,7 @@ grep -Fq 'run_in_background' <<<"$budget" || fail "long commands are not sent to
 grep -Fq 'Never a `while read` loop over URLs' <<<"$budget" || fail "serial URL loop not forbidden"
 
 # The budget has to be read before measuring starts, not after.
-line_of() { grep -n -- "$1" "$a" | head -1 | cut -d: -f1 || true; }
+line_of() { grep -n -- "$1" "$a" | sed -n 1p | cut -d: -f1 || true; }
 b=$(line_of '^## Budget and stop rule'); s1=$(line_of '^## Step 1:')
 [ -n "$b" ] && [ -n "$s1" ] || fail "budget section or Step 1 heading not found"
 [ "$b" -lt "$s1" ] || fail "budget section comes after Step 1"

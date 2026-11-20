@@ -15,20 +15,20 @@ done
 flata=$(tr '\n' ' ' < "$a11y" | sed 's/  */ /g')
 flatc=$(tr '\n' ' ' < "$css" | sed 's/  */ /g')
 
-printf '%s' "$flata" | grep -Fq 'narrowest selector' \
+printf '%s' "$flata" | grep >/dev/null -Fc 'narrowest selector' \
   || { echo "FAIL: $a11y does not tell a global colour fix to use the narrowest selector"; exit 1; }
-printf '%s' "$flata" | grep -Fq 'document.documentElement' \
+printf '%s' "$flata" | grep >/dev/null -Fc 'document.documentElement' \
   || { echo "FAIL: $a11y does not say to look for the theme switch attribute on document.documentElement versus body"; exit 1; }
-printf '%s' "$flata" | grep -Eiq 'overlay|text over image' \
+printf '%s' "$flata" | grep >/dev/null -Eic 'overlay|text over image' \
   || { echo "FAIL: $a11y does not name overlay / text-over-image cards as a context to measure"; exit 1; }
-printf '%s' "$flata" | grep -Fq 'transition' \
+printf '%s' "$flata" | grep >/dev/null -Fc 'transition' \
   || { echo "FAIL: $a11y does not warn that dark-mode measurement needs transitions off or finished"; exit 1; }
-printf '%s' "$flata" | grep -Fq 'getComputedStyle' \
+printf '%s' "$flata" | grep >/dev/null -Fc 'getComputedStyle' \
   || { echo "FAIL: $a11y does not verify the :not() exclusion with getComputedStyle"; exit 1; }
 
-printf '%s' "$flatc" | grep -Fq 'Overrides at the End of the Stylesheet' \
+printf '%s' "$flatc" | grep >/dev/null -Fc 'Overrides at the End of the Stylesheet' \
   || { echo "FAIL: $css has no section on end-of-sheet overrides"; exit 1; }
-printf '%s' "$flatc" | grep -Eiq 'overlay|text over an image' \
+printf '%s' "$flatc" | grep >/dev/null -Eic 'overlay|text over an image' \
   || { echo "FAIL: $css does not say to exclude overlay cards from a broad override"; exit 1; }
 
 echo "PASS: global colour fixes are scoped narrowly and measured in the theme-switch, overlay and mid-transition contexts"

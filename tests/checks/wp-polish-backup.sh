@@ -103,7 +103,7 @@ undirected() { # <flat-text> <literal-needle> <lowercase-ERE>
   local text=$1 needle=$2 pat=$3 sent
   while IFS= read -r sent; do
     [ -n "$sent" ] || continue
-    printf '%s' "$sent" | awk -v pat="$pat" -v neg="$NEGATION" '
+    awk -v pat="$pat" -v neg="$NEGATION" '
     {
       low = tolower($0); s = low; off = 0
       while (match(s, pat)) {
@@ -118,7 +118,7 @@ undirected() { # <flat-text> <literal-needle> <lowercase-ERE>
         off = off + ms + ml - 1
         s = substr(low, off + 1)
       }
-    }'
+    }' < <(printf '%s' "$sent")
   done <<< "$(sentences "$text" "$needle")"
   return 0
 }
@@ -178,13 +178,13 @@ live_promise() { # <file> <literal-needle> <locative-ERE> -> first offending sen
   text=$(paraflatten < "$file")
   while IFS= read -r sent; do
     [ -n "$sent" ] || continue
-    if printf '%s' "$sent" | grep -Eqi "$STRONG"; then continue; fi
+    if printf '%s' "$sent" | grep >/dev/null -Eci "$STRONG"; then continue; fi
     # the clause the path actually sits in, for the negation test only
     cl=$(printf '%s' "$sent" | sed 's/[,;(]/\n/g; s/—/\n/g' | grep -F "$needle") || true
-    if printf '%s' "$cl" | grep -Eqi "$WEAK"; then continue; fi
+    if printf '%s' "$cl" | grep >/dev/null -Eci "$WEAK"; then continue; fi
     # decided on the sentence, reported as the clause: a flattened code block can
     # run 240 characters without a full stop and the whole window is unreadable.
-    if printf '%s' "$sent" | grep -Eqi "$loc"; then printf '%s\n' "$cl" | head -1; return 0; fi
+    if printf '%s' "$sent" | grep >/dev/null -Eci "$loc"; then printf '%s\n' "$cl" | sed -n 1p; return 0; fi
   done <<< "$(sentences "$text" "$needle")"
   return 0
 }
@@ -223,7 +223,7 @@ pre=$(awk -v wh="$WRITE_HEAD" -v ws="$WRITE_SKIP" '
 #    glob, ripgrep and fd all skip, so /wp-seed's demo/*.html enumeration cannot
 #    see it. The save verb has to come from the BODY — see drop_headings above.
 # ---------------------------------------------------------------------------
-sentences "$pre" 'demo/.prepolish/' | grep -Eqi "$SAVE" \
+sentences "$pre" 'demo/.prepolish/' | grep >/dev/null -Eci "$SAVE" \
   || fail "The command never says, before the step that overwrites the page, that the pre-polish copy is written to demo/.prepolish/ — a backup beside the demo pages becomes a phantom WP Page on the next /wp-seed"
 
 # ...and nowhere may the file direct that copy at a sibling of demo/*.html.
@@ -270,7 +270,7 @@ COND="$COND"'|unless .{0,120}(already )?(exists|exist|is there|is present)'
 COND="$COND"'|only (if|when) .{0,120}(is|are) (absent|missing)'
 COND="$COND"'|(never|do not|does not|must not|no run) (overwrit|replac|clobber)(e|es|ing)'
 
-printf '%s\n' "$lifetime" | grep -Eqi "$COND" \
+printf '%s\n' "$lifetime" | grep >/dev/null -Eci "$COND" \
   || fail "The command does not make the backup write conditional, before the step that overwrites the page, on demo/.prepolish/<source-filename> not already existing — a second /wp-polish copies the already-polished page over the only unpolished copy. A conditional about creating the DIRECTORY does not count; the rule has to bind the copy"
 
 # ...and nothing may promise the opposite. "(overwrites if exists)" was only one
@@ -300,7 +300,7 @@ grep -qF '=== Demo Polished ===' "$f" || fail "$f prints no '=== Demo Polished =
 rep=$(awk '/^=== Demo Polished ===/{ inr = 1; next }
            inr && /^```/ { print "__FENCE__"; exit }
            inr { print }' "$f")
-printf '%s' "$rep" | grep -qF '__FENCE__' \
+printf '%s' "$rep" | grep >/dev/null -cF '__FENCE__' \
   || fail "the '=== Demo Polished ===' report block never closed on its code fence; the awk range ran to EOF and the assertions below would degrade to file-wide greps"
 # The `|| true` is load-bearing — same shape and same reason as the one on `qmode`
 # in tests/checks/wp-tailwind-migrate.sh. A report block holding nothing but its
@@ -311,9 +311,9 @@ printf '%s' "$rep" | grep -qF '__FENCE__' \
 # emptying the `=== Demo Polished ===` block.
 rep=$(printf '%s\n' "$rep" | { grep -Fv '__FENCE__' || true; })
 [ -n "$rep" ] || fail "$f's '=== Demo Polished ===' report block is empty"
-printf '%s' "$rep" | grep -qF 'demo/.prepolish/' \
+printf '%s' "$rep" | grep >/dev/null -cF 'demo/.prepolish/' \
   || fail "the printed report does not name the backup at demo/.prepolish/ — it points the user at a path the command no longer writes"
-if printf '%s' "$rep" | grep -Eq '^Original:.*demo/[A-Za-z]'; then
+if printf '%s' "$rep" | grep >/dev/null -Ec '^Original:.*demo/[A-Za-z]'; then
   fail "the report labels a sibling of demo/*.html 'Original:' — that file is both a phantom-page hazard and, after a re-run, not the original at all"
 fi
 
@@ -389,17 +389,17 @@ told_apart=$(printf '%s\n' "$blocks" \
 #        is the whole defect; <input-...> is allowed because it is the same claim in
 #        the other common word.
 # ---------------------------------------------------------------------------
-ph_bad=$(printf '%s' "$flat" | grep -oE 'demo/\.prepolish/<[^>]*>' | grep -Evi '<(source|input)' | head -1) || true
+ph_bad=$(printf '%s' "$flat" | grep -oE 'demo/\.prepolish/<[^>]*>' | grep -Evi '<(source|input)' | sed -n 1p) || true
 if [ -n "$ph_bad" ]; then
   fail "$f names the pre-polish copy after the demo page it is written to ($ph_bad), not after the source document. /wp-polish figma-v1.html then /wp-polish figma-v2.html both land at demo/index.html, so both key on demo/.prepolish/index.html: run two keeps run one's copy under the never-overwrite rule above and Step 7 presents figma-v1's markup as the pre-polish version of figma-v2 — a preserved original of a document nobody asked about"
 fi
-printf '%s' "$flat" | grep -Eq 'demo/\.prepolish/<(source|input)[^>]*>' \
+printf '%s' "$flat" | grep >/dev/null -Ec 'demo/\.prepolish/<(source|input)[^>]*>' \
   || fail "$f never spells out which filename the pre-polish copy takes. It has to be the source document's own, or two different documents polished into demo/index.html collide on one backup name"
 
 # 5b. ...and the file must say so against the alternative, because a reader who
 #     only sees "<source-filename>" cannot tell it apart from the demo page's name
 #     in the ordinary case, where the two are the same file.
-sentences "$pre" 'demo page' | grep -Ei 'rather than|instead of|(^|[^a-z])not([^a-z]|$)' | grep -Eqi 'sourc|input' \
+sentences "$pre" 'demo page' | grep -Ei 'rather than|instead of|(^|[^a-z])not([^a-z]|$)' | grep >/dev/null -Eci 'sourc|input' \
   || fail "$f no longer contrasts naming the copy after the source document with naming it after the demo page it is written to. In the ordinary in-place polish those are the same file and the distinction reads as pedantry; it is the whole fix for an input from outside demo/"
 
 # ---------------------------------------------------------------------------
@@ -423,7 +423,7 @@ sentences "$pre" 'demo page' | grep -Ei 'rather than|instead of|(^|[^a-z])not([^
 #    empty pattern would drop every line and mute the assertion.
 # ---------------------------------------------------------------------------
 PRECOPY='(cop(y|ies|ied)|mov(e|es|ed)).*(to|over|into|onto) .?demo/index[.]html'
-sentences "$pre" 'demo/index.html' | grep -Eqi "$PRECOPY" \
+sentences "$pre" 'demo/index.html' | grep >/dev/null -Eci "$PRECOPY" \
   || fail "$f no longer warns against copying the source over demo/index.html before the pre-polish copy is taken. That copy is what gave two different source documents one backup name, and what made Step 2's promise to run 'before touching anything' false for every input from outside demo/"
 
 wlab=$(awk -v wh="$WRITE_HEAD" -v ws="$WRITE_SKIP" '
@@ -446,7 +446,7 @@ fi
 # ---------------------------------------------------------------------------
 note=$(awk '/^=== Demo Polished ===/{ inr = 1 } inr { print }' "$f" | flatten)
 [ -n "$note" ] || fail "$f prints no '=== Demo Polished ===' report block"
-sentences "$note" 'demo/.prepolish/' | grep -Eqi 'a copy of|(came|come|comes) from|of nothing else' \
+sentences "$note" 'demo/.prepolish/' | grep >/dev/null -Eci 'a copy of|(came|come|comes) from|of nothing else' \
   || fail "the report section never says which document the file in demo/.prepolish/ is a copy of, so it is free to present one source document's unpolished markup as the pre-polish version of another"
 
 # ---------------------------------------------------------------------------
@@ -490,7 +490,7 @@ done
 rsec=$(awk '/^### /{ if (inr) exit; if (tolower($0) ~ /polish/) inr = 1 } inr { print }' README.md \
        | drop_headings | flatten)
 [ -n "$rsec" ] || rsec=$(drop_headings < README.md | flatten)
-sentences "$rsec" 'demo/.prepolish/' | grep -Eqi "$SAVE" \
+sentences "$rsec" 'demo/.prepolish/' | grep >/dev/null -Eci "$SAVE" \
   || fail "README.md's /wp-polish section does not say the unpolished copy is kept in demo/.prepolish/ — this is the only place a reader learns the polished page is recoverable at all"
 
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; fi_=$EXPANDED
@@ -499,15 +499,15 @@ test -f "$fi_" || fail "$fi_ missing"
 # 9a. the block /wp-init writes into the generated project's .claude/CLAUDE.md.
 idemo=$(awk '/^## Demo$/{ inr = 1 } inr { print } inr && /^```$/ { exit }' "$fi_")
 [ -n "$idemo" ] || idemo=$(cat "$fi_")
-printf '%s' "$idemo" | grep -qF 'demo/.prepolish/' \
+printf '%s' "$idemo" | grep >/dev/null -cF 'demo/.prepolish/' \
   || fail "the '## Demo' block $fi_ writes into the generated project's .claude/CLAUDE.md does not name demo/.prepolish/. That file is the first thing every agent in a user's project reads, so a wrong or missing backup path there is inherited by every later command"
 
 # 9b. the terminal summary /wp-init prints for a demo-first project.
 isum=$(awk '/^=== Project Initialized \(from existing demo\) ===/,/^Next step:/' "$fi_")
 [ -n "$isum" ] || isum=$(cat "$fi_")
-printf '%s' "$isum" | grep -qF 'Next step:' \
+printf '%s' "$isum" | grep >/dev/null -cF 'Next step:' \
   || fail "$fi_'s demo-first summary block never closed on its 'Next step:' line; the awk range ran to EOF and the assertion below would degrade to a file-wide grep"
-printf '%s' "$isum" | grep -qF 'demo/.prepolish/' \
+printf '%s' "$isum" | grep >/dev/null -cF 'demo/.prepolish/' \
   || fail "$fi_'s demo-first summary does not name demo/.prepolish/ — it is printed straight after /wp-init has run /wp-polish, and is where the user is told what to restore from"
 
 echo PASS

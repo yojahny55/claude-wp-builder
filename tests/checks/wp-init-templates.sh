@@ -27,7 +27,7 @@ for t in $targets; do
 done
 
 # Whatever the Enter-key default is, it must resolve to a real directory too.
-default=$(grep -oP '^Default: `\K[a-z]+' "$cmd" | head -1)
+default=$(grep -oP '^Default: `\K[a-z]+' "$cmd" | sed -n 1p)
 [[ -n "$default" ]] || { echo "FAIL: no template default declared in $cmd"; exit 1; }
 case "$default" in
   tailwind)  d=starter-theme/__tailwind__ ;;

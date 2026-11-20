@@ -52,9 +52,9 @@ need 'A failed import is the case that matters' \
   'does not say why the failing run is the one that leaves a dump behind'
 
 # Ordering: each cleanup must follow the step it cleans up after, and both must exist.
-rm_remote=$(grep -n "rm -f '\\\\\$REMOTE_DUMP'" "$f" | head -1 | cut -d: -f1 || true)
-rm_local=$(grep -n 'rm -f \\"\\\$LOCAL_DUMP\\"' "$f" | head -1 | cut -d: -f1 || true)
-imp=$(grep -n 'db import \\"\\\$LOCAL_DUMP\\"' "$f" | head -1 | cut -d: -f1 || true)
+rm_remote=$(grep -n "rm -f '\\\\\$REMOTE_DUMP'" "$f" | sed -n 1p | cut -d: -f1 || true)
+rm_local=$(grep -n 'rm -f \\"\\\$LOCAL_DUMP\\"' "$f" | sed -n 1p | cut -d: -f1 || true)
+imp=$(grep -n 'db import \\"\\\$LOCAL_DUMP\\"' "$f" | sed -n 1p | cut -d: -f1 || true)
 [ -n "$rm_remote" ] || fail "$f never removes the remote dump"
 [ -n "$imp" ] || fail "$f no longer imports from the captured local dump path"
 [ -n "$rm_local" ] || fail "$f never removes the local dump"

@@ -78,17 +78,17 @@ grep -Fq 'admin|maintain|write) ;;' "$AF" \
 grep -Fq 'if [ "$head_repo" != "$REPO" ] || [ "$state" != open ]; then' "$AF" \
   || fail "$AF: the same-repo / open-PR refusal is gone"
 fixjob=$(job fix)
-printf '%s\n' "$fixjob" | grep -Eq '^      contents: read$' \
-  && ! printf '%s\n' "$fixjob" | grep -Eq '^      [a-z-]+: write$' \
+printf '%s\n' "$fixjob" | grep >/dev/null -Ec '^      contents: read$' \
+  && ! printf '%s\n' "$fixjob" | grep >/dev/null -Ec '^      [a-z-]+: write$' \
   && [ "$(printf '%s\n' "$fixjob" | grep -c 'persist-credentials: false')" -eq "$(printf '%s\n' "$fixjob" | grep -c 'uses: actions/checkout@')" ] \
   || fail "$AF: the fix job (the agent) holds more than contents: read, or checks out with persisted credentials"
 pub=$(job publish)
-hash_line=$(printf '%s\n' "$pub" | grep -n '\[ "$got" = "$PATCH_SHA" \] ||' | head -1 | cut -d: -f1)
-apply_line=$(printf '%s\n' "$pub" | grep -nE '^[[:space:]]*git apply' | head -1 | cut -d: -f1)
+hash_line=$(printf '%s\n' "$pub" | grep -n '\[ "$got" = "$PATCH_SHA" \] ||' | sed -n 1p | cut -d: -f1)
+apply_line=$(printf '%s\n' "$pub" | grep -nE '^[[:space:]]*git apply' | sed -n 1p | cut -d: -f1)
 [ -n "$hash_line" ] && [ -n "$apply_line" ] && [ "$hash_line" -lt "$apply_line" ] \
   || fail "$AF: publish no longer checks the patch hash before applying it"
 pushes=$(printf '%s\n' "$pub" | grep -E '^[[:space:]]*(if )?git push')
-[ -n "$pushes" ] && ! printf '%s\n' "$pushes" | grep -Eq -- '--force|[[:space:]]-f([[:space:]]|$)|[[:space:]]"?\+' \
+[ -n "$pushes" ] && ! printf '%s\n' "$pushes" | grep >/dev/null -Ec -- '--force|[[:space:]]-f([[:space:]]|$)|[[:space:]]"?\+' \
   || fail "$AF: publish's push is forced (--force, -f or a + refspec) or gone"
 
 # ocr-review.yml runs on pull_request_target on a self-hosted rig: safe only while no PR

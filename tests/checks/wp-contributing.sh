@@ -180,8 +180,8 @@ grep -Fq '[ "$fail" = 0 ] && bash bin/doc-sync-check.sh' "$s" \
 grep -Fq 'git push origin main && git push origin vX.Y.Z' "$c" \
   || fail "$c does not say how to push the release commit and its tag"
 step5=$(awk '/^## Step 5/{f=1} f' "$c")
-recon=$(grep -n 'Reconciled' <<<"$step5" | head -1 | cut -d: -f1 || true)
-commit=$(grep -n 'chore(release)' <<<"$step5" | head -1 | cut -d: -f1 || true)
+recon=$(grep -n 'Reconciled' <<<"$step5" | sed -n 1p | cut -d: -f1 || true)
+commit=$(grep -n 'chore(release)' <<<"$step5" | sed -n 1p | cut -d: -f1 || true)
 [ -n "$recon" ] && [ -n "$commit" ] && [ "$recon" -lt "$commit" ] \
   || fail "$c Step 5 must reconcile BACKLOG.md before the release commit"
 

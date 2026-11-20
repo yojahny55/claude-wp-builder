@@ -41,7 +41,7 @@ git -C "$t" init -q
 node_bin=$(command -v node)
 set +e; out=$(node "$w" gitignore-check "$t"); rc=$?; set -e
 [ "$rc" = 4 ] || fail "unignored root should exit 4, got $rc"
-echo "$out" | grep -Fq 'missing: .wp-audit-findings.json' || fail "ledger not reported missing"
+echo "$out" | grep >/dev/null -Fc 'missing: .wp-audit-findings.json' || fail "ledger not reported missing"
 printf '.wp-audit/\n.wp-audit-findings.json\n.wp-create.local.json\n.wp-create.json.bak*\n.wp-create.json.v*.bak\n.wp-create.json.*.tmp\n.wp-create.json.lock*\n.htaccess.bak-*\n' > "$t/.gitignore"
 node "$w" gitignore-check "$t" >/dev/null || fail "fully ignored root should exit 0"
 n=$(mktemp -d); trap 'rm -rf "$t" "$n"' EXIT
@@ -49,7 +49,7 @@ node "$w" gitignore-check "$n" >/dev/null || fail "non-git root should exit 0"
 mkdir "$n/no-git"
 set +e; out=$(PATH="$n/no-git" "$node_bin" "$w" gitignore-check "$t" 2>&1); rc=$?; set -e
 [ "$rc" = 1 ] || fail "missing git should fail closed with 1, got $rc"
-echo "$out" | grep -Fq 'git unavailable; cannot check tool state ignores' || fail "missing git did not explain why ignore status is unknown"
+echo "$out" | grep >/dev/null -Fc 'git unavailable; cannot check tool state ignores' || fail "missing git did not explain why ignore status is unknown"
 
 # Behavior: out-dir precedence.
 run='{"findings":[]}'; echo "$run" > "$t/run.json"

@@ -23,7 +23,7 @@ out="$(HOME="$home" WP_S3_BACKUP_DIR='' XDG_STATE_HOME='' PATH="$(dirname "$(com
 [ ! -e "$root/s3-config.php" ] || fail "s3-config.php is still in the docroot"
 [ -z "$(find "$root" -name 's3-config*' -not -path '*/mu-plugins/*')" ] \
   || fail "something s3-config-shaped is still inside the docroot"
-parked="$(find "$home/.local/state/wp-s3-backups" -name s3-config.php.disabled | head -1)"
+parked="$(find "$home/.local/state/wp-s3-backups" -name s3-config.php.disabled | sed -n 1p)"
 [ -n "$parked" ] || fail "no parked config under the private state dir"
 mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
 [ "$(mode "$parked")" = 600 ] || fail "parked config is not 0600"
@@ -39,7 +39,7 @@ printf "<?php\ndefine('S3_UPLOADS_SECRET', 'legacy-canary');\n" > "$root2/s3-con
 out="$(HOME="$home2" WP_S3_BACKUP_DIR='' XDG_STATE_HOME='' PATH="$(dirname "$(command -v bash)"):/usr/bin:/bin" \
   bash "$revert" "$root2" --keep-remote-media 2>&1)" || { echo "$out"; fail "legacy revert did not finish"; }
 [ ! -e "$root2/s3-config.php.disabled" ] || fail "legacy .disabled is still in the docroot"
-parked2="$(find "$home2/.local/state/wp-s3-backups" -name 's3-config.php.disabled*' | head -1)"
+parked2="$(find "$home2/.local/state/wp-s3-backups" -name 's3-config.php.disabled*' | sed -n 1p)"
 [ -n "$parked2" ] || fail "legacy .disabled was not parked"
 [ "$(mode "$parked2")" = 600 ] || fail "parked legacy file is not 0600"
 grep -Fq legacy-canary "$parked2" || fail "parked legacy file lost its content"

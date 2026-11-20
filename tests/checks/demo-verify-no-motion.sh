@@ -44,7 +44,7 @@ rc=0; run "$work/index.html" --out "$work/off" || rc=$?
 grep -q '"no-engine"' "$work/off/findings.json" || fail "without the flag no-engine no longer blocks"
 
 rc=0; run "$work/index.html" --no-motion --out "$work/on" || rc=$?
-[ "$rc" = 0 ] || fail "--no-motion should exit 0, got $rc ($(cat "$work/out.txt" | head -5 | tr '\n' ' '))"
+[ "$rc" = 0 ] || fail "--no-motion should exit 0, got $rc ($(cat "$work/out.txt" | sed -n '1,5p' | tr '\n' ' '))"
 ! grep -Eq '"(no-engine|dead-scroll)"' "$work/on/findings.json" || fail "--no-motion still emits a motion finding"
 
 echo PASS

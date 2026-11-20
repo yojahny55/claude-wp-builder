@@ -28,43 +28,43 @@ flatc=$(tr '\n' ' ' < "$css" | sed 's/  */ /g')
 # 1. The agent's fix phase must state that a tag swap is a visual change, and mandate it.
 grep -Fq 'A tag swap is a visual change' "$a11y" \
   || { echo "FAIL: $a11y Step 8 does not state that a tag swap is a visual change"; exit 1; }
-printf '%s' "$flata" | grep -Fq 'MANDATORY' \
+printf '%s' "$flata" | grep >/dev/null -Fc 'MANDATORY' \
   || { echo "FAIL: the tag-swap measurement in $a11y is not mandatory, so it is the first thing skipped"; exit 1; }
 # The specific measurements. A rule that says "check it looks right" is not a measurement.
 for needle in 'getComputedStyle(el)' 'getBoundingClientRect()' 'fontSize' 'borderRadius'; do
-  printf '%s' "$flata" | grep -Fq "$needle" \
+  printf '%s' "$flata" | grep >/dev/null -Fc "$needle" \
     || { echo "FAIL: $a11y does not require $needle in the before/after comparison"; exit 1; }
 done
 # Before AND after. Measuring only afterwards has nothing to compare against.
-printf '%s' "$flata" | grep -Fq 'before and after' \
+printf '%s' "$flata" | grep >/dev/null -Fc 'before and after' \
   || { echo "FAIL: $a11y does not require the measurement on BOTH sides of the change"; exit 1; }
 # A mismatch is a regression, not a trade-off to explain in the report.
-printf '%s' "$flata" | grep -Fq 'is a regression to fix before the work is reported' \
+printf '%s' "$flata" | grep >/dev/null -Fc 'is a regression to fix before the work is reported' \
   || { echo "FAIL: $a11y treats a changed computed value as acceptable — a difference has to block the fix"; exit 1; }
 # Scope: every element sharing the class, and both viewports.
-printf '%s' "$flata" | grep -Fq 'every element that shares the class' \
+printf '%s' "$flata" | grep >/dev/null -Fc 'every element that shares the class' \
   || { echo "FAIL: $a11y measures only the element in hand — a reset class reaches every element already carrying it"; exit 1; }
-printf '%s' "$flata" | grep -Fq 'desktop and mobile' \
+printf '%s' "$flata" | grep >/dev/null -Fc 'desktop and mobile' \
   || { echo "FAIL: $a11y does not require both viewports"; exit 1; }
 # And why the page-level screenshot gate does not cover this.
-printf '%s' "$flata" | grep -Fq 'is not this measurement' \
+printf '%s' "$flata" | grep >/dev/null -Fc 'is not this measurement' \
   || { echo "FAIL: $a11y does not say why a screenshot diff cannot see this — a 26px icon becoming 18px in a flex row moves nothing else"; exit 1; }
 
 # States, dark mode and element scope: a change can match at rest and differ on hover or focus, in dark, or on a sibling element sharing the class.
 for needle in ':hover' ':focus-visible' 'dark mode' "document.querySelectorAll('.<class>')"; do
-  printf '%s' "$flata" | grep -Fq "$needle" \
+  printf '%s' "$flata" | grep >/dev/null -Fc "$needle" \
     || { echo "FAIL: $a11y does not require measuring $needle in the tag-swap comparison"; exit 1; }
 done
 
 # 2. The CSS skill must carry the specificity reason, or the rule reads as superstition.
 grep -Fq 'A reset class loses to nothing and wins on source order' "$css" \
   || { echo "FAIL: $css does not explain why a reset class beats the utilities already on the element"; exit 1; }
-printf '%s' "$flatc" | grep -Fq 'source order' \
+printf '%s' "$flatc" | grep >/dev/null -Fc 'source order' \
   || { echo "FAIL: $css does not name source order as what decides the tie"; exit 1; }
-printf '%s' "$flatc" | grep -Fq ':where(.btn-reset)' \
+printf '%s' "$flatc" | grep >/dev/null -Fc ':where(.btn-reset)' \
   || { echo "FAIL: $css offers no weightless form of the reset class"; exit 1; }
 # The rule list shows both declarations applying, which is what makes this invisible in DevTools.
-printf '%s' "$flatc" | grep -Fq 'both declarations show as applying' \
+printf '%s' "$flatc" | grep >/dev/null -Fc 'both declarations show as applying' \
   || { echo "FAIL: $css does not warn that the DevTools rule list shows nothing wrong in this case"; exit 1; }
 
 echo "PASS: a tag swap is measured before and after, and the specificity reason is written down where the CSS rules live"

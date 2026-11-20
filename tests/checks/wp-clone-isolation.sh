@@ -23,9 +23,9 @@ need 'Step 5.5: Isolate the Clone' 'has no post-import isolation step'
 
 # Order. Step 6 loads WordPress and then tells the operator to visit the site; anything
 # that must not happen has to be prevented before that, not reported after it.
-iso=$(grep -n '^## Step 5.5: Isolate the Clone' "$f" | head -1 | cut -d: -f1 || true)
-pre=$(grep -n '^## Step 5.4: Isolate the Clone' "$f" | head -1 | cut -d: -f1 || true)
-ver=$(grep -n '^## Step 6: Post-Clone Verification' "$f" | head -1 | cut -d: -f1 || true)
+iso=$(grep -n '^## Step 5.5: Isolate the Clone' "$f" | sed -n 1p | cut -d: -f1 || true)
+pre=$(grep -n '^## Step 5.4: Isolate the Clone' "$f" | sed -n 1p | cut -d: -f1 || true)
+ver=$(grep -n '^## Step 6: Post-Clone Verification' "$f" | sed -n 1p | cut -d: -f1 || true)
 [ -n "$iso" ] || fail "$f no longer declares Step 5.5 as a heading"
 [ -n "$pre" ] || fail "$f no longer declares Step 5.4 as a heading"
 [ -n "$ver" ] || fail "$f no longer declares Step 6 as a heading"
@@ -121,11 +121,11 @@ fi
 
 # The two file-level measures must live in 5.4, and the option-level one in 5.5 -- writing
 # blog_public before the import writes a value the import then overwrites.
-sed -n "${pre},${iso}p" "$f" | grep -Fq 'pre_wp_mail' \
+sed -n "${pre},${iso}p" "$f" | grep >/dev/null -Fc 'pre_wp_mail' \
   || fail "$f no longer writes the mail guard in Step 5.4 -- after the import is too late"
-sed -n "${pre},${iso}p" "$f" | grep -Fq 'DISABLE_WP_CRON' \
+sed -n "${pre},${iso}p" "$f" | grep >/dev/null -Fc 'DISABLE_WP_CRON' \
   || fail "$f no longer sets DISABLE_WP_CRON in Step 5.4"
-sed -n "${pre},${iso}p" "$f" | grep -Fq 'option update blog_public' \
+sed -n "${pre},${iso}p" "$f" | grep >/dev/null -Fc 'option update blog_public' \
   && fail "$f sets blog_public in Step 5.4 -- it is a wp_options row, and the import would overwrite it"
 
 need 'survive it' 'does not explain why the file-level guards can precede the import'

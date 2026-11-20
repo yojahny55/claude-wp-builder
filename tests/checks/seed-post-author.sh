@@ -29,7 +29,7 @@ missing=$(grep -nE "$cmd" "$s" | grep -vF -- '--post_author=$AUTHOR' || true)
 grep -qF '### Always set an author' "$skill" || fail "$skill lost the 'Always set an author' rule wp-seed points at"
 [ "$(grep -cF 'user list --role=administrator --field=ID --number=1' "$s")" = 1 ] \
   || fail "$s does not resolve the author exactly once"
-tr '\n' ' ' < "$s" | grep -qF 'No administrator is a stop' || fail "$s does not stop when there is no administrator to own the posts"
+tr '\n' ' ' < "$s" | grep >/dev/null -cF 'No administrator is a stop' || fail "$s does not stop when there is no administrator to own the posts"
 grep -qF "post_author = 0 AND post_status != 'auto-draft' AND post_type != 'nav_menu_item'" "$s" \
   || fail "$s does not sweep for authorless posts before reporting the seed done"
 
@@ -41,7 +41,7 @@ missing=$(grep -rnE "$cmd" commands agents skills --include=*.md | grep -vF -- '
 # counterparts came from wp_insert_post() under wp eval-file -- user 0 again.
 imp=skills/wp-polylang/scripts/pll-import.php
 awk '/\$target_id = wp_insert_post\( wp_slash\( \$postarr \), true \);|\$target_id += wp_insert_post\( wp_slash\( \$postarr \), true \);/{print prev} {prev=$0}' "$imp" \
-  | grep -qF "\$postarr['post_author'] = (int) \$source_post->post_author;" \
+  | grep >/dev/null -cF "\$postarr['post_author'] = (int) \$source_post->post_author;" \
   || fail "$imp creates a translated counterpart without its source's post_author"
 
 echo PASS

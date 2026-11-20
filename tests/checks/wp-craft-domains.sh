@@ -22,7 +22,7 @@ grep -Fqi 'MIT' "$d/LICENSE" || fail "$d/LICENSE is not the MIT text"
 [ -f "$d/domains.csv" ] || fail "$d/domains.csv is missing"
 [ -f "$d/README.md" ] || fail "$d/README.md is missing"
 
-head -1 "$d/domains.csv" | grep -Fq 'domain,keywords,page_pattern,considerations,confidence' \
+head -1 "$d/domains.csv" | grep >/dev/null -Fc 'domain,keywords,page_pattern,considerations,confidence' \
   || fail "$d/domains.csv header is not: domain,keywords,page_pattern,considerations,confidence"
 
 n=$(tail -n +2 "$d/domains.csv" | wc -l)
@@ -142,7 +142,7 @@ grep -Fq 'no domain signal' "$k" \
 # and the failure message named a shape the file no longer had.
 r=skills/wp-demo-craft/references/compositions.md
 row='section | role | composition | why | motion cost | domain signal | research signal'
-sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$r" | grep -Fxq "$row" \
+sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$r" | grep >/dev/null -Fxc "$row" \
   || fail "$r's composition-plan row is not \`$row\`"
 grep -Fq 'domain signal that justified' "$r" \
   || fail "$r does not require a domain signal (or brief constraint) per row"

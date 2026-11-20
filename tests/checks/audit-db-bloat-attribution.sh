@@ -27,10 +27,10 @@ grep -Fq 'PERF-060' "$perf" || fail "PERF-073 must cross-reference PERF-060"
 for c in 071 072; do
   row="$(grep -E "^\| PERF-$c \|" "$perf")"
   case "$row" in *'$($WP db prefix)'*) ;; *) fail "PERF-$c row must use \$(\$WP db prefix)";; esac
-  if printf '%s' "$row" | grep -Eiq '\b(UPDATE|DELETE|INSERT|REPLACE|LOAD DATA)\b'; then
+  if printf '%s' "$row" | grep >/dev/null -Eic '\b(UPDATE|DELETE|INSERT|REPLACE|LOAD DATA)\b'; then
     fail "PERF-$c row contains a word WP-CLI db query treats as row-modifying"
   fi
-  printf '%s' "$row" | grep -Eq '(FROM|JOIN) wp_' && fail "PERF-$c row hardcodes the wp_ prefix"
+  printf '%s' "$row" | grep >/dev/null -Ec '(FROM|JOIN) wp_' && fail "PERF-$c row hardcodes the wp_ prefix"
 done
 ! grep -Eq '^\| PERF-07[1-4] \|.*\| CRITICAL \|$' "$perf" || fail "PERF-071..074 must not be CRITICAL"
 
