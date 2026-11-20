@@ -389,22 +389,26 @@ cmd_permissions() {
     # .git and node_modules are pruned: their ownership and executable bits are not ours to reset.
     # chown without -R still follows a symlink given as an operand, so only real directories and
     # files are listed (a symlink to /etc/shadow is skipped) and -h keeps it off any link that races in.
-    # -execdir applies each change relative to the directory find is visiting, so an ancestor swapped
-    # for a symlink after the listing cannot redirect the change to a path outside the tree.
-    sudo find "$path" \( -name .git -o -name node_modules \) -prune -o \( -type d -o -type f \) -execdir chown -h "$web_user:$web_user" {} +
-    sudo find "$path" \( -name .git -o -name node_modules \) -prune -o -type d -execdir chmod 755 {} +
-    sudo find "$path" \( -name .git -o -name node_modules \) -prune -o -type f -execdir chmod 644 {} +
+    # -execdir applies each change relative to the directory find is visiting, which closes the race on
+    # intermediate directories: an ancestor swapped for a symlink after the listing is not followed.
+    # GNU chmod has no -h, so a leaf swapped for a symlink between find's stat and the exec remains a
+    # narrow residual risk; the type test and the change are one pass, which keeps that window small.
+    # -execdir refuses to run when PATH holds a relative or empty entry, and sudo may keep the caller's
+    # PATH, so find runs under a fixed absolute PATH.
+    local safe_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    sudo env PATH="$safe_path" find "$path" \( -name .git -o -name node_modules \) -prune -o \( -type d -o -type f \) -execdir chown -h "$web_user:$web_user" {} +
+    sudo env PATH="$safe_path" find "$path" \( -name .git -o -name node_modules \) -prune -o -type d -execdir chmod 755 {} +
+    sudo env PATH="$safe_path" find "$path" \( -name .git -o -name node_modules \) -prune -o -type f -execdir chmod 644 {} +
 
-    # Writable directories
+    # Writable directories: type check and chmod in one find pass; a symlink is excluded by type.
+    mkdir -p "$path/wp-content/uploads"
     for dir in uploads plugins themes cache; do
         if [[ -L "$path/wp-content/$dir" ]]; then
             print_warning "wp-content/$dir is a symlink; leaving its permissions alone"
-        elif [[ -d "$path/wp-content/$dir" ]]; then
-            sudo chmod 775 "$path/wp-content/$dir"
+        else
+            sudo env PATH="$safe_path" find "$path/wp-content" -mindepth 1 -maxdepth 1 -name "$dir" -type d -execdir chmod 775 {} +
         fi
     done
-    mkdir -p "$path/wp-content/uploads"
-    [[ -L "$path/wp-content/uploads" ]] || sudo chmod 775 "$path/wp-content/uploads"
 
     # Add current user to web group
     local current_user

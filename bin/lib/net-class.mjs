@@ -69,6 +69,18 @@ export function classifyHost(h) {
 export const isLinkLocal = (h) => ['metadata', 'linklocal'].includes(classifyHost(h));
 export const isPrivateHost = (h) => classifyHost(h) === 'private';
 
+// Reject when `signal` aborts (the request's own timeout/budget), so a slow resolver cannot
+// outlive the deadline the fetch is held to.
+function withSignal(promise, signal) {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
+  });
+}
+
 /**
  * Refuse a host by what it resolves to, not only by how it is spelled. An IP literal or a
  * name already classified by its text is judged without DNS. Any other name is resolved with
@@ -79,19 +91,24 @@ export const isPrivateHost = (h) => classifyHost(h) === 'private';
  * Limit: this is a check at one moment. A name can resolve differently when fetch() looks it
  * up again (DNS rebinding), so it narrows the redirect surface and does not close it.
  */
-export async function checkResolved(host, { siteLocal, lookup }) {
+export async function checkResolved(host, { siteLocal, lookup, signal, what = 'redirect host', allowUnresolved = false }) {
   const bare = String(host).replace(/^\[|\]$/g, '');
   if (isIP(normalizeHost(bare)) || classifyHost(bare) !== 'public') return;
   let addrs;
-  try { addrs = await lookup(bare, { all: true }); }
-  catch (e) { throw new Refused(`could not resolve redirect host ${host} (${e.code || e.name}); not followed`); }
+  try { addrs = await withSignal(lookup(bare, { all: true }), signal); }
+  catch (e) {
+    // The original link is not a redirect: a name that does not resolve is a dead link, and the
+    // request itself reports it. Only a redirect hop is refused for failing to resolve.
+    if (allowUnresolved) return;
+    throw new Refused(`could not resolve ${what} ${host} (${e.code || e.name}); not followed`);
+  }
   for (const { address } of addrs) {
     const c = classifyHost(address);
     if (c === 'metadata' || c === 'linklocal') {
-      throw new Refused(`redirect host ${host} resolves to link-local/metadata address ${address} not followed`);
+      throw new Refused(`${what} ${host} resolves to link-local/metadata address ${address} not followed`);
     }
     if (c === 'private' && !siteLocal) {
-      throw new Refused(`redirect host ${host} resolves to private/loopback address ${address} not followed from a non-local site`);
+      throw new Refused(`${what} ${host} resolves to private/loopback address ${address} not followed from a non-local site`);
     }
   }
 }

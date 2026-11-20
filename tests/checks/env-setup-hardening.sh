@@ -36,28 +36,38 @@ refused "permissions bad web-user" bash "$SCRIPT" permissions --path="$wp" --web
 refused "permissions via dotdot" bash "$SCRIPT" permissions --path="$wp/.."
 run_stubbed bash "$SCRIPT" permissions --path="$wp" --web-user=www-data
 [ "$STUB_RC" = 0 ] || fail "permissions on a WP dir failed: $STUB_OUT"
-grep -F 'sudo [find]' "$STUB_LOG" | grep -q '\[-name\] \[.git\]' || fail "permissions: .git is not pruned"
-grep -F 'sudo [find]' "$STUB_LOG" | grep -q '\[node_modules\]' || fail "permissions: node_modules is not pruned"
+grep -F '[find]' "$STUB_LOG" | grep -q '\[-name\] \[.git\]' || fail "permissions: .git is not pruned"
+grep -F '[find]' "$STUB_LOG" | grep -q '\[node_modules\]' || fail "permissions: node_modules is not pruned"
 ! grep -Eq 'chown\] \[-R\]' "$STUB_LOG" || fail "permissions: recursive chown is back"
 # A symlink inside the tree must not have its target re-owned: chown follows it unless the find
 # is limited to real dirs/files and chown gets -h.
 "$(PATH="$STUB_ORIG_PATH" command -v ln)" -s /etc/shadow "$wp/wp-content/evil-link"
 run_stubbed bash "$SCRIPT" permissions --path="$wp" --web-user=www-data
-chown_call=$(grep -F 'sudo [find]' "$STUB_LOG" | grep -F '[chown]' || true)
+chown_call=$(grep -F '[find]' "$STUB_LOG" | grep -F '[chown]' || true)
 [ -n "$chown_call" ] || fail "permissions: no chown recorded"
 grep -Fq '[-type] [d] [-o] [-type] [f]' <<<"$chown_call" || fail "permissions: chown is not limited to -type d / -type f (a symlink would be followed)"
 grep -Fq '[chown] [-h]' <<<"$chown_call" || fail "permissions: chown lacks -h"
 # Each change is applied relative to the directory find visits (-execdir), so an ancestor swapped
 # for a symlink between the listing and the exec cannot send root's chmod/chown outside the tree.
-grep -F 'sudo [find]' "$STUB_LOG" | grep -Fq '[-exec]' && fail "permissions: a path-resolving -exec is back"
+grep -F '[find]' "$STUB_LOG" | grep -Fq '[-exec]' && fail "permissions: a path-resolving -exec is back"
 for tool in chown 'chmod] [755' 'chmod] [644'; do
-  grep -F 'sudo [find]' "$STUB_LOG" | grep -F "[-execdir] [$tool" | grep -Fq '[{}] [+]' || fail "permissions: $tool is not -execdir ... {} +"
+  grep -F '[find]' "$STUB_LOG" | grep -F "[-execdir] [$tool" | grep -Fq '[{}] [+]' || fail "permissions: $tool is not -execdir ... {} +"
 done
+# find runs under a sanitized absolute PATH (a relative or empty PATH entry aborts -execdir).
+fcalls=$(grep -F '[find]' "$STUB_LOG")
+[ -n "$fcalls" ] || fail "permissions: no find recorded"
+while IFS= read -r l; do
+  grep -Eq '^sudo \[env\] \[PATH=(/[^]:]+)(:/[^]:]+)*\] \[find\]' <<<"$l" || fail "permissions: find is not run as sudo env PATH=<absolute> find: $l"
+done <<<"$fcalls"
+# The writable directories are changed by find -type d -execdir, not by a separate [[ -L ]] then chmod.
+grep -F '[find]' "$STUB_LOG" | grep -F '[-name] [uploads]' | grep -F '[-type] [d]' | grep -Fq '[-execdir] [chmod] [775]' \
+  || fail "permissions: uploads is not chmod-ed by find -type d -execdir"
+! grep -F 'sudo [chmod]' "$STUB_LOG" | grep -Fq '775' || fail "permissions: a bare sudo chmod 775 is back"
 # A writable-directory entry that is a symlink is not chmod-ed through.
 "$REAL_MKDIR" -p "$W/elsewhere"; "$(PATH="$STUB_ORIG_PATH" command -v ln)" -s "$W/elsewhere" "$wp/wp-content/plugins"
 run_stubbed bash "$SCRIPT" permissions --path="$wp" --web-user=www-data
 [ "$STUB_RC" = 0 ] || fail "permissions with a symlinked plugins dir failed: $STUB_OUT"
-! grep -F 'sudo [chmod]' "$STUB_LOG" | grep -Fq "wp-content/plugins" || fail "permissions: chmod 775 followed a symlinked wp-content/plugins"
+! grep -F 'sudo [env]' "$STUB_LOG" | grep -F '[chmod] [775]' | grep -Fq '[-name] [plugins]' || fail "permissions: chmod 775 followed a symlinked wp-content/plugins"
 grep -Fq 'symlink' <<<"$STUB_OUT" || fail "permissions: no warning for the symlinked directory"
 
 # SH-12: vhost-install --dest, service-reload --service, native-setup --web-server.

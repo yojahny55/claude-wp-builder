@@ -166,6 +166,13 @@ node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const bad=d.re
 grep -q 'private/loopback' <<<"$outd" && grep -q 'link-local/metadata' <<<"$outd" || fail "direct-link refusal reasons missing"
 [ "$(q /ok/ verdict)" = ok ] || fail "a same-host link is affected by the direct-link check"
 
+# A dead external host (.invalid never resolves) is a broken link, not an unmeasured one: the
+# resolution failure on the original URL is reported by the request, not refused as a redirect.
+outi=$(printf '%s\t%s\n' 'https://nonexistent-zzq.invalid/x' "$site/page-a/" | node "$tool" --site "$site" --budget 20)
+node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const r=d.results[0];
+if(!r||r.verdict!=='broken'){console.log(JSON.stringify(r));process.exit(1)}" <<<"$outi" \
+  || fail "a direct link to an unresolvable (.invalid) host was not reported broken"
+
 # The classifier and the resolved-address check, without a network: the lookup is injected.
 node --input-type=module - <<'JS' || fail "address classification (bin/lib/net-class.mjs) is wrong"
 import { classifyHost as c, checkResolved, Refused } from './bin/lib/net-class.mjs';
@@ -183,7 +190,12 @@ if (!/private\/loopback/.test(await refusal('lan.example', false, m))) { console
 if (await refusal('lan.example', true, m) !== null) { console.error('private refused from a local site'); process.exit(1); }
 if (!/private\/loopback/.test(await refusal('v6.example', false, m))) { console.error('mapped loopback answer not refused'); process.exit(1); }
 if (await refusal('ok.example', false, m) !== null) { console.error('public name refused'); process.exit(1); }
-if (!/could not resolve/.test(await refusal('nx.example', false, m))) { console.error('lookup failure is not a reasoned refusal'); process.exit(1); }
+if (!/could not resolve redirect host/.test(await refusal('nx.example', false, m))) { console.error('lookup failure is not a reasoned refusal'); process.exit(1); }
+{ let r = 'x'; try { await checkResolved('nx.example', { siteLocal: false, lookup: look(m), allowUnresolved: true }); r = null; } catch (e) { r = e.message; }
+  if (r !== null) { console.error('an unresolved original link was refused'); process.exit(1); } }
+{ const ac = new AbortController(); const slow = () => new Promise(() => {}); setTimeout(() => ac.abort(new Error('timeout')), 50);
+  let msg = ''; try { await checkResolved('slow.example', { siteLocal: false, lookup: slow, signal: ac.signal }); } catch (e) { msg = e.message; }
+  if (!/could not resolve/.test(msg)) { console.error('a hung lookup was not bounded by the signal'); process.exit(1); } }
 JS
 
 # Budget: a zero budget measures nothing and says why, instead of hanging.

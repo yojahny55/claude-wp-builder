@@ -178,7 +178,7 @@ const MAX_HOPS = 5;
 // what a hostname resolves to at check time; the clone origin only with --follow-clone-origin;
 // a private or loopback host only when the swept site is itself on one (a local dev sweep).
 // DNS rebinding between this lookup and fetch()'s own remains possible: see checkResolved.
-async function checkHop(o, u, what = 'redirect to') {
+async function checkHop(o, u, what = 'redirect to', { signal, initial = false } = {}) {
   if (!/^https?:$/.test(u.protocol)) throw new Refused(`${what} a non-http(s) target (${u.protocol}) not followed`);
   const host = u.hostname;
   if (bareHost(host) === bareHost(o.siteUrl.hostname)) return;
@@ -189,7 +189,8 @@ async function checkHop(o, u, what = 'redirect to') {
   if (isPrivateHost(host) && !isPrivateHost(o.siteUrl.hostname)) {
     throw new Refused(`${what} private/loopback host ${host} not followed from a non-local site`);
   }
-  await checkResolved(host, { siteLocal: isPrivateHost(o.siteUrl.hostname), lookup: dnsLookup });
+  await checkResolved(host, { siteLocal: isPrivateHost(o.siteUrl.hostname), lookup: dnsLookup, signal,
+    what: initial ? 'link host' : 'redirect host', allowUnresolved: initial });
 }
 
 // fetch() with redirects followed by hand, at most MAX_HOPS, each target checked first.
@@ -199,7 +200,7 @@ async function fetchChecked(o, url, init) {
   // The original link gets the same per-target policy as a redirect hop (same-host links pass).
   let first;
   try { first = new URL(url); } catch { throw new Refused('link with an unparseable URL'); }
-  await checkHop(o, first, 'link to');
+  await checkHop(o, first, 'link to', { signal: init.signal, initial: true });
   for (let hop = 0; ; hop++) {
     const res = await fetch(cur, { ...init, redirect: 'manual' });
     const loc = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
@@ -209,7 +210,7 @@ async function fetchChecked(o, url, init) {
     let next;
     try { next = new URL(loc, cur); } catch { throw new Refused('redirect with an unparseable Location'); }
     next.hash = '';
-    await checkHop(o, next);
+    await checkHop(o, next, 'redirect to', { signal: init.signal });
     cur = next.href;
   }
 }
