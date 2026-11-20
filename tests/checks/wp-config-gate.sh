@@ -78,7 +78,7 @@ done
 gate=skills/wp-manifest-gate/SKILL.md
 [ -f "$gate" ] || fail "$gate is missing"
 grep -Eq '^user-invocable: false$' "$gate" || fail "$gate must stay user-invocable: false"
-policy_of() { sed -n 's/^\*\*Exit `3` policy:\*\* `\([a-zA-Z0-9_-]*\)`.*/\1/p' "$1" | head -n 1; }
+policy_of() { sed -n 's/^\*\*Exit `3` policy:\*\* `\([a-zA-Z0-9_-]*\)`.*/\1/p' "$1" | sed -n 1p; }
 declare -A want=(
   [wp-seed]=bare-wp-fallback [wp-robin]=bare-wp-fallback [wp-s3]=bare-wp-fallback [wp-update]=bare-wp-fallback
   [wp-debug]=adopt-or-bare-wp [wp-audit]=adopt-or-stop [wp-adopt]=register [wp-init]=scaffold

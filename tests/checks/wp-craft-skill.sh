@@ -24,14 +24,14 @@ refs=$(awk '/^## References/{p=1} p' "$S")
 [ -n "$refs" ] || fail "$S has no References section"
 for f in "$R"/*.md "$K/compositions/README.md" "$R/domains/domains.csv" "$R/design-md/INDEX.md"; do
   rel=${f#"$K/"}
-  row=$(printf '%s\n' "$refs" | grep '^|' | grep -F "| \`$rel\` |" | head -1 || true)
+  row=$(printf '%s\n' "$refs" | grep '^|' | grep -F "| \`$rel\` |" | sed -n 1p || true)
   [ -n "$row" ] || fail "$S's References table has no row for $rel"
   cells=$(printf '%s' "$row" | awk -F'|' '{print NF-2}')
   [ "$cells" -eq 3 ] || fail "$S's row for $rel is not file | what it holds | read when"
   when=$(printf '%s' "$row" | awk -F'|' '{gsub(/^ +| +$/, "", $4); print $4}')
   [ -n "$when" ] || fail "$S gives $rel no read-when condition"
 done
-printf '%s\n' "$refs" | grep -Eq '^Read `references/taste.md` \(the floor\), then' \
+printf '%s\n' "$refs" | grep >/dev/null -Ec '^Read `references/taste.md` \(the floor\), then' \
   && fail "$S is back to one fixed reading order"
 
 # --- the recorded decision, the runners, the cinematic scope ------------------------
@@ -45,7 +45,7 @@ grep -Fq 'two distinct' "$S" || fail "$S does not say what domain classification
 desc=$(awk 'NR<=6 && /^description:/' "$S")
 [ -n "$desc" ] || fail "$S has no description: in its first 6 lines"
 for t in DESIGN.md BRIEF.md data-motion fingerprint 'Avoid list' /wp-polish 'Not for plain-mode demos'; do
-  printf '%s' "$desc" | grep -Fq -- "$t" || fail "$S's description does not name $t"
+  printf '%s' "$desc" | grep >/dev/null -Fc -- "$t" || fail "$S's description does not name $t"
 done
 
 # --- one copy of the gate's table, with the manifest shape ---------------------------
@@ -69,7 +69,7 @@ grep -Fq "Exit codes: 0 clean, 2 the plan was refused" bin/image-gen.mjs \
 # --- devices.md: the Contents list names every subsection -----------------------------
 contents=$(awk '/^## Contents/{p=1;next} p && /^## /{exit} p' "$R/devices.md")
 while IFS= read -r h; do
-  printf '%s\n' "$contents" | grep -Fq -- "$h" || fail "$R/devices.md's Contents omits the subsection: $h"
+  printf '%s\n' "$contents" | grep >/dev/null -Fc -- "$h" || fail "$R/devices.md's Contents omits the subsection: $h"
 done < <(awk '/^## Two kinds of motion/{p=1;next} p && /^## /{exit} p && /^### /{sub(/^### /,""); print}' "$R/devices.md")
 
 # --- nothing goes stale with the calendar -----------------------------------------------

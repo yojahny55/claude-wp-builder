@@ -49,9 +49,9 @@ grep -Fq 'demo mode: craft' <<<"$gate" \
 # carries its own unconditional "No CSS frameworks, preprocessors, or build tools"
 # line, which is a checklist item for a basic theme and is deliberately not gated here.
 flatf=$(tr '\n' ' ' < "$f" | sed -e 's/ \\ / /g' -e 's/  */ /g')
-clause=$(printf '%s' "$flatf" | { grep -oEi 'no ([A-Za-z]+ )?frameworks[^.]{0,200}' || true; } | head -1)
+clause=$(printf '%s' "$flatf" | { grep -oEi 'no ([A-Za-z]+ )?frameworks[^.]{0,200}' || true; } | sed -n 1p)
 [ -n "$clause" ] || { echo "FAIL: 'No frameworks' rule not found"; exit 1; }
-printf '%s' "$clause" | grep -Eq 'basic|this template' \
+printf '%s' "$clause" | grep >/dev/null -Ec 'basic|this template' \
   || { echo "FAIL: the 'No frameworks' rule is still unconditional: [$clause]"; exit 1; }
 
 # ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ for s in skills/*/SKILL.md; do
   [ -f "$s" ] || { echo "FAIL: no skills/*/SKILL.md found — this gate is matching nothing"; exit 1; }
   fm=$(awk 'NR == 1 && $0 !~ /^---[[:space:]]*$/ { exit } NR > 1 && /^---[[:space:]]*$/ { exit } NR > 1 { print }' "$s")
   [ -n "$fm" ] || { echo "FAIL: $s has no YAML frontmatter block — every skill declares name, description and user-invocable: false"; exit 1; }
-  printf '%s\n' "$fm" | grep -Eq '^[[:space:]]*user-invocable[[:space:]]*:[[:space:]]*false[[:space:]]*$' \
+  printf '%s\n' "$fm" | grep >/dev/null -Ec '^[[:space:]]*user-invocable[[:space:]]*:[[:space:]]*false[[:space:]]*$' \
     || { echo "FAIL: $s frontmatter does not carry 'user-invocable: false'. Skills are knowledge libraries read by commands and agents; one that omits the key is offered to the user as a slash command."; exit 1; }
 done
 

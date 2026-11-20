@@ -43,7 +43,7 @@ bashonly() { awk '/^```bash/{inb=1;next} /^```/{inb=0;next} inb'; }
 # (A bare 'wp-tailwind' is satisfied by this command's own name — see A11.)
 # A1 is deletion-proven only: there is no inversion of "points at the skill"
 # short of pointing somewhere else, which the literal path already rejects.
-if ! printf '%s' "$flatf" | grep -Fq 'skills/wp-tailwind-system/SKILL.md'; then
+if ! printf '%s' "$flatf" | grep >/dev/null -Fc 'skills/wp-tailwind-system/SKILL.md'; then
   echo "FAIL: does not send the agent to the Tailwind convention skill"; exit 1
 fi
 
@@ -51,14 +51,14 @@ fi
 s0=$(awk '/^## Step 0/,/^## Step 1/' "$f")
 # Defence in depth only — the closure proof below already fails on an empty region.
 [ -n "$s0" ] || { echo "FAIL: no Step 0 section"; exit 1; }
-if ! printf '%s\n' "$s0" | tail -1 | grep -q '^## Step 1'; then
+if ! printf '%s\n' "$s0" | tail -1 | grep >/dev/null -c '^## Step 1'; then
   echo "FAIL: the Step 0 region is not terminated by a '## Step 1' heading — its assertions would silently become file-wide"; exit 1
 fi
 s0flat=$(printf '%s\n' "$s0" | flat)
 
 # The repo gate itself. Without it the command runs against a directory git knows
 # nothing about and the "baseline commit" silently lands in some parent repo.
-if ! printf '%s' "$s0flat" | grep -Fq 'git rev-parse --is-inside-work-tree'; then
+if ! printf '%s' "$s0flat" | grep >/dev/null -Fc 'git rev-parse --is-inside-work-tree'; then
   echo "FAIL: Step 0 does not verify the theme is inside a git work tree"; exit 1
 fi
 
@@ -71,7 +71,7 @@ fi
 # closing half optional — narrowing to `[ … ]` false-failed the plain `test -z` form.
 # `--porcelain` takes flags: `--untracked-files=all` is the SAME gate, made stricter,
 # and pinning the closing paren straight after `--porcelain` false-failed it.
-if ! printf '%s' "$s0flat" | grep -Eq '(\[\[?|test) -z "\$\(git status --porcelain[^)]*\)"( \]\]?)? *\|\||(\[\[?|test) -n "\$\(git status --porcelain[^)]*\)"( \]\]?)? *&&|if (\[\[?|test) -n "\$\(git status --porcelain[^)]*\)"( \]\]?)? *;? *then'; then
+if ! printf '%s' "$s0flat" | grep >/dev/null -Ec '(\[\[?|test) -z "\$\(git status --porcelain[^)]*\)"( \]\]?)? *\|\||(\[\[?|test) -n "\$\(git status --porcelain[^)]*\)"( \]\]?)? *&&|if (\[\[?|test) -n "\$\(git status --porcelain[^)]*\)"( \]\]?)? *;? *then'; then
   echo "FAIL: Step 0 does not abort on a dirty tree — it must fail when 'git status --porcelain' is NON-empty, and an inverted test would migrate over uncommitted work"; exit 1
 fi
 
@@ -82,7 +82,7 @@ fi
 # baseline is not one. `[^|;&]*` keeps the flags in one command, so `--allow-empty`
 # cannot be borrowed from a neighbouring `git` invocation.
 s0bash=$(printf '%s\n' "$s0" | bashonly)
-if ! printf '%s\n' "$s0bash" | grep -Eq 'git commit[^|;&]*--allow-empty'; then
+if ! printf '%s\n' "$s0bash" | grep >/dev/null -Ec 'git commit[^|;&]*--allow-empty'; then
   echo "FAIL: Step 0 does not create the empty baseline commit — with nothing committed there is no point to revert the migration to"; exit 1
 fi
 
@@ -90,7 +90,7 @@ fi
 # leaves an untracked tree; the clean-tree gate above runs again on EVERY --page pass,
 # so an un-ignored node_modules/ aborts the next pass on the previous pass's own
 # dependencies, and the only escape the command would otherwise offer is committing it.
-if ! printf '%s' "$s0flat" | grep -Eq 'node_modules/?[^.]{0,90}\.gitignore|\.gitignore[^.]{0,90}node_modules/?'; then
+if ! printf '%s' "$s0flat" | grep >/dev/null -Ec 'node_modules/?[^.]{0,90}\.gitignore|\.gitignore[^.]{0,90}node_modules/?'; then
   echo "FAIL: Step 0 does not add node_modules/ to the theme's .gitignore — Step 2's npm install then dirties the tree and the next --page pass aborts on its own dependency directory"; exit 1
 fi
 
@@ -105,36 +105,36 @@ fi
 # the destination quoted — which is the CORRECT shell habit — and the fixed-string form
 # rejected it. The optional quote is allowed here and in the three sibling gates below,
 # so quoting can never flip a gate's verdict in either direction.
-if ! printf '%s' "$s0flat" | grep -Eq 'responsive-\*\.png "?\.tailwind-migrate/before/'; then
+if ! printf '%s' "$s0flat" | grep >/dev/null -Ec 'responsive-\*\.png "?\.tailwind-migrate/before/'; then
   echo "FAIL: Step 0 does not move the golden screenshots into .tailwind-migrate/before/<slug>/ — the Step 6 re-run overwrites responsive-*.png and the baseline is lost"; exit 1
 fi
 
 # Direction: before/ is written in Step 0, after/ in Step 6, never the reverse.
 # Forbid the WRITE, not the mention — Step 0 may legitimately explain what Step 6
 # does with after/, and a blanket negative on the path would fail that correct prose.
-if printf '%s' "$s0flat" | grep -Eq 'responsive-\*\.png "?\.tailwind-migrate/after/'; then
+if printf '%s' "$s0flat" | grep >/dev/null -Ec 'responsive-\*\.png "?\.tailwind-migrate/after/'; then
   echo "FAIL: Step 0 writes the after/ directory — the baseline and the comparison are the same files"; exit 1
 fi
 
 # Method A (Playwright MCP) is tried FIRST and names its own files, so the fixed
 # responsive-<w>.png names exist only under Method B. A command that assumes the
 # glob silently produces an empty golden and migrates anyway.
-if ! printf '%s' "$s0flat" | grep -Eqi 'method b[^.]{0,90}(fixed filenames|responsive-375)'; then
+if ! printf '%s' "$s0flat" | grep >/dev/null -Eci 'method b[^.]{0,90}(fixed filenames|responsive-375)'; then
   echo "FAIL: Step 0 does not say that only /wp-responsive-check's Method B writes the fixed responsive-<width>.png names"; exit 1
 fi
-if ! printf '%s' "$s0flat" | grep -Eqi '(do not|never) assume the glob|glob may match nothing|may be no [^ ]{0,2}responsive-\*'; then
+if ! printf '%s' "$s0flat" | grep >/dev/null -Eci '(do not|never) assume the glob|glob may match nothing|may be no [^ ]{0,2}responsive-\*'; then
   echo "FAIL: Step 0 assumes 'responsive-*.png' is in the cwd — under Method A it is not, and the golden ends up empty"; exit 1
 fi
 
 # Five widths, five files, or there is no golden. Polarity asserted: the guard must
 # abort when the count is NOT five. `-eq 5 ] &&` (abort when it IS five) is rejected.
-if ! printf '%s' "$s0flat" | grep -Eq '[-]eq 5 \] *\|\||[-]ne 5 \] *;? *then'; then
+if ! printf '%s' "$s0flat" | grep >/dev/null -Ec '[-]eq 5 \] *\|\||[-]ne 5 \] *;? *then'; then
   echo "FAIL: Step 0 does not abort when fewer than five golden screenshots land for a page"; exit 1
 fi
 
 # The human-facing half of the same rule: a missing golden stops the run, it does
 # not downgrade it to a best-effort migration.
-if ! printf '%s' "$s0flat" | grep -Eqi 'stop and report[^.]{0,80}(five files|golden)|do not proceed without the golden'; then
+if ! printf '%s' "$s0flat" | grep >/dev/null -Eci 'stop and report[^.]{0,80}(five files|golden)|do not proceed without the golden'; then
   echo "FAIL: Step 0 does not stop the run when the golden is unobtainable — a migration with no baseline cannot be verified"; exit 1
 fi
 
@@ -144,23 +144,23 @@ fi
 # and the suite stayed green.
 s1=$(awk '/^## Step 1/,/^## Step 2/' "$f")
 [ -n "$s1" ] || { echo "FAIL: no Step 1 section"; exit 1; }
-if ! printf '%s\n' "$s1" | tail -1 | grep -q '^## Step 2'; then
+if ! printf '%s\n' "$s1" | tail -1 | grep >/dev/null -c '^## Step 2'; then
   echo "FAIL: the Step 1 region is not terminated by a '## Step 2' heading — its assertions would silently become file-wide"; exit 1
 fi
 s1flat=$(printf '%s\n' "$s1" | flat)
 
 # Step 5 deletes enqueue calls; it can only delete what Step 1 found.
-if ! printf '%s' "$s1flat" | grep -Fq 'wp_enqueue_style'; then
+if ! printf '%s' "$s1flat" | grep >/dev/null -Fc 'wp_enqueue_style'; then
   echo "FAIL: Step 1 does not inventory the wp_enqueue_style calls — Step 5 removes enqueues it was never told about"; exit 1
 fi
 # Dead rules are the escape hatch Step 5's deletion gate depends on ("a rule that was
 # dead in Step 1's audit is accounted for by being reported as dead"). Wide alternation
 # and either word order: this is a claim, not a fixed wording.
-if ! printf '%s' "$s1flat" | grep -Eqi 'dead[^.]{0,40}(rule|css|selector|markup|declaration)|(rule|css|selector|declaration)[a-z]*[^.]{0,40}dead'; then
+if ! printf '%s' "$s1flat" | grep >/dev/null -Eci 'dead[^.]{0,40}(rule|css|selector|markup|declaration)|(rule|css|selector|declaration)[a-z]*[^.]{0,40}dead'; then
   echo "FAIL: Step 1 does not identify the dead CSS rules — Step 5's deletion gate treats 'reported as dead' as accounted for, so nothing would ever qualify"; exit 1
 fi
 # …and the inventory is reported before anything is changed, or it is not a gate.
-if ! printf '%s' "$s1flat" | grep -Eqi 'report[^.]{0,60}(before|prior to)[^.]{0,25}step 2|(before|prior to)[^.]{0,25}step 2[^.]{0,60}report'; then
+if ! printf '%s' "$s1flat" | grep >/dev/null -Eci 'report[^.]{0,60}(before|prior to)[^.]{0,25}step 2|(before|prior to)[^.]{0,25}step 2[^.]{0,60}report'; then
   echo "FAIL: Step 1 does not report the inventory to the user before Step 2 starts changing the theme"; exit 1
 fi
 
@@ -168,7 +168,7 @@ fi
 s2=$(awk '/^## Step 2/,/^## Step 3/' "$f")
 # Defence in depth only — the closure proof below already fails on an empty region.
 [ -n "$s2" ] || { echo "FAIL: no Step 2 section"; exit 1; }
-if ! printf '%s\n' "$s2" | tail -1 | grep -q '^## Step 3'; then
+if ! printf '%s\n' "$s2" | tail -1 | grep >/dev/null -c '^## Step 3'; then
   echo "FAIL: the Step 2 region is not terminated by a '## Step 3' heading — its assertions would silently become file-wide"; exit 1
 fi
 s2flat=$(printf '%s\n' "$s2" | flat)
@@ -223,14 +223,14 @@ fi
 # …and the sentence that keeps the set closed. Without it Step 2 can go on listing
 # four names while the next sentence invites a fifth, and the extraction above
 # still passes. Wide alternation: this is a claim, not a fixed wording.
-if ! printf '%s' "$s2flat" | grep -Eqi "(set|list) is closed|(never|do not|don'?t|must not|may not|cannot) (add|create)[^.]{0,30}(fifth|another|other|additional|extra|more)|errors on any other (name|director)|no (fifth|other|additional|further) (director|name)"; then
+if ! printf '%s' "$s2flat" | grep >/dev/null -Eci "(set|list) is closed|(never|do not|don'?t|must not|may not|cannot) (add|create)[^.]{0,30}(fifth|another|other|additional|extra|more)|errors on any other (name|director)|no (fifth|other|additional|further) (director|name)"; then
   echo "FAIL: Step 2 does not say the four-directory set is closed — bin/tailwind-native-check.sh rule 2 errors on any other name under assets/css/src/tailwindcss/, so a fifth directory breaks the build for every template"; exit 1
 fi
 
 # Step 3 writes the extracted tokens into main.css's `@theme` block, and Step 2 is the
 # only step that creates main.css. Without this, Step 2 installs a main.css holding
 # nothing but `@import "tailwindcss"` and Step 3 writes into a block that is not there.
-if ! printf '%s' "$s2flat" | grep -Eq '@theme'; then
+if ! printf '%s' "$s2flat" | grep >/dev/null -Ec '@theme'; then
   echo "FAIL: Step 2 does not put an @theme block in main.css — Step 3 has nowhere to write the tokens it extracts, and a token declared outside @theme compiles to nothing"; exit 1
 fi
 
@@ -239,18 +239,18 @@ fi
 # and Step 4's "prefer the Step 3 tokens" instruction pointing at nothing.
 s3=$(awk '/^## Step 3/,/^## Step 4/' "$f")
 [ -n "$s3" ] || { echo "FAIL: no Step 3 section"; exit 1; }
-if ! printf '%s\n' "$s3" | tail -1 | grep -q '^## Step 4'; then
+if ! printf '%s\n' "$s3" | tail -1 | grep >/dev/null -c '^## Step 4'; then
   echo "FAIL: the Step 3 region is not terminated by a '## Step 4' heading — its assertions would silently become file-wide"; exit 1
 fi
 s3flat=$(printf '%s\n' "$s3" | flat)
 
-if ! printf '%s' "$s3flat" | grep -Eqi '(mine|extract|harvest|collect|read|inventory)[a-z]*[^.]{0,60}(old|existing|current|plain)[- ]?css'; then
+if ! printf '%s' "$s3flat" | grep >/dev/null -Eci '(mine|extract|harvest|collect|read|inventory)[a-z]*[^.]{0,60}(old|existing|current|plain)[- ]?css'; then
   echo "FAIL: Step 3 does not mine the old CSS for its tokens — the @theme block Step 2 created stays empty and every converted template falls back to Tailwind's built-in scales"; exit 1
 fi
-if ! printf '%s' "$s3flat" | grep -Eq '@theme'; then
+if ! printf '%s' "$s3flat" | grep >/dev/null -Ec '@theme'; then
   echo "FAIL: Step 3 does not write the extracted tokens into the @theme block"; exit 1
 fi
-if ! printf '%s' "$s3flat" | grep -Fq 'main.css'; then
+if ! printf '%s' "$s3flat" | grep >/dev/null -Fc 'main.css'; then
   echo "FAIL: Step 3 does not say which file the @theme block lives in — the tokens have to land in assets/css/src/tailwindcss/main.css or nothing compiles them"; exit 1
 fi
 
@@ -258,7 +258,7 @@ fi
 s4=$(awk '/^## Step 4/,/^## Step 5/' "$f")
 # Defence in depth only — the closure proof below already fails on an empty region.
 [ -n "$s4" ] || { echo "FAIL: no Step 4 section"; exit 1; }
-if ! printf '%s\n' "$s4" | tail -1 | grep -q '^## Step 5'; then
+if ! printf '%s\n' "$s4" | tail -1 | grep >/dev/null -c '^## Step 5'; then
   echo "FAIL: the Step 4 region is not terminated by a '## Step 5' heading — its assertions would silently become file-wide"; exit 1
 fi
 s4flat=$(printf '%s\n' "$s4" | flat)
@@ -274,7 +274,7 @@ s4flat=$(printf '%s\n' "$s4" | flat)
 # BOTH words are alternated rather than lower-cased wholesale: "**Author Mode**" is the
 # same dispatch in title case and the `[Mm]`-less form rejected it, while a wholesale
 # `-i` would still let the neighbouring sentence through.
-if ! printf '%s' "$s4flat" | grep -Eq 'wp-tailwind[^-][^.]{0,80}[Aa]uthor[ -][Mm]ode|[Aa]uthor[ -][Mm]ode[^.]{0,80}wp-tailwind[^-]'; then
+if ! printf '%s' "$s4flat" | grep >/dev/null -Ec 'wp-tailwind[^-][^.]{0,80}[Aa]uthor[ -][Mm]ode|[Aa]uthor[ -][Mm]ode[^.]{0,80}wp-tailwind[^-]'; then
   echo "FAIL: Step 4 does not dispatch the wp-tailwind agent in author mode"; exit 1
 fi
 
@@ -290,13 +290,13 @@ fi
 # puts emphasis markers between `CSS` and the comma, and a wrap at the hyphen becomes
 # `plain- CSS` once flat() collapses the newline. Both are the same sentence and the
 # fixed-separator form rejected both.
-if ! printf '%s' "$s4flat" | grep -Eqi 'plain[-* ]{1,4}css[*_]{0,3},?[ *_]{0,4}not[ *_]{1,4}(yet[ *_]{1,4})?converted'; then
+if ! printf '%s' "$s4flat" | grep >/dev/null -Eci 'plain[-* ]{1,4}css[*_]{0,3},?[ *_]{0,4}not[ *_]{1,4}(yet[ *_]{1,4})?converted'; then
   echo "FAIL: Step 4 does not tell the agent its input is plain CSS and not converted — author mode's Inputs table says the opposite, and nothing else in the chain does the declaration-to-utility translation"; exit 1
 fi
 
 # A12b. The agent cannot translate rules it was never handed. Step 1's audit is the
 # only place those rules are enumerated, so the dispatch has to carry them across.
-if ! printf '%s' "$s4flat" | grep -Eqi '(css|style)[- ]?(rules|declarations)[^.]{0,40}step 1|step 1[^.]{0,40}(css|style)[- ]?(rules|declarations)'; then
+if ! printf '%s' "$s4flat" | grep >/dev/null -Eci '(css|style)[- ]?(rules|declarations)[^.]{0,40}step 1|step 1[^.]{0,40}(css|style)[- ]?(rules|declarations)'; then
   echo "FAIL: Step 4 does not hand the agent the CSS rules from Step 1's audit — with markup alone there is nothing to translate"; exit 1
 fi
 
@@ -304,10 +304,10 @@ fi
 # agent out of. This command is the only place it exists on the migration path, so
 # each of the three rules is gated separately — deleting any one of them leaves the
 # agent applying the @apply ladder to markup it never converted.
-if ! printf '%s' "$s4flat" | grep -Eqi '(translat|convert|turn|map)[a-z]*[^.]{0,25}declaration[^.]{0,45}utilit'; then
+if ! printf '%s' "$s4flat" | grep >/dev/null -Eci '(translat|convert|turn|map)[a-z]*[^.]{0,25}declaration[^.]{0,45}utilit'; then
   echo "FAIL: Step 4 does not tell the agent to translate each CSS declaration into the equivalent utility"; exit 1
 fi
-if ! printf '%s' "$s4flat" | grep -Eqi '@media[^.]{0,80}breakpoint (prefix|variant)|breakpoint (prefix|variant)[^.]{0,80}@media'; then
+if ! printf '%s' "$s4flat" | grep >/dev/null -Eci '@media[^.]{0,80}breakpoint (prefix|variant)|breakpoint (prefix|variant)[^.]{0,80}@media'; then
   echo "FAIL: Step 4 does not map @media queries onto Tailwind breakpoint prefixes — a re-written media query is not a Tailwind-native conversion"; exit 1
 fi
 # `@theme` and "tokens" in either order and at arm's length: "the tokens Step 3 wrote
@@ -315,14 +315,14 @@ fi
 # `@theme[^.]{0,3}tokens` form false-failed it. The preference direction is what carries
 # the meaning, so that stays mandatory — the reversed sentence (built-in preferred over
 # the tokens) still has nothing after `built-in` and is still rejected.
-if ! printf '%s' "$s4flat" | grep -Eqi '(@theme[^.]{0,30}token|token[^.]{0,30}@theme)[^.]{0,60}(over|rather than|instead of|in preference to)[^.]{0,45}built[- ]?in'; then
+if ! printf '%s' "$s4flat" | grep >/dev/null -Eci '(@theme[^.]{0,30}token|token[^.]{0,30}@theme)[^.]{0,60}(over|rather than|instead of|in preference to)[^.]{0,45}built[- ]?in'; then
   echo "FAIL: Step 4 does not prefer the Step 3 @theme tokens over Tailwind's built-in scales — the extracted design tokens would go unused"; exit 1
 fi
 
 # A12f. Author mode REQUIRES --block and --page; a dispatch missing them produces no
 # section at all. Both must appear in the same sentence — '--page' alone is satisfied
 # by this command's own unrelated --page flag, which the same region also discusses.
-if ! printf '%s' "$s4flat" | grep -Eq '[-]-block[^.]{0,90}--page|[-]-page[^.]{0,90}--block'; then
+if ! printf '%s' "$s4flat" | grep >/dev/null -Ec '[-]-block[^.]{0,90}--page|[-]-page[^.]{0,90}--block'; then
   echo "FAIL: Step 4 does not pass author mode the --block and --page arguments it requires"; exit 1
 fi
 
@@ -331,7 +331,7 @@ fi
 # enumerated only three: an agent with no theme path has no root to write its
 # components/<slug>.css into, and one with no prefix emits unprefixed function calls
 # into a theme whose helpers are all prefixed.
-if ! printf '%s' "$s4flat" | grep -Eqi 'theme path[^.]{0,120}prefix|prefix[^.]{0,120}theme path'; then
+if ! printf '%s' "$s4flat" | grep >/dev/null -Eci 'theme path[^.]{0,120}prefix|prefix[^.]{0,120}theme path'; then
   echo "FAIL: Step 4's dispatch list omits the theme path and/or the prefix — two of the five inputs author mode's Inputs table declares"; exit 1
 fi
 
@@ -340,16 +340,16 @@ fi
 # (agents/wp-tailwind.md Procedure 4, a Write). Dispatched in parallel that is
 # last-write-wins: the agent that finishes last erases every sibling's promotion and
 # every sibling's @import. The dispatch prompt has to take both files off the agents.
-if ! printf '%s' "$s4flat" | grep -Eqi "(do[ *_]{1,4}not|never|don'?t)[^.]{0,60}(creat|edit|writ|touch)[a-z]*[^.]{0,60}(main\.css|utilities/site\.css)"; then
+if ! printf '%s' "$s4flat" | grep >/dev/null -Eci "(do[ *_]{1,4}not|never|don'?t)[^.]{0,60}(creat|edit|writ|touch)[a-z]*[^.]{0,60}(main\.css|utilities/site\.css)"; then
   echo "FAIL: Step 4 lets the parallel agents create utilities/site.css and edit main.css — author mode writes both, so the last agent to finish erases the others' work"; exit 1
 fi
 # …and the single-writer step that replaces it. Both files must be written ONCE, by
 # this command, after the walk — which is also the first moment the cross-page corpus
 # author mode greps for actually exists.
-if ! printf '%s' "$s4flat" | grep -Eqi 'utilities/site\.css[^.]{0,40}(once|one edit|single edit)|(once|one edit|single edit)[^.]{0,40}utilities/site\.css'; then
+if ! printf '%s' "$s4flat" | grep >/dev/null -Eci 'utilities/site\.css[^.]{0,40}(once|one edit|single edit)|(once|one edit|single edit)[^.]{0,40}utilities/site\.css'; then
   echo "FAIL: nothing writes utilities/site.css exactly once after the parallel walk — cross-page promotion has no single writer"; exit 1
 fi
-if ! printf '%s' "$s4flat" | grep -Eqi 'main\.css[^.]{0,40}(once|one edit|single edit)|(once|one edit|single edit)[^.]{0,40}main\.css'; then
+if ! printf '%s' "$s4flat" | grep >/dev/null -Eci 'main\.css[^.]{0,40}(once|one edit|single edit)|(once|one edit|single edit)[^.]{0,40}main\.css'; then
   echo "FAIL: nothing registers the @import lines in main.css in one edit after the parallel walk — concurrent agents each rewrite the same file"; exit 1
 fi
 
@@ -362,7 +362,7 @@ fi
 # some other directory, and Step 2's set stays open. Bounded, not a blanket
 # negative over directory names — an unbounded negative is the class that
 # false-fails correct work on this branch.
-if ! printf '%s' "$s4flat" | grep -Eqi '(never|no agent|no new|do not|does not|must not|may not)[^.]{0,60}director[a-z]*[^.]{0,60}assets/css/src/tailwindcss'; then
+if ! printf '%s' "$s4flat" | grep >/dev/null -Eci '(never|no agent|no new|do not|does not|must not|may not)[^.]{0,60}director[a-z]*[^.]{0,60}assets/css/src/tailwindcss'; then
   echo "FAIL: Step 4 does not forbid the agents from creating a directory under assets/css/src/tailwindcss/ — only base, components, layouts and utilities may exist there"; exit 1
 fi
 
@@ -373,7 +373,7 @@ fi
 # agent would see FAIL on a correctly progressing migration. The dispatch prompt has
 # to wave them off. Accepts the post-Task-13 phrasings too (naming the script or the
 # check rather than the agent's heading), so this gate survives that refactor.
-if ! printf '%s' "$s4flat" | grep -Eqi "(do not|never|don'?t)[^.]{0,40}(run|execute|perform)[^.]{0,60}(verify before reporting done|bin/tailwind-native-check\.sh|convention check)"; then
+if ! printf '%s' "$s4flat" | grep >/dev/null -Eci "(do not|never|don'?t)[^.]{0,40}(run|execute|perform)[^.]{0,60}(verify before reporting done|bin/tailwind-native-check\.sh|convention check)"; then
   echo "FAIL: Step 4 does not stop the dispatched agents running the convention check themselves — mid-walk it fails by construction (styles.css still present, <3 templates converted)"; exit 1
 fi
 
@@ -381,7 +381,7 @@ fi
 s5=$(awk '/^## Step 5/,/^## Step 6/' "$f")
 # Defence in depth only — the closure proof below already fails on an empty region.
 [ -n "$s5" ] || { echo "FAIL: no Step 5 section"; exit 1; }
-if ! printf '%s\n' "$s5" | tail -1 | grep -q '^## Step 6'; then
+if ! printf '%s\n' "$s5" | tail -1 | grep >/dev/null -c '^## Step 6'; then
   echo "FAIL: the Step 5 region is not terminated by a '## Step 6' heading — its assertions would silently become file-wide"; exit 1
 fi
 s5flat=$(printf '%s\n' "$s5" | flat)
@@ -393,7 +393,7 @@ s5flat=$(printf '%s\n' "$s5" | flat)
 # The noun takes adjectives: "Never delete a **CSS** file until…" and "…delete an old
 # CSS file…" are the same rule, and the fixed "delete a file" form rejected both. The
 # emphasis-tolerant separator does the same job for a bolded "**Never**".
-if ! printf '%s' "$s5flat" | grep -Eqi '(do not|never|don'"'"'?t)[ *_]{1,4}delete an?[ *_A-Za-z-]{0,16}file until its rules (are|have been|were|get) accounted for'; then
+if ! printf '%s' "$s5flat" | grep >/dev/null -Eci '(do not|never|don'"'"'?t)[ *_]{1,4}delete an?[ *_A-Za-z-]{0,16}file until its rules (are|have been|were|get) accounted for'; then
   echo "FAIL: Step 5 does not gate deletion on Step 4's accounting"; exit 1
 fi
 
@@ -404,7 +404,7 @@ fi
 # enqueue in place", "…in place UNTOUCHED" — which the fixed-wording form false-failed.
 # The verb is what carries the meaning, so `leave|keep` stays mandatory and the
 # inversion ("delete the file and drop its enqueue") has neither.
-if ! printf '%s' "$s5flat" | grep -Eqi '(leave|keep)[^.]{0,15}the file and its enqueue[^.]{0,12}(in place|alone|untouched|as[- ]is)'; then
+if ! printf '%s' "$s5flat" | grep >/dev/null -Eci '(leave|keep)[^.]{0,15}the file and its enqueue[^.]{0,12}(in place|alone|untouched|as[- ]is)'; then
   echo "FAIL: Step 5 removes the old CSS unconditionally — under --page that unstyles every template the run did not migrate"; exit 1
 fi
 
@@ -412,7 +412,7 @@ fi
 s6=$(awk '/^## Step 6/,/^## Report/' "$f")
 # Defence in depth only — the closure proof below already fails on an empty region.
 [ -n "$s6" ] || { echo "FAIL: no Step 6 section"; exit 1; }
-if ! printf '%s\n' "$s6" | tail -1 | grep -q '^## Report'; then
+if ! printf '%s\n' "$s6" | tail -1 | grep >/dev/null -c '^## Report'; then
   echo "FAIL: the Step 6 region is not terminated by a '## Report' heading — its assertions would silently become file-wide"; exit 1
 fi
 s6flat=$(printf '%s\n' "$s6" | flat)
@@ -429,7 +429,7 @@ s6bash=$(printf '%s\n' "$s6" | bashonly)
 # while nothing compiled. `--prefix <theme-path>` is accepted because it is the same
 # invocation with the directory named instead of entered — rejecting it forced the
 # command into the `cd … && npm …` shape that A5 proved broken.
-if ! printf '%s\n' "$s6bash" | grep -Eq '^[[:space:]]*([^#]*&& *)?npm( +--prefix +[^ ]+)? +run +tailwindbuild'; then
+if ! printf '%s\n' "$s6bash" | grep >/dev/null -Ec '^[[:space:]]*([^#]*&& *)?npm( +--prefix +[^ ]+)? +run +tailwindbuild'; then
   echo "FAIL: Step 6 does not run 'npm run tailwindbuild' inside a bash block — the only build script Step 2 installs, and prose about it is not a build"; exit 1
 fi
 
@@ -440,11 +440,11 @@ fi
 # unbuilt dist/main.css, and the convention check's rule 6 (gated on that file) never
 # runs at all. Forbidden in the fence only: the prose above it must be free to SAY
 # "do not `cd <theme-path>` again".
-if printf '%s\n' "$s6bash" | grep -Eq 'cd +"?<theme-path>'; then
+if printf '%s\n' "$s6bash" | grep >/dev/null -Ec 'cd +"?<theme-path>'; then
   echo "FAIL: Step 6 cd's to the relative <theme-path> again — Step 0 already did, cwd persists, so this cd fails and '&&' swallows the build"; exit 1
 fi
 # …and the hazard is stated, so the next author does not put the cd back.
-if ! printf '%s' "$s6flat" | grep -Eqi "(do[ *_]{1,4}not|never|don'?t)[^.]{0,25}cd[^.]{0,45}(again|a second time)"; then
+if ! printf '%s' "$s6flat" | grep >/dev/null -Eci "(do[ *_]{1,4}not|never|don'?t)[^.]{0,25}cd[^.]{0,45}(again|a second time)"; then
   echo "FAIL: Step 6 does not warn against a second 'cd <theme-path>' — Step 0's cd already moved there and the relative path resolves only once"; exit 1
 fi
 
@@ -461,7 +461,7 @@ fi
 # accepted only the unquoted one — a brittle assertion, not a contract.
 # Scoped to Step 6's ```bash fences for the same reason as the build gate above: the
 # flat-region form was satisfied by unbackticked prose saying the check is NOT run.
-if ! printf '%s\n' "$s6bash" | grep -Eqi 'bin/tailwind-native-check\.sh"? +[^ `]*theme'; then
+if ! printf '%s\n' "$s6bash" | grep >/dev/null -Eci 'bin/tailwind-native-check\.sh"? +[^ `]*theme'; then
   echo "FAIL: Step 6 does not RUN bin/tailwind-native-check.sh against the theme path inside a bash block — naming the script in prose is not running it"; exit 1
 fi
 
@@ -472,7 +472,7 @@ fi
 # `${CLAUDE_PLUGIN_ROOT}/…`, never relative. The braces are optional here: they are
 # the house style everywhere else in the repo, but `$CLAUDE_PLUGIN_ROOT/bin/…` is the
 # same correct path and must not read as a regression.
-if ! printf '%s\n' "$s6bash" | grep -Eq '\$\{?CLAUDE_PLUGIN_ROOT\}?/bin/tailwind-native-check\.sh'; then
+if ! printf '%s\n' "$s6bash" | grep >/dev/null -Ec '\$\{?CLAUDE_PLUGIN_ROOT\}?/bin/tailwind-native-check\.sh'; then
   echo "FAIL: Step 6 does not root the convention check at \${CLAUDE_PLUGIN_ROOT} — a bare relative bin/ path cannot resolve from the theme directory this step cd's into"; exit 1
 fi
 
@@ -480,7 +480,7 @@ fi
 # a correct --page pass reads as a failed migration and gets "fixed" into a broken one.
 # The object takes a noun: "record both **failures** as expected" is the same sentence
 # and the adjacent-words form rejected it.
-if ! printf '%s' "$s6flat" | grep -Eqi '(record|treat|report)[ *_]{1,4}(both|them|these two|the two)[ *_A-Za-z-]{1,24}as expected'; then
+if ! printf '%s' "$s6flat" | grep >/dev/null -Eci '(record|treat|report)[ *_]{1,4}(both|them|these two|the two)[ *_A-Za-z-]{1,24}as expected'; then
   echo "FAIL: Step 6 does not record the two --page-inevitable check failures as expected — a correct --page pass would read as a failed migration"; exit 1
 fi
 
@@ -488,15 +488,15 @@ fi
 # so a presence assertion cannot tell the two apart, and the catastrophic inversion
 # (the re-shoot landing in before/, obliterating the golden) sails through one. The
 # write is asserted by argument order, and writing into before/ is forbidden outright.
-if ! printf '%s' "$s6flat" | grep -Eq 'responsive-\*\.png "?\.tailwind-migrate/after/'; then
+if ! printf '%s' "$s6flat" | grep >/dev/null -Ec 'responsive-\*\.png "?\.tailwind-migrate/after/'; then
   echo "FAIL: Step 6 does not capture the after-screenshots into .tailwind-migrate/after/<slug>/"; exit 1
 fi
-if printf '%s' "$s6flat" | grep -Eq 'responsive-\*\.png "?\.tailwind-migrate/before/'; then
+if printf '%s' "$s6flat" | grep >/dev/null -Ec 'responsive-\*\.png "?\.tailwind-migrate/before/'; then
   echo "FAIL: Step 6 writes the re-shot screenshots into .tailwind-migrate/before/ — that overwrites the Step 0 golden with the post-migration render, so the comparison compares a page against itself"; exit 1
 fi
 # A23, deletion-proven only: an inversion of "reads the golden" is "reads nothing",
 # which is the deletion.
-if ! printf '%s' "$s6flat" | grep -Fq '.tailwind-migrate/before/'; then
+if ! printf '%s' "$s6flat" | grep >/dev/null -Fc '.tailwind-migrate/before/'; then
   echo "FAIL: Step 6 never reads the Step 0 golden, so it compares nothing"; exit 1
 fi
 
@@ -510,14 +510,14 @@ fi
 # between the verb and the quantifier, and "Read **each** PNG" is the same instruction
 # with a different one. Both were rejected. What stays mandatory is that TWO artifacts
 # are opened, so a bare "compare them" still fails.
-if ! printf '%s' "$s6flat" | grep -Eqi '(read|open|view)[ *_]{1,4}(both|the two|each|all)[^.]{0,45}(pngs?|images?|screenshots?|captures?|files?)'; then
+if ! printf '%s' "$s6flat" | grep >/dev/null -Eci '(read|open|view)[ *_]{1,4}(both|the two|each|all)[^.]{0,45}(pngs?|images?|screenshots?|captures?|files?)'; then
   echo "FAIL: Step 6 states no mechanism for the comparison — /wp-responsive-check does not diff two images"; exit 1
 fi
 
 # …and the comparison has to gate the success report, or it is advice rather than a
 # step. Without this the command can pass its convention check, skip the visual read
 # entirely, and report a migration that silently changed the design.
-if ! printf '%s' "$s6flat" | grep -Eqi "(do not|never|don'?t) (report|declare|call)[^.]{0,60}(success|complete|done)[^.]{0,60}(without|until|unless)[^.]{0,60}compar"; then
+if ! printf '%s' "$s6flat" | grep >/dev/null -Eci "(do not|never|don'?t) (report|declare|call)[^.]{0,60}(success|complete|done)[^.]{0,60}(without|until|unless)[^.]{0,60}compar"; then
   echo "FAIL: Step 6 does not forbid reporting the migration successful without the before/after comparison — 'the check passed' is a different claim"; exit 1
 fi
 
@@ -530,7 +530,7 @@ fi
 # `set -euo pipefail` that aborts the whole script inside a command substitution.
 qmode=$(grep -E '^[[:space:]]*>' "$f" \
         | sed -e 's/^[[:space:]]*>//' -e 's/[*_]//g' | tr '\n' ' ' | sed 's/  */ /g' || true)
-if ! printf '%s' "$qmode" | grep -qiE 'Mode: ?author'; then
+if ! printf '%s' "$qmode" | grep >/dev/null -ciE 'Mode: ?author'; then
   echo "FAIL: commands/wp-tailwind-migrate.md has no QUOTED \`Mode: **author**\` line for its Step 4 dispatch — agents/wp-tailwind.md selects Section Authoring Mode on that line and on nothing else, so the migration dispatch would run Demo Conversion Mode and convert a template nobody asked to convert"; exit 1
 fi
 
@@ -549,7 +549,7 @@ fi
 # EMPTY region and reported that Step 4 had lost the promotion threshold when it had
 # not. Proven. The region above is already closure-proven — its last line is asserted
 # to be the `## Step 5` heading — so reusing it also inherits that guarantee.
-if ! printf '%s' "$s4flat" | grep -Eqi '3\+?[^.]{0,40}times?[^.]{0,60}2\+?[^.]{0,40}(distinct )?pages?'; then
+if ! printf '%s' "$s4flat" | grep >/dev/null -Eci '3\+?[^.]{0,40}times?[^.]{0,60}2\+?[^.]{0,40}(distinct )?pages?'; then
   echo "FAIL: Step 4 restates the promotion rule without its threshold — SKILL.md promotes a group only at 3+ occurrences or across 2+ distinct pages, and a restatement that omits the counts tells the agent to promote a group it saw twice inside one section"; exit 1
 fi
 
@@ -567,12 +567,12 @@ fi
 # Reuses the $s0 / $s0bash / $s0flat the Step 0 region above already derived, and the
 # house `bashonly` helper — a second pair of anchors for one region is two answers to
 # one question, which this file has already been bitten by once.
-printf '%s' "$s0bash" | grep -q "tailwindcss/package.json" \
+printf '%s' "$s0bash" | grep >/dev/null -c "tailwindcss/package.json" \
   || { echo "FAIL: Step 0 never reads the installed Tailwind version — it must resolve tailwindcss/package.json and stop when the major is not 4, or a v3 theme gets restructured around a layout it never had"; exit 1; }
-printf '%s' "$s0bash" | grep -Eq 'exit 1' \
+printf '%s' "$s0bash" | grep >/dev/null -Ec 'exit 1' \
   || { echo "FAIL: Step 0's version check does not exit — reporting the wrong major and continuing is the failure this gate exists to prevent"; exit 1; }
 s0flat=$(printf '%s' "$s0" | flat)
-printf '%s' "$s0flat" | grep -q 'tailwind.config.js' \
+printf '%s' "$s0flat" | grep >/dev/null -c 'tailwind.config.js' \
   || { echo "FAIL: Step 0 does not name tailwind.config.js as the v3 artifact to look for"; exit 1; }
 
 # 2. The pixel diff must carry its noise floor. `compare -metric AE` reads as the objective
@@ -581,12 +581,12 @@ printf '%s' "$s0flat" | grep -q 'tailwind.config.js' \
 # the SAME page differed by more than baseline-vs-migrated did, so the real comparison
 # looked cleaner than the page compared against itself. Without the floor, the count is
 # read as proof in whichever direction flatters the run.
-if ! printf '%s' "$flatf" | grep -qi 'noise floor'; then
+if ! printf '%s' "$flatf" | grep >/dev/null -ci 'noise floor'; then
   echo "FAIL: Step 6 offers compare -metric AE without a noise floor — a differing-pixel count means nothing until the same page is captured twice and diffed against itself"; exit 1
 fi
-printf '%s' "$flatf" | grep -qi 'backdrop-filter' \
+printf '%s' "$flatf" | grep >/dev/null -ci 'backdrop-filter' \
   || { echo "FAIL: Step 6 does not name backdrop-filter as the reason two captures of one page differ"; exit 1; }
-printf '%s' "$flatf" | grep -Eqi 'same (unchanged )?page' \
+printf '%s' "$flatf" | grep >/dev/null -Eci 'same (unchanged )?page' \
   || { echo "FAIL: Step 6 does not tell the reader to capture the same page twice before trusting any before/after count"; exit 1; }
 
 # 3. The verification contract must include ON-SCREEN ORDER. A rewrite that drops a
@@ -594,9 +594,9 @@ printf '%s' "$flatf" | grep -Eqi 'same (unchanged )?page' \
 # height, section heights, gaps and every element box stay byte-identical and a
 # size-only contract reports a perfect match. It shipped that way once and only the
 # screenshot read caught it.
-printf '%s' "$flatf" | grep -Eqi 'flex-direction' \
+printf '%s' "$flatf" | grep >/dev/null -Eci 'flex-direction' \
   || { echo "FAIL: Step 6's numeric contract never mentions flex-direction — a dropped row-reverse changes no box and passes every size comparison"; exit 1; }
-printf '%s' "$flatf" | grep -Eqi 'on-screen order|order of every row|element order' \
+printf '%s' "$flatf" | grep >/dev/null -Eci 'on-screen order|order of every row|element order' \
   || { echo "FAIL: Step 6's numeric contract does not require checking the on-screen order of reversible rows"; exit 1; }
 
 echo PASS

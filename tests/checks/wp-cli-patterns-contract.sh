@@ -72,7 +72,7 @@ grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/wp-cli-patterns/SKILL.md' "$wp_seed" \
 # must skip auto-drafts and menu items, or it fails on a perfectly seeded site — and the
 # same SQL is the delivery gate in /wp-finalize Check 7, so the two copies are compared.
 grep -qF -- '--post_author=$AUTHOR' "$s" || fail "$s no longer passes an author to every create"
-sweep=$(grep -F 'SELECT COUNT(*) FROM $($WP db prefix)posts WHERE post_author = 0' "$s" | head -1 || true)
+sweep=$(grep -F 'SELECT COUNT(*) FROM $($WP db prefix)posts WHERE post_author = 0' "$s" | sed -n 1p || true)
 [ -n "$sweep" ] || fail "$s has no post_author sweep"
 case "$sweep" in *"post_status != 'auto-draft'"*"post_type != 'nav_menu_item'"*) ;; *)
   fail "$s's author sweep lost one of its two exclusions (auto-draft, nav_menu_item)" ;; esac

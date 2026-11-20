@@ -40,18 +40,18 @@ $cfg adopt "$site" --code-home=child-theme --json >"$tmp/o.json" 2>/dev/null || 
 [ "$(jq_ 'j.manifest.code_home.kind' <"$tmp/o.json")" = child-theme ] || fail "code_home not recorded"
 [ "$(jq_ 'j.manifest.code_home.created' <"$tmp/o.json")" = false ] || fail "a planned child theme was marked created"
 [ "$(jq_ 'j.code_home_needed' <"$tmp/o.json")" = false ] || fail "code_home_needed still true after the choice"
-jq_ 'j.notes.length>0' <"$tmp/o.json" | grep -Fq true || fail "notes were not folded into the JSON"
+jq_ 'j.notes.length>0' <"$tmp/o.json" | grep >/dev/null -Fc true || fail "notes were not folded into the JSON"
 $cfg validate "$site" >/dev/null || fail "adopted manifest does not validate"
 
 # 3. code-home prints the theme_mods copy, before activation; once the dir exists it joins editable.
 msg=$($cfg code-home "$site" --kind=child-theme)
-echo "$msg" | grep -Fq 'option get theme_mods_vendor' || fail "theme_mods copy step missing"
-echo "$msg" | grep -Fq 'option update theme_mods_vendor-child' || fail "theme_mods target missing"
-[ "$(echo "$msg" | grep -n 'theme_mods_vendor ' | head -1 | cut -d: -f1)" -lt "$(echo "$msg" | grep -n 'theme activate' | head -1 | cut -d: -f1)" ] || fail "copy must come before activate"
+echo "$msg" | grep >/dev/null -Fc 'option get theme_mods_vendor' || fail "theme_mods copy step missing"
+echo "$msg" | grep >/dev/null -Fc 'option update theme_mods_vendor-child' || fail "theme_mods target missing"
+[ "$(echo "$msg" | grep -n 'theme_mods_vendor ' | sed -n 1p | cut -d: -f1)" -lt "$(echo "$msg" | grep -n 'theme activate' | sed -n 1p | cut -d: -f1)" ] || fail "copy must come before activate"
 mkdir -p "$site/wp-content/themes/vendor-child"
 $cfg code-home "$site" --kind=child-theme >/dev/null || fail "code-home failed after creation"
-jq_ 'j.code_scope.editable.includes("wp-content/themes/vendor-child")' <"$site/.wp-create.json" | grep -Fq true || fail "created home not in editable scope"
-$cfg code-home "$site" | grep -Fq 'child-theme at wp-content/themes/vendor-child' || fail "code-home does not report the recorded choice"
+jq_ 'j.code_scope.editable.includes("wp-content/themes/vendor-child")' <"$site/.wp-create.json" | grep >/dev/null -Fc true || fail "created home not in editable scope"
+$cfg code-home "$site" | grep >/dev/null -Fc 'child-theme at wp-content/themes/vendor-child' || fail "code-home does not report the recorded choice"
 $cfg validate "$site" >/dev/null || fail "validate after code-home"
 if $cfg code-home "$site" --kind=bogus 2>/dev/null; then fail "bogus kind accepted"; fi
 if $cfg code-home "$site" --kind=child-theme --path='wp-content/themes/x; rm -rf ~' 2>/dev/null; then fail "shell metacharacters accepted in code_home.path"; fi
@@ -64,7 +64,7 @@ set +e; $cfg drift "$site" >/dev/null; rc=$?; set -e
 $cfg refresh "$site" >/dev/null || fail "refresh failed"
 $cfg drift "$site" >/dev/null || fail "still drifts after refresh"
 n=$(ls "$tmp"/backups/*/ | wc -l)
-$cfg refresh "$site" | grep -Fq 'nothing to refresh' || fail "second refresh was not a no-op"
+$cfg refresh "$site" | grep >/dev/null -Fc 'nothing to refresh' || fail "second refresh was not a no-op"
 [ "$(ls "$tmp"/backups/*/ | wc -l)" = "$n" ] || fail "a no-op refresh wrote a backup"
 # shellcheck disable=SC2010  # fixture docroot with fixed ASCII names; the listing is the assertion
 [ -z "$(ls "$site" | grep -F bak || true)" ] && [ -z "$(ls -A "$site" | grep -F '.wp-create.json.bak' || true)" ] || fail "backup left in the docroot"
@@ -85,7 +85,7 @@ rm -rf "$site/wp-content/plugins/extra"
 mkprobe "$(plug ix-wp-envsync true false),$(plug seo-by-rank-math true true),$(plug wordfence false true),$(plug newbie true true)"
 set +e; d=$($cfg drift "$site"); rc=$?; set -e
 [ "$rc" = 4 ] || fail "deleted plugin not seen as drift"
-echo "$d" | grep -Fq 'no longer on disk' || fail "drift did not name the stale scope path"
+echo "$d" | grep >/dev/null -Fc 'no longer on disk' || fail "drift did not name the stale scope path"
 $cfg refresh "$site" >/dev/null || fail "refresh failed after a plugin was deleted"
 grep -Fq 'wp-content/plugins/extra' "$site/.wp-create.json" && fail "deleted plugin still in the manifest"
 grep -Fq 'wp-content/plugins/extra' "$site/.claude/CLAUDE.md" && fail "deleted plugin still in the generated block"
@@ -95,7 +95,7 @@ $cfg remove-plugin "$site" newbie >/dev/null || fail "remove-plugin failed"
 grep -Fq 'wp-content/plugins/newbie' "$site/.wp-create.json" && fail "remove-plugin left the scope path"
 grep -Fq 'newbie' "$site/.claude/CLAUDE.md" && fail "remove-plugin left the plugin in the block"
 $cfg validate "$site" >/dev/null || fail "validate failed after remove-plugin"
-$cfg remove-plugin "$site" never-there | grep -Fq 'nothing to remove' || fail "remove-plugin of an unknown slug should be a no-op"
+$cfg remove-plugin "$site" never-there | grep >/dev/null -Fc 'nothing to remove' || fail "remove-plugin of an unknown slug should be a no-op"
 
 # 7. Re-adoption keeps the choices and parks its backup outside the docroot.
 $cfg adopt "$site" --replace --json >"$tmp/r.json" 2>/dev/null || fail "adopt --replace --json failed"

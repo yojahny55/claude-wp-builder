@@ -34,10 +34,10 @@ need 'Do not move or rename those files' 'Path C does not warn that upload paths
 
 # Path C joins the shared gates, in order: gate before extraction, isolation before import.
 gate=$(grep -n 'Now run Step 1.5 (The Destination Gate)' "$f" | sed -n 3p | cut -d: -f1 || true)
-ext=$(grep -n 'tar -xzf /path/site.tar.gz' "$f" | head -1 | cut -d: -f1 || true)
+ext=$(grep -n 'tar -xzf /path/site.tar.gz' "$f" | sed -n 1p | cut -d: -f1 || true)
 [ -n "$gate" ] && [ -n "$ext" ] && [ "$gate" -lt "$ext" ] || fail "Path C extracts before the destination gate"
 iso=$(grep -n 'Now run Step 5.4 (Isolate the Clone' "$f" | sed -n 3p | cut -d: -f1 || true)
-imp=$(grep -n 'db import -' "$f" | head -1 | cut -d: -f1 || true)
+imp=$(grep -n 'db import -' "$f" | sed -n 1p | cut -d: -f1 || true)
 [ -n "$iso" ] && [ -n "$imp" ] && [ "$iso" -lt "$imp" ] || fail "Path C imports before Step 5.4 isolation"
 
 # The dump streams into the import: no scratch copy, and a corrupt stream must fail.

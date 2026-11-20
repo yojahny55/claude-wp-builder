@@ -65,33 +65,33 @@ run() { bash "$root/$s" --url "http://127.0.0.1:$port" --wp "$t/bin/wp" --root "
 
 # 1. No .htaccess: home 200, internal 404 -> exit 4, diagnosis names the file, nothing written.
 out=$(run) && fail "missing .htaccess exited 0"
-echo "$out" | grep -Fq 'scheme=http' || fail "scheme not reported"
-echo "$out" | grep -Fq 'probe_post=404' || fail "post probe did not see the 404"
-echo "$out" | grep -Fq 'htaccess=missing' || fail "missing .htaccess not detected"
-echo "$out" | grep -Fq 'diagnosis=htaccess-missing' || fail "wrong diagnosis"
+echo "$out" | grep >/dev/null -Fc 'scheme=http' || fail "scheme not reported"
+echo "$out" | grep >/dev/null -Fc 'probe_post=404' || fail "post probe did not see the 404"
+echo "$out" | grep >/dev/null -Fc 'htaccess=missing' || fail "missing .htaccess not detected"
+echo "$out" | grep >/dev/null -Fc 'diagnosis=htaccess-missing' || fail "wrong diagnosis"
 [ ! -e "$t/site/.htaccess" ] || fail "script wrote .htaccess without --write-htaccess"
 
 # 2. Plain permalinks are named, not blamed on rewrites.
 out=$(FAKE_STRUCT='' run) && fail "plain permalinks case exited 0 with 404s"
-echo "$out" | grep -Fq 'permalinks=plain' || fail "plain permalinks not reported"
-echo "$out" | grep -Fq 'diagnosis=plain-permalinks' || fail "plain permalinks not diagnosed"
+echo "$out" | grep >/dev/null -Fc 'permalinks=plain' || fail "plain permalinks not reported"
+echo "$out" | grep >/dev/null -Fc 'diagnosis=plain-permalinks' || fail "plain permalinks not diagnosed"
 
 # 3. An existing file with no WordPress block is backed up and extended, never overwritten.
 printf 'Options -Indexes\n' > "$t/site/.htaccess"
 out=$(run) && fail "no-wp-block case exited 0"
-echo "$out" | grep -Fq 'htaccess=no-wp-block' || fail "no-wp-block not detected"
+echo "$out" | grep >/dev/null -Fc 'htaccess=no-wp-block' || fail "no-wp-block not detected"
 out=$(run --write-htaccess) || fail "--write-htaccess did not end healthy"
-echo "$out" | grep -Fq 'backup=' || fail "no backup reported"
+echo "$out" | grep >/dev/null -Fc 'backup=' || fail "no backup reported"
 ls "$t/site"/.htaccess.bak-* >/dev/null 2>&1 || fail "backup file missing"
 grep -Fq 'Options -Indexes' "$t/site/.htaccess" || fail "existing rules were lost"
 grep -Fq '# BEGIN WordPress' "$t/site/.htaccess" || fail "stock block not written"
-echo "$out" | grep -Fq 'diagnosis=ok' || fail "not healthy after the write"
+echo "$out" | grep >/dev/null -Fc 'diagnosis=ok' || fail "not healthy after the write"
 
 # 4. Local-only: a git work tree gets an info/exclude entry, never a .gitignore edit.
 rm -f "$t/site"/.htaccess*
 git -C "$t/site" init -q
 out=$(run --write-htaccess) || fail "write into a git tree failed"
-echo "$out" | grep -Fq 'local_only=' || fail "local-only status not reported"
+echo "$out" | grep >/dev/null -Fc 'local_only=' || fail "local-only status not reported"
 git -C "$t/site" check-ignore -q .htaccess || fail ".htaccess not excluded locally"
 [ ! -e "$t/site/.gitignore" ] || fail "script edited .gitignore"
 
@@ -109,7 +109,7 @@ bash "$root/$s" --url "http://127.0.0.1:$port" --wp "$t/bin/badwp" --root "$t/si
 
 # 5. Unreachable host.
 out=$(bash "$root/$s" --url "http://127.0.0.1:1" --wp "$t/bin/wp" --root "$t/site") && fail "dead host exited 0"
-echo "$out" | grep -Fq 'diagnosis=host-unreachable' || fail "dead host not diagnosed"
+echo "$out" | grep >/dev/null -Fc 'diagnosis=host-unreachable' || fail "dead host not diagnosed"
 
 # Prose: the audit calls it before dispatch, passes the scheme, asks first, and never goes on quietly.
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md

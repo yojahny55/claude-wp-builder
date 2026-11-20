@@ -184,7 +184,7 @@ curl -s -o /dev/null -D - -r 0-0 --max-filesize 1024 --max-time 15 -A "Mozilla/5
 EOF_SNIPPETS
 )
 if [ "$code" != "$expected_code" ]; then
-  diff <(printf '%s\n' "$expected_code") <(printf '%s\n' "$code") | head -20 || true
+  diff <(printf '%s\n' "$expected_code") <(printf '%s\n' "$code") | sed -n '1,20p' || true
   fail "SEC-039 code blocks differ from the pinned copy (a line changed, removed or added)"
 fi
 
@@ -222,7 +222,7 @@ expected_table=$(cat <<'EOF_TABLE'
 EOF_TABLE
 )
 if [ "$table" != "$expected_table" ]; then
-  diff <(printf '%s\n' "$expected_table") <(printf '%s\n' "$table") | head -20 || true
+  diff <(printf '%s\n' "$expected_table") <(printf '%s\n' "$table") | sed -n '1,20p' || true
   fail "SEC-039 verdict table is not the 7 pinned rows, consecutive after the delimiter"
 fi
 # GFM keeps a non-blank line straight after the last row inside the table: require a blank.
@@ -248,7 +248,7 @@ done
 # A path line denies nothing on its own: it has to sit inside @disallowed, and that matcher has to
 # be answered. Repeated path lines in one matcher merge into a single OR list (caddy adapt).
 caddy=templates/native/Caddyfile.tpl
-awk '/@disallowed \{/{f=1} f{print} f&&/\}/{exit}' "$caddy" | grep -Fq 'path /wp-content/uploads/woocommerce_uploads/*' \
+awk '/@disallowed \{/{f=1} f{print} f&&/\}/{exit}' "$caddy" | grep >/dev/null -Fc 'path /wp-content/uploads/woocommerce_uploads/*' \
   || fail "$caddy does not match woocommerce_uploads inside its @disallowed matcher"
 grep -Fq 'respond @disallowed 404' "$caddy" \
   || fail "$caddy has no respond for @disallowed, so the woocommerce_uploads match denies nothing"

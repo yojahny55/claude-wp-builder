@@ -77,7 +77,7 @@ docker run --rm \
   -v "$PWD:/w" -v "$work:/out" \
   -w /w \
   "$IMAGE" \
-  bash -c 'CHROME_PATH="$(ls -d /ms-playwright/chromium-*/chrome-linux*/chrome 2>/dev/null | head -1)"
+  bash -c 'CHROME_PATH="$(ls -d /ms-playwright/chromium-*/chrome-linux*/chrome 2>/dev/null | sed -n 1p)"
            # An empty CHROME_PATH would fall through the launcher ladder to a system Chrome
            # this image does not have, and the run would SKIP -- reporting success for a
            # check that rendered nothing. Measured: the directory is chrome-linux64 here,

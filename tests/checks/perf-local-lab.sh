@@ -13,8 +13,8 @@ has() { grep -Fq -- "$1" "$2" || fail "$2 lost: $1"; }
 # contrast-propose.mjs: behaviour
 if command -v node >/dev/null; then
   out=$(node bin/contrast-propose.mjs --pair '#d85c33:#ffffff' --pair '#000000:#ffffff')
-  echo "$out" | grep -Fq '#d85c33 on #ffffff | 3.82 | 4.5 | #' || fail "contrast-propose did not propose a shade for a failing pair"
-  echo "$out" | grep -Fq '#000000 on #ffffff | 21.00 | 4.5 | passes' || fail "contrast-propose changed a passing pair"
+  echo "$out" | grep >/dev/null -Fc '#d85c33 on #ffffff | 3.82 | 4.5 | #' || fail "contrast-propose did not propose a shade for a failing pair"
+  echo "$out" | grep >/dev/null -Fc '#000000 on #ffffff | 21.00 | 4.5 | passes' || fail "contrast-propose changed a passing pair"
   # h2-proxy: refuses to start without a target (no hidden site-specific default)
   if node bin/h2-proxy.mjs 2>/dev/null; then fail "h2-proxy started without --target"; fi
 fi
@@ -38,7 +38,7 @@ has 'contrast-propose.mjs' templates/audit-suite/README.md
 has '`h2-proxy.mjs`' README.md
 has '`contrast-propose.mjs`' README.md
 # the old claim that PERF-047 is auto-fixable must be gone
-! grep -F 'PERF-047 | Render-blocking third-party CSS' "$perf" | grep -Fq '| Yes |' || fail "PERF-047 is still marked auto-fixable"
+! grep -F 'PERF-047 | Render-blocking third-party CSS' "$perf" | grep >/dev/null -Fc '| Yes |' || fail "PERF-047 is still marked auto-fixable"
 
 # Behaviour: a proposal must reach its ratio on the rounded hex that ships, and --json must
 # survive a pipe (process.exit after console.log once cut it at 64 KiB).
@@ -50,8 +50,8 @@ args=(); for i in $(seq 1 600); do args+=(--pair "#$(printf '%06x' $((i*20011 % 
 node "$cp" "${args[@]}" --json | node -e 'JSON.parse(require("fs").readFileSync(0,"utf8"))' \
   || fail "contrast-propose --json is truncated through a pipe"
 printf '%s' '{"violations":[{"id":"color-contrast","nodes":[{"target":["p"],"html":"<p>x</p>","any":[{"data":{"fgColor":"#e3fecc","bgColor":"#03b07d","expectedContrastRatio":"4.5:1"}}]},{"target":["h1"],"html":"<h1>x</h1>","any":[{"data":{"fgColor":"#949494","bgColor":"#ffffff","expectedContrastRatio":"3:1"}}]}]}]}' > "${TMPDIR:-/tmp}/axe-native.$$.json"
-node "$cp" --axe "${TMPDIR:-/tmp}/axe-native.$$.json" | tee "${TMPDIR:-/tmp}/axe-out.$$.txt" | grep -Fq '#e3fecc on #03b07d' || { rm -f "${TMPDIR:-/tmp}/axe-native.$$.json"; fail "contrast-propose cannot read raw axe-core results"; }
-grep -F '#949494 on #ffffff' "${TMPDIR:-/tmp}/axe-out.$$.txt" | grep -Fq 'passes' || fail "contrast-propose ignored axe's '3:1' requirement for large text"
+node "$cp" --axe "${TMPDIR:-/tmp}/axe-native.$$.json" | tee "${TMPDIR:-/tmp}/axe-out.$$.txt" | grep >/dev/null -Fc '#e3fecc on #03b07d' || { rm -f "${TMPDIR:-/tmp}/axe-native.$$.json"; fail "contrast-propose cannot read raw axe-core results"; }
+grep -F '#949494 on #ffffff' "${TMPDIR:-/tmp}/axe-out.$$.txt" | grep >/dev/null -Fc 'passes' || fail "contrast-propose ignored axe's '3:1' requirement for large text"
 rm -f "${TMPDIR:-/tmp}/axe-native.$$.json" "${TMPDIR:-/tmp}/axe-out.$$.txt"
 grep -Fq "listen(PORT, '127.0.0.1'" bin/h2-proxy.mjs || fail "h2-proxy must bind loopback only"
 ! git grep -n '/srv/http/claude-wp-builder' -- agents commands skills >/dev/null 2>&1 || fail "a distributed doc names an absolute plugin path"

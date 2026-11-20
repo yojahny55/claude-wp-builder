@@ -204,7 +204,7 @@ for f in "$C"/*/section.html; do
     # or its plain font-size.
     min=$(grep -E -A8 "(^|,)[[:space:]]*\.$cls([^a-zA-Z0-9_-]|$)" "$C/$comp/section.css" 2>/dev/null \
             | grep -oE 'font-size: *clamp\( *[0-9.]+rem|font-size: *[0-9.]+rem' \
-            | head -1 | grep -oE '[0-9.]+rem' | tr -d 'rem') || true
+            | sed -n 1p | grep -oE '[0-9.]+rem' | tr -d 'rem') || true
     [ -n "$min" ] || continue
     awk -v v="$min" 'BEGIN { exit !(v + 0 < 1.1) }' \
       && fail "$comp: .$cls is a heading element rendered at ${min}rem -- a label-sized heading flattens the h2/h3 role for every page it appears on"
@@ -256,7 +256,7 @@ done < <(grep -rn 'animation-range: entry [0-9.]*% entry [0-9.]*%' "$C"/*/sectio
 # viewport is smaller than the reader's own scroll increment.
 while IFS= read -r line; do
   f=${line%%:*}
-  px=$(printf '%s' "$line" | grep -oE 'var\(--motion-rise, *[0-9.]+px\)' | grep -oE '[0-9.]+' | head -1)
+  px=$(printf '%s' "$line" | grep -oE 'var\(--motion-rise, *[0-9.]+px\)' | grep -oE '[0-9.]+' | sed -n 1p)
   [ -n "$px" ] || continue
   awk -v v="$px" 'BEGIN { exit !(v + 0 < 35) }' \
     && fail "$f: --motion-rise falls back to ${px}px, below the amplitude floor where a rise stops being visible"
@@ -363,9 +363,9 @@ while IFS= read -r item; do
   # quoted declaration from an observation. So require the claim to be marked as
   # measured AND to carry a figure. Still a floor -- it cannot tell a real number
   # from a plausible one -- but it stops the shape both wrong reasons arrived in.
-  printf '%s' "$item" | grep -qi 'measured' \
+  printf '%s' "$item" | grep >/dev/null -ci 'measured' \
     || fail "$dev: silent-failure rule $n gives a reason that is not marked as measured. A rule nobody has cause to test is never exercised, so a wrong reason survives until someone reasons forward from it -- say what was observed: $(printf '%s' "$item" | cut -c1-70)"
-  printf '%s' "$item" | grep -qE '[0-9]+\.[0-9]+|=[0-9]|`[0-9]+`' \
+  printf '%s' "$item" | grep >/dev/null -cE '[0-9]+\.[0-9]+|=[0-9]|`[0-9]+`' \
     || fail "$dev: silent-failure rule $n says it was measured but carries no figure to re-run: $(printf '%s' "$item" | cut -c1-70)"
 done < <(printf '%s\n' "$list" | awk '
   /^[0-9]+\. / { if (buf != "") print buf; buf = $0; next }

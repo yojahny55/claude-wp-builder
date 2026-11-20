@@ -85,11 +85,11 @@ bullets() {
 # a correct edit, since cross-referencing another rule's subject is normal prose
 # and is exactly the wording this skill ships with today.
 bullet_about() { # <raw-text> <literal-label>
-  bullets "$1" | awk -v lab="$2" '
+  awk -v lab="$2" '
     { i = index($0, lab) }
     i > 0 { if (best == 0 || i < best) { best = i; line = $0 } }
     END { if (best == 0) exit 1; print line }
-  '
+  ' < <(bullets "$1")
 }
 
 # `sentences <flat-text> <needle>` prints one line per occurrence of <needle>: the
@@ -124,7 +124,7 @@ flatf=$(flat "$raw")
 # is a correct edit.
 # ---------------------------------------------------------------------------
 for rung in 'utility classes in the markup' 'utilities/site\.css' 'components/<slug>\.css' '@keyframes'; do
-  printf '%s' "$flatf" | grep -Eq "$rung" \
+  printf '%s' "$flatf" | grep >/dev/null -Ec "$rung" \
     || fail "skill missing decision-ladder element '$rung'"
 done
 
@@ -135,7 +135,7 @@ done
 # forms that mean two-or-more, each pinned behind a non-digit so `12+ pages` and
 # `12 or more pages` cannot satisfy it, and no other number can.
 TWO_PAGES='(^|[^0-9])(≥ ?2|2\+|2 or more|two or more|at least (2|two))[a-z ]{0,14}pages'
-printf '%s' "$flatf" | grep -Eqi "$TWO_PAGES" \
+printf '%s' "$flatf" | grep >/dev/null -Eci "$TWO_PAGES" \
   || fail "skill missing the decision-ladder threshold that sends a repeated utility group to utilities/site.css — the group has to be seen on two or more pages. Accepted forms: '≥2 pages', '2+ pages', '2 or more pages', 'two or more pages', 'at least 2 pages'."
 
 # Rungs 2 and 3 also have to exist as RUNGS. Both of their destinations are named
@@ -154,10 +154,10 @@ printf '%s' "$flatf" | grep -Eqi "$TWO_PAGES" \
 # and cannot satisfy either assertion.
 items=$(bullets "$(printf '%s\n' "$raw" | sed -E 's/^([0-9]+)\. /- /')")
 
-printf '%s\n' "$items" | grep -F 'utilities/site.css' | grep -Eqi "$TWO_PAGES" \
+printf '%s\n' "$items" | grep -F 'utilities/site.css' | grep >/dev/null -Eci "$TWO_PAGES" \
   || fail "no decision-ladder rung sends a utility group seen on two or more pages to \`utilities/site.css\`. The file-layout code fence names that path too, so a file-wide grep passes with the rung deleted — and a deleted rung is the whole promotion rule gone."
 
-printf '%s\n' "$items" | grep -Fq 'components/<slug>.css' \
+printf '%s\n' "$items" | grep >/dev/null -Fc 'components/<slug>.css' \
   || fail "no decision-ladder rung sends a group repeated within a single page to \`components/<slug>.css\`. As with rung 2, the code fence names the path, so only a rung proves the ladder still has its third step."
 
 # ---------------------------------------------------------------------------
@@ -170,17 +170,17 @@ BAN='never (write|create|author|emit|generate|produce|touch|use)|(do|does) not (
 #    "the shared output surface for every template".
 b_styles=$(bullet_about "$raw" 'assets/css/styles.css') \
   || fail "no Forbidden list item is about \`assets/css/styles.css\` — that file is the template=basic output surface and a Tailwind theme must never write it"
-printf '%s' "$b_styles" | grep -Eqi '(^|[^a-z])basic([^a-z]|$)' \
+printf '%s' "$b_styles" | grep >/dev/null -Eci '(^|[^a-z])basic([^a-z]|$)' \
   || fail "the \`assets/css/styles.css\` item does not say the file belongs to the \`basic\` template: [$b_styles]"
-printf '%s' "$b_styles" | grep -Eqi "$BAN" \
+printf '%s' "$b_styles" | grep >/dev/null -Eci "$BAN" \
   || fail "the \`assets/css/styles.css\` item names the file but never bans writing it. A Forbidden entry that only names its subject reads as documentation of an output surface, which is the opposite of the rule: [$b_styles]"
 
 # 2. BEM-with-custom-properties belongs to wp-css-system, and to nothing here.
 b_bem=$(bullet_about "$raw" 'BEM') \
   || fail "no Forbidden list item is about BEM-with-custom-properties authoring — that is wp-css-system's model, and it is what a Tailwind theme falls back to when this skill goes quiet"
-printf '%s' "$b_bem" | grep -Fq 'wp-css-system' \
+printf '%s' "$b_bem" | grep >/dev/null -Fc 'wp-css-system' \
   || fail "the BEM item does not hand BEM-with-custom-properties authoring back to \`wp-css-system\`: [$b_bem]"
-printf '%s' "$b_bem" | grep -Eqi "$BAN|not (this|ours|for this)|instead|rather than|belongs to|'s job" \
+printf '%s' "$b_bem" | grep >/dev/null -Eci "$BAN|not (this|ours|for this)|instead|rather than|belongs to|'s job" \
   || fail "the BEM item never says BEM-with-custom-properties authoring is not this skill's job. Named without a direction, it reads as a sanctioned second option: [$b_bem]"
 
 # 3. Tokens are declared in @theme, never in :root. ':root' appears in two items —
@@ -188,11 +188,11 @@ printf '%s' "$b_bem" | grep -Eqi "$BAN|not (this|ours|for this)|instead|rather t
 #    `bullet_about` rather than by "first mention".
 b_root=$(bullet_about "$raw" ':root') \
   || fail "no Forbidden list item is about a \`:root\` custom-property block"
-printf '%s' "$b_root" | grep -Fq '@theme' \
+printf '%s' "$b_root" | grep >/dev/null -Fc '@theme' \
   || fail "the \`:root\` item does not redirect tokens to the \`@theme\` block: [$b_root]"
-printf '%s' "$b_root" | grep -Eqi '(belong|live|go|are declared|are defined|are set) in|never (re)?declare|(^|[^a-z])only (in|ever)' \
+printf '%s' "$b_root" | grep >/dev/null -Eci '(belong|live|go|are declared|are defined|are set) in|never (re)?declare|(^|[^a-z])only (in|ever)' \
   || fail "the \`:root\` item names \`:root\` but never states where tokens go instead. \"A \`:root\` block is fine whenever \`@theme\` is inconvenient\" satisfies a check that only looks for the two words: [$b_root]"
-if printf '%s' "$b_root" | grep -Eqi '(is|are|stays|remains) (fine|ok|okay|acceptable|allowed|permitted|permissible)|may be used|is the fallback'; then
+if printf '%s' "$b_root" | grep >/dev/null -Eci '(is|are|stays|remains) (fine|ok|okay|acceptable|allowed|permitted|permissible)|may be used|is the fallback'; then
   fail "the \`:root\` item permits a \`:root\` block. Tokens live in \`@theme\`; a second declaration site is how a Tailwind theme grows a custom-property system it was never meant to have: [$b_root]"
 fi
 
@@ -201,9 +201,9 @@ fi
 #    the build for every template.
 b_dir=$(bullet_about "$raw" 'assets/css/src/tailwindcss/') \
   || fail "no Forbidden list item is about the directories under \`assets/css/src/tailwindcss/\`"
-printf '%s' "$b_dir" | grep -Eqi "$BAN|no (fifth|other|further|additional)|other than|beyond the four" \
+printf '%s' "$b_dir" | grep >/dev/null -Eci "$BAN|no (fifth|other|further|additional)|other than|beyond the four" \
   || fail "the directory item names \`assets/css/src/tailwindcss/\` but never bans a directory outside the sanctioned set: [$b_dir]"
-printf '%s' "$b_dir" | grep -Eqi 'fifth|other than|beyond the four|not one of|outside the' \
+printf '%s' "$b_dir" | grep >/dev/null -Eci 'fifth|other than|beyond the four|not one of|outside the' \
   || fail "the directory item does not say WHICH directories are out of bounds. It has to ban a fifth name, not the four sanctioned ones — those may be created when the first rule that belongs there is written: [$b_dir]"
 
 # The sanctioned SET itself, extracted positively and compared. This is the gate
@@ -332,7 +332,7 @@ section() { # section <heading text> — from the dehyphenated raw file on stdin
   '
 }
 scope=$(printf '%s\n' "$raw" | section 'File layout'; printf '%s\n' "$raw" | section 'Forbidden')
-printf '%s' "$scope" | grep -q '.' \
+printf '%s' "$scope" | grep >/dev/null -c '.' \
   || fail "neither a '## File layout' nor a '## Forbidden' section was found in $f — the stray-directory scan below would read an empty corpus and assert nothing"
 stray=$(flat "$scope" \
   | sed 's|[^A-Za-z0-9_/.<>-]|\
@@ -356,19 +356,19 @@ fi
 # dispatched it. The skill has to say the sanctioned four MAY be created when
 # absent — and, per the set gate above, still only those four.
 # ---------------------------------------------------------------------------
-printf '%s' "$flatf" | grep -Eqi '(may|can|must) be created|create (it|them|one of the four|any of the four|the missing)|creating one of the four' \
+printf '%s' "$flatf" | grep >/dev/null -Eci '(may|can|must) be created|create (it|them|one of the four|any of the four|the missing)|creating one of the four' \
   || fail "the skill never allows a sanctioned directory to be CREATED. layouts/ is not in the starter — git cannot track an empty directory — so an agent told only 'never create a new directory' cannot write layouts/header.css at all"
 lay=$(sentences "$flatf" 'layouts/' || true)
-printf '%s' "$lay" | grep -Eqi 'absent|missing|does not exist|not (yet )?(there|present|shipped)|empty' \
+printf '%s' "$lay" | grep >/dev/null -Eci 'absent|missing|does not exist|not (yet )?(there|present|shipped)|empty' \
   || fail "the skill treats layouts/ as a directory that is already there. It is not: git cannot track it while it is empty, so the skill has to say it can be missing and may be created: [$lay]"
 
 # ---------------------------------------------------------------------------
 # Tokens, empty files, and the Verify invocation.
 # ---------------------------------------------------------------------------
-printf '%s' "$flatf" | grep -Fq '@theme' \
+printf '%s' "$flatf" | grep >/dev/null -Fc '@theme' \
   || fail "skill does not point tokens at the @theme block"
 
-printf '%s' "$flatf" | grep -Eqi 'at least one rule|never create an empty' \
+printf '%s' "$flatf" | grep >/dev/null -Eci 'at least one rule|never create an empty' \
   || fail "skill missing the no-empty-file rule"
 
 # The Verify block must name the convention check AND root it at the plugin.
@@ -379,7 +379,7 @@ printf '%s' "$flatf" | grep -Eqi 'at least one rule|never create an empty' \
 # the repo-wide bare-path ban. The braces are optional:
 # `$CLAUDE_PLUGIN_ROOT/bin/…` is the same correct path.
 tr -d '[:space:]' < "$f" \
-  | grep -Eq '\$\{?CLAUDE_PLUGIN_ROOT\}?/bin/tailwind-native-check\.sh' \
+  | grep >/dev/null -Ec '\$\{?CLAUDE_PLUGIN_ROOT\}?/bin/tailwind-native-check\.sh' \
   || fail "skill does not point Verify at \${CLAUDE_PLUGIN_ROOT}/bin/tailwind-native-check.sh"
 
 echo PASS

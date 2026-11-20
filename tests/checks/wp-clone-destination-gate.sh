@@ -32,9 +32,9 @@ gate_a=$(grep -n 'Now run Step 1.5 (The Destination Gate)' "$f" | sed -n 1p | cu
 # Path A imports the dump it captured into a variable; Path B imports the operator's
 # --sql= file. Anchoring on "db import" plus the variable name identifies A without
 # depending on the exact quoting of the path, which is how this check broke once already.
-imp_a=$(grep -n 'db import' "$f" | grep 'LOCAL_DUMP' | head -1 | cut -d: -f1 || true)
+imp_a=$(grep -n 'db import' "$f" | grep 'LOCAL_DUMP' | sed -n 1p | cut -d: -f1 || true)
 gate_b=$(grep -n 'Now run Step 1.5 (The Destination Gate)' "$f" | sed -n 2p | cut -d: -f1 || true)
-imp_b=$(grep -n 'db import /path/to/dump.sql' "$f" | head -1 | cut -d: -f1 || true)
+imp_b=$(grep -n 'db import /path/to/dump.sql' "$f" | sed -n 1p | cut -d: -f1 || true)
 for pair in "A:$gate_a:$imp_a" "B:$gate_b:$imp_b"; do
   IFS=: read -r label g i <<<"$pair"
   [ -n "$g" ] || fail "$f path $label never invokes the destination gate before its import"

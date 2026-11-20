@@ -58,13 +58,13 @@ s55=$(awk '/^## Step 5\.5/,/^## Step 6:/' "$f")
 # not hypothetical: with s26 open to EOF, its assertions become satisfiable from
 # Step 5.5, which also mentions the backup path and "item 3". Prove every range
 # actually closed on the heading it claims to close on.
-printf '%s\n' "$s26" | tail -1 | grep -q '^## Step 3:' \
+printf '%s\n' "$s26" | tail -1 | grep >/dev/null -c '^## Step 3:' \
   || fail "the Step 2.6 region is not terminated by a '## Step 3:' heading — the Step 2.6 assertions would silently become file-wide and be satisfiable from Step 5.5"
-printf '%s\n' "$s3" | tail -1 | grep -q '^## Step 4:' \
+printf '%s\n' "$s3" | tail -1 | grep >/dev/null -c '^## Step 4:' \
   || fail "the Step 3 region is not terminated by a '## Step 4:' heading — the abort-wording assertions would silently become file-wide"
-printf '%s\n' "$s4" | tail -1 | grep -q '^## Step 4\.5' \
+printf '%s\n' "$s4" | tail -1 | grep >/dev/null -c '^## Step 4\.5' \
   || fail "the Step 4 region is not terminated by a '## Step 4.5' heading — the section-walk assertions would silently become file-wide"
-printf '%s\n' "$s55" | tail -1 | grep -q '^## Step 6:' \
+printf '%s\n' "$s55" | tail -1 | grep >/dev/null -c '^## Step 6:' \
   || fail "the Step 5.5 region is not terminated by a '## Step 6:' heading — the Step 5.5 assertions would silently become file-wide"
 
 # Blockquote notes and list bullets wrap across lines, so a single sentence is
@@ -102,7 +102,7 @@ flat() { printf '%s' "$1" | sed 's/^[[:space:]]*>[[:space:]]\?//' | tr '\n' ' ' 
 # the first line dedented out of it. None of those is a neighbouring bullet's
 # wording, so neither edit above can move it.
 bullet() { # <raw-region> <label>
-  printf '%s\n' "$1" | awk -v lab="$2" '
+  awk -v lab="$2" '
   {
     line = $0
     m = match(line, /[^[:space:]]/)
@@ -119,7 +119,7 @@ bullet() { # <raw-region> <label>
   grab && ind > bind { print line; next }       # wrapped continuation line
   { grab = 0 }                                  # anything dedented ends it
   END { if (!found) exit 1 }
-  '
+  ' < <(printf '%s\n' "$1")
 }
 
 # Closure proof for each extracted bullet, in the shape of the awk-range proofs
@@ -245,7 +245,7 @@ undirected() { # <flat-text> <literal-needle> <lowercase-ERE> [<extra-negation-E
   if [ -n "$extra" ]; then neg="$neg|$extra"; fi
   while IFS= read -r sent; do
     [ -n "$sent" ] || continue
-    printf '%s' "$sent" | awk -v pat="$pat" -v neg="$neg" '
+    awk -v pat="$pat" -v neg="$neg" '
     {
       low = tolower($0); s = low; off = 0
       while (match(s, pat)) {
@@ -264,7 +264,7 @@ undirected() { # <flat-text> <literal-needle> <lowercase-ERE> [<extra-negation-E
         off = off + ms + ml - 1
         s = substr(low, off + 1)
       }
-    }'
+    }' < <(printf '%s' "$sent")
   done <<< "$(sentences "$text" "$needle")"
   return 0
 }
@@ -289,9 +289,9 @@ no_rerun_safe() { # <region-label> <flattened-region>
   local label=$1 text=$2 sent claim
   while IFS= read -r sent; do
     [ -n "$sent" ] || continue
-    printf '%s' "$sent" | grep -Eqi 're-?run|second [^ ]{0,14} ?pass|later run|resume' || continue
+    printf '%s' "$sent" | grep >/dev/null -Eci 're-?run|second [^ ]{0,14} ?pass|later run|resume' || continue
     claim=${sent%%safe*}
-    if printf '%s' "$claim" | grep -Eqi "$NEGATION"; then
+    if printf '%s' "$claim" | grep >/dev/null -Eci "$NEGATION"; then
       continue
     fi
     fail "$label claims a re-run is safe. Only the conversion STEP is idempotent: by the time Step 2.6 runs again, Step 2 has re-dispatched wp-normalize unconditionally and emptied the manifest's cssRules/fonts/backgrounds, so the build degrades silently instead of failing. Say what is idempotent, and negate the rest: $sent"
@@ -305,18 +305,18 @@ no_rerun_safe() { # <region-label> <flattened-region>
 # The gate must skip on `basic`, i.e. RUN on `tailwind`. Asserting the literal
 # condition, not "some skip-ish word appears": the old `grep -q skip` was
 # satisfied by the inverted gate and by 12 unrelated uses of the word.
-printf '%s' "$f26" | grep -qF 'Skip this step entirely when `template == basic`' \
+printf '%s' "$f26" | grep >/dev/null -cF 'Skip this step entirely when `template == basic`' \
   || fail 'Step 2.6 does not gate on "Skip this step entirely when `template == basic`" — tailwind is the path that must convert'
-if printf '%s' "$f26" | grep -qF 'Skip this step entirely when `template == tailwind`'; then
+if printf '%s' "$f26" | grep >/dev/null -cF 'Skip this step entirely when `template == tailwind`'; then
   fail "Step 2.6 skips itself on the tailwind path — that is the only path that needs conversion"
 fi
 
-printf '%s' "$f26" | grep -qF '/wp-tailwindify' \
+printf '%s' "$f26" | grep >/dev/null -cF '/wp-tailwindify' \
   || fail "Step 2.6 does not run /wp-tailwindify on the tailwind path"
 
 # Multi-page demos are wp-yolo's premise (item 6 walks every inner page), so
 # the conversion cannot be a single hardcoded home-page run.
-printf '%s' "$f26" | grep -qF '**every** page in the manifest' \
+printf '%s' "$f26" | grep >/dev/null -cF '**every** page in the manifest' \
   || fail "Step 2.6 does not loop the conversion over every page in the manifest"
 
 # In-place conversion contract: a backup under a fixed name, and an output path
@@ -329,12 +329,12 @@ printf '%s' "$f26" | grep -qF '**every** page in the manifest' \
 # demo page out of unconverted markup. A dot-prefixed subdirectory is outside
 # `demo/*.html`, so it immunises every glob in the repo at once instead of
 # needing an exclusion at each call site.
-printf '%s' "$f26" | grep -qF 'demo/.original/<slug>.html' \
+printf '%s' "$f26" | grep >/dev/null -cF 'demo/.original/<slug>.html' \
   || fail "Step 2.6 does not name the backup copy demo/.original/<slug>.html"
-if printf '%s' "$f26" | grep -qF 'copy `demo/<slug>.html` to `demo/<slug>.original.html`'; then
+if printf '%s' "$f26" | grep >/dev/null -cF 'copy `demo/<slug>.html` to `demo/<slug>.original.html`'; then
   fail "Step 2.6 backs up to demo/<slug>.original.html — a sibling of demo/*.html, which /wp-seed turns into a phantom WP Page seeded from unconverted markup"
 fi
-printf '%s' "$f26" | grep -qF '/wp-tailwindify demo/<slug>.html --out demo/<slug>.html' \
+printf '%s' "$f26" | grep >/dev/null -cF '/wp-tailwindify demo/<slug>.html --out demo/<slug>.html' \
   || fail "Step 2.6 does not convert in place — /wp-tailwindify's output path must be the demo page itself"
 
 # The backup guard has to be asserted in its correct DIRECTION. The old pattern
@@ -342,7 +342,7 @@ printf '%s' "$f26" | grep -qF '/wp-tailwindify demo/<slug>.html --out demo/<slug
 # — "only if ... already exists" — just as happily, and under that inversion no
 # backup is ever taken on the first run and the pristine original is overwritten
 # with converted markup on every later one.
-printf '%s' "$f26" | grep -qF 'only if `demo/.original/<slug>.html` does not already exist' \
+printf '%s' "$f26" | grep >/dev/null -cF 'only if `demo/.original/<slug>.html` does not already exist' \
   || fail 'Step 2.6 does not guard the backup with the literal "only if `demo/.original/<slug>.html` does not already exist"'
 # Negative, directed, and scoped to GUARD sentences only. The previous version
 # of this assertion required every "already exist" anywhere in Step 2.6 to carry
@@ -355,7 +355,7 @@ printf '%s' "$f26" | grep -qF 'only if `demo/.original/<slug>.html` does not alr
 # clause whose "already exist" is not immediately preceded by a negation is the
 # inverted guard. Scanned per occurrence (not with one greedy regex) so a correct
 # guard sitting next to an inverted one cannot mask it.
-guard_bad=$(printf '%s' "$f26" | awk '
+guard_bad=$(awk '
 {
   s = $0
   while ((i = index(s, "already exist")) > 0) {
@@ -368,37 +368,37 @@ guard_bad=$(printf '%s' "$f26" | awk '
     s = substr(s, i + 13)
   }
   exit bad ? 1 : 0
-}') || fail "Step 2.6 has an \"only if ... already exist\" guard with no negation — the backup guard is inverted, so nothing is backed up on the first run and the pristine original is destroyed on every later one: $guard_bad"
+}' < <(printf '%s' "$f26")) || fail "Step 2.6 has an \"only if ... already exist\" guard with no negation — the backup guard is inverted, so nothing is backed up on the first run and the pristine original is destroyed on every later one: $guard_bad"
 
 # A truncated in-place write is otherwise unrecoverable: item 1's detect step
 # reads the wreckage, finds no <style> block, calls the page already
 # Tailwind-native and skips it forever. Verification must restore the backup
 # over the demo page — in that direction, never the reverse.
-printf '%s' "$f26" | grep -qF 'restore `demo/<slug>.html` from `demo/.original/<slug>.html`' \
+printf '%s' "$f26" | grep >/dev/null -cF 'restore `demo/<slug>.html` from `demo/.original/<slug>.html`' \
   || fail "Step 2.6 does not restore the demo page from its backup when /wp-tailwindify's verification fails — a truncated page would be treated as already-converted forever"
-if printf '%s' "$f26" | grep -qF 'restore `demo/.original/<slug>.html` from `demo/<slug>.html`'; then
+if printf '%s' "$f26" | grep >/dev/null -cF 'restore `demo/.original/<slug>.html` from `demo/<slug>.html`'; then
   fail "Step 2.6's restore runs backwards — it overwrites the pristine backup with the failed conversion"
 fi
-printf '%s' "$f26" | grep -qiF 'report the page as unconverted' \
+printf '%s' "$f26" | grep >/dev/null -ciF 'report the page as unconverted' \
   || fail "Step 2.6 does not report a page whose conversion failed verification as unconverted"
 # ...and the verification it reads has to include the third check (see $t's Step 4
 # below). Without it a page that lost its stylesheet and gained invented utilities
 # passes, is left at demo/<slug>.html, and is never restored from demo/.original/.
-printf '%s' "$f26" | grep -qF 'no project-local stylesheet `<link>` remaining' \
+printf '%s' "$f26" | grep >/dev/null -cF 'no project-local stylesheet `<link>` remaining' \
   || fail "Step 2.6's verify item does not include /wp-tailwindify's third verification check — that no project-local stylesheet <link> remains on the converted page"
 
 # The re-point item must say downstream reads the CONVERTED markup, and must
 # name the readers it covers — items 3 and 4 (header/footer) were missed once
 # already because the old wording scoped re-pointing to items 5 and 6 only.
-printf '%s' "$f26" | grep -qF 'every later reader picks up Tailwind-native markup' \
+printf '%s' "$f26" | grep >/dev/null -cF 'every later reader picks up Tailwind-native markup' \
   || fail "Step 2.6 does not state that every later reader picks up the converted markup"
 # item 2 is /wp-cpt: it reads demo/index.html via --from-demo and runs at Step 4
 # item 2, i.e. after Step 2.6. It is a CSS-emitting reader like the rest.
 for item in 'item 2' 'item 3' 'item 4' 'item 5' 'item 6'; do
-  printf '%s' "$f26" | grep -qF "$item" \
+  printf '%s' "$f26" | grep >/dev/null -cF "$item" \
     || fail "Step 2.6's re-point item does not account for $item as a reader of the converted demo"
 done
-printf '%s' "$f26" | grep -Eq 'never[[:space:]]*a build source' \
+printf '%s' "$f26" | grep >/dev/null -Ec 'never[[:space:]]*a build source' \
   || fail "Step 2.6 does not state that the .original.html backup is never a build source"
 # Negation-aware (see `undirected` above), for exactly the reason the two
 # evidence negatives are. This was the last raw negative left in the file, and
@@ -418,7 +418,7 @@ fi
 # The already-tailwind demo must be detected, not converted twice. Matched on
 # the report string itself — an 'already tailwind|no <style>|skip' alternation
 # hit the bare word "skip" 12 times in unrelated steps and so gated nothing.
-printf '%s' "$f26" | grep -qF 'conversion skipped' \
+printf '%s' "$f26" | grep >/dev/null -cF 'conversion skipped' \
   || fail "Step 2.6 has no skip path for an already-converted demo"
 
 # ---------------------------------------------------------------------------
@@ -474,7 +474,7 @@ bullet_closed '**Ambiguous'          "$amb_raw"
 dup=$(printf '%s\n%s\n%s\n%s\n' "$plain_raw" "$tw_raw" "$skip_raw" "$amb_raw" \
       | grep -v '^[[:space:]]*$' | sort | uniq -d)
 [ -z "$dup" ] \
-  || fail "Step 2.6's four detect bullets are not disjoint — the same line appears in more than one of them, so a bullet ran past its own end and every assertion scoped to it is satisfiable from a neighbour: $(printf '%s' "$dup" | head -1)"
+  || fail "Step 2.6's four detect bullets are not disjoint — the same line appears in more than one of them, so a bullet ran past its own end and every assertion scoped to it is satisfiable from a neighbour: $(printf '%s' "$dup" | sed -n 1p)"
 
 # A bullet's bold LABEL is not its instruction, and an assertion that a bullet
 # resolves a certain way must not be satisfiable by the label alone. Proven, not
@@ -495,11 +495,11 @@ amb_body=$(body "$amb_ev")
 #    the way a real page carries it — `<link rel="stylesheet" href="assets/styles.css">`
 #    — is strictly an improvement and is what the rule is about, and the `>` form
 #    exited 1 on it here, at the MUST-remove assertion and at $t's validate list.
-printf '%s' "$plain_ev" | grep -qF '<link rel="stylesheet"' \
+printf '%s' "$plain_ev" | grep >/dev/null -cF '<link rel="stylesheet"' \
   || fail 'Step 2.6 does not count a `<link rel="stylesheet">` as plain-CSS evidence. A demo that keeps its rules in an external stylesheet has no <style> block and no style=" attribute, so under a rule that only tests for those it is silently declared already Tailwind-native and never converted — which is the original defect this branch exists to fix, reproduced at the gate meant to prevent it.'
 # ...and the bullet has to resolve to CONVERT. Naming the evidence and then
 # skipping on it would satisfy the assertion above and change nothing.
-printf '%s' "$plain_ev" | grep -qiF 'convert' \
+printf '%s' "$plain_ev" | grep >/dev/null -ciF 'convert' \
   || fail "Step 2.6's plain-CSS evidence bullet never says what plain-CSS evidence means for the page: it means convert"
 # Negation-aware (see `undirected` above): "Never skip the page because the only
 # CSS it carries arrives through a link." is a legitimate strengthening of this
@@ -512,20 +512,20 @@ fi
 
 # 2. Tailwind evidence must be defined POSITIVELY, by utilities. Defining it as
 #    "no <style> block" is the defect wearing the new rule's clothes.
-printf '%s' "$tw_ev" | grep -qi 'utilit' \
+printf '%s' "$tw_ev" | grep >/dev/null -ci 'utilit' \
   || fail "Step 2.6's Tailwind-evidence bullet does not define Tailwind-nativeness by the presence of utility classes — absence of inline CSS is not evidence of anything"
-if printf '%s' "$tw_ev" | grep -qF 'no `<style>` block'; then
+if printf '%s' "$tw_ev" | grep >/dev/null -cF 'no `<style>` block'; then
   fail "Step 2.6 defines Tailwind evidence as the ABSENCE of a <style> block. That is the original heuristic: a plain-CSS demo with an external stylesheet satisfies it and is skipped."
 fi
 
 # 3. The skip needs BOTH halves — positive Tailwind evidence AND no plain-CSS
 #    evidence — and the skip ACTION has to sit in the same bullet as its
 #    condition, so the two cannot drift apart.
-printf '%s' "$skip_ev" | grep -qF 'Tailwind evidence' \
+printf '%s' "$skip_ev" | grep >/dev/null -cF 'Tailwind evidence' \
   || fail "Step 2.6's skip bullet does not require positive Tailwind evidence — a skip on anything less is a skip on ignorance"
-printf '%s' "$skip_ev" | grep -qF 'no plain-CSS evidence' \
+printf '%s' "$skip_ev" | grep >/dev/null -cF 'no plain-CSS evidence' \
   || fail "Step 2.6's skip bullet does not require the ABSENCE of plain-CSS evidence — a page with both utilities and a project stylesheet must still be converted"
-printf '%s' "$skip_ev" | grep -qF 'conversion skipped' \
+printf '%s' "$skip_ev" | grep >/dev/null -cF 'conversion skipped' \
   || fail "Step 2.6's skip condition and the skip it authorises are in different bullets — the report line \`demo already tailwind-native — conversion skipped\` must be emitted by the bullet that states the condition, or the two drift apart"
 
 # 4. Ambiguity converts, and the tie is broken in that direction on purpose.
@@ -533,7 +533,7 @@ printf '%s' "$skip_ev" | grep -qF 'conversion skipped' \
 # explanatory prose ("Converting a page that was already Tailwind-native costs
 # ..."), which survives inverting the instruction. Require the verb in the
 # DECISION position instead.
-printf '%s' "$amb_body" | grep -Eqi '\bconverts\b|\bconvert (it|them|the page|that page)\b' \
+printf '%s' "$amb_body" | grep >/dev/null -Eci '\bconverts\b|\bconvert (it|them|the page|that page)\b' \
   || fail "Step 2.6's ambiguous-input bullet does not resolve to convert"
 # Negation-aware for the same reason: "Never leave the file alone just because you
 # are unsure." says what this assertion wants and used to exit 1 saying the
@@ -549,7 +549,7 @@ fi
 # item 5's "all resolve to the converted file", so the inverted tie-break
 # ("bias every tie towards skipping") still printed PASS. Subsumption, exactly
 # the failure mode this file keeps re-learning.
-printf '%s' "$amb_ev" | grep -Eqi '(bias|break|breaks) [^.]{0,40}conver|in doubt[^.]{0,24}conver' \
+printf '%s' "$amb_ev" | grep >/dev/null -Eci '(bias|break|breaks) [^.]{0,40}conver|in doubt[^.]{0,24}conver' \
   || fail "Step 2.6's ambiguous-input bullet does not state which way to break a tie. It must break towards converting."
 
 # 5. Literal backstop against the exact sentence this task removed. The bullet
@@ -557,7 +557,7 @@ printf '%s' "$amb_ev" | grep -Eqi '(bias|break|breaks) [^.]{0,40}conver|in doubt
 #    catches the other shape of regression — the old sentence being ADDED BACK
 #    alongside the new bullets, leaving the step self-contradictory with the
 #    wrong half stated first.
-if printf '%s' "$f26" | grep -qF 'no `<style>` block and no static `style="` attribute, it is already Tailwind-native'; then
+if printf '%s' "$f26" | grep >/dev/null -cF 'no `<style>` block and no static `style="` attribute, it is already Tailwind-native'; then
   fail "Step 2.6's detect step carries the original heuristic again: absence of inline CSS is not proof of Tailwind-nativeness, and every demo fixture in this repo is the counter-example"
 fi
 
@@ -622,12 +622,12 @@ rc=0; mustrm=$(bullets "$a" '**MUST remove:**') || rc=$?
 [ "$rc" -eq 0 ] || fail "$a's MUST remove list could not be read (bullets exited $rc)"
 [ -n "$mustrm" ] || fail "$a has no '**MUST remove:**' bullet list for the conversion to be held to"
 [ -n "$mustkeep" ] || fail "$a has no '**MUST preserve:**' bullet list"
-if printf '%s\n' "$mustrm" | grep -q '^#'; then
+if printf '%s\n' "$mustrm" | grep >/dev/null -c '^#'; then
   fail "$a's MUST remove block swallowed a heading — the assertion below would be satisfiable from outside the list"
 fi
-printf '%s' "$(flat "$mustrm")" | grep -qF '<link rel="stylesheet"' \
+printf '%s' "$(flat "$mustrm")" | grep >/dev/null -cF '<link rel="stylesheet"' \
   || fail "$a's MUST remove list does not remove the demo's own project stylesheet <link>. /wp-yolo Step 2.6 skips a page only when it has Tailwind evidence and no plain-CSS evidence, and a linked project stylesheet IS plain-CSS evidence — so a conversion that leaves the link behind makes every converted page re-convert on every later run, and leaves a page that is not actually Tailwind-native."
-if printf '%s' "$(flat "$mustkeep")" | grep -qF '<link rel="stylesheet"'; then
+if printf '%s' "$(flat "$mustkeep")" | grep >/dev/null -cF '<link rel="stylesheet"'; then
   fail "$a preserves the project stylesheet <link> through conversion — the converted page then still carries plain-CSS evidence and is not Tailwind-native. Google Fonts and Tailwind CDN links are the ones that stay."
 fi
 
@@ -644,14 +644,14 @@ fi
 #    stayed and the page still rendered.
 sIn=$(awk '/^## Input/,/^### Step 2: Map Colors/' "$a")
 [ -n "$sIn" ] || fail "$a has no '## Input' region delimited by '### Step 2: Map Colors'"
-printf '%s\n' "$sIn" | tail -1 | grep -q '^### Step 2: Map Colors' \
+printf '%s\n' "$sIn" | tail -1 | grep >/dev/null -c '^### Step 2: Map Colors' \
   || fail "$a's Input/Step 1 region is not terminated by its '### Step 2: Map Colors' heading — the source-reading assertions would silently become file-wide and be satisfiable from the MUST-remove list they exist to license"
 fIn=$(flat "$sIn")
-printf '%s' "$fIn" | grep -qF '<link rel="stylesheet"' \
+printf '%s' "$fIn" | grep >/dev/null -cF '<link rel="stylesheet"' \
   || fail "$a's Input/Step 1 never mentions the project stylesheet <link>. Step 4 tells the agent to delete it; if Step 1 never opens it, the rules that live only there — :root custom properties, resets, @font-face, global @media — are deleted with it and nothing replaces them."
-printf '%s' "$fIn" | grep -qF 'conversion source exactly like a `<style>` block' \
+printf '%s' "$fIn" | grep >/dev/null -cF 'conversion source exactly like a `<style>` block' \
   || fail "$a's Input/Step 1 does not tell the agent that a linked stylesheet's rules are conversion source exactly like a \`<style>\` block's. Naming the file is not enough — it has to be read AS SOURCE, or the conversion covers only the rules wp-normalize happened to inline."
-printf '%s' "$fIn" | grep -qF 'licensed only once you have accounted for its rules' \
+printf '%s' "$fIn" | grep >/dev/null -cF 'licensed only once you have accounted for its rules' \
   || fail "$a's Input/Step 1 does not tie the MUST-remove licence to having accounted for the linked rules. Removal is only safe after the rules are absorbed; as an unconditional instruction it is a delete."
 
 # ...and that skip path must not be sold as making the RUN safe. See
@@ -671,14 +671,14 @@ no_rerun_safe "Step 2.6's detect/skip item" "$f26"
 # carry and /wp-finalize Layer 1 read. That is a degraded build, not a failing
 # one, which is exactly the kind of claim a check has to hold in place.
 # ---------------------------------------------------------------------------
-printf '%s' "$f3" | grep -qF 'A later `/wp-yolo` run is **not** a resume' \
+printf '%s' "$f3" | grep >/dev/null -cF 'A later `/wp-yolo` run is **not** a resume' \
   || fail "Step 3's abort branch does not state that a later /wp-yolo run is not a resume"
-printf '%s' "$f3" | grep -qF 'dispatches `wp-normalize` over the demo folder unconditionally' \
+printf '%s' "$f3" | grep >/dev/null -cF 'dispatches `wp-normalize` over the demo folder unconditionally' \
   || fail "Step 3's abort branch does not name the unconditional wp-normalize dispatch that makes a naive re-run degrade the manifest"
-printf '%s' "$f3" | grep -qF 'restore `demo/<slug>.html` from `demo/.original/<slug>.html` for every page first' \
+printf '%s' "$f3" | grep >/dev/null -cF 'restore `demo/<slug>.html` from `demo/.original/<slug>.html` for every page first' \
   || fail "Step 3's abort branch does not tell the operator to restore the plain-CSS originals before a fresh run"
 no_rerun_safe "Step 3's abort branch" "$f3"
-if printf '%s' "$f3" | grep -qF 'restore `demo/.original/<slug>.html` from `demo/<slug>.html`'; then
+if printf '%s' "$f3" | grep >/dev/null -cF 'restore `demo/.original/<slug>.html` from `demo/<slug>.html`'; then
   fail "Step 3's abort branch restores backwards — it would overwrite the pristine originals with the converted pages"
 fi
 
@@ -703,11 +703,11 @@ fi
 # second has to say what --resume does differently -- enters at Step 4, so it never
 # runs the Step 2 that regenerates the manifest -- because "use --resume" without
 # that is the same unexplained instruction --yolo used to be.
-printf '%s' "$f3" | grep -qF 'it is never `--yolo`' \
+printf '%s' "$f3" | grep >/dev/null -cF 'it is never `--yolo`' \
   || fail "Step 3's abort branch does not state plainly that a resume is never --yolo — without that sentence the operator is left to read --yolo as a second way to continue, and it re-runs wp-normalize and regenerates the manifest"
-printf '%s' "$f3" | grep -qF 'it enters at Step 4 with the manifest already on disk' \
+printf '%s' "$f3" | grep >/dev/null -cF 'it enters at Step 4 with the manifest already on disk' \
   || fail "Step 3's abort branch names --resume without saying why it is safe when --yolo is not: it enters at Step 4, so it never runs the Step 2 that regenerates the manifest. An operator told to use a flag but not told what it skips has been given the same unexplained instruction that made --yolo dangerous"
-printf '%s' "$f3" | grep -qF 'Step 2 still dispatches `wp-normalize` and still overwrites `demo/.yolo-manifest.json`' \
+printf '%s' "$f3" | grep >/dev/null -cF 'Step 2 still dispatches `wp-normalize` and still overwrites `demo/.yolo-manifest.json`' \
   || fail "Step 3's abort branch does not say what --yolo actually skips: it suppresses this checkpoint and nothing else, while Step 2 still dispatches wp-normalize and still overwrites demo/.yolo-manifest.json"
 
 # The offer itself, matched by direction. The window runs from a continue/resume
@@ -718,7 +718,7 @@ printf '%s' "$f3" | grep -qF 'Step 2 still dispatches `wp-normalize` and still o
 offers=$(printf '%s' "$f3" | grep -oEi '(^|[^a-zA-Z])(continue|continuing|resume|resuming|carry on|pick up)([^a-zA-Z])[^`]{0,80}`--yolo`' || true)
 while IFS= read -r offer; do
   [ -n "$offer" ] || continue
-  if printf '%s' "$offer" | grep -Eqi "$NEGATION"; then
+  if printf '%s' "$offer" | grep >/dev/null -Eci "$NEGATION"; then
     continue
   fi
   fail "Step 3's abort branch offers \`--yolo\` as a way to continue or resume the aborted build. It is not one: --yolo skips Step 3 only, Step 2 still dispatches wp-normalize and still regenerates demo/.yolo-manifest.json, so following the advice destroys the condition the advice is gated on. Tell the operator to restore from demo/.original/ and run fresh: $offer"
@@ -743,7 +743,7 @@ n=$(printf '%s\n' "$s4" | grep -c 'Template routing' || true)
 # to the wp-tailwind agent must appear at both sites.
 d=$(printf '%s' "$f4" | grep -oF 'is `tailwind`, `/wp-section` dispatches `wp-tailwind` in author mode instead of `wp-css`' | wc -l || true)
 [ "$d" -ge 2 ] || fail "found $d correctly-directed routing sentence(s) in Step 4, expected 2 — tailwind must be the value that gets the wp-tailwind agent"
-if printf '%s' "$f4" | grep -qF 'is `basic`, `/wp-section` dispatches `wp-tailwind`'; then
+if printf '%s' "$f4" | grep >/dev/null -cF 'is `basic`, `/wp-section` dispatches `wp-tailwind`'; then
   fail "a Step 4 routing note hands the Tailwind agent to template=basic"
 fi
 
@@ -753,7 +753,7 @@ fi
 # that does nothing.
 p=$(printf '%s' "$f4" | grep -oF 'reads `Template:` from `.claude/CLAUDE.md` itself' | wc -l || true)
 [ "$p" -ge 2 ] || fail "found $p note(s) saying /wp-section reads Template: itself, expected 2"
-if printf '%s' "$f4" | grep -qiF "Pass the project's \`Template:\` value"; then
+if printf '%s' "$f4" | grep >/dev/null -ciF "Pass the project's \`Template:\` value"; then
   fail "a Step 4 routing note still tells the caller to pass a Template: value /wp-section does not accept"
 fi
 
@@ -766,7 +766,7 @@ fi
 # gate that fails spuriously in CI gets muted, silencing all 30-odd assertions
 # in this file. Every pattern below is grep -F (byte-exact, locale-independent)
 # or an ERE containing the literal arrow bytes.
-printf '%s' "$f4" | grep -qF "\`basic\` → the section's verbatim demo \`cssRules\` from the manifest, which on this path is the source of truth" \
+printf '%s' "$f4" | grep >/dev/null -cF "\`basic\` → the section's verbatim demo \`cssRules\` from the manifest, which on this path is the source of truth" \
   || fail "Step 4 does not scope the manifest cssRules 'source of truth' claim to template=basic"
 
 # The tailwind --css source must be asserted BY PATH at both section-walk sites.
@@ -774,13 +774,13 @@ printf '%s' "$f4" | grep -qF "\`basic\` → the section's verbatim demo \`cssRul
 # re-pointing the source at the unconverted backup and survived deleting the
 # "never <backup>" clause outright — precisely the defect class this round
 # exists to eliminate.
-printf '%s' "$f4" | grep -qF '`tailwind` → the converted demo page itself, `demo/index.html`' \
+printf '%s' "$f4" | grep >/dev/null -cF '`tailwind` → the converted demo page itself, `demo/index.html`' \
   || fail "Step 4's home section walk does not point the tailwind --css source at the literal path demo/index.html"
-printf '%s' "$f4" | grep -qF "on \`tailwind\`, this page's converted demo file \`demo/<slug>.html\`" \
+printf '%s' "$f4" | grep >/dev/null -cF "on \`tailwind\`, this page's converted demo file \`demo/<slug>.html\`" \
   || fail "Step 4's inner-page section walk does not point the tailwind --css source at the literal path demo/<slug>.html"
-printf '%s' "$f4" | grep -qF 'never the backup at `demo/.original/<slug>.html`' \
+printf '%s' "$f4" | grep >/dev/null -cF 'never the backup at `demo/.original/<slug>.html`' \
   || fail "Step 4 does not exclude the demo/.original/ backup as a --css source"
-printf '%s' "$f4" | grep -qF 'stale on this path' \
+printf '%s' "$f4" | grep >/dev/null -cF 'stale on this path' \
   || fail "Step 4 does not state that the manifest cssRules are stale on the tailwind path"
 
 # File-wide negative: nowhere in wp-yolo may a --css source resolve to the
@@ -841,8 +841,8 @@ while IFS= read -r sent; do
   # -i: a designation verb at the head of a sentence is capitalised ("Set it to
   # the pristine copy in `demo/.original/<slug>.html`"), and the round-4 pattern
   # was case-sensitive, so exactly the sentence-initial re-point slipped through.
-  printf '%s' "$sent" | grep -Eqi "$src_pat" || continue
-  if printf '%s' "$sent" | grep -Eqi "$not_a_source"; then
+  printf '%s' "$sent" | grep >/dev/null -Eci "$src_pat" || continue
+  if printf '%s' "$sent" | grep >/dev/null -Eci "$not_a_source"; then
     continue
   fi
   fail "a --css source line in $f resolves to demo/.original/ — the unconverted backup, which is exactly the re-point this check exists to catch: $sent"
@@ -858,29 +858,29 @@ done <<< "$(sentences "$fall" 'demo/.original/')"
 # `tailwind` told to write a literal CSS declaration into the theme CSS — left
 # all three satisfied and printed PASS, with the file then instructing the
 # tailwind path to re-inject exactly the plain CSS Step 5.5 exists to keep out.
-printf '%s' "$f55" | grep -qF 'On `basic`, a repair is a literal CSS declaration' \
+printf '%s' "$f55" | grep >/dev/null -cF 'On `basic`, a repair is a literal CSS declaration' \
   || fail 'Step 5.5 does not bind the literal-CSS repair to `basic`: its template blockquote must say "On `basic`, a repair is a literal CSS declaration"'
-printf '%s' "$f55" | grep -qF 'On `tailwind`, a repair is expressed as **Tailwind utility classes' \
+printf '%s' "$f55" | grep >/dev/null -cF 'On `tailwind`, a repair is expressed as **Tailwind utility classes' \
   || fail 'Step 5.5 does not bind the tailwind repair to Tailwind utility classes: its template blockquote must say "On `tailwind`, a repair is expressed as **Tailwind utility classes"'
 # ...and each inversion banned by name, because the correct pair of lines can be
 # left in place while the wrong pair is added underneath it. A prohibition is
 # unaffected: negating either claim ("a repair is never a literal CSS
 # declaration") breaks the literal these two look for.
-if printf '%s' "$f55" | grep -qF 'On `tailwind`, a repair is a literal CSS declaration'; then
+if printf '%s' "$f55" | grep >/dev/null -cF 'On `tailwind`, a repair is a literal CSS declaration'; then
   fail "Step 5.5 tells the tailwind path that a repair is a literal CSS declaration written into the theme CSS — that re-injects the plain CSS this template exists to remove, which is the whole reason Step 5.5 branches"
 fi
-if printf '%s' "$f55" | grep -qF 'On `basic`, a repair is expressed as **Tailwind utility classes'; then
+if printf '%s' "$f55" | grep >/dev/null -cF 'On `basic`, a repair is expressed as **Tailwind utility classes'; then
   fail "Step 5.5 tells the basic path to repair with Tailwind utility classes — the basic theme has no Tailwind build, so the repair is inert and the parity finding never clears"
 fi
-printf '%s' "$f55" | grep -qF 'skills/wp-tailwind-system/SKILL.md' \
+printf '%s' "$f55" | grep >/dev/null -cF 'skills/wp-tailwind-system/SKILL.md' \
   || fail "Step 5.5's auto-fix has no tailwind branch citing the wp-tailwind-system decision ladder"
 # `-E` with an optional space after the hyphen rather than `-F`: re-wrapping the
 # blockquote so the break falls at this hyphen is an ordinary correct edit, and
 # `flat` rejoins the halves with a space, so the fixed string exited 1 on it.
 # Nothing else about the assertion changes.
-printf '%s' "$f55" | grep -Eqi 'step 2\.6- ?converted' \
+printf '%s' "$f55" | grep >/dev/null -Eci 'step 2\.6- ?converted' \
   || fail "Step 5.5's tailwind repair does not read from the Step 2.6-converted demo"
-printf '%s' "$f55" | grep -qiF 'never write a raw css declaration into a theme css file on the tailwind path' \
+printf '%s' "$f55" | grep >/dev/null -ciF 'never write a raw css declaration into a theme css file on the tailwind path' \
   || fail "Step 5.5 does not forbid writing a raw CSS declaration into theme CSS on the tailwind path"
 
 # ---------------------------------------------------------------------------
@@ -916,14 +916,14 @@ grep -qF 'demo/.original/<slug>.html' "$t" \
 # turning a scoped assertion back into a file-wide grep.
 s2t=$(awk '/^## Step 2:/,/^## Step 3:/' "$t")
 [ -n "$s2t" ] || fail "$t has no Step 2 read/validate region delimited by '## Step 3:'"
-printf '%s\n' "$s2t" | tail -1 | grep -q '^## Step 3:' \
+printf '%s\n' "$s2t" | tail -1 | grep >/dev/null -c '^## Step 3:' \
   || fail "$t's Step 2 region is not terminated by its '## Step 3:' heading — the validate assertions would silently become file-wide"
 f2t=$(flat "$s2t")
-printf '%s' "$f2t" | grep -qF '<link rel="stylesheet"' \
+printf '%s' "$f2t" | grep >/dev/null -cF '<link rel="stylesheet"' \
   || fail "$t's Step 2 validate list does not count a linked stylesheet as CSS to convert — it must agree with /wp-yolo Step 2.6, where a project-local <link rel=\"stylesheet\"> is plain-CSS evidence"
-printf '%s' "$f2t" | grep -qi 'positive evidence' \
+printf '%s' "$f2t" | grep >/dev/null -ci 'positive evidence' \
   || fail "$t's Step 2 validate list does not require positive evidence before calling a demo already Tailwind-native"
-if printf '%s' "$f2t" | grep -qF 'Does it contain `<style>` blocks or inline styles? (If not, it may already be Tailwind-native'; then
+if printf '%s' "$f2t" | grep >/dev/null -cF 'Does it contain `<style>` blocks or inline styles? (If not, it may already be Tailwind-native'; then
   fail "$t's Step 2 validate list is back to the original heuristic — absence of inline CSS is not proof of Tailwind-nativeness"
 fi
 
@@ -955,23 +955,23 @@ ft=$(flat "$(cat "$t")")
 ftl=$(printf '%s' "$ft" | tr 'A-Z' 'a-z')
 while IFS= read -r sent; do
   [ -n "$sent" ] || continue
-  printf '%s' "$sent" | grep -Eq 'alread|declar|decid|treat|consider|deem|assume|judg|call(s|ed)? (it|the page|the demo)' || continue
-  if printf '%s' "$sent" | grep -Eq 'utilit|stylesheet|evidence'; then
+  printf '%s' "$sent" | grep >/dev/null -Ec 'alread|declar|decid|treat|consider|deem|assume|judg|call(s|ed)? (it|the page|the demo)' || continue
+  if printf '%s' "$sent" | grep >/dev/null -Ec 'utilit|stylesheet|evidence'; then
     continue
   fi
   fail "$t decides Tailwind-nativeness without naming the evidence it rests on. Absence of a <style> block is not evidence: a plain-CSS demo with an external stylesheet has none either, which is what made Step 2.6 skip the conversion on every page. Say what the page must positively carry: $sent"
 done <<< "$(sentences "$ftl" 'tailwind-native')"
-printf '%s' "$ft" | grep -qF 'writes the converted HTML to a temporary path (`<output-path>.tmp`)' \
+printf '%s' "$ft" | grep >/dev/null -cF 'writes the converted HTML to a temporary path (`<output-path>.tmp`)' \
   || fail "$t does not require the agent to write to a temporary path (\`<output-path>.tmp\`) instead of the output path"
-printf '%s' "$ft" | grep -qF "moves it over the output path **only after** Step 4's verification passes" \
+printf '%s' "$ft" | grep >/dev/null -cF "moves it over the output path **only after** Step 4's verification passes" \
   || fail "$t does not require the temporary file to be moved over the output path only after Step 4's verification passes"
-printf '%s' "$ft" | grep -qF 'If verification fails, discard the temporary file and leave the output path exactly as it was' \
+printf '%s' "$ft" | grep >/dev/null -cF 'If verification fails, discard the temporary file and leave the output path exactly as it was' \
   || fail "$t does not discard the temporary file and leave the output path untouched when verification fails"
 # Direction: moving first and verifying after is the truncating write itself.
-if printf '%s' "$ft" | grep -Eq "moves it over the output path (\*\*)?(before|regardless of|and then|first)"; then
+if printf '%s' "$ft" | grep >/dev/null -Ec "moves it over the output path (\*\*)?(before|regardless of|and then|first)"; then
   fail "$t moves the temporary file into place before Step 4's verification — that is the destructive in-place write the temp path exists to prevent"
 fi
-printf '%s' "$ft" | grep -qF 'Only if 2, 3, 4 and 5 all hold' \
+printf '%s' "$ft" | grep >/dev/null -cF 'Only if 2, 3, 4 and 5 all hold' \
   || fail "$t's Step 4 does not make the move conditional on structure checks and the rendering gate"
 
 # ---------------------------------------------------------------------------
@@ -985,19 +985,19 @@ printf '%s' "$ft" | grep -qF 'Only if 2, 3, 4 and 5 all hold' \
 # ---------------------------------------------------------------------------
 s4t=$(awk '/^## Step 4:/,/^## Step 5:/' "$t")
 [ -n "$s4t" ] || fail "$t has no Step 4 verify-output region delimited by '## Step 5:'"
-printf '%s\n' "$s4t" | tail -1 | grep -q '^## Step 5:' \
+printf '%s\n' "$s4t" | tail -1 | grep >/dev/null -c '^## Step 5:' \
   || fail "$t's Step 4 region is not terminated by a '## Step 5:' heading — the verification-list assertions would silently become file-wide"
 f4t=$(flat "$s4t")
-printf '%s' "$f4t" | grep -qF 'Verify no project-local stylesheet `<link>` remains' \
+printf '%s' "$f4t" | grep >/dev/null -cF 'Verify no project-local stylesheet `<link>` remains' \
   || fail "$t's Step 4 does not verify that the project stylesheet <link> is gone from the converted page. The agent is required to delete it, so nothing else can catch a conversion that deleted it without absorbing its rules — and a conversion that left it behind produces a page /wp-yolo Step 2.6 correctly judges not Tailwind-native, which it then re-converts forever."
 
 # Step 4 item 4's FAILURE branch, gated in its own direction. Flipping "discard
 # it, leave the output path untouched" to "move it anyway and report a partial
 # success" reinstates exactly the destructive write the temp path exists to
 # prevent, and used to leave the suite green.
-printf '%s' "$ft" | grep -qF 'discard it, leave the output path untouched, and report the conversion as failed — never a partial success' \
+printf '%s' "$ft" | grep >/dev/null -cF 'discard it, leave the output path untouched, and report the conversion as failed — never a partial success' \
   || fail "$t's Step 4 item 4 does not discard the temporary file, leave the output path untouched and report a failed conversion when verification fails"
-if printf '%s' "$ft" | grep -Eq 'move (it|the temporary file) (anyway|regardless|and report)|partial success is|report (it |the conversion )?as a partial success'; then
+if printf '%s' "$ft" | grep >/dev/null -Ec 'move (it|the temporary file) (anyway|regardless|and report)|partial success is|report (it |the conversion )?as a partial success'; then
   fail "$t's Step 4 item 4 moves the unverified temporary file into place and/or reports a partial success — a failed verification must leave the output path exactly as it was"
 fi
 
@@ -1019,17 +1019,17 @@ fi
 # ---------------------------------------------------------------------------
 s3t=$(awk '/^## Step 3:/,/^## Step 4:/' "$t")
 [ -n "$s3t" ] || fail "$t has no Step 3 dispatch region delimited by '## Step 4:'"
-printf '%s\n' "$s3t" | tail -1 | grep -q '^## Step 4:' \
+printf '%s\n' "$s3t" | tail -1 | grep >/dev/null -c '^## Step 4:' \
   || fail "$t's Step 3 dispatch region is not terminated by its '## Step 4:' heading — the dispatch-context assertions would silently become file-wide"
 f3t=$(flat "$s3t")
 
-printf '%s' "$f3t" | grep -qF '**What the agent writes: `<output-path>.tmp`, never `<output-path>` itself.**' \
+printf '%s' "$f3t" | grep >/dev/null -cF '**What the agent writes: `<output-path>.tmp`, never `<output-path>` itself.**' \
   || fail "$t's Step 3 dispatch context does not tell the agent, in the bullets it hands over, to write \`<output-path>.tmp\` and never \`<output-path>\` itself"
-printf '%s' "$f3t" | grep -qF 'The agent writes `<output-path>.tmp` and stops there. It does not move, rename or delete `<output-path>`' \
+printf '%s' "$f3t" | grep >/dev/null -cF 'The agent writes `<output-path>.tmp` and stops there. It does not move, rename or delete `<output-path>`' \
   || fail "$t's Step 3 dispatch context does not stop the agent after the temporary write — the move belongs to the command, which is the only actor that can condition it on Step 4"
-printf '%s' "$f3t" | grep -qF "this command owns Step 4's verification and owns the move" \
+printf '%s' "$f3t" | grep >/dev/null -cF "this command owns Step 4's verification and owns the move" \
   || fail "$t's Step 3 dispatch context does not give Step 4's verification and the move to the command"
-printf '%s' "$f3t" | grep -qF '**This command**, not the agent, moves it over the output path' \
+printf '%s' "$f3t" | grep >/dev/null -cF '**This command**, not the agent, moves it over the output path' \
   || fail "$t names the agent, not the command, as the actor that moves the temporary file — Step 4 runs after the agent returns, so the agent cannot condition on it"
 
 # The stale sentence that contradicted all of the above.
@@ -1056,12 +1056,12 @@ if [ -n "$own_input" ]; then
 fi
 # Direction: no instruction in the dispatch context may name the output path as
 # the thing the agent writes.
-if printf '%s' "$f3t" | grep -Eq 'writes? (straight|directly) to|overwriting whatever is there|writes? (the converted HTML |it )?to `<output-path>`([^.]|$)'; then
+if printf '%s' "$f3t" | grep >/dev/null -Ec 'writes? (straight|directly) to|overwriting whatever is there|writes? (the converted HTML |it )?to `<output-path>`([^.]|$)'; then
   fail "$t's Step 3 dispatch context tells the agent to write the output path directly — it must write \`<output-path>.tmp\` and stop"
 fi
 # Every write instruction in the dispatch context that names <output-path> must
 # name the .tmp form.
-if printf '%s' "$f3t" | grep -oE 'writes?[^.`]{0,20}`<output-path>[^`]*`' | grep -qv '<output-path>\.tmp'; then
+if printf '%s' "$f3t" | grep -oE 'writes?[^.`]{0,20}`<output-path>[^`]*`' | grep >/dev/null -cv '<output-path>\.tmp'; then
   fail "$t's Step 3 dispatch context has a write instruction that names \`<output-path>\` rather than \`<output-path>.tmp\`"
 fi
 
@@ -1105,7 +1105,7 @@ f5tl=$(printf '%s' "$f5t" | tr 'A-Z' 'a-z')
 # statement deleted from the text the user actually sees. Proven, not assumed.
 rep5=$(printf '%s\n' "$s5t" | awk '/^```/{n++; next} n==1')
 [ -n "$rep5" ] || fail "$t's Step 5 has no fenced report block"
-printf '%s' "$rep5" | grep -qi 'unstyled' \
+printf '%s' "$rep5" | grep >/dev/null -ci 'unstyled' \
   || fail "$t's Step 5 report does not tell the user the converted demo renders UNSTYLED. Conversion strips the demo's <style> blocks and its stylesheet <link> and adds no replacement, so the page has no CSS at all until the theme's Tailwind build compiles it — and a report that omits that reads as a failed conversion."
 # ...and it must not send them to a browser to look at it. Negation-aware: the
 # file's own way of stating the rule is "Do not tell the user to open it in a
@@ -1121,17 +1121,17 @@ fi
 # first move PROMPTED and moved nothing, leaving three unconverted pages and
 # three orphan .tmp files while the loop reported success for every one of them.
 # ---------------------------------------------------------------------------
-printf '%s' "$f4t" | grep -qF '\mv -f' \
+printf '%s' "$f4t" | grep >/dev/null -cF '\mv -f' \
   || fail "$t's Step 4 does not specify \`\\mv -f\` for the move. A bare \`mv\` hits the interactive \`mv -i\` alias, prompts, moves nothing and still exits 0 — the demo folder then reports three converted pages that were never touched."
-printf '%s' "$f4t" | grep -Eqi 'post-condition' \
+printf '%s' "$f4t" | grep >/dev/null -Eci 'post-condition' \
   || fail "$t's Step 4 gives the move no post-condition. A no-op move must not be able to read as a success."
-printf '%s' "$f4t" | grep -Eqi '\.tmp[^.]{0,60}(no longer exists|is gone|does not exist)' \
+printf '%s' "$f4t" | grep >/dev/null -Eci '\.tmp[^.]{0,60}(no longer exists|is gone|does not exist)' \
   || fail "$t's Step 4 post-condition does not require the temporary file to be GONE after the move — that is the one observation that separates a real move from a prompt nobody answered."
 # `still[^.]{0,24}` rather than `still (on disk|...)`: "should the .tmp still be
 # present on disk" is an ordinary rewrite of "if the .tmp is still on disk", and
 # the tighter form exited 1 on it. The consequence half is what the assertion is
 # actually about, and it is unchanged.
-printf '%s' "$f4t" | grep -Eqi 'still[^.]{0,24}(on disk|there|present|exist)[^.]{0,120}(did not happen|failed|not converted)' \
+printf '%s' "$f4t" | grep >/dev/null -Eci 'still[^.]{0,24}(on disk|there|present|exist)[^.]{0,120}(did not happen|failed|not converted)' \
   || fail "$t's Step 4 does not say what a surviving .tmp means: the move did not happen and the page is a failure, not a conversion."
 
 # ---------------------------------------------------------------------------
@@ -1141,13 +1141,13 @@ printf '%s' "$f4t" | grep -Eqi 'still[^.]{0,24}(on disk|there|present|exist)[^.]
 # the branch is fine; presenting a no-op as the safety net is not, because it
 # hides that the real guarantee lives in the temp-then-move mechanism.
 # ---------------------------------------------------------------------------
-printf '%s' "$f26" | grep -Eqi 'nothing to restore' \
+printf '%s' "$f26" | grep >/dev/null -Eci 'nothing to restore' \
   || fail "Step 2.6 still presents the restore as the recovery path for a failed conversion. /wp-tailwindify moves the temporary file only after its own verification passes, so a failed page never reaches demo/<slug>.html: normally there is nothing to restore, and the step has to say so or the mechanism that actually protects the page goes undocumented."
-printf '%s' "$f26" | grep -Eqi 'belt[- ]and[- ]braces' \
+printf '%s' "$f26" | grep >/dev/null -Eci 'belt[- ]and[- ]braces' \
   || fail "Step 2.6 does not mark the restore as the belt-and-braces check it is — see the 'nothing to restore' assertion above."
-printf '%s' "$f26" | grep -Eqi 'compare `demo/<slug>\.html`' \
+printf '%s' "$f26" | grep >/dev/null -Eci 'compare `demo/<slug>\.html`' \
   || fail "Step 2.6's restore is unconditional. It must be conditioned on the invariant it backs up: compare demo/<slug>.html with the backup after a reported failure, restore only when they differ (something outside the contract wrote that path)."
-printf '%s' "$f26" | grep -Eqi 'identical' \
+printf '%s' "$f26" | grep >/dev/null -Eci 'identical' \
   || fail "Step 2.6 does not say what an identical comparison means — the contract held, report the page unconverted and touch nothing."
 
 # ---------------------------------------------------------------------------
@@ -1160,7 +1160,7 @@ printf '%s' "$f26" | grep -Eqi 'identical' \
 # ---------------------------------------------------------------------------
 s45=$(awk '/^## Step 4\.5/,/^## Step 5:/' "$f")
 [ -n "$s45" ] || fail "wp-yolo has no Step 4.5 font-carry region"
-printf '%s\n' "$s45" | tail -1 | grep -q '^## Step 5:' \
+printf '%s\n' "$s45" | tail -1 | grep >/dev/null -c '^## Step 5:' \
   || fail "the Step 4.5 region is not terminated by a '## Step 5:' heading — the font-carry assertions would silently become file-wide"
 f45=$(flat "$s45")
 
@@ -1170,13 +1170,13 @@ b45_ba=$(bullet "$s45" '`basic` →') \
   || fail "Step 4.5 has no \`basic\` branch — the original enqueue behaviour has to survive the split."
 fb_tw=$(flat "$b45_tw")
 fb_ba=$(flat "$b45_ba")
-printf '%s' "$fb_tw" | grep -qF 'base/fonts.css' \
+printf '%s' "$fb_tw" | grep >/dev/null -cF 'base/fonts.css' \
   || fail "Step 4.5's \`tailwind\` branch does not route the @font-face rule to assets/css/src/tailwindcss/base/fonts.css — the skill's file layout gives \`base\` the resets-and-font-face role, and it is the only sanctioned home for the rule on this path: [$fb_tw]"
-printf '%s' "$fb_tw" | grep -Eqi 'enqueue nothing|exactly one enqueue|no second enqueue|only enqueue' \
+printf '%s' "$fb_tw" | grep >/dev/null -Eci 'enqueue nothing|exactly one enqueue|no second enqueue|only enqueue' \
   || fail "Step 4.5's \`tailwind\` branch does not forbid a second enqueue. /wp-tailwind-migrate Step 5 says leave exactly one enqueue; a fonts stylesheet beside assets/css/dist/main.css is the regression this template exists to remove: [$fb_tw]"
-printf '%s' "$fb_ba" | grep -Eqi 'enqueue' \
+printf '%s' "$fb_ba" | grep >/dev/null -Eci 'enqueue' \
   || fail "Step 4.5's \`basic\` branch no longer enqueues the font stylesheet — the basic theme has no Tailwind build, so nothing else would load the @font-face rule: [$fb_ba]"
-if printf '%s' "$fb_ba" | grep -qF 'base/fonts.css'; then
+if printf '%s' "$fb_ba" | grep >/dev/null -cF 'base/fonts.css'; then
   fail "Step 4.5's \`basic\` branch writes into the Tailwind source tree. The two branches are swapped: [$fb_ba]"
 fi
 
@@ -1185,15 +1185,15 @@ fi
 # for it — and a re-emitted @font-face pointing at a missing file fails silently
 # under font-display: swap, so the theme renders the fallback stack with nothing
 # logged to say why.
-printf '%s' "$f45" | grep -Eqi 'not found in the demo folder|genuinely absent|not there|is missing' \
+printf '%s' "$f45" | grep >/dev/null -Eci 'not found in the demo folder|genuinely absent|not there|is missing' \
   || fail "Step 4.5 has no branch for a @font-face whose woff2 is not in the demo folder. The rehearsal demo declares assets/fonts/marcellus.woff2 and does not ship it; without a branch the step copies nothing and carries on."
 # Widened after a proven false-fail: "never re-emit" and "leave that family's rule
 # out altogether" are ordinary rewrites of "do **not** re-emit" / "skip that
 # family", and the first form of this needle exited 1 on both. The bold markers
 # survive `flat`, hence the optional asterisks.
-printf '%s' "$f45" | grep -Eqi '(not|never)\*{0,2},? ?re-emit|(skip|omit) (that|the) family|leave (that|the) family[^.]{0,40}out' \
+printf '%s' "$f45" | grep >/dev/null -Eci '(not|never)\*{0,2},? ?re-emit|(skip|omit) (that|the) family|leave (that|the) family[^.]{0,40}out' \
   || fail "Step 4.5's missing-source branch does not stop the @font-face rule being re-emitted anyway. A rule pointing at a file the theme does not have fails silently — with font-display: swap the page renders the fallback stack and nothing anywhere says why."
-printf '%s' "$f45" | grep -Eqi 'review list' \
+printf '%s' "$f45" | grep >/dev/null -Eci 'review list' \
   || fail "Step 4.5's missing-source branch does not surface the missing font to the operator. A silent fallback is exactly what the Review list exists for."
 
 # Step 5.5's prohibition ("Never write a raw CSS declaration into a theme CSS
@@ -1202,18 +1202,18 @@ printf '%s' "$f45" | grep -Eqi 'review list' \
 # @font-face is a raw declaration block with no utility and no @apply form — it
 # is rung 4 of the ladder — so it has to be carved out by name, and the carve-out
 # has to stay closed at one.
-printf '%s' "$f55" | grep -qF '@font-face' \
+printf '%s' "$f55" | grep >/dev/null -cF '@font-face' \
   || fail "Step 5.5 orders a raw @font-face re-emission four lines under a blanket ban on raw CSS declarations, and never reconciles them. Carve @font-face out by name."
 # Both needles accept the synonyms a careful author reaches for. "@font-face is
 # the single exception" is the same claim as "the one carve-out", and the
 # carve-out-only form exited 1 on it — the false-fail class this file exists to
 # stay clear of. The direction is still gated: a widened licence has to say
 # something, and the raw-CSS permission scan below catches what these two do not.
-printf '%s' "$f55" | grep -Eqi 'carve[- ]?out|(one|single|sole|only) exception' \
+printf '%s' "$f55" | grep >/dev/null -Eci 'carve[- ]?out|(one|single|sole|only) exception' \
   || fail "Step 5.5 does not mark @font-face as a carve-out from the raw-CSS prohibition — see the assertion above."
-printf '%s' "$f55" | grep -qF 'base/fonts.css' \
+printf '%s' "$f55" | grep >/dev/null -cF 'base/fonts.css' \
   || fail "Step 5.5's @font-face carve-out does not say where the rule goes on the tailwind path: assets/css/src/tailwindcss/base/fonts.css, the same place Step 4.5 puts it."
-printf '%s' "$f55" | grep -Eqi 'the only one|only carve[- ]?out|no other (repair|rule|exception)|nothing else may|and only (that|this) one' \
+printf '%s' "$f55" | grep >/dev/null -Eci 'the only one|only carve[- ]?out|no other (repair|rule|exception)|nothing else may|and only (that|this) one' \
   || fail "Step 5.5's carve-out is open-ended. One exception with a reason is a carve-out; an exception with no boundary is the prohibition repealed."
 # ...and nothing else in Step 5.5 may license raw CSS. A sentence that permits it
 # without naming @font-face reopens the door the carve-out just closed.
@@ -1243,15 +1243,15 @@ fi
 # Both halves are gated: the dispatch context (the only thing the agent's Demo
 # Conversion Mode actually reads) and the skill section it points at.
 # ---------------------------------------------------------------------------
-printf '%s' "$fkl" | grep -qF 'preflight' \
+printf '%s' "$fkl" | grep >/dev/null -cF 'preflight' \
   || fail "$k never mentions Preflight. Compiled Tailwind replaces the browser's default stylesheet, so a theme whose every declaration was translated correctly still does not render like the demo."
 for pf in 'max-width:100%' 'display:block' 'underline' 'button'; do
-  printf '%s' "$fkl" | grep -qiF "$pf" \
+  printf '%s' "$fkl" | grep >/dev/null -ciF "$pf" \
     || fail "$k's Preflight material does not name '$pf'. The measured moves are the whole content: <button> font, <img> display and max-width, <p>/heading margins, and the bare <a> underline."
 done
-printf '%s' "$fkl" | grep -Eqi 're-add|add (it|them) back|restore (it|the value)' \
+printf '%s' "$fkl" | grep >/dev/null -Eci 're-add|add (it|them) back|restore (it|the value)' \
   || fail "$k says Preflight changes the baseline but never says what to do about it: re-add the UA value the demo relied on as a utility ON the element."
-printf '%s' "$f3t" | grep -qi 'preflight' \
+printf '%s' "$f3t" | grep >/dev/null -ci 'preflight' \
   || fail "$t's Step 3 dispatch context never warns the conversion agent about Preflight. agents/wp-tailwind.md reads the wp-tailwind-system skill only in Section Authoring Mode, so Demo Conversion Mode learns this from the dispatch context or not at all."
 # Naming Preflight is not enough, and this was proven: replacing the whole bullet
 # with "- **Notes.**" left the word alive in the cross-reference that follows it
@@ -1259,10 +1259,10 @@ printf '%s' "$f3t" | grep -qi 'preflight' \
 # warning gone. The dispatch context has to carry what Preflight MOVES, because
 # Demo Conversion Mode reads no skill unless it is told to.
 for pf in 'max-width:100%' 'underline' 'display:block'; do
-  printf '%s' "$f3t" | grep -qiF "$pf" \
+  printf '%s' "$f3t" | grep >/dev/null -ciF "$pf" \
     || fail "$t's Step 3 dispatch context names Preflight but not what it moves ('$pf'). The measured list is <button> font, <img> display and max-width, <p>/heading margins and the bare <a> underline."
 done
-printf '%s' "$f3t" | grep -qF 'skills/wp-tailwind-system/SKILL.md' \
+printf '%s' "$f3t" | grep >/dev/null -cF 'skills/wp-tailwind-system/SKILL.md' \
   || fail "$t's Step 3 dispatch context does not point the conversion agent at the wp-tailwind-system skill, which is where the measured Preflight list and the v4 rules live."
 # Direction. Negation-aware, because the correct text says Preflight is NOT the
 # browser's default stylesheet and that a faithful conversion does NOT render the
@@ -1279,17 +1279,17 @@ fi
 # <a> came out rgb(28,28,28) instead of rgb(11,107,90). The rule and its test
 # both have to be written down.
 # ---------------------------------------------------------------------------
-printf '%s' "$fkl" | grep -Eqi 'bare (element )?selector' \
+printf '%s' "$fkl" | grep >/dev/null -Eci 'bare (element )?selector' \
   || fail "$k says nothing about bare element selectors (a {}, h1,h2,h3 {}, body {}, *,*::before,*::after {}). They carry real declarations and have no class to convert, so an agent with no rule either drops them or invents one."
-printf '%s' "$fkl" | grep -Eqi 'distribut' \
+printf '%s' "$fkl" | grep >/dev/null -Eci 'distribut' \
   || fail "$k does not give the default answer for a bare selector: distribute its declarations, as utilities, onto every element the selector actually reaches."
-printf '%s' "$fkl" | grep -Eqi 'dead only (when|if)' \
+printf '%s' "$fkl" | grep >/dev/null -Eci 'dead only (when|if)' \
   || fail "$k does not state the deadness test as a CONDITION. 'Every <a> has a class' is the reasoning that dropped the brand link colour in the rehearsal; the rule is that a bare selector is dead only when every element it matches already carries a class setting the same property."
-printf '%s' "$fkl" | grep -Eqi 'check the elements, not the stylesheet|read (each|every) `?class`? attribute|enumerate the matches' \
+printf '%s' "$fkl" | grep >/dev/null -Eci 'check the elements, not the stylesheet|read (each|every) `?class`? attribute|enumerate the matches' \
   || fail "$k does not say HOW to test a bare selector for deadness — the check is over the elements in the markup, not over the stylesheet."
-printf '%s' "$f3t" | grep -Eqi 'bare (element )?selector' \
+printf '%s' "$f3t" | grep >/dev/null -Eci 'bare (element )?selector' \
   || fail "$t's Step 3 dispatch context does not tell the conversion agent what to do with a bare element selector, and its Demo Conversion Mode reads no skill."
-printf '%s' "$f3t" | grep -Eqi 'dead only (when|if)' \
+printf '%s' "$f3t" | grep >/dev/null -Eci 'dead only (when|if)' \
   || fail "$t's Step 3 dispatch context gives no deadness test for a bare element selector — see the $k assertion above for what the missing test cost."
 
 # ---------------------------------------------------------------------------
@@ -1298,26 +1298,26 @@ printf '%s' "$f3t" | grep -Eqi 'dead only (when|if)' \
 # #d1d5db, while gray-200 is exact — so "no match → use Tailwind's built-in
 # colour scale" is right sometimes and off-by-one others with no way to tell.
 # ---------------------------------------------------------------------------
-printf '%s' "$fkl" | grep -Eqi '(^|[^a-z0-9])v4([^a-z0-9]|$)|tailwind 4|\^?4\.1' \
+printf '%s' "$fkl" | grep >/dev/null -Eci '(^|[^a-z0-9])v4([^a-z0-9]|$)|tailwind 4|\^?4\.1' \
   || fail "$k never names the Tailwind version. v3 and v4 disagree on utility names and on palette values, and the starter installs ^4.1."
-printf '%s' "$fkl" | grep -qF 'bg-linear-to-r' \
+printf '%s' "$fkl" | grep >/dev/null -cF 'bg-linear-to-r' \
   || fail "$k does not name the v4 gradient utility \`bg-linear-to-r\`. A v3-trained agent writes \`bg-gradient-to-r\`, which compiles to nothing in v4."
-printf '%s' "$fkl" | grep -qF 'oklch' \
+printf '%s' "$fkl" | grep >/dev/null -cF 'oklch' \
   || fail "$k does not say the built-in palette is OKLCH — that is why v4's gray-300 (#d1d5dc) is not the #d1d5db a demo declared."
-printf '%s' "$fkl" | grep -qF 'oklab' \
+printf '%s' "$fkl" | grep >/dev/null -cF 'oklab' \
   || fail "$k does not say gradients interpolate in OKLab. A converted linear-gradient compiles to oklab() stops with a different midpoint than the demo's sRGB ramp; an agent that does not know this chases the difference with extra stops."
-printf '%s' "$fkl" | grep -Eqi 'exact match or arbitrary|byte for byte' \
+printf '%s' "$fkl" | grep >/dev/null -Eci 'exact match or arbitrary|byte for byte' \
   || fail "$k gives no tolerance rule for a colour that is close to a scale value but not equal to it. The rule has to be decidable: exact match or arbitrary value."
-printf '%s' "$f3t" | grep -qF 'bg-linear-to-r' \
+printf '%s' "$f3t" | grep >/dev/null -cF 'bg-linear-to-r' \
   || fail "$t's Step 3 dispatch context does not name the v4 gradient utility for the conversion agent."
-printf '%s' "$f3t" | grep -Eqi 'exact match or arbitrary|byte for byte' \
+printf '%s' "$f3t" | grep >/dev/null -Eci 'exact match or arbitrary|byte for byte' \
   || fail "$t's Step 3 dispatch context gives the conversion agent no colour tolerance rule, so \"no match → use the built-in scale\" silently shifts the demo's declared value."
 # A v3 name may be MENTIONED, never recommended: every sentence naming it has to
 # mark it as v3 or reject it. A negative-only scan — zero iterations means the
 # name is absent, which is also fine.
 while IFS= read -r sent; do
   [ -n "$sent" ] || continue
-  if printf '%s' "$sent" | grep -Eqi 'v3|not |never|instead of|rather than'; then continue; fi
+  if printf '%s' "$sent" | grep >/dev/null -Eci 'v3|not |never|instead of|rather than'; then continue; fi
   fail "$k names \`bg-gradient-to-r\` without marking it as the v3 form: $sent"
 done <<< "$(sentences "$fkl" 'bg-gradient-to-r')"
 
@@ -1331,26 +1331,26 @@ s1=$(awk '/^## Step 1/,/^## Step 2:/' "$f")
 s5=$(awk '/^## Step 5:/,/^## Step 5\.5/' "$f")
 [ -n "$s1" ] || fail "wp-yolo has no Step 1 region delimited by Step 2"
 [ -n "$s5" ] || fail "wp-yolo has no Step 5 region delimited by Step 5.5"
-printf '%s\n' "$s1" | tail -1 | grep -q '^## Step 2:' \
+printf '%s\n' "$s1" | tail -1 | grep >/dev/null -c '^## Step 2:' \
   || fail "the Step 1 region is not terminated by a '## Step 2:' heading — the cinematic-refusal assertions would silently become file-wide"
-printf '%s\n' "$s5" | tail -1 | grep -q '^## Step 5\.5' \
+printf '%s\n' "$s5" | tail -1 | grep >/dev/null -c '^## Step 5\.5' \
   || fail "the Step 5 region is not terminated by a '## Step 5.5' heading — the seed assertions would silently become file-wide"
 f1=$(flat "$s1"); f5=$(flat "$s5")
 
 # Cinematic must be named AND refused — a mention is not a stop. Falling
 # through drives the section walk on a reel project and wp-css writes
 # assets/css/styles.css into a theme that has its own cinematic.css.
-printf '%s' "$f1" | grep -qF '`Template:` is `cinematic`' \
+printf '%s' "$f1" | grep >/dev/null -cF '`Template:` is `cinematic`' \
   || fail "Step 1 never names the cinematic template — a reel project runs the section walk and wp-css writes assets/css/styles.css into a theme that has its own cinematic.css"
-printf '%s' "$f1" | grep -qF 'exit without dispatching anything' \
+printf '%s' "$f1" | grep >/dev/null -cF 'exit without dispatching anything' \
   || fail "Step 1 names cinematic but never refuses it — a mention is not a stop, and falling through drives the section walk on a reel project"
 
 # The seed's language shape is the strategy's, not the suffix model's. Stating
 # 'primary language only' unconditionally told a polylang run to skip the
 # counterpart pages /wp-seed exists to build on that strategy.
-printf '%s' "$f5" | grep -qF 'under `suffix` it fills the primary language' \
+printf '%s' "$f5" | grep >/dev/null -cF 'under `suffix` it fills the primary language' \
   || fail "Step 5 item 1 does not scope primary-language seeding to the suffix strategy — the sentence is the suffix model's and a polylang run reading it skips the counterpart pages its strategy requires"
-printf '%s' "$f5" | grep -qF 'under `polylang` it builds a counterpart page per language' \
+printf '%s' "$f5" | grep >/dev/null -cF 'under `polylang` it builds a counterpart page per language' \
   || fail "Step 5 item 1 never says what /wp-seed does under polylang — seeding without the counterpart pages leaves every secondary language empty and /wp-polylang to rebuild them from nothing"
 
 echo PASS

@@ -76,7 +76,7 @@ node -e "const p=JSON.parse(process.argv[1]).peak; if(p>4){console.log('peak '+p
 [ "$(q /nohead/ verdict)" = ok ] && [ "$(q /nohead/ status)" = 206 ] || fail "HEAD 405 did not fall back to a ranged GET"
 [ "$(q /challenge-header/ verdict)" = unmeasured ] || fail "cf-mitigated challenge not UNMEASURED"
 [ "$(q /challenge-body/ verdict)" = unmeasured ] || fail "challenge-platform body not UNMEASURED"
-q /challenge-body/ reason | grep -q 'CDN bot challenge' || fail "challenge reason missing"
+q /challenge-body/ reason | grep >/dev/null -c 'CDN bot challenge' || fail "challenge reason missing"
 [ "$(q /forbidden/ verdict)" = broken ] || fail "a plain 403 was treated as a challenge"
 [ "$(q prod.example.com/ok/ verdict)" = unmeasured ] || fail "clone-origin link was requested without --follow-clone-origin"
 [ "$(q '#' verdict)" = fragment ] || fail "fragment-only href not reported as fragment"
