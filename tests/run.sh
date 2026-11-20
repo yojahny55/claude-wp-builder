@@ -32,6 +32,7 @@
 # skip path, exit 0 and be counted as a pass. See the skip_here note in ci.yml.
 set -uo pipefail
 
+caller=$PWD
 cd "$(dirname "$0")/.." || exit 1
 
 jobs_n=$(nproc 2>/dev/null || echo 2)
@@ -39,13 +40,17 @@ exclude=""
 files=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    -j) jobs_n=${2:?-j needs a number}; shift 2 ;;
+    -j) [ "$#" -ge 2 ] || { printf 'run.sh: -j needs a number\n' >&2; exit 2; }
+        jobs_n=$2; shift 2 ;;
     -j*) jobs_n=${1#-j}; shift ;;
     --exclude) exclude=${2-}; shift 2 ;;
     --exclude=*) exclude=${1#--exclude=}; shift ;;
     -h|--help) sed -n '2,8p' "$0"; exit 0 ;;
     -*) printf 'run.sh: unknown option %s\n' "$1" >&2; exit 2 ;;
-    *) files+=("$1"); shift ;;
+    # A check path is read the way the caller typed it: relative to where they stand,
+    # falling back to the repository root so `tests/checks/x.sh` works from either.
+    /*) files+=("$1"); shift ;;
+    *) if [ -e "$caller/$1" ]; then files+=("$caller/$1"); else files+=("$1"); fi; shift ;;
   esac
 done
 case "$jobs_n" in ''|*[!0-9]*|0) printf 'run.sh: -j needs a positive number\n' >&2; exit 2 ;; esac
@@ -89,7 +94,12 @@ for i in "${!selected[@]}"; do
   ms=$(cat "$work/$i.ms" 2>/dev/null || echo 0)
   if [ "$rc" -ne 0 ]; then
     failed+=("$i")
-  elif grep -Eq '^SKIP|NOT exercised' "$work/$i.out"; then
+  # Checks announce a skip in more than one spelling: "SKIP: ...", "PASS (SKIP: ...)",
+  # "browser half SKIPPED", "... NOT exercised", "PASS (static only: no node)". Any of
+  # them as a whole word means part of the check did not run. SKIP must stand alone, so
+  # an identifier such as SKIP_COUNT in a check that did measure is not read as a skip.
+  elif grep -Eq '(^|[^A-Za-z0-9_])SKIP(PED)?([^A-Za-z0-9_]|$)' "$work/$i.out" \
+       || grep -Eqi 'not exercised|static only' "$work/$i.out"; then
     skipped+=("$i")
   else
     pass=$((pass + 1))

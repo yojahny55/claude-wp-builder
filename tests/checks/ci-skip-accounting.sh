@@ -30,13 +30,13 @@ grep -Fq "PASS=%d SKIP=%d FAIL=%d" "$RUN" \
   || fail "$RUN does not report SKIP as its own number in the aggregate line"
 grep -Fq 'NOT counted as passing' "$RUN" \
   || fail "$RUN does not name the skipped checks in the summary"
-grep -Fq 'NOT exercised' "$RUN" \
-  || fail "$RUN does not treat 'NOT exercised' (the browser checks' static-only pass) as a skip"
+grep -Fq "grep -Eqi 'not exercised|static only'" "$RUN" \
+  || fail "$RUN does not treat 'not exercised' / 'static only' (the browser checks' skip paths) as a skip"
 
 # The ordering matters: pass must be incremented only on the non-skip branch. A file where
 # both happen would report the skip AND count it, which is the defect wearing a label.
 awk '
-  /grep -Eq .\^SKIP\|NOT exercised/ { inbranch = 1; next }
+  /elif grep -Eq .*SKIP\(PED\)/ { inbranch = 1; next }
   inbranch && /skipped\+=/ { saw_skip = 1; next }
   inbranch && /else/ { in_else = 1; next }
   inbranch && in_else && /pass=\$\(\(pass \+ 1\)\)/ { saw_pass_after_else = 1 }
@@ -54,6 +54,18 @@ rout=$(bash "$RUN" -j 2 "$fx/static.sh" "$fx/skip.sh" "$fx/ok.sh" 2>&1); rrc=$?
 [ "$rrc" -eq 0 ] || fail "$RUN exits $rrc when nothing failed"
 grep -Fq 'PASS=1 SKIP=2 FAIL=0' <<<"$rout" \
   || fail "$RUN did not classify a 'NOT exercised' pass and a SKIP as skips (got: $(grep -F 'PASS=' <<<"$rout"))"
+# Every spelling of a skip that a check in tests/checks prints today, and one that is not a
+# skip: an identifier that merely starts with SKIP, from a check that did measure.
+printf '#!/usr/bin/env bash\necho "PASS (SKIP: no node -- tool not exercised)"\n' >"$fx/paren.sh"
+printf '#!/usr/bin/env bash\necho "PASS (browser half SKIPPED: no chromium)"\n' >"$fx/skipped.sh"
+printf '#!/usr/bin/env bash\necho "PASS (static only: no node)"\n' >"$fx/nonode.sh"
+printf '#!/usr/bin/env bash\necho SKIP_COUNT=0\necho PASS\n' >"$fx/ident.sh"
+rout=$(bash "$RUN" -j 4 "$fx/paren.sh" "$fx/skipped.sh" "$fx/nonode.sh" "$fx/ident.sh" 2>&1)
+grep -Fq 'PASS=1 SKIP=3 FAIL=0' <<<"$rout" \
+  || fail "$RUN misclassified a skip spelling, or read SKIP_COUNT as a skip (got: $(grep -F 'PASS=' <<<"$rout"))"
+# A relative check path is the caller's, not the repository root's.
+rout=$(cd "$fx" && bash "$OLDPWD/$RUN" ok.sh 2>&1) && grep -Fq 'PASS=1 SKIP=0 FAIL=0' <<<"$rout" \
+  || fail "$RUN does not resolve a relative check path from the caller's directory (got: $(grep -F 'PASS=' <<<"$rout"))"
 rout=$(bash "$RUN" -j 2 "$fx/ok.sh" "$fx/bad.sh" 2>&1); rrc=$?
 [ "$rrc" -eq 1 ] && grep -Fq 'PASS=1 SKIP=0 FAIL=1' <<<"$rout" || fail "$RUN does not fail the run on a failing check"
 rout=$(bash "$RUN" --exclude "$fx/bad.sh" "$fx/ok.sh" "$fx/bad.sh" 2>&1) \
