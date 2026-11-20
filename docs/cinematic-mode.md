@@ -98,8 +98,8 @@ All-keyframe MP4 is 2-3× the size of streaming MP4. That's the price of frame-p
 This:
 
 1. Resolves the kit (skill → local → vendored).
-2. Hands off to `/wp-init` for project bootstrap (name, slug, languages, server, DB, ACF flavor).
-3. Copies `starter-theme/__cinematic__/` as the theme.
+2. Hands off to `/wp-init --mode=cinematic`, which copies `starter-theme/__cinematic__/` as the theme and runs the shared bootstrap (name, slug, languages, server, DB, ACF flavor), then returns.
+3. Owns the rest itself: kit resolution, scenes, seeding and menus.
 4. Dispatches the `wp-cinematic` agent to read `schemas/scene.json` and emit:
    - `fields/scenes.php` — ACF repeater with bilingual sub-fields
    - `fields/trailing-sections.php` — flex content for hybrid mode

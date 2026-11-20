@@ -65,7 +65,7 @@ If both fail → use vendored fallback and log: "Using vendored kit copy (offlin
 
 ## Step 1 — Hand off to /wp-init
 
-Invoke `/wp-init --path=<path> --mode=cinematic` (add `--acf-flavor=<value>` only when it was passed here, otherwise omit it so `/wp-init` asks Step 0.6; add `--no-hybrid` when it was passed here, and `--force-adopted` likewise). These are exactly the flags `/wp-init` Step 0.4 parses. Because it was entered with `--mode=cinematic`, `/wp-init` does not dispatch back here and does not resolve the kit again (Step 0 above did). It owns only the shared bootstrap:
+Invoke `/wp-init --path=<path> --mode=cinematic` (add `--acf-flavor=<value>` only when it was passed here, otherwise omit it so `/wp-init` asks Step 0.6; add `--force-adopted` when it was passed here; `--no-hybrid` stays with this command). These are exactly the flags `/wp-init` Step 0.4 parses. Because it was entered with `--mode=cinematic`, `/wp-init` does not dispatch back here and does not resolve the kit again (Step 0 above did). It owns only the shared bootstrap:
 - Project name/slug/text domain/languages
 - Copying `starter-theme/__cinematic__/` as the theme, placeholders, project CLAUDE.md
 - Server choice (Nginx native, Docker, etc.)
@@ -84,8 +84,8 @@ Pass to the `wp-cinematic` agent:
   "text_domain": "<from /wp-init>",
   "languages": ["en", "es"],
   "acf_flavor": "<scf|acf-pro>",
-  "scene_count": 9,
-  "hybrid": true
+  "scene_count": <--scenes value, default 9>,
+  "hybrid": <false when --no-hybrid was passed, else true>
 }
 ```
 

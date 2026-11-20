@@ -55,8 +55,8 @@ failing on it.
 
 This branch follows a different scaffolding shape: the page is one continuous reel, not discrete sections. Who owns what depends on how the run started:
 
-- **Entered from `/wp-cinematic-init`**: only `--mode=cinematic` or `--starter=__cinematic__` mark this (`--template=cinematic` does not: a user can type it with no caller). The caller is already running, so do NOT dispatch to it again (that is a loop), and do not resolve the kit (the caller's Step 0 did). Run this command's normal steps with Step 3 copying `starter-theme/__cinematic__/`, and no `/wp-section` loop, then return to the caller. The `wp-cinematic` agent, `/wp-cinematic-scene`, `/wp-cinematic-seed`, activation-time seeding and menus belong to the caller's Steps 2-3 alone: never run them here.
-- **Any other cinematic run** (`--template=cinematic`, or option 2 above): after Step 0.6, dispatch to `/wp-cinematic-init` (which re-enters here with `--mode=cinematic`) and stop.
+- **Entered from `/wp-cinematic-init`**: only `--mode=cinematic` or `--starter=__cinematic__` mark this (`--template=cinematic` does not: a user can type it with no caller). The caller is already running, so do NOT dispatch to it again (that is a loop), and do not resolve the kit (the caller's Step 0 did). Run this command's normal steps with Step 3 copying `starter-theme/__cinematic__/`, and no `/wp-section` loop, then return to the caller. The `wp-cinematic` agent, `/wp-cinematic-scene`, `/wp-cinematic-seed`, activation-time seeding and menus belong to the caller's Steps 2-3 alone: never run them here. Step 10 prints no "Next step" or live-view line in this branch (see Step 10).
+- **Any other cinematic run** (`--template=cinematic`, or option 2 above): after Step 0.6, dispatch to `/wp-cinematic-init --path=${PROJECT_PATH}`, adding `--acf-flavor=<value>` when Step 0.6 or intake set one (recorded `acf` becomes `acf-pro`, `scf` stays `scf`) and `--no-hybrid` when given; it re-enters here with `--mode=cinematic`. Stop.
 
 Hybrid mode is **on by default** for cinematic — `--no-hybrid` (the one spelling, here and in `/wp-cinematic-init`) disables trailing sections.
 
@@ -442,6 +442,8 @@ CLAUDE.md:  <path-to-claude-md>
 
 Next step: Run /wp-demo to create a demo mockup.
 ```
+
+**Entered with `--mode=cinematic` / `--starter=__cinematic__`:** omit the "Next step" and live-view lines. Print "Returning to `/wp-cinematic-init`" and: "If you ran /wp-init directly, the cinematic scaffold is not finished: run `/wp-cinematic-init --path=<path>`."
 
 If `$TEMPLATE` is `tailwind`, add after "Next step":
 ```

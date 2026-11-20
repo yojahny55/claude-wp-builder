@@ -10,3 +10,7 @@
   shared bootstrap only (starter copy, placeholders, server, database) and returns: the agent,
   scenes, seeding and menus are owned by `/wp-cinematic-init` alone, and `--acf-flavor` is
   passed only when given.
+  Choosing cinematic now dispatches `/wp-cinematic-init --path=<dir>` with `--acf-flavor` and
+  `--no-hybrid` when set; a caller-entered `/wp-init` prints a return line instead of "Next step"
+  and the live-view line; and `/wp-cinematic-init` builds the agent payload from `--scenes` and
+  `--no-hybrid` instead of hard-coding 9 and hybrid on.

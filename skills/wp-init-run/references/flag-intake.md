@@ -11,7 +11,7 @@ values; `/wp-cinematic-init` hands off through exactly this list and no other.
 | `--mode=cinematic` or `--starter=__cinematic__` | Presets `$TEMPLATE = cinematic` and marks the run as **entered from `/wp-cinematic-init`**: no dispatch back, no kit resolution, no agent, scenes or seeding. |
 | `--template=cinematic` | Presets `$TEMPLATE = cinematic` only. It does NOT mark a caller (a user can type it directly), so the run still dispatches to `/wp-cinematic-init`. `--template=tailwind` presets `$TEMPLATE = tailwind`. `--template=basic` is the `tailwind` alias. |
 | `--acf-flavor=scf` or `--acf-flavor=acf-pro` | Presets `$CF_PLUGIN`: `scf` stays `scf`, `acf-pro` becomes `acf` (the value Step 0.6 records). |
-| `--no-hybrid` | Passed through to the cinematic branch: no trailing flex sections. Hybrid is on when the flag is absent, and there is no `--hybrid` spelling. |
+| `--no-hybrid` | Passed through to the cinematic branch: no trailing flex sections. Hybrid is on when the flag is absent, and there is no `--hybrid` spelling. It is accepted and forwarded by the dispatch to `/wp-cinematic-init`, and ignored when entered from the caller (the caller owns it). |
 
 A preset value is final: **skip Step 0.5 when `$TEMPLATE` is preset and Step 0.6 when `$CF_PLUGIN` is
 preset**, and do not ask again. An empty `--acf-flavor=` counts as absent (ask Step 0.6). A non-empty unknown value for
