@@ -64,6 +64,7 @@ need 'the cost of the operator being wrong is a production site with its custome
 # ---------------------------------------------------------------------------
 # 2. Backup. There is no undo; this is the only way back.
 # ---------------------------------------------------------------------------
+# shellcheck disable=SC2088  # literal ~ is the text the check greps for in prose, not a path to expand
 need '~/.wp-clone-backups' \
   "the command does not back up outside the project, where the next clone's rsync and an rm -rf of the project both reach"
 need 'including the second and third time it is run on the same clone' \

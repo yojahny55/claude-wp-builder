@@ -41,7 +41,9 @@ permissions:
 # same ref, e.g. main's own CI for a commit.
 concurrency:
   group: ci-${{ github.event.pull_request.number || format('{0}-{1}', github.event_name, github.ref) }}
-  cancel-in-progress: true
+  # A push to main must finish: cancelling it by the next merge would leave a commit on main
+  # with no CI result at all. Only superseded pull-request and dispatch runs are cancelled.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   checks:
@@ -49,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # php and node are both preinstalled on ubuntu-latest, and the checks need both:
       # roughly a dozen shell out to `node` (the wp-config and craft families) and a
@@ -62,13 +64,11 @@ jobs:
           node --version
           php --version | head -1
 
-      # Every check runs, then the job reports. Exiting on the first red would hand back
-      # one defect per round trip -- a PR that broke three contracts would take three
-      # pushes to discover it broke three contracts.
+      # tests/run.sh runs every check in parallel and reports; its header explains why a
+      # skipped check is counted apart from a passing one and why it never stops at the first red.
       - name: Run every contract check
         run: |
           set -uo pipefail
-          pass=0; failed=(); skipped=()
           # The checks below are owned by their own jobs, which give them the WordPress and
           # the browser they need. Running them here too would execute them a second time per
           # CI run -- and worse, this job has neither, so each would take its skip path,
@@ -82,57 +82,24 @@ jobs:
           # base is already there -- here it would take its own skip path and pass while
           # checking nothing.
           skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/audit-resolve-links-integration.sh tests/checks/audit-ux-probe.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh tests/checks/wp-woo-setup-integration.sh'
-          for f in tests/checks/*.sh; do
-            case " $skip_here " in *" $f "*) continue ;; esac
-            if out=$(bash "$f" 2>&1); then
-              # Exit 0 is not the same fact as "this check measured something". Three
-              # checks here take a skip path when an optional dependency is absent --
-              # wp-polylang-live.sh without PLL_TEST_SITE, craft-kit-sync.sh without the
-              # kit, wp-library.sh without the MCP corpus -- and each printed SKIP, exited
-              # 0, and was counted in PASS. The aggregate then read as full coverage while
-              # some of it had not run. They are legitimately optional, so this does not
-              # fail the job; it separates the count, so "118 passed" cannot quietly mean
-              # 115 passed and 3 declined.
-              if printf '%s' "$out" | grep -q 'SKIP'; then
-                skipped+=("$f")
-              else
-                pass=$((pass + 1))
-              fi
-            else
-              failed+=("$f")
-              printf '::group::FAIL %s\n' "$f"
-              printf '%s\n' "$out" | tail -30
-              printf '::endgroup::\n'
-              printf '::error file=%s::%s failed\n' "$f" "$f"
-            fi
-          done
-          printf '\nPASS=%d SKIP=%d FAIL=%d\n' "$pass" "${#skipped[@]}" "${#failed[@]}"
-          if [ "${#skipped[@]}" -gt 0 ]; then
-            printf 'skipped checks (optional dependency absent, NOT counted as passing):\n'
-            printf '  %s\n' "${skipped[@]}"
-          fi
-          if [ "${#failed[@]}" -gt 0 ]; then
-            printf 'failing checks:\n'
-            printf '  %s\n' "${failed[@]}"
-            exit 1
-          fi
+          bash tests/run.sh -j 4 --exclude "$skip_here"
 
   syntax:
     name: Syntax
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - name: node --check every ES module
+      - name: node --check every ES module and CommonJS file
         run: |
           set -euo pipefail
           n=0
           while IFS= read -r f; do
             node --check "$f"
             n=$((n + 1))
-          done < <(find bin -name '*.mjs' -not -path '*/node_modules/*')
-          printf 'ok: %d ES module(s) parse\n' "$n"
+          done < <(find bin \( -name '*.mjs' -o -name '*.cjs' \) -not -path '*/node_modules/*')
+          printf 'ok: %d module(s) parse\n' "$n"
 
       # The runner's default PHP is 8.x, and `php -l` under 8.x happily accepts `match`,
       # union types and nullsafe calls -- every one of which is a fatal parse error on
@@ -147,7 +114,7 @@ jobs:
       # is that adding some fails here, making a raised floor a deliberate act instead
       # of a silent one.
       - name: Set up PHP 7.4
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
           php-version: '7.4'
 
@@ -163,7 +130,7 @@ jobs:
           printf 'ok: %d file(s) parse on 7.4\n' "$n"
 
       - name: Set up PHP 8.0
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
           php-version: '8.0'
 
@@ -189,7 +156,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: bash -n every shell script
         run: |
@@ -206,7 +173,7 @@ jobs:
         run: |
           set -uo pipefail
           shellcheck --version | sed -n 2p
-          mapfile -t files < <(find bin skills -name '*.sh' -not -path '*/node_modules/*' | sort)
+          mapfile -t files < <(find bin skills tests -name '*.sh' -not -path '*/node_modules/*' | sort)
           [ "${#files[@]}" -gt 0 ] || { echo 'ERROR: no shell scripts found' >&2; exit 1; }
           shellcheck --severity=warning --format=gcc "${files[@]}" | tee /tmp/shellcheck.out
           rc=${PIPESTATUS[0]}
@@ -224,7 +191,7 @@ jobs:
     env:
       BASE_REF: ${{ github.base_ref || inputs.base_ref }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
@@ -282,7 +249,7 @@ jobs:
           --health-cmd="healthcheck.sh --connect --innodb_initialized"
           --health-interval=10s --health-timeout=5s --health-retries=10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # --fail, and no pipe on the verification. Without --fail, curl writes the server's
       # 404 page to the output path and exits 0, so /usr/local/bin/wp becomes a text file
@@ -297,8 +264,15 @@ jobs:
       # obvious-looking pinned URL there is always a 404.
       - name: Install WP-CLI
         run: |
-          curl -sSL --fail -o /usr/local/bin/wp \
-            https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar
+          url=https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar
+          curl -sSL --fail -o /usr/local/bin/wp "$url"
+          # The phar runs as root with the fixture's database credentials: verify it against
+          # the checksum wp-cli publishes beside it, and fail the step on any mismatch.
+          expected=$(curl -sSL --fail "$url.sha512" | awk '{print $1; exit}')
+          actual=$(sha512sum /usr/local/bin/wp | awk '{print $1}')
+          if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+            echo "::error::WP-CLI phar sha512 mismatch (expected '$expected', got '$actual')"; exit 1
+          fi
           chmod +x /usr/local/bin/wp
           wp --info --allow-root
 
@@ -336,13 +310,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # playwright-core only -- not `playwright`, and no browser download. The runner
       # already ships Chrome, and a job that downloads a browser on every run is slower
       # and fails differently on a cold cache than the thing it is meant to be testing.
       # No package-lock.json, so no npm ci: the single dependency is pinned to an exact
       # version in package.json, which is what a lockfile would add here and nothing more.
+      # `npm install`, not `npm ci`, on purpose: no lockfile is committed (see above).
       - name: Install playwright-core
         run: npm install --no-audit --no-fund
 
@@ -368,9 +343,27 @@ jobs:
         env:
           WP_BROWSER_CHROMIUM: /usr/bin/google-chrome
           UX_PROBE_REQUIRE_BROWSER: "1"
+          CHECKS_REQUIRE_BROWSER: "1"
         run: |
           echo "::group::ux-probe"
           bash tests/checks/audit-ux-probe.sh
+          echo "::endgroup::"
+
+      # The demo-verify walk in the same Chrome. CHECKS_REQUIRE_BROWSER=1 turns the check's
+      # "PASS (static only -- NOT exercised" path into a failure, so a runner without a usable
+      # browser fails here instead of passing a check that drove nothing.
+      #
+      # demo-verify-engines.sh is deliberately NOT required here: it also needs an existing
+      # Playwright Firefox build, which this runner does not have (system Firefox cannot be
+      # driven, and nothing is downloaded). It stays a SKIP in the aggregate -- listed under
+      # "NOT counted as passing" -- rather than a red job nobody can fix on this image.
+      - name: demo-verify walk in a real browser
+        env:
+          WP_BROWSER_CHROMIUM: /usr/bin/google-chrome
+          CHECKS_REQUIRE_BROWSER: "1"
+        run: |
+          echo "::group::demo-verify no-motion"
+          bash tests/checks/demo-verify-no-motion.sh
           echo "::endgroup::"
 
   visual:
@@ -378,10 +371,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # pixelmatch and pngjs do the comparing; playwright-core is what runs inside the
       # container. All of them are pinned to exact versions in package.json.
+      # `npm install`, not `npm ci`: no lockfile is committed on purpose; versions are exact in package.json.
       - name: Install dev dependencies
         run: npm install --no-audit --no-fund
 
@@ -416,7 +410,7 @@ jobs:
       # reviewer that something moved, and only the picture tells them what.
       - name: Upload diffs when it fails
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: visual-baseline-diffs
           path: tests/baselines/.failed-diffs/

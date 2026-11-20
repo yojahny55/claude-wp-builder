@@ -16,7 +16,7 @@
 #    every file into <name>.webp.webp, a second lossy pass over an already-lossy source
 #    that webp_delivery_mode=picture then serves in place of the original.
 set -uo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../.." || exit 1
 
 script=skills/wp-robin/scripts/robin-fix.sh
 [ -f "$script" ] || { echo "FAIL: $script is missing"; exit 1; }

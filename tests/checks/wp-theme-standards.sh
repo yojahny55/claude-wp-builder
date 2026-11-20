@@ -98,6 +98,7 @@ grep -Fq 'wp_unslash( $_GET' "$skill" || fail "$skill's sanitization example doe
 # 6. SVG uploads are gated on unfiltered_html, for the user the list is built FOR. The wrong
 #    old form — an ungated upload_mimes filter — hands stored XSS to the Author role.
 setup=$dir/references/setup-and-enqueue.md
+# shellcheck disable=SC2100  # path assignment, not arithmetic
 starter=starter-theme/__tailwind__/inc/theme-setup.php
 for f in "$skill" "$setup" "$starter"; do
   grep -Fq 'unfiltered_html' "$f" || fail "$f does not gate SVG uploads on unfiltered_html"
