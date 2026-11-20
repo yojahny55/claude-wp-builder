@@ -57,23 +57,34 @@ case "$jobs_n" in ''|*[!0-9]*|0) printf 'run.sh: -j needs a positive number\n' >
 # A path is read the way the caller typed it: relative to where they stand, falling back
 # to the repository root so `tests/checks/x.sh` works from either. Check paths and
 # --exclude entries go through the same rule, so the two always compare like for like.
+# realpath -m folds ./, .. and // so `./x.sh` and `x.sh` are the same check (GNU
+# coreutils, which every runner and dev machine here has).
 resolve() {
+  local p
   case "$1" in
-    /*) printf '%s' "$1" ;;
-    *) if [ -e "$caller/$1" ]; then printf '%s/%s' "$caller" "$1"; else printf '%s/%s' "$PWD" "$1"; fi ;;
+    /*) p=$1 ;;
+    *) if [ -e "$caller/$1" ]; then p=$caller/$1; else p=$PWD/$1; fi ;;
   esac
+  realpath -m -- "$p"
 }
 # Shown relative to the repository root when inside it: shorter, and what GitHub's
 # ::error file= annotation needs to point at the file.
 disp() { printf '%s' "${1#"$PWD/"}"; }
 
 excluded=" "
-for e in $exclude; do excluded+="$(resolve "$e") "; done
-selected=()
+read -r -a exclude_list <<<"$exclude"   # split on spaces, no glob expansion
+for e in "${exclude_list[@]}"; do excluded+="$(resolve "$e") "; done
+selected=(); dropped=" "
 for f in "${files[@]}"; do
   f=$(resolve "$f")
-  case "$excluded" in *" $f "*) continue ;; esac
+  case "$excluded" in *" $f "*) dropped+="$f "; continue ;; esac
   selected+=("$f")
+done
+# An exclusion that matches nothing is usually a typo or a renamed check; say so, since
+# the check it meant to keep out is now running.
+for e in "${exclude_list[@]}"; do
+  r=$(resolve "$e")
+  case "$dropped" in *" $r "*) ;; *) printf 'run.sh: --exclude %s matched no selected check\n' "$e" >&2 ;; esac
 done
 [ "${#selected[@]}" -gt 0 ] || { printf 'run.sh: no checks to run\n' >&2; exit 2; }
 
