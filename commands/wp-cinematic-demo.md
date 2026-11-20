@@ -1,19 +1,19 @@
 ---
-name: wp-cinematic-demo
 description: "Generate (or regenerate) the cinematic HTML demo for client approval. Wraps the kit's `cinematic-site` skill but emits to `<theme>/demo/` with the same `<!-- SECTION: -->` delimiters the rest of the plugin uses, so the demo can be polished with `/wp-polish` and audited with `/wp-responsive-check` like any other plugin demo."
-arguments:
-  - name: --scenes
-    description: Scene count (default 9)
-    required: false
-  - name: --hybrid
-    description: Append a trailing sections block (default yes)
-    required: false
-  - name: --brand
-    description: Path to a brand brief (markdown) to drive editorial copy
-    required: false
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob
+argument-hint: "[--scenes <scenes>] [--no-hybrid] [--brand <brand>]"
 ---
 
 # /wp-cinematic-demo
+
+## Arguments
+
+| Argument | Required | Meaning |
+|---|---|---|
+| `--scenes` | no | Scene count (default 9) |
+| `--no-hybrid` | no | Disable the trailing sections block (hybrid is on by default; --no-hybrid is the only spelling) |
+| `--brand` | no | Path to a brand brief (markdown) to drive editorial copy |
+
 
 Produces a self-contained, scroll-driven demo HTML at `<theme>/demo/index.html` plus `demo/assets/{css,js,videos,posters}/`. The demo is what you send the client for approval BEFORE wiring WordPress.
 
@@ -42,13 +42,13 @@ sequence information is something the reader needs.
      scenes: <N>
      out_dir: <theme>/demo
      brand_brief: <--brand path or empty>
-     hybrid: <true|false>
+     hybrid: <false when --no-hybrid was passed, else true>
    ```
 3. Kit emits raw demo (its native `templates/index.html`, `main.js`, `style.css` skeleton).
 4. **Post-process** for plugin compatibility:
    - Wrap each scene with `<!-- SECTION: scene-N -->` ... `<!-- END SECTION -->` delimiters so `/wp-section` and `/wp-polish` recognize them.
    - Wrap trailing blocks with `<!-- SECTION: pricing -->`, `<!-- SECTION: contact -->`, etc.
-   - Inject the standard `<!-- DEMO: name=cinematic, archetype=cinematic-scroll, hybrid=true -->` header comment so `/wp-init` demo-first detection picks it up.
+   - Inject the standard `<!-- DEMO: name=cinematic, archetype=cinematic-scroll, hybrid=true -->` header comment (`hybrid=false` when `--no-hybrid` was passed) so `/wp-init` demo-first detection picks it up.
 5. If `--brand` provided, dispatch kit skill `01-narrative-from-brand` first; pipe its narrative into `02-storyboard-from-narrative`; feed the storyboard scenes into the demo generator (instead of placeholders).
 6. Generate placeholder videos by symlinking the kit's sample reels into `demo/assets/videos/` (do NOT copy — saves disk).
 7. Open `demo/index.html` in the user's browser via `wp-open` helper, or print the file:// path.

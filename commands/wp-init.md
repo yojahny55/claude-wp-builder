@@ -1,7 +1,7 @@
 ---
 description: Scaffold a new WordPress project — copies starter theme, replaces placeholders, generates .claude/CLAUDE.md
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob
-argument-hint: "[project-name] [--path=<dir>] [--mode=cinematic|--starter=__cinematic__|--template=tailwind|cinematic] [--acf-flavor=scf|acf-pro] [--no-hybrid] [--force-adopted]"
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion
+argument-hint: "[project-name] [--path=<dir>] [--mode=cinematic|--starter=__cinematic__|--template=tailwind|cinematic] [--acf-flavor=scf|acf-pro] [--i18n=suffix|polylang] [--no-hybrid] [--force-adopted]"
 ---
 
 # WP Init — Project Scaffolding
@@ -29,6 +29,58 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-init-run/references/flag-intake.md` now an
 `--mode=cinematic`, `--starter=__cinematic__`, `--template`, `--acf-flavor` and `--no-hybrid`
 from `$ARGUMENTS` before asking anything. A preset skips Step 0.5 or 0.6. Only `--mode=cinematic` or
 `--starter=__cinematic__` mark entry from `/wp-cinematic-init`, which is never dispatched back to.
+
+## Pre-Step: Check for `.wp-create.json` Manifest
+
+**First: validate the project configuration.**
+
+`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report". The path travels as a positional argument, never inside the `-c` string: write it in single quotes, and a path that holds a single quote gets each one written as `'\''`.
+
+```bash
+bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
+```
+
+| Exit | Meaning | Do |
+|---|---|---|
+| `0` | valid | continue |
+| `1` | invalid, or the generated context block disagrees with the manifest | stop and report the message verbatim |
+| `2` | an older manifest can migrate | run `wp-config.mjs migrate '${PROJECT_PATH}'`, then continue |
+| `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
+
+On exit 2, run the migration before continuing.
+
+**Exit `3` policy:** `scaffold`, defined in `${CLAUDE_PLUGIN_ROOT}/skills/wp-manifest-gate/SKILL.md`. Read it when the validator exits `3`.
+
+This runs before every question below and before any dispatch to another command: check if `.wp-create.json` exists in the current working directory or parent directories (same search pattern as `wp-content/themes/`).
+
+### If `.wp-create.json` exists:
+
+Read the manifest and extract:
+- `project.name` → use as project name (skip asking in Step 1)
+- `project.slug` → use as theme slug
+- `languages.primary` → use as primary language
+- `languages.additional` → use as secondary language(s)
+- `wp_cli.wrapper` → use for WP-CLI commands instead of bare `wp`
+- `project.domain` → use for site URL references
+
+**Skip Step 1 entirely** — all project details come from the manifest, with one exception: the
+manifest carries no tagline. Take it from the demo when the Demo-First Path runs, and otherwise
+ask Step 1's **Tagline** question on its own. Skipping it leaves Step 9 writing an empty site
+description, which is the state `/wp-finalize` fails on.
+
+### If `.wp-create.json` does NOT exist:
+
+Proceed with the normal flow (Step 0.45 → Step 0.5 → ... → Step 0 → Step 1 → ...). No changes to existing behavior.
+
+## Step 0.45: Stop on a Failed Demo
+
+**Stop if `demo/FAILED.md` exists.** Print its first ten lines and stop. Building
+a theme from a demo that never passed verification produces a verified-looking
+site on an unverified foundation, and every later audit measures the theme rather
+than the demo it came from. The marker is cleared only by a craft verify loop
+starting over (`/wp-demo iterate`, or a fresh craft run), which deletes it at its
+top — so it always describes the last loop. Do not delete it by hand to get past
+this gate.
 
 ## Step 0.5: Select Starter Template
 
@@ -109,57 +161,7 @@ Skip this question entirely when `$ARGUMENTS` contains `--i18n=suffix` or
 `--i18n=polylang`, so `/wp-yolo` and other non-interactive callers can pass it
 straight through.
 
-## Pre-Step: Check for `.wp-create.json` Manifest
-
-**First: validate the project configuration.**
-
-`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report". The path travels as a positional argument, never inside the `-c` string: write it in single quotes, and a path that holds a single quote gets each one written as `'\''`.
-
-```bash
-bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
-```
-
-| Exit | Meaning | Do |
-|---|---|---|
-| `0` | valid | continue |
-| `1` | invalid, or the generated context block disagrees with the manifest | stop and report the message verbatim |
-| `2` | an older manifest can migrate | run `wp-config.mjs migrate '${PROJECT_PATH}'`, then continue |
-| `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
-
-On exit 2, run the migration before continuing.
-
-**Exit `3` policy:** `scaffold`, defined in `${CLAUDE_PLUGIN_ROOT}/skills/wp-manifest-gate/SKILL.md`. Read it when the validator exits `3`.
-
-Before anything else, check if `.wp-create.json` exists in the current working directory or parent directories (same search pattern as `wp-content/themes/`).
-
-### If `.wp-create.json` exists:
-
-Read the manifest and extract:
-- `project.name` → use as project name (skip asking in Step 1)
-- `project.slug` → use as theme slug
-- `languages.primary` → use as primary language
-- `languages.additional` → use as secondary language(s)
-- `wp_cli.wrapper` → use for WP-CLI commands instead of bare `wp`
-- `project.domain` → use for site URL references
-
-**Skip Step 1 entirely** — all project details come from the manifest, with one exception: the
-manifest carries no tagline. Take it from the demo when the Demo-First Path runs, and otherwise
-ask Step 1's **Tagline** question on its own. Skipping it leaves Step 9 writing an empty site
-description, which is the state `/wp-finalize` fails on.
-
-### If `.wp-create.json` does NOT exist:
-
-Proceed with the normal flow (Step 0 → Step 1 → ...). No changes to existing behavior.
-
 ## Step 0: Check for Existing Demo
-
-**Stop if `demo/FAILED.md` exists.** Print its first ten lines and stop. Building
-a theme from a demo that never passed verification produces a verified-looking
-site on an unverified foundation, and every later audit measures the theme rather
-than the demo it came from. The marker is cleared only by a craft verify loop
-starting over (`/wp-demo iterate`, or a fresh craft run), which deletes it at its
-top — so it always describes the last loop. Do not delete it by hand to get past
-this gate.
 
 Before asking any project questions, check if a demo already exists.
 

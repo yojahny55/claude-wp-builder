@@ -1,6 +1,7 @@
 ---
 description: Pre-delivery checklist — validates escaping, bilingual coverage, responsive design, menus, and theme requirements
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
+argument-hint: "[project-path]"
 ---
 
 # WP Finalize — Pre-Delivery Checklist

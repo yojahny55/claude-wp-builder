@@ -1,7 +1,7 @@
 ---
 description: Contributor workflow for the plugin itself — scaffold a command/agent/skill with its check and doc rows, review a skill against the authoring best practices, verify the repo, or open the PR in the house format
 allowed-tools: Read, Write, Edit, Grep, Glob, Bash, Agent
-argument-hint: "<new|review|check|pr|release> [type] [name]"
+argument-hint: "<new|review|check|pr|release> [type] [name] [--title \"...\"] [--base <branch>]"
 ---
 
 # WP Contribute — Working on the Plugin Itself

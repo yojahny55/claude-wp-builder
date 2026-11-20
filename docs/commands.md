@@ -569,7 +569,7 @@ Details, kit install and encoding rationale: [cinematic-mode.md](cinematic-mode.
 | Command | Arguments |
 |---------|-----------|
 | `/wp-cinematic-init` | `[--path=<dir>] [--scenes=N] [--acf-flavor=…] [--no-hybrid]` — resolves `cinematic-scroll-kit` (global skill → `./.cinematic-kit/` → vendored copy), hands off to `/wp-init --mode=cinematic` for the starter copy and shared bootstrap, then dispatches the `wp-cinematic` agent for `fields/scenes.php`, `fields/trailing-sections.php`, `inc/seed-cinematic.php`, scene fragments, and owns seeding and menus |
-| `/wp-cinematic-demo` | `[--scenes N=9] [--hybrid] [--brand brief.md]` → `<theme>/demo/index.html` + `demo/assets/` |
+| `/wp-cinematic-demo` | `[--scenes N=9] [--no-hybrid] [--brand brief.md]` → `<theme>/demo/index.html` + `demo/assets/` |
 | `/wp-cinematic-encode` | `<input.mp4> [--scene N] [--desktop-only] [--mobile-only] [--poster]` → all-keyframe desktop MP4, 9:16 mobile MP4, poster JPG in `assets/videos/`; wires the ACF row when `--scene` given |
 | `/wp-cinematic-scene` | `<n|scene-id> [--eyebrow] [--headline] [--body] [--cta "Label|URL"] [--video …]` (+ `-es` variants) → updates the `cinematic_scenes` row; emits `template-parts/cinematic/scene-<id>.php` only for non-default layouts |
 | `/wp-cinematic-seed` | `[--manifest path] [--force] [--dry-run]` — idempotent; skips scenes that already have content; sideloads kit sample videos when none pinned |

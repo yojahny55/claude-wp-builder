@@ -1,28 +1,22 @@
 ---
-name: wp-cinematic-init
 description: Scaffold a cinematic-scroll WordPress theme from an existing demo or from scratch. Installs cinematic-scroll-kit as a recommended skill, picks the `__cinematic__` starter, then defers to `/wp-init` with `--mode=cinematic` for the rest of the bootstrap (project info, ACF flavor, server, vhost).
-arguments:
-  - name: --path
-    description: Target WordPress install path (parent of wp-content/)
-    required: true
-  - name: --scenes
-    description: Number of scenes to scaffold (default 9, min 1, max 12)
-    required: false
-  - name: --no-hybrid
-    description: Disable trailing flex sections after the reel (hybrid is on by default; --no-hybrid is the only spelling)
-    required: false
-  - name: --acf-flavor
-    description: Custom fields plugin, scf or acf-pro; handed to /wp-init, which asks when it is absent
-    required: false
-  - name: --skip-kit-install
-    description: Skip `npx skills add` and use vendored fallback from starter-theme/__cinematic__/assets/cinematic-kit/
-    required: false
-  - name: --force-adopted
-    description: Build on an adopted site (third-party theme) on purpose; otherwise the command stops
-    required: false
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
+argument-hint: "--path=<dir> [--scenes <N>] [--no-hybrid] [--acf-flavor=scf|acf-pro] [--skip-kit-install] [--force-adopted]"
 ---
 
 # /wp-cinematic-init
+
+## Arguments
+
+| Argument | Required | Meaning |
+|---|---|---|
+| `--path` | yes | Target WordPress install path (parent of wp-content/) |
+| `--scenes` | no | Number of scenes to scaffold (default 9, min 1, max 12) |
+| `--no-hybrid` | no | Disable trailing flex sections after the reel (hybrid is on by default; --no-hybrid is the only spelling) |
+| `--acf-flavor` | no | Custom fields plugin, scf or acf-pro; handed to /wp-init, which asks when it is absent |
+| `--skip-kit-install` | no | Skip `npx skills add` and use vendored fallback from starter-theme/__cinematic__/assets/cinematic-kit/ |
+| `--force-adopted` | no | Build on an adopted site (third-party theme) on purpose; otherwise the command stops |
+
 
 Use this when the demo is **not** a standard sectioned page but a cinematic scroll-driven reel: persistent video stage, N scenes that crossfade/scrub as the user scrolls, mobile autoplay-loop fork, motion-toggle, reduced-motion guard.
 
@@ -61,7 +55,7 @@ If `npx skills` is unavailable, fall back to:
 git clone --depth 1 https://github.com/yojahny55/cinematic-scroll-kit .cinematic-kit
 ```
 
-If both fail → use vendored fallback and log: "Using vendored kit copy (offline mode). Update later with `/wp-cinematic-init --update-kit`."
+If both fail → use vendored fallback and log: "Using vendored kit copy (offline mode). Update later by re-running `npx skills add yojahny55/cinematic-scroll-kit -g -y`, or `git pull` inside `.cinematic-kit` for the project-local clone."
 
 ## Step 1 — Hand off to /wp-init
 
