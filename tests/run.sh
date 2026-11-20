@@ -43,22 +43,36 @@ while [ "$#" -gt 0 ]; do
     -j) [ "$#" -ge 2 ] || { printf 'run.sh: -j needs a number\n' >&2; exit 2; }
         jobs_n=$2; shift 2 ;;
     -j*) jobs_n=${1#-j}; shift ;;
-    --exclude) exclude=${2-}; shift 2 ;;
+    --exclude) [ "$#" -ge 2 ] || { printf 'run.sh: --exclude needs a value\n' >&2; exit 2; }
+        exclude=$2; shift 2 ;;
     --exclude=*) exclude=${1#--exclude=}; shift ;;
     -h|--help) sed -n '2,8p' "$0"; exit 0 ;;
     -*) printf 'run.sh: unknown option %s\n' "$1" >&2; exit 2 ;;
-    # A check path is read the way the caller typed it: relative to where they stand,
-    # falling back to the repository root so `tests/checks/x.sh` works from either.
-    /*) files+=("$1"); shift ;;
-    *) if [ -e "$caller/$1" ]; then files+=("$caller/$1"); else files+=("$1"); fi; shift ;;
+    *) files+=("$1"); shift ;;
   esac
 done
 case "$jobs_n" in ''|*[!0-9]*|0) printf 'run.sh: -j needs a positive number\n' >&2; exit 2 ;; esac
 [ "${#files[@]}" -gt 0 ] || files=(tests/checks/*.sh)
 
+# A path is read the way the caller typed it: relative to where they stand, falling back
+# to the repository root so `tests/checks/x.sh` works from either. Check paths and
+# --exclude entries go through the same rule, so the two always compare like for like.
+resolve() {
+  case "$1" in
+    /*) printf '%s' "$1" ;;
+    *) if [ -e "$caller/$1" ]; then printf '%s/%s' "$caller" "$1"; else printf '%s/%s' "$PWD" "$1"; fi ;;
+  esac
+}
+# Shown relative to the repository root when inside it: shorter, and what GitHub's
+# ::error file= annotation needs to point at the file.
+disp() { printf '%s' "${1#"$PWD/"}"; }
+
+excluded=" "
+for e in $exclude; do excluded+="$(resolve "$e") "; done
 selected=()
 for f in "${files[@]}"; do
-  case " $exclude " in *" $f "*) continue ;; esac
+  f=$(resolve "$f")
+  case "$excluded" in *" $f "*) continue ;; esac
   selected+=("$f")
 done
 [ "${#selected[@]}" -gt 0 ] || { printf 'run.sh: no checks to run\n' >&2; exit 2; }
@@ -104,13 +118,13 @@ for i in "${!selected[@]}"; do
   else
     pass=$((pass + 1))
   fi
-  times+=("$ms $f")
+  times+=("$ms $(disp "$f")")
 done
 
 secs() { printf '%d.%01ds' "$(($1 / 1000))" "$((($1 % 1000) / 100))"; }
 
 for i in "${failed[@]}"; do
-  f=${selected[$i]}
+  f=$(disp "${selected[$i]}")
   if [ -n "${GITHUB_ACTIONS:-}" ]; then printf '::group::FAIL %s\n' "$f"; else printf '== FAIL %s\n' "$f"; fi
   tail -30 "$work/$i.out"
   if [ -n "${GITHUB_ACTIONS:-}" ]; then
@@ -128,10 +142,10 @@ printf '\nPASS=%d SKIP=%d FAIL=%d  (%s wall, -j %d)\n' "$pass" "${#skipped[@]}" 
   "$(secs $(((end - start) / 1000)))" "$jobs_n"
 if [ "${#skipped[@]}" -gt 0 ]; then
   printf 'skipped checks (optional dependency absent, NOT counted as passing):\n'
-  for i in "${skipped[@]}"; do printf '  %s  (%s)\n' "${selected[$i]}" "$(secs "$(cat "$work/$i.ms")")"; done
+  for i in "${skipped[@]}"; do printf '  %s  (%s)\n' "$(disp "${selected[$i]}")" "$(secs "$(cat "$work/$i.ms")")"; done
 fi
 if [ "${#failed[@]}" -gt 0 ]; then
   printf 'failing checks:\n'
-  for i in "${failed[@]}"; do printf '  %s  (%s)\n' "${selected[$i]}" "$(secs "$(cat "$work/$i.ms")")"; done
+  for i in "${failed[@]}"; do printf '  %s  (%s)\n' "$(disp "${selected[$i]}")" "$(secs "$(cat "$work/$i.ms")")"; done
   exit 1
 fi

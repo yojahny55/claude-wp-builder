@@ -66,6 +66,13 @@ grep -Fq 'PASS=1 SKIP=3 FAIL=0' <<<"$rout" \
 # A relative check path is the caller's, not the repository root's.
 rout=$(cd "$fx" && bash "$OLDPWD/$RUN" ok.sh 2>&1) && grep -Fq 'PASS=1 SKIP=0 FAIL=0' <<<"$rout" \
   || fail "$RUN does not resolve a relative check path from the caller's directory (got: $(grep -F 'PASS=' <<<"$rout"))"
+# --exclude goes through the same path rule as the checks: a relative entry excludes the
+# check it names, and a missing value is refused rather than looping on `shift 2`.
+rout=$(cd "$fx" && bash "$OLDPWD/$RUN" --exclude bad.sh ok.sh bad.sh 2>&1) \
+  && grep -Fq 'PASS=1 SKIP=0 FAIL=0' <<<"$rout" \
+  || fail "$RUN does not apply a relative --exclude to the check it names (got: $(grep -F 'PASS=' <<<"$rout"))"
+rrc=0; timeout 20 bash "$RUN" --exclude >/dev/null 2>&1 || rrc=$?
+[ "$rrc" -eq 2 ] || fail "$RUN --exclude with no value exits $rrc, expected 2 (124 means it hung)"
 rout=$(bash "$RUN" -j 2 "$fx/ok.sh" "$fx/bad.sh" 2>&1); rrc=$?
 [ "$rrc" -eq 1 ] && grep -Fq 'PASS=1 SKIP=0 FAIL=1' <<<"$rout" || fail "$RUN does not fail the run on a failing check"
 rout=$(bash "$RUN" --exclude "$fx/bad.sh" "$fx/ok.sh" "$fx/bad.sh" 2>&1) \
