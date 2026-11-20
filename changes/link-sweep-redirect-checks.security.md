@@ -8,6 +8,7 @@
   by their literal spelling (IPv4-mapped IPv6 such as `::ffff:169.254.169.254`, and
   `fd00:ec2::254`, included) and, for a hostname, by every address it resolves to at check time;
   a private or loopback host (literal or resolved) is refused unless the swept site is itself
-  on one. A failed lookup leaves the link `unmeasured` with the reason. DNS rebinding between
+  on one, which is judged by what the site's host resolves to (a dev name that `/etc/hosts`
+  points at loopback is local) and not by its spelling alone. A failed lookup leaves the link `unmeasured` with the reason. DNS rebinding between
   that lookup and the request itself is not closed. A refused hop leaves the link `unmeasured`
   with the reason.

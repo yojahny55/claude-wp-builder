@@ -112,3 +112,21 @@ export async function checkResolved(host, { siteLocal, lookup, signal, what = 'r
     }
   }
 }
+
+/**
+ * Whether the swept site itself is local, judged by what its host resolves to and not only by
+ * how it is spelled: a local dev site is usually served on an ordinary-looking name that
+ * /etc/hosts points at loopback, and judging that by text alone refused every other local
+ * host the sweep met, which is exactly the case the private-address exemption exists for.
+ * Local means every resolved address is private/loopback; a mixed or failed answer is not
+ * local, so the stricter policy applies.
+ */
+export async function siteIsLocal(host, { lookup, signal } = {}) {
+  const bare = String(host).replace(/^\[|\]$/g, '');
+  const c = classifyHost(bare);
+  if (c !== 'public') return c === 'private';
+  if (isIP(normalizeHost(bare))) return false;
+  let addrs;
+  try { addrs = await withSignal(lookup(bare, { all: true }), signal); } catch { return false; }
+  return addrs.length > 0 && addrs.every(({ address }) => classifyHost(address) === 'private');
+}

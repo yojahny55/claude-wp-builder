@@ -66,7 +66,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { lookup as dnsLookup } from 'node:dns/promises';
-import { Refused, isLinkLocal, isPrivateHost, checkResolved } from './lib/net-class.mjs';
+import { Refused, isLinkLocal, isPrivateHost, checkResolved, siteIsLocal } from './lib/net-class.mjs';
 
 const USAGE = 'usage: link-sweep.mjs --site <origin> [--urls <file>] [--clone-origin <host>] ' +
   '[--follow-clone-origin] [--concurrency <1-4>] [--per-group <n>] [--full] [--per-page <n>] [--max <n>] ' +
@@ -186,10 +186,10 @@ async function checkHop(o, u, what = 'redirect to', { signal, initial = false } 
   if (o.cloneOrigin && bareHost(host) === bareHost(hostOf(o.cloneOrigin)) && !o.followClone) {
     throw new Refused(`${what} the clone-origin host ${host} not followed without --follow-clone-origin`);
   }
-  if (isPrivateHost(host) && !isPrivateHost(o.siteUrl.hostname)) {
+  if (isPrivateHost(host) && !o.siteLocal) {
     throw new Refused(`${what} private/loopback host ${host} not followed from a non-local site`);
   }
-  await checkResolved(host, { siteLocal: isPrivateHost(o.siteUrl.hostname), lookup: dnsLookup, signal,
+  await checkResolved(host, { siteLocal: o.siteLocal, lookup: dnsLookup, signal,
     what: initial ? 'link host' : 'redirect host', allowUnresolved: initial });
 }
 
@@ -281,6 +281,9 @@ async function request(o, url, deadline) {
 
 async function main() {
   const o = parseArgs(process.argv.slice(2));
+  // Decided once, by resolution: a dev site on a name /etc/hosts sends to loopback is local.
+  o.siteLocal = await siteIsLocal(o.siteUrl.hostname,
+    { lookup: dnsLookup, signal: AbortSignal.timeout(o.timeout * 1000) });
   if (o.insecure) process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
   const byKey = new Map();
   for (const { href, page, group } of readLines(o)) {

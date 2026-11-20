@@ -175,7 +175,7 @@ if(!r||r.verdict!=='broken'){console.log(JSON.stringify(r));process.exit(1)}" <<
 
 # The classifier and the resolved-address check, without a network: the lookup is injected.
 node --input-type=module - <<'JS' || fail "address classification (bin/lib/net-class.mjs) is wrong"
-import { classifyHost as c, checkResolved, Refused } from './bin/lib/net-class.mjs';
+import { classifyHost as c, checkResolved, Refused, siteIsLocal } from './bin/lib/net-class.mjs';
 const want = { '[::ffff:a9fe:a9fe]': 'metadata', '::ffff:169.254.169.254': 'metadata', '[::ffff:7f00:1]': 'private',
   'fd00:ec2::254': 'metadata', '[::1]': 'private', '::': 'private', 'fe80::1': 'linklocal', 'fc00::1': 'private',
   'fd12::1': 'private', '0.0.0.0': 'private', '169.254.1.1': 'linklocal', '10.0.0.1': 'private', '172.16.0.1': 'private',
@@ -196,6 +196,11 @@ if (!/could not resolve redirect host/.test(await refusal('nx.example', false, m
 { const ac = new AbortController(); const slow = () => new Promise(() => {}); setTimeout(() => ac.abort(new Error('timeout')), 50);
   let msg = ''; try { await checkResolved('slow.example', { siteLocal: false, lookup: slow, signal: ac.signal }); } catch (e) { msg = e.message; }
   if (!/could not resolve/.test(msg)) { console.error('a hung lookup was not bounded by the signal'); process.exit(1); } }
+// The site's own locality is judged by resolution too: a dev name /etc/hosts points at
+// loopback is local, so another local host it links to is followed, not refused.
+{ const sm = { 'www.dev.example': ['127.0.0.1', '::1'], 'mixed.example': ['127.0.0.1', '93.184.216.34'], 'ok.example': ['93.184.216.34'] };
+  const cases = [['www.dev.example', true], ['mixed.example', false], ['ok.example', false], ['nx.example', false], ['localhost', true], ['127.0.0.1', true], ['8.8.8.8', false]];
+  for (const [h, want] of cases) { const got = await siteIsLocal(h, { lookup: look(sm) }); if (got !== want) { console.error('siteIsLocal', h, got, 'expected', want); process.exit(1); } } }
 JS
 
 # Budget: a zero budget measures nothing and says why, instead of hanging.
