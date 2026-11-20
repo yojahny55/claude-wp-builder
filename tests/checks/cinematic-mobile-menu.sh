@@ -24,4 +24,11 @@ unguarded=$(grep -n '\.play' "$js" | grep -v 'motionPaused' || true)
 unguarded=$(echo "$unguarded" | grep -v 'getBoundingClientRect\|r.bottom' || true)
 [ -z "$unguarded" ] || { echo "FAIL: unguarded play(): $unguarded"; exit 1; }
 grep -q 'if (motionPaused)' "$js" || { echo "FAIL: pause branch missing"; exit 1; }
+# Under reduced motion nothing plays, so the toggle is hidden rather than left offering a
+# "Play motion" that changes its label and starts nothing.
+grep -q 'if (reducedAtLoad) toggles.forEach' "$js" || { echo "FAIL: motion toggles are not hidden under reduced motion"; exit 1; }
+grep -q 'toggles.length && !reducedAtLoad' "$js" || { echo "FAIL: motion toggles are wired under reduced motion"; exit 1; }
+# The label changes with the state, so the button is an action button: aria-pressed beside
+# a changing label announces the opposite of the real state.
+if grep -q 'aria-pressed' "$nav" "$js"; then echo "FAIL: motion toggle combines aria-pressed with a changing label"; exit 1; fi
 echo PASS

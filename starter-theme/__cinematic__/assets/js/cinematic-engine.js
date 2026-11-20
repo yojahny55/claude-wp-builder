@@ -86,8 +86,13 @@
   // One shared play/pause state for every .nav__motion-toggle (WCAG 2.2.2).
   const MOTION_KEY = 'cinematic-motion';
   const toggles = Array.from(document.querySelectorAll('.nav__motion-toggle'));
-  let motionPaused = mqReduced.matches
+  // Under reduced motion the engine below strips autoplay and loop and shows posters, so
+  // nothing moves and a "Play motion" control would report playing while nothing plays.
+  // The toggles are hidden instead of offered as a control that does nothing.
+  const reducedAtLoad = mqReduced.matches
     || document.documentElement.classList.contains('prefers-reduced-motion');
+  if (reducedAtLoad) toggles.forEach(btn => { btn.hidden = true; });
+  let motionPaused = reducedAtLoad;
   if (!motionPaused) {
     try { motionPaused = localStorage.getItem(MOTION_KEY) === 'pause'; } catch (e) { /* storage blocked */ }
   }
@@ -95,7 +100,8 @@
   const renderMotion = () => {
     toggles.forEach(btn => {
       btn.dataset.state = motionPaused ? 'pause' : 'play';
-      btn.setAttribute('aria-pressed', motionPaused ? 'true' : 'false');
+      // An action button: the label names what a press does. No pressed state, which
+      // alongside a changing label would announce "Play motion, pressed" while paused.
       const label = motionPaused ? btn.dataset.labelPlay : btn.dataset.labelPause;
       if (label) btn.textContent = label;
     });
@@ -113,7 +119,7 @@
       });
     }
   };
-  if (toggles.length) {
+  if (toggles.length && !reducedAtLoad) {
     toggles.forEach(btn => btn.addEventListener('click', () => {
       motionPaused = !motionPaused;
       try { localStorage.setItem(MOTION_KEY, motionPaused ? 'pause' : 'play'); } catch (e) { /* storage blocked */ }

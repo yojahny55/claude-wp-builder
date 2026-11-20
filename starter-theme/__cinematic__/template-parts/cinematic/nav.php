@@ -31,7 +31,7 @@ $logo     = __starter___setting('site_logo');
             ]);
         }
         ?>
-        <button class="nav__motion-toggle" type="button" data-state="play" aria-pressed="false" data-label-pause="<?php echo esc_attr(__starter___b('Pause motion', 'Pausar movimiento')); ?>" data-label-play="<?php echo esc_attr(__starter___b('Play motion', 'Reproducir movimiento')); ?>">
+        <button class="nav__motion-toggle" type="button" data-state="play" data-label-pause="<?php echo esc_attr(__starter___b('Pause motion', 'Pausar movimiento')); ?>" data-label-play="<?php echo esc_attr(__starter___b('Play motion', 'Reproducir movimiento')); ?>">
             <?php echo esc_html(__starter___b('Pause motion', 'Pausar movimiento')); ?>
         </button>
     </div>
@@ -62,7 +62,7 @@ $logo     = __starter___setting('site_logo');
             <a class="mobile-menu__lang-item<?php echo $lang === 'en' ? ' is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg('lang', 'en')); ?>">EN</a>
             <a class="mobile-menu__lang-item<?php echo $lang === 'es' ? ' is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg('lang', 'es')); ?>">ES</a>
         </div>
-        <button class="nav__motion-toggle mobile-menu__motion-btn" type="button" data-state="play" aria-pressed="false" data-label-pause="<?php echo esc_attr(__starter___b('Pause motion', 'Pausar movimiento')); ?>" data-label-play="<?php echo esc_attr(__starter___b('Play motion', 'Reproducir movimiento')); ?>">
+        <button class="nav__motion-toggle mobile-menu__motion-btn" type="button" data-state="play" data-label-pause="<?php echo esc_attr(__starter___b('Pause motion', 'Pausar movimiento')); ?>" data-label-play="<?php echo esc_attr(__starter___b('Play motion', 'Reproducir movimiento')); ?>">
             <?php echo esc_html(__starter___b('Pause motion', 'Pausar movimiento')); ?>
         </button>
     </div>
