@@ -238,6 +238,46 @@ function inferKind(entry) {
   return null;
 }
 
+// POSIX single-quote a value for a shell line the operator pastes. Plain path-like words are
+// left bare so ordinary runbook lines read as before.
+function shq(v) {
+  const s = String(v);
+  return /^[A-Za-z0-9_@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+// Split a command line on its control operators (&&, ||, ;, |), keeping each operator with its
+// surrounding spaces as its own element. An operator inside '...' or "..." is data, not a
+// separator; a backslash escapes the next character outside single quotes.
+function splitShell(c) {
+  const out = [];
+  let cur = '';
+  let quote = null;
+  for (let i = 0; i < c.length; i++) {
+    const ch = c[i];
+    if (quote) {
+      cur += ch;
+      if (quote === '"' && ch === '\\' && i + 1 < c.length) cur += c[++i];
+      else if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '\\' && i + 1 < c.length) { cur += ch + c[++i]; continue; }
+    if (ch === "'" || ch === '"') { quote = ch; cur += ch; continue; }
+    const m = /^\s*(?:&&|\|\||;|\|)\s*/.exec(c.slice(i));
+    if (m) {
+      // The operator regex already consumed any whitespace before it. Whitespace left at the end
+      // of cur is an escaped space (`a\ `) that belongs to the argument: keep it there, and give
+      // the operator its own separator so an appended --url lands after the escape, not in it.
+      out.push(cur, /\s$/.test(cur) && !/^\s/.test(m[0]) ? ` ${m[0]}` : m[0]);
+      cur = '';
+      i += m[0].length - 1;
+      continue;
+    }
+    cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
 function filesOf(entry) {
   if (Array.isArray(entry.file)) return entry.file.filter((f) => typeof f === 'string' && f);
   return typeof entry.file === 'string' && entry.file ? [entry.file] : [];
@@ -332,7 +372,7 @@ function main() {
     c = scrubbed;
     // A compound command (&&, ||, ;, |) gets the production --url on every wp call in it,
     // not once at the end, where it would land after a pipe.
-    return c.split(/(\s*(?:&&|\|\||;|\|)\s*)/).map((part) => {
+    return splitShell(c).map((part) => {
       if (!/^wp\s/.test(part)) return part;
       return /(^|\s)--url=\S+/.test(part) ? part.replace(/(^|\s)--url=\S+/, `$1--url=${urlRef}`) : `${part} --url=${urlRef}`;
     }).join('');
@@ -375,7 +415,7 @@ function main() {
   const unshadowed = shadowTargets.filter((e) => !found.includes(e));
   if (unshadowed.length) {
     push(`- [ ] ${fill(S.shadowNone, { list: unshadowed.map((e) => `\`${e}\``).join(', ') })}`,
-      ...fence('bash', unshadowed.map((e) => `ls -l <wp-root>${e}`).join('\n')));
+      ...fence('bash', unshadowed.map((e) => `ls -l <wp-root>${shq(e)}`).join('\n')));
   }
   const codeFiles = [...new Set([...byKind('code'), ...byKind('server')].flatMap(filesOf))];
   const hostFiles = codeFiles.filter((f) => {
@@ -387,11 +427,11 @@ function main() {
   for (const f of hostFiles) push(`- [ ] **${S.found}** ${fill(S.staticHost, { file: f })}`);
   const themeDirs = [...new Set(byKind('code').flatMap(filesOf).map((f) => f.match(/^(wp-content\/(?:themes|plugins|mu-plugins)\/[^/]+)\//)?.[1]).filter(Boolean))];
   if (!hostFiles.length) {
-    push(`- [ ] ${S.staticGrep}`, ...fence('bash', `git grep -n -F '<local-host>' -- ${themeDirs.length ? themeDirs.join(' ') : 'wp-content/themes'}`));
+    push(`- [ ] ${S.staticGrep}`, ...fence('bash', `git grep -n -F '<local-host>' -- ${themeDirs.length ? themeDirs.map(shq).join(' ') : 'wp-content/themes'}`));
   }
   const committed = byKind('code').flatMap(filesOf);
   if (committed.length) {
-    push(`- [ ] ${S.committed}`, ...fence('bash', [...new Set(committed)].map((f) => `git ls-files --error-unmatch -- ${f}`).join('\n')));
+    push(`- [ ] ${S.committed}`, ...fence('bash', [...new Set(committed)].map((f) => `git ls-files --error-unmatch -- ${shq(f)}`).join('\n')));
   }
 
   // --- 2. code -------------------------------------------------------------------------
@@ -406,9 +446,9 @@ function main() {
   for (const slug of themes) {
     push(`- [ ] ${fill(S.theme, { slug })}`, ...fence('bash', `wp option get stylesheet --url=${urlRef}   # ${S.expect}: ${slug}`));
     push(`  ${S.themeActivate}`, ...fence('bash', [
-      `wp option get theme_mods_${slug} --format=json > theme_mods.json        # local`,
-      `wp theme activate ${slug} --url=${urlRef}`,
-      `wp option update theme_mods_${slug} --format=json --url=${urlRef} < theme_mods.json`,
+      `wp option get ${shq(`theme_mods_${slug}`)} --format=json > theme_mods.json        # local`,
+      `wp theme activate ${shq(slug)} --url=${urlRef}`,
+      `wp option update ${shq(`theme_mods_${slug}`)} --format=json --url=${urlRef} < theme_mods.json`,
     ].join('\n')));
     verifyLines.push({ cmd: `wp option get stylesheet --url=${urlRef}`, expect: slug });
   }
@@ -457,7 +497,7 @@ function main() {
       push(`  ${fill(S.noRule, { file: files[0] ?? '.htaccess' })}`, '');
       continue;
     }
-    const sub = (s) => s.split('<endpoint>').join(e.endpoint ?? '<endpoint>').split('<prod-url>').join(urlRef);
+    const sub = (s) => s.split('<prod-url><endpoint>').join(shq(urlRef + e.endpoint)).split('<endpoint>').join(e.endpoint ?? '<endpoint>').split('<prod-url>').join(urlRef);
     for (const lang of order) push(...fence(lang, sub(rule[lang])));
     if (server === 'caddy') push(`  ${S.caddy}`, '');
     verifyLines.push({ cmd: sub(rule.verify), expect: sub(rule.expect) });
@@ -491,7 +531,7 @@ function main() {
 
   function endpointVerify(e) {
     const rule = rules[e.endpoint.endsWith('/') ? 'virtual-endpoint-prefix' : 'virtual-endpoint'];
-    const sub = (s) => s.split('<endpoint>').join(e.endpoint).split('<prod-url>').join(urlRef);
+    const sub = (s) => s.split('<prod-url><endpoint>').join(shq(urlRef + e.endpoint)).split('<endpoint>').join(e.endpoint).split('<prod-url>').join(urlRef);
     return { cmd: sub(rule.verify), expect: sub(rule.expect) };
   }
 

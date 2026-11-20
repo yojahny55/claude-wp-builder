@@ -43,6 +43,91 @@
     }
   }
 
+  // ── Mobile menu + motion toggle (nav.php) ─────────────────────────────
+  // Runs before the scene check so it works on pages that have no scenes.
+  const menu      = document.getElementById('mobile-menu');
+  const hamburger = document.querySelector('.nav__hamburger');
+  if (menu && hamburger) {
+    const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const setMenu = open => {
+      menu.setAttribute('aria-hidden', open ? 'false' : 'true');
+      hamburger.setAttribute('aria-expanded', open ? 'true' : 'false');
+      menu.inert = !open;
+      document.body.style.overflow = open ? 'hidden' : '';
+      if (open) {
+        const first = menu.querySelector(FOCUSABLE);
+        if (first) first.focus();
+      } else if (menu.contains(document.activeElement)) {
+        hamburger.focus();
+      }
+    };
+    const isOpen = () => menu.getAttribute('aria-hidden') === 'false';
+    menu.inert = true;
+    hamburger.addEventListener('click', () => setMenu(true));
+    menu.querySelector('.mobile-menu__close')?.addEventListener('click', () => setMenu(false));
+    menu.querySelectorAll('.mobile-menu__list a').forEach(a => a.addEventListener('click', () => setMenu(false)));
+    document.addEventListener('keydown', e => {
+      if (!isOpen()) return;
+      if (e.key === 'Escape') { e.preventDefault(); setMenu(false); return; }
+      if (e.key !== 'Tab') return;
+      const items = Array.from(menu.querySelectorAll(FOCUSABLE)).filter(el => el.offsetParent !== null);
+      if (!items.length) return;
+      const first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && (document.activeElement === first || !menu.contains(document.activeElement))) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !menu.contains(document.activeElement))) {
+        e.preventDefault(); first.focus();
+      }
+    });
+    // Leaving the mobile layout with the menu open would leave scrolling locked.
+    window.matchMedia('(max-width: 780px)').addEventListener('change', e => { if (!e.matches && isOpen()) setMenu(false); });
+  }
+
+  // One shared play/pause state for every .nav__motion-toggle (WCAG 2.2.2).
+  const MOTION_KEY = 'cinematic-motion';
+  const toggles = Array.from(document.querySelectorAll('.nav__motion-toggle'));
+  // Under reduced motion the engine below strips autoplay and loop and shows posters, so
+  // nothing moves and a "Play motion" control would report playing while nothing plays.
+  // The toggles are hidden instead of offered as a control that does nothing.
+  const reducedAtLoad = mqReduced.matches
+    || document.documentElement.classList.contains('prefers-reduced-motion');
+  if (reducedAtLoad) toggles.forEach(btn => { btn.hidden = true; });
+  let motionPaused = reducedAtLoad;
+  if (!motionPaused) {
+    try { motionPaused = localStorage.getItem(MOTION_KEY) === 'pause'; } catch (e) { /* storage blocked */ }
+  }
+  const allVideos = () => Array.from(document.querySelectorAll('video'));
+  const renderMotion = () => {
+    toggles.forEach(btn => {
+      btn.dataset.state = motionPaused ? 'pause' : 'play';
+      // An action button: the label names what a press does. No pressed state, which
+      // alongside a changing label would announce "Play motion, pressed" while paused.
+      const label = motionPaused ? btn.dataset.labelPlay : btn.dataset.labelPause;
+      if (label) btn.textContent = label;
+    });
+  };
+  const applyMotion = () => {
+    renderMotion();
+    if (motionPaused) {
+      allVideos().forEach(v => v.pause());
+    } else {
+      // Resume only the inline clips the viewer can see; the observers handle the rest.
+      allVideos().forEach(v => {
+        if (!v.classList.contains('scene__video-mobile') || !v.hasAttribute('autoplay')) return;
+        const r = v.getBoundingClientRect();
+        if (r.bottom > 0 && r.top < window.innerHeight) v.play?.().catch(() => {});
+      });
+    }
+  };
+  if (toggles.length && !reducedAtLoad) {
+    toggles.forEach(btn => btn.addEventListener('click', () => {
+      motionPaused = !motionPaused;
+      try { localStorage.setItem(MOTION_KEY, motionPaused ? 'pause' : 'play'); } catch (e) { /* storage blocked */ }
+      applyMotion();
+    }));
+    applyMotion();
+  }
+
   if (!scenes.length) return;
 
   const isMobile = mqMobile.matches;
@@ -126,7 +211,7 @@
       scenes.forEach(s => {
         const v = s.querySelector('.scene__video-mobile');
         if (!v) return;
-        if (s === best.target) { v.play?.().catch(() => {}); }
+        if (s === best.target) { if (!motionPaused) v.play?.().catch(() => {}); }
         else if (!v.paused) { v.pause(); }
       });
     }, { rootMargin: '-35% 0% -35% 0%', threshold: 0 });

@@ -83,4 +83,12 @@ grep -Fq 'need `native`' "$s" || fail "$s does not say store profiles need the n
 ! grep -Fq 'All operations are idempotent' "$s" || fail "$s still makes the unsupported blanket idempotency claim"
 grep -Fq "\"Adopt Mode\" section" "$s" || fail "$s does not send /wp-create's Adopt Mode procedure to the command that owns it"
 
+# Every port the Docker template publishes binds to loopback. A bare "{{port}}:80" publishes on
+# 0.0.0.0, which puts an auto-login phpMyAdmin and the captured mail on any shared network.
+tpl=templates/docker/docker-compose.yml.tpl
+grep -Eq '^ +- "[^"]*\{\{[a-z_]+_port\}\}:' "$tpl" || fail "$tpl publishes no ports; the loopback assertion has nothing to check"
+if grep -En '^ +- "\{\{[a-z_]+_port\}\}:' "$tpl"; then
+  fail "$tpl publishes a port on every interface; bind it to 127.0.0.1"
+fi
+
 echo PASS
