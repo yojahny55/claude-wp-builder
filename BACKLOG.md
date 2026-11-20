@@ -13,9 +13,11 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 
 **Priority:** Items within each section are ordered by priority (highest first).
 
-**Reconciled** on October 27, 2026 against `main` at v1.31.0. Every item below was
-checked against the command, agent or script that would own it — an item claiming to be
-open while the behavior ships reads as a project that does not know what it has built.
+**Reconciled** on November 20, 2026 against `main` at v1.32.0. Every open and partial
+item was checked against what 1.32.0 shipped, and none changed state; the full pass against
+the command, agent or script that would own each item was last made at v1.31.0. An item
+claiming to be open while the behavior ships reads as a project that does not know what it
+has built.
 Larger reworks of delivered behavior are proposals, not backlog items, and are tracked
 separately by the maintainer.
 
