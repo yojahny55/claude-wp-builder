@@ -48,6 +48,10 @@ with only `min-width` queries, like a Tailwind one, has no gap and reports nothi
 `--no-gaps` skips the pass.
 
 
+**On "no pages to verify"** (exit 1, before any browser starts): the target is a directory
+with no `.html` files or a path that does not exist. Fix the target and rerun; never report
+it as a pass, and never fall back to screenshots for it.
+
 **On exit code 2**, fall back in this order: the Chrome or Playwright MCP
 screenshot tools if either is connected, then ask the user for screenshots at the
 five viewports. Say which route you used. (A craft build never reaches this
