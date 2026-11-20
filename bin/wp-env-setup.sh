@@ -92,7 +92,7 @@ detect_os() {
 get_version() {
     local cmd="$1"
     if command -v "$cmd" &>/dev/null; then
-        "$cmd" --version 2>/dev/null | head -1 | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -1 || echo "unknown"
+        "$cmd" --version 2>/dev/null | sed -n 1p | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | sed -n 1p || echo "unknown"
     else
         echo ""
     fi
@@ -101,7 +101,7 @@ get_version() {
 is_running() {
     local service="$1"
     if [[ "$OS" == "macos" ]]; then
-        brew services list 2>/dev/null | grep "$service" | grep -q "started" && echo "true" || echo "false"
+        brew services list 2>/dev/null | grep "$service" | grep -c "started" >/dev/null && echo "true" || echo "false"
     else
         systemctl is-active "$service" &>/dev/null && echo "true" || echo "false"
     fi
@@ -127,7 +127,7 @@ cmd_detect() {
 
     if command -v httpd &>/dev/null || command -v apache2 &>/dev/null; then
         apache_installed=true
-        apache_version=$( (httpd -v 2>/dev/null || apache2 -v 2>/dev/null) | head -1 | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p'  )
+        apache_version=$( (httpd -v 2>/dev/null || apache2 -v 2>/dev/null) | sed -n 1p | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p'  )
         [[ -z "$apache_version" ]] && apache_version="unknown"
         if [[ "$OS" == "fedora" ]] || [[ "$OS" == "rhel" ]]; then
             apache_running=$(is_running httpd)
@@ -189,13 +189,13 @@ cmd_detect() {
     local mariadb_installed=false mariadb_version="" mariadb_running=false
     local mysql_installed=false mysql_version="" mysql_running=false
 
-    if command -v mariadb &>/dev/null || (command -v mysql &>/dev/null && mysql --version 2>/dev/null | grep -qi mariadb); then
+    if command -v mariadb &>/dev/null || (command -v mysql &>/dev/null && mysql --version 2>/dev/null | grep -ci mariadb >/dev/null); then
         mariadb_installed=true
-        mariadb_version=$(mariadb --version 2>/dev/null | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -1 || echo "unknown")
+        mariadb_version=$(mariadb --version 2>/dev/null | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | sed -n 1p || echo "unknown")
         mariadb_running=$(is_running mariadb || is_running mysql)
     elif command -v mysql &>/dev/null; then
         mysql_installed=true
-        mysql_version=$(mysql --version 2>/dev/null | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -1 || echo "unknown")
+        mysql_version=$(mysql --version 2>/dev/null | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | sed -n 1p || echo "unknown")
         mysql_running=$(is_running mysql || is_running mysqld)
     fi
 

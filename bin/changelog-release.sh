@@ -44,7 +44,7 @@ for f in ${frags[@]+"${frags[@]}"}; do
   sec=${base##*.}
   [[ " $order " == *" $sec "* && "$base" == *.* ]] \
     || { echo "$f: name must be <slug>.<section>.md with section in: $order" >&2; exit 1; }
-  head -n1 "$f" | grep -q '^- ' || { echo "$f: must start with '- '" >&2; exit 1; }
+  sed -n 1p "$f" | grep -c '^- ' >/dev/null || { echo "$f: must start with '- '" >&2; exit 1; }
 done
 [ ! -s "$tmp/stray" ] || { echo "[Unreleased] has text outside any ### section; move it under one first:" >&2; cat "$tmp/stray" >&2; exit 1; }
 for o in "$tmp"/old.*; do

@@ -673,13 +673,13 @@ else
 			# Standard hash: sha256("$url|webp")
 			ITEM_HASH=$(echo -n "${s_url}|webp" | sha256sum | awk '{print $1}')
 			SUFFIX_HASH=$(echo -n "${s_url}|webp|${post_id}" | sha256sum | awk '{print $1}')
-			if [[ -n "$POST_HASHES" ]] && echo "$POST_HASHES" | grep -qxF -e "$ITEM_HASH" -e "$SUFFIX_HASH"; then
+			if [[ -n "$POST_HASHES" ]] && grep -qxF -e "$ITEM_HASH" -e "$SUFFIX_HASH" <<< "$POST_HASHES"; then
 				continue
 			fi
-			if echo "$EXISTING_HASHES" | grep -qF "$ITEM_HASH"; then
+			if grep -qxF -e "$ITEM_HASH" <<< "$EXISTING_HASHES"; then
 				# Collision → add |$post_id suffix
 				ITEM_HASH="$SUFFIX_HASH"
-				echo "$EXISTING_HASHES" | grep -qF "$ITEM_HASH" && continue
+				grep -qxF -e "$ITEM_HASH" <<< "$EXISTING_HASHES" && continue
 			fi
 
 			WEBP_PATH="${s_path}.webp"

@@ -259,7 +259,7 @@ mkdir -p "$dir"
 # The refusal names what it found: the usual cause is a log or a note somebody wrote into the
 # directory before its first run, and "not empty" alone sent a run off to guess which file.
 if [ -n "$(ls -A "$dir" 2>/dev/null || true)" ] && [ ! -f "$dir/VENDORED-FROM.txt" ]; then
-  stray="$(ls -A "$dir" | head -n 10 | sed 's/^/    /')"
+  stray="$(ls -A "$dir" | sed -n '1,10s/^/    /p')"
   count="$(ls -A "$dir" | wc -l | tr -d ' ')"
   cat >&2 <<EOF
 audit-suite: $dir is not empty and carries no VENDORED-FROM.txt, so it is not a suite this

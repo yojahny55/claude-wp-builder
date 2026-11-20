@@ -76,7 +76,7 @@ run_mirror() {
 
     if [[ "${other:-0}" -gt 0 ]]; then
         echo "ERROR: mcli reported an error during the transfer." >&2
-        grep '<ERROR>' "$log" | grep -v 'Overwrite not allowed' | head -5 >&2
+        grep '<ERROR>' "$log" | grep -v 'Overwrite not allowed' | sed -n 1,5p >&2
         failed=yes
     fi
 

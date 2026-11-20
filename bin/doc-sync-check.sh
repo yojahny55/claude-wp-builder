@@ -132,8 +132,8 @@ fi
 # `|| true` on every extraction: under `set -euo pipefail` a grep that matches
 # nothing fails the pipeline and aborts the script, so a MISSING version would
 # exit silently instead of reporting — the guards below would never run.
-v_plugin=$(grep -oE '"version": "[0-9]+\.[0-9]+\.[0-9]+"' .claude-plugin/plugin.json | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
-v_badge=$(grep -oE 'version-[0-9]+\.[0-9]+\.[0-9]+-blue' "$README" | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+v_plugin=$(grep -oE '"version": "[0-9]+\.[0-9]+\.[0-9]+"' .claude-plugin/plugin.json | sed -n 1p | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+v_badge=$(grep -oE 'version-[0-9]+\.[0-9]+\.[0-9]+-blue' "$README" | sed -n 1p | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
 # `while read` rather than `mapfile`: mapfile is bash 4+, and macOS still ships bash
 # 3.2 as /bin/bash. A gate that aborts on a contributor's machine teaches them to
 # skip it.
