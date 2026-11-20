@@ -72,7 +72,9 @@ q "$(tr '\n' ' ' < "$skill")" -F 'unquoted identifier: `has-[[aria-expanded=true
 hid=$(awk '/^## `hidden` is two different things/{f=1; next} f && /^## /{exit} f' "$skill")
 [ -n "$hid" ] || fail "$skill lost the hidden-attribute vs hidden-utility section"
 q "$hid" -F 'hidden with the ATTRIBUTE alone' || fail "$skill no longer says a script-toggled element is hidden with the attribute alone"
-rightline=$(printf '%s\n' "$hid" | awk '/<!-- right -->/{getline; print; exit}')
+# Here-string, not a pipe: awk exits early, and printf into a closed pipe is a silent
+# SIGPIPE exit under pipefail and set -e.
+rightline=$(awk '/<!-- right -->/{getline; print; exit}' <<<"$hid")
 [ -n "$rightline" ] || fail "$skill's hidden section marks no example as right"
 q "$rightline" -E 'class="([^"]* )?hidden[ "]' && fail "$skill marks an element carrying both the hidden utility and the attribute as right: $rightline"
 # 4d. One .btn: the starter's components/buttons.css owns it.

@@ -18,7 +18,7 @@ defined('ABSPATH') || exit;
  * Override via filter: `__starter___is_cinematic`.
  */
 function __starter___is_cinematic(): bool {
-    $is = is_front_page() || is_page_template('templates/cinematic.php');
+    $is = is_front_page();
     return (bool) apply_filters('__starter___is_cinematic', $is);
 }
 

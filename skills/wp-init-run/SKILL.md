@@ -19,6 +19,7 @@ read it whole and follow it in order.
 | Step | File | Covers |
 |---|---|---|
 | 0, Demo-First Path | [references/demo-first.md](references/demo-first.md) | Steps D1-D5: delimiter check, project details from the demo, confirmation, colours and fonts with the craft token aliases, `@theme static`, the `--container-max` guard, the `/wp-tailwindify` decision |
+| 0.4 | [references/flag-intake.md](references/flag-intake.md) | The flags `/wp-cinematic-init` hands off (`--path`, `--mode`, `--starter`, `--acf-flavor`, `--no-hybrid`), what each presets, and the no-redispatch rule |
 | 4.5 | [references/font-carry.md](references/font-carry.md) | Self-hosting every family the theme names, the Google Fonts fetch, `font-display: swap`, the one preload, the no-network fallback |
 | 5 | [references/i18n.md](references/i18n.md) | The Polylang variant of `inc/i18n.php`, `SUPPORTED_LANGS` and `DEFAULT_LANG`, the field-suffix rewrite |
 | 7 | [references/claude-md.md](references/claude-md.md) | The project `.claude/CLAUDE.md` template, its `## WP-CLI` and `## Demo` sections |

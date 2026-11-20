@@ -53,7 +53,8 @@ Each check is a standalone bash script that prints `PASS` or exits non-zero. No 
 
 ```bash
 bash tests/checks/wp-yolo-gate.sh                    # one check
-for f in tests/checks/*.sh; do bash "$f"; done       # all checks
+bash tests/run.sh                                    # all checks, in parallel (-j N, --exclude "...")
+for f in tests/checks/*.sh; do bash "$f"; done       # all checks, serially
 ```
 
 The browser checks (`demo-verify-engines.sh` and the others that drive a browser) need a

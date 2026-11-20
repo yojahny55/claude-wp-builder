@@ -6,7 +6,7 @@
 # (no browser) and, when a Chromium is available, renders a card from a local fixture and
 # asserts the injected "after" out-specifies the existing rule.
 set -uo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../.." || exit 1
 fail() { echo "FAIL: $*"; exit 1; }
 tool=bin/decision-sheet.mjs
 [ -f "$tool" ] || fail "$tool is missing"

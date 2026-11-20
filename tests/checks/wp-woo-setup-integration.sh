@@ -359,6 +359,7 @@ q 'update_option( "cfturnstile_secret", "1x0000000000000000000000000000000AA" );
 # The checkout limit: the fourth attempt in a minute is refused -- and only because of the setting.
 burst() { t=$(token); c=""; for _ in 1 2 3 4; do c="$c $(post "$t" checkout '{"payment_method":"cod"}' | code_of)"; done; echo "$c"; }
 clear_limits
+# shellcheck disable=SC2046  # burst() prints four space-separated codes; splitting them into $1..$4 is the point
 set -- $(burst)
 [ "${4:-}" = "rate_limit_exceeded" ] || fail "the fourth checkout attempt in a minute was not refused: $*"
 for c in "$1" "$2" "$3"; do [ "$c" != "rate_limit_exceeded" ] || fail "an attempt under the limit was refused: $*"; done
