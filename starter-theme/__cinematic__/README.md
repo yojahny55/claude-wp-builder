@@ -37,7 +37,7 @@ To preserve hand edits across regeneration, wrap them in:
 - `header.php`, `footer.php` (standard parts)
 - `inc/performance.php`, `inc/security.php` (head cleanup and the security baseline — XML-RPC, user enumeration, file editors, response headers)
 
-These are kept in sync with the kit via `/wp-cinematic-init --update-kit`, which copies fresh from the installed kit and shows a diff before overwriting.
+These are copied from the kit when the theme is scaffolded. Nothing re-syncs them afterwards: to pick up a newer kit, update it (re-run `npx skills add yojahny55/cinematic-scroll-kit -g -y`, or `git pull` inside `.cinematic-kit`) and copy the changed files over by hand, reviewing the diff first.
 
 ## Engine boot
 
