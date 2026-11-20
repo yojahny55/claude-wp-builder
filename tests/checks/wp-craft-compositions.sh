@@ -50,7 +50,7 @@ grep -Fq -- "container: p('spacing.container'" "$r" \
 # already exited by then, and seeing that would take the render itself.
 tokens="$(node "$r" --tokens)" \
   || fail "$r --tokens does not print the preview :root, so the emitted tokens cannot be asserted at all"
-echo "$tokens" | grep -Eq -- '--container-max:[^;}]*[0-9](px|rem|em|ch|vw|vmin|%)' \
+echo "$tokens" | grep >/dev/null -Ec -- '--container-max:[^;}]*[0-9](px|rem|em|ch|vw|vmin|%)' \
   || fail "$r emits a --container-max that is not a CSS length: $(echo "$tokens" | tr '\n' ' ')"
 
 c=skills/wp-demo-craft/compositions
@@ -207,7 +207,7 @@ for cssf in skills/wp-demo-craft/compositions/*/section.css; do
     inline_hit=""
     while IFS= read -r decl; do
       [ -n "$decl" ] || continue
-      printf '%s' "$decl" | grep -qE "$BLOCK_AXIS" && continue
+      printf '%s' "$decl" | grep >/dev/null -cE "$BLOCK_AXIS" && continue
       inline_hit="$decl"
       break
     done <<EOF_DECLS
@@ -303,7 +303,7 @@ for f in skills/wp-demo-craft/compositions/*/section.css; do
     *)                    sel="$name" ;;
   esac
   strip_comments "$f" | sed -n "/^\.$sel {\$/,/^}\$/p" \
-    | grep -Eq -- 'padding-inline:[^;]*var\(--container-max, *1280px\)' && n=$((n + 1))
+    | grep >/dev/null -Ec -- 'padding-inline:[^;]*var\(--container-max, *1280px\)' && n=$((n + 1))
 done
 [ "$n" -ge 13 ] \
   || fail "only $n compositions constrain content width against var(--container-max, 1280px) on the rule that carries their inline gutter, expected 13"
@@ -322,14 +322,14 @@ pr_media=$(sed -n '/^@media (prefers-reduced-motion: reduce) {$/,/^}$/p' "$PR_CS
 [ -n "$pr_media" ] || fail "process-rail/section.css has no prefers-reduced-motion media block"
 pr_frame_rule=$(printf '%s\n' "$pr_media" | grep -F '.process-rail__frame {')
 [ -n "$pr_frame_rule" ] || fail "process-rail/section.css has no .process-rail__frame rule inside prefers-reduced-motion"
-printf '%s\n' "$pr_frame_rule" | grep -Eq 'overflow-x:[[:space:]]*auto' \
+printf '%s\n' "$pr_frame_rule" | grep >/dev/null -Ec 'overflow-x:[[:space:]]*auto' \
   || fail "process-rail__frame has no overflow-x: auto inside prefers-reduced-motion, so the rail overflows the whole document instead of scrolling"
 # overflow: visible is a shorthand for BOTH axes, so it resets overflow-x too.
 # If overflow-x: auto is declared before that shorthand in the same rule, the
 # shorthand wins by source order and silently undoes the fix while the grep
 # above stays green — require the longhand strictly after the shorthand.
-pr_shorthand_at=$(printf '%s' "$pr_frame_rule" | grep -boE 'overflow:[[:space:]]*visible' | head -1 | cut -d: -f1)
-pr_longhand_at=$(printf '%s' "$pr_frame_rule" | grep -boE 'overflow-x:[[:space:]]*auto' | head -1 | cut -d: -f1)
+pr_shorthand_at=$(printf '%s' "$pr_frame_rule" | grep -boE 'overflow:[[:space:]]*visible' | sed -n 1p | cut -d: -f1)
+pr_longhand_at=$(printf '%s' "$pr_frame_rule" | grep -boE 'overflow-x:[[:space:]]*auto' | sed -n 1p | cut -d: -f1)
 if [ -n "$pr_shorthand_at" ] && [ -n "$pr_longhand_at" ]; then
   [ "$pr_longhand_at" -gt "$pr_shorthand_at" ] \
     || fail "process-rail__frame declares overflow-x: auto before the overflow: visible shorthand, so the shorthand resets it back to visible"
@@ -344,7 +344,7 @@ fi
 # scrollbar on a horizontal scroller, and the declaration that caused it would
 # not be in the file. `hidden` clips that overflow instead, which is the wanted
 # behaviour here and the reason the axis is stated at all.
-printf '%s' "$pr_frame_rule" | grep -qE 'overflow-y:[[:space:]]*hidden' \
+printf '%s' "$pr_frame_rule" | grep >/dev/null -cE 'overflow-y:[[:space:]]*hidden' \
   || fail "process-rail__frame does not state overflow-y explicitly inside prefers-reduced-motion, so it computes to auto and puts a second vertical scrollbar on a horizontal scroller as soon as anything grows past the frame"
 
 # A scroll container no keyboard can reach is not a fix, it is a different bug
@@ -359,7 +359,7 @@ printf '%s' "$pr_frame_rule" | grep -qE 'overflow-y:[[:space:]]*hidden' \
 PR_HTML=skills/wp-demo-craft/compositions/process-rail/section.html
 pr_frame_tag=$(grep -F 'class="process-rail__frame"' "$PR_HTML")
 [ -n "$pr_frame_tag" ] || fail "$PR_HTML has no .process-rail__frame element"
-printf '%s' "$pr_frame_tag" | grep -Eq 'tabindex=|role=|aria-label=' \
+printf '%s' "$pr_frame_tag" | grep >/dev/null -Ec 'tabindex=|role=|aria-label=' \
   && fail "$PR_HTML's .process-rail__frame carries a static tabindex/role/aria-label, which at default motion is a dead tab stop and a landmark on a region that cannot be scrolled"
 M=starter-theme/__tailwind__/assets/js/src/motion.js
 # Scoped to the reduced branch of the pan device, by its own brace range: the
@@ -367,7 +367,7 @@ M=starter-theme/__tailwind__/assets/js/src/motion.js
 # a whole-file grep while restoring exactly the defect above.
 pan_reduced="$(awk '/if \(kind === .pan.\)/,/^    if \(kind === .reveal./' "$M" | awk '/if \(reduced\) \{/,/^        \} else \{/' | grep -v '^[[:space:]]*//' || true)"
 [ -n "$pan_reduced" ] || fail "$M has no reduced-motion branch in the pan device, so the rail's keyboard affordance cannot be checked"
-printf '%s' "$pan_reduced" | grep -Fq 'const scroller = ' \
+printf '%s' "$pan_reduced" | grep >/dev/null -Fc 'const scroller = ' \
   || fail "$M's pan/reduced branch no longer picks the box that actually scrolls, so the affordance lands on an element the arrow keys do not move"
 # The affordance is attached only when a box ACTUALLY overflows. Without the
 # null arm, a rail below process-rail's own documented three-step minimum falls
@@ -375,21 +375,21 @@ printf '%s' "$pan_reduced" | grep -Fq 'const scroller = ' \
 # named region that scrolls nothing, which is the same dead tab stop this whole
 # block was written to remove. Measured: short rail picks `container` unguarded
 # (scrolls=false) and `null` guarded.
-printf '%s' "$pan_reduced" | grep -Fq ': null;' \
+printf '%s' "$pan_reduced" | grep >/dev/null -Fc ': null;' \
   || fail "motion.js's reduced-motion pan branch attaches the keyboard affordance without a no-overflow arm, so a rail too short to scroll still ships a focusable named region that scrolls nothing"
 # Anchored on the NAMING branch's own condition, not the bare `if (scroller && `
 # prefix: that prefix also opens the tabindex line, so a grep for it is satisfied
 # by the wrong occurrence and stays green while the naming branch loses its guard.
-printf '%s' "$pan_reduced" | grep -Fq 'if (scroller && heading && ' \
+printf '%s' "$pan_reduced" | grep >/dev/null -Fc 'if (scroller && heading && ' \
   || fail "motion.js sets the rail's accessible name without checking that a scroller was found, so a section with no overflow can still be given role=region"
-printf '%s' "$pan_reduced" | grep -Fq 'tabIndex = 0' \
+printf '%s' "$pan_reduced" | grep >/dev/null -Fc 'tabIndex = 0' \
   || fail "$M's pan/reduced branch does not make the scroll region focusable, so a keyboard-only user cannot reach the steps past the fold under reduced motion"
-printf '%s' "$pan_reduced" | grep -Fq "setAttribute('role', 'region')" \
+printf '%s' "$pan_reduced" | grep >/dev/null -Fc "setAttribute('role', 'region')" \
   || fail "$M's pan/reduced branch does not expose the scroll region as a landmark"
 # aria-labelledby onto the section's own heading, never a literal: a label
 # written in the markup ships one language on a bilingual site, and an
 # unsubstituted {{slot}} would be read out verbatim as the region's name.
-printf '%s' "$pan_reduced" | grep -Fq "setAttribute('aria-labelledby', heading.id)" \
+printf '%s' "$pan_reduced" | grep >/dev/null -Fc "setAttribute('aria-labelledby', heading.id)" \
   || fail "$M's pan/reduced branch names the region with something other than the section's own heading"
 
 # Nothing that becomes an accessible name may reach a reader as a raw {{slot}}.

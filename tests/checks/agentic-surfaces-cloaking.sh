@@ -24,8 +24,8 @@ grep -qi 'bingbot' "$f" || fail "$f must exclude bingbot from the agent/markdown
 
 # The indexer exclusion must appear, in source order, before the generic bot|crawl|spider
 # pattern — excluding after would already have returned true for "Googlebot".
-indexer_line=$(grep -n 'googlebot' "$f" | head -1 | cut -d: -f1)
-generic_line=$(grep -n "bot|crawl|spider|agent|curl|wget|python|httpx|libwww|httpclient" "$f" | head -1 | cut -d: -f1)
+indexer_line=$(grep -n 'googlebot' "$f" | sed -n 1p | cut -d: -f1)
+generic_line=$(grep -n "bot|crawl|spider|agent|curl|wget|python|httpx|libwww|httpclient" "$f" | sed -n 1p | cut -d: -f1)
 [ -n "$indexer_line" ] && [ -n "$generic_line" ] || fail "$f is missing one of the two UA patterns"
 [ "$indexer_line" -lt "$generic_line" ] || fail "$f must exclude named indexers BEFORE the generic bot pattern, not after"
 

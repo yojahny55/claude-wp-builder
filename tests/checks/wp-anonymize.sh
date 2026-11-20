@@ -32,7 +32,7 @@ f=commands/wp-anonymize.md
 flat=$(tr '\n\t\r' ' ' < "$f" | tr -s ' ')
 # `--` terminates options: a needle starting with a dash is otherwise parsed by grep as one,
 # which dies with a usage error instead of reporting a miss.
-need() { printf '%s' "$flat" | grep -Fq -- "$1" || fail "$2"; }
+need() { printf '%s' "$flat" | grep >/dev/null -Fc -- "$1" || fail "$2"; }
 
 # The cross-reference file needs the same guard $f got, and for a sharper reason: this one
 # is read by a redirect inside a command substitution, so under `set -euo pipefail` a missing
@@ -43,7 +43,7 @@ need() { printf '%s' "$flat" | grep -Fq -- "$1" || fail "$2"; }
 [ -f "$c" ] || fail "$c is missing -- /wp-anonymize's contract depends on /wp-clone naming it"
 [ -r "$c" ] || fail "$c exists but cannot be read"
 cflat=$(tr '\n\t\r' ' ' < "$c" | tr -s ' ')
-cneed() { printf '%s' "$cflat" | grep -Fq -- "$1" || fail "$2"; }
+cneed() { printf '%s' "$cflat" | grep >/dev/null -Fc -- "$1" || fail "$2"; }
 
 # ---------------------------------------------------------------------------
 # 1. The gate. This is the only guard against the one catastrophic mistake, and it must

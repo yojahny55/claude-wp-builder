@@ -19,7 +19,7 @@ for f in changes/*.md; do
   b=$(basename "$f" .md)
   [[ "$b" == *.* ]] || fail "$f: name must be <slug>.<section>.md"
   [[ " $order " == *" ${b##*.} "* ]] || fail "$f: section '${b##*.}' is not one of: $order"
-  head -n1 "$f" | grep -q '^- ' || fail "$f: first line must start with '- '"
+  head -n1 "$f" | grep >/dev/null -c '^- ' || fail "$f: first line must start with '- '"
   grep -q '^#' "$f" && fail "$f: carries a heading; the release script adds the section heading"
 done
 [ -f changes/README.md ] || fail "changes/README.md is missing"
@@ -40,7 +40,7 @@ out="$t/CHANGELOG.md"
 grep -qx '## \[Unreleased\]' "$out" || fail "release script dropped the Unreleased anchor"
 grep -qx '## \[1.1.0\] - 2026-02-02' "$out" || fail "release script wrote no release heading"
 # shellcheck disable=SC2010  # fixture dir with fixed ASCII names; the listing is the assertion
-ls "$t/changes" | grep -qx 'a.fixed.md' && fail "release script left a compiled fragment behind"
+ls "$t/changes" | grep >/dev/null -cx 'a.fixed.md' && fail "release script left a compiled fragment behind"
 [ -f "$t/changes/README.md" ] || fail "release script deleted changes/README.md"
 awk '/^## \[Unreleased\]/{u=NR} /^## \[1.1.0\]/{r=NR} /^## \[1.0.0\]/{o=NR} END{exit !(u<r && r<o)}' "$out" \
   || fail "release block is not between Unreleased and the previous release"

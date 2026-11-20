@@ -18,8 +18,8 @@ for f in nginx.conf.tpl nginx-no-ssl.conf.tpl; do
   grep -Fq 'try_files $uri =404;' "$p" || fail "$f: no try_files guard before fastcgi"
   ! grep -Fq 'location ~ /\.ht {' "$p" || fail "$f: still has the narrow /.ht rule"
   # regex locations match in order: the denies must precede the PHP block
-  deny=$(grep -Fn 'location ~* /uploads/.*\.php$ { deny all; }' "$p" | head -1 | cut -d: -f1 || true)
-  php=$(grep -Fn 'location ~ \.php$' "$p" | head -1 | cut -d: -f1 || true)
+  deny=$(grep -Fn 'location ~* /uploads/.*\.php$ { deny all; }' "$p" | sed -n 1p | cut -d: -f1 || true)
+  php=$(grep -Fn 'location ~ \.php$' "$p" | sed -n 1p | cut -d: -f1 || true)
   [ -n "$deny" ] && [ -n "$php" ] && [ "$deny" -lt "$php" ] || fail "$f: uploads deny must come before the PHP location"
   for ph in '{{domain}}' '{{document_root}}' '{{php_fpm_sock}}' '{{max_upload_size}}'; do
     grep -Fq "$ph" "$p" || fail "$f lost placeholder $ph"
@@ -40,9 +40,9 @@ for f in apache.conf.tpl apache-no-ssl.conf.tpl; do
   ! grep -Fq '<LocationMatch "^/wp-content/uploads/.*\.php' "$p" || fail "$f: old case-sensitive uploads rule is bypassed by evil.PHP and evil.php.jpg"
   printf '%s\n' '/wp-content/uploads/2026/evil.php/foo' '/wp-content/uploads/2026/evil.php/x.jpg' '/wp-content/uploads/2026/evil.php' \
     '/wp-content/uploads/2026/evil.php.jpg' '/wp-content/uploads/2026/evil.PHP' '/wp-content/uploads/2026/evil.Php5' '/wp-content/uploads/2026/e.phtml' '/wp-content/uploads/2026/e.phar' '/wp-content/uploads/2026/e.pht' |
-    while IFS= read -r u; do printf '%s' "$u" | grep -Eiq '^/wp-content/uploads/.*\.(php[0-9]?|phar|pht(ml)?)(\.|/|$)' || fail "$f: case $u not matched"; done
+    while IFS= read -r u; do printf '%s' "$u" | grep >/dev/null -Eic '^/wp-content/uploads/.*\.(php[0-9]?|phar|pht(ml)?)(\.|/|$)' || fail "$f: case $u not matched"; done
   for ok in /index.php/foo /wp-content/uploads/2026/x.php_.jpg /wp-content/uploads/2026/my.phpunit.pdf /wp-content/uploads/2026/a.jpg; do
-    ! printf '%s' "$ok" | grep -Eiq '^/wp-content/uploads/.*\.(php[0-9]?|phar|pht(ml)?)(\.|/|$)' || fail "$f: rule must not touch $ok"
+    ! printf '%s' "$ok" | grep >/dev/null -Eic '^/wp-content/uploads/.*\.(php[0-9]?|phar|pht(ml)?)(\.|/|$)' || fail "$f: rule must not touch $ok"
   done
   # DirectoryMatch compares the filesystem path: a docroot under a dot-directory or an ancestor
   # named uploads would be denied wholesale, so the rules must be URL-side.

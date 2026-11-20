@@ -29,7 +29,7 @@ suite=$(awk '/^### Ask for the browser suite up front/{on=1;print;next} on&&/^#/
 grep -Fq 'When the flag was passed, do not ask.' <<<"$suite" \
   || fail "Step 1 asks for the suite even when --suite was typed"
 
-line_of() { grep -nF -- "$1" "$audit" | head -1 | cut -d: -f1 || true; }
+line_of() { grep -nF -- "$1" "$audit" | sed -n 1p | cut -d: -f1 || true; }
 q=$(line_of 'Also run the browser suite (web-portal-audit')
 ro=$(line_of '[A] Report only')
 adopt=$(line_of '[A] Adopt it now')
@@ -39,7 +39,7 @@ install=$(line_of '[A] Install all recommended WordPress plugins')
 [ "$q" -lt "$adopt" ] || fail "suite question comes after the adoption prompt"
 [ "$q" -lt "$install" ] || fail "suite question comes after the plugin-install prompt"
 
-tr '\n' ' ' < docs/commands.md | grep -Fq 'question of the run also asks whether to run the suite' \
+tr '\n' ' ' < docs/commands.md | grep >/dev/null -Fc 'question of the run also asks whether to run the suite' \
   || fail "docs/commands.md does not describe the suite question"
 
 echo PASS

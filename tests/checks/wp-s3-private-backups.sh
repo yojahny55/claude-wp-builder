@@ -56,7 +56,7 @@ grep -Fq "fixture-secret" "$root/s3-config.php" || fail "the secret in --secret-
 
 # Nothing backup-shaped beside the originals; the copies are private.
 ! ls "$root"/*.bak-* >/dev/null 2>&1 || fail "a .bak-* file was left in the docroot"
-bdir="$(find "$home/.local/state/wp-s3-backups" -mindepth 1 -maxdepth 1 -type d | head -1)"
+bdir="$(find "$home/.local/state/wp-s3-backups" -mindepth 1 -maxdepth 1 -type d | sed -n 1p)"
 [ -n "$bdir" ] || fail "no backup directory under the home state dir"
 case "$(file_mode "$bdir")" in 700|0700) ;; *) false ;; esac || fail "backup directory is not 0700"
 shopt -s nullglob
@@ -117,7 +117,7 @@ HOME="$home" WP_S3_BACKUP_DIR='' XDG_STATE_HOME='' bash "$revert" "$root" --keep
   || { cat "$tmp/revert.out"; fail "revert failed against the fixture root"; }
 [ ! -e "$root/s3-config.php" ] && [ ! -e "$root/s3-config.php.disabled" ] \
   || fail "revert left the S3 config in the docroot"
-parked=$(find "$home/.local/state/wp-s3-backups" -type f -name 's3-config.php.disabled*' | head -1)
+parked=$(find "$home/.local/state/wp-s3-backups" -type f -name 's3-config.php.disabled*' | sed -n 1p)
 [ -n "$parked" ] || fail "revert did not park s3-config.php outside the docroot"
 [ "$(file_mode "$parked")" = 600 ] || [ "$(file_mode "$parked")" = 0600 ] || fail "parked s3-config.php is not 0600"
 

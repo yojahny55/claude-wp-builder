@@ -42,9 +42,9 @@ grep -Fq 'missing required "source" or "hash" property' "$t/malformed.out" || fa
 printf '{"sheets":{"assets/css/bundle.min.css":"%s"},"cuts":{"assets/critical/single.css":{"source":"assets/css/bundle.min.css","hash":"%s"}}}' "$h" "$h" > "$t/assets/build.json"
 echo 'a{color:blue}' > "$t/assets/css/bundle.min.css"
 out=$(node bin/assets-fresh.mjs "$t" 2>&1) && fail "changed sheet passed as fresh"
-printf '%s' "$out" | grep -Fq 'regenerate critical cuts' || fail "stale output lacks the message"
+printf '%s' "$out" | grep >/dev/null -Fc 'regenerate critical cuts' || fail "stale output lacks the message"
 rm "$t/assets/build.json"
-node bin/assets-fresh.mjs "$t" | grep -Fq SKIP || fail "missing manifest should SKIP"
+node bin/assets-fresh.mjs "$t" | grep >/dev/null -Fc SKIP || fail "missing manifest should SKIP"
 
 # Test missing cut file on disk
 t2=$(mktemp -d); cleanup_dirs="$t $t2"
@@ -55,7 +55,7 @@ h2=$(node -e 'const fs=require("fs"),crypto=require("crypto");process.stdout.wri
 printf '{"sheets":{"assets/css/bundle.min.css":"%s"},"cuts":{"assets/critical/single.css":{"source":"assets/css/bundle.min.css","hash":"%s"}}}' "$h2" "$h2" > "$t2/assets/build.json"
 rm "$t2/assets/critical/single.css"
 out2=$(node bin/assets-fresh.mjs "$t2" 2>&1) && fail "missing cut file passed as fresh"
-printf '%s' "$out2" | grep -Fq 'regenerate critical cuts' || fail "missing cut output lacks the message"
+printf '%s' "$out2" | grep >/dev/null -Fc 'regenerate critical cuts' || fail "missing cut output lacks the message"
 [[ $(printf '%s' "$out2" | grep -c 'cut assets/critical/single.css') -eq 1 ]] || fail "missing cut reported more than once"
 
 # Unknown flag is refused rather than its value being taken for the theme dir
@@ -66,6 +66,6 @@ echo 'a{color:red}' > "$t2/assets/critical/single.css"
 rm "$t2/assets/css/bundle.min.css"
 printf '{"cuts":{"assets/critical/single.css":{"source":"assets/css/bundle.min.css","hash":"%s"}}}' "$h2" > "$t2/assets/build.json"
 out3=$(node bin/assets-fresh.mjs "$t2" 2>&1) && fail "missing source sheet passed as fresh"
-printf '%s' "$out3" | grep -Fq 'is missing' || fail "missing source output lacks 'is missing'"
+printf '%s' "$out3" | grep >/dev/null -Fc 'is missing' || fail "missing source output lacks 'is missing'"
 
 echo PASS

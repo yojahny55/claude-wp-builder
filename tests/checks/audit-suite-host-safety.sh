@@ -75,7 +75,7 @@ rc=0
 ! grep -Fq 're-running through bin/prod-gate.sh' "$tmp/out-v6" || { cat "$tmp/out-v6"; fail "a child holding the gate for an IPv6 host re-ran the gate"; }
 
 # 3. Consecutive timeouts stop the run; the runner turns that into UNMEASURED, exit 2.
-node "$suite/guard/timeout-guard.selfcheck.js" | grep -Fq PASS || fail "the timeout guard self-check fails"
+node "$suite/guard/timeout-guard.selfcheck.js" | grep >/dev/null -Fc PASS || fail "the timeout guard self-check fails"
 has "$suite/playwright.guard.config.js" 'guard/timeout-guard'
 has "$runner" 'UNMEASURED: the browser tier did not complete'
 has "$runner" '--max-timeouts'
@@ -95,7 +95,7 @@ JSON
 node bin/audit-report.mjs --run "$tmp/run.json" --out "$tmp/out-report" --format both --date 2026-01-01 >/dev/null \
   || fail "audit-report.mjs failed on tier3-unmeasured input"
 for f in md html; do
-  head -n 40 "$tmp/out-report/informe-2026-01-01.$f" | grep -Eq '(\*\*|<strong>)Tier 3 \(browser measurement\) was NOT measured' \
+  head -n 40 "$tmp/out-report/informe-2026-01-01.$f" | grep >/dev/null -Ec '(\*\*|<strong>)Tier 3 \(browser measurement\) was NOT measured' \
     || fail "informe-*.$f has no bold Tier 3 UNMEASURED line in its first 40 lines"
 done
 echo '{"site":"Example","findings":[],"unmeasured":[]}' > "$tmp/run2.json"

@@ -181,7 +181,7 @@ done
 # --- A second run changes nothing and duplicates nothing ------------------------------------
 counts=$(rows)
 out=$(run_setup) || fail "the second run failed: $out"
-grep -q '^setup: 0 set' <<<"$out" || fail "the second run changed something: $(grep -E '^(set|client) ' <<<"$out" | head -5)"
+grep -q '^setup: 0 set' <<<"$out" || fail "the second run changed something: $(grep -E '^(set|client) ' <<<"$out" | sed -n '1,5p')"
 [ "$(rows)" = "$counts" ] || fail "the second run added rows ($counts -> $(rows))"
 
 # --- Ownership -------------------------------------------------------------------------------
@@ -219,10 +219,10 @@ run_setup >/dev/null || fail "restoring the block failed"
 cid=$(q 'echo (int) get_option( "woocommerce_checkout_page_id" );')
 set_block 's["checkout"] = "shortcode"; s["checkout_reason"] = "an extension that does not support the checkout block"'
 out=$(run_setup) || fail "the shortcode run failed: $out"
-q "echo get_post_field( 'post_content', $cid );" | grep -Fq '[woocommerce_checkout]' || fail "checkout shortcode did not reach the checkout page: $out"
+q "echo get_post_field( 'post_content', $cid );" | grep >/dev/null -Fc '[woocommerce_checkout]' || fail "checkout shortcode did not reach the checkout page: $out"
 set_block 's["checkout"] = "block"; s.pop("checkout_reason")'
 out=$(run_setup) || fail "the block run failed: $out"
-q "echo get_post_field( 'post_content', $cid );" | grep -Fq '<!-- wp:woocommerce/checkout' || fail "checkout block did not restore the block checkout: $out"
+q "echo get_post_field( 'post_content', $cid );" | grep >/dev/null -Fc '<!-- wp:woocommerce/checkout' || fail "checkout block did not restore the block checkout: $out"
 
 # Review Focus 5: a page the client moved to another language stays there.
 cart=$(q 'echo (int) get_option( "woocommerce_cart_page_id" );')
@@ -248,7 +248,7 @@ grep -Eq "^setup: .*, $deg degraded\$" <<<"$out" \
 set_block 's["shipping"][0]["methods"].append({"type": "free_shipping", "min_amount": "100"}); s["tax"]["rates"] = [{"country": "US", "state": "FL", "rate": "6.0000", "name": "FL Sales Tax", "shipping": True}]'
 out=$(run_setup) || fail "the run after restoring the rate and the method failed: $out"
 if grep -Fq "$stale" <<<"$out"; then fail "a rate or method back in the block is still reported stale: $out"; fi
-grep -q '^setup: 0 set' <<<"$out" || fail "restoring the block changed something: $(grep -E '^(set|client) ' <<<"$out" | head -5)"
+grep -q '^setup: 0 set' <<<"$out" || fail "restoring the block changed something: $(grep -E '^(set|client) ' <<<"$out" | sed -n '1,5p')"
 
 # An assigned page the client left unpublished is the client's: WooCommerce keeps it, setup must
 # neither replace it nor report it set on every run.
@@ -263,7 +263,7 @@ out=$(run_setup) || fail "the run with draft store pages failed: $out"
 grep -q '^client page:terms: kept as draft' <<<"$out" || fail "a draft terms page was not reported as the client's: $(grep page:terms <<<"$out")"
 grep -q '^client page:cart: kept as draft' <<<"$out" || fail "a draft cart page was not reported as the client's: $(grep 'page:cart' <<<"$out")"
 out=$(run_setup) || fail "the second run with draft store pages failed: $out"
-grep -q '^setup: 0 set' <<<"$out" || fail "draft store pages keep a re-run from reaching 0 set: $(grep -E '^(set|client) ' <<<"$out" | head -5)"
+grep -q '^setup: 0 set' <<<"$out" || fail "draft store pages keep a re-run from reaching 0 set: $(grep -E '^(set|client) ' <<<"$out" | sed -n '1,5p')"
 q "wp_update_post( array( 'ID' => $terms, 'post_status' => 'publish' ) ); wp_update_post( array( 'ID' => $cart, 'post_status' => 'publish' ) );"
 
 # Review Focus 1: no keys anywhere -- say where they go.

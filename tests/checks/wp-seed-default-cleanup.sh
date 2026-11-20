@@ -84,7 +84,7 @@ comment|1|comment_author|A WordPress Commenter
 FX
 got="$(run_case "$work/fx-pristine")"
 for want in "post 1" "post 2" "comment 1"; do
-  printf '%s\n' "$got" | grep -qx "$want" \
+  printf '%s\n' "$got" | grep >/dev/null -cx "$want" \
     || fail "an untouched default was not deleted: expected '$want' in the deletion log, got: $(printf '%s' "$got" | tr '\n' ' ')"
 done
 
@@ -100,9 +100,9 @@ post|2|post_modified|2026-03-04 11:22:00
 comment|1|comment_author|A WordPress Commenter
 FX
 got="$(run_case "$work/fx-repurposed")"
-printf '%s\n' "$got" | grep -qx "post 2" \
+printf '%s\n' "$got" | grep >/dev/null -cx "post 2" \
   && fail "a repurposed sample page (slug 'about') was deleted -- Phase 7 must keep a record the client owns"
-printf '%s\n' "$got" | grep -qx "post 1" \
+printf '%s\n' "$got" | grep >/dev/null -cx "post 1" \
   || fail "the untouched 'Hello world!' post was not deleted in the repurposed-page case"
 grep -q "KEPT post 2" "$work/out.txt" \
   || fail "keeping page 2 was not reported -- a default that survived must be named, not silently skipped"
@@ -115,7 +115,7 @@ post|2|post_date|2026-01-01 00:00:00
 post|2|post_modified|2026-05-05 09:00:00
 FX
 got="$(run_case "$work/fx-edited")"
-printf '%s\n' "$got" | grep -qx "post 2" \
+printf '%s\n' "$got" | grep >/dev/null -cx "post 2" \
   && fail "a sample page edited after creation was deleted -- post_modified moving means the client touched it"
 
 # --- case 4: the comment was replaced by a real one --------------------------------------
@@ -123,7 +123,7 @@ cat > "$work/fx-comment" <<'FX'
 comment|1|comment_author|Jane Client
 FX
 got="$(run_case "$work/fx-comment")"
-printf '%s\n' "$got" | grep -qx "comment 1" \
+printf '%s\n' "$got" | grep >/dev/null -cx "comment 1" \
   && fail "a comment by a real author was deleted -- only the WordPress default comment may go"
 
 # --- case 5: rerun, everything already gone ----------------------------------------------

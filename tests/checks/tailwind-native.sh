@@ -90,7 +90,7 @@ expect_fail() { # expect_fail <name> <ERE the finding must match> <what must be 
   # script with no output at all, would both read as a false confirmation. The ERE
   # names the fixture's own paths/counts, not the wording, so a reworded message
   # still passes.
-  if ! printf '%s\n' "$out" | grep -Eq "$2"; then
+  if ! printf '%s\n' "$out" | grep >/dev/null -Ec "$2"; then
     echo "FAIL: $3 — it did exit non-zero, but not on that finding. Output was:"
     printf '%s\n' "$out"; exit 1
   fi
@@ -300,10 +300,10 @@ fi
 # An awk range whose terminator never matches runs to EOF, so a non-empty result does NOT
 # prove the range closed. Assert the terminator is really in there, or a renamed closing
 # line silently turns the scan below into a file-wide grep.
-if ! printf '%s' "$report" | grep -q '^Result: Ready to deliver'; then
+if ! printf '%s' "$report" | grep >/dev/null -c '^Result: Ready to deliver'; then
   echo "FAIL: the /wp-finalize report block never closed on its 'Result: Ready to deliver' line; the awk range ran to EOF and the assertion below would degrade to a file-wide grep"; exit 1
 fi
-if ! printf '%s' "$report" | grep -Eqi 'tailwind convention|convention check'; then
+if ! printf '%s' "$report" | grep >/dev/null -Eci 'tailwind convention|convention check'; then
   echo "FAIL: /wp-finalize's printed report never names the Tailwind convention check, so a tailwind theme is reported on without the one gate that decides whether its markup carries any utility classes at all"; exit 1
 fi
 

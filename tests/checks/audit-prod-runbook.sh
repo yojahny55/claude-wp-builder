@@ -78,7 +78,7 @@ grep -Fq "wrote $md" <<<"$out" || fail "generator did not print the absolute pat
 prev=0
 for h in '## 1. Pre-deploy checks' '## 2. Code' '## 3. wp-config.php' '## 4. Database' \
          '## 5. Server rules' '## 6. Post-deploy' '## 7. Verification'; do
-  n=$(grep -nF -- "$h" "$md" | head -1 | cut -d: -f1)
+  n=$(grep -nF -- "$h" "$md" | sed -n 1p | cut -d: -f1)
   [ -n "$n" ] || fail "runbook lacks section: $h"
   [ "$n" -gt "$prev" ] || fail "section out of order: $h"
   prev=$n

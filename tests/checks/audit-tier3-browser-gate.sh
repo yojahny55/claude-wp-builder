@@ -94,7 +94,7 @@ grep -Fq 'It adds measurement, never criteria' "$standards" \
 flatp=$(tr '\n' ' ' < "$perf" | sed 's/  */ /g')
 # Case- and separator-insensitive like the offender scan above: a negative assertion that
 # only matches one spelling is the same defect this check was rewritten to close.
-if printf '%s' "$flatp" | grep -qiE 'if web[- ]quality[- ]skills'; then
+if printf '%s' "$flatp" | grep >/dev/null -ciE 'if web[- ]quality[- ]skills'; then
   fail "$perf still makes its budgets conditional on the package"
 fi
 case "$flatp" in

@@ -36,11 +36,11 @@ fixcss=$(printf '%s\n' "$fix" | awk '/^ *```css/{on=1; next} on&&/^ *```/{on=0} 
 [ -n "$fixcss" ] || fail "$a's A11Y-025/026 fix has no css block"
 printf '%s\n' "$fixcss" | bare_focus \
   && fail "$a still ships a bare or universal :focus-visible rule as the A11Y-025/026 fix"
-printf '%s\n' "$fix" | grep -Fq 'one focus indicator per element' || fail "$a's fix does not state one indicator per element"
-printf '%s\n' "$fix" | grep -Fq 'Inventory before writing' || fail "$a's fix does not inventory components with their own focus style first"
-printf '%s\n' "$fix" | grep -Fq 'replaced, not stacked' || fail "$a's fix does not replace a design focus colour that fails 3:1"
-printf '%s\n' "$fix" | grep -Fq 'getComputedStyle(el)' || fail "$a's fix does not measure before and after"
-printf '%s\n' "$fix" | grep -Fq ':where(' || fail "$a's global ring is not zero-specificity"
+printf '%s\n' "$fix" | grep >/dev/null -Fc 'one focus indicator per element' || fail "$a's fix does not state one indicator per element"
+printf '%s\n' "$fix" | grep >/dev/null -Fc 'Inventory before writing' || fail "$a's fix does not inventory components with their own focus style first"
+printf '%s\n' "$fix" | grep >/dev/null -Fc 'replaced, not stacked' || fail "$a's fix does not replace a design focus colour that fails 3:1"
+printf '%s\n' "$fix" | grep >/dev/null -Fc 'getComputedStyle(el)' || fail "$a's fix does not measure before and after"
+printf '%s\n' "$fix" | grep >/dev/null -Fc ':where(' || fail "$a's global ring is not zero-specificity"
 
 r=starter-theme/__tailwind__/assets/css/src/tailwindcss/base/reset.css
 grep -Fq ':where(a[href], button' "$r" || fail "$r's default focus ring is not wrapped in :where()"
@@ -54,7 +54,7 @@ starter_list=$(where_list < "$r")
 [ -n "$starter_list" ] && [ "$doc_list" = "$starter_list" ] \
   || fail "$a's ring selector ($doc_list) differs from $r's ($starter_list)"
 # Spacing around ':' and inside the value does not count; the failure prints both sides.
-outline_decl() { grep -oE 'outline[[:space:]]*:[^;]+;' | head -1 | sed -E 's/[[:space:]]*:[[:space:]]*/: /; s/[[:space:]]+/ /g'; }
+outline_decl() { grep -oE 'outline[[:space:]]*:[^;]+;' | sed -n 1p | sed -E 's/[[:space:]]*:[[:space:]]*/: /; s/[[:space:]]+/ /g'; }
 doc_outline=$(printf '%s\n' "$fixcss" | outline_decl)
 starter_outline=$(outline_decl < "$r")
 [ -n "$starter_outline" ] && [ "$doc_outline" = "$starter_outline" ] \

@@ -35,23 +35,23 @@ grep -Fq 'WP-051' "$audit" \
 grep -Fq 'Procedure — WP-051' "$audit" \
   || fail "$audit has no WP-051 procedure"
 # BOTH sides, because a grep over one of them can never see a mismatch.
-printf '%s' "$flat" | grep -Fq 'wp_ajax_nopriv_' \
+printf '%s' "$flat" | grep >/dev/null -Fc 'wp_ajax_nopriv_' \
   || fail "WP-051 does not collect the registered wp_ajax_nopriv_ actions"
-printf '%s' "$flat" | grep -Fq 'wp_localize_script()' \
+printf '%s' "$flat" | grep >/dev/null -Fc 'wp_localize_script()' \
   || fail "WP-051 does not collect the action names the theme sends through wp_localize_script()"
 # The runtime confirmation. This one is cheap to measure, so reporting it unmeasured is a choice.
 grep -Fq 'admin-ajax.php" -d "action=' "$audit" \
   || fail "WP-051 does not confirm the mismatch against the real endpoint before reporting it"
-printf '%s' "$flat" | grep -Fq '400' \
+printf '%s' "$flat" | grep >/dev/null -Fc '400' \
   || fail "WP-051 does not state what an unregistered action answers, so nothing tells a reader the request failed at all"
 # A dead filter is broken functionality, not a style finding.
-printf '%s' "$flat" | grep -Fq 'Report it CRITICAL' \
+printf '%s' "$flat" | grep >/dev/null -Fc 'Report it CRITICAL' \
   || fail "WP-051 does not set the severity to CRITICAL — a pagination answering 400 is not an advisory"
 # The wrong fix, named. Renaming the hook to match the message changes a public contract.
-printf '%s' "$flat" | grep -Fq 'never by renaming the hook' \
+printf '%s' "$flat" | grep >/dev/null -Fc 'never by renaming the hook' \
   || fail "WP-051 does not reject renaming the hook to match the message"
 # The two neighbours whose fix is in the same file.
-printf '%s' "$flat" | grep -Fq 'check_ajax_referer()' \
+printf '%s' "$flat" | grep >/dev/null -Fc 'check_ajax_referer()' \
   || fail "WP-051 does not fold in the nonce that no localized value feeds"
 
 # --- WP-052 ---------------------------------------------------------------------------------
@@ -60,17 +60,17 @@ grep -Fq 'WP-052' "$audit" \
 grep -Fq 'Procedure — WP-052' "$audit" \
   || fail "$audit has no WP-052 procedure"
 # The reason this is not WP-048: the rows are not posts.
-printf '%s' "$flat" | grep -Fq "plugin's own table" \
+printf '%s' "$flat" | grep >/dev/null -Fc "plugin's own table" \
   || fail "WP-052 does not say the record lives in the plugin's own table, which is why the WP-048 sweep cannot see it"
-printf '%s' "$flat" | grep -Fq 'get_post()' \
+printf '%s' "$flat" | grep >/dev/null -Fc 'get_post()' \
   || fail "WP-052 does not state that get_post() cannot resolve these IDs"
 # What the visitor actually gets, so the finding is not filed as cosmetic.
-printf '%s' "$flat" | grep -Eq 'printed as literal text|empty band' \
+printf '%s' "$flat" | grep >/dev/null -Ec 'printed as literal text|empty band' \
   || fail "WP-052 does not describe what renders when the record is gone"
 # The fix guards the whole section, and the wrong remedy is named.
-printf '%s' "$flat" | grep -Fq 'Never hide the empty section with CSS' \
+printf '%s' "$flat" | grep >/dev/null -Fc 'Never hide the empty section with CSS' \
   || fail "WP-052 does not reject hiding the empty section with CSS, which leaves the data broken and a gap in the layout"
-printf '%s' "$flat" | grep -Fq 'heading, padding and background' \
+printf '%s' "$flat" | grep >/dev/null -Fc 'heading, padding and background' \
   || fail "WP-052's fix does not skip the whole section — a guard around the shortcode alone still ships an empty band"
 
 echo "PASS: WP-051 and WP-052 are defined, measured and fixed without the two wrong remedies"

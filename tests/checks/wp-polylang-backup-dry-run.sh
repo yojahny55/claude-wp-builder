@@ -17,20 +17,20 @@ b=$(grep -n '^## Step 2.5' "$c" | cut -d: -f1 || true); m=$(grep -n '^## Step 6'
 s3=$(grep -n '^## Step 3:' "$c" | cut -d: -f1 || true)
 [ -n "$s3" ] && [ "$b" -lt "$s3" ] || fail "backup must come before configuring languages"
 grep -Fq 'pll-import.php" "$MANIFEST.translated" dry-run' "$c" || fail "Step 6 has no dry-run invocation"
-d=$(grep -n 'translated" dry-run' "$c" | head -1 | cut -d: -f1 || true)
-r=$(grep -n 'pll-import.php" "$MANIFEST.translated"$' "$c" | head -1 | cut -d: -f1 || true)
+d=$(grep -n 'translated" dry-run' "$c" | sed -n 1p | cut -d: -f1 || true)
+r=$(grep -n 'pll-import.php" "$MANIFEST.translated"$' "$c" | sed -n 1p | cut -d: -f1 || true)
 [ -n "$d" ] && [ -n "$r" ] && [ "$d" -lt "$r" ] || fail "dry-run must come before the real import"
 grep -Fq 'AskUserQuestion' "$c" && grep -Fq 'without a yes' "$c" || fail "hide_default=0 is not gated on confirmation"
 grep -Fq "wp_cli.wrapper" "$c" || fail "command does not read the WP-CLI wrapper"
 ! grep -E '^ *wp (plugin|eval-file|eval|rewrite|db) ' "$c" || fail "bare wp call left in the command; use \$WP"
 
 grep -Fq "'dry-run'" "$i" || fail "pll-import.php has no dry-run mode"
-dr=$(grep -n "in_array( 'dry-run'" "$i" | head -1 | cut -d: -f1 || true)
-w=$(grep -n '^\$written  ' "$i" | head -1 | cut -d: -f1 || true)
+dr=$(grep -n "in_array( 'dry-run'" "$i" | sed -n 1p | cut -d: -f1 || true)
+w=$(grep -n '^\$written  ' "$i" | sed -n 1p | cut -d: -f1 || true)
 [ -n "$dr" ] && [ -n "$w" ] && [ "$dr" -lt "$w" ] || fail "dry-run must return before the first write"
-sed -n "${dr},${w}p" "$i" | grep -Eq 'wp_(insert|update|delete)_post|wp_(update_nav_menu_item|create_nav_menu|insert_term|update_term|delete_term|delete_nav_menu_item)|(update|add|delete)_(post|term)_meta|pll_save_(post|term)_translations|pll_set_(post|term)_language|set_post_thumbnail|create_media_translation|pllx_string_translate|pllx_acf_write' \
+sed -n "${dr},${w}p" "$i" | grep >/dev/null -Ec 'wp_(insert|update|delete)_post|wp_(update_nav_menu_item|create_nav_menu|insert_term|update_term|delete_term|delete_nav_menu_item)|(update|add|delete)_(post|term)_meta|pll_save_(post|term)_translations|pll_set_(post|term)_language|set_post_thumbnail|create_media_translation|pllx_string_translate|pllx_acf_write' \
   && fail "the dry-run block itself writes" || true
-sed -n "${dr},${w}p" "$i" | grep -Fq 'would-skip menu' && sed -n "${dr},${w}p" "$i" | grep -Fq 'empty translated value' || fail "dry-run does not mirror the write path's skips"
+sed -n "${dr},${w}p" "$i" | grep >/dev/null -Fc 'would-skip menu' && sed -n "${dr},${w}p" "$i" | grep >/dev/null -Fc 'empty translated value' || fail "dry-run does not mirror the write path's skips"
 grep -Fq 'new translated menu' "$i" && grep -Fq 'existing translated menu rebuilt' "$i" || fail "dry-run does not distinguish an existing menu from a new one"
 command -v php >/dev/null && { php -l "$i" >/dev/null || fail "pll-import.php does not parse"; }
 

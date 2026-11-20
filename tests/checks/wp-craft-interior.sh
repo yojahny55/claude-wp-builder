@@ -62,7 +62,7 @@ grep -qE "scrollReactive" "$verify" \
 # static-page must be blocking: ADVISORY findings do not fail a round, and a page
 # that cannot move is not an advisory matter.
 advisory=$(sed -n '/const ADVISORY = new Set(/,/);/p' "$verify" | tr '\n' ' ')
-printf '%s' "$advisory" | grep -qF "'static-page'" \
+printf '%s' "$advisory" | grep >/dev/null -cF "'static-page'" \
   && fail "$verify: static-page must not be advisory -- it has to fail the round"
 
 echo PASS

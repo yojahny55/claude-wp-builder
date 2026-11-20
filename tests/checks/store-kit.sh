@@ -17,7 +17,7 @@ for f in "$main" "$kit/includes/catalog-mode.php" "$kit/includes/credentials.php
 done
 command -v php >/dev/null 2>&1 || fail "php is not on PATH; this check runs store-kit's filters"
 
-hdr() { sed -n "s/^ \* $1: *//p" "$main" | head -1; }
+hdr() { sed -n "s/^ \* $1: *//p" "$main" | sed -n 1p; }
 [ "$(hdr 'Update URI')" = "false" ] || fail "store-kit must set Update URI: false, or WordPress may offer a same-named plugin as an update"
 [ "$(hdr 'Requires Plugins')" = "woocommerce" ] || fail "store-kit must declare Requires Plugins: woocommerce"
 [ "$(hdr 'Requires PHP')" = "7.4" ] || fail "store-kit must declare the 7.4 floor"

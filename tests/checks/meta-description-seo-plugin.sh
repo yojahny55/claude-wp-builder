@@ -21,9 +21,9 @@ for f in $hits; do
   # The wp_head callback that prints it: from the nearest preceding add_action( 'wp_head'
   # to the print. The guard must return inside it, before the tag.
   block=$(awk '/add_action\( *.wp_head./{buf=""} {buf=buf $0 "\n"} /name="description"/{print buf; exit}' "$f")
-  printf '%s' "$block" | grep -qE "add_action\( *.wp_head." \
+  printf '%s' "$block" | grep >/dev/null -cE "add_action\( *.wp_head." \
     || fail "$f prints a meta description outside a wp_head callback this check can read"
-  printf '%s' "$block" | tr '\n' ' ' | grep -qE "if \( *$guard_fn\(\) *\) \{ *return;" \
+  printf '%s' "$block" | tr '\n' ' ' | grep >/dev/null -cE "if \( *$guard_fn\(\) *\) \{ *return;" \
     || fail "$f prints <meta name=\"description\"> without first returning on $guard_fn() -- beside Rank Math, Yoast or SEOPress that is two description tags"
 done
 

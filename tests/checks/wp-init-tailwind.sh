@@ -53,7 +53,7 @@ fin=$(flat "$(cat "$wp_finalize")")
 # ---------------------------------------------------------------------------
 d4_raw=$(awk '/^\*\*Step D4/,/^\*\*Step D5/' "$wp_init")
 [ -n "$d4_raw" ] || fail "wp-init.md has no '**Step D4' block — the tailwind demo-conversion instruction lives there"
-printf '%s\n' "$d4_raw" | tail -1 | grep -q '^\*\*Step D5' \
+printf '%s\n' "$d4_raw" | tail -1 | grep >/dev/null -c '^\*\*Step D5' \
   || fail "wp-init.md's Step D4 region is not terminated by its '**Step D5' heading — every assertion scoped to it would silently become file-wide"
 d4_raw=$(dehyphen "$d4_raw")
 d4=$(flat "$d4_raw")
@@ -73,9 +73,9 @@ d4=$(flat "$d4_raw")
 n_theme_bullets=$(printf '%s\n' "$d4_raw" | grep -cE '^[[:space:]]*- If `\$TEMPLATE` is `tailwind`:' || true)
 [ "$n_theme_bullets" -eq 1 ] \
   || fail "Step D4 has $n_theme_bullets bullets conditioned on \`\$TEMPLATE is tailwind\` for the @theme injection — exactly one may exist. The merge carried a duplicate whose target, assets/css/src/style.css, the Tailwind starter does not ship, so an agent handed two targets obeys both or neither and the palette never lands"
-printf '%s' "$d4" | grep -qF 'tailwindcss/main.css' \
+printf '%s' "$d4" | grep >/dev/null -cF 'tailwindcss/main.css' \
   || fail "Step D4's @theme injection never names assets/css/src/tailwindcss/main.css — mapping colours into any other file ships the default palette"
-if printf '%s' "$d4" | grep -qF 'style.css'; then
+if printf '%s' "$d4" | grep >/dev/null -cF 'style.css'; then
   fail "Step D4 still names style.css as an @theme target — the Tailwind starter's compiled entry point is tailwindcss/main.css, and a colour mapping written to a file that does not exist is a silent no-op"
 fi
 
@@ -84,10 +84,10 @@ fi
 # ---------------------------------------------------------------------------
 # The old wording must be gone. A positive alone is not enough: both sentences can
 # coexist, leaving the operator told to suggest AND to run.
-if printf '%s' "$init" | grep -qiF 'Also suggest running `/wp-tailwindify`'; then
+if printf '%s' "$init" | grep >/dev/null -ciF 'Also suggest running `/wp-tailwindify`'; then
   fail "wp-init still tells the operator to merely suggest /wp-tailwindify"
 fi
-printf '%s' "$d4" | grep -qiF 'run `/wp-tailwindify`' \
+printf '%s' "$d4" | grep >/dev/null -ciF 'run `/wp-tailwindify`' \
   || fail "wp-init's Step D4 does not tell the operator to RUN /wp-tailwindify"
 
 # ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ printf '%s' "$d4" | grep -qiF 'run `/wp-tailwindify`' \
 # or a dedent), never at a neighbouring bullet's wording, so renaming or
 # reordering a sibling cannot move it.
 bullet() { # <raw-region> <label>
-  printf '%s\n' "$1" | awk -v lab="$2" '
+  awk -v lab="$2" '
   {
     line = $0
     m = match(line, /[^[:space:]]/)
@@ -137,7 +137,7 @@ bullet() { # <raw-region> <label>
   grab && ind > bind { print line; next }       # wrapped continuation line
   { grab = 0 }                                  # anything dedented ends it
   END { if (!found) exit 1 }
-  '
+  ' < <(printf '%s\n' "$1")
 }
 
 # Closure proof for each extracted bullet. `bullet` cannot run past the list by
@@ -199,7 +199,7 @@ undirected() { # <flat-text> <literal-needle> <lowercase-ERE>
   local text=$1 needle=$2 pat=$3 sent
   while IFS= read -r sent; do
     [ -n "$sent" ] || continue
-    printf '%s' "$sent" | awk -v pat="$pat" -v neg="$NEGATION" '
+    awk -v pat="$pat" -v neg="$NEGATION" '
     {
       low = tolower($0); s = low; off = 0
       while (match(s, pat)) {
@@ -214,7 +214,7 @@ undirected() { # <flat-text> <literal-needle> <lowercase-ERE>
         off = off + ms + ml - 1
         s = substr(low, off + 1)
       }
-    }'
+    }' < <(printf '%s' "$sent")
   done <<< "$(sentences "$text" "$needle")"
   return 0
 }
@@ -242,7 +242,7 @@ bullet_closed '**Skip only'          "$skip_raw"
 dup=$(printf '%s\n%s\n%s\n' "$plain_raw" "$tw_raw" "$skip_raw" \
       | grep -v '^[[:space:]]*$' | sort | uniq -d)
 [ -z "$dup" ] \
-  || fail "Step D4's three detect bullets are not disjoint — the same line appears in more than one of them, so a bullet ran past its own end: $(printf '%s' "$dup" | head -1)"
+  || fail "Step D4's three detect bullets are not disjoint — the same line appears in more than one of them, so a bullet ran past its own end: $(printf '%s' "$dup" | sed -n 1p)"
 
 # 1. A linked stylesheet is plain-CSS evidence. This is the whole defect: without
 #    it, every demo fixture in tests/fixtures/ (no <style>, no style=, rules in
@@ -251,7 +251,7 @@ dup=$(printf '%s\n%s\n%s\n' "$plain_raw" "$tw_raw" "$skip_raw" \
 #    The literal stops at the closing quote, not at the tag's `>`: writing the tag
 #    the way a real page carries it — `<link rel="stylesheet" href="assets/styles.css">`
 #    — is strictly an improvement, and gating the `>` form exits 1 on it.
-printf '%s' "$plain_ev" | grep -qF '<link rel="stylesheet"' \
+printf '%s' "$plain_ev" | grep >/dev/null -cF '<link rel="stylesheet"' \
   || fail 'Step D4 does not count a `<link rel="stylesheet">` as plain-CSS evidence. A demo that keeps its rules in an external stylesheet has no <style> block and no style=" attribute, so under a rule that only tests for those it is silently declared already Tailwind-native and never converted — which is the original defect this branch exists to fix.'
 # ...and the bullet has to resolve to CONVERT. Naming the evidence and then
 # skipping on it would satisfy the assertion above and change nothing.
@@ -259,7 +259,7 @@ printf '%s' "$plain_ev" | grep -qF '<link rel="stylesheet"' \
 # ("any one of these means convert"), so inverting it to "means skip" fails this
 # assertion, and inverting the body instead is caught by the directional check
 # below. Same split /wp-yolo Step 2.6's gate uses.
-printf '%s' "$plain_ev" | grep -qiF 'convert' \
+printf '%s' "$plain_ev" | grep >/dev/null -ciF 'convert' \
   || fail "Step D4's plain-CSS evidence bullet never says what plain-CSS evidence means for the demo: it means convert"
 plain_skip=$(undirected "$plain_ev" 'skip' 'means skip|(^|[^a-z])skip (it|the demo|the page|that page|them)([^a-z]|$)')
 plain_skip="$plain_skip$(undirected "$plain_ev" 'means it is' 'means it is (already )?tailwind')"
@@ -268,32 +268,32 @@ if [ -n "$plain_skip" ]; then
 fi
 # The carve-out has to come with it, or a Google Fonts link alone re-converts an
 # already-Tailwind demo on every run and the step stops being idempotent.
-printf '%s' "$plain_ev" | grep -qF 'fonts.googleapis.com' \
+printf '%s' "$plain_ev" | grep >/dev/null -cF 'fonts.googleapis.com' \
   || fail "Step D4's plain-CSS evidence bullet does not exempt Google Fonts — a webfont <link> is not project CSS, and counting it makes every converted demo convert again forever"
-printf '%s' "$plain_ev" | grep -qF 'cdn.tailwindcss.com' \
+printf '%s' "$plain_ev" | grep >/dev/null -cF 'cdn.tailwindcss.com' \
   || fail "Step D4's plain-CSS evidence bullet does not exempt the Tailwind CDN — a demo linking it is the Tailwind-native case, not the plain-CSS one"
-printf '%s' "$plain_ev" | grep -Eqi 'exempt|not plain-CSS evidence|do(es)? not count|never count' \
+printf '%s' "$plain_ev" | grep >/dev/null -Eci 'exempt|not plain-CSS evidence|do(es)? not count|never count' \
   || fail "Step D4's plain-CSS evidence bullet names the font/CDN hosts but never says they are exempt — the carve-out has to state that a <link> to them is NOT plain-CSS evidence"
 
 # 2. Tailwind evidence must be defined POSITIVELY, by utilities. Defining it as
 #    "no <style> block" is the defect wearing the new rule's clothes.
-printf '%s' "$tw_ev" | grep -qi 'utilit' \
+printf '%s' "$tw_ev" | grep >/dev/null -ci 'utilit' \
   || fail "Step D4's Tailwind-evidence bullet does not define Tailwind-nativeness by the presence of utility classes — absence of inline CSS is not evidence of anything"
-if printf '%s' "$tw_ev" | grep -qF 'no `<style>` block'; then
+if printf '%s' "$tw_ev" | grep >/dev/null -cF 'no `<style>` block'; then
   fail "Step D4 defines Tailwind evidence as the ABSENCE of a <style> block. That is the original heuristic: a plain-CSS demo with an external stylesheet satisfies it and is skipped."
 fi
 
 # 3. The skip needs BOTH halves — positive Tailwind evidence AND no plain-CSS
 #    evidence — and the skip ACTION has to sit in the same bullet as its condition.
-printf '%s' "$skip_ev" | grep -qF 'Tailwind evidence' \
+printf '%s' "$skip_ev" | grep >/dev/null -cF 'Tailwind evidence' \
   || fail "Step D4's skip bullet does not require positive Tailwind evidence — a skip on anything less is a skip on ignorance"
-printf '%s' "$skip_ev" | grep -qF 'no plain-CSS evidence' \
+printf '%s' "$skip_ev" | grep >/dev/null -cF 'no plain-CSS evidence' \
   || fail "Step D4's skip bullet does not require the ABSENCE of plain-CSS evidence — a demo with both utilities and a project stylesheet must still be converted"
-printf '%s' "$skip_ev" | grep -qiF 'conversion skipped' \
+printf '%s' "$skip_ev" | grep >/dev/null -ciF 'conversion skipped' \
   || fail "Step D4's skip condition and the skip it authorises are in different bullets — the report line \`demo already tailwind-native — conversion skipped\` must be emitted by the bullet that states the condition, or the two drift apart"
 # ...and the operator still has to say which way it went. That predates this rule
 # and survives it.
-printf '%s' "$d4" | grep -qiF 'which case applied' \
+printf '%s' "$d4" | grep >/dev/null -ciF 'which case applied' \
   || fail "Step D4 no longer requires the operator to say which case applied"
 
 # 4. Literal backstop against the exact sentences this rule replaced — wp-init's
@@ -303,22 +303,22 @@ printf '%s' "$d4" | grep -qiF 'which case applied' \
 #    wholesale; these catch the other shape of regression — the old sentence being
 #    ADDED BACK alongside the new bullets, leaving the step self-contradictory
 #    with the wrong half stated first.
-if printf '%s' "$d4" | grep -qF 'Skip only if the demo has no `<style>` block and no static `style="` attribute'; then
+if printf '%s' "$d4" | grep >/dev/null -cF 'Skip only if the demo has no `<style>` block and no static `style="` attribute'; then
   fail "Step D4 carries the original heuristic again: absence of inline CSS is not proof of Tailwind-nativeness, and every demo fixture in this repo is the counter-example"
 fi
-if printf '%s' "$d4" | grep -qF 'no `<style>` block and no static `style="` attribute, it is already Tailwind-native'; then
+if printf '%s' "$d4" | grep >/dev/null -cF 'no `<style>` block and no static `style="` attribute, it is already Tailwind-native'; then
   fail "Step D4 carries /wp-yolo's original heuristic, which wp-yolo-tailwind.sh already bans from the two other files that state this rule"
 fi
 
 # ---------------------------------------------------------------------------
 # /wp-finalize
 # ---------------------------------------------------------------------------
-printf '%s' "$fin" | grep -qF 'bin/tailwind-native-check.sh' \
+printf '%s' "$fin" | grep >/dev/null -cF 'bin/tailwind-native-check.sh' \
   || fail "wp-finalize does not run the tailwind-native check"
 
 # The gate must be scoped to the tailwind template — an unconditional run would fail
 # every basic project on a missing main.css.
-printf '%s' "$fin" | grep -qF 'Skip when `Template:` is `basic`' \
+printf '%s' "$fin" | grep >/dev/null -cF 'Skip when `Template:` is `basic`' \
   || fail "wp-finalize's tailwind check is not gated on the template"
 
 # Step 4b: Layer 3 must compare the converted demo against the pristine original,
@@ -342,13 +342,13 @@ l3raw=$(awk '/Layer 3 \(measured visual parity/{f=1;next} f&&/^## Step 4:/{print
 # Emptiness first, so a DELETED subsection reports itself as deleted rather than as
 # an unterminated range — both exit 1, but only one of them names the mutation.
 [ -n "$l3raw" ] || fail "no Layer 3 section in wp-finalize.md"
-printf '%s' "$l3raw" | grep -qF '__END__' \
+printf '%s' "$l3raw" | grep >/dev/null -cF '__END__' \
   || fail "the Layer 3 region is not terminated by a '## Step 4:' heading — the awk range ran to EOF and its assertions would silently degrade to file-wide greps"
 l3=$(flat "$(printf '%s\n' "$l3raw" | { grep -Fv '__END__' || true; })")
 [ -n "$l3" ] || fail "the Layer 3 section holds nothing but its terminator"
-printf '%s' "$l3" | grep -qF 'demo/.original/' \
+printf '%s' "$l3" | grep >/dev/null -cF 'demo/.original/' \
   || fail "Layer 3 never reads demo/.original/ — on the tailwind path it compares the converted demo against a build made from that same converted demo, so a conversion defect cancels out"
-printf '%s' "$l3" | grep -qF 'conversion defect' \
+printf '%s' "$l3" | grep >/dev/null -cF 'conversion defect' \
   || fail "Layer 3 does not distinguish a conversion defect from a build defect"
 
 # ---------------------------------------------------------------------------
@@ -360,23 +360,23 @@ printf '%s' "$l3" | grep -qF 'conversion defect' \
 # ---------------------------------------------------------------------------
 c3raw=$(awk '/^### Check 3/,/^### Check 4/' "$wp_finalize")
 [ -n "$c3raw" ] || fail "wp-finalize has no Check 3 region"
-printf '%s\n' "$c3raw" | tail -1 | grep -q '^### Check 4' \
+printf '%s\n' "$c3raw" | tail -1 | grep >/dev/null -c '^### Check 4' \
   || fail "the Check 3 region is not terminated by a '### Check 4' heading — its assertions would silently become file-wide"
 c3=$(flat "$c3raw")
-printf '%s' "$c3" | grep -qF 'If `Template:` is `basic`' \
+printf '%s' "$c3" | grep >/dev/null -cF 'If `Template:` is `basic`' \
   || fail "Check 3 never branches on the template — it reads assets/css/styles.css and demands @media, which the Tailwind convention check in the same command fails delivery for existing"
-printf '%s' "$c3" | grep -qF 'If `Template:` is `tailwind`' \
+printf '%s' "$c3" | grep >/dev/null -cF 'If `Template:` is `tailwind`' \
   || fail "Check 3 has a basic branch but no tailwind branch — on tailwind the check still reads a file that must not exist"
-printf '%s' "$c3" | grep -qF 'responsive prefixes' \
+printf '%s' "$c3" | grep >/dev/null -cF 'responsive prefixes' \
   || fail "Check 3's tailwind branch never points at the Tailwind responsive-prefix equivalent — with no @media allowed, the branch must name what it checks instead"
-printf '%s' "$c3" | grep -qF 'at least 3 of the four' \
+printf '%s' "$c3" | grep >/dev/null -cF 'at least 3 of the four' \
   || fail "Check 3's basic branch no longer says 'at least 3 of the four' breakpoints — the old text promised 3 of 5 while listing 4"
 
 # The Tailwind convention gate must skip EVERY non-tailwind template, not just
 # basic: a cinematic project has its own assets/css/cinematic.css and would
 # fall through 'skip basic, run tailwind' into a gate written for the other
 # tree.
-printf '%s' "$fin" | grep -qF 'anything other than `tailwind`' \
+printf '%s' "$fin" | grep >/dev/null -cF 'anything other than `tailwind`' \
   || fail "the Tailwind convention check only skips basic — a cinematic project falls through and runs the tailwind gate against assets/css/cinematic.css"
 
 echo PASS

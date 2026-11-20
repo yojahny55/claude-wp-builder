@@ -25,10 +25,10 @@ fi
 
 # The gate must have scanned something. A green result over zero files is the
 # defect this check exists to close, not a pass.
-echo "$out" | grep -Eq 'assembled ([1-9][0-9]*) compositions' \
+echo "$out" | grep >/dev/null -Ec 'assembled ([1-9][0-9]*) compositions' \
   || fail "composition gate did not report how many compositions it assembled"
 
-n="$(echo "$out" | sed -n 's/.*assembled \([0-9]*\) compositions.*/\1/p' | head -1)"
+n="$(echo "$out" | sed -n 's/.*assembled \([0-9]*\) compositions.*/\1/p' | sed -n 1p)"
 [ "${n:-0}" -ge 13 ] \
   || fail "composition gate assembled only ${n:-0} compositions, expected at least 13"
 

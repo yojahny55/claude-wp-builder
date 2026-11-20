@@ -24,7 +24,7 @@ grep -Fq 'When the flag was passed, do not ask.' <<<"$step1" \
 
 # Order, independent of headings: the question must come before the adoption prompt and the
 # plugin-install prompt, so a whole-file fallback above cannot hide it moving back to Step 9.
-line_of() { grep -nF -- "$1" "$audit" | head -1 | cut -d: -f1 || true; }
+line_of() { grep -nF -- "$1" "$audit" | sed -n 1p | cut -d: -f1 || true; }
 q=$(line_of '[A] Report only')
 adopt=$(line_of '[A] Adopt it now')
 install=$(line_of '[A] Install all recommended WordPress plugins')
@@ -67,7 +67,7 @@ grep -Fq 'Report: not written — <the reason>' <<<"$step11" \
   || fail "Step 11 has no summary for a render that wrote nothing"
 
 # What the operator reads before running the command must say the same thing.
-tr '\n' ' ' < docs/commands.md | grep -Fq 'report-only run always writes the dated deliverable (`--report` defaults to `both`)' \
+tr '\n' ' ' < docs/commands.md | grep >/dev/null -Fc 'report-only run always writes the dated deliverable (`--report` defaults to `both`)' \
   || fail "docs/commands.md no longer says a report-only run writes the deliverable"
 grep -Fq '/wp-audit --report-only      # Report without fixing (writes the .md + .html deliverable)' README.md \
   || fail "README.md usage line no longer says report-only writes the deliverable"

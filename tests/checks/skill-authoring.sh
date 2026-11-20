@@ -35,7 +35,7 @@ for f in skills/*/SKILL.md; do
   desc=$(printf '%s\n' "$fm" | sed -n 's/^description: *//p' | unquote)
 
   [ "$name" = "$sk" ] || err "$f: name '$name' does not match its directory '$sk'"
-  printf '%s' "$name" | grep -Eq '^[a-z0-9-]{1,64}$' \
+  printf '%s' "$name" | grep >/dev/null -Ec '^[a-z0-9-]{1,64}$' \
     || err "$f: name must be 1-64 lowercase letters, digits or hyphens"
 
   [ -n "$desc" ] || err "$f: description is empty, or not on the description: line"
@@ -44,7 +44,7 @@ for f in skills/*/SKILL.md; do
   # every layer.
   case "$desc" in *'<'*|*'>'*) err "$f: description contains an angle bracket; descriptions carry no XML tags" ;; esac
   case "$desc" in *'Use when'*) ;; *) err "$f: description says what the skill is but not when to use it — add a 'Use when …' clause" ;; esac
-  ! printf '%s\n' "$fm" | grep -q '^trigger:' \
+  ! printf '%s\n' "$fm" | grep >/dev/null -c '^trigger:' \
     || err "$f: trigger: is not a frontmatter field and is ignored — say when to use the skill in the description"
 
   body=$(awk 'n >= 2 { b++ } /^---$/ && n < 2 { n++ } END { print b + 0 }' "$f")
@@ -56,7 +56,7 @@ for f in skills/*/SKILL.md; do
   while IFS= read -r r; do
     [ -n "$r" ] || continue
     if [ "$(wc -l < "$r")" -gt 100 ]; then
-      head -30 "$r" | grep -Eqi '^#{1,3} +(table of )?contents' \
+      head -30 "$r" | grep >/dev/null -Eci '^#{1,3} +(table of )?contents' \
         || err "$r is over 100 lines with no '## Contents' list near the top"
     fi
   done < <(find "$dir" -name '*.md' ! -path "$f" ! -path '*/design-md/*' | sort)

@@ -19,7 +19,7 @@ for needle in 'The fourth class, `visual`' '`design_impact`' 'never** counted as
   'one at a time' 'every element that shares the class' 'desktop and mobile' \
   'is a regression to fix' 'bin/style-diff.mjs' 'Builder first' '`stack.builder`' \
   'Back up the builder' 'the reason written in the finding'; do
-  printf '%s' "$flat" | grep -Fq -- "$needle" || fail "$fix lost: $needle"
+  printf '%s' "$flat" | grep >/dev/null -Fc -- "$needle" || fail "$fix lost: $needle"
 done
 # The offer must count visual fixes apart from the auto-fixable number.
 grep -Fq 'NOT in that number' "$fix" || fail "$fix offer does not count visual fixes apart"

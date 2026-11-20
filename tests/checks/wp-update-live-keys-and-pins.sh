@@ -19,7 +19,7 @@ agent_files=( agents/*.md )
 for f in "${command_files[@]}" "${skill_files[@]}" "${agent_files[@]}"; do
   while IFS= read -r line; do
     case "$line" in
-      *grep*_live_*) echo "$line" | grep -Eq 'grep -[a-zA-Z]*[cq]' \
+      *grep*_live_*) echo "$line" | grep >/dev/null -Ec 'grep -[a-zA-Z]*[cq]' \
         || fail "$f prints a live-key match: $line" ;;
     esac
   done < <(grep -F '_live_' "$f" | grep -F 'grep' || true)

@@ -33,7 +33,7 @@ for r in '/vendor/' 'wp-config*' '.htaccess' '/wp-content/uploads/' '/wp-content
 done
 [ "$(grep -Fxc -- '*.log' "$ig")" = 1 ] || fail "*.log duplicated"
 grep -q 'files would be committed' "$t/init.txt" || fail "no summary"
-git -C "$t/site" ls-files | grep -q . && fail "init staged files"
+git -C "$t/site" ls-files | grep >/dev/null -c . && fail "init staged files"
 [ "$(git -C "$t/site" symbolic-ref --short HEAD)" = dev ] || fail "branch is not dev"
 
 if wp --branch=dev --remote="$t/remote.git" 2>/dev/null; then fail "second init on a repo was not refused"; fi
@@ -59,8 +59,8 @@ if wp --branch=dev --remote=-u 2>/dev/null; then fail "--remote=-u accepted"; fi
 if wp --branch=dev --remote=other --commit 2>/dev/null; then fail "commit with a different origin accepted"; fi
 
 wp --branch=dev --remote="$t/remote.git" --commit >/dev/null
-git -C "$t/site" ls-files | grep -q wp-config && fail "wp-config was committed"
-git -C "$t/site" branch --list master | grep -q . && fail "a second branch exists locally"
+git -C "$t/site" ls-files | grep >/dev/null -c wp-config && fail "wp-config was committed"
+git -C "$t/site" branch --list master | grep >/dev/null -c . && fail "a second branch exists locally"
 if wp --branch=dev --remote="$t/remote.git" --push 2>/dev/null; then fail "push without --yes was not refused"; fi
 [ -z "$(git -C "$t/remote.git" branch --list)" ] || fail "remote got a branch before --yes"
 git -C "$t/site" branch master
