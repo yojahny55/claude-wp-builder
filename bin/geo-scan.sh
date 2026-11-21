@@ -148,7 +148,7 @@ fi
 # the timestamp is absent or unparseable (GNU date, then BSD date). The first "scanned_at" in
 # the body is enough; no jq.
 check_age() {
-  SCANNED_AT=$(grep -o '"scanned_at" *: *"[^"]*"' "$body" | head -n 1 | sed 's/.*: *"\(.*\)"/\1/' || true)
+  SCANNED_AT=$(grep -o '"scanned_at" *: *"[^"]*"' "$body" | sed -n 1p | sed 's/.*: *"\(.*\)"/\1/' || true)
   stale=0
   local epoch="" now age
   if [ -n "$SCANNED_AT" ]; then
@@ -178,7 +178,7 @@ challenge_evidence() {
   if [ "$(printf '%s\n' "$found" | grep -c .)" -lt 2 ]; then
     case "$found" in challenge-platform|cf-mitigated|"") return 0 ;; esac
   fi
-  printf '%s\n' "$found" | head -n 3 | paste -sd, -
+  printf '%s\n' "$found" | sed -n 1,3p | paste -sd, -
 }
 
 stale=0

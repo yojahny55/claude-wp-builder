@@ -82,8 +82,8 @@ post=$($wp post list --post_type=post --post_status=publish --posts_per_page=1 -
 # shellcheck disable=SC2086
 page=$($wp post list --post_type=page --post_status=publish --posts_per_page=1 --field=url 2>/dev/null | urlline)
 # shellcheck disable=SC2086
-tid=$($wp term list category --hide_empty --number=1 --field=term_id 2>/dev/null | grep -E '^[0-9]+$' | head -1)
-[ -n "$tid" ] || tid=$($wp term list category --number=1 --field=term_id 2>/dev/null | grep -E '^[0-9]+$' | head -1)
+tid=$($wp term list category --hide_empty --number=1 --field=term_id 2>/dev/null | grep -E '^[0-9]+$' | sed -n 1p)
+[ -n "$tid" ] || tid=$($wp term list category --number=1 --field=term_id 2>/dev/null | grep -E '^[0-9]+$' | sed -n 1p)
 cat=""
 # shellcheck disable=SC2086
 [ -n "$tid" ] && cat=$($wp eval "echo get_term_link((int) $tid);" 2>/dev/null | urlline)
