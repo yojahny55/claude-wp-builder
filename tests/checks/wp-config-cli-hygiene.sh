@@ -22,6 +22,8 @@ mkdir "$tmp/real"; ln -s "$tmp/real" "$tmp/link"
 url="https://user:SECRETTOKEN@host.example/r.git"
 out=$($cfg git-init "$tmp/link" --branch=main --remote="$url" 2>&1) || fail "git-init plan failed: $out"
 case "$out" in *SECRETTOKEN*) fail "git-init printed the credential";; esac
+mkdir "$tmp/at"; out=$($cfg git-init "$tmp/at" --branch=main --remote="https://user:p@SECRETTOKEN@host.example/r.git" --dry-run 2>&1) || fail "git-init plan with @ in the password failed: $out"
+case "$out" in *SECRETTOKEN*) fail "git-init printed the part of a password after a raw @";; esac
 echo x > "$tmp/real/index.php"
 $cfg git-init "$tmp/link" --branch=main --remote="$url" --commit >"$tmp/c" 2>&1 || fail "commit through a symlinked root refused: $(cat "$tmp/c")"
 $cfg git-init "$tmp/link" --branch=main --remote="$url" --push >"$tmp/pushout" 2>&1 && fail "push without --yes did not refuse"
@@ -76,4 +78,8 @@ elapsed=$(( ($(date +%s%N) - start) / 1000000 ))
 [ ! -e "$tmp/p/.wp-create.json.lock" ] || fail "env-set left the lock behind"
 $cfg keep-inactive "$tmp/p" bad_slug! >/dev/null 2>&1 && fail "bad slug accepted"
 [ ! -e "$tmp/p/.wp-create.json.lock" ] || fail "a refused locked command orphaned the lock"
+# A locked command on a path that does not exist exits 3 with the usual message, no stack trace.
+set +e; $cfg keep-inactive "$tmp/missing/x" foo >"$tmp/miss" 2>&1; rc=$?; set -e
+[ "$rc" = 3 ] || fail "a locked command on a missing project exited $rc, want 3: $(cat "$tmp/miss")"
+grep >/dev/null -c 'run /wp-create first' "$tmp/miss" || fail "missing-project message lost: $(cat "$tmp/miss")"
 echo PASS

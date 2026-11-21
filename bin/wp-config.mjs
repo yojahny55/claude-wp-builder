@@ -103,7 +103,13 @@ function withLock(file, fn) {
   try { return fn(); } finally { process.removeListener('exit', release); release(); }
 }
 
-const locked = (projectPath, fn) => withLock(join(resolve(projectPath), MANIFEST_NAME), fn);
+// A missing manifest is refused before the lock: mkdir of the lock under a directory that does
+// not exist would throw ENOENT, and the commands that branch on exit 3 would see a stack trace.
+const locked = (projectPath, fn) => {
+  const file = join(resolve(projectPath), MANIFEST_NAME);
+  if (!existsSync(file)) loadManifest(projectPath); // warns and exits 3
+  return withLock(file, fn);
+};
 
 // The one list of files this plugin writes into a site root that are working state, not
 // source: regenerable, machine-specific or secret. Anything new the plugin writes there
@@ -858,7 +864,8 @@ function cmdEnvSet(projectPath, flags) {
 // remote add, prints the summary, stages nothing) -> --commit -> --push --yes.
 // Only the named branch is ever created or pushed.
 // A URL's userinfo (`user:token@`) never reaches the output; git keeps the real value in .git/config.
-const maskUrl = (u) => String(u).replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/@\s]*@/i, '$1***@');
+// Greedy up to the last `@` before the first `/`: a password with a raw `@` stays hidden whole.
+const maskUrl = (u) => String(u).replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/\s]*@/i, '$1***@');
 
 const SECRET_FILE = /(^|\/)(wp-config[^/]*|\.env(\..*)?|\.htpasswd|id_rsa[^/]*|[^/]*\.(pem|key|p12|pfx)|credentials[^/]*\.json)$/i;
 
@@ -988,7 +995,12 @@ else if (cmd === 'get' && target && process.argv[4]) cmdGet(target, process.argv
 else if (cmd === 'validate-profile' && target) cmdValidateProfile(target);
 else if (cmd === 'drift' && target) cmdDrift(target);
 else if (cmd === 'refresh' && target) cmdRefresh(target);
-else if (cmd === 'keep-inactive' && target) locked(target, () => cmdKeepInactive(target, process.argv[4] && !process.argv[4].startsWith('--') ? process.argv[4] : undefined, parseFlags(cmd, process.argv.slice(4), 1)));
+// Flags are parsed before locked(): a malformed flag is a usage error (exit 1) whether or not
+// the project has a manifest yet.
+else if (cmd === 'keep-inactive' && target) {
+  const kiFlags = parseFlags(cmd, process.argv.slice(4), 1);
+  locked(target, () => cmdKeepInactive(target, process.argv[4] && !process.argv[4].startsWith('--') ? process.argv[4] : undefined, kiFlags));
+}
 else if (cmd === 'remove-plugin' && target) locked(target, () => cmdRemovePlugin(target, process.argv[4]));
 else if (cmd === 'code-home' && target) cmdCodeHome(target, parseFlags(cmd, process.argv.slice(4)));
 else if (cmd === 'set' && process.argv.length > 6) { warn('set takes exactly <project> <key> <value>; quote the value or pass it on stdin with `-`'); process.exit(1); }
@@ -996,7 +1008,10 @@ else if (cmd === 'set' && target && process.argv[4] && process.argv[5] !== undef
 else if (cmd === 'require-origin' && target) cmdRequireOrigin(target, parseFlags(cmd, process.argv.slice(4)));
 else if (cmd === 'gitignore-check' && target) cmdGitignoreCheck(target);
 else if (cmd === 'git-init' && target) cmdGitInit(target, parseFlags(cmd, process.argv.slice(4)));
-else if (cmd === 'env-set' && target) locked(target, () => cmdEnvSet(target, parseFlags(cmd, process.argv.slice(4))));
+else if (cmd === 'env-set' && target) {
+  const envFlags = parseFlags(cmd, process.argv.slice(4));
+  locked(target, () => cmdEnvSet(target, envFlags));
+}
 else if (cmd === 'adopt' && target) cmdAdopt(target, parseFlags(cmd, process.argv.slice(4)));
 else {
   warn('usage: wp-config.mjs <validate|migrate|render-context|get|set|validate-profile|adopt|drift|refresh|keep-inactive|remove-plugin|code-home|gitignore-check|git-init|env-set|require-origin> <project-path> [key [value]|wp-version|adopt flags]');
