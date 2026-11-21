@@ -261,9 +261,10 @@ version is reported, not retried with guessed flags.
 5. **Critical CSS cuts**: when the active theme has an `assets/build.json` manifest, run
    `node ${CLAUDE_PLUGIN_ROOT}/bin/assets-fresh.mjs <theme-dir>` (add `--root <wp-root>` when
    the manifest pins core or plugin sheets by path). A core, plugin or builder update rewrites
-   the sheets the cuts were taken from, and the cuts go stale in silence. A non-zero exit
+   the sheets the cuts were taken from, and the cuts go stale in silence. Exit `1`
    ("regenerate critical cuts") is reported as a finding with the project's cut-regeneration
-   step; do not regenerate them here. No manifest prints SKIP and is not a finding.
+   step; do not regenerate them here. Exit `2` (bad usage or an unreadable manifest) is a tool
+   error: report it as "critical cuts not checked" with its message, never as stale cuts. No manifest prints SKIP and is not a finding.
 6. Extra attention to anything flagged as version skew in Step 3.
 
 ## Step 6: Clone-aware Checks

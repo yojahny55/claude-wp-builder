@@ -195,7 +195,10 @@ The measurement is `node ${CLAUDE_PLUGIN_ROOT}/bin/style-diff.mjs`: take **two**
 before the change (`snapshot --label base1`, `--label base2`), one after, then
 `diff base1.json after.json --noise base1.json base2.json`. Two untouched baselines differ
 only in random-order carousels and sub-pixel separators; those elements are listed as noisy and
-never fail the run, so a non-zero exit means a style value the change moved. Add
+never fail the run. Read the exit code, not just non-zero: `1` means a style value the change
+moved (a regression until shown otherwise); `3` is INCOMPLETE, a page or viewport that was not
+measured, so nothing is known yet and the measurement is repeated, never read as a diff or as
+a pass; `2` is a usage error or no browser, a tool failure to report, not a result. Add
 `--state menu=<toggle-selector>@390` to record an opened mobile menu. Run it at desktop and
 mobile (the default 1366x768 and 390x844) and read the diff for every element sharing the class.
 
