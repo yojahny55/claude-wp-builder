@@ -63,7 +63,7 @@ grep -Fq 'node "${CLAUDE_PLUGIN_ROOT}/bin/image-gen.mjs" run --demo demo/' "$ip"
 for code in '`2` the plan was' '`3` no API key' '`4` one or more slots failed'; do
   grep -Fq "$code" "$ip" || fail "$ip does not state exit code: $code"
 done
-grep -Fq "Exit codes: 0 clean, 2 the plan was refused" bin/image-gen.mjs \
+grep -Fq "Exit codes: 0 clean, 2 the input was refused" bin/image-gen.mjs \
   || fail "bin/image-gen.mjs changed its exit codes; re-check $ip"
 
 # --- devices.md: the Contents list names every subsection -----------------------------

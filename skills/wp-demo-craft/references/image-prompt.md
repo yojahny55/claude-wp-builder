@@ -20,8 +20,9 @@ node "${CLAUDE_PLUGIN_ROOT}/bin/image-gen.mjs" run --demo demo/    # after a yes
 `plan` fills `gaps[]` (one per image slot, aspect read off the composition's `<img>`) and
 shows each gap's composed `prompt_sent` with an estimated cost; set exactly one of `prompt`
 or `use` per gap, show the table, and ask once. Exit codes: `0` clean; `2` the plan was
-refused before any request (a gap with both or neither of `prompt`/`use`, or a composed
-prompt that no longer matches the approved plan); `3` no API key (nothing written or
+refused before any request (a missing plan file, an unknown provider, a gap with both or
+neither of `prompt`/`use`, two `use` files sharing a basename, or a composed prompt that
+no longer matches the approved plan); `3` no API key (nothing written or
 billed); `4` one or more slots failed after work began. The key comes from the
 environment only (`GEMINI_API_KEY` or `OPENAI_API_KEY`).
 
