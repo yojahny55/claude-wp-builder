@@ -64,6 +64,10 @@ grep >/dev/null -Fc 'INCOMPLETE' "$tmp/e.txt" || fail "identical 404 pages were 
 node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1]));for(const u of Object.values(j.pages))for(const v of Object.values(u)){v.finalUrl="http://h/login"}fs.writeFileSync(process.argv[2],JSON.stringify(j))' "$tmp/b1.json" "$tmp/redir.json"
 node "$tool" diff "$tmp/b1.json" "$tmp/redir.json" >"$tmp/r.txt"; rc=$?
 [ "$rc" = 3 ] || fail "a different final URL exited $rc, not 3"
+# A fragment changed by a scroll-spy script is not a redirect.
+node -e 'const fs=require("fs");for(const [src,dst,h] of [[process.argv[1],process.argv[2],"#a"],[process.argv[1],process.argv[3],"#b"]]){const j=JSON.parse(fs.readFileSync(src));for(const [u,vs] of Object.entries(j.pages))for(const v of Object.values(vs)){v.finalUrl=u+h}fs.writeFileSync(dst,JSON.stringify(j))}' "$tmp/b1.json" "$tmp/ha.json" "$tmp/hb.json"
+node "$tool" diff "$tmp/ha.json" "$tmp/hb.json" >"$tmp/h.txt"; rc=$?
+[ "$rc" != 3 ] || fail "a fragment-only change of the final URL was UNMEASURED"
 # The real capture records status and final URL (local server: a 404 and a redirect).
 srv="$tmp/srv.mjs"
 cat > "$srv" <<'JS'

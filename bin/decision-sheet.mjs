@@ -85,21 +85,21 @@ const DEFAULT_OPTIONS = [
 export function parseAnswers(text, against = null) {
   const decisions = new Map(), warnings = [];
   const re = /^[\s>*\-]*DECISION\s+([A-Za-z0-9._-]+)\s*:\s*([^\s|]+)\s*(?:\|\s*(.*?))?\s*$/;
-  // A malformed line outside a block counts only when the text has no block at all: prose
-  // such as "DECISION needed here" pasted above a valid block must not fail the parse.
-  let inBlock = false, sawBlock = false, malformed = 0;
-  const loose = [];
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim().replace(/^[>*\-\s]+/, '');
-    if (/^DECISIONS v\d+$/.test(line)) { inBlock = true; sawBlock = true; continue; }
+  // When the text holds a block, only the lines inside a block are answers: prose such as
+  // "DECISION needed: soon" pasted above or below it is neither an answer nor a dropped one.
+  // Text with no block at all is read line by line, as before blocks existed.
+  const clean = (raw) => raw.trim().replace(/^[>*\-\s]+/, '');
+  const lines = text.split(/\r?\n/);
+  const hasBlock = lines.some((raw) => /^DECISIONS v\d+$/.test(clean(raw)));
+  let inBlock = false, malformed = 0;
+  for (const raw of lines) {
+    const line = clean(raw);
+    if (/^DECISIONS v\d+$/.test(line)) { inBlock = true; continue; }
     if (/^END DECISIONS$/.test(line)) { inBlock = false; continue; }
+    if (hasBlock && !inBlock) continue;
     const m = re.exec(raw);
-    if (sawBlock && !inBlock) continue;
     if (!m) {
-      if (/^DECISION\b(?!S\b)/.test(line)) {
-        const w = `line not understood, answer dropped: ${line.slice(0, 80)}`;
-        if (inBlock) { malformed++; warnings.push(w); } else loose.push(w);
-      }
+      if (/^DECISION\b(?!S\b)/.test(line)) { malformed++; warnings.push(`line not understood, answer dropped: ${line.slice(0, 80)}`); }
       continue;
     }
     const [, id, option, note = ''] = m;
@@ -113,7 +113,6 @@ export function parseAnswers(text, against = null) {
     }
     decisions.set(id, { id, option, status, note, ledger: status === 'rejected' ? 'accepted' : null });
   }
-  if (!sawBlock) { malformed += loose.length; warnings.push(...loose); }
   if (!decisions.size) warnings.push('no DECISION lines found');
   return { decisions: [...decisions.values()], warnings, malformed };
 }

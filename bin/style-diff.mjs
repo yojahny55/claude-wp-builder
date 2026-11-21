@@ -307,7 +307,9 @@ function runDiff(o) {
       if (!vb) vr.unmeasured = 'viewport absent from B';
       else if (va.unmeasured || vb.unmeasured) vr.unmeasured = va.unmeasured || vb.unmeasured;
       else if ((va.status ?? 0) >= 400 || (vb.status ?? 0) >= 400) vr.unmeasured = `HTTP ${(vb.status ?? 0) >= 400 ? `${vb.status} in B` : `${va.status} in A`}: an error page is not the page`;
-      else if (va.finalUrl && vb.finalUrl && va.finalUrl !== vb.finalUrl) vr.unmeasured = `redirected to a different URL (A ${va.finalUrl}, B ${vb.finalUrl})`;
+      // The fragment is left out: a scroll-spy or tab script rewrites it during the walk, and
+      // that is not a redirect to another page.
+      else if (va.finalUrl && vb.finalUrl && va.finalUrl.replace(/#.*$/, '') !== vb.finalUrl.replace(/#.*$/, '')) vr.unmeasured = `redirected to a different URL (A ${va.finalUrl}, B ${vb.finalUrl})`;
       if (vr.unmeasured) rep.totals.unmeasured++;
       else {
         const noisy = new Set();

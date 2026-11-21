@@ -109,6 +109,10 @@ node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));const a
 # prose starting with DECISION above a valid block is not a dropped answer
 printf 'DECISION needed here\nDECISIONS v1\nDECISION A: approve | ok\nEND DECISIONS\n' | node "$tool" --parse - >/dev/null 2>&1 \
   || fail "prose above a valid block failed the parse"
+# ...nor an answer when it happens to fit the grammar
+out=$(printf 'DECISION needed: soon\nDECISIONS v1\nDECISION A: approve | ok\nEND DECISIONS\n' | node "$tool" --parse - --against "$tmp/against.json" 2>/dev/null) \
+  || fail "grammatical prose above a valid block failed the parse"
+grep >/dev/null -c '"needed"' <<<"$out" && fail "prose above the block was read as an answer: $out"
 printf 'DECISION A: approve\nDECISION B approve\n' | node "$tool" --parse - >/dev/null 2>&1 && fail "a malformed line with no block was not reported"
 # --against or --proposals that parse but are not objects are usage errors (2), not crashes
 echo null > "$tmp/null.json"
