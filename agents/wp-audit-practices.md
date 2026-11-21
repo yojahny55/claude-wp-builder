@@ -98,7 +98,7 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 | WP-053 | Tailwind class that never compiled | On a compiled Tailwind theme run `node ${CLAUDE_PLUGIN_ROOT}/bin/theme-template-check.mjs <theme> --rule classes`. It fails on an HTML entity inside a class token (`group-aria-[expanded=&quot;false&quot;]:rotate-90` emitted nothing on a real build) and on a utility-shaped token with no selector in `assets/css/dist/*.css`. `CANNOT VERIFY` lines are runtime-built classes: report them as INFO, never as findings | WARNING | No |
 | WP-054 | Tabs, accordion or directory-filter markup without its script | `node ${CLAUDE_PLUGIN_ROOT}/bin/theme-template-check.mjs <theme> --rule widgets`: `role="tab"`, `data-accordion-trigger` or `data-directory` in a template requires `./tabs.js`, `./accordion.js` or `./directory-filter.js` imported by `assets/js/src/index.js` | WARNING | Yes |
 | WP-017 | Include instead of get_template_part | Grep templates for `include\|require` of template files (should use get_template_part) | WARNING | No |
-| WP-018 | Missing wp_body_open (owner, see the Same defect table) | Grep header.php for `wp_body_open()` | WARNING | Yes |
+| WP-018 | Missing wp_body_open (owner of A11Y-063) | Grep header.php for `wp_body_open()` | WARNING | Yes |
 | WP-019 | Broken template part refs | For each `get_template_part()` call, verify the referenced file exists | CRITICAL | No |
 | WP-048 | Orphaned IDs in relationship fields | Resolve every post ID stored in an ACF relationship or post-object field; split the ones a template prints from the ones nothing reads. See Procedure | WARNING / INFO | No |
 

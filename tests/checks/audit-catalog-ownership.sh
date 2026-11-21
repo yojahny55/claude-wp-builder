@@ -17,19 +17,13 @@ CMD=commands/wp-audit.md
 
 # Row text for a code: the whole table line, or empty.
 row() { grep -m1 -E "^\| $2(@[0-9]+)? \|" "$1" || true; }
-# First word of the severity column (second-last cell, before Auto-fix, or last cell).
+# Full severity cell, trimmed: the last cell, or the one before Auto-fix when that is Yes/No.
 sev() {
-  local line=$1 cells
-  IFS='|' read -ra cells <<<"$line"
-  local n=${#cells[@]} i=$((${#cells[@]} - 1))
-  # Trailing empty cell after the final pipe.
-  [ -z "${cells[$i]// /}" ] && i=$((i - 1))
-  local last=${cells[$i]}
-  # Auto-fix columns are Yes/No; the severity is then the cell before it.
-  case "${last// /}" in Yes|No) i=$((i - 1)); last=${cells[$i]};; esac
-  last=${last# }
-  echo "${last%% *}"
-  : "$n"
+  awk -F'|' '{
+    n = NF - 1; c = $n; gsub(/^ +| +$/, "", c)
+    if (c == "Yes" || c == "No") { n--; c = $n; gsub(/^ +| +$/, "", c) }
+    print c
+  }' <<<"$1"
 }
 
 # --- WCAG 2.2 AA ---
@@ -65,12 +59,19 @@ file_of() {
 for pair in SEC-026:PERF-040 SEC-026:WP-042 SEC-022:PERF-029 SEC-008:WP-040 SEC-001:WP-001 \
             SEC-004:WP-031 WP-018:A11Y-063 A11Y-001:SEO-006; do
   o=${pair%%:*}; d=${pair##*:}
-  grep -qE "^\| .*\b$o\b.* \| .*\b$d\b" "$STD" || fail "$STD: owner $o / duplicate $d not tabulated"
+  # Table row: column 2 is exactly the owner, column 3 contains the duplicate.
+  ok=$(awk -F'|' -v o="$o" -v d="$d" '{
+    c2 = $3; c3 = $4; gsub(/^ +| +$/, "", c2)
+    if (c2 == o && index(c3, d)) found = 1
+  } END { print found + 0 }' "$STD")
+  [ "$ok" = 1 ] || fail "$STD: no table row with owner $o and duplicate $d"
   ro=$(row "$(file_of "$o")" "$o"); rd=$(row "$(file_of "$d")" "$d")
   [ -n "$ro" ] || fail "owner row $o missing"
   [ -n "$rd" ] || fail "duplicate row $d missing"
+  case "$rd" in *"duplicate of $o"[,\ \)]*) ;; *) fail "$d row must say 'duplicate of $o'";; esac
+  case "$ro" in *"owner of "*"$d"*) ;; *) fail "$o row must say 'owner of' naming $d";; esac
   so=$(sev "$ro"); sd=$(sev "$rd")
-  [ "$so" = "$sd" ] || fail "$o is $so but its duplicate $d is $sd"
+  [ "$so" = "$sd" ] || fail "$o severity '$so' differs from duplicate $d '$sd'"
 done
 grep -q 'SEO-031' "$STD" || fail "$STD must say SEO-031 is not a duplicate"
 

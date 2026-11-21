@@ -402,11 +402,11 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/fix-verification.md` 
 
 ## Step 7: Aggregate Reports
 
-Collect reports from all agents. For each agent's output, parse the findings into a unified list. The parser is `bin/audit-report.mjs --agents <out>/agents` (Step 8.5): it normalizes the aliases agents drift into (`code` for `check`, `owner` for `ownership`, `fix: auto` for `auto_fixable`), refuses a finding with no catalog id or one also reported as a pass, and builds the run file's findings, so `run.json` is never assembled by a hand-written script.
+Collect reports from all agents. For each agent's output, parse the findings into a unified list. The parser is `bin/audit-report.mjs --agents <out>/agents` (Step 8.5): it normalizes the aliases agents drift into (`code` for `check`, `owner` for `ownership`, `fix: auto` for `auto_fixable`), refuses a finding with no catalog id or one also reported as a pass, and builds the run file's findings, so `run.json` is never hand-assembled.
 
 **Deduplication** runs on three different keys, because three different things collide here.
 
-*Different ids, one defect.* Apply the "Same defect, one owner" table in `wp-audit-standards` first: owner ran, duplicates `N/A`, findings dropped.
+*Different ids, one defect.* First merge per the "Same defect, one owner" table in `wp-audit-standards`: a duplicate on a resource the owner also failed joins the owner's finding.
 
 *Two agents reporting the same place.* If the same `file:line` appears in multiple reports:
 - Keep the highest-severity finding and drop the lower-severity duplicates
@@ -415,7 +415,7 @@ Collect reports from all agents. For each agent's output, parse the findings int
   Step 8.5's `code`/`setting`/`content`/`manual`, who applies the fix.)
 
 *The suite and an agent reporting the same defect.* With `--suite`, a contrast failure or
-missing description arrives twice: measured on a page, and inferred from the source.
+missing description arrives twice: measured on a page and inferred from source.
 **A measurement beats an inference.** They are the same defect only when the check **and**
 the resource match — a contrast failure measured on `/contact` and one in a stylesheet rule
 no audited page uses are two findings, and the second is the one nobody would find again.

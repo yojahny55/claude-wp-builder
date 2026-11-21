@@ -61,7 +61,7 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 
 | Code | Check | How to Detect | Severity | Auto-fix |
 |------|-------|---------------|----------|----------|
-| A11Y-001 | Images missing alt | Grep templates for `<img` without `alt=` | WARNING | No |
+| A11Y-001 | Images missing alt (owner of SEO-006) | Grep templates for `<img` without `alt=` | WARNING | No |
 | A11Y-002 | Decorative images wrong | Grep for `<img` with `alt=""` but missing `role="presentation"` | INFO | Yes |
 | A11Y-003 | Color contrast — text | Parse CSS `:root` custom properties, calculate text-color vs bg-color ratio. Min 4.5:1 normal, 3:1 large. `#767676` is minimum gray on white. | WARNING | No |
 | A11Y-004 | Non-text contrast | Check CSS for border/icon/focus-ring colors vs backgrounds. Min 3:1 (WCAG 1.4.11). Compute the ratio against the background the element ACTUALLY sits on where it receives focus, not the page's general ground color — a ring passing on the light page can still fail on a dark header, a skip link, or any element with its own background. A theme with more than one focus background needs more than one contrast calculation. | WARNING | No |

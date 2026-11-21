@@ -198,11 +198,20 @@ pass cannot see them. Each has one owner; the others are duplicates.
 SEO-031 (alt text counted in the media library, a database measurement) is a separate check,
 not a duplicate of A11Y-001 or SEO-006.
 
-When the owner ran in the same audit, the parent records each duplicate as `N/A` with the
-reason `duplicate of <owner>` and drops its findings, so the defect is scored once. When only
-the duplicate's category ran, the duplicate reports at the owner's severity. Duplicates keep
-their rows so a single-category audit still measures the defect. An owner and its duplicates
-carry the same severity.
+A duplicate's finding is merged into the owner's finding when the owner also failed on the
+same resource. For site-wide checks (PHP floor, XML-RPC, `WP_DEBUG`, `wp_body_open`) the
+resource is the site itself, so an owner failure absorbs the duplicate's. For per-location
+checks (unescaped output, dangerous functions, alt in templates) the resource is the
+`file:line`. The merged finding keeps the owner's id and records the duplicate's id in its
+evidence, the same shape as the suite and agent merge in `bin/audit-report.mjs --merge`. A
+duplicate finding with no owner failure on that resource (the owner passed, did not run, or
+ran on another scope) is kept, at the owner's severity: the detectors differ, so a defect
+only the duplicate sees is still a measured defect. Duplicates keep their rows and stay in
+`checks_executed` as normal, so a single-category audit still measures the defect and nothing
+changes in coverage or the ledger vocabulary. A duplicate's earlier open ledger entry that is
+now merged into the owner's finding reads as resolved under the duplicate's id, because the
+defect is tracked under the owner's id from this run on. An owner and its duplicates carry
+the same severity.
 
 ---
 

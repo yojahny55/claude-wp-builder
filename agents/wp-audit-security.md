@@ -98,14 +98,14 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 
 | Code | Check | How to Detect | Severity | Auto-fix |
 |------|-------|---------------|----------|----------|
-| SEC-001 | Unescaped output | Grep `.php` for `echo\s+\$` excluding lines with `esc_html\|esc_url\|esc_attr\|wp_kses` | WARNING | Yes |
+| SEC-001 | Unescaped output (owner of WP-001) | Grep `.php` for `echo\s+\$` excluding lines with `esc_html\|esc_url\|esc_attr\|wp_kses` | WARNING | Yes |
 | SEC-002 | SQL injection | Grep for `\$wpdb->query\(` without `prepare` on same/adjacent line | CRITICAL | No |
 | SEC-003 | Missing CSRF | Grep form handlers for `\$_POST\|\$_GET\|\$_REQUEST` without `wp_verify_nonce` nearby | CRITICAL | No |
-| SEC-004 | Dangerous functions | Grep for `\beval\(\|\bbase64_decode\(\|\bcreate_function\(\|\bserialize\(\|\bunserialize\(` | CRITICAL | No |
+| SEC-004 | Dangerous functions (owner of WP-031) | Grep for `\beval\(\|\bbase64_decode\(\|\bcreate_function\(\|\bserialize\(\|\bunserialize\(` | CRITICAL | No |
 | SEC-005 | Hardcoded credentials | Grep `.php` for `api_key\s*=\|password\s*=\|secret\s*=\|token\s*=` (excluding comments) | CRITICAL | No |
 | SEC-006 | DISALLOW_FILE_EDIT missing | Read `wp-config.php`, check if constant defined | WARNING | Yes |
 | SEC-007 | FORCE_SSL_ADMIN missing | Read `wp-config.php`, check if constant defined | WARNING | Yes |
-| SEC-008 | WP_DEBUG true in production | Read `wp-config.php`, check value is `false` | WARNING (`INFO` on a local clone) | Yes |
+| SEC-008 | WP_DEBUG true in production (owner of WP-040) | Read `wp-config.php`, check value is `false` | WARNING (`INFO` on a local clone) | Yes |
 | SEC-009 | WP_DEBUG_DISPLAY true | Read `wp-config.php`, check value is `false` | CRITICAL | Yes |
 | SEC-010 | File permission 777 | Grep config/scripts for `chmod.*777\|0777` | WARNING | No |
 | SEC-011 | PHP execution in uploads | Check if `wp-content/uploads/.htaccess` exists with PHP deny rules | WARNING | Yes |
@@ -189,11 +189,11 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 |------|-------|---------|---------------|----------|
 | SEC-020 | Default DB prefix | `$WP config get table_prefix` | Not `wp_` | WARNING |
 | SEC-021 | Directory browsing | Read `.htaccess` for `Options -Indexes` | Present | WARNING |
-| SEC-022 | XML-RPC enabled | `$WP eval "echo has_filter('xmlrpc_enabled','__return_false') ? 'off' : 'on';"` | `off` | WARNING |
+| SEC-022 | XML-RPC enabled (owner of PERF-029) | `$WP eval "echo has_filter('xmlrpc_enabled','__return_false') ? 'off' : 'on';"` | `off` | WARNING |
 | SEC-023 | REST API users exposed | `$WP eval "echo json_encode(rest_url('wp/v2/users'));"` + check if publicly accessible | Restricted | WARNING |
 | SEC-024 | Login URL default | Check AIOS config for renamed login | Changed | INFO |
 | SEC-025 | User enumeration | `$WP eval "echo get_option('permalink_structure') ? 'yes' : 'no';"` + check `?author=1` blocking | Blocked | WARNING |
-| SEC-026@2 | PHP version old | `$WP eval "echo phpversion();"` | >= 8.2 (8.1 is out of security support; this is the one place the floor is written) | WARNING |
+| SEC-026@2 | PHP version old (owner of PERF-040, WP-042) | `$WP eval "echo phpversion();"` | >= 8.2 (8.1 is out of security support; this is the one place the floor is written) | WARNING |
 | SEC-027 | No SSL | `$WP option get siteurl` | Starts with `https://` | CRITICAL |
 | SEC-028 | Sensitive files in root | Check existence of `readme.html`, `license.txt`, `wp-config-sample.php` | None exist | INFO |
 | SEC-029 | PHP files in uploads | `find wp-content/uploads -name "*.php"` | None found | CRITICAL |
