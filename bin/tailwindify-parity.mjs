@@ -33,9 +33,9 @@
  */
 import { existsSync, readdirSync, statSync, lstatSync, createReadStream, readFileSync, realpathSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, join, dirname, extname, normalize, sep, basename } from 'node:path';
-import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { createServer } from 'node:http';
+import { findBrowser } from './lib/browsers.mjs';
 
 const args = process.argv.slice(2);
 if (args.includes('--help') || !args.length) {
@@ -162,34 +162,6 @@ const serve = (root) => new Promise((ready, fail) => {
   });
 });
 
-function findChrome() {
-  if (process.env.WP_DEMO_CHROME && existsSync(process.env.WP_DEMO_CHROME)) return process.env.WP_DEMO_CHROME;
-  const win = process.platform === 'win32';
-  const candidates = win
-    ? [join(process.env.PROGRAMFILES || 'C:\\Program Files', 'Google\\Chrome\\Application\\chrome.exe'),
-       join(process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Google\\Chrome\\Application\\chrome.exe'),
-       process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'Google\\Chrome\\Application\\chrome.exe') : null]
-    : ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium',
-       '/usr/bin/chromium-browser', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'];
-  for (const c of candidates) if (c && existsSync(c)) return c;
-  const cacheRoots = win
-    ? [join(process.env.LOCALAPPDATA || homedir(), 'ms-playwright')]
-    : [join(homedir(), '.cache/ms-playwright'), join(homedir(), 'Library/Caches/ms-playwright')];
-  const tails = win
-    ? ['chrome-win\\chrome.exe']
-    : ['chrome-linux64/chrome', 'chrome-linux/chrome', 'chrome-mac/Chromium.app/Contents/MacOS/Chromium'];
-  for (const cache of cacheRoots) {
-    if (!existsSync(cache)) continue;
-    for (const entry of readdirSync(cache)) {
-      for (const tail of tails) {
-        const p = join(cache, entry, tail);
-        if (existsSync(p)) return p;
-      }
-    }
-  }
-  return null;
-}
-
 let chromium;
 try {
   if (process.env.PLAYWRIGHT_CORE) {
@@ -207,9 +179,9 @@ try {
   console.error('tailwindify-parity: playwright-core is not installed (npm i -D playwright-core)');
   process.exit(2);
 }
-const executablePath = findChrome();
+const executablePath = findBrowser('chromium');
 if (!executablePath) {
-  console.error('tailwindify-parity: no existing Chrome or Chromium found. Set WP_DEMO_CHROME to one; nothing is downloaded.');
+  console.error('tailwindify-parity: no existing Chrome or Chromium found. Set WP_BROWSER_CHROMIUM to an existing Chrome or Chromium binary; nothing is downloaded.');
   process.exit(2);
 }
 

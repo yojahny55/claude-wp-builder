@@ -10,10 +10,11 @@
  *                 without a browser, so the emitted CSS itself can be asserted on
  *        exit 0 ok, 2 no browser, 3 crash
  */
-import { existsSync, readFileSync, writeFileSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { resolve, join, dirname, basename } from 'node:path';
-import { tmpdir, homedir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { findBrowser } from './lib/browsers.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -102,23 +103,8 @@ function applyFills(src, compDir) {
   });
 }
 
-function findChrome() {
-  if (process.env.WP_DEMO_CHROME && existsSync(process.env.WP_DEMO_CHROME)) return process.env.WP_DEMO_CHROME;
-  for (const c of ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser',
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome']) if (existsSync(c)) return c;
-  for (const cache of [join(homedir(), '.cache/ms-playwright'), join(homedir(), 'Library/Caches/ms-playwright')]) {
-    if (!existsSync(cache)) continue;
-    for (const entry of readdirSync(cache))
-      for (const tail of ['chrome-linux64/chrome', 'chrome-linux/chrome', 'chrome-mac/Chromium.app/Contents/MacOS/Chromium']) {
-        const p = join(cache, entry, tail);
-        if (existsSync(p)) return p;
-      }
-  }
-  return null;
-}
-
 // playwright-core resolution ladder, the same house pattern demo-verify.mjs uses for
-// its own import/findChrome ladder: PLAYWRIGHT_CORE lets the check suite force the
+// its own import ladder: PLAYWRIGHT_CORE lets the check suite force the
 // no-browser path deterministically; the bare specifier resolves from this file's own
 // location in bin/, never the WordPress project the plugin is invoked from, so a
 // project-local `npm i -D playwright-core` needs the cwd fallback to be found at all.
@@ -139,9 +125,9 @@ try {
   console.error('composition-preview: playwright-core is not installed (npm i -D playwright-core)');
   process.exit(2);
 }
-const executablePath = findChrome();
+const executablePath = findBrowser('chromium');
 if (!executablePath) {
-  console.error('composition-preview: no existing Chrome or Chromium found. Set WP_DEMO_CHROME to an existing Chrome or Chromium binary; nothing is downloaded.');
+  console.error('composition-preview: no existing Chrome or Chromium found. Set WP_BROWSER_CHROMIUM to an existing Chrome or Chromium binary; nothing is downloaded.');
   process.exit(2);
 }
 

@@ -13,7 +13,6 @@
  */
 import { existsSync, mkdirSync, writeFileSync, readdirSync, statSync, createReadStream, realpathSync } from 'node:fs';
 import { resolve, join, dirname, basename, extname, normalize, sep } from 'node:path';
-import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
@@ -167,58 +166,6 @@ const serve = (root) => new Promise((ready, fail) => {
   });
 });
 
-function findChrome() {
-  if (process.env.WP_DEMO_CHROME && existsSync(process.env.WP_DEMO_CHROME))
-    return process.env.WP_DEMO_CHROME;
-  const win = process.platform === 'win32';
-  // Windows was unreachable before: with no candidate paths and no cache root
-  // for it, findChrome returned null and the command exited 2 (no usable
-  // browser) on a machine that had Chrome installed.
-  const candidates = win
-    ? [
-        join(process.env.PROGRAMFILES || 'C:\\Program Files', 'Google\\Chrome\\Application\\chrome.exe'),
-        join(process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Google\\Chrome\\Application\\chrome.exe'),
-        process.env.LOCALAPPDATA
-          ? join(process.env.LOCALAPPDATA, 'Google\\Chrome\\Application\\chrome.exe')
-          : null,
-      ]
-    : [
-        '/usr/bin/google-chrome',
-        '/usr/bin/google-chrome-stable',
-        '/usr/bin/chromium',
-        '/usr/bin/chromium-browser',
-        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-      ];
-  for (const c of candidates) if (c && existsSync(c)) return c;
-  // Playwright's own browser cache, when one already exists on the machine.
-  // Walked with readdirSync rather than a glob: fs.globSync landed in Node 22 and
-  // importing it outright makes this whole script a SyntaxError on Node 18 and 20.
-  // macOS caches under ~/Library/Caches, not ~/.cache, so all roots are tried.
-  const cacheRoots = win
-    ? [join(process.env.LOCALAPPDATA || homedir(), 'ms-playwright')]
-    : [
-        join(homedir(), '.cache/ms-playwright'),
-        join(homedir(), 'Library/Caches/ms-playwright'),
-      ];
-  const tails = win
-    ? ['chrome-win\\chrome.exe']
-    : [
-        'chrome-linux64/chrome',
-        'chrome-linux/chrome',
-        'chrome-mac/Chromium.app/Contents/MacOS/Chromium',
-      ];
-  for (const cache of cacheRoots) {
-    if (!existsSync(cache)) continue;
-    for (const entry of readdirSync(cache)) {
-      for (const tail of tails) {
-        const p = join(cache, entry, tail);
-        if (existsSync(p)) return p;
-      }
-    }
-  }
-  return null;
-}
-
 // playwright-core resolution order: PLAYWRIGHT_CORE, the bare import (from
 // bin/), the cwd's node_modules, then the global root (`npm root -g`).
 // PLAYWRIGHT_CORE lets the check suite force the no-browser path; a bogus
@@ -267,9 +214,9 @@ try {
   console.error(PROBE ? 'probe: missing playwright-core' : 'demo-verify: playwright-core is not installed (npm i -D playwright-core)');
   process.exit(2);
 }
-const executablePath = findChrome();
+const executablePath = findBrowser('chromium');
 if (!executablePath) {
-  console.error(PROBE ? 'probe: missing chrome' : 'demo-verify: no existing Chrome or Chromium found. Set WP_DEMO_CHROME to one; nothing is downloaded.');
+  console.error(PROBE ? 'probe: missing chrome' : 'demo-verify: no existing Chrome or Chromium found. Set WP_BROWSER_CHROMIUM to an existing Chrome or Chromium binary; nothing is downloaded.');
   process.exit(2);
 }
 // Firefox is the second engine, never a requirement: a Playwright Firefox build that
