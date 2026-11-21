@@ -11,7 +11,8 @@ command -v curl >/dev/null || { echo "PASS (SKIP: no curl)"; exit 0; }
 
 tmp=$(mktemp -d)
 pids=""
-trap 'for p in $pids; do kill "$p" 2>/dev/null || true; done; rm -rf "$tmp"' EXIT
+cleanup() { local p; for p in $pids; do kill "$p" 2>/dev/null || true; done; rm -rf "$tmp"; }
+trap cleanup EXIT
 
 cat >"$tmp/up.mjs" <<'JS'
 import http from 'node:http';
