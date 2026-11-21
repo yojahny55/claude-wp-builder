@@ -367,7 +367,9 @@ function resolveOutDir(flag, siteRoot, run) {
   if (process.env.WP_AUDIT_OUT_DIR) return process.env.WP_AUDIT_OUT_DIR;
   const manifest = readManifest(siteRoot);
   const dir = manifest?.audit?.out_dir;
-  if (typeof dir === 'string' && dir !== '') return dir;
+  // A relative manifest out_dir belongs to the site root, like the manifest itself, so the
+  // runbook (audit-runbook.mjs, same rule) finds what this wrote from any working directory.
+  if (typeof dir === 'string' && dir !== '') return resolve(siteRoot, dir);
   const root = process.env.WP_AUDITS_ROOT || manifest?.audit?.audits_root;
   if (typeof root === 'string' && root !== '') {
     // The site root's folder name is the last candidate so that the commands that run without

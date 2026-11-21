@@ -65,5 +65,9 @@ echo '{ "audit": { "out_dir": "audit-out" } }' > "$site/.wp-create.json"
 (cd "$tmp" && node "$rbk" --root "$site" --date 2026-01-02 >/dev/null 2>"$tmp/err5") \
   || fail "a relative audit.out_dir must resolve against --root: $(cat "$tmp/err5")"
 [ -f "$site/audit-out/runbook-2026-01-02.md" ] || fail "runbook not written under the site root's out_dir"
+# The report resolves the same relative out_dir against --site-root, so both tools meet.
+(cd "$tmp" && node "$rep" --run "$tmp/run.json" --site-root "$site" --format md --date 2026-01-03 >/dev/null 2>"$tmp/err6") \
+  || fail "report with a relative audit.out_dir failed: $(cat "$tmp/err6")"
+[ -f "$site/audit-out/informe-2026-01-03.md" ] || fail "report did not write under the site root's out_dir"
 
 echo PASS
