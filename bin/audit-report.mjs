@@ -236,6 +236,11 @@ Every value flag also takes --flag=value (the form for a value that starts with 
 The header of this file documents each flag.`;
 
 function parseArgs(argv) {
+  // Help wins wherever it appears, even where it would otherwise be read as a flag's value.
+  if (argv.includes('-h') || argv.includes('--help')) {
+    process.stdout.write(`${USAGE}\n`);
+    process.exit(0);
+  }
   const opts = {
     out: null, format: 'both', lang: null, run: null, date: null, merge: [], agents: [], siteRoot: '.', ledger: null,
     accept: [], unaccept: [], markFixed: [], reason: null, evidence: null,
@@ -251,11 +256,6 @@ function parseArgs(argv) {
     if (eq && !VALUE_FLAGS.has(eq[1])) die(1, `unknown argument: ${flag}`);
     if (eq) { flag = eq[1]; value = eq[2]; inline = true; }
     switch (flag) {
-      case '-h':
-      case '--help':
-        process.stdout.write(`${USAGE}\n`);
-        process.exit(0);
-        break;
       case '--rerender':
       case '--summary':
       case '--json':
@@ -650,7 +650,8 @@ function archiveSameDay(outDir, date) {
     for (const [from, to] of moved.reverse()) {
       try { renameSync(to, from); } catch { /* best effort: the message below names what is left */ }
     }
-    die(1, `audit-report: could not archive the earlier run of ${date} (${error.message}); nothing was changed`);
+    // An I/O failure is a crash (3), as it was before the rollback existed, not invalid input.
+    die(3, `audit-report: could not archive the earlier run of ${date} (${error.message}); nothing was changed`);
   }
   console.log(`audit-report: earlier run of ${date} kept as informe-${date}-${stamp}.*`);
 }
@@ -868,7 +869,9 @@ function splitByDecision(findings, entries, fresh) {
 
 function statusTable(rows) {
   const blank = () => ({ CRITICAL: 0, WARNING: 0, INFO: 0, other: 0, total: 0 });
-  const byStatus = Object.fromEntries(LEDGER_STATUSES.map((status) => [status, blank()]));
+  // Null prototype: a status is data, and `__proto__` as a plain-object key would reset the
+  // prototype instead of adding a row, so its counts would vanish from the table.
+  const byStatus = Object.assign(Object.create(null), Object.fromEntries(LEDGER_STATUSES.map((status) => [status, blank()])));
   const bySeverity = blank();
   for (const row of rows) {
     const status = row.status || 'unknown';
