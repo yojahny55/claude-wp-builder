@@ -26,8 +26,9 @@
 # skills/wp-robin/scripts/robin-fix.sh asked `echo "$EXISTING_HASHES" | grep -qF "$hash"`
 # whether a queue hash was already taken: once the list outgrows the 64 KiB pipe buffer
 # (about a thousand rows), a hash that IS present, anywhere but the list's tail, read as
-# absent every time, so the collision branch never ran and the row was inserted again. bin/*.sh and skills/*/scripts/*.sh are scanned too -- those that set pipefail,
-# and the sourced lib-*.sh files that inherit it from their caller.
+# absent every time, so the collision branch never ran and the row was inserted again.
+# bin/*.sh and skills/*/scripts/*.sh are scanned too -- those that set pipefail, and the
+# sourced lib-*.sh files that inherit it from their caller.
 set -uo pipefail
 cd "$(dirname "$0")/../.." || exit 1
 

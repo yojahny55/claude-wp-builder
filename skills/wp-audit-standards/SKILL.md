@@ -156,6 +156,21 @@ removing code and design decisions are never auto-fixable.
 | `UX-NNN` | Usability |
 | `A11Y-AXE-*`, `PERF-LH-*` | Evidence rows from the browser suite — measurements of an existing criterion, never criteria of their own |
 
+#### Unused and retired ids
+
+These numbers were never assigned, or were retired. They are never reused: `checks_run`
+history and ledger entries key by id, so a reused number would read old coverage as coverage
+of a new rule. A new check takes the next number after its prefix's highest (UX: after UX-058, see
+`skills/wp-audit-ux-standards/SKILL.md`). `A11Y-012`
+appears in examples in the run references only as a sample id; it is not a live check.
+
+- `SEC-015..019`
+- `SEO-013..019`, `SEO-047`
+- `PERF-006..009`, `PERF-014`, `PERF-024`, `PERF-032..034`, `PERF-050`
+- `A11Y-009..019`, `A11Y-035..039`, `A11Y-045..049`, `A11Y-054..059`
+- `WP-009`, `WP-035..039`, `WP-056..059`
+- `UX-022`, `UX-023` — see `skills/wp-audit-ux-standards/SKILL.md`
+
 ### Deduplication
 
 When several agents report one defect:
@@ -165,6 +180,46 @@ When several agents report one defect:
 - **SEO agent** owns heading hierarchy for search ranking context
 - **A11y agent** owns heading hierarchy for screen reader navigation context
 - **The command** deduplicates identical `file:line` findings, keeping the highest severity
+
+#### Same defect, one owner
+
+Some defects sit in the catalog of more than one agent under different ids, so the `file:line`
+pass cannot see them. Each has one owner; the others are duplicates.
+
+| Defect | Owner | Duplicates | `root_cause` |
+|---|---|---|---|
+| PHP version below the floor (`>= 8.2`; 8.1 is out of security support) | SEC-026@2 | PERF-040@2, WP-042@2 | `php-floor` |
+| XML-RPC enabled | SEC-022 | PERF-029@2 | `xmlrpc` |
+| `WP_DEBUG` on | SEC-008@2 | WP-040 | `wp-debug` |
+| Unescaped output | SEC-001 | WP-001 | `unescaped-output:<file>:<line>` |
+| Dangerous functions (SEC-004 also covers `serialize`/`unserialize`) | SEC-004 | WP-031 | `dangerous-function:<file>:<line>` |
+| Missing `wp_body_open` | WP-018 | A11Y-063 | `wp-body-open` |
+| Images missing alt in templates | A11Y-001 | SEO-006 | `img-alt:<file>:<line>` |
+
+The PHP floor is written here and in the SEC-026 row, nowhere else: the duplicate rows say
+"Not below SEC-026's floor", so a `--performance` or `--best-practices` run reads the number
+from this table.
+
+SEO-031 (alt text counted in the media library, a database measurement) is a separate check,
+not a duplicate of A11Y-001 or SEO-006.
+
+**The merge is the renderer's root-cause fold, not a hand edit.** Owner and duplicates set the
+same `root_cause` from the last column. Site-wide defects (PHP floor, XML-RPC, `WP_DEBUG`,
+`wp_body_open`) use the bare slug and `resource: site`; per-location defects put the
+`file:line` into the slug, so two different lines never fold together.
+`bin/audit-report.mjs` then folds findings that share a `root_cause` into one, which lists the
+others under `also_affects`; totals count the defect once, whichever id came first on equal
+severity. A duplicate whose owner did not fail on that resource (the owner passed, did not
+run, or ran on another scope) has nothing to fold into and stays its own finding, at the
+owner's severity: the detectors differ, so a defect only the duplicate sees is still a
+measured defect. Duplicates keep their rows and stay in `checks_executed` as normal, so a
+single-category audit still measures the defect and coverage does not change. An owner and
+its duplicates carry the same severity.
+
+**A folded id is still failing.** The report's comparison counts every id under
+`also_affects` as present, and the ledger does the same: a duplicate's open entry whose
+finding was folded into another stays `still_failing`, never `resolved` (see
+`skills/wp-audit-run/references/ledger.md`).
 
 ---
 

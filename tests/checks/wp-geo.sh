@@ -46,7 +46,8 @@ done
 
 # Auditor: model tier, report path, DOM parsing not regex.
 grep -q '^model: sonnet' "$agent" || fail "$agent must be sonnet"
-grep -q 'audit-results/geo.json' "$agent" || fail "$agent must write the GEO report"
+grep -q 'Write no report file inside the site' "$agent" || fail "$agent must return the GEO report to the parent"
+if grep -q 'audit-results/geo.json' "$agent"; then fail "$agent must not write geo.json inside the site"; fi
 grep -q 'DOMXPath' "$agent" || fail "$agent must parse the DOM, not regex the markup"
 
 # Auditor: schema @id referential integrity. GEO-A07 only counts identity blocks, so a

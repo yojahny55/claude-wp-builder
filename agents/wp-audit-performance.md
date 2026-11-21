@@ -117,7 +117,7 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 | PERF-026 | Heartbeat not throttled | Grep functions.php for `heartbeat_settings` filter | INFO | Yes |
 | PERF-027 | wp_head not cleaned | Check for `remove_action.*rsd_link\|wlwmanifest_link\|wp_generator` | INFO | Yes |
 | PERF-028 | Block CSS loaded | Grep for `wp_dequeue_style.*wp-block-library` | INFO | Yes |
-| PERF-029 | XML-RPC not disabled | Grep for `xmlrpc_enabled.*__return_false` | INFO | Yes |
+| PERF-029@2 | XML-RPC not disabled | Grep for `xmlrpc_enabled.*__return_false` (duplicate of SEC-022, see the Same defect table in `skills/wp-audit-standards/SKILL.md`) | WARNING | Yes |
 | PERF-030 | No preconnect hints | Grep for `wp_resource_hints\|rel="preconnect"` | INFO | Yes |
 | PERF-031 | Missing version strings | Grep `wp_enqueue_style\|wp_enqueue_script` for `false` as version param | WARNING | No |
 
@@ -130,7 +130,7 @@ When it is `adopted`, `/wp-adopt` registered a site this plugin did not build:
 | PERF-037 | Top autoloaded options | `$WP db query "SELECT option_name, LENGTH(option_value) AS size FROM $($WP db prefix)options WHERE autoload IN ('yes','on','auto-on','auto') ORDER BY size DESC LIMIT 10;"` | Info only | INFO |
 | PERF-038 | No object cache | `$WP cache type` | Not "WP Object Cache" (default) | INFO |
 | PERF-039 | Expired transients | `$WP db query "SELECT COUNT(*) FROM $($WP db prefix)options WHERE option_name LIKE '\_transient\_timeout\_%' AND option_value < UNIX_TIMESTAMP();"` | 0 | INFO |
-| PERF-040 | PHP version old | `$WP eval "echo phpversion();"` | ≥8.1 | WARNING |
+| PERF-040@2 | PHP version old (duplicate of SEC-026, see the Same defect table in `skills/wp-audit-standards/SKILL.md`) | `$WP eval "echo phpversion();"` | Not below SEC-026's floor | WARNING |
 | PERF-041 | OPcache off | `$WP eval "echo function_exists('opcache_get_status') && opcache_get_status() ? 'ON' : 'OFF';"` | ON | WARNING |
 | PERF-042 | Database bloated | `$WP db size --tables --format=json` | Info only | INFO |
 | PERF-061 | Action Scheduler backlog not pruned | `$WP db query "SELECT COUNT(*) FROM $($WP db prefix)actionscheduler_actions WHERE status IN ('complete','failed','canceled');"` | ≤10,000 completed/failed/canceled rows | WARNING |

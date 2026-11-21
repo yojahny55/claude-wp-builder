@@ -63,7 +63,7 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 
 | Code | Check | How to Detect | Severity | Auto-fix |
 |------|-------|---------------|----------|----------|
-| WP-001 | Unescaped output | Grep `.php` for `echo\s+\$` excluding `echo\s+esc_\|echo\s+wp_kses` | WARNING | Yes |
+| WP-001 | Unescaped output (duplicate of SEC-001) | Grep `.php` for `echo\s+\$` excluding `echo\s+esc_\|echo\s+wp_kses` | WARNING | Yes |
 | WP-002 | Wrong escaping context | Grep for `esc_html.*href=\|esc_url.*>.*<` (esc_html in URL context or esc_url in text) | WARNING | No |
 | WP-003 | Missing nonce verification | Grep for `\$_POST\|\$_GET\|\$_REQUEST` without `wp_verify_nonce\|check_admin_referer` nearby | WARNING | No |
 | WP-004 | Missing sanitization on save | Grep for `update_post_meta\|update_option` with raw `\$_POST` values | CRITICAL | No |
@@ -98,7 +98,7 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 | WP-053 | Tailwind class that never compiled | On a compiled Tailwind theme run `node ${CLAUDE_PLUGIN_ROOT}/bin/theme-template-check.mjs <theme> --rule classes`. It fails on an HTML entity inside a class token (`group-aria-[expanded=&quot;false&quot;]:rotate-90` emitted nothing on a real build) and on a utility-shaped token with no selector in `assets/css/dist/*.css`. `CANNOT VERIFY` lines are runtime-built classes: report them as INFO, never as findings | WARNING | No |
 | WP-054 | Tabs, accordion or directory-filter markup without its script | `node ${CLAUDE_PLUGIN_ROOT}/bin/theme-template-check.mjs <theme> --rule widgets`: `role="tab"`, `data-accordion-trigger` or `data-directory` in a template requires `./tabs.js`, `./accordion.js` or `./directory-filter.js` imported by `assets/js/src/index.js` | WARNING | Yes |
 | WP-017 | Include instead of get_template_part | Grep templates for `include\|require` of template files (should use get_template_part) | WARNING | No |
-| WP-018 | Missing wp_body_open | Grep header.php for `wp_body_open()` | WARNING | Yes |
+| WP-018 | Missing wp_body_open (owner of A11Y-063) | Grep header.php for `wp_body_open()` | WARNING | Yes |
 | WP-019 | Broken template part refs | For each `get_template_part()` call, verify the referenced file exists | CRITICAL | No |
 | WP-048 | Orphaned IDs in relationship fields | Resolve every post ID stored in an ACF relationship or post-object field; split the ones a template prints from the ones nothing reads. See Procedure | WARNING / INFO | No |
 
@@ -131,7 +131,7 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 
 | Code | Check | How to Detect | Severity | Auto-fix |
 |------|-------|---------------|----------|----------|
-| WP-031 | Dangerous functions | Grep for `\beval\(\|\bcreate_function\(\|\bbase64_decode\(` | CRITICAL | No |
+| WP-031 | Dangerous functions (duplicate of SEC-004) | Grep for `\beval\(\|\bcreate_function\(\|\bbase64_decode\(` | CRITICAL | No |
 | WP-032 | Closing PHP tag | Grep pure PHP files (not templates) for `\?>` at end | INFO | Yes |
 | WP-033 | Loose comparisons | Grep for `[^!=]==[^=]` (should use ===) in PHP files | INFO | No |
 | WP-034 | Raw get_field | Grep for `\bget_field\(` excluding `prefix_get_field` in templates (bypasses bilingual) | WARNING | Yes |
@@ -144,9 +144,9 @@ These checks require WP-CLI access via `$WP`. Skip this tier if `.wp-create.json
 
 | Code | Check | Command | Pass Criteria | Severity |
 |------|-------|---------|---------------|----------|
-| WP-040 | WP_DEBUG true | `$WP config get WP_DEBUG` | false | WARNING (`INFO` on a local clone) |
+| WP-040 | WP_DEBUG true (duplicate of SEC-008) | `$WP config get WP_DEBUG` | false | WARNING (`INFO` on a local clone) |
 | WP-041 | FS_METHOD not set | `$WP config get FS_METHOD 2>/dev/null` | `direct` | INFO |
-| WP-042 | PHP version old | `$WP eval "echo phpversion();"` | >=8.1 | WARNING |
+| WP-042@2 | PHP version old (duplicate of SEC-026, see the Same defect table in `skills/wp-audit-standards/SKILL.md`) | `$WP eval "echo phpversion();"` | Not below SEC-026's floor | WARNING |
 | WP-043 | WordPress outdated | `$WP core check-update`, **only after the network check below** | No updates | WARNING |
 | WP-044 | Plugin updates | `$WP plugin list --update=available --format=count`, **only after the network check below** | 0 | INFO |
 | WP-045 | Bad file permissions | Check uploads/plugins/upgrade dir permissions | 755 | WARNING (`INFO` on a local clone) |

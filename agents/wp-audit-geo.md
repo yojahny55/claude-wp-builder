@@ -353,7 +353,7 @@ echo wp_json_encode(\$out);
 
 ## Step 4: Output Report
 
-Generate a JSON report to `audit-results/geo.json`:
+Return a JSON report to the parent as your findings, per the dispatch contract in `skills/wp-audit-run/references/dispatch.md`. Write no report file inside the site:
 
 ```json
 {

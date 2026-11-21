@@ -9,13 +9,13 @@ cd "$(dirname "$0")/../.."
 
 fail() { echo "FAIL: $1"; exit 1; }
 
-# A code is "tabulated" when a line starts with `| <CODE> |`.
+# A code is "tabulated" when a line starts with `| <CODE> |` or `| <CODE>@<revision> |`.
 for spec in "agents/wp-audit-seo.md:SEO" "agents/wp-audit-performance.md:PERF" "agents/wp-audit-a11y.md:A11Y"; do
   f=${spec%%:*}
   prefix=${spec##*:}
   [ -f "$f" ] || fail "$f is missing"
   for code in $(grep -oE "${prefix}-[0-9]{3}" "$f" | sort -u); do
-    grep -qE "^\| ${code} \|" "$f" || fail "$f: ${code} is referenced but never tabulated"
+    grep -qE "^\| ${code}(@[0-9]+)? \|" "$f" || fail "$f: ${code} is referenced but never tabulated"
   done
 done
 
@@ -24,7 +24,7 @@ done
 for f in agents/wp-audit-geo.md agents/wp-agentic-surfaces.md; do
   [ -f "$f" ] || fail "$f is missing"
   for code in $(grep -oE "GEO-[DAUP][0-9]{2}" "$f" | sort -u); do
-    grep -qE "^\| ${code} \|" "$f" || fail "$f: ${code} is referenced but never tabulated"
+    grep -qE "^\| ${code}(@[0-9]+)? \|" "$f" || fail "$f: ${code} is referenced but never tabulated"
   done
 done
 
