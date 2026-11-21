@@ -7,6 +7,8 @@ cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 cfg="node bin/wp-config.mjs"
+# CI runners have no git identity; --commit needs one.
+export GIT_AUTHOR_NAME=check GIT_AUTHOR_EMAIL=check@example.invalid GIT_COMMITTER_NAME=check GIT_COMMITTER_EMAIL=check@example.invalid
 
 # --- CORE-02: the detected wrapper keeps a root with a space as one argument. ---
 w=$(node --input-type=module -e "import('./bin/lib/adopt.mjs').then(m=>{const r=m.detectWrapper(process.argv[1]);console.log(r.wrapper);console.log(JSON.stringify(m.splitWords(r.wrapper)))})" "$tmp/a b")
