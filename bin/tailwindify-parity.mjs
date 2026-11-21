@@ -140,8 +140,9 @@ const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript
 
 /** Serve `root` on an ephemeral port. file:// blocks module scripts and relative
  *  asset loads, neither of which is a defect in the page under test. */
-const serve = (root) => new Promise((ready, fail) => {
+const serve = (root, allowed = [root]) => new Promise((ready, fail) => {
   const base = realpathSync(root);
+  const inside = (file, dir) => file === dir || file.startsWith(dir + sep);
   const server = createServer((req, res) => {
     let file;
     try {
@@ -149,7 +150,7 @@ const serve = (root) => new Promise((ready, fail) => {
         .replace(/^(\.\.[/\\])+/, '')
         .replace(/^[/\\]+/, '');
       file = realpathSync(resolve(base, rel));
-      if (file !== base && !file.startsWith(base + sep)) return res.writeHead(404).end();
+      if (!inside(file, base) || !allowed.some((dir) => inside(file, dir))) return res.writeHead(404).end();
       if (statSync(file).isDirectory()) return res.writeHead(403).end();
     } catch (err) { return res.writeHead(err instanceof URIError ? 400 : 404).end(); }
     res.writeHead(200, { 'content-type': MIME[extname(file).toLowerCase()] || 'application/octet-stream' });
@@ -241,12 +242,27 @@ const commonRoot = (() => {
 // Trees with no shared ancestor below the filesystem root would be served from
 // `/`: the server's `base + sep` check then reads `//` and refuses every file,
 // and when it does not, a whole machine's worth of tree sits on 127.0.0.1.
-// One shared level (two folders under /tmp) is enough; only the bare root is refused.
 if (commonRoot.split(sep).filter(Boolean).length < 1) {
   console.error('tailwindify-parity: the converted and original trees share no ancestor below the filesystem root ' + commonRoot +
     ' (' + cRoot + ' and ' + oRoot + '); put them under one project folder');
   process.exit(3);
 }
+// The server answers only inside the two trees and the real targets of the
+// symlinks at their top level (`.original/css` -> `../css`), never the rest of
+// the common ancestor: two folders under /tmp or /home must not put their
+// neighbours' files (dotfiles included) on 127.0.0.1.
+const allowedRoots = (() => {
+  const out = new Set();
+  for (const root of [cRoot, oRoot]) {
+    const real = realpathSync(root);
+    out.add(real);
+    for (const entry of readdirSync(real)) {
+      const p = join(real, entry);
+      try { if (lstatSync(p).isSymbolicLink()) out.add(realpathSync(p)); } catch { /* dangling link */ }
+    }
+  }
+  return [...out];
+})();
 const relTo = (root, file) => {
   const p = realpathSync(join(root, file)).slice(commonRoot.length).replace(/^[/\\]+/, '');
   return p.split(sep).map(encodeURIComponent).join('/');
@@ -323,7 +339,7 @@ let srv, browser;
 const findings = [];
 const unrenderable = [];
 try {
-  srv = await serve(commonRoot);
+  srv = await serve(commonRoot, allowedRoots);
   browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] });
   const page = await browser.newPage();
 

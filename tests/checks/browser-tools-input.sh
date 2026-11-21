@@ -5,12 +5,15 @@
 #    newContext. Usage errors exit 1 with a one-line message.
 #  - demo-verify.mjs: the per-page browser context was closed only on the happy
 #    path, so a page that threw mid-walk leaked it in the shared browser.
-#  - tailwindify-parity.mjs: two trees with no shared ancestor deeper than `/` were
+#  - tailwindify-parity.mjs: two trees with no shared ancestor below `/` were
 #    served from `/` (every file refused, or a machine-wide tree on loopback). Now a
 #    clear exit 3, the tool's existing input-error code.
 #  - composition-preview.mjs: `--tokens` ran previewTokens() outside the try, so a bad
 #    token printed a raw stack at exit 1. Now the existing crash path, exit 3.
-# All of it runs against a stub playwright-core: no browser is launched.
+#  - tailwindify-parity.mjs: the server answers only inside the two trees (and their
+#    top-level symlink targets), never the rest of the common ancestor.
+# All of it runs against a stub playwright-core except the served-tree case, which
+# needs PLAYWRIGHT_CORE.
 set -u
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp" "${far:-}"' EXIT
@@ -80,6 +83,26 @@ if [ -n "$far" ]; then
   printf '%s' "$out" | grep >/dev/null -cF 'share no ancestor' && fail "sibling trees were rejected: $out"
 else
   echo "note: /dev/shm unavailable, disjoint-tree case not exercised"
+fi
+
+# --- tailwindify-parity serves only the two trees, not their common ancestor ---
+# Real browser only (the stub cannot run the page's fetch). The converted page reads
+# a file that sits in the common ancestor but in neither tree; the original page shows
+# what a refused read shows. Served, the texts differ and the run is not clean.
+if [ -n "${PLAYWRIGHT_CORE:-}" ] && [ -d "${PLAYWRIGHT_CORE:-}" ]; then
+  anc="$tmp/anc"; mkdir -p "$anc/a/conv" "$anc/b/orig"
+  echo leaked > "$anc/secret.txt"
+  cat > "$anc/a/conv/index.html" <<'HTML'
+<!doctype html><title>t</title><p id="r">pending</p>
+<script>fetch('../../secret.txt').then(r=>r.ok?r.text():'blocked').catch(()=>'blocked').then(t=>{document.getElementById('r').textContent=t.trim()})</script>
+HTML
+  printf '<!doctype html><title>t</title><p id="r">blocked</p>\n' > "$anc/b/orig/index.html"
+  out="$(node "$root/bin/tailwindify-parity.mjs" "$anc/a/conv/index.html" --against "$anc/b/orig/index.html" --widths 400x300 2>&1)"; rc=$?
+  [ "$rc" -eq 0 ] || fail "tailwindify-parity served a file outside both trees (rc $rc): $out"
+elif [ "${CHECKS_REQUIRE_BROWSER:-}" = 1 ]; then
+  fail "CHECKS_REQUIRE_BROWSER=1 but PLAYWRIGHT_CORE is not set"
+else
+  echo "note: PLAYWRIGHT_CORE not set, the served-tree case was NOT exercised"
 fi
 
 echo PASS
