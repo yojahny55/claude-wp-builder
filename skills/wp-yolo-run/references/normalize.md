@@ -121,7 +121,7 @@ itself, in these same terms. Run
 `npm i -D playwright-core` in the project root and probe again (say first that this
 writes a `package.json` and a `node_modules/` into the WordPress project root).
 After the retry, **only exit 0 continues** — exit 2 means print what the probe said
-is missing (`playwright-core` or Chrome; the fix is `WP_DEMO_CHROME` pointing at a Chrome or
+is missing (`playwright-core` or Chrome; the fix is `WP_BROWSER_CHROMIUM` pointing at a Chrome or
 Chromium already on the machine, never a browser download), and any other exit code (127 for a missing `node`, or a crash) means print it
 verbatim. Either way **stop** the whole run there: do not normalize on, never fall back to plain,
 and never build a craft demo blind. `--yolo` does not waive this. The

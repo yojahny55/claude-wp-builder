@@ -48,6 +48,7 @@ const SYSTEM_CHROMIUM = win
   ? [
       join(process.env.PROGRAMFILES || 'C:\\Program Files', 'Google\\Chrome\\Application\\chrome.exe'),
       join(process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Google\\Chrome\\Application\\chrome.exe'),
+      ...(process.env.LOCALAPPDATA ? [join(process.env.LOCALAPPDATA, 'Google\\Chrome\\Application\\chrome.exe')] : []),
     ]
   : [
       '/usr/bin/chromium',
@@ -109,6 +110,15 @@ export function findBrowser(engine) {
   const pinned = pins?.revisions[engine] || 0;
   const wants = pins ? (pinned ? `playwright-core at ${pins.dir} pins ${pinned}` : `playwright-core at ${pins.dir} pins none`) : 'no playwright-core manifest read';
   const override = process.env['WP_BROWSER_' + engine.toUpperCase()];
+  // WP_DEMO_CHROME is the older name for WP_BROWSER_CHROMIUM, from when demo-verify,
+  // composition-preview and tailwindify-parity each carried a resolver of their own. It is
+  // still honoured, but only when it names an executable, as it always was there: a stale
+  // value falls through to the cache instead of failing the run.
+  const legacy = engine === 'chromium' && !override ? process.env.WP_DEMO_CHROME : '';
+  if (legacy && isExecutable(legacy)) {
+    log(`${engine} ${legacy} (WP_DEMO_CHROME, the older name for WP_BROWSER_CHROMIUM; ${wants})`);
+    return legacy;
+  }
   if (override) {
     const ok = isExecutable(override);
     log(`${engine} ${ok ? override : 'none'} (WP_BROWSER_${engine.toUpperCase()}${ok ? '' : ' is not an executable file'}; ${wants})`);

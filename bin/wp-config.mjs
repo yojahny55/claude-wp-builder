@@ -364,11 +364,36 @@ function cmdValidateProfile(file) {
 // files written are the manifest and the generated block in .claude/CLAUDE.md, and only
 // without --dry-run. /wp-adopt runs --dry-run first, has the operator confirm the proposal,
 // then runs it again with the confirmed values as flags.
-function parseFlags(argv) {
+//
+// Every subcommand names the flags it accepts, and anything else stops the run: the old
+// parser dropped whatever did not match `--name[=value]` without a word, so a typo
+// (`adopt --replce`), a space instead of `=` (`--branch main`) or an uppercase name ran the
+// command as if the flag had never been passed. `positionals` is how many bare arguments
+// the subcommand takes before its flags (keep-inactive's plugin slug).
+const SUBCOMMAND_FLAGS = {
+  adopt: ['json', 'replace', 'wrapper', 'persist-wrapper', 'name', 'prefix', 'industry', 'editable', 'read-only', 'code-home', 'code-home-path', 'dry-run'],
+  'code-home': ['kind', 'path'],
+  'env-set': ['name', 'role', 'url', 'server', 'page-cache', 'sync', 'transport', 'allow-http'],
+  'git-init': ['branch', 'remote', 'dry-run', 'commit', 'message', 'push', 'yes', 'large-mb'],
+  'keep-inactive': ['unset'],
+  'require-origin': ['force-adopted'],
+};
+function parseFlags(cmd, argv, positionals = 0) {
+  const allowed = SUBCOMMAND_FLAGS[cmd];
   const flags = {};
-  for (const a of argv) {
-    const m = /^--([a-z-]+)(?:=(.*))?$/.exec(a);
-    if (m) flags[m[1]] = m[2] ?? true;
+  const bad = [];
+  argv.forEach((a, i) => {
+    if (i < positionals && !a.startsWith('--')) return;
+    const m = /^--([a-z][a-z-]*)(?:=(.*))?$/s.exec(a);
+    if (!m) bad.push(a.startsWith('--') ? `malformed flag ${a}` : `unexpected argument '${a}' (flags take the form --name=value)`);
+    else if (!allowed.includes(m[1])) bad.push(`unknown flag --${m[1]}`);
+    else flags[m[1]] = m[2] ?? true;
+  });
+  if (bad.length) {
+    for (const b of bad) warn(`${cmd}: ${b}`);
+    warn(`${cmd} accepts: ${allowed.map((f) => '--' + f).join(' ')}`);
+    warn('nothing done');
+    process.exit(1);
   }
   return flags;
 }
@@ -934,16 +959,16 @@ else if (cmd === 'get' && target && process.argv[4]) cmdGet(target, process.argv
 else if (cmd === 'validate-profile' && target) cmdValidateProfile(target);
 else if (cmd === 'drift' && target) cmdDrift(target);
 else if (cmd === 'refresh' && target) cmdRefresh(target);
-else if (cmd === 'keep-inactive' && target) cmdKeepInactive(target, process.argv[4] && !process.argv[4].startsWith('--') ? process.argv[4] : undefined, parseFlags(process.argv.slice(4)));
+else if (cmd === 'keep-inactive' && target) cmdKeepInactive(target, process.argv[4] && !process.argv[4].startsWith('--') ? process.argv[4] : undefined, parseFlags(cmd, process.argv.slice(4), 1));
 else if (cmd === 'remove-plugin' && target) cmdRemovePlugin(target, process.argv[4]);
-else if (cmd === 'code-home' && target) cmdCodeHome(target, parseFlags(process.argv.slice(4)));
+else if (cmd === 'code-home' && target) cmdCodeHome(target, parseFlags(cmd, process.argv.slice(4)));
 else if (cmd === 'set' && process.argv.length > 6) { warn('set takes exactly <project> <key> <value>; quote the value or pass it on stdin with `-`'); process.exit(1); }
 else if (cmd === 'set' && target && process.argv[4] && process.argv[5] !== undefined) cmdSet(target, process.argv[4], process.argv[5]);
-else if (cmd === 'require-origin' && target) cmdRequireOrigin(target, parseFlags(process.argv.slice(4)));
+else if (cmd === 'require-origin' && target) cmdRequireOrigin(target, parseFlags(cmd, process.argv.slice(4)));
 else if (cmd === 'gitignore-check' && target) cmdGitignoreCheck(target);
-else if (cmd === 'git-init' && target) cmdGitInit(target, parseFlags(process.argv.slice(4)));
-else if (cmd === 'env-set' && target) cmdEnvSet(target, parseFlags(process.argv.slice(4)));
-else if (cmd === 'adopt' && target) cmdAdopt(target, parseFlags(process.argv.slice(4)));
+else if (cmd === 'git-init' && target) cmdGitInit(target, parseFlags(cmd, process.argv.slice(4)));
+else if (cmd === 'env-set' && target) cmdEnvSet(target, parseFlags(cmd, process.argv.slice(4)));
+else if (cmd === 'adopt' && target) cmdAdopt(target, parseFlags(cmd, process.argv.slice(4)));
 else {
   warn('usage: wp-config.mjs <validate|migrate|render-context|get|set|validate-profile|adopt|drift|refresh|keep-inactive|remove-plugin|code-home|gitignore-check|git-init|env-set|require-origin> <project-path> [key [value]|wp-version|adopt flags]');
   process.exit(1);

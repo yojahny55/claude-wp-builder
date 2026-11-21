@@ -116,7 +116,7 @@ before writing any markup.
    Playwright installed globally already passes; say first that this writes a `package.json` and a `node_modules/` into
    the WordPress project root). After the retry, **only exit 0 continues** —
    exit 2 means print what the probe said is missing (`playwright-core` or
-   Chrome; the fix is `WP_DEMO_CHROME` pointing at a Chrome or Chromium already on
+   Chrome; the fix is `WP_BROWSER_CHROMIUM` pointing at a Chrome or Chromium already on
    the machine, never a browser download), and any other exit
    code (127 for a missing `node`, or a crash) means print it verbatim. Either
    way **stop**. A craft build is never made blind and never falls back to plain;
