@@ -690,7 +690,8 @@ JSON
 set +e; node "$g" run --demo "$rb/proj/demo" >/dev/null 2>"$rb/err"; rc=$?; set -e
 [ "$rc" = 2 ] || fail "colliding use basenames must exit 2; got $rc"
 [ ! -e "$rb/proj/demo/assets/img/logo.png" ] || fail "nothing may be copied when the plan is refused"
-# 12e. Every request carries a timeout signal; a timeout is retried once; the
+# 12e. Every request carries a timeout signal; a timeout is NOT retried (the
+#      first request may still be billing); a network error is retried once; the
 #      write leaves no temp file behind.
 node --input-type=module -e '
   import { readdirSync, existsSync } from "node:fs";
@@ -700,15 +701,43 @@ node --input-type=module -e '
   globalThis.fetch = async (url, init) => {
     seen.push(init.signal instanceof AbortSignal);
     if (seen.length === 1) throw Object.assign(new Error("timed out"), { name: "TimeoutError" });
+    if (seen.length === 2) throw new TypeError("fetch failed");
     return { ok: true, status: 200, json: async () => ({ output_image: { data: "aGVsbG8=" } }) };
   };
-  await m.generateInto(dir, "gen-t.jpg", { vendor: "google", model: "m", key: "k",
-    g: { prompt: "p", prompt_sent: "p", aspect: "1:1", size: "1K" } });
-  if (seen.length !== 2 || !seen.every(Boolean)) throw new Error("expected 2 signalled requests, got " + seen);
+  const g = { prompt: "p", prompt_sent: "p", aspect: "1:1", size: "1K" };
+  let timedOut = false;
+  try { await m.generateInto(dir, "gen-x.jpg", { vendor: "google", model: "m", key: "k", g }); }
+  catch (e) { timedOut = e.name === "TimeoutError"; }
+  if (!timedOut || seen.length !== 1) throw new Error("a timeout must fail the slot without a retry; requests: " + seen.length);
+  await m.generateInto(dir, "gen-t.jpg", { vendor: "google", model: "m", key: "k", g });
+  if (seen.length !== 3 || !seen.every(Boolean)) throw new Error("expected 3 signalled requests, got " + seen);
   const left = readdirSync(dir).filter((f) => f.includes(".tmp-"));
   if (left.length) throw new Error("temp files left: " + left);
   if (!existsSync(dir + "/gen-t.jpg") || !existsSync(dir + "/gen-t.json")) throw new Error("outputs missing");
 ' "$PWD" "$rb" || fail "timeout signal / retry / atomic write contract broken"
 grep >/dev/null -c 'renameSync' "$g" || fail "plates must be written through a temp file and a rename"
+# 12f. An empty `## World` followed directly by a heading reads as no world, not
+#      as the next section.
+printf '# Brief\n\n## World\n## Next\nnot the world\n' > "$rb/BRIEF.md"
+w=$(node -e 'import("./bin/image-gen.mjs").then((m) => console.log(m.readWorld(process.argv[1])))' "$rb")
+[ "$w" = "null" ] || fail "an empty ## World must not swallow the next section; got: $w"
+# 12g. A plan file holding JSON null is a usage error (2).
+mkdir -p "$rb/nullplan"; echo null > "$rb/nullplan/.image-plan.json"
+set +e; node "$g" run --demo "$rb/nullplan" >/dev/null 2>&1; rc=$?; set -e
+[ "$rc" = 2 ] || fail "a null plan must exit 2; got $rc"
+# 12h. A failed temp write is cleaned up: writing over a directory fails at the
+#      rename and must leave no .tmp- file.
+mkdir -p "$rb/blk/gen-d.jpg"
+node --input-type=module -e '
+  import { readdirSync } from "node:fs";
+  const m = await import(process.argv[1] + "/bin/image-gen.mjs");
+  const dir = process.argv[2];
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ output_image: { data: "aGVsbG8=" } }) });
+  let threw = false;
+  try { await m.generateInto(dir, "gen-d.jpg", { vendor: "google", model: "m", key: "k",
+    g: { prompt: "p", prompt_sent: "p", aspect: "1:1", size: "1K" } }); } catch { threw = true; }
+  const left = readdirSync(dir).filter((f) => f.includes(".tmp-"));
+  if (!threw || left.length) throw new Error("threw=" + threw + " left=" + left);
+' "$PWD" "$rb/blk" || fail "a failed plate write must remove its temp file"
 
 echo PASS

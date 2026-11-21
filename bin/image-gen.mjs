@@ -9,8 +9,8 @@
  * that logs commands. Here the key is read from process.env in-process, so no
  * invocation exists for anything to log.
  *
- * Exit codes: 0 clean, 2 the input was refused before any request (a missing or
- * unreadable plan file, an unknown provider, a gap with both or neither of
+ * Exit codes: 0 clean, 2 the input was refused before any request (a missing,
+ * unreadable or non-object plan file, an unknown provider, a gap with both or neither of
  * prompt/use, two `use` files that share a basename, or a composed prompt that
  * no longer matches the one plan showed and the operator approved), 3 no key (nothing written,
  * nothing billed), 4 one or more slots failed after work began.
@@ -118,7 +118,9 @@ export function readDesign(demo) {
 export function readWorld(demo) {
   const f = join(demo, 'BRIEF.md');
   if (!existsSync(f)) return null;
-  const m = /(?:^|\n)## World[^\n]*\n([\s\S]*?)(?=\n## |(?![\s\S]))/.exec(readFileSync(f, 'utf8').replace(/\r\n?/g, '\n'));
+  // `^## ` under the m flag also stops at a heading on the very next line, so an empty
+  // World never swallows the section after it.
+  const m = /(?:^|\n)## World[^\n]*\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(readFileSync(f, 'utf8').replace(/\r\n?/g, '\n'));
   if (!m) return null;
   const text = m[1].split('\n').map((l) => l.replace(/^>\s?/, '').trim()).filter(Boolean).join(' ');
   return text || null;
@@ -147,13 +149,21 @@ function readBuild(demo) {
 function planPath(demo) { return join(demo, '.image-plan.json'); }
 // A missing or unparseable plan is a usage error (exit 2), not a failed slot
 // (exit 4): nothing was attempted, so nothing can have been billed.
+// The build writes the plan file (wp-demo-run craft-composition); `plan` then
+// composes its prompts, so neither command can create a missing one.
 function readPlan(demo) {
+  let plan;
   try {
-    return JSON.parse(readFileSync(planPath(demo), 'utf8'));
+    plan = JSON.parse(readFileSync(planPath(demo), 'utf8'));
   } catch (e) {
-    warn(`cannot read ${planPath(demo)}: ${e.code || e.message}. Run plan first.`);
+    warn(`cannot read ${planPath(demo)}: ${e.code || e.message}. The craft build writes it from its composition table.`);
     process.exit(2);
   }
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan)) {
+    warn(`${planPath(demo)} is not a JSON object`);
+    process.exit(2);
+  }
+  return plan;
 }
 const ENV_VAR = { google: 'GEMINI_API_KEY', openai: 'OPENAI_API_KEY' };
 function parseProvider(plan) {
@@ -364,8 +374,8 @@ export async function generateInto(imgDir, file, { vendor, model, key, g }) {
   // leave a truncated .jpg that every later run treats as already paid for.
   const atomic = (name, data) => {
     const tmp = join(imgDir, `${name}.tmp-${process.pid}`);
-    writeFileSync(tmp, data);
-    renameSync(tmp, join(imgDir, name));
+    try { writeFileSync(tmp, data); renameSync(tmp, join(imgDir, name)); }
+    catch (err) { try { unlinkSync(tmp); } catch { /* never created */ } throw err; }
   };
   atomic(file.replace(/\.jpg$/, '.json'), JSON.stringify({
     model, prompt: g.prompt, prompt_sent: g.prompt_sent, aspect: g.aspect, size: g.size,
@@ -381,14 +391,18 @@ export async function generateInto(imgDir, file, { vendor, model, key, g }) {
 // back, so nothing was attempted server-side) or a transient HTTP 5xx. A 4xx
 // is deterministic, and a failure that surfaces AFTER the response already
 // reported success means the request was already billed -- retrying either
-// just pays twice for one plate. Reads e.status rather than matching on the
-// error message, so rewording a message can never change retry behaviour.
+// just pays twice for one plate. A timeout is not retried either: the request
+// was sent and may still be generating (and billing) server-side when the
+// client gives up, so a second request could pay twice. Reads e.status and
+// e.name rather than the message, so rewording a message can never change
+// retry behaviour.
 export const FETCH_TIMEOUT_MS = 120000;
 export async function once(fn) {
   try {
     return await fn();
   } catch (e) {
     if (e.status && e.status < 500) throw e;
+    if (e.name === 'TimeoutError' || e.name === 'AbortError') throw e;
     return await fn();
   }
 }
