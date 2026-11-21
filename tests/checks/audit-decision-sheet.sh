@@ -98,6 +98,18 @@ mkdir -p "$tmp/e4"
 node "$tool" build --out "$tmp/e4" --proposals "$tmp/pp.json" --sidecar "$tmp/sc3.json" --date 2026-01-02 >/dev/null 2>&1
 ids=$(grep -o 'data-id="[^"]*"' "$tmp/e4/decisions-2026-01-02.html" | tr '\n' ' ')
 [ "$ids" = 'data-id="P1" ' ] || fail "a site-wide finding got a duplicate card beside its proposal: $ids"
+# ...but listed before the page's own finding it does not take that page's proposal
+echo '{"findings":[{"check":"A","design_impact":true},{"check":"A","design_impact":true,"page":"/x"}]}' > "$tmp/sc4.json"
+mkdir -p "$tmp/e5"
+node "$tool" build --out "$tmp/e5" --proposals "$tmp/pp.json" --sidecar "$tmp/sc4.json" --date 2026-01-02 >/dev/null 2>&1
+ids=$(grep -o 'data-id="[^"]*"' "$tmp/e5/decisions-2026-01-02.html" | tr '\n' ' ')
+[ "$ids" = 'data-id="P1" data-id="A" ' ] || fail "card coverage depends on sidecar order: $ids"
+node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));const a=j.proposals.find(p=>p.id==="A");if(!a||a.page)process.exit(1)' "$tmp/e5/decisions-2026-01-02.json" \
+  || fail "the page's finding lost its proposal to the site-wide one listed first"
+# prose starting with DECISION above a valid block is not a dropped answer
+printf 'DECISION needed here\nDECISIONS v1\nDECISION A: approve | ok\nEND DECISIONS\n' | node "$tool" --parse - >/dev/null 2>&1 \
+  || fail "prose above a valid block failed the parse"
+printf 'DECISION A: approve\nDECISION B approve\n' | node "$tool" --parse - >/dev/null 2>&1 && fail "a malformed line with no block was not reported"
 # --against or --proposals that parse but are not objects are usage errors (2), not crashes
 echo null > "$tmp/null.json"
 printf 'DECISIONS v1\nDECISION A: approve\nEND DECISIONS\n' | node "$tool" --parse - --against "$tmp/null.json" >/dev/null 2>&1; rc=$?

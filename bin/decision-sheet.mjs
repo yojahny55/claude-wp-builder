@@ -85,7 +85,10 @@ const DEFAULT_OPTIONS = [
 export function parseAnswers(text, against = null) {
   const decisions = new Map(), warnings = [];
   const re = /^[\s>*\-]*DECISION\s+([A-Za-z0-9._-]+)\s*:\s*([^\s|]+)\s*(?:\|\s*(.*?))?\s*$/;
+  // A malformed line outside a block counts only when the text has no block at all: prose
+  // such as "DECISION needed here" pasted above a valid block must not fail the parse.
   let inBlock = false, sawBlock = false, malformed = 0;
+  const loose = [];
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim().replace(/^[>*\-\s]+/, '');
     if (/^DECISIONS v\d+$/.test(line)) { inBlock = true; sawBlock = true; continue; }
@@ -93,7 +96,10 @@ export function parseAnswers(text, against = null) {
     const m = re.exec(raw);
     if (sawBlock && !inBlock) continue;
     if (!m) {
-      if (/^DECISION\b(?!S\b)/.test(line)) { malformed++; warnings.push(`line not understood, answer dropped: ${line.slice(0, 80)}`); }
+      if (/^DECISION\b(?!S\b)/.test(line)) {
+        const w = `line not understood, answer dropped: ${line.slice(0, 80)}`;
+        if (inBlock) { malformed++; warnings.push(w); } else loose.push(w);
+      }
       continue;
     }
     const [, id, option, note = ''] = m;
@@ -107,6 +113,7 @@ export function parseAnswers(text, against = null) {
     }
     decisions.set(id, { id, option, status, note, ledger: status === 'rejected' ? 'accepted' : null });
   }
+  if (!sawBlock) { malformed += loose.length; warnings.push(...loose); }
   if (!decisions.size) warnings.push('no DECISION lines found');
   return { decisions: [...decisions.values()], warnings, malformed };
 }
@@ -166,16 +173,26 @@ function loadProposals(o) {
     // page is another card. A proposal with no page covers one finding of that check, and a
     // site-wide finding (no page) is covered by any unclaimed proposal of its check.
     const norm = u => { if (!u) return ''; try { return new URL(u, o.site || 'http://x.invalid').href.replace(/#.*$/, '').replace(/\/$/, ''); } catch { return String(u); } };
-    const claimed = new Set();
-    const covered = (check, page) => {
-      const p = list.find(q => q.check === check && !claimed.has(q) && (!page || !q.page || norm(q.page) === norm(page)));
-      if (p) claimed.add(p);
-      return !!p;
-    };
+    // Two passes, so the result does not depend on the sidecar's order: exact page matches
+    // first, then the loose ones (no page on either side). Otherwise a site-wide finding
+    // listed first could claim the proposal written for a page, and that page's finding would
+    // get a second card.
+    const claimed = new Set(), coveredAt = new Set();
+    const checkOf = (f, i) => String(f.check ?? `finding-${i + 1}`);
+    for (const exact of [true, false]) {
+      findings.forEach((f, i) => {
+        if (coveredAt.has(i) || (exact && !f.page)) return;
+        const check = checkOf(f, i);
+        const p = list.find(q => q.check === check && !claimed.has(q) && (exact
+          ? q.page && norm(q.page) === norm(f.page)
+          : !f.page || !q.page || norm(q.page) === norm(f.page)));
+        if (p) { claimed.add(p); coveredAt.add(i); }
+      });
+    }
     const used = new Set(list.map(p => p.id));
     findings.forEach((f, i) => {
-      const check = String(f.check ?? `finding-${i + 1}`);
-      if (covered(check, f.page)) return;
+      const check = checkOf(f, i);
+      if (coveredAt.has(i)) return;
       // The same check on several pages is several findings: each needs its own id.
       const base = check.replace(/[^A-Za-z0-9._-]+/g, '-') || `finding-${i + 1}`;
       let id = base, n = 1;
