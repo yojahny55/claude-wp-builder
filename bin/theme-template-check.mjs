@@ -30,14 +30,18 @@
  *            marker and never switched a panel.
  *
  * usage:
- *   theme-template-check.mjs <theme-dir> [--rule abspath|classes|widgets]...
+ *   theme-template-check.mjs <theme-dir> [--rule abspath|classes|widgets]... [--entry <js-file>]
+ *
+ * `widgets` reads the script entry named by `--entry` (relative to the theme), else the file
+ * a package.json script passes to `wp-scripts build|start`, else assets/js/src/index.js; the
+ * modules must sit next to that entry. A finding names the entry file it read.
  *
  * exit 0 = PASS (CANNOT VERIFY and SKIP lines are information), 1 = FAIL, 2 = usage.
  */
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, dirname } from 'node:path';
 
-const USAGE = 'usage: theme-template-check.mjs <theme-dir> [--rule abspath|classes|widgets]...';
+const USAGE = 'usage: theme-template-check.mjs <theme-dir> [--rule abspath|classes|widgets]... [--entry <js-file>]';
 const usage = (why) => {
   console.error(`${why}\n${USAGE}`);
   process.exit(2);
@@ -46,6 +50,7 @@ const ALL = ['abspath', 'classes', 'widgets'];
 const args = process.argv.slice(2);
 const picked = [];
 let theme;
+let entryArg;
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (a === '--rule') {
@@ -53,6 +58,9 @@ for (let i = 0; i < args.length; i++) {
     if (r === undefined) usage('--rule needs a value');
     if (!ALL.includes(r)) usage(`unknown rule: ${r}`);
     picked.push(r);
+  } else if (a === '--entry') {
+    entryArg = args[++i];
+    if (entryArg === undefined || entryArg.startsWith('--')) usage('--entry needs a value');
   } else if (a.startsWith('--')) {
     usage(`unknown option: ${a}`);
   } else if (theme !== undefined) {
@@ -346,8 +354,35 @@ if (rules.includes('classes')) {
 
 // ── widgets ──────────────────────────────────────────────────────────────────
 if (rules.includes('widgets')) {
-  const entry = join(theme, 'assets/js/src/index.js');
+  // The script entry: --entry wins; else the file a package.json script hands to
+  // `wp-scripts build|start` (or `webpack`/`vite build`-style first path argument ending in
+  // .js/.ts); else the starter's assets/js/src/index.js.
+  const DEFAULT_ENTRY = 'assets/js/src/index.js';
+  let entryRel = entryArg;
+  let entryHow = '--entry';
+  if (!entryRel) {
+    entryHow = 'default';
+    try {
+      const pkg = JSON.parse(readFileSync(join(theme, 'package.json'), 'utf8'));
+      for (const cmd of Object.values(pkg.scripts ?? {})) {
+        const m = String(cmd).match(/\bwp-scripts\s+(?:build|start)\s+((?:--\S+\s+)*)([^\s-][^\s]*\.(?:m?[jt]sx?))\b/);
+        if (m) {
+          entryRel = m[2];
+          entryHow = 'package.json';
+          break;
+        }
+      }
+    } catch {
+      /* no package.json, or not JSON: the default applies */
+    }
+  }
+  entryRel = entryRel || DEFAULT_ENTRY;
+  const entry = join(theme, entryRel);
+  const entryDir = dirname(entryRel);
   const index = existsSync(entry) ? readFileSync(entry, 'utf8') : '';
+  const entryNote = existsSync(entry)
+    ? `${entryRel} (from ${entryHow})`
+    : `${entryRel} (from ${entryHow}; the file does not exist, pass --entry <js-file> relative to the theme)`;
   const needs = [
     { name: 'tabs', marker: /role\s*=\s*["']tab["']/, module: /import\s[^;]*['"]\.\/tabs(\.js)?['"]/ },
     { name: 'accordion', marker: /data-accordion-trigger/, module: /import\s[^;]*['"]\.\/accordion(\.js)?['"]/ },
@@ -356,8 +391,8 @@ if (rules.includes('widgets')) {
   for (const n of needs) {
     const users = phpFiles.filter((f) => n.marker.test(sources.get(f)));
     if (!users.length) continue;
-    if (!n.module.test(index) || !existsSync(join(theme, `assets/js/src/${n.name}.js`))) {
-      fail(`${users.map(rel).join(', ')} carry ${n.name} markup but assets/js/src/index.js does not import ./${n.name}.js`);
+    if (!n.module.test(index) || !existsSync(join(theme, entryDir, `${n.name}.js`))) {
+      fail(`${users.map(rel).join(', ')} carry ${n.name} markup but the script entry ${entryNote} does not import ./${n.name}.js next to it`);
     }
   }
 }
