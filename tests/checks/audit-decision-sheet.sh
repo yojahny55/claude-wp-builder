@@ -92,6 +92,21 @@ mkdir -p "$tmp/e3"
 node "$tool" build --out "$tmp/e3" --proposals "$tmp/pp.json" --sidecar "$tmp/sc2.json" --date 2026-01-02 >/dev/null 2>&1
 ids=$(grep -o 'data-id="[^"]*"' "$tmp/e3/decisions-2026-01-02.html" | tr '\n' ' ')
 [ "$ids" = 'data-id="P1" data-id="A" ' ] || fail "a second page with the same check got no card: $ids"
+# a site-wide finding (no page) is covered by the proposal of its check, page or not
+echo '{"findings":[{"check":"A","design_impact":true}]}' > "$tmp/sc3.json"
+mkdir -p "$tmp/e4"
+node "$tool" build --out "$tmp/e4" --proposals "$tmp/pp.json" --sidecar "$tmp/sc3.json" --date 2026-01-02 >/dev/null 2>&1
+ids=$(grep -o 'data-id="[^"]*"' "$tmp/e4/decisions-2026-01-02.html" | tr '\n' ' ')
+[ "$ids" = 'data-id="P1" ' ] || fail "a site-wide finding got a duplicate card beside its proposal: $ids"
+# --against or --proposals that parse but are not objects are usage errors (2), not crashes
+echo null > "$tmp/null.json"
+printf 'DECISIONS v1\nDECISION A: approve\nEND DECISIONS\n' | node "$tool" --parse - --against "$tmp/null.json" >/dev/null 2>&1; rc=$?
+[ "$rc" = 2 ] || fail "--against null exited $rc, not 2"
+node "$tool" build --out "$tmp/e4" --proposals "$tmp/null.json" --date 2026-01-02 >/dev/null 2>&1; rc=$?
+[ "$rc" = 2 ] || fail "--proposals null exited $rc, not 2"
+echo '[null]' > "$tmp/nulls.json"
+node "$tool" build --out "$tmp/e4" --proposals "$tmp/nulls.json" --date 2026-01-02 >/dev/null 2>&1; rc=$?
+[ "$rc" = 2 ] || fail "--proposals [null] exited $rc, not 2"
 # --date becomes part of a file name: no path traversal
 for d in 'a/../../zz' '../x' 'a b'; do
   node "$tool" build --out "$tmp/e3" --proposals "$tmp/pp.json" --date "$d" >/dev/null 2>&1; rc=$?

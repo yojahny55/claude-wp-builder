@@ -115,8 +115,8 @@ function runParse(src, againstFile) {
   let text, against = null;
   if (againstFile) {
     const j = readJson(againstFile);
-    if (!Array.isArray(j.proposals)) usage(`${againstFile} is not a decision-sheet json (no proposals)`);
-    against = new Map(j.proposals.map(p => [p.id, (p.options || []).map(op => op.key)]));
+    if (!j || typeof j !== 'object' || !Array.isArray(j.proposals)) usage(`${againstFile} is not a decision-sheet json (no proposals)`);
+    against = new Map(j.proposals.filter(p => p && typeof p === 'object' && p.id).map(p => [p.id, (p.options || []).map(op => op?.key)]));
   }
   try { text = src === '-' ? readFileSync(0, 'utf8') : readFileSync(src, 'utf8'); }
   catch (e) { usage(`cannot read ${src}: ${e.message}`); }
@@ -156,18 +156,19 @@ function loadProposals(o) {
   let list = [];
   if (o.proposals) {
     const j = readJson(o.proposals);
-    list = Array.isArray(j) ? j : j.proposals;
-    if (!Array.isArray(list)) usage(`${o.proposals} is not a list of proposals`);
+    list = Array.isArray(j) ? j : j?.proposals;
+    if (!Array.isArray(list) || list.some(p => !p || typeof p !== 'object')) usage(`${o.proposals} is not a list of proposals`);
   }
   if (o.sidecar) {
     const sc = readJson(o.sidecar);
     const findings = (sc.findings || []).filter(f => f.design_impact === true);
     // A proposal covers the finding with its check AND its page; the same check on another
-    // page is another card. A proposal with no page covers one finding of that check.
+    // page is another card. A proposal with no page covers one finding of that check, and a
+    // site-wide finding (no page) is covered by any unclaimed proposal of its check.
     const norm = u => { if (!u) return ''; try { return new URL(u, o.site || 'http://x.invalid').href.replace(/#.*$/, '').replace(/\/$/, ''); } catch { return String(u); } };
     const claimed = new Set();
     const covered = (check, page) => {
-      const p = list.find(q => q.check === check && !claimed.has(q) && (q.page ? norm(q.page) === norm(page) : true));
+      const p = list.find(q => q.check === check && !claimed.has(q) && (!page || !q.page || norm(q.page) === norm(page)));
       if (p) claimed.add(p);
       return !!p;
     };

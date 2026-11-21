@@ -86,4 +86,6 @@ node "$tool" snapshot --out "$tmp" --label sok --urls "$base/ok" >/dev/null 2>&1
 node "$tool" diff "$tmp/s404.json" "$tmp/s404b.json" >/dev/null; rc=$?
 [ "$rc" = 3 ] || fail "two captured 404 pages exited $rc, not 3"
 node "$tool" diff "$tmp/sok.json" "$tmp/sok.json" >/dev/null || fail "a 200 page against itself did not exit 0"
+node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));const v=Object.values(j.pages).flatMap(u=>Object.values(u));if(!v.length||!v.every(e=>e.status===200&&/\/ok$/.test(e.finalUrl||"")))process.exit(1)' "$tmp/sgo.json" \
+  || fail "the capture of a redirect did not record status 200 and the final URL /ok"
 echo "PASS: style-diff reports a tag-swap regression, sets noise apart and exits 1/0"
