@@ -241,8 +241,9 @@ const commonRoot = (() => {
 // Trees with no shared ancestor below the filesystem root would be served from
 // `/`: the server's `base + sep` check then reads `//` and refuses every file,
 // and when it does not, a whole machine's worth of tree sits on 127.0.0.1.
-if (commonRoot.split(sep).filter(Boolean).length < 2) {
-  console.error('tailwindify-parity: the converted and original trees share no ancestor deeper than ' + commonRoot +
+// One shared level (two folders under /tmp) is enough; only the bare root is refused.
+if (commonRoot.split(sep).filter(Boolean).length < 1) {
+  console.error('tailwindify-parity: the converted and original trees share no ancestor below the filesystem root ' + commonRoot +
     ' (' + cRoot + ' and ' + oRoot + '); put them under one project folder');
   process.exit(3);
 }
