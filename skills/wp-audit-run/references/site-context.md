@@ -152,7 +152,7 @@ produced the finding, never fixed afterwards in the report.
    and run every fetch-based check on the scheme that answers. A check that failed because
    `https://` does not listen locally is `UNMEASURED` ("local host answers HTTP only"), never
    a finding about the site.
-5. **WP-040 (`WP_DEBUG` on) and WP-045 (file permissions) are `INFO` on a clone**, every run,
+5. **SEC-008 and WP-040 (`WP_DEBUG` on) and WP-045 (file permissions) are `INFO` on a clone**, every run,
    in every shard. A clone's debug flag and file owner are the copy's; confirm both on
    production, where they keep their `WARNING` severity.
 

@@ -54,6 +54,12 @@ did not run produces `unmeasured`, never `resolved` — otherwise running an aud
 Tier 2 would mark every Tier 2 finding fixed, and a report would show a site cleaning itself
 up by being audited with less access than before.
 
+**A folded finding is found, not resolved.** When findings share a `root_cause`,
+`bin/audit-report.mjs` keeps one and lists the others under `also_affects` (the "Same defect,
+one owner" table in `wp-audit-standards` is the common case). Every `check : resource` under
+`also_affects` was found by this run: its ledger entry is `still_failing` (or `new`), never
+`resolved`, exactly as the report's comparison counts it as present.
+
 **`fixed_unverified` is the honest name for a fix nobody has measured.** It is set by
 `--mark-fixed` (below) and never by an audit. It is not `resolved`: only a run that measures
 the same check on the same resource and does not find it turns it into `resolved`, and a run

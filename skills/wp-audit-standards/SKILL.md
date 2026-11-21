@@ -160,7 +160,8 @@ removing code and design decisions are never auto-fixable.
 
 These numbers were never assigned, or were retired. They are never reused: `checks_run`
 history and ledger entries key by id, so a reused number would read old coverage as coverage
-of a new rule. A new check takes the next number after its prefix's highest. `A11Y-012`
+of a new rule. A new check takes the next number after its prefix's highest (UX: after UX-058, see
+`skills/wp-audit-ux-standards/SKILL.md`). `A11Y-012`
 appears in examples in the run references only as a sample id; it is not a live check.
 
 - `SEC-015..019`
@@ -185,33 +186,40 @@ When several agents report one defect:
 Some defects sit in the catalog of more than one agent under different ids, so the `file:line`
 pass cannot see them. Each has one owner; the others are duplicates.
 
-| Defect | Owner | Duplicates |
-|---|---|---|
-| PHP version below the floor | SEC-026 | PERF-040, WP-042 |
-| XML-RPC enabled | SEC-022 | PERF-029 |
-| `WP_DEBUG` on | SEC-008 | WP-040 |
-| Unescaped output | SEC-001 | WP-001 |
-| Dangerous functions (SEC-004 also covers `serialize`/`unserialize`) | SEC-004 | WP-031 |
-| Missing `wp_body_open` | WP-018 | A11Y-063 |
-| Images missing alt in templates | A11Y-001 | SEO-006 |
+| Defect | Owner | Duplicates | `root_cause` |
+|---|---|---|---|
+| PHP version below the floor (`>= 8.2`; 8.1 is out of security support) | SEC-026@2 | PERF-040@2, WP-042@2 | `php-floor` |
+| XML-RPC enabled | SEC-022 | PERF-029@2 | `xmlrpc` |
+| `WP_DEBUG` on | SEC-008@2 | WP-040 | `wp-debug` |
+| Unescaped output | SEC-001 | WP-001 | `unescaped-output:<file>:<line>` |
+| Dangerous functions (SEC-004 also covers `serialize`/`unserialize`) | SEC-004 | WP-031 | `dangerous-function:<file>:<line>` |
+| Missing `wp_body_open` | WP-018 | A11Y-063 | `wp-body-open` |
+| Images missing alt in templates | A11Y-001 | SEO-006 | `img-alt:<file>:<line>` |
+
+The PHP floor is written here and in the SEC-026 row, nowhere else: the duplicate rows say
+"Not below SEC-026's floor", so a `--performance` or `--best-practices` run reads the number
+from this table.
 
 SEO-031 (alt text counted in the media library, a database measurement) is a separate check,
 not a duplicate of A11Y-001 or SEO-006.
 
-A duplicate's finding is merged into the owner's finding when the owner also failed on the
-same resource. For site-wide checks (PHP floor, XML-RPC, `WP_DEBUG`, `wp_body_open`) the
-resource is the site itself, so an owner failure absorbs the duplicate's. For per-location
-checks (unescaped output, dangerous functions, alt in templates) the resource is the
-`file:line`. The merged finding keeps the owner's id and records the duplicate's id in its
-evidence, the same shape as the suite and agent merge in `bin/audit-report.mjs --merge`. A
-duplicate finding with no owner failure on that resource (the owner passed, did not run, or
-ran on another scope) is kept, at the owner's severity: the detectors differ, so a defect
-only the duplicate sees is still a measured defect. Duplicates keep their rows and stay in
-`checks_executed` as normal, so a single-category audit still measures the defect and nothing
-changes in coverage or the ledger vocabulary. A duplicate's earlier open ledger entry that is
-now merged into the owner's finding reads as resolved under the duplicate's id, because the
-defect is tracked under the owner's id from this run on. An owner and its duplicates carry
-the same severity.
+**The merge is the renderer's root-cause fold, not a hand edit.** Owner and duplicates set the
+same `root_cause` from the last column. Site-wide defects (PHP floor, XML-RPC, `WP_DEBUG`,
+`wp_body_open`) use the bare slug and `resource: site`; per-location defects put the
+`file:line` into the slug, so two different lines never fold together.
+`bin/audit-report.mjs` then folds findings that share a `root_cause` into one, which lists the
+others under `also_affects`; totals count the defect once, whichever id came first on equal
+severity. A duplicate whose owner did not fail on that resource (the owner passed, did not
+run, or ran on another scope) has nothing to fold into and stays its own finding, at the
+owner's severity: the detectors differ, so a defect only the duplicate sees is still a
+measured defect. Duplicates keep their rows and stay in `checks_executed` as normal, so a
+single-category audit still measures the defect and coverage does not change. An owner and
+its duplicates carry the same severity.
+
+**A folded id is still failing.** The report's comparison counts every id under
+`also_affects` as present, and the ledger does the same: a duplicate's open entry whose
+finding was folded into another stays `still_failing`, never `resolved` (see
+`skills/wp-audit-run/references/ledger.md`).
 
 ---
 

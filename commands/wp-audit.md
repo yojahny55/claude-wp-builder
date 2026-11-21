@@ -406,7 +406,7 @@ Collect reports from all agents. For each agent's output, parse the findings int
 
 **Deduplication** runs on three different keys, because three different things collide here.
 
-*Different ids, one defect.* First merge per the "Same defect, one owner" table in `wp-audit-standards`: a duplicate on a resource the owner also failed joins the owner's finding.
+*Different ids, one defect.* Owner and duplicate in the "Same defect, one owner" table of `wp-audit-standards` share its `root_cause`, folded as below.
 
 *Two agents reporting the same place.* If the same `file:line` appears in multiple reports:
 - Keep the highest-severity finding and drop the lower-severity duplicates

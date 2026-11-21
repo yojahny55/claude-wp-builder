@@ -146,7 +146,7 @@ These checks require WP-CLI access via `$WP`. Skip this tier if `.wp-create.json
 |------|-------|---------|---------------|----------|
 | WP-040 | WP_DEBUG true (duplicate of SEC-008) | `$WP config get WP_DEBUG` | false | WARNING (`INFO` on a local clone) |
 | WP-041 | FS_METHOD not set | `$WP config get FS_METHOD 2>/dev/null` | `direct` | INFO |
-| WP-042 | PHP version old (duplicate of SEC-026, see the Same defect table in `skills/wp-audit-standards/SKILL.md`) | `$WP eval "echo phpversion();"` | Not below SEC-026's floor | WARNING |
+| WP-042@2 | PHP version old (duplicate of SEC-026, see the Same defect table in `skills/wp-audit-standards/SKILL.md`) | `$WP eval "echo phpversion();"` | Not below SEC-026's floor | WARNING |
 | WP-043 | WordPress outdated | `$WP core check-update`, **only after the network check below** | No updates | WARNING |
 | WP-044 | Plugin updates | `$WP plugin list --update=available --format=count`, **only after the network check below** | 0 | INFO |
 | WP-045 | Bad file permissions | Check uploads/plugins/upgrade dir permissions | 755 | WARNING (`INFO` on a local clone) |
