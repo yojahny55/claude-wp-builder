@@ -17,11 +17,12 @@ server {
     # backup under the project root (.wp-create*.json, .git/, .env, *.sql, *.bak) would
     # otherwise be served by the generic try_files.
     location ~ /\.(?!well-known) { deny all; }
-    location ~* \.(sql|bak|log)$ { deny all; }
+    location ~* \.(sql|sql\.gz|bak|log|zip|tar\.gz|tgz)$ { deny all; }
     location ~* \.bak- { deny all; }
     # The PHP location below is \.php$ only, so evil.php.jpg is served as a static file here; a
     # server that adds handlers for other names must widen this rule to match.
-    location ~* /uploads/.*\.php$ { deny all; }
+    location ~* "/uploads/.*\.(php[0-9]?|phar|pht(ml)?)(\.|/|$)" { deny all; }
+    location = /xmlrpc.php { deny all; }
 
     location ~ \.php$ {
         try_files $uri =404;

@@ -34,12 +34,16 @@ Common placeholders to replace:
 | `{{ssl_key}}` | `/etc/ssl/private/<domain>.key` |
 | `{{php_fpm_sock}}` | `/var/run/php/php<version>-fpm.sock` |
 | `{{web_user}}` | `nginx`, `www-data`, or `apache` (from detection) |
-| `{{max_upload_size}}` | Default `1024M`. Nginx only — see note below |
+| `{{max_upload_size}}` | Default `1024M`. Nginx vhosts and the PHP-FPM pool — see note below |
 | `{{phpmyadmin_port}}` | Default 8080 (check availability) |
 | `{{mailpit_port}}` | Default 8025 (check availability) |
 | `{{container_prefix}}` | Project slug |
 
-**Upload size (`{{max_upload_size}}`):** nginx's `client_max_body_size` defaults to `1m`, which rejects plugin/theme zips and migration archives with a bare `413 Request Entity Too Large` — nginx returns it before PHP runs, so WordPress shows no error of its own and PHP's `upload_max_filesize` is irrelevant. Set it to `1024M` unless the user asks otherwise. Only the nginx templates need this: Apache's `LimitRequestBody` and Caddy's request body limit both default to unlimited.
+**Upload size (`{{max_upload_size}}`):** two limits apply, and both must allow the file. nginx's `client_max_body_size` defaults to `1m` and rejects plugin/theme zips and migration archives with a bare `413 Request Entity Too Large` before PHP runs, so WordPress shows no error of its own. Past that, PHP's own `upload_max_filesize` (2M) and `post_max_size` (8M) defaults reject the same zips even when the web server allows them, so `php-fpm-pool.conf.tpl` sets both with `php_admin_value` from the same placeholder; a pool that omits them makes the nginx value irrelevant. Set it to `1024M` unless the user asks otherwise. Only the nginx templates need the web-server side: Apache's `LimitRequestBody` and Caddy's request body limit both default to unlimited.
+
+**Local TLS:** the Caddyfile sets `tls internal` (a local domain cannot get a public ACME certificate), and no template sends HSTS: the self-signed certificate `ssl-generate` issues lasts 365 days, and a pinned HSTS host cannot be clicked through once it expires.
+
+**Deny rules:** `templates/native/_deny.list` is the one reference for what every engine must refuse (dumps and archives, `/xmlrpc.php`, executable extensions under uploads); `tests/checks/vhost-deny-list-parity.sh` compares the three templates with it. It is read by the check only and is not installed.
 
 Write the generated config to the appropriate location:
 - Docker: `${PROJECT_PATH}/docker-compose.yml`

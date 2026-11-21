@@ -3,6 +3,7 @@
     DocumentRoot {{document_root}}
 
     <Directory {{document_root}}>
+        Options -Indexes
         AllowOverride All
         Require all granted
     </Directory>
@@ -13,10 +14,14 @@
     <LocationMatch "/\.(?!well-known)">
         Require all denied
     </LocationMatch>
-    <FilesMatch "(^\.(?!well-known)|\.(sql|bak|log)$|\.bak-)">
+    <FilesMatch "(^\.(?!well-known)|\.(sql|sql\.gz|bak|log|zip|tar\.gz|tgz)$|\.bak-)">
         Require all denied
     </FilesMatch>
     <LocationMatch "(?i)^/wp-content/uploads/.*\.(php[0-9]?|phar|pht(ml)?)(\.|/|$)">
+        Require all denied
+    </LocationMatch>
+
+    <LocationMatch "^/xmlrpc\.php$">
         Require all denied
     </LocationMatch>
 

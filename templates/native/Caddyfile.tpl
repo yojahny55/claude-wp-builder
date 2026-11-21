@@ -1,4 +1,7 @@
 {{domain}} {
+    # A local domain is not publicly resolvable: without this Caddy asks a public ACME CA and fails.
+    tls internal
+
     root * {{document_root}}
     php_fastcgi unix/{{php_fpm_sock}}
     file_server
@@ -9,6 +12,10 @@
         path *.sql
         path *.bak
         path *.log
+        path *.sql.gz
+        path *.zip
+        path *.tar.gz
+        path *.tgz
         path *.bak-*
         path /wp-content/uploads/woocommerce_uploads/*
     }
