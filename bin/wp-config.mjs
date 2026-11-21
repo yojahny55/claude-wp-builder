@@ -9,7 +9,7 @@
  * (a third-party theme this plugin did not build) and the calling builder must stop.
  */
 import {
-  readFileSync, existsSync, writeFileSync, copyFileSync, mkdirSync, renameSync, unlinkSync, rmdirSync, statSync, readdirSync,
+  readFileSync, existsSync, writeFileSync, copyFileSync, mkdirSync, renameSync, unlinkSync, rmdirSync, statSync, readdirSync, realpathSync,
 } from 'node:fs';
 import { join, resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,9 +30,11 @@ import {
 // Every manifest write goes through here: the bytes land in a sibling temp file and are
 // renamed over the target, so a reader (or a parallel builder) sees the old file or the
 // new one, never a half-written one. rename(2) is atomic within a directory.
-// Only `set` also takes withLock: migrate, render-context, adopt and refresh are one-shot
-// commands run by a single operator or a sequential flow, so they are single-writer by
-// contract; the temp name carries the pid, so concurrent writers never share a temp file.
+// Every read-modify-write of the manifest takes withLock (`set`, `env-set`, `keep-inactive`,
+// `remove-plugin`, `code-home`, `migrate`). render-context writes CLAUDE.md, not the manifest,
+// and adopt and refresh stay single-writer by contract: they run a WP-CLI probe of up to two
+// minutes, longer than the 30 s staleness window. The temp name carries the pid, so concurrent
+// writers never share a temp file.
 function sweepOrphans(dir, prefix, suffixOk, maxAgeMs) {
   // A writer killed between create and rename/rmdir leaves its temp file or aside directory
   // behind. Anything this old belongs to a dead process (a live write takes milliseconds).
@@ -94,8 +96,14 @@ function withLock(file, fn) {
       Atomics.wait(sleepBuf, 0, 0, 50); // sleeps without spinning the CPU
     }
   }
-  try { return fn(); } finally { try { rmdirSync(lock); } catch { /* already gone */ } }
+  // process.exit() inside a locked command skips the finally below; an exit handler releases
+  // the lock on that path too, so a refused command does not make the next writer wait.
+  const release = () => { try { rmdirSync(lock); } catch { /* already gone */ } };
+  process.once('exit', release);
+  try { return fn(); } finally { process.removeListener('exit', release); release(); }
 }
+
+const locked = (projectPath, fn) => withLock(join(resolve(projectPath), MANIFEST_NAME), fn);
 
 // The one list of files this plugin writes into a site root that are working state, not
 // source: regenerable, machine-specific or secret. Anything new the plugin writes there
@@ -708,7 +716,18 @@ function cmdSet(projectPath, key, raw) {
       }
       o = o[k];
     }
-    o[parts[parts.length - 1]] = value;
+    // The value went through JSON.parse, so `28001` or `2026` became a number and `true` a
+    // boolean. Say so when that changes what the key held, so a string the caller meant
+    // literally is not stored as another type without a word. The parse itself stays: the
+    // other callers pass objects and lists through it.
+    const lastKey = parts[parts.length - 1];
+    if (Object.hasOwn(o, lastKey)) {
+      const kind = (v) => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v);
+      if (kind(o[lastKey]) !== kind(value)) {
+        warn(`note: ${key} was a ${kind(o[lastKey])} and is now a ${kind(value)} (the value is parsed as JSON; pass '"${raw}"' to store the string)`);
+      }
+    }
+    o[lastKey] = value;
     // A parent key (`database`, `wordpress`) can carry a secret as a child of the value.
     const leaked = Object.values(SECRETS).find((sp, i) => {
       const now = secretAt(manifest, sp.manifestPath);
@@ -831,6 +850,9 @@ function cmdEnvSet(projectPath, flags) {
 // confirms between them: plan (--dry-run, changes nothing) -> init (writes .gitignore, git init,
 // remote add, prints the summary, stages nothing) -> --commit -> --push --yes.
 // Only the named branch is ever created or pushed.
+// A URL's userinfo (`user:token@`) never reaches the output; git keeps the real value in .git/config.
+const maskUrl = (u) => String(u).replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/@\s]*@/i, '$1***@');
+
 const SECRET_FILE = /(^|\/)(wp-config[^/]*|\.env(\..*)?|\.htpasswd|id_rsa[^/]*|[^/]*\.(pem|key|p12|pfx)|credentials[^/]*\.json)$/i;
 
 function gitIgnoreMerge(root, existing) {
@@ -866,7 +888,7 @@ function cmdGitInit(projectPath, flags) {
   const isRepo = top.status === 0;
 
   if (flags.commit || flags.push) {
-    if (!isRepo || resolve(top.stdout.trim()) !== root) { warn('refused: the root is not a git repository of its own; run git-init first'); process.exit(1); }
+    if (!isRepo || realpathSync(top.stdout.trim()) !== realpathSync(root)) { warn('refused: the root is not a git repository of its own; run git-init first'); process.exit(1); }
     const cur = git(['symbolic-ref', '--short', 'HEAD']).stdout.trim();
     if (cur !== branch) { warn(`refused: HEAD is ${cur || 'detached'}, not ${branch}`); process.exit(1); }
     // Only a repo this command created: same origin as --remote, and (for --commit) no history yet.
@@ -898,7 +920,7 @@ function cmdGitInit(projectPath, flags) {
     const remote = git(['remote', 'get-url', 'origin']).stdout.trim();
     const cmd = `git -C ${root} push -u origin refs/heads/${branch}:refs/heads/${branch}`;
     say(`push command: ${cmd}`);
-    say(`remote: ${remote}`);
+    say(`remote: ${maskUrl(remote)}`);
     if (!flags.yes) { warn('refused: pass --yes only after the operator confirmed this exact command'); process.exit(1); }
     const r = git(['push', '-u', 'origin', `refs/heads/${branch}:refs/heads/${branch}`], { stdio: 'inherit' });
     if (r.status !== 0) process.exit(1);
@@ -918,7 +940,7 @@ function cmdGitInit(projectPath, flags) {
   const igFile = join(root, '.gitignore');
   const existing = existsSync(igFile) ? readFileSync(igFile, 'utf8') : '';
   const add = gitIgnoreMerge(root, existing);
-  say(`plan: git init -b ${branch}; origin = ${remote}; only ${branch} will ever be pushed`);
+  say(`plan: git init -b ${branch}; origin = ${maskUrl(remote)}; only ${branch} will ever be pushed`);
   say(`plan: .gitignore ${existing ? 'gains' : 'is created with'} ${add.filter((l) => !l.startsWith('#')).length} rules`);
   if (flags['dry-run']) { for (const l of add) say(`  + ${l}`); say('dry run: nothing written'); return; }
 
@@ -953,21 +975,21 @@ function cmdGitInit(projectPath, flags) {
 
 const [cmd, target] = process.argv.slice(2);
 if (cmd === 'validate' && target) cmdValidate(target);
-else if (cmd === 'migrate' && target) cmdMigrate(target);
+else if (cmd === 'migrate' && target) locked(target, () => cmdMigrate(target));
 else if (cmd === 'render-context' && target) cmdRenderContext(target);
 else if (cmd === 'get' && target && process.argv[4]) cmdGet(target, process.argv[4]);
 else if (cmd === 'validate-profile' && target) cmdValidateProfile(target);
 else if (cmd === 'drift' && target) cmdDrift(target);
 else if (cmd === 'refresh' && target) cmdRefresh(target);
-else if (cmd === 'keep-inactive' && target) cmdKeepInactive(target, process.argv[4] && !process.argv[4].startsWith('--') ? process.argv[4] : undefined, parseFlags(cmd, process.argv.slice(4), 1));
-else if (cmd === 'remove-plugin' && target) cmdRemovePlugin(target, process.argv[4]);
-else if (cmd === 'code-home' && target) cmdCodeHome(target, parseFlags(cmd, process.argv.slice(4)));
+else if (cmd === 'keep-inactive' && target) locked(target, () => cmdKeepInactive(target, process.argv[4] && !process.argv[4].startsWith('--') ? process.argv[4] : undefined, parseFlags(cmd, process.argv.slice(4), 1)));
+else if (cmd === 'remove-plugin' && target) locked(target, () => cmdRemovePlugin(target, process.argv[4]));
+else if (cmd === 'code-home' && target) locked(target, () => cmdCodeHome(target, parseFlags(cmd, process.argv.slice(4))));
 else if (cmd === 'set' && process.argv.length > 6) { warn('set takes exactly <project> <key> <value>; quote the value or pass it on stdin with `-`'); process.exit(1); }
 else if (cmd === 'set' && target && process.argv[4] && process.argv[5] !== undefined) cmdSet(target, process.argv[4], process.argv[5]);
 else if (cmd === 'require-origin' && target) cmdRequireOrigin(target, parseFlags(cmd, process.argv.slice(4)));
 else if (cmd === 'gitignore-check' && target) cmdGitignoreCheck(target);
 else if (cmd === 'git-init' && target) cmdGitInit(target, parseFlags(cmd, process.argv.slice(4)));
-else if (cmd === 'env-set' && target) cmdEnvSet(target, parseFlags(cmd, process.argv.slice(4)));
+else if (cmd === 'env-set' && target) locked(target, () => cmdEnvSet(target, parseFlags(cmd, process.argv.slice(4))));
 else if (cmd === 'adopt' && target) cmdAdopt(target, parseFlags(cmd, process.argv.slice(4)));
 else {
   warn('usage: wp-config.mjs <validate|migrate|render-context|get|set|validate-profile|adopt|drift|refresh|keep-inactive|remove-plugin|code-home|gitignore-check|git-init|env-set|require-origin> <project-path> [key [value]|wp-version|adopt flags]');

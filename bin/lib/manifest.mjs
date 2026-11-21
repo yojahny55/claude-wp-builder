@@ -942,7 +942,7 @@ export function supersedeProseDecisions(claudeMd, manifest) {
   const text = claudeMd ?? '';
   const rewrite = (chunk) => contextFieldsFor(manifest).reduce((acc, f) => acc.replace(
     new RegExp(`^([ \\t]*-[ \\t]*\\*\\*${escapeRegExp(f.label)}:\\*\\*.*)$`, 'gm'),
-    (_, line) => `<!-- superseded by the wp-create:begin block below: ${line.trim()} -->`,
+    (_, line) => `<!-- superseded by the wp-create:begin block below: ${line.trim().replace(/--/g, '- -')} -->`,
   ), chunk);
 
   const state = markerState(text);
@@ -964,6 +964,7 @@ export function contextDrift(claudeMd, manifest) {
   if (!state.ok) return state.reason;
   if (!state.present) return null;
   const expected = renderContext(manifest);
-  const found = text.slice(state.start, state.end + MARK_END.length);
+  // A file saved with CRLF line endings is the same block, not a drifted one.
+  const found = text.slice(state.start, state.end + MARK_END.length).replace(/\r\n/g, '\n');
   return found === expected ? null : 'the generated block between wp-create:begin and wp-create:end no longer matches the manifest';
 }
