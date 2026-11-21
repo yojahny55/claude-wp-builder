@@ -31,7 +31,7 @@ import {
 // renamed over the target, so a reader (or a parallel builder) sees the old file or the
 // new one, never a half-written one. rename(2) is atomic within a directory.
 // Every read-modify-write of the manifest takes withLock (`set`, `env-set`, `keep-inactive`,
-// `remove-plugin`, `code-home`, `migrate`). render-context writes CLAUDE.md, not the manifest,
+// `remove-plugin`, `migrate`, and `code-home` around its write only, after its probe). render-context writes CLAUDE.md, not the manifest,
 // and adopt and refresh stay single-writer by contract: they run a WP-CLI probe of up to two
 // minutes, longer than the 30 s staleness window. The temp name carries the pid, so concurrent
 // writers never share a temp file.
@@ -638,21 +638,28 @@ function cmdCodeHome(projectPath, flags) {
   }
   if (!CODE_HOME_KINDS.includes(flags.kind)) { warn(`--kind must be one of ${CODE_HOME_KINDS.join(', ')}`); process.exit(1); }
   const wrapper = manifest.wp_cli?.wrapper || detectWrapper(root).wrapper;
+  // The probe runs before the lock: it can take two minutes, four times the lock's staleness
+  // window, and a writer that waited that long would break the lock as stale. Only the
+  // read-modify-write below is locked, and it re-reads the manifest so a key written by
+  // another writer during the probe is kept.
   const probed = runProbe(wrapper);
   if (!probed.ok) { warn(`probe failed: ${probed.reason}`); process.exit(1); }
-  const next = structuredClone(manifest);
-  next.code_home = planCodeHome(flags.kind, probed.probe, root, typeof flags.path === 'string' ? flags.path : undefined);
-  const scope = next.code_scope ?? (next.code_scope = { editable: [], read_only: [] });
-  if (next.code_home.created && !scope.editable.includes(next.code_home.path) && !scope.read_only.includes(next.code_home.path)) {
-    scope.editable.push(next.code_home.path);
-  }
-  const problems = validateManifest(next);
-  if (problems.length) {
-    for (const p of problems) warn(`invalid: ${p}`);
-    warn('nothing written');
-    process.exit(1);
-  }
-  writeAtomic(file, `${JSON.stringify(next, null, 2)}\n`);
+  const next = withLock(file, () => {
+    const fresh = structuredClone(loadManifest(root).manifest);
+    fresh.code_home = planCodeHome(flags.kind, probed.probe, root, typeof flags.path === 'string' ? flags.path : undefined);
+    const scope = fresh.code_scope ?? (fresh.code_scope = { editable: [], read_only: [] });
+    if (fresh.code_home.created && !scope.editable.includes(fresh.code_home.path) && !scope.read_only.includes(fresh.code_home.path)) {
+      scope.editable.push(fresh.code_home.path);
+    }
+    const problems = validateManifest(fresh);
+    if (problems.length) {
+      for (const p of problems) warn(`invalid: ${p}`);
+      warn('nothing written');
+      process.exit(1);
+    }
+    writeAtomic(file, `${JSON.stringify(fresh, null, 2)}\n`);
+    return fresh;
+  });
   say(`ok: code_home is ${next.code_home.kind} at ${next.code_home.path} (${next.code_home.created ? 'exists, in code_scope.editable' : 'not created yet'})`);
   if (next.code_home.kind === 'child-theme' && !next.code_home.created) {
     const child = basename(next.code_home.path);
@@ -983,7 +990,7 @@ else if (cmd === 'drift' && target) cmdDrift(target);
 else if (cmd === 'refresh' && target) cmdRefresh(target);
 else if (cmd === 'keep-inactive' && target) locked(target, () => cmdKeepInactive(target, process.argv[4] && !process.argv[4].startsWith('--') ? process.argv[4] : undefined, parseFlags(cmd, process.argv.slice(4), 1)));
 else if (cmd === 'remove-plugin' && target) locked(target, () => cmdRemovePlugin(target, process.argv[4]));
-else if (cmd === 'code-home' && target) locked(target, () => cmdCodeHome(target, parseFlags(cmd, process.argv.slice(4))));
+else if (cmd === 'code-home' && target) cmdCodeHome(target, parseFlags(cmd, process.argv.slice(4)));
 else if (cmd === 'set' && process.argv.length > 6) { warn('set takes exactly <project> <key> <value>; quote the value or pass it on stdin with `-`'); process.exit(1); }
 else if (cmd === 'set' && target && process.argv[4] && process.argv[5] !== undefined) cmdSet(target, process.argv[4], process.argv[5]);
 else if (cmd === 'require-origin' && target) cmdRequireOrigin(target, parseFlags(cmd, process.argv.slice(4)));

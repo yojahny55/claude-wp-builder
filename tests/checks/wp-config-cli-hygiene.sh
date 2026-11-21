@@ -11,6 +11,9 @@ cfg="node bin/wp-config.mjs"
 # --- CORE-02: the detected wrapper keeps a root with a space as one argument. ---
 w=$(node --input-type=module -e "import('./bin/lib/adopt.mjs').then(m=>{const r=m.detectWrapper(process.argv[1]);console.log(r.wrapper);console.log(JSON.stringify(m.splitWords(r.wrapper)))})" "$tmp/a b")
 [ "$(printf '%s\n' "$w" | sed -n 2p)" = "[\"wp\",\"--path=$tmp/a b\"]" ] || fail "wrapper for a root with a space did not split into two words: $w"
+# A path with an apostrophe is stored as '...'\''...' and must come back intact.
+apos=$(node --input-type=module -e "import('./bin/lib/adopt.mjs').then(m=>{const p=process.argv[1];const w=m.splitWords(m.detectWrapper(p).wrapper);console.log(w.length===2&&w[1]==='--path='+p?'ok':JSON.stringify(w))})" "$tmp/it's a b")
+[ "$apos" = ok ] || fail "a root with an apostrophe did not round-trip through the wrapper: $apos"
 plain=$(node --input-type=module -e "import('./bin/lib/adopt.mjs').then(m=>console.log(m.detectWrapper('/srv/x').wrapper))")
 [ "$plain" = "wp --path=/srv/x" ] || fail "a plain root changed its stored wrapper: $plain"
 
@@ -41,9 +44,27 @@ const crlf = renderContext(man).replace(/\n/g, '\r\n');
 if (contextDrift(crlf, man) !== null) { console.log('FAIL: CRLF block reports drift'); process.exit(1); }
 " || exit 1
 
-# --- CORE-15: keep-inactive, remove-plugin, env-set and code-home hold the lock. ---
+# --- CORE-15: keep-inactive, remove-plugin, env-set, migrate and code-home's write hold the lock. ---
 n=$(grep -c "locked(target, () => cmd" bin/wp-config.mjs)
-[ "$n" -ge 5 ] || fail "only $n locked dispatches, want migrate/keep-inactive/remove-plugin/code-home/env-set"
+[ "$n" -ge 4 ] || fail "only $n locked dispatches, want migrate/keep-inactive/remove-plugin/env-set"
+# code-home locks only its write: its WP-CLI probe (up to two minutes) must run unlocked, or
+# a writer waiting on it would break the lock as stale after 30 s.
+cp -r tests/fixtures/manifests/valid "$tmp/ch"
+cat >"$tmp/fakewp" <<EOS
+#!/usr/bin/env bash
+if [ -e "$tmp/ch/.wp-create.json.lock" ]; then echo locked >"$tmp/probe-saw"; else echo free >"$tmp/probe-saw"; fi
+exit 1
+EOS
+chmod +x "$tmp/fakewp"
+node --input-type=module -e "
+import fs from 'node:fs';
+const f = process.argv[1]; const m = JSON.parse(fs.readFileSync(f, 'utf8'));
+m.wp_cli.wrapper = process.argv[2]; fs.writeFileSync(f, JSON.stringify(m, null, 2));
+" "$tmp/ch/.wp-create.json" "$tmp/fakewp"
+$cfg code-home "$tmp/ch" --kind=mu-plugin >/dev/null 2>&1 && fail "code-home with a failing probe did not refuse"
+[ "$(cat "$tmp/probe-saw" 2>/dev/null)" = free ] || fail "code-home ran its probe while holding the manifest lock"
+[ ! -e "$tmp/ch/.wp-create.json.lock" ] || fail "code-home left the lock behind"
+grep >/dev/null -c 'const next = withLock(file' bin/wp-config.mjs || fail "code-home no longer locks its read-modify-write"
 mkdir "$tmp/p/.wp-create.json.lock"
 touch -d '5 seconds ago' "$tmp/p/.wp-create.json.lock"
 ( sleep 1; rmdir "$tmp/p/.wp-create.json.lock" ) &

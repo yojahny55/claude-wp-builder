@@ -102,8 +102,22 @@ export function splitWords(str) {
   let cur = '';
   let has = false;
   let q = null;
+  let esc = false;
   for (const c of str.trim()) {
-    if (q) { if (c === q) q = null; else cur += c; continue; }
+    // POSIX shell rules, the inverse of shellWord: a backslash outside quotes takes the next
+    // character literally (shellWord's `'\''` closes the quote, escapes a `'`, reopens it); inside
+    // double quotes it escapes only `"`, `\`, `$` and a backtick; inside single quotes nothing.
+    if (esc) {
+      cur += esc === 'dq' && !'"\\$`'.includes(c) ? `\\${c}` : c;
+      has = true; esc = false; continue;
+    }
+    if (q === "'") { if (c === q) q = null; else cur += c; continue; }
+    if (q === '"') {
+      if (c === '\\') { esc = 'dq'; continue; }
+      if (c === q) q = null; else cur += c;
+      continue;
+    }
+    if (c === '\\') { esc = true; has = true; continue; }
     if (c === "'" || c === '"') { q = c; has = true; continue; }
     if (/\s/.test(c)) { if (has || cur) { out.push(cur); cur = ''; has = false; } continue; }
     cur += c; has = true;
