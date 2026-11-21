@@ -20,6 +20,13 @@ done
 grep -Fq 'style-diff.mjs' README.md || fail "README bin table has no style-diff.mjs row"
 grep -Fq 'style-diff.mjs' CHANGELOG.md || fail "no changelog entry for the tool"
 
+# --label is a file name: no traversal out of --out (usage error, before any browser)
+for l in '../x' 'a/../../x' 'a b'; do
+  node "$tool" snapshot --out "${TMPDIR:-/tmp}/sd-label-$$" --label "$l" --urls http://x.invalid/ >/dev/null 2>&1; rc=$?
+  [ "$rc" = 2 ] || fail "--label '$l' exited $rc, not 2"
+done
+[ ! -e "${TMPDIR:-/tmp}/sd-label-$$" ] || { rm -rf "${TMPDIR:-/tmp}/sd-label-$$"; fail "a rejected --label still created --out"; }
+
 # Behavior needs a browser; without one, say so rather than pass silently.
 core=${PLAYWRIGHT_CORE:-}
 if [ -z "$core" ] || [ ! -d "$core" ]; then
@@ -49,4 +56,34 @@ node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[
 node "$tool" diff "$tmp/b1.json" "$tmp/broken.json" >"$tmp/inc.txt"; rc=$?
 [ "$rc" = 3 ] || fail "an unmeasured run exited $rc, not 3"
 grep -Fq 'INCOMPLETE' "$tmp/inc.txt" || fail "an unmeasured run was not reported as INCOMPLETE"
+# An error page or a redirect is never a clean page: two identical 404s, or a login redirect, are unmeasured.
+node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1]));for(const u of Object.values(j.pages))for(const v of Object.values(u)){v.status=404}fs.writeFileSync(process.argv[2],JSON.stringify(j))' "$tmp/b1.json" "$tmp/e404.json"
+node "$tool" diff "$tmp/e404.json" "$tmp/e404.json" >"$tmp/e.txt"; rc=$?
+[ "$rc" = 3 ] || fail "two identical 404 snapshots exited $rc, not 3"
+grep >/dev/null -Fc 'INCOMPLETE' "$tmp/e.txt" || fail "identical 404 pages were not INCOMPLETE"
+node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1]));for(const u of Object.values(j.pages))for(const v of Object.values(u)){v.finalUrl="http://h/login"}fs.writeFileSync(process.argv[2],JSON.stringify(j))' "$tmp/b1.json" "$tmp/redir.json"
+node "$tool" diff "$tmp/b1.json" "$tmp/redir.json" >"$tmp/r.txt"; rc=$?
+[ "$rc" = 3 ] || fail "a different final URL exited $rc, not 3"
+# The real capture records status and final URL (local server: a 404 and a redirect).
+srv="$tmp/srv.mjs"
+cat > "$srv" <<'JS'
+import http from 'node:http';
+const s = http.createServer((q, r) => {
+  if (q.url === '/ok') { r.setHeader('content-type', 'text/html'); r.end('<title>t</title><p>x</p>'); }
+  else if (q.url === '/go') { r.statusCode = 302; r.setHeader('location', '/ok'); r.end(); }
+  else { r.statusCode = 404; r.setHeader('content-type', 'text/html'); r.end('<title>nf</title><p>nf</p>'); }
+});
+s.listen(0, '127.0.0.1', () => console.log(s.address().port));
+JS
+node "$srv" > "$tmp/port" & srvpid=$!
+trap 'kill $srvpid 2>/dev/null; rm -rf "$tmp"' EXIT
+for _ in $(seq 50); do [ -s "$tmp/port" ] && break; sleep 0.1; done
+base="http://127.0.0.1:$(cat "$tmp/port")"
+node "$tool" snapshot --out "$tmp" --label s404 --urls "$base/nope" >/dev/null 2>&1 || fail "snapshot of a 404 failed"
+node "$tool" snapshot --out "$tmp" --label s404b --urls "$base/nope" >/dev/null 2>&1 || fail "snapshot of a 404 failed"
+node "$tool" snapshot --out "$tmp" --label sgo --urls "$base/go" >/dev/null 2>&1 || fail "snapshot of a redirect failed"
+node "$tool" snapshot --out "$tmp" --label sok --urls "$base/ok" >/dev/null 2>&1 || fail "snapshot of a 200 failed"
+node "$tool" diff "$tmp/s404.json" "$tmp/s404b.json" >/dev/null; rc=$?
+[ "$rc" = 3 ] || fail "two captured 404 pages exited $rc, not 3"
+node "$tool" diff "$tmp/sok.json" "$tmp/sok.json" >/dev/null || fail "a 200 page against itself did not exit 0"
 echo "PASS: style-diff reports a tag-swap regression, sets noise apart and exits 1/0"
