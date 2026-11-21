@@ -84,11 +84,24 @@ const opt = (name, dflt) => {
 // zero frames, zero findings, and a false clean report.
 const rawPositions = Number(opt('--positions', 6));
 const positions = Number.isFinite(rawPositions) && rawPositions >= 2 ? Math.floor(rawPositions) : 6;
+// --widths and --out each consume a value. A flag left last, or followed by
+// another flag, used to hand undefined to .split() / resolve() and die on an
+// uncaught TypeError; "1440" with no height became NaN and every page crashed
+// at newContext. Usage errors exit 1, like the missing-pages check below.
+const usageFail = (msg) => {
+  console.error('demo-verify: ' + msg);
+  process.exit(1);
+};
+for (const f of ['--widths', '--out']) {
+  const i = args.indexOf(f);
+  if (i !== -1 && (i === args.length - 1 || args[i + 1].startsWith('--'))) usageFail(f + ' needs a value');
+}
 const widths = opt('--widths', '1440x900,390x844')
   .split(',')
   .map((s) => {
-    const [w, h] = s.split('x').map(Number);
-    return { width: w, height: h };
+    const m = /^(\d+)x(\d+)$/.exec(s.trim());
+    if (!m || Number(m[1]) < 1 || Number(m[2]) < 1) usageFail('--widths wants WIDTHxHEIGHT entries such as 1440x900,390x844, got "' + s + '"');
+    return { width: Number(m[1]), height: Number(m[2]) };
   });
 const targetIsUrl = /^https?:\/\//.test(target);
 const targetIsDir = !targetIsUrl && existsSync(target) && statSync(target).isDirectory();
@@ -882,6 +895,9 @@ try {
   // it cannot be computed before the try.
   let pageUrl = pageTarget;
   const findings = [];
+  // Every context this page opens, so the finally below closes the ones a throw
+  // mid-walk would otherwise leave running in the shared browser.
+  const openContexts = [];
   try {
   const isRemote = /^https?:\/\//.test(pageTarget);
   // Loading a local page as file:// puts it on an opaque origin, where Chrome
@@ -922,6 +938,7 @@ try {
       reducedMotion: reduced ? 'reduce' : 'no-preference',
       ...TLS,
     });
+    openContexts.push(context);
     const page = await context.newPage();
     await page.goto(pageUrl, { waitUntil: 'load' });
     await page.waitForTimeout(600);
@@ -1293,6 +1310,8 @@ try {
     report.pages.push({ url: pageUrl, findings });
     console.error('demo-verify: ' + basename(pageTarget) + ' crashed, continuing: ' + why);
     exitCode = Math.max(exitCode, 1);
+  } finally {
+    for (const c of openContexts) await c.close().catch(() => {});
   }
   }
 

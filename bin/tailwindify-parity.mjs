@@ -238,6 +238,14 @@ const commonRoot = (() => {
   for (let i = 0; i < Math.min(a.length, b.length) && a[i] === b[i]; i += 1) out.push(a[i]);
   return out.join(sep) || sep;
 })();
+// Trees with no shared ancestor below the filesystem root would be served from
+// `/`: the server's `base + sep` check then reads `//` and refuses every file,
+// and when it does not, a whole machine's worth of tree sits on 127.0.0.1.
+if (commonRoot.split(sep).filter(Boolean).length < 2) {
+  console.error('tailwindify-parity: the converted and original trees share no ancestor deeper than ' + commonRoot +
+    ' (' + cRoot + ' and ' + oRoot + '); put them under one project folder');
+  process.exit(3);
+}
 const relTo = (root, file) => {
   const p = realpathSync(join(root, file)).slice(commonRoot.length).replace(/^[/\\]+/, '');
   return p.split(sep).map(encodeURIComponent).join('/');

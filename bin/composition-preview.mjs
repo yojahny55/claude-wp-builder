@@ -27,7 +27,12 @@ const dir = resolve(argv.find((a) => !a.startsWith('--')) || '.');
 // A source grep is satisfied by a commented-out line, a renamed key, a later
 // reassignment or a duplicate key; the output is satisfied by none of them.
 if (argv.includes('--tokens')) {
-  process.stdout.write(rootBlock(previewTokens()) + '\n');
+  try {
+    process.stdout.write(rootBlock(previewTokens()) + '\n');
+  } catch (err) {
+    console.error('composition-preview: crashed:', err && err.message ? err.message : err);
+    process.exit(3);
+  }
   process.exit(0);
 }
 
