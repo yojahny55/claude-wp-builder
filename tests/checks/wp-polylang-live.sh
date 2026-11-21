@@ -96,6 +96,7 @@ FIXTURE_TMPDIR="$(mktemp -d)"
 FIXTURE_MEDIA_FILE="$FIXTURE_TMPDIR/pll-fixture.png"
 
 cleanup() {
+  # shellcheck disable=SC2320  # cleanup() is an EXIT trap handler: $? here is the exit status being trapped
   local status=$?
   rm -rf "$FIXTURE_TMPDIR"
   # Nothing was created yet -- do not run a site mutation just to delete zero
@@ -1056,7 +1057,7 @@ grep -qF "ids are not portable between sites" <<<"$FOREIGN_OUT" || {
   echo "FAIL: import refused the foreign manifest, but not because of its site_url -- the site_url check is untested"
   exit 1
 }
-echo "  import reported: $(grep -F "ids are not portable" <<<"$FOREIGN_OUT" | head -1)"
+echo "  import reported: $(grep -F "ids are not portable" <<<"$FOREIGN_OUT" | sed -n 1p)"
 rm -f "$FOREIGN_MAN"
 
 echo "── an empty source menu is still exported ──"
@@ -1268,7 +1269,7 @@ grep -qF "refusing to overwrite an unrelated post" <<<"$HIJACK_OUT" || {
   echo "FAIL: import refused the hijack manifest, but not because of its target_id -- that check is untested"
   exit 1
 }
-echo "  import reported: $(grep -F "refusing to overwrite" <<<"$HIJACK_OUT" | head -1)"
+echo "  import reported: $(grep -F "refusing to overwrite" <<<"$HIJACK_OUT" | sed -n 1p)"
 
 HIJACK_AFTER="$(cd "$SITE" && PLL_V="$HIJACK_VICTIM" wp eval '
 $p = get_post((int) getenv("PLL_V"));
@@ -1663,8 +1664,8 @@ echo "$VERIFY_OUT"
 
 # An exit code alone would pass on a verifier that audited nothing. Assert the
 # counts it reports are real.
-V_POSTS="$(sed -n 's/.*posts=\([0-9]*\).*/\1/p' <<<"$VERIFY_OUT" | head -1)"
-V_TERMS="$(sed -n 's/.*terms=\([0-9]*\).*/\1/p' <<<"$VERIFY_OUT" | head -1)"
+V_POSTS="$(sed -n 's/.*posts=\([0-9]*\).*/\1/p' <<<"$VERIFY_OUT" | sed -n 1p)"
+V_TERMS="$(sed -n 's/.*terms=\([0-9]*\).*/\1/p' <<<"$VERIFY_OUT" | sed -n 1p)"
 [[ -n "$V_POSTS" && -n "$V_TERMS" ]] || { echo "FAIL: verify printed no audited counts"; exit 1; }
 (( V_POSTS > 0 )) || { echo "FAIL: verify audited 0 posts — vacuous pass"; exit 1; }
 echo "  verify audited $V_POSTS post(s), $V_TERMS term(s)"
@@ -1710,7 +1711,7 @@ grep -qF "post $VICTIM has language 'none', expected '$DST'" <<<"$VERIFY_BROKEN_
   echo "FAIL: verify rejected the site, but not with the counterpart-language check -- some other check fired, so that check is untested"
   exit 1
 }
-echo "  verify reported: $(grep -F "post $VICTIM has language" <<<"$VERIFY_BROKEN_OUT" | head -1)"
+echo "  verify reported: $(grep -F "post $VICTIM has language" <<<"$VERIFY_BROKEN_OUT" | sed -n 1p)"
 
 # Put it back so the suite is re-runnable.
 (cd "$SITE" && PLL_VICTIM="$VICTIM" PLL_DST="$DST" wp eval 'pll_set_post_language((int) getenv("PLL_VICTIM"), getenv("PLL_DST"));' --allow-root)
@@ -1757,7 +1758,7 @@ grep -qF "points at a '$SRC' post ($FIXTURE_CHILD_ID)" <<<"$MENU_BROKEN_OUT" || 
   echo "FAIL: verify rejected the site, but not with the menu-item language check -- some other check fired, so that check is untested"
   exit 1
 }
-echo "  verify reported: $(grep -F "points at a '$SRC' post" <<<"$MENU_BROKEN_OUT" | head -1)"
+echo "  verify reported: $(grep -F "points at a '$SRC' post" <<<"$MENU_BROKEN_OUT" | sed -n 1p)"
 
 (cd "$SITE" && PLL_ITEM="$MENU_VICTIM_ITEM" PLL_OBJ="$MENU_VICTIM_OBJ" wp eval '
 update_post_meta((int) getenv("PLL_ITEM"), "_menu_item_object_id", (int) getenv("PLL_OBJ"));
@@ -1788,7 +1789,7 @@ grep -qF "points at $TRASH_TARGET_ID, which is in the trash" <<<"$TRASH_OUT" || 
   echo "FAIL: verify rejected the site, but not for the trashed counterpart -- that check is untested"
   exit 1
 }
-echo "  verify reported: $(grep -F "which is in the trash" <<<"$TRASH_OUT" | head -1)"
+echo "  verify reported: $(grep -F "which is in the trash" <<<"$TRASH_OUT" | sed -n 1p)"
 
 TRASH_MAN="$FIXTURE_TMPDIR/manifest-trash.json"
 run "$SCRIPTS/pll-export.php" "$SRC" "$DST" "$TRASH_MAN" >/dev/null || { echo "FAIL: export exited non-zero with a trashed counterpart"; exit 1; }
@@ -1847,7 +1848,7 @@ grep -qF "links to a '$SRC' post ($FIXTURE_PARENT_ID) via an internal href" <<<"
   echo "FAIL: verify rejected the site, but not with the internal-link check -- some other check fired, so check 9 is untested"
   exit 1
 }
-echo "  verify reported: $(grep -F "via an internal href" <<<"$LINK_BROKEN_OUT" | head -1)"
+echo "  verify reported: $(grep -F "via an internal href" <<<"$LINK_BROKEN_OUT" | sed -n 1p)"
 
 (cd "$SITE" && PLL_TID="$LINK_TARGET_ID" PLL_C="$LINK_ORIG_CONTENT" wp eval '
 wp_update_post(array("ID" => (int) getenv("PLL_TID"), "post_content" => (string) getenv("PLL_C")));
@@ -1893,7 +1894,7 @@ grep -qF "(custom URL) points at a '$SRC' post ($FIXTURE_PARENT_ID)" <<<"$CUSTOM
   echo "FAIL: verify rejected the site, but not with the custom-menu-item check -- some other check fired, so that branch is untested"
   exit 1
 }
-echo "  verify reported: $(grep -F "(custom URL) points at" <<<"$CUSTOM_BROKEN_OUT" | head -1)"
+echo "  verify reported: $(grep -F "(custom URL) points at" <<<"$CUSTOM_BROKEN_OUT" | sed -n 1p)"
 
 (cd "$SITE" && wp post delete "$CUSTOM_ITEM_ID" --force --allow-root >/dev/null)
 run "$SCRIPTS/pll-verify.php" "$SRC" "$DST" >/dev/null || { echo "FAIL: verify still failing after the custom menu item was removed"; exit 1; }
@@ -1958,7 +1959,7 @@ grep -qF "is not symmetric" <<<"$ASYM_OUT" || {
   echo "FAIL: verify rejected the site, but not for the asymmetric group -- check 2 is untested"
   exit 1
 }
-echo "  verify reported: $(grep -F "is not symmetric" <<<"$ASYM_OUT" | head -1)"
+echo "  verify reported: $(grep -F "is not symmetric" <<<"$ASYM_OUT" | sed -n 1p)"
 run "$SCRIPTS/pll-verify.php" "$SRC" "$DST" >/dev/null || { echo "FAIL: verify still failing after the group was re-linked"; exit 1; }
 
 echo "── verify catches two target posts sharing a slug ──"
@@ -1999,7 +2000,7 @@ grep -qF "is used by both post" <<<"$SLUG_OUT" || {
   echo "FAIL: verify rejected the site, but not for the slug collision -- check 6 is untested"
   exit 1
 }
-echo "  verify reported: $(grep -F "is used by both post" <<<"$SLUG_OUT" | head -1)"
+echo "  verify reported: $(grep -F "is used by both post" <<<"$SLUG_OUT" | sed -n 1p)"
 
 echo "── verify catches an orphaned counterpart ──"
 # A target post whose group names a source that no longer exists. Reached by
@@ -2027,7 +2028,7 @@ grep -qF "is orphaned" <<<"$ORPH_OUT" || {
   echo "FAIL: verify rejected the site, but not for the orphan -- check 7 is untested"
   exit 1
 }
-echo "  verify reported: $(grep -F "is orphaned" <<<"$ORPH_OUT" | head -1)"
+echo "  verify reported: $(grep -F "is orphaned" <<<"$ORPH_OUT" | sed -n 1p)"
 
 echo "── verify catches a source term with no counterpart ──"
 TERM_PROBE_ID="$(cd "$SITE" && wp term create category "PLL term probe" --porcelain --allow-root)"
@@ -2043,7 +2044,7 @@ grep -qF "has no $DST counterpart" <<<"$TERMV_OUT" || {
   echo "FAIL: verify rejected the site, but not for the untranslated term -- check 8 is untested"
   exit 1
 }
-echo "  verify reported: $(grep -F "PLL term probe" <<<"$TERMV_OUT" | head -1)"
+echo "  verify reported: $(grep -F "PLL term probe" <<<"$TERMV_OUT" | sed -n 1p)"
 
 echo "── verify warns about an untranslated title and a stale source ──"
 # Both are WARNINGS, never failures -- a brand name legitimately survives
@@ -2563,7 +2564,7 @@ echo "── a counterpart with no fields set receives the untranslated values �
     echo "FAIL: the values arrived but the import reported copying none -- some other path wrote them"
     exit 1
   }
-  echo "  untranslated values copied to a blank counterpart: $(grep -oE 'Copied [0-9]+ untranslated ACF value\(s\)' <<<"$COPY_OUT" | head -1)"
+  echo "  untranslated values copied to a blank counterpart: $(grep -oE 'Copied [0-9]+ untranslated ACF value\(s\)' <<<"$COPY_OUT" | sed -n 1p)"
 
   echo "── an editor's own reference value survives the next import ──"
   # The reference pass derives every value from the SOURCE on every import and

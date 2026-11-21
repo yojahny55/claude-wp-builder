@@ -28,19 +28,19 @@ chmod 640 "$root/wp-config.php"
 orig_og="$(stat -c %U:%G "$root/wp-config.php")"
 printf '%s\n' 'fixture-secret' > "$tmp/secret"; chmod 644 "$tmp/secret"
 
-run() { HOME="$home" WP_S3_BACKUP_DIR= XDG_STATE_HOME= env -u S3_UPLOADS_SECRET_VALUE bash "$setup" \
+run() { HOME="$home" WP_S3_BACKUP_DIR='' XDG_STATE_HOME='' env -u S3_UPLOADS_SECRET_VALUE bash "$setup" \
   --wp-root "$root" --bucket b --region r --bucket-url https://m.example.test --auth key --key K \
   --skip-plugin-install "$@"; }
 
 # An operator override cannot put credential backups under the web root, even via symlink.
 mkdir -p "$root/private"
-HOME="$home" WP_S3_BACKUP_DIR="$root/private" XDG_STATE_HOME= S3_UPLOADS_SECRET_VALUE=fixture-secret \
+HOME="$home" WP_S3_BACKUP_DIR="$root/private" XDG_STATE_HOME='' S3_UPLOADS_SECRET_VALUE=fixture-secret \
   bash "$setup" --wp-root "$root" --bucket b --region r --bucket-url https://m.example.test \
   --auth key --key K --skip-plugin-install >"$tmp/inside.out" 2>&1 \
   && fail "a backup directory inside the document root was accepted"
 grep -Fq 'backup directory must be outside' "$tmp/inside.out" || fail "inside-docroot rejection was unclear"
 ln -s "$root" "$tmp/symlink-into-root"
-HOME="$home" WP_S3_BACKUP_DIR="$tmp/symlink-into-root/private" XDG_STATE_HOME= S3_UPLOADS_SECRET_VALUE=fixture-secret \
+HOME="$home" WP_S3_BACKUP_DIR="$tmp/symlink-into-root/private" XDG_STATE_HOME='' S3_UPLOADS_SECRET_VALUE=fixture-secret \
   bash "$setup" --wp-root "$root" --bucket b --region r --bucket-url https://m.example.test \
   --auth key --key K --skip-plugin-install >"$tmp/symlink.out" 2>&1 \
   && fail "a symlink into the document root was accepted"
@@ -56,7 +56,7 @@ grep -Fq "fixture-secret" "$root/s3-config.php" || fail "the secret in --secret-
 
 # Nothing backup-shaped beside the originals; the copies are private.
 ! ls "$root"/*.bak-* >/dev/null 2>&1 || fail "a .bak-* file was left in the docroot"
-bdir="$(find "$home/.local/state/wp-s3-backups" -mindepth 1 -maxdepth 1 -type d | head -1)"
+bdir="$(find "$home/.local/state/wp-s3-backups" -mindepth 1 -maxdepth 1 -type d | sed -n 1p)"
 [ -n "$bdir" ] || fail "no backup directory under the home state dir"
 case "$(file_mode "$bdir")" in 700|0700) ;; *) false ;; esac || fail "backup directory is not 0700"
 shopt -s nullglob
@@ -88,14 +88,14 @@ if [ -n "$alt_gid" ]; then
   printf '%s\n' '<?php' "define( 'DB_PASSWORD', 'fixture-db-password' );" "require_once ABSPATH . 'wp-settings.php';" > "$root2/wp-config.php"
   chmod 640 "$root2/wp-config.php"; chgrp "$alt_gid" "$root2/wp-config.php"
   before_og="$(stat -c %U:%G "$root2/wp-config.php")"; before_ino="$(stat -c %i "$root2/wp-config.php")"
-  HOME="$home" WP_S3_BACKUP_DIR= XDG_STATE_HOME= PYTHONPATH="$tmp/eperm" S3_UPLOADS_SECRET_VALUE=fixture-secret \
+  HOME="$home" WP_S3_BACKUP_DIR='' XDG_STATE_HOME='' PYTHONPATH="$tmp/eperm" S3_UPLOADS_SECRET_VALUE=fixture-secret \
     bash "$setup" --wp-root "$root2" --bucket b --region r --bucket-url https://m.example.test \
     --auth key --key K --skip-plugin-install >"$tmp/eperm.out" 2>&1 || { cat "$tmp/eperm.out"; fail "setup failed when chown was refused"; }
   grep -Fq "s3-config.php" "$root2/wp-config.php" || fail "the require was not written when chown was refused"
   [ "$(stat -c %U:%G "$root2/wp-config.php")" = "$before_og" ] || fail "setup changed wp-config.php's group when chown was refused"
   [ "$(stat -c %i "$root2/wp-config.php")" = "$before_ino" ] || fail "setup replaced the wp-config.php inode when chown was refused"
   case "$(file_mode "$root2/wp-config.php")" in 640|0640) ;; *) fail "setup changed wp-config.php's mode when chown was refused" ;; esac
-  HOME="$home" WP_S3_BACKUP_DIR= XDG_STATE_HOME= PYTHONPATH="$tmp/eperm" bash "$revert" "$root2" --keep-remote-media >"$tmp/eperm-revert.out" 2>&1 \
+  HOME="$home" WP_S3_BACKUP_DIR='' XDG_STATE_HOME='' PYTHONPATH="$tmp/eperm" bash "$revert" "$root2" --keep-remote-media >"$tmp/eperm-revert.out" 2>&1 \
     || { cat "$tmp/eperm-revert.out"; fail "revert failed when chown was refused"; }
   ! grep -Fq "s3-config.php" "$root2/wp-config.php" || fail "revert did not remove the require when chown was refused"
   [ "$(stat -c %U:%G "$root2/wp-config.php")" = "$before_og" ] || fail "revert changed wp-config.php's group when chown was refused"
@@ -113,11 +113,11 @@ for b in "${s3_backups[@]}"; do case "$(file_mode "$b")" in 600|0600) ;; *) fail
 shopt -u nullglob
 
 # Revert must never leave the credential-bearing config as plain text in the docroot.
-HOME="$home" WP_S3_BACKUP_DIR= XDG_STATE_HOME= bash "$revert" "$root" --keep-remote-media >"$tmp/revert.out" 2>&1 \
+HOME="$home" WP_S3_BACKUP_DIR='' XDG_STATE_HOME='' bash "$revert" "$root" --keep-remote-media >"$tmp/revert.out" 2>&1 \
   || { cat "$tmp/revert.out"; fail "revert failed against the fixture root"; }
 [ ! -e "$root/s3-config.php" ] && [ ! -e "$root/s3-config.php.disabled" ] \
   || fail "revert left the S3 config in the docroot"
-parked=$(find "$home/.local/state/wp-s3-backups" -type f -name 's3-config.php.disabled*' | head -1)
+parked=$(find "$home/.local/state/wp-s3-backups" -type f -name 's3-config.php.disabled*' | sed -n 1p)
 [ -n "$parked" ] || fail "revert did not park s3-config.php outside the docroot"
 [ "$(file_mode "$parked")" = 600 ] || [ "$(file_mode "$parked")" = 0600 ] || fail "parked s3-config.php is not 0600"
 

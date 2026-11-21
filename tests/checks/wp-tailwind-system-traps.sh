@@ -30,7 +30,7 @@ flat() { tr '\n' ' ' < "$1" | sed 's/  */ /g'; }
 #    or the fence end must carry no arbitrary max-[…] variant.
 right=$(awk '/^```html/{f=1; next} /^```/{f=0; r=0} f && /<!-- *right/{r=1; next} f && /<!--/{r=0} f && r' "$bp")
 [ -n "$right" ] || fail "$bp marks no conversion as right — the examples lost their direction"
-q "$right" -F 'max-[' && fail "$bp marks an arbitrary max-[…] variant as the right conversion, the form its own heading forbids: $(printf '%s\n' "$right" | grep -F 'max-[' | head -1)"
+q "$right" -F 'max-[' && fail "$bp marks an arbitrary max-[…] variant as the right conversion, the form its own heading forbids: $(printf '%s\n' "$right" | grep -F 'max-[' | sed -n 1p)"
 q "$(flat "$bp")" -E 'becomes a `--breakpoint-\*` stop set to `N\+1`' \
   || fail "$bp does not state the default: a demo's max-width N becomes a --breakpoint-* stop at N+1"
 q "$(flat "$bp")" -F 'only for the one-off width' \
@@ -48,8 +48,8 @@ grep -Fq 'theme-template-check.mjs" <theme-dir> --rule widgets' "$dir/references
 # 3. Verify compiles first, then runs every check, including theme-template-check.mjs.
 v=$(awk '/^## Verify/{f=1; next} f && /^## /{exit} f' "$skill")
 [ -n "$v" ] || fail "$skill has no ## Verify section"
-rb=$(printf '%s\n' "$v" | grep -n 'bin/tailwind-rebuild.sh' | head -1 | cut -d: -f1)
-nc=$(printf '%s\n' "$v" | grep -n 'bin/tailwind-native-check.sh' | head -1 | cut -d: -f1)
+rb=$(printf '%s\n' "$v" | grep -n 'bin/tailwind-rebuild.sh' | sed -n 1p | cut -d: -f1)
+nc=$(printf '%s\n' "$v" | grep -n 'bin/tailwind-native-check.sh' | sed -n 1p | cut -d: -f1)
 [ -n "$rb" ] && [ -n "$nc" ] && [ "$rb" -lt "$nc" ] \
   || fail "Verify does not compile (tailwind-rebuild.sh) before the convention check — without dist/main.css its markup rule is skipped and it passes"
 q "$v" -F '/bin/theme-template-check.mjs" <theme-dir>' \
@@ -72,7 +72,9 @@ q "$(tr '\n' ' ' < "$skill")" -F 'unquoted identifier: `has-[[aria-expanded=true
 hid=$(awk '/^## `hidden` is two different things/{f=1; next} f && /^## /{exit} f' "$skill")
 [ -n "$hid" ] || fail "$skill lost the hidden-attribute vs hidden-utility section"
 q "$hid" -F 'hidden with the ATTRIBUTE alone' || fail "$skill no longer says a script-toggled element is hidden with the attribute alone"
-rightline=$(printf '%s\n' "$hid" | awk '/<!-- right -->/{getline; print; exit}')
+# Here-string, not a pipe: awk exits early, and printf into a closed pipe is a silent
+# SIGPIPE exit under pipefail and set -e.
+rightline=$(awk '/<!-- right -->/{getline; print; exit}' <<<"$hid")
 [ -n "$rightline" ] || fail "$skill's hidden section marks no example as right"
 q "$rightline" -E 'class="([^"]* )?hidden[ "]' && fail "$skill marks an element carrying both the hidden utility and the attribute as right: $rightline"
 # 4d. One .btn: the starter's components/buttons.css owns it.

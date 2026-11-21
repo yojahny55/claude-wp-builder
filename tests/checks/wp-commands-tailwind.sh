@@ -39,7 +39,7 @@ for f in "$page_md" "$wp_header" commands/wp-footer.md commands/wp-cpt.md; do
   # blockquote at all exited 1 with NO message — the operator saw a silent
   # non-zero and none of the diagnosis below. Let the assertion do the talking.
   qmode=$(grep -E '^[[:space:]]*>' "$f" | sed -e 's/^[[:space:]]*>//' -e 's/[*_]//g' | tr '\n' ' ' | sed 's/  */ /g' || true)
-  printf '%s' "$qmode" | grep -qiE 'Mode: ?author' \
+  printf '%s' "$qmode" | grep >/dev/null -ciE 'Mode: ?author' \
     || { echo "FAIL: $f has no QUOTED \`Mode: **author**\` line for its tailwind dispatch to hand the agent — agents/wp-tailwind.md selects Section Authoring Mode on that line and on nothing else, so without it the dispatched wp-tailwind runs Demo Conversion Mode. Describing author mode in prose does not count: the agent only ever sees the blockquote"; exit 1; }
 
   # ---------------------------------------------------------------------------
@@ -55,26 +55,26 @@ for f in "$page_md" "$wp_header" commands/wp-footer.md commands/wp-cpt.md; do
   # ---------------------------------------------------------------------------
   qflat=$(grep -E '^[[:space:]]*>' "$f" | sed -e 's/^[[:space:]]*>//' -e 's/[*]//g' | tr '\n' ' ' | sed 's/  */ /g' || true)
 
-  printf '%s' "$qflat" | grep -qF 'wp-tailwind-system' \
+  printf '%s' "$qflat" | grep >/dev/null -cF 'wp-tailwind-system' \
     || { echo "FAIL: $f never sends the agent to the wp-tailwind-system skill from inside a QUOTED prompt — the skill owns the decision ladder and the prohibition list, and prose above the dispatch is not text the dispatched agent receives"; exit 1; }
 
   # The prohibition, quoted. `grep -F 'assets/css/styles.css'` over the blockquotes
   # would be satisfied by the basic branch's own prompt, which names that file as its
   # TARGET — so match the forbidding clause instead.
-  printf '%s' "$qflat" | grep -Eqi "(never|do not|don'?t|must not)[ a-z]{0,12}write[^.]{0,20}\`?assets/css/styles\.css" \
+  printf '%s' "$qflat" | grep >/dev/null -Eci "(never|do not|don'?t|must not)[ a-z]{0,12}write[^.]{0,20}\`?assets/css/styles\.css" \
     || { echo "FAIL: $f has no quoted prompt forbidding \`assets/css/styles.css\` — the tailwind dispatch's own prompt body must say it, because the only other quoted prompt in the file NAMES that path as its output target and an agent handed it writes the file the Tailwind starter never enqueues"; exit 1; }
 
   # The five inputs agents/wp-tailwind.md's Inputs table declares. wp-header.md and
   # wp-footer.md supplied NONE of them and instead named a target (`layouts/header.css`)
   # the table had no input for; wp-page.md and wp-cpt.md supplied two of five. Each is
   # asserted separately so the failure names the missing one.
-  printf '%s' "$qflat" | grep -qF -- '--block' \
+  printf '%s' "$qflat" | grep >/dev/null -cF -- '--block' \
     || { echo "FAIL: $f's quoted tailwind prompt does not supply \`--block <name>\` — without it the agent has no unique name to scope an \`@apply\` class under, and parallel section agents collide on a selector"; exit 1; }
-  printf '%s' "$qflat" | grep -Eq -- '--page|--layout' \
+  printf '%s' "$qflat" | grep >/dev/null -Ec -- '--page|--layout' \
     || { echo "FAIL: $f's quoted tailwind prompt supplies neither \`--page <slug>\` nor \`--layout <name>\` — those are the two spellings of the LOCAL @apply target input, and with neither the agent can only promote to utilities/site.css"; exit 1; }
-  printf '%s' "$qflat" | grep -qiF 'theme path' \
+  printf '%s' "$qflat" | grep >/dev/null -ciF 'theme path' \
     || { echo "FAIL: $f's quoted tailwind prompt does not supply the theme path — the agent has no theme root to write its CSS into"; exit 1; }
-  printf '%s' "$qflat" | grep -qiE 'function prefix|prefix:' \
+  printf '%s' "$qflat" | grep >/dev/null -ciE 'function prefix|prefix:' \
     || { echo "FAIL: $f's quoted tailwind prompt does not supply the project function prefix — the markup it edits calls prefix_ functions it would otherwise have to guess"; exit 1; }
 
   # ---------------------------------------------------------------------------
@@ -87,9 +87,9 @@ for f in "$page_md" "$wp_header" commands/wp-footer.md commands/wp-cpt.md; do
   # Backticks and emphasis are stripped so the relation can be matched as prose.
   # ---------------------------------------------------------------------------
   nof=$(tr '\n' ' ' < "$f" | sed -e 's/[`*]//g' -e 's/  */ /g')
-  printf '%s' "$nof" | grep -Eqi "wp[ -]{1,2}template[^.]{0,40}\b(owns|owned|belongs to|is the only agent that (may )?(writes?|creates?))" \
+  printf '%s' "$nof" | grep >/dev/null -Eci "wp[ -]{1,2}template[^.]{0,40}\b(owns|owned|belongs to|is the only agent that (may )?(writes?|creates?))" \
     || { echo "FAIL: $f never states that wp-template OWNS the .php files it generates — with ownership unstated the tailwind dispatch reads as a second author of the same file"; exit 1; }
-  printf '%s' "$nof" | grep -Eqi "wp[ -]{1,2}tailwind[^.]{0,60}\bafter\b[^.]{0,90}(never|not)[ a-z]{0,12}(beside|in parallel|simultaneous)" \
+  printf '%s' "$nof" | grep >/dev/null -Eci "wp[ -]{1,2}tailwind[^.]{0,60}\bafter\b[^.]{0,90}(never|not)[ a-z]{0,12}(beside|in parallel|simultaneous)" \
     || { echo "FAIL: $f does not say wp-tailwind runs AFTER wp-template and never beside it — a parallel dispatch races two agents on one file with opposite class systems, and the loser's ACF wiring and escaping vanish with no error anywhere"; exit 1; }
 done
 
@@ -187,7 +187,7 @@ walk_sites() {
     if [ "$lineno" -ge "$routing_line" ] && [ "$lineno" -lt "$block_end" ]; then
       continue
     fi
-    printf '%s\n' "$accounted" | grep -qx "$lineno" \
+    printf '%s\n' "$accounted" | grep >/dev/null -cx "$lineno" \
       || { echo "FAIL: $page line $lineno mentions **wp-css** but the dispatch-site walk did not match it — usually a hard-wrap that split \"Dispatch\" from \"**wp-css**\", which deletes the site from the walk. Keep them on one line, or (if this is prose, not a dispatch) move it inside the \"### CSS agent routing\" block or drop the bold markers: $rest"; exit 1; }
   done <<< "$mentions"
 
@@ -234,7 +234,7 @@ walk_sites() {
     # instead" — is a synonym a careful author reaches for, and it turned this gate
     # red. The DIRECTION is what the assertion is for, and both forms carry it.
     printf '%s\n' "$flat" \
-      | grep -qE 'on `tailwind`, dispatch (the )?`wp- ?tailwind`( agent)? in author mode instead' \
+      | grep >/dev/null -cE 'on `tailwind`, dispatch (the )?`wp- ?tailwind`( agent)? in author mode instead' \
       || { echo "FAIL: $page dispatch site #$site_num (line $lineno) does not route \`tailwind\` (and only \`tailwind\`) to wp-tailwind: $flat"; exit 1; }
 
     # Routing the site is not enough on its own: the site's own quoted prompt below
@@ -255,9 +255,9 @@ walk_sites() {
       { buf = buf " " $0 }
       END { print buf }
     ' "$page" | sed 's/[`*]//g' | sed 's/  */ /g')
-    printf '%s' "$pre" | grep -qiE '\bbasic\b[ a-z]{0,6}branch' \
+    printf '%s' "$pre" | grep >/dev/null -ciE '\bbasic\b[ a-z]{0,6}branch' \
       || { echo "FAIL: $page dispatch site #$site_num (line $lineno) is not marked as the \`basic\` branch — its quoted prompt names assets/css/styles.css, so a tailwind run that reaches it writes the one file the Tailwind starter never enqueues. Say so in the paragraph directly above the dispatch line, as commands/wp-header.md does"; exit 1; }
-    printf '%s' "$pre" | grep -qiE "(does not|doesn'?t|never|must not|do not)[ a-z]{0,18}\bruns?\b[^.]{0,24}at all" \
+    printf '%s' "$pre" | grep >/dev/null -ciE "(does not|doesn'?t|never|must not|do not)[ a-z]{0,18}\bruns?\b[^.]{0,24}at all" \
       || { echo "FAIL: $page dispatch site #$site_num (line $lineno) is called the \`basic\` branch but never says it does not run at all on \`tailwind\` — \"prefer the other agent\" is not the same instruction, and the quoted prompt below the site is still the nearest thing to follow"; exit 1; }
   done <<< "$sites"
 }
@@ -276,9 +276,9 @@ walk_sites commands/wp-footer.md
 # cannot satisfy it, and flattened so a re-wrap cannot break it.
 hdr_route=$(awk '/^### CSS agent routing$/,/^## Step 5:/' "$wp_header" \
   | tr '\n' ' ' | sed 's/  */ /g' || true)
-printf '%s' "$hdr_route" | grep -qiF 'cinematic' \
+printf '%s' "$hdr_route" | grep >/dev/null -ciF 'cinematic' \
   || { echo "FAIL: wp-header's CSS agent routing block never names cinematic — an agent handed a cinematic project falls through to the basic path and writes BEM CSS into a theme that has its own cinematic.css"; exit 1; }
-printf '%s' "$hdr_route" | grep -qiF 'not routed by this command' \
+printf '%s' "$hdr_route" | grep >/dev/null -ciF 'not routed by this command' \
   || { echo "FAIL: wp-header's routing block names cinematic but never says it is not routed by this command — naming it while leaving the fall-through open routes the project to wp-css anyway"; exit 1; }
 
 echo PASS

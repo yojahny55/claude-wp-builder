@@ -78,8 +78,8 @@ grep -Fq 'These delimiters are critical' "$c" || fail "$c no longer marks the de
 
 # --- description and loop ----------------------------------------------------------
 desc=$(awk 'NR<=6 && /^description:/' "$s")
-printf '%s' "$desc" | grep -q '[<>]' && fail "$s's description carries angle brackets"
-printf '%s' "$desc" | grep -Fq 'wp-demo-craft' || fail "$s's description does not send craft requests to wp-demo-craft"
+printf '%s' "$desc" | grep >/dev/null -c '[<>]' && fail "$s's description carries angle brackets"
+printf '%s' "$desc" | grep >/dev/null -Fc 'wp-demo-craft' || fail "$s's description does not send craft requests to wp-demo-craft"
 grep -Fq 'Run `/wp-demo-verify' "$s" && grep -Fq 'Stop when it reports no overflow' "$s" \
   || fail "$s does not loop on /wp-demo-verify with a stop condition"
 

@@ -16,14 +16,14 @@ has "$audit" "Measurement split:"
 has "$audit" "- Report-only: <yes|no>"
 has "$audit" "### A clone with a live mail transport is a finding, before any form is submitted"
 sec() { sed -n "/^$1/,/^$2/p" "$audit"; }
-sec "### A clone with a live mail transport" "Print the two facts" | grep -Fq 'no `pre_wp_mail`' \
+sec "### A clone with a live mail transport" "Print the two facts" | grep >/dev/null -Fc 'no `pre_wp_mail`' \
   || fail "mail-transport section lost its pre_wp_mail rule"
 has "$audit" "## Step 6.2: Live GEO scan"
 has "$audit" "in every mode including"
 has "$audit" "## Step 6.8: Coverage gate"
-sec "## Step 6.8" "## Step 6.9" | grep -Fq "rejected and its agent re-dispatched" \
+sec "## Step 6.8" "## Step 6.9" | grep >/dev/null -Fc "rejected and its agent re-dispatched" \
   || fail "Step 6.8 lost the browser-evidence rejection rule"
-sec "## Step 6.8" "## Step 6.9" | grep -Fq "Re-dispatch once." \
+sec "## Step 6.8" "## Step 6.9" | grep >/dev/null -Fc "Re-dispatch once." \
   || fail "Step 6.8 lost the single re-dispatch rule"
 has "$audit" "**\`Report-only: yes\` means the audit writes nothing.**"
 
@@ -44,7 +44,7 @@ done
 has skills/wp-cli-patterns/SKILL.md "## Guard a clone against outbound mail and calls"
 has skills/wp-cli-patterns/SKILL.md "pre_http_request"
 
-sec "## Step 6.8" "## Step 6.9" | grep -Fq '`checks_executed`' || fail "Step 6.8 lost checks_executed"
-sec "## Step 6.8" "## Step 6.9" | grep -Fq 'the report says `INCOMPLETE`' || fail "Step 6.8 lost the INCOMPLETE rule"
+sec "## Step 6.8" "## Step 6.9" | grep >/dev/null -Fc '`checks_executed`' || fail "Step 6.8 lost checks_executed"
+sec "## Step 6.8" "## Step 6.9" | grep >/dev/null -Fc 'the report says `INCOMPLETE`' || fail "Step 6.8 lost the INCOMPLETE rule"
 
 echo PASS

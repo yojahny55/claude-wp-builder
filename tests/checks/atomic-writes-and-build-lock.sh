@@ -35,6 +35,7 @@ node bin/wp-config.mjs set "$proj" research none >/dev/null || fail "set refused
 node bin/wp-config.mjs set "$proj" database.password x >/dev/null 2>&1 && fail "set accepted a secret path"
 node bin/wp-config.mjs set "$proj" __proto__.x 1 >/dev/null 2>&1 && fail "set accepted a prototype key"
 node bin/wp-config.mjs set "$proj" environments 5 >/dev/null 2>&1 && fail "set accepted an invalid environments value"
+# shellcheck disable=SC2010  # fixture dir with fixed ASCII names; the listing is the assertion
 ls -A "$proj" | grep -E '\.tmp$|\.lock$' && fail "set left a temp or lock file behind"
 
 # --- behavior: a parent key cannot smuggle a secret, and a broken argument is refused ---

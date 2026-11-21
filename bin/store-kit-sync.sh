@@ -11,7 +11,7 @@ src=$(cd "$(dirname "$0")/../plugins/store-kit" 2>/dev/null && pwd) \
 root=${1:-}
 [ -n "$root" ] && [ -d "$root" ] || { echo "store-kit-sync: usage: store-kit-sync.sh <plugins-dir> (got '${root}')" >&2; exit 1; }
 dest="$root/store-kit"
-version() { sed -n 's/^ \* Version: *\([0-9][0-9.]*\).*$/\1/p' "$1" 2>/dev/null | head -1 || true; }
+version() { sed -n 's/^ \* Version: *\([0-9][0-9.]*\).*$/\1/p' "$1" 2>/dev/null | sed -n 1p || true; }
 want=$(version "$src/store-kit.php")
 [ -n "$want" ] || { echo "store-kit-sync: the bundled store-kit.php has no Version header" >&2; exit 1; }
 have=$(version "$dest/store-kit.php")

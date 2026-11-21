@@ -1,25 +1,22 @@
 ---
-name: wp-cinematic-init
 description: Scaffold a cinematic-scroll WordPress theme from an existing demo or from scratch. Installs cinematic-scroll-kit as a recommended skill, picks the `__cinematic__` starter, then defers to `/wp-init` with `--mode=cinematic` for the rest of the bootstrap (project info, ACF flavor, server, vhost).
-arguments:
-  - name: --path
-    description: Target WordPress install path (parent of wp-content/)
-    required: true
-  - name: --scenes
-    description: Number of scenes to scaffold (default 9, min 1, max 12)
-    required: false
-  - name: --hybrid
-    description: Allow trailing flex sections after the reel (default yes; pass --no-hybrid to disable)
-    required: false
-  - name: --skip-kit-install
-    description: Skip `npx skills add` and use vendored fallback from starter-theme/__cinematic__/assets/cinematic-kit/
-    required: false
-  - name: --force-adopted
-    description: Build on an adopted site (third-party theme) on purpose; otherwise the command stops
-    required: false
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
+argument-hint: "--path=<dir> [--scenes <N>] [--no-hybrid] [--acf-flavor=scf|acf-pro] [--skip-kit-install] [--force-adopted]"
 ---
 
 # /wp-cinematic-init
+
+## Arguments
+
+| Argument | Required | Meaning |
+|---|---|---|
+| `--path` | yes | Target WordPress install path (parent of wp-content/) |
+| `--scenes` | no | Number of scenes to scaffold (default 9, min 1, max 12) |
+| `--no-hybrid` | no | Disable trailing flex sections after the reel (hybrid is on by default; --no-hybrid is the only spelling) |
+| `--acf-flavor` | no | Custom fields plugin, scf or acf-pro; handed to /wp-init, which asks when it is absent |
+| `--skip-kit-install` | no | Skip `npx skills add` and use vendored fallback from starter-theme/__cinematic__/assets/cinematic-kit/ |
+| `--force-adopted` | no | Build on an adopted site (third-party theme) on purpose; otherwise the command stops |
+
 
 Use this when the demo is **not** a standard sectioned page but a cinematic scroll-driven reel: persistent video stage, N scenes that crossfade/scrub as the user scrolls, mobile autoplay-loop fork, motion-toggle, reduced-motion guard.
 
@@ -58,19 +55,21 @@ If `npx skills` is unavailable, fall back to:
 git clone --depth 1 https://github.com/yojahny55/cinematic-scroll-kit .cinematic-kit
 ```
 
-If both fail → use vendored fallback and log: "Using vendored kit copy (offline mode). Update later with `/wp-cinematic-init --update-kit`."
+If both fail → use vendored fallback and log: "Using vendored kit copy (offline mode). Update later by re-running `npx skills add yojahny55/cinematic-scroll-kit -g -y`, or `git pull` inside `.cinematic-kit` for the project-local clone."
 
 ## Step 1 — Hand off to /wp-init
 
-Invoke `/wp-init --path=<path> --mode=cinematic --starter=__cinematic__ --acf-flavor=<scf|acf-pro>` and let the standard bootstrap run:
+Invoke `/wp-init --path=<path> --mode=cinematic` (add `--acf-flavor=<value>` only when it was passed here, otherwise omit it so `/wp-init` asks Step 0.6; add `--force-adopted` when it was passed here; `--no-hybrid` stays with this command). These are exactly the flags `/wp-init` Step 0.4 parses. Because it was entered with `--mode=cinematic`, `/wp-init` does not dispatch back here and does not resolve the kit again (Step 0 above did). It owns only the shared bootstrap:
 - Project name/slug/text domain/languages
+- Copying `starter-theme/__cinematic__/` as the theme, placeholders, project CLAUDE.md
 - Server choice (Nginx native, Docker, etc.)
-- Database
-- ACF flavor
+- Database, custom fields plugin, theme activation
 
-When `/wp-init` reaches the "section scaffolding" phase, it **skips** the usual `/wp-section` loop and instead dispatches to step 2 below.
+`/wp-init` returns here; continue with Step 2. It never runs the `wp-cinematic` agent, scenes, seeding or menus, and has no `/wp-section` loop for the reel.
 
-## Step 2 — Cinematic scaffold (dispatch `wp-cinematic` agent)
+## Step 2 — Cinematic scaffold (dispatch `wp-cinematic` agent; owned only here)
+
+Validate `--scenes` first: an integer from 1 to 12, or absent (9). Any other value is an error: print it and stop, as `/wp-init` does for an unknown `--acf-flavor`.
 
 Pass to the `wp-cinematic` agent:
 
@@ -81,8 +80,8 @@ Pass to the `wp-cinematic` agent:
   "text_domain": "<from /wp-init>",
   "languages": ["en", "es"],
   "acf_flavor": "<scf|acf-pro>",
-  "scene_count": 9,
-  "hybrid": true
+  "scene_count": <--scenes value, an integer 1-12, default 9>,
+  "hybrid": <false when --no-hybrid was passed, else true>
 }
 ```
 

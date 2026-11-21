@@ -185,7 +185,7 @@ installed_version() {
     # message at all, because everything this function prints is being captured.
     [[ -f "$PLUGIN_DIR/s3-uploads.php" ]] || return 0
     sed -n 's/^[[:space:]]*\*\?[[:space:]]*Version:[[:space:]]*//p' \
-        "$PLUGIN_DIR/s3-uploads.php" | head -n 1
+        "$PLUGIN_DIR/s3-uploads.php" | sed -n 1p
     return 0
 }
 

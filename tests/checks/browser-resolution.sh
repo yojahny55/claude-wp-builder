@@ -34,7 +34,7 @@ via_link=$(lookup "$linkdir/linked-plugin/bin/lib/browsers.mjs")
 for f in "$runner" bin/demo-verify.mjs bin/composition-preview.mjs bin/tailwindify-parity.mjs \
     commands/wp-audit.md "$dv" "$wp_demo" "$wp_yolo"; do
   [ -f "$f" ] || continue
-  if grep -v '^\s*#' "$f" | grep -Eq 'playwright install( |$|")|npx playwright install'; then
+  if grep -v '^\s*#' "$f" | grep >/dev/null -Ec 'playwright install( |$|")|npx playwright install'; then
     fail "$f still installs a browser (or tells the user to)"
   fi
 done

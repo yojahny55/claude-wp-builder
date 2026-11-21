@@ -76,6 +76,7 @@ environment type and languages.
 /wp-init [project-name]
 /wp-init path/to/mockup.html          # demo-first
 /wp-init --template=tailwind|cinematic --i18n=polylang|suffix   # skip those two questions
+/wp-init --path=<dir> --mode=cinematic --acf-flavor=scf|acf-pro --no-hybrid   # flags /wp-cinematic-init hands off
 ```
 
 Asks: starter template (`tailwind` default / `cinematic`), custom-fields plugin (`scf`
@@ -84,7 +85,12 @@ languages, industry. With a demo argument (or an existing `demo/index.html` you 
 infers name/slug/sections from the HTML and runs `/wp-polish` if delimiters are missing.
 Copies the starter, replaces `__starter__` / `__STARTER__` / `__STARTER_NAME__`, writes
 `.claude/CLAUDE.md`, activates the theme when `.wp-create.json` exists, and runs
-`/wp-context` when `docs/` exists. `cinematic` hands off to `/wp-cinematic-init`.
+`/wp-context` when `docs/` exists. Step 0.4 parses `--path`, `--mode`, `--starter`,
+`--template`, `--acf-flavor` and `--no-hybrid` before asking anything, and a preset value skips
+its question. `cinematic` dispatches to `/wp-cinematic-init --path=<dir>` (plus `--acf-flavor` and
+`--no-hybrid` when set). When entered from `/wp-cinematic-init` (`--mode=cinematic` or
+`--starter=__cinematic__`) it copies `starter-theme/__cinematic__/`, runs the shared bootstrap
+and returns, without a "Next step" line.
 
 ### `/wp-context`
 
@@ -562,8 +568,8 @@ Details, kit install and encoding rationale: [cinematic-mode.md](cinematic-mode.
 
 | Command | Arguments |
 |---------|-----------|
-| `/wp-cinematic-init` | `[--no-hybrid]` — resolves `cinematic-scroll-kit` (global skill → `./.cinematic-kit/` → vendored copy), calls `/wp-init`, copies `starter-theme/__cinematic__/`, dispatches the `wp-cinematic` agent for `fields/scenes.php`, `fields/trailing-sections.php`, `inc/seed-cinematic.php`, scene fragments |
-| `/wp-cinematic-demo` | `[--scenes N=9] [--hybrid] [--brand brief.md]` → `<theme>/demo/index.html` + `demo/assets/` |
+| `/wp-cinematic-init` | `[--path=<dir>] [--scenes=N] [--acf-flavor=…] [--no-hybrid]` — resolves `cinematic-scroll-kit` (global skill → `./.cinematic-kit/` → vendored copy), hands off to `/wp-init --mode=cinematic` for the starter copy and shared bootstrap, then dispatches the `wp-cinematic` agent for `fields/scenes.php`, `fields/trailing-sections.php`, `inc/seed-cinematic.php`, scene fragments, and owns seeding and menus |
+| `/wp-cinematic-demo` | `[--scenes N=9] [--no-hybrid] [--brand brief.md]` → `<theme>/demo/index.html` + `demo/assets/` |
 | `/wp-cinematic-encode` | `<input.mp4> [--scene N] [--desktop-only] [--mobile-only] [--poster]` → all-keyframe desktop MP4, 9:16 mobile MP4, poster JPG in `assets/videos/`; wires the ACF row when `--scene` given |
 | `/wp-cinematic-scene` | `<n|scene-id> [--eyebrow] [--headline] [--body] [--cta "Label|URL"] [--video …]` (+ `-es` variants) → updates the `cinematic_scenes` row; emits `template-parts/cinematic/scene-<id>.php` only for non-default layouts |
 | `/wp-cinematic-seed` | `[--manifest path] [--force] [--dry-run]` — idempotent; skips scenes that already have content; sideloads kit sample videos when none pinned |

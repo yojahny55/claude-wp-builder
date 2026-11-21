@@ -31,7 +31,7 @@ for src in "$f" skills/wp-css-system/SKILL.md skills/wp-css-system/references/pa
   used=$(grep -oE 'var\(--[a-z0-9-]+' "$src" | sed 's/^var(//' | sort -u || true)
   for v in $used; do
     case "$v" in --x|--motion-*) continue ;; esac
-    printf '%s\n' "$defs" | grep -qx -- "$v" \
+    printf '%s\n' "$defs" | grep >/dev/null -cx -- "$v" \
       || { echo "FAIL: $src uses var($v), which $tokens never defines — an agent copying the example emits an undefined custom property"; exit 1; }
   done
 done

@@ -82,7 +82,7 @@ for st in __tailwind__ __cinematic__; do
 done
 
 # --- 2. no command, agent or skill names a location the starters never register --
-under=$(grep -rnE '\b(primary|footer|mobile)_(en|es|<lang>|\{lang\})\b' commands agents skills CLAUDE.md docs/commands.md || true)
+under=$(grep -rnE '\b(primary|footer|mobile)_(en|es|<lang>|\{lang\})\b' commands agents skills CLAUDE.md docs/commands.md docs/known-ceilings.md docs/testing.md docs/architecture.md || true)
 [ -z "$under" ] || fail "an underscore menu location, which neither starter registers:"$'\n'"$under"
 lit=$(grep -rnE "'theme_location' *=> *['\"]" commands agents skills || true)
 [ -z "$lit" ] || fail "an instruction hands the agent a hand-built theme_location instead of prefix_nav_location():"$'\n'"$lit"
@@ -111,7 +111,7 @@ got=$(printf '%s\n' "$s6p" | grep -oE "^- \`'[a-z0-9_-]+' =>" | grep -oE "'[a-z0
 [ "$got" = "$bases" ] || fail "wp-init Step 6 registers [$got] under polylang; the Polylang helpers answer [$bases]"
 got=$(printf '%s\n' "$s6s" | grep -oE "^ *- \`'[a-z0-9_-]+' =>" | grep -oE "'[a-z0-9_-]+'" | tr -d "'" | words)
 [ "$got" = "$suffix_set" ] || fail "wp-init Step 6 registers [$got] under suffix; the starters register [$suffix_set]"
-printf '%s' "$s6" | flat | grep -qF '`functions.php` on `cinematic`' \
+printf '%s' "$s6" | flat | grep >/dev/null -cF '`functions.php` on `cinematic`' \
   || fail "wp-init Step 6 does not say the cinematic starter registers its menus in functions.php -- it has no inc/theme-setup.php to edit"
 
 # --- 4. /wp-header Step 7 registers the same names ---------------------------------
@@ -121,7 +121,10 @@ got=$(printf '%s\n' "$s7" | grep -oE "^ *'[a-z0-9_-]+' *=>" | grep -oE "[a-z0-9_
 
 # --- 5. /wp-seed Phase 6 assigns to them, per strategy, all of them ---------------
 p6=$(region "$wp_seed" '^## Phase 6:' '^## Phase 6[.]5:')
-p6p=$(printf '%s\n' "$p6" | awk '/^Everything below this line describes the `suffix` strategy/{exit} {print}')
+# A here-string, not printf into a pipe: awk exits early here, and a writer still
+# writing into a closed pipe dies of SIGPIPE, which pipefail and set -e turn into a
+# silent exit (see wp-section-tailwind.sh's contact block).
+p6p=$(awk '/^Everything below this line describes the `suffix` strategy/{exit} {print}' <<<"$p6")
 p6s=$(printf '%s\n' "$p6" | awk 'f{print} /^Everything below this line describes the `suffix` strategy/{f=1}')
 [ -n "$p6s" ] || fail "wp-seed Phase 6 lost the line that splits its polylang branch from its suffix branch"
 assigned() { grep -oE "menu location assign '[^']+' [a-z0-9_-]+" | awk '{print $NF}' | words; }
@@ -142,7 +145,7 @@ got=$(printf '%s' "$gate" | grep -oE '`[a-z0-9_-]+`' | tr -d '`' | grep -vx 'suf
 for spec in 'Check 4|Check 5' 'Check 7|Tailwind convention'; do
   chk=$(region "$wp_finalize" "^### ${spec%%|*}" "^### ${spec##*|}" | flat)
   for b in $bases; do
-    printf '%s' "$chk" | grep -qF "\`$b-<lang>\`" \
+    printf '%s' "$chk" | grep >/dev/null -cF "\`$b-<lang>\`" \
       || fail "wp-finalize ${spec%%|*} does not name \`$b-<lang>\` among the suffix locations it verifies"
   done
 done

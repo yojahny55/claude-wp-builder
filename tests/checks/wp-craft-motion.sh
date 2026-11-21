@@ -107,7 +107,7 @@ grep -Fq "CSS.supports('animation-timeline', 'view()')" "$m" \
 # cssReveal declaration's own next lines, not a bare '!reduced' anywhere in the file —
 # that token also guards the unrelated parallax branch further down and would still
 # pass with cssReveal's own term deleted.
-grep -A4 'const cssReveal =' "$m" | grep -Fq '!reduced' \
+grep -A4 'const cssReveal =' "$m" | grep >/dev/null -Fc '!reduced' \
   || fail "$m's cssReveal guard does not test reduced motion, so a reduced-motion reader on a supporting browser gets neither engine"
 # The yield itself, anchored on the branch guard rather than on prose. The earlier
 # form of this assertion grepped for "does not wire|handled by css", which the

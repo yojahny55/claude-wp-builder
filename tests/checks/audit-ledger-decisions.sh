@@ -53,7 +53,7 @@ run --mark-fixed SEC-036:wp_options.siteurl --evidence "option updated" >/dev/nu
 run --rerender >/dev/null
 md=out/informe-2026-10-01.md
 grep -Fq 'Findings: 1 (0 critical, 0 warnings, 1 info)' $md || fail "headline still counts accepted or fixed findings"
-sed -n '/^## Remediation plan/,/^## Accepted/p' $md | grep -Eq 'A11Y-028|SEC-036' && fail "accepted/fixed finding still in the plan"
+sed -n '/^## Remediation plan/,/^## Accepted/p' $md | grep >/dev/null -Ec 'A11Y-028|SEC-036' && fail "accepted/fixed finding still in the plan"
 grep -Fq '## Accepted by a human' $md || fail "no accepted section"
 grep -Fq 'client declined small targets' $md || fail "accepted reason missing from the report"
 grep -Fq '## Fixed, awaiting a measured re-run' $md || fail "no fixed_unverified section"
@@ -63,7 +63,7 @@ ls out/informe-2026-10-01.json >/dev/null
 
 # a later run that still finds the fixed entry reports it open, not set aside
 msg=$(run --run run.json 2>&1 >/dev/null || true)
-printf '%s' "$msg" | grep -Fq 'still found it' || fail "a run that still finds a fixed_unverified entry did not say so"
+printf '%s' "$msg" | grep >/dev/null -Fc 'still found it' || fail "a run that still finds a fixed_unverified entry did not say so"
 grep -Eq 'SEC-036' <(sed -n '/^## Remediation plan/,/^## Not measured/p' out/informe-2026-10-01.md) || fail "fresh finding of a fixed_unverified entry is not in the plan"
 
 # summary: counts by status and severity, machine readable
@@ -71,17 +71,17 @@ node "$R" --summary --json --out out | node -e '
 const s=JSON.parse(require("fs").readFileSync(0));
 if(s.total!==4||s.by_status.accepted.total!==2||s.by_status.fixed_unverified.CRITICAL!==1||s.open.total!==1||s.by_severity.WARNING!==2) process.exit(1)' \
   || fail "--summary --json counts are wrong"
-node "$R" --summary --out out | grep -q '^accepted ' || fail "--summary text lacks the status table"
+node "$R" --summary --out out | grep >/dev/null -c '^accepted ' || fail "--summary text lacks the status table"
 
 # unaccept restores the previous status
 run --unaccept A11Y-028:btn:1 >/dev/null
 [ "$(st A11Y-028:btn:1)" = new ] || fail "--unaccept did not restore the previous status"
-grep -c accepted_reason .wp-audit-findings.json | grep -q '^1$' || fail "--unaccept left decision fields behind"
+grep -c accepted_reason .wp-audit-findings.json | grep >/dev/null -c '^1$' || fail "--unaccept left decision fields behind"
 
 # a ledger of the wrong shape is refused with the shape
 echo '{"findings":{"a":1}}' > bad.json
 msg=$(node "$R" --summary --ledger bad.json --out out 2>&1 || true)
-printf '%s' "$msg" | grep -Fq 'ledger_version' || fail "a malformed ledger was not refused with the expected shape"
+printf '%s' "$msg" | grep >/dev/null -Fc 'ledger_version' || fail "a malformed ledger was not refused with the expected shape"
 
 cd - >/dev/null
 # the prose sends the agent to the commands

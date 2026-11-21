@@ -4,14 +4,12 @@ Cinematic scroll-driven WordPress starter. Persistent video stage + N scenes tha
 
 ## Placeholders
 
-Tokens replaced by `/wp-cinematic-init` / `/wp-init --mode=cinematic`:
+Tokens replaced by `/wp-init` Step 4 (the only tokens it replaces; `/wp-cinematic-init` and `/wp-init --mode=cinematic` run the same step). The theme version is a literal `1.0.0`, like the Tailwind starter:
 
 | Token | Replaced with |
 |---|---|
-| `__starter__` | project slug (kebab-case) — used as theme folder name |
+| `__starter__` | project slug (kebab-case) — theme folder name and i18n text domain |
 | `__STARTER__` | PHP prefix (snake_case) — function/constant prefix |
-| `__TEXTDOMAIN__` | i18n text domain |
-| `__VERSION__` | theme version (default `0.1.0`) |
 
 ## Files generated at scaffold time
 
@@ -39,7 +37,7 @@ To preserve hand edits across regeneration, wrap them in:
 - `header.php`, `footer.php` (standard parts)
 - `inc/performance.php`, `inc/security.php` (head cleanup and the security baseline — XML-RPC, user enumeration, file editors, response headers)
 
-These are kept in sync with the kit via `/wp-cinematic-init --update-kit`, which copies fresh from the installed kit and shows a diff before overwriting.
+A scaffolded theme gets all of these from this starter, not from the kit, and nothing re-syncs them afterwards. `cinematic.css` and `cinematic-engine.js` began as copies of the kit's templates but now carry starter code of their own (the mobile menu and the motion toggle), so a newer kit (re-run `npx skills add yojahny55/cinematic-scroll-kit -g -y`, or `git pull` inside `.cinematic-kit`) is merged into them by hand against its diff, never copied over them.
 
 ## Engine boot
 

@@ -7,7 +7,7 @@ cd "$(dirname "$0")/../.."
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-init.md; wp_init=$EXPANDED
 s=skills/wp-polylang/SKILL.md
 test -f "$s" || { echo "FAIL: $s missing"; exit 1; }
-head -1 "$s" | grep -q '^---$' || { echo "FAIL: no frontmatter"; exit 1; }
+head -1 "$s" | grep >/dev/null -c '^---$' || { echo "FAIL: no frontmatter"; exit 1; }
 grep -q '^name: wp-polylang$' "$s" || { echo "FAIL: no name in frontmatter"; exit 1; }
 grep -q '^description:' "$s" || { echo "FAIL: no description"; exit 1; }
 
@@ -24,7 +24,7 @@ grep -qi 'wp-bilingual' "$s" || { echo "FAIL: does not relate itself to wp-bilin
 
 c=commands/wp-polylang.md
 test -f "$c" || { echo "FAIL: $c missing"; exit 1; }
-head -1 "$c" | grep -q '^---$' || { echo "FAIL: command has no frontmatter"; exit 1; }
+head -1 "$c" | grep >/dev/null -c '^---$' || { echo "FAIL: command has no frontmatter"; exit 1; }
 grep -q 'allowed-tools:' "$c" || { echo "FAIL: no allowed-tools"; exit 1; }
 grep -q 'argument-hint:' "$c" || { echo "FAIL: no argument-hint"; exit 1; }
 for token in pll-setup.php pll-export.php pll-import.php pll-verify.php \
@@ -135,16 +135,16 @@ step_quotes() { # <from-step> <to-step>
 for spec in "4 5" "6 7"; do
   set -- $spec
   raw=$(awk "/^## Step $1:/,/^## Step $2:/" "$wp_header")
-  printf '%s\n' "$raw" | tail -1 | grep -q "^## Step $2:" \
+  printf '%s\n' "$raw" | tail -1 | grep >/dev/null -c "^## Step $2:" \
     || { echo "FAIL: wp-header's Step $1 region is not terminated by its '## Step $2:' heading — every assertion scoped to it would silently degrade to a file-wide grep"; exit 1; }
 done
 h4=$(step_quotes 4 5)
 h6=$(step_quotes 6 7)
-printf '%s' "$h4" | grep -qF 'pll_the_languages' \
+printf '%s' "$h4" | grep >/dev/null -cF 'pll_the_languages' \
   || { echo "FAIL: wp-header's Step 4 prompt never hands the wp-template agent pll_the_languages() for the polylang switcher — under polylang the header would build a suffix-model switcher over pages that have no suffix URLs"; exit 1; }
-printf '%s' "$h4" | grep -qF 'the bare location' \
+printf '%s' "$h4" | grep >/dev/null -cF 'the bare location' \
   || { echo "FAIL: wp-header's Step 4 prompt never tells wp-template to use the bare nav location under polylang — the agent writes 'primary_' . prefix_get_current_lang(), a location Step 7 does not register on that strategy"; exit 1; }
-printf '%s' "$h6" | grep -qF 'no `_<lang>` duplicate' \
+printf '%s' "$h6" | grep >/dev/null -cF 'no `_<lang>` duplicate' \
   || { echo "FAIL: wp-header's Step 6 prompt never tells wp-acf that polylang emits no _<lang> duplicate fields — the agent writes _es variants Polylang cannot serve, and /wp-finalize Check 2 then reports a bilingual failure on correct work"; exit 1; }
 
 # ── /wp-finalize must branch its checks on i18n strategy ────────────────────
@@ -157,7 +157,7 @@ printf '%s' "$h6" | grep -qF 'no `_<lang>` duplicate' \
 fin_pair() { # <from-heading-prefix> <to-heading-prefix>
   local raw
   raw=$(awk "/^### $1/,/^### $2/" "$wp_finalize")
-  printf '%s\n' "$raw" | tail -1 | grep -q "^### $2" \
+  printf '%s\n' "$raw" | tail -1 | grep >/dev/null -c "^### $2" \
     || { echo "FAIL: wp-finalize's '$1' region is not terminated by its '$2' heading — its assertions would silently degrade to file-wide greps"; exit 1; }
   printf '%s\n' "$raw" | tr '\n' ' ' | sed 's/  */ /g'
 }
@@ -165,15 +165,15 @@ c2=$(fin_pair 'Check 2' 'Check 3')
 c4=$(fin_pair 'Check 4' 'Check 5')
 c7=$(fin_pair 'Check 7' 'Tailwind convention')
 l2=$(fin_pair 'Demo-parity gate — Layer 2' 'Demo-parity gate — Layer 3')
-printf '%s' "$c2" | grep -qF 'Under `polylang`, skip this item' \
+printf '%s' "$c2" | grep >/dev/null -cF 'Under `polylang`, skip this item' \
   || { echo "FAIL: wp-finalize Check 2 never skips the field-variant item under polylang — it verifies _es variants that a polylang project deliberately does not have, and fails every correct delivery"; exit 1; }
-printf '%s' "$c2" | grep -qF 'pll-verify.php' \
+printf '%s' "$c2" | grep >/dev/null -cF 'pll-verify.php' \
   || { echo "FAIL: wp-finalize Check 2 names no polylang coverage check — skipping the suffix item leaves the polylang project with nothing verifying translation coverage at delivery"; exit 1; }
-printf '%s' "$c4" | grep -qF 'one bare location per name' \
+printf '%s' "$c4" | grep >/dev/null -cF 'one bare location per name' \
   || { echo "FAIL: wp-finalize Check 4 still requires per-language menu locations on both strategies — under polylang the theme registers one bare location per name and the check fails it"; exit 1; }
-printf '%s' "$c7" | grep -qF 'bare `primary`, `footer` under `polylang`' \
+printf '%s' "$c7" | grep >/dev/null -cF 'bare `primary`, `footer` under `polylang`' \
   || { echo "FAIL: wp-finalize Check 7 item 2 still lists only suffix menu locations — under polylang it verifies locations that were never registered"; exit 1; }
-printf '%s' "$l2" | grep -qF 'under `polylang`: bare `primary`, `footer`' \
+printf '%s' "$l2" | grep >/dev/null -cF 'under `polylang`: bare `primary`, `footer`' \
   || { echo "FAIL: wp-finalize Layer 2 still lists only suffix menu locations — under polylang it fails delivery on locations that were never registered"; exit 1; }
 
 # ── /wp-init Step 0.7 must default to polylang, for SEO ────────────────────
@@ -182,16 +182,16 @@ printf '%s' "$l2" | grep -qF 'under `polylang`: bare `primary`, `footer`' \
 # translated title. It stays available as a toggle; it is not the default.
 s07=$(awk '/^## Step 0.7:/,/^## Pre-Step:/' "$wp_init")
 [ -n "$s07" ] || { echo "FAIL: no Step 0.7 region in commands/wp-init.md"; exit 1; }
-printf '%s' "$s07" | grep -qF 'Default: `polylang`' \
+printf '%s' "$s07" | grep >/dev/null -cF 'Default: `polylang`' \
   || { echo "FAIL: /wp-init Step 0.7 does not default to polylang — a bilingual site scaffolded on Enter gets the suffix model, whose second language cannot be indexed"; exit 1; }
-printf '%s' "$s07" | grep -qiE 'hreflang|crawler|SEO' \
+printf '%s' "$s07" | grep >/dev/null -ciE 'hreflang|crawler|SEO' \
   || { echo "FAIL: /wp-init Step 0.7 states no SEO reason for the default — without it the next edit flips it back on 'what existing projects use'"; exit 1; }
-printf '%s' "$s07" | grep -qF 'suffix' \
+printf '%s' "$s07" | grep >/dev/null -cF 'suffix' \
   || { echo "FAIL: /wp-init Step 0.7 dropped the suffix option — it is still the right choice when the second language does not need to rank"; exit 1; }
 # Old projects must not be re-read as polylang: the absent-line fallback stays suffix.
 grep -qF 'the project predates the choice and is' CLAUDE.md \
   || { echo "FAIL: CLAUDE.md dropped the absent-line fallback — existing suffix projects would be rebuilt as polylang"; exit 1; }
-printf '%s' "$s07" | grep -qF '`i18n strategy` line is absent stays `suffix`' \
+printf '%s' "$s07" | grep >/dev/null -cF '`i18n strategy` line is absent stays `suffix`' \
   || { echo "FAIL: /wp-init Step 0.7 does not say the new default governs new scaffolds only"; exit 1; }
 
 # ── Menu import must not depend on the 'polylang' option alone ─────────────
@@ -237,9 +237,9 @@ for f in "$rb" "$af" "$il"; do
 done
 grep -q '^## Rewrite bases are never translated' "$rb" \
   || { echo "FAIL: $rb does not document that Polylang never translates a CPT/taxonomy rewrite base"; exit 1; }
-flat_of "$rb" | grep -qF 'chosen by the URL already in hand, never by who is reading' \
+flat_of "$rb" | grep >/dev/null -cF 'chosen by the URL already in hand, never by who is reading' \
   || { echo "FAIL: $rb does not state the rewrite-base swap must be decided from the URL, not the current reader"; exit 1; }
-flat_of "$af" | grep -qi "taxonomy TERM's fields are a separate" \
+flat_of "$af" | grep >/dev/null -ci "taxonomy TERM's fields are a separate" \
   || { echo "FAIL: $af does not call out that a term's own fields are a separate surface from a post's"; exit 1; }
 
 # ── The rules a later edit could drop without anything failing ──────────────
@@ -251,8 +251,8 @@ pin() { # <haystack> <needle> <why>
 # The central rule: a save replaces the translation group, so read, merge, save.
 pin "$sflat" '**replaces** the whole translation group' \
   "SKILL.md no longer warns that pll_save_post_translations() replaces the translation group -- a {source, target} save silently drops every other language"
-read_line=$(grep -nF 'pll_get_post_translations( $source_id );' "$s" | head -1 | cut -d: -f1 || true)
-save_line=$(grep -nF 'pll_save_post_translations( $group );' "$s" | head -1 | cut -d: -f1 || true)
+read_line=$(grep -nF 'pll_get_post_translations( $source_id );' "$s" | sed -n 1p | cut -d: -f1 || true)
+save_line=$(grep -nF 'pll_save_post_translations( $group );' "$s" | sed -n 1p | cut -d: -f1 || true)
 [ -n "$read_line" ] && [ -n "$save_line" ] && [ "$read_line" -lt "$save_line" ] \
   || { echo "FAIL: SKILL.md's merge snippet no longer reads the translation group before saving it"; exit 1; }
 # Menus: the option overrides a theme_mod entry it never creates.
@@ -329,6 +329,7 @@ grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/wp-polylang/SKILL.md' "$c" \
 # (the PRIMARY language, per commands/wp-init.md Step 6), so asking for 'en'
 # there never matches and a client's edits under Languages > Strings are
 # silently ignored.
+# shellcheck disable=SC2100  # path assignment, not arithmetic
 tw=starter-theme/_i18n-variants/__tailwind__.php
 # Scoped to the $source assignment specifically -- a later, unrelated fallback
 # in the same function legitimately defaults to 'en' when a key has no entry
@@ -336,9 +337,9 @@ tw=starter-theme/_i18n-variants/__tailwind__.php
 src_line=$(grep -A1 '^\s*\$source = isset(\$translations\[\$key\]' "$tw" | tr '\n' ' ')
 [ -n "$src_line" ] \
   || { echo "FAIL: __tailwind__.php's Polylang variant has no recognizable \$source assignment in __starter___t() to check"; exit 1; }
-printf '%s' "$src_line" | grep -qF '__STARTER___DEFAULT_LANG' \
+printf '%s' "$src_line" | grep >/dev/null -cF '__STARTER___DEFAULT_LANG' \
   || { echo "FAIL: __tailwind__.php's Polylang variant does not resolve its string source through the DEFAULT_LANG constant"; exit 1; }
-printf '%s' "$src_line" | grep -qF "['en']" \
+printf '%s' "$src_line" | grep >/dev/null -cF "['en']" \
   && { echo "FAIL: __tailwind__.php's Polylang variant still hardcodes 'en' as the registered-string source"; exit 1; }
 true
 

@@ -165,7 +165,7 @@ grep -Fq 'at the top level of' <<<"$i4s" \
 grep -Fq -- '`--space-gutter`, `--container-max`' <<<"$i4s" \
   || fail "$i4 Step D4 does not write --container-max into the @theme block, so the theme loses the demo's content width"
 
-tr '\n' ' ' < "$r" | grep -Eq '@property --container-max[[:space:]]*\{[^}]*inherits: true' \
+tr '\n' ' ' < "$r" | grep >/dev/null -Ec '@property --container-max[[:space:]]*\{[^}]*inherits: true' \
   || fail "$r's @property rule does not set inherits: true, so a well-formed --container-max never reaches the preview's sections"
 grep -Eq '@property --container-max[[:space:]]*\{' "$r" \
   || fail "$r does not emit @property, so previews and client demos differ"
@@ -192,7 +192,12 @@ grep -Eq '@property --container-max[[:space:]]*\{' <<<"$tokens" \
 # Permanent zero-occurrence control: this ceiling is fixed, so its old wording
 # must never reappear in CLAUDE.md. Stays green forever unless the ceiling
 # entry is reverted while the code fix (and the greps above) stay in place.
-grep -Fq 'only guards an absent token, not a malformed one' CLAUDE.md \
-  && fail "CLAUDE.md still records the old container-max ceiling as unfixed"
+# Checked in CLAUDE.md and in docs/known-ceilings.md, where the ceilings now live: checking
+# only CLAUDE.md would stay green forever on a file that no longer holds the text.
+for doc in CLAUDE.md docs/known-ceilings.md; do
+  [ -f "$doc" ] || fail "$doc is missing, so the zero-occurrence control would be vacuous"
+  grep -Fq 'only guards an absent token, not a malformed one' "$doc" \
+    && fail "$doc still records the old container-max ceiling as unfixed"
+done
 
 echo PASS

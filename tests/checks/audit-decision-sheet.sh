@@ -6,7 +6,7 @@
 # (no browser) and, when a Chromium is available, renders a card from a local fixture and
 # asserts the injected "after" out-specifies the existing rule.
 set -uo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../.." || exit 1
 fail() { echo "FAIL: $*"; exit 1; }
 tool=bin/decision-sheet.mjs
 [ -f "$tool" ] || fail "$tool is missing"
@@ -15,7 +15,7 @@ fix=skills/wp-audit-run/references/fix.md
 grep -Fq 'bin/decision-sheet.mjs' "$fix" || fail "$fix does not point at the decision sheet"
 flat=$(tr '\n' ' ' < "$fix" | sed 's/  */ /g')
 for needle in '--parse' 'Never apply a `visual` finding without an answer' '`accepted`'; do
-  printf '%s' "$flat" | grep -Fq -- "$needle" || fail "$fix lost: $needle"
+  printf '%s' "$flat" | grep >/dev/null -Fc -- "$needle" || fail "$fix lost: $needle"
 done
 grep -Fq 'decision-sheet.mjs' README.md || fail "README bin table has no decision-sheet.mjs row"
 grep -Fq 'decision-sheet.mjs' CLAUDE.md || fail "CLAUDE.md bin list has no decision-sheet.mjs"
@@ -50,7 +50,7 @@ if(d["ignored-after-block"])bad.push("line after END counted");
 if(!j.warnings.some(w=>/A11Y-001.*more than once/.test(w)))bad.push("no duplicate warning");
 if(bad.length){console.log(bad.join(", "));process.exit(1);}'; }
 r=$(chk) || fail "--parse result wrong: $r"
-printf 'DECISION A: other\n' | node "$tool" --parse - | grep -Fq 'has no note' || fail "empty other note was not warned"
+printf 'DECISION A: other\n' | node "$tool" --parse - | grep >/dev/null -Fc 'has no note' || fail "empty other note was not warned"
 echo 'nothing here' | node "$tool" --parse - >/dev/null 2>&1 && fail "--parse of text with no DECISION exited 0"
 
 

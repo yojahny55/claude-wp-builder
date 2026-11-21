@@ -36,7 +36,7 @@ allowed=$(printf '%s\n--motion-p\n--motion-mx\n--motion-my\n' "$tokens")
 
 # taste.md names only tokens that exist.
 for t in $(grep -oE '`--[a-z0-9-]+' "$R/taste.md" | tr -d '`' | sort -u); do
-  printf '%s\n' "$allowed" | grep -Fxq -- "$t" || fail "$R/taste.md tells the author to use $t, which no DESIGN.md or engine defines"
+  printf '%s\n' "$allowed" | grep >/dev/null -Fxc -- "$t" || fail "$R/taste.md tells the author to use $t, which no DESIGN.md or engine defines"
 done
 grep -Fq 'engine already switches' "$R/taste.md" && fail "$R/taste.md claims an engine behaviour no engine has"
 for cls in $(grep -oE '\.scrim--[a-z]+|\.grain\b' "$R/taste.md" | sort -u); do
@@ -47,8 +47,8 @@ done
 # property the same file declares.
 for css in "$C"/*/section.css; do
   for t in $(grep -oE 'var\(--[a-z0-9-]+\)' "$css" | sed 's/^var(//; s/)$//' | sort -u); do
-    printf '%s\n' "$allowed" | grep -Fxq -- "$t" && continue
-    grep -Eq -- "(^|[;{[:space:]])$t[[:space:]]*:" "$css" && continue
+    printf '%s\n' "$allowed" | grep >/dev/null -Fxc -- "$t" && continue
+    grep -Eq -- "(^|[;{[:space:]])${t}[[:space:]]*:" "$css" && continue
     fail "$css reads var($t) with no fallback, and no DESIGN.md defines it"
   done
 done
@@ -63,19 +63,19 @@ fallback=$(grep -rhoE 'var\(--motion-rise, *[0-9]+px\)' "$C"/*/section.css | gre
 # --- the attribute contract matches the engine, both directions ---------------------
 contract=$(awk '/^```/{n++; next} n==1' "$R/devices.md")
 for a in $(grep -oE 'data-motion-[a-z]+' "$M" | sort -u); do
-  printf '%s\n' "$contract" | grep -Fq -- "$a" || fail "motion.js reads $a but the devices.md attribute contract omits it"
+  printf '%s\n' "$contract" | grep >/dev/null -Fc -- "$a" || fail "motion.js reads $a but the devices.md attribute contract omits it"
 done
 for a in $(printf '%s\n' "$contract" | grep -oE 'data-motion-[a-z]+' | sort -u); do
   grep -Fq -- "$a" "$M" || fail "devices.md declares $a, which motion.js never reads"
 done
 engine=$( { grep -oE "kind === '[a-z]+'" "$M" | grep -oE "'[a-z]+'"; grep -oE 'data-motion="[a-z]+"' "$M" | grep -oE '"[a-z]+"'; } | tr -d "'\"" | sort -u)
-declared=$(printf '%s\n' "$contract" | grep -oE 'data-motion="[a-z|]+"' | head -1 | tr -d '"' | sed 's/^data-motion=//' | tr '|' '\n' | sort -u)
+declared=$(printf '%s\n' "$contract" | grep -oE 'data-motion="[a-z|]+"' | sed -n 1p | tr -d '"' | sed 's/^data-motion=//' | tr '|' '\n' | sort -u)
 [ "$engine" = "$declared" ] || fail "the devices.md data-motion list ($(echo $declared)) does not match the devices motion.js binds ($(echo $engine))"
 # The interior-page floor offers only devices that exist (count is dispatched by its attribute).
 floor=$(awk '/scroll-reactive device that is not/{p=1} p{print} /All of them cost/{exit}' "$R/devices.md")
 for d in $(printf '%s\n' "$floor" | grep -oE '`[a-z]+`' | tr -d '`' | sort -u); do
   [ "$d" = count ] && continue
-  printf '%s\n' "$engine" | grep -Fxq "$d" || fail "devices.md offers \`$d\` as a scroll-reactive device; motion.js does not implement it, so it is a silent no-op"
+  printf '%s\n' "$engine" | grep >/dev/null -Fxc "$d" || fail "devices.md offers \`$d\` as a scroll-reactive device; motion.js does not implement it, so it is a silent no-op"
 done
 grep -Fq 'The eight devices' "$R/devices.md" && fail "devices.md heads its device list with a count that does not match it"
 
@@ -95,7 +95,7 @@ for d in $sr; do
       || fail "$V counts \`count\` as scroll-reactive but never reads data-motion-count, the attribute motion.js dispatches it on"
     continue
   fi
-  printf '%s\n' "$engine" | grep -Fxq "$d" \
+  printf '%s\n' "$engine" | grep >/dev/null -Fxc "$d" \
     || fail "$V counts \`$d\` as scroll-reactive; motion.js does not implement it, so a page carrying it passes static-page with nothing moving"
 done
 want=$(printf '%s\n' "$floor" | grep -oE '`[a-z]+`' | tr -d '`' | grep -vx reveal | sort -u)
@@ -108,12 +108,12 @@ grep -Fq 'Every build invents one bespoke interaction' "$R/uniqueness.md" \
 grep -Fq 'does not require one' "$R/devices.md" && fail "devices.md says the signature move is optional; uniqueness.md and /wp-demo require it"
 grep -Fq '`uniqueness.md` §4) usually lives inside it' "$R/feel.md" \
   || fail "feel.md does not point at uniqueness.md §4 for the signature move"
-tr '\n' ' ' < "$R/feel.md" | grep -Fq '(defined in `devices.md`)' \
+tr '\n' ' ' < "$R/feel.md" | grep >/dev/null -Fc '(defined in `devices.md`)' \
   && fail "feel.md sends the reader to devices.md for the signature move"
 
 # --- process-rail keeps its heading out of the rail ---------------------------------
 pr="$C/process-rail/section.html"
-awk '/data-motion-rail/{p=1} p{print} /<\/ol>/{p=0}' "$pr" | grep -q '<h2' \
+awk '/data-motion-rail/{p=1} p{print} /<\/ol>/{p=0}' "$pr" | grep >/dev/null -c '<h2' \
   && fail "$pr puts the section heading inside the pan rail, which pans the label off screen (devices.md, pan)"
 grep -q '<h2' "$pr" || fail "$pr has no section heading"
 n=$(grep -c 'class="process-rail__step"' "$pr")

@@ -24,29 +24,29 @@ g=$(tr '\n' ' ' < "$gate" | sed 's/  */ /g')
 
 # The join cannot be on selectors: the two files use different class systems by
 # construction. Text is what survives the conversion unchanged.
-printf '%s' "$g" | grep -qF 'tag + text' \
+printf '%s' "$g" | grep >/dev/null -cF 'tag + text' \
   || { echo "FAIL: $gate does not document joining on tag + text — a selector join is impossible across two class systems, and an undocumented join key gets 'fixed' into one"; exit 1; }
 
 # `cursor` is the declaration that started this. If it leaves the property list the gate
 # stops catching the exact defect it was built for.
 for p in cursor lineHeight fontWeight whiteSpace letterSpacing; do
-  printf '%s' "$g" | grep -qF "'$p'" \
+  printf '%s' "$g" | grep >/dev/null -cF "'$p'" \
     || { echo "FAIL: $gate does not compare '$p' — preflight does not restore it and a demo commonly declares it"; exit 1; }
 done
 
 # Tailwind emits oklab() for a colour with an opacity modifier where plain CSS emits
 # rgba(). Same pixels. Comparing the strings produced dozens of false findings and buried
 # the real ones, so colours are resolved through a canvas in the page.
-printf '%s' "$g" | grep -qF 'getImageData' \
+printf '%s' "$g" | grep >/dev/null -cF 'getImageData' \
   || { echo "FAIL: $gate does not resolve colours through a canvas — oklab() vs rgba() for the same colour is a notation difference, and string-comparing them floods the report with noise"; exit 1; }
 
 # A converted page with no Tailwind runtime renders as bare HTML, where EVERY element
 # differs. Reporting that as lost declarations is how a gate gets ignored.
-printf '%s' "$g" | grep -qF 'unrenderable' \
+printf '%s' "$g" | grep >/dev/null -cF 'unrenderable' \
   || { echo "FAIL: $gate does not detect an unstyled converted page — conversion strips the demo's stylesheet, and without this guard a page with no Tailwind runtime reports every element as a delta"; exit 1; }
 
 # Exit codes are a contract: a missing browser is not a failing gate.
-printf '%s' "$g" | grep -qF 'process.exit(2)' \
+printf '%s' "$g" | grep >/dev/null -cF 'process.exit(2)' \
   || { echo "FAIL: $gate does not exit 2 when no browser is usable — the caller cannot tell 'could not run' from 'found defects'"; exit 1; }
 
 # 1440 and 390 never land on a converted breakpoint's off-by-one: a demo's
@@ -54,10 +54,10 @@ printf '%s' "$g" | grep -qF 'process.exit(2)' \
 # The gate has to read the original's own CSS for its max-width/min-width stops and
 # sample those exact pixel widths too, or the one width where the defect is visible
 # is never sampled.
-printf '%s' "$g" | grep -qF 'collectBreakpoints' \
+printf '%s' "$g" | grep >/dev/null -cF 'collectBreakpoints' \
   || { echo "FAIL: $gate does not collect breakpoint widths from the original's own CSS — --widths alone never lands on the exact pixel where an inclusive/exclusive max-width conversion goes wrong"; exit 1; }
 # Fixed-string: this pins the collector's JS regex source, not a pattern to run.
-printf '%s' "$g" | grep -qF 'm(?:in|ax)-width' \
+printf '%s' "$g" | grep >/dev/null -cF 'm(?:in|ax)-width' \
   || { echo "FAIL: $gate's breakpoint collector does not match both max-width and min-width — a demo mixes both forms"; exit 1; }
 
 # Run the collector itself on a fixture: both media-query forms are read, build and
@@ -85,13 +85,13 @@ fi
 # And the command has to actually run it.
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-tailwindify.md; cmd=$EXPANDED
 flat=$(tr '\n' ' ' < "$cmd" | sed 's/  */ /g')
-printf '%s' "$flat" | grep -qF 'tailwindify-parity.mjs' \
+printf '%s' "$flat" | grep >/dev/null -cF 'tailwindify-parity.mjs' \
   || { echo "FAIL: $cmd never invokes bin/tailwindify-parity.mjs — a gate nothing calls is documentation"; exit 1; }
-printf '%s' "$flat" | grep -qF -- '--against' \
+printf '%s' "$flat" | grep >/dev/null -cF -- '--against' \
   || { echo "FAIL: $cmd invokes the gate without --against, so it compares the converted page with nothing"; exit 1; }
-printf '%s' "$flat" | grep -qiE 'renders?, not only what it contains|what it RENDERS' \
+printf '%s' "$flat" | grep >/dev/null -ciE 'renders?, not only what it contains|what it RENDERS' \
   || { echo "FAIL: $cmd does not say the structural checks are insufficient — items 2-4 all pass on a page that has lost a declaration"; exit 1; }
-printf '%s' "$flat" | grep -qiE 'sampl(e|ing).{0,80}(768|1024|breakpoint)' \
+printf '%s' "$flat" | grep >/dev/null -ciE 'sampl(e|ing).{0,80}(768|1024|breakpoint)' \
   || { echo "FAIL: $cmd never explains that the gate also samples breakpoint widths found in the original CSS, not only --widths"; exit 1; }
 
 echo PASS

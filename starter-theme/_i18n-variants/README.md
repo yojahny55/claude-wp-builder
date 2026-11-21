@@ -8,7 +8,7 @@ contains two definitions of the same function is a trap. `functions.php`
 requires `inc/i18n.php` by name today, so nothing breaks right now — but the
 next person to swap that for a `glob( 'inc/*.php' )` gets a fatal error, and
 `tests/checks/tailwind-starter.sh` correctly refuses a starter in that state.
-Keeping the variants out of the copied tree means `cp -r starter-theme/__x__/`
+Keeping the variants out of the copied tree means `cp -r starter-theme/<template>/`
 never carries a file the project has to remember to delete.
 
 `/wp-init` Step 5 copies the matching file over `inc/i18n.php` when the user

@@ -25,7 +25,7 @@ u=$(grep -n '^## Step 3: Update' "$c" | cut -d: -f1 || true)
 [ -n "$b" ] && [ -n "$u" ] && [ "$b" -lt "$u" ] || fail "backup step must precede update step"
 
 # The exclude flag sits before the operands in the core tarball line.
-line=$(grep -F 'core.tar.gz' "$c" | grep -F 'tar -czf' | head -1 || true)
+line=$(grep -F 'core.tar.gz' "$c" | grep -F 'tar -czf' | sed -n 1p || true)
 case "$line" in *--exclude=wp-config.php*-C*) ;; *) fail "tar --exclude must precede the operands";; esac
 
 # Wrong forms stay out.

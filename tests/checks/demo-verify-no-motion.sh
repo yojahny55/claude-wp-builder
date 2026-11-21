@@ -14,8 +14,15 @@ grep -Fq -- '--no-motion' "$dv" || fail "commands/wp-demo-verify.md does not doc
 grep -Fq -- '--no-motion' commands/wp-responsive-check.md || fail "commands/wp-responsive-check.md does not pass --no-motion"
 grep -Fq -- '--no-motion' CHANGELOG.md || fail "CHANGELOG.md has no --no-motion entry"
 
-command -v node >/dev/null || { echo "PASS (static only: no node)"; exit 0; }
+if ! command -v node >/dev/null; then
+  [ "${CHECKS_REQUIRE_BROWSER:-0}" = 1 ] && { echo "FAIL: CHECKS_REQUIRE_BROWSER=1 and there is no node"; exit 1; }
+  echo "PASS (static only: no node)"; exit 0
+fi
 if ! probe=$(node "$s" --probe 2>&1); then
+  if [ "${CHECKS_REQUIRE_BROWSER:-0}" = 1 ]; then
+    echo "FAIL: CHECKS_REQUIRE_BROWSER=1 and the walk cannot happen: no usable playwright-core or Chromium here -- $(tr '\n' ' ' <<<"$probe")"
+    exit 1
+  fi
   echo "PASS (static only -- the walk was NOT exercised: no usable playwright-core or Chromium here -- $(tr '\n' ' ' <<<"$probe"))"
   echo "  To run it for real, point PLAYWRIGHT_CORE at an installed playwright-core, e.g."
   echo "  PLAYWRIGHT_CORE=\"\$(npm root -g)/@playwright/test/node_modules/playwright-core\" bash $0"
@@ -37,7 +44,7 @@ rc=0; run "$work/index.html" --out "$work/off" || rc=$?
 grep -q '"no-engine"' "$work/off/findings.json" || fail "without the flag no-engine no longer blocks"
 
 rc=0; run "$work/index.html" --no-motion --out "$work/on" || rc=$?
-[ "$rc" = 0 ] || fail "--no-motion should exit 0, got $rc ($(cat "$work/out.txt" | head -5 | tr '\n' ' '))"
+[ "$rc" = 0 ] || fail "--no-motion should exit 0, got $rc ($(cat "$work/out.txt" | sed -n '1,5p' | tr '\n' ' '))"
 ! grep -Eq '"(no-engine|dead-scroll)"' "$work/on/findings.json" || fail "--no-motion still emits a motion finding"
 
 echo PASS

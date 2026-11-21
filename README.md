@@ -8,7 +8,7 @@
 
 **Demo HTML to production WordPress theme — automated.**
 
-[![Version](https://img.shields.io/badge/version-1.31.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.32.0-blue.svg)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-Plugin-blueviolet.svg)](https://docs.anthropic.com/en/docs/claude-code)
@@ -758,7 +758,7 @@ non-zero. Most assert that a command, agent or skill still states its contract; 
 a real browser or a disposable WordPress.
 
 ```bash
-for f in tests/checks/*.sh; do bash "$f"; done
+bash tests/run.sh   # all checks in parallel; a skipped check is counted apart from a pass
 ```
 
 CI runs every check on each pull request, plus `node --check`, `php -l` at the PHP floors

@@ -1,7 +1,7 @@
 ---
 description: Verify a demo directory, page or live URL — impeccable detector, scroll-walk screenshots per section and viewport, machine findings, and a seven-line critique written to demo/VERIFY.md
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob
-argument-hint: "<demo-dir-or-file-path-or-url> [--positions N] [--no-motion]"
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
+argument-hint: "<demo-dir-or-file-path-or-url> [--positions N] [--no-motion] [--no-firefox] [--no-gaps]"
 ---
 
 # WP Demo Verify

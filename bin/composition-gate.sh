@@ -113,21 +113,38 @@ else:
 #   hero-bleed, hero-split, hero-type and page-head. Restyling those kickers is a design
 #   change that needs measuring and approval, done as its own PR, which removes this entry.
 IGNORED = {"hero-eyebrow-chip"}
-ignored = [f for f in findings if f.get("antipattern") in IGNORED]
+# Rules ignored only in named compositions. Anywhere else the rule still blocks, so a new
+# composition that adds the pattern, or a fixed one that regains it, fails the gate.
+# - kicker-above-heading: added in an impeccable 4.x release after 4.5; flags the small
+#   label above the section title. These ten non-hero compositions carry one on purpose
+#   (the hero and page-head kickers are hero-eyebrow-chip's). Same way out as above:
+#   dropping or restyling them changes how every craft build looks, so it waits for a
+#   measured, approved design PR, which removes this entry.
+IGNORED_AT = {
+    "kicker-above-heading": {
+        "closing-block", "faq-list", "feature-zigzag", "icon-row", "offer-table",
+        "process-flow", "process-rail", "proof-row", "score-scale", "testimonial-pair",
+    },
+}
+def comp(f):
+    return f.get("file", "?").split("/")[-1].replace(".html", "")
+def ignored_finding(f):
+    rule = f.get("antipattern")
+    return rule in IGNORED or comp(f) in IGNORED_AT.get(rule, ())
+ignored = [f for f in findings if ignored_finding(f)]
 for name in sorted({f.get("antipattern") for f in ignored}):
-    print("composition-gate: ignoring %s (%d finding(s)) — see IGNORED in bin/composition-gate.sh"
+    print("composition-gate: ignoring %s (%d finding(s)) — see IGNORED and IGNORED_AT in bin/composition-gate.sh"
           % (name, sum(1 for f in ignored if f.get("antipattern") == name)), file=sys.stderr)
 blocking = [f for f in findings
             if f.get("category") == "slop" and f.get("severity") == "warning"
-            and f.get("antipattern") not in IGNORED]
+            and not ignored_finding(f)]
 by_comp = collections.defaultdict(list)
 for f in blocking:
-    by_comp[f.get("file", "?").split("/")[-1].replace(".html", "")].append(
-        f.get("antipattern", "?"))
+    by_comp[comp(f)].append(f.get("antipattern", "?"))
 if blocking:
-    for comp in sorted(by_comp):
+    for name in sorted(by_comp):
         print("composition-gate: %s fails the slop gate: %s"
-              % (comp, ", ".join(sorted(set(by_comp[comp])))), file=sys.stderr)
+              % (name, ", ".join(sorted(set(by_comp[name])))), file=sys.stderr)
     raise SystemExit(2)
 print("composition-gate: %d compositions, 0 slop findings at warning severity" % expected)
 PY

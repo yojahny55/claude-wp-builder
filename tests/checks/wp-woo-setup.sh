@@ -18,7 +18,7 @@ script=skills/wp-woocommerce/scripts/woo-setup.php
 skill=skills/wp-woocommerce/SKILL.md
 for f in "$cmd" "$script" "$skill"; do [ -r "$f" ] || fail "$f is missing or unreadable"; done
 
-line_of() { grep -n -- "$1" "$2" | head -1 | cut -d: -f1 || true; }
+line_of() { grep -n -- "$1" "$2" | sed -n 1p | cut -d: -f1 || true; }
 dry=$(line_of '^## Step 5: Dry run first' "$cmd"); apply=$(line_of '^## Step 6: Apply' "$cmd")
 [ -n "$dry" ] && [ -n "$apply" ] && [ "$dry" -lt "$apply" ] || fail "$cmd must show the dry run (Step 5) before applying (Step 6)"
 sync=$(line_of 'store-kit-sync.sh' "$cmd")
@@ -78,9 +78,9 @@ for stale in 'will be our own' 'as of 2026' 'N01 piece' 'pending review' 'deprec
   if grep -Fq "$stale" "$ref"; then fail "$ref carries a roadmap or calendar claim that goes stale: $stale"; fi
 done
 
-h=$(grep -nE '^\s*wooset_step_hpos\(' "$script" | head -1 | cut -d: -f1 || true)
-pg=$(grep -nE '^\s*wooset_step_pages\(' "$script" | head -1 | cut -d: -f1 || true)
-pay=$(grep -nE '^\s*wooset_step_payments\(' "$script" | head -1 | cut -d: -f1 || true)
+h=$(grep -nE '^\s*wooset_step_hpos\(' "$script" | sed -n 1p | cut -d: -f1 || true)
+pg=$(grep -nE '^\s*wooset_step_pages\(' "$script" | sed -n 1p | cut -d: -f1 || true)
+pay=$(grep -nE '^\s*wooset_step_payments\(' "$script" | sed -n 1p | cut -d: -f1 || true)
 [ -n "$h" ] && [ -n "$pg" ] && [ -n "$pay" ] && [ "$h" -lt "$pg" ] && [ "$pg" -lt "$pay" ] \
   || fail "$script must turn HPOS on before it touches pages, and pages before payments"
 grep -Fq "WP_CLI::runcommand( 'wc hpos enable'" "$script" || fail "$script no longer enables HPOS through WooCommerce's own command"

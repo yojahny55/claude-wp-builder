@@ -29,9 +29,9 @@ need 'does not transfer plugins' 'does not state that plugin and theme files are
 
 # Timing. The inventory has to be taken while the source is reachable; afterwards the local
 # database knows names and nothing else. Asserted by position, not just by wording.
-inv=$(grep -n '^### A3.5: Inventory Remote Dependencies' "$f" | head -1 | cut -d: -f1 || true)
-exp=$(grep -n '^### A4: Export Remote Database' "$f" | head -1 | cut -d: -f1 || true)
-ups=$(grep -n '^### A7: Rsync Uploads' "$f" | head -1 | cut -d: -f1 || true)
+inv=$(grep -n '^### A3.5: Inventory Remote Dependencies' "$f" | sed -n 1p | cut -d: -f1 || true)
+exp=$(grep -n '^### A4: Export Remote Database' "$f" | sed -n 1p | cut -d: -f1 || true)
+ups=$(grep -n '^### A7: Rsync Uploads' "$f" | sed -n 1p | cut -d: -f1 || true)
 [ -n "$inv" ] || fail "$f no longer declares A3.5 as a heading"
 [ -n "$exp" ] || fail "$f no longer declares A4 as a heading"
 [ -n "$ups" ] || fail "$f no longer declares A7 as a heading"
@@ -86,8 +86,8 @@ need 'Bundled with claude-wp-builder' 'the persisted inventory has no section fo
 # a request for store-kit.
 need 'bundled first**, then recoverable' 'Path B splits three ways, so a bundled plugin reads as not on WordPress.org'
 need 'matched by slug only' 'Path B classifies by slug without saying it had no header to compare'
-b=$(grep -n 'Bundled plugins first' "$f" | head -1 | cut -d: -f1 || true)
-o=$(grep -n 'api.wordpress.org/plugins/info' "$f" | head -1 | cut -d: -f1 || true)
+b=$(grep -n 'Bundled plugins first' "$f" | sed -n 1p | cut -d: -f1 || true)
+o=$(grep -n 'api.wordpress.org/plugins/info' "$f" | sed -n 1p | cut -d: -f1 || true)
 [ -n "$o" ] || fail "$f no longer looks plugins up at api.wordpress.org/plugins/info"
 [ -n "$b" ] && [ "$b" -lt "$o" ] \
   || fail "$f asks WordPress.org before checking for a bundled plugin, so store-kit would read as unobtainable"

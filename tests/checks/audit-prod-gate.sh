@@ -129,7 +129,7 @@ done
 #    and link-sweep's delay is opt-in.
 grep -Fq 'pw_args=(--workers=1)' bin/audit-suite.sh || fail "audit-suite.sh no longer drops to one worker for a public URL"
 grep -Fq '*.local.com|*.local.com:*' bin/audit-suite.sh || fail "audit-suite.sh lost the local-host exemption"
-node bin/link-sweep.mjs --help | grep -Fq -- '--delay-ms' || fail "link-sweep.mjs does not accept --delay-ms"
+node bin/link-sweep.mjs --help | grep >/dev/null -Fc -- '--delay-ms' || fail "link-sweep.mjs does not accept --delay-ms"
 grep -Fq 'delayMs: 0' bin/link-sweep.mjs || fail "link-sweep.mjs --delay-ms is no longer off by default"
 grep -Fq 'stopOnBlock: false' bin/link-sweep.mjs || fail "link-sweep.mjs --stop-on-block is no longer opt-in"
 grep -Fq 'if (o.stopOnBlock && (res.status === 429' bin/link-sweep.mjs \

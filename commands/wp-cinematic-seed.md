@@ -1,22 +1,20 @@
 ---
-name: wp-cinematic-seed
 description: Seed (or re-seed) all cinematic scenes from a manifest. Idempotent — skips scenes whose `scene_id` already has content unless `--force`. Sideloads sample videos from the kit if no Media Library attachments are pinned.
-arguments:
-  - name: --manifest
-    description: Path to a JSON manifest (default `<theme>/demo/scenes.json` or kit's `templates/scenes.json`)
-    required: false
-  - name: --force
-    description: Overwrite existing scene rows
-    required: false
-  - name: --dry-run
-    description: Print what would change without writing
-    required: false
-  - name: --force-adopted
-    description: Build on an adopted site (third-party theme) on purpose; otherwise the command stops
-    required: false
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob
+argument-hint: "[--manifest <manifest>] [--force] [--dry-run] [--force-adopted]"
 ---
 
 # /wp-cinematic-seed
+
+## Arguments
+
+| Argument | Required | Meaning |
+|---|---|---|
+| `--manifest` | no | Path to a JSON manifest (default `<theme>/demo/scenes.json` or kit's `templates/scenes.json`) |
+| `--force` | no | Overwrite existing scene rows |
+| `--dry-run` | no | Print what would change without writing |
+| `--force-adopted` | no | Build on an adopted site (third-party theme) on purpose; otherwise the command stops |
+
 
 ## Adopted-site guard
 

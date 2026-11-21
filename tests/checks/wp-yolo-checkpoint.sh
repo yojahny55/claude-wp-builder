@@ -28,7 +28,7 @@ grep -Fq "AskUserQuestion" <<<"$s3" || fail "Step 3 does not ask via AskUserQues
 s5=$(awk "/^## Step 5: Phase 3/,/^## Step 5\\.5/" "$f")
 [ -n "$s5" ] || fail "no Step 5 region"
 for c in wp-finalize wp-polish wp-responsive-check wp-audit; do
-  grep -Eq "\\*\\*\`/$c[^\`]*\`\\*\\* — MANDATORY" <<<"$s5" || fail "Step 5 does not mark /$c MANDATORY"
+  grep -Eq "\\*\\*\`/${c}[^\`]*\`\\*\\* — MANDATORY" <<<"$s5" || fail "Step 5 does not mark /$c MANDATORY"
 done
 grep -Fq "Completion rule" <<<"$s5" || fail "Step 5 has no completion rule"
 grep -Fq "incomplete" <<<"$s5" || fail "Step 5 completion rule does not mark a run without items 4-7 incomplete"

@@ -8,7 +8,7 @@
 # This check runs the tool on a file:// fixture, asserts it catches the regression and ignores
 # the noise, and pins the docs that must point at it.
 set -uo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../.." || exit 1
 fail() { echo "FAIL: $*"; exit 1; }
 tool=bin/style-diff.mjs
 [ -f "$tool" ] || fail "$tool is missing"
@@ -37,10 +37,10 @@ page '<span class="i">x</span>'; snap b1; snap b2
 page '<button class="i r">x</button>'; snap after
 out=$(node "$tool" diff "$tmp/b1.json" "$tmp/after.json" --noise "$tmp/b1.json" "$tmp/b2.json"); rc=$?
 [ "$rc" = 1 ] || fail "a tag swap that changed colour and size exited $rc, not 1"
-printf '%s' "$out" | grep -Fq 'color: rgb(255, 255, 255) -> rgb(0, 0, 0)' || fail "the colour change was not reported"
-printf '%s' "$out" | grep -Fq 'fontSize: 26px -> 16px' || fail "the font-size change was not reported"
-printf '%s' "$out" | grep -Fq 'noisy, excluded' || fail "the random-height element was not set apart as noise"
-printf '%s' "$out" | grep -Fq 'nth-child(2)' && printf '%s' "$out" | sed -n '/STYLE diffs/,/SIZE diffs/p' | grep -Fq 'nth-child(2)' \
+printf '%s' "$out" | grep >/dev/null -Fc 'color: rgb(255, 255, 255) -> rgb(0, 0, 0)' || fail "the colour change was not reported"
+printf '%s' "$out" | grep >/dev/null -Fc 'fontSize: 26px -> 16px' || fail "the font-size change was not reported"
+printf '%s' "$out" | grep >/dev/null -Fc 'noisy, excluded' || fail "the random-height element was not set apart as noise"
+printf '%s' "$out" | grep >/dev/null -Fc 'nth-child(2)' && printf '%s' "$out" | sed -n '/STYLE diffs/,/SIZE diffs/p' | grep >/dev/null -Fc 'nth-child(2)' \
   && fail "the noisy element was reported as a style diff"
 # Same page against itself: clean, exit 0.
 node "$tool" diff "$tmp/b1.json" "$tmp/b1.json" >/dev/null || fail "identical snapshots did not exit 0"

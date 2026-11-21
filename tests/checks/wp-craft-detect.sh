@@ -97,7 +97,7 @@ grep -Fq 'if (frame.pageDevices === 0) {' "$vs" \
 # And the silent branch under it. Deleting it, or reordering it above the
 # pageDevices test, sends a device-free section to unobserved (noise) or to
 # no-engine (blocking). Anchored on the branch and its position.
-grep -A1 -F 'if (frame.pageDevices === 0) {' "$vs" | grep -Fq "kind: 'no-engine'" \
+grep -A1 -F 'if (frame.pageDevices === 0) {' "$vs" | grep >/dev/null -Fc "kind: 'no-engine'" \
   || fail "$v does not push no-engine directly under the page-wide device test, so the two were decoupled and no-engine no longer means what it says"
 grep -Fq '} else if (frame.devices === 0) {' "$vs" \
   || fail "$v does not silently skip a section that carries no device of its own on a page that does move, so a plain <section> is reported as a defect"
@@ -140,7 +140,7 @@ grep -Fq "const SCRUB = ['pin', 'pan', 'kinetic', 'wipe', 'drift']" "$vs" \
 # the comparison still pushes a finding when the two samples match.
 grep -Fq 'const after = await page.evaluate(revealState, b.idx);' "$vs" \
   || fail "$v does not take the second reveal sample, so the two-point check cannot run and a sparse walk reports dead scroll on a section that reveals"
-grep -A1 -F 'if (after === before)' "$vs" | grep -Fq "kind: 'dead-scroll'" \
+grep -A1 -F 'if (after === before)' "$vs" | grep >/dev/null -Fc "kind: 'dead-scroll'" \
   || fail "$v does not report dead-scroll when both reveal samples match, so a reveal that never fires walks clean"
 # The predicate itself. Comparing computed opacity/transform let a decorative
 # @keyframes on the reveal's own children counterfeit a live reveal; only a
@@ -165,7 +165,7 @@ grep -Fq "out.push('none')" "$vs" \
 # drop to exit 0. Anchoring the first sample under the exact condition is what
 # makes either edit fail here by name.
 grep -A3 -F 'if (!b.scrub && !reduced && belowFold >= 0) {' "$vs" \
-  | grep -Fq 'const before = await page.evaluate(revealState, b.idx);' \
+  | grep >/dev/null -Fc 'const before = await page.evaluate(revealState, b.idx);' \
   || fail "$v does not gate the two-point reveal check on exactly '!b.scrub && !reduced && belowFold >= 0' with the first sample inside it, so inverting or disabling that guard silently switches reveal detection off"
 # The GSAP fallback path. motion.js drives reveal with rAF tweens when the
 # browser has no view(), and those are invisible to getAnimations(), so the
@@ -289,7 +289,7 @@ grep -Fq 'try { els = document.querySelectorAll(sel); } catch { continue; }' "$v
 # and the lint goes permanently silent. Anchored under the query that produces
 # `els`, so the guard cannot be satisfied by an identical line elsewhere.
 grep -A1 -F 'try { els = document.querySelectorAll(sel); } catch { continue; }' "$vs" \
-  | grep -Fq 'if (!els.length) continue;' \
+  | grep >/dev/null -Fc 'if (!els.length) continue;' \
   || fail "$v does not skip only the selectors that match nothing after querySelectorAll, so inverting that guard skips every selector that does match and the container lint goes silent"
 # The whole match list has to be walked. `for (const el of els)` -> `[els[0]]`
 # restores first-match judgement with querySelectorAll still in place above.
@@ -334,7 +334,7 @@ grep -Fq 'script[type="module"][src]' "$vs" \
 # because the flag is only ever set inside it — container-noop and
 # external-module both disappear with every line of theirs still present, and
 # the run exits 0. Anchored on the guard and on the flag being set inside it.
-grep -A1 -F 'if (!staticChecked) {' "$vs" | grep -Fq 'staticChecked = true;' \
+grep -A1 -F 'if (!staticChecked) {' "$vs" | grep >/dev/null -Fc 'staticChecked = true;' \
   || fail "$v does not gate the static checks on '!staticChecked' with the flag set inside, so inverting that guard silently skips container-noop and external-module entirely"
 # The demo server decodes the request path. decodeURIComponent throws URIError
 # on a malformed escape, and outside the try that throw is uncaught and kills
@@ -351,7 +351,7 @@ grep -Fq 'err instanceof URIError ? 400 : 404' "$vs" \
 grep -Fq 'file = realpathSync(resolve(base, rel));' "$vs" \
   || fail "$v does not resolve the request path through realpath, so a symlink inside the demo root pointing outside it is followed and served"
 grep -A1 -F 'file = realpathSync(resolve(base, rel));' "$vs" \
-  | grep -Fq 'if (file !== base && !file.startsWith(base + sep)) return res.writeHead(404).end();' \
+  | grep >/dev/null -Fc 'if (file !== base && !file.startsWith(base + sep)) return res.writeHead(404).end();' \
   || fail "$v does not refuse a resolved path outside the demo root with 404, so path containment is not enforced at all and a drive-absolute or symlinked path escapes"
 # The relative-isation the containment depends on. Without the leading-separator
 # strip, resolve(base, '/index.html') returns the filesystem root's index.html:
@@ -365,7 +365,7 @@ grep -Fq ".replace(/^[/\\\\]+/, '')" "$vs" \
 grep -Fq "server.once('error', fail);" "$vs" \
   || fail "$v never rejects the serve() promise, so a failed bind hangs the walk instead of reporting a crash"
 grep -A1 -F "server.listen(0, '127.0.0.1', () => {" "$vs" \
-  | grep -Fq "server.removeListener('error', fail);" \
+  | grep >/dev/null -Fc "server.removeListener('error', fail);" \
   || fail "$v leaves the error handler attached after listen succeeds, so a later runtime error rejects an already-settled promise"
 # Anchored on the explanatory phrase from each dedicated bullet, not only the
 # bare kind name: both files also name-drop 'external-module' in passing, in
@@ -410,9 +410,14 @@ grep -Fq '`CSSMediaRule`, `CSSSupportsRule` and `CSSLayerBlockRule` bodies' skil
 if grep -Fq 'it walks only each sheet' skills/wp-demo-craft/references/verify.md; then
   fail "verify.md still records the retired top-level-only limit as current behaviour"
 fi
-if grep -Fq 'The `@container` lint under-reports in one known way' CLAUDE.md; then
-  fail "CLAUDE.md still lists the retired @container top-level-only limit as a known ceiling"
-fi
+# Both files: the ceilings live in docs/known-ceilings.md, and a check on CLAUDE.md alone
+# would stay green on a file that no longer holds them.
+for doc in CLAUDE.md docs/known-ceilings.md; do
+  [ -f "$doc" ] || fail "$doc is missing, so the zero-occurrence control would be vacuous"
+  if grep -Fq 'The `@container` lint under-reports in one known way' "$doc"; then
+    fail "$doc still lists the retired @container top-level-only limit as a known ceiling"
+  fi
+done
 # The first-match limit is retired, not recorded: it was a blocking false
 # positive, not an under-report, so the file must say the lint reads every match
 # — a stale "first match only" line teaches a build to dismiss a finding that is

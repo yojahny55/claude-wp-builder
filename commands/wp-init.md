@@ -1,7 +1,7 @@
 ---
 description: Scaffold a new WordPress project — copies starter theme, replaces placeholders, generates .claude/CLAUDE.md
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob
-argument-hint: "[project-name] [--force-adopted]"
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion
+argument-hint: "[project-name] [--path=<dir>] [--mode=cinematic|--starter=__cinematic__|--template=tailwind|cinematic] [--acf-flavor=scf|acf-pro] [--i18n=suffix|polylang] [--no-hybrid] [--force-adopted]"
 ---
 
 # WP Init — Project Scaffolding
@@ -23,9 +23,68 @@ Exit `0` continue. Exit `5` stop and print the message verbatim: `adopted site w
 use /wp-audit, /wp-debug or /wp-update`. If `$ARGUMENTS` contains `--force-adopted`, append it to the
 call (and ignore it everywhere else): the operator chose to build on an adopted site on purpose.
 
+## Step 0.4: Flag intake
+
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-init-run/references/flag-intake.md` now and parse `--path`,
+`--mode=cinematic`, `--starter=__cinematic__`, `--template`, `--acf-flavor` and `--no-hybrid`
+from `$ARGUMENTS` before asking anything. A preset skips Step 0.5 or 0.6. Only `--mode=cinematic` or
+`--starter=__cinematic__` mark entry from `/wp-cinematic-init`, which is never dispatched back to.
+
+## Pre-Step: Check for `.wp-create.json` Manifest
+
+**First: validate the project configuration.**
+
+`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report". The path travels as a positional argument, never inside the `-c` string: write it in single quotes, and a path that holds a single quote gets each one written as `'\''`.
+
+```bash
+bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
+```
+
+| Exit | Meaning | Do |
+|---|---|---|
+| `0` | valid | continue |
+| `1` | invalid, or the generated context block disagrees with the manifest | stop and report the message verbatim |
+| `2` | an older manifest can migrate | run `wp-config.mjs migrate '${PROJECT_PATH}'`, then continue |
+| `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
+
+On exit 2, run the migration before continuing.
+
+**Exit `3` policy:** `scaffold`, defined in `${CLAUDE_PLUGIN_ROOT}/skills/wp-manifest-gate/SKILL.md`. Read it when the validator exits `3`.
+
+This runs before every question below and before any dispatch to another command: check if `.wp-create.json` exists in the current working directory or parent directories (same search pattern as `wp-content/themes/`).
+
+### If `.wp-create.json` exists:
+
+Read the manifest and extract:
+- `project.name` → use as project name (skip asking in Step 1)
+- `project.slug` → use as theme slug
+- `languages.primary` → use as primary language
+- `languages.additional` → use as secondary language(s)
+- `wp_cli.wrapper` → use for WP-CLI commands instead of bare `wp`
+- `project.domain` → use for site URL references
+
+**Skip Step 1 entirely** — all project details come from the manifest, with one exception: the
+manifest carries no tagline. Take it from the demo when the Demo-First Path runs, and otherwise
+ask Step 1's **Tagline** question on its own. Skipping it leaves Step 9 writing an empty site
+description, which is the state `/wp-finalize` fails on.
+
+### If `.wp-create.json` does NOT exist:
+
+Proceed with the normal flow (Step 0.45 → Step 0.5 → ... → Step 0 → Step 1 → ...). No changes to existing behavior.
+
+## Step 0.45: Stop on a Failed Demo
+
+**Stop if `demo/FAILED.md` exists.** Print its first ten lines and stop. Building
+a theme from a demo that never passed verification produces a verified-looking
+site on an unverified foundation, and every later audit measures the theme rather
+than the demo it came from. The marker is cleared only by a craft verify loop
+starting over (`/wp-demo iterate`, or a fresh craft run), which deletes it at its
+top — so it always describes the last loop. Do not delete it by hand to get past
+this gate.
+
 ## Step 0.5: Select Starter Template
 
-Ask the user to choose a starter template:
+Skip this step when Step 0.4 preset `$TEMPLATE`. Ask the user to choose a starter template:
 
 > **Select a starter template:**
 > 1. **Tailwind Starter** — Tailwind CSS 4 + WordPress Scripts build pipeline, BrowserSync
@@ -46,20 +105,16 @@ failing on it.
 
 ### If `$TEMPLATE = cinematic`
 
-This branch follows a different scaffolding shape — the page is one continuous reel, not discrete sections. After Step 0.6, dispatch to `/wp-cinematic-init` for the cinematic-specific flow:
+This branch follows a different scaffolding shape: the page is one continuous reel, not discrete sections. Who owns what depends on how the run started:
 
-1. Resolve `cinematic-scroll-kit` (globally-installed skill → `./.cinematic-kit/` → vendored fallback in `starter-theme/__cinematic__/assets/cinematic-kit/`).
-2. If none present, offer: `npx skills add yojahny55/cinematic-scroll-kit -g -y` (recommended). Decline → use vendored fallback.
-3. Copy `starter-theme/__cinematic__/` as the theme.
-4. Run the `wp-cinematic` agent against `schemas/scene.json` to generate `fields/scenes.php`, `fields/trailing-sections.php` (if hybrid), `inc/seed-cinematic.php`, and per-scene template fragments.
-5. Skip the per-section `/wp-section` loop. Author scenes via `/wp-cinematic-scene <n>` and append trailing flex sections via `/wp-section <name> --hybrid` if hybrid mode is on.
-6. Seed with `/wp-cinematic-seed` (uses kit sample videos).
+- **Entered from `/wp-cinematic-init`**: only `--mode=cinematic` or `--starter=__cinematic__` mark this (`--template=cinematic` does not: a user can type it with no caller). The caller is already running, so do NOT dispatch to it again (that is a loop), and do not resolve the kit (the caller's Step 0 did). Run this command's normal steps with Step 3 copying `starter-theme/__cinematic__/`, and no `/wp-section` loop, then return to the caller. The `wp-cinematic` agent, `/wp-cinematic-scene`, `/wp-cinematic-seed`, activation-time seeding and menus belong to the caller's Steps 2-3 alone: never run them here. Step 10 prints no "Next step" or live-view line in this branch (see Step 10).
+- **Any other cinematic run** (`--template=cinematic`, or option 2 above): after Step 0.6, dispatch to `/wp-cinematic-init --path=${PROJECT_PATH}`, adding `--acf-flavor=<value>` when Step 0.6 or intake set one (recorded `acf` becomes `acf-pro`, `scf` stays `scf`) `--no-hybrid` and `--force-adopted` when given; it re-enters here with `--mode=cinematic`. Stop.
 
-Hybrid mode is **on by default** for cinematic — pass `--no-hybrid` to disable trailing sections.
+Hybrid mode is **on by default** for cinematic — `--no-hybrid` (the one spelling, here and in `/wp-cinematic-init`) disables trailing sections.
 
 ## Step 0.6: Select Custom Fields Plugin
 
-Ask the user to choose a custom fields plugin:
+Skip this step when Step 0.4 preset `$CF_PLUGIN`. Ask the user to choose a custom fields plugin:
 
 > **Select custom fields plugin:**
 > 1. **SCF** (Secure Custom Fields) — Free, community fork
@@ -106,57 +161,7 @@ Skip this question entirely when `$ARGUMENTS` contains `--i18n=suffix` or
 `--i18n=polylang`, so `/wp-yolo` and other non-interactive callers can pass it
 straight through.
 
-## Pre-Step: Check for `.wp-create.json` Manifest
-
-**First: validate the project configuration.**
-
-`${PROJECT_PATH}` is not an environment variable the way `${CLAUDE_PLUGIN_ROOT}` beside it is: it is the WordPress project root, the directory holding `.wp-create.json`, and you substitute the real path yourself — the one the user named, or the working directory when they named none — because an empty argument makes the validator print its usage line and exit `1`, which the table below then reads as "stop and report". The path travels as a positional argument, never inside the `-c` string: write it in single quotes, and a path that holds a single quote gets each one written as `'\''`.
-
-```bash
-bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
-```
-
-| Exit | Meaning | Do |
-|---|---|---|
-| `0` | valid | continue |
-| `1` | invalid, or the generated context block disagrees with the manifest | stop and report the message verbatim |
-| `2` | an older manifest can migrate | run `wp-config.mjs migrate '${PROJECT_PATH}'`, then continue |
-| `3` | no manifest | this project was not created by `/wp-create`; stop and say so |
-
-On exit 2, run the migration before continuing.
-
-**Exit `3` policy:** `scaffold`, defined in `${CLAUDE_PLUGIN_ROOT}/skills/wp-manifest-gate/SKILL.md`. Read it when the validator exits `3`.
-
-Before anything else, check if `.wp-create.json` exists in the current working directory or parent directories (same search pattern as `wp-content/themes/`).
-
-### If `.wp-create.json` exists:
-
-Read the manifest and extract:
-- `project.name` → use as project name (skip asking in Step 1)
-- `project.slug` → use as theme slug
-- `languages.primary` → use as primary language
-- `languages.additional` → use as secondary language(s)
-- `wp_cli.wrapper` → use for WP-CLI commands instead of bare `wp`
-- `project.domain` → use for site URL references
-
-**Skip Step 1 entirely** — all project details come from the manifest, with one exception: the
-manifest carries no tagline. Take it from the demo when the Demo-First Path runs, and otherwise
-ask Step 1's **Tagline** question on its own. Skipping it leaves Step 9 writing an empty site
-description, which is the state `/wp-finalize` fails on.
-
-### If `.wp-create.json` does NOT exist:
-
-Proceed with the normal flow (Step 0 → Step 1 → ...). No changes to existing behavior.
-
 ## Step 0: Check for Existing Demo
-
-**Stop if `demo/FAILED.md` exists.** Print its first ten lines and stop. Building
-a theme from a demo that never passed verification produces a verified-looking
-site on an unverified foundation, and every later audit measures the theme rather
-than the demo it came from. The marker is cleared only by a craft verify loop
-starting over (`/wp-demo iterate`, or a fresh craft run), which deletes it at its
-top — so it always describes the last loop. Do not delete it by hand to get past
-this gate.
 
 Before asking any project questions, check if a demo already exists.
 
@@ -439,6 +444,8 @@ CLAUDE.md:  <path-to-claude-md>
 
 Next step: Run /wp-demo to create a demo mockup.
 ```
+
+**Entered with `--mode=cinematic` / `--starter=__cinematic__` (both summaries, plain and demo-first):** omit the "Next step" and live-view lines. Print "Returning to `/wp-cinematic-init`" and: "If you ran /wp-init directly, the cinematic scaffold is not finished: run `/wp-cinematic-init --path=<path>`."
 
 If `$TEMPLATE` is `tailwind`, add after "Next step":
 ```

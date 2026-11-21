@@ -25,10 +25,10 @@ fi
 
 # The gate must have scanned something. A green result over zero files is the
 # defect this check exists to close, not a pass.
-echo "$out" | grep -Eq 'assembled ([1-9][0-9]*) compositions' \
+echo "$out" | grep >/dev/null -Ec 'assembled ([1-9][0-9]*) compositions' \
   || fail "composition gate did not report how many compositions it assembled"
 
-n="$(echo "$out" | sed -n 's/.*assembled \([0-9]*\) compositions.*/\1/p' | head -1)"
+n="$(echo "$out" | sed -n 's/.*assembled \([0-9]*\) compositions.*/\1/p' | sed -n 1p)"
 [ "${n:-0}" -ge 13 ] \
   || fail "composition gate assembled only ${n:-0} compositions, expected at least 13"
 
@@ -101,6 +101,28 @@ grep -Fq 'carries no findings list' "$work/shape.out" \
 grep -Eq 'for attempt in 1 2' bin/composition-gate.sh \
   || fail "bin/composition-gate.sh no longer retries the detector on an empty payload (a transient npx failure fails the gate)"
 
+# 4. A rule ignored per composition must stay ignored only there. The stub detector reports
+#    kicker-above-heading twice — once in a composition IGNORED_AT names, once in slop-probe,
+#    which it does not — and the gate must block on slop-probe alone. A filter keyed on the
+#    rule name (the first draft of this exclusion) passes both and turns this red.
+cat > "$work/fakebin/npx" <<'SH'
+#!/usr/bin/env bash
+cat <<'JSON'
+[{"antipattern":"kicker-above-heading","category":"slop","severity":"warning","file":"/x/proof-row.html"},
+ {"antipattern":"kicker-above-heading","category":"slop","severity":"warning","file":"/x/slop-probe.html"}]
+JSON
+SH
+rc=0
+PATH="$work/fakebin:$PATH" COMPS_DIR="$work/slop" bash bin/composition-gate.sh \
+  >"$work/scoped.out" 2>&1 || rc=$?
+[ "$rc" -eq 2 ] \
+  || fail "the composition gate let kicker-above-heading through in a composition IGNORED_AT does not name (rc=$rc, expected 2): $(cat "$work/scoped.out")"
+grep -Fq 'slop-probe fails the slop gate: kicker-above-heading' "$work/scoped.out" \
+  || fail "the composition gate did not name slop-probe for kicker-above-heading: $(cat "$work/scoped.out")"
+if grep -Fq 'proof-row fails' "$work/scoped.out"; then
+  fail "the composition gate blocked proof-row on kicker-above-heading, which IGNORED_AT exempts there: $(cat "$work/scoped.out")"
+fi
+
 # The detector follows the newest 4.x on purpose, so a new release is picked up without a PR.
 # A pinned exact version would freeze the rules instead of answering them.
 grep -Eq 'impeccable@4 detect' bin/composition-gate.sh \
@@ -110,5 +132,7 @@ grep -Eq 'impeccable@4 detect' bin/composition-gate.sh \
 ign=$(grep -E '^IGNORED = ' bin/composition-gate.sh || true)
 [ "$ign" = 'IGNORED = {"hero-eyebrow-chip"}' ] \
   || fail "the gate's IGNORED rules changed ($ign) — each entry needs its reason in the gate and this check updated"
+grep -Eq '^    "kicker-above-heading": \{$' bin/composition-gate.sh \
+  || fail "kicker-above-heading is no longer scoped per composition in IGNORED_AT — a global ignore hides it in new compositions too"
 
 echo PASS

@@ -21,10 +21,10 @@ PKG_MANAGER=""
 # Utility functions
 ##############################################################################
 
-print_status() { [[ "$JSON_OUTPUT" == "false" ]] && echo -e "${BLUE}[INFO]${NC} $1"; }
-print_success() { [[ "$JSON_OUTPUT" == "false" ]] && echo -e "${GREEN}[OK]${NC} $1"; }
-print_warning() { [[ "$JSON_OUTPUT" == "false" ]] && echo -e "${YELLOW}[WARN]${NC} $1"; }
-print_error() { [[ "$JSON_OUTPUT" == "false" ]] && echo -e "${RED}[ERROR]${NC} $1"; }
+print_status() { if [[ "$JSON_OUTPUT" == "false" ]]; then echo -e "${BLUE}[INFO]${NC} $1"; fi; }
+print_success() { if [[ "$JSON_OUTPUT" == "false" ]]; then echo -e "${GREEN}[OK]${NC} $1"; fi; }
+print_warning() { if [[ "$JSON_OUTPUT" == "false" ]]; then echo -e "${YELLOW}[WARN]${NC} $1"; fi; }
+print_error() { if [[ "$JSON_OUTPUT" == "false" ]]; then echo -e "${RED}[ERROR]${NC} $1"; fi; }
 
 # A domain ends up in sudo rm paths, /etc/hosts, a sed regex and an openssl
 # subject, so it is checked before any command acts on it: lowercase letters,
@@ -34,6 +34,28 @@ validate_domain() {
     local domain="$1"
     if [[ ! "$domain" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$ ]]; then
         print_error "Invalid domain '$domain': use lowercase letters, digits, dots and hyphens only"
+        exit 1
+    fi
+}
+
+# The RHEL-style Apache layout is chosen by whether this directory exists. Overridable so a
+# test can select the layout; it only decides WHICH fixed /etc path is written, never where.
+HTTPD_LAYOUT_PROBE="${WP_ENV_HTTPD_LAYOUT_PROBE:-/etc/httpd/conf.d}"
+
+# Web servers native-setup knows how to configure.
+validate_web_server() {
+    case "$1" in
+        nginx|apache|caddy) ;;
+        *) print_error "Unknown web server '$1': use nginx, apache or caddy"; exit 1;;
+    esac
+}
+
+# Root writes a vhost to --dest, so it must sit under a web server's config tree, with no ".."
+# component that could climb out of it. Shared by vhost-install and native-setup.
+validate_vhost_dest() {
+    local dest="$1"
+    if [[ ! "$dest" =~ ^/etc/(nginx|httpd|apache2|caddy)/[^[:space:]]+$ || "$dest" =~ (^|/)\.\.(/|$) ]]; then
+        print_error "Refusing --dest outside /etc/{nginx,httpd,apache2,caddy}/: $dest"
         exit 1
     fi
 }
@@ -70,7 +92,7 @@ detect_os() {
 get_version() {
     local cmd="$1"
     if command -v "$cmd" &>/dev/null; then
-        "$cmd" --version 2>/dev/null | head -1 | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -1 || echo "unknown"
+        "$cmd" --version 2>/dev/null | sed -n 1p | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | sed -n 1p || echo "unknown"
     else
         echo ""
     fi
@@ -79,7 +101,7 @@ get_version() {
 is_running() {
     local service="$1"
     if [[ "$OS" == "macos" ]]; then
-        brew services list 2>/dev/null | grep "$service" | grep -q "started" && echo "true" || echo "false"
+        brew services list 2>/dev/null | grep "$service" | grep -c "started" >/dev/null && echo "true" || echo "false"
     else
         systemctl is-active "$service" &>/dev/null && echo "true" || echo "false"
     fi
@@ -105,7 +127,7 @@ cmd_detect() {
 
     if command -v httpd &>/dev/null || command -v apache2 &>/dev/null; then
         apache_installed=true
-        apache_version=$( (httpd -v 2>/dev/null || apache2 -v 2>/dev/null) | head -1 | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p'  )
+        apache_version=$( (httpd -v 2>/dev/null || apache2 -v 2>/dev/null) | sed -n 1p | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p'  )
         [[ -z "$apache_version" ]] && apache_version="unknown"
         if [[ "$OS" == "fedora" ]] || [[ "$OS" == "rhel" ]]; then
             apache_running=$(is_running httpd)
@@ -167,13 +189,13 @@ cmd_detect() {
     local mariadb_installed=false mariadb_version="" mariadb_running=false
     local mysql_installed=false mysql_version="" mysql_running=false
 
-    if command -v mariadb &>/dev/null || (command -v mysql &>/dev/null && mysql --version 2>/dev/null | grep -qi mariadb); then
+    if command -v mariadb &>/dev/null || (command -v mysql &>/dev/null && mysql --version 2>/dev/null | grep -ci mariadb >/dev/null); then
         mariadb_installed=true
-        mariadb_version=$(mariadb --version 2>/dev/null | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -1 || echo "unknown")
+        mariadb_version=$(mariadb --version 2>/dev/null | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | sed -n 1p || echo "unknown")
         mariadb_running=$(is_running mariadb || is_running mysql)
     elif command -v mysql &>/dev/null; then
         mysql_installed=true
-        mysql_version=$(mysql --version 2>/dev/null | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -1 || echo "unknown")
+        mysql_version=$(mysql --version 2>/dev/null | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | sed -n 1p || echo "unknown")
         mysql_running=$(is_running mysql || is_running mysqld)
     fi
 
@@ -338,6 +360,19 @@ cmd_permissions() {
 
     [[ -z "$path" ]] && { print_error "Usage: wp-env-setup.sh permissions --path=/var/www/html/site [--web-user=nginx]"; exit 1; }
     [[ ! -d "$path" ]] && { print_error "Directory not found: $path"; exit 1; }
+    path=$(realpath -- "$path") || { print_error "Cannot resolve path: $path"; exit 1; }
+    if [[ "$path" == "/" || "$path" == "${HOME:-}" || "$path" == "$(realpath -- "${HOME:-/nonexistent}" 2>/dev/null || true)" ]]; then
+        print_error "Refusing to change permissions on $path"
+        exit 1
+    fi
+    if [[ ! -f "$path/wp-config.php" && ! -d "$path/wp-content" ]]; then
+        print_error "Not a WordPress directory (no wp-config.php or wp-content/): $path"
+        exit 1
+    fi
+    if [[ -n "$web_user" && ! "$web_user" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+        print_error "Invalid --web-user '$web_user'"
+        exit 1
+    fi
 
     detect_os
     if [[ -z "$web_user" ]]; then
@@ -351,16 +386,29 @@ cmd_permissions() {
 
     print_status "Setting permissions for $path (web user: $web_user)..."
 
-    sudo chown -R "$web_user:$web_user" "$path"
-    sudo find "$path" -type d -exec chmod 755 {} \;
-    sudo find "$path" -type f -exec chmod 644 {} \;
+    # .git and node_modules are pruned: their ownership and executable bits are not ours to reset.
+    # chown without -R still follows a symlink given as an operand, so only real directories and
+    # files are listed (a symlink to /etc/shadow is skipped) and -h keeps it off any link that races in.
+    # -execdir applies each change relative to the directory find is visiting, which closes the race on
+    # intermediate directories: an ancestor swapped for a symlink after the listing is not followed.
+    # GNU chmod has no -h, so a leaf swapped for a symlink between find's stat and the exec remains a
+    # narrow residual risk; the type test and the change are one pass, which keeps that window small.
+    # -execdir refuses to run when PATH holds a relative or empty entry, and sudo may keep the caller's
+    # PATH, so find runs under a fixed absolute PATH.
+    local safe_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    sudo env PATH="$safe_path" find "$path" \( -name .git -o -name node_modules \) -prune -o \( -type d -o -type f \) -execdir chown -h "$web_user:$web_user" {} +
+    sudo env PATH="$safe_path" find "$path" \( -name .git -o -name node_modules \) -prune -o -type d -execdir chmod 755 {} +
+    sudo env PATH="$safe_path" find "$path" \( -name .git -o -name node_modules \) -prune -o -type f -execdir chmod 644 {} +
 
-    # Writable directories
-    for dir in uploads plugins themes cache; do
-        [[ -d "$path/wp-content/$dir" ]] && sudo chmod 775 "$path/wp-content/$dir"
-    done
+    # Writable directories: type check and chmod in one find pass; a symlink is excluded by type.
     mkdir -p "$path/wp-content/uploads"
-    sudo chmod 775 "$path/wp-content/uploads"
+    for dir in uploads plugins themes cache; do
+        if [[ -L "$path/wp-content/$dir" ]]; then
+            print_warning "wp-content/$dir is a symlink; leaving its permissions alone"
+        else
+            sudo env PATH="$safe_path" find "$path/wp-content" -mindepth 1 -maxdepth 1 -name "$dir" -type d -execdir chmod 775 {} +
+        fi
+    done
 
     # Add current user to web group
     local current_user
@@ -432,6 +480,11 @@ cmd_service_reload() {
 
     [[ -z "$service" ]] && { print_error "Usage: wp-env-setup.sh service-reload --service=nginx"; exit 1; }
 
+    case "$service" in
+        nginx|apache|apache2|httpd|caddy|php-fpm*|php[0-9]*-fpm) ;;
+        *) print_error "Refusing to reload unknown service '$service'"; exit 1;;
+    esac
+
     detect_os
     print_status "Reloading $service..."
 
@@ -473,6 +526,7 @@ cmd_vhost_install() {
         exit 1
     }
     [[ ! -f "$src" ]] && { print_error "Source file not found: $src"; exit 1; }
+    validate_vhost_dest "$dest"
 
     # Install atomically with correct mode + owner. `install` is preferable to
     # `mv`/`cp` because it sets all three in one call without race windows.
@@ -523,8 +577,31 @@ cmd_native_setup() {
         exit 1
     }
     validate_domain "$domain"
+    validate_web_server "$web_server"
 
     detect_os
+
+    # Work out and validate the vhost destination before anything runs under sudo, so a refusal
+    # leaves no certificate and no hosts entry behind.
+    local dest="" debian_apache=false
+    if [[ -n "$vhost_src" ]]; then
+        case "$web_server" in
+            nginx)  dest="/etc/nginx/conf.d/$domain.conf";;
+            apache)
+                if [[ -d "$HTTPD_LAYOUT_PROBE" ]]; then
+                    dest="/etc/httpd/conf.d/$domain.conf"
+                else
+                    dest="/etc/apache2/sites-available/$domain.conf"
+                    debian_apache=true
+                fi
+                ;;
+            caddy)
+                print_error "--vhost-src is not supported for caddy (configs append to Caddyfile). Install manually."
+                return 1
+                ;;
+        esac
+        validate_vhost_dest "$dest"
+    fi
 
     # SSL
     if [[ "$ssl" == "true" && "$web_server" != "caddy" ]]; then
@@ -537,23 +614,11 @@ cmd_native_setup() {
     # Vhost config — if --vhost-src is provided, install it; otherwise print
     # guidance for Claude to write the config and then call vhost-install.
     if [[ -n "$vhost_src" ]]; then
-        local dest
-        case "$web_server" in
-            nginx)  dest="/etc/nginx/conf.d/$domain.conf";;
-            apache)
-                if [[ -d /etc/httpd/conf.d ]]; then
-                    dest="/etc/httpd/conf.d/$domain.conf"
-                else
-                    dest="/etc/apache2/sites-available/$domain.conf"
-                fi
-                ;;
-            caddy)
-                print_error "--vhost-src is not supported for caddy (configs append to Caddyfile). Install manually."
-                return 1
-                ;;
-        esac
-        if [[ -n "$dest" ]]; then
-            cmd_vhost_install --src="$vhost_src" --dest="$dest"
+        cmd_vhost_install --src="$vhost_src" --dest="$dest"
+        # Debian keeps vhosts in sites-available; they are served only once enabled.
+        if [[ "$debian_apache" == "true" ]]; then
+            sudo a2enmod ssl proxy_fcgi rewrite
+            sudo a2ensite "$domain"
         fi
     else
         print_status "Web server config should be generated by Claude from templates and placed in the appropriate directory."
