@@ -404,22 +404,21 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-run/references/fix-verification.md` 
 
 Collect reports from all agents. For each agent's output, parse the findings into a unified list. The parser is `bin/audit-report.mjs --agents <out>/agents` (Step 8.5): it normalizes the aliases agents drift into (`code` for `check`, `owner` for `ownership`, `fix: auto` for `auto_fixable`), refuses a finding with no catalog id or one also reported as a pass, and builds the run file's findings, so `run.json` is never assembled by a hand-written script.
 
-**Deduplication** runs on two different keys, because two different things collide here.
+**Deduplication** runs on three different keys, because three different things collide here.
+
+*Different ids, one defect.* Apply the "Same defect, one owner" table in `wp-audit-standards` first: owner ran, duplicates `N/A`, findings dropped.
 
 *Two agents reporting the same place.* If the same `file:line` appears in multiple reports:
-- Keep the finding with the highest severity
-- Remove duplicates from lower-severity reports
+- Keep the highest-severity finding and drop the lower-severity duplicates
 - Category claims: Security claims vulnerability checks, Practices claims coding-standards
-  checks. ("Claims" is which auditor the check belongs to. It is not the finding's **owner**
-  — that is Step 8.5's `code`/`setting`/`content`/`manual`, and it says who applies the fix.
-  One word for two unrelated ideas is how a `setting` ends up rendered as `code`.)
+  checks. ("Claims" names the auditor the check belongs to, not the finding's **owner** —
+  Step 8.5's `code`/`setting`/`content`/`manual`, who applies the fix.)
 
-*The suite and an agent reporting the same defect.* With `--suite`, a contrast failure or a
-missing description arrives twice: once measured on a page, once inferred from the source.
+*The suite and an agent reporting the same defect.* With `--suite`, a contrast failure or
+missing description arrives twice: measured on a page, and inferred from the source.
 **A measurement beats an inference.** They are the same defect only when the check **and**
-the resource match — a contrast failure measured on `/contact` and one found in a stylesheet
-rule no audited page uses are two real findings, and the second is the one nobody would find
-again.
+the resource match — a contrast failure measured on `/contact` and one in a stylesheet rule
+no audited page uses are two findings, and the second is the one nobody would find again.
 
 This one is not applied by hand. `bin/audit-report.mjs --merge` does it in Step 8.5, keeping
 the measured finding and recording the loser's code in its evidence so the ledger still

@@ -91,7 +91,7 @@ reader wants production's posture, not a list of what localization changed:
 | `object-cache.php` / `advanced-cache.php` absent or left as `*.bak` | the backing service (Redis, a CDN cache) does not exist locally |
 | `advanced-cache.php` still in place, with `WP_CACHE` true, while the page-cache plugin that wrote it is clone-suppressed (PERF-070) | the drop-in and the constant came with the copy from production, where that plugin is active |
 | A must-use plugin that neutralizes mail or external calls (e.g. a local `wp_mail()` override) | added by the clone to keep the copy from contacting the outside world |
-| `WP_DEBUG` / `WP_DEBUG_LOG` on (SEC-008/009) | a development copy logs; production is what those checks are about (WP-040 is `INFO`, see the severity ceiling below) |
+| `WP_DEBUG` / `WP_DEBUG_LOG` on (SEC-008/009) | a development copy logs; production is what those checks are about (SEC-008 and WP-040 are both `INFO`, see the severity ceiling below) |
 | An attachment whose file is missing on disk **when the file archive predates the database** | the media was uploaded after the file backup was taken; it exists in production |
 
 Do not widen this list to excuse a real defect: a plugin deactivated on the clone that has no

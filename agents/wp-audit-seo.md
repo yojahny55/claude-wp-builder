@@ -68,7 +68,7 @@ Scan theme template files using Grep and Glob. No WP-CLI needed.
 | SEO-003 | Multiple H1 per page | Grep each page template for `<h1` count — more than 1 per template is a violation | WARNING | No |
 | SEO-004 | Skipped heading levels | Analyze heading tags in templates (h1→h3 without h2) | WARNING | No |
 | SEO-005 | No semantic HTML | Grep templates for absence of `<nav>`, `<main>`, `<article>`, `<section>` | INFO | No |
-| SEO-006 | Images missing alt | Grep template `<img` tags for missing `alt=` | WARNING | No |
+| SEO-006 | Images missing alt | Grep template `<img` tags for missing `alt=` (duplicate of A11Y-001, see the Same defect table in `skills/wp-audit-standards/SKILL.md`) | WARNING | No |
 | SEO-007 | Hardcoded meta description | Grep header.php for `<meta name="description"` | WARNING | Yes |
 | SEO-008 | Hardcoded canonical | Grep header.php for `<link rel="canonical"` | WARNING | Yes |
 | SEO-009 | Hardcoded OG meta | Grep header.php for `og:title\|og:description\|og:image` | INFO | Yes |
@@ -468,7 +468,7 @@ Generate a JSON report with the field names of the report contract in `wp-audit-
 }
 ```
 
-Write the report to `audit-results/seo.json`.
+Return this JSON to the parent as your findings, per the dispatch contract in `skills/wp-audit-run/references/dispatch.md`. Write no report file inside the site.
 
 ## Step 5: Fix Phase
 

@@ -105,7 +105,7 @@ Scan all theme `.php` files using Grep and Read. No WP-CLI required for this tie
 | SEC-005 | Hardcoded credentials | Grep `.php` for `api_key\s*=\|password\s*=\|secret\s*=\|token\s*=` (excluding comments) | CRITICAL | No |
 | SEC-006 | DISALLOW_FILE_EDIT missing | Read `wp-config.php`, check if constant defined | WARNING | Yes |
 | SEC-007 | FORCE_SSL_ADMIN missing | Read `wp-config.php`, check if constant defined | WARNING | Yes |
-| SEC-008 | WP_DEBUG true in production | Read `wp-config.php`, check value is `false` | WARNING | Yes |
+| SEC-008 | WP_DEBUG true in production | Read `wp-config.php`, check value is `false` | WARNING (`INFO` on a local clone) | Yes |
 | SEC-009 | WP_DEBUG_DISPLAY true | Read `wp-config.php`, check value is `false` | CRITICAL | Yes |
 | SEC-010 | File permission 777 | Grep config/scripts for `chmod.*777\|0777` | WARNING | No |
 | SEC-011 | PHP execution in uploads | Check if `wp-content/uploads/.htaccess` exists with PHP deny rules | WARNING | Yes |
@@ -193,7 +193,7 @@ Only run these checks if `$WP` wrapper is available from `.wp-create.json`.
 | SEC-023 | REST API users exposed | `$WP eval "echo json_encode(rest_url('wp/v2/users'));"` + check if publicly accessible | Restricted | WARNING |
 | SEC-024 | Login URL default | Check AIOS config for renamed login | Changed | INFO |
 | SEC-025 | User enumeration | `$WP eval "echo get_option('permalink_structure') ? 'yes' : 'no';"` + check `?author=1` blocking | Blocked | WARNING |
-| SEC-026 | PHP version old | `$WP eval "echo phpversion();"` | >= 8.1 | WARNING |
+| SEC-026@2 | PHP version old | `$WP eval "echo phpversion();"` | >= 8.2 (8.1 is out of security support; this is the one place the floor is written) | WARNING |
 | SEC-027 | No SSL | `$WP option get siteurl` | Starts with `https://` | CRITICAL |
 | SEC-028 | Sensitive files in root | Check existence of `readme.html`, `license.txt`, `wp-config-sample.php` | None exist | INFO |
 | SEC-029 | PHP files in uploads | `find wp-content/uploads -name "*.php"` | None found | CRITICAL |

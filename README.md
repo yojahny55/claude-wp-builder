@@ -520,7 +520,7 @@ commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. 
 | `wp-context` | Project-docs analyzer — reads `docs/` and extracts constraints plus an actionable scope manifest |
 | `wp-research` | Client-business researcher — finds the client's web presence and comparable competitors, writes `demo/RESEARCH.md` |
 | `wp-cinematic` | Cinematic scroll specialist — scene fields, template parts and scroll-engine wiring for the `__cinematic__` starter |
-| `wp-audit-security` · `wp-audit-seo` · `wp-audit-a11y` · `wp-audit-performance` · `wp-audit-practices` | The five `/wp-audit` judgment auditors — code scanning, structured data, WCAG 2.1 AA, Core Web Vitals, WordPress standards |
+| `wp-audit-security` · `wp-audit-seo` · `wp-audit-a11y` · `wp-audit-performance` · `wp-audit-practices` | The five `/wp-audit` judgment auditors — code scanning, structured data, WCAG 2.2 AA, Core Web Vitals, WordPress standards |
 | `wp-audit-aios` · `wp-audit-rankmath` | The two mechanical audit installers — All-in-One WP Security and Rank Math, configured via WP-CLI |
 | `wp-audit-geo` | GEO / AI-agent-readiness auditor — maps the ORA check catalog to GEO codes, parses the rendered DOM and runs the is-agentic scan |
 | `wp-audit-ux` | Usability auditor — forms, navigation, links followed rather than inferred, hover and active states, rendered line length per breakpoint, logo and typography consistency across pages |
@@ -644,7 +644,7 @@ The `/wp-audit` command runs a comprehensive audit across 7 categories and offer
 |------|----------|--------------------|
 | `--security` | Security hardening, code scanning | All-in-One WP Security |
 | `--seo` | SEO optimization, schema, meta data | Rank Math SEO |
-| `--a11y` | WCAG 2.1 AA accessibility | — |
+| `--a11y` | WCAG 2.2 AA accessibility | — |
 | `--performance` | Core Web Vitals, caching, assets | — |
 | `--best-practices` | WordPress coding standards | — |
 | `--geo` | GEO / AI-agent readiness, ORA-scored | is-agentic live scan |
