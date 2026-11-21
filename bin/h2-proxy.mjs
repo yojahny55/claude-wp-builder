@@ -17,7 +17,9 @@
  *                  (default: the target host, port 80 or the one in --target)
  *   --port N       HTTPS listen port (default 8443)
  *   --no-cache     do not cache HTML. By default anonymous GET HTML (no WordPress login or
- *                  cart cookie) is cached in memory, like a page cache/CDN would serve it.
+ *                  cart cookie) is cached in memory, like a page cache/CDN would serve it,
+ *                  keyed by URL, request cookies and Accept-Language; a response with
+ *                  Set-Cookie or Cache-Control no-store/private is never cached.
  *   GET /__purge   empties that cache
  *
  * The certificate is self-signed and generated at runtime with `openssl` into a temp dir;
@@ -87,7 +89,10 @@ const server = http2.createSecureServer({ key: fs.readFileSync(key), cert: fs.re
     const chunks = [];
     for await (const c of req) chunks.push(c);
     const anon = req.method === 'GET' && !/wordpress_logged_in|woocommerce_items_in_cart/.test(req.headers.cookie || '');
-    const key = req.url + '|' + (req.headers['x-exp'] || ''); // x-exp: free-form experiment label, part of the cache key
+    // The key is everything that makes the response vary: the URL, the request cookies (a
+    // language cookie such as pll_language picks the language), Accept-Language and x-exp
+    // (a free-form experiment label).
+    const key = [req.url, req.headers.cookie || '', req.headers['accept-language'] || '', req.headers['x-exp'] || ''].join('|');
     let out = useCache && anon && cache.get(key);
     if (!out) {
         const up = await upstream(req, Buffer.concat(chunks)).catch((e) => ({ status: 502, headers: {}, body: Buffer.from(String(e)) }));
@@ -100,7 +105,9 @@ const server = http2.createSecureServer({ key: fs.readFileSync(key), cert: fs.re
         }
         if (headers.location) headers.location = rewrite(headers.location);
         out = { status: up.status, headers, body, type };
-        if (anon && up.status === 200 && /text\/html/.test(type)) cache.set(key, out);
+        // A response that sets a cookie or says it is not shareable is not a page-cache entry.
+        const personal = up.headers['set-cookie'] || /\b(no-store|private)\b/i.test(up.headers['cache-control'] || '');
+        if (anon && !personal && up.status === 200 && /text\/html/.test(type)) cache.set(key, out);
     }
     const headers = { ...out.headers };
     let body = out.body;

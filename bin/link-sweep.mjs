@@ -173,6 +173,8 @@ function isChallenge(res, body) {
 
 const MAX_HOPS = 5;
 
+class RedirectLoop extends Error {}
+
 // Refuse a redirect target the original link's classification never saw. Link-local and
 // metadata addresses are refused by their literal spelling (IPv4-mapped IPv6 included) and by
 // what a hostname resolves to at check time; the clone origin only with --follow-clone-origin;
@@ -201,6 +203,7 @@ async function fetchChecked(o, url, init) {
   let first;
   try { first = new URL(url); } catch { throw new Refused('link with an unparseable URL'); }
   await checkHop(o, first, 'link to', { signal: init.signal, initial: true });
+  const seen = new Set([first.href]);
   for (let hop = 0; ; hop++) {
     const res = await fetch(cur, { ...init, redirect: 'manual' });
     const loc = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
@@ -210,6 +213,10 @@ async function fetchChecked(o, url, init) {
     let next;
     try { next = new URL(loc, cur); } catch { throw new Refused('redirect with an unparseable Location'); }
     next.hash = '';
+    // A target already requested in this chain is a cycle: the link is dead, not unmeasured.
+    // A long chain of distinct URLs is still only "not followed" (the hop cap above).
+    if (seen.has(next.href)) throw new RedirectLoop();
+    seen.add(next.href);
     await checkHop(o, next, 'redirect to', { signal: init.signal });
     cur = next.href;
   }
@@ -264,6 +271,7 @@ async function request(o, url, deadline) {
     else if (moved) verdict = 'redirect';
     return { verdict, status: res.status, final: res.finalUrl };
   } catch (e) {
+    if (e instanceof RedirectLoop) return { verdict: 'broken', status: null, reason: 'redirect loop' };
     if (e instanceof Refused) return { verdict: 'unmeasured', status: null, reason: e.message };
     const timeout = e.name === 'TimeoutError' || e.name === 'AbortError';
     if (timeout && Date.now() >= deadline) {

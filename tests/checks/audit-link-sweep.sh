@@ -39,6 +39,10 @@ const srv = http.createServer((req, res) => {
   if (p === '/to-awsv6/') return done(302, { location: 'http://[fd00:ec2::254]/' });
   if (p === '/direct-private') { directHits++; return done(200); }
   if (p === '/loop/') return done(302, { location: '/loop/' });
+  if (p === '/pingpong/a') return done(302, { location: '/pingpong/b' });
+  if (p === '/pingpong/b') return done(302, { location: '/pingpong/a' });
+  const chain = /^\/chain\/(\d+)$/.exec(p);
+  if (chain) return done(Number(chain[1]) >= 7 ? 200 : 302, { location: `/chain/${Number(chain[1]) + 1}` });
   if (p === '/nohead/') {
     if (req.method === 'HEAD') { headRefused++; return done(405); }
     return done(req.headers.range === 'bytes=0-0' ? 206 : 500);
@@ -134,7 +138,7 @@ if(ok!=='z1/,z3/,z4/'){console.log(ok);process.exit(1)}" <<<"$outpg" \
 # site that redirects to the clone-origin host must not reach it without --follow-clone-origin;
 # a redirect to a link-local/metadata address is never followed; a loop stops at 5 hops. The
 # fixture is reachable as 127.0.0.1 (the site) and as localhost (standing in for the origin).
-printf '/to-origin/\n/to-meta/\n/to-meta6/\n/to-meta6hex/\n/to-awsv6/\n/loop/\n/moved/\n' >"$tmp/redir"
+printf '/to-origin/\n/to-meta/\n/to-meta6/\n/to-meta6hex/\n/to-awsv6/\n/loop/\n/pingpong/a\n/chain/0\n/moved/\n' >"$tmp/redir"
 outr=$(node "$tool" --site "$site" --urls "$tmp/redir" --clone-origin localhost --budget 30)
 hits=$(curl -s "$site/__peak" | node -e "console.log(JSON.parse(require('fs').readFileSync(0,'utf8')).originHits)")
 [ "$hits" = 0 ] || fail "a redirect reached the clone-origin host without --follow-clone-origin ($hits requests)"
@@ -149,7 +153,9 @@ for r in /to-meta6/ /to-meta6hex/ /to-awsv6/; do
   [ "$(qr $r verdict)" = unmeasured ] || fail "redirect to $r was not UNMEASURED"
   qr $r reason | grep >/dev/null -c 'link-local/metadata' || fail "redirect $r was not refused as link-local/metadata: $(qr $r reason)"
 done
-[ "$(qr /loop/ verdict)" = unmeasured ] && qr /loop/ reason | grep >/dev/null -c 'more than 5 redirects' || fail "a redirect loop was not stopped at 5 hops"
+[ "$(qr /loop/ verdict)" = broken ] && [ "$(qr /loop/ reason)" = "redirect loop" ] || fail "a self-redirect was not BROKEN as a redirect loop: $(qr /loop/ verdict) $(qr /loop/ reason)"
+[ "$(qr /pingpong/a verdict)" = broken ] && [ "$(qr /pingpong/a reason)" = "redirect loop" ] || fail "a two-URL redirect cycle was not BROKEN as a redirect loop"
+[ "$(qr /chain/0 verdict)" = unmeasured ] && qr /chain/0 reason | grep >/dev/null -c 'more than 5 redirects' || fail "a long chain of distinct URLs was not stopped at 5 hops as UNMEASURED"
 [ "$(qr /moved/ verdict)" = redirect ] || fail "a same-site redirect is no longer followed"
 outf=$(printf '/to-origin/\n' | node "$tool" --site "$site" --clone-origin localhost --follow-clone-origin --budget 30)
 grep -q '"verdict": "redirect"' <<<"$outf" || fail "--follow-clone-origin did not allow the redirect to the origin"
