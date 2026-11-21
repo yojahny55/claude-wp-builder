@@ -30,11 +30,12 @@ sev() {
 for f in "$A11Y" README.md; do
   if grep -q 'WCAG 2.1 AA' "$f"; then fail "$f still states WCAG 2.1 AA"; fi
 done
-for pair in 070:2.4.11 071:3.3.8 072:2.5.7 073:3.3.7 074:3.2.6; do
-  id=A11Y-${pair%%:*}; crit=${pair##*:}
+# Each row names its criterion at its own level: 3.3.7 and 3.2.6 are level A, the rest AA.
+for spec in 070:AA:2.4.11 071:AA:3.3.8 072:AA:2.5.7 073:A:3.3.7 074:A:3.2.6; do
+  id=A11Y-${spec%%:*}; rest=${spec#*:}; lvl=${rest%%:*}; crit=${rest#*:}
   r=$(row "$A11Y" "$id")
   [ -n "$r" ] || fail "$A11Y: $id is not a table row"
-  case "$r" in *"$crit"*) ;; *) fail "$id does not name criterion $crit";; esac
+  case "$r" in *"(WCAG 2.2 $lvl $crit)"*) ;; *) fail "$id must name '(WCAG 2.2 $lvl $crit)'";; esac
 done
 
 # --- one PHP floor ---

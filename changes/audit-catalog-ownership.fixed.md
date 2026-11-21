@@ -1,7 +1,7 @@
 - **`/wp-audit` scores each defect once, audits to WCAG 2.2 AA, and no longer writes reports
   into the site.** The accessibility auditor now targets WCAG 2.2 AA and tabulates the new
   criteria as A11Y-070 to A11Y-074 (focus obscured, accessible authentication, dragging
-  movements, redundant entry, consistent help). The PHP version floor is `>= 8.2`, written
+  movements, redundant entry and consistent help, the last two at level A). The PHP version floor is `>= 8.2`, written
   only in SEC-026 and in the new "Same defect, one owner" table; PERF-040 and WP-042 point at
   it. That table names the owner of defects listed under several ids (PHP floor, XML-RPC,
   `WP_DEBUG`, escaping, dangerous functions, `wp_body_open`, image alt) and the `root_cause`
