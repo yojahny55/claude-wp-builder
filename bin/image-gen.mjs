@@ -9,12 +9,13 @@
  * that logs commands. Here the key is read from process.env in-process, so no
  * invocation exists for anything to log.
  *
- * Exit codes: 0 clean, 2 the plan was refused before any request (a gap with
- * both or neither of prompt/use, or a composed prompt that no longer matches
- * the one plan showed and the operator approved), 3 no key (nothing written,
+ * Exit codes: 0 clean, 2 the input was refused before any request (a missing,
+ * unreadable or non-object plan file, an unknown provider, a gap with both or neither of
+ * prompt/use, two `use` files that share a basename, or a composed prompt that
+ * no longer matches the one plan showed and the operator approved), 3 no key (nothing written,
  * nothing billed), 4 one or more slots failed after work began.
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, realpathSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, renameSync, unlinkSync, realpathSync } from 'node:fs';
 import { resolve, join, dirname, basename, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -117,7 +118,9 @@ export function readDesign(demo) {
 export function readWorld(demo) {
   const f = join(demo, 'BRIEF.md');
   if (!existsSync(f)) return null;
-  const m = /^## World[^\n]*\n([\s\S]*?)(?=\n## |\s*$)/m.exec(readFileSync(f, 'utf8'));
+  // `^## ` under the m flag also stops at a heading on the very next line, so an empty
+  // World never swallows the section after it.
+  const m = /(?:^|\n)## World[^\n]*\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(readFileSync(f, 'utf8').replace(/\r\n?/g, '\n'));
   if (!m) return null;
   const text = m[1].split('\n').map((l) => l.replace(/^>\s?/, '').trim()).filter(Boolean).join(' ');
   return text || null;
@@ -144,14 +147,40 @@ function readBuild(demo) {
 }
 
 function planPath(demo) { return join(demo, '.image-plan.json'); }
-function readPlan(demo) { return JSON.parse(readFileSync(planPath(demo), 'utf8')); }
+// A missing or unparseable plan is a usage error (exit 2), not a failed slot
+// (exit 4): nothing was attempted, so nothing can have been billed.
+// The build writes the plan file (wp-demo-run craft-composition); `plan` then
+// composes its prompts, so neither command can create a missing one.
+function readPlan(demo) {
+  let plan;
+  try {
+    plan = JSON.parse(readFileSync(planPath(demo), 'utf8'));
+  } catch (e) {
+    warn(`cannot read ${planPath(demo)}: ${e.code || e.message}. The craft build writes it from its composition table.`);
+    process.exit(2);
+  }
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan)) {
+    warn(`${planPath(demo)} is not a JSON object`);
+    process.exit(2);
+  }
+  return plan;
+}
+const ENV_VAR = { google: 'GEMINI_API_KEY', openai: 'OPENAI_API_KEY' };
+function parseProvider(plan) {
+  const [vendor, model] = String(plan.provider).split('/');
+  if (!Object.hasOwn(ENV_VAR, vendor) || !model) {
+    warn(`unknown provider "${plan.provider}": expected ${Object.keys(ENV_VAR).map((v) => `${v}/<model>`).join(' or ')}`);
+    process.exit(2);
+  }
+  return [vendor, model];
+}
 function writePlan(demo, plan) {
   writeFileSync(planPath(demo), JSON.stringify(plan, null, 2) + '\n');
 }
 
 function cmdPlan(demo) {
   const plan = readPlan(demo);
-  const [vendor, model] = String(plan.provider).split('/');
+  const [vendor, model] = parseProvider(plan);
   const imgDir = join(demo, 'assets', 'img');
   const build = readBuild(demo);
 
@@ -201,11 +230,9 @@ function cmdPlan(demo) {
   say('Costs are estimates, not a bill.');
 }
 
-const ENV_VAR = { google: 'GEMINI_API_KEY', openai: 'OPENAI_API_KEY' };
-
 async function cmdRun(demo) {
   const plan = readPlan(demo);
-  const [vendor, model] = String(plan.provider).split('/');
+  const [vendor, model] = parseProvider(plan);
   const imgDir = join(demo, 'assets', 'img');
   mkdirSync(imgDir, { recursive: true });
   const gaps = plan.gaps || [];
@@ -248,6 +275,20 @@ async function cmdRun(demo) {
     }
   }
 
+  // Two different files sharing a basename would overwrite each other in
+  // assets/img, and both slots would report the survivor.
+  const seen = new Map();
+  for (const g of gaps) {
+    if (!g.use) continue;
+    const src = resolve(isAbsolute(g.use) ? g.use : resolve(projectRoot, g.use));
+    const prev = seen.get(basename(g.use));
+    if (prev && prev !== src) {
+      warn(`${g.page}/${g.section}/${g.slot}: "use" files share the basename ${basename(g.use)} but are different files; rename one.`);
+      process.exit(2);
+    }
+    seen.set(basename(g.use), src);
+  }
+
   const needsKey = gaps.some((g) => g.prompt && !isCached(imgDir, g, model));
   const envVar = ENV_VAR[vendor];
   const key = process.env[envVar];
@@ -268,7 +309,11 @@ async function cmdRun(demo) {
       const dest = join(imgDir, basename(g.use));
       try {
         // Same source and destination would truncate the file mid-copy.
-        if (resolve(src) !== resolve(dest)) copyFileSync(src, dest);
+        if (resolve(src) !== resolve(dest)) {
+          const tmp = `${dest}.tmp-${process.pid}`;
+          try { copyFileSync(src, tmp); renameSync(tmp, dest); }
+          catch (err) { try { unlinkSync(tmp); } catch {} throw err; }
+        }
         g.result = { file: `assets/img/${basename(g.use)}`, generated: false };
         say(`  ${g.slot}: used ${g.use}`);
       } catch (e) {
@@ -324,13 +369,21 @@ export async function generateInto(imgDir, file, { vendor, model, key, g }) {
   // it would cache an empty file forever behind a plate that was already
   // billed once real generation happens on a later, unrelated run.
   if (!bytes || bytes.length === 0) throw new Error(`${vendor} returned an empty image payload`);
-  writeFileSync(join(imgDir, file), bytes);
-  writeFileSync(join(imgDir, file.replace(/\.jpg$/, '.json')), JSON.stringify({
+  // Sidecar first, image last, each through a temp file and a rename: the
+  // cache test is "the .jpg exists", so a run killed mid-write must never
+  // leave a truncated .jpg that every later run treats as already paid for.
+  const atomic = (name, data) => {
+    const tmp = join(imgDir, `${name}.tmp-${process.pid}`);
+    try { writeFileSync(tmp, data); renameSync(tmp, join(imgDir, name)); }
+    catch (err) { try { unlinkSync(tmp); } catch { /* never created */ } throw err; }
+  };
+  atomic(file.replace(/\.jpg$/, '.json'), JSON.stringify({
     model, prompt: g.prompt, prompt_sent: g.prompt_sent, aspect: g.aspect, size: g.size,
     date: new Date().toISOString().slice(0, 10),
     est_cost: g.est_cost,
     synthid: vendor === 'google',
   }, null, 2) + '\n');
+  atomic(file, bytes);
 }
 
 // One retry, then give up on this slot -- but only for a failure a retry can
@@ -338,13 +391,18 @@ export async function generateInto(imgDir, file, { vendor, model, key, g }) {
 // back, so nothing was attempted server-side) or a transient HTTP 5xx. A 4xx
 // is deterministic, and a failure that surfaces AFTER the response already
 // reported success means the request was already billed -- retrying either
-// just pays twice for one plate. Reads e.status rather than matching on the
-// error message, so rewording a message can never change retry behaviour.
+// just pays twice for one plate. A timeout is not retried either: the request
+// was sent and may still be generating (and billing) server-side when the
+// client gives up, so a second request could pay twice. Reads e.status and
+// e.name rather than the message, so rewording a message can never change
+// retry behaviour.
+export const FETCH_TIMEOUT_MS = 120000;
 export async function once(fn) {
   try {
     return await fn();
   } catch (e) {
     if (e.status && e.status < 500) throw e;
+    if (e.name === 'TimeoutError' || e.name === 'AbortError') throw e;
     return await fn();
   }
 }
@@ -362,6 +420,7 @@ export async function callGoogle(model, key, g) {
           aspect_ratio: g.aspect, image_size: g.size,
         },
       }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     // Status only. The response body can echo the request, and the request
     // carries nothing secret, but the headers object does - never format it.
@@ -395,6 +454,7 @@ export async function callOpenAI(model, key, g) {
         model, prompt: g.prompt_sent ?? g.prompt, size: g.size,
         quality: 'medium', output_format: 'jpeg', n: 1,
       }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!r.ok) {
       const e = new Error(`openai returned HTTP ${r.status}`);
