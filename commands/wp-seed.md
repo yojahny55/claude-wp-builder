@@ -63,7 +63,7 @@ Extract and store:
 - **Project slug** — `project.slug`
 - **Project path** — `project.path`
 
-If `.wp-create.json` does not exist, fall back the same way `/wp-debug` does:
+If `.wp-create.json` does not exist, apply the `bare-wp-fallback` policy named above (`/wp-debug` uses `adopt-or-bare-wp`, which differs):
 - Check if bare `wp` is available: `bash -c "which wp"`
 - If available, set `$WP` to `wp` (assume the current directory is the WordPress root) and
   take the languages from the `Languages:` line of `.claude/CLAUDE.md` instead (first =

@@ -1,8 +1,8 @@
-# /wp-finalize — Check 7: WP-CLI Runtime Validation (when `.wp-create.json` exists)
+# /wp-finalize — Check 7: WP-CLI Runtime Validation
 
 `commands/wp-finalize.md` sends the run here at Check 7: WP-CLI Runtime Validation. Follow it in order; nothing in it is optional background.
 
-If `.wp-create.json` exists in the project, read `wp_cli.wrapper` and run runtime checks:
+Read `wp_cli.wrapper` and run runtime checks:
 
 1. **Pages exist with correct templates:**
    ```bash

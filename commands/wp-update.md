@@ -85,7 +85,7 @@ Treat the root as a **local clone** when `.wp-create.json` has `project.source: 
 2. Record the start marks used by Step 5: the byte size of `wp-content/debug.log`
    (`stat -c %s`, 0 if absent) and the time. On a clone also record the enabled WooCommerce
    gateways and the active plugin list, for Step 6.
-   When the site had performance work (see Step 5.3), also count the render-blocking scripts in
+   When the site had performance work (see Step 5, item 3), also count the render-blocking scripts in
    the home page `<head>` now, for the same comparison afterwards:
 
    ```bash
@@ -247,7 +247,7 @@ version is reported, not retried with guessed flags.
 3. **Head scripts**: when the site had performance work (deferred or delayed scripts, or a
    page-cache/optimizer plugin), compare the render-blocking `<script src>` in the home page
    `<head>` with and without `defer`/`async`/`type=module` against the pre-update count taken
-   in Step 1.2 (same command); a new blocking script is a regression to report.
+   in Step 1, item 2 (same command); a new blocking script is a regression to report.
 4. **Regression suite**: if `.wp-audit/suite/` exists (the shopper-flow suite installed by
    `/wp-audit`), run `REGRESSION_LABEL=after npm run test:regression` there and
    `npm run regression:compare -- before after`, and quote the pass/fail counts. It is meant for
@@ -281,7 +281,7 @@ isolation. Read the state, change nothing without asking:
   now active.
 
 Anything re-enabled is reported as a regression with the command that turns it off again;
-offer it, do not run it silently. The live-gateway-key gate is in Step 1.2, before the update.
+offer it, do not run it silently. The live-gateway-key gate is in Step 1, item 2, before the update.
 
 ## Step 7: Report
 

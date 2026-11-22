@@ -27,6 +27,8 @@ bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '$
 
 On exit 2, run the migration before continuing.
 
+**Exit `3` policy:** `stop` — `/wp-finalize` has no run without a manifest.
+
 Read `.claude/CLAUDE.md` to extract:
 - **Function prefix** (e.g., `kairo_`)
 - **Theme slug**
@@ -146,7 +148,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-finalize-run/references/theme-structure.md
 
 ---
 
-### Check 7: WP-CLI Runtime Validation (when `.wp-create.json` exists)
+### Check 7: WP-CLI Runtime Validation
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-finalize-run/references/wp-cli-runtime.md` now and follow it in order.
 
@@ -222,58 +224,41 @@ path alongside the rest of the checklist.
 ```
 === WP Finalize Report ===
 
-[PASS] Escaping validation
-  All echo statements properly escaped.
-
-[FAIL] Bilingual coverage
+[PASS] Check 1: Escaping validation
+[FAIL] Check 2: Bilingual coverage
   - fields/hero.php: missing hero_title_es variant
   - template-parts/section-about.php:12: raw get_field('about_title') used
-
-[PASS] Responsive breakpoints
-  Media queries found for: 576px, 768px, 1024px, 1440px
-
-[PASS] Theme structure
-  All required files present.
-
-[FAIL] Content templates
+[PASS] Check 3: Responsive breakpoints
+[PASS] Check 4: Theme structure
+[FAIL] Check 5: Content templates
   - template-parts/section-pricing.php referenced but does not exist
-
-[PASS] Settings page
-  Options page registered, fields/settings.php loaded.
-
-[PASS] WP-CLI runtime validation
-  Pages, menus, ACF fields, permalinks, PHP errors, and plugins all verified.
-  (Skipped if .wp-create.json not found)
-
+[PASS] Check 6: Settings page
+[PASS] Check 7: WP-CLI runtime validation
+[PASS] Check 8: GEO & agent-readiness
 [PASS] Tailwind convention
-  No leftover assets/css/styles.css, no empty or comment-only .css, every .css
-  really imported by main.css, no unsanctioned or nested directory, utilities
-  present in the markup.
-  (Skipped when Template: is basic)
-
-[PASS] GEO & agent-readiness
-  Raw-HTML content and heading order, metadata, JSON-LD identity, robots AI policy,
-  sitemap lastmod, trust anchors, 404 status, well-known discovery, and llms.txt
-  all verified.
+[PASS] Demo-parity Layer 1 (static)
+[FAIL] Demo-parity Layer 2 (WP-CLI)
+  - front page: hero_title empty on a page the demo fills
+[SKIP] Demo-parity Layer 3 (visual): claude-in-chrome not connected
 
 ---
-Result: 5/9 checks passed — 4 issues found (with .wp-create.json, tailwind template)
-Result: 5/7 checks passed — 2 issues found (without .wp-create.json, basic template)
+Result: 8/11 checks passed — 3 failed, 1 skipped
 
-Note: two checks are conditional. Check 7 (WP-CLI Runtime Validation) only runs when
-`.wp-create.json` exists, and the Tailwind convention check only runs when `Template:`
-is `tailwind`. The denominator is 7, 8 or 9 accordingly — count the checks you actually
-ran, and never report a total that omits a check that did run.
+Note: this example is a tailwind project. Count only the checks you ran: a SKIP
+(Layer 2 or 3 unavailable) leaves the denominator, the Tailwind convention is only
+in the list when `Template:` is `tailwind`, and the craft gate is only in it when
+`.wp-create.json` records `"demo mode": "craft"`. Always report the failed and skipped
+counts beside the total, and never omit a check that ran. Every project here has a
+manifest: Step 1 stops on exit `3`, so there is no run without `.wp-create.json`.
 
-Issues to fix:
-1. Add Spanish field variants in fields/hero.php
-2. Replace get_field() with prefix_get_field() in section-about.php
-3. Create template-parts/section-pricing.php or remove the reference
+Issues to fix (one per FAIL):
+1. Bilingual coverage: add Spanish field variants in fields/hero.php; use prefix_get_field() in section-about.php
+2. Content templates: create template-parts/section-pricing.php or remove the reference
+3. Layer 2: fill hero_title on the front page
 ```
 
 If all checks pass:
 ```
 ---
-Result: Ready to deliver! All 9 checks passed. (8/8 on the basic template, 7/7 if
-there is also no .wp-create.json — state the denominator you actually ran)
+Result: Ready to deliver! All <N> checks passed. (State the denominator you actually ran.)
 ```

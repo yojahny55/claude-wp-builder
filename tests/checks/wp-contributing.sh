@@ -177,8 +177,13 @@ grep -Fq 'fail=0; for f in tests/checks/*.sh; do bash "$f" || { echo "FAILED: $f
   || fail "$s does not give the aggregating form of the check loop"
 grep -Fq '[ "$fail" = 0 ] && bash bin/doc-sync-check.sh' "$s" \
   || fail "$s does not gate doc-sync on every check passing"
-grep -Fq 'git push origin main && git push origin vX.Y.Z' "$c" \
-  || fail "$c does not say how to push the release commit and its tag"
+grep -Fq 'git tag -a vX.Y.Z <merge-sha> -m "vX.Y.Z" && git push origin vX.Y.Z' "$c" \
+  || fail "$c does not say how to tag the merge commit and push the tag"
+grep -Fq 'release/X.Y.Z' "$c" \
+  || fail "$c does not send the release commit through a release/X.Y.Z branch and PR"
+if grep -Fq 'git push origin main' "$c"; then
+  fail "$c still tells the release to push to main directly"
+fi
 step5=$(awk '/^## Step 5/{f=1} f' "$c")
 recon=$(grep -n 'Reconciled' <<<"$step5" | sed -n 1p | cut -d: -f1 || true)
 commit=$(grep -n 'chore(release)' <<<"$step5" | sed -n 1p | cut -d: -f1 || true)

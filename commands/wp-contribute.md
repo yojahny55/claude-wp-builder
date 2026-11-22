@@ -216,13 +216,16 @@ Refuse unless the working tree is clean, the branch is `main`, `main` is up to d
    release whose own suite is red.
 5. **Re-run Step 3.** The version and backlog checks can only go red after steps 2-4. A
    `FAILED:` line or a red doc-sync stops here: fix it and run Step 3 again until both pass.
-6. Commit, tag, and push both over SSH:
+6. Commit the bump (`git commit -am "chore(release): vX.Y.Z"`) on a `release/X.Y.Z` branch cut
+   from an up-to-date `main`, push that branch over SSH and open the version PR (never push to `main` directly). There is no release workflow in
+   CI: merging the PR creates neither the tag nor the release.
+7. After the merge, from the merge commit on `main`, publish the tag and the release by hand:
 
    ```bash
-   git commit -am "chore(release): vX.Y.Z" && git tag -a vX.Y.Z -m "vX.Y.Z"
-   git push origin main && git push origin vX.Y.Z
+   git tag -a vX.Y.Z <merge-sha> -m "vX.Y.Z" && git push origin vX.Y.Z
+   env -u GH_TOKEN gh release create vX.Y.Z --verify-tag --title vX.Y.Z \
+     --notes-file <the X.Y.Z section of CHANGELOG.md> --latest
    ```
-7. `env -u GH_TOKEN gh release create vX.Y.Z --title "…" --notes-file <file> --latest`.
 8. **Verify**: the release is published and not a draft; the tag resolves on the remote; and
    the raw `.claude-plugin/*.json` served from GitHub carry the new version — that is what a
    user's install reads. The GitHub release is the artifact: verify all three by hand.
