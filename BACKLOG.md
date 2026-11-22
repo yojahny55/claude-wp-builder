@@ -13,10 +13,13 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 
 **Priority:** Items within each section are ordered by priority (highest first).
 
-**Reconciled** on November 21, 2026 against `main` at v1.33.0. Every open and partial
-item was checked against what 1.33.0 shipped (input hygiene in the `bin/` tools, shared native
-server deny rules, audit-catalog ownership, a slimmer CLAUDE.md), and none changed state: the
-Docker nginx config still has no owner, and the REST block is still not written down. The full pass against
+**Reconciled** on November 22, 2026 against `main` at v1.34.0. Every open and partial
+item was checked against what 1.34.0 shipped (the starters' language negotiation behind a page
+cache, `/wp-status`, `/wp-backup` and `/wp-restore`, the exit-code table, the Rank Math agent on
+sonnet, `impeccable@latest`). Those seven moved to delivered; the cinematic switcher under
+Polylang and the tailwind starter strings stay open, as measured proposals not yet applied, and the
+seeded-defects item stays partial with a narrower gap. The Docker nginx config still has no owner,
+and the REST block is still not written down. The full pass against
 the command, agent or script that would own each item was last made at v1.31.0. An item
 claiming to be open while the behavior ships reads as a project that does not know what it
 has built.
@@ -37,18 +40,11 @@ that one happened.
 
 Issues discovered during testing that need to be resolved.
 
-- [ ] **Theme language survives a page cache** `OPEN`
-  The starters' `inc/i18n.php` ([tailwind](starter-theme/__tailwind__/inc/i18n.php),
-  [cinematic](starter-theme/__cinematic__/inc/i18n.php)) pick the language from `?lang`, a cookie and `Accept-Language`
-  without a `Vary` header or a cache bypass, so behind a page cache the first visitor's
-  language is served to everyone. `Accept-Language` also ignores q-values (`fr,es;q=0.9`
-  resolves to `en`), and the tailwind and cinematic starters resolve an unknown `?lang`
-  differently. Send `Vary` and `nocache_headers()` on language-negotiated responses, parse
-  q-values, and share one resolution rule.
+- [x] **Theme language survives a page cache** `DELIVERED`
+  Both starters' `inc/i18n.php` ([tailwind](starter-theme/__tailwind__/inc/i18n.php), [cinematic](starter-theme/__cinematic__/inc/i18n.php)) send `Vary: Accept-Language, Cookie` and `nocache_headers()` on language-negotiated responses, read `Accept-Language` q-values (`fr,es;q=0.9` is Spanish) and share one rule for an unknown `?lang`. [theme-i18n-request-lang](tests/checks/theme-i18n-request-lang.sh) guards it.
 
-- [ ] **Language attribute on the front end only** `OPEN`
-  The `language_attributes` filter in both starters' `inc/i18n.php` ([tailwind](starter-theme/__tailwind__/inc/i18n.php), [cinematic](starter-theme/__cinematic__/inc/i18n.php)) also runs in wp-admin and on the login
-  screen, which then carry the visitor's `lang`. Return early there.
+- [x] **Language attribute on the front end only** `DELIVERED`
+  The `language_attributes` filter in both starters' `inc/i18n.php` ([tailwind](starter-theme/__tailwind__/inc/i18n.php), [cinematic](starter-theme/__cinematic__/inc/i18n.php)) returns early in wp-admin and on the login screen, so they keep the site's own `lang`. [theme-i18n-request-lang](tests/checks/theme-i18n-request-lang.sh) guards it.
 
 - [ ] **Cinematic language switcher under Polylang** `OPEN`
   The cinematic starter's switcher is a fixed `add_query_arg('lang', …)` with untranslated
@@ -150,16 +146,11 @@ Improving how content is created, organized, and populated.
 
 Making the command flow smoother and more guided.
 
-- [ ] **`/wp-status`: what step comes next** `OPEN`
-  A new command, read-only, that reads `.wp-create.json`, the build ledger, the audit ledger and
-  `demo/FAILED.md` and says where the project stands and which command to run next. Today
-  that state is spread over four files and each command reports only its own part.
+- [x] **`/wp-status`: what step comes next** `DELIVERED`
+  [wp-status](commands/wp-status.md) runs [wp-status.mjs](bin/wp-status.mjs), read-only: it reads `.wp-create.json`, `.claude/CLAUDE.md`, `demo/` (including `FAILED.md`), the build ledger and the audit ledger, and ends with `Next: <command> - <reason>`; `--json` gives the same report to scripts. [wp-status](tests/checks/wp-status.sh) guards it.
 
-- [ ] **`/wp-backup` and `/wp-restore`** `OPEN`
-  The database export is written three times, in [wp-update](commands/wp-update.md),
-  [wp-clone](commands/wp-clone.md) and [wp-anonymize](commands/wp-anonymize.md), and none of
-  them covers `wp-content/uploads`. One pair of commands owns the export, its private
-  permissions, the uploads archive and a verified restore, and the three commands call it.
+- [x] **`/wp-backup` and `/wp-restore`** `DELIVERED`
+  [wp-backup](commands/wp-backup.md) runs [wp-backup.sh](bin/wp-backup.sh): a verified database dump (SQL header and footer, atomic rename) plus the uploads archive, in a private folder outside the WordPress root, with sha256 sums and counts in `backup.json`. [wp-restore](commands/wp-restore.md) runs [wp-restore.sh](bin/wp-restore.sh): verifies the sums, takes a pre-restore copy and fails unless site URL, table count and post count match afterwards. [wp-update](commands/wp-update.md), [wp-clone](commands/wp-clone.md) and [wp-anonymize](commands/wp-anonymize.md) call it instead of exporting by hand. [wp-backup-restore](tests/checks/wp-backup-restore.sh) guards it.
 
 - [ ] **Section list command** `PARTIAL`
   **Gap:** [wp-init](commands/wp-init.md) parses the delimiters and prints the detected sections as part of its own run. There is no standalone command or flag that lists them without initializing a theme.
@@ -174,7 +165,7 @@ Making the command flow smoother and more guided.
   [motion-devices](tests/checks/motion-devices.sh) now drives both paths. Under default motion it loads the real pinned GSAP from `node_modules` and asserts the rail's transform tracks scroll and that the JS `reveal` branch hides its children and then shows them — reached by forcing `CSS.supports('animation-timeline', …)` to report false, since every browser the suite can run supports it and the CSS engine would otherwise take over.
 
 - [ ] **Broken-site corpus with expected audit findings** `PARTIAL`
-  A fixture site seeded with known defects and a file of the findings an audit should report. Without it no test can fail because an audit *missed* a defect — the ceiling CLAUDE.md records for the whole audit family. [seeded-defects](tests/fixtures/seeded-defects/) now ships a theme and plugin with 11 marked defects and `expected-findings.json`, and [provision.sh](tests/fixtures/wp/provision.sh) installs them with `WP_FIXTURE_SEEDED=1`. **Gap:** [the check](tests/checks/seeded-defects.sh) only validates the corpus offline; comparing a real `/wp-audit` run against it needs `SEEDED_FINDINGS`, and CI has no audit run to compare.
+  A fixture site seeded with known defects and a file of the findings an audit should report. Without it no test can fail because an audit *missed* a defect — the ceiling CLAUDE.md records for the whole audit family. [seeded-defects](tests/fixtures/seeded-defects/) now ships a theme and plugin with 11 marked defects and `expected-findings.json`, and [provision.sh](tests/fixtures/wp/provision.sh) installs them with `WP_FIXTURE_SEEDED=1`. **Gap:** [the check](tests/checks/seeded-defects.sh) validates the corpus offline and, in CI, compares it against a committed `recorded-findings.json` (with a negative case); comparing a real `/wp-audit` run still needs `SEEDED_FINDINGS`, and CI has no live audit run to compare.
 
 - [ ] **Maintenance mode command** `OPEN`
   New `/wp-maintenance` command to enable/disable maintenance mode — either via a custom template or by installing a maintenance plugin via WP-CLI.
@@ -199,11 +190,8 @@ Making the command flow smoother and more guided.
 
 Improving the reliability and output quality of agents.
 
-- [ ] **Rank Math agent runs on sonnet** `OPEN`
-  [wp-audit-rankmath](agents/wp-audit-rankmath.md) runs on haiku but judges schema conflicts,
-  titles, JSON-LD graph merges and the Polylang path. Move it to sonnet, and move its long
-  heredocs to `skills/wp-audit-seo-standards/references/` so the agent file carries the steps,
-  not the payloads.
+- [x] **Rank Math agent runs on sonnet** `DELIVERED`
+  [wp-audit-rankmath](agents/wp-audit-rankmath.md) runs on sonnet, and the code of its long steps lives in `skills/wp-audit-seo-standards/references/` (`rankmath-*.md`), with the agent keeping each step's condition, rules and a pointer. [model-routing](tests/checks/model-routing.sh) guards the tier.
 
 - [x] **Audit and fix sites this plugin did not build** `DELIVERED`
   [`/wp-adopt`](commands/wp-adopt.md) writes a manifest for an existing install through
@@ -275,17 +263,11 @@ Improving the reliability and output quality of agents.
 
 Server setup, permissions, and WordPress configuration.
 
-- [ ] **One documented table of tool exit codes** `OPEN`
-  The same exit number means different things across `bin/*.mjs`: 2 is "no browser" in one
-  tool and "can migrate" in another; 3 is a crash, an incomplete run, an exhausted budget or
-  a missing key. Renumbering would break every command and check that reads them, so the
-  existing numbers stay: nothing owns a shared table yet; a new module under `bin/lib/` and the docs state what each exit
-  means per tool, and new tools follow one shared scheme.
+- [x] **One documented table of tool exit codes** `DELIVERED`
+  [exit-codes.mjs](bin/lib/exit-codes.mjs) declares what each `bin/*.mjs` tool returns (`COMMON` for new tools) and [docs/exit-codes.md](docs/exit-codes.md) lists it, without renumbering. [exit-code-table](tests/checks/exit-code-table.sh) fails when a tool exits with an undeclared code or the table and the doc drift apart.
 
-- [ ] **`impeccable` follows its latest release** `OPEN`
-  The craft commands, [composition-gate](bin/composition-gate.sh) and the detect check pin `impeccable@4`,
-  against the rule that external `npx` tools follow their latest release. Drop the pin, and
-  make the composition gate fail loudly on output it cannot parse instead of passing.
+- [x] **`impeccable` follows its latest release** `DELIVERED`
+  Every call is `npx -y impeccable@latest`, and [composition-gate](bin/composition-gate.sh) exits 1 on detector output it does not understand instead of passing it. [wp-craft-composition-gate](tests/checks/wp-craft-composition-gate.sh) and [wp-craft-detect](tests/checks/wp-craft-detect.sh) guard it and fail on any numeric `impeccable@` pin.
 
 - [ ] **WooCommerce stores (N01)** `PARTIAL`
   Piece 1 of 8, the foundation, is delivered: three store profiles, the `store` block,
