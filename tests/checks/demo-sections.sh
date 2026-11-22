@@ -101,6 +101,13 @@ run "$p" --page missing; [ "$rc" = 2 ] || fail "a missing page must exit 2, got 
 run "$p" --page ../x; [ "$rc" = 64 ] || fail "--page with a path must exit 64, got $rc"
 run "$p" --nope; [ "$rc" = 64 ] || fail "an unknown flag must exit 64, got $rc"
 
+# --- a listing larger than a pipe buffer (64 KiB) arrives whole ---------------------------
+mkdir -p "$tmp/big/demo"
+awk 'BEGIN { for (i = 0; i < 3000; i++) printf "<!-- SECTION: S%d -->\n<!-- END SECTION -->\n", i }' > "$tmp/big/demo/index.html"
+n=$(node "$tool" "$tmp/big" --json | node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(0,"utf8")).pages[0].sections.length))') \
+  || fail 'a large --json listing piped to a reader must parse: the output was cut short'
+[ "$n" = 3000 ] || fail "a large listing must carry all 3000 sections through a pipe, got $n"
+
 # --- the command contract -----------------------------------------------------------------
 cmd=commands/wp-section.md
 ref=skills/wp-section-run/references/list-mode.md
