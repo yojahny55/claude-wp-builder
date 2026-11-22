@@ -111,8 +111,8 @@ Ensuring the WordPress output matches the demo HTML 1:1 in appearance and conten
 
 Improving how content is created, organized, and populated.
 
-- [ ] **Auto-trigger `/wp-page blog` for blog sections** `OPEN`
-  When `/wp-section blog` is built, automatically run `/wp-page blog` to generate `archive.php`, `single.php`, and blog-specific templates. [wp-page](commands/wp-page.md) already builds the blog page type; the dispatch from [wp-section](commands/wp-section.md) does not exist.
+- [x] **Auto-trigger `/wp-page blog` for blog sections** `DELIVERED`
+  [wp-section](commands/wp-section.md) Step 6.7 runs [wp-page](commands/wp-page.md) `blog` after a `blog`, `journal`, `news` or `posts` section, by reading the command rather than copying it. It is skipped under `--no-blog-page`, under `--transcribe` (the `/wp-yolo` walk, which runs `/wp-page blog` once itself), on a cinematic project (`/wp-page` has no cinematic CSS route), when the theme already has the card template `/wp-page blog` writes, and when `archive.php` or `single.php` exists and the operator does not confirm the overwrite. [section-blog-page](tests/checks/section-blog-page.sh) pins the step and the three facts its skips rest on.
 
 - [ ] **Legal pages: create and seed content** `PARTIAL`
   **Gap:** [wp-page](commands/wp-page.md) generates the `legal` template, and [wp-finalize](commands/wp-finalize.md) treats a stub privacy page as a trust gap rather than a pass. Neither creates the Privacy Policy / Terms / Cookie Policy pages nor seeds industry-appropriate content from the project's `CLAUDE.md`.
