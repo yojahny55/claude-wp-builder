@@ -19,12 +19,17 @@ done
 
 # BLOCKED line in the agents that read the project file or tokens.
 for n in wp-template wp-css wp-acf wp-cf7 wp-cinematic wp-tailwind \
-         wp-audit-a11y wp-audit-seo wp-audit-geo wp-audit-performance wp-audit-practices; do
+         wp-context wp-normalize \
+         wp-audit-a11y wp-audit-seo wp-audit-geo wp-audit-performance wp-audit-practices \
+         wp-audit-security wp-audit-ux; do
   inc "agents/$n.md" 'BLOCKED: <reason>'
 done
-for n in wp-audit-a11y wp-audit-seo wp-audit-geo wp-audit-performance wp-audit-practices; do
+for n in wp-audit-a11y wp-audit-seo wp-audit-geo wp-audit-performance wp-audit-practices \
+         wp-audit-security wp-audit-ux; do
   inc "agents/$n.md" '"blocked": "<reason>"'
 done
+# The parent consumes the blocked key: one re-dispatch, then the reason is named in the report.
+inc skills/wp-audit-run/references/dispatch.md 'the report names that agent and its `blocked` reason'
 inc agents/wp-tailwind.md 'Demo Conversion Mode'
 inc agents/wp-tailwind.md 'Its absence is not a'
 

@@ -117,7 +117,8 @@ did. `tests/checks/tailwind-rebuild.sh` does this with a fake `npm` and fake wat
   already touched (`touched: none` if none). Auditors keep their JSON contract: the findings
   JSON gains a top-level `"blocked": "<reason>"` with empty `findings` and `checks_executed`,
   and `BLOCKED: <reason>` is the first line of the summary; `/wp-audit` Step 6.8 then sees
-  unexecuted ids and sends them back.
+  unexecuted ids and sends them back once; a second blocked report is named in the audit
+  report with its reason.
 - **The `wp-audit-*` prefix** means an agent dispatched by `/wp-audit`, and most of them only
   read and report. Two do not: `wp-audit-aios` and `wp-audit-rankmath` install and configure
   (plugin installs, options, post meta) and say so in their first lines. They keep the name
