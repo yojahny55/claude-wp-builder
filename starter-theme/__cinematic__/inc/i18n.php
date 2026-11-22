@@ -12,15 +12,44 @@ function __starter___current_lang(): string {
     if ($lang !== null) {
         return $lang;
     }
-    $candidate = '';
-    if (isset($_GET['lang'])) {
-        $candidate = sanitize_key(wp_unslash($_GET['lang']));
-    } elseif (isset($_COOKIE['__starter___lang'])) {
-        $candidate = sanitize_key(wp_unslash($_COOKIE['__starter___lang']));
+    // URL > cookie > Accept-Language > default. An unsupported value at one
+    // step falls through to the next, as in the Tailwind starter: ?lang=fr
+    // keeps a visitor's stored Spanish instead of resetting it to English.
+    $supported = ['en', 'es'];
+    $lang      = 'en';
+    $url       = isset($_GET['lang']) ? sanitize_key(wp_unslash($_GET['lang'])) : '';
+    $cookie    = isset($_COOKIE['__starter___lang']) ? sanitize_key(wp_unslash($_COOKIE['__starter___lang'])) : '';
+    if (in_array($url, $supported, true)) {
+        $lang = $url;
+    } elseif (in_array($cookie, $supported, true)) {
+        $lang = $cookie;
     } elseif (isset($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
-        $candidate = strtolower(substr(sanitize_text_field(wp_unslash($_SERVER['HTTP_ACCEPT_LANGUAGE'])), 0, 2));
+        // By q-value: `fr,es;q=0.9` is Spanish. q=0 is refused, equal q-values keep
+        // header order, `es-MX` matches `es`. Inline, as in the Tailwind starter: every
+        // function here is template-facing and the Polylang variant would need it too.
+        $ranked = [];
+        foreach (explode(',', sanitize_text_field(wp_unslash($_SERVER['HTTP_ACCEPT_LANGUAGE']))) as $i => $part) {
+            $bits = explode(';', trim($part));
+            $tag  = strtolower(trim($bits[0]));
+            $q    = 1.0;
+            foreach (array_slice($bits, 1) as $param) {
+                $param = trim($param);
+                if (strncasecmp($param, 'q=', 2) === 0) {
+                    $q = (float) substr($param, 2);
+                }
+            }
+            if ($tag !== '' && $q > 0) {
+                $ranked[] = [$q, $i, substr($tag, 0, 2)];
+            }
+        }
+        usort($ranked, fn ($a, $b) => $a[0] === $b[0] ? $a[1] <=> $b[1] : $b[0] <=> $a[0]);
+        foreach ($ranked as $entry) {
+            if (in_array($entry[2], $supported, true)) {
+                $lang = $entry[2];
+                break;
+            }
+        }
     }
-    $lang = in_array($candidate, ['en', 'es'], true) ? $candidate : 'en';
     return $lang;
 }
 
@@ -38,6 +67,25 @@ add_action('init', function (): void {
     $stored = isset($_COOKIE['__starter___lang']) ? sanitize_key(wp_unslash($_COOKIE['__starter___lang'])) : '';
     if ($lang === sanitize_key(wp_unslash($_GET['lang'])) && $lang !== $stored && !headers_sent()) {
         setcookie('__starter___lang', $lang, array( 'expires' => time() + (365 * 24 * 60 * 60), 'path' => '/', 'samesite' => 'Lax', 'httponly' => true, 'secure' => is_ssl() ));
+    }
+});
+
+/*
+ * Page caches: same contract as the Tailwind starter. One URL serves two
+ * languages through the cookie and Accept-Language, so proxies get Vary, and a
+ * response that is not the default language or that carries ?lang (and so a
+ * Set-Cookie) is kept out of WordPress page caches.
+ */
+add_action('send_headers', function (): void {
+    if (is_admin()) {
+        return;
+    }
+    header('Vary: Accept-Language, Cookie', false);
+    if (isset($_GET['lang']) || __starter___current_lang() !== 'en') {
+        if (!defined('DONOTCACHEPAGE')) {
+            define('DONOTCACHEPAGE', true);
+        }
+        nocache_headers();
     }
 });
 
@@ -85,5 +133,9 @@ function __starter___nav_location(string $location): string {
  * ?lang=es included (WCAG 3.1.1).
  */
 add_filter('language_attributes', function (string $output): string {
+    // Front end only: wp-admin and the login screen follow the user's locale.
+    if (is_admin() || did_action('login_init')) {
+        return $output;
+    }
     return (string) preg_replace('/lang="[^"]*"/', 'lang="' . esc_attr(__starter___current_lang()) . '"', $output);
 });
