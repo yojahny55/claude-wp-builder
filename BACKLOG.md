@@ -17,8 +17,8 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 item was checked against what 1.35.0 shipped: the cinematic language switcher under Polylang
 and every front-end string of both starters reading the page language instead of gettext.
 Those two items, open as measured proposals at 1.34.0, are delivered; no other item moved.
-The store-setup integration failure is still unexplained, the Docker nginx config still has no
-owner, and the REST block is still not written down. The full pass against
+The store-setup integration failure is closed after two months without a recurrence in CI.
+The Docker nginx config still has no owner, and the REST block is still not written down. The full pass against
 the command, agent or script that would own each item was last made at v1.31.0. An item
 claiming to be open while the behavior ships reads as a project that does not know what it
 has built.
@@ -273,13 +273,17 @@ Server setup, permissions, and WordPress configuration.
   pages, product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang
   bridge, subscriptions, bookings.
 
-- [ ] **One unexplained integration failure in store setup** `OPEN`
+- [x] **One unexplained integration failure in store setup** `DELIVERED`
   [The integration check](tests/checks/wp-woo-setup-integration.sh) failed once at "setup
   overwrote the client's shipping cost", during a mutation run that cannot reach that
   assertion; it was not reproduced in 4+ full runs or 12 targeted loops. The assertion now
   prints the cost it read and setup's output, so a recurrence explains itself. Watch it in CI.
   As of October 5, 2026 it has not recurred: none of the last 60 CI runs failed on it. Close
   this after a further month without a recurrence.
+  Closed on November 22, 2026: none of the 611 CI runs since October 5 failed on it (the one
+  failed `WordPress integration` job in that window, on October 22, was an unrelated SEC-040
+  snippet extraction on a refactor branch). The assertion keeps its diagnostics, so a
+  recurrence still explains itself.
 
 - [ ] **Docker environments get no nginx config** `OPEN`
   [`docker-compose.yml.tpl`](templates/docker/docker-compose.yml.tpl) mounts `./docker/nginx.conf`,
