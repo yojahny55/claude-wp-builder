@@ -9,7 +9,9 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-t=agents/wp-template.md
+# The carousel rules live in a reference the agent is told to read; assert on both.
+t=$(mktemp); trap 'rm -f "$t"' EXIT
+cat agents/wp-template.md skills/wp-theme-standards/references/template-carousels.md > "$t"
 a=agents/wp-audit-a11y.md
 
 grep -Fq 'Every card inside the scrolling element is `relative`' "$t" \

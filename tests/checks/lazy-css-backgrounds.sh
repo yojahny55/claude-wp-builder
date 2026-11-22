@@ -84,7 +84,7 @@ printf '%s' "$flatjs" | grep >/dev/null -Fc 'el.style.cssText += declaration;' \
 
 # 3. The agent contract. Flattened first: a correct re-wrap can split any of these phrases
 # across two physical lines, including at a hyphen.
-flatagent=$(tr '\n' ' ' < "$agent" | sed 's/  */ /g')
+flatagent=$(cat "$agent" skills/wp-theme-standards/references/template-css-backgrounds.md | tr '\n' ' ' | sed 's/  */ /g')
 printf '%s' "$flatagent" | grep >/dev/null -Fc 'prefix_lazy_background_attr(' \
   || { echo "FAIL: $agent never names prefix_lazy_background_attr(), so no builder ever defers a background"; exit 1; }
 # Directed, not a bare 'hero' token the file is full of: the sentence has to forbid the
