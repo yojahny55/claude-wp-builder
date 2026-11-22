@@ -124,6 +124,9 @@ Read `references/skill-review.md` when creating, changing or reviewing a skill: 
 checklist `/wp-contribute review` hands a fresh reviewer, and the part of the best practices
 no grep can check.
 
+Read `references/flag-vocabulary.md` when adding a flag to a command: it fixes what `--yes`,
+`--force`, `--dry-run` and `--resume` mean and lists the historical exceptions.
+
 ### The traps that cost the most
 
 - **Two i18n systems, never mixed.** `suffix` = one page with ACF fields duplicated as

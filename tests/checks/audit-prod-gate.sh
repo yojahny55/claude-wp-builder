@@ -23,6 +23,7 @@ tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 export WP_AUDIT_GATE_DIR="$tmp/gate"
 
 # 1. A local host is passed straight through: no lock, no pacing state.
+printf '127.0.0.1 site.local.com\n' > "$tmp/hosts"; export WP_HOSTS_FILE="$tmp/hosts"
 out="$("$gate" http://site.local.com -- echo local-ok)"
 [ "$out" = "local-ok" ] || fail "local host did not run the command"
 [ ! -e "$WP_AUDIT_GATE_DIR/site.local.com.last" ] || fail "local host left pacing state"
@@ -46,9 +47,9 @@ awk -v e="$first_end" -v s="$second_start" 'BEGIN{exit !(s >= e + 0.9)}' \
 mkdir -p "$tmp/bin"
 printf '#!/usr/bin/env bash\nexit 7\n' > "$tmp/bin/curl"; chmod +x "$tmp/bin/curl"
 set +e
-PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://blocked.example -- curl -sS https://blocked.example/ 2>/dev/null
+PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://blocked.example.org -- curl -sS https://blocked.example.org/ 2>/dev/null
 rc=$?
-"$gate" --delay 0 https://blocked.example -- touch "$tmp/should-not-exist" >/dev/null
+"$gate" --delay 0 https://blocked.example.org -- touch "$tmp/should-not-exist" >/dev/null
 rc2=$?
 set -e
 [ "$rc" -eq 7 ] || fail "gate did not return curl's own exit code (got $rc)"
@@ -56,14 +57,14 @@ set -e
 [ ! -e "$tmp/should-not-exist" ] || fail "a blocked host still ran the command"
 
 # 4. --mark-blocked and --status, for a 429 or a WAF 403 the caller recognised.
-"$gate" --mark-blocked https://waf.example "HTTP 429" >/dev/null
-set +e; "$gate" --status https://waf.example >/dev/null; rc3=$?; set -e
+"$gate" --mark-blocked https://waf.example.org "HTTP 429" >/dev/null
+set +e; "$gate" --status https://waf.example.org >/dev/null; rc3=$?; set -e
 [ "$rc3" -eq 4 ] || fail "--status did not report a marked host as blocked"
 
 # 4b. One key per server: a query, a fragment or a port must not escape the blocked flag.
 set +e
-"$gate" --delay 0 'https://waf.example?author=1' -- touch "$tmp/q" >/dev/null; rq=$?
-"$gate" --delay 0 'https://waf.example:443/x' -- touch "$tmp/p" >/dev/null; rp=$?
+"$gate" --delay 0 'https://waf.example.org?author=1' -- touch "$tmp/q" >/dev/null; rq=$?
+"$gate" --delay 0 'https://waf.example.org:443/x' -- touch "$tmp/p" >/dev/null; rp=$?
 set -e
 [ "$rq" -eq 4 ] && [ ! -e "$tmp/q" ] || fail "a ?query URL escaped the blocked host"
 [ "$rp" -eq 4 ] && [ ! -e "$tmp/p" ] || fail "a :port URL escaped the blocked host"
@@ -73,43 +74,43 @@ set +e; timeout 5 "$gate" --delay >/dev/null 2>&1; rv=$?; set -e
 [ "$rv" -eq 1 ] || fail "--delay with no value did not exit 1 (got $rv)"
 
 # 4d. A background process left by the command does not keep the host locked.
-"$gate" --delay 0 https://bg.example -- bash -c 'sleep 6 >/dev/null 2>&1 &'
+"$gate" --delay 0 https://bg.example.org -- bash -c 'sleep 6 >/dev/null 2>&1 &'
 t0=$(date +%s)
-"$gate" --delay 0 --wait 3 https://bg.example -- true || fail "a leftover child held the host's lock"
+"$gate" --delay 0 --wait 3 https://bg.example.org -- true || fail "a leftover child held the host's lock"
 [ $(( $(date +%s) - t0 )) -lt 3 ] || fail "the next call waited on a leftover child"
 
 # 4e. Two curl timeouts in a row (a DROP ban) mark the host blocked.
 printf '#!/usr/bin/env bash\nexit 28\n' > "$tmp/bin/curl"
 set +e
-PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://drop.example -- timeout 30 curl https://drop.example/ 2>/dev/null
-PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://drop.example -- timeout 30 curl https://drop.example/ 2>/dev/null
-"$gate" --status https://drop.example >/dev/null; rd=$?
+PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://drop.example.org -- timeout 30 curl https://drop.example.org/ 2>/dev/null
+PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://drop.example.org -- timeout 30 curl https://drop.example.org/ 2>/dev/null
+"$gate" --status https://drop.example.org >/dev/null; rd=$?
 set -e
 [ "$rd" -eq 4 ] || fail "two curl timeouts (curl wrapped in timeout) did not mark the host blocked"
 
 # 4e2. Any other result between two timeouts breaks the run: timeout, success, timeout is not a ban.
 printf '#!/usr/bin/env bash\nexit "${FAKE_RC:-28}"\n' > "$tmp/bin/curl"
 set +e
-PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://flaky.example -- curl https://flaky.example/ 2>/dev/null
-FAKE_RC=0 PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://flaky.example -- curl https://flaky.example/ 2>/dev/null
-PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://flaky.example -- curl https://flaky.example/ 2>/dev/null
-"$gate" --status https://flaky.example >/dev/null; rf=$?; set -e
+PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://flaky.example.org -- curl https://flaky.example.org/ 2>/dev/null
+FAKE_RC=0 PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://flaky.example.org -- curl https://flaky.example.org/ 2>/dev/null
+PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://flaky.example.org -- curl https://flaky.example.org/ 2>/dev/null
+"$gate" --status https://flaky.example.org >/dev/null; rf=$?; set -e
 [ "$rf" -eq 0 ] || fail "a successful curl between two timeouts did not reset the timeout count"
 
 # 4f. A command that is not curl is not judged as curl, even with an argument ending in /curl.
 printf '#!/usr/bin/env bash\nexit 7\n' > "$tmp/bin/notcurl"
-set +e; PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://argcurl.example -- notcurl https://argcurl.example/api/curl 2>/dev/null
-"$gate" --status https://argcurl.example >/dev/null; ra=$?; set -e
+set +e; PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://argcurl.example.org -- notcurl https://argcurl.example.org/api/curl 2>/dev/null
+"$gate" --status https://argcurl.example.org >/dev/null; ra=$?; set -e
 [ "$ra" -eq 0 ] || fail "a non-curl command with a /curl argument marked the host blocked"
 
 # 4f2. Nested wrappers and timeout options with a separate value still reach curl.
 set +e
-PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://nest.example -- timeout -s KILL 30 env FOO=1 curl https://nest.example/ 2>/dev/null
-PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://nest.example -- timeout -k 5 30 env FOO=1 curl https://nest.example/ 2>/dev/null
-PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://envu.example -- env -u HOME curl https://envu.example/ 2>/dev/null
-PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://envu.example -- env -u HOME curl https://envu.example/ 2>/dev/null
-"$gate" --status https://envu.example >/dev/null; ru=$?
-"$gate" --status https://nest.example >/dev/null; rn=$?; set -e
+PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://nest.example.org -- timeout -s KILL 30 env FOO=1 curl https://nest.example.org/ 2>/dev/null
+PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://nest.example.org -- timeout -k 5 30 env FOO=1 curl https://nest.example.org/ 2>/dev/null
+PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://envu.example.org -- env -u HOME curl https://envu.example.org/ 2>/dev/null
+PATH="$tmp/bin:$PATH" "$gate" --delay 0 https://envu.example.org -- env -u HOME curl https://envu.example.org/ 2>/dev/null
+"$gate" --status https://envu.example.org >/dev/null; ru=$?
+"$gate" --status https://nest.example.org >/dev/null; rn=$?; set -e
 [ "$ru" -eq 4 ] || fail "curl under 'env -u HOME' was not judged as curl"
 [ "$rn" -eq 4 ] || fail "curl under 'timeout -s KILL 30 env' was not judged as curl"
 
@@ -128,7 +129,7 @@ done
 # 5. The measurement is unchanged: the suite keeps its tests and paces only a public URL,
 #    and link-sweep's delay is opt-in.
 grep -Fq 'pw_args=(--workers=1)' bin/audit-suite.sh || fail "audit-suite.sh no longer drops to one worker for a public URL"
-grep -Fq '*.local.com|*.local.com:*' bin/audit-suite.sh || fail "audit-suite.sh lost the local-host exemption"
+grep -Fq 'host_is_local' bin/audit-suite.sh || fail "audit-suite.sh lost the local-host exemption"
 node bin/link-sweep.mjs --help | grep >/dev/null -Fc -- '--delay-ms' || fail "link-sweep.mjs does not accept --delay-ms"
 grep -Fq 'delayMs: 0' bin/link-sweep.mjs || fail "link-sweep.mjs --delay-ms is no longer off by default"
 grep -Fq 'stopOnBlock: false' bin/link-sweep.mjs || fail "link-sweep.mjs --stop-on-block is no longer opt-in"
@@ -152,13 +153,13 @@ for bad in 1.2.3 ...  .; do
   [ "$rd" -eq 1 ] || fail "--delay $bad was accepted (exit $rd)"
 done
 # Run-mode diagnostics go to stderr, so a wrapped command's stdout stays parseable.
-out="$("$gate" --delay 0 https://blocked.example -- true 2>/dev/null)" || true
+out="$("$gate" --delay 0 https://blocked.example.org -- true 2>/dev/null)" || true
 [ -z "$out" ] || fail "a blocked run wrote to stdout: $out"
 
 # Exit 5: a host whose lock is held longer than --wait is not sent to, and the command does not run.
-"$gate" --delay 0 https://busy.example -- sleep 4 >/dev/null 2>&1 &
+"$gate" --delay 0 https://busy.example.org -- sleep 4 >/dev/null 2>&1 &
 sleep 1
-set +e; "$gate" --delay 0 --wait 1 https://busy.example -- touch "$tmp/busy" >/dev/null 2>&1; rb=$?; set -e
+set +e; "$gate" --delay 0 --wait 1 https://busy.example.org -- touch "$tmp/busy" >/dev/null 2>&1; rb=$?; set -e
 wait
 [ "$rb" -eq 5 ] || fail "a held lock did not exit 5 after --wait (got $rb)"
 [ ! -e "$tmp/busy" ] || fail "the command ran although the lock was held"
