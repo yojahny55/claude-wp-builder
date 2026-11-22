@@ -129,6 +129,21 @@ rc=0; PATH="$nf" timeout 20 bash bin/prod-gate.sh --dir "$gate" --delay 0 --wait
 [ "$rc" = 0 ] || fail "dead takeover mutex was not recovered (rc=$rc)"
 has bin/prod-gate.sh 'indistinguishable from the gate'
 
-# 6. audit-suite empties results/audit at the start of a run, that directory only.
-has bin/audit-suite.sh "find \"\$dir/results/audit\" -mindepth 1 -maxdepth 1 -name '*.json' -delete"
+# 6. audit-suite empties results/audit at the start of a run, that directory only, and only the
+#    files of the requested pass: `--only seo` after `--only a11y` keeps the accessibility JSON.
+#    Run the real block (from its `case "$only"` to its `fi`) against a scratch directory.
+block=$(awk '/^case "\$only" in$/ { f = 1 } f { print } f && /^fi$/ { exit }' bin/audit-suite.sh)
+[ -n "$block" ] || fail "bin/audit-suite.sh has no per-pass results reset block"
+reset_for() {
+  local d; d=$(mktemp -d); mkdir -p "$d/results/audit" "$d/results/other"
+  touch "$d/results/audit/home.chromium.json" "$d/results/audit/lh-home.json" \
+        "$d/results/audit/g2-home.json" "$d/results/audit/notes.txt" "$d/results/other/keep.json"
+  ( dir="$d"; only="$1"; eval "$block" )
+  (cd "$d/results" && find . -type f | sort | tr '\n' ' ')
+  rm -rf "$d"
+}
+[ "$(reset_for all)" = "./audit/notes.txt ./other/keep.json " ] || fail "--only all reset: $(reset_for all)"
+[ "$(reset_for seo)" = "./audit/home.chromium.json ./audit/lh-home.json ./audit/notes.txt ./other/keep.json " ] || fail "--only seo reset: $(reset_for seo)"
+[ "$(reset_for perf)" = "./audit/g2-home.json ./audit/home.chromium.json ./audit/notes.txt ./other/keep.json " ] || fail "--only perf reset: $(reset_for perf)"
+[ "$(reset_for a11y)" = "./audit/g2-home.json ./audit/lh-home.json ./audit/notes.txt ./other/keep.json " ] || fail "--only a11y reset: $(reset_for a11y)"
 echo PASS

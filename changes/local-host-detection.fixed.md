@@ -8,7 +8,8 @@
   resolves to is loopback or private, and an unresolved name is not local. `geo-scan.sh`
   also lower-cases the host and no longer matches `10.example.com` with a prefix glob.
   `audit-suite.sh` empties `results/audit/*.json` at the start of a run, so a run over
-  fewer pages no longer reports the pages of an earlier one. `prod-gate.sh` falls back to
+  fewer pages no longer reports the pages of an earlier one; with `--only` it empties only
+  that pass's files, so separate passes still add up to one report. `prod-gate.sh` falls back to
   a symlink-to-pid lock where `flock` is missing (macOS) instead of exiting 1; a lock it
   cannot create (read-only state dir, name too long) exits 1 with `cannot create lock`
   instead of spinning, and its

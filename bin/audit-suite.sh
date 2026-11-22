@@ -307,9 +307,18 @@ fi
 # The page list and site name are still written, as before.
 rm -f "$dir/results/unmeasured.json" "$dir/results/unmeasured-pages.json"
 # results/audit/*.json of an earlier run would be converted with this run's: a run over fewer
-# pages then reports the old ones too. Empty that one directory (guarded: never an empty path).
+# pages then reports the old ones too. Empty that one directory (guarded: never an empty path),
+# but only of the files the requested pass writes: `--only seo` after `--only a11y` must keep
+# the accessibility results. Names: Lighthouse lh-*.json, technical SEO g2-*.json, and the
+# accessibility pass everything else (<page>.<browser>.json).
+case "$only" in
+  perf) reset=(-name 'lh-*.json') ;;
+  seo)  reset=(-name 'g2-*.json') ;;
+  a11y) reset=(-name '*.json' ! -name 'lh-*.json' ! -name 'g2-*.json') ;;
+  *)    reset=(-name '*.json') ;;
+esac
 if [ -n "$dir" ] && [ -d "$dir/results/audit" ]; then
-  find "$dir/results/audit" -mindepth 1 -maxdepth 1 -name '*.json' -delete
+  find "$dir/results/audit" -mindepth 1 -maxdepth 1 -type f "${reset[@]}" -delete
 fi
 export BASE_URL="$url"
 if ! BASE_URL="$url" PAGES="$pages" SITE="$site" node - "$dir/audit.config.js" <<'NODE'
