@@ -3,7 +3,7 @@
 # model, exit codes a build can act on. It is an external package this repo
 # does not install, vendor or configure, so a missing binary, an offline
 # machine or a rate-limited registry must never look like a clean scan — this
-# pins the major-version guard (impeccable@1 404s; @4 is the real latest) and
+# pins the follow-the-latest rule (impeccable@latest, never a numeric major) and
 # the distinct "could not run" message that keep that failure mode from
 # passing as zero findings. It also pins the real finding shape: the tool has
 # no P0 severity, only a category (slop/quality) and an advisory flag, and a
@@ -19,7 +19,12 @@ fail() { echo "FAIL: $*"; exit 1; }
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-demo-verify.md; c=$EXPANDED
 d=$wp_demo
 
-grep -Eq 'impeccable@4' "$c" || fail "$c does not pin the detector to the real major version (4, not the nonexistent 1)"
+grep -Fq 'impeccable@latest' "$c" || fail "$c does not run the detector as impeccable@latest"
+stale=$(grep -rnE 'impeccable@[0-9]' commands agents skills bin README.md || true)
+[ -z "$stale" ] || fail "a numeric impeccable pin is back (the detector follows the newest release on purpose): $stale"
+r=skills/wp-demo-verify-run/references/detector.md
+[ "$(grep -Ec 'Pin the major|`@[0-9]+`' "$r")" -eq 0 ] || fail "$r still tells the run to pin the detector's major version"
+grep -Fq 'never a clean scan' "$r" || fail "$r no longer says unrecognised detector output is a detector that could not run"
 grep -Fq -- '--json' "$c" || fail "$c does not ask the detector for JSON"
 grep -Fq 'impeccable.json' "$c" || fail "$c does not save detector findings under .verify"
 grep -Fq 'slop' "$c" || fail "$c does not gate on the real 'slop' category"

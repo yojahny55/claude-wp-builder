@@ -33,7 +33,7 @@ machine finding as a capture artefact requires a `## Findings judged to be
 capture artefacts` heading with the measurement that justifies each one; a
 finding argued away without one is a finding still outstanding.
 
-1. **Deterministic gate.** `npx -y impeccable@4 detect demo/ --json`, findings
+1. **Deterministic gate.** `npx -y impeccable@latest detect demo/ --json`, findings
    written to `demo/.verify/impeccable.json`. Each finding carries a `category`
    (`slop` or `quality`) and a `severity`; every finding observed here has
    carried `warning`. A **`slop`** finding at `warning` fails the round before a
