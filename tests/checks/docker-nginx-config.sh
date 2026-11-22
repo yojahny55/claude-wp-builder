@@ -19,6 +19,9 @@ need_token "$compose" './docker/nginx.conf:/etc/nginx/conf.d/default.conf'
 need_token "$env_ref" 'templates/docker/nginx.conf.tpl'
 need_token "$env_ref" 'docker/nginx.conf'
 need_token "$env_ref" 'creates a root-owned *directory*'
+need_token "$env_ref" 'If `docker/nginx.conf` is already a directory'
+need_token "$env_ref" 'sudo rmdir docker/nginx.conf'
+need_token skills/wp-create-run/references/overwrite.md 'Docker created is not a file to copy'
 need_token skills/wp-create-run/references/overwrite.md '`docker/nginx.conf`'
 need_token "$tpl" 'fastcgi_pass wordpress:9000;'
 need_token "$tpl" 'woocommerce_uploads'
@@ -52,7 +55,8 @@ mkdir -p "$www/.well-known" "$www/wp-content/uploads/woocommerce_uploads" "$www/
 echo home > "$www/index.html"
 for f in index.php .env dump.sql backup.tar.gz site.zip wp-config.php.bak-1 .well-known/security.txt \
          wp-content/uploads/photo.zip wp-content/uploads/evil.php.jpg \
-         wp-content/uploads/woocommerce_uploads/paid.pdf assets/site.css robots.txt; do
+         wp-content/uploads/woocommerce_uploads/paid.pdf \
+         wp-content/uploads/woocommerce_uploads/paid.png assets/site.css robots.txt; do
   echo x > "$www/$f"
 done
 # mktemp -d is 0700; the container's nginx user must read the tree.
@@ -82,6 +86,7 @@ served() { local c; c=$(code "$1"); [ "$c" = 200 ] || fail "not served (got $c):
 
 for p in /.env /dump.sql /backup.tar.gz /site.zip /wp-config.php.bak-1 \
          /wp-content/uploads/evil.php.jpg /wp-content/uploads/woocommerce_uploads/paid.pdf \
+         /wp-content/uploads/woocommerce_uploads/paid.png \
          /xmlrpc.php /xmlrpc.php/x; do
   denied "$p"
 done
