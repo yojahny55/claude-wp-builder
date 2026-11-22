@@ -50,7 +50,11 @@ normal design-system authoring path unchanged.
   the converted demo ARE its declared values; carry them across character for character,
   do NOT re-author, and do not swap a utility for one you judge equivalent. Scope any
   `@apply` class under `--block`, exactly as `wp-css` scopes its BEM selectors. `wp-css`
-  is not dispatched at all on this path.
+  is not dispatched at all on this path. No raw declarations survive in the converted demo
+  to copy — the conversion turned every one into a utility class — so "copy its exact
+  declared values" reads here as **copy its exact utility classes and its exact element
+  structure**. That is not a licence to substitute an equivalent utility, to collapse two
+  elements into one, or to drop a breakpoint variant.
 - **wp-template (basic path):** instruct it to scope all BEM classes under the `--block`
   name (use `<block>__<element>` instead of `<section>__<element>`) so the transcribed
   CSS and the markup share the same unique block and parallel sections never collide.
@@ -93,7 +97,11 @@ set, do not dispatch `wp-tailwind`: `wp-template` has already written the sectio
 inline utilities, which is a complete and correct section — the `@apply` promotion is an
 optimisation over the finished theme, and `/wp-yolo` Step 4.4 runs it once over every
 template part after the walk. Report the section as built with promotion deferred so the
-absence is not read as a missed dispatch. The flag never suppresses `wp-css` on `basic`:
+absence is not read as a missed dispatch. The promotion waits because the ladder's "3+
+times, or on 2+ distinct pages" test cannot be answered while the rest of the theme does
+not exist yet. That is also why the flag is never for a one-off section added by hand: a
+finished theme has the whole theme to grep, and deferring would leave its utilities
+unpromoted with no later pass to catch them. The flag never suppresses `wp-css` on `basic`:
 there is no promotion step there and `wp-css` writes the section's only stylesheet, so
 skipping it would ship an unstyled section.
 Agents 1 (`wp-acf`) and 4 (`wp-cf7`) are identical on both paths. Agent 2
