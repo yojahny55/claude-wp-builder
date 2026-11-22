@@ -34,6 +34,7 @@
  * Exit codes: 0 report printed (findings or none: the lint never blocks), 2 nothing to read
  * (no such path, or no .html/.css under it), 3 crash, 64 usage.
  */
+import './lib/stdio-blocking.mjs';
 import { readFileSync, readdirSync, statSync, realpathSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';

@@ -24,6 +24,7 @@
  * (4.5) or above 1; an unknown argument is exit 2; an unreadable colour in a `--axe` node is
  * skipped with a WARN on stderr.
  */
+import './lib/stdio-blocking.mjs';
 import fs from 'node:fs';
 
 class InputError extends Error {}

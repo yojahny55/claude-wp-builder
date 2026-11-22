@@ -28,6 +28,7 @@
  * Stop it with `kill <pid>` (not `pkill -f`, which also matches the shell that launched it).
  * Brotli/gzip applies to text responses only; images pass through untouched.
  */
+import './lib/stdio-blocking.mjs';
 import http2 from 'node:http2';
 import http from 'node:http';
 import zlib from 'node:zlib';

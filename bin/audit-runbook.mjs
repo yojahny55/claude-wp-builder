@@ -46,6 +46,7 @@
 //      server rule, or a local host that would leak into the runbook
 //   3  crash
 
+import './lib/stdio-blocking.mjs';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';

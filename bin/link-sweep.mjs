@@ -64,6 +64,7 @@
  *
  * exit 0 = sweep ran (findings are in the JSON), 2 = usage, 4 = --stop-on-block stopped it.
  */
+import './lib/stdio-blocking.mjs';
 import { readFileSync } from 'node:fs';
 import { lookup as dnsLookup } from 'node:dns/promises';
 import { Refused, isLinkLocal, isPrivateHost, checkResolved, siteIsLocal } from './lib/net-class.mjs';

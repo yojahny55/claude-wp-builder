@@ -8,6 +8,7 @@
  * paths are listed that git would commit; `git-init` uses 4 when the dry-run summary found secret-looking files. `require-origin` adds 5: the site is adopted
  * (a third-party theme this plugin did not build) and the calling builder must stop.
  */
+import './lib/stdio-blocking.mjs';
 import {
   readFileSync, existsSync, writeFileSync, copyFileSync, mkdirSync, renameSync, unlinkSync, rmdirSync, statSync, readdirSync, realpathSync,
 } from 'node:fs';

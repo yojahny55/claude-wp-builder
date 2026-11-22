@@ -107,6 +107,8 @@ did. `tests/checks/tailwind-rebuild.sh` does this with a fake `npm` and fake wat
 
 A new `bin/*.mjs` tool takes its exit codes from `COMMON` in `bin/lib/exit-codes.mjs` (0 ok, 1 negative result, 2 could not measure, 3 crash, 64 usage, 4-9 its own). Declare any other code in `TOOLS` and in `docs/exit-codes.md`, or `tests/checks/exit-code-table.sh` fails.
 
+Its first import is `import './lib/stdio-blocking.mjs';`, which makes stdout and stderr blocking. Without it, a `process.exit()` right after a write larger than a pipe's 64 KiB buffer ends the process with the rest unsent, and `tool | reader` reads a cut report while the exit code says nothing went wrong. `tests/checks/mjs-stdio-blocking.sh` fails when a tool lacks the import.
+
 ### Agent contracts
 
 - **First Action.** Every agent opens with a `## First Action (MANDATORY)` block.

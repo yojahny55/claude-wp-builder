@@ -38,6 +38,7 @@
  *
  * exit 0 = PASS (CANNOT VERIFY and SKIP lines are information), 1 = FAIL, 2 = usage.
  */
+import './lib/stdio-blocking.mjs';
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative, dirname } from 'node:path';
 

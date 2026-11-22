@@ -11,6 +11,7 @@
  * the caller can fall back to MCP screenshot tools rather than reporting a failure),
  * 3 the walk itself crashed (not a findings report).
  */
+import './lib/stdio-blocking.mjs';
 import { existsSync, mkdirSync, writeFileSync, readdirSync, statSync, createReadStream, realpathSync } from 'node:fs';
 import { resolve, join, dirname, basename, extname, normalize, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
