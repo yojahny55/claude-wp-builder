@@ -2,6 +2,44 @@
 
 ## [Unreleased]
 
+## [1.37.0] - 2026-11-22
+
+### Added
+
+- **A family lint measures the Avoid items that are visible in CSS.** `bin/family-lint.mjs`
+  reports `backdrop-filter` glass, a `border-radius` over 12px on a box with a border on all
+  sides (pills and circles left out, `var()` resolved), and more than one saturated hue across
+  a demo's colours, each with its file and line. `/wp-demo` hands the report to the verify
+  critique, which names every finding in `demo/VERIFY.md` as an Avoid hit or as the family's
+  deliberate exception. The lint never blocks and always exits 0, so a brutalist page's one
+  intended exception stays the evaluator's decision. Before this, nothing measured the Avoid
+  list: the evaluator found these by eye on contact sheets.
+
+- **A blog section now builds the blog templates it links to.** `/wp-section blog` (also
+  `journal`, `news` or `posts`) runs `/wp-page blog` at a new Step 6.7, so the posts it lists
+  have an archive and a single view to open. It is skipped under `--no-blog-page`, under
+  `--transcribe` (the `/wp-yolo` walk, which already runs `/wp-page blog` once), on a cinematic
+  project (`/wp-page` has no cinematic CSS route), when the theme already has
+  `template-parts/journal/content-journal-card.php`, and when `archive.php` or `single.php`
+  exists and the operator does not confirm the overwrite. Before this, a blog section built
+  by hand left the archive and single templates to be remembered.
+
+- **`/wp-section --list` lists a demo's sections without initializing anything.**
+  `bin/demo-sections.mjs` reads the delimiters of every `demo/*.html` page and prints each
+  section's name, the slug `/wp-section` takes, its line range and whether the theme already
+  has `template-parts/section-<slug>.php`. It also reports the delimiter defects that make
+  `/wp-init`, `/wp-section` and `/wp-yolo` misread a demo (a section never closed, an END with
+  no open section or another section's name, a nested or duplicate section, a page with no
+  delimiters) and exits 1 on any of them. Before this, the only way to see the sections was
+  to run `/wp-init`.
+
+### Fixed
+
+- **`demo-sections.mjs` no longer cuts a large listing short on a pipe.** It wrote its report
+  and then called `process.exit()`, which drops whatever a pipe has not taken yet: a `--json`
+  listing over 64 KiB reached its reader truncated and unparseable. Exit codes are now set
+  through `process.exitCode`, and bad usage is thrown to the entry point, which sets 64.
+
 ## [1.36.0] - 2026-11-22
 
 ### Added
