@@ -31,7 +31,7 @@ get_header();
         <?php the_posts_navigation(); ?>
 
     <?php else : ?>
-        <p><?php esc_html_e('Nothing was found.', '__starter__'); ?></p>
+        <p><?php echo esc_html(__starter___b('Nothing was found.', 'No se encontró nada.')); ?></p>
     <?php endif; ?>
 </main>
 

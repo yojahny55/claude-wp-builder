@@ -51,6 +51,7 @@ Issues discovered during testing that need to be resolved.
 
 - [x] **Tailwind starter strings follow the page language** `DELIVERED`
   The skip link, menu `aria-label`, 404 copy and footer in the tailwind starter ([header.php](starter-theme/__tailwind__/header.php), [404.php](starter-theme/__tailwind__/404.php)) read the starter's string table through `__starter___e()` / `__starter___t()` instead of gettext. Measured: only the focused skip link's width changes in Spanish, with its longer text. [starter-i18n-switcher-strings](tests/checks/starter-i18n-switcher-strings.sh) guards it.
+  Later the post, search and archive templates (`search.php`, `single.php`, `template-parts/content*.php`, `inc/template-tags.php`) and the cinematic skip link, menu `aria-label`s, 404, index and post navigation followed: no front-end template of either starter uses gettext now, only the wp-admin menu-location labels. Measured: no style changes; Spanish text is wider, and two titles wrap to a second line at 390.
 
 - [x] **Fix anchor links in SCF URL fields** `DELIVERED`
   [wp-acf](agents/wp-acf.md) rule 19 sends hash-only and site-path links to a `text` field, keeps `url` for absolute addresses, and shows the seed call. [acf-anchor-links](tests/checks/acf-anchor-links.sh) guards it.

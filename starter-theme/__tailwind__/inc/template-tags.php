@@ -28,8 +28,8 @@ if ( ! function_exists( '__starter___posted_on' ) ) :
 		);
 
 		$posted_on = sprintf(
-			/* translators: %s: post date. */
-			esc_html_x( 'Posted on %s', 'post date', '__starter__' ),
+			/* %s: post date. */
+			esc_html( __starter___t( 'posted_on' ) ),
 			'<a href="' . esc_url( get_permalink() ) . '" rel="bookmark">' . $time_string . '</a>'
 		);
 
@@ -50,8 +50,8 @@ if ( ! function_exists( '__starter___posted_by' ) ) :
 			$name = '<a class="url fn n" href="' . esc_url( get_author_posts_url( get_the_author_meta( 'ID' ) ) ) . '">' . $name . '</a>';
 		}
 		$byline = sprintf(
-			/* translators: %s: post author. */
-			esc_html_x( 'by %s', 'post author', '__starter__' ),
+			/* %s: post author. */
+			esc_html( __starter___t( 'posted_by' ) ),
 			'<span class="author vcard">' . $name . '</span>'
 		);
 
@@ -67,18 +67,17 @@ if ( ! function_exists( '__starter___entry_footer' ) ) :
 	function __starter___entry_footer() {
 		// Hide category and tag text for pages.
 		if ( 'post' === get_post_type() ) {
-			/* translators: used between list items, there is a space after the comma */
-			$categories_list = get_the_category_list( esc_html__( ', ', '__starter__' ) );
+			// Separator between list items; there is a space after the comma.
+			$categories_list = get_the_category_list( esc_html( __starter___t( 'list_separator' ) ) );
 			if ( $categories_list ) {
-				/* translators: 1: list of categories. */
-				printf( '<span class="cat-links">' . esc_html__( 'Posted in %1$s', '__starter__' ) . '</span>', $categories_list ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				/* 1: list of categories. */
+				printf( '<span class="cat-links">' . esc_html( __starter___t( 'posted_in' ) ) . '</span>', $categories_list ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 			}
 
-			/* translators: used between list items, there is a space after the comma */
-			$tags_list = get_the_tag_list( '', esc_html_x( ', ', 'list item separator', '__starter__' ) );
+			$tags_list = get_the_tag_list( '', esc_html( __starter___t( 'list_separator' ) ) );
 			if ( $tags_list ) {
-				/* translators: 1: list of tags. */
-				printf( '<span class="tags-links">' . esc_html__( 'Tagged %1$s', '__starter__' ) . '</span>', $tags_list ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				/* 1: list of tags. */
+				printf( '<span class="tags-links">' . esc_html( __starter___t( 'tagged' ) ) . '</span>', $tags_list ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 			}
 		}
 
@@ -87,8 +86,8 @@ if ( ! function_exists( '__starter___entry_footer' ) ) :
 			comments_popup_link(
 				sprintf(
 					wp_kses(
-						/* translators: %s: post title */
-						__( 'Leave a Comment<span class="screen-reader-text"> on %s</span>', '__starter__' ),
+						/* %s: post title */
+						__starter___t( 'leave_comment' ),
 						array(
 							'span' => array(
 								'class' => array(),
@@ -104,8 +103,8 @@ if ( ! function_exists( '__starter___entry_footer' ) ) :
 		edit_post_link(
 			sprintf(
 				wp_kses(
-					/* translators: %s: Name of current post. Only visible to screen readers */
-					__( 'Edit <span class="screen-reader-text">%s</span>', '__starter__' ),
+					/* %s: Name of current post. Only visible to screen readers */
+					__starter___t( 'edit_post' ),
 					array(
 						'span' => array(
 							'class' => array(),

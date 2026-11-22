@@ -13,4 +13,4 @@ defined('ABSPATH') || exit;
 </head>
 <body <?php body_class(); ?>>
 <?php wp_body_open(); ?>
-<a class="skip-link screen-reader-text" href="#cinematic"><?php esc_html_e( 'Skip to content', '__starter__' ); ?></a>
+<a class="skip-link screen-reader-text" href="#cinematic"><?php echo esc_html(__starter___b('Skip to content', 'Saltar al contenido')); ?></a>
