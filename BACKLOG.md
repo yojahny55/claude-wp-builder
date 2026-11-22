@@ -122,8 +122,8 @@ Improving how content is created, organized, and populated.
 - [ ] **Blog language field** `OPEN`
   Add an SCF field to blog posts for selecting the post language; archive templates filter by the active language. Note this only applies under `i18n strategy: suffix` — the Polylang model already carries language per post. No owner exists: [wp-acf](agents/wp-acf.md) would emit the field and [wp-page](commands/wp-page.md) the archive filter, and neither does today.
 
-- [ ] **Placeholder content for empty elements** `PARTIAL`
-  **Gap:** [wp-finalize](commands/wp-finalize.md) refuses `href="#"` in delivered markup and flags a stub privacy page. Nothing seeds obvious placeholder values for social icons or phone numbers when the demo has none, so those elements are simply absent rather than flagged in the report.
+- [x] **Placeholder content for empty elements** `DELIVERED`
+  [wp-finalize](commands/wp-finalize.md) refuses `href="#"` in delivered markup and flags a stub privacy page. Check 7 item 12 ([wp-cli-runtime.md](skills/wp-finalize-run/references/wp-cli-runtime.md)) lists every empty social, phone, email and address setting under **Content pending** in the report, never as a FAIL. It flags rather than seeds: an invented phone number or profile link is one a client can ship by mistake. [wp-finalize-content-pending](tests/checks/wp-finalize-content-pending.sh) runs the snippet against stubbed ACF.
 
 - [x] **Multi-page demo support** `DELIVERED`
   [wp-normalize](agents/wp-normalize.md) splits an arbitrary multi-page site into the canonical demo format; [wp-yolo](commands/wp-yolo.md) and [wp-seed](commands/wp-seed.md) generate the corresponding pages, templates and navigation.

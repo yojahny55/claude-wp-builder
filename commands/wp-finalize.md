@@ -234,6 +234,7 @@ path alongside the rest of the checklist.
   - template-parts/section-pricing.php referenced but does not exist
 [PASS] Check 6: Settings page
 [PASS] Check 7: WP-CLI runtime validation
+  Content pending (client to supply, never a FAIL): social_tiktok, contact_phone
 [PASS] Check 8: GEO & agent-readiness
 [PASS] Tailwind convention
 [PASS] Demo-parity Layer 1 (static)
