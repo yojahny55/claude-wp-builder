@@ -109,12 +109,16 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-craft/SKILL.md` and its `references/`
 before writing any markup.
 
 0. **Gate.** Run `node "${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs" --probe`.
-   On exit 2, run `npm i -D playwright-core` in the project root and probe again
-   (the probe resolves `playwright-core` from `PLAYWRIGHT_CORE`, then the
-   plugin's own `node_modules`, then the project's, then the global npm root
-   (`npm root -g`), which is why installing here works, and why a machine with
-   Playwright installed globally already passes; say first that this writes a `package.json` and a `node_modules/` into
-   the WordPress project root). After the retry, **only exit 0 continues** —
+   On exit 2, look for a `playwright-core` already on the machine before installing anything:
+   `$(npm root -g)/playwright-core` or
+   `$(npm root -g)/@playwright/test/node_modules/playwright-core`. If one exists, set
+   `PLAYWRIGHT_CORE` to that directory and probe again (the probe resolves `playwright-core`
+   from `PLAYWRIGHT_CORE`, then the plugin's own `node_modules`, then the project's, then the
+   global npm root). Only when none exists, ask the user (`AskUserQuestion`) whether to run
+   `npm i -D playwright-core` in the project root, and say first that this writes a
+   `package.json` and a `node_modules/` into the WordPress project root; without an explicit
+   yes, do not install. With no copy and no yes, print what the probe said is missing and stop.
+   After the retry, **only exit 0 continues** —
    exit 2 means print what the probe said is missing (`playwright-core` or
    Chrome; the fix is `WP_BROWSER_CHROMIUM` pointing at a Chrome or Chromium already on
    the machine, never a browser download), and any other exit

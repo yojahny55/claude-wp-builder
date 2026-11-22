@@ -13,7 +13,7 @@ Layer 3 is the backstop that measures **computed styles**, not just screenshots,
    Step 2.6 has already converted each demo page **in place**, so the demo URL loaded in
    item 2 serves the *converted* page: an error the conversion introduced is present on
    both sides of that comparison and cancels out. So for each in-scope page also open the
-   pristine pre-conversion copy at `demo/.original/<slug>.html` (Step 2.6 keeps it there;
+   pristine pre-conversion copy at `demo/.original/<slug>.html` (`/wp-yolo` Step 2.6 keeps it there;
    the old `demo/<slug>.original.html` no longer exists) and repeat the measurement and
    classification below between it and the converted `demo/<slug>.html`. Report a hard
    delta found here as a **conversion defect** — `/wp-tailwindify` changed the page — and

@@ -14,6 +14,8 @@ grep -Fq 'npm i -D playwright-core' "$d" || fail "$d does not try to install pla
 # Anchored to the gate itself: a bare 'stop' is satisfied by the verify loop's
 # own stop-after-three-rounds, which would leave this check green with Step 0
 # deleted outright.
+grep -Fq 'PLAYWRIGHT_CORE' "$d" || fail "$d does not try an existing playwright-core before installing"
+grep -Fq 'without an explicit' "$d" || fail "$d installs into the project without asking"
 grep -Fq 'probe again' "$d" || fail "$d does not retry the probe after installing playwright-core"
 grep -Fq 'way **stop**' "$d" || fail "$d does not stop on a missing browser"
 # The second alternative this used to carry, 'any other exit code', is wrapped

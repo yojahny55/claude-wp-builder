@@ -136,7 +136,7 @@ For each confirmed section, wrap it with the standard comment delimiters:
 
 Rules:
 - **Include** `<header>` as `SECTION: Header` and `<footer>` as `SECTION: Footer` — the `/wp-header` and `/wp-footer` commands expect these delimiters.
-- **Skip** sections that already have correct delimiters (detected in Step 3.1).
+- **Skip** sections that already have correct delimiters (detected in Step 3, item 1).
 - **Preserve** all existing content within sections — do not rewrite or reorder HTML.
 - Place opening delimiter on the line immediately before the section's opening tag.
 - Place closing delimiter on the line immediately after the section's closing tag.
