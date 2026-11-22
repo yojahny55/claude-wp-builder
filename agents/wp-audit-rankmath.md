@@ -2,7 +2,7 @@
 name: wp-audit-rankmath
 description: Rank Math SEO installer, configurator, and SEO data seeder — modules, schema, breadcrumbs, meta, sitemap
 tools: Read, Write, Edit, Grep, Glob, Bash
-model: haiku
+model: sonnet
 ---
 
 # Rank Math SEO Configurator
@@ -407,85 +407,7 @@ not report "sitemap validated" on the strength of this script alone.
 for a permalink silently never fires. Fetch the index, then fetch every child it names, and
 match against the concatenation.
 
-```bash
-$WP eval "
-\$home = home_url('/');
-\$sitemap_url = \$home . 'sitemap_index.xml';
-\$response = wp_remote_get(\$sitemap_url);
-\$code = wp_remote_retrieve_response_code(\$response);
-\$body = wp_remote_retrieve_body(\$response);
-\$content_type = wp_remote_retrieve_header(\$response, 'content-type');
-
-echo \"Status: \$code\n\";
-echo \"Content-Type: \$content_type\n\";
-
-// Follow the index into every child sitemap — the URLs live there, not here.
-// Only an index has children: in a flat <urlset> the <loc> entries are the post
-// URLs themselves, and re-fetching each one would hammer the site for nothing.
-\$children = array();
-\$all_bodies = array();
-if (stripos(\$body, '<sitemapindex') !== false) {
-    preg_match_all('#<loc>\s*([^<\s]+)\s*</loc>#i', \$body, \$m);
-    \$children = array_diff(array_unique(\$m[1]), array(\$sitemap_url));
-    foreach (\$children as \$child) {
-        \$all_bodies[] = wp_remote_retrieve_body(wp_remote_get(\$child));
-    }
-}
-echo 'Fetched ' . count(\$children) . \" child sitemaps.\n\";
-
-// Every <loc> across the index and its children, compared as whole URLs. A
-// substring test would report /page/ as present because /page/2/ is listed.
-\$all_bodies[] = \$body;
-\$listed = array();
-foreach (\$all_bodies as \$b) {
-    preg_match_all('#<loc>\s*([^<\s]+)\s*</loc>#i', \$b, \$m);
-    foreach (\$m[1] as \$loc) { \$listed[untrailingslashit(html_entity_decode(\$loc))] = true; }
-}
-
-// Check 1: Must return 200
-if (\$code !== 200) { echo \"FAIL: Sitemap returns \$code\n\"; }
-
-// Check 2: Must be XML, not HTML
-if (strpos(\$body, '<!DOCTYPE html') !== false || strpos(\$body, '<html') !== false) {
-    echo \"FAIL: Sitemap returns HTML (not XML)\n\";
-}
-
-// Check 3: Must contain <sitemapindex or <urlset
-if (strpos(\$body, '<sitemapindex') === false && strpos(\$body, '<urlset') === false) {
-    echo \"FAIL: Sitemap missing <sitemapindex> or <urlset>\n\";
-}
-
-// Check 4: registration_skip flag
-\$skip = get_option('rank_math_registration_skip', 0);
-\$configured = get_option('rank_math_is_configured', 0);
-if (!\$skip) { echo \"FAIL: rank_math_registration_skip not set — Rank Math loads NO frontend SEO\n\"; }
-if (!\$configured) { echo \"FAIL: rank_math_is_configured not set — wizard flag missing\n\"; }
-
-// Check 5: Noindex pages in sitemap
-global \$wpdb;
-\$noindex_in_sitemap = \$wpdb->get_col(\"
-    SELECT p.ID FROM {\$wpdb->posts} p
-    JOIN {\$wpdb->postmeta} m ON p.ID=m.post_id
-    WHERE p.post_status='publish' AND p.post_type IN ('post','page')
-    AND m.meta_key='rank_math_robots' AND m.meta_value LIKE '%noindex%'
-\");
-foreach (\$noindex_in_sitemap as \$id) {
-    if (isset(\$listed[untrailingslashit(get_permalink(\$id))])) {
-        echo \"FAIL: noindex post #\$id is listed in the sitemap\n\";
-    }
-}
-
-// Check 6: Draft/private posts in sitemap
-\$drafts = \$wpdb->get_col(\"SELECT ID FROM {\$wpdb->posts} WHERE post_status IN ('draft','private') AND post_type IN ('post','page')\");
-foreach (\$drafts as \$id) {
-    if (isset(\$listed[untrailingslashit(get_permalink(\$id))])) {
-        echo \"FAIL: unpublished post #\$id is listed in the sitemap\n\";
-    }
-}
-
-echo \"Sitemap validation complete.\n\";
-"
-```
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-seo-standards/references/rankmath-sitemap-validation.md` and run the script there. Every `FAIL:` line it prints is a finding to fix or report; a run with none is still not "sitemap validated" until the checks above that need Step 8.5's data have run.
 
 ## Step 6: Configure OG / Social Defaults and the site icon
 
@@ -730,83 +652,7 @@ echo \"Seeded SEO meta for \$count terms.\";
 
 After seeding meta, check for schema issues:
 
-```bash
-$WP eval "
-// Check 1: Theme JSON-LD + Rank Math = duplicate schema
-\$theme_jsonld = 0;
-\$it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(get_template_directory()));
-foreach (\$it as \$f) {
-    if (\$f->getExtension() !== 'php') continue;
-    if (strpos(file_get_contents(\$f->getPathname()), 'application/ld+json') !== false) {
-        \$theme_jsonld++;
-        echo \"Theme JSON-LD found in: \" . \$f->getFilename() . \"\n\";
-    }
-}
-if (\$theme_jsonld > 0) {
-    echo \"WARN: Theme outputs JSON-LD AND Rank Math is active = duplicate schema\n\";
-    echo \"  FIX: if it shares an @id with Rank Math's own node (Organization/LocalBusiness), merge it\n\";
-    echo \"       through the rank_math/json_ld filter (Step 4.7) instead of removing it outright —\n\";
-    echo \"       Rank Math does not collect address/contactPoint/geo/sameAs itself, so deleting the\n\";
-    echo \"       theme's block loses that data rather than de-duplicating it. Only a genuinely\n\";
-    echo \"       independent node (a different @type, its own @id) should just be removed.\n\";
-}
-
-// Check 1b: Theme's own <meta name=\"description\"> duplicates Rank Math's
-\$meta_desc_theme = [];
-\$it2 = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(get_template_directory()));
-foreach (\$it2 as \$f) {
-    if (\$f->getExtension() !== 'php') continue;
-    if (preg_match('/<meta\s+name=([\"\x27])description\1/i', file_get_contents(\$f->getPathname()))) {
-        \$meta_desc_theme[] = \$f->getFilename();
-    }
-}
-if (\$meta_desc_theme) {
-    echo \"WARN: theme prints its own <meta name=description> in: \" . implode(', ', \$meta_desc_theme) . \"\n\";
-    echo \"  FIX: do not gate this only on 'is an SEO plugin active' — Rank Math can be active and still\n\";
-    echo \"       emit no description on a specific page (an unconfigured template, a route with no\n\";
-    echo \"       post/term to hold meta). Gate the theme's own tag on the CURRENT object already having\n\";
-    echo \"       a non-empty rank_math_description/rank_math_title (get_post_meta / get_term_meta), and\n\";
-    echo \"       only print the fallback when that is empty — otherwise two description tags render on\n\";
-    echo \"       the same page once Rank Math starts covering more routes.\n\";
-}
-\$dup = wp_remote_get(home_url('/'));
-\$dup_body = wp_remote_retrieve_body(\$dup);
-\$dup_count = preg_match_all('/<meta\s+name=[\"\x27]description[\"\x27]/i', \$dup_body);
-echo \$dup_count > 1 ? \"FAIL: home page renders \$dup_count <meta name=description> tags\n\" : \"home page has \$dup_count description tag OK\n\";
-
-// Check 2: Validate required schema fields
-\$posts = get_posts(['post_type' => ['post','page'], 'posts_per_page' => -1, 'post_status' => 'publish']);
-\$schema_issues = [];
-foreach (\$posts as \$p) {
-    \$schema = get_post_meta(\$p->ID, 'rank_math_schema_BlogPosting', true);
-    if (\$schema && is_array(\$schema)) {
-        // BlogPosting requires: headline, datePublished, author
-        if (empty(\$schema['headline'])) { \$schema_issues[] = '#' . \$p->ID . ' missing headline'; }
-        if (empty(\$schema['datePublished'])) { \$schema_issues[] = '#' . \$p->ID . ' missing datePublished'; }
-        if (empty(\$schema['author'])) { \$schema_issues[] = '#' . \$p->ID . ' missing author'; }
-    }
-}
-if (!empty(\$schema_issues)) {
-    echo \"Schema issues: \" . implode(', ', \$schema_issues) . \"\n\";
-} else {
-    echo \"Schema validation passed.\n\";
-}
-
-// Check 3: LocalBusiness schema for service businesses
-\$kg_type = get_option('rank-math-options-titles', [])['knowledgegraph_type'] ?? '';
-if (\$kg_type === 'localBusiness') {
-    \$schema = get_option('rank_math_schema_LocalBusiness', []);
-    if (empty(\$schema['areaServed'])) {
-        echo \"WARN: LocalBusiness schema missing areaServed\n\";
-    }
-    if (empty(\$schema['hasOfferCatalog'])) {
-        echo \"WARN: LocalBusiness schema missing hasOfferCatalog (service catalog)\n\";
-    }
-}
-
-echo \"Schema checks complete.\n\";
-"
-```
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-seo-standards/references/rankmath-schema-validation.md` and run the script there. Every `WARN`/`FAIL` it prints is a finding; the merge rule for a theme `<script type="application/ld+json">` that shares an `@id` with Rank Math is Step 4.7.
 
 ## Step 8.6: Title/description quality validation
 
@@ -942,75 +788,7 @@ echo \"FAQ schema seeded for \$count pages.\";
 
 ## Step 12: Add Breadcrumbs to Theme
 
-### 12a. Add PHP Function
-
-Read the theme's `functions.php`. Add the `prefix_breadcrumbs()` function from the `wp-audit-seo-standards` skill (Section 10, `references/breadcrumbs.md`). Replace `prefix_` with the actual function prefix from CLAUDE.md:
-
-```php
-function prefix_breadcrumbs() {
-    if (is_front_page()) return;
-    echo '<nav class="breadcrumbs" aria-label="Breadcrumb">';
-    if (function_exists('rank_math_the_breadcrumbs')) {
-        rank_math_the_breadcrumbs();
-    } else {
-        echo '<a href="' . esc_url(home_url('/')) . '">Home</a>';
-        echo ' &raquo; ';
-        if (is_singular()) { the_title(); }
-        elseif (is_archive()) { the_archive_title(); }
-        elseif (is_search()) { echo 'Search results'; }
-        elseif (is_404()) { echo 'Page Not Found'; }
-    }
-    echo '</nav>';
-}
-```
-
-### 12b. Add Breadcrumb Call to Templates
-
-Edit the main template file (usually `header.php` or a layout partial). Insert the breadcrumb call after `</nav>` (main navigation) and before `<main`:
-
-```php
-<?php prefix_breadcrumbs(); ?>
-```
-
-### 12c. Add Breadcrumb CSS
-
-Append breadcrumb styles to `assets/css/styles.css` using the CSS from the skill:
-
-```css
-/* Breadcrumbs */
-.breadcrumbs {
-    padding: 12px 0;
-    font-size: 0.875rem;
-    color: #6b7280;
-}
-.breadcrumbs a {
-    color: #3b82f6;
-    text-decoration: none;
-    /* 24x24 target (WCAG 2.2 AA 2.5.8), a home icon included, without moving the text:
-       the padding and the equal negative margin cancel out in the layout. */
-    display: inline-block;
-    padding: 4px;
-    margin: -4px;
-}
-.breadcrumbs a:hover {
-    text-decoration: underline;
-}
-.breadcrumbs .separator {
-    margin: 0 0.5rem;
-    color: #9ca3af;
-}
-```
-
-### 12d. Enable Breadcrumbs in Rank Math
-
-```bash
-$WP eval "
-\$opts = (array) get_option('rank-math-options-general', []);
-\$opts['breadcrumbs'] = 'on';
-update_option('rank-math-options-general', \$opts);
-echo 'Breadcrumbs enabled.';
-"
-```
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-seo-standards/references/rankmath-theme-breadcrumbs.md` and run 12a to 12d there, in order: 12a adds `prefix_breadcrumbs()` to `functions.php` (real prefix from CLAUDE.md), 12b calls it in the main template after the main `</nav>` and before `<main`, 12c appends the breadcrumb CSS to `assets/css/styles.css`, 12d enables breadcrumbs in Rank Math.
 
 ## Step 13: Set Permalinks
 
@@ -1041,91 +819,7 @@ On a local clone flush local caches only; never run a CDN or page-cache plugin's
 
 ## Step 15: Polylang-specific Rank Math Integration
 
-If Polylang is active, verify:
-
-```bash
-$WP eval "
-if (!function_exists('pll_languages_list')) { echo 'SKIP: Polylang not active'; exit; }
-
-\$langs = pll_languages_list();
-echo 'Languages: ' . implode(', ', \$langs) . PHP_EOL;
-
-// Check 1: Free Polylang = single sitemap (not per-language)
-\$sitemap_url = home_url('/sitemap_index.xml');
-\$response = wp_remote_get(\$sitemap_url);
-\$body = wp_remote_retrieve_body(\$response);
-if (strpos(\$body, '<sitemapindex') !== false) {
-    echo 'OK: Sitemap index present' . PHP_EOL;
-}
-// Per-language /<lang>/sitemap_index.xml 404s by design on free Polylang — not a defect.
-
-// Check 2: Posts without language assigned
-global \$wpdb;
-\$posts = \$wpdb->get_col(\"SELECT ID FROM {\$wpdb->posts} WHERE post_status='publish' AND post_type='post'\");
-\$untranslated = 0;
-foreach (\$posts as \$id) {
-    if (!pll_get_post_language(\$id)) { \$untranslated++; }
-}
-if (\$untranslated > 0) {
-    echo \"WARN: \$untranslated posts have no Polylang language assigned\" . PHP_EOL;
-}
-
-// Check 3: Translation completeness
-\$default = pll_default_language();
-\$missing = 0;
-foreach (\$posts as \$id) {
-    if (pll_get_post_language(\$id) !== \$default) continue;
-    \$tr = pll_get_post_translations(\$id);
-    if (count(\$tr) < 2) { \$missing++; }
-}
-if (\$missing > 0) {
-    echo \"INFO: \$missing default-language posts have no translations\" . PHP_EOL;
-}
-
-echo 'Polylang + Rank Math checks complete.' . PHP_EOL;
-"
-```
-
-### 15b. Translate the CPT-archive breadcrumb
-
-Rank Math builds the archive crumb of a custom post type from the label passed to
-`register_post_type()`, a plain literal in the primary language. Under Polylang,
-`/en/<cpt-plural>/` and every single under it then show the primary-language plural in the
-breadcrumb. `post_type_archive_title` filters do not reach it. Add this to the theme's
-`inc/rankmath.php` (or wherever Step 4.7's `rank_math/json_ld` filter lives), with the real
-prefix:
-
-```php
-/**
- * Route each CPT-archive crumb through the theme's string table, the same
- * `plural_<post_type>` key the post_type_archive_title filter reads.
- */
-add_filter( 'rank_math/frontend/breadcrumb/items', function ( $crumbs ) {
-    $types = get_post_types( array( '_builtin' => false, 'has_archive' => true ), 'names' );
-    foreach ( $crumbs as $i => $crumb ) {
-        foreach ( $types as $type ) {
-            $link = get_post_type_archive_link( $type );
-            $is_archive_crumb = ! empty( $crumb[1] ) && $link
-                && untrailingslashit( $crumb[1] ) === untrailingslashit( $link );
-            // On the archive itself the last crumb may carry no link.
-            $is_current = empty( $crumb[1] ) && is_post_type_archive( $type ) && $i === array_key_last( $crumbs );
-            if ( $is_archive_crumb || $is_current ) {
-                $key   = 'plural_' . $type;
-                $label = prefix_t( $key );
-                // Fallback: the type's own label. post_type_archive_title() is null
-                // on a single, and every single under the CPT carries this crumb too.
-                $crumbs[ $i ][0] = $label !== $key ? $label : get_post_type_object( $type )->labels->name;
-            }
-        }
-    }
-    return $crumbs;
-} );
-```
-
-Register a `plural_<post_type>` string for every CPT with an archive, in every language.
-Then verify on the secondary language: fetch `/<lang>/<cpt-plural>/` and one single, and
-read the breadcrumb text. The crumb must match the page's `<h1>`/`<title>` language, not the
-primary one.
+If Polylang is active, read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-seo-standards/references/rankmath-polylang.md` and run it: the verification script (free Polylang has one sitemap, not one per language; every post has a language; default-language posts have translations) and 15b, the `rank_math/frontend/breadcrumb/items` filter that routes each CPT-archive crumb through the theme string table (`plural_<post_type>`, in every language) and is verified by fetching `/<lang>/<cpt-plural>/` and one single, whose breadcrumb must match the page language. Of the script's output, `SKIP:` ends the step (Polylang is not active), each `WARN:` is a finding, and `INFO:` lines are reported as is, not fixed.
 
 ## Verification
 

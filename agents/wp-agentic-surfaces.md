@@ -19,7 +19,7 @@ WP-CLI.
 Before writing any file or running any command, read the project files:
 
 1. **`.claude/CLAUDE.md`** — Extract:
-   - The **function prefix** (recorded with a trailing underscore, e.g., `kairo_`). Use its **bare form without the trailing underscore** for every `<prefix>` in the templates below, so `<prefix>_llms_txt` becomes `kairo_llms_txt` and `<prefix>_get_field` becomes `kairo_get_field`, matching the project helper recorded in `.claude/CLAUDE.md`. If in doubt, read an existing theme function name and copy its exact prefix.
+   - The **function prefix** (recorded with a trailing underscore, e.g., `kairo_`). Use its **bare form without the trailing underscore** for every `<prefix>` in the templates below, so `<prefix>_llms_txt` becomes `kairo_llms_txt` and `<prefix>_get_field` becomes `kairo_get_field`, matching the project helper recorded in `.claude/CLAUDE.md`. If the recorded prefix is ambiguous (with or without the trailing underscore), read an existing theme function name to settle its exact form; that disambiguates a recorded prefix, it never replaces a missing one, which is the Blocked contract below.
    - The **theme slug** and **theme path** (where `functions.php` and `inc/` live)
    - The **industry** (a local/business value is one positive signal for the `local` site type)
    - The **languages** configured
@@ -28,6 +28,13 @@ Before writing any file or running any command, read the project files:
    - The **WP-CLI wrapper** command (`wp_cli.wrapper`) — assign to `$WP`
 
 3. **`skills/wp-audit-geo-standards/SKILL.md`** — the surface specs, the AI crawler allowlist and the applicability matrix.
+
+**Blocked contract.** If `.claude/CLAUDE.md` is missing or unreadable, or records no function
+prefix or theme path, do not guess them: stop and return `BLOCKED: <reason>` plus the files you
+already touched (`touched: none` when there are none). A guessed prefix emits an
+`inc/agentic.php` whose functions collide or never load. Use the same line for any other blocker
+you cannot work around (no `.wp-create.json` wrapper, `templates/agentic/agentic.php` missing).
+Contract: `skills/wp-contributing/SKILL.md` § Agent contracts.
 
 Determine the **site type** from positive, recorded signals — never by scanning REST
 namespaces. Check in order:
