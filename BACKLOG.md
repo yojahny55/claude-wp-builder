@@ -13,8 +13,10 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 
 **Priority:** Items within each section are ordered by priority (highest first).
 
-**Reconciled** on November 20, 2026 against `main` at v1.32.0. Every open and partial
-item was checked against what 1.32.0 shipped, and none changed state; the full pass against
+**Reconciled** on November 21, 2026 against `main` at v1.33.0. Every open and partial
+item was checked against what 1.33.0 shipped (input hygiene in the `bin/` tools, shared native
+server deny rules, audit-catalog ownership, a slimmer CLAUDE.md), and none changed state: the
+Docker nginx config still has no owner, and the REST block is still not written down. The full pass against
 the command, agent or script that would own each item was last made at v1.31.0. An item
 claiming to be open while the behavior ships reads as a project that does not know what it
 has built.

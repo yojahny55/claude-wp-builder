@@ -2,6 +2,126 @@
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-11-21
+
+### Changed
+
+- **`CLAUDE.md` is down from 805 lines to about 245.** It loads into every session, and the
+  history behind each rule was paid for on every task. The testing detail, the architecture
+  reasoning and every known ceiling moved verbatim to `docs/testing.md`,
+  `docs/architecture.md` and `docs/known-ceilings.md`, and `CLAUDE.md` keeps the rules, the
+  recorded-decision lines and a pointer to each. The `bin/` list now names every script, and the
+  fixed counts of compositions, roles and audit checks are gone in favour of their source of
+  truth. The checks that read the moved text follow it, and the zero-occurrence controls now
+  read both files, so they cannot pass on a file that no longer holds the text;
+  `tests/checks/claude-md-budget.sh` holds the size cap.
+
+### Fixed
+
+- **`/wp-audit` scores each defect once, audits to WCAG 2.2 AA, and no longer writes reports
+  into the site.** The accessibility auditor now targets WCAG 2.2 AA and tabulates the new
+  criteria as A11Y-070 to A11Y-074 (focus obscured, accessible authentication, dragging
+  movements, redundant entry and consistent help, the last two at level A). The PHP version floor is `>= 8.2`, written
+  only in SEC-026 and in the new "Same defect, one owner" table; PERF-040 and WP-042 point at
+  it. That table names the owner of defects listed under several ids (PHP floor, XML-RPC,
+  `WP_DEBUG`, escaping, dangerous functions, `wp_body_open`, image alt) and the `root_cause`
+  slug owner and duplicates share, so the report's existing root-cause fold counts the defect
+  once; a defect only the duplicate finds is still reported, at the owner's severity, and a
+  folded id stays `still_failing` in the ledger. Rules that now report differently carry a
+  revision (`SEC-026@2`, `SEC-008@2`, `PERF-029@2`, `PERF-040@2`, `WP-042@2`), and SEC-008
+  joins WP-040 under the local-clone `INFO` ceiling. The SEO, accessibility and GEO auditors
+  return their findings to the parent instead of writing `audit/` or `audit-results/` files
+  inside the site. Unused and retired check ids are listed and never reused; new usability
+  ids start after UX-058.
+
+- **The audit report and runbook tools no longer trust their input.** A category named like an object property (`constructor`) no longer renders function source in the report; `--help` and `--flag=value` work; archiving an earlier same-day run is all or nothing; a malformed `.wp-create.json` aborts the runbook instead of being treated as absent, and a relative `audit.out_dir` resolves against the site root in both tools (`--root` for the runbook, `--site-root` for the report) instead of the working directory.
+
+- **Browser tools reject bad input instead of crashing.** `demo-verify.mjs` exits 1 with a one-line message when `--widths` or `--out` has no value or `--widths` is not `WIDTHxHEIGHT` (a last-argument flag threw an uncaught TypeError, and `--widths 1440` made every page crash on `NaN`), and it now closes each page's browser contexts in a `finally`, so a page that throws mid-walk no longer leaks them. `tailwindify-parity.mjs` exits 3 with a clear message when the two trees share no ancestor below the filesystem root, instead of serving `/`, and its local server now answers only inside the two trees (and the targets of their top-level symlinks, such as `.original/css`), not the rest of their common ancestor. `composition-preview.mjs --tokens` reports a bad preview token through the existing crash path (exit 3) instead of a raw stack.
+
+- `bin/wp-config.mjs` refuses a flag it does not know instead of ignoring it. `adopt`,
+  `code-home`, `env-set`, `git-init`, `keep-inactive` and `require-origin` each name the
+  flags they accept; a typo (`adopt --replce`), a space instead of `=` (`--branch main`) or
+  an uppercase name now exits 1 with the flag named and nothing done, where it used to run
+  as if the flag had never been passed.
+- `demo-verify`, `composition-preview` and `tailwindify-parity` resolve Chromium through
+  `bin/lib/browsers.mjs` like every other tool, so they prefer the revision playwright-core
+  pins over the system Chrome and read `WP_BROWSER_CHROMIUM`. `WP_DEMO_CHROME` is still
+  honoured as its older name when it points at an executable.
+
+- **Commands now declare what they use, in an order that refuses before it asks.** `/wp-init`
+  validated the manifest and stopped on `demo/FAILED.md` only after it had asked the template,
+  custom-fields and i18n questions, and could dispatch to `/wp-cinematic-init` first; both
+  refusals now come before any question or dispatch. `/wp-init` and `/wp-polylang` declare
+  `AskUserQuestion` and `/wp-demo-verify` declares `Agent`. Argument hints list the flags the
+  bodies accept (`/wp-yolo`, `/wp-init`, `/wp-section`, `/wp-demo-verify`,
+  `/wp-responsive-check`, `/wp-contribute`). The five `/wp-cinematic-*` commands move from
+  `name:`/`arguments:` to the standard frontmatter, `/wp-cinematic-demo` takes `--no-hybrid`
+  like the rest, and `/wp-cinematic-init` no longer points at a nonexistent `--update-kit`.
+  `tests/checks/command-frontmatter.sh` and `tests/checks/wp-init-order.sh` pin all of it.
+
+- **decision-sheet and style-diff stop dropping things silently.** A sidecar finding with the same `check` as a proposal but on another page now gets its own card instead of being skipped (a site-wide finding with no page is still covered by its check's proposal, and exact page matches are made first so the sidecar's order does not matter); a `--proposals` or `--against` file that parses but is not a list of objects is a usage error (exit 2) instead of a crash; `--parse` warns on stderr about any `DECISION` line it cannot read inside the block (for example no `|` after the option) and exits 1, while text outside a block is ignored whenever the paste holds one (a prose line that fits the grammar is not an answer), and `--parse --against <decisions-*.json>` drops answers for unknown cards or options a card does not offer; `--date` and `--label` are restricted to `[A-Za-z0-9._-]+` without `..` so they cannot escape `--out`; and `style-diff` records the HTTP status and final URL of each page, so a 4xx/5xx page or a different final URL between snapshots (the fragment aside) is UNMEASURED (exit 3) rather than CLEAN.
+
+- **`/wp-audit` and `/wp-update` read the exit code their tools document.** The audit fix step
+  took any non-zero `bin/style-diff.mjs` exit as a moved style value, so an INCOMPLETE run
+  (exit 3, a page or viewport not measured) was reported as a diff; it now repeats the
+  measurement, and exit 2 is a tool failure. `/wp-update` took any non-zero
+  `bin/assets-fresh.mjs` exit as stale critical cuts; exit 2 (bad usage or an unreadable
+  manifest) is now reported as "critical cuts not checked".
+
+- **`image-gen.mjs` robustness.** A multi-line `## World` in `BRIEF.md` is now read whole instead of being cut at its first line, and an empty one followed directly by a heading reads as no world instead of the next section (existing plates composed with a multi-line world get a new hash and are regenerated once; single-line worlds are unaffected). Requests time out after 120 s; a timeout fails the slot without a retry, since the first request may still be billing. An unknown provider, a missing, unreadable or non-object plan file, and two `use` files sharing a basename now exit 2 before any request instead of "no key ... undefined" or exit 4. Plates and copied files are written through a temp file and a rename (removed if the write fails), so a killed run no longer leaves a truncated plate that is treated as cached forever.
+
+- **Lint and gate tools stop answering in silence.** `css-contour-lint` rejects unknown
+  flags and accepts `--rule=<name>` (both used to run every rule), no longer reads `clearfix`
+  as a search clear control, and no longer reads a border-only compound such as
+  `.btn.btn-primary` as transparent when `.btn` paints a solid background. `contrast-propose`
+  reads `#rgb`, `#rgba`, `#rrggbbaa` and `rgb()`/`rgba()` (alpha is flattened onto the
+  background, then onto white; the proposal stays opaque) and reports bad or missing input as
+  a one-line error with exit 2 instead of a stack or "no shade reaches it". `assets-fresh`
+  exits 2 ("critical cuts not checked") when a manifest lists no sheet and no cut, instead of
+  printing FRESH, and checks an optional `cutHash` for the cut file itself. `theme-template-check`
+  takes the `widgets` script entries from `--entry` alone, or from every path any `wp-scripts
+  build|start` call in `package.json` names plus `assets/js/src/index.js` when it exists (a
+  module passes when any of them imports it), and its finding lists the files it read.
+  `contrast-propose` also scores a moved background with a translucent foreground composited
+  over each candidate and reports the final pair's real ratio. What is now an error (exit 2):
+  an unknown argument, a `--pair` ratio of 0 or 1 or below or not a number (an empty ratio
+  still means 4.5), and an unreadable colour in `--pair`; an unreadable or non-text colour in
+  an `--axe` node is skipped with a WARN on stderr and the rest is reported.
+
+- **Manifest CLI edge cases.** A site root containing a space or an apostrophe is quoted in the detected WP-CLI wrapper and read back word-aware, so `adopt` no longer fails with "eval exited"; `git-init --commit/--push` accepts a root reached through a symlink; credentials in `--remote` are masked in everything printed; `set` warns on stderr when JSON parsing changes a key's type; a `-->` in a superseded CLAUDE.md line no longer closes the comment early; CRLF in the generated block is not drift; and `env-set`, `keep-inactive`, `remove-plugin` and `migrate` now take the manifest lock like `set`, and `code-home` takes it around its write, after its WP-CLI probe (an exit inside a locked command releases it).
+
+- **Network tool edges.** `link-sweep` now reports a redirect cycle (a target already
+  requested in the chain) as `broken` with the reason "redirect loop", while a long chain of
+  distinct URLs stays `unmeasured` at the 5-hop cap. `h2-proxy` keys its HTML cache on the
+  request cookies and `Accept-Language` as well as the URL, so pages that vary by a language
+  cookie are no longer served crossed, and it no longer caches responses carrying `Set-Cookie`
+  or `Cache-Control: no-store`/`private`. The suite preload keeps the third-party block closed
+  when `BASE_URL` is missing (it protects production properties) but now says so on stderr
+  instead of blocking every host silently.
+
+- `robin-fix.sh` no longer reads a queue hash that is already taken as free once the
+  WebP queue passes about a thousand rows. It asked `echo "$hashes" | grep -qF` under
+  `pipefail`: once the list outgrew the pipe buffer, `grep -q` closed the pipe at its
+  match, `echo` died of SIGPIPE and the pipeline reported the hash missing, so the
+  collision branch never ran and the row was inserted again. Lookups now read a
+  here-string and match whole lines. The same early-exit reader (`grep -q`, `head`) is
+  gone from every other shipped script that runs under `pipefail` (`wp-env-setup.sh`,
+  `geo-scan.sh`, `clone-preflight.sh`, the S3 mirror's error summary, `audit-suite.sh`'s
+  refusal listing and others), and `tests/checks/no-early-exit-pipes.sh` now scans
+  `bin/*.sh` and `skills/*/scripts/*.sh` as well as the checks.
+
+- **Native server templates agree on what they refuse, and stop breaking local setups.** The
+  PHP-FPM pool now sets `upload_max_filesize` and `post_max_size` from `{{max_upload_size}}`
+  (PHP's 2M/8M defaults rejected plugin zips even when nginx allowed 1024M, and the doc claimed
+  otherwise). The nginx template no longer sends a two-year HSTS header over a 365-day
+  self-signed certificate, which locked the browser out of `example.test` once it expired. The
+  Apache vhosts add `Options -Indexes`, and the Caddyfile adds `tls internal` so a local domain
+  stops asking a public ACME CA. nginx, Apache and Caddy now share one deny list
+  (`templates/native/_deny.list`): `/xmlrpc.php` (including `/xmlrpc.php/x`), `.sql.gz` and
+  `phar`/`pht(ml)` under uploads are refused by all three, and `.zip`, `.tar.gz` and `.tgz` are
+  refused everywhere except `/wp-content/uploads/`, so media-library zips still load, and
+  `tests/checks/vhost-deny-list-parity.sh` fails when an engine stops denying an entry.
+
 ## [1.32.0] - 2026-11-20
 
 ### Added
