@@ -6,7 +6,7 @@ argument-hint: "[--dry-run] [--keep-user=<login>]"
 
 # WP Anonymize — Replace Real People In A Clone
 
-`/wp-clone` brings a production database onto a development machine. Step 5.5 isolates the
+`/wp-clone` brings a production database onto a development machine. `/wp-clone` Step 5.5 isolates the
 seams a copy shares with its original — mail, cron, indexing — but the database it imported
 holds live customer records from the moment the import finishes, and isolation does nothing
 about that. This command is the separate, opt-in operation that `/wp-clone`'s report points
