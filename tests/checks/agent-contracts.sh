@@ -40,7 +40,7 @@ inc agents/wp-css.md 'is missing or unreadable, stop'
 
 # Conventions documented once.
 c=skills/wp-contributing/SKILL.md
-for t in '### Agent contracts' 'BLOCKED: <reason>' 'wp-context' 'wp-normalize' 'wp-audit-aios' 'wp-audit-rankmath' 'do not rename them'; do
+for t in '### Agent contracts' 'BLOCKED: <reason>' 'wp-context' 'wp-normalize' 'wp-research' 'wp-audit-aios' 'wp-audit-rankmath' 'do not rename them'; do
   inc "$c" "$t"
 done
 for n in wp-audit-aios wp-audit-rankmath; do inc "agents/$n.md" 'This agent writes.'; done

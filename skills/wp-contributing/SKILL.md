@@ -119,6 +119,9 @@ did. `tests/checks/tailwind-rebuild.sh` does this with a fake `npm` and fake wat
   and `BLOCKED: <reason>` is the first line of the summary; `/wp-audit` Step 6.8 then sees
   unexecuted ids and sends them back once; a second blocked report leaves the audit
   `INCOMPLETE`, with the agent and its reason named in the report.
+  `wp-research` is the documented exception: it reads `.claude/CLAUDE.md` only for business
+  context, beside `docs/` and the manifest, and needs no prefix, languages or theme slug, so a
+  missing file leaves it with less context, not blocked, and it has no `BLOCKED` return.
 - **The `wp-audit-*` prefix** means an agent dispatched by `/wp-audit`, and most of them only
   read and report. Two do not: `wp-audit-aios` and `wp-audit-rankmath` install and configure
   (plugin installs, options, post meta) and say so in their first lines. They keep the name
