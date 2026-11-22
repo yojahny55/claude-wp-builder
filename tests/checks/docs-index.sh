@@ -3,7 +3,7 @@
 # (two of them were linked from nowhere before the index existed).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-fail() { echo "FAIL: $1"; exit 1; }
+. tests/lib/assert.sh
 [ -f docs/README.md ] || fail "docs/README.md is missing"
 n=0
 for f in docs/*.md; do
