@@ -117,6 +117,12 @@ export const TOOLS = {
     143: 'SIGTERM',
   },
   // The named exception: every command reads these through skills/wp-manifest-gate/SKILL.md.
+  // A library module that is also a CLI: commands read `exit 2 = no browser` from it.
+  'lib/browsers.mjs': {
+    0: 'browser found (path on stdout)',
+    1: 'usage: engine is not chromium, firefox or webkit',
+    2: 'no browser of that engine on the machine',
+  },
   'wp-config.mjs': {
     0: 'ok',
     1: 'invalid or refused',

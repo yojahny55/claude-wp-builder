@@ -169,6 +169,17 @@ named exception (read by every command through `skills/wp-manifest-gate/SKILL.md
 | 130 | SIGINT |
 | 143 | SIGTERM |
 
+### `lib/browsers.mjs`
+
+A library module that is also a CLI (`node bin/lib/browsers.mjs <engine>`); `/wp-audit`'s
+browser tier reads its exit 2 as "no browser".
+
+| Code | Meaning |
+|---|---|
+| 0 | browser found (path on stdout) |
+| 1 | usage: engine is not chromium, firefox or webkit |
+| 2 | no browser of that engine on the machine |
+
 ### `wp-config.mjs`
 
 | Code | Meaning |
