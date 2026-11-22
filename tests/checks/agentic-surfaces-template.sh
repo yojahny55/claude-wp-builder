@@ -38,4 +38,10 @@ doc=$(sed -n '/^| Token | Replace with |/,/^$/p' "$agent" | grep -oE '`__[A-Za-z
 # No unsubstituted legacy placeholder in the template.
 ! grep -qF '<prefix>' "$tpl" || fail "$tpl still holds a <prefix> placeholder"
 
+# Substitution check must not abort a good run; copy is whole, gates trim at runtime.
+grep >/dev/null -cF 'UNSUBSTITUTED TOKENS' "$agent" || fail "$agent lacks the non-failing unsubstituted-token check"
+! grep -qF "grep -c '__prefix__" "$agent" || fail "$agent still uses the exit-1 grep -c token check"
+grep >/dev/null -cF 'Copy the whole template' "$agent" || fail "$agent lacks the whole-template copy rule"
+grep >/dev/null -cF 'the template spells it `__prefix__`' "$agent" || fail "$agent lacks the <prefix> documentation note"
+
 echo PASS

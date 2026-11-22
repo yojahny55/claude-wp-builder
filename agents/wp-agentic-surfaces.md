@@ -42,8 +42,8 @@ namespaces. Check in order:
 Bake the result into the emitted `inc/agentic.php` as
 `define( '<prefix>_AGENTIC_SITE_TYPE', '<content|local|merchant|saas>' );`. Every
 applicability gate reads that constant, so the site type is decided once, at build time,
-with no per-request sniffing. Only the surfaces that site type implies are emitted; the
-`N/A` surfaces are left out of `inc/agentic.php` rather than shipped empty.
+with no per-request sniffing. Only the surfaces that site type implies are served; the
+`N/A` surfaces stay in the file but its gates keep them from registering or emitting.
 
 ---
 
@@ -52,6 +52,7 @@ with no per-request sniffing. Only the surfaces that site type implies are emitt
 The PHP is not written by you. It is a fixed file, `${CLAUDE_PLUGIN_ROOT}/templates/agentic/agentic.php`,
 held to the PHP 7.4 floor and linted in CI. **Copy it and substitute the two tokens; do not
 retype, reorder or "improve" it** — a regenerated copy is how the 7.4 floor drifts.
+`<prefix>` in this file is documentation; the template spells it `__prefix__`.
 
 | Token | Replace with |
 |---|---|
@@ -61,7 +62,7 @@ retype, reorder or "improve" it** — a regenerated copy is how the 7.4 floor dr
 ```bash
 \cp -f "${CLAUDE_PLUGIN_ROOT}/templates/agentic/agentic.php" "<theme>/inc/agentic.php"
 sed -i -e "s/__prefix__/<prefix>/g" -e "s/__SITE_TYPE__/<site-type>/g" "<theme>/inc/agentic.php"
-grep -c '__prefix__\|__SITE_TYPE__' "<theme>/inc/agentic.php"   # must print 0
+if grep -q '__prefix__\|__SITE_TYPE__' "<theme>/inc/agentic.php"; then echo "UNSUBSTITUTED TOKENS"; exit 1; fi
 php -l "<theme>/inc/agentic.php"
 ```
 
@@ -72,8 +73,10 @@ every builder reads it back through `<prefix>_is_merchant_or_saas()` (pricing, G
 `<prefix>_is_saas()` (api-catalog, GEO-A22, and auth.md, GEO-U08) and
 `<prefix>_is_local_business()` (the `LocalBusiness` identity).
 
-Remove the routes and builders that the detected site type excludes rather than shipping
-stubs, then re-run `php -l`: the file must still parse on 7.4 (no `match`, no union types).
+Copy the whole template; do not delete routes or builders. The applicability gates above
+(`<prefix>_is_merchant_or_saas()`, `<prefix>_is_saas()`, `<prefix>_is_local_business()`) trim
+the surfaces the detected site type excludes at runtime, so an excluded surface is never
+registered or emitted. Re-run `php -l` after substitution: the file must still parse on 7.4.
 
 ---
 
@@ -306,8 +309,8 @@ codes below are detected by `wp-audit-geo` and deliberately **not** fixed from t
 ## Rules
 
 1. **Always read `.claude/CLAUDE.md` and `.wp-create.json` first** — they define the
-   prefix, theme path, industry and the `$WP` wrapper. Substitute the real prefix for
-   every `<prefix>` before writing the file.
+   prefix, theme path, industry and the `$WP` wrapper. Copy the template and substitute
+   `__prefix__` and `__SITE_TYPE__` as in Step 1.
 2. **Reference the `wp-audit-geo-standards` skill** for surface specs, the crawler
    allowlist and the applicability matrix.
 3. **The emitted file must parse on PHP 7.4** — no `match`, no union types.
