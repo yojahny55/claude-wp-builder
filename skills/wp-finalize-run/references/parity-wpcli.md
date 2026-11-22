@@ -2,7 +2,7 @@
 
 `commands/wp-finalize.md` sends the run here at Demo-parity gate — Layer 2. Follow it in order; nothing in it is optional background.
 
-Layer 2 runs when `.wp-create.json` exists and WordPress is reachable (reuse `$WP` from Check 7). Every check below is **critical**.
+Layer 2 runs when WordPress is reachable (reuse `$WP` from Check 7). Every check below is **critical**.
 
 1. **`site_logo` + critical options non-empty** — `critical`
 
@@ -36,4 +36,4 @@ Layer 2 runs when `.wp-create.json` exists and WordPress is reachable (reuse `$W
    ```
    **PASS** if every in-scope page from the manifest has a corresponding WordPress page. **FAIL** listing missing pages.
 
-**PASS** if all 4 checks pass. **FAIL** listing every offending check with its details. If WordPress is not reachable (no `.wp-create.json`, or `$WP` calls fail to connect), **SKIP** Layer 2 with a noted reason — this is not a failure, but Layers 1 and 3 still gate.
+**PASS** if all 4 checks pass. **FAIL** listing every offending check with its details. If WordPress is not reachable (`$WP` calls fail to connect), **SKIP** Layer 2 with a noted reason — this is not a failure, but Layers 1 and 3 still gate.

@@ -32,14 +32,14 @@ cfg="$tmp/audit.config.js"
 sed "s#https://example.com#https://stale-host.example#" "$suite/audit.config.js" | grep -v WP_AUDIT_BASE_URL_OVERRIDE > "$cfg"
 before="$(grep -F 'baseURL:' "$cfg")"
 for run in 1 2; do
-  RUNNER="$runner" CFG="$cfg" BASE_URL="https://audited.example" node "$tmp/rewrite.js" 2>> "$tmp/err" \
+  RUNNER="$runner" CFG="$cfg" BASE_URL="https://audited.example.org" node "$tmp/rewrite.js" 2>> "$tmp/err" \
     || fail "$runner could not prepare a config holding another host"
 done
 [ "$(grep -F 'baseURL:' "$cfg")" = "$before" ] || fail "$runner edited baseURL in audit.config.js"
 grep -Fq 'stale-host.example' "$tmp/err" || fail "$runner did not report the baseURL / --url mismatch"
 [ "$(grep -c WP_AUDIT_BASE_URL_OVERRIDE "$cfg")" = 1 ] || fail "the override line was not added exactly once"
-got="$(BASE_URL=https://audited.example node -e 'console.log(require(process.argv[1]).baseURL)' "$cfg")"
-[ "$got" = "https://audited.example" ] || fail "audit.baseURL is $got, not the --url host, in a spec that reads the config"
+got="$(BASE_URL=https://audited.example.org node -e 'console.log(require(process.argv[1]).baseURL)' "$cfg")"
+[ "$got" = "https://audited.example.org" ] || fail "audit.baseURL is $got, not the --url host, in a spec that reads the config"
 
 # 2. A production host never gets a request outside the gate, even when the caller forgot it.
 has bin/prod-gate.sh 'WP_AUDIT_GATE_HELD="$host"'
@@ -49,10 +49,10 @@ has "$runner" 'prod-gate.sh'
 has "$runner" 'WP_AUDIT_GATE_HELD'
 fakebin="$tmp/bin"; mkdir -p "$fakebin"; printf '#!/bin/sh\nexit 0\n' > "$fakebin/chromium"; chmod +x "$fakebin/chromium"
 gate="$tmp/gate"
-bin/prod-gate.sh --dir "$gate" --mark-blocked https://audited.example "test ban" 2>/dev/null
+bin/prod-gate.sh --dir "$gate" --mark-blocked https://audited.example.org "test ban" 2>/dev/null
 rc=0
 (cd "$tmp" && WP_AUDIT_GATE_DIR="$gate" WP_BROWSER_CHROMIUM="$fakebin/chromium" \
-  bash "$OLDPWD/$runner" --url https://audited.example/ --dir "$tmp/suite" > "$tmp/out" 2>&1) || rc=$?
+  bash "$OLDPWD/$runner" --url https://audited.example.org/ --dir "$tmp/suite" > "$tmp/out" 2>&1) || rc=$?
 [ "$rc" = 4 ] || { cat "$tmp/out"; fail "an ungated call to a blocked production host exited $rc, not the gate's 4"; }
 [ ! -e "$tmp/suite" ] || fail "something was scaffolded before the gate refused"
 

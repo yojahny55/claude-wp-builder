@@ -105,11 +105,12 @@ grep -Fq 'bin/geo-scan.sh' <<<"$step23" \
   || fail "$audit Step 2.3 does not name bin/geo-scan.sh as the source of truth for a non-public host"
 grep -Fq '*.local.com' <<<"$step23" \
   || fail "$audit Step 2.3 does not recognize *.local.com (this plugin's own default local domain) as a non-public host"
-grep -Fq '*.local.com' bin/geo-scan.sh \
-  || fail "bin/geo-scan.sh does not recognize *.local.com, though Step 2.3 claims it defers to this script for the exact list"
+grep -Fq 'host_is_local' bin/geo-scan.sh \
+  || fail "bin/geo-scan.sh lost the shared local-host test, though Step 2.3 claims it defers to this script for the exact list"
 # Functional, not just textual: the pattern in the case statement actually matches and
 # actually exits 3 (not publicly reachable), the same as any other dev host.
-out=$(bash bin/geo-scan.sh "some-project.local.com" 2>&1) && status=0 || status=$?
+_h=$(mktemp); echo "127.0.0.1 some-project.local.com" > "$_h"
+out=$(WP_HOSTS_FILE="$_h" bash bin/geo-scan.sh "some-project.local.com" 2>&1) && status=0 || status=$?
 [ "$status" -eq 3 ] || fail "bin/geo-scan.sh does not exit 3 for a *.local.com host (got $status)"
 grep -q 'NOT PUBLIC' <<<"$out" || fail "bin/geo-scan.sh does not report a *.local.com host as NOT PUBLIC"
 
