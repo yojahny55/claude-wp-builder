@@ -14,6 +14,9 @@ done
 # The pair must be documented, not just the command: some entry of the reference (a table
 # row, or a bullet with its continuation lines) names both `/<command>` and that flag.
 # Naming the command for another flag does not cover a new one.
+# Limit: an entry counts when it holds `/<command>` and the flag anywhere, so prose such as
+# "the field-level form of `--force`" in the `/wp-seed --force-fields` entry would cover a
+# bare `--force` added to /wp-seed. A new flag on such a command still needs its own entry.
 entries=$(awk '
   /^\|/ || /^- / || /^$/ { if (e != "") print e; e = "" }
   /^$/ { next }
