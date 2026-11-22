@@ -3,9 +3,8 @@
 # agents that read the project file, writer notes on the two installers, FAQ and GSAP wording.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-fail() { echo "FAIL: $*"; exit 1; }
-inc() { grep >/dev/null -c -F -- "$2" "$1" || fail "$1 lacks: $2"; }
-grep_count() { grep -c -F -- "$2" "$1" || true; }
+. tests/lib/assert.sh
+inc() { need_token "$1" "$2" "$1 lacks: $2"; }
 
 # First Action: every agent, except the documented list (each says so in its own text).
 EXCEPTIONS=" wp-context wp-normalize "
@@ -28,6 +27,13 @@ for n in wp-audit-a11y wp-audit-seo wp-audit-geo wp-audit-performance wp-audit-p
 done
 inc agents/wp-tailwind.md 'Demo Conversion Mode'
 inc agents/wp-tailwind.md 'Its absence is not a'
+
+# Blocked audit reports: not re-dispatched, category INCOMPLETE with the reason.
+inc skills/wp-audit-run/references/dispatch.md 'A `blocked` report is not re-dispatched.'
+inc skills/wp-audit-run/references/dispatch.md 'its category is INCOMPLETE'
+# Blocked and missing-file rules match their own steps.
+inc agents/wp-normalize.md 'treat the project as not tailwind and capture `cssRules`'
+inc agents/wp-css.md 'is missing or unreadable, stop'
 
 # Conventions documented once.
 c=skills/wp-contributing/SKILL.md

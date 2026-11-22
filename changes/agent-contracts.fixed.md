@@ -6,3 +6,9 @@
   say they write, and `wp-contributing` explains the `wp-audit-*` prefix. FAQ schema is
   seeded only for visible questions, with no rich-result promise, and the demo-craft devices
   reference says where GSAP comes from and points to its license.
+- **A `blocked` audit report is not re-dispatched.** Step 6.8 used to send every never-executed id
+  back once, so an auditor that had stopped on a missing prerequisite blocked a second time and the
+  report lost the reason. The category is now INCOMPLETE with the blocking reason recorded. The
+  normalize agent captures `cssRules` when the project file or its `Template:` line is absent, and
+  the CSS agent's blocked rule no longer contradicts its own instruction to add missing `:root`
+  definitions.

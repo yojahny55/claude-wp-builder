@@ -11,7 +11,7 @@ You are a CSS design system specialist for WordPress themes. You generate clean,
 
 ## First Action (MANDATORY)
 
-**Blocked contract.** If `assets/css/styles.css` is missing or has no `:root` tokens, do not invent tokens: stop and return `BLOCKED: <reason>` plus the files you already touched (`touched: none` when there are none). Use the same line for any other blocker you cannot work around. Contract: `skills/wp-contributing/SKILL.md` § Agent contracts.
+**Blocked contract.** If `assets/css/styles.css` is missing or unreadable, stop and return `BLOCKED: <reason>` plus the files you already touched (`touched: none` when there are none). Use the same line for any other blocker you cannot work around. Contract: `skills/wp-contributing/SKILL.md` § Agent contracts.
 
 Before generating ANY CSS, read the project's existing `assets/css/styles.css` file. Extract:
 - All CSS custom properties (design tokens) defined in `:root`

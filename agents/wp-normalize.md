@@ -329,6 +329,9 @@ collide on a class name. Do this per section/page, in addition to everything abo
    tailwind path skipped CSS capture by design, so a reader does not mistake the null for a
    failed scan.
 
+   If `.claude/CLAUDE.md` or its `Template:` line is missing (this agent may run before the
+   project file exists), treat the project as not tailwind and capture `cssRules`.
+
    `backgrounds`, `fonts` and `computed` below are still captured on **both** paths. The
    font carry (`/wp-yolo` Step 4.5) and the demo-parity gate (`/wp-finalize` Layer 1) read
    them whatever the template, and `fonts` in particular cannot be recovered from converted
