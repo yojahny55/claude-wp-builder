@@ -63,7 +63,7 @@ fi
 probe=$(mktemp -d)
 trap 'rm -rf "$probe"' EXIT
 printf '#!/usr/bin/env bash\nset -euo pipefail\nprintf x | grep -Fq x\n' >"$probe/p.sh"
-hit=$(awk '{ l = $0; gsub(/\047[^\047]*\047/, "", l); gsub(/\|\|/, "", l) || true
+hit=$(awk '{ l = $0; gsub(/\047[^\047]*\047/, "", l); gsub(/\|\|/, "", l)
   if (l ~ /\|[[:space:]]*grep([[:space:]]+-[A-Za-z0-9]+)*[[:space:]]+-[A-Za-z0-9]*q/) print }' "$probe/p.sh")
 [ -n "$hit" ] || { echo "FAIL: the early-exit pattern no longer matches 'printf x | grep -Fq x'"; exit 1; }
 

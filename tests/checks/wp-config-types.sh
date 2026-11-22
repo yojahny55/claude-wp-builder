@@ -102,7 +102,7 @@ console.log(out.join('\n'));
 EOF
 
 probe_dir="$(mktemp -d)"
-trap 'rm -rf "$probe_dir"' EXIT
+trap 'rm -rf "$work" "$probe_dir"' EXIT
 sed "s#'./bin/lib/manifest.mjs'#'file://$PWD/bin/lib/manifest.mjs'#" "$work/probe.mjs" > "$probe_dir/probe-types.mjs"
 status=0; result="$(cd "$probe_dir" && node ./probe-types.mjs 2>&1)" || status=$?
 if [ "$status" -ne 0 ]; then
