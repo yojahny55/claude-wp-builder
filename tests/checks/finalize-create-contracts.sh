@@ -54,12 +54,19 @@ grep -Fq 'db reset --yes' "$cr" || err "$cr 4.4 does not reset the database on O
 [ -r "$ref" ] || err "$ref is missing"
 body=$(cat "$ref" 2>/dev/null || true)
 for t in 'mkdir -p ~/wp-create-backups' 'db export -' 'to the host' 'Unknown database' 'start them' 'Any other failure: stop' \
-  '-- Dump completed' 'wp-quiet' '--skip-content' 'config create --force' 'database.*' 'naming only what this environment will really replace' 'Without an explicit yes, stop' 'db reset --yes' 'never Adopt Mode' 'core download --force'; do
+  '-- Dump completed' 'wp-quiet' '--skip-content' 'config create --force' 'database.*' 'naming only what this environment will really replace' 'Without an explicit yes, stop' 'db reset --yes' 'never Adopt Mode' 'core download --force' \
+  'config get DB_NAME' 'If they differ, stop and name both' 'umask 077' 'chmod 700' '.ddev/config.yaml' '<DB_NAME read in step 2>'; do
   hasp "$body" "$t" || err "$ref does not say: $t"
 done
 # export and confirmation come before the replace step
 e=$(grep -n 'Export, to the host' "$ref" | sed -n 1p | cut -d: -f1); c=$(grep -n '\*\*Confirm' "$ref" | sed -n 1p | cut -d: -f1); r=$(grep -n '\*\*Replace' "$ref" | sed -n 1p | cut -d: -f1)
-[ -n "$e" ] && [ -n "$c" ] && [ -n "$r" ] && [ "$e" -lt "$c" ] && [ "$c" -lt "$r" ] || err "$ref does not order export, confirm, replace"
+d=$(grep -n '\*\*Same database' "$ref" | sed -n 1p | cut -d: -f1)
+[ -n "$d" ] && [ -n "$e" ] && [ -n "$c" ] && [ -n "$r" ] && [ "$d" -lt "$e" ] && [ "$e" -lt "$c" ] && [ "$c" -lt "$r" ] || err "$ref does not order same-database, export, confirm, replace"
+# 4.4: the Overwrite line comes after the per-environment "Skip this step" lines, which it overrides
+s44=$(awk '/^### Step 4.4/{f=1;next} /^### /{f=0} f' "$cr")
+lo=$(grep -n 'Overwrite:\*\* run `$WP db reset' <<<"$s44" | sed -n 1p | cut -d: -f1 || true)
+ls=$(grep -n 'Skip this step' <<<"$s44" | tail -n 1 | cut -d: -f1 || true)
+[ -n "$lo" ] && [ -n "$ls" ] && [ "$lo" -gt "$ls" ] || err "$cr 4.4 Overwrite line is not after the Skip lines it overrides"
 
 sd=commands/wp-seed.md
 pol=$(sed -n 's/^\*\*Exit `3` policy:\*\* `\([a-z-]*\)`.*/\1/p' "$sd" | sed -n 1p)

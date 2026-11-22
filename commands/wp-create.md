@@ -290,11 +290,11 @@ environment, the placeholder values, the port auto-assignment and the validation
 bash -c "$WP db create"
 ```
 
-**Overwrite:** run `$WP db reset --yes` instead of `db create`, in every environment.
-
 **Docker environments:** The database is created automatically by the MariaDB/MySQL container. Skip this step but verify the DB container starts successfully in Step 4.8.
 
 **DDEV/Lando/wp-env:** These tools handle database creation. Skip this step.
+
+**Overwrite:** run `$WP db reset --yes` instead of `db create`, in every environment.
 
 **On failure:** See Failure Handling table.
 
