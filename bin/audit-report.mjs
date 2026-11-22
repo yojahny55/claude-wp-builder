@@ -23,6 +23,7 @@
 //   bin/audit-report.mjs --run <run.json> [--agents <dir|file>...] [--merge <other.json>...]
 //                        [--out <dir>] [--format md|html|both] [--lang en|es]
 //                        [--date YYYY-MM-DD] [--notes <file>] [--site-root <dir>]
+// Every flag that takes a value also takes `--flag=value`; -h / --help prints the usage, exit 0.
 //
 // --agents builds the findings straight from the agents' report files (a directory of
 // *.json, or one file) instead of a run file somebody had to assemble by hand; --run may then
@@ -95,6 +96,11 @@ import { normalizeEntry, normalizeReport, loadReports } from './lib/audit-schema
 
 const OWNERSHIP = ['code', 'setting', 'content', 'manual'];
 const SEVERITY_ORDER = { CRITICAL: 0, WARNING: 1, INFO: 2 };
+
+// Keys here come from data (a category, a severity, a status in a run file or a sidecar), so a
+// lookup must not walk the prototype chain: `constructor` is a category name somebody can write.
+const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+const ownGet = (object, key) => (hasOwn(object, key) ? object[key] : undefined);
 
 const STRINGS = {
   en: {
@@ -216,15 +222,39 @@ function die(code, message) {
 
 const DECISION_FLAGS = { '--accept': 'accept', '--unaccept': 'unaccept', '--mark-fixed': 'markFixed' };
 
+const VALUE_FLAGS = new Set([
+  '--merge', '--agents', '--site-root', '--accept', '--unaccept', '--mark-fixed', '--run', '--out', '--format',
+  '--lang', '--notes', '--ledger', '--reason', '--evidence', '--date',
+]);
+
+const USAGE = `usage: audit-report.mjs --run <run.json> [--merge <run.json>]... [--agents <dir|file>]...
+         [--out <dir>] [--format md|html|both] [--lang en|es] [--notes <file>] [--date YYYY-MM-DD]
+         [--site-root <dir>] [--ledger <file>]
+       audit-report.mjs --accept <id,...> --reason "<why>" | --unaccept <id,...> | --mark-fixed <id,...> --evidence "<what>"
+       audit-report.mjs --rerender | --summary [--json]
+Every value flag also takes --flag=value (the form for a value that starts with "--"). -h, --help prints this.
+The header of this file documents each flag.`;
+
 function parseArgs(argv) {
+  // Help wins wherever it appears, even where it would otherwise be read as a flag's value.
+  if (argv.includes('-h') || argv.includes('--help')) {
+    process.stdout.write(`${USAGE}\n`);
+    process.exit(0);
+  }
   const opts = {
     out: null, format: 'both', lang: null, run: null, date: null, merge: [], agents: [], siteRoot: '.', ledger: null,
     accept: [], unaccept: [], markFixed: [], reason: null, evidence: null,
     rerender: false, summary: false, json: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
-    const flag = argv[i];
-    const value = argv[i + 1];
+    let flag = argv[i];
+    let value = argv[i + 1];
+    // `--flag=value` carries its value in the same token, so a value that starts with `--`
+    // can be given. Only flags that take a value are split; a switch with `=` stays unknown.
+    let inline = false;
+    const eq = /^(--[a-z-]+)=([\s\S]*)$/.exec(flag);
+    if (eq && !VALUE_FLAGS.has(eq[1])) die(1, `unknown argument: ${flag}`);
+    if (eq) { flag = eq[1]; value = eq[2]; inline = true; }
     switch (flag) {
       case '--rerender':
       case '--summary':
@@ -232,31 +262,31 @@ function parseArgs(argv) {
         opts[flag.slice(2)] = true;
         break;
       case '--merge': {
-        if (value === undefined || value.startsWith('--')) die(1, `${flag} needs a value`);
+        if (value === undefined || (!inline && value.startsWith('--'))) die(1, `${flag} needs a value`);
         opts.merge.push(value);
-        i += 1;
+        if (!inline) i += 1;
         break;
       }
       case '--agents': {
-        if (value === undefined || value.startsWith('--')) die(1, `${flag} needs a value`);
+        if (value === undefined || (!inline && value.startsWith('--'))) die(1, `${flag} needs a value`);
         opts.agents.push(value);
-        i += 1;
+        if (!inline) i += 1;
         break;
       }
       case '--site-root': {
-        if (value === undefined || value.startsWith('--')) die(1, `${flag} needs a value`);
+        if (value === undefined || (!inline && value.startsWith('--'))) die(1, `${flag} needs a value`);
         opts.siteRoot = value;
-        i += 1;
+        if (!inline) i += 1;
         break;
       }
       case '--accept':
       case '--unaccept':
       case '--mark-fixed': {
-        if (value === undefined || value.startsWith('--')) die(1, `${flag} needs a value`);
+        if (value === undefined || (!inline && value.startsWith('--'))) die(1, `${flag} needs a value`);
         // Comma-separated, or the flag repeated. A resource can hold spaces but not a comma
         // in any identity the ledger spells, so a comma is the separator.
         opts[DECISION_FLAGS[flag]].push(...value.split(',').map((id) => id.trim()).filter(Boolean));
-        i += 1;
+        if (!inline) i += 1;
         break;
       }
       case '--run':
@@ -268,11 +298,11 @@ function parseArgs(argv) {
       case '--reason':
       case '--evidence':
       case '--date': {
-        if (value === undefined || value.startsWith('--')) {
+        if (value === undefined || (!inline && value.startsWith('--'))) {
           die(1, `${flag} needs a value`);
         }
         opts[flag.slice(2)] = value;
-        i += 1;
+        if (!inline) i += 1;
         break;
       }
       default:
@@ -337,7 +367,9 @@ function resolveOutDir(flag, siteRoot, run) {
   if (process.env.WP_AUDIT_OUT_DIR) return process.env.WP_AUDIT_OUT_DIR;
   const manifest = readManifest(siteRoot);
   const dir = manifest?.audit?.out_dir;
-  if (typeof dir === 'string' && dir !== '') return dir;
+  // A relative manifest out_dir belongs to the site root, like the manifest itself, so the
+  // runbook (audit-runbook.mjs, same rule) finds what this wrote from any working directory.
+  if (typeof dir === 'string' && dir !== '') return resolve(siteRoot, dir);
   const root = process.env.WP_AUDITS_ROOT || manifest?.audit?.audits_root;
   if (typeof root === 'string' && root !== '') {
     // The site root's folder name is the last candidate so that the commands that run without
@@ -413,7 +445,7 @@ function foldRootCauses(findings) {
       const parent = { ...finding, also_affects: [...(finding.also_affects || [])] };
       parents.set(key, parent);
       out.push(parent);
-    } else if ((SEVERITY_ORDER[finding.severity] ?? 99) < (SEVERITY_ORDER[held.severity] ?? 99)) {
+    } else if ((ownGet(SEVERITY_ORDER, finding.severity) ?? 99) < (ownGet(SEVERITY_ORDER, held.severity) ?? 99)) {
       // A more severe sibling becomes the parent; the old parent folds under it.
       const parent = { ...finding, also_affects: [...(finding.also_affects || []), ...held.also_affects, { check: held.check, resource: held.resource || null }] };
       parents.set(key, parent);
@@ -442,7 +474,7 @@ function validate(findings) {
     }
     if (!finding.message) problems.push(`${where} has no "message"`);
     if (!finding.severity) problems.push(`${where} has no "severity"`);
-    else if (!(finding.severity in SEVERITY_ORDER)) {
+    else if (!hasOwn(SEVERITY_ORDER, finding.severity)) {
       problems.push(`${where} has severity "${finding.severity}" — expected one of ${Object.keys(SEVERITY_ORDER).join(', ')}`);
     }
     if (!finding.ownership) {
@@ -603,9 +635,23 @@ function archiveSameDay(outDir, date) {
     candidate = `${stamp}-${n++}`;
   }
   stamp = candidate;
-  for (const ext of ['json', 'md', 'html']) {
-    const from = join(outDir, `informe-${date}.${ext}`);
-    if (existsSync(from)) renameSync(from, join(outDir, `informe-${date}-${stamp}.${ext}`));
+  // The three files move as a set: a rename that fails part way is undone, so the trio is never
+  // left half under the old name and half under the new one.
+  const moved = [];
+  try {
+    for (const ext of ['json', 'md', 'html']) {
+      const from = join(outDir, `informe-${date}.${ext}`);
+      if (!existsSync(from)) continue;
+      const to = join(outDir, `informe-${date}-${stamp}.${ext}`);
+      renameSync(from, to);
+      moved.push([from, to]);
+    }
+  } catch (error) {
+    for (const [from, to] of moved.reverse()) {
+      try { renameSync(to, from); } catch { /* best effort: the message below names what is left */ }
+    }
+    // An I/O failure is a crash (3), as it was before the rollback existed, not invalid input.
+    die(3, `audit-report: could not archive the earlier run of ${date} (${error.message}); nothing was changed`);
   }
   console.log(`audit-report: earlier run of ${date} kept as informe-${date}-${stamp}.*`);
 }
@@ -823,12 +869,14 @@ function splitByDecision(findings, entries, fresh) {
 
 function statusTable(rows) {
   const blank = () => ({ CRITICAL: 0, WARNING: 0, INFO: 0, other: 0, total: 0 });
-  const byStatus = Object.fromEntries(LEDGER_STATUSES.map((status) => [status, blank()]));
+  // Null prototype: a status is data, and `__proto__` as a plain-object key would reset the
+  // prototype instead of adding a row, so its counts would vanish from the table.
+  const byStatus = Object.assign(Object.create(null), Object.fromEntries(LEDGER_STATUSES.map((status) => [status, blank()])));
   const bySeverity = blank();
   for (const row of rows) {
     const status = row.status || 'unknown';
-    byStatus[status] ||= blank();
-    const bucket = row.severity in SEVERITY_ORDER ? row.severity : 'other';
+    if (!hasOwn(byStatus, status)) byStatus[status] = blank();
+    const bucket = hasOwn(SEVERITY_ORDER, row.severity) ? row.severity : 'other';
     byStatus[status][bucket] += 1;
     byStatus[status].total += 1;
     bySeverity[bucket] += 1;
@@ -874,7 +922,7 @@ function counts(findings) {
     // written by whatever version of this tool existed then. An unknown severity must land
     // somewhere visible: dropping it leaves a summary whose parts do not add up to its own
     // total, in a client-facing comparison, with nothing saying why.
-    if (finding.severity in out && finding.severity !== 'total' && finding.severity !== 'other') {
+    if (hasOwn(out, finding.severity) && finding.severity !== 'total' && finding.severity !== 'other') {
       out[finding.severity] += 1;
     } else {
       out.other += 1;
@@ -906,7 +954,7 @@ function sortForPlan(findings) {
     // `undefined - undefined` is NaN, NaN !== 0, and a comparator returning NaN leaves the
     // sort undefined -- on a list built from a PREVIOUS run's sidecar, which never passed
     // validation because it was written by whatever version existed then.
-    const rank = (finding) => SEVERITY_ORDER[finding.severity] ?? Number.POSITIVE_INFINITY;
+    const rank = (finding) => ownGet(SEVERITY_ORDER, finding.severity) ?? Number.POSITIVE_INFINITY;
     const bySeverity = rank(a) - rank(b);
     if (bySeverity !== 0) return bySeverity;
     return identity(a).localeCompare(identity(b));
@@ -1093,12 +1141,12 @@ function renderMarkdown(model) {
     push('|---|---|---|---|---|---|');
     for (const finding of model.plan) {
       push(`| ${[
-        t.severity[finding.severity],
+        ownGet(t.severity, finding.severity),
         `\`${identity(finding)}\``,
         finding.page || '—',
         finding.message + alsoText(finding),
         finding.fix || '—',
-        t.ownership[finding.ownership] + (finding.design_impact === true ? ` · ${t.designImpact}` : ''),
+        (ownGet(t.ownership, finding.ownership) ?? finding.ownership) + (finding.design_impact === true ? ` · ${t.designImpact}` : ''),
       ].map(mdCell).join(' | ')} |`);
     }
     push();
@@ -1355,15 +1403,15 @@ function renderHtml(model) {
   const plural = (n, one, many) => (n === 1 ? one : many);
   const esc = escapeHtml;
   const sevChip = (severity) =>
-    `<span class="chip sev-${severity in SEVERITY_ORDER ? severity.toLowerCase() : 'other'}">${esc(
-      t.severity[severity] || severity,
+    `<span class="chip sev-${hasOwn(SEVERITY_ORDER, severity) ? severity.toLowerCase() : 'other'}">${esc(
+      ownGet(t.severity, severity) || severity,
     )}</span>`;
-  const ownTag = (owner) => `<span class="tag own-${owner}">${esc(t.ownership[owner] || owner)}</span>`;
+  const ownTag = (owner) => `<span class="tag own-${owner}">${esc(ownGet(t.ownership, owner) || owner)}</span>`;
   // A zero is good news and is coloured as such; a count is coloured by what it counts.
   const score = (value, tone) => `<span class="score ${value ? tone : 'ok'}">${value}</span>`;
   // The header KPIs follow the same rule, so a clean run is not a red 0 at the top of the page.
   const kpi = (value, tone) => `<b class="${value ? tone : 'ok'}">${value}</b>`;
-  const categoryName = (name) => ui.categoryNames[name] || name;
+  const categoryName = (name) => ownGet(ui.categoryNames, name) || name;
   const slug = (value) => String(value).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const c = model.counts;
 

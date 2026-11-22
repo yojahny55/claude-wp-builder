@@ -196,11 +196,12 @@ function readJson(path) {
 }
 
 // Same order as audit-report.mjs: --out > WP_AUDIT_OUT_DIR > audit.out_dir > .wp-audit
-function resolveOutDir(flag, manifest) {
+// A relative manifest `audit.out_dir` is relative to the site root, like the manifest itself.
+function resolveOutDir(flag, manifest, root) {
   if (flag) return flag;
   if (process.env.WP_AUDIT_OUT_DIR) return process.env.WP_AUDIT_OUT_DIR;
   const dir = manifest?.audit?.out_dir;
-  if (typeof dir === 'string' && dir !== '') return dir;
+  if (typeof dir === 'string' && dir !== '') return resolve(root, dir);
   return '.wp-audit';
 }
 
@@ -311,7 +312,11 @@ function main() {
   const opts = parseArgs(process.argv.slice(2));
   const root = resolve(opts.root ?? '.');
   const manifestPath = opts.manifest ?? join(root, '.wp-create.json');
+  // A manifest that exists but does not parse is not "no manifest": the local hosts the
+  // runbook must never carry come from it, so a silent null would leave the leak barrier to
+  // the regex scan alone.
   const manifest = existsSync(manifestPath) ? readJson(manifestPath) : null;
+  if (existsSync(manifestPath) && manifest === null) die(1, `${resolve(manifestPath)} is not valid JSON; fix it or pass a different --manifest`);
   const S = STRINGS[opts.lang];
 
   const envs = manifest && typeof manifest.environments === 'object' && manifest.environments ? Object.values(manifest.environments) : [];
@@ -334,7 +339,7 @@ function main() {
   const prodHost = prodUrl ? hostOf(prodUrl) : null;
   if (prodHost) localHosts.delete(prodHost);
 
-  const outDir = resolveOutDir(opts.out, manifest);
+  const outDir = resolveOutDir(opts.out, manifest, root);
   const replayPath = opts.replay ?? join(outDir, 'replay.json');
   if (!existsSync(replayPath)) die(1, `no replay record at ${resolve(replayPath)}; fix.md's replay log writes it as each fix lands`);
   const record = readJson(replayPath);
