@@ -51,6 +51,8 @@ contract. The only executable code shipped is:
   `wp-config.php` instead of the database. Held to the PHP 7.4 floor, and exercised against a
   real WooCommerce in the fixture.
 - `starter-theme/**` — PHP copied into user projects (never executed here)
+- `templates/agentic/agentic.php` — the theme's `inc/agentic.php`, copied whole by the
+  `wp-agentic-surfaces` agent with its tokens substituted (never executed here)
 
 Editing a "feature" therefore usually means editing prose contracts, and the tests assert on
 those contracts (grep for required tokens in the markdown), not on program behavior.

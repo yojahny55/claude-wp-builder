@@ -7,6 +7,7 @@ fail() { echo "FAIL: $1"; exit 1; }
 skill=skills/wp-audit-geo-standards/SKILL.md
 agent=agents/wp-audit-geo.md
 fixer=agents/wp-agentic-surfaces.md
+tpl=templates/agentic/agentic.php
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
 audit=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
@@ -20,7 +21,7 @@ surfaces=$refs/surface-templates.md
 citability=$refs/citability.md
 for f in "$catalog" "$surfaces" "$citability"; do [ -f "$f" ] || fail "$f is missing"; done
 
-for f in "$skill" "$agent" "$fixer"; do [ -f "$f" ] || fail "$f is missing"; done
+for f in "$skill" "$agent" "$fixer" "$tpl"; do [ -f "$f" ] || fail "$f is missing"; done
 
 # Skill: ORA layers as exact table rows. Bare '20'/'30'/'40'/'10' also match the
 # citability weights, so they never proved the layer table; require the row shape.
@@ -104,19 +105,19 @@ out=$(geo_start 'event: x\ndata: {"type": "scan_complete"}\n') && status=0 || st
   || fail "geo-scan.sh --start must say the report is not ready after a completed scan"
 
 # Fixer: the RFC 8288 Link header belongs on send_headers — wp_headers filters request headers.
-grep -q 'send_headers' "$fixer" || fail "$fixer must emit the Link header on send_headers"
-grep -qE "add_filter\\( *'wp_headers'" "$fixer" && fail "$fixer must not build the Link header on wp_headers"
+grep -q 'send_headers' "$tpl" || fail "$tpl must emit the Link header on send_headers"
+grep -qE "add_filter\\( *'wp_headers'" "$tpl" && fail "$tpl must not build the Link header on wp_headers"
 
 # Fixer: Content-Signal must match the training-capable allowlist, not contradict it.
-grep -q 'ai-train=yes' "$fixer" || fail "$fixer must declare ai-train=yes to match its allowlist"
-grep -qE 'Content-Signal: *ai-train=no' "$fixer" && fail "$fixer must not emit ai-train=no while allowing training crawlers"
+grep -q 'ai-train=yes' "$tpl" || fail "$tpl must declare ai-train=yes to match its allowlist"
+grep -qE 'Content-Signal: *ai-train=no' "$tpl" && fail "$tpl must not emit ai-train=no while allowing training crawlers"
 
 # Fixer: trust-anchor seeding calls the copy function; quoting it makes wp eval fatal.
 grep -q "'<prefix>_trust_anchor_copy" "$fixer" && fail "$fixer must not quote the trust-anchor copy call"
 
 # Fixer: llms-full is capped; an unbounded dump can exhaust memory on a large site.
-grep -q "'posts_per_page' => 200" "$fixer" || fail "$fixer must cap llms-full.txt at 200 posts"
-grep -q 'Never answer an empty 200' "$fixer" || fail "$fixer must 404 a missing area llms builder"
+grep -q "'posts_per_page' => 200" "$tpl" || fail "$tpl must cap llms-full.txt at 200 posts"
+grep -q 'Never answer an empty 200' "$tpl" || fail "$tpl must 404 a missing area llms builder"
 
 # Scanner: a full URL must be reduced to a bare host before building the API query.
 grep -qF 'host="${host#*@}"' bin/geo-scan.sh || fail "bin/geo-scan.sh must strip userinfo/query/fragment from the host"
@@ -185,7 +186,7 @@ grep -Fq 'training-only, unlike `ClaudeBot`' "$fixer" && fail "$fixer still cont
 # reported the fix as missing.
 grep -Eq '^\| GEO-D04 \|.*`/agents.md`' "$catalog" || fail "$catalog GEO-D04 does not name the /agents.md route"
 grep -Eq '^\| GEO-D04 \|.*`GET /agents.md`' "$agent" || fail "$agent GEO-D04 does not request /agents.md"
-grep -Fq "home_url( '/agents.md' )" "$fixer" || fail "$fixer no longer serves /agents.md -- update GEO-D04"
+grep -Fq "home_url( '/agents.md' )" "$tpl" || fail "$tpl no longer serves /agents.md -- update GEO-D04"
 
 # GEO-A07 to GEO-A10 are fixable only when no SEO plugin owns the graph, as the fixer's Rule 4 says.
 for code in GEO-A07 GEO-A08 GEO-A09 GEO-A10; do
