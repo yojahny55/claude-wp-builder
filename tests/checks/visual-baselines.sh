@@ -9,7 +9,7 @@
 # WHY A CONTAINER, and not the runner's own Chrome like motion-devices.sh:
 #   That check asserts on the DOM, which is stable across browser versions. This one
 #   asserts on PIXELS, which are not. CI renders with /usr/bin/google-chrome from
-#   ubuntu-latest -- a browser that updates itself, on an image that migrates to Ubuntu 26
+#   the pinned ubuntu-24.04 image -- a browser that updates itself, on an image family that migrates to Ubuntu 26
 #   in October. Baselines taken against a moving renderer fail every time Chrome ships a
 #   font or antialiasing change, so "the baseline changed" would mean "Chrome changed" far
 #   more often than "the UI changed", and a gate that cries wolf is a gate people mute.

@@ -22,9 +22,9 @@
 #      password holding `"` (or a double-quoted user holding `'`) reached the client cut short.
 #   8. With cwebp chosen, every GIF went to gif2webp whether or not it was installed, and
 #      each one failed as a bare "conversion failed".
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
-fail() { echo "FAIL: $*"; exit 1; }
 
 script=$PWD/skills/wp-robin/scripts/robin-fix.sh
 gd=$PWD/skills/wp-robin/scripts/webp-gd.php
@@ -92,7 +92,7 @@ run() {  # dir, then env assignments; prints output, returns the exit code
 
 # 1. No root.
 mkdir -p "$tmp/nowhere"
-out=$(run "$tmp/nowhere"); rc=$?
+rc=0; out=$(run "$tmp/nowhere") || rc=$?
 [ "$rc" -eq 1 ] && grep -q 'Could not find WordPress root' <<<"$out" \
   || fail "with no WordPress root the script exits $rc without saying why: $out"
 
@@ -110,7 +110,7 @@ $table_prefix = "abc_";
 PHP
 
 # 4. wp plugin install fails, and the download is a 404.
-out=$(run "$tmp" WP_ROOT="$wp"); rc=$?
+rc=0; out=$(run "$tmp" WP_ROOT="$wp") || rc=$?
 [ "$rc" -eq 1 ] && grep -q 'could not be downloaded' <<<"$out" \
   || fail "a failed install and a 404 download did not stop the run with a reason (exit $rc): $out"
 [ ! -e "$wp/wp-content/plugins/robin-image-optimizer" ] || fail "a 404 page was unpacked as the plugin"
@@ -127,7 +127,7 @@ add_image_size( "dq-size", 300, 200 );
 add_image_size( 'bs\size', 10, 10 );
 PHP
 : > "$tmp/log"
-out=$(run "$tmp" WP_ROOT="$wp"); rc=$?
+rc=0; out=$(run "$tmp" WP_ROOT="$wp") || rc=$?
 [ "$rc" -eq 1 ] || fail "a missing queue table did not stop the run (exit $rc): $out"
 grep -q 'settings were NOT written' <<<"$out" || fail "refused settings writes were not reported: $out"
 ! grep -q 'Settings applied' <<<"$out" || fail "refused settings writes were reported as applied"
@@ -164,7 +164,7 @@ gif="$wp/wp-content/uploads/2026/10/a.gif"
 php -r '$i = imagecreatetruecolor(8, 8); imagegif($i, $argv[1]);' "$gif" 2>/dev/null || printf 'GIF89a' > "$gif"
 meta=$(php -r 'echo serialize(array("file" => "2026/10/a.gif"));')
 gap=$(php -r 'echo base64_encode($argv[1]);' "$meta")
-out=$(run "$tmp" WP_ROOT="$wp" ROBIN_QUEUE=1 ROBIN_META="$meta" ROBIN_GAP="$gap"); rc=$?
+rc=0; out=$(run "$tmp" WP_ROOT="$wp" ROBIN_QUEUE=1 ROBIN_META="$meta" ROBIN_GAP="$gap") || rc=$?
 grep -q 'WebP converter: cwebp' <<<"$out" || fail "the fake cwebp was not chosen, so the GIF path was not exercised: $out"
 if php -r 'exit(function_exists("imagewebp") ? 0 : 1);'; then
   [ "$rc" -eq 0 ] || fail "the GIF sync run exited $rc: $out"

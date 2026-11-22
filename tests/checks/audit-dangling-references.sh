@@ -12,9 +12,9 @@
 # What must not rot, in both cases, is the part that makes the finding actionable rather than a
 # guess: WP-051 is confirmed against the real endpoint before it is reported, and both fixes name
 # the wrong remedy so it is not proposed as an improvement later.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 
-fail() { echo "FAIL: $1"; exit 1; }
 
 cd "$(dirname "$0")/../.." || fail "cannot cd to the repository root"
 

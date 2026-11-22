@@ -1,0 +1,66 @@
+{
+ "version": 1,
+ "note": "Recorded findings of a correct audit over the fixture: every seeded defect found as FAIL. Used by tests/checks/seeded-defects.sh.",
+ "findings": [
+  {
+   "check": "SEC-001@1",
+   "status": "FAIL",
+   "file": "theme/index.php"
+  },
+  {
+   "check": "SEC-002",
+   "status": "FAIL",
+   "file": "plugin/seeded-defects.php"
+  },
+  {
+   "check": "SEC-003",
+   "status": "FAIL",
+   "file": "plugin/seeded-defects.php"
+  },
+  {
+   "check": "SEC-004",
+   "status": "FAIL",
+   "file": "theme/functions.php"
+  },
+  {
+   "check": "SEC-005",
+   "status": "FAIL",
+   "file": "theme/functions.php"
+  },
+  {
+   "check": "A11Y-007",
+   "status": "FAIL",
+   "file": "theme/header.php"
+  },
+  {
+   "check": "A11Y-026",
+   "status": "FAIL",
+   "file": "theme/style.css"
+  },
+  {
+   "check": "A11Y-042",
+   "status": "FAIL",
+   "file": "theme/searchform.php"
+  },
+  {
+   "check": "SEO-002",
+   "status": "FAIL",
+   "file": "theme/header.php"
+  },
+  {
+   "check": "PERF-003",
+   "status": "FAIL",
+   "file": "theme/style.css"
+  },
+  {
+   "check": "WP-020",
+   "status": "FAIL",
+   "file": "theme/index.php"
+  },
+  {
+   "check": "SEO-099",
+   "status": "PASS",
+   "file": "theme/index.php"
+  }
+ ]
+}
