@@ -89,11 +89,12 @@ as `$WP`.
 ## Step 2: Back up first, unconditionally
 
 ```bash
-bash -c "mkdir -p ~/.wp-clone-backups"
-bash -c "$WP db export ~/.wp-clone-backups/<project-slug>-$(date -u +%Y%m%dT%H%M%SZ)-pre-anonymize.sql"
+B=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/wp-backup.sh" '<project-path>' --out ~/.wp-clone-backups --label pre-anonymize) || exit 1
+[ -d "$B" ] || exit 1
+echo "$B"
 ```
 
-Outside the project, for the reason `/wp-clone` Step 1.5 already gives: a backup under
+If the backup fails, stop. Outside the project, for the reason `/wp-clone` Step 1.5 already gives: a backup under
 `wp-content/` is reached by the next clone's `rsync` and by an `rm -rf` of the project.
 
 **Unconditional, and not skippable by `--dry-run` skipping it.** A dry run changes nothing
@@ -235,7 +236,7 @@ as one:
   wp_wc_order_addresses  118 rows still carry a real email address
 
 The catalog did not reach these. Do not treat this database as anonymised.
-Restore from ~/.wp-clone-backups/<file> if you need the original.
+Restore the original with `/wp-restore <project> "$B"` (the backup folder from Step 2).
 ```
 
 Do **not** print the success summary in the same run. A command that reports success while
@@ -248,7 +249,7 @@ decide who to send the database to.
 
 ```
 === Anonymised ===
-Backup            ~/.wp-clone-backups/client-demo-20260919T161145Z-pre-anonymize.sql
+Backup            ~/.wp-clone-backups/client-demo-20260919T161145Z-pre-anonymize/
 Users             903 anonymised, 1 preserved (admin "yojahny" — still a real address)
 Comments          1,204 anonymised (author, email, url, IP)
 Orders            1,284 addresses anonymised (HPOS: wp_wc_order_addresses)

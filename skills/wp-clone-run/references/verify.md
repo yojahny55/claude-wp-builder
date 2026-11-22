@@ -120,7 +120,7 @@ Uploads:      <synced | extracted | linked to <dir> | skipped>
 Admin users:  <list of admin usernames>
 
 Replaced:     a WordPress site was already here — "Client Demo", 47 posts
-  Backup      ~/.wp-clone-backups/client-demo-20260919T161145Z.sql
+  Backup      ~/.wp-clone-backups/client-demo-20260919T161145Z-pre-clone/
               (omit this block entirely when the destination was empty)
 
 Dependencies: 2 recoverable, 1 bundled, 2 need the client's own copies, 0 unclassified

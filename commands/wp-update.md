@@ -128,14 +128,22 @@ $WP theme list --update=available --fields=name,version,update_version,status --
 ## Step 2: Backup
 
 Back up **before** any update, into a dated folder **outside the docroot** (default
-`~/wp-update-backups/<site-slug>-<UTC timestamp>/`). Never write it under the WordPress root.
+`~/wp-update-backups/<site-slug>-<UTC timestamp>-pre-update/`). Never write it under the WordPress root.
 
 ```bash
-B=~/wp-update-backups/<site-slug>-$(date -u +%Y%m%dT%H%M%SZ); mkdir -p "$B"
-$WP db export "$B/db.sql"
+B=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/wp-backup.sh" '<wp-root>' --wrapper "$WP" --out ~/wp-update-backups --label pre-update) || exit 1
+[ -d "$B" ] || exit 1
 tar -czf "$B/plugins.tar.gz" -C <wp-root>/wp-content plugins
 tar -czf "$B/core.tar.gz" --exclude=wp-config.php -C <wp-root> wp-admin wp-includes $(cd <wp-root> && find . -maxdepth 1 -name '*.php' ! -name wp-config.php -printf '%f\n')
 ```
+
+`bin/wp-backup.sh` runs `wp db export` and writes `db.sql` (verified: non-empty, ends with the dump's `Dump completed`
+footer, renamed into place only when complete) and `backup.json` with sha256 sums into
+that folder, mode 700, and refuses a destination under the
+WordPress root. Exit `1` or `2` from it means there is no backup: stop. The tarballs below sit
+in the same folder. `/wp-restore "$B"` restores the database from it. If the backup fails, stop:
+no update runs without one. `--wrapper "$WP"` hands over the wrapper this command already
+resolved, so the backup also works when the project has no manifest (the bare-`wp` fallback).
 
 List the root files with `find`, never `ls`: an aliased `ls --color` writes escape codes into the
 names and `tar` stops with `Cannot stat`, leaving a core archive without its root files.
@@ -294,7 +302,9 @@ Print one block, then the rollback:
 - Verification: page table, new fatals (count), head-script result, suite result.
 - Backup path and its contents.
 - Commits made since the last reviewed point (git roots only).
-- **Rollback**: `$WP db import "$B/db.sql"`; then restore files by extracting the matching tar
+- **Rollback**: `bash "${CLAUDE_PLUGIN_ROOT}/bin/wp-restore.sh" '<wp-root>' "$B" --wrapper "$WP"`
+  (checks the sums, imports `db.sql`, verifies the site URL and counts; `--wrapper` because the
+  project may have no manifest); then restore files by extracting the matching tar
   over the root (`tar -xzf "$B/plugins.tar.gz" -C <wp-root>/wp-content` after removing the
   updated plugin directories; `tar -xzf "$B/core.tar.gz" -C <wp-root>` for core), then
   `$WP cache flush`. Database migrations in Step 4 are only undone by the db import, so restore
