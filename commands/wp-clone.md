@@ -82,9 +82,12 @@ people learn to skip past. It speaks only when there is something to lose.
 Whenever the destination is occupied, back it up **before** asking anything:
 
 ```bash
-B=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/wp-backup.sh" '<project-path>' --out ~/.wp-clone-backups --label pre-clone)
+B=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/wp-backup.sh" '<project-path>' --out ~/.wp-clone-backups --label pre-clone) || exit 1
+[ -d "$B" ] || exit 1
 echo "$B"
 ```
+
+If the backup fails, stop: nothing is replaced without a verified copy.
 
 **The backup goes outside the project directory on purpose.** A backup inside
 `wp-content/` shares the fate of the thing it protects: the next clone's `rsync` reaches it,
@@ -114,8 +117,9 @@ Error: the destination already holds a WordPress site.
   Last modified: "Services" — 2026-09-19 14:02 (2 hours ago)
   Uploads:       312 files
 
-Importing replaces this database. A backup was written first:
-  ~/.wp-clone-backups/client-demo-20260919T161145Z.sql
+Importing replaces this database. A verified backup was written first
+  (restore it with `/wp-restore <project> <folder>`):
+  ~/.wp-clone-backups/client-demo-20260919T161145Z-pre-clone/
 (Path C also replaces code: it was archived beside it as `*-code-*.tar.gz`; uploads were not.)
 
 Re-run with --force to proceed, or clone into a different path.

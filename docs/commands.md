@@ -684,28 +684,28 @@ summary.
 ### `/wp-backup`
 
 ```
-/wp-backup                          # database only, to ~/.wp-backups/<slug>/<timestamp>/
+/wp-backup                          # database only, to ~/.wp-backups/<slug>-<timestamp>/
 /wp-backup /path/to/wordpress --uploads --label before-redesign
 ```
 
 Runs `bin/wp-backup.sh`, the one export `/wp-update`, `/wp-clone` and `/wp-anonymize` share. The
 dump is written under a temp name and renamed only if it is non-empty and ends with the
-dump's `Dump completed` footer; `--uploads` adds a `gzip -t`-verified `uploads.tar.gz`. A
-`backup.json` records the site URL, database name and sha256 of every file. Always outside the
+dump's SQL header and its `Dump completed` footer (a PHP notice printed before the SQL fails it); `--uploads` adds a `gzip -t`-verified `uploads.tar.gz`. A
+`backup.json` records the site URL, database name, table and post counts and sha256 of every file. Always outside the
 WordPress root (`--out` inside it is refused), folders 700, files 600, `wp-config.php` never
 copied. Exit `1`: the copy did not verify and was deleted; `2`: the site could not be measured.
 
 ### `/wp-restore`
 
 ```
-/wp-restore ~/.wp-backups/<slug>/<timestamp> --dry-run
-/wp-restore ~/.wp-backups/<slug>/<timestamp>
+/wp-restore ~/.wp-backups/<slug>-<timestamp> --dry-run
+/wp-restore ~/.wp-backups/<slug>-<timestamp>
 ```
 
 Runs `bin/wp-restore.sh`. Checks every sha256 before touching anything, refuses a backup from
-a different `DB_NAME` unless `--yes`, takes a `pre-restore` copy first (uploads included when the
+a different `DB_NAME` or `siteurl` unless `--yes`, takes a `pre-restore` copy first (uploads included when the
 backup has them), imports, swaps uploads with the old directory kept until verification, then
-requires `option get siteurl` to equal the backup's. The command asks with `AskUserQuestion`
+requires `option get siteurl`, the table count and the post count to equal the backup's, and on any failure prints the pre-restore copy and the command to go back. The command asks with `AskUserQuestion`
 before importing; `--dry-run` prints the plan and changes nothing.
 
 ### `/wp-update`

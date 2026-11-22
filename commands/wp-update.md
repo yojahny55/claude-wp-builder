@@ -128,10 +128,11 @@ $WP theme list --update=available --fields=name,version,update_version,status --
 ## Step 2: Backup
 
 Back up **before** any update, into a dated folder **outside the docroot** (default
-`~/wp-update-backups/<UTC timestamp>-pre-update/`). Never write it under the WordPress root.
+`~/wp-update-backups/<site-slug>-<UTC timestamp>-pre-update/`). Never write it under the WordPress root.
 
 ```bash
-B=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/wp-backup.sh" '<wp-root>' --out ~/wp-update-backups --label pre-update)
+B=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/wp-backup.sh" '<wp-root>' --wrapper "$WP" --out ~/wp-update-backups --label pre-update) || exit 1
+[ -d "$B" ] || exit 1
 tar -czf "$B/plugins.tar.gz" -C <wp-root>/wp-content plugins
 tar -czf "$B/core.tar.gz" --exclude=wp-config.php -C <wp-root> wp-admin wp-includes $(cd <wp-root> && find . -maxdepth 1 -name '*.php' ! -name wp-config.php -printf '%f\n')
 ```
@@ -140,7 +141,9 @@ tar -czf "$B/core.tar.gz" --exclude=wp-config.php -C <wp-root> wp-admin wp-inclu
 footer, renamed into place only when complete) and `backup.json` with sha256 sums into
 that folder, mode 700, and refuses a destination under the
 WordPress root. Exit `1` or `2` from it means there is no backup: stop. The tarballs below sit
-in the same folder. `/wp-restore "$B"` restores the database from it.
+in the same folder. `/wp-restore "$B"` restores the database from it. If the backup fails, stop:
+no update runs without one. `--wrapper "$WP"` hands over the wrapper this command already
+resolved, so the backup also works when the project has no manifest (the bare-`wp` fallback).
 
 List the root files with `find`, never `ls`: an aliased `ls --color` writes escape codes into the
 names and `tar` stops with `Cannot stat`, leaving a core archive without its root files.

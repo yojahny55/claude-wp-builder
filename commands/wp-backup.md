@@ -38,7 +38,7 @@ B=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/wp-backup.sh" '<project-path>' [--uploads] [
 ```
 
 Add `--uploads` when the user asks for media too (it can be large). The folder defaults to
-`~/.wp-backups/<slug>/<UTC timestamp>[-<label>]/`, always outside the WordPress root, mode 700,
+`~/.wp-backups/<slug>-<UTC timestamp>[-<label>]/`, always outside the WordPress root, mode 700,
 files 600. `wp-config.php` is never copied: it holds credentials.
 
 The script checks the dump is non-empty and ends with its `Dump completed` footer, writes it

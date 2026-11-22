@@ -67,6 +67,7 @@ need 'never "skip the safety net"' \
 
 # The step scrolls away long before the clone ends.
 need 'Backup      ~/.wp-clone-backups' 'the clone summary does not carry the backup path'
+need 'client-demo-20260919T161145Z-pre-clone/' 'the clone summary shows the old .sql path instead of the backup folder'
 need 'omit this block entirely when the destination was empty' \
   'does not keep the summary quiet when nothing was replaced'
 
