@@ -20,7 +20,9 @@
  * Colours: #rgb, #rgba, #rrggbb, #rrggbbaa (what axe emits for a translucent colour) and
  * rgb()/rgba(). A translucent background is flattened onto white, then a translucent
  * foreground onto that background; the proposal is always an opaque #rrggbb. Bad or missing
- * input is a one-line error and exit 2, never a stack.
+ * input is a one-line error and exit 2, never a stack. A `--pair` needs a ratio that is empty
+ * (4.5) or above 1; an unknown argument is exit 2; an unreadable colour in a `--axe` node is
+ * skipped with a WARN on stderr.
  */
 import fs from 'node:fs';
 
@@ -76,7 +78,7 @@ function hsl2rgb([h, s, l]) {
     return [f(p, q, h + 1 / 3), f(p, q, h), f(p, q, h - 1 / 3)].map((v) => v * 255);
 }
 // Move lightness toward black or white, in 0.1% steps, until the pair reaches `need`.
-function nearest(move, fixed, need) {
+function nearest(move, score, need) {
     const [h, s, l] = rgb2hsl(move);
     let best = null;
     for (const dir of [-1, 1]) {
@@ -84,7 +86,7 @@ function nearest(move, fixed, need) {
             const nl = l + dir * i / 1000;
             if (nl < 0 || nl > 1) break;
             const c = hsl2rgb([h, s, nl]).map(Math.round); // test the colour that ships, not the float
-            if (ratio(c, fixed) >= need) { if (!best || i < best.steps) best = { rgb: c, steps: i }; break; }
+            if (score(c) >= need) { if (!best || i < best.steps) best = { rgb: c, steps: i }; break; }
         }
     }
     return best && best.rgb;
@@ -93,13 +95,17 @@ function propose(fg, bg, need) {
     const { F, B } = resolvePair(fg, bg);
     const before = ratio(F, B);
     if (before >= need) return { fg, bg, need, before, ok: true };
-    const nf = nearest(F, B, need), nb = nearest(B, F, need);
+    // The foreground is replaced by an opaque colour; the background is replaced by an opaque
+    // colour under which a translucent foreground is composited again, so both candidates are
+    // scored the way the final pair will be.
+    const fgRgba = parseColor(fg);
+    const nf = nearest(F, (c) => ratio(c, B), need), nb = nearest(B, (c) => ratio(flatten(fgRgba, c), c), need);
     const dist = (a, b) => Math.abs(rgb2hsl(a)[2] - rgb2hsl(b)[2]);
     const useFg = nf && (!nb || dist(nf, F) <= dist(nb, B));
     const pick = useFg ? nf : nb;
     if (!pick) return { fg, bg, need, before, ok: false };
     const nfg = useFg ? toHex(pick) : fg, nbg = useFg ? bg : toHex(pick);
-    return { fg, bg, need, before, ok: false, changes: useFg ? 'fg' : 'bg', newFg: nfg, newBg: nbg, after: ratio(...[nfg, nbg].map((c) => resolvePair(c, '#ffffff').F)) };
+    return { fg, bg, need, before, ok: false, changes: useFg ? 'fg' : 'bg', newFg: nfg, newBg: nbg, after: (() => { const r = resolvePair(nfg, nbg); return ratio(r.F, r.B); })() };
 }
 
 const USAGE = 'usage: contrast-propose.mjs --pair fg:bg[:need] ... | --axe file.json [--json]';
@@ -113,8 +119,9 @@ for (let i = 0; i < argv.length; i++) {
         const spec = value(i); i++;
         const parts = spec.split(':');
         if (parts.length < 2 || parts.length > 3 || !parts[0] || !parts[1]) die(`bad --pair "${spec}": expected foreground:background[:need]`);
-        const need = parts[2] === undefined ? 4.5 : Number(parts[2]);
-        if (!(need > 1)) die(`bad --pair "${spec}": the required ratio must be a number above 1`);
+        const need = parts[2] === undefined || parts[2] === '' ? 4.5 : Number(parts[2]);
+        if (!(need > 1)) die(`bad --pair "${spec}": the required ratio must be empty (4.5) or a number above 1`);
+        try { parseColor(parts[0]); parseColor(parts[1]); } catch (e) { if (e instanceof InputError) die(e.message); throw e; }
         rows.push({ fg: parts[0], bg: parts[1], need });
     } else if (argv[i] === '--axe') {
         const file = value(i); i++;
@@ -133,7 +140,14 @@ for (let i = 0; i < argv.length; i++) {
         }
     } else die(`unknown argument: ${argv[i]}`);
 }
-if (!rows.length) die('no colour pairs given');
+// A node with a missing or unreadable colour is skipped with a warning: one odd node in an
+// axe report must not discard the rest.
+const usable = rows.filter((r) => {
+    try { if (typeof r.fg !== 'string' || typeof r.bg !== 'string') throw new InputError(`non-text colour in ${JSON.stringify([r.fg, r.bg])}`); parseColor(r.fg); parseColor(r.bg); return true; }
+    catch (e) { if (!(e instanceof InputError)) throw e; console.error(`WARN: skipped ${r.target || r.text || 'a node'}: ${e.message}`); return false; }
+});
+rows.length = 0; rows.push(...usable);
+if (!rows.length) die('no usable colour pairs given');
 const groups = new Map();
 for (const r of rows) {
     const k = [r.fg.toLowerCase(), r.bg.toLowerCase(), r.need].join('|');

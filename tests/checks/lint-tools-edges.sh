@@ -62,6 +62,24 @@ for args in "" "--pair" "--axe" "--pair zzz:#fff" "--pair #fff" "--pair #fff:#00
   grep >/dev/null -Fc 'ERROR:' "$tmp/out" || fail "contrast-propose [$args] gave no clear error"
 done
 
+# translucent foreground, proposal moves the background: the ratio reported is the real one
+line=$(node "$cp" --pair '#ffffff80:#d85c33' | sed -n 3p)
+nb=$(sed -n 's/.*#ffffff80 on \(#[0-9a-f]\{6\}\) .*/\1/p' <<<"$line")
+[ -n "$nb" ] || fail "no background proposal for a translucent foreground: $line"
+real=$(node "$cp" --pair "#ffffff80:$nb" | sed -n 3p | cut -d'|' -f3 | tr -d ' ')
+said=$(cut -d'|' -f6 <<<"$line" | tr -d ' ')
+[ "$real" = "$said" ] || fail "reported ratio $said, real ratio $real for $nb"
+awk -v r="$real" 'BEGIN{exit !(r+0 >= 4.5)}' || fail "proposed background still fails: $real"
+# an empty ratio keeps the 4.5 default; zero is an error
+[ "$(rc node "$cp" --pair '#d85c33:#fff:')" = 0 ] || fail "empty need no longer defaults to 4.5"
+grep >/dev/null -Fc '| 4.5 |' "$tmp/out" || fail "empty need is not 4.5"
+[ "$(rc node "$cp" --pair '#d85c33:#fff:0')" = 2 ] || fail "need 0 not an error"
+# one bad node in an axe report is skipped with a warning, the rest is reported
+printf '[{"fg":"zzz","bg":"#fff"},{"fg":5,"bg":"#fff"},{"fg":"#d85c33","bg":"#fff"}]' > "$tmp/axe.json"
+node "$cp" --axe "$tmp/axe.json" > "$tmp/o" 2> "$tmp/e" || fail "a bad axe node aborted the report"
+grep >/dev/null -Fc '#d85c33 on #fff' "$tmp/o" || fail "the good axe node was lost"
+[ "$(grep -c '^WARN: skipped' "$tmp/e")" = 2 ] || fail "bad axe nodes not warned about: $(cat "$tmp/e")"
+
 # ── assets-fresh ────────────────────────────────────────────────────────────
 af=bin/assets-fresh.mjs
 th="$tmp/theme"; mkdir -p "$th/assets"
@@ -98,5 +116,19 @@ echo 'export {};' > "$t/assets/scripts/index.js"
 [ "$(rc node "$tc" "$t" --rule widgets)" = 1 ] || fail "detected entry without the import passed"
 grep >/dev/null -Fc 'assets/scripts/index.js (from package.json)' "$tmp/out" || fail "message does not name the detected entry"
 [ "$(rc node "$tc" "$t" --entry)" = 2 ] || fail "--entry without a value is not a usage error"
+
+# several scripts, several paths per call, the default entry: any one importing the module passes
+printf '{"scripts":{"build:blocks":"wp-scripts build src/blocks/index.js","build":"wp-scripts build assets/scripts/index.js --output-path=x"}}' > "$t/package.json"
+echo "import './tabs.js';" > "$t/assets/scripts/index.js"
+[ "$(rc node "$tc" "$t" --rule widgets)" = 0 ] || fail "an extra blocks build before the real entry failed the gate: $(cat "$tmp/out")"
+printf '{"scripts":{"build":"wp-scripts build src/blocks/index.js assets/scripts/index.js"}}' > "$t/package.json"
+[ "$(rc node "$tc" "$t" --rule widgets)" = 0 ] || fail "only the first path of a call was read: $(cat "$tmp/out")"
+rm -f "$t/package.json"; mkdir -p "$t/assets/js/src"; echo "import './tabs.js';" > "$t/assets/js/src/index.js"; echo 'export {};' > "$t/assets/js/src/tabs.js"
+printf '{"scripts":{"build:blocks":"wp-scripts build src/blocks/index.js"}}' > "$t/package.json"
+[ "$(rc node "$tc" "$t" --rule widgets)" = 0 ] || fail "a theme that passed with the default entry now fails: $(cat "$tmp/out")"
+echo 'export {};' > "$t/assets/js/src/index.js"; echo 'export {};' > "$t/assets/scripts/index.js"
+[ "$(rc node "$tc" "$t" --rule widgets)" = 1 ] || fail "no entry importing the module passed"
+grep >/dev/null -Fc 'src/blocks/index.js' "$tmp/out" || fail "the message omits a searched entry"
+grep >/dev/null -Fc 'assets/js/src/index.js' "$tmp/out" || fail "the message omits the default entry"
 
 echo PASS

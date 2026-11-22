@@ -354,35 +354,38 @@ if (rules.includes('classes')) {
 
 // ── widgets ──────────────────────────────────────────────────────────────────
 if (rules.includes('widgets')) {
-  // The script entry: --entry wins; else the file a package.json script hands to
-  // `wp-scripts build|start` (or `webpack`/`vite build`-style first path argument ending in
-  // .js/.ts); else the starter's assets/js/src/index.js.
+  // The script entries: --entry alone when given; else every .js/.ts path a package.json
+  // script passes to `wp-scripts build|start`, plus the starter's assets/js/src/index.js when
+  // it exists. A module counts when ANY of them imports it, so a theme with an extra blocks
+  // build, or a path other than the first, is not failed for the wrong entry.
   const DEFAULT_ENTRY = 'assets/js/src/index.js';
-  let entryRel = entryArg;
-  let entryHow = '--entry';
-  if (!entryRel) {
-    entryHow = 'default';
+  const candidates = [];
+  const addCandidate = (rel, how) => {
+    if (rel && !candidates.some((c) => c.rel === rel)) candidates.push({ rel, how });
+  };
+  if (entryArg) addCandidate(entryArg, '--entry');
+  else {
     try {
       const pkg = JSON.parse(readFileSync(join(theme, 'package.json'), 'utf8'));
       for (const cmd of Object.values(pkg.scripts ?? {})) {
-        const m = String(cmd).match(/\bwp-scripts\s+(?:build|start)\s+((?:--\S+\s+)*)([^\s-][^\s]*\.(?:m?[jt]sx?))\b/);
-        if (m) {
-          entryRel = m[2];
-          entryHow = 'package.json';
-          break;
+        for (const call of String(cmd).matchAll(/\bwp-scripts\s+(?:build|start)\b([^&|;\n]*)/g)) {
+          for (const tok of call[1].split(/\s+/)) if (/^[^\s-][^\s]*\.(?:m?[jt]sx?)$/.test(tok)) addCandidate(tok, 'package.json');
         }
       }
     } catch {
       /* no package.json, or not JSON: the default applies */
     }
+    if (existsSync(join(theme, DEFAULT_ENTRY))) addCandidate(DEFAULT_ENTRY, 'default');
+    if (!candidates.length) addCandidate(DEFAULT_ENTRY, 'default');
   }
-  entryRel = entryRel || DEFAULT_ENTRY;
-  const entry = join(theme, entryRel);
-  const entryDir = dirname(entryRel);
-  const index = existsSync(entry) ? readFileSync(entry, 'utf8') : '';
-  const entryNote = existsSync(entry)
-    ? `${entryRel} (from ${entryHow})`
-    : `${entryRel} (from ${entryHow}; the file does not exist, pass --entry <js-file> relative to the theme)`;
+  const entries = candidates.map((c) => ({
+    ...c,
+    index: existsSync(join(theme, c.rel)) ? readFileSync(join(theme, c.rel), 'utf8') : '',
+    dir: dirname(c.rel),
+  }));
+  const entryNote = entries
+    .map((e) => (existsSync(join(theme, e.rel)) ? `${e.rel} (from ${e.how})` : `${e.rel} (from ${e.how}; the file does not exist, pass --entry <js-file> relative to the theme)`))
+    .join(', ');
   const needs = [
     { name: 'tabs', marker: /role\s*=\s*["']tab["']/, module: /import\s[^;]*['"]\.\/tabs(\.js)?['"]/ },
     { name: 'accordion', marker: /data-accordion-trigger/, module: /import\s[^;]*['"]\.\/accordion(\.js)?['"]/ },
@@ -391,8 +394,8 @@ if (rules.includes('widgets')) {
   for (const n of needs) {
     const users = phpFiles.filter((f) => n.marker.test(sources.get(f)));
     if (!users.length) continue;
-    if (!n.module.test(index) || !existsSync(join(theme, entryDir, `${n.name}.js`))) {
-      fail(`${users.map(rel).join(', ')} carry ${n.name} markup but the script entry ${entryNote} does not import ./${n.name}.js next to it`);
+    if (!entries.some((e) => n.module.test(e.index) && existsSync(join(theme, e.dir, `${n.name}.js`)))) {
+      fail(`${users.map(rel).join(', ')} carry ${n.name} markup but the script entries searched, ${entryNote}, does not import ./${n.name}.js next to it`);
     }
   }
 }
