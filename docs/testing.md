@@ -34,6 +34,16 @@ claiming a change works. Shell scripts that run `sudo`, `rm` or `sed` on user-de
 tested with hostile arguments through the stub PATH in `tests/lib/stub-path.sh`
 (`tests/checks/hostile-input-env-setup.sh` is the model). CI is the net under that, not a replacement for it.
 
+**Mutation pass (manual, not a check).** `bash tests/mutation.sh [-n 15] [-s seed] [-c "a.sh b.sh"]`
+samples contract checks that grep `need <file> "<token>"` (seeded, so a run repeats), copies the
+repo to a temp dir, deletes the first line holding one required token and expects the check to
+FAIL on the copy; a check that still passes is a survivor (its token also sits in a comment or
+another line). The real tree is never touched. Only checks with a literal path and plain token
+are eligible. `tests/checks/mutation-harness.sh` proves the harness catches a mutant and leaves
+the tree unchanged. `seeded-defects.sh` compares against the committed `recorded-findings.json`
+(plus a case with one finding removed) so the comparison logic always runs; `SEEDED_FINDINGS`
+still compares a real audit run.
+
 **The PHP lint is version-pinned, and that is the point.** It lints at **7.4** — the floor
 `skills/wp-polylang/scripts/*.php` carry, because they run via `wp eval-file` inside
 whatever WordPress the client has — with `starter-theme/__cinematic__/` held to **8.0**,
