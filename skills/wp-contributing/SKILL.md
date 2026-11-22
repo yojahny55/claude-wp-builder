@@ -239,6 +239,13 @@ hand. What it rests on is the part worth knowing first:
 - `gh` runs as `env -u GH_TOKEN gh …`, so it authenticates with its own stored login rather
   than with whatever `GH_TOKEN` the shell happens to export.
 
+The sequence is a version PR first, then — after it merges — the tag on the merge commit and
+the GitHub release, both published by hand: merging the PR creates neither. There is no release
+workflow in CI.
+
+This repository deliberately has no Dependabot and no CODEOWNERS: both would open pull requests
+or review requests on the owner's repository from outside the project's own flow.
+
 Then delete the merged branch, and check no others accumulated: a branch whose PR is merged —
 or closed but superseded — is safe to delete once `git diff main <branch>` shows nothing on it
 that `main` lacks.

@@ -81,6 +81,27 @@ for doc in "$README" "$DOCS"; do
 done
 
 # ---------------------------------------------------------------------------
+# 2b. ...in prose too. Rule 2 reads table cells only, so a sentence naming a command
+#     that never existed (/wp-woo-verify in the README roadmap) passed. Every
+#     `/wp-<name>` cited anywhere in the README or docs/*.md must be a command file.
+#     A trailing hyphen is a family prefix (`/wp-cinematic-*`), not a name. Anything
+#     else that is legitimately not a command goes in PROSE_NOT_COMMANDS, with a reason.
+# ---------------------------------------------------------------------------
+# /wp-figma-connect: a proposal in docs/code-connect-draft.md, not shipped.
+PROSE_NOT_COMMANDS=" /wp-figma-connect "
+for doc in "$README" docs/*.md; do
+  # the archive is history: it names commands that were removed since
+  [ "$doc" = docs/changelog-archive.md ] && continue
+  cited=$(grep -oE '(^|[^A-Za-z0-9_/.-])/wp-[a-z0-9-]+' "$doc" | grep -oE '/wp-[a-z0-9-]+' | sort -u || true)
+  for name in $cited; do
+    case "$name" in *-) continue ;; esac
+    case "$PROSE_NOT_COMMANDS" in *" $name "*) continue ;; esac
+    [ -f "commands/${name#/}.md" ] \
+      || err "$doc mentions $name, but commands/${name#/}.md does not exist (add it to PROSE_NOT_COMMANDS if it is not meant to be a command)"
+  done
+done
+
+# ---------------------------------------------------------------------------
 # 3. Every skill directory is named in the skills table — as a table row, not as
 #    a prose mention. The README discusses wp-robin and wp-aos-animator in prose
 #    outside the table, so a whole-file grep passed even with their rows deleted.

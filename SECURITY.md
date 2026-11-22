@@ -2,22 +2,32 @@
 
 ## About This Project
 
-Claude WP Builder is a code generation tool — it generates WordPress theme files (PHP, CSS, JavaScript) from demo HTML. It does not run as a service or handle user data directly.
+Claude WP Builder is a Claude Code plugin. It generates WordPress theme files (PHP, CSS, JavaScript) from demo HTML, but it is more than a text generator. It also:
+
+- ships a WordPress plugin, `plugins/store-kit`, that is copied into stores and runs on live sites;
+- reads Stripe keys from `wp-config.php` constants for store setups;
+- clones production data into local sites and anonymizes it (`/wp-clone`, `/wp-anonymize`);
+- handles image-generation API keys (`GEMINI_API_KEY`, `OPENAI_API_KEY`) through `bin/image-gen.mjs`;
+- runs WP-CLI, shell and browser tooling against the user's machine and sites.
 
 ## What to Report
 
-Security-relevant issues include:
-
-- **Generated code with vulnerabilities** — if a command or agent produces PHP with XSS, SQL injection, CSRF, or other OWASP Top 10 patterns
-- **Hardcoded credentials** — if generated files contain API keys, passwords, or tokens
-- **Unsafe file operations** — if commands write files to unexpected locations or with dangerous permissions
-- **WP-CLI command injection** — if user input is passed unsafely to shell commands
+- **Generated code with vulnerabilities**: a command or agent that produces PHP with XSS, SQL injection, CSRF, or other OWASP Top 10 patterns.
+- **`plugins/store-kit` flaws**: anything exploitable in the plugin that reaches a store, including catalog-mode bypasses and handling of payment settings.
+- **Secret exposure**: generated files, logs, manifests, reports or committed artifacts that contain API keys, Stripe keys, database passwords or tokens, or a path where a secret read from `wp-config.php` or the environment ends up somewhere it should not.
+- **Clone and anonymizer leaks**: production data (personal data, credentials, tokens) that survives `/wp-anonymize`, or that a clone copies somewhere it should not.
+- **Unsafe file operations**: commands that write files to unexpected locations or with dangerous permissions.
+- **Command injection**: user or site input passed unsafely to WP-CLI or shell commands.
 
 ## How to Report
 
-Open a [GitHub Issue](https://github.com/yojahny55/claude-wp-builder/issues/new?labels=security) with the `security` label.
+**Sensitive reports go to the maintainer privately first.** Contact the maintainer through their [GitHub profile](https://github.com/yojahny55) and do not post details publicly. This covers anything that exposes secrets, production data, or an exploitable flaw in code that already runs on live sites (`plugins/store-kit`, generated theme code).
 
-Since this is a code generation tool (not a running service), public disclosure via Issues is acceptable. If you believe the issue is sensitive, contact the maintainer directly via their [GitHub profile](https://github.com/yojahny55).
+GitHub's private vulnerability reporting is not enabled on this repository, so do not look for a "Report a vulnerability" button.
+
+**Public issues are only for what is not sensitive**: a hardening suggestion, a generated-code pattern that is weak but not exploitable by itself, or a gap in the built-in checks. Open a [GitHub Issue](https://github.com/yojahny55/claude-wp-builder/issues/new?labels=security) with the `security` label.
+
+When in doubt, treat it as sensitive.
 
 ## Automated Security Checks
 
@@ -35,8 +45,4 @@ The maintainer aims to acknowledge security reports within 7 days and provide a 
 
 ## Supported Versions
 
-| Version | Supported |
-|---------|-----------|
-| 1.3.x   | Yes       |
-| 1.2.x   | Yes       |
-| < 1.2   | No        |
+Only the latest release receives security fixes. The current version is in `.claude-plugin/plugin.json`.

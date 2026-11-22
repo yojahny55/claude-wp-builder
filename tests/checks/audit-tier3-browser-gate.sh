@@ -38,7 +38,7 @@ done
 #    a file that legitimately names the retired key, so a file-level list would either hide a
 #    real offender sitting beside them or fail on the migration path itself.
 stale=$(grep -rniE 'web[- ]quality[- ]skills|web_quality_skills' --include='*.md' --include='*.sh' . \
-  | grep -vE '^\./(CHANGELOG\.md|tests/checks/audit-tier3-browser-gate\.sh):' \
+  | grep -vE '^\./(CHANGELOG\.md|docs/changelog-archive\.md|tests/checks/audit-tier3-browser-gate\.sh):' \
   | grep -vF 'the legacy `audit.web_quality_skills_available`' \
   | grep -vF 'Delete `audit.web_quality_skills_available` as you write this block' || true)
 [ -z "$stale" ] \
