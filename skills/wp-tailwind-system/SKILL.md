@@ -1,6 +1,6 @@
 ---
 name: wp-tailwind-system
-description: Defines how markup and CSS are written in a theme built from the __tailwind__ starter (Tailwind v4) — the ladder from utilities to @apply classes in utilities/site.css and components/, @theme tokens, the four CSS directories and their layer() imports, Preflight, named breakpoints at the demo's width plus one, and the traps that compile without an error (an unescaped underscore or a quote inside an arbitrary variant, an unlayered import, a scoped reset outside :where(), a second .btn, the hidden utility on a script-toggled element). Use when writing or converting markup or CSS in a project whose template is tailwind — the wp-tailwind agent, /wp-section, /wp-header, /wp-footer, /wp-page, /wp-cpt, /wp-tailwindify, /wp-tailwind-migrate, /wp-yolo, /wp-finalize — or when a utility such as has-[.card__title]:underline does nothing. Not for a basic theme's BEM CSS (wp-css-system), nor Tailwind outside a WordPress starter.
+description: How markup and CSS are written in a theme built from the __tailwind__ starter (Tailwind v4) — utilities-to-@apply ladder, @theme tokens, silent compile traps. Use when writing or converting markup or CSS in a tailwind-template project (wp-tailwind agent, /wp-section, /wp-tailwindify, /wp-yolo) or when a utility does nothing. Not for a basic theme's BEM CSS (wp-css-system).
 user-invocable: false
 ---
 

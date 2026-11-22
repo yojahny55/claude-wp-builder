@@ -1,6 +1,6 @@
 ---
 name: wp-demo-run
-description: "The step detail of the /wp-demo run, split out of commands/wp-demo.md so the command stays a short map — the craft brief and its form interview, asset inventory and reference precedence, the grammar and composition plan with the family, world and image plan, the craft build of every page, and the section plan both modes record. Use when /wp-demo reaches a step that names one of these reference files, or when changing how a /wp-demo step behaves. Not for craft design rules (wp-demo-craft) or the demo page contract (wp-demo)."
+description: "Step detail of the /wp-demo run, split out of the command. Use when /wp-demo reaches a step that names one of these reference files, or when changing how a /wp-demo step behaves."
 user-invocable: false
 ---
 

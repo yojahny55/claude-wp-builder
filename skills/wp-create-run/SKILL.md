@@ -1,6 +1,6 @@
 ---
 name: wp-create-run
-description: "The step detail of the /wp-create run, split out of commands/wp-create.md so the command stays a short map — the environment config templates and port assignment, the plugin profile install with its required-versus-optional outcomes, and the .wp-create.json manifest. Use when /wp-create reaches a step that names one of these reference files, or when changing how a /wp-create step behaves. Not for the environment helper itself (wp-environments) or the manifest validator (bin/wp-config.mjs)."
+description: "Step detail of the /wp-create run, split out of the command. Use when /wp-create reaches a step that names one of these reference files, or when changing how a /wp-create step behaves."
 user-invocable: false
 ---
 

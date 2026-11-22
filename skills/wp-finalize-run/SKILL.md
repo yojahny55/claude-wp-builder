@@ -1,6 +1,6 @@
 ---
 name: wp-finalize-run
-description: "The check detail of the /wp-finalize run, split out of commands/wp-finalize.md so the command stays a short map — bilingual coverage, theme structure, the WP-CLI runtime validation, the GEO and agent-readiness report, and the three demo-parity layers (static, WP-CLI, measured visual parity). Use when /wp-finalize reaches a check that names one of these reference files, or when changing how a /wp-finalize check behaves. Not for the audit agents' own checks (wp-audit-standards) or the GEO catalog itself (wp-audit-geo-standards)."
+description: "Step detail of the /wp-finalize run, split out of the command. Use when /wp-finalize reaches a step that names one of these reference files, or when changing how a /wp-finalize step behaves."
 user-invocable: false
 ---
 

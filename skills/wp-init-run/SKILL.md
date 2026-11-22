@@ -1,6 +1,6 @@
 ---
 name: wp-init-run
-description: "The step detail of the /wp-init run, split out of commands/wp-init.md so the command stays a short map — the Demo-First Path (delimiter check, project details read from the demo, the colour and font injection with the craft token aliases and the /wp-tailwindify decision), the font carry, the i18n helper and field-suffix rewrite, the nav menu registration, the generated .claude/CLAUDE.md, and plugin install, theme activation, site identity and the Tailwind build. Use when /wp-init reaches a step that names one of these reference files, or when changing how a /wp-init step behaves. Not for the bilingual helpers themselves (wp-bilingual, wp-polylang) or the Tailwind token system (wp-tailwind-system)."
+description: "Step detail of the /wp-init run, split out of the command. Use when /wp-init reaches a step that names one of these reference files, or when changing how a /wp-init step behaves."
 user-invocable: false
 ---
 

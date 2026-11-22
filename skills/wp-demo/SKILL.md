@@ -1,6 +1,6 @@
 ---
 name: wp-demo
-description: Defines the demo page contract — single-file demo/index.html and demo/slug.html pages whose SECTION and END SECTION comment delimiters map 1:1 to WordPress template parts — plus the accessibility, navigation and footer markup every demo carries and, in plain mode, the token names, font link and placeholder images. Use when writing or editing a demo page with /wp-demo, or converting one with /wp-init, /wp-section, /wp-seed or /wp-yolo. Craft-mode design rules are in wp-demo-craft, responsive CSS in wp-responsive.
+description: Defines the demo page contract — single-file demo/index.html and demo/slug.html pages whose SECTION and END SECTION delimiters map 1:1 to WordPress template parts, plus the markup every demo carries. Use when writing a demo page with /wp-demo, or converting one with /wp-init, /wp-section, /wp-seed or /wp-yolo. Craft-mode design rules are in wp-demo-craft.
 user-invocable: false
 ---
 

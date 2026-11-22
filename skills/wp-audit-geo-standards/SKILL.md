@@ -1,6 +1,6 @@
 ---
 name: wp-audit-geo-standards
-description: GEO and AI-agent-readiness reference — the ORA and is-agentic scoring model, the GEO-D, GEO-A, GEO-U and GEO-P check catalog, applicability by site type (content, local, merchant, catalog store, SaaS), the AI crawler allowlist for robots.txt and the Content-Signal header, the dynamic llms.txt, ARD catalog (ard.json), agent-skills index, markdown negotiation and other surfaces inc/agentic.php serves, the bin/geo-scan.sh live verifier, and a citability rubric for writing copy that AI engines quote. Use when running /wp-audit --geo, explaining why is-agentic grades a site, fixing GEO findings with wp-agentic-surfaces, choosing which AI crawlers robots.txt allows, or writing section copy for ChatGPT and Perplexity to cite. Not for Rank Math titles, meta descriptions, sitemap or schema configuration (wp-audit-seo-standards), and not for accessibility fixes, which GEO-U01 to U05 only mirror.
+description: GEO and AI-agent-readiness reference — ORA and is-agentic scoring, GEO-D, GEO-A, GEO-U and GEO-P checks, AI crawler allowlist, llms.txt, inc/agentic.php surfaces, bin/geo-scan.sh. Use when running /wp-audit --geo, explaining an is-agentic grade, or choosing AI crawlers for robots.txt. Not for Rank Math titles, sitemap or schema (wp-audit-seo-standards).
 user-invocable: false
 ---
 

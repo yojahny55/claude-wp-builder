@@ -1,6 +1,6 @@
 ---
 name: wp-bilingual
-description: Documents the suffix i18n model — one page carries every language, with ACF/SCF fields duplicated as _lang suffixes (hero_title_es) and resolved by prefix_get_field(), prefix_t() and prefix_e() on the tailwind starter or prefix_b() and prefix_setting() on the cinematic one, plus ?lang= detection, the language cookie, the language switcher, per-language menu locations and the html lang attribute, all in the theme's inc/i18n.php. Use when the project's .claude/CLAUDE.md records the suffix i18n strategy or records no strategy at all, when adding a second-language field or UI string, or when a ?lang=es page still shows the primary language. Not for Polylang projects (wp-polylang), and not for a one-language site.
+description: Documents the suffix i18n model — one page carries every language, ACF/SCF fields duplicated as _lang suffixes, resolved by prefix_get_field() in inc/i18n.php. Use when the project's .claude/CLAUDE.md records the suffix strategy or records no strategy at all, when adding a second-language field, or when a ?lang=es page shows the primary language. Not for Polylang projects (wp-polylang).
 user-invocable: false
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: wp-css-system
-description: Defines the plain-CSS design system of a basic-template theme's assets/css/styles.css and of a plain demo's style block — the :root token names and scales, BEM naming, the reset and its specificity traps (scoped resets, reset classes, :where()), flex or grid layout instead of position absolute, stylesheet delimiters, and contours that render the same in every engine. Use when writing or reviewing that CSS, mapping a demo's values to var() tokens, turning absolutely positioned mockup boxes into a layout, or fixing a reset that beats a class. Not for a tailwind theme (wp-tailwind-system), a cinematic theme's cinematic.css, or breakpoints alone (wp-responsive).
+description: Defines the plain-CSS design system of a basic-template theme's assets/css/styles.css and a plain demo's style block — :root tokens, BEM, reset traps, flex or grid layout. Use when writing or reviewing that CSS, mapping demo values to var() tokens, or fixing a reset that beats a class. Not for a tailwind theme (wp-tailwind-system), cinematic.css, or breakpoints alone (wp-responsive).
 user-invocable: false
 ---
 

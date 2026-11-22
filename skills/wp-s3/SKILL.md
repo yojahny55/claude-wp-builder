@@ -1,6 +1,6 @@
 ---
 name: wp-s3
-description: Moves a WordPress site's media library to S3, or to any S3-compatible server such as MinIO, with Human Made's S3 Uploads plugin, through bundled scripts — installs the plugin with its vendor tree, writes s3-config.php and the endpoint mu-plugin, migrates wp-content/uploads with a transfer that verifies itself, sets up the AWS side (bucket, CloudFront with OAC, IAM role), and takes the site back off S3. Run through /wp-s3 and /wp-s3-media. Use when a site's uploads should be served from an S3 bucket or a CloudFront media domain with S3 Uploads, when configuring S3 Uploads against AWS or MinIO, migrating or verifying the media transfer, or reverting a site off S3. Not for backups to S3, WP Offload Media, or hosting a static site or demo on S3.
+description: Moves a WordPress media library to S3 or MinIO with Human Made's S3 Uploads plugin — install, s3-config.php, self-verifying uploads transfer, AWS side, revert. Run through /wp-s3 and /wp-s3-media. Use when uploads should be served from an S3 bucket or CloudFront, or migrating or reverting that transfer. Not for backups to S3 or WP Offload Media.
 user-invocable: false
 ---
 

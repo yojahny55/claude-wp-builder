@@ -1,6 +1,6 @@
 ---
 name: wp-polylang
-description: Documents how to drive Polylang from automation — one post per language joined into translation groups through the pll_* API, and the bundled pll-setup, pll-export, pll-import and pll-verify scripts run with wp eval-file. Covers per-language menus, internal links, posts and terms with no language, WooCommerce products and categories, proper-noun taxonomies, language prefixes and CPT rewrite bases, hreflang, ACF/SCF fields and strings. Use when the project's .claude/CLAUDE.md records i18n strategy polylang (the default for new scaffolds), when translating or retrofitting a site with /wp-polylang, or when a translated page serves the wrong language, links back to the source language or is missing from the site. Not for the suffix model with hero_title_es fields (wp-bilingual), and not for WPML.
+description: Drives Polylang from automation — one post per language in translation groups through the pll_* API and the bundled pll-* scripts. Use when the project's .claude/CLAUDE.md records i18n strategy polylang (the default), when translating with /wp-polylang, or when a translated page serves the wrong language or links back to the source one. Not for the suffix model with hero_title_es fields (wp-bilingual), nor WPML.
 user-invocable: false
 ---
 

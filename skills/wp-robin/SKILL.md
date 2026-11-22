@@ -1,6 +1,6 @@
 ---
 name: wp-robin
-description: Installs, configures and unsticks the Robin Image Optimizer plugin (robin-image-optimizer) through the bundled robin-fix.sh — writes Robin's wbcr_io_* settings (WebP on, AVIF off, every registered size), clears webp queue rows stuck in processing in wp_rio_process_queue, writes the missing .webp sibling files and the queue rows Robin expects, so its bulk run stops at "X remaining" no more; also covers why a CSS background-image still serves the JPEG or PNG under Robin's webp_delivery_mode=picture. Run through /wp-robin. Use when Robin Image Optimizer is stuck, looping or never finishes its bulk optimization, keeps showing "X remaining", is missing .webp files, needs installing and configuring on a site, when a Robin site's CSS background-image still serves the original although the .webp sibling exists, or before converting PNG attachments to WebP in place. Not for ShortPixel, Imagify or EWWW, moving media to S3 (wp-s3), or uploads and thumbnails that fail to generate (/wp-debug media).
+description: Installs, configures and unsticks Robin Image Optimizer through robin-fix.sh — wbcr_io_* settings, stuck queue rows, missing .webp siblings. Run through /wp-robin. Use when Robin is stuck, loops, keeps showing "X remaining", misses .webp files, needs installing, or a CSS background-image still serves the JPEG. Not for ShortPixel, Imagify or EWWW, or moving media to S3 (wp-s3).
 user-invocable: false
 ---
 

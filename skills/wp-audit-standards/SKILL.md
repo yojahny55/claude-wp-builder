@@ -1,6 +1,6 @@
 ---
 name: wp-audit-standards
-description: Shared contract for every wp-audit-* agent — severity levels, the report fields bin/audit-report.mjs reads (check, status, severity, ownership, resource), the SEC-, SEO-, A11Y-, PERF-, WP-, GEO- and UX- prefixes, deduplication, the N/A rules for a WooCommerce catalog store or a local clone of production, link sweeps through bin/link-sweep.mjs, pacing live checks through bin/prod-gate.sh behind fail2ban, CrowdSec or ModSecurity, Lighthouse measurement traps, page-weight budgets and the WCAG and Core Web Vitals thresholds. Use when writing, merging or scoring an audit finding, deciding whether a check is N/A, sweeping a site's links, sending any request to a production host during /wp-audit, or judging a Lighthouse or Core Web Vitals number. Not for a domain's own checks — Rank Math and SEO (wp-audit-seo-standards), local SEO (wp-audit-local-standards), GEO, llms.txt and AI crawlers (wp-audit-geo-standards), usability UX-NNN (wp-audit-ux-standards).
+description: Shared contract for every wp-audit-* agent — severity levels, report fields, check prefixes, N/A rules, link sweeps, pacing with bin/prod-gate.sh, Lighthouse traps. Use when writing, merging or scoring an audit finding, deciding if a check is N/A, or hitting a production host during /wp-audit. Not for a domain's own checks (wp-audit-seo-standards and siblings).
 user-invocable: false
 ---
 

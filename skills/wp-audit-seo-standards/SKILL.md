@@ -1,6 +1,6 @@
 ---
 name: wp-audit-seo-standards
-description: Rank Math SEO reference for WordPress — detecting the plugin, the module, option and post meta keys (rank-math-options-titles), title templates and meta descriptions to seed with WP-CLI, JSON-LD schema templates, breadcrumbs, the classic robots.txt block, sitemap failure modes such as a sitemap_index.xml that 404s or returns HTML, the category-noindex gate, duplicate theme JSON-LD, title and description length limits, the Lighthouse link-text trap, and WooCommerce SEO checks SEO-064 to SEO-068. Use when auditing, configuring or seeding SEO on a site running Rank Math (wp-audit-seo, wp-audit-rankmath), or when per-category noindex, the sitemap or link-text fails. Not for llms.txt, AI-crawler rules in robots.txt or the Content-Signal header (wp-audit-geo-standards), and not for NAP or LocalBusiness subtype checks (wp-audit-local-standards).
+description: Rank Math SEO reference — meta keys, titles, JSON-LD, robots.txt, sitemap failures, category noindex, WooCommerce checks SEO-064 to SEO-068. Use when auditing, configuring or seeding SEO on a Rank Math site (wp-audit-seo, wp-audit-rankmath). Not for llms.txt, AI-crawler rules in robots.txt or the Content-Signal header (wp-audit-geo-standards), nor NAP checks (wp-audit-local-standards).
 user-invocable: false
 ---
 
