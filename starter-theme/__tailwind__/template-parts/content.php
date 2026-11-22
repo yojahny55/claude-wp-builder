@@ -36,8 +36,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 		the_content(
 			sprintf(
 				wp_kses(
-					/* translators: %s: Name of current post. Only visible to screen readers */
-					__( 'Continue reading<span class="screen-reader-text"> "%s"</span>', '__starter__' ),
+					/* %s: Name of current post. Only visible to screen readers */
+					__starter___t( 'continue_reading' ),
 					array(
 						'span' => array(
 							'class' => array(),
@@ -50,7 +50,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 		wp_link_pages(
 			array(
-				'before' => '<div class="page-links">' . esc_html__( 'Pages:', '__starter__' ),
+				'before' => '<div class="page-links">' . esc_html( __starter___t( 'page_links' ) ),
 				'after'  => '</div>',
 			)
 		);

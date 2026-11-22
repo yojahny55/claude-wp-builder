@@ -10,7 +10,7 @@ defined('ABSPATH') || exit;
 $location = __starter___nav_location('primary'); // primary-<lang>, or bare under Polylang
 $logo     = __starter___setting('site_logo');
 ?>
-<nav class="nav" aria-label="<?php echo esc_attr__('Primary', '__starter__'); ?>">
+<nav class="nav" aria-label="<?php echo esc_attr(__starter___b('Primary', 'Principal')); ?>">
     <a class="nav__lockup" href="<?php echo esc_url(home_url('/')); ?>" aria-label="<?php echo esc_attr(get_bloginfo('name')); ?>">
         <?php if ($logo) : ?>
             <img src="<?php echo esc_url($logo); ?>" alt="<?php echo esc_attr(get_bloginfo('name')); ?>" width="600" height="160">
@@ -35,15 +35,15 @@ $logo     = __starter___setting('site_logo');
         </button>
     </div>
 
-    <button class="nav__hamburger" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="<?php echo esc_attr__('Open menu', '__starter__'); ?>">
+    <button class="nav__hamburger" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="<?php echo esc_attr(__starter___b('Open menu', 'Abrir menú')); ?>">
         <span class="nav__hamburger-bars" aria-hidden="true"></span>
     </button>
 </nav>
 
 <div id="mobile-menu" class="mobile-menu" role="dialog" aria-modal="true" aria-hidden="true" inert>
-    <button class="mobile-menu__close" type="button" aria-label="<?php echo esc_attr__('Close menu', '__starter__'); ?>">×</button>
+    <button class="mobile-menu__close" type="button" aria-label="<?php echo esc_attr(__starter___b('Close menu', 'Cerrar menú')); ?>">×</button>
 
-    <nav class="mobile-menu__nav" aria-label="<?php echo esc_attr__('Mobile primary', '__starter__'); ?>">
+    <nav class="mobile-menu__nav" aria-label="<?php echo esc_attr(__starter___b('Mobile primary', 'Principal (móvil)')); ?>">
         <?php
         if (has_nav_menu($location)) {
             wp_nav_menu([

@@ -22,8 +22,8 @@ get_header();
         <?php
         the_post_navigation(
             [
-                'prev_text' => '<span class="nav-subtitle">' . esc_html__('Previous:', '__starter__') . '</span> <span class="nav-title">%title</span>',
-                'next_text' => '<span class="nav-subtitle">' . esc_html__('Next:', '__starter__') . '</span> <span class="nav-title">%title</span>',
+                'prev_text' => '<span class="nav-subtitle">' . esc_html(__starter___b('Previous:', 'Anterior:')) . '</span> <span class="nav-title">%title</span>',
+                'next_text' => '<span class="nav-subtitle">' . esc_html(__starter___b('Next:', 'Siguiente:')) . '</span> <span class="nav-title">%title</span>',
             ]
         );
 

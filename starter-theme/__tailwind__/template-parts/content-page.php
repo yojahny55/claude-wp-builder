@@ -35,7 +35,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 		wp_link_pages(
 			array(
-				'before' => '<div class="page-links mt-8">' . esc_html__( 'Pages:', '__starter__' ),
+				'before' => '<div class="page-links mt-8">' . esc_html( __starter___t( 'page_links' ) ),
 				'after'  => '</div>',
 			)
 		);
@@ -48,8 +48,8 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 			edit_post_link(
 				sprintf(
 					wp_kses(
-						/* translators: %s: Name of current post. Only visible to screen readers */
-						__( 'Edit <span class="screen-reader-text">%s</span>', '__starter__' ),
+						/* %s: Name of current post. Only visible to screen readers */
+						__starter___t( 'edit_post' ),
 						array(
 							'span' => array(
 								'class' => array(),

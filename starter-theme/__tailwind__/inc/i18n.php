@@ -321,6 +321,73 @@ function __starter___get_translations() {
             'es' => 'Prueba a buscar en los archivos mensuales. %1$s',
         ),
 
+        // Post, search and archive chrome (search.php, single.php,
+        // template-parts/content*.php, inc/template-tags.php): same reason
+        'search_results_for' => array(
+            'en' => 'Search Results for: %s',
+            'es' => 'Resultados de búsqueda de: %s',
+        ),
+        'post_nav_previous' => array(
+            'en' => 'Previous:',
+            'es' => 'Anterior:',
+        ),
+        'post_nav_next' => array(
+            'en' => 'Next:',
+            'es' => 'Siguiente:',
+        ),
+        'continue_reading' => array(
+            'en' => 'Continue reading<span class="screen-reader-text"> "%s"</span>',
+            'es' => 'Seguir leyendo<span class="screen-reader-text"> «%s»</span>',
+        ),
+        'page_links' => array(
+            'en' => 'Pages:',
+            'es' => 'Páginas:',
+        ),
+        'edit_post' => array(
+            'en' => 'Edit <span class="screen-reader-text">%s</span>',
+            'es' => 'Editar <span class="screen-reader-text">%s</span>',
+        ),
+        'posted_on' => array(
+            'en' => 'Posted on %s',
+            'es' => 'Publicado el %s',
+        ),
+        'posted_by' => array(
+            'en' => 'by %s',
+            'es' => 'por %s',
+        ),
+        'list_separator' => array(
+            'en' => ', ',
+            'es' => ', ',
+        ),
+        'posted_in' => array(
+            'en' => 'Posted in %1$s',
+            'es' => 'Publicado en %1$s',
+        ),
+        'tagged' => array(
+            'en' => 'Tagged %1$s',
+            'es' => 'Etiquetas: %1$s',
+        ),
+        'leave_comment' => array(
+            'en' => 'Leave a Comment<span class="screen-reader-text"> on %s</span>',
+            'es' => 'Deja un comentario<span class="screen-reader-text"> en %s</span>',
+        ),
+        'nothing_found' => array(
+            'en' => 'Nothing Found',
+            'es' => 'No se encontró nada',
+        ),
+        'first_post' => array(
+            'en' => 'Ready to publish your first post? <a href="%1$s">Get started here</a>.',
+            'es' => '¿Listo para publicar tu primera entrada? <a href="%1$s">Empieza aquí</a>.',
+        ),
+        'search_no_match' => array(
+            'en' => 'Sorry, but nothing matched your search terms. Please try again with some different keywords.',
+            'es' => 'Lo sentimos, nada coincide con tu búsqueda. Prueba de nuevo con otras palabras.',
+        ),
+        'nothing_here' => array(
+            'en' => 'It seems we can’t find what you’re looking for. Perhaps searching can help.',
+            'es' => 'Parece que no encontramos lo que buscas. Quizá una búsqueda te ayude.',
+        ),
+
         // Language switcher
         'lang_en' => array(
             'en' => 'English',
