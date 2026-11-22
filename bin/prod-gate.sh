@@ -44,7 +44,13 @@
 # Exit: the wrapped command's own exit code, or
 #   4 = the host is marked blocked; nothing was sent (stderr says why)
 #   5 = another command held the host longer than --wait; nothing was sent
-#   1 = usage error, or flock is unavailable (the gate refuses to run unserialized)
+#   1 = usage error
+# Where flock is missing (macOS) the lock is an atomic mkdir under the state dir, with the
+# holder's pid inside so a dead holder's lock is taken over.
+# The gate's 4 and 5 share the number space of the wrapped command: a wrapped command that
+# itself exits 4 or 5 (link-sweep's 4 is a block signal; a script of the caller's may use
+# either) is indistinguishable from the gate's own 4 or 5. Read stderr: the gate always
+# prints "BLOCKED:" or "busy for more than" before its 4 or 5, and sends nothing then.
 set -uo pipefail
 
 dir="${WP_AUDIT_GATE_DIR:-${TMPDIR:-/tmp}/wp-audit-gate}" delay=2 wait_max=300 mode=run force_prod=0
@@ -75,20 +81,10 @@ case "$wait_max" in ''|*[!0-9]*) echo "--wait must be an integer" >&2; exit 1 ;;
 . "$(dirname "$0")/lib/host-key.sh"
 host="$(host_key "$target")"
 [ -n "$host" ] || { echo "cannot read a host from: $target" >&2; exit 1; }
+# shellcheck source=lib/local-host.sh
+. "$(dirname "$0")/lib/local-host.sh"
 local_host=0
-case "$host" in
-  localhost|*.localhost|*.local|*.local.com|*.test|\[::1\]|0.0.0.0) local_host=1 ;;
-  # Private ranges apply to a dotted IPv4 address only, by octet: a prefix glob would also
-  # pass `10.example.com` or `172.160.0.1` through ungated.
-  *[!0-9.]*) ;;
-  *.*.*.*)
-    IFS=. read -r o1 o2 _ <<< "$host"
-    case "$o1" in
-      10|127) local_host=1 ;;
-      192) [ "$o2" = 168 ] && local_host=1 ;;
-      172) [ "${o2:-0}" -ge 16 ] && [ "${o2:-0}" -le 31 ] && local_host=1 ;;
-    esac ;;
-esac
+host_is_local "$host" && local_host=1
 
 [ "$force_prod" -eq 1 ] && local_host=0
 mkdir -p "$dir" || { echo "cannot create $dir" >&2; exit 1; }
@@ -114,12 +110,30 @@ esac
 # A development host keeps its old behaviour: no lock, no delay.
 if [ "$local_host" -eq 1 ]; then exec "$@"; fi
 
-command -v flock >/dev/null 2>&1 \
-  || { echo "prod-gate: flock is unavailable; refusing to send to a production host unserialized" >&2; exit 1; }
-exec 9>"$lock"
-if ! flock -w "$wait_max" 9; then
-  echo "prod-gate: $host busy for more than ${wait_max}s (another agent's command). Nothing sent; call again later." >&2
-  exit 5
+# Serialize with flock where it exists. macOS ships none, so there the lock is a directory:
+# mkdir is atomic. A holder that died leaves the directory behind, so a lock whose owner pid
+# (written inside it) is gone is taken over; the trap releases it on every normal exit.
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$lock"
+  if ! flock -w "$wait_max" 9; then
+    echo "prod-gate: $host busy for more than ${wait_max}s (another agent's command). Nothing sent; call again later." >&2
+    exit 5
+  fi
+else
+  lockd="$lock.d" waited=0
+  until mkdir "$lockd" 2>/dev/null; do
+    owner="$(cat "$lockd/pid" 2>/dev/null || true)"
+    if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
+      rm -rf "$lockd"; continue
+    fi
+    if [ "$waited" -ge "$wait_max" ]; then
+      echo "prod-gate: $host busy for more than ${wait_max}s (another agent's command). Nothing sent; call again later." >&2
+      exit 5
+    fi
+    sleep 1; waited=$((waited + 1))
+  done
+  printf '%s\n' "$$" > "$lockd/pid"
+  trap 'rm -rf "$lockd"' EXIT
 fi
 if [ -f "$blocked" ]; then
   echo "BLOCKED: $host -- $(cat "$blocked"). Nothing sent; report this check UNMEASURED." >&2

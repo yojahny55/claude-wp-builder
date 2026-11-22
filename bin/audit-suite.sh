@@ -125,23 +125,9 @@ case ",$engines," in *,chromium,*) : ;; *) echo "--engines must include chromium
 url_host="${url#*://}"; url_host="${url_host%%/*}"; url_host="${url_host%%\?*}"; url_host="${url_host%%#*}"; url_host="${url_host##*@}"
 url_host="$(printf '%s' "$url_host" | tr '[:upper:]' '[:lower:]')"
 pw_args=(--workers=1)
-case "$url_host" in
-  localhost|localhost:*|*.localhost|*.localhost:*|*.local|*.local:*|*.local.com|*.local.com:*|*.test|*.test:*|\[::1\]*|0.0.0.0|0.0.0.0:*) pw_args=() ;;
-  *)
-    # Private ranges apply to a dotted IPv4 address only, by octet, as in prod-gate.sh:
-    # a prefix glob would also give `10.example.com` the local parallelism.
-    ip="${url_host%%:*}"
-    case "$ip" in
-      *[!0-9.]*) ;;
-      *.*.*.*)
-        IFS=. read -r o1 o2 _ <<< "$ip"
-        case "$o1" in
-          10|127) pw_args=() ;;
-          192) [ "$o2" = 168 ] && pw_args=() ;;
-          172) [ "${o2:-0}" -ge 16 ] && [ "${o2:-0}" -le 31 ] && pw_args=() ;;
-        esac ;;
-    esac ;;
-esac
+# shellcheck source=lib/local-host.sh
+. "$(dirname "$0")/lib/local-host.sh"
+host_is_local "$url_host" && pw_args=()
 
 # A host is production when it is public (above) or when the manifest's `environments` says
 # role prod for it. Without that key the public-host rule is the whole criterion.
@@ -320,6 +306,11 @@ fi
 # override line at the end of the config makes it win in every spec that reads audit.baseURL.
 # The page list and site name are still written, as before.
 rm -f "$dir/results/unmeasured.json" "$dir/results/unmeasured-pages.json"
+# results/audit/*.json of an earlier run would be converted with this run's: a run over fewer
+# pages then reports the old ones too. Empty that one directory (guarded: never an empty path).
+if [ -n "$dir" ] && [ -d "$dir/results/audit" ]; then
+  find "$dir/results/audit" -mindepth 1 -maxdepth 1 -name '*.json' -delete
+fi
 export BASE_URL="$url"
 if ! BASE_URL="$url" PAGES="$pages" SITE="$site" node - "$dir/audit.config.js" <<'NODE'
 const fs = require('fs');
