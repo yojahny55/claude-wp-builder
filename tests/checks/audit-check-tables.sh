@@ -50,9 +50,19 @@ fi
 
 # A permalink is a prefix of its own paginated children, so a substring test reports
 # /page/ as listed because /page/2/ is. Sitemap membership is an exact <loc> comparison.
-if grep -n 'strpos(\\\$all, get_permalink' agents/wp-audit-rankmath.md >/dev/null 2>&1; then
-  fail "wp-audit-rankmath.md: sitemap membership must compare whole URLs, not substrings"
-fi
+sm_ref=skills/wp-audit-seo-standards/references/rankmath-sitemap-validation.md
+grep -qF 'Every `FAIL:` line it prints is a finding' agents/wp-audit-rankmath.md \
+  || fail "agents/wp-audit-rankmath.md Step 5.5 no longer says that every FAIL: line of the sitemap script is a finding"
+[ -f "$sm_ref" ] || fail "$sm_ref is missing"
+grep -qF 'references/rankmath-sitemap-validation.md' agents/wp-audit-rankmath.md \
+  || fail "wp-audit-rankmath.md: Step 5.5 does not point at $sm_ref"
+for f in agents/wp-audit-rankmath.md "$sm_ref"; do
+  if grep -n 'strpos(\\\$all, get_permalink' "$f" >/dev/null 2>&1; then
+    fail "$f: sitemap membership must compare whole URLs, not substrings"
+  fi
+done
+grep -qF 'untrailingslashit(html_entity_decode(\$loc))' "$sm_ref" \
+  || fail "$sm_ref: sitemap membership must be an exact <loc> comparison"
 
 # The head snapshot issues one request per post against the site itself; it must stay capped.
 grep -q 'posts_per_page.*\\\$limit' agents/wp-audit-seo.md \
@@ -67,6 +77,8 @@ fi
 # the index alone never fires, and the check reports a clean sitemap either way.
 grep -q "child sitemaps" agents/wp-audit-rankmath.md \
   || fail "wp-audit-rankmath.md: sitemap validation must follow the index into its child sitemaps"
+grep -q "child sitemaps" "$sm_ref" \
+  || fail "$sm_ref: the sitemap script must follow the index into its child sitemaps"
 
 # Head values must be parsed, not pattern-matched: a regex that assumes double quotes or
 # rel-before-href returns '' on valid markup, which reads as "no finding" and passes a

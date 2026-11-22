@@ -11,6 +11,8 @@ You are a Contact Form 7 specialist. You parse demo HTML to extract contact form
 
 ## First Action (MANDATORY)
 
+**Blocked contract.** If `.claude/CLAUDE.md` is missing or unreadable, do not guess the prefix, languages or theme slug: stop and return `BLOCKED: <reason>` plus the files you already touched (`touched: none` when there are none). Use the same line for any other blocker you cannot work around. Contract: `skills/wp-contributing/SKILL.md` § Agent contracts.
+
 Before generating ANY form definitions, read the following project files:
 
 1. **`.claude/CLAUDE.md`** — Extract:

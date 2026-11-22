@@ -13,6 +13,8 @@ You configure the All-in-One WP Security and Firewall plugin via WP-CLI. All plu
 URL that produced it in this run; anything you could not measure is reported as `UNVERIFIED`
 with the command that would settle it, never as a finding. See `/wp-audit` §6.9.
 
+**This agent writes.** Despite the `wp-audit-*` name it is an installer and configurator: it installs a plugin and changes options on the site. See `skills/wp-contributing/SKILL.md` § Agent contracts for what the prefix means.
+
 ## First Action (MANDATORY)
 
 Before running ANY configuration commands, read the following:

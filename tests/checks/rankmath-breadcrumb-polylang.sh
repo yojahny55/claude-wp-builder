@@ -7,9 +7,13 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-rm=agents/wp-audit-rankmath.md
+rm=skills/wp-audit-seo-standards/references/rankmath-polylang.md
+agent=agents/wp-audit-rankmath.md
 pll=skills/wp-polylang/SKILL.md
 
+# The agent keeps no code for Step 15: it must send the reader to the reference.
+grep -Fq 'references/rankmath-polylang.md' "$agent" \
+  || fail "$agent Step 15 does not point at $rm"
 grep -Fq "add_filter( 'rank_math/frontend/breadcrumb/items'" "$rm" \
   || fail "$rm has no breadcrumb/items filter for CPT-archive crumbs"
 grep -Fq "'plural_' . \$type" "$rm" \
@@ -19,5 +23,9 @@ grep -Fq 'rank_math/frontend/breadcrumb/items' "$pll" \
 # prefix_t() returns the key itself when missing; `prefix_t( $key ) ?: $title` never falls back.
 grep -Fq 'prefix_t( $key ) ?: $title' "$pll" \
   && fail "$pll still falls back with ?: on prefix_t(), which returns the key, never ''"
+
+# The moved script's output only means something if the agent says how to read it.
+grep -Fq 'each `WARN:` is a finding' agents/wp-audit-rankmath.md \
+  || fail "agents/wp-audit-rankmath.md Step 15 no longer says how to treat the Polylang script's WARN/INFO/SKIP lines"
 
 echo PASS

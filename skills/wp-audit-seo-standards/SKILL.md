@@ -28,6 +28,15 @@ the same section numbers they carry here:
   meta-description traps, the category-noindex gate, the sitemap failure modes and their
   validator, duplicate JSON-LD detection, and the length check. Read before reporting an SEO
   finding fixed, or when validating the sitemap or the schema.
+- [references/rankmath-sitemap-validation.md](references/rankmath-sitemap-validation.md) — the
+  `wp eval` script behind `wp-audit-rankmath` Step 5.5 (six mechanical sitemap checks).
+- [references/rankmath-schema-validation.md](references/rankmath-schema-validation.md) — the
+  `wp eval` script behind Step 8.5 (duplicate JSON-LD, duplicate description, BlogPosting and
+  LocalBusiness fields).
+- [references/rankmath-theme-breadcrumbs.md](references/rankmath-theme-breadcrumbs.md) — Step 12,
+  12a to 12d: the function, template call, CSS and Rank Math switch as the agent applies them.
+- [references/rankmath-polylang.md](references/rankmath-polylang.md) — Step 15 and 15b: the
+  Polylang verification script and the CPT-archive breadcrumb filter.
 - [references/woocommerce-seo.md](references/woocommerce-seo.md) — §18, the store-only checks
   SEO-064 to SEO-068. Read only when `site.commerce` is `woocommerce`.
 
@@ -216,6 +225,11 @@ writer, `wp-agentic-surfaces` Step 4, which confirms the owner's AI-crawler post
 ## 11. FAQ Detection Patterns
 
 FAQ content can appear in several forms. Detect and convert to JSON-LD schema automatically.
+
+Emit FAQ schema only on pages whose questions and answers are **visible in the rendered
+content** (Google's requirement). It serves assistants, AI answers and other search engines;
+since 2023 Google limits FAQ rich results to a few site types (authoritative government and
+health sites), so do not promise a rich result.
 
 ### Detection Sources
 

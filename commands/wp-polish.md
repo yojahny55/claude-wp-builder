@@ -86,7 +86,7 @@ exception is a recursive descent that does not honour the dot rule — `find dem
 '*.html'` walks into `demo/.prepolish/` and returns the backups — so anything switching to
 `find` must add `-not -path 'demo/.prepolish/*'` itself — and, on a demo folder
 `/wp-yolo` has already converted, `-not -path 'demo/.original/*'` alongside it, because
-Step 2.6 keeps its own backups there.
+`/wp-yolo` Step 2.6 keeps its own backups there.
 
 `demo/.prepolish/` is not `demo/.original/`: `/wp-yolo` Step 2.6 keeps the
 pre-**conversion** plain-CSS copy of each page in `demo/.original/<slug>.html`, while
@@ -135,7 +135,7 @@ For each confirmed section, wrap it with the standard comment delimiters:
 
 Rules:
 - **Include** `<header>` as `SECTION: Header` and `<footer>` as `SECTION: Footer` — the `/wp-header` and `/wp-footer` commands expect these delimiters.
-- **Skip** sections that already have correct delimiters (detected in Step 3.1).
+- **Skip** sections that already have correct delimiters (detected in Step 3, item 1).
 - **Preserve** all existing content within sections — do not rewrite or reorder HTML.
 - Place opening delimiter on the line immediately before the section's opening tag.
 - Place closing delimiter on the line immediately after the section's closing tag.

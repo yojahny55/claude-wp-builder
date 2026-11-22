@@ -42,7 +42,9 @@ cd "$(dirname "$0")/../.." || fail "cannot cd to the repository root"
 
 perf=$(bash tests/checks/lib/agent-text.sh wp-audit-performance)
 seo=agents/wp-audit-seo.md
-changelog=CHANGELOG.md
+# CHANGELOG.md plus the archive of releases before 1.30.0, newest first
+changelog=$(mktemp); trap 'rm -f "$changelog"' EXIT
+cat CHANGELOG.md docs/changelog-archive.md > "$changelog"
 
 for f in "$perf" "$seo" "$changelog"; do
   [ -f "$f" ] || fail "$f is missing"
