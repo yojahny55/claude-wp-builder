@@ -40,7 +40,9 @@ fail() { echo "FAIL: $1"; exit 1; }
 cd "$(dirname "$0")/../.." || fail "cannot cd to the repository root"
 
 agent=$(bash tests/checks/lib/agent-text.sh wp-audit-performance)
-changelog=CHANGELOG.md
+# CHANGELOG.md plus the archive of releases before 1.30.0, newest first
+changelog=$(mktemp); trap 'rm -f "$changelog"' EXIT
+cat CHANGELOG.md docs/changelog-archive.md > "$changelog"
 for f in "$agent" "$changelog"; do
   [ -s "$f" ] || fail "$f is missing or empty"
 done

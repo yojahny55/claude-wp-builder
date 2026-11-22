@@ -76,7 +76,7 @@ inside this `### CSS agent routing` block — everything from this heading down 
 heading at `###` or above is exempt, sub-headings and fenced examples included.
 
 Routing matters here because `--from-demo` reads `demo/index.html`, and on the `tailwind`
-path `/wp-yolo` Step 4 item 2 runs `/wp-cpt` *after* Step 2.6 has converted that file in
+path `/wp-yolo` Step 4 item 2 runs `/wp-cpt` *after* `/wp-yolo` Step 2.6 has converted that file in
 place. The markup this command reads is already Tailwind-native; building its CSS through
 `wp-css` would leak plain CSS straight into `front-page.php` via the teaser.
 

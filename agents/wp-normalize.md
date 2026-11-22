@@ -14,6 +14,11 @@ this agent, this is an LLM-reasoning task. The checkpoint that follows Phase 1 i
 safety net for that non-determinism, so you MUST record confidence and rationale for
 every non-obvious decision.
 
+**First Action exception.** This agent has no First Action block on purpose: it runs on an
+externally authored demo before `/wp-init` exists, so there is no `.claude/CLAUDE.md` to read
+(the one place it reads that file, below, applies only when the project already has one). If
+the demo folder is missing or has no HTML, return `BLOCKED: <reason>` with `touched: none`.
+
 ## Analysis Procedure
 
 Work through these steps, in order, for the demo folder you are given:
@@ -323,6 +328,9 @@ collide on a class name. Do this per section/page, in addition to everything abo
    Write `"cssRules": null` instead, and add one `review[]` entry recording that the
    tailwind path skipped CSS capture by design, so a reader does not mistake the null for a
    failed scan.
+
+   If `.claude/CLAUDE.md` or its `Template:` line is missing (this agent may run before the
+   project file exists), treat the project as not tailwind and capture `cssRules`.
 
    `backgrounds`, `fonts` and `computed` below are still captured on **both** paths. The
    font carry (`/wp-yolo` Step 4.5) and the demo-parity gate (`/wp-finalize` Layer 1) read

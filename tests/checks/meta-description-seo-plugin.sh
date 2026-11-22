@@ -2,7 +2,7 @@
 # The tailwind starter printed its own <meta name="description"> on the front page with no
 # early return for an SEO plugin, so a site running Rank Math (which /wp-create's plugin
 # profiles install) shipped two description tags. The detection already existed -- the
-# wp-agentic-surfaces agent's <prefix>_seo_plugin_owns_schema(), which identity JSON-LD
+# wp-agentic-surfaces agent's __prefix___seo_plugin_owns_schema(), which identity JSON-LD
 # returns on -- and wp-theme-standards taught a second, narrower one (two constants, no
 # SEOPress). There is now one guard: the starter defines it, the meta description returns on
 # it, and inc/agentic.php declares it only for a theme that lacks it (twice is a fatal).
@@ -10,7 +10,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-agent=agents/wp-agentic-surfaces.md
+agent=templates/agentic/agentic.php
 ref=skills/wp-theme-standards/references/head-and-performance.md
 guard_fn='__starter___seo_plugin_owns_schema'
 
@@ -40,7 +40,7 @@ body() { # <file> <function-name-regex>: the guard's return expression, whitespa
     | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//'
 }
 b_tw=$(body "$tw" "$guard_fn")
-b_ag=$(body "$agent" '<prefix>_seo_plugin_owns_schema')
+b_ag=$(body "$agent" '__prefix___seo_plugin_owns_schema')
 [ -n "$b_tw" ] && [ -n "$b_ag" ] || fail "could not read the guard's body from $tw or $agent -- this check would be vacuous"
 [ "$b_tw" = "$b_ag" ] || fail "the starter's $guard_fn() and $agent's detect different plugins:"$'\n'"  starter: $b_tw"$'\n'"  agent:   $b_ag"
 for p in RANK_MATH_VERSION WPSEO_VERSION SEOPRESS_VERSION; do
@@ -52,8 +52,8 @@ other=$(grep -rnE "defined\( *'(RANK_MATH|WPSEO|SEOPRESS)_VERSION' *\)" starter-
 [ -z "$other" ] || fail "a starter detects an SEO plugin outside $guard_fn():"$'\n'"$other"
 
 # --- the agent declares it only for a theme that lacks it ------------------------------
-grep -qF "if ( ! function_exists( '<prefix>_seo_plugin_owns_schema' ) ) {" "$agent" \
-  || fail "$agent declares <prefix>_seo_plugin_owns_schema() unguarded -- on a theme built from the tailwind starter, which defines it, that is a 'Cannot redeclare' fatal"
+grep -qF "if ( ! function_exists( '__prefix___seo_plugin_owns_schema' ) ) {" "$agent" \
+  || fail "$agent declares __prefix___seo_plugin_owns_schema() unguarded -- on a theme built from the tailwind starter, which defines it, that is a 'Cannot redeclare' fatal"
 
 # --- the skill teaches the same guard, not two constants --------------------------------
 grep -qF 'if (prefix_seo_plugin_owns_schema()) {' "$ref" \
