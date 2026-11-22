@@ -5,7 +5,7 @@
 # at no file nothing creates.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-fail() { echo "FAIL: $*"; exit 1; }
+. tests/lib/assert.sh
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 
 # --- SH-11: detect must not let npx install anything
