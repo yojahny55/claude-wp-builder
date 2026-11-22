@@ -1,6 +1,6 @@
 ---
 name: wp-init-run
-description: "The step detail of the /wp-init run, split out of commands/wp-init.md so the command stays a short map — the Demo-First Path (delimiter check, project details read from the demo, the colour and font injection with the craft token aliases and the /wp-tailwindify decision), the font carry, the i18n helper and field-suffix rewrite, the generated .claude/CLAUDE.md, and plugin install, theme activation, site identity and the Tailwind build. Use when /wp-init reaches a step that names one of these reference files, or when changing how a /wp-init step behaves. Not for the bilingual helpers themselves (wp-bilingual, wp-polylang) or the Tailwind token system (wp-tailwind-system)."
+description: "The step detail of the /wp-init run, split out of commands/wp-init.md so the command stays a short map — the Demo-First Path (delimiter check, project details read from the demo, the colour and font injection with the craft token aliases and the /wp-tailwindify decision), the font carry, the i18n helper and field-suffix rewrite, the nav menu registration, the generated .claude/CLAUDE.md, and plugin install, theme activation, site identity and the Tailwind build. Use when /wp-init reaches a step that names one of these reference files, or when changing how a /wp-init step behaves. Not for the bilingual helpers themselves (wp-bilingual, wp-polylang) or the Tailwind token system (wp-tailwind-system)."
 user-invocable: false
 ---
 
@@ -22,6 +22,7 @@ read it whole and follow it in order.
 | 0.4 | [references/flag-intake.md](references/flag-intake.md) | The flags `/wp-cinematic-init` hands off (`--path`, `--mode`, `--starter`, `--acf-flavor`, `--no-hybrid`), what each presets, and the no-redispatch rule |
 | 4.5 | [references/font-carry.md](references/font-carry.md) | Self-hosting every family the theme names, the Google Fonts fetch, `font-display: swap`, the one preload, the no-network fallback |
 | 5 | [references/i18n.md](references/i18n.md) | The Polylang variant of `inc/i18n.php`, `SUPPORTED_LANGS` and `DEFAULT_LANG`, the field-suffix rewrite |
+| 6 | [references/menus.md](references/menus.md) | Registering the nav locations per i18n strategy so they match `<prefix>nav_location()`, and the Polylang string registration |
 | 7 | [references/claude-md.md](references/claude-md.md) | The project `.claude/CLAUDE.md` template, its `## WP-CLI` and `## Demo` sections |
 | 9 | [references/activate.md](references/activate.md) | Custom fields and translation plugins, theme activation, `blogname` and `blogdescription`, the Tailwind build |
 

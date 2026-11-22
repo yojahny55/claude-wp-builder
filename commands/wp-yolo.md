@@ -201,7 +201,7 @@ pages as already Tailwind-native and skips them, while Step 4.5's font carry and
 build completes, reports success, and ships a theme with no carried fonts and no background
 parity.
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-yolo-run/references/normalize.md` now and follow it — it is this step, not background. It covers the `demo/.original/` refusal, the `wp-normalize` dispatch and the manifest it writes, demo mode, client research, domain classification, and the browser gate.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-yolo-run/references/normalize.md` now and follow it — it is this step, not background.
 
 ## Step 2.5: Phase 1.5 — Load & reconcile scope
 
@@ -231,7 +231,7 @@ its own — a craft demo carries a `:root` and BEM classes and so is plain-CSS e
 by every test in it — which is why the stop is here, before the walk. `/wp-init`
 Step D4 makes the same exception in the same terms; do not restate it a third way.
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-yolo-run/references/demo-conversion.md` now and follow it — it is this step, not background. It covers the in-place conversion and its backup, the per-page detection, converting a repeated card once, failure handling, and the `--careful` confirmation.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-yolo-run/references/demo-conversion.md` now and follow it — it is this step, not background.
 
 ## Step 3: Checkpoint (skipped under --yolo)
 
@@ -250,7 +250,7 @@ interruption — a crash, a closed terminal, one failing dispatch — threw all 
 because the only way to run this command again was from Step 2, which regenerates the
 manifest the build reads.
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-yolo-run/references/build-ledger.md` now and follow it — it is this step, not background. It covers the unit, what the ledger does not cover, the ledger file, a generated file someone else changed, entering with `--resume`, and verifying before skipping.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-yolo-run/references/build-ledger.md` now and follow it — it is this step, not background.
 
 ## Step 4: Phase 2 — Build (dependency order)
 
@@ -328,25 +328,17 @@ Drive the existing commands/agents in this exact order, reading everything from 
      same transcribe dispatch.
    - `kind: "cpt-teaser"` on an inner page → same skip rule as step 5 (owned by `/wp-cpt`).
 
-   > **Template routing.** Do not pass a template flag — `/wp-section` takes no such
-   > argument and inventing one would do nothing. `/wp-section` reads `Template:` from
-   > `.claude/CLAUDE.md` itself. What the template changes is which agent it dispatches
-   > and what you pass as `--css`: when `Template:` is `tailwind`, `/wp-section`
-   > dispatches `wp-tailwind` in author mode instead of `wp-css` (see its "CSS agent
-   > routing" table), and `--css` is the Step 2.6-converted demo page rather than the
-   > manifest's `cssRules`. When it is `basic` nothing changes.
+   > **Template routing.** As in step 5, no template flag; `/wp-section` reads `Template:` from `.claude/CLAUDE.md` itself. When `Template:` is `tailwind`, `/wp-section` dispatches `wp-tailwind` in author mode instead of `wp-css`, and `--css` is the Step 2.6-converted page.
 
    > **Pass the section's line range, never the whole page.** Every dispatch above hands
    > over a page path, and an agent given a path reads the file — a craft page is ~4,000
    > lines of which perhaps 7 to 34 are the section, because the build inlines about 3,360
    > lines of CSS ahead of the body. Three of four template agents on one build died with
-   > "Prompt is too long", one at the words *"Now I have everything needed."* — the run
-   > spent its whole context finding the markup and had none left to write with. The
+   > "Prompt is too long": they spent their whole context finding the markup. The
    > manifest already knows where each section begins and ends, so put the range in the
    > dispatch (`sed -n '<start>,<end>p' demo/<slug>.html`) and say that is the section. On
    > the `tailwind` path the agent has no reason to read the `<style>` block at all:
-   > `cssRules` is null there by contract and the classes come from the converted page. A
-   > re-dispatch carrying the range rescued all three of those agents, first time.
+   > `cssRules` is null there by contract and the classes come from the converted page.
 
    Under `--careful`, confirm with the user before building each inner page.
 7. **`cpt-archive` pages** — no WP Page is created for these (their archive URL is
@@ -446,16 +438,14 @@ Run, in order:
    - **exit 2** — no report exists yet, or no network: record it `UNMEASURED` and mark the
      run incomplete in Step 6, exactly as the completion rule requires below. An absent
      score is not a good score.
-     Do not add `--start` here: it makes is-agentic fetch the host, and an unattended
-     run has no operator to confirm the host is meant to be public. `/wp-audit --geo
-     --host <public-url>` passes it once the operator has.
+     Do not add `--start`: it makes is-agentic fetch the host, and an unattended run has no operator to confirm the host is public.
+     `/wp-audit --geo --host <public-url>` passes it once the operator has.
    - **exit 3** — `wordpress.url` is not publicly reachable, so the site cannot be scanned
      at that address at all. Record it `UNMEASURED — configuration` and mark the run
      incomplete. This is not the same as exit 2 and must not be reported as one: it has a
      fix, which is to re-run the scan against the public URL
      (`/wp-audit --geo --host <public-url>`). A build served from a `.local` host reaches
-     this every time, and reporting it as an ordinary skip is what let a whole category
-     stay unmeasured on project after project without anyone noticing.
+     this every time; reporting it as an ordinary skip leaves a whole category unmeasured.
    - **exit 4** — a report came back but is older than 24 h: record the score as
      `stale: scanned <date>` and mark the run incomplete; do not count it as the
      before/after of a fix. A `CHALLENGED` skip arrives as exit 2: record it

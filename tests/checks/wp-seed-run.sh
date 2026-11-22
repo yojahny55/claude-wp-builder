@@ -46,9 +46,9 @@ done
 awk '/^$/ { n = 0; next } /skills\/wp-seed-run\/references\// { if (++n > 1) bad = 1 }
   END { exit bad }' "$cmd" || err "$cmd names two wp-seed-run references in one paragraph"
 
-# The command stays a map. Step 0, Phases 1.5, 2, 4.5, 6.5 and the Seed Report stay whole,
+# The command stays a map. Step 0, Phases 1.5, 2, 4.5 and the Seed Report stay whole,
 # because they are the gates and the resolve-before-create rule the run needs in view from the
-# start. The command is 18 KB after the split; the 20 KB ceiling leaves room for a sentence or
+# start; Phase 6.5 keeps its trigger and sends the rest to its reference. The command is about 17 KB after the split; the 20 KB ceiling leaves room for a sentence or
 # two per phase, and a step that needs more goes to its reference file instead.
 size=$(wc -c < "$cmd")
 [ "$size" -le 20480 ] || err "$cmd is $size bytes; move long step detail to $refs"

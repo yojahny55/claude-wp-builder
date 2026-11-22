@@ -1,6 +1,6 @@
 ---
 name: wp-seed-run
-description: "The step detail of the /wp-seed run, split out of commands/wp-seed.md so the command stays a short map — parsing the demo HTML, importing media by source identity, seeding the primary-language ACF fields with the three-way compare, the bilingual content for Polylang and the field-suffix strategy, the menus and their locations, and the final setup (rewrite flush, default-content cleanup, timezone, comments, author sweep). Use when /wp-seed reaches a phase that names one of these reference files, or when changing how a /wp-seed phase behaves. Not for the WP-CLI persistence rules (wp-cli-patterns) or the bilingual helpers themselves (wp-bilingual, wp-polylang)."
+description: "The step detail of the /wp-seed run, split out of commands/wp-seed.md so the command stays a short map — parsing the demo HTML, importing media by source identity, seeding the primary-language ACF fields with the three-way compare, the bilingual content for Polylang and the field-suffix strategy, the menus and their locations, the placeholder pages for `page_link` options fields, and the final setup (rewrite flush, default-content cleanup, timezone, comments, author sweep). Use when /wp-seed reaches a phase that names one of these reference files, or when changing how a /wp-seed phase behaves. Not for the WP-CLI persistence rules (wp-cli-patterns) or the bilingual helpers themselves (wp-bilingual, wp-polylang)."
 user-invocable: false
 ---
 
@@ -23,6 +23,7 @@ read it whole and follow it in order.
 | 4 | [references/acf-fields.md](references/acf-fields.md) | Field ownership, the three-way compare, `update_field()` via `wp eval`, the `wp_options` alternative, verification |
 | 5 | [references/bilingual.md](references/bilingual.md) | The Polylang and field-suffix variants of the secondary-language content |
 | 6 | [references/menus.md](references/menus.md) | The location table per `i18n strategy`, menu structures and items, location assignment, verification |
+| 6.5 | [references/placeholder-pages.md](references/placeholder-pages.md) | Placeholder pages for empty `page_link` options fields, their markers, the re-run rule, the template guard |
 | 7 | [references/final-setup.md](references/final-setup.md) | Rewrite flush, default-content cleanup, timezone, comments, the author sweep |
 
 ## Changing a phase
