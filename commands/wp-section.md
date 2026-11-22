@@ -1,7 +1,7 @@
 ---
 description: One-shot section builder — generates ACF fields + template part + CSS for a section from the demo
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
-argument-hint: "<section-name> | --list [--page <slug>] [screenshot-path] [--cf7] [--hybrid] [--no-hybrid] [--defer-promotion] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>] [--force-adopted]"
+argument-hint: "<section-name> | --list [--page <slug>] [screenshot-path] [--cf7] [--hybrid] [--no-hybrid] [--defer-promotion] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>] [--no-blog-page] [--force-adopted]"
 ---
 
 # WP Section — One-Shot Section Builder
@@ -10,9 +10,8 @@ Generate ACF field definitions, a template part, and CSS for a single section �
 
 ## List mode (`--list`)
 
-If `$ARGUMENTS` contains `--list`, build nothing: print the sections the demo declares and stop,
-before the adopted-site guard and every later step. This mode writes nothing, so it needs no
-manifest, no theme and no section name.
+If `$ARGUMENTS` contains `--list`, build nothing; stop before the adopted-site guard and every
+later step. It only prints the demo's sections: no manifest, theme or name needed.
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-section-run/references/list-mode.md` now and follow it.
 
@@ -46,14 +45,15 @@ Parse `$ARGUMENTS`:
   - `basic` → the section's **verbatim** demo CSS, and the SOURCE OF TRUTH for the transcription: an inline CSS blob or a path to a CSS file, whose declared values are copied exactly.
   - `tailwind` → the converted demo page itself (HTML, converted in place by `/wp-yolo` Step 2.6), and the SOURCE OF TRUTH for the transcription exactly as the CSS blob is on `basic`. No raw declarations survive in it to copy — the conversion turned every one into a utility class — so "copy its exact declared values" reads here as **copy its exact utility classes and its exact element structure**. That is not a licence to substitute an equivalent utility, to collapse two elements into one, or to drop a breakpoint variant.
 
+- **`--no-blog-page` flag** = skip Step 6.7 (`/wp-page blog` after a blog section)
 - **`--defer-promotion` flag** = `tailwind` only. Skip the `wp-tailwind` author-mode dispatch entirely: `wp-template` writes the section with inline utilities and the command returns without an `@apply` promotion. Report the section as built with promotion deferred. Set by `/wp-yolo` on the section walk, where the ladder's "3+ times, or on 2+ distinct pages" test cannot be answered yet because the rest of the theme does not exist; `/wp-yolo` Step 4.4 then runs one promotion pass over every template part the walk produced. Ignored on `basic`, which has no promotion step. Never set it by hand for a one-off section — a section added to a finished theme has the whole theme to grep, and deferring would leave its utilities unpromoted with no later pass to catch them.
 
 > **Note:** `/wp-yolo` sets `--transcribe --block <block> --css <css-source>` on every `/wp-section` dispatch, plus `--defer-promotion` on the `tailwind` path (see `commands/wp-yolo.md` Steps 4 and 4.4). When invoked by hand without these flags, `/wp-section` keeps its original design-system authoring behavior.
 
-If no section name is provided (and `--list` is absent; see List mode above), print an error:
+If no section name is provided and `--list` is absent, print an error:
 ```
 Error: Section name is required.
-Usage: /wp-section <section-name> [screenshot-path] [--cf7] [--hybrid] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>]
+Usage: /wp-section <section-name> [screenshot-path] [--cf7] [--hybrid] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>] [--no-blog-page]
 Example: /wp-section hero
          /wp-section --list
          /wp-section services /path/to/screenshot.png
@@ -204,6 +204,12 @@ Silent no-op on a non-Tailwind theme; skips itself when the user has `npm run pr
 running (the watcher already owns `dist/`). Do this before the summary — a summary that
 lists files no browser can see yet is not a finished section.
 
+## Step 6.7: Blog templates
+
+Applies only when the section slug is `blog`, `journal`, `news` or `posts`.
+
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-section-run/references/blog-templates.md` now and follow it.
+
 ## Motion attribute assertion (craft mode only)
 
 When `.wp-create.json` records `"demo mode": "craft"`, after writing the template
@@ -229,6 +235,7 @@ Files created/updated:
   - assets/css/styles.css (<Name> section CSS)                       [basic only]
   - components/<page-slug>.css or utilities/site.css (only if a rule was needed) [tailwind only]
   - <page-template>.php (added get_template_part call)
+  - Blog templates: built by /wp-page blog | skipped (<reason>) [blog sections, Step 6.7]
 
 Fields registered:
   - <list of field names>
