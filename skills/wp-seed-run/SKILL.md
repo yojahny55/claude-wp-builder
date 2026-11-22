@@ -1,6 +1,6 @@
 ---
 name: wp-seed-run
-description: "The step detail of the /wp-seed run, split out of commands/wp-seed.md so the command stays a short map — parsing the demo HTML, importing media by source identity, seeding the primary-language ACF fields with the three-way compare, the bilingual content for Polylang and the field-suffix strategy, the menus and their locations, the placeholder pages for `page_link` options fields, and the final setup (rewrite flush, default-content cleanup, timezone, comments, author sweep). Use when /wp-seed reaches a phase that names one of these reference files, or when changing how a /wp-seed phase behaves. Not for the WP-CLI persistence rules (wp-cli-patterns) or the bilingual helpers themselves (wp-bilingual, wp-polylang)."
+description: "Step detail of the /wp-seed run, split out of the command. Use when /wp-seed reaches a step that names one of these reference files, or when changing how a /wp-seed step behaves."
 user-invocable: false
 ---
 

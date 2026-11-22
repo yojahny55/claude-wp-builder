@@ -1,6 +1,6 @@
 ---
 name: wp-tailwindify-run
-description: "The step detail of the /wp-tailwindify run, split out of commands/wp-tailwindify.md so the command stays a short map — Step 3 (the context handed to the wp-tailwind conversion agent and the temporary-path write contract) and Step 4 (verifying the converted file, the rendering parity gate and the checked move). Use when /wp-tailwindify reaches a step that names one of these reference files, or when changing how a /wp-tailwindify step behaves. Not for argument parsing, the already-Tailwind check or the next-steps report (they stay in the command), nor for the Tailwind rules themselves (wp-tailwind-system)."
+description: "Step detail of the /wp-tailwindify run, split out of the command. Use when /wp-tailwindify reaches a step that names one of these reference files, or when changing how a /wp-tailwindify step behaves."
 user-invocable: false
 ---
 

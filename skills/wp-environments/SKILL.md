@@ -1,6 +1,6 @@
 ---
 name: wp-environments
-description: Detects the local tooling with the bundled wp-env-setup.sh, reads the .wp-create.json manifest through wp-config.mjs (environment.type and environment.engine, the wp_cli.wrapper every WP-CLI call runs through, the database password kept in .wp-create.local.json), fills the placeholders in the native and Docker .tpl templates, and resolves port and PHP-version conflicts for a local WordPress site on native, docker-compose, DDEV, Lando or wp-env. Use when /wp-create or /wp-adopt sets up a local WordPress site, when choosing or reading the WP-CLI wrapper for one, when a WordPress docker compose or wp-env port is already taken, or when listing or installing PHP versions for a local WordPress site. Not for deploying to a server, or for containerizing an app that is not WordPress.
+description: Detects local tooling with wp-env-setup.sh, reads the .wp-create.json manifest through wp-config.mjs (wp_cli.wrapper), fills templates, and resolves port and PHP conflicts for a local WordPress site (native, docker-compose, DDEV, Lando, wp-env). Use when /wp-create or /wp-adopt sets up a local site, or a compose or wp-env port is taken. Not for deploying to a server.
 user-invocable: false
 ---
 

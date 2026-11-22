@@ -1,6 +1,6 @@
 ---
 name: wp-research
-description: Method for researching a client's business and its comparable local competitors from the open web — confirming the client's identity by two independent signals, choosing 3-5 competitors, reading their sites for hero, proof, CTA and positioning, writing a differentiation line, and picking a source rung (WebSearch and WebFetch, Firecrawl, or DataForSEO) under a fixed fetch cap. Its output is demo/RESEARCH.md and the research key in .wp-create.json. Use when the wp-research agent runs, or when asked to research a client's business or competitors before a /wp-demo or /wp-yolo build. Not for extracting design tokens from a site (wp-demo-craft), keyword or backlink data (seo-dataforseo), or auditing a built site's SEO.
+description: Researches a client's business and 3-5 local competitors from the open web; output is demo/RESEARCH.md and the research key in .wp-create.json. Use when the wp-research agent runs, or when asked to research a client or competitors before /wp-demo or /wp-yolo. Not for extracting design tokens (wp-demo-craft), keyword data (seo-dataforseo), or auditing a built site.
 user-invocable: false
 ---
 

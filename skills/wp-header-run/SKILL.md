@@ -1,6 +1,6 @@
 ---
 name: wp-header-run
-description: "The step detail of the /wp-header run, split out of commands/wp-header.md so the command stays a short map — Step 4's wp-template prompt (header.php, the nav walker, the language switcher rule, class naming per template) and the CSS agent routing with the wp-tailwind author-mode prompt and file ownership. Use when /wp-header reaches a step that names one of these reference files, or when changing how a /wp-header step behaves. Not for the agents' own contracts (agents/wp-template.md, wp-css.md, wp-tailwind.md) or the Tailwind token system (wp-tailwind-system)."
+description: "Step detail of the /wp-header run, split out of the command. Use when /wp-header reaches a step that names one of these reference files, or when changing how a /wp-header step behaves."
 user-invocable: false
 ---
 

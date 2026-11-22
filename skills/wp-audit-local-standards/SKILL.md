@@ -1,6 +1,6 @@
 ---
 name: wp-audit-local-standards
-description: Criteria for the local-SEO audit checks SEO-055 to SEO-063 — the two-signal applicability gate, brick-and-mortar, service-area and hybrid business types, LocalBusiness subtype by vertical (LegalService, MedicalClinic, Plumber, AutoDealer), NAP consistency across the rendered JSON-LD, Rank Math and the options page with phone and address normalization, geo precision, sameAs citation signals, aggregateRating spam, and doorway-page location sampling. Use when auditing a business with a street address or a service area, or when an SEO-055 to SEO-063 finding needs explaining, for example SEO-057 saying the phone differs between the footer and the schema. Not for configuring Rank Math's local module or seeding the business address (wp-audit-seo-standards), and not for generic SEO or WooCommerce checks.
+description: Criteria for local-SEO checks SEO-055 to SEO-063 — applicability gate, LocalBusiness subtype, NAP consistency, sameAs, doorway pages. Use when auditing a business with a street address or service area, or explaining an SEO-055 to SEO-063 finding. Not for configuring Rank Math local or seeding the address (wp-audit-seo-standards).
 user-invocable: false
 ---
 

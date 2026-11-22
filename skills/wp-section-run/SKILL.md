@@ -1,6 +1,6 @@
 ---
 name: wp-section-run
-description: "The step detail of the /wp-section run, split out of commands/wp-section.md so the command stays a short map — the --hybrid overlay of Step 2, Step 5's agent dispatch: the field naming convention, GEO citability, the --transcribe overlay, CSS agent routing and file ownership, the three-agent dispatch for an ordinary section, the two-phase dispatch for a contact section, and the contact summary of Step 7. Use when /wp-section reaches a step that names one of these reference files, or when changing how a /wp-section step behaves. Not for the agents' own contracts (agents/wp-acf.md, wp-template.md, wp-css.md, wp-tailwind.md, wp-cf7.md) or the Tailwind token system (wp-tailwind-system)."
+description: "Step detail of the /wp-section run, split out of the command. Use when /wp-section reaches a step that names one of these reference files, or when changing how a /wp-section step behaves."
 user-invocable: false
 ---
 

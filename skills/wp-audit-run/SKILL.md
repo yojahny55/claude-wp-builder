@@ -1,6 +1,6 @@
 ---
 name: wp-audit-run
-description: "The step detail of the /wp-audit run, split out of commands/wp-audit.md so the command stays a short map — site type and local clone, manifest reconciliation, page scope, the agent dispatch prompt, the browser suite, measured findings and verified fixes, the finding ledger, the status vocabulary, the dated deliverable, the fix phase and the manifest update. Use when /wp-audit reaches a step that names one of these reference files, or when changing how a /wp-audit step behaves. Not for the agents' shared audit contract (wp-audit-standards)."
+description: "Step detail of the /wp-audit run, split out of the command. Use when /wp-audit reaches a step that names one of these reference files, or when changing how a /wp-audit step behaves."
 user-invocable: false
 ---
 

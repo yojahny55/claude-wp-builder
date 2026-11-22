@@ -1,6 +1,6 @@
 ---
 name: wp-responsive
-description: Defines the mobile-first responsive rules for plain-CSS demo pages — the 576/768/1024/1200/1440 min-width breakpoint scale, container widths, the hamburger-to-horizontal header with an accessible mobile menu, grid and flex stacking, clamp() type, responsive images with a never-lazy hero, 24x24 touch targets, reduced motion and no horizontal scroll. Use when writing or fixing a section's breakpoints, a mobile menu, a hero's fluid type, image srcset or a too-small tap target in a /wp-demo page, or an image or touch target in a theme template. Not for a Tailwind theme's breakpoints (wp-tailwind-system), a screenshot walk of a site (/wp-demo-verify), or a cinematic site's mobile fallback (adaptive-mobile-strategy).
+description: Mobile-first responsive rules for plain-CSS demo pages — the 576/768/1024/1200/1440 scale, mobile menu, clamp() type, images, 24x24 touch targets. Use when writing or fixing breakpoints, a mobile menu, fluid hero type, srcset or a small tap target in a /wp-demo page or theme template. Not for a Tailwind theme's breakpoints (wp-tailwind-system) or a screenshot walk (/wp-demo-verify).
 user-invocable: false
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: wp-manifest-gate
-description: The single source for what a command does with each exit code of wp-config.mjs validate, and the named policy that decides what exit 3 (no manifest) means for each command — stop, adopt-or-stop, adopt-or-bare-wp, bare-wp-fallback, scaffold or register. Use when writing or changing the manifest-validation prologue of a command, deciding what a command does on a site with no .wp-create.json, or checking that the commands agree.
+description: The single source for what a command does with each exit code of wp-config.mjs validate, and the named policy for exit 3 (no manifest) — stop, adopt-or-stop, adopt-or-bare-wp, bare-wp-fallback, scaffold or register. Use when writing a command's manifest-validation prologue, or deciding what a command does on a site with no .wp-create.json.
 user-invocable: false
 ---
 

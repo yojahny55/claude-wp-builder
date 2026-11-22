@@ -1,6 +1,6 @@
 ---
 name: wp-woocommerce
-description: WooCommerce store practice for sites this plugin builds — the catalog, store and full tiers recorded as store.tier in .wp-create.json and the plugins each installs (and the ones deliberately avoided, with reasons), store-kit's catalog mode and Stripe keys kept as constants in wp-config.php, Stripe test mode, the HPOS, block-checkout and card-testing defaults a WP-CLI install gets wrong, and the woo-setup.php script /wp-woo-setup runs to bring a store in line with the store block. Use when creating, configuring or auditing a WooCommerce store, choosing a store tier or a store plugin, turning on catalog mode, or asking why Stripe keys live in wp-config.php. Not for translating products (wp-polylang), or a product post type for a client who will never sell online (/wp-cpt).
+description: WooCommerce store practice for sites this plugin builds — store.tier (catalog, store, full), store-kit catalog mode, Stripe keys in wp-config.php, woo-setup.php behind /wp-woo-setup. Use when creating, configuring or auditing a WooCommerce store, choosing a tier, or enabling catalog mode. Not for translating products (wp-polylang) or a /wp-cpt product post type.
 user-invocable: false
 ---
 

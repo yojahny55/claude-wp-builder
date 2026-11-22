@@ -1,6 +1,6 @@
 ---
 name: wp-audit-ux-standards
-description: The UX-NNN usability catalog for a WordPress site — forms and data entry, navigation and task flow, broken internal and external links, hover and active states, line length per breakpoint, logo and typography consistency — with the page-level and site-level split, the applicability rules that decide which criteria are N/A and keep the score honest, the owner each fix belongs to, and the standard a visual fix must meet. Use when running /wp-audit --usability, explaining or fixing a UX-NNN finding such as UX-014 on page:/contact/, deciding whether a usability criterion is N/A on a brochure site or a catalog store, or scoring usability. Not for contrast, ARIA, focus or target size (wp-audit-a11y), Core Web Vitals or Lighthouse (wp-audit-performance), or titles and schema (wp-audit-seo-standards).
+description: The UX-NNN usability catalog — forms, navigation, links, hover states, line length, N/A rules. Use when running /wp-audit --usability, explaining or fixing a UX-NNN finding such as UX-014, or scoring usability. Not for contrast, ARIA, focus or target size (wp-audit-a11y), Core Web Vitals (wp-audit-performance), or titles and schema (wp-audit-seo-standards).
 user-invocable: false
 ---
 

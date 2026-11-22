@@ -1,6 +1,6 @@
 ---
 name: wp-yolo-run
-description: "The step detail of the /wp-yolo run, split out of commands/wp-yolo.md so the command stays a short map — the normalize dispatch and its refusals, the Tailwind demo conversion, the checkpoint, the build ledger and --resume, the @apply promotion pass, the font and behaviour carries, and the demo-parity gate. Use when /wp-yolo reaches a step that names one of these reference files, or when changing how a /wp-yolo step behaves. Not for the builders /wp-yolo dispatches, which own their own steps."
+description: "Step detail of the /wp-yolo run, split out of the command. Use when /wp-yolo reaches a step that names one of these reference files, or when changing how a /wp-yolo step behaves."
 user-invocable: false
 ---
 

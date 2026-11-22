@@ -1,6 +1,6 @@
 ---
 name: wp-contributing
-description: Documents how to change the claude-wp-builder plugin itself — the four-layer architecture (commands, agents, skills, starter-theme) and what may call what, why checks in tests/checks/ are grep gates over prose, the frontmatter contract per layer, the two i18n systems, opening a PR, and what a release rests on. Use when editing this repository's own commands/, agents/, skills/, starter-theme/, bin/ or tests/, when writing a check, opening a PR, cutting a release or editing CHANGELOG.md, BACKLOG.md or the .claude-plugin/ version files, or when running /wp-contribute. Not for building a WordPress site with the plugin, or for testing some other WordPress plugin.
+description: Documents how to change the claude-wp-builder plugin itself — layers, checks in tests/checks/, PRs, releases. Use when editing this repository's commands/, agents/, skills/, starter-theme/, bin/ or tests/, writing a check, cutting a release, editing CHANGELOG.md, or running /wp-contribute. Not for building a WordPress site with the plugin.
 user-invocable: false
 ---
 

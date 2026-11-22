@@ -1,6 +1,6 @@
 ---
 name: wp-aos-animator
-description: Installs AOS (Animate On Scroll) into a plain-mode WordPress theme and adds data-aos entrance animations across its templates — the library under assets/vendor/aos/, the functions.php enqueue, the init module, and the attributes in front-page.php and template-parts/. Reads demo mode and the Template line first and stops on a craft or cinematic theme, which already run GSAP and data-motion. Use when the user asks to add scroll, fade-in or entrance animations, install AOS or put data-aos attributes on a plain theme's sections, or fix AOS elements that never appear or a dropdown painted behind cards after its entrance. Run through /wp-aos-animator. Not for GSAP, ScrollTrigger or data-motion work (wp-demo-craft).
+description: Installs AOS and adds data-aos entrance animations to a plain-mode WordPress theme; stops on craft or cinematic themes. Use when asked to add scroll, fade-in or entrance animations, install AOS, or fix AOS elements that never appear. Run through /wp-aos-animator. Not for GSAP or data-motion work (wp-demo-craft).
 user-invocable: false
 ---
 

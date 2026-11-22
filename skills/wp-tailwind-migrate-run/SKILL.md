@@ -1,6 +1,6 @@
 ---
 name: wp-tailwind-migrate-run
-description: "The step detail of the /wp-tailwind-migrate run, split out of commands/wp-tailwind-migrate.md so the command stays a short map — Step 0 (the visual golden capture), Step 4 (the parallel wp-tailwind author-mode dispatch and the prompt every agent receives) and Step 6 (the convention check, the after-shots and the before/after comparison against the golden). Use when /wp-tailwind-migrate reaches a step that names one of these reference files, or when changing how a /wp-tailwind-migrate step behaves. Not for the baseline gate or the Tailwind v4 check (they stay in the command), nor for the decision ladder (wp-tailwind-system)."
+description: "Step detail of the /wp-tailwind-migrate run, split out of the command. Use when /wp-tailwind-migrate reaches a step that names one of these reference files, or when changing how a /wp-tailwind-migrate step behaves."
 user-invocable: false
 ---
 

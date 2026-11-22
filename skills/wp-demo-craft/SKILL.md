@@ -1,6 +1,6 @@
 ---
 name: wp-demo-craft
-description: Defines the craft-mode design floor for client demos — demo/DESIGN.md tokens, demo/BRIEF.md with its feeling curve and one peak, the composition library and its role table, the data-motion device budget, the aesthetic family and its Avoid list, the signature move, the fingerprint gate against earlier builds, generated image plates, and the seven-line verify rubric with its static-page and dead-scroll findings. Use when a project records demo mode craft and a demo is built, rebuilt, audited or verified with /wp-demo, /wp-yolo, /wp-cinematic-demo, /wp-demo-verify or /wp-polish --craft. Not for plain-mode demos (wp-demo), AOS scroll animation (wp-aos-animator), or ACF fields and template parts (/wp-section).
+description: Craft-mode design floor for client demos — demo/DESIGN.md tokens, demo/BRIEF.md, composition library, data-motion budget, aesthetic family and Avoid list, fingerprint gate. Use when a project records demo mode craft and a demo is built or verified with /wp-demo, /wp-yolo, /wp-cinematic-demo, /wp-demo-verify or /wp-polish --craft. Not for plain-mode demos (wp-demo) or AOS animation (wp-aos-animator).
 user-invocable: false
 ---
 

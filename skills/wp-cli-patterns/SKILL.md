@@ -1,6 +1,6 @@
 ---
 name: wp-cli-patterns
-description: WP-CLI-first rules for seeding and diagnosing a WordPress site — run WP-CLI instead of generating PHP, the $WP wrapper from .wp-create.json, re-runnable seed scripts in inc/seed/ with ownership markers, ACF field seeding, matching records by slug, always setting post_author, guarding a clone against outbound mail, and shipped scripts that find leftover dev-host rows, orphaned ACF post IDs, broken menu links, missing media files, redeclared functions and internal link targets. Use when seeding pages, fields, menus or media, writing a seed script, checking a site for those defects before a deploy, or running one of those scripts. Not for choosing a local environment (wp-environments) or translating with Polylang (wp-polylang).
+description: WP-CLI-first rules for seeding and diagnosing a WordPress site — the $WP wrapper from .wp-create.json, re-runnable seed scripts, and scripts that find dev-host rows, orphaned ACF IDs and broken menu links. Use when seeding pages, fields, menus or media, or checking a site for those defects before a deploy. Not for local environments (wp-environments) or Polylang (wp-polylang).
 user-invocable: false
 ---
 

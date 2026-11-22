@@ -1,6 +1,6 @@
 ---
 name: wp-theme-standards
-description: Sets the standards for a classic (non-block) WordPress theme built from this plugin's starters — the layout read from the recorded template, one enqueue callback with filemtime cache busting, escaping (esc_html, wp_kses with an allowlist, never the_field), the unfiltered_html gate on SVG uploads, the SCF/ACF Local JSON field model in acf-json/, image delivery in inc/performance.php, self-hosted fonts and the LCP preload, and the .nav__toggle and .nav__link class contract shared by the walker and the header CSS. Use when writing or reviewing a theme's functions.php, inc/*.php or templates (enqueueing, escaping a headline that carries markup, theme supports, SVG uploads, image delivery, a stale stylesheet that will not update), or the nav classes in header CSS. Not for a site audit (wp-audit-standards) or Tailwind CSS (wp-tailwind-system).
+description: Standards for a classic WordPress theme built from this plugin's starters — enqueue, escaping, SVG uploads, SCF/ACF Local JSON, image delivery, fonts, the .nav__toggle and .nav__link contract. Use when writing or reviewing functions.php, inc/*.php or templates, a stale stylesheet, or nav classes. Not for a site audit (wp-audit-standards) or Tailwind CSS (wp-tailwind-system).
 user-invocable: false
 ---
 

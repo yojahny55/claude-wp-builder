@@ -1,6 +1,6 @@
 ---
 name: wp-page-run
-description: "The step detail of the /wp-page run, split out of commands/wp-page.md so the command stays a short map — the per-type dispatch for the blog, legal, 404, search and embed page types (template, ACF fields and CSS agent prompts). Use when /wp-page reaches a type that names one of these reference files, or when changing how a /wp-page type behaves. Not for the argument parse, the CSS agent routing, the tailwind prompt body or the generic and custom types (they stay in the command), nor for the agents' own contracts (agents/wp-template.md, wp-acf.md, wp-css.md, wp-tailwind.md)."
+description: "Step detail of the /wp-page run, split out of the command. Use when /wp-page reaches a step that names one of these reference files, or when changing how a /wp-page step behaves."
 user-invocable: false
 ---
 

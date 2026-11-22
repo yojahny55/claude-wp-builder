@@ -1,6 +1,6 @@
 ---
 name: wp-demo-verify-run
-description: "The step detail of the /wp-demo-verify run, split out of commands/wp-demo-verify.md so the command stays a short map — Step 2a (the impeccable detector and its gate), Step 2b (the scroll walk, Firefox pass, --no-motion, fractional widths and the exit-code 2 fallback) and Step 3 (reading every finding kind). Use when /wp-demo-verify reaches a step that names one of these reference files, or when changing how a /wp-demo-verify step behaves. Not for target resolution, the inert-control grade, the sheet critique or the report (they stay in the command), nor for building a demo (wp-demo-run)."
+description: "Step detail of the /wp-demo-verify run, split out of the command. Use when /wp-demo-verify reaches a step that names one of these reference files, or when changing how a /wp-demo-verify step behaves."
 user-invocable: false
 ---
 
