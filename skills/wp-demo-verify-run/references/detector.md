@@ -3,10 +3,16 @@
 `commands/wp-demo-verify.md` sends the run here at Step 2a. Follow it in order; nothing in it is optional background.
 
 `impeccable` is an external package this repo does not install, vendor or
-configure — it is fetched from the npm registry at run time via `npx`. Pin the
-major version (`@4`; `@1` does not exist on the registry) so a future major
-release cannot silently change rule identifiers or output shape underneath
-this gate.
+configure — it is fetched from the npm registry at run time via `npx`, as
+`impeccable@latest`: it follows the newest release on purpose, so new rules are
+answered rather than frozen out. The price is that a release can change rule
+identifiers or the output shape, so anything this step does not recognise is a
+detector that could not run, never a clean scan: a top level that is not an
+array of findings, a finding that is not an object or lacks `antipattern` or
+`file`, a `category` other than `slop`/`quality`, a `severity` other than
+`warning`/`advisory`, or an exit code that disagrees with the payload (`2`
+without a `warning` finding, `0` with one). `bin/composition-gate.sh` enforces
+the same rule for the composition library.
 
 The exit code says whether the scan ran, not how many findings it made: `0`
 is a clean or advisory-only scan, `1` means a requested target could not be

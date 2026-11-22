@@ -21,7 +21,7 @@ is a demo with several palettes.
    name, **or `research.site` from `demo/RESEARCH.md` when `confidence` is
    `confirmed`** — then on each reference URL the docs name. Pinned to the major
    version so a future major cannot change the flags or the output shape
-   underneath this step, exactly as `impeccable@4` is pinned in `verify.md`. Take
+   underneath this step. Take
    what the site declares. A site built on inline styles yields thin tokens;
    that is expected, and thin real tokens still beat invented ones.
 3. **The catalogue.** Open `references/design-md/INDEX.md` — real brands, one

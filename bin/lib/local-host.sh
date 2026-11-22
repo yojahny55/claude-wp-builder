@@ -12,7 +12,9 @@
 #     or private. A name that does not resolve, or resolves to anything public, is NOT
 #     local: the safe side, because a local verdict skips the production gate.
 # Resolution reads WP_HOSTS_FILE (hosts-file format) when set, so a test needs no network;
-# otherwise `getent ahosts`/`getent hosts`, otherwise /etc/hosts.
+# otherwise `getent ahosts` (bounded by `timeout 3` when coreutils' timeout exists, so a
+# dead resolver cannot hang the gate; a lookup that times out resolves to nothing, which
+# is the not-local side), otherwise /etc/hosts.
 . "$(dirname "${BASH_SOURCE[0]}")/host-key.sh"
 
 # local_addr_private <ip>: 0 when the address is loopback or private.
@@ -45,7 +47,11 @@ local_host_addrs() {
   if [ -n "${WP_HOSTS_FILE:-}" ]; then
     awk -v n="$n" '{ sub(/#.*/, "") } NF > 1 { for (i = 2; i <= NF; i++) if (tolower($i) == n) print $1 }' "$WP_HOSTS_FILE" 2>/dev/null
   elif command -v getent >/dev/null 2>&1; then
-    getent ahosts "$n" 2>/dev/null | awk '{ print $1 }' | sort -u
+    if command -v timeout >/dev/null 2>&1; then
+      timeout 3 getent ahosts "$n" 2>/dev/null | awk '{ print $1 }' | sort -u
+    else
+      getent ahosts "$n" 2>/dev/null | awk '{ print $1 }' | sort -u
+    fi
   elif [ -r /etc/hosts ]; then
     awk -v n="$n" '{ sub(/#.*/, "") } NF > 1 { for (i = 2; i <= NF; i++) if (tolower($i) == n) print $1 }' /etc/hosts 2>/dev/null
   fi

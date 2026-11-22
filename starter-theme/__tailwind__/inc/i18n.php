@@ -44,12 +44,35 @@ function __starter___get_current_lang() {
         return $current_lang;
     }
 
-    // 3. Check browser language (Accept-Language header)
+    // 3. Check browser language (Accept-Language header), by q-value: `fr,es;q=0.9`
+    //    is Spanish (the first two characters alone named unsupported French and fell
+    //    through). q=0 is refused, equal q-values keep header order, `es-MX` matches `es`.
+    //    Inline rather than a helper: every function here is template-facing, and the
+    //    Polylang variant would have to define it too.
     if (isset($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
-        $browser_lang = substr($_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2);
-        if (in_array($browser_lang, __STARTER___SUPPORTED_LANGS)) {
-            $current_lang = $browser_lang;
-            return $current_lang;
+        $ranked = array();
+        foreach (explode(',', sanitize_text_field(wp_unslash($_SERVER['HTTP_ACCEPT_LANGUAGE']))) as $i => $part) {
+            $bits = explode(';', trim($part));
+            $tag  = strtolower(trim($bits[0]));
+            $q    = 1.0;
+            foreach (array_slice($bits, 1) as $param) {
+                $param = trim($param);
+                if (strncasecmp($param, 'q=', 2) === 0) {
+                    $q = (float) substr($param, 2);
+                }
+            }
+            if ($tag !== '' && $q > 0) {
+                $ranked[] = array($q, $i, substr($tag, 0, 2));
+            }
+        }
+        usort($ranked, function ($a, $b) {
+            return $a[0] === $b[0] ? $a[1] - $b[1] : ($a[0] < $b[0] ? 1 : -1);
+        });
+        foreach ($ranked as $entry) {
+            if (in_array($entry[2], __STARTER___SUPPORTED_LANGS, true)) {
+                $current_lang = $entry[2];
+                return $current_lang;
+            }
         }
     }
 
@@ -324,10 +347,38 @@ function __starter___nav_location($location) {
 add_action('init', '__starter___get_current_lang');
 
 /*
+ * Page caches. Without ?lang the language comes from a cookie or from
+ * Accept-Language, so one URL serves two languages: a proxy or CDN must key on
+ * both (Vary), and a WordPress page cache, which ignores Vary, must not store a
+ * response that is not the default language or that sets the language cookie
+ * (DONOTCACHEPAGE, honoured by the common cache plugins, plus no-cache headers).
+ * A cache that already holds the default-language page still serves it to a
+ * returning visitor whose cookie says otherwise: that needs the cache's own
+ * cookie rule, which the theme cannot set.
+ */
+add_action('send_headers', function () {
+    if (is_admin()) {
+        return;
+    }
+    header('Vary: Accept-Language, Cookie', false);
+    if (isset($_GET['lang']) || __starter___get_current_lang() !== __STARTER___DEFAULT_LANG) {
+        if (!defined('DONOTCACHEPAGE')) {
+            define('DONOTCACHEPAGE', true);
+        }
+        nocache_headers();
+    }
+});
+
+/*
  * <html lang> follows the request, not the site locale. header.php prints
  * language_attributes(), which reads the locale: the primary language on every
  * request of a suffix site, ?lang=es included (WCAG 3.1.1).
  */
 add_filter('language_attributes', function ($output) {
+    // Front end only: wp-admin and the login screen follow the user's locale,
+    // not a visitor's ?lang or cookie.
+    if (is_admin() || did_action('login_init')) {
+        return $output;
+    }
     return (string) preg_replace('/lang="[^"]*"/', 'lang="' . esc_attr(__starter___get_current_lang()) . '"', $output);
 });

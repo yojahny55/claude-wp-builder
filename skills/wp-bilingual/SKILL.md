@@ -104,6 +104,23 @@ Language is detected using a strict priority chain. The first match wins.
 
 **Priority: URL parameter > Cookie > Browser Accept-Language > Default**
 
+An unsupported value at one step falls through to the next (`?lang=fr` keeps a stored `es`).
+Accept-Language is read by q-value, not by its first two characters: `fr,es;q=0.9` is `es`,
+`q=0` is refused, `es-MX` matches `es`. The parse is inline in the resolver, not a helper:
+every function in `inc/i18n.php` is template-facing and the Polylang variant mirrors them.
+
+### Page caches
+
+One URL serves two languages through the cookie and Accept-Language. Every front-end response
+sends `Vary: Accept-Language, Cookie` for proxies and CDNs; a response that is not the default
+language, or that carries `?lang` (and so a `Set-Cookie`), defines `DONOTCACHEPAGE` and sends
+`nocache_headers()`, which keeps it out of WordPress page caches. The ceiling: a cache already
+holding the default-language page serves it to a returning visitor whose cookie says otherwise,
+before PHP runs. Only the cache's own cookie rule fixes that; the theme cannot set it.
+
+`language_attributes` is rewritten on the front end only: wp-admin and the login screen keep
+the user's locale.
+
 ### The language cookie
 
 A switcher link carries `?lang=es`. The **first** call to `prefix_get_current_lang()` on that

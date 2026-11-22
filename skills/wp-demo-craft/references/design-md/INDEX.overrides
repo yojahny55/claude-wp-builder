@@ -1,0 +1,15 @@
+# Hand corrections to INDEX.md, applied by bin/design-md-index.sh after its keyword
+# heuristic. One line per domain: <domain> <industry> [<tone>]. Edit here, then re-run
+# the script; never edit INDEX.md directly.
+airbnb hospitality
+apple general
+binance finance
+dell-1996 general
+framer saas
+nike commerce
+ollama devtools
+opencode.ai devtools
+playstation general
+renault automotive
+stripe finance
+zapier devtools
