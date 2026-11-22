@@ -47,7 +47,6 @@ get_header();
 					</div><!-- .widget -->
 
 					<?php
-					/* translators: %1$s: smiley */
 					$__starter___archive_content = '<p>' . sprintf( esc_html( __starter___t( 'error_404_archives' ) ), convert_smilies( ':)' ) ) . '</p>';
 					the_widget( 'WP_Widget_Archives', 'dropdown=1', "after_title=</h2>$__starter___archive_content" );
 
