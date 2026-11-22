@@ -14,6 +14,9 @@
 # domain that has no DESIGN.md fails the run, so a renamed or removed vendor cannot
 # leave a correction silently unused.
 set -euo pipefail
+# Byte order for the glob below: a locale-aware collation sorts `bmw/` before `bmw-m/` on one
+# machine and after it on another, and the versioned index must equal any regeneration.
+export LC_ALL=C
 cd "$(dirname "$0")/.."
 d=skills/wp-demo-craft/references/design-md
 

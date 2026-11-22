@@ -14,8 +14,8 @@ DESIGN.md: the catalogue is vocabulary, the client docs are the source.
 | airtable | saas | light | "Haas Groot Disp, Haas, sans-serif" | #181d26 |
 | apple | general | light | "SF Pro Display, system-ui, -apple-system, sans-serif" | #0066cc |
 | binance | finance | unknown | "BinanceNova, sans-serif" | #fcd535 |
-| bmw | automotive | light | "'BMW Type Next Latin', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" | #1c69d4 |
 | bmw-m | automotive | dark | "BMWTypeNextLatin, sans-serif" | #ffffff |
+| bmw | automotive | light | "'BMW Type Next Latin', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" | #1c69d4 |
 | bugatti | automotive | dark | "Bugatti Display, sans-serif" | #ffffff |
 | cal | saas | light | "Cal Sans, Inter, sans-serif" | #111111 |
 | claude | saas | light | "Copernicus, Tiempos Headline, serif" | #cc785c |
