@@ -5,7 +5,7 @@
 # agent copies and token-substitutes; this check pins that split.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-fail() { echo "FAIL: $*"; exit 1; }
+. tests/lib/assert.sh
 
 tpl=templates/agentic/agentic.php
 agent=agents/wp-agentic-surfaces.md
