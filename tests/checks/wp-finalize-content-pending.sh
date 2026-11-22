@@ -58,4 +58,14 @@ $out
 expected:
 $want"
 
+# A settings group that cannot be read must say so, not print an empty "nothing pending".
+cat > "$tmp/none.php" <<'PHP'
+<?php
+function acf_get_fields($g) { return false; }
+function get_field($n, $where) { return null; }
+PHP
+cat "$tmp/snippet.php" >> "$tmp/none.php"
+out=$(php "$tmp/none.php")
+[ "$out" = "UNKNOWN group_settings has no fields" ] || fail "with no settings group the snippet printed '$out', not the UNKNOWN line"
+
 echo "PASS: /wp-finalize lists empty contact and social settings as content pending"

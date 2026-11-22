@@ -103,6 +103,7 @@ Read `wp_cli.wrapper` and run runtime checks:
     ```bash
     $WP eval '
     $names = array_column(acf_get_fields("group_settings") ?: array(), "name");
+    if (!$names) { echo "UNKNOWN group_settings has no fields\n"; return; }
     foreach ($names as $n) {
       if (!preg_match("/^(social_[a-z0-9_]+|contact_email|contact_phone|header_phone|business_address)$/", $n)) continue;
       if (preg_match("/^(.+)_[a-z]{2}$/", $n, $m) && in_array($m[1], $names, true)) continue;
@@ -111,7 +112,9 @@ Read `wp_cli.wrapper` and run runtime checks:
     }'
     ```
     Each `PENDING` line goes in the report under **Content pending**, with the
-    field name, beside the links item 9 found. This item never turns Check 7
+    field name, beside the links item 9 found. An `UNKNOWN` line or a non-zero exit
+    means nothing was checked: report the item as **not checked**, never as an
+    empty list. This item never turns Check 7
     into a FAIL: the value is the client's to supply, not a defect in the build.
 
 **PASS** if all runtime checks succeed. **FAIL** with details.
