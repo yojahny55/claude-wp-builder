@@ -353,7 +353,7 @@ CPT posts. `--exclude-slugs` prevents a WP Page colliding with a CPT archive slu
 
 No arguments. Reports (does not fix) escaping, `prefix_get_field()` usage, bilingual
 coverage, responsive breakpoints, menus, theme structure; adds WP-CLI runtime checks (pages,
-menus, ACF fields, plugins) when `.wp-create.json` exists.
+menus, ACF fields, plugins).
 
 ### `/wp-demo-verify`
 

@@ -52,13 +52,13 @@ has 'Chrome DevTools MCP for a Lighthouse run or a performance trace, Playwright
 # --- the production gate, against its own script --------------------------------------------
 grep -Fq '4 = the host is marked blocked; nothing was sent' bin/prod-gate.sh || fail "bin/prod-gate.sh changed exit 4 -- update the skill"
 grep -Fq '5 = another command held the host longer than --wait; nothing was sent' bin/prod-gate.sh || fail "bin/prod-gate.sh changed exit 5 -- update the skill"
-grep -Fq '1 = usage error, or flock is unavailable' bin/prod-gate.sh || fail "bin/prod-gate.sh changed exit 1 -- update the skill"
+grep -Fq '1 = usage error' bin/prod-gate.sh || fail "bin/prod-gate.sh changed exit 1 -- update the skill"
 grep -Fq 'WP_AUDIT_GATE_DIR=<gate dir> ${CLAUDE_PLUGIN_ROOT}/bin/prod-gate.sh [--delay 10] <host> -- <command> [args...]' "$k" \
   || fail "$k does not show the gated call"
 grep -Fq 'WP_AUDIT_GATE_DIR=<gate dir> ${CLAUDE_PLUGIN_ROOT}/bin/prod-gate.sh --mark-blocked <host> "<reason>"' "$k" \
   || fail "$k does not show how to mark a host blocked"
 has 'every agent of the run must use the same one' || fail "$k does not say the gate directory must be shared"
-has 'It needs `flock`' || fail "$k does not state the gate's flock dependency"
+has 'It serializes with `flock`' || fail "$k does not state the gate's lock mechanism"
 for trigger in '- a `429`' '- a `403` carrying a WAF signature' '- `ERR_CONNECTION_REFUSED` in a browser' '- link-sweep exit `4`'; do
   grep -Fq -- "$trigger" "$k" || fail "$k lost the block trigger: $trigger"
 done

@@ -55,24 +55,12 @@ host="${host#*@}"; host="${host%%\?*}"; host="${host%%#*}"
 
 # A scan of a host the scanner cannot reach is not a scan. Catch it here, with its own exit
 # code, rather than letting it arrive as a 404 that reads as "nobody has scanned this yet".
-case "$host" in
-  localhost|localhost:*|*.localhost|*.local|*.test|*.localhost:*|*.local:*|*.test:*)
-    echo "NOT PUBLIC: $host is a development host — pass the public URL with --host"
-    exit 3 ;;
-  *.local.com|*.local.com:*)
-    # This plugin's own default local domain shape: /wp-create offers <slug>.local.com
-    # (commands/wp-create.md Step 3.3) and /wp-clone's placeholder domain follows the
-    # same shape -- every project this plugin scaffolds locally can live under this
-    # suffix, and it is not covered by the generic *.local pattern above.
-    echo "NOT PUBLIC: $host is a development host — pass the public URL with --host"
-    exit 3 ;;
-  127.*|10.*|192.168.*|[::1]|[::1]:*|0.0.0.0*)
-    echo "NOT PUBLIC: $host is a private address — pass the public URL with --host"
-    exit 3 ;;
-  172.1[6-9].*|172.2[0-9].*|172.3[01].*)
-    echo "NOT PUBLIC: $host is a private address — pass the public URL with --host"
-    exit 3 ;;
-esac
+# shellcheck source=lib/local-host.sh
+. "$(dirname "$0")/lib/local-host.sh"
+if host_is_local "$host"; then
+  echo "NOT PUBLIC: $host is a development host or private address — pass the public URL with --host"
+  exit 3
+fi
 # A name with no dot is a LAN hostname, not a registrable domain.
 case "$host" in
   *.*) ;;
