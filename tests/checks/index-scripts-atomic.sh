@@ -76,6 +76,25 @@ row() { grep "^| $1 |" "$X/INDEX.md"; }
 [ "$(row carco | cut -d'|' -f3 | tr -d ' ')" = automotive ] || fail "whole-word car not matched"
 [ "$(row cardco | cut -d'|' -f3 | tr -d ' ')" = general ] || fail "card/care/capital/rapid matched car or api"
 [ "$(row rapidco | cut -d'|' -f3 | tr -d ' ')" = general ] || fail "rapid matched api"
+# Hand corrections come from INDEX.overrides and survive a regeneration; tone too.
+printf '# comment line\ncarco agency dark\nrapidco finance\n' > "$X/INDEX.overrides"
+bash "$W/bin/design-md-index.sh" >/dev/null 2>&1 || fail "design-md-index failed with an overrides file"
+[ "$(row carco | cut -d'|' -f3,4 | tr -d ' ')" = 'agency|dark' ] || fail "override industry+tone not applied: $(row carco)"
+[ "$(row rapidco | cut -d'|' -f3,4 | tr -d ' ')" = 'finance|light' ] || fail "override industry not applied or tone lost: $(row rapidco)"
+[ "$(row apiish | cut -d'|' -f3 | tr -d ' ')" = devtools ] || fail "a domain without an override changed"
+# An override naming a domain with no DESIGN.md fails and leaves INDEX.md as it was.
+\cp -f "$X/INDEX.md" "$T/index.before"
+printf 'gone finance\n' >> "$X/INDEX.overrides"
+if bash "$W/bin/design-md-index.sh" >/dev/null 2>&1; then fail "an override for a missing domain was accepted"; fi
+cmp -s "$X/INDEX.md" "$T/index.before" || fail "INDEX.md changed on a refused overrides file"
+rm -f "$X/INDEX.overrides"
+# The versioned index is exactly what the script produces from its source.
+G="$T/real"; mkdir -p "$G/bin" "$G/skills/wp-demo-craft/references"
+\cp -f "$ROOT/bin/design-md-index.sh" "$G/bin/"
+\cp -rf "$ROOT/skills/wp-demo-craft/references/design-md" "$G/skills/wp-demo-craft/references/"
+bash "$G/bin/design-md-index.sh" >/dev/null 2>&1 || fail "design-md-index failed on the real catalogue"
+cmp -s "$G/skills/wp-demo-craft/references/design-md/INDEX.md" "$ROOT/skills/wp-demo-craft/references/design-md/INDEX.md" \
+  || fail "versioned INDEX.md differs from a regeneration: put hand corrections in INDEX.overrides"
 
 # --- composition-gate.sh: a composition missing a fragment fails (exit 1), offline
 W="$T/cg"; mk_tree "$W"
