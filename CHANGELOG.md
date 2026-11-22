@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [1.35.0] - 2026-11-22
+
+### Fixed
+
+- **The rest of the starters' front-end strings follow the page language.** The
+  tailwind search, single-post and archive templates (`search.php`, `single.php`,
+  `template-parts/content*.php`, the post meta in `inc/template-tags.php`) and the
+  cinematic skip link, menu `aria-label`s, 404, empty index and post navigation still
+  went through gettext, so on a Spanish page they read "Posted on", "Previous:" or
+  "Skip to content". They now read the tailwind string table (16 new keys, registered
+  with Polylang like the rest) or the cinematic `__starter___b()` literal. Only the
+  nav-menu location labels keep gettext: they show in wp-admin. New scaffolds only.
+
+- **Starter language switcher and chrome strings follow the page language.** The
+  cinematic switcher was a fixed `?lang=` link, which Polylang ignores, so on a
+  Polylang scaffold it never changed language; it now reads
+  `__starter___lang_switcher()`, which the Polylang variant answers from
+  `pll_the_languages()` and links to the translated page. The tailwind starter's skip
+  link, menu `aria-label`, 404 copy and footer went through gettext with no text
+  domain loaded, so they followed the site locale instead of the page; they now read
+  the starter's string table. New scaffolds only: an existing project needs the helper
+  copied into its own `inc/i18n.php` before taking the new `nav.php`.
+
 ## [1.34.0] - 2026-11-22
 
 ### Added

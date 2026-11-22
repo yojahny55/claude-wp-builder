@@ -13,13 +13,12 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 
 **Priority:** Items within each section are ordered by priority (highest first).
 
-**Reconciled** on November 22, 2026 against `main` at v1.34.0. Every open and partial
-item was checked against what 1.34.0 shipped (the starters' language negotiation behind a page
-cache, `/wp-status`, `/wp-backup` and `/wp-restore`, the exit-code table, the Rank Math agent on
-sonnet, `impeccable@latest`). Those seven moved to delivered; the cinematic switcher under
-Polylang and the tailwind starter strings stay open, as measured proposals not yet applied, and the
-seeded-defects item stays partial with a narrower gap. The Docker nginx config still has no owner,
-and the REST block is still not written down. The full pass against
+**Reconciled** on November 22, 2026 against `main` at v1.35.0. Every open and partial
+item was checked against what 1.35.0 shipped: the cinematic language switcher under Polylang
+and every front-end string of both starters reading the page language instead of gettext.
+Those two items, open as measured proposals at 1.34.0, are delivered; no other item moved.
+The store-setup integration failure is still unexplained, the Docker nginx config still has no
+owner, and the REST block is still not written down. The full pass against
 the command, agent or script that would own each item was last made at v1.31.0. An item
 claiming to be open while the behavior ships reads as a project that does not know what it
 has built.
