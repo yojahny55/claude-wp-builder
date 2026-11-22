@@ -45,8 +45,8 @@
 #   4 = the host is marked blocked; nothing was sent (stderr says why)
 #   5 = another command held the host longer than --wait; nothing was sent
 #   1 = usage error
-# Where flock is missing (macOS) the lock is an atomic mkdir under the state dir, with the
-# holder's pid inside so a dead holder's lock is taken over.
+# Where flock is missing (macOS) the lock is a symlink to the holder's pid, with a
+# race-safe takeover of a dead holder's lock (see below).
 # The gate's 4 and 5 share the number space of the wrapped command: a wrapped command that
 # itself exits 4 or 5 (link-sweep's 4 is a block signal; a script of the caller's may use
 # either) is indistinguishable from the gate's own 4 or 5. Read stderr: the gate always
@@ -110,9 +110,14 @@ esac
 # A development host keeps its old behaviour: no lock, no delay.
 if [ "$local_host" -eq 1 ]; then exec "$@"; fi
 
-# Serialize with flock where it exists. macOS ships none, so there the lock is a directory:
-# mkdir is atomic. A holder that died leaves the directory behind, so a lock whose owner pid
-# (written inside it) is gone is taken over; the trap releases it on every normal exit.
+# Serialize with flock where it exists. macOS ships none (and its mv has no -T), so there the
+# lock is a symlink, `$lock.l` -> owner pid: `ln -s` creates it atomically with the pid already
+# in it, so no moment exists with a lock and no owner. A dead owner (`ps -p` fails; unlike
+# `kill -0` it does not fail on EPERM for another user's process) is cleared under a second
+# mutex, the mkdir `$lock.takeover`: inside it the owner is read AGAIN and the lock is removed
+# only if it is still that same dead pid, so a waiter holding a stale read can never remove a
+# lock somebody else took meanwhile. A takeover mutex older than a minute is abandoned. Limit:
+# a reused pid reads as alive, so the gate then waits and exits 5 (safe side, nothing sent).
 if command -v flock >/dev/null 2>&1; then
   exec 9>"$lock"
   if ! flock -w "$wait_max" 9; then
@@ -120,11 +125,17 @@ if command -v flock >/dev/null 2>&1; then
     exit 5
   fi
 else
-  lockd="$lock.d" waited=0
-  until mkdir "$lockd" 2>/dev/null; do
-    owner="$(cat "$lockd/pid" 2>/dev/null || true)"
-    if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
-      rm -rf "$lockd"; continue
+  lockl="$lock.l" take="$lock.takeover" waited=0
+  until ln -s "$$" "$lockl" 2>/dev/null; do
+    owner="$(readlink "$lockl" 2>/dev/null || true)"
+    if [ -z "$owner" ]; then continue; fi
+    if ! ps -p "$owner" >/dev/null 2>&1; then
+      if mkdir "$take" 2>/dev/null; then
+        [ "$(readlink "$lockl" 2>/dev/null || true)" = "$owner" ] && rm -f "$lockl"
+        rmdir "$take"
+        continue
+      fi
+      [ -z "$(find "$take" -maxdepth 0 -mmin +1 2>/dev/null)" ] || rmdir "$take" 2>/dev/null || true
     fi
     if [ "$waited" -ge "$wait_max" ]; then
       echo "prod-gate: $host busy for more than ${wait_max}s (another agent's command). Nothing sent; call again later." >&2
@@ -132,8 +143,8 @@ else
     fi
     sleep 1; waited=$((waited + 1))
   done
-  printf '%s\n' "$$" > "$lockd/pid"
-  trap 'rm -rf "$lockd"' EXIT
+  # Release only a lock that is still ours.
+  trap '[ "$(readlink "$lockl" 2>/dev/null || true)" = "$$" ] && rm -f "$lockl"; true' EXIT
 fi
 if [ -f "$blocked" ]; then
   echo "BLOCKED: $host -- $(cat "$blocked"). Nothing sent; report this check UNMEASURED." >&2

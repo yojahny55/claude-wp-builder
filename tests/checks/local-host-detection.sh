@@ -78,22 +78,37 @@ done
 rc=0; out="$(bash bin/geo-scan.sh 10.example.com 2>&1)" || rc=$?
 case "$out" in *"NOT PUBLIC"*) fail "geo-scan treated 10.example.com as private" ;; esac
 
-# 5. prod-gate without flock: mkdir lock, released on exit, dead holder taken over, busy -> 5.
+# 5. prod-gate without flock: symlink lock, released on exit, dead holder taken over, busy -> 5.
 nf="$tmp/noflock"; mkdir "$nf"
-for t in bash date awk sleep cat mkdir rm kill tr dirname env mv sort cksum mktemp ls sed grep timeout curl; do
+for t in bash date awk sleep cat mkdir rm kill tr dirname env mv sort cksum mktemp ls sed grep timeout curl ln readlink ps find rmdir sh; do
   p="$(command -v "$t" 2>/dev/null || true)"; [ -n "$p" ] && ln -s "$p" "$nf/$t"
 done
 ! PATH="$nf" command -v flock >/dev/null 2>&1 || fail "test PATH still has flock"
 gate="$tmp/gate2"
+gl="$gate/pub.local.com.lock.l"
 PATH="$nf" bash bin/prod-gate.sh --dir "$gate" --delay 0 pub.local.com -- echo ran >/dev/null 2>&1 \
   || fail "gate without flock failed"
-[ ! -d "$gate/pub.local.com.lock.d" ] || fail "mkdir lock not released"
-mkdir "$gate/pub.local.com.lock.d"; echo 999999 > "$gate/pub.local.com.lock.d/pid"
-PATH="$nf" bash bin/prod-gate.sh --dir "$gate" --delay 0 pub.local.com -- echo ran >/dev/null 2>&1 \
-  || fail "stale mkdir lock was not taken over"
-mkdir "$gate/pub.local.com.lock.d"; echo $$ > "$gate/pub.local.com.lock.d/pid"
+[ ! -L "$gl" ] || fail "symlink lock not released"
+# (1) two runs racing for the same DEAD lock never overlap their commands.
+cat > "$tmp/mark.sh" <<'M'
+#!/bin/sh
+echo "start $$" >> "$1"; sleep 0.3; echo "end $$" >> "$1"
+M
+for i in 1 2 3 4 5; do
+  : > "$tmp/marks"; rm -f "$gl"; ln -s 999999 "$gl"
+  for j in 1 2; do PATH="$nf" bash bin/prod-gate.sh --dir "$gate" --delay 0 pub.local.com -- sh "$tmp/mark.sh" "$tmp/marks" >/dev/null 2>&1 & done
+  wait
+  [ "$(awk '{print $1}' "$tmp/marks" | tr '\n' ' ')" = "start end start end " ] \
+    || fail "round $i: commands overlapped under a dead lock: $(tr '\n' ';' < "$tmp/marks")"
+done
+# (2) a lock owned by a live process: exit 5 after --wait, and the lock is left alone.
+sleep 30 & other=$!
+rm -f "$gl"; ln -s "$other" "$gl"
 rc=0; PATH="$nf" bash bin/prod-gate.sh --dir "$gate" --delay 0 --wait 1 pub.local.com -- echo ran >/dev/null 2>&1 || rc=$?
-[ "$rc" = 5 ] || fail "live mkdir lock: expected exit 5, got $rc"
+[ "$rc" = 5 ] || fail "live symlink lock: expected exit 5, got $rc"
+# (3) the failed run's trap did not remove somebody else's lock.
+[ "$(readlink "$gl")" = "$other" ] || fail "the trap removed a lock it did not own"
+kill "$other" 2>/dev/null || true; rm -f "$gl"
 has bin/prod-gate.sh 'indistinguishable from the gate'
 
 # 6. audit-suite empties results/audit at the start of a run, that directory only.
