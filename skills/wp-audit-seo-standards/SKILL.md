@@ -28,6 +28,15 @@ the same section numbers they carry here:
   meta-description traps, the category-noindex gate, the sitemap failure modes and their
   validator, duplicate JSON-LD detection, and the length check. Read before reporting an SEO
   finding fixed, or when validating the sitemap or the schema.
+- [references/rankmath-sitemap-validation.md](references/rankmath-sitemap-validation.md) — the
+  `wp eval` script behind `wp-audit-rankmath` Step 5.5 (six mechanical sitemap checks).
+- [references/rankmath-schema-validation.md](references/rankmath-schema-validation.md) — the
+  `wp eval` script behind Step 8.5 (duplicate JSON-LD, duplicate description, BlogPosting and
+  LocalBusiness fields).
+- [references/rankmath-theme-breadcrumbs.md](references/rankmath-theme-breadcrumbs.md) — Step 12,
+  12a to 12d: the function, template call, CSS and Rank Math switch as the agent applies them.
+- [references/rankmath-polylang.md](references/rankmath-polylang.md) — Step 15 and 15b: the
+  Polylang verification script and the CPT-archive breadcrumb filter.
 - [references/woocommerce-seo.md](references/woocommerce-seo.md) — §18, the store-only checks
   SEO-064 to SEO-068. Read only when `site.commerce` is `woocommerce`.
 
