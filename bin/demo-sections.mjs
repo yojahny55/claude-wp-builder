@@ -30,9 +30,12 @@ template-parts/section-<slug>.php exists. Read-only.
 Exit 0 listed with no delimiter defect, 1 a delimiter defect, 2 nothing to read, 3 crash, 64 usage.
 `;
 
+// Exit codes are set through process.exitCode, never forced with process.exit(): a forced exit
+// right after a write to a pipe drops whatever the pipe has not taken yet (64 KiB), so a large
+// --json listing would reach its reader cut short. Bad usage throws, and the entry point sets 64.
+class UsageError extends Error {}
 function usage(msg) {
-  process.stderr.write(`${msg}\n${HELP}`);
-  process.exit(64);
+  throw new UsageError(msg);
 }
 
 const isFile = (p) => { try { return statSync(p).isFile(); } catch { return false; } };
@@ -149,7 +152,7 @@ function main(argv) {
   let root = null; let page = null; let json = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--help' || a === '-h') { process.stdout.write(HELP); process.exit(0); }
+    if (a === '--help' || a === '-h') { process.stdout.write(HELP); process.exitCode = 0; return; }
     else if (a === '--json') json = true;
     else if (a === '--page') {
       page = argv[++i];
@@ -166,15 +169,21 @@ function main(argv) {
   if (r.error) {
     if (json) process.stdout.write(`${JSON.stringify({ project: root, error: r.error })}\n`);
     else process.stderr.write(`${r.error}\n`);
-    process.exit(2);
+    process.exitCode = 2;
+    return;
   }
   process.stdout.write(json ? `${JSON.stringify(r, null, 2)}\n` : `${render(r)}\n`);
-  process.exit(r.defects ? 1 : 0);
+  process.exitCode = r.defects ? 1 : 0;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   try { main(process.argv.slice(2)); } catch (e) {
-    process.stderr.write(`demo-sections.mjs crashed: ${e && e.stack ? e.stack : e}\n`);
-    process.exit(3);
+    if (e instanceof UsageError) {
+      process.stderr.write(`${e.message}\n${HELP}`);
+      process.exitCode = 64;
+    } else {
+      process.stderr.write(`demo-sections.mjs crashed: ${e && e.stack ? e.stack : e}\n`);
+      process.exitCode = 3;
+    }
   }
 }
