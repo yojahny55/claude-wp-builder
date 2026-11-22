@@ -55,7 +55,7 @@ printf '%s' "$out" | grep >/dev/null -c 'needs a value\|wants WIDTHxHEIGHT' && f
 # --- demo-verify: every opened context is closed when the page throws ---
 : > "$tmp/log"
 dv --widths 1440x900 --out "$tmp/o2" >/dev/null || true
-opened="$(grep -c '^open$' "$tmp/log")"; closed="$(grep -c '^close$' "$tmp/log")"
+opened="$(grep -c "^open$" "$tmp/log" || true)"; closed="$(grep -c "^close$" "$tmp/log" || true)"
 [ "$opened" -ge 1 ] || fail "the stub saw no context opened, the case does not exercise the walk"
 [ "$closed" -ge "$opened" ] || fail "$opened context(s) opened, only $closed closed after the page threw"
 

@@ -10,10 +10,9 @@
 #   3. the fix tells the project that editing a source file changes nothing once the twin
 #      exists. That failure is silent — the page loads, the console is clean, the old
 #      behaviour persists, and reading the source confirms a change that is not live.
-# -e is off on purpose, as in the rest of tests/checks: every assertion below is a grep that
-# is allowed to miss, and under -e the first miss would abort the run with no message instead
-# of printing which contract broke. What -e would have caught is caught explicitly instead:
-# the cd answers for itself, and the file is tested for readability, not only existence.
+# -e is on: a command that fails unexpectedly stops the run. A grep that is allowed to miss
+# ends in `|| true` or sits in an `|| fail` list, so the contract that broke is still named.
+# The cd answers for itself, and the file is tested for readability, not only existence.
 set -euo pipefail
 . "$(dirname "$0")/../lib/assert.sh"
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }

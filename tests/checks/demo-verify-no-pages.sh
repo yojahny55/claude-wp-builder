@@ -17,7 +17,7 @@ for t in "$tmp/empty" "$tmp/missing.html"; do
 done
 
 # --probe takes no target and must still reach the browser probe, not the page check.
-out="$(node "$root/bin/demo-verify.mjs" --probe 2>&1)"
+out="$(node "$root/bin/demo-verify.mjs" --probe 2>&1)" || true
 [ "$(printf '%s' "$out" | grep -cF 'no pages to verify' || true)" -eq 0 ] || fail "--probe hit the page check: $out"
 
 echo PASS

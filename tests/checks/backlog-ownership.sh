@@ -22,7 +22,8 @@ fail() { printf 'FAIL: %s\n' "$1"; fails=$((fails + 1)); }
 # An entry runs from its `- [ ] **Title** `STATUS`` line to the next entry or heading.
 # The phrases below are the ways an entry can say "no owner exists"; they are matched
 # literally so that adding a new spelling is a deliberate edit to this list.
-python3 - "$B" <<'PY'
+py_rc=0
+python3 - "$B" <<'PY' || py_rc=$?
 import re, sys
 
 path = sys.argv[1]
@@ -68,7 +69,7 @@ for line, status, title in bad:
     print(f'  {path}:{line} [{status}] {title}')
 sys.exit(1 if bad else 0)
 PY
-if [ $? -ne 0 ]; then
+if [ "$py_rc" -ne 0 ]; then
   fail "the entries above link no implementation and do not say that no owner exists yet -- a reader cannot tell an incomplete owner from an absent one"
 fi
 

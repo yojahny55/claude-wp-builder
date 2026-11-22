@@ -15,7 +15,7 @@
 #   4. the audit can find the defect in a theme nobody built with this starter.
 set -euo pipefail
 . "$(dirname "$0")/../lib/assert.sh"
-# -e is off (several greps are allowed to miss), so the one command whose failure would
+# -e is on; a grep allowed to miss ends in `|| true`. The one command whose failure would
 # change what every path below resolves against answers for itself.
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
 

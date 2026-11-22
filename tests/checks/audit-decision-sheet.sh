@@ -82,7 +82,7 @@ grep -Fq '&lt;img src=x' "$eh" || fail "title was not escaped"
 grep -Fq '<img src=x' "$eh" && fail "raw title markup reached the page"
 grep -Fq '<script>alert' "$eh" && fail "raw script from a proposal reached the page"
 node "$tool" build --out "$tmp/e2" --sidecar "$tmp/sc.json" --date 2026-01-02 >/dev/null 2>&1 || true
-ids=$(grep -o 'data-id="[^"]*"' "$tmp/e2/decisions-2026-01-02.html" | tr '\n' ' ')
+ids=$(grep -o 'data-id="[^"]*"' "$tmp/e2/decisions-2026-01-02.html" | tr '\n' ' ') || true
 [ "$ids" = 'data-id="A" data-id="A-2" data-id="finding-3" ' ] || fail "sidecar findings did not get unique ids: $ids"
 
 # the same check on another page is another card, even when a proposal covers the first page
@@ -90,19 +90,19 @@ echo '[{"id":"P1","title":"t","check":"A","page":"/x"}]' > "$tmp/pp.json"
 echo '{"findings":[{"check":"A","design_impact":true,"page":"/x"},{"check":"A","design_impact":true,"page":"/y"}]}' > "$tmp/sc2.json"
 mkdir -p "$tmp/e3"
 node "$tool" build --out "$tmp/e3" --proposals "$tmp/pp.json" --sidecar "$tmp/sc2.json" --date 2026-01-02 >/dev/null 2>&1 || true
-ids=$(grep -o 'data-id="[^"]*"' "$tmp/e3/decisions-2026-01-02.html" | tr '\n' ' ')
+ids=$(grep -o 'data-id="[^"]*"' "$tmp/e3/decisions-2026-01-02.html" | tr '\n' ' ') || true
 [ "$ids" = 'data-id="P1" data-id="A" ' ] || fail "a second page with the same check got no card: $ids"
 # a site-wide finding (no page) is covered by the proposal of its check, page or not
 echo '{"findings":[{"check":"A","design_impact":true}]}' > "$tmp/sc3.json"
 mkdir -p "$tmp/e4"
 node "$tool" build --out "$tmp/e4" --proposals "$tmp/pp.json" --sidecar "$tmp/sc3.json" --date 2026-01-02 >/dev/null 2>&1 || true
-ids=$(grep -o 'data-id="[^"]*"' "$tmp/e4/decisions-2026-01-02.html" | tr '\n' ' ')
+ids=$(grep -o 'data-id="[^"]*"' "$tmp/e4/decisions-2026-01-02.html" | tr '\n' ' ') || true
 [ "$ids" = 'data-id="P1" ' ] || fail "a site-wide finding got a duplicate card beside its proposal: $ids"
 # ...but listed before the page's own finding it does not take that page's proposal
 echo '{"findings":[{"check":"A","design_impact":true},{"check":"A","design_impact":true,"page":"/x"}]}' > "$tmp/sc4.json"
 mkdir -p "$tmp/e5"
 node "$tool" build --out "$tmp/e5" --proposals "$tmp/pp.json" --sidecar "$tmp/sc4.json" --date 2026-01-02 >/dev/null 2>&1 || true
-ids=$(grep -o 'data-id="[^"]*"' "$tmp/e5/decisions-2026-01-02.html" | tr '\n' ' ')
+ids=$(grep -o 'data-id="[^"]*"' "$tmp/e5/decisions-2026-01-02.html" | tr '\n' ' ') || true
 [ "$ids" = 'data-id="P1" data-id="A" ' ] || fail "card coverage depends on sidecar order: $ids"
 node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));const a=j.proposals.find(p=>p.id==="A");if(!a||a.page)process.exit(1)' "$tmp/e5/decisions-2026-01-02.json" \
   || fail "the page's finding lost its proposal to the site-wide one listed first"

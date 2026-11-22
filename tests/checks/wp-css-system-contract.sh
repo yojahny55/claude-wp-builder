@@ -22,7 +22,7 @@ for f in "$skill" "$pat"; do [ -f "$f" ] || fail "$f is missing"; done
 # with the @media wrapper kept on the inner rule's line so a mobile-first step is visible.
 # Comments are dropped first so a comment's words cannot become a selector. The comment
 # pattern lets a `*` stand inside the body (`/** … */`, `/* a * b */`), which `[^*]*` did not.
-code=$(awk '/^```css/{f=1; next} /^```/{f=0} f' "$pat" | tr '\n' ' ' | sed -E -e 's#/\*([^*]|\*+[^*/])*\*+/##g' -e 's/  */ /g')
+code=$(awk '/^```css/{f=1; next} /^```/{f=0} f' "$pat" | tr '\n' ' ' | sed -E -e 's#/\*([^*]|\*+[^*/])*\*+/##g' -e 's/  */ /g') || true
 rules=$(printf '%s' "$code" | grep -oE '(@media[^{]*\{ *)?[.a-z_][^{}]*\{[^{}]*\}' | sed 's/^ *//' || true)
 [ -n "$rules" ] || fail "no CSS rules parsed from $pat"
 

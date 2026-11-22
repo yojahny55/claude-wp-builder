@@ -43,7 +43,7 @@ for fmt in md html; do
   out="$tmp/out-$fmt"
   node bin/audit-report.mjs --run "$tmp/run.json" --out "$out" --format "$fmt" >/dev/null 2>&1 \
     || fail "audit-report.mjs rejected a run with design_impact ($fmt)"
-  n=$(grep -rFo 'Visual change' "$out" | wc -l)
+  n=$(grep -rFo 'Visual change' "$out" | wc -l) || true
   [ "$n" -ge 1 ] || fail "the $fmt report does not tag a design_impact finding"
 done
 # Negative: the tag belongs to the one flagged finding, not to every row (md: exactly once).

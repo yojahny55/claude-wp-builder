@@ -149,7 +149,7 @@ sql=$(head -1 "$tmp/insert")
 ! grep -Fq "Brien" <<<"$sql" || fail "the file name reached the SQL in the clear: $sql"
 grep -q "INSERT INTO .wp_rio_process_queue. .*VALUES (7,'webp',CONVERT(UNHEX(" <<<"$sql" || fail "the INSERT lost its shape: ${sql:0:300}"
 # Decode extra_data back and compare with the real path.
-hexes=$(grep -oP "UNHEX\\('[[:xdigit:]]*'\\)" <<<"$sql" | sed "s/UNHEX('//; s/')//")
+hexes=$(grep -oP "UNHEX\\('[[:xdigit:]]*'\\)" <<<"$sql" | sed "s/UNHEX('//; s/')//") || true
 [ -n "$hexes" ] || fail "the INSERT had no extractable UNHEX payload"
 decoded=$(php -r '$found = false; foreach (explode("\n", trim(stream_get_contents(STDIN))) as $h) { $raw = hex2bin($h); if (false === $raw) { fwrite(STDERR, "invalid extracted hex payload\n"); exit(1); } $j = json_decode($raw, true); if (is_array($j) && isset($j["source_path"])) { echo $j["source_path"], "\n", $j["converted_path"], "\n", $j["converted_from_size"], "\n"; $found = true; } } if (!$found) { fwrite(STDERR, "no extracted payload decoded to expected extra_data\n"); exit(1); }' <<<"$hexes") || fail "the extracted UNHEX payload could not be decoded into extra_data"
 want_src="$wp/wp-content/uploads/$rel"

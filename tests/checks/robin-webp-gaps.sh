@@ -45,7 +45,7 @@ grep -Fq 'RIO_Process_Queue::try_create_plugin_tables()' "$skill" \
 # 3. The skill documents what the script writes and how to run it. Its settings table once
 #    listed 7 of the 16 settings the script overwrites, so an operator could not see that a
 #    run resets webp_delivery_mode or the schedule; nothing tied the two together.
-keys=$(grep -oE '^\s*\[[a-z0-9_]+\]=|SETTINGS\[[a-z0-9_]+\]=' "$script" | sed -E 's/^[^[]*\[([a-z0-9_]+)\]=$/\1/')
+keys=$(grep -oE '^\s*\[[a-z0-9_]+\]=|SETTINGS\[[a-z0-9_]+\]=' "$script" | sed -E 's/^[^[]*\[([a-z0-9_]+)\]=$/\1/') || true
 [ -n "$keys" ] || { echo "FAIL: no SETTINGS keys found in $script — this assertion is matching nothing"; exit 1; }
 for k in $keys; do
   grep -Fq "| \`$k\` |" "$skill" || { echo "FAIL: $skill's settings table does not list $k, which $script writes on every run"; exit 1; }
