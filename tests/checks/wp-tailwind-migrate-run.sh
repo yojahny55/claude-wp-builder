@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # commands/wp-tailwind-migrate.md grew to 23 KB, so every run read the full author-mode
-# dispatch prompt and the verification procedure up front. Step 4 and Step 6 moved to
+# dispatch prompt and the verification procedure up front. Steps 0 (golden capture), 4 and 6 moved to
 # skills/wp-tailwind-migrate-run/references/, read at the step that needs them. A reference
 # nothing points to is a step the run silently never performs, so every file there must be
 # named in the command under its own heading and in the skill's table, and the command must
 # stay a map rather than grow back.
-# Ceiling: the command is 13.8 KB with the two references moved out, so 15 KB leaves room
+# Ceiling: the command is 12.3 KB with the three references moved out, so 15 KB leaves room
 # for a few added lines but fails if a step's detail is pasted back in.
 set -euo pipefail
 cd "$(dirname "$0")/../.."

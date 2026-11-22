@@ -33,39 +33,8 @@ Run the detection script to discover what tools are available on the system.
 bash -c "${CLAUDE_PLUGIN_ROOT}/bin/wp-env-setup.sh detect"
 ```
 
-Parse the JSON output. The structure is:
-
-```json
-{
-  "os": "fedora",
-  "package_manager": "dnf",
-  "web_servers": {
-    "nginx": { "installed": true, "version": "1.24.0", "running": true },
-    "apache": { "installed": true, "version": "2.4.58", "running": false },
-    "caddy": { "installed": false }
-  },
-  "php": {
-    "versions": ["8.2", "8.3"],
-    "active": "8.3",
-    "extensions": ["mysql", "curl", "mbstring", "xml", "gd", "zip", "intl"]
-  },
-  "docker": {
-    "installed": true,
-    "version": "24.0.7",
-    "compose": true
-  },
-  "tools": {
-    "ddev": { "installed": false },
-    "lando": { "installed": false },
-    "wp-env": { "installed": false },
-    "wp-cli": { "installed": true, "version": "2.9.0" }
-  },
-  "database": {
-    "mariadb": { "installed": true, "version": "10.11", "running": true },
-    "mysql": { "installed": false }
-  }
-}
-```
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-create-run/references/detect-output.md` now and
+follow it. It shows the JSON `detect` prints.
 
 Present the findings clearly:
 
@@ -458,25 +427,8 @@ bash -c "$WP site switch-language ${PRIMARY_LANG}"
 
 ### Step 4.15: Filesystem Permissions (Native Only)
 
-WordPress must be able to write to `wp-content` as the PHP process user, or media uploads and plugin installs fail. Determine that user:
-
-```bash
-bash -c "grep -hE '^user =' /etc/php-fpm.d/*.conf 2>/dev/null || grep -hE '^(user|User)' /etc/apache2/envvars /etc/httpd/conf/httpd.conf 2>/dev/null"
-```
-
-Grant it write access via an inherited default ACL:
-
-```bash
-bash -c 'setfacl -R -m "g:$1:rwX" -m "d:g:$1:rwX" "$2/wp-content"' _ '${WEB_USER}' '${PROJECT_PATH}'
-```
-
-A plain `chmod -R g+w` is not sufficient: WordPress creates `uploads/<year>/<month>` at runtime under umask 022, so each new month's directory is created mode 755 and uploads break again. The `d:` (default) entry makes every directory created later inherit group write. Capital `X` sets execute on directories only, so uploaded files never become executable.
-
-**Validation:** create a directory under `uploads/` and confirm it is group-writable, then remove it.
-
-**On failure (`setfacl: Operation not permitted`):** the path is owned by another user — ACLs require ownership. If a restore or migration created directories owned by the web user, rename the parent rather than chasing ownership, or re-run with `sudo`.
-
-**Note on the ACL mask:** if a directory already exists with mode 750, its ACL mask clamps `group:<user>:rwx` down to an effective `r-x`. `getfacl` shows this as `#effective:r-x`. The recursive `setfacl` above recalculates the mask, but directories created afterward by a *different* owner may reintroduce it.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-create-run/references/permissions.md` now and
+follow it — it is this step, not background. It covers the PHP user, ACL and failures.
 
 Skip this step for Docker, DDEV, Lando, and wp-env — those images handle ownership internally.
 

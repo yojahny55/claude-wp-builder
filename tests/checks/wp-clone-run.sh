@@ -8,9 +8,9 @@
 #
 # The headings here are "## Path A", "## Path B" and "## Step 6", so the heading anchor takes
 # either a colon or a space after the title (wp-init's "## Step N:" form is not the only one).
-# Ceiling: the command is 16 KB with the four references moved out (Path C and the gateway
-# step added), so 18 KB leaves room for a few added lines but fails if a path's detail is
-# pasted back in.
+# Ceiling: the command is 16 KB with the five references moved out (Path C and Step 5.4.1's
+# mail capture joined the first three), so 18 KB leaves room for a few added lines but fails
+# if a path's detail is pasted back in.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail=0
