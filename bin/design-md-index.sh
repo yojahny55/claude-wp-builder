@@ -14,6 +14,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 d=skills/wp-demo-craft/references/design-md
 
+tmp=$(mktemp "$d/.INDEX.md.XXXXXX")
+trap 'rm -f "$tmp"' EXIT
+
 echo "warning: about to overwrite $d/INDEX.md — any hand-corrected industry or" >&2
 echo "tone values will be replaced by the keyword heuristic below. Diff the" >&2
 echo "result against git before committing and redo hand corrections that still apply." >&2
@@ -60,17 +63,21 @@ EOF
       '#f'*|'#F'*|'#e'*|'#E'*) tone=light ;;
     esac
     industry=general
-    case "$(echo "$desc" | tr 'A-Z' 'a-z')" in
+    # `api` and `car` match as whole words only: as substrings they hit "capital",
+    # "rapid", "card", "care". Padded with spaces so a word at either end matches too.
+    words=" $(echo "$desc" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9\n' ' ') "
+    case "$words" in
       *fintech*|*bank*|*payment*|*finance*) industry=finance ;;
-      *developer*|*devtool*|*api*|*infrastructure*) industry=devtools ;;
+      *developer*|*devtool*|*" api "*|*" apis "*|*infrastructure*) industry=devtools ;;
       *saas*|*product*|*software*) industry=saas ;;
       *commerce*|*shop*|*retail*|*store*) industry=commerce ;;
       *agency*|*studio*|*portfolio*) industry=agency ;;
       *health*|*medical*|*wellness*) industry=health ;;
       *travel*|*hotel*|*hospitality*) industry=hospitality ;;
-      *car*|*automotive*|*vehicle*) industry=automotive ;;
+      *" car "*|*" cars "*|*automotive*|*vehicle*) industry=automotive ;;
     esac
     echo "| $dom | $industry | $tone | ${display:-unknown} | ${accent:-unknown} |"
   done
-} > "$d/INDEX.md"
+} > "$tmp"
+mv -f "$tmp" "$d/INDEX.md"
 echo "wrote $d/INDEX.md"
