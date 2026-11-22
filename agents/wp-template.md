@@ -326,36 +326,9 @@ echo prefix_image(prefix_get_field('site_logo', 'option'), 'medium', array(
 
 ### CSS backgrounds (MANDATORY when a section paints an image through CSS)
 
-An image printed as a `background-image` is not an `<img>`, so nothing that rewrites `<img>` tags reaches it — including Robin Image Optimizer in its default `picture` delivery mode, which is what most optimized sites run. A background left alone can serve a megabyte where its WebP sibling is a third of that.
-
-Print the background with the starter helper `prefix_background_image( $url )` (from `inc/performance.php`), never a bare `url()`:
-
-```php
-$image = prefix_get_field('hero_image');
-?>
-<section class="hero" style="<?php echo prefix_background_image( $image['url'] ?? '' ); ?>">
-```
-
-- The helper emits `background-image:url(…)` first and an `image-set()` second, so a browser without `image-set()`/`type()` (Safari 16 and older) keeps the plain URL and the background never disappears.
-- It adds the WebP branch **only when the sibling file exists on disk**, and it resolves local uploads URLs only.
-- Its return value is already escaped — print it raw, do **not** wrap it in `esc_attr()`.
-- Each browser requests the URL it understands, so this is safe behind a full-page cache. Never solve this with `Vary: Accept` from a template.
-- Prefer an `<img>` with `object-fit: cover` where the layout allows one: it gets a `srcset`, which a background never has.
-
-#### A decorative background below the fold is deferred (MANDATORY)
-
-`background-image` has no `loading` attribute, so the browser downloads every background it parses with the first paint — a footer band, a map panel or a decorative section sitting thousands of pixels down is on the critical path exactly like the hero. On a real build four such backgrounds were 120–320KB each, and holding them back took the first paint from 3.7MB to 1.4MB with no visible change.
-
-Print those with `prefix_lazy_background_attr( $url )` instead, which returns attributes rather than a style value:
-
-```php
-<section class="cta" <?php echo prefix_lazy_background_attr( $image['url'] ?? '' ); ?>>
-```
-
-- **Never the hero.** It is the LCP element, and deferring it moves the largest paint later by whatever the observer waits. The hero keeps `prefix_background_image()` and its preload.
-- Pass `true` as the second argument for an element that is *inside* the first viewport but not yet visible — a carousel slide behind the first one. An observer fires on those immediately, so they are painted after the load event instead.
-- The helper registers each declaration and `prefix_print_lazy_background_noscript()` repeats all of them inside a `<noscript><style>` block on `wp_footer`, so a visitor with JavaScript disabled sees the same page. Do not remove that hook while the helper is in use.
-- The key travels in a data attribute and **not** in `id`, because these sections usually carry one already and an HTML parser drops a second `id` on the same element — which leaves the noscript rule pointing at nothing while the page still looks correct with JavaScript on.
+Applies when a section paints an image through CSS (`background-image`).
+Print backgrounds with `prefix_background_image( $url )`, never a bare `url()`; a decorative background below the fold uses `prefix_lazy_background_attr( $url )`, never the hero.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-theme-standards/references/template-css-backgrounds.md` and follow it — it is mandatory for that case, not background.
 
 ## Descriptive Link Text (SEO — MANDATORY)
 
@@ -413,116 +386,17 @@ endif;
 
 Always call `wp_reset_postdata()` after a custom query loop.
 
-### Archive and directory ordering needs a tiebreaker
+### Archive ordering and pagination
 
-`'orderby' => 'date'` alone is not stable when several records share a `post_date` to the
-second — which seeded content routinely does, since a seed script creates a batch of posts
-in the same request. MySQL is free to return same-timestamp rows in a different order on
-every query, so the same archive/directory page silently reshuffles between requests and
-between page loads. Add `ID` as the tiebreaker whenever ordering by date:
-
-```php
-'orderby' => array( 'date' => 'DESC', 'ID' => 'DESC' ),
-```
-
-Only do this for date-based ordering. A query whose `orderby` is already something else —
-`menu_order`, a specific field, the demo's own explicit sequence (see "A list's ORDER and
-COUNT come from the demo" above) — is already deterministic and does not need it.
-
-## Pagination
-
-Use WordPress built-in pagination functions:
-
-```php
-<?php
-// Simple numbered pagination
-the_posts_pagination(array(
-    'mid_size'  => 2,
-    'prev_text' => '&laquo; Previous',
-    'next_text' => 'Next &raquo;',
-));
-?>
-```
-
-For custom query pagination, use `paginate_links()`.
+Applies when a template lists posts in an archive, directory or paginated custom query.
+Order by a stable tiebreaker and paginate custom queries with `paginate_links()`.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-theme-standards/references/template-archive-queries.md` and follow it — it is mandatory for that case, not background.
 
 ## Custom Nav Walker
 
-Nav markup/styles MUST follow the nav-class contract in the wp-theme-standards skill.
-
-When generating custom navigation markup, extend `Walker_Nav_Menu`:
-
-**A walker that overrides `start_el()` must re-apply the core filters `start_el()` would
-otherwise have run.** `Walker_Nav_Menu::start_el()` is what calls `nav_menu_css_class`,
-`nav_menu_item_id` and `nav_menu_link_attributes` — overriding the method replaces core's
-implementation entirely, so a walker that reads `$item->classes` raw and never calls
-`apply_filters()` itself silently drops every class, ID or link attribute any plugin, or
-the theme's own "current menu item" logic, adds through those filters. This is not
-theoretical: a build shipped exactly this, and the detail page for a record lost the
-"you are here" highlight on its parent nav item the moment its `current-menu-item` class —
-added via `nav_menu_css_class` — stopped surviving the walker.
-
-```php
-class Prefix_Nav_Walker extends Walker_Nav_Menu {
-    public function start_el(&$output, $item, $depth = 0, $args = null, $id = 0) {
-        // Re-apply the filters core's own start_el() would have run.
-        $classes = (array) apply_filters('nav_menu_css_class', array_filter((array) $item->classes), $item, $args, $depth);
-        $item_id = apply_filters('nav_menu_item_id', 'menu-item-' . $item->ID, $item, $args, $depth);
-        // Dropdown parents carry the contract's has-children modifier.
-        $has_children = in_array('menu-item-has-children', $classes, true);
-        $li_class = 'nav__item' . ($has_children ? ' nav__item--has-children' : '');
-        $output .= '<li' . ($item_id ? ' id="' . esc_attr($item_id) . '"' : '') . ' class="' . esc_attr(trim($li_class . ' ' . implode(' ', $classes))) . '">';
-        $atts = apply_filters('nav_menu_link_attributes', array('class' => 'nav__link', 'href' => $item->url), $item, $args, $depth);
-        $output .= '<a';
-        foreach ($atts as $attr => $value) {
-            $output .= ' ' . esc_attr($attr) . '="' . ($attr === 'href' ? esc_url($value) : esc_attr($value)) . '"';
-        }
-        $output .= '>';
-        $output .= esc_html($item->title);
-        $output .= '</a>';
-        // Dropdown items emit a toggle control per the nav-class contract.
-        if ($has_children) {
-            $output .= '<button class="nav__toggle" aria-expanded="false" aria-label="' . esc_attr__('Toggle submenu', 'textdomain') . '"></button>';
-        }
-    }
-
-    // Child <ul> MUST use .nav__submenu to match the contract (default is 'sub-menu').
-    public function start_lvl(&$output, $depth = 0, $args = null) {
-        $output .= '<ul class="nav__submenu">';
-    }
-
-    public function end_lvl(&$output, $depth = 0, $args = null) {
-        $output .= '</ul>';
-    }
-
-    public function end_el(&$output, $item, $depth = 0, $args = null) {
-        $output .= '</li>';
-    }
-}
-```
-
-Usage in templates:
-
-```php
-// The registered name depends on the i18n strategy: primary-en, primary-es, …
-// under suffix, one bare 'primary' under polylang. prefix_nav_location() in
-// inc/i18n.php returns the right one; a name built here renders nothing on
-// the other strategy.
-wp_nav_menu(array(
-    'theme_location' => prefix_nav_location('primary'),
-    'container'      => 'nav',
-    'container_class'=> 'nav',
-    'menu_class'     => 'nav__menu',
-    'walker'         => new Prefix_Nav_Walker(),
-));
-```
-
-The walker output MUST match the nav-class contract exactly: `.nav__menu` on the top-level
-`<ul>`, `.nav__item` (+ `.nav__item--has-children` on dropdown parents) on each `<li>`,
-`.nav__link` on anchors, `.nav__submenu` on the child `<ul>`, and `.nav__toggle` on the
-dropdown control. A `menu_class` or submenu class that diverges from this leaves the header
-CSS targeting selectors the walker never emits (dead selectors — the Layer-1 nav-contract
-gate fails).
+Applies when building the header or any navigation markup (a custom `Walker_Nav_Menu`).
+Nav markup/styles MUST follow the nav-class contract in the wp-theme-standards skill; walker output MUST match it exactly (`.nav__menu`, `.nav__item`, `.nav__link`, `.nav__submenu`, `.nav__toggle`).
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-theme-standards/references/template-nav-walker.md` and follow it — it is mandatory for that case, not background.
 
 ## Markup Fidelity (every section, both templates)
 
@@ -571,41 +445,9 @@ ACF calls, the escaping, the i18n helpers, the loops.
 
 ## Wiring a Demo Control to Real Data
 
-A static demo control (a search box, a filter dropdown, a pager, a "see more" link) is only
-coherent because it was built against the same handful of mock values its cards show. Before
-turning any such control from decoration into something that queries real content:
-
-- **Grep the demo section for `MOCK:` and `data-mock` first.** The demo-authoring tooling
-  writes these on exactly the controls it knows are not backed by real behaviour — a search
-  form with no endpoint, a pager over a fully-rendered list, a filter whose options are not
-  drawn from any real taxonomy. A control carrying either marker is never wired as-is: either
-  re-derive it from the real query (a search that actually searches, a filter whose options
-  come from `get_terms()` on the records this section queries — Rule 12: build options from
-  real data, never from the demo's `<option>` values), or drop the control and say so in
-  your report. Shipping a search box that posts
-  nowhere, a pager that pages nothing, or a client-side filter checked against mock values
-  the real cards don't carry is worse than shipping no control — it reads as broken rather
-  than as absent.
-- **An optional "see more" / CTA URL control renders only when the field holds a real
-  `http(s)://` or site-relative URL.** A demo placeholder like `href="#anchor"` or
-  `href="#noticias"` is not a destination; printing the control anyway ships a dead link.
-  Check the field truthy AND shaped like a URL before rendering the `<a>`, and omit the whole
-  control — not just style it disabled — when it is not:
-
-  ```php
-  $more_url = prefix_get_field('news_more_url');
-  if ($more_url && preg_match('#^(https?://|/)#', $more_url)) : ?>
-      <a class="news__more" href="<?php echo esc_url($more_url); ?>" target="_blank" rel="noopener nofollow">
-          <?php prefix_e('see_more'); ?>
-      </a>
-  <?php endif; ?>
-  ```
-- **Never hardcode an example person, office or address in the template** to stand in for a
-  relation the demo shows but the project has not seeded yet — a practice area's "handled by"
-  lawyer, a service's "offered at" branch. If the relation is real but not yet in the
-  database, that is a seeding gap: report it so it gets seeded (`inc/seed/`), never paper over
-  it with a name and address typed into the PHP. A template that queries the real relation and
-  gets nothing back renders nothing for that slot; it does not invent an answer.
+Applies when the section has a search box, filter dropdown, pager, tabs, accordion, "see more" link or any control that selects data.
+Never ship a control that queries nothing: grep the demo section for `MOCK:` and `data-mock` first, build options from real data, and drop a dead control and say so in your report.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-theme-standards/references/template-demo-controls.md` and follow it — it is mandatory for that case, not background.
 
 ## Teaser Fidelity (CPT teaser / archive cards)
 
@@ -613,48 +455,8 @@ CPT single-post teasers (used in archive/blog loops, e.g. `.blog__card` above) M
 
 ## Carousels (JS you author for a section)
 
-A carousel's controls are correct only relative to how much the strip can actually scroll,
-and that changes with the real content count — which the demo's mock cards never show,
-because a demo always carries enough cards to overflow. Whenever a section script builds a
-scrollable strip with dots and/or arrows:
-
-- **Hide the controls, don't disable-and-leave-them, when the strip cannot move.** Compare
-  `scrollWidth` to `clientWidth` on the scrolling element; when it cannot overflow (the real
-  record count fits the viewport, which routinely happens with seeded content — three news
-  posts, four team members — where the demo showed six or eight), set `hidden` on the arrows,
-  the dots AND their wrapper. `hidden`, not `opacity:0` or a disabled state: a dimmed but
-  present control reads as "temporarily unavailable, try again," and a strip that will never
-  gain more content is never coming back. A "disabled button has no pointer cursor" report is
-  usually this working correctly, not a missing `cursor:pointer` — verify against `hidden`
-  before treating it as a CSS bug.
-- **Dot count is `Math.round(maxScroll / step) + 1`, clamped to the number of cards.**
-  `Math.ceil` turns a sub-pixel width or a scrollbar gutter (a ratio like 2.004 instead of a
-  clean 2) into an extra dot nothing stops on. Whatever the arithmetic produces, a strip
-  cannot have more stops than it has cards — clamp to that count as a hard ceiling.
-- **Dots and arrows live OUTSIDE the element that scrolls**, never as a child of the
-  `overflow-x-auto` box. A control placed inside the scrolling box is itself part of the
-  scrolled content: it renders fine on the first view and slides out of sight as soon as a
-  visitor moves the strip.
-- **Every card inside the scrolling element is `relative`** (the strip's direct children,
-  e.g. `<li class="relative ...">`). `overflow-x: auto` clips only the descendants whose
-  containing block is the strip or something inside it. A `position: absolute` box in a card
-  with no positioned ancestor below the strip (a `screen-reader-text` new-tab notice, a
-  badge, a stretched link) is laid out against a container *above* the strip. The strip
-  never clips it, and each off-screen card's copy stretches the whole document sideways at
-  every width. A 1px screen-reader span shows in no screenshot, so check the document
-  itself at a desktop and a phone width:
-  `document.documentElement.scrollWidth <= document.documentElement.clientWidth`.
-- **A mirrored icon (a prev arrow, typically) uses `transform` consistently across its
-  states.** In Tailwind v4, `-scale-x-100` writes the `scale` CSS property, not `transform` —
-  so a hover/focus rule that still sets `transform: translateX(...)` on the same element
-  REPLACES the mirroring instead of composing with it, and the icon flips back to unmirrored
-  on hover. Either keep every state on `scale`/`translate`/`rotate` (which compose with each
-  other in v4) or write the mirror as part of the same `transform` value the hover state uses
-  — never mix the two systems on one element.
-- **If the starter theme ships a shared carousel module** (a `carousel.js` or equivalent used
-  by more than one section), fix the defect THERE, not by patching around it in the section
-  that found it — every other carousel on the site has the same bug and will surface it later
-  if the fix stays local.
+Applies when a section you build has a carousel, slider or scrollable strip with dots and/or arrows.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-theme-standards/references/template-carousels.md` and follow it — it is mandatory for that case, not background.
 
 ## Component Reuse: Solve It Once
 

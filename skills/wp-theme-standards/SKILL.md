@@ -19,6 +19,14 @@ than retyping it:
 - [references/head-and-performance.md](references/head-and-performance.md) — the self-hosted font preload, the LCP preload, emoji and version removal, and
   the meta-description fallback. Read when writing anything hooked to `wp_head` or `init`.
 
+The `wp-template` agent reads these only when its section needs them (each is mandatory for that case):
+
+- [references/template-nav-walker.md](references/template-nav-walker.md) — the custom `Walker_Nav_Menu` and the nav-class contract. Header and navigation builds.
+- [references/template-carousels.md](references/template-carousels.md) — the JS rules for a scrollable strip with dots or arrows. Sections with a carousel or slider.
+- [references/template-css-backgrounds.md](references/template-css-backgrounds.md) — `prefix_background_image()` and the deferred below-the-fold background. Sections that paint an image through CSS.
+- [references/template-demo-controls.md](references/template-demo-controls.md) — wiring a search, filter, pager or CTA control to real data. Sections whose demo has such a control.
+- [references/template-archive-queries.md](references/template-archive-queries.md) — archive ordering tiebreaker and pagination. Archive, directory and paginated query templates.
+
 ---
 
 `style.css` carries the theme header and no styles: every rule goes where the template's
