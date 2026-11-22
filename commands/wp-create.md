@@ -116,6 +116,8 @@ bash -c 'test -f "$1/.wp-create.json" && echo EXISTS || echo NOT_FOUND' _ '${PRO
 
 If `.wp-create.json` already exists, see the **Existing `.wp-create.json` Handling** section below.
 
+**Order when both exist:** 2b wins. Handle the manifest first; Adopt Mode (2a) applies only after Update, or when there is no manifest.
+
 ---
 
 ## Step 3: Configuration Collection
@@ -621,7 +623,7 @@ What would you like to do?
   [3] Abort — Cancel and keep everything as-is
 ```
 
-- **Overwrite:** Proceed with full setup as if `.wp-create.json` did not exist. The old manifest is backed up to `.wp-create.json.bak`.
+- **Overwrite:** destroys the existing database and core (4.2 and 4.4 rerun on that site). Before 4.2: if `wp-config.php` exists, run `$WP db export ~/wp-create-backups/<slug>-$(date -u +%Y%m%dT%H%M%SZ).sql` (never under the WordPress root); stop if it fails. Then ask the user to confirm, naming the database and core to be replaced; no yes, no 4.2. Back up the manifest to `.wp-create.json.bak`, then proceed as if it did not exist.
 - **Update:** Skip environment setup steps (4.1-4.8). Only re-run configuration steps: update plugins (4.10), update permalinks (4.11), update options (4.13), install new languages (4.14). Regenerate the manifest with updated values.
 - **Abort:** Exit the command immediately.
 
