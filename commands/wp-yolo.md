@@ -478,7 +478,8 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-yolo-run/references/parity-gate.md` now an
 
 If any critical demo-parity finding survived Step 5.5's auto-fix + re-verify, or the
 GEO scan in Step 5 item 8 did not succeed (unmeasured on exit 2 or 3, errored on exit 1), or
-any of Step 5 items 4-8 did not run, do NOT print "Build Complete." Print instead,
+its GEO fixer returned `BLOCKED: <reason>`, or any of Step 5 items 4-8 did not run, do NOT
+print "Build Complete." Print instead,
 before anything else:
 ```
 === WP YOLO Build INCOMPLETE — deliverable not signed off ===
@@ -486,6 +487,7 @@ before anything else:
 Review (blocking):
   - <every unresolved critical finding — layer, selector/property/file, demo value vs. built value>
   - <GEO scan unmeasured (exit 2), not publicly reachable (exit 3 — re-run with --host), or errored (exit 1)>
+  - <GEO fixer BLOCKED: wp-agentic-surfaces, its reason, the files it touched, the checks still failing>
   - <any of Step 5 items 4-8 that did not run, and why>
 
 Run /wp-finalize again after resolving the above, then re-run this gate.

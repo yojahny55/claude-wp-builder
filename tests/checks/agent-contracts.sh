@@ -33,6 +33,7 @@ inc skills/wp-audit-run/references/dispatch.md 'A blocked reason is not an allow
 inc skills/wp-audit-run/references/dispatch.md 'writes the agent and its `blocked` reason into the Step 6.8 point 5 summary'
 inc skills/wp-audit-run/references/fix.md 'If the fixer returns `BLOCKED: <reason>`, skip the after scan'
 inc commands/wp-yolo.md 'skip the re-scan: list the failed checks under Review'
+inc commands/wp-yolo.md '<GEO fixer BLOCKED: wp-agentic-surfaces, its reason'
 inc agents/wp-audit-geo.md 'do not re-scan or count any code as resolved'
 inc agents/wp-agentic-surfaces.md 'it never replaces a missing one'
 inc agents/wp-tailwind.md 'Demo Conversion Mode'
