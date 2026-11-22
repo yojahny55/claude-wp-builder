@@ -9,7 +9,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 
-fail() { echo "FAIL: $*" >&2; exit 1; }
+. "$ROOT/tests/lib/assert.sh"
 
 mk_tree() { # $1 = dir
   mkdir -p "$1/bin" "$1/skills/wp-demo-craft/references/domains" "$1/skills/wp-demo-craft/references/design-md"
