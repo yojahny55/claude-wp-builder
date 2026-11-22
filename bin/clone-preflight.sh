@@ -62,7 +62,9 @@ fi
 base="$scheme://$host$subdir"
 echo "base=$base"
 code "$base/" "$hdrs" >/dev/null
-server=$(tr -d '\r' < "$hdrs" | awk -F': ' 'tolower($1)=="server"{print $2; exit}')
+# One awk reading the whole file: `tr | awk '...exit'` under pipefail died with 141 when the
+# headers outgrew the pipe buffer after the Server line.
+server=$(awk -F': ' '{ sub(/\r$/, "") } tolower($1)=="server" && !seen { print $2; seen = 1 }' "$hdrs")
 echo "server=${server:-unknown}"
 
 # 2. Permalinks and three internal URLs, taken from WP-CLI and requested on the audited host.

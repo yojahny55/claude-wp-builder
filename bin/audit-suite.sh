@@ -507,7 +507,10 @@ fi
 # install on a machine that has Node, not a machine without one.
 if ! out="$(cd "$dir" && npx --no-install playwright --version 2>&1)"; then
   echo "audit-suite: the Playwright CLI in $modules does not load:" >&2
-  printf '%s\n' "$out" | grep -m3 -E 'Error|Cannot find' >&2 || printf '%s\n' "$out" | tail -3 >&2
+  # Not `| grep -m3`: under pipefail an early-exiting grep can SIGPIPE printf, and the
+  # fallback then ran as well, printing the tail after the matches.
+  errs=$(grep -E 'Error|Cannot find' <<<"$out" || true)
+  if [ -n "$errs" ]; then sed -n 1,3p <<<"$errs" >&2; else tail -3 <<<"$out" >&2; fi
   exit 1
 fi
 
