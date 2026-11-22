@@ -18,6 +18,7 @@
  * Exit codes: 0 sections listed and no delimiter defect, 1 a delimiter defect was found,
  * 2 nothing to read (no demo/ directory, no such page, or no .html in it), 3 crash, 64 usage.
  */
+import './lib/stdio-blocking.mjs';
 import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 import { pathToFileURL } from 'node:url';

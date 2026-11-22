@@ -15,6 +15,7 @@
  * no longer matches the one plan showed and the operator approved), 3 no key (nothing written,
  * nothing billed), 4 one or more slots failed after work began.
  */
+import './lib/stdio-blocking.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, renameSync, unlinkSync, realpathSync } from 'node:fs';
 import { resolve, join, dirname, basename, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';

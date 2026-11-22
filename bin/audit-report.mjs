@@ -89,6 +89,7 @@
 //   1  invalid input — the run file is missing, unparseable, or a finding is incomplete
 //   3  crash
 
+import './lib/stdio-blocking.mjs';
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, renameSync, statSync } from 'node:fs';
 import { join, resolve, basename, isAbsolute } from 'node:path';
 import { spawnSync } from 'node:child_process';

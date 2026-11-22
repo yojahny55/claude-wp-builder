@@ -58,6 +58,7 @@
  * diffs found, 2 = usage or no browser (nothing is installed or downloaded), 3 = INCOMPLETE:
  * no diff, but a page or viewport was unmeasured, which is never a pass.
  */
+import './lib/stdio-blocking.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';

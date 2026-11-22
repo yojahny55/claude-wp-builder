@@ -31,6 +31,7 @@
  *
  * exit 0 clean · 1 deltas found · 2 no usable browser · 3 the run itself crashed
  */
+import './lib/stdio-blocking.mjs';
 import { existsSync, readdirSync, statSync, lstatSync, createReadStream, readFileSync, realpathSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, join, dirname, extname, normalize, sep, basename } from 'node:path';
 import { pathToFileURL } from 'node:url';

@@ -35,6 +35,7 @@
 // Exit: 0 gate passed, 1 below the threshold (or INCOMPLETE with --final), 2 invalid input
 // (including an agent report the normalizer rejects), 3 crash.
 
+import './lib/stdio-blocking.mjs';
 import { existsSync } from 'node:fs';
 import {
   CATALOGS, canonicalCategory, readCatalog, loadReports, normalizeReport, classifyUnmeasured,

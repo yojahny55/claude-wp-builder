@@ -62,6 +62,7 @@
  * exit 0 = ran (findings and unmeasured items are in the JSON), 2 = usage or no browser,
  * 3 = budget spent (launches or wall clock) — report what you have.
  */
+import './lib/stdio-blocking.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';

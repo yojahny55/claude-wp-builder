@@ -57,6 +57,7 @@
  * installed or downloaded), or an unsafe --date; 3 the page was written but a picture or an
  * ineffective rule left a card incomplete.
  */
+import './lib/stdio-blocking.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';

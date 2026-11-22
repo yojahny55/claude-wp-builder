@@ -10,6 +10,7 @@
  *                 without a browser, so the emitted CSS itself can be asserted on
  *        exit 0 ok, 2 no browser, 3 crash
  */
+import './lib/stdio-blocking.mjs';
 import { existsSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { resolve, join, dirname, basename } from 'node:path';
 import { tmpdir } from 'node:os';

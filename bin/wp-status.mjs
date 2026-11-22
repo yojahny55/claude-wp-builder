@@ -9,6 +9,7 @@
  * Exit codes: 0 report printed (whatever the state), 3 crash, 64 usage (unknown flag, or a
  * path that is not a directory).
  */
+import './lib/stdio-blocking.mjs';
 import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { MANIFEST_NAME, validateManifest, isAdopted } from './lib/manifest.mjs';
