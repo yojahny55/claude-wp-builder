@@ -8,6 +8,7 @@ here is missing from this list.
 - [cinematic-mode.md](cinematic-mode.md) — scroll-driven cinematic sites: when to use them and the pipeline from video to theme.
 - [code-connect-draft.md](code-connect-draft.md) — draft proposal (not implemented) for mapping Figma Code Connect to the canonical demo snippets.
 - [commands.md](commands.md) — reference for every slash command: what it needs and what it writes.
+- [exit-codes.md](exit-codes.md) — the exit codes of every `bin/*.mjs` tool, as they are, and the scheme a new tool follows.
 - [known-ceilings.md](known-ceilings.md) — deliberate, documented limits of the plugin and its checks.
 - [postmortem-reference-build.md](postmortem-reference-build.md) — defects with a traceable tool root cause, from one full bilingual build.
 - [testing.md](testing.md) — how the contract checks run, what CI adds, and what nothing covers.

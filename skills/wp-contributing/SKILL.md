@@ -105,6 +105,8 @@ When the thing you changed is a real script (`bin/*.sh`), test its behavior, not
 build a temp directory, put a fake binary earlier on `PATH`, run the script, assert what it
 did. `tests/checks/tailwind-rebuild.sh` does this with a fake `npm` and fake watcher processes.
 
+A new `bin/*.mjs` tool takes its exit codes from `COMMON` in `bin/lib/exit-codes.mjs` (0 ok, 1 negative result, 2 could not measure, 3 crash, 64 usage, 4-9 its own). Declare any other code in `TOOLS` and in `docs/exit-codes.md`, or `tests/checks/exit-code-table.sh` fails.
+
 ### Agent contracts
 
 - **First Action.** Every agent opens with a `## First Action (MANDATORY)` block.
