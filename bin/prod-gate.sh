@@ -114,9 +114,9 @@ if [ "$local_host" -eq 1 ]; then exec "$@"; fi
 # lock is a symlink, `$lock.l` -> owner pid: `ln -s` creates it atomically with the pid already
 # in it, so no moment exists with a lock and no owner. A dead owner (`ps -p` fails; unlike
 # `kill -0` it does not fail on EPERM for another user's process) is cleared under a second
-# mutex, the mkdir `$lock.takeover`: inside it the owner is read AGAIN and the lock is removed
+# mutex, the symlink `$lock.takeover`: inside it the owner is read AGAIN and the lock is removed
 # only if it is still that same dead pid, so a waiter holding a stale read can never remove a
-# lock somebody else took meanwhile. A takeover mutex older than a minute is abandoned. Limit:
+# lock somebody else took meanwhile. A takeover mutex is a symlink to its holder's pid and is cleared only when that pid is dead. Limit:
 # a reused pid reads as alive, so the gate then waits and exits 5 (safe side, nothing sent).
 if command -v flock >/dev/null 2>&1; then
   exec 9>"$lock"
@@ -127,15 +127,27 @@ if command -v flock >/dev/null 2>&1; then
 else
   lockl="$lock.l" take="$lock.takeover" waited=0
   until ln -s "$$" "$lockl" 2>/dev/null; do
+    # `ln -s` also fails for reasons other than "held": a name past NAME_MAX, a plain file in
+    # the way, a read-only state dir. Without a symlink there is no holder to wait for, and
+    # waiting would spin: retry once (the holder may just have left), then give up.
+    if [ ! -L "$lockl" ]; then
+      ln -s "$$" "$lockl" 2>/dev/null && break
+      [ -L "$lockl" ] || { echo "prod-gate: cannot create lock $lockl" >&2; exit 1; }
+    fi
     owner="$(readlink "$lockl" 2>/dev/null || true)"
-    if [ -z "$owner" ]; then continue; fi
-    if ! ps -p "$owner" >/dev/null 2>&1; then
-      if mkdir "$take" 2>/dev/null; then
+    if [ -n "$owner" ] && ! ps -p "$owner" >/dev/null 2>&1; then
+      if ln -s "$$" "$take" 2>/dev/null; then
         [ "$(readlink "$lockl" 2>/dev/null || true)" = "$owner" ] && rm -f "$lockl"
-        rmdir "$take"
+        [ "$(readlink "$take" 2>/dev/null || true)" = "$$" ] && rm -f "$take"
         continue
       fi
-      [ -z "$(find "$take" -maxdepth 0 -mmin +1 2>/dev/null)" ] || rmdir "$take" 2>/dev/null || true
+      # The takeover mutex is a symlink to its holder's pid too; one whose holder is dead
+      # is cleared (re-reading the pid first), never one cleared by age.
+      t="$(readlink "$take" 2>/dev/null || true)"
+      if [ -n "$t" ] && ! ps -p "$t" >/dev/null 2>&1 && [ "$(readlink "$take" 2>/dev/null || true)" = "$t" ]; then
+        rm -f "$take"
+        continue
+      fi
     fi
     if [ "$waited" -ge "$wait_max" ]; then
       echo "prod-gate: $host busy for more than ${wait_max}s (another agent's command). Nothing sent; call again later." >&2

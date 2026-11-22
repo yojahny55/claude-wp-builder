@@ -109,6 +109,24 @@ rc=0; PATH="$nf" bash bin/prod-gate.sh --dir "$gate" --delay 0 --wait 1 pub.loca
 # (3) the failed run's trap did not remove somebody else's lock.
 [ "$(readlink "$gl")" = "$other" ] || fail "the trap removed a lock it did not own"
 kill "$other" 2>/dev/null || true; rm -f "$gl"
+# (4) a lock that cannot be created exits 1 with a message, fast, instead of spinning.
+long="$(printf 'x%.0s' $(seq 1 250)).org"
+t0=$SECONDS; rc=0
+out="$(PATH="$nf" timeout 10 bash bin/prod-gate.sh --dir "$tmp/gate3" --delay 0 --wait 3 "$long" -- echo ran 2>&1)" || rc=$?
+[ "$rc" = 1 ] && [ $((SECONDS - t0)) -le 5 ] && grep >/dev/null -c 'cannot create lock' <<<"$out" || fail "name past NAME_MAX: rc=$rc out=$out"
+mkdir -p "$tmp/gate4"; : > "$tmp/gate4/pub.local.com.lock.l"
+rc=0; out="$(PATH="$nf" timeout 10 bash bin/prod-gate.sh --dir "$tmp/gate4" --delay 0 --wait 3 pub.local.com -- echo ran 2>&1)" || rc=$?
+[ "$rc" = 1 ] && grep >/dev/null -c 'cannot create lock' <<<"$out" || fail "plain file as lock: rc=$rc out=$out"
+if [ "$(id -u)" != 0 ]; then
+  mkdir -p "$tmp/gate5"; chmod 555 "$tmp/gate5"
+  rc=0; out="$(PATH="$nf" timeout 10 bash bin/prod-gate.sh --dir "$tmp/gate5" --delay 0 --wait 3 pub.local.com -- echo ran 2>&1)" || rc=$?
+  chmod 755 "$tmp/gate5"
+  [ "$rc" = 1 ] && grep >/dev/null -c 'cannot create lock' <<<"$out" || fail "read-only state dir: rc=$rc out=$out"
+fi
+# (5) a dead lock whose takeover mutex is also dead is recovered.
+rm -f "$gl"; ln -s 999999 "$gl"; ln -s 999998 "$gate/pub.local.com.lock.takeover"
+rc=0; PATH="$nf" timeout 20 bash bin/prod-gate.sh --dir "$gate" --delay 0 --wait 3 pub.local.com -- echo ran >/dev/null 2>&1 || rc=$?
+[ "$rc" = 0 ] || fail "dead takeover mutex was not recovered (rc=$rc)"
 has bin/prod-gate.sh 'indistinguishable from the gate'
 
 # 6. audit-suite empties results/audit at the start of a run, that directory only.
