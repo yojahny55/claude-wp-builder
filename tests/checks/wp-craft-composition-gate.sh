@@ -115,19 +115,31 @@ fi
 grep -Fq 'carries no findings list' "$work/shape.out" \
   || fail "the composition gate exited 1 on an uninterpretable detector payload without saying that is why, so it is indistinguishable from any other failure"
 
-# 3b. Findings that break the contract the gate reads: an unknown severity, or an element that is
-#     not an object. Both must be rc 1 with a stated reason, never a pass and never a traceback.
-for case in 'sev|[{"antipattern":"x","category":"slop","severity":"error","file":"/x/slop-probe.html"}]' 'nonobj|["x"]'; do
-  name=${case%%|*}; payload=${case#*|}
-  printf '#!/usr/bin/env bash\necho %q\n' "$payload" > "$work/fakebin/npx"
+# 3b. Detector output the gate does not understand: an unknown severity or category, a field
+#     missing or of the wrong type, an element that is not an object, a wrapper object with
+#     keys besides "findings", an exit code other than 0/2, or an exit code that disagrees
+#     with the payload. Every one must be rc 1 with "not understood" or "could not scan",
+#     never a pass and never a traceback. Case format: name|detector exit|payload.
+W='"antipattern":"x","file":"/x/slop-probe.html"'
+for case in \
+  "sev|0|[{$W,\"category\":\"slop\",\"severity\":\"error\"}]" \
+  "cat|0|[{$W,\"category\":\"style\",\"severity\":\"advisory\"}]" \
+  "sevlist|0|[{$W,\"category\":\"slop\",\"severity\":[\"warning\"]}]" \
+  "nofile|2|[{\"antipattern\":\"x\",\"category\":\"slop\",\"severity\":\"warning\"}]" \
+  'nonobj|0|["x"]' \
+  'extrakey|0|{"findings":[],"error":"crashed"}' \
+  'crash|3|[]' \
+  "rc0warn|0|[{$W,\"category\":\"quality\",\"severity\":\"warning\"}]" \
+  'rc2empty|2|[]'; do
+  name=${case%%|*}; rest=${case#*|}; drc=${rest%%|*}; payload=${rest#*|}
+  printf '#!/usr/bin/env bash\necho %q\nexit %d\n' "$payload" "$drc" > "$work/fakebin/npx"
   rc=0
   PATH="$work/fakebin:$PATH" COMPS_DIR="$work/slop" bash bin/composition-gate.sh \
     >"$work/$name.out" 2>&1 || rc=$?
-  [ "$rc" -eq 1 ] || fail "the composition gate returned rc=$rc on the '$name' detector payload, expected 1: $(cat "$work/$name.out")"
-  if grep -Fq 'Traceback' "$work/$name.out"; then fail "the composition gate raised a traceback on the '$name' payload: $(cat "$work/$name.out")"; fi
-  if [ "$name" = sev ]; then
-    grep -Fq 'not understood' "$work/$name.out" || fail "the composition gate did not say 'not understood' on an unknown severity: $(cat "$work/$name.out")"
-  fi
+  [ "$rc" -eq 1 ] || fail "the composition gate returned rc=$rc on the '$name' detector output, expected 1: $(cat "$work/$name.out")"
+  if grep -Fq 'Traceback' "$work/$name.out"; then fail "the composition gate raised a traceback on the '$name' output: $(cat "$work/$name.out")"; fi
+  [ "$(grep -Ec 'not understood|could not scan' "$work/$name.out")" -gt 0 ] \
+    || fail "the composition gate exited 1 on the '$name' output without saying it was not understood: $(cat "$work/$name.out")"
 done
 
 # An empty detector payload is a dropped connection, not a verdict: the gate retries once.
@@ -144,6 +156,7 @@ cat <<'JSON'
 [{"antipattern":"kicker-above-heading","category":"slop","severity":"warning","file":"/x/proof-row.html"},
  {"antipattern":"kicker-above-heading","category":"slop","severity":"warning","file":"/x/slop-probe.html"}]
 JSON
+exit 2
 SH
 rc=0
 PATH="$work/fakebin:$PATH" COMPS_DIR="$work/slop" bash bin/composition-gate.sh \

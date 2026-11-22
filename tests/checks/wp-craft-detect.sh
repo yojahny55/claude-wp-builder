@@ -22,6 +22,9 @@ d=$wp_demo
 grep -Fq 'impeccable@latest' "$c" || fail "$c does not run the detector as impeccable@latest"
 stale=$(grep -rnE 'impeccable@[0-9]' commands agents skills bin README.md || true)
 [ -z "$stale" ] || fail "a numeric impeccable pin is back (the detector follows the newest release on purpose): $stale"
+r=skills/wp-demo-verify-run/references/detector.md
+[ "$(grep -Ec 'Pin the major|`@[0-9]+`' "$r")" -eq 0 ] || fail "$r still tells the run to pin the detector's major version"
+grep -Fq 'never a clean scan' "$r" || fail "$r no longer says unrecognised detector output is a detector that could not run"
 grep -Fq -- '--json' "$c" || fail "$c does not ask the detector for JSON"
 grep -Fq 'impeccable.json' "$c" || fail "$c does not save detector findings under .verify"
 grep -Fq 'slop' "$c" || fail "$c does not gate on the real 'slop' category"

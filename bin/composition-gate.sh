@@ -88,14 +88,22 @@ echo "composition-gate: assembled $count compositions (each >= $MIN_DOC_BYTES by
 # detector that answered, with any JSON, is never re-run. Because the version floats, the
 # gate below refuses any finding whose shape, category or severity it does not know (exit
 # 1, "not understood"), so a new release can make the gate fail but never makes it green.
+# The detector's exit code is kept: 0 is a clean or advisory-only scan, 2 a scan with at
+# least one non-advisory finding, anything else a scan that did not complete. Valid JSON
+# from a run that exited otherwise (a crash after printing `[]`) is not a clean scan.
 for attempt in 1 2; do
-  npx -y impeccable@latest detect "$WORK" --json > "$WORK/findings.json" 2>/dev/null || true
+  det_rc=0
+  npx -y impeccable@latest detect "$WORK" --json > "$WORK/findings.json" 2>/dev/null || det_rc=$?
   [ -s "$WORK/findings.json" ] && break
 done
 
-python3 - "$WORK/findings.json" "$count" <<'PY'
+python3 - "$WORK/findings.json" "$count" "$det_rc" <<'PY'
 import json, sys, collections
-path, expected = sys.argv[1], int(sys.argv[2])
+path, expected, det_rc = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+if det_rc not in (0, 2):
+    print("composition-gate: detector exited %d (0 = clean, 2 = findings) — treating as could not scan" % det_rc,
+          file=sys.stderr)
+    raise SystemExit(1)
 try:
     data = json.load(open(path))
 except Exception as exc:
@@ -103,7 +111,9 @@ except Exception as exc:
     raise SystemExit(1)
 if isinstance(data, list):
     findings = data
-elif isinstance(data, dict) and isinstance(data.get("findings"), list):
+elif isinstance(data, dict) and isinstance(data.get("findings"), list) and set(data) == {"findings"}:
+    # Only a bare {"findings": [...]} wrapper: any other key ("error", "skipped", ...)
+    # may say the list is partial, and this gate cannot tell, so it is not understood.
     findings = data["findings"]
 else:
     # Parseable JSON in a shape this gate does not understand is a scan that did
@@ -127,10 +137,17 @@ for i, f in enumerate(findings):
     for key in ("antipattern", "file"):
         if not isinstance(f.get(key), str) or not f.get(key):
             unknown.append("finding %d has no %s" % (i, key))
-    if f.get("category") not in KNOWN_CATEGORY:
-        unknown.append("finding %d has category %r" % (i, f.get("category")))
-    if f.get("severity") not in KNOWN_SEVERITY:
-        unknown.append("finding %d has severity %r" % (i, f.get("severity")))
+    cat, sev = f.get("category"), f.get("severity")
+    if not isinstance(cat, str) or cat not in KNOWN_CATEGORY:
+        unknown.append("finding %d has category %r" % (i, cat))
+    if not isinstance(sev, str) or sev not in KNOWN_SEVERITY:
+        unknown.append("finding %d has severity %r" % (i, sev))
+if not unknown:
+    # The exit code and the payload must agree: 2 means at least one non-advisory finding,
+    # 0 means none. A disagreement is a detector this gate no longer understands.
+    has_warning = any(f.get("severity") == "warning" for f in findings)
+    if has_warning != (det_rc == 2):
+        unknown.append("detector exited %d but the payload has %s warning finding" % (det_rc, "a" if has_warning else "no"))
 if unknown:
     for line in unknown[:10]:
         print("composition-gate: detector output not understood: %s" % line, file=sys.stderr)
