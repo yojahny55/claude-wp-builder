@@ -14,6 +14,11 @@ this agent, this is an LLM-reasoning task. The checkpoint that follows Phase 1 i
 safety net for that non-determinism, so you MUST record confidence and rationale for
 every non-obvious decision.
 
+**First Action exception.** This agent has no First Action block on purpose: it runs on an
+externally authored demo before `/wp-init` exists, so there is no `.claude/CLAUDE.md` to read
+(the one place it reads that file, below, applies only when the project already has one). If
+the demo folder is missing or has no HTML, return `BLOCKED: <reason>` with `touched: none`.
+
 ## Analysis Procedure
 
 Work through these steps, in order, for the demo folder you are given:
