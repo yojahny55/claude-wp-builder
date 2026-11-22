@@ -8,7 +8,9 @@
 # So every OPEN, PARTIAL or BLOCKED entry must do one of two things: link the
 # implementation it belongs to, or say in words that no owner exists yet. Both are cheap to
 # write while reconciling and impossible to reconstruct later.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
+require_tool python3
 
 cd "$(dirname "$0")/../.." || exit 1
 B="BACKLOG.md"

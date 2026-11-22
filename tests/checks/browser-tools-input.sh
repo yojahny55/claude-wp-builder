@@ -14,10 +14,10 @@
 #    top-level symlink targets), never the rest of the common ancestor.
 # All of it runs against a stub playwright-core except the served-tree case, which
 # needs PLAYWRIGHT_CORE.
-set -u
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp" "${far:-}"' EXIT
-fail() { echo "FAIL: $*"; exit 1; }
 command -v node >/dev/null || { echo "SKIP: node not on PATH"; exit 0; }
 
 mkdir -p "$tmp/pw"
@@ -44,17 +44,17 @@ dv() { PLAYWRIGHT_CORE="$tmp/pw" WP_BROWSER_CHROMIUM="$tmp/fakechrome" node "$ro
 # --- demo-verify: value-less and malformed flag values ---
 for bad in "--widths" "--out" "--widths 1440" "--widths 1440x" "--widths --out" "--widths axb"; do
   # shellcheck disable=SC2086
-  out="$(dv $bad)"; rc=$?
+  rc=0; out="$(dv $bad)" || rc=$?
   [ "$rc" -eq 1 ] || fail "demo-verify $bad exited $rc, want 1: $out"
   printf '%s' "$out" | grep >/dev/null -c 'TypeError\|    at ' && fail "demo-verify $bad printed a stack: $out"
   printf '%s' "$out" | grep >/dev/null -cF 'demo-verify: --' || fail "demo-verify $bad gave no clear message: $out"
 done
-out="$(dv --widths 1440x900 --out "$tmp/o")"
+out="$(dv --widths 1440x900 --out "$tmp/o")" || true
 printf '%s' "$out" | grep >/dev/null -c 'needs a value\|wants WIDTHxHEIGHT' && fail "a valid --widths was rejected: $out"
 
 # --- demo-verify: every opened context is closed when the page throws ---
 : > "$tmp/log"
-dv --widths 1440x900 --out "$tmp/o2" >/dev/null
+dv --widths 1440x900 --out "$tmp/o2" >/dev/null || true
 opened="$(grep -c '^open$' "$tmp/log")"; closed="$(grep -c '^close$' "$tmp/log")"
 [ "$opened" -ge 1 ] || fail "the stub saw no context opened, the case does not exercise the walk"
 [ "$closed" -ge "$opened" ] || fail "$opened context(s) opened, only $closed closed after the page threw"
@@ -64,7 +64,7 @@ mkdir -p "$tmp/cp/bin" "$tmp/cp/skills/wp-demo-craft/references/design-md"
 cp -R "$root/bin/lib" "$tmp/cp/bin/lib"; cp "$root/bin/composition-preview.mjs" "$tmp/cp/bin/"
 sed 's/^  canvas:/  canvasx:/' "$root/skills/wp-demo-craft/references/design-md/_preview.md" \
   > "$tmp/cp/skills/wp-demo-craft/references/design-md/_preview.md"
-out="$(node "$tmp/cp/bin/composition-preview.mjs" --tokens 2>&1)"; rc=$?
+rc=0; out="$(node "$tmp/cp/bin/composition-preview.mjs" --tokens 2>&1)" || rc=$?
 [ "$rc" -eq 3 ] || fail "composition-preview --tokens with a bad token exited $rc, want 3: $out"
 printf '%s' "$out" | grep >/dev/null -c '    at ' && fail "composition-preview --tokens printed a stack: $out"
 printf '%s' "$out" | grep >/dev/null -cF 'missing the token: canvas' || fail "composition-preview --tokens lost the token name: $out"
@@ -75,11 +75,11 @@ far="$(mktemp -d -p /dev/shm 2>/dev/null || true)"
 if [ -n "$far" ]; then
   mkdir -p "$tmp/a"; cp "$tmp/page.html" "$tmp/a/a.html"; cp "$tmp/page.html" "$far/a.html"
   tp() { PLAYWRIGHT_CORE="$tmp/pw" WP_BROWSER_CHROMIUM="$tmp/fakechrome" node "$root/bin/tailwindify-parity.mjs" "$1" --against "$2" --widths 1440x900 2>&1; }
-  out="$(tp "$tmp/a/a.html" "$far/a.html")"; rc=$?
+  rc=0; out="$(tp "$tmp/a/a.html" "$far/a.html")" || rc=$?
   [ "$rc" -eq 3 ] || fail "tailwindify-parity on disjoint trees exited $rc, want 3: $out"
   printf '%s' "$out" | grep >/dev/null -cF 'share no ancestor' || fail "tailwindify-parity gave no clear message: $out"
   mkdir -p "$tmp/b"; cp "$tmp/page.html" "$tmp/b/a.html"
-  out="$(tp "$tmp/a/a.html" "$tmp/b/a.html")"
+  out="$(tp "$tmp/a/a.html" "$tmp/b/a.html")" || true
   printf '%s' "$out" | grep >/dev/null -cF 'share no ancestor' && fail "sibling trees were rejected: $out"
 else
   echo "note: /dev/shm unavailable, disjoint-tree case not exercised"
@@ -97,7 +97,7 @@ if [ -n "${PLAYWRIGHT_CORE:-}" ] && [ -d "${PLAYWRIGHT_CORE:-}" ]; then
 <script>fetch('../../secret.txt').then(r=>r.ok?r.text():'blocked').catch(()=>'blocked').then(t=>{document.getElementById('r').textContent=t.trim()})</script>
 HTML
   printf '<!doctype html><title>t</title><p id="r">blocked</p>\n' > "$anc/b/orig/index.html"
-  out="$(node "$root/bin/tailwindify-parity.mjs" "$anc/a/conv/index.html" --against "$anc/b/orig/index.html" --widths 400x300 2>&1)"; rc=$?
+  rc=0; out="$(node "$root/bin/tailwindify-parity.mjs" "$anc/a/conv/index.html" --against "$anc/b/orig/index.html" --widths 400x300 2>&1)" || rc=$?
   [ "$rc" -eq 0 ] || fail "tailwindify-parity served a file outside both trees (rc $rc): $out"
 elif [ "${CHECKS_REQUIRE_BROWSER:-}" = 1 ]; then
   fail "CHECKS_REQUIRE_BROWSER=1 but PLAYWRIGHT_CORE is not set"

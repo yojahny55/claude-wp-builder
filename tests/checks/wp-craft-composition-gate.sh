@@ -13,9 +13,20 @@
 # disabled one: mutating the detector filter ("slop" -> "slopx") or zeroing
 # MIN_HTML_BYTES leaves the pass half of this check green.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+. "$(dirname "$0")/../lib/assert.sh"
+cd "$(dirname "$0")/../.." || exit 1
 
-fail() { echo "FAIL: $*" >&2; exit 1; }
+
+require_tool npx python3
+
+# The real detector needs the npm cache or the network. Where it cannot start, this check
+# measures nothing, so it SKIPs; it fails only when a detector that did run answers badly.
+probe_dir="$(mktemp -d)"
+trap 'rm -rf "$probe_dir"' EXIT
+printf '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>p</title></head><body><p>probe</p></body></html>\n' > "$probe_dir/p.html"
+npx -y impeccable@4 detect "$probe_dir" --json > "$probe_dir/out.json" 2>/dev/null || true
+python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$probe_dir/out.json" 2>/dev/null \
+  || skip "impeccable detector did not start (no npm cache or network); gate not exercised"
 
 [ -x bin/composition-gate.sh ] || fail "bin/composition-gate.sh is missing or not executable"
 
@@ -34,7 +45,7 @@ n="$(echo "$out" | sed -n 's/.*assembled \([0-9]*\) compositions.*/\1/p' | sed -
 
 # --- negative controls -------------------------------------------------------
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+trap 'rm -rf "$work" "$probe_dir"' EXIT
 
 # 1. A composition carrying the exact defect the gate exists to catch: an
 #    infinite translate the detector calls `marquee`. rc must be 2.

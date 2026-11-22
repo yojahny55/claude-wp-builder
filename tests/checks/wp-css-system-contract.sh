@@ -6,13 +6,13 @@
 #   - the outline button (`.btn--secondary`) was a border on a transparent background, the
 #     shape the skill's contour rule replaces with an inset box-shadow, under a second name
 #     for the `.btn--outline` the skill itself uses.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 # `q "$text" <grep flags> <pattern>`: a here-string, never `printf | grep -q`. Under
 # pipefail an early-exiting `grep -q` hands printf a SIGPIPE and the pipeline returns 141,
 # which silently flips an assertion either way.
 q() { local s=$1; shift; grep -q "$@" <<<"$s"; }
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
-fail() { echo "FAIL: $*"; exit 1; }
 
 skill=skills/wp-css-system/SKILL.md
 pat=skills/wp-css-system/references/patterns.md

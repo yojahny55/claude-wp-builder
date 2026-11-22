@@ -7,9 +7,9 @@
 # looked for the deprecated ImageMagick `convert` before `magick`.
 # Run against a fake WordPress root, a fake mysql that records the SQL it is sent and fake
 # converters, so nothing real is touched.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
-fail() { echo "FAIL: $*"; exit 1; }
 
 script=$PWD/skills/wp-robin/scripts/robin-fix.sh
 [ -f "$script" ] || fail "$script is missing"
@@ -92,7 +92,7 @@ $table_prefix = 'commented_';
 $table_prefix = 'pfx\'_';
 PHP
 : > "$tmp/log"
-out=$(run "$tmp" WP_ROOT="$wp"); rc=$?
+rc=0; out=$(run "$tmp" WP_ROOT="$wp") || rc=$?
 [ -s "$tmp/log" ] || fail "no query reached the client: $out"
 first=$(head -1 "$tmp/log")
 grep -Fq -- 'livedb' <<<"$first" || fail "a commented-out DB_NAME won over the live define: $first"
@@ -110,7 +110,7 @@ define("DB_PASSWORD", "p\w\'x\e");
 $table_prefix = 'wp_';
 PHP
 : > "$tmp/log"
-out=$(run "$tmp" WP_ROOT="$wp"); rc=$?
+rc=0; out=$(run "$tmp" WP_ROOT="$wp") || rc=$?
 [ -s "$tmp/log" ] || fail "no query reached the client for the unknown-escape password: $out"
 expected_pwd=$(printf '%s' 'p\w\'"'"'x'$'\033' | base64 | tr -d '\n')
 grep -Fq "pwd_b64=$expected_pwd" "$tmp/log" || fail "unknown escapes in a double-quoted password were decoded differently from PHP (want p\\w\\'x<ESC>): $(head -1 "$tmp/log")"
@@ -133,8 +133,8 @@ sync() {  # extra PATH dirs as args; leaves the INSERT in $tmp/insert. Sets glob
   rm -f "$wp/wp-content/uploads/$rel.webp" "$tmp/insert" "$tmp/conv"
   rm -rf "$tmp/cbin"; mkdir "$tmp/cbin"
   for c in "$@"; do ln -s "$tmp/fake/$c" "$tmp/cbin/$c"; done
-  out=$(env -i PATH="$tmp/cbin:$tmp/bin" HOME="$tmp" TMPDIR="$tmp/t" ROBIN_LOG="$tmp/log" ROBIN_INSERT="$tmp/insert" \
-    ROBIN_CONV_LOG="$tmp/conv" ROBIN_QUEUE=1 ROBIN_META="$meta" ROBIN_GAP="$gap" WP_ROOT="$wp" bash "$script" 2>&1); rc=$?
+  rc=0; out=$(env -i PATH="$tmp/cbin:$tmp/bin" HOME="$tmp" TMPDIR="$tmp/t" ROBIN_LOG="$tmp/log" ROBIN_INSERT="$tmp/insert" \
+    ROBIN_CONV_LOG="$tmp/conv" ROBIN_QUEUE=1 ROBIN_META="$meta" ROBIN_GAP="$gap" WP_ROOT="$wp" bash "$script" 2>&1) || rc=$?
 }
 
 sync magick convert

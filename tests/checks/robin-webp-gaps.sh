@@ -11,7 +11,8 @@
 #    run printed hundreds of "conversion failed" lines. The script must check writability
 #    first and say why — and the skill must document both that and the missing queue table
 #    a WP-CLI activation can leave behind.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 cd "$(dirname "$0")/../.." || exit 1
 
 script=skills/wp-robin/scripts/robin-fix.sh

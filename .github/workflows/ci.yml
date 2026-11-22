@@ -67,6 +67,9 @@ jobs:
       # tests/run.sh runs every check in parallel and reports; its header explains why a
       # skipped check is counted apart from a passing one and why it never stops at the first red.
       - name: Run every contract check
+        env:
+          # A runner that lost php, python3 or curl must fail the checks that need them, not skip.
+          CHECKS_REQUIRE_TOOLS: "1"
         run: |
           set -uo pipefail
           # The checks below are owned by their own jobs, which give them the WordPress and

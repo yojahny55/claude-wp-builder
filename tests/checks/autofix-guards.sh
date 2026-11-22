@@ -3,7 +3,8 @@
 # its guards are YAML lines that read like tidy-up to a later edit. Each one below closed a
 # real finding on PR #142; this pins the line that does it, so deleting one fails here
 # instead of in a run that pushed something it should not have.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 
 cd "$(dirname "$0")/../.." || exit 1
 AF=".github/workflows/autofix.yml"
@@ -36,7 +37,7 @@ grep -Eq '^[[:space:]]+uses: alibaba/open-code-review@[0-9a-f]{40}([[:space:]]|$
   || fail "$OCR: alibaba/open-code-review is not pinned to a full commit SHA"
 # ...and no second use of it rides a branch or tag beside the pinned one.
 unpinned=$(grep -E 'uses:[[:space:]]*alibaba/open-code-review@' "$OCR" \
-  | grep -Ev 'uses:[[:space:]]*alibaba/open-code-review@[0-9a-f]{40}([[:space:]]|$)')
+  | grep -Ev 'uses:[[:space:]]*alibaba/open-code-review@[0-9a-f]{40}([[:space:]]|$)') || true
 [ -z "$unpinned" ] || fail "$OCR: a use of alibaba/open-code-review is not a 40-hex SHA: $unpinned"
 
 # A gate that fails after the eyes reaction must still leave a comment.

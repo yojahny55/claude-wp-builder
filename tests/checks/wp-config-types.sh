@@ -18,7 +18,8 @@
 # These assertions call the exported functions directly. A manifest fixture on disk would
 # exercise the CLI's file handling too, which other checks already own; what was missing
 # here is the rule itself.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 
 cd "$(dirname "$0")/../.." || exit 1
 fails=0

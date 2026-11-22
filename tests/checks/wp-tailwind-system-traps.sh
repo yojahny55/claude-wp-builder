@@ -9,13 +9,13 @@
 #     user's project (and the widget gate exits 2 without a theme dir);
 #   - Verify ran the convention check before any compile, where its markup rule is skipped
 #     and it passes having checked nothing, and never ran theme-template-check.mjs.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 # `q "$text" <grep flags> <pattern>`: a here-string, never `printf | grep -q`. Under
 # pipefail an early-exiting `grep -q` hands printf a SIGPIPE and the pipeline returns 141,
 # which silently flips an assertion either way.
 q() { local s=$1; shift; grep -q "$@" <<<"$s"; }
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
-fail() { echo "FAIL: $*"; exit 1; }
 
 dir=skills/wp-tailwind-system
 skill=$dir/SKILL.md
