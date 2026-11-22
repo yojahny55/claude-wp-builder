@@ -214,7 +214,12 @@ before writing any markup.
    `demo/.verify/`, the seven rubric lines, and the family's Avoid list from
    `demo/BRIEF.md ## Family`; ask for a pass or fail per rubric line with one
    sentence per failure, and separately for every Avoid item it can see on any
-   sheet, named with the page — which is what goes into `demo/VERIFY.md`. An
+   sheet, named with the page — which is what goes into `demo/VERIFY.md`. Also
+   hand it the report of `node "${CLAUDE_PLUGIN_ROOT}/bin/family-lint.mjs" demo/`
+   (glass, rounded bordered cards, more than one saturated accent, each with its
+   file and line). The lint only reports and always exits `0`: the critique names
+   each finding as an Avoid hit or dismisses it in one sentence as the family's
+   deliberate exception, and both go into `demo/VERIFY.md`. An
    Avoid hit is a ship blocker (`SKILL.md`), fixed like a failed line. The
    context that wrote the markup and the brief cannot grade the render — that is
    the self-assessment the rubric exists to remove. Read `demo/VERIFY.md`, fix

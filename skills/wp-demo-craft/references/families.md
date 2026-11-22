@@ -238,8 +238,13 @@ to be an act, recorded, with the client's word for it in `BRIEF.md`.
 ## What this file cannot do
 
 The Avoid list is read by the evaluator, page by page, in the same round as the
-rubric. Nothing measures it: a glass card is `backdrop-filter`, a rounded SaaS
-card is a radius over 12px on a bordered box, and both are detectable — but a
-detector that fires on a brutalist page's one deliberate exception is a detector
-the build learns to argue with. If Avoid hits keep shipping, the upgrade path is
-a family lint under `bin/` that reports, never blocks, and lets the evaluator decide.
+rubric. Three of its items are visible in the CSS, and
+[`bin/family-lint.mjs`](../../../bin/family-lint.mjs) reports them before the
+critique: a glass card is `backdrop-filter`, a rounded SaaS card is a radius over
+12px on a bordered box, and more than one saturated accent is more than one
+saturated hue in the page's colours. It reports and never blocks, because a
+detector that fails a brutalist page's one deliberate exception is a detector the
+build learns to argue with. The evaluator decides: `/wp-demo` hands it the report,
+and every finding is named in `demo/VERIFY.md` as a hit or as the exception.
+Everything else on the list (misalignment as a style, narrative order, parallax
+theatre) is judgment, read from the contact sheets.
