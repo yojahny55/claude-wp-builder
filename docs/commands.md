@@ -35,6 +35,7 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-cinematic-encode`](#wp-cinematic-encode) | C | required per video | source MP4 | `assets/videos/*`, ACF row |
 | [`/wp-cinematic-scene`](#wp-cinematic-scene) | C | required per scene | — | scene repeater row, optional template override |
 | [`/wp-cinematic-seed`](#wp-cinematic-seed) | C | required | scenes manifest | scene rows, sample videos |
+| [`/wp-status`](#wp-status) | utility | — | a project folder | a report only (writes nothing) |
 | [`/wp-adopt`](#wp-adopt) | utility | — | a running WordPress root | `.wp-create.json` (`origin: adopted`), `.claude/CLAUDE.md` block |
 | [`/wp-debug`](#wp-debug) | utility | — | `.wp-create.json` | offered fixes |
 | [`/wp-clone`](#wp-clone) | utility | — | remote site | local install |
@@ -578,6 +579,20 @@ Details, kit install and encoding rationale: [cinematic-mode.md](cinematic-mode.
 ---
 
 ## Utilities
+
+### `/wp-status`
+
+```
+/wp-status [project-path] [--json]
+```
+
+Read-only: answers "where am I and what runs next". It reads `.wp-create.json`,
+`.claude/CLAUDE.md`, `demo/` (including `FAILED.md`), the `/wp-yolo` build ledger and the
+audit findings ledger, prints one block, and ends with `Next: <command> — <reason>`. The
+first rule that matches wins: no manifest, invalid manifest, adopted site (audit only),
+no `.claude/CLAUDE.md`, `demo/FAILED.md`, no demo, no or unfinished build, no
+`demo/VERIFY.md`, no audit ledger, open audit findings, nothing pending. It writes nothing,
+runs no WP-CLI and uses no network; it never runs the next command by itself.
 
 ### `/wp-adopt`
 

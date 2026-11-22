@@ -472,6 +472,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-cinematic-encode` | C | per video | ffmpeg — all-keyframe desktop MP4 + 9:16 mobile |
 | `/wp-cinematic-scene` | C | per scene | Author one scene — replaces `/wp-section` on path C |
 | `/wp-cinematic-seed` | C | required | Seed every scene from a manifest, idempotent |
+| `/wp-status [project-path] [--json]` | utility | — | Read-only: where the project is (manifest, demo, build, audit) and which command runs next |
 | `/wp-adopt [wp-root]` | utility | — | Register a site not built with `/wp-create` — read-only, so `/wp-audit`, `/wp-debug` and `/wp-clone` run on it |
 | `/wp-debug [issue]` | utility | — | WP-CLI diagnostics and fixes |
 | `/wp-clone --from --to` | utility | — | Clone a remote site locally (SSH, SQL dump + uploads, or a full-site archive + dump); payment gateways are disabled in the clone |
