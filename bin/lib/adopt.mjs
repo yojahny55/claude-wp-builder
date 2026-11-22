@@ -90,17 +90,53 @@ echo '<<WPCB-PROBE>>' . wp_json_encode(array(
 )) . '<<END-WPCB-PROBE>>';
 `.replace(/\n/g, ' ');
 
+// A wrapper is stored as one string and read back by splitting words. A path with whitespace or
+// a quote is single-quoted, so it stays one argument; a plain path is stored exactly as before
+// (existing manifests keep working), and a stored quoted form is read back by splitWords.
+export function shellWord(w) {
+  return /^[\w@%+=:,./-]+$/.test(w) ? w : `'${w.replace(/'/g, `'\\''`)}'`;
+}
+
+export function splitWords(str) {
+  const out = [];
+  let cur = '';
+  let has = false;
+  let q = null;
+  let esc = false;
+  for (const c of str.trim()) {
+    // POSIX shell rules, the inverse of shellWord: a backslash outside quotes takes the next
+    // character literally (shellWord's `'\''` closes the quote, escapes a `'`, reopens it); inside
+    // double quotes it escapes only `"`, `\`, `$` and a backtick; inside single quotes nothing.
+    if (esc) {
+      cur += esc === 'dq' && !'"\\$`'.includes(c) ? `\\${c}` : c;
+      has = true; esc = false; continue;
+    }
+    if (q === "'") { if (c === q) q = null; else cur += c; continue; }
+    if (q === '"') {
+      if (c === '\\') { esc = 'dq'; continue; }
+      if (c === q) q = null; else cur += c;
+      continue;
+    }
+    if (c === '\\') { esc = true; has = true; continue; }
+    if (c === "'" || c === '"') { q = c; has = true; continue; }
+    if (/\s/.test(c)) { if (has || cur) { out.push(cur); cur = ''; has = false; } continue; }
+    cur += c; has = true;
+  }
+  if (has || cur) out.push(cur);
+  return out;
+}
+
 export function detectWrapper(root) {
   if (existsSync(join(root, '.ddev', 'config.yaml'))) return { wrapper: 'ddev wp', engine: 'ddev', type: 'docker' };
   if (existsSync(join(root, '.lando.yml'))) return { wrapper: 'lando wp', engine: 'lando', type: 'docker' };
-  return { wrapper: `wp --path=${root}`, engine: 'native', type: 'native' };
+  return { wrapper: `wp --path=${shellWord(root)}`, engine: 'native', type: 'native' };
 }
 
-// The wrapper is split on whitespace and run without a shell: the probe is PHP full of `$`
+// The wrapper is split into words (quotes honoured) and run without a shell: the probe is PHP full of `$`
 // and quotes, and passing it as one argv entry is the only way it arrives intact. Wrappers
-// are commands like `docker exec my-wp wp --allow-root`, never quoted strings.
+// are commands like `docker exec my-wp wp --allow-root`; quotes only keep a path with a space whole.
 export function runProbe(wrapper) {
-  const [bin, ...args] = wrapper.trim().split(/\s+/);
+  const [bin, ...args] = splitWords(wrapper);
   const r = spawnSync(bin, [...args, 'eval', PROBE_PHP], { encoding: 'utf8', timeout: 120000 });
   if (r.error) return { ok: false, reason: `could not run ${bin}: ${r.error.code ?? r.error.message}` };
   if (r.status !== 0) return { ok: false, reason: `${wrapper} eval exited ${r.status}: ${(r.stderr || r.stdout).trim().split('\n').pop()}` };
