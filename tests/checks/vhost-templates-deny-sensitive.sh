@@ -11,14 +11,14 @@ d=templates/native
 for f in nginx.conf.tpl nginx-no-ssl.conf.tpl; do
   p="$d/$f"
   grep -Fq 'location ~ /\.(?!well-known) { deny all; }' "$p" || fail "$f: dotfiles not denied"
-  grep -Fq 'location ~* \.(sql|bak|log)$ { deny all; }' "$p" || fail "$f: sql/bak/log not denied"
+  grep -Fq 'location ~* \.(sql|sql\.gz|bak|log)$ { deny all; }' "$p" || fail "$f: dumps/archives not denied"
   grep -Fq 'location ~* \.bak- { deny all; }' "$p" || fail "$f: .bak-* not denied"
-  grep -Fq 'location ~* /uploads/.*\.php$ { deny all; }' "$p" || fail "$f: PHP in uploads not denied"
+  grep -Fq 'location ~* "/uploads/.*\.(php[0-9]?|phar|pht(ml)?)(\.|/|$)" { deny all; }' "$p" || fail "$f: PHP in uploads not denied"
   grep -Fq 'location ^~ /wp-content/uploads/woocommerce_uploads/ { deny all; }' "$p" || fail "$f: woocommerce_uploads not denied"
   grep -Fq 'try_files $uri =404;' "$p" || fail "$f: no try_files guard before fastcgi"
   ! grep -Fq 'location ~ /\.ht {' "$p" || fail "$f: still has the narrow /.ht rule"
   # regex locations match in order: the denies must precede the PHP block
-  deny=$(grep -Fn 'location ~* /uploads/.*\.php$ { deny all; }' "$p" | sed -n 1p | cut -d: -f1 || true)
+  deny=$(grep -Fn 'location ~* "/uploads/.*\.(php[0-9]?|phar|pht(ml)?)(\.|/|$)" { deny all; }' "$p" | sed -n 1p | cut -d: -f1 || true)
   php=$(grep -Fn 'location ~ \.php$' "$p" | sed -n 1p | cut -d: -f1 || true)
   [ -n "$deny" ] && [ -n "$php" ] && [ "$deny" -lt "$php" ] || fail "$f: uploads deny must come before the PHP location"
   for ph in '{{domain}}' '{{document_root}}' '{{php_fpm_sock}}' '{{max_upload_size}}'; do
@@ -31,7 +31,7 @@ for ph in '{{ssl_cert}}' '{{ssl_key}}'; do grep -Fq "$ph" "$d/apache.conf.tpl" |
 for f in apache.conf.tpl apache-no-ssl.conf.tpl; do
   p="$d/$f"
   grep -Fq '<LocationMatch "/\.(?!well-known)">' "$p" || fail "$f: dot-directories not denied"
-  grep -Fq '\.(sql|bak|log)$' "$p" || fail "$f: sql/bak/log not denied"
+  grep -Fq '\.(sql|sql\.gz|bak|log)$' "$p" || fail "$f: dumps/archives not denied"
   grep -Fq '\.bak-' "$p" || fail "$f: .bak-* not denied"
   # (/|$), not $: /uploads/x/evil.php/foo (PATH_INFO) maps to evil.php and reaches the PHP handler.
   # mod_mime applies AddHandler to .php in ANY position of the name and ignores case, so
@@ -62,5 +62,16 @@ grep -Fq 'path_regexp (?i)^/wp-content/uploads/.*\.(php[0-9]?|phar|pht(ml)?)(\.|
 grep -Fq 'path /xmlrpc.php' "$c" || fail "Caddyfile: xmlrpc block missing"
 grep -Fq 'path /wp-content/uploads/woocommerce_uploads/*' "$c" || fail "Caddyfile: woocommerce_uploads not denied"
 for ph in '{{domain}}' '{{document_root}}' '{{php_fpm_sock}}'; do grep -Fq "$ph" "$c" || fail "Caddyfile lost $ph"; done
+
+# Directory listing is off in nginx and Caddy by default; Apache needs it said.
+for f in apache.conf.tpl apache-no-ssl.conf.tpl; do
+  grep -Fq 'Options -Indexes' "$d/$f" || fail "$f: directory listing not disabled"
+done
+# A local domain cannot get a public ACME certificate.
+grep -Fq 'tls internal' "$c" || fail "Caddyfile: no 'tls internal' for a local domain"
+# PHP's 2M/8M defaults reject plugin zips even when the web server allows them.
+pool=$d/php-fpm-pool.conf.tpl
+grep -Fq 'php_admin_value[upload_max_filesize] = {{max_upload_size}}' "$pool" || fail "pool: upload_max_filesize not set"
+grep -Fq 'php_admin_value[post_max_size] = {{max_upload_size}}' "$pool" || fail "pool: post_max_size not set"
 
 echo PASS

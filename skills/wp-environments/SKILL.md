@@ -136,7 +136,7 @@ tokens the templates use:
 | `{{ssl_key}}` | Derived: `/etc/ssl/private/<domain>.key` | |
 | `{{php_fpm_sock}}` | Derived: `/var/run/php/php<php_version>-fpm.sock` | |
 | `{{web_user}}` | Derived from the OS: `nginx` (Fedora/RHEL with nginx), `apache` (Fedora/RHEL with Apache), `www-data` (Debian/Ubuntu) | |
-| `{{max_upload_size}}` | `1024M` unless the user asks otherwise; nginx templates only | `1024M` |
+| `{{max_upload_size}}` | `1024M` unless the user asks otherwise; nginx vhosts and the PHP-FPM pool | `1024M` |
 | `{{http_port}}` | Host port for HTTP: docker compose and wp-env (see section 5) | `80`, wp-env `8888` |
 | `{{https_port}}` | Host port for HTTPS, docker compose | `443` |
 | `{{tests_port}}` | wp-env's tests site | `8889` |

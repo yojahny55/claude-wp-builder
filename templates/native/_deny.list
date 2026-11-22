@@ -1,0 +1,22 @@
+# Single reference for what every native vhost template (nginx, apache, Caddyfile) must refuse
+# to serve on a local development docroot. tests/checks/vhost-deny-list-parity.sh compares each
+# template against it, so an engine that stops denying an entry fails the suite. This file is
+# never installed or rendered; it is read by the check only.
+# Format: "<kind> <value>", one per line.
+#   ext          a file name ending in .<value>, anywhere in the docroot (dumps, logs, backups)
+#   ext-outside  the same, but NOT under /wp-content/uploads/ (archives: a dump left in the
+#                docroot is the risk, a zip in the media library is legitimate)
+#   path         an exact URL path, including its PATH_INFO form (/xmlrpc.php/x)
+#   uploads      a PHP-executable extension denied at any depth under /wp-content/uploads/
+ext sql
+ext sql.gz
+ext bak
+ext log
+ext-outside zip
+ext-outside tar.gz
+ext-outside tgz
+path /xmlrpc.php
+uploads php
+uploads phar
+uploads pht
+uploads phtml
