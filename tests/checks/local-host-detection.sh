@@ -65,7 +65,7 @@ done
 # 3. prod-gate: a public-resolving *.local.com is gated; a loopback-resolving one is not.
 gate="$tmp/gate"
 out="$(bash bin/prod-gate.sh --dir "$gate" --delay 0 pub.local.com -- echo ran 2>&1)" || fail "gated run failed: $out"
-ls "$gate" | grep >/dev/null -c '^pub.local.com' || fail "pub.local.com was not gated (no state written)"
+compgen -G "$gate/pub.local.com*" >/dev/null || fail "pub.local.com was not gated (no state written)"
 rm -rf "$gate"
 bash bin/prod-gate.sh --dir "$gate" --delay 0 www.x.local.com -- echo ran >/dev/null 2>&1
 [ ! -e "$gate/www.x.local.com.lock" ] || fail "loopback-resolving host was gated"
