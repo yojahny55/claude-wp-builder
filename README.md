@@ -765,7 +765,7 @@ Failure modes the commands already report, and what to do about each.
 | You see | Cause | Fix |
 |---------|-------|-----|
 | A craft `/wp-demo` or `/wp-yolo` stops at the browser gate; `demo-verify.mjs --probe` exits 2 | No `playwright-core` or no Chrome/Chromium found | Say yes to `npm i -D playwright-core` in the project root, and set `WP_BROWSER_CHROMIUM` to an installed Chrome or Chromium. The plugin never downloads a browser and never falls back to plain mode for craft. |
-| A command stops with exit 3 and "no .wp-create.json" | The project was not created by `/wp-create`. Only commands whose manifest policy is `stop` halt here; others adopt the site or carry on with bare WP-CLI (`skills/wp-manifest-gate/SKILL.md`). | Run `/wp-create`, or `/wp-adopt` for an existing site. |
+| A command stops with exit 3 and "no .wp-create.json" | The project was not created by `/wp-create`. Not every command halts on a missing manifest: each has a policy (stop, offer to adopt, fall back to bare WP-CLI, scaffold) listed in `skills/wp-manifest-gate/SKILL.md`. | Run `/wp-create`, or `/wp-adopt` for an existing site. |
 | `wp-config.mjs validate` exits 1 | The manifest is invalid, or the generated context block disagrees with it | Read the message; fix the field it names. |
 | `wp-config.mjs validate` exits 2 | An older manifest that can migrate | Run `node "${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs" migrate <project>`, then rerun. |
 | `wp-config.mjs drift` exits 4 | The manifest no longer describes the site WP-CLI talks to (for example a database restored over a blank scaffold) | Each `drift:` line names a disagreement; correct the manifest or the site. |
