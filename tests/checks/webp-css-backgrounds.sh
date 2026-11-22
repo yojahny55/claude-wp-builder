@@ -12,8 +12,9 @@
 #   3. the wp-robin skill states that `picture` does not cover CSS, and its webp-delivery
 #      reference carries the page-cache caveat on `url` mode and the server-side
 #      alternative for a stylesheet.
-set -uo pipefail
-# -e is off (several greps are allowed to miss), so the one command whose failure would
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
+# -e is on; a grep allowed to miss ends in `|| true`. The one command whose failure would
 # silently change what every path below resolves against answers for itself.
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
 

@@ -12,7 +12,8 @@
 #
 # Both live in the skill, and the performance agent's Tier 3 step must point at them: an agent
 # that never reads them files the finding before the skill can warn it.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
 
 # The lessons moved out of SKILL.md into a reference file every audit agent no longer pays

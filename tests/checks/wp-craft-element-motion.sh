@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
+require_tool python3
 
 # Element motion: the half of "motion" that costs nothing and was rationed anyway.
 #
@@ -10,7 +12,6 @@ set -euo pipefail
 # scroll budget it was supposedly respecting sat a quarter unspent, because that budget
 # meters page length and never metered animation at all.
 
-fail() { echo "FAIL: $*"; exit 1; }
 
 dev=skills/wp-demo-craft/references/devices.md
 dmd=skills/wp-demo-craft/references/design-md.md
