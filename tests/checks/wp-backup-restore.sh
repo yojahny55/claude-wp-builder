@@ -82,10 +82,11 @@ case "${1:-}" in -czf)
   n=$(cat "$FAKE_TAR_STATE" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "$FAKE_TAR_STATE"
   if [ "${FAKE_TAR_ALWAYS:-0}" = 1 ] || [ "$n" = 1 ]; then echo new > "$FAKE_TAR_SITE/wp-content/uploads/2026/live-$n.txt"; fi ;;
 esac
-exec /usr/bin/env -S PATH="$FAKE_REALPATH" tar "$@"
+exec "$FAKE_REAL_TAR" "$@"
 FAKETAR
 chmod +x "$T/tarbin/tar"
-export FAKE_REALPATH=$PATH FAKE_TAR_SITE=$SITE FAKE_TAR_STATE=$T/tar.state
+FAKE_REAL_TAR=$(command -v tar)
+export FAKE_REAL_TAR FAKE_TAR_SITE=$SITE FAKE_TAR_STATE=$T/tar.state
 rm -f "$T/tar.state"
 rc=$(PATH="$T/tarbin:$PATH" code bash bin/wp-backup.sh "$SITE" --uploads --label live)
 [ "$rc" = 0 ] || fail "one change during the archive should be retried, got exit $rc: $(cat "$T/err")"
