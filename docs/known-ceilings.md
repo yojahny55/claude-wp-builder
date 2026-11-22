@@ -467,9 +467,10 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
 - **Setup reads Stripe keys from the environment and `.wp-create.local.json` inside the WP-CLI
   wrapper's own environment.** A Docker wrapper sees neither the host's environment nor host
   paths unless they are passed or mounted — the limit `skills/wp-polylang/scripts/` carries too.
-- **The `woocommerce_uploads` deny rule reaches the native nginx and Caddy templates only.**
-  `templates/docker/docker-compose.yml.tpl` mounts a `docker/nginx.conf` that nothing in this
-  plugin writes (a BACKLOG row), and DDEV, Lando and wp-env keep their own server configs.
+- **The `woocommerce_uploads` deny rule reaches the plugin's own nginx and Caddy templates
+  only.** The native templates and the Docker `docker/nginx.conf` (rendered by `/wp-create`
+  from `templates/docker/nginx.conf.tpl`) carry it; DDEV, Lando and wp-env keep their own
+  server configs.
   SEC-039 still measures every one of them live.
 - **`store-kit` is linted at PHP 7.4 and executed on the fixture's PHP.** Syntax on the floor is
   proven; behaviour on 7.4 itself is not.

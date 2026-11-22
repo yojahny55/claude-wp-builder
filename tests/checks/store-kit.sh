@@ -193,7 +193,7 @@ for c in 'Gateway keys from constants cover Stripe only' 'The general Store API 
 done
 grep -Fq -- '- [ ] **WooCommerce stores (N01)** `PARTIAL`' BACKLOG.md \
   || fail "BACKLOG.md's N01 row is not an unchecked PARTIAL: the remaining pieces are the item"
-grep -Fq '**Docker environments get no nginx config**' BACKLOG.md \
-  || fail "BACKLOG.md lost the docker nginx row CLAUDE.md's deny-rule ceiling cites"
+grep -Fq 'Docker `docker/nginx.conf`' docs/known-ceilings.md \
+  || fail "docs/known-ceilings.md's deny-rule ceiling no longer says the Docker nginx config carries it"
 
 echo PASS
