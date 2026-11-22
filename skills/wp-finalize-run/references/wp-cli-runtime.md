@@ -2,6 +2,16 @@
 
 `commands/wp-finalize.md` sends the run here at Check 7: WP-CLI Runtime Validation. Follow it in order; nothing in it is optional background.
 
+## Contents
+
+- 1-6. Pages, menus, ACF values, permalinks, PHP errors, plugins
+- 7. Every post has an author
+- 8. An installed SEO plugin is configured
+- 9. No placeholder links
+- 10. One `<h1>` per page
+- 11. No horizontal overflow on a phone
+- 12. Contact and social settings left empty (report only)
+
 Read `wp_cli.wrapper` and run runtime checks:
 
 1. **Pages exist with correct templates:**
@@ -83,5 +93,25 @@ Read `wp_cli.wrapper` and run runtime checks:
     units (`auto-cols-[22.9375rem]`) overflows a 360px viewport and scrolls the
     whole document sideways. Measure, at 360px, per page template:
     `document.documentElement.scrollWidth <= window.innerWidth`.
+
+12. **Contact and social settings left empty (report only).** A demo with no
+    Instagram link or phone number leaves those settings empty, and the header,
+    footer or contact section then renders nothing in their place: the element is
+    absent, not flagged, and the client never learns it was theirs to fill. List
+    every empty one. A `_<lang>` variant is skipped when its base exists: it falls
+    back to the base, so the base is the one that decides.
+    ```bash
+    $WP eval '
+    $names = array_column(acf_get_fields("group_settings") ?: array(), "name");
+    foreach ($names as $n) {
+      if (!preg_match("/^(social_[a-z0-9_]+|contact_email|contact_phone|header_phone|business_address)$/", $n)) continue;
+      if (preg_match("/^(.+)_[a-z]{2}$/", $n, $m) && in_array($m[1], $names, true)) continue;
+      $v = get_field($n, "option");
+      if ($v === null || $v === false || $v === "" || $v === array()) echo "PENDING $n\n";
+    }'
+    ```
+    Each `PENDING` line goes in the report under **Content pending**, with the
+    field name, beside the links item 9 found. This item never turns Check 7
+    into a FAIL: the value is the client's to supply, not a defect in the build.
 
 **PASS** if all runtime checks succeed. **FAIL** with details.
