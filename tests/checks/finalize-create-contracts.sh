@@ -55,7 +55,8 @@ grep -Fq 'db reset --yes' "$cr" || err "$cr 4.4 does not reset the database on O
 body=$(cat "$ref" 2>/dev/null || true)
 for t in 'mkdir -p ~/wp-create-backups' 'db export -' 'to the host' 'Unknown database' 'start them' 'Any other failure: stop' \
   '-- Dump completed' 'wp-quiet' '--skip-content' 'config create --force' 'database.*' 'naming only what this environment will really replace' 'Without an explicit yes, stop' 'db reset --yes' 'never Adopt Mode' 'core download --force' \
-  'config get DB_NAME' 'If they differ, stop and name both' 'umask 077' 'chmod 700' '.ddev/config.yaml' '<DB_NAME read in step 2>'; do
+  'config get DB_NAME' 'If they differ, stop and name both' 'umask 077' 'chmod 700' '.ddev/config.yaml' '<DB_NAME read in step 2>' \
+  'prints nothing, stop' 'TS=$(date -u' '<slug>-$TS.sql' '(umask 077; cp -p'; do
   hasp "$body" "$t" || err "$ref does not say: $t"
 done
 # export and confirmation come before the replace step
