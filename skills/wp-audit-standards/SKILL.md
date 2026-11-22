@@ -326,8 +326,8 @@ auditing IP within five minutes, and every live check of the run was lost (the h
 The fix changes **the pace, never the measurement**. Every check still runs the same command
 against the same host, with the same headers and user agents — Lighthouse, Playwright, the
 suite, the GEO probes with AI user agents and `Accept: text/markdown`, the security probes.
-Against a public host, run `bin/prod-gate.sh`; never reimplement it. It serializes with `flock`, or with an
-atomic `mkdir` lock where `flock` is missing (macOS), and never sends unserialized.
+Against a public host, run `bin/prod-gate.sh`; never reimplement it. It serializes with `flock`, or with a
+symlink-to-pid lock where `flock` is missing (macOS), and never sends unserialized.
 
 1. **Send every request through the gate**, with the gate directory `/wp-audit` passes in the
    dispatch prompt. The directory is the shared lock: every agent of the run must use the same
@@ -364,7 +364,7 @@ atomic `mkdir` lock where `flock` is missing (macOS), and never sends unserializ
    | the command's own | the command ran | judge its output. A wrapped command can itself exit `4` or `5`: read stderr, the gate prints `BLOCKED:` or `busy for more than` before its own |
    | `4` | the host is marked blocked; nothing was sent | report the check `UNMEASURED: production blocked the audit`. Never retry — a retry against a ban extends the ban |
    | `5` | another agent held the host past `--wait` (300 s); nothing was sent | call again, at most twice more; after a third `5`, report the check `UNMEASURED: production gate busy` |
-   | `1` | a usage error | fix the call |
+   | `1` | a usage error, or the gate could not create its lock in the state directory (stderr: `cannot create lock`); nothing was sent | fix the call or the gate directory |
 
 **A local site keeps its own limits, unchanged.** `prod-gate.sh` passes a development host
 straight through, and nothing above applies to it. The local rule is *Link and page sweeps

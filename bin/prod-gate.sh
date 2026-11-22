@@ -44,7 +44,7 @@
 # Exit: the wrapped command's own exit code, or
 #   4 = the host is marked blocked; nothing was sent (stderr says why)
 #   5 = another command held the host longer than --wait; nothing was sent
-#   1 = usage error
+#   1 = usage error, or the lock cannot be created in the state dir (stderr: cannot create lock)
 # Where flock is missing (macOS) the lock is a symlink to the holder's pid, with a
 # race-safe takeover of a dead holder's lock (see below).
 # The gate's 4 and 5 share the number space of the wrapped command: a wrapped command that
@@ -118,6 +118,9 @@ if [ "$local_host" -eq 1 ]; then exec "$@"; fi
 # only if it is still that same dead pid, so a waiter holding a stale read can never remove a
 # lock somebody else took meanwhile. A takeover mutex is a symlink to its holder's pid and is cleared only when that pid is dead. Limit:
 # a reused pid reads as alive, so the gate then waits and exits 5 (safe side, nothing sent).
+# Second limit: reading a dead takeover pid and removing it are two steps, so two waiters that
+# both find dead takeover holders in the same instant can, in theory, each believe it holds the
+# mutex; the lock itself is still removed only after its owner is re-read as the dead pid.
 if command -v flock >/dev/null 2>&1; then
   exec 9>"$lock"
   if ! flock -w "$wait_max" 9; then
@@ -139,14 +142,17 @@ else
       if ln -s "$$" "$take" 2>/dev/null; then
         [ "$(readlink "$lockl" 2>/dev/null || true)" = "$owner" ] && rm -f "$lockl"
         [ "$(readlink "$take" 2>/dev/null || true)" = "$$" ] && rm -f "$take"
-        continue
-      fi
-      # The takeover mutex is a symlink to its holder's pid too; one whose holder is dead
-      # is cleared (re-reading the pid first), never one cleared by age.
-      t="$(readlink "$take" 2>/dev/null || true)"
-      if [ -n "$t" ] && ! ps -p "$t" >/dev/null 2>&1 && [ "$(readlink "$take" 2>/dev/null || true)" = "$t" ]; then
-        rm -f "$take"
-        continue
+        # Retry at once only if the dead lock is really gone; one that could not be removed
+        # (sticky dir, another user's file) is waited out like a live one, never spun on.
+        [ "$(readlink "$lockl" 2>/dev/null || true)" = "$owner" ] || continue
+      else
+        # The takeover mutex is a symlink to its holder's pid too; one whose holder is dead
+        # is cleared (re-reading the pid first), never one cleared by age.
+        t="$(readlink "$take" 2>/dev/null || true)"
+        if [ -n "$t" ] && ! ps -p "$t" >/dev/null 2>&1 && [ "$(readlink "$take" 2>/dev/null || true)" = "$t" ]; then
+          rm -f "$take"
+          [ "$(readlink "$take" 2>/dev/null || true)" = "$t" ] || continue
+        fi
       fi
     fi
     if [ "$waited" -ge "$wait_max" ]; then
