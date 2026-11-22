@@ -47,6 +47,8 @@ run_mirror() {
     # the other side, and one <ERROR> line per file reads like a disaster when it is the
     # tool doing exactly what it was told.
     set +e
+    # transfer-verified: verify-transfer.py compares both sides below; mirror's exit code is
+    # not evidence (see the top of this file).
     "$MCLI" mirror "${options[@]}" "$source" "$target" 2>&1 \
         | tee "$log" \
         | grep -v 'Overwrite not allowed'
