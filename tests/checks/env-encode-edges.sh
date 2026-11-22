@@ -13,9 +13,8 @@ grep >/dev/null -c 'npx --no-install wp-env' bin/wp-env-setup.sh || fail "detect
 mkdir "$work/bin"
 printf '#!/bin/sh\necho "$@" >> "%s/npx.log"\nexit 1\n' "$work" > "$work/bin/npx"; chmod +x "$work/bin/npx"
 PATH="$work/bin:$PATH" bash bin/wp-env-setup.sh detect >/dev/null 2>&1 || true
-if [ -f "$work/npx.log" ]; then
-  grep >/dev/null -c -- '--no-install' "$work/npx.log" || fail "npx ran without --no-install: $(sed -n 1p "$work/npx.log")"
-fi
+[ -f "$work/npx.log" ] || fail "detect never called npx"
+grep >/dev/null -c -- '--no-install' "$work/npx.log" || fail "npx ran without --no-install: $(sed -n 1p "$work/npx.log")"
 
 # --- SH-13: is_running returns the real state; a || b reaches the second service
 cat > "$work/bin/systemctl" <<'SH'
@@ -38,9 +37,7 @@ set +e
 bash $enc "$work/in.mp4" --theme="$work/theme" --desktop-only --mobile-only >/dev/null 2>&1; rc=$?
 set -e
 [ "$rc" = 2 ] || fail "--desktop-only --mobile-only exited $rc, want 2"
-grep >/dev/null -c 'KIT_DIR="\$HOME/' $enc || fail "leading ~ in --kit is not expanded"
-grep >/dev/null -c 'pwd -P' $enc || fail "--theme is not resolved to an absolute path"
-grep >/dev/null -c 'pids\[@\]+' $enc || fail "empty pids array unguarded under set -u"
+grep >/dev/null -c 'pids\[@\]+' $enc || fail "(static grep) empty pids array unguarded under set -u"
 
 # --- SH-09: failed keyframe check exits non-zero before any import
 fakebin="$work/fb"; mkdir -p "$fakebin" "$work/kit/scripts"
@@ -56,13 +53,25 @@ set -e
 [ "$rc" = 1 ] || fail "failed keyframe verification exited $rc, want 1"
 [ ! -f "$work/wp.log" ] || fail "video imported despite failed keyframe verification"
 
-# --- SH-22: nothing references a php.ini nobody creates
-if grep >/dev/null -c 'lando/php.ini' templates/docker/.lando.yml.tpl; then
-  grep >/dev/null -rlc 'lando/php.ini' skills commands bin || fail ".lando.yml.tpl references .lando/php.ini that nothing creates"
-fi
+# --- SH-21 behaviour: tilde kit and relative theme, through the same fakes
+mkdir -p "$work/home/kit/scripts" "$work/root/wp-content/themes/t"
+cp "$work/kit/scripts/"* "$work/home/kit/scripts/"
+printf '#!/bin/sh\nfor i in 1 2 3 4 5 6 7 8 9 10; do echo "0,0,I,x"; done\n' > "$fakebin/ffprobe"
+printf '#!/bin/sh\necho "$@" >> "%s/wp2.log"\ncase "$1$2" in *media*import*) echo 7;; esac\nexit 0\n' "$work" > "$fakebin/wp"
+set +e
+out=$(HOME="$work/home" PATH="$fakebin:$PATH" bash $enc "$work/in.mp4" --theme="$work/theme" --kit='~/kit' --desktop-only 2>&1); rc=$?
+set -e
+[ "$rc" = 0 ] || fail "--kit='~/kit' not resolved (rc=$rc): $out"
+rm -f "$work/wp2.log"
+root=$(cd "$work/root" && pwd -P)
+cp "$work/in.mp4" "$work/root/in.mp4"
+(cd "$work/root/wp-content/themes/t" && PATH="$fakebin:$PATH" bash "$OLDPWD/$enc" ../../../in.mp4 --theme=. --kit="$work/kit" --scene=1 >/dev/null 2>&1) || fail "--theme=. run failed"
+grep >/dev/null -c -- "--path=$root " "$work/wp2.log" || fail "--theme=. did not import against $root: $(cat "$work/wp2.log" 2>/dev/null)"
 
-# --- SH-25: the comment does not claim the plugin is never absent
-! grep >/dev/null -c 'the plugin$' bin/store-kit-sync.sh || true
+# --- SH-22: the template references no php.ini nobody creates
+! grep >/dev/null -c 'lando/php.ini' templates/docker/.lando.yml.tpl || fail ".lando.yml.tpl references .lando/php.ini"
+
+# --- SH-25: comment states the gap
 ! grep -E 'would be absent, and' bin/store-kit-sync.sh >/dev/null || fail "store-kit-sync comment still claims the swap has no gap"
 
 echo PASS
