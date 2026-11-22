@@ -173,7 +173,9 @@ Checks read such a command through `tests/checks/lib/expand-command.sh`, which s
 the command's own `<command>-run` references.
 
 **Agent** (`agents/<name>.md`) — frontmatter `name`, `description`, `tools`, `model` (`opus`|`sonnet`|`haiku` — cost tier, see `tests/checks/model-routing.sh`) (order:
-`Read, Write, Edit, Grep, Glob, Bash`). Must open with the "First Action (MANDATORY)" block.
+`Read, Write, Edit, Grep, Glob, Bash`). Must open with the "First Action (MANDATORY)" block,
+and return `BLOCKED: <reason>` plus the files it touched when it cannot proceed, never a guess
+(contract and exceptions: `skills/wp-contributing/SKILL.md` § Agent contracts).
 
 **Skill** (`skills/<name>/SKILL.md`) — frontmatter `name`, `description`, `user-invocable: false`.
 Skills inform; they never act. The description says what the skill does and ends with a
