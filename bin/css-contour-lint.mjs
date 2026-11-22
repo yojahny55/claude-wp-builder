@@ -39,6 +39,7 @@
  *
  * usage:
  *   css-contour-lint.mjs <dir>... [--rule thin-border|drop-shadow-ring|search-clear]...
+ *   (`--rule=<name>` also works; an unknown flag or rule is a usage error, never ignored)
  *
  * exit 0 = PASS, 1 = FAIL (one line per finding), 2 = usage.
  */
@@ -46,13 +47,29 @@ import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const args = process.argv.slice(2);
-const dirs = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--rule');
 const ALL = ['thin-border', 'drop-shadow-ring', 'search-clear'];
-const picked = args.flatMap((a, i) => (args[i - 1] === '--rule' ? [a] : []));
-if (!dirs.length || dirs.some((d) => !existsSync(d) || !statSync(d).isDirectory()) || picked.some((r) => !ALL.includes(r))) {
-  console.error('usage: css-contour-lint.mjs <dir>... [--rule thin-border|drop-shadow-ring|search-clear]...');
+const USAGE = 'usage: css-contour-lint.mjs <dir>... [--rule thin-border|drop-shadow-ring|search-clear]...';
+const usageFail = (why) => {
+  console.error(`${why}\n${USAGE}`);
   process.exit(2);
+};
+const dirs = [];
+const picked = [];
+for (let i = 0; i < args.length; i++) {
+  const a = args[i];
+  if (a === '--rule' || a.startsWith('--rule=')) {
+    const r = a === '--rule' ? args[++i] : a.slice('--rule='.length);
+    if (r === undefined || r.startsWith('--')) usageFail('--rule needs a value');
+    if (!ALL.includes(r)) usageFail(`unknown rule: ${r}`);
+    picked.push(r);
+  } else if (a.startsWith('--')) {
+    usageFail(`unknown option: ${a}`);
+  } else {
+    dirs.push(a);
+  }
 }
+if (!dirs.length) usageFail('missing directory');
+for (const d of dirs) if (!existsSync(d) || !statSync(d).isDirectory()) usageFail(`not a directory: ${d}`);
 const rules = picked.length ? picked : ALL;
 
 const SKIP_DIRS = new Set(['node_modules', 'vendor', 'dist', 'build']);
@@ -231,6 +248,24 @@ const collectCancelHiders = (rulesList) => {
 
 const CONTROL_SEL = /(^|[\s,>+~(])(a|button|input|select|textarea)(?=$|[\s,.:[#>+~)])|\.(btn|button)\b|\[type=|:focus|:invalid|:user-invalid|error|invalid|not-valid|outline|ghost/i;
 const cssFiles = files.filter((x) => x.f.endsWith('.css'));
+// Classes whose own rule (`.btn { background: #0a58ca }`) paints a solid background. A
+// compound such as `.btn.btn-primary` that sets only a border inherits it, so it is not
+// read as transparent.
+const solidBgClasses = new Set();
+for (const file of cssFiles) {
+  for (const { selector, body } of parseCss(file.text)) {
+    const { decl, apply } = readDecls(body);
+    const bg = decl['background-color'] ?? decl.background;
+    const solid = bg !== undefined ? !isLightOrClear(bg) : apply.some((t) => !hasVariant(t) && isBgTok(t) && !isLightBgTok(t));
+    if (!solid) continue;
+    for (const s of splitList(selector)) {
+      const m = s.match(/^\.([\w-]+)$/);
+      if (m) solidBgClasses.add(m[1]);
+    }
+  }
+}
+const inheritsSolidBg = (selector) =>
+  splitList(selector).some((s) => /^(?:\.[\w-]+){2,}$/.test(s) && [...s.matchAll(/\.([\w-]+)/g)].some((c) => solidBgClasses.has(c[1])));
 for (const file of cssFiles) {
   const parsed = parseCss(file.text);
   collectCancelHiders(parsed);
@@ -246,7 +281,7 @@ for (const file of cssFiles) {
     const radius =
       (decl['border-radius'] && !/^0(px|rem|em|%)?$/.test(decl['border-radius'].trim())) || apply.some(isRoundedTok);
     const bgDecl = decl['background-color'] ?? decl.background;
-    const bgClear = bgDecl !== undefined ? isLightOrClear(bgDecl) : apply.some(isLightBgTok) || !base.some(isBgTok);
+    const bgClear = bgDecl !== undefined ? isLightOrClear(bgDecl) : apply.some(isLightBgTok) || (!base.some(isBgTok) && !inheritsSolidBg(selector));
     const contourByShadow = /inset\s+0\s+0\s+0\s+1px/.test(decl['box-shadow'] || '') || apply.some(isShadowContourTok);
 
     if (rules.includes('thin-border') && thin && radius && bgClear && !contourByShadow && CONTROL_SEL.test(selector)) {
@@ -334,7 +369,7 @@ function fieldCovered(tag) {
   });
 }
 if (rules.includes('search-clear')) {
-  const CLEAR = /type\s*=\s*["']reset["']|data-[\w-]*clear|\bclass\s*=\s*["'][^"']*\bclear|['"][\w-]*_clear['"]|aria-label\s*=\s*["'][^"']*\b(clear|limpiar|borrar|effacer)/i;
+  const CLEAR = /type\s*=\s*["']reset["']|data-[\w-]*clear|\bclass\s*=\s*["'][^"']*\bclear\b|['"][\w-]*_clear['"]|aria-label\s*=\s*["'][^"']*\b(clear|limpiar|borrar|effacer)/i;
   for (const file of tplFiles) {
     const re = /type\s*=\s*["']search["']/gi;
     let m;

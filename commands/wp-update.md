@@ -264,7 +264,7 @@ version is reported, not retried with guessed flags.
    the sheets the cuts were taken from, and the cuts go stale in silence. Exit `1`
    ("regenerate critical cuts") is reported as a finding with the project's cut-regeneration
    step; do not regenerate them here. Exit `2` (bad usage or an unreadable manifest) is a tool
-   error: report it as "critical cuts not checked" with its message, never as stale cuts. No manifest prints SKIP and is not a finding.
+   error (it also covers a manifest that lists no sheet and no cut): report it as "critical cuts not checked" with its message, never as stale cuts. No manifest prints SKIP and is not a finding.
 6. Extra attention to anything flagged as version skew in Step 3.
 
 ## Step 6: Clone-aware Checks

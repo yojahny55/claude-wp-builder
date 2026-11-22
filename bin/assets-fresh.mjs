@@ -17,14 +17,17 @@
  *   {
  *     "sheets": { "assets/css/bundle.min.css": "<sha256 hex>" },
  *     "cuts":   { "assets/critical/single-bundle.css":
- *                   { "source": "assets/css/bundle.min.css", "hash": "<sha256 hex>" } }
+ *                   { "source": "assets/css/bundle.min.css", "hash": "<sha256 hex>",
+ *                     "cutHash": "<sha256 hex of the cut itself, optional>" } }
  *   }
  * `sheets` pins built files; each cut pins the hash of the sheet it was cut from. Paths are
  * relative to --root (default: the theme dir), so a cut taken from a core or plugin sheet
  * can name it with a path outside the theme, e.g. "../../../wp-includes/css/dist/block-library/style.min.css".
  *
  * Exit 0: fresh, or no manifest (nothing to check; prints SKIP). Exit 1: stale, with the
- * message "regenerate critical cuts". Exit 2: bad usage or an unreadable manifest.
+ * message "regenerate critical cuts". Exit 2: bad usage or an unreadable manifest, which
+ * includes a manifest that lists no sheet and no cut (`{}`, or `cut` for `cuts`): zero
+ * entries checked is never FRESH.
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -89,20 +92,42 @@ const sha = (rel) => {
     process.exit(2);
   }
 };
+const asEntries = (key) => {
+  const v = manifest[key];
+  if (v === undefined) return [];
+  if (!v || typeof v !== 'object' || Array.isArray(v)) {
+    console.error(`ERROR: "${key}" in ${manifestPath} must be an object (critical cuts not checked)`);
+    process.exit(2);
+  }
+  return Object.entries(v);
+};
+const sheets = asEntries('sheets');
+const cuts = asEntries('cuts');
+if (!sheets.length && !cuts.length) {
+  const others = Object.keys(manifest).filter((k) => k !== 'sheets' && k !== 'cuts');
+  console.error(
+    `ERROR: ${manifestPath} lists no "sheets" and no "cuts", so nothing was checked (critical cuts not checked)` +
+      (others.length ? `; found other keys: ${others.join(', ')}. Did you mean "sheets" or "cuts"?` : ''),
+  );
+  process.exit(2);
+}
 const stale = [];
-for (const [rel, want] of Object.entries(manifest.sheets ?? {})) {
+for (const [rel, want] of sheets) {
   const got = sha(rel);
   if (got !== want) stale.push(`sheet ${rel}: ${got ? 'content changed' : 'missing'}`);
 }
-for (const [cut, meta] of Object.entries(manifest.cuts ?? {})) {
+for (const [cut, meta] of cuts) {
   if (!meta || typeof meta.source !== 'string' || typeof meta.hash !== 'string') {
     console.error(`ERROR: cut "${cut}" in manifest is missing required "source" or "hash" property`);
     process.exit(2);
   }
-  if (sha(cut) === null) {
+  const cutNow = sha(cut);
+  if (cutNow === null) {
     stale.push(`cut ${cut}: missing`);
     continue;
   }
+  // Optional: a manifest that also records the cut's own hash catches a cut edited by hand.
+  if (typeof meta.cutHash === 'string' && cutNow !== meta.cutHash) stale.push(`cut ${cut}: content changed since it was generated`);
   const got = sha(meta.source);
   if (got !== meta.hash) stale.push(`cut ${cut}: source ${meta.source} ${got ? 'changed since the cut' : 'is missing'}`);
 }
