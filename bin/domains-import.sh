@@ -20,7 +20,9 @@ cd "$(dirname "$0")/.."
 DOMAINS_REF="${DOMAINS_REF:-4aad0584d92131626b16d4ff4d77f0455385013c}"
 d=skills/wp-demo-craft/references/domains
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+# The staged .*.new files sit next to their targets; a failure between staging and the
+# renames must not leave them behind as untracked files.
+trap 'rm -rf "$tmp"; rm -f "$d/.LICENSE.new" "$d/.SOURCE.txt.new" "$d/.domains.csv.new"' EXIT
 
 # init + fetch rather than `clone --branch`, which cannot take a commit SHA.
 git init -q "$tmp/up"

@@ -16,6 +16,9 @@ d=skills/wp-demo-craft/references/design-md
 
 tmp=$(mktemp "$d/.INDEX.md.XXXXXX")
 trap 'rm -f "$tmp"' EXIT
+# mktemp creates 0600; copying the current file first keeps its mode, so the rename
+# below does not leave INDEX.md unreadable to the group. The contents are replaced.
+[ -f "$d/INDEX.md" ] && \cp -pf "$d/INDEX.md" "$tmp"
 
 echo "warning: about to overwrite $d/INDEX.md — any hand-corrected industry or" >&2
 echo "tone values will be replaced by the keyword heuristic below. Diff the" >&2
