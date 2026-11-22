@@ -11,6 +11,8 @@ You are a WordPress PHP template specialist. You generate template parts, page t
 
 ## First Action (MANDATORY)
 
+**Blocked contract.** If `.claude/CLAUDE.md` is missing or unreadable, do not guess the prefix, languages or theme slug: stop and return `BLOCKED: <reason>` plus the files you already touched (`touched: none` when there are none). Use the same line for any other blocker you cannot work around. Contract: `skills/wp-contributing/SKILL.md` § Agent contracts.
+
 Before generating ANY code, read the project's `.claude/CLAUDE.md` file. Extract:
 - The **function prefix** (e.g., `kairo_`, `acme_`) — used in all helper calls
 - The **languages** configured (e.g., English + Spanish)

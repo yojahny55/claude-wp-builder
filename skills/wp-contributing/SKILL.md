@@ -105,6 +105,28 @@ When the thing you changed is a real script (`bin/*.sh`), test its behavior, not
 build a temp directory, put a fake binary earlier on `PATH`, run the script, assert what it
 did. `tests/checks/tailwind-rebuild.sh` does this with a fake `npm` and fake watcher processes.
 
+### Agent contracts
+
+- **First Action.** Every agent opens with a `## First Action (MANDATORY)` block.
+  `wp-context` and `wp-normalize` are the documented exceptions: they run before `/wp-init`,
+  when no `.claude/CLAUDE.md` exists yet, and say so in their own text. `wp-tailwind` has the
+  block with a per-mode rule: author mode reads the project file, conversion mode may run
+  with no project. A new exception goes in the list in `tests/checks/agent-contracts.sh`.
+- **BLOCKED.** An agent that cannot proceed (no `.claude/CLAUDE.md`, a missing input) does not
+  guess the prefix, languages or theme slug. It returns `BLOCKED: <reason>` and the files it
+  already touched (`touched: none` if none). Auditors keep their JSON contract: the findings
+  JSON gains a top-level `"blocked": "<reason>"` with empty `findings` and `checks_executed`,
+  and `BLOCKED: <reason>` is the first line of the summary; `/wp-audit` Step 6.8 then sees
+  unexecuted ids and sends them back once; a second blocked report leaves the audit
+  `INCOMPLETE`, with the agent and its reason named in the report.
+  `wp-research` is the documented exception: it reads `.claude/CLAUDE.md` only for business
+  context, beside `docs/` and the manifest, and needs no prefix, languages or theme slug, so a
+  missing file leaves it with less context, not blocked, and it has no `BLOCKED` return.
+- **The `wp-audit-*` prefix** means an agent dispatched by `/wp-audit`, and most of them only
+  read and report. Two do not: `wp-audit-aios` and `wp-audit-rankmath` install and configure
+  (plugin installs, options, post meta) and say so in their first lines. They keep the name
+  because commands and users dispatch them by it; do not rename them.
+
 ### Frontmatter is the loader's contract
 
 | Layer | Required | Notes |
@@ -123,6 +145,9 @@ value; `tests/checks/frontmatter-yaml.sh` fails on it in every layer.
 Read `references/skill-review.md` when creating, changing or reviewing a skill: it is the
 checklist `/wp-contribute review` hands a fresh reviewer, and the part of the best practices
 no grep can check.
+
+Read `references/flag-vocabulary.md` when adding a flag to a command: it fixes what `--yes`,
+`--force`, `--dry-run` and `--resume` mean and lists the historical exceptions.
 
 ### The traps that cost the most
 

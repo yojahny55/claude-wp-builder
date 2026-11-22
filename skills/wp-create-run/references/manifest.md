@@ -84,7 +84,7 @@ longer match:
 
 `${PROJECT_PATH}/.wp-create.local.json` — the project root, a sibling of
 `.wp-create.json`, not a file inside the theme directory `/wp-init` scaffolds
-later. `/wp-init` (Step 9.6) adds `.wp-create.local.json` to
+later. `/wp-init` Step 9.6 adds `.wp-create.local.json` to
 `${PROJECT_PATH}/.gitignore` — the project root's own `.gitignore`, creating
 that file if the root has none yet. That is a different repository from the
 theme's own `.gitignore` (`/wp-init` Step 9.5, scoped to `<theme-dir>`), which
