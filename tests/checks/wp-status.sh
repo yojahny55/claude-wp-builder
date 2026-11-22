@@ -33,7 +33,14 @@ mk() {
       failed) mkdir -p "$d/demo"; printf 'demo failed\nreason\n' >"$d/demo/FAILED.md" ;;
       build-open) echo '{"version":2,"completed":null,"units":[{"id":"header"}]}' >"$d/demo/.yolo-progress.json" ;;
       build-done) echo '{"version":2,"completed":"2026-01-01T00:00:00Z","units":[{"id":"header"}]}' >"$d/demo/.yolo-progress.json" ;;
+      build-array) echo '[]' >"$d/demo/.yolo-progress.json" ;;
+      build-null) echo 'null' >"$d/demo/.yolo-progress.json" ;;
+      build-emptystamp) echo '{"version":2,"completed":"","units":[]}' >"$d/demo/.yolo-progress.json" ;;
       verify) echo ok >"$d/demo/VERIFY.md" ;;
+      ledger-null) echo 'null' >"$d/.wp-audit-findings.json" ;;
+      ledger-obj) echo '{"ledger_version":1,"findings":{"a":1}}' >"$d/.wp-audit-findings.json" ;;
+      ledger-unmeasured) echo '{"ledger_version":1,"findings":[{"check":"PERF-001","resource":"a","status":"unmeasured"}]}' >"$d/.wp-audit-findings.json" ;;
+      ledger-nostatus) echo '{"ledger_version":1,"findings":[null,5]}' >"$d/.wp-audit-findings.json" ;;
       ledger-empty) : ;;
       ledger-open) echo '{"ledger_version":1,"findings":[{"check":"SEC-001","resource":"a","status":"new"},{"check":"SEC-002","resource":"b","status":"resolved"}]}' >"$d/.wp-audit-findings.json" ;;
       ledger-clean) echo '{"ledger_version":1,"findings":[{"check":"SEC-001","resource":"a","status":"resolved"},{"check":"SEC-002","resource":"b","status":"accepted"}]}' >"$d/.wp-audit-findings.json" ;;
@@ -67,6 +74,16 @@ mk j manifest claude html build-done verify; expect j '/wp-audit'
 mk k manifest claude html build-done verify ledger-open; expect k '/wp-audit'
 mk l manifest claude html build-done verify ledger-clean; [ "$(next l)" = null ] || fail "l: nothing must be pending"
 expect a '/wp-create'
+
+# Valid JSON in the wrong shape is unreadable, never "in progress" or "nothing pending".
+mk ba manifest claude html build-array;     expect ba '/wp-yolo demo/'
+case "$(next ba)" in *--resume*) fail "ba: a [] build ledger was read as an unfinished build" ;; esac
+mk bn manifest claude html build-null;      case "$(next bn)" in *--resume*|'/wp-finalize'*) fail "bn: a null build ledger was read as a build" ;; esac
+mk be manifest claude html build-emptystamp; expect be '--resume'
+mk ln manifest claude html build-done verify ledger-null;       expect ln '/wp-audit'
+mk lo manifest claude html build-done verify ledger-obj;        expect lo '/wp-audit'
+mk lu manifest claude html build-done verify ledger-unmeasured; expect lu '/wp-audit'
+mk ls manifest claude html build-done verify ledger-nostatus;   expect ls '/wp-audit'
 
 # rule e shows the first lines of FAILED.md
 node "$tool" "$tmp/e" | grep >/dev/null -c 'demo failed' || fail "FAILED.md lines are not shown"

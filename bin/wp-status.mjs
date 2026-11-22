@@ -71,9 +71,13 @@ export function collect(root) {
 
   const b = readJson(join(demoDir, '.yolo-progress.json'));
   const build = { state: b.state, units: 0, completed: null };
-  if (b.state === 'ok' && b.data && typeof b.data === 'object') {
+  // Valid JSON that is not the ledger object (null, an array, a number) is not a build in
+  // progress: it is a ledger this tool cannot read. Only a non-empty `completed` string
+  // (the ISO stamp /wp-yolo writes) means the build finished.
+  if (b.state === 'ok' && !(b.data && typeof b.data === 'object' && !Array.isArray(b.data))) build.state = 'unreadable';
+  if (build.state === 'ok') {
     build.units = Array.isArray(b.data.units) ? b.data.units.length : 0;
-    build.completed = b.data.completed ?? null;
+    build.completed = typeof b.data.completed === 'string' && b.data.completed !== '' ? b.data.completed : null;
   }
 
   // The manifest pointer wins; the conventional file name is the fallback.
@@ -82,8 +86,12 @@ export function collect(root) {
   if (typeof ptr === 'string' && ptr !== '') ledgerPath = ptr;
   const l = readJson(resolve(root, ledgerPath));
   const audit = { ledger: ledgerPath, state: l.state, counts: {}, total: 0 };
-  if (l.state === 'ok' && Array.isArray(l.data?.findings)) {
+  // A ledger that parses but has no findings array is as unreadable as one that does not parse:
+  // reading it as an empty ledger would report "nothing pending" over a corrupt file.
+  if (l.state === 'ok' && !Array.isArray(l.data?.findings)) audit.state = 'unreadable';
+  if (audit.state === 'ok') {
     for (const f of l.data.findings) {
+      // An entry without a status string is counted as open (`unknown`): it cannot be shown done.
       const s = typeof f?.status === 'string' ? f.status : 'unknown';
       audit.counts[s] = (audit.counts[s] || 0) + 1;
       audit.total += 1;
@@ -111,9 +119,11 @@ export function decide({ manifest, demo, build, audit }) {
     if (!demo.verify) return { command: '/wp-finalize, then /wp-demo-verify demo/', reason: 'the build is complete and demo/VERIFY.md does not exist' };
   }
 
-  if (audit.state !== 'ok') return { command: '/wp-audit', reason: adopted ? 'an adopted site is audited, not built; there is no readable findings ledger' : 'there is no readable findings ledger' };
-  const open = n('new') + n('still_failing') + n('fixed_unverified');
-  if (open > 0) return { command: '/wp-audit', reason: `re-run to fix or verify: ${n('new')} new, ${n('still_failing')} still failing, ${n('fixed_unverified')} fixed but unverified` };
+  if (audit.state !== 'ok') return { command: '/wp-audit', reason: (adopted ? 'an adopted site is audited, not built; ' : '') + (audit.state === 'unreadable' ? `the findings ledger ${audit.ledger} cannot be read` : 'there is no findings ledger') };
+  // Open as the ledger defines it (new + still_failing + unmeasured), plus fixed_unverified,
+  // which still needs a run to confirm, and entries whose status cannot be read.
+  const open = n('new') + n('still_failing') + n('unmeasured') + n('fixed_unverified') + n('unknown');
+  if (open > 0) return { command: '/wp-audit', reason: `re-run to fix or verify: ${n('new')} new, ${n('still_failing')} still failing, ${n('unmeasured')} unmeasured, ${n('fixed_unverified')} fixed but unverified${n('unknown') ? `, ${n('unknown')} without a status` : ''}` };
   return { command: null, reason: 'nothing pending' };
 }
 
