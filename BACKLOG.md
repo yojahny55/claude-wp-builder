@@ -18,8 +18,8 @@ item was checked against what 1.35.0 shipped: the cinematic language switcher un
 and every front-end string of both starters reading the page language instead of gettext.
 Those two items, open as measured proposals at 1.34.0, are delivered; no other item moved.
 The store-setup integration failure is closed after two months without a recurrence in CI.
-The Docker nginx config still has no owner. The REST block in Apache is written down as a
-reference with its PHP half, and delivered. The full pass against
+The REST block in Apache is written down as a reference with its PHP half, and the Docker
+nginx config is now written by `/wp-create`; both are delivered. The full pass against
 the command, agent or script that would own each item was last made at v1.31.0. An item
 claiming to be open while the behavior ships reads as a project that does not know what it
 has built.
@@ -286,10 +286,12 @@ Server setup, permissions, and WordPress configuration.
   snippet extraction on a refactor branch). The assertion keeps its diagnostics, so a
   recurrence still explains itself.
 
-- [ ] **Docker environments get no nginx config** `OPEN`
-  [`docker-compose.yml.tpl`](templates/docker/docker-compose.yml.tpl) mounts `./docker/nginx.conf`,
-  and no template or command writes that file — no owner exists yet. Until one does, a Docker
-  store also misses the `woocommerce_uploads` deny rule the native templates carry.
+- [x] **Docker environments get no nginx config** `DELIVERED`
+  [`templates/docker/nginx.conf.tpl`](templates/docker/nginx.conf.tpl) is rendered by
+  [`/wp-create`](skills/wp-create-run/references/env-templates.md) Step 4.3 to the
+  `docker/nginx.conf` that [`docker-compose.yml.tpl`](templates/docker/docker-compose.yml.tpl)
+  mounts, with the native deny list (`woocommerce_uploads` included), backed up on overwrite and
+  served by a real nginx in `tests/checks/docker-nginx-config.sh`.
 
 - [x] **Set `FS_METHOD` to `direct`** `DELIVERED`
   Handled by `/wp-audit --security`.

@@ -5,6 +5,7 @@
 # templates/native/_deny.list is the single reference; every engine must cover every entry, and
 # no local template may send HSTS (a pinned self-signed host cannot be clicked through).
 # nginx and Apache: the deny regexes are read out of the template and run against sample URLs.
+# The Docker nginx template (templates/docker/nginx.conf.tpl) is held to the same list.
 # Caddy: its path tokens are compared whole (a substring match let `*.sql` hide behind `*.sql.gz`).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -16,7 +17,7 @@ list=$d/_deny.list
 # One deny regex per line, prefixed F (matches the file name) or L (matches the URL path).
 regexes() {
   case $1 in
-    nginx*) sed -n 's/^ *location ~\*\{0,1\} *"\{0,1\}\(.*[^"]\)"\{0,1\} { deny all; }$/L\1/p' "$2";;
+    *nginx*) sed -n 's/^ *location ~\*\{0,1\} *"\{0,1\}\(.*[^"]\)"\{0,1\} { deny all; }$/L\1/p' "$2";;
     apache*)
       sed -n 's/^ *<LocationMatch "\(.*\)">$/L\1/p' "$2"
       sed -n 's/^ *<FilesMatch "\(.*\)">$/F\1/p' "$2";;
@@ -43,7 +44,7 @@ denied() { # regex-lines url
 
 checked=0 entries=0
 while read -r kind value; do case "$kind" in ''|'#'*) continue;; esac; entries=$((entries + 1)); done < "$list"
-templates="nginx.conf.tpl nginx-no-ssl.conf.tpl apache.conf.tpl apache-no-ssl.conf.tpl Caddyfile.tpl"
+templates="nginx.conf.tpl nginx-no-ssl.conf.tpl apache.conf.tpl apache-no-ssl.conf.tpl Caddyfile.tpl ../docker/nginx.conf.tpl"
 tcount=0
 for f in $templates; do
   tcount=$((tcount + 1))
@@ -92,7 +93,7 @@ done
 [ "$entries" -gt 0 ] || fail "empty deny list"
 
 # nginx: regex locations match in order, so the xmlrpc deny must precede the PHP block.
-for f in nginx.conf.tpl nginx-no-ssl.conf.tpl; do
+for f in nginx.conf.tpl nginx-no-ssl.conf.tpl ../docker/nginx.conf.tpl; do
   x=$(grep -n 'xmlrpc' "$d/$f" | grep -F 'location' | sed -n 1p | cut -d: -f1 || true)
   php=$(grep -Fn 'location ~ \.php$' "$d/$f" | sed -n 1p | cut -d: -f1 || true)
   [ -n "$x" ] && [ -n "$php" ] && [ "$x" -lt "$php" ] || fail "$f: xmlrpc deny must come before the PHP location"
