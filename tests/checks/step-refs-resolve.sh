@@ -7,6 +7,9 @@
 # `/wp-x`'s Step 2.6, `commands/wp-x.md` Steps 4 and 4.4) or right after it (Step 2.6 of `/wp-x`); the check then resolves it
 # against that command, expanded with its own -run references. Any other citation is the
 # citing command's own. The plural form ("Steps 2, 2.5, 2.6") is checked item by item.
+# Limit: only the citation right next to `/wp-x` is qualified. In "`/wp-x` Step 2.6 and
+# Step 3.1" the second citation resolves against the citing command; write the plural
+# "`/wp-x` Steps 2.6 and 3.1" to cite several steps of another command.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # shellcheck source=lib/expand-command.sh
