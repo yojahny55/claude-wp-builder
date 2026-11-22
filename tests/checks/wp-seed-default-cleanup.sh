@@ -15,7 +15,8 @@
 # grep for the word "untouched" would pass against a block that deletes everything anyway.
 # The stub records deletions instead of performing them, so the assertions are about which
 # records the shipped text decided to remove.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 
 cd "$(dirname "$0")/../.." || exit 1
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED

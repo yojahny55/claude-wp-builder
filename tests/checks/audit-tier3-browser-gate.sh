@@ -10,9 +10,9 @@
 # browser that loads the page. This check asserts both directions — the external gate is
 # gone, and the browser gate replaced it — because a positive grep alone is satisfied by
 # deleting the tier.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
-fail() { echo "FAIL: $*"; exit 1; }
 
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
 audit=$EXPANDED

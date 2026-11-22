@@ -33,8 +33,9 @@
 #  16. The revert needs the transfer client and a key pair too, and says so.
 #  17. The documented configuration, exclusions and never-public paths are the real ones.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
-fail() { echo "FAIL: $*"; exit 1; }
+. "$(dirname "$0")/../lib/assert.sh"
+require_tool php python3
+cd "$(dirname "$0")/../.." || exit 1
 
 setup=skills/wp-s3/scripts/s3-setup.sh
 media=skills/wp-s3/scripts/s3-media.sh

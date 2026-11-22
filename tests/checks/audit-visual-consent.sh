@@ -5,9 +5,9 @@
 # The plugin also knew stack.builder and never used it, so a setting with a builder control was
 # patched with theme CSS. fix.md must keep visual fixes out of auto-fixable, measured before and
 # after, and builder-first; the agents that emit CSS must declare design_impact.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
-fail() { echo "FAIL: $*"; exit 1; }
 
 fix=skills/wp-audit-run/references/fix.md
 disp=skills/wp-audit-run/references/dispatch.md
@@ -43,7 +43,7 @@ for fmt in md html; do
   out="$tmp/out-$fmt"
   node bin/audit-report.mjs --run "$tmp/run.json" --out "$out" --format "$fmt" >/dev/null 2>&1 \
     || fail "audit-report.mjs rejected a run with design_impact ($fmt)"
-  n=$(grep -rFo 'Visual change' "$out" | wc -l)
+  n=$(grep -rFo 'Visual change' "$out" | wc -l) || true
   [ "$n" -ge 1 ] || fail "the $fmt report does not tag a design_impact finding"
 done
 # Negative: the tag belongs to the one flagged finding, not to every row (md: exactly once).

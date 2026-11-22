@@ -15,7 +15,8 @@
 #    which the setting does not: on a library that is already WebP the step re-encoded
 #    every file into <name>.webp.webp, a second lossy pass over an already-lossy source
 #    that webp_delivery_mode=picture then serves in place of the original.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 cd "$(dirname "$0")/../.." || exit 1
 
 script=skills/wp-robin/scripts/robin-fix.sh

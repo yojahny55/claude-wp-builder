@@ -18,7 +18,8 @@
 # These assertions call the exported functions directly. A manifest fixture on disk would
 # exercise the CLI's file handling too, which other checks already own; what was missing
 # here is the rule itself.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 
 cd "$(dirname "$0")/../.." || exit 1
 fails=0
@@ -100,10 +101,10 @@ emit('id-revision-word', validateManifest(withIds(['SEC-036@x'])).length > 0 ? '
 console.log(out.join('\n'));
 EOF
 
-cp "$work/probe.mjs" ./.probe-types.mjs
-result="$(node ./.probe-types.mjs 2>&1)"
-status=$?
-rm -f ./.probe-types.mjs
+probe_dir="$(mktemp -d)"
+trap 'rm -rf "$work" "$probe_dir"' EXIT
+sed "s#'./bin/lib/manifest.mjs'#'file://$PWD/bin/lib/manifest.mjs'#" "$work/probe.mjs" > "$probe_dir/probe-types.mjs"
+status=0; result="$(cd "$probe_dir" && node ./probe-types.mjs 2>&1)" || status=$?
 if [ "$status" -ne 0 ]; then
   fail "the probe did not run: $result"
   printf 'FAILED %d\n' "$fails"
@@ -112,7 +113,7 @@ fi
 
 expect() {
   local name="$1" want="$2" got
-  got="$(printf '%s\n' "$result" | awk -F'\t' -v n="$name" '$1 == n { print $2 }')"
+  got="$(printf '%s\n' "$result" | awk -F'\t' -v n="$name" '$1 == n { print $2 }')" || true
   [ "$got" = "$want" ] || fail "$name: expected '$want', got '${got:-<no result>}'"
 }
 
