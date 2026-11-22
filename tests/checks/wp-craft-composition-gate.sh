@@ -26,7 +26,7 @@ require_tool npx python3
 probe_dir="$(mktemp -d)"
 trap 'rm -rf "$probe_dir"' EXIT
 printf '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>p</title></head><body><p>probe</p></body></html>\n' > "$probe_dir/p.html"
-npx -y impeccable@4 detect "$probe_dir" --json > "$probe_dir/out.json" 2> "$probe_dir/err.txt" || true
+npx -y impeccable@latest detect "$probe_dir" --json > "$probe_dir/out.json" 2> "$probe_dir/err.txt" || true
 if ! python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$probe_dir/out.json" 2>/dev/null; then
   if [ "$(grep -ciE 'ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNREFUSED|ENETUNREACH|ECONNRESET|network|FetchError|EACCES|EROFS' "$probe_dir/err.txt" || true)" -gt 0 ]; then
     [ "${CHECKS_REQUIRE_TOOLS:-0}" = 1 ] && fail "CHECKS_REQUIRE_TOOLS=1 and the impeccable detector cannot be fetched: $(head -c 300 "$probe_dir/err.txt")"
@@ -115,6 +115,33 @@ fi
 grep -Fq 'carries no findings list' "$work/shape.out" \
   || fail "the composition gate exited 1 on an uninterpretable detector payload without saying that is why, so it is indistinguishable from any other failure"
 
+# 3b. Detector output the gate does not understand: an unknown severity or category, a field
+#     missing or of the wrong type, an element that is not an object, a wrapper object with
+#     keys besides "findings", an exit code other than 0/2, or an exit code that disagrees
+#     with the payload. Every one must be rc 1 with "not understood" or "could not scan",
+#     never a pass and never a traceback. Case format: name|detector exit|payload.
+W='"antipattern":"x","file":"/x/slop-probe.html"'
+for case in \
+  "sev|0|[{$W,\"category\":\"slop\",\"severity\":\"error\"}]" \
+  "cat|0|[{$W,\"category\":\"style\",\"severity\":\"advisory\"}]" \
+  "sevlist|0|[{$W,\"category\":\"slop\",\"severity\":[\"warning\"]}]" \
+  "nofile|2|[{\"antipattern\":\"x\",\"category\":\"slop\",\"severity\":\"warning\"}]" \
+  'nonobj|0|["x"]' \
+  'extrakey|0|{"findings":[],"error":"crashed"}' \
+  'crash|3|[]' \
+  "rc0warn|0|[{$W,\"category\":\"quality\",\"severity\":\"warning\"}]" \
+  'rc2empty|2|[]'; do
+  name=${case%%|*}; rest=${case#*|}; drc=${rest%%|*}; payload=${rest#*|}
+  printf '#!/usr/bin/env bash\necho %q\nexit %d\n' "$payload" "$drc" > "$work/fakebin/npx"
+  rc=0
+  PATH="$work/fakebin:$PATH" COMPS_DIR="$work/slop" bash bin/composition-gate.sh \
+    >"$work/$name.out" 2>&1 || rc=$?
+  [ "$rc" -eq 1 ] || fail "the composition gate returned rc=$rc on the '$name' detector output, expected 1: $(cat "$work/$name.out")"
+  if grep -Fq 'Traceback' "$work/$name.out"; then fail "the composition gate raised a traceback on the '$name' output: $(cat "$work/$name.out")"; fi
+  [ "$(grep -Ec 'not understood|could not scan' "$work/$name.out")" -gt 0 ] \
+    || fail "the composition gate exited 1 on the '$name' output without saying it was not understood: $(cat "$work/$name.out")"
+done
+
 # An empty detector payload is a dropped connection, not a verdict: the gate retries once.
 grep -Eq 'for attempt in 1 2' bin/composition-gate.sh \
   || fail "bin/composition-gate.sh no longer retries the detector on an empty payload (a transient npx failure fails the gate)"
@@ -129,6 +156,7 @@ cat <<'JSON'
 [{"antipattern":"kicker-above-heading","category":"slop","severity":"warning","file":"/x/proof-row.html"},
  {"antipattern":"kicker-above-heading","category":"slop","severity":"warning","file":"/x/slop-probe.html"}]
 JSON
+exit 2
 SH
 rc=0
 PATH="$work/fakebin:$PATH" COMPS_DIR="$work/slop" bash bin/composition-gate.sh \
@@ -141,10 +169,10 @@ if grep -Fq 'proof-row fails' "$work/scoped.out"; then
   fail "the composition gate blocked proof-row on kicker-above-heading, which IGNORED_AT exempts there: $(cat "$work/scoped.out")"
 fi
 
-# The detector follows the newest 4.x on purpose, so a new release is picked up without a PR.
-# A pinned exact version would freeze the rules instead of answering them.
-grep -Eq 'impeccable@4 detect' bin/composition-gate.sh \
-  || fail "bin/composition-gate.sh no longer follows the newest impeccable 4.x (pinned, or another major)"
+# The detector follows the newest release on purpose, so a new release is picked up without a PR.
+# A pinned version would freeze the rules instead of answering them.
+grep -Fq 'impeccable@latest detect' bin/composition-gate.sh \
+  || fail "bin/composition-gate.sh no longer follows the newest impeccable release (pinned to a version)"
 # Ignoring a rule is a debt with a named exit, not a place to park findings. Growing the list
 # needs this line changed too, which makes the decision visible in review.
 ign=$(grep -E '^IGNORED = ' bin/composition-gate.sh || true)

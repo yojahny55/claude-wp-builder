@@ -415,7 +415,9 @@ exit 4 means the report is older than 24 h: report `Live scan: <score> (stale: s
 Dispatch the `wp-agentic-surfaces` agent for the fixable surfaces — it owns
 `inc/agentic.php` and every generated surface (`llms.txt`, ARD catalog, agent-skills
 index, markdown negotiation, Link headers, agent-friendly 404, JSON-LD breadth, trust
-anchors). Do **not** duplicate its work or re-implement the surfaces here.
+anchors). Do **not** duplicate its work or re-implement the surfaces here. If it returns
+`BLOCKED: <reason>`, its findings stay open: report them as failing with the agent, its reason
+and the files it touched, and do not re-scan or count any code as resolved.
 
 Advisory and off-site findings (GEO-D05 through GEO-D08, GEO-U10, GEO-P01 through
 GEO-P05) are reported with a recommendation and left unfixed — a WordPress theme cannot

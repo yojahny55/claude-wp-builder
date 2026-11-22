@@ -191,6 +191,8 @@ SKILL.md (`tests/checks/skill-authoring.sh`).
 Under `set -o pipefail` a check never ends a pipe in `grep -q` or `head`: the reader exits early,
 the producer dies of SIGPIPE and the check fails at random on a busy runner. Use
 `grep >/dev/null -c` and `sed -n 1p` (`tests/checks/no-early-exit-pipes.sh` enforces it).
+A new check sources `tests/lib/assert.sh` (`fail`, `skip`, `require_tool`, `need_token`) instead
+of redefining them, and is committed with mode 100755 (`tests/checks/assert-lib-adoption.sh`).
 
 ## Generated-theme conventions (what the agents must emit)
 
@@ -210,6 +212,10 @@ Version lives in `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`
 README badge — bump all of them together. Add a `changes/<slug>.<section>.md` fragment (format
 in `changes/README.md`) and never edit `CHANGELOG.md` in a PR; update `README.md` when adding a
 command.
+
+A release is a `release/X.Y.Z` branch and PR (never a push to `main`); once it merges, tag the
+merge commit with an annotated `vX.Y.Z` tag and publish it with `gh release create vX.Y.Z --latest`.
+The merged PR alone is not a release.
 
 **Reconcile `BACKLOG.md` as part of cutting the release**, and update its `**Reconciled** on`
 line. `tests/checks/backlog-freshness.sh` fails when the newest release in the CHANGELOG is
