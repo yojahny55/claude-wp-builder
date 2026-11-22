@@ -106,7 +106,7 @@ Only offer environment types whose prerequisites are met. If only one viable opt
 bash -c 'test -f "$1/wp-config.php" && echo EXISTS || echo NOT_FOUND' _ '${PROJECT_PATH}'
 ```
 
-If `wp-config.php` exists at `PROJECT_PATH`, enter **Adopt Mode** (see the full Adopt Mode section below). This skips WordPress download, database creation, config creation, and core install.
+If `wp-config.php` exists at `PROJECT_PATH` and there is no `.wp-create.json`, enter **Adopt Mode** (see the full Adopt Mode section below). This skips WordPress download, database creation, config creation, and core install.
 
 ### 2b: Check for existing `.wp-create.json`
 
@@ -116,7 +116,7 @@ bash -c 'test -f "$1/.wp-create.json" && echo EXISTS || echo NOT_FOUND' _ '${PRO
 
 If `.wp-create.json` already exists, see the **Existing `.wp-create.json` Handling** section below.
 
-**Order when both exist:** 2b wins. Handle the manifest first; Adopt Mode (2a) applies only after Update, or when there is no manifest.
+**Order when both exist:** 2b wins, and Adopt Mode never applies. Update: the manifest rules. Overwrite: a full install despite `wp-config.php`. Adopt Mode is only for a site with no manifest.
 
 ---
 
@@ -266,6 +266,10 @@ For Docker environments where WP-CLI runs inside the container, download WordPre
 
 **Validation:** Check that `${PROJECT_PATH}/wp-load.php` exists after download.
 
+On **Overwrite**, read `${CLAUDE_PLUGIN_ROOT}/skills/wp-create-run/references/overwrite.md` now and follow it first: it governs the download above.
+
+**Overwrite:** the reference at 4.2 sets the sequence; 4.2 uses `core download --force`.
+
 **On failure:** See Failure Handling table.
 
 ### Step 4.3: Generate Environment Config from Templates
@@ -283,6 +287,8 @@ environment, the placeholder values, the port auto-assignment and the validation
 ```bash
 bash -c "$WP db create"
 ```
+
+**Overwrite:** run `$WP db reset --yes` instead of `db create`, in every environment.
 
 **Docker environments:** The database is created automatically by the MariaDB/MySQL container. Skip this step but verify the DB container starts successfully in Step 4.8.
 
@@ -623,7 +629,7 @@ What would you like to do?
   [3] Abort — Cancel and keep everything as-is
 ```
 
-- **Overwrite:** destroys the existing database and core (4.2 and 4.4 rerun on that site). Before 4.2: if `wp-config.php` exists, run `$WP db export ~/wp-create-backups/<slug>-$(date -u +%Y%m%dT%H%M%SZ).sql` (never under the WordPress root); stop if it fails. Then ask the user to confirm, naming the database and core to be replaced; no yes, no 4.2. Back up the manifest to `.wp-create.json.bak`, then proceed as if it did not exist.
+- **Overwrite:** a full install, never Adopt Mode, and it replaces the existing core and database. Step 4.2 sends the run to the export, the confirmation and the replace steps; no yes, no 4.2 and no 4.4. The old manifest is backed up to `.wp-create.json.bak`.
 - **Update:** Skip environment setup steps (4.1-4.8). Only re-run configuration steps: update plugins (4.10), update permalinks (4.11), update options (4.13), install new languages (4.14). Regenerate the manifest with updated values.
 - **Abort:** Exit the command immediately.
 

@@ -9,7 +9,7 @@ user-invocable: false
 `commands/wp-finalize.md` owns the order of the run, the short checks and the report format. Each
 check that needs more than a few paragraphs keeps its heading and entry condition there and sends
 the run to one file here. The command reads the file at that check, not before, so a project
-without `.wp-create.json` or a demo never pays for the WP-CLI validation or the parity layers.
+without a demo never pays for the WP-CLI validation or the parity layers.
 
 These files are the check itself, not background reading. When the command says to read one,
 read it whole and follow it in order.
