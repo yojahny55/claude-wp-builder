@@ -10,6 +10,8 @@ reads it to learn the project, `/wp-yolo` converts it page by page, `/wp-section
 Pages. Nothing downstream invents design: it transcribes what the demo already decided, so
 there is no path that begins at WordPress.
 
+Lost? Where am I: `/wp-status` reads the manifest, demo, build ledger and audit ledger (read-only) and names the next command.
+
 ```
 SETUP           /wp-create (optional)  →  /wp-init  →  /wp-context (optional)
                                               │
