@@ -128,14 +128,19 @@ $WP theme list --update=available --fields=name,version,update_version,status --
 ## Step 2: Backup
 
 Back up **before** any update, into a dated folder **outside the docroot** (default
-`~/wp-update-backups/<site-slug>-<UTC timestamp>/`). Never write it under the WordPress root.
+`~/wp-update-backups/<UTC timestamp>-pre-update/`). Never write it under the WordPress root.
 
 ```bash
-B=~/wp-update-backups/<site-slug>-$(date -u +%Y%m%dT%H%M%SZ); mkdir -p "$B"
-$WP db export "$B/db.sql"
+B=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/wp-backup.sh" '<wp-root>' --out ~/wp-update-backups --label pre-update)
 tar -czf "$B/plugins.tar.gz" -C <wp-root>/wp-content plugins
 tar -czf "$B/core.tar.gz" --exclude=wp-config.php -C <wp-root> wp-admin wp-includes $(cd <wp-root> && find . -maxdepth 1 -name '*.php' ! -name wp-config.php -printf '%f\n')
 ```
+
+`bin/wp-backup.sh` runs `wp db export` and writes `db.sql` (verified: non-empty, ends with the dump's `Dump completed`
+footer, renamed into place only when complete) and `backup.json` with sha256 sums into
+that folder, mode 700, and refuses a destination under the
+WordPress root. Exit `1` or `2` from it means there is no backup: stop. The tarballs below sit
+in the same folder. `/wp-restore "$B"` restores the database from it.
 
 List the root files with `find`, never `ls`: an aliased `ls --color` writes escape codes into the
 names and `tar` stops with `Cannot stat`, leaving a core archive without its root files.

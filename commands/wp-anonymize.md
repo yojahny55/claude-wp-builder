@@ -89,8 +89,8 @@ as `$WP`.
 ## Step 2: Back up first, unconditionally
 
 ```bash
-bash -c "mkdir -p ~/.wp-clone-backups"
-bash -c "$WP db export ~/.wp-clone-backups/<project-slug>-$(date -u +%Y%m%dT%H%M%SZ)-pre-anonymize.sql"
+B=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/wp-backup.sh" '<project-path>' --out ~/.wp-clone-backups --label pre-anonymize)
+echo "$B"
 ```
 
 Outside the project, for the reason `/wp-clone` Step 1.5 already gives: a backup under

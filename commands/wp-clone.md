@@ -82,8 +82,8 @@ people learn to skip past. It speaks only when there is something to lose.
 Whenever the destination is occupied, back it up **before** asking anything:
 
 ```bash
-bash -c "mkdir -p ~/.wp-clone-backups"
-bash -c "$WP db export ~/.wp-clone-backups/<project-slug>-$(date -u +%Y%m%dT%H%M%SZ).sql"
+B=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/wp-backup.sh" '<project-path>' --out ~/.wp-clone-backups --label pre-clone)
+echo "$B"
 ```
 
 **The backup goes outside the project directory on purpose.** A backup inside

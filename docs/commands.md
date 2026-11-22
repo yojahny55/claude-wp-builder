@@ -39,6 +39,8 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-debug`](#wp-debug) | utility | — | `.wp-create.json` | offered fixes |
 | [`/wp-clone`](#wp-clone) | utility | — | remote site | local install |
 | [`/wp-anonymize`](#wp-anonymize) | utility | — | cloned database | anonymised database |
+| [`/wp-backup`](#wp-backup) | utility | — | target WordPress root | verified backup folder with sha256 sums |
+| [`/wp-restore`](#wp-restore) | utility | — | backup folder | restored, verified site |
 | [`/wp-update`](#wp-update) | utility | — | target WordPress root | updated core/plugins/themes, dated backup, migrations, verification report |
 | [`/wp-robin`](#wp-robin) | utility | — | target WordPress root | Robin settings, queue rows, `.webp` files |
 | [`/wp-s3`](#wp-s3) | utility | — | bucket, region, media URL, credentials | `s3-config.php`, the `require` in `wp-config.php`, the endpoint mu-plugin |
@@ -678,6 +680,33 @@ identity and they are what the clone exists to debug.
 Every table outside the catalog is reported by name and row count under *Not examined*, and
 residue found by the verification pass is reported as a failure rather than beside a success
 summary.
+
+### `/wp-backup`
+
+```
+/wp-backup                          # database only, to ~/.wp-backups/<slug>/<timestamp>/
+/wp-backup /path/to/wordpress --uploads --label before-redesign
+```
+
+Runs `bin/wp-backup.sh`, the one export `/wp-update`, `/wp-clone` and `/wp-anonymize` share. The
+dump is written under a temp name and renamed only if it is non-empty and ends with the
+dump's `Dump completed` footer; `--uploads` adds a `gzip -t`-verified `uploads.tar.gz`. A
+`backup.json` records the site URL, database name and sha256 of every file. Always outside the
+WordPress root (`--out` inside it is refused), folders 700, files 600, `wp-config.php` never
+copied. Exit `1`: the copy did not verify and was deleted; `2`: the site could not be measured.
+
+### `/wp-restore`
+
+```
+/wp-restore ~/.wp-backups/<slug>/<timestamp> --dry-run
+/wp-restore ~/.wp-backups/<slug>/<timestamp>
+```
+
+Runs `bin/wp-restore.sh`. Checks every sha256 before touching anything, refuses a backup from
+a different `DB_NAME` unless `--yes`, takes a `pre-restore` copy first (uploads included when the
+backup has them), imports, swaps uploads with the old directory kept until verification, then
+requires `option get siteurl` to equal the backup's. The command asks with `AskUserQuestion`
+before importing; `--dry-run` prints the plan and changes nothing.
 
 ### `/wp-update`
 

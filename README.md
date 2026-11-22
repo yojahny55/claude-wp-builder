@@ -101,7 +101,7 @@ What each family of commands actually runs. Anything not listed needs nothing be
 
 | Needs | Commands | Notes |
 |-------|----------|-------|
-| **WP-CLI** and **PHP** | `/wp-create`, `/wp-init`, `/wp-seed`, `/wp-section`, `/wp-page`, `/wp-cpt`, `/wp-polylang`, `/wp-update`, `/wp-debug`, `/wp-adopt`, `/wp-clone`, `/wp-anonymize`, `/wp-woo-setup`, `/wp-finalize`, `/wp-audit` | The commands read the wrapper from `.wp-create.json` (`wp_cli.wrapper`), so WP-CLI can sit behind Docker, DDEV, Lando or wp-env. Theme and plugin PHP keeps a 7.4 floor. |
+| **WP-CLI** and **PHP** | `/wp-create`, `/wp-init`, `/wp-seed`, `/wp-section`, `/wp-page`, `/wp-cpt`, `/wp-polylang`, `/wp-update`, `/wp-debug`, `/wp-adopt`, `/wp-clone`, `/wp-anonymize`, `/wp-backup`, `/wp-restore`, `/wp-woo-setup`, `/wp-finalize`, `/wp-audit` | The commands read the wrapper from `.wp-create.json` (`wp_cli.wrapper`), so WP-CLI can sit behind Docker, DDEV, Lando or wp-env. Theme and plugin PHP keeps a 7.4 floor. |
 | **Node.js** | every command that runs a `bin/*.mjs` tool (`wp-config.mjs`, `demo-verify.mjs`, `image-gen.mjs`, the audit tools) | `/wp-create` and the manifest gate call `wp-config.mjs`, so treat Node as required. `npx` reaches the network for `impeccable` in `/wp-demo-verify`. |
 | **A Chrome or Chromium** plus `playwright-core` | `/wp-demo` (craft mode), `/wp-yolo` (craft), `/wp-demo-verify`, `/wp-responsive-check` (it delegates to `/wp-demo-verify`), browser tiers of `/wp-audit` | `bin/demo-verify.mjs --probe` answers whether the machine can render. Point `WP_BROWSER_CHROMIUM` at a browser already installed; the plugin never downloads one. A Playwright Firefox build (or `WP_BROWSER_FIREFOX`) adds a second-engine pass and is optional. |
 | **ffmpeg** | `/wp-cinematic-encode` | `bin/wp-cinematic-encode.sh` stops with "ffmpeg not installed" when it is missing. |
@@ -476,6 +476,8 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-debug [issue]` | utility | — | WP-CLI diagnostics and fixes |
 | `/wp-clone --from --to` | utility | — | Clone a remote site locally (SSH, SQL dump + uploads, or a full-site archive + dump); payment gateways are disabled in the clone |
 | `/wp-anonymize` | utility | — | Replace real people in a clone with deterministic fakes |
+| `/wp-backup [wp-root] [--uploads] [--label] [--out]` | utility | — | Verified backup outside the project: database dump checked for its completion footer, optional uploads archive, sha256 sums in `backup.json`, folders 700 / files 600 |
+| `/wp-restore <backup-dir> [wp-root] [--dry-run] [--yes]` | utility | — | Restore a `/wp-backup` folder: checksums first, DB name check, automatic pre-restore copy, site URL verified after |
 | `/wp-update [wp-root] [--plugins] [--exclude] [--core-only]` | utility | — | Update core, plugins and themes behind a backup outside the docroot, run the migrations, report licence-blocked premium plugins as skipped, verify, and print the rollback |
 | `/wp-robin [wp-root]` | utility | — | Runner for the `wp-robin` skill — install and configure Robin Image Optimizer, unstick the bulk queue, generate missing `.webp` |
 | `/wp-s3 [wp-root] [--revert]` | utility | — | Runner for the `wp-s3` skill — install and configure S3 Uploads so WordPress writes its media to S3, or take the site back off it |
