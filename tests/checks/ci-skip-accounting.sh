@@ -9,7 +9,8 @@
 # had not been applied to the aggregate. This check pins the accounting, and verifies the
 # skip-prone checks really do announce themselves, because accounting for a signal nothing
 # emits would be a guard standing next to an open door.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 
 cd "$(dirname "$0")/../.." || exit 1
 CI=".github/workflows/ci.yml"
@@ -50,7 +51,7 @@ printf '#!/usr/bin/env bash\necho "PASS (static only -- the walk was NOT exercis
 printf '#!/usr/bin/env bash\necho "SKIP: no kit"\n' >"$fx/skip.sh"
 printf '#!/usr/bin/env bash\necho PASS\n' >"$fx/ok.sh"
 printf '#!/usr/bin/env bash\necho boom\nexit 1\n' >"$fx/bad.sh"
-rout=$(bash "$RUN" -j 2 "$fx/static.sh" "$fx/skip.sh" "$fx/ok.sh" 2>&1); rrc=$?
+rrc=0; rout=$(bash "$RUN" -j 2 "$fx/static.sh" "$fx/skip.sh" "$fx/ok.sh" 2>&1) || rrc=$?
 [ "$rrc" -eq 0 ] || fail "$RUN exits $rrc when nothing failed"
 grep -Fq 'PASS=1 SKIP=2 FAIL=0' <<<"$rout" \
   || fail "$RUN did not classify a 'NOT exercised' pass and a SKIP as skips (got: $(grep -F 'PASS=' <<<"$rout"))"
@@ -82,10 +83,10 @@ rrc=0; timeout 20 bash "$RUN" --exclude >/dev/null 2>&1 || rrc=$?
 # A check that dies with no output still reports why: its exit status. Without it a
 # silent set -e exit (SIGPIPE under pipefail was the real one) is an empty FAIL group.
 printf '#!/usr/bin/env bash\nexit 141\n' >"$fx/mute.sh"
-rout=$(bash "$RUN" "$fx/mute.sh" 2>&1)
+rout=$(bash "$RUN" "$fx/mute.sh" 2>&1) || true
 grep -Fq '(no output)' <<<"$rout" && grep -Fq 'exit status 141' <<<"$rout" \
   || fail "$RUN prints neither '(no output)' nor the exit status for a check that failed silently"
-rout=$(bash "$RUN" -j 2 "$fx/ok.sh" "$fx/bad.sh" 2>&1); rrc=$?
+rrc=0; rout=$(bash "$RUN" -j 2 "$fx/ok.sh" "$fx/bad.sh" 2>&1) || rrc=$?
 [ "$rrc" -eq 1 ] && grep -Fq 'PASS=1 SKIP=0 FAIL=1' <<<"$rout" || fail "$RUN does not fail the run on a failing check"
 rout=$(bash "$RUN" --exclude "$fx/bad.sh" "$fx/ok.sh" "$fx/bad.sh" 2>&1) \
   && grep -Fq 'PASS=1 SKIP=0 FAIL=0' <<<"$rout" || fail "$RUN ignores --exclude"
@@ -104,8 +105,7 @@ done
 # --- the signal being accounted for actually exists ------------------------------------------
 # Without PLL_TEST_SITE this must print SKIP and exit 0. If it ever stops saying SKIP, the
 # accounting above silently starts counting it as a measured pass again.
-out=$(PLL_TEST_SITE='' bash tests/checks/wp-polylang-live.sh 2>&1)
-status=$?
+status=0; out=$(PLL_TEST_SITE='' bash tests/checks/wp-polylang-live.sh 2>&1) || status=$?
 if [ "$status" -ne 0 ]; then
   fail "wp-polylang-live.sh exits $status with no PLL_TEST_SITE; it is documented to exit 0 with SKIP"
 elif ! grep -q '^SKIP' <<<"$out"; then

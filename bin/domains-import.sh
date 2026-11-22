@@ -20,7 +20,9 @@ cd "$(dirname "$0")/.."
 DOMAINS_REF="${DOMAINS_REF:-4aad0584d92131626b16d4ff4d77f0455385013c}"
 d=skills/wp-demo-craft/references/domains
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+# The staged .*.new files sit next to their targets; a failure between staging and the
+# renames must not leave them behind as untracked files.
+trap 'rm -rf "$tmp"; rm -f "$d/.LICENSE.new" "$d/.SOURCE.txt.new" "$d/.domains.csv.new"' EXIT
 
 # init + fetch rather than `clone --branch`, which cannot take a commit SHA.
 git init -q "$tmp/up"
@@ -32,20 +34,19 @@ prov="$tmp/up/src/ui-ux-pro-max/data/data-provenance.json"
 [ -f "$src" ] || { echo "upstream products.csv not found; the catalogue moved" >&2; exit 1; }
 
 mkdir -p "$d"
-cp "$tmp/up/LICENSE" "$d/LICENSE"
 
 # Record what was actually imported: the requested ref, the exact commit, and the
 # date, so provenance is a fact recorded at import time.
 sha=$(git -C "$tmp/up" rev-parse HEAD)
 ref="$DOMAINS_REF"
-cat > "$d/SOURCE.txt" <<EOF
+cat > "$tmp/SOURCE.txt" <<EOF
 Source: https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
 Ref: $ref
 Commit: $sha
 Imported: $(date -u +%Y-%m-%d)
 EOF
 
-python3 - "$src" "$prov" > "$d/domains.csv" <<'PY'
+python3 - "$src" "$prov" > "$tmp/domains.csv" <<'PY'
 import csv, json, sys, re
 
 src, prov = sys.argv[1], sys.argv[2]
@@ -80,5 +81,15 @@ for row in csv.DictReader(open(src)):
         cons = (cons + " " if cons else "") + f"Style leaning: {style}."
     out.writerow([domain, kw, pattern, cons, conf.get(slug(domain), 0.5)])
 PY
+
+# Nothing versioned is touched until everything above has succeeded. Each file is
+# staged next to its target so `mv` is a same-filesystem rename, never a partial copy.
+cp "$tmp/up/LICENSE" "$tmp/LICENSE"
+for f in LICENSE SOURCE.txt domains.csv; do
+  \cp -f "$tmp/$f" "$d/.$f.new"
+done
+for f in LICENSE SOURCE.txt domains.csv; do
+  mv -f "$d/.$f.new" "$d/$f"
+done
 
 echo "wrote $d/domains.csv ($(($(wc -l < "$d/domains.csv") - 1)) rows)"

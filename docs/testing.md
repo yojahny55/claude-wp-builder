@@ -34,6 +34,16 @@ claiming a change works. Shell scripts that run `sudo`, `rm` or `sed` on user-de
 tested with hostile arguments through the stub PATH in `tests/lib/stub-path.sh`
 (`tests/checks/hostile-input-env-setup.sh` is the model). CI is the net under that, not a replacement for it.
 
+**Mutation pass (manual, not a check).** `bash tests/mutation.sh [-n 15] [-s seed] [-c "a.sh b.sh"]`
+samples contract checks that grep `need <file> "<token>"` (seeded, so a run repeats), copies the
+repo to a temp dir, deletes the first line holding one required token and expects the check to
+FAIL on the copy; a check that still passes is a survivor (its token also sits in a comment or
+another line). The real tree is never touched. Only checks with a literal path and plain token
+are eligible. `tests/checks/mutation-harness.sh` proves the harness catches a mutant and leaves
+the tree unchanged. `seeded-defects.sh` compares against the committed `recorded-findings.json`
+(plus a case with one finding removed) so the comparison logic always runs; `SEEDED_FINDINGS`
+still compares a real audit run.
+
 **The PHP lint is version-pinned, and that is the point.** It lints at **7.4** — the floor
 `skills/wp-polylang/scripts/*.php` carry, because they run via `wp eval-file` inside
 whatever WordPress the client has — with `starter-theme/__cinematic__/` held to **8.0**,
@@ -95,3 +105,13 @@ Still not covered: a generated site end to end, the broken-site corpus with expe
 findings, and browser artifacts for failed functional scenarios. A green CI means the
 contracts still say what they should, the code still parses, and the ACF translation path
 still agrees with a real WordPress.
+
+## Writing a check
+
+Source `tests/lib/assert.sh` instead of redefining helpers: `fail`, `skip` (prints `SKIP: ...`,
+exit 0, which `run.sh` counts apart from PASS), `need_token FILE TOKEN [MSG]` and
+`require_tool php python3 curl`, which skips when a tool is missing. CI sets
+`CHECKS_REQUIRE_TOOLS=1` so a runner that lost php fails instead of skipping. Checks start
+with `set -euo pipefail` and `cd ... || exit 1`, and must be executable in git.
+`assert-lib-adoption.sh` fails a new check that defines its own `fail()`; the older ones are
+frozen in `tests/checks/lib/fail-allowlist.txt` and leave it as they are migrated.

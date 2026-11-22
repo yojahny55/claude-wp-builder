@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -eu
-cd "$(dirname "$0")/../.."
+. "$(dirname "$0")/../lib/assert.sh"
+require_tool curl
+cd "$(dirname "$0")/../.." || exit 1
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 grep -q '"wp-design-library"' .mcp.json || { echo "FAIL: mcp registration"; exit 1; }
 # A caret RANGE on the 1.x line, never an exact version. An exact pin had to be edited here, in

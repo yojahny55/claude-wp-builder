@@ -7,9 +7,10 @@
 # Offline half (always runs): the JSON has the right shape, every code is in the catalog of
 # the audit that owns its domain, every defect is still in its file, and every file's
 # SEEDED marker names the same code.
-# Comparison half (only when SEEDED_FINDINGS points at the findings JSON of a real
-# /wp-audit run over the fixture): every expected code must appear as a FAIL. That half is
-# NOT exercised in CI, which has no audit run to compare.
+# Comparison half: every expected code must appear as a FAIL. Always runs against the
+# committed recorded-findings.json (plus a negative case with one finding removed); when
+# SEEDED_FINDINGS points at the findings JSON of a real /wp-audit run it compares that too.
+# The real-run comparison is NOT exercised in CI, which has no audit run to compare.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
@@ -65,15 +66,36 @@ fi
 [ -f tests/fixtures/wp/provision.sh ] || fail "tests/fixtures/wp/provision.sh does not exist"
 grep -Fq 'WP_FIXTURE_SEEDED' tests/fixtures/wp/provision.sh || fail "provision.sh lost WP_FIXTURE_SEEDED"
 
+# The comparison itself, as a function so the same logic runs against the recorded audit
+# (always) and against a real run (SEEDED_FINDINGS). Prints the missed codes, empty when none.
+missed_codes() {
+  local fired c missed=""
+  # A check id may carry a revision (SEC-036@2, see CLAUDE.md); the expected codes are bare ids.
+  fired=$(jq -r '[.findings[] | select(.status == "FAIL") | .check] | unique[]' "$1" | sed 's/@.*//')
+  for c in $listed; do grep -Fxq "$c" <<<"$fired" || missed="$missed $c"; done
+  printf '%s' "$missed"
+}
+
+# Recorded half (always runs): a committed findings file standing for a correct audit, so the
+# comparison logic is exercised in CI. Then a negative case: the same file with one finding
+# removed must be reported as missing that defect.
+rec=$fx/recorded-findings.json
+[ -f "$rec" ] || fail "$rec is missing"
+m=$(missed_codes "$rec")
+[ -z "$m" ] || fail "the recorded audit misses seeded defects:$m (re-record it or fix the corpus)"
+first=$(printf '%s\n' "$listed" | sed -n 1p)
+neg=$(mktemp)
+trap 'rm -f "$neg"' EXIT
+jq --arg c "$first" '.findings |= map(select((.check | sub("@.*"; "")) != $c))' "$rec" > "$neg"
+m=$(missed_codes "$neg")
+[ "$m" = " $first" ] || fail "negative case: dropping $first from the recorded audit should miss exactly it, got '$m'"
+
 if [ -n "${SEEDED_FINDINGS:-}" ]; then
   [ -f "$SEEDED_FINDINGS" ] || fail "SEEDED_FINDINGS=$SEEDED_FINDINGS does not exist"
-  # A check id may carry a revision (SEC-036@2, see CLAUDE.md); the expected codes are bare ids.
-  fired=$(jq -r '[.findings[] | select(.status == "FAIL") | .check] | unique[]' "$SEEDED_FINDINGS" | sed 's/@.*//')
-  missed=""
-  for c in $listed; do grep -Fxq "$c" <<<"$fired" || missed="$missed $c"; done
-  [ -z "$missed" ] || fail "the audit missed seeded defects:$missed"
+  m=$(missed_codes "$SEEDED_FINDINGS")
+  [ -z "$m" ] || fail "the audit missed seeded defects:$m"
   echo "compared against $SEEDED_FINDINGS: all $n fired"
 else
-  echo "SKIP: SEEDED_FINDINGS not set, the comparison with a real audit run was NOT exercised"
+  echo "compared against the recorded audit ($rec): all $n fired; set SEEDED_FINDINGS to also compare a real run"
 fi
 echo PASS
