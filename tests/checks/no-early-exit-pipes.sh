@@ -51,11 +51,13 @@ scan='
         # awk fed by a pipe whose (single-quoted, so stripped above) program exits early
         # (an `exit` in END is not early: awk has read everything by then).
         r = $0
+        gsub(/\|\|/, "", r)                      # || is not a pipe here either
         if (match(r, /\|[[:space:]]*awk([[:space:]]|$)/)) {
           r = substr(r, RSTART + RLENGTH)
           while (match(r, /\047[^\047]*\047/)) {
             prog = substr(r, RSTART, RLENGTH)
             r = substr(r, RSTART + RLENGTH)
+            gsub(/"[^"]*"/, "", prog)               # "exit" inside a string is not exit
             sub(/END[[:space:]]*\{.*/, "", prog)
             if (prog ~ /(^|[^A-Za-z0-9_])exit([^A-Za-z0-9_]|$)/) hit = 1
           }
@@ -92,9 +94,15 @@ for shape in 'printf x | grep -Fq x' 'printf x | grep -m1 x' 'printf x | head -1
   hit=$(awk -v f=p "$scan" "$probe/p.sh")
   [ -n "$hit" ] || { echo "FAIL: the early-exit pattern no longer matches: $(sed -n 3p "$probe/p.sh")"; exit 1; }
 done
-# ...and must not flag an awk whose exit is in END (it has read all of its input by then).
-printf '#!/usr/bin/env bash\nset -euo pipefail\nprintf x | awk \047{ n++ } END { exit !n }\047\n' >"$probe/p.sh"
-hit=$(awk -v f=p "$scan" "$probe/p.sh")
-[ -z "$hit" ] || { echo "FAIL: an awk exit inside END is flagged as early: $hit"; exit 1; }
+# ...and must not flag what is not an early exit: an exit in END (awk has read all of its input
+# by then), an awk after `||` (no pipe), or the word exit inside a string.
+for shape in 'printf x | awk \047{ n++ } END { exit !n }\047' \
+             'false || awk \047{ exit }\047 /dev/null' \
+             'printf x | awk \047{ print "exit" }\047'; do
+  # shellcheck disable=SC2059  # the shape IS a format: its \047 must become a quote
+  printf "#!/usr/bin/env bash\nset -euo pipefail\n$shape\n" >"$probe/p.sh"
+  hit=$(awk -v f=p "$scan" "$probe/p.sh")
+  [ -z "$hit" ] || { echo "FAIL: not an early exit, but flagged: $hit"; exit 1; }
+done
 
 echo "PASS: no pipeline under pipefail ends in grep -q, grep -m, head or awk exit (checks and shipped scripts)"
