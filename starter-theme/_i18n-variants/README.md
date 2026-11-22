@@ -15,5 +15,5 @@ never carries a file the project has to remember to delete.
 picks Polylang, and does nothing here otherwise.
 
 Each variant must expose exactly the helper set its own `inc/i18n.php` does —
-the two starters have deliberately different contracts (ten helpers vs four).
+the two starters have deliberately different contracts (ten helpers vs five).
 `tests/checks/wp-polylang.sh` asserts that pairing per starter.

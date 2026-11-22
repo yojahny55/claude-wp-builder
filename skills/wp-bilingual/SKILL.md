@@ -31,7 +31,7 @@ not define is a fatal error on the page.
 | `Template:` | Helpers in `inc/i18n.php` | Source |
 |---|---|---|
 | `tailwind` (and legacy `basic`) | `prefix_get_current_lang()`, `prefix_get_field()`, `prefix_get_repeater()`, `prefix_get_sub_field()`, `prefix_t()`, `prefix_e()`, `prefix_is_lang()`, `prefix_get_translations()`, `prefix_get_lang_url()`, `prefix_nav_location()` | `${CLAUDE_PLUGIN_ROOT}/starter-theme/__tailwind__/inc/i18n.php` |
-| `cinematic` | `prefix_current_lang()`, `prefix_b( $en, $es )`, `prefix_setting( $name )`, `prefix_nav_location( $location )` — plus `prefix_get_sub( $name )` in `inc/scenes-renderer.php` for scene sub-fields | `${CLAUDE_PLUGIN_ROOT}/starter-theme/__cinematic__/inc/i18n.php` |
+| `cinematic` | `prefix_current_lang()`, `prefix_b( $en, $es )`, `prefix_setting( $name )`, `prefix_nav_location( $location )`, `prefix_lang_switcher()` (switcher rows: `slug`, `label`, `url`, `active`; Polylang reads `pll_the_languages()`) — plus `prefix_get_sub( $name )` in `inc/scenes-renderer.php` for scene sub-fields | `${CLAUDE_PLUGIN_ROOT}/starter-theme/__cinematic__/inc/i18n.php` |
 
 Everything from "Translation Helper Functions" down describes the `tailwind` contract. On
 `cinematic`, a literal is `prefix_b( 'English', 'Español' )` (it allows `br`, `em`, `strong`,

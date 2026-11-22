@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 ?>
-<nav class="main-navigation" aria-label="<?php esc_attr_e('Main menu', '__starter__'); ?>">
+<nav class="main-navigation" aria-label="<?php echo esc_attr( __starter___t( 'main_menu' ) ); ?>">
     <?php
     // The registered name depends on the i18n strategy (primary-en under the
     // suffix model, a bare `primary` under Polylang); inc/i18n.php knows which.

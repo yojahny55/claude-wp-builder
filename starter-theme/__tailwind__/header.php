@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 <body <?php body_class(); ?>>
 <?php wp_body_open(); ?>
 
-<a class="skip-link screen-reader-text" href="#primary"><?php esc_html_e( 'Skip to content', '__starter__' ); ?></a>
+<a class="skip-link screen-reader-text" href="#primary"><?php __starter___e( 'skip_to_content' ); ?></a>
 
 <!-- Replace with /wp-header output -->
 <header id="masthead" class="site-header">

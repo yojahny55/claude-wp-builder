@@ -46,18 +46,11 @@ Issues discovered during testing that need to be resolved.
 - [x] **Language attribute on the front end only** `DELIVERED`
   The `language_attributes` filter in both starters' `inc/i18n.php` ([tailwind](starter-theme/__tailwind__/inc/i18n.php), [cinematic](starter-theme/__cinematic__/inc/i18n.php)) returns early in wp-admin and on the login screen, so they keep the site's own `lang`. [theme-i18n-request-lang](tests/checks/theme-i18n-request-lang.sh) guards it.
 
-- [ ] **Cinematic language switcher under Polylang** `OPEN`
-  The cinematic starter's switcher is a fixed `add_query_arg('lang', …)` with untranslated
-  labels; the Polylang variant exposes no equivalent and
-  [`nav.php`](starter-theme/__cinematic__/template-parts/cinematic/nav.php) has no Polylang branch, so
-  on a Polylang scaffold the switcher does nothing. Changes what the header shows: ships as a
-  proposal with before/after measurements, desktop and mobile, for approval.
+- [x] **Cinematic language switcher under Polylang** `DELIVERED`
+  [`nav.php`](starter-theme/__cinematic__/template-parts/cinematic/nav.php) renders the rows of `__starter___lang_switcher()`: `?lang=` links in the suffix model ([i18n.php](starter-theme/__cinematic__/inc/i18n.php)), `pll_the_languages()` in the [Polylang variant](starter-theme/_i18n-variants/__cinematic__.php), so the link reaches the translated page. Measured before and after at 1440 and 390: no visual change. [starter-i18n-switcher-strings](tests/checks/starter-i18n-switcher-strings.sh) guards it.
 
-- [ ] **Tailwind starter strings follow the page language** `OPEN`
-  The tailwind starter ([header.php](starter-theme/__tailwind__/header.php) and friends) loads no text domain, so under the suffix model the skip link,
-  `aria-label`s and 404 copy follow the site locale, not the page's `?lang`, and under
-  Polylang there is no `.mo`. Route them through the starter's `_t()` helper or load the
-  domain. Changes visible text: ships as a proposal with measurements, for approval.
+- [x] **Tailwind starter strings follow the page language** `DELIVERED`
+  The skip link, menu `aria-label`, 404 copy and footer in the tailwind starter ([header.php](starter-theme/__tailwind__/header.php), [404.php](starter-theme/__tailwind__/404.php)) read the starter's string table through `__starter___e()` / `__starter___t()` instead of gettext. Measured: only the focused skip link's width changes in Spanish, with its longer text. [starter-i18n-switcher-strings](tests/checks/starter-i18n-switcher-strings.sh) guards it.
 
 - [x] **Fix anchor links in SCF URL fields** `DELIVERED`
   [wp-acf](agents/wp-acf.md) rule 19 sends hash-only and site-path links to a `text` field, keeps `url` for absolute addresses, and shows the seed call. [acf-anchor-links](tests/checks/acf-anchor-links.sh) guards it.

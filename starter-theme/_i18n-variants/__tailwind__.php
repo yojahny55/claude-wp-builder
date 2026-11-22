@@ -303,6 +303,15 @@ function __starter___get_translations() {
         'directory_search'    => array('en' => 'Search',          'es' => 'Buscar'),
         'directory_all'       => array('en' => 'All',             'es' => 'Todos'),
 
+        // Chrome that used to go through gettext (header, 404): gettext follows
+        // the site locale, not ?lang=, and Polylang ships no .mo for the theme
+        'skip_to_content' => array('en' => 'Skip to content', 'es' => 'Saltar al contenido'),
+        'main_menu'       => array('en' => 'Main menu',       'es' => 'Menú principal'),
+        'error_404_title' => array('en' => 'Oops! That page can’t be found.', 'es' => '¡Vaya! No se encuentra esa página.'),
+        'error_404_text'  => array('en' => 'It looks like nothing was found at this location. Maybe try one of the links below or a search?', 'es' => 'Parece que no hay nada en esta dirección. Prueba alguno de los enlaces de abajo o haz una búsqueda.'),
+        'error_404_categories' => array('en' => 'Most Used Categories', 'es' => 'Categorías más usadas'),
+        'error_404_archives'   => array('en' => 'Try looking in the monthly archives. %1$s', 'es' => 'Prueba a buscar en los archivos mensuales. %1$s'),
+
         // Language switcher
         'lang_en'         => array('en' => 'English', 'es' => 'Inglés'),
         'lang_es'         => array('en' => 'Spanish', 'es' => 'Español'),
