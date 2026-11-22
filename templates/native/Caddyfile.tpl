@@ -8,18 +8,22 @@
     encode gzip
 
     @disallowed {
-        path /xmlrpc.php
+        path /xmlrpc.php /xmlrpc.php/*
         path *.sql
         path *.bak
         path *.log
         path *.sql.gz
-        path *.zip
-        path *.tar.gz
-        path *.tgz
         path *.bak-*
         path /wp-content/uploads/woocommerce_uploads/*
     }
     respond @disallowed 404
+
+    # Archives are denied outside uploads only: a zip in the media library is legitimate.
+    @archives {
+        path *.zip *.tar.gz *.tgz
+        not path /wp-content/uploads/*
+    }
+    respond @archives 404
 
     # PHP at any depth under uploads: Caddy's path glob never crosses "/", so a
     # glob would miss the dated subdirectories. A regexp is a separate matcher

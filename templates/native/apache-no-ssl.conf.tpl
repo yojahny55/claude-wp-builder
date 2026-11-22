@@ -14,14 +14,19 @@
     <LocationMatch "/\.(?!well-known)">
         Require all denied
     </LocationMatch>
-    <FilesMatch "(^\.(?!well-known)|\.(sql|sql\.gz|bak|log|zip|tar\.gz|tgz)$|\.bak-)">
+    <FilesMatch "(^\.(?!well-known)|\.(sql|sql\.gz|bak|log)$|\.bak-)">
         Require all denied
     </FilesMatch>
     <LocationMatch "(?i)^/wp-content/uploads/.*\.(php[0-9]?|phar|pht(ml)?)(\.|/|$)">
         Require all denied
     </LocationMatch>
 
-    <LocationMatch "^/xmlrpc\.php$">
+    # Archives are denied outside uploads only: a zip in the media library is legitimate.
+    <LocationMatch "(?i)^(?!/wp-content/uploads/).*\.(zip|tar\.gz|tgz)$">
+        Require all denied
+    </LocationMatch>
+    # PATH_INFO form (/xmlrpc.php/x) still runs the script, so match the prefix.
+    <LocationMatch "^/xmlrpc\.php(/|$)">
         Require all denied
     </LocationMatch>
 

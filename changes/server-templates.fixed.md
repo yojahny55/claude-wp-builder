@@ -5,6 +5,7 @@
   self-signed certificate, which locked the browser out of `example.test` once it expired. The
   Apache vhosts add `Options -Indexes`, and the Caddyfile adds `tls internal` so a local domain
   stops asking a public ACME CA. nginx, Apache and Caddy now share one deny list
-  (`templates/native/_deny.list`): `/xmlrpc.php`, `.sql.gz`, `.zip`, `.tar.gz`, `.tgz` and
-  `phar`/`pht(ml)` under uploads are refused by all three, and
+  (`templates/native/_deny.list`): `/xmlrpc.php` (including `/xmlrpc.php/x`), `.sql.gz` and
+  `phar`/`pht(ml)` under uploads are refused by all three, and `.zip`, `.tar.gz` and `.tgz` are
+  refused everywhere except `/wp-content/uploads/`, so media-library zips still load, and
   `tests/checks/vhost-deny-list-parity.sh` fails when an engine stops denying an entry.

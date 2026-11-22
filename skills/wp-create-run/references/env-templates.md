@@ -43,7 +43,7 @@ Common placeholders to replace:
 
 **Local TLS:** the Caddyfile sets `tls internal` (a local domain cannot get a public ACME certificate), and no template sends HSTS: the self-signed certificate `ssl-generate` issues lasts 365 days, and a pinned HSTS host cannot be clicked through once it expires.
 
-**Deny rules:** `templates/native/_deny.list` is the one reference for what every engine must refuse (dumps and archives, `/xmlrpc.php`, executable extensions under uploads); `tests/checks/vhost-deny-list-parity.sh` compares the three templates with it. It is read by the check only and is not installed.
+**Deny rules:** `templates/native/_deny.list` is the one reference for what every engine must refuse (dumps and archives, `/xmlrpc.php`, executable extensions under uploads); `tests/checks/vhost-deny-list-parity.sh` compares the three templates with it. It is read by the check only and is not installed. `.zip`, `.tar.gz` and `.tgz` are denied outside `/wp-content/uploads/` only, so a zip in the media library (or in cloned production content) is still served; `.sql`, `.sql.gz`, `.bak` and `.log` are denied everywhere, and `/xmlrpc.php` is denied with its PATH_INFO form (`/xmlrpc.php/x`).
 
 Write the generated config to the appropriate location:
 - Docker: `${PROJECT_PATH}/docker-compose.yml`

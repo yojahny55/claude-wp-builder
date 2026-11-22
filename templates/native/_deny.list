@@ -3,16 +3,18 @@
 # template against it, so an engine that stops denying an entry fails the suite. This file is
 # never installed or rendered; it is read by the check only.
 # Format: "<kind> <value>", one per line.
-#   ext      a file name ending in .<value> (dumps, archives, logs)
-#   path     an exact URL path
-#   uploads  a PHP-executable extension denied at any depth under /wp-content/uploads/
+#   ext          a file name ending in .<value>, anywhere in the docroot (dumps, logs, backups)
+#   ext-outside  the same, but NOT under /wp-content/uploads/ (archives: a dump left in the
+#                docroot is the risk, a zip in the media library is legitimate)
+#   path         an exact URL path, including its PATH_INFO form (/xmlrpc.php/x)
+#   uploads      a PHP-executable extension denied at any depth under /wp-content/uploads/
 ext sql
 ext sql.gz
 ext bak
 ext log
-ext zip
-ext tar.gz
-ext tgz
+ext-outside zip
+ext-outside tar.gz
+ext-outside tgz
 path /xmlrpc.php
 uploads php
 uploads phar

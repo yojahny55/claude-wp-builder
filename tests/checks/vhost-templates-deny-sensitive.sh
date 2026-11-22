@@ -11,7 +11,7 @@ d=templates/native
 for f in nginx.conf.tpl nginx-no-ssl.conf.tpl; do
   p="$d/$f"
   grep -Fq 'location ~ /\.(?!well-known) { deny all; }' "$p" || fail "$f: dotfiles not denied"
-  grep -Fq 'location ~* \.(sql|sql\.gz|bak|log|zip|tar\.gz|tgz)$ { deny all; }' "$p" || fail "$f: dumps/archives not denied"
+  grep -Fq 'location ~* \.(sql|sql\.gz|bak|log)$ { deny all; }' "$p" || fail "$f: dumps/archives not denied"
   grep -Fq 'location ~* \.bak- { deny all; }' "$p" || fail "$f: .bak-* not denied"
   grep -Fq 'location ~* "/uploads/.*\.(php[0-9]?|phar|pht(ml)?)(\.|/|$)" { deny all; }' "$p" || fail "$f: PHP in uploads not denied"
   grep -Fq 'location ^~ /wp-content/uploads/woocommerce_uploads/ { deny all; }' "$p" || fail "$f: woocommerce_uploads not denied"
@@ -31,7 +31,7 @@ for ph in '{{ssl_cert}}' '{{ssl_key}}'; do grep -Fq "$ph" "$d/apache.conf.tpl" |
 for f in apache.conf.tpl apache-no-ssl.conf.tpl; do
   p="$d/$f"
   grep -Fq '<LocationMatch "/\.(?!well-known)">' "$p" || fail "$f: dot-directories not denied"
-  grep -Fq '\.(sql|sql\.gz|bak|log|zip|tar\.gz|tgz)$' "$p" || fail "$f: dumps/archives not denied"
+  grep -Fq '\.(sql|sql\.gz|bak|log)$' "$p" || fail "$f: dumps/archives not denied"
   grep -Fq '\.bak-' "$p" || fail "$f: .bak-* not denied"
   # (/|$), not $: /uploads/x/evil.php/foo (PATH_INFO) maps to evil.php and reaches the PHP handler.
   # mod_mime applies AddHandler to .php in ANY position of the name and ignores case, so
