@@ -215,6 +215,9 @@ report when the scan finishes. The three calls are capped at 110 s together, so 
 timeout of at least 150000 ms. Pass it only for a host this run
 confirmed as public — the scan makes a third party fetch that site.
 
+If the fixer returns `BLOCKED: <reason>`, skip the after scan: the GEO findings stay open, and
+the report names the agent, its reason and the files it touched.
+
 `<home-host>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json` (or
 `$WP option get home`) — **unless `local_clone` is true (Step 2.3): the live scan must not probe
 the clone's own host**, so Step 2.3's live-check rule applies instead of that fallback — the

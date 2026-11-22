@@ -440,7 +440,9 @@ Run, in order:
    - **exit 0** — a report came back: fold every **failed** check into a fix pass (the
      `wp-agentic-surfaces` loop item 7 uses), then re-run the scan **once** and record
      the before/after score in Step 6. If that fix touched theme CSS, templates or
-     enqueues, re-run `/wp-finalize`'s Layers 2-3 before Step 5.5 signs off.
+     enqueues, re-run `/wp-finalize`'s Layers 2-3 before Step 5.5 signs off. If the fixer
+     returns `BLOCKED: <reason>`, skip the re-scan: list the failed checks under Review in
+     Step 6 with the agent, its reason and the files it touched, and mark the run incomplete.
    - **exit 2** — no report exists yet, or no network: record it `UNMEASURED` and mark the
      run incomplete in Step 6, exactly as the completion rule requires below. An absent
      score is not a good score.
@@ -477,7 +479,8 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-yolo-run/references/parity-gate.md` now an
 
 If any critical demo-parity finding survived Step 5.5's auto-fix + re-verify, or the
 GEO scan in Step 5 item 8 did not succeed (unmeasured on exit 2 or 3, errored on exit 1), or
-any of Step 5 items 4-8 did not run, do NOT print "Build Complete." Print instead,
+its GEO fixer returned `BLOCKED: <reason>`, or any of Step 5 items 4-8 did not run, do NOT
+print "Build Complete." Print instead,
 before anything else:
 ```
 === WP YOLO Build INCOMPLETE — deliverable not signed off ===
@@ -485,6 +488,7 @@ before anything else:
 Review (blocking):
   - <every unresolved critical finding — layer, selector/property/file, demo value vs. built value>
   - <GEO scan unmeasured (exit 2), not publicly reachable (exit 3 — re-run with --host), or errored (exit 1)>
+  - <GEO fixer BLOCKED: wp-agentic-surfaces, its reason, the files it touched, the checks still failing>
   - <any of Step 5 items 4-8 that did not run, and why>
 
 Run /wp-finalize again after resolving the above, then re-run this gate.
