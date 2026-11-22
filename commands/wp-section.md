@@ -43,10 +43,10 @@ Parse `$ARGUMENTS`:
 - **`--block <name>`** = the unique BEM block name to scope every generated selector under (optional; used with `--transcribe` so parallel section builds can never collide on a selector).
 - **`--css <source>`** = the demo source the section is transcribed from (optional; required with `--transcribe`). What it means depends on the project's `Template:`, per the transcription overlay below:
   - `basic` → the section's **verbatim** demo CSS, and the SOURCE OF TRUTH for the transcription: an inline CSS blob or a path to a CSS file, whose declared values are copied exactly.
-  - `tailwind` → the converted demo page itself (HTML, converted in place by `/wp-yolo` Step 2.6), and the SOURCE OF TRUTH for the transcription exactly as the CSS blob is on `basic`. No raw declarations survive in it to copy — the conversion turned every one into a utility class — so "copy its exact declared values" reads here as **copy its exact utility classes and its exact element structure**. That is not a licence to substitute an equivalent utility, to collapse two elements into one, or to drop a breakpoint variant.
+  - `tailwind` → the converted demo page itself (HTML, converted in place by `/wp-yolo` Step 2.6), and the SOURCE OF TRUTH exactly as the CSS blob is on `basic`: its utility classes and element structure are the declared values (Step 5's transcription overlay).
 
 - **`--no-blog-page` flag** = skip Step 6.7 (`/wp-page blog` after a blog section)
-- **`--defer-promotion` flag** = `tailwind` only. Skip the `wp-tailwind` author-mode dispatch entirely: `wp-template` writes the section with inline utilities and the command returns without an `@apply` promotion. Report the section as built with promotion deferred. Set by `/wp-yolo` on the section walk, where the ladder's "3+ times, or on 2+ distinct pages" test cannot be answered yet because the rest of the theme does not exist; `/wp-yolo` Step 4.4 then runs one promotion pass over every template part the walk produced. Ignored on `basic`, which has no promotion step. Never set it by hand for a one-off section — a section added to a finished theme has the whole theme to grep, and deferring would leave its utilities unpromoted with no later pass to catch them.
+- **`--defer-promotion` flag** = `tailwind` only. Skip the `wp-tailwind` author-mode dispatch (Step 5). Set by `/wp-yolo` on the section walk; `/wp-yolo` Step 4.4 then runs one promotion pass over every template part. Ignored on `basic`. Never set it by hand for a one-off section: no later pass would promote its utilities.
 
 > **Note:** `/wp-yolo` sets `--transcribe --block <block> --css <css-source>` on every `/wp-section` dispatch, plus `--defer-promotion` on the `tailwind` path (see `commands/wp-yolo.md` Steps 4 and 4.4). When invoked by hand without these flags, `/wp-section` keeps its original design-system authoring behavior.
 
@@ -102,24 +102,10 @@ list, so a standalone section injected there would never render. An explicit `--
 (e.g. `--target page-pricing.php`) is a normal inner page on a cinematic site and is built
 the standard way; `--hybrid` is never implied over it.
 
-Under `--hybrid`, four things change and nothing else does:
-
-1. **Fields** — `wp-acf` does not write `fields/<section>.php`. It appends one flexible-content
-   **layout** named `<section>` (label `<Section Name>`) to the `trailing_sections` field in
-   `fields/trailing-sections.php`, carrying the section's sub-fields under the normal
-   `<section>_<element>` / `field_<section>_<element>` naming. If that file does not exist yet
-   (init ran with `--no-hybrid`), create it with the `trailing_sections` flexible-content field
-   attached to the front page, then add the layout.
-2. **Template** — `template-parts/section-<section>.php` is rendered from inside the trailing
-   `have_rows()` loop (see `starter-theme/__cinematic__/front-page.php`), so it reads its values
-   with `get_sub_field('<field>')` — appending `_<lang>` for the secondary language the same way
-   `prefix_get_field()` does — never `prefix_get_field()` / `get_field()`, which would resolve
-   against the page, not the row.
-3. **CSS** — the cinematic starter has no `assets/css/styles.css`; the CSS agent appends the
-   section block to `assets/css/cinematic.css` under `/* ====== Section: <Name> ====== */`.
-4. **Injection** — skip Step 6 entirely. The layout renders because the loop maps every
-   `get_row_layout()` to `template-parts/section-<layout>.php`. Passing `--hybrid` with an explicit `--target` is a contradiction — error out
-   and ask for one or the other.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-section-run/references/hybrid.md` now and follow it
+when `--hybrid` is set or implied — it is this step, not background. It covers the four things
+that change: the trailing flex layout, `get_sub_field()` in the template, the cinematic CSS file,
+and the skipped injection.
 
 ## Step 3: Read Demo Section
 
@@ -244,24 +230,6 @@ Next: Run /wp-section <next-section> for the next section.
 ```
 
 ### For contact sections:
-```
-=== Section "Contact" Built ===
-Files created/updated:
-  - fields/contact.php (ACF field definitions)
-  - template-parts/section-contact.php (template part)
-  - assets/css/styles.css (Contact section CSS)                      [basic only]
-  - components/<page-slug>.css or utilities/site.css (only if a rule was needed) [tailwind only]
-  - <page-template>.php (added get_template_part call)
-  - cf7/form-en.html (CF7 form markup — English)
-  - cf7/form-es.html (CF7 form markup — Spanish)
-  - cf7/email-admin-en.html (Admin email template — English)
-  - cf7/email-admin-es.html (Admin email template — Spanish)
-  - cf7/email-user-en.html (User confirmation — English)
-  - cf7/email-user-es.html (User confirmation — Spanish)
 
-CF7 Forms created:
-  - Contact EN (ID: <id>)
-  - Contact ES (ID: <id>)
-
-Next: Run /wp-section <next-section> for the next section.
-```
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-section-run/references/summary-contact.md` now and follow
+it when `is_contact_section = true` — it adds the CF7 files and the created form IDs.

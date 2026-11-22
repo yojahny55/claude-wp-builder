@@ -46,11 +46,12 @@ done
 awk '/^$/ { n = 0; next } /skills\/wp-section-run\/references\// { if (++n > 1) bad = 1 }
   END { exit bad }' "$cmd" || err "$cmd names two wp-section-run references in one paragraph"
 
-# The command stays a map. Argument parsing, the manifest gate, the hybrid overlay, the demo
-# read, Steps 6 to 7 and their summary templates stay whole, because they are the choices and
-# the gates the run needs in view from the start. The ceiling is 16 KB: the command is 14.5 KB
-# after the split, so it leaves room for a flag or a gate and fails when a step's detail
-# grows back into it.
+# The command stays a map. Argument parsing, the manifest gate, the --hybrid refusal and
+# implication, the demo read, Steps 6 to 7 and the ordinary summary template stay whole,
+# because they are the choices and the gates the run needs in view from the start. What only
+# one kind of run reads (the --hybrid overlay, the contact dispatch and its summary) lives in
+# a reference. The ceiling is 16 KB: the command is 13.5 KB after the second split, so it
+# leaves 2.5 KB for a flag or a gate and fails when a step's detail grows back into it.
 size=$(wc -c < "$cmd")
 [ "$size" -le 16384 ] || err "$cmd is $size bytes; move long step detail to $refs"
 
