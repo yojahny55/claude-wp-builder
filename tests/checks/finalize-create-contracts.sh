@@ -37,19 +37,24 @@ done
 
 cr=commands/wp-create.md
 ref=skills/wp-create-run/references/overwrite.md
-grep -Fq '**Order when both exist:** 2b wins, and Adopt Mode never applies' "$cr" || err "$cr has no 2a/2b order rule"
+grep -Fq '**Both exist:** 2b wins; no Adopt Mode' "$cr" || err "$cr has no 2a/2b order rule"
 grep -Fq 'and there is no `.wp-create.json`, enter **Adopt Mode**' "$cr" || err "$cr 2a still enters Adopt Mode with a manifest present"
 ow=$(grep -F -- '- **Overwrite:**' "$cr" || true)
 for t in 'never Adopt Mode' 'no yes, no 4.2 and no 4.4'; do
   hasp "$ow" "$t" || err "$cr Overwrite does not say: $t"
 done
-grep -Fq 'references/overwrite.md` now and follow it first' "$cr" || err "$cr 4.2 does not send Overwrite to its reference"
-grep -Fq '`core download --force`' "$cr" || err "$cr Overwrite does not use core download --force"
+grep -Fq 'references/overwrite.md` now and follow it first.' "$cr" || err "$cr 4.2 does not send Overwrite to its reference"
+grep -Fq 'core download --force --skip-content' "$cr" || err "$cr 4.2 lacks --skip-content"
+grep -Fq 'add `--force` (`wp-config.php` exists)' "$cr" || err "$cr 4.5 lacks config create --force on Overwrite"
+grep -Fq 'reuse `database.*`' "$cr" || err "$cr Step 3 does not reuse the manifest database on Overwrite"
+grep -Fq 'Never after Overwrite.' "$cr" || err "$cr Adopt Mode section does not exclude Overwrite"
+grep -Fq 'except in Overwrite, which follows' "$cr" || err "$cr partial-state note ignores Overwrite"
+grep -Fq '(Overwrite: overwrite.md)' "$cr" || err "$cr failure table ignores Overwrite"
 grep -Fq 'db reset --yes' "$cr" || err "$cr 4.4 does not reset the database on Overwrite"
 [ -r "$ref" ] || err "$ref is missing"
 body=$(cat "$ref" 2>/dev/null || true)
 for t in 'mkdir -p ~/wp-create-backups' 'db export -' 'to the host' 'Unknown database' 'start them' 'Any other failure: stop' \
-  'naming only what this environment will really replace' 'Without an explicit yes, stop' 'db reset --yes' 'never Adopt Mode' 'core download --force'; do
+  '-- Dump completed' 'wp-quiet' '--skip-content' 'config create --force' 'database.*' 'naming only what this environment will really replace' 'Without an explicit yes, stop' 'db reset --yes' 'never Adopt Mode' 'core download --force'; do
   hasp "$body" "$t" || err "$ref does not say: $t"
 done
 # export and confirmation come before the replace step
