@@ -87,7 +87,7 @@ exception is a recursive descent that does not honour the dot rule — `find dem
 '*.html'` walks into `demo/.prepolish/` and returns the backups — so anything switching to
 `find` must add `-not -path 'demo/.prepolish/*'` itself — and, on a demo folder
 `/wp-yolo` has already converted, `-not -path 'demo/.original/*'` alongside it, because
-Step 2.6 keeps its own backups there.
+`/wp-yolo` Step 2.6 keeps its own backups there.
 
 `demo/.prepolish/` is not `demo/.original/`: `/wp-yolo` Step 2.6 keeps the
 pre-**conversion** plain-CSS copy of each page in `demo/.original/<slug>.html`, while

@@ -114,7 +114,9 @@ before writing any markup.
    `$(npm root -g)/@playwright/test/node_modules/playwright-core`. If one exists, set
    `PLAYWRIGHT_CORE` to that directory and probe again (the probe resolves `playwright-core`
    from `PLAYWRIGHT_CORE`, then the plugin's own `node_modules`, then the project's, then the
-   global npm root). Only when none exists, ask the user (`AskUserQuestion`) whether to run
+   global npm root). `PLAYWRIGHT_CORE` does not persist between Bash calls: export it in the same
+   command of every launch of `demo-verify.mjs` and `composition-preview.mjs` for the rest of
+   this run (`bin/lib/browsers.mjs` reads it too). Only when none exists, ask the user (`AskUserQuestion`) whether to run
    `npm i -D playwright-core` in the project root, and say first that this writes a
    `package.json` and a `node_modules/` into the WordPress project root; without an explicit
    yes, do not install. With no copy and no yes, print what the probe said is missing and stop.

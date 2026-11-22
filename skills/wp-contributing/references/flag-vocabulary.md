@@ -15,9 +15,9 @@ rediscover them from the command text.
 
 | Flag | Canonical meaning | Commands that carry it today |
 |---|---|---|
-| `--yes` | Skip a question the command would otherwise ask. Never skips a backup or a production gate. | `/wp-update` (skips "which updates") |
+| `--yes` | Skip a question the command would otherwise ask. Never skips a backup or a production gate. | `/wp-update` (skips "which updates"); `/wp-adopt` passes `--yes` to `wp-config.mjs git-init --push` (see the tool flags below) |
 | `--force` | Replace or overwrite what already exists (a built theme, a seeded row, an icon, a client-edited value). The safety net, such as a backup, still runs. | `/wp-yolo` (discard the current build), `/wp-favicon` (replace the chosen icon), `/wp-cinematic-seed` (overwrite scene rows), `/wp-woo-setup` (take back values the client changed) |
-| `--dry-run` | Report what would change; write nothing. | `/wp-anonymize`, `/wp-s3-media`, `/wp-cinematic-seed` |
+| `--dry-run` | Report what would change; write nothing. | `/wp-anonymize`, `/wp-s3-media`, `/wp-cinematic-seed`; `/wp-adopt` and `/wp-debug` use it on a tool they call (see below) |
 | `--resume` | Continue an interrupted run from its recorded state instead of starting over. | `/wp-yolo` only |
 
 `--force-adopted` is a different flag: it lets a command run against a site `/wp-adopt`
@@ -31,6 +31,12 @@ registered rather than one this plugin built. It never implies `--force`.
   the client edited, not records.
 - `--yes` exists only on `/wp-update`; the other commands ask through `AskUserQuestion`
   and have no flag to skip the question.
+- Flags that belong to a tool a command calls, not to the command: `/wp-adopt` runs
+  `wp-config.mjs adopt --dry-run` and `wp-config.mjs git-init ... --dry-run` / `--push --yes`
+  (`--push` without `--yes` prints the command and refuses); `/wp-debug` suggests
+  `wp search-replace --dry-run`; `/wp-update` installs a plugin zip with `wp plugin install --force`
+  and warns that it can downgrade; `/wp-create` deletes the default post with `wp post delete --force`.
+  `/wp-anonymize` states that it has no `--force` past its isolation gate, and must not gain one.
 - `--dry-run` is missing from most commands that write. Absence is not a statement that a
   command is safe to run blind.
 
