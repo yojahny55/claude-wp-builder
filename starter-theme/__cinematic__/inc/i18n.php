@@ -139,3 +139,25 @@ add_filter('language_attributes', function (string $output): string {
     }
     return (string) preg_replace('/lang="[^"]*"/', 'lang="' . esc_attr(__starter___current_lang()) . '"', $output);
 });
+
+/**
+ * Language switcher entries: one row per language with its label, URL and
+ * whether it is the current one, so a template renders the switcher without
+ * knowing which i18n model is installed. Suffix model: the current URL with
+ * ?lang=<slug>. The Polylang variant answers from pll_the_languages().
+ *
+ * @return array<int, array{slug: string, label: string, url: string, active: bool}>
+ */
+function __starter___lang_switcher(): array {
+    $current = __starter___current_lang();
+    $rows    = [];
+    foreach (['en', 'es'] as $slug) {
+        $rows[] = [
+            'slug'   => $slug,
+            'label'  => strtoupper($slug),
+            'url'    => add_query_arg('lang', $slug),
+            'active' => $current === $slug,
+        ];
+    }
+    return $rows;
+}

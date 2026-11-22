@@ -7,7 +7,6 @@
 
 defined('ABSPATH') || exit;
 
-$lang     = __starter___current_lang();
 $location = __starter___nav_location('primary'); // primary-<lang>, or bare under Polylang
 $logo     = __starter___setting('site_logo');
 ?>
@@ -59,8 +58,9 @@ $logo     = __starter___setting('site_logo');
 
     <div class="mobile-menu__controls">
         <div class="mobile-menu__lang-row">
-            <a class="mobile-menu__lang-item<?php echo $lang === 'en' ? ' is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg('lang', 'en')); ?>">EN</a>
-            <a class="mobile-menu__lang-item<?php echo $lang === 'es' ? ' is-active' : ''; ?>" href="<?php echo esc_url(add_query_arg('lang', 'es')); ?>">ES</a>
+            <?php foreach (__starter___lang_switcher() as $item) : ?>
+                <a class="mobile-menu__lang-item<?php echo $item['active'] ? ' is-active' : ''; ?>" href="<?php echo esc_url($item['url']); ?>"><?php echo esc_html($item['label']); ?></a>
+            <?php endforeach; ?>
         </div>
         <button class="nav__motion-toggle mobile-menu__motion-btn" type="button" data-state="play" data-label-pause="<?php echo esc_attr(__starter___b('Pause motion', 'Pausar movimiento')); ?>" data-label-play="<?php echo esc_attr(__starter___b('Play motion', 'Reproducir movimiento')); ?>">
             <?php echo esc_html(__starter___b('Pause motion', 'Pausar movimiento')); ?>

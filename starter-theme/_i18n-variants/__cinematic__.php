@@ -3,11 +3,11 @@
  * Minimal bilingual layer — Polylang variant.
  *
  * Drop-in replacement for inc/i18n.php when the project was scaffolded with
- * Polylang. Same four function names and signatures as the file it replaces,
+ * Polylang. Same five function names and signatures as the file it replaces,
  * so no template changes.
  *
  * Note this starter's contract is deliberately smaller than __tailwind__'s:
- * four functions, not ten. Each starter's Polylang variant mirrors ITS OWN
+ * five functions, not ten. Each starter's Polylang variant mirrors ITS OWN
  * i18n.php, and tests/checks/wp-polylang.sh asserts that pairing per starter
  * rather than across them.
  *
@@ -88,4 +88,38 @@ function __starter___setting(string $name): string {
  */
 function __starter___nav_location(string $location): string {
     return $location;
+}
+
+/**
+ * Language switcher entries, from Polylang: one row per language with label,
+ * URL and active flag. pll_the_languages(raw) gives the counterpart of the
+ * CURRENT page in each language (a different post at a different permalink),
+ * which a ?lang= query arg cannot. Returns an empty list when Polylang is
+ * inactive, so a template renders no switcher instead of fataling.
+ *
+ * @return array<int, array{slug: string, label: string, url: string, active: bool}>
+ */
+function __starter___lang_switcher(): array {
+    $current = __starter___current_lang();
+    $rows    = [];
+
+    if (function_exists('pll_the_languages')) {
+        $languages = pll_the_languages(['raw' => 1, 'hide_if_no_translation' => 0]);
+        if (is_array($languages)) {
+            foreach ($languages as $slug => $language) {
+                $url = isset($language['url']) ? (string) $language['url'] : '';
+                if ($url === '' && function_exists('pll_home_url')) {
+                    $url = (string) pll_home_url((string) $slug);
+                }
+                $rows[] = [
+                    'slug'   => (string) $slug,
+                    'label'  => strtoupper((string) $slug),
+                    'url'    => $url !== '' ? $url : home_url('/'),
+                    'active' => (string) $slug === $current,
+                ];
+            }
+        }
+    }
+
+    return $rows;
 }
