@@ -68,7 +68,9 @@ if [ "$(id -u)" = 0 ]; then
   run_as="User nobody
 Group $(id -gn nobody)"
 fi
-# The reference's placeholder document root becomes the throwaway site's.
+# The reference's placeholder document root becomes the throwaway site's. With bash 5.2's
+# patsub_replacement an `&` in TMPDIR would expand to the match; switch it off.
+shopt -u patsub_replacement 2>/dev/null || true
 rule="${rule//\/var\/www\/example/$tmp/root}"
 lm() { [ -f "$mods/mod_$1.so" ] && echo "LoadModule $1_module $mods/mod_$1.so"; return 0; }
 
