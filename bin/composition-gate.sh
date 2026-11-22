@@ -41,8 +41,12 @@ count=0
 empty=""
 for dir in "$COMPS"/*/; do
   name="$(basename "$dir")"
-  [ -f "$dir/section.html" ] || continue
-  [ -f "$dir/section.css" ] || continue
+  # A missing fragment is a bad composition, not one to skip: skipping left the gate
+  # green with fewer compositions than the library holds. Same exit as truncated content.
+  if [ ! -f "$dir/section.html" ] || [ ! -f "$dir/section.css" ]; then
+    empty="$empty $name(missing section.html or section.css)"
+    continue
+  fi
   html_bytes=$(wc -c < "$dir/section.html")
   css_bytes=$(wc -c < "$dir/section.css")
   if [ "$html_bytes" -lt "$MIN_HTML_BYTES" ] || [ "$css_bytes" -lt "$MIN_CSS_BYTES" ]; then

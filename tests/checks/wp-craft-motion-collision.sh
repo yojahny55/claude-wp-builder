@@ -15,7 +15,9 @@
 # So the children are found relative to whichever element declares it, at that
 # element's own indent + 1 level — not at a fixed depth from the file's top.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+. "$(dirname "$0")/../lib/assert.sh"
+require_tool python3
+cd "$(dirname "$0")/../.." || exit 1
 
 root=skills/wp-demo-craft/compositions
 test -d "$root" || { echo "FAIL: $root missing"; exit 1; }

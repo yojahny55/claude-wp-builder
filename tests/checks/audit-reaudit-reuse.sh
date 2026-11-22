@@ -3,8 +3,8 @@
 # report never said it was a re-audit. Pins the contract: detection, one reuse prompt,
 # safe reuse, scoped mode, persistence, and the manifest validation of audit.last_answers.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
-fail() { echo "FAIL: $*"; exit 1; }
+. "$(dirname "$0")/../lib/assert.sh"
+cd "$(dirname "$0")/../.." || exit 1
 
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md
 c=$EXPANDED
@@ -25,8 +25,10 @@ need 'compared against <baseline source>' 'the report does not state its baselin
 need '`last_answers` records what the operator chose' 'Step 10 does not persist last_answers'
 
 # Manifest validation: valid and invalid cases.
-cat > ./.probe-reaudit.mjs <<'JS'
-import { validateManifest } from './bin/lib/manifest.mjs';
+probe_dir=$(mktemp -d)
+trap 'rm -rf "$probe_dir"' EXIT
+cat > "$probe_dir/probe-reaudit.mjs" <<'JS'
+const { validateManifest } = await import(process.env.MANIFEST_URL);
 const base = { manifest_version: 3, wp_cli: { wrapper: 'wp' }, wordpress: { url: 'http://x.test' } };
 const good = { mode: 'report-only', suite: true, production_url: 'https://example.com', answered: '2026-10-01T10:00:00Z' };
 const probe = (a) => validateManifest({ ...base, audit: { last_answers: a } }).filter((p) => p.includes('last_answers'));
@@ -49,6 +51,5 @@ for (const [name, [a, want]] of Object.entries(cases)) {
 }
 process.exit(bad ? 1 : 0);
 JS
-trap 'rm -f ./.probe-reaudit.mjs' EXIT
-node ./.probe-reaudit.mjs || fail "manifest validation of audit.last_answers"
+MANIFEST_URL="file://$PWD/bin/lib/manifest.mjs" node "$probe_dir/probe-reaudit.mjs" || fail "manifest validation of audit.last_answers"
 echo PASS

@@ -98,13 +98,25 @@ get_version() {
     fi
 }
 
+# Prints true/false and returns the same state (0 running, 1 not), so `a || b` works.
 is_running() {
-    local service="$1"
+    local service="$1" up=1
     if [[ "$OS" == "macos" ]]; then
-        brew services list 2>/dev/null | grep "$service" | grep -c "started" >/dev/null && echo "true" || echo "false"
+        brew services list 2>/dev/null | grep "$service" | grep -c "started" >/dev/null && up=0
     else
-        systemctl is-active "$service" &>/dev/null && echo "true" || echo "false"
+        systemctl is-active "$service" &>/dev/null && up=0
     fi
+    if [[ $up -eq 0 ]]; then echo "true"; else echo "false"; fi
+    return $up
+}
+
+# True when any of the named services runs; prints one true/false.
+any_running() {
+    local s
+    for s in "$@"; do
+        if is_running "$s" >/dev/null; then echo "true"; return 0; fi
+    done
+    echo "false"
 }
 
 ##############################################################################
@@ -122,7 +134,7 @@ cmd_detect() {
     if command -v nginx &>/dev/null; then
         nginx_installed=true
         nginx_version=$(nginx -v 2>&1 | sed -n 's/.*\/\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' || echo "unknown")
-        nginx_running=$(is_running nginx)
+        nginx_running=$(is_running nginx || true)
     fi
 
     if command -v httpd &>/dev/null || command -v apache2 &>/dev/null; then
@@ -130,16 +142,16 @@ cmd_detect() {
         apache_version=$( (httpd -v 2>/dev/null || apache2 -v 2>/dev/null) | sed -n 1p | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p'  )
         [[ -z "$apache_version" ]] && apache_version="unknown"
         if [[ "$OS" == "fedora" ]] || [[ "$OS" == "rhel" ]]; then
-            apache_running=$(is_running httpd)
+            apache_running=$(is_running httpd || true)
         else
-            apache_running=$(is_running apache2)
+            apache_running=$(is_running apache2 || true)
         fi
     fi
 
     if command -v caddy &>/dev/null; then
         caddy_installed=true
         caddy_version=$(get_version caddy)
-        caddy_running=$(is_running caddy)
+        caddy_running=$(is_running caddy || true)
     fi
 
     # PHP
@@ -179,7 +191,7 @@ cmd_detect() {
 
     command -v ddev &>/dev/null && ddev_installed=true && ddev_version=$(get_version ddev)
     command -v lando &>/dev/null && lando_installed=true && lando_version=$(get_version lando)
-    command -v npx &>/dev/null && npx wp-env --version &>/dev/null 2>&1 && wpenv_installed=true
+    command -v npx &>/dev/null && npx --no-install wp-env --version &>/dev/null 2>&1 && wpenv_installed=true
     if command -v wp &>/dev/null; then
         wpcli_installed=true
         wpcli_version=$(wp --version 2>/dev/null | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' || echo "unknown")
@@ -192,11 +204,11 @@ cmd_detect() {
     if command -v mariadb &>/dev/null || (command -v mysql &>/dev/null && mysql --version 2>/dev/null | grep -ci mariadb >/dev/null); then
         mariadb_installed=true
         mariadb_version=$(mariadb --version 2>/dev/null | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | sed -n 1p || echo "unknown")
-        mariadb_running=$(is_running mariadb || is_running mysql)
+        mariadb_running=$(any_running mariadb mysql)
     elif command -v mysql &>/dev/null; then
         mysql_installed=true
         mysql_version=$(mysql --version 2>/dev/null | sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | sed -n 1p || echo "unknown")
-        mysql_running=$(is_running mysql || is_running mysqld)
+        mysql_running=$(any_running mysql mysqld)
     fi
 
     # Output JSON
@@ -258,14 +270,14 @@ cmd_php_list() {
 
     if [[ "$JSON_OUTPUT" == "true" ]]; then
         printf '{"versions": ['; local first=true
-        for v in "${versions[@]}"; do
+        for v in ${versions[@]+"${versions[@]}"}; do
             [[ "$first" == "true" ]] && first=false || printf ','
             printf '"%s"' "$v"
         done
         printf ']}\n'
     else
         echo "Available PHP versions:"
-        for v in "${versions[@]}"; do echo "  - $v"; done
+        for v in ${versions[@]+"${versions[@]}"}; do echo "  - $v"; done
     fi
 }
 

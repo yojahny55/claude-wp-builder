@@ -4,7 +4,8 @@
 # (`npm i -g @playwright/test`) the probe printed "missing playwright-core" and exited 2,
 # although a working copy sat under `npm root -g`. Behavior test: a fake `npm` reports a
 # fake global root holding a stub playwright-core; the probe must import it.
-set -u
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 
@@ -27,7 +28,7 @@ export const firefox = { launch() {} };
 STUB
 
 out="$(cd "$tmp/cwd" && env -u PLAYWRIGHT_CORE PATH="$tmp/bin:$PATH" \
-  WP_DEMO_CHROME="$tmp/nonexistent-chrome" node "$root/bin/demo-verify.mjs" --probe 2>&1)"
+  WP_DEMO_CHROME="$tmp/nonexistent-chrome" node "$root/bin/demo-verify.mjs" --probe 2>&1)" || true
 
 fail=0
 case "$out" in *"missing playwright-core"*) echo "FAIL: probe did not find the global playwright-core: $out"; fail=1;; esac
@@ -35,8 +36,8 @@ case "$out" in *"missing playwright-core"*) echo "FAIL: probe did not find the g
 
 # PLAYWRIGHT_CORE must still skip the ladder: a bogus value is exit 2, not the global copy.
 rm -f "$tmp/imported"
-(cd "$tmp/cwd" && PLAYWRIGHT_CORE="$tmp/bogus" PATH="$tmp/bin:$PATH" node "$root/bin/demo-verify.mjs" --probe >/dev/null 2>&1)
-[ $? -eq 2 ] && [ ! -f "$tmp/imported" ] || { echo "FAIL: PLAYWRIGHT_CORE no longer forces the failure path"; fail=1; }
+(cd "$tmp/cwd" && PLAYWRIGHT_CORE="$tmp/bogus" PATH="$tmp/bin:$PATH" node "$root/bin/demo-verify.mjs" --probe >/dev/null 2>&1) || probe_rc=$?
+[ "${probe_rc:-0}" -eq 2 ] && [ ! -f "$tmp/imported" ] || { echo "FAIL: PLAYWRIGHT_CORE no longer forces the failure path"; fail=1; }
 
 [ "$fail" = 0 ] && echo "PASS: demo-verify-global-playwright"
 exit "$fail"

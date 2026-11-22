@@ -4,10 +4,11 @@
 # nothing at all — so every check here is about asserting from a REQUEST rather
 # than from the database, which is the thing they all have in common.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+. "$(dirname "$0")/../lib/assert.sh"
+require_tool php
+cd "$(dirname "$0")/../.." || exit 1
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 
-fail() { echo "FAIL: $1"; exit 1; }
 
 p=commands/wp-polylang.md
 s=$wp_seed

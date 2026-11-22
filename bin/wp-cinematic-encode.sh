@@ -45,15 +45,25 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# A literal leading ~ (quoted or in --kit=~/x) is not expanded by the shell.
+# shellcheck disable=SC2088  # matching a literal "~" on purpose, to expand it ourselves
+case "$KIT_DIR" in "~") KIT_DIR="$HOME" ;; "~/"*) KIT_DIR="$HOME/${KIT_DIR#\~/}" ;; esac
+
 # --scene goes into the PHP of `wp eval` below, so it must be a plain number.
 if [[ -n "$SCENE" && ! "$SCENE" =~ ^[1-9][0-9]*$ ]]; then
   err "--scene must be a positive integer, got: $SCENE"; exit 2
+fi
+
+if [[ $DESKTOP_ONLY -eq 1 && $MOBILE_ONLY -eq 1 ]]; then
+  err "--desktop-only and --mobile-only exclude each other: nothing would be encoded"; exit 2
 fi
 
 [[ -z "$INPUT" ]] && { err "Missing <input.mp4>"; exit 2; }
 [[ -z "$THEME" ]] && { err "Missing --theme=<theme-dir>"; exit 2; }
 [[ ! -f "$INPUT" ]] && { err "Input not found: $INPUT"; exit 1; }
 [[ ! -d "$THEME" ]] && { err "Theme dir not found: $THEME"; exit 1; }
+# Absolute, so `--theme=.` still finds the WordPress root three levels up.
+THEME=$(cd "$THEME" && pwd -P)
 
 # ---- locate ffmpeg -------------------------------------------------------
 command -v ffmpeg >/dev/null || { err "ffmpeg not installed. (Fedora: sudo dnf install ffmpeg)"; exit 1; }
@@ -119,7 +129,7 @@ if [[ $POSTER -eq 1 ]]; then
 fi
 
 encode_failed=0
-for pid in "${pids[@]}"; do
+for pid in ${pids[@]+"${pids[@]}"}; do
   if ! wait "$pid"; then encode_failed=1; fi
 done
 fail=$encode_failed
@@ -129,7 +139,9 @@ fail=$encode_failed
 if [[ -f "$OUT_DESKTOP" ]]; then
   ikeys=$(ffprobe -loglevel error -select_streams v:0 -show_frames -read_intervals %+#10 -print_format csv "$OUT_DESKTOP" | grep -c ',I,' || true)
   if [[ "$ikeys" -lt 10 ]]; then
-    err "All-keyframe verification failed for $OUT_DESKTOP (only $ikeys I-frames in first 10). Re-encode required."
+    err "All-keyframe verification failed for $OUT_DESKTOP (only $ikeys I-frames in first 10). Re-encode required; nothing was imported."
+    fail=1
+    exit 1
   else
     ok "Desktop verified: ${ikeys} I-frames in first 10 — scrub-ready."
   fi
