@@ -23,7 +23,7 @@ Apache matched first, and that may be the one without the rule.
 `<If>` sections are merged last, after `<Directory>`, `<Location>` and `.htaccess`. An `<If>`
 written in server context, outside every `<VirtualHost>`, applies to every request whichever
 vhost answers it, and a later `Require all granted` in a `<Directory>` cannot undo it. The
-condition names the site's host, so the other sites on the server are untouched.
+condition names the site's document root, so the other sites on the server are untouched.
 
 Put it in its own file under `conf.d/` (`/etc/httpd/conf.d/` or `/etc/apache2/conf-enabled/`),
 never in `.htaccess`: `.htaccess` is per directory, a plugin can rewrite it, and `<If>` there
@@ -31,14 +31,15 @@ only covers requests that reach that directory.
 
 ## The rule
 
-Replace the host (`example[.]com`) and nothing else. Every character class is written as
+Replace the document root (`/var/www/example`) and nothing else: write it exactly as the
+site's `DocumentRoot` reads, with any `.` in it as `[.]`. Every character class is written as
 `[.]` or `[+]` instead of a backslash escape on purpose: Apache's config parser and the
 expression parser both consume backslashes, and a class reads the same to both.
 
 <!-- apache-rest-block:rule -->
 ```apache
-# REST API blocked for example.com, CF7 left open. Server context: outside every <VirtualHost>.
-<If "(tolower(%{HTTP_HOST}) =~ /^(www[.])?example[.]com[.]?(:[0-9]+)?$/ || -z %{HTTP_HOST}) && ((%{REQUEST_URI} =~ m#^/+([^/]+[.]php/+)?wp-json(/|$)#i && ! (%{REQUEST_URI} =~ m#^/+wp-json/+contact-form-7/+v1/#i)) || %{QUERY_STRING} =~ /(^|&)([+]|%20)*(r|%72)(e|%65)(s|%73)(t|%74)(_|[.]|[+]|[[]|%5f|%2e|%20|%5b)(r|%72)(o|%6f)(u|%75)(t|%74)(e|%65)($|=|&|[[]|%5b|%00)/i)">
+# REST API blocked for the site in /var/www/example, CF7 left open. Server context: outside every <VirtualHost>.
+<If "%{DOCUMENT_ROOT} =~ m#^/var/www/example/?$# && ((%{REQUEST_URI} =~ m#^/+([^/]+[.]php/+)?wp-json(/|$)#i && ! (%{REQUEST_URI} =~ m#^/+wp-json/+contact-form-7/+v1/#i)) || %{QUERY_STRING} =~ /(^|&)([+]|%20)*(r|%72)(e|%65)(s|%73)(t|%74)(_|[.]|[+]|[[]|%5f|%2e|%20|%5b)(r|%72)(o|%6f)(u|%75)(t|%74)(e|%65)($|=|&|[[]|%5b|%00)/i)">
     Require all denied
 </If>
 ```
@@ -46,11 +47,14 @@ expression parser both consume backslashes, and a class reads the same to both.
 
 What each part answers:
 
-- **Host.** `tolower`, an optional `www.`, an optional trailing dot (`example.com.` is the same
-  name to DNS and reaches the same vhost) and an optional port. A request with no `Host` at all
-  (HTTP/1.0) is answered by the default vhost, which may be this site, so an empty host is
-  blocked too. That blocks host-less REST calls for every site on the server, which no browser
-  sends.
+- **Which site.** The condition names the site by `%{DOCUMENT_ROOT}`, the `DocumentRoot` of
+  the vhost that actually answered, never by the `Host` header. A host test is a test of what
+  the client typed: every `ServerAlias`, the server's IP, a trailing dot, a port, and no `Host`
+  at all when the site is the default vhost all reach the same site under a name the test does
+  not list. The document root is the same whichever name got the request there, and a site on
+  another vhost has its own. Two vhosts serving one directory (a `:80` and a `:443` copy) are
+  one site and are both covered. Under `mod_vhost_alias` the document root is computed per
+  request and this variable does not reflect it; that layout needs one condition per name.
 - **Path.** `%{REQUEST_URI}` is the decoded path with dot segments already removed, so
   `%77p-json`, `/x/../wp-json` and `//wp-json` all arrive as `/wp-json`. `[^/]+[.]php/+`
   covers WordPress reading the route from `PATH_INFO`: `/index.php/wp-json/…` and
@@ -94,10 +98,10 @@ request through.
 | `/index.php/wp-json/wp/v2/users`, `/wp-blog-header.php/wp-json/` | 403 |
 | `/?rest_route=/wp/v2/users` and every key form in the table above | 403 |
 | `/wp-json/contact-form-7/v1/x?rest_route=/wp/v2/users` | 403 |
-| `Host: example.com.`, `Host: WWW.EXAMPLE.COM:443`, no `Host` | 403 |
+| `Host: example.com.`, `Host: WWW.EXAMPLE.COM:443`, an alias, the IP, no `Host` (default vhost) | 403 |
 | `/wp-json/contact-form-7/v1/contact-forms/1/feedback` | passes |
 | `/wp-admin/admin-ajax.php`, `/`, `/?s=rest_route`, `/?payment_method=x`, `/?x=1%26rest_route=/a` | passes |
-| `/wp-json/wp/v2/users` with `Host: other.example` | passes |
+| `/wp-json/wp/v2/users` on another vhost with its own document root | passes |
 
 ## What it breaks, and how to open a namespace
 

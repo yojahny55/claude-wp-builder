@@ -26,6 +26,8 @@ block() { sed -n "/<!-- apache-rest-block:$1 -->/,/<!-- \/apache-rest-block:$1 -
 rule="$(block rule)"
 php_half="$(block mu-plugin)"
 [ "$(printf '%s\n' "$rule" | grep -c '^<If ')" = 1 ] || fail "the reference's rule block has no single <If> line"
+[ "$(printf '%s\n' "$rule" | grep -c 'DOCUMENT_ROOT')" = 1 ] || fail "the rule no longer names the site by its document root"
+[ "$(printf '%s\n' "$rule" | grep -c 'HTTP_HOST')" = 0 ] || fail "the rule names the site by the Host header, which the client chooses"
 [ "$(printf '%s\n' "$php_half" | grep -c 'rest_pre_dispatch')" -gt 0 ] || fail "the reference's mu-plugin block lost the hook"
 
 tmp="$(mktemp -d)"
@@ -55,8 +57,19 @@ if [ -z "$httpd_bin" ] || [ -z "$mods" ]; then
   skip "no Apache 2.4 installed: the rule was NOT replayed"
 fi
 
-mkdir -p "$tmp/root"
+mkdir -p "$tmp/root" "$tmp/other"
 echo ok > "$tmp/root/index.html"
+echo ok > "$tmp/other/index.html"
+# mktemp -d is 0700. Run as root, Apache drops to its run user and would answer 403 from the
+# file system, which reads as the rule firing; let that user in and name it.
+chmod 755 "$tmp" "$tmp/root" "$tmp/other"
+run_as=""
+if [ "$(id -u)" = 0 ]; then
+  run_as="User nobody
+Group $(id -gn nobody)"
+fi
+# The reference's placeholder document root becomes the throwaway site's.
+rule="${rule//\/var\/www\/example/$tmp/root}"
 lm() { [ -f "$mods/mod_$1.so" ] && echo "LoadModule $1_module $mods/mod_$1.so"; return 0; }
 
 port=""
@@ -73,12 +86,22 @@ $(lm authz_core)
 $(lm dir)
 DirectoryIndex index.html
 ServerName localhost
+$run_as
 $rule
+# The site is the first vhost, so it is also the default one: an unknown Host, the IP and a
+# request with no Host all land on it.
 <VirtualHost 127.0.0.1:$p>
   ServerName example.com
-  ServerAlias www.example.com other.example
+  ServerAlias www.example.com alias.example
   DocumentRoot $tmp/root
   <Directory $tmp/root>
+    Require all granted
+  </Directory>
+</VirtualHost>
+<VirtualHost 127.0.0.1:$p>
+  ServerName other.example
+  DocumentRoot $tmp/other
+  <Directory $tmp/other>
     Require all granted
   </Directory>
 </VirtualHost>
@@ -117,6 +140,9 @@ for p in /wp-json/ /wp-json /wp-json/wp/v2/users /WP-JSON/wp/v2/users //wp-json/
 done
 blocked 'example.com.' /wp-json/
 blocked 'WWW.EXAMPLE.COM:443' /wp-json/
+blocked alias.example /wp-json/wp/v2/users
+blocked 127.0.0.1 /wp-json/wp/v2/users
+blocked unknown.example '/?rest_route=/wp/v2/users'
 [ "$(curl -s -o /dev/null -w '%{http_code}' --http1.0 -H 'Host:' "http://127.0.0.1:$port/wp-json/")" = 403 ] \
   || fail "not blocked: a request with no Host header"
 
