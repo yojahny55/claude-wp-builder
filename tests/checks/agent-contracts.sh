@@ -28,9 +28,6 @@ done
 inc agents/wp-tailwind.md 'Demo Conversion Mode'
 inc agents/wp-tailwind.md 'Its absence is not a'
 
-# Blocked audit reports: not re-dispatched, category INCOMPLETE with the reason.
-inc skills/wp-audit-run/references/dispatch.md 'A `blocked` report is not re-dispatched.'
-inc skills/wp-audit-run/references/dispatch.md 'its category is INCOMPLETE'
 # Blocked and missing-file rules match their own steps.
 inc agents/wp-normalize.md 'treat the project as not tailwind and capture `cssRules`'
 inc agents/wp-css.md 'is missing or unreadable, stop'

@@ -66,11 +66,7 @@ the site does not have the feature, or as `UNMEASURED` with one of the allowed r
 "no browser measurement" and a missing reason are not reasons: Step 6.8 counts those ids as
 missing and sends them back. Without the list an agent picks which checks to run, and a
 category came back at 38 of 61 and cost two extra agents. A re-dispatch (Step 6.8) uses the
-same line carrying only the missing ids.
-
-**A `blocked` report is not re-dispatched.** An auditor that returns `"blocked": "<reason>"`
-with empty findings stopped on a missing prerequisite, so asking again blocks again. Step 6.8
-skips it: its category is INCOMPLETE and the report records the blocking reason verbatim. A shard (below) gets the full list and omits the ids
+same line carrying only the missing ids. A shard (below) gets the full list and omits the ids
 that are not about its surface; it does not report them `N/A`.
 
 **One quiet wrapper for noisy sites.** When Step 2 or Step 3 saw a plugin print PHP notices or
