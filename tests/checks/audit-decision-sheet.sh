@@ -54,6 +54,19 @@ printf 'DECISION A: other\n' | node "$tool" --parse - | grep >/dev/null -Fc 'has
 echo 'nothing here' | node "$tool" --parse - >/dev/null 2>&1 && fail "--parse of text with no DECISION exited 0"
 
 
+# a line that starts with DECISION but does not match is warned about and fails the parse
+printf 'DECISIONS v1\nDECISION a: approve looks fine\nDECISION b: approve\nEND DECISIONS\n' > "$tmp/bad.txt"
+node "$tool" --parse "$tmp/bad.txt" >"$tmp/bad.out" 2>"$tmp/bad.err"; rc=$?
+[ "$rc" = 1 ] || fail "a dropped DECISION line exited $rc, not 1"
+grep >/dev/null -Fc 'line not understood' "$tmp/bad.err" || fail "a dropped DECISION line was not warned about on stderr"
+grep >/dev/null -Fc '"id": "b"' "$tmp/bad.out" || fail "the good line was not still parsed"
+# --against: an id with no card, or an option the card does not offer, is dropped
+echo '{"proposals":[{"id":"A","options":[{"key":"approve"},{"key":"reject"}]}]}' > "$tmp/against.json"
+printf 'DECISIONS v1\nDECISION A: approve | ok\nDECISION A2: approve\nEND DECISIONS\n' | node "$tool" --parse - --against "$tmp/against.json" >/dev/null 2>"$tmp/ag.err" && fail "--against accepted an id with no card"
+grep >/dev/null -Fc 'no such card' "$tmp/ag.err" || fail "--against did not warn about the unknown id"
+printf 'DECISIONS v1\nDECISION A: nope | x\nEND DECISIONS\n' | node "$tool" --parse - --against "$tmp/against.json" >/dev/null 2>&1 && fail "--against accepted an option the card does not offer"
+printf 'DECISIONS v1\nDECISION A: reject | x\nEND DECISIONS\n' | node "$tool" --parse - --against "$tmp/against.json" >/dev/null 2>&1 || fail "--against refused a valid answer"
+
 # --- escaping and sidecar ids: no browser needed (no page/selector => card without pictures)
 cat > "$tmp/esc.json" <<'JSON'
 [{"id":"E-1","title":"<img src=x onerror=1>\"&","why":"</textarea><script>alert(1)</script>",
@@ -71,6 +84,51 @@ grep -Fq '<script>alert' "$eh" && fail "raw script from a proposal reached the p
 node "$tool" build --out "$tmp/e2" --sidecar "$tmp/sc.json" --date 2026-01-02 >/dev/null 2>&1
 ids=$(grep -o 'data-id="[^"]*"' "$tmp/e2/decisions-2026-01-02.html" | tr '\n' ' ')
 [ "$ids" = 'data-id="A" data-id="A-2" data-id="finding-3" ' ] || fail "sidecar findings did not get unique ids: $ids"
+
+# the same check on another page is another card, even when a proposal covers the first page
+echo '[{"id":"P1","title":"t","check":"A","page":"/x"}]' > "$tmp/pp.json"
+echo '{"findings":[{"check":"A","design_impact":true,"page":"/x"},{"check":"A","design_impact":true,"page":"/y"}]}' > "$tmp/sc2.json"
+mkdir -p "$tmp/e3"
+node "$tool" build --out "$tmp/e3" --proposals "$tmp/pp.json" --sidecar "$tmp/sc2.json" --date 2026-01-02 >/dev/null 2>&1
+ids=$(grep -o 'data-id="[^"]*"' "$tmp/e3/decisions-2026-01-02.html" | tr '\n' ' ')
+[ "$ids" = 'data-id="P1" data-id="A" ' ] || fail "a second page with the same check got no card: $ids"
+# a site-wide finding (no page) is covered by the proposal of its check, page or not
+echo '{"findings":[{"check":"A","design_impact":true}]}' > "$tmp/sc3.json"
+mkdir -p "$tmp/e4"
+node "$tool" build --out "$tmp/e4" --proposals "$tmp/pp.json" --sidecar "$tmp/sc3.json" --date 2026-01-02 >/dev/null 2>&1
+ids=$(grep -o 'data-id="[^"]*"' "$tmp/e4/decisions-2026-01-02.html" | tr '\n' ' ')
+[ "$ids" = 'data-id="P1" ' ] || fail "a site-wide finding got a duplicate card beside its proposal: $ids"
+# ...but listed before the page's own finding it does not take that page's proposal
+echo '{"findings":[{"check":"A","design_impact":true},{"check":"A","design_impact":true,"page":"/x"}]}' > "$tmp/sc4.json"
+mkdir -p "$tmp/e5"
+node "$tool" build --out "$tmp/e5" --proposals "$tmp/pp.json" --sidecar "$tmp/sc4.json" --date 2026-01-02 >/dev/null 2>&1
+ids=$(grep -o 'data-id="[^"]*"' "$tmp/e5/decisions-2026-01-02.html" | tr '\n' ' ')
+[ "$ids" = 'data-id="P1" data-id="A" ' ] || fail "card coverage depends on sidecar order: $ids"
+node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));const a=j.proposals.find(p=>p.id==="A");if(!a||a.page)process.exit(1)' "$tmp/e5/decisions-2026-01-02.json" \
+  || fail "the page's finding lost its proposal to the site-wide one listed first"
+# prose starting with DECISION above a valid block is not a dropped answer
+printf 'DECISION needed here\nDECISIONS v1\nDECISION A: approve | ok\nEND DECISIONS\n' | node "$tool" --parse - >/dev/null 2>&1 \
+  || fail "prose above a valid block failed the parse"
+# ...nor an answer when it happens to fit the grammar
+out=$(printf 'DECISION needed: soon\nDECISIONS v1\nDECISION A: approve | ok\nEND DECISIONS\n' | node "$tool" --parse - --against "$tmp/against.json" 2>/dev/null) \
+  || fail "grammatical prose above a valid block failed the parse"
+grep >/dev/null -c '"needed"' <<<"$out" && fail "prose above the block was read as an answer: $out"
+printf 'DECISION A: approve\nDECISION B approve\n' | node "$tool" --parse - >/dev/null 2>&1 && fail "a malformed line with no block was not reported"
+# --against or --proposals that parse but are not objects are usage errors (2), not crashes
+echo null > "$tmp/null.json"
+printf 'DECISIONS v1\nDECISION A: approve\nEND DECISIONS\n' | node "$tool" --parse - --against "$tmp/null.json" >/dev/null 2>&1; rc=$?
+[ "$rc" = 2 ] || fail "--against null exited $rc, not 2"
+node "$tool" build --out "$tmp/e4" --proposals "$tmp/null.json" --date 2026-01-02 >/dev/null 2>&1; rc=$?
+[ "$rc" = 2 ] || fail "--proposals null exited $rc, not 2"
+echo '[null]' > "$tmp/nulls.json"
+node "$tool" build --out "$tmp/e4" --proposals "$tmp/nulls.json" --date 2026-01-02 >/dev/null 2>&1; rc=$?
+[ "$rc" = 2 ] || fail "--proposals [null] exited $rc, not 2"
+# --date becomes part of a file name: no path traversal
+for d in 'a/../../zz' '../x' 'a b'; do
+  node "$tool" build --out "$tmp/e3" --proposals "$tmp/pp.json" --date "$d" >/dev/null 2>&1; rc=$?
+  [ "$rc" = 2 ] || fail "--date '$d' exited $rc, not 2"
+done
+[ ! -e "$tmp/zz.html" ] && [ ! -e "$tmp/zz.json" ] || fail "--date escaped --out"
 
 # --- build needs a browser
 core=${PLAYWRIGHT_CORE:-}

@@ -77,7 +77,8 @@ safe. The rules:
   injected "after" CSS is forced `!important` and transitions are frozen, so the picture shows
   the proposed value, not the old rule; a rule that changed nothing is reported ineffective.
 - When the user pastes the block back, run
-  `node ${CLAUDE_PLUGIN_ROOT}/bin/decision-sheet.mjs --parse -` (or a file) and act on the JSON,
+  `node ${CLAUDE_PLUGIN_ROOT}/bin/decision-sheet.mjs --parse - --against <decisions-*.json>` (or a file) and act on the JSON
+  (exit 1 or a warning means an answer was dropped: ask again),
   never on a hand reading of the text: `approved` is applied one at a time as above;
   `rejected` stays unapplied and its ledger entry becomes `accepted` (the user decided to keep
   it), so the next audit does not raise it again; `postponed` and `pending` stay open and are

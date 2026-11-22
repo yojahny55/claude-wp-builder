@@ -13,7 +13,11 @@
  *   build   decision-sheet.mjs build --out <audit results dir> (--proposals <file.json> |
  *           --sidecar <informe-*.json> [--proposals <file.json>]) [--site <origin>]
  *           [--lang en|es] [--date YYYY-MM-DD] [--settle-ms <n>] [--page-timeout <s>]
- *   parse   decision-sheet.mjs --parse <file|->     (the block, pasted back, to JSON on stdout)
+ *           (--date must be [A-Za-z0-9._-]+ with no `..`: it becomes part of the file name)
+ *   parse   decision-sheet.mjs --parse <file|-> [--against <decisions-*.json>]
+ *           (the block, pasted back, to JSON on stdout). --against is the json written beside
+ *           the page: an id with no card, or an option that card does not offer, is dropped
+ *           with a warning.
  *
  * Proposals file: a JSON list, or {"proposals": [...]}. Each entry:
  *   id         required, [A-Za-z0-9._-]+, the key the answer comes back under
@@ -46,8 +50,12 @@
  * approved | rejected | postponed | other | chosen | pending, and `ledger` is "accepted" for a
  * rejected finding (the user decided to keep it as is) and null otherwise.
  *
- * Exit: 0 ok; 2 usage, or no browser (nothing is installed or downloaded); 3 the page was
- * written but a picture or an ineffective rule left a card incomplete.
+ * Exit: 0 ok; 1 (--parse) no DECISION line parsed, or a line inside the block was dropped
+ * (a DECISION line that does not match the grammar, e.g. no `|` after the option, or an answer
+ * --against rejects): the JSON is still printed and each drop is a warning on stderr, so a
+ * partly read answer is never mistaken for a complete one; 2 usage, or no browser (nothing is
+ * installed or downloaded), or an unsafe --date; 3 the page was written but a picture or an
+ * ineffective rule left a card incomplete.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -56,7 +64,7 @@ import { findBrowser } from './lib/browsers.mjs';
 
 const USAGE = 'usage: decision-sheet.mjs build --out <dir> (--proposals <file> | --sidecar <file> [--proposals <file>]) ' +
   '[--site <origin>] [--lang en|es] [--date YYYY-MM-DD] [--settle-ms <n>] [--page-timeout <s>]\n' +
-  '       decision-sheet.mjs --parse <file|->';
+  '       decision-sheet.mjs --parse <file|-> [--against <decisions-*.json>]';
 
 function usage(msg, code = 2) {
   if (msg) process.stderr.write(`decision-sheet: ${msg}\n`);
@@ -74,34 +82,54 @@ const DEFAULT_OPTIONS = [
 
 /* ------------------------------------------------------------------ parse */
 
-export function parseAnswers(text) {
+export function parseAnswers(text, against = null) {
   const decisions = new Map(), warnings = [];
   const re = /^[\s>*\-]*DECISION\s+([A-Za-z0-9._-]+)\s*:\s*([^\s|]+)\s*(?:\|\s*(.*?))?\s*$/;
-  let inBlock = false, sawBlock = false;
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim().replace(/^[>*\-\s]+/, '');
-    if (/^DECISIONS v\d+$/.test(line)) { inBlock = true; sawBlock = true; continue; }
+  // When the text holds a block, only the lines inside a block are answers: prose such as
+  // "DECISION needed: soon" pasted above or below it is neither an answer nor a dropped one.
+  // Text with no block at all is read line by line, as before blocks existed.
+  const clean = (raw) => raw.trim().replace(/^[>*\-\s]+/, '');
+  const lines = text.split(/\r?\n/);
+  const hasBlock = lines.some((raw) => /^DECISIONS v\d+$/.test(clean(raw)));
+  let inBlock = false, malformed = 0;
+  for (const raw of lines) {
+    const line = clean(raw);
+    if (/^DECISIONS v\d+$/.test(line)) { inBlock = true; continue; }
     if (/^END DECISIONS$/.test(line)) { inBlock = false; continue; }
+    if (hasBlock && !inBlock) continue;
     const m = re.exec(raw);
-    if (!m) continue;
-    if (sawBlock && !inBlock) continue;
+    if (!m) {
+      if (/^DECISION\b(?!S\b)/.test(line)) { malformed++; warnings.push(`line not understood, answer dropped: ${line.slice(0, 80)}`); }
+      continue;
+    }
     const [, id, option, note = ''] = m;
     if (decisions.has(id)) warnings.push(`${id}: answered more than once, the last answer wins`);
     const status = { approve: 'approved', reject: 'rejected', postpone: 'postponed', other: 'other', pending: 'pending' }[option] || 'chosen';
     if (option === 'other' && !note) warnings.push(`${id}: "other" has no note, the instruction is empty`);
+    if (against) {
+      const opts = against.get(id);
+      if (!opts) { malformed++; warnings.push(`${id}: no such card in the sheet, answer dropped`); continue; }
+      if (option !== 'pending' && !opts.includes(option)) { malformed++; warnings.push(`${id}: "${option}" is not one of its options (${opts.join(', ')}), answer dropped`); continue; }
+    }
     decisions.set(id, { id, option, status, note, ledger: status === 'rejected' ? 'accepted' : null });
   }
   if (!decisions.size) warnings.push('no DECISION lines found');
-  return { decisions: [...decisions.values()], warnings };
+  return { decisions: [...decisions.values()], warnings, malformed };
 }
 
-function runParse(src) {
-  let text;
+function runParse(src, againstFile) {
+  let text, against = null;
+  if (againstFile) {
+    const j = readJson(againstFile);
+    if (!j || typeof j !== 'object' || !Array.isArray(j.proposals)) usage(`${againstFile} is not a decision-sheet json (no proposals)`);
+    against = new Map(j.proposals.filter(p => p && typeof p === 'object' && p.id).map(p => [p.id, (p.options || []).map(op => op?.key)]));
+  }
   try { text = src === '-' ? readFileSync(0, 'utf8') : readFileSync(src, 'utf8'); }
   catch (e) { usage(`cannot read ${src}: ${e.message}`); }
-  const out = parseAnswers(text);
+  const out = parseAnswers(text, against);
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
-  process.exit(out.decisions.length ? 0 : 1);
+  for (const w of out.warnings) process.stderr.write(`decision-sheet: ${w}\n`);
+  process.exit(out.decisions.length && !out.malformed ? 0 : 1);
 }
 
 /* ----------------------------------------------------------------- inputs */
@@ -134,17 +162,36 @@ function loadProposals(o) {
   let list = [];
   if (o.proposals) {
     const j = readJson(o.proposals);
-    list = Array.isArray(j) ? j : j.proposals;
-    if (!Array.isArray(list)) usage(`${o.proposals} is not a list of proposals`);
+    list = Array.isArray(j) ? j : j?.proposals;
+    if (!Array.isArray(list) || list.some(p => !p || typeof p !== 'object')) usage(`${o.proposals} is not a list of proposals`);
   }
   if (o.sidecar) {
     const sc = readJson(o.sidecar);
     const findings = (sc.findings || []).filter(f => f.design_impact === true);
-    const by = new Map(list.filter(p => p.check).map(p => [p.check, p]));
+    // A proposal covers the finding with its check AND its page; the same check on another
+    // page is another card. A proposal with no page covers one finding of that check, and a
+    // site-wide finding (no page) is covered by any unclaimed proposal of its check.
+    const norm = u => { if (!u) return ''; try { return new URL(u, o.site || 'http://x.invalid').href.replace(/#.*$/, '').replace(/\/$/, ''); } catch { return String(u); } };
+    // Two passes, so the result does not depend on the sidecar's order: exact page matches
+    // first, then the loose ones (no page on either side). Otherwise a site-wide finding
+    // listed first could claim the proposal written for a page, and that page's finding would
+    // get a second card.
+    const claimed = new Set(), coveredAt = new Set();
+    const checkOf = (f, i) => String(f.check ?? `finding-${i + 1}`);
+    for (const exact of [true, false]) {
+      findings.forEach((f, i) => {
+        if (coveredAt.has(i) || (exact && !f.page)) return;
+        const check = checkOf(f, i);
+        const p = list.find(q => q.check === check && !claimed.has(q) && (exact
+          ? q.page && norm(q.page) === norm(f.page)
+          : !f.page || !q.page || norm(q.page) === norm(f.page)));
+        if (p) { claimed.add(p); coveredAt.add(i); }
+      });
+    }
     const used = new Set(list.map(p => p.id));
     findings.forEach((f, i) => {
-      const check = String(f.check ?? `finding-${i + 1}`);
-      if (by.has(check)) return;
+      const check = checkOf(f, i);
+      if (coveredAt.has(i)) return;
       // The same check on several pages is several findings: each needs its own id.
       const base = check.replace(/[^A-Za-z0-9._-]+/g, '-') || `finding-${i + 1}`;
       let id = base, n = 1;
@@ -368,6 +415,7 @@ ${cards.join('\n')}</main>
 async function runBuild(o) {
   if (!o.out) usage('build needs --out (the audit results directory)');
   if (!['en', 'es'].includes(o.lang)) usage('--lang is en or es');
+  if (o.date != null && (!/^[\w.-]+$/.test(o.date) || o.date.includes('..'))) usage(`--date "${o.date}" must match [A-Za-z0-9._-]+ and contain no ..`);
   const t = T[o.lang];
   const list = loadProposals(o);
   const date = o.date || new Date().toISOString().slice(0, 10);
@@ -408,6 +456,8 @@ async function runBuild(o) {
 const argv = process.argv.slice(2);
 if (argv[0] === '--parse') {
   if (!argv[1]) usage('--parse needs a file or -');
-  runParse(argv[1]);
+  if (argv[2] && argv[2] !== '--against') usage(`unknown option ${argv[2]}`);
+  if (argv[2] && !argv[3]) usage('--against needs a file');
+  runParse(argv[1], argv[3]);
 } else if (argv[0] === 'build') await runBuild(parseArgs(argv));
 else usage(argv[0] ? `unknown mode ${argv[0]}` : 'missing mode');

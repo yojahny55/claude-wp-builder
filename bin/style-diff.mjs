@@ -48,8 +48,12 @@
  * --positions adds x,y (page coordinates) and compares them as size.
  * Relative URLs resolve against --site.
  *
+ * --label must match [A-Za-z0-9._-]+ with no `..` (it is the file name); usage error, exit 2.
  * Output: snapshot writes <out>/<label>.json (label defaults to a timestamp) and prints
  * the path; diff prints a text report and, with --out, the same as JSON.
+ * Each page record keeps the HTTP status and the final URL of its navigation. At diff time a
+ * status >= 400 in either snapshot, or a different final URL between them (a login redirect),
+ * makes that page/viewport UNMEASURED: two identical error pages are not a clean page.
  * exit 0 = no non-noise style diff (size diffs fail only with --fail-on-size), 1 = style
  * diffs found, 2 = usage or no browser (nothing is installed or downloaded), 3 = INCOMPLETE:
  * no diff, but a page or viewport was unmeasured, which is never a pass.
@@ -75,6 +79,7 @@ function usage(msg, code = 2) {
 }
 
 function parseArgs(argv) {
+  const SAFE = /^[\w.-]+$/;
   const o = { cmd: argv[0], files: [], noise: [], states: [], viewports: '1366x768,390x844', settleMs: 600,
     pageTimeout: 30, tolerance: 0.5, limit: 40, scroll: false, positions: false, failOnSize: false };
   const next = (i, f) => { if (i + 1 >= argv.length) usage(`${f} needs a value`); return argv[i + 1]; };
@@ -82,7 +87,9 @@ function parseArgs(argv) {
     const a = argv[i];
     switch (a) {
       case '--out': o.out = next(i++, a); break;
-      case '--label': o.label = next(i++, a); break;
+      case '--label': o.label = next(i++, a);
+        if (!SAFE.test(o.label) || o.label.includes('..')) usage(`--label "${o.label}" must match [A-Za-z0-9._-]+ and contain no ..`);
+        break;
       case '--urls': o.urls = next(i++, a).split(',').map(s => s.trim()).filter(Boolean); break;
       case '--urls-file': o.urlsFile = next(i++, a); break;
       case '--site': o.site = next(i++, a); break;
@@ -196,14 +203,17 @@ async function runSnapshot(o) {
         page.on('pageerror', e => consoleErrors.push(String(e.message).slice(0, 300)));
         page.on('requestfailed', r => failedRequests.push(`${r.url().slice(0, 200)} ${r.failure()?.errorText || ''}`.trim()));
         page.on('response', r => { if (r.status() >= 400) failedRequests.push(`${r.url().slice(0, 200)} ${r.status()}`); });
+        let nav = null;
         const load = async () => {
-          await page.goto(url, { waitUntil: 'load', timeout: o.pageTimeout * 1000 });
+          nav = await page.goto(url, { waitUntil: 'load', timeout: o.pageTimeout * 1000 });
           await page.waitForTimeout(o.settleMs);
           if (o.scroll) await scrollWalk(page);
         };
         const entry = { viewport: vp.key };
         try {
           await load();
+          entry.status = nav ? nav.status() : null;
+          entry.finalUrl = page.url();
           entry.elements = await page.evaluate(collect, { props: STYLE_PROPS, positions: o.positions });
           entry.consoleErrors = [...new Set(consoleErrors)];
           entry.failedRequests = [...new Set(failedRequests)];
@@ -296,6 +306,10 @@ function runDiff(o) {
       const vr = { viewport: vk };
       if (!vb) vr.unmeasured = 'viewport absent from B';
       else if (va.unmeasured || vb.unmeasured) vr.unmeasured = va.unmeasured || vb.unmeasured;
+      else if ((va.status ?? 0) >= 400 || (vb.status ?? 0) >= 400) vr.unmeasured = `HTTP ${(vb.status ?? 0) >= 400 ? `${vb.status} in B` : `${va.status} in A`}: an error page is not the page`;
+      // The fragment is left out: a scroll-spy or tab script rewrites it during the walk, and
+      // that is not a redirect to another page.
+      else if (va.finalUrl && vb.finalUrl && va.finalUrl.replace(/#.*$/, '') !== vb.finalUrl.replace(/#.*$/, '')) vr.unmeasured = `redirected to a different URL (A ${va.finalUrl}, B ${vb.finalUrl})`;
       if (vr.unmeasured) rep.totals.unmeasured++;
       else {
         const noisy = new Set();
