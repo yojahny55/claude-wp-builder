@@ -101,11 +101,20 @@ files=(db.sql)
 
 # --- uploads ---
 uploads_state="not in this copy"
+uploads_files=null
 if [ "$uploads" = 1 ]; then
   if [ -d "$root/wp-content/uploads" ]; then
+    # transfer-verified: the archive's entries are counted against the files on disk, and the
+    # count goes into backup.json for wp-restore.sh to check after extracting. An exit code
+    # says the tool finished, not that it copied everything.
+    want_files=$(find "$root/wp-content/uploads" -type f | wc -l)
     tar -czf "$dir/uploads.tar.gz" -C "$root/wp-content" uploads || bad "tar of wp-content/uploads failed"
     gzip -t "$dir/uploads.tar.gz" || bad "uploads.tar.gz does not read back"
     [ -s "$dir/uploads.tar.gz" ] || bad "uploads.tar.gz is empty"
+    got_files=$(tar -tvzf "$dir/uploads.tar.gz" | grep -c '^[-h]' || true)
+    [ "$got_files" = "$want_files" ] \
+      || bad "uploads.tar.gz holds $got_files files, wp-content/uploads has $want_files (uploads changed during the backup, or tar skipped some)"
+    uploads_files=$got_files
     files+=(uploads.tar.gz); uploads_state="uploads.tar.gz"
   else
     echo "wp-backup: --uploads given but $root/wp-content/uploads does not exist; nothing to archive" >&2
@@ -127,11 +136,11 @@ for f in "${files[@]}"; do
   size=$(stat -c %s -- "$dir/$f")
   sums+="$f"$'\t'"$sha"$'\t'"$size"$'\n'
 done
-SUMS=$sums SLUG=$slug SITEURL=$siteurl DBNAME=$db_name TABLES=$tables POSTS=$posts UPLOADS=$uploads_state CREATED=$stamp \
+SUMS=$sums SLUG=$slug SITEURL=$siteurl DBNAME=$db_name TABLES=$tables POSTS=$posts UPLOADS=$uploads_state UPLOADS_FILES=$uploads_files CREATED=$stamp \
   node -e '
     const files = process.env.SUMS.trim().split("\n").map((l) => { const [name, sha256, size] = l.split("\t"); return { name, sha256, size: Number(size) }; });
     const e = process.env;
-    process.stdout.write(JSON.stringify({ created: e.CREATED, slug: e.SLUG, siteurl: e.SITEURL, db_name: e.DBNAME, tables: e.TABLES === "null" ? null : Number(e.TABLES), posts: e.POSTS === "null" ? null : Number(e.POSTS), uploads: e.UPLOADS, files }, null, 2) + "\n");
+    process.stdout.write(JSON.stringify({ created: e.CREATED, slug: e.SLUG, siteurl: e.SITEURL, db_name: e.DBNAME, tables: e.TABLES === "null" ? null : Number(e.TABLES), posts: e.POSTS === "null" ? null : Number(e.POSTS), uploads: e.UPLOADS, uploads_files: e.UPLOADS_FILES === "null" ? null : Number(e.UPLOADS_FILES), files }, null, 2) + "\n");
   ' > "$dir/backup.json"
 chmod 600 "$dir"/*
 chmod 700 "$dir"

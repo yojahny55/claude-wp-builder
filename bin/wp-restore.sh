@@ -51,10 +51,11 @@ meta=$(META="$backup/backup.json" node -e '
   console.log(["D", m.db_name].join("\t"));
   console.log(["T", m.tables ?? ""].join("\t"));
   console.log(["P", m.posts ?? ""].join("\t"));
+  console.log(["U", Number.isInteger(m.uploads_files) ? m.uploads_files : ""].join("\t"));
 ') || refuse "backup.json is malformed or lists no db.sql"
 
 # --- 1. checksums, before anything else ---
-has_uploads=0 want_url="" want_db="" want_tables="" want_posts=""
+has_uploads=0 want_url="" want_db="" want_tables="" want_posts="" want_files=""
 while IFS=$'\t' read -r kind a b; do
   case "$kind" in
     F)
@@ -66,6 +67,7 @@ while IFS=$'\t' read -r kind a b; do
     D) want_db=$a ;;
     T) want_tables=$a ;;
     P) want_posts=$a ;;
+    U) want_files=$a ;;
   esac
 done <<< "$meta"
 
@@ -124,6 +126,12 @@ if [ "$has_uploads" = 1 ]; then
   ( umask 022; mkdir -p -- "$stage" ) || fail_after "cannot create $stage; the database was imported"
   ( umask 022; tar -xzpf "$backup/uploads.tar.gz" -C "$stage" ) || { rm -rf -- "$stage"; fail_after "uploads.tar.gz did not extract; the database was imported"; }
   [ -d "$stage/uploads" ] || { rm -rf -- "$stage"; fail_after "uploads.tar.gz has no uploads/ directory; the database was imported"; }
+  # transfer-verified: the extracted files are counted against backup.json before they replace
+  # anything (a backup older than the count has none, and is trusted on its sha256 alone).
+  if [ -n "$want_files" ]; then
+    got_files=$(find "$stage/uploads" -type f | wc -l)
+    [ "$got_files" = "$want_files" ] || { rm -rf -- "$stage"; fail_after "uploads.tar.gz extracted $got_files files, backup.json says $want_files; the current uploads were not touched, the database was imported"; }
+  fi
   if [ -d "$root/wp-content/uploads" ]; then
     old="$root/wp-content/uploads.pre-restore-$ts"
     mv -- "$root/wp-content/uploads" "$old" || { old=""; rm -rf -- "$stage"; fail_after "could not move the current uploads aside; the database was imported"; }

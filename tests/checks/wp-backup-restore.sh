@@ -60,6 +60,8 @@ done
 want=$(sha256sum "$B/db.sql"); want=${want%% *}
 node -e 'const m=JSON.parse(require("fs").readFileSync(process.argv[1]));const f=m.files.find(x=>x.name==="db.sql");if(f.sha256!==process.argv[2]||m.siteurl!=="https://site.test"||m.db_name!=="wpdb"||m.slug!=="demo-site"||m.tables!==3||m.posts!==7)process.exit(1)' "$B/backup.json" "$want" || fail "backup.json does not carry sha256/siteurl/db_name/slug/tables/posts"
 tar -tzf "$B/uploads.tar.gz" | grep >/dev/null -c 'uploads/2026/a.txt' || fail "uploads archive lacks the file"
+node -e 'const m=JSON.parse(require("fs").readFileSync(process.argv[1]));if(m.uploads_files!==1)process.exit(1)' "$B/backup.json" \
+  || fail "backup.json does not record the uploads file count the archive was verified against"
 
 # --- no --uploads: said so ---
 rc=$(code bash bin/wp-backup.sh "$SITE" --label t2)
@@ -140,6 +142,17 @@ rc=$(code bash bin/wp-restore.sh "$SITE" "$T/badtar" --yes)
 [ "$rc" = 1 ] && [ "$(imports)" = 1 ] || fail "corrupt uploads: exit $rc, imports $(imports)"
 grep >/dev/null -c 'to go back' "$T/err" || fail "corrupt uploads: no way back in the message"
 [ "$(cat "$SITE/wp-content/uploads/2026/a.txt")" = keep ] || fail "corrupt uploads archive disturbed the current uploads"
+
+# --- restore: the archive extracts fewer files than backup.json counted -> 1, uploads untouched ---
+\cp -rf "$B" "$T/short"
+node -e 'const fs=require("fs"),f=process.argv[1]+"/backup.json",m=JSON.parse(fs.readFileSync(f));m.uploads_files=2;fs.writeFileSync(f,JSON.stringify(m))' "$T/short"
+reset_imports; echo "keep" > "$SITE/wp-content/uploads/2026/a.txt"
+rc=$(code bash bin/wp-restore.sh "$SITE" "$T/short" --yes)
+[ "$rc" = 1 ] || fail "a short uploads extraction exited $rc, expected 1"
+grep >/dev/null -c 'extracted 1 files, backup.json says 2' "$T/err" || fail "a short extraction does not say what it counted: $(cat "$T/err")"
+[ "$(cat "$SITE/wp-content/uploads/2026/a.txt")" = keep ] || fail "a short extraction replaced the current uploads"
+[ -z "$(find "$SITE/wp-content" -maxdepth 1 -name '.uploads-restore-*')" ] || fail "a short extraction left its staging directory"
+\rm -rf "$SITE"/wp-content/uploads.pre-restore-*
 
 # --- restore: uploads swap fails (forced mv): rolled back, or the message says where the old ones are ---
 mkdir -p "$T/mvbin"

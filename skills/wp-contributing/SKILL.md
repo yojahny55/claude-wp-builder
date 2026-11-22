@@ -177,6 +177,14 @@ Read `references/flag-vocabulary.md` when adding a flag to a command: it fixes w
 - **PHP 7.4 floor** in `skills/wp-polylang/scripts/*.php`: no `match`, no union types. Those
   run inside a real WordPress through `wp eval-file`, and `pll-lib.php` bridges `eval-file`'s
   local `$args` into `$GLOBALS` — the scripts do not work without that require.
+- **A bulk transfer is verified by its result, not its exit code.** An exit code is the tool
+  saying it finished; it is not evidence. Measured: a mirror writing 7 of 38 objects and
+  exiting `0`, the same mirror "succeeding" against a stopped backend, and an interactive
+  `cp -i` alias skipping copies in silence. Every copy, sync, archive or extraction a shipped
+  script runs confirms what arrived (a file count, a hash, a `diff -r`, the file that has to be
+  there) and carries a `# transfer-verified: <how>` comment within six lines of the command.
+  In a session, copy with `command cp -f`, never through an alias.
+  `tests/checks/transfers-verified-by-result.sh` finds the transfers and fails on an unmarked one.
 - **Markup that lives in the database is invisible to every build step.** A CF7 form is a post
   row: Tailwind utility classes written into it compile only while some theme file happens to
   use the same ones. One hook class per element, declared in the theme CSS.

@@ -28,6 +28,8 @@ trap 'rm -rf "$tmp" "$old"' EXIT
 # mktemp creates 0700; the web server reads the plugin as another user.
 chmod 755 "$tmp"
 cp -R "$src/." "$tmp"
+# transfer-verified: the copy is compared with its source before it replaces the live plugin.
+diff -r "$src" "$tmp" >/dev/null || { echo "store-kit-sync: the copy in $tmp does not match $src; the site's plugin was not touched" >&2; exit 1; }
 # The old copy is renamed aside rather than deleted first, which keeps the gap short but does
 # not remove it: between moving $dest aside and moving the new copy in, the plugin is absent
 # for two renames, and a request in that window runs without the credential strip.
