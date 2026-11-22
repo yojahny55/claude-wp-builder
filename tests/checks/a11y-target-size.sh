@@ -32,8 +32,11 @@ grep -Fq 'equal negative margin' skills/wp-responsive/SKILL.md || fail "wp-respo
 # The generators of the three measured offenders.
 grep -Fq 'renders at least 24x24 at desktop and mobile' "$wp_header" || fail "/wp-header nav items have no 24x24 rule"
 grep -Fq 'renders at least 24x24 at desktop and mobile' commands/wp-footer.md || fail "/wp-footer social icons have no 24x24 rule"
-for f in agents/wp-audit-rankmath.md skills/wp-audit-seo-standards/references/breadcrumbs.md; do
+# The rankmath agent keeps no CSS: Step 12 hands it to a reference, which must carry the fix.
+for f in skills/wp-audit-seo-standards/references/rankmath-theme-breadcrumbs.md skills/wp-audit-seo-standards/references/breadcrumbs.md; do
   grep -Fq 'margin: -4px;' "$f" || fail "$f breadcrumb links do not reach 24x24"
 done
+grep -Fq 'references/rankmath-theme-breadcrumbs.md' agents/wp-audit-rankmath.md \
+  || fail "agents/wp-audit-rankmath.md Step 12 does not point at the breadcrumb reference that carries the 24x24 CSS"
 
 echo PASS

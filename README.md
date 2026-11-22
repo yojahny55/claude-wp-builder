@@ -521,7 +521,7 @@ commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. 
 | `wp-research` | Client-business researcher — finds the client's web presence and comparable competitors, writes `demo/RESEARCH.md` |
 | `wp-cinematic` | Cinematic scroll specialist — scene fields, template parts and scroll-engine wiring for the `__cinematic__` starter |
 | `wp-audit-security` · `wp-audit-seo` · `wp-audit-a11y` · `wp-audit-performance` · `wp-audit-practices` | The five `/wp-audit` judgment auditors — code scanning, structured data, WCAG 2.2 AA, Core Web Vitals, WordPress standards |
-| `wp-audit-aios` · `wp-audit-rankmath` | The two mechanical audit installers — All-in-One WP Security and Rank Math, configured via WP-CLI |
+| `wp-audit-aios` · `wp-audit-rankmath` | The two audit installers — All-in-One WP Security (haiku, mechanical WP-CLI config) and Rank Math (sonnet, because schema conflicts, title quality and the Polylang route are judgment) |
 | `wp-audit-geo` | GEO / AI-agent-readiness auditor — maps the ORA check catalog to GEO codes, parses the rendered DOM and runs the is-agentic scan |
 | `wp-audit-ux` | Usability auditor — forms, navigation, links followed rather than inferred, hover and active states, rendered line length per breakpoint, logo and typography consistency across pages |
 | `wp-agentic-surfaces` | Agentic-surfaces fixer — emits the theme's `inc/agentic.php` (llms.txt, ARD catalog, agent-skills index, markdown negotiation, Link headers, agent-friendly 404, JSON-LD breadth), seeds trust anchors and writes the robots AI policy |

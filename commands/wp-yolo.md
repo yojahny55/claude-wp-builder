@@ -173,9 +173,10 @@ without any flag on this command:
 
 - **opus** — planning/analysis whose output steers the whole build: `wp-normalize`, `wp-context`.
 - **sonnet** — code authoring and judgment audits: `wp-template`, `wp-css`, `wp-tailwind`,
-  `wp-cinematic`, `wp-audit-a11y|performance|practices|security|seo`.
+  `wp-cinematic`, `wp-audit-a11y|performance|practices|security|seo`,
+  `wp-audit-rankmath` (schema conflicts, title quality, JSON-LD merge and the Polylang route are judgment, not mechanical config).
 - **haiku** — mechanical generation and WP-CLI config: `wp-acf`, `wp-cf7`,
-  `wp-audit-aios`, `wp-audit-rankmath`. `wp-acf` and `wp-cf7` stay here because each ends
+  `wp-audit-aios`. `wp-acf` and `wp-cf7` stay here because each ends
   in a mandatory `php -l` + `wp-config.mjs validate` step; `wp-normalize` (opus) ends in a
   manifest parse, with Bash granted for that step alone.
 
