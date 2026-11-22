@@ -22,11 +22,16 @@ fail() { echo "FAIL: $*"; exit 1; }
 
 f=agents/wp-audit-rankmath.md
 [ -f "$f" ] || fail "$f is missing"
+# Step 8.5's script lives in a reference; the agent must point at it so the code is not orphaned.
+schema_ref=skills/wp-audit-seo-standards/references/rankmath-schema-validation.md
+[ -f "$schema_ref" ] || fail "$schema_ref is missing"
+grep -qF 'references/rankmath-schema-validation.md' "$f" || fail "$f Step 8.5 does not point at $schema_ref"
 
 # JSON-LD must be merged through Rank Math's own filter, never duplicated.
 grep -qF "add_filter( 'rank_math/json_ld'" "$f" || fail "$f must merge theme identity data through rank_math/json_ld"
 grep -qF 'array_merge( $extra, $entity )' "$f" || fail "$f json_ld merge must let Rank Math win on keys it already fills"
-grep -qF 'FIX: if it shares an @id with' "$f" || fail "$f Step 8.5's duplicate-schema check must point to the merge filter, not blind removal"
+grep -qF 'FIX: if it shares an @id with' "$schema_ref" || fail "$f Step 8.5's duplicate-schema check must point to the merge filter, not blind removal"
+grep -qF 'Step 4.7' "$f" || fail "$f Step 8.5 summary lost the merge-rule pointer"
 
 # knowledgegraph_type must be read, not assumed, when resolving the merge target's @id.
 grep -qF "knowledgegraph_type" "$f" || fail "$f must reference knowledgegraph_type"

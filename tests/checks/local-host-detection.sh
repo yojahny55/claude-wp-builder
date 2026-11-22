@@ -146,4 +146,15 @@ reset_for() {
 [ "$(reset_for seo)" = "./audit/home.chromium.json ./audit/lh-home.json ./audit/notes.txt ./other/keep.json " ] || fail "--only seo reset: $(reset_for seo)"
 [ "$(reset_for perf)" = "./audit/g2-home.json ./audit/home.chromium.json ./audit/notes.txt ./other/keep.json " ] || fail "--only perf reset: $(reset_for perf)"
 [ "$(reset_for a11y)" = "./audit/g2-home.json ./audit/lh-home.json ./audit/notes.txt ./other/keep.json " ] || fail "--only a11y reset: $(reset_for a11y)"
+# 5. A resolver that hangs cannot hang the gate: getent runs under `timeout 3` and a lookup
+#    that times out resolves to nothing, the not-local side.
+if command -v timeout >/dev/null 2>&1; then
+  mkdir -p "$tmp/slowbin"
+  printf '#!/bin/sh\nsleep 20\necho "127.0.0.1 STREAM $3"\n' > "$tmp/slowbin/getent"; chmod +x "$tmp/slowbin/getent"
+  start=$(date +%s)
+  got=$(unset WP_HOSTS_FILE; PATH="$tmp/slowbin:$PATH"; . bin/lib/local-host.sh; host_is_local hang.local.com && echo local || echo public)
+  took=$(( $(date +%s) - start ))
+  [ "$got" = public ] || fail "a hung resolver produced a local verdict"
+  [ "$took" -le 8 ] || fail "a hung resolver held host_is_local for ${took}s (timeout 3 missing?)"
+fi
 echo PASS

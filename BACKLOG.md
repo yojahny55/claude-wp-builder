@@ -37,6 +37,32 @@ that one happened.
 
 Issues discovered during testing that need to be resolved.
 
+- [ ] **Theme language survives a page cache** `OPEN`
+  The starters' `inc/i18n.php` ([tailwind](starter-theme/__tailwind__/inc/i18n.php),
+  [cinematic](starter-theme/__cinematic__/inc/i18n.php)) pick the language from `?lang`, a cookie and `Accept-Language`
+  without a `Vary` header or a cache bypass, so behind a page cache the first visitor's
+  language is served to everyone. `Accept-Language` also ignores q-values (`fr,es;q=0.9`
+  resolves to `en`), and the tailwind and cinematic starters resolve an unknown `?lang`
+  differently. Send `Vary` and `nocache_headers()` on language-negotiated responses, parse
+  q-values, and share one resolution rule.
+
+- [ ] **Language attribute on the front end only** `OPEN`
+  The `language_attributes` filter in both starters' `inc/i18n.php` ([tailwind](starter-theme/__tailwind__/inc/i18n.php), [cinematic](starter-theme/__cinematic__/inc/i18n.php)) also runs in wp-admin and on the login
+  screen, which then carry the visitor's `lang`. Return early there.
+
+- [ ] **Cinematic language switcher under Polylang** `OPEN`
+  The cinematic starter's switcher is a fixed `add_query_arg('lang', …)` with untranslated
+  labels; the Polylang variant exposes no equivalent and
+  [`nav.php`](starter-theme/__cinematic__/template-parts/cinematic/nav.php) has no Polylang branch, so
+  on a Polylang scaffold the switcher does nothing. Changes what the header shows: ships as a
+  proposal with before/after measurements, desktop and mobile, for approval.
+
+- [ ] **Tailwind starter strings follow the page language** `OPEN`
+  The tailwind starter ([header.php](starter-theme/__tailwind__/header.php) and friends) loads no text domain, so under the suffix model the skip link,
+  `aria-label`s and 404 copy follow the site locale, not the page's `?lang`, and under
+  Polylang there is no `.mo`. Route them through the starter's `_t()` helper or load the
+  domain. Changes visible text: ships as a proposal with measurements, for approval.
+
 - [x] **Fix anchor links in SCF URL fields** `DELIVERED`
   [wp-acf](agents/wp-acf.md) rule 19 sends hash-only and site-path links to a `text` field, keeps `url` for absolute addresses, and shows the seed call. [acf-anchor-links](tests/checks/acf-anchor-links.sh) guards it.
 
@@ -124,6 +150,17 @@ Improving how content is created, organized, and populated.
 
 Making the command flow smoother and more guided.
 
+- [ ] **`/wp-status`: what step comes next** `OPEN`
+  A new command, read-only, that reads `.wp-create.json`, the build ledger, the audit ledger and
+  `demo/FAILED.md` and says where the project stands and which command to run next. Today
+  that state is spread over four files and each command reports only its own part.
+
+- [ ] **`/wp-backup` and `/wp-restore`** `OPEN`
+  The database export is written three times, in [wp-update](commands/wp-update.md),
+  [wp-clone](commands/wp-clone.md) and [wp-anonymize](commands/wp-anonymize.md), and none of
+  them covers `wp-content/uploads`. One pair of commands owns the export, its private
+  permissions, the uploads archive and a verified restore, and the three commands call it.
+
 - [ ] **Section list command** `PARTIAL`
   **Gap:** [wp-init](commands/wp-init.md) parses the delimiters and prints the detected sections as part of its own run. There is no standalone command or flag that lists them without initializing a theme.
 
@@ -161,6 +198,12 @@ Making the command flow smoother and more guided.
 ## Agent Quality
 
 Improving the reliability and output quality of agents.
+
+- [ ] **Rank Math agent runs on sonnet** `OPEN`
+  [wp-audit-rankmath](agents/wp-audit-rankmath.md) runs on haiku but judges schema conflicts,
+  titles, JSON-LD graph merges and the Polylang path. Move it to sonnet, and move its long
+  heredocs to `skills/wp-audit-seo-standards/references/` so the agent file carries the steps,
+  not the payloads.
 
 - [x] **Audit and fix sites this plugin did not build** `DELIVERED`
   [`/wp-adopt`](commands/wp-adopt.md) writes a manifest for an existing install through
@@ -231,6 +274,18 @@ Improving the reliability and output quality of agents.
 ## Environment & Configuration
 
 Server setup, permissions, and WordPress configuration.
+
+- [ ] **One documented table of tool exit codes** `OPEN`
+  The same exit number means different things across `bin/*.mjs`: 2 is "no browser" in one
+  tool and "can migrate" in another; 3 is a crash, an incomplete run, an exhausted budget or
+  a missing key. Renumbering would break every command and check that reads them, so the
+  existing numbers stay: nothing owns a shared table yet; a new module under `bin/lib/` and the docs state what each exit
+  means per tool, and new tools follow one shared scheme.
+
+- [ ] **`impeccable` follows its latest release** `OPEN`
+  The craft commands, [composition-gate](bin/composition-gate.sh) and the detect check pin `impeccable@4`,
+  against the rule that external `npx` tools follow their latest release. Drop the pin, and
+  make the composition gate fail loudly on output it cannot parse instead of passing.
 
 - [ ] **WooCommerce stores (N01)** `PARTIAL`
   Piece 1 of 8, the foundation, is delivered: three store profiles, the `store` block,

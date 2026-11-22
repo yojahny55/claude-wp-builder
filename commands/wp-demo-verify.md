@@ -32,7 +32,7 @@ runs it as the craft gate before writing any markup.
 ## Step 2a: Detector
 
 ```bash
-npx -y impeccable@4 detect <target> --json > <dir>/.verify/impeccable.json
+npx -y impeccable@latest detect <target> --json > <dir>/.verify/impeccable.json
 ```
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-demo-verify-run/references/detector.md` now and follow
