@@ -120,6 +120,18 @@ rc=$(FAKE_IMPORT_FAIL=1 code bash bin/wp-restore.sh "$SITE" "$B" --yes)
 grep >/dev/null -c 'pre-restore' "$T/err" || fail "a failed import does not name the pre-restore copy"
 grep >/dev/null -c 'wp-restore.sh' "$T/err" || fail "a failed import does not give the command to go back"
 
+# The way-back line survives a wrapper that carries its own quotes and spaces: parsed by the
+# shell, its --wrapper argument is the wrapper, byte for byte.
+printf '#!/usr/bin/env bash\n[ "$1" = "--path=$QWP_EXPECT" ] || exit 9\nshift; exec wp "$@"\n' > "$T/bin/qwp"; chmod +x "$T/bin/qwp"
+QW="qwp --path='$T/x y'"
+rc=$(QWP_EXPECT="$T/x y" FAKE_IMPORT_FAIL=1 code bash bin/wp-restore.sh "$SITE" "$B" --yes --wrapper "$QW")
+[ "$rc" = 1 ] || fail "failed import with a quoted wrapper exited $rc, expected 1: $(cat "$T/err")"
+line=$(grep -o 'bash "${CLAUDE_PLUGIN_ROOT}/bin/wp-restore.sh".*' "$T/err" | sed -n 1p)
+[ -n "$line" ] || fail "no way-back command printed: $(cat "$T/err")"
+CLAUDE_PLUGIN_ROOT=/plugin; eval "set -- ${line#bash }"
+got=""; while [ $# -gt 0 ]; do [ "$1" = --wrapper ] && { got=$2; break; }; shift; done
+[ "$got" = "$QW" ] || fail "the printed way-back command does not round-trip the wrapper: got [$got] want [$QW]"
+
 # --- restore: corrupt uploads archive with a matching sha -> 1, database already imported ---
 \cp -rf "$B" "$T/badtar"; echo "not a tar" > "$T/badtar/uploads.tar.gz"
 node -e 'const fs=require("fs"),c=require("crypto"),f=process.argv[1]+"/backup.json",m=JSON.parse(fs.readFileSync(f));const u=m.files.find(x=>x.name==="uploads.tar.gz");u.sha256=c.createHash("sha256").update(fs.readFileSync(process.argv[1]+"/uploads.tar.gz")).digest("hex");fs.writeFileSync(f,JSON.stringify(m))' "$T/badtar"

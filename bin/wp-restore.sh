@@ -90,7 +90,7 @@ echo "  database      $cur_db <- db.sql (backup was taken from $want_db)" >&2
 echo "  uploads       $([ "$has_uploads" = 1 ] && echo 'replaced from uploads.tar.gz (old one kept until siteurl verifies)' || echo 'untouched (not in this backup)')" >&2
 echo "  pre-restore   a copy of the current state is taken first" >&2
 echo "  verification  option get siteurl must equal $want_url" >&2
-echo "  counts        $([ -n "$want_tables$want_posts" ] && echo "tables=${want_tables:-?} posts=${want_posts:-?} must match after the import" || echo 'not recorded in this backup: not verified')" >&2
+echo "  counts        $([ -n "$want_tables$want_posts" ] && echo "after the import: tables >= ${want_tables:-?} (the dump replaces only its own), posts = ${want_posts:-?}" || echo 'not recorded in this backup: not verified')" >&2
 [ "$db_match" = 1 ] || echo "  WARNING       DB_NAME differs: without --yes this is refused" >&2
 [ "$url_match" = 1 ] || echo "  WARNING       the site's siteurl ($cur_url) is not the backup's ($want_url): without --yes this is refused" >&2
 
@@ -107,7 +107,9 @@ echo "wp-restore: pre-restore copy at $pre" >&2
 
 # --- 4. import ---
 # Every failure from here on names the pre-restore copy and the exact command to go back.
-back="bash \"\${CLAUDE_PLUGIN_ROOT}/bin/wp-restore.sh\" '$root' '$pre' --yes --wrapper '$WP'"
+# printf %q: the wrapper often carries its own quotes (--path='...'), and this is the line a
+# user pastes at the worst moment, so it must survive the shell exactly.
+back="bash \"\${CLAUDE_PLUGIN_ROOT}/bin/wp-restore.sh\" $(printf '%q' "$root") $(printf '%q' "$pre") --yes --wrapper $(printf '%q' "$WP")"
 fail_after() { refuse "$1; the pre-restore copy is at $pre; to go back: $back${old:+ (the previous uploads are at $old)}"; }
 old=""
 q=$(printf '%q' "$backup/db.sql")
