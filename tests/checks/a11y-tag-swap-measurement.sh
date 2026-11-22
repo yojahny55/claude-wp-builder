@@ -14,7 +14,8 @@
 # skill, which is where the specificity rule lives. Neither is sufficient alone — the agent
 # without the measurement ships the regression, and the skill without the agent is never read at
 # the moment the tag changes.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 cd "$(dirname "$0")/../.." || { echo "FAIL: cannot cd to the repository root"; exit 1; }
 
 a11y=agents/wp-audit-a11y.md

@@ -78,7 +78,7 @@ jobs:
       github.event.issue.pull_request
       && github.event.comment.user.type != 'Bot'
       && startsWith(github.event.comment.body, '/autofix')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -207,7 +207,7 @@ jobs:
   fix:
     needs: gate
     if: needs.gate.outputs.count != '0'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # OpenCode gets 25 of these minutes. A job cut off here still gets a report: that is a
     # separate job.
     timeout-minutes: 35
@@ -304,7 +304,7 @@ jobs:
 
   filter:
     needs: [gate, fix]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -378,7 +378,7 @@ jobs:
   verify:
     needs: [gate, filter]
     if: needs.filter.outputs.changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -492,7 +492,7 @@ jobs:
   publish:
     needs: [gate, filter, verify]
     if: needs.verify.outputs.ok == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: write
@@ -557,7 +557,7 @@ jobs:
       always() && needs.gate.result != 'skipped'
       && needs.gate.outputs.refused != 'true'
       && (needs.gate.result != 'success' || needs.gate.outputs.count != '0')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read

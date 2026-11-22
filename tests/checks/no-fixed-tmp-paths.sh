@@ -11,8 +11,8 @@
 #   skills/wp-clone-run/references/verify.md                names a user-supplied dump path
 #   skills/wp-audit-seo-standards/references/woocommerce-seo.md   explains why /tmp is not used
 #   commands/wp-clone.md                                    example paths for user-supplied --sql/--uploads
-set -uo pipefail
-fail() { echo "FAIL: $1"; exit 1; }
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 cd "$(dirname "$0")/../.." || fail "cannot cd to the repository root"
 
 allowed='^(bin/wp-env-setup\.sh|skills/wp-create-run/references/env-templates\.md|skills/wp-environments/SKILL\.md|skills/wp-clone-run/references/verify\.md|skills/wp-audit-seo-standards/references/woocommerce-seo\.md|commands/wp-clone\.md):'

@@ -4,9 +4,10 @@
 # harness (tests/lib/stub-path.sh) and asserts what it would have done. SCRIPT overrides the
 # script under test, so the check can be pointed at an older copy to prove it fails there.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+. "$(dirname "$0")/../lib/assert.sh"
+require_tool python3
+cd "$(dirname "$0")/../.." || exit 1
 . tests/lib/stub-path.sh
-fail() { echo "FAIL: $*"; exit 1; }
 SCRIPT="${SCRIPT:-bin/wp-env-setup.sh}"
 stub_path_init; REAL_MKDIR=$(PATH="$STUB_ORIG_PATH" command -v mkdir)   # mkdir and rm are stubbed on PATH
 trap '"$STUB_REAL_RM" -rf "${W:-}"; stub_path_cleanup' EXIT
