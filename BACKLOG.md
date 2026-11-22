@@ -13,13 +13,11 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 
 **Priority:** Items within each section are ordered by priority (highest first).
 
-**Reconciled** on November 22, 2026 against `main` at v1.35.0. Every open and partial
-item was checked against what 1.35.0 shipped: the cinematic language switcher under Polylang
-and every front-end string of both starters reading the page language instead of gettext.
-Those two items, open as measured proposals at 1.34.0, are delivered; no other item moved.
-The store-setup integration failure is closed after two months without a recurrence in CI.
-The REST block in Apache is written down as a reference with its PHP half, and the Docker
-nginx config is now written by `/wp-create`; both are delivered. The full pass against
+**Reconciled** on November 22, 2026 against `main` at v1.36.0. Every open and partial
+item was checked against what 1.36.0 shipped: the REST block in Apache written down with its
+PHP half, the nginx config `/wp-create` now writes for Docker environments, and bulk
+transfers verified by their result with a check that holds new scripts to it. Those three
+items, open at 1.35.0 with no owner, are delivered; no other item moved. The full pass against
 the command, agent or script that would own each item was last made at v1.31.0. An item
 claiming to be open while the behavior ships reads as a project that does not know what it
 has built.

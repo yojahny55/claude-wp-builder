@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+## [1.36.0] - 2026-11-22
+
+### Added
+
+- **Blocking the REST API in Apache, written down and replayed.** `wp-environments` gains a
+  reference with a server-context `<If>` rule that refuses `/wp-json` and every key form PHP
+  reads as `rest_route` (percent-encoded letters, `.`, `+`, `[`, NUL, `index.php/` path info),
+  naming the site by its document root so an alias, the IP or a missing `Host` cannot route
+  around it, and leaving `admin-ajax.php` and Contact Form 7 open. It also
+  ships the PHP half the rule cannot replace, a `rest_pre_dispatch` mu-plugin, because
+  WordPress reads `rest_route` from a POST body Apache never sees. A new check loads the rule
+  exactly as printed into a throwaway Apache and replays the whole table.
+
+### Fixed
+
+- **Docker environments get their nginx config.** `docker-compose.yml.tpl` mounted a
+  `docker/nginx.conf` that nothing wrote, so Docker created a directory at the mount source and
+  the `webserver` container never started. `/wp-create` Step 4.3 now renders
+  `templates/docker/nginx.conf.tpl` there (PHP to the `wordpress:9000` FPM service, the native
+  deny list including `woocommerce_uploads`, `client_max_body_size`), backs it up on overwrite
+  like the other environment files, and a new check serves it from a real nginx.
+
+- **Bulk transfers are verified by their result, not their exit code.** `wp-backup.sh` counts
+  the files in the uploads archive against `wp-content/uploads` and records the count in
+  `backup.json`; `wp-restore.sh` checks it after extracting and leaves the current uploads alone
+  on a mismatch. `store-kit-sync.sh` and `audit-suite.sh` compare each copy with its source, and
+  `s3-setup.sh` refuses an unpacked archive without the plugin's main file. The rule is written
+  down in `wp-contributing`, and a new check fails on a shipped script that adds a bulk copy,
+  sync, archive or extraction without a `transfer-verified:` comment saying how it is confirmed.
+
 ## [1.35.0] - 2026-11-22
 
 ### Fixed
