@@ -60,6 +60,10 @@ SH
   chmod +x "$tmp/stub/$b"
 done
 printf '#!/usr/bin/env bash\nprintf "ARG:%%s\\n" "$@" >>"$ARGV_OUT"\n' >"$tmp/plugin/bin/store-kit-sync.sh"
+cat >"$tmp/plugin/bin/demo-sections.mjs" <<'JS'
+import { appendFileSync } from 'node:fs';
+appendFileSync(process.env.ARGV_OUT, process.argv.slice(2).map((a) => `ARG:${a}\n`).join(''));
+JS
 mkdir -p "$hostile"
 export WP="$tmp/stub/wp --allow-root"
 webuser="we'b \$(touch $tmp/PWNED3)"
@@ -81,6 +85,7 @@ while IFS= read -r line; do
     *"cd \"\$1\""*) grep -Fxq "PWD:$hostile" "$tmp/argv" || fail "cd did not land in the path: $line" ;;
     *setfacl*) grep -Fxq "ARG:g:$webuser:rwX" "$tmp/argv" && grep -Fxq "ARG:$hostile/wp-content" "$tmp/argv" \
          || fail "setfacl args not intact: $line" ;;
+    *demo-sections*) [ "$(cat "$tmp/argv")" = "ARG:$hostile" ] || fail "demo-sections path not intact: $line ($(cat "$tmp/argv"))" ;;
     *store-kit-sync*) grep -Fxq "ARG:$hostile/wp-content/plugins" "$tmp/argv" || fail "store-kit-sync path not intact: $line"
          case $line in *'$WP '*) grep -Fxq 'ARG:--allow-root' "$tmp/argv" || fail "\$WP flags were lost after store-kit-sync: $line" ;; esac ;;
     *'$WP '*) grep -Fxq 'ARG:--allow-root' "$tmp/argv" || fail "\$WP flags were lost: $line"

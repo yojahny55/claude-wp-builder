@@ -42,7 +42,8 @@ contract. The only executable code shipped is:
   `audit-coverage.mjs` (`/wp-audit` Step 6.8: how much of each agent's catalog the run executed),
   `audit-runbook.mjs` (renders the replay record of an audit's fixes as an ordered production
   runbook), `assets-fresh.mjs` (fails when a theme's critical CSS cuts no longer match the
-  sheet they were cut from) and `wp-status.mjs` (the read-only `/wp-status` report).
+  sheet they were cut from), `wp-status.mjs` (the read-only `/wp-status` report) and
+  `demo-sections.mjs` (the read-only `/wp-section --list`: a demo's sections and delimiter defects).
   `bin/lib/` holds what they share.
 - `skills/wp-polylang/scripts/*.php` and `skills/wp-woocommerce/scripts/*.php` — run inside a
   real WordPress via `wp eval-file`

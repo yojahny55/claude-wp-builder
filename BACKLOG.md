@@ -144,8 +144,8 @@ Making the command flow smoother and more guided.
 - [x] **`/wp-backup` and `/wp-restore`** `DELIVERED`
   [wp-backup](commands/wp-backup.md) runs [wp-backup.sh](bin/wp-backup.sh): a verified database dump (SQL header and footer, atomic rename) plus the uploads archive, in a private folder outside the WordPress root, with sha256 sums and counts in `backup.json`. [wp-restore](commands/wp-restore.md) runs [wp-restore.sh](bin/wp-restore.sh): verifies the sums, takes a pre-restore copy and fails unless site URL, table count and post count match afterwards. [wp-update](commands/wp-update.md), [wp-clone](commands/wp-clone.md) and [wp-anonymize](commands/wp-anonymize.md) call it instead of exporting by hand. [wp-backup-restore](tests/checks/wp-backup-restore.sh) guards it.
 
-- [ ] **Section list command** `PARTIAL`
-  **Gap:** [wp-init](commands/wp-init.md) parses the delimiters and prints the detected sections as part of its own run. There is no standalone command or flag that lists them without initializing a theme.
+- [x] **Section list command** `DELIVERED`
+  [`/wp-section --list`](commands/wp-section.md) runs [`bin/demo-sections.mjs`](bin/demo-sections.mjs), which lists every page's sections with the slug `/wp-section` takes, the line range and whether the theme already has the template part, without a manifest or theme. It also reports the delimiter defects that make the builders misread a demo (unclosed, stray or mismatched END, nested, duplicate, none at all) and exits 1 on any. [demo-sections](tests/checks/demo-sections.sh) runs it on a fixture.
 
 - [ ] **Screenshot generation with Playwright** `PARTIAL`
   **Gap:** [wp-finalize](commands/wp-finalize.md) checks that `screenshot.png` exists, and both starters ship one. Nothing regenerates it at 1200x900 from the built homepage, so a delivered theme's preview image is the starter's, not the site's.
