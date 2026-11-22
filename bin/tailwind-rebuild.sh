@@ -32,8 +32,9 @@ watcher_output() {
   local pid=$1 cwd out
   cwd=$(proc_cwd "$pid") || return 1
   [ -n "$cwd" ] || return 1
+  # awk reads all of its input (no early `exit`), so the pipe cannot SIGPIPE tr under pipefail.
   out=$(tr '\0' '\n' < "/proc/$pid/cmdline" 2>/dev/null \
-        | awk '$0 == "-o" || $0 == "--output" { getline; print; exit }') || return 1
+        | awk 'found { next } $0 == "-o" || $0 == "--output" { if ((getline v) > 0) print v; found = 1 }') || return 1
   [ -n "$out" ] || return 1
   case "$out" in
     /*) printf '%s\n' "$out" ;;
