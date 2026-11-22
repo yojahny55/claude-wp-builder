@@ -1,12 +1,20 @@
 ---
 description: One-shot section builder — generates ACF fields + template part + CSS for a section from the demo
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
-argument-hint: "<section-name> [screenshot-path] [--cf7] [--hybrid] [--no-hybrid] [--defer-promotion] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>] [--force-adopted]"
+argument-hint: "<section-name> | --list [--page <slug>] [screenshot-path] [--cf7] [--hybrid] [--no-hybrid] [--defer-promotion] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>] [--force-adopted]"
 ---
 
 # WP Section — One-Shot Section Builder
 
 Generate ACF field definitions, a template part, and CSS for a single section — all in one command. On `basic` it dispatches three agents in parallel; on `tailwind`, `wp-tailwind` runs after `wp-template` returns (see File ownership below).
+
+## List mode (`--list`)
+
+If `$ARGUMENTS` contains `--list`, build nothing: print the sections the demo declares and stop,
+before the adopted-site guard and every later step. This mode writes nothing, so it needs no
+manifest, no theme and no section name.
+
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-section-run/references/list-mode.md` now and follow it.
 
 ## Adopted-site guard
 
@@ -42,11 +50,12 @@ Parse `$ARGUMENTS`:
 
 > **Note:** `/wp-yolo` sets `--transcribe --block <block> --css <css-source>` on every `/wp-section` dispatch, plus `--defer-promotion` on the `tailwind` path (see `commands/wp-yolo.md` Steps 4 and 4.4). When invoked by hand without these flags, `/wp-section` keeps its original design-system authoring behavior.
 
-If no section name is provided, print an error:
+If no section name is provided (and `--list` is absent; see List mode above), print an error:
 ```
 Error: Section name is required.
 Usage: /wp-section <section-name> [screenshot-path] [--cf7] [--hybrid] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>]
 Example: /wp-section hero
+         /wp-section --list
          /wp-section services /path/to/screenshot.png
          /wp-section contact --cf7
          /wp-section about-story --page about --target page-about.php

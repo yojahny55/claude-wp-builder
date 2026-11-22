@@ -18,6 +18,7 @@ read it whole and follow it in order.
 
 | Step | File | Covers |
 |---|---|---|
+| List mode, `--list` | [references/list-mode.md](references/list-mode.md) | The read-only `bin/demo-sections.mjs` call, what it prints, and its exit codes |
 | 5, every section | [references/dispatch-rules.md](references/dispatch-rules.md) | The field naming convention, the GEO citability rubric, the `--transcribe` overlay, CSS agent routing by `Template:`, the one-writer-per-file ownership rule |
 | 5, not a contact section | [references/non-contact.md](references/non-contact.md) | Agents 1-3 (`wp-acf`, `wp-template`, `wp-css` or `wp-tailwind` in author mode), their order per template, the tabs/accordion/filter markup contract |
 | 5, contact section | [references/contact.md](references/contact.md) | The two-phase dispatch with `wp-cf7`, and where `wp-css` or `wp-tailwind` and `wp-template` sit in each phase |
