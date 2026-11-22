@@ -8,7 +8,7 @@
 # prod-gate's flock-less lock.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-fail() { echo "FAIL: $*"; exit 1; }
+. tests/lib/assert.sh
 has() { grep -Fq -- "$2" "$1" || fail "$1 lacks: $2"; }
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 
