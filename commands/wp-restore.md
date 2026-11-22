@@ -1,7 +1,7 @@
 ---
 description: Restore a WordPress site from a /wp-backup folder, verifying checksums first and the site URL after
 allowed-tools: Read, Bash, AskUserQuestion
-argument-hint: "<backup-dir> [/path/to/wordpress] [--dry-run] [--yes]"
+argument-hint: "<backup-dir> [/path/to/wordpress] [--dry-run] [--yes] [--wrapper <cmd>]"
 ---
 
 # WP Restore — put a backup back, and prove it
@@ -53,9 +53,14 @@ step is the only gate; do not skip it because the user "obviously" wants a resto
 bash "${CLAUDE_PLUGIN_ROOT}/bin/wp-restore.sh" '<project-path>' '<backup-dir>' --yes
 ```
 
+`--wrapper "<cmd>"` supplies the WP-CLI wrapper when the project has no manifest (the same flag
+as `/wp-backup`'s script; `/wp-update`'s rollback uses it). It is handed on to the pre-restore copy.
+
 (`--yes` is passed only after the answer above, or when the user gave it.) The script takes a
-`pre-restore` copy first, imports, swaps uploads, then checks `option get siteurl` against the
-backup. Exit `0` is restored and verified; exit `1` after the import means verification failed
+`pre-restore` copy first, imports, swaps uploads, then checks, against the backup, `option get siteurl`,
+the post count (exactly equal: `wp_posts` is replaced whole) and the table count (at least as many:
+the dump only drops and recreates its own tables, so a table the site gained since the backup, such
+as a plugin installed later, survives the import; fewer tables means the import did not complete). Exit `0` is restored and verified; exit `1` after the import means verification failed
 and the message names the pre-restore copy to go back to with `/wp-restore`; exit `2` means the
 site could not be measured.
 

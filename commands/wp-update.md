@@ -302,7 +302,9 @@ Print one block, then the rollback:
 - Verification: page table, new fatals (count), head-script result, suite result.
 - Backup path and its contents.
 - Commits made since the last reviewed point (git roots only).
-- **Rollback**: `$WP db import "$B/db.sql"`; then restore files by extracting the matching tar
+- **Rollback**: `bash "${CLAUDE_PLUGIN_ROOT}/bin/wp-restore.sh" '<wp-root>' "$B" --wrapper "$WP"`
+  (checks the sums, imports `db.sql`, verifies the site URL and counts; `--wrapper` because the
+  project may have no manifest); then restore files by extracting the matching tar
   over the root (`tar -xzf "$B/plugins.tar.gz" -C <wp-root>/wp-content` after removing the
   updated plugin directories; `tar -xzf "$B/core.tar.gz" -C <wp-root>` for core), then
   `$WP cache flush`. Database migrations in Step 4 are only undone by the db import, so restore

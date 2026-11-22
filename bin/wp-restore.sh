@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wp-restore.sh <project-path> <backup-dir> [--dry-run] [--yes]
+# wp-restore.sh <project-path> <backup-dir> [--dry-run] [--yes] [--wrapper "<cmd>"]
 #
 # Restores a folder written by wp-backup.sh, and proves it did.
 #   1. every file in backup.json is checked against its sha256 BEFORE anything is touched;
@@ -8,7 +8,10 @@
 #      when the backup carries them); if it fails nothing is touched;
 #   4. db import, then uploads swapped in with mv (the old directory stays as
 #      uploads.pre-restore-<ts> until siteurl verifies, then it is removed);
-#   5. `option get siteurl` must equal the backup's.
+#   5. `option get siteurl` must equal the backup's, the post count must be equal and the table
+#      count at least the backup's (see the comment at the check).
+# --wrapper "<cmd>" supplies the WP-CLI wrapper instead of reading it from the manifest (same
+# meaning as in wp-backup.sh), and is handed on to the pre-restore copy.
 # --dry-run prints the plan and exits 0 without changing anything.
 #
 # Exit: 0 restored and verified; 1 refused or verification failed (the message gives the
@@ -17,15 +20,16 @@ set -euo pipefail
 umask 077
 
 here=$(cd "$(dirname "$0")" && pwd)
-usage() { echo "usage: wp-restore.sh <project-path> <backup-dir> [--dry-run] [--yes]" >&2; exit 64; }
+usage() { echo "usage: wp-restore.sh <project-path> <backup-dir> [--dry-run] [--yes] [--wrapper \"<cmd>\"]" >&2; exit 64; }
 
 [ $# -ge 2 ] || usage
 project=$1; backup=$2; shift 2
-dry=0 yes=0
+dry=0 yes=0 wrapper=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) dry=1; shift ;;
     --yes) yes=1; shift ;;
+    --wrapper) [ $# -ge 2 ] || usage; wrapper=$2; shift 2 ;;
     *) usage ;;
   esac
 done
@@ -65,8 +69,10 @@ while IFS=$'\t' read -r kind a b; do
   esac
 done <<< "$meta"
 
-wrapper=$(node "$here/wp-config.mjs" get "$root" wp_cli.wrapper 2>/dev/null) || {
-  echo "wp-restore: cannot read wp_cli.wrapper from $root/.wp-create.json" >&2; exit 2; }
+if [ -z "$wrapper" ]; then
+  wrapper=$(node "$here/wp-config.mjs" get "$root" wp_cli.wrapper 2>/dev/null) || {
+    echo "wp-restore: cannot read wp_cli.wrapper from $root/.wp-create.json (pass --wrapper)" >&2; exit 2; }
+fi
 WP=$wrapper
 cd "$root"
 cur_db=$(bash -c "$WP config get DB_NAME" 2>/dev/null) || cur_db=""
@@ -101,8 +107,8 @@ echo "wp-restore: pre-restore copy at $pre" >&2
 
 # --- 4. import ---
 # Every failure from here on names the pre-restore copy and the exact command to go back.
-back="bash \"\${CLAUDE_PLUGIN_ROOT}/bin/wp-restore.sh\" '$root' '$pre' --yes"
-fail_after() { refuse "$1; the pre-restore copy is at $pre; to go back: $back${old:+ (previous uploads kept at $old)}"; }
+back="bash \"\${CLAUDE_PLUGIN_ROOT}/bin/wp-restore.sh\" '$root' '$pre' --yes --wrapper '$WP'"
+fail_after() { refuse "$1; the pre-restore copy is at $pre; to go back: $back${old:+ (the previous uploads are at $old)}"; }
 old=""
 q=$(printf '%q' "$backup/db.sql")
 bash -c "$WP db import $q" || fail_after "db import failed"
@@ -121,9 +127,16 @@ if [ "$has_uploads" = 1 ]; then
     mv -- "$root/wp-content/uploads" "$old" || { old=""; rm -rf -- "$stage"; fail_after "could not move the current uploads aside; the database was imported"; }
   fi
   if ! mv -- "$stage/uploads" "$root/wp-content/uploads"; then
-    if [ -n "$old" ]; then mv -- "$old" "$root/wp-content/uploads" || true; old=""; fi
     rm -rf -- "$stage"
-    fail_after "could not move the restored uploads into place (the previous uploads were put back); the database was imported"
+    if [ -z "$old" ]; then
+      fail_after "could not move the restored uploads into place; the database was imported"
+    elif mv -- "$old" "$root/wp-content/uploads"; then
+      old=""
+      fail_after "could not move the restored uploads into place (the previous uploads were put back); the database was imported"
+    else
+      # old stays set: fail_after must say where the previous uploads are, not claim they are back.
+      fail_after "could not move the restored uploads into place and could not put the previous uploads back: the previous uploads are at $old; the database was imported"
+    fi
   fi
   rmdir -- "$stage" || true
 fi
@@ -134,7 +147,10 @@ now_url=$(bash -c "$WP option get siteurl" 2>/dev/null) || now_url=""
 verified="siteurl $now_url"
 if [ -n "$want_tables" ]; then
   now_tables=$(bash -c "$WP db tables --all-tables-with-prefix" 2>/dev/null | wc -l) || now_tables=""
-  [ "$now_tables" = "$want_tables" ] || fail_after "after the import there are $now_tables tables, the backup has $want_tables"
+  # At least, not equal: the dump only drops and recreates its own tables, so a table the site
+  # gained since the backup (a plugin installed later) survives the import. Fewer tables than
+  # the backup means the import did not complete. Posts are exact: wp_posts is replaced whole.
+  [ "${now_tables:-0}" -ge "$want_tables" ] || fail_after "after the import there are $now_tables tables, the backup has $want_tables"
   verified="$verified, $now_tables tables"
 fi
 if [ -n "$want_posts" ]; then

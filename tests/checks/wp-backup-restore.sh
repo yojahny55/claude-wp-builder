@@ -129,15 +129,52 @@ rc=$(code bash bin/wp-restore.sh "$SITE" "$T/badtar" --yes)
 grep >/dev/null -c 'to go back' "$T/err" || fail "corrupt uploads: no way back in the message"
 [ "$(cat "$SITE/wp-content/uploads/2026/a.txt")" = keep ] || fail "corrupt uploads archive disturbed the current uploads"
 
+# --- restore: uploads swap fails (forced mv): rolled back, or the message says where the old ones are ---
+mkdir -p "$T/mvbin"
+cat > "$T/mvbin/mv" <<'FAKEMV'
+#!/usr/bin/env bash
+src=${2:-}
+case "$src" in
+  */.uploads-restore-*/uploads) exit 1 ;;
+  */uploads.pre-restore-*) [ "${FAKE_MV_BACK_FAIL:-0}" != 1 ] || exit 1 ;;
+esac
+exec /usr/bin/env -S PATH="$FAKE_REALPATH" mv "$@"
+FAKEMV
+chmod +x "$T/mvbin/mv"
+export FAKE_REALPATH=$PATH
+reset_imports; \rm -rf "$SITE"/wp-content/uploads.pre-restore-*; echo "mine" > "$SITE/wp-content/uploads/2026/a.txt"
+rc=$(PATH="$T/mvbin:$PATH" code bash bin/wp-restore.sh "$SITE" "$B" --yes)
+[ "$rc" = 1 ] || fail "forced mv failure exited $rc, expected 1"
+grep >/dev/null -c 'previous uploads were put back' "$T/err" || fail "rollback success not reported"
+[ "$(cat "$SITE/wp-content/uploads/2026/a.txt")" = mine ] || fail "the rollback did not return the previous uploads"
+reset_imports; \rm -rf "$SITE"/wp-content/uploads.pre-restore-*
+rc=$(FAKE_MV_BACK_FAIL=1 PATH="$T/mvbin:$PATH" code bash bin/wp-restore.sh "$SITE" "$B" --yes)
+[ "$rc" = 1 ] || fail "forced mv + failed rollback exited $rc, expected 1"
+grep >/dev/null -c 'the previous uploads are at .*uploads.pre-restore-' "$T/err" || fail "a failed rollback must say where the previous uploads are"
+if grep >/dev/null -c 'were put back' "$T/err"; then fail "a failed rollback claimed the uploads were put back"; fi
+[ -n "$(find "$SITE/wp-content" -maxdepth 1 -name 'uploads.pre-restore-*')" ] || fail "the previous uploads were lost after a failed rollback"
+\rm -rf "$SITE"/wp-content/uploads.pre-restore-*; mkdir -p "$SITE/wp-content/uploads/2026"
+
+# --- restore without a manifest but with --wrapper ---
+BARE2="$T/bare2"; mkdir -p "$BARE2/wp-content"
+reset_imports
+rc=$(code bash bin/wp-restore.sh "$BARE2" "$B" --wrapper wp --yes)
+[ "$rc" = 0 ] || fail "restore with --wrapper and no manifest exited $rc: $(cat "$T/err")"
+rc=$(code bash bin/wp-restore.sh "$BARE2" "$B" --yes)
+[ "$rc" = 2 ] || fail "restore with no manifest and no --wrapper exited $rc, expected 2"
+
 # --- restore: table or post counts differ after the import -> 1 ---
 reset_imports
 rc=$(FAKE_TABLES_AFTER=2 code bash bin/wp-restore.sh "$SITE" "$B" --yes)
 [ "$rc" = 1 ] || fail "table count mismatch exited $rc, expected 1"
-grep >/dev/null -c 'tables' "$T/err" || fail "table count failure not reported"
+grep >/dev/null -c 'after the import there are .* tables' "$T/err" || fail "table count failure not reported"
 reset_imports
 rc=$(FAKE_POSTS_AFTER=0 code bash bin/wp-restore.sh "$SITE" "$B" --yes)
 [ "$rc" = 1 ] || fail "post count mismatch exited $rc, expected 1"
-grep >/dev/null -c 'posts' "$T/err" || fail "post count failure not reported"
+grep >/dev/null -c 'after the import there are .* posts' "$T/err" || fail "post count failure not reported"
+reset_imports
+rc=$(FAKE_TABLES_AFTER=4 code bash bin/wp-restore.sh "$SITE" "$B" --yes)
+[ "$rc" = 0 ] || fail "a table gained since the backup (plugin installed later) must not fail the restore: exit $rc: $(cat "$T/err")"
 
 # --- restore ok: pre-restore copy, import, uploads swapped ---
 reset_imports
@@ -160,6 +197,7 @@ rc=$(code bash bin/wp-restore.sh "$SITE" "$B" --yes)
 reset_imports
 rc=$(FAKE_URL_AFTER=https://elsewhere.test code bash bin/wp-restore.sh "$SITE" "$B" --yes)
 [ "$rc" = 1 ] || fail "siteurl mismatch exited $rc, expected 1"
+grep >/dev/null -c 'after the import siteurl is' "$T/err" || fail "the post-import siteurl failure is not reported"
 grep >/dev/null -c 'pre-restore copy' "$T/err" || fail "the failure does not name the pre-restore copy"
 
 # --- the commands that export must call the shared script, never db export themselves ---
