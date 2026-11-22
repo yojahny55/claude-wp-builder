@@ -12,7 +12,9 @@ source tests/lib/assert.sh
 
 agent=agents/wp-template.md
 refdir=skills/wp-theme-standards/references
-limit=32768
+# The agent is 32 KB after the split; 34 KB leaves room for a rule or two and fails long
+# before a moved block is pasted back.
+limit=34816
 
 for ref in "$refdir"/template-*.md; do
   [ -e "$ref" ] || fail "no $refdir/template-*.md references found"
