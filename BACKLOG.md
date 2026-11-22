@@ -13,11 +13,12 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 
 **Priority:** Items within each section are ordered by priority (highest first).
 
-**Reconciled** on November 22, 2026 against `main` at v1.36.0. Every open and partial
-item was checked against what 1.36.0 shipped: the REST block in Apache written down with its
-PHP half, the nginx config `/wp-create` now writes for Docker environments, and bulk
-transfers verified by their result with a check that holds new scripts to it. Those three
-items, open at 1.35.0 with no owner, are delivered; no other item moved. The full pass against
+**Reconciled** on November 22, 2026 against `main` at v1.37.0. Every open and partial
+item was checked against what 1.37.0 shipped: `/wp-section --list` with its delimiter-defect
+report, a blog section running `/wp-page blog`, and the family lint the craft-family item named
+as its first gap. The section list and the blog auto-trigger are delivered; the craft-family
+item stays partial, its remaining gap a real client run that is the owner's call. No other item
+moved. The full pass against
 the command, agent or script that would own each item was last made at v1.31.0. An item
 claiming to be open while the behavior ships reads as a project that does not know what it
 has built.
