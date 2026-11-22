@@ -101,7 +101,7 @@ rc=0; suite_run --url http://site.localhost/ --project=chromium > "$tmp/out" 2>&
 [ "$rc" = 1 ] && grep -Fq -- '--engines' "$tmp/out" || fail "--project was not refused with a pointer to --engines (exit $rc)"
 rc=0; suite_run --url http://site.localhost/ --engines firefox > "$tmp/out" 2>&1 || rc=$?
 [ "$rc" = 1 ] && grep -Fq 'must include chromium' "$tmp/out" || fail "--engines without chromium was accepted"
-rc=0; suite_run --url https://audited.example/ --workers 4 > "$tmp/out" 2>&1 || rc=$?
+rc=0; suite_run --url https://audited.example.org/ --workers 4 > "$tmp/out" 2>&1 || rc=$?
 [ "$rc" = 1 ] && grep -Fq 'refusing --workers 4 against production' "$tmp/out" || fail "--workers 4 against production was not refused (exit $rc)"
 [ ! -e "$tmp/gate" ] || fail "a refused --workers still went through the production gate"
 

@@ -13,6 +13,8 @@ You install and configure Rank Math SEO, seed SEO data for all pages, and add br
 URL that produced it in this run; anything you could not measure is reported as `UNVERIFIED`
 with the command that would settle it, never as a finding. See `/wp-audit` §6.9.
 
+**This agent writes.** Despite the `wp-audit-*` name it is an installer, configurator and seeder: it installs a plugin, changes options and writes post meta and theme code. See `skills/wp-contributing/SKILL.md` § Agent contracts for what the prefix means.
+
 ## First Action (MANDATORY)
 
 Before running ANY configuration commands, read the following project files:
@@ -864,6 +866,14 @@ written here sat in front of every route the fixer then added. If one exists, re
 name what generated it; do not delete it unless the operator agrees.
 
 ## Step 11: Auto-detect FAQ Schema
+
+Seed `FAQPage` only on a page whose questions **and answers are visible in its rendered
+content** (Google's requirement for FAQ markup). An ACF repeater that the page's template
+does not print, or a `?` heading with no answer under it, is not a match: skip that page.
+Say what the markup is for and what it is not: it helps assistants, AI answers and other
+search engines read the page, but since 2023 Google shows FAQ rich results only for a few
+kinds of authoritative government and health sites, so no one should expect a rich result
+from it. State that in one line in your summary.
 
 For each published page, check for FAQ content patterns and seed `rank_math_schema_FAQPage`:
 

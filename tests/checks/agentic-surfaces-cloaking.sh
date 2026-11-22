@@ -14,11 +14,12 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-f=agents/wp-agentic-surfaces.md
-[ -f "$f" ] || fail "$f is missing"
+f=templates/agentic/agentic.php
+agent=agents/wp-agentic-surfaces.md
+[ -f "$f" ] && [ -f "$agent" ] || fail "$f or $agent is missing"
 
 # 1a. Named search indexers are matched and excluded inside wants_markdown().
-grep -qE 'function <prefix>_wants_markdown' "$f" || fail "$f must define <prefix>_wants_markdown()"
+grep -qE 'function __prefix___wants_markdown' "$f" || fail "$f must define __prefix___wants_markdown()"
 grep -qi 'googlebot' "$f" || fail "$f must exclude googlebot from the agent/markdown sniff"
 grep -qi 'bingbot' "$f" || fail "$f must exclude bingbot from the agent/markdown sniff"
 
@@ -35,12 +36,12 @@ grep -qE '\(\?!-extended\)' "$f" || fail "$f must not exclude Applebot-Extended 
 
 # Step 5's verification must actually probe as Googlebot and check the response, not just
 # fetch the plain route.
-grep -qF "'user-agent'" "$f" || fail "$f Step 5 must fetch a route while impersonating a named indexer"
-grep -qF 'CLOAKING' "$f" || fail "$f Step 5 must fail loudly if a named indexer gets markdown"
+grep -qF "'user-agent'" "$agent" || fail "$agent Step 5 must fetch a route while impersonating a named indexer"
+grep -qF 'CLOAKING' "$agent" || fail "$agent Step 5 must fail loudly if a named indexer gets markdown"
 
 # 2. Content-Signal is an HTTP header, not a robots.txt directive.
-grep -qE "define\\( *'<prefix>_CONTENT_SIGNAL'" "$f" || fail "$f must define a shared Content-Signal constant"
-grep -qE "header\\( *<prefix>_CONTENT_SIGNAL *\\)" "$f" || fail "$f must send Content-Signal as a response header"
+grep -qE "define\\( *'__prefix___CONTENT_SIGNAL'" "$f" || fail "$f must define a shared Content-Signal constant"
+grep -qE "header\\( *__prefix___CONTENT_SIGNAL *\\)" "$f" || fail "$f must send Content-Signal as a response header"
 
 # The robots_txt filter and the physical robots.txt writer (Step 4) must not emit a bare
 # Content-Signal directive — only a comment form is legal robots.txt.
@@ -48,12 +49,12 @@ grep -qE "header\\( *<prefix>_CONTENT_SIGNAL *\\)" "$f" || fail "$f must send Co
 # old defect was written as the two characters backslash-n inside a double-quoted string
 # (`$output .= "\nContent-Signal: ..."`). Matching a real newline would never fire.
 ! grep -qF '.= "\nContent-Signal: ai-train' "$f" || fail "$f must not append a bare Content-Signal line to robots.txt"
-! grep -qE "\\\$robots \\.= 'Content-Signal: [a-z=,; -]+' \\. PHP_EOL;\$" "$f" \
-  || fail "$f Step 4 must not write a bare Content-Signal directive into the physical robots.txt file"
-grep -qE '# Content-Signal' "$f" || fail "$f must document Content-Signal in robots.txt only as a comment"
+! grep -qE "\\\$robots \\.= 'Content-Signal: [a-z=,; -]+' \\. PHP_EOL;\$" "$agent" \
+  || fail "$agent Step 4 must not write a bare Content-Signal directive into the physical robots.txt file"
+grep -qE '# Content-Signal' "$agent" || fail "$agent must document Content-Signal in robots.txt only as a comment"
 
 # GEO-D02's own row must no longer claim Content-Signal comes from the robots_txt filter.
-! grep -qF '| GEO-D02 | robots AI crawler allowlist + `Content-Signal` — Step 4 and the `robots_txt` filter |' "$f" \
-  || fail "$f GEO-D02 row still attributes Content-Signal to the robots_txt filter"
+! grep -qF '| GEO-D02 | robots AI crawler allowlist + `Content-Signal` — Step 4 and the `robots_txt` filter |' "$agent" \
+  || fail "$agent GEO-D02 row still attributes Content-Signal to the robots_txt filter"
 
 echo PASS

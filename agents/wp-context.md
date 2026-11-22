@@ -12,6 +12,11 @@ project context the build pipeline can use: a prose `## Project Constraints` blo
 `.claude/CLAUDE.md` and a structured `docs/.scope-manifest.json`. Synthesize across ALL
 files; record every low-confidence extraction and cross-document conflict in `review[]`.
 
+**First Action exception.** This agent has no First Action block on purpose: it can run before
+`/wp-init`, when no `.claude/CLAUDE.md` exists yet, and it is the step that writes the
+`## Project Constraints` block into that file. Its input is the `docs/` folder named in the dispatch.
+If that folder is missing or empty, return `BLOCKED: <reason>` with `touched: none`.
+
 ## Extraction Procedure
 
 Work through every file in the `docs/` folder given to you. Per file type:

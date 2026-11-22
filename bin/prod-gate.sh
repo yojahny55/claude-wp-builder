@@ -44,7 +44,13 @@
 # Exit: the wrapped command's own exit code, or
 #   4 = the host is marked blocked; nothing was sent (stderr says why)
 #   5 = another command held the host longer than --wait; nothing was sent
-#   1 = usage error, or flock is unavailable (the gate refuses to run unserialized)
+#   1 = usage error, or the lock cannot be created in the state dir (stderr: cannot create lock)
+# Where flock is missing (macOS) the lock is a symlink to the holder's pid, with a
+# race-safe takeover of a dead holder's lock (see below).
+# The gate's 4 and 5 share the number space of the wrapped command: a wrapped command that
+# itself exits 4 or 5 (link-sweep's 4 is a block signal; a script of the caller's may use
+# either) is indistinguishable from the gate's own 4 or 5. Read stderr: the gate always
+# prints "BLOCKED:" or "busy for more than" before its 4 or 5, and sends nothing then.
 set -uo pipefail
 
 dir="${WP_AUDIT_GATE_DIR:-${TMPDIR:-/tmp}/wp-audit-gate}" delay=2 wait_max=300 mode=run force_prod=0
@@ -75,20 +81,10 @@ case "$wait_max" in ''|*[!0-9]*) echo "--wait must be an integer" >&2; exit 1 ;;
 . "$(dirname "$0")/lib/host-key.sh"
 host="$(host_key "$target")"
 [ -n "$host" ] || { echo "cannot read a host from: $target" >&2; exit 1; }
+# shellcheck source=lib/local-host.sh
+. "$(dirname "$0")/lib/local-host.sh"
 local_host=0
-case "$host" in
-  localhost|*.localhost|*.local|*.local.com|*.test|\[::1\]|0.0.0.0) local_host=1 ;;
-  # Private ranges apply to a dotted IPv4 address only, by octet: a prefix glob would also
-  # pass `10.example.com` or `172.160.0.1` through ungated.
-  *[!0-9.]*) ;;
-  *.*.*.*)
-    IFS=. read -r o1 o2 _ <<< "$host"
-    case "$o1" in
-      10|127) local_host=1 ;;
-      192) [ "$o2" = 168 ] && local_host=1 ;;
-      172) [ "${o2:-0}" -ge 16 ] && [ "${o2:-0}" -le 31 ] && local_host=1 ;;
-    esac ;;
-esac
+host_is_local "$host" && local_host=1
 
 [ "$force_prod" -eq 1 ] && local_host=0
 mkdir -p "$dir" || { echo "cannot create $dir" >&2; exit 1; }
@@ -114,12 +110,60 @@ esac
 # A development host keeps its old behaviour: no lock, no delay.
 if [ "$local_host" -eq 1 ]; then exec "$@"; fi
 
-command -v flock >/dev/null 2>&1 \
-  || { echo "prod-gate: flock is unavailable; refusing to send to a production host unserialized" >&2; exit 1; }
-exec 9>"$lock"
-if ! flock -w "$wait_max" 9; then
-  echo "prod-gate: $host busy for more than ${wait_max}s (another agent's command). Nothing sent; call again later." >&2
-  exit 5
+# Serialize with flock where it exists. macOS ships none (and its mv has no -T), so there the
+# lock is a symlink, `$lock.l` -> owner pid: `ln -s` creates it atomically with the pid already
+# in it, so no moment exists with a lock and no owner. A dead owner (`ps -p` fails; unlike
+# `kill -0` it does not fail on EPERM for another user's process) is cleared under a second
+# mutex, the symlink `$lock.takeover`: inside it the owner is read AGAIN and the lock is removed
+# only if it is still that same dead pid, so a waiter holding a stale read can never remove a
+# lock somebody else took meanwhile. A takeover mutex is a symlink to its holder's pid and is cleared only when that pid is dead. Limit:
+# a reused pid reads as alive, so the gate then waits and exits 5 (safe side, nothing sent).
+# Second limit: reading a dead takeover pid and removing it are two steps, so two waiters that
+# both find dead takeover holders in the same instant can, in theory, each believe it holds the
+# mutex, and then one of them can remove a live lock another waiter took in between. Both
+# need dead takeover holders in the same instant; the gate accepts it as it accepts pid reuse.
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$lock"
+  if ! flock -w "$wait_max" 9; then
+    echo "prod-gate: $host busy for more than ${wait_max}s (another agent's command). Nothing sent; call again later." >&2
+    exit 5
+  fi
+else
+  lockl="$lock.l" take="$lock.takeover" waited=0
+  until ln -s "$$" "$lockl" 2>/dev/null; do
+    # `ln -s` also fails for reasons other than "held": a name past NAME_MAX, a plain file in
+    # the way, a read-only state dir. Without a symlink there is no holder to wait for, and
+    # waiting would spin: retry once (the holder may just have left), then give up.
+    if [ ! -L "$lockl" ]; then
+      ln -s "$$" "$lockl" 2>/dev/null && break
+      [ -L "$lockl" ] || { echo "prod-gate: cannot create lock $lockl" >&2; exit 1; }
+    fi
+    owner="$(readlink "$lockl" 2>/dev/null || true)"
+    if [ -n "$owner" ] && ! ps -p "$owner" >/dev/null 2>&1; then
+      if ln -s "$$" "$take" 2>/dev/null; then
+        [ "$(readlink "$lockl" 2>/dev/null || true)" = "$owner" ] && rm -f "$lockl"
+        [ "$(readlink "$take" 2>/dev/null || true)" = "$$" ] && rm -f "$take"
+        # Retry at once only if the dead lock is really gone; one that could not be removed
+        # (sticky dir, another user's file) is waited out like a live one, never spun on.
+        [ "$(readlink "$lockl" 2>/dev/null || true)" = "$owner" ] || continue
+      else
+        # The takeover mutex is a symlink to its holder's pid too; one whose holder is dead
+        # is cleared (re-reading the pid first), never one cleared by age.
+        t="$(readlink "$take" 2>/dev/null || true)"
+        if [ -n "$t" ] && ! ps -p "$t" >/dev/null 2>&1 && [ "$(readlink "$take" 2>/dev/null || true)" = "$t" ]; then
+          rm -f "$take"
+          [ "$(readlink "$take" 2>/dev/null || true)" = "$t" ] || continue
+        fi
+      fi
+    fi
+    if [ "$waited" -ge "$wait_max" ]; then
+      echo "prod-gate: $host busy for more than ${wait_max}s (another agent's command). Nothing sent; call again later." >&2
+      exit 5
+    fi
+    sleep 1; waited=$((waited + 1))
+  done
+  # Release only a lock that is still ours.
+  trap '[ "$(readlink "$lockl" 2>/dev/null || true)" = "$$" ] && rm -f "$lockl"; true' EXIT
 fi
 if [ -f "$blocked" ]; then
   echo "BLOCKED: $host -- $(cat "$blocked"). Nothing sent; report this check UNMEASURED." >&2

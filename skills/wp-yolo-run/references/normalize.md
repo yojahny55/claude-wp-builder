@@ -117,9 +117,15 @@ the client's own material, never from a category.
 **The browser gate, here, before anything is built.** The gate is not `/wp-demo`'s
 alone — a craft `/wp-yolo` run never calls `/wp-demo`, so it must run the probe
 itself, in these same terms. Run
-`node "${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs" --probe`. On exit 2, run
-`npm i -D playwright-core` in the project root and probe again (say first that this
-writes a `package.json` and a `node_modules/` into the WordPress project root).
+`node "${CLAUDE_PLUGIN_ROOT}/bin/demo-verify.mjs" --probe`. On exit 2, look for a `playwright-core` already on the machine
+(`$(npm root -g)/playwright-core` or `$(npm root -g)/@playwright/test/node_modules/playwright-core`),
+set `PLAYWRIGHT_CORE` to it and probe again. `PLAYWRIGHT_CORE` does not persist between Bash
+calls: export it in the same command of every launch of `demo-verify.mjs` and
+`composition-preview.mjs` for the rest of this run (`bin/lib/browsers.mjs` reads it too). Only
+when none exists, ask the user (`AskUserQuestion`) whether to
+run `npm i -D playwright-core` in the project root (say first that this writes a
+`package.json` and a `node_modules/` into the WordPress project root); without an explicit yes,
+do not install.
 After the retry, **only exit 0 continues** — exit 2 means print what the probe said
 is missing (`playwright-core` or Chrome; the fix is `WP_BROWSER_CHROMIUM` pointing at a Chrome or
 Chromium already on the machine, never a browser download), and any other exit code (127 for a missing `node`, or a crash) means print it

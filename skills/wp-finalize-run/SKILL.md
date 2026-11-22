@@ -9,7 +9,7 @@ user-invocable: false
 `commands/wp-finalize.md` owns the order of the run, the short checks and the report format. Each
 check that needs more than a few paragraphs keeps its heading and entry condition there and sends
 the run to one file here. The command reads the file at that check, not before, so a project
-without `.wp-create.json` or a demo never pays for the WP-CLI validation or the parity layers.
+without a demo never pays for the WP-CLI validation or the parity layers.
 
 These files are the check itself, not background reading. When the command says to read one,
 read it whole and follow it in order.
@@ -20,7 +20,7 @@ read it whole and follow it in order.
 |---|---|---|
 | Check 2, Bilingual Coverage | [references/bilingual.md](references/bilingual.md) | The per-strategy i18n checks: Polylang and field-suffix coverage, untranslated strings, language-switcher presence |
 | Check 4, Theme Structure | [references/theme-structure.md](references/theme-structure.md) | Required theme files and headers, menu locations per strategy, favicon, login branding |
-| Check 7, WP-CLI Runtime Validation | [references/wp-cli-runtime.md](references/wp-cli-runtime.md) | Runtime checks against the live site when `.wp-create.json` exists: pages, menus, options, authors |
+| Check 7, WP-CLI Runtime Validation | [references/wp-cli-runtime.md](references/wp-cli-runtime.md) | Runtime checks against the live site: pages, menus, options, authors |
 | Check 8, GEO and agent-readiness | [references/geo.md](references/geo.md) | The report-only GEO and agent-readiness scan |
 | Demo-parity gate, Layer 1 | [references/parity-static.md](references/parity-static.md) | Static comparison of the demo against the theme: tokens, fonts, backgrounds, collisions |
 | Demo-parity gate, Layer 2 | [references/parity-wpcli.md](references/parity-wpcli.md) | The WP-CLI layer when WordPress is reachable: content and media parity |
