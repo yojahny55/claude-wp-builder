@@ -87,6 +87,9 @@ bash "$W/bin/design-md-index.sh" >/dev/null 2>&1 || fail "design-md-index failed
 printf 'gone finance\n' >> "$X/INDEX.overrides"
 if bash "$W/bin/design-md-index.sh" >/dev/null 2>&1; then fail "an override for a missing domain was accepted"; fi
 cmp -s "$X/INDEX.md" "$T/index.before" || fail "INDEX.md changed on a refused overrides file"
+# Same refusal when that line is the last one and has no trailing newline.
+printf 'carco agency\ngone finance' > "$X/INDEX.overrides"
+if bash "$W/bin/design-md-index.sh" >/dev/null 2>&1; then fail "an unterminated last override line escaped validation"; fi
 rm -f "$X/INDEX.overrides"
 # The versioned index is exactly what the script produces from its source.
 G="$T/real"; mkdir -p "$G/bin" "$G/skills/wp-demo-craft/references"

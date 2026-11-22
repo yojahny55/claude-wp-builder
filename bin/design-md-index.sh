@@ -25,7 +25,7 @@ trap 'rm -f "$tmp"' EXIT
 
 ov="$d/INDEX.overrides"
 if [ -f "$ov" ]; then
-  while read -r odom _rest; do
+  while read -r odom _rest || [ -n "${odom:-}" ]; do
     case "$odom" in ''|'#'*) continue ;; esac
     [ -f "$d/$odom/DESIGN.md" ] || { echo "error: $ov names '$odom', which has no DESIGN.md" >&2; exit 1; }
   done < "$ov"
