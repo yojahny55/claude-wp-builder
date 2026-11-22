@@ -37,6 +37,14 @@ const exe = {
 const block = process.env.WP_AUDIT_BLOCK_THIRD_PARTY === '1'
   ? thirdParty.allowlistFor(process.env.BASE_URL, process.env.WP_AUDIT_ALLOW_HOSTS)
   : null;
+// No audited host means the allowlist is loopback only, so every other host is blocked,
+// including the site itself if it is not on loopback. That is deliberate: the block exists so a
+// run never hits production properties, and a missing BASE_URL must not turn it into "allow
+// everything". It is said once, so a blocked page is not a silent mystery. bin/audit-suite.sh
+// always exports BASE_URL, so this only fires when the preload is used by hand.
+if (block && !thirdParty.hostOf(process.env.BASE_URL)) {
+  process.stderr.write('wp-audit: WP_AUDIT_BLOCK_THIRD_PARTY=1 but BASE_URL is not set to a valid URL; the allowlist is loopback only and every other host is blocked (set BASE_URL or WP_AUDIT_ALLOW_HOSTS)\n');
+}
 const settleRaw = Number.parseInt(process.env.WP_AUDIT_SETTLE_MS || '', 10);
 const settleMs = Number.isFinite(settleRaw) && settleRaw >= 0 ? settleRaw : 0;
 
