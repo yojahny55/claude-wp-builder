@@ -120,7 +120,8 @@ if [ "$local_host" -eq 1 ]; then exec "$@"; fi
 # a reused pid reads as alive, so the gate then waits and exits 5 (safe side, nothing sent).
 # Second limit: reading a dead takeover pid and removing it are two steps, so two waiters that
 # both find dead takeover holders in the same instant can, in theory, each believe it holds the
-# mutex; the lock itself is still removed only after its owner is re-read as the dead pid.
+# mutex, and then one of them can remove a live lock another waiter took in between. Both
+# need dead takeover holders in the same instant; the gate accepts it as it accepts pid reuse.
 if command -v flock >/dev/null 2>&1; then
   exec 9>"$lock"
   if ! flock -w "$wait_max" 9; then
