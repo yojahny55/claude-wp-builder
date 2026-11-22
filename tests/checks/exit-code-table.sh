@@ -113,7 +113,7 @@ fi
 # Self-test 3: a declared code the tool no longer returns must fail (the table would lie).
 sed -i 's/process.exitCode = 4;/process.exitCode = 1;/' "$tmp/copy/bin/link-sweep.mjs"
 sed -i '/process.argv.includes("--zz")/d' "$tmp/copy/bin/css-contour-lint.mjs"
-if ROOT="$tmp/copy" node "$tmp/scan.mjs" >/dev/null 2>&1; then
-  fail "self-test: link-sweep no longer returning its declared 4 was not caught"
-fi
+out3=$(ROOT="$tmp/copy" node "$tmp/scan.mjs" 2>&1) && fail "self-test: link-sweep no longer returning its declared 4 was not caught"
+[ "$(grep -Fc 'link-sweep.mjs: TOOLS declares 4, but no exit site returns it' <<<"$out3")" -gt 0 ] \
+  || fail "self-test 3 failed for another reason than the stale declared 4: $out3"
 echo PASS
