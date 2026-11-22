@@ -64,6 +64,13 @@ jobs:
           node --version
           php --version | head -1
 
+      # docker-nginx-config.sh serves the Docker nginx template from the image the compose
+      # file names and never pulls it itself (a check must not reach the network on a
+      # developer's machine). The runner has Docker; the image is fetched here, once, so the
+      # check runs instead of failing under CHECKS_REQUIRE_TOOLS.
+      - name: Fetch the nginx image the Docker template runs in
+        run: docker pull --quiet nginx:alpine
+
       # tests/run.sh runs every check in parallel and reports; its header explains why a
       # skipped check is counted apart from a passing one and why it never stops at the first red.
       - name: Run every contract check
