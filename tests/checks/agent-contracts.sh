@@ -28,8 +28,9 @@ for n in wp-audit-a11y wp-audit-seo wp-audit-geo wp-audit-performance wp-audit-p
          wp-audit-security wp-audit-ux; do
   inc "agents/$n.md" '"blocked": "<reason>"'
 done
-# The parent consumes the blocked key: one re-dispatch, then the reason is named in the report.
-inc skills/wp-audit-run/references/dispatch.md 'the report names that agent and its `blocked` reason'
+# The parent consumes the blocked key: one re-dispatch, still INCOMPLETE, reason named in the report.
+inc skills/wp-audit-run/references/dispatch.md 'A blocked reason is not an allowed blocker'
+inc skills/wp-audit-run/references/dispatch.md 'writes the agent and its `blocked` reason into the Step 6.8 point 5 summary'
 inc agents/wp-tailwind.md 'Demo Conversion Mode'
 inc agents/wp-tailwind.md 'Its absence is not a'
 
