@@ -257,3 +257,7 @@ production:
 The EnvSync recipes (pull by scope, push only what is missing, volatile tables, the token)
 are in [references/sync-environments.md](references/sync-environments.md). The skill that
 drives the tool is `wp-envsync`; these are the rules that sit around it.
+
+Closing the REST API to anonymous visitors on an Apache host (the server-context `<If>` rule
+that wins whichever vhost answers, the PHP half it needs, and what each one breaks) is in
+[references/apache-rest-block.md](references/apache-rest-block.md).

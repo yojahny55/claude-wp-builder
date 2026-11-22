@@ -18,7 +18,8 @@ item was checked against what 1.35.0 shipped: the cinematic language switcher un
 and every front-end string of both starters reading the page language instead of gettext.
 Those two items, open as measured proposals at 1.34.0, are delivered; no other item moved.
 The store-setup integration failure is closed after two months without a recurrence in CI.
-The Docker nginx config still has no owner, and the REST block is still not written down. The full pass against
+The Docker nginx config still has no owner. The REST block in Apache is written down as a
+reference with its PHP half, and delivered. The full pass against
 the command, agent or script that would own each item was last made at v1.31.0. An item
 claiming to be open while the behavior ships reads as a project that does not know what it
 has built.
@@ -335,8 +336,8 @@ Longer-term features and exploration areas.
 - [ ] **WebP migration of an existing library** `PARTIAL`
   The other half of the item above, and the larger one: convert a library already on disk, update `wp_postmeta` sizes, replace URLs in content and Elementor data, verify coverage, and delete the originals only after the coverage check passes. A ten-step procedure with backups at each step exists and has been run end to end on a real site, the written procedure now ships as [png-to-webp-conversion](skills/wp-robin/references/png-to-webp-conversion.md) (old-to-new file map, serialization-safe database replace, 301 rules). **Gap:** it has no command or script, so nothing runs it for you.
 
-- [ ] **Blocking the REST API in Apache** `OPEN`
-  A `<If>` block matching `HTTP_HOST` plus `REQUEST_URI ^/wp-json` and `rest_route=` in the query string, which is evaluated after `<Directory>` and therefore wins whichever vhost serves the request — the case that defeats a per-vhost rule on a host with duplicated includes. Leaves `admin-ajax.php` alone. Belongs in [wp-environments](skills/wp-environments/SKILL.md) as a reference.
+- [x] **Blocking the REST API in Apache** `DELIVERED`
+  [apache-rest-block](skills/wp-environments/references/apache-rest-block.md), linked from [wp-environments](skills/wp-environments/SKILL.md) § 8: a server-context `<If>` that wins whichever vhost answers, matching `/wp-json` (also behind `index.php/` and other `.php` path info) and every key form PHP reads as `rest_route` (percent-encoded letters, `.`, `+`, `[`, NUL), leaving `admin-ajax.php` and Contact Form 7 open. Because WordPress also reads `rest_route` from a POST body Apache never sees, it ships with a `rest_pre_dispatch` mu-plugin and is documented as the outer layer, not the boundary. [apache-rest-block](tests/checks/apache-rest-block.sh) replays the whole table against a throwaway Apache.
 
 - [ ] **Verify bulk transfers by result, not by exit code** `OPEN`
   Three separate measurements in one project of a tool reporting success without doing the work: a mirror writing 7 of 38 objects and exiting `0`, the same mirror "succeeding" against a stopped backend, and an interactive `cp` alias silently skipping copies that invalidated an A/B measurement. [skills/wp-s3/scripts/lib-mirror.sh](skills/wp-s3/scripts/lib-mirror.sh) answers it for one tool. The general form — every mass copy, sync or import confirms its result by count or hash — is not written down anywhere, and no check enforces it on new scripts.
