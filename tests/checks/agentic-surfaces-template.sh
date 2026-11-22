@@ -30,8 +30,8 @@ inline=$(awk '/^```php/{f=1;next} /^```/{f=0} f' "$agent" | wc -l)
 [ "$inline" -le 40 ] || fail "$agent carries $inline lines of fenced PHP (max 40); put it in $tpl"
 
 # Tokens: exactly the ones the template uses are the ones the agent documents.
-in_tpl=$(grep -oE '__[A-Za-z]+__' "$tpl" | sort -u | tr '\n' ' ')
-doc=$(sed -n '/^| Token | Replace with |/,/^$/p' "$agent" | grep -oE '`__[A-Za-z]+__`' | tr -d '`' | sort -u | tr '\n' ' ')
+in_tpl=$(grep -oE '__[A-Za-z][A-Za-z_]*[A-Za-z]__' "$tpl" | sort -u | tr '\n' ' ')
+doc=$(sed -n '/^| Token | Replace with |/,/^$/p' "$agent" | grep -oE '`__[A-Za-z][A-Za-z_]*[A-Za-z]__`' | tr -d '`' | sort -u | tr '\n' ' ')
 [ -n "$in_tpl" ] || fail "$tpl uses no tokens"
 [ "$in_tpl" = "$doc" ] || fail "tokens differ: template uses [$in_tpl], agent documents [$doc]"
 
