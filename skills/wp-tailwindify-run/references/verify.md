@@ -49,7 +49,7 @@ path:
    and adds no replacement (see Step 5), so unless the demo carries its own Tailwind
    runtime the converted page is bare HTML and there is nothing to compare — the gate
    detects that shape and says so rather than reporting every element as a delta. On the
-   `/wp-yolo` path, run it once after Step 2.6 has converted every page. A delta the gate
+   `/wp-yolo` path, run it once after `/wp-yolo` Step 2.6 has converted every page. A delta the gate
    reports is not automatically a defect: `oklab()` for a colour with an opacity modifier
    and `rgba()` for the same colour are the same pixels, and the gate already resolves
    both through a canvas, but a `visually-hidden` heading that no one can see is still

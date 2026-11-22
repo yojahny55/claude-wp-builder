@@ -465,6 +465,19 @@ scrub and refresh semantics this kit depends on. They are not required, and
 nothing in the demo-authoring path should reference them: a demo author writes
 `data-motion` attributes, never GSAP.
 
+**Where GSAP comes from, and its license.** Nothing is vendored in this repo. The
+`__tailwind__` starter declares `gsap` (`^3.13.0`) in its `package.json` and imports
+`gsap` and `gsap/ScrollTrigger` in `assets/js/src/index.js`, so the theme build bundles them
+from npm. The `__cinematic__` starter enqueues `gsap@3.12.5` and ScrollTrigger from jsDelivr
+(`inc/cinematic-loader.php`), and `bin/composition-preview.mjs` loads 3.13.0 from cdnjs for
+previews only. To update the bundled copy, raise the `gsap` range in the theme's
+`package.json` and rebuild; to update the CDN copy, change the pinned version in
+`cinematic-loader.php`. GSAP's terms changed when Webflow took it over: the core and its
+plugins are now offered free of charge under GSAP's own license rather than the old
+paid-plugin tiers. That is not verified from a file in this repo, so read the current
+terms at https://gsap.com/licensing before shipping a build to a client, and record the
+license version in the project's notes.
+
 ### `pin`
 
 Minimum useful span is 1.2, because a pinned section's travel is

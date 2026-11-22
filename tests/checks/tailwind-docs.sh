@@ -34,11 +34,13 @@ grep -Eqi 'basic|plain.css|non.tailwind|without tailwind' <<<"$row" \
 # NOTE: a bare `grep -qi tailwind CHANGELOG.md` gates NOTHING — the file already
 # carried tailwind mentions from 1.7.0 and earlier before this work started.
 # Assert the new entry's own contents, inside its own line range.
-new_head=$(grep -n -m1 '^## \[' CHANGELOG.md | cut -d: -f1 || true)
+cl=$(mktemp); trap 'rm -f "$cl"' EXIT
+cat CHANGELOG.md docs/changelog-archive.md > "$cl"   # 1.7.0 and 1.8.0 live in the archive
+new_head=$(grep -n -m1 '^## \[' "$cl" | cut -d: -f1 || true)
 [ -n "$new_head" ] || { echo "FAIL: CHANGELOG has no version headings"; exit 1; }
-grep -q '^## \[1\.7\.0\]' CHANGELOG.md \
+grep -q '^## \[1\.7\.0\]' "$cl" \
   || { echo "FAIL: the 1.7.0 heading this check anchors on is gone; re-derive the range"; exit 1; }
-old_head=$(grep -n -m1 '^## \[1\.7\.0\]' CHANGELOG.md | cut -d: -f1)
+old_head=$(grep -n -m1 '^## \[1\.7\.0\]' "$cl" | cut -d: -f1)
 [ "$new_head" -lt "$old_head" ] \
   || { echo "FAIL: the tailwind entry is not above [1.7.0] — CHANGELOG is newest-first"; exit 1; }
 
@@ -50,12 +52,12 @@ old_head=$(grep -n -m1 '^## \[1\.7\.0\]' CHANGELOG.md | cut -d: -f1)
 # three, and failed on the very next release (1.12.1, a docs-only patch), because no later
 # entry has any reason to name the migrator. A check only the release that introduced the
 # feature can satisfy is a check that fails forever afterwards.
-grep -q '^## \[1\.8\.0\]' CHANGELOG.md \
+grep -q '^## \[1\.8\.0\]' "$cl" \
   || { echo "FAIL: the [1.8.0] heading this check anchors on is gone; re-derive the range"; exit 1; }
-tw_head=$(grep -n -m1 '^## \[1\.8\.0\]' CHANGELOG.md | cut -d: -f1)
-tw_next=$(awk -v start="$tw_head" 'NR > start && /^## \[/{print NR; exit}' CHANGELOG.md)
+tw_head=$(grep -n -m1 '^## \[1\.8\.0\]' "$cl" | cut -d: -f1)
+tw_next=$(awk -v start="$tw_head" 'NR > start && /^## \[/{print NR; exit}' "$cl")
 [ -n "$tw_next" ] || { echo "FAIL: CHANGELOG has no heading after [1.8.0]; the range cannot be closed"; exit 1; }
-entry=$(sed -n "${tw_head},$((tw_next - 1))p" CHANGELOG.md)
+entry=$(sed -n "${tw_head},$((tw_next - 1))p" "$cl")
 grep -Fq 'wp-tailwind-migrate' <<<"$entry" \
   || { echo "FAIL: the [1.8.0] CHANGELOG entry does not mention /wp-tailwind-migrate"; exit 1; }
 grep -Fq 'wp-tailwind-system' <<<"$entry" \

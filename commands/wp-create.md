@@ -106,7 +106,7 @@ Only offer environment types whose prerequisites are met. If only one viable opt
 bash -c 'test -f "$1/wp-config.php" && echo EXISTS || echo NOT_FOUND' _ '${PROJECT_PATH}'
 ```
 
-If `wp-config.php` exists at `PROJECT_PATH`, enter **Adopt Mode** (see the full Adopt Mode section below). This skips WordPress download, database creation, config creation, and core install.
+If `wp-config.php` exists at `PROJECT_PATH` and there is no `.wp-create.json`, enter **Adopt Mode** (see the full Adopt Mode section below). This skips WordPress download, database creation, config creation, and core install.
 
 ### 2b: Check for existing `.wp-create.json`
 
@@ -116,11 +116,15 @@ bash -c 'test -f "$1/.wp-create.json" && echo EXISTS || echo NOT_FOUND' _ '${PRO
 
 If `.wp-create.json` already exists, see the **Existing `.wp-create.json` Handling** section below.
 
+**Both exist:** 2b wins; no Adopt Mode. Update: the manifest rules. Overwrite: full install despite `wp-config.php`.
+
 ---
 
 ## Step 3: Configuration Collection
 
 Gather all configuration values from the user. For each field, provide a sensible default derived from the project path and detected environment.
+
+**Overwrite:** reuse `database.*` and the environment of the existing manifest, no new password.
 
 ### 3.1 Project Name
 
@@ -264,6 +268,10 @@ For Docker environments where WP-CLI runs inside the container, download WordPre
 
 **Validation:** Check that `${PROJECT_PATH}/wp-load.php` exists after download.
 
+On **Overwrite**, read `${CLAUDE_PLUGIN_ROOT}/skills/wp-create-run/references/overwrite.md` now and follow it first.
+
+**Overwrite:** `core download --force --skip-content`.
+
 **On failure:** See Failure Handling table.
 
 ### Step 4.3: Generate Environment Config from Templates
@@ -286,6 +294,8 @@ bash -c "$WP db create"
 
 **DDEV/Lando/wp-env:** These tools handle database creation. Skip this step.
 
+**Overwrite:** run `$WP db reset --yes` instead of `db create`, in every environment.
+
 **On failure:** See Failure Handling table.
 
 ### Step 4.5: Configure WordPress
@@ -293,6 +303,8 @@ bash -c "$WP db create"
 ```bash
 bash -c "$WP config create --dbname='${DB_NAME}' --dbuser='${DB_USER}' --dbpass='${DB_PASSWORD}' --dbhost='${DB_HOST}'"
 ```
+
+**Overwrite:** add `--force` (`wp-config.php` exists).
 
 For Docker environments, run this inside the container after it starts (move after Step 4.8 if needed), or pre-generate `wp-config.php` from a template.
 
@@ -477,7 +489,7 @@ Each step validates before proceeding. On failure:
 | Step | Failure | Action |
 |------|---------|--------|
 | Download WP (4.2) | Network error, disk full | Abort. Show the error message. Suggest: "Check your internet connection and disk space, then re-run `/wp-create`." |
-| DB create (4.4) | Server not running, permissions | Abort. Suggest: "Start your database server (`sudo systemctl start mariadb`) or check credentials." |
+| DB create (4.4) | Server not running, permissions (Overwrite: overwrite.md) | Abort. Suggest: "Start your database server (`sudo systemctl start mariadb`) or check credentials." |
 | Config create (4.5) | File write permissions | Abort. Suggest: "Fix path permissions: `sudo chown -R $USER:$USER ${PROJECT_PATH}`" |
 | Docker up (4.8) | Port conflict | Detect which ports are in use with `ss -tlnp`. Offer alternative ports. Update `docker-compose.yml` with new ports. Retry `docker-compose up -d`. Update manifest with actual ports. |
 | Core install (4.9) | DB connection refused | Check if services are running. For Docker: `docker-compose ps`. For native: `systemctl status mariadb`. Suggest fix and offer retry. |
@@ -491,13 +503,13 @@ Each step validates before proceeding. On failure:
 - Steps 4.1-4.9 are **critical** — failure aborts the process.
 - Steps 4.11-4.15 are **non-critical** — failure warns but continues. Step 4.10 is **non-critical per plugin**, not per step: an optional plugin warns, a required one blocks.
 
-**Partial state on failure:** On any critical failure, leave partial state in place for debugging. The `.wp-create.json` manifest is NOT generated until all critical steps succeed. The user can re-run `/wp-create` on the same path to retry — idempotent steps detect existing state and skip (e.g., if WordPress is already downloaded, skip download; if DB already exists, skip create).
+**Partial state on failure:** On any critical failure, leave partial state in place for debugging. The `.wp-create.json` manifest is NOT generated until all critical steps succeed. The user can re-run `/wp-create` on the same path to retry — idempotent steps detect existing state and skip (e.g., if WordPress is already downloaded, skip download; if DB already exists, skip create), except in Overwrite, which follows `overwrite.md`.
 
 ---
 
 ## Adopt Mode
 
-When `wp-config.php` is detected at `PROJECT_PATH` in Step 2a, enter Adopt Mode.
+When `wp-config.php` is detected at `PROJECT_PATH` in Step 2a and there is no `.wp-create.json`, enter Adopt Mode. Never after Overwrite.
 
 ### What to skip
 
@@ -621,7 +633,7 @@ What would you like to do?
   [3] Abort — Cancel and keep everything as-is
 ```
 
-- **Overwrite:** Proceed with full setup as if `.wp-create.json` did not exist. The old manifest is backed up to `.wp-create.json.bak`.
+- **Overwrite:** a full install, never Adopt Mode; replaces core and database. Step 4.2 sends the run to the export, confirmation and replace steps: no yes, no 4.2 and no 4.4.
 - **Update:** Skip environment setup steps (4.1-4.8). Only re-run configuration steps: update plugins (4.10), update permalinks (4.11), update options (4.13), install new languages (4.14). Regenerate the manifest with updated values.
 - **Abort:** Exit the command immediately.
 

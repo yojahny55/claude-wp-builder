@@ -15,6 +15,8 @@ with the command that would settle it, never as a finding. See `/wp-audit` §6.9
 
 ## First Action (MANDATORY)
 
+**Blocked contract.** If `.claude/CLAUDE.md` is missing or unreadable, do not guess the prefix, theme slug or languages: return the findings JSON with an extra top-level `"blocked": "<reason>"`, empty `findings` and `checks_executed`, and `BLOCKED: <reason>` as the first line of your summary (`touched: none` when you wrote nothing). The parent reads it as a run with no measured checks, so Step 6.8 sends the ids back; never invent findings. Contract: `skills/wp-contributing/SKILL.md` § Agent contracts.
+
 Before running ANY coding standards checks, read the following project files:
 
 1. **`.claude/CLAUDE.md`** — Extract:
