@@ -5,9 +5,10 @@
 # the sweep with the limits built in. This check runs it against a local fixture server and
 # asserts the limits, then pins the shared rule and the agents that must point at it.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+. "$(dirname "$0")/../lib/assert.sh"
+require_tool curl
+cd "$(dirname "$0")/../.." || exit 1
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-audit.md; wp_audit=$EXPANDED
-fail() { echo "FAIL: $*"; exit 1; }
 
 tool=bin/link-sweep.mjs
 [ -f "$tool" ] || fail "$tool missing"
