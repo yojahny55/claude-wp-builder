@@ -4,8 +4,8 @@
 # does not (its token is on a second line too), and assert 1 killed, 1 survived, exit 1 and
 # an untouched tree. Independent of the real checks, so editing them cannot break this.
 set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 here=$(cd "$(dirname "$0")/../.." && pwd)
-fail() { echo "FAIL: $*"; exit 1; }
 fx=$(mktemp -d)
 trap 'rm -rf "$fx"' EXIT
 cd "$fx"

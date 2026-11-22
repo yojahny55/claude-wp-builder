@@ -105,3 +105,13 @@ Still not covered: a generated site end to end, the broken-site corpus with expe
 findings, and browser artifacts for failed functional scenarios. A green CI means the
 contracts still say what they should, the code still parses, and the ACF translation path
 still agrees with a real WordPress.
+
+## Writing a check
+
+Source `tests/lib/assert.sh` instead of redefining helpers: `fail`, `skip` (prints `SKIP: ...`,
+exit 0, which `run.sh` counts apart from PASS), `need_token FILE TOKEN [MSG]` and
+`require_tool php python3 curl`, which skips when a tool is missing. CI sets
+`CHECKS_REQUIRE_TOOLS=1` so a runner that lost php fails instead of skipping. Checks start
+with `set -euo pipefail` and `cd ... || exit 1`, and must be executable in git.
+`assert-lib-adoption.sh` fails a new check that defines its own `fail()`; the older ones are
+frozen in `tests/checks/lib/fail-allowlist.txt` and leave it as they are migrated.

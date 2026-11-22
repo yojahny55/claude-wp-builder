@@ -29,7 +29,8 @@
 # absent every time, so the collision branch never ran and the row was inserted again.
 # bin/*.sh and skills/*/scripts/*.sh are scanned too -- those that set pipefail, and the
 # sourced lib-*.sh files that inherit it from their caller.
-set -uo pipefail
+set -euo pipefail
+. "$(dirname "$0")/../lib/assert.sh"
 cd "$(dirname "$0")/../.." || exit 1
 
 bad=$(
