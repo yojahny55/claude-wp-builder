@@ -439,7 +439,9 @@ Run, in order:
    - **exit 0** — a report came back: fold every **failed** check into a fix pass (the
      `wp-agentic-surfaces` loop item 7 uses), then re-run the scan **once** and record
      the before/after score in Step 6. If that fix touched theme CSS, templates or
-     enqueues, re-run `/wp-finalize`'s Layers 2-3 before Step 5.5 signs off.
+     enqueues, re-run `/wp-finalize`'s Layers 2-3 before Step 5.5 signs off. If the fixer
+     returns `BLOCKED: <reason>`, skip the re-scan: list the failed checks under Review in
+     Step 6 with the agent, its reason and the files it touched, and mark the run incomplete.
    - **exit 2** — no report exists yet, or no network: record it `UNMEASURED` and mark the
      run incomplete in Step 6, exactly as the completion rule requires below. An absent
      score is not a good score.

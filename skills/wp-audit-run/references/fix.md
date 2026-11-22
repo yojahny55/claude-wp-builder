@@ -203,7 +203,7 @@ a pass; `2` is a usage error or no browser, a tool failure to report, not a resu
 `--state menu=<toggle-selector>@390` to record an opened mobile menu. Run it at desktop and
 mobile (the default 1366x768 and 390x844) and read the diff for every element sharing the class.
 
-**GEO fixes:** Dispatch an agent with `subagent_type: wp-agentic-surfaces` with the full project context and the list of auto-fixable GEO findings. It owns `inc/agentic.php` and every generated agent surface (`llms.txt`, ARD catalog, agent-skills index, markdown negotiation, Link headers, agent-friendly 404, JSON-LD breadth, trust anchors) — do not re-implement the surfaces here. Before dispatching, run the live verifier to capture the before score; run it again after the fixer completes and report the before → after score. If the fixer returns `BLOCKED: <reason>`, skip the after scan: the GEO findings stay open, and the report names the agent, its reason and the files it touched:
+**GEO fixes:** Dispatch an agent with `subagent_type: wp-agentic-surfaces` with the full project context and the list of auto-fixable GEO findings. It owns `inc/agentic.php` and every generated agent surface (`llms.txt`, ARD catalog, agent-skills index, markdown negotiation, Link headers, agent-friendly 404, JSON-LD breadth, trust anchors) — do not re-implement the surfaces here. Before dispatching, run the live verifier to capture the before score; run it again after the fixer completes and report the before → after score:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host> --start
@@ -214,6 +214,9 @@ ${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host> --start
 report when the scan finishes. The three calls are capped at 110 s together, so run the command with a Bash
 timeout of at least 150000 ms. Pass it only for a host this run
 confirmed as public — the scan makes a third party fetch that site.
+
+If the fixer returns `BLOCKED: <reason>`, skip the after scan: the GEO findings stay open, and
+the report names the agent, its reason and the files it touched.
 
 `<home-host>` is `--host` when given, otherwise `wordpress.url` from `.wp-create.json` (or
 `$WP option get home`) — **unless `local_clone` is true (Step 2.3): the live scan must not probe

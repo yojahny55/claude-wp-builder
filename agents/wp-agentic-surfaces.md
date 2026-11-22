@@ -19,7 +19,7 @@ WP-CLI.
 Before writing any file or running any command, read the project files:
 
 1. **`.claude/CLAUDE.md`** — Extract:
-   - The **function prefix** (recorded with a trailing underscore, e.g., `kairo_`). Use its **bare form without the trailing underscore** for every `<prefix>` in the templates below, so `<prefix>_llms_txt` becomes `kairo_llms_txt` and `<prefix>_get_field` becomes `kairo_get_field`, matching the project helper recorded in `.claude/CLAUDE.md`. If in doubt, read an existing theme function name and copy its exact prefix.
+   - The **function prefix** (recorded with a trailing underscore, e.g., `kairo_`). Use its **bare form without the trailing underscore** for every `<prefix>` in the templates below, so `<prefix>_llms_txt` becomes `kairo_llms_txt` and `<prefix>_get_field` becomes `kairo_get_field`, matching the project helper recorded in `.claude/CLAUDE.md`. If the recorded prefix is ambiguous (with or without the trailing underscore), read an existing theme function name to settle its exact form; that disambiguates a recorded prefix, it never replaces a missing one, which is the Blocked contract below.
    - The **theme slug** and **theme path** (where `functions.php` and `inc/` live)
    - The **industry** (a local/business value is one positive signal for the `local` site type)
    - The **languages** configured
