@@ -2,6 +2,174 @@
 
 ## [Unreleased]
 
+## [1.34.0] - 2026-11-22
+
+### Added
+
+- **Documented exit-code table for every `bin/*.mjs` tool.** `bin/lib/exit-codes.mjs`
+  (`COMMON` for new tools, `TOOLS` with the codes each existing tool really returns) and
+  `docs/exit-codes.md` record them without renumbering anything, since commands and checks
+  read the numbers in prose. `tests/checks/exit-code-table.sh` fails when a tool exits with
+  an undeclared code or the table and the doc drift apart.
+
+- **`/wp-backup` and `/wp-restore`.** One verified backup script (`bin/wp-backup.sh`) replaces
+  the three hand-written database exports in `/wp-update`, `/wp-clone` and `/wp-anonymize`,
+  which had different permissions, no check of the dump and no uploads. The dump must start
+  with a SQL header and end with its `Dump completed` footer (a PHP notice printed by the
+  wrapper fails it), is written to a temp name and renamed only when complete, and the folder
+  is `<slug>-<timestamp>`, 700/600, always outside the WordPress root, with sha256 sums plus
+  table and post counts in `backup.json`. `/wp-restore` verifies the sums, refuses another
+  database name or site URL unless `--yes`, takes a pre-restore copy, imports, swaps uploads
+  with a way back, and fails unless the site URL, table count and post count match afterwards,
+  printing the command to return to the pre-restore copy.
+
+- **`/wp-status`: where the project is and what runs next.** A read-only command backed by
+  `bin/wp-status.mjs` reads `.wp-create.json`, `.claude/CLAUDE.md`, `demo/` (including
+  `FAILED.md`), the `/wp-yolo` build ledger and the audit findings ledger, and ends with
+  `Next: <command> - <reason>`. It writes nothing, runs no WP-CLI and uses no network;
+  `--json` gives the same report for scripts. Exit 0 whenever a report prints, 64 on bad usage.
+
+### Changed
+
+- **`wp-agentic-surfaces` follows the BLOCKED contract.** Without a readable `.claude/CLAUDE.md`
+  that records the function prefix and theme path it stops and returns `BLOCKED: <reason>`
+  plus the files it touched, instead of guessing a prefix into `inc/agentic.php`.
+  `agent-contracts.sh` now includes it in the BLOCKED list.
+
+- **`wp-agentic-surfaces` copies its PHP instead of rewriting it.** The ~700 lines of
+  `inc/agentic.php` that lived inside the agent's markdown are now `templates/agentic/agentic.php`,
+  copied with two tokens (`__prefix__`, `__SITE_TYPE__`) substituted. CI's `php -l` at the 7.4
+  floor now covers that file, which it never did while the code sat in a fenced block, so a run can
+  no longer drift from the floor. The emitted file is byte-identical to what the agent produced.
+
+- **Check hygiene.** `tests/lib/assert.sh` gives checks `fail`, `skip`, `need_token` and
+  `require_tool` (SKIP, not a confusing FAIL, when php, python3 or curl is missing;
+  `CHECKS_REQUIRE_TOOLS=1` in CI turns that back into a failure). The composition-gate check
+  SKIPs when the impeccable detector cannot start offline instead of failing. The 27 checks
+  that ran without `set -e` now run under `set -euo pipefail`, `cd` failures stop them, and
+  the re-audit check writes its probe to a temp dir. Every check is executable in git, and
+  `assert-lib-adoption.sh` freezes the checks that still define their own `fail()`.
+
+- **CI and test-harness coverage.** CI jobs pin `runs-on: ubuntu-24.04` instead of the floating
+  `ubuntu-latest`. New `tests/mutation.sh` (manual tool) deletes a required token from a copy
+  of the repo and reports contract checks that still pass, with `tests/checks/mutation-harness.sh`
+  guarding it. `seeded-defects.sh` now compares against a committed recorded audit
+  (`recorded-findings.json`, plus a negative case), so the comparison runs in CI without
+  `SEEDED_FINDINGS`.
+
+- **The impeccable detector follows the newest release.** Every call is now `npx -y impeccable@latest`
+  instead of a major-version pin, on purpose. `bin/composition-gate.sh` refuses detector output it
+  does not understand (a finding that is not an object, one missing `antipattern` or `file`, a
+  `category` outside slop/quality or a `severity` outside warning/advisory) and exits 1 instead of
+  passing it. The checks now fail on any numeric `impeccable@` pin.
+  The gate also keeps the detector's exit code: anything but 0 or 2, or a code that
+  disagrees with the payload, is "could not scan", and so is a wrapper object with keys
+  besides `findings`. `/wp-demo-verify`'s detector step states the same rule.
+
+- **`wp-audit-rankmath` now runs on sonnet, and its long scripts moved to references.** The agent
+  settles schema conflicts, title quality, the JSON-LD merge and the Polylang route, which is
+  judgment rather than mechanical config, so it leaves the haiku tier (`/wp-yolo` model routing
+  and the README follow). The code of Steps 5.5, 8.5, 12 and 15 now lives in
+  `skills/wp-audit-seo-standards/references/rankmath-*.md`; the agent keeps each step's
+  condition, rules and a pointer, and the checks that grepped those tokens now read the
+  reference and require the pointer.
+
+- Repository docs sweep. The README no longer names a `/wp-woo-verify` command that does not exist, and gains an update/uninstall note, a per-command requirements matrix and a troubleshooting table. `bin/doc-sync-check.sh` now fails when README.md or any `docs/*.md` cites a `/wp-<name>` that has no `commands/<name>.md` (family prefixes ending in `-` and an explicit exclusion list aside). `docs/README.md` indexes every document in `docs/`, and `tests/checks/docs-index.sh` fails when one is missing. Releases before 1.30.0 moved verbatim from `CHANGELOG.md` to `docs/changelog-archive.md`, with a link left behind. `TODO.md` (a deprecated pointer) and `docs/finds/audit` (a pasted terminal transcript) are removed. `SECURITY.md` now sends sensitive reports to the maintainer privately first and covers `store-kit`, Stripe keys, clone and anonymizer data, and image API keys. `wp-contributing` documents the manual tag and `gh release` sequence.
+
+### Fixed
+
+- **Agent contracts stated once and enforced.** `wp-tailwind` now has a First Action block
+  (author mode reads the project file; conversion mode may run with no project), and
+  `wp-context` and `wp-normalize` document why they have none. The agents that read the
+  project file return `BLOCKED: <reason>` plus touched files instead of guessing a prefix;
+  auditors (security and usability included) keep their JSON and add a `"blocked"` key, which
+  `/wp-audit` re-dispatches once and, if still blocked, names in the `INCOMPLETE` report. `wp-audit-aios` and `wp-audit-rankmath`
+  say they write, and `wp-contributing` explains the `wp-audit-*` prefix. FAQ schema is
+  seeded only for visible questions, with no rich-result promise, and the demo-craft devices
+  reference says where GSAP comes from and points to its license.
+- The normalize agent captures `cssRules` when the project file or its `Template:` line is
+  absent, and the CSS agent's blocked rule no longer contradicts its own instruction to add
+  missing `:root` definitions.
+
+- **Command cross-references, the craft gate, the model table and the flag vocabulary.**
+  `/wp-update` and `/wp-polish` cited "Step 5.3", "Step 1.2" and "Step 3.1", which are list
+  items, not headings, so a run looking for them found nothing; they now read "Step 5, item 3",
+  and `tests/checks/step-refs-resolve.sh` fails on any `Step N.M` a command cites without a
+  heading, and on an unqualified citation of another command's step. The craft gate no
+  longer runs `npm i -D playwright-core` in the WordPress project on probe exit 2: it points
+  `PLAYWRIGHT_CORE` at a copy already on the machine, and installs only after the user says yes.
+  `/wp-yolo`'s model routing list now names every agent (it omitted `wp-audit-geo`,
+  `wp-audit-ux`, `wp-agentic-surfaces` and `wp-research`), and `model-routing.sh` checks it
+  against each agent's frontmatter. `skills/wp-contributing/references/flag-vocabulary.md` fixes
+  what `--yes`, `--force`, `--dry-run` and `--resume` mean and lists the existing exceptions.
+
+- **Env setup and encoder edge cases.** `wp-env-setup.sh detect` runs `npx --no-install`, so a
+  detection pass can no longer download `@wordpress/env`; `is_running` returns the real state
+  (`mariadb || mysql` now reaches the second service); empty arrays are guarded for bash 3.2.
+  `wp-cinematic-encode.sh` exits 1 without importing when the all-keyframe check fails, refuses
+  `--desktop-only --mobile-only` (exit 2), expands a leading `~` in `--kit` and resolves
+  `--theme` to an absolute path. The Lando template no longer points at a `php.ini` nothing
+  creates, and the `store-kit-sync.sh` comment no longer claims the swap has no gap.
+
+- `/wp-finalize` example report now adds up and lists the parity layers; the no-manifest variants are gone because exit 3 is the `stop` policy. `/wp-create` states that an existing manifest (2b) is handled before Adopt Mode (2a), and Overwrite exports the database and asks for confirmation naming the database and core before download. `/wp-seed` names its own `bare-wp-fallback` policy.
+
+- **Suffix-model language no longer leaks through page caches, and Accept-Language reads
+  q-values.** Both starters' `inc/i18n.php` (Tailwind and cinematic) send
+  `Vary: Accept-Language, Cookie` on front-end responses, and keep a response out of
+  WordPress page caches (`DONOTCACHEPAGE` plus `nocache_headers()`) when it is not the
+  default language or carries `?lang`; before, the first visitor's language could be cached
+  and served to everyone. `fr,es;q=0.9` now resolves to Spanish instead of the default; an
+  unsupported `?lang` falls through to the cookie in both starters (the cinematic one reset
+  it to English); and the `<html lang>` rewrite no longer reaches wp-admin or the login
+  screen. Check `theme-i18n-request-lang.sh` runs both resolvers under stubbed WordPress.
+
+- **Index and import scripts no longer truncate versioned files, and the gate no longer skips a bad composition.**
+  `design-md-index.sh` and `domains-import.sh` wrote straight into tracked files, so a
+  python or awk failure midway left them truncated (and `domains-import.sh` had already
+  replaced the licence and source record). Both now build into temporaries and rename at
+  the end, with a trap removing leftovers. `design-md-index.sh` matches `api` and `car` as
+  whole words instead of inside "capital", "rapid", "card" or "care", which mislabelled
+  industries. `composition-gate.sh` treats a composition missing `section.html` or
+  `section.css` as a failure (exit 1, like truncated content) instead of skipping it.
+
+- **One definition of a local host, and it no longer trusts `*.local.com` by name.**
+  `prod-gate.sh`, `audit-suite.sh` and `geo-scan.sh` each kept their own list, and all
+  three treated any `*.local.com` as development although `local.com` is a public domain
+  (a production host there skipped the gate, got 4 workers, and was refused by the GEO
+  scan). They now share `bin/lib/local-host.sh`: reserved suffixes (`.test`, `.local`,
+  `.internal`, `.lan`, `.home.arpa`, `.example`, `.invalid`, `localhost`) and private IP
+  literals by octet are local by name; any other name is local only when every address it
+  resolves to is loopback or private, and an unresolved name is not local. `geo-scan.sh`
+  also lower-cases the host and no longer matches `10.example.com` with a prefix glob.
+  `audit-suite.sh` empties `results/audit/*.json` at the start of a run, so a run over
+  fewer pages no longer reports the pages of an earlier one; with `--only` it empties only
+  that pass's files, so separate passes still add up to one report. `prod-gate.sh` falls back to
+  a symlink-to-pid lock where `flock` is missing (macOS) instead of exiting 1; a lock it
+  cannot create (read-only state dir, name too long) exits 1 with `cannot create lock`
+  instead of spinning, and its
+  header documents that the wrapped command's own exit 4 or 5 is indistinguishable from
+  the gate's.
+
+- **A hung resolver no longer hangs the production gate, and the design-md index keeps
+  its hand corrections.** `bin/lib/local-host.sh` runs `getent ahosts` under `timeout 3`
+  when `timeout` exists; a lookup that times out resolves to nothing, which is the
+  not-local side. `bin/design-md-index.sh` reads hand corrections from
+  `references/design-md/INDEX.overrides` (`<domain> <industry> [<tone>]` per line) and
+  applies them after its keyword heuristic, so regenerating `INDEX.md` no longer erases
+  the twelve rows that had been fixed by hand. An override naming a domain with no
+  DESIGN.md fails the run, and a check fails when the versioned `INDEX.md` differs from a
+  regeneration.
+
+- **The last early-exit readers under `pipefail` are gone, and the check now sees them.**
+  `bin/clone-preflight.sh` read the `Server` header with `tr | awk '…exit'`, which died with
+  141 under `set -e` when the headers outgrew the pipe buffer after that line;
+  `bin/audit-suite.sh` reported a Playwright CLI that does not load with `| grep -m3 … ||
+  tail -3`, so an early grep could SIGPIPE `printf` and print the tail after the matches; and
+  `bin/tailwind-rebuild.sh` read a watcher's `-o` the same racy way. Each reader now
+  consumes all of its input. `tests/checks/no-early-exit-pipes.sh` also flags `| grep -m`
+  and a piped awk whose program exits outside `END`, and its self-test runs the same program
+  as the scan.
+
 ## [1.33.0] - 2026-11-21
 
 ### Changed
