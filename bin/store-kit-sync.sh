@@ -28,8 +28,9 @@ trap 'rm -rf "$tmp" "$old"' EXIT
 # mktemp creates 0700; the web server reads the plugin as another user.
 chmod 755 "$tmp"
 cp -R "$src/." "$tmp"
-# The old copy is renamed aside rather than deleted first: between an rm and the mv the plugin
-# would be absent, and a request in that window runs without the credential strip.
+# The old copy is renamed aside rather than deleted first, which keeps the gap short but does
+# not remove it: between moving $dest aside and moving the new copy in, the plugin is absent
+# for two renames, and a request in that window runs without the credential strip.
 [ -e "$dest" ] && mv "$dest" "$old/store-kit"
 if ! mv "$tmp" "$dest"; then [ -e "$old/store-kit" ] && mv "$old/store-kit" "$dest"; exit 1; fi
 echo "store-kit ${have:-absent} -> $want"
