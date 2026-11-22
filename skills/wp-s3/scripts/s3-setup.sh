@@ -271,8 +271,8 @@ else
         if command -v sha256sum >/dev/null 2>&1; then
             echo "   sha256 of what arrived: $(sha256sum "$tmp/s3-uploads.tar.gz" | cut -d" " -f1)"
         fi
-        tar -xzf "$tmp/s3-uploads.tar.gz" -C "$tmp" || die "could not unpack S3-Uploads $PLUGIN_VERSION"
         # transfer-verified: an unpacked tree without the plugin's main file is not the plugin.
+        tar -xzf "$tmp/s3-uploads.tar.gz" -C "$tmp" || die "could not unpack S3-Uploads $PLUGIN_VERSION"
         [[ -f "$tmp/S3-Uploads-${PLUGIN_VERSION}/s3-uploads.php" ]] \
             || die "the S3-Uploads $PLUGIN_VERSION archive did not unpack to a plugin (no s3-uploads.php)"
         mv "$tmp/S3-Uploads-${PLUGIN_VERSION}" "$PLUGIN_DIR"

@@ -63,6 +63,41 @@ tar -tzf "$B/uploads.tar.gz" | grep >/dev/null -c 'uploads/2026/a.txt' || fail "
 node -e 'const m=JSON.parse(require("fs").readFileSync(process.argv[1]));if(m.uploads_files!==1)process.exit(1)' "$B/backup.json" \
   || fail "backup.json does not record the uploads file count the archive was verified against"
 
+# --- a file name holding a newline is one file on both sides of the count ---
+nl="$SITE/wp-content/uploads/2026/b
+c.txt"
+echo x > "$nl"
+rc=$(code bash bin/wp-backup.sh "$SITE" --uploads --label nl)
+[ "$rc" = 0 ] || fail "a newline in an upload's name failed the backup: $(cat "$T/err")"
+node -e 'const m=JSON.parse(require("fs").readFileSync(process.argv[1]));if(m.uploads_files!==2)process.exit(1)' "$(tail -n 1 "$T/out")/backup.json" \
+  || fail "a newline in an upload's name was not counted as one file"
+rm -f -- "$nl"
+
+# --- uploads changing during the archive: one retry, then refuse ---
+mkdir -p "$T/tarbin"
+cat > "$T/tarbin/tar" <<'FAKETAR'
+#!/usr/bin/env bash
+# Adds an upload while archiving: every time (FAKE_TAR_ALWAYS=1) or on the first archive only.
+case "${1:-}" in -czf)
+  n=$(cat "$FAKE_TAR_STATE" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "$FAKE_TAR_STATE"
+  if [ "${FAKE_TAR_ALWAYS:-0}" = 1 ] || [ "$n" = 1 ]; then echo new > "$FAKE_TAR_SITE/wp-content/uploads/2026/live-$n.txt"; fi ;;
+esac
+exec /usr/bin/env -S PATH="$FAKE_REALPATH" tar "$@"
+FAKETAR
+chmod +x "$T/tarbin/tar"
+export FAKE_REALPATH=$PATH FAKE_TAR_SITE=$SITE FAKE_TAR_STATE=$T/tar.state
+rm -f "$T/tar.state"
+rc=$(PATH="$T/tarbin:$PATH" code bash bin/wp-backup.sh "$SITE" --uploads --label live)
+[ "$rc" = 0 ] || fail "one change during the archive should be retried, got exit $rc: $(cat "$T/err")"
+grep >/dev/null -c 'changed during the archive' "$T/err" || fail "the retry is not reported"
+node -e 'const m=JSON.parse(require("fs").readFileSync(process.argv[1]));if(m.uploads_files!==2)process.exit(1)' "$(tail -n 1 "$T/out")/backup.json" \
+  || fail "the retried archive does not record the file added during the first one"
+rm -f "$T/tar.state" "$SITE"/wp-content/uploads/2026/live-*.txt
+rc=$(FAKE_TAR_ALWAYS=1 PATH="$T/tarbin:$PATH" code bash bin/wp-backup.sh "$SITE" --uploads --label live2)
+[ "$rc" = 1 ] || fail "uploads changing on every archive should be refused, got exit $rc"
+grep >/dev/null -c 'kept changing during the backup' "$T/err" || fail "a refused live backup does not say why: $(cat "$T/err")"
+rm -f "$SITE"/wp-content/uploads/2026/live-*.txt "$T/tar.state"
+
 # --- no --uploads: said so ---
 rc=$(code bash bin/wp-backup.sh "$SITE" --label t2)
 [ "$rc" = 0 ] && [ ! -e "$(tail -n 1 "$T/out")/uploads.tar.gz" ] || fail "backup without --uploads should have no archive"

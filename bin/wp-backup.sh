@@ -104,16 +104,29 @@ uploads_state="not in this copy"
 uploads_files=null
 if [ "$uploads" = 1 ]; then
   if [ -d "$root/wp-content/uploads" ]; then
-    # transfer-verified: the archive's entries are counted against the files on disk, and the
-    # count goes into backup.json for wp-restore.sh to check after extracting. An exit code
-    # says the tool finished, not that it copied everything.
-    want_files=$(find "$root/wp-content/uploads" -type f | wc -l)
-    tar -czf "$dir/uploads.tar.gz" -C "$root/wp-content" uploads || bad "tar of wp-content/uploads failed"
-    gzip -t "$dir/uploads.tar.gz" || bad "uploads.tar.gz does not read back"
-    [ -s "$dir/uploads.tar.gz" ] || bad "uploads.tar.gz is empty"
-    got_files=$(tar -tvzf "$dir/uploads.tar.gz" | grep -c '^[-h]' || true)
-    [ "$got_files" = "$want_files" ] \
-      || bad "uploads.tar.gz holds $got_files files, wp-content/uploads has $want_files (uploads changed during the backup, or tar skipped some)"
+    # Files on disk, NUL-counted so a name holding a newline counts once (tar lists it once).
+    count_uploads() { find "$root/wp-content/uploads" -type f -print0 | tr -cd '\0' | wc -c | tr -d ' '; }
+    attempt=1
+    while :; do
+      before=$(count_uploads)
+      # transfer-verified: the archive's regular files (and hard links) are counted against the
+      # disk, before and after tar, and the count goes into backup.json for wp-restore.sh to
+      # check after extracting. An exit code says tar finished, not that it copied everything.
+      tar -czf "$dir/uploads.tar.gz" -C "$root/wp-content" uploads || bad "tar of wp-content/uploads failed"
+      gzip -t "$dir/uploads.tar.gz" || bad "uploads.tar.gz does not read back"
+      [ -s "$dir/uploads.tar.gz" ] || bad "uploads.tar.gz is empty"
+      after=$(count_uploads)
+      got_files=$(tar -tvzf "$dir/uploads.tar.gz" | grep -c '^[-h]' || true)
+      [ "$before" = "$after" ] && [ "$got_files" = "$after" ] && break
+      # A live site can add a thumbnail mid-archive. Once is a race; twice is not.
+      if [ "$before" != "$after" ] && [ "$attempt" = 1 ]; then
+        echo "wp-backup: wp-content/uploads changed during the archive ($before -> $after files); archiving again" >&2
+        attempt=2; continue
+      fi
+      [ "$before" = "$after" ] \
+        || bad "wp-content/uploads kept changing during the backup ($before -> $after files); retry when uploads are quiet"
+      bad "uploads.tar.gz holds $got_files files, wp-content/uploads has $after: tar skipped some"
+    done
     uploads_files=$got_files
     files+=(uploads.tar.gz); uploads_state="uploads.tar.gz"
   else

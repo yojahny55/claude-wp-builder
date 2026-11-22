@@ -290,8 +290,8 @@ for item in lib guard tests scripts regression playwright.config.js playwright.g
       ;;
   esac
   rm -rf "${dir:?}/$item"
-  cp -r "$template/$item" "$dir/$item"
   # transfer-verified: the refreshed item is compared with the template it came from.
+  cp -r "$template/$item" "$dir/$item"
   diff -r "$template/$item" "$dir/$item" >/dev/null \
     || { echo "audit-suite: $dir/$item does not match $template/$item after the copy" >&2; exit 1; }
 done

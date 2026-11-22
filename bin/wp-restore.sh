@@ -124,12 +124,13 @@ if [ "$has_uploads" = 1 ]; then
   # normal umask, or the umask 077 above would leave uploads 700/600 and unreadable to the
   # web server user.
   ( umask 022; mkdir -p -- "$stage" ) || fail_after "cannot create $stage; the database was imported"
+  # transfer-verified: the extracted files are counted against backup.json below, before they
+  # replace anything (a backup older than the count has none, and rests on its sha256 alone).
   ( umask 022; tar -xzpf "$backup/uploads.tar.gz" -C "$stage" ) || { rm -rf -- "$stage"; fail_after "uploads.tar.gz did not extract; the database was imported"; }
   [ -d "$stage/uploads" ] || { rm -rf -- "$stage"; fail_after "uploads.tar.gz has no uploads/ directory; the database was imported"; }
-  # transfer-verified: the extracted files are counted against backup.json before they replace
-  # anything (a backup older than the count has none, and is trusted on its sha256 alone).
   if [ -n "$want_files" ]; then
-    got_files=$(find "$stage/uploads" -type f | wc -l)
+    # NUL-counted, as wp-backup.sh counts: a name holding a newline is one file.
+    got_files=$(find "$stage/uploads" -type f -print0 | tr -cd '\0' | wc -c | tr -d ' ')
     [ "$got_files" = "$want_files" ] || { rm -rf -- "$stage"; fail_after "uploads.tar.gz extracted $got_files files, backup.json says $want_files; the current uploads were not touched, the database was imported"; }
   fi
   if [ -d "$root/wp-content/uploads" ]; then
