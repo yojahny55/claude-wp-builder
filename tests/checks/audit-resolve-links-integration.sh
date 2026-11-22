@@ -12,8 +12,9 @@
 #
 # SKIPs unless WP_FIXTURE=1, like the other fixture-backed checks.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
-fail() { echo "FAIL: $*"; exit 1; }
+. "$(dirname "$0")/../lib/assert.sh"
+require_tool python3
+cd "$(dirname "$0")/../.." || exit 1
 
 if [ "${WP_FIXTURE:-0}" != "1" ]; then
   echo "SKIP: set WP_FIXTURE=1 to provision a disposable WordPress and run this"

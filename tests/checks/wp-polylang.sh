@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+. "$(dirname "$0")/../lib/assert.sh"
+require_tool php
+cd "$(dirname "$0")/../.." || exit 1
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-header.md; wp_header=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-seed.md; wp_seed=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-finalize.md; wp_finalize=$EXPANDED

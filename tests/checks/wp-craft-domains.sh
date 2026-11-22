@@ -10,10 +10,11 @@
 # contributor who re-imports the whole thing reintroduces exactly the sameness
 # this plugin exists to refuse, so the refusal is asserted here.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+. "$(dirname "$0")/../lib/assert.sh"
+require_tool python3
+cd "$(dirname "$0")/../.." || exit 1
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-demo.md; wp_demo=$EXPANDED
 . tests/checks/lib/expand-command.sh; expand_command commands/wp-yolo.md; wp_yolo=$EXPANDED
-fail() { echo "FAIL: $*"; exit 1; }
 
 d=skills/wp-demo-craft/references/domains
 
