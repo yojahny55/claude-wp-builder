@@ -24,4 +24,8 @@ grep -Fq 'rank_math/frontend/breadcrumb/items' "$pll" \
 grep -Fq 'prefix_t( $key ) ?: $title' "$pll" \
   && fail "$pll still falls back with ?: on prefix_t(), which returns the key, never ''"
 
+# The moved script's output only means something if the agent says how to read it.
+grep -Fq 'each `WARN:` is a finding' agents/wp-audit-rankmath.md \
+  || fail "agents/wp-audit-rankmath.md Step 15 no longer says how to treat the Polylang script's WARN/INFO/SKIP lines"
+
 echo PASS

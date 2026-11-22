@@ -51,6 +51,8 @@ fi
 # A permalink is a prefix of its own paginated children, so a substring test reports
 # /page/ as listed because /page/2/ is. Sitemap membership is an exact <loc> comparison.
 sm_ref=skills/wp-audit-seo-standards/references/rankmath-sitemap-validation.md
+grep -qF 'Every `FAIL:` line it prints is a finding' agents/wp-audit-rankmath.md \
+  || fail "agents/wp-audit-rankmath.md Step 5.5 no longer says that every FAIL: line of the sitemap script is a finding"
 [ -f "$sm_ref" ] || fail "$sm_ref is missing"
 grep -qF 'references/rankmath-sitemap-validation.md' agents/wp-audit-rankmath.md \
   || fail "wp-audit-rankmath.md: Step 5.5 does not point at $sm_ref"

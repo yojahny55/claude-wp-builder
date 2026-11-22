@@ -405,7 +405,7 @@ not report "sitemap validated" on the strength of this script alone.
 for a permalink silently never fires. Fetch the index, then fetch every child it names, and
 match against the concatenation.
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-seo-standards/references/rankmath-sitemap-validation.md` and run the script there.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-seo-standards/references/rankmath-sitemap-validation.md` and run the script there. Every `FAIL:` line it prints is a finding to fix or report; a run with none is still not "sitemap validated" until the checks above that need Step 8.5's data have run.
 
 ## Step 6: Configure OG / Social Defaults and the site icon
 
@@ -809,7 +809,7 @@ On a local clone flush local caches only; never run a CDN or page-cache plugin's
 
 ## Step 15: Polylang-specific Rank Math Integration
 
-If Polylang is active, read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-seo-standards/references/rankmath-polylang.md` and run it: the verification script (free Polylang has one sitemap, not one per language; every post has a language; default-language posts have translations) and 15b, the `rank_math/frontend/breadcrumb/items` filter that routes each CPT-archive crumb through the theme string table (`plural_<post_type>`, in every language) and is verified by fetching `/<lang>/<cpt-plural>/` and one single, whose breadcrumb must match the page language.
+If Polylang is active, read `${CLAUDE_PLUGIN_ROOT}/skills/wp-audit-seo-standards/references/rankmath-polylang.md` and run it: the verification script (free Polylang has one sitemap, not one per language; every post has a language; default-language posts have translations) and 15b, the `rank_math/frontend/breadcrumb/items` filter that routes each CPT-archive crumb through the theme string table (`plural_<post_type>`, in every language) and is verified by fetching `/<lang>/<cpt-plural>/` and one single, whose breadcrumb must match the page language. Of the script's output, `SKIP:` ends the step (Polylang is not active), each `WARN:` is a finding, and `INFO:` lines are reported as is, not fixed.
 
 ## Verification
 
