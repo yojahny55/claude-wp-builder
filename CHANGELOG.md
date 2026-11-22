@@ -2,6 +2,54 @@
 
 ## [Unreleased]
 
+## [1.38.0] - 2026-11-22
+
+### Changed
+
+- **Seven commands have room to grow again.** `/wp-create`, `/wp-audit` and `/wp-init`
+  sat 20 to 62 bytes under the size ceilings their `*-run` checks enforce, and
+  `/wp-clone`, `/wp-tailwind-migrate`, `/wp-yolo` and `/wp-seed` were within 1.3 KB.
+  Detail that only some runs read moved to each command's `skills/<command>-run/references/`
+  (filesystem permissions and the `detect` output for `/wp-create`, manifest drift for
+  `/wp-audit`, menu registration for `/wp-init`, the clone's mail capture, the Tailwind
+  migration's visual golden, the seed's placeholder pages), and `/wp-yolo` lost repeated
+  rationale. Every command now has at least 2 KB under its ceiling; no ceiling moved.
+
+- **Every skill keeps its description in the session listing.** Claude Code lists each
+  skill's name and description under one shared character budget. The plugin's 36
+  descriptions came to about 25 KB, and in a real session the listing ran out after
+  `wp-create-run`, so `wp-css-system`, `wp-demo-craft`, `wp-environments`, `wp-polylang`,
+  `wp-woocommerce` and the rest appeared with no description and nothing told Claude when
+  to load them. The descriptions now total about 10.8 KB. The 14 `*-run` skills, loaded only
+  when their command names a reference, say just that. The others keep what the skill is,
+  its strongest triggers and the `Not for` line that tells it from a sibling.
+
+- **`/wp-section` has room to grow again.** The command sat 6 bytes under its 16 KB
+  ceiling, so the next flag or gate would have failed `tests/checks/wp-section-run.sh`.
+  The `--hybrid` overlay and the contact-section summary, each read by only one kind of
+  run, moved to `skills/wp-section-run/references/` (`hybrid.md`, `summary-contact.md`),
+  and the `--css` and `--defer-promotion` rationale that Step 1 repeated now lives once in
+  `dispatch-rules.md`. The command is 13.5 KB, with 2.5 KB of headroom; the expanded text
+  the checks read keeps every line it had.
+
+- **`wp-template` reads its conditional sections from references.** The nav walker, carousel,
+  CSS background, demo-control and archive ordering/pagination blocks moved from
+  `agents/wp-template.md` to `skills/wp-theme-standards/references/template-*.md`, read only when
+  a section needs them, cutting the agent from 44 KB to 32 KB on every dispatch.
+  `tests/checks/wp-template-references.sh` pins the pointers and the size budget.
+
+### Fixed
+
+- **`bin/*.mjs` tools no longer drop output on a pipe when they exit.** On a pipe Node
+  writes asynchronously, so a tool that printed more than 64 KiB and then called
+  `process.exit()` ended with the rest of its output unsent: `css-contour-lint.mjs` with a
+  thousand findings delivered 272 of its 1001 lines through a slow reader, the summary line
+  among the lost ones, and still exited 1. Every tool now imports `bin/lib/stdio-blocking.mjs`
+  first, which makes stdout and stderr blocking, so each write completes before the next
+  statement and none of the tools' 160 or so exit sites had to change.
+  `tests/checks/mjs-stdio-blocking.sh` pins the import in every tool and pipes more than
+  64 KiB through the module and through `css-contour-lint.mjs`.
+
 ## [1.37.0] - 2026-11-22
 
 ### Added
