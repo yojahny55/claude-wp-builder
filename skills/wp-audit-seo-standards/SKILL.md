@@ -226,6 +226,11 @@ writer, `wp-agentic-surfaces` Step 4, which confirms the owner's AI-crawler post
 
 FAQ content can appear in several forms. Detect and convert to JSON-LD schema automatically.
 
+Emit FAQ schema only on pages whose questions and answers are **visible in the rendered
+content** (Google's requirement). It serves assistants, AI answers and other search engines;
+since 2023 Google limits FAQ rich results to a few site types (authoritative government and
+health sites), so do not promise a rich result.
+
 ### Detection Sources
 
 1. **ACF repeater fields** — field names: `faq_items`, `faqs`, `faq_cards`, `faq`

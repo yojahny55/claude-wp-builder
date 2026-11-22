@@ -119,8 +119,8 @@ none of them, so a section authored there ships with no ACF wiring, no escaping 
 i18n, and `/wp-finalize` then reports it as a bilingual failure.
 
 What the `tailwind` path changes is the class system, not the owner: `wp-template` keeps
-the Tailwind utility classes already on the section HTML it was handed — Step 2.6 of
-`/wp-yolo` converted the demo before this walk, so they are there — instead of inventing
+the Tailwind utility classes already on the section HTML it was handed — `/wp-yolo`
+Step 2.6 converted the demo before this walk, so they are there — instead of inventing
 BEM names. Agent 2's prompt below carries that instruction.
 
 **`wp-tailwind` in author mode runs AFTER `wp-template` returns, never beside it**, and

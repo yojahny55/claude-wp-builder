@@ -171,9 +171,11 @@ Every agent this command reaches — directly or through the commands it drives 
 its own `model:` in its frontmatter (`agents/*.md`), so dispatch cost is routed per task
 without any flag on this command:
 
-- **opus** — planning/analysis whose output steers the whole build: `wp-normalize`, `wp-context`.
+- **opus** — planning/analysis whose output steers the whole build: `wp-normalize`, `wp-context`,
+  `wp-research`.
 - **sonnet** — code authoring and judgment audits: `wp-template`, `wp-css`, `wp-tailwind`,
-  `wp-cinematic`, `wp-audit-a11y|performance|practices|security|seo`,
+  `wp-cinematic`, `wp-agentic-surfaces`,
+  `wp-audit-a11y|geo|performance|practices|security|seo|ux`,
   `wp-audit-rankmath` (schema conflicts, title quality, JSON-LD merge and the Polylang route are judgment, not mechanical config).
 - **haiku** — mechanical generation and WP-CLI config: `wp-acf`, `wp-cf7`,
   `wp-audit-aios`. `wp-acf` and `wp-cf7` stay here because each ends

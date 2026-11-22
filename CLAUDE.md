@@ -51,6 +51,8 @@ contract. The only executable code shipped is:
   `wp-config.php` instead of the database. Held to the PHP 7.4 floor, and exercised against a
   real WooCommerce in the fixture.
 - `starter-theme/**` — PHP copied into user projects (never executed here)
+- `templates/agentic/agentic.php` — the theme's `inc/agentic.php`, copied whole by the
+  `wp-agentic-surfaces` agent with its tokens substituted (never executed here)
 
 Editing a "feature" therefore usually means editing prose contracts, and the tests assert on
 those contracts (grep for required tokens in the markdown), not on program behavior.
@@ -171,7 +173,9 @@ Checks read such a command through `tests/checks/lib/expand-command.sh`, which s
 the command's own `<command>-run` references.
 
 **Agent** (`agents/<name>.md`) — frontmatter `name`, `description`, `tools`, `model` (`opus`|`sonnet`|`haiku` — cost tier, see `tests/checks/model-routing.sh`) (order:
-`Read, Write, Edit, Grep, Glob, Bash`). Must open with the "First Action (MANDATORY)" block.
+`Read, Write, Edit, Grep, Glob, Bash`). Must open with the "First Action (MANDATORY)" block,
+and return `BLOCKED: <reason>` plus the files it touched when it cannot proceed, never a guess
+(contract and exceptions: `skills/wp-contributing/SKILL.md` § Agent contracts).
 
 **Skill** (`skills/<name>/SKILL.md`) — frontmatter `name`, `description`, `user-invocable: false`.
 Skills inform; they never act. The description says what the skill does and ends with a

@@ -28,6 +28,22 @@ converted. A file path cannot supply the mode line; only a dispatcher that means
 
 Convert a standard HTML/CSS demo file into Tailwind-native HTML using utility classes.
 
+## First Action (MANDATORY)
+
+Which mode you are in (above) decides what you read first:
+
+- **Section Authoring Mode** (`Mode: **author**`): read the project's `.claude/CLAUDE.md` before
+  writing anything and extract the **function prefix**, the **languages** and the **theme slug**.
+  The dispatch also supplies the prefix, so a mismatch between the two is a blocker, not a
+  choice. If `.claude/CLAUDE.md` is missing or unreadable, do not guess: stop and return
+  `BLOCKED: <reason>` plus the files you already touched (`touched: none` when there are none).
+  Contract: `skills/wp-contributing/SKILL.md` § Agent contracts.
+- **Demo Conversion Mode** (no `Mode: **author**` line): the demo may come from a folder that
+  has no WordPress project yet, so there may be no `.claude/CLAUDE.md`. Its absence is not a
+  blocker here: convert from the input file and the stylesheets it links. Read the file when it
+  exists (it can name the theme's colour tokens) and carry on when it does not. Blocked only
+  when the input file or its output path is missing.
+
 **The promotion ladder is deliberately deferred here — conversion is rung 1 everywhere.**
 `skills/wp-tailwind-system/SKILL.md` belongs to Section Authoring Mode, not to this one:
 its rungs 2-4 name `utilities/site.css` and `components/<slug>.css`, files that live inside

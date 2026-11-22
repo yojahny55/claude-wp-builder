@@ -35,6 +35,8 @@ function esc_attr( $s ) { return htmlspecialchars( (string) $s, ENT_QUOTES ); }
 function wp_kses( $s, $allowed ) { return $s; }
 function get_field( $name, $id = false ) { return ''; }
 function is_ssl() { return false; }
+function is_admin() { return false; }
+function did_action( $hook ) { return 0; }
 
 $which = isset( $argv[1] ) ? $argv[1] : '';
 $files = array(

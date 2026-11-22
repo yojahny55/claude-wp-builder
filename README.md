@@ -15,7 +15,7 @@
 
 A Claude Code plugin that turns approved demo HTML into a complete WordPress theme — section by section, with ACF/SCF fields, bilingual support, SEO, and security — all from the command line.
 
-[Quick Start](#installation) | [Workflows](docs/workflows.md) | [Commands](docs/commands.md) | [Architecture](#architecture) | [Cinematic Mode](docs/cinematic-mode.md) | [Contributing](CONTRIBUTING.md) | [Backlog](BACKLOG.md)
+[Quick Start](#installation) | [Workflows](docs/workflows.md) | [Commands](docs/commands.md) | [Architecture](#architecture) | [Cinematic Mode](docs/cinematic-mode.md) | [Contributing](CONTRIBUTING.md) | [All docs](docs/README.md) | [Backlog](BACKLOG.md)
 
 </div>
 
@@ -88,6 +88,30 @@ Add to your project's `.claude/settings.json` so all collaborators get it automa
   }
 }
 ```
+
+### Updating and uninstalling
+
+- **Marketplace install:** run `/plugin`, refresh the `claude-wp-builder` marketplace, update the plugin, then run `/reload-plugins` so the open session loads the new commands. Or from the prompt: `/plugin marketplace update claude-wp-builder`.
+- **`--plugin-dir` clone:** `git pull` in the clone, then `/reload-plugins` in each open session.
+- **Uninstall:** `/plugin uninstall claude-wp-builder@claude-wp-builder`, and `/plugin marketplace remove claude-wp-builder` if you added the marketplace. Your projects keep everything the plugin generated (theme, `.wp-create.json`, `demo/`); only the commands go away.
+
+## Requirements
+
+What each family of commands actually runs. Anything not listed needs nothing beyond Claude Code and a shell.
+
+| Needs | Commands | Notes |
+|-------|----------|-------|
+| **WP-CLI** and **PHP** | `/wp-create`, `/wp-init`, `/wp-seed`, `/wp-section`, `/wp-page`, `/wp-cpt`, `/wp-polylang`, `/wp-update`, `/wp-debug`, `/wp-adopt`, `/wp-clone`, `/wp-anonymize`, `/wp-woo-setup`, `/wp-finalize`, `/wp-audit` | The commands read the wrapper from `.wp-create.json` (`wp_cli.wrapper`), so WP-CLI can sit behind Docker, DDEV, Lando or wp-env. Theme and plugin PHP keeps a 7.4 floor. |
+| **Node.js** | every command that runs a `bin/*.mjs` tool (`wp-config.mjs`, `demo-verify.mjs`, `image-gen.mjs`, the audit tools) | `/wp-create` and the manifest gate call `wp-config.mjs`, so treat Node as required. `npx` reaches the network for `impeccable` in `/wp-demo-verify`. |
+| **A Chrome or Chromium** plus `playwright-core` | `/wp-demo` (craft mode), `/wp-yolo` (craft), `/wp-demo-verify`, `/wp-responsive-check` (it delegates to `/wp-demo-verify`), browser tiers of `/wp-audit` | `bin/demo-verify.mjs --probe` answers whether the machine can render. Point `WP_BROWSER_CHROMIUM` at a browser already installed; the plugin never downloads one. A Playwright Firefox build (or `WP_BROWSER_FIREFOX`) adds a second-engine pass and is optional. |
+| **ffmpeg** | `/wp-cinematic-encode` | `bin/wp-cinematic-encode.sh` stops with "ffmpeg not installed" when it is missing. |
+| **Docker** | `/wp-create` with a Docker-based environment (its own Docker template, DDEV, Lando or wp-env), `/wp-debug` and `/wp-seed` against a container | Native Nginx, Apache or Caddy needs no Docker. |
+| **A MariaDB or MySQL server** | `/wp-create` native environments | The Docker template, DDEV, Lando and wp-env bring their own. |
+| **A MySQL/MariaDB client, the `php` CLI and one of ImageMagick, `cwebp` or PHP GD** | `/wp-robin` | See the command's own preflight for the full list. |
+| **An image API key** | `/wp-demo` craft-mode generated images | `GEMINI_API_KEY` or `OPENAI_API_KEY` in the environment; image generation is optional and costs money on your key. |
+| **`git`** | `/wp-adopt` publishing, `/wp-contribute` | |
+
+Not derivable from the code, so not listed here: tested minimum versions of Node, WP-CLI, Chromium and WordPress.
 
 ## Quickstart
 
@@ -734,12 +758,30 @@ The `/wp-demo` command works best with these skills installed. All other command
 | `frontend-design` | [anthropics/claude-code](https://github.com/anthropics/claude-code/tree/main/plugins) | `/plugin install frontend-design@anthropics-claude-code` |
 | `ui-ux-pro-max` | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | `/plugin marketplace add nextlevelbuilder/ui-ux-pro-max-skill` |
 
+## Troubleshooting
+
+Failure modes the commands already report, and what to do about each.
+
+| You see | Cause | Fix |
+|---------|-------|-----|
+| A craft `/wp-demo` or `/wp-yolo` stops at the browser gate; `demo-verify.mjs --probe` exits 2 | No `playwright-core` or no Chrome/Chromium found | Say yes to `npm i -D playwright-core` in the project root, and set `WP_BROWSER_CHROMIUM` to an installed Chrome or Chromium. The plugin never downloads a browser and never falls back to plain mode for craft. |
+| A command stops with exit 3 and "no .wp-create.json" | The project was not created by `/wp-create`. Not every command halts on a missing manifest: each has a policy (stop, offer to adopt, fall back to bare WP-CLI, scaffold) listed in `skills/wp-manifest-gate/SKILL.md`. | Run `/wp-create`, or `/wp-adopt` for an existing site. |
+| `wp-config.mjs validate` exits 1 | The manifest is invalid, or the generated context block disagrees with it | Read the message; fix the field it names. |
+| `wp-config.mjs validate` exits 2 | An older manifest that can migrate | Run `node "${CLAUDE_PLUGIN_ROOT}/bin/wp-config.mjs" migrate <project>`, then rerun. |
+| `wp-config.mjs drift` exits 4 | The manifest no longer describes the site WP-CLI talks to (for example a database restored over a blank scaffold) | Each `drift:` line names a disagreement; correct the manifest or the site. |
+| `Language 'es' not available` from WP-CLI | A bare language code was used | Use the full locale, such as `es_ES`. |
+| `ffmpeg not installed` | `/wp-cinematic-encode` cannot find ffmpeg | Install ffmpeg. |
+| Store profiles refuse to run | They need native WP-CLI | Use a native environment, or run the store step outside the container wrapper. |
+| New commands do not appear after an update | The session still holds the old plugin | `/reload-plugins`. |
+
+Every documented limit that is deliberate rather than a bug is in [docs/known-ceilings.md](docs/known-ceilings.md).
+
 ## Roadmap
 
 See [BACKLOG.md](BACKLOG.md) for the full product backlog. Key areas of active development:
 
 - **WooCommerce stores, after the foundation** — theme integration (the enquiry form and
-  WhatsApp button render in the theme), store demo pages, product seeding and `/wp-woo-verify`,
+  WhatsApp button render in the theme), store demo pages, product seeding and a store verify step,
   a store audit and launch step, the Polylang bridge, then subscriptions and bookings
 - Visual regression between a demo and the theme built from it — screenshot baselines exist today for the motion fixtures only
 - An end-to-end run of a generated site in CI, and a corpus of broken sites with expected audit findings
