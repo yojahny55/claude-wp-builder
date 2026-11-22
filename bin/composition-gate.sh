@@ -82,11 +82,14 @@ fi
 
 echo "composition-gate: assembled $count compositions (each >= $MIN_DOC_BYTES bytes on disk)"
 
-# `@4` is resolved against the registry on every run, so one dropped connection leaves an
+# `@latest` follows the newest release on purpose (new rules are answered, not frozen out),
+# and is resolved against the registry on every run, so one dropped connection leaves an
 # empty findings.json and reads as "could not scan". Retry once on an empty payload only: a
-# detector that answered, with any JSON, is never re-run.
+# detector that answered, with any JSON, is never re-run. Because the version floats, the
+# gate below refuses any finding whose shape, category or severity it does not know (exit
+# 1, "not understood"), so a new release can make the gate fail but never makes it green.
 for attempt in 1 2; do
-  npx -y impeccable@4 detect "$WORK" --json > "$WORK/findings.json" 2>/dev/null || true
+  npx -y impeccable@latest detect "$WORK" --json > "$WORK/findings.json" 2>/dev/null || true
   [ -s "$WORK/findings.json" ] && break
 done
 
@@ -110,6 +113,31 @@ else:
     # unreadable payload as zero findings would be a vacuous pass.
     print("composition-gate: detector JSON carries no findings list (top level: %s) — treating as could not scan"
           % type(data).__name__, file=sys.stderr)
+    raise SystemExit(1)
+# Every finding must be a shape this gate can judge. A category or severity it has never
+# seen (a new release adding "error", say) would otherwise fall through the slop+warning
+# filter below and read as a clean pass: refuse instead, naming what was not understood.
+KNOWN_CATEGORY = {"slop", "quality"}
+KNOWN_SEVERITY = {"warning", "advisory"}
+unknown = []
+for i, f in enumerate(findings):
+    if not isinstance(f, dict):
+        unknown.append("finding %d is a %s, not an object" % (i, type(f).__name__))
+        continue
+    for key in ("antipattern", "file"):
+        if not isinstance(f.get(key), str) or not f.get(key):
+            unknown.append("finding %d has no %s" % (i, key))
+    if f.get("category") not in KNOWN_CATEGORY:
+        unknown.append("finding %d has category %r" % (i, f.get("category")))
+    if f.get("severity") not in KNOWN_SEVERITY:
+        unknown.append("finding %d has severity %r" % (i, f.get("severity")))
+if unknown:
+    for line in unknown[:10]:
+        print("composition-gate: detector output not understood: %s" % line, file=sys.stderr)
+    if len(unknown) > 10:
+        print("composition-gate: ... and %d more" % (len(unknown) - 10), file=sys.stderr)
+    print("composition-gate: treating as could not scan; teach the gate the new shape before trusting it",
+          file=sys.stderr)
     raise SystemExit(1)
 # Rules the gate does not block on yet, each with the reason and the way out. Keep this
 # list short: every entry is a finding nobody is looking at.

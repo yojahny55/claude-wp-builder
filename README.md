@@ -205,7 +205,7 @@ composition's size-based breakpoints are `@container` queries against its own co
 than the viewport, and its fluid ramps in `clamp()` read `cqi` and track that container too,
 except for three: two hero headlines sized against the screen on purpose, and one
 root `gap` that cannot be `cqi` because its own rule declares the container — and loops
-on `npx -y impeccable@4 detect`, a seven-line critique rubric, and a `demo-verify.mjs` walk
+on `npx -y impeccable@latest detect`, a seven-line critique rubric, and a `demo-verify.mjs` walk
 (served over HTTP, not `file://`; `no-engine` and `container-noop` join `dead-scroll` as
 blocking findings, `unobserved` and `external-module` stay advisory) for at most three rounds. A
 build still failing at the cap writes `demo/FAILED.md` — every failing rubric line, every
