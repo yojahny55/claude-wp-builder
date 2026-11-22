@@ -13,9 +13,27 @@
 # disabled one: mutating the detector filter ("slop" -> "slopx") or zeroing
 # MIN_HTML_BYTES leaves the pass half of this check green.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+. "$(dirname "$0")/../lib/assert.sh"
+cd "$(dirname "$0")/../.." || exit 1
 
-fail() { echo "FAIL: $*" >&2; exit 1; }
+
+require_tool npx python3
+
+# The real detector needs the npm cache or the network. Where it cannot be fetched this check
+# measures nothing, so it SKIPs; any other probe failure (the detector broke, changed format
+# or flag) is a FAIL. CHECKS_REQUIRE_TOOLS=1 turns even the offline SKIP into a FAIL.
+# "Responded" means parseable JSON of any shape, the same bar bin/composition-gate.sh sets.
+probe_dir="$(mktemp -d)"
+trap 'rm -rf "$probe_dir"' EXIT
+printf '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>p</title></head><body><p>probe</p></body></html>\n' > "$probe_dir/p.html"
+npx -y impeccable@4 detect "$probe_dir" --json > "$probe_dir/out.json" 2> "$probe_dir/err.txt" || true
+if ! python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$probe_dir/out.json" 2>/dev/null; then
+  if [ "$(grep -ciE 'ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNREFUSED|ENETUNREACH|ECONNRESET|network|FetchError|EACCES|EROFS' "$probe_dir/err.txt" || true)" -gt 0 ]; then
+    [ "${CHECKS_REQUIRE_TOOLS:-0}" = 1 ] && fail "CHECKS_REQUIRE_TOOLS=1 and the impeccable detector cannot be fetched: $(head -c 300 "$probe_dir/err.txt")"
+    skip "impeccable detector not reachable (no usable npm cache or network); gate not exercised"
+  fi
+  fail "the impeccable detector started badly and it is not a network problem: $(head -c 300 "$probe_dir/err.txt")"
+fi
 
 [ -x bin/composition-gate.sh ] || fail "bin/composition-gate.sh is missing or not executable"
 
@@ -34,7 +52,7 @@ n="$(echo "$out" | sed -n 's/.*assembled \([0-9]*\) compositions.*/\1/p' | sed -
 
 # --- negative controls -------------------------------------------------------
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+trap 'rm -rf "$work" "$probe_dir"' EXIT
 
 # 1. A composition carrying the exact defect the gate exists to catch: an
 #    infinite translate the detector calls `marquee`. rc must be 2.
