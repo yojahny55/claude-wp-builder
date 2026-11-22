@@ -18,6 +18,7 @@ read it whole and follow it in order.
 
 | Step | File | Covers |
 |---|---|---|
+| 4.2 | [references/overwrite.md](references/overwrite.md) | Overwrite on an existing manifest: export to the host, confirmation, `core download --force`, `db reset --yes` |
 | 4.3 | [references/env-templates.md](references/env-templates.md) | The template for each environment, the `{{placeholder}}` values, port auto-assignment, the validation |
 | 4.10 | [references/plugin-profile.md](references/plugin-profile.md) | Profile validation, installing each plugin, required versus optional outcomes, `plugins.degraded` |
 | 5 | [references/manifest.md](references/manifest.md) | The `.wp-create.json` written to the project root, its fields and the validation that follows |
