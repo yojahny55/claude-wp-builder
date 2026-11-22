@@ -88,7 +88,9 @@ done
 #     else that is legitimately not a command goes in PROSE_NOT_COMMANDS, with a reason.
 # ---------------------------------------------------------------------------
 # /wp-figma-connect: a proposal in docs/code-connect-draft.md, not shipped.
-PROSE_NOT_COMMANDS=" /wp-figma-connect "
+# /wp-admin, /wp-json, /wp-content, /wp-includes, /wp-login, /wp-cron: WordPress's own paths
+# (`/wp-login.php` matches as /wp-login), which the docs cite as URLs, never as commands.
+PROSE_NOT_COMMANDS=" /wp-figma-connect /wp-admin /wp-json /wp-content /wp-includes /wp-login /wp-cron "
 for doc in "$README" docs/*.md; do
   # the archive is history: it names commands that were removed since
   [ "$doc" = docs/changelog-archive.md ] && continue
