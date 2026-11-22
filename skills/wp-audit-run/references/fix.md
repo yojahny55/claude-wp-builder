@@ -203,7 +203,7 @@ a pass; `2` is a usage error or no browser, a tool failure to report, not a resu
 `--state menu=<toggle-selector>@390` to record an opened mobile menu. Run it at desktop and
 mobile (the default 1366x768 and 390x844) and read the diff for every element sharing the class.
 
-**GEO fixes:** Dispatch an agent with `subagent_type: wp-agentic-surfaces` with the full project context and the list of auto-fixable GEO findings. It owns `inc/agentic.php` and every generated agent surface (`llms.txt`, ARD catalog, agent-skills index, markdown negotiation, Link headers, agent-friendly 404, JSON-LD breadth, trust anchors) — do not re-implement the surfaces here. Before dispatching, run the live verifier to capture the before score; run it again after the fixer completes and report the before → after score:
+**GEO fixes:** Dispatch an agent with `subagent_type: wp-agentic-surfaces` with the full project context and the list of auto-fixable GEO findings. It owns `inc/agentic.php` and every generated agent surface (`llms.txt`, ARD catalog, agent-skills index, markdown negotiation, Link headers, agent-friendly 404, JSON-LD breadth, trust anchors) — do not re-implement the surfaces here. Before dispatching, run the live verifier to capture the before score; run it again after the fixer completes and report the before → after score. If the fixer returns `BLOCKED: <reason>`, skip the after scan: the GEO findings stay open, and the report names the agent, its reason and the files it touched:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/bin/geo-scan.sh <home-host> --start

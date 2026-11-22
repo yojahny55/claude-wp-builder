@@ -18,7 +18,7 @@ for f in agents/*.md; do
 done
 
 # BLOCKED line in the agents that read the project file or tokens.
-for n in wp-template wp-css wp-acf wp-cf7 wp-cinematic wp-tailwind \
+for n in wp-template wp-css wp-acf wp-cf7 wp-cinematic wp-tailwind wp-agentic-surfaces \
          wp-context wp-normalize \
          wp-audit-a11y wp-audit-seo wp-audit-geo wp-audit-performance wp-audit-practices \
          wp-audit-security wp-audit-ux; do
@@ -31,6 +31,7 @@ done
 # The parent consumes the blocked key: one re-dispatch, still INCOMPLETE, reason named in the report.
 inc skills/wp-audit-run/references/dispatch.md 'A blocked reason is not an allowed blocker'
 inc skills/wp-audit-run/references/dispatch.md 'writes the agent and its `blocked` reason into the Step 6.8 point 5 summary'
+inc skills/wp-audit-run/references/fix.md 'If the fixer returns `BLOCKED: <reason>`, skip the after scan'
 inc agents/wp-tailwind.md 'Demo Conversion Mode'
 inc agents/wp-tailwind.md 'Its absence is not a'
 

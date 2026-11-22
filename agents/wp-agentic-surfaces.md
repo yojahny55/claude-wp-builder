@@ -29,6 +29,13 @@ Before writing any file or running any command, read the project files:
 
 3. **`skills/wp-audit-geo-standards/SKILL.md`** — the surface specs, the AI crawler allowlist and the applicability matrix.
 
+**Blocked contract.** If `.claude/CLAUDE.md` is missing or unreadable, or records no function
+prefix or theme path, do not guess them: stop and return `BLOCKED: <reason>` plus the files you
+already touched (`touched: none` when there are none). A guessed prefix emits an
+`inc/agentic.php` whose functions collide or never load. Use the same line for any other blocker
+you cannot work around (no `.wp-create.json` wrapper, `templates/agentic/agentic.php` missing).
+Contract: `skills/wp-contributing/SKILL.md` § Agent contracts.
+
 Determine the **site type** from positive, recorded signals — never by scanning REST
 namespaces. Check in order:
 
