@@ -4,12 +4,13 @@
 #   bash tests/mutation.sh                     15 checks, seed 1
 #   bash tests/mutation.sh -n 30 -s 7          bigger sample, another seed
 #   bash tests/mutation.sh -c "a.sh b.sh"      only these checks (names under tests/checks/)
+#   bash tests/mutation.sh -r DIR              mutate the git repo at DIR (default: this one)
 #
 # Most checks are `need FILE "token"` greps over commands/, agents/ and skills/. A grep that
 # also matches a comment or another file keeps passing when the contract wording is gone,
 # and nothing says so. For each sampled check this copies the repo to a temp dir (the real
 # tree is never touched), deletes the first line holding one token the check requires, and
-# expects the check to FAIL on the copy. A check that still passes is a survivor: a mutant it
+# expects the check to FAIL on the copy (a check that already fails unmutated there, or times out, is skipped, not counted). A check that still passes is a survivor: a mutant it
 # does not detect. One mutant per check; the token is picked by the seed, so a run repeats.
 # Only checks whose `need()` takes (file, token) and calls with a literal path and a plain
 # quoted token are eligible. Exit 0 when nothing survived, 1 otherwise, 2 on bad usage.
@@ -17,16 +18,18 @@ set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 root=$PWD
 
-n=15 seed=1 only=""
+n=15 seed=1 only="" target_root=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -n) n=${2:-}; shift 2 ;;
     -s) seed=${2:-}; shift 2 ;;
     -c) only=${2:-}; shift 2 ;;
-    -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
+    -r) target_root=${2:-}; shift 2 ;;
+    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
     *) echo "mutation.sh: unknown option $1" >&2; exit 2 ;;
   esac
 done
+if [ -n "$target_root" ]; then cd "$target_root" || { echo "mutation.sh: no such root $target_root" >&2; exit 2; }; fi
 case "$n$seed" in ''|*[!0-9]*) echo "mutation.sh: -n and -s need numbers" >&2; exit 2 ;; esac
 
 # Helpers of the form `name() { grep ... "$2" "$1" ...}` (file, token) or `"$1" "$2"` (token,
@@ -85,16 +88,24 @@ for c in "${picked[@]}"; do
   if [ ! -f "$target" ] || ! grep -nF -- "$token" "$target" >/dev/null; then
     skipped=$((skipped + 1)); printf 'SKIP     %s (%s / "%s" not in the copy)\n' "$c" "$file" "$token"; continue
   fi
+  # Reference run: a check that fails (or times out) unmutated in the copy proves nothing.
+  (cd "$tmp" && timeout 120 bash "tests/checks/$c" >/dev/null 2>&1); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    skipped=$((skipped + 1)); printf 'SKIP     %s (fails unmutated in the copy, exit %d)\n' "$c" "$rc"; continue
+  fi
   ln=$(grep -nF -- "$token" "$target" | sed -n 1p | cut -d: -f1)
   cp -p "$target" "$tmp/.orig"
   sed -i "${ln}d" "$target"
-  if (cd "$tmp" && timeout 120 bash "tests/checks/$c" >/dev/null 2>&1); then
+  (cd "$tmp" && timeout 120 bash "tests/checks/$c" >/dev/null 2>&1); rc=$?
+  cp -p "$tmp/.orig" "$target"
+  if [ "$rc" -eq 124 ]; then
+    skipped=$((skipped + 1)); printf 'SKIP     %s (timed out)\n' "$c"
+  elif [ "$rc" -eq 0 ]; then
     survived+=("$c: deleting $file:$ln (token \"$token\") still passes")
     printf 'SURVIVED %s\n' "$c"
   else
     killed=$((killed + 1)); printf 'killed   %s\n' "$c"
   fi
-  cp -p "$tmp/.orig" "$target"
 done
 
 printf '\nmutants: %d killed, %d survived, %d skipped (sample %d, seed %d)\n' "$killed" "${#survived[@]}" "$skipped" "${#picked[@]}" "$seed"

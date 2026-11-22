@@ -387,8 +387,8 @@ jobs:
       #
       # Deliberately NOT the runner's own Chrome, which is what motion-devices.sh uses.
       # That check asserts on the DOM, which survives a browser upgrade; this one asserts
-      # on pixels, which do not. ubuntu-latest ships a self-updating Chrome and migrates
-      # to Ubuntu 26 in October, so baselines taken against it would fail every time
+      # on pixels, which do not. the pinned ubuntu-24.04 image still ships a self-updating Chrome (and floating tags migrate
+      # to Ubuntu 26 in October), so baselines taken against it would fail every time
       # Chrome shipped a font or antialiasing change -- "the baseline moved" would mean
       # "Chrome moved" more often than it meant a regression, and a gate that cries wolf
       # is a gate people mute.
