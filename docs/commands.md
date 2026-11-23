@@ -23,6 +23,7 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-cpt`](#wp-cpt) | B | optional | demo section hints | CPT registration, fields, archive/single, teaser, `inc/seed/<name>.php` |
 | [`/wp-settings`](#wp-settings) | B | optional | `fields/settings.php` | new settings fields |
 | [`/wp-favicon`](#wp-favicon) | all | optional | one square image | `assets/img/favicon/*`, Site Icon |
+| [`/wp-maintenance`](#wp-maintenance) | all | optional | WP-CLI, theme prefix | `inc/maintenance.php`, one option |
 | [`/wp-seed`](#wp-seed) | B | required for content | demo HTML, `.wp-create.json` | WP pages, media, ACF values, menus |
 | [`/wp-finalize`](#wp-finalize) | all | recommended | theme, WP-CLI | report only |
 | [`/wp-demo-verify`](#wp-demo-verify) | all | recommended | URL or file | `.verify/` screenshots, contact sheet, findings |
@@ -335,6 +336,19 @@ upscales. Writes 16, 32, 180, 192 and 512 px PNGs, a multi-size `favicon.ico` an
 An icon already set is left alone unless `--force`. Needs ImageMagick 7 (`magick`); it is not
 installed for you. WordPress does not link a manifest; both starter themes print the link when
 the file exists, and the command shows the hook for a theme without it.
+
+### `/wp-maintenance`
+
+```
+/wp-maintenance on [--retry-after <seconds>] | off | status [--force]
+```
+
+Closes the site to visitors and keeps it open to editors. On a theme site it copies
+`templates/maintenance/maintenance.php` into `inc/maintenance.php` and switches it with the
+`<prefix>_maintenance` option: visitors who cannot `edit_posts` get a `503` with
+`Retry-After`, and anonymous REST requests get the same error. A theme copy that no longer
+matches the template is left alone unless `--force`. Stores use the same switch; WooCommerce's
+coming-soon mode is launch state and is reported, never written. Verified with an anonymous `curl`.
 
 ### `/wp-seed`
 
