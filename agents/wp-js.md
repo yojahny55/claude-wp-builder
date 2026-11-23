@@ -24,12 +24,21 @@ Read the project's `.claude/CLAUDE.md` for the function prefix, the theme direct
 languages. Then read, before writing anything:
 
 1. `<theme>/assets/js/src/index.js` — how modules are imported and started (`startWidgets`).
-2. Every module already in `<theme>/assets/js/src/` — tabs, accordion, directory filter and
+2. Every module already in `<theme>/assets/js/src/`, including `sections/` and a
+   `sections.js` a `/wp-yolo` build may have left — tabs, accordion, directory filter and
    motion already exist. **Never write a second implementation of a behaviour the theme
    already has**: give the markup the attributes that module reads instead, and say so.
-3. `<theme>/package.json` — the libraries the bundle can import.
-4. The section's template part, `template-parts/section-<slug>.php`, and the demo section's
-   markup and every script the prompt hands you.
+3. `<theme>/package.json` — the libraries the bundle can import. **Check the libraries now,
+   before writing anything**: a library the demo's script uses that `package.json` lacks is a
+   `BLOCKED` return with `touched: none` (see Wiring 2), never a module that imports it.
+4. The section's template part, `template-parts/section-<slug>.php`, the section's CSS (its
+   block in `assets/css/styles.css`, or its utilities and `@apply` rules on `tailwind`), and
+   the demo section's markup and every script the prompt hands you.
+
+**Port this section only.** A shared demo script (one `main.js` for the whole page) is handed
+to you whole: port only the parts that act on this section's root or its descendants, and
+list the rest as "not ported: belongs to <other section or chrome>". A behaviour a module
+already covers is not ported twice.
 
 ## What to write
 
@@ -48,6 +57,10 @@ One module per behaviour: `assets/js/src/sections/<slug>.js`, exporting `init<Na
 - **Accessible by construction.** State lives in ARIA (`aria-expanded`, `aria-selected`,
   `aria-hidden`, `aria-current`), keyboard works (Enter, Space, arrows, Escape where the
   pattern has them), focus moves where the pattern says it does.
+- **The CSS sees the state.** Toggle, together with the ARIA, every state class or attribute
+  the section's CSS already styles (`.is-open`, `.is-active`, `[aria-expanded="true"]`…) —
+  the demo's script tells you which. A state the CSS does not style at all is not invented in
+  the script: return it as "CSS needed: <selector> for <state>". You never edit CSS.
 - **Reduced motion.** Autoplay, parallax and smooth scrolling stop under
   `matchMedia('(prefers-reduced-motion: reduce)')`; the content stays reachable.
 - **Strings.** User-visible text inside the script comes from the localized data object the
@@ -60,7 +73,10 @@ One module per behaviour: `assets/js/src/sections/<slug>.js`, exporting `init<Na
 ## Wiring
 
 1. In `index.js`, import the module and call its `init` inside `startWidgets` (or the
-   equivalent DOM-ready starter the file uses). One import, one call.
+   equivalent DOM-ready starter the file uses). One import, one call. If the build in step 3
+   fails, or you return `BLOCKED` after this edit, take the import and the call back out of
+   `index.js` before returning: a module the bundle cannot build breaks every script on the
+   site, not just this section's.
 2. **Libraries.** Use a library (Swiper, Splide, GSAP, AOS…) only when the demo's script
    uses it, and only from `package.json`. GSAP is already there. A library the demo uses
    that `package.json` lacks: do not add a CDN `<script>` and do not run `npm install`;
@@ -81,5 +97,6 @@ unverified.
 ## Return
 
 The files you wrote or edited, the behaviours ported, any behaviour deliberately not ported
-(with the reason), and whether the bundle was rebuilt and the behaviour used. Or
+(with the reason), every "CSS needed" line, and whether the bundle was rebuilt and the
+behaviour used. Or
 `BLOCKED: <reason>` and the files touched.
