@@ -38,7 +38,8 @@ for f in "$refs"/*.md; do
   step=$(sed -n '1s/^# \/wp-page — //p' "$f")
   [ -n "$step" ] || { err "$f has no '# /wp-page — Type: <name>' title"; continue; }
   h="### ${step}"
-  grep -Fxq -- "$h" "$cmd" || h="#### ${step}"
+  # Only a non-type step may sit at "####": a "### Type:" heading demoted to "####" fails.
+  case "$step" in Type:*) ;; *) grep -Fxq -- "$h" "$cmd" || h="#### ${step}" ;; esac
   grep -Fxq -- "$h" "$cmd" || err "$f belongs to $step, which $cmd no longer has"
   # The pointer sits under that step, not elsewhere in the command.
   awk -v s="$h" -v b="references/$b" '
