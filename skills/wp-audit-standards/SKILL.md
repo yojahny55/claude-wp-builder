@@ -118,8 +118,9 @@ It also accepts three report shapes that agents drifted into in a real run:
   `{ "SEO-021": "no SEO plugin active" }`, read as the array form. Write the array form.
 - A report with no `category` key takes it from its file name, `agents/wp-audit-<x>.json`.
   Write the key anyway: a shard file named another way has no other source.
-- A scan note in `findings` (`check: "VENDOR"`, or a non-catalog id with `status: "INFO"`)
-  is moved to the report's notes and never counted as a finding. A note about the scan goes
+- A scan note in `findings` (`check: "VENDOR"` with no status, or a non-catalog id with
+  `status: "INFO"`) is moved to the report's notes and never counted as a finding. A
+  `VENDOR` row marked `FAIL` claims a defect with no id, and is refused. A note about the scan goes
   in the top-level `notes` (or `vendor_notes`) array. A catalog id with `status: "INFO"`
   stays refused: that is a finding whose status was confused with its severity.
 

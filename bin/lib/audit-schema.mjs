@@ -189,10 +189,14 @@ function rowsOf(value) {
 // finding whose status was confused with its severity, and moving it would hide it.
 const NOTE_CHECK = /^(VENDOR|NOTES?|INFO)$/i;
 const NOTE_STATUS = /^(INFO|NOTE)$/i;
+// A row only moves when its status says it is a note (INFO, NOTE) or says nothing: a
+// `VENDOR` row marked FAIL claims a defect, and is refused instead of silently dropped.
 function isScanNote(entry) {
   if (!entry || typeof entry !== 'object' || typeof entry.check !== 'string') return false;
   if (CATALOG_SHAPED.test(entry.check.trim())) return false;
-  return NOTE_CHECK.test(entry.check.trim()) || NOTE_STATUS.test(String(entry.status ?? ''));
+  const status = String(entry.status ?? '').trim();
+  if (NOTE_STATUS.test(status)) return true;
+  return status === '' && NOTE_CHECK.test(entry.check.trim());
 }
 function noteStrings(value) {
   const list = Array.isArray(value) ? value : value === undefined || value === null ? [] : [value];
@@ -236,6 +240,10 @@ export function normalizeReport(report, label = 'report') {
       if (key === 'findings' && isScanNote(entry)) {
         out.vendor_notes.push(...noteStrings(entry.message ?? entry.evidence ?? entry.check));
         notes.push(`${entry.check} row moved from findings to vendor_notes`);
+        return;
+      }
+      if (key === 'findings' && typeof entry.check === 'string' && NOTE_CHECK.test(entry.check.trim())) {
+        problems.push(`${where} "${entry.check}" is not a check id -- a note about the scan goes in "notes", a defect carries its catalog id`);
         return;
       }
       if (typeof entry.check !== 'string' || !entry.check) { problems.push(`${where} has no "check" id (aliases accepted: ${KEY_ALIASES.check.join(', ')})`); return; }

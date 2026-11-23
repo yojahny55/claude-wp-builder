@@ -81,10 +81,15 @@ done < <(jq -r '.defects[] | [.check,.file,.pattern] | @tsv' "$exp")
 if command -v php >/dev/null; then
   while IFS= read -r p; do php -l "$p" >/dev/null || fail "php -l failed after stripping: $p"; done < <(find "$scratch" -name '*.php')
 fi
-printf '<?php echo 1; // SEEDED SEC-999: inline\n' > "$scratch/theme/inline.php"
-if bash tests/fixtures/wp/provision.sh --strip-seeded "$scratch" >/dev/null 2>&1; then
-  fail "provision.sh --strip-seeded accepted an inline marker it cannot remove"
-fi
+# Three markers the line rule must refuse rather than delete: one after code, one before code
+# (deleting that line would delete the defect), one opening a block comment that runs on.
+for bad in '<?php echo 1; // SEEDED SEC-999: inline' '/* SEEDED A11Y-999: x */ a:focus{outline:0}' $'/* SEEDED PERF-999: runs\n   on */'; do
+  rm -f "$scratch/theme/inline.css"
+  printf '%s\n' "$bad" > "$scratch/theme/inline.css"
+  if bash tests/fixtures/wp/provision.sh --strip-seeded "$scratch" >/dev/null 2>&1; then
+    fail "provision.sh --strip-seeded accepted a marker it cannot remove whole: $bad"
+  fi
+done
 rm -rf "$scratch"
 
 # The comparison itself, as a function so the same logic runs against the recorded audit

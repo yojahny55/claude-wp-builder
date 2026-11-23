@@ -72,7 +72,8 @@ fi
 # check can tie a defect to its expected finding. Those comments must not reach the site:
 # the HTML and CSS ones are served, and an audit that reads "SEEDED A11Y-007" in the page
 # source is being told the answer. Every marker is a whole-line comment, so the line goes;
-# a marker left anywhere afterwards (one written inline) fails the copy instead of shipping.
+# a marker left anywhere afterwards (inline, or opening a multi-line comment) fails the copy
+# instead of shipping.
 # Offline and callable alone (--strip-seeded <dir>) so tests/checks/seeded-defects.sh can
 # run it on a scratch copy.
 # --------------------------------------------------------------------------------------
@@ -80,7 +81,15 @@ strip_seeded_markers() {
   local dir="$1" f
   [ -d "$dir" ] || die "strip-seeded: $dir is not a directory"
   while IFS= read -r -d '' f; do
-    sed -i -E '/^[[:space:]]*(\/\/|#|\/\*|<!--)[[:space:]]*SEEDED [A-Z0-9]+-[0-9]+/d' "$f" \
+    # Only a line that is one closed comment and nothing else: `// ...`, `# ...`,
+    # `/* ... */` or `<!-- ... -->`. A marker sharing its line with code, or a block comment
+    # that runs on to the next line, is left alone and fails the check below, because
+    # deleting that line would delete the defect or leave half a comment.
+    sed -i -E \
+      -e '/^[[:space:]]*(\/\/|#)[[:space:]]*SEEDED [A-Z0-9]+-[0-9]+/d' \
+      -e '/^[[:space:]]*\/\*[[:space:]]*SEEDED [A-Z0-9]+-[0-9]+[^*]*\*\/[[:space:]]*$/d' \
+      -e '/^[[:space:]]*<!--[[:space:]]*SEEDED [A-Z0-9]+-[0-9]+[^>]*-->[[:space:]]*$/d' \
+      "$f" \
       || die "strip-seeded: could not edit $f"
   done < <(find "$dir" -type f \( -name '*.php' -o -name '*.css' -o -name '*.js' -o -name '*.html' \) -print0)
   if grep -rlE 'SEEDED [A-Z0-9]+-[0-9]+' "$dir" >/dev/null 2>&1; then

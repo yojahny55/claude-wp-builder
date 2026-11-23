@@ -36,6 +36,11 @@ cat > "$t/notes.json" <<'JSON'
   {"check":"NOTE-X","status":"INFO","severity":"INFO","message":"second scan note"}],
  "notes":["a"],"vendor_notes":["b"]}
 JSON
+# A VENDOR row marked FAIL claims a defect: refused, never moved to the notes or dropped.
+cat > "$t/vendor-fail.json" <<'JSON'
+{"category":"best-practices",
+ "findings":[{"check":"VENDOR","status":"FAIL","severity":"WARNING","message":"real defect with no id"}]}
+JSON
 cat > "$t/catalog-info.json" <<'JSON'
 {"category":"best-practices",
  "findings":[{"check":"WP-020","status":"INFO","severity":"INFO","message":"query_posts used"}]}
@@ -71,6 +76,10 @@ for (const want of ["vendor notes: mu-plugins holds only net-guard", "second sca
 const c = norm("catalog-info.json");
 eq("catalog id with INFO is not moved", c.vendor_notes, []);
 if (c.problems.length !== 1 || !/status/.test(c.problems[0])) errs.push(`catalog id with INFO must yield one status problem: ${JSON.stringify(c.problems)}`);
+const v = norm("vendor-fail.json");
+eq("VENDOR marked FAIL is not moved", v.vendor_notes, []);
+eq("VENDOR marked FAIL is not a finding", v.findings.map((f) => f.check), []);
+if (v.problems.length !== 1 || !/not a check id/.test(v.problems[0])) errs.push(`VENDOR marked FAIL must yield one problem: ${JSON.stringify(v.problems)}`);
 if (errs.length) { console.log(errs.join("\n")); process.exit(1); }
 ' 2>&1) || fail "audit-schema report shapes:
 $out"
