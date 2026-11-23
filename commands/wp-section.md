@@ -183,27 +183,9 @@ If the page template does not exist yet, create it with `get_header()`, `<main>`
 A section whose demo has a script — a carousel, a gallery, tabs, an accordion, a filter, a
 form check — is not built until the script is. Skip this step under `--transcribe` (the
 `/wp-yolo` run ports every script once, in its behaviour-carry step), under `--hybrid`, and on a
-`cinematic` theme. Otherwise find the scripts that touch the section. A hit in the page's
-markup is not one — the section's own HTML always names its classes — so search scripts only:
-the demo's own `.js` files (not minified or vendored libraries), and the inline `<script>`
-bodies of the demo page, which `bin/demo-scripts.mjs` extracts (no `src`, no JSON-LD; exit 0
-printed, 1 none matching):
+`cinematic` theme.
 
-```bash
-grep -rlE '<root-class>|<child-ids-or-data-attributes>' demo --include=*.js \
-  --exclude=*.min.js --exclude-dir=vendor --exclude-dir=node_modules
-bash -c 'node "$1/bin/demo-scripts.mjs" "$2" --match "$3"' _ "${CLAUDE_PLUGIN_ROOT}" \
-  'demo/<page>.html' '<root-class>|<child-ids-or-data-attributes>'
-```
-
-None: skip, and say "no behaviour" in the summary. Some: dispatch **wp-js** with the slug,
-the theme directory, the template part path, the section's CSS, the demo section's markup and
-those scripts (a shared script whole: the agent ports only what acts on this section).
-It writes `assets/js/src/sections/<slug>.js`, wires it into `index.js`, adds `data-` hooks to
-the template part, and rebuilds the bundle. A `BLOCKED:` return (a library the theme does not
-have, no `index.js`) goes into the summary verbatim with the files it touched; the section
-is reported as built without its behaviour, never as finished. Its "CSS needed" lines go
-into the summary too: the CSS agent's next pass owns them.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-section-run/references/behaviour.md` now and follow it — it is this step, not background. It covers finding the scripts that act on the section, the `wp-js` dispatch, and how a section without behaviour or a `BLOCKED:` return is reported.
 
 ## Step 6.5: Rebuild Tailwind CSS
 
