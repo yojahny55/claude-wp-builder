@@ -51,7 +51,7 @@ for (const name of approved) {
 }
 for (const name of shots) {
   if (!approved.includes(name)) {
-    console.log(`FAIL [${name}] rendered, but no approved baseline -- run with --approve and review the PNG`);
+    console.log(`FAIL [${name}] rendered, but no approved baseline -- review the rendered PNG (tests/baselines/.failed-diffs/rendered/) and commit it as one`);
     failed = 1;
   }
 }
@@ -93,6 +93,44 @@ for (const name of shots.filter((n) => approved.includes(n))) {
   }
 }
 
+// Mutants (shoot.mjs): one token changed on a baselined page. Each must differ from its
+// baseline by more than the tolerance; one that does not names a change these baselines
+// cannot see. A missing mutants.json is a shooter that stopped producing them, not a pass.
+let mutants = [];
+try {
+  mutants = JSON.parse(await readFile(join(shotdir, 'mutants.json'), 'utf8'));
+} catch {
+  console.log('FAIL the shooter wrote no mutants.json');
+  failed = 1;
+}
+if (!Array.isArray(mutants) || mutants.length === 0) {
+  console.log('FAIL no mutants were rendered');
+  failed = 1;
+  mutants = [];
+}
+for (const name of mutants) {
+  const of = name.split('~')[0];
+  if (!approved.includes(of)) {
+    console.log(`FAIL [${name}] mutates ${of}, which has no approved baseline`);
+    failed = 1;
+    continue;
+  }
+  const got = await read(join(shotdir, 'mutants', name + '.png'));
+  const want = await read(join(baselinedir, of + '.png'));
+  let pct = 100;
+  if (got.width === want.width && got.height === want.height) {
+    const differing = pixelmatch(got.data, want.data, null, got.width, got.height, { threshold: 0.1 });
+    pct = (differing / (got.width * got.height)) * 100;
+  }
+  const seen = pct > tolerance;
+  report.push({ name, mutant: true, pct: Number(pct.toFixed(4)), seen });
+  console.log(
+    `${seen ? 'ok  ' : 'FAIL'} [${name}] mutant differs by ${pct.toFixed(4)}% (must exceed ${tolerance}%)`
+  );
+  if (!seen) failed = 1;
+}
+
 await writeFile(join(diffdir, 'report.json'), JSON.stringify(report, null, 2) + '\n');
-console.log(failed ? 'VISUAL FAILED' : `VISUAL OK (${report.length} shots)`);
+const nm = report.filter((r) => r.mutant).length;
+console.log(failed ? 'VISUAL FAILED' : `VISUAL OK (${report.length - nm} shots, ${nm} mutants seen)`);
 process.exit(failed);

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Render the motion fixtures and compare them to approved baselines.
+# Render the motion fixtures and the colour-and-type page, and compare them to approved
+# baselines. Mutants of the type page must differ from its baseline (compare.mjs).
 #
 # The last leg of I06: "Save approved demo/theme screenshot pairs matching fonts, content,
 # viewports, animation states. Report image differences reviewable tolerances." The pairs
@@ -33,10 +34,21 @@ TOLERANCE="0.1"
 
 shooter=tests/fixtures/motion/shoot.mjs
 comparer=tests/fixtures/motion/compare.mjs
-for f in "$shooter" "$comparer" "$BASELINES/RENDERED-BY.txt"; do
+for f in "$shooter" "$comparer" "$BASELINES/RENDERED-BY.txt" tests/fixtures/motion/type.html; do
   [ -f "$f" ] || fail "$f is missing"
   [ -r "$f" ] || fail "$f exists but cannot be read"
 done
+
+# Checked before the docker skip, so a machine without docker still sees the colour-and-type
+# coverage disappear: its baselines, its mutants, and the comparer's demand that each mutant
+# be seen.
+for b in type-1280 type-390; do
+  [ -f "$BASELINES/$b.png" ] || fail "$BASELINES/$b.png is missing -- the colour and type baseline"
+done
+for m in text-colour heading-family accent-colour lead-size; do
+  grep -F "'type-1280~$m'" "$shooter" >/dev/null || fail "$shooter no longer renders the $m mutant"
+done
+grep -F 'const seen = pct > tolerance;' "$comparer" >/dev/null || fail "$comparer no longer requires each mutant to be seen"
 
 # The baselines record which renderer produced them. If this check ever runs against a
 # different one, the pixels below are not comparable and the right answer is to say so
@@ -97,11 +109,15 @@ if ! node "$comparer" "$shots" "$BASELINES" "$diffs" "$TOLERANCE"; then
   rm -rf "$keep"
   mkdir -p "$keep"
   cp "$diffs"/*.png "$diffs"/report.json "$keep"/ 2>/dev/null || true
+  # The rendered shots too: a new shot has no diff to show, and approving it means
+  # reviewing the PNG the pinned renderer produced, not one taken on another machine.
+  mkdir -p "$keep/rendered"
+  cp "$shots"/*.png "$keep/rendered"/ 2>/dev/null || true
   echo "FAIL: rendered output differs from the approved baselines"
-  echo "      diff images and report.json written to $keep/"
+  echo "      diff images, report.json and the rendered shots (rendered/) written to $keep/"
   echo "      to approve: review them, replace the baseline PNGs, and commit with a"
   echo "      message whose first line starts 'baseline: <why>' (see baseline-approval.sh)"
   exit 1
 fi
 
-echo "PASS: rendered motion fixtures match the approved baselines (tolerance ${TOLERANCE}%)"
+echo "PASS: rendered motion and type fixtures match the approved baselines, and every colour or type mutant is seen (tolerance ${TOLERANCE}%)"

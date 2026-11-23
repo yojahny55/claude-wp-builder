@@ -42,3 +42,6 @@ package-lock.json
 
 # Codebase-memory MCP artifacts — local index, never committed.
 .codebase-memory/
+
+# Evidence of a failed tests/checks/visual-baselines.sh run; never committed.
+tests/baselines/.failed-diffs/

@@ -18,8 +18,9 @@ item was checked against what 1.41.0 shipped. Delivered and marked so: the Playw
 visual QA loop (`/wp-yolo --visual` now runs it over a full build) and WooCommerce N01, whose
 remaining pieces shipped together — the store theme and demo layer, cart and store links,
 products seeded from the demo, `/wp-woo-verify`, the store audit, `/wp-woo-launch` and the
-`store-polylang` bridge. Still partial: visual regression testing (baselines cover only the
-motion fixtures) and the craft-family item, which waits for the next real craft demo. No item
+`store-polylang` bridge. Since then, visual regression testing was delivered (colour and
+type baselines with mutants). Still partial: the craft-family item, which waits for the
+next real craft demo. No item
 is open. The full pass against
 the command, agent or script that would own each item was last made at v1.31.0. An item
 claiming to be open while the behavior ships reads as a project that does not know what it
@@ -84,9 +85,9 @@ Ensuring the WordPress output matches the demo HTML 1:1 in appearance and conten
   [`bin/family-lint.mjs`](bin/family-lint.mjs) now measures the three Avoid items visible in CSS (`backdrop-filter` glass, a radius over 12px on a bordered box, more than one saturated hue) and `/wp-demo` hands its report to the critique, which names each finding a hit or the family's deliberate exception in `demo/VERIFY.md`; it never blocks ([family-lint](tests/checks/family-lint.sh)).
   **Gap:** the gate has not yet run on a real client build: running `/wp-demo` on the project whose demo prompted this and reading `demo/VERIFY.md` is the owner's call, because a craft run is paid and judged by eye.
 
-- [ ] **Visual regression testing with Playwright** `PARTIAL`
+- [x] **Visual regression testing with Playwright** `DELIVERED`
   After each section build, take screenshots at key viewports and compare against the demo. Loop fixes until the section matches the demo visually.
-  **Gap:** baselines, tolerances and an approval step now exist, but only over the motion fixtures. [visual-baselines](tests/checks/visual-baselines.sh) renders inside a pinned Playwright container, diffs against committed PNGs at a 0.1% tolerance and prints the percentage on every shot; [baseline-approval](tests/checks/baseline-approval.sh) requires a `baseline: <why>` subject on any commit that changes them. The comparison I06 actually names — a built section against the demo it came from — now has a tool, [section-diff.mjs](bin/section-diff.mjs), and a loop that acts on it in `/wp-section --visual` (*Playwright-based visual QA loop* below). The fixtures here are geometric, so these baselines see layout move and would not see a colour or font change. [`bin/style-diff.mjs`](bin/style-diff.mjs) adds before/after computed-style regression on a real page, which does see colour and font, but it is not the section-versus-demo loop.
+  The section-versus-demo comparison is [section-diff.mjs](bin/section-diff.mjs), and the loop that acts on it is `/wp-section --visual` and `/wp-yolo --visual` (*Playwright-based visual QA loop* below). The regression half is [visual-baselines](tests/checks/visual-baselines.sh): it renders inside a pinned Playwright container, diffs against committed PNGs at a 0.1% tolerance and prints the percentage on every shot, and [baseline-approval](tests/checks/baseline-approval.sh) requires a `baseline: <why>` subject on any commit that changes them. Besides the motion fixtures it baselines a colour-and-type page ([type.html](tests/fixtures/motion/type.html)) at two viewports, with four one-token mutants (text colour, heading family, accent colour, lead size) the comparer must see. A one-step text tint is below what pixels see and is left to the computed-style comparisons ([`bin/style-diff.mjs`](bin/style-diff.mjs) and the `/wp-finalize` parity gate), as [docs/testing.md](docs/testing.md) records.
 
 - [x] **Enforce CSS match from demo** `DELIVERED`
   Transcription mode (`--transcribe`, `/wp-yolo`) makes agents copy the demo's exact declared values instead of re-authoring them — [wp-css](agents/wp-css.md), [wp-template](agents/wp-template.md), [wp-section](commands/wp-section.md). The Layer 1 demo-parity gate in [wp-finalize](commands/wp-finalize.md) blocks delivery on a font or background mismatch.

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>colour and type fixture</title>
+<style>
+  /* The motion fixtures are grey boxes on white: a baseline of them sees layout move and
+     cannot see a colour or a font change. This page is the opposite: almost nothing here
+     moves, and almost every pixel is a colour token or a glyph. The families are CSS
+     generics on purpose -- the renderer is pinned, so its fonts are too, and a web font
+     fetched at render time would make the baseline depend on the network. */
+  body { margin: 0; background: #f8f5ef; color: #374151; font: 16px/1.6 sans-serif; }
+  .hero { padding: 48px 32px; background: #1d3557; color: #f1faee; }
+  .hero__eyebrow { margin: 0 0 8px; font: 600 12px/1 monospace; letter-spacing: .12em; text-transform: uppercase; color: #a8dadc; }
+  .hero__title { margin: 0 0 16px; font: 700 44px/1.1 serif; }
+  .hero__lead { margin: 0 0 24px; max-width: 34em; font-size: 18px; }
+  .hero__cta { display: inline-block; padding: 12px 24px; border-radius: 6px; background: #e63946; color: #fff; font-weight: 700; text-decoration: none; }
+  .body { padding: 32px; max-width: 46em; }
+  .body h2 { margin: 0 0 12px; font: 700 26px/1.2 serif; color: #1d3557; }
+  .body p { margin: 0 0 14px; }
+  .body a { color: #2563eb; }
+  .body small { display: block; color: #6b7280; font-size: 12px; }
+  .body .price { font: 700 20px/1 monospace; color: #457b9d; }
+</style>
+</head>
+<body>
+<section class="hero">
+  <p class="hero__eyebrow">Fixture section</p>
+  <h1 class="hero__title">A headline set in the display family</h1>
+  <p class="hero__lead">A lead paragraph long enough to wrap at the narrow viewport, so a
+    change to its size or family moves every line break as well as every glyph.</p>
+  <a class="hero__cta" href="#body">Primary action</a>
+</section>
+<section class="body" id="body">
+  <h2>Body copy in the text colour</h2>
+  <p>Paragraph text is where a token change hides best: one hex step on the body colour
+    touches every glyph on the page and no box moves. A <a href="#body">link in the accent
+    colour</a> sits inside it.</p>
+  <p>A second paragraph keeps enough text in frame that the share of glyph pixels is
+    measurable against the whole viewport rather than lost in the background.</p>
+  <p class="price">€ 1.290,00</p>
+  <small>Caption text in the muted colour, at the smallest size the theme sets.</small>
+</section>
+</body>
+</html>

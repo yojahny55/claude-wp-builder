@@ -84,8 +84,8 @@ that renders perfectly and delivers nothing costs a client enquiries before anyo
 and no grep over `agents/wp-cf7.md` can see it.
 
 **Screenshots are compared against approved baselines, inside a pinned renderer.**
-`tests/checks/visual-baselines.sh` renders the motion fixtures and diffs them against
-committed PNGs, reporting the percentage of differing pixels on every shot rather than
+`tests/checks/visual-baselines.sh` renders the motion fixtures and a colour-and-type page
+(`tests/fixtures/motion/type.html`) and diffs them against committed PNGs, reporting the percentage of differing pixels on every shot rather than
 only on a failure — the tolerance is 0.1%, and a number nobody can see is a number nobody
 can argue with. It runs inside `mcr.microsoft.com/playwright:v1.63.0-noble`, not the
 runner's Chrome, because pixels do not survive a browser upgrade the way a DOM assertion
@@ -97,9 +97,15 @@ Three limits come with it, and all three are the shape of the thing rather than 
 against the theme built from it, and that needs a generated site, which is still the gap
 below. **Only settled states are photographed**, because determinism requires waiting for
 motion to stop: breaking the reveal so it never hides its children changes nothing any
-baseline can see, and `motion-devices.sh` catches that one instead, by name. **The fixtures
-are geometric** — grey boxes on white, carrying no typography or colour — so these
-baselines see layout move and would not see a font change.
+baseline can see, and `motion-devices.sh` catches that one instead, by name. **A one-step
+colour tint on text is below what pixels see.** The type page has four mutants, each one
+token changed (body text two grey steps lighter, the heading's family, the button colour,
+the lead's size), and the comparer fails unless every one differs from the baseline by
+more than the tolerance (measured 0.37% to 2.06%). One grey step on thin glyphs measures
+0.0000%, under pixelmatch's per-pixel threshold; that change belongs to the parity gate
+and `bin/style-diff.mjs`, which compare computed styles. A failed run keeps the diffs and
+the rendered shots in `tests/baselines/.failed-diffs/`, ignored by git; approving a new or
+changed baseline means copying its PNG from `rendered/` in a `baseline: <why>` commit.
 
 Still not covered: a generated site end to end, the broken-site corpus with expected audit
 findings, and browser artifacts for failed functional scenarios. A green CI means the
