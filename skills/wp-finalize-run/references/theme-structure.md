@@ -6,7 +6,15 @@ Verify required WordPress theme files and configurations:
 
 1. **style.css** exists at theme root with proper headers (Theme Name, Version, Description, Author, Text Domain)
 2. **index.php** exists (required WordPress fallback)
-3. **screenshot.png** exists (theme preview image)
+3. **screenshot.png** is the site's own preview: 1200x900, taken from the built homepage.
+   Both starters ship a 1x1 placeholder, and a delivered theme that still carries it shows a
+   blank tile in Appearance > Themes. Read the PNG size:
+   ```bash
+   python3 -c "import struct,sys; b=open(sys.argv[1],'rb').read(24); print('%dx%d' % struct.unpack('>II', b[16:24]) if b[1:4]==b'PNG' else 'not-a-png')" <theme-dir>/screenshot.png
+   ```
+   **FAIL** when the file is missing, not a PNG, or `1x1`, with the fix:
+   `node "${CLAUDE_PLUGIN_ROOT}/bin/theme-screenshot.mjs" <home-url> <theme-dir>` (it keeps a
+   real preview unless `--force`). Any other size passes: a client may supply their own.
 4. **SCF/ACF dependency:** Check `functions.php` or `inc/theme-setup.php` for SCF/ACF dependency notice or check
 5. **register_nav_menus** is called in `inc/theme-setup.php` (`functions.php` on
    `cinematic`) — with per-language locations, hyphenated (`primary-<lang>`,

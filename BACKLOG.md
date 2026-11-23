@@ -149,8 +149,8 @@ Making the command flow smoother and more guided.
 - [x] **Section list command** `DELIVERED`
   [`/wp-section --list`](commands/wp-section.md) runs [`bin/demo-sections.mjs`](bin/demo-sections.mjs), which lists every page's sections with the slug `/wp-section` takes, the line range and whether the theme already has the template part, without a manifest or theme. It also reports the delimiter defects that make the builders misread a demo (unclosed, stray or mismatched END, nested, duplicate, none at all) and exits 1 on any. [demo-sections](tests/checks/demo-sections.sh) runs it on a fixture.
 
-- [ ] **Screenshot generation with Playwright** `PARTIAL`
-  **Gap:** [wp-finalize](commands/wp-finalize.md) checks that `screenshot.png` exists, and both starters ship one. Nothing regenerates it at 1200x900 from the built homepage, so a delivered theme's preview image is the starter's, not the site's.
+- [x] **Screenshot generation with Playwright** `DELIVERED`
+  [theme-screenshot.mjs](bin/theme-screenshot.mjs) captures the built homepage at 1200x900 in an existing Chrome, with reduced motion and the fonts loaded, into the theme's `screenshot.png` through a temporary file; it keeps a real preview unless `--force`, and a failing page or a missing browser never touches the file. [wp-yolo](commands/wp-yolo.md) Phase 3 runs it after the CSS rebuild, and [wp-finalize](commands/wp-finalize.md) Check 4 ([theme-structure.md](skills/wp-finalize-run/references/theme-structure.md)) fails a theme still carrying the starters' 1x1 placeholder, with the command as the fix. [theme-screenshot](tests/checks/theme-screenshot.sh) runs it against a local page.
 
 - [x] **Verify form delivery end to end** `DELIVERED`
   [wp-cf7-delivery](tests/checks/wp-cf7-delivery.sh) creates a real CF7 form in the WordPress fixture, serves the site, and posts to CF7's own REST endpoint: a valid submission is accepted and its mail captured by a `pre_wp_mail` sink with the right recipient and an interpolated body, and a submission missing a required field is refused and sends nothing.

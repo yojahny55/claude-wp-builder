@@ -406,6 +406,10 @@ Run, in order:
    gate in Step 5.5 — looks at the live site, so without this they would judge an
    unstyled page. No-op on `basic`; skipped when a `tailwindwatch` process already
    owns `dist/`.
+   Then write the theme's preview image from the built homepage, replacing the starter's
+   1x1 placeholder: `node "${CLAUDE_PLUGIN_ROOT}/bin/theme-screenshot.mjs" <home-url> <theme-dir>`.
+   Exit `2` (no browser) or `1` (page failed): list it under Review in Step 6; it does not
+   make the run incomplete.
 4. **`/wp-finalize`** — MANDATORY. Run the command exactly as a user would (read
    `${CLAUDE_PLUGIN_ROOT}/commands/wp-finalize.md` and execute every step in this same
    run). It runs the 3-layer demo-parity gate (Layers 1-3) that signs off delivery;
