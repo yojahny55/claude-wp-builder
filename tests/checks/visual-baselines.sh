@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Render the motion fixtures and compare them to approved baselines.
+# Render the motion fixtures and the colour-and-type page, and compare them to approved
+# baselines. Mutants of the type page must differ from its baseline (compare.mjs).
 #
 # The last leg of I06: "Save approved demo/theme screenshot pairs matching fonts, content,
 # viewports, animation states. Report image differences reviewable tolerances." The pairs
@@ -33,10 +34,26 @@ TOLERANCE="0.1"
 
 shooter=tests/fixtures/motion/shoot.mjs
 comparer=tests/fixtures/motion/compare.mjs
-for f in "$shooter" "$comparer" "$BASELINES/RENDERED-BY.txt"; do
+for f in "$shooter" "$comparer" "$BASELINES/RENDERED-BY.txt" tests/fixtures/motion/type.html; do
   [ -f "$f" ] || fail "$f is missing"
   [ -r "$f" ] || fail "$f exists but cannot be read"
 done
+
+# The colour-and-type mutants the comparer must find in mutants.json and see. Passed to it
+# by name, so a shooter that drops one fails the comparison rather than shrinking it.
+MUTANTS="type-1280~text-colour,type-1280~heading-family,type-1280~accent-colour,type-1280~lead-size"
+for m in ${MUTANTS//,/ }; do
+  grep -E "^[[:space:]]*'$m':" "$shooter" >/dev/null || fail "$shooter no longer renders the $m mutant"
+done
+
+# Without docker nothing renders, so the baselines' presence is the only part checkable
+# here. With docker it is not checked up front: the comparer reports a missing baseline
+# AFTER rendering, which is what leaves the shots in .failed-diffs/rendered/ to approve.
+type_baselines_present() {
+  for b in type-1280 type-390; do
+    [ -f "$BASELINES/$b.png" ] || fail "$BASELINES/$b.png is missing -- the colour and type baseline"
+  done
+}
 
 # The baselines record which renderer produced them. If this check ever runs against a
 # different one, the pixels below are not comparable and the right answer is to say so
@@ -45,6 +62,7 @@ recorded="$(tr -d '[:space:]' < "$BASELINES/RENDERED-BY.txt")"
 [ "$recorded" = "$IMAGE" ] || fail "baselines were rendered by '$recorded' but this check uses '$IMAGE'"
 
 if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+  type_baselines_present
   echo "SKIP: docker is not available -- cannot render against the pinned browser"
   if [ -n "${VISUAL_REQUIRE_BROWSER:-}" ]; then
     fail "docker is unavailable, but VISUAL_REQUIRE_BROWSER is set -- this environment is supposed to have it"
@@ -53,6 +71,7 @@ if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
 fi
 
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  type_baselines_present
   echo "SKIP: $IMAGE is not pulled locally (docker pull $IMAGE)"
   if [ -n "${VISUAL_REQUIRE_BROWSER:-}" ]; then
     fail "$IMAGE is missing, but VISUAL_REQUIRE_BROWSER is set"
@@ -90,18 +109,23 @@ docker run --rm \
 
 [ -f "$shots/shots.json" ] || fail "the shooter produced no manifest"
 
-if ! node "$comparer" "$shots" "$BASELINES" "$diffs" "$TOLERANCE"; then
+if ! node "$comparer" "$shots" "$BASELINES" "$diffs" "$TOLERANCE" "$MUTANTS"; then
   # Copied out of the temp dir that the trap is about to delete -- a failing visual check
   # whose evidence is deleted on exit is a check nobody can act on.
   keep="tests/baselines/.failed-diffs"
   rm -rf "$keep"
   mkdir -p "$keep"
   cp "$diffs"/*.png "$diffs"/report.json "$keep"/ 2>/dev/null || true
+  # The rendered shots too: a new shot has no diff to show, and approving it means
+  # reviewing the PNG the pinned renderer produced, not one taken on another machine.
+  mkdir -p "$keep/rendered"
+  cp "$shots"/*.png "$keep/rendered"/ 2>/dev/null || true
+  cp -r "$shots/mutants" "$keep/rendered/" 2>/dev/null || true
   echo "FAIL: rendered output differs from the approved baselines"
-  echo "      diff images and report.json written to $keep/"
+  echo "      diff images, report.json and the rendered shots (rendered/) written to $keep/"
   echo "      to approve: review them, replace the baseline PNGs, and commit with a"
   echo "      message whose first line starts 'baseline: <why>' (see baseline-approval.sh)"
   exit 1
 fi
 
-echo "PASS: rendered motion fixtures match the approved baselines (tolerance ${TOLERANCE}%)"
+echo "PASS: rendered motion and type fixtures match the approved baselines, and every colour or type mutant is seen (tolerance ${TOLERANCE}%)"

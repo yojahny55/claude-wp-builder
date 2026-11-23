@@ -459,4 +459,7 @@ jobs:
         with:
           name: visual-baseline-diffs
           path: tests/baselines/.failed-diffs/
+          # upload-artifact v4 skips hidden paths by default, and .failed-diffs is one:
+          # without this the step found nothing and a failed run uploaded no evidence.
+          include-hidden-files: true
           if-no-files-found: ignore

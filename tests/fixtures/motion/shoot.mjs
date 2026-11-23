@@ -1,4 +1,5 @@
-// Render the motion fixtures to PNGs: the capture half of the screenshot-pair check.
+// Render the motion fixtures and the colour-and-type page to PNGs: the capture half of the
+// screenshot-pair check.
 //
 // I06 asks for approved screenshot pairs "matching fonts, content, viewports, animation
 // states", and specifically for a "reduced motion motion-engine fallback scenario". The
@@ -137,10 +138,57 @@ await settle(page, revealOpacity);
 await shoot(page, 'scroll-motion-reveal-1280');
 
 await page.context().close();
+
+// --- colour and type, where the motion shots are blind ----------------------------------
+// The shots above are grey boxes: they see layout move and cannot see a recoloured token
+// or a swapped font family. type.html is almost all glyphs and colour tokens, at both
+// viewports. It loads no motion engine, so it waits for fonts rather than __motionReady.
+const openStatic = async (opts, url) => {
+  const ctx = await browser.newContext(opts);
+  const p = await ctx.newPage();
+  await p.goto(`${base}/${url}`);
+  await p.evaluate(() => document.fonts.ready);
+  return p;
+};
+for (const [w, h, label] of [[1280, 800, '1280'], [390, 844, '390']]) {
+  const p = await openStatic({ viewport: { width: w, height: h } }, 'type.html');
+  await shoot(p, `type-${label}`);
+  await p.context().close();
+}
+
+// Mutants: the same page with one token changed, each the kind of regression a CSS edit
+// makes without moving a box. They are not baselines. The comparer requires every one to
+// differ from type-1280 by MORE than the tolerance, so a baseline that cannot see a
+// colour or a font change fails here instead of reporting coverage it does not have.
+//
+// The text-colour mutant moves two grey steps (#374151 to the caption's #6b7280), not one.
+// Measured in a local Chromium: one step either way (#4b5563, #1f2937) differs by 0.0000%,
+// because thin glyph pixels that close stay under pixelmatch's per-pixel threshold; two
+// steps differ by 0.29-0.37% there, and by 0.55% in the pinned renderer. A one-step tint is the parity gate's to catch (computed styles), not these
+// pixels', and docs/testing.md says so.
+const MUTANTS = {
+  'type-1280~text-colour': '.body p { color: #6b7280 }',
+  'type-1280~heading-family': '.hero__title { font-family: sans-serif }',
+  'type-1280~accent-colour': '.hero__cta { background: #c1121f }',
+  'type-1280~lead-size': '.hero__lead { font-size: 17px }',
+};
+const mutants = [];
+await mkdir(join(outdir, 'mutants'), { recursive: true });
+for (const [name, css] of Object.entries(MUTANTS)) {
+  const p = await openStatic({ viewport: { width: 1280, height: 800 } }, 'type.html');
+  await p.addStyleTag({ content: css });
+  await p.evaluate(() => document.fonts.ready);
+  await p.screenshot({ path: join(outdir, 'mutants', name + '.png'), fullPage: false });
+  mutants.push(name);
+  console.log('mutant ' + name);
+  await p.context().close();
+}
+await writeFile(join(outdir, 'mutants.json'), JSON.stringify(mutants, null, 2) + '\n');
+
 // The manifest is what the comparer iterates, so a shot that silently stopped being taken
 // is a missing baseline rather than a quietly smaller run.
 await writeFile(join(outdir, 'shots.json'), JSON.stringify(shots.sort(), null, 2) + '\n');
 
 await browser.close();
 server.close();
-console.log(`SHOT ${shots.length}`);
+console.log(`SHOT ${shots.length} MUTANT ${mutants.length}`);

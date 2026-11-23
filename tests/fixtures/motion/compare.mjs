@@ -1,7 +1,7 @@
 // Compare freshly-rendered shots against the approved baselines, and report how far off
 // each one is.
 //
-// Usage: node tests/fixtures/motion/compare.mjs <shotdir> <baselinedir> <diffdir> <tolerance>
+// Usage: node tests/fixtures/motion/compare.mjs <shotdir> <baselinedir> <diffdir> <tolerance> [<mutant,...>]
 // Exits 0 when every shot is within tolerance, 1 otherwise.
 //
 // "Reviewable tolerances" (I06) means the number is printed whether or not it passes. A
@@ -15,9 +15,11 @@ import { join, basename } from 'node:path';
 import { PNG } from 'pngjs';
 import pixelmatch from 'pixelmatch';
 
-const [shotdir, baselinedir, diffdir, toleranceArg] = process.argv.slice(2);
+const [shotdir, baselinedir, diffdir, toleranceArg, requiredArg = ''] = process.argv.slice(2);
+// Mutants that must have been rendered (comma-separated), so dropping one is a failure.
+const required = requiredArg.split(',').filter(Boolean);
 if (!shotdir || !baselinedir || !diffdir || !toleranceArg) {
-  console.log('usage: node compare.mjs <shotdir> <baselinedir> <diffdir> <tolerance>');
+  console.log('usage: node compare.mjs <shotdir> <baselinedir> <diffdir> <tolerance> [<mutant,...>]');
   process.exit(1);
 }
 const tolerance = parseFloat(toleranceArg);
@@ -51,7 +53,7 @@ for (const name of approved) {
 }
 for (const name of shots) {
   if (!approved.includes(name)) {
-    console.log(`FAIL [${name}] rendered, but no approved baseline -- run with --approve and review the PNG`);
+    console.log(`FAIL [${name}] rendered, but no approved baseline -- review the rendered PNG (tests/baselines/.failed-diffs/rendered/) and commit it as one`);
     failed = 1;
   }
 }
@@ -93,6 +95,51 @@ for (const name of shots.filter((n) => approved.includes(n))) {
   }
 }
 
+// Mutants (shoot.mjs): one token changed on a baselined page. Each must differ from its
+// baseline by more than the tolerance; one that does not names a change these baselines
+// cannot see. A missing mutants.json is a shooter that stopped producing them, not a pass.
+let mutants = [];
+try {
+  mutants = JSON.parse(await readFile(join(shotdir, 'mutants.json'), 'utf8'));
+} catch {
+  console.log('FAIL the shooter wrote no mutants.json');
+  failed = 1;
+}
+if (!Array.isArray(mutants) || mutants.length === 0) {
+  console.log('FAIL no mutants were rendered');
+  failed = 1;
+  mutants = [];
+}
+for (const name of required.filter((n) => !mutants.includes(n))) {
+  console.log(`FAIL [${name}] required mutant was not rendered`);
+  failed = 1;
+}
+for (const name of mutants) {
+  const of = name.split('~')[0];
+  if (!approved.includes(of)) {
+    console.log(`FAIL [${name}] mutates ${of}, which has no approved baseline`);
+    failed = 1;
+    continue;
+  }
+  const got = await read(join(shotdir, 'mutants', name + '.png'));
+  const want = await read(join(baselinedir, of + '.png'));
+  // A size mismatch is not "seen": nothing was compared pixel for pixel.
+  if (got.width !== want.width || got.height !== want.height) {
+    console.log(`FAIL [${name}] mutant is ${got.width}x${got.height}, its baseline ${want.width}x${want.height}`);
+    failed = 1;
+    continue;
+  }
+  const differing = pixelmatch(got.data, want.data, null, got.width, got.height, { threshold: 0.1 });
+  const pct = (differing / (got.width * got.height)) * 100;
+  const seen = pct > tolerance;
+  report.push({ name, mutant: true, pct: Number(pct.toFixed(4)), seen });
+  console.log(
+    `${seen ? 'ok  ' : 'FAIL'} [${name}] mutant differs by ${pct.toFixed(4)}% (must exceed ${tolerance}%)`
+  );
+  if (!seen) failed = 1;
+}
+
 await writeFile(join(diffdir, 'report.json'), JSON.stringify(report, null, 2) + '\n');
-console.log(failed ? 'VISUAL FAILED' : `VISUAL OK (${report.length} shots)`);
+const nm = report.filter((r) => r.mutant).length;
+console.log(failed ? 'VISUAL FAILED' : `VISUAL OK (${report.length - nm} shots, ${nm} mutants seen)`);
 process.exit(failed);
