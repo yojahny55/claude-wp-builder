@@ -20,7 +20,8 @@
  * The count comes from the server. WooCommerce's cart fragments are not used (an uncached
  * request on every page view); the script re-reads the count from the Store API only when
  * WooCommerce says the cart changed: added_to_cart and removed_from_cart (classic buttons,
- * jQuery events) and wc-blocks_added_to_cart and wc-blocks_removed_from_cart (blocks).
+ * jQuery events), wc-blocks_added_to_cart (block buttons) and wc-blocks_store_sync_required
+ * (the cart and checkout blocks' quantity and remove controls).
  */
 
 defined( 'ABSPATH' ) || exit;

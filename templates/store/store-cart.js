@@ -4,7 +4,9 @@
  * The server renders the count. This re-reads it from WooCommerce's Store API only when
  * WooCommerce says the cart changed, and when the browser restores the page from its
  * back-forward cache. Classic add-to-cart buttons announce a change with jQuery events, which
- * a native listener never hears; blocks announce it with native events.
+ * a native listener never hears; block add-to-cart buttons with wc-blocks_added_to_cart; and the
+ * cart and checkout blocks, whose quantity steppers and remove links fire neither, with
+ * wc-blocks_store_sync_required on window whenever their cart data changes (WooCommerce 11.1.2).
  */
 ( () => {
 	'use strict';
@@ -60,6 +62,7 @@
 	}
 	document.body.addEventListener( 'wc-blocks_added_to_cart', refresh );
 	document.body.addEventListener( 'wc-blocks_removed_from_cart', refresh );
+	window.addEventListener( 'wc-blocks_store_sync_required', refresh );
 	window.addEventListener( 'pageshow', ( event ) => {
 		if ( event.persisted ) {
 			refresh();

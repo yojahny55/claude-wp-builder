@@ -43,6 +43,7 @@ need_token "$php_tpl" "esc_attr( \$store_cart['count_class'] )"
 need_token "$js_tpl" "on( 'added_to_cart removed_from_cart', refresh )"
 need_token "$js_tpl" "addEventListener( 'wc-blocks_added_to_cart', refresh )"
 need_token "$js_tpl" "addEventListener( 'wc-blocks_removed_from_cart', refresh )"
+need_token "$js_tpl" "window.addEventListener( 'wc-blocks_store_sync_required', refresh )"
 need_token "$js_tpl" "cart.items_count"
 if grep -E 'wc-cart-fragments|wc_fragments|get_refreshed_fragments' "$php_tpl" "$js_tpl" >/dev/null; then
   fail "the cart link uses WooCommerce's cart fragments; it reads the Store API on a change instead"
