@@ -39,16 +39,21 @@ for f in "$shooter" "$comparer" "$BASELINES/RENDERED-BY.txt" tests/fixtures/moti
   [ -r "$f" ] || fail "$f exists but cannot be read"
 done
 
-# Checked before the docker skip, so a machine without docker still sees the colour-and-type
-# coverage disappear: its baselines, its mutants, and the comparer's demand that each mutant
-# be seen.
-for b in type-1280 type-390; do
-  [ -f "$BASELINES/$b.png" ] || fail "$BASELINES/$b.png is missing -- the colour and type baseline"
+# The colour-and-type mutants the comparer must find in mutants.json and see. Passed to it
+# by name, so a shooter that drops one fails the comparison rather than shrinking it.
+MUTANTS="type-1280~text-colour,type-1280~heading-family,type-1280~accent-colour,type-1280~lead-size"
+for m in ${MUTANTS//,/ }; do
+  grep -E "^[[:space:]]*'$m':" "$shooter" >/dev/null || fail "$shooter no longer renders the $m mutant"
 done
-for m in text-colour heading-family accent-colour lead-size; do
-  grep -F "'type-1280~$m'" "$shooter" >/dev/null || fail "$shooter no longer renders the $m mutant"
-done
-grep -F 'const seen = pct > tolerance;' "$comparer" >/dev/null || fail "$comparer no longer requires each mutant to be seen"
+
+# Without docker nothing renders, so the baselines' presence is the only part checkable
+# here. With docker it is not checked up front: the comparer reports a missing baseline
+# AFTER rendering, which is what leaves the shots in .failed-diffs/rendered/ to approve.
+type_baselines_present() {
+  for b in type-1280 type-390; do
+    [ -f "$BASELINES/$b.png" ] || fail "$BASELINES/$b.png is missing -- the colour and type baseline"
+  done
+}
 
 # The baselines record which renderer produced them. If this check ever runs against a
 # different one, the pixels below are not comparable and the right answer is to say so
@@ -57,6 +62,7 @@ recorded="$(tr -d '[:space:]' < "$BASELINES/RENDERED-BY.txt")"
 [ "$recorded" = "$IMAGE" ] || fail "baselines were rendered by '$recorded' but this check uses '$IMAGE'"
 
 if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+  type_baselines_present
   echo "SKIP: docker is not available -- cannot render against the pinned browser"
   if [ -n "${VISUAL_REQUIRE_BROWSER:-}" ]; then
     fail "docker is unavailable, but VISUAL_REQUIRE_BROWSER is set -- this environment is supposed to have it"
@@ -65,6 +71,7 @@ if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
 fi
 
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  type_baselines_present
   echo "SKIP: $IMAGE is not pulled locally (docker pull $IMAGE)"
   if [ -n "${VISUAL_REQUIRE_BROWSER:-}" ]; then
     fail "$IMAGE is missing, but VISUAL_REQUIRE_BROWSER is set"
@@ -102,7 +109,7 @@ docker run --rm \
 
 [ -f "$shots/shots.json" ] || fail "the shooter produced no manifest"
 
-if ! node "$comparer" "$shots" "$BASELINES" "$diffs" "$TOLERANCE"; then
+if ! node "$comparer" "$shots" "$BASELINES" "$diffs" "$TOLERANCE" "$MUTANTS"; then
   # Copied out of the temp dir that the trap is about to delete -- a failing visual check
   # whose evidence is deleted on exit is a check nobody can act on.
   keep="tests/baselines/.failed-diffs"
@@ -113,6 +120,7 @@ if ! node "$comparer" "$shots" "$BASELINES" "$diffs" "$TOLERANCE"; then
   # reviewing the PNG the pinned renderer produced, not one taken on another machine.
   mkdir -p "$keep/rendered"
   cp "$shots"/*.png "$keep/rendered"/ 2>/dev/null || true
+  cp -r "$shots/mutants" "$keep/rendered/" 2>/dev/null || true
   echo "FAIL: rendered output differs from the approved baselines"
   echo "      diff images, report.json and the rendered shots (rendered/) written to $keep/"
   echo "      to approve: review them, replace the baseline PNGs, and commit with a"

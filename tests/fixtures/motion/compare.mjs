@@ -1,7 +1,7 @@
 // Compare freshly-rendered shots against the approved baselines, and report how far off
 // each one is.
 //
-// Usage: node tests/fixtures/motion/compare.mjs <shotdir> <baselinedir> <diffdir> <tolerance>
+// Usage: node tests/fixtures/motion/compare.mjs <shotdir> <baselinedir> <diffdir> <tolerance> [<mutant,...>]
 // Exits 0 when every shot is within tolerance, 1 otherwise.
 //
 // "Reviewable tolerances" (I06) means the number is printed whether or not it passes. A
@@ -15,7 +15,9 @@ import { join, basename } from 'node:path';
 import { PNG } from 'pngjs';
 import pixelmatch from 'pixelmatch';
 
-const [shotdir, baselinedir, diffdir, toleranceArg] = process.argv.slice(2);
+const [shotdir, baselinedir, diffdir, toleranceArg, requiredArg = ''] = process.argv.slice(2);
+// Mutants that must have been rendered (comma-separated), so dropping one is a failure.
+const required = requiredArg.split(',').filter(Boolean);
 if (!shotdir || !baselinedir || !diffdir || !toleranceArg) {
   console.log('usage: node compare.mjs <shotdir> <baselinedir> <diffdir> <tolerance>');
   process.exit(1);
@@ -108,6 +110,10 @@ if (!Array.isArray(mutants) || mutants.length === 0) {
   failed = 1;
   mutants = [];
 }
+for (const name of required.filter((n) => !mutants.includes(n))) {
+  console.log(`FAIL [${name}] required mutant was not rendered`);
+  failed = 1;
+}
 for (const name of mutants) {
   const of = name.split('~')[0];
   if (!approved.includes(of)) {
@@ -117,11 +123,14 @@ for (const name of mutants) {
   }
   const got = await read(join(shotdir, 'mutants', name + '.png'));
   const want = await read(join(baselinedir, of + '.png'));
-  let pct = 100;
-  if (got.width === want.width && got.height === want.height) {
-    const differing = pixelmatch(got.data, want.data, null, got.width, got.height, { threshold: 0.1 });
-    pct = (differing / (got.width * got.height)) * 100;
+  // A size mismatch is not "seen": nothing was compared pixel for pixel.
+  if (got.width !== want.width || got.height !== want.height) {
+    console.log(`FAIL [${name}] mutant is ${got.width}x${got.height}, its baseline ${want.width}x${want.height}`);
+    failed = 1;
+    continue;
   }
+  const differing = pixelmatch(got.data, want.data, null, got.width, got.height, { threshold: 0.1 });
+  const pct = (differing / (got.width * got.height)) * 100;
   const seen = pct > tolerance;
   report.push({ name, mutant: true, pct: Number(pct.toFixed(4)), seen });
   console.log(
