@@ -52,5 +52,6 @@ need_token "$ref" 'Without `--visual`, Step 6 prints no `Visual:` line.'
 # in visual-check must fall back to the slug or every inner section is "not measured".
 need_token "$check" '--name=<slug> --fields=ID,url'
 need_token "$check" '`/wp-yolo --visual` runs this file itself'
+need_token "$check" 'Undoing a round also deletes any file the agent created there.'
 
 echo "PASS: /wp-yolo --visual measures each seeded section, one at a time, before /wp-finalize, never blocking"

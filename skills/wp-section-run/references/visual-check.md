@@ -120,10 +120,13 @@ The agent's instructions, in the prompt:
 Each round, in this order:
 
 1. **Keep a copy** of every file the agent may edit — `assets/css/styles.css` on `basic`;
-   the template part and the section's component CSS on `tailwind` — under
+   on `tailwind`, the template part, `assets/css/src/tailwindcss/main.css`, and every file
+   under `assets/css/src/tailwindcss/components/`, `layouts/` or `utilities/` that holds a
+   rule for the section's block (promoted rules live in `components/` and in
+   `utilities/site.css`) — under
    `$out/before/`, keeping each file's path relative to the theme, so two files with the
    same name never overwrite each other. `$out` is the directory of the measurement this
-   round starts from.
+   round starts from. Undoing a round also deletes any file the agent created there.
 2. Dispatch the agent, as above.
 3. Rebuild (Step 6.5 again on `tailwind`).
 4. Measure again (3), into a new `--out` directory so each round's images stay apart.
