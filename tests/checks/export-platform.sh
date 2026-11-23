@@ -65,6 +65,21 @@ for f in files:
         sys.exit(f"{f}: no {{args}}")
 PY
 
+# quoted(): DEL, a C1 control and a lone surrogate still give a string TOML accepts.
+TOOL="$(cd "$(dirname "$tool")" && pwd)/$(basename "$tool")" node -e '
+  import(process.env.TOOL).then((m) => {
+    process.stdout.write("v = " + m.quoted("a\u007fb \ud800 c\u0085 \"q\" \\ d") + "\n");
+  });' >"$tmp/q.toml" || fail "quoted() threw"
+python3 - "$tmp/q.toml" <<'PY' || fail "quoted() wrote a string TOML rejects: $(cat "$tmp/q.toml")"
+import sys
+try:
+    import tomllib
+except ImportError:
+    sys.exit(0)
+v = tomllib.load(open(sys.argv[1], "rb"))["v"]
+assert v == 'a\x7fb � c\x85 "q" \\ d', repr(v)
+PY
+
 # Nothing in the plugin changed.
 git diff --quiet -- commands agents skills || fail "export-platform changed a plugin file"
 

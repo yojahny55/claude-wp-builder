@@ -121,12 +121,23 @@ export function indexDoc(root, commands, agents, heading) {
   return lines.join('\n') + '\n';
 }
 
+/**
+ * A double-quoted string valid in both TOML (basic string) and YAML (flow scalar). JSON.stringify
+ * escapes quotes, backslashes and C0 controls with escapes both accept, but leaves DEL and the
+ * C1 controls raw and writes a lone surrogate as \uD800, which neither accepts. So: lone
+ * surrogates become U+FFFD first, and DEL and C1 are escaped after.
+ */
+export function quoted(s) {
+  const wellFormed = String(s).replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
+  return JSON.stringify(wellFormed).replace(/[\x7f-\x9f]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+}
+
 /** A Cursor rule (.mdc): attached on request by its description, never always on. */
 export function cursorRule(root, cmd) {
   const desc = `/${cmd.name}: ${cmd.meta.description || ''}`.replace(/\s+/g, ' ').trim();
   return [
     '---',
-    `description: ${JSON.stringify(desc)}`,
+    `description: ${quoted(desc)}`,
     'globs:',
     'alwaysApply: false',
     '---',
@@ -136,14 +147,13 @@ export function cursorRule(root, cmd) {
 }
 
 /**
- * A Gemini CLI custom command. Strings go out as TOML basic strings through JSON.stringify:
- * every escape it emits (\" \\ \n \r \t \b \f \uXXXX) is a valid TOML escape, so a command
- * body full of quotes, backslashes and backticks needs no hand-written escaping.
+ * A Gemini CLI custom command. Strings go out as TOML basic strings through quoted(), so a
+ * command body full of quotes, backslashes and backticks needs no hand-written escaping.
  */
 export function geminiCommand(root, cmd) {
   const desc = `/${cmd.name}: ${cmd.meta.description || ''}`.replace(/\s+/g, ' ').trim();
   const prompt = preamble(root, cmd, "The user's arguments: `{{args}}`.") + portBody(cmd.body, root, '{{args}}');
-  return `description = ${JSON.stringify(desc)}\nprompt = ${JSON.stringify(prompt)}\n`;
+  return `description = ${quoted(desc)}\nprompt = ${quoted(prompt)}\n`;
 }
 
 function write(file, text) {
