@@ -269,8 +269,11 @@ Server setup, permissions, and WordPress configuration.
   and [`store-kit`](plugins/store-kit/store-kit.php), proven by
   [the integration check](tests/checks/wp-woo-setup-integration.sh). The audit already reads
   the store tier, detects a merchant by active plugin, and checks paid downloads (SEC-039) and
-  gateway keys at rest (SEC-040); a shopper-flow regression suite ([check](tests/checks/audit-regression-suite.sh)) now proves search, cart and checkout survive a change; a store-specific audit pass is still to come. Not started, each
-  its own spec: theme integration (the WhatsApp button and enquiry form render there), store demo
+  gateway keys at rest (SEC-040); a shopper-flow regression suite ([check](tests/checks/audit-regression-suite.sh)) now proves search, cart and checkout survive a change; a store-specific audit pass is still to come. Piece 2, theme integration, is delivered:
+  `/wp-woo-setup` Step 6.5 installs [a fixed enquiry file](templates/store/store-enquiry.php)
+  into a catalog store's theme, which adds the WhatsApp number, message and enquiry form to the
+  settings page and renders the filled ones on product pages while catalog mode is on
+  ([check](tests/checks/store-enquiry.sh), [on a real store](tests/checks/store-enquiry-integration.sh)). Not started, each its own spec: store demo
   pages, product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang
   bridge, subscriptions, bookings.
 
