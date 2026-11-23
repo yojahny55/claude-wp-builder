@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # bin/section-diff.mjs compares one built section with the demo section it came from. This runs
 # it on fixture pages: an identical section passes at 0%, a recoloured one fails on pixels, a
-# taller one fails on height, a section whose root class is gone exits 3, and bad arguments
-# exit 64. The browser part needs playwright-core, pixelmatch and pngjs (npm install) and a
+# taller one fails on height, a narrower one on width, a section whose root class is gone or
+# matches twice exits 3, a page that fails to load exits 4, and bad arguments exit 64. The browser part needs playwright-core, pixelmatch and pngjs (npm install) and a
 # Chrome; without them it skips, unless CHECKS_REQUIRE_BROWSER=1.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -36,6 +36,8 @@ sed 's/<!-- =.*-->//' "$tmp/demo.html" > "$tmp/site/same.html"
 sed 's/#1d3557/#c1121f/' "$tmp/site/same.html" > "$tmp/site/red.html"
 sed 's/padding:60px 24px/padding:120px 24px/' "$tmp/site/same.html" > "$tmp/site/tall.html"
 sed 's/class="hero"/class="banner"/' "$tmp/site/same.html" > "$tmp/site/gone.html"
+sed 's|<body>|<body><div style="width:60%">|; s|</body>|</div></body>|' "$tmp/site/same.html" > "$tmp/site/narrow.html"
+sed 's|<div class="after"></div>|<section class="hero"><h1>Again</h1></section><div class="after"></div>|' "$tmp/site/same.html" > "$tmp/site/twice.html"
 
 port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')
 (cd "$tmp/site" && exec python3 -m http.server "$port" --bind 127.0.0.1) >/dev/null 2>&1 &
@@ -66,4 +68,14 @@ printf '%s' "$out" | python3 -c "import json,sys; r=json.load(sys.stdin); assert
 set +e; run gone >/dev/null; rc=$?; set -e
 [ "$rc" = 3 ] || fail "a section missing on the built page exited $rc, not 3"
 
-echo "PASS: section-diff passes an identical section and fails a recoloured, a taller and a missing one"
+set +e; out=$(run narrow); rc=$?; set -e
+[ "$rc" = 1 ] || fail "a narrower section exited $rc, not 1"
+printf '%s' "$out" | python3 -c "import json,sys; r=json.load(sys.stdin); assert all(v['widthDeltaPercent']<-20 for v in r['viewports'])" || fail "a narrower section was not measured as a width difference: $out"
+
+set +e; run twice >/dev/null; rc=$?; set -e
+[ "$rc" = 3 ] || fail "a root class that matches two elements on the built page exited $rc, not 3"
+
+set +e; run missing-page >/dev/null; rc=$?; set -e
+[ "$rc" = 4 ] || fail "a 404 built page exited $rc, not 4 (nothing measured is not a regression)"
+
+echo "PASS: section-diff passes an identical section, fails a recoloured, a taller and a narrower one, and refuses a missing or ambiguous one"

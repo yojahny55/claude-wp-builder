@@ -14,18 +14,25 @@
  * Usage:
  *   section-diff.mjs --demo <demo.html|url> --site <url> --section <name>
  *                    [--selector <css>] [--viewports 390,1440] [--threshold 2]
- *                    [--height-tolerance 5] [--out <dir>] [--json]
+ *                    [--size-tolerance 5] [--out <dir>] [--json]
  *
  * --threshold is the percent of differing pixels allowed per viewport (default 2: antialiasing
- * and font hinting alone differ between two renders of the same markup). --height-tolerance is
- * the percent the built section's height may differ from the demo's (default 5).
+ * and font hinting alone differ between two renders of the same markup). --size-tolerance is
+ * the percent the built section's width or height may differ from the demo's (default 5): the
+ * pixels are compared over the shared area only, so a section that lost half its width or
+ * gained a row is caught here, not there.
+ *
+ * The built side's selector is the demo root's first class unless --selector is given. When
+ * that selector matches more than one element on the built page, the tool stops with exit 3
+ * instead of measuring whichever came first.
  *
  * Writes <vw>-demo.png, <vw>-site.png, <vw>-diff.png and report.json to --out (default a new
  * temporary directory, printed). Nothing is downloaded: it drives an existing Chrome.
  *
  * Exit: 0 every viewport within both tolerances, 1 a viewport is over one of them, 2 no
  * playwright-core, pixelmatch, pngjs or Chrome (nothing measured), 3 the section was not found
- * on one side, 64 usage.
+ * on one side or its selector is ambiguous, 4 the browser or a page failed (nothing measured:
+ * not a visual regression), 64 usage.
  */
 import './lib/stdio-blocking.mjs';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -35,10 +42,10 @@ import { pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { findBrowser } from './lib/browsers.mjs';
 
-const HELP = 'usage: section-diff.mjs --demo <demo.html|url> --site <url> --section <name> [--selector <css>] [--viewports 390,1440] [--threshold 2] [--height-tolerance 5] [--out <dir>] [--json]';
+const HELP = 'usage: section-diff.mjs --demo <demo.html|url> --site <url> --section <name> [--selector <css>] [--viewports 390,1440] [--threshold 2] [--size-tolerance 5] [--out <dir>] [--json]';
 
 function parseArgs(argv) {
-  const o = { viewports: [390, 1440], threshold: 2, heightTolerance: 5, json: false };
+  const o = { viewports: [390, 1440], threshold: 2, sizeTolerance: 5, json: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => {
@@ -52,7 +59,7 @@ function parseArgs(argv) {
     else if (a === '--out') o.out = next();
     else if (a === '--json') o.json = true;
     else if (a === '--threshold') o.threshold = Number(next());
-    else if (a === '--height-tolerance') o.heightTolerance = Number(next());
+    else if (a === '--size-tolerance') o.sizeTolerance = Number(next());
     else if (a === '--viewports') o.viewports = next().split(',').map((v) => Number(v.trim()));
     else if (a === '--help' || a === '-h') { console.log(HELP); process.exit(0); }
     else throw new Error(`unknown argument ${a}`);
@@ -60,7 +67,7 @@ function parseArgs(argv) {
   if (!o.demo || !o.site || (!o.section && !o.selector)) throw new Error('--demo, --site and --section (or --selector) are required');
   if (!/^https?:\/\//.test(o.site)) throw new Error('--site must be an http(s) URL');
   if (!o.viewports.length || o.viewports.some((v) => !Number.isInteger(v) || v < 200 || v > 3840)) throw new Error('--viewports must be widths between 200 and 3840');
-  if (!(o.threshold >= 0 && o.threshold <= 100) || !(o.heightTolerance >= 0)) throw new Error('--threshold is 0-100 and --height-tolerance is >= 0');
+  if (!(o.threshold >= 0 && o.threshold <= 100) || !(o.sizeTolerance >= 0)) throw new Error('--threshold is 0-100 and --size-tolerance is >= 0');
   return o;
 }
 
@@ -142,7 +149,8 @@ function tagRoot({ section, selector, mark }) {
   }
   if (!el) return null;
   el.setAttribute(mark, '');
-  return el.classList.length ? '.' + CSS.escape(el.classList[0]) : el.tagName.toLowerCase();
+  const derived = el.classList.length ? '.' + CSS.escape(el.classList[0]) : el.tagName.toLowerCase();
+  return { derived, matches: selector ? document.querySelectorAll(selector).length : 1 };
 }
 
 async function capture(page, url, find, file) {
@@ -150,13 +158,14 @@ async function capture(page, url, find, file) {
   if (response && response.status() >= 400) throw new Error(`${url} answered ${response.status()}`);
   await page.addStyleTag({ content: SETTLE_CSS });
   await page.evaluate(() => document.fonts.ready);
-  const rootSelector = await page.evaluate(tagRoot, find);
-  if (rootSelector === null) return null;
+  const found = await page.evaluate(tagRoot, find);
+  if (found === null) return null;
+  if (found.matches > 1) return { ambiguous: found.matches };
   const root = page.locator('[data-section-diff-root]').first();
   await root.scrollIntoViewIfNeeded();
   await page.waitForLoadState('networkidle').catch(() => {});
   await root.screenshot({ path: file, animations: 'disabled' });
-  return rootSelector;
+  return found.derived;
 }
 
 /** Compare two PNG files over their shared area; write the diff image. */
@@ -180,10 +189,11 @@ function compare(aFile, bFile, diffFile) {
     site: { width: b.width, height: b.height },
     diffPercent: w && h ? Math.round((differing / (w * h)) * 10000) / 100 : 100,
     heightDeltaPercent: a.height ? Math.round(((b.height - a.height) / a.height) * 10000) / 100 : 100,
+    widthDeltaPercent: a.width ? Math.round(((b.width - a.width) / a.width) * 10000) / 100 : 100,
   };
 }
 
-const report = { demo: demoUrl, site: opts.site, section: opts.section || null, threshold: opts.threshold, heightTolerance: opts.heightTolerance, out, viewports: [] };
+const report = { demo: demoUrl, site: opts.site, section: opts.section || null, threshold: opts.threshold, sizeTolerance: opts.sizeTolerance, out, viewports: [] };
 let code = 0;
 let browser;
 try {
@@ -195,8 +205,10 @@ try {
     const sitePng = join(out, `${vw}-site.png`);
     const mark = 'data-section-diff-root';
     const demoSel = await capture(page, demoUrl, { section: opts.section, selector: opts.selector, mark }, demoPng);
-    if (demoSel === null) {
-      console.error(`section-diff: section ${opts.selector || opts.section} not found in the demo`);
+    if (demoSel === null || demoSel.ambiguous) {
+      console.error(demoSel === null
+        ? `section-diff: section ${opts.selector || opts.section} not found in the demo`
+        : `section-diff: ${opts.selector} matches ${demoSel.ambiguous} elements in the demo; pass a selector that matches one`);
       code = 3;
       await context.close();
       break;
@@ -204,23 +216,29 @@ try {
     const siteSel = opts.selector || demoSel;
     const found = await capture(page, opts.site, { selector: siteSel, mark }, sitePng);
     await context.close();
-    if (found === null) {
-      console.error(`section-diff: ${siteSel} not found on ${opts.site} (pass --selector when the built section's root class differs)`);
+    if (found === null || found.ambiguous) {
+      console.error(found === null
+        ? `section-diff: ${siteSel} not found on ${opts.site} (pass --selector when the built section's root class differs)`
+        : `section-diff: ${siteSel} matches ${found.ambiguous} elements on ${opts.site}; pass --selector with one that matches the section only`);
       code = 3;
       break;
     }
     const r = compare(demoPng, sitePng, join(out, `${vw}-diff.png`));
     r.viewport = vw;
     r.selector = siteSel;
-    r.pass = r.diffPercent <= opts.threshold && Math.abs(r.heightDeltaPercent) <= opts.heightTolerance;
+    r.pass = r.diffPercent <= opts.threshold
+      && Math.abs(r.heightDeltaPercent) <= opts.sizeTolerance
+      && Math.abs(r.widthDeltaPercent) <= opts.sizeTolerance;
     if (!r.pass) code = 1;
     report.viewports.push(r);
   }
 } catch (err) {
-  console.error(`section-diff: ${err.message.split('\n')[0]}`);
-  code = code || 1;
+  // A browser that will not start or a page that fails to load measured nothing: that is not
+  // a visual regression, and a gate reading exit 1 must not take it for one.
+  console.error(`section-diff: ${err.message.split('\n')[0]} (nothing measured)`);
+  code = 4;
 } finally {
-  if (browser) await browser.close();
+  if (browser) await browser.close().catch(() => {});
 }
 report.pass = code === 0;
 writeFileSync(join(out, 'report.json'), JSON.stringify(report, null, 2) + '\n');
@@ -228,7 +246,8 @@ if (opts.json) {
   console.log(JSON.stringify(report));
 } else {
   for (const r of report.viewports) {
-    console.log(`${r.pass ? 'PASS' : 'FAIL'} ${r.viewport}px ${r.selector}: ${r.diffPercent}% of pixels differ (max ${opts.threshold}%), height ${r.heightDeltaPercent >= 0 ? '+' : ''}${r.heightDeltaPercent}% (max ±${opts.heightTolerance}%)`);
+    const sign = (v) => (v >= 0 ? '+' : '') + v;
+    console.log(`${r.pass ? 'PASS' : 'FAIL'} ${r.viewport}px ${r.selector}: ${r.diffPercent}% of pixels differ (max ${opts.threshold}%), width ${sign(r.widthDeltaPercent)}%, height ${sign(r.heightDeltaPercent)}% (max ±${opts.sizeTolerance}%)`);
   }
   console.log(`images and report.json: ${out}`);
 }
