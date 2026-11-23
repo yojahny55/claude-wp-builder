@@ -50,6 +50,12 @@ if ( ! in_array( $wm_action, $wm_actions, true ) || '' === $wm_work ) {
 
 $wm_uploads = wp_upload_dir( null, false );
 $wm_base    = rtrim( $wm_uploads['basedir'], '/' );
+// References are matched as `uploads/<path relative to basedir>`: true on a single site whose
+// uploads URL ends in /uploads. Anything else would match nothing and let verify pass.
+$wm_url_path = (string) wp_parse_url( $wm_uploads['baseurl'], PHP_URL_PATH );
+if ( is_multisite() || 'uploads' !== basename( untrailingslashit( $wm_url_path ) ) ) {
+	WP_CLI::error( 'webp-migrate: only a single site whose uploads URL ends in /uploads is supported (this one: ' . $wm_url_path . ')' );
+}
 if ( wp_is_stream( $wm_base ) ) {
 	WP_CLI::error( 'webp-migrate: uploads live behind a stream wrapper (' . $wm_base . '); convert on a local copy of the library, not through the bucket' );
 }
@@ -148,13 +154,16 @@ function webp_migrate_rows( $old, $new_meta, $new_attached ) {
 	return $rows;
 }
 
+const WEBP_MIGRATE_PATTERN = '~uploads(\\\\?/)((?:[^"\'\s<>()\\\\]|\\\\/)+?\.png)(?![\w.-])~i';
+
 /**
  * Replace every uploads/<old> in a string, plain or JSON-escaped. A match must end the file
- * name: uploads/x.png inside uploads/x.png.webp (Robin's sibling) is not a match.
+ * name: uploads/x.png inside uploads/x.png.webp (Robin's sibling) is not a match. Returns null
+ * when PCRE fails, so the caller leaves the value alone instead of writing a lost one.
  */
 function webp_migrate_replace_string( $value, $map, &$hits ) {
-	return preg_replace_callback(
-		'~uploads(\\\\?/)((?:[^"\'\s<>()\\\\]|\\\\/)+?\.png)(?![\w.-])~i',
+	$result = preg_replace_callback(
+		WEBP_MIGRATE_PATTERN,
 		function ( $m ) use ( $map, &$hits ) {
 			$escaped = '\\/' === $m[1];
 			$rel     = str_replace( '\\/', '/', $m[2] );
@@ -167,73 +176,142 @@ function webp_migrate_replace_string( $value, $map, &$hits ) {
 		},
 		$value
 	);
+	return null === $result ? null : $result;
 }
 
-function webp_migrate_replace_value( $value, $map, &$hits ) {
+/** How many mapped old references a raw value names, read without rewriting anything. */
+function webp_migrate_count_refs( $raw, $map ) {
+	$found = preg_match_all( WEBP_MIGRATE_PATTERN, $raw, $all );
+	if ( false === $found ) {
+		return 1; // PCRE gave up on this value: count it, so verify cannot pass over it
+	}
+	if ( 0 === $found ) {
+		return 0;
+	}
+	$n = 0;
+	foreach ( $all[2] as $path ) {
+		if ( isset( $map[ str_replace( '\\/', '/', $path ) ] ) ) {
+			$n++;
+		}
+	}
+	return $n;
+}
+
+/**
+ * Walk a decoded value. Strings that are themselves serialized (double serialization) are
+ * decoded and re-encoded in turn, so their inner lengths stay right. Any object, any string
+ * that will not decode, and any PCRE failure sets $unsafe: the caller then writes nothing.
+ */
+function webp_migrate_replace_value( $value, $map, &$hits, &$unsafe ) {
 	if ( is_string( $value ) ) {
-		return webp_migrate_replace_string( $value, $map, $hits );
+		if ( is_serialized( $value ) ) {
+			$inner = @unserialize( $value, array( 'allowed_classes' => false ) );
+			if ( false === $inner && 'b:0;' !== $value ) {
+				$unsafe = true;
+				return $value;
+			}
+			$before = $hits;
+			$inner  = webp_migrate_replace_value( $inner, $map, $hits, $unsafe );
+			return $hits > $before ? serialize( $inner ) : $value;
+		}
+		$r = webp_migrate_replace_string( $value, $map, $hits );
+		if ( null === $r ) {
+			$unsafe = true;
+			return $value;
+		}
+		return $r;
 	}
 	if ( is_array( $value ) ) {
 		foreach ( $value as $k => $v ) {
-			$value[ $k ] = webp_migrate_replace_value( $v, $map, $hits );
+			$value[ $k ] = webp_migrate_replace_value( $v, $map, $hits, $unsafe );
 		}
 		return $value;
 	}
-	if ( is_object( $value ) && ! ( $value instanceof __PHP_Incomplete_Class ) ) {
-		foreach ( get_object_vars( $value ) as $k => $v ) {
-			$value->$k = webp_migrate_replace_value( $v, $map, $hits );
-		}
+	if ( is_object( $value ) ) {
+		// Decoded without its class (allowed_classes false): serializing it again could drop
+		// what a Serializable class kept in its own format. Never rewrite a value holding one.
+		$unsafe = true;
 	}
 	return $value;
 }
 
 /**
- * One database value: serialized data is unserialized, replaced and serialized again so every
- * string length stays right. Returns the new value, or null when nothing in it changes.
+ * One database value. Returns [ new value or null when nothing changes, unresolved ]:
+ * unresolved means the value names an old file but cannot be rewritten safely (a broken or
+ * object-holding serialization, a PCRE failure). It is left as it is and reported, and verify,
+ * which reads the raw value, keeps failing until someone fixes it by hand.
  */
 function webp_migrate_replace_cell( $raw, $map ) {
-	$hits = 0;
+	$hits   = 0;
+	$unsafe = false;
 	if ( is_serialized( $raw ) ) {
 		$data = @unserialize( $raw, array( 'allowed_classes' => false ) );
 		if ( false === $data && 'b:0;' !== $raw ) {
-			return null; // unreadable serialization: leave it, never rewrite it as a string
+			$unsafe = true;
+			$new    = $raw;
+		} else {
+			$new = serialize( webp_migrate_replace_value( $data, $map, $hits, $unsafe ) );
 		}
-		$new = serialize( webp_migrate_replace_value( $data, $map, $hits ) );
 	} else {
-		$new = webp_migrate_replace_string( $raw, $map, $hits );
+		$new = webp_migrate_replace_value( $raw, $map, $hits, $unsafe );
 	}
-	return ( $hits > 0 && $new !== $raw ) ? $new : null;
+	if ( $unsafe ) {
+		return array( null, webp_migrate_count_refs( $raw, $map ) > 0 );
+	}
+	return array( ( $hits > 0 && $new !== $raw ) ? $new : null, false );
 }
 
 /**
- * Walk every text column of the prefixed tables. Returns [ rows changed (or to change), cells ].
+ * The text columns this procedure reads: every char/text column of the prefixed tables, less
+ * posts.guid, Robin's queue and session tables. Each entry: table, column, primary key (or ''
+ * when the table has no single-column one), and the extra WHERE for options (no transients).
  */
-function webp_migrate_replace_all( $map, $dry ) {
+function webp_migrate_columns() {
 	global $wpdb;
-	$like   = $wpdb->esc_like( $wpdb->prefix ) . '%';
-	$cols   = $wpdb->get_results( $wpdb->prepare(
+	$cols = $wpdb->get_results( $wpdb->prepare(
 		"SELECT TABLE_NAME AS t, COLUMN_NAME AS c FROM information_schema.COLUMNS
 		 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME LIKE %s
 		 AND DATA_TYPE IN ('char','varchar','tinytext','text','mediumtext','longtext')",
-		$like
+		$wpdb->esc_like( $wpdb->prefix ) . '%'
 	) );
-	$total = 0;
-	$per   = array();
+	$pks = array();
+	$out = array();
 	foreach ( $cols as $col ) {
 		$t = $col->t;
 		$c = $col->c;
 		if ( ( $t === $wpdb->posts && 'guid' === $c ) || preg_match( '/(rio_process_queue|_sessions)$/', $t ) ) {
 			continue;
 		}
-		$pk = $wpdb->get_col( "SHOW KEYS FROM `$t` WHERE Key_name = 'PRIMARY'", 4 );
-		if ( 1 !== count( $pk ) ) {
-			webp_migrate_out( array( 'skipped_table' => $t, 'reason' => 'no single-column primary key' ) );
-			continue;
+		if ( ! isset( $pks[ $t ] ) ) {
+			$pk         = $wpdb->get_col( "SHOW KEYS FROM `$t` WHERE Key_name = 'PRIMARY'", 4 );
+			$pks[ $t ] = 1 === count( $pk ) ? $pk[0] : '';
 		}
-		$pk    = $pk[0];
 		$where = "`$c` LIKE '%.png%'";
 		if ( $t === $wpdb->options && 'option_value' === $c ) {
 			$where .= " AND option_name NOT LIKE '\\_transient\\_%' AND option_name NOT LIKE '\\_site\\_transient\\_%'";
+		}
+		$out[] = array( $t, $c, $pks[ $t ], $where );
+	}
+	return $out;
+}
+
+/**
+ * Rewrite every reference. Returns [ rows changed (or to change), per column, unresolved per
+ * column ]. A table with no single-column key cannot be updated row by row: each of its rows
+ * that names an old file is counted unresolved.
+ */
+function webp_migrate_replace_all( $map, $dry ) {
+	global $wpdb;
+	$total      = 0;
+	$per        = array();
+	$unresolved = array();
+	foreach ( webp_migrate_columns() as list( $t, $c, $pk, $where ) ) {
+		if ( '' === $pk ) {
+			$n = webp_migrate_scan_column( $t, $c, $where, $map );
+			if ( $n ) {
+				$unresolved[ "$t.$c" ] = $n;
+			}
+			continue;
 		}
 		$last = null;
 		do {
@@ -241,7 +319,10 @@ function webp_migrate_replace_all( $map, $dry ) {
 			$rows = $wpdb->get_results( $sql );
 			foreach ( $rows as $row ) {
 				$last = $row->k;
-				$new  = webp_migrate_replace_cell( (string) $row->v, $map );
+				list( $new, $stuck ) = webp_migrate_replace_cell( (string) $row->v, $map );
+				if ( $stuck ) {
+					$unresolved[ "$t.$c" ] = isset( $unresolved[ "$t.$c" ] ) ? $unresolved[ "$t.$c" ] + 1 : 1;
+				}
 				if ( null === $new ) {
 					continue;
 				}
@@ -255,6 +336,40 @@ function webp_migrate_replace_all( $map, $dry ) {
 	}
 	if ( ! $dry && $total ) {
 		wp_cache_flush();
+	}
+	return array( $total, $per, $unresolved );
+}
+
+/** Rows of one column whose raw value still names a mapped old file. Read-only. */
+function webp_migrate_scan_column( $t, $c, $where, $map ) {
+	global $wpdb;
+	$n      = 0;
+	$offset = 0;
+	do {
+		$vals = $wpdb->get_col( "SELECT `$c` FROM `$t` WHERE $where LIMIT 500 OFFSET $offset" );
+		foreach ( $vals as $v ) {
+			if ( webp_migrate_count_refs( (string) $v, $map ) > 0 ) {
+				$n++;
+			}
+		}
+		$offset += 500;
+	} while ( count( $vals ) === 500 );
+	return $n;
+}
+
+/**
+ * Verify's database half: rows whose raw value still names an old file, per column. It reads
+ * the stored bytes and never decodes them, so a value replace could not rewrite still counts.
+ */
+function webp_migrate_scan_all( $map ) {
+	$total = 0;
+	$per   = array();
+	foreach ( webp_migrate_columns() as list( $t, $c, , $where ) ) {
+		$n = webp_migrate_scan_column( $t, $c, $where, $map );
+		if ( $n ) {
+			$per[ "$t.$c" ] = $n;
+			$total         += $n;
+		}
 	}
 	return array( $total, $per );
 }
@@ -310,10 +425,14 @@ switch ( $wm_action ) {
 		$robin_old = get_option( $robin_key, null );
 		if ( ! $wm_dry && null !== $robin_old ) {
 			update_option( $robin_key, 0 );
+			// A shutdown function, not `finally`: WP_CLI::error() exits, and exit skips finally.
+			register_shutdown_function( function () use ( $robin_key, $robin_old ) {
+				update_option( $robin_key, $robin_old );
+			} );
 		}
 		$done   = 0;
 		$failed = 0;
-		try {
+		{
 			foreach ( $ids as $id ) {
 				$id       = (int) $id;
 				$meta     = wp_get_attachment_metadata( $id );
@@ -355,27 +474,33 @@ switch ( $wm_action ) {
 					continue;
 				}
 
-				// From here the attachment is half done until its map rows are written.
-				file_put_contents( $wm_progress, wp_json_encode( array( 'id' => $id, 'attached' => $attached, 'meta' => $meta ) ) );
+				// From here the attachment is half done until its map rows are written. No marker,
+				// no change: an unrecorded half-done attachment is the one trap with no repair.
+				if ( false === file_put_contents( $wm_progress, wp_json_encode( array( 'id' => $id, 'attached' => $attached, 'meta' => $meta ) ) ) ) {
+					@unlink( $target );
+					WP_CLI::error( 'webp-migrate: cannot write ' . $wm_progress . '; nothing was changed for attachment ' . $id );
+				}
 				update_attached_file( $id, $target );
 				$wpdb->update( $wpdb->posts, array( 'post_mime_type' => 'image/webp' ), array( 'ID' => $id ) );
 				clean_post_cache( $id );
 				$new_meta = wp_create_image_subsizes( $target, $id );
-				$new_rel  = (string) get_post_meta( $id, '_wp_attached_file', true );
-				$lines    = '';
-				foreach ( webp_migrate_rows( $old, is_array( $new_meta ) ? $new_meta : array(), $new_rel ) as $from => $to ) {
+				if ( ! is_array( $new_meta ) || empty( $new_meta['file'] ) ) {
+					// The marker stays: the next run stops, and Traps says how to finish it.
+					WP_CLI::error( 'webp-migrate: attachment ' . $id . ' has no sizes after conversion' . ( is_wp_error( $new_meta ) ? ' (' . $new_meta->get_error_message() . ')' : '' ) . '; ' . $wm_progress . ' left in place' );
+				}
+				$new_rel = (string) get_post_meta( $id, '_wp_attached_file', true );
+				$lines   = '';
+				foreach ( webp_migrate_rows( $old, $new_meta, $new_rel ) as $from => $to ) {
 					if ( $from !== $to ) {
 						$lines .= $from . "\t" . $to . "\t" . $id . "\n";
 					}
 				}
-				file_put_contents( $wm_map_file, $lines, FILE_APPEND | LOCK_EX );
+				if ( false === file_put_contents( $wm_map_file, $lines, FILE_APPEND | LOCK_EX ) ) {
+					WP_CLI::error( 'webp-migrate: cannot append to ' . $wm_map_file . ' for attachment ' . $id . '; ' . $wm_progress . ' left in place' );
+				}
 				unlink( $wm_progress );
 				webp_migrate_out( array( 'id' => $id, 'action' => 'converted', 'file' => $new_rel, 'sizes' => isset( $new_meta['sizes'] ) ? count( $new_meta['sizes'] ) : 0 ) );
 				$done++;
-			}
-		} finally {
-			if ( ! $wm_dry && null !== $robin_old ) {
-				update_option( $robin_key, $robin_old );
 			}
 		}
 		webp_migrate_out( array( 'summary' => 'convert', 'converted' => $done, 'skipped' => $failed, 'remaining_png' => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'attachment' AND post_mime_type = 'image/png'" ), 'dry_run' => $wm_dry ) );
@@ -389,8 +514,11 @@ switch ( $wm_action ) {
 		if ( ! $map ) {
 			WP_CLI::error( 'webp-migrate: the map is empty; run convert first' );
 		}
-		list( $total, $per ) = webp_migrate_replace_all( $map, $wm_dry );
-		webp_migrate_out( array( 'summary' => 'replace', 'rows' => $total, 'columns' => $per, 'dry_run' => $wm_dry ) );
+		list( $total, $per, $stuck ) = webp_migrate_replace_all( $map, $wm_dry );
+		webp_migrate_out( array( 'summary' => 'replace', 'rows' => $total, 'columns' => $per, 'unresolved' => $stuck, 'dry_run' => $wm_dry ) );
+		if ( $stuck ) {
+			WP_CLI::warning( 'webp-migrate: some rows name old files but cannot be rewritten safely (an object or a broken serialization, or a table with no single-column key); fix them by hand, verify will fail until then' );
+		}
 		break;
 
 	case 'verify':
@@ -400,7 +528,7 @@ switch ( $wm_action ) {
 			WP_CLI::error( 'webp-migrate: the map is empty; run convert first' );
 		}
 		$missing        = webp_migrate_missing( $map, $wm_base );
-		list( $refs, $per ) = webp_migrate_replace_all( $map, true );
+		list( $refs, $per ) = webp_migrate_scan_all( $map );
 		$ok             = ! $missing && 0 === $refs && ! file_exists( $wm_progress );
 		webp_migrate_out( array( 'summary' => 'verify', 'ok' => $ok, 'missing_new' => array_slice( $missing, 0, 20 ), 'missing_count' => count( $missing ), 'rows_still_naming_old' => $refs, 'columns' => $per, 'in_progress' => file_exists( $wm_progress ) ) );
 		if ( ! $ok ) {

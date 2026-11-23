@@ -7,7 +7,10 @@
 #   - replace rewrites plain URLs in post content, JSON-escaped ones in Elementor-style meta and
 #     URLs inside a serialized option, keeping it unserializable; it leaves Robin's
 #     <file>.png.webp names, transients and guid alone; a dry replace writes nothing;
-#   - verify passes after replace and fails while a row still names an old file;
+#   - verify passes after replace and fails while a row still names an old file, including
+#     rows replace refuses to rewrite (an object in a serialized option, a table with no
+#     primary key), which it reports as unresolved; a twice-serialized meta value is rewritten
+#     with its inner lengths right;
 #   - move-aside refuses a backup folder inside uploads, then moves every old PNG out of
 #     uploads into the backup folder, and every new WebP is still there;
 #   - a workdir inside the WordPress root is refused.
@@ -73,6 +76,11 @@ q "update_post_meta($post, '_elementor_data', wp_slash('[{\"settings\":{\"image\
 q "update_option('fx_theme_opts', array('logo' => '$small_url', 'n' => 1));"
 q "set_transient('fx_cache', '$small_url', 3600);"
 guid_before=$(q "echo get_post_field('guid',$big);")
+# Shapes replace must not rewrite blindly: an object inside a serialized option, a table with
+# no primary key, and a meta value serialized twice (which it must rewrite, keeping lengths).
+q "update_option('fx_obj', (object) array('logo' => '$small_url'));"
+q "global \$wpdb; \$wpdb->query(\"CREATE TABLE {\$wpdb->prefix}fx_nopk (v TEXT)\"); \$wpdb->insert(\$wpdb->prefix . 'fx_nopk', array('v' => '$small_url'));"
+q "update_post_meta($post, 'fx_double', serialize(array('u' => '$small_url')));"
 
 # A workdir inside the WordPress root is refused.
 if run plan "$DIR/wp-content/webp-work" >/dev/null; then fail "a workdir inside the WordPress root was accepted"; fi
@@ -125,6 +133,19 @@ printf '%s' "$content" | grep -c '\.webp\.webp' >/dev/null && fail "a .png.webp 
 [ "$(q "\$o=get_option('fx_theme_opts'); echo is_array(\$o) ? substr(\$o['logo'],-5) . '|' . \$o['n'] : 'broken';")" = ".webp|1" ] || fail "the serialized option was not replaced cleanly"
 [ "$(q "echo substr(get_transient('fx_cache'),-4);")" = .png ] || fail "a transient was rewritten"
 [ "$(q "echo get_post_field('guid',$big);")" = "$guid_before" ] || fail "guid was rewritten"
+
+printf '%s' "$out" | python3 -c "import json,sys
+r=[json.loads(l) for l in sys.stdin if l.strip().startswith('{')][-1]
+u=r['unresolved']; assert any(k.endswith('options.option_value') for k in u) and any(k.endswith('fx_nopk.v') for k in u), u" \
+  || fail "replace did not report the object option and the keyless table as unresolved: $out"
+[ "$(q "\$o=get_option('fx_obj'); echo substr(\$o->logo,-4);")" = .png ] || fail "an object-holding option was rewritten"
+[ "$(q "\$d=unserialize(get_post_meta($post,'fx_double',true)); echo is_array(\$d) ? substr(\$d['u'],-5) : 'broken';")" = .webp ] || fail "a twice-serialized meta value was not rewritten cleanly"
+
+# Unresolved rows keep verify failing, so move-aside cannot run over them.
+if run verify "$WORK" >/dev/null; then fail "verify passed while an object option and a keyless table still name old files"; fi
+if run move-aside "$WORK" "backup=$BACKUP" >/dev/null; then fail "move-aside ran while verify fails"; fi
+[ -n "$(find "$(q 'echo wp_upload_dir()["basedir"];')" -name '*.png' | sed -n 1p)" ] || fail "a refused move-aside moved files"
+q "delete_option('fx_obj'); global \$wpdb; \$wpdb->query(\"DROP TABLE {\$wpdb->prefix}fx_nopk\");"
 
 out=$(run verify "$WORK") || fail "verify failed after replace: $out"
 

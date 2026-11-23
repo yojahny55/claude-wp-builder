@@ -29,10 +29,12 @@ need_token "$script" 'the workdir must be outside the WordPress root and uploads
 need_token "$script" 'the backup folder must be outside uploads and the WordPress root'
 need_token "$script" 'uploads live behind a stream wrapper'
 need_token "$script" "'allowed_classes' => false"
+need_token "$script" 'register_shutdown_function'
+need_token "$script" 'only a single site whose uploads URL ends in /uploads is supported'
 need_token BACKLOG.md 'tests/checks/webp-migrate-integration.sh'
 need_token skills/wp-robin/SKILL.md 'scripts/webp-migrate.php'
-if grep -nE '\bunlink\(|wp_delete_file|wp_delete_attachment' "$script" | grep -v 'wm_progress' >/dev/null; then
-  fail "$script deletes a file other than its own progress marker; old files are only moved aside"
+if grep -nE '\bunlink\(|wp_delete_file|wp_delete_attachment' "$script" | grep -vE 'wm_progress|unlink\( \$target \)' >/dev/null; then
+  fail "$script deletes a file other than its progress marker or the WebP it just wrote; old files are only moved aside"
 fi
 
 require_tool php
