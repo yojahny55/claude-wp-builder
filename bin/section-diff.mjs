@@ -236,7 +236,7 @@ try {
   // A browser that will not start or a page that fails to load measured nothing: that is not
   // a visual regression, and a gate reading exit 1 must not take it for one.
   console.error(`section-diff: ${err.message.split('\n')[0]} (nothing measured)`);
-  code = 2;
+  code = code === 1 ? 1 : 2; // a regression already measured stays the result
 } finally {
   if (browser) await browser.close().catch(() => {});
 }
