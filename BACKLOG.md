@@ -287,8 +287,10 @@ Server setup, permissions, and WordPress configuration.
   and so is the demo's own store styling: [`/wp-yolo`](skills/wp-yolo-run/references/store-layer.md)
   installs that base and has `wp-css` write the demo's store pages into its `Section: Store demo`
   on [WooCommerce's selectors](skills/wp-woocommerce/references/store-selectors.md)
-  ([check](tests/checks/store-demo-layer.sh)). A cart link in the header and rewiring the demo's
-  links are still to come. Not started, each its own spec: product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang
+  ([check](tests/checks/store-demo-layer.sh)), and so is the header cart link: Step 6.6 also
+  installs [a fixed template part](templates/store/store-cart.php) that `/wp-header` calls on a
+  `store` or `full` store, with the server's count refreshed from the Store API on WooCommerce's
+  cart events ([check](tests/checks/store-cart.sh)). Rewiring the demo's links is still to come. Not started, each its own spec: product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang
   bridge, subscriptions, bookings.
 
 - [x] **One unexplained integration failure in store setup** `DELIVERED`

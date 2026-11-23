@@ -80,13 +80,13 @@ awk '/^## Step 6.6/{f=1} f&&/^```bash$/{c++; if(c==1){g=1;next}} g&&/^```$/{exit
 grep -F 'head_of' "$tmp/block.sh" >/dev/null || fail "could not extract the Step 6.6 copy block"
 run() { CLAUDE_PLUGIN_ROOT="$PWD" bash "$tmp/block.sh" 2>&1 | grep -E '^(INSTALLED|UNCHANGED|EDITED|FAILED|UNSUBSTITUTED|PHP LINT)' | sed "s#$tmp/theme/##" | tr '\n' ' '; }
 mkdir -p "$tmp/theme"
-got=$(run); [ "$got" = "INSTALLED inc/store-theme.php INSTALLED assets/css/store.css " ] || fail "first run: $got"
+got=$(run); [ "$got" = "INSTALLED inc/store-theme.php INSTALLED assets/css/store.css INSTALLED template-parts/header/store-cart.php INSTALLED assets/js/store-cart.js " ] || fail "first run: $got"
 cmp -s "$tmp/store-theme.php" "$tmp/theme/inc/store-theme.php" || fail "the installed PHP is not the substituted template"
-got=$(run); [ "$got" = "UNCHANGED inc/store-theme.php UNCHANGED assets/css/store.css " ] || fail "second run: $got"
+got=$(run); [ "$got" = "UNCHANGED inc/store-theme.php UNCHANGED assets/css/store.css UNCHANGED template-parts/header/store-cart.php UNCHANGED assets/js/store-cart.js " ] || fail "second run: $got"
 printf 'body.woocommerce-page { --store-accent: #b91c1c; }\n' >> "$tmp/theme/assets/css/store.css"
-got=$(run); [ "$got" = "UNCHANGED inc/store-theme.php UNCHANGED assets/css/store.css " ] || fail "a filled demo section reads as an edit: $got"
+got=$(run); [ "$got" = "UNCHANGED inc/store-theme.php UNCHANGED assets/css/store.css UNCHANGED template-parts/header/store-cart.php UNCHANGED assets/js/store-cart.js " ] || fail "a filled demo section reads as an edit: $got"
 sed -i 's/--store-radius: 0.375rem/--store-radius: 0/' "$tmp/theme/assets/css/store.css"
-got=$(run); [ "$got" = "UNCHANGED inc/store-theme.php EDITED assets/css/store.css " ] || fail "an edit above the demo section went unnoticed: $got"
+got=$(run); [ "$got" = "UNCHANGED inc/store-theme.php EDITED assets/css/store.css UNCHANGED template-parts/header/store-cart.php UNCHANGED assets/js/store-cart.js " ] || fail "an edit above the demo section went unnoticed: $got"
 printf '// edited\n' >> "$tmp/theme/inc/store-theme.php"
 got=$(run); case "$got" in "EDITED inc/store-theme.php "*) ;; *) fail "an edited store-theme.php went unnoticed: $got" ;; esac
 

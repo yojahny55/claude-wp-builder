@@ -33,6 +33,15 @@ Read `.claude/CLAUDE.md` to extract:
 
 If `.claude/CLAUDE.md` does not exist, tell the user to run `/wp-init` first.
 
+Read the store tier too; exit `1` means the site is not a store:
+
+```bash
+bash -c 'node "$1/bin/wp-config.mjs" get "$2" store.tier' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
+```
+
+On `store` or `full`, Step 4 hands the tier to `wp-template`, which puts the cart link in the
+header. On `catalog`, or no store, there is no cart link.
+
 ## Step 2: Read Demo Header
 
 Read `demo/index.html` and extract the header/nav section (between `<!-- ============ SECTION: Header ============ -->` delimiters, or the `<header>` element).
@@ -51,7 +60,7 @@ If `$ARGUMENTS` provides a screenshot path, read the screenshot file for additio
 
 ## Step 4: Dispatch wp-template Agent
 
-Dispatch the **wp-template** agent with the prompt in the reference below, handing it the demo header from Step 2 and the project context from Step 1.
+Dispatch the **wp-template** agent with the prompt in the reference below, handing it the demo header from Step 2 and the project context from Step 1, store tier included.
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-header-run/references/template-dispatch.md` now and send its quoted prompt: the `header.php` and `inc/nav-walker.php` contract, the language switcher rule and the class naming per `Template:`.
 
