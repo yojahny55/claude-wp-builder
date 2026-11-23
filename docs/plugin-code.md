@@ -50,6 +50,9 @@ load-bearing gates rather than helpers:
 - `export-platform.mjs` — the commands as `AGENTS.md`, Cursor rules (`.cursor/rules/*.mdc`) or Gemini
   CLI commands (`GEMINI.md`, `.gemini/commands/*.toml`) for agents other than Claude Code, paths absolute.
 - `theme-screenshot.mjs` — the theme's 1200x900 `screenshot.png` from the built homepage.
+- `store-layer-check.mjs` — `/wp-yolo`'s store layer: whether the `Section: Store demo` of a
+  theme's `store.css` holds rules, all scoped to a store body class, without `!important`, under
+  an untouched base.
 - `decision-sheet.mjs` — the approval page for `design_impact` findings and the parser for its
   answers.
 - `audit-report.mjs` — renders an audit run into a dated Markdown and HTML deliverable.

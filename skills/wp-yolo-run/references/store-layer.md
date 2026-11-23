@@ -38,16 +38,16 @@ rebuilds Tailwind. Keep two things from its report:
 
 ## 2. Written already?
 
-The base ships `Section: Store demo` with a placeholder comment and nothing else. When the
-theme's section differs from the template's, an earlier run (or a person) wrote it: keep it,
-skip step 3, and add the Review line "store layer kept from an earlier run". On `--resume` this
-is what stops a second run from overwriting it.
+The base ships `Section: Store demo` with a placeholder comment and no rule. When the theme's
+section holds a rule, an earlier run (or a person) wrote it: keep it, skip step 3, and add the
+Review line "store layer kept from an earlier run". On `--resume` this is what stops a second
+run from overwriting it.
 
 ```bash
-tail_of() { sed -n '/====== Section: Store demo ======/,$p' "$1"; }
-cmp -s <(tail_of "${CLAUDE_PLUGIN_ROOT}/templates/store/store.css") <(tail_of "<theme>/assets/css/store.css") \
-  && echo "STORE LAYER EMPTY" || echo "STORE LAYER WRITTEN"
+node "${CLAUDE_PLUGIN_ROOT}/bin/store-layer-check.mjs" "${CLAUDE_PLUGIN_ROOT}/templates/store/store.css" "<theme>/assets/css/store.css" --state
 ```
+
+`STORE LAYER EMPTY`: go on to step 3. `STORE LAYER WRITTEN`: keep it, as above.
 
 ## 3. Dispatch `wp-css` in store layer mode
 
@@ -67,26 +67,20 @@ The agent reads `skills/wp-woocommerce/references/store-selectors.md`, writes be
 
 ## 4. Verify
 
+`bin/store-layer-check.mjs` parses the section rather than matching lines, so a comment, a
+`:not(.a, .b)` or an `@keyframes` body does not read as a selector:
+
 ```bash
-theme="<theme>"; tpl="${CLAUDE_PLUGIN_ROOT}/templates/store/store.css"; css="$theme/assets/css/store.css"
-head_of() { sed '/====== Section: Store demo ======/,$d' "$1"; }
-tail_of() { sed -n '/====== Section: Store demo ======/,$p' "$1"; }
-if [ ! -f "$css" ]; then echo "NO STORE CSS"
-elif ! cmp -s <(head_of "$tpl") <(head_of "$css"); then echo "BASE CHANGED"
-elif cmp -s <(tail_of "$tpl") <(tail_of "$css"); then echo "NOTHING WRITTEN"
-elif tail_of "$css" | grep -F '!important' >/dev/null; then echo "IMPORTANT USED"
-elif tail_of "$css" | tr '\n' ' ' | sed 's#/\*\([^*]\|\*[^/]\)*\*/##g' | grep -o '[^{};]*{' \
-     | tr ',' '\n' | sed 's/{$//; s/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' \
-     | grep -Ev '^(@|body\.woocommerce)' >/dev/null; then echo "UNSCOPED SELECTOR"
-else echo "STORE LAYER OK"; fi
+node "${CLAUDE_PLUGIN_ROOT}/bin/store-layer-check.mjs" "${CLAUDE_PLUGIN_ROOT}/templates/store/store.css" "<theme>/assets/css/store.css"
 ```
 
 | Last line | Do |
 |---|---|
 | `STORE LAYER OK` | go on |
-| `BASE CHANGED` | the agent wrote above its section. Put the base back and keep its section — `{ head_of "$tpl"; tail_of "$css"; } > "$css.new" && /bin/cp -f "$css.new" "$css" && rm -f "$css.new"` — then run the block again |
+| `BASE CHANGED` | the agent wrote above its section. Put the base back and keep its section — `tpl="${CLAUDE_PLUGIN_ROOT}/templates/store/store.css"; css="<theme>/assets/css/store.css"; { sed '/====== Section: Store demo ======/,$d' "$tpl"; sed -n '/====== Section: Store demo ======/,$p' "$css"; } > "$css.new" && /bin/cp -f "$css.new" "$css" && rm -f "$css.new"` — then run the check again |
+| `MARKER MISSING` | the agent removed the section's own line, so there is no telling its rules from the base: send it back once to restore the line; a second failure goes under Review, with nothing repaired |
 | `NOTHING WRITTEN` | the agent found nothing to carry: list its report's skipped elements under Review |
-| `IMPORTANT USED`, `UNSCOPED SELECTOR` | send the agent back once with the line; a second failure goes under Review, and the section stays for a person to fix |
+| `IMPORTANT USED`, `UNSCOPED SELECTOR: <selector>`, `UNBALANCED BRACES` | send the agent back once with the line; a second failure goes under Review, and the section stays for a person to fix |
 | `NO STORE CSS` | step 1 did not install; it is already under Review |
 
 ## 5. Review

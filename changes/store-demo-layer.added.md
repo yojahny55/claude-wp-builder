@@ -4,5 +4,5 @@
   since the setup `/wp-create` runs comes before any theme) and has `wp-css`, in a new store
   layer mode, transcribe the demo's store styling into the stylesheet's `Section: Store demo`,
   on WooCommerce's own selectors from a reference measured on WooCommerce 11.1.2. The section
-  is verified: the base above it untouched, every selector scoped to a store body class, no
+  is verified by `bin/store-layer-check.mjs`: the base above it untouched, at least one rule, every selector scoped to a store body class, no
   `!important`, and a section an earlier run wrote is kept on `--resume`.
