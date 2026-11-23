@@ -80,10 +80,12 @@ bash -c 'node "$1/bin/wp-config.mjs" get "$2" wp_cli.wrapper' _ "${CLAUDE_PLUGIN
 ```
 
 **1. Gather the facts — only recorded ones.** Read the project's `.claude/CLAUDE.md`
-(business name, country, contact email, languages, i18n strategy), the `store` block of
-`.wp-create.json` when present, and the active plugins:
+(business name, country, contact email, languages, i18n strategy), the store tier from the
+manifest (`store`, `catalog`, …; exit `1` with `unknown key` means the site is not a store),
+and the active plugins:
 
 ```bash
+bash -c 'node "$1/bin/wp-config.mjs" get "$2" store.tier' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 $WP plugin list --status=active --field=name
 ```
 
