@@ -154,6 +154,24 @@ Where Design impact is `true` when applying the fix could change how the site re
   independent of Owner, and `false` means the fix leaves every computed style and box as it was.
   `/wp-audit` Step 9 never applies a `true` finding without asking.
 Where CODE follows the pattern: SEC-NNN, SEO-NNN, A11Y-NNN, PERF-NNN, WP-NNN, GEO-Dnn/Axx/Uxx/Pxx, UX-NNN
+
+The findings JSON you return has exactly this skeleton. Keep every top-level key, even when
+its list is empty; `findings` holds FAIL rows only, one object per defect and resource:
+{
+  "category": "<category>",
+  "checks_executed": ["<every id you ran, passes included>"],
+  "findings": [
+    { "check": "<CODE>", "status": "FAIL", "severity": "<CRITICAL|WARNING|INFO>",
+      "ownership": "<code|setting|content|manual>", "resource": "<resource>",
+      "message": "<one sentence>", "evidence": "<command, selector or value>",
+      "fix": "<how to fix it>", "auto_fixable": false, "design_impact": false,
+      "root_cause": "<slug or null>", "file": "<path or null>", "line": null }
+  ],
+  "unmeasured": [ { "check": "<CODE>", "reason": "<what stopped it>" } ],
+  "not_applicable": [ { "check": "<CODE>", "reason": "<why it does not apply>" } ],
+  "notes": ["<a note about the scan itself, such as what a vendor directory held>"]
+}
+A note about the scan is never a row in `findings`: it has no catalog id and no defect.
 ```
 
 Use these `subagent_type` values:

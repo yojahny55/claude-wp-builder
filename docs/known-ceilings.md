@@ -300,7 +300,17 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   suite by construction, and is found the way the site-name and schema `@id` gaps were
   found: by auditing a real site by hand and asking which contract should have caught it.
   Deliberate; recorded here rather than papered over with a check that would only assert
-  its own mock.
+  its own mock. The seeded-defects corpus (`tests/fixtures/seeded-defects/`) is now that
+  harness, run by hand: a live `/wp-audit` over it reported every seeded defect, and CI
+  compares only a recorded findings file, never a live run.
+- **A seeded-corpus run measures the code, not the render.** The corpus pages are nearly
+  empty, and on that run the accessibility agent skipped its browser measurements and
+  reported from the source alone. It still found its seeded defects, which are all in the
+  source, so the comparison passed. `/wp-audit` Step 6.8 would have refused the run as
+  incomplete, because the browser checks it skipped were not blocked by credentials, the
+  network or production. The corpus check reads only whether each expected code fired, so
+  a skipped tier is the coverage gate's to catch, not the corpus's. Not repeated: a corpus
+  with real pages to render is a different fixture.
 - **The manifest reconciliation measures, but only what WP-CLI can reach.** `/wp-audit`
   Step 2.5 re-measures plugins, PHP version, web server and Tier 3 availability on every
   run instead of trusting the manifest. Without Tier 2 it can measure none of them, and

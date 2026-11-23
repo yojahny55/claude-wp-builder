@@ -67,6 +67,40 @@ if [ "${1:-}" = "--teardown" ]; then
   exit 0
 fi
 
+# --------------------------------------------------------------------------------------
+# The seeded corpus carries a `SEEDED <code>` comment beside each defect, so the offline
+# check can tie a defect to its expected finding. Those comments must not reach the site:
+# the HTML and CSS ones are served, and an audit that reads "SEEDED A11Y-007" in the page
+# source is being told the answer. Every marker is a whole-line comment, so the line goes;
+# a marker left anywhere afterwards (inline, or opening a multi-line comment) fails the copy
+# instead of shipping.
+# Offline and callable alone (--strip-seeded <dir>) so tests/checks/seeded-defects.sh can
+# run it on a scratch copy.
+# --------------------------------------------------------------------------------------
+strip_seeded_markers() {
+  local dir="$1" f
+  [ -d "$dir" ] || die "strip-seeded: $dir is not a directory"
+  while IFS= read -r -d '' f; do
+    # Only a line that is one closed comment and nothing else: `// ...`, `# ...`,
+    # `/* ... */` or `<!-- ... -->`. A marker sharing its line with code, or a block comment
+    # that runs on to the next line, is left alone and fails the check below, because
+    # deleting that line would delete the defect or leave half a comment.
+    sed -i -E \
+      -e '/^[[:space:]]*(\/\/|#)[[:space:]]*SEEDED [A-Z0-9]+-[0-9]+/d' \
+      -e '/^[[:space:]]*\/\*[[:space:]]*SEEDED [A-Z0-9]+-[0-9]+[^*]*\*\/[[:space:]]*$/d' \
+      -e '/^[[:space:]]*<!--[[:space:]]*SEEDED [A-Z0-9]+-[0-9]+[^>]*-->[[:space:]]*$/d' \
+      "$f" \
+      || die "strip-seeded: could not edit $f"
+  done < <(find "$dir" -type f \( -name '*.php' -o -name '*.css' -o -name '*.js' -o -name '*.html' \) -print0)
+  if grep -rlE 'SEEDED [A-Z0-9]+-[0-9]+' "$dir" >/dev/null 2>&1; then
+    die "strip-seeded: a SEEDED marker survived in $(grep -rlE 'SEEDED [A-Z0-9]+-[0-9]+' "$dir" | tr '\n' ' ')"
+  fi
+}
+if [ "${1:-}" = "--strip-seeded" ]; then
+  strip_seeded_markers "${2:-}"
+  exit 0
+fi
+
 command -v wp >/dev/null 2>&1 || die "wp-cli is not on PATH"
 command -v mysql >/dev/null 2>&1 || die "the mysql client is not on PATH"
 
@@ -134,6 +168,25 @@ WP="wp --path=$DIR --allow-root"
 # --allow-root because CI runs as root and wp-cli refuses otherwise; the fixture is
 # disposable and owns nothing worth protecting from itself.
 $WP core download --version="$PINNED_WP" --quiet || die "core download failed"
+# WP-CLI extracts the .tar.gz with PHP's PharData, which ignores the PAX headers the
+# WordPress tarball uses for paths over 100 characters: those files land with their names
+# cut at 100 (observed under wp-includes/php-ai-client/ and a bundled theme's fonts), so the
+# fixture was missing core classes and an audit rightly reported modified core. Verify, and
+# on a mismatch re-extract the tarball WP-CLI cached with the system tar, which reads PAX.
+# A core that still does not verify stops the run: every result after it would be about a
+# broken WordPress rather than about the thing a check tests.
+if ! $WP core verify-checksums --quiet >/dev/null 2>&1; then
+  command -v tar >/dev/null 2>&1 || die "core does not verify against its checksums and tar is not available to re-extract it"
+  # shellcheck disable=SC2016 # the PHP is single-quoted on purpose
+  cache_dir=$(wp cli info --format=json --allow-root 2>/dev/null \
+    | php -r '$i = json_decode(stream_get_contents(STDIN)); echo $i->wp_cli_cache_dir_path ?? "";')
+  tarball="$cache_dir/core/wordpress-$PINNED_WP-en_US.tar.gz"
+  [ -n "$cache_dir" ] && [ -f "$tarball" ] || die "core does not verify against its checksums and no cached tarball to re-extract ($tarball)"
+  note "core download cut long file names; re-extracting with tar"
+  find "$DIR" -mindepth 1 -delete
+  tar -xzf "$tarball" -C "$DIR" --strip-components=1 || die "tar could not extract $tarball"
+  $WP core verify-checksums --quiet >/dev/null 2>&1 || die "core does not verify against its checksums even after re-extracting with tar"
+fi
 $WP config create --dbname="$DB_NAME" --dbuser="$DB_USER" --dbpass="$DB_PASS" \
   --dbhost="$DB_HOST" --quiet || die "config create failed"
 $WP core install --url=http://localhost:8080 --title="Fixture" \
@@ -171,6 +224,8 @@ if [ "${WP_FIXTURE_SEEDED:-0}" = "1" ]; then
   seeded="$(cd "$(dirname "$0")/.." && pwd)/seeded-defects"
   cp -R "$seeded/theme" "$DIR/wp-content/themes/seeded-defects" || die "could not copy the seeded theme"
   cp -R "$seeded/plugin" "$DIR/wp-content/plugins/seeded-defects" || die "could not copy the seeded plugin"
+  strip_seeded_markers "$DIR/wp-content/themes/seeded-defects"
+  strip_seeded_markers "$DIR/wp-content/plugins/seeded-defects"
 fi
 
 # Offline from here on. Everything above needed the network to download WordPress and its

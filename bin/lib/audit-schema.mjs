@@ -9,7 +9,7 @@
 // place the drift is tolerated, and it is listed there too.
 
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -170,12 +170,47 @@ export function catalogProblem(check, root = PLUGIN_ROOT) {
   return `check "${check}" is not in any audit catalog -- a finding carries the catalog's own id`;
 }
 
+// `not_applicable` and `unmeasured` as a map keyed by check id -- `{ "SEO-021": "no SEO
+// plugin" }` -- is how four of five agents wrote them in a real run, and the array-only reader
+// dropped every row, so Step 6.8 saw those checks as never reported. A map becomes the array
+// form here; a value may be the reason string or an object carrying it.
+function rowsOf(value) {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== 'object') return [];
+  return Object.entries(value).map(([check, v]) => (
+    v && typeof v === 'object' && !Array.isArray(v) ? { check, ...v } : { check, reason: typeof v === 'string' ? v : null }
+  ));
+}
+
+// A note about the scan itself (what a vendor directory held, what was read-only) is not a
+// finding: it has no catalog id and no defect. Agents put it in `notes` or `vendor_notes`;
+// one that put it in `findings` as `check: "VENDOR"` / `status: "INFO"` has it moved there,
+// never counted as a finding. A catalog id with status INFO stays a problem: that is a
+// finding whose status was confused with its severity, and moving it would hide it.
+const NOTE_CHECK = /^(VENDOR|NOTES?|INFO)$/i;
+const NOTE_STATUS = /^(INFO|NOTE)$/i;
+// A row only moves when its status says it is a note (INFO, NOTE) or says nothing: a
+// `VENDOR` row marked FAIL claims a defect, and is refused instead of silently dropped.
+function isScanNote(entry) {
+  if (!entry || typeof entry !== 'object' || typeof entry.check !== 'string') return false;
+  if (CATALOG_SHAPED.test(entry.check.trim())) return false;
+  const status = String(entry.status ?? '').trim();
+  if (NOTE_STATUS.test(status)) return true;
+  return status === '' && NOTE_CHECK.test(entry.check.trim());
+}
+function noteStrings(value) {
+  const list = Array.isArray(value) ? value : value === undefined || value === null ? [] : [value];
+  return list.map((v) => (typeof v === 'string' ? v : v && typeof v === 'object' ? String(v.message ?? v.note ?? JSON.stringify(v)) : String(v)))
+    .map((v) => v.trim()).filter(Boolean);
+}
+
 // Normalize one agent report object ({category, checks_executed, findings[], passes?}) and
-// return { category, executed[], findings[] (FAIL), unmeasured[], na[], passes[], problems[], notes[] }.
+// return { category, executed[], findings[] (FAIL), unmeasured[], na[], passes[], problems[],
+// notes[] (alias translations), vendor_notes[] (scan notes, never findings) }.
 export function normalizeReport(report, label = 'report') {
   const problems = [];
   const notes = [];
-  const out = { category: null, executed: [], findings: [], unmeasured: [], na: [], passes: [], problems, notes };
+  const out = { category: null, executed: [], findings: [], unmeasured: [], na: [], passes: [], problems, notes, vendor_notes: [] };
   if (!report || typeof report !== 'object' || Array.isArray(report)) {
     problems.push(`${label} is not an object`);
     return out;
@@ -184,7 +219,8 @@ export function normalizeReport(report, label = 'report') {
   const exec = report.checks_executed ?? report.checksExecuted ?? [];
   if (!Array.isArray(exec)) problems.push(`${label} "checks_executed" must be an array of check ids`);
   else out.executed = exec.filter((x) => typeof x === 'string').map((x) => x.trim());
-  const listed = (key) => (Array.isArray(report[key]) ? report[key] : []);
+  const listed = (key) => rowsOf(report[key]);
+  out.vendor_notes.push(...noteStrings(report.vendor_notes), ...noteStrings(report.notes));
   const passList = [...listed('passes'), ...listed('checks_passed'), ...listed('passed')];
   for (const item of passList) {
     const { entry } = normalizeEntry(typeof item === 'string' ? { check: item, status: 'PASS' } : item);
@@ -201,6 +237,15 @@ export function normalizeReport(report, label = 'report') {
       notes.push(...n);
       const where = `${label} ${key}[${index}]`;
       if (!entry || typeof entry !== 'object' || Array.isArray(entry)) { problems.push(`${where} is not an object`); return; }
+      if (key === 'findings' && isScanNote(entry)) {
+        out.vendor_notes.push(...noteStrings(entry.message ?? entry.evidence ?? entry.check));
+        notes.push(`${entry.check} row moved from findings to vendor_notes`);
+        return;
+      }
+      if (key === 'findings' && typeof entry.check === 'string' && NOTE_CHECK.test(entry.check.trim())) {
+        problems.push(`${where} "${entry.check}" is not a check id -- a note about the scan goes in "notes", a defect carries its catalog id`);
+        return;
+      }
       if (typeof entry.check !== 'string' || !entry.check) { problems.push(`${where} has no "check" id (aliases accepted: ${KEY_ALIASES.check.join(', ')})`); return; }
       if (entry.status !== undefined && !STATUSES.includes(entry.status)) { problems.push(`${entry.check} has status "${entry.status}" -- expected ${STATUSES.join(', ')}`); return; }
       const status = entry.status ?? fallback;
@@ -237,11 +282,16 @@ export function loadReports(path) {
   for (const file of files) {
     let data;
     try { data = JSON.parse(readFileSync(file, 'utf8')); } catch (error) { throw new Error(`${file} is not valid JSON: ${error.message}`); }
-    if (Array.isArray(data)) data.forEach((r, i) => out.push({ label: `${file}[${i}]`, report: r }));
+    // A report with no `category` (or `agent`) takes it from its file name, `wp-audit-<x>.json`:
+    // dispatch names each agent's file that way, and in a real run four of five reports left
+    // the key out, which made Step 6.8 unable to say whose catalog they covered.
+    const fromName = canonicalCategory(basename(file, '.json'));
+    const named = (r) => (fromName && r && typeof r === 'object' && !Array.isArray(r) && r.category === undefined && r.agent === undefined ? { category: fromName, ...r } : r);
+    if (Array.isArray(data)) data.forEach((r, i) => out.push({ label: `${file}[${i}]`, report: named(r) }));
     else if (data && typeof data === 'object' && !Array.isArray(data.findings) && !data.checks_executed && typeof data === 'object' && Object.values(data).every((v) => v && typeof v === 'object')) {
       // { security: {...}, seo: {...} }
       for (const [key, value] of Object.entries(data)) out.push({ label: `${file}#${key}`, report: { category: key, ...value } });
-    } else out.push({ label: file, report: data });
+    } else out.push({ label: file, report: named(data) });
   }
   return out;
 }
