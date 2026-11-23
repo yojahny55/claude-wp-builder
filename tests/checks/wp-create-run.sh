@@ -56,8 +56,8 @@ awk '/^$/ { n = 0; next } /skills\/wp-create-run\/references\// { if (++n > 1) b
 
 # The command stays a map. Configuration collection (Step 3), Failure Handling, Adopt Mode
 # and the short steps stay whole, because they are the choices and the gates the run needs in
-# view from the start. The command is 26 KB; the ceiling sits 1 KB above that, enough for a
-# sentence or two of wording and not enough to move a step's detail back in.
+# view from the start. Steps 4.5 and 4.14 moved out when the command reached 25.5 KB of the
+# 27 KB ceiling; at 23.9 KB the headroom is for a step's entry condition, not its detail.
 size=$(wc -c < "$cmd")
 [ "$size" -le 27648 ] || err "$cmd is $size bytes; move long step detail to $refs"
 

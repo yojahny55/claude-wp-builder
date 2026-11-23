@@ -32,6 +32,7 @@ quotes it.
 | 6.5 | [references/browser-suite.md](references/browser-suite.md) | Running the browser suite and merging its findings |
 | 6.9 | [references/measurement.md](references/measurement.md) | What counts as a finding |
 | 6.10 | [references/fix-verification.md](references/fix-verification.md) | How a fix is verified against the case that produced its finding |
+| 7 | [references/aggregate.md](references/aggregate.md) | Parsing agent reports, deduplication on three keys, measurement over inference, the resource convention, one row per page, one finding per defect |
 | 7.5 | [references/ledger.md](references/ledger.md) | Finding identity, ledger statuses, where the ledger lives |
 | 8 | [references/status-vocabulary.md](references/status-vocabulary.md) | The five statuses and the console report |
 | 8.5 | [references/deliverable.md](references/deliverable.md) | Finding owners, `bin/audit-report.mjs`, report before fix |

@@ -269,35 +269,8 @@ bash -c "$WP db create"
 
 ### Step 4.5: Configure WordPress
 
-```bash
-bash -c "$WP config create --dbname='${DB_NAME}' --dbuser='${DB_USER}' --dbpass='${DB_PASSWORD}' --dbhost='${DB_HOST}'"
-```
-
-**Overwrite:** add `--force` (`wp-config.php` exists).
-
-For Docker environments, run this inside the container after it starts (move after Step 4.8 if needed), or pre-generate `wp-config.php` from a template.
-
-Then set the filesystem method so WordPress writes updates directly instead of prompting for FTP credentials:
-
-```bash
-bash -c "$WP config set FS_METHOD direct --type=constant"
-```
-
-`FS_METHOD direct` is correct for local development, where PHP runs as a user that owns (or has group write on) `wp-content`. Without it, WordPress falls back to asking for FTP credentials on every plugin/theme install. It depends on the permissions set in Step 4.15 — `direct` without write access turns the FTP prompt into a "could not create directory" error instead of fixing anything. Do not carry this constant to shared hosting where PHP runs as a different user than the file owner.
-
-**Validation:** Check that `${PROJECT_PATH}/wp-config.php` exists and contains the correct DB credentials, and that `$WP config get FS_METHOD` returns `direct`.
-
-Mark the site as local. WordPress reads an unset `WP_ENVIRONMENT_TYPE` as `production`, and
-store setup keys its test-only behaviour — cash on delivery for the automated test order, a
-visible storefront — on this value:
-
-```bash
-bash -c "$WP config set WP_ENVIRONMENT_TYPE local --type=constant"
-```
-
-**Validation:** `$WP config get WP_ENVIRONMENT_TYPE` returns `local`.
-
-**On failure:** See Failure Handling table.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-create-run/references/configure.md` now and
+follow it — it is this step, not background. It covers `wp config create` (with `--force` on overwrite, and the Docker ordering), `FS_METHOD direct` and when not to carry it, `WP_ENVIRONMENT_TYPE local`, and the validation of each.
 
 ### Step 4.6: SSL Certificate (Native Only)
 
@@ -409,21 +382,8 @@ bash -c "$WP option update default_comment_status closed"
 
 ### Step 4.14: Install Languages (if non-English)
 
-For each additional language:
-
-```bash
-bash -c "$WP language core install es_ES"
-```
-
-Use full WordPress locale codes, not bare language codes. `es` is not a locale — WP-CLI warns `Language 'es' not available` and reports `Installed 0 of 1 languages (1 skipped)` with a **zero exit code**, so this failure is silent unless the output is read. Map the user's answer to a real locale (`es` -> `es_ES`, `pt` -> `pt_BR`, `fr` -> `fr_FR`) and confirm the choice when the language has several regional variants.
-
-If the primary language is not English:
-
-```bash
-bash -c "$WP site switch-language ${PRIMARY_LANG}"
-```
-
-**Validation:** `$WP language core list --status=installed` lists every requested locale.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-create-run/references/languages.md` now and
+follow it — it is this step, not background. It covers full locale codes rather than bare language codes (WP-CLI skips `es` silently with exit 0), switching the site language, and the validation.
 
 ### Step 4.15: Filesystem Permissions (Native Only)
 
