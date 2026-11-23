@@ -2,6 +2,104 @@
 
 ## [Unreleased]
 
+## [1.41.0] - 2026-11-23
+
+### Added
+
+- **A store's products come from its demo.** `wp-normalize` now extracts the products a
+  demo's shop and product pages show into `products[]`, and `/wp-seed --products <file>`
+  (passed by `/wp-yolo` on a store, with a client's `products.json` winning over the demo)
+  creates them through `skills/wp-woocommerce/scripts/product-seed.php`: simple products, or
+  External ones for a link to a dealer, with prices, categories and images. A re-run updates
+  only what it wrote, leaves a price the client changed and a product the client created
+  alone, and a product with size or colour options is a draft reported for review, because
+  its variations are not built.
+
+- **`/wp-audit --store`: whether a WooCommerce store can sell, and is launched.** A new
+  category, dispatched only when WooCommerce is active, so a site without it scores exactly as
+  before. `wp-audit-store` reports the `STORE-NNN` catalog from one tool, `bin/store-audit.mjs`:
+  `bin/woo-verify.mjs` from outside (setup drift, store pages, shop, a Store API cart) and a
+  read-only database pass (policy pages that are published and say something, the email sender,
+  a shipping method at the store's own address, tax rates when taxes are on, products with a
+  price, image and category, failed scheduled actions, order-table sync, and the launch state,
+  `CRITICAL` on production and `INFO` elsewhere). `woo-verify` gains `--read-only`, which skips
+  the cart check so a report-only audit writes nothing, and `--tier`, for a store with no
+  `store` block. Subscriptions and bookings are recorded as a known ceiling.
+
+- **A store's header links to its cart.** `/wp-woo-setup` Step 6.6 now also installs a fixed
+  header template part with its script, and `/wp-header` calls it on a `store` or `full` store,
+  where the demo draws its cart or beside the menu toggle, never inside the menu the hamburger
+  hides. The count comes from the server and is re-read from the Store API when WooCommerce
+  announces a cart change (classic buttons, block buttons, or the cart and checkout blocks); WooCommerce's cart fragments stay off. Nothing
+  renders in catalog mode, and an existing header changes only when `/wp-header` runs again.
+
+- **A demo's store pages now style the store.** When a `/wp-yolo` demo has store pages on a
+  tailwind theme with a recorded store, the build installs the store stylesheet with
+  `/wp-woo-setup --store-theme` (which now goes straight to the theme step on a recorded store,
+  since the setup `/wp-create` runs comes before any theme) and has `wp-css`, in a new store
+  layer mode, transcribe the demo's store styling into the stylesheet's `Section: Store demo`,
+  on WooCommerce's own selectors from a reference measured on WooCommerce 11.1.2. The section
+  is verified by `bin/store-layer-check.mjs`: the base above it untouched, at least one rule, every selector scoped to a store body class, no
+  `!important`, and a section an earlier run wrote is kept on `--resume`.
+
+- **A demo's links to its store pages reach WooCommerce.** `/wp-seed --store-pages
+  <slug=surface,...>` (passed by `/wp-yolo` from the demo's store pages) builds no WP Page for
+  them and points the demo's nav items and link fields at WooCommerce's own shop, cart,
+  checkout and account pages: a menu item whose object is the WooCommerce page, added at the
+  demo's position and never twice, and the page's permalink in a button field. A product link,
+  and cart and checkout on a catalog store, are listed for review instead.
+
+- **A Polylang bridge for WooCommerce stores.** The bundled `plugins/store-polylang/` keeps one
+  product post per language with shared price, SKU and meta, takes one shared stock, resolves
+  the cart, checkout, account and shop pages and `wc-ajax` to the current language, and records
+  the order language for customer emails. `/wp-woo-setup` installs it when Polylang is active
+  and stands it down when another bridge runs; `woo-setup.php` turns on product translation on
+  a store with no products yet; `/wp-polylang`'s import maps store data into the product
+  translations it creates. `bin/store-kit-sync.sh` copies either plugin. Limits are in
+  `docs/known-ceilings.md`.
+
+- **Store pages in the theme's own look.** The starter themes never declared WooCommerce
+  support, so WooCommerce squeezed the shop and every product into `page.php`, without gallery
+  zoom, lightbox or slider, in its default purple and olive, with Tailwind's preflight stripping
+  the borders off its form controls. `/wp-woo-setup` Step 6.6 now installs
+  `templates/store/store-theme.php` and `templates/store/store.css` into a tailwind theme:
+  WooCommerce support, its wrapper and sidebar replaced so the page keeps one `<main>`, and a
+  stylesheet in the theme's tokens loaded on store pages only. It installs on a new store, or on
+  an existing one only with `--store-theme`, because it changes how the store looks.
+
+- **`/wp-woo-launch` takes a store live on purpose.** Until now every store stayed in test
+  mode and nothing switched it: the launch was a hand-off. The command runs only on
+  production, checks the live Stripe keys and real Turnstile keys in `wp-config.php` without
+  ever writing one, requires a clean `/wp-woo-verify` and a store audit with no blocking finding
+  (empty terms or refund pages block too), takes a verified `pre-launch` backup, and asks the
+  operator to type the site's host. It then switches Stripe live, cash on delivery off,
+  Turnstile on the checkout and coming soon off last, verifies the live store and puts coming
+  soon back when that fails. `store.launch` records it, and from then on `/wp-woo-setup` never
+  writes launch state, `force` included; `--revert` puts coming soon back. Never run from
+  `/wp-yolo`.
+
+- **`/wp-woo-verify` checks a store from outside.** `bin/woo-verify.mjs` runs setup's dry run
+  (nothing left to set), visits the shop, cart, checkout and account pages, reads the shop for a
+  product, and puts one in a cart and takes it out through the Store API, deleting the cart
+  session afterwards. `--order`, only on a local store that sells and has no other order, places
+  a cash-on-delivery order, checks the new-order email was sent, then cancels it (stock and sales
+  count back) and deletes it for good, so setup never reads the store as one with orders.
+
+- **`/wp-yolo --visual`.** A full build can now run the visual QA loop: once the pages are
+  seeded and before `/wp-finalize`, it pixel-compares every section it built with its demo
+  section and hands a difference back to the CSS agent, up to three rounds per section, one
+  section at a time. What stays over tolerance is reported, never blocking. `/wp-section
+  --visual` also finds an inner page whose `page-<slug>.php` template applies by slug, which
+  it reported as "not measured" before.
+
+### Fixed
+
+- **A demo's store pages no longer collide with WooCommerce.** `wp-normalize` classified a
+  demo's `shop.html`, `product.html` or `cart.html` as an ordinary inner page, so `/wp-yolo`
+  built a `page-shop.php` WooCommerce never shows and `/wp-seed` created a WP Page at the
+  shop's slug. They are now `role: store`, with the WooCommerce surface they show: no WP Page,
+  no section build, and each demo link to them is listed for review.
+
 ## [1.40.0] - 2026-11-23
 
 ### Added
