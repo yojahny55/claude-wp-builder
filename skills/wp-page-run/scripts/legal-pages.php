@@ -23,9 +23,10 @@
  *
  * Per page, by slug:
  *   - no page:                  created as a draft on page-legal.php, fields filled  -> created
- *   - WordPress's own privacy   the draft core makes on install, when it is still the
- *     draft, never filled:      privacy page and has no legal_content: filled, kept a
- *                               draft                                                 -> filled
+ *   - WordPress's own privacy   the draft core makes on install, as core made it: still
+ *     draft, untouched:         the privacy page, a draft on the default template, never
+ *                               saved since or still core's text (see
+ *                               legal_pages_is_core_stub): filled, kept a draft        -> filled
  *   - any other existing page:  left exactly as it is                                 -> kept
  *
  * Nothing is ever published: legal text is reviewed by the client before it goes live.
@@ -82,6 +83,33 @@ function legal_pages_fill( $post_id, $page, $default, $updated ) {
 	update_post_meta( $post_id, '_wp_page_template', 'page-legal.php' );
 }
 
+/**
+ * Whether a page is WordPress's own Privacy Policy draft exactly as core made it: still the
+ * privacy page, still a draft, on the default template, with no legal field, and either never
+ * saved since it was created or still holding core's default text. Anything else is a page
+ * someone wrote, and is kept. When in doubt, this says no.
+ */
+function legal_pages_is_core_stub( $page, $privacy_id ) {
+	if ( (int) $page->ID !== (int) $privacy_id || 'draft' !== $page->post_status ) {
+		return false;
+	}
+	$template = (string) get_post_meta( $page->ID, '_wp_page_template', true );
+	if ( '' !== $template && 'default' !== $template ) {
+		return false;
+	}
+	if ( '' !== (string) get_post_meta( $page->ID, 'legal_content', true ) ) {
+		return false;
+	}
+	if ( $page->post_modified_gmt === $page->post_date_gmt ) {
+		return true;
+	}
+	if ( ! class_exists( 'WP_Privacy_Policy_Content' ) && defined( 'ABSPATH' ) && is_readable( ABSPATH . 'wp-admin/includes/class-wp-privacy-policy-content.php' ) ) {
+		require_once ABSPATH . 'wp-admin/includes/class-wp-privacy-policy-content.php';
+	}
+	return class_exists( 'WP_Privacy_Policy_Content' )
+		&& trim( (string) $page->post_content ) === trim( (string) WP_Privacy_Policy_Content::get_default_content() );
+}
+
 $legal_roles   = array( 'privacy', 'terms', 'cookies' );
 $legal_privacy = (int) get_option( 'wp_page_for_privacy_policy', 0 );
 $legal_failed  = false;
@@ -106,9 +134,7 @@ foreach ( $legal_spec['pages'] as $page ) {
 	}
 	$action = 'created';
 	if ( $existing ) {
-		$is_core_stub = (int) $existing->ID === $legal_privacy
-			&& 'draft' === $existing->post_status
-			&& '' === (string) get_post_meta( $existing->ID, 'legal_content', true );
+		$is_core_stub = 'privacy' === $role && legal_pages_is_core_stub( $existing, $legal_privacy );
 		$action = $is_core_stub ? 'filled' : 'kept';
 	}
 

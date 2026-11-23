@@ -90,6 +90,35 @@ out=$(run "$spec") || fail "second run failed: $out"
 [ "$(printf '%s\n' "$out" | grep -c '"action":"kept"')" = 3 ] || fail "second run did not keep all three: $out"
 [ "$(q 'echo count(get_posts(array("post_type"=>"page","post_status"=>"any","numberposts"=>-1)));')" = "$pages_after" ] || fail "second run created a page"
 
+# Core's privacy draft, once someone has edited it, is theirs: kept byte for byte.
+fp() { q "\$p=get_post($1); echo md5(\$p->post_content.\$p->post_title.\$p->post_status.json_encode(get_post_meta($1)));"; }
+$WP post create --post_type=page --post_status=draft --post_name=edited-privacy --post_title="Our privacy" --porcelain > "$SCRATCH/ep"
+edited=$(cat "$SCRATCH/ep")
+q "update_option('wp_page_for_privacy_policy', $edited);"
+sleep 1
+$WP post update "$edited" --post_content="Written by the client." --quiet
+python3 - "$spec" "$SCRATCH/spec-edited.json" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1])); s["pages"][0]["slug"] = "edited-privacy"
+json.dump(s, open(sys.argv[2], "w"))
+PY
+before=$(fp "$edited")
+out=$(run "$SCRATCH/spec-edited.json") || fail "run over an edited privacy draft failed: $out"
+read -r a id p <<<"$(action privacy)"; [ "$a $id" = "kept $edited" ] || fail "edited privacy draft: expected 'kept $edited', got '$a $id'"
+[ "$before" = "$(fp "$edited")" ] || fail "the client's edited privacy draft changed"
+# A terms entry under the privacy page's slug must never fill it either.
+python3 - "$spec" "$SCRATCH/spec-role.json" "$edited" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1])); s["pages"] = [dict(s["pages"][1], slug="edited-privacy")]
+json.dump(s, open(sys.argv[2], "w"))
+PY
+q "global \$wpdb; \$p=get_post($edited); \$wpdb->update(\$wpdb->posts, array('post_modified_gmt'=>\$p->post_date_gmt), array('ID'=>$edited)); clean_post_cache($edited);"
+before=$(fp "$edited")
+out=$(run "$SCRATCH/spec-role.json") || fail "run with a terms entry on the privacy slug failed: $out"
+read -r a id p <<<"$(action terms)"; [ "$a" = kept ] || fail "terms entry on the privacy page's slug: expected kept, got '$a'"
+[ "$before" = "$(fp "$edited")" ] || fail "a terms entry filled the privacy page"
+q "update_option('wp_page_for_privacy_policy', $core);"
+
 # A page someone wrote is never touched.
 $WP post delete "$cookies" --force --quiet
 mine=$($WP post create --post_type=page --post_status=publish --post_name=cookie-policy --post_title="Our cookies" --post_content="Written by the client." --porcelain)

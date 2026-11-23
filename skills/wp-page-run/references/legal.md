@@ -119,7 +119,8 @@ WP="$WP" bash -c '$WP eval-file "$1/skills/wp-page-run/scripts/legal-pages.php" 
 Per page it prints one JSON line with its `action`:
 
 - `created` — no page had the slug; a draft on the Legal Page template now holds the fields.
-- `filled` — WordPress's own Privacy Policy draft, still unfilled; it is filled and stays a draft.
+- `filled` — WordPress's own Privacy Policy draft, untouched since core made it; it is filled
+  and stays a draft. A privacy draft someone edited is `kept`.
 - `kept` — a page someone already wrote holds the slug. It is left exactly as it is; never
   overwrite it, and do not ask to.
 
