@@ -17,7 +17,7 @@ need_token skills/wp-seed-run/references/menus.md '### Links to the demo'"'"'s s
 need_token skills/wp-seed-run/references/menus.md '**at the moment
 the walk reaches it in the demo nav**'
 need_token skills/wp-seed-run/references/menus.md 'scripts/store-links.php" menu "$2" "$3" "$4"'
-need_token skills/wp-seed-run/references/menus.md '**Under `polylang`**, every language'"'"'s menu gets the same WooCommerce page'
+need_token skills/wp-seed-run/references/menus.md '**Under `polylang`**, every language'"'"'s menu gets the WooCommerce page titled'
 need_token skills/wp-seed-run/references/acf-fields.md 'scripts/store-links.php" url "$2"'
 need_token commands/wp-yolo.md '1. **`/wp-seed --exclude-slugs <slugs> --store-pages <pairs>`**'
 need_token commands/wp-yolo.md 'Pass `--store-pages` with every `pages[role=store]` entry as `<slug>=<store>`'

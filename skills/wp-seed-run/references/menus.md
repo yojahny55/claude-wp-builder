@@ -151,8 +151,9 @@ renamed page keeps its link, and it adds nothing to a menu that already holds th
 | `skipped cart: …` / `skipped checkout: …` | a catalog store has neither: drop the link and list it under Review |
 | `missing …` (exit `1`) | WooCommerce has no published page for it, or the menu does not exist: list it under Review and go on |
 
-**Under `polylang`**, every language's menu gets the same WooCommerce page, titled in its own
-language: WooCommerce has one shop, cart, checkout and account page until the Polylang bridge.
+**Under `polylang`**, every language's menu gets the WooCommerce page titled in its own
+language. `/wp-polylang`'s import re-points each menu item to the translated page, and the
+`store-polylang` bridge resolves WooCommerce's page IDs to the current language.
 
 ### Assign menus to theme locations
 

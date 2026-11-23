@@ -330,6 +330,7 @@ function wooset_step_pages( $store ) {
 		}
 	}
 	wooset_page_languages();
+	wooset_product_languages();
 }
 
 function wooset_page_languages() {
@@ -352,6 +353,50 @@ function wooset_page_languages() {
 		}
 		wooset_report( 'set', "page:$page:language", "$lang -- created before Polylang had a language, so it had none" );
 	}
+}
+
+/**
+ * Products in every language, through the store-polylang bridge (Step 2 installs it on a
+ * Polylang site). Turning on translation for products is safe only on a store with none
+ * yet: Polylang then filters products by language, and an existing product would vanish
+ * from every other language until it is translated. So a store that already has products
+ * is told how to do it, and nothing is changed.
+ */
+function wooset_product_languages() {
+	if ( ! function_exists( 'pll_languages_list' ) || count( (array) pll_languages_list() ) < 2 ) {
+		return;
+	}
+	if ( ! defined( 'PLL_WC_BRIDGE' ) || 'store-polylang' !== PLL_WC_BRIDGE ) {
+		wooset_report( 'note', 'languages:products', defined( 'PLL_WC_BRIDGE' ) ? PLL_WC_BRIDGE . ' connects Polylang and WooCommerce here; setup leaves products to it' : 'store-polylang is not active, so products have one language' );
+		return;
+	}
+	$options = get_option( 'polylang' );
+	if ( ! is_array( $options ) ) {
+		wooset_report( 'degraded', 'languages:products', "Polylang has no settings yet: open Languages once, then run setup again" );
+		return;
+	}
+	$types = isset( $options['post_types'] ) ? (array) $options['post_types'] : array();
+	$taxes = isset( $options['taxonomies'] ) ? (array) $options['taxonomies'] : array();
+	$want  = array( 'product_cat', 'product_tag' );
+	if ( in_array( 'product', $types, true ) && ! array_diff( $want, $taxes ) ) {
+		wooset_report( 'ok', 'languages:products', 'products, categories and tags are translated' );
+		return;
+	}
+	$count = 0;
+	foreach ( (array) wp_count_posts( 'product' ) as $status => $n ) {
+		$count += 'auto-draft' === $status ? 0 : (int) $n;
+	}
+	if ( $count > 0 ) {
+		wooset_report( 'degraded', 'languages:products', "$count product(s) exist in one language: translating products now would hide them in the other languages until each is translated. When ready: Languages > Settings > Custom post types and Taxonomies, tick Products, Product categories and Product tags, set the default language on the products, then run /wp-polylang" );
+		return;
+	}
+	if ( $GLOBALS['wooset_ctx']['write'] ) {
+		$options['post_types'] = array_values( array_unique( array_merge( $types, array( 'product' ) ) ) );
+		$options['taxonomies'] = array_values( array_unique( array_merge( $taxes, $want ) ) );
+		update_option( 'polylang', $options );
+		delete_option( 'rewrite_rules' ); // Polylang adds the language to product URLs.
+	}
+	wooset_report( 'set', 'languages:products', 'products, categories and tags translated, one post per language; /wp-polylang translates them' );
 }
 
 function wooset_step_rules( $store ) {

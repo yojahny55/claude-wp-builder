@@ -83,3 +83,5 @@ Behaviour that must survive a theme
 switch lives in `plugins/store-kit/`, copied into the site by `bin/store-kit-sync.sh`: catalog
 mode, and Stripe API keys supplied from `wp-config.php` — its webhook-secret constant only seeds
 an empty field, so a secret Stripe rotates is saved to the database, and SEC-040 reports it.
+Under Polylang, `plugins/store-polylang/` is the bridge (one product post per language, one
+shared stock) and stands down when another bridge runs.

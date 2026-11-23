@@ -79,6 +79,28 @@ and activate it:
 WP="$WP" bash -c 'bash "$1/bin/store-kit-sync.sh" "$2/wp-content/plugins" && $WP plugin activate store-kit' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
+**On a Polylang site only** (`bash -c "$WP plugin is-active polylang"` succeeds), copy in and
+activate the bundled `store-polylang` bridge the same way. It keeps one stock across a
+product's translations, serves the store pages, cart and customer emails in the shopper's
+language, and makes stored strings (gateways, shipping, attributes) translatable in
+Languages > Translations:
+
+```bash
+WP="$WP" bash -c 'bash "$1/bin/store-kit-sync.sh" "$2/wp-content/plugins" store-polylang && $WP plugin activate store-polylang' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
+bash -c "$WP eval 'echo defined( \"PLL_WC_BRIDGE\" ) ? PLL_WC_BRIDGE : \"none\";'"
+```
+
+The second line names the bridge that runs. Anything but `store-polylang` means another plugin
+already connects Polylang and WooCommerce: the paid Polylang for WooCommerce, or any active
+plugin whose header requires both. `store-polylang` then stands down by itself, because two
+bridges take every sale twice from stock. Deactivate it (`$WP plugin deactivate
+store-polylang`) and list the other bridge under Review. Never deactivate the other one.
+
+The bridge changes nothing a visitor sees until something is translated. Setup's
+`languages:products` line (Step 6) turns on translation for products only on a store with no
+products yet. On a store that has them, it explains how and changes nothing: translating them
+would hide every product from the other languages until each one is translated.
+
 ## Step 3: Record the store
 
 If `.wp-create.json` already has a `store` block, show it and ask what changed. Otherwise ask,

@@ -18,6 +18,7 @@ fails a profile that installs one without a reason, or installs anything under *
 | `wp-super-cache` | all, optional | Honours WooCommerce's `DONOTCACHEPAGE` on cart, checkout and account; no vulnerability records since 2025. W3 Total Cache and Breeze had 2026 criticals. |
 | `contact-form-7` | all, optional | The form engine for a catalog's `form` enquiry channel (which no starter theme renders) and the contact page every site has, built by the existing `wp-cf7` agent. |
 | `wp-mail-smtp` | catalog optional; store and full required | Order mail has to arrive. No records since 2025. Conflicts with `fluent-smtp`: two mailers fight over `wp_mail()`. |
+| `store-polylang` | all, when Polylang is active, bundled | Ours: the Polylang (free) and WooCommerce bridge — one product post per language with shared data and one shared stock, store pages and cart in the current language, the order language kept for emails. Stands down when another bridge runs. Copied by `${CLAUDE_PLUGIN_ROOT}/bin/store-kit-sync.sh <plugins-dir> store-polylang`. |
 | `woocommerce-gateway-stripe` | store, full | Cards and wallets on the block checkout, with Radar. Configured with API keys through `store-kit`, not the Connect button, which stores keys in the database. |
 | `simple-cloudflare-turnstile` | store, full | A bot check that validates the Store API checkout itself, where card-testing scripts post directly. Preferred to reCAPTCHA, whose free tier is capped at 10,000 assessments a month. |
 | `woocommerce-google-analytics-integration` | store, full, optional | GA4 purchase events that respect the WP Consent API; no records since 2025. Use it or Site Kit's WooCommerce tracking, never both. |
@@ -63,6 +64,6 @@ fails a profile that installs one without a reason, or installs anything under *
 - **Subscriptions and bookings** — not built: the free subscriptions plugin is rejected above,
   and WooCommerce's own extensions are paid, with no licence here to test them. The merchant
   installs them from their own account (`docs/known-ceilings.md`).
-- **Multilingual** — Polylang, which leaves products untranslated: this plugin has no bridge
-  between WooCommerce and Polylang. Never SCF suffix fields for a store: one URL per product
+- **Multilingual** — Polylang, with the bundled `store-polylang` bridge for products, pages and
+  stock. Never SCF suffix fields for a store: one URL per product
   cannot rank in two languages.

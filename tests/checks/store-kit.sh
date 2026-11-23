@@ -191,8 +191,13 @@ for c in 'Gateway keys from constants cover Stripe only' 'The general Store API 
          'Store profiles need native WP-CLI'; do
   grep -Fq "$c" <<<"$ceilings" || fail "docs/known-ceilings.md does not record: $c"
 done
-grep -Fq -- '- [ ] **WooCommerce stores (N01)** `PARTIAL`' BACKLOG.md \
-  || fail "BACKLOG.md's N01 row is not an unchecked PARTIAL: the remaining pieces are the item"
+# N01 is delivered: six pieces built, subscriptions and bookings closed as a ceiling. The row
+# must say so, and still link the bridge that closed it.
+grep -Fq -- '- [x] **WooCommerce stores (N01)** `DELIVERED`' BACKLOG.md \
+  || fail "BACKLOG.md's N01 row is not a checked DELIVERED"
+n01=$(awk '/^- \[x\] \*\*WooCommerce stores \(N01\)\*\*/{f=1;next} f&&/^- \[/{f=0} f' BACKLOG.md)
+grep -Fq 'plugins/store-polylang/store-polylang.php' <<<"$n01" || fail "BACKLOG.md's N01 row no longer links store-polylang"
+grep -Fq 'Subscriptions and bookings are closed as a [known ceiling]' <<<"$n01" || fail "BACKLOG.md's N01 row no longer records subscriptions and bookings as a ceiling"
 grep -Fq 'Docker `docker/nginx.conf`' docs/known-ceilings.md \
   || fail "docs/known-ceilings.md's deny-rule ceiling no longer says the Docker nginx config carries it"
 

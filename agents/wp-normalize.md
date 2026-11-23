@@ -190,8 +190,8 @@ custom-post-type → the teaser block's section `kind: "cpt-teaser"`, plus a
   `review[]` entry naming the page and the surface it might be. The products those pages
   show become the top-level `products[]` (below), which `/wp-seed --products` creates in
   WooCommerce; the pages themselves are never seed data. A translated
-  store page (`es/tienda.html`) is `role: 'store'` too: WooCommerce has one page per surface
-  until the Polylang bridge exists.
+  store page (`es/tienda.html`) is `role: 'store'` too: the `store-polylang` bridge
+  resolves WooCommerce's page per language.
 - Detail pages like `team/john.html` → **seed data** for single posts, not templates —
   each becomes one entry in that content type's `seed[]`, not a page.
 - The home "Team" block (the teaser) → a **query section**, i.e. `kind: 'cpt-teaser'` in
@@ -268,8 +268,8 @@ product's own page (the page has the fuller description and gallery):
   `options` when the page offers a choice (size, colour); its variations are not built, so the
   product is seeded as a draft and reported for review.
 - Copy the text as the demo shows it; never write copy, prices or categories the demo does not
-  show. Products in a second language are not entries: products stay untranslated until the
-  Polylang bridge exists.
+  show. Products in a second language are not entries: `/wp-polylang` translates products
+  through the `store-polylang` bridge.
 
 ### Filled example
 
