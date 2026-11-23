@@ -100,7 +100,7 @@ database into a destination the command has no manifest for.
 
 | Command | Policy |
 |---|---|
-| `/wp-audit` | `adopt-or-stop` |
+| `/wp-audit`, `/wp-webp` | `adopt-or-stop` |
 | `/wp-debug` | `adopt-or-bare-wp` |
 | `/wp-adopt` | `register` |
 | `/wp-init` | `scaffold` |
