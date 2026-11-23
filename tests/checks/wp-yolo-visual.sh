@@ -17,7 +17,7 @@ check=skills/wp-section-run/references/visual-check.md
 need_token "$cmd" '[--force] [--visual] [--resume'
 need_token "$cmd" '- **`--visual`** = once the pages are seeded'
 need_token "$cmd" '**With `--visual` only:** read'
-need_token "$cmd" 'Visual:            <counts, only with --visual'
+need_token skills/wp-yolo-run/references/report.md 'Visual:            <counts, only with --visual'
 need_token docs/commands.md '/wp-yolo <demo-folder> [--yolo | --careful] [--visual]'
 
 # The pointer sits in Step 5 item 3, after the rebuild and before /wp-finalize (item 4).

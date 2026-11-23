@@ -27,6 +27,7 @@ read it whole and follow it in order.
 | 4.6 | [references/behaviour-carry.md](references/behaviour-carry.md) | Porting every demo script and proving it runs before Step 5 |
 | 5 (item 3) | [references/visual-pass.md](references/visual-pass.md) | `--visual` only: the per-section visual check after seeding, one section at a time, never blocking |
 | 5.5 | [references/parity-gate.md](references/parity-gate.md) | Auto-fixing mechanical parity findings per template, re-verifying, blocking |
+| 6 | [references/report.md](references/report.md) | The INCOMPLETE block and what forces it, the Build Complete summary, the Resume block, the closing note on `--yolo` |
 
 ## Changing a step
 
