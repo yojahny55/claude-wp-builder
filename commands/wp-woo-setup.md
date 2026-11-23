@@ -197,7 +197,8 @@ sed -e "s/__prefix__/<prefix>/g" -e "s/__textdomain__/<slug>/g" \
   "${CLAUDE_PLUGIN_ROOT}/templates/store/store-enquiry.php" > "$tmp"
 if grep -q '__prefix__\|__textdomain__' "$tmp"; then echo "UNSUBSTITUTED TOKENS"; rm -f "$tmp"; exit 1; fi
 php -l "$tmp" || { rm -f "$tmp"; exit 1; }
-if [ ! -f "$dest" ]; then mkdir -p "$(dirname "$dest")" && cp "$tmp" "$dest" && echo INSTALLED
+if [ ! -f "$dest" ]; then
+  mkdir -p "$(dirname "$dest")" && cp "$tmp" "$dest" && echo INSTALLED || { echo FAILED; rm -f "$tmp"; exit 1; }
 elif cmp -s "$tmp" "$dest"; then echo UNCHANGED
 else diff -u "$dest" "$tmp"; echo EDITED; fi
 rm -f "$tmp"
