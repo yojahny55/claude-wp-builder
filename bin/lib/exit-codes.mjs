@@ -91,6 +91,13 @@ export const TOOLS = {
     2: 'usage',
     4: 'blocked by the host, --stop-on-block stopped it',
   },
+  'section-diff.mjs': {
+    0: 'every viewport within the pixel and size tolerances',
+    1: 'a viewport over a tolerance',
+    2: 'nothing measured: no playwright-core, pixelmatch, pngjs or Chrome, or a page failed',
+    4: 'section not found on one side, or its selector matches more than one element',
+    64: 'usage',
+  },
   'style-diff.mjs': {
     0: 'no non-noise style diff',
     1: 'style diffs found (size diffs only with --fail-on-size)',

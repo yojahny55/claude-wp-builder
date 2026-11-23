@@ -3,5 +3,5 @@
   delimiter and in the built page by the same root class, captures both per viewport with
   motion settled, compares them with pixelmatch over the shared area, checks the width and
   height difference on their own, and writes demo, site and diff images. Exit `1` over a
-  tolerance, `2` with no browser, `3` when the section is missing or its selector ambiguous,
-  `4` when a page fails to load.
+  tolerance, `2` when nothing could be measured (no browser, a page that fails to load), `4`
+  when the section is missing or its selector ambiguous.

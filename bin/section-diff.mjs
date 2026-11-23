@@ -23,16 +23,16 @@
  * gained a row is caught here, not there.
  *
  * The built side's selector is the demo root's first class unless --selector is given. When
- * that selector matches more than one element on the built page, the tool stops with exit 3
+ * that selector matches more than one element on the built page, the tool stops with exit 4
  * instead of measuring whichever came first.
  *
  * Writes <vw>-demo.png, <vw>-site.png, <vw>-diff.png and report.json to --out (default a new
  * temporary directory, printed). Nothing is downloaded: it drives an existing Chrome.
  *
- * Exit: 0 every viewport within both tolerances, 1 a viewport is over one of them, 2 no
- * playwright-core, pixelmatch, pngjs or Chrome (nothing measured), 3 the section was not found
- * on one side or its selector is ambiguous, 4 the browser or a page failed (nothing measured:
- * not a visual regression), 64 usage.
+ * Exit (the COMMON scheme of bin/lib/exit-codes.mjs): 0 every viewport within the tolerances,
+ * 1 a viewport is over one of them, 2 nothing measured (no playwright-core, pixelmatch, pngjs
+ * or Chrome, or the browser or a page failed: not a visual regression), 4 the section
+ * was not found on one side or its selector is ambiguous, 64 usage.
  */
 import './lib/stdio-blocking.mjs';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -209,7 +209,7 @@ try {
       console.error(demoSel === null
         ? `section-diff: section ${opts.selector || opts.section} not found in the demo`
         : `section-diff: ${opts.selector} matches ${demoSel.ambiguous} elements in the demo; pass a selector that matches one`);
-      code = 3;
+      code = 4;
       await context.close();
       break;
     }
@@ -220,7 +220,7 @@ try {
       console.error(found === null
         ? `section-diff: ${siteSel} not found on ${opts.site} (pass --selector when the built section's root class differs)`
         : `section-diff: ${siteSel} matches ${found.ambiguous} elements on ${opts.site}; pass --selector with one that matches the section only`);
-      code = 3;
+      code = 4;
       break;
     }
     const r = compare(demoPng, sitePng, join(out, `${vw}-diff.png`));
@@ -236,7 +236,7 @@ try {
   // A browser that will not start or a page that fails to load measured nothing: that is not
   // a visual regression, and a gate reading exit 1 must not take it for one.
   console.error(`section-diff: ${err.message.split('\n')[0]} (nothing measured)`);
-  code = 4;
+  code = 2;
 } finally {
   if (browser) await browser.close().catch(() => {});
 }
