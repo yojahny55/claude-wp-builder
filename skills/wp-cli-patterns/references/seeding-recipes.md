@@ -37,7 +37,7 @@ Use ACF's own API for field operations. This is storage-format-agnostic and hand
 $WP eval "update_field('hero_title', 'Building Digital Excellence', 'option');"
 
 # Image field (import first, use attachment ID; $AUTHOR resolved once, as in SKILL.md)
-ID=$($WP media import 'https://images.unsplash.com/photo-xxx' --title='Hero Background' --post_author=$AUTHOR --porcelain)
+ID=$($WP media import 'https://images.unsplash.com/photo-xxx' --title='Hero Background' --user=$AUTHOR --porcelain)
 $WP eval "update_field('hero_image', $ID, 'option');"
 
 # Repeater field
@@ -158,7 +158,7 @@ create — and leave the other languages' menus to `/wp-polylang`'s import. Neve
 ### Import Media and Use Attachment ID
 
 ```bash
-ID=$($WP media import 'https://example.com/photo.jpg' --title='Hero Image' --post_author=$AUTHOR --porcelain)
+ID=$($WP media import 'https://example.com/photo.jpg' --title='Hero Image' --user=$AUTHOR --porcelain)
 $WP eval "update_field('hero_image', $ID, 'option');"
 ```
 

@@ -603,7 +603,7 @@ $WP eval "update_field('hero_title', 'Building Digital Excellence', 'option');"
 
 # Image fields (import first)
 AUTHOR=$($WP user list --role=administrator --field=ID --number=1)  # once; see "Always set an author" in wp-cli-patterns
-ID=$($WP media import '<url>' --post_author=$AUTHOR --porcelain)
+ID=$($WP media import '<url>' --user=$AUTHOR --porcelain)
 $WP eval "update_field('hero_image', $ID, 'option');"
 
 # Repeater fields

@@ -97,7 +97,7 @@ A fresh install has no `site_icon` row, so the read fails with no output; absent
 
 ```bash
 AUTHOR=$($WP user list --role=administrator --field=ID --number=1)
-ID=$($WP media import "<dir>/icon-512.png" --post_author=$AUTHOR --porcelain)
+ID=$($WP media import "<dir>/icon-512.png" --user=$AUTHOR --porcelain)
 $WP option update site_icon "$ID"
 ```
 
