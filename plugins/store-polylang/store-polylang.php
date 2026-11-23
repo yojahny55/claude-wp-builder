@@ -4,7 +4,8 @@
  * Description:       Polylang (free) + WooCommerce: one shared inventory across translations, per-language store pages, cart and customer emails, translatable stored strings. Installed by /wp-woo-setup on a Polylang site.
  * Plugin URI:        https://github.com/yojahny55/claude-wp-builder
  * Version:           1.0.0
- * Author:            Yojahny
+ * Author:            Lacho00
+ * Author URI:        https://lazarosantana.dev
  * License:           GPL-2.0-or-later
  * Requires at least: 6.5
  * Requires PHP:      7.4
