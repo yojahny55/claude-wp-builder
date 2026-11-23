@@ -367,7 +367,7 @@ function webp_migrate_verify_patterns( $map, $skip_siblings = true ) {
 /**
  * Every spelling a stored value can give one file name: as is, percent-encoded both ways
  * (`%20` and `+`), JSON-escaped (`\u00e9` for a non-ASCII byte, `\/` cannot occur in a base
- * name), and HTML-escaped (`&amp;`).
+ * name), HTML-escaped (`&amp;`), and for a name outside plain ASCII its longest plain run.
  *
  * @return string[]
  */
@@ -376,6 +376,21 @@ function webp_migrate_name_forms( $base ) {
 	$json  = json_encode( $base );
 	if ( is_string( $json ) ) {
 		$forms[] = substr( $json, 1, -1 );
+	}
+	// Any other spelling (double encoding, numeric entities, NFD) cannot be listed. For a name
+	// with a character outside [A-Za-z0-9._-], also match its longest plain run, which survives
+	// every encoding; with no run of four, match `.png` itself. Both raise false alarms on
+	// purpose: a false alarm is fixable, a false all-clear moves a file still in use.
+	if ( preg_match( '/[^A-Za-z0-9._-]/', $base ) ) {
+		$stem = pathinfo( $base, PATHINFO_FILENAME );
+		preg_match_all( '/[A-Za-z0-9_-]{4,}/', $stem, $runs );
+		$longest = '';
+		foreach ( $runs[0] as $run ) {
+			if ( strlen( $run ) > strlen( $longest ) ) {
+				$longest = $run;
+			}
+		}
+		$forms[] = '' !== $longest ? $longest : '.png';
 	}
 	return array_values( array_unique( array_filter( $forms, 'strlen' ) ) );
 }
